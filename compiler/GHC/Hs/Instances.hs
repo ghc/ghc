@@ -378,10 +378,7 @@ deriving instance Data (HsSplice GhcPs)
 deriving instance Data (HsSplice GhcRn)
 deriving instance Data (HsSplice GhcTc)
 
--- deriving instance (DataIdLR p p) => Data (HsSplicedThing p)
-deriving instance Data (HsSplicedThing GhcPs)
-deriving instance Data (HsSplicedThing GhcRn)
-deriving instance Data (HsSplicedThing GhcTc)
+deriving instance Data HsSplicedThing
 
 -- deriving instance (DataIdLR p p) => Data (HsQuote p)
 deriving instance Data (HsQuote GhcPs)

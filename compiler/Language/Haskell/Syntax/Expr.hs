@@ -47,12 +47,8 @@ import GHC.Core.Type
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
-import qualified Data.Data as Data (Fixity(..))
 
 import Data.List.NonEmpty ( NonEmpty )
-
-import GHCi.RemoteTypes ( ForeignRef )
-import qualified Language.Haskell.TH as TH (Q)
 
 {- Note [RecordDotSyntax field updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1562,15 +1558,6 @@ data HsSplice id
         SrcSpan          -- The span of the enclosed string
         FastString       -- The enclosed string
 
-   -- AZ:TODO: use XSplice instead of HsSpliced
-   | HsSpliced  -- See Note [Delaying modFinalizers in untyped splices] in
-                -- GHC.Rename.Splice.
-                -- This is the result of splicing a splice. It is produced by
-                -- the renamer and consumed by the typechecker. It lives only
-                -- between the two.
-        (XSpliced id)
-        ThModFinalizers     -- TH finalizers produced by the splice.
-        (HsSplicedThing id) -- The result of splicing
    | XSplice !(XXSplice id) -- Extension point; see Note [Trees That Grow]
                             -- in Language.Haskell.Syntax.Extension
 
@@ -1589,28 +1576,6 @@ instance Outputable SpliceDecoration where
 isTypedSplice :: HsSplice id -> Bool
 isTypedSplice (HsTypedSplice {}) = True
 isTypedSplice _                  = False   -- Quasi-quotes are untyped splices
-
--- | Finalizers produced by a splice with
--- 'Language.Haskell.TH.Syntax.addModFinalizer'
---
--- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice. For how
--- this is used.
---
-newtype ThModFinalizers = ThModFinalizers [ForeignRef (TH.Q ())]
-
--- A Data instance which ignores the argument of 'ThModFinalizers'.
-instance Data ThModFinalizers where
-  gunfold _ z _ = z $ ThModFinalizers []
-  toConstr  a   = mkConstr (dataTypeOf a) "ThModFinalizers" [] Data.Prefix
-  dataTypeOf a  = mkDataType "HsExpr.ThModFinalizers" [toConstr a]
-
--- | Haskell Spliced Thing
---
--- Values that can result from running a splice.
-data HsSplicedThing id
-    = HsSplicedExpr (HsExpr id) -- ^ Haskell Spliced Expression
-    | HsSplicedTy   (HsType id) -- ^ Haskell Spliced Type
-    | HsSplicedPat  (Pat id)    -- ^ Haskell Spliced Pattern
 
 
 -- | Haskell (Untyped) Quote = Expr + Pat + Type + Var

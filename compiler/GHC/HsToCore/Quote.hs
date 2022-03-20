@@ -1454,7 +1454,7 @@ repSplice :: HsSplice GhcRn -> MetaM (Core a)
 repSplice (HsTypedSplice   (_, n) _ _) = rep_splice n
 repSplice (HsUntypedSplice (_, n) _ _) = rep_splice n
 repSplice (HsQuasiQuote    (n, _) _ _) = rep_splice n
-repSplice e@(HsSpliced {})             = pprPanic "repSplice" (ppr e)
+repSplice e@(XSplice {})               = pprPanic "repSplice" (ppr e)
 
 rep_splice :: Name -> MetaM (Core a)
 rep_splice splice_name

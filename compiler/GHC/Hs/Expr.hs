@@ -65,6 +65,9 @@ import GHC.Builtin.Types (mkTupleStr)
 import GHC.Tc.Utils.TcType (TcType)
 import {-# SOURCE #-} GHC.Tc.Types (TcLclEnv)
 
+import GHCi.RemoteTypes ( ForeignRef )
+import qualified Language.Haskell.TH as TH (Q)
+
 -- libraries:
 import Data.Data hiding (Fixity(..))
 import qualified Data.Data as Data (Fixity(..))
@@ -1686,6 +1689,29 @@ pprQuals quals = interpp'SP quals
 ************************************************************************
 -}
 
+-- | Finalizers produced by a splice with
+-- 'Language.Haskell.TH.Syntax.addModFinalizer'
+--
+-- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice. For how
+-- this is used.
+--
+newtype ThModFinalizers = ThModFinalizers [ForeignRef (TH.Q ())]
+
+-- A Data instance which ignores the argument of 'ThModFinalizers'.
+instance Data ThModFinalizers where
+  gunfold _ z _ = z $ ThModFinalizers []
+  toConstr  a   = mkConstr (dataTypeOf a) "ThModFinalizers" [] Data.Prefix
+  dataTypeOf a  = mkDataType "HsExpr.ThModFinalizers" [toConstr a]
+
+
+-- | Haskell Spliced Thing
+--
+-- Values that can result from running a splice.
+data HsSplicedThing
+    = HsSplicedExpr (HsExpr GhcRn) -- ^ Haskell Spliced Expression
+    | HsSplicedTy   (HsType GhcRn) -- ^ Haskell Spliced Type
+    | HsSplicedPat  (Pat GhcRn)    -- ^ Haskell Spliced Pattern
+
 newtype HsSplicedT = HsSplicedT DelayedSplice deriving (Data)
 
 -- (IdP id): A unique name to identify this splice point
@@ -1697,9 +1723,14 @@ type instance XUntypedSplice (GhcPass p) = (EpAnn [AddEpAnn], IdP (GhcPass p))
 type instance XQuasiQuote    (GhcPass p) = ( (IdP (GhcPass p))   -- Splice point
                                            , (IdP (GhcPass p)) ) -- Quoter
 
-type instance XSpliced       (GhcPass _) = NoExtField
 type instance XXSplice       GhcPs       = DataConCantHappen
-type instance XXSplice       GhcRn       = DataConCantHappen
+
+-- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
+-- This is the result of splicing a splice. It is produced by
+-- the renamer and consumed by the typechecker. It lives only between the two.
+type instance XXSplice       GhcRn       = ( ThModFinalizers     -- TH finalizers produced by the splice.
+                                           , HsSplicedThing ) -- The result of splicing
+
 type instance XXSplice       GhcTc       = HsSplicedT
 
 -- See Note [Running typed splices in the zonker]
@@ -1793,8 +1824,7 @@ checker:
         [||1 + $$(f 2)||]
 -}
 
-instance OutputableBndrId p
-       => Outputable (HsSplicedThing (GhcPass p)) where
+instance Outputable HsSplicedThing where
   ppr (HsSplicedExpr e) = ppr_expr e
   ppr (HsSplicedTy   t) = ppr t
   ppr (HsSplicedPat  p) = ppr p
@@ -1827,12 +1857,11 @@ pprSplice (HsUntypedSplice (_, n) DollarSplice e)
 pprSplice (HsUntypedSplice (_, n) BareSplice e)
   = ppr_splice empty  n e empty
 pprSplice (HsQuasiQuote (n, q) _ s)      = ppr_quasi n q s
-pprSplice (HsSpliced _ _ thing)         = ppr thing
 pprSplice (XSplice x)                   = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
                                             GhcPs -> dataConCantHappen x
-                                            GhcRn -> dataConCantHappen x
 #endif
+                                            GhcRn | (_, thing) <- x -> ppr thing
                                             GhcTc -> case x of
                                                        HsSplicedT _ -> text "Unevaluated typed splice"
 

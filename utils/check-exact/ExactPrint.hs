@@ -2152,7 +2152,6 @@ instance ExactPrint (HsSplice GhcPs) where
   getAnnotationEntry (HsTypedSplice an _ _ _)   = fromAnn an
   getAnnotationEntry (HsUntypedSplice an _ _ _) = fromAnn an
   getAnnotationEntry (HsQuasiQuote _ _ _ _ _)   = NoEntryVal
-  getAnnotationEntry (HsSpliced _ _ _)          = NoEntryVal
 
   exact (HsTypedSplice an DollarSplice _n e) = do
     markEpAnn an AnnDollarDollar

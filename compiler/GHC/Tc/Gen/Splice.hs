@@ -647,9 +647,10 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var q@(QuoteWrapper _ m_var)) spl
        -- But we still return a plausible expression
        --   (a) in case we print it in debug messages, and
        --   (b) because we test whether it is tagToEnum in Tc.Gen.Expr.tcApp
-       ; return (HsSpliceE noAnn $
-                 HsSpliced noExtField (ThModFinalizers []) $
-                 HsSplicedExpr (unLoc expr'')) }
+       ; return (HsSpliceE noAnn $ -- ROMES:TODO what can we do for a plausible
+                                   -- expression now? perhaps use a sum type to instance XUntypedSplice to
+                                   -- construct one here without idP... or make up a Var?...
+                 HsUntypedSplice undefined BareSplice expr'') }
 
 
 tcNestedSplice _ _ splice_name _ _

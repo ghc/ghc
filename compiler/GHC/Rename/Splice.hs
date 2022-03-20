@@ -1,4 +1,4 @@
-
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -340,7 +340,6 @@ checkTopSpliceAllowed splice = do
      spliceExtension (HsQuasiQuote {}) = ("Quasi-quotes", LangExt.QuasiQuotes)
      spliceExtension (HsTypedSplice {}) = ("Top-level splices", LangExt.TemplateHaskell)
      spliceExtension (HsUntypedSplice {}) = ("Top-level splices", LangExt.TemplateHaskell)
-     spliceExtension s@(HsSpliced {}) = pprPanic "spliceExtension" (ppr s)
 
 ------------------
 
@@ -364,7 +363,7 @@ runRnSplice flavour run_meta ppr_res splice
                 HsUntypedSplice _ _ e      ->  e
                 HsQuasiQuote (_, q) qs str -> mkQuasiQuoteExpr flavour q qs str
                 HsTypedSplice {}           -> pprPanic "runRnSplice" (ppr splice)
-                HsSpliced {}               -> pprPanic "runRnSplice" (ppr splice)
+                XSplice {}                 -> pprPanic "runRnSplice" (ppr splice)
 
              -- Typecheck the expression
        ; meta_exp_ty   <- tcMetaTy meta_ty_name
@@ -409,7 +408,7 @@ makePending flavour (HsQuasiQuote (n, quoter) q_span quote)
   = PendingRnSplice flavour n (mkQuasiQuoteExpr flavour quoter q_span quote)
 makePending _ splice@(HsTypedSplice {})
   = pprPanic "makePending" (ppr splice)
-makePending _ splice@(HsSpliced {})
+makePending _ splice@(XSplice {})
   = pprPanic "makePending" (ppr splice)
 
 ------------------
@@ -461,8 +460,6 @@ rnSplice (HsQuasiQuote (splice_name, quoter) q_loc quote)
         ; return (HsQuasiQuote (splice_name', quoter') q_loc quote
                                                              , unitFV quoter') }
 
-rnSplice splice@(HsSpliced {}) = pprPanic "rnSplice" (ppr splice)
-
 ---------------------
 rnSpliceExpr :: HsSplice GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnSpliceExpr splice
@@ -492,7 +489,7 @@ rnSpliceExpr splice
            ; (lexpr3, fvs) <- checkNoErrs (rnLExpr rn_expr)
              -- See Note [Delaying modFinalizers in untyped splices].
            ; let e =  HsSpliceE noAnn
-                    . HsSpliced noExtField (ThModFinalizers mod_finalizers)
+                    . XSplice . (ThModFinalizers mod_finalizers,)
                     . HsSplicedExpr
                         <$> lexpr3
            ; return (gHsPar e, fvs)
@@ -667,7 +664,7 @@ rnSpliceType splice
              -- See Note [Delaying modFinalizers in untyped splices].
            ; return ( HsParTy noAnn
                               $ HsSpliceTy noExtField
-                              . HsSpliced noExtField (ThModFinalizers mod_finalizers)
+                              . XSplice . (ThModFinalizers mod_finalizers,)
                               . HsSplicedTy <$>
                               hs_ty3
                     , fvs
@@ -717,29 +714,30 @@ whole signature, instead of as an arbitrary type.
 
 ----------------------
 -- | Rename a splice pattern. See Note [rnSplicePat]
-rnSplicePat :: HsSplice GhcPs -> RnM ( Either (Pat GhcPs) (Pat GhcRn)
+rnSplicePat :: HsSplice GhcPs -> RnM ( Either (ThModFinalizers, Pat GhcPs) (HsSplice GhcRn)
                                        , FreeVars)
 rnSplicePat splice
   = rnSpliceGen run_pat_splice pend_pat_splice splice
   where
     pend_pat_splice :: HsSplice GhcRn ->
-                       (PendingRnSplice, Either b (Pat GhcRn))
+                       (PendingRnSplice, Either b (HsSplice GhcRn))
     pend_pat_splice rn_splice
       = (makePending UntypedPatSplice rn_splice
-        , Right (SplicePat noExtField rn_splice))
+        , Right rn_splice)
 
     run_pat_splice :: HsSplice GhcRn ->
-                      RnM (Either (Pat GhcPs) (Pat GhcRn), FreeVars)
+                      RnM (Either (ThModFinalizers
+                                  , Pat GhcPs) -- ROMES:TODO: explain in note..
+                                               -- Spliced Pattern to be used with constructor HsSplicedPat
+                                  (HsSplice GhcRn)
+                          , FreeVars)
     run_pat_splice rn_splice
       = do { traceRn "rnSplicePat: untyped pattern splice" empty
            ; (pat, mod_finalizers) <-
                 runRnSplice UntypedPatSplice runMetaP ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; let p =  SplicePat noExtField
-                    . HsSpliced noExtField (ThModFinalizers mod_finalizers)
-                    . HsSplicedPat
-                        <$> pat
-           ; return (Left $ gParPat p, emptyFVs) }
+           ; let p = (ThModFinalizers mod_finalizers, gParPat pat)
+           ; return (Left p, emptyFVs) }
               -- Wrap the result of the quasi-quoter in parens so that we don't
               -- lose the outermost location set by runQuasiQuote (#7918)
 
@@ -829,7 +827,6 @@ spliceCtxt splice
              HsUntypedSplice {} -> text "untyped splice:"
              HsTypedSplice   {} -> text "typed splice:"
              HsQuasiQuote    {} -> text "quasi-quotation:"
-             HsSpliced       {} -> text "spliced expression:"
 
 -- | The splice data to be logged
 data SpliceInfo

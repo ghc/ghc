@@ -1897,12 +1897,8 @@ instance HiePass p => ToHie (LocatedA (HsSplice (GhcPass p))) where
       HsQuasiQuote _ ispan _ ->
         [ locOnly ispan
         ]
-      HsSpliced _ _ _ ->
-        []
       XSplice x -> case hiePass @p of
-#if __GLASGOW_HASKELL__ < 811
-                     HieRn -> dataConCantHappen x
-#endif
+                     HieRn | (_, _) <- x -> []
                      HieTc -> case x of
                                 HsSplicedT _ -> []
 

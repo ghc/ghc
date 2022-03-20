@@ -1204,8 +1204,8 @@ collect_pat flag pat bndrs = case pat of
   NPlusKPat _ n _ _ _ _ -> unXRec @p n : bndrs
   SigPat _ pat _        -> collect_lpat flag pat bndrs
   XPat ext              -> collectXXPat @p flag ext bndrs
-  SplicePat _ (HsSpliced _ _ (HsSplicedPat pat))
-                        -> collect_pat flag pat bndrs
+  SplicePat _ (XSplice ext)
+                        -> collectXXSplicePat @p flag ext bndrs
   SplicePat _ _         -> bndrs
   -- See Note [Dictionary binders in ConPatOut]
   ConPat {pat_args=ps}  -> case flag of
@@ -1232,6 +1232,7 @@ add_ev_bndr (EvBind { eb_lhs = b }) bs | isId b    = b:bs
 class UnXRec p => CollectPass p where
   collectXXPat :: CollectFlag p -> XXPat p -> [IdP p] -> [IdP p]
   collectXXHsBindsLR :: forall pR. XXHsBindsLR p pR -> [IdP p] -> [IdP p]
+  collectXXSplicePat :: CollectFlag p -> XXSplice p -> [IdP p] -> [IdP p]
 
 instance IsPass p => CollectPass (GhcPass p) where
   collectXXPat flag ext =
@@ -1252,6 +1253,14 @@ instance IsPass p => CollectPass (GhcPass p) where
         -- I don't think we want the binders from the abe_binds
 
         -- binding (hence see AbsBinds) is in zonking in GHC.Tc.Utils.Zonk
+
+  collectXXSplicePat flag ext =
+      case ghcPass @p of
+        GhcPs -> dataConCantHappen ext
+        GhcRn -> case snd ext of
+                   HsSplicedPat pat -> collect_pat flag pat
+                   thing -> pprPanic "collectXXSplicePat: Resolve of pattern splice is not a pattern" $ ppr thing
+        GhcTc -> id
 
 
 {-

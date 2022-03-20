@@ -467,7 +467,6 @@ type family XXTupArg  x
 type family XTypedSplice   x
 type family XUntypedSplice x
 type family XQuasiQuote    x
-type family XSpliced       x
 type family XXSplice       x
 
 -- -------------------------------------

@@ -1056,9 +1056,9 @@ tcPatToExpr name args pat = go pat
                                     = return $ unLoc $ foldl' nlHsApp (noLocA neg)
                                                        [noLocA (HsOverLit noAnn n)]
         | otherwise                 = return $ HsOverLit noAnn n
-    go1 (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
+    go1 (SplicePat _ (XSplice (_, HsSplicedPat pat)))
                                     = go1 pat
-    go1 (SplicePat _ (HsSpliced{})) = panic "Invalid splice variety"
+    go1 (SplicePat _ (XSplice{})) = panic "Invalid splice variety"
     go1 (XPat (HsPatExpanded _ pat))= go1 pat
 
     -- See Note [Invertible view patterns]

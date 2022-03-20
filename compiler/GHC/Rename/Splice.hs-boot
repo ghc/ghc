@@ -7,8 +7,8 @@ import GHC.Types.Name.Set
 
 
 rnSpliceType :: HsSplice GhcPs   -> RnM (HsType GhcRn, FreeVars)
-rnSplicePat  :: HsSplice GhcPs   -> RnM ( Either (Pat GhcPs) (Pat GhcRn)
-                                          , FreeVars )
+rnSplicePat  :: HsSplice GhcPs   -> RnM ( Either (ThModFinalizers, Pat GhcPs) (HsSplice GhcRn)
+                                        , FreeVars)
 rnSpliceDecl :: SpliceDecl GhcPs -> RnM (SpliceDecl GhcRn, FreeVars)
 
 rnTopSpliceDecls :: HsSplice GhcPs -> RnM ([LHsDecl GhcPs], FreeVars)

@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE RankNTypes          #-}
@@ -609,15 +610,18 @@ rnPatAndThen mk (SumPat _ pat alt arity)
        ; return (SumPat noExtField pat alt arity)
        }
 
+-- This only used to happen because of the recursive call on the Left case in
+-- the function body of the next pattern matched
 -- If a splice has been run already, just rename the result.
-rnPatAndThen mk (SplicePat x (HsSpliced x2 mfs (HsSplicedPat pat)))
-  = SplicePat x . HsSpliced x2 mfs . HsSplicedPat <$> rnPatAndThen mk pat
+-- rnPatAndThen mk (SplicePat x (XSplice (mfs, HsSplicedPat pat))
+--   = SplicePat x . HsSpliced x2 mfs . HsSplicedPat <$> rnPatAndThen mk pat
 
-rnPatAndThen mk (SplicePat _ splice)
+rnPatAndThen mk (SplicePat ext splice)
   = do { eith <- liftCpsFV $ rnSplicePat splice
-       ; case eith of   -- See Note [rnSplicePat] in GHC.Rename.Splice
-           Left  not_yet_renamed -> rnPatAndThen mk not_yet_renamed
-           Right already_renamed -> return already_renamed }
+       ; case eith of   -- See Note [rnSplicePat] in GHC.Rename.Splice -- ROMES:TODO: rewrite note
+           Left  (mfs, pat) ->
+               SplicePat ext . XSplice . (mfs,) . HsSplicedPat <$> rnPatAndThen mk pat
+           Right already_renamed -> return (SplicePat noExtField already_renamed) }
 
 --------------------
 rnConPatAndThen :: NameMaker

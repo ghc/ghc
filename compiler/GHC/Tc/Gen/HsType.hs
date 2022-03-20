@@ -1043,7 +1043,7 @@ tc_infer_hs_type mode (HsKindSig _ ty sig)
 -- splices or not.
 --
 -- See Note [Delaying modFinalizers in untyped splices].
-tc_infer_hs_type mode (HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)))
+tc_infer_hs_type mode (HsSpliceTy _ (XSplice (_, HsSplicedTy ty)))
   = tc_infer_hs_type mode ty
 
 tc_infer_hs_type mode (HsDocTy _ ty _) = tc_infer_lhs_type mode ty
@@ -1151,7 +1151,7 @@ tc_hs_type _ ty@(HsRecTy {})      _
 -- while capturing the local environment.
 --
 -- See Note [Delaying modFinalizers in untyped splices].
-tc_hs_type mode (HsSpliceTy _ (HsSpliced _ mod_finalizers (HsSplicedTy ty)))
+tc_hs_type mode (HsSpliceTy _ (XSplice (mod_finalizers, HsSplicedTy ty)))
            exp_kind
   = do addModFinalizersWithLclEnv mod_finalizers
        tc_hs_type mode ty exp_kind
