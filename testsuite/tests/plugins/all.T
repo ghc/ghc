@@ -289,3 +289,23 @@ test('T20803b',
       pre_cmd('$MAKE -s --no-print-directory -C T20803-plugin package.T20803b TOP={top}')],
      compile_fail,
      ['-package-db T20803-plugin/pkg.T20803b/local.package.conf -fplugin AddErrorPlugin -package T20803-plugin ' + config.plugin_way_flags])
+
+test('test-echo-in-turn',
+     [extra_files(['echo-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-turn TOP={top}')],
+     makefile_test, [])
+
+test('test-echo-in-line',
+     [extra_files(['echo-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-line TOP={top}')],
+     makefile_test, [])
+
+test('test-echo-in-turn-many-args',
+     [extra_files(['echo-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-turn-many-args TOP={top}')],
+     makefile_test, [])
+
+test('test-echo-in-line-many-args',
+     [extra_files(['echo-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-line-many-args TOP={top}')],
+     makefile_test, [])

@@ -216,7 +216,36 @@ option. The list of enabled plugins can be reset with the
     :category: plugins
 
     Give arguments to a plugin module; module must be specified with
-    :ghc-flag:`-fplugin=⟨module⟩`.
+    :ghc-flag:`-fplugin=⟨module⟩`. The order of plugin pragmas matter but the
+    order of arg pragmas does not. The same set of arguments go to all plugins
+    from the same module.
+
+    ::
+
+      -- Two Echo plugins will both get args A and B.
+      {-# OPTIONS -fplugin Echo -fplugin-opt Echo:A #-}
+      {-# OPTIONS -fplugin Echo -fplugin-opt Echo:B #-}
+
+      -- While order of the plugins matters, arg order does not.
+      {-# OPTIONS -fplugin-opt Echo2:B #-}
+
+      {-# OPTIONS -fplugin Echo1 #-}
+      {-# OPTIONS -fplugin-opt Echo1:A #-}
+
+      {-# OPTIONS -fplugin Echo2 #-}
+
+    If you want to use the same plugin with different arguments then rexport the
+    same plugin from different lightweight modules.
+
+    ::
+
+      -- Echo1 and Echo2 as lightweight modules re-exporting Echo.plugin.
+      module Echo1 (plugin) where import Echo (plugin)
+      module Echo2 (plugin) where import Echo (plugin)
+
+      -- Echo1 gets arg A while Echo2 gets arg B.
+      {-# OPTIONS -fplugin Echo1 -fplugin-opt Echo1:A #-}
+      {-# OPTIONS -fplugin Echo2 -fplugin-opt Echo2:B #-}
 
 .. ghc-flag:: -fplugin-trustworthy
     :shortdesc: Trust the used plugins and no longer mark the compiled module

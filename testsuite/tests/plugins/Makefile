@@ -189,3 +189,19 @@ T20803a:
 .PHONY: T20803b
 T20803b:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 T20803b.hs -package-db T20803-plugin/pkg.T20803b/local.package.conf
+
+.PHONY: test-echo-in-turn
+test-echo-in-turn:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 test-echo-in-turn.hs -package-db echo-plugin/pkg.test-echo-in-turn/local.package.conf
+
+.PHONY: test-echo-in-line
+test-echo-in-line:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 test-echo-in-line.hs -package-db echo-plugin/pkg.test-echo-in-line/local.package.conf
+
+.PHONY: test-echo-in-turn-many-args
+test-echo-in-turn-many-args:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 test-echo-in-turn-many-args.hs -package-db echo-plugin/pkg.test-echo-in-turn-many-args/local.package.conf
+
+.PHONY: test-echo-in-line-many-args
+test-echo-in-line-many-args:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 test-echo-in-line-many-args.hs -package-db echo-plugin/pkg.test-echo-in-line-many-args/local.package.conf
