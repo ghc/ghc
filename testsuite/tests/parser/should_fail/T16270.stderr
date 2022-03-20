@@ -26,18 +26,17 @@ T16270.hs:14:8: error:
       Perhaps you intended to use BlockArguments
 
 T16270.hs:18:22: error:
-    Illegal record syntax: {fst :: a,
-                            snd :: b}
+    Illegal record syntax: {fst :: a, snd :: b}
     Suggested fix: Perhaps you intended to use TraditionalRecordSyntax
 
 T16270.hs:19:5: error:
-    Illegal record syntax: p {fst = 1,
-                              snd = True}
+    Illegal record syntax: p {fst = 1, snd = True}
     Suggested fix: Perhaps you intended to use TraditionalRecordSyntax
 
 T16270.hs:21:6: error:
     Illegal symbol ‘forall’ in type
-    Suggested fix: Perhaps you intended to use RankNTypes
+    Suggested fix:
+      Perhaps you intended to use RankNTypes
                    or a similar language extension to enable explicit-forall syntax: forall <tvs>. <type>
 
 T16270.hs:22:8: error:
@@ -47,7 +46,8 @@ T16270.hs:22:8: error:
 
 T16270.hs:24:10: error:
     Illegal keyword 'where' in data declaration
-    Suggested fix: Perhaps you intended to use GADTs
+    Suggested fix:
+      Perhaps you intended to use GADTs
                    or a similar language extension to enable syntax: data T where
 
 T16270.hs:26:12: error:
@@ -64,7 +64,7 @@ T16270.hs:30:9: error:
     Suggested fix: Perhaps you intended to use MultiWayIf
 
 T16270.hs:33:6:
-    Illegal lambda-case
+    Illegal \case
     Suggested fix: Perhaps you intended to use LambdaCase
 
 T16270.hs:36:5: error:
@@ -74,8 +74,7 @@ T16270.hs:36:5: error:
 T16270.hs:38:5: error:
     primitive string literal must contain only characters <= '\xFF'
 
-T16270.hs:40:7: error:
-    A lambda requires at least one parameter
+T16270.hs:40:7: error: A lambda requires at least one parameter
 
 T16270.hs:46:1: error:
     parse error (possibly incorrect indentation or mismatched brackets)

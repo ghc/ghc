@@ -24,7 +24,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Data.Maybe (catMaybes)
-import GHC.Hs.Expr (prependQualified,HsExpr(..))
+import GHC.Hs.Expr (prependQualified, HsExpr(..), LamCaseVariant(..), lamCaseKeyword)
 import GHC.Hs.Type (pprLHsContext)
 import GHC.Builtin.Names (allNameStrings)
 import GHC.Builtin.Types (filterCTuple)
@@ -175,9 +175,11 @@ instance Diagnostic PsMessage where
                      , text "Character literals may not be empty"
                      ]
     PsErrLambdaCase
-      -> mkSimpleDecorated $ text "Illegal lambda-case"
+      -- we can't get this error for \cases, since without -XLambdaCase, that's
+      -- just a regular lambda expression
+      -> mkSimpleDecorated $ text "Illegal" <+> lamCaseKeyword LamCase
     PsErrEmptyLambda
-       -> mkSimpleDecorated $ text "A lambda requires at least one parameter"
+      -> mkSimpleDecorated $ text "A lambda requires at least one parameter"
     PsErrLinearFunction
       -> mkSimpleDecorated $ text "Illegal use of linear functions"
     PsErrOverloadedRecordUpdateNotEnabled
@@ -312,8 +314,8 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ text "do-notation in pattern"
     PsErrIfThenElseInPat
       -> mkSimpleDecorated $ text "(if ... then ... else ...)-syntax in pattern"
-    PsErrLambdaCaseInPat
-      -> mkSimpleDecorated $ text "(\\case ...)-syntax in pattern"
+    (PsErrLambdaCaseInPat lc_variant)
+      -> mkSimpleDecorated $ lamCaseKeyword lc_variant <+> text "...-syntax in pattern"
     PsErrCaseInPat
       -> mkSimpleDecorated $ text "(case ... of ...)-syntax in pattern"
     PsErrLetInPat
@@ -341,6 +343,9 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ pp_unexpected_fun_app (text "lambda command") a
     PsErrCaseCmdInFunAppCmd a
       -> mkSimpleDecorated $ pp_unexpected_fun_app (text "case command") a
+    PsErrLambdaCaseCmdInFunAppCmd lc_variant a
+      -> mkSimpleDecorated $
+           pp_unexpected_fun_app (lamCaseKeyword lc_variant <+> text "command") a
     PsErrIfCmdInFunAppCmd a
       -> mkSimpleDecorated $ pp_unexpected_fun_app (text "if command") a
     PsErrLetCmdInFunAppCmd a
@@ -355,8 +360,8 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ pp_unexpected_fun_app (text "lambda expression") a
     PsErrCaseInFunAppExpr a
       -> mkSimpleDecorated $ pp_unexpected_fun_app (text "case expression") a
-    PsErrLambdaCaseInFunAppExpr a
-      -> mkSimpleDecorated $ pp_unexpected_fun_app (text "lambda-case expression") a
+    PsErrLambdaCaseInFunAppExpr lc_variant a
+      -> mkSimpleDecorated $ pp_unexpected_fun_app (lamCaseKeyword lc_variant <+> text "expression") a
     PsErrLetInFunAppExpr a
       -> mkSimpleDecorated $ pp_unexpected_fun_app (text "let expression") a
     PsErrIfInFunAppExpr a
@@ -556,7 +561,7 @@ instance Diagnostic PsMessage where
     PsErrIllegalUnboxedFloatingLitInPat{}         -> ErrorWithoutFlag
     PsErrDoNotationInPat{}                        -> ErrorWithoutFlag
     PsErrIfThenElseInPat                          -> ErrorWithoutFlag
-    PsErrLambdaCaseInPat                          -> ErrorWithoutFlag
+    PsErrLambdaCaseInPat{}                        -> ErrorWithoutFlag
     PsErrCaseInPat                                -> ErrorWithoutFlag
     PsErrLetInPat                                 -> ErrorWithoutFlag
     PsErrLambdaInPat                              -> ErrorWithoutFlag
@@ -566,6 +571,7 @@ instance Diagnostic PsMessage where
     PsErrViewPatInExpr{}                          -> ErrorWithoutFlag
     PsErrLambdaCmdInFunAppCmd{}                   -> ErrorWithoutFlag
     PsErrCaseCmdInFunAppCmd{}                     -> ErrorWithoutFlag
+    PsErrLambdaCaseCmdInFunAppCmd{}               -> ErrorWithoutFlag
     PsErrIfCmdInFunAppCmd{}                       -> ErrorWithoutFlag
     PsErrLetCmdInFunAppCmd{}                      -> ErrorWithoutFlag
     PsErrDoCmdInFunAppCmd{}                       -> ErrorWithoutFlag
@@ -685,7 +691,7 @@ instance Diagnostic PsMessage where
     PsErrIllegalUnboxedFloatingLitInPat{}         -> noHints
     PsErrDoNotationInPat{}                        -> noHints
     PsErrIfThenElseInPat                          -> noHints
-    PsErrLambdaCaseInPat                          -> noHints
+    PsErrLambdaCaseInPat{}                        -> noHints
     PsErrCaseInPat                                -> noHints
     PsErrLetInPat                                 -> noHints
     PsErrLambdaInPat                              -> noHints
@@ -695,6 +701,7 @@ instance Diagnostic PsMessage where
     PsErrViewPatInExpr{}                          -> noHints
     PsErrLambdaCmdInFunAppCmd{}                   -> suggestParensAndBlockArgs
     PsErrCaseCmdInFunAppCmd{}                     -> suggestParensAndBlockArgs
+    PsErrLambdaCaseCmdInFunAppCmd{}               -> suggestParensAndBlockArgs
     PsErrIfCmdInFunAppCmd{}                       -> suggestParensAndBlockArgs
     PsErrLetCmdInFunAppCmd{}                      -> suggestParensAndBlockArgs
     PsErrDoCmdInFunAppCmd{}                       -> suggestParensAndBlockArgs

@@ -793,6 +793,7 @@ data Token
   | ITequal
   | ITlam
   | ITlcase
+  | ITlcases
   | ITvbar
   | ITlarrow            IsUnicodeSyntax
   | ITrarrow            IsUnicodeSyntax
@@ -961,6 +962,7 @@ reservedWordsFM = listToUFM $
         [( "_",              ITunderscore,    0 ),
          ( "as",             ITas,            0 ),
          ( "case",           ITcase,          0 ),
+         ( "cases",          ITlcases,        xbit LambdaCaseBit ),
          ( "class",          ITclass,         0 ),
          ( "data",           ITdata,          0 ),
          ( "default",        ITdefault,       0 ),
@@ -1621,6 +1623,14 @@ varid span buf len =
         _ -> return ITcase
       maybe_layout keyword
       return $ L span keyword
+    Just (ITlcases, _) -> do
+      lastTk <- getLastTk
+      lambdaCase <- getBit LambdaCaseBit
+      token <- case lastTk of
+        Strict.Just (L _ ITlam) | lambdaCase -> return ITlcases
+        _ -> return $ ITvarid fs
+      maybe_layout token
+      return $ L span token
     Just (keyword, 0) -> do
       maybe_layout keyword
       return $ L span keyword
@@ -1862,6 +1872,7 @@ maybe_layout t = do -- If the alternative layout rule is enabled then
           f (ITmdo _)   = pushLexState layout_do
           f ITof        = pushLexState layout
           f ITlcase     = pushLexState layout
+          f ITlcases    = pushLexState layout
           f ITlet       = pushLexState layout
           f ITwhere     = pushLexState layout
           f ITrec       = pushLexState layout
@@ -3169,6 +3180,7 @@ lexTokenAlr = do mPending <- popPendingImplicitToken
                      ITlet    -> setAlrExpectingOCurly (Just ALRLayoutLet)
                      ITof     -> setAlrExpectingOCurly (Just ALRLayoutOf)
                      ITlcase  -> setAlrExpectingOCurly (Just ALRLayoutOf)
+                     ITlcases -> setAlrExpectingOCurly (Just ALRLayoutOf)
                      ITdo  _  -> setAlrExpectingOCurly (Just ALRLayoutDo)
                      ITmdo _  -> setAlrExpectingOCurly (Just ALRLayoutDo)
                      ITrec    -> setAlrExpectingOCurly (Just ALRLayoutDo)

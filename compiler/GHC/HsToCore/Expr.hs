@@ -195,8 +195,7 @@ dsUnliftedBind (FunBind { fun_id = L l fun
                         , fun_tick = tick }) body
                -- Can't be a bang pattern (that looks like a PatBind)
                -- so must be simply unboxed
-  = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun))
-                                     Nothing matches
+  = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun)) Nothing matches
        ; massert (null args) -- Functions aren't lifted
        ; massert (isIdHsWrapper co_fn)
        ; let rhs' = mkOptTickBox tick rhs
@@ -300,11 +299,10 @@ dsExpr (NegApp _ expr neg_expr)
        ; dsSyntaxExpr neg_expr [expr'] }
 
 dsExpr (HsLam _ a_Match)
-  = uncurry mkLams <$> matchWrapper LambdaExpr Nothing a_Match
+  = uncurry mkCoreLams <$> matchWrapper LambdaExpr Nothing a_Match
 
-dsExpr (HsLamCase _ matches)
-  = do { ([discrim_var], matching_code) <- matchWrapper CaseAlt Nothing matches
-       ; return $ Lam discrim_var matching_code }
+dsExpr (HsLamCase _ lc_variant matches)
+  = uncurry mkCoreLams <$> matchWrapper (LamCaseAlt lc_variant) Nothing matches
 
 dsExpr e@(HsApp _ fun arg)
   = do { fun' <- dsLExpr fun
@@ -356,7 +354,7 @@ dsExpr (HsPragE _ prag expr) =
 
 dsExpr (HsCase _ discrim matches)
   = do { core_discrim <- dsLExpr discrim
-       ; ([discrim_var], matching_code) <- matchWrapper CaseAlt (Just discrim) matches
+       ; ([discrim_var], matching_code) <- matchWrapper CaseAlt (Just [discrim]) matches
        ; return (bindNonRec discrim_var core_discrim matching_code) }
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
@@ -606,7 +604,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
         -- constructor arguments.
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code)
-                <- matchWrapper RecUpd (Just record_expr) -- See Note [Scrutinee in Record updates]
+                <- matchWrapper RecUpd (Just [record_expr]) -- See Note [Scrutinee in Record updates]
                                       (MG { mg_alts = noLocA alts
                                           , mg_ext = MatchGroupTc [unrestricted in_ty] out_ty
                                           , mg_origin = FromSource

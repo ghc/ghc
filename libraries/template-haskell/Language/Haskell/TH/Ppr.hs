@@ -154,8 +154,11 @@ pprExp _ (InfixE me1 op me2) = parens $ pprMaybeExp noPrec me1
 pprExp i (LamE [] e) = pprExp i e -- #13856
 pprExp i (LamE ps e) = parensIf (i > noPrec) $ char '\\' <> hsep (map (pprPat appPrec) ps)
                                            <+> text "->" <+> ppr e
-pprExp i (LamCaseE ms) = parensIf (i > noPrec)
-                       $ text "\\case" $$ braces (semiSep ms)
+pprExp i (LamCaseE ms)
+  = parensIf (i > noPrec) $ text "\\case" $$ braces (semiSep ms)
+pprExp i (LamCasesE ms)
+  = parensIf (i > noPrec) $ text "\\cases" $$ braces (semi_sep ms)
+  where semi_sep = sep . punctuate semi . map (pprClause False)
 pprExp i (TupE es)
   | [Just e] <- es
   = pprExp i (ConE (tupleDataName 1) `AppE` e)
@@ -268,6 +271,12 @@ pprBody eq body = case body of
     NormalB  e  -> eqDoc <+> ppr e
   where eqDoc | eq        = equals
               | otherwise = arrow
+
+------------------------------
+pprClause :: Bool -> Clause -> Doc
+pprClause eqDoc (Clause ps rhs ds)
+  = hsep (map (pprPat appPrec) ps) <+> pprBody eqDoc rhs
+    $$ where_clause ds
 
 ------------------------------
 instance Ppr Lit where
@@ -652,8 +661,7 @@ instance Ppr RuleBndr where
 
 ------------------------------
 instance Ppr Clause where
-    ppr (Clause ps rhs ds) = hsep (map (pprPat appPrec) ps) <+> pprBody True rhs
-                             $$ where_clause ds
+    ppr = pprClause True
 
 ------------------------------
 instance Ppr Con where

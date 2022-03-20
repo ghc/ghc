@@ -18,7 +18,7 @@ testMe (HsIPVar xv hin) = _
 testMe (HsOverLit xole hol) = _
 testMe (HsLit xle hl) = _
 testMe (HsLam xl mg) = _
-testMe (HsLamCase xlc mg) = _
+testMe (HsLamCase xlc lc_variant mg) = _
 testMe (HsApp xa gl gl') = _
 testMe (HsAppType xate gl hwcb) = _
 testMe (OpApp xoa gl gl' gl2) = _
@@ -44,4 +44,3 @@ testMe (HsSpliceE xse hs) = _
 testMe (HsProc xp pat gl) = _
 testMe (HsStatic xs gl) = _
 testMe (XExpr xe) = _
-

@@ -1,5 +1,5 @@
-
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE BlockArguments #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -466,6 +466,8 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd)
         fvs_cond `unionDVarSet` fvs_then `unionDVarSet` fvs_else)
 
 {-
+Note [Desugaring HsCmdCase]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Case commands are treated in much the same way as if commands
 (see above) except that there are more alternatives.  For example
 
@@ -492,74 +494,87 @@ case bodies, containing the following fields:
    bodies with |||.
 -}
 
-dsCmd ids local_vars stack_ty res_ty
-      (HsCmdCase _ exp (MG { mg_alts = L l matches
-                           , mg_ext = MatchGroupTc arg_tys _
-                           , mg_origin = origin }))
-      env_ids = do
+dsCmd ids local_vars stack_ty res_ty (HsCmdCase _ exp match) env_ids = do
     stack_id <- newSysLocalDs Many stack_ty
-
-    -- Extract and desugar the leaf commands in the case, building tuple
-    -- expressions that will (after tagging) replace these leaves
-
-    let
-        leaves = concatMap leavesMatch matches
-        make_branch (leaf, bound_vars) = do
-            (core_leaf, _fvs, leaf_ids)
-               <- dsfixCmd ids (bound_vars `unionVarSet` local_vars) stack_ty
-                    res_ty leaf
-            return ([mkHsEnvStackExpr leaf_ids stack_id],
-                    envStackType leaf_ids stack_ty,
-                    core_leaf)
-
-    branches <- mapM make_branch leaves
-    either_con <- dsLookupTyCon eitherTyConName
-    left_con <- dsLookupDataCon leftDataConName
-    right_con <- dsLookupDataCon rightDataConName
-    let
-        left_id  = mkConLikeTc (RealDataCon left_con)
-        right_id = mkConLikeTc (RealDataCon right_con)
-        left_expr  ty1 ty2 e = noLocA $ HsApp noComments
-                           (noLocA $ mkHsWrap (mkWpTyApps [ty1, ty2]) left_id ) e
-        right_expr ty1 ty2 e = noLocA $ HsApp noComments
-                           (noLocA $ mkHsWrap (mkWpTyApps [ty1, ty2]) right_id) e
-
-        -- Prefix each tuple with a distinct series of Left's and Right's,
-        -- in a balanced way, keeping track of the types.
-
-        merge_branches :: ([LHsExpr GhcTc], Type, CoreExpr)
-                      -> ([LHsExpr GhcTc], Type, CoreExpr)
-                      -> ([LHsExpr GhcTc], Type, CoreExpr) -- AZ
-        merge_branches (builds1, in_ty1, core_exp1)
-                       (builds2, in_ty2, core_exp2)
-          = (map (left_expr in_ty1 in_ty2) builds1 ++
-                map (right_expr in_ty1 in_ty2) builds2,
-             mkTyConApp either_con [in_ty1, in_ty2],
-             do_choice ids in_ty1 in_ty2 res_ty core_exp1 core_exp2)
-        (leaves', sum_ty, core_choices) = foldb merge_branches branches
-
-        -- Replace the commands in the case with these tagged tuples,
-        -- yielding a HsExpr Id we can feed to dsExpr.
-
-        (_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
+    (match', core_choices)
+      <- dsCases ids local_vars stack_id stack_ty res_ty match
+    let MG{ mg_ext = MatchGroupTc _ sum_ty } = match'
         in_ty = envStackType env_ids stack_ty
 
-    core_body <- dsExpr (HsCase noExtField exp
-                         (MG { mg_alts = L l matches'
-                             , mg_ext = MatchGroupTc arg_tys sum_ty
-                             , mg_origin = origin }))
-        -- Note that we replace the HsCase result type by sum_ty,
-        -- which is the type of matches'
+    core_body <- dsExpr (HsCase noExtField exp match')
 
     core_matches <- matchEnvStack env_ids stack_id core_body
     return (do_premap ids in_ty sum_ty res_ty core_matches core_choices,
             exprFreeIdsDSet core_body `uniqDSetIntersectUniqSet` local_vars)
 
+{-
+\cases and \case are desugared analogously to a case command (see above).
+For example
+
+        \cases {p1 q1 -> c1; p2 q2 -> c2; p3 q3 -> c3 }
+
+is translated to
+
+        premap (\ ((xs), (e1, (e2,stk))) -> cases e1 e2 of
+                  p1 q1 -> (Left (Left (xs1), stk))
+                  p2 q2 -> Left ((Right (xs2), stk))
+                  p3 q3 -> Right ((xs3), stk))
+        ((c1 ||| c2) ||| c3)
+
+(cases...of is hypothetical notation that works like case...of but with
+multiple scrutinees)
+
+-}
 dsCmd ids local_vars stack_ty res_ty
-      (HsCmdLamCase _ mg@MG { mg_ext = MatchGroupTc [Scaled arg_mult arg_ty] _ }) env_ids = do
-  arg_id <- newSysLocalDs arg_mult arg_ty
-  let case_cmd  = noLocA $ HsCmdCase noExtField (nlHsVar arg_id) mg
-  dsCmdLam ids local_vars stack_ty res_ty [nlVarPat arg_id] case_cmd env_ids
+      (HsCmdLamCase _ lc_variant match@MG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } )
+      env_ids = do
+    arg_ids <- newSysLocalsDs arg_tys
+
+    let match_ctxt = ArrowLamCaseAlt lc_variant
+        pat_vars = mkVarSet arg_ids
+        local_vars' = pat_vars `unionVarSet` local_vars
+        (pat_tys, stack_ty') = splitTypeAt (length arg_tys) stack_ty
+
+    -- construct and desugar a case expression with multiple scrutinees
+    (core_body, free_vars, env_ids') <- trimInput \env_ids -> do
+      stack_id <- newSysLocalDs Many stack_ty'
+      (match', core_choices)
+        <- dsCases ids local_vars' stack_id stack_ty' res_ty match
+
+      let MG{ mg_ext = MatchGroupTc _ sum_ty } = match'
+          in_ty = envStackType env_ids stack_ty'
+          discrims = map nlHsVar arg_ids
+      (discrim_vars, matching_code)
+        <- matchWrapper (ArrowMatchCtxt match_ctxt) (Just discrims) match'
+      core_body <- flip (bind_vars discrim_vars) matching_code <$>
+        traverse dsLExpr discrims
+
+      core_matches <- matchEnvStack env_ids stack_id core_body
+      return (do_premap ids in_ty sum_ty res_ty core_matches core_choices,
+              exprFreeIdsDSet core_body `uniqDSetIntersectUniqSet` local_vars')
+
+    param_ids <- mapM (newSysLocalDs Many) pat_tys
+    stack_id' <- newSysLocalDs Many stack_ty'
+
+    -- the expression is built from the inside out, so the actions
+    -- are presented in reverse order
+
+    let -- build a new environment, plus what's left of the stack
+        core_expr = buildEnvStack env_ids' stack_id'
+        in_ty = envStackType env_ids stack_ty
+        in_ty' = envStackType env_ids' stack_ty'
+
+    -- bind the scrutinees to the parameters
+    let match_code = bind_vars arg_ids (map Var param_ids) core_expr
+
+    -- match the parameters against the top of the old stack
+    (stack_id, param_code) <- matchVarStack param_ids stack_id' match_code
+    -- match the old environment and stack against the input
+    select_code <- matchEnvStack env_ids stack_id param_code
+    return (do_premap ids in_ty in_ty' res_ty select_code core_body,
+            free_vars `uniqDSetMinusUniqSet` pat_vars)
+    where
+      bind_vars vars exprs expr = foldr (uncurry bindNonRec) expr $ zip vars exprs
 
 -- D; ys |-a cmd : stk --> t
 -- ----------------------------------
@@ -680,7 +695,7 @@ trimInput build_arrow
         (core_cmd, free_vars) <- build_arrow env_ids
         return (core_cmd, free_vars, dVarSetElems free_vars))
 
--- Desugaring for both HsCmdLam and HsCmdLamCase.
+-- Desugaring for both HsCmdLam
 --
 -- D; ys |-a cmd : stk t'
 -- -----------------------------------------------
@@ -725,6 +740,71 @@ dsCmdLam ids local_vars stack_ty res_ty pats body env_ids = do
     select_code <- matchEnvStack env_ids stack_id param_code
     return (do_premap ids in_ty in_ty' res_ty select_code core_body,
             free_vars `uniqDSetMinusUniqSet` pat_vars)
+
+-- Used for case and \case(s)
+-- See Note [Desugaring HsCmdCase]
+dsCases :: DsCmdEnv                               -- arrow combinators
+        -> IdSet                                  -- set of local vars available to this command
+        -> Id                                     -- stack id
+        -> Type                                   -- type of the stack (right-nested tuple)
+        -> Type                                   -- return type of the command
+        -> MatchGroup GhcTc (LHsCmd GhcTc)        -- match group to desugar
+        -> DsM (MatchGroup GhcTc (LHsExpr GhcTc), -- match group with choice tree
+                CoreExpr)                         -- desugared choices
+dsCases ids local_vars stack_id stack_ty res_ty
+        (MG { mg_alts = L l matches
+            , mg_ext = MatchGroupTc arg_tys _
+            , mg_origin = origin }) = do
+
+  -- Extract and desugar the leaf commands in the case, building tuple
+  -- expressions that will (after tagging) replace these leaves
+
+  let leaves = concatMap leavesMatch matches
+      make_branch (leaf, bound_vars) = do
+          (core_leaf, _fvs, leaf_ids)
+             <- dsfixCmd ids (bound_vars `unionVarSet` local_vars) stack_ty
+                  res_ty leaf
+          return ([mkHsEnvStackExpr leaf_ids stack_id],
+                  envStackType leaf_ids stack_ty,
+                  core_leaf)
+
+  branches <- mapM make_branch leaves
+  either_con <- dsLookupTyCon eitherTyConName
+  left_con <- dsLookupDataCon leftDataConName
+  right_con <- dsLookupDataCon rightDataConName
+  let
+      left_id  = mkConLikeTc (RealDataCon left_con)
+      right_id = mkConLikeTc (RealDataCon right_con)
+      left_expr  ty1 ty2 e = noLocA $ HsApp noComments
+                         (noLocA $ mkHsWrap (mkWpTyApps [ty1, ty2]) left_id ) e
+      right_expr ty1 ty2 e = noLocA $ HsApp noComments
+                         (noLocA $ mkHsWrap (mkWpTyApps [ty1, ty2]) right_id) e
+
+      -- Prefix each tuple with a distinct series of Left's and Right's,
+      -- in a balanced way, keeping track of the types.
+
+      merge_branches :: ([LHsExpr GhcTc], Type, CoreExpr)
+                    -> ([LHsExpr GhcTc], Type, CoreExpr)
+                    -> ([LHsExpr GhcTc], Type, CoreExpr) -- AZ
+      merge_branches (builds1, in_ty1, core_exp1)
+                     (builds2, in_ty2, core_exp2)
+        = (map (left_expr in_ty1 in_ty2) builds1 ++
+              map (right_expr in_ty1 in_ty2) builds2,
+           mkTyConApp either_con [in_ty1, in_ty2],
+           do_choice ids in_ty1 in_ty2 res_ty core_exp1 core_exp2)
+      (leaves', sum_ty, core_choices) = foldb merge_branches branches
+
+      -- Replace the commands in the case with these tagged tuples,
+      -- yielding a HsExpr Id we can feed to dsExpr.
+
+      (_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
+
+  -- Note that we replace the MatchGroup result type by sum_ty,
+  -- which is the type of matches'
+  return (MG { mg_alts = L l matches'
+             , mg_ext = MatchGroupTc arg_tys sum_ty
+             , mg_origin = origin },
+          core_choices)
 
 {-
 Translation of command judgements of the form

@@ -71,6 +71,8 @@ import qualified Data.Data as Data (Fixity(..))
 import qualified Data.Kind
 import Data.Maybe (isJust)
 import Data.Foldable ( toList )
+import Data.List (uncons)
+import Data.Bifunctor (first)
 
 {- *********************************************************************
 *                                                                      *
@@ -322,6 +324,7 @@ type instance XLitE          (GhcPass _) = EpAnnCO
 type instance XLam           (GhcPass _) = NoExtField
 
 type instance XLamCase       (GhcPass _) = EpAnn [AddEpAnn]
+
 type instance XApp           (GhcPass _) = EpAnnCO
 
 type instance XAppTypeE      GhcPs = SrcSpan -- Where the `@` lives
@@ -643,8 +646,8 @@ ppr_expr (ExplicitSum _ alt arity expr)
 ppr_expr (HsLam _ matches)
   = pprMatches matches
 
-ppr_expr (HsLamCase _ matches)
-  = sep [ sep [text "\\case"],
+ppr_expr (HsLamCase _ lc_variant matches)
+  = sep [ sep [lamCaseKeyword lc_variant],
           nest 2 (pprMatches matches) ]
 
 ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ alts }))
@@ -1229,8 +1232,8 @@ ppr_cmd (HsCmdCase _ expr matches)
   = sep [ sep [text "case", nest 4 (ppr expr), text "of"],
           nest 2 (pprMatches matches) ]
 
-ppr_cmd (HsCmdLamCase _ matches)
-  = sep [ text "\\case", nest 2 (pprMatches matches) ]
+ppr_cmd (HsCmdLamCase _ lc_variant matches)
+  = sep [ lamCaseKeyword lc_variant, nest 2 (pprMatches matches) ]
 
 ppr_cmd (HsCmdIf _ _ e ct ce)
   = sep [hsep [text "if", nest 2 (ppr e), text "then"],
@@ -1405,6 +1408,14 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
                      _ -> pprPanic "pprMatch" (ppr ctxt $$ ppr pats)
 
             LambdaExpr -> (char '\\', pats)
+
+            -- We don't simply return (empty, pats) to avoid introducing an
+            -- additional `nest 2` via the empty herald
+            LamCaseAlt LamCases ->
+              maybe (empty, []) (first $ pprParendLPat appPrec) (uncons pats)
+
+            ArrowMatchCtxt (ArrowLamCaseAlt LamCases) ->
+              maybe (empty, []) (first $ pprParendLPat appPrec) (uncons pats)
 
             ArrowMatchCtxt KappaExpr -> (char '\\', pats)
 
@@ -1929,23 +1940,30 @@ pp_dotdot = text " .. "
 -}
 
 instance OutputableBndrId p => Outputable (HsMatchContext (GhcPass p)) where
-  ppr m@(FunRhs{})          = text "FunRhs" <+> ppr (mc_fun m) <+> ppr (mc_fixity m)
-  ppr LambdaExpr            = text "LambdaExpr"
-  ppr CaseAlt               = text "CaseAlt"
-  ppr IfAlt                 = text "IfAlt"
-  ppr (ArrowMatchCtxt c)    = text "ArrowMatchCtxt" <+> ppr c
-  ppr PatBindRhs            = text "PatBindRhs"
-  ppr PatBindGuards         = text "PatBindGuards"
-  ppr RecUpd                = text "RecUpd"
-  ppr (StmtCtxt _)          = text "StmtCtxt _"
-  ppr ThPatSplice           = text "ThPatSplice"
-  ppr ThPatQuote            = text "ThPatQuote"
-  ppr PatSyn                = text "PatSyn"
+  ppr m@(FunRhs{})            = text "FunRhs" <+> ppr (mc_fun m) <+> ppr (mc_fixity m)
+  ppr LambdaExpr              = text "LambdaExpr"
+  ppr CaseAlt                 = text "CaseAlt"
+  ppr (LamCaseAlt lc_variant) = text "LamCaseAlt" <+> ppr lc_variant
+  ppr IfAlt                   = text "IfAlt"
+  ppr (ArrowMatchCtxt c)      = text "ArrowMatchCtxt" <+> ppr c
+  ppr PatBindRhs              = text "PatBindRhs"
+  ppr PatBindGuards           = text "PatBindGuards"
+  ppr RecUpd                  = text "RecUpd"
+  ppr (StmtCtxt _)            = text "StmtCtxt _"
+  ppr ThPatSplice             = text "ThPatSplice"
+  ppr ThPatQuote              = text "ThPatQuote"
+  ppr PatSyn                  = text "PatSyn"
+
+instance Outputable LamCaseVariant where
+  ppr = text . \case
+    LamCase  -> "LamCase"
+    LamCases -> "LamCases"
 
 instance Outputable HsArrowMatchContext where
-  ppr ProcExpr     = text "ProcExpr"
-  ppr ArrowCaseAlt = text "ArrowCaseAlt"
-  ppr KappaExpr    = text "KappaExpr"
+  ppr ProcExpr                     = text "ProcExpr"
+  ppr ArrowCaseAlt                 = text "ArrowCaseAlt"
+  ppr (ArrowLamCaseAlt lc_variant) = parens $ text "ArrowLamCaseAlt" <+> ppr lc_variant
+  ppr KappaExpr                    = text "KappaExpr"
 
 -----------------
 
@@ -1956,27 +1974,29 @@ instance OutputableBndrId p
 -- Used to generate the string for a *runtime* error message
 matchContextErrString :: OutputableBndrId p
                       => HsMatchContext (GhcPass p) -> SDoc
-matchContextErrString (FunRhs{mc_fun=L _ fun})   = text "function" <+> ppr fun
-matchContextErrString CaseAlt                    = text "case"
-matchContextErrString IfAlt                      = text "multi-way if"
-matchContextErrString PatBindRhs                 = text "pattern binding"
-matchContextErrString PatBindGuards              = text "pattern binding guards"
-matchContextErrString RecUpd                     = text "record update"
-matchContextErrString LambdaExpr                 = text "lambda"
-matchContextErrString (ArrowMatchCtxt c)         = matchArrowContextErrString c
-matchContextErrString ThPatSplice                = panic "matchContextErrString"  -- Not used at runtime
-matchContextErrString ThPatQuote                 = panic "matchContextErrString"  -- Not used at runtime
-matchContextErrString PatSyn                     = panic "matchContextErrString"  -- Not used at runtime
-matchContextErrString (StmtCtxt (ParStmtCtxt c))   = matchContextErrString (StmtCtxt c)
-matchContextErrString (StmtCtxt (TransStmtCtxt c)) = matchContextErrString (StmtCtxt c)
-matchContextErrString (StmtCtxt (PatGuard _))      = text "pattern guard"
-matchContextErrString (StmtCtxt (ArrowExpr))       = text "'do' block"
+matchContextErrString (FunRhs{mc_fun=L _ fun})      = text "function" <+> ppr fun
+matchContextErrString CaseAlt                       = text "case"
+matchContextErrString (LamCaseAlt lc_variant)       = lamCaseKeyword lc_variant
+matchContextErrString IfAlt                         = text "multi-way if"
+matchContextErrString PatBindRhs                    = text "pattern binding"
+matchContextErrString PatBindGuards                 = text "pattern binding guards"
+matchContextErrString RecUpd                        = text "record update"
+matchContextErrString LambdaExpr                    = text "lambda"
+matchContextErrString (ArrowMatchCtxt c)            = matchArrowContextErrString c
+matchContextErrString ThPatSplice                   = panic "matchContextErrString"  -- Not used at runtime
+matchContextErrString ThPatQuote                    = panic "matchContextErrString"  -- Not used at runtime
+matchContextErrString PatSyn                        = panic "matchContextErrString"  -- Not used at runtime
+matchContextErrString (StmtCtxt (ParStmtCtxt c))    = matchContextErrString (StmtCtxt c)
+matchContextErrString (StmtCtxt (TransStmtCtxt c))  = matchContextErrString (StmtCtxt c)
+matchContextErrString (StmtCtxt (PatGuard _))       = text "pattern guard"
+matchContextErrString (StmtCtxt (ArrowExpr))        = text "'do' block"
 matchContextErrString (StmtCtxt (HsDoStmt flavour)) = matchDoContextErrString flavour
 
 matchArrowContextErrString :: HsArrowMatchContext -> SDoc
-matchArrowContextErrString ProcExpr     = text "proc"
-matchArrowContextErrString ArrowCaseAlt = text "case"
-matchArrowContextErrString KappaExpr    = text "kappa"
+matchArrowContextErrString ProcExpr                     = text "proc"
+matchArrowContextErrString ArrowCaseAlt                 = text "case"
+matchArrowContextErrString (ArrowLamCaseAlt lc_variant) = lamCaseKeyword lc_variant
+matchArrowContextErrString KappaExpr                    = text "kappa"
 
 matchDoContextErrString :: HsDoFlavour -> SDoc
 matchDoContextErrString GhciStmtCtxt = text "interactive GHCi command"

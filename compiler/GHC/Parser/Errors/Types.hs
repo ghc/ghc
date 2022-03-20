@@ -245,7 +245,7 @@ data PsMessage
    | PsErrIfThenElseInPat
 
    -- | Lambda-case in pattern
-   | PsErrLambdaCaseInPat
+   | PsErrLambdaCaseInPat LamCaseVariant
 
    -- | case..of in pattern
    | PsErrCaseInPat
@@ -311,6 +311,9 @@ data PsMessage
    -- | Unexpected case command in function application
    | PsErrCaseCmdInFunAppCmd !(LHsCmd GhcPs)
 
+   -- | Unexpected \case(s) command in function application
+   | PsErrLambdaCaseCmdInFunAppCmd !LamCaseVariant !(LHsCmd GhcPs)
+
    -- | Unexpected if command in function application
    | PsErrIfCmdInFunAppCmd !(LHsCmd GhcPs)
 
@@ -332,8 +335,8 @@ data PsMessage
    -- | Unexpected case expression in function application
    | PsErrCaseInFunAppExpr !(LHsExpr GhcPs)
 
-   -- | Unexpected lambda-case expression in function application
-   | PsErrLambdaCaseInFunAppExpr !(LHsExpr GhcPs)
+   -- | Unexpected \case(s) expression in function application
+   | PsErrLambdaCaseInFunAppExpr !LamCaseVariant !(LHsExpr GhcPs)
 
    -- | Unexpected let expression in function application
    | PsErrLetInFunAppExpr !(LHsExpr GhcPs)

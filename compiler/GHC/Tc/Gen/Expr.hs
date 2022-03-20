@@ -264,13 +264,13 @@ tcExpr (HsLam _ match) res_ty
     match_ctxt = MC { mc_what = LambdaExpr, mc_body = tcBody }
     herald = ExpectedFunTyLam match
 
-tcExpr e@(HsLamCase x matches) res_ty
+tcExpr e@(HsLamCase x lc_variant matches) res_ty
   = do { (wrap, matches')
            <- tcMatchLambda herald match_ctxt matches res_ty
-       ; return (mkHsWrap wrap $ HsLamCase x matches') }
+       ; return (mkHsWrap wrap $ HsLamCase x lc_variant matches') }
   where
-    match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
-    herald = ExpectedFunTyLamCase e
+    match_ctxt = MC { mc_what = LamCaseAlt lc_variant, mc_body = tcBody }
+    herald = ExpectedFunTyLamCase lc_variant e
 
 
 

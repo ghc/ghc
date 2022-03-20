@@ -1,0 +1,66 @@
+
+T20768_arrow_fail.hs:9:10:
+     /cases alternatives within arrow notation have different numbers of arguments
+        T20768_arrow_fail.hs:10:6-54
+        T20768_arrow_fail.hs:12:6-25
+     In the command: /cases
+                        Just x | x > 100 -> returnA -< "big " ++ show x
+                        1 2 | otherwise -> returnA -< "small " ++ show x
+                          -> returnA -< "none"
+      In the command: (| id
+                          (/cases
+                             Just x | x > 100 -> returnA -< "big " ++ show x
+                             1 2 | otherwise -> returnA -< "small " ++ show x
+                               -> returnA -< "none") |)
+      In the command: (| id
+                          (/cases
+                             Just x | x > 100 -> returnA -< "big " ++ show x
+                             1 2 | otherwise -> returnA -< "small " ++ show x
+                               -> returnA -< "none") |)
+                        x
+
+T20768_arrow_fail.hs:17:9:
+     Could not deduce (ArrowChoice p) arising from an arrow command
+      from the context: Arrow p
+        bound by the type signature for:
+                   foo :: forall (p :: * -> * -> *). Arrow p => p (Maybe Int) String
+        at T20768_arrow_fail.hs:15:1-38
+      Possible fix:
+        add (ArrowChoice p) to the context of
+          the type signature for:
+            foo :: forall (p :: * -> * -> *). Arrow p => p (Maybe Int) String
+     In the command: (| id
+                          (/cases
+                             (Just x)
+                               | x > 100 -> returnA -< "big " ++ show x
+                               | otherwise -> returnA -< "small " ++ show x
+                             Nothing -> returnA -< "none") |)
+      In the command: (| id
+                          (/cases
+                             (Just x)
+                               | x > 100 -> returnA -< "big " ++ show x
+                               | otherwise -> returnA -< "small " ++ show x
+                             Nothing -> returnA -< "none") |)
+                        x
+      In the expression:
+        proc x -> (| id
+                      (/cases
+                         (Just x)
+                           | x > 100 -> returnA -< "big " ++ show x
+                           | otherwise -> returnA -< "small " ++ show x
+                         Nothing -> returnA -< "none") |)
+                    x
+
+T20768_arrow_fail.hs:26:21:
+     Could not deduce (Num (Maybe Int)) arising from the literal ‘100’
+      from the context: ArrowChoice p
+        bound by the type signature for:
+                   bar :: forall (p :: * -> * -> *).
+                          ArrowChoice p =>
+                          p (Maybe Int) String
+        at T20768_arrow_fail.hs:23:1-44
+     In the second argument of ‘(>)’, namely ‘100’
+      In the expression: x > 100
+      In a stmt of a pattern guard for
+                     a /cases alternative within arrow notation:
+        x > 100

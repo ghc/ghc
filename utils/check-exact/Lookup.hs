@@ -38,6 +38,7 @@ keywordToString kw =
       (G AnnBackquote ) -> "`"
       (G AnnBy     ) -> "by"
       (G AnnCase   ) -> "case"
+      (G AnnCases  ) -> "cases"
       (G AnnClass   ) -> "class"
       (G AnnCloseB  ) -> "|)"
       (G AnnCloseBU ) -> "⦈"

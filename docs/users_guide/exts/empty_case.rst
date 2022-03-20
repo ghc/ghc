@@ -19,6 +19,9 @@ or ::
 
     \case { }       -- -XLambdaCase is also required
 
+Note that it is not allowed for ``\cases``, since it would be unclear how many
+patterns are being matched.
+
 This can be useful when you know that the expression being scrutinised
 has no non-bottom values. For example:
 
@@ -45,5 +48,3 @@ We much prefer (B). Why? Because GHC can figure out that
 is able to compile with :ghc-flag:`-Wincomplete-patterns` and
 :ghc-flag:`-Werror`. On the other hand (A) looks dangerous, and GHC doesn't
 check to make sure that, in fact, the function can never get called.
-
-

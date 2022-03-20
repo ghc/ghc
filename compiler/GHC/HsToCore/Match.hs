@@ -708,15 +708,32 @@ Call @match@ with all of this information!
 \end{enumerate}
 -}
 
+-- Note [matchWrapper scrutinees]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- There are three possible cases for matchWrapper's scrutinees argument:
+--
+-- 1. Nothing   Used for FunBind, HsLam, HsLamcase, where there is no explicit scrutinee
+--              The MatchGroup may have matchGroupArity of 0 or more. Examples:
+--                  f p1 q1 = ... -- matchGroupArity 2
+--                  f p2 q2 = ...
+--
+--                  \cases | g1 -> ... -- matchGroupArity 0
+--                         | g2 -> ...
+--
+-- 2. Just [e]  Used for HsCase, RecordUpd; exactly one scrutinee
+--              The MatchGroup has matchGroupArity of exactly 1. Example:
+--                  case e of p1 -> e1 -- matchGroupArity 1
+--                            p2 -> e2
+--
+-- 3. Just es   Used for HsCmdLamCase; zero or more scrutinees
+--              The MatchGroup has matchGroupArity of (length es). Example:
+--                  \cases p1 q1 -> returnA -< ... -- matchGroupArity 2
+--                         p2 q2 -> ...
+
 matchWrapper
   :: HsMatchContext GhcRn              -- ^ For shadowing warning messages
-  -> Maybe (LHsExpr GhcTc)             -- ^ Scrutinee. (Just scrut) for a case expr
-                                       --      case scrut of { p1 -> e1 ... }
-                                       --   (and in this case the MatchGroup will
-                                       --    have all singleton patterns)
-                                       --   Nothing for a function definition
-                                       --      f p1 q1 = ...  -- No "scrutinee"
-                                       --      f p2 q2 = ...  -- in this case
+  -> Maybe [LHsExpr GhcTc]             -- ^ Scrutinee(s)
+                                       -- see Note [matchWrapper scrutinees]
   -> MatchGroup GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared
   -> DsM ([Id], CoreExpr)              -- ^ Results (usually passed to 'match')
 
@@ -744,7 +761,7 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 -}
 
-matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
+matchWrapper ctxt scrs (MG { mg_alts = L _ matches
                              , mg_ext = MatchGroupTc arg_tys rhs_ty
                              , mg_origin = origin })
   = do  { dflags <- getDynFlags
@@ -762,7 +779,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         -- @rhss_nablas@ is a flat list of covered Nablas for each RHS.
         -- Each Match will split off one Nablas for its RHSs from this.
         ; matches_nablas <- if isMatchContextPmChecked dflags origin ctxt
-            then addHsScrutTmCs mb_scr new_vars $
+            then addHsScrutTmCs (concat scrs) new_vars $
                  -- See Note [Long-distance information]
                  pmcMatches (DsMatchContext ctxt locn) new_vars matches
             else pure (initNablasMatches matches)
@@ -872,7 +889,7 @@ matchSinglePatVar var mb_scrut ctx pat ty match_result
        ; locn   <- getSrcSpanDs
        -- Pattern match check warnings
        ; when (isMatchContextPmChecked dflags FromSource ctx) $
-           addCoreScrutTmCs mb_scrut [var] $
+           addCoreScrutTmCs (maybeToList mb_scrut) [var] $
            pmcPatBind (DsMatchContext ctx locn) var (unLoc pat)
 
        ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]

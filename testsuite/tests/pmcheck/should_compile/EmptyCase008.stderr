@@ -1,22 +1,22 @@
 
 EmptyCase008.hs:17:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative:
+    In a \case alternative:
         Patterns of type ‘Foo3 Int’ not matched:
             Foo3 (MkDA1 _)
             Foo3 MkDA2
 
 EmptyCase008.hs:21:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative:
+    In a \case alternative:
         Patterns of type ‘Foo3 a’ not matched: Foo3 _
 
 EmptyCase008.hs:40:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative:
+    In a \case alternative:
         Patterns of type ‘Foo4 Int ()’ not matched: Foo4 MkDB1
 
 EmptyCase008.hs:48:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative:
+    In a \case alternative:
         Patterns of type ‘Foo4 a b’ not matched: Foo4 _

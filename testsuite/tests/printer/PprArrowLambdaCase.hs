@@ -16,3 +16,11 @@ foo = proc x ->
             | otherwise -> returnA -< "small " ++ show x
      Nothing            -> returnA -< "none")
   |) x
+
+foo :: ArrowChoice p => p (Maybe Int) String
+foo = proc x ->
+  (| id (\cases
+     y (Just x) | x > 100   -> returnA -< "big " ++ show x
+                | otherwise -> returnA -< "small " ++ show x
+     _ Nothing              -> returnA -< "none")
+  |) 1 x

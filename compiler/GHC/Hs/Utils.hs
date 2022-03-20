@@ -41,7 +41,7 @@ module GHC.Hs.Utils(
   mkHsPar, mkHsApp, mkHsAppWith, mkHsApps, mkHsAppsWith,
   mkHsAppType, mkHsAppTypes, mkHsCaseAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
-  mkMatchGroup, mkMatch, mkPrefixFunRhs, mkHsLam, mkHsIf,
+  mkMatchGroup, mkLamCaseMatchGroup, mkMatch, mkPrefixFunRhs, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
   mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsDoAnns, mkHsComp, mkHsCompAnns, mkHsWrapPat, mkHsWrapPatCo,
@@ -212,6 +212,15 @@ mkMatchGroup :: AnnoBody p body
 mkMatchGroup origin matches = MG { mg_ext = noExtField
                                  , mg_alts = matches
                                  , mg_origin = origin }
+
+mkLamCaseMatchGroup :: AnnoBody p body
+                    => Origin
+                    -> LamCaseVariant
+                    -> LocatedL [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
+                    -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
+mkLamCaseMatchGroup origin lc_variant (L l matches)
+  = mkMatchGroup origin (L l $ map fixCtxt matches)
+  where fixCtxt (L a match) = L a match{m_ctxt = LamCaseAlt lc_variant}
 
 mkLocatedList :: Semigroup a
   => [GenLocated (SrcAnn a) e2] -> LocatedAn an [GenLocated (SrcAnn a) e2]

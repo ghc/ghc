@@ -360,13 +360,17 @@ data HsExpr p
 
        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
-  | HsLamCase (XLamCase p) (MatchGroup p (LHsExpr p)) -- ^ Lambda-case
-       --
-       -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
-       --           'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen',
-       --           'GHC.Parser.Annotation.AnnClose'
+  -- | Lambda-case
+  --
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+  --           'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen',
+  --           'GHC.Parser.Annotation.AnnClose'
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+  --           'GHC.Parser.Annotation.AnnCases','GHC.Parser.Annotation.AnnOpen',
+  --           'GHC.Parser.Annotation.AnnClose'
 
-       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+  | HsLamCase (XLamCase p) LamCaseVariant (MatchGroup p (LHsExpr p))
 
   | HsApp     (XApp p) (LHsExpr p) (LHsExpr p) -- ^ Application
 
@@ -679,6 +683,16 @@ data HsTupArg id
   | XTupArg !(XXTupArg id)   -- ^ Extension point; see Note [Trees That Grow]
                              -- in Language.Haskell.Syntax.Extension
 
+-- | Which kind of lambda case are we dealing with?
+data LamCaseVariant
+  = LamCase -- ^ `\case`
+  | LamCases -- ^ `\cases`
+  deriving (Data, Eq)
+
+lamCaseKeyword :: LamCaseVariant -> SDoc
+lamCaseKeyword LamCase  = text "\\case"
+lamCaseKeyword LamCases = text "\\cases"
+
 {-
 Note [Parens in HsSyn]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -913,13 +927,18 @@ data HsCmd id
 
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
-  | HsCmdLamCase (XCmdLamCase id)
-                 (MatchGroup id (LHsCmd id))    -- bodies are HsCmd's
-    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
-    --       'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen' @'{'@,
-    --       'GHC.Parser.Annotation.AnnClose' @'}'@
+  -- | Lambda-case
+  --
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+  --     'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen' @'{'@,
+  --     'GHC.Parser.Annotation.AnnClose' @'}'@
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+  --     'GHC.Parser.Annotation.AnnCases','GHC.Parser.Annotation.AnnOpen' @'{'@,
+  --     'GHC.Parser.Annotation.AnnClose' @'}'@
 
-    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+  | HsCmdLamCase (XCmdLamCase id) LamCaseVariant
+                 (MatchGroup id (LHsCmd id)) -- bodies are HsCmd's
 
   | HsCmdIf     (XCmdIf id)
                 (SyntaxExpr id)         -- cond function
@@ -1654,7 +1673,8 @@ data HsMatchContext p
                                        -- See Note [FunBind vs PatBind]
       }
   | LambdaExpr                  -- ^Patterns of a lambda
-  | CaseAlt                     -- ^Patterns and guards on a case alternative
+  | CaseAlt                     -- ^Patterns and guards in a case alternative
+  | LamCaseAlt LamCaseVariant   -- ^Patterns and guards in @\case@ and @\cases@
   | IfAlt                       -- ^Guards of a multi-way if alternative
   | ArrowMatchCtxt              -- ^A pattern match inside arrow notation
       HsArrowMatchContext
@@ -1690,9 +1710,10 @@ data HsStmtContext p
 
 -- | Haskell arrow match context.
 data HsArrowMatchContext
-  = ProcExpr     -- ^ A proc expression
-  | ArrowCaseAlt -- ^ A case alternative inside arrow notation
-  | KappaExpr    -- ^ An arrow kappa abstraction
+  = ProcExpr                       -- ^ A proc expression
+  | ArrowCaseAlt                   -- ^ A case alternative inside arrow notation
+  | ArrowLamCaseAlt LamCaseVariant -- ^ A \case or \cases alternative inside arrow notation
+  | KappaExpr                      -- ^ An arrow kappa abstraction
 
 data HsDoFlavour
   = DoExpr (Maybe ModuleName)        -- ^[ModuleName.]do { ... }
@@ -1752,15 +1773,16 @@ isMonadDoCompContext (DoExpr _)   = False
 isMonadDoCompContext (MDoExpr _)  = False
 
 matchSeparator :: HsMatchContext p -> SDoc
-matchSeparator (FunRhs {})   = text "="
-matchSeparator CaseAlt       = text "->"
-matchSeparator IfAlt         = text "->"
-matchSeparator LambdaExpr    = text "->"
-matchSeparator (ArrowMatchCtxt{})= text "->"
-matchSeparator PatBindRhs    = text "="
-matchSeparator PatBindGuards = text "="
-matchSeparator (StmtCtxt _)  = text "<-"
-matchSeparator RecUpd        = text "=" -- This can be printed by the pattern
+matchSeparator FunRhs{}         = text "="
+matchSeparator CaseAlt          = text "->"
+matchSeparator LamCaseAlt{}     = text "->"
+matchSeparator IfAlt            = text "->"
+matchSeparator LambdaExpr       = text "->"
+matchSeparator ArrowMatchCtxt{} = text "->"
+matchSeparator PatBindRhs       = text "="
+matchSeparator PatBindGuards    = text "="
+matchSeparator StmtCtxt{}       = text "<-"
+matchSeparator RecUpd           = text "=" -- This can be printed by the pattern
                                        -- match checker trace
 matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
@@ -1779,26 +1801,45 @@ pprMatchContext ctxt
 
 pprMatchContextNoun :: forall p. (Outputable (IdP p), UnXRec p)
                     => HsMatchContext p -> SDoc
-pprMatchContextNoun (FunRhs {mc_fun=fun})
-                                    = text "equation for"
-                                      <+> quotes (ppr (unXRec @p fun))
-pprMatchContextNoun CaseAlt         = text "case alternative"
-pprMatchContextNoun IfAlt           = text "multi-way if alternative"
-pprMatchContextNoun RecUpd          = text "record-update construct"
-pprMatchContextNoun ThPatSplice     = text "Template Haskell pattern splice"
-pprMatchContextNoun ThPatQuote      = text "Template Haskell pattern quotation"
-pprMatchContextNoun PatBindRhs      = text "pattern binding"
-pprMatchContextNoun PatBindGuards   = text "pattern binding guards"
-pprMatchContextNoun LambdaExpr      = text "lambda abstraction"
-pprMatchContextNoun (ArrowMatchCtxt c)= pprArrowMatchContextNoun c
-pprMatchContextNoun (StmtCtxt ctxt) = text "pattern binding in"
-                                      $$ pprAStmtContext ctxt
-pprMatchContextNoun PatSyn          = text "pattern synonym declaration"
+pprMatchContextNoun (FunRhs {mc_fun=fun})   = text "equation for"
+                                              <+> quotes (ppr (unXRec @p fun))
+pprMatchContextNoun CaseAlt                 = text "case alternative"
+pprMatchContextNoun (LamCaseAlt lc_variant) = lamCaseKeyword lc_variant
+                                              <+> text "alternative"
+pprMatchContextNoun IfAlt                   = text "multi-way if alternative"
+pprMatchContextNoun RecUpd                  = text "record-update construct"
+pprMatchContextNoun ThPatSplice             = text "Template Haskell pattern splice"
+pprMatchContextNoun ThPatQuote              = text "Template Haskell pattern quotation"
+pprMatchContextNoun PatBindRhs              = text "pattern binding"
+pprMatchContextNoun PatBindGuards           = text "pattern binding guards"
+pprMatchContextNoun LambdaExpr              = text "lambda abstraction"
+pprMatchContextNoun (ArrowMatchCtxt c)      = pprArrowMatchContextNoun c
+pprMatchContextNoun (StmtCtxt ctxt)         = text "pattern binding in"
+                                              $$ pprAStmtContext ctxt
+pprMatchContextNoun PatSyn                  = text "pattern synonym declaration"
+
+pprMatchContextNouns :: forall p. (Outputable (IdP p), UnXRec p)
+                     => HsMatchContext p -> SDoc
+pprMatchContextNouns (FunRhs {mc_fun=fun})   = text "equations for"
+                                               <+> quotes (ppr (unXRec @p fun))
+pprMatchContextNouns PatBindGuards           = text "pattern binding guards"
+pprMatchContextNouns (ArrowMatchCtxt c)      = pprArrowMatchContextNouns c
+pprMatchContextNouns (StmtCtxt ctxt)         = text "pattern bindings in"
+                                               $$ pprAStmtContext ctxt
+pprMatchContextNouns ctxt                    = pprMatchContextNoun ctxt <> char 's'
 
 pprArrowMatchContextNoun :: HsArrowMatchContext -> SDoc
-pprArrowMatchContextNoun ProcExpr     = text "arrow proc pattern"
-pprArrowMatchContextNoun ArrowCaseAlt = text "case alternative within arrow notation"
-pprArrowMatchContextNoun KappaExpr    = text "arrow kappa abstraction"
+pprArrowMatchContextNoun ProcExpr                     = text "arrow proc pattern"
+pprArrowMatchContextNoun ArrowCaseAlt                 = text "case alternative within arrow notation"
+pprArrowMatchContextNoun (ArrowLamCaseAlt lc_variant) = lamCaseKeyword lc_variant
+                                                        <+> text "alternative within arrow notation"
+pprArrowMatchContextNoun KappaExpr                    = text "arrow kappa abstraction"
+
+pprArrowMatchContextNouns :: HsArrowMatchContext -> SDoc
+pprArrowMatchContextNouns ArrowCaseAlt                 = text "case alternatives within arrow notation"
+pprArrowMatchContextNouns (ArrowLamCaseAlt lc_variant) = lamCaseKeyword lc_variant
+                                                         <+> text "alternatives within arrow notation"
+pprArrowMatchContextNouns ctxt                         = pprArrowMatchContextNoun ctxt <> char 's'
 
 -----------------
 pprAStmtContext, pprStmtContext :: (Outputable (IdP p), UnXRec p)
