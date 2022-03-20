@@ -256,10 +256,6 @@ instance Diagnostic TcRnMessage where
     TcRnArrowIfThenElsePredDependsOnResultTy
       -> mkSimpleDecorated $
            text "Predicate type of `ifThenElse' depends on result type"
-    TcRnArrowCommandExpected cmd
-      -> mkSimpleDecorated $
-           vcat [text "The expression", nest 2 (ppr cmd),
-                 text "was found where an arrow command was expected"]
     TcRnIllegalHsBootFileDecl
       -> mkSimpleDecorated $
            text "Illegal declarations in an hs-boot file"
@@ -867,8 +863,6 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnArrowIfThenElsePredDependsOnResultTy
       -> ErrorWithoutFlag
-    TcRnArrowCommandExpected{}
-      -> ErrorWithoutFlag
     TcRnIllegalHsBootFileDecl
       -> ErrorWithoutFlag
     TcRnRecursivePatternSynonym{}
@@ -1128,8 +1122,6 @@ instance Diagnostic TcRnMessage where
     TcRnTagToEnumResTyNotAnEnum{}
       -> noHints
     TcRnArrowIfThenElsePredDependsOnResultTy
-      -> noHints
-    TcRnArrowCommandExpected{}
       -> noHints
     TcRnIllegalHsBootFileDecl
       -> noHints

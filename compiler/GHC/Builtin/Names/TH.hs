@@ -54,7 +54,7 @@ templateHaskellNames = [
     -- Exp
     varEName, conEName, litEName, appEName, appTypeEName, infixEName,
     infixAppName, sectionLName, sectionRName, lamEName, lamCaseEName,
-    tupEName, unboxedTupEName, unboxedSumEName,
+    lamCasesEName, tupEName, unboxedTupEName, unboxedSumEName,
     condEName, multiIfEName, letEName, caseEName, doEName, mdoEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
     listEName, sigEName, recConEName, recUpdEName, staticEName, unboundVarEName,
@@ -285,7 +285,7 @@ clauseName = libFun (fsLit "clause") clauseIdKey
 
 -- data Exp = ...
 varEName, conEName, litEName, appEName, appTypeEName, infixEName, infixAppName,
-    sectionLName, sectionRName, lamEName, lamCaseEName, tupEName,
+    sectionLName, sectionRName, lamEName, lamCaseEName, lamCasesEName, tupEName,
     unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
     caseEName, doEName, mdoEName, compEName, staticEName, unboundVarEName,
     labelEName, implicitParamVarEName, getFieldEName, projectionEName :: Name
@@ -300,6 +300,7 @@ sectionLName          = libFun (fsLit "sectionL")          sectionLIdKey
 sectionRName          = libFun (fsLit "sectionR")          sectionRIdKey
 lamEName              = libFun (fsLit "lamE")              lamEIdKey
 lamCaseEName          = libFun (fsLit "lamCaseE")          lamCaseEIdKey
+lamCasesEName         = libFun (fsLit "lamCasesE")         lamCasesEIdKey
 tupEName              = libFun (fsLit "tupE")              tupEIdKey
 unboxedTupEName       = libFun (fsLit "unboxedTupE")       unboxedTupEIdKey
 unboxedSumEName       = libFun (fsLit "unboxedSumE")       unboxedSumEIdKey
@@ -813,8 +814,8 @@ clauseIdKey         = mkPreludeMiscIdUnique 262
 -- data Exp = ...
 varEIdKey, conEIdKey, litEIdKey, appEIdKey, appTypeEIdKey, infixEIdKey,
     infixAppIdKey, sectionLIdKey, sectionRIdKey, lamEIdKey, lamCaseEIdKey,
-    tupEIdKey, unboxedTupEIdKey, unboxedSumEIdKey, condEIdKey, multiIfEIdKey,
-    letEIdKey, caseEIdKey, doEIdKey, compEIdKey,
+    lamCasesEIdKey, tupEIdKey, unboxedTupEIdKey, unboxedSumEIdKey, condEIdKey,
+    multiIfEIdKey, letEIdKey, caseEIdKey, doEIdKey, compEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey,
     unboundVarEIdKey, labelEIdKey, implicitParamVarEIdKey, mdoEIdKey,
@@ -830,52 +831,53 @@ sectionLIdKey          = mkPreludeMiscIdUnique 277
 sectionRIdKey          = mkPreludeMiscIdUnique 278
 lamEIdKey              = mkPreludeMiscIdUnique 279
 lamCaseEIdKey          = mkPreludeMiscIdUnique 280
-tupEIdKey              = mkPreludeMiscIdUnique 281
-unboxedTupEIdKey       = mkPreludeMiscIdUnique 282
-unboxedSumEIdKey       = mkPreludeMiscIdUnique 283
-condEIdKey             = mkPreludeMiscIdUnique 284
-multiIfEIdKey          = mkPreludeMiscIdUnique 285
-letEIdKey              = mkPreludeMiscIdUnique 286
-caseEIdKey             = mkPreludeMiscIdUnique 287
-doEIdKey               = mkPreludeMiscIdUnique 288
-compEIdKey             = mkPreludeMiscIdUnique 289
-fromEIdKey             = mkPreludeMiscIdUnique 290
-fromThenEIdKey         = mkPreludeMiscIdUnique 291
-fromToEIdKey           = mkPreludeMiscIdUnique 292
-fromThenToEIdKey       = mkPreludeMiscIdUnique 293
-listEIdKey             = mkPreludeMiscIdUnique 294
-sigEIdKey              = mkPreludeMiscIdUnique 295
-recConEIdKey           = mkPreludeMiscIdUnique 296
-recUpdEIdKey           = mkPreludeMiscIdUnique 297
-staticEIdKey           = mkPreludeMiscIdUnique 298
-unboundVarEIdKey       = mkPreludeMiscIdUnique 299
-labelEIdKey            = mkPreludeMiscIdUnique 300
-implicitParamVarEIdKey = mkPreludeMiscIdUnique 301
-mdoEIdKey              = mkPreludeMiscIdUnique 302
-getFieldEIdKey         = mkPreludeMiscIdUnique 303
-projectionEIdKey       = mkPreludeMiscIdUnique 304
+lamCasesEIdKey         = mkPreludeMiscIdUnique 281
+tupEIdKey              = mkPreludeMiscIdUnique 282
+unboxedTupEIdKey       = mkPreludeMiscIdUnique 283
+unboxedSumEIdKey       = mkPreludeMiscIdUnique 284
+condEIdKey             = mkPreludeMiscIdUnique 285
+multiIfEIdKey          = mkPreludeMiscIdUnique 286
+letEIdKey              = mkPreludeMiscIdUnique 287
+caseEIdKey             = mkPreludeMiscIdUnique 288
+doEIdKey               = mkPreludeMiscIdUnique 289
+compEIdKey             = mkPreludeMiscIdUnique 290
+fromEIdKey             = mkPreludeMiscIdUnique 291
+fromThenEIdKey         = mkPreludeMiscIdUnique 292
+fromToEIdKey           = mkPreludeMiscIdUnique 293
+fromThenToEIdKey       = mkPreludeMiscIdUnique 294
+listEIdKey             = mkPreludeMiscIdUnique 295
+sigEIdKey              = mkPreludeMiscIdUnique 296
+recConEIdKey           = mkPreludeMiscIdUnique 297
+recUpdEIdKey           = mkPreludeMiscIdUnique 298
+staticEIdKey           = mkPreludeMiscIdUnique 299
+unboundVarEIdKey       = mkPreludeMiscIdUnique 300
+labelEIdKey            = mkPreludeMiscIdUnique 301
+implicitParamVarEIdKey = mkPreludeMiscIdUnique 302
+mdoEIdKey              = mkPreludeMiscIdUnique 303
+getFieldEIdKey         = mkPreludeMiscIdUnique 304
+projectionEIdKey       = mkPreludeMiscIdUnique 305
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique
-fieldExpIdKey       = mkPreludeMiscIdUnique 305
+fieldExpIdKey       = mkPreludeMiscIdUnique 306
 
 -- data Body = ...
 guardedBIdKey, normalBIdKey :: Unique
-guardedBIdKey     = mkPreludeMiscIdUnique 306
-normalBIdKey      = mkPreludeMiscIdUnique 307
+guardedBIdKey     = mkPreludeMiscIdUnique 307
+normalBIdKey      = mkPreludeMiscIdUnique 308
 
 -- data Guard = ...
 normalGEIdKey, patGEIdKey :: Unique
-normalGEIdKey     = mkPreludeMiscIdUnique 308
-patGEIdKey        = mkPreludeMiscIdUnique 309
+normalGEIdKey     = mkPreludeMiscIdUnique 309
+patGEIdKey        = mkPreludeMiscIdUnique 310
 
 -- data Stmt = ...
 bindSIdKey, letSIdKey, noBindSIdKey, parSIdKey, recSIdKey :: Unique
-bindSIdKey       = mkPreludeMiscIdUnique 310
-letSIdKey        = mkPreludeMiscIdUnique 311
-noBindSIdKey     = mkPreludeMiscIdUnique 312
-parSIdKey        = mkPreludeMiscIdUnique 313
-recSIdKey        = mkPreludeMiscIdUnique 314
+bindSIdKey       = mkPreludeMiscIdUnique 311
+letSIdKey        = mkPreludeMiscIdUnique 312
+noBindSIdKey     = mkPreludeMiscIdUnique 313
+parSIdKey        = mkPreludeMiscIdUnique 314
+recSIdKey        = mkPreludeMiscIdUnique 315
 
 -- data Dec = ...
 funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey, classDIdKey,

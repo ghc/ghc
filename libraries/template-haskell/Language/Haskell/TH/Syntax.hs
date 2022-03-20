@@ -2242,6 +2242,7 @@ type FieldPat = (Name,Pat)
 
 data Match = Match Pat Body [Dec] -- ^ @case e of { pat -> body where decs }@
     deriving( Show, Eq, Ord, Data, Generic )
+
 data Clause = Clause [Pat] Body [Dec]
                                   -- ^ @f { p1 p2 = body where decs }@
     deriving( Show, Eq, Ord, Data, Generic )
@@ -2273,6 +2274,7 @@ data Exp
                                        -- See "Language.Haskell.TH.Syntax#infix"
   | LamE [Pat] Exp                     -- ^ @{ \\ p1 p2 -> e }@
   | LamCaseE [Match]                   -- ^ @{ \\case m1; m2 }@
+  | LamCasesE [Clause]                 -- ^ @{ \\cases m1; m2 }@
   | TupE [Maybe Exp]                   -- ^ @{ (e1,e2) }  @
                                        --
                                        -- The 'Maybe' is necessary for handling

@@ -1189,15 +1189,43 @@ type AnnoBody body
     , Outputable (body GhcPs)
     )
 
+-- Note [Empty MatchGroups]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
+-- In some cases, MatchGroups are allowed to be empty. Firstly, the
+-- prerequisite is that -XEmptyCase is enabled. Then you have an empty
+-- MatchGroup resulting either from a case-expression:
+--
+--     case e of {}
+--
+-- or from a \case-expression:
+--
+--     \case {}
+--
+-- NB: \cases {} is not allowed, since it's not clear how many patterns this
+-- should match on.
+--
+-- The same applies in arrow notation commands: With -XEmptyCases, it is
+-- allowed in case- and \case-commands, but not \cases.
+--
+-- Since the lambda expressions and empty function definitions are already
+-- disallowed elsewhere, here, we only need to make sure we don't accept empty
+-- \cases expressions or commands. In that case, or if we encounter an empty
+-- MatchGroup but -XEmptyCases is disabled, we add an error.
+
 rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContext GhcRn
              -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
              -> MatchGroup GhcPs (LocatedA (body GhcPs))
              -> RnM (MatchGroup GhcRn (LocatedA (body GhcRn)), FreeVars)
 rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_origin = origin })
-  = do { empty_case_ok <- xoptM LangExt.EmptyCase
-       ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
+         -- see Note [Empty MatchGroups]
+  = do { whenM ((null ms &&) <$> mustn't_be_empty) (addErr (emptyCaseErr ctxt))
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
        ; return (mkMatchGroup origin (L lm new_ms), ms_fvs) }
+  where
+    mustn't_be_empty = case ctxt of
+      LamCaseAlt LamCases -> return True
+      ArrowMatchCtxt (ArrowLamCaseAlt LamCases) -> return True
+      _ -> not <$> xoptM LangExt.EmptyCase
 
 rnMatch :: AnnoBody body
         => HsMatchContext GhcRn
@@ -1222,17 +1250,28 @@ rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
                         , m_grhss = grhss'}, grhss_fvs ) }
 
 emptyCaseErr :: HsMatchContext GhcRn -> TcRnMessage
-emptyCaseErr ctxt = TcRnUnknownMessage $ mkPlainError noHints $
-  hang (text "Empty list of alternatives in" <+> pp_ctxt ctxt)
-        2 (text "Use EmptyCase to allow this")
+emptyCaseErr ctxt = TcRnUnknownMessage $ mkPlainError noHints $ message ctxt
   where
     pp_ctxt :: HsMatchContext GhcRn -> SDoc
     pp_ctxt c = case c of
-      CaseAlt       -> text "case expression"
-      LambdaExpr    -> text "\\case expression"
-      ArrowMatchCtxt ArrowCaseAlt -> text "case expression"
-      ArrowMatchCtxt KappaExpr    -> text "kappa abstraction"
-      _             -> text "(unexpected)" <+> pprMatchContextNoun c
+      CaseAlt                                  -> text "case expression"
+      LamCaseAlt LamCase                       -> text "\\case expression"
+      ArrowMatchCtxt (ArrowLamCaseAlt LamCase) -> text "\\case command"
+      ArrowMatchCtxt ArrowCaseAlt              -> text "case command"
+      ArrowMatchCtxt KappaExpr                 -> text "kappa abstraction"
+      _                                        -> text "(unexpected)"
+                                                  <+> pprMatchContextNoun c
+
+    message :: HsMatchContext GhcRn -> SDoc
+    message (LamCaseAlt LamCases) = lcases_msg <+> text "expression"
+    message (ArrowMatchCtxt (ArrowLamCaseAlt LamCases)) =
+      lcases_msg <+> text "command"
+    message ctxt =
+      hang (text "Empty list of alternatives in" <+> pp_ctxt ctxt)
+           2 (text "Use EmptyCase to allow this")
+
+    lcases_msg =
+      text "Empty list of alternatives is not allowed in \\cases"
 
 {-
 ************************************************************************

@@ -42,9 +42,9 @@ module Language.Haskell.TH.Lib (
     -- *** Expressions
         dyn, varE, unboundVarE, labelE, implicitParamVarE, conE, litE, staticE,
         appE, appTypeE, uInfixE, parensE, infixE, infixApp, sectionL, sectionR,
-        lamE, lam1E, lamCaseE, tupE, unboxedTupE, unboxedSumE, condE, multiIfE,
-        letE, caseE, appsE, listE, sigE, recConE, recUpdE, stringE, fieldExp,
-        getFieldE, projectionE,
+        lamE, lam1E, lamCaseE, lamCasesE, tupE, unboxedTupE, unboxedSumE, condE,
+        multiIfE, letE, caseE, appsE, listE, sigE, recConE, recUpdE, stringE,
+        fieldExp, getFieldE, projectionE,
     -- **** Ranges
     fromE, fromThenE, fromToE, fromThenToE,
 

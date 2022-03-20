@@ -364,4 +364,3 @@ resizeSmallMutableArray# arr0 szNew a s0 =
 -- accessible\" by word.
 considerAccessible :: Bool
 considerAccessible = True
-

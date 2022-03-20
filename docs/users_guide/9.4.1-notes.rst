@@ -41,6 +41,12 @@ Language
     re-exported from ``Prelude``. When ``(~)`` is not in scope, its use results
     in a warning (:ghc-flag:`-Wtype-equality-out-of-scope`).
 
+- GHC Proposal `#302 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0302-cases.rst>`_ has been implemented.
+  This means under ``-XLambdaCase``, a new expression heralded by ``\cases`` is
+  available, which works like ``\case`` but can match on multiple patterns.
+  This means constructor patterns with arguments have to parenthesized here,
+  just like in lambda expressions.
+
 - There were previously cases around functional dependencies and injective
   type families where the result of type inference would depend on the order
   of constraints, as written in a source file. These cases are fundamentally ambiguous.

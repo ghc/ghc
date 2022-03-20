@@ -1,6 +1,6 @@
 
 NoBlockArgumentsFail3.hs:7:22: error:
-    Unexpected lambda-case expression in function application:
+    Unexpected \case expression in function application:
         \case Just 3 -> print x
     Suggested fixes:
       Use parentheses.

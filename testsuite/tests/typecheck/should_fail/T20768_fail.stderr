@@ -1,0 +1,31 @@
+
+T20768_fail.hs:7:16:
+     Couldn't match expected type ‘Bool’ with actual type ‘Char’
+     In the expression: 'c'
+      In a stmt of a pattern guard for
+                     a /cases alternative:
+        'c'
+      In a /cases alternative: | 'c' -> "foo"
+
+T20768_fail.hs:9:1:
+     Couldn't match expected type: IO t0
+                  with actual type: a0 -> m0 ()
+     When checking the type of the IO action ‘main’
+
+T20768_fail.hs:11:11:
+     /cases alternatives have different numbers of arguments
+        T20768_fail.hs:11:18-33
+        T20768_fail.hs:12:18-31
+     In the second argument of ‘(&)’, namely
+        ‘/cases
+           1 2 -> return ()
+           1 -> return ()’
+      In the expression:
+        1 & /cases
+              1 2 -> return ()
+              1 -> return ()
+      In an equation for ‘foo’:
+          foo
+            = 1 & /cases
+                    1 2 -> return ()
+                    1 -> return ()

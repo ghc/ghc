@@ -132,12 +132,14 @@ hard_hole_fits.hs:20:24: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
            (and originally defined in ‘GHC.Enum’))
 
-hard_hole_fits.hs:21:29: warning: [-Wtyped-holes (in -Wdefault)]
+hard_hole_fits.hs:21:40: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In an equation for ‘testMe’: testMe (HsLamCase xlc mg) = _
+    • In an equation for ‘testMe’:
+           testMe (HsLamCase xlc lc_variant mg) = _
     • Relevant bindings include
         mg :: MatchGroup GhcPs (LHsExpr GhcPs)
-          (bound at hard_hole_fits.hs:21:23)
+          (bound at hard_hole_fits.hs:21:34)
+        lc_variant :: LamCaseVariant (bound at hard_hole_fits.hs:21:23)
         xlc :: Language.Haskell.Syntax.Extension.XLamCase GhcPs
           (bound at hard_hole_fits.hs:21:19)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)

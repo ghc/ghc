@@ -1,7 +1,7 @@
 
 EmptyCase001.hs:9:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns of type ‘Int’ not matched: _
+    In a \case alternative: Patterns of type ‘Int’ not matched: _
 
 EmptyCase001.hs:14:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive

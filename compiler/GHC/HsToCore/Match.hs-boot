@@ -15,7 +15,7 @@ match   :: [Id]
 
 matchWrapper
         :: HsMatchContext GhcRn
-        -> Maybe (LHsExpr GhcTc)
+        -> Maybe [LHsExpr GhcTc]
         -> MatchGroup GhcTc (LHsExpr GhcTc)
         -> DsM ([Id], CoreExpr)
 

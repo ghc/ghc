@@ -207,6 +207,7 @@ data AnnKeywordId
     | AnnBackquote -- ^ '`'
     | AnnBy
     | AnnCase -- ^ case or lambda case
+    | AnnCases -- ^ lambda cases
     | AnnClass
     | AnnClose -- ^  '\#)' or '\#-}'  etc
     | AnnCloseB -- ^ '|)'

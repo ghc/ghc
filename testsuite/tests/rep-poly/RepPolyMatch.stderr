@@ -1,6 +1,6 @@
 
 RepPolyMatch.hs:11:9: error:
-    • The binder of the lambda-case expression
+    • The binder of the \case expression
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE rep

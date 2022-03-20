@@ -57,7 +57,6 @@ import GHC.Utils.Panic
 
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
-
 import Data.Maybe( catMaybes, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
@@ -1012,16 +1011,21 @@ cvtl e = wrapLA (cvt e)
                             ; th_origin <- getOrigin
                             ; wrapParLA (HsLam noExtField . mkMatchGroup th_origin)
                                         [mkSimpleMatch LambdaExpr pats e']}
-    cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch CaseAlt) ms
+    cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch $ LamCaseAlt LamCase) ms
                             ; th_origin <- getOrigin
-                            ; wrapParLA (HsLamCase noAnn . mkMatchGroup th_origin) ms'
+                            ; wrapParLA (HsLamCase noAnn LamCase . mkMatchGroup th_origin) ms'
                             }
+    cvt (LamCasesE ms)
+      | null ms   = failWith (text "\\cases expression with no alternatives")
+      | otherwise = do { ms' <- mapM (cvtClause $ LamCaseAlt LamCases) ms
+                       ; th_origin <- getOrigin
+                       ; wrapParLA (HsLamCase noAnn LamCases . mkMatchGroup th_origin) ms'
+                       }
     cvt (TupE es)        = cvt_tup es Boxed
     cvt (UnboxedTupE es) = cvt_tup es Unboxed
     cvt (UnboxedSumE e alt arity) = do { e' <- cvtl e
                                        ; unboxedSumChecks alt arity
-                                       ; return $ ExplicitSum noAnn
-                                                                   alt arity e'}
+                                       ; return $ ExplicitSum noAnn alt arity e'}
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
                             ; return $ mkHsIf x' y' z' noAnn }
     cvt (MultiIfE alts)

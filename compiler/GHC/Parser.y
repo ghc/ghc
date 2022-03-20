@@ -648,6 +648,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '='            { L _ ITequal }
  '\\'           { L _ ITlam }
  'lcase'        { L _ ITlcase }
+ 'lcases'       { L _ ITlcases }
  '|'            { L _ ITvbar }
  '<-'           { L _ (ITlarrow _) }
  '->'           { L _ (ITrarrow _) }
@@ -2805,9 +2806,12 @@ aexp    :: { ECP }
         | 'let' binds 'in' exp          {  ECP $
                                            unECP $4 >>= \ $4 ->
                                            mkHsLetPV (comb2A $1 $>) (hsTok $1) (unLoc $2) (hsTok $3) $4 }
-        | '\\' 'lcase' altslist
+        | '\\' 'lcase' altslist(pats1)
             {  ECP $ $3 >>= \ $3 ->
-                 mkHsLamCasePV (comb2 $1 (reLoc $>)) $3 [mj AnnLam $1,mj AnnCase $2] }
+                 mkHsLamCasePV (comb2 $1 (reLoc $>)) LamCase $3 [mj AnnLam $1,mj AnnCase $2] }
+        | '\\' 'lcases' altslist(apats)
+            {  ECP $ $3 >>= \ $3 ->
+                 mkHsLamCasePV (comb2 $1 (reLoc $>)) LamCases $3 [mj AnnLam $1,mj AnnCases $2] }
         | 'if' exp optSemi 'then' exp optSemi 'else' exp
                          {% runPV (unECP $2) >>= \ ($2 :: LHsExpr GhcPs) ->
                             return $ ECP $
@@ -2825,11 +2829,11 @@ aexp    :: { ECP }
                                            fmap ecpFromExp $
                                            acsA (\cs -> sLL $1 $> $ HsMultiIf (EpAnn (glR $1) (mj AnnIf $1:(fst $ unLoc $2)) cs)
                                                      (reverse $ snd $ unLoc $2)) }
-        | 'case' exp 'of' altslist    {% runPV (unECP $2) >>= \ ($2 :: LHsExpr GhcPs) ->
-                                         return $ ECP $
-                                           $4 >>= \ $4 ->
-                                           mkHsCasePV (comb3 $1 $3 (reLoc $4)) $2 $4
-                                                (EpAnnHsCase (glAA $1) (glAA $3) []) }
+        | 'case' exp 'of' altslist(pats1) {% runPV (unECP $2) >>= \ ($2 :: LHsExpr GhcPs) ->
+                                             return $ ECP $
+                                               $4 >>= \ $4 ->
+                                               mkHsCasePV (comb3 $1 $3 (reLoc $4)) $2 $4
+                                                    (EpAnnHsCase (glAA $1) (glAA $3) []) }
         -- QualifiedDo.
         | DO  stmtlist               {% do
                                       hintQualifiedDo $1
@@ -3209,48 +3213,48 @@ guardquals1 :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
 -----------------------------------------------------------------------------
 -- Case alternatives
 
-altslist :: { forall b. DisambECP b => PV (LocatedL [LMatch GhcPs (LocatedA b)]) }
-        : '{'            alts '}'  { $2 >>= \ $2 -> amsrl
-                                     (sLL $1 $> (reverse (snd $ unLoc $2)))
-                                               (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) (fst $ unLoc $2) []) }
-        |     vocurly    alts  close { $2 >>= \ $2 -> amsrl
-                                       (L (getLoc $2) (reverse (snd $ unLoc $2)))
-                                        (AnnList (Just $ glR $2) Nothing Nothing (fst $ unLoc $2) []) }
-        | '{'                 '}'    { amsrl (sLL $1 $> []) (AnnList Nothing (Just $ moc $1) (Just $ mcc $2) [] []) }
-        |     vocurly          close { return $ noLocA [] }
+altslist(PATS) :: { forall b. DisambECP b => PV (LocatedL [LMatch GhcPs (LocatedA b)]) }
+        : '{'        alts(PATS) '}'    { $2 >>= \ $2 -> amsrl
+                                           (sLL $1 $> (reverse (snd $ unLoc $2)))
+                                           (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) (fst $ unLoc $2) []) }
+        | vocurly    alts(PATS)  close { $2 >>= \ $2 -> amsrl
+                                           (L (getLoc $2) (reverse (snd $ unLoc $2)))
+                                           (AnnList (Just $ glR $2) Nothing Nothing (fst $ unLoc $2) []) }
+        | '{'              '}'   { amsrl (sLL $1 $> []) (AnnList Nothing (Just $ moc $1) (Just $ mcc $2) [] []) }
+        | vocurly          close { return $ noLocA [] }
 
-alts    :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LocatedA b)])) }
-        : alts1                    { $1 >>= \ $1 -> return $
+alts(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LocatedA b)])) }
+        : alts1(PATS)              { $1 >>= \ $1 -> return $
                                      sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
-        | ';' alts                 { $2 >>= \ $2 -> return $
+        | ';' alts(PATS)           { $2 >>= \ $2 -> return $
                                      sLL $1 $> (((mz AnnSemi $1) ++ (fst $ unLoc $2) )
                                                ,snd $ unLoc $2) }
 
-alts1   :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LocatedA b)])) }
-        : alts1 ';' alt         { $1 >>= \ $1 ->
-                                  $3 >>= \ $3 ->
-                                     case snd $ unLoc $1 of
-                                       [] -> return (sLL $1 (reLoc $>) ((fst $ unLoc $1) ++ (mz AnnSemi $2)
-                                                                       ,[$3]))
-                                       (h:t) -> do
-                                         h' <- addTrailingSemiA h (gl $2)
-                                         return (sLL $1 (reLoc $>) (fst $ unLoc $1,$3 : h' : t)) }
-        | alts1 ';'             {  $1 >>= \ $1 ->
-                                     case snd $ unLoc $1 of
-                                       [] -> return (sLL $1 $> ((fst $ unLoc $1) ++ (mz AnnSemi $2)
-                                                                       ,[]))
-                                       (h:t) -> do
-                                         h' <- addTrailingSemiA h (gl $2)
-                                         return (sLL $1 $> (fst $ unLoc $1, h' : t)) }
-        | alt                   { $1 >>= \ $1 -> return $ sL1 (reLoc $1) ([],[$1]) }
+alts1(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LocatedA b)])) }
+        : alts1(PATS) ';' alt(PATS) { $1 >>= \ $1 ->
+                                        $3 >>= \ $3 ->
+                                          case snd $ unLoc $1 of
+                                            [] -> return (sLL $1 (reLoc $>) ((fst $ unLoc $1) ++ (mz AnnSemi $2)
+                                                                            ,[$3]))
+                                            (h:t) -> do
+                                              h' <- addTrailingSemiA h (gl $2)
+                                              return (sLL $1 (reLoc $>) (fst $ unLoc $1,$3 : h' : t)) }
+        | alts1(PATS) ';'           {  $1 >>= \ $1 ->
+                                         case snd $ unLoc $1 of
+                                           [] -> return (sLL $1 $> ((fst $ unLoc $1) ++ (mz AnnSemi $2)
+                                                                           ,[]))
+                                           (h:t) -> do
+                                             h' <- addTrailingSemiA h (gl $2)
+                                             return (sLL $1 $> (fst $ unLoc $1, h' : t)) }
+        | alt(PATS)                 { $1 >>= \ $1 -> return $ sL1 (reLoc $1) ([],[$1]) }
 
-alt     :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
-           : pat alt_rhs  { $2 >>= \ $2 ->
-                            acsA (\cs -> sLL (reLoc $1) $>
-                                           (Match { m_ext = (EpAnn (glAR $1) [] cs)
-                                                  , m_ctxt = CaseAlt
-                                                  , m_pats = [$1]
-                                                  , m_grhss = unLoc $2 }))}
+alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
+        : PATS alt_rhs { $2 >>= \ $2 ->
+                         acsA (\cs -> sLLAsl $1 $>
+                                         (Match { m_ext = EpAnn (listAsAnchor $1) [] cs
+                                                , m_ctxt = CaseAlt -- for \case and \cases, this will be changed during post-processing
+                                                , m_pats = $1
+                                                , m_grhss = unLoc $2 }))}
 
 alt_rhs :: { forall b. DisambECP b => PV (Located (GRHSs GhcPs (LocatedA b))) }
         : ralt wherebinds           { $1 >>= \alt ->
@@ -3289,6 +3293,11 @@ gdpat   :: { forall b. DisambECP b => PV (LGRHS GhcPs (LocatedA b)) }
 -- we parse them right when bang-patterns are off
 pat     :: { LPat GhcPs }
 pat     :  exp          {% (checkPattern <=< runPV) (unECP $1) }
+
+-- 'pats1' does the same thing as 'pat', but returns it as a singleton
+-- list so that it can be used with a parameterized production rule
+pats1   :: { [LPat GhcPs] }
+pats1   : pat { [ $1 ] }
 
 bindpat :: { LPat GhcPs }
 bindpat :  exp            {% -- See Note [Parser-Validator Details] in GHC.Parser.PostProcess
@@ -4057,6 +4066,11 @@ sLLlA x y = sL (comb2A x y) -- #define LL   sL (comb2 $1 $>)
 {-# INLINE sLLAl #-}
 sLLAl :: LocatedAn t a -> Located b -> c -> Located c
 sLLAl x y = sL (comb2A y x) -- #define LL   sL (comb2 $1 $>)
+
+{-# INLINE sLLAsl #-}
+sLLAsl :: [LocatedAn t a] -> Located b -> c -> Located c
+sLLAsl [] = sL1
+sLLAsl (x:_) = sLLAl x
 
 {-# INLINE sLLAA #-}
 sLLAA :: LocatedAn t a -> LocatedAn u b -> c -> Located c

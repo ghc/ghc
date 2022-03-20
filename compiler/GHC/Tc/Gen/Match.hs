@@ -31,6 +31,7 @@ module GHC.Tc.Gen.Match
    , tcBody
    , tcDoStmt
    , tcGuardStmt
+   , checkPatCounts
    )
 where
 
@@ -105,7 +106,9 @@ tcMatchesFun fun_id matches exp_ty
            -- ann-grabbing, because we don't always have annotations in
            -- hand when we call tcMatchesFun...
           traceTc "tcMatchesFun" (ppr fun_name $$ ppr exp_ty)
-        ; checkArgs fun_name matches
+           -- We can't easily call checkPatCounts here because fun_id can be an
+           -- unfilled thunk
+        ; checkArgCounts fun_name matches
 
         ; matchExpectedFunTys herald ctxt arity exp_ty $ \ pat_tys rhs_ty ->
              -- NB: exp_type may be polymorphic, but
@@ -161,8 +164,10 @@ tcMatchLambda :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys
               -> ExpRhoType
               -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
 tcMatchLambda herald match_ctxt match res_ty
-  = matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty ->
-    tcMatches match_ctxt pat_tys rhs_ty match
+  =  do { checkPatCounts (mc_what match_ctxt) match
+        ; matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty -> do
+            -- checking argument counts since this is also used for \cases
+            tcMatches match_ctxt pat_tys rhs_ty match }
   where
     n_pats | isEmptyMatchGroup match = 1   -- must be lambda-case
            | otherwise               = matchGroupArity match
@@ -1132,23 +1137,35 @@ the variables they bind into scope, and typecheck the thing_inside.
 *                                                                      *
 ************************************************************************
 
-@sameNoOfArgs@ takes a @[RenamedMatch]@ and decides whether the same
+@checkArgCounts@ takes a @[RenamedMatch]@ and decides whether the same
 number of args are used in each equation.
 -}
 
-checkArgs :: AnnoBody body
-          => Name -> MatchGroup GhcRn (LocatedA (body GhcRn)) -> TcM ()
-checkArgs _ (MG { mg_alts = L _ [] })
+checkArgCounts :: AnnoBody body
+               => Name -> MatchGroup GhcRn (LocatedA (body GhcRn)) -> TcM ()
+checkArgCounts = check_match_pats . (text "Equations for" <+>) . quotes . ppr
+
+-- @checkPatCounts@ takes a @[RenamedMatch]@ and decides whether the same
+-- number of patterns are used in each alternative
+checkPatCounts :: AnnoBody body
+               => HsMatchContext GhcTc -> MatchGroup GhcRn (LocatedA (body GhcRn))
+               -> TcM ()
+checkPatCounts = check_match_pats . pprMatchContextNouns
+
+check_match_pats :: AnnoBody body
+                 => SDoc -> MatchGroup GhcRn (LocatedA (body GhcRn))
+                 -> TcM ()
+check_match_pats _ (MG { mg_alts = L _ [] })
     = return ()
-checkArgs fun (MG { mg_alts = L _ (match1:matches) })
+check_match_pats err_msg (MG { mg_alts = L _ (match1:matches) })
     | null bad_matches
     = return ()
     | otherwise
     = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
-      (vcat [ text "Equations for" <+> quotes (ppr fun) <+>
-                         text "have different numbers of arguments"
-                       , nest 2 (ppr (getLocA match1))
-                       , nest 2 (ppr (getLocA (head bad_matches)))])
+      (vcat [ err_msg <+>
+              text "have different numbers of arguments"
+            , nest 2 (ppr (getLocA match1))
+            , nest 2 (ppr (getLocA (head bad_matches)))])
   where
     n_args1 = args_in_match match1
     bad_matches = [m | m <- matches, args_in_match m /= n_args1]

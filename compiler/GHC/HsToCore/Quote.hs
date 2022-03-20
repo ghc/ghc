@@ -1499,10 +1499,14 @@ repE (HsOverLit _ l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit _ l)     = do { a <- repLiteral l;           repLit a }
 repE (HsLam _ (MG { mg_alts = (L _ [m]) })) = repLambda m
 repE e@(HsLam _ (MG { mg_alts = (L _ _) })) = pprPanic "repE: HsLam with multiple alternatives" (ppr e)
-repE (HsLamCase _ (MG { mg_alts = (L _ ms) }))
+repE (HsLamCase _ LamCase (MG { mg_alts = (L _ ms) }))
                    = do { ms' <- mapM repMatchTup ms
                         ; core_ms <- coreListM matchTyConName ms'
                         ; repLamCase core_ms }
+repE (HsLamCase _ LamCases (MG { mg_alts = (L _ ms) }))
+                   = do { ms' <- mapM repClauseTup ms
+                        ; core_ms <- coreListM matchTyConName ms'
+                        ; repLamCases core_ms }
 repE (HsApp _ x y)   = do {a <- repLE x; b <- repLE y; repApp a b}
 repE (HsAppType _ e t) = do { a <- repLE e
                             ; s <- repLTy (hswc_body t)
@@ -2358,6 +2362,9 @@ repLam (MkC ps) (MkC e) = rep2 lamEName [ps, e]
 
 repLamCase :: Core [(M TH.Match)] -> MetaM (Core (M TH.Exp))
 repLamCase (MkC ms) = rep2 lamCaseEName [ms]
+
+repLamCases :: Core [(M TH.Clause)] -> MetaM (Core (M TH.Exp))
+repLamCases (MkC ms) = rep2 lamCasesEName [ms]
 
 repTup :: Core [Maybe (M TH.Exp)] -> MetaM (Core (M TH.Exp))
 repTup (MkC es) = rep2 tupEName [es]

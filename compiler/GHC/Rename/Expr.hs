@@ -374,9 +374,9 @@ rnExpr (HsLam x matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLExpr matches
        ; return (HsLam x matches', fvMatch) }
 
-rnExpr (HsLamCase x matches)
-  = do { (matches', fvs_ms) <- rnMatchGroup CaseAlt rnLExpr matches
-       ; return (HsLamCase x matches', fvs_ms) }
+rnExpr (HsLamCase x lc_variant matches)
+  = do { (matches', fvs_ms) <- rnMatchGroup (LamCaseAlt lc_variant) rnLExpr matches
+       ; return (HsLamCase x lc_variant matches', fvs_ms) }
 
 rnExpr (HsCase _ expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
@@ -810,9 +810,10 @@ rnCmd (HsCmdCase _ expr matches)
        ; return (HsCmdCase noExtField new_expr new_matches
                 , e_fvs `plusFV` ms_fvs) }
 
-rnCmd (HsCmdLamCase x matches)
-  = do { (new_matches, ms_fvs) <- rnMatchGroup (ArrowMatchCtxt ArrowCaseAlt) rnLCmd matches
-       ; return (HsCmdLamCase x new_matches, ms_fvs) }
+rnCmd (HsCmdLamCase x lc_variant matches)
+  = do { (new_matches, ms_fvs) <-
+           rnMatchGroup (ArrowMatchCtxt $ ArrowLamCaseAlt lc_variant) rnLCmd matches
+       ; return (HsCmdLamCase x lc_variant new_matches, ms_fvs) }
 
 rnCmd (HsCmdIf _ _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
@@ -864,7 +865,7 @@ methodNamesCmd (HsCmdLam _ match)        = methodNamesMatch match
 
 methodNamesCmd (HsCmdCase _ _ matches)
   = methodNamesMatch matches `addOneFV` choiceAName
-methodNamesCmd (HsCmdLamCase _ matches)
+methodNamesCmd (HsCmdLamCase _ _ matches)
   = methodNamesMatch matches `addOneFV` choiceAName
 
 --methodNamesCmd _ = emptyFVs

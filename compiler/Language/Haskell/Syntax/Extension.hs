@@ -519,18 +519,18 @@ type family XXStmtLR         x x' b
 
 -- -------------------------------------
 -- HsCmd type families
-type family XCmdArrApp  x
-type family XCmdArrForm x
-type family XCmdApp     x
-type family XCmdLam     x
-type family XCmdPar     x
-type family XCmdCase    x
-type family XCmdLamCase x
-type family XCmdIf      x
-type family XCmdLet     x
-type family XCmdDo      x
-type family XCmdWrap    x
-type family XXCmd       x
+type family XCmdArrApp   x
+type family XCmdArrForm  x
+type family XCmdApp      x
+type family XCmdLam      x
+type family XCmdPar      x
+type family XCmdCase     x
+type family XCmdLamCase  x
+type family XCmdIf       x
+type family XCmdLet      x
+type family XCmdDo       x
+type family XCmdWrap     x
+type family XXCmd        x
 
 -- -------------------------------------
 -- ParStmtBlock type families

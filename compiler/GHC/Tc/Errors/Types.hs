@@ -619,15 +619,6 @@ data TcRnMessage where
   -}
   TcRnArrowIfThenElsePredDependsOnResultTy :: TcRnMessage
 
-  {-| TcRnArrowCommandExpected is an error that occurs if a non-arrow command
-      is used where an arrow command is expected.
-
-      Example(s): None
-
-     Test cases: None
-  -}
-  TcRnArrowCommandExpected :: HsCmd GhcRn -> TcRnMessage
-
   {-| TcRnIllegalHsBootFileDecl is an error that occurs when an hs-boot file
       contains declarations that are not allowed, such as bindings.
 

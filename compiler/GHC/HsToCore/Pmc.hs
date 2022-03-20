@@ -419,24 +419,25 @@ addTyCs origin ev_vars m = do
               addPhiCtsNablas nablas (PhiTyCt . evVarPred <$> ev_vars))
             m
 
--- | Add equalities for the 'CoreExpr' scrutinee to the local 'DsM' environment
--- when checking a case expression:
+-- | Add equalities for the 'CoreExpr' scrutinees to the local 'DsM' environment,
+-- e.g. when checking a case expression:
 --     case e of x { matches }
 -- When checking matches we record that (x ~ e) where x is the initial
 -- uncovered. All matches will have to satisfy this equality.
-addCoreScrutTmCs :: Maybe CoreExpr -> [Id] -> DsM a -> DsM a
-addCoreScrutTmCs Nothing    _   k = k
-addCoreScrutTmCs (Just scr) [x] k =
-  flip locallyExtendPmNablas k $ \nablas ->
+-- This is also used for the Arrows \cases command, where these equalities have
+-- to be added for multiple scrutinees rather than just one.
+addCoreScrutTmCs :: [CoreExpr] -> [Id] -> DsM a -> DsM a
+addCoreScrutTmCs []         _      k = k
+addCoreScrutTmCs (scr:scrs) (x:xs) k =
+  flip locallyExtendPmNablas (addCoreScrutTmCs scrs xs k) $ \nablas ->
     addPhiCtsNablas nablas (unitBag (PhiCoreCt x scr))
-addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: scrutinee, but more than one match id"
+addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: numbers of scrutinees and match ids differ"
 
--- | 'addCoreScrutTmCs', but desugars the 'LHsExpr' first.
-addHsScrutTmCs :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM a -> DsM a
-addHsScrutTmCs Nothing    _    k = k
-addHsScrutTmCs (Just scr) vars k = do
-  scr_e <- dsLExpr scr
-  addCoreScrutTmCs (Just scr_e) vars k
+-- | 'addCoreScrutTmCs', but desugars the 'LHsExpr's first.
+addHsScrutTmCs :: [LHsExpr GhcTc] -> [Id] -> DsM a -> DsM a
+addHsScrutTmCs scrs vars k = do
+  scr_es <- traverse dsLExpr scrs
+  addCoreScrutTmCs scr_es vars k
 
 {- Note [Long-distance information]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

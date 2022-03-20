@@ -82,26 +82,28 @@ redundantBang dflags = wopt Opt_WarnRedundantBangPatterns dflags
 -- via which 'WarningFlag' it's controlled.
 -- Returns 'Nothing' if check is not supported.
 exhaustiveWarningFlag :: HsMatchContext id -> Maybe WarningFlag
-exhaustiveWarningFlag (FunRhs {})   = Just Opt_WarnIncompletePatterns
-exhaustiveWarningFlag CaseAlt       = Just Opt_WarnIncompletePatterns
-exhaustiveWarningFlag IfAlt         = Just Opt_WarnIncompletePatterns
-exhaustiveWarningFlag LambdaExpr    = Just Opt_WarnIncompleteUniPatterns
-exhaustiveWarningFlag PatBindRhs    = Just Opt_WarnIncompleteUniPatterns
-exhaustiveWarningFlag PatBindGuards = Just Opt_WarnIncompletePatterns
+exhaustiveWarningFlag FunRhs{}           = Just Opt_WarnIncompletePatterns
+exhaustiveWarningFlag CaseAlt            = Just Opt_WarnIncompletePatterns
+exhaustiveWarningFlag LamCaseAlt{}       = Just Opt_WarnIncompletePatterns
+exhaustiveWarningFlag IfAlt              = Just Opt_WarnIncompletePatterns
+exhaustiveWarningFlag LambdaExpr         = Just Opt_WarnIncompleteUniPatterns
+exhaustiveWarningFlag PatBindRhs         = Just Opt_WarnIncompleteUniPatterns
+exhaustiveWarningFlag PatBindGuards      = Just Opt_WarnIncompletePatterns
 exhaustiveWarningFlag (ArrowMatchCtxt c) = arrowMatchContextExhaustiveWarningFlag c
-exhaustiveWarningFlag RecUpd        = Just Opt_WarnIncompletePatternsRecUpd
-exhaustiveWarningFlag ThPatSplice   = Nothing
-exhaustiveWarningFlag PatSyn        = Nothing
-exhaustiveWarningFlag ThPatQuote    = Nothing
+exhaustiveWarningFlag RecUpd             = Just Opt_WarnIncompletePatternsRecUpd
+exhaustiveWarningFlag ThPatSplice        = Nothing
+exhaustiveWarningFlag PatSyn             = Nothing
+exhaustiveWarningFlag ThPatQuote         = Nothing
 -- Don't warn about incomplete patterns in list comprehensions, pattern guards
 -- etc. They are often *supposed* to be incomplete
-exhaustiveWarningFlag (StmtCtxt {}) = Nothing
+exhaustiveWarningFlag StmtCtxt{}         = Nothing
 
 arrowMatchContextExhaustiveWarningFlag :: HsArrowMatchContext -> Maybe WarningFlag
 arrowMatchContextExhaustiveWarningFlag = \ case
-  ProcExpr     -> Just Opt_WarnIncompleteUniPatterns
-  ArrowCaseAlt -> Just Opt_WarnIncompletePatterns
-  KappaExpr    -> Just Opt_WarnIncompleteUniPatterns
+  ProcExpr          -> Just Opt_WarnIncompleteUniPatterns
+  ArrowCaseAlt      -> Just Opt_WarnIncompletePatterns
+  ArrowLamCaseAlt _ -> Just Opt_WarnIncompletePatterns
+  KappaExpr         -> Just Opt_WarnIncompleteUniPatterns
 
 -- | Check whether any part of pattern match checking is enabled for this
 -- 'HsMatchContext' (does not matter whether it is the redundancy check or the

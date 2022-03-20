@@ -60,6 +60,7 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 
 import GHC.Data.FastString
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -684,7 +685,7 @@ exprCtOrigin (HsIPVar _ ip)       = IPOccOrigin ip
 exprCtOrigin (HsOverLit _ lit)    = LiteralOrigin lit
 exprCtOrigin (HsLit {})           = Shouldn'tHappenOrigin "concrete literal"
 exprCtOrigin (HsLam _ matches)    = matchesCtOrigin matches
-exprCtOrigin (HsLamCase _ ms)     = matchesCtOrigin ms
+exprCtOrigin (HsLamCase _ _ ms)   = matchesCtOrigin ms
 exprCtOrigin (HsApp _ e1 _)       = lexprCtOrigin e1
 exprCtOrigin (HsAppType _ e1 _)   = lexprCtOrigin e1
 exprCtOrigin (OpApp _ _ op _)     = lexprCtOrigin op
@@ -1169,14 +1170,19 @@ data FRRArrowOrigin
   -- Test cases: none.
   | ArrowCmdLam !Int
 
-  -- | The scrutinee type in an arrow command case or lambda-case
-  -- statement does not have a fixed runtime representation.
+  -- | The scrutinee type in an arrow command case statement does not have a
+  -- fixed runtime representation.
   --
   -- Test cases: none.
-  | ArrowCmdCase { isCmdLamCase :: Bool
-                    -- ^ Whether this is a lambda-case (True)
-                    -- or a normal case (False)
-                 }
+  | ArrowCmdCase
+
+  -- | A pattern in an arrow command \cases statement does not
+  -- have a fixed runtime representation.
+  --
+  -- Test cases: none.
+  | ArrowCmdLamCase !(Strict.Maybe Int)
+      -- ^ @Nothing@ for @\case@, @Just@ the index of the pattern for @\cases@
+      -- (starting from  1)
 
   -- | The overall type of an arrow proc expression does not have
   -- a fixed runtime representation.
@@ -1199,13 +1205,13 @@ pprFRRArrowOrigin (ArrowCmdArrApp fun arg ho_app)
          , nest 2 (quotes (ppr arg)) ]
 pprFRRArrowOrigin (ArrowCmdLam i)
   = vcat [ text "The" <+> speakNth i <+> text "pattern of the arrow command abstraction" ]
-pprFRRArrowOrigin (ArrowCmdCase { isCmdLamCase = is_lam_case })
-  = text "The scrutinee of the arrow" <+> what <+> text "command"
-  where
-    what :: SDoc
-    what = if is_lam_case
-           then text "lambda-case"
-           else text "case"
+pprFRRArrowOrigin ArrowCmdCase
+  = text "The scrutinee of the arrow case command"
+pprFRRArrowOrigin (ArrowCmdLamCase Strict.Nothing)
+  = text "The scrutinee of the arrow \\case command"
+pprFRRArrowOrigin (ArrowCmdLamCase (Strict.Just i))
+  = text "The" <+> speakNth i
+    <+> text "scrutinee of the arrow \\cases command"
 pprFRRArrowOrigin (ArrowFun fun)
   = vcat [ text "The return type of the arrow function"
          , nest 2 (quotes (ppr fun)) ]
@@ -1246,7 +1252,7 @@ data ExpectedFunTyOrigin
             -- ^ argument
   | ExpectedFunTyMatches  !TypedThing !(MatchGroup GhcRn (LHsExpr GhcRn))
   | ExpectedFunTyLam      !(MatchGroup GhcRn (LHsExpr GhcRn))
-  | ExpectedFunTyLamCase  !(HsExpr GhcRn)
+  | ExpectedFunTyLamCase  LamCaseVariant !(HsExpr GhcRn)
 
 pprExpectedFunTyOrigin :: ExpectedFunTyOrigin
                        -> Int -- ^ argument position (starting at 1)
@@ -1272,13 +1278,14 @@ pprExpectedFunTyOrigin funTy_origin i =
       | otherwise
       -> text "The" <+> speakNth i <+> text "pattern in the equation" <> plural alts
      <+> text "for" <+> quotes (ppr fun)
-    ExpectedFunTyLam {} ->
-      text "The binder of the lambda expression"
-    ExpectedFunTyLamCase {} ->
-      text "The binder of the lambda-case expression"
+    ExpectedFunTyLam {} -> binder_of $ text "lambda"
+    ExpectedFunTyLamCase lc_variant _ -> binder_of $ lamCaseKeyword lc_variant
   where
     the_arg_of :: SDoc
     the_arg_of = text "The" <+> speakNth i <+> text "argument of"
+
+    binder_of :: SDoc -> SDoc
+    binder_of what = text "The binder of the" <+> what <+> text "expression"
 
 pprExpectedFunTyHerald :: ExpectedFunTyOrigin -> SDoc
 pprExpectedFunTyHerald (ExpectedFunTySyntaxOp {})
@@ -1296,6 +1303,6 @@ pprExpectedFunTyHerald (ExpectedFunTyLam match)
                            pprMatches match)
         -- The pprSetDepth makes the lambda abstraction print briefly
         , text "has" ]
-pprExpectedFunTyHerald (ExpectedFunTyLamCase expr)
+pprExpectedFunTyHerald (ExpectedFunTyLamCase _ expr)
   = sep [ text "The function" <+> quotes (ppr expr)
         , text "requires" ]

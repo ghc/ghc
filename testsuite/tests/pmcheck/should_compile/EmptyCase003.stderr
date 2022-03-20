@@ -1,12 +1,12 @@
 
 EmptyCase003.hs:15:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns of type  ‘A a’ not matched: _
+    In a \case alternative: Patterns of type  ‘A a’ not matched: _
 
 EmptyCase003.hs:32:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns of type  ‘C a’ not matched: _
+    In a \case alternative: Patterns of type  ‘C a’ not matched: _
 
 EmptyCase003.hs:37:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns of type  ‘C Int’ not matched: _
+    In a \case alternative: Patterns of type  ‘C Int’ not matched: _

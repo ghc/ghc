@@ -763,9 +763,9 @@ zonkExpr env (HsLam x matches)
   = do new_matches <- zonkMatchGroup env zonkLExpr matches
        return (HsLam x new_matches)
 
-zonkExpr env (HsLamCase x matches)
+zonkExpr env (HsLamCase x lc_variant matches)
   = do new_matches <- zonkMatchGroup env zonkLExpr matches
-       return (HsLamCase x new_matches)
+       return (HsLamCase x lc_variant new_matches)
 
 zonkExpr env (HsApp x e1 e2)
   = do new_e1 <- zonkLExpr env e1
@@ -1004,9 +1004,9 @@ zonkCmd env (HsCmdCase x expr ms)
        new_ms <- zonkMatchGroup env zonkLCmd ms
        return (HsCmdCase x new_expr new_ms)
 
-zonkCmd env (HsCmdLamCase x ms)
+zonkCmd env (HsCmdLamCase x lc_variant ms)
   = do new_ms <- zonkMatchGroup env zonkLCmd ms
-       return (HsCmdLamCase x new_ms)
+       return (HsCmdLamCase x lc_variant new_ms)
 
 zonkCmd env (HsCmdIf x eCond ePred cThen cElse)
   = do { (env1, new_eCond) <- zonkSyntaxExpr env eCond

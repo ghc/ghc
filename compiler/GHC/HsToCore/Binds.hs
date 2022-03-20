@@ -164,9 +164,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                           -- addTyCs: Add type evidence to the refinement type
                           --            predicate of the coverage checker
                           -- See Note [Long-distance information] in "GHC.HsToCore.Pmc"
-                          matchWrapper
-                           (mkPrefixFunRhs (L loc (idName fun)))
-                           Nothing matches
+                          matchWrapper (mkPrefixFunRhs (L loc (idName fun))) Nothing matches
 
         ; core_wrap <- dsHsWrapper co_fn
         ; let body' = mkOptTickBox tick body
