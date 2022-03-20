@@ -58,8 +58,6 @@ module Language.Haskell.Syntax.Type (
 
 import GHC.Prelude
 
-import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsSplice )
-
 import Language.Haskell.Syntax.Extension
 
 import GHC.Types.SourceText

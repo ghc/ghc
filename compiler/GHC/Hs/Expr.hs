@@ -422,7 +422,6 @@ type instance XArithSeq      GhcPs = EpAnn [AddEpAnn]
 type instance XArithSeq      GhcRn = NoExtField
 type instance XArithSeq      GhcTc = PostTcExpr
 
-type instance XSpliceE       (GhcPass _) = EpAnnCO
 type instance XProc          (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XStatic        GhcPs = EpAnn [AddEpAnn]
@@ -492,10 +491,20 @@ tupArgPresent (Missing {}) = False
 ********************************************************************* -}
 
 type instance XXExpr GhcPs = DataConCantHappen
-type instance XXExpr GhcRn = HsExpansion (HsExpr GhcRn) (HsExpr GhcRn)
+type instance XXExpr GhcRn = XXExprGhcRn
 type instance XXExpr GhcTc = XXExprGhcTc
 -- HsExpansion: see Note [Rebindable syntax and HsExpansion] below
 
+
+data XXExprGhcRn
+  = HsExpansionRn (HsExpansion (HsExpr GhcRn) (HsExpr GhcRn))
+
+    -- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
+    -- This is the result of splicing a splice. It is produced by
+    -- the renamer and consumed by the typechecker. It lives only between the two.
+  | HsSpliceRn
+        ThModFinalizers -- TH finalizers produced by the splice.
+        HsSplicedThing  -- The result of splicing
 
 data XXExprGhcTc
   = WrapExpr        -- Type and evidence application and abstractions
@@ -522,6 +531,8 @@ data XXExprGhcTc
      Int                                -- module-local tick number for True
      Int                                -- module-local tick number for False
      (LHsExpr GhcTc)                    -- sub-expression
+
+  | HsSplicedTc DelayedSplice
 
 
 {- *********************************************************************
@@ -1712,26 +1723,15 @@ data HsSplicedThing
     | HsSplicedTy   (HsType GhcRn) -- ^ Haskell Spliced Type
     | HsSplicedPat  (Pat GhcRn)    -- ^ Haskell Spliced Pattern
 
-newtype HsSplicedT = HsSplicedT DelayedSplice deriving (Data)
+-- (IdP id): A unique name to identify this splice point
+type instance XTypedSplice   (GhcPass p) = (EpAnnCO, EpAnn [AddEpAnn], IdP (GhcPass p))
 
 -- (IdP id): A unique name to identify this splice point
-type instance XTypedSplice   (GhcPass p) = (EpAnn [AddEpAnn], IdP (GhcPass p))
+type instance XUntypedSplice (GhcPass p) = (EpAnnCO, EpAnn [AddEpAnn], IdP (GhcPass p))
 
--- (IdP id): A unique name to identify this splice point
-type instance XUntypedSplice (GhcPass p) = (EpAnn [AddEpAnn], IdP (GhcPass p))
-
-type instance XQuasiQuote    (GhcPass p) = ( (IdP (GhcPass p))   -- Splice point
+type instance XQuasiQuote    (GhcPass p) = ( EpAnnCO,
+                                           , (IdP (GhcPass p))   -- Splice point
                                            , (IdP (GhcPass p)) ) -- Quoter
-
-type instance XXSplice       GhcPs       = DataConCantHappen
-
--- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
--- This is the result of splicing a splice. It is produced by
--- the renamer and consumed by the typechecker. It lives only between the two.
-type instance XXSplice       GhcRn       = ( ThModFinalizers     -- TH finalizers produced by the splice.
-                                           , HsSplicedThing ) -- The result of splicing
-
-type instance XXSplice       GhcTc       = HsSplicedT
 
 -- See Note [Running typed splices in the zonker]
 -- These are the arguments that are passed to `GHC.Tc.Gen.Splice.runTopSplice`

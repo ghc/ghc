@@ -431,7 +431,6 @@ type family XExprWithTySig  x
 type family XArithSeq       x
 type family XTypedBracket   x
 type family XUntypedBracket x
-type family XSpliceE        x
 type family XProc           x
 type family XStatic         x
 type family XTick           x
@@ -467,7 +466,6 @@ type family XXTupArg  x
 type family XTypedSplice   x
 type family XUntypedSplice x
 type family XQuasiQuote    x
-type family XXSplice       x
 
 -- -------------------------------------
 -- HsQuoteBracket type families

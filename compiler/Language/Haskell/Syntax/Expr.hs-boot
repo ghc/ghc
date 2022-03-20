@@ -12,9 +12,7 @@ import Data.Kind  ( Type )
 type role HsExpr nominal
 type role MatchGroup nominal nominal
 type role GRHSs nominal nominal
-type role HsSplice nominal
 data HsExpr (i :: Type)
-data HsSplice (i :: Type)
 data MatchGroup (a :: Type) (body :: Type)
 data GRHSs (a :: Type) (body :: Type)
 type family SyntaxExpr (i :: Type)

@@ -596,7 +596,20 @@ data HsExpr p
   --         'GHC.Parser.Annotation.AnnClose'
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | HsSpliceE  (XSpliceE p) (HsSplice p)
+  | HsTypedSplice        --  $$z  or $$(f 4)
+        (XTypedSplice p)
+        SpliceDecoration -- Whether $$( ) variant found, for pretty printing
+        (LHsExpr p)      -- See Note [Pending Splices]
+
+  | HsUntypedSplice      --  $z  or $(f 4)
+        (XUntypedSplice p)
+        SpliceDecoration -- Whether $( ) variant found, for pretty printing
+        (LHsExpr p)      -- See Note [Pending Splices]
+
+  | HsQuasiQuote         -- See Note [Quasi-quote overview]
+        (XQuasiQuote p)
+        SrcSpan          -- The span of the enclosed string
+        FastString       -- The enclosed string
 
   -----------------------------------------------------------
   -- Arrow notation extension
@@ -1541,26 +1554,6 @@ However, you can do this in patterns as well as terms.  Because of this,
 the splice is run by the *renamer* rather than the type checker.
 -}
 
--- | Haskell Splice
-data HsSplice id
-   = HsTypedSplice       --  $$z  or $$(f 4)
-        (XTypedSplice id)
-        SpliceDecoration -- Whether $$( ) variant found, for pretty printing
-        (LHsExpr id)     -- See Note [Pending Splices]
-
-   | HsUntypedSplice     --  $z  or $(f 4)
-        (XUntypedSplice id)
-        SpliceDecoration -- Whether $( ) variant found, for pretty printing
-        (LHsExpr id)     -- See Note [Pending Splices]
-
-   | HsQuasiQuote        -- See Note [Quasi-quote overview]
-        (XQuasiQuote id)
-        SrcSpan          -- The span of the enclosed string
-        FastString       -- The enclosed string
-
-   | XSplice !(XXSplice id) -- Extension point; see Note [Trees That Grow]
-                            -- in Language.Haskell.Syntax.Extension
-
 -- | A splice can appear with various decorations wrapped around it. This data
 -- type captures explicitly how it was originally written, for use in the pretty
 -- printer.
@@ -1571,11 +1564,6 @@ data SpliceDecoration
 
 instance Outputable SpliceDecoration where
   ppr x = text $ show x
-
-
-isTypedSplice :: HsSplice id -> Bool
-isTypedSplice (HsTypedSplice {}) = True
-isTypedSplice _                  = False   -- Quasi-quotes are untyped splices
 
 
 -- | Haskell (Untyped) Quote = Expr + Pat + Type + Var
