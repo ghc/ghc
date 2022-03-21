@@ -79,6 +79,9 @@ module GHC.Driver.Main
     , hscParseExpr
     , hscParseType
     , hscCompileCoreExpr
+    , hscTidy
+
+
     -- * Low-level exports for hooks
     , hscCompileCoreExpr'
       -- We want to make sure that we export enough to be able to redefine
@@ -109,6 +112,7 @@ import GHC.Driver.Config.Stg.Ppr  (initStgPprOpts)
 import GHC.Driver.Config.Stg.Pipeline (initStgPipelineOpts)
 import GHC.Driver.Config.StgToCmm (initStgToCmmConfig)
 import GHC.Driver.Config.Diagnostic
+import GHC.Driver.Config.Tidy
 import GHC.Driver.Hooks
 
 import GHC.Runtime.Context
@@ -142,14 +146,17 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 import GHC.Core
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
-import GHC.Core.Lint           ( lintInteractiveExpr )
+import GHC.Core.Lint           ( lintInteractiveExpr, endPassIO )
 import GHC.Core.Multiplicity
 import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
+import GHC.Core.Opt.Monad      ( CoreToDo (..))
 import GHC.Core.Opt.Pipeline
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
+import GHC.Core.Rules
+import GHC.Core.Stats
 
 import GHC.CoreToStg.Prep
 import GHC.CoreToStg    ( coreToStg )
@@ -940,8 +947,8 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
           simplified_guts <- hscSimplify' plugins desugared_guts
 
-          (cg_guts, details) <- {-# SCC "CoreTidy" #-}
-              liftIO $ tidyProgram hsc_env simplified_guts
+          (cg_guts, details) <-
+              liftIO $ hscTidy hsc_env simplified_guts
 
           let !partial_iface =
                 {-# SCC "GHC.Driver.Main.mkPartialIface" #-}
@@ -2027,7 +2034,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
       hscSimplify hsc_env plugins ds_result
 
     {- Tidy -}
-    (tidy_cg, mod_details) <- liftIO $ tidyProgram hsc_env simpl_mg
+    (tidy_cg, mod_details) <- liftIO $ hscTidy hsc_env simpl_mg
 
     let !CgGuts{ cg_module    = this_mod,
                  cg_binds     = core_binds,
@@ -2196,6 +2203,44 @@ hscParseThingWithLocation source linenumber parser str = do
                 liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed_ast "Parser AST"
                             FormatHaskell (showAstData NoBlankSrcSpan NoBlankEpAnnotations thing)
                 return thing
+
+hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
+hscTidy hsc_env guts = do
+  let logger   = hsc_logger hsc_env
+  let this_mod = mg_module guts
+
+  opts <- initTidyOpts hsc_env
+  (cgguts, details) <- withTiming logger
+    (text "CoreTidy"<+>brackets (ppr this_mod))
+    (const ())
+    $! {-# SCC "CoreTidy" #-} tidyProgram opts guts
+
+  -- post tidy pretty-printing and linting...
+  let tidy_rules     = md_rules details
+  let all_tidy_binds = cg_binds cgguts
+  let print_unqual   = mkPrintUnqualified (hsc_unit_env hsc_env) (mg_rdr_env guts)
+
+  endPassIO hsc_env print_unqual CoreTidy all_tidy_binds tidy_rules
+
+  -- If the endPass didn't print the rules, but ddump-rules is
+  -- on, print now
+  unless (logHasDumpFlag logger Opt_D_dump_simpl) $
+    putDumpFileMaybe logger Opt_D_dump_rules
+      (renderWithContext defaultSDocContext (ppr CoreTidy <+> text "rules"))
+      FormatText
+      (pprRulesForUser tidy_rules)
+
+  -- Print one-line size info
+  let cs = coreBindsStats all_tidy_binds
+  putDumpFileMaybe logger Opt_D_dump_core_stats "Core Stats"
+    FormatText
+    (text "Tidy size (terms,types,coercions)"
+     <+> ppr (moduleName this_mod) <> colon
+     <+> int (cs_tm cs)
+     <+> int (cs_ty cs)
+     <+> int (cs_co cs))
+
+  pure (cgguts, details)
 
 
 {- **********************************************************************

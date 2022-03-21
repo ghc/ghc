@@ -19,6 +19,7 @@ module GHC.Core.Make (
         mkIntegerExpr, mkNaturalExpr,
         mkFloatExpr, mkDoubleExpr,
         mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
+        MkStringIds (..), getMkStringIds,
 
         -- * Floats
         FloatBind(..), wrapFloat, wrapFloats, floatBindings,
@@ -333,26 +334,37 @@ mkCharExpr c = mkCoreConApps charDataCon [mkCharLit c]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @String@
 mkStringExpr   :: MonadThings m => String     -> m CoreExpr  -- Result :: String
+mkStringExpr str = mkStringExprFS (mkFastString str)
 
 -- | Create a 'CoreExpr' which will evaluate to a string morally equivalent to the given @FastString@
 mkStringExprFS :: MonadThings m => FastString -> m CoreExpr  -- Result :: String
+mkStringExprFS = mkStringExprFSLookup lookupId
 
-mkStringExpr str = mkStringExprFS (mkFastString str)
+mkStringExprFSLookup :: Monad m => (Name -> m Id) -> FastString -> m CoreExpr
+mkStringExprFSLookup lookupM str = do
+  mk <- getMkStringIds lookupM
+  pure (mkStringExprFSWith mk str)
 
-mkStringExprFS = mkStringExprFSWith lookupId
+getMkStringIds :: Applicative m => (Name -> m Id) -> m MkStringIds
+getMkStringIds lookupM = MkStringIds <$> lookupM unpackCStringName <*> lookupM unpackCStringUtf8Name
 
-mkStringExprFSWith :: Monad m => (Name -> m Id) -> FastString -> m CoreExpr
-mkStringExprFSWith lookupM str
+data MkStringIds = MkStringIds
+  { unpackCStringId     :: !Id
+  , unpackCStringUtf8Id :: !Id
+  }
+
+mkStringExprFSWith :: MkStringIds -> FastString -> CoreExpr
+mkStringExprFSWith ids str
   | nullFS str
-  = return (mkNilExpr charTy)
+  = mkNilExpr charTy
 
   | all safeChar chars
-  = do unpack_id <- lookupM unpackCStringName
-       return (App (Var unpack_id) lit)
+  = let !unpack_id = unpackCStringId ids
+    in App (Var unpack_id) lit
 
   | otherwise
-  = do unpack_utf8_id <- lookupM unpackCStringUtf8Name
-       return (App (Var unpack_utf8_id) lit)
+  = let !unpack_utf8_id = unpackCStringUtf8Id ids
+    in App (Var unpack_utf8_id) lit
 
   where
     chars = unpackFS str

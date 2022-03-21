@@ -394,6 +394,7 @@ Library
         GHC.Driver.Config.Stg.Pipeline
         GHC.Driver.Config.Stg.Ppr
         GHC.Driver.Config.StgToCmm
+        GHC.Driver.Config.Tidy
         GHC.Driver.Env
         GHC.Driver.Env.KnotVars
         GHC.Driver.Env.Types

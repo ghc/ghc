@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns  #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | Code generation for the Static Pointer Table
 --
@@ -48,9 +48,11 @@
 --
 
 module GHC.Iface.Tidy.StaticPtrTable
-    ( sptCreateStaticBinds
-    , sptModuleInitCode
-    ) where
+  ( sptCreateStaticBinds
+  , sptModuleInitCode
+  , StaticPtrOpts (..)
+  )
+where
 
 {- Note [Grand plan for static forms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -126,36 +128,34 @@ Here is a running example:
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Driver.Session
-import GHC.Driver.Env
-
 import GHC.Core
 import GHC.Core.Utils (collectMakeStaticArgs)
 import GHC.Core.DataCon
-import GHC.Core.Make (mkStringExprFSWith)
+import GHC.Core.Make (mkStringExprFSWith,MkStringIds(..))
 import GHC.Core.Type
 
 import GHC.Cmm.CLabel
 
 import GHC.Unit.Module
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Panic
-import GHC.Builtin.Names
-import GHC.Tc.Utils.Env (lookupGlobal)
 
 import GHC.Linker.Types
 
-import GHC.Types.Name
 import GHC.Types.Id
-import GHC.Types.TyThing
 import GHC.Types.ForeignStubs
+import GHC.Data.Maybe
 
-import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 import Data.List (intercalate)
-import Data.Maybe
 import GHC.Fingerprint
-import qualified GHC.LanguageExtensions as LangExt
+
+data StaticPtrOpts = StaticPtrOpts
+  { opt_platform                :: !Platform    -- ^ Target platform
+  , opt_gen_cstub               :: !Bool        -- ^ Generate CStub or not
+  , opt_mk_string               :: !MkStringIds -- ^ Ids for `unpackCString[Utf8]#`
+  , opt_static_ptr_info_datacon :: !DataCon          -- ^ `StaticPtrInfo` datacon
+  , opt_static_ptr_datacon      :: !DataCon          -- ^ `StaticPtr` datacon
+  }
 
 -- | Replaces all bindings of the form
 --
@@ -170,24 +170,19 @@ import qualified GHC.LanguageExtensions as LangExt
 --
 -- It also yields the C stub that inserts these bindings into the static
 -- pointer table.
-sptCreateStaticBinds :: HscEnv -> Module -> CoreProgram
-                     -> IO ([SptEntry], CoreProgram)
-sptCreateStaticBinds hsc_env this_mod binds
-    | not (xopt LangExt.StaticPointers dflags) =
-      return ([], binds)
-    | otherwise = do
-      -- Make sure the required interface files are loaded.
-      _ <- lookupGlobal hsc_env unpackCStringName
+sptCreateStaticBinds :: StaticPtrOpts -> Module -> CoreProgram -> IO ([SptEntry], Maybe CStub, CoreProgram)
+sptCreateStaticBinds opts this_mod binds = do
       (fps, binds') <- evalStateT (go [] [] binds) 0
-      return (fps, binds')
+      let cstub
+            | opt_gen_cstub opts = Just (sptModuleInitCode (opt_platform opts) this_mod fps)
+            | otherwise          = Nothing
+      return (fps, cstub, binds')
   where
     go fps bs xs = case xs of
       []        -> return (reverse fps, reverse bs)
       bnd : xs' -> do
         (fps', bnd') <- replaceStaticBind bnd
         go (reverse fps' ++ fps) (bnd' : bs) xs'
-
-    dflags = hsc_dflags hsc_env
 
     -- Generates keys and replaces 'makeStatic' with 'StaticPtr'.
     --
@@ -214,19 +209,16 @@ sptCreateStaticBinds hsc_env this_mod binds
     mkStaticBind t srcLoc e = do
       i <- get
       put (i + 1)
-      staticPtrInfoDataCon <-
-        lift $ lookupDataConHscEnv staticPtrInfoDataConName
+      let staticPtrInfoDataCon = opt_static_ptr_info_datacon opts
       let fp@(Fingerprint w0 w1) = mkStaticPtrFingerprint i
-      info <- mkConApp staticPtrInfoDataCon <$>
-            (++[srcLoc]) <$>
-            mapM (mkStringExprFSWith (lift . lookupIdHscEnv))
-                 [ unitFS $ moduleUnit this_mod
-                 , moduleNameFS $ moduleName this_mod
-                 ]
+      let mk_string_fs = mkStringExprFSWith (opt_mk_string opts)
+      let info = mkConApp staticPtrInfoDataCon
+                  [ mk_string_fs $ unitFS $ moduleUnit this_mod
+                  , mk_string_fs $ moduleNameFS $ moduleName this_mod
+                  , srcLoc
+                  ]
 
-      -- The module interface of GHC.StaticPtr should be loaded at least
-      -- when looking up 'fromStatic' during type-checking.
-      staticPtrDataCon <- lift $ lookupDataConHscEnv staticPtrDataConName
+      let staticPtrDataCon = opt_static_ptr_datacon opts
       return (fp, mkConApp staticPtrDataCon
                                [ Type t
                                , mkWord64LitWord64 w0
@@ -240,17 +232,6 @@ sptCreateStaticBinds hsc_env this_mod binds
         , moduleNameString $ moduleName this_mod
         , show n
         ]
-
-    lookupIdHscEnv :: Name -> IO Id
-    lookupIdHscEnv n = lookupType hsc_env n >>=
-                         maybe (getError n) (return . tyThingId)
-
-    lookupDataConHscEnv :: Name -> IO DataCon
-    lookupDataConHscEnv n = lookupType hsc_env n >>=
-                              maybe (getError n) (return . tyThingDataCon)
-
-    getError n = pprPanic "sptCreateStaticBinds.get: not found" $
-      text "Couldn't find" <+> ppr n
 
 -- | @sptModuleInitCode module fps@ is a C stub to insert the static entries
 -- of @module@ into the static pointer table.

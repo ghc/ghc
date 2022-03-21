@@ -338,7 +338,6 @@ import GHC.Parser.Utils
 import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Hs
 import GHC.Builtin.Types.Prim ( alphaTyVars )
-import GHC.Iface.Tidy
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
@@ -1330,12 +1329,12 @@ compileCore simplify fn = do
          if simplify
           then do
              -- If simplify is true: simplify (hscSimplify), then tidy
-             -- (tidyProgram).
+             -- (hscTidy).
              hsc_env <- getSession
              simpl_guts <- liftIO $ do
                plugins <- readIORef (tcg_th_coreplugins tcg)
                hscSimplify hsc_env plugins mod_guts
-             tidy_guts <- liftIO $ tidyProgram hsc_env simpl_guts
+             tidy_guts <- liftIO $ hscTidy hsc_env simpl_guts
              return $ Left tidy_guts
           else
              return $ Right mod_guts
