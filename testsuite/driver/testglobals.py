@@ -218,7 +218,7 @@ class TestConfig:
         self.only_report_hadrian_deps = None # type: Optional[Path]
 
         # C++ standard library implementation
-        self.stdcxx_impl = 'stdc++' # or cxx
+        self.stdcxx_impl = 'stdc++' # or c++ for LLVM/libc++ based platforms
 
     def validate(self) -> None:
         """ Check the TestConfig for self-consistency """
