@@ -989,43 +989,46 @@ What qualifies as a "recursive data constructor" as per
 Note [CPR for recursive data constructors]? That is up to
 'GHC.Core.Opt.WorkWrapW.Utils.isRecDataCon' to decide. It does a DFS search over
 the field types of the DataCon and looks for term-level recursion into the data
-constructor's type constructor. A few perhaps surprising points:
+constructor's type constructor. Assuming infinite fuel (point (4) below), it
+looks inside the following class of types, represented by `ty` (and responds
+`NonRecursiveOrUnsure` in all other cases):
+
+ A. If `ty = forall v. ty'`, then look into `ty'`
+ B. If `ty = Tc tc_args` and `Tc` is an `AlgTyCon`, look into the arg
+    types of its data constructors and check `tc_args` for recursion.
+ C. If `ty = F tc_args`, `F` is a `FamTyCon` and we can reduce `F tc_args` to
+    `rhs`, look into the `rhs` type.
+
+A few perhaps surprising points:
 
   1. It deems any function type as non-recursive, because it's unlikely that
      a recursion through a function type builds up a recursive data structure.
   2. It doesn't look into kinds or coercion types because there's nothing to unbox.
      Same for promoted data constructors.
-  3. We don't care whether a NewTyCon or DataTyCon App is fully saturated or not;
-     we simply look at its definition/DataCons and its field tys. Any recursive arg
-     occs will have been detected before (see the invariant of 'go_tc_app').
-     This is so that we expand the `ST` in `StateT Int (ST s) a`.
+  3. We don't care whether an AlgTyCon app `T tc_args` is fully saturated or not;
+     we simply look at its definition/DataCons and its field tys and look for
+     recursive occs in the `tc_args` we are given. This is so that we expand
+     the `ST` in `StateT Int (ST s) a`.
   4. We don't recurse deeper than 3 (at the moment of this writing) TyCons and
-     assume the DataCon is non-recursive after that. One reason is guaranteed
-     constant-time efficiency; the other is that it's fair to say that a recursion
-     over 3 or more TyCons doesn't really count as a list-like data structure
-     anymore and a bit of unboxing doesn't hurt much.
-  5. It checks TyConApps like `T <huge> <type>` by eagerly checking the
-     potentially huge argument types *before* it tries to expand the
-     DataCons/NewTyCon/TyFams/etc. so that it doesn't need to re-check those
-     argument types after having been substituted into every occurrence of
-     the the respective TyCon parameter binders. It's like call-by-value vs.
-     call-by-name: Eager checking of argument types means we only need to check
-     them exactly once.
-     There's one exception to that rule, namely when we are able to reduce a
-     TyFam by considering argument types. Then we pay the price of potentially
-     checking the same type arg twice (or more, if the TyFam is recursive).
-     It should hardly matter.
+     assume the DataCon is non-recursive after that. One reason for this "fuel"
+     approach is guaranteed constant-time efficiency; the other is that it's
+     fair to say that a recursion over 3 or more TyCons doesn't really count as
+     a list-like data structure anymore and a bit of unboxing doesn't hurt much.
+  5. It checks AlgTyCon apps like `T tc_args` by eagerly checking the `tc_args`
+     *before* it looks into the expanded DataCons/NewTyCon, so that it
+     terminates before doing a deep nest of expansions only to discover that the
+     first level already contained a recursion.
   6. As a result of keeping the implementation simple, it says "recursive"
      for `data T = MkT [T]`, even though we could argue that the inner recursion
      (through the `[]` TyCon) by way of which `T` is recursive will already be
      "broken" and thus never unboxed. Consequently, it might be OK to CPR a
      function returning `T`. Lacking arguments for or against the current simple
      behavior, we stick to it.
-  7. When the search hits an abstract TyCon (one without visible DataCons, e.g.,
-     from an .hs-boot file), it returns 'Nothing' for "inconclusive", the same
-     as when we run out of fuel. If there is ever a recursion through an
-     abstract TyCon, then it's not part of the same function we are looking at,
-     so we can treat it as if it wasn't recursive.
+  7. When the search hits an abstract TyCon (algebraic, but without visible
+     DataCons, e.g., from an .hs-boot file), it returns 'NonRecursiveOrUnsure',
+     the same as when we run out of fuel. If there is ever a recursion through
+     an abstract TyCon, then it's not part of the same function we are looking
+     at in CPR, so we can treat it as if it wasn't recursive.
      We handle stuck type and data families much the same.
 
 Here are a few examples of data constructors or data types with a single data
@@ -1049,7 +1052,7 @@ con and the answers of our function:
       E Int = Char
       E (a,b) = (E a, E b)
       E Char = Blub
-    data Blah = Blah (E (Int, (Int, Int)))     NonRec  (see point (5))
+    data Blah = Blah (E (Int, (Int, Int)))     NonRec
     data Blub = Blub (E (Char, Int))           Rec
     data Blub2 = Blub2 (E (Bool, Int))     }   Unsure, because stuck (see point (7))
 
