@@ -473,7 +473,8 @@ test('keep-cafs',
 # Test proper functioning of C++ exceptions within a C++ program.
 # On darwin, this requires -fcompact-unwind.
 # When -fcompact-unwind becomes default, generalize test to all platforms.
-test('T11829', unless(opsys('darwin'), skip), compile_and_run, ['T11829_c.cpp -lstdc++ -fcompact-unwind'])
+test('T11829', unless(opsys('darwin'), skip), compile_and_run,
+     ['T11829_c.cpp -l{} -fcompact-unwind'.format(config.stdcxx_impl)])
 
 test('T16514', normal, compile_and_run, ['T16514_c.c'])
 test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])

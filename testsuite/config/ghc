@@ -58,6 +58,7 @@ if ghc_with_dynamic_rts:
 
 if windows:
     config.supports_dynamic_hs = False
+    config.stdcxx_impl = 'cxx'
 
 if (config.have_profiling and ghc_with_threaded_rts):
     config.run_ways.append('profthreaded')

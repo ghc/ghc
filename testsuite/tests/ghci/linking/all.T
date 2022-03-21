@@ -13,9 +13,6 @@ test('ghcilink002', [extra_files(['TestLink.hs', 'f.c']),
 
 test('ghcilink003',
      [ unless(doing_ghci, skip),
-       # libstdc++ is GCC-specific on FreeBSD. FreeBSD has libc++ though.
-       when(opsys('freebsd'), fragile(17739)),
-       when(opsys('mingw32'), fragile(17739)),
        # from Big Sur onwards, we can't dlopen libstdc++.dylib
        # anymore. Will produce:
        #   dlopen(libstdc++.dylib, 5): image not found
@@ -38,8 +35,6 @@ test('ghcilink005',
 
 test('ghcilink006',
      [ unless(doing_ghci, skip),
-       # libstdc++ is GCC-specific on FreeBSD. FreeBSD has libc++ though.
-       when(opsys('freebsd'), fragile(17739)),
        # from Big Sur onwards, we can't dlopen libstdc++.dylib
        # anymore. Will produce:
        #   dlopen(libstdc++.dylib, 5): image not found
