@@ -17,7 +17,8 @@ test('T3242',
 
 test('T10955',
      [extra_files(['A.c', 'B.c']),
-      unless(doing_ghci, skip), unless(opsys('mingw32'), skip),
+      unless(doing_ghci, skip),
+      unless(opsys('mingw32'), skip),
       pre_cmd('$MAKE -s --no-print-directory compile_libAB_dep'),
       extra_hc_opts('-L. -L./bin_dep')],
      ghci_script, ['T10955.script'])
@@ -41,7 +42,8 @@ test('T11072msvc', [extra_files(['A.c', 'T11072.hs', 'libAS.def', 'i686/', 'x86_
                     unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
      makefile_test, ['compile_libAS_impl_msvc'])
 
-test('T13606', [unless(doing_ghci, skip), unless(opsys('mingw32'), skip),
+test('T13606', [unless(doing_ghci, skip),
+                unless(opsys('mingw32'), skip),
                 exit_code(0)],
      makefile_test, ['T13606'])
 
