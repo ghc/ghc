@@ -35,6 +35,7 @@ import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCon
+import GHC.Core.TyCon.Set
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.SimpleOpt( SimpleOpts )
 
@@ -49,7 +50,6 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Name ( getOccFS )
 
 import GHC.Data.FastString
-import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Data.List.SetOps
 
@@ -1267,87 +1267,65 @@ combineIRDCRs = foldl' combineIRDCR NonRecursiveOrUnsure
 -- See Note [Detecting recursive data constructors] for which recursive DataCons
 -- we want to flag.
 isRecDataCon :: FamInstEnvs -> IntWithInf -> DataCon -> IsRecDataConResult
-isRecDataCon fam_envs fuel dc
-  | isTupleDataCon dc || isUnboxedSumDataCon dc
+isRecDataCon fam_envs fuel orig_dc
+  | isTupleDataCon orig_dc || isUnboxedSumDataCon orig_dc
   = NonRecursiveOrUnsure
   | otherwise
   = -- pprTraceWith "isRecDataCon" (\answer -> ppr dc <+> dcolon <+> ppr (dataConRepType dc) $$ ppr fuel $$ ppr answer) $
-    go_dc fuel (setRecTcMaxBound 1 initRecTc) dc
+    go_dc fuel emptyTyConSet orig_dc
   where
-    _pp_dc_ty = ppr dc
-    (<||>) = combineIRDCR
-
-    go_dc :: IntWithInf -> RecTcChecker -> DataCon -> IsRecDataConResult
-    go_dc fuel rec_tc dc =
-      combineIRDCRs [ go_arg_ty fuel rec_tc arg_ty
+    go_dc :: IntWithInf -> TyConSet -> DataCon -> IsRecDataConResult
+    go_dc fuel visited_tcs dc =
+      combineIRDCRs [ go_arg_ty fuel visited_tcs arg_ty
                     | arg_ty <- map scaledThing (dataConRepArgTys dc) ]
 
-    go_arg_ty :: IntWithInf -> RecTcChecker -> Type -> IsRecDataConResult
-    go_arg_ty fuel rec_tc ty
+    go_arg_ty :: IntWithInf -> TyConSet -> Type -> IsRecDataConResult
+    go_arg_ty fuel visited_tcs ty
       --- | pprTrace "arg_ty" (ppr ty) False = undefined
 
-      | Just (_, _arg_ty, _res_ty) <- splitFunTy_maybe ty
-      -- = go_arg_ty fuel rec_tc _arg_ty <||> go_arg_ty fuel rec_tc _res_ty
-          -- Plausible, but unnecessary for CPR.
-          -- See Note [Detecting recursive data constructors], point (1)
-      = NonRecursiveOrUnsure
-
       | Just (_tcv, ty') <- splitForAllTyCoVar_maybe ty
-      = go_arg_ty fuel rec_tc ty'
-          -- See Note [Detecting recursive data constructors], point (2)
+      = go_arg_ty fuel visited_tcs ty'
+          -- See Note [Detecting recursive data constructors], point (A)
 
       | Just (tc, tc_args) <- splitTyConApp_maybe ty
-      = combineIRDCRs (map (go_arg_ty fuel rec_tc) tc_args)
-        <||> go_tc_app fuel rec_tc tc tc_args
+      = go_tc_app fuel visited_tcs tc tc_args
 
       | otherwise
       = NonRecursiveOrUnsure
 
-    -- | PRECONDITION: tc_args has no recursive occs
-    -- See Note [Detecting recursive data constructors], point (5)
-    go_tc_app :: IntWithInf -> RecTcChecker -> TyCon -> [Type] -> IsRecDataConResult
-    go_tc_app fuel rec_tc tc tc_args
-      --- | pprTrace "tc_app" (vcat [ppr tc, ppr tc_args]) False = undefined
+    go_tc_app :: IntWithInf -> TyConSet -> TyCon -> [Type] -> IsRecDataConResult
+    go_tc_app fuel visited_tcs tc tc_args =
+      case tyConDataCons_maybe tc of
+        --- | pprTrace "tc_app" (vcat [ppr tc, ppr tc_args]) False -> undefined
 
-      | isPrimTyCon tc
-      = NonRecursiveOrUnsure
+        _ | Just (HetReduction (Reduction _ rhs) _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
+          -- This is the only place where we look at tc_args, which might have
+          -- See Note [Detecting recursive data constructors], point (C) and (5)
+          -> go_arg_ty fuel visited_tcs rhs
 
-      | not $ tcIsRuntimeTypeKind $ tyConResKind tc
-      = NonRecursiveOrUnsure
+        _ | tc == dataConTyCon orig_dc
+          -> DefinitelyRecursive -- loop found!
 
-      | isAbstractTyCon tc   -- When tc has no DataCons, from an hs-boot file
-      = NonRecursiveOrUnsure -- See Note [Detecting recursive data constructors], point (7)
+        Just dcs
+          | DefinitelyRecursive <- combineIRDCRs [ go_arg_ty fuel visited_tcs' ty | ty <- tc_args ]
+              -- Check tc_args, See Note [Detecting recursive data constructors], point (5)
+              -- The new visited_tcs', so that we don't recursively check tc,
+              -- promising that we will check it below.
+              -- Do the tc_args check *before* the dcs check below, otherwise
+              -- we might miss an obvious rec occ in tc_args when we run out of
+              -- fuel and respond NonRecursiveOrUnsure instead
+          -> DefinitelyRecursive
 
-      | isFamilyTyCon tc
-      -- This is the only place where we look at tc_args
-      -- See Note [Detecting recursive data constructors], point (5)
-      = case topReduceTyFamApp_maybe fam_envs tc tc_args of
-          Just (HetReduction (Reduction _ rhs) _) ->
-            go_arg_ty fuel rec_tc rhs
-          Nothing ->
-            NonRecursiveOrUnsure -- NB: We simply give up here. Better return
-                                 -- Unsure, as for abstract TyCons, point (7)
+          | fuel >= 0
+              -- See Note [Detecting recursive data constructors], point (4)
+          , not (tc `elemTyConSet` visited_tcs)
+              -- only need to check tc if we haven't visited it already. NB: original visited_tcs
+          -> combineIRDCRs [ go_dc (subWithInf fuel 1) visited_tcs' dc | dc <- dcs ]
+              -- Finally: check ds
 
-      | tc == dataConTyCon dc
-      = DefinitelyRecursive -- loop found!
-
-      | otherwise
-      = assertPpr (isAlgTyCon tc) (ppr tc <+> ppr dc) $
-        case checkRecTc rec_tc tc of
-          Nothing -> NonRecursiveOrUnsure
-            -- we expanded this TyCon once already, no need to test it multiple times
-
-          Just rec_tc'
-            | Just (_tvs, rhs, _co) <- unwrapNewTyCon_maybe tc
-                -- See Note [Detecting recursive data constructors], points (2) and (3)
-            -> go_arg_ty fuel rec_tc' rhs
-
-            | fuel < 0
-            -> NonRecursiveOrUnsure -- that's why we track fuel!
-
-            | let dcs = expectJust "isRecDataCon:go_tc_app" $ tyConDataCons_maybe tc
-            -> combineIRDCRs (map (\dc -> go_dc (subWithInf fuel 1) rec_tc' dc) dcs)
-                -- See Note [Detecting recursive data constructors], point (4)
+        _ -> NonRecursiveOrUnsure
+        where
+          visited_tcs' = extendTyConSet visited_tcs tc
 
 {-
 ************************************************************************
