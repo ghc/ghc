@@ -24,12 +24,6 @@ else
 DLL = lib$1.so
 endif
 
-ifeq "$(LIBCXX_PLATFORM)" "YES"
-LIBCXX=c++
-else
-LIBCXX=stdc++
-endif
-
 .PHONY: ghcilink002
 ghcilink002 :
 	$(RM) -rf dir002
@@ -118,11 +112,7 @@ ghcilink006 :
 	echo "version: 1.0" >>$(PKG006)
 	echo "id: test-XXX" >>$(PKG006)
 	echo "key: test-XXX" >>$(PKG006)
-ifeq "$(WINDOWS)" "YES"
-	echo "extra-libraries: stdc++-6" >>$(PKG006)
-else
 	echo "extra-libraries: $(LIBCXX)" >>$(PKG006)
-endif
 	'$(GHC_PKG)' init $(LOCAL_PKGCONF006)
 	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF006) register $(PKG006) -v0
 	#

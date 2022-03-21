@@ -397,12 +397,9 @@ test('T13098', normal, compile, ['-v0'])
 test('T11046', normal, multimod_compile, ['T11046','-v0'])
 test('T13366',
      [expect_broken_for(13366, ['ghci']),
-      # libstdc++ is GCC-specific on FreeBSD, the test will
-      # fail with clang, and pass with GCC.
-      when(opsys('freebsd'), fragile(17739)),
       when(opsys('darwin'), expect_broken(16083))],
      compile_and_run,
-     ['-lstdc++ -v0'] if not opsys('openbsd') else ['-lc++ -lc++abi -v0'])
+     ['-l{} -v0'.format(config.stdcxx_impl)])
 test('T13473', normal, multimod_compile_and_run,
      ['T13473.hs', '-v0 ' + config.ghc_th_way_flags])
 test('T13587', expect_broken(13587), compile_and_run, ['-v0'])
