@@ -99,6 +99,7 @@ T1407:
 .PHONY: T3242
 	echo ":q" | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -lm
 
+# We use gdi32 as library with an import library.
 .PHONY: T13606
 T13606:
-	echo ":q" | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -lgcc_s
+	echo ":q" | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -lgdi32.a
