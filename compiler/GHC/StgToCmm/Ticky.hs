@@ -115,8 +115,6 @@ module GHC.StgToCmm.Ticky (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
-
 import GHC.Platform
 import GHC.Platform.Profile
 

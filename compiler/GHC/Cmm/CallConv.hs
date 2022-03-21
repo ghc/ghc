@@ -14,7 +14,6 @@ import GHC.Runtime.Heap.Layout
 import GHC.Cmm (Convention(..))
 import GHC.Cmm.Ppr () -- For Outputable instances
 
-import GHC.Driver.Session
 import GHC.Platform
 import GHC.Platform.Profile
 import GHC.Utils.Outputable

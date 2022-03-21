@@ -10,8 +10,6 @@ module GHC.ByteCode.InfoTable ( mkITbls ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
-
 import GHC.Platform
 import GHC.Platform.Profile
 

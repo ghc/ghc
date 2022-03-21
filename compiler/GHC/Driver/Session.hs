@@ -24,7 +24,6 @@ module GHC.Driver.Session (
         GeneralFlag(..),
         WarningFlag(..), DiagnosticReason(..),
         Language(..),
-        PlatformConstants(..),
         FatalMessager, FlushOut(..),
         ProfAuto(..),
         glasgowExtsFlags,

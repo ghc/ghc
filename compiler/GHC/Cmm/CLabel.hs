@@ -145,7 +145,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
-import GHC.Driver.Session
 import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Utils.Misc

@@ -47,11 +47,11 @@ module GHC.Runtime.Heap.Layout (
 
 import GHC.Prelude
 
+import GHC.StgToCmm.Types
+
 import GHC.Types.Basic( ConTagZ )
-import GHC.Driver.Session
 import GHC.Platform
 import GHC.Platform.Profile
-import GHC.StgToCmm.Types
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
