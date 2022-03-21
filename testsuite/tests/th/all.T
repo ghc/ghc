@@ -395,7 +395,11 @@ test('T13018', normal, compile, ['-v0'])
 test('T13123', normal, compile, ['-v0'])
 test('T13098', normal, compile, ['-v0'])
 test('T11046', normal, multimod_compile, ['T11046','-v0'])
-test('T13366',
+test('T13366C',
+     [expect_broken_for(13366, ['ghci'])],
+     compile_and_run,
+     ['-v0'])
+test('T13366Cxx',
      [expect_broken_for(13366, ['ghci']),
       when(opsys('darwin'), expect_broken(16083))],
      compile_and_run,
