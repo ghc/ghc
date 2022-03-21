@@ -38,6 +38,7 @@ import GHC.Iface.Load
 import GHC.Iface.Env
 
 import GHC.StgToCmm.Types
+import GHC.Runtime.Heap.Layout
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.TyCl.Build

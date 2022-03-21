@@ -47,8 +47,6 @@ module GHC.Runtime.Heap.Layout (
 
 import GHC.Prelude
 
-import GHC.StgToCmm.Types
-
 import GHC.Types.Basic( ConTagZ )
 import GHC.Platform
 import GHC.Platform.Profile
@@ -69,6 +67,9 @@ import Data.ByteString (ByteString)
 
 -- | Byte offset, or byte count
 type ByteOff = Int
+
+-- | Word offset, or word count
+type WordOff = Int
 
 -- | Round up the given byte count to the next byte count that's a
 -- multiple of the machine's word size.
@@ -197,6 +198,37 @@ data ClosureTypeInfo
 type ConstrDescription = ByteString -- result of dataConIdentity
 type FunArity          = Int
 type SelectorOffset    = Int
+
+-- | We represent liveness bitmaps as a Bitmap (whose internal representation
+-- really is a bitmap).  These are pinned onto case return vectors to indicate
+-- the state of the stack for the garbage collector.
+--
+-- In the compiled program, liveness bitmaps that fit inside a single word
+-- (StgWord) are stored as a single word, while larger bitmaps are stored as a
+-- pointer to an array of words.
+
+type Liveness = [Bool]   -- One Bool per word; True  <=> non-ptr or dead
+                         --                    False <=> ptr
+
+--------------------------------------------------------------------------------
+-- | An ArgDescr describes the argument pattern of a function
+
+data ArgDescr
+  = ArgSpec             -- Fits one of the standard patterns
+        !Int            -- RTS type identifier ARG_P, ARG_N, ...
+
+  | ArgGen              -- General case
+        Liveness        -- Details about the arguments
+
+  | ArgUnknown          -- For imported binds.
+                        -- Invariant: Never Unknown for binds of the module
+                        -- we are compiling.
+  deriving (Eq)
+
+instance Outputable ArgDescr where
+  ppr (ArgSpec n) = text "ArgSpec" <+> ppr n
+  ppr (ArgGen ls) = text "ArgGen" <+> ppr ls
+  ppr ArgUnknown = text "ArgUnknown"
 
 -----------------------------------------------------------------------------
 -- Construction

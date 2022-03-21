@@ -4,22 +4,24 @@ module GHC.StgToCmm.Types
   ( CgInfos (..)
   , LambdaFormInfo (..)
   , ModuleLFInfos
-  , Liveness
-  , ArgDescr (..)
   , StandardFormInfo (..)
-  , WordOff
   , DoSCCProfiling
   , DoExtDynRefs
   ) where
 
 import GHC.Prelude
 
+import GHC.Core.DataCon
+
+import GHC.Stg.InferTags.TagSig
+
+import GHC.Runtime.Heap.Layout
+
 import GHC.Types.Basic
 import GHC.Types.ForeignStubs
-import GHC.Core.DataCon
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Stg.InferTags.TagSig
+
 import GHC.Utils.Outputable
 
 
@@ -168,39 +170,6 @@ pprUpdateable True = text "updateable"
 pprUpdateable False = text "oneshot"
 
 --------------------------------------------------------------------------------
-
--- | We represent liveness bitmaps as a Bitmap (whose internal representation
--- really is a bitmap).  These are pinned onto case return vectors to indicate
--- the state of the stack for the garbage collector.
---
--- In the compiled program, liveness bitmaps that fit inside a single word
--- (StgWord) are stored as a single word, while larger bitmaps are stored as a
--- pointer to an array of words.
-
-type Liveness = [Bool]   -- One Bool per word; True  <=> non-ptr or dead
-                         --                    False <=> ptr
-
---------------------------------------------------------------------------------
--- | An ArgDescr describes the argument pattern of a function
-
-data ArgDescr
-  = ArgSpec             -- Fits one of the standard patterns
-        !Int            -- RTS type identifier ARG_P, ARG_N, ...
-
-  | ArgGen              -- General case
-        Liveness        -- Details about the arguments
-
-  | ArgUnknown          -- For imported binds.
-                        -- Invariant: Never Unknown for binds of the module
-                        -- we are compiling.
-  deriving (Eq)
-
-instance Outputable ArgDescr where
-  ppr (ArgSpec n) = text "ArgSpec" <+> ppr n
-  ppr (ArgGen ls) = text "ArgGen" <+> ppr ls
-  ppr ArgUnknown = text "ArgUnknown"
-
---------------------------------------------------------------------------------
 -- | StandardFormInfo tells whether this thunk has one of a small number of
 -- standard forms
 
@@ -225,9 +194,6 @@ data StandardFormInfo
         -- in the RTS to save space.
         !RepArity       -- Arity, n
   deriving (Eq)
-
--- | Word offset, or word count
-type WordOff = Int
 
 instance Outputable StandardFormInfo where
   ppr NonStandardThunk = text "RegThunk"
