@@ -3005,7 +3005,7 @@ showDynFlags show_all dflags = do
                 is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
-        default_dflags = defaultDynFlags (settings dflags) (llvmConfig dflags)
+        default_dflags = defaultDynFlags (settings dflags)
 
         (ghciFlags,others)  = partition (\f -> flagSpecFlag f `elem` flgs)
                                         DynFlags.fFlags
@@ -3458,8 +3458,7 @@ showLanguages' show_all dflags =
                 is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
-   default_dflags =
-       defaultDynFlags (settings dflags) (llvmConfig dflags) `lang_set` Just lang
+   default_dflags = defaultDynFlags (settings dflags) `lang_set` Just lang
 
    lang = fromMaybe GHC2021 (language dflags)
 

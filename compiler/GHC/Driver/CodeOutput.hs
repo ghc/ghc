@@ -30,6 +30,7 @@ import GHC.Driver.Session
 import GHC.Driver.Config.Finder    (initFinderOpts)
 import GHC.Driver.Config.CmmToAsm  (initNCGConfig)
 import GHC.Driver.Config.CmmToLlvm (initLlvmCgConfig)
+import GHC.Driver.LlvmConfigCache  (LlvmConfigCache)
 import GHC.Driver.Ppr
 import GHC.Driver.Backend
 
@@ -73,6 +74,7 @@ codeOutput
     :: forall a.
        Logger
     -> TmpFs
+    -> LlvmConfigCache
     -> DynFlags
     -> UnitState
     -> Module
@@ -87,7 +89,7 @@ codeOutput
            (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
            [(ForeignSrcLang, FilePath)]{-foreign_fps-},
            a)
-codeOutput logger tmpfs dflags unit_state this_mod filenm location genForeignStubs foreign_fps pkg_deps
+codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location genForeignStubs foreign_fps pkg_deps
   cmm_stream
   =
     do  {
@@ -122,7 +124,7 @@ codeOutput logger tmpfs dflags unit_state this_mod filenm location genForeignStu
                  NCG         -> outputAsm logger dflags this_mod location filenm
                                           final_stream
                  ViaC        -> outputC logger dflags filenm final_stream pkg_deps
-                 LLVM        -> outputLlvm logger dflags filenm final_stream
+                 LLVM        -> outputLlvm logger llvm_config dflags filenm final_stream
                  Interpreter -> panic "codeOutput: Interpreter"
                  NoBackend   -> panic "codeOutput: NoBackend"
         ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
@@ -209,9 +211,9 @@ outputAsm logger dflags this_mod location filenm cmm_stream = do
 ************************************************************************
 -}
 
-outputLlvm :: Logger -> DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
-outputLlvm logger dflags filenm cmm_stream = do
-  lcg_config <- initLlvmCgConfig logger dflags
+outputLlvm :: Logger -> LlvmConfigCache -> DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
+outputLlvm logger llvm_config dflags filenm cmm_stream = do
+  lcg_config <- initLlvmCgConfig logger llvm_config dflags
   {-# SCC "llvm_output" #-} doOutput filenm $
     \f -> {-# SCC "llvm_CodeGen" #-}
       llvmCodeGen logger lcg_config f cmm_stream

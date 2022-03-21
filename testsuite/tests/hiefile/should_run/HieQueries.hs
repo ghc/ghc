@@ -47,7 +47,7 @@ makeNc = initNameCache 'z' []
 dynFlagsForPrinting :: String -> IO DynFlags
 dynFlagsForPrinting libdir = do
   systemSettings <- initSysTools libdir
-  return $ defaultDynFlags systemSettings (LlvmConfig [] [])
+  return $ defaultDynFlags systemSettings
 
 main = do
   libdir:_ <- getArgs

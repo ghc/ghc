@@ -1,4 +1,4 @@
-Found 282 Language.Haskell.Syntax module dependencies
+Found 284 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.PrimOps.Ids
@@ -19,6 +19,7 @@ GHC.Cmm.Node
 GHC.Cmm.Switch
 GHC.Cmm.Type
 GHC.CmmToAsm.CFG.Weight
+GHC.CmmToLlvm.Config
 GHC.Core
 GHC.Core.Class
 GHC.Core.Coercion
@@ -96,6 +97,7 @@ GHC.Driver.Errors.Ppr
 GHC.Driver.Errors.Types
 GHC.Driver.Flags
 GHC.Driver.Hooks
+GHC.Driver.LlvmConfigCache
 GHC.Driver.Monad
 GHC.Driver.Phases
 GHC.Driver.Pipeline.Monad

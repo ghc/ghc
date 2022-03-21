@@ -16,11 +16,12 @@ import GHC.Cmm.Utils (toBlockList)
 import GHC.Data.Maybe (firstJusts)
 import GHC.Data.Stream (Stream, liftIO)
 import qualified GHC.Data.Stream as Stream
-import GHC.Driver.Env (hsc_dflags)
+import GHC.Driver.Env (hsc_dflags, hsc_logger)
 import GHC.Driver.Env.Types (HscEnv)
 import GHC.Driver.Flags (GeneralFlag (Opt_InfoTableMap))
 import GHC.Driver.Session (gopt, targetPlatform)
 import GHC.Driver.Config.StgToCmm
+import GHC.Driver.Config.Cmm
 import GHC.Prelude
 import GHC.Runtime.Heap.Layout (isStackRep)
 import GHC.Settings (Platform, platformUnregisterised)
@@ -184,7 +185,9 @@ generateCgIPEStub :: HscEnv -> Module -> InfoTableProvMap -> NameEnv TagSig -> S
 generateCgIPEStub hsc_env this_mod denv tag_sigs s = do
   let dflags   = hsc_dflags hsc_env
       platform = targetPlatform dflags
+      logger   = hsc_logger hsc_env
       fstate   = initFCodeState platform
+      cmm_cfg  = initCmmConfig dflags
   cgState <- liftIO initC
 
   -- Collect info tables, but only if -finfo-table-map is enabled, otherwise labeledInfoTablesWithTickishes is empty.
@@ -195,7 +198,7 @@ generateCgIPEStub hsc_env this_mod denv tag_sigs s = do
   let denv' = denv {provInfoTables = Map.fromList (map (\(_, i, t) -> (cit_lbl i, t)) labeledInfoTablesWithTickishes)}
       ((ipeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv (map sndOf3 labeledInfoTablesWithTickishes) denv')
 
-  (_, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline hsc_env (emptySRT this_mod) ipeCmmGroup
+  (_, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline logger cmm_cfg (emptySRT this_mod) ipeCmmGroup
   Stream.yield ipeCmmGroupSRTs
 
   return CgInfos {cgNonCafs = nonCaffySet, cgLFInfos = moduleLFInfos, cgIPEStub = ipeStub, cgTagSigs = tag_sigs}

@@ -351,9 +351,6 @@ import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family
 
 import GHC.Utils.TmpFs
-import GHC.SysTools
-import GHC.SysTools.BaseDir
-
 import GHC.Utils.Error
 import GHC.Utils.Monad
 import GHC.Utils.Misc
@@ -559,53 +556,7 @@ withCleanupSession ghc = ghc `MC.finally` cleanup
 -- <http://hackage.haskell.org/package/ghc-paths>.
 
 initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
-initGhcMonad mb_top_dir
-  = do { env <- liftIO $
-                do { top_dir <- findTopDir mb_top_dir
-                   ; mySettings <- initSysTools top_dir
-                   ; myLlvmConfig <- lazyInitLlvmConfig top_dir
-                   ; dflags <- initDynFlags (defaultDynFlags mySettings myLlvmConfig)
-                   ; hsc_env <- newHscEnv dflags
-                   ; checkBrokenTablesNextToCode (hsc_logger hsc_env) dflags
-                   ; setUnsafeGlobalDynFlags dflags
-                      -- c.f. DynFlags.parseDynamicFlagsFull, which
-                      -- creates DynFlags and sets the UnsafeGlobalDynFlags
-                   ; return hsc_env }
-       ; setSession env }
-
--- | The binutils linker on ARM emits unnecessary R_ARM_COPY relocations which
--- breaks tables-next-to-code in dynamically linked modules. This
--- check should be more selective but there is currently no released
--- version where this bug is fixed.
--- See https://sourceware.org/bugzilla/show_bug.cgi?id=16177 and
--- https://gitlab.haskell.org/ghc/ghc/issues/4210#note_78333
-checkBrokenTablesNextToCode :: MonadIO m => Logger -> DynFlags -> m ()
-checkBrokenTablesNextToCode logger dflags
-  = do { broken <- checkBrokenTablesNextToCode' logger dflags
-       ; when broken
-         $ do { _ <- liftIO $ throwIO $ mkApiErr dflags invalidLdErr
-              ; liftIO $ fail "unsupported linker"
-              }
-       }
-  where
-    invalidLdErr = text "Tables-next-to-code not supported on ARM" <+>
-                   text "when using binutils ld (please see:" <+>
-                   text "https://sourceware.org/bugzilla/show_bug.cgi?id=16177)"
-
-checkBrokenTablesNextToCode' :: MonadIO m => Logger -> DynFlags -> m Bool
-checkBrokenTablesNextToCode' logger dflags
-  | not (isARM arch)               = return False
-  | ways dflags `hasNotWay` WayDyn = return False
-  | not tablesNextToCode           = return False
-  | otherwise                      = do
-    linkerInfo <- liftIO $ getLinkerInfo logger dflags
-    case linkerInfo of
-      GnuLD _  -> return True
-      _        -> return False
-  where platform = targetPlatform dflags
-        arch = platformArch platform
-        tablesNextToCode = platformTablesNextToCode platform
-
+initGhcMonad mb_top_dir = setSession =<< liftIO (initHscEnv mb_top_dir)
 
 -- %************************************************************************
 -- %*                                                                      *

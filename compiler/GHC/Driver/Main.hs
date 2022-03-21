@@ -39,6 +39,7 @@ module GHC.Driver.Main
     -- * Making an HscEnv
       newHscEnv
     , newHscEnvWithHUG
+    , initHscEnv
 
     -- * Compiling complete source files
     , Messager, batchMsg, batchMultiMsg
@@ -99,10 +100,14 @@ module GHC.Driver.Main
 
 import GHC.Prelude
 
+import GHC.Platform
+import GHC.Platform.Ways
+
 import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Env
+import GHC.Driver.Env.KnotVars
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
@@ -111,10 +116,13 @@ import GHC.Driver.Config.Logger   (initLogFlags)
 import GHC.Driver.Config.Parser   (initParserOpts)
 import GHC.Driver.Config.Stg.Ppr  (initStgPprOpts)
 import GHC.Driver.Config.Stg.Pipeline (initStgPipelineOpts)
-import GHC.Driver.Config.StgToCmm (initStgToCmmConfig)
+import GHC.Driver.Config.StgToCmm  (initStgToCmmConfig)
+import GHC.Driver.Config.Cmm       (initCmmConfig)
+import GHC.Driver.LlvmConfigCache  (initLlvmConfigCache)
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Tidy
 import GHC.Driver.Hooks
+import GHC.Driver.GenerateCgIPEStub (generateCgIPEStub)
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter ( addSptEntry )
@@ -172,6 +180,7 @@ import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
 
 import GHC.Stg.Syntax
 import GHC.Stg.Pipeline ( stg2stg )
+import GHC.Stg.InferTags
 
 import GHC.Builtin.Utils
 import GHC.Builtin.Names
@@ -215,6 +224,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Cache ( initNameCache )
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Ppr
+import GHC.Types.Name.Set (NonCaffySet)
 import GHC.Types.TyThing
 import GHC.Types.HpcInfo
 
@@ -232,7 +242,11 @@ import GHC.Data.Bag
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
+import GHC.Data.Maybe
+
 import qualified GHC.SysTools
+import GHC.SysTools (initSysTools)
+import GHC.SysTools.BaseDir (findTopDir)
 
 import Data.Data hiding (Fixity, TyCon)
 import Data.List        ( nub, isPrefixOf, partition )
@@ -246,14 +260,9 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first)
-import GHC.Data.Maybe
-import GHC.Driver.Env.KnotVars
-import GHC.Types.Name.Set (NonCaffySet)
-import GHC.Driver.GenerateCgIPEStub (generateCgIPEStub)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 
 
-import GHC.Stg.InferTags
 
 {- **********************************************************************
 %*                                                                      *
@@ -261,35 +270,79 @@ import GHC.Stg.InferTags
 %*                                                                      *
 %********************************************************************* -}
 
-newHscEnv :: DynFlags -> IO HscEnv
-newHscEnv dflags = newHscEnvWithHUG dflags (homeUnitId_ dflags) home_unit_graph
+newHscEnv :: FilePath -> DynFlags -> IO HscEnv
+newHscEnv top_dir dflags = newHscEnvWithHUG top_dir dflags (homeUnitId_ dflags) home_unit_graph
   where
     home_unit_graph = unitEnv_singleton
                         (homeUnitId_ dflags)
                         (mkHomeUnitEnv dflags emptyHomePackageTable Nothing)
 
-newHscEnvWithHUG :: DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
-newHscEnvWithHUG top_dynflags cur_unit home_unit_graph = do
+newHscEnvWithHUG :: FilePath -> DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
+newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
     nc_var  <- initNameCache 'r' knownKeyNames
     fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs
     let dflags = homeUnitEnv_dflags $ unitEnv_lookup cur_unit home_unit_graph
     unit_env <- initUnitEnv cur_unit home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags)
-    return HscEnv { hsc_dflags = top_dynflags
+    llvm_config <- initLlvmConfigCache top_dir
+    return HscEnv { hsc_dflags         = top_dynflags
                   , hsc_logger         = setLogFlags logger (initLogFlags top_dynflags)
-                  ,  hsc_targets        = []
-                  ,  hsc_mod_graph      = emptyMG
-                  ,  hsc_IC             = emptyInteractiveContext dflags
-                  ,  hsc_NC             = nc_var
-                  ,  hsc_FC             = fc_var
-                  ,  hsc_type_env_vars  = emptyKnotVars
-                  ,  hsc_interp         = Nothing
-                  ,  hsc_unit_env       = unit_env
-                  ,  hsc_plugins        = emptyPlugins
-                  ,  hsc_hooks          = emptyHooks
-                  ,  hsc_tmpfs          = tmpfs
+                  , hsc_targets        = []
+                  , hsc_mod_graph      = emptyMG
+                  , hsc_IC             = emptyInteractiveContext dflags
+                  , hsc_NC             = nc_var
+                  , hsc_FC             = fc_var
+                  , hsc_type_env_vars  = emptyKnotVars
+                  , hsc_interp         = Nothing
+                  , hsc_unit_env       = unit_env
+                  , hsc_plugins        = emptyPlugins
+                  , hsc_hooks          = emptyHooks
+                  , hsc_tmpfs          = tmpfs
+                  , hsc_llvm_config    = llvm_config
                   }
+
+-- | Initialize HscEnv from an optional top_dir path
+initHscEnv :: Maybe FilePath -> IO HscEnv
+initHscEnv mb_top_dir = do
+  top_dir <- findTopDir mb_top_dir
+  mySettings <- initSysTools top_dir
+  dflags <- initDynFlags (defaultDynFlags mySettings)
+  hsc_env <- newHscEnv top_dir dflags
+  checkBrokenTablesNextToCode (hsc_logger hsc_env) dflags
+  setUnsafeGlobalDynFlags dflags
+   -- c.f. DynFlags.parseDynamicFlagsFull, which
+   -- creates DynFlags and sets the UnsafeGlobalDynFlags
+  return hsc_env
+
+-- | The binutils linker on ARM emits unnecessary R_ARM_COPY relocations which
+-- breaks tables-next-to-code in dynamically linked modules. This
+-- check should be more selective but there is currently no released
+-- version where this bug is fixed.
+-- See https://sourceware.org/bugzilla/show_bug.cgi?id=16177 and
+-- https://gitlab.haskell.org/ghc/ghc/issues/4210#note_78333
+checkBrokenTablesNextToCode :: Logger -> DynFlags -> IO ()
+checkBrokenTablesNextToCode logger dflags = do
+  let invalidLdErr = "Tables-next-to-code not supported on ARM \
+                     \when using binutils ld (please see: \
+                     \https://sourceware.org/bugzilla/show_bug.cgi?id=16177)"
+  broken <- checkBrokenTablesNextToCode' logger dflags
+  when broken (panic invalidLdErr)
+
+checkBrokenTablesNextToCode' :: Logger -> DynFlags -> IO Bool
+checkBrokenTablesNextToCode' logger dflags
+  | not (isARM arch)               = return False
+  | ways dflags `hasNotWay` WayDyn = return False
+  | not tablesNextToCode           = return False
+  | otherwise                      = do
+    linkerInfo <- liftIO $ GHC.SysTools.getLinkerInfo logger dflags
+    case linkerInfo of
+      GnuLD _  -> return True
+      _        -> return False
+  where platform = targetPlatform dflags
+        arch = platformArch platform
+        tablesNextToCode = platformTablesNextToCode platform
+
 
 -- -----------------------------------------------------------------------------
 
@@ -1630,6 +1683,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             logger = hsc_logger hsc_env
             hooks  = hsc_hooks hsc_env
             tmpfs  = hsc_tmpfs hsc_env
+            llvm_config = hsc_llvm_config hsc_env
             profile = targetProfile dflags
             data_tycons = filter isDataTyCon tycons
             -- cg_tycons includes newtypes, for the benefit of External Core,
@@ -1688,7 +1742,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
             (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
                 <- {-# SCC "codeOutput" #-}
-                  codeOutput logger tmpfs dflags (hsc_units hsc_env) this_mod output_filename location
+                  codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
             return (output_filename, stub_c_exists, foreign_fps, Just cg_infos)
 
@@ -1741,6 +1795,8 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
         profile  = targetProfile dflags
         home_unit = hsc_home_unit hsc_env
         platform  = targetPlatform dflags
+        llvm_config = hsc_llvm_config hsc_env
+        cmm_config = initCmmConfig dflags
         do_info_table = gopt Opt_InfoTableMap dflags
         -- Make up a module name to give the NCG. We can't pass bottom here
         -- lest we reproduce #11784.
@@ -1763,7 +1819,7 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
         -- in C we must declare before use, but SRT algorithm is free to
         -- re-order [A, B] (B refers to A) when A is not CAFFY and return [B, A]
         cmmgroup <-
-          concatMapM (\cmm -> snd <$> cmmPipeline hsc_env (emptySRT cmm_mod) [cmm]) cmm
+          concatMapM (\cmm -> snd <$> cmmPipeline logger cmm_config (emptySRT cmm_mod) [cmm]) cmm
 
         unless (null cmmgroup) $
           putDumpFileMaybe logger Opt_D_dump_cmm "Output Cmm"
@@ -1778,7 +1834,7 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
               in NoStubs `appendStubC` ip_init
 
         (_output_filename, (_stub_h_exists, stub_c_exists), _foreign_fps, _caf_infos)
-          <- codeOutput logger tmpfs dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] S.empty
+          <- codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] S.empty
              rawCmms
         return stub_c_exists
   where
@@ -1853,11 +1909,13 @@ doCodeGen hsc_env this_mod denv data_tycons
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
+        cmm_config = initCmmConfig dflags
+
         pipeline_stream :: Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos)
         pipeline_stream = do
           (non_cafs,  lf_infos) <-
             {-# SCC "cmmPipeline" #-}
-            Stream.mapAccumL_ (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
+            Stream.mapAccumL_ (cmmPipeline logger cmm_config) (emptySRT this_mod) ppr_stream1
               <&> first (srtMapNonCAFs . moduleSRTMap)
 
           return (non_cafs, lf_infos)

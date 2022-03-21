@@ -70,7 +70,8 @@ import Data.IORef
 import GHC.Types.Name.Env
 import GHC.Platform.Ways
 import GHC.Platform.ArchOS
-import GHC.CmmToLlvm.Base ( llvmVersionList )
+import GHC.Driver.LlvmConfigCache (readLlvmConfigCache)
+import GHC.CmmToLlvm.Config (llvmVersionList, LlvmTarget (..), LlvmConfig (..))
 import {-# SOURCE #-} GHC.Driver.Pipeline (compileForeign, compileEmptyStub)
 import GHC.Settings
 import System.IO
@@ -209,6 +210,7 @@ runLlvmLlcPhase pipe_env hsc_env input_fn = do
     --
     -- Observed at least with -mtriple=arm-unknown-linux-gnueabihf -enable-tbaa
     --
+    llvm_config <- readLlvmConfigCache (hsc_llvm_config hsc_env)
     let dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
         llvmOpts = case llvmOptLevel dflags of
@@ -217,7 +219,7 @@ runLlvmLlcPhase pipe_env hsc_env input_fn = do
           _ -> "-O2"
 
         defaultOptions = map GHC.SysTools.Option . concatMap words . snd
-                         $ unzip (llvmOptions dflags)
+                         $ unzip (llvmOptions llvm_config dflags)
         optFlag = if null (getOpts dflags opt_lc)
                   then map GHC.SysTools.Option $ words llvmOpts
                   else []
@@ -243,16 +245,17 @@ runLlvmOptPhase :: PipeEnv -> HscEnv -> FilePath -> IO FilePath
 runLlvmOptPhase pipe_env hsc_env input_fn = do
     let dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
+    llvm_config <- readLlvmConfigCache (hsc_llvm_config hsc_env)
     let -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
         optIdx = max 0 $ min 2 $ llvmOptLevel dflags  -- ensure we're in [0,2]
-        llvmOpts = case lookup optIdx $ llvmPasses $ llvmConfig dflags of
+        llvmOpts = case lookup optIdx $ llvmPasses llvm_config of
                     Just passes -> passes
                     Nothing -> panic ("runPhase LlvmOpt: llvm-passes file "
                                       ++ "is missing passes for level "
                                       ++ show optIdx)
         defaultOptions = map GHC.SysTools.Option . concat . fmap words . fst
-                         $ unzip (llvmOptions dflags)
+                         $ unzip (llvmOptions llvm_config dflags)
 
         -- don't specify anything if user has specified commands. We do this
         -- for opt but not llc since opt is very specifically for optimisation
@@ -867,9 +870,10 @@ getOutputFilename logger tmpfs stop_phase output basename dflags next_phase mayb
 
 -- | LLVM Options. These are flags to be passed to opt and llc, to ensure
 -- consistency we list them in pairs, so that they form groups.
-llvmOptions :: DynFlags
+llvmOptions :: LlvmConfig
+            -> DynFlags
             -> [(String, String)]  -- ^ pairs of (opt, llc) arguments
-llvmOptions dflags =
+llvmOptions llvm_config dflags =
        [("-enable-tbaa -tbaa",  "-enable-tbaa") | gopt Opt_LlvmTBAA dflags ]
     ++ [("-relocation-model=" ++ rmodel
         ,"-relocation-model=" ++ rmodel) | not (null rmodel)]
@@ -883,7 +887,7 @@ llvmOptions dflags =
     ++ [("", "-target-abi=" ++ abi) | not (null abi) ]
 
   where target = platformMisc_llvmTarget $ platformMisc dflags
-        Just (LlvmTarget _ mcpu mattr) = lookup target (llvmTargets $ llvmConfig dflags)
+        Just (LlvmTarget _ mcpu mattr) = lookup target (llvmTargets llvm_config)
 
         -- Relocation models
         rmodel | gopt Opt_PIC dflags         = "pic"

@@ -15,10 +15,6 @@ module GHC.CmmToLlvm.Base (
         LiveGlobalRegs,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
-        LlvmVersion, supportedLlvmVersionLowerBound, supportedLlvmVersionUpperBound,
-        llvmVersionSupported, parseLlvmVersion,
-        llvmVersionStr, llvmVersionList,
-
         LlvmM,
         runLlvm, withClearVars, varLookup, varInsert,
         markStackReg, checkStackReg,
@@ -66,10 +62,8 @@ import GHC.Utils.Logger
 
 import Data.Maybe (fromJust)
 import Control.Monad (ap)
-import Data.Char (isDigit)
-import Data.List (sortBy, groupBy, intercalate)
+import Data.List (sortBy, groupBy)
 import Data.Ord (comparing)
-import qualified Data.List.NonEmpty as NE
 
 -- ----------------------------------------------------------------------------
 -- * Some Data Types
@@ -259,42 +253,6 @@ tysToParams = map (\ty -> (ty, []))
 -- | Pointer width
 llvmPtrBits :: Platform -> Int
 llvmPtrBits platform = widthInBits $ typeWidth $ gcWord platform
-
--- ----------------------------------------------------------------------------
--- * Llvm Version
---
-
-parseLlvmVersion :: String -> Maybe LlvmVersion
-parseLlvmVersion =
-    fmap LlvmVersion . NE.nonEmpty . go [] . dropWhile (not . isDigit)
-  where
-    go vs s
-      | null ver_str
-      = reverse vs
-      | '.' : rest' <- rest
-      = go (read ver_str : vs) rest'
-      | otherwise
-      = reverse (read ver_str : vs)
-      where
-        (ver_str, rest) = span isDigit s
-
--- | The (inclusive) lower bound on the LLVM Version that is currently supported.
-supportedLlvmVersionLowerBound :: LlvmVersion
-supportedLlvmVersionLowerBound = LlvmVersion (sUPPORTED_LLVM_VERSION_MIN NE.:| [])
-
--- | The (not-inclusive) upper bound  bound on the LLVM Version that is currently supported.
-supportedLlvmVersionUpperBound :: LlvmVersion
-supportedLlvmVersionUpperBound = LlvmVersion (sUPPORTED_LLVM_VERSION_MAX NE.:| [])
-
-llvmVersionSupported :: LlvmVersion -> Bool
-llvmVersionSupported v =
-  v >= supportedLlvmVersionLowerBound && v < supportedLlvmVersionUpperBound
-
-llvmVersionStr :: LlvmVersion -> String
-llvmVersionStr = intercalate "." . map show . llvmVersionList
-
-llvmVersionList :: LlvmVersion -> [Int]
-llvmVersionList = NE.toList . llvmVersionNE
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling

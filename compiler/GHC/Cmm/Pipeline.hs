@@ -1,13 +1,12 @@
 {-# LANGUAGE BangPatterns #-}
 
 module GHC.Cmm.Pipeline (
-  -- | Converts C-- with an implicit stack and native C-- calls into
-  -- optimized, CPS converted and native-call-less C--.  The latter
-  -- C-- can be used to generate assembly.
   cmmPipeline
 ) where
 
 import GHC.Prelude
+
+import GHC.Driver.Flags
 
 import GHC.Cmm
 import GHC.Cmm.Config
@@ -22,37 +21,38 @@ import GHC.Cmm.Sink
 import GHC.Cmm.Switch.Implement
 
 import GHC.Types.Unique.Supply
-import GHC.Driver.Session
-import GHC.Driver.Config.Cmm
+
 import GHC.Utils.Error
 import GHC.Utils.Logger
-import GHC.Driver.Env
-import Control.Monad
 import GHC.Utils.Outputable
+
 import GHC.Platform
+
+import Control.Monad
 import Data.Either (partitionEithers)
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
 -----------------------------------------------------------------------------
 
+-- | Converts C-- with an implicit stack and native C-- calls into
+-- optimized, CPS converted and native-call-less C--.  The latter
+-- C-- can be used to generate assembly.
 cmmPipeline
- :: HscEnv -- Compilation env including
-           -- dynamic flags: -dcmm-lint -ddump-cmm-cps
+ :: Logger
+ -> CmmConfig
  -> ModuleSRTInfo        -- Info about SRTs generated so far
  -> CmmGroup             -- Input C-- with Procedures
  -> IO (ModuleSRTInfo, CmmGroupSRTs) -- Output CPS transformed C--
 
-cmmPipeline hsc_env srtInfo prog = do
-  let logger    = hsc_logger hsc_env
-  let cmmConfig = initCmmConfig (hsc_dflags hsc_env)
+cmmPipeline logger cmm_config srtInfo prog = do
   let forceRes (info, group) = info `seq` foldr seq () group
-  let platform = cmmPlatform cmmConfig
+  let platform = cmmPlatform cmm_config
   withTimingSilent logger (text "Cmm pipeline") forceRes $ do
-     tops <- {-# SCC "tops" #-} mapM (cpsTop logger platform cmmConfig) prog
+     tops <- {-# SCC "tops" #-} mapM (cpsTop logger platform cmm_config) prog
 
      let (procs, data_) = partitionEithers tops
-     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmmConfig srtInfo procs data_
+     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo procs data_
      dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
 
      return (srtInfo, cmms)

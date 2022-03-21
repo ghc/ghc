@@ -8,6 +8,8 @@ module GHC.Driver.Env.Types
 import GHC.Driver.Errors.Types ( GhcMessage )
 import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Driver.Session ( ContainsDynFlags(..), HasDynFlags(..), DynFlags )
+import GHC.Driver.LlvmConfigCache (LlvmConfigCache)
+
 import GHC.Prelude
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types ( Interp )
@@ -106,4 +108,7 @@ data HscEnv
 
         , hsc_tmpfs :: !TmpFs
                 -- ^ Temporary files
+
+        , hsc_llvm_config :: !LlvmConfigCache
+                -- ^ LLVM configuration cache.
  }

@@ -17,6 +17,8 @@ module GHC.Stg.Pipeline
 
 import GHC.Prelude
 
+import GHC.Driver.Flags
+
 import GHC.Stg.Syntax
 
 import GHC.Stg.Lint     ( lintStgTopBindings )
@@ -29,7 +31,6 @@ import GHC.Stg.Lift     ( StgLiftConfig, stgLiftLams )
 import GHC.Unit.Module ( Module )
 import GHC.Runtime.Context ( InteractiveContext )
 
-import GHC.Driver.Flags (DumpFlag(..))
 import GHC.Utils.Error
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable

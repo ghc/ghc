@@ -38,7 +38,7 @@ makeNc = initNameCache 'z' []
 dynFlagsForPrinting :: String -> IO DynFlags
 dynFlagsForPrinting libdir = do
   systemSettings <- initSysTools libdir
-  return $ defaultDynFlags systemSettings (LlvmConfig [] [])
+  return $ defaultDynFlags systemSettings
 
 selectPoint' :: HieFile -> (Int,Int) -> HieAST Int
 selectPoint' hf loc =

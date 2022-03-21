@@ -14,7 +14,6 @@
 module GHC.SysTools (
         -- * Initialisation
         initSysTools,
-        lazyInitLlvmConfig,
 
         -- * Interface to system tools
         module GHC.SysTools.Tasks,
@@ -32,7 +31,6 @@ module GHC.SysTools (
 
 import GHC.Prelude
 
-import GHC.Settings.Utils
 
 import GHC.Utils.Panic
 import GHC.Driver.Session
@@ -44,9 +42,7 @@ import GHC.SysTools.BaseDir
 import GHC.Settings.IO
 
 import Control.Monad.Trans.Except (runExceptT)
-import System.FilePath
 import System.IO
-import System.IO.Unsafe (unsafeInterleaveIO)
 import Foreign.Marshal.Alloc (allocaBytes)
 import System.Directory (copyFile)
 
@@ -101,47 +97,6 @@ stuff.
 *                                                                      *
 ************************************************************************
 -}
-
--- Note [LLVM configuration]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- The `llvm-targets` and `llvm-passes` files are shipped with GHC and contain
--- information needed by the LLVM backend to invoke `llc` and `opt`.
--- Specifically:
---
---  * llvm-targets maps autoconf host triples to the corresponding LLVM
---    `data-layout` declarations. This information is extracted from clang using
---    the script in utils/llvm-targets/gen-data-layout.sh and should be updated
---    whenever we target a new version of LLVM.
---
---  * llvm-passes maps GHC optimization levels to sets of LLVM optimization
---    flags that GHC should pass to `opt`.
---
--- This information is contained in files rather the GHC source to allow users
--- to add new targets to GHC without having to recompile the compiler.
---
--- Since this information is only needed by the LLVM backend we load it lazily
--- with unsafeInterleaveIO. Consequently it is important that we lazily pattern
--- match on LlvmConfig until we actually need its contents.
-
-lazyInitLlvmConfig :: String
-               -> IO LlvmConfig
-lazyInitLlvmConfig top_dir
-  = unsafeInterleaveIO $ do    -- see Note [LLVM configuration]
-      targets <- readAndParse "llvm-targets"
-      passes <- readAndParse "llvm-passes"
-      return $ LlvmConfig { llvmTargets = fmap mkLlvmTarget <$> targets,
-                            llvmPasses = passes }
-  where
-    readAndParse :: Read a => String -> IO a
-    readAndParse name =
-      do let llvmConfigFile = top_dir </> name
-         llvmConfigStr <- readFile llvmConfigFile
-         case maybeReadFuzzy llvmConfigStr of
-           Just s -> return s
-           Nothing -> pgmError ("Can't parse " ++ show llvmConfigFile)
-
-    mkLlvmTarget :: (String, String, String) -> LlvmTarget
-    mkLlvmTarget (dl, cpu, attrs) = LlvmTarget dl cpu (words attrs)
 
 
 initSysTools :: String          -- TopDir path

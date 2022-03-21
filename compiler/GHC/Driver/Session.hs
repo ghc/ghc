@@ -71,9 +71,6 @@ module GHC.Driver.Session (
         safeDirectImpsReq, safeImplicitImpsReq,
         unsafeFlags, unsafeFlagsForInfer,
 
-        -- ** LLVM Targets
-        LlvmTarget(..), LlvmConfig(..),
-
         -- ** System tool settings and locations
         Settings(..),
         sProgramName,
@@ -452,9 +449,6 @@ data DynFlags = DynFlags {
   rawSettings       :: [(String, String)],
   tmpDir            :: TempDir,
 
-  llvmConfig            :: LlvmConfig,
-    -- ^ N.B. It's important that this field is lazy since we load the LLVM
-    -- configuration lazily. See Note [LLVM configuration] in "GHC.SysTools".
   llvmOptLevel          :: Int,         -- ^ LLVM optimisation level
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   debugLevel            :: Int,         -- ^ How much debug information to produce
@@ -772,17 +766,6 @@ data ProfAuto
   | ProfAutoExports    -- ^ exported functions annotated only
   | ProfAutoCalls      -- ^ annotate call-sites
   deriving (Eq,Enum)
-
-data LlvmTarget = LlvmTarget
-  { lDataLayout :: String
-  , lCPU        :: String
-  , lAttributes :: [String]
-  }
-
--- | See Note [LLVM configuration] in "GHC.SysTools".
-data LlvmConfig = LlvmConfig { llvmTargets :: [(String, LlvmTarget)]
-                             , llvmPasses  :: [(Int, String)]
-                             }
 
 -----------------------------------------------------------------------------
 -- Accessessors from 'DynFlags'
@@ -1117,8 +1100,8 @@ initDynFlags dflags = do
 
 -- | The normal 'DynFlags'. Note that they are not suitable for use in this form
 -- and must be fully initialized by 'GHC.runGhc' first.
-defaultDynFlags :: Settings -> LlvmConfig -> DynFlags
-defaultDynFlags mySettings llvmConfig =
+defaultDynFlags :: Settings -> DynFlags
+defaultDynFlags mySettings =
 -- See Note [Updating flag description in the User's Guide]
      DynFlags {
         ghcMode                 = CompManager,
@@ -1227,8 +1210,6 @@ defaultDynFlags mySettings llvmConfig =
 
         tmpDir                  = panic "defaultDynFlags: uninitialized tmpDir",
 
-        -- See Note [LLVM configuration].
-        llvmConfig              = llvmConfig,
         llvmOptLevel            = 0,
 
         -- ghc -M values

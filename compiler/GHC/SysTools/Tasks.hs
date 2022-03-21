@@ -14,8 +14,7 @@ import GHC.Platform
 import GHC.ForeignSrcLang
 import GHC.IO (catchException)
 
-import GHC.CmmToLlvm.Base   (llvmVersionStr, supportedLlvmVersionUpperBound, parseLlvmVersion, supportedLlvmVersionLowerBound)
-import GHC.CmmToLlvm.Config (LlvmVersion)
+import GHC.CmmToLlvm.Config (LlvmVersion, llvmVersionStr, supportedLlvmVersionUpperBound, parseLlvmVersion, supportedLlvmVersionLowerBound)
 
 import GHC.SysTools.Process
 import GHC.SysTools.Info

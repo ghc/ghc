@@ -26,6 +26,7 @@ import qualified GHC.CmmToAsm.X86.Instr as X86.Instr
 import qualified GHC.CmmToAsm.X86 as X86
 import GHC.Driver.Config.Cmm.Parser
 import GHC.Driver.Config.CmmToAsm
+import GHC.Driver.Config.Cmm
 import GHC.Driver.Main
 import GHC.Driver.Env
 import GHC.StgToCmm.CgUtils
@@ -85,12 +86,12 @@ main = do
 
         dflags <- getDynFlags
         logger <- getLogger
+        home_unit <- hsc_home_unit <$> getSession
         reifyGhc $ \_ -> do
             us <- unitTestUniqSupply
-            runTests logger dflags us
+            runTests logger home_unit dflags us
 
     return ()
-
 
 -- | TODO: Make this an IORef along the lines of Data.Unique.newUnique to add
 -- stronger guarantees a UniqSupply won't be accidentally reused
@@ -118,30 +119,31 @@ assertIO = assertOr $ \msg -> void (throwIO . RegAllocTestException $ msg)
 -- | compile the passed cmm file and return the register allocator stats
 -- ***NOTE*** This function sets Opt_D_dump_asm_stats in the passed
 -- DynFlags because it won't work without it.  Handle stderr appropriately.
-compileCmmForRegAllocStats ::
-    Logger ->
-    DynFlags ->
-    FilePath ->
-    (NCGConfig ->
-        NcgImpl (Alignment, RawCmmStatics) X86.Instr.Instr X86.Instr.JumpDest) ->
-    UniqSupply ->
-    IO [( Maybe [Color.RegAllocStats (Alignment, RawCmmStatics) X86.Instr.Instr]
+compileCmmForRegAllocStats
+  :: Logger
+  -> HomeUnit
+  -> DynFlags
+  -> FilePath
+  -> (NCGConfig ->
+        NcgImpl (Alignment, RawCmmStatics) X86.Instr.Instr X86.Instr.JumpDest)
+  -> UniqSupply
+  -> IO [( Maybe [Color.RegAllocStats (Alignment, RawCmmStatics) X86.Instr.Instr]
         , Maybe [Linear.RegAllocStats])]
-compileCmmForRegAllocStats logger dflags cmmFile ncgImplF us = do
+compileCmmForRegAllocStats logger home_unit dflags cmmFile ncgImplF us = do
     let ncgImpl = ncgImplF (initNCGConfig dflags thisMod)
-    hscEnv <- newHscEnv dflags
+    let cmm_config = initCmmConfig dflags
 
     -- parse the cmm file and output any warnings or errors
-    let fake_mod = mkHomeModule (hsc_home_unit hscEnv) (mkModuleName "fake")
+    let fake_mod = mkHomeModule home_unit (mkModuleName "fake")
         cmmpConfig = initCmmParserConfig dflags
-    (warnings, errors, parsedCmm) <- parseCmmFile cmmpConfig fake_mod (hsc_home_unit hscEnv) cmmFile
+    (warnings, errors, parsedCmm) <- parseCmmFile cmmpConfig fake_mod home_unit cmmFile
 
     -- print parser errors or warnings
     let !diag_opts = initDiagOpts dflags
     mapM_ (printMessages logger diag_opts) [warnings, errors]
 
     let initTopSRT = emptySRT thisMod
-    cmmGroup <- fmap snd $ cmmPipeline hscEnv initTopSRT $ fst $ fromJust parsedCmm
+    cmmGroup <- fmap snd $ cmmPipeline logger cmm_config initTopSRT $ fst $ fromJust parsedCmm
 
     let profile = targetProfile dflags
     rawCmms <- cmmToRawCmm logger profile (Stream.yield cmmGroup)
@@ -175,10 +177,11 @@ noSpillsCmmFile = "no_spills.cmm"
 
 -- | Run each unit test in this file and notify the user of success or
 -- failure.
-runTests :: Logger -> DynFlags -> UniqSupply -> IO ()
-runTests logger dflags us = testGraphNoSpills logger dflags noSpillsCmmFile us >>= \res ->
-                        if res then putStrLn "All tests passed."
-                               else hPutStr stderr "testGraphNoSpills failed!"
+runTests :: Logger -> HomeUnit -> DynFlags -> UniqSupply -> IO ()
+runTests logger home_unit dflags us = do
+  res <- testGraphNoSpills logger home_unit dflags noSpillsCmmFile us
+  if res then putStrLn "All tests passed."
+         else hPutStr stderr "testGraphNoSpills failed!"
 
 
 -- | To map an unlimited number of abstract variables to a limited number of
@@ -192,10 +195,10 @@ runTests logger dflags us = testGraphNoSpills logger dflags noSpillsCmmFile us >
 -- the register allocator should be able to do everything
 -- (on x86) in the passed file without any spills or reloads.
 --
-testGraphNoSpills :: Logger -> DynFlags -> FilePath -> UniqSupply -> IO Bool
-testGraphNoSpills logger dflags' path us = do
+testGraphNoSpills :: Logger -> HomeUnit -> DynFlags -> FilePath -> UniqSupply -> IO Bool
+testGraphNoSpills logger home_unit dflags' path us = do
         colorStats <- fst . concatTupledMaybes <$>
-                        compileCmmForRegAllocStats logger dflags path X86.ncgX86 us
+                        compileCmmForRegAllocStats logger home_unit dflags path X86.ncgX86 us
 
         assertIO "testGraphNoSpills: color stats should not be empty"
                         $ not (null colorStats)
