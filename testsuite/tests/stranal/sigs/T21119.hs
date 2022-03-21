@@ -3,12 +3,31 @@
 -- {-# LANGUAGE PatternSynonyms #-}
 -- {-# LANGUAGE BangPatterns #-}
 -- {-# LANGUAGE MagicHash, UnboxedTuples #-}
-module T21119 where
+{-# LANGUAGE MagicHash #-}
+module T21119 ( get, getIO, indexError, throwIndexError ) where
 
-import Control.Exception
+import Control.Exception (Exception(..))
+import GHC.IO hiding (throwIO)
+import GHC.Exts
 
-indexError :: Show a => (a, a) -> a -> String -> b
-indexError rng i s = error (show rng ++ show i ++ show s)
+throwIO :: Exception e => e -> IO a
+throwIO e = IO (raiseIO# (toException e))
+
+myconcat :: [[a]] -> [a]
+myconcat = concat
+{-# NOINLINE myconcat #-}
+
+class MyShow a where
+  myshow :: a -> String
+
+instance MyShow Int where
+  myshow !_ = "0"
+
+instance MyShow (a, b) where
+  myshow !_ = "()"
+
+indexError :: MyShow a => (a, a) -> a -> String -> b
+indexError rng i s = errorWithoutStackTrace (myconcat [myshow rng, myshow i, s])
 
 get :: (Int, Int) -> Int -> [a] -> a
 get p@(l,u) i xs
@@ -17,8 +36,8 @@ get p@(l,u) i xs
 
 -- Now the same with precise exceptions:
 
-throwIndexError :: Show a => (a, a) -> a -> String -> IO b
-throwIndexError rng i s = throwIO (userError (show rng ++ show i ++ show s))
+throwIndexError :: MyShow a => (a, a) -> a -> String -> IO b
+throwIndexError rng i s = throwIO (userError (myconcat [myshow rng, myshow i, s]))
 
 -- It's important that we don't unbox 'u' here.
 -- We may or may not unbox 'p' and 'l'.
