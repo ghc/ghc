@@ -10,6 +10,7 @@ class FieldType:
 
 VariableLength = None
 ThreadId = FieldType('EventThreadID')
+KernelThreadId = FieldType('EventKernelThreadId')
 CapNo = FieldType('EventCapNo')
 CapsetType = FieldType('EventCapsetType')
 Timestamp = FieldType('EventTimestamp')
@@ -84,12 +85,12 @@ event_types = [
     EventType(47, 'CAP_DISABLE',      [CapNo],                        'Disable capability'),
     EventType(48, 'CAP_ENABLE',       [CapNo],                        'Enable capability'),
     EventType(49, 'HEAP_ALLOCATED',   [CapsetId, Word64],             'Total heap memory ever allocated'),
-    EventType(50, 'HEAP_SIZE',        [CapsetId, Word64],             'Current heap size'),
+    EventType(50, 'HEAP_SIZE',        [CapsetId, Word64],             'Current heap size (number of allocated mblocks)'),
     EventType(51, 'HEAP_LIVE',        [CapsetId, Word64],             'Current heap live data'),
     EventType(52, 'HEAP_INFO_GHC',    [CapsetId, Word16] + 4*[Word64], 'Heap static parameters'),
     EventType(53, 'GC_STATS_GHC',     [CapsetId, Word16] + 3*[Word64] + [Word32] + 3*[Word64], 'GC statistics'),
     EventType(54, 'GC_GLOBAL_SYNC',   [],                             'Synchronise stop-the-world GC'),
-    EventType(55, 'TASK_CREATE',      [TaskId, CapNo, ThreadId],      'Task create'),
+    EventType(55, 'TASK_CREATE',      [TaskId, CapNo, KernelThreadId],      'Task create'),
     EventType(56, 'TASK_MIGRATE',     [TaskId, CapNo, CapNo],         'Task migrate'),
     EventType(57, 'TASK_DELETE',      [TaskId],                       'Task delete'),
     EventType(58, 'USER_MARKER',      VariableLength,                 'User marker'),
@@ -124,7 +125,7 @@ event_types = [
 
     # Non-moving GC
     EventType(200, 'CONC_MARK_BEGIN',              [],                    'Begin concurrent mark phase'),
-    EventType(201, 'CONC_MARK_END',                [],                    'End concurrent mark phase'),
+    EventType(201, 'CONC_MARK_END',                [Word32],              'End concurrent mark phase'),
     EventType(202, 'CONC_SYNC_BEGIN',              [],                    'Begin concurrent GC synchronisation'),
     EventType(203, 'CONC_SYNC_END',                [],                    'End concurrent mark synchronisation'),
     EventType(204, 'CONC_SWEEP_BEGIN',             [],                    'Begin concurrent sweep phase'),
