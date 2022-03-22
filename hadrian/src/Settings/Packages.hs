@@ -51,6 +51,9 @@ packageArgs = do
             [ inputs ["**/GHC.hs", "**/GHC/Driver/Make.hs"] ? arg "-fprof-auto"
             , input "**/Parser.hs" ?
               pure ["-fno-ignore-interface-pragmas", "-fcmm-sink"]
+            -- Enable -haddock and -Winvalid-haddock for the compiler
+            , arg "-haddock"
+            , notStage0 ? arg "-Winvalid-haddock"
             -- These files take a very long time to compile with -O1,
             -- so we use -O0 for them just in Stage0 to speed up the
             -- build but not affect Stage1+ executables
