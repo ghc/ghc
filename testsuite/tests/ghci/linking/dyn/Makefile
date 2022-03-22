@@ -2,6 +2,16 @@ TOP=../../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+# On Windows we must provide module definitions (.def files)
+# for shared libraries, lest the linker exports *everything*, including RTS
+# symbols. This would mean that we couldn't link against multiple dynamic
+# objects simultaneously as the RTS symbols would be defined multiple times.
+ifeq "$(WINDOWS)" "YES"
+DEF = "$1.def"
+else
+DEF =
+endif
+
 ifeq "$(WINDOWS)" "YES"
 DLL = lib$1.dll
 else ifeq "$(DARWIN)" "YES"
@@ -62,16 +72,16 @@ compile_libT10458:
 compile_libAB_dep:
 	rm -rf bin_dep
 	mkdir bin_dep
-	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_dep" -shared A.c -o "bin_dep/$(call DLL,A)"
-	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_dep" -shared B.c -o "bin_dep/$(call DLL,B)" -lA -L"./bin_dep"
+	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_dep" -shared A.c -o "bin_dep/$(call DLL,A)" $(call DEF,A)
+	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_dep" -shared B.c -o "bin_dep/$(call DLL,B)" $(call DEF,B) -lA -L"./bin_dep"
 	rm -f bin_dep/*.a
 
 .PHONY: compile_libAB_dyn
 compile_libAB_dyn:
 	rm -rf bin_dyn
 	mkdir bin_dyn
-	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_dyn" -shared A.c -o "bin_dyn/$(call DLL,A)"
-	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_dyn" -shared B.c -o "bin_dyn/$(call DLL,B)" -lA -L"./bin_dyn"
+	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_dyn" -shared A.c -o "bin_dyn/$(call DLL,A)" $(call DEF,A)
+	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_dyn" -shared B.c -o "bin_dyn/$(call DLL,B)" $(call DEF,B) -lA -L"./bin_dyn"
 	rm -f bin_dyn/*.a
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -v0 -o "bin_dyn/$(call EXE,T10955dyn)" -L./bin_dyn -lB -lA T10955dyn.hs -v0
 	LD_LIBRARY_PATH=./bin_dyn ./bin_dyn/$(call EXE,T10955dyn)

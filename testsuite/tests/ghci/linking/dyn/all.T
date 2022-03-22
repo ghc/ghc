@@ -16,13 +16,15 @@ test('T3242',
      makefile_test, ['T3242'])
 
 test('T10955',
-     [extra_files(['A.c', 'B.c']),
-      unless(doing_ghci, skip), unless(opsys('mingw32'), skip),
+     [extra_files(['A.c', 'B.c', 'A.def', 'B.def']),
+      unless(doing_ghci, skip),
+      unless(opsys('mingw32'), skip),
       pre_cmd('$MAKE -s --no-print-directory compile_libAB_dep'),
       extra_hc_opts('-L. -L./bin_dep')],
      ghci_script, ['T10955.script'])
 
-test('T10955dyn', [extra_files(['A.c', 'B.c'])], makefile_test, ['compile_libAB_dyn'])
+test('T10955dyn', [extra_files(['A.c', 'B.c', 'A.def', 'B.def'])],
+     makefile_test, ['compile_libAB_dyn'])
 
 test('T10458',
      [extra_files(['A.c']),
