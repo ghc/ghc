@@ -505,15 +505,17 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
         // see Note [n_gc_threads]
         // par_n_threads is set to n_gc_threads at the single callsite of this
         // function
-        if (par_n_threads == 1) {
-            ASSERT(initiating_gct->gc_end_cpu >= initiating_gct->gc_start_cpu);
-            stats.gc.cpu_ns += initiating_gct->gc_end_cpu - initiating_gct->gc_start_cpu;
-        } else {
-            for (unsigned int i=0; i < par_n_threads; i++) {
-                gc_thread *gct = gc_threads[i];
-                ASSERT(gct->gc_end_cpu >= gct->gc_start_cpu);
-                stats.gc.cpu_ns += gct->gc_end_cpu - gct->gc_start_cpu;
-            }
+        for (unsigned int i=0; i < par_n_threads; i++) {
+            gc_thread *gct = gc_threads[i];
+            ASSERT(gct->gc_end_cpu >= gct->gc_start_cpu);
+            stats.gc.cpu_ns += gct->gc_end_cpu - gct->gc_start_cpu;
+            // Reset the start/end times to zero after the difference has been
+            // added to the global total (see #21082)
+            // Resetting the values here is the most direct way to avoid double counting
+            // because the gc_end_cpu and gc_start_cpu is not reset to zero as
+            // stat_startGC is only called on active (not idle threads).
+            gct->gc_end_cpu = 0;
+            gct->gc_start_cpu = 0;
         }
     }
     // -------------------------------------------------
