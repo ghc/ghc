@@ -134,6 +134,9 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    A top-level typed expression splice can occur in place of an expression; the
    spliced expression must have type ``Code Q a``
 
+   **NOTE**: Currently typed splices may inhibit the unused identifier warning for
+   identifiers in scope. See `#16524 <https://gitlab.haskell.org/ghc/ghc/-/issues/16524>`
+
 -  A *typed* expression quotation is written as ``[|| ... ||]``, or
    ``[e|| ... ||]``, where the "..." is an expression; if the "..."
    expression has type ``a``, then the quotation has type
