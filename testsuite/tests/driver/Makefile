@@ -739,3 +739,8 @@ T20316:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -fno-code T20316.hs -ddump-to-file -ddump-timings;
 	echo "*** non-module.dump-timings ***"
 	cat non-module.dump-timings | grep alloc | sed 's/alloc.*//'
+
+.PHONY: T20569
+T20569:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c T20569/A.hs -i -iT20569 -hidir=interface
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c T20569/B.hs -i -iT20569 -hidir=interface

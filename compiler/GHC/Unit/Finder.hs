@@ -412,6 +412,12 @@ findInstalledHomeModule fc fopts home_unit mod_name = do
      home_path = case maybe_working_dir of
                   Nothing -> finder_importPaths fopts
                   Just fp -> augmentImports fp (finder_importPaths fopts)
+     hi_dir_path =
+      case finder_hiDir fopts of
+        Just hiDir -> case maybe_working_dir of
+                        Nothing -> [hiDir]
+                        Just fp -> [fp </> hiDir]
+        Nothing -> home_path
      hisuf = finder_hiSuf fopts
      mod = mkModule home_unit mod_name
 
@@ -431,8 +437,9 @@ findInstalledHomeModule fc fopts home_unit mod_name = do
         -- In compilation manager modes, we look for source files in the home
         -- package because we can compile these automatically.  In one-shot
         -- compilation mode we look for .hi and .hi-boot files only.
-     exts | finder_lookupHomeInterfaces fopts = hi_exts
-          | otherwise                         = source_exts
+     (search_dirs, exts)
+          | finder_lookupHomeInterfaces fopts = (hi_dir_path, hi_exts)
+          | otherwise                         = (home_path, source_exts)
    in
 
    -- special case for GHC.Prim; we won't find it in the filesystem.
@@ -440,7 +447,7 @@ findInstalledHomeModule fc fopts home_unit mod_name = do
    -- is a home module).
    if mod `installedModuleEq` gHC_PRIM
          then return (InstalledFound (error "GHC.Prim ModLocation") mod)
-         else searchPathExts home_path mod exts
+         else searchPathExts search_dirs mod exts
 
 -- | Prepend the working directory to the search path.
 augmentImports :: FilePath -> [FilePath] -> [FilePath]
