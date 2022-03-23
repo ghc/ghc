@@ -2,6 +2,7 @@
 module Settings.Builders.RunTest (runTestBuilderArgs, runTestGhcFlags) where
 
 import Hadrian.Utilities
+import qualified System.FilePath
 import System.Environment
 
 import CommandLine
@@ -63,13 +64,16 @@ data TestCompilerArgs = TestCompilerArgs{
  ,   withInterpreter   :: Bool
  ,   unregisterised    :: Bool
  ,   withSMP           :: Bool
- ,   debugged          :: Bool
+ ,   debugAssertions   :: Bool
+      -- ^ Whether the compiler has debug assertions enabled,
+      -- corresponding to the -DDEBUG option.
  ,   profiled          :: Bool
  ,   os,arch, platform, wordsize :: String
  ,   libdir :: FilePath
  ,   have_llvm :: Bool
  ,   rtsLinker :: Bool
  ,   pkgConfCacheFile :: FilePath }
+   deriving (Eq, Show)
 
 
 -- | If the tree is in-compiler then we already know how we will build it so
@@ -95,8 +99,8 @@ inTreeCompilerArgs stg = expr $ do
     withInterpreter     <- ghcWithInterpreter
     unregisterised      <- flag GhcUnregisterised
     withSMP             <- targetSupportsSMP
-    debugged            <- ghcDebugged <$> flavour
-    profiled            <- ghcProfiled <$> flavour
+    debugAssertions     <- ghcDebugAssertions <$> flavour
+    profiled            <- ghcProfiled        <$> flavour
 
     os          <- setting HostOs
     arch        <- setting TargetArch
@@ -108,8 +112,10 @@ inTreeCompilerArgs stg = expr $ do
 
     top         <- topDirectory
 
-    pkgConfCacheFile <- (top -/-) <$> (packageDbPath stg <&> (-/- "package.cache"))
-    libdir <- (top -/-) <$> stageLibPath stg
+    pkgConfCacheFile <- System.FilePath.normalise . (top -/-)
+                    <$> (packageDbPath stg <&> (-/- "package.cache"))
+    libdir           <- System.FilePath.normalise . (top -/-)
+                    <$> stageLibPath stg
 
     rtsLinker <- (== "YES") <$> setting TargetHasRtsLinker
 
@@ -136,8 +142,7 @@ outOfTreeCompilerArgs testGhc = do
     withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
     withSMP             <- getBooleanSetting TestGhcWithSMP
-    debugged            <- getBooleanSetting TestGhcDebugged
-
+    debugAssertions     <- getBooleanSetting TestGhcDebugged
 
     os          <- getTestSetting TestHostOS
     arch        <- getTestSetting TestTargetARCH_CPP
@@ -148,8 +153,8 @@ outOfTreeCompilerArgs testGhc = do
     have_llvm <- expr (liftIO (isJust <$> findExecutable llc_cmd))
     profiled <- getBooleanSetting TestGhcProfiled
 
-    pkgConfCacheFile <- getTestSetting TestGhcPackageDb <&> (-/- "package.cache")
-    libdir <-  getTestSetting TestGhcLibDir
+    pkgConfCacheFile <- getTestSetting TestGhcPackageDb <&> (</> "package.cache")
+    libdir <- getTestSetting TestGhcLibDir
 
     rtsLinker <- getBooleanSetting TestGhcWithRtsLinker
     return TestCompilerArgs{..}
@@ -170,7 +175,14 @@ runTestBuilderArgs = builder Testsuite ? do
     TestCompilerArgs{..} <-
       case stageOfTestCompiler testGhc of
         Just stg -> inTreeCompilerArgs stg
-        Nothing -> outOfTreeCompilerArgs testGhc
+                 {- do { in_args  <- inTreeCompilerArgs stg
+                       ; out_args <- outOfTreeCompilerArgs testGhc
+                       ; when (in_args /= out_args) $ error $
+                          "in-tree arguments don't match out-of-tree arguments:\n\
+                          \in-tree arguments:\n" ++ show in_args ++ "\n\
+                          \out-of-tree arguments:\n" ++ show out_args
+                       ; return in_args } -}
+        Nothing  -> outOfTreeCompilerArgs testGhc
 
     -- MP: TODO, these should be queried from the test compiler?
     bignumBackend <- getBignumBackend
@@ -214,8 +226,8 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ "config.accept_platform=" ++ show acceptPlatform
             , arg "-e", arg $ "config.accept_os=" ++ show acceptOS
             , arg "-e", arg $ "config.exeext=" ++ quote (if null exe then "" else "."<>exe)
-            , arg "-e", arg $ "config.compiler_debugged=" ++
-              show debugged
+            , arg "-e", arg $ "config.compiler_debugged=" ++ show debugAssertions
+
             -- MP: TODO, we do not need both, they get aliased to the same thing.
             , arg "-e", arg $ asBool "ghc_with_native_codegen=" withNativeCodeGen
             , arg "-e", arg $ asBool "config.have_ncg=" withNativeCodeGen

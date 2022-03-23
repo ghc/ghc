@@ -35,8 +35,10 @@ data Flavour = Flavour {
     ghciWithDebugger :: Bool,
     -- | Build profiled GHC.
     ghcProfiled :: Bool,
-    -- | Build GHC with debug information.
-    ghcDebugged :: Bool
+    -- | Build GHC with the debug RTS.
+    ghcDebugged :: Bool,
+    -- | Build GHC with debug assertions.
+    ghcDebugAssertions :: Bool,
     -- | Build the GHC executable against the threaded runtime system.
     ghcThreaded :: Bool,
     -- | Whether to build docs and which ones

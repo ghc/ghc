@@ -12,7 +12,8 @@ developmentFlavour ghcStage = defaultFlavour
     , args = defaultBuilderArgs <> developmentArgs ghcStage <> defaultPackageArgs
     , libraryWays = pure [vanilla]
     , rtsWays = pure [vanilla, logging, debug, threaded, threadedLogging, threadedDebug]
-    , dynamicGhcPrograms = return False }
+    , dynamicGhcPrograms = return False
+    , ghcDebugAssertions = True }
 
 developmentArgs :: Stage -> Args
 developmentArgs ghcStage = do
@@ -24,5 +25,5 @@ developmentArgs ghcStage = do
                                  package cabal ? pure ["-O0"]]
         , hsLibrary  = notStage0 ? arg "-dcore-lint"
         , hsCompiler = mconcat [stage0 ? arg "-O2",
-                                succ stage == ghcStage ? pure ["-O0", "-DDEBUG"]]
-        , hsGhc      = succ stage == ghcStage ? pure ["-O0", "-DDEBUG"] }
+                                succ stage == ghcStage ? pure ["-O0"]]
+        , hsGhc      = succ stage == ghcStage ? pure ["-O0"] }

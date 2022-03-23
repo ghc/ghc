@@ -37,19 +37,9 @@ validateArgs = sourceArgs SourceArgs
 slowValidateFlavour :: Flavour
 slowValidateFlavour = werror $ validateFlavour
     { name = "slow-validate"
-    , args = defaultBuilderArgs <> slowValidateArgs <> defaultPackageArgs
+    , args = defaultBuilderArgs <> validateArgs <> defaultPackageArgs
+    , ghcDebugAssertions = True
     }
-
-slowValidateArgs :: Args
-slowValidateArgs =
-  mconcat [ validateArgs
-          , sourceArgs SourceArgs
-            { hsCompiler = notStage0 ? arg "-DDEBUG"
-            , hsDefault  = mempty
-            , hsLibrary  = mempty
-            , hsGhc      = mempty
-            }
-          ]
 
 quickValidateArgs :: Args
 quickValidateArgs = sourceArgs SourceArgs

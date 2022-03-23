@@ -236,6 +236,7 @@ defaultFlavour = Flavour
     , ghciWithDebugger   = False
     , ghcProfiled        = False
     , ghcDebugged        = False
+    , ghcDebugAssertions = False
     , ghcThreaded        = True
     , ghcDocs            = cmdDocsArgs }
 

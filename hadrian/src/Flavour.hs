@@ -213,10 +213,7 @@ enableLateCCS =
 
 -- | Enable assertions for the stage2 compiler
 enableAssertions :: Flavour -> Flavour
-enableAssertions =
-  let Right kv = parseKV "stage1.*.ghc.hs.opts += -DDEBUG"
-      Right transformer = applySetting kv
-  in transformer
+enableAssertions flav = flav { ghcDebugAssertions = True }
 
 -- | Produce fully statically-linked executables and build libraries suitable
 -- for static linking.

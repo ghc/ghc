@@ -26,6 +26,7 @@ packageArgs = do
 
     cursesIncludeDir <- getSetting CursesIncludeDir
     cursesLibraryDir <- getSetting CursesLibDir
+    debugAssertions  <- ghcDebugAssertions <$> expr flavour
 
     mconcat
         --------------------------------- base ---------------------------------
@@ -48,7 +49,9 @@ packageArgs = do
           [ builder Alex ? arg "--latin1"
 
           , builder (Ghc CompileHs) ? mconcat
-            [ inputs ["**/GHC.hs", "**/GHC/Driver/Make.hs"] ? arg "-fprof-auto"
+            [ debugAssertions ? notStage0 ? arg "-DDEBUG"
+
+            , inputs ["**/GHC.hs", "**/GHC/Driver/Make.hs"] ? arg "-fprof-auto"
             , input "**/Parser.hs" ?
               pure ["-fno-ignore-interface-pragmas", "-fcmm-sink"]
             -- Enable -haddock and -Winvalid-haddock for the compiler
@@ -75,7 +78,9 @@ packageArgs = do
 
         ---------------------------------- ghc ---------------------------------
         , package ghc ? mconcat
-          [ builder Ghc ? arg ("-I" ++ compilerPath)
+          [ builder Ghc ? mconcat
+             [ arg ("-I" ++ compilerPath)
+             , debugAssertions ? notStage0 ? arg "-DDEBUG" ]
 
           , builder (Cabal Flags) ? mconcat
             [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"
