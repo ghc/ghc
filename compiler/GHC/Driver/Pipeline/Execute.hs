@@ -1153,7 +1153,7 @@ joinObjectFiles hsc_env o_files output_fn
   withAtomicRename output_fn $ \tmp_ar ->
       liftIO $ runAr logger dflags Nothing $ map Option $ ["rc", tmp_ar] ++ o_files
   where
-    can_merge_objs = False -- XXX
+    can_merge_objs = isJust (pgm_lm (hsc_dflags hsc_env))
     dflags = hsc_dflags hsc_env
     tmpfs = hsc_tmpfs hsc_env
     logger = hsc_logger hsc_env

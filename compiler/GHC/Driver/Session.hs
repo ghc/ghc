@@ -821,7 +821,7 @@ pgm_a                 :: DynFlags -> (String,[Option])
 pgm_a dflags = toolSettings_pgm_a $ toolSettings dflags
 pgm_l                 :: DynFlags -> (String,[Option])
 pgm_l dflags = toolSettings_pgm_l $ toolSettings dflags
-pgm_lm                 :: DynFlags -> (String,[Option])
+pgm_lm                 :: DynFlags -> Maybe (String,[Option])
 pgm_lm dflags = toolSettings_pgm_lm $ toolSettings dflags
 pgm_dll               :: DynFlags -> (String,[Option])
 pgm_dll dflags = toolSettings_pgm_dll $ toolSettings dflags
@@ -2108,7 +2108,8 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "pgmlc"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_lc  = (f,[]) }
   , make_ord_flag defFlag "pgmlm"
-      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_lm  = (f,[]) }
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_lm  =
+          if null f then Nothing else Just (f,[]) }
   , make_ord_flag defFlag "pgmi"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_i   =  f }
   , make_ord_flag defFlag "pgmL"

@@ -99,7 +99,9 @@ data ToolSettings = ToolSettings
   , toolSettings_pgm_c       :: String
   , toolSettings_pgm_a       :: (String, [Option])
   , toolSettings_pgm_l       :: (String, [Option])
-  , toolSettings_pgm_lm      :: (String, [Option])
+  , toolSettings_pgm_lm      :: Maybe (String, [Option])
+    -- ^ N.B. On Windows we don't have a linker which supports object
+    -- merging, hence the 'Maybe'.
   , toolSettings_pgm_dll     :: (String, [Option])
   , toolSettings_pgm_T       :: String
   , toolSettings_pgm_windres :: String
@@ -207,7 +209,7 @@ sPgm_a :: Settings -> (String, [Option])
 sPgm_a = toolSettings_pgm_a . sToolSettings
 sPgm_l :: Settings -> (String, [Option])
 sPgm_l = toolSettings_pgm_l . sToolSettings
-sPgm_lm :: Settings -> (String, [Option])
+sPgm_lm :: Settings -> Maybe (String, [Option])
 sPgm_lm = toolSettings_pgm_lm . sToolSettings
 sPgm_dll :: Settings -> (String, [Option])
 sPgm_dll = toolSettings_pgm_dll . sToolSettings

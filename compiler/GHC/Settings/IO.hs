@@ -130,6 +130,9 @@ initSettings top_dir = do
         ld_args  = map Option (cc_args ++ words cc_link_args_str)
   ld_r_prog <- getToolSetting "Merge objects command"
   ld_r_args <- getSetting "Merge objects flags"
+  let ld_r
+        | null ld_r_prog = Nothing
+        | otherwise      = Just (ld_r_prog, map Option $ words ld_r_args)
 
   llvmTarget <- getSetting "LLVM target"
 
@@ -171,7 +174,7 @@ initSettings top_dir = do
       , toolSettings_pgm_c   = cc_prog
       , toolSettings_pgm_a   = (as_prog, as_args)
       , toolSettings_pgm_l   = (ld_prog, ld_args)
-      , toolSettings_pgm_lm  = (ld_r_prog, map Option $ words ld_r_args)
+      , toolSettings_pgm_lm  = ld_r
       , toolSettings_pgm_dll = (mkdll_prog,mkdll_args)
       , toolSettings_pgm_T   = touch_path
       , toolSettings_pgm_windres = windres_path
