@@ -35,6 +35,7 @@ main = do
   getGhcFieldProgWithDefault fields "LLC" "LLVM llc command" "llc"
   getGhcFieldProgWithDefault fields "TEST_CC" "C compiler command" "gcc"
   getGhcFieldProgWithDefault fields "TEST_CC_OPTS" "C compiler flags" ""
+  getGhcFieldProgWithDefault fields "TEST_CXX" "C++ compiler command" "g++"
 
 getGhcFieldOrFail :: [(String,String)] -> String -> String -> IO ()
 getGhcFieldOrFail fields mkvar key

@@ -92,6 +92,7 @@ module GHC.Driver.Session (
         sPgm_P,
         sPgm_F,
         sPgm_c,
+        sPgm_cxx,
         sPgm_a,
         sPgm_l,
         sPgm_lm,
@@ -131,7 +132,7 @@ module GHC.Driver.Session (
         ghcUsagePath, ghciUsagePath, topDir,
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, globalPackageDatabasePath,
-        pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_lm, pgm_dll, pgm_T,
+        pgm_L, pgm_P, pgm_F, pgm_c, pgm_cxx, pgm_a, pgm_l, pgm_lm, pgm_dll, pgm_T,
         pgm_windres, pgm_libtool, pgm_ar, pgm_otool, pgm_install_name_tool,
         pgm_ranlib, pgm_lo, pgm_lc, pgm_lcc, pgm_i,
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
@@ -817,6 +818,8 @@ pgm_F                 :: DynFlags -> String
 pgm_F dflags = toolSettings_pgm_F $ toolSettings dflags
 pgm_c                 :: DynFlags -> String
 pgm_c dflags = toolSettings_pgm_c $ toolSettings dflags
+pgm_cxx               :: DynFlags -> String
+pgm_cxx dflags = toolSettings_pgm_cxx $ toolSettings dflags
 pgm_a                 :: DynFlags -> (String,[Option])
 pgm_a dflags = toolSettings_pgm_a $ toolSettings dflags
 pgm_l                 :: DynFlags -> (String,[Option])
@@ -2120,6 +2123,8 @@ dynamic_flags_deps = [
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_F   = f }
   , make_ord_flag defFlag "pgmc"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_c   = f }
+  , make_ord_flag defFlag "pgmcxx"
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_cxx = f }
   , (Deprecated, defFlag  "pgmc-supports-no-pie"
       $ noArgM  $ \d -> do
         deprecate $ "use -pgml-supports-no-pie instead"

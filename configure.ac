@@ -362,6 +362,7 @@ else
     # are screwed up. Configure doesn't think they're ever equal and
     # so never tried without the prefix.
     AC_PATH_PROG([CC],[gcc], [clang])
+    AC_PATH_PROG([CXX],[g++], [clang++])
     AC_PATH_PROG([NM],[nm])
     AC_PATH_PROG([LD],[ld])
     AC_PATH_PROG([AR],[ar])
@@ -480,6 +481,7 @@ AC_ARG_WITH([clang],
 dnl detect compiler (prefer gcc over clang) and set $CC (unless CC already set),
 dnl later CC is copied to CC_STAGE{1,2,3}
 AC_PROG_CC([cc gcc clang])
+AC_PROG_CXX([g++ clang++ c++])
 
 MAYBE_OVERRIDE_STAGE0([ar],[AR_STAGE0])
 

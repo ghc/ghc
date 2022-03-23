@@ -11,6 +11,7 @@ AC_DEFUN([FP_SETTINGS],
         mingw_bin_prefix='$$tooldir/mingw/bin/'
         SettingsCCompilerCommand="${mingw_bin_prefix}clang.exe"
         SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+        SettingsCxxCompilerCommand="${mingw_bin_prefix}clang++.exe"
         SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
         SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
         SettingsHaskellCPPCommand="${mingw_bin_prefix}clang.exe"
@@ -32,6 +33,7 @@ AC_DEFUN([FP_SETTINGS],
 
         SettingsCCompilerCommand="$CC"
         SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+        SettingsCxxCompilerCommand="$CXX"
         SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
         SettingsHaskellCPPCommand="$HaskellCPPCmd"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
@@ -109,6 +111,7 @@ AC_DEFUN([FP_SETTINGS],
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
 
     AC_SUBST(SettingsCCompilerCommand)
+    AC_SUBST(SettingsCxxCompilerCommand)
     AC_SUBST(SettingsHaskellCPPCommand)
     AC_SUBST(SettingsHaskellCPPFlags)
     AC_SUBST(SettingsCCompilerFlags)
