@@ -244,6 +244,9 @@ data Instr
         | SAR         Format Operand{-amount-} Operand
         | SHR         Format Operand{-amount-} Operand
 
+        -- Rotate
+        | ROL         Format Operand Operand
+
         | BT          Format Imm Operand
         | NOP
 
@@ -389,6 +392,7 @@ regUsageOfInstr platform instr
     SHL    _ imm dst    -> usageRM imm dst
     SAR    _ imm dst    -> usageRM imm dst
     SHR    _ imm dst    -> usageRM imm dst
+    ROL    _ imm dst    -> usageRM imm dst
     BT     _ _   src    -> mkRUR (use_R src [])
 
     PUSH   _ op         -> mkRUR (use_R op [])
@@ -547,6 +551,7 @@ patchRegsOfInstr instr env
     SHL  fmt imm dst     -> patch1 (SHL fmt imm) dst
     SAR  fmt imm dst     -> patch1 (SAR fmt imm) dst
     SHR  fmt imm dst     -> patch1 (SHR fmt imm) dst
+    ROL  fmt imm dst     -> patch1 (ROL fmt imm) dst
     BT   fmt imm src     -> patch1 (BT  fmt imm) src
     TEST fmt src dst     -> patch2 (TEST fmt) src dst
     CMP  fmt src dst     -> patch2 (CMP  fmt) src dst

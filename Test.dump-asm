@@ -1,0 +1,120 @@
+
+==================== Asm code ====================
+2022-03-23 21:16:21.239468 UTC
+
+.section	__TEXT,__cstring,cstring_literals
+.align 1
+.align 0
+.globl Main.$trModule2_bytes
+Main.$trModule2_bytes:
+	.string "Main"
+
+
+==================== Asm code ====================
+2022-03-23 21:16:21.240354 UTC
+
+.section	__TEXT,__cstring,cstring_literals
+.align 1
+.align 0
+.globl Main.$trModule4_bytes
+Main.$trModule4_bytes:
+	.string "main"
+
+
+==================== Asm code ====================
+2022-03-23 21:16:21.24134 UTC
+
+.section	__TEXT,__cstring,cstring_literals
+.align 1
+.align 0
+.globl Main.main4_bytes
+Main.main4_bytes:
+	.string "======="
+
+
+==================== Asm code ====================
+2022-03-23 21:16:21.242333 UTC
+
+.section	__TEXT,__cstring,cstring_literals
+.align 1
+.align 0
+.globl Main.main6_bytes
+Main.main6_bytes:
+	.string "Pattern match failure in 'do' block at Test.hs:19:3-5"
+
+
+==================== Asm code ====================
+2022-03-23 21:16:21.243208 UTC
+
+.section	__TEXT,__cstring,cstring_literals
+.align 1
+.align 0
+lvl_r2DK_bytes:
+	.string "Test.hs:(10,14)-(12,12)|case"
+
+
+==================== Asm code ====================
+2022-03-23 21:16:21.245335 UTC
+
+.data
+.align 3
+.align 0
+_u2GS_srt:
+	.quad	stg_SRT_1_info
+	.quad	Control.Exception.Base.patError_closure
+	.quad	0
+
+
+==================== Asm code ====================
+2022-03-23 21:16:21.246899 UTC
+
+.text
+.align 3
+dsp_Main.divInt#1_info_dsp:
+.align 3
+	.quad	0
+	.long	21
+	.long	_u2GS_srt-(Main.divInt#1_info)+0
+.globl Main.divInt#1_info
+Main.divInt#1_info:
+_blk_c2GP:
+	leaq -16(%rbp),%rax
+	cmpq %r15,%rax
+	jb _blk_c2GQ
+_blk_c2GR:
+	subq $8,%rsp
+	movq %r13,%rax
+	movq %rbx,%rsi
+	movq %rax,%rdi
+	xorl %eax,%eax
+	call newCAF
+	addq $8,%rsp
+	testq %rax,%rax
+	je _blk_c2GO
+_blk_c2GN:
+	leaq _stg_bh_upd_frame_info(%rip),%rbx
+	movq %rbx,-16(%rbp)
+	movq %rax,-8(%rbp)
+	leaq _Llvl_r2DK_bytes(%rip),%r14
+	addq $-16,%rbp
+	jmp Control.Exception.Base.patError_info
+_blk_c2GO:
+	jmp *(%rbx)
+_blk_c2GQ:
+	jmp *-16(%r13)
+	.long  Main.divInt#1_info - dsp_Main.divInt#1_info_dsp
+
+
+==================== Asm code ====================
+2022-03-23 21:16:21.247358 UTC
+
+.data
+.align 3
+.align 0
+.globl Main.divInt#1_closure
+Main.divInt#1_closure:
+	.quad	Main.divInt#1_info
+	.quad	0
+	.quad	0
+	.quad	0
+

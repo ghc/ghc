@@ -28,6 +28,8 @@ module GHC.CmmToAsm.X86.CodeGen (
 
 where
 
+import GHC.Utils.Trace
+
 -- NCG stuff:
 import GHC.Prelude
 
@@ -2910,7 +2912,14 @@ extractUnwindPoints instrs =
 -- register allocator.
 
 condIntReg :: Cond -> CmmExpr -> CmmExpr -> NatM Register
-
+condIntReg LTT x (CmmLit (CmmInt 0 pk)) = do
+  let oneLit = OpImm (litToImm (CmmInt 1 pk))
+      fmt = intFormat pk
+      code x_reg = toOL
+                 [ ROL fmt oneLit (OpReg x_reg)
+                 , AND fmt oneLit (OpReg x_reg)
+                 ]
+  return (Any II32 code)
 condIntReg cond x y = do
   CondCode _ cond cond_code <- condIntCode cond x y
   tmp <- getNewRegNat II8
@@ -4331,4 +4340,3 @@ genPred64 cond dst x y = do
           , SETCC cond (OpReg dst_r)
           , MOVZxL II8 (OpReg dst_r) (OpReg dst_r)
           ]
-

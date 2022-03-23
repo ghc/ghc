@@ -757,6 +757,9 @@ pprInstr platform i = case i of
    SHR format src dst
       -> pprShift (text "shr") format src dst
 
+   ROL format src dst
+      -> pprFormatOpOp (text "rol") format src dst
+
    BT format imm src
       -> pprFormatImmOp (text "bt") format imm src
 

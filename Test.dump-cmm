@@ -1,0 +1,123 @@
+
+==================== Output Cmm ====================
+2022-03-23 21:16:21.237317 UTC
+
+[section ""cstring" . Main.$trModule2_bytes" {
+     Main.$trModule2_bytes:
+         I8[] "Main"
+ }]
+
+
+==================== Output Cmm ====================
+2022-03-23 21:16:21.239853 UTC
+
+[section ""cstring" . Main.$trModule4_bytes" {
+     Main.$trModule4_bytes:
+         I8[] "main"
+ }]
+
+
+==================== Output Cmm ====================
+2022-03-23 21:16:21.240777 UTC
+
+[section ""cstring" . Main.main4_bytes" {
+     Main.main4_bytes:
+         I8[] "======="
+ }]
+
+
+==================== Output Cmm ====================
+2022-03-23 21:16:21.241777 UTC
+
+[section ""cstring" . Main.main6_bytes" {
+     Main.main6_bytes:
+         I8[] "Pattern match failure in 'do' block at Test.hs:19:3-5"
+ }]
+
+
+==================== Output Cmm ====================
+2022-03-23 21:16:21.242695 UTC
+
+[section ""cstring" . lvl_r2DK_bytes" {
+     lvl_r2DK_bytes:
+         I8[] "Test.hs:(10,14)-(12,12)|case"
+ }]
+
+
+==================== Output Cmm ====================
+2022-03-23 21:16:21.244353 UTC
+
+[section ""data" . _u2GS_srt" {
+     _u2GS_srt:
+         const stg_SRT_1_info;
+         const Control.Exception.Base.patError_closure;
+         const 0;
+ },
+ Main.divInt#1_entry() { //  [R1]
+         { info_tbls: [(c2GP,
+                        label: Main.divInt#1_info
+                        rep: HeapRep static { Thunk }
+                        srt: Just _u2GS_srt)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       c2GP: // global
+           if ((Sp + -16) < SpLim) (likely: False) goto c2GQ; else goto c2GR;
+       c2GQ: // global
+           call (stg_gc_enter_1)(R1) args: 8, res: 0, upd: 8;
+       c2GR: // global
+           (_c2GM::I64) = call "ccall" arg hints:  [PtrHint,
+                                                    PtrHint]  result hints:  [PtrHint] newCAF(BaseReg, R1);
+           if (_c2GM::I64 == 0) goto c2GO; else goto c2GN;
+       c2GO: // global
+           call (I64[R1])() args: 8, res: 0, upd: 8;
+       c2GN: // global
+           I64[Sp - 16] = stg_bh_upd_frame_info;
+           I64[Sp - 8] = _c2GM::I64;
+           R2 = lvl_r2DK_bytes;
+           Sp = Sp - 16;
+           call Control.Exception.Base.patError_info(R2) args: 24, res: 0, upd: 24;
+     }
+ },
+ section ""data" . Main.divInt#1_closure" {
+     Main.divInt#1_closure:
+         const Main.divInt#1_info;
+         const 0;
+         const 0;
+         const 0;
+ }]
+
+
+==================== Output Cmm ====================
+2022-03-23 21:16:21.248286 UTC
+
+[Main.divInt#_entry() { //  [R2]
+         { info_tbls: [(c2Ha,
+                        label: Main.divInt#_info
+                        rep: HeapRep static { Fun {arity: 1 fun_type: ArgSpec 4} }
+                        srt: Just Main.divInt#1_closure)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       c2Ha: // global
+           _s2Gh::I64 = %MO_S_Lt_W64(R2, 0);
+           if (_s2Gh::I64 != 0) goto u2Hd; else goto c2H8;
+       u2Hd: // global
+           if (_s2Gh::I64 != 1) goto c2H7; else goto c2H9;
+       c2H7: // global
+           R1 = Main.divInt#1_closure;
+           call (I64[R1])(R1) args: 8, res: 0, upd: 8;
+       c2H9: // global
+           R1 = 0;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+       c2H8: // global
+           R1 = 4;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+     }
+ },
+ section ""data" . Main.divInt#_closure" {
+     Main.divInt#_closure:
+         const Main.divInt#_info;
+         const 0;
+ }]
+
