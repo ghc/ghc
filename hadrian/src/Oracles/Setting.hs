@@ -106,6 +106,7 @@ data SettingList = ConfCcArgs Stage
 -- Eventually much of that local can probably be computed just in Hadrian.
 data SettingsFileSetting
     = SettingsFileSetting_CCompilerCommand
+    | SettingsFileSetting_CxxCompilerCommand
     | SettingsFileSetting_HaskellCPPCommand
     | SettingsFileSetting_HaskellCPPFlags
     | SettingsFileSetting_CCompilerFlags
@@ -199,6 +200,7 @@ settingList key = fmap words $ lookupSystemConfig $ case key of
 settingsFileSetting :: SettingsFileSetting -> Action String
 settingsFileSetting key = lookupSystemConfig $ case key of
     SettingsFileSetting_CCompilerCommand -> "settings-c-compiler-command"
+    SettingsFileSetting_CxxCompilerCommand -> "settings-cxx-compiler-command"
     SettingsFileSetting_HaskellCPPCommand -> "settings-haskell-cpp-command"
     SettingsFileSetting_HaskellCPPFlags -> "settings-haskell-cpp-flags"
     SettingsFileSetting_CCompilerFlags -> "settings-c-compiler-flags"

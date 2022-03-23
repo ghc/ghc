@@ -370,7 +370,7 @@ BIN_DIST_TAR_COMP       = $(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.$(TAR_COMP_EXT)
 # SRC_HC_OPTS is *not* for adding flags that are required to make your
 # build work.  Examples:
 #
-#  - instead of using -pgmc/-pgma-/-pgml, use the --with-gcc option to configure
+#  - instead of using -pgmc/-pgmcxx/-pgma-/-pgml, use the --with-gcc option to configure
 #
 #  - if you need -optc, -opta, or -optl flags, the CONF_CC_* and CONF_LD_*
 #    variables are more appropriate (set via configure)
@@ -469,6 +469,7 @@ TargetHasLibm = @TargetHasLibm@
 TablesNextToCode = @TablesNextToCode@
 
 SettingsCCompilerCommand = @SettingsCCompilerCommand@
+SettingsCxxCompilerCommand = @SettingsCxxCompilerCommand@
 SettingsHaskellCPPCommand = @SettingsHaskellCPPCommand@
 SettingsHaskellCPPFlags = @SettingsHaskellCPPFlags@
 SettingsCCompilerFlags = @SettingsCCompilerFlags@

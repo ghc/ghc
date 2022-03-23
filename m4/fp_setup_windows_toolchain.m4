@@ -80,6 +80,7 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
     mingwbin="$hardtop/inplace/mingw/bin/"
 
     CC="${mingwbin}clang.exe"
+    CXX="${mingwbin}clang++.exe"
     cflags="--rtlib=compiler-rt"
     CFLAGS="$cflags"
     CONF_CC_OPTS_STAGE1="$cflags"
