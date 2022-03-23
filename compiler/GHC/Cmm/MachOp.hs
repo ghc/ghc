@@ -5,6 +5,7 @@ module GHC.Cmm.MachOp
     , pprMachOp, isCommutableMachOp, isAssociativeMachOp
     , isComparisonMachOp, maybeIntComparison, machOpResultType
     , machOpArgReps, maybeInvertComparison, isFloatComparison
+    , isIntWidthConversion ,machOpWidth
 
     -- MachOp builders
     , mo_wordAdd, mo_wordSub, mo_wordEq, mo_wordNe,mo_wordMul, mo_wordSQuot
@@ -363,6 +364,15 @@ maybeInvertComparison op
         MO_S_Ge r -> Just (MO_S_Lt r)
         _other    -> Nothing
 
+-- | Is this op convertion a word/int type into one of a different width.
+isIntWidthConversion :: MachOp -> Bool
+isIntWidthConversion op
+  = case op of
+      MO_SS_Conv{} -> True
+      MO_UU_Conv{} -> True
+      MO_XX_Conv{} -> True
+      _            -> False
+
 -- ----------------------------------------------------------------------------
 -- machOpResultType
 
@@ -538,6 +548,92 @@ machOpArgReps platform op =
     MO_VF_Neg  _ r      -> [r]
 
     MO_AlignmentCheck _ r -> [r]
+
+-- -----------------------------------------------------------------------------
+-- machOpWidenTo
+
+-- | Mach op width for scalar machops.
+
+machOpWidth :: MachOp -> Maybe Width
+machOpWidth op =
+  case op of
+    MO_Add    r         -> Just r
+    MO_Sub    r         -> Just r
+    MO_Eq     r         -> Just r
+    MO_Ne     r         -> Just r
+    MO_Mul    r         -> Just r
+    MO_S_MulMayOflo r   -> Just r
+    MO_S_Quot r         -> Just r
+    MO_S_Rem  r         -> Just r
+    MO_S_Neg  r         -> Just r
+    MO_U_MulMayOflo r   -> Just r
+    MO_U_Quot r         -> Just r
+    MO_U_Rem  r         -> Just r
+
+    MO_S_Ge r           -> Just r
+    MO_S_Le r           -> Just r
+    MO_S_Gt r           -> Just r
+    MO_S_Lt r           -> Just r
+
+    MO_U_Ge r           -> Just r
+    MO_U_Le r           -> Just r
+    MO_U_Gt r           -> Just r
+    MO_U_Lt r           -> Just r
+
+    MO_F_Add r          -> Just r
+    MO_F_Sub r          -> Just r
+    MO_F_Mul r          -> Just r
+    MO_F_Quot r         -> Just r
+    MO_F_Neg r          -> Just r
+    MO_F_Eq  r          -> Just r
+    MO_F_Ne  r          -> Just r
+    MO_F_Ge  r          -> Just r
+    MO_F_Le  r          -> Just r
+    MO_F_Gt  r          -> Just r
+    MO_F_Lt  r          -> Just r
+
+    MO_And   r          -> Just r
+    MO_Or    r          -> Just r
+    MO_Xor   r          -> Just r
+    MO_Not   r          -> Just r
+    MO_Shl   r          -> Just r
+    MO_U_Shr r          -> Just r
+    MO_S_Shr r          -> Just r
+
+    -- TODO
+    MO_SS_Conv from to  -> Nothing
+    MO_UU_Conv from to  -> Nothing
+    MO_XX_Conv from to  -> Nothing
+    MO_SF_Conv from to  -> Nothing
+    MO_FS_Conv from to  -> Nothing
+    MO_FF_Conv from to  -> Nothing
+
+    MO_V_Insert  l r    -> Nothing
+    MO_V_Extract l r    -> Nothing
+
+    MO_V_Add _ r        -> Nothing
+    MO_V_Sub _ r        -> Nothing
+    MO_V_Mul _ r        -> Nothing
+
+    MO_VS_Quot _ r      -> Nothing
+    MO_VS_Rem  _ r      -> Nothing
+    MO_VS_Neg  _ r      -> Nothing
+
+    MO_VU_Quot _ r      -> Nothing
+    MO_VU_Rem  _ r      -> Nothing
+
+    MO_VF_Insert  l r   -> Nothing
+    MO_VF_Extract l r   -> Nothing
+
+    MO_VF_Add  _ r      -> Nothing
+    MO_VF_Sub  _ r      -> Nothing
+    MO_VF_Mul  _ r      -> Nothing
+    MO_VF_Quot _ r      -> Nothing
+    MO_VF_Neg  _ r      -> Nothing
+
+    MO_AlignmentCheck _ r -> Just r
+
+
 
 -----------------------------------------------------------------------------
 -- CallishMachOp

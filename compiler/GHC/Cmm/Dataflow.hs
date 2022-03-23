@@ -27,7 +27,7 @@ module GHC.Cmm.Dataflow
   , Fact, FactBase
   , getFact, mkFactBase
   , analyzeCmmFwd, analyzeCmmBwd
-  , rewriteCmmBwd
+  , rewriteCmmFwd, rewriteCmmBwd
   , changedIf
   , joinOutFacts
   , joinFacts
@@ -174,6 +174,15 @@ rewriteCmmBwd
     -> FactBase f
     -> UniqSM (GenCmmGraph node, FactBase f)
 rewriteCmmBwd = rewriteCmm Bwd
+
+rewriteCmmFwd
+    :: (NonLocal node)
+    => DataflowLattice f
+    -> RewriteFun' node f
+    -> GenCmmGraph node
+    -> FactBase f
+    -> UniqSM (GenCmmGraph node, FactBase f)
+rewriteCmmFwd = rewriteCmm Fwd
 
 rewriteCmm
     :: (NonLocal node)

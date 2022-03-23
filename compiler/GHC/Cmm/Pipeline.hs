@@ -20,6 +20,7 @@ import GHC.Cmm.LayoutStack
 import GHC.Cmm.ProcPoint
 import GHC.Cmm.Sink
 import GHC.Cmm.Switch.Implement
+import GHC.Cmm.Extend
 
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
@@ -151,6 +152,10 @@ cpsTop logger platform cfg proc =
       g <- return (map removeUnreachableBlocksProc g)
            -- See Note [unreachable blocks]
       dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
+
+      ----------- MachOp width extension ---------------------------------
+      g <- {-# SCC "cmmExtMachOps" #-}
+           runUniqSM $ mapM (cmmExtendMachOps platform) g
 
       return (Left (cafEnv, g))
 

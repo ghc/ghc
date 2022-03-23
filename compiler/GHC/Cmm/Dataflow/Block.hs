@@ -17,6 +17,7 @@ module GHC.Cmm.Dataflow.Block
     , blockCons
     , blockFromList
     , blockJoin
+    , blockJoinList
     , blockJoinHead
     , blockJoinTail
     , blockSnoc
@@ -132,6 +133,9 @@ blockJoinTail b t = b `cat` BlockOC BNil t
 
 blockJoin :: n C O -> Block n O O -> n O C -> Block n C C
 blockJoin f b t = BlockCC f b t
+
+blockJoinList :: n C O -> [n O O] -> n O C -> Block n C C
+blockJoinList f b t = BlockCC f (blockFromList b) t
 
 blockAppend :: Block n e O -> Block n O x -> Block n e x
 blockAppend = cat
