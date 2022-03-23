@@ -1752,7 +1752,7 @@ Getting started with ticky profiling consists of three steps.
     ticked throughout the duration of the program.
 
 Additional Ticky Flags
-----------------------
+~~~~~~~~~~~~~~~~~~~~~~
 
 There are some additional flags which can be used to increase the number of
 ticky counters and the quality of the profile.
@@ -1820,7 +1820,7 @@ lifetime. See :ref:`ticky-event-format` for details on the event types
 reported.
 
 Understanding the Output of Ticky-Ticky profiles
-------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Once you have your rendered profile then you can begin to understand the allocation
 behaviour of your program. There are two classes of ticky-ticky counters.
@@ -1841,7 +1841,7 @@ In general you are probably interested mostly in the name-specific counters as t
 can provided detailed information about where allocates how much in your program.
 
 Information about name-specific counters
-----------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Name-specific counters provide the following information about a closure.
 
@@ -1888,7 +1888,7 @@ calls to dictionary arguments by searching the profile for the ``+`` classifier.
 This indicates that the function has failed to specialise for one reason or another.
 
 Examples
---------
+~~~~~~~~
 
 A typical use of ticky-ticky would be to generate a ticky report using the eventlog by evoking an
 application with RTS arguments like this:
@@ -1904,7 +1904,7 @@ on the produced eventlog. In the example above the invocation would then be ``ev
 Which will produce a searchable and sortable table containing all the ticky counters in the log.
 
 Notes about ticky profiling
----------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * You can mix together modules compiled with and without ``-ticky`` but you will
   miss out on allocations and counts from uninstrumented modules in the profile.
