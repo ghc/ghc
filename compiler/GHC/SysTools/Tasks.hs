@@ -81,13 +81,13 @@ runPp logger dflags args = traceToolCommand logger "pp" $ do
 -- | Run compiler of C-like languages and raw objects (such as gcc or clang).
 runCc :: Maybe ForeignSrcLang -> Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
 runCc mLanguage logger tmpfs dflags args = traceToolCommand logger "cc" $ do
-  let p = pgm_c dflags
-      args1 = map Option userOpts
+  let args1 = map Option userOpts
       args2 = languageOptions ++ args ++ args1
       -- We take care to pass -optc flags in args1 last to ensure that the
       -- user can override flags passed by GHC. See #14452.
   mb_env <- getGccEnv args2
-  runSomethingResponseFile logger tmpfs dflags cc_filter "C Compiler" p args2 mb_env
+  runSomethingResponseFile logger tmpfs dflags cc_filter dbgstring prog args2
+                           mb_env
  where
   -- discard some harmless warnings from gcc that we can't turn off
   cc_filter = unlines . doFilter . lines
@@ -143,17 +143,23 @@ runCc mLanguage logger tmpfs dflags args = traceToolCommand logger "cc" $ do
   -- compiling .hc files, by adding the -x c option.
   -- Also useful for plain .c files, just in case GHC saw a
   -- -x c option.
-  (languageOptions, userOpts) = case mLanguage of
-    Nothing -> ([], userOpts_c)
-    Just language -> ([Option "-x", Option languageName], opts)
+  (languageOptions, userOpts, prog, dbgstring) = case mLanguage of
+    Nothing -> ([], userOpts_c, pgm_c dflags, "C Compiler")
+    Just language -> ([Option "-x", Option languageName], opts, prog, dbgstr)
       where
-        (languageName, opts) = case language of
-          LangC      -> ("c",             userOpts_c)
-          LangCxx    -> ("c++",           userOpts_cxx)
-          LangObjc   -> ("objective-c",   userOpts_c)
-          LangObjcxx -> ("objective-c++", userOpts_cxx)
-          LangAsm    -> ("assembler",     [])
-          RawObject  -> ("c",             []) -- claim C for lack of a better idea
+        (languageName, opts, prog, dbgstr) = case language of
+          LangC      -> ("c",             userOpts_c
+                        ,pgm_c dflags,    "C Compiler")
+          LangCxx    -> ("c++",           userOpts_cxx
+                        ,pgm_cxx dflags , "C++ Compiler")
+          LangObjc   -> ("objective-c",   userOpts_c
+                        ,pgm_c dflags   , "Objective C Compiler")
+          LangObjcxx -> ("objective-c++", userOpts_cxx
+                        ,pgm_cxx dflags,  "Objective C++ Compiler")
+          LangAsm    -> ("assembler",     []
+                        ,pgm_c dflags,    "Asm Compiler")
+          RawObject  -> ("c",             []
+                        ,pgm_c dflags,    "C Compiler") -- claim C for lack of a better idea
   userOpts_c   = getOpts dflags opt_c
   userOpts_cxx = getOpts dflags opt_cxx
 

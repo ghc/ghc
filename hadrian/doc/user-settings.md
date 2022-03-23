@@ -369,6 +369,7 @@ the right names for them:
 	    argument for `hadrian/ghci` to work
 
   * `cc` refers to C compiler commands
+  * `cxx` refers to C++ compiler commands
 
     * `c.opts` for commands that call the C compiler on some C files
 	  * `deps.opts` for commands that call the C compiler for figuring out

@@ -28,6 +28,7 @@ module GHC.Settings
   , sPgm_P
   , sPgm_F
   , sPgm_c
+  , sPgm_cxx
   , sPgm_a
   , sPgm_l
   , sPgm_lm
@@ -98,6 +99,7 @@ data ToolSettings = ToolSettings
   , toolSettings_pgm_P       :: (String, [Option])
   , toolSettings_pgm_F       :: String
   , toolSettings_pgm_c       :: String
+  , toolSettings_pgm_cxx     :: String
   , toolSettings_pgm_a       :: (String, [Option])
   , toolSettings_pgm_l       :: (String, [Option])
   , toolSettings_pgm_lm      :: Maybe (String, [Option])
@@ -208,6 +210,8 @@ sPgm_F :: Settings -> String
 sPgm_F = toolSettings_pgm_F . sToolSettings
 sPgm_c :: Settings -> String
 sPgm_c = toolSettings_pgm_c . sToolSettings
+sPgm_cxx :: Settings -> String
+sPgm_cxx = toolSettings_pgm_cxx . sToolSettings
 sPgm_a :: Settings -> (String, [Option])
 sPgm_a = toolSettings_pgm_a . sToolSettings
 sPgm_l :: Settings -> (String, [Option])
