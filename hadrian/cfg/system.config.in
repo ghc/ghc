@@ -142,6 +142,7 @@ ld-is-gnu-ld = @LdIsGNULd@
 ar-args = @ArArgs@
 
 settings-c-compiler-command = @SettingsCCompilerCommand@
+settings-cxx-compiler-command = @SettingsCxxCompilerCommand@
 settings-haskell-cpp-command = @SettingsHaskellCPPCommand@
 settings-haskell-cpp-flags = @SettingsHaskellCPPFlags@
 settings-c-compiler-flags = @SettingsCCompilerFlags@

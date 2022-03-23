@@ -193,6 +193,7 @@ $(includes_SETTINGS) : rts/include/Makefile | $$(dir $$@)/.
 	@echo '[("GCC extra via C opts", "$(GccExtraViaCOpts)")' >> $@
 	@echo ',("C compiler command", "$(SettingsCCompilerCommand)")' >> $@
 	@echo ',("C compiler flags", "$(SettingsCCompilerFlags)")' >> $@
+	@echo ',("C++ compiler command", "$(SettingsCxxCompilerCommand)")' >> $@
 	@echo ',("C++ compiler flags", "$(SettingsCxxCompilerFlags)")' >> $@
 	@echo ',("C compiler link flags", "$(SettingsCCompilerLinkFlags)")' >> $@
 	@echo ',("C compiler supports -no-pie", "$(SettingsCCompilerSupportsNoPie)")' >> $@

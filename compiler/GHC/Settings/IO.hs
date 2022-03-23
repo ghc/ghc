@@ -78,6 +78,7 @@ initSettings top_dir = do
   targetPlatformString <- getSetting "target platform string"
   myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
   cc_prog <- getToolSetting "C compiler command"
+  cxx_prog <- getToolSetting "C++ compiler command"
   cc_args_str <- getSetting "C compiler flags"
   cxx_args_str <- getSetting "C++ compiler flags"
   gccSupportsNoPie <- getBooleanSetting "C compiler supports -no-pie"
@@ -174,6 +175,7 @@ initSettings top_dir = do
       , toolSettings_pgm_P   = (cpp_prog, cpp_args)
       , toolSettings_pgm_F   = ""
       , toolSettings_pgm_c   = cc_prog
+      , toolSettings_pgm_cxx = cxx_prog
       , toolSettings_pgm_a   = (as_prog, as_args)
       , toolSettings_pgm_l   = (ld_prog, ld_args)
       , toolSettings_pgm_lm  = ld_r
