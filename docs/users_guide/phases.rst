@@ -38,6 +38,13 @@ given compilation phase:
 
     Use ⟨cmd⟩ as the C compiler.
 
+.. ghc-flag:: -pgmcxx ⟨cmd⟩
+    :shortdesc: Use ⟨cmd⟩ as the C++ compiler
+    :type: dynamic
+    :category: phase-programs
+
+    Use ⟨cmd⟩ as the C++ compiler.
+
 .. ghc-flag:: -pgmlo ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the LLVM optimiser
     :type: dynamic

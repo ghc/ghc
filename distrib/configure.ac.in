@@ -92,6 +92,7 @@ AC_ARG_ENABLE(distro-toolchain,
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
 AC_PROG_CC([gcc clang])
+AC_PROG_CXX([g++ clang++ c++])
 
 dnl ** figure out how to invoke the C preprocessor (i.e. `gcc -E`)
 AC_PROG_CPP
