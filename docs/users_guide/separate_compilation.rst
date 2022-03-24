@@ -137,16 +137,20 @@ In your program, you import a module ``Foo`` by saying ``import Foo``.
 In :ghc-flag:`--make` mode or GHCi, GHC will look for a source file for ``Foo``
 and arrange to compile it first. Without :ghc-flag:`--make`, GHC will look for
 the interface file for ``Foo``, which should have been created by an
-earlier compilation of ``Foo``. GHC uses the same strategy in each of
-these cases for finding the appropriate file.
+earlier compilation of ``Foo``.
 
-This strategy is as follows: GHC keeps a list of directories called the
+The strategy for looking for source files is as follows:
+GHC keeps a list of directories called the
 search path. For each of these directories, it tries appending
 ``⟨basename⟩.⟨extension⟩`` to the directory, and checks whether the
 file exists. The value of ⟨basename⟩ is the module name with dots
 replaced by the directory separator ("``/``" or "``\\"``, depending on the
 system), and ⟨extension⟩ is a source extension (``hs``, ``lhs``) if we
-are in :ghc-flag:`--make` mode or GHCi, or ⟨hisuf⟩ otherwise.
+are in :ghc-flag:`--make` mode or GHCi.
+
+When looking for interface files in :ghc-flag:`-c` mode, we look for interface
+files in the ``-hidir``, if it's set. Otherwise the same strategy as
+for source files is used to try to locate the interface file.
 
 For example, suppose the search path contains directories ``d1``,
 ``d2``, and ``d3``, and we are in :ghc-flag:`--make` mode looking for the source
@@ -887,7 +891,7 @@ A hs-boot file is written in a subset of Haskell:
    instance head: no superclasses, no class methods, no associated types.
    However, if the class has any ::extension::`FunctionalDependencies`,
    those given in the hs-boot file must be the same.
-  
+
    If the class declaration is given in full, the entire class declaration
    must be identical, up to a renaming of the type variables bound by the
    class head. This means:
