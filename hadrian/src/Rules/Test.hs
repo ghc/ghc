@@ -10,6 +10,7 @@ import Hadrian.Haskell.Cabal.Type (packageDependencies)
 import Hadrian.Oracles.Cabal (readPackageData)
 import Oracles.Setting
 import Oracles.TestSettings
+import Oracles.Flag
 import Packages
 import Settings
 import Settings.Builders.RunTest
@@ -284,7 +285,8 @@ needTestsuitePackages stg = do
   let pkgs = filter (\(_,p) -> not $ "iserv" `isInfixOf` pkgName p || ((pkgName p `elem` ["ghc", "Cabal"]) && stg == Stage0))
                     (libpkgs ++ exepkgs ++ [ (stg,timeout) | windowsHost ])
   need =<< mapM (uncurry pkgFile) pkgs
-  needIservBins stg
+  cross <- flag CrossCompiling
+  when (not cross) $ needIservBins stg
   root <- buildRoot
   -- require the shims for testing stage1
   need =<< sequence [(\f -> root -/- "stage1-test/bin" -/- takeFileName f) <$> (pkgFile Stage0 p) | (Stage0,p) <- exepkgs]
