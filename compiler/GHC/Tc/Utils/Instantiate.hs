@@ -497,6 +497,27 @@ tcInstTypeBndrs id
       = do { (subst', tv') <- newMetaTyVarTyVarX subst tv
            ; return (subst', Bndr tv' spec) }
 
+--------------------------
+-- | Wrap up the origin of a skolem type variable with a new 'Unique',
+-- so that we can common up skolem type variables whose 'SkolemInfo'
+-- shares a certain 'Unique'.
+-- Allocate a TcLevel of "one level down"; we allocate skolems before
+-- pushing the level to create the implication constraints
+mkSkolemDetails, mkSuperSkolemDetails :: SkolemInfo -> TcM SkolemDetails
+mkSkolemDetails      = mk_skolem_info False
+mkSuperSkolemDetails = mk_skolem_info True
+
+mk_skolem_details :: Bool -> SkolemInfo -> TcM SkolemDetails
+mk_skolem_details overlappable skol_info
+  = do { uniq <- getUnique
+       ; lvl  <- getTcLevel
+       ; let pushed_lvl = pushTcLevel lvl
+       ; return (SkolemDetails { skol_uniq = uniq
+                               , skol_overlap = overlappable
+                               , sk_lvl = pushed_lvl
+                               , sk_info = skol_info }) }
+
+-------------------------
 tcSkolDFunType :: SkolemInfo -> DFunId -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type signature with skolem constants.
 -- This freshens the names, but no need to do so

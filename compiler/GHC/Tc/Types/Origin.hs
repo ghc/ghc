@@ -13,8 +13,8 @@ module GHC.Tc.Types.Origin (
   redundantConstraintsSpan,
 
   -- SkolemInfo
-  SkolemInfo(..), SkolemInfoAnon(..), mkSkolemInfo, getSkolemInfo, pprSigSkolInfo, pprSkolInfo,
-  unkSkol, unkSkolAnon,
+  SkolemInfo(..), mkSkolemInfo, getSkolemInfo, pprSigSkolInfo, pprSkolInfo,
+  unkSkol,
 
   -- CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
@@ -197,20 +197,7 @@ isSigMaybe _                = Nothing
 ************************************************************************
 -}
 
--- | 'SkolemInfo' stores the origin of a skolem type variable,
--- so that we can display this information to the user in case of a type error.
---
--- The 'Unique' field allows us to report all skolem type variables bound in the
--- same place in a single report.
-data SkolemInfo
-  = SkolemInfo
-      Unique -- ^ used to common up skolem variables bound at the same location
-      SkolemInfoAnon -- ^ the information about the origin of the skolem type variable
-
-instance Uniquable SkolemInfo where
-  getUnique (SkolemInfo u _) = u
-
--- | 'SkolemInfoAnon' stores the origin of a skolem type variable (e.g. bound by
+-- | 'SkolemInfo' stores the origin of a skolem type variable (e.g. bound by
 -- a user-written forall, the header of a data declaration, a deriving clause, ...).
 --
 -- This information is displayed when reporting an error message, such as
@@ -218,10 +205,7 @@ instance Uniquable SkolemInfo where
 --  @"Couldn't match 'k' with 'l'"@
 --
 -- This allows us to explain where the type variable came from.
---
--- When several skolem type variables are bound at once, prefer using 'SkolemInfo',
--- which stores a 'Unique' which allows these type variables to be reported
-data SkolemInfoAnon
+data SkolemInfo
   = SigSkol -- A skolem that is created by instantiating
             -- a programmer-supplied type signature
             -- Location of the binding site is on the TyVar
@@ -283,39 +267,18 @@ data SkolemInfoAnon
 
   | UnkSkol CallStack
 
-
-
-
--- | Use this when you can't specify a helpful origin for
+-- | Use 'unkSkol' when you can't specify a helpful origin for
 -- some skolem type variable.
 --
 -- We're hoping to be able to get rid of this entirely, but for the moment
 -- it's still needed.
 unkSkol :: HasCallStack => SkolemInfo
-unkSkol = SkolemInfo (mkUniqueGrimily 0) unkSkolAnon
-
-unkSkolAnon :: HasCallStack => SkolemInfoAnon
-unkSkolAnon = UnkSkol callStack
-
--- | Wrap up the origin of a skolem type variable with a new 'Unique',
--- so that we can common up skolem type variables whose 'SkolemInfo'
--- shares a certain 'Unique'.
-mkSkolemInfo :: MonadIO m => SkolemInfoAnon -> m SkolemInfo
-mkSkolemInfo sk_anon = do
-  u <- liftIO $! uniqFromMask 's'
-  return (SkolemInfo u sk_anon)
-
-getSkolemInfo :: SkolemInfo -> SkolemInfoAnon
-getSkolemInfo (SkolemInfo _ skol_anon) = skol_anon
-
+unkSkol = UnkSkol callStack
 
 instance Outputable SkolemInfo where
-  ppr (SkolemInfo _ sk_info ) = ppr sk_info
-
-instance Outputable SkolemInfoAnon where
   ppr = pprSkolInfo
 
-pprSkolInfo :: SkolemInfoAnon -> SDoc
+pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
 pprSkolInfo (SigTypeSkol cx)  = pprUserTypeCtxt cx
@@ -418,7 +381,7 @@ in the right place.  So we proceed as follows:
 data CtOrigin
   = -- | A given constraint from a user-written type signature. The
     -- 'SkolemInfo' inside gives more information.
-    GivenOrigin SkolemInfoAnon
+    GivenOrigin SkolemInfo
 
   -- The following are other origins for given constraints that cannot produce
   -- new skolems -- hence no SkolemInfo.
@@ -449,7 +412,7 @@ data CtOrigin
   -- Note [Use only the best local instance], both in GHC.Tc.Solver.Interact.
   | OtherSCOrigin ScDepth -- ^ The number of superclass selections necessary to
                           -- get this constraint
-                  SkolemInfoAnon   -- ^ Where the sub-class constraint arose from
+                  SkolemInfo   -- ^ Where the sub-class constraint arose from
                                -- (used only for printing)
 
   -- All the others are for *wanted* constraints

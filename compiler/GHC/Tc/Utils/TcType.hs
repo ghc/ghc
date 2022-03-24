@@ -345,9 +345,9 @@ type TcInvisTVBinder   = InvisTVBinder
 type TcReqTVBinder     = ReqTVBinder
 
 -- See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon]
-type TcTyCon     = TyCon
-type MonoTcTyCon = TcTyCon
-type PolyTcTyCon = TcTyCon
+type TcTyCon        = TyCon
+type MonoTcTyCon    = TcTyCon
+type PolyTcTyCon   = TcTyCon
 
 -- These types do not have boxy type variables in them
 type TcPredType     = PredType
@@ -503,14 +503,7 @@ we would need to enforce the separation.
 -- A TyVarDetails is inside a TyVar
 -- See Note [TyVars and TcTyVars]
 data TcTyVarDetails
-  = SkolemTv      -- A skolem
-       SkolemInfo
-       TcLevel    -- Level of the implication that binds it
-                  -- See GHC.Tc.Utils.Unify Note [Deeper level on the left] for
-                  --     how this level number is used
-       Bool       -- True <=> this skolem type variable can be overlapped
-                  --          when looking up instances
-                  -- See Note [Binding when looking up instances] in GHC.Core.InstEnv
+  = SkolemTv SkolemDetails      -- A skolem
 
   | RuntimeUnk    -- Stands for an as-yet-unknown type in the GHCi
                   -- interactive context
@@ -518,6 +511,29 @@ data TcTyVarDetails
   | MetaTv { mtv_info  :: MetaInfo
            , mtv_ref   :: IORef MetaDetails
            , mtv_tclvl :: TcLevel }  -- See Note [TcLevel invariants]
+
+pprTcTyVarDetails :: TcTyVarDetails -> SDoc
+-- For debugging
+pprTcTyVarDetails (RuntimeUnk {})    = text "rt"
+pprTcTyVarDetails (SkolemTv skd)     = pprSkolemDetails skd
+pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
+  = ppr info <> colon <> ppr tclvl
+
+-----------------------------
+data SkolemDetails
+  = SkolemDetails
+       { skol_uniq :: !Unique
+       , skol_info :: SkolemInfo
+       , skol_lvl  :: !TcLevel   -- Level of the implication that binds it
+                                 -- See GHC.Tc.Utils.Unify Note [Deeper level on the left] for
+                                 --     how this level number is used
+       , skol_overlap :: Bool    -- True <=> this skolem type variable can be overlapped
+       }                         --          when looking up instances
+                                 -- See Note [Binding when looking up instances] in GHC.Core.InstEnv
+
+pprSkolemDetails (SkolemTv { skol_lvl = lvl, skol_overlap = overlap })
+  | overlap   = text "ssk" <> colon <> ppr lvl
+  | otherwise = text "sk" <> colon <> ppr lvl
 
 vanillaSkolemTv, superSkolemTv :: SkolemInfo -> TcTyVarDetails
 -- See Note [Binding when looking up instances] in GHC.Core.InstEnv
@@ -532,13 +548,8 @@ vanillaSkolemTvUnk = vanillaSkolemTv unkSkol
 instance Outputable TcTyVarDetails where
   ppr = pprTcTyVarDetails
 
-pprTcTyVarDetails :: TcTyVarDetails -> SDoc
--- For debugging
-pprTcTyVarDetails (RuntimeUnk {})      = text "rt"
-pprTcTyVarDetails (SkolemTv _sk lvl True)  = text "ssk" <> colon <> ppr lvl
-pprTcTyVarDetails (SkolemTv _sk lvl False) = text "sk"  <> colon <> ppr lvl
-pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
-  = ppr info <> colon <> ppr tclvl
+instance Outputable SkolemDetails where
+  ppr skd = pprSkolemDetails skd
 
 -----------------------------
 data MetaDetails
