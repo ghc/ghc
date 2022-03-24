@@ -1758,7 +1758,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                -> TcM (TcId, LHsBind GhcTc, Maybe Implication)
 
     tc_default sel_id (Just (dm_name, _))
-      = do { (meth_bind, inline_prags) <- mkDefMethBind dfun_id clas sel_id dm_name
+      = do { (meth_bind, inline_prags) <- mkDefMethBind inst_loc dfun_id clas sel_id dm_name
            ; tcMethodBody clas tyvars dfun_ev_vars inst_tys
                           dfun_ev_binds is_derived hs_sig_fn
                           spec_inst_prags inline_prags
@@ -2105,7 +2105,7 @@ mk_meth_spec_prags meth_id spec_inst_prags spec_prags_for_me
          | L inst_loc (SpecPrag _       wrap inl) <- spec_inst_prags]
 
 
-mkDefMethBind :: DFunId -> Class -> Id -> Name
+mkDefMethBind :: SrcSpan -> DFunId -> Class -> Id -> Name
               -> TcM (LHsBind GhcRn, [LSig GhcRn])
 -- The is a default method (vanailla or generic) defined in the class
 -- So make a binding   op = $dmop @t1 @t2
@@ -2113,7 +2113,7 @@ mkDefMethBind :: DFunId -> Class -> Id -> Name
 -- and t1,t2 are the instance types.
 -- See Note [Default methods in instances] for why we use
 -- visible type application here
-mkDefMethBind dfun_id clas sel_id dm_name
+mkDefMethBind loc dfun_id clas sel_id dm_name
   = do  { logger <- getLogger
         ; dm_id <- tcLookupId dm_name
         ; let inline_prag = idInlinePragma dm_id
@@ -2128,8 +2128,9 @@ mkDefMethBind dfun_id clas sel_id dm_name
               visible_inst_tys = [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
                                       , tyConBinderArgFlag tcb /= Inferred ]
               rhs  = foldl' mk_vta (nlHsVar dm_name) visible_inst_tys
-              bind = noLocA $ mkTopFunBind Generated fn $
-                             [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
+              bind = L (noAnnSrcSpan loc)
+                    $ mkTopFunBind Generated fn
+                        [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
 
         ; liftIO (putDumpFileMaybe logger Opt_D_dump_deriv "Filling in method body"
                    FormatHaskell
