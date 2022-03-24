@@ -101,7 +101,8 @@ data ToolSettings = ToolSettings
   , toolSettings_pgm_l       :: (String, [Option])
   , toolSettings_pgm_lm      :: Maybe (String, [Option])
     -- ^ N.B. On Windows we don't have a linker which supports object
-    -- merging, hence the 'Maybe'.
+    -- merging, hence the 'Maybe'. See Note [Object merging] in
+    -- "GHC.Driver.Pipeline.Execute" for details.
   , toolSettings_pgm_dll     :: (String, [Option])
   , toolSettings_pgm_T       :: String
   , toolSettings_pgm_windres :: String

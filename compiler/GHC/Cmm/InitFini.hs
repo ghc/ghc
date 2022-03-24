@@ -49,12 +49,12 @@ and turn them back into a list of CLabels.
 
 On Windows initializers/finalizers are a bit tricky due to the inability to
 merge objects (due to the lld linker's lack of `-r` support on Windows; see
-#21068) since we instead must package foreign stubs into static archives.
-However, the linker is free to not include any constituent objects of a static
-library in the final object code if nothing depends upon them. Consequently, we
-must ensure that the initializer list for a module is defined in the module's
-object code, not its foreign stubs. This happens naturally with the plan laid
-out above.
+Note [Object merging] in GHC.Driver.Pipeline.Execute) since we instead must
+package foreign stubs into static archives.  However, the linker is free to not
+include any constituent objects of a static library in the final object code if
+nothing depends upon them. Consequently, we must ensure that the initializer
+list for a module is defined in the module's object code, not its foreign
+stubs. This happens naturally with the plan laid out above.
 
 Note that we maintain the invariant that at most one initializer and one
 finalizer CmmDecl will be emitted per module.
