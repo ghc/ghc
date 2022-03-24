@@ -1099,6 +1099,34 @@ Unfortunately the big object format is not supported on 32-bit targets so
 none of this can be used in that case.
 
 
+Note [Object merging]
+~~~~~~~~~~~~~~~~~~~~~
+On most platforms one can "merge" a set of relocatable object files into a new,
+partiall-linked-but-still-relocatable object. In a typical UNIX-style linker,
+this is accomplished with the `ld -r` command. We rely on this for two ends:
+
+ * We rely on `ld -r` to squash together split sections, making GHCi loading
+   more efficient. See Note [Merging object files for GHCi].
+
+ * We use merging to combine a module's object code (e.g. produced by the NCG)
+   with its foreign stubs (typically produced by a C compiler).
+
+The command used for object linking is set using the -pgmlm and -optlm
+command-line options.
+
+Sadly, the LLD linker that we use on Windows does not support the `-r` flag
+needed to support object merging (see #21068). For this reason on Windows we do
+not support GHCi objects.  To deal with foreign stubs we build a static archive
+of all of a module's object files instead merging them. Consequently, we can
+end up producing `.o` files which are in fact static archives. However,
+toolchains generally don't have a problem with this as they use file headers,
+not the filename, to determine the nature of inputs.
+
+Note that this has somewhat non-obvious consequences when producing
+initializers and finalizers. See Note [Initializers and finalizers in Cmm]
+in GHC.Cmm.InitFini for details.
+
+
 Note [Merging object files for GHCi]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHCi can usually loads standard linkable object files using GHC's linker
@@ -1113,9 +1141,9 @@ text section section and can consequently be mapped far more efficiently. As
 gcc tends to do unpredictable things to our linker command line, we opt to
 invoke ld directly in this case, in contrast to our usual strategy of linking
 via gcc.
-
 -}
 
+-- | See Note [Object merging].
 joinObjectFiles :: HscEnv -> [FilePath] -> FilePath -> IO ()
 joinObjectFiles hsc_env o_files output_fn
   | can_merge_objs = do

@@ -1401,6 +1401,8 @@ static HsInt loadObj_ (pathchar *path)
        return 1; // success
    }
 
+   // Things that look like object files (e.g. end in `.o`) may nevertheless be
+   // archives, as noted in Note [Object merging] in GHC.Driver.Pipeline.Execute.
    if (isArchive(path)) {
        if (loadArchive_(path)) {
             return 1; // success
