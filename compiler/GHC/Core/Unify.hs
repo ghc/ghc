@@ -56,6 +56,7 @@ import GHC.Data.FastString
 import Data.List ( mapAccumL )
 import Control.Monad
 import qualified Data.Semigroup as S
+
 import GHC.Builtin.Names (constraintKindTyConKey, liftedTypeKindTyConKey)
 
 {-
@@ -1545,10 +1546,13 @@ liftCoMatch tmpls ty co
 ty_co_match :: MatchEnv   -- ^ ambient helpful info
             -> LiftCoEnv  -- ^ incoming subst
             -> Type       -- ^ ty, type to match
-            -> Coercion   -- ^ co, coercion to match against
-            -> Coercion   -- ^ :: kind of L type of substed ty ~N L kind of co
-            -> Coercion   -- ^ :: kind of R type of substed ty ~N R kind of co
+            -> Coercion   -- ^ co :: lty ~r rty, coercion to match against
+            -> Coercion   -- ^ :: kind(lsubst(ty)) ~N kind(lty)
+            -> Coercion   -- ^ :: kind(rsubst(ty)) ~N kind(rty)
             -> Maybe LiftCoEnv
+   -- ^ Just env ==> liftCoSubst Nominal env ty == co, modulo roles.
+   -- Also: Just env ==> lsubst(ty) == lty and rsubst(ty) == rty,
+   -- where lsubst = lcSubstLeft(env) and rsubst = lcSubstRight(env)
 ty_co_match menv subst ty co lkco rkco
   | Just ty' <- coreView ty = ty_co_match menv subst ty' co lkco rkco
      -- why coreView here, not tcView? Because we're firmly after type-checking.
@@ -1618,14 +1622,17 @@ ty_co_match menv subst ty1 (AppCo co2 arg2) _lkco _rkco
 ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
   = ty_co_match_tc menv subst tc1 tys tc2 cos
 ty_co_match menv subst (FunTy _ w ty1 ty2) co _lkco _rkco
-    -- Despite the fact that (->) is polymorphic in five type variables (two
-    -- runtime rep, a multiplicity and two types), we shouldn't need to
-    -- explicitly unify the runtime reps here; unifying the types themselves
-    -- should be sufficient.  See Note [Representation of function types].
-  | Just (tc, [co_mult, _,_,co1,co2]) <- splitTyConAppCo_maybe co
+  | Just (tc, [co_mult,rrco1,rrco2,co1,co2]) <- splitTyConAppCo_maybe co
   , tc == funTyCon
-  = let Pair lkcos rkcos = traverse (fmap mkNomReflCo . coercionKind) [co_mult,co1,co2]
-    in ty_co_match_args menv subst [w, ty1, ty2] [co_mult, co1, co2] lkcos rkcos
+  = let rr1 = getRuntimeRep ty1
+        rr2 = getRuntimeRep ty2
+        Pair lkcos rkcos = traverse (fmap (mkNomReflCo . typeKind) . coercionKind)
+                             [co_mult,rrco1, rrco2,co1,co2]
+    in  -- NB: we include the RuntimeRep arguments in the matching; not doing so caused #21205.
+        ty_co_match_args menv subst
+          [w, rr1, rr2, ty1, ty2]
+          [co_mult, rrco1, rrco2, co1, co2]
+          lkcos rkcos
 
 ty_co_match menv subst (ForAllTy (Bndr tv1 _) ty1)
                        (ForAllCo tv2 kind_co2 co2)
@@ -1694,7 +1701,7 @@ ty_co_match_tc menv subst tc1 tys1 tc2 cos2
        ; ty_co_match_args menv subst tys1 cos2 lkcos rkcos }
   where
     Pair lkcos rkcos
-      = traverse (fmap mkNomReflCo . coercionKind) cos2
+      = traverse (fmap (mkNomReflCo . typeKind) . coercionKind) cos2
 
 ty_co_match_app :: MatchEnv -> LiftCoEnv
                 -> Type -> [Type] -> Coercion -> [Coercion]
@@ -1708,7 +1715,7 @@ ty_co_match_app menv subst ty1 ty1args co2 co2args
   = do { subst1 <- ty_co_match menv subst ki1 ki2 ki_ki_co ki_ki_co
        ; let Pair lkco rkco = mkNomReflCo <$> coercionKind ki2
        ; subst2 <- ty_co_match menv subst1 ty1 co2 lkco rkco
-       ; let Pair lkcos rkcos = traverse (fmap mkNomReflCo . coercionKind) co2args
+       ; let Pair lkcos rkcos = traverse (fmap (mkNomReflCo . typeKind) . coercionKind) co2args
        ; ty_co_match_args menv subst2 ty1args co2args lkcos rkcos }
   where
     ki1 = typeKind ty1
