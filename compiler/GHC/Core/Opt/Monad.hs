@@ -13,6 +13,8 @@ module GHC.Core.Opt.Monad (
     CoreToDo(..), runWhen, runMaybe,
     SimplMode(..),
     FloatOutSwitches(..),
+    FloatEnable(..),
+    floatEnable,
     pprPassDetails,
 
     -- * Plugins
@@ -171,6 +173,49 @@ pprPassDetails (CoreDoSimplify n md) = vcat [ text "Max iterations =" <+> int n
                                             , ppr md ]
 pprPassDetails _ = Outputable.empty
 
+
+data FloatEnable  -- Controls local let-floating
+  = FloatDisabled      -- Do no local let-floating
+  | FloatNestedOnly    -- Local let-floating for nested (NotTopLevel) bindings only
+  | FloatEnabled       -- Do local let-floating on all bindings
+
+floatEnable :: DynFlags -> FloatEnable
+floatEnable dflags =
+  case (gopt Opt_LocalFloatOut dflags, gopt Opt_LocalFloatOutTopLevel dflags) of
+    (True, True) -> FloatEnabled
+    (True, False)-> FloatNestedOnly
+    (False, _)   -> FloatDisabled
+
+{-
+Note [Local floating]
+~~~~~~~~~~~~~~~~~~~~~
+The Simplifier can perform local let-floating: it floats let-bindings
+out of the RHS of let-bindings.  See
+  Let-floating: moving bindings to give faster programs (ICFP'96)
+  https://www.microsoft.com/en-us/research/publication/let-floating-moving-bindings-to-give-faster-programs/
+
+Here's an example
+   x = let y = v+1 in (y,true)
+
+The RHS of x is a thunk.  Much better to float that y-binding out to give
+   y = v+1
+   x = (y,true)
+
+Not only have we avoided building a thunk, but any (case x of (p,q) -> ...) in
+the scope of the x-binding can now be simplified.
+
+This local let-floating is done in GHC.Core.Opt.Simplify.prepareBinding,
+controlled by the predicate GHC.Core.Opt.Simplify.Env.doFloatFromRhs.
+
+The `FloatEnable` data type controls where local let-floating takes place;
+it allows you to specify that it should be done only for nested bindings;
+or for top-level bindings as well; or not at all.
+
+Note that all of this is quite separate from the global FloatOut pass;
+see GHC.Core.Opt.FloatOut.
+
+-}
+
 data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
   = SimplMode
         { sm_names        :: [String]       -- ^ Name(s) of the phase
@@ -182,6 +227,7 @@ data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
         , sm_eta_expand   :: !Bool          -- ^ Whether eta-expansion is enabled
         , sm_cast_swizzle :: !Bool          -- ^ Do we swizzle casts past lambdas?
         , sm_pre_inline   :: !Bool          -- ^ Whether pre-inlining is enabled
+        , sm_float_enable :: !FloatEnable   -- ^ Whether to enable floating out
         , sm_logger       :: !Logger
         , sm_dflags       :: DynFlags
             -- Just for convenient non-monadic access; we don't override these.

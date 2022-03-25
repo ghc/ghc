@@ -36,7 +36,7 @@ module GHC.Core.Opt.Simplify.Env (
         doFloatFromRhs, getTopFloatBinds,
 
         -- * LetFloats
-        LetFloats, letFloatBinds, emptyLetFloats, unitLetFloat,
+        LetFloats, FloatEnable(..), letFloatBinds, emptyLetFloats, unitLetFloat,
         addLetFlts,  mapLetFloats,
 
         -- * JoinFloats
@@ -47,7 +47,7 @@ module GHC.Core.Opt.Simplify.Env (
 import GHC.Prelude
 
 import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Opt.Monad        ( SimplMode(..) )
+import GHC.Core.Opt.Monad        ( SimplMode(..), FloatEnable (..) )
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Multiplicity     ( scaleScaled )
@@ -506,10 +506,14 @@ andFF FltOkSpec  FltCareful = FltCareful
 andFF FltOkSpec  _          = FltOkSpec
 andFF FltLifted  flt        = flt
 
-doFloatFromRhs :: TopLevelFlag -> RecFlag -> Bool -> SimplFloats -> OutExpr -> Bool
--- If you change this function look also at FloatIn.noFloatFromRhs
-doFloatFromRhs lvl rec strict_bind (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
-  =  not (isNilOL fs) && want_to_float && can_float
+
+doFloatFromRhs :: FloatEnable -> TopLevelFlag -> RecFlag -> Bool -> SimplFloats -> OutExpr -> Bool
+-- If you change this function look also at FloatIn.noFloatIntoRhs
+doFloatFromRhs fe lvl rec strict_bind (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
+  = floatEnabled lvl fe
+      && not (isNilOL fs)
+      && want_to_float
+      && can_float
   where
      want_to_float = isTopLevel lvl || exprIsCheap rhs || exprIsExpandable rhs
                      -- See Note [Float when cheap or expandable]
@@ -517,6 +521,12 @@ doFloatFromRhs lvl rec strict_bind (SimplFloats { sfLetFloats = LetFloats fs ff 
                    FltLifted  -> True
                    FltOkSpec  -> isNotTopLevel lvl && isNonRec rec
                    FltCareful -> isNotTopLevel lvl && isNonRec rec && strict_bind
+
+     -- Whether any floating is allowed by flags.
+     floatEnabled :: TopLevelFlag -> FloatEnable -> Bool
+     floatEnabled _ FloatDisabled = False
+     floatEnabled lvl FloatNestedOnly = not (isTopLevel lvl)
+     floatEnabled _ FloatEnabled = True
 
 {-
 Note [Float when cheap or expandable]

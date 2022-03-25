@@ -136,6 +136,7 @@ getCoreToDo logger dflags
     phases        = simplPhases        dflags
     max_iter      = maxSimplIterations dflags
     rule_check    = ruleCheck          dflags
+    float_enable  = floatEnable        dflags
     const_fold    = gopt Opt_CoreConstantFolding          dflags
     call_arity    = gopt Opt_CallArity                    dflags
     exitification = gopt Opt_Exitification                dflags
@@ -177,6 +178,7 @@ getCoreToDo logger dflags
                           , sm_inline       = True
                           , sm_case_case    = True
                           , sm_pre_inline   = pre_inline_on
+                          , sm_float_enable = float_enable
                           }
 
     simpl_phase phase name iter

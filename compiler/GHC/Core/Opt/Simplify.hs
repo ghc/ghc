@@ -722,7 +722,7 @@ prepareBinding env top_lvl is_rec strict_bind bndr rhs_floats rhs
 
        -- Finally, decide whether or not to float
        ; let all_floats = rhs_floats1 `addLetFloats` anf_floats
-       ; if doFloatFromRhs top_lvl is_rec strict_bind all_floats rhs2
+       ; if doFloatFromRhs (sm_float_enable $ seMode env) top_lvl is_rec strict_bind all_floats rhs2
          then -- Float!
               do { tick LetFloatFromLet
                  ; return (all_floats, rhs2) }

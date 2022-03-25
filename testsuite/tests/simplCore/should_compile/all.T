@@ -385,6 +385,9 @@ test('T19790',  normal, compile, ['-O -ddump-rule-firings'])
 # which (before the fix) lost crucial dependencies
 test('T20820',  normal, compile, ['-O0'])
 
+# Verify that the letrec is still there
+test('T20895', [ grep_errmsg(r'\s*=\s*letrec') ], compile, ['-O0 -ddump-simpl -dsuppress-all -fno-local-float-out-top-level'])
+
 test('OpaqueNoAbsentArgWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoCastWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoRebox', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])

@@ -743,6 +743,54 @@ by saying ``-fno-wombat``.
 
     Sets the maximal number of iterations for the simplifier.
 
+.. ghc-flag:: -flocal-float-out
+    :shortdesc: Enable local floating definitions out of let-binds.
+    :type: dynamic
+    :reverse: -fno-local-float-out
+    :category:
+
+    :default: on
+
+    Enable local floating of bindings from the RHS of a let(rec) in the
+    simplifier. For example ::
+
+        let x = let y = rhs_y in rhs_x in blah
+        ==>
+        let y = rhs_y in let x = rhs_x in blah
+
+    See the paper "Let-floating: moving bindings to give faster programs", Partain, Santos, and Peyton Jones; ICFP 1996.
+    https://www.microsoft.com/en-us/research/publication/let-floating-moving-bindings-to-give-faster-programs/
+
+    .. note::
+      This is distinct from the global floating pass which can be disabled with
+      :ghc-flag:`-fno-full-laziness`.
+
+.. ghc-flag:: -flocal-float-out-top-level
+    :shortdesc: Enable local floating to float top-level bindings
+    :type: dynamic
+    :reverse: -fno-local-float-out-top-level
+    :category:
+
+    :default: on
+
+    Enable local floating of top-level bindings from the RHS of a let(rec) in
+    the simplifier. For example
+
+      x = let y = e in (a,b)
+      ===>
+      y = e; x = (a,b)
+
+
+    See the paper "Let-floating: moving bindings to give faster programs", Partain, Santos, and Peyton Jones; ICFP 1996.
+    https://www.microsoft.com/en-us/research/publication/let-floating-moving-bindings-to-give-faster-programs/
+
+    Note that if :ghc-flag:`-fno-local-float-out` is set, that will take
+    precedence.
+
+    .. note::
+      This is distinct from the global floating pass which can be disabled with
+      :ghc-flag:`-fno-full-laziness`.
+
 .. ghc-flag:: -fmax-worker-args=⟨n⟩
     :shortdesc: *default: 10.* Maximum number of value arguments for a worker.
     :type: dynamic

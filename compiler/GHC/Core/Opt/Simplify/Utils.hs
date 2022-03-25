@@ -48,7 +48,7 @@ import GHC.Driver.Session
 import GHC.Core
 import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
-import GHC.Core.Opt.Monad        ( SimplMode(..), Tick(..) )
+import GHC.Core.Opt.Monad        ( SimplMode(..), Tick(..), floatEnable )
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
@@ -951,12 +951,14 @@ simplEnvForGHCi logger dflags
                            , sm_cast_swizzle = True
                            , sm_case_case  = True
                            , sm_pre_inline = pre_inline_on
+                           , sm_float_enable = float_enable
                            }
   where
     rules_on      = gopt Opt_EnableRewriteRules   dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion dflags
     pre_inline_on = gopt Opt_SimplPreInlining     dflags
     uf_opts       = unfoldingOpts                 dflags
+    float_enable  = floatEnable                   dflags
 
 updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
 updModeForStableUnfoldings unf_act current_mode

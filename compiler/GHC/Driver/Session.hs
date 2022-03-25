@@ -733,6 +733,15 @@ data DynFlags = DynFlags {
   cfgWeights            :: Weights
 }
 
+{- Note [RHS Floating]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  We provide both 'Opt_LocalFloatOut' and 'Opt_LocalFloatOutTopLevel' to correspond to
+  'doFloatFromRhs'; with this we can control floating out with GHC flags.
+
+  This addresses https://gitlab.haskell.org/ghc/ghc/-/issues/13663 and
+  allows for experminentation.
+-}
+
 class HasDynFlags m where
     getDynFlags :: m DynFlags
 
@@ -3414,6 +3423,8 @@ fFlagsDeps = [
   flagSpec "full-laziness"                    Opt_FullLaziness,
   depFlagSpec' "fun-to-thunk"                 Opt_FunToThunk
       (useInstead "-f" "full-laziness"),
+  flagSpec "local-float-out"                  Opt_LocalFloatOut,
+  flagSpec "local-float-out-top-level"        Opt_LocalFloatOutTopLevel,
   flagSpec "gen-manifest"                     Opt_GenManifest,
   flagSpec "ghci-history"                     Opt_GhciHistory,
   flagSpec "ghci-leak-check"                  Opt_GhciLeakCheck,
@@ -3799,9 +3810,14 @@ defaultFlags settings
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
              -- The default -O0 options
 
+    -- Default floating flags (see Note [RHS Floating])
+    ++ [ Opt_LocalFloatOut, Opt_LocalFloatOutTopLevel ]
+
+
     ++ default_PIC platform
 
     ++ validHoleFitDefaults
+
 
     where platform = sTargetPlatform settings
 

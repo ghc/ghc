@@ -187,6 +187,11 @@ data GeneralFlag
    | Opt_KillOneShot
    | Opt_FullLaziness
    | Opt_FloatIn
+   | Opt_LocalFloatOut -- ^ Enable floating out of let-bindings in the
+                      --   simplifier
+   | Opt_LocalFloatOutTopLevel -- ^ Enable floating out of let-bindings at the
+                               --   top level in the simplifier
+                               --   N.B. See Note [RHS Floating]
    | Opt_LateSpecialise
    | Opt_Specialise
    | Opt_SpecialiseAggressively
