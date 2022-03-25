@@ -76,6 +76,10 @@ endef
 # QUESTION : should we use shell commands?
 
 
+show:
+	@echo '$(VALUE)="$($(VALUE))"'
+
+
 .PHONY: install
 
 ifeq "$(TargetOS_CPP)" "mingw32"
