@@ -13,7 +13,6 @@ module Settings.Default (
     defaultFlavour, defaultBignumBackend
     ) where
 
-import qualified Hadrian.Builder.Ar
 import qualified Hadrian.Builder.Sphinx
 import qualified Hadrian.Builder.Tar
 import Hadrian.Haskell.Cabal.Type
@@ -36,6 +35,7 @@ import Settings.Builders.Haddock
 import Settings.Builders.Happy
 import Settings.Builders.Hsc2Hs
 import Settings.Builders.HsCpp
+import Settings.Builders.Ar
 import Settings.Builders.Ld
 import Settings.Builders.Make
 import Settings.Builders.MergeObjects
@@ -267,6 +267,7 @@ defaultBuilderArgs = mconcat
     , hsc2hsBuilderArgs
     , hsCppBuilderArgs
     , ldBuilderArgs
+    , arBuilderArgs
     , makeBuilderArgs
     , mergeObjectsBuilderArgs
     , runTestBuilderArgs
@@ -274,8 +275,6 @@ defaultBuilderArgs = mconcat
     , xelatexBuilderArgs
     , win32TarballsArgs
     -- Generic builders from the Hadrian library:
-    , builder (Ar Pack         ) ? Hadrian.Builder.Ar.args Pack
-    , builder (Ar Unpack       ) ? Hadrian.Builder.Ar.args Unpack
     , builder (Sphinx HtmlMode ) ? Hadrian.Builder.Sphinx.args HtmlMode
     , builder (Sphinx LatexMode) ? Hadrian.Builder.Sphinx.args LatexMode
     , builder (Sphinx ManMode  ) ? Hadrian.Builder.Sphinx.args ManMode
