@@ -311,8 +311,8 @@ instance H.Builder Builder where
             case builder of
                 Ar Pack _ -> do
                     useTempFile <- flag ArSupportsAtFile
-                    if useTempFile then runAr                path buildArgs
-                                   else runArWithoutTempFile path buildArgs
+                    if useTempFile then runAr                path buildArgs buildInputs
+                                   else runArWithoutTempFile path buildArgs buildInputs
 
                 Ar Unpack _ -> cmd' [Cwd output] [path] buildArgs
 

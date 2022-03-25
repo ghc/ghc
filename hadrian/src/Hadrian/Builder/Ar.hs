@@ -16,13 +16,12 @@
 -- and call @ar@ multiple times, e.g. when passing arguments via a temporary
 -- file is not supported (see 'runArWithoutTempFile').
 -----------------------------------------------------------------------------
-module Hadrian.Builder.Ar (ArMode (..), args, runAr, runArWithoutTempFile) where
+module Hadrian.Builder.Ar (ArMode (..), runAr, runArWithoutTempFile) where
 
 import Control.Monad
 import Development.Shake
 import Development.Shake.Classes
 import GHC.Generics
-import Hadrian.Expression
 import Hadrian.Utilities
 
 -- | We support packing and unpacking archives with @ar@.
@@ -32,37 +31,26 @@ instance Binary   ArMode
 instance Hashable ArMode
 instance NFData   ArMode
 
--- NOTE: Make sure to appropriately update 'arFlagsCount' when changing 'args'.
--- | Default command line arguments for invoking the archiving utility @ar@.
-args :: (ShakeValue c, ShakeValue b) => ArMode -> Args c b
-args Pack   = mconcat [ arg "q", arg =<< getOutput, getInputs ]
-args Unpack = mconcat [ arg "x", arg =<< getInput ]
-
--- This count includes "q" and the output file arguments in 'args'. This is
--- only relevant for the 'Pack' @ar@ mode.
-arFlagsCount :: Int
-arFlagsCount = 2
-
 -- | Invoke @ar@ given a path to it and a list of arguments. The list of files
--- to be archived is passed via a temporary file. Passing arguments via a
--- temporary file is not supported by some versions of @ar@, in which case you
--- should use 'runArWithoutTempFile' instead.
-runAr :: FilePath -> [String] -> Action ()
-runAr arPath argList = withTempFile $ \tmp -> do
+-- to be archived is passed via a temporary response file. Passing arguments
+-- via a response file is not supported by some versions of @ar@, in which
+-- case you should use 'runArWithoutTempFile' instead.
+runAr :: FilePath    -- ^ path to @ar@
+      -> [String]    -- ^ other arguments
+      -> [FilePath]  -- ^ input file paths
+      -> Action ()
+runAr arPath flagArgs fileArgs = withTempFile $ \tmp -> do
     writeFile' tmp $ unwords fileArgs
     cmd [arPath] flagArgs ('@' : tmp)
-  where
-    flagArgs = take arFlagsCount argList
-    fileArgs = drop arFlagsCount argList
 
 -- | Invoke @ar@ given a path to it and a list of arguments. Note that @ar@
 -- will be called multiple times if the list of files to be archived is too
 -- long and doesn't fit into the command line length limit. This function is
 -- typically much slower than 'runAr'.
-runArWithoutTempFile :: FilePath -> [String] -> Action ()
-runArWithoutTempFile arPath argList =
+runArWithoutTempFile :: FilePath    -- ^ path to @ar@
+                     -> [String]    -- ^ other arguments
+                     -> [FilePath]  -- ^ input file paths
+                     -> Action ()
+runArWithoutTempFile arPath flagArgs fileArgs =
     forM_ (chunksOfSize cmdLineLengthLimit fileArgs) $ \argsChunk ->
         unit . cmd [arPath] $ flagArgs ++ argsChunk
-  where
-    flagArgs = take arFlagsCount argList
-    fileArgs = drop arFlagsCount argList

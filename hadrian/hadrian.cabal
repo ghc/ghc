@@ -101,6 +101,7 @@ executable hadrian
                        , Settings.Builders.Happy
                        , Settings.Builders.Hsc2Hs
                        , Settings.Builders.HsCpp
+                       , Settings.Builders.Ar
                        , Settings.Builders.Ld
                        , Settings.Builders.Make
                        , Settings.Builders.MergeObjects
