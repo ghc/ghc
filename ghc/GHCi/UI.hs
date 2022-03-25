@@ -51,6 +51,7 @@ import GHC.Driver.Session as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
 import GHC.Driver.Monad ( modifySession )
+import GHC.Driver.Make ( newHomeModInfoCache, HomeModInfoCache(..) )
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Config.Diagnostic
 import qualified GHC
@@ -541,6 +542,7 @@ interactiveUI config srcs maybe_exprs = do
    let prelude_import = simpleImportDecl preludeModuleName
    hsc_env <- GHC.getSession
    let in_multi = length (hsc_all_home_unit_ids hsc_env) > 1
+   empty_cache <- liftIO newHomeModInfoCache
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname           = default_progname,
                    args               = default_args,
@@ -575,7 +577,7 @@ interactiveUI config srcs maybe_exprs = do
                    mod_infos          = M.empty,
                    flushStdHandles    = flush,
                    noBuffering        = nobuffering,
-                   hmiCache = []
+                   hmiCache = empty_cache
                  }
 
    return ()
@@ -1679,12 +1681,6 @@ trySuccess act =
                                 return Failed) $ do
       act
 
-trySuccessWithRes :: (Monoid a, GhciMonad m) => m (SuccessFlag, a) -> m (SuccessFlag, a)
-trySuccessWithRes act =
-    handleSourceError (\e -> do printErrAndMaybeExit e -- immediately exit fith failure if in ghc -e
-                                return (Failed, mempty))
-      act
-
 -----------------------------------------------------------------------------
 -- :edit
 
@@ -2149,9 +2145,7 @@ doLoad retain_context howmuch = do
               liftIO $ do hSetBuffering stdout NoBuffering
                           hSetBuffering stderr NoBuffering) $ \_ -> do
       hmis <- hmiCache <$> getGHCiState
-      modifyGHCiState (\ghci -> ghci { hmiCache = [] })
-      (ok, new_cache) <- trySuccessWithRes $ GHC.loadWithCache hmis howmuch
-      modifyGHCiState (\ghci -> ghci { hmiCache = new_cache })
+      ok <- trySuccess $ GHC.loadWithCache (Just hmis) howmuch
       afterLoad ok retain_context
       return ok
 
@@ -4443,10 +4437,9 @@ discardActiveBreakPoints = do
    mapM_ (turnBreakOnOff False) $ breaks st
    setGHCiState $ st { breaks = IntMap.empty }
 
--- don't reset the counter back to zero?
 discardInterfaceCache :: GhciMonad m => m ()
-discardInterfaceCache = do
-   modifyGHCiState $ (\st -> st { hmiCache = [] })
+discardInterfaceCache =
+   void (liftIO . hmi_clearCache . hmiCache =<< getGHCiState)
 
 clearHPTs :: GhciMonad m => m ()
 clearHPTs = do
