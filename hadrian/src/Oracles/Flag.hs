@@ -12,6 +12,7 @@ import Base
 import Oracles.Setting
 
 data Flag = ArSupportsAtFile
+          | ArSupportsDashL
           | CrossCompiling
           | CcLlvmBackend
           | GhcUnregisterised
@@ -34,6 +35,7 @@ flag :: Flag -> Action Bool
 flag f = do
     let key = case f of
             ArSupportsAtFile     -> "ar-supports-at-file"
+            ArSupportsDashL      -> "ar-supports-dash-l"
             CrossCompiling       -> "cross-compiling"
             CcLlvmBackend        -> "cc-llvm-backend"
             GhcUnregisterised    -> "ghc-unregisterised"
