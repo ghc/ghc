@@ -258,11 +258,13 @@ test('T20218b',
 
 test('test-defaulting-plugin',
      [extra_files(['defaulting-plugin/']),
+      when(opsys('mingw32'), fragile(21293)),
       pre_cmd('$MAKE -s --no-print-directory -C defaulting-plugin package.test-defaulting-plugin TOP={top}')],
      makefile_test, [])
 
 test('test-defaulting-plugin-fail',
      [extra_files(['defaulting-plugin/']),
+      when(opsys('mingw32'), fragile(21293)),
       pre_cmd('$MAKE -s --no-print-directory -C defaulting-plugin package.test-defaulting-plugin-fail TOP={top}')],
      makefile_test, [])
 
