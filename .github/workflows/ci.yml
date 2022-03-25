@@ -19,7 +19,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-      if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/ghc-9.2'
 
     - uses: haskell/actions/setup@v1
       id: setup-haskell-cabal
@@ -28,9 +27,19 @@ jobs:
         ghc-version: ${{ matrix.ghc }}
         cabal-version: ${{ matrix.cabal }}
 
-    - name: Prepare environment
-      run: echo "$HOME/.ghcup/bin" >> $GITHUB_PATH
+    # GitHub preinstalls recent GHC versions, and haskell/actions/setup uses the
+    # preinstalled version when possible. However, GitHub's preinstalled GHC does
+    # not include documentation, and we need documentation to run Haddock tests.
+    # Therefore, we reinstall GHC to ensure that we have the documentation we
+    # need.
 
+    # TODO: Only reinstall GHC when the docs are actually missing. (If we're
+    # using a GHC version that is not preinstalled by GitHub, then we will be
+    # using a GHC installed by ghcup, which should have documentation.)
+    - name: Reinstall GHC with docs
+      run: |
+        ghcup rm ghc ${{ matrix.ghc }}
+        ghcup install ghc ${{ matrix.ghc }}
 
     - name: Freeze
       run: |
