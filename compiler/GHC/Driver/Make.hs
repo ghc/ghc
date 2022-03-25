@@ -27,7 +27,7 @@
 -- -----------------------------------------------------------------------------
 module GHC.Driver.Make (
         depanal, depanalE, depanalPartial, checkHomeUnitsClosed,
-        load, loadWithCache, load', LoadHowMuch(..),
+        load, loadWithCache, load', LoadHowMuch(..), HomeModInfoCache(..), noHomeCache, newHomeModInfoCache,
         instantiationNodes,
 
         downsweep,
@@ -121,7 +121,7 @@ import Data.Either ( rights, partitionEithers, lefts )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Control.Concurrent ( newQSem, waitQSem, signalQSem, ThreadId, killThread, forkIOWithUnmask )
+import Control.Concurrent ( newQSem, waitQSem, signalQSem, ThreadId, killThread, forkIOWithUnmask , forkIO )
 import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
 import Control.Monad
@@ -409,6 +409,64 @@ data LoadHowMuch
      -- ^ Load only the dependencies of the given module, but not the module
      -- itself.
 
+{-
+Note [Caching HomeModInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+API clients who call `load` like to cache the HomeModInfo in memory between
+calls to this function. In the old days, this cache was a simple MVar which stored
+a HomePackageTable. This was insufficient, as the interface files for boot modules
+were not recorded in the cache. In the less old days, the cache was returned at the
+end of load, and supplied at the start of load, however, this was not sufficient
+because it didn't account for the possibility of exceptions such as SIGINT (#20780).
+
+So now, in the current day, we have this HomeModInfoCache abstraction which
+can incrementally be updated during the process of upsweep. This alllows us
+to store interface files for boot modules in an exception-safe way.
+
+When the final version of an interface file is completed then it is placed into
+the cache. The contents of the cache is retrieved, and the cache cleared, by hmi_clearCache.
+
+If a module is in a loop then the final version is the retypechecked version of
+the inteface file which is created after the loop has concluded. For modules not
+in a loop, the final interface file is just the normal one we create at the end
+of compiling the module.
+
+One slightly tricky part is keeping the cache up-to-date when performing parallel
+upsweep. In order to do this we spawn a thread for each module which blocks on
+the result variable and once unblocked adds the interface to the cache. This also
+has the effect of writing the maximal number of modules into the cache as modules are not
+inserted in the linearised order. In addition
+to this we are careful to block the program continuing whilst there are still threads
+waiting to write to the cache, lest we end up in situations where load is called
+again before all threads have finished writing and old information will be placed into
+the cache.
+
+
+
+-}
+
+
+-- Abstract interface to a cache of HomeModInfo
+-- See Note [Caching HomeModInfo]
+data HomeModInfoCache = HomeModInfoCache { hmi_clearCache :: IO [HomeModInfo]
+                                         , hmi_addToCache :: HomeModInfo -> IO () }
+
+noHomeCache :: Maybe HomeModInfoCache
+noHomeCache = Nothing
+
+newHomeModInfoCache :: IO HomeModInfoCache
+newHomeModInfoCache = do
+  ioref <- newIORef []
+  return $
+    HomeModInfoCache
+      { hmi_clearCache = atomicModifyIORef' ioref (\c -> ([], c))
+      , hmi_addToCache = \hmi -> atomicModifyIORef' ioref (\c -> (hmi:c, ()))
+      }
+
+
+
+
 -- | Try to load the program.  See 'LoadHowMuch' for the different modes.
 --
 -- This function implements the core of GHC's @--make@ mode.  It preprocesses,
@@ -425,7 +483,7 @@ data LoadHowMuch
 -- All other errors are reported using the 'defaultWarnErrLogger'.
 
 load :: GhcMonad f => LoadHowMuch -> f SuccessFlag
-load how_much = fst <$> loadWithCache [] how_much
+load how_much = loadWithCache noHomeCache how_much
 
 mkBatchMsg :: HscEnv -> Messager
 mkBatchMsg hsc_env =
@@ -434,7 +492,8 @@ mkBatchMsg hsc_env =
     then batchMultiMsg
     else batchMsg
 
-loadWithCache :: GhcMonad m => [HomeModInfo] -> LoadHowMuch -> m (SuccessFlag, [HomeModInfo])
+
+loadWithCache :: GhcMonad m => Maybe HomeModInfoCache -> LoadHowMuch -> m SuccessFlag
 loadWithCache cache how_much = do
     (errs, mod_graph) <- depanalE [] False                        -- #17459
     msg <- mkBatchMsg <$> getSession
@@ -586,8 +645,8 @@ createBuildPlan mod_graph maybe_top_mod =
 -- | Generalized version of 'load' which also supports a custom
 -- 'Messager' (for reporting progress) and 'ModuleGraph' (generally
 -- produced by calling 'depanal'.
-load' :: GhcMonad m => [HomeModInfo] -> LoadHowMuch -> Maybe Messager -> ModuleGraph -> m (SuccessFlag, [HomeModInfo])
-load' cache how_much mHscMessage mod_graph = do
+load' :: GhcMonad m => Maybe HomeModInfoCache -> LoadHowMuch -> Maybe Messager -> ModuleGraph -> m SuccessFlag
+load' mhmi_cache how_much mHscMessage mod_graph = do
     modifySession $ \hsc_env -> hsc_env { hsc_mod_graph = mod_graph }
     guessOutputFile
     hsc_env <- getSession
@@ -621,7 +680,7 @@ load' cache how_much mHscMessage mod_graph = do
             | otherwise = do
                     liftIO $ errorMsg logger
                         (text "no such module:" <+> quotes (ppr (moduleUnit m) <> colon <> ppr (moduleName m)))
-                    return (Failed, [])
+                    return Failed
 
     checkHowMuch how_much $ do
 
@@ -642,6 +701,7 @@ load' cache how_much mHscMessage mod_graph = do
         build_plan = createBuildPlan mod_graph maybe_top_mod
 
 
+    cache <- liftIO $ maybe (return []) hmi_clearCache mhmi_cache
     let
         -- prune the HPT so everything is not retained when doing an
         -- upsweep.
@@ -668,10 +728,10 @@ load' cache how_much mHscMessage mod_graph = do
 
     setSession $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
     hsc_env <- getSession
-    (upsweep_ok, hsc_env1, new_cache) <- withDeferredDiagnostics $
-      liftIO $ upsweep n_jobs hsc_env mHscMessage (toCache pruned_cache) build_plan
+    (upsweep_ok, hsc_env1) <- withDeferredDiagnostics $
+      liftIO $ upsweep n_jobs hsc_env mhmi_cache mHscMessage (toCache pruned_cache) build_plan
     setSession hsc_env1
-    fmap (, new_cache) $ case upsweep_ok of
+    case upsweep_ok of
       Failed -> loadFinish upsweep_ok
       Succeeded -> do
           liftIO $ debugTraceMsg logger 2 (text "Upsweep completely successful.")
@@ -950,18 +1010,46 @@ type RunMakeM a = ReaderT MakeEnv (MaybeT IO) a
 -- if the module participates in a loop. This step also labels each node with a number for the output.
 -- See Note [Upsweep] for a high-level description.
 interpretBuildPlan :: HomeUnitGraph
+                   -> Maybe HomeModInfoCache
                    -> M.Map ModNodeKeyWithUid HomeModInfo
                    -> [BuildPlan]
                    -> IO ( Maybe [ModuleGraphNode] -- Is there an unresolved cycle
                          , [MakeAction] -- Actions we need to run in order to build everything
                          , IO [Maybe (Maybe HomeModInfo)]) -- An action to query to get all the built modules at the end.
-interpretBuildPlan hug old_hpt plan = do
+interpretBuildPlan hug mhmi_cache old_hpt plan = do
   hug_var <- newMVar hug
   ((mcycle, plans), build_map) <- runStateT (buildLoop plan) (BuildLoopState M.empty 1 hug_var)
-  return (mcycle, plans, collect_results (buildDep build_map))
+  wait <- collect_results (buildDep build_map)
+  return (mcycle, plans, wait)
 
   where
-    collect_results build_map = mapM (\(_doc, res_var) -> runMaybeT (waitResult res_var)) (M.elems build_map)
+    collect_results build_map = do
+      -- 1. On success, write the result to the cache, fork threads waiting for each result
+      -- so that the cache can be updated out of order, before we wait at the end for everything to
+      -- finish. We do this here rather than when we update the hug_var because we only ever
+      -- want to add things to the cache which are externally visible
+      -- (something which is hard to work out in the main loop).
+      waits <- mapM (\(_doc, res_var) -> collect_result res_var) (M.elems build_map)
+      -- 2. Block waiting for all to finish
+      return (sequence waits)
+
+    -- See Note [Caching HomeModInfo]
+    collect_result res_var = case mhmi_cache of
+      -- Avoid forking a new thread when there's no cache
+      Nothing -> return (runMaybeT (waitResult res_var))
+      Just hmi_cache -> do
+        -- Barrier used to ensure that we write to the cache before execution
+        -- continues.
+        barrier <- newEmptyMVar
+        forkIO (do
+           r <- runMaybeT (waitResult res_var)
+           case r of
+             Just (Just hmi) -> do
+               hmi_addToCache hmi_cache hmi
+             _ -> do
+               return ()
+           putMVar barrier r)
+        return (takeMVar barrier)
 
     n_mods = sum (map countMods plan)
 
@@ -1057,12 +1145,13 @@ withCurrentUnit uid = do
 upsweep
     :: Int -- ^ The number of workers we wish to run in parallel
     -> HscEnv -- ^ The base HscEnv, which is augmented for each module
+    -> Maybe HomeModInfoCache -- ^ A cache to incrementally write final interface files to
     -> Maybe Messager
     -> M.Map ModNodeKeyWithUid HomeModInfo
     -> [BuildPlan]
-    -> IO (SuccessFlag, HscEnv, [HomeModInfo])
-upsweep n_jobs hsc_env mHscMessage old_hpt build_plan = do
-    (cycle, pipelines, collect_result) <- interpretBuildPlan (hsc_HUG hsc_env) old_hpt build_plan
+    -> IO (SuccessFlag, HscEnv)
+upsweep n_jobs hsc_env hmi_cache mHscMessage old_hpt build_plan = do
+    (cycle, pipelines, collect_result) <- interpretBuildPlan (hsc_HUG hsc_env) hmi_cache old_hpt build_plan
     runPipelines n_jobs hsc_env mHscMessage pipelines
     res <- collect_result
 
@@ -1075,10 +1164,10 @@ upsweep n_jobs hsc_env mHscMessage old_hpt build_plan = do
         Just mss -> do
           let logger = hsc_logger hsc_env
           liftIO $ fatalErrorMsg logger (cyclicModuleErr mss)
-          return (Failed, hsc_env, completed)
+          return (Failed, hsc_env)
         Nothing  -> do
           let success_flag = successIf (all isJust res)
-          return (success_flag, hsc_env', completed)
+          return (success_flag, hsc_env')
 
 toCache :: [HomeModInfo] -> M.Map (ModNodeKeyWithUid) HomeModInfo
 toCache hmis = M.fromList ([(miKey $ hm_iface hmi, hmi) | hmi <- hmis])

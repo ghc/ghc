@@ -327,7 +327,7 @@ buildUnit session cid insts lunit = do
         mod_graph <- hsunitModuleGraph False (unLoc lunit)
 
         msg <- mkBackpackMsg
-        (ok, _) <- load' [] LoadAllTargets (Just msg) mod_graph
+        ok <- load' noHomeCache LoadAllTargets (Just msg) mod_graph
         when (failed ok) (liftIO $ exitWith (ExitFailure 1))
 
         let hi_dir = expectJust (panic "hiDir Backpack") $ hiDir dflags
@@ -416,7 +416,7 @@ compileExe lunit = do
     withBkpExeSession deps_w_rns $ do
         mod_graph <- hsunitModuleGraph True (unLoc lunit)
         msg <- mkBackpackMsg
-        (ok, _) <- load' [] LoadAllTargets (Just msg) mod_graph
+        ok <- load' noHomeCache LoadAllTargets (Just msg) mod_graph
         when (failed ok) (liftIO $ exitWith (ExitFailure 1))
 
 -- | Register a new virtual unit database containing a single unit
