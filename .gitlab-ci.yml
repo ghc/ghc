@@ -2,11 +2,11 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 885dfba7f74583d6a394dbf711cc805178cfcc47
+  DOCKER_REV: 0849567cd9780cc8e9652118b949cb050c632ef4
 
   # Sequential version number of all cached things.
   # Bump to invalidate GitLab CI cache.
-  CACHE_REV: 6
+  CACHE_REV: 8
 
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
@@ -342,7 +342,8 @@ stack-hadrian-build:
 
 .build-x86_64-linux-deb10-make:
   extends: .validate
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  # Sadly we cannot bootstrap the make build system with 9.2 due to #21188.
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:885dfba7f74583d6a394dbf711cc805178cfcc47"
   variables:
     TEST_ENV: "x86_64-linux-deb10-make"
     BUILD_FLAVOUR: "validate"
