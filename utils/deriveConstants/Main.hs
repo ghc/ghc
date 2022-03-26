@@ -814,7 +814,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                   , Just sym <- stripPrefix prefix sym0 = Just (sym, read n)
                   | otherwise = Nothing
                 where
-                  [sym0, _] = take 2 (reverse $ words l1)
+                  sym0 = head $ reverse $ words l1
 
           -- If an Int value is larger than 2^28 or smaller
           -- than -2^28, then fail.
