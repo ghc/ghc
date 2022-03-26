@@ -19,8 +19,6 @@ variables:
 
   GIT_SUBMODULE_STRATEGY: "recursive"
 
-  HACKAGE_INDEX_STATE: "2020-12-21T14:48:20Z"
-
   # Makes ci.sh isolate CABAL_DIR
   HERMETIC: "YES"
 
