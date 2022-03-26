@@ -673,7 +673,11 @@ gen_primop_list (Info _ entries)
         map (\p -> "   , " ++ cons p) rest
         ++
         [     "   ]"     ]
-     ) where (first:rest) = concatMap desugarVectorSpec (filter is_primop entries)
+     ) where
+         (first,rest) =
+           case concatMap desugarVectorSpec (filter is_primop entries) of
+             x:xs -> (x,xs)
+             [] -> error "gen_primop_list: no primops"
 
 mIN_VECTOR_UNIQUE :: Int
 mIN_VECTOR_UNIQUE = 300

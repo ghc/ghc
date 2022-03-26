@@ -135,7 +135,10 @@ prepareTree dest = do
         let ctx = Context stg pkg vanilla
             srcInputFile = dest -/- pkgPath pkg -/- inp
             generatedFile = dest -/- pkgPath pkg -/- out
-            Just builder = determineBuilder stg inp
+            builder =
+                case determineBuilder stg inp of
+                  Just builder -> builder
+                  Nothing -> error $ "Failed to determine builder for " ++ inp
 
         -- We first make sure that the generated file is... generated.
         build $ target ctx builder [srcInputFile] [generatedFile]

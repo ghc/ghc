@@ -622,12 +622,16 @@ dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mk
 
 
 checkNonStdWay :: DynFlags -> Interp -> SrcSpan -> IO (Maybe FilePath)
-checkNonStdWay dflags interp srcspan
+checkNonStdWay _dflags interp _srcspan
   | ExternalInterp {} <- interpInstance interp = return Nothing
     -- with -fexternal-interpreter we load the .o files, whatever way
     -- they were built.  If they were built for a non-std way, then
     -- we will use the appropriate variant of the iserv binary to load them.
 
+-- #if-guard the following equations otherwise the pattern match checker will
+-- complain that they are redundant.
+#if defined(HAVE_INTERNAL_INTERPRETER)
+checkNonStdWay dflags InternalInterp srcspan
   | hostFullWays == targetFullWays = return Nothing
     -- Only if we are compiling with the same ways as GHC is built
     -- with, can we dynamically load those object files. (see #3604)
@@ -642,8 +646,8 @@ checkNonStdWay dflags interp srcspan
                   "" -> ""
                   tag -> tag ++ "_"
 
-normalObjectSuffix :: String
-normalObjectSuffix = phaseInputExt StopLn
+    normalObjectSuffix :: String
+    normalObjectSuffix = phaseInputExt StopLn
 
 data Way' = Normal | Prof | Dyn
 
@@ -677,6 +681,7 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
             Normal -> "the normal way"
             Prof -> "with -prof"
             Dyn -> "with -dynamic"
+#endif
 
 getLinkDeps :: HscEnv
             -> LoaderState
