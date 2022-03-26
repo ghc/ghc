@@ -12,22 +12,21 @@ let
   happy = hsPkgs.happy;
   targetTriple = pkgs.stdenv.targetPlatform.config;
 
+  ghcBindists = let version = ghc.version; in {
+    aarch64-darwin = pkgs.fetchurl {
+      url = "https://downloads.haskell.org/ghc/${version}/ghc-${version}-aarch64-apple-darwin.tar.xz";
+      sha256 = "sha256:075skdnsa072088a8jfkqac7pphkgzlgqpspb8xa7ljzqg1ryinw";
+    };
+    x86_64-darwin = pkgs.fetchurl {
+      url = "https://downloads.haskell.org/ghc/${version}/ghc-${version}-x86_64-apple-darwin.tar.xz";
+      sha256 = "sha256:0ir02gjyb4l073z4gs3f1zjkx04n14dp7a5z4cqzbj9qqgwv0z98";
+    };
+  };
+
   ghc = pkgs.stdenv.mkDerivation rec {
     version = "8.10.7";
     name = "ghc";
-    src =
-      let
-        bindists = {
-          aarch64-darwin = {
-            url = "https://downloads.haskell.org/ghc/${version}/ghc-${version}-aarch64-apple-darwin.tar.xz";
-            sha256 = "sha256:075skdnsa072088a8jfkqac7pphkgzlgqpspb8xa7ljzqg1ryinw";
-          };
-          x86_64-darwin = {
-            url = "https://downloads.haskell.org/ghc/${version}/ghc-${version}-x86_64-apple-darwin.tar.xz";
-            sha256 = "sha256:0ir02gjyb4l073z4gs3f1zjkx04n14dp7a5z4cqzbj9qqgwv0z98";
-          };
-        };
-      in pkgs.fetchurl bindists.${pkgs.stdenv.hostPlatform.system};
+    src = ghcBindists.${pkgs.stdenv.hostPlatform.system};
     configureFlags = [
       "CC=/usr/bin/clang"
       "CLANG=/usr/bin/clang"
