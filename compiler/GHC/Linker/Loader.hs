@@ -631,7 +631,7 @@ checkNonStdWay _dflags interp _srcspan
 -- #if-guard the following equations otherwise the pattern match checker will
 -- complain that they are redundant.
 #if defined(HAVE_INTERNAL_INTERPRETER)
-checkNonStdWay dflags InternalInterp srcspan
+checkNonStdWay dflags _interp srcspan
   | hostFullWays == targetFullWays = return Nothing
     -- Only if we are compiling with the same ways as GHC is built
     -- with, can we dynamically load those object files. (see #3604)
