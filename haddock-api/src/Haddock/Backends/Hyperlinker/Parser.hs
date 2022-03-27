@@ -269,6 +269,7 @@ classify tok =
     ITequal                -> TkGlyph
     ITlam                  -> TkGlyph
     ITlcase                -> TkGlyph
+    ITlcases               -> TkGlyph
     ITvbar                 -> TkGlyph
     ITlarrow            {} -> TkGlyph
     ITrarrow            {} -> TkGlyph
