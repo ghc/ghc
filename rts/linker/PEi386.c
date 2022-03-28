@@ -537,7 +537,7 @@ COFF_OBJ_TYPE getObjectType ( char* image, pathchar* fileName )
  *************/
 COFF_HEADER_INFO* getHeaderInfo ( ObjectCode* oc )
 {
-   COFF_OBJ_TYPE coff_type = getObjectType (oc->image, oc->fileName);
+   COFF_OBJ_TYPE coff_type = getObjectType (oc->image, OC_INFORMATIVE_FILENAME(oc));
 
    COFF_HEADER_INFO* info
      = stgMallocBytes (sizeof(COFF_HEADER_INFO), "getHeaderInfo");
