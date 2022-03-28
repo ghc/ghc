@@ -96,6 +96,7 @@ initSettings top_dir = do
   ldSupportsBuildId       <- getBooleanSetting "ld supports build-id"
   ldSupportsFilelist      <- getBooleanSetting "ld supports filelist"
   ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
+  arSupportsDashL         <- getBooleanSetting "ar supports -L"
 
   let globalpkgdb_path = installed "package.conf.d"
       ghc_usage_msg_path  = installed "ghc-usage.txt"
@@ -167,6 +168,7 @@ initSettings top_dir = do
       , toolSettings_ldIsGnuLd               = ldIsGnuLd
       , toolSettings_ccSupportsNoPie         = gccSupportsNoPie
       , toolSettings_useInplaceMinGW         = useInplaceMinGW
+      , toolSettings_arSupportsDashL         = arSupportsDashL
 
       , toolSettings_pgm_L   = unlit_path
       , toolSettings_pgm_P   = (cpp_prog, cpp_args)

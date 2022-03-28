@@ -23,6 +23,7 @@ module GHC.Settings
   , sLdIsGnuLd
   , sGccSupportsNoPie
   , sUseInplaceMinGW
+  , sArSupportsDashL
   , sPgm_L
   , sPgm_P
   , sPgm_F
@@ -91,6 +92,7 @@ data ToolSettings = ToolSettings
   , toolSettings_ldIsGnuLd               :: Bool
   , toolSettings_ccSupportsNoPie         :: Bool
   , toolSettings_useInplaceMinGW         :: Bool
+  , toolSettings_arSupportsDashL         :: Bool
 
   -- commands for particular phases
   , toolSettings_pgm_L       :: String
@@ -197,6 +199,8 @@ sGccSupportsNoPie :: Settings -> Bool
 sGccSupportsNoPie = toolSettings_ccSupportsNoPie . sToolSettings
 sUseInplaceMinGW :: Settings -> Bool
 sUseInplaceMinGW = toolSettings_useInplaceMinGW . sToolSettings
+sArSupportsDashL :: Settings -> Bool
+sArSupportsDashL = toolSettings_arSupportsDashL . sToolSettings
 
 sPgm_L :: Settings -> String
 sPgm_L = toolSettings_pgm_L . sToolSettings

@@ -1179,8 +1179,10 @@ joinObjectFiles hsc_env o_files output_fn
 
   | otherwise = do
   withAtomicRename output_fn $ \tmp_ar ->
-      liftIO $ runAr logger dflags Nothing $ map Option $ ["rc", tmp_ar] ++ o_files
+      liftIO $ runAr logger dflags Nothing $ map Option $ ["qc" ++ dashL, tmp_ar] ++ o_files
   where
+    dashLSupported = sArSupportsDashL (settings dflags)
+    dashL = if dashLSupported then "L" else ""
     can_merge_objs = isJust (pgm_lm (hsc_dflags hsc_env))
     dflags = hsc_dflags hsc_env
     tmpfs = hsc_tmpfs hsc_env
