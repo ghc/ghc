@@ -60,6 +60,9 @@ Language
 Compiler
 ~~~~~~~~
 
+- The compiler now accepts arguments via GNU-style response files
+  (:ghc-ticket:`16476`).
+
 - New :ghc-flag:`-Wredundant-strictness-flags` that checks for strictness flags
   (``!``) applied to unlifted types, which are always strict.
 

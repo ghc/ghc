@@ -560,10 +560,9 @@ parseModeFlags :: [Located String]
                       [Located String],
                       [Warn])
 parseModeFlags args = do
-  let ((leftover, errs1, warns), (mModeFlag, units, errs2, flags')) =
-          runCmdLine (processArgs mode_flags args)
-                     (Nothing, [], [], [])
-      mode = case mModeFlag of
+  ((leftover, errs1, warns), (mModeFlag, units, errs2, flags')) <-
+        processCmdLineP mode_flags (Nothing, [], [], []) args
+  let mode = case mModeFlag of
              Nothing     -> doMakeMode
              Just (m, _) -> m
 

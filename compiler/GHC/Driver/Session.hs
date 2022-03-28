@@ -160,6 +160,11 @@ module GHC.Driver.Session (
         impliedOffGFlags,
         impliedXFlags,
 
+        -- ** State
+        CmdLineP(..), runCmdLineP,
+        getCmdLineState, putCmdLineState,
+        processCmdLineP,
+
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
         parseDynamicFilePragma,
@@ -262,6 +267,8 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Except
+import Control.Monad.Trans.State as State
+import Data.Functor.Identity
 
 import Data.Ord
 import Data.Char
@@ -1864,20 +1871,56 @@ parseDynamicFilePragma :: MonadIO m => DynFlags -> [Located String]
                           -- list of warnings.
 parseDynamicFilePragma = parseDynamicFlagsFull flagsDynamic False
 
+newtype CmdLineP s a = CmdLineP (forall m. (Monad m) => StateT s m a)
+
+instance Monad (CmdLineP s) where
+    CmdLineP k >>= f = CmdLineP (k >>= \x -> case f x of CmdLineP g -> g)
+    return = pure
+
+instance Applicative (CmdLineP s) where
+    pure x = CmdLineP (pure x)
+    (<*>) = ap
+
+instance Functor (CmdLineP s) where
+    fmap f (CmdLineP k) = CmdLineP (fmap f k)
+
+getCmdLineState :: CmdLineP s s
+getCmdLineState = CmdLineP State.get
+
+putCmdLineState :: s -> CmdLineP s ()
+putCmdLineState x = CmdLineP (State.put x)
+
+runCmdLineP :: CmdLineP s a -> s -> (a, s)
+runCmdLineP (CmdLineP k) s0 = runIdentity $ runStateT k s0
+
+-- | A helper to parse a set of flags from a list of command-line arguments, handling
+-- response files.
+processCmdLineP
+    :: forall s m. MonadIO m
+    => [Flag (CmdLineP s)]  -- ^ valid flags to match against
+    -> s                    -- ^ current state
+    -> [Located String]     -- ^ arguments to parse
+    -> m (([Located String], [Err], [Warn]), s)
+                            -- ^ (leftovers, errors, warnings)
+processCmdLineP activeFlags s0 args =
+    runStateT (processArgs (map (hoistFlag getCmdLineP) activeFlags) args parseResponseFile) s0
+  where
+    getCmdLineP :: CmdLineP s a -> StateT s m a
+    getCmdLineP (CmdLineP k) = k
 
 -- | Parses the dynamically set flags for GHC. This is the most general form of
 -- the dynamic flag parser that the other methods simply wrap. It allows
 -- saying which flags are valid flags and indicating if we are parsing
 -- arguments from the command line or from a file pragma.
-parseDynamicFlagsFull :: MonadIO m
-                  => [Flag (CmdLineP DynFlags)]    -- ^ valid flags to match against
-                  -> Bool                          -- ^ are the arguments from the command line?
-                  -> DynFlags                      -- ^ current dynamic flags
-                  -> [Located String]              -- ^ arguments to parse
-                  -> m (DynFlags, [Located String], [Warn])
+parseDynamicFlagsFull
+    :: forall m. MonadIO m
+    => [Flag (CmdLineP DynFlags)]    -- ^ valid flags to match against
+    -> Bool                          -- ^ are the arguments from the command line?
+    -> DynFlags                      -- ^ current dynamic flags
+    -> [Located String]              -- ^ arguments to parse
+    -> m (DynFlags, [Located String], [Warn])
 parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
-  let ((leftover, errs, warns), dflags1)
-          = runCmdLine (processArgs activeFlags args) dflags0
+  ((leftover, errs, warns), dflags1) <- processCmdLineP activeFlags dflags0 args
 
   -- See Note [Handling errors when parsing command-line flags]
   let rdr = renderWithContext (initSDocContext dflags0 defaultUserStyle)
