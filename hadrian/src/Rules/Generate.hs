@@ -311,6 +311,7 @@ generateSettings = do
         , ("ar command", expr $ settingsFileSetting SettingsFileSetting_ArCommand)
         , ("ar flags", expr $ lookupSystemConfig "ar-args")
         , ("ar supports at file", expr $ yesNo <$> flag ArSupportsAtFile)
+        , ("ar supports -L", expr $ yesNo <$> flag ArSupportsDashL)
         , ("ranlib command", expr $ settingsFileSetting SettingsFileSetting_RanlibCommand)
         , ("otool command", expr $ settingsFileSetting SettingsFileSetting_OtoolCommand)
         , ("install_name_tool command", expr $ settingsFileSetting SettingsFileSetting_InstallNameToolCommand)

@@ -682,6 +682,7 @@ endif
 AR			= @ArCmd@
 AR_OPTS			= @ArArgs@
 ArSupportsAtFile = @ArSupportsAtFile@
+ArSupportsDashL  = @ArSupportsDashL@
 
 AR_STAGE0 = @AR_STAGE0@
 AR_STAGE1 = $(AR)

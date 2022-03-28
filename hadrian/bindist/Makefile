@@ -121,6 +121,7 @@ lib/settings :
 	@echo ',("ar command", "$(SettingsArCommand)")' >> $@
 	@echo ',("ar flags", "$(ArArgs)")' >> $@
 	@echo ',("ar supports at file", "$(ArSupportsAtFile)")' >> $@
+	@echo ',("ar supports -L", "$(ArSupportsDashL)")' >> $@
 	@echo ',("ranlib command", "$(SettingsRanlibCommand)")' >> $@
 	@echo ',("otool command", "$(SettingsOtoolCommand)")' >> $@
 	@echo ',("install_name_tool command", "$(SettingsInstallNameToolCommand)")' >> $@
