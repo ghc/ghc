@@ -85,6 +85,17 @@ all files; you cannot, for example, invoke
 ``ghc -c -O1 Foo.hs -O2 Bar.hs`` to apply different optimisation levels
 to the files ``Foo.hs`` and ``Bar.hs``.
 
+In addition to passing arguments via the command-line, arguments can be passed
+via GNU-style response files. For instance,
+
+.. code-block:: bash
+
+    $ cat response-file
+    -O1
+    Hello.hs
+    -o Hello
+    $ ghc @response-file
+
 .. note::
 
     .. index::

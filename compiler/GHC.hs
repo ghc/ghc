@@ -1900,7 +1900,7 @@ interpretPackageEnv logger dflags = do
       Just envfile -> do
         content <- readFile envfile
         compilationProgressMsg logger (text "Loaded package environment from " <> text envfile)
-        let (_, dflags') = runCmdLine (runEwM (setFlagsFromEnvFile envfile content)) dflags
+        let (_, dflags') = runCmdLineP (runEwM (setFlagsFromEnvFile envfile content)) dflags
 
         return dflags'
   where
