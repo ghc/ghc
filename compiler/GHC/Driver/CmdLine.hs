@@ -1,5 +1,4 @@
-
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE RankNTypes #-}
 
 -------------------------------------------------------------------------------
 --
@@ -13,9 +12,8 @@
 
 module GHC.Driver.CmdLine
     (
-      processArgs, OptKind(..), GhcFlagMode(..),
-      CmdLineP(..), getCmdLineState, putCmdLineState,
-      Flag(..), defFlag, defGhcFlag, defGhciFlag, defHiddenFlag,
+      processArgs, parseResponseFile, OptKind(..), GhcFlagMode(..),
+      Flag(..), defFlag, defGhcFlag, defGhciFlag, defHiddenFlag, hoistFlag,
       errorsToGhcException,
 
       Err(..), Warn(..), WarnReason(..),
@@ -38,7 +36,10 @@ import GHC.Types.Error ( DiagnosticReason(..) )
 import Data.Function
 import Data.List (sortBy, intercalate, stripPrefix)
 
+import GHC.ResponseFile
+import Control.Exception (IOException, catch)
 import Control.Monad (liftM, ap)
+import Control.Monad.IO.Class
 
 --------------------------------------------------------
 --         The Flag and OptKind types
@@ -61,6 +62,24 @@ defGhciFlag name optKind = Flag name optKind OnlyGhci
 
 defHiddenFlag :: String -> OptKind m -> Flag m
 defHiddenFlag name optKind = Flag name optKind HiddenFlag
+
+hoistFlag :: forall m n. (forall a. m a -> n a) -> Flag m -> Flag n
+hoistFlag f (Flag a b c) = Flag a (go b) c
+  where
+      go (NoArg k)  = NoArg (go2 k)
+      go (HasArg k) = HasArg (\s -> go2 (k s))
+      go (SepArg k) = SepArg (\s -> go2 (k s))
+      go (Prefix k) = Prefix (\s -> go2 (k s))
+      go (OptPrefix k) = OptPrefix (\s -> go2 (k s))
+      go (OptIntSuffix k) = OptIntSuffix (\n -> go2 (k n))
+      go (IntSuffix k) = IntSuffix (\n -> go2 (k n))
+      go (WordSuffix k) = WordSuffix (\s -> go2 (k s))
+      go (FloatSuffix k) = FloatSuffix (\s -> go2 (k s))
+      go (PassFlag k) = PassFlag (\s -> go2 (k s))
+      go (AnySuffix k) = AnySuffix (\s -> go2 (k s))
+
+      go2 :: EwM m a -> EwM n a
+      go2 (EwM g) = EwM $ \loc es ws -> f (g loc es ws)
 
 -- | GHC flag modes describing when a flag has an effect.
 data GhcFlagMode
@@ -130,6 +149,8 @@ instance Monad m => Applicative (EwM m) where
 instance Monad m => Monad (EwM m) where
     (EwM f) >>= k = EwM (\l e w -> do (e', w', r) <- f l e w
                                       unEwM (k r) l e' w')
+instance MonadIO m => MonadIO (EwM m) where
+    liftIO = liftEwM . liftIO
 
 runEwM :: EwM m a -> m (Errs, Warns, a)
 runEwM action = unEwM action (panic "processArgs: no arg yet") emptyBag emptyBag
@@ -158,40 +179,17 @@ liftEwM action = EwM (\_ es ws -> do { r <- action; return (es, ws, r) })
 
 
 --------------------------------------------------------
--- A state monad for use in the command-line parser
---------------------------------------------------------
-
--- (CmdLineP s) typically instantiates the 'm' in (EwM m) and (OptKind m)
-newtype CmdLineP s a = CmdLineP { runCmdLine :: s -> (a, s) }
-    deriving (Functor)
-
-instance Applicative (CmdLineP s) where
-    pure a = CmdLineP $ \s -> (a, s)
-    (<*>) = ap
-
-instance Monad (CmdLineP s) where
-    m >>= k = CmdLineP $ \s ->
-                  let (a, s') = runCmdLine m s
-                  in runCmdLine (k a) s'
-
-
-getCmdLineState :: CmdLineP s s
-getCmdLineState   = CmdLineP $ \s -> (s,s)
-putCmdLineState :: s -> CmdLineP s ()
-putCmdLineState s = CmdLineP $ \_ -> ((),s)
-
-
---------------------------------------------------------
 --         Processing arguments
 --------------------------------------------------------
 
 processArgs :: Monad m
-            => [Flag m]               -- cmdline parser spec
-            -> [Located String]       -- args
+            => [Flag m]               -- ^ cmdline parser spec
+            -> [Located String]       -- ^ args
+            -> (FilePath -> EwM m [Located String]) -- ^ response file handler
             -> m ( [Located String],  -- spare args
                    [Err],  -- errors
                    [Warn] ) -- warnings
-processArgs spec args = do
+processArgs spec args handleRespFile = do
     (errs, warns, spare) <- runEwM action
     return (spare, bagToList errs, bagToList warns)
   where
@@ -199,6 +197,10 @@ processArgs spec args = do
 
     -- process :: [Located String] -> [Located String] -> EwM m [Located String]
     process [] spare = return (reverse spare)
+
+    process (L _ ('@' : resp_file) : args) spare = do
+        resp_args <- handleRespFile resp_file
+        process (resp_args ++ args) spare
 
     process (locArg@(L _ ('-' : arg)) : args) spare =
         case findArg spec arg of
@@ -319,6 +321,14 @@ missingArgErr f = Left ("missing argument for flag: " ++ f)
 -- Utils
 --------------------------------------------------------
 
+-- | Parse a response file into arguments.
+parseResponseFile :: MonadIO m => FilePath -> EwM m [Located String]
+parseResponseFile path = do
+  res <- liftIO $ fmap Right (readFile path) `catch`
+    \(e :: IOException) -> pure (Left e)
+  case res of
+    Left _err -> addErr "Could not open response file" >> return []
+    Right resp_file -> return $ map (mkGeneralLocated path) (unescapeArgs resp_file)
 
 -- See Note [Handling errors when parsing command-line flags]
 errorsToGhcException :: [(String,    -- Location
