@@ -1,0 +1,29 @@
+
+T21306.hs:23:15: error:
+    • Couldn't match type ‘xs’ with ‘xs1’
+      Expected: EqualLists xs xs2
+        Actual: EqualLists xs1 ys
+      ‘xs’ is a rigid type variable bound by
+        a pattern with constructor:
+          Cons :: forall x xs. x -> HList xs -> HList (x, xs),
+        in an equation for ‘foo’
+        at T21306.hs:21:23-45
+      ‘xs1’ is a rigid type variable bound by
+        a pattern with constructor:
+          ConsRefl :: forall xs ys x.
+                      EqualLists xs ys -> EqualLists (x, xs) (x, ys),
+        in an equation for ‘foo’
+        at T21306.hs:21:6-19
+    • In the first argument of ‘foo’, namely ‘equal’
+      In the expression: foo equal xs ys
+      In an equation for ‘k’: k = foo equal xs ys
+    • Relevant bindings include
+        k :: Foo xs d -> Foo xs2 d (bound at T21306.hs:23:7)
+        xs :: HList xs (bound at T21306.hs:21:31)
+        equal :: EqualLists xs1 ys (bound at T21306.hs:21:15)
+
+T21306.hs:25:5: error:
+    • The constructor ‘Foo’ should have 2 arguments, but has been given 1
+    • In the pattern: Foo bar
+      In a case alternative: Foo bar -> Foo bar $ k foo
+      In the expression: case f of Foo bar -> Foo bar $ k foo
