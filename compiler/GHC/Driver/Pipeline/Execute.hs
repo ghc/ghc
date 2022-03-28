@@ -996,7 +996,7 @@ doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
 
     -- MIN_VERSION macros
     let uids = explicitUnits unit_state
-        pkgs = catMaybes (map (lookupUnit unit_state) uids)
+        pkgs = mapMaybe (lookupUnit unit_state . fst) uids
     mb_macro_include <-
         if not (null pkgs) && gopt Opt_VersionMacros dflags
             then do macro_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "h"

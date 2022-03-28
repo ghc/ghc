@@ -264,7 +264,7 @@ instantiationNodes uid unit_state = InstantiationNode uid <$> iuids_to_check
   where
     iuids_to_check :: [InstantiatedUnit]
     iuids_to_check =
-      nubSort $ concatMap goUnitId (explicitUnits unit_state)
+      nubSort $ concatMap (goUnitId . fst) (explicitUnits unit_state)
      where
       goUnitId uid =
         [ recur
@@ -460,39 +460,24 @@ warnUnusedPackages us dflags mod_graph =
             $ concatMap ms_imps (
               filter (\ms -> homeUnitId_ dflags == ms_unitid ms) (mgModSummaries mod_graph))
 
-        requestedArgs = mapMaybe packageArg (packageFlags dflags)
+        used_args = Set.fromList $ map unitId loadedPackages
 
-        unusedArgs
-          = filter (\arg -> not $ any (matching us arg) loadedPackages)
-                   requestedArgs
+        resolve (u,mflag) = do
+                  -- The units which we depend on via the command line explicitly
+                  flag <- mflag
+                  -- Which we can find the UnitInfo for (should be all of them)
+                  ui <- lookupUnit us u
+                  -- Which are not explicitly used
+                  guard (Set.notMember (unitId ui) used_args)
+                  return (unitId ui, unitPackageName ui, unitPackageVersion ui, flag)
+
+        unusedArgs = mapMaybe resolve (explicitUnits us)
 
         warn = singleMessage $ mkPlainMsgEnvelope diag_opts noSrcSpan (DriverUnusedPackages unusedArgs)
 
     in if null unusedArgs
         then emptyMessages
         else warn
-
-    where
-        packageArg (ExposePackage _ arg _) = Just arg
-        packageArg _ = Nothing
-
-        matchingStr :: String -> UnitInfo -> Bool
-        matchingStr str p
-                =  str == unitPackageIdString p
-                || str == unitPackageNameString p
-
-        matching :: UnitState -> PackageArg -> UnitInfo -> Bool
-        matching _ (PackageArg str) p = matchingStr str p
-        matching state (UnitIdArg uid) p = uid == realUnit state p
-
-        -- For wired-in packages, we have to unwire their id,
-        -- otherwise they won't match package flags
-        realUnit :: UnitState -> UnitInfo -> Unit
-        realUnit state
-          = unwireUnit state
-          . RealUnit
-          . Definite
-          . unitId
 
 
 -- | A ModuleGraphNode which also has a hs-boot file, and the list of nodes on any

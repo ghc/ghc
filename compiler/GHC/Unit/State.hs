@@ -119,6 +119,7 @@ import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
 import qualified Data.Set as Set
 import GHC.LanguageExtensions
+import Control.Applicative
 
 -- ---------------------------------------------------------------------------
 -- The Unit state
@@ -276,7 +277,7 @@ data UnitVisibility = UnitVisibility
     , uv_requirements :: Map ModuleName (Set InstantiatedModule)
       -- ^ The signatures which are contributed to the requirements context
       -- from this unit ID.
-    , uv_explicit :: Bool
+    , uv_explicit :: Maybe PackageArg
       -- ^ Whether or not this unit was explicitly brought into scope,
       -- as opposed to implicitly via the 'exposed' fields in the
       -- package database (when @-hide-all-packages@ is not passed.)
@@ -298,7 +299,7 @@ instance Semigroup UnitVisibility where
           , uv_renamings = uv_renamings uv1 ++ uv_renamings uv2
           , uv_package_name = mappend (uv_package_name uv1) (uv_package_name uv2)
           , uv_requirements = Map.unionWith Set.union (uv_requirements uv1) (uv_requirements uv2)
-          , uv_explicit = uv_explicit uv1 || uv_explicit uv2
+          , uv_explicit = uv_explicit uv1 <|> uv_explicit uv2
           }
 
 instance Monoid UnitVisibility where
@@ -307,7 +308,7 @@ instance Monoid UnitVisibility where
              , uv_renamings = []
              , uv_package_name = First Nothing
              , uv_requirements = Map.empty
-             , uv_explicit = False
+             , uv_explicit = Nothing
              }
     mappend = (Semigroup.<>)
 
@@ -441,8 +442,10 @@ data UnitState = UnitState {
   preloadUnits      :: [UnitId],
 
   -- | Units which we explicitly depend on (from a command line flag).
-  -- We'll use this to generate version macros.
-  explicitUnits      :: [Unit],
+  -- We'll use this to generate version macros and the unused packages warning. The
+  -- original flag which was used to bring the unit into scope is recorded for the
+  -- -Wunused-packages warning.
+  explicitUnits :: [(Unit, Maybe PackageArg)],
 
   homeUnitDepends    :: [UnitId],
 
@@ -909,7 +912,7 @@ applyPackageFlag prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
                 , uv_renamings = rns
                 , uv_package_name = First (Just n)
                 , uv_requirements = reqs
-                , uv_explicit = True
+                , uv_explicit = Just arg
                 }
            vm' = Map.insertWith mappend (mkUnit p) uv vm_cleared
            -- In the old days, if you said `ghc -package p-0.1 -package p-0.2`
@@ -1573,7 +1576,7 @@ mkUnitState logger cfg = do
                                                  uv_renamings = [],
                                                  uv_package_name = First (Just (fsPackageName p)),
                                                  uv_requirements = Map.empty,
-                                                 uv_explicit = False
+                                                 uv_explicit = Nothing
                                                }
                                                vm
                                else vm)
@@ -1636,7 +1639,7 @@ mkUnitState logger cfg = do
   -- The requirement context is directly based off of this: we simply
   -- look for nested unit IDs that are directly fed holes: the requirements
   -- of those units are precisely the ones we need to track
-  let explicit_pkgs = Map.keys vis_map
+  let explicit_pkgs = [(k, uv_explicit v) | (k, v) <- Map.toList vis_map]
       req_ctx = Map.map (Set.toList)
               $ Map.unionsWith Set.union (map uv_requirements (Map.elems vis_map))
 
@@ -1651,7 +1654,7 @@ mkUnitState logger cfg = do
   -- NB: preload IS important even for type-checking, because we
   -- need the correct include path to be set.
   --
-  let preload1 = Map.keys (Map.filter uv_explicit vis_map)
+  let preload1 = Map.keys (Map.filter (isJust . uv_explicit) vis_map)
 
       -- add default preload units if they can be found in the db
       basicLinkedUnits = fmap (RealUnit . Definite)

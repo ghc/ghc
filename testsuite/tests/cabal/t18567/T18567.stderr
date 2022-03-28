@@ -2,4 +2,4 @@
 <no location info>: warning: [-Wunused-packages]
     The following packages were specified via -package or -package-id flags,
     but were not needed for compilation:
-      - internal-lib-0.1.0.0-1ShKL1eXB3aGPfTSujH0Bv-sublib-unused
+      - internal-lib-0.1.0.0 (exposed by flag -package-id internal-lib-0.1.0.0-1ShKL1eXB3aGPfTSujH0Bv-sublib-unused)

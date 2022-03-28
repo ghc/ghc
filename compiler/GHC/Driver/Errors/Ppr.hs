@@ -19,6 +19,7 @@ import GHC.Unit.Module
 import GHC.Unit.State
 import GHC.Types.Hint
 import GHC.Types.SrcLoc
+import Data.Version
 
 import Language.Haskell.Syntax.Decls (RuleDecl(..))
 
@@ -104,16 +105,23 @@ instance Diagnostic DriverMessage where
       -> let msg = vcat [ text "The following packages were specified" <+>
                           text "via -package or -package-id flags,"
                         , text "but were not needed for compilation:"
-                        , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs))
+                        , nest 2 (vcat (map (withDash . displayOneUnused) unusedArgs))
                         ]
          in mkSimpleDecorated msg
          where
             withDash :: SDoc -> SDoc
             withDash = (<+>) (text "-")
 
+            displayOneUnused (_uid, pn , v, f) =
+              ppr pn <> text "-"  <> text (showVersion v)
+                     <+> parens (suffix f)
+
+            suffix f = text "exposed by flag" <+> pprUnusedArg f
+
             pprUnusedArg :: PackageArg -> SDoc
-            pprUnusedArg (PackageArg str) = text str
-            pprUnusedArg (UnitIdArg uid) = ppr uid
+            pprUnusedArg (PackageArg str) = text "-package" <+> text str
+            pprUnusedArg (UnitIdArg uid) = text "-package-id" <+> ppr uid
+
     DriverUnnecessarySourceImports mod
       -> mkSimpleDecorated (text "{-# SOURCE #-} unnecessary in import of " <+> quotes (ppr mod))
     DriverDuplicatedModuleDeclaration mod files
