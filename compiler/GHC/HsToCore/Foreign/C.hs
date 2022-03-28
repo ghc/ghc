@@ -62,7 +62,7 @@ import GHC.Utils.Encoding
 import Data.Maybe
 import Data.List (nub)
 
-dsCFExport:: Id                 -- Either the exported Id,
+dsCFExport :: Id                -- Either the exported Id,
                                 -- or the foreign-export-dynamic constructor
           -> Coercion           -- Coercion between the Haskell type callable
                                 -- from C, and its representation type
@@ -76,7 +76,6 @@ dsCFExport:: Id                 -- Either the exported Id,
                  , String       -- string describing type to pass to createAdj.
                  , Int          -- size of args to stub function
                  )
-
 dsCFExport fn_id co ext_name cconv isDyn = do
     let
        ty                     = coercionRKind co
@@ -624,4 +623,3 @@ fun_type_arg_stdcall_info platform StdCallConv ty
     in Just $ sum (map (widthInBytes . typeWidth . typeCmmType platform . getPrimTyOf) fe_arg_tys)
 fun_type_arg_stdcall_info _ _other_conv _
   = Nothing
-

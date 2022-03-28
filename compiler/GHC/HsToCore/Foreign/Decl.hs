@@ -20,6 +20,7 @@ import GHC.Prelude
 import GHC.Tc.Utils.Monad        -- temp
 
 import GHC.HsToCore.Foreign.C
+import GHC.HsToCore.Foreign.JavaScript
 import GHC.HsToCore.Foreign.Utils
 import GHC.HsToCore.Monad
 
@@ -38,6 +39,7 @@ import GHC.Platform
 import GHC.Data.OrdList
 import GHC.Utils.Panic
 import GHC.Driver.Hooks
+import GHC.Unit.Module
 
 import Data.List (unzip4)
 
@@ -129,7 +131,9 @@ dsFImport :: Id
           -> ForeignImport
           -> DsM ([Binding], CHeader, CStub)
 dsFImport id co (CImport cconv safety mHeader spec _) =
-    dsCImport id co spec (unLoc cconv) (unLoc safety) mHeader
+  case unLoc cconv of
+    JavaScriptCallConv -> dsJsImport id co spec (unLoc cconv) (unLoc safety) mHeader
+    _                  -> dsCImport  id co spec (unLoc cconv) (unLoc safety) mHeader
 
 {-
 ************************************************************************
@@ -165,9 +169,44 @@ dsFExport :: Id                 -- Either the exported Id,
                  , Int          -- size of args to stub function
                  )
 dsFExport fn_id co ext_name cconv is_dyn = case cconv of
-  JavaScriptCallConv -> panic "dsFExport: JavaScript foreign exports not supported yet"
+  JavaScriptCallConv -> dsJsFExport fn_id co ext_name cconv is_dyn
   _                  -> dsCFExport  fn_id co ext_name cconv is_dyn
 
+{-
+@foreign import "wrapper"@ (previously "foreign export dynamic") lets
+you dress up Haskell IO actions of some fixed type behind an
+externally callable interface (i.e., as a C function pointer). Useful
+for callbacks and stuff.
+
+\begin{verbatim}
+type Fun = Bool -> Int -> IO Int
+foreign import "wrapper" f :: Fun -> IO (FunPtr Fun)
+
+-- Haskell-visible constructor, which is generated from the above:
+-- SUP: No check for NULL from createAdjustor anymore???
+
+f :: Fun -> IO (FunPtr Fun)
+f cback =
+   bindIO (newStablePtr cback)
+          (\StablePtr sp# -> IO (\s1# ->
+              case _ccall_ createAdjustor cconv sp# ``f_helper'' <arg info> s1# of
+                 (# s2#, a# #) -> (# s2#, A# a# #)))
+
+foreign import "&f_helper" f_helper :: FunPtr (StablePtr Fun -> Fun)
+
+-- and the helper in C: (approximately; see `mkFExportCBits` below)
+
+f_helper(StablePtr s, HsBool b, HsInt i)
+{
+        Capability *cap;
+        cap = rts_lock();
+        rts_inCall(&cap,
+                   rts_apply(rts_apply(deRefStablePtr(s),
+                                       rts_mkBool(b)), rts_mkInt(i)));
+        rts_unlock(cap);
+}
+\end{verbatim}
+-}
 
 foreignExportsInitialiser :: Platform -> Module -> [Id] -> CStub
 foreignExportsInitialiser _        _   []     = mempty
@@ -198,4 +237,3 @@ foreignExportsInitialiser platform mod hs_fns =
 
     closure_ptr :: Id -> SDoc
     closure_ptr fn = text "(StgPtr) &" <> ppr fn <> text "_closure"
-

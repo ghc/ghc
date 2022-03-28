@@ -2899,7 +2899,7 @@ dynamic_flags_deps = [
          (deprecate $ "The -fvia-C flag does nothing; " ++
                       "it will be removed in a future GHC release"))
   , make_ord_flag defGhcFlag "fllvm"            (NoArg (setObjBackend llvmBackend))
-  , make_ord_flag defGhcFlag "fjavascript"      (NoArg (upd $ \dfs -> dfs { backend = JavaScript}))
+  , make_ord_flag defGhcFlag "fjavascript"      (NoArg (upd enableJavaScript))
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
                   d { ghcLink=NoLink }) >> setBackend noBackend))
@@ -5068,3 +5068,37 @@ updatePlatformConstants dflags mconstants = do
   let platform1 = (targetPlatform dflags) { platform_constants = mconstants }
   let dflags1   = dflags { targetPlatform = platform1 }
   return dflags1
+
+
+-- | Enable the JavaScript backend and overrides the target platform with a JS
+-- one.
+--
+-- FIXME: This will need to done differently. Instead of passing -fjavascript to
+-- enable the JS backend, compiler's settings will define the architecture of
+-- the target platform as ArchJavaScript and the default backend will be
+-- JavaScript.
+enableJavaScript :: DynFlags -> DynFlags
+enableJavaScript dflags = dflags
+  { backend        = JavaScript
+  , targetPlatform = jsPlatform
+  }
+
+jsPlatform :: Platform
+jsPlatform = Platform
+  { platformArchOS                   = ArchOS ArchJavaScript OSUnknown
+  , platformWordSize                 = PW8 -- FIXME: should be PW4 but then we can't load "base"
+                                           -- for dirty tests (i.e. loading
+                                           -- interfaces for the original non-JS target
+                                           -- platform)
+  , platformByteOrder                = LittleEndian
+  , platformUnregisterised           = False
+  , platformHasGnuNonexecStack       = False
+  , platformHasIdentDirective        = False
+  , platformHasSubsectionsViaSymbols = False
+  , platformIsCrossCompiling         = True
+  , platformLeadingUnderscore        = False
+  , platformTablesNextToCode         = False
+  , platformHasLibm                  = False
+  , platform_constants               = Nothing
+  }
+

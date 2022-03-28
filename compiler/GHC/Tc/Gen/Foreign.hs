@@ -323,6 +323,10 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       -- prim import result is more liberal, allows (#,,#)
       checkForeignRes nonIOok checkSafe (isFFIPrimResultTy dflags) res_ty
       return idecl
+  | cconv == JavaScriptCallConv = do
+      checkCg (Right idecl) backendValidityOfCImport
+      -- leave the rest to the JS backend (at least for now)
+      return idecl
   | otherwise = do              -- Normal foreign import
       checkCg (Right idecl) backendValidityOfCImport
       cconv' <- checkCConv (Right idecl) cconv
@@ -507,7 +511,6 @@ checkCg decl check = do
         addErrTc $ TcRnIllegalForeignDeclBackend decl bcknd expectedBcknds
 
 -- Calling conventions
-
 checkCConv :: Either ForeignExport ForeignImport -> CCallConv -> TcM CCallConv
 checkCConv _ CCallConv    = return CCallConv
 checkCConv _ CApiConv     = return CApiConv
