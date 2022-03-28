@@ -1792,7 +1792,7 @@ ticky counters and the quality of the profile.
     * The number of avoided tag checks in the entry count.
     * "infer" as the argument string to distinguish them from regular counters.
     * The name of the variable we are casing on, as well as a unique to represent the inspection site as one variable might be cased on multiple times.
-      The unique comes first , with the variable coming at the end. Like this: `u10_s98c (Main) at nofib/spectral/simple/Main.hs:677:1 in u10`
+      The unique comes first with the variable coming at the end. Like this: ``u10_s98c (Main) at nofib/spectral/simple/Main.hs:677:1 in u10``
       where `u10` is the variable and `u10_s98c` the unique associated with the inspection site.
 
     Note that these counters are currently not processed well be eventlog2html. So if you want to check them you will have to use the text based interface.
@@ -1855,33 +1855,33 @@ Name-specific counters provide the following information about a closure.
 The FVs and Args information is encoded using a small DSL.
 
 +------------------+---------------------------------------------------+
-|Classification    |Description                                        |
+| Classification   | Description                                       |
 +==================+===================================================+
-|\+                |dictionary                                         |
+| ``+``            | dictionary                                        |
 +------------------+---------------------------------------------------+
-|\>                |function                                           |
+| ``\>``           | function                                          |
 +------------------+---------------------------------------------------+
-|{C,I,F,D,W}       |   char, int, float, double, word                  |
+| ``{C,I,F,D,W}``  | char, int, float, double, word                    |
 +------------------+---------------------------------------------------+
-|{c,i,f,d,w}       |  unboxed ditto                                    |
+| ``{c,i,f,d,w}``  | unboxed ditto                                     |
 +------------------+---------------------------------------------------+
-|T                 |  tuple                                            |
+| ``T``            | unboxed tuple                                     |
 +------------------+---------------------------------------------------+
-|P                 | other primitive type                              |
+| ``P``            | other primitive type                              |
 +------------------+---------------------------------------------------+
-|p                 | unboxed primitive type                            |
+| ``p``            | unboxed primitive type                            |
 +------------------+---------------------------------------------------+
-|L                 | list                                              |
+| ``L``            | list                                              |
 +------------------+---------------------------------------------------+
-|E                 | enumeration type                                  |
+| ``E``            | enumeration type                                  |
 +------------------+---------------------------------------------------+
-|S                 | Single constructor type                           |
+| ``S``            | single-constructor type                           |
 +------------------+---------------------------------------------------+
-|M                 | Multi constructor type                            |
+| ``M``            | multi-constructor type                            |
 +------------------+---------------------------------------------------+
-|.                 |other type                                         |
+| ``.``            | other type                                        |
 +------------------+---------------------------------------------------+
-|\-                |reserved for others to mark as "uninteresting"     |
+| ``-``            | reserved for others to mark as "uninteresting"    |
 +------------------+---------------------------------------------------+
 
 In particular note that you can use the ticky profiler to see any function
