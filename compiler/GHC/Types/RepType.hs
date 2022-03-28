@@ -32,8 +32,21 @@ import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.Builtin.Types.Prim
-import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind, runtimeRepTy )
+import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind, runtimeRepTy
+  , vecRepDataConTyCon
+  , liftedRepTy, unliftedRepTy, zeroBitRepTy
+  , intRepDataConTy
+  , int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy
+  , wordRepDataConTy
+  , word16RepDataConTy, word8RepDataConTy, word32RepDataConTy, word64RepDataConTy
+  , addrRepDataConTy
+  , floatRepDataConTy, doubleRepDataConTy
+  , vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy
+  , vec64DataConTy
+  , int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy
+  , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
+  , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
+  , doubleElemRepDataConTy )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -473,7 +486,8 @@ runtimeRepPrimRep works by using tyConRuntimeRepInfo. That function
 should be passed the TyCon produced by promoting one of the constructors
 of RuntimeRep into type-level data. The RuntimeRep promoted datacons are
 associated with a RuntimeRepInfo (stored directly in the PromotedDataCon
-constructor of TyCon). This pairing happens in GHC.Builtin.Types. A RuntimeRepInfo
+constructor of TyCon, field promDcRepInfo).
+This pairing happens in GHC.Builtin.Types. A RuntimeRepInfo
 usually(*) contains a function from [Type] to [PrimRep]: the [Type] are
 the arguments to the promoted datacon. These arguments are necessary
 for the TupleRep and SumRep constructors, so that this process can recur,
@@ -594,6 +608,48 @@ runtimeRepPrimRep doc rr_ty
   = fun args
   | otherwise
   = pprPanic "runtimeRepPrimRep" (doc $$ ppr rr_ty)
+
+-- | Convert a 'PrimRep' to a 'Type' of kind RuntimeRep
+primRepToRuntimeRep :: PrimRep -> Type
+primRepToRuntimeRep rep = case rep of
+  VoidRep       -> zeroBitRepTy
+  LiftedRep     -> liftedRepTy
+  UnliftedRep   -> unliftedRepTy
+  IntRep        -> intRepDataConTy
+  Int8Rep       -> int8RepDataConTy
+  Int16Rep      -> int16RepDataConTy
+  Int32Rep      -> int32RepDataConTy
+  Int64Rep      -> int64RepDataConTy
+  WordRep       -> wordRepDataConTy
+  Word8Rep      -> word8RepDataConTy
+  Word16Rep     -> word16RepDataConTy
+  Word32Rep     -> word32RepDataConTy
+  Word64Rep     -> word64RepDataConTy
+  AddrRep       -> addrRepDataConTy
+  FloatRep      -> floatRepDataConTy
+  DoubleRep     -> doubleRepDataConTy
+  VecRep n elem -> TyConApp vecRepDataConTyCon [n', elem']
+    where
+      n' = case n of
+        2  -> vec2DataConTy
+        4  -> vec4DataConTy
+        8  -> vec8DataConTy
+        16 -> vec16DataConTy
+        32 -> vec32DataConTy
+        64 -> vec64DataConTy
+        _  -> pprPanic "Disallowed VecCount" (ppr n)
+
+      elem' = case elem of
+        Int8ElemRep   -> int8ElemRepDataConTy
+        Int16ElemRep  -> int16ElemRepDataConTy
+        Int32ElemRep  -> int32ElemRepDataConTy
+        Int64ElemRep  -> int64ElemRepDataConTy
+        Word8ElemRep  -> word8ElemRepDataConTy
+        Word16ElemRep -> word16ElemRepDataConTy
+        Word32ElemRep -> word32ElemRepDataConTy
+        Word64ElemRep -> word64ElemRepDataConTy
+        FloatElemRep  -> floatElemRepDataConTy
+        DoubleElemRep -> doubleElemRepDataConTy
 
 -- | Convert a PrimRep back to a Type. Used only in the unariser to give types
 -- to fresh Ids. Really, only the type's representation matters.

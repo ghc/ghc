@@ -46,7 +46,7 @@ module GHC.Builtin.Types.Prim(
         tYPETyCon, tYPETyConName,
 
         -- Kinds
-        mkTYPEapp, primRepToRuntimeRep, primRepsToRuntimeRep,
+        mkTYPEapp,
 
         functionWithMultiplicity,
         funTyCon, funTyConName,
@@ -110,7 +110,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind
-  , boxedRepDataConTyCon, vecRepDataConTyCon, tupleRepDataConTyCon
+  , boxedRepDataConTyCon, vecRepDataConTyCon
   , liftedRepTy, unliftedRepTy, zeroBitRepTy
   , intRepDataConTy
   , int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy
@@ -124,7 +124,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , mkPromotedListTy, multiplicityTy )
+  , multiplicityTy )
 
 import GHC.Types.Var    ( TyVarBinder, TyVar
                         , mkTyVar, mkTyVarBinder, mkTyVarBinders )
@@ -137,8 +137,6 @@ import GHC.Builtin.Uniques
 import GHC.Builtin.Names
 import GHC.Data.FastString
 import GHC.Utils.Misc ( changeLast )
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
                          -- import loops which show up if you import Type instead
 import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, mkTyConApp, mkTYPEapp, getLevity )
@@ -576,29 +574,6 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
                      (a :: TYPE r1) (b :: TYPE r2).
                      a -> b -> TYPE ('TupleRep '[r1, r2])
 
-Note [PrimRep and kindPrimRep]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As part of its source code, in GHC.Core.TyCon, GHC has
-  data PrimRep = BoxedRep Levity | IntRep | FloatRep | ...etc...
-
-Notice that
- * RuntimeRep is part of the syntax tree of the program being compiled
-     (defined in a library: ghc-prim:GHC.Types)
- * PrimRep is part of GHC's source code.
-     (defined in GHC.Core.TyCon)
-
-We need to get from one to the other; that is what kindPrimRep does.
-Suppose we have a value
-   (v :: t) where (t :: k)
-Given this kind
-    k = TyConApp "TYPE" [rep]
-GHC needs to be able to figure out how 'v' is represented at runtime.
-It expects 'rep' to be form
-    TyConApp rr_dc args
-where 'rr_dc' is a promoteed data constructor from RuntimeRep. So
-now we need to go from 'dc' to the corresponding PrimRep.  We store this
-PrimRep in the promoted data constructor itself: see TyCon.promDcRepInfo.
-
 -}
 
 tYPETyCon :: TyCon
@@ -645,19 +620,19 @@ functionWithMultiplicity mul = TyConApp funTyCon [mul]
 --
 -- Only use this in "GHC.Builtin.Types.Prim".
 pcPrimTyCon :: Name
-            -> [Role] -> PrimRep -> TyCon
+            -> [Role] -> RuntimeRepType -> TyCon
 pcPrimTyCon name roles res_rep
   = mkPrimTyCon name binders result_kind roles
   where
     bndr_kis    = liftedTypeKind <$ roles
     binders     = mkTemplateAnonTyConBinders bndr_kis
-    result_kind = mkTYPEapp (primRepToRuntimeRep res_rep)
+    result_kind = mkTYPEapp res_rep
 
 -- | Create a primitive nullary 'TyCon' with the given 'Name'
 -- and result kind representation.
 --
 -- Only use this in "GHC.Builtin.Types.Prim".
-pcPrimTyCon0 :: Name -> PrimRep -> TyCon
+pcPrimTyCon0 :: Name -> RuntimeRepType -> TyCon
 pcPrimTyCon0 name res_rep
   = pcPrimTyCon name [] res_rep
 
@@ -669,12 +644,12 @@ pcPrimTyCon_LevPolyLastArg :: Name
                            -> [Role] -- ^ roles of the arguments (must be non-empty),
                                      -- not including the implicit argument of kind 'Levity',
                                      -- which always has 'Nominal' role
-                           -> PrimRep
+                           -> RuntimeRepType  -- ^ representation of the fully-applied type
                            -> TyCon
 pcPrimTyCon_LevPolyLastArg name roles res_rep
   = mkPrimTyCon name binders result_kind (Nominal : roles)
     where
-      result_kind = mkTYPEapp (primRepToRuntimeRep res_rep)
+      result_kind = mkTYPEapp res_rep
       lev_bndr = mkNamedTyConBinder Inferred levity1TyVar
       binders  = lev_bndr : mkTemplateAnonTyConBinders anon_bndr_kis
       lev_tv   = mkTyVarTy (binderVar lev_bndr)
@@ -683,129 +658,75 @@ pcPrimTyCon_LevPolyLastArg name roles res_rep
       anon_bndr_kis = changeLast (liftedTypeKind <$ roles)
                         (mkTYPEapp $ mkTyConApp boxedRepDataConTyCon [lev_tv])
 
--- | Convert a 'PrimRep' to a 'Type' of kind RuntimeRep
--- Defined here to avoid (more) module loops
-primRepToRuntimeRep :: PrimRep -> Type
-primRepToRuntimeRep rep = case rep of
-  VoidRep       -> zeroBitRepTy
-  LiftedRep     -> liftedRepTy
-  UnliftedRep   -> unliftedRepTy
-  IntRep        -> intRepDataConTy
-  Int8Rep       -> int8RepDataConTy
-  Int16Rep      -> int16RepDataConTy
-  Int32Rep      -> int32RepDataConTy
-  Int64Rep      -> int64RepDataConTy
-  WordRep       -> wordRepDataConTy
-  Word8Rep      -> word8RepDataConTy
-  Word16Rep     -> word16RepDataConTy
-  Word32Rep     -> word32RepDataConTy
-  Word64Rep     -> word64RepDataConTy
-  AddrRep       -> addrRepDataConTy
-  FloatRep      -> floatRepDataConTy
-  DoubleRep     -> doubleRepDataConTy
-  VecRep n elem -> TyConApp vecRepDataConTyCon [n', elem']
-    where
-      n' = case n of
-        2  -> vec2DataConTy
-        4  -> vec4DataConTy
-        8  -> vec8DataConTy
-        16 -> vec16DataConTy
-        32 -> vec32DataConTy
-        64 -> vec64DataConTy
-        _  -> pprPanic "Disallowed VecCount" (ppr n)
-
-      elem' = case elem of
-        Int8ElemRep   -> int8ElemRepDataConTy
-        Int16ElemRep  -> int16ElemRepDataConTy
-        Int32ElemRep  -> int32ElemRepDataConTy
-        Int64ElemRep  -> int64ElemRepDataConTy
-        Word8ElemRep  -> word8ElemRepDataConTy
-        Word16ElemRep -> word16ElemRepDataConTy
-        Word32ElemRep -> word32ElemRepDataConTy
-        Word64ElemRep -> word64ElemRepDataConTy
-        FloatElemRep  -> floatElemRepDataConTy
-        DoubleElemRep -> doubleElemRepDataConTy
-
--- | Given a list of types representing 'RuntimeRep's @reps@, construct
--- @'TupleRep' reps@.
-mkTupleRep :: [Type] -> Type
-mkTupleRep reps = TyConApp tupleRepDataConTyCon [mkPromotedListTy runtimeRepTy reps]
-
--- | Convert a list of 'PrimRep's to a 'Type' of kind RuntimeRep
--- Defined here to avoid (more) module loops
-primRepsToRuntimeRep :: [PrimRep] -> Type
-primRepsToRuntimeRep [rep] = primRepToRuntimeRep rep
-primRepsToRuntimeRep reps  = mkTupleRep $ map primRepToRuntimeRep reps
-
 charPrimTy :: Type
 charPrimTy      = mkTyConTy charPrimTyCon
 charPrimTyCon :: TyCon
-charPrimTyCon   = pcPrimTyCon0 charPrimTyConName WordRep
+charPrimTyCon   = pcPrimTyCon0 charPrimTyConName wordRepDataConTy
 
 intPrimTy :: Type
 intPrimTy       = mkTyConTy intPrimTyCon
 intPrimTyCon :: TyCon
-intPrimTyCon    = pcPrimTyCon0 intPrimTyConName IntRep
+intPrimTyCon    = pcPrimTyCon0 intPrimTyConName intRepDataConTy
 
 int8PrimTy :: Type
 int8PrimTy     = mkTyConTy int8PrimTyCon
 int8PrimTyCon :: TyCon
-int8PrimTyCon  = pcPrimTyCon0 int8PrimTyConName Int8Rep
+int8PrimTyCon  = pcPrimTyCon0 int8PrimTyConName int8RepDataConTy
 
 int16PrimTy :: Type
 int16PrimTy    = mkTyConTy int16PrimTyCon
 int16PrimTyCon :: TyCon
-int16PrimTyCon = pcPrimTyCon0 int16PrimTyConName Int16Rep
+int16PrimTyCon = pcPrimTyCon0 int16PrimTyConName int16RepDataConTy
 
 int32PrimTy :: Type
 int32PrimTy     = mkTyConTy int32PrimTyCon
 int32PrimTyCon :: TyCon
-int32PrimTyCon  = pcPrimTyCon0 int32PrimTyConName Int32Rep
+int32PrimTyCon  = pcPrimTyCon0 int32PrimTyConName int32RepDataConTy
 
 int64PrimTy :: Type
 int64PrimTy     = mkTyConTy int64PrimTyCon
 int64PrimTyCon :: TyCon
-int64PrimTyCon  = pcPrimTyCon0 int64PrimTyConName Int64Rep
+int64PrimTyCon  = pcPrimTyCon0 int64PrimTyConName int64RepDataConTy
 
 wordPrimTy :: Type
 wordPrimTy      = mkTyConTy wordPrimTyCon
 wordPrimTyCon :: TyCon
-wordPrimTyCon   = pcPrimTyCon0 wordPrimTyConName WordRep
+wordPrimTyCon   = pcPrimTyCon0 wordPrimTyConName wordRepDataConTy
 
 word8PrimTy :: Type
 word8PrimTy     = mkTyConTy word8PrimTyCon
 word8PrimTyCon :: TyCon
-word8PrimTyCon  = pcPrimTyCon0 word8PrimTyConName Word8Rep
+word8PrimTyCon  = pcPrimTyCon0 word8PrimTyConName word8RepDataConTy
 
 word16PrimTy :: Type
 word16PrimTy    = mkTyConTy word16PrimTyCon
 word16PrimTyCon :: TyCon
-word16PrimTyCon = pcPrimTyCon0 word16PrimTyConName Word16Rep
+word16PrimTyCon = pcPrimTyCon0 word16PrimTyConName word16RepDataConTy
 
 word32PrimTy :: Type
 word32PrimTy    = mkTyConTy word32PrimTyCon
 word32PrimTyCon :: TyCon
-word32PrimTyCon = pcPrimTyCon0 word32PrimTyConName Word32Rep
+word32PrimTyCon = pcPrimTyCon0 word32PrimTyConName word32RepDataConTy
 
 word64PrimTy :: Type
 word64PrimTy    = mkTyConTy word64PrimTyCon
 word64PrimTyCon :: TyCon
-word64PrimTyCon = pcPrimTyCon0 word64PrimTyConName Word64Rep
+word64PrimTyCon = pcPrimTyCon0 word64PrimTyConName word64RepDataConTy
 
 addrPrimTy :: Type
 addrPrimTy      = mkTyConTy addrPrimTyCon
 addrPrimTyCon :: TyCon
-addrPrimTyCon   = pcPrimTyCon0 addrPrimTyConName AddrRep
+addrPrimTyCon   = pcPrimTyCon0 addrPrimTyConName addrRepDataConTy
 
 floatPrimTy     :: Type
 floatPrimTy     = mkTyConTy floatPrimTyCon
 floatPrimTyCon :: TyCon
-floatPrimTyCon  = pcPrimTyCon0 floatPrimTyConName FloatRep
+floatPrimTyCon  = pcPrimTyCon0 floatPrimTyConName floatRepDataConTy
 
 doublePrimTy :: Type
 doublePrimTy    = mkTyConTy doublePrimTyCon
 doublePrimTyCon :: TyCon
-doublePrimTyCon = pcPrimTyCon0 doublePrimTyConName DoubleRep
+doublePrimTyCon = pcPrimTyCon0 doublePrimTyConName doubleRepDataConTy
 
 {-
 ************************************************************************
@@ -994,7 +915,7 @@ mkStatePrimTy :: Type -> Type
 mkStatePrimTy ty = TyConApp statePrimTyCon [ty]
 
 statePrimTyCon :: TyCon   -- See Note [The State# TyCon]
-statePrimTyCon   = pcPrimTyCon statePrimTyConName [Nominal] VoidRep
+statePrimTyCon   = pcPrimTyCon statePrimTyConName [Nominal] zeroBitRepTy
 
 {-
 RealWorld is deeply magical.  It is *primitive*, but it is not
@@ -1097,12 +1018,12 @@ isReflPrimTyCon =
 arrayPrimTyCon, mutableArrayPrimTyCon, mutableByteArrayPrimTyCon,
     byteArrayPrimTyCon,
     smallArrayPrimTyCon, smallMutableArrayPrimTyCon :: TyCon
-arrayPrimTyCon             = pcPrimTyCon_LevPolyLastArg arrayPrimTyConName        [Representational]          UnliftedRep
-mutableArrayPrimTyCon      = pcPrimTyCon_LevPolyLastArg mutableArrayPrimTyConName [Nominal, Representational] UnliftedRep
-mutableByteArrayPrimTyCon  = pcPrimTyCon mutableByteArrayPrimTyConName  [Nominal] UnliftedRep
-byteArrayPrimTyCon         = pcPrimTyCon0 byteArrayPrimTyConName        UnliftedRep
-smallArrayPrimTyCon        = pcPrimTyCon_LevPolyLastArg smallArrayPrimTyConName        [Representational]          UnliftedRep
-smallMutableArrayPrimTyCon = pcPrimTyCon_LevPolyLastArg smallMutableArrayPrimTyConName [Nominal, Representational] UnliftedRep
+arrayPrimTyCon             = pcPrimTyCon_LevPolyLastArg arrayPrimTyConName        [Representational]          unliftedRepTy
+mutableArrayPrimTyCon      = pcPrimTyCon_LevPolyLastArg mutableArrayPrimTyConName [Nominal, Representational] unliftedRepTy
+mutableByteArrayPrimTyCon  = pcPrimTyCon mutableByteArrayPrimTyConName  [Nominal] unliftedRepTy
+byteArrayPrimTyCon         = pcPrimTyCon0 byteArrayPrimTyConName        unliftedRepTy
+smallArrayPrimTyCon        = pcPrimTyCon_LevPolyLastArg smallArrayPrimTyConName        [Representational]          unliftedRepTy
+smallMutableArrayPrimTyCon = pcPrimTyCon_LevPolyLastArg smallMutableArrayPrimTyConName [Nominal, Representational] unliftedRepTy
 
 mkArrayPrimTy :: Type -> Type
 mkArrayPrimTy elt           = TyConApp arrayPrimTyCon [getLevity elt, elt]
@@ -1125,7 +1046,7 @@ mkSmallMutableArrayPrimTy s elt = TyConApp smallMutableArrayPrimTyCon [getLevity
 ********************************************************************* -}
 
 mutVarPrimTyCon :: TyCon
-mutVarPrimTyCon = pcPrimTyCon_LevPolyLastArg mutVarPrimTyConName [Nominal, Representational] UnliftedRep
+mutVarPrimTyCon = pcPrimTyCon_LevPolyLastArg mutVarPrimTyConName [Nominal, Representational] unliftedRepTy
 
 mkMutVarPrimTy :: Type -> Type -> Type
 mkMutVarPrimTy s elt        = TyConApp mutVarPrimTyCon [getLevity elt, s, elt]
@@ -1139,7 +1060,7 @@ mkMutVarPrimTy s elt        = TyConApp mutVarPrimTyCon [getLevity elt, s, elt]
 -}
 
 ioPortPrimTyCon :: TyCon
-ioPortPrimTyCon = pcPrimTyCon_LevPolyLastArg ioPortPrimTyConName [Nominal, Representational] UnliftedRep
+ioPortPrimTyCon = pcPrimTyCon_LevPolyLastArg ioPortPrimTyConName [Nominal, Representational] unliftedRepTy
 
 mkIOPortPrimTy :: Type -> Type -> Type
 mkIOPortPrimTy s elt          = TyConApp ioPortPrimTyCon [getLevity elt, s, elt]
@@ -1154,7 +1075,7 @@ mkIOPortPrimTy s elt          = TyConApp ioPortPrimTyCon [getLevity elt, s, elt]
 -}
 
 mVarPrimTyCon :: TyCon
-mVarPrimTyCon = pcPrimTyCon_LevPolyLastArg mVarPrimTyConName [Nominal, Representational] UnliftedRep
+mVarPrimTyCon = pcPrimTyCon_LevPolyLastArg mVarPrimTyConName [Nominal, Representational] unliftedRepTy
 
 mkMVarPrimTy :: Type -> Type -> Type
 mkMVarPrimTy s elt          = TyConApp mVarPrimTyCon [getLevity elt, s, elt]
@@ -1168,7 +1089,7 @@ mkMVarPrimTy s elt          = TyConApp mVarPrimTyCon [getLevity elt, s, elt]
 -}
 
 tVarPrimTyCon :: TyCon
-tVarPrimTyCon = pcPrimTyCon_LevPolyLastArg tVarPrimTyConName [Nominal, Representational] UnliftedRep
+tVarPrimTyCon = pcPrimTyCon_LevPolyLastArg tVarPrimTyConName [Nominal, Representational] unliftedRepTy
 
 mkTVarPrimTy :: Type -> Type -> Type
 mkTVarPrimTy s elt = TyConApp tVarPrimTyCon [getLevity elt, s, elt]
@@ -1182,7 +1103,7 @@ mkTVarPrimTy s elt = TyConApp tVarPrimTyCon [getLevity elt, s, elt]
 -}
 
 stablePtrPrimTyCon :: TyCon
-stablePtrPrimTyCon = pcPrimTyCon_LevPolyLastArg stablePtrPrimTyConName [Representational] AddrRep
+stablePtrPrimTyCon = pcPrimTyCon_LevPolyLastArg stablePtrPrimTyConName [Representational] addrRepDataConTy
 
 mkStablePtrPrimTy :: Type -> Type
 mkStablePtrPrimTy ty = TyConApp stablePtrPrimTyCon [getLevity ty, ty]
@@ -1196,7 +1117,7 @@ mkStablePtrPrimTy ty = TyConApp stablePtrPrimTyCon [getLevity ty, ty]
 -}
 
 stableNamePrimTyCon :: TyCon
-stableNamePrimTyCon = pcPrimTyCon_LevPolyLastArg stableNamePrimTyConName [Phantom] UnliftedRep
+stableNamePrimTyCon = pcPrimTyCon_LevPolyLastArg stableNamePrimTyConName [Phantom] unliftedRepTy
 
 mkStableNamePrimTy :: Type -> Type
 mkStableNamePrimTy ty = TyConApp stableNamePrimTyCon [getLevity ty, ty]
@@ -1210,7 +1131,7 @@ mkStableNamePrimTy ty = TyConApp stableNamePrimTyCon [getLevity ty, ty]
 -}
 
 compactPrimTyCon :: TyCon
-compactPrimTyCon = pcPrimTyCon0 compactPrimTyConName UnliftedRep
+compactPrimTyCon = pcPrimTyCon0 compactPrimTyConName unliftedRepTy
 
 compactPrimTy :: Type
 compactPrimTy = mkTyConTy compactPrimTyCon
@@ -1224,7 +1145,7 @@ compactPrimTy = mkTyConTy compactPrimTyCon
 -}
 
 stackSnapshotPrimTyCon :: TyCon
-stackSnapshotPrimTyCon = pcPrimTyCon0 stackSnapshotPrimTyConName UnliftedRep
+stackSnapshotPrimTyCon = pcPrimTyCon0 stackSnapshotPrimTyConName unliftedRepTy
 
 stackSnapshotPrimTy :: Type
 stackSnapshotPrimTy = mkTyConTy stackSnapshotPrimTyCon
@@ -1244,7 +1165,7 @@ stackSnapshotPrimTy = mkTyConTy stackSnapshotPrimTyCon
 bcoPrimTy    :: Type
 bcoPrimTy    = mkTyConTy bcoPrimTyCon
 bcoPrimTyCon :: TyCon
-bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName LiftedRep
+bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName liftedRepTy
 
 {-
 ************************************************************************
@@ -1255,7 +1176,7 @@ bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName LiftedRep
 -}
 
 weakPrimTyCon :: TyCon
-weakPrimTyCon = pcPrimTyCon_LevPolyLastArg weakPrimTyConName [Representational] UnliftedRep
+weakPrimTyCon = pcPrimTyCon_LevPolyLastArg weakPrimTyConName [Representational] unliftedRepTy
 
 mkWeakPrimTy :: Type -> Type
 mkWeakPrimTy v = TyConApp weakPrimTyCon [getLevity v, v]
@@ -1280,7 +1201,7 @@ to the thread id internally.
 threadIdPrimTy :: Type
 threadIdPrimTy    = mkTyConTy threadIdPrimTyCon
 threadIdPrimTyCon :: TyCon
-threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName UnliftedRep
+threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName unliftedRepTy
 
 {-
 ************************************************************************

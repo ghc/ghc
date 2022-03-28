@@ -32,7 +32,7 @@ desugarVectorSpec i              = case vecOptions i of
                             , name    = name'
                             , prefix  = pfx
                             , veclen  = n
-                            , elemrep = con ++ "ElemRep"
+                            , elemrep = map toLower con ++ "ElemRepDataConTy"
                             , ty      = desugarTy (ty i)
                             , cat     = cat i
                             , desc    = desc i
@@ -42,7 +42,7 @@ desugarVectorSpec i              = case vecOptions i of
               PrimVecTypeSpec { ty      = desugarTy (ty i)
                               , prefix  = pfx
                               , veclen  = n
-                              , elemrep = con ++ "ElemRep"
+                              , elemrep = map toLower con ++ "ElemRepDataConTy"
                               , desc    = desc i
                               , opts    = opts i
                               }
@@ -708,7 +708,7 @@ gen_primop_vector_tys (Info _ entries)
         , ty_id ++ " = mkTyConTy " ++ tycon_id
         , tycon_id ++ " :: TyCon"
         , tycon_id ++ " = pcPrimTyCon0 " ++ name_id ++
-                      " (VecRep " ++ show (veclen i) ++ " " ++ elemrep i ++ ")"
+                      " (TyConApp vecRepDataConTyCon [vec" ++ show (veclen i) ++ "DataConTy, " ++ elemrep i ++ "])"
         ]
       where
         key_id   = prefix i ++ "PrimTyConKey"

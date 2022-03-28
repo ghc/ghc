@@ -30,6 +30,7 @@ module GHC.Core.TyCo.Rep (
 
         TyLit(..),
         KindOrType, Kind,
+        RuntimeRepType,
         KnotTied,
         PredType, ThetaType,      -- Synonyms
         ArgFlag(..), AnonArgFlag(..),
@@ -111,6 +112,9 @@ type KindOrType = Type -- See Note [Arguments to type constructors]
 
 -- | The key type representing kinds in the compiler.
 type Kind = Type
+
+-- | Type synonym used for types of kind RuntimeRep.
+type RuntimeRepType = Type
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
