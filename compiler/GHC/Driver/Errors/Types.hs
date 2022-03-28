@@ -143,7 +143,7 @@ data DriverMessage where
 
      Test cases: warnings/should_compile/UnusedPackages
   -}
-  DriverUnusedPackages :: [PackageArg] -> DriverMessage
+  DriverUnusedPackages :: [(UnitId, PackageName, Version, PackageArg)] -> DriverMessage
 
   {-| DriverUnnecessarySourceImports (controlled with -Wunused-imports) occurs if there
       are {-# SOURCE #-} imports which are not necessary. See 'warnUnnecessarySourceImports'
