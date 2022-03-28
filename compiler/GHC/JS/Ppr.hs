@@ -18,6 +18,7 @@ module GHC.JS.Ppr
   , defaultRenderJs
   , RenderJs(..)
   , jsToDoc
+  , pprStringLit
   )
 where
 
@@ -162,7 +163,7 @@ defRenderJsV r = \case
   JInt i
     | i < 0     -> parens (integer i)
     | otherwise -> integer i
-  JStr s    -> hcat [char '\"',encodeJson s, char '\"']
+  JStr s    -> pprStringLit s
   JRegEx s  -> hcat [char '/',stext s, char '/']
   JHash m
     | M.null m  -> text "{}"
@@ -173,6 +174,10 @@ defRenderJsV r = \case
 
 defRenderJsI :: RenderJs -> Ident -> Doc
 defRenderJsI _ (TxtI t) = stext t
+
+
+pprStringLit :: ShortText -> Doc
+pprStringLit s = hcat [char '\"',encodeJson s, char '\"']
 
 encodeJson :: ShortText -> Doc
 encodeJson xs = hcat (map encodeJsonChar (ST.unpack xs))
