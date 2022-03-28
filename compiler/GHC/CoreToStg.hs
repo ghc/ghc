@@ -402,7 +402,11 @@ coreToStgExpr expr@(App _ _)
   = case app_head of
       Var f -> coreToStgApp f args ticks -- Regular application
       Lit l | isLitRubbish l             -- If there is LitRubbish at the head,
-            -> return (StgLit l)         --    discard the arguments
+                                         --    discard the arguments
+                                         --    Recompute representation, because in
+                                         --    '(RUBBISH[rep] x) :: (T :: TYPE rep2)'
+                                         --    rep might not be equal to rep2
+            -> return (StgLit $ LitRubbish $ getRuntimeRep (exprType expr))
 
       _     -> pprPanic "coreToStgExpr - Invalid app head:" (ppr expr)
     where
