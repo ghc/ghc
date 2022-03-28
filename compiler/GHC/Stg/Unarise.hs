@@ -456,7 +456,7 @@ unariseRubbish_maybe (LitRubbish rep)
   = Nothing   -- Single, non-void PrimRep. Nothing to do!
 
   | otherwise -- Multiple reps, possibly with VoidRep. Eliminate via elimCase
-  = Just [ StgLitArg (LitRubbish (primRepToType prep))
+  = Just [ StgLitArg (LitRubbish (primRepToRuntimeRep prep))
          | prep <- preps, not (isVoidRep prep) ]
   where
     preps = runtimeRepPrimRep (text "unariseRubbish_maybe") rep

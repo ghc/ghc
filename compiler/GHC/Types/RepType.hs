@@ -13,7 +13,7 @@ module GHC.Types.RepType
     -- * Type representation for the code generator
     typePrimRep, typePrimRep1,
     runtimeRepPrimRep, typePrimRepArgs,
-    PrimRep(..), primRepToType,
+    PrimRep(..), primRepToRuntimeRep, primRepToType,
     countFunRepArgs, countConRepArgs, dataConRuntimeRepStrictness,
     tyConPrimRep, tyConPrimRep1,
 
