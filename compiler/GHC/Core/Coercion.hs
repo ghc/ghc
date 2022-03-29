@@ -95,10 +95,10 @@ module GHC.Core.Coercion (
         -- ** Lifting
         liftCoSubst, liftCoSubstTyVar, liftCoSubstWith, liftCoSubstWithEx,
         emptyLiftingContext, extendLiftingContext, extendLiftingContextAndInScope,
-        liftCoSubstVarBndrUsing, isMappedByLC,
+        liftCoSubstVarBndrUsing, isMappedByLC, extendLiftingContextCvSubst,
 
         mkSubstLiftingContext, zapLiftingContext,
-        substForAllCoBndrUsingLC, lcTCvSubst, lcInScopeSet,
+        substForAllCoBndrUsingLC, lcLookupCoVar, lcInScopeSet,
 
         LiftCoEnv, LiftingContext(..), liftEnvSubstLeft, liftEnvSubstRight,
         substRightCo, substLeftCo, swapLiftCoEnv, lcSubstLeft, lcSubstRight,
@@ -1987,6 +1987,15 @@ extendLiftingContext (LC subst env) tv arg
   | otherwise
   = LC subst (extendVarEnv env tv arg)
 
+-- | Extend the substitution component of a lifting context with
+-- a new binding for a coercion variable. Used during coercion optimisation.
+extendLiftingContextCvSubst :: LiftingContext
+                            -> CoVar
+                            -> Coercion
+                            -> LiftingContext
+extendLiftingContextCvSubst (LC subst env) cv co
+  = LC (extendCvSubst subst cv co) env
+
 -- | Extend a lifting context with a new mapping, and extend the in-scope set
 extendLiftingContextAndInScope :: LiftingContext  -- ^ Original LC
                                -> TyCoVar         -- ^ new variable to map...
@@ -2289,9 +2298,9 @@ liftEnvSubst selector subst lc_env
       where
         equality_ty = selector (coercionKind co)
 
--- | Extract the underlying substitution from the LiftingContext
-lcTCvSubst :: LiftingContext -> TCvSubst
-lcTCvSubst (LC subst _) = subst
+-- | Lookup a 'CoVar' in the substitution in a 'LiftingContext'
+lcLookupCoVar :: LiftingContext -> CoVar -> Maybe Coercion
+lcLookupCoVar (LC subst _) cv = lookupCoVar subst cv
 
 -- | Get the 'InScopeSet' from a 'LiftingContext'
 lcInScopeSet :: LiftingContext -> InScopeSet

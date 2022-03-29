@@ -280,14 +280,15 @@ opt_co4 env sym rep r (FunCo _r cow co1 co2)
     cow' = opt_co1 env sym cow
 
 opt_co4 env sym rep r (CoVarCo cv)
-  | Just co <- lookupCoVar (lcTCvSubst env) cv
+  | Just co <- lcLookupCoVar env cv   -- see the ForAllCo case over coercions for why
+                                      -- this is the right thing here
   = opt_co4_wrap (zapLiftingContext env) sym rep r co
 
   | ty1 `eqType` ty2   -- See Note [Optimise CoVarCo to Refl]
   = mkReflCo (chooseRole rep r) ty1
 
   | otherwise
-  = assert (isCoVar cv1 )
+  = assert (isCoVar cv1) $
     wrapRole rep r $ wrapSym sym $
     CoVarCo cv1
 
@@ -405,11 +406,38 @@ opt_co4 env sym rep r (InstCo co1 arg)
                  sym rep r co_body
 
     -- forall over coercion...
-  | Just (cv, kind_co, co_body) <- splitForAllCo_co_maybe co1
+    -- Example:
+    --   type (:~:) :: forall k. k -> k -> Type
+    --   Refl :: forall k (a :: k) (b :: k). forall (cv :: (~#) k k a b). (:~:) k a b
+    --   k1,k2,k3,k4 :: Type
+    --   eta :: (k1 ~# k2) ~# (k3 ~# k4)    ==    ((~#) Type Type k1 k2) ~# ((~#) Type Type k3 k4)
+    --   co1_3 :: k1 ~# k3
+    --   co2_4 :: k2 ~# k4
+    --   nth 2 eta :: k1 ~# k3
+    --   nth 3 eta :: k2 ~# k4
+    --   co11_31 :: <k1> ~# (sym co1_3)
+    --   co22_24 :: <k2> ~# co2_4
+    --   (forall (cv :: eta). Refl <Type> co1_3 co2_4 (co11_31 ;; cv ;; co22_24)) ::
+    --     (forall (cv :: k1 ~# k2). Refl Type k1 k2 (<k1> ;; cv ;; <k2>) ~#
+    --     (forall (cv :: k3 ~# k4). Refl Type k3 k4
+    --        (sym co1_3 ;; nth 2 eta ;; cv ;; sym (nth 3 eta) ;; co2_4))
+    --   co1_2 :: k1 ~# k2
+    --   co3_4 :: k3 ~# k4
+    --   co5 :: co1_2 ~# co3_4
+    --   InstCo (forall (cv :: eta). Refl <Type> co1_3 co2_4 (co11_31 ;; cv ;; co22_24)) co5 ::
+    --    (Refl Type k1 k2 (<k1> ;; cv ;; <k2>))[cv |-> co1_2] ~#
+    --    (Refl Type k3 k4 (sym co1_3 ;; nth 2 eta ;; cv ;; sym (nth 3 eta) ;; co2_4))[cv |-> co3_4]
+    --       ==
+    --    (Refl Type k1 k2 (<k1> ;; co1_2 ;; <k2>)) ~#
+    --     (Refl Type k3 k4 (sym co1_3 ;; nth 2 eta ;; co3_4 ;; sym (nth 3 eta) ;; co2_4))
+    --       ==>
+    --    Refl <Type> co1_3 co2_4 (co11_31 ;; co1_2 ;; co22_24)
+    -- Conclusion: Because of the way this all works, we want to put in the *left-hand*
+    -- coercion in co5's type. (In the code, co5 is called `arg`.)
+    -- So we extend the environment binding cv to arg's left-hand type.
+  | Just (cv, _kind_co, co_body) <- splitForAllCo_co_maybe co1
   , CoercionTy h1 <- t1
-  , CoercionTy h2 <- t2
-  = let new_co = mk_new_co cv (opt_co4_wrap env sym False Nominal kind_co) h1 h2
-    in opt_co4_wrap (extendLiftingContext env cv new_co) sym rep r co_body
+  = opt_co4_wrap (extendLiftingContextCvSubst env cv h1) sym rep r co_body
 
     -- See if it is a forall after optimization
     -- If so, do an inefficient one-variable substitution, then re-optimize
@@ -420,12 +448,10 @@ opt_co4 env sym rep r (InstCo co1 arg)
                     (mkCoherenceRightCo Nominal t2' (mkSymCo kind_co') arg'))
             False False r' co_body'
 
-    -- forall over coercion...
-  | Just (cv', kind_co', co_body') <- splitForAllCo_co_maybe co1'
+    -- forall over coercion... see long analysis above
+  | Just (cv', _kind_co', co_body') <- splitForAllCo_co_maybe co1'
   , CoercionTy h1' <- t1'
-  , CoercionTy h2' <- t2'
-  = let new_co = mk_new_co cv' kind_co' h1' h2'
-    in opt_co4_wrap (extendLiftingContext (zapLiftingContext env) cv' new_co)
+  = opt_co4_wrap (extendLiftingContextCvSubst (zapLiftingContext env) cv' h1')
                     False False r' co_body'
 
   | otherwise = InstCo co1' arg'
@@ -445,20 +471,6 @@ opt_co4 env sym rep r (InstCo co1 arg)
     -- lacks, so we need to use sym_arg to balance the number of Syms. (#15725)
     Pair t1  t2  = coercionKind sym_arg
     Pair t1' t2' = coercionKind arg'
-
-    mk_new_co cv kind_co h1 h2
-      = let -- h1 :: (t1 ~ t2)
-            -- h2 :: (t3 ~ t4)
-            -- kind_co :: (t1 ~ t2) ~ (t3 ~ t4)
-            -- n1 :: t1 ~ t3
-            -- n2 :: t2 ~ t4
-            -- new_co = (h1 :: t1 ~ t2) ~ ((n1;h2;sym n2) :: t1 ~ t2)
-            r2  = coVarRole cv
-            kind_co' = downgradeRole r2 Nominal kind_co
-            n1 = mkNthCo r2 2 kind_co'
-            n2 = mkNthCo r2 3 kind_co'
-         in mkProofIrrelCo Nominal (Refl (coercionType h1)) h1
-                           (n1 `mkTransCo` h2 `mkTransCo` (mkSymCo n2))
 
 opt_co4 env sym _rep r (KindCo co)
   = assert (r == Nominal) $
