@@ -1406,6 +1406,10 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
 
             LambdaExpr -> (char '\\', pats)
 
+            ArrowMatchCtxt KappaExpr -> (char '\\', pats)
+
+            ArrowMatchCtxt ProcExpr -> (text "proc", pats)
+
             _ -> case pats of
                    []    -> (empty, [])
                    [pat] -> (ppr pat, [])  -- No parens around the single pat in a case
