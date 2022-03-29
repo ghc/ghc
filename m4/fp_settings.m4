@@ -74,11 +74,6 @@ AC_DEFUN([FP_SETTINGS],
     fi
 
     # Platform-agnostic tools
-    if test -z "$LibtoolCmd"; then
-        LibtoolCmd="libtool"
-    fi
-    SettingsLibtoolCommand="$LibtoolCmd"
-
     if test -z "$ClangCmd"; then
         ClangCmd="clang"
     fi
@@ -125,7 +120,6 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsInstallNameToolCommand)
     AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
-    AC_SUBST(SettingsLibtoolCommand)
     AC_SUBST(SettingsTouchCommand)
     AC_SUBST(SettingsClangCommand)
     AC_SUBST(SettingsLlcCommand)
