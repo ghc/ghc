@@ -319,7 +319,6 @@ generateSettings = do
         , ("touch command", expr $ settingsFileSetting SettingsFileSetting_TouchCommand)
         , ("dllwrap command", expr $ settingsFileSetting SettingsFileSetting_DllWrapCommand)
         , ("windres command", expr $ settingsFileSetting SettingsFileSetting_WindresCommand)
-        , ("libtool command", expr $ settingsFileSetting SettingsFileSetting_LibtoolCommand)
         , ("unlit command", ("$topdir/bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
         , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
         , ("target platform string", getSetting TargetPlatform)

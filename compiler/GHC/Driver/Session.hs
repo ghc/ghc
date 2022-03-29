@@ -98,7 +98,6 @@ module GHC.Driver.Session (
         sPgm_dll,
         sPgm_T,
         sPgm_windres,
-        sPgm_libtool,
         sPgm_ar,
         sPgm_ranlib,
         sPgm_lo,
@@ -132,7 +131,7 @@ module GHC.Driver.Session (
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, globalPackageDatabasePath,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_lm, pgm_dll, pgm_T,
-        pgm_windres, pgm_libtool, pgm_ar, pgm_otool, pgm_install_name_tool,
+        pgm_windres, pgm_ar, pgm_otool, pgm_install_name_tool,
         pgm_ranlib, pgm_lo, pgm_lc, pgm_lcc, pgm_i,
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
         opt_P_signature,
@@ -829,8 +828,6 @@ pgm_T                 :: DynFlags -> String
 pgm_T dflags = toolSettings_pgm_T $ toolSettings dflags
 pgm_windres           :: DynFlags -> String
 pgm_windres dflags = toolSettings_pgm_windres $ toolSettings dflags
-pgm_libtool           :: DynFlags -> String
-pgm_libtool dflags = toolSettings_pgm_libtool $ toolSettings dflags
 pgm_lcc               :: DynFlags -> (String,[Option])
 pgm_lcc dflags = toolSettings_pgm_lcc $ toolSettings dflags
 pgm_ar                :: DynFlags -> String
@@ -2145,8 +2142,6 @@ dynamic_flags_deps = [
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_dll = (f,[]) }
   , make_ord_flag defFlag "pgmwindres"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_windres = f }
-  , make_ord_flag defFlag "pgmlibtool"
-      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_libtool = f }
   , make_ord_flag defFlag "pgmar"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_ar = f }
   , make_ord_flag defFlag "pgmotool"

@@ -128,7 +128,6 @@ lib/settings :
 	@echo ',("touch command", "$(SettingsTouchCommand)")' >> $@
 	@echo ',("dllwrap command", "$(SettingsDllWrapCommand)")' >> $@
 	@echo ',("windres command", "$(SettingsWindresCommand)")' >> $@
-	@echo ',("libtool command", "$(SettingsLibtoolCommand)")' >> $@
 	@echo ',("unlit command", "$$topdir/bin/unlit")' >> $@
 	@echo ',("cross compiling", "$(CrossCompiling)")' >> $@
 	@echo ',("target platform string", "$(TARGETPLATFORM)")' >> $@

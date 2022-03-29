@@ -122,7 +122,6 @@ data SettingsFileSetting
     | SettingsFileSetting_InstallNameToolCommand
     | SettingsFileSetting_DllWrapCommand
     | SettingsFileSetting_WindresCommand
-    | SettingsFileSetting_LibtoolCommand
     | SettingsFileSetting_TouchCommand
     | SettingsFileSetting_ClangCommand
     | SettingsFileSetting_LlcCommand
@@ -215,7 +214,6 @@ settingsFileSetting key = lookupSystemConfig $ case key of
     SettingsFileSetting_InstallNameToolCommand -> "settings-install_name_tool-command"
     SettingsFileSetting_DllWrapCommand -> "settings-dll-wrap-command"
     SettingsFileSetting_WindresCommand -> "settings-windres-command"
-    SettingsFileSetting_LibtoolCommand -> "settings-libtool-command"
     SettingsFileSetting_TouchCommand -> "settings-touch-command"
     SettingsFileSetting_ClangCommand -> "settings-clang-command"
     SettingsFileSetting_LlcCommand -> "settings-llc-command"

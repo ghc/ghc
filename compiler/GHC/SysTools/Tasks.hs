@@ -342,15 +342,6 @@ runMergeObjects logger tmpfs dflags args =
       else do
         runSomething logger "Merge objects" p args2
 
-runLibtool :: Logger -> DynFlags -> [Option] -> IO ()
-runLibtool logger dflags args = traceToolCommand logger "libtool" $ do
-  linkargs <- neededLinkArgs `fmap` getLinkerInfo logger dflags
-  let args1      = map Option (getOpts dflags opt_l)
-      args2      = [Option "-static"] ++ args1 ++ args ++ linkargs
-      libtool    = pgm_libtool dflags
-  mb_env <- getGccEnv args2
-  runSomethingFiltered logger id "Libtool" libtool args2 Nothing mb_env
-
 runAr :: Logger -> DynFlags -> Maybe FilePath -> [Option] -> IO ()
 runAr logger dflags cwd args = traceToolCommand logger "ar" $ do
   let ar = pgm_ar dflags
