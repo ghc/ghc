@@ -279,29 +279,7 @@ opt_co4 env sym rep r (FunCo _r cow co1 co2)
     co2' = opt_co4_wrap env sym rep r co2
     cow' = opt_co1 env sym cow
 
-opt_co4 env sym rep r (CoVarCo cv)
-  | Just co <- lcLookupCoVar env cv   -- see the ForAllCo case over coercions for why
-                                      -- this is the right thing here
-  = opt_co4_wrap (zapLiftingContext env) sym rep r co
-
-  | ty1 `eqType` ty2   -- See Note [Optimise CoVarCo to Refl]
-  = mkReflCo (chooseRole rep r) ty1
-
-  | otherwise
-  = assert (isCoVar cv1) $
-    wrapRole rep r $ wrapSym sym $
-    CoVarCo cv1
-
-  where
-    Pair ty1 ty2 = coVarTypes cv1
-
-    cv1 = case lookupInScope (lcInScopeSet env) cv of
-             Just cv1 -> cv1
-             Nothing  -> warnPprTrace True
-                          "opt_co: not in scope"
-                          (ppr cv $$ ppr env)
-                          cv
-          -- cv1 might have a substituted kind!
+opt_co4 env sym rep r (CoVarCo cv) = opt_covar env sym rep r cv
 
 opt_co4 _ _ _ _ (HoleCo h)
   = pprPanic "opt_univ fell into a hole" (ppr h)
@@ -498,12 +476,14 @@ opt_co4 env sym rep r (ZappedCo _r t1 t2 cvs)
   = mkReflCo (chooseRole rep r) t1'
 
   | otherwise
-  =
-    ZappedCo (chooseRole rep r) (lcSubstLeft env t1) (lcSubstRight env t2)
+  = ZappedCo (chooseRole rep r) (lcSubstLeft env t1) (lcSubstRight env t2) cvs'
 
   where
     t1' = lcSubstLeft env t1
     t2' = lcSubstRight env t2
+
+    cvs' = coVarsOfCosDSet $ map opt (dVarSetElems cvs)
+    opt cv = opt_covar env False False (coVarRole cv) cv
 
 
 {- Note [Optimise CoVarCo to Refl]
@@ -631,9 +611,31 @@ opt_univ env sym prov role oty1 oty2
       CorePrepProv _     -> prov
 
 -------------
-opt_covar :: LiftingContext -> SymFlag -> ReprFlag -> CoVar -> NormalCo
-opt_covar env sym rep cv
-  | Just co <-
+opt_covar :: LiftingContext -> SymFlag -> ReprFlag -> CoVar -> Role -> NormalCo
+opt_covar env sym rep r cv
+  | Just co <- lcLookupCoVar env cv   -- see the ForAllCo case over coercions for why
+                                      -- this is the right thing here
+  = opt_co4_wrap (zapLiftingContext env) sym rep r co
+
+  | ty1 `eqType` ty2   -- See Note [Optimise CoVarCo to Refl]
+  = mkReflCo (chooseRole rep r) ty1
+
+  | otherwise
+  = assert (isCoVar cv1) $
+    wrapRole rep r $ wrapSym sym $
+    CoVarCo cv1
+
+  where
+    Pair ty1 ty2 = coVarTypes cv1
+
+    cv1 = case lookupInScope (lcInScopeSet env) cv of
+             Just cv1 -> cv1
+             Nothing  -> warnPprTrace True
+                          "opt_co: not in scope"
+                          (ppr cv $$ ppr env)
+                          cv
+          -- cv1 might have a substituted kind!
+
 
 -------------
 opt_transList :: HasDebugCallStack => InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
@@ -695,6 +697,10 @@ opt_trans_rule is in_co1@(LRCo d1 co1) in_co2@(LRCo d2 co2)
   , co1 `compatible_co` co2
   = fireTransRule "PushLR" in_co1 in_co2 $
     mkLRCo d1 (opt_trans is co1 co2)
+
+opt_trans_rule is in_co1@(ZappedCo r1 t1 _ cvs1) in_co2@(ZappedCo r2 _ t2 cvs2)
+  = assert (r1 == r2) $
+    mkZappedCo r1 t1 t2 (cvs1 <> cvs2)
 
 -- Push transitivity inside instantiation
 opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)

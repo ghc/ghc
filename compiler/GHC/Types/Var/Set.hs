@@ -26,7 +26,7 @@ module GHC.Types.Var.Set (
         nonDetStrictFoldVarSet,
 
         -- * Deterministic Var set types
-        DVarSet, DIdSet, DTyVarSet, DTyCoVarSet,
+        DVarSet, DIdSet, DTyVarSet, DTyCoVarSet, DCoVarSet,
 
         -- ** Manipulating these sets
         emptyDVarSet, unitDVarSet, mkDVarSet,
@@ -234,6 +234,9 @@ type DTyVarSet   = UniqDSet TyVar
 
 -- | Deterministic Type or Coercion Variable Set
 type DTyCoVarSet = UniqDSet TyCoVar
+
+-- | Deterministic Coercion Variable Set
+type DCoVarSet   = UniqDSet CoVar
 
 emptyDVarSet :: DVarSet
 emptyDVarSet = emptyUniqDSet

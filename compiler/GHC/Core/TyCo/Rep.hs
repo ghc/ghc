@@ -1936,6 +1936,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (InstCo co arg)         = go_co env co `mappend` go_co env arg
     go_co env (KindCo co)             = go_co env co
     go_co env (SubCo co)              = go_co env co
+    go_co env (ZappedCo _ t1 t2 cvs)  = go_ty env t1 `mappend` go_ty env t2 `mappend` ...
     go_co env (ForAllCo tv kind_co co)
       = go_co env kind_co `mappend` go_ty env (varType tv)
                           `mappend` go_co env' co

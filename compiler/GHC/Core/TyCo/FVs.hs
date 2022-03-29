@@ -647,6 +647,9 @@ tyCoFVsOfCo (InstCo co arg)     fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV`
 tyCoFVsOfCo (KindCo co)         fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (SubCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (AxiomRuleCo _ cs)  fv_cand in_scope acc = tyCoFVsOfCos cs fv_cand in_scope acc
+tyCoFVsOfCo (ZappedCo _ a b vs) fv_cand in_scope acc
+  = (tyCoFVsOfType a `unionFV` tyCoFVsOfType b `unionFV` mkFVs (dVarSetElems vs))
+    fv_cand in_scope acc
 
 tyCoFVsOfCoVar :: CoVar -> FV
 tyCoFVsOfCoVar v fv_cand in_scope acc
@@ -714,6 +717,10 @@ almost_devoid_co_var_of_co (SubCo co) cv
   = almost_devoid_co_var_of_co co cv
 almost_devoid_co_var_of_co (AxiomRuleCo _ cs) cv
   = almost_devoid_co_var_of_cos cs cv
+almost_devoid_co_var_of_co (ZappedCo _ t1 t2 cvs) cv
+  = almost_devoid_co_var_of_type t1 cv
+  && almost_devoid_co_var_of_type t2 cv
+  && not (cv `elemDVarSet` cvs)
 
 almost_devoid_co_var_of_cos :: [Coercion] -> CoVar -> Bool
 almost_devoid_co_var_of_cos [] _ = True
