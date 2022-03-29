@@ -1,5 +1,5 @@
-
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -50,7 +50,9 @@ import GHC.Utils.Panic
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
 import GHC.Data.List.SetOps( assocMaybe )
+import Data.Foldable (toList)
 import Data.List (mapAccumL)
+import Data.List.NonEmpty (NonEmpty(..), nonEmpty)
 import GHC.Utils.Misc
 import GHC.Types.Unique.DSet
 
@@ -466,6 +468,8 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd)
         fvs_cond `unionDVarSet` fvs_then `unionDVarSet` fvs_else)
 
 {-
+Note [Desugaring HsCmdCase]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Case commands are treated in much the same way as if commands
 (see above) except that there are more alternatives.  For example
 
@@ -516,6 +520,7 @@ dsCmd ids local_vars stack_ty res_ty
     either_con <- dsLookupTyCon eitherTyConName
     left_con <- dsLookupDataCon leftDataConName
     right_con <- dsLookupDataCon rightDataConName
+    void_ty <- mkTyConTy <$> dsLookupTyCon voidTyConName
     let
         left_id  = mkConLikeTc (RealDataCon left_con)
         right_id = mkConLikeTc (RealDataCon right_con)
@@ -536,12 +541,22 @@ dsCmd ids local_vars stack_ty res_ty
                 map (right_expr in_ty1 in_ty2) builds2,
              mkTyConApp either_con [in_ty1, in_ty2],
              do_choice ids in_ty1 in_ty2 res_ty core_exp1 core_exp2)
-        (leaves', sum_ty, core_choices) = foldb merge_branches branches
+    (leaves', sum_ty, core_choices) <- case nonEmpty branches of
+      Just bs -> return $ foldb merge_branches bs
+      -- when the case command has no alternatives, the sum type from
+      -- Note [Desugaring HsCmdCase] becomes the empty sum type,
+      -- i.e. Void. The choices then effectively become `arr absurd`,
+      -- implemented as `arr \case {}`.
+      Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
+        dsExpr (HsLamCase EpAnnNotUsed
+          (MG { mg_alts = noLocA []
+              , mg_ext = MatchGroupTc [Scaled Many void_ty] res_ty
+              , mg_origin = Generated }))
 
-        -- Replace the commands in the case with these tagged tuples,
-        -- yielding a HsExpr Id we can feed to dsExpr.
 
-        (_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
+    -- Replace the commands in the case with these tagged tuples,
+    -- yielding a HsExpr Id we can feed to dsExpr.
+    let (_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
         in_ty = envStackType env_ids stack_ty
 
     core_body <- dsExpr (HsCase noExtField exp
@@ -1151,11 +1166,12 @@ replaceLeavesGRHS [] _ = panic "replaceLeavesGRHS []"
 
 -- Balanced fold of a non-empty list.
 
-foldb :: (a -> a -> a) -> [a] -> a
-foldb _ [] = error "foldb of empty list"
-foldb _ [x] = x
+foldb :: (a -> a -> a) -> NonEmpty a -> a
+foldb _ (x:|[]) = x
 foldb f xs = foldb f (fold_pairs xs)
   where
-    fold_pairs [] = []
-    fold_pairs [x] = [x]
-    fold_pairs (x1:x2:xs) = f x1 x2:fold_pairs xs
+    fold_pairs (x1:|x2:xs) = f x1 x2 :| keep_empty fold_pairs xs
+    fold_pairs xs          = xs
+
+    keep_empty :: (NonEmpty a -> NonEmpty a) -> [a] -> [a]
+    keep_empty f = maybe [] (toList . f) . nonEmpty

@@ -455,6 +455,9 @@ basicKnownKeyNames
         -- The Either type
         , eitherTyConName, leftDataConName, rightDataConName
 
+        -- The Void type
+        , voidTyConName
+
         -- Plugins
         , pluginTyConName
         , frontendPluginTyConName
@@ -533,7 +536,7 @@ gHC_PRIM, gHC_PRIM_PANIC, gHC_PRIM_EXCEPTION,
     gHC_GHCI, gHC_GHCI_HELPERS, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_MAYBE,
     gHC_NUM_INTEGER, gHC_NUM_NATURAL, gHC_NUM_BIGNAT,
-    gHC_LIST, gHC_TUPLE, dATA_EITHER, dATA_LIST, dATA_STRING,
+    gHC_LIST, gHC_TUPLE, dATA_EITHER, dATA_VOID, dATA_LIST, dATA_STRING,
     dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_IX, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
@@ -569,6 +572,7 @@ gHC_NUM_BIGNAT  = mkBignumModule (fsLit "GHC.Num.BigNat")
 gHC_LIST        = mkBaseModule (fsLit "GHC.List")
 gHC_TUPLE       = mkPrimModule (fsLit "GHC.Tuple")
 dATA_EITHER     = mkBaseModule (fsLit "Data.Either")
+dATA_VOID       = mkBaseModule (fsLit "Data.Void")
 dATA_LIST       = mkBaseModule (fsLit "Data.List")
 dATA_STRING     = mkBaseModule (fsLit "Data.String")
 dATA_FOLDABLE   = mkBaseModule (fsLit "Data.Foldable")
@@ -946,6 +950,9 @@ eitherTyConName, leftDataConName, rightDataConName :: Name
 eitherTyConName   = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
 leftDataConName   = dcQual dATA_EITHER (fsLit "Left")   leftDataConKey
 rightDataConName  = dcQual dATA_EITHER (fsLit "Right")  rightDataConKey
+
+voidTyConName :: Name
+voidTyConName = tcQual dATA_VOID (fsLit "Void") voidTyConKey
 
 -- Generics (types)
 v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
@@ -1869,8 +1876,11 @@ isReflPrimTyConKey                      = mkPreludeTyConUnique 82
 eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
 
+voidTyConKey :: Unique
+voidTyConKey                            = mkPreludeTyConUnique 85
+
 nonEmptyTyConKey :: Unique
-nonEmptyTyConKey                        = mkPreludeTyConUnique 85
+nonEmptyTyConKey                        = mkPreludeTyConUnique 86
 
 -- Kind constructors
 liftedTypeKindTyConKey, unliftedTypeKindTyConKey,
@@ -1878,9 +1888,9 @@ liftedTypeKindTyConKey, unliftedTypeKindTyConKey,
   constraintKindTyConKey, levityTyConKey, runtimeRepTyConKey,
   vecCountTyConKey, vecElemTyConKey,
   zeroBitRepTyConKey, zeroBitTypeTyConKey :: Unique
-liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
-unliftedTypeKindTyConKey                = mkPreludeTyConUnique 88
-tYPETyConKey                            = mkPreludeTyConUnique 89
+liftedTypeKindTyConKey                  = mkPreludeTyConUnique 88
+unliftedTypeKindTyConKey                = mkPreludeTyConUnique 89
+tYPETyConKey                            = mkPreludeTyConUnique 90
 constraintKindTyConKey                  = mkPreludeTyConUnique 92
 levityTyConKey                          = mkPreludeTyConUnique 94
 runtimeRepTyConKey                      = mkPreludeTyConUnique 95
