@@ -1,6 +1,5 @@
 module GHC.Linker.Static
    ( linkBinary
-   , linkBinary'
    , linkStaticLib
    )
 where
@@ -65,15 +64,12 @@ it is supported by both gcc and clang. Anecdotally nvcc supports
 -}
 
 linkBinary :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
-linkBinary = linkBinary' False
-
-linkBinary' :: Bool -> Logger -> TmpFs -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
-linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
+linkBinary logger tmpfs dflags unit_env o_files dep_units = do
     let platform   = ue_platform unit_env
         unit_state = ue_units unit_env
         toolSettings' = toolSettings dflags
         verbFlags = getVerbFlags dflags
-        output_fn = exeFileName platform staticLink (outputFile_ dflags)
+        output_fn = exeFileName platform False (outputFile_ dflags)
 
     -- get the full list of packages to link with, by combining the
     -- explicit packages with the auto packages and all of their
@@ -153,13 +149,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
 
     pkg_link_opts <- do
         (package_hs_libs, extra_libs, other_flags) <- getUnitLinkOpts dflags unit_env dep_units
-        return $ if staticLink
-            then package_hs_libs -- If building an executable really means making a static
-                                 -- library (e.g. iOS), then we only keep the -l options for
-                                 -- HS packages, because libtool doesn't accept other options.
-                                 -- In the case of iOS these need to be added by hand to the
-                                 -- final link in Xcode.
-            else other_flags ++ dead_strip
+        return $ other_flags ++ dead_strip
                   ++ pre_hs_libs ++ package_hs_libs ++ post_hs_libs
                   ++ extra_libs
                  -- -Wl,-u,<sym> contained in other_flags
@@ -184,8 +174,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
       OSMinGW32 | gopt Opt_GenManifest dflags -> maybeCreateManifest logger tmpfs dflags output_fn
       _                                       -> return []
 
-    let link dflags args | staticLink = GHC.SysTools.runLibtool logger dflags args
-                         | platformOS platform == OSDarwin
+    let link dflags args | platformOS platform == OSDarwin
                             = do
                                  GHC.SysTools.runLink logger tmpfs dflags args
                                  GHC.Linker.MacOS.runInjectRPaths logger dflags pkg_lib_paths output_fn
@@ -220,7 +209,6 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                       -- on x86.
                       ++ (if not (gopt Opt_CompactUnwind dflags) &&
                              toolSettings_ldSupportsCompactUnwind toolSettings' &&
-                             not staticLink &&
                              (platformOS platform == OSDarwin) &&
                              case platformArch platform of
                                ArchX86     -> True
@@ -238,8 +226,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                       -- whether this is something we ought to fix, but
                       -- for now this flags silences them.
                       ++ (if platformOS   platform == OSDarwin &&
-                             platformArch platform == ArchX86 &&
-                             not staticLink
+                             platformArch platform == ArchX86
                           then ["-Wl,-read_only_relocs,suppress"]
                           else [])
 
