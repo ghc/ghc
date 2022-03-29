@@ -229,7 +229,7 @@ addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype))
        = L loc (HsQualTy { hst_xqual = noExtField
                          , hst_ctxt = add_ctxt (noLocA []), hst_body = L loc ty })
 
-    extra_pred = nlHsTyConApp Prefix cls (lHsQTyVarsToTypes tvs0)
+    extra_pred = nlHsTyConApp NotPromoted Prefix cls (lHsQTyVarsToTypes tvs0)
 
     add_ctxt (L loc preds) = L loc (extra_pred : preds)
 
@@ -365,8 +365,8 @@ reparenTypePrec = go
     = paren p PREC_CON $ HsAppTy x (goL PREC_FUN fun_ty) (goL PREC_CON arg_ty)
   go p (HsAppKindTy x fun_ty arg_ki)
     = paren p PREC_CON $ HsAppKindTy x (goL PREC_FUN fun_ty) (goL PREC_CON arg_ki)
-  go p (HsOpTy x ty1 op ty2)
-    = paren p PREC_FUN $ HsOpTy x (goL PREC_OP ty1) op (goL PREC_OP ty2)
+  go p (HsOpTy x prom ty1 op ty2)
+    = paren p PREC_FUN $ HsOpTy x prom (goL PREC_OP ty1) op (goL PREC_OP ty2)
   go p (HsParTy _ t) = unXRec @a $ goL p t -- pretend the paren doesn't exist - it will be added back if needed
   go _ t@HsTyVar{} = t
   go _ t@HsStarTy{} = t

@@ -16,6 +16,7 @@ import Haddock.Syb
 import Haddock.Types
 
 import GHC
+import GHC.Types.Basic ( PromotionFlag(..) )
 import GHC.Types.Name
 import GHC.Data.FastString
 import GHC.Builtin.Types ( listTyConName, unrestrictedFunTyConName )
@@ -132,8 +133,8 @@ sugarTuples typ =
 
 
 sugarOperators :: HsType GhcRn -> HsType GhcRn
-sugarOperators (HsAppTy _ (L _ (HsAppTy _ (L _ (HsTyVar _ _ (L l name))) la)) lb)
-    | isSymOcc $ getOccName name' = mkHsOpTy la (L l name) lb
+sugarOperators (HsAppTy _ (L _ (HsAppTy _ (L _ (HsTyVar _ prom (L l name))) la)) lb)
+    | isSymOcc $ getOccName name' = mkHsOpTy prom la (L l name) lb
     | unrestrictedFunTyConName == name' = HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) la lb
   where
     name' = getName name
@@ -293,8 +294,8 @@ renameType (HsFunTy x w la lr) = HsFunTy x <$> renameHsArrow w <*> renameLType l
 renameType (HsListTy x lt) = HsListTy x <$> renameLType lt
 renameType (HsTupleTy x srt lt) = HsTupleTy x srt <$> mapM renameLType lt
 renameType (HsSumTy x lt) = HsSumTy x <$> mapM renameLType lt
-renameType (HsOpTy x la lop lb) =
-    HsOpTy x <$> renameLType la <*> locatedN renameName lop <*> renameLType lb
+renameType (HsOpTy x prom la lop lb) =
+    HsOpTy x prom <$> renameLType la <*> locatedN renameName lop <*> renameLType lb
 renameType (HsParTy x lt) = HsParTy x <$> renameLType lt
 renameType (HsIParamTy x ip lt) = HsIParamTy x ip <$> renameLType lt
 renameType (HsKindSig x lt lk) = HsKindSig x <$> renameLType lt <*> pure lk

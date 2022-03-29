@@ -24,7 +24,7 @@ import Haddock.GhcUtils
 import GHC.Utils.Ppr hiding (Doc, quote)
 import qualified GHC.Utils.Ppr as Pretty
 
-import GHC.Types.Basic        ( PromotionFlag(..) )
+import GHC.Types.Basic        ( PromotionFlag(..), isPromoted )
 import GHC hiding (fromMaybeContext )
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name        ( nameOccName )
@@ -1133,9 +1133,13 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode
 ppr_mono_ty (HsAppKindTy _ fun_ty arg_ki) unicode
   = hsep [ppr_mono_lty fun_ty unicode, atSign unicode <> ppr_mono_lty arg_ki unicode]
 
-ppr_mono_ty (HsOpTy _ ty1 op ty2) unicode
-  = ppr_mono_lty ty1 unicode <+> ppr_op <+> ppr_mono_lty ty2 unicode
+ppr_mono_ty (HsOpTy _ prom ty1 op ty2) unicode
+  = ppr_mono_lty ty1 unicode <+> ppr_op_prom <+> ppr_mono_lty ty2 unicode
   where
+    ppr_op_prom | isPromoted prom
+                = char '\'' <> ppr_op
+                | otherwise
+                = ppr_op
     ppr_op | isSymOcc (getOccName op) = ppLDocName op
            | otherwise = char '`' <> ppLDocName op <> char '`'
 

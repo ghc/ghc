@@ -290,11 +290,11 @@ renameType t = case t of
   HsTupleTy _ b ts -> return . HsTupleTy noAnn b =<< mapM renameLType ts
   HsSumTy _ ts -> HsSumTy noAnn <$> mapM renameLType ts
 
-  HsOpTy _ a (L loc op) b -> do
+  HsOpTy _ prom a (L loc op) b -> do
     op' <- rename op
     a'  <- renameLType a
     b'  <- renameLType b
-    return (HsOpTy noAnn a' (L loc op') b')
+    return (HsOpTy noAnn prom a' (L loc op') b')
 
   HsParTy _ ty -> return . (HsParTy noAnn) =<< renameLType ty
 

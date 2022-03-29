@@ -1281,15 +1281,15 @@ ppr_mono_ty (HsAppKindTy _ fun_ty arg_ki) unicode qual _
   = hsep [ppr_mono_lty fun_ty unicode qual HideEmptyContexts
          , atSign unicode <> ppr_mono_lty arg_ki unicode qual HideEmptyContexts]
 
-ppr_mono_ty (HsOpTy _ ty1 op ty2) unicode qual _
-  = ppr_mono_lty ty1 unicode qual HideEmptyContexts <+> ppr_op <+> ppr_mono_lty ty2 unicode qual HideEmptyContexts
+ppr_mono_ty (HsOpTy _ prom ty1 op ty2) unicode qual _
+  = ppr_mono_lty ty1 unicode qual HideEmptyContexts <+> ppr_op_prom <+> ppr_mono_lty ty2 unicode qual HideEmptyContexts
   where
-    -- `(:)` is valid in type signature only as constructor to promoted list
-    -- and needs to be quoted in code so we explicitly quote it here too.
-    ppr_op
-        | (getOccString . getName . unL) op == ":" = promoQuote ppr_op'
-        | otherwise = ppr_op'
-    ppr_op' = ppLDocName qual Infix op
+    ppr_op_prom
+        | isPromoted prom
+        = promoQuote ppr_op
+        | otherwise
+        = ppr_op
+    ppr_op = ppLDocName qual Infix op
 
 ppr_mono_ty (HsParTy _ ty) unicode qual emptyCtxts
   = parens (ppr_mono_lty ty unicode qual emptyCtxts)
