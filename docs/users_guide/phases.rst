@@ -123,13 +123,6 @@ given compilation phase:
     GHC installation. See ``-fno-embed-manifest`` in
     :ref:`options-linker`.
 
-.. ghc-flag:: -pgmlibtool ⟨cmd⟩
-    :shortdesc: Use ⟨cmd⟩ as the command for libtool (with :ghc-flag:`-staticlib` only).
-    :type: dynamic
-    :category: phase-programs
-
-    Use ⟨cmd⟩ as the libtool command (when using :ghc-flag:`-staticlib` only).
-
 .. ghc-flag:: -pgmi ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the external interpreter command.
     :type: dynamic

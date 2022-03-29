@@ -107,7 +107,6 @@ initSettings top_dir = do
   unlit_path <- getToolSetting "unlit command"
 
   windres_path <- getToolSetting "windres command"
-  libtool_path <- getToolSetting "libtool command"
   ar_path <- getToolSetting "ar command"
   otool_path <- getToolSetting "otool command"
   install_name_tool_path <- getToolSetting "install_name_tool command"
@@ -180,7 +179,6 @@ initSettings top_dir = do
       , toolSettings_pgm_dll = (mkdll_prog,mkdll_args)
       , toolSettings_pgm_T   = touch_path
       , toolSettings_pgm_windres = windres_path
-      , toolSettings_pgm_libtool = libtool_path
       , toolSettings_pgm_ar = ar_path
       , toolSettings_pgm_otool = otool_path
       , toolSettings_pgm_install_name_tool = install_name_tool_path

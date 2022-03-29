@@ -34,7 +34,6 @@ module GHC.Settings
   , sPgm_dll
   , sPgm_T
   , sPgm_windres
-  , sPgm_libtool
   , sPgm_ar
   , sPgm_otool
   , sPgm_install_name_tool
@@ -108,7 +107,6 @@ data ToolSettings = ToolSettings
   , toolSettings_pgm_dll     :: (String, [Option])
   , toolSettings_pgm_T       :: String
   , toolSettings_pgm_windres :: String
-  , toolSettings_pgm_libtool :: String
   , toolSettings_pgm_ar      :: String
   , toolSettings_pgm_otool   :: String
   , toolSettings_pgm_install_name_tool :: String
@@ -222,8 +220,6 @@ sPgm_T :: Settings -> String
 sPgm_T = toolSettings_pgm_T . sToolSettings
 sPgm_windres :: Settings -> String
 sPgm_windres = toolSettings_pgm_windres . sToolSettings
-sPgm_libtool :: Settings -> String
-sPgm_libtool = toolSettings_pgm_libtool . sToolSettings
 sPgm_ar :: Settings -> String
 sPgm_ar = toolSettings_pgm_ar . sToolSettings
 sPgm_otool :: Settings -> String

@@ -216,7 +216,6 @@ $(includes_SETTINGS) : rts/include/Makefile | $$(dir $$@)/.
 	@echo ',("touch command", "$(SettingsTouchCommand)")' >> $@
 	@echo ',("dllwrap command", "$(SettingsDllWrapCommand)")' >> $@
 	@echo ',("windres command", "$(SettingsWindresCommand)")' >> $@
-	@echo ',("libtool command", "$(SettingsLibtoolCommand)")' >> $@
 	@echo ',("unlit command", "$$topdir/bin/$(utils/unlit_dist_PROG)")' >> $@
 	@echo ',("cross compiling", "$(CrossCompiling)")' >> $@
 	@echo ',("target platform string", "$(TARGETPLATFORM)")' >> $@

@@ -159,7 +159,6 @@ settings-otool-command = @SettingsOtoolCommand@
 settings-install_name_tool-command = @SettingsInstallNameToolCommand@
 settings-dll-wrap-command = @SettingsDllWrapCommand@
 settings-windres-command = @SettingsWindresCommand@
-settings-libtool-command = @SettingsLibtoolCommand@
 settings-touch-command = @SettingsTouchCommand@
 settings-clang-command = @SettingsClangCommand@
 settings-llc-command = @SettingsLlcCommand@
