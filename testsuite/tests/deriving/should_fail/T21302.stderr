@@ -1,0 +1,19 @@
+
+T21302.hs:6:13: error:
+    • Could not solve: (c0 Eq Int)
+        arising from the first field of ‘BoxAssocDouble’
+          (type ‘BoxAssoc Int’)
+    • When deriving the instance for (Eq BoxAssocDouble)
+
+T21302.hs:12:19: error:
+    • Could not deduce (c0 Eq a)
+      from the context: c Eq a
+        bound by a stand-alone deriving instance declaration:
+                   forall (c :: (* -> Constraint) -> * -> Constraint) a.
+                   c Eq a =>
+                   Eq (BoxAssoc a)
+        at T21302.hs:12:19-43
+    • In the ambiguity check for a stand-alone deriving instance declaration
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      In the stand-alone deriving instance for
+        ‘c Eq a => Eq (BoxAssoc a)’
