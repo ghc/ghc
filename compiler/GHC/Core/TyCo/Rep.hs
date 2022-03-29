@@ -1208,6 +1208,8 @@ data Coercion
 
   | HoleCo CoercionHole              -- ^ See Note [Coercion holes]
                                      -- Only present during typechecking
+
+  | ZappedCo Role Type Type DCoVarSet      -- TODO (RAE): Comment
   deriving Data.Data
 
 type CoercionN = Coercion       -- always nominal

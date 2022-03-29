@@ -295,6 +295,10 @@ toIfaceCoercionX fr co
     go (InstCo co arg)      = IfaceInstCo (go co) (go arg)
     go (KindCo c)           = IfaceKindCo (go c)
     go (SubCo co)           = IfaceSubCo (go co)
+    go (ZappedCo r t1 t2 vs)= IfaceZappedCo r (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+                                            free_cvs (map toIfaceCoVar (dVarSetElems bound_cvs))
+      where
+        (free_cvs, bound_cvs) = partitionDVarSet (`elemVarSet` fr) vs
     go (AxiomRuleCo co cs)  = IfaceAxiomRuleCo (coaxrName co) (map go cs)
     go (AxiomInstCo c i cs) = IfaceAxiomInstCo (coAxiomName c) i (map go cs)
     go (UnivCo p r t1 t2)   = IfaceUnivCo (go_prov p) r

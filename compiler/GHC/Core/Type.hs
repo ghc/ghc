@@ -622,6 +622,9 @@ expandTypeSynonyms ty
       = AxiomRuleCo ax (map (go_co subst) cs)
     go_co _ (HoleCo h)
       = pprPanic "expandTypeSynonyms hit a hole" (ppr h)
+    go_co subst (ZappedCo r t1 t2 cvs)
+      = mkZappedCo r (go subst t1) (go subst t2)
+                   (coVarsOfCosDSet (map (substCoVar subst) (dVarSetElems cvs)))
 
     go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
@@ -973,6 +976,9 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
            ; co' <- go_co env' co
            ; return $ mkForAllCo tv' kind_co' co' }
         -- See Note [Efficiency for ForAllCo case of mapTyCoX]
+    go_co env (ZappedCo r t1 t2 cvs)
+      = ZappedCo r <$> go_ty env t1 <*> go_ty env t2 <*>
+                 (coVarsOfCosDSet <$> mapM (covar env) (dVarSetElems cvs))
 
     go_prov env (PhantomProv co)    = PhantomProv <$> go_co env co
     go_prov env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
@@ -3366,11 +3372,8 @@ occCheckExpand vs_to_avoid ty
                                              ; co2' <- go_co cxt co2
                                              ; w' <- go_co cxt w
                                              ; return (mkFunCo r w' co1' co2') }
-    go_co (as,env) co@(CoVarCo c)
-      | Just c' <- lookupVarEnv env c   = return (mkCoVarCo c')
-      | bad_var_occ as c                = Nothing
-      | otherwise                       = return co
-
+    go_co env (CoVarCo cv)              = do { cv' <- go_covar env cv
+                                             ; return (mkCoVarCo cv') }
     go_co (as,_) co@(HoleCo h)
       | bad_var_occ as (ch_co_var h)    = Nothing
       | otherwise                       = return co
@@ -3399,6 +3402,15 @@ occCheckExpand vs_to_avoid ty
                                              ; return (mkSubCo co') }
     go_co cxt (AxiomRuleCo ax cs)       = do { cs' <- mapM (go_co cxt) cs
                                              ; return (mkAxiomRuleCo ax cs') }
+    go_co cxt (ZappedCo r t1 t2 cvs)    = do { t1' <- go cxt t1
+                                             ; t2' <- go cxt t2
+                                             ; cvs' <- mapM (go_covar cxt) (dVarSetElems cvs)
+                                             ; return (mkZappedCo r t1' t2' (mkDVarSet cvs')) }
+
+    go_covar (as,env) cv
+      | Just cv' <- lookupVarEnv env cv = return cv'
+      | bad_var_occ as cv               = Nothing
+      | otherwise                       = return cv
 
     ------------------
     go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
@@ -3452,6 +3464,7 @@ tyConsOfType ty
      go_co (KindCo co)             = go_co co
      go_co (SubCo co)              = go_co co
      go_co (AxiomRuleCo _ cs)      = go_cos cs
+     go_co (ZappedCo _ t1 t2 _)    = go t1 `unionUniqSets` go t2
 
      go_mco MRefl    = emptyUniqSet
      go_mco (MCo co) = go_co co

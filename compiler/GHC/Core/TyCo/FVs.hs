@@ -16,7 +16,8 @@ module GHC.Core.TyCo.FVs
         tyCoVarsOfCo, tyCoVarsOfCos, tyCoVarsOfMCo,
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
-        tyCoVarsOfCoDSet,
+        coVarsOfCosDSet,
+        tyCoVarsOfCoDSet, tyCoVarsOfCosDSet,
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList,
 
@@ -430,6 +431,12 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
                        -- See Note [CoercionHoles and coercion free variables]
                        -- in GHC.Core.TyCo.Rep
 
+coVarsOfCoDSet :: Coercion -> DCoVarSet
+coVarsOfCoDSet = fvDVarSet . filterFV isCoVar . tyCoFVsOfCo
+
+coVarsOfCosDSet :: [Coercion] -> DCoVarSet
+coVarsOfCosDSet = fvDVarSet . filterFV isCoVar . tyCoFVsOfCos
+
 {- *********************************************************************
 *                                                                      *
           Closing over kinds
@@ -596,6 +603,10 @@ tyCoFVsOfTypes []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 tyCoVarsOfCoDSet :: Coercion -> DTyCoVarSet
 -- See Note [Free variables of types]
 tyCoVarsOfCoDSet co = fvDVarSet $ tyCoFVsOfCo co
+
+-- | Get a deterministic set of the vars free in a list of coercions
+tyCoVarsOfCosDSet :: [Coercion] -> DTyCoVarSet
+tyCoVarsOfCosDSet cos = fvDVarSet $ tyCoFVsOfCos cos
 
 tyCoVarsOfCoList :: Coercion -> [TyCoVar]
 -- See Note [Free variables of types]

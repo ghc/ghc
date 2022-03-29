@@ -391,6 +391,9 @@ data IfaceCoercion
   | IfaceSubCo        IfaceCoercion
   | IfaceFreeCoVar    CoVar    -- See Note [Free tyvars in IfaceType]
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
+  | IfaceZappedCo     Role IfaceType IfaceType
+                      CoVarSet     -- free cvs, Note [Free tyvars in IfaceType]
+                      [IfLclName]  -- bound cvs
 
 data IfaceUnivCoProv
   = IfacePhantomProv IfaceCoercion

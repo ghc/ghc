@@ -492,6 +492,20 @@ opt_co4 env sym rep r (AxiomRuleCo co cs)
     wrapSym sym $
     AxiomRuleCo co (zipWith (opt_co2 env False) (coaxrAsmpRoles co) cs)
 
+opt_co4 env sym rep r (ZappedCo _r t1 t2 cvs)
+  | assert (r == _r) $
+    t1' `eqType` t2'
+  = mkReflCo (chooseRole rep r) t1'
+
+  | otherwise
+  =
+    ZappedCo (chooseRole rep r) (lcSubstLeft env t1) (lcSubstRight env t2)
+
+  where
+    t1' = lcSubstLeft env t1
+    t2' = lcSubstRight env t2
+
+
 {- Note [Optimise CoVarCo to Refl]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have (c :: t~t) we can optimise it to Refl. That increases the
@@ -615,6 +629,11 @@ opt_univ env sym prov role oty1 oty2
       ProofIrrelProv kco -> ProofIrrelProv $ opt_co4_wrap env sym False Nominal kco
       PluginProv _       -> prov
       CorePrepProv _     -> prov
+
+-------------
+opt_covar :: LiftingContext -> SymFlag -> ReprFlag -> CoVar -> NormalCo
+opt_covar env sym rep cv
+  | Just co <-
 
 -------------
 opt_transList :: HasDebugCallStack => InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]

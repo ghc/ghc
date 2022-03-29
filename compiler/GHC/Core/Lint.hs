@@ -2428,6 +2428,16 @@ lintCoercion (HoleCo h)
   = do { addErrL $ text "Unfilled coercion hole:" <+> ppr h
        ; lintCoercion (CoVarCo (coHoleCoVar h)) }
 
+lintCoercion (ZappedCo r t1 t2 cvs)
+  = do { t1' <- lintType t1
+       ; t2' <- lintType t2
+
+       ; subst <- getTCvSubst
+       ; let substed_cos = map (lookupCoVar subst) $ dVarSetElems cvs
+             cvs'        = coVarsOfCosDSet substed_cos
+
+       ; return (ZappedCo r t1' t2' cvs') }
+
 {-
 ************************************************************************
 *                                                                      *

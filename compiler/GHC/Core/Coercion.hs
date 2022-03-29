@@ -45,6 +45,7 @@ module GHC.Core.Coercion (
         mkKindCo,
         castCoercionKind, castCoercionKind1, castCoercionKind2,
         mkFamilyTyConAppCo,
+        mkZappedCo,
 
         mkHeteroCoercionType,
         mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
@@ -1335,6 +1336,10 @@ mkProofIrrelCo r co g  _ | isGReflCo co  = mkReflCo r (mkCoercionTy g)
 mkProofIrrelCo r kco        g1 g2 = mkUnivCo (ProofIrrelProv kco) r
                                              (mkCoercionTy g1) (mkCoercionTy g2)
 
+-- | TODO (RAE): Comment
+mkZappedCo :: Role -> Type -> Type -> DCoVarSet -> Coercion
+mkZappedCo = ZappedCo
+
 {-
 %************************************************************************
 %*                                                                      *
@@ -1531,6 +1536,9 @@ promoteCoercion co = case co of
 
     SubCo g
       -> promoteCoercion g
+
+    ZappedCo _ t1 t2 cvs
+      -> mkZappedCo Nominal (typeKind t1) (typeKind t2) cvs
 
   where
     Pair ty1 ty2 = coercionKind co
@@ -2339,6 +2347,7 @@ seqCo (InstCo co arg)           = seqCo co `seq` seqCo arg
 seqCo (KindCo co)               = seqCo co
 seqCo (SubCo co)                = seqCo co
 seqCo (AxiomRuleCo _ cs)        = seqCos cs
+seqCo (ZappedCo r t1 t2 cvs)    = r `seq` seqType t1 `seq` seqType t2 `seq` seqDVarSet cvs
 
 seqProv :: UnivCoProvenance -> ()
 seqProv (PhantomProv co)    = seqCo co
@@ -2403,6 +2412,7 @@ coercionLKind co
     go (AxiomInstCo ax ind cos) = go_ax_inst ax ind (map go cos)
     go (AxiomRuleCo ax cos)     = pFst $ expectJust "coercionKind" $
                                   coaxrProves ax $ map coercionKind cos
+    go (ZappedCo _ t1 _ _)      = t1
 
     go_ax_inst ax ind tys
       | CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
@@ -2458,6 +2468,7 @@ coercionRKind co
     go (AxiomInstCo ax ind cos) = go_ax_inst ax ind (map go cos)
     go (AxiomRuleCo ax cos)     = pSnd $ expectJust "coercionKind" $
                                   coaxrProves ax $ map coercionKind cos
+    go (ZappedCo _ _ t2 _)      = t2
 
     go co@(ForAllCo tv1 k_co co1) -- works for both tyvar and covar
        | isGReflCo k_co           = mkTyCoInvForAllTy tv1 (go co1)
@@ -2562,6 +2573,7 @@ coercionRole = go
     go (KindCo {}) = Nominal
     go (SubCo _) = Representational
     go (AxiomRuleCo ax _) = coaxrRole ax
+    go (ZappedCo r _ _ _) = r
 
 {-
 Note [Nested InstCos]
