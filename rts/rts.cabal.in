@@ -10,6 +10,8 @@ source-repository head
     location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   rts
 
+flag mmtk
+  default: True
 flag libm
   default: @CabalHaveLibm@
 flag librt
@@ -470,6 +472,12 @@ library
     -- Use assembler STG entrypoint on archictures where it is used
     if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64)
       asm-sources: StgCRunAsm.S
+
+    if flag(mmtk)
+      -- link against libmmtk-ghc
+      extra-libraries: mmtk-ghc
+      extra-lib-dirs: mmtk
+      cpp-options: -DMMTK_GHC
 
     c-sources: Adjustor.c
                adjustor/AdjustorPool.c

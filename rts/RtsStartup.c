@@ -41,6 +41,9 @@
 #include "LinkerInternals.h"
 #include "LibdwPool.h"
 #include "sm/CNF.h"
+#if defined(MMTK_GHC)
+#include "mmtk/mmtk-ghc.h"
+#endif
 #include "TopHandler.h"
 
 #if defined(PROFILING)
@@ -205,6 +208,10 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     }
 
     setlocale(LC_CTYPE,"");
+
+#if defined(MMTK_GHC)
+    mmtk_ghc_init();
+#endif
 
     /* Initialise the stats department, phase 0 */
     initStats0();
