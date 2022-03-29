@@ -53,6 +53,9 @@ import Data.Data
 newtype UniqDSet a = UniqDSet {getUniqDSet' :: UniqDFM a a}
                    deriving (Data)
 
+instance Foldable UniqDSet where
+  foldr f z = foldr f z . uniqDSetToList
+
 emptyUniqDSet :: UniqDSet a
 emptyUniqDSet = UniqDSet emptyUDFM
 
