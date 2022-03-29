@@ -485,7 +485,6 @@ SettingsInstallNameToolCommand = @SettingsInstallNameToolCommand@
 SettingsRanlibCommand = @SettingsRanlibCommand@
 SettingsDllWrapCommand = @SettingsDllWrapCommand@
 SettingsWindresCommand = @SettingsWindresCommand@
-SettingsLibtoolCommand = @SettingsLibtoolCommand@
 SettingsTouchCommand = @SettingsTouchCommand@
 SettingsClangCommand = @SettingsClangCommand@
 SettingsLlcCommand = @SettingsLlcCommand@

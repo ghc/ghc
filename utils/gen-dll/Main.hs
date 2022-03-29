@@ -44,9 +44,9 @@
      which is also the partitioning scheme used for all other files including
      the resulting dlls.
 
-     From the .def file we use libtool or genlib (when available) to generate
-     an import library. In this case we generate a GNU style import library
-     See Note [BFD import library].
+     From the .def file we use genlib to generate an import library. In this
+     case we generate a GNU style import library See Note [BFD import
+     library].
 
      These import libraries are used to break the cyclic dependencies that may
      exist between the symbols due to the random partitioning. e.g. A may
@@ -71,7 +71,7 @@
      only 1 symbol and the dll in which to find this symbol.
 
      A proper linker processes all the object files in this AR file (lld, ld and
-     ghci do this.) and so while genlib and libtool don't allow you to create
+     ghci do this.) and so while genlib doesn't allow you to create
      import libraries with multiple dll pointers, it is trivial to do.
 
      We use ar to merge together the import libraries into a large complete one.
@@ -440,13 +440,12 @@ execProg prog m_stdin args =
          length results `seq` return $ lines results)
 
 -- | Mingw-w64's genlib.exe is generally a few order of magnitudes faster than
--- libtool which is BFD based. So we prefer it, but it's not standard so
--- support both. We're talking a difference of 45 minutes in build time here.
+-- libtool which is BFD based.  We used to support both but the libtool path
+-- would literally require fractions of hours to finish so we dropped it in the
+-- name of consistency and simplicity.
 execLibTool :: String -> String -> IO [String]
-execLibTool input_def output_lib =
-  do if HAS_GENLIB
-        then execProg genlib Nothing [input_def, "-o", output_lib]
-        else execProg libexe Nothing ["-d", input_def, "-l", output_lib]
+execLibTool input_def output_lib
+  = execProg genlib Nothing [input_def, "-o", output_lib]
 
 -- Builds a delay import lib at the very end which is used to
 -- be able to delay the picking of a DLL on Windows.
@@ -470,9 +469,9 @@ build_import_lib base dll_name defFile objs
        let (globals, functions) = splitObjs objs
 
        -- This split is important because for DATA entries the compiler should not generate
-       -- a trampoline since CONTS DATA is directly referenced and not executed. This is not very
+       -- a trampoline since CONST DATA is directly referenced and not executed. This is not very
        -- important for mingw-w64 which would generate both the trampoline and direct reference
-       -- by default, but for libtool is it and even for mingw-w64 we can trim the output.
+       -- by default, but nevertheless for mingw-w64 we can trim the output.
        _ <- withFile defFile WriteMode $ \hDef -> do
               hPutStrLn hDef $ unlines $ ["LIBRARY " ++ show dll_name
                                          ,"EXPORTS"

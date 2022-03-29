@@ -547,22 +547,6 @@ AC_CHECK_TARGET_TOOL([STRIP], [strip])
 StripCmd="$STRIP"
 AC_SUBST([StripCmd])
 
-
-dnl ** which libtool to use?
-dnl --------------------------------------------------------------
-# The host normalization on Windows breaks autoconf, it no longer
-# thinks that target == host so it never checks the unqualified
-# tools for Windows. See #14274.
-if test "$HostOS" = "mingw32"
-then
-    AC_PATH_PROG([LIBTOOL],[libtool])
-    LibtoolCmd="$(cygpath -m $LIBTOOL)"
-else
-    AC_CHECK_TARGET_TOOL([LIBTOOL], [libtool])
-    LibtoolCmd="$LIBTOOL"
-fi
-AC_SUBST([LibtoolCmd])
-
 dnl ** Which otool to use on macOS
 dnl --------------------------------------------------------------
 AC_CHECK_TARGET_TOOL([OTOOL], [otool])
@@ -1299,7 +1283,6 @@ echo "\
    ar           : $ArCmd
    ld           : $LdCmd
    nm           : $NmCmd
-   libtool      : $LibtoolCmd
    objdump      : $ObjdumpCmd
    ranlib       : $RanlibCmd
    otool        : $OtoolCmd
