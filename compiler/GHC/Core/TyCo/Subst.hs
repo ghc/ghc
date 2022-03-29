@@ -61,7 +61,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkNomReflCo, mkSubCo, mkSymCo
    , mkFunCo, mkForAllCo, mkUnivCo
    , mkAxiomInstCo, mkAppCo, mkGReflCo
-   , mkInstCo, mkLRCo, mkTyConAppCo
+   , mkInstCo, mkLRCo, mkTyConAppCo, mkZappedCo
    , mkCoercionType
    , coercionKind, coercionLKind, coVarKindsTypesRole )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
@@ -848,6 +848,8 @@ subst_co subst co
     go (AxiomRuleCo c cs)    = let cs1 = map go cs
                                 in cs1 `seqList` AxiomRuleCo c cs1
     go (HoleCo h)            = HoleCo $! go_hole h
+    go (ZappedCo r t1 t2 vs) = ((mkZappedCo r $! go_ty t1) $! go_ty t2) $!
+                                 coVarsOfCosDSet (map (substCoVar subst) (dVarSetElems vs))
 
     go_prov (PhantomProv kco)    = PhantomProv (go kco)
     go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)

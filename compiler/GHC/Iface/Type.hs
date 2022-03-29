@@ -79,6 +79,7 @@ import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy )
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
+import GHC.Types.Var.Set
 import GHC.Builtin.Names
 import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyConName )
 import GHC.Types.Name
@@ -93,6 +94,7 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
 import Control.DeepSeq
+import GHC.Utils.Panic.Plain
 
 {-
 ************************************************************************
@@ -392,7 +394,7 @@ data IfaceCoercion
   | IfaceFreeCoVar    CoVar    -- See Note [Free tyvars in IfaceType]
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
   | IfaceZappedCo     Role IfaceType IfaceType
-                      CoVarSet     -- free cvs, Note [Free tyvars in IfaceType]
+                      DCoVarSet    -- free cvs, Note [Free tyvars in IfaceType]
                       [IfLclName]  -- bound cvs
 
 data IfaceUnivCoProv
@@ -594,6 +596,7 @@ substIfaceType env ty
     go_co (IfaceKindCo co)           = IfaceKindCo (go_co co)
     go_co (IfaceSubCo co)            = IfaceSubCo (go_co co)
     go_co (IfaceAxiomRuleCo n cos)   = IfaceAxiomRuleCo n (go_cos cos)
+    go_co (IfaceZappedCo r t1 t2 f_vs b_vs) = IfaceZappedCo r (go t1) (go t2) f_vs b_vs
 
     go_cos = map go_co
 
@@ -1776,6 +1779,9 @@ ppr_co ctxt_prec (IfaceSubCo co)
   = ppr_special_co ctxt_prec (text "Sub") [co]
 ppr_co ctxt_prec (IfaceKindCo co)
   = ppr_special_co ctxt_prec (text "Kind") [co]
+ppr_co ctxt_prec (IfaceZappedCo r t1 t2 f_cvs b_cvs)
+  = maybeParen ctxt_prec appPrec $
+    sep [text "Zapped", ppr r, pprParendIfaceType t1, pprParendIfaceType t2, ppr f_cvs, ppr b_cvs]
 
 ppr_special_co :: PprPrec -> SDoc -> [IfaceCoercion] -> SDoc
 ppr_special_co ctxt_prec doc cos
@@ -2086,6 +2092,13 @@ instance Binary IfaceCoercion where
   put_ _  (IfaceHoleCo cv)
        = pprPanic "Can't serialise IfaceHoleCo" (ppr cv)
           -- See Note [Holes in IfaceCoercion]
+  put_ bh (IfaceZappedCo r t1 t2 f_cvs b_cvs)
+       = assert (isEmptyDVarSet f_cvs) $ do
+         putByte bh 18
+         put_ bh r
+         put_ bh t1
+         put_ bh t2
+         put_ bh b_cvs
 
   get bh = do
       tag <- getByte bh
@@ -2144,6 +2157,11 @@ instance Binary IfaceCoercion where
            17-> do a <- get bh
                    b <- get bh
                    return $ IfaceAxiomRuleCo a b
+           18-> do a <- get bh
+                   b <- get bh
+                   c <- get bh
+                   d <- get bh
+                   return $ IfaceZappedCo a b c emptyDVarSet d
            _ -> panic ("get IfaceCoercion " ++ show tag)
 
 instance Binary IfaceUnivCoProv where
@@ -2223,6 +2241,7 @@ instance NFData IfaceCoercion where
     IfaceSubCo f1 -> rnf f1
     IfaceFreeCoVar f1 -> f1 `seq` ()
     IfaceHoleCo f1 -> f1 `seq` ()
+    IfaceZappedCo f1 f2 f3 f4 f5 -> f1 `seq` rnf f2 `seq` rnf f3 `seq` seqDVarSet f4 `seq` rnf f5
 
 instance NFData IfaceUnivCoProv where
   rnf x = seq x ()

@@ -24,6 +24,7 @@ import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
@@ -233,9 +234,7 @@ tidyCo env@(_, subst) co
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
     go (FunCo r w co1 co2)   = ((FunCo r $! go w) $! go co1) $! go co2
-    go (CoVarCo cv)          = case lookupVarEnv subst cv of
-                                 Nothing  -> CoVarCo cv
-                                 Just cv' -> CoVarCo cv'
+    go (CoVarCo cv)          = CoVarCo (go_covar cv)
     go (HoleCo h)            = HoleCo h
     go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! strictMap go cos
     go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
@@ -248,6 +247,12 @@ tidyCo env@(_, subst) co
     go (KindCo co)           = KindCo $! go co
     go (SubCo co)            = SubCo $! go co
     go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $ strictMap go cos
+    go (ZappedCo r t1 t2 vs) = ((ZappedCo r $! tidyType env t1) $! tidyType env t2) $!
+                                 mapDVarSet go_covar vs
+
+    go_covar cv
+      | Just cv' <- lookupVarEnv subst cv = cv'
+      | otherwise                         = cv
 
     go_prov (PhantomProv co)    = PhantomProv $! go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv $! go co

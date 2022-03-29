@@ -703,6 +703,8 @@ rnIfaceCo (IfaceSubCo c) = IfaceSubCo <$> rnIfaceCo c
 rnIfaceCo (IfaceAxiomRuleCo ax cos)
     = IfaceAxiomRuleCo ax <$> mapM rnIfaceCo cos
 rnIfaceCo (IfaceKindCo c) = IfaceKindCo <$> rnIfaceCo c
+rnIfaceCo (IfaceZappedCo r t1 t2 f_cvs b_cvs)
+  = IfaceZappedCo r <$> rnIfaceType t1 <*> rnIfaceType t2 <*> pure f_cvs <*> pure b_cvs
 
 rnIfaceTyCon :: Rename IfaceTyCon
 rnIfaceTyCon (IfaceTyCon n info)

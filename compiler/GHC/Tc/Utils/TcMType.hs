@@ -1581,6 +1581,9 @@ collect_cand_qtvs_co orig_ty bound = go_co
     go_co dv (InstCo co1 co2)      = foldlM go_co dv [co1, co2]
     go_co dv (KindCo co)           = go_co dv co
     go_co dv (SubCo co)            = go_co dv co
+    go_co dv (ZappedCo _ t1 t2 vs) = do dv1 <- collect_cand_qtvs orig_ty True bound dv  t1
+                                        dv2 <- collect_cand_qtvs orig_ty True bound dv1 t2
+                                        foldlM go_cv dv2 vs
 
     go_co dv (HoleCo hole)
       = do m_co <- unpackCoercionHole_maybe hole

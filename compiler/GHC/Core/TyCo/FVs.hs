@@ -16,7 +16,7 @@ module GHC.Core.TyCo.FVs
         tyCoVarsOfCo, tyCoVarsOfCos, tyCoVarsOfMCo,
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
-        coVarsOfCosDSet,
+        coVarsOfCoDSet, coVarsOfCosDSet,
         tyCoVarsOfCoDSet, tyCoVarsOfCosDSet,
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList,

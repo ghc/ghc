@@ -2055,26 +2055,7 @@ lintCoercion :: InCoercion -> LintM LintedCoercion
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 
-lintCoercion (CoVarCo cv)
-  | not (isCoVar cv)
-  = failWithL (hang (text "Bad CoVarCo:" <+> ppr cv)
-                  2 (text "With offending type:" <+> ppr (varType cv)))
-
-  | otherwise
-  = do { subst <- getTCvSubst
-       ; case lookupCoVar subst cv of
-           Just linted_co -> return linted_co ;
-           Nothing
-              | cv `isInScope` subst
-                   -> return (CoVarCo cv)
-              | otherwise
-                   ->
-                      -- lintCoBndr always extends the substitition
-                      failWithL $
-                      hang (text "The coercion variable" <+> pprBndr LetBind cv)
-                         2 (text "is out of scope")
-     }
-
+lintCoercion (CoVarCo cv) = lintCoVar cv
 
 lintCoercion (Refl ty)
   = do { ty' <- lintType ty
@@ -2432,11 +2413,31 @@ lintCoercion (ZappedCo r t1 t2 cvs)
   = do { t1' <- lintType t1
        ; t2' <- lintType t2
 
-       ; subst <- getTCvSubst
-       ; let substed_cos = map (lookupCoVar subst) $ dVarSetElems cvs
-             cvs'        = coVarsOfCosDSet substed_cos
+       ; substed_cvs <- mapM lintCoVar (dVarSetElems cvs)
+       ; let cvs' = coVarsOfCosDSet substed_cvs
 
        ; return (ZappedCo r t1' t2' cvs') }
+
+lintCoVar :: CoVar -> LintM LintedCoercion
+lintCoVar cv
+  | not (isCoVar cv)
+  = failWithL (hang (text "Bad CoVarCo:" <+> ppr cv)
+                  2 (text "With offending type:" <+> ppr (varType cv)))
+
+  | otherwise
+  = do { subst <- getTCvSubst
+       ; case lookupCoVar subst cv of
+           Just linted_co -> return linted_co ;
+           Nothing
+              | cv `isInScope` subst
+                   -> return (CoVarCo cv)
+              | otherwise
+                   ->
+                      -- lintCoBndr always extends the substitition
+                      failWithL $
+                      hang (text "The coercion variable" <+> pprBndr LetBind cv)
+                         2 (text "is out of scope")
+     }
 
 {-
 ************************************************************************

@@ -150,6 +150,7 @@ synonymTyConsOfType ty
      go_co (KindCo co)            = go_co co
      go_co (SubCo co)             = go_co co
      go_co (AxiomRuleCo _ cs)     = go_co_s cs
+     go_co (ZappedCo _ t1 t2 _)   = go t1 `plusNameEnv` go t2
 
      go_prov (PhantomProv co)     = go_co co
      go_prov (ProofIrrelProv co)  = go_co co

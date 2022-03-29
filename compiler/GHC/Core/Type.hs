@@ -274,7 +274,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkTyConAppCo, mkAppCo, mkCoVarCo, mkAxiomRuleCo
    , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
    , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
-   , mkKindCo, mkSubCo
+   , mkKindCo, mkSubCo, mkZappedCo
    , decomposePiCos, coercionKind, coercionLKind
    , coercionRKind, coercionType
    , isReflexiveCo, seqCo

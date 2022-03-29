@@ -1698,6 +1698,8 @@ freeNamesIfCoercion (IfaceSubCo co)
 freeNamesIfCoercion (IfaceAxiomRuleCo _ax cos)
   -- the axiom is just a string, so we don't count it as a name.
   = fnList freeNamesIfCoercion cos
+freeNamesIfCoercion (IfaceZappedCo _ t1 t2 _ _)
+  = freeNamesIfType t1 &&& freeNamesIfType t2
 
 freeNamesIfProv :: IfaceUnivCoProv -> NameSet
 freeNamesIfProv (IfacePhantomProv co)    = freeNamesIfCoercion co

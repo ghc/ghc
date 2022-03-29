@@ -35,6 +35,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Trace
 
 import Control.Monad   ( zipWithM )
+import GHC.Core.TyCo.FVs
 
 {-
 %************************************************************************
@@ -475,12 +476,15 @@ opt_co4 env sym rep r (ZappedCo _r t1 t2 cvs)
     t1' `eqType` t2'
   = mkReflCo (chooseRole rep r) t1'
 
+  | sym
+  = ZappedCo (chooseRole rep r) t2' t1' cvs'
+
   | otherwise
-  = ZappedCo (chooseRole rep r) (lcSubstLeft env t1) (lcSubstRight env t2) cvs'
+  = ZappedCo (chooseRole rep r) t1' t2' cvs'
 
   where
-    t1' = lcSubstLeft env t1
-    t2' = lcSubstRight env t2
+    t1' = substTy (lcSubstLeft env) t1
+    t2' = substTy (lcSubstRight env) t2
 
     cvs' = coVarsOfCosDSet $ map opt (dVarSetElems cvs)
     opt cv = opt_covar env False False (coVarRole cv) cv
@@ -611,7 +615,7 @@ opt_univ env sym prov role oty1 oty2
       CorePrepProv _     -> prov
 
 -------------
-opt_covar :: LiftingContext -> SymFlag -> ReprFlag -> CoVar -> Role -> NormalCo
+opt_covar :: LiftingContext -> SymFlag -> ReprFlag -> Role -> CoVar -> NormalCo
 opt_covar env sym rep r cv
   | Just co <- lcLookupCoVar env cv   -- see the ForAllCo case over coercions for why
                                       -- this is the right thing here
@@ -698,9 +702,10 @@ opt_trans_rule is in_co1@(LRCo d1 co1) in_co2@(LRCo d2 co2)
   = fireTransRule "PushLR" in_co1 in_co2 $
     mkLRCo d1 (opt_trans is co1 co2)
 
-opt_trans_rule is in_co1@(ZappedCo r1 t1 _ cvs1) in_co2@(ZappedCo r2 _ t2 cvs2)
+opt_trans_rule _is in_co1@(ZappedCo r1 t1 _ cvs1) in_co2@(ZappedCo r2 _ t2 cvs2)
   = assert (r1 == r2) $
-    mkZappedCo r1 t1 t2 (cvs1 <> cvs2)
+    fireTransRule "PushZapped" in_co1 in_co2 $
+    mkZappedCo r1 t1 t2 (cvs1 `unionDVarSet` cvs2)
 
 -- Push transitivity inside instantiation
 opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)
