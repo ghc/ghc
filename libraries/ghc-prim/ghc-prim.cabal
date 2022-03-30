@@ -87,7 +87,3 @@ Library
         cbits/pext.c
         cbits/popcnt.c
         cbits/word2float.c
-
-    -- We need to set the unit ID to ghc-prim (without a version number)
-    -- as it's magic.
-    ghc-options: -this-unit-id ghc-prim

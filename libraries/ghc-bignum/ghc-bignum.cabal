@@ -84,11 +84,6 @@ library
   ghc-options: -Wall
   cc-options: -std=c99 -Wall
 
-  -- GHC has wired-in IDs from the ghc-bignum package. Hence the unit-id
-  -- of the package should not contain the version: i.e. it must be
-  -- "ghc-bignum" and not "ghc-bignum-1.0".
-  ghc-options: -this-unit-id ghc-bignum
-
   include-dirs: include
 
   if flag(gmp)

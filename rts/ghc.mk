@@ -262,7 +262,7 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/dist-install/libs.depe
 	# $$9  = create delay load import lib
 	# $$10 = SxS Name
 	# $$11 = SxS Version
-	$$(gen-dll_INPLACE) link "rts/dist-install/build" "rts/dist-install/build" "" "" "$$(ALL_RTS_DEF_LIBS)" "$$(rts_$1_OBJS)" "$$@" "$$(rts_dist-install_HC) -this-unit-id rts -no-hs-main -shared -dynamic -dynload deploy \
+	$$(gen-dll_INPLACE) link "rts/dist-install/build" "rts/dist-install/build" "" "" "$$(ALL_RTS_DEF_LIBS)" "$$(rts_$1_OBJS)" "$$@" "$$(rts_dist-install_HC) -this-unit-id $$(rts_COMPONENT_ID) -no-hs-main -shared -dynamic -dynload deploy \
          -no-auto-link-packages -Lrts/dist-install/build -l$$(LIBFFI_NAME) \
          `cat rts/dist-install/libs.depend | tr '\n' ' '` \
          $$(rts_dist-install_$1_GHC_LD_OPTS)" "NO" \
@@ -284,7 +284,7 @@ LIBFFI_LIBS =
 endif
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/dist-install/libs.depend $$(rts_dist-install_FFI_SO)
 	"$$(RM)" $$(RM_OPTS) $$@
-	"$$(rts_dist-install_HC)" -this-unit-id rts -shared -dynamic -dynload deploy \
+	"$$(rts_dist-install_HC)" -this-unit-id $$(rts_COMPONENT_ID) -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages $$(LIBFFI_LIBS) `cat rts/dist-install/libs.depend` $$(rts_$1_OBJS) \
           $$(rts_dist-install_$1_GHC_LD_OPTS) \
 	  $$(rts_$1_DTRACE_OBJS) -o $$@
@@ -402,7 +402,9 @@ rts_CPP_OPTS += -DCOMPILING_RTS -DFS_NAMESPACE=rts
 
 rts_CC_OPTS += $(WARNING_OPTS)
 
-rts_HC_OPTS += -this-unit-id rts
+rts_COMPONENT_ID = rts
+
+rts_HC_OPTS += -this-unit-id $$(rts_COMPONENT_ID)
 
 ifneq "$(GhcWithSMP)" "YES"
 rts_CC_OPTS += -DNOSMP

@@ -61,11 +61,6 @@ flag thread-sanitizer
   default: False
 
 library
-    -- rts is a wired in package and
-    -- expects the unit-id to be
-    -- set without version
-    ghc-options: -this-unit-id rts
-
     -- If we are using an in-tree libffi then we must declare it as a bundled
     -- library to ensure that Cabal installs it.
     if !flag(use-system-libffi)

@@ -136,10 +136,6 @@ Library
 
     Include-Dirs: .
 
-    -- We need to set the unit id to ghc (without a version number)
-    -- as it's magic.
-    GHC-Options: -this-unit-id ghc
-
     c-sources:
         cbits/cutils.c
         cbits/genSym.c
