@@ -4,7 +4,15 @@ import Settings.Builders.Common
 
 ghcPkgBuilderArgs :: Args
 ghcPkgBuilderArgs = mconcat
-    [ builder (GhcPkg Copy) ? do
+    [ builder (GhcPkg Init) ? do
+        stage     <- getStage
+        pkgDb     <- expr $ packageDbPath stage
+        -- Confusingly calls recache rather than init because shake "creates"
+        -- the package db by virtue of creating the path to it, so we just recache
+        -- to create the package.cache file.
+        mconcat [ use_db pkgDb, arg "recache" ]
+
+    , builder (GhcPkg Copy) ? do
         verbosity <- expr getVerbosity
         stage     <- getStage
         pkgDb     <- expr $ packageDbPath stage

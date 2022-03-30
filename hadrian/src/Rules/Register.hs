@@ -90,7 +90,12 @@ registerPackageRules rs stage = do
     root <- buildRootRules
 
     -- Initialise the package database.
-    root -/- relativePackageDbPath stage -/- packageDbStamp %> \stamp ->
+    root -/- relativePackageDbPath stage -/- packageDbStamp %> \stamp -> do
+        -- This command initialises the package.cache file to avoid a race where
+        -- a package gets registered but there's not a package.cache file (which
+        -- leads to errors in GHC).
+        buildWithResources rs $
+            target (Context stage compiler vanilla) (GhcPkg Init stage) [] []
         writeFileLines stamp []
 
     -- Register a package.
