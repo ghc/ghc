@@ -3427,6 +3427,7 @@ fFlagsDeps = [
   flagSpec "prof-cafs"                        Opt_AutoSccsOnIndividualCafs,
   flagSpec "prof-count-entries"               Opt_ProfCountEntries,
   flagSpec "prof-late"                        Opt_ProfLateCcs,
+  flagSpec "prof-manual"                      Opt_ProfManualCcs,
   flagSpec "regs-graph"                       Opt_RegsGraph,
   flagSpec "regs-iterative"                   Opt_RegsIterative,
   depFlagSpec' "rewrite-rules"                Opt_EnableRewriteRules
@@ -3926,6 +3927,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
   = [ ([0,1,2], Opt_DoLambdaEtaExpansion)
     , ([0,1,2], Opt_DoEtaReduction)       -- See Note [Eta-reduction in -O0]
     , ([0,1,2], Opt_LlvmTBAA)
+    , ([0,1,2], Opt_ProfManualCcs )
     , ([2], Opt_DictsStrict)
 
     , ([0],     Opt_IgnoreInterfacePragmas)
