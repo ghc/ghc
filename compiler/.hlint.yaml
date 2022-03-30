@@ -23,4 +23,4 @@
 - ignore: {name: Redundant do, within: [GHC.SysTools.Terminal, GHC.Utils.Binary]}
 - ignore: {name: Use fewer imports, within: [GHC.Parser, GHC.Cmm.Parser ] }
 - ignore: {name: Redundant return, within: [GHC.Data.FastString] }
-- ignore: {within: [GHC.Parser, GHC.Parser.Lexer] }
+- ignore: {within: [GHC.Parser, GHC.Parser.Lexer, GHC.Parser.HaddockLex] }
