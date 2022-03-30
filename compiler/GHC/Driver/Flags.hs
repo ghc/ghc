@@ -256,6 +256,7 @@ data GeneralFlag
    | Opt_AutoSccsOnIndividualCafs
    | Opt_ProfCountEntries
    | Opt_ProfLateCcs
+   | Opt_ProfManualCcs -- ^ Ignore manual SCC annotations
 
    -- misc opts
    | Opt_Pp

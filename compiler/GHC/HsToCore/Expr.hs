@@ -765,7 +765,7 @@ dsExpr (SectionR x _ _)  = dataConCantHappen x
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
 ds_prag_expr (HsPragSCC _ _ cc) expr = do
     dflags <- getDynFlags
-    if sccProfilingEnabled dflags
+    if sccProfilingEnabled dflags && gopt Opt_ProfManualCcs dflags
       then do
         mod_name <- getModule
         count <- goptM Opt_ProfCountEntries

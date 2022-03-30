@@ -463,6 +463,17 @@ compiled program.
     "big" CAF cost-centre. With this option, all CAFs get their own
     cost-centre. An "if all else fails" option…
 
+.. ghc-flag:: -fprof-manual
+    :shortdesc: Process manual ``SCC`` annotations.
+    :type: dynamic
+    :reverse: -fno-prof-manual
+    :category:
+
+    :default: on
+
+    Process (or ignore) manual ``SCC`` annotations. Can be helpful to ignore annotations from libraries which
+    are not desired.
+
 .. ghc-flag:: -auto-all
     :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fprof-auto`
     :type: dynamic
