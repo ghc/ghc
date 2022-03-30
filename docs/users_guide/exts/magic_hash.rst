@@ -19,7 +19,7 @@ names ending in "#" for unboxed values or types (e.g. ``Int#``), but
 there is no requirement to do so; they are just plain ordinary
 variables. Nor does the :extension:`MagicHash` extension bring anything into
 scope. For example, to bring ``Int#`` into scope you must import
-``GHC.Prim`` (see :ref:`primitives`); the :extension:`MagicHash` extension then
+``GHC.Exts`` (see :ref:`primitives`); the :extension:`MagicHash` extension then
 allows you to *refer* to the ``Int#`` that is now in scope. Note that
 with this option, the meaning of ``x#y = 0`` is changed: it defines a
 function ``x#`` taking a single argument ``y``; to define the operator

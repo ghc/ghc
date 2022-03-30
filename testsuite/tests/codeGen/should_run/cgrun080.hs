@@ -10,7 +10,7 @@ module Main ( main ) where
 
 import Data.Bits
 import GHC.Int
-import GHC.Prim
+import GHC.Exts
 import GHC.Word
 import Control.Monad
 import Control.Concurrent

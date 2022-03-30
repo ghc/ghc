@@ -7,7 +7,7 @@ import Control.Monad
 import Foreign hiding (void)
 import Foreign.C
 import GHC.Conc
-import GHC.Prim
+import GHC.Exts
 import System.Environment
 
 -- Measure raw throughput, for M threads that each do N calls to C

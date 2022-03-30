@@ -17,7 +17,7 @@ import Data.Char(ord,chr)
 -- low level imports
 import GHC.Base                 (realWorld#)
 import GHC.IO                   (IO(IO), unIO, unsafePerformIO)
-import GHC.Prim                 (State#,RealWorld)
+import GHC.Exts                 (State#,RealWorld)
 
 
 -- FFI replacements for Haskell stuff

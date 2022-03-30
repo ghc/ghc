@@ -2,7 +2,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 
-import GHC.Prim (StackSnapshot#, ThreadId#)
+import GHC.Exts (StackSnapshot#, ThreadId#)
 import GHC.Conc.Sync (ThreadId(..))
 import GHC.Stack.CloneStack
 import Control.Concurrent

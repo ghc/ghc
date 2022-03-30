@@ -4,7 +4,7 @@
 
 module Type where
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Types
 
 import StrictPrim

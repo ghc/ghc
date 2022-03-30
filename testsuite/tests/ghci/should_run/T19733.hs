@@ -6,7 +6,7 @@
 
 module Main where
 
-import           GHC.Prim
+import           GHC.Exts
 import           GHC.IO
 import           Foreign.C
 

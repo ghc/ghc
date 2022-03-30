@@ -1,7 +1,7 @@
 {-# LANGUAGE MagicHash #-}
 module T8274 where
 
-import GHC.Prim
+import GHC.Exts
 
 data P = Positives Int# Float# Double# Char# Word#
 data N = Negatives Int# Float# Double#

@@ -1102,7 +1102,7 @@ to move. Consequently, it has a stable address that can be safely
 requested with ``byteArrayContents#``. Not that being pinned doesn't
 prevent the byteArray from being gc'ed in the same fashion a regular
 byte array would be.
-There are a handful of primitive functions in :ghc-prim-ref:`GHC.Prim.`
+There are a handful of primitive functions in :base-ref:`GHC.Exts.`
 used to enforce or check for pinnedness: ``isByteArrayPinned#``,
 ``isMutableByteArrayPinned#``, and ``newPinnedByteArray#``. A
 byte array can be pinned as a result of three possible causes:

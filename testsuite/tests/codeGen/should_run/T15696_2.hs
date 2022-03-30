@@ -1,7 +1,6 @@
 {-# LANGUAGE MagicHash #-}
 
 import GHC.Exts
-import GHC.Prim
 
 main :: IO ()
 main = do

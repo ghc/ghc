@@ -2,7 +2,7 @@
 
 module Lib where
 
-import GHC.Prim
+import GHC.Exts
 
 data B = B1 Int# Int# Int# Int# Int# | B2 Float#
 

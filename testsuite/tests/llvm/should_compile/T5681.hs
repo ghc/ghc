@@ -3,7 +3,7 @@
 -- Test case for #5681
 module Main where
 
-import GHC.Prim
+import GHC.Exts
 
 work :: Int -> Int
 work n = work (n-1)

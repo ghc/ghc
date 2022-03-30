@@ -1,4 +1,6 @@
 
 T15209.hs:6:10: error:
     Not in scope: type constructor or class ‘~#’
-    Suggested fix: Perhaps use ‘~’ (imported from Prelude)
+    Suggested fix:
+      Perhaps use one of these:
+        ‘~’ (imported from GHC.Exts), ‘~~’ (imported from GHC.Exts)

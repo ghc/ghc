@@ -9,7 +9,6 @@
              TypeFamilyDependencies #-}
 module T17541 where
 
-import GHC.Prim
 import GHC.Exts
 
 

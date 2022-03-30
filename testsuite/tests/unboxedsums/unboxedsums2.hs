@@ -2,7 +2,7 @@
 
 module Main where
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Types
 
 -- Code generator used to fail with illegal instruction errors when Float# is

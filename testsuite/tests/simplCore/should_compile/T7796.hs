@@ -2,7 +2,7 @@
 
 module T7796 where
 
-import GHC.Prim
+import GHC.Exts
 
 --
 -- test for #7796

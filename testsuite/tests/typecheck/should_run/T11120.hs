@@ -1,7 +1,7 @@
 {-# LANGUAGE MagicHash, DataKinds #-}
 -- See also TypeOf.hs
 
-import GHC.Prim
+import GHC.Exts
 import Data.Typeable
 
 data CharHash = CharHash Char#

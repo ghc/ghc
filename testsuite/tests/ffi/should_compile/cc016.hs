@@ -6,7 +6,7 @@ module Cc015 where
 
 import Foreign
 import Foreign.C.Types
-import GHC.Prim
+import GHC.Exts
 
 type family F a
 type instance F Int = Int# -> Int#

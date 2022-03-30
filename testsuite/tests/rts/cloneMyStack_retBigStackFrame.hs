@@ -8,7 +8,7 @@ module Main where
 import Control.Concurrent
 import Data.IORef
 import GHC.IO.Unsafe
-import GHC.Prim (StackSnapshot#)
+import GHC.Exts (StackSnapshot#)
 import GHC.Stack.CloneStack
 import System.Mem
 

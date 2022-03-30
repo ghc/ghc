@@ -1,7 +1,7 @@
 {-# LANGUAGE MagicHash, DeriveDataTypeable #-}
 module T2700 where
 
-import GHC.Prim
+import GHC.Exts
 
 import Data.Data
 import Data.Typeable

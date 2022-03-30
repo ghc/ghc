@@ -1,6 +1,6 @@
 {-# LANGUAGE MagicHash #-}
 
-import GHC.Prim
+import GHC.Exts
 
 data TestData = First Int Double String Int Int Int Int
               | Second Char# Int# Word# Double#

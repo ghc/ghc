@@ -4,7 +4,6 @@
 module T13155 where
 
 import GHC.Ptr
-import GHC.Prim
 import GHC.Exts
 
 foo :: Ptr Float -> State# RealWorld -> (# State# RealWorld, Float #)

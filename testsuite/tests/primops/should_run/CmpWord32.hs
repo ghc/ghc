@@ -5,7 +5,6 @@ module Main where
 
 import Data.Word
 import Data.List (findIndex)
-import GHC.Prim
 import GHC.Exts
 
 

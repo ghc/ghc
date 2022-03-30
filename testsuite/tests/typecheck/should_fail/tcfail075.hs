@@ -5,7 +5,7 @@
 module ShouldFail where
 
 import GHC.Base
-import GHC.Prim
+import GHC.Exts
 
 x = 1#
 

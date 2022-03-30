@@ -5,7 +5,7 @@ module Main where
 
 import Prelude hiding (Eq (..), Num(..))
 import qualified Prelude as P
-import GHC.Prim
+import GHC.Exts
 import GHC.Types
 
 class XNum (a :: TYPE rep) where

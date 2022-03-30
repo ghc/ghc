@@ -2,7 +2,7 @@
 
 module Float where
 
-import GHC.Prim
+import GHC.Exts
 
 foo vs  
   = let w = if length (reverse vs) > 10 then Just (length vs) else Nothing

@@ -1,7 +1,7 @@
 {-# LANGUAGE MagicHash #-}
 module T18589 where
 
-import GHC.Prim
+import GHC.Exts
 
 -- See Note [Guarding against silly shifts]
 -- Make sure that a silly shift is optimized correctly

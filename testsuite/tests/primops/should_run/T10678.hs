@@ -1,6 +1,6 @@
 {-# LANGUAGE MagicHash #-}
 
-import GHC.Prim
+import GHC.Exts
 
 main :: IO ()
 main = go 1000000# 10 (2^100)

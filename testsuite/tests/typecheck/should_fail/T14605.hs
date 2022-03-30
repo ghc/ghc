@@ -9,6 +9,6 @@
 
 module T14605 where
 
-import GHC.Prim (coerce)
+import GHC.Exts (coerce)
 
 duplicate = coerce @(forall x. ()) @(forall x. x)

@@ -2,7 +2,7 @@
 
 module Main where
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Types
 
 type Sum1 = (# (# Int#, Int #) | (# Int#, Int# #) | (# Int, Int# #) #)

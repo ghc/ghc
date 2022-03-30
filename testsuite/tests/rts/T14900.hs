@@ -2,7 +2,7 @@
 
 import GHC.Compact
 import GHC.Int
-import GHC.Prim
+import GHC.Exts
 import GHC.IO
 import GHC.Exts
 

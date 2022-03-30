@@ -2,7 +2,7 @@
 
 module Main where
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Types
 
 import Data.Void (Void)

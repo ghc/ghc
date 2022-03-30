@@ -6,7 +6,7 @@ module Super where
 
 import Data.Kind
 import Data.Proxy
-import GHC.Prim
+import GHC.Exts
 
 class (a ~ b) => C a b
 data SameKind :: k -> k -> Type where

@@ -2,7 +2,7 @@
 {-# LANGUAGE MagicHash, UnliftedFFITypes #-}
 module T7575 where
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Word
 import GHC.Types
 

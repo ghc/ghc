@@ -1,5 +1,5 @@
 
-T17541.hs:20:17: error:
+T17541.hs:19:17: error:
     • Couldn't match kind ‘Rep rep’ with ‘'IntRep’
       Expected kind ‘TYPE (Rep rep)’, but ‘Int#’ has kind ‘TYPE 'IntRep’
       The type variable ‘rep’ is ambiguous

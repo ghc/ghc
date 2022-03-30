@@ -1,7 +1,7 @@
 {-# LANGUAGE MagicHash #-}
 module Main where
 
-import GHC.Prim
+import GHC.Exts
 
 data P = Positives Int# Float# Double# Char# Word# deriving Show
 data N = Negatives Int# Float# Double# deriving Show
