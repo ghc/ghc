@@ -740,6 +740,29 @@ T20316:
 	echo "*** non-module.dump-timings ***"
 	cat non-module.dump-timings | grep alloc | sed 's/alloc.*//'
 
+.PHONY: T16476a
+T16476a:
+	echo '--make' > resp
+	echo '-XCPP' >> resp
+	echo '-DTEST' >> resp
+	echo 'T16476a.hs' >> resp
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 @resp
+	./T16476a
+
+# Tests that response files and -unit @file arguments work as expected.
+.PHONY: T16476b
+T16476b:
+	echo '-XCPP' >> unit-a
+	echo '-DTEST' >> unit-a
+	echo 'T16476b.hs' >> unit-a
+	
+	echo '--make' > resp
+	echo '-unit' > resp
+	echo '@unit-a' > resp
+	
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 @resp
+	./T16476b
+
 .PHONY: T20569
 T20569:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c T20569/A.hs -i -iT20569 -hidir=interface
