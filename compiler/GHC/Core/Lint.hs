@@ -96,6 +96,7 @@ import Data.List          ( partition )
 import Data.Maybe
 import GHC.Data.Pair
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Types.Unique.DSet
 
 {-
 Note [Core Lint guarantee]
@@ -2409,14 +2410,17 @@ lintCoercion (HoleCo h)
   = do { addErrL $ text "Unfilled coercion hole:" <+> ppr h
        ; lintCoercion (CoVarCo (coHoleCoVar h)) }
 
-lintCoercion (ZappedCo r t1 t2 cvs)
+lintCoercion co@(ZappedCo r t1 t2 vs)
   = do { t1' <- lintType t1
        ; t2' <- lintType t2
 
-       ; substed_cvs <- mapM lintCoVar (dVarSetElems cvs)
-       ; let cvs' = coVarsOfCosDSet substed_cvs
+       ; vs' <- updateFreeCoVarsM vs $ \cvs ->
+                  coVarsOfCosDSet <$> mapM lintCoVar (dVarSetElems cvs)
 
-       ; return (ZappedCo r t1' t2' cvs') }
+       ; checkL (isEmptyUniqDSet (freeCoHoles vs)) $
+         text "Unzonked coercion hole in ZappedCo:" <+> ppr co
+
+       ; return (ZappedCo r t1' t2' vs') }
 
 lintCoVar :: CoVar -> LintM LintedCoercion
 lintCoVar cv

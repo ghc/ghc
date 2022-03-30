@@ -36,6 +36,7 @@ import GHC.Utils.Trace
 
 import Control.Monad   ( zipWithM )
 import GHC.Core.TyCo.FVs
+import GHC.Types.Unique.DSet
 
 {-
 %************************************************************************
@@ -471,22 +472,23 @@ opt_co4 env sym rep r (AxiomRuleCo co cs)
     wrapSym sym $
     AxiomRuleCo co (zipWith (opt_co2 env False) (coaxrAsmpRoles co) cs)
 
-opt_co4 env sym rep r (ZappedCo _r t1 t2 cvs)
+opt_co4 env sym rep r (ZappedCo _r t1 t2 vs)
   | assert (r == _r) $
+    assert (isEmptyUniqDSet (freeCoHoles vs)) $
     t1' `eqType` t2'
   = mkReflCo (chooseRole rep r) t1'
 
   | sym
-  = ZappedCo (chooseRole rep r) t2' t1' cvs'
+  = ZappedCo (chooseRole rep r) t2' t1' vs'
 
   | otherwise
-  = ZappedCo (chooseRole rep r) t1' t2' cvs'
+  = ZappedCo (chooseRole rep r) t1' t2' vs'
 
   where
     t1' = substTy (lcSubstLeft env) t1
     t2' = substTy (lcSubstRight env) t2
 
-    cvs' = coVarsOfCosDSet $ map opt (dVarSetElems cvs)
+    vs' = updateFreeCoVars vs (coVarsOfCosDSet . map opt . dVarSetElems)
     opt cv = opt_covar env False False (coVarRole cv) cv
 
 
@@ -702,10 +704,10 @@ opt_trans_rule is in_co1@(LRCo d1 co1) in_co2@(LRCo d2 co2)
   = fireTransRule "PushLR" in_co1 in_co2 $
     mkLRCo d1 (opt_trans is co1 co2)
 
-opt_trans_rule _is in_co1@(ZappedCo r1 t1 _ cvs1) in_co2@(ZappedCo r2 _ t2 cvs2)
+opt_trans_rule _is in_co1@(ZappedCo r1 t1 _ vs1) in_co2@(ZappedCo r2 _ t2 vs2)
   = assert (r1 == r2) $
     fireTransRule "PushZapped" in_co1 in_co2 $
-    mkZappedCo r1 t1 t2 (cvs1 `unionDVarSet` cvs2)
+    mkZappedCo r1 t1 t2 (vs1 `mappend` vs2)
 
 -- Push transitivity inside instantiation
 opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)

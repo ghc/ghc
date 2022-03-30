@@ -41,6 +41,12 @@ module GHC.Core.TyCo.Rep (
         CoercionN, CoercionR, CoercionP, KindCoercion,
         MCoercion(..), MCoercionR, MCoercionN,
 
+        FreeCoVarsHoles,
+        mkFreeCoVarsHoles, updateFreeCoVars, updateFreeCoVarsM,
+        sizeFreeCoVarsHoles,
+        freeCoVars, freeCoHoles,
+
+
         -- * Functions over types
         mkNakedTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
@@ -98,6 +104,10 @@ import GHC.Utils.Panic
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
 import Data.IORef ( IORef )   -- for CoercionHole
+import GHC.Types.Unique.DSet
+import qualified Data.Semigroup   -- for (<>) in a Semigroup instance only
+import GHC.Utils.Panic.Plain
+
 
 {- **********************************************************************
 *                                                                       *
@@ -1209,7 +1219,7 @@ data Coercion
   | HoleCo CoercionHole              -- ^ See Note [Coercion holes]
                                      -- Only present during typechecking
 
-  | ZappedCo Role Type Type DCoVarSet      -- TODO (RAE): Comment
+  | ZappedCo Role Type Type !FreeCoVarsHoles     -- TODO (RAE): Comment
   deriving Data.Data
 
 type CoercionN = Coercion       -- always nominal
@@ -1661,6 +1671,55 @@ instance Outputable CoercionHole where
 instance Uniquable CoercionHole where
   getUnique (CoercionHole { ch_co_var = cv }) = getUnique cv
 
+-- | Stores the free covars and coercion holes from a type or coercion;
+-- these are often needed together
+data FreeCoVarsHoles = FCVH_Empty  -- avoid allocating a new FCVH node at every <>
+                     | FCVH !DCoVarSet !(UniqDSet CoercionHole)
+  deriving Data.Data
+
+mkFreeCoVarsHoles :: DCoVarSet -> UniqDSet CoercionHole -> FreeCoVarsHoles
+mkFreeCoVarsHoles = FCVH
+
+-- this one preserves FCVH_Empty
+-- Pre-condition: f empty == empty
+updateFreeCoVars :: FreeCoVarsHoles -> (DCoVarSet -> DCoVarSet) -> FreeCoVarsHoles
+updateFreeCoVars FCVH_Empty f    = assert (isEmptyDVarSet (f emptyDVarSet))
+                                   FCVH_Empty
+updateFreeCoVars (FCVH cvs hs) f = FCVH (f cvs) hs
+
+-- this one preserves FCVH_Empty
+-- Pre-condition: f empty == empty (and has no side effects)
+updateFreeCoVarsM :: Applicative m => FreeCoVarsHoles -> (DCoVarSet -> m DCoVarSet)
+                  -> m FreeCoVarsHoles
+updateFreeCoVarsM FCVH_Empty _    = pure FCVH_Empty
+updateFreeCoVarsM (FCVH cvs hs) f = FCVH <$> f cvs <*> pure hs
+
+freeCoVars :: FreeCoVarsHoles -> DCoVarSet
+freeCoVars FCVH_Empty   = emptyDVarSet
+freeCoVars (FCVH cvs _) = cvs
+
+freeCoHoles :: FreeCoVarsHoles -> UniqDSet CoercionHole
+freeCoHoles FCVH_Empty  = emptyUniqDSet
+freeCoHoles (FCVH _ hs) = hs
+
+sizeFreeCoVarsHoles :: FreeCoVarsHoles -> Int
+sizeFreeCoVarsHoles FCVH_Empty    = 0
+sizeFreeCoVarsHoles (FCVH cvs hs) = sizeDVarSet cvs + sizeUniqDSet hs
+
+instance Outputable FreeCoVarsHoles where
+  ppr FCVH_Empty   = braces empty
+  ppr (FCVH vs hs) = braces (fcat (punctuate comma (map ppr (dVarSetElems vs))) <> vbar <>
+                             fcat (punctuate comma (map ppr (uniqDSetToList hs))))
+
+instance Semigroup FreeCoVarsHoles where
+  FCVH_Empty   <> FCVH_Empty   = FCVH_Empty
+  FCVH_Empty   <> other        = other
+  other        <> FCVH_Empty   = other
+  FCVH vs1 hs1 <> FCVH vs2 hs2 = FCVH (vs1 `mappend` vs2) (hs1 `mappend` hs2)
+
+instance Monoid FreeCoVarsHoles where
+  mempty = FCVH_Empty
+
 {- Note [Phantom coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -1936,9 +1995,10 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (InstCo co arg)         = go_co env co `mappend` go_co env arg
     go_co env (KindCo co)             = go_co env co
     go_co env (SubCo co)              = go_co env co
-    go_co env (ZappedCo _ t1 t2 cvs)  = go_ty env t1 `mappend`
+    go_co env (ZappedCo _ t1 t2 vs)   = go_ty env t1 `mappend`
                                         go_ty env t2 `mappend`
-                                        foldMap (covar env) cvs
+                                        foldMap (covar env) (freeCoVars vs) `mappend`
+                                        foldMap (cohole env) (freeCoHoles vs)
     go_co env (ForAllCo tv kind_co co)
       = go_co env kind_co `mappend` go_ty env (varType tv)
                           `mappend` go_co env' co
@@ -2004,7 +2064,7 @@ coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg
 coercionSize (KindCo co)         = 1 + coercionSize co
 coercionSize (SubCo co)          = 1 + coercionSize co
 coercionSize (AxiomRuleCo _ cs)  = 1 + sum (map coercionSize cs)
-coercionSize (ZappedCo _ a b vs) = 1 + typeSize a + typeSize b + sizeDVarSet vs
+coercionSize (ZappedCo _ a b vs) = 1 + typeSize a + typeSize b + sizeFreeCoVarsHoles vs
 
 provSize :: UnivCoProvenance -> Int
 provSize (PhantomProv co)    = 1 + coercionSize co

@@ -3,8 +3,8 @@ T20363_show_co.hs:23:10: error:
     • The newtype constructor pattern
       does not have a fixed runtime representation.
       Its type is:
-        ((# #) |> (TYPE (Sym (T20363_show_co.D:R:NilRep[0])))_N) :: TYPE
-                                                                      NilRep
+        ((# #) |> (TYPE
+                     (Sym (Zapped nominal NilRep ZeroBitRep {} [])))_N) :: TYPE NilRep
       NB: GHC does not (yet) support rewriting in runtime representations.
       Please comment on GHC ticket #13105 if this is causing you trouble.
       <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>

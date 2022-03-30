@@ -1581,15 +1581,11 @@ collect_cand_qtvs_co orig_ty bound = go_co
     go_co dv (InstCo co1 co2)      = foldlM go_co dv [co1, co2]
     go_co dv (KindCo co)           = go_co dv co
     go_co dv (SubCo co)            = go_co dv co
+    go_co dv (HoleCo hole)         = go_hole dv hole
     go_co dv (ZappedCo _ t1 t2 vs) = do dv1 <- collect_cand_qtvs orig_ty True bound dv  t1
                                         dv2 <- collect_cand_qtvs orig_ty True bound dv1 t2
-                                        foldlM go_cv dv2 vs
-
-    go_co dv (HoleCo hole)
-      = do m_co <- unpackCoercionHole_maybe hole
-           case m_co of
-             Just co -> go_co dv co
-             Nothing -> go_cv dv (coHoleCoVar hole)
+                                        dv3 <- foldlM go_cv dv2 (freeCoVars vs)
+                                        foldlM go_hole dv3 (freeCoHoles vs)
 
     go_co dv (CoVarCo cv) = go_cv dv cv
 
@@ -1614,6 +1610,13 @@ collect_cand_qtvs_co orig_ty bound = go_co
       | otherwise           = collect_cand_qtvs orig_ty True bound
                                     (dv { dv_cvs = cvs `extendVarSet` cv })
                                     (idType cv)
+
+    go_hole :: CandidatesQTvs -> CoercionHole -> TcM CandidatesQTvs
+    go_hole dv hole = do
+      m_co <- unpackCoercionHole_maybe hole
+      case m_co of
+        Just co -> go_co dv co
+        Nothing -> go_cv dv (coHoleCoVar hole)
 
     is_bound tv = tv `elemVarSet` bound
 

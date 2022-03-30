@@ -8,6 +8,7 @@ import {-# SOURCE #-} GHC.Core.TyCon ( TyCon )
 
 data Type
 data Coercion
+data FreeCoVarsHoles
 data UnivCoProvenance
 data TyLit
 data TyCoBinder

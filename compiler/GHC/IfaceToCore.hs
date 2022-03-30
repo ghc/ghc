@@ -1429,7 +1429,8 @@ tcIfaceCo = go
     go (IfaceHoleCo c)           = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr c)
     go (IfaceZappedCo r t1 t2 free_cvs bound_cvs)
       = assert (isEmptyDVarSet free_cvs) $
-        ZappedCo r <$> tcIfaceType t1 <*> tcIfaceType t2 <*> (mkDVarSet <$> mapM go_var bound_cvs)
+        ZappedCo r <$> tcIfaceType t1 <*> tcIfaceType t2 <*>
+                 (mkFreeCoVarsHoles <$> (mkDVarSet <$> mapM go_var bound_cvs) <*> pure mempty)
 
     go_var :: FastString -> IfL CoVar
     go_var = tcIfaceLclId

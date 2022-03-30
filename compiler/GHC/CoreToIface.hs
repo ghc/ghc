@@ -84,6 +84,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Trace
 
 import Data.Maybe ( catMaybes )
+import GHC.Types.Unique.DSet
 
 {- Note [Avoiding space leaks in toIface*]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -296,9 +297,14 @@ toIfaceCoercionX fr co
     go (KindCo c)           = IfaceKindCo (go c)
     go (SubCo co)           = IfaceSubCo (go co)
     go (ZappedCo r t1 t2 vs)= IfaceZappedCo r (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
-                                            free_cvs (map toIfaceCoVar (dVarSetElems bound_cvs))
+                                              (free_cvs1 `unionDVarSet` free_cvs2)
+                                              (map toIfaceCoVar (dVarSetElems bound_cvs))
       where
-        (free_cvs, bound_cvs) = partitionDVarSet (`elemVarSet` fr) vs
+        cvs                    = freeCoVars vs
+        hs                     = freeCoHoles vs
+        (free_cvs1, bound_cvs) = partitionDVarSet (`elemVarSet` fr) cvs
+        free_cvs2              = mkDVarSet (map coHoleCoVar (uniqDSetToList hs))
+
     go (AxiomRuleCo co cs)  = IfaceAxiomRuleCo (coaxrName co) (map go cs)
     go (AxiomInstCo c i cs) = IfaceAxiomInstCo (coAxiomName c) i (map go cs)
     go (UnivCo p r t1 t2)   = IfaceUnivCo (go_prov p) r

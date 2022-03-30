@@ -296,6 +296,7 @@ import GHC.Types.Unique ( nonDetCmpUnique )
 import GHC.Data.Maybe   ( orElse, expectJust )
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
+import GHC.Types.Unique.DSet
 -- import GHC.Utils.Trace
 
 -- $type_classification
@@ -622,9 +623,10 @@ expandTypeSynonyms ty
       = AxiomRuleCo ax (map (go_co subst) cs)
     go_co _ (HoleCo h)
       = pprPanic "expandTypeSynonyms hit a hole" (ppr h)
-    go_co subst (ZappedCo r t1 t2 cvs)
-      = mkZappedCo r (go subst t1) (go subst t2)
-                   (coVarsOfCosDSet (map (substCoVar subst) (dVarSetElems cvs)))
+    go_co subst (ZappedCo r t1 t2 vs)
+      = assert (isEmptyUniqDSet (freeCoHoles vs)) $
+        mkZappedCo r (go subst t1) (go subst t2)
+                   (updateFreeCoVars vs (coVarsOfCosDSet . map (substCoVar subst) . dVarSetElems))
 
     go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
@@ -976,9 +978,16 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
            ; co' <- go_co env' co
            ; return $ mkForAllCo tv' kind_co' co' }
         -- See Note [Efficiency for ForAllCo case of mapTyCoX]
-    go_co env (ZappedCo r t1 t2 cvs)
-      = ZappedCo r <$> go_ty env t1 <*> go_ty env t2 <*>
-                 (coVarsOfCosDSet <$> mapM (covar env) (dVarSetElems cvs))
+    go_co env (ZappedCo r t1 t2 vs)
+      = do { t1' <- go_ty env t1
+           ; t2' <- go_ty env t2
+           ; let cvs = freeCoVars vs
+                 hs  = freeCoHoles vs
+           ; cos_from_cvs <- mapM (covar env) (dVarSetElems cvs)
+           ; cos_from_hs  <- mapM (cohole env) (uniqDSetToList hs)
+           ; let new_vs = coVarsHolesOfCos cos_from_cvs `mappend` coVarsHolesOfCos cos_from_hs
+           ; return $ mkZappedCo r t1' t2' new_vs }
+
 
     go_prov env (PhantomProv co)    = PhantomProv <$> go_co env co
     go_prov env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
@@ -2532,7 +2541,7 @@ getRuntimeRep_maybe :: HasDebugCallStack
 getRuntimeRep_maybe = kindRep_maybe . typeKind
 
 -- | Extract the RuntimeRep classifier of a type. For instance,
--- @getRuntimeRep_maybe Int = LiftedRep@. Panics if this is not possible.
+-- @getRuntimeRep Int = LiftedRep@. Panics if this is not possible.
 getRuntimeRep :: HasDebugCallStack => Type -> Type
 getRuntimeRep ty
   = case getRuntimeRep_maybe ty of
@@ -3372,11 +3381,11 @@ occCheckExpand vs_to_avoid ty
                                              ; co2' <- go_co cxt co2
                                              ; w' <- go_co cxt w
                                              ; return (mkFunCo r w' co1' co2') }
-    go_co env (CoVarCo cv)              = do { cv' <- go_covar env cv
+    go_co cxt (CoVarCo cv)              = do { cv' <- go_covar cxt cv
                                              ; return (mkCoVarCo cv') }
-    go_co (as,_) co@(HoleCo h)
-      | bad_var_occ as (ch_co_var h)    = Nothing
-      | otherwise                       = return co
+    go_co cxt co@(HoleCo h)
+      | ok_hole cxt h = return co
+      | otherwise     = Nothing
 
     go_co cxt (AxiomInstCo ax ind args) = do { args' <- mapM (go_co cxt) args
                                              ; return (mkAxiomInstCo ax ind args') }
@@ -3402,16 +3411,20 @@ occCheckExpand vs_to_avoid ty
                                              ; return (mkSubCo co') }
     go_co cxt (AxiomRuleCo ax cs)       = do { cs' <- mapM (go_co cxt) cs
                                              ; return (mkAxiomRuleCo ax cs') }
-    go_co cxt (ZappedCo r t1 t2 cvs)    = do { t1' <- go cxt t1
-                                             ; t2' <- go cxt t2
-                                             ; cvs' <- mapM (go_covar cxt) (dVarSetElems cvs)
-                                             ; return (mkZappedCo r t1' t2' (mkDVarSet cvs')) }
+    go_co cxt (ZappedCo r t1 t2 vs)
+      = do { t1' <- go cxt t1
+           ; t2' <- go cxt t2
+           ; vs' <- updateFreeCoVarsM vs $ \cvs ->
+                      mkDVarSet <$> mapM (go_covar cxt) (dVarSetElems cvs)
+           ; guard (all (ok_hole cxt) (uniqDSetToList (freeCoHoles vs)))
+           ; return (mkZappedCo r t1' t2' vs') }
 
     go_covar (as,env) cv
       | Just cv' <- lookupVarEnv env cv = return cv'
       | bad_var_occ as cv               = Nothing
       | otherwise                       = return cv
 
+    ok_hole (as,_) h = not (bad_var_occ as (ch_co_var h))
     ------------------
     go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
     go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co

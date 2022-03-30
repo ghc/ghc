@@ -1127,22 +1127,23 @@ mk_maybe_roles ReprEq roles = Just roles
 data UsedCoVars
   = JustZonked    -- ^ we only zonked; nothing else interesting happened
                   -- consequence: a coercion between the output and the input is just Refl
-  | UsedCoVars DCoVarSet   -- ^ something interesting happened, with the given set
+  | UsedCoVars !FreeCoVarsHoles
+                           -- ^ something interesting happened, with the given sets
                            -- of free covars. NB: UsedCoVars <empty> is *not* the same
                            -- as JustZonked!
 
 instance Semigroup UsedCoVars where
-  JustZonked      <> JustZonked      = JustZonked
-  UsedCoVars cvs  <> JustZonked      = UsedCoVars cvs
-  JustZonked      <> UsedCoVars cvs  = UsedCoVars cvs
-  UsedCoVars cvs1 <> UsedCoVars cvs2 = UsedCoVars (cvs1 `unionDVarSet` cvs2)
+  JustZonked     <> JustZonked     = JustZonked
+  other          <> JustZonked     = other
+  JustZonked     <> other          = other
+  UsedCoVars vs1 <> UsedCoVars vs2 = UsedCoVars (vs1 `mappend` vs2)
 
 instance Monoid UsedCoVars where
   mempty = JustZonked
 
 coercionUsedCoVars :: Coercion -> UsedCoVars
 coercionUsedCoVars co | isReflCo co = JustZonked
-                      | otherwise   = UsedCoVars (coVarsOfCoDSet co)
+                      | otherwise   = UsedCoVars (coVarsHolesOfCo co)
 
 
 rewrite_zapped :: Type -> RewriteM (Xi, UsedCoVars)
@@ -1173,7 +1174,7 @@ rewrite_zapped (TyVarTy tv)
                  ; when wrw $ recordRewriter ctev
 
                  ; (xi, ucv) <- bumpDepth $ rewrite_zapped rhs_ty
-                 ; return (xi, ucv `mappend` UsedCoVars (coVarsOfCoDSet (ctEvCoercion ctev))) }
+                 ; return (xi, ucv `mappend` coercionUsedCoVars (ctEvCoercion ctev)) }
 
        ; _ -> do { tv' <- liftTcS $ updateTyVarKindM zonkTcType tv
                  ; return (mkTyVarTy tv', JustZonked) }}}}}
@@ -1201,8 +1202,15 @@ rewrite_zapped (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 
            <- setEqRel NomEq $ liftA3 (,,) (rewrite_zapped mult)
                                            (rewrite_zapped arg_rep)
                                            (rewrite_zapped res_rep)
-       ; let arg_ki_co = build_zapped_mco arg_rep arg_rep_xi ucv4
-             res_ki_co = build_zapped_mco res_rep res_rep_xi ucv5
+       ; let arg_rr_mco = build_zapped_mco arg_rep arg_rep_xi ucv4
+             res_rr_mco = build_zapped_mco res_rep res_rep_xi ucv5
+
+             mk_TYPE_mco MRefl = MRefl
+             mk_TYPE_mco (MCo rr_co) = MCo (mkTyConAppCo Nominal tYPETyCon [rr_co])
+
+             arg_ki_co = mk_TYPE_mco arg_rr_mco
+             res_ki_co = mk_TYPE_mco res_rr_mco
+
        ; return ( mkFunTy vis mult_xi (xi1 `mkCastTyMCo` arg_ki_co) (xi2 `mkCastTyMCo` res_ki_co)
                 , mconcat [ucv1, ucv2, ucv3, ucv4, ucv5] ) }
 
@@ -1431,7 +1439,7 @@ rewrite_args_slow_zapped orig_binders orig_inner_ki fvs orig_roles orig_tys
 build_zapped_mco :: Kind -> Kind -> UsedCoVars -> MCoercionN
 build_zapped_mco _ki1 _ki2 JustZonked = MRefl
 build_zapped_mco ki1 ki2 _ | ki1 `eqType` ki2 = MRefl
-build_zapped_mco ki1 ki2 (UsedCoVars cvs) = MCo $ mkZappedCo Nominal ki1 ki2 cvs
+build_zapped_mco ki1 ki2 (UsedCoVars vs) = MCo $ mkZappedCo Nominal ki1 ki2 vs
 
 build_zapped_co :: Role -> Type -> Type -> UsedCoVars -> Coercion
 build_zapped_co r t1 t2 ucv
@@ -1440,3 +1448,5 @@ build_zapped_co r t1 t2 ucv
 
 -- TODO (RAE): Make mode where both rewriters run, comparing the results
 -- TODO (RAE): Fix rw in HEAD
+-- TODO (RAE): Make reduction strict in HEAD
+-- TODO (RAE): Make reduction use MCo in HEAD

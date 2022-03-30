@@ -16,10 +16,12 @@ module GHC.Core.TyCo.FVs
         tyCoVarsOfCo, tyCoVarsOfCos, tyCoVarsOfMCo,
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
-        coVarsOfCoDSet, coVarsOfCosDSet,
+        coVarsOfCosDSet,
         tyCoVarsOfCoDSet, tyCoVarsOfCosDSet,
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList,
+
+        coVarsHolesOfCo, coVarsHolesOfCos,
 
         almostDevoidCoVarOfCo,
 
@@ -52,7 +54,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Types.Var
 import GHC.Utils.FV
-
+import GHC.Types.Unique.DSet
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -431,9 +433,6 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
                        -- See Note [CoercionHoles and coercion free variables]
                        -- in GHC.Core.TyCo.Rep
 
-coVarsOfCoDSet :: Coercion -> DCoVarSet
-coVarsOfCoDSet = fvDVarSet . filterFV isCoVar . tyCoFVsOfCo
-
 coVarsOfCosDSet :: [Coercion] -> DCoVarSet
 coVarsOfCosDSet = fvDVarSet . filterFV isCoVar . tyCoFVsOfCos
 
@@ -648,7 +647,11 @@ tyCoFVsOfCo (KindCo co)         fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in
 tyCoFVsOfCo (SubCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (AxiomRuleCo _ cs)  fv_cand in_scope acc = tyCoFVsOfCos cs fv_cand in_scope acc
 tyCoFVsOfCo (ZappedCo _ a b vs) fv_cand in_scope acc
-  = (tyCoFVsOfType a `unionFV` tyCoFVsOfType b `unionFV` mkFVs (dVarSetElems vs))
+  = (tyCoFVsOfType a `unionFV`
+     tyCoFVsOfType b `unionFV`
+     mapUnionFV tyCoFVsOfCoVar (dVarSetElems (freeCoVars vs)) `unionFV`
+     mapUnionFV (tyCoFVsOfCoVar . coHoleCoVar) (uniqDSetToList (freeCoHoles vs)))
+       -- See Note [CoercionHoles and coercion free variables]
     fv_cand in_scope acc
 
 tyCoFVsOfCoVar :: CoVar -> FV
@@ -717,10 +720,12 @@ almost_devoid_co_var_of_co (SubCo co) cv
   = almost_devoid_co_var_of_co co cv
 almost_devoid_co_var_of_co (AxiomRuleCo _ cs) cv
   = almost_devoid_co_var_of_cos cs cv
-almost_devoid_co_var_of_co (ZappedCo _ t1 t2 cvs) cv
+almost_devoid_co_var_of_co (ZappedCo _ t1 t2 vs) cv
   = almost_devoid_co_var_of_type t1 cv
   && almost_devoid_co_var_of_type t2 cv
-  && not (cv `elemDVarSet` cvs)
+  && not (cv `elemDVarSet` freeCoVars vs)
+  && not (cv `elemDVarSet` mapUniqDSet coHoleCoVar (freeCoHoles vs))
+                            -- there should be no holes here, anyway
 
 almost_devoid_co_var_of_cos :: [Coercion] -> CoVar -> Bool
 almost_devoid_co_var_of_cos [] _ = True
@@ -1014,3 +1019,21 @@ tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
 -- | Get the free vars of types in scoped order
 tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
 tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
+
+{- *********************************************************************
+*                                                                      *
+      Free coercion holes
+*                                                                      *
+********************************************************************* -}
+
+coVarsHolesOfCo :: Coercion -> FreeCoVarsHoles
+coVarsHolesOfCos :: [Coercion] -> FreeCoVarsHoles
+(coVarsHolesOfCo, coVarsHolesOfCos) = (go_co, go_cos)
+  where
+    (go_ty, _, go_co, go_cos) = foldTyCo folder ()
+    folder = TyCoFolder { tcf_view = noView
+                        , tcf_tyvar = \ _ tv -> go_ty (varType tv)
+                        , tcf_covar = \ _ cv -> mkFreeCoVarsHoles (unitDVarSet cv) mempty `mappend`
+                                                go_ty (varType cv)
+                        , tcf_hole = \ _ h -> mkFreeCoVarsHoles mempty (unitUniqDSet h)
+                        , tcf_tycobinder = const2 }

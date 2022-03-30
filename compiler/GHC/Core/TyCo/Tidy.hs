@@ -248,7 +248,7 @@ tidyCo env@(_, subst) co
     go (SubCo co)            = SubCo $! go co
     go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $ strictMap go cos
     go (ZappedCo r t1 t2 vs) = ((ZappedCo r $! tidyType env t1) $! tidyType env t2) $!
-                                 mapDVarSet go_covar vs
+                                updateFreeCoVars vs (mapDVarSet go_covar)
 
     go_covar cv
       | Just cv' <- lookupVarEnv subst cv = cv'

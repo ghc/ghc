@@ -1911,9 +1911,14 @@ zonkScaledTcTypeToTypeX env (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX env m
 
 zonkTcTypeToTypeX   :: ZonkEnv -> TcType   -> TcM Type
 zonkTcTypesToTypesX :: ZonkEnv -> [TcType] -> TcM [Type]
-zonkCoToCo          :: ZonkEnv -> Coercion -> TcM Coercion
-(zonkTcTypeToTypeX, zonkTcTypesToTypesX, zonkCoToCo, _)
+zonkCoToCo_, zonkCoToCo         :: ZonkEnv -> Coercion -> TcM Coercion  -- "RAE"
+(zonkTcTypeToTypeX, zonkTcTypesToTypesX, zonkCoToCo_, _)
   = mapTyCoX zonk_tycomapper
+
+zonkCoToCo env co = do { traceTc "RAE1" (ppr co)
+                       ; co' <- zonkCoToCo_ env co
+                       ; traceTc "RAE2" (ppr co')
+                       ; return co' }
 
 zonkScaledTcTypesToTypesX :: ZonkEnv -> [Scaled TcType] -> TcM [Scaled Type]
 zonkScaledTcTypesToTypesX env scaled_tys =

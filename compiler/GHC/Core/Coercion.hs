@@ -126,7 +126,13 @@ module GHC.Core.Coercion (
 
         hasCoercionHoleTy, hasCoercionHoleCo, hasThisCoercionHoleTy,
 
-        setCoHoleType
+        setCoHoleType,
+
+        FreeCoVarsHoles,
+        mkFreeCoVarsHoles, updateFreeCoVars, updateFreeCoVarsM,
+        sizeFreeCoVarsHoles,
+        freeCoVars, freeCoHoles,
+
        ) where
 
 import {-# SOURCE #-} GHC.CoreToIface (toIfaceTyCon, tidyToIfaceTcArgs)
@@ -1337,7 +1343,7 @@ mkProofIrrelCo r kco        g1 g2 = mkUnivCo (ProofIrrelProv kco) r
                                              (mkCoercionTy g1) (mkCoercionTy g2)
 
 -- | TODO (RAE): Comment
-mkZappedCo :: Role -> Type -> Type -> DCoVarSet -> Coercion
+mkZappedCo :: Role -> Type -> Type -> FreeCoVarsHoles -> Coercion
 mkZappedCo = ZappedCo
 
 {-
@@ -2347,7 +2353,7 @@ seqCo (InstCo co arg)           = seqCo co `seq` seqCo arg
 seqCo (KindCo co)               = seqCo co
 seqCo (SubCo co)                = seqCo co
 seqCo (AxiomRuleCo _ cs)        = seqCos cs
-seqCo (ZappedCo r t1 t2 cvs)    = r `seq` seqType t1 `seq` seqType t2 `seq` seqDVarSet cvs
+seqCo (ZappedCo r t1 t2 _vs)   = r `seq` seqType t1 `seq` seqType t2
 
 seqProv :: UnivCoProvenance -> ()
 seqProv (PhantomProv co)    = seqCo co

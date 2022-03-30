@@ -33,7 +33,8 @@ module GHC.Types.Unique.DSet (
         lookupUniqDSet,
         uniqDSetToList,
         partitionUniqDSet,
-        mapUniqDSet
+        mapUniqDSet,
+        seqUniqDSet,
     ) where
 
 import GHC.Prelude
@@ -45,6 +46,7 @@ import GHC.Types.Unique
 
 import Data.Coerce
 import Data.Data
+import qualified Data.Semigroup
 
 -- See Note [UniqSet invariant] in GHC.Types.Unique.Set for why we want a newtype here.
 -- Beyond preserving invariants, we may also want to 'override' typeclass
@@ -52,6 +54,12 @@ import Data.Data
 
 newtype UniqDSet a = UniqDSet {getUniqDSet' :: UniqDFM a a}
                    deriving (Data)
+
+instance Semigroup (UniqDSet a) where
+  (<>) = unionUniqDSets
+
+instance Monoid (UniqDSet a) where
+  mempty = emptyUniqDSet
 
 instance Foldable UniqDSet where
   foldr f z = foldr f z . uniqDSetToList
@@ -143,3 +151,6 @@ instance Outputable a => Outputable (UniqDSet a) where
 
 pprUniqDSet :: (a -> SDoc) -> UniqDSet a -> SDoc
 pprUniqDSet f = braces . pprWithCommas f . uniqDSetToList
+
+seqUniqDSet :: UniqDSet a -> ()
+seqUniqDSet set = sizeUniqDSet set `seq` ()

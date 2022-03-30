@@ -85,6 +85,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
 import Data.List (mapAccumL)
+import GHC.Types.Unique.DSet
 
 {-
 %************************************************************************
@@ -859,8 +860,11 @@ subst_co subst co
     go (AxiomRuleCo c cs)    = let cs1 = map go cs
                                 in cs1 `seqList` AxiomRuleCo c cs1
     go (HoleCo h)            = HoleCo $! go_hole h
-    go (ZappedCo r t1 t2 vs) = ((mkZappedCo r $! go_ty t1) $! go_ty t2) $!
-                                 coVarsOfCosDSet (map (substCoVar subst) (dVarSetElems vs))
+    go (ZappedCo r t1 t2 vs) = ((mkZappedCo r $! go_ty t1) $! go_ty t2) $! new_vs
+      where
+        cos_from_vs = map (substCoVar subst) (dVarSetElems (freeCoVars vs))
+        new_vs      = coVarsHolesOfCos cos_from_vs `mappend`
+                      mkFreeCoVarsHoles mempty (mapUniqDSet go_hole (freeCoHoles vs))
 
     go_prov (PhantomProv kco)    = PhantomProv (go kco)
     go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)
