@@ -4,7 +4,7 @@
 # given type. Defines ALIGNMENT_TYPE.
 AC_DEFUN([FP_CHECK_ALIGNMENT],
 [AS_LITERAL_IF(m4_translit([[$1]], [*], [p]), [],
-               [AC_FATAL([$0: requires literal arguments])])[]dnl
+               [m4_fatal([$0: requires literal arguments])])[]dnl
 AC_CHECK_TYPE([$1], [], [], [$3])[]dnl
 m4_pushdef([fp_Cache], [AS_TR_SH([fp_cv_alignment_$1])])[]dnl
 AC_CACHE_CHECK([alignment of $1], [fp_Cache],

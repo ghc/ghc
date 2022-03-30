@@ -145,8 +145,7 @@ x$B" | sed 's/^ *//' | sort -r | sed "s/x${A}/true/;s/x${B}/false/;1q"`
       B=`echo "$B" | sed "s/\(\([[0-9]]\{4\}\)\{m4_substr($2,2)\}\).*/\1/"`
     ],
     [.+],[
-      AC_WARNING(
-        [invalid OP numeric parameter: $2])
+      m4_warn([syntax], [invalid OP numeric parameter: $2])
     ],[])
 
     # Pad zeros at end of numbers to make same length.
@@ -162,7 +161,7 @@ x$B" | sed 's/^ *//' | sort -r | sed "s/x${A}/true/;s/x${B}/false/;1q"`
     [ne],[
       test "x$A" != "x$B" && ax_compare_version=true
     ],[
-      AC_WARNING([invalid OP parameter: $2])
+      m4_warn([syntax], [invalid OP parameter: $2])
     ])
   ])
 

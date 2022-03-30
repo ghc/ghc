@@ -15,7 +15,7 @@ then
   else
   AC_CACHE_CHECK([for a working timer_create(CLOCK_REALTIME)],
     [fptools_cv_timer_create_works],
-    [AC_TRY_RUN([
+    [AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <stdio.h>
 #if defined(HAVE_STDLIB_H)
 #include <stdlib.h>
@@ -99,9 +99,10 @@ int main(int argc, char *argv[])
 
     exit(0);
 }
-     ],
+     ]])],
      [fptools_cv_timer_create_works=yes],
-     [fptools_cv_timer_create_works=no])
+     [fptools_cv_timer_create_works=no],
+     [])
   ])
 case $fptools_cv_timer_create_works in
     yes) AC_DEFINE([USE_TIMER_CREATE], 1,
