@@ -304,4 +304,6 @@ test('T20200loop', extra_files(['T20200loop']), multimod_compile,
 test('T20316', normal, makefile_test, [])
 test('MultiRootsErr', normal, multimod_compile_fail, ['MultiRootsErr', 'MultiRootsErr'])
 test('patch-level2', normal, compile, ['-Wcpp-undef'])
+test('T16476a', normal, makefile_test, [])
+test('T16476b', normal, makefile_test, [])
 test('T20569', extra_files(["T20569/"]), makefile_test, [])
