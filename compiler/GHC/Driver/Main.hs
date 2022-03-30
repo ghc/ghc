@@ -493,10 +493,11 @@ hscParse' mod_summary
 
             -- apply parse transformation of plugins
             let applyPluginAction p opts
-                  = uncurry (parsedResultAction p opts mod_summary)
+                  = parsedResultAction p opts mod_summary
             hsc_env <- getHscEnv
-            (transformed, (warns, errs)) <-
-              withPlugins (hsc_plugins hsc_env) applyPluginAction (res, getPsMessages pst)
+            (ParsedResult transformed (PsMessages warns errs)) <-
+              withPlugins (hsc_plugins hsc_env) applyPluginAction
+                (ParsedResult res (uncurry PsMessages $ getPsMessages pst))
 
             logDiagnostics (GhcPsMessage <$> warns)
             unless (isEmptyMessages errs) $ throwErrors (GhcPsMessage <$> errs)

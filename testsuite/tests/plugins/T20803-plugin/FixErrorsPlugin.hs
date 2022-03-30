@@ -30,20 +30,19 @@ replaceHoles new = gmapT \case
         Eq.Refl | HsUnboundVar _ _ <- d -> Just new
         _                               -> Nothing
 
-parsedAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
-             -> (Messages PsWarning, Messages PsError)
-             -> Hsc (HsParsedModule, (Messages PsWarning, Messages PsError))
-parsedAction _ _ (HsParsedModule lmod srcFiles) (warns, errs) = do
+parsedAction :: [CommandLineOption] -> ModSummary
+             -> ParsedResult -> Hsc ParsedResult
+parsedAction _ _ (ParsedResult (HsParsedModule lmod srcFiles) msgs) = do
   liftIO $ putStrLn "parsePlugin"
   liftIO $ putStrLn $ showPprUnsafe newModule
   -- TODO: Remove #20791
   liftIO $ hFlush stdout
-  pure (HsParsedModule newModule srcFiles, (warns, otherErrs))
+  pure (ParsedResult (HsParsedModule newModule srcFiles) msgs{psErrors = otherErrs})
 
   where
     PsErrBangPatWithoutSpace (L _ holeExpr) = errMsgDiagnostic noSpaceBang
     (bagToList -> [noSpaceBang], mkMessages -> otherErrs) =
-      partitionBag (isNoSpaceBang . errMsgDiagnostic) . getMessages $ errs
+      partitionBag (isNoSpaceBang . errMsgDiagnostic) . getMessages $ psErrors msgs
 
     isNoSpaceBang (PsErrBangPatWithoutSpace _) = True
     isNoSpaceBang _ = False

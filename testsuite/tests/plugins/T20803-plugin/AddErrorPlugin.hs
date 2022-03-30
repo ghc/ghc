@@ -17,14 +17,13 @@ import System.IO
 plugin :: Plugin
 plugin = defaultPlugin {parsedResultAction = parsedAction}
 
-parsedAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
-             -> (Messages PsWarning, Messages PsError)
-             -> Hsc (HsParsedModule, (Messages PsWarning, Messages PsError))
-parsedAction _ _ pm (warns, _) = do
+parsedAction :: [CommandLineOption] -> ModSummary
+             -> ParsedResult -> Hsc ParsedResult
+parsedAction _ _ (ParsedResult pm msgs) = do
   liftIO $ putStrLn "parsePlugin"
   -- TODO: Remove #20791
   liftIO $ hFlush stdout
-  pure (pm, (warns, mkMessages $ unitBag err))
+  pure (ParsedResult pm msgs{psErrors = mkMessages $ unitBag err})
   where
     err = MsgEnvelope
       { errMsgSpan = UnhelpfulSpan UnhelpfulNoLocationInfo

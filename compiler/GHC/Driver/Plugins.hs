@@ -12,6 +12,8 @@ module GHC.Driver.Plugins (
     , Plugin(..)
     , defaultPlugin
     , CommandLineOption
+    , PsMessages(..)
+    , ParsedResult(..)
       -- ** Recompilation checking
     , purePlugin, impurePlugin, flagRecompile
     , PluginRecompile(..)
@@ -89,6 +91,19 @@ import GHC.Types.Unique.DFM
 -- are given to you as this type
 type CommandLineOption = String
 
+-- | Errors and warnings produced by the parser
+data PsMessages = PsMessages { psWarnings :: Messages PsWarning
+                             , psErrors   :: Messages PsError
+                             }
+
+-- | Result of running the parser and the parser plugin
+data ParsedResult = ParsedResult
+  { -- | Parsed module, potentially modified by a plugin
+    parsedResultModule :: HsParsedModule
+  , -- | Warnings and errors from parser, potentially modified by a plugin
+    parsedResultMessages :: PsMessages
+  }
+
 -- | 'Plugin' is the compiler plugin data type. Try to avoid
 -- constructing one of these directly, and just modify some fields of
 -- 'defaultPlugin' instead: this is to try and preserve source-code
@@ -121,9 +136,8 @@ data Plugin = Plugin {
 
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
-  , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
-                       -> (Messages PsWarning, Messages PsError)
-                       -> Hsc (HsParsedModule, (Messages PsWarning, Messages PsError))
+  , parsedResultAction :: [CommandLineOption] -> ModSummary
+                       -> ParsedResult -> Hsc ParsedResult
     -- ^ Modify the module when it is parsed. This is called by
     -- "GHC.Driver.Main" when the parser has produced no or only non-fatal
     -- errors.
@@ -237,7 +251,7 @@ defaultPlugin = Plugin {
       , driverPlugin          = const return
       , pluginRecompile       = impurePlugin
       , renamedResultAction   = \_ env grp -> return (env, grp)
-      , parsedResultAction    = \_ _ mod msgs -> return (mod, msgs)
+      , parsedResultAction    = \_ _ -> return
       , typeCheckResultAction = \_ _ -> return
       , spliceRunAction       = \_ -> return
       , interfaceLoadAction   = \_ -> return
