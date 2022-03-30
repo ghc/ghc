@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeApplications #-}
-module Settings.Builders.RunTest (runTestBuilderArgs, runTestGhcFlags) where
+module Settings.Builders.RunTest (runTestBuilderArgs, runTestGhcFlags, assertSameCompilerArgs) where
 
 import Hadrian.Utilities
 import qualified System.FilePath
@@ -14,11 +14,11 @@ import Flavour
 import qualified Context.Type as C
 import System.Directory (findExecutable)
 
-getTestSetting :: TestSetting -> Expr String
-getTestSetting key = expr $ testSetting key
+getTestSetting :: TestSetting -> Action String
+getTestSetting key = testSetting key
 
 -- | Parse the value of a Boolean test setting or report an error.
-getBooleanSetting :: TestSetting -> Expr Bool
+getBooleanSetting :: TestSetting -> Action Bool
 getBooleanSetting key = fromMaybe (error msg) <$> parseYesNo <$> getTestSetting key
   where
     msg = "Cannot parse test setting " ++ quote (show key)
@@ -79,8 +79,8 @@ data TestCompilerArgs = TestCompilerArgs{
 -- | If the tree is in-compiler then we already know how we will build it so
 -- don't build anything in order to work out what we will build.
 --
-inTreeCompilerArgs :: Stage -> Expr TestCompilerArgs
-inTreeCompilerArgs stg = expr $ do
+inTreeCompilerArgs :: Stage -> Action TestCompilerArgs
+inTreeCompilerArgs stg = do
 
 
     (hasDynamicRts, hasThreadedRts) <- do
@@ -126,16 +126,14 @@ ghcConfigPath = "test/ghcconfig"
 
 -- | If the compiler is out-of-tree then we have to query the compiler to work out
 -- facts about it.
-outOfTreeCompilerArgs :: String -> Expr TestCompilerArgs
+outOfTreeCompilerArgs :: String -> Action TestCompilerArgs
 outOfTreeCompilerArgs testGhc = do
-
-    expr (do
-      root <- buildRoot
-      need [root -/- ghcConfigPath])
+    root <- buildRoot
+    need [root -/- ghcConfigPath]
     (hasDynamicRts, hasThreadedRts) <- do
-      ways <- expr testRTSSettings
+      ways <- testRTSSettings
       return ("dyn" `elem` ways, "thr" `elem` ways)
-    libWays <- expr (inferLibraryWays testGhc)
+    libWays <- inferLibraryWays testGhc
     hasDynamic          <- getBooleanSetting TestGhcDynamic
     leadingUnderscore   <- getBooleanSetting TestLeadingUnderscore
     withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
@@ -150,7 +148,7 @@ outOfTreeCompilerArgs testGhc = do
     wordsize    <- getTestSetting TestWORDSIZE
 
     llc_cmd   <- getTestSetting TestLLC
-    have_llvm <- expr (liftIO (isJust <$> findExecutable llc_cmd))
+    have_llvm <- liftIO (isJust <$> findExecutable llc_cmd)
     profiled <- getBooleanSetting TestGhcProfiled
 
     pkgConfCacheFile <- getTestSetting TestGhcPackageDb <&> (</> "package.cache")
@@ -158,6 +156,22 @@ outOfTreeCompilerArgs testGhc = do
 
     rtsLinker <- getBooleanSetting TestGhcWithRtsLinker
     return TestCompilerArgs{..}
+
+
+-- | Assert that the inTree and outOfTree compiler args compute to the same
+-- thing
+assertSameCompilerArgs :: Stage -> Action ()
+assertSameCompilerArgs stg = do
+  test_ghc <- testCompiler <$> userSetting defaultTestArgs
+  in_args  <- inTreeCompilerArgs stg
+  out_args <- outOfTreeCompilerArgs test_ghc
+  -- The assertion to check we calculated the right thing
+  when (in_args /= out_args) $ putFailure $ unlines $
+    [ "Report this as an issue on the issue tracker, continuing with in-tree args"
+    , "in-tree arguments don't match out-of-tree arguments:"
+    , "in-tree arguments:\n" ++ show in_args
+    , "out-of-tree arguments:\n" ++ show out_args
+    ]
 
 
 -- Command line arguments for invoking the @runtest.py@ script. A lot of this
@@ -172,16 +186,9 @@ runTestBuilderArgs = builder Testsuite ? do
 
     testGhc <- expr (testCompiler <$> userSetting defaultTestArgs)
 
-    TestCompilerArgs{..} <-
+    TestCompilerArgs{..} <- expr $
       case stageOfTestCompiler testGhc of
         Just stg -> inTreeCompilerArgs stg
-                 {- do { in_args  <- inTreeCompilerArgs stg
-                       ; out_args <- outOfTreeCompilerArgs testGhc
-                       ; when (in_args /= out_args) $ error $
-                          "in-tree arguments don't match out-of-tree arguments:\n\
-                          \in-tree arguments:\n" ++ show in_args ++ "\n\
-                          \out-of-tree arguments:\n" ++ show out_args
-                       ; return in_args } -}
         Nothing  -> outOfTreeCompilerArgs testGhc
 
     -- MP: TODO, these should be queried from the test compiler?

@@ -79,7 +79,13 @@ testsuiteDeps = do
   "test:ghc" ~> inTreeOutTree
                     (\stg -> do
                       needTestsuitePackages stg
-                      need [(root -/- ghcConfigPath)])
+                      need [(root -/- ghcConfigPath)]
+                      -- This is here because it's the one place we know that GHC is
+                      -- up-to-date. Later when we compute the in/out tree arguments
+                      -- we can't be sure whether checking this assertion will trigger
+                      -- a rebuild.
+                      assertSameCompilerArgs stg)
+
                     (return ())
 
 ghcConfigPath :: FilePath
