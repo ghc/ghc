@@ -352,7 +352,7 @@ applySettings kvs = case partitionEithers (map applySetting kvs) of
   --     x  = -b
   --     x += -c
   -- produce the final x = "-b -c" value. With just (.) we would apply
-  -- the x = -b assignment last, which would silently drop the -c adddition.
+  -- the x = -b assignment last, which would silently drop the -c addition.
   --
   --     foldr (.) id [f, g, h] = f . g . h
   --        -- first function (f) is applied last, we're applying them in

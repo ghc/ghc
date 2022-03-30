@@ -67,7 +67,7 @@ lookupValuesOrError file key = fromMaybe (error msg) <$> lookupValues file key
 lookupDependencies :: FilePath -> FilePath -> Action (FilePath, [FilePath])
 lookupDependencies depFile file = do
     let -- .hs needs to come before .hi-boot deps added to fix #14482.
-        -- This is still a bit fragile: we have no order guaranty from the input
+        -- This is still a bit fragile: we have no order guarantee from the input
         -- file. Let's hope we don't have two different .hs source files (e.g.
         -- one included into the other)...
         weigh p
