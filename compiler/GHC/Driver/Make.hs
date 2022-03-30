@@ -2412,7 +2412,7 @@ fully cyclic structure, in which `S` refers to `T` and `T` refers to `S`.
 
 Solution: **rehydration**.  *Before compiling `R.hs`*, rehydrate all the
 ModIfaces below it that depend on R.hs-boot.  To rehydrate a ModIface, call
-`rehydrateIface` to convert it to a ModDetails.  It's just a de-serialisation
+`typecheckIface` to convert it to a ModDetails.  It's just a de-serialisation
 step, no type inference, just lookups.
 
 Now `S` will be bound to a thunk that, when forced, will "see" the final binding
