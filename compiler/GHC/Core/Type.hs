@@ -204,7 +204,7 @@ module GHC.Core.Type (
         zapTCvSubst, getTCvInScope, getTCvSubstRangeFVs,
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
         extendTCvSubst, extendCvSubst,
-        extendTvSubst, extendTvSubstBinderAndInScope,
+        extendTvSubst, extendTCvSubstBinderAndInScope,
         extendTvSubstList, extendTvSubstAndInScope,
         extendTCvSubstList,
         extendTvSubstWithClone,

@@ -4,6 +4,8 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}  -- "RAE"
+
 module GHC.Tc.Solver.Rewrite(
    rewrite, rewriteArgsNom,
    rewriteType
@@ -23,6 +25,7 @@ import GHC.Core.Type
 import GHC.Tc.Types.Evidence
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- performs delicate algorithm on types
+import GHC.Core.TyCo.FVs
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Types.Unique.FM
@@ -42,6 +45,8 @@ import Control.Monad
 import Control.Applicative (liftA3)
 import GHC.Builtin.Types.Prim (tYPETyCon)
 import Data.List ( find )
+import qualified Data.Semigroup    -- just to get (<>) for defining a Semigroup instance
+import GHC.Utils.Monad
 
 {-
 ************************************************************************
@@ -217,11 +222,18 @@ a better error message anyway.)
 -- See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
 rewrite :: CtEvidence -> TcType
         -> TcS (Reduction, RewriterSet)
+{- "RAE"
 rewrite ev ty
   = do { traceTcS "rewrite {" (ppr ty)
        ; result@(redn, _) <- runRewriteCtEv ev (rewrite_one ty)
        ; traceTcS "rewrite }" (ppr $ reductionReducedType redn)
        ; return result }
+-}
+rewrite ev ty
+  = do { traceTcS "rewrite {" (ppr ty)
+       ; ((xi, ucv), rewriters) <- runRewriteCtEv ev (rewrite_zapped ty)
+       ; traceTcS "rewrite }" (ppr xi)
+       ; return (mkReduction (build_zapped_co (ctEvRole ev) ty xi ucv) xi, rewriters) }
 
 -- See Note [Rewriting]
 rewriteArgsNom :: CtEvidence -> TyCon -> [TcType]
@@ -236,6 +248,7 @@ rewriteArgsNom :: CtEvidence -> TyCon -> [TcType]
 --
 -- Final return value returned which Wanteds rewrote another Wanted
 -- See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
+{- "RAE"
 rewriteArgsNom ev tc tys
   = do { traceTcS "rewrite_args {" (vcat (map ppr tys))
        ; (ArgsReductions redns@(Reductions _ tys') kind_co, rewriters)
@@ -243,12 +256,22 @@ rewriteArgsNom ev tc tys
        ; massert (isReflMCo kind_co)
        ; traceTcS "rewrite }" (vcat (map ppr tys'))
        ; return (redns, rewriters) }
+-}
+rewriteArgsNom ev tc tys
+  = do { traceTcS "rewrite_args {" (vcat (map ppr tys))
+       ; ((xis, kind_mco, ucv), rewriters) <- runRewriteCtEv ev $
+                                              rewrite_args_tc_zapped tc Nothing tys
+       ; massert (isReflMCo kind_mco)
+       ; traceTcS "rewrite_args }" (vcat (map ppr xis))
+       ; let cos = zipWith (\t x -> build_zapped_co Nominal t x ucv) tys xis
+       ; return (mkReductions cos xis, rewriters) }
 
 -- | Rewrite a type w.r.t. nominal equality. This is useful to rewrite
 -- a type w.r.t. any givens. It does not do type-family reduction. This
 -- will never emit new constraints. Call this when the inert set contains
 -- only givens.
 rewriteType :: CtLoc -> TcType -> TcS TcType
+{- "RAE"
 rewriteType loc ty
   = do { (redn, _) <- runRewrite loc Given NomEq $
                        rewrite_one ty
@@ -257,6 +280,10 @@ rewriteType loc ty
                      -- (Shouldn't matter, if only Givens are present
                      -- anyway)
        ; return $ reductionReducedType redn }
+-}
+rewriteType loc ty
+  = do { ((xi, _), _) <- runRewrite loc Given NomEq $ rewrite_zapped ty
+       ; return xi }
 
 {- *********************************************************************
 *                                                                      *
@@ -624,11 +651,11 @@ rewrite_app_ty_args fun_redn@(Reduction fun_co fun_xi) arg_tys
 
 rewrite_ty_con_app :: TyCon -> [TcType] -> RewriteM Reduction
 rewrite_ty_con_app tc tys
-  = do { role <- getRole
-       ; let m_roles | Nominal <- role = Nothing
-                     | otherwise       = Just $ tyConRolesX role tc
-       ; ArgsReductions redns kind_co <- rewrite_args_tc tc m_roles tys
-       ; let tyconapp_redn
+  = do { eq_rel <- getEqRel
+       ; let mb_roles = mk_maybe_roles eq_rel (tyConRolesRepresentational tc)
+       ; ArgsReductions redns kind_co <- rewrite_args_tc tc mb_roles tys
+       ; let role = eqRelRole eq_rel
+             tyconapp_redn
                 = mkHetReduction
                     (mkTyConAppRedn role tc redns)
                     kind_co
@@ -642,7 +669,7 @@ rewrite_vector :: Kind   -- of the function being applied to these arguments
                -> RewriteM ArgsReductions
 rewrite_vector ki roles tys
   = do { eq_rel <- getEqRel
-       ; let mb_roles = case eq_rel of { NomEq -> Nothing; ReprEq -> Just roles }
+       ; let mb_roles = mk_maybe_roles eq_rel roles
        ; rewrite_args bndrs any_named_bndrs inner_ki fvs mb_roles tys
        }
   where
@@ -1081,3 +1108,335 @@ ty_con_binders_ty_binders' = foldr go ([], False)
       = (Anon af (tymult (tyVarKind tv)) : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}
+
+-- If the given EqRel is ReprEq, return the given roles; otherwise, return Nothing.
+-- Useful for calling rewrite_args
+mk_maybe_roles :: EqRel -> [Role] -> Maybe [Role]
+mk_maybe_roles NomEq  _     = Nothing
+mk_maybe_roles ReprEq roles = Just roles
+
+{-
+************************************************************************
+*                                                                      *
+             The zapped rewriter
+*                                                                      *
+********************************************************************* -}
+
+-- TODO (RAE): More comments.
+
+data UsedCoVars
+  = JustZonked    -- ^ we only zonked; nothing else interesting happened
+                  -- consequence: a coercion between the output and the input is just Refl
+  | UsedCoVars DCoVarSet   -- ^ something interesting happened, with the given set
+                           -- of free covars. NB: UsedCoVars <empty> is *not* the same
+                           -- as JustZonked!
+
+instance Semigroup UsedCoVars where
+  JustZonked      <> JustZonked      = JustZonked
+  UsedCoVars cvs  <> JustZonked      = UsedCoVars cvs
+  JustZonked      <> UsedCoVars cvs  = UsedCoVars cvs
+  UsedCoVars cvs1 <> UsedCoVars cvs2 = UsedCoVars (cvs1 `unionDVarSet` cvs2)
+
+instance Monoid UsedCoVars where
+  mempty = JustZonked
+
+coercionUsedCoVars :: Coercion -> UsedCoVars
+coercionUsedCoVars co | isReflCo co = JustZonked
+                      | otherwise   = UsedCoVars (coVarsOfCoDSet co)
+
+
+rewrite_zapped :: Type -> RewriteM (Xi, UsedCoVars)
+rewrite_zapped ty
+  | Just ty' <- rewriterView ty  -- See Note [Rewriting synonyms]
+  = rewrite_zapped ty'
+
+rewrite_zapped (TyVarTy tv)
+  = do { mb_ty <- liftTcS $ isFilledMetaTyVar_maybe tv
+       ; case mb_ty of
+       { Just ty -> do { traceRewriteM "Following filled tyvar (z)"
+                           (ppr tv <+> equals <+> ppr ty)
+                       ; bumpDepth $ rewrite_zapped ty }
+       ; Nothing -> do
+       { traceRewriteM "Unfilled tyvar (z)" (pprTyVar tv)
+       ; ieqs <- liftTcS getInertEqs
+       ; fr <- getFlavourRole
+       ; case lookupDVarEnv ieqs tv of
+       { Just equal_ct_list
+           | Just ct <- find (\ct -> ctFlavourRole ct `eqCanRewriteFR` fr) equal_ct_list
+           , CEqCan { cc_ev = ctev, cc_lhs = TyVarLHS tv
+                    , cc_rhs = rhs_ty } <- ct
+           -> do { let wrw = isWantedCt ct
+                 ; traceRewriteM "Following inert tyvar (z)" $
+                     vcat [ ppr tv <+> equals <+> ppr rhs_ty
+                          , ppr ctev
+                          , text "wanted_rewrite_wanted:" <+> ppr wrw ]
+                 ; when wrw $ recordRewriter ctev
+
+                 ; (xi, ucv) <- bumpDepth $ rewrite_zapped rhs_ty
+                 ; return (xi, ucv `mappend` UsedCoVars (coVarsOfCoDSet (ctEvCoercion ctev))) }
+
+       ; _ -> do { tv' <- liftTcS $ updateTyVarKindM zonkTcType tv
+                 ; return (mkTyVarTy tv', JustZonked) }}}}}
+
+rewrite_zapped (AppTy t1 t2) = rewrite_app_tys_zapped t1 [t2]
+
+rewrite_zapped (TyConApp tc tys)
+  | isTypeFamilyTyCon tc
+  = rewrite_fam_app_zapped tc tys
+
+  | otherwise
+  = rewrite_ty_con_app_zapped tc tys
+
+rewrite_zapped ty@(ForAllTy {})
+  = do { let (bndrs, rho) = tcSplitForAllTyVarBinders ty
+       ; (xi, ucv) <- rewrite_zapped rho
+       ; return (mkForAllTys bndrs xi, ucv) }
+
+rewrite_zapped (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
+  = do { (xi1, ucv1) <- rewrite_zapped ty1
+       ; (xi2, ucv2) <- rewrite_zapped ty2
+       ; let arg_rep = getRuntimeRep xi1
+             res_rep = getRuntimeRep xi2
+       ; ((mult_xi, ucv3), (arg_rep_xi, ucv4), (res_rep_xi, ucv5))
+           <- setEqRel NomEq $ liftA3 (,,) (rewrite_zapped mult)
+                                           (rewrite_zapped arg_rep)
+                                           (rewrite_zapped res_rep)
+       ; let arg_ki_co = build_zapped_mco arg_rep arg_rep_xi ucv4
+             res_ki_co = build_zapped_mco res_rep res_rep_xi ucv5
+       ; return ( mkFunTy vis mult_xi (xi1 `mkCastTyMCo` arg_ki_co) (xi2 `mkCastTyMCo` res_ki_co)
+                , mconcat [ucv1, ucv2, ucv3, ucv4, ucv5] ) }
+
+rewrite_zapped xi@(LitTy {}) = return (xi, mempty)
+
+rewrite_zapped (CastTy ty co)
+  = do { (xi, ucv) <- rewrite_zapped ty
+       ; co'       <- rewrite_co co
+       ; return (xi `mkCastTy` co', ucv) }
+
+rewrite_zapped (CoercionTy co)
+  = do { co' <- rewrite_co co
+       ; return (CoercionTy co', JustZonked) }
+
+rewrite_app_tys_zapped :: Type -> [Type] -> RewriteM (Xi, UsedCoVars)
+rewrite_app_tys_zapped (AppTy t1 t2) tys = rewrite_app_tys_zapped t1 (t2 : tys)
+rewrite_app_tys_zapped fun args
+  = do { (fun_xi, ucv) <- rewrite_zapped fun
+       ; rewrite_app_ty_args_zapped fun_xi ucv args }
+
+rewrite_app_ty_args_zapped :: Xi -> UsedCoVars -> [Type] -> RewriteM (Xi, UsedCoVars)
+rewrite_app_ty_args_zapped fun_xi fun_ucv []
+  = return (fun_xi, fun_ucv)
+rewrite_app_ty_args_zapped fun_xi fun_ucv arg_tys
+  = do { (arg_xis, kind_mco, arg_ucv) <- case tcSplitTyConApp_maybe fun_xi of
+           Just (tc, tc_xis) -> rewrite_vector_zapped fun_xi_kind arg_roles arg_tys
+             where arg_roles = dropList tc_xis (tyConRolesRepresentational tc)
+              -- NB: rewrite_vector_zapped uses these only when the ambient role is R
+           Nothing           -> rewrite_vector_zapped fun_xi_kind (repeat Nominal) arg_tys
+       ; return ( mkAppTys fun_xi arg_xis `mkCastTyMCo` kind_mco
+                , fun_ucv `mappend` arg_ucv ) }
+  where fun_xi_kind = typeKind fun_xi
+
+{-# INLINE rewrite_vector_zapped #-}
+rewrite_vector_zapped :: Kind   -- of the function being applied to these arguments
+                      -> [Role] -- If we're rewriting w.r.t. ReprEq, what roles do args have?
+                      -> [Type] -- args
+                      -> RewriteM ([Xi], MCoercionN, UsedCoVars)
+                          -- coercion is new kind ~# old kind
+rewrite_vector_zapped ki roles tys
+  = do { eq_rel <- getEqRel
+       ; let mb_roles = case eq_rel of { NomEq -> Nothing; ReprEq -> Just roles }
+       ; rewrite_args_zapped bndrs any_named_bndrs inner_ki fvs mb_roles tys }
+  where
+    (bndrs, inner_ki, any_named_bndrs) = split_pi_tys' ki
+    fvs                                = tyCoVarsOfType ki
+
+rewrite_fam_app_zapped :: TyCon -> [Type] -> RewriteM (Xi, UsedCoVars)
+rewrite_fam_app_zapped tc tys
+  = assertPpr (tys `lengthAtLeast` tyConArity tc)
+              (ppr tc $$ ppr (tyConArity tc) $$ ppr tys) $
+    do { let (tf_args, rest_args) = splitAt (tyConArity tc) tys
+       ; (xi, ucv) <- rewrite_exact_fam_app_zapped tc tf_args
+       ; rewrite_app_ty_args_zapped xi ucv rest_args }
+
+rewrite_exact_fam_app_zapped :: TyCon -> [Type] -> RewriteM (Xi, UsedCoVars)
+rewrite_exact_fam_app_zapped tc tys
+  = do { checkStackDepth (mkTyConApp tc tys)
+       ; tc_rewriters <- getTcPluginRewritersForTyCon tc
+       ; result1 <- try_to_reduce_zapped tc tys tc_rewriters
+       ; case result1 of
+         { Just stuff -> finish False stuff
+         ; Nothing ->
+    do { eq_rel <- getEqRel
+       ; (xis, kind_mco, ucv1) <- if eq_rel == NomEq
+                                  then rewrite_args_tc_zapped tc Nothing tys
+                                  else setEqRel NomEq $ rewrite_args_tc_zapped tc Nothing tys
+       ; flavour <- getFlavour
+       ; result2 <- liftTcS $ lookupFamAppInert (`eqCanRewriteFR` (flavour, eq_rel)) tc xis
+       ; case result2 of
+         { Just (reduction, (inert_flavour, _inert_eq_rel))
+             -> do { traceRewriteM "rewrite family application with inert"
+                       (ppr tc <+> ppr xis $$ ppr reduction)
+                   ; finish (inert_flavour == Given)
+                            ( reductionReducedType reduction `mkCastTyMCo` kind_mco
+                            , ucv1 `mappend` coercionUsedCoVars (reductionCoercion reduction) ) }
+         ; Nothing ->
+    do { result3 <- try_to_reduce_zapped tc xis tc_rewriters
+       ; case result3 of
+         { Just (xi, ucv2) -> finish True (xi `mkCastTyMCo` kind_mco, ucv1 `mappend` ucv2)
+         ; Nothing         -> return (mkTyConApp tc xis `mkCastTyMCo` kind_mco, ucv1) }}}}}}
+  where
+    {-# INLINE finish #-}
+    finish use_cache (xi, ucv)
+      = do { (final_xi, ucv3) <- bumpDepth $ rewrite_zapped xi
+           ; let final_ucv = ucv `mappend` ucv3
+           ; eq_rel <- getEqRel
+           ; when (use_cache && eq_rel == NomEq) $
+             let final_co = build_zapped_co (eqRelRole eq_rel) (mkTyConApp tc tys)
+                                            final_xi final_ucv
+             in
+             liftTcS $ extendFamAppCache tc tys (mkReduction final_co final_xi)
+           ; return (final_xi, final_ucv) }
+
+try_to_reduce_zapped :: TyCon -> [Type] -> [TcPluginRewriter]
+                     -> RewriteM (Maybe (Xi, UsedCoVars))
+try_to_reduce_zapped tc tys tc_rewriters
+  = do { rewrite_env <- getRewriteEnv
+       ; m_reduction <- liftTcS $ firstJustsM   -- TODO (RAE): make this into a separate function
+                          [ runTcPluginRewriters rewrite_env tc_rewriters tys
+                          , lookupFamAppCache tc tys
+                          , matchFam tc tys ]
+       ; return (fmap zap m_reduction) }
+  where
+    zap reduction = ( reductionReducedType reduction
+                    , coercionUsedCoVars (reductionCoercion reduction))
+
+rewrite_ty_con_app_zapped :: TyCon -> [Type] -> RewriteM (Xi, UsedCoVars)
+rewrite_ty_con_app_zapped tc tys
+  = do { eq_rel <- getEqRel
+       ; let mb_roles = mk_maybe_roles eq_rel (tyConRolesRepresentational tc)
+       ; (xis, kind_mco, ucv) <- rewrite_args_tc_zapped tc mb_roles tys
+       ; return (mkTyConApp tc xis `mkCastTyMCo` kind_mco, ucv) }
+
+rewrite_args_tc_zapped :: TyCon -> Maybe [Role] -> [Type]
+                       -> RewriteM ([Xi], MCoercionN, UsedCoVars)
+rewrite_args_tc_zapped tc = rewrite_args_zapped all_bndrs any_named_bndrs inner_ki emptyVarSet
+  where
+    (bndrs, named) = ty_con_binders_ty_binders' (tyConBinders tc)
+    (inner_bndrs, inner_ki, inner_named) = split_pi_tys' (tyConResKind tc)
+    !all_bndrs = bndrs `chkAppend` inner_bndrs
+    !any_named_bndrs = named || inner_named
+
+{-# INLINE rewrite_args_zapped #-}
+rewrite_args_zapped :: [TyCoBinder] -> Bool
+                    -> Kind -> TcTyCoVarSet
+                    -> Maybe [Role] -> [Type]
+                    -> RewriteM ([Xi], MCoercionN, UsedCoVars)
+rewrite_args_zapped orig_binders any_named_bndrs orig_inner_ki orig_fvs orig_m_roles orig_tys
+  | Nothing <- orig_m_roles
+  , not any_named_bndrs
+  = rewrite_args_fast_zapped orig_tys
+  | otherwise
+  = rewrite_args_slow_zapped orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
+  where orig_roles = fromMaybe (repeat Nominal) orig_m_roles
+
+{-# INLINE rewrite_args_fast_zapped #-}
+rewrite_args_fast_zapped :: [Type] -> RewriteM ([Xi], MCoercionN, UsedCoVars)
+rewrite_args_fast_zapped orig_tys
+  = do { (xis, ucv) <- concatMapM rewrite_zapped_list orig_tys
+       ; return (xis, MRefl, ucv) }
+  where rewrite_zapped_list ty = do { (xi, ucv) <- rewrite_zapped ty
+                                    ; return ([xi], ucv) }
+
+{-# INLINE rewrite_args_slow_zapped #-}
+rewrite_args_slow_zapped :: [TyCoBinder] -> Kind -> TcTyCoVarSet -> [Role] -> [Type]
+                         -> RewriteM ([Xi], MCoercionN, UsedCoVars)
+rewrite_args_slow_zapped orig_binders orig_inner_ki fvs orig_roles orig_tys
+  = go [] mempty empty_subst empty_subst orig_inner_ki orig_binders orig_roles orig_tys
+  where
+    empty_subst = mkEmptyTCvSubst (mkInScopeSet fvs)
+
+    {-# INLINE rw #-}
+    rw Nominal ty = setEqRel NomEq $ rewrite_zapped ty
+    rw Representational ty = setEqRel ReprEq $ rewrite_zapped ty
+    rw Phantom ty = do { ty <- liftTcS $ zonkTcType ty
+                       ; return (ty, JustZonked) }
+
+    go acc_xis ucv old_subst new_subst inner_ki binders _roles []
+      = return (reverse acc_xis, build_zapped_mco new_ki old_ki ucv, ucv)
+      where
+        ki = mkPiTys binders inner_ki
+        old_ki = substTy old_subst ki
+        new_ki = substTy new_subst ki
+
+    go acc_xis ucv old_subst new_subst inner_ki (binder:binders) (role:roles) (ty:tys)
+      = do { (xi, this_ucv) <- rw role ty
+           ; let ucv'      = ucv `mappend` this_ucv
+
+                 this_kind = tyCoBinderType binder
+                 ty_kind   = substTy old_subst this_kind
+                 xi_kind   = substTy new_subst this_kind
+                 xi_co     = build_zapped_mco ty_kind xi_kind ucv'
+                 casted_xi = xi `mkCastTyMCo` xi_co
+
+                 old_subst' = extendTCvSubstBinderAndInScope old_subst binder ty
+                 new_subst' = extendTCvSubstBinderAndInScope new_subst binder casted_xi
+
+           ; go (casted_xi:acc_xis) ucv' old_subst' new_subst' inner_ki binders roles tys }
+
+    go acc_xis ucv old_subst new_subst inner_ki [] roles tys
+      = go2 acc_xis ucv (zapTCvSubst old_subst) (zapTCvSubst new_subst)
+            old_inner_ki new_inner_ki old_binders new_binders roles tys
+      where
+        (old_binders, old_inner_ki) = splitPiTys (substTy old_subst inner_ki)
+        (new_binders, new_inner_ki) = splitPiTys (substTy new_subst inner_ki)
+
+    go _ _ _ _ _ _ [] _ = panic "rewrite_args_slow_zapped ran out of roles"
+
+    go2 acc_xis ucv old_subst new_subst old_inner_ki new_inner_ki old_binders new_binders _roles []
+      = return (reverse acc_xis, build_zapped_mco new_ki old_ki ucv, ucv)
+      where
+        old_ki = substTy old_subst (mkPiTys old_binders old_inner_ki)
+        new_ki = substTy new_subst (mkPiTys new_binders new_inner_ki)
+
+    go2 acc_xis ucv old_subst new_subst old_inner_ki new_inner_ki
+        (old_binder:old_binders) (new_binder:new_binders) (role:roles) (ty:tys)
+      = do { (xi, this_ucv) <- rw role ty
+           ; let ucv'      = ucv `mappend` this_ucv
+
+                 ty_kind   = substTy old_subst (tyCoBinderType old_binder)
+                 xi_kind   = substTy new_subst (tyCoBinderType new_binder)
+                 xi_co     = build_zapped_mco ty_kind xi_kind ucv'
+                 casted_xi = xi `mkCastTyMCo` xi_co
+
+                 old_subst' = extendTCvSubstBinderAndInScope old_subst old_binder ty
+                 new_subst' = extendTCvSubstBinderAndInScope new_subst new_binder casted_xi
+
+           ; go2 (casted_xi:acc_xis) ucv' old_subst' new_subst' old_inner_ki new_inner_ki
+                 old_binders new_binders roles tys }
+
+    go2 acc_xis ucv old_subst new_subst old_inner_ki new_inner_ki [] new_binders roles tys
+      = go2 acc_xis ucv (zapTCvSubst old_subst) new_subst
+            old_inner_ki' new_inner_ki old_binders' new_binders roles tys
+      where
+        (old_binders', old_inner_ki') = splitPiTys (substTy old_subst old_inner_ki)
+
+    go2 acc_xis ucv old_subst new_subst old_inner_ki new_inner_ki old_binders [] roles tys
+      = go2 acc_xis ucv old_subst (zapTCvSubst new_subst)
+            old_inner_ki new_inner_ki' old_binders new_binders' roles tys
+      where
+        (new_binders', new_inner_ki') = splitPiTys (substTy new_subst new_inner_ki)
+
+    go2 _ _ _ _ _ _ _ _ [] _ = panic "rewrite_args_slow_zapped (2) ran out of roles"
+
+build_zapped_mco :: Kind -> Kind -> UsedCoVars -> MCoercionN
+build_zapped_mco _ki1 _ki2 JustZonked = MRefl
+build_zapped_mco ki1 ki2 _ | ki1 `eqType` ki2 = MRefl
+build_zapped_mco ki1 ki2 (UsedCoVars cvs) = MCo $ mkZappedCo Nominal ki1 ki2 cvs
+
+build_zapped_co :: Role -> Type -> Type -> UsedCoVars -> Coercion
+build_zapped_co r t1 t2 ucv
+  | MCo nom_co <- build_zapped_mco t1 t2 ucv = downgradeRole r Nominal nom_co
+  | otherwise                                = mkReflCo r t2  -- t2 is more zonked, generally
+
+-- TODO (RAE): Make mode where both rewriters run, comparing the results
+-- TODO (RAE): Fix rw in HEAD

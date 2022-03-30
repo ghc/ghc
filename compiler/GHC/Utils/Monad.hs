@@ -169,9 +169,15 @@ liftFstM f thing = do { (a,r) <- thing; return (f a, r) }
 liftSndM :: Monad m => (a -> b) -> m (r, a) -> m (r, b)
 liftSndM f thing = do { (r,a) <- thing; return (r, f a) }
 
--- | Monadic version of concatMap
-concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
-concatMapM f xs = liftM concat (mapM f xs)
+-- | Monadic version of concatMap, generalised to work over
+-- any monoid. (Called foldMapM elsewhere.)
+concatMapM :: (Monad m, Foldable f, Monoid t) => (a -> m t) -> f a -> m t
+-- implementation from the 'rio' package
+concatMapM f xs = foldlM ( \ acc a -> do { w <- f a
+                                         ; return $! mappend acc w }) mempty xs
+{-# SPECIALISE concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b] #-}
+  -- this was the old type of concatMapM, so preserving this specialisation for performance
+{-# INLINABLE concatMapM #-}   -- for cross-module specialisation
 
 -- | Applicative version of mapMaybe
 mapMaybeM :: Applicative m => (a -> m (Maybe b)) -> [a] -> m [b]

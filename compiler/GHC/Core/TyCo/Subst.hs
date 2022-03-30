@@ -23,8 +23,8 @@ module GHC.Core.TyCo.Subst
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
         extendTCvSubst, extendTCvSubstWithClone,
         extendCvSubst, extendCvSubstWithClone,
-        extendTvSubst, extendTvSubstBinderAndInScope, extendTvSubstWithClone,
-        extendTvSubstList, extendTvSubstAndInScope,
+        extendTvSubst, extendTCvSubstBinderAndInScope, extendTvSubstWithClone,
+        extendTvSubstList, extendTvSubstAndInScope, extendCvSubstAndInScope,
         extendTCvSubstList,
         unionTCvSubst, zipTyEnv, zipCoEnv,
         zipTvSubst, zipCvSubst,
@@ -342,11 +342,15 @@ extendTvSubst :: TCvSubst -> TyVar -> Type -> TCvSubst
 extendTvSubst (TCvSubst in_scope tenv cenv) tv ty
   = TCvSubst in_scope (extendVarEnv tenv tv ty) cenv
 
-extendTvSubstBinderAndInScope :: TCvSubst -> TyCoBinder -> Type -> TCvSubst
-extendTvSubstBinderAndInScope subst (Named (Bndr v _)) ty
-  = assert (isTyVar v )
+extendTCvSubstBinderAndInScope :: TCvSubst -> TyCoBinder -> Type -> TCvSubst
+extendTCvSubstBinderAndInScope subst (Named (Bndr v _)) ty
+  | CoercionTy co <- ty
+  = assert (isCoVar v) $
+    extendCvSubstAndInScope subst v co
+  | otherwise
+  = assert (isTyVar v) $
     extendTvSubstAndInScope subst v ty
-extendTvSubstBinderAndInScope subst (Anon {}) _
+extendTCvSubstBinderAndInScope subst (Anon {}) _
   = subst
 
 extendTvSubstWithClone :: TCvSubst -> TyVar -> TyVar -> TCvSubst
@@ -376,6 +380,13 @@ extendTvSubstAndInScope (TCvSubst in_scope tenv cenv) tv ty
   = TCvSubst (in_scope `extendInScopeSetSet` tyCoVarsOfType ty)
              (extendVarEnv tenv tv ty)
              cenv
+
+extendCvSubstAndInScope :: TCvSubst -> CoVar -> Coercion -> TCvSubst
+-- Also extends the in-scope set
+extendCvSubstAndInScope (TCvSubst in_scope tenv cenv) cv co
+  = TCvSubst (in_scope `extendInScopeSetSet` tyCoVarsOfCo co)
+             tenv
+             (extendVarEnv cenv cv co)
 
 extendTvSubstList :: TCvSubst -> [Var] -> [Type] -> TCvSubst
 extendTvSubstList subst tvs tys
