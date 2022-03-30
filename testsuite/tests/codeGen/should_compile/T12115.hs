@@ -2,7 +2,7 @@
 
 module T12115 where
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Types
 
 f :: (# (# #), (# #) #) -> String

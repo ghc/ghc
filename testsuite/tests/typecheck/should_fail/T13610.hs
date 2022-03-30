@@ -2,7 +2,7 @@
 
 module T13610 where
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Types
 
 main = do

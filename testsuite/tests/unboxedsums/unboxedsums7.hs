@@ -2,7 +2,7 @@
 
 module Main where
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Types
 
 type Either1 a b c = (# a | (# b, c #) #)

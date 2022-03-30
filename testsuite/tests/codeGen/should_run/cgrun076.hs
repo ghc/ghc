@@ -4,7 +4,7 @@ module Main ( main ) where
 
 import Data.Bits
 import GHC.Int
-import GHC.Prim
+import GHC.Exts
 import GHC.Word
 import Data.Int
 import Data.Word

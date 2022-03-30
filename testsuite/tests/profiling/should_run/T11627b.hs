@@ -5,7 +5,7 @@
 -- A reduced test case for #11627
 
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Types (Int(..),IO(..))
 import System.Mem
 

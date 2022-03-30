@@ -9,8 +9,7 @@ module Main (main) where
 import           Control.Monad
 import           Control.Monad.ST
 import           Data.List        (sort, intercalate)
-import           GHC.Exts         (Int (..))
-import           GHC.Prim
+import           GHC.Exts
 import           GHC.ST           (ST (ST))
 import           GHC.Word         (Word8 (..))
 import           Text.Printf

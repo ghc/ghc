@@ -6,7 +6,7 @@ module T12709 where
 import GHC.Types
 import Prelude hiding (Num (..))
 import qualified Prelude as P
-import GHC.Prim
+import GHC.Exts
 
 data BoxUnbox = BUB Int Int#
 

@@ -12,11 +12,10 @@ you write will be optimised to the efficient unboxed version in any
 case. And if it isn't, we'd like to know about it.
 
 All these primitive data types and operations are exported by the
-library :ghc-prim-ref:`GHC.Prim.`. (This documentation is generated from
-the file ``compiler/GHC/Builtin/primops.txt.pp``.)
+library :base-ref:`GHC.Exts.`.
 
 If you want to mention any of the primitive data types or operations in
-your program, you must first import ``GHC.Prim`` to bring them into
+your program, you must first import ``GHC.Exts`` to bring them into
 scope. Many of them have names ending in ``#``, and to mention such names
 you need the :extension:`MagicHash` extension.
 

@@ -2,7 +2,7 @@
 
 module Bug ( box, wrap, proxy ) where
 
-import GHC.Prim
+import GHC.Exts
 
 box :: (# Proxy# a, b #) -> b
 box (# x, y #) = y

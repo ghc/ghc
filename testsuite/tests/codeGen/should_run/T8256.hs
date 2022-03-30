@@ -3,7 +3,7 @@
 module Main where
 
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Types
 import Foreign
 import Foreign.Ptr

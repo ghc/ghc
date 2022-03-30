@@ -2,7 +2,7 @@
 module Main where
 
 import Language.Haskell.TH
-import GHC.Prim(Addr#)
+import GHC.Exts(Addr#)
 import GHC.Ptr
 import Foreign.Marshal.Array (peekArray)
 import Data.Word (Word8)

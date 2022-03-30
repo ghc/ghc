@@ -4,7 +4,6 @@
 
 import Control.Concurrent
 import GHC.Conc
-import GHC.Prim
 import GHC.Exts
 
 main = do

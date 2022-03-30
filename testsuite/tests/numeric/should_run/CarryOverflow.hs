@@ -1,6 +1,5 @@
 {-# LANGUAGE MagicHash, UnboxedTuples #-}
 
-import GHC.Prim
 import GHC.Word
 import GHC.Exts
 

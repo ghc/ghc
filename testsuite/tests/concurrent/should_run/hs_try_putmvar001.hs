@@ -6,7 +6,7 @@ import Control.Exception
 import Foreign
 import Foreign.C
 import GHC.Conc
-import GHC.Prim
+import GHC.Exts
 
 -- Sample code demonstrating proper use of hs_try_putmvar()
 

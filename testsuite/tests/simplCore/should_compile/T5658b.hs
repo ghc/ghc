@@ -1,7 +1,6 @@
 {-# LANGUAGE MagicHash, BangPatterns #-}
 module T5658b where
-import GHC.Prim
-import GHC.Exts ( isTrue# )
+import GHC.Exts
 
 foo :: ByteArray# -> ByteArray# -> Int# -> Int# -> Bool
 foo xs ys m n = go 0# 0#

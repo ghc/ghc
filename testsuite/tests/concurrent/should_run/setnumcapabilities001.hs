@@ -1,7 +1,7 @@
 {-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 import GHC.Conc
-import GHC.Prim
+import GHC.Exts
 import System.Environment
 import System.IO
 import Control.Monad

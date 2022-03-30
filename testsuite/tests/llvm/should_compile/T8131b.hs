@@ -1,6 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE MagicHash, UnboxedTuples #-}
-import GHC.Prim
+import GHC.Exts
 import GHC.IO
 
 main = IO $ \s ->

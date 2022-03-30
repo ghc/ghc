@@ -4,7 +4,7 @@
 
 module TH_foreignCallingConventions where
 
-import GHC.Prim
+import GHC.Exts
 import Control.Applicative
 import Language.Haskell.TH
 import System.IO

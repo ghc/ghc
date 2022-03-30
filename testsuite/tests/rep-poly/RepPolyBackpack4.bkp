@@ -26,7 +26,7 @@ unit number-int where
 unit number-unboxed-int where
   module NumberUnknown where
     import GHC.Types
-    import GHC.Prim
+    import GHC.Exts
     type Rep = IntRep
     type Number = Int#
     plus :: Int# -> Int# -> Int#

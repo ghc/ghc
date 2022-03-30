@@ -2,7 +2,7 @@
 
 module T7888 where
 import GHC.Err( undefined )
-import GHC.Prim
+import GHC.Exts
 
 {- The fix for #11431 makes this no longer work. But it shouldn't really,
 without impredicativity.

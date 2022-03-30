@@ -7,7 +7,6 @@ module Main ( main ) where
 
 import GHC.Word
 import GHC.Exts hiding (IsList(..))
-import GHC.Prim
 import GHC.ST
 import GHC.IO
 import GHC.Ptr

@@ -2,7 +2,7 @@
 
 module Main where
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Int
 
 -- Test that large unchecked shifts, which constitute undefined behavior, do

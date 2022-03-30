@@ -4,7 +4,7 @@
 {-# LANGUAGE MagicHash         #-}
 module T11174 where
 
-import GHC.Prim (Int#)
+import GHC.Exts (Int#)
 
 data IntHash a = IntHash Int#
   deriving (Functor, Foldable, Traversable)

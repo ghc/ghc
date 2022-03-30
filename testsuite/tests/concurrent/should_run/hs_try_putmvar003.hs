@@ -8,7 +8,7 @@ import Foreign hiding (void)
 import Foreign.C
 import GHC.Conc
 import GHC.MVar (MVar(..))
-import GHC.Prim
+import GHC.Exts
 import System.Environment
 import System.Exit
 import Unsafe.Coerce

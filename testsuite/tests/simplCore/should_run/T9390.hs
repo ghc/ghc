@@ -2,7 +2,7 @@
 module Main(main ) where
 
 import GHC.IO (IO (..))
-import GHC.Prim
+import GHC.Exts
 
 writeB :: MutableArray# RealWorld Char -> IO ()
 writeB arr# = IO $ \s0# -> (# writeArray# arr# 0# 'B' s0#, () #)

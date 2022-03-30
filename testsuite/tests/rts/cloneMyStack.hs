@@ -2,7 +2,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 
-import GHC.Prim (StackSnapshot#)
+import GHC.Exts (StackSnapshot#)
 import GHC.Stack.CloneStack
 import Foreign
 import Foreign.C.Types (CUInt)

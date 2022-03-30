@@ -2,6 +2,6 @@
 
 module Lib where
 
-import GHC.Prim
+import GHC.Exts
 
 foreign import prim f1 :: Int# -> Int#

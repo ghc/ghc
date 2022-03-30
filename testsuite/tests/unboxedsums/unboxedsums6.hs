@@ -4,7 +4,7 @@
 
 module Main where
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Types
 
 import System.Mem (performMajorGC)

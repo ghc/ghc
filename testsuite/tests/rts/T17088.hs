@@ -6,7 +6,7 @@ module Main (main) where
 
 import Data.Word
 import Foreign.Storable
-import GHC.Prim
+import GHC.Exts
 import GHC.Ptr
 import GHC.Types
 import System.IO.Unsafe

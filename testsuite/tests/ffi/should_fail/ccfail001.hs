@@ -5,6 +5,6 @@
 
 module Foo where
 
-import GHC.Prim
+import GHC.Exts
 
 foreign import ccall foo :: Int -> State# RealWorld

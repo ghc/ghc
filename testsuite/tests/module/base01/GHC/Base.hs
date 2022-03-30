@@ -1,7 +1,6 @@
 
 module GHC.Base (module GHC.Base, Bool(..)) where
 
-import GHC.Prim
 import GHC.Types
 
 default ()

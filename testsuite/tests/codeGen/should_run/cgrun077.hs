@@ -3,7 +3,7 @@
 module Main ( main ) where
 
 import Data.Bits
-import GHC.Prim
+import GHC.Exts
 import GHC.Word
 
 #include "MachDeps.h"

@@ -1,7 +1,7 @@
 {-# LANGUAGE MagicHash #-}
 module T19851 where
 
-import GHC.Prim
+import GHC.Exts
 import GHC.Word
 
 

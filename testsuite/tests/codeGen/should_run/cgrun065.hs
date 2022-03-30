@@ -3,7 +3,6 @@
 module Main ( main ) where
 
 import GHC.Exts
-import GHC.Prim
 import GHC.ST
 
 main = putStr

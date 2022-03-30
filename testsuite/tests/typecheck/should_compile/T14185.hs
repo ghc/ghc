@@ -4,7 +4,7 @@
 module T14185 where
 
 import GHC.Types
-import GHC.Prim
+import GHC.Exts
 
 
 class Unbox (t :: *) (r :: TYPE k) | t -> r, r -> t where

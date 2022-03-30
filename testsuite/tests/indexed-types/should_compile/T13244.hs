@@ -4,7 +4,7 @@ module T13244 where
 
 import Data.Int
 import Data.Word
-import GHC.Prim
+import GHC.Exts
 import GHC.Types
 
 type family Rep x where
