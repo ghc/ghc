@@ -343,7 +343,6 @@ runCcPhase cc_phase pipe_env hsc_env input_fn = do
   let dflags    = hsc_dflags hsc_env
   let logger    = hsc_logger hsc_env
   let unit_env  = hsc_unit_env hsc_env
-  let home_unit = hsc_home_unit hsc_env
   let tmpfs     = hsc_tmpfs hsc_env
   let platform  = ue_platform unit_env
   let hcc       = cc_phase `eqPhase` HCc
@@ -432,16 +431,6 @@ runCcPhase cc_phase pipe_env hsc_env input_fn = do
                   ]
                  ++ map GHC.SysTools.Option (
                     pic_c_flags
-
-          -- Stub files generated for foreign exports references the runIO_closure
-          -- and runNonIO_closure symbols, which are defined in the base package.
-          -- These symbols are imported into the stub.c file via RtsAPI.h, and the
-          -- way we do the import depends on whether we're currently compiling
-          -- the base package or not.
-                 ++ (if platformOS platform == OSMinGW32 &&
-                        isHomeUnitId home_unit baseUnitId
-                          then [ "-DCOMPILING_BASE_PACKAGE" ]
-                          else [])
 
                  -- GCC 4.6+ doesn't like -Wimplicit when compiling C++.
                  ++ (if (cc_phase /= Ccxx && cc_phase /= Cobjcxx)

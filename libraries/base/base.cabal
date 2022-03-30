@@ -446,6 +446,14 @@ Library
     if os(freebsd)
         cc-options: -DLIBICONV_PLUG
 
+    -- Stub files generated for foreign exports references the runIO_closure
+    -- and runNonIO_closure symbols, which are defined in the base package.
+    -- These symbols are imported into the stub.c file via RtsAPI.h, and the
+    -- way we do the import depends on whether we're currently compiling
+    -- the base package or not.
+    if os(windows)
+        cc-options: -DCOMPILING_BASE_PACKAGE
+
     -- We need to set the unit id to base (without a version number)
     -- as it's magic.
     ghc-options: -this-unit-id base
