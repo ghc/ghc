@@ -64,11 +64,12 @@ Compiler
   defaults for ambiguous variables that would otherwise cause errors
   just like the built-in defaulting mechanism.
 
-- ``GHC.Plugins.parsedResultAction`` now takes and returns a tuple of warnings
-  and errors encountered by the parser before they're shown to the user, as
-  long as none of the errors prevented the AST from being built. This means
-  plugins can remove, modify, or add any of these, or simply pass them through
-  unchanged.
+- ``GHC.Plugins.parsedResultAction`` now takes and returns a value of type
+  ``ParsedResult``, containing the ``HsParsedModule`` as well as ``PsMessages``,
+  which contains warnings and errors encountered by the parser before
+  they're shown to the user, as long as none of the errors prevented the AST
+  from being built. This means plugins can remove, modify, or add any of these,
+  or simply pass them through unchanged.
 
 - The way GHC checks for representation polymorphism has been overhauled:
   all the checks are now done during typechecking. The error messages
