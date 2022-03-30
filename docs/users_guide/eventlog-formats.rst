@@ -520,7 +520,7 @@ Task events
    :length: fixed
    :field TaskId: task id
    :field CapNo: capability number
-   :field ThreadId: TODO
+   :field KernelThreadId: The thread-id of the kernel thread which created the task.
 
    Marks the creation of a task.
 
@@ -840,6 +840,7 @@ A typical non-moving collection cycle will look something like the following:
 
    :tag: 201
    :length: fixed
+   :field Word32: number of objects which were marked in this marking phase.
 
    Marks the end of marking by the concurrent collector.
 
