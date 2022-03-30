@@ -89,8 +89,6 @@ ghc-patch-level       = @GhcPatchLevel@
 bootstrap-threaded-rts      = @GhcThreadedRts@
 bootstrap-event-logging-rts = @GhcEventLoggingRts@
 
-supports-this-unit-id = @SUPPORTS_THIS_UNIT_ID@
-
 project-name          = @ProjectName@
 project-version       = @ProjectVersion@
 project-version-int   = @ProjectVersionInt@
