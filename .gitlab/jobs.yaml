@@ -1477,9 +1477,8 @@
   },
   "nightly-x86_64-windows-int_native-validate": {
     "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      "bash .gitlab/ci.sh save_cache",
+      "bash .gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -1539,9 +1538,8 @@
   },
   "nightly-x86_64-windows-validate": {
     "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      "bash .gitlab/ci.sh save_cache",
+      "bash .gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2508,9 +2506,8 @@
   },
   "release-x86_64-windows-int_native-perf": {
     "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      "bash .gitlab/ci.sh save_cache",
+      "bash .gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -2571,9 +2568,8 @@
   },
   "release-x86_64-windows-perf": {
     "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      "bash .gitlab/ci.sh save_cache",
+      "bash .gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3626,9 +3622,8 @@
   },
   "x86_64-windows-int_native-validate": {
     "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      "bash .gitlab/ci.sh save_cache",
+      "bash .gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
@@ -3687,9 +3682,8 @@
   },
   "x86_64-windows-validate": {
     "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
+      "bash .gitlab/ci.sh save_cache",
+      "bash .gitlab/ci.sh clean"
     ],
     "allow_failure": false,
     "artifacts": {
