@@ -122,5 +122,5 @@ T7072:
 
 .PHONY: T20918
 T20918:
-	"$(TEST_CC)" -c T20918_v.cc -o T20918_v.o
-	echo hello | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) T20918_v.o T20918.hs -lstdc++
+	"$(TEST_HC)" -c T20918_v.cc -o T20918_v.o
+	echo hello | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) T20918_v.o T20918.hs
