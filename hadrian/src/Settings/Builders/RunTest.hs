@@ -167,8 +167,9 @@ assertSameCompilerArgs stg = do
   out_args <- outOfTreeCompilerArgs test_ghc
   -- The assertion to check we calculated the right thing
   when (in_args /= out_args) $ putFailure $ unlines $
-    [ "Report this as an issue on the issue tracker, continuing with in-tree args"
-    , "in-tree arguments don't match out-of-tree arguments:"
+    [ "Hadrian assertion failure: in-tree arguments don't match out-of-tree arguments."
+    , "Please report this bug on the GHC issue tracker. Continuing with in-tree arguments."
+        -- NB: we always use the in-tree arguments whenever they are available.
     , "in-tree arguments:\n" ++ show in_args
     , "out-of-tree arguments:\n" ++ show out_args
     ]
