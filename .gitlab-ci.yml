@@ -599,9 +599,6 @@ perf-nofib:
       optional: true
     - job: release-x86_64-linux-fedora33-perf
       optional: true
-
-    - job: doc-tarball
-      optional: false
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
   rules:
     - if: $CI_MERGE_REQUEST_ID
@@ -648,8 +645,6 @@ perf:
       optional: true
     - job: release-x86_64-linux-fedora33-perf
       optional: true
-    - job: doc-tarball
-      optional: false
   dependencies: null
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
   rules:
