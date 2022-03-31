@@ -528,11 +528,21 @@ test-bootstrap:
 
 .hackage:
   stage: testing
-  needs: [doc-tarball]
+  needs:
+    - job: x86_64-linux-fedora33-perf
+      optional: true
+      artifacts: false
+    - job: nightly-x86_64-linux-fedora33-perf
+      optional: true
+      artifacts: false
+    - job: release-x86_64-linux-fedora33-perf
+      optional: true
+      artifacts: false
   variables:
     UPSTREAM_PROJECT_PATH: "$CI_PROJECT_PATH"
     UPSTREAM_PROJECT_ID: "$CI_PROJECT_ID"
     UPSTREAM_PIPELINE_ID: "$CI_PIPELINE_ID"
+    RELEASE_JOB: "$RELEASE_JOB"
   trigger:
     project: "ghc/head.hackage"
     branch: "master"
@@ -556,6 +566,8 @@ hackage-label-lint:
 nightly-hackage-lint:
   rules:
     - if: $NIGHTLY
+      variables:
+        NIGHTLY: "$NIGHTLY"
   extends: .hackage
   variables:
     EXTRA_HC_OPTS: "-dcore-lint"
@@ -563,6 +575,8 @@ nightly-hackage-lint:
 nightly-hackage-perf:
   rules:
     - if: $NIGHTLY
+      variables:
+        NIGHTLY: "$NIGHTLY"
   extends: .hackage
   variables:
     # Generate logs for nightly builds which include timing information.
