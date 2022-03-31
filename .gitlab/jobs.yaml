@@ -1533,7 +1533,6 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
-      "SPHINXBUILD": "/mingw64/bin/sphinx-build.exe",
       "TEST_ENV": "x86_64-windows-int_native-validate",
       "XZ_OPT": "-9"
     }
@@ -1596,7 +1595,6 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
-      "SPHINXBUILD": "/mingw64/bin/sphinx-build.exe",
       "TEST_ENV": "x86_64-windows-validate",
       "XZ_OPT": "-9"
     }
@@ -2567,7 +2565,6 @@
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
-      "SPHINXBUILD": "/mingw64/bin/sphinx-build.exe",
       "TEST_ENV": "x86_64-windows-int_native-perf",
       "XZ_OPT": "-9"
     }
@@ -2631,7 +2628,6 @@
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
-      "SPHINXBUILD": "/mingw64/bin/sphinx-build.exe",
       "TEST_ENV": "x86_64-windows-perf",
       "XZ_OPT": "-9"
     }
@@ -3686,7 +3682,6 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
-      "SPHINXBUILD": "/mingw64/bin/sphinx-build.exe",
       "TEST_ENV": "x86_64-windows-int_native-validate"
     }
   },
@@ -3748,7 +3743,6 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
-      "SPHINXBUILD": "/mingw64/bin/sphinx-build.exe",
       "TEST_ENV": "x86_64-windows-validate"
     }
   }
