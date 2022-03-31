@@ -559,7 +559,12 @@ job arch opsys buildConfig = (jobName, Job {..})
         , ".gitlab/ci.sh test_hadrian"
         ]
 
-    jobAfterScript =
+    jobAfterScript
+      | Windows <- opsys =
+      [ "bash .gitlab/ci.sh save_cache"
+      , "bash .gitlab/ci.sh clean"
+      ]
+      | otherwise =
       [ ".gitlab/ci.sh save_cache"
       , ".gitlab/ci.sh clean"
       , "cat ci_timings" ]
