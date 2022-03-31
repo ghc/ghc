@@ -351,6 +351,14 @@ distroVariables Alpine = mconcat
 -- (see Note [Object unloading]).
   , "BROKEN_TESTS" =: "encoding004 T10458 ghcilink002 linker_unload_native"
   ]
+distroVariables Fedora33 = mconcat
+  -- LLC/OPT do not work for some reason in our fedora images
+  -- These tests fail with this error: T11649 T5681 T7571 T8131b
+  -- +/opt/llvm/bin/opt: /lib64/libtinfo.so.5: no version information available (required by /opt/llvm/bin/opt)
+-- +/opt/llvm/bin/llc: /lib64/libtinfo.so.5: no version information available (required by /opt/llvm/bin/llc)
+  [ "LLC" =: "/bin/false"
+  , "OPT" =: "/bin/false"
+  ]
 distroVariables _ = mempty
 
 -----------------------------------------------------------------------------
