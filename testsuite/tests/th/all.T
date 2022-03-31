@@ -400,7 +400,8 @@ test('T13366C',
      ['-v0'])
 test('T13366Cxx',
      [expect_broken_for(13366, ['ghci']),
-      when(opsys('darwin'), expect_broken(16083))],
+      when(opsys('darwin'), expect_broken(16083))
+     ],
      compile_and_run,
      ['-l{} -v0'.format(config.stdcxx_impl)])
 test('T13473', normal, multimod_compile_and_run,
