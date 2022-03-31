@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 module Rules.Test (testRules) where
 
 import System.Environment
@@ -56,13 +57,23 @@ whitespaceLinterSourcePath = "linters/lint-whitespace/Main.hs"
 whitespaceLinterExtra :: [String]
 whitespaceLinterExtra = ["-ilinters/lint-whitespace", "-ilinters/linters-common"]
 
-checkPrograms :: [(String,FilePath, FilePath, [String], Package, Stage -> Stage, [Package] -> [Package])]
+data CheckProgram =
+        CheckProgram { cp_target :: String -- ^ Name for the hadrian target
+                     , cp_exe_path :: FilePath -- ^ Path to resulting executable
+                     , cp_src_path :: FilePath -- ^ Source to the Main.hs for the executable
+                     , cp_extra_args :: [String] -- ^ Any extra arguments to use when compiling Main.hs
+                     , cp_hadrian_pkg :: Package -- ^ How to build the executable when using in-tree compiler.
+                     , cp_modify_stage :: Stage -> Stage -- ^ Which stage GHC to build the executable with.
+                     , cp_modify_deps  :: [Package] -> [Package] -- ^ How to modify the package dependencies, only used for the linter to remove the dependency on lintersCommon.
+                     }
+
+checkPrograms :: [CheckProgram]
 checkPrograms =
-    [ ("test:check-ppr",checkPprProgPath, checkPprSourcePath, checkPprExtra, checkPpr, id, id)
-    , ("test:check-exact",checkExactProgPath, checkExactSourcePath, checkExactExtra, checkExact, id, id)
-    , ("test:count-deps",countDepsProgPath, countDepsSourcePath, countDepsExtra, countDeps, id, id)
-    , ("lint:notes", noteLinterProgPath, noteLinterSourcePath, noteLinterExtra, lintNotes, const Stage0, id)
-    , ("lint:whitespace", whitespaceLinterProgPath, whitespaceLinterSourcePath, whitespaceLinterExtra, lintWhitespace, const Stage0, filter (/= lintersCommon))
+    [ CheckProgram "test:check-ppr" checkPprProgPath checkPprSourcePath checkPprExtra checkPpr id id
+    , CheckProgram "test:check-exact" checkExactProgPath checkExactSourcePath checkExactExtra checkExact id id
+    , CheckProgram "test:count-deps" countDepsProgPath countDepsSourcePath countDepsExtra countDeps id id
+    , CheckProgram "lint:notes" noteLinterProgPath  noteLinterSourcePath  noteLinterExtra  lintNotes  (const Stage0)  id
+    , CheckProgram "lint:whitespace"  whitespaceLinterProgPath  whitespaceLinterSourcePath  whitespaceLinterExtra  lintWhitespace  (const Stage0)  (filter (/= lintersCommon))
     ]
 
 inTreeOutTree :: (Stage -> Action b) -> Action b -> Action b
@@ -122,7 +133,7 @@ testRules = do
     -- Rules for building check-ppr, check-exact and
     -- check-ppr-annotations with the compiler we are going to test
     -- (in-tree or out-of-tree).
-    forM_ checkPrograms $ \(name, progPath, sourcePath, mextra, progPkg, mod_stage, mod_pkgs) -> do
+    forM_ checkPrograms $ \(CheckProgram name progPath sourcePath mextra progPkg mod_stage mod_pkgs) -> do
         name ~> need [root -/- progPath]
         root -/- progPath %> \path -> do
             need [ sourcePath ]
@@ -247,9 +258,7 @@ isOkToBuild :: TestArgs -> String -> Bool
 isOkToBuild args target
    = stageOf (testCompiler args) `elem` [Just Stage1, Just Stage2]
   || testHasInTreeFiles args
-  || target `elem` map fst7 checkPrograms
-  where
-    fst7 (a,_,_,_,_,_,_) = a
+  || target `elem` map cp_target checkPrograms
 
 -- | Build the timeout program.
 -- See: https://github.com/ghc/ghc/blob/master/testsuite/timeout/Makefile#L23
