@@ -240,11 +240,9 @@ tcExpr (NegApp x expr neg_expr) res_ty
         ; return (NegApp x expr' neg_expr') }
 
 tcExpr e@(HsIPVar _ x) res_ty
-  = do {   {- Implicit parameters must have a *tau-type* not a
-              type scheme.  We enforce this by creating a fresh
-              type variable as its type.  (Because res_ty may not
-              be a tau-type.) -}
-         ip_ty <- newOpenFlexiTyVarTy
+  = do { ip_ty <- newFlexiTyVarTy liftedTypeKind
+          -- Create a unification type variable of kind 'Type'.
+          -- (The type of an implicit parameter must have kind 'Type'.)
        ; let ip_name = mkStrLitTy (hsIPNameFS x)
        ; ipClass <- tcLookupClass ipClassName
        ; ip_var <- emitWantedEvVar origin (mkClassPred ipClass [ip_name, ip_ty])
