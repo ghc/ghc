@@ -6,8 +6,6 @@
  *
  *---------------------------------------------------------------------------*/
 
-#include <string.h>
-
 #include "Rts.h"
 #include "rts/Messages.h"
 #include "Messages.h"
@@ -23,6 +21,8 @@
 #include "sm/Sanity.h"
 #include "Printer.h"
 #endif
+
+#include <string.h>
 
 static StgStack* cloneStackChunk(Capability* capability, const StgStack* stack)
 {
