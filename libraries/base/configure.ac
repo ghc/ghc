@@ -189,6 +189,8 @@ FP_CHECK_CONSTS([SIGINT], [
 dnl ** can we open files in binary mode?
 FP_CHECK_CONST([O_BINARY], [#include <fcntl.h>], [0])
 
+FP_CHECK_ENVIRON
+
 # We don't use iconv or libcharset on Windows, but if configure finds
 # them then it can cause problems. So we don't even try looking if
 # we are on Windows.
