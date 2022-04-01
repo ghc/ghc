@@ -152,11 +152,24 @@ instance Outputable GhcHint where
       -> vcat [ text "If you bound a unique Template Haskell name (NameU)"
               , text "perhaps via newName,"
               , text "then -ddump-splices might be useful." ]
-    SuggestAddTick name
+    SuggestAddTick (UntickedConstructor fixity name)
       -> hsep [ text "Use"
-              , quotes (char '\'' <> ppr name)
+              , char '\'' <> con
               , text "instead of"
-              , quotes (ppr name) <> dot ]
+              , con <> mb_dot ]
+        where
+          con = pprUntickedConstructor fixity name
+          mb_dot
+            | isBareSymbol fixity name
+            -- A final dot can be confusing for a symbol without parens, e.g.
+            --
+            --  * Use ': instead of :.
+            = empty
+            | otherwise
+            = dot
+
+    SuggestAddTick UntickedExplicitList
+      -> text "Add a promotion tick, e.g." <+> text "'[x,y,z]" <> dot
     SuggestMoveToDeclarationSite what rdr_name
       -> text "Move the" <+> what <+> text "to the declaration site of"
          <+> quotes (ppr rdr_name) <> dot

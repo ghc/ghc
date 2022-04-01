@@ -97,6 +97,7 @@ import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
 
+import GHC.Types.Fixity ( LexicalFixity(..) )
 import GHC.Types.Id ( Id )
 import GHC.Types.SourceText
 import GHC.Types.Name( Name, NamedThing(getName) )
@@ -104,6 +105,7 @@ import GHC.Types.Name.Reader ( RdrName )
 import GHC.Types.Var ( VarBndr )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Builtin.Types( manyDataConName, oneDataConName, mkTupleStr )
+import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
 import GHC.Hs.Doc
 import GHC.Types.Basic
@@ -291,7 +293,7 @@ type instance XFunTy           (GhcPass _) = EpAnnCO
 type instance XListTy          (GhcPass _) = EpAnn AnnParen
 type instance XTupleTy         (GhcPass _) = EpAnn AnnParen
 type instance XSumTy           (GhcPass _) = EpAnn AnnParen
-type instance XOpTy            (GhcPass _) = NoExtField
+type instance XOpTy            (GhcPass _) = EpAnn [AddEpAnn]
 type instance XParTy           (GhcPass _) = EpAnn AnnParen
 type instance XIParamTy        (GhcPass _) = EpAnn [AddEpAnn]
 type instance XStarTy          (GhcPass _) = NoExtField
@@ -448,9 +450,10 @@ mkAnonWildCardTy :: HsType GhcPs
 mkAnonWildCardTy = HsWildCardTy noExtField
 
 mkHsOpTy :: (Anno (IdGhcP p) ~ SrcSpanAnnN)
-         => LHsType (GhcPass p) -> LocatedN (IdP (GhcPass p))
+         => PromotionFlag
+         -> LHsType (GhcPass p) -> LocatedN (IdP (GhcPass p))
          -> LHsType (GhcPass p) -> HsType (GhcPass p)
-mkHsOpTy ty1 op ty2 = HsOpTy noExtField ty1 op ty2
+mkHsOpTy prom ty1 op ty2 = HsOpTy noAnn prom ty1 op ty2
 
 mkHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 mkHsAppTy t1 t2
@@ -513,7 +516,7 @@ hsTyGetAppHead_maybe = go
     go (L _ (HsTyVar _ _ ln))          = Just ln
     go (L _ (HsAppTy _ l _))           = go l
     go (L _ (HsAppKindTy _ t _))       = go t
-    go (L _ (HsOpTy _ _ ln _))         = Just ln
+    go (L _ (HsOpTy _ _ _ ln _))       = Just ln
     go (L _ (HsParTy _ t))             = go t
     go (L _ (HsKindSig _ t _))         = go t
     go _                               = Nothing
@@ -1040,12 +1043,10 @@ ppr_mono_ty (HsForAllTy { hst_tele = tele, hst_body = ty })
 ppr_mono_ty (HsQualTy { hst_ctxt = ctxt, hst_body = ty })
   = sep [pprLHsContextAlways ctxt, ppr_mono_lty ty]
 
-ppr_mono_ty (HsBangTy _ b ty)   = ppr b <> ppr_mono_lty ty
-ppr_mono_ty (HsRecTy _ flds)      = pprConDeclFields flds
-ppr_mono_ty (HsTyVar _ prom (L _ name))
-  | isPromoted prom = quote (pprPrefixOcc name)
-  | otherwise       = pprPrefixOcc name
-ppr_mono_ty (HsFunTy _ mult ty1 ty2)   = ppr_fun_ty mult ty1 ty2
+ppr_mono_ty (HsBangTy _ b ty)           = ppr b <> ppr_mono_lty ty
+ppr_mono_ty (HsRecTy _ flds)            = pprConDeclFields flds
+ppr_mono_ty (HsTyVar _ prom (L _ name)) = pprOccWithTick Prefix prom name
+ppr_mono_ty (HsFunTy _ mult ty1 ty2)    = ppr_fun_ty mult ty1 ty2
 ppr_mono_ty (HsTupleTy _ con tys)
     -- Special-case unary boxed tuples so that they are pretty-printed as
     -- `Solo x`, not `(x)`
@@ -1083,10 +1084,9 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty)
   = hsep [ppr_mono_lty fun_ty, ppr_mono_lty arg_ty]
 ppr_mono_ty (HsAppKindTy _ ty k)
   = ppr_mono_lty ty <+> char '@' <> ppr_mono_lty k
-ppr_mono_ty (HsOpTy _ ty1 (L _ op) ty2)
+ppr_mono_ty (HsOpTy _ prom ty1 (L _ op) ty2)
   = sep [ ppr_mono_lty ty1
-        , sep [pprInfixOcc op, ppr_mono_lty ty2 ] ]
-
+        , sep [pprOccWithTick Infix prom op, ppr_mono_lty ty2 ] ]
 ppr_mono_ty (HsParTy _ ty)
   = parens (ppr_mono_lty ty)
   -- Put the parens in where the user did
@@ -1187,7 +1187,7 @@ lhsTypeHasLeadingPromotionQuote ty
     go (HsListTy{})          = False
     go (HsTupleTy{})         = False
     go (HsSumTy{})           = False
-    go (HsOpTy _ t1 _ _)     = goL t1
+    go (HsOpTy _ _ t1 _ _)   = goL t1
     go (HsKindSig _ t _)     = goL t
     go (HsIParamTy{})        = False
     go (HsSpliceTy{})        = False

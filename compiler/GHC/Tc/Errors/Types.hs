@@ -73,6 +73,7 @@ import GHC.Tc.Types.Origin (CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol),
 import GHC.Tc.Types.Rank (Rank)
 import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType)
 import GHC.Types.Error
+import GHC.Types.Hint (UntickedPromotedThing(..))
 import GHC.Types.FieldLabel (FieldLabelString)
 import GHC.Types.ForeignCall (CLabelString)
 import GHC.Types.Name (Name, OccName, getSrcLoc)
@@ -1631,18 +1632,20 @@ data TcRnMessage where
                  -> [GhcHint]        -- ^ hints, e.g. enable DataKinds to refer to a promoted data constructor
                  -> TcRnMessage
 
-  {-| TcRnUntickedPromotedConstructor is a warning (controlled with -Wunticked-promoted-constructors)
+  {-| TcRnUntickedPromotedThing is a warning (controlled with -Wunticked-promoted-constructors)
       that is triggered by an unticked occurrence of a promoted data constructor.
 
-      Example:
+      Examples:
 
         data A = MkA
         type family F (a :: A) where { F MkA = Bool }
 
-      Test case: T9778.
+        type B = [ Int, Bool ]
+
+      Test cases: T9778, T19984.
   -}
-  TcRnUntickedPromotedConstructor :: Name
-                                  -> TcRnMessage
+  TcRnUntickedPromotedThing :: UntickedPromotedThing
+                            -> TcRnMessage
 
   {-| TcRnIllegalBuiltinSyntax is an error that occurs when built-in syntax appears
       in an unexpected location, e.g. as a data constructor or in a fixity declaration.

@@ -2516,8 +2516,8 @@ getGhciStepIO :: TcM (LHsExpr GhcRn)
 getGhciStepIO = do
     ghciTy <- getGHCiMonad
     a_tv <- newName (mkTyVarOccFS (fsLit "a"))
-    let ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
-        ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
+    let ghciM   = nlHsAppTy (nlHsTyVar NotPromoted ghciTy) (nlHsTyVar NotPromoted a_tv)
+        ioM     = nlHsAppTy (nlHsTyVar NotPromoted ioTyConName) (nlHsTyVar NotPromoted a_tv)
 
         step_ty :: LHsSigType GhcRn
         step_ty = noLocA $ HsSig

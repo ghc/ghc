@@ -23,13 +23,15 @@ module GHC.Core.Ppr (
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
         pprCoreBindingWithSize, pprCoreBindingsWithSize,
         pprCoreBinder, pprCoreBinders,
-        pprRule, pprRules, pprOptCo
+        pprRule, pprRules, pprOptCo,
+        pprOcc, pprOccWithTick
     ) where
 
 import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Stats (exprStats)
+import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Literal( pprLiteral )
 import GHC.Types.Name( pprInfixName, pprPrefixName )
 import GHC.Types.Var
@@ -381,6 +383,17 @@ instance Outputable b => OutputableBndr (TaggedBndr b) where
   pprInfixOcc  b = ppr b
   pprPrefixOcc b = ppr b
   bndrIsJoin_maybe (TB b _) = isJoinId_maybe b
+
+pprOcc :: OutputableBndr a => LexicalFixity -> a -> SDoc
+pprOcc Infix  = pprInfixOcc
+pprOcc Prefix = pprPrefixOcc
+
+pprOccWithTick :: OutputableBndr a => LexicalFixity -> PromotionFlag -> a -> SDoc
+pprOccWithTick fixity prom op
+  | isPromoted prom
+  = quote (pprOcc fixity op)
+  | otherwise
+  = pprOcc fixity op
 
 pprCoreBinder :: BindingSite -> Var -> SDoc
 pprCoreBinder LetBind binder

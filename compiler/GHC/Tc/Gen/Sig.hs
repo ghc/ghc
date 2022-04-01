@@ -301,7 +301,7 @@ no_anon_wc_ty lty = go lty
       HsListTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys
       HsSumTy _ tys                  -> gos tys
-      HsOpTy _ ty1 _ ty2             -> go ty1 && go ty2
+      HsOpTy _ _ ty1 _ ty2           -> go ty1 && go ty2
       HsParTy _ ty                   -> go ty
       HsIParamTy _ _ ty              -> go ty
       HsKindSig _ ty kind            -> go ty && go kind

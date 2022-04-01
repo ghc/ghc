@@ -603,24 +603,25 @@ nlList exprs          = noLocA (ExplicitList noAnn exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IsSrcSpanAnn p a
-          => IdP (GhcPass p)                            -> LHsType (GhcPass p)
+          => PromotionFlag -> IdP (GhcPass p)           -> LHsType (GhcPass p)
 nlHsFunTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLocA (HsAppTy noExtField f (parenthesizeHsType appPrec t))
-nlHsTyVar x   = noLocA (HsTyVar noAnn NotPromoted (noLocA x))
+nlHsTyVar p x = noLocA (HsTyVar noAnn p (noLocA x))
 nlHsFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) (parenthesizeHsType funPrec a) b)
 nlHsParTy t   = noLocA (HsParTy noAnn t)
 
 nlHsTyConApp :: IsSrcSpanAnn p a
-             => LexicalFixity -> IdP (GhcPass p)
+             => PromotionFlag
+             -> LexicalFixity -> IdP (GhcPass p)
              -> [LHsTypeArg (GhcPass p)] -> LHsType (GhcPass p)
-nlHsTyConApp fixity tycon tys
+nlHsTyConApp prom fixity tycon tys
   | Infix <- fixity
   , HsValArg ty1 : HsValArg ty2 : rest <- tys
-  = foldl' mk_app (noLocA $ HsOpTy noExtField ty1 (noLocA tycon) ty2) rest
+  = foldl' mk_app (noLocA $ HsOpTy noAnn prom ty1 (noLocA tycon) ty2) rest
   | otherwise
-  = foldl' mk_app (nlHsTyVar tycon) tys
+  = foldl' mk_app (nlHsTyVar prom tycon) tys
   where
     mk_app :: LHsType (GhcPass p) -> LHsTypeArg (GhcPass p) -> LHsType (GhcPass p)
     mk_app fun@(L _ (HsOpTy {})) arg = mk_app (noLocA $ HsParTy noAnn fun) arg

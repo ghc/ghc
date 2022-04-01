@@ -61,6 +61,7 @@ import GHC.Tc.Errors.Ppr ( pprScopeError
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
+import GHC.Types.Hint ( UntickedPromotedThing(..) )
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Set
@@ -70,7 +71,7 @@ import GHC.Types.Error
 import GHC.Utils.Misc
 import GHC.Types.Fixity ( compareFixity, negateFixity
                         , Fixity(..), FixityDirection(..), LexicalFixity(..) )
-import GHC.Types.Basic  ( TypeOrKind(..) )
+import GHC.Types.Basic  ( PromotionFlag(..), isPromoted, TypeOrKind(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -626,15 +627,21 @@ rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
            -- Any type variable at the kind level is illegal without the use
            -- of PolyKinds (see #14710)
        ; name <- rnTyVar env rdr_name
+       ; when (isDataConName name && not (isPromoted ip)) $
+         -- NB: a prefix symbolic operator such as (:) is represented as HsTyVar.
+            addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Prefix name)
        ; return (HsTyVar noAnn ip (L loc name), unitFV name) }
 
-rnHsTyKi env ty@(HsOpTy _ ty1 l_op ty2)
+rnHsTyKi env ty@(HsOpTy _ prom ty1 l_op ty2)
   = setSrcSpan (getLocA l_op) $
     do  { (l_op', fvs1) <- rnHsTyOp env (ppr ty) l_op
+        ; let op_name = unLoc l_op'
         ; fix   <- lookupTyFixityRn l_op'
         ; (ty1', fvs2) <- rnLHsTyKi env ty1
         ; (ty2', fvs3) <- rnLHsTyKi env ty2
-        ; res_ty <- mkHsOpTyRn l_op' fix ty1' ty2'
+        ; res_ty <- mkHsOpTyRn prom l_op' fix ty1' ty2'
+        ; when (isDataConName op_name && not (isPromoted prom)) $
+            addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Infix op_name)
         ; return (res_ty, plusFVs [fvs1, fvs2, fvs3]) }
 
 rnHsTyKi env (HsParTy _ ty)
@@ -758,6 +765,8 @@ rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
   = do { data_kinds <- xoptM LangExt.DataKinds
        ; unless data_kinds (addErr (dataKindsErr env ty))
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
+       ; unless (isPromoted ip) $
+           addDiagnostic (TcRnUntickedPromotedThing $ UntickedExplicitList)
        ; return (HsExplicitListTy noExtField ip tys', fvs) }
 
 rnHsTyKi env ty@(HsExplicitTupleTy _ tys)
@@ -1314,33 +1323,34 @@ precedence and does not require rearrangement.
 -}
 
 ---------------
--- Building (ty1 `op1` (ty21 `op2` ty22))
-mkHsOpTyRn :: LocatedN Name -> Fixity -> LHsType GhcRn -> LHsType GhcRn
+-- Building (ty1 `op1` (ty2a `op2` ty2b))
+mkHsOpTyRn :: PromotionFlag
+           -> LocatedN Name -> Fixity -> LHsType GhcRn -> LHsType GhcRn
            -> RnM (HsType GhcRn)
 
-mkHsOpTyRn op1 fix1 ty1 (L loc2 (HsOpTy _ ty21 op2 ty22))
+mkHsOpTyRn prom1 op1 fix1 ty1 (L loc2 (HsOpTy _ prom2 ty2a op2 ty2b))
   = do  { fix2 <- lookupTyFixityRn op2
-        ; mk_hs_op_ty op1 fix1 ty1 op2 fix2 ty21 ty22 loc2 }
+        ; mk_hs_op_ty prom1 op1 fix1 ty1 prom2 op2 fix2 ty2a ty2b loc2 }
 
-mkHsOpTyRn op1 _ ty1 ty2              -- Default case, no rearrangment
-  = return (HsOpTy noExtField ty1 op1 ty2)
+mkHsOpTyRn prom1 op1 _ ty1 ty2              -- Default case, no rearrangment
+  = return (HsOpTy noAnn prom1 ty1 op1 ty2)
 
 ---------------
-mk_hs_op_ty :: LocatedN Name -> Fixity -> LHsType GhcRn
-            -> LocatedN Name -> Fixity -> LHsType GhcRn
+mk_hs_op_ty :: PromotionFlag -> LocatedN Name -> Fixity -> LHsType GhcRn
+            -> PromotionFlag -> LocatedN Name -> Fixity -> LHsType GhcRn
             -> LHsType GhcRn -> SrcSpanAnnA
             -> RnM (HsType GhcRn)
-mk_hs_op_ty op1 fix1 ty1 op2 fix2 ty21 ty22 loc2
+mk_hs_op_ty prom1 op1 fix1 ty1 prom2 op2 fix2 ty2a ty2b loc2
   | nofix_error     = do { precParseErr (NormalOp (unLoc op1),fix1)
                                         (NormalOp (unLoc op2),fix2)
-                         ; return (ty1 `op1ty` (L loc2 (ty21 `op2ty` ty22))) }
-  | associate_right = return (ty1 `op1ty` (L loc2 (ty21 `op2ty` ty22)))
-  | otherwise       = do { -- Rearrange to ((ty1 `op1` ty21) `op2` ty22)
-                           new_ty <- mkHsOpTyRn op1 fix1 ty1 ty21
-                         ; return (noLocA new_ty `op2ty` ty22) }
+                         ; return (ty1 `op1ty` (L loc2 (ty2a `op2ty` ty2b))) }
+  | associate_right = return (ty1 `op1ty` (L loc2 (ty2a `op2ty` ty2b)))
+  | otherwise       = do { -- Rearrange to ((ty1 `op1` ty2a) `op2` ty2b)
+                           new_ty <- mkHsOpTyRn prom1 op1 fix1 ty1 ty2a
+                         ; return (noLocA new_ty `op2ty` ty2b) }
   where
-    lhs `op1ty` rhs = HsOpTy noExtField lhs op1 rhs
-    lhs `op2ty` rhs = HsOpTy noExtField lhs op2 rhs
+    lhs `op1ty` rhs = HsOpTy noAnn prom1 lhs op1 rhs
+    lhs `op2ty` rhs = HsOpTy noAnn prom2 lhs op2 rhs
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
 
@@ -1352,17 +1362,17 @@ mkOpAppRn :: NegationHandling
                                        -- be a NegApp)
           -> RnM (HsExpr GhcRn)
 
--- (e11 `op1` e12) `op2` e2
-mkOpAppRn negation_handling e1@(L _ (OpApp fix1 e11 op1 e12)) op2 fix2 e2
+-- (e1a `op1` e1b) `op2` e2
+mkOpAppRn negation_handling e1@(L _ (OpApp fix1 e1a op1 e1b)) op2 fix2 e2
   | nofix_error
   = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
        return (OpApp fix2 e1 op2 e2)
 
   | associate_right = do
-    new_e <- mkOpAppRn negation_handling e12 op2 fix2 e2
-    return (OpApp fix1 e11 op1 (L loc' new_e))
+    new_e <- mkOpAppRn negation_handling e1b op2 fix2 e2
+    return (OpApp fix1 e1a op1 (L loc' new_e))
   where
-    loc'= combineLocsA e12 e2
+    loc'= combineLocsA e1b e2
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
 ---------------------------
@@ -1447,20 +1457,20 @@ mkOpFormRn :: LHsCmdTop GhcRn            -- Left operand; already rearranged
           -> LHsCmdTop GhcRn             -- Right operand (not an infix)
           -> RnM (HsCmd GhcRn)
 
--- (e11 `op1` e12) `op2` e2
-mkOpFormRn a1@(L loc
+-- (e1a `op1` e1b) `op2` e2
+mkOpFormRn e1@(L loc
                     (HsCmdTop _
                      (L _ (HsCmdArrForm x op1 f (Just fix1)
-                        [a11,a12]))))
-        op2 fix2 a2
+                        [e1a,e1b]))))
+        op2 fix2 e2
   | nofix_error
   = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
-       return (HsCmdArrForm x op2 f (Just fix2) [a1, a2])
+       return (HsCmdArrForm x op2 f (Just fix2) [e1, e2])
 
   | associate_right
-  = do new_c <- mkOpFormRn a12 op2 fix2 a2
+  = do new_c <- mkOpFormRn e1a op2 fix2 e2
        return (HsCmdArrForm noExtField op1 f (Just fix1)
-               [a11, L loc (HsCmdTop [] (L (l2l loc) new_c))])
+               [e1b, L loc (HsCmdTop [] (L (l2l loc) new_c))])
         -- TODO: locs are wrong
   where
     (nofix_error, associate_right) = compareFixity fix1 fix2
@@ -1474,7 +1484,7 @@ mkOpFormRn arg1 op fix arg2                     -- Default case, no rearrangment
 mkConOpPatRn :: LocatedN Name -> Fixity -> LPat GhcRn -> LPat GhcRn
              -> RnM (Pat GhcRn)
 
-mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p11 p12))) p2
+mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p1a p1b))) p2
   = do  { fix1 <- lookupFixityRn (unLoc op1)
         ; let (nofix_error, associate_right) = compareFixity fix1 fix2
 
@@ -1489,11 +1499,11 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p11 p12))) p2
                 }
 
           else if associate_right then do
-                { new_p <- mkConOpPatRn op2 fix2 p12 p2
+                { new_p <- mkConOpPatRn op2 fix2 p1b p2
                 ; return $ ConPat
                     { pat_con_ext = noExtField
                     , pat_con = op1
-                    , pat_args = InfixCon p11 (L loc new_p)
+                    , pat_args = InfixCon p1a (L loc new_p)
                     }
                 }
                 -- XXX loc right?
@@ -1946,7 +1956,7 @@ extract_lty (L _ ty) acc
                                      extract_lty ty2 $
                                      extract_hs_arrow w acc
       HsIParamTy _ _ ty           -> extract_lty ty acc
-      HsOpTy _ ty1 tv ty2         -> extract_tv tv $
+      HsOpTy _ _ ty1 tv ty2       -> extract_tv tv $
                                      extract_lty ty1 $
                                      extract_lty ty2 acc
       HsParTy _ ty                -> extract_lty ty acc

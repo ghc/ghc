@@ -1078,9 +1078,7 @@ lookup_demoted rdr_name
             then do { mb_demoted_name <- lookupOccRn_maybe demoted_rdr
                     ; case mb_demoted_name of
                         Nothing -> unboundNameX looking_for rdr_name star_is_type_hints
-                        Just demoted_name ->
-                          do { addDiagnostic $ TcRnUntickedPromotedConstructor demoted_name
-                             ; return demoted_name } }
+                        Just demoted_name -> return demoted_name }
             else do { -- We need to check if a data constructor of this name is
                       -- in scope to give good error messages. However, we do
                       -- not want to give an additional error if the data

@@ -9,6 +9,8 @@ module GHC.Types.Hint (
   , HowInScope(..)
   , SimilarName(..)
   , StarIsType(..)
+  , UntickedPromotedThing(..)
+  , pprUntickedConstructor, isBareSymbol
   , suggestExtension
   , suggestExtensionWithInfo
   , suggestExtensions
@@ -29,7 +31,8 @@ import Data.Typeable
 import GHC.Unit.Module (ModuleName, Module)
 import GHC.Hs.Extension (GhcTc)
 import GHC.Core.Coercion
-import GHC.Types.Name (Name, NameSpace, OccName (occNameFS))
+import GHC.Types.Fixity (LexicalFixity(..))
+import GHC.Types.Name (Name, NameSpace, OccName (occNameFS), isSymOcc, nameOccName)
 import GHC.Types.Name.Reader (RdrName (Unqual), ImpDeclSpec)
 import GHC.Types.SrcLoc (SrcSpan)
 import GHC.Types.Basic (Activation, RuleName)
@@ -342,12 +345,12 @@ data GhcHint
    -}
   | SuggestDumpSlices
 
-  {-| Suggests adding a tick to refer to a data constructor
-      at the type level.
+  {-| Suggests adding a tick to refer to something which has been
+      promoted to the type level, e.g. a data constructor.
 
-      Test case: T9778.
+      Test cases: T9778, T19984.
   -}
-  | SuggestAddTick Name
+  | SuggestAddTick UntickedPromotedThing
 
   {-| Something is split off from its corresponding declaration.
       For example, a datatype is given a role declaration
@@ -421,6 +424,33 @@ data HowInScope
 data SimilarName
   = SimilarName Name
   | SimilarRdrName RdrName HowInScope
+
+-- | Something is promoted to the type-level without a promotion tick.
+data UntickedPromotedThing
+  = UntickedConstructor LexicalFixity Name
+  | UntickedExplicitList
+
+pprUntickedConstructor :: LexicalFixity -> Name -> SDoc
+pprUntickedConstructor fixity nm =
+  case fixity of
+    Prefix -> pprPrefixVar is_op ppr_nm -- e.g. (:) and '(:)
+    Infix  -> pprInfixVar  is_op ppr_nm -- e.g. `Con` and '`Con`
+  where
+    ppr_nm = ppr nm
+    is_op = isSymOcc (nameOccName nm)
+
+-- | Whether a constructor name is printed out as a bare symbol, e.g. @:@.
+--
+-- True for symbolic names in infix position.
+--
+-- Used for pretty-printing.
+isBareSymbol :: LexicalFixity -> Name -> Bool
+isBareSymbol fixity nm
+  | isSymOcc (nameOccName nm)
+  , Infix <- fixity
+  = True
+  | otherwise
+  = False
 
 --------------------------------------------------------------------------------
 

@@ -227,7 +227,8 @@
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:11:11-16 })
                  (HsOpTy
-                  (NoExtField)
+                  (EpAnnNotUsed)
+                  (NotPromoted)
                   (L
                    (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:11:11 })
                    (HsTyVar

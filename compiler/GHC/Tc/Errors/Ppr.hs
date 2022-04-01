@@ -50,6 +50,7 @@ import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType
 import GHC.Types.Error
 import GHC.Types.FieldLabel (flIsOverloaded)
+import GHC.Types.Hint (UntickedPromotedThing(..), pprUntickedConstructor, isBareSymbol)
 import GHC.Types.Hint.Ppr () -- Outputable GhcHint
 import GHC.Types.Basic
 import GHC.Types.Id
@@ -691,9 +692,17 @@ instance Diagnostic TcRnMessage where
     TcRnNotInScope err name imp_errs _
       -> mkSimpleDecorated $
            pprScopeError name err $$ vcat (map ppr imp_errs)
-    TcRnUntickedPromotedConstructor name
+    TcRnUntickedPromotedThing thing
       -> mkSimpleDecorated $
-         text "Unticked promoted constructor" <> colon <+> quotes (ppr name) <> dot
+         text "Unticked promoted" <+> what
+           where
+             what :: SDoc
+             what = case thing of
+               UntickedExplicitList -> text "list" <> dot
+               UntickedConstructor fixity nm ->
+                 let con      = pprUntickedConstructor fixity nm
+                     bare_sym = isBareSymbol fixity nm
+                 in text "constructor:" <+> con <> if bare_sym then empty else dot
     TcRnIllegalBuiltinSyntax what rdr_name
       -> mkSimpleDecorated $
            hsep [text "Illegal", what, text "of built-in syntax:", ppr rdr_name]
@@ -1032,7 +1041,7 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnNotInScope {}
       -> ErrorWithoutFlag
-    TcRnUntickedPromotedConstructor {}
+    TcRnUntickedPromotedThing {}
       -> WarningWithFlag Opt_WarnUntickedPromotedConstructors
     TcRnIllegalBuiltinSyntax {}
       -> ErrorWithoutFlag
@@ -1291,8 +1300,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnNotInScope err _ _ hints
       -> scopeErrorHints err ++ hints
-    TcRnUntickedPromotedConstructor name
-      -> [SuggestAddTick name]
+    TcRnUntickedPromotedThing thing
+      -> [SuggestAddTick thing]
     TcRnIllegalBuiltinSyntax {}
       -> noHints
     TcRnWarnDefaulting {}

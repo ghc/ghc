@@ -984,7 +984,7 @@ checkTyClHdr is_cls ty
 
     go _ (HsTyVar _ _ ltc@(L _ tc)) acc ops cps fix
       | isRdrTc tc               = return (ltc, acc, fix, (reverse ops) ++ cps)
-    go _ (HsOpTy _ t1 ltc@(L _ tc) t2) acc ops cps _fix
+    go _ (HsOpTy _ _ t1 ltc@(L _ tc) t2) acc ops cps _fix
       | isRdrTc tc               = return (ltc, HsValArg t1:HsValArg t2:acc, Infix, (reverse ops) ++ cps)
     go l (HsParTy _ ty)    acc ops cps fix = goL ty acc (o:ops) (c:cps) fix
       where
@@ -1928,7 +1928,7 @@ class DisambTD b where
   -- | Disambiguate @f \@t@ (visible kind application)
   mkHsAppKindTyPV :: LocatedA b -> SrcSpan -> LHsType GhcPs -> PV (LocatedA b)
   -- | Disambiguate @f \# x@ (infix operator)
-  mkHsOpTyPV :: LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> PV (LocatedA b)
+  mkHsOpTyPV :: PromotionFlag -> LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> PV (LocatedA b)
   -- | Disambiguate @{-\# UNPACK \#-} t@ (unpack/nounpack pragma)
   mkUnpackednessPV :: Located UnpackednessPragma -> LocatedA b -> PV (LocatedA b)
 
@@ -1936,7 +1936,7 @@ instance DisambTD (HsType GhcPs) where
   mkHsAppTyHeadPV = return
   mkHsAppTyPV t1 t2 = return (mkHsAppTy t1 t2)
   mkHsAppKindTyPV t l_at ki = return (mkHsAppKindTy l_at t ki)
-  mkHsOpTyPV t1 op t2 = return (mkLHsOpTy t1 op t2)
+  mkHsOpTyPV prom t1 op t2 = return (mkLHsOpTy prom t1 op t2)
   mkUnpackednessPV = addUnpackednessP
 
 dataConBuilderCon :: DataConBuilder -> LocatedN RdrName
@@ -1975,7 +1975,7 @@ instance DisambTD DataConBuilder where
     addFatalError $ mkPlainErrorMsgEnvelope l_at $
                       (PsErrUnexpectedKindAppInDataCon (unLoc lhs) (unLoc ki))
 
-  mkHsOpTyPV lhs tc rhs = do
+  mkHsOpTyPV _ lhs tc rhs = do
       check_no_ops (unLoc rhs)  -- check the RHS because parsing type operators is right-associative
       data_con <- eitherToP $ tyConToDataCon tc
       return $ L l (InfixDataConBuilder lhs data_con rhs)
@@ -3048,10 +3048,10 @@ mkSumOrTuplePat l Boxed a@Sum{} _ =
     addFatalError $
       mkPlainErrorMsgEnvelope (locA l) $ PsErrUnsupportedBoxedSumPat a
 
-mkLHsOpTy :: LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> LHsType GhcPs
-mkLHsOpTy x op y =
+mkLHsOpTy :: PromotionFlag -> LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> LHsType GhcPs
+mkLHsOpTy prom x op y =
   let loc = getLoc x `combineSrcSpansA` (noAnnSrcSpan $ getLocA op) `combineSrcSpansA` getLoc y
-  in L loc (mkHsOpTy x op y)
+  in L loc (mkHsOpTy prom x op y)
 
 mkMultTy :: LHsToken "%" GhcPs -> LHsType GhcPs -> LHsUniToken "->" "→" GhcPs -> HsArrow GhcPs
 mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText "1") 1))) arr

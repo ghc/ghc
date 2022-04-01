@@ -2876,7 +2876,7 @@ instance ExactPrint (HsType GhcPs) where
   getAnnotationEntry (HsListTy an _)           = fromAnn an
   getAnnotationEntry (HsTupleTy an _ _)        = fromAnn an
   getAnnotationEntry (HsSumTy an _)            = fromAnn an
-  getAnnotationEntry (HsOpTy _ _ _ _)          = NoEntryVal
+  getAnnotationEntry (HsOpTy an _ _ _ _)       = fromAnn an
   getAnnotationEntry (HsParTy an _)            = fromAnn an
   getAnnotationEntry (HsIParamTy an _ _)       = fromAnn an
   getAnnotationEntry (HsStarTy _ _)            = NoEntryVal
@@ -2926,7 +2926,8 @@ instance ExactPrint (HsType GhcPs) where
     markOpeningParen an
     markAnnotated tys
     markClosingParen an
-  exact (HsOpTy _an t1 lo t2) = do
+  exact (HsOpTy an promoted t1 lo t2) = do
+    when (isPromoted promoted) $ markEpAnn an AnnSimpleQuote
     markAnnotated t1
     markAnnotated lo
     markAnnotated t2

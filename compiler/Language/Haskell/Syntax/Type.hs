@@ -791,6 +791,8 @@ data HsType pass
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | HsOpTy              (XOpTy pass)
+                        PromotionFlag    -- Whether explicitly promoted,
+                                         -- for the pretty printer
                         (LHsType pass) (LIdP pass) (LHsType pass)
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 

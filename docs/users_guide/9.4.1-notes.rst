@@ -383,3 +383,7 @@ Compiler
 - GHC no longer carries ``Derived`` constraints. Accordingly, several functions
   in the plugin architecture that previously passed or received three sets of
   constraints (givens, deriveds, and wanteds) now work with two such sets.
+
+- A new argument has been added to the ``HsOpTy`` constructor of the ``HsType``
+  datatype, to track the presence of a promotion tick. Plugins which manipulate
+  the Haskell AST will need to take this change into account.

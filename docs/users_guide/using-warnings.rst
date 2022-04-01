@@ -1652,6 +1652,13 @@ of ``-W(no-)*``.
     Will raise two warnings because ``Zero`` and ``Succ`` are not
     written as ``'Zero`` and ``'Succ``.
 
+    This also applies to list literals since 9.4. For example: ::
+
+      type L = [Int, Char, Bool]
+
+    will raise a warning, because ``[Int, Char, Bool]`` is a promoted list
+    which lacks a tick.
+
 .. ghc-flag:: -Wunused-binds
     :shortdesc: warn about bindings that are unused. Alias for
         :ghc-flag:`-Wunused-top-binds`, :ghc-flag:`-Wunused-local-binds` and

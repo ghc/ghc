@@ -2168,14 +2168,15 @@ infixtype :: { forall b. DisambTD b => PV (LocatedA b) }
         : ftype %shift                  { $1 }
         | ftype tyop infixtype          { $1 >>= \ $1 ->
                                           $3 >>= \ $3 ->
-                                          do { when (looksLikeMult $1 $2 $3) $ hintLinear (getLocA $2)
-                                             ; mkHsOpTyPV $1 $2 $3 } }
+                                          do { let (op, prom) = $2
+                                             ; when (looksLikeMult $1 op $3) $ hintLinear (getLocA op)
+                                             ; mkHsOpTyPV prom $1 op $3 } }
         | unpackedness infixtype        { $2 >>= \ $2 ->
                                           mkUnpackednessPV $1 $2 }
 
 ftype :: { forall b. DisambTD b => PV (LocatedA b) }
         : atype                         { mkHsAppTyHeadPV $1 }
-        | tyop                          { failOpFewArgs $1 }
+        | tyop                          { failOpFewArgs (fst $1) }
         | ftype tyarg                   { $1 >>= \ $1 ->
                                           mkHsAppTyPV $1 $2 }
         | ftype PREFIX_AT atype         { $1 >>= \ $1 ->
@@ -2185,13 +2186,15 @@ tyarg :: { LHsType GhcPs }
         : atype                         { $1 }
         | unpackedness atype            {% addUnpackednessP $1 $2 }
 
-tyop :: { LocatedN RdrName }
-        : qtyconop                      { $1 }
-        | tyvarop                       { $1 }
-        | SIMPLEQUOTE qconop            {% amsrn (sLL $1 (reLoc $>) (unLoc $2))
-                                                 (NameAnnQuote (glAA $1) (gl $2) []) }
-        | SIMPLEQUOTE varop             {% amsrn (sLL $1 (reLoc $>) (unLoc $2))
-                                                 (NameAnnQuote (glAA $1) (gl $2) []) }
+tyop :: { (LocatedN RdrName, PromotionFlag) }
+        : qtyconop                      { ($1, NotPromoted) }
+        | tyvarop                       { ($1, NotPromoted) }
+        | SIMPLEQUOTE qconop            {% do { op <- amsrn (sLL $1 (reLoc $>) (unLoc $2))
+                                                            (NameAnnQuote (glAA $1) (gl $2) [])
+                                              ; return (op, IsPromoted) } }
+        | SIMPLEQUOTE varop             {% do { op <- amsrn (sLL $1 (reLoc $>) (unLoc $2))
+                                                            (NameAnnQuote (glAA $1) (gl $2) [])
+                                              ; return (op, IsPromoted) } }
 
 atype :: { LHsType GhcPs }
         : ntgtycon                       {% acsa (\cs -> sL1a (reLocN $1) (HsTyVar (EpAnn (glNR $1) [] cs) NotPromoted $1)) }      -- Not including unit tuples

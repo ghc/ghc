@@ -590,7 +590,7 @@ unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
   where
     ascribeBool e = noLocA $ ExprWithTySig noAnn e
                            $ mkHsWildCardBndrs $ noLocA $ mkHsImplicitSigType
-                           $ nlHsTyVar boolTyCon_RDR
+                           $ nlHsTyVar NotPromoted boolTyCon_RDR
 
 nlConWildPat :: DataCon -> LPat GhcPs
 -- The pattern (K {})
@@ -2233,9 +2233,9 @@ genAuxBindSpecSig loc spec = case spec of
   DerivMaxTag _ _
     -> mk_sig (L (noAnnSrcSpan loc) (XHsType intTy))
   DerivDataDataType _ _ _
-    -> mk_sig (nlHsTyVar dataType_RDR)
+    -> mk_sig (nlHsTyVar NotPromoted dataType_RDR)
   DerivDataConstr _ _ _
-    -> mk_sig (nlHsTyVar constr_RDR)
+    -> mk_sig (nlHsTyVar NotPromoted constr_RDR)
   where
     mk_sig = mkHsWildCardBndrs . L (noAnnSrcSpan loc) . mkHsImplicitSigType
 

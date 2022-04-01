@@ -1783,9 +1783,9 @@ defineMacro overwrite s = do
       expr <- GHC.parseExpr definition
       -- > ghciStepIO . definition :: String -> IO String
       let stringTy :: LHsType GhcPs
-          stringTy = nlHsTyVar stringTyCon_RDR
+          stringTy = nlHsTyVar NotPromoted stringTyCon_RDR
           ioM :: LHsType GhcPs -- AZ
-          ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
+          ioM = nlHsTyVar NotPromoted (getRdrName ioTyConName) `nlHsAppTy` stringTy
           body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
                                      `mkHsApp` (nlHsPar expr)
           tySig = mkHsWildCardBndrs $ noLocA $ mkHsImplicitSigType $
@@ -1853,9 +1853,9 @@ cmdCmd str = handleSourceError printErrAndMaybeExit $ do
 getGhciStepIO :: GHC.GhcMonad m => m (LHsExpr GhcPs)
 getGhciStepIO = do
   ghciTyConName <- GHC.getGHCiMonad
-  let stringTy = nlHsTyVar stringTyCon_RDR
-      ghciM = nlHsTyVar (getRdrName ghciTyConName) `nlHsAppTy` stringTy
-      ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
+  let stringTy = nlHsTyVar NotPromoted stringTyCon_RDR
+      ghciM = nlHsTyVar NotPromoted (getRdrName ghciTyConName) `nlHsAppTy` stringTy
+      ioM = nlHsTyVar NotPromoted (getRdrName ioTyConName) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)
       tySig = mkHsWildCardBndrs $ noLocA $ mkHsImplicitSigType $
               nlHsFunTy ghciM ioM

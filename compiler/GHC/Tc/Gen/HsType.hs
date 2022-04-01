@@ -1165,7 +1165,7 @@ tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
 tc_hs_type mode (HsFunTy _ mult ty1 ty2) exp_kind
   = tc_fun_type mode mult ty1 ty2 exp_kind
 
-tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
+tc_hs_type mode (HsOpTy _ _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
   = tc_fun_type mode (HsUnrestrictedArrow noHsUniTok) ty1 ty2 exp_kind
 
@@ -1508,7 +1508,7 @@ splitHsAppTys hs_ty
     is_app :: HsType GhcRn -> Bool
     is_app (HsAppKindTy {})        = True
     is_app (HsAppTy {})            = True
-    is_app (HsOpTy _ _ (L _ op) _) = not (op `hasKey` funTyConKey)
+    is_app (HsOpTy _ _ _ (L _ op) _) = not (op `hasKey` funTyConKey)
       -- I'm not sure why this funTyConKey test is necessary
       -- Can it even happen?  Perhaps for   t1 `(->)` t2
       -- but then maybe it's ok to treat that like a normal
@@ -1524,8 +1524,8 @@ splitHsAppTys hs_ty
     go (L _  (HsAppTy _ f a))      as = go f (HsValArg a : as)
     go (L _  (HsAppKindTy l ty k)) as = go ty (HsTypeArg l k : as)
     go (L sp (HsParTy _ f))        as = go f (HsArgPar (locA sp) : as)
-    go (L _  (HsOpTy _ l op@(L sp _) r)) as
-      = ( L (na2la sp) (HsTyVar noAnn NotPromoted op)
+    go (L _  (HsOpTy _ prom l op@(L sp _) r)) as
+      = ( L (na2la sp) (HsTyVar noAnn prom op)
         , HsValArg l : HsValArg r : as )
     go f as = (f, as)
 

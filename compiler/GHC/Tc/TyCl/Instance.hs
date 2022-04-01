@@ -924,7 +924,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                   -- Check that the result kind of the TyCon applied to its args
                   -- is compatible with the explicit signature (or Type, if there
                   -- is none)
-                  ; let hs_lhs = nlHsTyConApp fixity (getName fam_tc) hs_pats
+                  ; let hs_lhs = nlHsTyConApp NotPromoted fixity (getName fam_tc) hs_pats
                   ; _ <- unifyKind (Just . HsTypeRnThing $ unLoc hs_lhs) lhs_applied_kind res_kind
 
                   ; traceTc "tcDataFamInstHeader" $

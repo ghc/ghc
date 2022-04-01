@@ -1394,7 +1394,7 @@ repTy (HsTupleTy _ _ tys)   = do tys1 <- repLTys tys
 repTy (HsSumTy _ tys)       = do tys1 <- repLTys tys
                                  tcon <- repUnboxedSumTyCon (length tys)
                                  repTapps tcon tys1
-repTy (HsOpTy _ ty1 n ty2)  = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1)
+repTy (HsOpTy _ prom ty1 n ty2) = repLTy ((nlHsTyVar prom (unLoc n) `nlHsAppTy` ty1)
                                    `nlHsAppTy` ty2)
 repTy (HsParTy _ t)         = repLTy t
 repTy (HsStarTy _ _) =  repTStar

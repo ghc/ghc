@@ -1661,7 +1661,7 @@ cvtTypeKind ty_str ty
            UInfixT t1 s t2
              -> do { s' <- tconNameN s
                    ; t2' <- cvtType t2
-                   ; t <- cvtOpAppT t1 s' t2'
+                   ; t <- cvtOpAppT NotPromoted t1 s' t2'
                    ; mk_apps (unLoc t) tys'
                    } -- Note [Converting UInfix]
 
@@ -1677,7 +1677,7 @@ cvtTypeKind ty_str ty
            PromotedUInfixT t1 s t2
              -> do { s' <- cNameN s
                    ; t2' <- cvtType t2
-                   ; t <- cvtOpAppT t1 s' t2'
+                   ; t <- cvtOpAppT IsPromoted t1 s' t2'
                    ; mk_apps (unLoc t) tys'
                    } -- Note [Converting UInfix]
 
@@ -1725,7 +1725,7 @@ cvtTypeKind ty_str ty
                    let px = parenthesizeHsType opPrec x'
                        py = parenthesizeHsType opPrec y'
                    in do { eq_tc <- returnLA eqTyCon_RDR
-                         ; returnLA (HsOpTy noExtField px eq_tc py) }
+                         ; returnLA (HsOpTy noAnn NotPromoted px eq_tc py) }
                -- The long-term goal is to remove the above case entirely and
                -- subsume it under the case for InfixT. See #15815, comment:6,
                -- for more details.
@@ -1835,18 +1835,18 @@ provided @y@ is.
 
 See the @cvtOpApp@ documentation for how this function works.
 -}
-cvtOpAppT :: TH.Type -> LocatedN RdrName -> LHsType GhcPs -> CvtM (LHsType GhcPs)
-cvtOpAppT (UInfixT x op2 y) op1 z
+cvtOpAppT :: PromotionFlag -> TH.Type -> LocatedN RdrName -> LHsType GhcPs -> CvtM (LHsType GhcPs)
+cvtOpAppT prom (UInfixT x op2 y) op1 z
   = do { op2' <- tconNameN op2
-       ; l <- cvtOpAppT y op1 z
-       ; cvtOpAppT x op2' l }
-cvtOpAppT (PromotedUInfixT x op2 y) op1 z
+       ; l <- cvtOpAppT prom y op1 z
+       ; cvtOpAppT NotPromoted x op2' l }
+cvtOpAppT prom (PromotedUInfixT x op2 y) op1 z
   = do { op2' <- cNameN op2
-       ; l <- cvtOpAppT y op1 z
-       ; cvtOpAppT x op2' l }
-cvtOpAppT x op y
+       ; l <- cvtOpAppT prom y op1 z
+       ; cvtOpAppT IsPromoted x op2' l }
+cvtOpAppT prom x op y
   = do { x' <- cvtType x
-       ; returnLA (mkHsOpTy x' op y) }
+       ; returnLA (mkHsOpTy prom x' op y) }
 
 cvtKind :: TH.Kind -> CvtM (LHsKind GhcPs)
 cvtKind = cvtTypeKind "kind"
