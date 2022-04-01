@@ -1054,7 +1054,7 @@ data ConDecl pass
   = ConDeclGADT
       { con_g_ext   :: XConDeclGADT pass
       , con_names   :: [LIdP pass]
-
+      , con_dcolon  :: !(LHsUniToken "::" "∷" pass)
       -- The following fields describe the type after the '::'
       -- See Note [GADT abstract syntax]
       , con_bndrs   :: XRec pass (HsOuterSigTyVarBndrs pass)
