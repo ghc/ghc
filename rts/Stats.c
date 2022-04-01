@@ -26,16 +26,6 @@
 
 #include <string.h> // for memset
 
-#if defined(mingw32_HOST_OS)
-/* On Win64, if we say "printf" then gcc thinks we are going to use
-   MS format specifiers like %I64d rather than %llu */
-#define PRINTF gnu_printf
-#else
-/* However, on OS X, "gnu_printf" isn't recognised */
-#define PRINTF printf
-#endif
-
-
 #if defined(THREADED_RTS)
 // Protects all statistics below
 Mutex stats_mutex;
@@ -79,7 +69,7 @@ static Time *GC_coll_cpu = NULL;
 static Time *GC_coll_elapsed = NULL;
 static Time *GC_coll_max_pause = NULL;
 
-static int statsPrintf( char *s, ... ) GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
+static int statsPrintf( char *s, ... ) STG_PRINTF_ATTR(1, 2);
 static void statsFlush( void );
 static void statsClose( void );
 
