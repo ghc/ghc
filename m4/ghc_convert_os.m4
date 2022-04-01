@@ -46,6 +46,9 @@ AC_DEFUN([GHC_CONVERT_OS],[
       nto-qnx*)
         $3="nto-qnx"
         ;;
+      ghcjs*)
+        $3="ghcjs"
+        ;;
       *)
         echo "Unknown OS $1"
         exit 1
