@@ -45,6 +45,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS],
         hppa|hppa1_1|ia64|m68k|nios2|riscv32|rs6000|s390|sh4|vax)
             test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
+        js)
+            test -z "[$]2" || eval "[$]2=ArchJavaScript"
+            ;;
         *)
             echo "Unknown arch [$]1"
             exit 1
@@ -105,6 +108,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS],
             ;;
         gnu)
             test -z "[$]2" || eval "[$]2=OSHurd"
+            ;;
+        ghcjs|js)
+            test -z "[$]2" || eval "[$]2=OSUnknown"
             ;;
         *)
             echo "Unknown OS '[$]1'"

@@ -74,6 +74,9 @@ case "$1" in
   x86_64|amd64)
     $2="x86_64"
     ;;
+  js)
+    $2="js"
+    ;;
   *)
     echo "Unknown CPU $1"
     exit 1
