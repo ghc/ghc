@@ -48,9 +48,9 @@ import GHC.Types.Literal
 import GHC.Builtin.PrimOps
 import GHC.Types.Id.Info
 import GHC.Types.Basic  ( Arity )
+import GHC.Types.RepType ( isZeroBitTy )
 import GHC.Core.Type
 import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Data.Bag
 import GHC.Utils.Logger
 import GHC.Utils.Misc
@@ -431,7 +431,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     size_up (Type _)   = sizeZero           -- Types cost nothing
     size_up (Coercion _) = sizeZero
     size_up (Lit lit)  = sizeN (litSize lit)
-    size_up (Var f) | isRealWorldId f = sizeZero
+    size_up (Var f) | isZeroBitId f = sizeZero
                       -- Make sure we get constructor discounts even
                       -- on nullary constructors
                     | otherwise       = size_up_call f [] 0
@@ -439,10 +439,10 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     size_up (App fun arg)
       | isTyCoArg arg = size_up fun
       | otherwise     = size_up arg  `addSizeNSD`
-                        size_up_app fun [arg] (if isRealWorldExpr arg then 1 else 0)
+                        size_up_app fun [arg] (if isZeroBitExpr arg then 1 else 0)
 
     size_up (Lam b e)
-      | isId b && not (isRealWorldId b) = lamScrutDiscount opts (size_up e `addSizeN` 10)
+      | isId b && not (isZeroBitId b) = lamScrutDiscount opts (size_up e `addSizeN` 10)
       | otherwise = size_up e
 
     size_up (Let (NonRec binder rhs) body)
@@ -546,7 +546,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     -- size_up_app is used when there's ONE OR MORE value args
     size_up_app (App fun arg) args voids
         | isTyCoArg arg                  = size_up_app fun args voids
-        | isRealWorldExpr arg            = size_up_app fun (arg:args) (voids + 1)
+        | isZeroBitExpr arg              = size_up_app fun (arg:args) (voids + 1)
         | otherwise                      = size_up arg  `addSizeNSD`
                                            size_up_app fun (arg:args) voids
     size_up_app (Var fun)     args voids = size_up_call fun args voids
@@ -611,12 +611,14 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
                                  (xs `unionBags` ys)
                                  d2  -- Ignore d1
 
-    isRealWorldId id = idType id `eqType` realWorldStatePrimTy
+    -- don't count expressions such as State# RealWorld
+    -- exclude join points, because they can be rep-polymorphic
+    -- and typePrimRep will crash
+    isZeroBitId id = not (isJoinId id) && isZeroBitTy (idType id)
 
-    -- an expression of type State# RealWorld must be a variable
-    isRealWorldExpr (Var id)   = isRealWorldId id
-    isRealWorldExpr (Tick _ e) = isRealWorldExpr e
-    isRealWorldExpr _          = False
+    isZeroBitExpr (Var id)   = isZeroBitId id
+    isZeroBitExpr (Tick _ e) = isZeroBitExpr e
+    isZeroBitExpr _          = False
 
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
