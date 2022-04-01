@@ -434,7 +434,7 @@ void freePreloadObjectFile_PEi386(ObjectCode *oc)
            See Note [Exception Unwinding].  */
         if (oc->info->xdata) {
             if (!RtlDeleteFunctionTable (oc->info->xdata->start))
-              debugBelch ("Unable to remove Exception handlers for %" PATH_FMT,
+              debugBelch ("Unable to remove Exception handlers for %" PATH_FMT "\n",
                           oc->fileName);
             oc->info->xdata = NULL;
             oc->info->pdata = NULL;
