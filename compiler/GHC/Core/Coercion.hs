@@ -792,14 +792,15 @@ mkTyConAppCo r tc cos
   | otherwise = TyConAppCo r tc cos
 
 -- | Build a function 'Coercion' from two other 'Coercion's. That is,
--- given @co1 :: a ~ b@ and @co2 :: x ~ y@ produce @co :: (a -> x) ~ (b -> y)@.
+-- given @co1 :: a ~ b@ and @co2 :: x ~ y@ produce @co :: (a -> x) ~ (b -> y)@
+-- or @(a => x) ~ (b => y)@, depending on the kind of @a@/@b@.
 mkFunCo :: Role -> CoercionN -> Coercion -> Coercion -> Coercion
 mkFunCo r w co1 co2
     -- See Note [Refl invariant]
   | Just (ty1, _) <- isReflCo_maybe co1
   , Just (ty2, _) <- isReflCo_maybe co2
   , Just (w, _) <- isReflCo_maybe w
-  = mkReflCo r (mkVisFunTy w ty1 ty2)
+  = mkReflCo r (mkFunctionType w ty1 ty2)
   | otherwise = FunCo r w co1 co2
 
 -- | Apply a 'Coercion' to another 'Coercion'.

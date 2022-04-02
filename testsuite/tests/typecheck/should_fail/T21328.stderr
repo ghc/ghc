@@ -1,0 +1,4 @@
+
+T21328.hs:11:8: error:
+    Invalid instantiation of ‘withDict’ at type:
+        Id (TypeRep a) -> (Typeable a => Int) -> Int
