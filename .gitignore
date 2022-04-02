@@ -80,6 +80,7 @@ _darcs/
 /libraries/*/dist-install/
 /libraries/*/dist-newstyle/
 /libraries/dist-haddock/
+/linters/*/dist-install/
 /utils/*/dist*/
 /compiler/stage1/
 /compiler/stage2/
