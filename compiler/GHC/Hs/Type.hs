@@ -864,46 +864,17 @@ ambiguousFieldOcc (FieldOcc sel rdr) = Unambiguous sel rdr
 -}
 
 class OutputableBndrFlag flag p where
-    pprTyVarBndr :: OutputableBndrId p
-                 => HsTyVarBndr flag (GhcPass p) -> SDoc
+    pprTyVarBndr :: OutputableBndrId p => HsTyVarBndr flag (GhcPass p) -> SDoc
 
 instance OutputableBndrFlag () p where
-    pprTyVarBndr (UserTyVar _ _ n) --     = pprIdP n
-      = case ghcPass @p of
-          GhcPs -> ppr n
-          GhcRn -> ppr n
-          GhcTc -> ppr n
-    pprTyVarBndr (KindedTyVar _ _ n k) = parens $ hsep [ppr_n, dcolon, ppr k]
-      where
-        ppr_n = case ghcPass @p of
-          GhcPs -> ppr n
-          GhcRn -> ppr n
-          GhcTc -> ppr n
+    pprTyVarBndr (UserTyVar _ _ n)     = ppr n
+    pprTyVarBndr (KindedTyVar _ _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
 
 instance OutputableBndrFlag Specificity p where
-    pprTyVarBndr (UserTyVar _ SpecifiedSpec n) --     = pprIdP n
-      = case ghcPass @p of
-          GhcPs -> ppr n
-          GhcRn -> ppr n
-          GhcTc -> ppr n
-    pprTyVarBndr (UserTyVar _ InferredSpec n)      = braces $ ppr_n
-      where
-        ppr_n = case ghcPass @p of
-          GhcPs -> ppr n
-          GhcRn -> ppr n
-          GhcTc -> ppr n
-    pprTyVarBndr (KindedTyVar _ SpecifiedSpec n k) = parens $ hsep [ppr_n, dcolon, ppr k]
-      where
-        ppr_n = case ghcPass @p of
-          GhcPs -> ppr n
-          GhcRn -> ppr n
-          GhcTc -> ppr n
-    pprTyVarBndr (KindedTyVar _ InferredSpec n k)  = braces $ hsep [ppr_n, dcolon, ppr k]
-      where
-        ppr_n = case ghcPass @p of
-          GhcPs -> ppr n
-          GhcRn -> ppr n
-          GhcTc -> ppr n
+    pprTyVarBndr (UserTyVar _ SpecifiedSpec n)     = ppr n
+    pprTyVarBndr (UserTyVar _ InferredSpec n)      = braces $ ppr n
+    pprTyVarBndr (KindedTyVar _ SpecifiedSpec n k) = parens $ hsep [ppr n, dcolon, ppr k]
+    pprTyVarBndr (KindedTyVar _ InferredSpec n k)  = braces $ hsep [ppr n, dcolon, ppr k]
 
 instance OutputableBndrId p => Outputable (HsSigType (GhcPass p)) where
     ppr (HsSig { sig_bndrs = outer_bndrs, sig_body = body }) =
