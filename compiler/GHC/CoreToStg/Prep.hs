@@ -1098,6 +1098,12 @@ cpeApp top_env expr
             | not (isTyCoArg arg) = True
           has_value_arg (_:rest) = has_value_arg rest
 
+--    cpe_app env (Var f) args
+--      | isClassOpId f
+--      , Just tmpl <- maybeUnfoldingTemplate (idUnfolding f)
+--      , pprTrace "cpe_app:class op" (ppr f $$ ppr tmpl)
+--      = cpe_app env tmpl args
+
     cpe_app env (Var v) args
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1

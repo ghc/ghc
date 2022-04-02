@@ -615,7 +615,12 @@ specProgram guts@(ModGuts { mg_module = this_mod
 
              go []           = return ([], emptyUDs)
              go (bind:binds) = do (binds', uds) <- go binds
-                                  (bind', uds') <- specBind top_env bind uds
+                                  let env = bringFloatedDictsIntoScope top_env uds
+                                  (bind', uds') <- specBind env bind uds
+                                  -- let db_bndrs = unionVarSets $ map (mkVarSet . filter isLocalId . bindersOf . db_bind) (bagToList (ud_binds uds))
+                                  -- let not_in_scope = db_bndrs `minusVarSet` getInScopeVars (Core.substInScope (se_subst top_env))
+                                  -- massertPpr (isEmptyVarSet not_in_scope)
+                                  --   (text "not in scope above" $$ ppr (bindersOf bind) $$ ppr (ud_binds uds) $$ ppr not_in_scope)
                                   return (bind' ++ binds', uds')
 
              -- Specialise the bindings of this module
@@ -650,7 +655,7 @@ See #10491
 
 {- *********************************************************************
 *                                                                      *
-                   Specialising imported functions
+                     Specialising imported functions
 *                                                                      *
 ********************************************************************* -}
 
@@ -1129,13 +1134,13 @@ specExpr env expr@(App {})
        }
   where
     -- See Note [Specialisation modulo dictionary selectors]
-    rewrite_class_ops :: CoreExpr -> [CoreExpr] -> (CoreExpr, [CoreExpr])
+    rewrite_class_ops :: InExpr -> [OutExpr] -> (InExpr, [OutExpr])
     rewrite_class_ops (Var f) args
       | isClassOpId f -- If we see `op_sel $fCInt`, we rewrite to `$copInt`
       -- , pprTrace "class op" (ppr f <+> ppr args) True
       , Just (rule, expr) <- specLookupRule env f args (idCoreRules f)
       , let rest_args = drop (ruleArity rule) args -- See Note [Extra args in the target]
-      -- , pprTrace "class op rewritten" (ppr expr <+> ppr rest_args) True
+      , pprTrace "class op rewritten" (ppr f <+> ppr args $$ ppr expr <+> ppr rest_args) True
       , (fun, args) <- collectArgs expr
       = rewrite_class_ops fun (args++rest_args)
     rewrite_class_ops fun args = (fun, args)
@@ -1165,10 +1170,11 @@ specExpr env (Let bind body)
        ; (body', body_uds) <- specExpr body_env body
 
         -- Deal with the bindings
-      ; (binds', uds) <- specBind rhs_env bind' body_uds
+       ; let rhs_env' = bringFloatedDictsIntoScope rhs_env body_uds
+       ; (binds', uds) <- specBind rhs_env' bind' body_uds
 
-        -- All done
-      ; return (foldr Let body' binds', uds) }
+         -- All done
+       ; return (foldr Let body' binds', uds) }
 
 --------------
 specLam :: SpecEnv -> [OutBndr] -> InExpr -> SpecM (OutExpr, UsageDetails)
@@ -1302,6 +1308,14 @@ to substitute sc -> sc_flt in the RHS
 *                                                                      *
 ************************************************************************
 -}
+
+bringFloatedDictsIntoScope :: SpecEnv -> UsageDetails -> SpecEnv
+bringFloatedDictsIntoScope env uds =
+  -- pprTrace "brought into scope" (ppr dx_bndrs) $
+  env{se_subst=subst'}
+  where
+   dx_bndrs = bindersOfBinds (map db_bind (bagToList (ud_binds uds)))
+   subst'   = se_subst env `Core.extendInScopeList` dx_bndrs
 
 specBind :: SpecEnv                     -- Use this for RHSs
          -> CoreBind                    -- Binders are already cloned by cloneBindSM,
@@ -1496,16 +1510,17 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
              , rule_bndrs, rule_lhs_args
              , spec_bndrs1, dx_binds, spec_args) <- specHeader env rhs_bndrs all_call_args
 
---           ; pprTrace "spec_call" (vcat [ text "call info: " <+> ppr _ci
---                                        , text "useful:    " <+> ppr useful
---                                        , text "rule_bndrs:" <+> ppr rule_bndrs
---                                        , text "lhs_args:  " <+> ppr rule_lhs_args
---                                        , text "spec_bndrs:" <+> ppr spec_bndrs1
---                                        , text "spec_args: " <+> ppr spec_args
---                                        , text "dx_binds:  " <+> ppr dx_binds
---                                        , text "rhs_env2:  " <+> ppr (se_subst rhs_env2)
---                                        , ppr dx_binds ]) $
---             return ()
+           ; pprTrace "spec_call" (vcat [ text "fun:       " <+> ppr fn
+                                        , text "call info: " <+> ppr _ci
+                                        , text "useful:    " <+> ppr useful
+                                        , text "rule_bndrs:" <+> ppr rule_bndrs
+                                        , text "lhs_args:  " <+> ppr rule_lhs_args
+                                        , text "spec_bndrs:" <+> ppr spec_bndrs1
+                                        , text "spec_args: " <+> ppr spec_args
+                                        , text "dx_binds:  " <+> ppr dx_binds
+                                        , text "rhs_env2:  " <+> ppr (se_subst rhs_env2)
+                                        , ppr dx_binds ]) $
+             return ()
 
            ; if not useful  -- No useful specialisation
                 || already_covered rules_acc rule_lhs_args
@@ -2458,7 +2473,8 @@ bindAuxiliaryDict env@(SE { se_subst = subst, se_interesting = interesting })
                                 `Core.extendInScope` dict_id
                           -- See Note [Keep the old dictionaries interesting]
                    , se_interesting = interesting `extendVarSet` dict_id }
-    in (env', Nothing, dict_expr)
+    in -- pprTrace "bindAuxiliaryDict:trivial" (ppr orig_dict_id <+> ppr dict_id) $
+       (env', Nothing, dict_expr)
 
   | otherwise  -- Non-trivial dictionary arg; make an auxiliary binding
   = let dict_unf       = mkSimpleUnfolding defaultUnfoldingOpts dict_expr
@@ -2466,10 +2482,12 @@ bindAuxiliaryDict env@(SE { se_subst = subst, se_interesting = interesting })
           -- See Note [Specialisation modulo dictionary selectors] for the unfolding
         dict_bind = mkDB (NonRec fresh_dict_id' dict_expr)
         env' = env { se_subst = Core.extendSubst subst orig_dict_id (Var fresh_dict_id')
-                                `Core.extendInScope` fresh_dict_id'
+                                `Core.extendInScope`     fresh_dict_id'
+                                `Core.extendInScopeList` exprFreeVarsList dict_expr
                       -- See Note [Make the new dictionaries interesting]
                    , se_interesting = interesting `extendVarSet` fresh_dict_id' }
-    in (env', Just dict_bind, Var fresh_dict_id')
+    in -- pprTrace "bindAuxiliaryDict:non-trivial" (ppr orig_dict_id <+> ppr fresh_dict_id' $$ ppr dict_expr $$ ppr (exprFreeVarsList dict_expr)) $
+       (env', Just dict_bind, Var fresh_dict_id')
 
 {-
 Note [Make the new dictionaries interesting]
@@ -2727,7 +2745,7 @@ singleCall id args
         --
         -- We don't include the 'id' itself.
 
-mkCallUDs, mkCallUDs' :: SpecEnv -> Id -> [CoreExpr] -> UsageDetails
+mkCallUDs, mkCallUDs' :: SpecEnv -> Id -> [OutExpr] -> UsageDetails
 mkCallUDs env f args
   = -- pprTrace "mkCallUDs" (vcat [ ppr f, ppr args, ppr res ])
     res
@@ -2757,7 +2775,7 @@ mkCallUDs' env f args
              -- which broadens its applicability, since rules only
              -- fire when saturated
 
-    mk_spec_arg :: CoreExpr -> TyCoBinder -> SpecArg
+    mk_spec_arg :: OutExpr -> TyCoBinder -> SpecArg
     mk_spec_arg arg (Named bndr)
       |  binderVar bndr `elemVarSet` constrained_tyvars
       = case arg of
@@ -3120,6 +3138,7 @@ cloneBindSM env@(SE { se_subst = subst, se_interesting = interesting }) (NonRec 
        ; let (subst', bndr') = Core.cloneIdBndr subst us bndr
              interesting' | typeDeterminesValue (idType bndr)
                           , interestingDict env rhs
+                          , pprTrace "cloneBindSM:interesting" (ppr bndr <> arrow <> ppr bndr') True
                           = interesting `extendVarSet` bndr'
                           | otherwise = interesting
        ; return (env, env { se_subst = subst', se_interesting = interesting' }

@@ -2300,7 +2300,7 @@ lintCoercion the_co@(NthCo r0 n co)
          ; _ -> case (splitTyConApp_maybe s, splitTyConApp_maybe t) of
          { (Just (tc_s, tys_s), Just (tc_t, tys_t))
              | tc_s == tc_t
-             , isInjectiveTyCon tc_s r
+             , isInjectiveTyCon tc_s r || isClassTyCon tc_s
                  -- see Note [NthCo and newtypes] in GHC.Core.TyCo.Rep
              , tys_s `equalLength` tys_t
              , tys_s `lengthExceeds` n

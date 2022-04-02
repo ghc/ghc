@@ -37,7 +37,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.DataCon
-import GHC.Core.TyCon     ( tyConArity )
+import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
 import GHC.Core.Predicate ( isDictTy, isCallStackPredTy )
 import GHC.Core.Multiplicity
@@ -1812,7 +1812,8 @@ pushCoDataCon dc dc_args co
         -- where S is a type function.  In fact, exprIsConApp
         -- will probably not be called in such circumstances,
         -- but there's nothing wrong with it
-
+  , not (isNewDataCon dc) || isClassTyCon to_tc
+        -- see Note [NthCo and newtypes] in GHC.Core.TyCo.Rep
   = let
         tc_arity       = tyConArity to_tc
         dc_univ_tyvars = dataConUnivTyVars dc
