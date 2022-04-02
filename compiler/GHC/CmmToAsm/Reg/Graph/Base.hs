@@ -104,7 +104,7 @@ worst regsOfClass regAlias neighbors classN classC
         regsC           = regsOfClass classC
 
         -- all the possible subsets of c which have size < m
-        regsS           = filter (\s -> sizeUniqSet s >= 1
+        regsS           = filter (\s -> not (isEmptyUniqSet s)
                                      && sizeUniqSet s <= neighbors)
                         $ powersetLS regsC
 
