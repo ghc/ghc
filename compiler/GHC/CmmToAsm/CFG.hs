@@ -1350,7 +1350,7 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
                                 vcat (map (\(k,m) -> ppr (k,m :: IM.IntMap Double)) $ IM.toList g)
                             )
 
-    nodeCount = IM.foldl' (\count toMap -> IM.foldlWithKey' countTargets count toMap) (IM.size graph) graph
+    nodeCount = IM.foldl' (\count toMap -> IM.foldlWithKey' countTargets (count + 1) toMap) 0 graph
       where
         countTargets = (\count k _ -> countNode k + count )
         countNode n = if IM.member n graph then 0 else 1
