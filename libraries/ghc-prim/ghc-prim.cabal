@@ -68,7 +68,7 @@ Library
         --          mingw32 which is required by mingwex.
         -- user32: provides access to apis to modify user components (UI etc)
         --         on Windows. Required because of mingw32.
-        extra-libraries: user32, mingw32, mingwex
+        extra-libraries: user32, mingw32, mingwex, ucrt
 
     if os(linux)
         -- we need libm, but for musl and other's we might need libc, as libm

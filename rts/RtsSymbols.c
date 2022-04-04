@@ -162,12 +162,12 @@ extern char **environ;
       SymI_HasProto(stg_asyncDoProczh)                   \
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
+      SymI_NeedsProto(__mingw_module_is_dll)             \
       RTS_WIN32_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
-      RTS_WIN32_ONLY(SymI_HasProto(_imp___environ))      \
-      RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \
-      RTS_WIN32_ONLY(SymI_HasProto(_imp___iob))          \
-      RTS_WIN64_ONLY(SymI_HasProto(__iob_func))          \
+      RTS_WIN64_ONLY(SymI_HasProto(__stdio_common_vswprintf_s)) \
+      RTS_WIN64_ONLY(SymI_HasProto(__stdio_common_vswprintf)) \
+      RTS_WIN64_ONLY(SymI_HasProto(_errno))  \
       /* see Note [Symbols for MinGW's printf] */        \
       SymI_HasProto(_lock_file)                          \
       SymI_HasProto(_unlock_file)                        \
