@@ -97,6 +97,7 @@ test('NumConstantFolding16', normal, compile_and_run, [''])
 test('NumConstantFolding32', normal, compile_and_run, [''])
 test('NumConstantFolding', normal, compile_and_run, [''])
 test('T19413', normal, compile_and_run, [''])
+test('T19569', [only_ways(['optasm']),extra_run_opts('True 1000000')], compile_and_run, ['-O2'])
 test('T20203', normal, compile, ['-O -dsuppress-all -dsuppress-uniques -dno-typeable-binds -ddump-simpl'])
 test('T19313', expect_broken(19131), compile_and_run, [''])
 
