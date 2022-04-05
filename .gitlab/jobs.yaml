@@ -1492,11 +1492,8 @@
       }
     },
     "cache": {
-      "key": "x86_64-windows-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
+      "key": "no-caching",
+      "paths": []
     },
     "dependencies": [],
     "image": null,
@@ -1553,11 +1550,8 @@
       }
     },
     "cache": {
-      "key": "x86_64-windows-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
+      "key": "no-caching",
+      "paths": []
     },
     "dependencies": [],
     "image": null,
@@ -2521,11 +2515,8 @@
       }
     },
     "cache": {
-      "key": "x86_64-windows-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
+      "key": "no-caching",
+      "paths": []
     },
     "dependencies": [],
     "image": null,
@@ -2583,11 +2574,8 @@
       }
     },
     "cache": {
-      "key": "x86_64-windows-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
+      "key": "no-caching",
+      "paths": []
     },
     "dependencies": [],
     "image": null,
@@ -3637,11 +3625,8 @@
       }
     },
     "cache": {
-      "key": "x86_64-windows-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
+      "key": "no-caching",
+      "paths": []
     },
     "dependencies": [],
     "image": null,
@@ -3697,11 +3682,8 @@
       }
     },
     "cache": {
-      "key": "x86_64-windows-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
+      "key": "no-caching",
+      "paths": []
     },
     "dependencies": [],
     "image": null,

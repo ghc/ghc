@@ -590,11 +590,16 @@ job arch opsys buildConfig = (jobName, Job {..})
                         ,"junit.xml"]
       }
 
-    jobCache = Cache
-      { cachePaths = [ "cabal-cache", "toolchain" ]
-      , cacheKey = mkCacheKey arch opsys
+    jobCache
+        -- N.B. We have temporarily disabled cabal-install store caching on
+        -- Windows due to #21347.
+      | Windows <- opsys =
+          Cache { cachePaths = [], cacheKey = "no-caching" }
+      | otherwise = Cache
+          { cachePaths = [ "cabal-cache", "toolchain" ]
+          , cacheKey = mkCacheKey arch opsys
 
-      }
+          }
 
     jobAllowFailure = False
     jobStage = "full-build"
