@@ -216,7 +216,7 @@ These pragmas control the inlining of function definitions.
 
 .. pragma:: INLINE ⟨name⟩
 
-    :where: top-level
+    :where: any function definition
 
     Force GHC to inline a value.
 
@@ -308,9 +308,6 @@ selected, in which case the ``INLINE`` pragma is ignored. For example, for a
 self-recursive function, the loop breaker can only be the function
 itself, so an ``INLINE`` pragma is always ignored.
 
-Syntactically, an ``INLINE`` pragma for a function can be put anywhere
-its type signature could be put.
-
 ``INLINE`` pragmas are a particularly good idea for the
 ``then``/``return`` (or ``bind``/``unit``) functions in a monad. For
 example, in GHC's own ``UniqueSupply`` monad code, we have: ::
@@ -321,6 +318,44 @@ example, in GHC's own ``UniqueSupply`` monad code, we have: ::
 See also the ``NOINLINE`` (:ref:`noinline-pragma`) and ``INLINABLE``
 (:ref:`inlinable-pragma`) pragmas.
 
+``INLINE`` pragma effects on various locations
+++++++++++++++++++++++++++++++++++++++++++++++
+
+Syntactically, an ``INLINE`` pragma for a function can be put anywhere
+its type signature could be put. This means a ``INLINE`` pragma can really
+be put on any definition site for a binding.
+This includes top-level, ``let`` and ``where`` bindings as well as default
+class methods and instance declarations.
+
+The pragma itself will only have an effect when the RHS of the binding it's applied
+to is used. For regular bindings this is straight forward but for class methods and
+instance definitions this can have surprising ramifications.
+
+If we consider a class definition with two instances like this: ::
+
+    class C a where
+        op1 :: a -> a
+
+        op2 :: [a] -> [a]
+        op2 xs = reverse (xs ++ xs)
+        {-# INLINE op2 #-}
+
+    instance C T1 where
+        op1 x = ...blah...
+
+    instance C T2 where
+        {-# INLINE op1 #-}
+        op1 x = ...blah...
+        op2 xs = ...blah...
+
+Then ``op2`` for the T1 instance will get an implicit ``INLINE`` pragma. This is because
+the RHS of the default method is used for ``op2`` which retains it's ``INLINE`` pragma.
+
+In the T2 instance ``op1`` gets an ``INLINE`` pragma and behaves accordingly. However ``op2`` for T2
+is **not** implemented by the default method. This means the pragma in the class definition doesn't apply
+to this instance. With no pragma being explicitly applied GHC will then decide on a proper inlining behaviour
+for ``T2``\s ``op2`` method on it's own.
+
 .. _inlinable-pragma:
 
 ``INLINABLE`` pragma
@@ -328,7 +363,7 @@ See also the ``NOINLINE`` (:ref:`noinline-pragma`) and ``INLINABLE``
 
 .. pragma:: INLINABLE ⟨name⟩
 
-    :where: top-level
+    :where: any function definition
 
     Suggest that the compiler always consider inlining ``name``.
 
@@ -375,7 +410,7 @@ The alternative spelling ``INLINEABLE`` is also accepted by GHC.
 
 .. pragma:: NOINLINE ⟨name⟩
 
-    :where: top-level
+    :where: any function definition
 
     Instructs the compiler not to inline a value.
 
