@@ -1315,7 +1315,9 @@ scheduleHandleThreadFinished (Capability *cap, Task *task, StgTSO *t)
           if (t->what_next == ThreadComplete) {
               if (task->incall->ret) {
                   // NOTE: return val is stack->sp[1] (see StgStartup.cmm)
-                  *(task->incall->ret) = (StgClosure *)task->incall->tso->stackobj->sp[1];
+                  StgDeadThreadFrame *dead = (StgDeadThreadFrame *) &task->incall->tso->stackobj->sp[0];
+                  ASSERT(dead->header.info == &stg_dead_thread_info);
+                  *(task->incall->ret) = (StgClosure *) dead->result;
               }
               task->incall->rstat = Success;
           } else {

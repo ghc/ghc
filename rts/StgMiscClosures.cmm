@@ -414,6 +414,16 @@ INFO_TABLE_RET( stg_apply_interp, RET_BCO )
     jump stg_yield_to_interpreter [];
 }
 
+/*
+ * Dummy info table pushed on the top of the stack when the stack's
+ * owning thread has finished.
+ */
+INFO_TABLE_RET( stg_dead_thread, RET_SMALL,
+                W_ info_ptr,
+                PROF_HDR_FIELDS(W_,p1,p2)
+                P_ result )
+{ foreign "C" barf("stg_dead_thread entered!") never returns; }
+
 /* ----------------------------------------------------------------------------
    Entry code for a BCO
    ------------------------------------------------------------------------- */

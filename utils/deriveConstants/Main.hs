@@ -418,9 +418,11 @@ wanteds os = concat
           ,structField  Both "StgEntCounter" "link"
           ,structField  Both "StgEntCounter" "entry_count"
 
-          ,closureSize Both "StgUpdateFrame"
-          ,closureSize C    "StgCatchFrame"
-          ,closureSize C    "StgStopFrame"
+          ,closureSize  Both "StgUpdateFrame"
+          ,closureSize  C    "StgCatchFrame"
+          ,closureSize  C    "StgStopFrame"
+          ,closureSize  C    "StgDeadThreadFrame"
+          ,closureField C    "StgDeadThreadFrame" "result"
 
           ,closureSize  Both "StgMutArrPtrs"
           ,closureField Both "StgMutArrPtrs" "ptrs"
