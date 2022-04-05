@@ -480,14 +480,20 @@ mkSeqs args untaggedIds mkExpr = do
 
 -- Out of all arguments passed at runtime only return these ending up in a
 -- strict field
-getStrictConArgs :: DataCon -> [a] -> [a]
+getStrictConArgs :: Outputable a => DataCon -> [a] -> [a]
 getStrictConArgs con args
     -- These are always lazy in their arguments.
     | isUnboxedTupleDataCon con = []
     | isUnboxedSumDataCon con = []
     -- For proper data cons we have to check.
     | otherwise =
+        assertPpr   (length args == length (dataConRuntimeRepStrictness con))
+                    (text "Missmatched con arg and con rep strictness lengths:" $$
+                     text "Con" <> ppr con <+> text "is applied to" <+> ppr args $$
+                     text "But seems to have arity" <> ppr (length repStrictness)) $
         [ arg | (arg,MarkedStrict)
                     <- zipEqual "getStrictConArgs"
                                 args
-                                (dataConRuntimeRepStrictness con)]
+                                repStrictness]
+        where
+            repStrictness = (dataConRuntimeRepStrictness con)

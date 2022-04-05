@@ -47,7 +47,7 @@ import GHC.Core.DataCon
 import GHC.Core             ( AltCon(..) )
 import GHC.Core.Type
 
-import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel )
+import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel, isMarkedCbv )
 import GHC.Types.CostCentre ( isCurrentCCS )
 import GHC.Types.Error      ( DiagnosticReason(WarningWithoutFlag) )
 import GHC.Types.Id
@@ -69,6 +69,7 @@ import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 import Control.Applicative ((<|>))
 import Control.Monad
 import Data.Maybe
+import GHC.Utils.Misc
 
 lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
                    => Logger
@@ -179,10 +180,13 @@ lintStgRhs (StgRhsClosure _ _ _ binders expr)
         lintStgExpr expr
 
 lintStgRhs rhs@(StgRhsCon _ con _ _ args) = do
+    opts <- getStgPprOpts
     when (isUnboxedTupleDataCon con || isUnboxedSumDataCon con) $ do
-      opts <- getStgPprOpts
       addErrL (text "StgRhsCon is an unboxed tuple or sum application" $$
                pprStgRhs opts rhs)
+
+    lintConApp con args (pprStgRhs opts rhs)
+
     mapM_ lintStgArg args
     mapM_ checkPostUnariseConArg args
 
@@ -200,7 +204,7 @@ lintStgExpr e@(StgApp fun args) = do
       -- always needs to be applied to n arguments.
       -- See Note [Strict Worker Ids].
       let marks = fromMaybe [] $ idCbvMarks_maybe fun
-      if length marks > length args
+      if length (dropWhileEndLE (not . isMarkedCbv) marks) > length args
         then addErrL $ hang (text "Undersatured cbv marked ID in App" <+> ppr e ) 2 $
           (text "marks" <> ppr marks $$
           text "args" <> ppr args $$
@@ -211,10 +215,15 @@ lintStgExpr e@(StgApp fun args) = do
 lintStgExpr app@(StgConApp con _n args _arg_tys) = do
     -- unboxed sums should vanish during unarise
     lf <- getLintFlags
-    when (lf_unarised lf && isUnboxedSumDataCon con) $ do
+    let !unarised = lf_unarised lf
+    when (unarised && isUnboxedSumDataCon con) $ do
       opts <- getStgPprOpts
       addErrL (text "Unboxed sum after unarise:" $$
                pprStgExpr opts app)
+
+    opts <- getStgPprOpts
+    lintConApp con args (pprStgExpr opts app)
+
     mapM_ lintStgArg args
     mapM_ checkPostUnariseConArg args
 
@@ -261,6 +270,18 @@ lintAlt GenStgAlt{ alt_con   = DataAlt _
   do
     mapM_ checkPostUnariseBndr bndrs
     addInScopeVars bndrs (lintStgExpr rhs)
+
+-- Post unarise check we apply constructors to the right number of args.
+-- This can be violated by invalid use of unsafeCoerce as showcased by test
+-- T9208
+lintConApp :: Foldable t => DataCon -> t a -> SDoc -> LintM ()
+lintConApp con args app = do
+    unarised <- lf_unarised <$> getLintFlags
+    when (unarised &&
+          not (isUnboxedTupleDataCon con) &&
+          length (dataConRuntimeRepStrictness con) /= length args) $ do
+      addErrL (text "Constructor applied to incorrect number of arguments:" $$
+               text "Application:" <> app)
 
 {-
 ************************************************************************
