@@ -15,6 +15,7 @@ module GHC.Cmm.Dominators
   , graphMap
   , gwdRPNumber
   , gwdDominatorsOf
+  , gwdDominatorTree
 
   -- * Utility functions on dominator sets
   , dominatorsMember
@@ -26,6 +27,7 @@ import GHC.Prelude
 
 import Data.Array.IArray
 import Data.Foldable()
+import qualified Data.Tree as Tree
 
 import qualified Data.IntMap.Strict as IM
 import qualified Data.IntSet as IS
@@ -191,6 +193,16 @@ gwdRPNumber g l = mapFindWithDefault unreachable l (gwd_rpnumbering g)
 
 gwdDominatorsOf :: GraphWithDominators node -> Label -> DominatorSet
 gwdDominatorsOf g lbl = mapFindWithDefault unreachable lbl (gwd_dominators g)
+
+gwdDominatorTree :: GraphWithDominators node -> Tree.Tree Label
+gwdDominatorTree g = subtreeAt (g_entry (gwd_graph gwd))
+  where subtreeAt label = Tree.Node label $ map subtreeAt $ children label
+        children l = mapFindWithDefault [] l child_map
+        child_map = mapFoldlWithKey addParent mapEmpty $ gwd_dominators g
+          where addParent cm _ EntryNode = cm
+                addParent cm lbl (ImmediateDominator p _) =
+                    mapInsertWith (++) p [lbl] cm
+
 
 -- | Turn a function into an array.  Inspired by SML's `Array.tabulate`
 tabulate :: (Ix i) => (i, i) -> (i -> e) -> Array i e
