@@ -45,6 +45,7 @@ module GHC.Driver.Backend
    -- * Available back ends
    , ncgBackend
    , llvmBackend
+   , jsBackend
    , viaCBackend
    , interpreterBackend
    , noBackend
@@ -197,6 +198,7 @@ platformDefaultBackend :: Platform -> Backend
 platformDefaultBackend platform = if
       | platformUnregisterised platform -> viaCBackend
       | platformNcgSupported platform   -> ncgBackend
+      | platformJSSupported platform    -> jsBackend
       | otherwise                       -> llvmBackend
 
 -- | Is the platform supported by the Native Code Generator?
@@ -213,6 +215,12 @@ platformNcgSupported platform = if
          ArchPPC_64 {} -> True
          ArchAArch64   -> True
          _             -> False
+
+-- | Is the platform supported by the Native Code Generator?
+platformJSSupported :: Platform -> Bool
+platformJSSupported platform
+  | platformArch platform == ArchJavaScript = True
+  | otherwise                               = False
 
 -- | Will this backend produce an object file on the disk?
 backendProducesObject :: Backend -> Bool
