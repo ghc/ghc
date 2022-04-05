@@ -51,13 +51,13 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
 
        We Leave the stack looking like this:
 
-                +----------------+
-                |      -------------------> return value
-                +----------------+
-                | stg_enter_info |
-                +----------------+
+                +----------------------+
+                |      -----------------------> return value
+                +----------------------+
+                | stg_dead_thread_info |
+                +----------------------+
 
-       The stg_enter_info is just a dummy info table so that the
+       The stg_dead_thread_info is just a dummy info table so that the
        garbage collector can understand the stack (there must always
        be an info table on top of the stack).
     */
@@ -70,9 +70,9 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
     unwind UnwindReturnReg = return;
 #endif
 
-    Sp = Sp + SIZEOF_StgStopFrame - WDS(2);
+    Sp = Sp + SIZEOF_StgStopFrame - SIZEOF_StgDeadThreadFrame;
+    Sp(0) = stg_dead_thread_info;
     Sp(1) = R1;
-    Sp(0) = stg_enter_info;
 
     StgTSO_what_next(CurrentTSO) = ThreadComplete::I16;
 
