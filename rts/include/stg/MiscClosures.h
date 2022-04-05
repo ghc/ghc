@@ -159,6 +159,7 @@ RTS_RET(stg_ctoi_t61);
 RTS_RET(stg_ctoi_t62);
 
 RTS_RET(stg_apply_interp);
+RTS_RET(stg_dead_thread);
 
 RTS_ENTRY(stg_IND);
 RTS_ENTRY(stg_IND_STATIC);
