@@ -457,7 +457,7 @@ function test_make() {
     return
   fi
 
-  run "$MAKE" test_bindist TEST_PREP=YES
+  run "$MAKE" test_bindist TEST_PREP=YES TEST_PROF=$RELEASE_JOB
   run "$MAKE" V=0 VERBOSE=1 test \
     THREADS="$cores" \
     JUNIT_FILE=../../junit.xml \
@@ -496,6 +496,14 @@ function test_hadrian() {
       ;;
   esac
   cd ../../../
+
+  # If we are doing a release job, check the compiler can build a profiled executable
+  if [ "${RELEASE_JOB:-}" == "yes" ]; then
+    echo "main = print ()" > proftest.hs
+    $TOP/_build/install/bin/ghc$exe -prof proftest.hs
+    rm proftest.hs
+  fi
+
 
   run_hadrian \
     test \
