@@ -1179,9 +1179,6 @@ nightly-x86_64-windows:
 release-x86_64-windows:
   <<: *release
   extends: .build-x86_64-windows-hadrian
-  variables:
-    # --skip-perf is incompatible with IGNORE_PERF_FAILURES.
-    IGNORE_PERF_FAILURES: ""
 
 release-x86_64-windows-integer-simple:
   <<: *release
