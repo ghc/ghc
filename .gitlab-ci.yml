@@ -692,6 +692,10 @@ nightly-aarch64-linux-deb10:
   variables:
     TEST_TYPE: slowtest
 
+release-aarch64-linux-deb10:
+  <<: *release
+  extends: .build-aarch64-linux-deb10
+
 .build-aarch64-linux-deb10-llvm:
   extends: .build-aarch64-linux-deb10
   stage: full-build
@@ -783,6 +787,10 @@ nightly-i386-linux-deb9:
   extends: .build-i386-linux-deb9
   variables:
     TEST_TYPE: slowtest
+
+release-i386-linux-deb9:
+  <<: *release
+  extends: .build-i386-linux-deb9
 
 #################################
 # x86_64-linux-deb9
