@@ -7,8 +7,8 @@
  * ---------------------------------------------------------------------------*/
 
 #include "rts/PosixSource.h"
-#include "HsFFI.h"
 #include "Rts.h"
+#include "HsFFI.h"
 
 #include "StablePtr.h"
 #include "Task.h"

@@ -13,8 +13,9 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
 #include "GCUtils.h"
+
+#include "BeginPrivate.h"
 
 INLINE_HEADER void
 push_mark_stack(StgPtr p)

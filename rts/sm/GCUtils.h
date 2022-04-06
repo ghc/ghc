@@ -13,9 +13,9 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 #include "GCTDecl.h"
+
+#include "BeginPrivate.h"
 
 bdescr* allocGroup_sync(uint32_t n);
 bdescr* allocGroupOnNode_sync(uint32_t node, uint32_t n);

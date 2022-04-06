@@ -7,9 +7,8 @@
  * ---------------------------------------------------------------------------*/
 
 #include "ghcplatform.h"
-#include "RtsSymbols.h"
-
 #include "Rts.h"
+#include "RtsSymbols.h"
 #include "TopHandler.h"
 #include "HsFFI.h"
 #include "CloneStack.h"

@@ -10,12 +10,12 @@
 
 #include <stdio.h>
 
-#include "BeginPrivate.h"
 #include "Rts.h"
-
 #if defined(DEBUG)
 #include "Arena.h"
 #endif
+
+#include "BeginPrivate.h"
 
 #if defined(PROFILING)
 #define PROFILING_ONLY(s) s
