@@ -7,7 +7,7 @@ test('T8131', [cmm_src, only_ways(llvm_ways)], compile_fail, ['-no-hs-main'])
 def check_bounds_test(name):
     """ A -fcheck-prim-bounds test that is expected to fail. """
     test(name,
-         [ignore_stderr, exit_code(3 if opsys('mingw32') else 134)],
+         [ignore_stderr, exit_code(127 if opsys('mingw32') else 134)],
          compile_and_run, ['-fcheck-prim-bounds'])
 
 check_bounds_test('CheckBoundsWriteArray')
