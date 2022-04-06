@@ -75,7 +75,7 @@
         `unsafeThawSmallArray#`, `copySmallArray#`, `copySmallMutableArray#`, `cloneSmallArray#`,
         `cloneSmallMutableArray#`, `freezeSmallArray#`, `thawSmallArray#`, `casSmallArray#`,
 
-    - `newMutVar#`,`readMutVar#`,`writeMutV#`,`casMutVar#`,
+    - `newMutVar#`, `readMutVar#`, `writeMutVar#`,`casMutVar#`,
 
     - operations on `MVar#` and `TVar#`:
 
