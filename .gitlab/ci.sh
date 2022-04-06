@@ -453,7 +453,7 @@ function determine_metric_baseline() {
 # We should never try to build a validate build in a release pipeline so this is
 # very defensive in case we have made a mistake somewhere.
 function check_release_build() {
-  if [ -z "${RELEASE_JOB:-}" ] && [[ "${BUILD_FLAVOUR:-}" == *"validate"* ]]
+  if [ "${RELEASE_JOB:-}" == "yes" ] && [[ "${BUILD_FLAVOUR:-}" == *"validate"* ]]
   then
     info "Exiting build because this is a validate build in a release job"
     exit 0;
