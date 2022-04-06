@@ -20,18 +20,6 @@
 
 #pragma once
 
-#if defined(mingw32_HOST_OS)
-#  if defined(__USE_MINGW_ANSI_STDIO)
-#    if __USE_MINGW_ANSI_STDIO != 1
-#       warning "Mismatch between __USE_MINGW_ANSI_STDIO definitions. \
-If using Rts.h make sure it is the first header included."
-#    endif
-#  else
-/* Inform mingw we want the ISO rather than Windows printf format specifiers. */
-#    define __USE_MINGW_ANSI_STDIO 1
-#endif
-#endif
-
 /* ISO C 99 says:
  * "C++ implementations should define these macros only when
  * __STDC_LIMIT_MACROS is defined before <stdint.h> is included."
