@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 // Use wchar_t for pathnames on Windows (#5697)
 #if defined(mingw32_HOST_OS)
 #include "fs_rts.h"
@@ -36,6 +34,8 @@
 #define pathsize sizeof(char)
 #define pathcopy strcpy
 #endif
+
+#include "BeginPrivate.h"
 
 pathchar* pathdup(pathchar *path);
 pathchar* pathdir(pathchar *path);

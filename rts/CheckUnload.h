@@ -10,9 +10,9 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 #include "LinkerInternals.h"
+
+#include "BeginPrivate.h"
 
 // Currently live objects
 extern ObjectCode *objects;

@@ -7,9 +7,8 @@
  * ---------------------------------------------------------------------------*/
 
 #include "ghcplatform.h"
-#include "RtsSymbolInfo.h"
-
 #include "Rts.h"
+#include "RtsSymbolInfo.h"
 #include "HsFFI.h"
 
 #include "Hash.h"

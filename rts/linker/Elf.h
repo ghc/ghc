@@ -2,10 +2,9 @@
 
 #include "Rts.h"
 #include "LinkerInternals.h"
+#include "linker/ElfTypes.h"
 
 #include "BeginPrivate.h"
-
-#include <linker/ElfTypes.h>
 
 void ocInit_ELF          ( ObjectCode* oc );
 void ocDeinit_ELF        ( ObjectCode* oc );

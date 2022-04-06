@@ -13,9 +13,9 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 #include "HeapAlloc.h"
+
+#include "BeginPrivate.h"
 
 void GarbageCollect (uint32_t collect_gen,
                      bool do_heap_census,

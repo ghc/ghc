@@ -18,8 +18,6 @@
 
 void printLoadedObjects(void);
 
-#include "BeginPrivate.h"
-
 /* Which object file format are we targeting? */
 #if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) \
 || defined(linux_android_HOST_OS) \
@@ -367,6 +365,8 @@ typedef struct _RtsSymbolInfo {
     ObjectCode *owner;
     SymStrength strength;
 } RtsSymbolInfo;
+
+#include "BeginPrivate.h"
 
 void exitLinker( void );
 
