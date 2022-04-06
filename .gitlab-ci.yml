@@ -81,7 +81,7 @@ workflow:
     XZ_OPT: "-9"
   rules:
     - if: $NIGHTLY
-  artifact:
+  artifacts:
     when: always
     expire_in: 8 weeks
 
@@ -1168,8 +1168,9 @@ validate-x86_64-windows-hadrian:
     key: "x86_64-windows-$CACHE_REV"
 
 nightly-x86_64-windows:
-  <<: *nightly
-  extends: .build-x86_64-windows-make
+  extends: 
+    - .nightly
+    - .build-x86_64-windows-make
   stage: full-build
   variables:
     BUILD_FLAVOUR: "validate"
@@ -1179,6 +1180,9 @@ nightly-x86_64-windows:
 release-x86_64-windows:
   <<: *release
   extends: .build-x86_64-windows-hadrian
+  variables:
+    IGNORE_PERF_FAILURES: ""
+    BUILD_FLAVOUR: "perf"
 
 release-x86_64-windows-integer-simple:
   <<: *release
@@ -1188,6 +1192,7 @@ release-x86_64-windows-integer-simple:
     BIN_DIST_NAME: "ghc-x86_64-mingw32-unknown-nogmp"
     # --skip-perf is incompatible with IGNORE_PERF_FAILURES.
     IGNORE_PERF_FAILURES: ""
+    BUILD_FLAVOUR: "perf"
 
 
 ############################################################
