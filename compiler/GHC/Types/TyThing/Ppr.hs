@@ -33,6 +33,8 @@ import GHC.Iface.Make ( tyThingToIfaceDecl )
 import GHC.Utils.Outputable
 import GHC.Utils.Trace
 
+import Data.Maybe ( isJust )
+
 -- -----------------------------------------------------------------------------
 -- Pretty-printing entities that we get from the GHC API
 
@@ -178,7 +180,7 @@ pprTyThing ss ty_thing
 
     ppr_bndr :: Name -> Maybe (OccName -> SDoc)
     ppr_bndr name
-      | isBuiltInSyntax name
+      | isBuiltInSyntax name || isJust (namePun_maybe name)
          = Nothing
       | otherwise
          = case nameModule_maybe name of

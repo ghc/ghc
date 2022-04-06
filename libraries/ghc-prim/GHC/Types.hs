@@ -22,16 +22,15 @@
 -----------------------------------------------------------------------------
 
 module GHC.Types (
-        -- Data types that are built-in syntax
-        -- They are defined here, but not explicitly exported
-        --
-        --    Lists:          []( [], (:) )
-        --    Type equality:  (~)( Eq# )
-
         -- * Built-in types
         Bool(..), Char(..), Int(..), Word(..),
         Float(..), Double(..),
         Ordering(..), IO(..),
+
+        List,   -- List( [], (:) )
+          -- List constructors are not exported
+          -- because they are built-in syntax
+
         isTrue#,
         SPEC(..),
         Symbol,
@@ -177,7 +176,7 @@ type family Any :: k where { }
 -- >>> ['h','e','l','l','o'] == "hello"
 -- True
 --
-data [] a = [] | a : [a]
+data List a = [] | a : List a
 
 
 {- *********************************************************************

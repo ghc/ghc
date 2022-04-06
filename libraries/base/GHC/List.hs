@@ -18,7 +18,9 @@
 -----------------------------------------------------------------------------
 
 module GHC.List (
-   -- [] (..),          -- built-in syntax; can't be used in export list
+
+   -- The list data type
+   List,
 
    -- List-monomorphic Foldable methods and misc functions
    foldr, foldr', foldr1,
