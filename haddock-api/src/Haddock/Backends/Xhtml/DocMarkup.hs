@@ -46,7 +46,7 @@ parHtmlMarkup qual insertAnchors ppId = Markup {
   markupIdentifierUnchecked  = thecode . ppUncheckedLink qual,
   markupModule               = \(ModLink m lbl) ->
                                  let (mdl,ref) = break (=='#') m
-                                       -- Accomodate for old style
+                                       -- Accommodate for old style
                                        -- foo\#bar anchors
                                      mdl' = case reverse mdl of
                                               '\\':_ -> init mdl

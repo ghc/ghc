@@ -361,7 +361,7 @@ table = do
     firstRow <- parseFirstRow
     let len = T.length firstRow
 
-    -- then we parse all consequtive rows starting and ending with + or |,
+    -- then we parse all consecutive rows starting and ending with + or |,
     -- of the width `len`.
     restRows <- many (try (parseRestRows len))
 

@@ -84,7 +84,7 @@ import GHC.Unit.Module.Warnings
 
 newtype IfEnv m = IfEnv
   {
-    -- | Lookup names in the enviroment.
+    -- | Lookup names in the environment.
     ife_lookup_name :: Name -> m (Maybe TyThing)
   }
 
@@ -266,7 +266,7 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
   mod_warning <- liftErrMsg (moduleWarning dflags tcg_rdr_env tcg_warns)
 
   let
-    -- Warnings in this module and transitive warnings from dependend modules
+    -- Warnings in this module and transitive warnings from dependent modules
     warnings :: Map Name (Doc Name)
     warnings = M.unions (decl_warnings : map ifaceWarningMap (M.elems ifaces))
 

@@ -150,7 +150,7 @@ data Interface = Interface
     -- | Warnings for things defined in this module.
   , ifaceWarningMap :: !WarningMap
 
-    -- | Tokenized source code of module (avaliable if Haddock is invoked with
+    -- | Tokenized source code of module (available if Haddock is invoked with
     -- source generation flag).
   , ifaceHieFile :: !(Maybe FilePath)
   , ifaceDynFlags :: !DynFlags

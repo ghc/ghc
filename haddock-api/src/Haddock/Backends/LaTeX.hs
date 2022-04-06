@@ -1296,7 +1296,7 @@ latexMarkup = Markup
       Just label -> text "\\href" <> braces (text url) <> braces label
       Nothing    -> text "\\url"  <> braces (text url)
 
-    -- Is there a better way of doing this? Just a space is an aribtrary choice.
+    -- Is there a better way of doing this? Just a space is an arbitrary choice.
     markupPic (Picture uri title) = parens (imageText title)
       where
         imageText Nothing = beg
@@ -1328,7 +1328,7 @@ rdrDocToLaTeX doc = markup latexMarkup doc Plain empty
 
 data StringContext
   = Plain  -- ^ all special characters have to be escape
-  | Mono   -- ^ on top of special characters, escape space chraacters
+  | Mono   -- ^ on top of special characters, escape space characters
   | Verb   -- ^ don't escape anything
 
 
