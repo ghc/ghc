@@ -22,7 +22,7 @@
 #define struct_stat struct _stat
 #define open wopen
 #define WSTR(s) L##s
-#define pathprintf swprintf
+#define pathprintf snwprintf
 #define pathcopy wcscpy
 #define pathsize sizeof(wchar_t)
 #else
