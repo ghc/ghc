@@ -23,7 +23,11 @@ test('changelogs', [ no_deps if has_ls_files() else skip
 
 test('cpp', [ no_deps if has_ls_files() else skip
             , extra_files(["regex-linters"]) ]
-            , makefile_test, ['cpp'])
+          , makefile_test, ['cpp'])
+
+test('rts-includes', [ no_deps if has_ls_files() else skip
+                     , extra_files(["regex-linters"]) ]
+                   , makefile_test, ['rts-includes'])
 
 test('version-number', [ no_deps if has_ls_files() else skip
                        , extra_files(["regex-linters"]) ]
