@@ -645,10 +645,10 @@ bool isArchive (pathchar *path)
     }
 
     size_t ret = fread(buffer, 1, sizeof(buffer), f);
+    fclose(f);
     if (ret < sizeof(buffer)) {
         return false;
     }
-    fclose(f);
     return strncmp(ARCHIVE_HEADER, buffer, sizeof(ARCHIVE_HEADER)-1) == 0;
 }
 
