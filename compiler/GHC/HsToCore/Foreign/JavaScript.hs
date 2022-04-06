@@ -396,7 +396,7 @@ typeTyCon ty
   | Just (tc, _) <- tcSplitTyConApp_maybe (unwrapType ty) -- rep_ty
   = tc
   | otherwise
-  = pprPanic "Gen2.Foreign.typeTyCon" (ppr ty)
+  = pprPanic "typeTyCon" (ppr ty)
 
 
 {-
