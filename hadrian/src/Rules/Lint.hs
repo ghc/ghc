@@ -37,12 +37,8 @@ base = do
   let include2  = stage1Lib
   let include3  = topDir </> buildDir </> "stage1/libraries/base/build/include"
   let hlintYaml = topDir </> "libraries/base/.hlint.yaml"
-  threads <- shakeThreads <$> getShakeOptions
   hostArch <- (<> "_HOST_ARCH") <$> setting HostArch
-  let cmdLine = "hlint" <>
-                " -j" <> show threads <>
-                " --cpp-define " <> hostArch <>
-                " --cpp-include=" <> include0 <>
+  let cmdLine = "hlint -j --cpp-define " <> hostArch <> " --cpp-include=" <> include0 <>
                 " --cpp-include=" <> include1 <>
                 " --cpp-include=" <> include2 <>
                 " --cpp-include=" <> include3 <>
@@ -67,10 +63,7 @@ compiler = do
   let include1  = stage1Lib
   let hlintYaml = topDir </> "compiler/.hlint.yaml"
   hostArch <- (<> "_HOST_ARCH") <$> setting HostArch
-  threads <- shakeThreads <$> getShakeOptions
-  let cmdLine = "hlint" <>
-                " -j" <> show threads <>
-                " --cpp-define " <> hostArch <>
+  let cmdLine = "hlint -j --cpp-define " <> hostArch <>
                 " --cpp-include=" <> include0 <>
                 " --cpp-include=" <> include1 <>
                 " --cpp-include=" <> compilerDir <>
