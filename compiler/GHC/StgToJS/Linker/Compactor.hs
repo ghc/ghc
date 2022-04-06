@@ -2,6 +2,8 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.StgToJS.Linker
@@ -29,6 +31,12 @@
 
 module GHC.StgToJS.Linker.Compactor
   ( compact
+    -- FIXME (Sylvain 2022-04): remove or use these exports
+  , collectGlobals
+  , debugShowStat
+  , packStrings
+  , staticInfoArgs
+  , staticValArgs
   ) where
 
 
@@ -40,8 +48,6 @@ import           Control.Applicative
 import           GHC.Utils.Monad.State.Strict
 import           Data.Function
 
-import qualified Data.Binary.Get as DB
-import qualified Data.Binary.Put as DB
 import qualified Data.Bits as Bits
 import           Data.Bits (shiftL, shiftR)
 import           Data.Bifunctor (second)
@@ -54,7 +60,7 @@ import qualified Data.Graph as G
 import qualified Data.Map.Strict as M
 import           Data.Map (Map)
 import           Data.Int
-import           Data.List
+import qualified Data.List as List
 import           Data.Maybe
 import qualified Data.Set as S
 import           Data.Set (Set)
@@ -334,11 +340,11 @@ renameInternals ln_cfg cfg cs0 rtsDeps stats0a = (cs, stats, meta)
             -- entryArr     = safariCrashWorkaround $
             entryArr     = toJExpr
                            . map (TxtI . fst)
-                           . sortBy (compare `on` snd)
+                           . List.sortBy (compare `on` snd)
                            . M.toList
                            $ csEntries cs
             lblArr       = map (TxtI . fst)
-                           . sortBy (compare `on` snd)
+                           . List.sortBy (compare `on` snd)
                            . M.toList
                            $ csLabels cs
             ss           = concatMap (\(_,_,xs) -> map (renameStaticInfo cs) xs)
@@ -445,7 +451,7 @@ lookupRenamed cs i@(TxtI t) =
 renameVar :: Ident                      -- ^ text identifier to rename
           -> State CompactorState Ident -- ^ the updated renamer state and the new ident
 renameVar i@(TxtI t)
-  | "h$$" `isPrefixOf` T.unpack t = do
+  | "h$$" `List.isPrefixOf` T.unpack t = do
       m <- gets csNameMap
       case M.lookup t m of
         Just r  -> return r
@@ -746,13 +752,6 @@ encodeMax = 737189
   [symbols]
  -}
 
-renderBase :: Base                                   -- ^ base metadata
-           -> BL.ByteString                          -- ^ rendered result
-renderBase = DB.runPut . putBase
-
-loadBase :: FilePath -> IO Base
-loadBase file = DB.runGet (getBase file) <$> BL.readFile file
-
 staticInfoArgs :: Applicative f => (StaticArg -> f StaticArg) -> StaticInfo -> f StaticInfo
 staticInfoArgs f (StaticInfo si sv sa) = StaticInfo si <$> staticValArgs f sv <*> pure sa
 
@@ -802,7 +801,7 @@ dedupeBodies rtsDeps input = (renderBuildFunctions bfN bfCB, input')
                         . hashDefinitions globals) b
                         )
                         input
-    globals = foldl' (flip S.delete) (findAllGlobals input) rtsDeps
+    globals = List.foldl' (flip S.delete) (findAllGlobals input) rtsDeps
 
 renderBuildFunctions :: [BuildFunction] -> [BuildFunction] -> JStat
 renderBuildFunctions normalBfs cycleBreakerBfs =
@@ -837,7 +836,7 @@ data BuildFunction = BuildFunction
 sortBuildFunctions :: [BuildFunction] -> ([BuildFunction], [BuildFunction])
 sortBuildFunctions bfs = (map snd normBFs, map snd cbBFs)
   where
-    (normBFs, cbBFs) = partition (not.fst) . concatMap fromSCC $ sccs bfs
+    (normBFs, cbBFs) = List.partition (not.fst) . concatMap fromSCC $ sccs bfs
     bfm :: Map ShortText BuildFunction
     bfm = M.fromList (map (\x -> (bfName x, x)) bfs)
     fromSCC :: G.SCC ShortText -> [(Bool, BuildFunction)]
@@ -860,7 +859,7 @@ sortBuildFunctions bfs = (map snd normBFs, map snd cbBFs)
         inDeg  = M.fromListWith (+) (map (,1) . concatMap (bfDeps . (bfm M.!)) $ nodes)
         -- ELS heuristic (Eades et. al.)
         selected :: ShortText
-        selected = maximumBy (compare `on` (\x -> outDeg M.! x - inDeg M.! x)) nodes
+        selected = List.maximumBy (compare `on` (\x -> outDeg M.! x - inDeg M.! x)) nodes
 
 rewriteBodies :: Set ShortText
               -> Map ShortText BS.ByteString
@@ -989,12 +988,12 @@ dedupe rtsDeps input
   where
     idx    = HashIdx hashes hr
     hashes0 = buildHashes rtsDeps input
-    hashes  = foldl' (flip M.delete) hashes0 rtsDeps
+    hashes  = List.foldl' (flip M.delete) hashes0 rtsDeps
     hr     = fmap pickShortest
              (M.fromListWith (++) $
              map (\(i, h) -> (h, [i])) (M.toList hashes))
     pickShortest :: [ShortText] -> ShortText
-    pickShortest = minimumBy (compare `on` T.codepointLength)
+    pickShortest = List.minimumBy (compare `on` T.codepointLength)
 
 dedupeBlock :: HashIdx
             -> JStat
@@ -1031,7 +1030,7 @@ dedupeStaticInfo hi (StaticInfo i val ccs)
 dedupeStaticInfo _ _ = Nothing
 
 dedupeCIStatic :: HashIdx -> CIStatic -> CIStatic
-dedupeCIStatic hi (CIStaticRefs refs) = CIStaticRefs (nub $ map (toCanon hi) refs)
+dedupeCIStatic hi (CIStaticRefs refs) = CIStaticRefs (List.nub $ map (toCanon hi) refs)
 
 dedupeStaticVal :: HashIdx -> StaticVal -> StaticVal
 dedupeStaticVal hi (StaticFun t args) =
@@ -1110,7 +1109,7 @@ buildHashes rtsDeps xss
   -- - | dumpHashes0 hashes0
   = fixHashes (fmap finalizeHash hashes0)
   where
-    globals = foldl' (flip S.delete) (findAllGlobals xss) rtsDeps
+    globals = List.foldl' (flip S.delete) (findAllGlobals xss) rtsDeps
     hashes0 = M.unions (map buildHashesBlock xss)
     buildHashesBlock (st, cis, sis) =
       let hdefs = hashDefinitions globals st
@@ -1208,7 +1207,7 @@ fixHashesIter n invDeps allKeys checkKeys sccs hashes finalHashes
               BB.int64LE (fromIntegral $ length deps') <>
               mconcat (map BB.byteString deps')
         toHash :: [ShortText]
-        toHash = sortBy (compare `on` fst . (hashes M.!)) scc
+        toHash = List.sortBy (compare `on` fst . (hashes M.!)) scc
 
 makeFinalHash :: BS.ByteString -> [BS.ByteString] -> BS.ByteString
 makeFinalHash b bs = mconcat (b:bs)
@@ -1293,7 +1292,7 @@ findDefinitions _                                 = []
 hashSingleDefinition :: Set ShortText -> Ident -> JExpr -> (ShortText, HashBuilder)
 hashSingleDefinition globals (TxtI i) expr = (i, ht 0 <> render st <> mconcat (map hobj globalRefs))
   where
-    globalRefs = nub $ filter (`S.member` globals) (map (\(TxtI i) -> i) (identsE expr))
+    globalRefs = List.nub $ filter (`S.member` globals) (map (\(TxtI i) -> i) (identsE expr))
     globalMap  = M.fromList $ zip globalRefs (map (T.pack . ("h$$$global_"++) . show) [(1::Int)..])
     expr'      = identsE' (\i@(TxtI t) ->  maybe i TxtI (M.lookup t globalMap)) expr
     st         = AssignStat (ValExpr (JVar (TxtI "dummy"))) expr'
