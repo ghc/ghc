@@ -1067,6 +1067,15 @@ validate-x86_64-linux-fedora27:
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
+release-x86_64-linux-fedora27:
+  <<: *release
+  extends: .build-x86_64-linux-fedora27
+  variables:
+    HADDOCK_HYPERLINKED_SOURCES: "yes"
+    BUILD_FLAVOUR: perf
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux.tar.xz"
+    TEST_ENV: "x86_64-linux-fedora27"
+
 release-x86_64-linux-fedora27-dwarf:
   <<: *release
   extends: .build-x86_64-linux-fedora27
