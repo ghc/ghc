@@ -2156,10 +2156,11 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType 
         if (pinfo->value == (void*)0xBAADF00D)
         {
             char symBuffer[50];
+            const char *crt_impl = "ucrtbase";
             sprintf(symBuffer, "_%s", lbl);
-            static HMODULE msvcrt = NULL;
-            if (!msvcrt) msvcrt = GetModuleHandle("msvcrt");
-            pinfo->value = GetProcAddress(msvcrt, symBuffer);
+            static HMODULE crt = NULL;
+            if (!crt) crt = GetModuleHandle(crt_impl);
+            pinfo->value = GetProcAddress(crt, symBuffer);
             return pinfo->value;
         }
         else if (pinfo && pinfo->owner && isSymbolImport (pinfo->owner, lbl))
