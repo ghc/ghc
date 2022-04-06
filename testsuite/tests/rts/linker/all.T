@@ -119,8 +119,9 @@ test('T7072',
 
 
 test('T20918',
-	[extra_files(['T20918_v.cc']),
-		unless(opsys('mingw32'), skip),
-		req_rts_linker],
-	makefile_test, ['T20918'])
+     [extra_files(['T20918_v.cc']),
+      unless(opsys('mingw32'), skip),
+      when(opsys('mingw32'), expect_broken(2)),
+      req_rts_linker],
+     makefile_test, ['T20918'])
 
