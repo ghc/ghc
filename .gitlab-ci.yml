@@ -1182,6 +1182,7 @@ release-x86_64-windows:
   variables:
     # --skip-perf is incompatible with IGNORE_PERF_FAILURES.
     IGNORE_PERF_FAILURES: ""
+    BUILD_FLAVOUR: "perf"
 
 release-x86_64-windows-integer-simple:
   <<: *release
@@ -1191,6 +1192,7 @@ release-x86_64-windows-integer-simple:
     BIN_DIST_NAME: "ghc-x86_64-mingw32-unknown-nogmp"
     # --skip-perf is incompatible with IGNORE_PERF_FAILURES.
     IGNORE_PERF_FAILURES: ""
+    BUILD_FLAVOUR: "perf"
 
 
 ############################################################
