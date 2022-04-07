@@ -1033,11 +1033,11 @@ dsHsConLike (PatSynCon ps)
   | otherwise
   = pprPanic "dsConLike" (ppr ps)
 
-dsConLike :: ConLike -> [TcInvisTVBinder] -> [Scaled Type] -> DsM CoreExpr
+dsConLike :: ConLike -> [TcTyVar] -> [Scaled Type] -> DsM CoreExpr
 -- This function desugars ConLikeTc
 -- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
 --     for what is going on here
-dsConLike con tvbs tys
+dsConLike con tvs tys
   = do { ds_con <- dsHsConLike con
        ; ids    <- newSysLocalsDs tys
                    -- newSysLocalDs: /can/ be lev-poly; see
@@ -1046,7 +1046,6 @@ dsConLike con tvbs tys
                  ds_con `mkTyApps` mkTyVarTys tvs
                         `mkVarApps` drop_stupid ids) }
   where
-    tvs = binderVars tvbs
 
     drop_stupid = dropList (conLikeStupidTheta con)
     -- drop_stupid: see Note [Instantiating stupid theta]

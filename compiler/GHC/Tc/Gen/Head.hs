@@ -809,7 +809,8 @@ check_naughty lbl id
 tcInferDataCon :: DataCon -> TcM (HsExpr GhcTc, TcSigmaType)
 -- See Note [Typechecking data constructors]
 tcInferDataCon con
-  = do { let tvs   = dataConUserTyVarBinders con
+  = do { let tvbs  = dataConUserTyVarBinders con
+             tvs   = binderVars tvbs
              theta = dataConOtherTheta con
              args  = dataConOrigArgTys con
              res   = dataConOrigResTy con
@@ -823,7 +824,7 @@ tcInferDataCon con
                 -- See Note [Instantiating stupid theta]
 
        ; return ( XExpr (ConLikeTc (RealDataCon con) tvs all_arg_tys)
-                , mkInvisForAllTys tvs $ mkPhiTy full_theta $
+                , mkInvisForAllTys tvbs $ mkPhiTy full_theta $
                   mkVisFunTys scaled_arg_tys res ) }
   where
     linear_to_poly :: Scaled Type -> TcM (Scaled Type)
@@ -874,7 +875,7 @@ mostly in tcInferDataCon:
 
 4. The (ConLikeTc K [r,a] [Scaled p a]) is later desugared by
    GHC.HsToCore.Expr.dsConLike to:
-     (/\r a. \(x %p :: a). K @r @a x)
+     (/\r (a :: TYPE r). \(x %p :: a). K @r @a x)
    which has the desired type given in the previous bullet.
    The 'p' is the multiplicity unification variable, which
    will by now have been unified to something, or defaulted in
@@ -883,21 +884,37 @@ mostly in tcInferDataCon:
 
 Wrinkles
 
-* Why put [InvisTVBinder] in ConLikeTc, when we only need [TyVar] to
-  desugar?  It's a bit of a toss-up, but having [InvisTvBinder] supports
-  a future hsExprType :: HsExpr GhcTc -> Type
-
-* Note that the [InvisTvBinder] is strictly redundant anyway; it's
-  just the dataConUserTyVarBinders of the data constructor.  Similarly
-  in the [Scaled TcType] field of ConLikeTc, the type comes directly
+* Note that the [TcType] is strictly redundant anyway; those are the
+  type variables from the dataConUserTyVarBinders of the data constructor.
+  Similarly in the [Scaled TcType] field of ConLikeTc, the types come directly
   from the data constructor.  The only bit that /isn't/ redundant is the
   fresh multiplicity variables!
 
   So an alternative would be to define ConLikeTc like this:
       | ConLikeTc [TcType]    -- Just the multiplicity variables
-  But then the desugarer (and hsExprType, when we implement it) would
-  need to repeat some of the work done here.  So for now at least
-  ConLikeTc records this strictly-redundant info.
+  But then the desugarer would need to repeat some of the work done here.
+  So for now at least ConLikeTc records this strictly-redundant info.
+
+* The lambda expression we produce in (4) can have representation-polymorphic
+  arguments, as indeed in (/\r (a :: TYPE r). \(x %p :: a). K @r @a x),
+  we have a lambda-bound variable x :: (a :: TYPE r).
+  This goes against the representation polymorphism invariants given in
+  Note [Representation polymorphism invariants] in GHC.Core. The trick is that
+  this this lambda will always be instantiated in a way that upholds the invariants.
+  This is achieved as follows:
+
+    A. Any arguments to such lambda abstractions are guaranteed to have
+       a fixed runtime representation. This is enforced in 'tcApp' by
+       'matchActualFunTySigma'.
+
+    B. If there are fewer arguments than there are bound term variables,
+       hasFixedRuntimeRep_remainingValArgs will ensure that we are still
+       instantiating at a representation-monomorphic type, e.g.
+
+       ( /\r (a :: TYPE r). \ (x %p :: a). K @r @a x) @IntRep @Int#
+         :: Int# -> T IntRep Int#
+
+  We then rely on the simple optimiser to beta reduce the lambda.
 
 * See Note [Instantiating stupid theta] for an extra wrinkle
 

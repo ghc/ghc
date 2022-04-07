@@ -406,12 +406,12 @@ function arguments. See Note [Representation polymorphism invariants]
 in GHC.Core.  That is checked by the calls to `hasFixedRuntimeRep ` in
 `tcEValArg`.
 
-But some /built-in/ functions are representation-polymorphic.  Users
-can't define such Ids; they are all GHC built-ins or data
+But some /built-in/ functions have representation-polymorphic argument
+types. Users can't define such Ids; they are all GHC built-ins or data
 constructors.  Specifically they are:
 
 1. A few wired-in Ids like unsafeCoerce#, with compulsory unfoldings.
-2. Primops, such as raise#
+2. Primops, such as raise#.
 3. Newtype constructors with `UnliftedNewtypes` that have
    a representation-polymorphic argument.
 4. Representation-polymorphic data constructors: unboxed tuples
@@ -480,7 +480,10 @@ Wrinkles
 
   Because we want to accept this, we switch off Lint's representation
   polymorphism checks when Lint checks the output of the desugarer;
-  see the lf_check_fixed_repy flag in GHC.Core.Lint.lintCoreBindings.
+  see the lf_check_fixed_rep flag in GHC.Core.Lint.lintCoreBindings.
+
+  We then rely on the simple optimiser to beta reduce these
+  representation-polymorphic lambdas (e.g. GHC.Core.SimpleOpt.simple_app).
 
 * Arity.  We don't want to check for arguments past the
   arity of the function.  For example

@@ -979,15 +979,10 @@ producing an error message of the form:
 -- | In what context are we checking that a type has a fixed runtime representation?
 data FRROrigin
 
-  -- | Function arguments must have a fixed runtime representation.
-  --
-  -- Test case: RepPolyApp.
-  = FRRApp !(HsExpr GhcTc)
-
   -- | Record fields in record updates must have a fixed runtime representation.
   --
   -- Test case: RepPolyRecordUpdate.
-  | FRRRecordUpdate !RdrName !(HsExpr GhcTc)
+  = FRRRecordUpdate !RdrName !(HsExpr GhcTc)
 
   -- | Variable binders must have a fixed runtime representation.
   --
@@ -1073,9 +1068,6 @@ data FRROrigin
 -- Note that this function does not include the specific 'RuntimeRep'
 -- which is not fixed. That information is added by 'GHC.Tc.Errors.mkFRRErr'.
 pprFRROrigin :: FRROrigin -> SDoc
-pprFRROrigin (FRRApp arg)
-  = sep [ text "The function argument"
-        , nest 2 $ quotes (ppr arg) ]
 pprFRROrigin (FRRRecordUpdate lbl _arg)
   = sep [ text "The record update at field"
         , quotes (ppr lbl) ]
@@ -1241,8 +1233,28 @@ instance Outputable FRRArrowOrigin where
 --     Uses 'pprExpectedFunTyOrigin'.
 --     See 'FRROrigin' for more general origins of representation polymorphism checks.
 data ExpectedFunTyOrigin
-  = ExpectedFunTySyntaxOp !CtOrigin !(HsExpr GhcRn)
-  | ExpectedFunTyViewPat  !(HsExpr GhcRn)
+
+  -- | A rebindable syntax operator is expected to have a function type.
+  --
+  -- Test cases for representation-polymorphism checks:
+  --   RepPolyDoBind, RepPolyDoBody{1,2}, RepPolyMc{Bind,Body,Guard}, RepPolyNPlusK
+  = ExpectedFunTySyntaxOp
+    !CtOrigin
+    !(HsExpr GhcRn)
+      -- ^ rebindable syntax operator
+
+  -- | A view pattern must have a function type.
+  --
+  -- Test cases for representation-polymorphism checks:
+  --   RepPolyBinder
+  | ExpectedFunTyViewPat
+    !(HsExpr GhcRn)
+      -- ^ function used in the view pattern
+
+  -- | Need to be able to extract an argument type from a function type.
+  --
+  -- Test cases for representation-polymorphism checks:
+  --   RepPolyApp
   | forall (p :: Pass)
       . (OutputableBndrId p)
       => ExpectedFunTyArg
@@ -1250,9 +1262,33 @@ data ExpectedFunTyOrigin
             -- ^ function
           !(HsExpr (GhcPass p))
             -- ^ argument
-  | ExpectedFunTyMatches  !TypedThing !(MatchGroup GhcRn (LHsExpr GhcRn))
-  | ExpectedFunTyLam      !(MatchGroup GhcRn (LHsExpr GhcRn))
-  | ExpectedFunTyLamCase  LamCaseVariant !(HsExpr GhcRn)
+
+  -- | Ensure that a function defined by equations indeed has a function type
+  -- with the appropriate number of arguments.
+  --
+  -- Test cases for representation-polymorphism checks:
+  --   RepPolyBinder, RepPolyRecordPattern, RepPolyWildcardPattern
+  | ExpectedFunTyMatches
+      !TypedThing
+        -- ^ name of the function
+      !(MatchGroup GhcRn (LHsExpr GhcRn))
+       -- ^ equations
+
+  -- | Ensure that a lambda abstraction has a function type.
+  --
+  -- Test cases for representation-polymorphism checks:
+  --   RepPolyLambda
+  | ExpectedFunTyLam
+      !(MatchGroup GhcRn (LHsExpr GhcRn))
+
+  -- | Ensure that a lambda case expression has a function type.
+  --
+  -- Test cases for representation-polymorphism checks:
+  --   RepPolyMatch
+  | ExpectedFunTyLamCase
+      LamCaseVariant
+      !(HsExpr GhcRn)
+       -- ^ the entire lambda-case expression
 
 pprExpectedFunTyOrigin :: ExpectedFunTyOrigin
                        -> Int -- ^ argument position (starting at 1)

@@ -52,7 +52,6 @@ import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish (CoreTickish)
-import GHC.Types.Var( InvisTVBinder )
 import GHC.Core.ConLike
 import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Misc
@@ -62,7 +61,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Core.Type
 import GHC.Builtin.Types (mkTupleStr)
-import GHC.Tc.Utils.TcType (TcType)
+import GHC.Tc.Utils.TcType (TcType, TcTyVar)
 import {-# SOURCE #-} GHC.Tc.Types (TcLclEnv)
 
 -- libraries:
@@ -507,7 +506,7 @@ data XXExprGhcTc
                    --     GHC.Tc.Gen.Head
                    -- The two arguments describe how to eta-expand
                    -- the data constructor when desugaring
-        ConLike [InvisTVBinder] [Scaled TcType]
+        ConLike [TcTyVar] [Scaled TcType]
 
   ---------------------------------------
   -- Haskell program coverage (Hpc) Support

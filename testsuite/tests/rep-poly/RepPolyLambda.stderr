@@ -1,0 +1,8 @@
+
+RepPolyLambda.hs:11:5: error:
+    • The binder of the lambda expression
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE r
+    • In the expression: \ x -> x
+      In an equation for ‘f’: f = \ x -> x
