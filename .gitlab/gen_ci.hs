@@ -410,11 +410,11 @@ data OnOffRules = OnOffRules { rule_set :: Set Rule -- ^ The set of enabled rule
 
 -- The initial set of rules where all rules are disabled and the job is always run.
 emptyRules :: OnOffRules
-emptyRules = OnOffRules S.empty Always
+emptyRules = OnOffRules S.empty OnSuccess
 
 -- When to run the job
 data ManualFlag = Manual -- ^ Only run the job when explicitly triggered by a user
-                | Always -- ^ Always run it, if the rules pass (the default)
+                | OnSuccess -- ^ Always run it, if the rules pass (the default)
                 deriving Eq
 
 enableRule :: Rule -> OnOffRules -> OnOffRules
@@ -439,7 +439,7 @@ data OnOff = On | Off
 
 instance ToJSON ManualFlag where
   toJSON Manual = "manual"
-  toJSON Always = "always"
+  toJSON OnSuccess = "on_success"
 
 instance ToJSON OnOffRules where
   toJSON rules = toJSON [(object ([
