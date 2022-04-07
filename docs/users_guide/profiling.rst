@@ -439,19 +439,47 @@ compiled program.
     details.
 
 .. ghc-flag:: -fprof-late
-    :shortdesc: Auto-add ``SCC``\\ s to all top level bindings *after* the optimizer has run.
+    :shortdesc: Auto-add ``SCC``\\ s to all top level bindings *after* the core pipeline has run.
     :type: dynamic
     :reverse: -fno-prof-late
     :category:
 
     :since: 9.4.1
 
-    Adds an automatic ``SCC`` annotation to all top level bindings late in the core pipeline after
-    the optimizer has run. This means these cost centres will not interfere with core-level optimizations
+    Adds an automatic ``SCC`` annotation to all top level bindings late in the compilation pipeline after
+    the optimizer has run and unfoldings have been created. This means these cost centres will not interfere with core-level optimizations
     and the resulting profile will be closer to the performance profile of an optimized non-profiled
     executable.
-    While the results of this are generally very informative some of the compiler internal names
-    will leak into the profile.
+    While the results of this are generally informative, some of the compiler internal names
+    will leak into the profile. Further if a function is inlined into a use site it's costs will be counted against the
+    caller's cost center.
+
+    For example if we have this code:
+
+    .. code-block:: haskell
+
+        {-# INLINE mysum #-}
+        mysum = sum
+        main = print $ mysum [1..9999999]
+
+    Then ``mysum`` will not show up in the profile since it will be inlined into main and therefore
+    it's associated costs will be attributed to mains implicit cost centre.
+
+.. ghc-flag:: -fprof-late-inline
+    :shortdesc: Auto-add ``SCC``\\ s to all top level bindings *after* the optimizer has run and retain them when inlining.
+    :type: dynamic
+    :reverse: -fno-prof-late-inline
+    :category:
+
+    :since: 9.4.1
+
+    Adds an automatic ``SCC`` annotation to all top level bindings late in the core pipeline after
+    the optimizer has run. This is the same as :ghc-flag:`-fprof-late` except that cost centers are included in some unfoldings.
+
+    The result of which is that cost centers *can* inhibit core optimizations to some degree at use sites
+    after inlining. Further there can be significant overhead from cost centres added to small functions if they are inlined often.
+
+    You can try this mode if :ghc-flag:`-fprof-late` results in a profile that's too hard to interpret.
 
 .. ghc-flag:: -fprof-cafs
     :shortdesc: Auto-add ``SCC``\\ s to all CAFs

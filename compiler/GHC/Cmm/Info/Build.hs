@@ -56,8 +56,8 @@ import GHC.Types.Name.Set
 {- Note [SRTs]
    ~~~~~~~~~~~
 Static Reference Tables (SRTs) are the mechanism by which the garbage collector
-can determine the live CAFs in the program. An SRT is a static tables associated
-with a CAFfy static closure which record which CAFfy objects are reachable from
+can determine the live CAFs in the program. An SRT is a static table associated
+with a CAFfy closure which record which CAFfy objects are reachable from
 the closure's code.
 
 Representation

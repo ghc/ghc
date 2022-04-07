@@ -171,6 +171,8 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Rules
 import GHC.Core.Stats
+import GHC.Core.LateCC (addLateCostCentresPgm)
+
 
 import GHC.CoreToStg.Prep
 import GHC.CoreToStg    ( coreToStg )
@@ -266,7 +268,6 @@ import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first)
 import Data.List.NonEmpty (NonEmpty ((:|)))
-
 
 
 {- **********************************************************************
@@ -1692,6 +1693,21 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             -- but we don't generate any code for newtypes
 
         -------------------
+        -- Insert late cost centres if enabled.
+        -- If `-fprof-late-inline` is enabled we can skip this, as it will have added
+        -- a superset of cost centres we would add here already.
+
+        (late_cc_binds, late_local_ccs) <-
+              if gopt Opt_ProfLateCcs dflags && not (gopt Opt_ProfLateInlineCcs dflags)
+                  then  {-# SCC lateCC #-} do
+                    (binds,late_ccs) <- addLateCostCentresPgm dflags logger this_mod core_binds
+                    return ( binds, (S.toList late_ccs `mappend` local_ccs ))
+                  else
+                    return (core_binds, local_ccs)
+
+
+
+        -------------------
         -- PREPARE FOR CODE GENERATION
         -- Do saturation and convert to A-normal form
         (prepd_binds) <- {-# SCC "CorePrep" #-} do
@@ -1700,7 +1716,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             (hsc_logger hsc_env)
             cp_cfg
             (initCorePrepPgmConfig (hsc_dflags hsc_env) (interactiveInScope $ hsc_IC hsc_env))
-            this_mod location core_binds data_tycons
+            this_mod location late_cc_binds data_tycons
 
         -----------------  Convert to STG ------------------
         (stg_binds, denv, (caf_ccs, caf_cc_stacks))
@@ -1711,7 +1727,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                    (myCoreToStg logger dflags (hsc_IC hsc_env) False this_mod location prepd_binds)
 
         let cost_centre_info =
-              (local_ccs ++ caf_ccs, caf_cc_stacks)
+              (late_local_ccs ++ caf_ccs, caf_cc_stacks)
             platform = targetPlatform dflags
             prof_init
               | sccProfilingEnabled dflags = profilingInitCode platform this_mod cost_centre_info
