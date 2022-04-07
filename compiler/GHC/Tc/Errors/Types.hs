@@ -204,7 +204,14 @@ data TcRnMessage where
 
       Test cases: T9939, T10632, T18036a, T20602, PluralS, T19296.
   -}
-  TcRnRedundantConstraints :: [Id] -> (SkolemInfoAnon, Bool) -> TcRnMessage
+  TcRnRedundantConstraints :: [Id]
+                           -> (SkolemInfoAnon, Bool)
+                              -- ^ The contextual skolem info.
+                              -- The boolean controls whether we
+                              -- want to show it in the user message.
+                              -- (Nice to keep track of the info in either case,
+                              -- for other users of the GHC API.)
+                           -> TcRnMessage
 
   {-| TcRnInaccessibleCode is a warning that is emitted when the RHS of a pattern
       match is inaccessible, because the constraint solver has detected a contradiction.

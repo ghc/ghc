@@ -536,7 +536,7 @@ The `tcRnSrcDecls` extends the environments in `gbl_env` and `lcl_env`
 which we then want to be in scope in `more stuff`.
 
 The problem is that `lcl_env :: TcLclEnv` has an IORef for error
-messages `tcl_errs`, and another for constraints (`tcl_lie`),a and
+messages `tcl_errs`, and another for constraints (`tcl_lie`), and
 another for Linear Haskell usage information (`tcl_usage`).  Now
 suppose we change it a tiny bit
    do { (gbl_env, lcl_env) <- checkNoErrs $

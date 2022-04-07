@@ -823,3 +823,4 @@ test('T18529', normal, compile, ['-ddump-tc -fprint-explicit-foralls -dsuppress-
 test('T21023', normal, compile, ['-ddump-types'])
 test('T21205', normal, compile, ['-O0'])
 test('T21323', normal, compile, [''])
+test('T21315', normal, compile, ['-Wredundant-constraints'])

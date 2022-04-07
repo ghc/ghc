@@ -393,17 +393,22 @@ warnRedundantConstraints ctxt env info ev_vars
  = return ()
 
  | SigSkol user_ctxt _ _ <- info
- = restoreLclEnv env $  -- We want to add "In the type signature for f"
-                        -- to the error context, which is a bit tiresome
+ -- When dealing with a user-written type signature,
+ -- we want to add "In the type signature for f".
+ = restoreLclEnv env $
    setSrcSpan (redundantConstraintsSpan user_ctxt) $
    report_redundant_msg True
+                  --  ^^^^ add "In the type signature..."
 
- | otherwise  -- But for InstSkol there already *is* a surrounding
-              -- "In the instance declaration for Eq [a]" context
-              -- and we don't want to say it twice. Seems a bit ad-hoc
- = report_redundant_msg False
+ | otherwise
+ -- But for InstSkol there already *is* a surrounding
+ -- "In the instance declaration for Eq [a]" context
+ -- and we don't want to say it twice. Seems a bit ad-hoc
+ = restoreLclEnv env
+ $ report_redundant_msg False
+                 --   ^^^^^ don't add "In the type signature..."
  where
-   report_redundant_msg :: Bool -- whether to add "In ..." to the diagnostic
+   report_redundant_msg :: Bool -- whether to add "In the type signature..." to the diagnostic
                         -> TcRn ()
    report_redundant_msg show_info
      = do { lcl_env <- getLclEnv
