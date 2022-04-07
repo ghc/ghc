@@ -1772,8 +1772,8 @@ Note [Avoiding exponential behaviour]
 One way in which we can get exponential behaviour is if we simplify a
 big expression, and the re-simplify it -- and then this happens in a
 deeply-nested way.  So we must be jolly careful about re-simplifying
-an expression.  That is why completeNonRecX does not try
-preInlineUnconditionally.
+an expression.  That is why simplNonRecX does not try
+preInlineUnconditionally (unlike simplNonRecE).
 
 Example:
   f BIG, where f has a RULE
