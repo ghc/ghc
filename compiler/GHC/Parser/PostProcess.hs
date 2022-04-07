@@ -134,7 +134,7 @@ import GHC.Parser.Types
 import GHC.Parser.Lexer
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
-import GHC.Utils.Lexeme ( isLexCon )
+import GHC.Utils.Lexeme ( okConOcc )
 import GHC.Types.TyThing
 import GHC.Core.Type    ( unrestrictedFunTyCon, Specificity(..) )
 import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
@@ -639,8 +639,7 @@ constructor, a type, or a context, we would need unlimited lookahead which
 -- See Note [Parsing data constructors is hard]
 tyConToDataCon :: LocatedN RdrName -> Either (MsgEnvelope PsMessage) (LocatedN RdrName)
 tyConToDataCon (L loc tc)
-  | isTcOcc occ || isDataOcc occ
-  , isLexCon (occNameFS occ)
+  | okConOcc (occNameString occ)
   = return (L loc (setRdrNameSpace tc srcDataName))
 
   | otherwise
