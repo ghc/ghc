@@ -446,6 +446,12 @@ subexpression elimination pass.
 
     Dump output of Core preparation pass
 
+.. ghc-flag:: -ddump-late-cc
+    :shortdesc: Dump core with late cost centres added
+    :type: dynamic
+
+    Dump output of LateCC pass after cost centres have been added.
+
 .. ghc-flag:: -ddump-view-pattern-commoning
     :shortdesc: Dump commoned view patterns
     :type: dynamic

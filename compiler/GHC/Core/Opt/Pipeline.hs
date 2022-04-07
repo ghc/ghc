@@ -43,7 +43,7 @@ import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
-import GHC.Core.LateCC           (addLateCostCentres)
+import GHC.Core.LateCC           (addLateCostCentresMG)
 import GHC.Core.Seq (seqBinds)
 import GHC.Core.FamInstEnv
 
@@ -198,7 +198,7 @@ getCoreToDo dflags rule_base extra_vars
         runWhen (profiling && not (null $ callerCcFilters dflags)) CoreAddCallerCcs
 
     add_late_ccs =
-        runWhen (profiling && gopt Opt_ProfLateCcs dflags) $ CoreAddLateCcs
+        runWhen (profiling && gopt Opt_ProfLateInlineCcs dflags) $ CoreAddLateCcs
 
     core_todo =
      [
@@ -463,7 +463,6 @@ doCorePass pass guts = do
   p_fam_env <- getPackageFamInstEnv
   let platform = targetPlatform dflags
   let fam_envs = (p_fam_env, mg_fam_inst_env guts)
-  let prof_count_entries = gopt Opt_ProfCountEntries dflags
   let updateBinds  f = return $ guts { mg_binds = f (mg_binds guts) }
   let updateBindsM f = f (mg_binds guts) >>= \b' -> return $ guts { mg_binds = b' }
 
@@ -513,7 +512,7 @@ doCorePass pass guts = do
                                  addCallerCostCentres guts
 
     CoreAddLateCcs            -> {-# SCC "AddLateCcs" #-}
-                                 return (addLateCostCentres prof_count_entries guts)
+                                 addLateCostCentresMG guts
 
     CoreDoPrintCore           -> {-# SCC "PrintCore" #-}
                                  liftIO $ printCore logger (mg_binds guts) >> return guts

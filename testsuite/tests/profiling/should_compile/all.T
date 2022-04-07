@@ -4,6 +4,8 @@ test('prof001', [only_ways(['normal']), req_profiling], compile_and_run, ['-prof
 test('prof002', [only_ways(['normal']), req_profiling], compile_and_run, ['-prof -fprof-cafs'])
 test('prof-late-cc', [only_ways(['normal']), req_profiling], compile, ['-prof -fprof-late'])
 test('prof-late-cc2', [only_ways(['normal']), req_profiling], compile_and_run, ['-prof -fprof-late'])
+test('prof-late-cc3', [only_ways(['normal']), req_profiling, grep_errmsg('scc')], compile, ['-prof -fprof-late -ddump-prep -ddump-simpl -dno-typeable-binds'])
+test('prof-late-cc4', [only_ways(['normal']), req_profiling, grep_errmsg('scc')], compile, ['-prof -fprof-late-inline -ddump-simpl -dno-typeable-binds -O'])
 
 test('T2410', [only_ways(['normal']), req_profiling], compile, ['-O2 -prof -fprof-cafs'])
 test('T5889', [only_ways(['normal']), req_profiling, extra_files(['T5889/A.hs', 'T5889/B.hs'])], multimod_compile, ['A B', '-O -prof -fno-prof-count-entries -v0'])
