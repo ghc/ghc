@@ -347,7 +347,7 @@ data UnfoldingExposure
 
 data TidyOpts = TidyOpts
   { opt_name_cache        :: !NameCache
-  , opt_collect_ccs       :: !Bool
+  , opt_collect_ccs       :: !Bool -- ^ Always true if we compile with -prof
   , opt_unfolding_opts    :: !UnfoldingOpts
   , opt_expose_unfoldings :: !UnfoldingExposure
       -- ^ Which unfoldings to expose
@@ -468,7 +468,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
 -- unfoldings.
 collectCostCentres :: Module -> CoreProgram -> [CoreRule] -> S.Set CostCentre
 collectCostCentres mod_name binds rules
-  = foldl' go_bind (go_rules S.empty) binds
+  = {-# SCC collectCostCentres #-} foldl' go_bind (go_rules S.empty) binds
   where
     go cs e = case e of
       Var{} -> cs

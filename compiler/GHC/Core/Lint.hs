@@ -349,10 +349,10 @@ coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds_preopt
 coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds
 coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
 coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
-coreDumpFlag CoreOccurAnal            = Just Opt_D_dump_occur_anal
+coreDumpFlag CoreAddLateCcs           = Just Opt_D_dump_late_cc
 
 coreDumpFlag CoreAddCallerCcs         = Nothing
-coreDumpFlag CoreAddLateCcs           = Nothing
+coreDumpFlag CoreOccurAnal            = Nothing
 coreDumpFlag CoreDoPrintCore          = Nothing
 coreDumpFlag (CoreDoRuleCheck {})     = Nothing
 coreDumpFlag CoreDoNothing            = Nothing

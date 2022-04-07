@@ -43,7 +43,7 @@ import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
-import GHC.Core.LateCC           (addLateCostCentres)
+import GHC.Core.LateCC           (addLateCostCentresMG)
 import GHC.Core.Seq (seqBinds)
 import GHC.Core.FamInstEnv
 
@@ -227,7 +227,7 @@ getCoreToDo logger dflags
         runWhen (profiling && not (null $ callerCcFilters dflags)) CoreAddCallerCcs
 
     add_late_ccs =
-        runWhen (profiling && gopt Opt_ProfLateCcs dflags) $ CoreAddLateCcs
+        runWhen (profiling && gopt Opt_ProfLateInlineCcs dflags) $ CoreAddLateCcs
 
     core_todo =
      [
@@ -529,7 +529,7 @@ doCorePass pass guts = do
                                  addCallerCostCentres guts
 
     CoreAddLateCcs            -> {-# SCC "AddLateCcs" #-}
-                                 addLateCostCentres guts
+                                 addLateCostCentresMG guts
 
     CoreDoPrintCore           -> {-# SCC "PrintCore" #-}
                                  liftIO $ printCore logger (mg_binds guts) >> return guts

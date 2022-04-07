@@ -2538,6 +2538,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_spec)
   , make_ord_flag defGhcFlag "ddump-prep"
         (setDumpFlag Opt_D_dump_prep)
+  , make_ord_flag defGhcFlag "ddump-late-cc"
+        (setDumpFlag Opt_D_dump_late_cc)
   , make_ord_flag defGhcFlag "ddump-stg-from-core"
         (setDumpFlag Opt_D_dump_stg_from_core)
   , make_ord_flag defGhcFlag "ddump-stg-unarised"
@@ -3481,6 +3483,7 @@ fFlagsDeps = [
   flagSpec "prof-count-entries"               Opt_ProfCountEntries,
   flagSpec "prof-late"                        Opt_ProfLateCcs,
   flagSpec "prof-manual"                      Opt_ProfManualCcs,
+  flagSpec "prof-late-inline"                 Opt_ProfLateInlineCcs,
   flagSpec "regs-graph"                       Opt_RegsGraph,
   flagSpec "regs-iterative"                   Opt_RegsIterative,
   depFlagSpec' "rewrite-rules"                Opt_EnableRewriteRules

@@ -94,6 +94,7 @@ data DumpFlag
    | Opt_D_dump_simpl_iterations
    | Opt_D_dump_spec
    | Opt_D_dump_prep
+   | Opt_D_dump_late_cc
    | Opt_D_dump_stg_from_core -- ^ Initial STG (CoreToStg output)
    | Opt_D_dump_stg_unarised  -- ^ STG after unarise
    | Opt_D_dump_stg_cg        -- ^ STG (after stg2stg)
@@ -255,6 +256,7 @@ data GeneralFlag
    -- profiling opts
    | Opt_AutoSccsOnIndividualCafs
    | Opt_ProfCountEntries
+   | Opt_ProfLateInlineCcs
    | Opt_ProfLateCcs
    | Opt_ProfManualCcs -- ^ Ignore manual SCC annotations
 

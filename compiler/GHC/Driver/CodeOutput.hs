@@ -329,7 +329,8 @@ outputForeignStubs_help fname doc_str header footer
 -- | Generate code to initialise cost centres
 profilingInitCode :: Platform -> Module -> CollectedCCs -> CStub
 profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
- = initializerCStub platform fn_name decls body
+ = {-# SCC profilingInitCode #-}
+   initializerCStub platform fn_name decls body
  where
    fn_name = mkInitializerStubLabel this_mod "prof_init"
    decls = vcat
