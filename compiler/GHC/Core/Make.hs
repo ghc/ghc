@@ -71,7 +71,7 @@ import GHC.Types.Literal
 import GHC.Types.Unique.Supply
 
 import GHC.Core
-import GHC.Core.Utils ( exprType, needsCaseBinding, mkSingleAltCase, bindNonRec )
+import GHC.Core.Utils ( exprType, mkSingleAltCase, bindNonRec )
 import GHC.Core.Type
 import GHC.Core.Coercion ( isCoVar )
 import GHC.Core.DataCon  ( DataCon, dataConWorkId )
@@ -115,9 +115,9 @@ sortQuantVars vs = sorted_tcvs ++ ids
     sorted_tcvs = scopedSort tcvs
 
 -- | Bind a binding group over an expression, using a @let@ or @case@ as
--- appropriate (see "GHC.Core#let_app_invariant")
+-- appropriate (see "GHC.Core#let_can_float_invariant")
 mkCoreLet :: CoreBind -> CoreExpr -> CoreExpr
-mkCoreLet (NonRec bndr rhs) body        -- See Note [Core let/app invariant]
+mkCoreLet (NonRec bndr rhs) body        -- See Note [Core let-can-float invariant]
   = bindNonRec bndr rhs body
 mkCoreLet bind body
   = Let bind body
@@ -141,9 +141,6 @@ mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
 
 -- | Construct an expression which represents the application of a number of
 -- expressions to another. The leftmost expression in the list is applied first
---
--- Respects the let/app invariant by building a case expression where necessary
---   See Note [Core let/app invariant] in "GHC.Core"
 mkCoreApps :: CoreExpr -- ^ function
            -> [CoreExpr] -- ^ arguments
            -> CoreExpr
@@ -156,9 +153,6 @@ mkCoreApps fun args
 
 -- | Construct an expression which represents the application of one expression
 -- to the other
---
--- Respects the let/app invariant by building a case expression where necessary
---   See Note [Core let/app invariant] in "GHC.Core"
 mkCoreApp :: SDoc
           -> CoreExpr -- ^ function
           -> CoreExpr -- ^ argument
@@ -170,9 +164,6 @@ mkCoreApp s fun arg
 -- paired with its type to an argument. The result is paired with its type. This
 -- function is not exported and used in the definition of 'mkCoreApp' and
 -- 'mkCoreApps'.
---
--- Respects the let/app invariant by building a case expression where necessary
---   See Note [Core let/app invariant] in "GHC.Core"
 mkCoreAppTyped :: SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
 mkCoreAppTyped _ (fun, fun_ty) (Type ty)
   = (App fun (Type ty), piResultTy fun_ty ty)
@@ -180,20 +171,9 @@ mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
   = (App fun (Coercion co), funResultTy fun_ty)
 mkCoreAppTyped d (fun, fun_ty) arg
   = assertPpr (isFunTy fun_ty) (ppr fun $$ ppr arg $$ d)
-    (mkValApp fun arg (Scaled mult arg_ty) res_ty, res_ty)
+    (App fun arg, res_ty)
   where
-    (mult, arg_ty, res_ty) = splitFunTy fun_ty
-
--- | Build an application (e1 e2),
--- or a strict binding  (case e2 of x -> e1 x)
--- using the latter when necessary to respect the let/app invariant
---   See Note [Core let/app invariant] in GHC.Core
-mkValApp :: CoreExpr -> CoreExpr -> Scaled Type -> Type -> CoreExpr
-mkValApp fun arg (Scaled w arg_ty) res_ty
-  | not (needsCaseBinding arg_ty arg)
-  = App fun arg                -- The vastly common case
-  | otherwise
-  = mkStrictApp fun arg (Scaled w arg_ty) res_ty
+    (_mult, _arg_ty, res_ty) = splitFunTy fun_ty
 
 {- *********************************************************************
 *                                                                      *
@@ -224,25 +204,6 @@ mkWildCase :: CoreExpr -- ^ scrutinee
            -> CoreExpr
 mkWildCase scrut (Scaled w scrut_ty) res_ty alts
   = Case scrut (mkWildValBinder w scrut_ty) res_ty alts
-
--- | Build a strict application (case e2 of x -> e1 x)
-mkStrictApp :: CoreExpr -> CoreExpr -> Scaled Type -> Type -> CoreExpr
-mkStrictApp fun arg (Scaled w arg_ty) res_ty
-  = Case arg arg_id res_ty [Alt DEFAULT [] (App fun (Var arg_id))]
-       -- mkDefaultCase looks attractive here, and would be sound.
-       -- But it uses (exprType alt_rhs) to compute the result type,
-       -- whereas here we already know that the result type is res_ty
-  where
-    arg_id = mkWildValBinder w arg_ty
-        -- Lots of shadowing, but it doesn't matter,
-        -- because 'fun' and 'res_ty' should not have a free wild-id
-        --
-        -- This is Dangerous.  But this is the only place we play this
-        -- game, mkStrictApp returns an expression that does not have
-        -- a free wild-id.  So the only way 'fun' could get a free wild-id
-        -- would be if you take apart this case expression (or some other
-        -- expression that uses mkWildValBinder, of which there are not
-        -- many), and pass a fragment of it as the fun part of a 'mkStrictApp'.
 
 mkIfThenElse :: CoreExpr -- ^ guard
              -> CoreExpr -- ^ then

@@ -175,7 +175,6 @@ These data types are the heart of the compiler
 -- *  Primitive literals
 --
 -- *  Applications: note that the argument may be a 'Type'.
---    See Note [Core let/app invariant]
 --    See Note [Representation polymorphism invariants]
 --
 -- *  Lambda abstraction
@@ -186,7 +185,7 @@ These data types are the heart of the compiler
 --    bound and then executing the sub-expression.
 --
 --    See Note [Core letrec invariant]
---    See Note [Core let/app invariant]
+--    See Note [Core let-can-float invariant]
 --    See Note [Representation polymorphism invariants]
 --    See Note [Core type and coercion invariant]
 --
@@ -421,11 +420,11 @@ parts of the compilation pipeline.
   in the object file, the content of the exported literal is given a label with
   the _bytes suffix.
 
-Note [Core let/app invariant]
+Note [Core let-can-float invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The let/app invariant
-     the right hand side of a non-recursive 'Let', and
-     the argument of an 'App',
+The let-can-float invariant:
+
+    The right hand side of a non-recursive 'Let'
     /may/ be of unlifted type, but only if
     the expression is ok-for-speculation
     or the 'Let' is for a join point.
@@ -445,11 +444,28 @@ In this situation you should use @case@ rather than a @let@. The function
 alternatively use 'GHC.Core.Make.mkCoreLet' rather than this constructor directly,
 which will generate a @case@ if necessary
 
-The let/app invariant is initially enforced by mkCoreLet and mkCoreApp in
-GHC.Core.Make.
+The let-can-float invariant is initially enforced by mkCoreLet in GHC.Core.Make.
 
-For discussion of some implications of the let/app invariant primops see
+For discussion of some implications of the let-can-float invariant primops see
 Note [Checking versus non-checking primops] in GHC.Builtin.PrimOps.
+
+Historical Note [The let/app invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Before 2022 GHC used the "let/app invariant", which applied the let-can-float rules
+to the argument of an application, as well as to the RHS of a let.  This made some
+kind of sense, because 'let' can always be encoded as application:
+   let x=rhs in b   =    (\x.b) rhs
+
+But the let/app invariant got in the way of RULES; see #19313.  For example
+  up :: Int# -> Int#
+  {-# RULES "up/down" forall x. up (down x) = x #-}
+The LHS of this rule doesn't satisfy the let/app invariant.
+
+Indeed RULES is a big reason that GHC doesn't use ANF, where the argument of an
+application is always a variable or a constant.  To allow RULES to work nicely
+we need to allow lots of things in the arguments of a call.
+
+TL;DR: we relaxed the let/app invariant to become the let-can-float invariant.
 
 Note [Case expression invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -749,7 +765,7 @@ Join points must follow these invariants:
 However, join points have simpler invariants in other ways
 
   5. A join point can have an unboxed type without the RHS being
-     ok-for-speculation (i.e. drop the let/app invariant)
+     ok-for-speculation (i.e. drop the let-can-float invariant)
      e.g.  let j :: Int# = factorial x in ...
 
   6. The RHS of join point is not required to have a fixed runtime representation,
@@ -1846,8 +1862,8 @@ mkDoubleLit       d = Lit (mkLitDouble d)
 mkDoubleLitDouble d = Lit (mkLitDouble (toRational d))
 
 -- | Bind all supplied binding groups over an expression in a nested let expression. Assumes
--- that the rhs satisfies the let/app invariant.  Prefer to use 'GHC.Core.Make.mkCoreLets' if
--- possible, which does guarantee the invariant
+-- that the rhs satisfies the let-can-float invariant.  Prefer to use
+-- 'GHC.Core.Make.mkCoreLets' if possible, which does guarantee the invariant
 mkLets        :: [Bind b] -> Expr b -> Expr b
 -- | Bind all supplied binders over an expression in a nested lambda expression. Prefer to
 -- use 'GHC.Core.Make.mkCoreLams' if possible

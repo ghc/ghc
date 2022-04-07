@@ -631,8 +631,8 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
        ; checkL (not (isCoVar binder) || isCoArg rhs)
                 (mkLetErr binder rhs)
 
-        -- Check the let/app invariant
-        -- See Note [Core let/app invariant] in GHC.Core
+        -- Check the let-can-float invariant
+        -- See Note [Core let-can-float invariant] in GHC.Core
        ; checkL ( isJoinId binder
                || mightBeLiftedType binder_ty
                || (isNonRec rec_flag && exprOkForSpeculation rhs)
@@ -1285,10 +1285,7 @@ lintCoreArg (fun_ty, fun_ue) arg
          do { checkL (typeHasFixedRuntimeRep arg_ty)
                      (text "Argument does not have a fixed runtime representation"
                       <+> ppr arg <+> dcolon
-                      <+> parens (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty)))
-
-            ; checkL (mightBeLiftedType arg_ty || exprOkForSpeculation arg)
-                     (mkLetAppMsg arg) }
+                      <+> parens (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))) }
 
        ; lintValApp arg fun_ty arg_ty fun_ue arg_ue }
 
@@ -3266,11 +3263,6 @@ mkRhsMsg binder what ty
             ppr binder],
      hsep [text "Binder's type:", ppr (idType binder)],
      hsep [text "Rhs type:", ppr ty]]
-
-mkLetAppMsg :: CoreExpr -> SDoc
-mkLetAppMsg e
-  = hang (text "This argument does not satisfy the let/app invariant:")
-       2 (ppr e)
 
 badBndrTyMsg :: Id -> SDoc -> SDoc
 badBndrTyMsg binder what
