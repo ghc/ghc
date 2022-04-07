@@ -542,7 +542,7 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
       let extra_opts | needHieFiles = [Opt_WriteHie, Opt_Haddock]
                      | otherwise = [Opt_Haddock]
           dynflags' = (foldl' gopt_set dynflags extra_opts)
-                        { backend = NoBackend
+                        { backend = noBackend
                         , ghcMode = CompManager
                         , ghcLink = NoLink
                         }
