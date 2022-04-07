@@ -224,6 +224,9 @@ data PsMessage
    -- | Cannot parse data constructor in a data/newtype declaration
    | PsErrInvalidInfixDataCon !(HsType GhcPs) !RdrName !(HsType GhcPs)
 
+   -- | Illegal DataKinds quote mark in data/newtype constructor declaration
+   | PsErrIllegalPromotionQuoteDataCon !RdrName
+
    -- | UNPACK applied to a data constructor
    | PsErrUnpackDataCon
 

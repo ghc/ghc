@@ -1976,9 +1976,10 @@ instance DisambTD DataConBuilder where
     addFatalError $ mkPlainErrorMsgEnvelope l_at $
                       (PsErrUnexpectedKindAppInDataCon (unLoc lhs) (unLoc ki))
 
-  mkHsOpTyPV _ lhs tc rhs = do
+  mkHsOpTyPV prom lhs tc rhs = do
       check_no_ops (unLoc rhs)  -- check the RHS because parsing type operators is right-associative
       data_con <- eitherToP $ tyConToDataCon tc
+      checkNotPromotedDataCon prom data_con
       return $ L l (InfixDataConBuilder lhs data_con rhs)
     where
       l = combineLocsA lhs rhs
@@ -2000,8 +2001,9 @@ instance DisambTD DataConBuilder where
          return constr_stuff
 
 tyToDataConBuilder :: LHsType GhcPs -> PV (LocatedA DataConBuilder)
-tyToDataConBuilder (L l (HsTyVar _ NotPromoted v)) = do
+tyToDataConBuilder (L l (HsTyVar _ prom v)) = do
   data_con <- eitherToP $ tyConToDataCon v
+  checkNotPromotedDataCon prom data_con
   return $ L l (PrefixDataConBuilder nilOL data_con)
 tyToDataConBuilder (L l (HsTupleTy _ HsBoxedOrConstraintTuple ts)) = do
   let data_con = L (l2l l) (getRdrName (tupleDataCon Boxed (length ts)))
@@ -2009,6 +2011,13 @@ tyToDataConBuilder (L l (HsTupleTy _ HsBoxedOrConstraintTuple ts)) = do
 tyToDataConBuilder t =
   addFatalError $ mkPlainErrorMsgEnvelope (getLocA t) $
                     (PsErrInvalidDataCon (unLoc t))
+
+-- | Rejects declarations such as @data T = 'MkT@ (note the leading tick).
+checkNotPromotedDataCon :: PromotionFlag -> LocatedN RdrName -> PV ()
+checkNotPromotedDataCon NotPromoted _ = return ()
+checkNotPromotedDataCon IsPromoted (L l name) =
+  addError $ mkPlainErrorMsgEnvelope (locA l) $
+    PsErrIllegalPromotionQuoteDataCon name
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
