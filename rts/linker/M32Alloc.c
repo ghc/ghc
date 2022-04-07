@@ -460,6 +460,15 @@ m32_is_large_object(size_t size, size_t alignment)
    return size >= getPageSize() - ROUND_UP(sizeof(struct m32_page_t), alignment);
 }
 
+static void
+m32_report_allocation(struct m32_allocator_t *alloc STG_UNUSED, void *addr STG_UNUSED, size_t size STG_UNUSED)
+{
+    IF_DEBUG(linker_verbose, debugBelch(
+      "m32_allocated(%p:%s): %p - %p\n",
+      alloc, alloc->executable ? "RX": "RW",
+      addr, (uint8_t*) addr + size));
+}
+
 /**
  * Allocate `size` bytes of memory with the given alignment.
  *
@@ -474,6 +483,8 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
    if (m32_is_large_object(size,alignment)) {
       // large object
       size_t alsize = ROUND_UP(sizeof(struct m32_page_t), alignment);
+      // TODO: lower-bound allocation size to allocation granularity and return
+      // remainder to free pool.
       struct m32_page_t *page = mmapAnonForLinker(alsize+size);
       if (page == NULL) {
           sysErrorBelch("m32_alloc: Failed to map pages for %zd bytes", size);
@@ -486,7 +497,9 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
       SET_PAGE_TYPE(page, FILLED_PAGE);
       page->filled_page.size = alsize + size;
       m32_allocator_push_filled_list(&alloc->unprotected_list, (struct m32_page_t *) page);
-      return (char*) page + alsize;
+      uint8_t *res = (uint8_t *) page + alsize;
+      m32_report_allocation(alloc, res, size);
+      return res;
    }
 
    // small object
@@ -508,6 +521,7 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
       if (size <= pgsz - alsize) {
          void * addr = (char*)alloc->pages[i] + alsize;
          alloc->pages[i]->current_size = alsize + size;
+         m32_report_allocation(alloc, addr, size);
          return addr;
       }
 
@@ -534,9 +548,10 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
    SET_PAGE_TYPE(page, NURSERY_PAGE);
    alloc->pages[empty]               = page;
    // Add header size and padding
-   alloc->pages[empty]->current_size =
-       size+ROUND_UP(sizeof(struct m32_page_t),alignment);
-   return (char*)page + ROUND_UP(sizeof(struct m32_page_t),alignment);
+   alloc->pages[empty]->current_size = size + ROUND_UP(sizeof(struct m32_page_t),alignment);
+   uint8_t *res = (uint8_t *) page + ROUND_UP(sizeof(struct m32_page_t), alignment);
+   m32_report_allocation(alloc, res, size);
+   return res;
 }
 
 #else

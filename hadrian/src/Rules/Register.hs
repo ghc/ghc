@@ -9,6 +9,7 @@ import Expression ( getContextData )
 import Hadrian.BuildPath
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
+import Oracles.Flag (platformSupportsGhciObjects)
 import Packages
 import Rules.Rts
 import {-# SOURCE #-} Rules.Library (needLibrary)
@@ -206,12 +207,14 @@ extraTargets context
 -- | Given a library 'Package' this action computes all of its targets. Needing
 -- all the targets should build the library such that it is ready to be
 -- registered into the package database.
--- See 'packageTargets' for the explanation of the @includeGhciLib@ parameter.
+-- See 'Rules.packageTargets' for the explanation of the @includeGhciLib@
+-- parameter.
 libraryTargets :: Bool -> Context -> Action [FilePath]
 libraryTargets includeGhciLib context@Context {..} = do
     libFile  <- pkgLibraryFile     context
     ghciLib  <- pkgGhciLibraryFile context
-    ghci     <- if includeGhciLib && not (wayUnit Dynamic way)
+    ghciObjsSupported <- platformSupportsGhciObjects
+    ghci     <- if ghciObjsSupported && includeGhciLib && not (wayUnit Dynamic way)
                 then interpretInContext context $ getContextData buildGhciLib
                 else return False
     extra    <- extraTargets context

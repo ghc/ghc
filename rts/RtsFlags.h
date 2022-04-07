@@ -9,8 +9,9 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
 #include <stdbool.h>
+
+#include "BeginPrivate.h"
 
 /* Routines that operate-on/to-do-with RTS flags: */
 

@@ -7,9 +7,8 @@
  * ---------------------------------------------------------------------------*/
 
 #include "ghcplatform.h"
-#include "RtsSymbols.h"
-
 #include "Rts.h"
+#include "RtsSymbols.h"
 #include "TopHandler.h"
 #include "HsFFI.h"
 #include "CloneStack.h"
@@ -162,12 +161,12 @@ extern char **environ;
       SymI_HasProto(stg_asyncDoProczh)                   \
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
+      SymI_NeedsProto(__mingw_module_is_dll)             \
       RTS_WIN32_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
-      RTS_WIN32_ONLY(SymI_HasProto(_imp___environ))      \
-      RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \
-      RTS_WIN32_ONLY(SymI_HasProto(_imp___iob))          \
-      RTS_WIN64_ONLY(SymI_HasProto(__iob_func))          \
+      RTS_WIN64_ONLY(SymI_HasProto(__stdio_common_vswprintf_s)) \
+      RTS_WIN64_ONLY(SymI_HasProto(__stdio_common_vswprintf)) \
+      RTS_WIN64_ONLY(SymI_HasProto(_errno))  \
       /* see Note [Symbols for MinGW's printf] */        \
       SymI_HasProto(_lock_file)                          \
       SymI_HasProto(_unlock_file)                        \
@@ -175,9 +174,9 @@ extern char **environ;
       /* ^^ Need to figure out why this is needed.  */   \
       /* See Note [_iob_func symbol] */                  \
       RTS_WIN64_ONLY(SymI_HasProto_redirect(             \
-         __imp___acrt_iob_func, __rts_iob_func, STRENGTH_WEAK))   \
+         __imp___acrt_iob_func, __rts_iob_func, STRENGTH_WEAK, SYM_TYPE_INDIRECT_DATA))   \
       RTS_WIN32_ONLY(SymI_HasProto_redirect(             \
-         __imp____acrt_iob_func, __rts_iob_func, STRENGTH_WEAK))  \
+         __imp____acrt_iob_func, __rts_iob_func, STRENGTH_WEAK, SYM_TYPE_INDIRECT_DATA))  \
       SymI_HasProto(__mingw_vsnwprintf)                  \
       /* ^^ Need to figure out why this is needed.  */   \
       SymI_HasProto(__mingw_vfprintf)                    \
@@ -587,36 +586,36 @@ extern char **environ;
       RTS_PROF_SYMBOLS                                                  \
       RTS_LIBDW_SYMBOLS                                                 \
       SymI_HasProto(StgReturn)                                          \
-      SymI_HasProto(stg_gc_noregs)                                      \
-      SymI_HasProto(stg_ret_v_info)                                     \
-      SymI_HasProto(stg_ret_p_info)                                     \
-      SymI_HasProto(stg_ret_n_info)                                     \
-      SymI_HasProto(stg_ret_f_info)                                     \
-      SymI_HasProto(stg_ret_d_info)                                     \
-      SymI_HasProto(stg_ret_l_info)                                     \
-      SymI_HasProto(stg_ret_t_info)                                     \
-      SymI_HasProto(stg_ctoi_t)                                         \
-      SymI_HasProto(stg_gc_prim_p)                                      \
-      SymI_HasProto(stg_gc_prim_pp)                                     \
-      SymI_HasProto(stg_gc_prim_n)                                      \
-      SymI_HasProto(stg_enter_info)                                     \
-      SymI_HasProto(__stg_gc_enter_1)                                   \
-      SymI_HasProto(stg_gc_unpt_r1)                                     \
-      SymI_HasProto(stg_gc_unbx_r1)                                     \
-      SymI_HasProto(stg_gc_f1)                                          \
-      SymI_HasProto(stg_gc_d1)                                          \
-      SymI_HasProto(stg_gc_l1)                                          \
-      SymI_HasProto(stg_gc_pp)                                          \
-      SymI_HasProto(stg_gc_ppp)                                         \
-      SymI_HasProto(stg_gc_pppp)                                        \
-      SymI_HasProto(__stg_gc_fun)                                       \
-      SymI_HasProto(stg_gc_fun_info)                                    \
-      SymI_HasProto(stg_yield_noregs)                                   \
-      SymI_HasProto(stg_yield_to_interpreter)                           \
-      SymI_HasProto(stg_block_noregs)                                   \
-      SymI_HasProto(stg_block_takemvar)                                 \
-      SymI_HasProto(stg_block_readmvar)                                 \
-      SymI_HasProto(stg_block_putmvar)                                  \
+      SymI_HasDataProto(stg_gc_noregs)                                      \
+      SymI_HasDataProto(stg_ret_v_info)                                     \
+      SymI_HasDataProto(stg_ret_p_info)                                     \
+      SymI_HasDataProto(stg_ret_n_info)                                     \
+      SymI_HasDataProto(stg_ret_f_info)                                     \
+      SymI_HasDataProto(stg_ret_d_info)                                     \
+      SymI_HasDataProto(stg_ret_l_info)                                     \
+      SymI_HasDataProto(stg_ret_t_info)                                     \
+      SymI_HasDataProto(stg_ctoi_t)                                         \
+      SymI_HasDataProto(stg_gc_prim_p)                                      \
+      SymI_HasDataProto(stg_gc_prim_pp)                                     \
+      SymI_HasDataProto(stg_gc_prim_n)                                      \
+      SymI_HasDataProto(stg_enter_info)                                     \
+      SymI_HasDataProto(__stg_gc_enter_1)                                   \
+      SymI_HasDataProto(stg_gc_unpt_r1)                                     \
+      SymI_HasDataProto(stg_gc_unbx_r1)                                     \
+      SymI_HasDataProto(stg_gc_f1)                                          \
+      SymI_HasDataProto(stg_gc_d1)                                          \
+      SymI_HasDataProto(stg_gc_l1)                                          \
+      SymI_HasDataProto(stg_gc_pp)                                          \
+      SymI_HasDataProto(stg_gc_ppp)                                         \
+      SymI_HasDataProto(stg_gc_pppp)                                        \
+      SymI_HasDataProto(__stg_gc_fun)                                       \
+      SymI_HasDataProto(stg_gc_fun_info)                                    \
+      SymI_HasDataProto(stg_yield_noregs)                                   \
+      SymI_HasDataProto(stg_yield_to_interpreter)                           \
+      SymI_HasDataProto(stg_block_noregs)                                   \
+      SymI_HasDataProto(stg_block_takemvar)                                 \
+      SymI_HasDataProto(stg_block_readmvar)                                 \
+      SymI_HasDataProto(stg_block_putmvar)                                  \
       MAIN_CAP_SYM                                                      \
       SymI_HasProto(addDLL)                                             \
       SymI_HasProto(addLibrarySearchPath)                               \
@@ -626,41 +625,41 @@ extern char **environ;
       SymI_HasProto(__word_encodeDouble)                                \
       SymI_HasProto(__int_encodeFloat)                                  \
       SymI_HasProto(__word_encodeFloat)                                 \
-      SymI_HasProto(stg_atomicallyzh)                                   \
+      SymI_HasDataProto(stg_atomicallyzh)                                   \
       SymI_HasProto(barf)                                               \
       SymI_HasProto(flushEventLog)                                      \
       SymI_HasProto(deRefStablePtr)                                     \
       SymI_HasProto(debugBelch)                                         \
       SymI_HasProto(errorBelch)                                         \
       SymI_HasProto(sysErrorBelch)                                      \
-      SymI_HasProto(stg_getMaskingStatezh)                              \
-      SymI_HasProto(stg_maskAsyncExceptionszh)                          \
-      SymI_HasProto(stg_maskUninterruptiblezh)                          \
-      SymI_HasProto(stg_catchzh)                                        \
-      SymI_HasProto(stg_catchRetryzh)                                   \
-      SymI_HasProto(stg_catchSTMzh)                                     \
-      SymI_HasProto(stg_clearCCSzh)                                     \
-      SymI_HasProto(stg_compactAddWithSharingzh)                        \
-      SymI_HasProto(stg_compactAddzh)                                   \
-      SymI_HasProto(stg_compactNewzh)                                   \
-      SymI_HasProto(stg_compactResizzezh)                               \
-      SymI_HasProto(stg_compactContainszh)                              \
-      SymI_HasProto(stg_compactContainsAnyzh)                           \
-      SymI_HasProto(stg_compactGetFirstBlockzh)                         \
-      SymI_HasProto(stg_compactGetNextBlockzh)                          \
-      SymI_HasProto(stg_compactAllocateBlockzh)                         \
-      SymI_HasProto(stg_compactFixupPointerszh)                         \
-      SymI_HasProto(stg_compactSizzezh)                                 \
+      SymI_HasDataProto(stg_getMaskingStatezh)                              \
+      SymI_HasDataProto(stg_maskAsyncExceptionszh)                          \
+      SymI_HasDataProto(stg_maskUninterruptiblezh)                          \
+      SymI_HasDataProto(stg_catchzh)                                        \
+      SymI_HasDataProto(stg_catchRetryzh)                                   \
+      SymI_HasDataProto(stg_catchSTMzh)                                     \
+      SymI_HasDataProto(stg_clearCCSzh)                                     \
+      SymI_HasDataProto(stg_compactAddWithSharingzh)                        \
+      SymI_HasDataProto(stg_compactAddzh)                                   \
+      SymI_HasDataProto(stg_compactNewzh)                                   \
+      SymI_HasDataProto(stg_compactResizzezh)                               \
+      SymI_HasDataProto(stg_compactContainszh)                              \
+      SymI_HasDataProto(stg_compactContainsAnyzh)                           \
+      SymI_HasDataProto(stg_compactGetFirstBlockzh)                         \
+      SymI_HasDataProto(stg_compactGetNextBlockzh)                          \
+      SymI_HasDataProto(stg_compactAllocateBlockzh)                         \
+      SymI_HasDataProto(stg_compactFixupPointerszh)                         \
+      SymI_HasDataProto(stg_compactSizzezh)                                 \
       SymI_HasProto(closure_flags)                                      \
       SymI_HasProto(eq_thread)                                          \
       SymI_HasProto(cmp_thread)                                         \
       SymI_HasProto(createAdjustor)                                     \
-      SymI_HasProto(stg_decodeDoublezu2Intzh)                           \
-      SymI_HasProto(stg_decodeDoublezuInt64zh)                          \
-      SymI_HasProto(stg_decodeFloatzuIntzh)                             \
-      SymI_HasProto(stg_delayzh)                                        \
-      SymI_HasProto(stg_deRefWeakzh)                                    \
-      SymI_HasProto(stg_deRefStablePtrzh)                               \
+      SymI_HasDataProto(stg_decodeDoublezu2Intzh)                           \
+      SymI_HasDataProto(stg_decodeDoublezuInt64zh)                          \
+      SymI_HasDataProto(stg_decodeFloatzuIntzh)                             \
+      SymI_HasDataProto(stg_delayzh)                                        \
+      SymI_HasDataProto(stg_deRefWeakzh)                                    \
+      SymI_HasDataProto(stg_deRefStablePtrzh)                               \
       SymI_HasProto(dirty_MUT_VAR)                                      \
       SymI_HasProto(dirty_TVAR)                                         \
       SymI_HasProto(stg_forkzh)                                         \
@@ -713,65 +712,65 @@ extern char **environ;
       SymI_HasProto(defaultRtsConfig)                                   \
       SymI_HasProto(initLinker)                                         \
       SymI_HasProto(initLinker_)                                        \
-      SymI_HasProto(stg_unpackClosurezh)                                \
-      SymI_HasProto(stg_closureSizzezh)                                 \
-      SymI_HasProto(stg_whereFromzh)                                 \
-      SymI_HasProto(stg_getApStackValzh)                                \
-      SymI_HasProto(stg_getSparkzh)                                     \
-      SymI_HasProto(stg_numSparkszh)                                    \
-      SymI_HasProto(stg_isCurrentThreadBoundzh)                         \
-      SymI_HasProto(stg_isEmptyMVarzh)                                  \
-      SymI_HasProto(stg_killThreadzh)                                   \
+      SymI_HasDataProto(stg_unpackClosurezh)                                \
+      SymI_HasDataProto(stg_closureSizzezh)                                 \
+      SymI_HasDataProto(stg_whereFromzh)                                 \
+      SymI_HasDataProto(stg_getApStackValzh)                                \
+      SymI_HasDataProto(stg_getSparkzh)                                     \
+      SymI_HasDataProto(stg_numSparkszh)                                    \
+      SymI_HasDataProto(stg_isCurrentThreadBoundzh)                         \
+      SymI_HasDataProto(stg_isEmptyMVarzh)                                  \
+      SymI_HasDataProto(stg_killThreadzh)                                   \
       SymI_HasProto(loadArchive)                                        \
       SymI_HasProto(loadObj)                                            \
       SymI_HasProto(purgeObj)                                           \
       SymI_HasProto(insertSymbol)                                       \
       SymI_HasProto(lookupSymbol)                                       \
-      SymI_HasProto(stg_makeStablePtrzh)                                \
-      SymI_HasProto(stg_mkApUpd0zh)                                     \
-      SymI_HasProto(stg_labelThreadzh)                                  \
-      SymI_HasProto(stg_newArrayzh)                                     \
-      SymI_HasProto(stg_copyArrayzh)                                    \
-      SymI_HasProto(stg_copyMutableArrayzh)                             \
-      SymI_HasProto(stg_cloneArrayzh)                                   \
-      SymI_HasProto(stg_cloneMutableArrayzh)                            \
-      SymI_HasProto(stg_freezzeArrayzh)                                 \
-      SymI_HasProto(stg_thawArrayzh)                                    \
-      SymI_HasProto(stg_casArrayzh)                                     \
-      SymI_HasProto(stg_newSmallArrayzh)                                \
-      SymI_HasProto(stg_unsafeThawSmallArrayzh)                         \
-      SymI_HasProto(stg_cloneSmallArrayzh)                              \
-      SymI_HasProto(stg_cloneSmallMutableArrayzh)                       \
-      SymI_HasProto(stg_freezzeSmallArrayzh)                            \
-      SymI_HasProto(stg_thawSmallArrayzh)                               \
-      SymI_HasProto(stg_copySmallArrayzh)                               \
-      SymI_HasProto(stg_copySmallMutableArrayzh)                        \
-      SymI_HasProto(stg_casSmallArrayzh)                                \
-      SymI_HasProto(stg_copyArray_barrier)                              \
-      SymI_HasProto(stg_newBCOzh)                                       \
-      SymI_HasProto(stg_newByteArrayzh)                                 \
-      SymI_HasProto(stg_casIntArrayzh)                                  \
-      SymI_HasProto(stg_casInt8Arrayzh)                                 \
-      SymI_HasProto(stg_casInt16Arrayzh)                                \
-      SymI_HasProto(stg_casInt32Arrayzh)                                \
-      SymI_HasProto(stg_casInt64Arrayzh)                                \
-      SymI_HasProto(stg_newMVarzh)                                      \
-      SymI_HasProto(stg_newMutVarzh)                                    \
-      SymI_HasProto(stg_newTVarzh)                                      \
-      SymI_HasProto(stg_readIOPortzh)                                   \
-      SymI_HasProto(stg_writeIOPortzh)                                  \
-      SymI_HasProto(stg_newIOPortzh)                                    \
-      SymI_HasProto(stg_noDuplicatezh)                                  \
-      SymI_HasProto(stg_atomicModifyMutVar2zh)                          \
-      SymI_HasProto(stg_atomicModifyMutVarzuzh)                         \
-      SymI_HasProto(stg_casMutVarzh)                                    \
-      SymI_HasProto(stg_newPinnedByteArrayzh)                           \
-      SymI_HasProto(stg_newAlignedPinnedByteArrayzh)                    \
-      SymI_HasProto(stg_isByteArrayPinnedzh)                            \
-      SymI_HasProto(stg_isMutableByteArrayPinnedzh)                     \
-      SymI_HasProto(stg_shrinkMutableByteArrayzh)                       \
-      SymI_HasProto(stg_resizzeMutableByteArrayzh)                      \
-      SymI_HasProto(stg_shrinkSmallMutableArrayzh)                       \
+      SymI_HasDataProto(stg_makeStablePtrzh)                                \
+      SymI_HasDataProto(stg_mkApUpd0zh)                                     \
+      SymI_HasDataProto(stg_labelThreadzh)                                  \
+      SymI_HasDataProto(stg_newArrayzh)                                     \
+      SymI_HasDataProto(stg_copyArrayzh)                                    \
+      SymI_HasDataProto(stg_copyMutableArrayzh)                             \
+      SymI_HasDataProto(stg_cloneArrayzh)                                   \
+      SymI_HasDataProto(stg_cloneMutableArrayzh)                            \
+      SymI_HasDataProto(stg_freezzeArrayzh)                                 \
+      SymI_HasDataProto(stg_thawArrayzh)                                    \
+      SymI_HasDataProto(stg_casArrayzh)                                     \
+      SymI_HasDataProto(stg_newSmallArrayzh)                                \
+      SymI_HasDataProto(stg_unsafeThawSmallArrayzh)                         \
+      SymI_HasDataProto(stg_cloneSmallArrayzh)                              \
+      SymI_HasDataProto(stg_cloneSmallMutableArrayzh)                       \
+      SymI_HasDataProto(stg_freezzeSmallArrayzh)                            \
+      SymI_HasDataProto(stg_thawSmallArrayzh)                               \
+      SymI_HasDataProto(stg_copySmallArrayzh)                               \
+      SymI_HasDataProto(stg_copySmallMutableArrayzh)                        \
+      SymI_HasDataProto(stg_casSmallArrayzh)                                \
+      SymI_HasDataProto(stg_copyArray_barrier)                              \
+      SymI_HasDataProto(stg_newBCOzh)                                       \
+      SymI_HasDataProto(stg_newByteArrayzh)                                 \
+      SymI_HasDataProto(stg_casIntArrayzh)                                  \
+      SymI_HasDataProto(stg_casInt8Arrayzh)                                 \
+      SymI_HasDataProto(stg_casInt16Arrayzh)                                \
+      SymI_HasDataProto(stg_casInt32Arrayzh)                                \
+      SymI_HasDataProto(stg_casInt64Arrayzh)                                \
+      SymI_HasDataProto(stg_newMVarzh)                                      \
+      SymI_HasDataProto(stg_newMutVarzh)                                    \
+      SymI_HasDataProto(stg_newTVarzh)                                      \
+      SymI_HasDataProto(stg_readIOPortzh)                                   \
+      SymI_HasDataProto(stg_writeIOPortzh)                                  \
+      SymI_HasDataProto(stg_newIOPortzh)                                    \
+      SymI_HasDataProto(stg_noDuplicatezh)                                  \
+      SymI_HasDataProto(stg_atomicModifyMutVar2zh)                          \
+      SymI_HasDataProto(stg_atomicModifyMutVarzuzh)                         \
+      SymI_HasDataProto(stg_casMutVarzh)                                    \
+      SymI_HasDataProto(stg_newPinnedByteArrayzh)                           \
+      SymI_HasDataProto(stg_newAlignedPinnedByteArrayzh)                    \
+      SymI_HasDataProto(stg_isByteArrayPinnedzh)                            \
+      SymI_HasDataProto(stg_isMutableByteArrayPinnedzh)                     \
+      SymI_HasDataProto(stg_shrinkMutableByteArrayzh)                       \
+      SymI_HasDataProto(stg_resizzeMutableByteArrayzh)                      \
+      SymI_HasDataProto(stg_shrinkSmallMutableArrayzh)                       \
       SymI_HasProto(newSpark)                                           \
       SymI_HasProto(updateRemembSetPushThunk)                             \
       SymI_HasProto(updateRemembSetPushThunk_)                            \
@@ -780,21 +779,21 @@ extern char **environ;
       SymI_HasProto(performMajorGC)                                     \
       SymI_HasProto(prog_argc)                                          \
       SymI_HasProto(prog_argv)                                          \
-      SymI_HasProto(stg_putMVarzh)                                      \
-      SymI_HasProto(stg_raisezh)                                        \
-      SymI_HasProto(stg_raiseDivZZerozh)                                \
-      SymI_HasProto(stg_raiseUnderflowzh)                               \
-      SymI_HasProto(stg_raiseOverflowzh)                                \
-      SymI_HasProto(stg_raiseIOzh)                                      \
-      SymI_HasProto(stg_paniczh)                                        \
-      SymI_HasProto(stg_absentErrorzh)                                  \
-      SymI_HasProto(stg_readTVarzh)                                     \
-      SymI_HasProto(stg_readTVarIOzh)                                   \
+      SymI_HasDataProto(stg_putMVarzh)                                      \
+      SymI_HasDataProto(stg_raisezh)                                        \
+      SymI_HasDataProto(stg_raiseDivZZerozh)                                \
+      SymI_HasDataProto(stg_raiseUnderflowzh)                               \
+      SymI_HasDataProto(stg_raiseOverflowzh)                                \
+      SymI_HasDataProto(stg_raiseIOzh)                                      \
+      SymI_HasDataProto(stg_paniczh)                                        \
+      SymI_HasDataProto(stg_absentErrorzh)                                  \
+      SymI_HasDataProto(stg_readTVarzh)                                     \
+      SymI_HasDataProto(stg_readTVarIOzh)                                   \
       SymI_HasProto(resumeThread)                                       \
       SymI_HasProto(setNumCapabilities)                                 \
       SymI_HasProto(getNumberOfProcessors)                              \
       SymI_HasProto(resolveObjs)                                        \
-      SymI_HasProto(stg_retryzh)                                        \
+      SymI_HasDataProto(stg_retryzh)                                        \
       SymI_HasProto(rts_apply)                                          \
       SymI_HasProto(rts_checkSchedStatus)                               \
       SymI_HasProto(rts_eval)                                           \
@@ -861,143 +860,143 @@ extern char **environ;
       SymI_HasProto(stable_ptr_table)                                   \
       SymI_HasProto(reportStackOverflow)                                \
       SymI_HasProto(reportHeapOverflow)                                 \
-      SymI_HasProto(stg_CAF_BLACKHOLE_info)                             \
-      SymI_HasProto(stg_BLACKHOLE_info)                                 \
-      SymI_HasProto(__stg_EAGER_BLACKHOLE_info)                         \
-      SymI_HasProto(stg_BLOCKING_QUEUE_CLEAN_info)                      \
-      SymI_HasProto(stg_BLOCKING_QUEUE_DIRTY_info)                      \
+      SymI_HasDataProto(stg_CAF_BLACKHOLE_info)                             \
+      SymI_HasDataProto(stg_BLACKHOLE_info)                                 \
+      SymI_HasDataProto(__stg_EAGER_BLACKHOLE_info)                         \
+      SymI_HasDataProto(stg_BLOCKING_QUEUE_CLEAN_info)                      \
+      SymI_HasDataProto(stg_BLOCKING_QUEUE_DIRTY_info)                      \
       SymI_HasProto(startTimer)                                         \
-      SymI_HasProto(stg_MVAR_CLEAN_info)                                \
-      SymI_HasProto(stg_MVAR_DIRTY_info)                                \
-      SymI_HasProto(stg_TVAR_CLEAN_info)                                \
-      SymI_HasProto(stg_TVAR_DIRTY_info)                                \
-      SymI_HasProto(stg_IND_STATIC_info)                                \
-      SymI_HasProto(stg_ARR_WORDS_info)                                 \
-      SymI_HasProto(stg_MUT_ARR_PTRS_DIRTY_info)                        \
-      SymI_HasProto(stg_MUT_ARR_PTRS_FROZEN_CLEAN_info)                 \
-      SymI_HasProto(stg_MUT_ARR_PTRS_FROZEN_DIRTY_info)                 \
-      SymI_HasProto(stg_SMALL_MUT_ARR_PTRS_DIRTY_info)                  \
-      SymI_HasProto(stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info)           \
-      SymI_HasProto(stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info)           \
-      SymI_HasProto(stg_MUT_VAR_CLEAN_info)                             \
-      SymI_HasProto(stg_MUT_VAR_DIRTY_info)                             \
-      SymI_HasProto(stg_WEAK_info)                                      \
-      SymI_HasProto(stg_SRT_1_info)                                     \
-      SymI_HasProto(stg_SRT_2_info)                                     \
-      SymI_HasProto(stg_SRT_3_info)                                     \
-      SymI_HasProto(stg_SRT_4_info)                                     \
-      SymI_HasProto(stg_SRT_5_info)                                     \
-      SymI_HasProto(stg_SRT_6_info)                                     \
-      SymI_HasProto(stg_SRT_7_info)                                     \
-      SymI_HasProto(stg_SRT_8_info)                                     \
-      SymI_HasProto(stg_SRT_9_info)                                     \
-      SymI_HasProto(stg_SRT_10_info)                                    \
-      SymI_HasProto(stg_SRT_11_info)                                    \
-      SymI_HasProto(stg_SRT_12_info)                                    \
-      SymI_HasProto(stg_SRT_13_info)                                    \
-      SymI_HasProto(stg_SRT_14_info)                                    \
-      SymI_HasProto(stg_SRT_15_info)                                    \
-      SymI_HasProto(stg_SRT_16_info)                                    \
-      SymI_HasProto(stg_ap_v_info)                                      \
-      SymI_HasProto(stg_ap_f_info)                                      \
-      SymI_HasProto(stg_ap_d_info)                                      \
-      SymI_HasProto(stg_ap_l_info)                                      \
-      SymI_HasProto(stg_ap_v16_info)                                    \
-      SymI_HasProto(stg_ap_v32_info)                                    \
-      SymI_HasProto(stg_ap_v64_info)                                    \
-      SymI_HasProto(stg_ap_n_info)                                      \
-      SymI_HasProto(stg_ap_p_info)                                      \
-      SymI_HasProto(stg_ap_pv_info)                                     \
-      SymI_HasProto(stg_ap_pp_info)                                     \
-      SymI_HasProto(stg_ap_ppv_info)                                    \
-      SymI_HasProto(stg_ap_ppp_info)                                    \
-      SymI_HasProto(stg_ap_pppv_info)                                   \
-      SymI_HasProto(stg_ap_pppp_info)                                   \
-      SymI_HasProto(stg_ap_ppppp_info)                                  \
-      SymI_HasProto(stg_ap_pppppp_info)                                 \
-      SymI_HasProto(stg_ap_0_fast)                                      \
-      SymI_HasProto(stg_ap_v_fast)                                      \
-      SymI_HasProto(stg_ap_f_fast)                                      \
-      SymI_HasProto(stg_ap_d_fast)                                      \
-      SymI_HasProto(stg_ap_l_fast)                                      \
-      SymI_HasProto(stg_ap_v16_fast)                                    \
-      SymI_HasProto(stg_ap_v32_fast)                                    \
-      SymI_HasProto(stg_ap_v64_fast)                                    \
-      SymI_HasProto(stg_ap_n_fast)                                      \
-      SymI_HasProto(stg_ap_p_fast)                                      \
-      SymI_HasProto(stg_ap_pv_fast)                                     \
-      SymI_HasProto(stg_ap_pp_fast)                                     \
-      SymI_HasProto(stg_ap_ppv_fast)                                    \
-      SymI_HasProto(stg_ap_ppp_fast)                                    \
-      SymI_HasProto(stg_ap_pppv_fast)                                   \
-      SymI_HasProto(stg_ap_pppp_fast)                                   \
-      SymI_HasProto(stg_ap_ppppp_fast)                                  \
-      SymI_HasProto(stg_ap_pppppp_fast)                                 \
-      SymI_HasProto(stg_ap_1_upd_info)                                  \
-      SymI_HasProto(stg_ap_2_upd_info)                                  \
-      SymI_HasProto(stg_ap_3_upd_info)                                  \
-      SymI_HasProto(stg_ap_4_upd_info)                                  \
-      SymI_HasProto(stg_ap_5_upd_info)                                  \
-      SymI_HasProto(stg_ap_6_upd_info)                                  \
-      SymI_HasProto(stg_ap_7_upd_info)                                  \
-      SymI_HasProto(stg_exit)                                           \
-      SymI_HasProto(stg_sel_0_upd_info)                                 \
-      SymI_HasProto(stg_sel_1_upd_info)                                 \
-      SymI_HasProto(stg_sel_2_upd_info)                                 \
-      SymI_HasProto(stg_sel_3_upd_info)                                 \
-      SymI_HasProto(stg_sel_4_upd_info)                                 \
-      SymI_HasProto(stg_sel_5_upd_info)                                 \
-      SymI_HasProto(stg_sel_6_upd_info)                                 \
-      SymI_HasProto(stg_sel_7_upd_info)                                 \
-      SymI_HasProto(stg_sel_8_upd_info)                                 \
-      SymI_HasProto(stg_sel_9_upd_info)                                 \
-      SymI_HasProto(stg_sel_10_upd_info)                                \
-      SymI_HasProto(stg_sel_11_upd_info)                                \
-      SymI_HasProto(stg_sel_12_upd_info)                                \
-      SymI_HasProto(stg_sel_13_upd_info)                                \
-      SymI_HasProto(stg_sel_14_upd_info)                                \
-      SymI_HasProto(stg_sel_15_upd_info)                                \
-      SymI_HasProto(stg_sel_0_noupd_info)                               \
-      SymI_HasProto(stg_sel_1_noupd_info)                               \
-      SymI_HasProto(stg_sel_2_noupd_info)                               \
-      SymI_HasProto(stg_sel_3_noupd_info)                               \
-      SymI_HasProto(stg_sel_4_noupd_info)                               \
-      SymI_HasProto(stg_sel_5_noupd_info)                               \
-      SymI_HasProto(stg_sel_6_noupd_info)                               \
-      SymI_HasProto(stg_sel_7_noupd_info)                               \
-      SymI_HasProto(stg_sel_8_noupd_info)                               \
-      SymI_HasProto(stg_sel_9_noupd_info)                               \
-      SymI_HasProto(stg_sel_10_noupd_info)                              \
-      SymI_HasProto(stg_sel_11_noupd_info)                              \
-      SymI_HasProto(stg_sel_12_noupd_info)                              \
-      SymI_HasProto(stg_sel_13_noupd_info)                              \
-      SymI_HasProto(stg_sel_14_noupd_info)                              \
-      SymI_HasProto(stg_sel_15_noupd_info)                              \
-      SymI_HasProto(stg_upd_frame_info)                                 \
-      SymI_HasProto(stg_bh_upd_frame_info)                              \
+      SymI_HasDataProto(stg_MVAR_CLEAN_info)                                \
+      SymI_HasDataProto(stg_MVAR_DIRTY_info)                                \
+      SymI_HasDataProto(stg_TVAR_CLEAN_info)                                \
+      SymI_HasDataProto(stg_TVAR_DIRTY_info)                                \
+      SymI_HasDataProto(stg_IND_STATIC_info)                                \
+      SymI_HasDataProto(stg_ARR_WORDS_info)                                 \
+      SymI_HasDataProto(stg_MUT_ARR_PTRS_DIRTY_info)                        \
+      SymI_HasDataProto(stg_MUT_ARR_PTRS_FROZEN_CLEAN_info)                 \
+      SymI_HasDataProto(stg_MUT_ARR_PTRS_FROZEN_DIRTY_info)                 \
+      SymI_HasDataProto(stg_SMALL_MUT_ARR_PTRS_DIRTY_info)                  \
+      SymI_HasDataProto(stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info)           \
+      SymI_HasDataProto(stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info)           \
+      SymI_HasDataProto(stg_MUT_VAR_CLEAN_info)                             \
+      SymI_HasDataProto(stg_MUT_VAR_DIRTY_info)                             \
+      SymI_HasDataProto(stg_WEAK_info)                                      \
+      SymI_HasDataProto(stg_SRT_1_info)                                     \
+      SymI_HasDataProto(stg_SRT_2_info)                                     \
+      SymI_HasDataProto(stg_SRT_3_info)                                     \
+      SymI_HasDataProto(stg_SRT_4_info)                                     \
+      SymI_HasDataProto(stg_SRT_5_info)                                     \
+      SymI_HasDataProto(stg_SRT_6_info)                                     \
+      SymI_HasDataProto(stg_SRT_7_info)                                     \
+      SymI_HasDataProto(stg_SRT_8_info)                                     \
+      SymI_HasDataProto(stg_SRT_9_info)                                     \
+      SymI_HasDataProto(stg_SRT_10_info)                                    \
+      SymI_HasDataProto(stg_SRT_11_info)                                    \
+      SymI_HasDataProto(stg_SRT_12_info)                                    \
+      SymI_HasDataProto(stg_SRT_13_info)                                    \
+      SymI_HasDataProto(stg_SRT_14_info)                                    \
+      SymI_HasDataProto(stg_SRT_15_info)                                    \
+      SymI_HasDataProto(stg_SRT_16_info)                                    \
+      SymI_HasDataProto(stg_ap_v_info)                                      \
+      SymI_HasDataProto(stg_ap_f_info)                                      \
+      SymI_HasDataProto(stg_ap_d_info)                                      \
+      SymI_HasDataProto(stg_ap_l_info)                                      \
+      SymI_HasDataProto(stg_ap_v16_info)                                    \
+      SymI_HasDataProto(stg_ap_v32_info)                                    \
+      SymI_HasDataProto(stg_ap_v64_info)                                    \
+      SymI_HasDataProto(stg_ap_n_info)                                      \
+      SymI_HasDataProto(stg_ap_p_info)                                      \
+      SymI_HasDataProto(stg_ap_pv_info)                                     \
+      SymI_HasDataProto(stg_ap_pp_info)                                     \
+      SymI_HasDataProto(stg_ap_ppv_info)                                    \
+      SymI_HasDataProto(stg_ap_ppp_info)                                    \
+      SymI_HasDataProto(stg_ap_pppv_info)                                   \
+      SymI_HasDataProto(stg_ap_pppp_info)                                   \
+      SymI_HasDataProto(stg_ap_ppppp_info)                                  \
+      SymI_HasDataProto(stg_ap_pppppp_info)                                 \
+      SymI_HasDataProto(stg_ap_0_fast)                                      \
+      SymI_HasDataProto(stg_ap_v_fast)                                      \
+      SymI_HasDataProto(stg_ap_f_fast)                                      \
+      SymI_HasDataProto(stg_ap_d_fast)                                      \
+      SymI_HasDataProto(stg_ap_l_fast)                                      \
+      SymI_HasDataProto(stg_ap_v16_fast)                                    \
+      SymI_HasDataProto(stg_ap_v32_fast)                                    \
+      SymI_HasDataProto(stg_ap_v64_fast)                                    \
+      SymI_HasDataProto(stg_ap_n_fast)                                      \
+      SymI_HasDataProto(stg_ap_p_fast)                                      \
+      SymI_HasDataProto(stg_ap_pv_fast)                                     \
+      SymI_HasDataProto(stg_ap_pp_fast)                                     \
+      SymI_HasDataProto(stg_ap_ppv_fast)                                    \
+      SymI_HasDataProto(stg_ap_ppp_fast)                                    \
+      SymI_HasDataProto(stg_ap_pppv_fast)                                   \
+      SymI_HasDataProto(stg_ap_pppp_fast)                                   \
+      SymI_HasDataProto(stg_ap_ppppp_fast)                                  \
+      SymI_HasDataProto(stg_ap_pppppp_fast)                                 \
+      SymI_HasDataProto(stg_ap_1_upd_info)                                  \
+      SymI_HasDataProto(stg_ap_2_upd_info)                                  \
+      SymI_HasDataProto(stg_ap_3_upd_info)                                  \
+      SymI_HasDataProto(stg_ap_4_upd_info)                                  \
+      SymI_HasDataProto(stg_ap_5_upd_info)                                  \
+      SymI_HasDataProto(stg_ap_6_upd_info)                                  \
+      SymI_HasDataProto(stg_ap_7_upd_info)                                  \
+      SymI_HasDataProto(stg_exit)                                           \
+      SymI_HasDataProto(stg_sel_0_upd_info)                                 \
+      SymI_HasDataProto(stg_sel_1_upd_info)                                 \
+      SymI_HasDataProto(stg_sel_2_upd_info)                                 \
+      SymI_HasDataProto(stg_sel_3_upd_info)                                 \
+      SymI_HasDataProto(stg_sel_4_upd_info)                                 \
+      SymI_HasDataProto(stg_sel_5_upd_info)                                 \
+      SymI_HasDataProto(stg_sel_6_upd_info)                                 \
+      SymI_HasDataProto(stg_sel_7_upd_info)                                 \
+      SymI_HasDataProto(stg_sel_8_upd_info)                                 \
+      SymI_HasDataProto(stg_sel_9_upd_info)                                 \
+      SymI_HasDataProto(stg_sel_10_upd_info)                                \
+      SymI_HasDataProto(stg_sel_11_upd_info)                                \
+      SymI_HasDataProto(stg_sel_12_upd_info)                                \
+      SymI_HasDataProto(stg_sel_13_upd_info)                                \
+      SymI_HasDataProto(stg_sel_14_upd_info)                                \
+      SymI_HasDataProto(stg_sel_15_upd_info)                                \
+      SymI_HasDataProto(stg_sel_0_noupd_info)                               \
+      SymI_HasDataProto(stg_sel_1_noupd_info)                               \
+      SymI_HasDataProto(stg_sel_2_noupd_info)                               \
+      SymI_HasDataProto(stg_sel_3_noupd_info)                               \
+      SymI_HasDataProto(stg_sel_4_noupd_info)                               \
+      SymI_HasDataProto(stg_sel_5_noupd_info)                               \
+      SymI_HasDataProto(stg_sel_6_noupd_info)                               \
+      SymI_HasDataProto(stg_sel_7_noupd_info)                               \
+      SymI_HasDataProto(stg_sel_8_noupd_info)                               \
+      SymI_HasDataProto(stg_sel_9_noupd_info)                               \
+      SymI_HasDataProto(stg_sel_10_noupd_info)                              \
+      SymI_HasDataProto(stg_sel_11_noupd_info)                              \
+      SymI_HasDataProto(stg_sel_12_noupd_info)                              \
+      SymI_HasDataProto(stg_sel_13_noupd_info)                              \
+      SymI_HasDataProto(stg_sel_14_noupd_info)                              \
+      SymI_HasDataProto(stg_sel_15_noupd_info)                              \
+      SymI_HasDataProto(stg_upd_frame_info)                                 \
+      SymI_HasDataProto(stg_bh_upd_frame_info)                              \
       SymI_HasProto(suspendThread)                                      \
-      SymI_HasProto(stg_takeMVarzh)                                     \
-      SymI_HasProto(stg_readMVarzh)                                     \
-      SymI_HasProto(stg_threadStatuszh)                                 \
-      SymI_HasProto(stg_tryPutMVarzh)                                   \
-      SymI_HasProto(stg_tryTakeMVarzh)                                  \
-      SymI_HasProto(stg_tryReadMVarzh)                                  \
-      SymI_HasProto(stg_unmaskAsyncExceptionszh)                        \
+      SymI_HasDataProto(stg_takeMVarzh)                                     \
+      SymI_HasDataProto(stg_readMVarzh)                                     \
+      SymI_HasDataProto(stg_threadStatuszh)                                 \
+      SymI_HasDataProto(stg_tryPutMVarzh)                                   \
+      SymI_HasDataProto(stg_tryTakeMVarzh)                                  \
+      SymI_HasDataProto(stg_tryReadMVarzh)                                  \
+      SymI_HasDataProto(stg_unmaskAsyncExceptionszh)                        \
       SymI_HasProto(unloadObj)                                          \
-      SymI_HasProto(stg_unsafeThawArrayzh)                              \
-      SymI_HasProto(stg_waitReadzh)                                     \
-      SymI_HasProto(stg_waitWritezh)                                    \
-      SymI_HasProto(stg_writeTVarzh)                                    \
-      SymI_HasProto(stg_yieldzh)                                        \
-      SymI_NeedsProto(stg_badAlignment_entry)                           \
-      SymI_NeedsProto(stg_interp_constr1_entry)                         \
-      SymI_NeedsProto(stg_interp_constr2_entry)                         \
-      SymI_NeedsProto(stg_interp_constr3_entry)                         \
-      SymI_NeedsProto(stg_interp_constr4_entry)                         \
-      SymI_NeedsProto(stg_interp_constr5_entry)                         \
-      SymI_NeedsProto(stg_interp_constr6_entry)                         \
-      SymI_NeedsProto(stg_interp_constr7_entry)                         \
-      SymI_HasProto(stg_arg_bitmaps)                                    \
+      SymI_HasDataProto(stg_unsafeThawArrayzh)                              \
+      SymI_HasDataProto(stg_waitReadzh)                                     \
+      SymI_HasDataProto(stg_waitWritezh)                                    \
+      SymI_HasDataProto(stg_writeTVarzh)                                    \
+      SymI_HasDataProto(stg_yieldzh)                                        \
+      SymI_NeedsDataProto(stg_badAlignment_entry)                           \
+      SymI_NeedsDataProto(stg_interp_constr1_entry)                         \
+      SymI_NeedsDataProto(stg_interp_constr2_entry)                         \
+      SymI_NeedsDataProto(stg_interp_constr3_entry)                         \
+      SymI_NeedsDataProto(stg_interp_constr4_entry)                         \
+      SymI_NeedsDataProto(stg_interp_constr5_entry)                         \
+      SymI_NeedsDataProto(stg_interp_constr6_entry)                         \
+      SymI_NeedsDataProto(stg_interp_constr7_entry)                         \
+      SymI_HasDataProto(stg_arg_bitmaps)                                    \
       SymI_HasProto(large_alloc_lim)                                    \
       SymI_HasProto(g0)                                                 \
       SymI_HasProto(allocate)                                           \
@@ -1013,12 +1012,12 @@ extern char **environ;
       SymI_HasProto(stopTimer)                                          \
       SymI_HasProto(n_capabilities)                                     \
       SymI_HasProto(enabled_capabilities)                               \
-      SymI_HasProto(stg_traceCcszh)                                     \
-      SymI_HasProto(stg_traceEventzh)                                   \
-      SymI_HasProto(stg_traceMarkerzh)                                  \
-      SymI_HasProto(stg_traceBinaryEventzh)                             \
-      SymI_HasProto(stg_getThreadAllocationCounterzh)                   \
-      SymI_HasProto(stg_setThreadAllocationCounterzh)                   \
+      SymI_HasDataProto(stg_traceCcszh)                                     \
+      SymI_HasDataProto(stg_traceEventzh)                                   \
+      SymI_HasDataProto(stg_traceMarkerzh)                                  \
+      SymI_HasDataProto(stg_traceBinaryEventzh)                             \
+      SymI_HasDataProto(stg_getThreadAllocationCounterzh)                   \
+      SymI_HasDataProto(stg_setThreadAllocationCounterzh)                   \
       SymI_HasProto(getMonotonicNSec)                                   \
       SymI_HasProto(lockFile)                                           \
       SymI_HasProto(unlockFile)                                         \
@@ -1072,7 +1071,7 @@ extern char **environ;
 
 // Symbols defined by libc
 #define RTS_LIBC_SYMBOLS                               \
-      SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG) /* See Note [Strong symbols] */ \
+      SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG, CODE_TYPE_CODE) /* See Note [Strong symbols] */ \
       SymI_HasProto(environ)
 
 #if !defined(DYNAMIC) && defined(linux_HOST_OS)
@@ -1101,11 +1100,13 @@ extern char **environ;
 #else
 #define SymE_NeedsProto(vvv)  SymI_NeedsProto(vvv);
 #define SymE_NeedsDataProto(vvv)  SymI_NeedsDataProto(vvv);
-#define SymE_HasProto(vvv)    SymI_HasProto(vvv)
+#define SymE_HasProto(vvv)    SymI_HasProto(vvv);
 #endif
 #define SymI_HasProto(vvv) /**/
-#define SymI_HasProto_redirect(vvv,xxx,strength) /**/
+#define SymI_HasDataProto(vvv) /**/
+#define SymI_HasProto_redirect(vvv,xxx,strength,ty) /**/
 #define SymI_HasProto_deprecated(vvv) /**/
+
 RTS_SYMBOLS
 RTS_RET_SYMBOLS
 RTS_POSIX_ONLY_SYMBOLS
@@ -1116,9 +1117,11 @@ RTS_LIBC_SYMBOLS
 RTS_LIBGCC_SYMBOLS
 RTS_FINI_ARRAY_SYMBOLS
 RTS_LIBFFI_SYMBOLS
+
 #undef SymI_NeedsProto
 #undef SymI_NeedsDataProto
 #undef SymI_HasProto
+#undef SymI_HasDataProto
 #undef SymI_HasProto_redirect
 #undef SymI_HasProto_deprecated
 #undef SymE_HasProto
@@ -1127,13 +1130,13 @@ RTS_LIBFFI_SYMBOLS
 #undef SymE_NeedsDataProto
 
 #define SymI_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    (void*)(&(vvv)), STRENGTH_NORMAL },
-#define SymI_HasDataProto(vvv) \
-                    SymI_HasProto(vvv)
+                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
+#define SymI_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
+                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA },
 #define SymE_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)DLL_IMPORT_DATA_REF(vvv), STRENGTH_NORMAL },
-#define SymE_HasDataProto(vvv) \
-                    SymE_HasProto(vvv)
+            (void*)DLL_IMPORT_DATA_REF(vvv), STRENGTH_NORMAL, SYM_TYPE_CODE },
+#define SymE_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
+            (void*)DLL_IMPORT_DATA_REF(vvv), STRENGTH_NORMAL, SYM_TYPE_DATA },
 
 #define SymI_NeedsProto(vvv) SymI_HasProto(vvv)
 #define SymI_NeedsDataProto(vvv) SymI_HasDataProto(vvv)
@@ -1142,9 +1145,9 @@ RTS_LIBFFI_SYMBOLS
 
 // SymI_HasProto_redirect allows us to redirect references to one symbol to
 // another symbol.  See newCAF/newRetainedCAF/newGCdCAF for an example.
-#define SymI_HasProto_redirect(vvv,xxx,strength) \
+#define SymI_HasProto_redirect(vvv,xxx,strength,ty) \
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv),    \
-      (void*)(&(xxx)), strength },
+      (void*)(&(xxx)), strength, ty },
 
 // SymI_HasProto_deprecated allows us to redirect references from their deprecated
 // names to the undeprecated ones. e.g. access -> _access.
@@ -1154,7 +1157,7 @@ RTS_LIBFFI_SYMBOLS
 // define them, since on Windows these functions shouldn't be in the top level
 // namespace, but we have them for POSIX compatibility.
 #define SymI_HasProto_deprecated(vvv)   \
-   { #vvv, (void*)0xBAADF00D, STRENGTH_WEAK },
+   { #vvv, (void*)0xBAADF00D, STRENGTH_WEAK, SYM_TYPE_CODE },
 
 RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS
@@ -1174,5 +1177,5 @@ RtsSymbolVal rtsSyms[] = {
       // lazy pointers as nonlazy.
       { "dyld_stub_binding_helper", (void*)0xDEADBEEF, STRENGTH_NORMAL },
 #endif
-      { 0, 0, STRENGTH_NORMAL } /* sentinel */
+      { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
 };

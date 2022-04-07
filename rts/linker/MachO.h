@@ -1,10 +1,9 @@
 #pragma once
 
 #include "Rts.h"
+#include "MachOTypes.h"
 
 #include "BeginPrivate.h"
-
-#include "MachOTypes.h"
 
 void   ocInit_MachO                 ( ObjectCode* oc );
 void   ocDeinit_MachO               ( ObjectCode* oc );

@@ -1303,7 +1303,9 @@ def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str
     if_verbose(1, '*** framework failure for %s %s ' % (full_name, reason))
     name2 = name if name is not None else TestName('none')
     way2 = way if way is not None else WayName('none')
-    t.framework_failures.append(TestResult(directory, name2, reason, way2))
+    if way not in opts.fragile_ways:
+        # If the test is fragile then we rather report this as a fragile test failure
+        t.framework_failures.append(TestResult(directory, name2, reason, way2))
 
 def framework_warn(name: TestName, way: WayName, reason: str) -> None:
     opts = getTestOpts()

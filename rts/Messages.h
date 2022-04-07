@@ -8,6 +8,10 @@
 
 #pragma once
 
+#include "Capability.h"
+#include "Updates.h" // for DEBUG_FILL_SLOP
+#include "SMPClosureOps.h"
+
 #include "BeginPrivate.h"
 
 uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg);
@@ -17,10 +21,6 @@ StgTSO * blackHoleOwner (StgClosure *bh);
 void executeMessage (Capability *cap, Message *m);
 void sendMessage    (Capability *from_cap, Capability *to_cap, Message *msg);
 #endif
-
-#include "Capability.h"
-#include "Updates.h" // for DEBUG_FILL_SLOP
-#include "SMPClosureOps.h"
 
 INLINE_HEADER void
 doneWithMsgThrowTo (Capability *cap, MessageThrowTo *m)

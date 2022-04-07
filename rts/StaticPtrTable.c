@@ -8,8 +8,8 @@
  *
  */
 
-#include "StaticPtrTable.h"
 #include "Rts.h"
+#include "StaticPtrTable.h"
 #include "RtsUtils.h"
 #include "Hash.h"
 #include "StablePtr.h"

@@ -20,6 +20,9 @@ version-number:
 cpp:
 	(cd $(TOP)/tests/linters/ && python3 regex-linters/check-cpp.py tracked)
 
+rts-includes:
+	(cd $(TOP)/tests/linters/ && python3 regex-linters/check-rts-includes.py tracked)
+
 changelogs:
 	regex-linters/check-changelogs.sh $(TOP)/..
 

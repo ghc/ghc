@@ -466,12 +466,12 @@ iservBins = do
 -- | Create a wrapper script calls the executable given as first argument
 createVersionWrapper :: String -> FilePath -> Action ()
 createVersionWrapper versioned_exe install_path = do
-  ccPath <- builderPath (Cc CompileC Stage2)
+  ghcPath <- builderPath (Ghc CompileCWithGhc Stage2)
   top <- topDirectory
   let version_wrapper_dir = top -/- "hadrian" -/- "bindist" -/- "cwrappers"
       wrapper_files = [ version_wrapper_dir -/- file | file <- ["version-wrapper.c", "getLocation.c", "cwrapper.c"]]
 
-  cmd ccPath (["-o", install_path, "-I", version_wrapper_dir
+  cmd ghcPath (["-no-hs-main", "-o", install_path, "-I"++version_wrapper_dir
               , "-DEXE_PATH=\"" ++ versioned_exe ++ "\""
               ] ++ wrapper_files)
 

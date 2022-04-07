@@ -52,8 +52,7 @@ test('TH_NestedSplices', [], multimod_compile,
 # normal way first, which is why the work is done by a Makefile rule.
 test('TH_spliceE5_prof',
      [req_profiling, only_ways(['normal']),
-      when(ghc_dynamic(), expect_broken(11495)),
-      when(opsys('mingw32'), expect_broken(18271))],
+      when(ghc_dynamic(), expect_broken(11495))],
      makefile_test, ['TH_spliceE5_prof'])
 
 test('TH_spliceE5_prof_ext', [req_profiling, req_rts_linker, only_ways(['normal'])],
@@ -395,14 +394,16 @@ test('T13018', normal, compile, ['-v0'])
 test('T13123', normal, compile, ['-v0'])
 test('T13098', normal, compile, ['-v0'])
 test('T11046', normal, multimod_compile, ['T11046','-v0'])
-test('T13366',
-     [expect_broken_for(13366, ['ghci']),
-      # libstdc++ is GCC-specific on FreeBSD, the test will
-      # fail with clang, and pass with GCC.
-      when(opsys('freebsd'), fragile(17739)),
-      when(opsys('darwin'), expect_broken(16083))],
+test('T13366C',
+     [expect_broken_for(13366, ['ghci'])],
      compile_and_run,
-     ['-lstdc++ -v0'] if not opsys('openbsd') else ['-lc++ -lc++abi -v0'])
+     ['-v0'])
+test('T13366Cxx',
+     [expect_broken_for(13366, ['ghci']),
+      when(opsys('darwin'), expect_broken(16083))
+     ],
+     compile_and_run,
+     ['-l{} -v0'.format(config.stdcxx_impl)])
 test('T13473', normal, multimod_compile_and_run,
      ['T13473.hs', '-v0 ' + config.ghc_th_way_flags])
 test('T13587', expect_broken(13587), compile_and_run, ['-v0'])

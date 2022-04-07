@@ -104,3 +104,6 @@ test('T15570',
    #   warning: integer constant is so large that it is unsigned
 
 test('T18614', normal, compile, [''])
+test('mk-big-obj',
+     [unless(opsys('mingw32'), skip), pre_cmd('$PYTHON mk-big-obj.py > mk-big-obj.c')],
+     multimod_compile, ['mk-big-obj.c', '-c -v0 -no-hs-main'])

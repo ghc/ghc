@@ -82,6 +82,7 @@ test('T5435_dyn_gcc', extra_files(['T5435.hs', 'T5435_gcc.c']) , makefile_test, 
 ######################################
 test('linker_unload',
      [extra_files(['LinkerUnload.hs', 'Test.hs']),
+      when(opsys('mingw32'), expect_broken(21354)),
       req_rts_linker],
      makefile_test, ['linker_unload'])
 
@@ -119,8 +120,9 @@ test('T7072',
 
 
 test('T20918',
-	[extra_files(['T20918_v.cc']),
-		unless(opsys('mingw32'), skip),
-		req_rts_linker],
-	makefile_test, ['T20918'])
+     [extra_files(['T20918_v.cc']),
+      unless(opsys('mingw32'), skip),
+      when(opsys('mingw32'), expect_broken(2)),
+      req_rts_linker],
+     makefile_test, ['T20918'])
 

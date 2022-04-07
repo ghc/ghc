@@ -41,7 +41,7 @@ void initLinker (void);
  */
 void initLinker_ (int retain_cafs);
 
-/* insert a symbol in the hash table */
+/* insert a code symbol in the hash table */
 HsInt insertSymbol(pathchar* obj_name, char* key, void* data);
 
 /* lookup a symbol in the hash table */
@@ -52,6 +52,7 @@ typedef enum {
     OBJECT_LOADED,
     OBJECT_NEEDED,
     OBJECT_RESOLVED,
+    OBJECT_READY,
     OBJECT_UNLOADED,
     OBJECT_DONT_RESOLVE,
     OBJECT_NOT_LOADED     /* The object was either never loaded or has been

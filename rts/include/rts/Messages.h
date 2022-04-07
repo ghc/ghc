@@ -18,15 +18,6 @@
 
 #include <stdarg.h>
 
-#if defined(mingw32_HOST_OS) && !defined(__clang__)
-/* On Win64, if we say "printf" then gcc thinks we are going to use
-   MS format specifiers like %I64d rather than %llu */
-#define PRINTF gnu_printf
-#else
-/* However, on OS X, "gnu_printf" isn't recognised */
-#define PRINTF printf
-#endif
-
 /* -----------------------------------------------------------------------------
  * Message generation
  * -------------------------------------------------------------------------- */
@@ -41,7 +32,7 @@
  */
 void barf(const char *s, ...)
    GNUC3_ATTRIBUTE(__noreturn__)
-   GNUC3_ATTRIBUTE(format(PRINTF, 1, 2));
+   STG_PRINTF_ATTR(1, 2);
 
 void vbarf(const char *s, va_list ap)
    GNUC3_ATTRIBUTE(__noreturn__);
@@ -57,7 +48,7 @@ void vbarf(const char *s, va_list ap)
  * errorBelch() invokes (*errorMsgFn)().
  */
 void errorBelch(const char *s, ...)
-   GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
+   STG_PRINTF_ATTR(1, 2);
 
 void verrorBelch(const char *s, va_list ap);
 
@@ -71,7 +62,7 @@ void verrorBelch(const char *s, va_list ap);
  * sysErrorBelch() invokes (*sysErrorMsgFn)().
  */
 void sysErrorBelch(const char *s, ...)
-   GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
+   STG_PRINTF_ATTR(1, 2);
 
 void vsysErrorBelch(const char *s, va_list ap);
 
@@ -83,7 +74,7 @@ void vsysErrorBelch(const char *s, va_list ap);
  * debugBelch() invokes (*debugMsgFn)().
  */
 void debugBelch(const char *s, ...)
-   GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
+   STG_PRINTF_ATTR(1, 2);
 
 int vdebugBelch(const char *s, va_list ap);
 
@@ -103,5 +94,3 @@ extern RtsMsgFunction rtsFatalInternalErrorFn;
 extern RtsMsgFunctionRetLen rtsDebugMsgFn;
 extern RtsMsgFunction rtsErrorMsgFn;
 extern RtsMsgFunction rtsSysErrorMsgFn;
-
-#undef PRINTF

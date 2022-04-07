@@ -552,9 +552,9 @@ INLINE int __hscore_open(char *file, int how, mode_t mode) {
 #include <crt_externs.h>
 INLINE char **__hscore_environ(void) { return *(_NSGetEnviron()); }
 #else
-/* ToDo: write a feature test that doesn't assume 'environ' to
- *    be in scope at link-time. */
+#if !HAVE_DECL_ENVIRON
 extern char** environ;
+#endif
 INLINE char **__hscore_environ(void) { return environ; }
 #endif
 

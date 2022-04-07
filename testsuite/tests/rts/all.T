@@ -387,7 +387,7 @@ test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000') ],
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
                compile_and_run, [''])
 
-test('T9405', [when(msys(), expect_broken(12714))], makefile_test, ['T9405'])
+test('T9405', [when(opsys('mingw32'), expect_broken(21361))], makefile_test, ['T9405'])
 
 test('T11788', when(ghc_dynamic(), skip),
               makefile_test, ['T11788'])
@@ -474,9 +474,10 @@ test('keep-cafs',
 # Test proper functioning of C++ exceptions within a C++ program.
 # On darwin, this requires -fcompact-unwind.
 # When -fcompact-unwind becomes default, generalize test to all platforms.
-test('T11829', unless(opsys('darwin'), skip), compile_and_run, ['T11829_c.cpp -lstdc++ -fcompact-unwind'])
+test('T11829', unless(opsys('darwin'), skip), compile_and_run,
+     ['T11829_c.cpp -l{} -fcompact-unwind'.format(config.stdcxx_impl)])
 
-test('T16514', unless(opsys('mingw32'), skip), compile_and_run, ['T16514_c.cpp -lstdc++'])
+test('T16514', normal, compile_and_run, ['T16514_c.c'])
 test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])
 
 test('T13676',

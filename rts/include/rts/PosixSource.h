@@ -36,3 +36,15 @@
 #define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE   700
 #endif
+
+#if defined(mingw32_HOST_OS)
+#  if defined(__USE_MINGW_ANSI_STDIO)
+#    if __USE_MINGW_ANSI_STDIO != 1
+#       warning "Mismatch between __USE_MINGW_ANSI_STDIO definitions. \
+If using PosixSource.h make sure it is the first header included."
+#    endif
+#  else
+/* Inform mingw we want the ISO rather than Windows printf format specifiers. */
+#    define __USE_MINGW_ANSI_STDIO 1
+#endif
+#endif

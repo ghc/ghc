@@ -72,6 +72,123 @@ static struct MemoryRegion allMemory = {
 
 #if defined(mingw32_HOST_OS)
 
+/* A wrapper for VirtualQuery() providing useful debug output */
+static int virtualQuery(void *baseAddr, PMEMORY_BASIC_INFORMATION info)
+{
+    int res = VirtualQuery (baseAddr, info, sizeof (*info));
+    IF_DEBUG(linker_verbose,
+        debugBelch("Probing region 0x%p (0x%p) - 0x%p (%" FMT_SizeT ") [%ld] with base 0x%p\n",
+                   baseAddr,
+                   info->BaseAddress,
+                   (uint8_t *) info->BaseAddress + info->RegionSize,
+                   info->RegionSize, info->State,
+                   info->AllocationBase));
+    if (!res) {
+        IF_DEBUG(linker_verbose, debugBelch("Querying 0x%p failed. Aborting..\n", baseAddr));
+        return 1;
+    }
+    return 0;
+}
+
+static inline uintptr_t round_up(uintptr_t num, uint64_t factor)
+{
+    return num + factor - 1 - (num + factor - 1) % factor;
+}
+
+/*
+ * Try and find a location in the VMMAP to allocate SZ bytes starting at
+ * BASEADDR.  If successful then location to use is returned and the amount of
+ * bytes you *must* allocate is returned in REQ.  You are free to use less but
+ * you must allocate the amount given in REQ.  If not successful NULL.
+ */
+static void *allocateBytes(void* baseAddr, void *endAddr, size_t sz, size_t *req)
+{
+    SYSTEM_INFO sys;
+    GetSystemInfo(&sys);
+
+    IF_DEBUG(linker_verbose, debugBelch("Requesting mapping of %" FMT_SizeT " bytes between %p and %p\n",
+                                sz, baseAddr, endAddr));
+
+    MEMORY_BASIC_INFORMATION info;
+    uint8_t *initialAddr = baseAddr;
+    uint8_t *region = NULL;
+    while (!region
+           && initialAddr <= (uint8_t *) endAddr
+           && (void *) initialAddr < sys.lpMaximumApplicationAddress)
+    {
+        int res = virtualQuery(initialAddr, &info);
+        if (res) {
+            return NULL;
+        }
+
+        if ((info.State & MEM_FREE) == MEM_FREE) {
+            IF_DEBUG(linker_verbose, debugBelch("Free range at 0x%p of %zu bytes\n",
+                                        info.BaseAddress, info.RegionSize));
+
+            if (info.RegionSize >= sz) {
+                if (info.AllocationBase == 0) {
+                    size_t needed_sz = round_up (sz, sys.dwAllocationGranularity);
+                    if (info.RegionSize >= needed_sz) {
+                        IF_DEBUG(linker_verbose, debugBelch("Range is unmapped, Allocation "
+                                                    "required by granule...\n"));
+                        *req = needed_sz;
+                        region
+                        = (void*)(uintptr_t)round_up ((uintptr_t)initialAddr,
+                                                        sys.dwAllocationGranularity);
+                        IF_DEBUG(linker_verbose, debugBelch("Requested %" PRId64 ", rounded: %"
+                                                    PRId64 ".\n", sz, *req));
+                        IF_DEBUG(linker_verbose, debugBelch("Aligned region claimed 0x%p -> "
+                                                    "0x%p.\n", initialAddr, region));
+                    }
+                } else {
+                    IF_DEBUG(linker_verbose, debugBelch("Range is usable for us, claiming...\n"));
+                    *req = sz;
+                    region = initialAddr;
+                }
+            }
+        }
+        initialAddr = (uint8_t *) info.BaseAddress + info.RegionSize;
+    }
+
+    return region;
+}
+
+/* Find free address space for mapping anonymous memory. */
+static void *allocateLocalBytes(size_t sz, size_t *req)
+{
+    // We currently don't attempt to take address space from the region below
+    // the image as malloc() tends to like to use this space, but we could do if
+    // necessary.
+    size_t max_range = 0x7fffffff - sz;
+
+    static void *base_addr = NULL;
+    if (base_addr == NULL) {
+        base_addr = GetModuleHandleW(NULL);
+    }
+    uint8_t *end_addr = (uint8_t *) base_addr + max_range;
+
+    // We track the location of the last allocation to avoid having to
+    // do a linear search of address space looking for space on every allocation
+    // as this can easily devolve into quadratic complexity.
+    static void *last_alloca = NULL;
+    if (last_alloca == NULL) {
+        // Start the search at the image base
+        last_alloca = base_addr;
+    }
+
+    void *result = NULL;
+    result = allocateBytes (last_alloca, end_addr, sz, req);
+    if (result == NULL) {
+        // We failed to find suitable address space; restart the search at base_addr.
+        result = allocateBytes (base_addr, end_addr, sz, req);
+    }
+
+    if (result != NULL) {
+        last_alloca = (uint8_t *) result + *req;
+    }
+    return result;
+}
+
 static DWORD
 memoryAccessToProt(MemoryAccess access)
 {
@@ -92,7 +209,15 @@ memoryAccessToProt(MemoryAccess access)
 void *
 mmapAnonForLinker (size_t bytes)
 {
-  return VirtualAlloc(NULL, bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+  size_t size = 0;
+  /* For linking purposes we want to load code within a 4GB range from the
+     load address of the application.  As such we need to find a location to
+     allocate at.   */
+  void* region = allocateLocalBytes (bytes, &size);
+  if (region == NULL) {
+      return NULL;
+  }
+  return VirtualAlloc(region, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 }
 
 void

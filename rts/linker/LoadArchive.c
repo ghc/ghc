@@ -246,6 +246,7 @@ HsInt loadArchive_ (pathchar *path)
     char *image = NULL;
     HsInt retcode = 0;
     int memberSize;
+    int memberIdx = 0;
     FILE *f = NULL;
     int n;
     size_t thisFileNameSize = (size_t)-1; /* shut up bogus GCC warning */
@@ -517,11 +518,11 @@ HsInt loadArchive_ (pathchar *path)
                 }
             }
 
-            int size = pathlen(path) + thisFileNameSize + 3;
-            archiveMemberName = stgMallocBytes(size * pathsize,
-                                               "loadArchive(file)");
-            pathprintf(archiveMemberName, size, WSTR("%" PATH_FMT "(%.*s)"),
-                       path, (int)thisFileNameSize, fileName);
+            int size = pathprintf(NULL, 0, WSTR("%" PATH_FMT "(#%d:%.*s)"),
+                                  path, memberIdx, (int)thisFileNameSize, fileName);
+            archiveMemberName = stgMallocBytes((size+1) * sizeof(pathchar), "loadArchive(file)");
+            pathprintf(archiveMemberName, size, WSTR("%" PATH_FMT "(#%d:%.*s)"),
+                       path, memberIdx, (int)thisFileNameSize, fileName);
 
             ObjectCode *oc = mkOc(STATIC_OBJECT, path, image, memberSize, false, archiveMemberName,
                                   misalignment);
@@ -604,6 +605,7 @@ while reading filename from `%" PATH_FMT "'", path);
             }
             DEBUG_LOG("successfully read one pad byte\n");
         }
+        memberIdx ++;
         DEBUG_LOG("reached end of archive loading while loop\n");
     }
     retcode = 1;
@@ -643,10 +645,10 @@ bool isArchive (pathchar *path)
     }
 
     size_t ret = fread(buffer, 1, sizeof(buffer), f);
+    fclose(f);
     if (ret < sizeof(buffer)) {
         return false;
     }
-    fclose(f);
     return strncmp(ARCHIVE_HEADER, buffer, sizeof(ARCHIVE_HEADER)-1) == 0;
 }
 

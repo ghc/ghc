@@ -232,6 +232,8 @@ else:
                 print('WARNING: No UTF8 locale found.')
                 print('You may get some spurious test failures.')
 
+ghc_env['LIBCXX'] = config.stdcxx_impl
+
 # https://stackoverflow.com/a/22254892/1308058
 def supports_colors():
     """

@@ -18,8 +18,6 @@
 
 void printLoadedObjects(void);
 
-#include "BeginPrivate.h"
-
 /* Which object file format are we targeting? */
 #if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) \
 || defined(linux_android_HOST_OS) \
@@ -38,6 +36,30 @@ typedef char SymbolName;
 typedef struct _ObjectCode ObjectCode;
 typedef struct _Section    Section;
 
+/*
+ * Note [Processing overflowed relocations]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * When processing relocations whose targets exceed the relocation's maximum
+ * displacement, we can take advantage of knowledge of the symbol type to avoid
+ * linker failures. In particular, if we know that a symbol is a code symbol
+ * then we can handle the relocation by creating a "jump island", a small bit
+ * of code which immediately jumps (with an instruction sequence capable of
+ * larger displacement) to the target.
+ *
+ * This is not possible for data symbols (or, for that matter, Haskell symbols
+ * when TNTC is in use). In these cases we have to rather fail and ask the user
+ * to recompile their program as position-independent.
+ */
+
+/* What kind of thing a symbol identifies. We need to know this to determine how
+ * to process overflowing relocations. See Note [Processing overflowed relocations]. */
+typedef enum _SymType {
+    SYM_TYPE_CODE, /* the symbol is a function and can be relocated via a jump island */
+    SYM_TYPE_DATA, /* the symbol is data */
+    SYM_TYPE_INDIRECT_DATA, /* see Note [_iob_func symbol] */
+} SymType;
+
+
 #if defined(OBJFORMAT_ELF)
 #  include "linker/ElfTypes.h"
 #elif defined(OBJFORMAT_PEi386)
@@ -55,6 +77,7 @@ typedef struct _Symbol
 {
     SymbolName *name;
     SymbolAddr *addr;
+    SymType type;
 } Symbol_t;
 
 typedef struct NativeCodeRange_ {
@@ -88,8 +111,11 @@ typedef
           SECTIONKIND_EXCEPTION_UNWIND,
           /* Section belongs to an import section group. e.g. .idata$.  */
           SECTIONKIND_IMPORT,
+          /* Section defines the head section of a BFD-style import library, e.g. idata$7.  */
+          SECTIONKIND_BFD_IMPORT_LIBRARY_HEAD,
           /* Section defines an import library entry, e.g. idata$7.  */
-          SECTIONKIND_IMPORT_LIBRARY,
+          SECTIONKIND_BFD_IMPORT_LIBRARY,
+          /* Unknown section */
           SECTIONKIND_NOINFOAVAIL
         }
    SectionKind;
@@ -332,6 +358,12 @@ struct _ObjectCode {
       (OC)->fileName                            \
     )
 
+#define ocDebugBelch(oc, s, ...) \
+    debugBelch("%s(%" PATH_FMT ": " s, \
+               __func__, \
+               OC_INFORMATIVE_FILENAME(oc), \
+               ##__VA_ARGS__)
+
 
 #if defined(THREADED_RTS)
 extern Mutex linker_mutex;
@@ -339,7 +371,7 @@ extern Mutex linker_mutex;
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 extern Mutex dl_mutex;
 #endif
-#endif
+#endif /* THREADED_RTS */
 
 /* Type of the initializer */
 typedef void (*init_t) (int argc, char **argv, char **env);
@@ -366,7 +398,10 @@ typedef struct _RtsSymbolInfo {
     SymbolAddr* value;
     ObjectCode *owner;
     SymStrength strength;
+    SymType type;
 } RtsSymbolInfo;
+
+#include "BeginPrivate.h"
 
 void exitLinker( void );
 
@@ -390,11 +425,12 @@ int ghciInsertSymbolTable(
     const SymbolName* key,
     SymbolAddr* data,
     SymStrength weak,
+    SymType type,
     ObjectCode *owner);
 
 /* Lock-free version of lookupSymbol. When 'dependent' is not NULL, adds it as a
- * dependent to the owner of the symbol. */
-SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent);
+ * dependent to the owner of the symbol. The type of the symbol is stored in 'type'. */
+SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent, SymType *type);
 
 /* Perform TLSGD symbol lookup returning the address of the resulting GOT entry,
  * which in this case holds the module id and the symbol offset. */

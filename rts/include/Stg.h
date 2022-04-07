@@ -231,6 +231,16 @@
 #define STG_NO_OPTIMIZE /* nothing */
 #endif
 
+// Mark a function as accepting a printf-like format string.
+#if !defined(__GNUC__) && defined(mingw32_HOST_OS)
+/* On Win64, if we say "printf" then gcc thinks we are going to use
+   MS format specifiers like %I64d rather than %llu */
+#define STG_PRINTF_ATTR(fmt_arg, rest) GNUC3_ATTRIBUTE(format(gnu_printf, fmt_arg, rest))
+#else
+/* However, on OS X, "gnu_printf" isn't recognised */
+#define STG_PRINTF_ATTR(fmt_arg, rest) GNUC3_ATTRIBUTE(format(printf, fmt_arg, rest))
+#endif
+
 /* -----------------------------------------------------------------------------
    Global type definitions
    -------------------------------------------------------------------------- */

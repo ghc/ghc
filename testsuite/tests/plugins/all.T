@@ -99,7 +99,7 @@ test('plugins15',
 
 test('T10420',
      [extra_files(['rule-defining-plugin/']),
-
+      when(opsys('mingw32'), expect_broken(21322)),
       pre_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin package.T10420 TOP={top}')],
      makefile_test, [])
 
@@ -258,11 +258,13 @@ test('T20218b',
 
 test('test-defaulting-plugin',
      [extra_files(['defaulting-plugin/']),
+      when(opsys('mingw32'), fragile(21293)),
       pre_cmd('$MAKE -s --no-print-directory -C defaulting-plugin package.test-defaulting-plugin TOP={top}')],
      makefile_test, [])
 
 test('test-defaulting-plugin-fail',
      [extra_files(['defaulting-plugin/']),
+      when(opsys('mingw32'), fragile(21293)),
       pre_cmd('$MAKE -s --no-print-directory -C defaulting-plugin package.test-defaulting-plugin-fail TOP={top}')],
      makefile_test, [])
 

@@ -1,8 +1,11 @@
 {-# LANGUAGE MultiWayIf #-}
 
 module Oracles.Flag (
-    Flag (..), flag, getFlag, platformSupportsSharedLibs,
-    targetSupportsSMP, useLibffiForAdjustors
+    Flag (..), flag, getFlag,
+    platformSupportsSharedLibs,
+    platformSupportsGhciObjects,
+    targetSupportsSMP,
+    useLibffiForAdjustors
     ) where
 
 import Hadrian.Oracles.TextFile
@@ -59,6 +62,12 @@ flag f = do
 -- | Get a configuration setting.
 getFlag :: Flag -> Expr c b Bool
 getFlag = expr . flag
+
+-- | Does the platform support object merging (and therefore we can build GHCi objects
+-- when appropriate).
+platformSupportsGhciObjects :: Action Bool
+platformSupportsGhciObjects =
+    not . null <$> settingsFileSetting SettingsFileSetting_MergeObjectsCommand
 
 platformSupportsSharedLibs :: Action Bool
 platformSupportsSharedLibs = do
