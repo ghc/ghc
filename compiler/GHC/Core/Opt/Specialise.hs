@@ -67,6 +67,7 @@ import GHC.Utils.Trace
 import GHC.Unit.Module( Module )
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.External
+import GHC.Core.Unfold
 
 {-
 ************************************************************************
@@ -614,7 +615,8 @@ specProgram guts@(ModGuts { mg_module = this_mod
 
              go []           = return ([], emptyUDs)
              go (bind:binds) = do (binds', uds) <- go binds
-                                  (bind', uds') <- specBind top_env bind uds
+                                  let env = bringFloatedDictsIntoScope top_env uds
+                                  (bind', uds') <- specBind env bind uds
                                   return (bind' ++ binds', uds')
 
              -- Specialise the bindings of this module
@@ -1116,16 +1118,12 @@ specExpr env (Tick tickish body)
 
 ---------------- Applications might generate a call instance --------------------
 specExpr env expr@(App {})
-  = go expr []
-  where
-    go (App fun arg) args = do (arg', uds_arg) <- specExpr env arg
-                               (fun', uds_app) <- go fun (arg':args)
-                               return (App fun' arg', uds_arg `plusUDs` uds_app)
-
-    go (Var f)       args = case specVar env f of
-                                Var f' -> return (Var f', mkCallUDs env f' args)
-                                e'     -> return (e', emptyUDs) -- I don't expect this!
-    go other         _    = specExpr env other
+  = do { let (fun_in, args_in) = collectArgs expr
+       ; (args_out, uds_args) <- mapAndCombineSM (specExpr env) args_in
+       ; let (fun_in', args_out') = rewriteClassOps env fun_in args_out
+       ; (fun_out', uds_fun) <- specExpr env fun_in'
+       ; let uds_call = mkCallUDs env fun_out' args_out'
+       ; return (fun_out' `mkApps` args_out', uds_fun `plusUDs` uds_call `plusUDs` uds_args) }
 
 ---------------- Lambda/case require dumping of usage details --------------------
 specExpr env e@(Lam {})
@@ -1152,10 +1150,23 @@ specExpr env (Let bind body)
        ; (body', body_uds) <- specExpr body_env body
 
         -- Deal with the bindings
-      ; (binds', uds) <- specBind rhs_env bind' body_uds
+       ; let rhs_env' = bringFloatedDictsIntoScope rhs_env body_uds
+       ; (binds', uds) <- specBind rhs_env' bind' body_uds
 
-        -- All done
-      ; return (foldr Let body' binds', uds) }
+         -- All done
+       ; return (foldr Let body' binds', uds) }
+
+-- See Note [Specialisation modulo dictionary selectors]
+-- and Note [ClassOp/DFun selection]
+rewriteClassOps :: SpecEnv -> InExpr -> [OutExpr] -> (InExpr, [OutExpr])
+rewriteClassOps env (Var f) args
+  | isClassOpId f -- If we see `op_sel $fCInt`, we rewrite to `$copInt`
+  , Just (rule, expr) <- specLookupRule env f args (idCoreRules f)
+  , let rest_args = drop (ruleArity rule) args -- See Note [Extra args in the target]
+  -- , pprTrace "class op rewritten" (ppr f <+> ppr args $$ ppr expr <+> ppr rest_args) True
+  , (fun, args) <- collectArgs expr
+  = rewriteClassOps env fun (args++rest_args)
+rewriteClassOps _ fun args = (fun, args)
 
 --------------
 specLam :: SpecEnv -> [OutBndr] -> InExpr -> SpecM (OutExpr, UsageDetails)
@@ -1214,7 +1225,7 @@ specCase env scrut' case_bndr [Alt con args rhs]
                              | (sc_arg_flt, sc_rhs) <- sc_args_flt `zip` sc_rhss ]
              flt_binds     = scrut_bind : sc_binds
              (free_uds, dumped_dbs) = dumpUDs (case_bndr':args') rhs_uds
-             all_uds = flt_binds `addDictBinds` free_uds
+             all_uds = flt_binds `consDictBinds` free_uds
              alt'    = Alt con args' (wrapDictBindsE dumped_dbs rhs')
        ; return (Var case_bndr_flt, case_bndr', [alt'], all_uds) }
   where
@@ -1290,6 +1301,14 @@ to substitute sc -> sc_flt in the RHS
 ************************************************************************
 -}
 
+bringFloatedDictsIntoScope :: SpecEnv -> UsageDetails -> SpecEnv
+bringFloatedDictsIntoScope env uds =
+  -- pprTrace "brought into scope" (ppr dx_bndrs) $
+  env{se_subst=subst'}
+  where
+   dx_bndrs = ud_bs_of_binds uds
+   subst'   = se_subst env `Core.extendInScopeSet` dx_bndrs
+
 specBind :: SpecEnv                     -- Use this for RHSs
          -> CoreBind                    -- Binders are already cloned by cloneBindSM,
                                         -- but RHSs are un-processed
@@ -1302,12 +1321,12 @@ specBind :: SpecEnv                     -- Use this for RHSs
 specBind rhs_env (NonRec fn rhs) body_uds
   = do { (rhs', rhs_uds) <- specExpr rhs_env rhs
 
-        ; let zapped_fn = zapIdDemandInfo fn
+       ; let zapped_fn = zapIdDemandInfo fn
               -- We zap the demand info because the binding may float,
               -- which would invaidate the demand info (see #17810 for example).
               -- Destroying demand info is not terrible; specialisation is
               -- always followed soon by demand analysis.
-      ; (fn', spec_defns, body_uds1) <- specDefn rhs_env body_uds zapped_fn rhs
+       ; (fn', spec_defns, body_uds1) <- specDefn rhs_env body_uds zapped_fn rhs
 
        ; let pairs = spec_defns ++ [(fn', rhs')]
                         -- fn' mentions the spec_defns in its rules,
@@ -1461,7 +1480,6 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     is_local  = isLocalId fn
     is_dfun   = isDFunId fn
     dflags    = se_dflags env
-    ropts     = initRuleOpts dflags
     this_mod  = se_module env
         -- Figure out whether the function has an INLINE pragma
         -- See Note [Inline specialisations]
@@ -1469,13 +1487,9 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     (rhs_bndrs, rhs_body) = collectBindersPushingCo rhs
                             -- See Note [Account for casts in binding]
 
-    in_scope = Core.substInScope (se_subst env)
-
-    already_covered :: RuleOpts -> [CoreRule] -> [CoreExpr] -> Bool
-    already_covered ropts new_rules args      -- Note [Specialisations already covered]
-       = isJust (lookupRule ropts (in_scope, realIdUnfolding)
-                            (const True) fn args
-                            (new_rules ++ existing_rules))
+    already_covered :: [CoreRule] -> [CoreExpr] -> Bool
+    already_covered new_rules args      -- Note [Specialisations already covered]
+       = isJust (specLookupRule env fn args (new_rules ++ existing_rules))
          -- NB: we look both in the new_rules (generated by this invocation
          --     of specCalls), and in existing_rules (passed in to specCalls)
 
@@ -1493,7 +1507,8 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
              , rule_bndrs, rule_lhs_args
              , spec_bndrs1, dx_binds, spec_args) <- specHeader env rhs_bndrs all_call_args
 
---           ; pprTrace "spec_call" (vcat [ text "call info: " <+> ppr _ci
+--           ; pprTrace "spec_call" (vcat [ text "fun:       " <+> ppr fn
+--                                        , text "call info: " <+> ppr _ci
 --                                        , text "useful:    " <+> ppr useful
 --                                        , text "rule_bndrs:" <+> ppr rule_bndrs
 --                                        , text "lhs_args:  " <+> ppr rule_lhs_args
@@ -1505,7 +1520,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 --             return ()
 
            ; if not useful  -- No useful specialisation
-                || already_covered ropts rules_acc rule_lhs_args
+                || already_covered rules_acc rule_lhs_args
              then return spec_acc
              else
         do { -- Run the specialiser on the specialised RHS
@@ -1614,6 +1629,16 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                     , (spec_f_w_arity, spec_rhs) : pairs_acc
                     , spec_uds           `plusUDs` uds_acc
                     ) } }
+
+-- Convenience function for invoking lookupRule from Specialise
+specLookupRule :: SpecEnv -> Id -> [CoreExpr] -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
+specLookupRule env fn args rules
+  = lookupRule ropts (in_scope, realIdUnfolding) (const True) fn args rules
+  where
+    dflags   = se_dflags env
+    in_scope = Core.substInScope (se_subst env)
+    ropts    = initRuleOpts dflags
+
 
 {- Note [Specialising DFuns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1770,6 +1795,55 @@ Wrinkles
 
   The right thing to do is to produce a LitRubbish; it should rapidly
   disappear.  Rather like GHC.Core.Opt.WorkWrap.Utils.mk_absent_let.
+
+Note [Specialisation modulo dictionary selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In #19644, we discovered that the ClassOp/DFun rules from
+Note [ClassOp/DFun selection] inhibit transitive specialisation.
+Example, inspired by T17966:
+
+  class C a where
+    m :: Show b => a -> b -> String
+    dummy :: a -> () -- Force a datatype dictionary representation
+
+  instance C Int where
+    m a b = show a ++ show b
+    dummy _ = ()
+
+  f :: (C a, Show b) => a -> b -> String
+  f a b = m a b ++ "!"
+  {-# INLINABLE[0] f #-}
+
+  main = putStrLn (f (42::Int) (True::Bool))
+
+Here, we specialise `f` at `Int` and `Bool`, giving
+
+  $dC = $fCInt
+  $dShow = GHC.Show.$fShowBool
+  $sf (a::Int) (b::Bool) =
+        ... (m @Int $dC @Bool $dShow a b) ...
+
+Here `m` is just a DictSel, so there is (apparently) nothing to specialise!
+However, the next Simplifier run will expose the rewritten instance method:
+
+  ... $fCInt_$cm @Bool $fShowBool a b ...
+
+where $fCInt_$cm is the instance method for `m` in `instance C Int`:
+
+   $fCInt_$cm :: forall b. Show b => Int -> b -> String
+   $fCInt_$cm b d x y = show @Int $dShowInt x ++ show @b d y
+
+We want to specialise this! How? By doing the the method-selection rewrite in
+the Specialiser. Hence
+
+1. In the App case of 'specExpr', try to apply the ClassOp/DFun rule on the
+   head of the application, repeatedly, via 'rewriteClassOps'.
+2. Attach an unfolding to freshly-bound dictionary ids such as `$dC` and
+   `$dShow` in `bindAuxiliaryDict`, so that we can exploit the unfolding
+   in 'rewriteClassOps' to do the ClassOp/DFun rewrite.
+
+NB: Without (2), (1) would be pointless, because 'lookupRule' wouldn't be able
+to look into the RHS of `$dC` to see the DFun.
 
 Note [Zap occ info in rule binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2403,15 +2477,21 @@ bindAuxiliaryDict env@(SE { se_subst = subst, se_interesting = interesting })
                                 `Core.extendInScope` dict_id
                           -- See Note [Keep the old dictionaries interesting]
                    , se_interesting = interesting `extendVarSet` dict_id }
-    in (env', Nothing, dict_expr)
+    in -- pprTrace "bindAuxiliaryDict:trivial" (ppr orig_dict_id <+> ppr dict_id) $
+       (env', Nothing, dict_expr)
 
   | otherwise  -- Non-trivial dictionary arg; make an auxiliary binding
-  = let dict_bind = mkDB (NonRec fresh_dict_id dict_expr)
-        env' = env { se_subst = Core.extendSubst subst orig_dict_id (Var fresh_dict_id)
-                                `Core.extendInScope` fresh_dict_id
+  = let dict_unf       = mkSimpleUnfolding defaultUnfoldingOpts dict_expr
+        fresh_dict_id' = fresh_dict_id `setIdUnfolding` dict_unf
+          -- See Note [Specialisation modulo dictionary selectors] for the unfolding
+        dict_bind = mkDB (NonRec fresh_dict_id' dict_expr)
+        env' = env { se_subst = Core.extendSubst subst orig_dict_id (Var fresh_dict_id')
+                                `Core.extendInScope`     fresh_dict_id'
+                                `Core.extendInScopeList` exprFreeVarsList dict_expr
                       -- See Note [Make the new dictionaries interesting]
-                   , se_interesting = interesting `extendVarSet` fresh_dict_id }
-    in (env', Just dict_bind, Var fresh_dict_id)
+                   , se_interesting = interesting `extendVarSet` fresh_dict_id' }
+    in -- pprTrace "bindAuxiliaryDict:non-trivial" (ppr orig_dict_id <+> ppr fresh_dict_id' $$ ppr dict_expr $$ ppr (exprFreeVarsList dict_expr)) $
+       (env', Just dict_bind, Var fresh_dict_id')
 
 {-
 Note [Make the new dictionaries interesting]
@@ -2480,6 +2560,12 @@ data UsageDetails
                -- in ds1 `union` ds2, bindings in ds2 can depend on those in ds1
                -- (Remember, Bags preserve order in GHC.)
 
+      ud_bs_of_binds :: !IdSet,
+               -- ^ The binders of 'ud_binds'.
+               -- Caches a superset of the expression
+               --   `mkVarSet (bindersOfDictBinds ud_binds))`
+               -- for later addition to an InScopeSet
+
       ud_calls :: !CallDetails
 
       -- INVARIANT: suppose bs = bindersOf ud_binds
@@ -2490,6 +2576,12 @@ data UsageDetails
 -- | A 'DictBind' is a binding along with a cached set containing its free
 -- variables (both type variables and dictionaries)
 data DictBind = DB { db_bind :: CoreBind, db_fvs :: VarSet }
+
+bindersOfDictBind :: DictBind -> [Id]
+bindersOfDictBind = bindersOf . db_bind
+
+bindersOfDictBinds :: Foldable f => f DictBind -> [Id]
+bindersOfDictBinds = bindersOfBinds . foldr ((:) . db_bind) []
 
 {- Note [Floated dictionary bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2516,6 +2608,10 @@ successfully specialise 'f'.
 
 So the DictBinds in (ud_binds :: Bag DictBind) may contain
 non-dictionary bindings too.
+
+It's important to add the dictionary binders that are currently in-float to the
+InScopeSet of the SpecEnv before calling 'specBind'. That's what we do when we
+call 'bringFloatedDictsIntoScope'.
 
 Note [Specialising polymorphic dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2584,7 +2680,9 @@ instance Outputable UsageDetails where
                  text "calls" <+> equals <+> ppr calls]))
 
 emptyUDs :: UsageDetails
-emptyUDs = MkUD { ud_binds = emptyBag, ud_calls = emptyDVarEnv }
+emptyUDs = MkUD { ud_binds       = emptyBag
+                , ud_bs_of_binds = emptyVarSet
+                , ud_calls       = emptyDVarEnv }
 
 ------------------------------------------------------------
 type CallDetails  = DIdEnv CallInfoSet
@@ -2653,7 +2751,7 @@ getTheta = fmap tyBinderType . filter isInvisibleBinder . filter (not . isNamedB
 ------------------------------------------------------------
 singleCall :: Id -> [SpecArg] -> UsageDetails
 singleCall id args
-  = MkUD {ud_binds = emptyBag,
+  = MkUD {ud_binds = emptyBag, ud_bs_of_binds = emptyVarSet,
           ud_calls = unitDVarEnv id $ CIS id $
                      unitBag (CI { ci_key  = args -- used to be tys
                                  , ci_fvs  = call_fvs }) }
@@ -2669,13 +2767,15 @@ singleCall id args
         --
         -- We don't include the 'id' itself.
 
-mkCallUDs, mkCallUDs' :: SpecEnv -> Id -> [CoreExpr] -> UsageDetails
-mkCallUDs env f args
-  = -- pprTrace "mkCallUDs" (vcat [ ppr f, ppr args, ppr res ])
-    res
-  where
-    res = mkCallUDs' env f args
+mkCallUDs :: SpecEnv -> OutExpr -> [OutExpr] -> UsageDetails
+mkCallUDs env fun args
+  | Var f <- fun
+  = -- pprTraceWith "mkCallUDs" (\res -> vcat [ ppr f, ppr args, ppr res ]) $
+    mkCallUDs' env f args
+  | otherwise
+  = emptyUDs
 
+mkCallUDs' :: SpecEnv -> Id -> [OutExpr] -> UsageDetails
 mkCallUDs' env f args
   | wantCallsFor env f    -- We want it, and...
   , not (null ci_key)     -- this call site has a useful specialisation
@@ -2699,7 +2799,7 @@ mkCallUDs' env f args
              -- which broadens its applicability, since rules only
              -- fire when saturated
 
-    mk_spec_arg :: CoreExpr -> TyCoBinder -> SpecArg
+    mk_spec_arg :: OutExpr -> TyCoBinder -> SpecArg
     mk_spec_arg arg (Named bndr)
       |  binderVar bndr `elemVarSet` constrained_tyvars
       = case arg of
@@ -2797,10 +2897,11 @@ interestingDict env (Cast e _)            = interestingDict env e
 interestingDict _ _                       = True
 
 plusUDs :: UsageDetails -> UsageDetails -> UsageDetails
-plusUDs (MkUD {ud_binds = db1, ud_calls = calls1})
-        (MkUD {ud_binds = db2, ud_calls = calls2})
-  = MkUD { ud_binds = db1    `unionBags`   db2
-         , ud_calls = calls1 `unionCalls`  calls2 }
+plusUDs (MkUD {ud_binds = db1, ud_bs_of_binds = bs1, ud_calls = calls1})
+        (MkUD {ud_binds = db2, ud_bs_of_binds = bs2, ud_calls = calls2})
+  = MkUD { ud_binds       = db1    `unionBags`   db2
+         , ud_bs_of_binds = bs1    `unionVarSet` bs2
+         , ud_calls       = calls1 `unionCalls`  calls2 }
 
 -----------------------------
 _dictBindBndrs :: Bag DictBind -> [Id]
@@ -2851,19 +2952,26 @@ recWithDumpedDicts pairs dbs
       where
         fvs' = fvs_acc `unionVarSet` fvs
 
+snocDictBind :: UsageDetails -> DictBind -> UsageDetails
+snocDictBind uds@MkUD{ud_binds=dbs,ud_bs_of_binds=bs} db
+  = uds { ud_binds       = dbs `snocBag` db
+        , ud_bs_of_binds = bs  `extendVarSetList` bindersOfDictBind db }
+
 snocDictBinds :: UsageDetails -> [DictBind] -> UsageDetails
 -- Add ud_binds to the tail end of the bindings in uds
-snocDictBinds uds dbs
-  = uds { ud_binds = ud_binds uds `unionBags` listToBag dbs }
+snocDictBinds uds@MkUD{ud_binds=binds,ud_bs_of_binds=bs} dbs
+  = uds { ud_binds       = binds `unionBags`        listToBag dbs
+        , ud_bs_of_binds = bs    `extendVarSetList` bindersOfDictBinds dbs }
 
 consDictBind :: DictBind -> UsageDetails -> UsageDetails
-consDictBind bind uds = uds { ud_binds = bind `consBag` ud_binds uds }
+consDictBind db uds@MkUD{ud_binds=binds,ud_bs_of_binds=bs}
+  = uds { ud_binds       = db `consBag` binds
+        , ud_bs_of_binds = bs `extendVarSetList` bindersOfDictBind db }
 
-addDictBinds :: [DictBind] -> UsageDetails -> UsageDetails
-addDictBinds binds uds = uds { ud_binds = listToBag binds `unionBags` ud_binds uds }
-
-snocDictBind :: UsageDetails -> DictBind -> UsageDetails
-snocDictBind uds bind = uds { ud_binds = ud_binds uds `snocBag` bind }
+consDictBinds :: [DictBind] -> UsageDetails -> UsageDetails
+consDictBinds dbs uds@MkUD{ud_binds=binds,ud_bs_of_binds=bs}
+  = uds { ud_binds       = listToBag dbs `unionBags` binds
+        , ud_bs_of_binds = bs `extendVarSetList` bindersOfDictBinds dbs }
 
 wrapDictBinds :: Bag DictBind -> [CoreBind] -> [CoreBind]
 wrapDictBinds dbs binds
@@ -2880,14 +2988,15 @@ wrapDictBindsE dbs expr
 ----------------------
 dumpUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, Bag DictBind)
 -- Used at a lambda or case binder; just dump anything mentioning the binder
-dumpUDs bndrs uds@(MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
+dumpUDs bndrs uds@(MkUD { ud_binds = orig_dbs, ud_bs_of_binds = bs, ud_calls = orig_calls })
   | null bndrs = (uds, emptyBag)  -- Common in case alternatives
   | otherwise  = -- pprTrace "dumpUDs" (ppr bndrs $$ ppr free_uds $$ ppr dump_dbs) $
                  (free_uds, dump_dbs)
   where
-    free_uds = MkUD { ud_binds = free_dbs, ud_calls = free_calls }
+    free_uds = uds { ud_binds = free_dbs, ud_bs_of_binds = free_bs, ud_calls = free_calls }
     bndr_set = mkVarSet bndrs
     (free_dbs, dump_dbs, dump_set) = splitDictBinds orig_dbs bndr_set
+    free_bs = bs `minusVarSet` dump_set
     free_calls = deleteCallsMentioning dump_set $   -- Drop calls mentioning bndr_set on the floor
                  deleteCallsFor bndrs orig_calls    -- Discard calls for bndr_set; there should be
                                                     -- no calls for any of the dicts in dump_dbs
@@ -2898,28 +3007,27 @@ dumpBindUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, Bag DictBind, Bool)
 -- directly or indirectly, by any of the ud_calls; in that case we want to
 -- float the binding itself;
 -- See Note [Floated dictionary bindings]
-dumpBindUDs bndrs (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
+dumpBindUDs bndrs (MkUD { ud_binds = orig_dbs, ud_bs_of_binds = bs, ud_calls = orig_calls })
   = -- pprTrace "dumpBindUDs" (ppr bndrs $$ ppr free_uds $$ ppr dump_dbs) $
     (free_uds, dump_dbs, float_all)
   where
-    free_uds = MkUD { ud_binds = free_dbs, ud_calls = free_calls }
+    free_uds = MkUD { ud_binds = free_dbs, ud_bs_of_binds = free_bs, ud_calls = free_calls }
     bndr_set = mkVarSet bndrs
     (free_dbs, dump_dbs, dump_set) = splitDictBinds orig_dbs bndr_set
+    free_bs = bs `minusVarSet` dump_set
     free_calls = deleteCallsFor bndrs orig_calls
     float_all = dump_set `intersectsVarSet` callDetailsFVs free_calls
 
 callsForMe :: Id -> UsageDetails -> (UsageDetails, [CallInfo])
-callsForMe fn (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
+callsForMe fn uds@MkUD { ud_binds = orig_dbs, ud_calls = orig_calls }
   = -- pprTrace ("callsForMe")
     --          (vcat [ppr fn,
     --                 text "Orig dbs ="     <+> ppr (_dictBindBndrs orig_dbs),
     --                 text "Orig calls ="   <+> ppr orig_calls,
-    --                 text "Dep set ="      <+> ppr dep_set,
     --                 text "Calls for me =" <+> ppr calls_for_me]) $
     (uds_without_me, calls_for_me)
   where
-    uds_without_me = MkUD { ud_binds = orig_dbs
-                          , ud_calls = delDVarEnv orig_calls fn }
+    uds_without_me = uds { ud_calls = delDVarEnv orig_calls fn }
     calls_for_me = case lookupDVarEnv orig_calls fn of
                         Nothing -> []
                         Just cis -> filterCalls cis orig_dbs

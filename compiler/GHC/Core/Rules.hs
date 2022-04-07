@@ -522,11 +522,14 @@ matchRule :: RuleOpts -> InScopeEnv -> (Activation -> Bool)
 --               [f,map g x]            -- tpl_args
 --               map (f.g) x)           -- rhs
 --
--- Then the call: matchRule the_rule [e1,map e2 e3]
+-- Then the expression
+--      map e1 (map e2 e3) e4
+-- results in a call to
+--      matchRule the_rule [e1,map e2 e3,e4]
 --        = Just ("map/map", (\f,g,x -> rhs) e1 e2 e3)
 --
--- Any 'surplus' arguments in the input are simply put on the end
--- of the output.
+-- NB: The 'surplus' argument e4 in the input is simply dropped.
+-- See Note [Extra args in the target]
 
 matchRule opts rule_env _is_active fn args _rough_args
           (BuiltinRule { ru_try = match_fn })

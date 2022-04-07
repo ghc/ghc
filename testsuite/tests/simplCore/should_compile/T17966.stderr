@@ -1,0 +1,310 @@
+
+==================== Specialise ====================
+Result size of Specialise
+  = {terms: 166, types: 158, coercions: 24, joins: 0/0}
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+$dShow_sRN :: Show (Maybe Integer)
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=True,
+         WorkFree=False, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$dShow_sRN = GHC.Show.$fShowMaybe @Integer GHC.Show.$fShowInteger
+
+Rec {
+-- RHS size: {terms: 2, types: 1, coercions: 4, joins: 0/0}
+$dC_sRM :: C Bool ()
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=False, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 60}]
+$dC_sRM
+  = ($cm_aHo @() GHC.Show.$fShow())
+    `cast` (Sym (T17966.N:C[0] <Bool>_N <()>_N)
+            :: (forall c. Show c => Bool -> () -> c -> String) ~R# C Bool ())
+
+-- RHS size: {terms: 30, types: 24, coercions: 0, joins: 0/0}
+$s$cm_sRQ [InlPrag=[0]]
+  :: forall {c}. Show c => Bool -> () -> c -> [Char]
+[LclId, Arity=4]
+$s$cm_sRQ
+  = \ (@c_aHr)
+      ($dShow_aHs :: Show c_aHr)
+      (a_aBf :: Bool)
+      (b_aBg :: ())
+      (c_aBh :: c_aHr) ->
+      GHC.Base.augment
+        @Char
+        (\ (@b_aQg)
+           (c_aQh [OS=OneShot] :: Char -> b_aQg -> b_aQg)
+           (n_aQi [OS=OneShot] :: b_aQg) ->
+           GHC.Base.foldr
+             @Char
+             @b_aQg
+             c_aQh
+             n_aQi
+             (case a_aBf of {
+                False -> GHC.Show.$fShowBool5;
+                True -> GHC.Show.$fShowBool4
+              }))
+        (GHC.Base.augment
+           @Char
+           (\ (@b_aQg)
+              (c_aQh [OS=OneShot] :: Char -> b_aQg -> b_aQg)
+              (n_aQi [OS=OneShot] :: b_aQg) ->
+              GHC.Base.foldr
+                @Char @b_aQg c_aQh n_aQi (GHC.Show.$fShow()_$cshow b_aBg))
+           (show @c_aHr $dShow_aHs c_aBh))
+
+-- RHS size: {terms: 33, types: 28, coercions: 0, joins: 0/0}
+$cm_aHo [InlPrag=INLINABLE[0]]
+  :: forall b c. (Show b, Show c) => Bool -> b -> c -> String
+[LclId,
+ Arity=5,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [30 30 30 0 0] 140 0
+         Tmpl= \ (@b_aHl)
+                 ($dShow_aHm [Occ=Once1] :: Show b_aHl)
+                 (@c_aHr)
+                 ($dShow_aHs [Occ=Once1] :: Show c_aHr)
+                 (a_aBf [Occ=Once1!] :: Bool)
+                 (b_aBg [Occ=Once1] :: b_aHl)
+                 (c_aBh [Occ=Once1] :: c_aHr) ->
+                 ++
+                   @Char
+                   (case a_aBf of {
+                      False -> GHC.Show.$fShowBool5;
+                      True -> GHC.Show.$fShowBool4
+                    })
+                   (++
+                      @Char
+                      (show @b_aHl $dShow_aHm b_aBg)
+                      (show @c_aHr $dShow_aHs c_aBh))},
+ RULES: "SPEC $cm @()" [0]
+            forall ($dShow_sRP :: Show ()). $cm_aHo @() $dShow_sRP = $s$cm_sRQ]
+$cm_aHo
+  = \ (@b_aHl)
+      ($dShow_aHm :: Show b_aHl)
+      (@c_aHr)
+      ($dShow_aHs :: Show c_aHr)
+      (a_aBf :: Bool)
+      (b_aBg :: b_aHl)
+      (c_aBh :: c_aHr) ->
+      GHC.Base.augment
+        @Char
+        (\ (@b_aQg)
+           (c_aQh [OS=OneShot] :: Char -> b_aQg -> b_aQg)
+           (n_aQi [OS=OneShot] :: b_aQg) ->
+           GHC.Base.foldr
+             @Char
+             @b_aQg
+             c_aQh
+             n_aQi
+             (case a_aBf of {
+                False -> GHC.Show.$fShowBool5;
+                True -> GHC.Show.$fShowBool4
+              }))
+        (GHC.Base.augment
+           @Char
+           (\ (@b_aQg)
+              (c_aQh [OS=OneShot] :: Char -> b_aQg -> b_aQg)
+              (n_aQi [OS=OneShot] :: b_aQg) ->
+              GHC.Base.foldr
+                @Char @b_aQg c_aQh n_aQi (show @b_aHl $dShow_aHm b_aBg))
+           (show @c_aHr $dShow_aHs c_aBh))
+end Rec }
+
+-- RHS size: {terms: 1, types: 0, coercions: 10, joins: 0/0}
+T17966.$fCBoolb [InlPrag=INLINE (sat-args=0)]
+  :: forall b. Show b => C Bool b
+[LclIdX[DFunId(nt)],
+ Arity=5,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=True)
+         Tmpl= $cm_aHo
+               `cast` (forall (b :: <*>_N).
+                       <Show b>_R %<'Many>_N ->_R Sym (T17966.N:C[0] <Bool>_N <b>_N)
+                       :: (forall {b} c. (Show b, Show c) => Bool -> b -> c -> String)
+                          ~R# (forall {b}. Show b => C Bool b))}]
+T17966.$fCBoolb
+  = $cm_aHo
+    `cast` (forall (b :: <*>_N).
+            <Show b>_R %<'Many>_N ->_R Sym (T17966.N:C[0] <Bool>_N <b>_N)
+            :: (forall {b} c. (Show b, Show c) => Bool -> b -> c -> String)
+               ~R# (forall {b}. Show b => C Bool b))
+
+-- RHS size: {terms: 18, types: 15, coercions: 3, joins: 0/0}
+$sf_sRO [InlPrag=[0]] :: Bool -> () -> Maybe Integer -> [Char]
+[LclId, Arity=3]
+$sf_sRO
+  = \ (a_aBl :: Bool) (b_aBm :: ()) (c_aBn :: Maybe Integer) ->
+      GHC.Base.build
+        @Char
+        (\ (@b_aQz)
+           (c_aQA [OS=OneShot] :: Char -> b_aQz -> b_aQz)
+           (n_aQB [OS=OneShot] :: b_aQz) ->
+           GHC.Base.foldr
+             @Char
+             @b_aQz
+             c_aQA
+             (GHC.CString.unpackFoldrCString# @b_aQz "!"# c_aQA n_aQB)
+             (($dC_sRM
+               `cast` (T17966.N:C[0] <Bool>_N <()>_N
+                       :: C Bool () ~R# (forall c. Show c => Bool -> () -> c -> String)))
+                @(Maybe Integer) $dShow_sRN a_aBl b_aBm c_aBn))
+
+-- RHS size: {terms: 23, types: 21, coercions: 3, joins: 0/0}
+f [InlPrag=INLINABLE[0]]
+  :: forall a b c. (C a b, Show c) => a -> b -> c -> String
+[LclIdX,
+ Arity=5,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 0 0 0 0] 120 0
+         Tmpl= \ (@a_aFi)
+                 (@b_aFj)
+                 (@c_aFk)
+                 ($dC_aFl [Occ=Once1] :: C a_aFi b_aFj)
+                 ($dShow_aFm [Occ=Once1] :: Show c_aFk)
+                 (a_aBl [Occ=Once1] :: a_aFi)
+                 (b_aBm [Occ=Once1] :: b_aFj)
+                 (c_aBn [Occ=Once1] :: c_aFk) ->
+                 ++
+                   @Char
+                   (($dC_aFl
+                     `cast` (T17966.N:C[0] <a_aFi>_N <b_aFj>_N
+                             :: C a_aFi b_aFj
+                                ~R# (forall c. Show c => a_aFi -> b_aFj -> c -> String)))
+                      @c_aFk $dShow_aFm a_aBl b_aBm c_aBn)
+                   (GHC.CString.unpackCString# "!"#)},
+ RULES: "SPEC f @Bool @() @(Maybe Integer)" [0]
+            forall ($dC_sRM :: C Bool ()) ($dShow_sRN :: Show (Maybe Integer)).
+              f @Bool @() @(Maybe Integer) $dC_sRM $dShow_sRN
+              = $sf_sRO]
+f = \ (@a_aFi)
+      (@b_aFj)
+      (@c_aFk)
+      ($dC_aFl :: C a_aFi b_aFj)
+      ($dShow_aFm :: Show c_aFk)
+      (a_aBl :: a_aFi)
+      (b_aBm :: b_aFj)
+      (c_aBn :: c_aFk) ->
+      GHC.Base.build
+        @Char
+        (\ (@b_aQz)
+           (c_aQA [OS=OneShot] :: Char -> b_aQz -> b_aQz)
+           (n_aQB [OS=OneShot] :: b_aQz) ->
+           GHC.Base.foldr
+             @Char
+             @b_aQz
+             c_aQA
+             (GHC.CString.unpackFoldrCString# @b_aQz "!"# c_aQA n_aQB)
+             (($dC_aFl
+               `cast` (T17966.N:C[0] <a_aFi>_N <b_aFj>_N
+                       :: C a_aFi b_aFj
+                          ~R# (forall c. Show c => a_aFi -> b_aFj -> c -> String)))
+                @c_aFk $dShow_aFm a_aBl b_aBm c_aBn))
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_sRG :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$trModule_sRG = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_sRH :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule_sRH = GHC.Types.TrNameS $trModule_sRG
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_sRI :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+$trModule_sRI = "T17966"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_sRJ :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule_sRJ = GHC.Types.TrNameS $trModule_sRI
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T17966.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T17966.$trModule = GHC.Types.Module $trModule_sRH $trModule_sRJ
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep_aPr [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_aPr
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcConstraint (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_aPq [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_aPq = GHC.Types.KindRepFun GHC.Types.krep$* $krep_aPr
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_aPp [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_aPp = GHC.Types.KindRepFun GHC.Types.krep$* $krep_aPq
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tcC_sRK :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$tcC_sRK = "C"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tcC_sRL :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$tcC_sRL = GHC.Types.TrNameS $tcC_sRK
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T17966.$tcC :: GHC.Types.TyCon
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T17966.$tcC
+  = GHC.Types.TyCon
+      12503088876068780286##64
+      926716241154773768##64
+      T17966.$trModule
+      $tcC_sRL
+      0#
+      $krep_aPp
+
+-- RHS size: {terms: 10, types: 7, coercions: 4, joins: 0/0}
+x :: String
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 120 0}]
+x = f @Bool
+      @()
+      @(Maybe Integer)
+      (($cm_aHo @() GHC.Show.$fShow())
+       `cast` (Sym (T17966.N:C[0] <Bool>_N <()>_N)
+               :: (forall c. Show c => Bool -> () -> c -> String) ~R# C Bool ()))
+      (GHC.Show.$fShowMaybe @Integer GHC.Show.$fShowInteger)
+      GHC.Types.True
+      GHC.Tuple.()
+      (GHC.Maybe.Just @Integer (GHC.Num.Integer.IS 42#))
+
+
+

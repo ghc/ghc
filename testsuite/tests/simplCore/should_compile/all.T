@@ -136,7 +136,9 @@ test('T5366',
 test('T7796', [], makefile_test, ['T7796'])
 test('T5550', omit_ways(prof_ways), compile, [''])
 test('T7865', normal, makefile_test, ['T7865'])
-test('T7785', only_ways(['optasm']), compile, ['-ddump-rules'])
+# T7785: Check that we generate the specialising RULE. Might not be listed in
+#        -ddump-rules because of Note [Trimming auto-rules], hence grep
+test('T7785', [ only_ways(['optasm']), grep_errmsg(r'RULE') ], compile, ['-ddump-spec'])
 test('T7702',
      [extra_files(['T7702plugin']),
       pre_cmd('$MAKE -s --no-print-directory -C T7702plugin package.T7702 TOP={top}'),
@@ -308,9 +310,6 @@ test('T17901',
      makefile_test, ['T17901'])
 test('T17930', [ grep_errmsg(r'^\$sfoo') ], compile, ['-O -ddump-spec -dsuppress-uniques -dsuppress-idinfo'])
 test('spec004', [ grep_errmsg(r'\$sfoo') ], compile, ['-O -ddump-spec -dsuppress-uniques'])
-test('T17966',
-     normal,
-     makefile_test, ['T17966'])
 # NB: T17810: -fspecialise-aggressively
 test('T17810', normal, multimod_compile, ['T17810', '-fspecialise-aggressively -dcore-lint -O -v0'])
 test('T18013', normal, multimod_compile, ['T18013', '-v0 -O'])
@@ -399,3 +398,8 @@ test('T20040', [ grep_errmsg(r'ifoldl\''), expect_broken(20040) ], compile, ['-O
 
 # Key here is that yes* become visibly trivial due to eta-reduction, while no* are not eta-reduced.
 test('T21261', [ grep_errmsg(r'^(yes|no)') ], compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
+
+# We expect to see a SPEC rule for $cm
+test('T17966',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])
+# We expect to see a SPEC rule for $cm
+test('T19644',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])

@@ -1,0 +1,246 @@
+
+==================== Specialise ====================
+Result size of Specialise
+  = {terms: 134, types: 114, coercions: 3, joins: 0/0}
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+$cdummy_aPi :: Int -> ()
+[LclId,
+ Arity=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+$cdummy_aPi = \ _ [Occ=Dead] -> GHC.Tuple.()
+
+-- RHS size: {terms: 17, types: 13, coercions: 0, joins: 0/0}
+$s$cm_sZO :: Int -> Bool -> [Char]
+[LclId, Arity=2]
+$s$cm_sZO
+  = \ (a_aBe :: Int) (b_aBf :: Bool) ->
+      GHC.Base.augment
+        @Char
+        (\ (@b_aQs)
+           (c_aQt [OS=OneShot] :: Char -> b_aQs -> b_aQs)
+           (n_aQu [OS=OneShot] :: b_aQs) ->
+           GHC.Base.foldr
+             @Char
+             @b_aQs
+             c_aQt
+             n_aQu
+             (case a_aBe of { GHC.Types.I# n_aQz ->
+              GHC.Show.itos n_aQz (GHC.Types.[] @Char)
+              }))
+        (GHC.Show.$fShowBool_$cshow b_aBf)
+
+-- RHS size: {terms: 20, types: 17, coercions: 0, joins: 0/0}
+$cm_aP5 :: forall b. Show b => Int -> b -> String
+[LclId,
+ Arity=3,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 20 0] 130 40},
+ RULES: "SPEC $cm @Bool"
+            forall ($dShow_sZN :: Show Bool).
+              $cm_aP5 @Bool $dShow_sZN
+              = $s$cm_sZO]
+$cm_aP5
+  = \ (@b_aP8)
+      ($dShow_aP9 :: Show b_aP8)
+      (a_aBe :: Int)
+      (b_aBf :: b_aP8) ->
+      GHC.Base.augment
+        @Char
+        (\ (@b_aQs)
+           (c_aQt [OS=OneShot] :: Char -> b_aQs -> b_aQs)
+           (n_aQu [OS=OneShot] :: b_aQs) ->
+           GHC.Base.foldr
+             @Char
+             @b_aQs
+             c_aQt
+             n_aQu
+             (case a_aBe of { GHC.Types.I# n_aQz ->
+              GHC.Show.itos n_aQz (GHC.Types.[] @Char)
+              }))
+        (show @b_aP8 $dShow_aP9 b_aBf)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+T19644.$fCInt [InlPrag=CONLIKE] :: C Int
+[LclIdX[DFunId],
+ Unf=DFun: \ -> T19644.C:C TYPE: Int $cm_aP5 $cdummy_aPi]
+T19644.$fCInt = T19644.C:C @Int $cm_aP5 $cdummy_aPi
+
+-- RHS size: {terms: 16, types: 12, coercions: 0, joins: 0/0}
+$sf_sZM [InlPrag=[0]] :: Int -> Bool -> [Char]
+[LclId, Arity=2]
+$sf_sZM
+  = \ (a_aBi :: Int) (b_aBj :: Bool) ->
+      GHC.Base.build
+        @Char
+        (\ (@b_aQT)
+           (c_aQU [OS=OneShot] :: Char -> b_aQT -> b_aQT)
+           (n_aQV [OS=OneShot] :: b_aQT) ->
+           GHC.Base.foldr
+             @Char
+             @b_aQT
+             c_aQU
+             (GHC.CString.unpackFoldrCString# @b_aQT "!"# c_aQU n_aQV)
+             ($cm_aP5 @Bool GHC.Show.$fShowBool a_aBi b_aBj))
+
+-- RHS size: {terms: 21, types: 19, coercions: 0, joins: 0/0}
+f [InlPrag=INLINABLE[0]]
+  :: forall a b. (C a, Show b) => a -> b -> String
+[LclIdX,
+ Arity=4,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 0 0 0] 120 0
+         Tmpl= \ (@a_aOm)
+                 (@b_aOn)
+                 ($dC_aOo [Occ=Once1] :: C a_aOm)
+                 ($dShow_aOp [Occ=Once1] :: Show b_aOn)
+                 (a_aBi [Occ=Once1] :: a_aOm)
+                 (b_aBj [Occ=Once1] :: b_aOn) ->
+                 ++
+                   @Char
+                   (m @a_aOm $dC_aOo @b_aOn $dShow_aOp a_aBi b_aBj)
+                   (GHC.CString.unpackCString# "!"#)},
+ RULES: "SPEC f @Int @Bool" [0]
+            forall ($dC_sZK :: C Int) ($dShow_sZL :: Show Bool).
+              f @Int @Bool $dC_sZK $dShow_sZL
+              = $sf_sZM]
+f = \ (@a_aOm)
+      (@b_aOn)
+      ($dC_aOo :: C a_aOm)
+      ($dShow_aOp :: Show b_aOn)
+      (a_aBi :: a_aOm)
+      (b_aBj :: b_aOn) ->
+      GHC.Base.build
+        @Char
+        (\ (@b_aQT)
+           (c_aQU [OS=OneShot] :: Char -> b_aQT -> b_aQT)
+           (n_aQV [OS=OneShot] :: b_aQT) ->
+           GHC.Base.foldr
+             @Char
+             @b_aQT
+             c_aQU
+             (GHC.CString.unpackFoldrCString# @b_aQT "!"# c_aQU n_aQV)
+             (m @a_aOm $dC_aOo @b_aOn $dShow_aOp a_aBi b_aBj))
+
+-- RHS size: {terms: 6, types: 2, coercions: 0, joins: 0/0}
+main_sZC :: String
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 60 0}]
+main_sZC
+  = f @Int
+      @Bool
+      T19644.$fCInt
+      GHC.Show.$fShowBool
+      (GHC.Types.I# 42#)
+      GHC.Types.True
+
+-- RHS size: {terms: 4, types: 0, coercions: 0, joins: 0/0}
+main_sZD
+  :: GHC.Prim.State# GHC.Prim.RealWorld
+     -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #)
+[LclId,
+ Arity=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 60}]
+main_sZD
+  = GHC.IO.Handle.Text.hPutStr2
+      GHC.IO.Handle.FD.stdout main_sZC GHC.Types.True
+
+-- RHS size: {terms: 1, types: 0, coercions: 3, joins: 0/0}
+main :: IO ()
+[LclIdX,
+ Arity=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+main
+  = main_sZD
+    `cast` (Sym (GHC.Types.N:IO[0] <()>_R)
+            :: (GHC.Prim.State# GHC.Prim.RealWorld
+                -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))
+               ~R# IO ())
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_sZE :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$trModule_sZE = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_sZF :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule_sZF = GHC.Types.TrNameS $trModule_sZE
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_sZG :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+$trModule_sZG = "T19644"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_sZH :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule_sZH = GHC.Types.TrNameS $trModule_sZG
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T19644.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T19644.$trModule = GHC.Types.Module $trModule_sZF $trModule_sZH
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep_aPH [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_aPH
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcConstraint (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_aPG [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_aPG = GHC.Types.KindRepFun GHC.Types.krep$* $krep_aPH
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tcC_sZI :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$tcC_sZI = "C"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tcC_sZJ :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$tcC_sZJ = GHC.Types.TrNameS $tcC_sZI
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T19644.$tcC :: GHC.Types.TyCon
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T19644.$tcC
+  = GHC.Types.TyCon
+      3363473062474234294##64
+      5379444656532611026##64
+      T19644.$trModule
+      $tcC_sZJ
+      0#
+      $krep_aPG
+
+
+

@@ -45,7 +45,7 @@ import GHC.Core.Multiplicity
 -- We have two sorts of substitution:
 --   GHC.Core.Subst.Subst, and GHC.Core.TyCo.TCvSubst
 -- Both have substTy, substCo  Hence need for qualification
-import GHC.Core.Subst    as Core
+import GHC.Core.Subst    as Core hiding ( extendInScopeSet )
 import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
 

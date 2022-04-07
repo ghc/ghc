@@ -88,7 +88,7 @@ import GHC.Core.DataCon
 import GHC.Core.Utils
 import GHC.Core.Make
 import GHC.Core.FVs
-import GHC.Core.Subst hiding( substTyVarBndr, substCoVarBndr, extendCvSubst )
+import GHC.Core.Subst hiding( substTyVarBndr, substCoVarBndr, extendCvSubst, extendInScopeSet )
        -- These names are also exported by Type
 
 import GHC.Core.Rules

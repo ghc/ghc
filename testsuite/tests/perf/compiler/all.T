@@ -54,6 +54,7 @@ test('T3064',
      compile,
      [''])
 
+# The foldr/build rule is the important one
 test('T4007', normal, makefile_test, ['T4007'])
 
 test('T5030',
