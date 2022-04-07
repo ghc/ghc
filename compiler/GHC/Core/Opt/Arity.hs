@@ -1784,7 +1784,11 @@ pushCoercionIntoLambda in_scope x e co
           in_scope' = in_scope `extendInScopeSet` x'
           subst = extendIdSubst (mkEmptySubst in_scope')
                                 x
-                                (mkCast (Var x') co1)
+                                (mkCast (Var x') (mkSymCo co1))
+            -- We substitute x' for x, except we need to preserve types.
+            -- The types are as follows:
+            --   x :: s1,  x' :: t1,  co1 :: s1 ~# t1,
+            -- so we extend the substitution with x |-> (x' |> sym co1).
       in Just (x', substExpr subst e `mkCast` co2)
     | otherwise
     = pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
