@@ -98,5 +98,5 @@ test('NumConstantFolding32', normal, compile_and_run, [''])
 test('NumConstantFolding', normal, compile_and_run, [''])
 test('T19413', normal, compile_and_run, [''])
 test('T20203', normal, compile, ['-O -dsuppress-all -dsuppress-uniques -dno-typeable-binds -ddump-simpl'])
-test('T19313', expect_broken(19131), compile_and_run, [''])
-
+test('T19313', normal, compile_and_run, [''])
+test('UnliftedArgRule', normal, compile_and_run, [''])

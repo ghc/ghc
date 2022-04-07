@@ -496,7 +496,7 @@ stripTicksT p expr = fromOL $ go expr
 ************************************************************************
 -}
 
-bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
+bindNonRec :: HasDebugCallStack => Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- ^ @bindNonRec x r b@ produces either:
 --
 -- > let x = r in b
@@ -522,8 +522,8 @@ bindNonRec bndr rhs body
     case_bind = mkDefaultCase rhs bndr body
     let_bind  = Let (NonRec bndr rhs) body
 
--- | Tests whether we have to use a @case@ rather than @let@ binding for this expression
--- as per the invariants of 'CoreExpr': see "GHC.Core#let_app_invariant"
+-- | Tests whether we have to use a @case@ rather than @let@ binding for this
+-- expression as per the invariants of 'CoreExpr': see "GHC.Core#let_can_float_invariant"
 needsCaseBinding :: Type -> CoreExpr -> Bool
 needsCaseBinding ty rhs =
   mightBeUnliftedType ty && not (exprOkForSpeculation rhs)
@@ -1599,7 +1599,8 @@ expr_ok primop_ok (Case scrut bndr _ alts)
 expr_ok primop_ok other_expr
   | (expr, args) <- collectArgs other_expr
   = case stripTicksTopE (not . tickishCounts) expr of
-        Var f            -> app_ok primop_ok f args
+        Var f ->
+           app_ok primop_ok f args
 
         -- 'LitRubbish' is the only literal that can occur in the head of an
         -- application and will not be matched by the above case (Var /= Lit).
@@ -1645,7 +1646,7 @@ app_ok primop_ok fun args
 
         | otherwise
         -> primop_ok op  -- Check the primop itself
-        && and (zipWith primop_arg_ok arg_tys args)  -- Check the arguments
+        && and (zipWith arg_ok arg_tys args)  -- Check the arguments
 
       _  -- Unlifted types
          -- c.f. the Var case of exprIsHNF
@@ -1657,7 +1658,8 @@ app_ok primop_ok fun args
                   -- and we'd need to actually test n_val_args == 0.
 
          -- Partial applications
-         | idArity fun > n_val_args -> True
+         | idArity fun > n_val_args ->
+           and (zipWith arg_ok arg_tys args)  -- Check the arguments
 
          -- Functions that terminate fast without raising exceptions etc
          -- See Note [Discarding unnecessary unsafeEqualityProofs]
@@ -1671,9 +1673,10 @@ app_ok primop_ok fun args
     n_val_args   = valArgCount args
     (arg_tys, _) = splitPiTys (idType fun)
 
-    primop_arg_ok :: TyBinder -> CoreExpr -> Bool
-    primop_arg_ok (Named _) _ = True   -- A type argument
-    primop_arg_ok (Anon _ ty) arg      -- A term argument
+    -- Used for arguments to primops and to partial applications
+    arg_ok :: TyBinder -> CoreExpr -> Bool
+    arg_ok (Named _) _ = True   -- A type argument
+    arg_ok (Anon _ ty) arg      -- A term argument
        | Just Lifted <- typeLevity_maybe (scaledThing ty)
        = True -- See Note [Primops with lifted arguments]
        | otherwise
@@ -1714,12 +1717,12 @@ But we restrict it sharply:
                                                ; False -> e2 }
                        in ...) ...
 
-  Does the RHS of v satisfy the let/app invariant?  Previously we said
+  Does the RHS of v satisfy the let-can-float invariant?  Previously we said
   yes, on the grounds that y is evaluated.  But the binder-swap done
   by GHC.Core.Opt.SetLevels would transform the inner alternative to
      DEFAULT -> ... (let v::Int# = case x of { ... }
                      in ...) ....
-  which does /not/ satisfy the let/app invariant, because x is
+  which does /not/ satisfy the let-can-float invariant, because x is
   not evaluated. See Note [Binder-swap during float-out]
   in GHC.Core.Opt.SetLevels.  To avoid this awkwardness it seems simpler
   to stick to unlifted scrutinees where the issue does not
@@ -1823,25 +1826,25 @@ Now consider these examples:
  * case x of y { DEFAULT -> ....y.... }
    Should 'y' (alone) be considered ok-for-speculation?
 
- * case x of y { DEFAULT -> ....f (dataToTag# y)... }
+ * case x of y { DEFAULT -> ....let z = dataToTag# y... }
    Should (dataToTag# y) be considered ok-for-spec?
 
 You could argue 'yes', because in the case alternative we know that
 'y' is evaluated.  But the binder-swap transformation, which is
 extremely useful for float-out, changes these expressions to
    case x of y { DEFAULT -> ....x.... }
-   case x of y { DEFAULT -> ....f (dataToTag# x)... }
+   case x of y { DEFAULT -> ....let z = dataToTag# x... }
 
-And now the expression does not obey the let/app invariant!  Yikes!
-Moreover we really might float (f (dataToTag# x)) outside the case,
-and then it really, really doesn't obey the let/app invariant.
+And now the expression does not obey the let-can-float invariant!  Yikes!
+Moreover we really might float (dataToTag# x) outside the case,
+and then it really, really doesn't obey the let-can-float invariant.
 
 The solution is simple: exprOkForSpeculation does not try to take
 advantage of the evaluated-ness of (lifted) variables.  And it returns
 False (always) for DataToTagOp and SeqOp.
 
 Note that exprIsHNF /can/ and does take advantage of evaluated-ness;
-it doesn't have the trickiness of the let/app invariant to worry about.
+it doesn't have the trickiness of the let-can-float invariant to worry about.
 
 Note [Discarding unnecessary unsafeEqualityProofs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1892,9 +1895,8 @@ but one might imagine a more systematic check in future.
 --
 -- > C (f x :: Int#)
 --
--- Suppose @f x@ diverges; then @C (f x)@ is not a value. However this can't
--- happen: see "GHC.Core#let_app_invariant". This invariant states that arguments of
--- unboxed type must be ok-for-speculation (or trivial).
+-- Suppose @f x@ diverges; then @C (f x)@ is not a value.
+-- We check for this using needsCaseBinding below
 exprIsHNF :: CoreExpr -> Bool           -- True => Value-lambda, constructor, PAP
 exprIsHNF = exprIsHNFlike isDataConWorkId isEvaldUnfolding
 
@@ -1908,7 +1910,7 @@ exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
 -- constructors / CONLIKE functions (as determined by the function argument)
 -- or PAPs.
 --
-exprIsHNFlike :: (Var -> Bool) -> (Unfolding -> Bool) -> CoreExpr -> Bool
+exprIsHNFlike :: HasDebugCallStack => (Var -> Bool) -> (Unfolding -> Bool) -> CoreExpr -> Bool
 exprIsHNFlike is_con is_con_unf = is_hnf_like
   where
     is_hnf_like (Var v) -- NB: There are no value args at this point
@@ -1949,7 +1951,13 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     app_is_value (Tick _ f) nva = app_is_value f nva
     app_is_value (Cast f _) nva = app_is_value f nva
     app_is_value (App f a)  nva
-      | isValArg a              = app_is_value f (nva + 1)
+      | isValArg a              =
+        app_is_value f (nva + 1) &&
+        not (needsCaseBinding (exprType a) a)
+          -- For example  f (x /# y)  where f has arity two, and the first
+          -- argument is unboxed. This is not a value!
+          -- But  f 34#  is a value.
+          -- NB: Check app_is_value first, the arity check is cheaper
       | otherwise               = app_is_value f nva
     app_is_value _          _   = False
 

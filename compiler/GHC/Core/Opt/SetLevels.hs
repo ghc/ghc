@@ -912,15 +912,15 @@ Note [Test cheapness with exprOkForSpeculation]
 We don't want to float very cheap expressions by boxing and unboxing.
 But we use exprOkForSpeculation for the test, not exprIsCheap.
 Why?  Because it's important /not/ to transform
-     f (a /# 3)
+     let x = a /# 3
 to
-     f (case bx of I# a -> a /# 3)
-and float bx = I# (a /# 3), because the application of f no
-longer obeys the let/app invariant.  But (a /# 3) is ok-for-spec
+     let x = case bx of I# a -> a /# 3
+because the let binding no
+longer obeys the let-can-float invariant.  But (a /# 3) is ok-for-spec
 due to a special hack that says division operators can't fail
 when the denominator is definitely non-zero.  And yet that
 same expression says False to exprIsCheap.  Simplest way to
-guarantee the let/app invariant is to use the same function!
+guarantee the let-can-float invariant is to use the same function!
 
 If an expression is okay for speculation, we could also float it out
 *without* boxing and unboxing, since evaluating it early is okay.

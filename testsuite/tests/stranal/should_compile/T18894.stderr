@@ -67,9 +67,10 @@ g2
                   Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
                           WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 2 0}]
                  c1# = GHC.Prim.andI# 1# (GHC.Prim.<# wild 0#) } in
-               case GHC.Prim.quotInt# (GHC.Prim.-# 2# c1#) wild of wild
+               case GHC.Prim.-# (GHC.Prim.quotInt# (GHC.Prim.-# 2# c1#) wild) c1#
+               of ds2
                { __DEFAULT ->
-               GHC.Types.I# (GHC.Prim.-# wild c1#)
+               GHC.Types.I# ds2
                };
              0# -> GHC.Real.divZeroError @Int
            });
@@ -166,9 +167,10 @@ g1
                   Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
                           WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 2 0}]
                  c1# = GHC.Prim.andI# 1# (GHC.Prim.<# wild 0#) } in
-               case GHC.Prim.quotInt# (GHC.Prim.-# 2# c1#) wild of wild
+               case GHC.Prim.-# (GHC.Prim.quotInt# (GHC.Prim.-# 2# c1#) wild) c1#
+               of ds2
                { __DEFAULT ->
-               GHC.Types.I# (GHC.Prim.-# wild c1#)
+               GHC.Types.I# ds2
                };
              0# -> GHC.Real.divZeroError @Int
            });
@@ -282,9 +284,10 @@ $wg2
                     Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
                             WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 2 0}]
                    c1# = GHC.Prim.andI# 1# (GHC.Prim.<# wild 0#) } in
-                 case GHC.Prim.quotInt# (GHC.Prim.-# 2# c1#) wild of wild
+                 case GHC.Prim.-# (GHC.Prim.quotInt# (GHC.Prim.-# 2# c1#) wild) c1#
+                 of ds2
                  { __DEFAULT ->
-                 GHC.Types.I# (GHC.Prim.-# wild c1#)
+                 GHC.Types.I# ds2
                  };
                0# -> GHC.Real.divZeroError @Int
              } #);
@@ -345,9 +348,10 @@ $wg1
                     Unf=Unf{Src=<vanilla>, TopLvl=False, Value=False, ConLike=False,
                             WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 2 0}]
                    c1# = GHC.Prim.andI# 1# (GHC.Prim.<# wild 0#) } in
-                 case GHC.Prim.quotInt# (GHC.Prim.-# 2# c1#) wild of wild
+                 case GHC.Prim.-# (GHC.Prim.quotInt# (GHC.Prim.-# 2# c1#) wild) c1#
+                 of ds2
                  { __DEFAULT ->
-                 GHC.Types.I# (GHC.Prim.-# wild c1#)
+                 GHC.Types.I# ds2
                  };
                0# -> GHC.Real.divZeroError @Int
              } #);

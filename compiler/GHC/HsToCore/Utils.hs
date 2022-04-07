@@ -471,14 +471,12 @@ There are a few subtleties in the desugaring of `seq`:
     Consider,
        f x y = x `seq` (y `seq` (# x,y #))
 
-    The [Core let/app invariant] means that, other things being equal, because
-    the argument to the outer 'seq' has an unlifted type, we'll use call-by-value thus:
+    Because the argument to the outer 'seq' has an unlifted type, we'll use
+    call-by-value, and compile it as if we had
 
        f x y = case (y `seq` (# x,y #)) of v -> x `seq` v
 
-    But that is bad for two reasons:
-      (a) we now evaluate y before x, and
-      (b) we can't bind v to an unboxed pair
+    But that is bad, because we now evaluate y before x!
 
     Seq is very, very special!  So we recognise it right here, and desugar to
             case x of _ -> case y of _ -> (# x,y #)

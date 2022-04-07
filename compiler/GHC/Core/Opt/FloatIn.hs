@@ -194,14 +194,11 @@ fiExpr platform to_drop ann_expr@(_,AnnApp {})
     add_arg :: (Type,FreeVarSet) -> CoreExprWithFVs -> (Type,FreeVarSet)
     add_arg (fun_ty, extra_fvs) (_, AnnType ty)
       = (piResultTy fun_ty ty, extra_fvs)
-
     add_arg (fun_ty, extra_fvs) (arg_fvs, arg)
-      | noFloatIntoArg arg arg_ty
-      = (res_ty, extra_fvs `unionDVarSet` arg_fvs)
+      | noFloatIntoArg arg
+      = (funResultTy fun_ty, extra_fvs `unionDVarSet` arg_fvs)
       | otherwise
-      = (res_ty, extra_fvs)
-      where
-       (_, arg_ty, res_ty) = splitFunTy fun_ty
+      = (funResultTy fun_ty, extra_fvs)
 
 {- Note [Dead bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -211,15 +208,6 @@ only way that can happen is if the binding wrapped the literal
    case x of { DEFAULT -> 1# }
 But, while this may be unusual it is not actually wrong, and it did
 once happen (#15696).
-
-Note [Do not destroy the let/app invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Watch out for
-   f (x +# y)
-We don't want to float bindings into here
-   f (case ... of { x -> x +# y })
-because that might destroy the let/app invariant, which requires
-unlifted function arguments to be ok-for-speculation.
 
 Note [Join points]
 ~~~~~~~~~~~~~~~~~~
@@ -588,14 +576,14 @@ noFloatIntoRhs is_rec bndr rhs
   | isJoinId bndr
   = isRec is_rec -- Joins are one-shot iff non-recursive
 
+  | Just Unlifted <- typeLevity_maybe (idType bndr)
+  = True  -- Preserve let-can-float invariant, see Note [noFloatInto considerations]
+
   | otherwise
-  = noFloatIntoArg rhs (idType bndr)
+  = noFloatIntoArg rhs
 
-noFloatIntoArg :: CoreExprWithFVs' -> Type -> Bool
-noFloatIntoArg expr expr_ty
-  | Just Unlifted <- typeLevity_maybe expr_ty
-  = True  -- See Note [Do not destroy the let/app invariant]
-
+noFloatIntoArg :: CoreExprWithFVs' -> Bool
+noFloatIntoArg expr
    | AnnLam bndr e <- expr
    , (bndrs, _) <- collectAnnBndrs e
    =  noFloatIntoLam (bndr:bndrs)  -- Wrinkle 1 (a)
@@ -610,11 +598,11 @@ noFloatIntoArg expr expr_ty
 {- Note [noFloatInto considerations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When do we want to float bindings into
-   - noFloatIntoRHs: the RHS of a let-binding
+   - noFloatIntoRhs: the RHS of a let-binding
    - noFloatIntoArg: the argument of a function application
 
-Definitely don't float in if it has unlifted type; that
-would destroy the let/app invariant.
+Definitely don't float into RHS if it has unlifted type;
+that would destroy the let-can-float invariant.
 
 * Wrinkle 1: do not float in if
      (a) any non-one-shot value lambdas

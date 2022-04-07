@@ -6,7 +6,7 @@ A lint pass to check basic STG invariants:
 - Variables should be defined before used.
 
 - Let bindings should not have unboxed types (unboxed bindings should only
-  appear in case), except when they're join points (see Note [Core let/app
+  appear in case), except when they're join points (see Note [Core let-can-float
   invariant] and #14117).
 
 - If linting after unarisation, invariants listed in Note [Post-unarisation

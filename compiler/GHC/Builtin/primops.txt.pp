@@ -3173,7 +3173,7 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 -- unnecessarily conservative, but it prevented reallyUnsafePtrEquality# from
 -- floating out of places where its arguments were known to be forced.
 -- Unfortunately, GHC could sometimes lose track of whether those arguments
--- were forced, leading to let/app invariant failures (see #13027 and the
+-- were forced, leading to let-can-float invariant failures (see #13027 and the
 -- discussion in #11444). Now that ok_for_speculation skips over lifted
 -- arguments, we need to explicitly prevent reallyUnsafePtrEquality#
 -- from floating out. Imagine if we had
@@ -3788,7 +3788,7 @@ section "Prefetch"
   to reflect that these operations have side effects with respect to the runtime
   performance characteristics of the resulting code. Additionally, if the prefetchValue
   operations did not have this attribute, GHC does a float out transformation that
-  results in a let/app violation, at least with the current design.
+  results in a let-can-float invariant violation, at least with the current design.
   }
 
 

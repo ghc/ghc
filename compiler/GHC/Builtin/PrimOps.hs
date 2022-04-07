@@ -325,8 +325,8 @@ Note [Checking versus non-checking primops]
       never throw an exception, so we cannot rewrite to a call to error.
 
   It is important that a non-checking primop never be transformed in a way that
-  would cause it to bottom. Doing so would violate Core's let/app invariant
-  (see Note [Core let/app invariant] in GHC.Core) which is critical to
+  would cause it to bottom. Doing so would violate Core's let-can-float invariant
+  (see Note [Core let-can-float invariant] in GHC.Core) which is critical to
   the simplifier's ability to float without fear of changing program meaning.
 
 
@@ -479,7 +479,7 @@ Two main predicates on primops test these flags:
   * The "no-float-out" thing is achieved by ensuring that we never
     let-bind a can_fail or has_side_effects primop.  The RHS of a
     let-binding (which can float in and out freely) satisfies
-    exprOkForSpeculation; this is the let/app invariant.  And
+    exprOkForSpeculation; this is the let-can-float invariant.  And
     exprOkForSpeculation is false of can_fail and has_side_effects.
 
   * So can_fail and has_side_effects primops will appear only as the
