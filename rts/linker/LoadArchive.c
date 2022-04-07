@@ -520,8 +520,11 @@ HsInt loadArchive_ (pathchar *path)
 
             int size = pathprintf(NULL, 0, WSTR("%" PATH_FMT "(#%d:%.*s)"),
                                   path, memberIdx, (int)thisFileNameSize, fileName);
-            archiveMemberName = stgMallocBytes((size+1) * sizeof(pathchar), "loadArchive(file)");
-            pathprintf(archiveMemberName, size, WSTR("%" PATH_FMT "(#%d:%.*s)"),
+            // I don't understand why this extra +1 is needed here; pathprintf
+            // should have given us the correct length but in practice it seems
+            // to be one byte short on Win32.
+            archiveMemberName = stgMallocBytes((size+1+1) * sizeof(pathchar), "loadArchive(file)");
+            pathprintf(archiveMemberName, size+1, WSTR("%" PATH_FMT "(#%d:%.*s)"),
                        path, memberIdx, (int)thisFileNameSize, fileName);
 
             ObjectCode *oc = mkOc(STATIC_OBJECT, path, image, memberSize, false, archiveMemberName,
