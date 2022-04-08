@@ -3,7 +3,6 @@ module GHC.Driver.Config.Cmm
   ) where
 
 import GHC.Cmm.Config
-import GHC.Cmm.Switch (backendSupportsSwitch)
 
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -31,3 +30,10 @@ initCmmConfig dflags = CmmConfig
           case (platformArch platform, platformOS platform, positionIndependent dflags)
           of   (ArchX86, OSDarwin, pic) -> pic
                _                        -> False
+
+-- | Does the backend support switch out of the box? Then leave this to the
+-- backend!
+backendSupportsSwitch :: Backend -> Bool
+backendSupportsSwitch ViaC = True
+backendSupportsSwitch LLVM = True
+backendSupportsSwitch _    = False

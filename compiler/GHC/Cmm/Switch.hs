@@ -8,14 +8,12 @@ module GHC.Cmm.Switch (
      switchTargetsToList, eqSwitchTargetWith,
 
      SwitchPlan(..),
-     backendSupportsSwitch,
      createSwitchPlan,
   ) where
 
 import GHC.Prelude
 
 import GHC.Utils.Outputable
-import GHC.Driver.Backend
 import GHC.Utils.Panic
 import GHC.Cmm.Dataflow.Label (Label)
 
@@ -311,13 +309,6 @@ While this is fairly cheap it made no big difference for the >3000 case
 and slowed down all other cases making it not worthwhile.
 -}
 
-
--- | Does the backend support switch out of the box? Then leave this to the
--- backend!
-backendSupportsSwitch :: Backend -> Bool
-backendSupportsSwitch ViaC = True
-backendSupportsSwitch LLVM = True
-backendSupportsSwitch _    = False
 
 -- | This function creates a SwitchPlan from a SwitchTargets value, breaking it
 -- down into smaller pieces suitable for code generation.
