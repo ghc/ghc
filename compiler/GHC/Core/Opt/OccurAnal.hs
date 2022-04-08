@@ -363,6 +363,12 @@ Solution:
     then just glom all the bindings into a single Rec, so that
     the *next* iteration of the occurrence analyser will sort
     them all out.   This part happens in occurAnalysePgm.
+
+This is a legitimate situation where the need for glomming doesn't
+point to any problems. However, when GHC is compiled with -DDEBUG, we
+produce a warning addressed to the GHC developers just in case we
+require glomming due to an out-of-order reference that is caused by
+some earlier transformation stage misbehaving.
 -}
 
 {-
