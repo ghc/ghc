@@ -1057,9 +1057,6 @@ reservedSymsFM = listToUFM $
 
        ,("*",   ITstar NormalSyntax,        NormalSyntax,  xbit StarIsTypeBit)
 
-        -- For 'forall a . t'
-       ,(".",   ITdot,                      NormalSyntax,  0 )
-
        ,("-<",  ITlarrowtail NormalSyntax,  NormalSyntax,  xbit ArrowsBit)
        ,(">-",  ITrarrowtail NormalSyntax,  NormalSyntax,  xbit ArrowsBit)
        ,("-<<", ITLarrowtail NormalSyntax,  NormalSyntax,  xbit ArrowsBit)
@@ -1726,13 +1723,8 @@ consym = sym (\_span _exts s -> return $ ITconsym s)
 sym :: (PsSpan -> ExtsBitmap -> FastString -> P Token) -> Action
 sym con span buf len =
   case lookupUFM reservedSymsFM fs of
-    Just (keyword, NormalSyntax, 0) -> do
-      exts <- getExts
-      if fs == fsLit "." &&
-         exts .&. (xbit OverloadedRecordDotBit) /= 0 &&
-         xtest OverloadedRecordDotBit exts
-      then L span <$!> con span exts fs  -- Process by varsym_*.
-      else return $ L span keyword
+    Just (keyword, NormalSyntax, 0) ->
+      return $ L span keyword
     Just (keyword, NormalSyntax, i) -> do
       exts <- getExts
       if exts .&. i /= 0

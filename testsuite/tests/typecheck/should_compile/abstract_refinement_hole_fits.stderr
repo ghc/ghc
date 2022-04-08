@@ -35,7 +35,7 @@ abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
           where const :: forall a b. a -> b -> a
         curry (_ :: (t0, [Integer]) -> Integer) (_ :: t0)
           where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
-        (.) (_ :: b1 -> Integer) (_ :: [Integer] -> b1)
+        (.) (_ :: b3 -> Integer) (_ :: [Integer] -> b3)
           where (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
         flip (_ :: [Integer] -> t0 -> Integer) (_ :: t0)
           where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
@@ -89,7 +89,7 @@ abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
           where head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
         last (_ :: [t0 -> [Integer] -> Integer]) (_ :: t0)
           where last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
-        fst (_ :: (t0 -> [Integer] -> Integer, b2)) (_ :: t0)
+        fst (_ :: (t0 -> [Integer] -> Integer, b1)) (_ :: t0)
           where fst :: forall a b. (a, b) -> a
         snd (_ :: (a2, t0 -> [Integer] -> Integer)) (_ :: t0)
           where snd :: forall a b. (a, b) -> b
@@ -111,7 +111,7 @@ abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
           where snd :: forall a b. (a, b) -> b
         const (_ :: [Integer] -> Integer) (_ :: t0)
           where const :: forall a b. a -> b -> a
-        uncurry (_ :: a3 -> b3 -> [Integer] -> Integer) (_ :: (a3, b3))
+        uncurry (_ :: a3 -> b2 -> [Integer] -> Integer) (_ :: (a3, b2))
           where uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
         seq (_ :: t2) (_ :: [Integer] -> Integer)
           where seq :: forall a b. a -> b -> b
@@ -152,7 +152,7 @@ abstract_refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           where const :: forall a b. a -> b -> a
         curry (_ :: (t0, Integer) -> [Integer] -> Integer) (_ :: t0)
           where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
-        (.) (_ :: b1 -> [Integer] -> Integer) (_ :: Integer -> b1)
+        (.) (_ :: b3 -> [Integer] -> Integer) (_ :: Integer -> b3)
           where (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
         flip (_ :: Integer -> t0 -> [Integer] -> Integer) (_ :: t0)
           where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
@@ -209,7 +209,7 @@ abstract_refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           where head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
         last (_ :: [t0 -> Integer -> [Integer] -> Integer]) (_ :: t0)
           where last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
-        fst (_ :: (t0 -> Integer -> [Integer] -> Integer, b2)) (_ :: t0)
+        fst (_ :: (t0 -> Integer -> [Integer] -> Integer, b1)) (_ :: t0)
           where fst :: forall a b. (a, b) -> a
         snd (_ :: (a2, t0 -> Integer -> [Integer] -> Integer)) (_ :: t0)
           where snd :: forall a b. (a, b) -> b
@@ -232,8 +232,8 @@ abstract_refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           where snd :: forall a b. (a, b) -> b
         const (_ :: Integer -> [Integer] -> Integer) (_ :: t0)
           where const :: forall a b. a -> b -> a
-        uncurry (_ :: a3 -> b3 -> Integer -> [Integer] -> Integer)
-                (_ :: (a3, b3))
+        uncurry (_ :: a3 -> b2 -> Integer -> [Integer] -> Integer)
+                (_ :: (a3, b2))
           where uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
         seq (_ :: t2) (_ :: Integer -> [Integer] -> Integer)
           where seq :: forall a b. a -> b -> b
