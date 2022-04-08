@@ -2811,7 +2811,7 @@ mkCallUDs' env f args
     -- we decide on a case by case basis if we want to specialise
     -- on this argument; if so, SpecDict, if not UnspecArg
     mk_spec_arg arg (Anon InvisArg pred)
-      | not (isIPLikePred (scaledThing pred))
+      | typeDeterminesValue (scaledThing pred)
               -- See Note [Type determines value]
       , interestingDict env arg
               -- See Note [Interesting dictionary arguments]
@@ -2881,8 +2881,13 @@ whole it's only a small win: 2.2% improvement in allocation for ansi,
 1.2% for bspt, but mostly 0.0!  Average 0.1% increase in binary size.
 -}
 
+typeDeterminesValue :: Type -> Bool
+-- See Note [Type determines value]
+typeDeterminesValue ty = isDictTy ty && not (isIPLikePred ty)
+
 interestingDict :: SpecEnv -> CoreExpr -> Bool
--- A dictionary argument is interesting if it has *some* structure
+-- A dictionary argument is interesting if it has *some* structure,
+-- see Note [Interesting dictionary arguments]
 -- NB: "dictionary" arguments include constraints of all sorts,
 --     including equality constraints; hence the Coercion case
 interestingDict env (Var v) =  hasSomeUnfolding (idUnfolding v)
@@ -3164,7 +3169,8 @@ cloneBindSM :: SpecEnv -> CoreBind -> SpecM (SpecEnv, SpecEnv, CoreBind)
 cloneBindSM env@(SE { se_subst = subst, se_interesting = interesting }) (NonRec bndr rhs)
   = do { us <- getUniqueSupplyM
        ; let (subst', bndr') = Core.cloneIdBndr subst us bndr
-             interesting' | interestingDict env rhs
+             interesting' | typeDeterminesValue (idType bndr)
+                          , interestingDict env rhs
                           = interesting `extendVarSet` bndr'
                           | otherwise = interesting
        ; return (env, env { se_subst = subst', se_interesting = interesting' }
@@ -3175,7 +3181,7 @@ cloneBindSM env@(SE { se_subst = subst, se_interesting = interesting }) (Rec pai
        ; let (subst', bndrs') = Core.cloneRecIdBndrs subst us (map fst pairs)
              env' = env { se_subst = subst'
                         , se_interesting = interesting `extendVarSetList`
-                                           [ v | (v,r) <- pairs, interestingDict env r ] }
+                                           [ v | (v,r) <- pairs, typeDeterminesValue (idType v), interestingDict env r ] }
        ; return (env', env', Rec (bndrs' `zip` map snd pairs)) }
 
 newDictBndr :: SpecEnv -> CoreBndr -> SpecM CoreBndr
