@@ -100,7 +100,7 @@ import GHC.Parser.Annotation
 import GHC.Types.Fixity ( LexicalFixity(..) )
 import GHC.Types.Id ( Id )
 import GHC.Types.SourceText
-import GHC.Types.Name( Name, NamedThing(getName) )
+import GHC.Types.Name( Name, NamedThing(getName), tcName, dataName )
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Types.Var ( VarBndr )
 import GHC.Core.TyCo.Rep ( Type(..) )
@@ -1023,7 +1023,7 @@ ppr_mono_ty (HsTupleTy _ con tys)
     -- `Solo x`, not `(x)`
   | [ty] <- tys
   , BoxedTuple <- std_con
-  = sep [text (mkTupleStr Boxed 1), ppr_mono_lty ty]
+  = sep [text (mkTupleStr Boxed tcName 1), ppr_mono_lty ty]
   | otherwise
   = tupleParens std_con (pprWithCommas ppr tys)
   where std_con = case con of
@@ -1041,9 +1041,9 @@ ppr_mono_ty (HsExplicitListTy _ prom tys)
   | otherwise       = brackets (interpp'SP tys)
 ppr_mono_ty (HsExplicitTupleTy _ tys)
     -- Special-case unary boxed tuples so that they are pretty-printed as
-    -- `'Solo x`, not `'(x)`
+    -- `'MkSolo x`, not `'(x)`
   | [ty] <- tys
-  = quote $ sep [text (mkTupleStr Boxed 1), ppr_mono_lty ty]
+  = quote $ sep [text (mkTupleStr Boxed dataName 1), ppr_mono_lty ty]
   | otherwise
   = quote $ parens (maybeAddSpace tys $ interpp'SP tys)
 ppr_mono_ty (HsTyLit _ t)       = ppr t

@@ -47,6 +47,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Error
 import GHC.Utils.Logger
+import GHC.Utils.Misc (HasCallStack)
 
 import Data.List     ( partition )
 import Control.Monad
@@ -61,7 +62,7 @@ import Control.Monad
 See Also: Note [The Name Cache] in GHC.Types.Name.Cache
 -}
 
-newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
+newGlobalBinder :: HasCallStack => Module -> OccName -> SrcSpan -> TcRnIf a b Name
 -- Used for source code and interface files, to make the
 -- Name for a thing, given its Module and OccName
 -- See Note [The Name Cache] in GHC.Types.Name.Cache
@@ -85,7 +86,8 @@ newInteractiveBinder hsc_env occ loc = do
   allocateGlobalBinder (hsc_NC hsc_env) mod occ loc
 
 allocateGlobalBinder
-  :: NameCache
+  :: HasCallStack
+  => NameCache
   -> Module -> OccName -> SrcSpan
   -> IO Name
 -- See Note [The Name Cache] in GHC.Types.Name.Cache

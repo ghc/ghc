@@ -27,6 +27,7 @@ import GHC.Builtin.Names
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Misc (HasCallStack)
 
 import Control.Concurrent.MVar
 import Control.Monad
@@ -100,7 +101,7 @@ type OrigNameCache   = ModuleEnv (OccEnv Name)
 takeUniqFromNameCache :: NameCache -> IO Unique
 takeUniqFromNameCache (NameCache c _) = uniqFromMask c
 
-lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
+lookupOrigNameCache :: HasCallStack => OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ
   | mod == gHC_TYPES || mod == gHC_PRIM || mod == gHC_TUPLE
   , Just name <- isBuiltInOcc_maybe occ

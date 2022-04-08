@@ -3371,7 +3371,8 @@ tcConDecls new_or_data dd_info rep_tycon tmpl_bndrs res_kind
     -- mkTyConTagMap: it's important that we pay for tag allocation here,
     -- once per TyCon. See Note [Constructor tag allocation], fixes #14657
 
-tcConDecl :: NewOrData
+tcConDecl :: HasCallStack
+          => NewOrData
           -> DataDeclInfo
           -> KnotTied TyCon   -- Representation tycon. Knot-tied!
           -> [TcTyConBinder]  -- Binders of representation TyCon

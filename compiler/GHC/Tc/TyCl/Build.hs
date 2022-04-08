@@ -135,7 +135,8 @@ There are other ways we could do the check (discussion on #19739):
 -}
 
 ------------------------------------------------------
-buildDataCon :: FamInstEnvs
+buildDataCon :: HasCallStack
+            => FamInstEnvs
             -> DataConBangOpts
             -> Name
             -> Bool                     -- Declared infix
@@ -424,7 +425,8 @@ one field, because equality predicates are unboxed, and classes
 are boxed.
 -}
 
-newImplicitBinder :: Name                       -- Base name
+newImplicitBinder :: HasCallStack
+                  => Name                       -- Base name
                   -> (OccName -> OccName)       -- Occurrence name modifier
                   -> TcRnIf m n Name            -- Implicit name
 -- Called in GHC.Tc.TyCl.Build to allocate the implicit binders of type/class decls
@@ -433,7 +435,8 @@ newImplicitBinder :: Name                       -- Base name
 newImplicitBinder base_name mk_sys_occ
   = newImplicitBinderLoc base_name mk_sys_occ (nameSrcSpan base_name)
 
-newImplicitBinderLoc :: Name                       -- Base name
+newImplicitBinderLoc :: HasCallStack
+                     => Name                       -- Base name
                      -> (OccName -> OccName)       -- Occurrence name modifier
                      -> SrcSpan
                      -> TcRnIf m n Name            -- Implicit name

@@ -202,6 +202,7 @@ import GHC.Utils.Panic.Plain
 import qualified Data.ByteString.Char8 as BS
 
 import Data.List        ( elemIndex, intersperse )
+import Numeric          ( showInt )
 
 alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]
@@ -806,16 +807,16 @@ Basically it keeps everything uniform.
 
 However the /naming/ of the type/data constructors for one-tuples is a
 bit odd:
-  3-tuples:  (,,)   (,,)#
-  2-tuples:  (,)    (,)#
+  3-tuples:  Tuple3   (,,)#
+  2-tuples:  Tuple2   (,)#
   1-tuples:  ??
-  0-tuples:  ()     ()#
+  0-tuples:  Unit     ()#
 
 Zero-tuples have used up the logical name. So we use 'Solo' and 'Solo#'
 for one-tuples.  So in ghc-prim:GHC.Tuple we see the declarations:
-  data ()     = ()
-  data Solo a = Solo a
-  data (a,b)  = (a,b)
+  data Unit = ()
+  data Solo a = MkSolo a
+  data Tuple2 a b = (a,b)
 
 There is no way to write a boxed one-tuple in Haskell using tuple syntax.
 They can, however, be written using other methods:
@@ -866,7 +867,7 @@ known-key is the next-best way to teach the internals of the compiler about it.
 --
 -- Moreover, there is no need to include names of things that the user can't
 -- write (e.g. type representation bindings like $tc(,,,)).
-isBuiltInOcc_maybe :: OccName -> Maybe Name
+isBuiltInOcc_maybe :: HasCallStack => OccName -> Maybe Name
 isBuiltInOcc_maybe occ =
     case name of
       "[]" -> Just $ choose_ns listTyConName nilDataConName
@@ -924,7 +925,7 @@ isBuiltInOcc_maybe occ =
     choose_ns tc dc
       | isTcClsNameSpace ns   = tc
       | isDataConNameSpace ns = dc
-      | otherwise             = pprPanic "tup_name" (ppr occ)
+      | otherwise             = pprPanic "tup_name" (ppr occ <+> parens (pprNameSpace ns))
       where ns = occNameSpace occ
 
     tup_name boxity arity
@@ -948,20 +949,26 @@ isPunOcc_maybe _ _ = Nothing
 
 mkTupleOcc :: NameSpace -> Boxity -> Arity -> OccName
 -- No need to cache these, the caching is done in mk_tuple
-mkTupleOcc ns Boxed   ar = mkOccName ns (mkBoxedTupleStr   ar)
+mkTupleOcc ns Boxed   ar = mkOccName ns (mkBoxedTupleStr ns ar)
 mkTupleOcc ns Unboxed ar = mkOccName ns (mkUnboxedTupleStr ar)
 
 mkCTupleOcc :: NameSpace -> Arity -> OccName
 mkCTupleOcc ns ar = mkOccName ns (mkConstraintTupleStr ar)
 
-mkTupleStr :: Boxity -> Arity -> String
+mkTupleStr :: Boxity -> NameSpace -> Arity -> String
 mkTupleStr Boxed   = mkBoxedTupleStr
-mkTupleStr Unboxed = mkUnboxedTupleStr
+mkTupleStr Unboxed = \_ns -> mkUnboxedTupleStr
 
-mkBoxedTupleStr :: Arity -> String
-mkBoxedTupleStr 0  = "()"
-mkBoxedTupleStr 1  = "Solo"   -- See Note [One-tuples]
-mkBoxedTupleStr ar = '(' : commas ar ++ ")"
+mkBoxedTupleStr :: NameSpace -> Arity -> String
+mkBoxedTupleStr ns 0
+  | isValNameSpace ns = "()"
+  | otherwise         = "Unit"
+mkBoxedTupleStr ns 1  -- See Note [One-tuples]
+  | isValNameSpace ns = "MkSolo"
+  | otherwise         = "Solo"
+mkBoxedTupleStr ns ar
+  | isValNameSpace ns = '(' : commas ar ++ ")"
+  | otherwise         = "Tuple" ++ showInt ar ""
 
 mkUnboxedTupleStr :: Arity -> String
 mkUnboxedTupleStr 0  = "(##)"
@@ -1124,7 +1131,7 @@ mk_tuple Boxed arity = (tycon, tuple_con)
     boxity  = Boxed
     modu    = gHC_TUPLE
     tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
-                         (ATyCon tycon) BuiltInSyntax
+                         (ATyCon tycon) UserSyntax
     dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
                             (AConLike (RealDataCon tuple_con)) BuiltInSyntax
     tc_uniq = mkTupleTyConUnique   boxity arity
