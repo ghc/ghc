@@ -300,6 +300,10 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
            hang (text "Cannot parse an infix data constructor in a data/newtype declaration:") 2
                 (ppr lhs <+> ppr tc <+> ppr rhs)
+    PsErrIllegalPromotionQuoteDataCon name
+      -> mkSimpleDecorated $
+           text "Illegal promotion quote mark in the declaration of" $$
+           text "data/newtype constructor" <+> pprPrefixOcc name
     PsErrUnpackDataCon
       -> mkSimpleDecorated $ text "{-# UNPACK #-} cannot be applied to a data constructor."
     PsErrUnexpectedKindAppInDataCon lhs ki
@@ -557,6 +561,7 @@ instance Diagnostic PsMessage where
     PsErrDotsInRecordUpdate                       -> ErrorWithoutFlag
     PsErrInvalidDataCon{}                         -> ErrorWithoutFlag
     PsErrInvalidInfixDataCon{}                    -> ErrorWithoutFlag
+    PsErrIllegalPromotionQuoteDataCon{}           -> ErrorWithoutFlag
     PsErrUnpackDataCon                            -> ErrorWithoutFlag
     PsErrUnexpectedKindAppInDataCon{}             -> ErrorWithoutFlag
     PsErrInvalidRecordCon{}                       -> ErrorWithoutFlag
@@ -688,6 +693,7 @@ instance Diagnostic PsMessage where
     PsErrDotsInRecordUpdate                       -> noHints
     PsErrInvalidDataCon{}                         -> noHints
     PsErrInvalidInfixDataCon{}                    -> noHints
+    PsErrIllegalPromotionQuoteDataCon{}           -> noHints
     PsErrUnpackDataCon                            -> noHints
     PsErrUnexpectedKindAppInDataCon{}             -> noHints
     PsErrInvalidRecordCon{}                       -> noHints

@@ -1621,30 +1621,30 @@ here because it uses sizeTypes, fvTypes.
 
 It checks for three things
 
-  * No repeated variables (hasNoDups fvs)
+(VD1) No repeated variables (hasNoDups fvs)
 
-  * No type constructors.  This is done by comparing
+(VD2) No type constructors.  This is done by comparing
         sizeTypes tys == length (fvTypes tys)
-    sizeTypes counts variables and constructors; fvTypes returns variables.
-    So if they are the same, there must be no constructors.  But there
-    might be applications thus (f (g x)).
+      sizeTypes counts variables and constructors; fvTypes returns variables.
+      So if they are the same, there must be no constructors.  But there
+      might be applications thus (f (g x)).
 
-    Note that tys only includes the visible arguments of the class type
-    constructor. Including the non-visible arguments can cause the following,
-    perfectly valid instance to be rejected:
-       class Category (cat :: k -> k -> *) where ...
-       newtype T (c :: * -> * -> *) a b = MkT (c a b)
-       instance Category c => Category (T c) where ...
-    since the first argument to Category is a non-visible *, which sizeTypes
-    would count as a constructor! See #11833.
+      Note that tys only includes the visible arguments of the class type
+      constructor. Including the non-visible arguments can cause the following,
+      perfectly valid instance to be rejected:
+         class Category (cat :: k -> k -> *) where ...
+         newtype T (c :: * -> * -> *) a b = MkT (c a b)
+         instance Category c => Category (T c) where ...
+      since the first argument to Category is a non-visible *, which sizeTypes
+      would count as a constructor! See #11833.
 
-  * Also check for a bizarre corner case, when the derived instance decl
-    would look like
-       instance C a b => D (T a) where ...
-    Note that 'b' isn't a parameter of T.  This gives rise to all sorts of
-    problems; in particular, it's hard to compare solutions for equality
-    when finding the fixpoint, and that means the inferContext loop does
-    not converge.  See #5287.
+(VD3) Also check for a bizarre corner case, when the derived instance decl
+      would look like
+         instance C a b => D (T a) where ...
+      Note that 'b' isn't a parameter of T.  This gives rise to all sorts of
+      problems; in particular, it's hard to compare solutions for equality
+      when finding the fixpoint, and that means the inferContext loop does
+      not converge.  See #5287, #21302
 
 Note [Equality class instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1657,21 +1657,27 @@ instances only in the defining module.
 validDerivPred :: TyVarSet -> PredType -> Bool
 -- See Note [Valid 'deriving' predicate]
 validDerivPred tv_set pred
+  | not (tyCoVarsOfType pred `subVarSet` tv_set)
+  = False  -- Check (VD3)
+
+  | otherwise
   = case classifyPredType pred of
-       ClassPred cls tys -> cls `hasKey` typeableClassKey
-                -- Typeable constraints are bigger than they appear due
-                -- to kind polymorphism, but that's OK
-                       || check_tys cls tys
-       EqPred {}       -> False  -- reject equality constraints
-       _               -> True   -- Non-class predicates are ok
-  where
-    check_tys cls tys
-              = hasNoDups fvs
-                   -- use sizePred to ignore implicit args
-                && lengthIs fvs (sizePred pred)
-                && all (`elemVarSet` tv_set) fvs
-      where tys' = filterOutInvisibleTypes (classTyCon cls) tys
-            fvs  = fvTypes tys'
+
+       ClassPred cls tys
+          | isTerminatingClass cls -> True
+            -- Typeable constraints are bigger than they appear due
+            -- to kind polymorphism, but that's OK
+
+          | otherwise -> hasNoDups visible_fvs                        -- Check (VD1)
+                      && lengthIs visible_fvs (sizeTypes visible_tys) -- Check (VD2)
+          where
+            visible_tys = filterOutInvisibleTypes (classTyCon cls) tys
+            visible_fvs = fvTypes visible_tys
+
+       IrredPred {}   -> True   -- Accept (f a)
+       EqPred {}      -> False  -- Reject equality constraints
+       ForAllPred {}  -> False  -- Rejects quantified predicates
+       SpecialPred {} -> False  -- Rejects special predicates
 
 {-
 ************************************************************************
@@ -2790,27 +2796,6 @@ sizeTypes = foldr ((+) . sizeType) 0
 sizeTyConAppArgs :: TyCon -> [Type] -> Int
 sizeTyConAppArgs _tc tys = sizeTypes tys -- (filterOutInvisibleTypes tc tys)
                            -- See Note [Invisible arguments and termination]
-
--- Size of a predicate
---
--- We are considering whether class constraints terminate.
--- Equality constraints and constraints for the implicit
--- parameter class always terminate so it is safe to say "size 0".
--- See #4200.
-sizePred :: PredType -> Int
-sizePred ty = goClass ty
-  where
-    goClass p = go (classifyPredType p)
-
-    go (ClassPred cls tys')
-      | isTerminatingClass cls = 0
-      | otherwise = sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys')
-                    -- The filtering looks bogus
-                    -- See Note [Invisible arguments and termination]
-    go (EqPred {})           = 0
-    go (SpecialPred {})      = 0
-    go (IrredPred ty)        = sizeType ty
-    go (ForAllPred _ _ pred) = goClass pred
 
 -- | When this says "True", ignore this class constraint during
 -- a termination check

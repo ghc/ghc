@@ -29,7 +29,7 @@ module GHC.Core.Opt.Simplify.Env (
         substCo, substCoVar,
 
         -- * Floats
-        SimplFloats(..), emptyFloats, mkRecFloats,
+        SimplFloats(..), emptyFloats, isEmptyFloats, mkRecFloats,
         mkFloatBind, addLetFloats, addJoinFloats, addFloats,
         extendFloats, wrapFloats,
         doFloatFromRhs, getTopFloatBinds,
@@ -138,6 +138,13 @@ emptyFloats env
   = SimplFloats { sfLetFloats  = emptyLetFloats
                 , sfJoinFloats = emptyJoinFloats
                 , sfInScope    = seInScope env }
+
+isEmptyFloats :: SimplFloats -> Bool
+-- Precondition: used only when sfJoinFloats is empty
+isEmptyFloats (SimplFloats { sfLetFloats  = LetFloats fs _
+                           , sfJoinFloats = js })
+  = assertPpr (isNilOL js) (ppr js ) $
+    isNilOL fs
 
 pprSimplEnv :: SimplEnv -> SDoc
 -- Used for debugging; selective
@@ -485,7 +492,7 @@ andFF FltLifted  flt        = flt
 
 doFloatFromRhs :: TopLevelFlag -> RecFlag -> Bool -> SimplFloats -> OutExpr -> Bool
 -- If you change this function look also at FloatIn.noFloatFromRhs
-doFloatFromRhs lvl rec str (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
+doFloatFromRhs lvl rec strict_bind (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
   =  not (isNilOL fs) && want_to_float && can_float
   where
      want_to_float = isTopLevel lvl || exprIsCheap rhs || exprIsExpandable rhs
@@ -493,7 +500,7 @@ doFloatFromRhs lvl rec str (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
      can_float = case ff of
                    FltLifted  -> True
                    FltOkSpec  -> isNotTopLevel lvl && isNonRec rec
-                   FltCareful -> isNotTopLevel lvl && isNonRec rec && str
+                   FltCareful -> isNotTopLevel lvl && isNonRec rec && strict_bind
 
 {-
 Note [Float when cheap or expandable]

@@ -1,2 +1,16 @@
-T17865.hs:3:10:
-    Cannot parse data constructor in a data/newtype declaration: 'MkT
+
+T17865.hs:3:11: error:
+    Illegal promotion quote mark in the declaration of
+    data/newtype constructor MkT
+
+T17865.hs:5:13: error:
+    Illegal promotion quote mark in the declaration of
+    data/newtype constructor MkT'
+
+T17865.hs:7:16: error:
+    Illegal promotion quote mark in the declaration of
+    data/newtype constructor (:>)
+
+T17865.hs:9:17: error:
+    Illegal promotion quote mark in the declaration of
+    data/newtype constructor (:>$)

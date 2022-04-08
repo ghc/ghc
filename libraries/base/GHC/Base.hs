@@ -17,7 +17,7 @@ GHC.Prim        Has no implementation.  It defines built-in things, and
                 copied to make GHC.Prim.hi
 
 GHC.Base        Classes: Eq, Ord, Functor, Monad
-                Types:   list, (), Int, Bool, Ordering, Char, String
+                Types:   List, (), Int, Bool, Ordering, Char, String
 
 Data.Tuple      Types: tuples, plus instances for GHC.Base classes
 

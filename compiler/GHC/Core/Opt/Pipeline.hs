@@ -26,7 +26,7 @@ import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop, dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( endPass, lintPassResult, dumpPassResult,
                           lintAnnots )
-import GHC.Core.Opt.Simplify       ( simplTopBinds, simplExpr, simplRules )
+import GHC.Core.Opt.Simplify       ( simplTopBinds, simplExpr, simplImpRules )
 import GHC.Core.Opt.Simplify.Utils ( simplEnvForGHCi, activeRule, activeUnfolding )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Monad
@@ -749,7 +749,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                       -- for imported Ids.  Eg  RULE map my_f = blah
                       -- If we have a substitution my_f :-> other_f, we'd better
                       -- apply it to the rule to, or it'll never match
-                  ; rules1 <- simplRules env1 Nothing rules Nothing
+                  ; rules1 <- simplImpRules env1 rules
 
                   ; return (getTopFloatBinds floats, rules1) } ;
 

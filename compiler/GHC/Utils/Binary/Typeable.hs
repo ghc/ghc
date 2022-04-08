@@ -198,10 +198,12 @@ putTypeRep bh (App f x) = do
     put_ bh (2 :: Word8)
     putTypeRep bh f
     putTypeRep bh x
+#if __GLASGOW_HASKELL__ < 903
 putTypeRep bh (Fun arg res) = do
     put_ bh (3 :: Word8)
     putTypeRep bh arg
     putTypeRep bh res
+#endif
 
 instance Binary Serialized where
     put_ bh (Serialized the_type bytes) = do

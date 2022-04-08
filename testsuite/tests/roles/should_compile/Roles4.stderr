@@ -35,7 +35,7 @@ $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp GHC.Types.$tc[] ((:) $krep [])
+  = GHC.Types.KindRepTyConApp GHC.Types.$tcList ((:) $krep [])
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp GHC.Types.$tcConstraint []
 $krep [InlPrag=[~]]

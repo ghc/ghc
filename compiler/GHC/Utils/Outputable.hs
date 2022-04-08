@@ -385,6 +385,7 @@ data SDocContext = SDC
   , sdocStarIsType                  :: !Bool
   , sdocLinearTypes                 :: !Bool
   , sdocImpredicativeTypes          :: !Bool
+  , sdocListTuplePuns               :: !Bool
   , sdocPrintTypeAbbreviations      :: !Bool
   , sdocUnitIdForUser               :: !(FastString -> SDoc)
       -- ^ Used to map UnitIds to more friendly "package-version:component"
@@ -444,6 +445,7 @@ defaultSDocContext = SDC
   , sdocStarIsType                  = False
   , sdocImpredicativeTypes          = False
   , sdocLinearTypes                 = False
+  , sdocListTuplePuns               = True
   , sdocPrintTypeAbbreviations      = True
   , sdocUnitIdForUser               = ftext
   }

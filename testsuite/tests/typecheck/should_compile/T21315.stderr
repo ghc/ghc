@@ -1,0 +1,4 @@
+
+T21315.hs:6:10: warning: [-Wredundant-constraints]
+    • Redundant constraint: Eq a
+    • In the instance declaration for ‘C (T a)’

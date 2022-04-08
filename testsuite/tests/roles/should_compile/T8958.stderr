@@ -59,7 +59,7 @@ $krep [InlPrag=[~]]
          $krep ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep))
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
-      GHC.Types.$tc[]
+      GHC.Types.$tcList
       ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep)
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp

@@ -28,9 +28,9 @@ instance ∀ a b. Functor ((,,) a b) -- Defined in ‘GHC.Base’
 instance ∀ a b c. Functor ((,,,) a b c) -- Defined in ‘GHC.Base’
 instance ∀ r. Functor ((->) r) -- Defined in ‘GHC.Base’
 instance Functor IO -- Defined in ‘GHC.Base’
+instance Functor [] -- Defined in ‘GHC.Base’
 instance Functor Maybe -- Defined in ‘GHC.Base’
 instance Functor Solo -- Defined in ‘GHC.Base’
-instance Functor [] -- Defined in ‘GHC.Base’
 instance ∀ a. Functor (Either a) -- Defined in ‘Data.Either’
 instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
          (Functor f, Functor g) ⇒

@@ -572,9 +572,8 @@ pattern Con' :: forall k (a :: k). ()
              => TyCon -> [SomeTypeRep] -> TypeRep a
 pattern Con' con ks <- (splitApp -> IsCon con ks)
 
--- TODO: Remove Fun when #14253 is fixed
-{-# COMPLETE Fun, App, Con  #-}
-{-# COMPLETE Fun, App, Con' #-}
+{-# COMPLETE App, Con  #-}
+{-# COMPLETE App, Con' #-}
 
 {- Note [Con evidence]
 ~~~~~~~~~~~~~~~~~~~~~~

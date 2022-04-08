@@ -106,9 +106,9 @@ docs:
           $fCTYPEInt -> [text:
                            -- |A new instance
                          identifiers:],
-          $fCTYPE[] -> [text:
-                          -- |Another new instance
-                        identifiers:],
+          $fCTYPEList -> [text:
+                            -- |Another new instance
+                          identifiers:],
           $fDka -> [text:
                       -- |Another new instance
                     identifiers:],

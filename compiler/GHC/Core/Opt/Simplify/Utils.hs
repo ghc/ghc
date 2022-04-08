@@ -16,6 +16,9 @@ module GHC.Core.Opt.Simplify.Utils (
         getUnfoldingInRuleMatch,
         simplEnvForGHCi, updModeForStableUnfoldings, updModeForRules,
 
+        -- The BindContext type
+        BindContext(..), bindContextLevel,
+
         -- The continuation type
         SimplCont(..), DupFlag(..), StaticEnv,
         isSimplified, contIsStop,
@@ -82,8 +85,27 @@ import GHC.Utils.Trace
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
 
-{-
-************************************************************************
+{- *********************************************************************
+*                                                                      *
+                The BindContext type
+*                                                                      *
+********************************************************************* -}
+
+-- What sort of binding is this? A let-binding or a join-binding?
+data BindContext
+  = BC_Let                 -- A regular let-binding
+      TopLevelFlag RecFlag
+
+  | BC_Join                -- A join point with continuation k
+      SimplCont            -- See Note [Rules and unfolding for join points]
+                           -- in GHC.Core.Opt.Simplify
+
+bindContextLevel :: BindContext -> TopLevelFlag
+bindContextLevel (BC_Let top_lvl _) = top_lvl
+bindContextLevel (BC_Join {})       = NotTopLevel
+
+
+{- *********************************************************************
 *                                                                      *
                 The SimplCont and DupFlag types
 *                                                                      *
@@ -1389,7 +1411,7 @@ rules] for details.
 -}
 
 postInlineUnconditionally
-    :: SimplEnv -> TopLevelFlag
+    :: SimplEnv -> BindContext
     -> OutId            -- The binder (*not* a CoVar), including its unfolding
     -> OccInfo          -- From the InId
     -> OutExpr
@@ -1398,14 +1420,15 @@ postInlineUnconditionally
 -- See Note [Core let/app invariant] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
-postInlineUnconditionally env top_lvl bndr occ_info rhs
+postInlineUnconditionally env bind_cxt bndr occ_info rhs
   | not active                  = False
   | isWeakLoopBreaker occ_info  = False -- If it's a loop-breaker of any kind, don't inline
                                         -- because it might be referred to "earlier"
   | isStableUnfolding unfolding = False -- Note [Stable unfoldings and postInlineUnconditionally]
-  | isTopLevel top_lvl          = False -- Note [Top level and postInlineUnconditionally]
+  | isTopLevel (bindContextLevel bind_cxt)
+                                = False -- Note [Top level and postInlineUnconditionally]
   | exprIsTrivial rhs           = True
-  | isJoinId bndr                       -- See point (1) of Note [Duplicating join points]
+  | BC_Join {} <- bind_cxt              -- See point (1) of Note [Duplicating join points]
   , not (phase == FinalPhase)   = False -- in Simplify.hs
   | otherwise
   = case occ_info of

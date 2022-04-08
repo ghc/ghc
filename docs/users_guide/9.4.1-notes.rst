@@ -63,6 +63,9 @@ Compiler
 - New :ghc-flag:`-Wredundant-strictness-flags` that checks for strictness flags
   (``!``) applied to unlifted types, which are always strict.
 
+- New :ghc-flag:`-Wforall-identifier` (enabled by default) that warns against
+  using the name ``forall`` as an identifer on the term level.
+
 - New :ghc-flag:`-fprof-late` that adds automatic CCS annotations to all
   top level functions *after* core optimisation have been run.
 
@@ -189,13 +192,19 @@ Compiler
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
-- ``GHC.Exts.magicDict`` has been renamed to ``withDict`` and given a more
-  specific type: ::
+- There's a new special function ``withDict`` in ``GHC.Exts``: ::
 
         withDict :: forall {rr :: RuntimeRep} st dt (r :: TYPE rr). st -> (dt => r) -> r
 
-  Unlike ``magicDict``, ``withDict`` can be used without defining an
-  intermediate data type. For example, the ``withTypeable`` function from the
+  where ``dt`` must be a class containing exactly one method, whose type
+  must be ``st``.
+
+  This function converts ``st`` to a type class dictionary.
+  It removes the need for ``unsafeCoerce`` in implementation of reflection
+  libraries. It should be used with care, because it can introduce
+  incoherent instances.
+
+  For example, the ``withTypeable`` function from the
   ``Data.Typeable`` module can now be defined as: ::
 
         withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
@@ -204,6 +213,9 @@ Compiler
 
   Note that the explicit type applications are required, as the call to
   ``withDict`` would be ambiguous otherwise.
+
+  This replaces the old ``GHC.Exts.magicDict``, which required
+  an intermediate data type and was less reliable.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
@@ -255,7 +267,7 @@ Compiler
         ``unsafeThawSmallArray#``, ``copySmallArray#``, ``copySmallMutableArray#``, ``cloneSmallArray#``,
         ``cloneSmallMutableArray#``, ``freezeSmallArray#``, ``thawSmallArray#``, ``casSmallArray#``,
 
-    - ``newMutVar#``,``readMutVar#``,``writeMutV#``,``casMutVar#``,
+    - ``newMutVar#``, ``readMutVar#``, ``writeMutVar#``, ``casMutVar#``,
 
     - operations on ``MVar#`` and ``TVar#``:
 
@@ -284,7 +296,7 @@ Compiler
           :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)).
              SmallMutableArray# s a -> Int# -> a -> State# s -> State# s
 
-- ``ArrayArray#` and ``MutableArrayArray#`` have been moved from ``GHC.Prim`` to ``GHC.Exts``.
+- ``ArrayArray#`` and ``MutableArrayArray#`` have been moved from ``GHC.Prim`` to ``GHC.Exts``.
   They are deprecated, because their functionality is now subsumed by ``Array#``
   and ``MutableArray#``.
 
