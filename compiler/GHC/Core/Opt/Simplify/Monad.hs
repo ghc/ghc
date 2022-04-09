@@ -7,7 +7,8 @@
 
 module GHC.Core.Opt.Simplify.Monad (
         -- The monad
-        TopEnvConfig(..), SimplM,
+        TopEnvConfig(..),
+        SimplM(unSM, SM'), SimplTopEnv(..),
         initSmpl, traceSmpl,
         getSimplRules,
 
@@ -73,6 +74,8 @@ pattern SM m <- SM' m
 data TopEnvConfig = TopEnvConfig
   { te_history_size :: !Int
   , te_tick_factor :: !Int
+  , te_simpl_threads :: !Int
+  , te_simpl_group_size :: !Int
   }
 
 data SimplTopEnv

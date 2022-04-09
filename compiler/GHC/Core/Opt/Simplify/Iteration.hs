@@ -7,6 +7,8 @@
 
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.Simplify.Iteration ( simplTopBinds, simplExpr, simplImpRules ) where
@@ -34,7 +36,7 @@ import GHC.Core.DataCon
    ( DataCon, dataConWorkId, dataConRepStrictness
    , dataConRepArgTys, isUnboxedTupleDataCon
    , StrictnessMark (..) )
-import GHC.Core.Opt.Stats ( Tick(..) )
+import GHC.Core.Opt.Stats ( Tick(..), hasDetailedCounts, zeroSimplCount' )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
@@ -62,7 +64,7 @@ import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
 
-import GHC.Data.Maybe   ( isNothing, orElse )
+import GHC.Data.Maybe   ( orElse )
 import GHC.Data.FastString
 import GHC.Unit.Module ( moduleName )
 import GHC.Utils.Outputable
@@ -74,6 +76,20 @@ import GHC.Utils.Logger
 import GHC.Utils.Misc
 
 import Control.Monad
+
+import qualified Data.Map as M
+
+import Control.Concurrent
+import Data.Maybe
+import GHC.Types.Var.Env
+
+import GHC.Types.Unique.FM
+import Control.Exception (bracket_)
+import GHC.Types.Unique.Set
+import Data.Traversable (for)
+import qualified Data.IntMap as IM
+import qualified Data.Set as Set
+import GHC.Types.Var.Set
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -209,38 +225,152 @@ too small to show up in benchmarks.
 ************************************************************************
 -}
 
-simplTopBinds :: SimplEnv -> [InBind] -> SimplM (SimplFloats, SimplEnv)
+type SimplR = (SimplFloats, (SimplEnv, VarSet), SimplCount)
+type ResimplEnv = (Bool, SimplEnv)
+
+-- TODO rename
+simplScc :: ResimplEnv -> [SimplR] -> [InBind] -> SimplM (SimplFloats, SimplEnv, VarSet)
+simplScc (should_trace, env0) deps b = {-# SCC simplScc #-} do
+  let traceM | should_trace
+               && False
+             = pprTraceM
+             | otherwise = \_ _ -> pure ()
+  let (_floats0, envs0, _scs) =  unzip3 deps
+
+  traceM "simplScc:start:(#deps,binders)" $ ppr (length deps, bindersOfBinds b)
+  -- when (any (> 1) check) $ pprPanic "simplScc" $ ppr (floats0, b)
+  let
+    !inscope = {-# SCC in_scope #-} foldl' extendInScopeSetSet (seInScope env0) (snd <$> envs0)
+
+    no_collisions x y = plusUFM_C f x y where
+      -- f x y = pprPanic "collision" $ ppr (x,y)
+      f x _ = x
+    env1 = env0 { seInScope = inscope
+                , seIdSubst = foldr no_collisions emptyUFM (seIdSubst . fst <$> envs0)
+                }
+
+  traceM  "simplScc:env1:" $ ppr env1
+  (floats1, env2) <- simpl_binds env1 b
+  traceM  "simplScc:simpl_bind:(floats1,env1)" $ ppr (floats1,env2)
+  -- pprTraceM "simplScc2" $ ppr b
+  let all_new_vars = unionVarSets (mkVarSet (bindersOfBinds (getTopFloatBinds floats1)) : (map snd envs0))
+
+  pure (floats1, env2, all_new_vars)
+
+-- | Quotient a core program graph by creating regular sized groups in topological order. The result is a new
+-- quotiented graph with groups of the specified size.
+simple_group_binds :: Int -> ([(Int, InBind)], M.Map Int [Int]) -> ([(Int, [InBind])], M.Map Int [Int])
+simple_group_binds n (nodes, edges) = finalise (loop n 0 nodes IM.empty)
+  where
+    -- This part performs the edge quotient.
+    finalise :: IM.IntMap [(Int, InBind)] -> ([(Int, [InBind])], M.Map Int [Int])
+
+    finalise im = let im' = IM.toList im in (map (\(k,v) -> (k, reverse $ map snd v)) im', deps_map)
+      where
+
+        deps_map = M.fromList [(key, Set.toList deps) | (key, bs) <- IM.toList im, let deps = Set.filter (/= key) (Set.unions (map (deps_for . fst) bs))]
+
+        -- Map from old-id to new-id
+
+        rev_mapping = \n -> reverse_map IM.! n
+          where
+            reverse_map = IM.fromList [(from, to) | (to, bs) <- IM.toList im, from <- map fst bs]
+
+        deps_for :: Int -> Set.Set Int
+        deps_for b = Set.map rev_mapping (Set.fromList (edges M.! b))
+
+    -- This creates the binding groups.
+    loop k new_group_id im acc =
+      case im of
+        -- Finished
+        [] -> acc
+        ((bind_id, b): bs) ->
+          let (binds, im', k') = ([(bind_id, b)], bs, k - 1)
+              acc' = IM.insertWith (++) new_group_id binds acc
+          in case k' of
+               -- Got all we needed, now form another group
+               0 -> loop n (new_group_id + 1) im' acc'
+               -- Didn't manage to get enough bindings for a group
+               _ -> loop k' new_group_id im' acc'
+
+simplTopBinds :: Int -> SimplEnv -> ([(Int, InBind)], M.Map Int [Int]) -> SimplM (SimplFloats, SimplEnv)
 -- See Note [The big picture]
-simplTopBinds env0 binds0
+simplTopBinds group_size env0 in_binds --(binds0, g)
   = do  {       -- Put all the top-level binders into scope at the start
                 -- so that if a rewrite rule has unexpectedly brought
                 -- anything into scope, then we don't get a complaint about that.
                 -- It's rather as if the top-level binders were imported.
-                -- See Note [Glomming] in "GHC.Core.Opt.OccurAnal".
+                -- See note [Glomming] in "GHC.Core.Opt.OccurAnal".
         -- See Note [Bangs in the Simplifier]
-        ; !env1 <- {-#SCC "simplTopBinds-simplRecBndrs" #-} simplRecBndrs env0 (bindersOfBinds binds0)
-        ; (floats, env2) <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 binds0
+        ; let !env1 =  env0 { seInScope = mkInScopeSet (mkUniqSet (bindersOfBinds (concatMap snd binds0))) }
+
+        ; res <- SM' $ \te sc -> do
+            case te_simpl_threads (st_config te) of
+              1 -> unSM (simpl_binds env1 (map snd (fst in_binds))) te sc
+              _ -> do
+                -- Create a result variable for each binding group
+                env_m_vars <- liftIO $ M.fromList <$> (sequence [(k,) <$> newEmptyMVar | (k,_) <- binds0])
+                -- Control the amount of parrelism with a semaphore
+                sem <- newQSem (te_simpl_threads $ st_config te)
+                let zero_sc = zeroSimplCount' $ hasDetailedCounts sc
+                let work :: [IO ()]
+                    work = map (mk_work sem (False, env1) env_m_vars te zero_sc) grouped_binds
+                -- Spawn each group into a separate thread
+                mapM_ forkIO work
+
+                let res_vars = M.elems env_m_vars
+                (all_floats, all_envs, counts) <- liftIO (unzip3 <$> mapM readMVar res_vars)
+                let
+                  !final_env = combine_envs env1 all_envs
+                  !final_floats = foldl' addFloats (emptyFloats final_env) all_floats
+                  !final_counts = foldl' plusSimplCount sc counts
+
+                pure ((final_floats, final_env), final_counts)
+
+
         ; freeTick SimplifierDone
-        ; return (floats, env2) }
+
+        ; return res }
+
   where
+
+    (binds0, g) = simple_group_binds group_size in_binds
+    grouped_binds = binds0
+    combine_envs env0 envs =
+      env0 { seInScope = foldl' extendInScopeSetSet (seInScope env0) (map snd envs)
+           , seIdSubst = foldr plusUFM (seIdSubst env0) (map (seIdSubst . fst) envs)  }
+
+    mk_work sem env1 deps te sc0 (k, b) = do
+        rs <- for [x | di <- Set.toList (Set.fromList (g M.! k)), di /= k, Just x <- [M.lookup di deps]] readMVar
+        -- Wait for dependencies to finish
+        let my_var = fromJust (M.lookup k deps)
+        -- Wait for a semaphore slot
+        bracket_ (waitQSem sem) (signalQSem sem) $ do
+          -- Simplify the group
+          ((f,e, new_vars),sc) <- unSM (simplScc env1 rs b) te sc0
+          -- Put the result into the result variable
+          putMVar my_var (f, (e, new_vars), sc)
+
+
         -- We need to track the zapped top-level binders, because
         -- they should have their fragile IdInfo zapped (notably occurrence info)
         -- That's why we run down binds and bndrs' simultaneously.
         --
-    simpl_binds :: SimplEnv -> [InBind] -> SimplM (SimplFloats, SimplEnv)
-    simpl_binds env []           = return (emptyFloats env, env)
-    simpl_binds env (bind:binds) = do { (float,  env1) <- simpl_bind env bind
-                                      ; (floats, env2) <- simpl_binds env1 binds
-                                      -- See Note [Bangs in the Simplifier]
-                                      ; let !floats1 = float `addFloats` floats
-                                      ; return (floats1, env2) }
+simpl_binds :: SimplEnv -> [InBind] -> SimplM (SimplFloats, SimplEnv)
+simpl_binds env []           = return (emptyFloats env, env)
+simpl_binds env (bind:binds) = do { (float,  env1) <- simpl_bind env bind
+                                  ; (floats, env2) <- simpl_binds env1 binds
+                                  -- See Note [Bangs in the Simplifier]
+                                  ; let !floats1 = float `addFloats` floats
+                                  ; return (floats1, env2) }
 
-    simpl_bind env (Rec pairs)
-      = simplRecBind env (BC_Let TopLevel Recursive) pairs
-    simpl_bind env (NonRec b r)
-      = do { let bind_cxt = BC_Let TopLevel NonRecursive
-           ; (env', b') <- addBndrRules env b (lookupRecBndr env b) bind_cxt
-           ; simplRecOrTopPair env' bind_cxt b b' r }
+simpl_bind :: SimplEnv -> Bind InId -> SimplM (SimplFloats, SimplEnv)
+simpl_bind env (Rec pairs)
+   = simplRecBind env (BC_Let TopLevel Recursive) pairs
+simpl_bind env (NonRec b r)
+   = do { let bind_cxt = BC_Let TopLevel NonRecursive
+        ; (env', b') <- addBndrRules env b (lookupRecBndr env b) bind_cxt
+        ; simplRecOrTopPair env' bind_cxt b b' r }
 
 {-
 ************************************************************************

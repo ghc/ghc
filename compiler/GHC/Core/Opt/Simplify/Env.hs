@@ -83,7 +83,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Types.Unique.FM      ( pprUniqFM )
 
-import Data.List ( intersperse, mapAccumL )
+import Data.List ( intersperse )
 
 {-
 ************************************************************************
@@ -316,6 +316,10 @@ Note that all of this is quite separate from the global FloatOut pass;
 see GHC.Core.Opt.FloatOut.
 
 -}
+instance Outputable SimplEnv where
+  ppr (SimplEnv a b c d e f g h) = ppr a <+> ppr b <+> ppr c <+> ppr d <+> ppr e <+> ppr f <+> ppr g <+> ppr h
+
+
 
 data SimplFloats
   = SimplFloats
@@ -995,7 +999,7 @@ simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 simplBinder !env bndr
   | isTyVar bndr  = do  { let (env', tv) = substTyVarBndr env bndr
                         ; seqTyVar tv `seq` return (env', tv) }
-  | otherwise     = do  { let (env', id) = substIdBndr env bndr
+  | otherwise     = do  { (env', id) <- substIdBndr env bndr
                         ; seqId id `seq` return (env', id) }
 
 ---------------
@@ -1003,7 +1007,7 @@ simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- A non-recursive let binder
 simplNonRecBndr !env id
   -- See Note [Bangs in the Simplifier]
-  = do  { let (!env1, id1) = substIdBndr env id
+  = do  { (!env1, id1) <- substIdBndr env id
         ; seqId id1 `seq` return (env1, id1) }
 
 ---------------
@@ -1012,21 +1016,21 @@ simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
 simplRecBndrs env@(SimplEnv {}) ids
   -- See Note [Bangs in the Simplifier]
   = assert (all (not . isJoinId) ids) $
-    do  { let (!env1, ids1) = mapAccumL substIdBndr env ids
+    do  { (!env1, ids1) <- mapAccumLM substIdBndr env ids
         ; seqIds ids1 `seq` return env1 }
 
 ---------------
-substIdBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)
+substIdBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- Might be a coercion variable
 substIdBndr env bndr
-  | isCoVar bndr  = substCoVarBndr env bndr
+  | isCoVar bndr  = return $ substCoVarBndr env bndr
   | otherwise     = substNonCoVarIdBndr env bndr
 
 ---------------
 substNonCoVarIdBndr
    :: SimplEnv
    -> InBndr    -- Env and binder to transform
-   -> (SimplEnv, OutBndr)
+   -> SimplM (SimplEnv, OutBndr)
 -- Clone Id if necessary, substitute its type
 -- Return an Id with its
 --      * Type substituted
@@ -1053,34 +1057,36 @@ substNonCoVarIdBndr env id = subst_id_bndr env id (\x -> x)
 subst_id_bndr :: SimplEnv
               -> InBndr    -- Env and binder to transform
               -> (OutId -> OutId)  -- Adjust the type
-              -> (SimplEnv, OutBndr)
+              -> SimplM (SimplEnv, OutBndr)
 subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
               old_id adjust_type
-  = assertPpr (not (isCoVar old_id)) (ppr old_id)
-    (env { seInScope = new_in_scope,
-           seIdSubst = new_subst }, new_id)
-    -- It's important that both seInScope and seIdSubst are updated with
-    -- the new_id, /after/ applying adjust_type. That's why adjust_type
-    -- is done here.  If we did adjust_type in simplJoinBndr (the only
-    -- place that gives a non-identity adjust_type) we'd have to fiddle
-    -- afresh with both seInScope and seIdSubst
-  where
-    -- See Note [Bangs in the Simplifier]
-    !id1  = uniqAway in_scope old_id
-    !id2  = substIdType env id1
-    !id3  = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
-                                      -- and fragile OccInfo
-    !new_id = adjust_type id3
+  =  do
+      -- See Note [Bangs in the Simplifier]
+      new_unique <- getUniqueM
+      let
+        !id1  = setVarUnique old_id new_unique
+        !id2  = substIdType env id1
+        !id3  = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
+                                          -- and fragile OccInfo
+        !new_id = adjust_type id3
 
-        -- Extend the substitution if the unique has changed,
-        -- or there's some useful occurrence information
-        -- See the notes with substTyVarBndr for the delSubstEnv
-    !new_subst | new_id /= old_id
-              = extendVarEnv id_subst old_id (DoneId new_id)
-              | otherwise
-              = delVarEnv id_subst old_id
+            -- Extend the substitution if the unique has changed,
+            -- or there's some useful occurrence information
+            -- See the notes with substTyVarBndr for the delSubstEnv
+        !new_subst | new_id /= old_id
+                  = extendVarEnv id_subst old_id (DoneId new_id)
+                  | otherwise
+                  = delVarEnv id_subst old_id
 
-    !new_in_scope = in_scope `extendInScopeSet` new_id
+        !new_in_scope = in_scope `extendInScopeSet` new_id
+      assertPpr (not (isCoVar old_id)) (ppr old_id) $
+        return (env { seInScope = new_in_scope,
+                      seIdSubst = new_subst }, new_id)
+        -- It's important that both seInScope and seIdSubst are updated with
+        -- the new_id, /after/ applying adjust_type. That's why adjust_type
+        -- is done here.  If we did adjust_type in simplJoinBndr (the only
+        -- place that gives a non-identity adjust_type) we'd have to fiddle
+        -- afresh with both seInScope and seIdSubst
 
 ------------------------------------
 seqTyVar :: TyVar -> ()
@@ -1134,7 +1140,7 @@ simplNonRecJoinBndr :: SimplEnv -> InBndr
 -- context being pushed inward may change the type
 -- See Note [Return type for join points]
 simplNonRecJoinBndr env id mult res_ty
-  = do { let (env1, id1) = simplJoinBndr mult res_ty env id
+  = do { (env1, id1) <- simplJoinBndr mult res_ty env id
        ; seqId id1 `seq` return (env1, id1) }
 
 simplRecJoinBndrs :: SimplEnv -> [InBndr]
@@ -1145,13 +1151,13 @@ simplRecJoinBndrs :: SimplEnv -> [InBndr]
 -- See Note [Return type for join points]
 simplRecJoinBndrs env@(SimplEnv {}) ids mult res_ty
   = assert (all isJoinId ids) $
-    do  { let (env1, ids1) = mapAccumL (simplJoinBndr mult res_ty) env ids
+    do  { (env1, ids1) <- mapAccumLM (simplJoinBndr mult res_ty) env ids
         ; seqIds ids1 `seq` return env1 }
 
 ---------------
 simplJoinBndr :: Mult -> OutType
               -> SimplEnv -> InBndr
-              -> (SimplEnv, OutBndr)
+              -> SimplM (SimplEnv, OutBndr)
 simplJoinBndr mult res_ty env id
   = subst_id_bndr env id (adjustJoinPointType mult res_ty)
 

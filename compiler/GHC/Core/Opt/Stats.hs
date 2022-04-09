@@ -10,7 +10,7 @@
 module GHC.Core.Opt.Stats (
     SimplCount, doSimplTick, doFreeSimplTick, simplCountN,
     pprSimplCount, plusSimplCount, zeroSimplCount,
-    isZeroSimplCount, hasDetailedCounts, Tick(..)
+    isZeroSimplCount, hasDetailedCounts, Tick(..), zeroSimplCount'
   ) where
 
 import GHC.Prelude
@@ -73,6 +73,11 @@ zeroSimplCount dump_simpl_stats
                 n_log = 0, log1 = [], log2 = []}
   | otherwise
   = VerySimplCount 0
+
+zeroSimplCount' :: Bool -> SimplCount
+zeroSimplCount' True  = SimplCount {ticks = 0, details = Map.empty, n_log = 0, log1 = [], log2 = []}
+zeroSimplCount' False = VerySimplCount 0
+
 
 isZeroSimplCount (VerySimplCount n)         = n==0
 isZeroSimplCount (SimplCount { ticks = n }) = n==0

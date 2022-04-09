@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TupleSections #-}
 
 module GHC.Core.Opt.Simplify
   ( SimplifyExprOpts(..), SimplifyOpts(..)
@@ -31,21 +33,20 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Unit.Env ( UnitEnv, ueEPS )
 import GHC.Unit.External
 import GHC.Unit.Module.ModGuts
+import GHC.Types.Var.Env
+
+import GHC.Types.Unique.FM
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Basic
 import GHC.Types.Var.Set
-import GHC.Types.Var.Env
 import GHC.Types.Tickish
-import GHC.Types.Unique.FM
 
 import Control.Monad
 import Data.Foldable ( for_ )
 
-#if __GLASGOW_HASKELL__ <= 810
-import GHC.Utils.Panic ( panic )
-#endif
+
 
 {-
 ************************************************************************
@@ -214,7 +215,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                } ;
            Logger.putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
                      FormatCore
-                     (pprCoreBindings tagged_binds);
+                     (pprCoreBindings (map snd (fst tagged_binds)));
 
                 -- read_eps_rules:
                 -- We need to read rules from the EPS regularly because simplification can
@@ -245,7 +246,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
            ((binds1, rules1), counts1) <-
              initSmpl logger read_rule_env top_env_cfg sz $
                do { (floats, env1) <- {-# SCC "SimplTopBinds" #-}
-                                      simplTopBinds simpl_env tagged_binds
+                                      simplTopBinds (te_simpl_group_size top_env_cfg) simpl_env tagged_binds
 
                       -- Apply the substitution to rules defined in this module
                       -- for imported Ids.  Eg  RULE map my_f = blah

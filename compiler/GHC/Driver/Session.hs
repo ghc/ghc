@@ -485,6 +485,8 @@ data DynFlags = DynFlags {
                                         --   a pattern against. A safe guard
                                         --   against exponential blow-up.
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
+  simplThreads          :: Int,         -- ^ The number of threads to use in the simplifier
+  simplGroupSize        :: Int,         -- ^ The group size to use in the parralel simplifier
   dmdUnboxWidth         :: !Int,        -- ^ Whether DmdAnal should optimistically put an
                                         --   Unboxed demand on returned products with at most
                                         --   this number of fields
@@ -1128,6 +1130,8 @@ defaultDynFlags mySettings =
         maxUncoveredPatterns    = 4,
         maxPmCheckModels        = 30,
         simplTickFactor         = 100,
+        simplThreads            = 1,
+        simplGroupSize          = 50,
         dmdUnboxWidth           = 3,      -- Default: Assume an unboxed demand on function bodies returning a triple
         specConstrThreshold     = Just 2000,
         specConstrCount         = Just 3,
@@ -2754,6 +2758,10 @@ dynamic_flags_deps = [
           ; return d })))
   , make_ord_flag defFlag "fsimpl-tick-factor"
       (intSuffix (\n d -> d { simplTickFactor = n }))
+  , make_ord_flag defFlag "fsimpl-threads"
+      (intSuffix (\n d -> d { simplThreads = n }))
+  , make_ord_flag defFlag "fsimpl-group-size"
+      (intSuffix (\n d -> d { simplGroupSize = n }))
   , make_ord_flag defFlag "fdmd-unbox-width"
       (intSuffix (\n d -> d { dmdUnboxWidth = n }))
   , make_ord_flag defFlag "fspec-constr-threshold"

@@ -244,7 +244,7 @@ plusUFM (UFM x) (UFM y) = UFM (M.union y x)
      -- M.union is left-biased, plusUFM should be right-biased.
 
 plusUFM_C :: (elt -> elt -> elt) -> UniqFM key elt -> UniqFM key elt -> UniqFM key elt
-plusUFM_C f (UFM x) (UFM y) = UFM (M.unionWith f x y)
+plusUFM_C f (UFM x) (UFM y) = UFM (MS.unionWith f x y)
 
 -- | `plusUFM_CD f m1 d1 m2 d2` merges the maps using `f` as the
 -- combinding function and `d1` resp. `d2` as the default value if

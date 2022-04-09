@@ -36,6 +36,8 @@ initSimplifyExprOpts dflags ic = SimplifyExprOpts
   , se_top_env_cfg = TopEnvConfig
     { te_history_size = historySize dflags
     , te_tick_factor = simplTickFactor dflags
+    , te_simpl_threads = simplThreads dflags
+    , te_simpl_group_size = simplGroupSize dflags
     }
   }
 
@@ -52,7 +54,9 @@ initSimplifyOpts dflags extra_vars iterations mode hpt_rule_base = let
                            else Nothing
     , so_hpt_rules       = hpt_rule_base
     , so_top_env_cfg     = TopEnvConfig { te_history_size = historySize dflags
-                                        , te_tick_factor = simplTickFactor dflags }
+                                        , te_tick_factor = simplTickFactor dflags
+                                        , te_simpl_threads = simplThreads dflags
+                                        , te_simpl_group_size = simplGroupSize dflags }
     }
   in opts
 

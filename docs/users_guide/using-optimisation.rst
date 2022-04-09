@@ -945,6 +945,26 @@ by saying ``-fno-wombat``.
     more detailed list. Usually that identifies the loop quite
     accurately, because some numbers are very large.
 
+.. ghc-flag:: -fsimpl-threads=⟨n⟩
+    :shortdesc: *default: 1.* Set
+    :type: dynamic
+    :category:
+
+    :default: 1
+
+    Stub
+
+
+.. ghc-flag:: -fsimpl-group-size=⟨n⟩
+    :shortdesc: *default: .* Set the group size
+    :type: dynamic
+    :category:
+
+    :default: 50
+
+    stub
+
+
 .. ghc-flag:: -fdmd-unbox-width=⟨n⟩
     :shortdesc: *default: 3.* Boxity analysis pretends that returned records
                               with this many fields can be unboxed.
