@@ -108,8 +108,7 @@ Note [Embedding large binary blobs]
 To embed a blob of binary data (e.g. an UTF-8 encoded string) into the generated
 code object, we have several options:
 
-   1. Generate a ".byte" directive for each byte. This is what was done in the past
-      (see Note [Pretty print ASCII when AsmCodeGen]).
+   1. Generate a ".byte" directive for each byte. This is what was done in the past.
 
    2. Generate a single ".string"/".asciz" directive for the whole sequence of
       bytes. Bytes in the ASCII printable range are rendered as characters and
