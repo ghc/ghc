@@ -4,6 +4,10 @@
  *
  * Generational garbage collector: scavenging functions
  *
+ * Scavenging means reading already copied (evacuated) objects and evactuating
+ * any pointers the object holds and updating the pointers to their new
+ * locations.
+ *
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
  *

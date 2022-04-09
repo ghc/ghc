@@ -4,6 +4,9 @@
  *
  * Generational garbage collector: evacuation functions
  *
+ * Evacuating is copying (live) objects from a source generation to the target
+ * generation.
+ *
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
  *
@@ -633,7 +636,8 @@ evacuate_compact (StgPtr p)
 /* ----------------------------------------------------------------------------
    Evacuate
 
-   This is called (eventually) for every live object in the system.
+   Copies an object from its current generation to a target generation. This is
+   called (eventually) for every live object in the system.
 
    The caller to evacuate specifies a desired generation in the
    gct->evac_gen thread-local variable.  The following conditions apply to
