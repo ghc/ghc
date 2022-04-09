@@ -48,6 +48,9 @@
     A [migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/no-monadfail-st-inst.md)
     is available.
 
+  * Add functions `traceWith`, `traceShowWith`, `traceEventWith` to
+    `Debug.Trace`, per
+    [CLC #36](https://github.com/haskell/core-libraries-committee/issues/36).
 
 ## 4.16.0.0 *Nov 2021*
 
