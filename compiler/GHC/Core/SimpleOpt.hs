@@ -158,14 +158,14 @@ simpleOptPgm :: SimpleOpts
              -> (CoreProgram, [CoreRule], CoreProgram)
 -- See Note [The simple optimiser]
 simpleOptPgm opts this_mod binds rules =
-    (reverse binds', rules', occ_anald_binds)
+    (reverse binds', rules', map snd $ fst occ_anald_binds)
   where
     occ_anald_binds  = occurAnalysePgm this_mod
                           (\_ -> True)  {- All unfoldings active -}
                           (\_ -> False) {- No rules active -}
                           rules binds
 
-    (final_env, binds') = foldl' do_one (emptyEnv opts, []) occ_anald_binds
+    (final_env, binds') = foldl' do_one (emptyEnv opts, []) (map snd (fst occ_anald_binds))
     final_subst = soe_subst final_env
 
     rules' = substRulesForImportedIds final_subst rules

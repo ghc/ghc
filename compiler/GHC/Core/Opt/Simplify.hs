@@ -6,6 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
@@ -70,7 +71,14 @@ import GHC.Utils.Misc
 import GHC.Unit.Module ( moduleName, pprModuleName )
 import GHC.Core.Multiplicity
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
+import qualified Data.Map as M
+import Control.Concurrent
+import Data.Maybe
+import GHC.Types.Var.Env
 
+import GHC.Types.Unique.FM
+import Control.Concurrent.QSem
+import Control.Exception
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -206,20 +214,63 @@ too small to show up in benchmarks.
 ************************************************************************
 -}
 
-simplTopBinds :: SimplEnv -> [InBind] -> SimplM (SimplFloats, SimplEnv)
+simplTopBinds :: SimplEnv -> ([(Int, InBind)], M.Map Int [Int]) -> SimplM (SimplFloats, SimplEnv)
 -- See Note [The big picture]
-simplTopBinds env0 binds0
+simplTopBinds env0 (binds0, g)
   = do  {       -- Put all the top-level binders into scope at the start
                 -- so that if a rewrite rule has unexpectedly brought
                 -- anything into scope, then we don't get a complaint about that.
                 -- It's rather as if the top-level binders were imported.
                 -- See note [Glomming] in "GHC.Core.Opt.OccurAnal".
         -- See Note [Bangs in the Simplifier]
-        ; !env1 <- {-#SCC "simplTopBinds-simplRecBndrs" #-} simplRecBndrs env0 (bindersOfBinds binds0)
-        ; (floats, env2) <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 binds0
+        ; !env1 <- {-#SCC "simplTopBinds-simplRecBndrs" #-} simplRecBndrs env0 (bindersOfBinds (map snd binds0))
+
+--        ; env_m_vars :: M.Map Int (MVar (SimplFloats, SimplEnv))
+        ; env_m_vars <- liftIO $ M.fromList <$> (sequence [(k,) <$> newEmptyMVar | (k,_) <- binds0])
+
+
+        ; sem <- liftIO $ newQSem 8
+        ; SM' $ \te sc -> do
+            mapM_ (do_one sem env1 env_m_vars te sc) binds0
+            return ((), sc)
+
+        ; let res_vars = M.elems env_m_vars
+        ; (all_floats, all_envs) <- liftIO (unzip <$> mapM readMVar res_vars)
+
+        ;
+
+--        ; old_res <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 (map snd binds0)
         ; freeTick SimplifierDone
-        ; return (floats, env2) }
+        ; let new_res = (foldl' unionFloats (emptyFloats env1) all_floats ,  combine_envs env1 all_envs)
+
+        ; return new_res }
   where
+    combine_envs env0 envs =
+      env0 { seInScope = foldr unionInScope (seInScope env0) (map seInScope envs)
+           , seIdSubst = foldr plusUFM (seIdSubst env0) (map seIdSubst envs)  }
+
+    do_one sem env1 deps te sc (k, b) = do
+      ---pprTraceM "forking" (ppr k)
+      forkIO $ do
+        let ds = (filter (/= k) $ fromJust $ M.lookup k g)
+        --print (k, ds)
+        (_, envs) <- unzip <$> mapM readMVar (mapMaybe (\di -> M.lookup di deps) ds)
+        let my_var = fromJust (M.lookup k deps)
+        let env' = combine_envs env1 envs
+        bracket_ (waitQSem sem) (signalQSem sem) $ do
+          --pprTraceM "starting" (ppr k )
+          ((floats, env''), _) <- unSM (simpl_bind env' b) te sc
+          putMVar my_var (floats, env'')
+        --pprTraceM "finished" (ppr k )
+
+
+
+
+--    go :: M.Map Int (MVar SimplEnv) -> [Int] -> IO (MVar SimplEnv)
+--    go m deps = let deps = map (\k -> M.lookup k m) deps
+--                in _
+
+
         -- We need to track the zapped top-level binders, because
         -- they should have their fragile IdInfo zapped (notably occurrence info)
         -- That's why we run down binds and bndrs' simultaneously.

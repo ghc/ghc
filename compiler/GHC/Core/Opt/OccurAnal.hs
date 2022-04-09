@@ -34,7 +34,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Basic
 import GHC.Types.Tickish
-import GHC.Unit.Module( Module )
+import GHC.Unit.Module( Module, moduleNameString, moduleName )
 import GHC.Core.Coercion
 import GHC.Core.Type
 import GHC.Core.TyCo.FVs( tyCoVarsOfMCo )
@@ -54,7 +54,12 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe( isJust )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import Data.Maybe
+import System.IO.Unsafe
 import Data.List (mapAccumL, mapAccumR)
+import System.Directory
+import GHC.Core.Stats
+import qualified Data.Map as Map
 
 {-
 ************************************************************************
@@ -71,25 +76,30 @@ occurAnalyseExpr :: CoreExpr -> CoreExpr
 occurAnalyseExpr expr
   = snd (occAnal initOccEnv expr)
 
+
+
+
 occurAnalysePgm :: Module         -- Used only in debug output
                 -> (Id -> Bool)         -- Active unfoldings
                 -> (Activation -> Bool) -- Active rules
                 -> [CoreRule]           -- Local rules for imported Ids
-                -> CoreProgram -> CoreProgram
+                -> CoreProgram -> ([(Int, CoreBind)], Map.Map Int [Int])
 occurAnalysePgm this_mod active_unf active_rule imp_rules binds
-  | isEmptyDetails final_usage
-  = occ_anald_binds
+--  | isEmptyDetails final_usage && False
+--  = occ_anald_binds
 
   | otherwise   -- See Note [Glomming]
   = WARN( True, hang (text "Glomming in" <+> ppr this_mod <> colon)
                    2 (ppr final_usage ) )
-    occ_anald_glommed_binds
+    unsafePerformIO dump `seq` (occ_anald_glommed_binds, g)
   where
+    dump = (dumpCoreProgram this_mod init_env TopLevel imp_rule_edges (flattenBinds binds) initial_uds)
+
     init_env = initOccEnv { occ_rule_act = active_rule
                           , occ_unf_act  = active_unf }
 
     (final_usage, occ_anald_binds) = go init_env binds
-    (_, occ_anald_glommed_binds)   = occAnalRecBind init_env TopLevel
+    (_, occ_anald_glommed_binds, g)   = occAnalRecBind init_env TopLevel
                                                     imp_rule_edges
                                                     (flattenBinds binds)
                                                     initial_uds
@@ -722,7 +732,8 @@ occAnalBind :: OccEnv           -- The incoming OccEnv
 occAnalBind env lvl top_env (NonRec binder rhs) body_usage
   = occAnalNonRecBind env lvl top_env binder rhs body_usage
 occAnalBind env lvl top_env (Rec pairs) body_usage
-  = occAnalRecBind env lvl top_env pairs body_usage
+  = let (a,b,_) = occAnalRecBind env lvl top_env pairs body_usage
+    in (a,map snd b)
 
 -----------------
 occAnalNonRecBind :: OccEnv -> TopLevelFlag -> ImpRuleEdges -> Var -> CoreExpr
@@ -789,38 +800,108 @@ occAnalNonRecBind env lvl imp_rule_edges bndr rhs body_usage
     active     = isAlwaysActive (idInlineActivation bndr)
     not_stable = not (isStableUnfolding (idUnfolding bndr))
 
+dumpCoreProgram :: Module -> OccEnv -> TopLevelFlag -> ImpRuleEdges -> [(Var,CoreExpr)]
+                -> UsageDetails -> IO ()
+dumpCoreProgram mod env lvl imp_rule_edges pairs body_usage
+  = mapM_ dumpSCC sccs
+  where
+    sccs :: [(Int, SCC LetrecNode)]
+    sccs =  zip [0..] $ stronglyConnCompFromEdgedVerticesUniqR nodes
+
+    -- Map from binder to unique
+    nodeMap :: UniqFM Unique Int
+    nodeMap = foldr process emptyUFM sccs
+      where
+        process (k, AcyclicSCC n) m = addToUFM m (node_key n) k
+        process (k, CyclicSCC ns) m = foldr process m (map (\n -> (k, AcyclicSCC n)) ns)
+
+
+    nodes :: [LetrecNode]
+    nodes = map (makeNode rhs_env imp_rule_edges bndr_set) pairs
+
+    bndrs    = map fst pairs
+    bndr_set = mkVarSet bndrs
+    rhs_env  = env `addInScope` bndrs
+
+    outfile_cand = "core/" ++ moduleNameString (moduleName mod) ++ "-core.edges"
+
+    outfile = unsafePerformIO $ loop outfile_cand 0
+      where
+        loop f n = do
+          e <- doesFileExist (f ++ show n)
+          if e then loop f (n + 1) else return (f ++ show n)
+
+
+
+    dumpVertex :: Int -> Int -> [Unique] -> IO ()
+    dumpVertex u s ds = appendFile outfile (show (u, s, map resolveEdge ds) ++ "\n")
+
+    resolveEdge :: Unique -> Int
+    resolveEdge v = fromJust $ lookupUFM nodeMap v
+
+    size = exprSize
+
+    dumpSCC :: (Int, SCC LetrecNode) -> IO ()
+    dumpSCC (k, (AcyclicSCC n)) = dumpVertex k (size (nd_rhs (node_payload n))) (node_dependencies n)
+    dumpSCC (k, (CyclicSCC n)) = dumpVertex k
+                                  (sum (map (size . nd_rhs . node_payload) n))
+                                  (concatMap node_dependencies n)
+
 -----------------
 occAnalRecBind :: OccEnv -> TopLevelFlag -> ImpRuleEdges -> [(Var,CoreExpr)]
-               -> UsageDetails -> (UsageDetails, [CoreBind])
+               -> UsageDetails -> (UsageDetails, [(Int, CoreBind)], Map.Map Int [Int])
 -- For a recursive group, we
 --      * occ-analyse all the RHSs
 --      * compute strongly-connected components
 --      * feed those components to occAnalRec
 -- See Note [Recursive bindings: the grand plan]
 occAnalRecBind env lvl imp_rule_edges pairs body_usage
-  = foldr (occAnalRec rhs_env lvl) (body_usage, []) sccs
+  = let (uds, bs) = foldr (uncurry $ occAnalRec rhs_env lvl) (body_usage, []) o_sccs
+    in (uds, bs, Map.fromList (map dumpSCC sccs))
   where
-    sccs :: [SCC Details]
-    sccs = {-# SCC "occAnalBind.scc" #-}
-           stronglyConnCompFromEdgedVerticesUniq nodes
+    o_sccs = fmap (fmap (fmap node_payload)) sccs
+
+    sccs :: [(Int, SCC LetrecNode)]
+    sccs =  zip [0..] $ stronglyConnCompFromEdgedVerticesUniqR nodes
+
+    -- Map from binder to unique
+    nodeMap :: UniqFM Unique Int
+    nodeMap = foldr process emptyUFM sccs
+      where
+        process (k, AcyclicSCC n) m = addToUFM m (node_key n) k
+        process (k, CyclicSCC ns) m = foldr process m (map (\n -> (k, AcyclicSCC n)) ns)
+
 
     nodes :: [LetrecNode]
-    nodes = {-# SCC "occAnalBind.assoc" #-}
-            map (makeNode rhs_env imp_rule_edges bndr_set) pairs
+    nodes = map (makeNode rhs_env imp_rule_edges bndr_set) pairs
 
     bndrs    = map fst pairs
     bndr_set = mkVarSet bndrs
     rhs_env  = env `addInScope` bndrs
 
+    dumpVertex :: Int -> Int -> [Unique] -> (Int, [Int])
+    dumpVertex u s ds = (u,  map resolveEdge ds)
+
+    resolveEdge :: Unique -> Int
+    resolveEdge v = fromJust $ lookupUFM nodeMap v
+
+    size = exprSize
+
+    dumpSCC :: (Int, SCC LetrecNode) -> (Int, [Int])
+    dumpSCC (k, (AcyclicSCC n)) = dumpVertex k (size (nd_rhs (node_payload n))) (node_dependencies n)
+    dumpSCC (k, (CyclicSCC n)) = dumpVertex k
+                                  (sum (map (size . nd_rhs . node_payload) n))
+                                  (concatMap node_dependencies n)
+
 
 -----------------------------
 occAnalRec :: OccEnv -> TopLevelFlag
-           -> SCC Details
-           -> (UsageDetails, [CoreBind])
-           -> (UsageDetails, [CoreBind])
+           -> Int -> SCC Details
+           -> (UsageDetails, [(Int, CoreBind)])
+           -> (UsageDetails, [(Int, CoreBind)])
 
         -- The NonRec case is just like a Let (NonRec ...) above
-occAnalRec _ lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
+occAnalRec _ lvl k (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
                                  , nd_uds = rhs_uds, nd_rhs_bndrs = rhs_bndrs }))
            (body_uds, binds)
   | not (bndr `usedIn` body_uds)
@@ -828,7 +909,7 @@ occAnalRec _ lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
 
   | otherwise                   -- It's mentioned in the body
   = (body_uds' `andUDs` rhs_uds',
-     NonRec tagged_bndr rhs : binds)
+     (k, NonRec tagged_bndr rhs) : binds)
   where
     (body_uds', tagged_bndr) = tagNonRecBinder lvl body_uds bndr
     rhs_uds'   = adjustRhsUsage NonRecursive (willBeJoinId_maybe tagged_bndr)
@@ -837,13 +918,13 @@ occAnalRec _ lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
         -- The Rec case is the interesting one
         -- See Note [Recursive bindings: the grand plan]
         -- See Note [Loop breaking]
-occAnalRec env lvl (CyclicSCC details_s) (body_uds, binds)
+occAnalRec env lvl k (CyclicSCC details_s) (body_uds, binds)
   | not (any (`usedIn` body_uds) bndrs) -- NB: look at body_uds, not total_uds
   = (body_uds, binds)                   -- See Note [Dead code]
 
   | otherwise   -- At this point we always build a single Rec
   = -- pprTrace "occAnalRec" (ppr loop_breaker_nodes)
-    (final_uds, Rec pairs : binds)
+    (final_uds, (k, Rec pairs) : binds)
 
   where
     bndrs      = map nd_bndr details_s
@@ -1369,7 +1450,7 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
                  , nd_inl             = inl_fvs
                  , nd_simple          = null rules_w_uds && null imp_rule_info
                  , nd_active_rule_fvs = active_rule_fvs
-                 , nd_score           = pprPanic "makeNodeDetails" (ppr bndr) }
+                 , nd_score           = (0,0, False) }
 
     bndr' = bndr `setIdUnfolding`      unf'
                  `setIdSpecialisation` mkRuleInfo rules'

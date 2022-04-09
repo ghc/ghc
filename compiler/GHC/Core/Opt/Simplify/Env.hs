@@ -30,7 +30,7 @@ module GHC.Core.Opt.Simplify.Env (
 
         -- * Floats
         SimplFloats(..), emptyFloats, mkRecFloats,
-        mkFloatBind, addLetFloats, addJoinFloats, addFloats,
+        mkFloatBind, addLetFloats, addJoinFloats, addFloats, unionFloats,
         extendFloats, wrapFloats,
         doFloatFromRhs, getTopFloatBinds,
 
@@ -107,6 +107,11 @@ data SimplEnv
 
       , seCaseDepth :: !Int  -- Depth of multi-branch case alternatives
     }
+
+instance Outputable SimplEnv where
+  ppr (SimplEnv a b c d e f) = ppr a <+> ppr b <+> ppr c <+> ppr d <+> ppr e <+> ppr f
+
+
 
 data SimplFloats
   = SimplFloats
@@ -601,6 +606,14 @@ addFloats (SimplFloats { sfLetFloats = lf1, sfJoinFloats = jf1 })
   = SimplFloats { sfLetFloats  = lf1 `addLetFlts` lf2
                 , sfJoinFloats = jf1 `addJoinFlts` jf2
                 , sfInScope    = in_scope }
+
+
+unionFloats :: SimplFloats -> SimplFloats -> SimplFloats
+unionFloats (SimplFloats { sfLetFloats = lf1, sfJoinFloats = jf1, sfInScope = in_scope1 })
+            (SimplFloats { sfLetFloats = lf2, sfJoinFloats = jf2, sfInScope = in_scope2 })
+  = SimplFloats { sfLetFloats  = lf1 `addLetFlts` lf2
+                , sfJoinFloats = jf1 `addJoinFlts` jf2
+                , sfInScope    = in_scope1 `unionInScope` in_scope2 }
 
 addLetFlts :: LetFloats -> LetFloats -> LetFloats
 addLetFlts (LetFloats bs1 l1) (LetFloats bs2 l2)

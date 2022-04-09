@@ -771,7 +771,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                } ;
            Logger.dumpIfSet_dyn logger dflags Opt_D_dump_occur_anal "Occurrence analysis"
                      FormatCore
-                     (pprCoreBindings tagged_binds);
+                     (pprCoreBindings (map snd $ fst tagged_binds));
 
                 -- Get any new rules, and extend the rule base
                 -- See Note [Overall plumbing for rules] in GHC.Core.Rules
