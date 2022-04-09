@@ -12,7 +12,6 @@
 module GHC.CmmToAsm.Ppr (
         doubleToBytes,
         floatToBytes,
-        pprASCII,
         pprString,
         pprFileEmbed,
         pprSectionHeader
@@ -88,42 +87,6 @@ doubleToBytes d = runST $ do
 -- Printing ASCII strings.
 --
 -- Print as a string and escape non-printable characters.
--- This is similar to charToC in GHC.Utils.Misc
-
-pprASCII :: ByteString -> SDoc
-pprASCII str
-  -- Transform this given literal bytestring to escaped string and construct
-  -- the literal SDoc directly.
-  -- See #14741
-  -- and Note [Pretty print ASCII when AsmCodeGen]
-  --
-  -- We work with a `Doc` instead of an `SDoc` because there is no need to carry
-  -- an `SDocContext` that we don't use. It leads to nicer (STG) code.
-  = docToSDoc (BS.foldr f Pretty.empty str)
-    where
-       f :: Word8 -> Pretty.Doc -> Pretty.Doc
-       f w s = do1 w Pretty.<> s
-
-       do1 :: Word8 -> Pretty.Doc
-       do1 w | 0x09 == w = Pretty.text "\\t"
-             | 0x0A == w = Pretty.text "\\n"
-             | 0x22 == w = Pretty.text "\\\""
-             | 0x5C == w = Pretty.text "\\\\"
-               -- ASCII printable characters range
-             | w >= 0x20 && w <= 0x7E = Pretty.char (chr' w)
-             | otherwise = Pretty.sizedText 4 xs
-                where
-                 !xs = [ '\\', x0, x1, x2] -- octal
-                 !x0 = chr' (ord0 + (w `unsafeShiftR` 6) .&. 0x07)
-                 !x1 = chr' (ord0 + (w `unsafeShiftR` 3) .&. 0x07)
-                 !x2 = chr' (ord0 + w .&. 0x07)
-                 !ord0 = 0x30 -- = ord '0'
-
-       -- we know that the Chars we create are in the ASCII range
-       -- so we bypass the check in "chr"
-       chr' :: Word8 -> Char
-       chr' (W8# w#) = C# (chr# (word2Int# (word8ToWord# w#)))
-
 
 -- | Emit a ".string" directive
 pprString :: ByteString -> SDoc
@@ -163,24 +126,6 @@ time of writing).
 
 The threshold is configurable via the `-fbinary-blob-threshold` flag.
 
--}
-
-
-{-
-Note [Pretty print ASCII when AsmCodeGen]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Previously, when generating assembly code, we created SDoc with
-`(ptext . sLit)` for every bytes in literal bytestring, then
-combine them using `hcat`.
-
-When handling literal bytestrings with millions of bytes,
-millions of SDoc would be created and to combine, leading to
-high memory usage.
-
-Now we escape the given bytestring to string directly and construct
-SDoc only once. This improvement could dramatically decrease the
-memory allocation from 4.7GB to 1.3GB when embedding a 3MB literal
-string in source code. See #14741 for profiling results.
 -}
 
 -- ----------------------------------------------------------------------------
