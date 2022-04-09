@@ -29,6 +29,7 @@ import GHC.CmmToAsm.Config
 import GHC.Utils.Outputable as SDoc
 import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.Panic
+import GHC.Utils.Misc ( charToC )
 import GHC.Platform
 
 import qualified Data.Array.Unsafe as U ( castSTUArray )
@@ -126,7 +127,7 @@ pprASCII str
 
 -- | Emit a ".string" directive
 pprString :: ByteString -> SDoc
-pprString bs = text "\t.string " <> doubleQuotes (pprASCII bs)
+pprString bs = text "\t.string " <> doubleQuotes (text (concatMap charToC (BS.unpack bs)))
 
 -- | Emit a ".incbin" directive
 --
