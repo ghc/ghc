@@ -124,6 +124,13 @@ parser and interface file reader.
 
     Dump parser output as a syntax tree
 
+.. ghc-flag:: -dkeep-comments
+    :shortdesc: Include comments in the parser.  Useful in combination with :ghc-flag:`-ddump-parsed-ast`.
+    :type: dynamic
+
+    Include comments in the parser.  Useful in combination with :ghc-flag:`-ddump-parsed-ast`.
+
+
 .. ghc-flag:: -ddump-if-trace
     :shortdesc: Trace interface files
     :type: dynamic
