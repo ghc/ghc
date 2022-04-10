@@ -744,9 +744,7 @@ type instance XXClsInstDecl    (GhcPass _) = DataConCantHappen
 
 type instance XClsInstD     (GhcPass _) = NoExtField
 
-type instance XDataFamInstD GhcPs = EpAnn [AddEpAnn]
-type instance XDataFamInstD GhcRn = NoExtField
-type instance XDataFamInstD GhcTc = NoExtField
+type instance XDataFamInstD (GhcPass _) = NoExtField
 
 type instance XTyFamInstD   GhcPs = NoExtField
 type instance XTyFamInstD   GhcRn = NoExtField

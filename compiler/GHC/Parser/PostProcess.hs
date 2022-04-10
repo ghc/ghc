@@ -323,15 +323,31 @@ mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
               ksig data_cons (L _ maybe_deriv) anns
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; cs <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan
-       ; let anns' = addAnns (EpAnn (spanAsAnchor loc) ann cs) anns emptyComments
+       ; let fam_eqn_ans = addAnns (EpAnn (spanAsAnchor loc) ann cs) anns emptyComments
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
-       ; return (L (noAnnSrcSpan loc) (DataFamInstD anns' (DataFamInstDecl
-                  (FamEqn { feqn_ext    = anns'
+       ; return (L (noAnnSrcSpan loc) (DataFamInstD noExtField (DataFamInstDecl
+                  (FamEqn { feqn_ext    = fam_eqn_ans
                           , feqn_tycon  = tc
                           , feqn_bndrs  = bndrs
                           , feqn_pats   = tparams
                           , feqn_fixity = fixity
                           , feqn_rhs    = defn })))) }
+
+-- mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
+--               ksig data_cons (L _ maybe_deriv) anns
+--   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
+--        ; cs <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan
+--        ; let anns' = addAnns (EpAnn (spanAsAnchor loc) ann cs) anns emptyComments
+--        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
+--        ; return (L (noAnnSrcSpan loc) (DataFamInstD anns' (DataFamInstDecl
+--                   (FamEqn { feqn_ext    = anns'
+--                           , feqn_tycon  = tc
+--                           , feqn_bndrs  = bndrs
+--                           , feqn_pats   = tparams
+--                           , feqn_fixity = fixity
+--                           , feqn_rhs    = defn })))) }
+
+
 
 mkTyFamInst :: SrcSpan
             -> TyFamInstEqn GhcPs
