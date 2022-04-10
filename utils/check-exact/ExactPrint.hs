@@ -859,7 +859,6 @@ instance ExactPrint (InstDecl GhcPs) where
   exact (DataFamInstD an decl) = do
     exactDataFamInstDecl an TopLevel decl
   exact (TyFamInstD _ eqn) = do
-    -- exactTyFamInstDecl an TopLevel eqn
     markAnnotated eqn
 
 -- ---------------------------------------------------------------------

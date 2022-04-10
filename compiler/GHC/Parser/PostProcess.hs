@@ -323,9 +323,10 @@ mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
               ksig data_cons (L _ maybe_deriv) anns
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; cs <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan
-       ; let anns' = addAnns (EpAnn (spanAsAnchor loc) ann cs) anns emptyComments
+       ; let anns1 = EpAnn (spanAsAnchor loc) [] cs
+       ; let anns' = addAnns (EpAnn (spanAsAnchor loc) ann emptyComments) anns emptyComments
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
-       ; return (L (noAnnSrcSpan loc) (DataFamInstD anns' (DataFamInstDecl
+       ; return (L (noAnnSrcSpan loc) (DataFamInstD anns1 (DataFamInstDecl
                   (FamEqn { feqn_ext    = anns'
                           , feqn_tycon  = tc
                           , feqn_bndrs  = bndrs

@@ -1028,10 +1028,7 @@
        (Anchor
         { DumpParsedAst.hs:(21,1)-(22,45) }
         (UnchangedAnchor))
-       [(AddEpAnn AnnNewtype (EpaSpan { DumpParsedAst.hs:21:1-7 }))
-       ,(AddEpAnn AnnInstance (EpaSpan { DumpParsedAst.hs:21:9-16 }))
-       ,(AddEpAnn AnnDcolon (EpaSpan { DumpParsedAst.hs:21:39-40 }))
-       ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAst.hs:21:62-66 }))]
+       []
        (EpaComments
         []))
       (DataFamInstDecl
