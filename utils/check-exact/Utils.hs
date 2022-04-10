@@ -19,6 +19,7 @@ module Utils
   where
 import Control.Monad.State
 import Data.Function
+import Data.Maybe (isJust)
 import Data.Ord (comparing)
 
 import GHC.Hs.Dump
@@ -82,12 +83,12 @@ warn c _ = c
 -- | A good delta has no negative values.
 isGoodDelta :: DeltaPos -> Bool
 isGoodDelta (SameLine co) = co >= 0
-isGoodDelta (DifferentLine ro co) = ro > 0 && co >= 0
+isGoodDelta (DifferentLine ro _co) = ro > 0
   -- Note: DifferentLine invariant is ro is nonzero and positive
 
 
 -- | Create a delta from the current position to the start of the given
--- @SrcSpan@.
+-- @RealSrcSpan@.
 ss2delta :: Pos -> RealSrcSpan -> DeltaPos
 ss2delta ref ss = pos2delta ref (ss2pos ss)
 
@@ -136,25 +137,15 @@ undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddEpAnn
 undeltaSpan anchor kw dp = AddEpAnn kw (EpaSpan sp)
   where
     (l,c) = undelta (ss2pos anchor) dp (LayoutStartCol 0)
-    len = length (keywordToString (G kw))
+    len = length (keywordToString kw)
     sp = range2rs ((l,c),(l,c+len))
-
--- | Add together two @DeltaPos@ taking into account newlines
---
--- > DP (0, 1) `addDP` DP (0, 2) == DP (0, 3)
--- > DP (0, 9) `addDP` DP (1, 5) == DP (1, 5)
--- > DP (1, 4) `addDP` DP (1, 3) == DP (2, 3)
-addDP :: DeltaPos -> DeltaPos -> DeltaPos
-addDP dp (DifferentLine c d) = DifferentLine (getDeltaLine dp+c) d
-addDP (DifferentLine a b) (SameLine  d) = DifferentLine a (b+d)
-addDP (SameLine b)        (SameLine  d) = SameLine (b+d)
 
 -- ---------------------------------------------------------------------
 
-adjustDeltaForOffset :: Int -> LayoutStartCol -> DeltaPos -> DeltaPos
-adjustDeltaForOffset _ _colOffset                      dp@(SameLine _) = dp
-adjustDeltaForOffset d (LayoutStartCol colOffset) (DifferentLine l c)
-  = DifferentLine l (c - colOffset - d)
+adjustDeltaForOffset :: LayoutStartCol -> DeltaPos -> DeltaPos
+adjustDeltaForOffset _colOffset                      dp@(SameLine _) = dp
+adjustDeltaForOffset (LayoutStartCol colOffset) (DifferentLine l c)
+  = DifferentLine l (c - colOffset)
 
 -- ---------------------------------------------------------------------
 
@@ -207,21 +198,10 @@ orderByKey keys order
 
 -- ---------------------------------------------------------------------
 
-isListComp :: HsDoFlavour -> Bool
-isListComp = isDoComprehensionContext
-
--- ---------------------------------------------------------------------
-
 isGadt :: [LConDecl (GhcPass p)] -> Bool
-isGadt [] = False
+isGadt [] = True
 isGadt ((L _ (ConDeclGADT{})):_) = True
 isGadt _ = False
-
--- ---------------------------------------------------------------------
-
--- Is a RdrName of type Exact? SYB query, so can be extended to other types too
-isExactName :: (Data name) => name -> Bool
-isExactName = False `mkQ` isExact
 
 -- ---------------------------------------------------------------------
 
@@ -245,13 +225,29 @@ ghcCommentText (L _ (GHC.EpaComment (EpaEofComment) _))        = ""
 
 tokComment :: LEpaComment -> Comment
 tokComment t@(L lt _) = mkComment (normaliseCommentText $ ghcCommentText t) lt
+-- tokComment t@(L lt c) = mkComment (normaliseCommentText $ ghcCommentText t) lt (ac_prior_tok c)
 
-mkLEpaComment :: String -> Anchor -> LEpaComment
--- Note: fudging the ac_prior_tok value, hope it does not cause a problem
-mkLEpaComment s anc = (L anc (GHC.EpaComment (EpaLineComment s) (anchor anc)))
+mkEpaComments :: [Comment] -> [Comment] -> EpAnnComments
+mkEpaComments priorCs []
+  = EpaComments (map comment2LEpaComment priorCs)
+mkEpaComments priorCs postCs
+  = EpaCommentsBalanced (map comment2LEpaComment priorCs) (map comment2LEpaComment postCs)
 
-mkComment :: String -> Anchor -> Comment
-mkComment c anc = Comment c anc Nothing
+comment2LEpaComment :: Comment -> LEpaComment
+comment2LEpaComment (Comment s anc r _mk) = mkLEpaComment s anc r
+
+mkLEpaComment :: String -> Anchor -> RealSrcSpan -> LEpaComment
+mkLEpaComment "" anc r = (L anc (GHC.EpaComment (EpaEofComment) r))
+mkLEpaComment s anc r = (L anc (GHC.EpaComment (EpaLineComment s) r))
+
+-- mkLEpaComment :: String -> Anchor -> LEpaComment
+-- -- Note: fudging the ac_prior_tok value, hope it does not cause a problem
+-- mkLEpaComment s anc = (L anc (GHC.EpaComment (EpaLineComment s) (anchor anc)))
+
+-- mkComment :: String -> Anchor -> Comment
+-- mkComment c anc = Comment c anc Nothing
+mkComment :: String -> Anchor -> RealSrcSpan -> Comment
+mkComment c anc r = Comment c anc r Nothing
 
 -- Windows comments include \r in them from the lexer.
 normaliseCommentText :: String -> String
@@ -259,37 +255,36 @@ normaliseCommentText [] = []
 normaliseCommentText ('\r':xs) = normaliseCommentText xs
 normaliseCommentText (x:xs) = x:normaliseCommentText xs
 
--- | Makes a comment which originates from a specific keyword.
-mkKWComment :: AnnKeywordId -> EpaLocation -> [Comment]
-mkKWComment kw (EpaSpan ss)
-  = [Comment (keywordToString $ G kw) (Anchor ss UnchangedAnchor) (Just kw)]
-mkKWComment kw (EpaDelta dp cs)
-  = (map tokComment cs) ++ [Comment (keywordToString $ G kw) (Anchor placeholderRealSpan (MovedAnchor dp)) (Just kw)]
+-- |Must compare without span filenames, for CPP injected comments with fake filename
+cmpComments :: Comment -> Comment -> Ordering
+cmpComments (Comment _ l1 _ _) (Comment _ l2 _ _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
 
-comment2dp :: (Comment,  DeltaPos) -> (KeywordId, DeltaPos)
-comment2dp = first AnnComment
+-- |Sort, comparing without span filenames, for CPP injected comments with fake filename
+sortComments :: [Comment] -> [Comment]
+sortComments cs = sortBy cmpComments cs
+
+-- |Sort, comparing without span filenames, for CPP injected comments with fake filename
+sortEpaComments :: [LEpaComment] -> [LEpaComment]
+sortEpaComments cs = sortBy cmp cs
+  where
+    cmp (L l1 _) (L l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+
+-- | Makes a comment which originates from a specific keyword.
+mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
+mkKWComment kw (EpaSpan ss)
+  = Comment (keywordToString kw) (Anchor ss UnchangedAnchor) ss (Just kw)
+mkKWComment kw (EpaDelta dp _)
+  = Comment (keywordToString kw) (Anchor placeholderRealSpan (MovedAnchor dp)) placeholderRealSpan (Just kw)
+
+-- | Detects a comment which originates from a specific keyword.
+isKWComment :: Comment -> Bool
+isKWComment c = isJust (commentOrigin c)
+
+noKWComments :: [Comment] -> [Comment]
+noKWComments = filter (\c -> not (isKWComment c))
 
 sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
 sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
-
-getAnnotationEP :: (Data a) =>  Located a  -> Anns -> Maybe Annotation
-getAnnotationEP  la as =
-  Map.lookup (mkAnnKey la) as
-
--- | The "true entry" is the distance from the last concrete element to the
--- start of the current element.
-annTrueEntryDelta :: Annotation -> DeltaPos
-annTrueEntryDelta Ann{annEntryDelta, annPriorComments} =
-  foldr addDP (SameLine 0) (map (\(a, b) -> addDP b (dpFromString $ commentContents a)) annPriorComments )
-    `addDP` annEntryDelta
-
--- | Return the DP of the first item that generates output, either a comment or the entry DP
-annLeadingCommentEntryDelta :: Annotation -> DeltaPos
-annLeadingCommentEntryDelta Ann{annPriorComments,annEntryDelta} = dp
-  where
-    dp = case annPriorComments of
-      [] -> annEntryDelta
-      ((_,ed):_) -> ed
 
 -- | Calculates the distance from the start of a string to the end of
 -- a string.
