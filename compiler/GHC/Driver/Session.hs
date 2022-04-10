@@ -3362,6 +3362,9 @@ fFlagsDeps = [
   flagSpec "defer-typed-holes"                Opt_DeferTypedHoles,
   flagSpec "defer-out-of-scope-variables"     Opt_DeferOutOfScopeVariables,
   flagSpec "diagnostics-show-caret"           Opt_DiagnosticsShowCaret,
+  -- With-ways needs to be reversible hence why its made via flagSpec unlike
+  -- other debugging flags.
+  flagSpec "dump-with-ways"                   Opt_DumpWithWays,
   flagSpec "dicts-cheap"                      Opt_DictsCheap,
   flagSpec "dicts-strict"                     Opt_DictsStrict,
   depFlagSpec "dmd-tx-dict-sel"
@@ -3756,7 +3759,8 @@ defaultFlags settings
       Opt_SharedImplib,
       Opt_SimplPreInlining,
       Opt_VersionMacros,
-      Opt_RPath
+      Opt_RPath,
+      Opt_DumpWithWays
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]

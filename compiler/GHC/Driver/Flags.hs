@@ -147,6 +147,7 @@ data GeneralFlag
 -- See Note [Updating flag description in the User's Guide]
 
    = Opt_DumpToFile                     -- ^ Append dump output to files instead of stdout.
+   | Opt_DumpWithWays                   -- ^ Use foo.ways.<dumpFlag> instead of foo.<dumpFlag>
    | Opt_D_dump_minimal_imports
    | Opt_DoCoreLinting
    | Opt_DoLinearCoreLinting

@@ -101,6 +101,7 @@ import Control.Monad
 import Control.Concurrent.MVar
 import System.IO.Unsafe
 import Debug.Trace (trace)
+import GHC.Platform.Ways
 
 ---------------------------------------------------------------
 -- Log flags
@@ -118,8 +119,10 @@ data LogFlags = LogFlags
   , log_dump_dir             :: !(Maybe FilePath)   -- ^ Dump directory
   , log_dump_prefix          :: !FilePath           -- ^ Normal dump path ("basename.")
   , log_dump_prefix_override :: !(Maybe FilePath)   -- ^ Overriden dump path
+  , log_with_ways            :: !Bool               -- ^ Use different dump files names for different ways
   , log_enable_debug         :: !Bool               -- ^ Enable debug output
   , log_verbosity            :: !Int                -- ^ Verbosity level
+  , log_ways                 :: !(Maybe Ways)         -- ^ Current ways (to name dump files)
   }
 
 -- | Default LogFlags
@@ -135,8 +138,10 @@ defaultLogFlags = LogFlags
   , log_dump_dir             = Nothing
   , log_dump_prefix          = ""
   , log_dump_prefix_override = Nothing
+  , log_with_ways           = True
   , log_enable_debug         = False
   , log_verbosity            = 0
+  , log_ways                 = Nothing
   }
 
 -- | Test if a DumpFlag is enabled
@@ -462,7 +467,8 @@ dumpSDocWithStyle dumps log_action sty logflags flag hdr doc =
 -- file, otherwise 'Nothing'.
 withDumpFileHandle :: DumpCache -> LogFlags -> DumpFlag -> (Maybe Handle -> IO ()) -> IO ()
 withDumpFileHandle dumps logflags flag action = do
-    let mFile = chooseDumpFile logflags flag
+    let dump_ways = log_ways logflags
+    let mFile = chooseDumpFile logflags dump_ways flag
     case mFile of
       Just fileName -> do
         gd <- readIORef dumps
@@ -482,14 +488,20 @@ withDumpFileHandle dumps logflags flag action = do
       Nothing -> action Nothing
 
 -- | Choose where to put a dump file based on LogFlags and DumpFlag
-chooseDumpFile :: LogFlags -> DumpFlag -> Maybe FilePath
-chooseDumpFile logflags flag
+chooseDumpFile :: LogFlags -> Maybe Ways -> DumpFlag -> Maybe FilePath
+chooseDumpFile logflags ways flag
     | log_dump_to_file logflags || forced_to_file
-    = Just $ setDir (getPrefix ++ dump_suffix)
+    = Just $ setDir (getPrefix ++ way_infix ++ dump_suffix)
 
     | otherwise
     = Nothing
   where
+    way_infix = case ways of
+      _ | not (log_with_ways logflags) -> ""
+      Nothing -> ""
+      Just ws
+        | null ws || null (waysTag ws) -> ""
+        | otherwise -> waysTag ws ++ "."
     (forced_to_file, dump_suffix) = case flag of
         -- -dth-dec-file dumps expansions of TH
         -- splices into MODULE.th.hs even when
