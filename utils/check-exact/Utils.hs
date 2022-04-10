@@ -20,10 +20,13 @@ module Utils
   where
 import Control.Monad.State
 import Data.Function
+import Data.Maybe (isJust)
 import Data.Ord (comparing)
 
 import GHC.Hs.Dump
 import Lookup
+import Orphans (Default())
+import qualified Orphans as Orphans
 
 import GHC hiding (EpaComment)
 import qualified GHC
@@ -32,12 +35,8 @@ import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Driver.Ppr
 import GHC.Data.FastString
+import qualified GHC.Data.Strict as Strict
 
-import qualified GHC.Types.Name.Occurrence as OccName (OccName(..),pprNameSpaceBrief)
-
-import Control.Arrow
-
-import qualified Data.Map as Map
 import Data.Data hiding ( Fixity )
 import Data.List (sortBy, elemIndex)
 
@@ -51,28 +50,14 @@ debugEnabledFlag :: Bool
 -- debugEnabledFlag = True
 debugEnabledFlag = False
 
--- |Global switch to enable debug tracing in ghc-exactprint Pretty
-debugPEnabledFlag :: Bool
--- debugPEnabledFlag = True
-debugPEnabledFlag = False
-
 -- |Provide a version of trace that comes at the end of the line, so it can
 -- easily be commented out when debugging different things.
 debug :: c -> String -> c
 debug c s = if debugEnabledFlag
               then trace s c
               else c
-
--- |Provide a version of trace for the Pretty module, which can be enabled
--- separately from 'debug' and 'debugM'
-debugP :: String -> c -> c
-debugP s c = if debugPEnabledFlag
-               then trace s c
-               else c
-
 debugM :: Monad m => String -> m ()
 debugM s = when debugEnabledFlag $ traceM s
-
 
 -- ---------------------------------------------------------------------
 
@@ -83,12 +68,12 @@ warn c _ = c
 -- | A good delta has no negative values.
 isGoodDelta :: DeltaPos -> Bool
 isGoodDelta (SameLine co) = co >= 0
-isGoodDelta (DifferentLine ro co) = ro > 0 && co >= 0
+isGoodDelta (DifferentLine ro _co) = ro > 0
   -- Note: DifferentLine invariant is ro is nonzero and positive
 
 
 -- | Create a delta from the current position to the start of the given
--- @SrcSpan@.
+-- @RealSrcSpan@.
 ss2delta :: Pos -> RealSrcSpan -> DeltaPos
 ss2delta ref ss = pos2delta ref (ss2pos ss)
 
@@ -137,25 +122,15 @@ undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddEpAnn
 undeltaSpan anchor kw dp = AddEpAnn kw (EpaSpan sp)
   where
     (l,c) = undelta (ss2pos anchor) dp (LayoutStartCol 0)
-    len = length (keywordToString (G kw))
+    len = length (keywordToString kw)
     sp = range2rs ((l,c),(l,c+len))
-
--- | Add together two @DeltaPos@ taking into account newlines
---
--- > DP (0, 1) `addDP` DP (0, 2) == DP (0, 3)
--- > DP (0, 9) `addDP` DP (1, 5) == DP (1, 5)
--- > DP (1, 4) `addDP` DP (1, 3) == DP (2, 3)
-addDP :: DeltaPos -> DeltaPos -> DeltaPos
-addDP dp (DifferentLine c d) = DifferentLine (getDeltaLine dp+c) d
-addDP (DifferentLine a b) (SameLine  d) = DifferentLine a (b+d)
-addDP (SameLine b)        (SameLine  d) = SameLine (b+d)
 
 -- ---------------------------------------------------------------------
 
-adjustDeltaForOffset :: Int -> LayoutStartCol -> DeltaPos -> DeltaPos
-adjustDeltaForOffset _ _colOffset                      dp@(SameLine _) = dp
-adjustDeltaForOffset d (LayoutStartCol colOffset) (DifferentLine l c)
-  = DifferentLine l (c - colOffset - d)
+adjustDeltaForOffset :: LayoutStartCol -> DeltaPos -> DeltaPos
+adjustDeltaForOffset _colOffset                      dp@(SameLine _) = dp
+adjustDeltaForOffset (LayoutStartCol colOffset) (DifferentLine l c)
+  = DifferentLine l (c - colOffset)
 
 -- ---------------------------------------------------------------------
 
@@ -213,27 +188,23 @@ isListComp = isDoComprehensionContext
 
 -- ---------------------------------------------------------------------
 
-isGadt :: Foldable f => f (LConDecl (GhcPass p)) -> Bool
-isGadt = any $ \ case
-    L _ ConDeclGADT {} -> True
-    _ -> False
-
--- ---------------------------------------------------------------------
-
--- Is a RdrName of type Exact? SYB query, so can be extended to other types too
-isExactName :: (Data name) => name -> Bool
-isExactName = False `mkQ` isExact
+needsWhere :: DataDefnCons (LConDecl (GhcPass p)) -> Bool
+needsWhere (NewTypeCon _) = True
+needsWhere (DataTypeCons _ []) = True
+needsWhere (DataTypeCons _ ((L _ (ConDeclGADT{})):_)) = True
+needsWhere _ = False
 
 -- ---------------------------------------------------------------------
 
 insertCppComments ::  ParsedSource -> [LEpaComment] -> ParsedSource
 insertCppComments (L l p) cs = L l p'
   where
-    ncs = EpaComments cs
     an' = case GHC.hsmodAnn $ GHC.hsmodExt p of
-      (EpAnn a an ocs) -> EpAnn a an (ocs <> ncs)
+      (EpAnn a an ocs) -> EpAnn a an (EpaComments cs')
+        where
+          cs' = sortEpaComments $ priorComments ocs ++ getFollowingComments ocs ++ cs
       unused -> unused
-    p' = p { GHC.hsmodExt = (GHC.hsmodExt p) { GHC.hsmodAnn = an' } } 
+    p' = p { GHC.hsmodExt = (GHC.hsmodExt p) { GHC.hsmodAnn = an' } }
 
 -- ---------------------------------------------------------------------
 
@@ -245,14 +216,23 @@ ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s
 ghcCommentText (L _ (GHC.EpaComment (EpaEofComment) _))        = ""
 
 tokComment :: LEpaComment -> Comment
-tokComment t@(L lt _) = mkComment (normaliseCommentText $ ghcCommentText t) lt
+tokComment t@(L lt c) = mkComment (normaliseCommentText $ ghcCommentText t) lt (ac_prior_tok c)
 
-mkLEpaComment :: String -> Anchor -> LEpaComment
--- Note: fudging the ac_prior_tok value, hope it does not cause a problem
-mkLEpaComment s anc = (L anc (GHC.EpaComment (EpaLineComment s) (anchor anc)))
+mkEpaComments :: [Comment] -> [Comment] -> EpAnnComments
+mkEpaComments priorCs []
+  = EpaComments (map comment2LEpaComment priorCs)
+mkEpaComments priorCs postCs
+  = EpaCommentsBalanced (map comment2LEpaComment priorCs) (map comment2LEpaComment postCs)
 
-mkComment :: String -> Anchor -> Comment
-mkComment c anc = Comment c anc Nothing
+comment2LEpaComment :: Comment -> LEpaComment
+comment2LEpaComment (Comment s anc r _mk) = mkLEpaComment s anc r
+
+mkLEpaComment :: String -> Anchor -> RealSrcSpan -> LEpaComment
+mkLEpaComment "" anc r = (L anc (GHC.EpaComment (EpaEofComment) r))
+mkLEpaComment s anc r = (L anc (GHC.EpaComment (EpaLineComment s) r))
+
+mkComment :: String -> Anchor -> RealSrcSpan -> Comment
+mkComment c anc r = Comment c anc r Nothing
 
 -- Windows comments include \r in them from the lexer.
 normaliseCommentText :: String -> String
@@ -260,37 +240,36 @@ normaliseCommentText [] = []
 normaliseCommentText ('\r':xs) = normaliseCommentText xs
 normaliseCommentText (x:xs) = x:normaliseCommentText xs
 
--- | Makes a comment which originates from a specific keyword.
-mkKWComment :: AnnKeywordId -> EpaLocation -> [Comment]
-mkKWComment kw (EpaSpan ss)
-  = [Comment (keywordToString $ G kw) (Anchor ss UnchangedAnchor) (Just kw)]
-mkKWComment kw (EpaDelta dp cs)
-  = (map tokComment cs) ++ [Comment (keywordToString $ G kw) (Anchor placeholderRealSpan (MovedAnchor dp)) (Just kw)]
+-- |Must compare without span filenames, for CPP injected comments with fake filename
+cmpComments :: Comment -> Comment -> Ordering
+cmpComments (Comment _ l1 _ _) (Comment _ l2 _ _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
 
-comment2dp :: (Comment,  DeltaPos) -> (KeywordId, DeltaPos)
-comment2dp = first AnnComment
+-- |Sort, comparing without span filenames, for CPP injected comments with fake filename
+sortComments :: [Comment] -> [Comment]
+sortComments cs = sortBy cmpComments cs
+
+-- |Sort, comparing without span filenames, for CPP injected comments with fake filename
+sortEpaComments :: [LEpaComment] -> [LEpaComment]
+sortEpaComments cs = sortBy cmp cs
+  where
+    cmp (L l1 _) (L l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+
+-- | Makes a comment which originates from a specific keyword.
+mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
+mkKWComment kw (EpaSpan ss)
+  = Comment (keywordToString kw) (Anchor ss UnchangedAnchor) ss (Just kw)
+mkKWComment kw (EpaDelta dp _)
+  = Comment (keywordToString kw) (Anchor placeholderRealSpan (MovedAnchor dp)) placeholderRealSpan (Just kw)
+
+-- | Detects a comment which originates from a specific keyword.
+isKWComment :: Comment -> Bool
+isKWComment c = isJust (commentOrigin c)
+
+noKWComments :: [Comment] -> [Comment]
+noKWComments = filter (\c -> not (isKWComment c))
 
 sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
 sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
-
-getAnnotationEP :: (Data a) =>  Located a  -> Anns -> Maybe Annotation
-getAnnotationEP  la as =
-  Map.lookup (mkAnnKey la) as
-
--- | The "true entry" is the distance from the last concrete element to the
--- start of the current element.
-annTrueEntryDelta :: Annotation -> DeltaPos
-annTrueEntryDelta Ann{annEntryDelta, annPriorComments} =
-  foldr addDP (SameLine 0) (map (\(a, b) -> addDP b (dpFromString $ commentContents a)) annPriorComments )
-    `addDP` annEntryDelta
-
--- | Return the DP of the first item that generates output, either a comment or the entry DP
-annLeadingCommentEntryDelta :: Annotation -> DeltaPos
-annLeadingCommentEntryDelta Ann{annPriorComments,annEntryDelta} = dp
-  where
-    dp = case annPriorComments of
-      [] -> annEntryDelta
-      ((_,ed):_) -> ed
 
 -- | Calculates the distance from the start of a string to the end of
 -- a string.
@@ -326,24 +305,119 @@ name2String = showPprUnsafe
 
 -- ---------------------------------------------------------------------
 
-occAttributes :: OccName.OccName -> String
-occAttributes o = "(" ++ ns ++ vo ++ tv ++ tc ++ d ++ ds ++ s ++ v ++ ")"
-  where
-    -- ns = (showSDocUnsafe $ OccName.pprNameSpaceBrief $ occNameSpace o) ++ ", "
-    ns = (showSDocUnsafe $ OccName.pprNameSpaceBrief $ occNameSpace o) ++ ", "
-    vo = if isVarOcc     o then "Var "     else ""
-    tv = if isTvOcc      o then "Tv "      else ""
-    tc = if isTcOcc      o then "Tc "      else ""
-    d  = if isDataOcc    o then "Data "    else ""
-    ds = if isDataSymOcc o then "DataSym " else ""
-    s  = if isSymOcc     o then "Sym "     else ""
-    v  = if isValOcc     o then "Val "     else ""
+-- occAttributes :: OccName.OccName -> String
+-- occAttributes o = "(" ++ ns ++ vo ++ tv ++ tc ++ d ++ ds ++ s ++ v ++ ")"
+--   where
+--     -- ns = (showSDocUnsafe $ OccName.pprNameSpaceBrief $ occNameSpace o) ++ ", "
+--     ns = (showSDocUnsafe $ OccName.pprNameSpaceBrief $ occNameSpace o) ++ ", "
+--     vo = if isVarOcc     o then "Var "     else ""
+--     tv = if isTvOcc      o then "Tv "      else ""
+--     tc = if isTcOcc      o then "Tc "      else ""
+--     d  = if isDataOcc    o then "Data "    else ""
+--     ds = if isDataSymOcc o then "DataSym " else ""
+--     s  = if isSymOcc     o then "Sym "     else ""
+--     v  = if isValOcc     o then "Val "     else ""
 
  -- ---------------------------------------------------------------------
 
 locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
 locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan l
 locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
+
+-- ---------------------------------------------------------------------
+
+setAnchorAn :: (Default an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
+setAnchorAn (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
+  = (L (SrcSpanAnn (EpAnn anc Orphans.def cs) l) a)
+     -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
+setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
+  = (L (SrcSpanAnn (EpAnn anc an cs) l) a)
+     -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
+
+setAnchorEpa :: (Default an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
+setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc Orphans.def cs
+setAnchorEpa (EpAnn _ an _) anc cs = EpAnn anc an          cs
+
+setAnchorEpaL :: EpAnn AnnList -> Anchor -> EpAnnComments -> EpAnn AnnList
+setAnchorEpaL EpAnnNotUsed   anc cs = EpAnn anc mempty cs
+setAnchorEpaL (EpAnn _ an _) anc cs = EpAnn anc (an {al_anchor = Nothing}) cs
+
+setAnchorHsModule :: HsModule GhcPs -> Anchor -> EpAnnComments -> HsModule GhcPs
+setAnchorHsModule hsmod anc cs = hsmod { hsmodExt = (hsmodExt hsmod) {hsmodAnn = an'} }
+  where
+    anc' = anc { anchor_op = UnchangedAnchor }
+    an' = setAnchorEpa (hsmodAnn $ hsmodExt hsmod) anc' cs
+
+-- |Version of l2l that preserves the anchor, immportant if it has an
+-- updated AnchorOperation
+moveAnchor :: Monoid b => SrcAnn a -> SrcAnn b
+moveAnchor (SrcSpanAnn EpAnnNotUsed l) = noAnnSrcSpan l
+moveAnchor (SrcSpanAnn (EpAnn anc _ cs) l) = SrcSpanAnn (EpAnn anc mempty cs) l
+
+-- ---------------------------------------------------------------------
+
+trailingAnnLoc :: TrailingAnn -> EpaLocation
+trailingAnnLoc (AddSemiAnn ss)    = ss
+trailingAnnLoc (AddCommaAnn ss)   = ss
+trailingAnnLoc (AddVbarAnn ss)    = ss
+
+setTrailingAnnLoc :: TrailingAnn -> EpaLocation -> TrailingAnn
+setTrailingAnnLoc (AddSemiAnn _)    ss = (AddSemiAnn ss)
+setTrailingAnnLoc (AddCommaAnn _)   ss = (AddCommaAnn ss)
+setTrailingAnnLoc (AddVbarAnn _)    ss = (AddVbarAnn ss)
+
+addEpAnnLoc :: AddEpAnn -> EpaLocation
+addEpAnnLoc (AddEpAnn _ l) = l
+
+-- ---------------------------------------------------------------------
+
+-- TODO: move this to GHC
+anchorToEpaLocation :: Anchor -> EpaLocation
+anchorToEpaLocation (Anchor r UnchangedAnchor) = EpaSpan r
+anchorToEpaLocation (Anchor _ (MovedAnchor dp)) = EpaDelta dp []
+
+-- ---------------------------------------------------------------------
+-- Horrible hack for dealing with some things still having a SrcSpan,
+-- not an Anchor.
+
+{-
+A SrcSpan is defined as
+
+data SrcSpan =
+    RealSrcSpan !RealSrcSpan !(Maybe BufSpan)  -- See Note [Why Maybe BufPos]
+  | UnhelpfulSpan !UnhelpfulSpanReason
+
+data BufSpan =
+  BufSpan { bufSpanStart, bufSpanEnd :: {-# UNPACK #-} !BufPos }
+  deriving (Eq, Ord, Show)
+
+newtype BufPos = BufPos { bufPos :: Int }
+
+
+We use the BufPos to encode a delta, using bufSpanStart for the line,
+and bufSpanEnd for the col.
+
+To be absolutely sure, we make the delta versions use -ve values.
+
+-}
+
+hackSrcSpanToAnchor :: SrcSpan -> Anchor
+hackSrcSpanToAnchor (UnhelpfulSpan s) = error $ "hackSrcSpanToAnchor : UnhelpfulSpan:" ++ show s
+hackSrcSpanToAnchor (RealSrcSpan r Strict.Nothing) = Anchor r UnchangedAnchor
+hackSrcSpanToAnchor (RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e))))
+  = if s <= 0 && e <= 0
+    then Anchor r (MovedAnchor (deltaPos (-s) (-e)))
+      `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
+    else Anchor r UnchangedAnchor
+
+hackAnchorToSrcSpan :: Anchor -> SrcSpan
+hackAnchorToSrcSpan (Anchor r UnchangedAnchor) = RealSrcSpan r Strict.Nothing
+hackAnchorToSrcSpan (Anchor r (MovedAnchor dp))
+  = RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e)))
+      `debug` ("hackAnchorToSrcSpan: (r,dp,s,e)=" ++ showAst (r,dp,s,e) )
+  where
+    s = - (getDeltaLine dp)
+    e = - (deltaColumn dp)
 
  -- ---------------------------------------------------------------------
 

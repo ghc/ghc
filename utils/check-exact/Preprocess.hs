@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 -- | This module provides support for CPP, interpreter directives and line
 -- pragmas.
 module Preprocess
@@ -16,6 +17,7 @@ module Preprocess
 import qualified GHC            as GHC hiding (parseModule)
 
 import qualified Control.Monad.IO.Class as GHC
+import qualified GHC.Data.Bag          as GHC
 import qualified GHC.Data.FastString   as GHC
 import qualified GHC.Data.StringBuffer as GHC
 import qualified GHC.Driver.Config.Parser as GHC
@@ -26,17 +28,16 @@ import qualified GHC.Driver.Pipeline   as GHC
 import qualified GHC.Fingerprint.Type  as GHC
 import qualified GHC.Parser.Lexer      as GHC
 import qualified GHC.Settings          as GHC
-import qualified GHC.Types.Error       as GHC (getMessages)
+import qualified GHC.Types.Error       as GHC (getErrorMessages, DiagnosticMessage(..))
 import qualified GHC.Types.SourceError as GHC
 import qualified GHC.Types.SourceFile  as GHC
 import qualified GHC.Types.SrcLoc      as GHC
 import qualified GHC.Utils.Error       as GHC
 import qualified GHC.Utils.Fingerprint as GHC
-import qualified GHC.Utils.Outputable  as GHC
 import GHC.Types.SrcLoc (mkSrcSpan, mkSrcLoc)
 import GHC.Data.FastString (mkFastString)
 
-import Data.List (isPrefixOf)
+import Data.List (isPrefixOf, intercalate)
 import Data.Maybe
 import Types
 import Utils
@@ -74,14 +75,14 @@ checkLine line s
            size   = length pragma
            mSrcLoc = mkSrcLoc (mkFastString "LINE")
            ss     = mkSrcSpan (mSrcLoc line 1) (mSrcLoc line (size+1))
-       in (res, Just $ mkLEpaComment pragma (GHC.spanAsAnchor ss))
+       in (res, Just $ mkLEpaComment pragma (GHC.spanAsAnchor ss) (GHC.realSrcSpan ss))
   -- Deal with shebang/cpp directives too
   -- x |  "#" `isPrefixOf` s = ("",Just $ Comment ((line, 1), (line, length s)) s)
   |  "#!" `isPrefixOf` s =
     let mSrcLoc = mkSrcLoc (mkFastString "SHEBANG")
         ss = mkSrcSpan (mSrcLoc line 1) (mSrcLoc line (length s))
     in
-    ("",Just $ mkLEpaComment s (GHC.spanAsAnchor ss))
+    ("",Just $ mkLEpaComment s (GHC.spanAsAnchor ss) (GHC.realSrcSpan ss))
   | otherwise = (s, Nothing)
 
 getPragma :: String -> (String, String)
@@ -124,8 +125,8 @@ goodComment :: GHC.LEpaComment -> Bool
 goodComment c = isGoodComment (tokComment c)
   where
     isGoodComment :: Comment -> Bool
-    isGoodComment (Comment "" _ _) = False
-    isGoodComment _              = True
+    isGoodComment (Comment "" _ _ _) = False
+    isGoodComment _                  = True
 
 
 toRealLocated :: GHC.Located a -> GHC.RealLocated a
@@ -167,7 +168,7 @@ getCppTokens directiveToks origSrcToks postCppToks = toks
     missingAsComments = map mkCommentTok missingToks
       where
         mkCommentTok :: (GHC.Located GHC.Token,String) -> (GHC.Located GHC.Token,String)
-        mkCommentTok (GHC.L l _,s) = (GHC.L l (GHC.ITlineComment s placeholderBufSpan),s)
+        mkCommentTok (GHC.L l _,s) = (GHC.L l (GHC.ITlineComment s (makeBufSpan l)),s)
 
     toks = mergeBy locFn directiveToks missingAsComments
 
@@ -213,23 +214,29 @@ getPreprocessedSrcDirectPrim :: (GHC.GhcMonad m)
                               -> m (String, GHC.StringBuffer, GHC.DynFlags)
 getPreprocessedSrcDirectPrim cppOptions src_fn = do
   hsc_env <- GHC.getSession
-  let dflags = GHC.hsc_dflags hsc_env
-      new_env = GHC.hscSetFlags (injectCppOptions cppOptions dflags) hsc_env
+  let dfs = GHC.hsc_dflags hsc_env
+      new_env = hsc_env { GHC.hsc_dflags = injectCppOptions cppOptions dfs }
   r <- GHC.liftIO $ GHC.preprocess new_env src_fn Nothing (Just (GHC.Cpp GHC.HsSrcFile))
   case r of
-    Left err -> error $ showErrorMessages err
+    Left err -> error $ showErrorMessages $ fmap GHC.GhcDriverMessage err
     Right (dflags', hspp_fn) -> do
       buf <- GHC.liftIO $ GHC.hGetStringBuffer hspp_fn
       txt <- GHC.liftIO $ readFileGhc hspp_fn
       return (txt, buf, dflags')
 
-showErrorMessages :: GHC.Messages GHC.DriverMessage -> String
-showErrorMessages msgs =
-  GHC.renderWithContext GHC.defaultSDocContext
-    $ GHC.vcat
-    $ GHC.pprMsgEnvelopeBagWithLoc
-    $ GHC.getMessages
-    $ msgs
+showErrorMessages :: GHC.ErrorMessages -> String
+showErrorMessages msgs = intercalate "\n"
+    $ map (show @(GHC.MsgEnvelope GHC.DiagnosticMessage) . fmap toDiagnosticMessage)
+    $ GHC.bagToList
+    $ GHC.getErrorMessages msgs
+
+-- | Show Error Messages relies on show instance for MsgEnvelope DiagnosticMessage
+-- We convert a known Diagnostic into this generic version
+toDiagnosticMessage :: GHC.Diagnostic e => e -> GHC.DiagnosticMessage
+toDiagnosticMessage msg = GHC.DiagnosticMessage { diagMessage = GHC.diagnosticMessage msg
+                                                , diagReason  = GHC.diagnosticReason  msg
+                                                , diagHints   = GHC.diagnosticHints   msg
+                                                }
 
 injectCppOptions :: CppOptions -> GHC.DynFlags -> GHC.DynFlags
 injectCppOptions CppOptions{..} dflags =
@@ -261,7 +268,7 @@ getPreprocessorAsComments srcFile = do
   let directives = filter (\(_lineNum,line) -> line /= [] && head line == '#')
                     $ zip [1..] (lines fcontents)
 
-  let mkTok (lineNum,line) = (GHC.L l (GHC.ITlineComment line placeholderBufSpan),line)
+  let mkTok (lineNum,line) = (GHC.L l (GHC.ITlineComment line (makeBufSpan l)),line)
        where
          start = GHC.mkSrcLoc (GHC.mkFastString srcFile) lineNum 1
          end   = GHC.mkSrcLoc (GHC.mkFastString srcFile) lineNum (length line)
@@ -270,11 +277,11 @@ getPreprocessorAsComments srcFile = do
   let toks = map mkTok directives
   return toks
 
-placeholderBufSpan :: GHC.PsSpan
-placeholderBufSpan = pspan
+makeBufSpan :: GHC.SrcSpan -> GHC.PsSpan
+makeBufSpan ss = pspan
   where
     bl = GHC.BufPos 0
-    pspan = GHC.PsSpan GHC.placeholderRealSpan (GHC.BufSpan bl bl)
+    pspan = GHC.PsSpan (GHC.realSrcSpan ss) (GHC.BufSpan bl bl)
 
 -- ---------------------------------------------------------------------
 
@@ -283,7 +290,8 @@ parseError pst = do
      let
        -- (warns,errs) = GHC.getMessages pst dflags
      -- throw $ GHC.mkSrcErr (GHC.unitBag $ GHC.mkPlainErrMsg dflags sspan err)
-     GHC.throwErrors $ (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
+     -- GHC.throwErrors (fmap GHC.mkParserErr (GHC.getErrorMessages pst))
+     GHC.throwErrors (fmap GHC.GhcPsMessage (GHC.getPsErrorMessages pst))
 
 -- ---------------------------------------------------------------------
 

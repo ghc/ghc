@@ -8,6 +8,6 @@ foo a b = a + b
 -- | Do bar
 bar x y = {- baz -} foo (x+y) x
 
--- end of file
-
 nn = n2
+
+-- end of file
