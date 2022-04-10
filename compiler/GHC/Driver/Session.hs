@@ -2473,6 +2473,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_parsed)
   , make_ord_flag defGhcFlag "ddump-parsed-ast"
         (setDumpFlag Opt_D_dump_parsed_ast)
+  , make_ord_flag defGhcFlag "dkeep-comments"
+        (NoArg (setGeneralFlag Opt_KeepRawTokenStream))
   , make_ord_flag defGhcFlag "ddump-rn"
         (setDumpFlag Opt_D_dump_rn)
   , make_ord_flag defGhcFlag "ddump-rn-ast"
