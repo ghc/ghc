@@ -850,16 +850,14 @@ instance ExactPrint (HsDecl GhcPs) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (InstDecl GhcPs) where
-  getAnnotationEntry (ClsInstD     _  _) = NoEntryVal
-  getAnnotationEntry (DataFamInstD an _) = fromAnn an
-  getAnnotationEntry (TyFamInstD   _  _) = NoEntryVal
-
+  getAnnotationEntry (ClsInstD     _ _) = NoEntryVal
+  getAnnotationEntry (DataFamInstD _ _) = NoEntryVal
+  getAnnotationEntry (TyFamInstD   _ _) = NoEntryVal
 
   exact (ClsInstD     _  cid) = markAnnotated cid
-  exact (DataFamInstD an decl) = do
-    exactDataFamInstDecl an TopLevel decl
+  exact (DataFamInstD _ decl) = do
+    exactDataFamInstDecl noAnn TopLevel decl
   exact (TyFamInstD _ eqn) = do
-    -- exactTyFamInstDecl an TopLevel eqn
     markAnnotated eqn
 
 -- ---------------------------------------------------------------------
