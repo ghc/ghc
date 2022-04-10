@@ -1511,7 +1511,7 @@ flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
     mapLL (\s -> SigD noExtField s) all_ss,
     mapLL (\t -> TyClD noExtField (FamDecl noExtField t)) all_ts,
     mapLL (\tfi -> InstD noExtField (TyFamInstD noExtField tfi)) all_tfis,
-    mapLL (\dfi -> InstD noExtField (DataFamInstD noAnn dfi)) all_dfis,
+    mapLL (\dfi -> InstD noExtField (DataFamInstD noExtField dfi)) all_dfis,
     mapLL (\d -> DocD noExtField d) all_docs
   ]
 
