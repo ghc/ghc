@@ -1,6 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE MagicHash #-}
-
 -----------------------------------------------------------------------------
 --
 -- Pretty-printing assembly language
@@ -26,7 +23,6 @@ import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.CmmToAsm.Config
 import GHC.Utils.Outputable as SDoc
-import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.Panic
 import GHC.Utils.Misc ( charToC )
 import GHC.Platform
@@ -38,14 +34,6 @@ import Control.Monad.ST
 import Data.Word
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import GHC.Exts
-import GHC.Word
-
-#if !MIN_VERSION_base(4,16,0)
-word8ToWord# :: Word# -> Word#
-word8ToWord# w = w
-{-# INLINE word8ToWord# #-}
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Converting floating-point literals to integrals for printing
