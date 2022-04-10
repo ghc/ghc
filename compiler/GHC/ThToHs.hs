@@ -381,7 +381,7 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
                                , dd_cons = cons', dd_derivs = derivs' }
 
        ; returnJustLA $ InstD noExtField $ DataFamInstD
-           { dfid_ext = noAnn
+           { dfid_ext = noExtField
            , dfid_inst = DataFamInstDecl { dfid_eqn =
                            FamEqn { feqn_ext = noAnn
                                   , feqn_tycon = tc'
@@ -401,7 +401,7 @@ cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
                                , dd_kindSig = ksig'
                                , dd_cons = [con'], dd_derivs = derivs' }
        ; returnJustLA $ InstD noExtField $ DataFamInstD
-           { dfid_ext = noAnn
+           { dfid_ext = noExtField
            , dfid_inst = DataFamInstDecl { dfid_eqn =
                            FamEqn { feqn_ext = noAnn
                                   , feqn_tycon = tc'
