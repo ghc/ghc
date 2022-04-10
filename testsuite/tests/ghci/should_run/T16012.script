@@ -1,6 +1,8 @@
 -- We expect the allocation counter to be initialized to zero and to count down.
 -- As ghc expressions are executed in their own thread a call to getAllocationCounter
 -- should always return a reasonably low result.
+-- The actual number is somewhat arbitrary. If this fails because the value is slightly over
+-- the threshold below it's fine to increase the threshold!
 
 n <- System.Mem.getAllocationCounter
-if (n < 0 && n >= -200000) then putStrLn "Allocation counter in expected range" else (putStrLn $ "Unexpected allocation counter result:" ++ show n)
+if (n < 0 && n >= -222222) then putStrLn "Allocation counter in expected range" else (putStrLn $ "Unexpected allocation counter result:" ++ show n)

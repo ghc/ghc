@@ -44,6 +44,17 @@ Dumping out compiler intermediate structures
     ``-ddump-file-prefix=Foo`` will cause the output from
     :ghc-flag:`-ddump-simpl` to be dumped to :file:`Foo.dump-simpl`.
 
+.. ghc-flag:: -fdump-with-ways
+    :shortdesc: Include the tag of the enabled ways in the extension of dump files.
+    :type: dynamic
+
+    :default: enabled
+
+
+    When compiling Main.hs with profiling and without this will now produce
+    ``Main.p.dump-simpl`` and ``Main.dump-simpl`` instead of overwriting the
+    output of one way with the output of another.
+
 .. ghc-flag:: -ddump-json
     :shortdesc: Dump error messages as JSON documents
     :type: dynamic

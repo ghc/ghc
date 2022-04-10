@@ -43,7 +43,7 @@ runTestGhcFlags = do
     -- Take flags to send to the Haskell compiler from test.mk.
     -- See: https://github.com/ghc/ghc/blob/master/testsuite/mk/test.mk#L37
     unwords <$> sequence
-        [ pure " -dcore-lint -dstg-lint -dcmm-lint -no-user-package-db -rtsopts"
+        [ pure " -dcore-lint -dstg-lint -dcmm-lint -no-user-package-db -fno-dump-with-ways -rtsopts"
         , pure ghcOpts
         , pure ghcExtraFlags
         , ifMinGhcVer "711" "-fno-warn-missed-specialisations"

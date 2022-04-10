@@ -23,7 +23,9 @@ initLogFlags dflags = LogFlags
   , log_dump_dir             = dumpDir dflags
   , log_dump_prefix          = dumpPrefix dflags
   , log_dump_prefix_override = dumpPrefixForce dflags
+  , log_with_ways            = gopt Opt_DumpWithWays dflags
   , log_enable_debug         = not (hasNoDebugOutput dflags)
   , log_verbosity            = verbosity dflags
+  , log_ways                 = Just $ ways dflags
   }
 
