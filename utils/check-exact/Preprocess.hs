@@ -74,7 +74,7 @@ checkLine line s
            size   = length pragma
            mSrcLoc = mkSrcLoc (mkFastString "LINE")
            ss     = mkSrcSpan (mSrcLoc line 1) (mSrcLoc line (size+1))
-       in (res, Just $ mkLEpaComment pragma (GHC.spanAsAnchor ss))
+       in (res, Just $ mkLEpaComment pragma (GHC.spanAsAnchor ss) (GHC.realSrcSpan ss))
   -- Deal with shebang/cpp directives too
   -- x |  "#" `isPrefixOf` s = ("",Just $ Comment ((line, 1), (line, length s)) s)
   |  "#!" `isPrefixOf` s =
