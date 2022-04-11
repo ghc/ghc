@@ -50,7 +50,7 @@ import Data.Foldable
 import Data.Functor.Const
 import qualified Data.Set as Set
 import Data.Typeable
-import Data.List ( partition, sortBy)
+import Data.List ( partition, sort, sortBy)
 import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe ( isJust, mapMaybe )
 import qualified Data.Set as Set
@@ -2255,6 +2255,9 @@ exactMatch (Match an mctxt pats grhss) = do
       CaseAlt -> do
         pats' <- markAnnotated pats
         return (an, CaseAlt, pats')
+      LamCaseAlt v -> do
+        pats' <- markAnnotated pats
+        return (an, LamCaseAlt v, pats')
       _ -> do
         mctxt' <- withPpr mctxt
         return (an, mctxt', pats)

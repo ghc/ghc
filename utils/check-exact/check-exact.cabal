@@ -22,6 +22,7 @@ Executable check-exact
     Ghc-Options: -Wall
     other-modules: ExactPrint
                    Lookup
+                   Orphans
                    Parsers
                    Preprocess
                    Transform

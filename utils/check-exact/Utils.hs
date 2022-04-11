@@ -24,6 +24,7 @@ import Data.Ord (comparing)
 
 import GHC.Hs.Dump
 import Lookup
+import Orphans (Default(..))
 
 import GHC hiding (EpaComment)
 import qualified GHC
@@ -32,6 +33,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Driver.Ppr
 import GHC.Data.FastString
+import qualified GHC.Data.Strict as Strict
 
 import qualified GHC.Types.Name.Occurrence as OccName (OccName(..),pprNameSpaceBrief)
 
@@ -338,6 +340,99 @@ occAttributes o = "(" ++ ns ++ vo ++ tv ++ tc ++ d ++ ds ++ s ++ v ++ ")"
 locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
 locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan l
 locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
+
+-- ---------------------------------------------------------------------
+
+setAnchorAn :: (Default an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
+setAnchorAn (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
+  = (L (SrcSpanAnn (EpAnn anc def cs) l) a)
+     -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
+setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
+  = (L (SrcSpanAnn (EpAnn anc an cs) l) a)
+     -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
+
+setAnchorEpa :: (Default an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
+setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc def cs
+setAnchorEpa (EpAnn _ an _) anc cs = EpAnn anc an     cs
+
+setAnchorEpaL :: EpAnn AnnList -> Anchor -> EpAnnComments -> EpAnn AnnList
+setAnchorEpaL EpAnnNotUsed   anc cs = EpAnn anc mempty cs
+setAnchorEpaL (EpAnn _ an _) anc cs = EpAnn anc (an {al_anchor = Nothing}) cs
+
+setAnchorHsModule :: HsModule -> Anchor -> EpAnnComments -> HsModule
+setAnchorHsModule hsmod anc cs = hsmod { hsmodAnn = an' }
+  where
+    anc' = anc { anchor_op = UnchangedAnchor }
+    an' = setAnchorEpa (hsmodAnn hsmod) anc' cs
+
+-- |Version of l2l that preserves the anchor, immportant if it has an
+-- updated AnchorOperation
+moveAnchor :: Monoid b => SrcAnn a -> SrcAnn b
+moveAnchor (SrcSpanAnn EpAnnNotUsed l) = noAnnSrcSpan l
+moveAnchor (SrcSpanAnn (EpAnn anc _ cs) l) = SrcSpanAnn (EpAnn anc mempty cs) l
+
+-- ---------------------------------------------------------------------
+
+trailingAnnLoc :: TrailingAnn -> EpaLocation
+trailingAnnLoc (AddSemiAnn ss)    = ss
+trailingAnnLoc (AddCommaAnn ss)   = ss
+trailingAnnLoc (AddVbarAnn ss)    = ss
+
+setTrailingAnnLoc :: TrailingAnn -> EpaLocation -> TrailingAnn
+setTrailingAnnLoc (AddSemiAnn _)    ss = (AddSemiAnn ss)
+setTrailingAnnLoc (AddCommaAnn _)   ss = (AddCommaAnn ss)
+setTrailingAnnLoc (AddVbarAnn _)    ss = (AddVbarAnn ss)
+
+addEpAnnLoc :: AddEpAnn -> EpaLocation
+addEpAnnLoc (AddEpAnn _ l) = l
+
+-- ---------------------------------------------------------------------
+
+-- TODO: move this to GHC
+anchorToEpaLocation :: Anchor -> EpaLocation
+anchorToEpaLocation (Anchor r UnchangedAnchor) = EpaSpan r
+anchorToEpaLocation (Anchor _ (MovedAnchor dp)) = EpaDelta dp []
+
+-- ---------------------------------------------------------------------
+-- Horrible hack for dealing with some things still having a SrcSpan,
+-- not an Anchor.
+
+{-
+A SrcSpan is defined as
+
+data SrcSpan =
+    RealSrcSpan !RealSrcSpan !(Maybe BufSpan)  -- See Note [Why Maybe BufPos]
+  | UnhelpfulSpan !UnhelpfulSpanReason
+
+data BufSpan =
+  BufSpan { bufSpanStart, bufSpanEnd :: {-# UNPACK #-} !BufPos }
+  deriving (Eq, Ord, Show)
+
+newtype BufPos = BufPos { bufPos :: Int }
+
+
+We use the BufPos to encode a delta, using bufSpanStart for the line,
+and bufSpanEnd for the col.
+
+To be absolutely sure, we make the delta versions use -ve values.
+
+-}
+
+hackSrcSpanToAnchor :: SrcSpan -> Anchor
+hackSrcSpanToAnchor (UnhelpfulSpan s) = error $ "hackSrcSpanToAnchor : UnhelpfulSpan:" ++ show s
+hackSrcSpanToAnchor (RealSrcSpan r Strict.Nothing) = Anchor r UnchangedAnchor
+hackSrcSpanToAnchor (RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e))))
+  = if s <= 0 && e <= 0
+    then Anchor r (MovedAnchor (deltaPos (-s) (-e)))
+    else Anchor r UnchangedAnchor
+
+hackAnchorToSrcSpan :: Anchor -> SrcSpan
+hackAnchorToSrcSpan (Anchor r UnchangedAnchor) = RealSrcSpan r Strict.Nothing
+hackAnchorToSrcSpan (Anchor r (MovedAnchor dp))
+  = RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e)))
+  where
+    s = - (getDeltaLine dp)
+    e = - (deltaColumn dp)
 
  -- ---------------------------------------------------------------------
 
