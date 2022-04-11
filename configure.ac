@@ -219,14 +219,6 @@ if test "$WithGhc" != ""; then
   else
       AC_SUBST(GhcThreadedRts, NO)
   fi
-
-  dnl Same for an event-logging RTS.
-  if echo ${RTS_WAYS_STAGE0} | tr ' ' '\n' | grep '^l$' 2>&1 >/dev/null
-  then
-      AC_SUBST(GhcEventLoggingRts, YES)
-  else
-      AC_SUBST(GhcEventLoggingRts, NO)
-  fi
 fi
 
 dnl ** Must have GHC to build GHC
@@ -1277,7 +1269,6 @@ echo "\
    Bootstrapping using   : $WithGhc
       which is version   : $GhcVersion
       with threaded RTS? : $GhcThreadedRts
-      with eventlog RTS? : $GhcEventLoggingRts
 "
 
 if test "x$CcLlvmBackend" = "xYES"; then

@@ -354,6 +354,7 @@
    Constants.
    -------------------------------------------------------------------------- */
 
+#include "rts/Config.h"
 #include "rts/Constants.h"
 #include "DerivedConstants.h"
 #include "rts/storage/ClosureTypes.h"

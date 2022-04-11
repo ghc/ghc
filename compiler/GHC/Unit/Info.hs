@@ -211,14 +211,8 @@ unitHsLibs namever ways0 p = map (mkDynName . addSuffix . ST.unpack) (unitLibrar
         -- the name of a shared library is libHSfoo-ghc<version>.so
         -- we leave out the _dyn, because it is superfluous
 
-        -- debug and profiled RTSs include support for -eventlog
-        ways2 |  ways1 `hasWay` WayDebug || ways1 `hasWay` WayProf
-              = removeWay WayTracing ways1
-              | otherwise
-              = ways1
-
-        tag     = waysTag (fullWays ways2)
-        rts_tag = waysTag ways2
+        tag     = waysTag (fullWays ways1)
+        rts_tag = waysTag ways1
 
         mkDynName x
          | not (ways0 `hasWay` WayDyn) = x

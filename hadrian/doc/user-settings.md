@@ -324,15 +324,14 @@ One can alternatively supply settings from the command line or a
 For example, putting the following in a file at `_build/hadrian.settings`:
 
 ``` make
-stage1.ghc-bin.ghc.link.opts += -eventlog
+stage1.ghc-bin.ghc.link.opts += -debug
 *.base.ghc.*.opts += -v3
 ```
 
 and running hadrian with the default build root (`_build`), would respectively
-link the stage 2 GHC executable (using the stage 1 GHC) with the `-eventlog`
-flag, so that stage 2 GHC supports producing eventlogs with `+RTS -l`, and use
-`-v3` on all GHC commands used to build anything related to `base`, whatever
-the stage.
+link the stage 2 GHC executable (using the stage 1 GHC) with the `-debug`
+flag and use `-v3` on all GHC commands used to build anything related to
+`base`, whatever the stage.
 
 We could equivalently specify those settings on the command-line:
 

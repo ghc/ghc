@@ -521,16 +521,8 @@ easily compute totals with tools like ghc-events-analyze (see below).
 Producing an eventlog for GHC
 -----------------------------
 
-To actually produce the eventlog, you need an eventlog-capable GHC build:
-
-  With Hadrian:
-  $ hadrian/build -j "stage1.ghc-bin.ghc.link.opts += -eventlog"
-
-  With Make:
-  $ make -j GhcStage2HcOpts+=-eventlog
-
-You can then produce an eventlog when compiling say hello.hs by simply
-doing:
+You can produce an eventlog when compiling, for instance, hello.hs by simply
+running:
 
   If GHC was built by Hadrian:
   $ _build/stage1/bin/ghc -ddump-timings hello.hs -o hello +RTS -l

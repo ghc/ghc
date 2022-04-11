@@ -10,7 +10,7 @@ quickestFlavour = defaultFlavour
     { name        = "quickest"
     , args        = defaultBuilderArgs <> quickestArgs <> defaultPackageArgs
     , libraryWays = pure [vanilla]
-    , rtsWays     = pure [vanilla, threaded, threadedLogging, logging]
+    , rtsWays     = pure [vanilla, threaded]
     , dynamicGhcPrograms = return False }
 
 quickestArgs :: Args
