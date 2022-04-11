@@ -169,9 +169,6 @@ GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised
 # Whether or not the bootstrapping GHC supplies a threaded RTS.
 GhcThreadedRts = @GhcThreadedRts@
 
-# Whether or not the bootstrapping GHC supplies an event-logging RTS.
-GhcEventLoggingRts = @GhcEventLoggingRts@
-
 # Whether to include GHCi in the compiler.  Depends on whether the RTS linker
 # has support for this OS/ARCH combination.
 
@@ -230,31 +227,22 @@ BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))
 # make sense here:
 #
 #   thr           : threaded
-#   thr_p         : threaded + profiled + eventlog
-#   debug         : debugging + eventlog
-#   thr_debug     : debugging + threaded, + eventlog
-#   l             : eventlog
-#   p             : profiled + eventlog
-#   thr_l         : threaded + eventlog
+#   thr_p         : threaded + profiled
+#   debug         : debugging
+#   thr_debug     : debugging + threaded
+#   p             : profiled
 #
-# Note how there are a few cases which are handled specially (in packageHsLibs)
-# to reduce the number of distinct ways,
-#
-#   debug     implies  eventlog
-#   profiled  implies  eventlog
-#
-# This means, for instance, that there is no debug_l way.
-#
-GhcRTSWays=l
+# While the eventlog used to be enabled in only a subset of ways, we now always
+# enable it.
 
 # Usually want the debug version
-GhcRTSWays += debug
+GhcRTSWays = debug
 
 # We always have the threaded versions, but note that SMP support may be disabled
 # (see GhcWithSMP).
-GhcRTSWays += thr thr_debug thr_l
+GhcRTSWays += thr thr_debug
 GhcRTSWays += $(if $(findstring p, $(GhcLibWays)),thr_p,)
-GhcRTSWays += $(if $(findstring dyn, $(GhcLibWays)),dyn debug_dyn thr_dyn thr_debug_dyn l_dyn thr_l_dyn,)
+GhcRTSWays += $(if $(findstring dyn, $(GhcLibWays)),dyn debug_dyn thr_dyn thr_debug_dyn,)
 GhcRTSWays += $(if $(findstring p, $(GhcLibWays)),thr_debug_p debug_p,)
 
 # We can only build GHCi threaded if we have a threaded RTS:

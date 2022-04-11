@@ -121,19 +121,19 @@ KeepCafs:
 
 .PHONY: EventlogOutput1
 EventlogOutput1:
-	"$(TEST_HC)" -eventlog -v0 EventlogOutput.hs
+	"$(TEST_HC)" -v0 EventlogOutput.hs
 	./EventlogOutput +RTS -l -olhello.eventlog
 	ls hello.eventlog >/dev/null
 
 .PHONY: EventlogOutput2
 EventlogOutput2:
-	"$(TEST_HC)" -eventlog -v0 EventlogOutput.hs
+	"$(TEST_HC)" -v0 EventlogOutput.hs
 	./EventlogOutput +RTS -l
 	ls EventlogOutput.eventlog >/dev/null
 
 .PHONY: EventlogOutputNull
 EventlogOutputNull:
-	"$(TEST_HC)" -eventlog -rtsopts -v0 EventlogOutput.hs
+	"$(TEST_HC)" -rtsopts -v0 EventlogOutput.hs
 	./EventlogOutput +RTS -l --null-eventlog-writer
 	test ! -e EventlogOutput.eventlog
 

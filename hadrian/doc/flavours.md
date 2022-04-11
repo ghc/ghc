@@ -305,26 +305,16 @@ information. The following table lists ways that are built in different flavours
     <th>default<br>perf<br>prof<br>devel1<br>devel2</td>
     <td>vanilla</td>
     <td>vanilla<br>profiling<br>dynamic</td>
-    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
-        <br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic
-        <br>loggingDynamic<br>threadedLoggingDynamic
-    </td>
-    <td>
-        logging<br>debug<br>threaded<br>threadedDebug<br>
-        threadedLogging<br>threadedProfiling
-        <br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic
-        <br>loggingDynamic<br>threadedLoggingDynamic
-    </td>
+    <td>debug<br>threaded<br>threadedDebug<br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic</td>
+    <td>debug<br>threaded<br>threadedDebug<br>threadedProfiling<br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic</td>
 </tr>
 <tr>
     <th>static</td>
     <td>vanilla</td>
     <td>vanilla<br>profiling</td>
-    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
-    </td>
+    <td>debug<br>threaded<br>threadedDebug</td>
     <td>
-        logging<br>debug<br>threaded<br>threadedDebug<br>
-        threadedLogging<br>threadedProfiling
+        debug<br>threaded<br>threadedDebug<br>threadedProfiling
     </td>
     <td>Only in<br>prof<br>flavour</td>
     <td>Only in<br>prof<br>flavour</td>
@@ -333,14 +323,8 @@ information. The following table lists ways that are built in different flavours
     <th>quick<br>quick-validate<br>quick-debug</th>
     <td>vanilla</td>
     <td>vanilla<br>dynamic</td>
-    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
-        <br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic
-        <br>loggingDynamic<br>threadedLoggingDynamic
-    </td>
-    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
-        <br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic
-        <br>loggingDynamic<br>threadedLoggingDynamic
-    </td>
+    <td>debug<br>threaded<br>threadedDebug<br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic</td>
+    <td>debug<br>threaded<br>threadedDebug<br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic</td>
 </tr>
 <tr>
     <th>quickest<br>bench</th>

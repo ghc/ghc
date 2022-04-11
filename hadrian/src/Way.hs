@@ -1,10 +1,10 @@
 module Way (
     WayUnit (..), Way, wayUnit, addWayUnit, removeWayUnit, wayFromUnits, allWays,
 
-    vanilla, profiling, dynamic, profilingDynamic, threaded, debug, logging,
-    threadedDebug, threadedProfiling, threadedLogging, threadedDynamic,
+    vanilla, profiling, dynamic, profilingDynamic, threaded, debug,
+    threadedDebug, threadedProfiling, threadedDynamic,
     threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic,
-    threadedLoggingDynamic, debugProfiling, debugDynamic, loggingDynamic,
+    debugProfiling, debugDynamic,
 
     wayPrefix, waySuffix, hisuf, osuf, hcsuf, obootsuf, hibootsuf, ssuf
     ) where
@@ -28,10 +28,6 @@ profilingDynamic :: Way
 profilingDynamic = wayFromUnits [Profiling, Dynamic]
 
 -- RTS only ways below. See compiler/GHC/Driver/Session.hs.
--- | Build RTS with event logging.
-logging :: Way
-logging = wayFromUnits [Logging]
-
 -- | Build multithreaded RTS.
 threaded :: Way
 threaded = wayFromUnits [Threaded]
@@ -41,28 +37,25 @@ debug :: Way
 debug = wayFromUnits [Debug]
 
 -- | Various combinations of RTS only ways.
-threadedDebug, threadedProfiling, threadedLogging, threadedDynamic,
+threadedDebug, threadedProfiling, threadedDynamic,
     threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic,
-    threadedLoggingDynamic, debugProfiling, debugDynamic, loggingDynamic :: Way
+    debugProfiling, debugDynamic :: Way
 threadedDebug            = wayFromUnits [Threaded, Debug]
 threadedProfiling        = wayFromUnits [Threaded, Profiling]
-threadedLogging          = wayFromUnits [Threaded, Logging]
 threadedDynamic          = wayFromUnits [Threaded, Dynamic]
 threadedDebugProfiling   = wayFromUnits [Threaded, Debug, Profiling]
 threadedDebugDynamic     = wayFromUnits [Threaded, Debug, Dynamic]
 threadedProfilingDynamic = wayFromUnits [Threaded, Profiling, Dynamic]
-threadedLoggingDynamic   = wayFromUnits [Threaded, Logging, Dynamic]
 debugProfiling           = wayFromUnits [Debug, Profiling]
 debugDynamic             = wayFromUnits [Debug, Dynamic]
-loggingDynamic           = wayFromUnits [Logging, Dynamic]
 
 -- | All ways supported by the build system.
 allWays :: [Way]
 allWays =
-    [ vanilla, profiling, dynamic, profilingDynamic, threaded, debug, logging
-    , threadedDebug, threadedProfiling, threadedLogging, threadedDynamic
+    [ vanilla, profiling, dynamic, profilingDynamic, threaded, debug
+    , threadedDebug, threadedProfiling, threadedDynamic
     , threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic
-    , threadedLoggingDynamic, debugProfiling, debugDynamic, loggingDynamic ]
+    , debugProfiling, debugDynamic ]
 
 wayPrefix :: Way -> String
 wayPrefix way | way == vanilla = ""

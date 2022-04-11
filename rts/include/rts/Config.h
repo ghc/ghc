@@ -26,12 +26,11 @@
 #define USING_LIBBFD 1
 #endif
 
-/* DEBUG and PROFILING both imply TRACING */
-#if defined(DEBUG) || defined(PROFILING)
-#if !defined(TRACING)
+/*
+ * We previously only offer the eventlog in a subset of RTS ways; we now
+ * enable it unconditionally to simplify packaging. See #18948.
+ */
 #define TRACING
-#endif
-#endif
 
 /* DEBUG implies TICKY_TICKY */
 #if defined(DEBUG)

@@ -10,7 +10,7 @@ benchmarkFlavour = defaultFlavour
     { name = "bench"
     , args = defaultBuilderArgs <> benchmarkArgs <> defaultPackageArgs
     , libraryWays = pure [vanilla]
-    , rtsWays = pure [vanilla, threaded, logging, threadedLogging] }
+    , rtsWays = pure [vanilla, threaded] }
 
 benchmarkArgs :: Args
 benchmarkArgs = sourceArgs SourceArgs

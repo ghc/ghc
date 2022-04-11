@@ -160,11 +160,11 @@ test('rtsflags002', [ only_ways(['normal']) ], compile_and_run, ['-with-rtsopts=
 # variants of the RTS by default
 test('traceEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
                      extra_run_opts('+RTS -ls -RTS') ],
-                   compile_and_run, ['-eventlog'])
+                   compile_and_run, [''])
 
 test('traceBinaryEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
                            extra_run_opts('+RTS -ls -RTS') ],
-                         compile_and_run, ['-eventlog'])
+                         compile_and_run, [''])
 
 # Test that -ol flag works as expected
 test('EventlogOutput1',
@@ -209,7 +209,7 @@ test('ipeEventLog',
        # In general this test should work on Darwin - Just not on our CI.
        when(opsys('darwin'), fragile(0))
      ],
-     compile_and_run, ['ipeEventLog_lib.c -eventlog'])
+     compile_and_run, ['ipeEventLog_lib.c'])
 
 # Manually create IPE entries, force the initialization of the underlying hash map
 # and dump them to event log (stderr).
@@ -225,7 +225,7 @@ test('ipeEventLog_fromMap',
        # In general this test should work on Darwin - Just not on our CI.
        when(opsys('darwin'), fragile(0))
      ],
-     compile_and_run, ['ipeEventLog_lib.c -eventlog'])
+     compile_and_run, ['ipeEventLog_lib.c'])
 
 test('T4059', [], makefile_test, ['T4059'])
 
@@ -486,10 +486,10 @@ test('T13676',
      ghci_script, ['T13676.script'])
 test('InitEventLogging',
      [only_ways(['normal']), extra_run_opts('+RTS -RTS')],
-     compile_and_run, ['-eventlog InitEventLogging_c.c'])
+     compile_and_run, ['InitEventLogging_c.c'])
 test('RestartEventLogging',
      [only_ways(['threaded1','threaded2']), extra_run_opts('+RTS -la -RTS')],
-     compile_and_run, ['-eventlog RestartEventLogging_c.c'])
+     compile_and_run, ['RestartEventLogging_c.c'])
 
 test('T17088',
      [only_ways(['normal']), extra_run_opts('+RTS -c -A256k -RTS')],
