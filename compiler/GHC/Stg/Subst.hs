@@ -39,8 +39,9 @@ substBndr :: Id -> Subst -> (Id, Subst)
 substBndr id (Subst in_scope env)
   = (new_id, Subst new_in_scope new_env)
   where
-    (new_id, new_in_scope) = uniqAway in_scope id
+    new_id = uniqAway in_scope id
     no_change = new_id == id -- in case nothing shadowed
+    new_in_scope = in_scope `extendInScopeSet` new_id
     new_env
       | no_change = delVarEnv env id
       | otherwise = extendVarEnv env id new_id

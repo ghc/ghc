@@ -66,7 +66,6 @@ import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Utils.Misc
-import GHC.Core.TyCo.Subst
 
 {-
 ************************************************************************
@@ -1913,8 +1912,8 @@ freshEtaId n subst ty
       = (subst', eta_id')
       where
         Scaled mult' ty' = Type.substScaledTyUnchecked subst ty
-        (eta_id', new_scope) = uniqAway (getTCvInScope subst) $
+        eta_id' = uniqAway (getTCvInScope subst) $
                   mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) mult' ty'
                   -- "OrCoVar" since this can be used to eta-expand
                   -- coercion abstractions
-        subst'  = setTCvInScope subst new_scope
+        subst'  = extendTCvInScope subst eta_id'

@@ -250,9 +250,9 @@ substBndr :: CseEnv -> InId -> (CseEnv, OutId)
 substBndr env old_id
   = (new_env, new_id)
   where
-    (new_id, new_scope) = uniqAway (ce_in_scope env) old_id
+    new_id = uniqAway (ce_in_scope env) old_id
     no_change = new_id == old_id
-    env' = env { ce_in_scope = new_scope }
+    env' = env { ce_in_scope = ce_in_scope env `extendInScopeSet` new_id }
     new_env | no_change = env'
             | otherwise = env' { ce_subst = extendVarEnv (ce_subst env) old_id new_id }
 

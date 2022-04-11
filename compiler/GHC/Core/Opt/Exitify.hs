@@ -263,8 +263,7 @@ mkExitJoinId in_scope ty join_arity = do
     fs <- get
     let avoid = in_scope `extendInScopeSetList` (map fst fs)
                          `extendInScopeSet` exit_id_tmpl -- just cosmetics
-    let (new_id, in_scope) = uniqAway avoid exit_id_tmpl
-    return new_id
+    return (uniqAway avoid exit_id_tmpl)
   where
     exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique Many ty
                     `asJoinId` join_arity
