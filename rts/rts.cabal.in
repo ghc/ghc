@@ -91,10 +91,6 @@ library
       extra-library-flavours: _debug _thr_debug
       if flag(dynamic)
         extra-dynamic-library-flavours: _debug _thr_debug
-    if flag(logging)
-      extra-library-flavours: _l _thr_l
-      if flag(dynamic)
-        extra-dynamic-library-flavours: _l _thr_l
     if flag(dynamic)
       extra-dynamic-library-flavours: _thr
 

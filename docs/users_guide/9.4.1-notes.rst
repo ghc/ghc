@@ -192,6 +192,13 @@ Compiler
   type variables when given a polymorphic type. (It used to instantiate
   inferred type variables.)
 
+Runtime system
+~~~~~~~~~~~~~~~~
+
+- Support for GHC's eventlog is now enabled in all runtime system configurations,
+  eliminating the need to pass the :ghc-flag:`-eventlog` flag to use the eventlog.
+  This flag has been deprecated (:ghc-ticket:`18948`).
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

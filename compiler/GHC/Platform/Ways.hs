@@ -68,7 +68,6 @@ data Way
   | WayThreaded      -- ^ (RTS only) Multithreaded runtime system
   | WayDebug         -- ^ Debugging, enable trace messages and extra checks
   | WayProf          -- ^ Profiling, enable cost-centre stacks and profiling reports
-  | WayTracing       -- ^ (RTS only) enable event logging (tracing)
   | WayDyn           -- ^ Dynamic linking
   deriving (Eq, Ord, Show, Read)
 
@@ -118,7 +117,6 @@ wayTag WayThreaded    = "thr"
 wayTag WayDebug       = "debug"
 wayTag WayDyn         = "dyn"
 wayTag WayProf        = "p"
-wayTag WayTracing     = "l" -- "l" for "logging"
 
 -- | Return true for ways that only impact the RTS, not the generated code
 wayRTSOnly :: Way -> Bool
@@ -127,7 +125,6 @@ wayRTSOnly WayDyn         = False
 wayRTSOnly WayProf        = False
 wayRTSOnly WayThreaded    = True
 wayRTSOnly WayDebug       = True
-wayRTSOnly WayTracing     = True
 
 -- | Filter ways that have an impact on compilation
 fullWays :: Ways -> Ways
@@ -143,7 +140,6 @@ wayDesc WayThreaded    = "Threaded"
 wayDesc WayDebug       = "Debug"
 wayDesc WayDyn         = "Dynamic"
 wayDesc WayProf        = "Profiling"
-wayDesc WayTracing     = "Tracing"
 
 -- | Turn these flags on when enabling this way
 wayGeneralFlags :: Platform -> Way -> [GeneralFlag]
@@ -159,7 +155,6 @@ wayGeneralFlags _ WayDyn      = [Opt_PIC, Opt_ExternalDynamicRefs]
     -- PIC objects can be linked into a .so, we have to compile even
     -- modules of the main program with -fPIC when using -dynamic.
 wayGeneralFlags _ WayProf     = []
-wayGeneralFlags _ WayTracing  = []
 
 -- | Turn these flags off when enabling this way
 wayUnsetGeneralFlags :: Platform -> Way -> [GeneralFlag]
@@ -170,7 +165,6 @@ wayUnsetGeneralFlags _ WayDyn      = [Opt_SplitSections]
    -- There's no point splitting when we're going to be dynamically linking.
    -- Plus it breaks compilation on OSX x86.
 wayUnsetGeneralFlags _ WayProf     = []
-wayUnsetGeneralFlags _ WayTracing  = []
 
 -- | Pass these options to the C compiler when enabling this way
 wayOptc :: Platform -> Way -> [String]
@@ -182,7 +176,6 @@ wayOptc platform WayThreaded = case platformOS platform of
 wayOptc _ WayDebug      = []
 wayOptc _ WayDyn        = []
 wayOptc _ WayProf       = ["-DPROFILING"]
-wayOptc _ WayTracing    = ["-DTRACING"]
 
 -- | Pass these options to linker when enabling this way
 wayOptl :: Platform -> Way -> [String]
@@ -198,7 +191,6 @@ wayOptl platform WayThreaded =
 wayOptl _ WayDebug      = []
 wayOptl _ WayDyn        = []
 wayOptl _ WayProf       = []
-wayOptl _ WayTracing    = []
 
 -- | Pass these options to the preprocessor when enabling this way
 wayOptP :: Platform -> Way -> [String]
@@ -207,7 +199,6 @@ wayOptP _ WayThreaded = []
 wayOptP _ WayDebug    = []
 wayOptP _ WayDyn      = []
 wayOptP _ WayProf     = ["-DPROFILING"]
-wayOptP _ WayTracing  = ["-DTRACING"]
 
 
 -- | Consult the RTS to find whether it has been built with profiling enabled.
@@ -268,7 +259,6 @@ hostWays = Set.unions
    , if hostIsProfiled then Set.singleton WayProf     else Set.empty
    , if hostIsThreaded then Set.singleton WayThreaded else Set.empty
    , if hostIsDebugged then Set.singleton WayDebug    else Set.empty
-   , if hostIsTracing  then Set.singleton WayTracing  else Set.empty
    ]
 
 -- | Host "full" ways (i.e. ways that have an impact on the compilation,

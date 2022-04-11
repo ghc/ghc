@@ -88,7 +88,6 @@ ghc-minor-version     = @GhcMinVersion@
 ghc-patch-level       = @GhcPatchLevel@
 
 bootstrap-threaded-rts      = @GhcThreadedRts@
-bootstrap-event-logging-rts = @GhcEventLoggingRts@
 
 project-name          = @ProjectName@
 project-version       = @ProjectVersion@

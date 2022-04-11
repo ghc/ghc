@@ -2106,7 +2106,10 @@ dynamic_flags_deps = [
 
     ------- ways ---------------------------------------------------------------
   , make_ord_flag defGhcFlag "prof"           (NoArg (addWayDynP WayProf))
-  , make_ord_flag defGhcFlag "eventlog"       (NoArg (addWayDynP WayTracing))
+  , (Deprecated, defFlag     "eventlog"
+     $ noArgM $ \d -> do
+         deprecate "the eventlog is now enabled in all runtime system ways"
+         return d)
   , make_ord_flag defGhcFlag "debug"          (NoArg (addWayDynP WayDebug))
   , make_ord_flag defGhcFlag "threaded"       (NoArg (addWayDynP WayThreaded))
 

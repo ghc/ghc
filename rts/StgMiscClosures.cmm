@@ -18,6 +18,11 @@ import ghczmprim_GHCziTypes_Izh_info;
 import AcquireSRWLockExclusive;
 import ReleaseSRWLockExclusive;
 
+#if defined(PROF_SPIN)
+import whitehole_lockClosure_spin;
+import whitehole_lockClosure_yield;
+#endif
+
 /* ----------------------------------------------------------------------------
    Stack underflow
    ------------------------------------------------------------------------- */
