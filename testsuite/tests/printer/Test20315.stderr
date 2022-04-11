@@ -1,0 +1,7 @@
+
+Test20315.hs:3:5: error:
+    • Couldn't match type ‘'Many’ with ‘m1 n1’
+      Expected: a1 %(m1 n1) -> a1
+        Actual: a1 -> a1
+    • In the expression: id :: a %(m n) -> a
+      In an equation for ‘f’: f = id :: a %(m n) -> a

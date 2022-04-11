@@ -55,6 +55,7 @@ module GHC.Iface.Type (
         pprIfaceCoercion, pprParendIfaceCoercion,
         splitIfaceSigmaTy, pprIfaceTypeApp, pprUserIfaceForAll,
         pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp,
+        mulArrow,
         ppr_fun_arrow,
         isIfaceTauType,
 
@@ -909,13 +910,19 @@ pprPrecIfaceType :: PprPrec -> IfaceType -> SDoc
 pprPrecIfaceType prec ty =
   hideNonStandardTypes (ppr_ty prec) ty
 
+-- mulArrow takes a pretty printer for the type it is being called on to
+-- allow type applications to be printed with the correct precedence inside
+-- the multiplicity e.g. a %(m n) -> b. See #20315.
+mulArrow :: (PprPrec -> a -> SDoc) -> a -> SDoc
+mulArrow ppr_mult mult = text "%" <> ppr_mult appPrec mult <+> arrow
+
 ppr_fun_arrow :: IfaceMult -> SDoc
 ppr_fun_arrow w
   | (IfaceTyConApp tc _) <- w
   , tc `ifaceTyConHasKey` (getUnique manyDataConTyCon) = arrow
   | (IfaceTyConApp tc _) <- w
   , tc `ifaceTyConHasKey` (getUnique oneDataConTyCon) = lollipop
-  | otherwise = mulArrow (pprIfaceType w)
+  | otherwise = mulArrow pprPrecIfaceType w
 
 ppr_sigma :: PprPrec -> IfaceType -> SDoc
 ppr_sigma ctxt_prec ty
@@ -1718,7 +1725,7 @@ ppr_co ctxt_prec (IfaceFunCo r cow co1 co2)
       = (coercionArrow cow' <> ppr_role r <+> ppr_co funPrec co1) : ppr_fun_tail cow co2
     ppr_fun_tail cow' other_co
       = [coercionArrow cow' <> ppr_role r <+> pprIfaceCoercion other_co]
-    coercionArrow w = mulArrow (ppr_co topPrec w)
+    coercionArrow w = mulArrow ppr_co w
 
 ppr_co _         (IfaceTyConAppCo r tc cos)
   = parens (pprIfaceCoTcApp topPrec tc cos) <> ppr_role r

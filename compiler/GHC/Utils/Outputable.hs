@@ -36,7 +36,7 @@ module GHC.Utils.Outputable (
         semi, comma, colon, dcolon, space, equals, dot, vbar,
         arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
         lambda,
-        lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore, mulArrow,
+        lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
         blankLine, forAllLit, bullet,
         (<>), (<+>), hcat, hsep,
         ($$), ($+$), vcat,
@@ -735,10 +735,6 @@ lbrack     = docToSDoc $ Pretty.lbrack
 rbrack     = docToSDoc $ Pretty.rbrack
 lbrace     = docToSDoc $ Pretty.lbrace
 rbrace     = docToSDoc $ Pretty.rbrace
-
-mulArrow :: SDoc -> SDoc
-mulArrow d = text "%" <> d <+> arrow
-
 
 forAllLit :: SDoc
 forAllLit = unicodeSyntax (char '∀') (text "forall")

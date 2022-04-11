@@ -107,6 +107,7 @@ import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Builtin.Types( manyDataConName, oneDataConName, mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
+import GHC.Iface.Type
 import GHC.Hs.Doc
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
@@ -360,7 +361,7 @@ instance
 pprHsArrow :: (OutputableBndrId pass) => HsArrow (GhcPass pass) -> SDoc
 pprHsArrow (HsUnrestrictedArrow _) = arrow
 pprHsArrow (HsLinearArrow _) = lollipop
-pprHsArrow (HsExplicitMult _ p _) = mulArrow (ppr p)
+pprHsArrow (HsExplicitMult _ p _) = mulArrow (const ppr) p
 
 type instance XConDeclField  (GhcPass _) = EpAnn [AddEpAnn]
 type instance XXConDeclField (GhcPass _) = DataConCantHappen

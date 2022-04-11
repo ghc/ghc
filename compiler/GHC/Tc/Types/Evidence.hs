@@ -87,6 +87,8 @@ import GHC.Core
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
 
+import GHC.Iface.Type
+
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
@@ -1034,7 +1036,7 @@ instance Outputable EvCallStack where
 instance Outputable EvTypeable where
   ppr (EvTypeableTyCon ts _)  = text "TyCon" <+> ppr ts
   ppr (EvTypeableTyApp t1 t2) = parens (ppr t1 <+> ppr t2)
-  ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> mulArrow (ppr tm) <+> ppr t2)
+  ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> mulArrow (const ppr) tm <+> ppr t2)
   ppr (EvTypeableTyLit t1)    = text "TyLit" <> ppr t1
 
 
