@@ -183,13 +183,13 @@ since they are only locally unique. In particular, two successive calls to
 
 -- | @uniqAway in_scope v@ finds a unique that is not used in the
 -- in-scope set, and gives that to v. See Note [Local uniques].
-uniqAway :: InScopeSet -> Var -> Var
+uniqAway :: InScopeSet -> Var -> (Var, InScopeSet)
 -- It starts with v's current unique, of course, in the hope that it won't
 -- have to change, and thereafter uses the successor to the last derived unique
 -- found in the in-scope set.
 uniqAway in_scope var
-  | var `elemInScopeSet` in_scope = uniqAway' in_scope var      -- Make a new one
-  | otherwise                     = var                         -- Nothing to do
+  | var `elemInScopeSet` in_scope = let new_var = uniqAway' in_scope var in (new_var, extendInScopeSet  in_scope new_var)      -- Make a new one
+  | otherwise                     = (var, in_scope)                       -- Nothing to do
 
 uniqAway' :: InScopeSet -> Var -> Var
 -- This one *always* makes up a new variable
@@ -317,9 +317,9 @@ rnBndrL :: RnEnv2 -> Var -> (RnEnv2, Var)
 rnBndrL (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL
   = (RV2 { envL     = extendVarEnv envL bL new_b
          , envR     = envR
-         , in_scope = extendInScopeSet in_scope new_b }, new_b)
+         , in_scope = new_scope }, new_b)
   where
-    new_b = uniqAway in_scope bL
+    (new_b, new_scope) = uniqAway in_scope bL
 
 rnBndrR :: RnEnv2 -> Var -> (RnEnv2, Var)
 -- ^ Similar to 'rnBndr2' but used when there's a binder on the right
@@ -327,9 +327,9 @@ rnBndrR :: RnEnv2 -> Var -> (RnEnv2, Var)
 rnBndrR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
   = (RV2 { envR     = extendVarEnv envR bR new_b
          , envL     = envL
-         , in_scope = extendInScopeSet in_scope new_b }, new_b)
+         , in_scope = new_scope }, new_b)
   where
-    new_b = uniqAway in_scope bR
+    (new_b, new_scope) = uniqAway in_scope bR
 
 rnEtaL :: RnEnv2 -> Var -> (RnEnv2, Var)
 -- ^ Similar to 'rnBndrL' but used for eta expansion
@@ -337,9 +337,9 @@ rnEtaL :: RnEnv2 -> Var -> (RnEnv2, Var)
 rnEtaL (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL
   = (RV2 { envL     = extendVarEnv envL bL new_b
          , envR     = extendVarEnv envR new_b new_b     -- Note [Eta expansion]
-         , in_scope = extendInScopeSet in_scope new_b }, new_b)
+         , in_scope = new_scope }, new_b)
   where
-    new_b = uniqAway in_scope bL
+    (new_b, new_scope) = uniqAway in_scope bL
 
 rnEtaR :: RnEnv2 -> Var -> (RnEnv2, Var)
 -- ^ Similar to 'rnBndr2' but used for eta expansion
@@ -347,9 +347,9 @@ rnEtaR :: RnEnv2 -> Var -> (RnEnv2, Var)
 rnEtaR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
   = (RV2 { envL     = extendVarEnv envL new_b new_b     -- Note [Eta expansion]
          , envR     = extendVarEnv envR bR new_b
-         , in_scope = extendInScopeSet in_scope new_b }, new_b)
+         , in_scope = new_scope }, new_b)
   where
-    new_b = uniqAway in_scope bR
+    (new_b, new_scope) = uniqAway in_scope bR
 
 delBndrL, delBndrR :: RnEnv2 -> Var -> RnEnv2
 delBndrL rn@(RV2 { envL = env, in_scope = in_scope }) v

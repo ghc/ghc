@@ -20,7 +20,7 @@ module GHC.Core.TyCo.Subst
         getCvSubstEnv, getTCvInScope, getTCvSubstRangeFVs,
         isInScope, elemTCvSubst, notElemTCvSubst,
         setTvSubstEnv, setCvSubstEnv, zapTCvSubst,
-        extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
+        extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet, setTCvInScope,
         extendTCvSubst, extendTCvSubstWithClone,
         extendCvSubst, extendCvSubstWithClone,
         extendTvSubst, extendTvSubstBinderAndInScope, extendTvSubstWithClone,
@@ -315,6 +315,10 @@ zapTCvSubst (TCvSubst in_scope _ _) = TCvSubst in_scope emptyVarEnv emptyVarEnv
 extendTCvInScope :: TCvSubst -> Var -> TCvSubst
 extendTCvInScope (TCvSubst in_scope tenv cenv) var
   = TCvSubst (extendInScopeSet in_scope var) tenv cenv
+
+setTCvInScope :: TCvSubst -> InScopeSet -> TCvSubst
+setTCvInScope (TCvSubst _ tenv cenv) in_scope
+  = TCvSubst in_scope tenv cenv
 
 extendTCvInScopeList :: TCvSubst -> [Var] -> TCvSubst
 extendTCvInScopeList (TCvSubst in_scope tenv cenv) vars
@@ -888,7 +892,7 @@ substForAllCoTyVarBndrUsing :: Bool  -- apply sym to binder?
                             -> (TCvSubst, TyVar, KindCoercion)
 substForAllCoTyVarBndrUsing sym sco (TCvSubst in_scope tenv cenv) old_var old_kind_co
   = ASSERT( isTyVar old_var )
-    ( TCvSubst (in_scope `extendInScopeSet` new_var) new_env cenv
+    ( TCvSubst new_scope new_env cenv
     , new_var, new_kind_co )
   where
     new_env | no_change && not sym = delVarEnv tenv old_var
@@ -908,7 +912,7 @@ substForAllCoTyVarBndrUsing sym sco (TCvSubst in_scope tenv cenv) old_var old_ki
     -- we want. We don't want to do substitution once more. Also, in most cases,
     -- new_kind_co is a Refl, in which case coercionKind is really fast.
 
-    new_var  = uniqAway in_scope (setTyVarKind old_var new_ki1)
+    (new_var, new_scope)  = uniqAway in_scope (setTyVarKind old_var new_ki1)
 
 substForAllCoCoVarBndrUsing :: Bool  -- apply sym to binder?
                             -> (Coercion -> Coercion)  -- transformation to kind co
@@ -917,7 +921,7 @@ substForAllCoCoVarBndrUsing :: Bool  -- apply sym to binder?
 substForAllCoCoVarBndrUsing sym sco (TCvSubst in_scope tenv cenv)
                             old_var old_kind_co
   = ASSERT( isCoVar old_var )
-    ( TCvSubst (in_scope `extendInScopeSet` new_var) tenv new_cenv
+    ( TCvSubst new_scope tenv new_cenv
     , new_var, new_kind_co )
   where
     new_cenv | no_change && not sym = delVarEnv cenv old_var
@@ -931,7 +935,7 @@ substForAllCoCoVarBndrUsing sym sco (TCvSubst in_scope tenv cenv)
 
     Pair h1 h2 = coercionKind new_kind_co
 
-    new_var       = uniqAway in_scope $ mkCoVar (varName old_var) new_var_type
+    (new_var, new_scope)       = uniqAway in_scope $ mkCoVar (varName old_var) new_var_type
     new_var_type  | sym       = h2
                   | otherwise = h1
 
@@ -985,7 +989,7 @@ substTyVarBndrUsing
 substTyVarBndrUsing subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
   = ASSERT2( _no_capture, pprTyVar old_var $$ pprTyVar new_var $$ ppr subst )
     ASSERT( isTyVar old_var )
-    (TCvSubst (in_scope `extendInScopeSet` new_var) new_env cenv, new_var)
+    (TCvSubst new_scope new_env cenv, new_var)
   where
     new_env | no_change = delVarEnv tenv old_var
             | otherwise = extendVarEnv tenv old_var (TyVarTy new_var)
@@ -1006,7 +1010,8 @@ substTyVarBndrUsing subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
         --      (\x.e) with id_subst = [x |-> e']
         -- Here we must simply zap the substitution for x
 
-    new_var | no_kind_change = uniqAway in_scope old_var
+    (new_var, new_scope)
+            | no_kind_change = uniqAway in_scope old_var
             | otherwise = uniqAway in_scope $
                           setTyVarKind old_var (subst_fn subst old_ki)
         -- The uniqAway part makes sure the new variable is not already in scope
@@ -1019,7 +1024,7 @@ substCoVarBndrUsing
   -> TCvSubst -> CoVar -> (TCvSubst, CoVar)
 substCoVarBndrUsing subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
   = ASSERT( isCoVar old_var )
-    (TCvSubst (in_scope `extendInScopeSet` new_var) tenv new_cenv, new_var)
+    (TCvSubst new_scope tenv new_cenv, new_var)
   where
     new_co         = mkCoVarCo new_var
     no_kind_change = noFreeVarsOfTypes [t1, t2]
@@ -1028,7 +1033,7 @@ substCoVarBndrUsing subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
     new_cenv | no_change = delVarEnv cenv old_var
              | otherwise = extendVarEnv cenv old_var new_co
 
-    new_var = uniqAway in_scope subst_old_var
+    (new_var, new_scope) = uniqAway in_scope subst_old_var
     subst_old_var = mkCoVar (varName old_var) new_var_type
 
     (_, _, t1, t2, role) = coVarKindsTypesRole old_var

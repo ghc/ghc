@@ -1997,9 +1997,9 @@ coreFlattenVarBndr subst env tv
     -- See Note [Flattening type-family applications when matching instances], wrinkle 2B.
     kind          = varType tv
     (env1, kind') = coreFlattenTy subst env kind
-    tv'           = uniqAway (fe_in_scope env1) (setVarType tv kind')
+    (tv', new_scope) = uniqAway (fe_in_scope env1) (setVarType tv kind')
     subst'        = extendVarEnv subst tv (mkTyVarTy tv')
-    env2          = updateInScopeSet env1 (flip extendInScopeSet tv')
+    env2          = updateInScopeSet env1 (const new_scope)
 
 coreFlattenTyFamApp :: TvSubstEnv -> FlattenEnv
                     -> TyCon         -- type family tycon
@@ -2010,13 +2010,13 @@ coreFlattenTyFamApp tv_subst env fam_tc fam_args
       Just (tv, _, _) -> (env', mkAppTys (mkTyVarTy tv) leftover_args')
       Nothing ->
         let tyvar_name = mkFlattenFreshTyName fam_tc
-            tv         = uniqAway in_scope $
+            (tv, new_in_scope) = uniqAway in_scope $
                          mkTyVar tyvar_name (typeKind fam_ty)
 
             ty'   = mkAppTys (mkTyVarTy tv) leftover_args'
             env'' = env' { fe_type_map = extendTypeMap type_map fam_ty
                                                        (tv, fam_tc, sat_fam_args)
-                         , fe_in_scope = extendInScopeSet in_scope tv }
+                         , fe_in_scope = new_in_scope }
         in (env'', ty')
   where
     arity = tyConArity fam_tc

@@ -470,9 +470,9 @@ substIdBndr :: SDoc
 
 substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
   = -- pprTrace "substIdBndr" (doc $$ ppr old_id $$ ppr in_scope) $
-    (Subst (in_scope `extendInScopeSet` new_id) new_env tvs cvs, new_id)
+    (Subst new_scope new_env tvs cvs, new_id)
   where
-    id1 = uniqAway in_scope old_id      -- id1 is cloned if necessary
+    (id1, new_scope) = uniqAway in_scope old_id      -- id1 is cloned if necessary
     id2 | no_type_change = id1
         | otherwise      = updateIdTypeAndMult (substTy subst) id1
 

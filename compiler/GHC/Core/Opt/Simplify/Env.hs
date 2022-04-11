@@ -855,7 +855,7 @@ subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
     -- afresh with both seInScope and seIdSubst
   where
     -- See Note [Bangs in the Simplifier]
-    !id1  = uniqAway in_scope old_id
+    !(id1, new_in_scope)  = uniqAway in_scope old_id
     !id2  = substIdType env id1
     !id3  = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
                                       -- and fragile OccInfo
@@ -868,8 +868,6 @@ subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
               = extendVarEnv id_subst old_id (DoneId new_id)
               | otherwise
               = delVarEnv id_subst old_id
-
-    !new_in_scope = in_scope `extendInScopeSet` new_id
 
 ------------------------------------
 seqTyVar :: TyVar -> ()

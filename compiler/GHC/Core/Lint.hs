@@ -1510,7 +1510,7 @@ lintTyCoBndr :: TyCoVar -> (LintedTyCoVar -> LintM a) -> LintM a
 lintTyCoBndr tcv thing_inside
   = do { subst <- getTCvSubst
        ; kind' <- lintType (varType tcv)
-       ; let tcv' = uniqAway (getTCvInScope subst) $
+       ; let (tcv', _in_scope) = uniqAway (getTCvInScope subst) $
                     setVarType tcv kind'
              subst' = extendTCvSubstWithClone subst tcv tcv'
        ; when (isCoVar tcv) $

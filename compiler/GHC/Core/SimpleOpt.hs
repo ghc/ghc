@@ -629,13 +629,12 @@ subst_opt_id_bndr env@(SOE { soe_subst = subst, soe_inl = inl }) old_id
   where
     Subst in_scope id_subst tv_subst cv_subst = subst
 
-    id1    = uniqAway in_scope old_id
+    (id1, new_in_scope) = uniqAway in_scope old_id
     id2    = updateIdTypeAndMult (substTy subst) id1
     new_id = zapFragileIdInfo id2
              -- Zaps rules, unfolding, and fragile OccInfo
              -- The unfolding and rules will get added back later, by add_info
 
-    new_in_scope = in_scope `extendInScopeSet` new_id
 
     no_change = new_id == old_id
 

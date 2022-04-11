@@ -2171,13 +2171,13 @@ liftCoSubstTyVarBndrUsing :: (LiftingContext -> Type -> (CoercionN, a))
                            -> (LiftingContext, TyVar, CoercionN, a)
 liftCoSubstTyVarBndrUsing fun lc@(LC subst cenv) old_var
   = ASSERT( isTyVar old_var )
-    ( LC (subst `extendTCvInScope` new_var) new_cenv
+    ( LC (subst `setTCvInScope` new_scope) new_cenv
     , new_var, eta, stuff )
   where
     old_kind     = tyVarKind old_var
     (eta, stuff) = fun lc old_kind
     k1           = coercionLKind eta
-    new_var      = uniqAway (getTCvInScope subst) (setVarType old_var k1)
+    (new_var, new_scope) = uniqAway (getTCvInScope subst) (setVarType old_var k1)
 
     lifted   = mkGReflRightCo Nominal (TyVarTy new_var) eta
                -- :: new_var ~ new_var |> eta
@@ -2189,13 +2189,13 @@ liftCoSubstCoVarBndrUsing :: (LiftingContext -> Type -> (CoercionN, a))
                            -> (LiftingContext, CoVar, CoercionN, a)
 liftCoSubstCoVarBndrUsing fun lc@(LC subst cenv) old_var
   = ASSERT( isCoVar old_var )
-    ( LC (subst `extendTCvInScope` new_var) new_cenv
+    ( LC (setTCvInScope subst new_scope) new_cenv
     , new_var, kind_co, stuff )
   where
     old_kind     = coVarKind old_var
     (eta, stuff) = fun lc old_kind
     k1           = coercionLKind eta
-    new_var      = uniqAway (getTCvInScope subst) (setVarType old_var k1)
+    (new_var, new_scope) = uniqAway (getTCvInScope subst) (setVarType old_var k1)
 
     -- old_var :: s1  ~r s2
     -- eta     :: (s1' ~r s2') ~N (t1 ~r t2)
