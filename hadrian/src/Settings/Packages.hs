@@ -93,9 +93,6 @@ packageArgs = do
                   -- We build a threaded stage N, N>1 if the configuration calls
                   -- for it.
                   ((ghcThreaded <$> expr flavour) `cabalFlag` "threaded")
-              -- Don't try to build stage 1 with an event-logging RTS if
-              -- the bootstrapping compiler doesn't support it.
-            , orM [notStage0, eventLoggingBootstrapper] `cabalFlag` "eventlog"
             ]
           ]
 
@@ -377,7 +374,6 @@ rtsPackageArgs = package rts ? do
         [ builder (Cabal Flags) ? mconcat
           [ any (wayUnit Profiling) rtsWays `cabalFlag` "profiling"
           , any (wayUnit Debug) rtsWays     `cabalFlag` "debug"
-          , any (wayUnit Logging) rtsWays   `cabalFlag` "logging"
           , any (wayUnit Dynamic) rtsWays   `cabalFlag` "dynamic"
           , useSystemFfi                    `cabalFlag` "use-system-libffi"
           , useLibffiForAdjustors           `cabalFlag` "libffi-adjustors"

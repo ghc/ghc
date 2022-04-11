@@ -89,7 +89,7 @@ config.way_flags = {
     'sanity'       : ['-debug'],
     'threaded1'    : ['-threaded', '-debug'],
     'threaded1_ls' : ['-threaded', '-debug'],
-    'threaded2'    : ['-O', '-threaded', '-eventlog'],
+    'threaded2'    : ['-O', '-threaded'],
     'threaded2_hT' : ['-O', '-threaded'],
     'hpc'          : ['-O', '-fhpc'],
     'prof_hc_hb'   : ['-O', '-prof', '-static', '-fprof-auto'],

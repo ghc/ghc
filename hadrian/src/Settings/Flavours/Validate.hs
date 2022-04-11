@@ -18,10 +18,9 @@ validateFlavour = werror $ defaultFlavour
                             , notStage0 ? platformSupportsSharedLibs ? pure [dynamic]
                             ]
     , rtsWays = Set.fromList <$>
-                mconcat [ pure [vanilla, threaded, debug, logging, threadedDebug, threadedLogging]
+                mconcat [ pure [vanilla, threaded, debug, threadedDebug]
                         , notStage0 ? platformSupportsSharedLibs ? pure
                             [ dynamic, threadedDynamic, debugDynamic, threadedDebugDynamic
-                            , loggingDynamic, threadedLoggingDynamic
                             ]
                         ]
     }

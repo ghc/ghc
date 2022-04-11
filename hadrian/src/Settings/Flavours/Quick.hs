@@ -23,11 +23,10 @@ quickFlavour = defaultFlavour
     , rtsWays     = Set.fromList <$>
                     mconcat
                     [ pure
-                      [ vanilla, threaded, logging, debug
-                      , threadedDebug, threadedLogging, threaded ]
+                      [ vanilla, threaded, debug
+                      , threadedDebug, threaded ]
                     , notStage0 ? platformSupportsSharedLibs ? pure
-                      [ dynamic, debugDynamic, threadedDynamic, loggingDynamic
-                      , threadedDebugDynamic, threadedLoggingDynamic ]
+                      [ dynamic, debugDynamic, threadedDynamic, threadedDebugDynamic ]
                     ] }
 
 quickArgs :: Args

@@ -13,7 +13,7 @@ developmentFlavour ghcStage = defaultFlavour
     { name = "devel" ++ show (fromEnum ghcStage)
     , args = defaultBuilderArgs <> developmentArgs ghcStage <> defaultPackageArgs
     , libraryWays = pure $ Set.fromList [vanilla]
-    , rtsWays = pure $ Set.fromList [vanilla, logging, debug, threaded, threadedLogging, threadedDebug]
+    , rtsWays = pure $ Set.fromList [vanilla, debug, threaded, threadedDebug]
     , dynamicGhcPrograms = return False
     , ghcDebugAssertions = True }
 
