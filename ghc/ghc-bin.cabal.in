@@ -27,11 +27,6 @@ Flag threaded
     Default: True
     Manual: True
 
-Flag eventlog
-    Description: Link the ghc executable against the event-logging RTS
-    Default: True
-    Manual: True
-
 Executable ghc
     Default-Language: Haskell2010
 
@@ -93,10 +88,6 @@ Executable ghc
     -- disabling this flag.
     if flag(threaded)
       ghc-options: -threaded
-
-    -- Same for GhcEventLoggingRts
-    if flag(eventlog)
-      ghc-options: -eventlog
 
     Other-Extensions:
         CPP

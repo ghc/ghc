@@ -54,4 +54,4 @@ test('T12870h',
 
 test('T20006', [extra_run_opts('+RTS --eventlog-flush-interval=1')],
     compile_and_run,
-    ['-eventlog'])
+    [''])
