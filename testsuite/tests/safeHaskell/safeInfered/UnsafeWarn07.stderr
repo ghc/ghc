@@ -4,4 +4,4 @@ UnsafeWarn07.hs:5:17: warning: [-Wunsafe]
     Reason:
         UnsafeWarn07.hs:10:11: warning:
             Rule "f" ignored
-            User defined rules are disabled under Safe Haskell
+            Defining user rules is disabled under Safe Haskell

@@ -148,7 +148,7 @@ instance Diagnostic DriverMessage where
     DriverUserDefinedRuleIgnored (HsRule { rd_name = n })
       -> mkSimpleDecorated $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
-            text "User defined rules are disabled under Safe Haskell"
+            text "Defining user rules is disabled under Safe Haskell"
     DriverMixedSafetyImport modName
       -> mkSimpleDecorated $
            text "Module" <+> ppr modName <+> text ("is imported both as a safe and unsafe import!")
