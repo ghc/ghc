@@ -880,7 +880,7 @@ occAnalRecBind env lvl imp_rule_edges pairs body_usage
     rhs_env  = env `addInScope` bndrs
 
     dumpVertex :: Int -> Int -> [Unique] -> (Int, [Int])
-    dumpVertex u s ds = (u,  map resolveEdge ds)
+    dumpVertex u _s ds = (u,  map resolveEdge ds)
 
     resolveEdge :: Unique -> Int
     resolveEdge v = fromJust $ lookupUFM nodeMap v
