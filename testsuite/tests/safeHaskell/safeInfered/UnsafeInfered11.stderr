@@ -1,9 +1,10 @@
+
 UnsafeInfered11_A.hs:2:17: warning: [-Wunsafe]
     ‘UnsafeInfered11_A’ has been inferred as unsafe!
     Reason:
         UnsafeInfered11_A.hs:18:11: warning:
             Rule "lookupx/T" ignored
-            User defined rules are disabled under Safe Haskell
+            Defining user rules is disabled under Safe Haskell
 
 UnsafeInfered11.hs:6:1: error:
     UnsafeInfered11_A: Can't be safely imported!

@@ -11,4 +11,4 @@ UnsafeWarn05.hs:5:17: warning: [-Wunsafe]
     Reason:
         UnsafeWarn05.hs:16:11: warning:
             Rule "g" ignored
-            User defined rules are disabled under Safe Haskell
+            Defining user rules is disabled under Safe Haskell
