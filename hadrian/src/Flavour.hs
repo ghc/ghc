@@ -21,6 +21,7 @@ import Expression
 import Data.Either
 import Data.Map (Map)
 import qualified Data.Map as M
+import qualified Data.Set as Set
 import Packages
 import Flavour.Type
 import Settings.Parser
@@ -173,7 +174,7 @@ enableProfiledGhc flavour =
   where
     addWays :: [Way] -> Ways -> Ways
     addWays ways =
-      fmap (++ ways)
+      fmap (Set.union (Set.fromList ways))
 
 -- | Disable 'dynamicGhcPrograms'.
 disableDynamicGhcPrograms :: Flavour -> Flavour
@@ -187,7 +188,7 @@ disableProfiledLibs flavour =
             }
   where
     prune :: Ways -> Ways
-    prune = fmap $ filter (not . wayUnit Profiling)
+    prune = fmap $ Set.filter (not . wayUnit Profiling)
 
 -- | Build stage2 compiler with -fomit-interface-pragmas to reduce
 -- recompilation.
@@ -224,7 +225,7 @@ fullyStatic flavour =
   where
     -- Remove any Way that contains a WayUnit of Dynamic
     prune :: Ways -> Ways
-    prune = fmap $ filter staticCompatible
+    prune = fmap $ Set.filter staticCompatible
 
     staticCompatible :: Way -> Bool
     staticCompatible = not . wayUnit Dynamic

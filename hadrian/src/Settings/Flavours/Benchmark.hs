@@ -1,5 +1,6 @@
 module Settings.Flavours.Benchmark (benchmarkFlavour) where
 
+import qualified Data.Set as Set
 import Expression
 import Flavour
 import {-# SOURCE #-} Settings.Default
@@ -9,8 +10,8 @@ benchmarkFlavour :: Flavour
 benchmarkFlavour = defaultFlavour
     { name = "bench"
     , args = defaultBuilderArgs <> benchmarkArgs <> defaultPackageArgs
-    , libraryWays = pure [vanilla]
-    , rtsWays = pure [vanilla, threaded, logging, threadedLogging] }
+    , libraryWays = pure $ Set.fromList [vanilla]
+    , rtsWays = pure $ Set.fromList [vanilla, threaded, logging, threadedLogging] }
 
 benchmarkArgs :: Args
 benchmarkArgs = sourceArgs SourceArgs

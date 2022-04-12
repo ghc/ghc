@@ -1,5 +1,6 @@
 module Expression.Type where
 
+import Data.Set (Set)
 import Context.Type
 import Way.Type
 
@@ -15,4 +16,4 @@ type Expr a = H.Expr Context Builder a
 -- and 'Packages'.
 type Predicate = H.Predicate Context Builder
 type Args      = H.Args      Context Builder
-type Ways      = Expr [Way]
+type Ways      = Expr (Set Way)

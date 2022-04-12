@@ -1,5 +1,7 @@
 module Settings.Flavours.QuickCross (quickCrossFlavour) where
 
+import qualified Data.Set as Set
+
 import Expression
 import Flavour
 import Oracles.Flag
@@ -11,10 +13,12 @@ quickCrossFlavour = defaultFlavour
     { name        = "quick-cross"
     , args        = defaultBuilderArgs <> quickCrossArgs <> defaultPackageArgs
     , dynamicGhcPrograms = pure False
-    , libraryWays = mconcat
+    , libraryWays = Set.fromList <$>
+                    mconcat
                     [ pure [vanilla]
                     , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ]
-    , rtsWays     = mconcat
+    , rtsWays     = Set.fromList <$>
+                    mconcat
                     [ pure
                       [ vanilla, threaded, logging, debug
                       , threadedDebug, threadedLogging, threaded ]

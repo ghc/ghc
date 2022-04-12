@@ -1,5 +1,7 @@
 module Rules.Program (buildProgramRules) where
 
+import qualified Data.Set as Set
+
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 
@@ -113,7 +115,7 @@ buildBinary rs bin context@Context {..} = do
     needLibrary =<< contextDependencies context
     when (stage > Stage0) $ do
         ways <- interpretInContext context (getLibraryWays <> getRtsWays)
-        needLibrary [ (rtsContext stage) { way = w } | w <- ways ]
+        needLibrary [ (rtsContext stage) { way = w } | w <- Set.toList ways ]
     asmSrcs <- interpretInContext context (getContextData asmSrcs)
     asmObjs <- mapM (objectPath context) asmSrcs
     cSrcs   <- interpretInContext context (getContextData cSrcs)

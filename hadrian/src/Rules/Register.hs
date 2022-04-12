@@ -19,6 +19,7 @@ import Utilities
 
 import Hadrian.Haskell.Cabal.Type
 import qualified Text.Parsec      as Parsec
+import qualified Data.Set         as Set
 
 import Distribution.Version (Version)
 import qualified Distribution.Parsec as Cabal
@@ -122,7 +123,7 @@ buildConf _ context@Context {..} _conf = do
     need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
 
     ways <- interpretInContext context (getLibraryWays <> if package == rts then getRtsWays else mempty)
-    need =<< concatMapM (libraryTargets True) [ context { way = w } | w <- ways ]
+    need =<< concatMapM (libraryTargets True) [ context { way = w } | w <- Set.toList ways ]
 
     -- We might need some package-db resource to limit read/write, see packageRules.
     path <- buildPath context

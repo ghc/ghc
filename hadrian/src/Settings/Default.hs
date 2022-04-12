@@ -13,6 +13,8 @@ module Settings.Default (
     defaultFlavour, defaultBignumBackend
     ) where
 
+import qualified Data.Set as Set
+
 import qualified Hadrian.Builder.Sphinx
 import qualified Hadrian.Builder.Tar
 import Hadrian.Haskell.Cabal.Type
@@ -162,7 +164,8 @@ testsuitePackages = return ([ timeout | windowsHost ] ++ [ checkPpr, checkExact,
 -- * We build 'profiling' way when stage > Stage0.
 -- * We build 'dynamic' way when stage > Stage0 and the platform supports it.
 defaultLibraryWays :: Ways
-defaultLibraryWays = mconcat
+defaultLibraryWays = Set.fromList <$>
+    mconcat
     [ pure [vanilla]
     , notStage0 ? pure [profiling]
     , notStage0 ? platformSupportsSharedLibs ? pure [dynamic]
@@ -170,7 +173,8 @@ defaultLibraryWays = mconcat
 
 -- | Default build ways for the RTS.
 defaultRtsWays :: Ways
-defaultRtsWays = mconcat
+defaultRtsWays = Set.fromList <$>
+  mconcat
   [ pure [vanilla, threaded]
   , notStage0 ? pure
       [ profiling, threadedProfiling, debugProfiling, threadedDebugProfiling

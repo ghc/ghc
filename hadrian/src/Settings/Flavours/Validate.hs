@@ -1,6 +1,8 @@
 module Settings.Flavours.Validate (validateFlavour, slowValidateFlavour,
                                     quickValidateFlavour) where
 
+import qualified Data.Set as Set
+
 import Expression
 import Flavour
 import Oracles.Flag
@@ -11,10 +13,12 @@ validateFlavour :: Flavour
 validateFlavour = werror $ defaultFlavour
     { name = "validate"
     , args = defaultBuilderArgs <> validateArgs <> defaultPackageArgs
-    , libraryWays = mconcat [ pure [vanilla]
+    , libraryWays = Set.fromList <$>
+                    mconcat [ pure [vanilla]
                             , notStage0 ? platformSupportsSharedLibs ? pure [dynamic]
                             ]
-    , rtsWays = mconcat [ pure [vanilla, threaded, debug, logging, threadedDebug, threadedLogging]
+    , rtsWays = Set.fromList <$>
+                mconcat [ pure [vanilla, threaded, debug, logging, threadedDebug, threadedLogging]
                         , notStage0 ? platformSupportsSharedLibs ? pure
                             [ dynamic, threadedDynamic, debugDynamic, threadedDebugDynamic
                             , loggingDynamic, threadedLoggingDynamic

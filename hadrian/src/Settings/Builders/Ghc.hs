@@ -11,6 +11,7 @@ import Settings.Builders.Common
 import Settings.Warnings
 import qualified Context as Context
 import Rules.Libffi (libffiName)
+import qualified Data.Set as Set
 import System.Directory
 
 ghcBuilderArgs :: Args
@@ -188,7 +189,7 @@ findHsDependencies = builder (Ghc FindHsDependencies) ? do
             , defaultGhcWarningsArgs
             , arg "-include-pkg-deps"
             , arg "-dep-makefile", arg =<< getOutput
-            , pure $ concat [ ["-dep-suffix", wayPrefix w] | w <- ways ]
+            , pure $ concat [ ["-dep-suffix", wayPrefix w] | w <- Set.toList ways ]
             , getInputs ]
 
 haddockGhcArgs :: Args

@@ -4,6 +4,7 @@ module Rules.Generate (
     ghcPrimDependencies
     ) where
 
+import qualified Data.Set as Set
 import Base
 import qualified Context
 import Expression
@@ -340,7 +341,7 @@ generateSettings = do
 
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
-        , ("RTS ways", unwords . map show <$> getRtsWays)
+        , ("RTS ways", unwords . map show . Set.toList <$> getRtsWays)
         , ("Tables next to code", expr $ yesNo <$> flag TablesNextToCode)
         , ("Leading underscore", expr $ yesNo <$> flag LeadingUnderscore)
         , ("Use LibFFI", expr $ yesNo <$> useLibffiForAdjustors)

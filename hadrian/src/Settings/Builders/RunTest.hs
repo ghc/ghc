@@ -57,8 +57,8 @@ runTestGhcFlags = do
 
 data TestCompilerArgs = TestCompilerArgs{
     hasDynamicRts, hasThreadedRts :: Bool
- ,   libWays :: [Way]
- ,   hasDynamic :: Bool
+ ,   libWays           :: Set.Set Way
+ ,   hasDynamic        :: Bool
  ,   leadingUnderscore :: Bool
  ,   withNativeCodeGen :: Bool
  ,   withInterpreter   :: Bool
@@ -382,14 +382,14 @@ setTestSpeed TestFast   = "2"
 --   - if we find @PrimopWrappers.hi@, we have the vanilla way;
 --   - if we find @PrimopWrappers.dyn_hi@, we have the dynamic way;
 --   - if we find @PrimopWrappers.p_hi@, we have the profiling way.
-inferLibraryWays :: String -> Action [Way]
+inferLibraryWays :: String -> Action (Set.Set Way)
 inferLibraryWays compiler = do
   bindir <- getBinaryDirectory compiler
   Stdout ghcPrimLibdirDirty <- cmd
     [bindir </> "ghc-pkg" <.> exe]
     ["field", "ghc-prim", "library-dirs", "--simple-output"]
   let ghcPrimLibdir = fixup ghcPrimLibdirDirty
-  ways <- catMaybes <$> traverse (lookForWay ghcPrimLibdir) candidateWays
+  ways <- Set.fromList . catMaybes <$> traverse (lookForWay ghcPrimLibdir) candidateWays
   return ways
 
   where lookForWay dir (hifile, w) = do

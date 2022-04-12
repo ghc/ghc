@@ -4,6 +4,8 @@ module Settings.Flavours.Quick
    )
 where
 
+import qualified Data.Set as Set
+
 import Expression
 import Flavour
 import Oracles.Flag
@@ -14,10 +16,12 @@ quickFlavour :: Flavour
 quickFlavour = defaultFlavour
     { name        = "quick"
     , args        = defaultBuilderArgs <> quickArgs <> defaultPackageArgs
-    , libraryWays = mconcat
+    , libraryWays = Set.fromList <$>
+                    mconcat
                     [ pure [vanilla]
                     , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ]
-    , rtsWays     = mconcat
+    , rtsWays     = Set.fromList <$>
+                    mconcat
                     [ pure
                       [ vanilla, threaded, logging, debug
                       , threadedDebug, threadedLogging, threaded ]

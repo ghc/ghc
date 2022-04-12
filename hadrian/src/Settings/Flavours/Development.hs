@@ -1,5 +1,7 @@
 module Settings.Flavours.Development (developmentFlavour) where
 
+import qualified Data.Set as Set
+
 import Expression
 import Flavour
 import Packages
@@ -10,8 +12,8 @@ developmentFlavour :: Stage -> Flavour
 developmentFlavour ghcStage = defaultFlavour
     { name = "devel" ++ show (fromEnum ghcStage)
     , args = defaultBuilderArgs <> developmentArgs ghcStage <> defaultPackageArgs
-    , libraryWays = pure [vanilla]
-    , rtsWays = pure [vanilla, logging, debug, threaded, threadedLogging, threadedDebug]
+    , libraryWays = pure $ Set.fromList [vanilla]
+    , rtsWays = pure $ Set.fromList [vanilla, logging, debug, threaded, threadedLogging, threadedDebug]
     , dynamicGhcPrograms = return False
     , ghcDebugAssertions = True }
 

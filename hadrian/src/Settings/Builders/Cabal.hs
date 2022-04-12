@@ -10,6 +10,7 @@ import Packages
 import Settings.Builders.Common
 import qualified Settings.Builders.Common as S
 import Control.Exception (assert)
+import qualified Data.Set as Set
 import System.Directory
 import Settings.Program (programContext)
 
@@ -140,7 +141,7 @@ libraryArgs = do
     withGhci    <- expr ghcWithInterpreter
     dynPrograms <- expr (flavour >>= dynamicGhcPrograms)
     ghciObjsSupported <- expr platformSupportsGhciObjects
-    let ways = flavourWays ++ [contextWay]
+    let ways = Set.insert contextWay flavourWays
         hasVanilla = vanilla `elem` ways
         hasProfiling = any (wayUnit Profiling) ways
         hasDynamic = any (wayUnit Dynamic) ways

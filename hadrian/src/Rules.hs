@@ -1,6 +1,8 @@
 module Rules (buildRules, oracleRules, packageTargets, topLevelTargets
              , toolArgsTarget ) where
 
+import qualified Data.Set as Set
+
 import qualified Hadrian.Oracles.ArgsHash
 import qualified Hadrian.Oracles.Cabal.Rules
 import qualified Hadrian.Oracles.DirectoryContents
@@ -90,7 +92,7 @@ packageTargets includeGhciLib stage pkg = do
         then do -- Collect all targets of a library package.
             let pkgWays = if pkg == rts then getRtsWays else getLibraryWays
             ways  <- interpretInContext context pkgWays
-            libs  <- mapM (pkgLibraryFile . Context stage pkg) ways
+            libs  <- mapM (pkgLibraryFile . Context stage pkg) (Set.toList ways)
             more  <- Rules.Library.libraryTargets includeGhciLib context
             setupConfig <- pkgSetupConfigFile context
             return $ [setupConfig] ++ libs ++ more

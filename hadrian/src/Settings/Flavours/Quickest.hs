@@ -1,5 +1,7 @@
 module Settings.Flavours.Quickest (quickestFlavour) where
 
+import qualified Data.Set as Set
+
 import Expression
 import Flavour
 import {-# SOURCE #-} Settings.Default
@@ -9,8 +11,8 @@ quickestFlavour :: Flavour
 quickestFlavour = defaultFlavour
     { name        = "quickest"
     , args        = defaultBuilderArgs <> quickestArgs <> defaultPackageArgs
-    , libraryWays = pure [vanilla]
-    , rtsWays     = pure [vanilla, threaded, threadedLogging, logging]
+    , libraryWays = pure (Set.fromList [vanilla])
+    , rtsWays     = pure (Set.fromList [vanilla, threaded, threadedLogging, logging])
     , dynamicGhcPrograms = return False }
 
 quickestArgs :: Args
