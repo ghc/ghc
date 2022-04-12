@@ -160,14 +160,14 @@ class  Enum a   where
     {-# INLINABLE enumFromThenTo #-}
     enumFromThenTo x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
 
--- See Note [Stable Unfolding for list producers]
-{-# INLINABLE boundedEnumFrom #-}
+-- See Note [Inline Enum method helpers]
+{-# INLINE boundedEnumFrom #-}
 -- Default methods for bounded enumerations
 boundedEnumFrom :: (Enum a, Bounded a) => a -> [a]
 boundedEnumFrom n = map toEnum [fromEnum n .. fromEnum (maxBound `asTypeOf` n)]
 
--- See Note [Stable Unfolding for list producers]
-{-# INLINABLE boundedEnumFromThen #-}
+-- See Note [Inline Enum method helpers]
+{-# INLINE boundedEnumFromThen #-}
 boundedEnumFromThen :: (Enum a, Bounded a) => a -> a -> [a]
 boundedEnumFromThen n1 n2
   | i_n2 >= i_n1  = map toEnum [i_n1, i_n2 .. fromEnum (maxBound `asTypeOf` n1)]
@@ -176,11 +176,55 @@ boundedEnumFromThen n1 n2
     i_n1 = fromEnum n1
     i_n2 = fromEnum n2
 
-{-
-Note [Stable Unfolding for list producers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Stable Unfolding for list producers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The INLINABLE/INLINE pragmas ensure that we export stable (unoptimised)
 unfoldings in the interface file so we can do list fusion at usage sites.
+
+Related tickets: #15185, #8763, #18178.
+
+Note [Inline Enum method helpers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The overloaded `numericEnumFrom` functions are used to abbreviate Enum
+instances. We call them "method helpers".  For example, in GHC.Float:
+
+  numericEnumFromTo :: (Ord a, Fractional a) => a -> a -> [a]
+  mnumericEnumFromTo = ...blah...
+
+  instance  Enum Double  where
+     ...
+    enumFromTo = numericEnumFromTo
+
+Similarly with the overloaded `boundedEnumFrom` functions. E.g. in GHC.Word
+
+  boundedEnumFrom :: (Enum a, Bounded a) => a -> [a]
+  boundedEnumFrom n = map toEnum [fromEnum n .. fromEnum (maxBound `asTypeOf` n)]
+
+  instance Enum Word8 where
+    ...
+    enumFrom            = boundedEnumFrom
+
+In both cases, it is super-important to specialise these overloaded
+helper function (`numericEnumFromTo`, `boundedEnumFrom` etc) to the
+particular type of the instance, else every use of that instance will
+be inefficient.
+
+Moreover (see Note [Stable Unfolding for list producers]) the helper
+function is a list producer, so we want it to have a stable unfolding
+to support fusion.
+
+So we attach an INLINE pragma to them.
+
+Alternatives might be
+* An `INLINABLE` pragma on `numericEnumFromTo`, relying on the
+  specialiser to create a specialised version.  But (a) if the
+  instance method is marked INLINE we may get spurious INLINE
+  loop-breaker warnings (#21343), and (b) specialision gains no extra
+  sharing, because there is just one call at each type.
+
+* Using `inline` at the call site
+    enumFromTo = inline numericEnumFromTo
+  But that means remembering to do this in multiple places.
 -}
 
 ------------------------------------------------------------------------
