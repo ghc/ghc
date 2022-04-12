@@ -275,6 +275,7 @@ class  (Real a, Fractional a) => RealFrac a  where
 -- These 'numeric' enumerations come straight from the Report
 
 numericEnumFrom         :: (Fractional a) => a -> [a]
+{-# INLINE numericEnumFrom #-}  -- See Note [Inline Enum method helpers] in GHC.Enum
 numericEnumFrom n       = go 0
   where
     -- See Note [Numeric Stability of Enumerating Floating Numbers]
@@ -282,6 +283,7 @@ numericEnumFrom n       = go 0
              in n' : go (k + 1)
 
 numericEnumFromThen     :: (Fractional a) => a -> a -> [a]
+{-# INLINE numericEnumFromThen #-}  -- See Note [Inline Enum method helpers] in GHC.Enum
 numericEnumFromThen n m = go 0
   where
     step = m - n
@@ -290,9 +292,11 @@ numericEnumFromThen n m = go 0
              in n' : go (k + 1)
 
 numericEnumFromTo       :: (Ord a, Fractional a) => a -> a -> [a]
+{-# INLINE numericEnumFromTo #-}  -- See Note [Inline Enum method helpers] in GHC.Enum
 numericEnumFromTo n m   = takeWhile (<= m + 1/2) (numericEnumFrom n)
 
 numericEnumFromThenTo   :: (Ord a, Fractional a) => a -> a -> a -> [a]
+{-# INLINE numericEnumFromThenTo #-}  -- See Note [Inline Enum method helpers] in GHC.Enum
 numericEnumFromThenTo e1 e2 e3
     = takeWhile predicate (numericEnumFromThen e1 e2)
                                 where
@@ -829,13 +833,13 @@ lcm x y         =  abs ((x `quot` (gcd x y)) * y)
 "gcd/Word->Word->Word"          gcd = gcdWord
  #-}
 
--- See Note [Stable Unfolding for list producers] in GHC.Enum
-{-# INLINABLE integralEnumFrom #-}
+-- INLINE pragma: see Note [Inline Enum method helpers] in GHC.Enum
+{-# INLINE integralEnumFrom #-}
 integralEnumFrom :: (Integral a, Bounded a) => a -> [a]
 integralEnumFrom n = map fromInteger [toInteger n .. toInteger (maxBound `asTypeOf` n)]
 
--- See Note [Stable Unfolding for list producers] in GHC.Enum
-{-# INLINABLE integralEnumFromThen #-}
+-- INLINE pragma: see Note [Inline Enum method helpers] in GHC.Enum
+{-# INLINE integralEnumFromThen #-}
 integralEnumFromThen :: (Integral a, Bounded a) => a -> a -> [a]
 integralEnumFromThen n1 n2
   | i_n2 >= i_n1  = map fromInteger [i_n1, i_n2 .. toInteger (maxBound `asTypeOf` n1)]
@@ -844,13 +848,13 @@ integralEnumFromThen n1 n2
     i_n1 = toInteger n1
     i_n2 = toInteger n2
 
--- See Note [Stable Unfolding for list producers] in GHC.Enum
-{-# INLINABLE integralEnumFromTo #-}
+-- INLINE pragma: see Note [Inline Enum method helpers] in GHC.Enum
+{-# INLINE integralEnumFromTo #-}
 integralEnumFromTo :: Integral a => a -> a -> [a]
 integralEnumFromTo n m = map fromInteger [toInteger n .. toInteger m]
 
--- See Note [Stable Unfolding for list producers] in GHC.Enum
-{-# INLINABLE integralEnumFromThenTo #-}
+-- INLINE pragma: see Note [Inline Enum method helpers] in GHC.Enum
+{-# INLINE integralEnumFromThenTo #-}
 integralEnumFromThenTo :: Integral a => a -> a -> a -> [a]
 integralEnumFromThenTo n1 n2 m
   = map fromInteger [toInteger n1, toInteger n2 .. toInteger m]

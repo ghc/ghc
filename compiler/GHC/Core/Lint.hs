@@ -767,7 +767,65 @@ It's very suspicious if a strong loop breaker is marked INLINE.
 However, the desugarer generates instance methods with INLINE pragmas
 that form a mutually recursive group.  Only after a round of
 simplification are they unravelled.  So we suppress the test for
-the desugarer.
+the desugarer.  Here is an example:
+  instance Eq T where
+    t1 == t2 = blah
+    t1 /= t2 = not (t1 == t2)
+    {-# INLINE (/=) #-}
+
+This will generate something like
+    -- From the class decl for Eq
+    data Eq a = EqDict (a->a->Bool) (a->a->Bool)
+    eq_sel :: Eq a -> (a->a->Bool)
+    eq_sel (EqDict eq _) = eq
+
+    -- From the instance Eq T
+    $ceq :: T -> T -> Bool
+    $ceq = blah
+
+    Rec { $dfEqT :: Eq T {-# DFunId #-}
+          $dfEqT = EqDict $ceq $cnoteq
+
+          $cnoteq :: T -> T -> Bool  {-# INLINE #-}
+          $cnoteq x y = not (eq_sel $dfEqT x y) }
+
+Notice that
+
+* `$dfEqT` and `$cnotEq` are mutually recursive.
+
+* We do not want `$dfEqT` to be the loop breaker: it's a DFunId, and
+  we want to let it "cancel" with "eq_sel" (see Note [ClassOp/DFun
+  selection] in GHC.Tc.TyCl.Instance, which it can't do if it's a loop
+  breaker.
+
+So we make `$cnoteq` into the loop breaker. That means it can't
+inline, despite the INLINE pragma. That's what gives rise to the
+warning, which is perfectly appropriate for, say
+   Rec { {-# INLINE f #-}  f = \x -> ...f.... }
+We can't inline a recursive function -- it's a loop breaker.
+
+But now we can optimise `eq_sel $dfEqT` to `$ceq`, so we get
+  Rec {
+    $dfEqT :: Eq T {-# DFunId #-}
+    $dfEqT = EqDict $ceq $cnoteq
+
+    $cnoteq :: T -> T -> Bool  {-# INLINE #-}
+    $cnoteq x y = not ($ceq x y) }
+
+and now the dependencies of the Rec have gone, and we can split it up to give
+    NonRec {  $dfEqT :: Eq T {-# DFunId #-}
+              $dfEqT = EqDict $ceq $cnoteq }
+
+    NonRec {  $cnoteq :: T -> T -> Bool  {-# INLINE #-}
+              $cnoteq x y = not ($ceq x y) }
+
+Now $cnoteq is not a loop breaker any more, so the INLINE pragma can
+take effect -- the warning turned out to be temporary.
+
+To stop excessive warnings, this warning for INLINE loop breakers is
+switched off when linting the the result of the desugarer.  See
+lf_check_inline_loop_breakers in GHC.Core.Lint.
+
 
 Note [Checking for representation polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
