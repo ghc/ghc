@@ -25,7 +25,7 @@ developmentArgs ghcStage = do
                                  -- Disable optimization when building Cabal;
                                  -- this saves many minutes of build time.
                                  package cabal ? pure ["-O0"]]
-        , hsLibrary  = notStage0 ? arg "-dcore-lint"
+        , hsLibrary  = notStage0 ? arg "-dlint"
         , hsCompiler = mconcat [stage0 ? arg "-O2",
                                 succ stage == ghcStage ? pure ["-O0"]]
         , hsGhc      = succ stage == ghcStage ? pure ["-O0"] }
