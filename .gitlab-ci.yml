@@ -232,6 +232,24 @@ typecheck-testsuite:
     - _build/stage0/bin/lint-submodule-refs . $(git rev-list $base..$CI_COMMIT_SHA)
   dependencies: []
 
+# We allow the submodule checker to fail when run on merge requests (to
+# accommodate, e.g., haddock changes not yet upstream) but not on `master` or
+# Marge jobs.
+lint-author:
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  extends: .lint-params
+  variables:
+    BUILD_FLAVOUR: default
+  script:
+    - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
+    - "echo Linting authors between $base..$CI_COMMIT_SHA"
+    - .gitlab/ci.sh lint_author $base $CI_COMMIT_SHA
+  dependencies: []
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+    - *drafts-can-fail-lint
+
 lint-submods:
   extends: .lint-submods
   # Allow failure on merge requests since any necessary submodule patches may

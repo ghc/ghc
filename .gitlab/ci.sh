@@ -675,6 +675,18 @@ function shell() {
   run "$cmd"
 }
 
+function lint_author(){
+  base=$1
+  head=$2
+  for email in $(git log --format='%ae' $base..$head); do
+    if [ $email == "ghc-ci@gitlab-haskell.org" ];
+    then
+      fail "Commit has GHC CI author, please amend the author information."
+    fi
+  done
+}
+
+
 setup_locale
 
 # Platform-specific environment initialization
@@ -772,6 +784,7 @@ case $1 in
   run_hadrian) shift; run_hadrian "$@" ;;
   perf_test) run_perf_test ;;
   cabal_test) cabal_test ;;
+  lint_author) shift; lint_author "$@" ;;
   clean) clean ;;
   save_cache) save_cache ;;
   shell) shift; shell "$@" ;;
