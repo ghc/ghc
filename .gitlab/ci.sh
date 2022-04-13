@@ -492,7 +492,7 @@ function test_make() {
 
   check_release_build
 
-  run "$MAKE" test_bindist TEST_PREP=YES
+  run "$MAKE" test_bindist TEST_PREP=YES TEST_PROF=${RELEASE_JOB:-}
   (unset $(compgen -v | grep CI_*);
     run "$MAKE" V=0 VERBOSE=1 test \
       THREADS="$cores" \
@@ -586,6 +586,13 @@ function test_hadrian() {
     test_compiler_backend=$(${test_compiler} -e "GHC.Num.Backend.backendName")
     if [ $test_compiler_backend != "\"$BIGNUM_BACKEND\"" ]; then
       fail "Test compiler has a different BIGNUM_BACKEND ($test_compiler_backend) thean requested ($BIGNUM_BACKEND)"
+    fi
+
+    # If we are doing a release job, check the compiler can build a profiled executable
+    if [ "${RELEASE_JOB:-}" == "yes" ]; then
+      echo "main = print ()" > proftest.hs
+      run ${test_compiler} -prof proftest.hs || fail "hadrian profiled libs test"
+      rm proftest.hs
     fi
 
     run_hadrian \
