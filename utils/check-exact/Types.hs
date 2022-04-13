@@ -13,9 +13,7 @@ module Types
 
 import GHC hiding (EpaComment)
 import GHC.Utils.Outputable hiding ( (<>) )
-import Data.Data (Data, toConstr,cast)
-
-import qualified Data.Map as Map
+import Data.Data (Data)
 
 -- ---------------------------------------------------------------------
 

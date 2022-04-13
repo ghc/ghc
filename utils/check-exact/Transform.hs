@@ -97,14 +97,14 @@ import GHC.Data.Bag
 import GHC.Data.FastString
 
 import Data.Data
-import Data.List (sort, sortBy, sortOn, find)
+import Data.List ( sortBy )
 import Data.Maybe
 
-import qualified Data.Map as Map
+-- import qualified Data.Map as Map
 
 import Data.Functor.Identity
 import Control.Monad.State
-import Control.Monad.Writer
+-- import Control.Monad.Writer
 -- import Data.Default
 
 ------------------------------------------------------------------------------
@@ -496,7 +496,6 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
     (move',stay') = break simpleBreak (trailingCommentsDeltas (anchorFromLocatedA (L l ())) cs1f)
     move = map snd move'
     stay = map snd stay'
-  -- LGRHS: Anno = SrcAnn NoEpAnns
     (l'', grhss', binds', logInfo)
       = case reverse grhss of
           [] -> (l, [], binds,                 (EpaComments [], SrcSpanAnn EpAnnNotUsed noSrcSpan))
@@ -869,12 +868,12 @@ commentsOrigDeltasDecl (L (SrcSpanAnn an l) d) = L (SrcSpanAnn an' l) d
 
 -- ---------------------------------------------------------------------
 
--- | Take an anchor and a preceding location, and generate an
--- equivalent one with a 'MovedAnchor' delta.
-deltaAnchor :: Anchor -> RealSrcSpan -> Anchor
-deltaAnchor (Anchor anc _) ss = Anchor anc (MovedAnchor dp)
-  where
-    dp = pos2delta (ss2pos ss) (ss2pos anc)
+-- -- | Take an anchor and a preceding location, and generate an
+-- -- equivalent one with a 'MovedAnchor' delta.
+-- deltaAnchor :: Anchor -> RealSrcSpan -> Anchor
+-- deltaAnchor (Anchor anc _) ss = Anchor anc (MovedAnchor dp)
+--   where
+--     dp = pos2delta (ss2pos ss) (ss2pos anc)
 
 -- ---------------------------------------------------------------------
 
@@ -1330,64 +1329,6 @@ modifyDeclsT action t = do
 
 -- ---------------------------------------------------------------------
 
--- type RWS r w s = RWST r w s Identity
--- runRWS :: Monoid w => RWS r w s a -> r -> s -> (a, s, w)
--- rws :: Monoid w => (r -> s -> (a, s, w)) -> RWS r w s a
-
--- -- | Evaluate a computation with the given initial state and environment,
--- -- returning the final value and output, discarding the final state.
--- evalRWS :: (Monoid w)
---         => RWS r w s a  -- ^RWS computation to execute
---         -> r            -- ^initial environment
---         -> s            -- ^initial value
---         -> (a, w)       -- ^final value and output
-
--- mkM :: (Monad m, Typeable a, Typeable b) => (b -> m b) -> a -> m a
-
-type Delta a = RWS () [String] (Maybe Anchor) a
-
-
--- | Generic top-down traversal through the given AST fragment,
--- converting all ExactPrint Anchor's into ones with an equivalent
--- MovedAnchor operation.  Initially ignores comments
-makeDeltaAst' :: forall a. (Data a) => a -> a
-makeDeltaAst' a = fst $ evalRWS (go a) () Nothing
-  where
-    go :: a -> Delta a
-    go = everywhereM' (mkM   (locatedAnnImpl @AnnListItem) -- LocatedA
-                      `extM` (locatedAnnImpl @NameAnn)     -- LocatedN
-                      `extM` (locatedAnnImpl @AnnList)     -- LocatedL
-                      `extM` (locatedAnnImpl @AnnPragma)   -- LocatedP
-                      `extM` (locatedAnnImpl @AnnContext)  -- LocatedC
-                      )
-
-    locatedAnnImpl :: forall an. (Default an)
-      => SrcAnn an -> Delta (SrcAnn an)
-    locatedAnnImpl (SrcSpanAnn (EpAnn anc@(Anchor loc _op) an cs) l) = do
-      -- error "locatedAnnImpl:EpAnn"
-      ma <- get
-      put (Just anc)
-      let anchor' = case ma of
-                      Nothing -> (Anchor loc (MovedAnchor (SameLine 0)))
-                      Just (Anchor rl _op) -> deltaAnchor anc rl
-      let cs' = case ma of
-            Nothing -> cs <> mkComments ("from anc:Nothing") (Anchor loc UnchangedAnchor)
-            Just anc' -> cs <> mkComments ("from anc:" ++ showGhc anc') anc'
-      return (SrcSpanAnn (EpAnn anchor' an cs') l)
-
-    locatedAnnImpl (SrcSpanAnn EpAnnNotUsed l) = do
-      -- error $ "EpAnnNotUsed: " ++ showGhc l
-      ma <- get
-      let anc = spanAsAnchor l
-      put (Just anc)
-      let anchor' = case ma of
-                      Nothing -> Anchor (realSrcSpan l) (MovedAnchor (SameLine 0))
-                      Just (Anchor rl _op) -> deltaAnchor anc rl
-      let cs' = case ma of
-            Nothing -> mkComments ("EpAnnNotUsed:from anc:Nothing") (spanAsAnchor l)
-            Just anc' -> mkComments ("EpAnnNotUsed:from anc:" ++ showGhc anc') anc'
-      return (SrcSpanAnn (EpAnn anchor' def cs') l)
-
 -- | Monadic variation on everywhere', so Apply a monadic
 -- transformation everywhere in top-down manner
 everywhereM' :: Monad m => GenericM m -> GenericM m
@@ -1396,8 +1337,8 @@ everywhereM' f x
        gmapM (everywhereM' f) x'
 
 
-mkComments  :: String -> Anchor -> EpAnnComments
-mkComments str anc = EpaComments [mkCommentAnc str anc]
+-- mkComments  :: String -> Anchor -> EpAnnComments
+-- mkComments str anc = EpaComments [mkCommentAnc str anc]
 
-mkCommentAnc :: String -> Anchor -> LEpaComment
-mkCommentAnc str anc = L anc (EpaComment (EpaLineComment str) (anchor anc) )
+-- mkCommentAnc :: String -> Anchor -> LEpaComment
+-- mkCommentAnc str anc = L anc (EpaComment (EpaLineComment str) (anchor anc) )

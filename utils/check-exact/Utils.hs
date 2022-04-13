@@ -24,7 +24,8 @@ import Data.Ord (comparing)
 
 import GHC.Hs.Dump
 import Lookup
-import Orphans (Default(..))
+import Orphans (Default())
+import qualified Orphans as Orphans
 
 import GHC hiding (EpaComment)
 import qualified GHC
@@ -37,9 +38,6 @@ import qualified GHC.Data.Strict as Strict
 
 import qualified GHC.Types.Name.Occurrence as OccName (OccName(..),pprNameSpaceBrief)
 
-import Control.Arrow
-
-import qualified Data.Map as Map
 import Data.Data hiding ( Fixity )
 import Data.List (sortBy, elemIndex)
 
@@ -50,13 +48,13 @@ import Types
 
 -- |Global switch to enable debug tracing in ghc-exactprint Delta / Print
 debugEnabledFlag :: Bool
--- debugEnabledFlag = True
-debugEnabledFlag = False
+debugEnabledFlag = True
+-- debugEnabledFlag = False
 
 -- |Global switch to enable debug tracing in ghc-exactprint Pretty
 debugPEnabledFlag :: Bool
--- debugPEnabledFlag = True
-debugPEnabledFlag = False
+debugPEnabledFlag = True
+-- debugPEnabledFlag = False
 
 -- |Provide a version of trace that comes at the end of the line, so it can
 -- easily be commented out when debugging different things.
@@ -226,7 +224,6 @@ ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s
 ghcCommentText (L _ (GHC.EpaComment (EpaEofComment) _))        = ""
 
 tokComment :: LEpaComment -> Comment
--- tokComment t@(L lt _) = mkComment (normaliseCommentText $ ghcCommentText t) lt
 tokComment t@(L lt c) = mkComment (normaliseCommentText $ ghcCommentText t) lt (ac_prior_tok c)
 
 mkEpaComments :: [Comment] -> [Comment] -> EpAnnComments
@@ -242,12 +239,6 @@ mkLEpaComment :: String -> Anchor -> RealSrcSpan -> LEpaComment
 mkLEpaComment "" anc r = (L anc (GHC.EpaComment (EpaEofComment) r))
 mkLEpaComment s anc r = (L anc (GHC.EpaComment (EpaLineComment s) r))
 
--- mkLEpaComment :: String -> Anchor -> LEpaComment
--- -- Note: fudging the ac_prior_tok value, hope it does not cause a problem
--- mkLEpaComment s anc = (L anc (GHC.EpaComment (EpaLineComment s) (anchor anc)))
-
--- mkComment :: String -> Anchor -> Comment
--- mkComment c anc = Comment c anc Nothing
 mkComment :: String -> Anchor -> RealSrcSpan -> Comment
 mkComment c anc r = Comment c anc r Nothing
 
@@ -345,15 +336,15 @@ locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
 setAnchorAn :: (Default an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
 setAnchorAn (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
-  = (L (SrcSpanAnn (EpAnn anc def cs) l) a)
+  = (L (SrcSpanAnn (EpAnn anc Orphans.def cs) l) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
   = (L (SrcSpanAnn (EpAnn anc an cs) l) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 
 setAnchorEpa :: (Default an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
-setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc def cs
-setAnchorEpa (EpAnn _ an _) anc cs = EpAnn anc an     cs
+setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc Orphans.def cs
+setAnchorEpa (EpAnn _ an _) anc cs = EpAnn anc an          cs
 
 setAnchorEpaL :: EpAnn AnnList -> Anchor -> EpAnnComments -> EpAnn AnnList
 setAnchorEpaL EpAnnNotUsed   anc cs = EpAnn anc mempty cs
@@ -424,12 +415,14 @@ hackSrcSpanToAnchor (RealSrcSpan r Strict.Nothing) = Anchor r UnchangedAnchor
 hackSrcSpanToAnchor (RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e))))
   = if s <= 0 && e <= 0
     then Anchor r (MovedAnchor (deltaPos (-s) (-e)))
+      `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
     else Anchor r UnchangedAnchor
 
 hackAnchorToSrcSpan :: Anchor -> SrcSpan
 hackAnchorToSrcSpan (Anchor r UnchangedAnchor) = RealSrcSpan r Strict.Nothing
 hackAnchorToSrcSpan (Anchor r (MovedAnchor dp))
   = RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e)))
+      `debug` ("hackAnchorToSrcSpan: (r,dp,s,e)=" ++ showAst (r,dp,s,e) )
   where
     s = - (getDeltaLine dp)
     e = - (deltaColumn dp)

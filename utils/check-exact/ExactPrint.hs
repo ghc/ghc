@@ -20,11 +20,18 @@ module ExactPrint
   (
     ExactPrint(..)
   , exactPrint
-  -- , exactPrintWithOptions
+  , exactPrintWithOptions
+  , makeDeltaAst
+
+  -- * Configuration
+  , EPOptions(epRigidity, epAstPrint, epTokenPrint, epWhitespacePrint, epUpdateAnchors)
+  , stringOptions
+  , epOptions
+  , deltaOptions
   ) where
 
 import GHC
-import GHC.Base (NonEmpty(..) )
+-- import GHC.Base (NonEmpty(..) )
 import GHC.Core.Coercion.Axiom (Role(..))
 import GHC.Data.Bag
 import qualified GHC.Data.BooleanFormula as BF
@@ -51,16 +58,16 @@ import Data.Functor.Const
 import qualified Data.Set as Set
 import Data.Typeable
 import Data.List ( partition, sort, sortBy)
-import Data.List.NonEmpty ( NonEmpty )
+-- import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe ( isJust, mapMaybe )
-import qualified Data.Set as Set
+-- import qualified Data.Set as Set
 
 import Data.Void
 
 import Lookup
 import Utils
 import Types
-import Data.Ord
+-- import Data.Ord
 
 -- import Debug.Trace
 
@@ -87,7 +94,6 @@ makeDeltaAst ast = fst $ runIdentity (runEP deltaOptions (markAnnotated ast))
 ------------------------------------------------------
 
 type EP w m a = RWST (EPOptions m w) (EPWriter w) EPState m a
-type EPP a = EP String Identity a
 
 runEP :: (Monad m)
       => EPOptions m w
@@ -492,17 +498,20 @@ printStringAtRs pa str = printStringAtRsC CaptureComments pa str
 printStringAtRsC :: (Monad m, Monoid w)
   => CaptureComments -> RealSrcSpan -> String -> EP w m EpaLocation
 printStringAtRsC capture pa str = do
+  debugM $ "printStringAtRsC: pa=" ++ showAst pa
   printComments pa
   pe <- getPriorEndD
-  debugM $ "printStringAtRs:pe=" ++ show pe
+  debugM $ "printStringAtRsC:pe=" ++ show pe
   let p = ss2delta pe pa
   p' <- adjustDeltaForOffsetM p
+  debugM $ "printStringAtRsC:(p,p')=" ++ show (p,p')
   printStringAtLsDelta p' str
   setPriorEndASTD True pa
   cs' <- case capture of
     CaptureComments -> takeAppliedComments
     NoCaptureComments -> return []
-  debugM $ "printStringAtRs:cs'=" ++ show cs'
+  debugM $ "printStringAtRsC:cs'=" ++ show cs'
+  debugM $ "printStringAtRsC:p'=" ++ showAst p'
   return (EpaDelta p' (map comment2LEpaComment cs'))
 
 printStringAtRs' :: (Monad m, Monoid w) => RealSrcSpan -> String -> EP w m ()
@@ -543,6 +552,7 @@ printStringAtAAC :: (Monad m, Monoid w)
   => CaptureComments -> EpaLocation -> String -> EP w m EpaLocation
 printStringAtAAC capture (EpaSpan r) s = printStringAtRsC capture r s
 printStringAtAAC capture (EpaDelta d cs) s = do
+  debugM $ "printStringAtAAC: EpaDelta"
   mapM_ (printOneComment . tokComment) cs
   pe1 <- getPriorEndD
   p1 <- getPosP
@@ -581,7 +591,7 @@ markLensAA (EpAnn anc a cs) l = do
   return (EpAnn anc (set l a' a) cs)
 
 
-markEpAnnLMS :: (Monad m, Monoid w)
+markEpAnnLMS :: (Monad m, Monoid w, Data a)
   => EpAnn a -> Lens a [AddEpAnn] -> AnnKeywordId -> Maybe String -> EP w m (EpAnn a)
 markEpAnnLMS an l kw Nothing = markEpAnnL an l kw
 markEpAnnLMS EpAnnNotUsed  _ _ _ = return EpAnnNotUsed
@@ -613,14 +623,14 @@ markEpAnnLMS' (EpAnn anc a cs) l kw (Just str) = do
 
 -- ---------------------------------------------------------------------
 
-markToken :: forall m w tok a. (Monad m, Monoid w, KnownSymbol tok)
+markToken :: forall m w tok . (Monad m, Monoid w, KnownSymbol tok)
   => LHsToken tok GhcPs -> EP w m (LHsToken tok GhcPs)
 markToken (L NoTokenLoc t) = return (L NoTokenLoc t)
 markToken (L (TokenLoc aa) t) = do
   aa' <- printStringAtAA aa (symbolVal (Proxy @tok))
   return (L (TokenLoc aa') t)
 
-markUniToken :: forall m w tok utok a. (Monad m, Monoid w, KnownSymbol tok, KnownSymbol utok)
+markUniToken :: forall m w tok utok. (Monad m, Monoid w, KnownSymbol tok, KnownSymbol utok)
   => LHsUniToken tok utok GhcPs -> EP w m (LHsUniToken tok utok GhcPs)
 markUniToken (L l HsNormalTok)  = do
   (L l' _) <- markToken (L l (HsTok @tok))
@@ -1108,11 +1118,14 @@ markEpAnn EpAnnNotUsed _ = return 1
 markEpAnn (EpAnn _ a _) kw = mark a kw >> return 1
 
 
-markEpAnnL :: (Monad m, Monoid w)
+markEpAnnL :: (Monad m, Monoid w, Data ann)
   => EpAnn ann -> Lens ann [AddEpAnn] -> AnnKeywordId -> EP w m (EpAnn ann)
 markEpAnnL EpAnnNotUsed _ _ = return EpAnnNotUsed
 markEpAnnL (EpAnn anc a cs) l kw = do
+  debugM $ "markEpAnnL (view l a)=" ++ showAst (view l a)
   anns <- mark' (view l a) kw
+  debugM $ "markEpAnnL anns=" ++ showAst anns
+  debugM $ "markEpAnnL (set l anns a)=" ++ showAst (set l anns a)
   return (EpAnn anc (set l anns a) cs)
 
 markEpAnnAllL :: (Monad m, Monoid w)
@@ -1169,7 +1182,9 @@ markKw an = markKwC CaptureComments an
 
 markKwC :: (Monad m, Monoid w) => CaptureComments -> AddEpAnn -> EP w m AddEpAnn
 markKwC capture (AddEpAnn kw ss) = do
+  debugM $ "markKwC: ss=" ++ showAst ss
   ss' <- markKwAC capture kw ss
+  debugM $ "markKwC: ss'=" ++ showAst ss'
   return (AddEpAnn kw ss')
 
 -- | This should be the main driver of the process, managing printing keywords.
@@ -1386,6 +1401,7 @@ instance ExactPrint HsModule where
   exact (HsModule an lo mmn mexports imports decls mdeprec mbDoc) = do
 
     debugM "HsModule Entered"
+    debugM $ "HsModule an=" ++ showAst an
 
     mbDoc' <- markAnnotated mbDoc
 
@@ -1393,7 +1409,9 @@ instance ExactPrint HsModule where
       case mmn of
         Nothing -> return (an, mmn, mdeprec, mexports)
         Just m -> do
+          debugM $ "HsModule.AnnModule an=" ++ showAst an
           an0 <- markEpAnnL an lam_main AnnModule
+          debugM $ "HsModule.AnnModule an0=" ++ showAst an0
           m' <- markAnnotated m
 
           mdeprec' <- setLayoutTopLevelP $ markAnnotated mdeprec
@@ -1401,6 +1419,7 @@ instance ExactPrint HsModule where
           mexports' <- setLayoutTopLevelP $ markAnnotated mexports
 
           debugM $ "HsModule.AnnWhere coming"
+          debugM $ "HsModule.AnnWhere an0=" ++ showAst an0
           an1 <- setLayoutTopLevelP $ markEpAnnL an0 lam_main AnnWhere
           debugM $ "HsModule.AnnWhere done, an1=" ++ showAst (anns an1)
 
@@ -1850,7 +1869,7 @@ instance ExactPrint (RuleDecl GhcPs) where
     rhs' <- markAnnotated rhs
     return (HsRule an4 ln' act mtybndrs' termbndrs' lhs' rhs')
 
-markActivation :: (Monad m, Monoid w)
+markActivation :: (Monad m, Monoid w, Data a)
   => EpAnn a -> Lens a [AddEpAnn] -> Activation -> EP w m (EpAnn a)
 markActivation an l act = do
   case act of
@@ -2715,6 +2734,7 @@ instance ExactPrint (HsExpr GhcPs) where
 
   setAnnotationAnchor a@(HsVar{})              _ _s = a
   setAnnotationAnchor (HsUnboundVar an a)    anc cs = (HsUnboundVar (setAnchorEpa an anc cs) a)
+  setAnnotationAnchor a@(HsRecSel{})           _ _s  = a
   setAnnotationAnchor (HsOverLabel an a)     anc cs = (HsOverLabel (setAnchorEpa an anc cs) a)
   setAnnotationAnchor (HsIPVar an a)         anc cs = (HsIPVar (setAnchorEpa an anc cs) a)
   setAnnotationAnchor (HsOverLit an a)       anc cs = (HsOverLit (setAnchorEpa an anc cs) a)
@@ -3034,12 +3054,7 @@ instance ExactPrint (HsExpr GhcPs) where
   exact x = error $ "exact HsExpr for:" ++ showAst x
 
 -- ---------------------------------------------------------------------
--- exactDo :: (ExactPrint body)
---         => EpAnn AnnList -> HsDoFlavour -> body -> EPP ()
 
--- exactDo :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
---         => EpAnn AnnList -> HsStmtContext any -> LocatedAn an a
---         -> EP w m (EpAnn AnnList, LocatedAn an a)
 exactDo :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
         => EpAnn AnnList -> HsDoFlavour -> LocatedAn an a
         -> EP w m (EpAnn AnnList, LocatedAn an a)
@@ -3049,7 +3064,6 @@ exactDo an GhciStmtCtxt  stmts = markEpAnnL an lal_rest AnnDo >>= \an0 -> markMa
 exactDo an (MDoExpr m)   stmts = exactMdo an m AnnMdo         >>= \an0 -> markMaybeDodgyStmts an0 stmts
 exactDo an ListComp      stmts = markMaybeDodgyStmts an stmts
 exactDo an MonadComp     stmts = markMaybeDodgyStmts an stmts
-exactDo _  _             _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
 exactMdo :: (Monad m, Monoid w)
   => EpAnn AnnList -> Maybe ModuleName -> AnnKeywordId -> EP w m (EpAnn AnnList)
@@ -3166,6 +3180,7 @@ instance (ExactPrint body) => ExactPrint (HsRecFields GhcPs body) where
 instance (ExactPrint body)
     => ExactPrint (HsFieldBind (LocatedAn NoEpAnns (FieldOcc GhcPs)) body) where
   getAnnotationEntry x = fromAnn (hfbAnn x)
+  setAnnotationAnchor (HsFieldBind an f arg isPun) anc cs = (HsFieldBind (setAnchorEpa an anc cs) f arg isPun)
   exact (HsFieldBind an f arg isPun) = do
     debugM $ "HsFieldBind"
     f' <- markAnnotated f
@@ -3181,6 +3196,8 @@ instance (ExactPrint body)
 instance (ExactPrint body)
     => ExactPrint (HsFieldBind (LocatedAn NoEpAnns (FieldLabelStrings GhcPs)) body) where
   getAnnotationEntry x = fromAnn (hfbAnn x)
+  setAnnotationAnchor (HsFieldBind an f arg isPun) anc cs = (HsFieldBind (setAnchorEpa an anc cs) f arg isPun)
+
   exact (HsFieldBind an f arg isPun) = do
     debugM $ "HsFieldBind FieldLabelStrings"
     f' <- markAnnotated f
@@ -3196,6 +3213,7 @@ instance (ExactPrint body)
 instance (ExactPrint (LocatedA body))
     => ExactPrint (HsFieldBind (LocatedAn NoEpAnns (AmbiguousFieldOcc GhcPs)) (LocatedA body)) where
   getAnnotationEntry x = fromAnn (hfbAnn x)
+  setAnnotationAnchor (HsFieldBind an f arg isPun) anc cs = (HsFieldBind (setAnchorEpa an anc cs) f arg isPun)
   exact (HsFieldBind an f arg isPun) = do
     debugM $ "HsRecUpdField"
     f' <- markAnnotated f
@@ -3214,6 +3232,8 @@ instance
          (Either [LocatedA (HsFieldBind (LocatedAn NoEpAnns (a GhcPs)) body)]
                  [LocatedA (HsFieldBind (LocatedAn NoEpAnns (b GhcPs)) body)]) where
   getAnnotationEntry = const NoEntryVal
+  setAnnotationAnchor a _ _ = a
+
   exact (Left rbinds) = Left <$> markAnnotated rbinds
   exact (Right pbinds) = Right <$> markAnnotated pbinds
 
@@ -3229,10 +3249,12 @@ instance ExactPrint (FieldLabelStrings GhcPs) where
 instance ExactPrint (DotFieldOcc GhcPs) where
   getAnnotationEntry (DotFieldOcc an _) = fromAnn an
 
+  setAnnotationAnchor (DotFieldOcc an a) anc cs = DotFieldOcc (setAnchorEpa an anc cs) a
+
   exact (DotFieldOcc an fs) = do
     an0 <- markLensKwM an lafDot  AnnDot
     fs' <- markAnnotated fs
-    return (DotFieldOcc an fs)
+    return (DotFieldOcc an0 fs')
 
 -- ---------------------------------------------------------------------
 
@@ -3292,7 +3314,7 @@ instance ExactPrint (HsCmd GhcPs) where
         arg' <- markAnnotated arg
         an0 <- markKw (anns an)
         arr' <- markAnnotated arr
-        let an1 = an{anns = an0}
+        let an1 = an {anns = an0}
         return (HsCmdArrApp an1 arr' arg' o isRightToLeft)
 
   exact (HsCmdArrForm an e fixity mf cs) = do
@@ -4109,7 +4131,7 @@ instance ExactPrint (LocatedN RdrName) where
   setAnnotationAnchor = setAnchorAn
 
   exact x@(L (SrcSpanAnn EpAnnNotUsed l) n) = do
-    printUnicode (spanAsAnchor l) n
+    _ <- printUnicode (spanAsAnchor l) n
     return x
   exact (L (SrcSpanAnn (EpAnn anc ann cs) ll) n) = do
     ann' <-
@@ -4128,6 +4150,13 @@ instance ExactPrint (LocatedN RdrName) where
           (AddEpAnn _ c') <- markKwC NoCaptureComments (AddEpAnn kwc c)
           t' <- markTrailing t
           return (NameAnnCommas a o' commas' c' t')
+        NameAnnBars a o bars c t -> do
+          let (kwo,kwc) = adornments a
+          (AddEpAnn _ o') <- markKwC NoCaptureComments (AddEpAnn kwo o)
+          bars' <- forM bars (\loc -> locFromAdd <$> markKwC NoCaptureComments (AddEpAnn AnnVbar loc))
+          (AddEpAnn _ c') <- markKwC NoCaptureComments (AddEpAnn kwc c)
+          t' <- markTrailing t
+          return (NameAnnBars a o' bars' c' t')
         NameAnnOnly a o c t -> do
           (o',_,c') <- markName a o Nothing c
           t' <- markTrailing t
@@ -4143,7 +4172,7 @@ instance ExactPrint (LocatedN RdrName) where
           t' <- markTrailing t
           return (NameAnnQuote q' name' t')
         NameAnnTrailing t -> do
-          anc' <- printUnicode anc n
+          _anc' <- printUnicode anc n
           t' <- markTrailing t
           return (NameAnnTrailing t')
     return (L (SrcSpanAnn (EpAnn anc ann' cs) ll) n)

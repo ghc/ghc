@@ -111,7 +111,7 @@ runParser parser flags filename str = GHC.unP parser parseState
 -- @
 -- myParser fname expr = withDynFlags (\\d -> parseExpr d fname expr)
 -- @
-withDynFlags :: FilePath -> (GHC.DynFlags -> a) -> IO a
+withDynFlags :: LibDir -> (GHC.DynFlags -> a) -> IO a
 withDynFlags libdir action = ghcWrapper libdir $ do
   dflags <- GHC.getSessionDynFlags
   void $ GHC.setSessionDynFlags dflags
@@ -171,7 +171,7 @@ parseModule libdir file = parseModuleWithCpp libdir defaultCppOptions file
 -- string; the `FilePath` parameter solely exists to provide a name
 -- in source location annotations.
 parseModuleFromString
-  :: FilePath -- GHC libdir
+  :: LibDir -- GHC libdir
   -> FilePath
   -> String
   -> IO (ParseResult GHC.ParsedSource)
@@ -190,7 +190,7 @@ parseModuleFromStringInternal dflags fileName str =
           -> Right (lp, dflags, pmod)
   in  postParseTransform res
 
-parseModuleWithOptions :: FilePath -- ^ GHC libdir
+parseModuleWithOptions :: LibDir -- ^ GHC libdir
                        -> FilePath
                        -> IO (ParseResult GHC.ParsedSource)
 parseModuleWithOptions libdir fp =
@@ -199,7 +199,7 @@ parseModuleWithOptions libdir fp =
 
 -- | Parse a module with specific instructions for the C pre-processor.
 parseModuleWithCpp
-  :: FilePath -- ^ GHC libdir
+  :: LibDir -- ^ GHC libdir
   -> CppOptions
   -> FilePath -- ^ File to be parsed
   -> IO (ParseResult GHC.ParsedSource)
@@ -213,7 +213,7 @@ parseModuleWithCpp libdir cpp fp = do
 -- It is advised to use 'parseModule' or 'parseModuleWithCpp' instead of
 -- this function.
 parseModuleEpAnnsWithCpp
-  :: FilePath -- ^ GHC libdir
+  :: LibDir -- ^ GHC libdir
   -> CppOptions
   -> FilePath -- ^ File to be parsed
   -> IO
@@ -226,7 +226,7 @@ parseModuleEpAnnsWithCpp libdir cppOptions file = ghcWrapper libdir $ do
   parseModuleEpAnnsWithCppInternal cppOptions dflags file
 
 -- | Internal function. Default runner of GHC.Ghc action in IO.
-ghcWrapper :: FilePath -> GHC.Ghc a -> IO a
+ghcWrapper :: LibDir -> GHC.Ghc a -> IO a
 ghcWrapper libdir a =
   GHC.defaultErrorHandler GHC.defaultFatalMessager GHC.defaultFlushOut
     $ GHC.runGhc (Just libdir) a
@@ -303,6 +303,7 @@ fixModuleTrailingComments (GHC.L l p) = GHC.L l p'
 -- See ghc tickets #15513, #15541.
 initDynFlags :: GHC.GhcMonad m => FilePath -> m GHC.DynFlags
 initDynFlags file = do
+  -- Based on GHC backpack driver doBackPack
   dflags0         <- GHC.getSessionDynFlags
   let parser_opts0 = GHC.initParserOpts dflags0
   (_, src_opts)   <- GHC.liftIO $ GHC.getOptionsFromFile parser_opts0 file
@@ -327,6 +328,7 @@ initDynFlags file = do
 -- See ghc tickets #15513, #15541.
 initDynFlagsPure :: GHC.GhcMonad m => FilePath -> String -> m GHC.DynFlags
 initDynFlagsPure fp s = do
+  -- AZ Note: "I" below appears to be Lennart Spitzner
   -- I was told we could get away with using the unsafeGlobalDynFlags.
   -- as long as `parseDynamicFilePragma` is impure there seems to be
   -- no reason to use it.
