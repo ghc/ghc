@@ -148,7 +148,9 @@ recoverDecode cfm input@Buffer{  bufRaw=iraw, bufL=ir, bufR=_  }
                   output@Buffer{ bufRaw=oraw, bufL=_,  bufR=ow } =
  --puts $ "recoverDecode " ++ show ir
  case cfm of
-  ErrorOnCodingFailure       -> ioe_decodingError
+  ErrorOnCodingFailure       -> do
+      b <- readWord8Buf iraw ir
+      ioe_decodingError b
   IgnoreCodingFailure        -> return (input { bufL=ir+1 }, output)
   TransliterateCodingFailure -> do
       ow' <- writeCharBuf oraw ow unrepresentableChar
@@ -189,15 +191,17 @@ recoverEncode cfm input@Buffer{  bufRaw=iraw, bufL=ir, bufR=_  }
     RoundtripFailure | Just x <- unescapeRoundtripCharacterSurrogate c -> do
         writeWord8Buf oraw ow x
         return (input { bufL=ir' }, output { bufR=ow+1 })
-    _                          -> ioe_encodingError
+    _                          -> ioe_encodingError c
 
-ioe_decodingError :: IO a
-ioe_decodingError = ioException
+ioe_decodingError :: Word8 -> IO a
+ioe_decodingError b = ioException
     (IOError Nothing InvalidArgument "recoverDecode"
-        "invalid byte sequence" Nothing Nothing)
+        ("cannot decode byte sequence starting from " ++ show b) Nothing Nothing)
 
-ioe_encodingError :: IO a
-ioe_encodingError = ioException
+ioe_encodingError :: Char -> IO a
+ioe_encodingError ch = ioException
     (IOError Nothing InvalidArgument "recoverEncode"
-        "invalid character" Nothing Nothing)
+        -- This assumes that @show ch@ escapes non-ASCII symbols
+        -- and thus does not cause recursive encoding failures.
+        ("cannot encode character " ++ show ch) Nothing Nothing)
 
