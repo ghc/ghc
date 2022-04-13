@@ -36,7 +36,7 @@ import GHC.Data.FastString
 -- ---------------------------------------------------------------------
 
 _tt :: IO ()
-_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib"
+_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
 
@@ -81,7 +81,6 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/RmTypeSig2.hs" (Just rmTypeSig2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddHiding1.hs" (Just addHiding1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddHiding2.hs" (Just addHiding2)
-
  "../../testsuite/tests/printer/Ppr001.hs" Nothing
  -- "../../testsuite/tests/ghc-api/annotations/CommentsTest.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/Constructors.hs" Nothing
@@ -268,6 +267,7 @@ main :: IO()
 main = do
   args <- getArgs
   case args of
+   [] -> _tt
    [libdir,fileName] -> testOneFile changers libdir fileName Nothing
    [libdir,fileName,changerStr] -> do
      case lookup changerStr changers of

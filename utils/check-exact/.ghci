@@ -1,4 +1,3 @@
 :set -package ghc
-:set -package mtl
-:set -i./src
 :set -Wall
+-- :set -fobject-code

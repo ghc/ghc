@@ -512,6 +512,8 @@ printStringAtRsC capture pa str = do
     NoCaptureComments -> return []
   debugM $ "printStringAtRsC:cs'=" ++ show cs'
   debugM $ "printStringAtRsC:p'=" ++ showAst p'
+  debugM $ "printStringAtRsC: (EpaDelta p' [])=" ++ showAst (EpaDelta p' [])
+  debugM $ "printStringAtRsC: (EpaDelta p' (map comment2LEpaComment cs'))=" ++ showAst (EpaDelta p' (map comment2LEpaComment cs'))
   return (EpaDelta p' (map comment2LEpaComment cs'))
 
 printStringAtRs' :: (Monad m, Monoid w) => RealSrcSpan -> String -> EP w m ()
@@ -550,7 +552,10 @@ printStringAtAAL (EpAnn anc an cs) l str = do
 
 printStringAtAAC :: (Monad m, Monoid w)
   => CaptureComments -> EpaLocation -> String -> EP w m EpaLocation
-printStringAtAAC capture (EpaSpan r) s = printStringAtRsC capture r s
+printStringAtAAC capture (EpaSpan r) s = do
+  ret <- printStringAtRsC capture r s
+  debugM $ "printStringAtAAC: (EpaSpan r,s,ret)=" ++ showAst (EpaSpan r,s,ret)
+  return ret
 printStringAtAAC capture (EpaDelta d cs) s = do
   debugM $ "printStringAtAAC: EpaDelta"
   mapM_ (printOneComment . tokComment) cs
@@ -1194,7 +1199,10 @@ markKwA kw aa = markKwAC CaptureComments kw aa
 
 markKwAC :: (Monad m, Monoid w)
   => CaptureComments -> AnnKeywordId -> EpaLocation -> EP w m EpaLocation
-markKwAC capture kw aa = printStringAtAAC capture aa (keywordToString kw)
+markKwAC capture kw aa = do
+  r <- printStringAtAAC capture aa (keywordToString kw)
+  debugM $ "markKwAC: r=" ++ showAst r
+  return r
 
 -- | Print a keyword encoded in a 'TrailingAnn'
 markKwT :: (Monad m, Monoid w) => TrailingAnn -> EP w m TrailingAnn
@@ -4316,7 +4324,7 @@ instance ExactPrint (ConDecl GhcPs) where
     doc' <- mapM markAnnotated doc
     cons' <- mapM markAnnotated cons
     dcol' <- markUniToken dcol
-    an1 <- annotationsToComments an0 lidl  [AnnOpenP, AnnCloseP]
+    an1 <- annotationsToComments an lidl  [AnnOpenP, AnnCloseP]
 
     -- Work around https://gitlab.haskell.org/ghc/ghc/-/issues/20558
     bndrs' <- case bndrs of
