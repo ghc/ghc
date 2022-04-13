@@ -108,7 +108,6 @@ packageArgs = do
         -------------------------------- ghcPrim -------------------------------
         , package ghcPrim ? mconcat
           [ builder (Cabal Flags) ? arg "include-ghc-prim"
-          , builder (Cabal Setup) ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
 
           , builder (Cc CompileC) ? (not <$> flag CcLlvmBackend) ?
             input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
@@ -384,6 +383,7 @@ rtsPackageArgs = package rts ? do
           , useLibffiForAdjustors           `cabalFlag` "libffi-adjustors"
           , Debug `wayUnit` way             `cabalFlag` "find-ptr"
           ]
+        , builder (Cabal Setup) ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
         , builder (Cabal Setup) ? mconcat
               [ cabalExtraDirs libdwIncludeDir libdwLibraryDir
               , cabalExtraDirs libnumaIncludeDir libnumaLibraryDir
