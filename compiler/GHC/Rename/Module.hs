@@ -2350,7 +2350,6 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                   all_fvs) }}
 
 rnConDecl (ConDeclGADT { con_names   = names
-                       , con_dcolon  = dcol
                        , con_bndrs   = L l outer_bndrs
                        , con_mb_cxt  = mcxt
                        , con_g_args  = args
@@ -2389,7 +2388,6 @@ rnConDecl (ConDeclGADT { con_names   = names
             (ppr names $$ ppr outer_bndrs')
         ; new_mb_doc <- traverse rnLHsDoc mb_doc
         ; return (ConDeclGADT { con_g_ext = noAnn, con_names = new_names
-                              , con_dcolon = dcol
                               , con_bndrs = L l outer_bndrs', con_mb_cxt = new_cxt
                               , con_g_args = new_args, con_res_ty = new_res_ty
                               , con_doc = new_mb_doc },

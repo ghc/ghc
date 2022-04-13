@@ -2371,7 +2371,7 @@ gadt_constr :: { LConDecl GhcPs }
     -- Returns a list because of:   C,D :: ty
     -- TODO:AZ capture the optSemi. Why leading?
         : optSemi con_list '::' sigtype
-                {% mkGadtDecl (comb2A $2 $>) (unLoc $2) (hsUniTok $3) $4 }
+                {% mkGadtDecl (comb2A $2 $>) (unLoc $2) $4 [mu AnnDcolon $3] }
 
 {- Note [Difference in parsing GADT and data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

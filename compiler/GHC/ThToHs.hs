@@ -703,7 +703,6 @@ mk_gadt_decl names args res_ty
        returnLA $ ConDeclGADT
                    { con_g_ext  = noAnn
                    , con_names  = names
-                   , con_dcolon = noHsUniTok
                    , con_bndrs  = bndrs
                    , con_mb_cxt = Nothing
                    , con_g_args = args

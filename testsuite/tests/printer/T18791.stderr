@@ -75,17 +75,13 @@
            (Anchor
             { T18791.hs:5:3-17 }
             (UnchangedAnchor))
-           []
+           [(AddEpAnn AnnDcolon (EpaSpan { T18791.hs:5:7-8 }))]
            (EpaComments
             []))
           [(L
             (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:3-5 })
             (Unqual
              {OccName: MkT}))]
-          (L
-           (TokenLoc
-            (EpaSpan { T18791.hs:5:7-8 }))
-           (HsNormalTok))
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:10-17 })
            (HsOuterImplicit

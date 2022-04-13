@@ -3230,13 +3230,11 @@ instance ExactPrint (ConDecl GhcPs) where
 
   exact (ConDeclGADT { con_g_ext = an
                      , con_names = cons
-                     , con_dcolon = dcol
                      , con_bndrs = bndrs
                      , con_mb_cxt = mcxt, con_g_args = args
                      , con_res_ty = res_ty, con_doc = doc }) = do
     mapM_ markAnnotated doc
     mapM_ markAnnotated cons
-    markUniToken dcol
     markEpAnn an AnnDcolon
     annotationsToComments (epAnnAnns an)  [AnnOpenP, AnnCloseP]
     -- when has_forall $ markEpAnn an AnnForall

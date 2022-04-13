@@ -89,17 +89,13 @@
            (Anchor
             { T15323.hs:6:5-54 }
             (UnchangedAnchor))
-           []
+           [(AddEpAnn AnnDcolon (EpaSpan { T15323.hs:6:17-18 }))]
            (EpaComments
             []))
           [(L
             (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:5-14 })
             (Unqual
              {OccName: TestParens}))]
-          (L
-           (TokenLoc
-            (EpaSpan { T15323.hs:6:17-18 }))
-           (HsNormalTok))
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:20-54 })
            (HsOuterExplicit
@@ -229,5 +225,3 @@
        []))))]
   (Nothing)
   (Nothing)))
-
-

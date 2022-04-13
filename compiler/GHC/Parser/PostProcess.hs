@@ -722,10 +722,10 @@ mkConDeclH98 ann name mb_forall mb_cxt args
 --   Note [GADT abstract syntax] in "GHC.Hs.Decls" for more details.
 mkGadtDecl :: SrcSpan
            -> [LocatedN RdrName]
-           -> LHsUniToken "::" "∷" GhcPs
            -> LHsSigType GhcPs
+           -> [AddEpAnn]
            -> P (LConDecl GhcPs)
-mkGadtDecl loc names dcol ty = do
+mkGadtDecl loc names ty annsIn = do
   cs <- getCommentsFor loc
   let l = noAnnSrcSpan loc
 
@@ -745,12 +745,11 @@ mkGadtDecl loc names dcol ty = do
        let (anns, cs, arg_types, res_type) = splitHsFunType body_ty
        return (PrefixConGADT arg_types, res_type, anns, cs)
 
-  let an = EpAnn (spanAsAnchor loc) annsa (cs Semi.<> csa)
+  let an = EpAnn (spanAsAnchor loc) (annsIn ++ annsa) (cs Semi.<> csa)
 
   pure $ L l ConDeclGADT
                      { con_g_ext  = an
                      , con_names  = names
-                     , con_dcolon = dcol
                      , con_bndrs  = L (getLoc ty) outer_bndrs
                      , con_mb_cxt = mcxt
                      , con_g_args = args

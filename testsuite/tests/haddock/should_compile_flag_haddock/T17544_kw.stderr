@@ -75,17 +75,13 @@
            (Anchor
             { T17544_kw.hs:16:9-20 }
             (UnchangedAnchor))
-           []
+           [(AddEpAnn AnnDcolon (EpaSpan { T17544_kw.hs:16:15-16 }))]
            (EpaComments
             []))
           [(L
             (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:9-13 })
             (Unqual
              {OccName: MkFoo}))]
-          (L
-           (TokenLoc
-            (EpaSpan { T17544_kw.hs:16:15-16 }))
-           (HsNormalTok))
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:18-20 })
            (HsOuterImplicit
@@ -163,17 +159,13 @@
            (Anchor
             { T17544_kw.hs:19:9-26 }
             (UnchangedAnchor))
-           []
+           [(AddEpAnn AnnDcolon (EpaSpan { T17544_kw.hs:19:15-16 }))]
            (EpaComments
             []))
           [(L
             (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:19:9-13 })
             (Unqual
              {OccName: MkBar}))]
-          (L
-           (TokenLoc
-            (EpaSpan { T17544_kw.hs:19:15-16 }))
-           (HsNormalTok))
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:19:18-26 })
            (HsOuterImplicit
