@@ -7,7 +7,7 @@
 set -Eeuo pipefail
 
 # Configuration:
-HACKAGE_INDEX_STATE="2020-12-21T14:48:20Z" # TODO dedup with yaml's def
+HACKAGE_INDEX_STATE="2020-12-21T14:48:20Z"
 MIN_HAPPY_VERSION="1.20"
 MIN_ALEX_VERSION="3.2.6"
 
@@ -235,7 +235,7 @@ function set_toolchain_paths() {
 }
 
 function cabal_update() {
-  "$CABAL" update --index="$HACKAGE_INDEX_STATE"
+  run "$CABAL" update --index="$HACKAGE_INDEX_STATE"
 }
 
 
@@ -254,7 +254,7 @@ function setup() {
     *) ;;
   esac
 
-  cabal_update
+  cabal_update || fail "cabal update failed"
 
   # Make sure that git works
   git config user.email "ghc-ci@gitlab-haskell.org"

@@ -399,10 +399,6 @@ validate-x86_64-linux-deb10-make:
 test-cabal-reinstall-x86_64-linux-deb10:
   extends: nightly-x86_64-linux-deb10-validate
   stage: full-build
-  before_script:
-    - ./boot
-    - ./configure
-    - "cabal update --index=$HACKAGE_INDEX_STATE --project-file=cabal.project-reinstall"
   variables:
     REINSTALL_GHC: "yes"
     BUILD_FLAVOUR: validate
