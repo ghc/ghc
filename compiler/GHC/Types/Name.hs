@@ -54,7 +54,6 @@ module GHC.Types.Name (
         setNameLoc,
         tidyNameOcc,
         localiseName,
-        namePun_maybe,
 
         nameSrcLoc, nameSrcSpan, pprNameDefnLoc, pprDefinedAt,
         pprFullName, pprTickyName,
@@ -84,7 +83,6 @@ module GHC.Types.Name (
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Types.TyThing ( TyThing )
-import {-# SOURCE #-} GHC.Builtin.Types ( listTyCon )
 
 import GHC.Platform
 import GHC.Types.Name.Occurrence
@@ -333,12 +331,6 @@ nameModule_maybe _                                  = Nothing
 
 is_interactive_or_from :: Module -> Module -> Bool
 is_interactive_or_from from mod = from == mod || isInteractiveModule mod
-
--- Return the pun for a name if available.
--- Used for pretty-printing under ListTuplePuns.
-namePun_maybe :: Name -> Maybe FastString
-namePun_maybe name | getUnique name == getUnique listTyCon = Just (fsLit "[]")
-namePun_maybe _ = Nothing
 
 nameIsLocalOrFrom :: Module -> Name -> Bool
 -- ^ Returns True if the name is
@@ -624,21 +616,14 @@ instance OutputableBndr Name where
     pprPrefixOcc = pprPrefixName
 
 pprName :: Name -> SDoc
-pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
+pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \sty ->
     getPprDebug $ \debug ->
-    sdocOption sdocListTuplePuns $ \listTuplePuns ->
-    handlePuns listTuplePuns (namePun_maybe name) $
     case sort of
       WiredIn mod _ builtin   -> pprExternal debug sty uniq mod occ True  builtin
       External mod            -> pprExternal debug sty uniq mod occ False UserSyntax
       System                  -> pprSystem   debug sty uniq occ
       Internal                -> pprInternal debug sty uniq occ
-  where
-    -- Print GHC.Types.List as [], etc.
-    handlePuns :: Bool -> Maybe FastString -> SDoc -> SDoc
-    handlePuns True (Just pun) _ = ftext pun
-    handlePuns _    _          r = r
 
 -- | Print fully qualified name (with unit-id, module and unique)
 pprFullName :: Module -> Name -> SDoc

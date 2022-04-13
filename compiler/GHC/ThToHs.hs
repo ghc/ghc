@@ -57,7 +57,6 @@ import GHC.Utils.Panic
 
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
-import Control.Applicative( (<|>) )
 import Data.Maybe( catMaybes, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
@@ -2108,10 +2107,9 @@ thRdrName loc ctxt_ns th_occ th_name
 thOrigRdrName :: String -> TH.NameSpace -> PkgName -> ModName -> RdrName
 thOrigRdrName occ th_ns pkg mod =
   let occ' = mk_occ (mk_ghc_ns th_ns) occ
-      mod' = mkModule (mk_pkg pkg) (mk_mod mod)
-  in case isBuiltInOcc_maybe occ' <|> isPunOcc_maybe mod' occ' of
+  in case isBuiltInOcc_maybe occ' of
        Just name -> nameRdrName name
-       Nothing   -> (mkOrig $! mod') $! occ'
+       Nothing   -> (mkOrig $! (mkModule (mk_pkg pkg) (mk_mod mod))) $! occ'
 
 thRdrNameGuesses :: TH.Name -> [RdrName]
 thRdrNameGuesses (TH.Name occ flavour)

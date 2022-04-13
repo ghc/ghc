@@ -3,15 +3,14 @@ At point (31,9), we found:
 ==========================
 ┌
 │ $dC at HieQueries.hs:31:1-13, of type: C [a]
-│     is an evidence variable bound by a let, depending on: [$fCList,
-│                                                            $dC]
+│     is an evidence variable bound by a let, depending on: [$fC[], $dC]
 │           with scope: LocalScope HieQueries.hs:31:1-13
 │           bound at: HieQueries.hs:31:1-13
 │     Defined at <no location info>
 └
 |
 +- ┌
-|  │ $fCList at HieQueries.hs:27:10-21, of type: forall a. C a => C [a]
+|  │ $fC[] at HieQueries.hs:27:10-21, of type: forall a. C a => C [a]
 |  │     is an evidence variable bound by an instance of class C
 |  │           with scope: ModuleScope
 |  │           
@@ -31,7 +30,7 @@ At point (37,9), we found:
 ==========================
 ┌
 │ $dShow at HieQueries.hs:37:1-22, of type: Show [(Integer, x, A)]
-│     is an evidence variable bound by a let, depending on: [$fShowList,
+│     is an evidence variable bound by a let, depending on: [$fShow[],
 │                                                            $dShow]
 │           with scope: LocalScope HieQueries.hs:37:1-22
 │           bound at: HieQueries.hs:37:1-22
@@ -39,7 +38,7 @@ At point (37,9), we found:
 └
 |
 +- ┌
-|  │ $fShowList at HieQueries.hs:37:1-22, of type: forall a. Show a => Show [a]
+|  │ $fShow[] at HieQueries.hs:37:1-22, of type: forall a. Show a => Show [a]
 |  │     is a usage of an external evidence variable
 |  │     Defined in `GHC.Show'
 |  └

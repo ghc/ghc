@@ -18,7 +18,7 @@ module GHC.Builtin.Types (
         mkWiredInIdName,    -- used in GHC.Types.Id.Make
 
         -- * All wired in things
-        wiredInTyCons, isBuiltInOcc_maybe, isPunOcc_maybe,
+        wiredInTyCons, isBuiltInOcc_maybe,
 
         -- * Bool
         boolTy, boolTyCon, boolTyCon_RDR, boolTyConName,
@@ -372,7 +372,7 @@ falseDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "False") fa
 trueDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "True")  trueDataConKey  trueDataCon
 
 listTyConName, nilDataConName, consDataConName :: Name
-listTyConName     = mkWiredInTyConName   UserSyntax    gHC_TYPES (fsLit "List") listTyConKey listTyCon
+listTyConName     = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "[]") listTyConKey listTyCon
 nilDataConName    = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") nilDataConKey nilDataCon
 consDataConName   = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
 
@@ -930,21 +930,6 @@ isBuiltInOcc_maybe occ =
     tup_name boxity arity
       = choose_ns (getName (tupleTyCon   boxity arity))
                   (getName (tupleDataCon boxity arity))
-
--- When resolving names produced by Template Haskell (see thOrigRdrName
--- in GHC.ThToHs), we want ghc-prim:GHC.Types.List to yield an Exact name, not
--- an Orig name.
---
--- This matters for pretty-printing under ListTuplePuns. If we don't do it,
--- then -ddump-splices will print ''[] as ''GHC.Types.List.
---
--- Test case: th/T13776
---
-isPunOcc_maybe :: Module -> OccName -> Maybe Name
-isPunOcc_maybe mod occ
-  | mod == gHC_TYPES, occ == occName listTyConName
-  = Just listTyConName
-isPunOcc_maybe _ _ = Nothing
 
 mkTupleOcc :: NameSpace -> Boxity -> Arity -> OccName
 -- No need to cache these, the caching is done in mk_tuple

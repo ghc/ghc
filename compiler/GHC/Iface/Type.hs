@@ -1610,26 +1610,26 @@ pprIfaceCoTcApp ctxt_prec tc tys =
 -- 2. Coercions (from 'pprIfaceCoTcApp')
 ppr_iface_tc_app :: (PprPrec -> (a, ArgFlag) -> SDoc)
                  -> PprPrec -> IfaceTyCon -> [(a, ArgFlag)] -> SDoc
+ppr_iface_tc_app pp _ tc [ty]
+  | tc `ifaceTyConHasKey` listTyConKey = pprPromotionQuote tc <> brackets (pp topPrec ty)
 
-ppr_iface_tc_app pp ctxt_prec tc tys =
-  sdocOption sdocListTuplePuns $ \listTuplePuns ->
-  if | listTuplePuns, tc `ifaceTyConHasKey` listTyConKey, [ty] <- tys
-     -> brackets (pp topPrec ty)
+ppr_iface_tc_app pp ctxt_prec tc tys
+  | tc `ifaceTyConHasKey` liftedTypeKindTyConKey
+  = ppr_kind_type ctxt_prec
 
-     | tc `ifaceTyConHasKey` liftedTypeKindTyConKey
-     -> ppr_kind_type ctxt_prec
+  | not (isSymOcc (nameOccName (ifaceTyConName tc)))
+  = pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp appPrec) tys)
 
-     | not (isSymOcc (nameOccName (ifaceTyConName tc)))
-     -> pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp appPrec) tys)
+  | [ ty1@(_, Required)
+    , ty2@(_, Required) ] <- tys
+      -- Infix, two visible arguments (we know nothing of precedence though).
+      -- Don't apply this special case if one of the arguments is invisible,
+      -- lest we print something like (@LiftedRep -> @LiftedRep) (#15941).
+  = pprIfaceInfixApp ctxt_prec (ppr tc)
+                     (pp opPrec ty1) (pp opPrec ty2)
 
-     | [ ty1@(_, Required), ty2@(_, Required) ] <- tys
-         -- Infix, two visible arguments (we know nothing of precedence though).
-         -- Don't apply this special case if one of the arguments is invisible,
-         -- lest we print something like (@LiftedRep -> @LiftedRep) (#15941).
-     -> pprIfaceInfixApp ctxt_prec (ppr tc) (pp opPrec ty1) (pp opPrec ty2)
-
-     | otherwise
-     -> pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
+  | otherwise
+  = pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
 
 -- | Pretty-print an unboxed sum type. The sum should be saturated:
 -- as many visible arguments as the arity of the sum.
