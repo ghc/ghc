@@ -668,7 +668,7 @@ function run_hadrian() {
 
 # A convenience function to allow debugging in the CI environment.
 function shell() {
-  local cmd="*@"
+  local cmd="${@: 1}"
   if [ -z "$cmd" ]; then
     cmd="bash -i"
   fi
@@ -774,6 +774,6 @@ case $1 in
   cabal_test) cabal_test ;;
   clean) clean ;;
   save_cache) save_cache ;;
-  shell) shell "$@" ;;
+  shell) shift; shell "$@" ;;
   *) fail "unknown mode $1" ;;
 esac
