@@ -555,7 +555,7 @@ function test_hadrian() {
       --test-compiler=stage-cabal \
       --test-root-dirs=testsuite/tests/perf \
       --test-root-dirs=testsuite/tests/typecheck \
-      "runtest.opts+=${RUNTEST_ARGS:-}"
+      "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian cabal-install test"
   else
     cd _build/bindist/ghc-*/
     case "$(uname)" in
@@ -572,15 +572,13 @@ function test_hadrian() {
     cd ../../../
     test_compiler="$TOP/_build/install/bin/ghc$exe"
 
-
-    run_hadrian \
-      test \
-      --test-root-dirs=testsuite/tests/stage1 \
-      --test-compiler=stage1 \
-      "runtest.opts+=${RUNTEST_ARGS:-}"
-
-    shell ls
-    shell ls _build/stage-cabal/bin
+    # Disabled, see #21072
+    # run_hadrian \
+    #  test \
+    #  --test-root-dirs=testsuite/tests/stage1 \
+    #  --test-compiler=stage1 \
+    #  "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian stage1 test"
+    #info "STAGE1_TEST=$?"
 
     # Ensure the resulting compiler has the correct bignum-flavour
     test_compiler_backend=$(${test_compiler} -e "GHC.Num.Backend.backendName")
@@ -600,7 +598,9 @@ function test_hadrian() {
       --summary-junit=./junit.xml \
       --test-have-intree-files \
       --test-compiler="${test_compiler}" \
-      "runtest.opts+=${RUNTEST_ARGS:-}" \
+      "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian main testsuite"
+
+    info "STAGE2_TEST=$?"
 
     fi
 
