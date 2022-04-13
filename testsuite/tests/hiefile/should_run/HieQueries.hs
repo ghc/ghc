@@ -1,22 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
-import System.Environment
-
-import GHC.Types.Name.Cache
-import GHC.Types.SrcLoc
-import GHC.Types.Unique.Supply
-import GHC.Types.Name
+import TestUtils
 import Data.Tree
-import GHC.Iface.Ext.Binary
-import GHC.Iface.Ext.Types
-import GHC.Iface.Ext.Utils
-import Data.Maybe (fromJust)
-import GHC.Driver.Session
-import GHC.SysTools
-import GHC.Utils.Outputable                 ( Outputable, renderWithContext, ppr, defaultUserStyle, text)
-import qualified Data.Map as M
-import Data.Foldable
 
 class C a where
   f :: a -> Char
@@ -31,31 +17,19 @@ foo :: C a => a -> Char
 foo x = f [x]
 --      ^ this is the point
 point :: (Int,Int)
-point = (31,9)
+point = (17,9)
 
 bar :: Show x => x -> String
 bar x = show [(1,x,A)]
 --      ^ this is the point'
 point' :: (Int,Int)
-point' = (37,9)
+point' = (23,9)
 
 data A = A deriving Show
 
-makeNc :: IO NameCache
-makeNc = initNameCache 'z' []
-
-dynFlagsForPrinting :: String -> IO DynFlags
-dynFlagsForPrinting libdir = do
-  systemSettings <- initSysTools libdir
-  return $ defaultDynFlags systemSettings
-
 main = do
-  libdir:_ <- getArgs
-  df <- dynFlagsForPrinting libdir
-  nc <- makeNc
-  hfr <- readHieFile nc "HieQueries.hie"
-  let hf = hie_file_result hfr
-      refmap = generateReferencesMap $ getAsts $ hie_asts hf
+  (df, hf) <- readTestHie "HieQueries.hie"
+  let refmap = generateReferencesMap $ getAsts $ hie_asts hf
   explainEv df hf refmap point
   explainEv df hf refmap point'
   return ()
@@ -76,5 +50,5 @@ explainEv df hf refmap point = do
 
     pretty = unlines . (++["└"]) . ("┌":) . map ("│ "++) . lines
 
-    pprint = pretty . renderWithContext (initSDocContext df sty) . ppr
-    sty = defaultUserStyle
+    pprint = pretty . render df
+

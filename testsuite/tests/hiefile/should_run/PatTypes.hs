@@ -1,20 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
-import System.Environment
-
-import GHC.Types.Name.Cache
-import GHC.Types.SrcLoc
-import GHC.Types.Unique.Supply
-import GHC.Types.Name
-
-import GHC.Iface.Ext.Binary
-import GHC.Iface.Ext.Types
-import GHC.Iface.Ext.Utils
-
-import GHC.Driver.Session
-import GHC.SysTools
-
+import TestUtils
 import qualified Data.Map as M
 import Data.Foldable
 
@@ -27,29 +13,17 @@ foo x = 'b'
 -- 4^
 
 p1,p2,p3,p4 :: (Int,Int)
-p1 = (22,6)
-p2 = (24,5)
-p3 = (24,11)
-p4 = (26,5)
-
-makeNc :: IO NameCache
-makeNc = initNameCache 'z' []
-
-dynFlagsForPrinting :: String -> IO DynFlags
-dynFlagsForPrinting libdir = do
-  systemSettings <- initSysTools libdir
-  return $ defaultDynFlags systemSettings
+p1 = (8,6)
+p2 = (10,5)
+p3 = (10,11)
+p4 = (12,5)
 
 selectPoint' :: HieFile -> (Int,Int) -> HieAST Int
 selectPoint' hf loc =
   maybe (error "point not found") id $ selectPoint hf loc
 
 main = do
-  libdir:_ <- getArgs
-  df <- dynFlagsForPrinting libdir
-  nc <- makeNc
-  hfr <- readHieFile nc "PatTypes.hie"
-  let hf = hie_file_result hfr
+  (df, hf) <- readTestHie "PatTypes.hie"
   forM_ [p1,p2,p3,p4] $ \point -> do
     putStr $ "At " ++ show point ++ ", got type: "
     let types = concatMap nodeType $ getSourcedNodeInfo $ sourcedNodeInfo $ selectPoint' hf point

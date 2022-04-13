@@ -1,27 +1,12 @@
 {-# language DeriveAnyClass #-}
 {-# language DefaultSignatures #-}
-{-# language DeriveGeneric #-}
 
 module Main where
 
-import System.Environment
-import Data.Tree
-import GHC.Types.Name.Cache
-import GHC.Types.SrcLoc
-import GHC.Types.Unique.Supply
-import GHC.Types.Name
-import GHC.Utils.Outputable                 ( Outputable, renderWithContext, ppr, defaultUserStyle, text)
-import GHC.Iface.Ext.Binary
-import GHC.Iface.Ext.Types
-import GHC.Iface.Ext.Utils
-
-import GHC.Driver.Session
-import GHC.SysTools
-
+import TestUtils
 import qualified Data.Map as M
+import Data.Tree
 import Data.Foldable
-
-import GHC.Generics
 
 class ToJSON a where
   foo :: a -> String
@@ -41,39 +26,24 @@ h = show (MkT True)
 --   ^ this is point'
 
 point :: (Int, Int)
-point = (36,6)
+point = (21,6)
 
 point' :: (Int, Int)
-point' = (40,6)
-
-makeNc :: IO NameCache
-makeNc = initNameCache 'z' []
-
-dynFlagsForPrinting :: String -> IO DynFlags
-dynFlagsForPrinting libdir = do
-  systemSettings <- initSysTools libdir
-  return $ defaultDynFlags systemSettings (LlvmConfig [] [])
+point' = (25,6)
 
 selectPoint' :: HieFile -> (Int,Int) -> HieAST Int
 selectPoint' hf loc =
   maybe (error "point not found") id $ selectPoint hf loc
 
 main = do
-  libdir:_ <- getArgs
-  df <- dynFlagsForPrinting libdir
-  nc <- makeNc
-  hfr <- readHieFile nc "T20341.hie"
-  let hf = hie_file_result hfr
-      asts = getAsts $ hie_asts hf
+  (df, hf) <- readTestHie "T20341.hie"
+  let asts = getAsts $ hie_asts hf
       [ast] = M.elems asts
       refmap = generateReferencesMap $ asts
       expandType = text . renderHieType df .
         flip recoverFullType (hie_types hf)
       pretty = unlines . (++["└"]) . ("┌":) . map ("│ "++) . lines
-      pprint = pretty . render
-      render :: forall a. Outputable a => a -> String
-      render = renderWithContext (initSDocContext df sty) . ppr
-      sty = defaultUserStyle
+      pprint = pretty . render df
   putStr $ "At " ++ show point ++ ", got evidence: "
   let trees = getEvidenceTreesAtPoint hf refmap point
       ptrees = fmap (pprint . fmap expandType) <$> trees
