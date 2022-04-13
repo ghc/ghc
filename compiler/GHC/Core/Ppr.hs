@@ -311,8 +311,10 @@ ppr_expr add_par (Let bind expr)
 
 ppr_expr add_par (Tick tickish expr)
   = sdocOption sdocSuppressTicks $ \case
-      True  -> ppr_expr add_par expr
-      False -> add_par (sep [ppr tickish, pprCoreExpr expr])
+      -- Only hide non-runtime relevant ticks.
+      True
+        | not (tickishIsCode tickish) -> ppr_expr add_par expr
+      _ -> add_par (sep [ppr tickish, pprCoreExpr expr])
 
 pprCoreAlt :: OutputableBndr a => Alt a -> SDoc
 pprCoreAlt (Alt con args rhs)
