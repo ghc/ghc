@@ -50,6 +50,12 @@ endif
 	$(CONTEXT_DIFF) output expected_output
 # Without --no-user-package-db we might pick up random packages from ~/.ghc
 	$(BIN_DIST_INST_DIR)/bin/ghc-pkg check --no-user-package-db
+ifeq "$(TEST_PROF)" "yes"
+	$(BIN_DIST_INST_DIR)/bin/ghc --make -prof HelloWorld
+	./HelloWorld > output
+	$(CONTEXT_DIFF) output expected_output
+endif
+
 
 clean distclean:
 	"$(RM)" $(RM_OPTS_REC) $(BIN_DIST_INST_SUBDIR)
