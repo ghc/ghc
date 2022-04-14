@@ -175,13 +175,11 @@ type instance XHsFieldBind _ = EpAnn [AddEpAnn]
 
 type instance XVisPat (GhcPass _) = NoExtField
 
-type instance XInvisTyVarPat GhcPs = NoExtField
-type instance XInvisTyVarPat GhcRn = NoExtField
-type instance XInvisTyVarPat GhcTc = DataConCantHappen
+type instance XInvisTyVarPat (GhcPass _) = NoExtField
 
 type instance XInvisWildTyPat GhcPs = NoExtField
 type instance XInvisWildTyPat GhcRn = NoExtField
-type instance XInvisWildTyPat GhcTc = DataConCantHappen
+type instance XInvisWildTyPat GhcTc = Type
 
 type instance XXMatchPat (GhcPass _) = DataConCantHappen
 
@@ -193,9 +191,8 @@ expectVisPats :: [LMatchPat GhcTc] -> [LPat GhcTc]
 expectVisPats xs = map toLPat xs
   where
     toLPat :: LMatchPat GhcTc -> LPat GhcTc
-    toLPat (L _ (VisPat _ pat))      = pat
-    toLPat (L _ (InvisTyVarPat x _)) = dataConCantHappen x
-    toLPat (L _ (InvisWildTyPat x))  = dataConCantHappen x
+    toLPat (L _ (VisPat _ pat)) = pat
+    toLPat _                    = panic "at the moment, @-binders are not allowed yet"
 
 -- ---------------------------------------------------------------------
 
