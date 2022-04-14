@@ -626,9 +626,7 @@ do_return:
         // the stack, and start executing the BCO.
         INTERP_TICK(it_retto_BCO);
         Sp_subW(1);
-        SpW(0) = (W_)obj;
-        // NB. return the untagged object; the bytecode expects it to
-        // be untagged.  XXX this doesn't seem right.
+        SpW(0) = (W_)tagged_obj;
         obj = (StgClosure*)SpW(2);
         ASSERT(get_itbl(obj)->type == BCO);
         goto run_BCO_return;
@@ -1675,7 +1673,8 @@ run_BCO:
             Sp_subW(1);
             // No write barrier is needed here as this is a new allocation
             // visible only from our stack
-            SET_HDR(con, (StgInfoTable*)BCO_LIT(o_itbl), cap->r.rCCCS);
+            StgInfoTable *con_itbl = (StgInfoTable*) BCO_LIT(o_itbl);
+            SET_HDR(con, con_itbl, cap->r.rCCCS);
 
             // Note [Data constructor dynamic tags]
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2000,6 +1999,7 @@ run_BCO:
             // it might have moved during the call.  Also reload the
             // pointers to the components of the BCO.
             obj        = (StgClosure*)SpW(1);
+              // N.B. this is a BCO and therefore is by definition not tagged
             bco        = (StgBCO*)obj;
             instrs     = (StgWord16*)(bco->instrs->payload);
             literals   = (StgWord*)(&bco->literals->payload[0]);
