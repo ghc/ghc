@@ -257,8 +257,7 @@ desugarLPat x = desugarPat x . unLoc
 -- | Desugar a match pattern
 desugarLMatchPat :: Id -> LMatchPat GhcTc -> DsM [PmGrd]
 desugarLMatchPat x (L _ (VisPat _ pat))      = desugarLPat x pat
-desugarLMatchPat _ (L _ (InvisTyVarPat x _)) = dataConCantHappen x
-desugarLMatchPat _ (L _ (InvisWildTyPat x))  = dataConCantHappen x
+desugarLMatchPat _ _                         = panic "desugarLMatchPat"
 
 -- | 'desugarLPat', but also select and return a new match var.
 desugarLPatV :: LPat GhcTc -> DsM (Id, [PmGrd])
