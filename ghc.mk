@@ -1193,15 +1193,13 @@ SRC_DIST_TESTSUITE_TARBALL        = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME).
 #
 # Files to include in source distributions
 #
-SRC_DIST_GHC_DIRS = mk m4 rules docs distrib bindisttest libffi includes \
-    utils docs rts compiler ghc driver libraries libffi-tarballs \
-	hadrian
+SRC_DIST_GHC_DIRS = bindisttest compiler distrib docs driver ghc hadrian \
+    includes libffi libffi-tarballs libraries m4 mk rts rules utils
 SRC_DIST_GHC_FILES += \
-    configure.ac config.guess config.sub configure \
-    aclocal.m4 m4/ax_compare_version.m4 \
-	README.md ANNOUNCE HACKING.md INSTALL.md LICENSE Makefile \
-    install-sh llvm-targets llvm-passes VERSION GIT_COMMIT_ID \
-    boot packages ghc.mk MAKEHELP.md
+    GIT_COMMIT_ID HACKING.md INSTALL.md LICENSE MAKEHELP.md Makefile \
+    README.md VERSION aclocal.m4 boot config.guess config.sub configure \
+    configure.ac ghc.mk install-sh llvm-passes llvm-targets \
+    m4/ax_compare_version.m4 packages
 
 .PHONY: VERSION
 VERSION:
