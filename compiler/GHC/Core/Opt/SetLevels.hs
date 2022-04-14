@@ -104,7 +104,7 @@ import GHC.Types.Unique.Set   ( nonDetStrictFoldUniqSet )
 import GHC.Types.Unique.DSet  ( getUniqDSet )
 import GHC.Types.Var.Env
 import GHC.Types.Literal      ( litIsTrivial )
-import GHC.Types.Demand       ( DmdSig, Demand, isStrUsedDmd, splitDmdSig, prependArgsDmdSig )
+import GHC.Types.Demand
 import GHC.Types.Cpr          ( mkCprSig, botCpr )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
@@ -730,7 +730,7 @@ lvlMFE env strict_ctxt ann_expr
                            -- See Note [Bottoming floats]
                            -- esp Bottoming floats (2)
     expr_ok_for_spec = exprOkForSpeculation expr
-    dest_lvl     = destLevel env fvs fvs_ty is_function is_bot False
+    dest_lvl     = destLevel env fvs fvs_ty is_function is_bot False False
     abs_vars     = abstractVars dest_lvl env fvs
 
     -- float_is_new_lam: the floated thing will be a new value lambda
@@ -1175,7 +1175,8 @@ lvlBind env (AnnNonRec bndr rhs)
     rhs_fvs    = freeVarsOf rhs
     bind_fvs   = rhs_fvs `unionDVarSet` dIdFreeVars bndr
     abs_vars   = abstractVars dest_lvl env bind_fvs
-    dest_lvl   = destLevel env bind_fvs ty_fvs (isFunction rhs) is_bot is_join
+    frag_dmd   = hasFragileDmdSig bndr
+    dest_lvl   = destLevel env bind_fvs ty_fvs (isFunction rhs) is_bot is_join frag_dmd
 
     deann_rhs  = deAnnotate rhs
     mb_bot_str = exprBotStrictness_maybe deann_rhs
@@ -1275,7 +1276,8 @@ lvlBind env (AnnRec pairs)
                 bndrs
 
     ty_fvs   = foldr (unionVarSet . tyCoVarsOfType . idType) emptyVarSet bndrs
-    dest_lvl = destLevel env bind_fvs ty_fvs is_fun is_bot is_join
+    frag_dmd = any hasFragileDmdSig bndrs
+    dest_lvl = destLevel env bind_fvs ty_fvs is_fun is_bot is_join frag_dmd
     abs_vars = abstractVars dest_lvl env bind_fvs
 
 profitableFloat :: LevelEnv -> Level -> Bool
@@ -1283,6 +1285,15 @@ profitableFloat env dest_lvl
   =  (dest_lvl `ltMajLvl` le_ctxt_lvl env)  -- Escapes a value lambda
   || isTopLvl dest_lvl                      -- Going all the way to top level
 
+-- | The 'idDmdSig' of a join point is fragile if it is not top and was computed
+-- assuming an interesting 'idDemandInfo' on the join body that would be lost by
+-- floating the join point to the top-level.
+hasFragileDmdSig :: Id -> Bool
+hasFragileDmdSig join_bndr
+  = not (isTopSig (idDmdSig join_bndr)) && topSubDmd /= body_sd
+  where
+    _ :* join_sd = idDemandInfo join_bndr
+    (_, body_sd) = peelManyCalls (idArity join_bndr) join_sd
 
 ----------------------------------------------------
 -- Three help functions for the type-abstraction case
@@ -1445,11 +1456,13 @@ destLevel :: LevelEnv
           -> Bool   -- True <=> is function
           -> Bool   -- True <=> is bottom
           -> Bool   -- True <=> is a join point
+          -> Bool   -- True <=> if join point, then demand info is fragile
           -> Level
 -- INVARIANT: if is_join=True then result >= join_ceiling
-destLevel env fvs fvs_ty is_function is_bot is_join
+destLevel env fvs fvs_ty is_function is_bot is_join frag_dmd
   | isTopLvl max_fv_id_level  -- Float even joins if they get to top level
                               -- See Note [Floating join point bindings]
+  , is_bot || not (is_join && frag_dmd)
   = tOP_LEVEL
 
   | is_join  -- Never float a join point past the join ceiling

@@ -22,6 +22,7 @@ module GHC.Types.Demand (
     Demand(AbsDmd, BotDmd, (:*)),
     SubDemand(Prod, Poly), mkProd, viewProd,
     -- ** Algebra
+    botCard, topCard,
     absDmd, topDmd, botDmd, seqDmd, topSubDmd,
     -- *** Least upper bound
     lubCard, lubDmd, lubSubDmd,
@@ -39,7 +40,8 @@ module GHC.Types.Demand (
     lazyApply1Dmd, lazyApply2Dmd, strictOnceApply1Dmd, strictManyApply1Dmd,
     -- ** Other @Demand@ operations
     oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, lazifyDmd,
-    peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds,
+    peelCallDmd, peelManyCalls, enterManyCalls,
+    mkCall, mkCalls, mkCalledOnceDmd, mkCalledOnceDmds,
     mkWorkerDemand, subDemandIfEvaluated,
     -- ** Extracting one-shot information
     argOneShots, argsOneShots, saturatedByOneShots,
@@ -536,8 +538,8 @@ pattern C_0N = Card 0b111
 
 {-# COMPLETE C_00, C_01, C_0N, C_10, C_11, C_1N :: Card #-}
 
-_botCard, topCard :: Card
-_botCard = C_10
+botCard, topCard :: Card
+botCard = C_10
 topCard = C_0N
 
 -- | True <=> lower bound is 1.
@@ -803,13 +805,14 @@ viewProd _ _
                         -- for Arity. Otherwise, #18304 bites us.
 
 -- | A smart constructor for 'Call', applying rewrite rules along the semantic
--- equality @Call C_0N (Poly C_0N) === Poly C_0N@, simplifying to 'Poly' 'SubDemand's
+-- equality @Call n (Poly n) === Poly n@, simplifying to 'Poly' 'SubDemand's
 -- when possible.
-mkCall :: CardNonAbs -> SubDemand -> SubDemand
-mkCall C_1N sd@(Poly Boxed C_1N) = sd
-mkCall C_0N sd@(Poly Boxed C_0N) = sd
-mkCall n    sd                   = assertPpr (isCardNonAbs n) (ppr n $$ ppr sd) $
-                                   Call n sd
+mkCall :: Card -> SubDemand -> SubDemand
+mkCall n sd@(Poly Boxed m) | n == m = sd
+mkCall n sd = Call n sd & assertPpr (isCardNonAbs n) (ppr n $$ ppr sd)
+
+mkCalls :: [Card] -> SubDemand -> SubDemand
+mkCalls ns sd = foldr mkCall sd ns
 
 -- | @viewCall sd@ interprets @sd@ as a 'Call', expanding 'Poly' subdemands as
 -- necessary.
@@ -1096,14 +1099,49 @@ mkCalledOnceDmds arity sd = iterate mkCalledOnceDmd sd !! arity
 peelCallDmd :: SubDemand -> (Card, SubDemand)
 peelCallDmd sd = viewCall sd `orElse` (topCard, topSubDmd)
 
--- Peels multiple nestings of 'Call' sub-demands and also returns
--- whether it was unsaturated in the form of a 'Card'inality, denoting
--- how many times the lambda body was entered.
+-- A "fusion helper" that allows efficient implementation of peelManyCalls and
+-- enterManyCalls (and possibly other folds in the future).
+peelManyCallsFB
+  :: Arity
+  -> SubDemand
+  -> (Card -> r -> r) -- "cons" / Call
+  -> (SubDemand -> r) -- "nil" / out of arity
+  -> r
+peelManyCallsFB k sd call end = peel k sd
+  where
+    peel 0 sd                       = end sd
+    peel k (peelCallDmd -> (n, sd)) = n `call` (peel (k-1) sd)
+{-# INLINE peelManyCallsFB #-}
+
+-- | 'peelManyCalls k sd' iterates 'peelCallDmd' `k` times on (the 'Call' body
+-- of) `sd`. E.g.
+--
+-- > peelManyCalls 3 CL(CM(CS(P(A)))) = ([L,M,S], P(A))
+--
+peelManyCalls :: Arity -> SubDemand -> ([Card], SubDemand)
+peelManyCalls k sd = peelManyCallsFB k sd cons nil
+  where
+    nil  sd         = ([],   sd)
+    cons n (ns, sd) = (n:ns, sd)
+
+-- | 'enterManyCalls k sd' returns as a 'Card' how often `sd` was called with
+-- `k` many args. A more efficient variant of
+--
+-- > let (cards, _) = peelManyCalls in
+-- > in foldr multCard C_11 cards
+--
+-- If `sd` represents undersaturated calls (e.g., there are less than `k`
+-- 'Call's) then the resulting cardinality is 'topCard'. Examples:
+--
+-- > enterManyCalls 2 CS(C1(CM(A))) = S
+-- > enterManyCalls 3 CS(C1(CM(A))) = L
+-- > enterManyCalls 2 C1(C1(CM(A))) = 1
+-- > enterManyCalls 3 C1(C1(CM(A))) = M
+-- > enterManyCalls 3 C1(C1(A)) = A
+--
 -- See Note [Demands from unsaturated function calls].
-peelManyCalls :: Int -> SubDemand -> Card
-peelManyCalls 0 _                          = C_11
-peelManyCalls n (viewCall -> Just (m, sd)) = m `multCard` peelManyCalls (n-1) sd
-peelManyCalls _ _                          = C_0N
+enterManyCalls :: Arity -> SubDemand -> Card
+enterManyCalls k sd = peelManyCallsFB k sd multCard (\_sd -> C_11)
 
 -- | Extract the 'SubDemand' of a 'Demand'.
 -- PRECONDITION: The SubDemand must be used in a context where the expression
@@ -1153,7 +1191,7 @@ argOneShots (_ :* sd) = go sd
 saturatedByOneShots :: Int -> Demand -> Bool
 saturatedByOneShots _ AbsDmd    = True
 saturatedByOneShots _ BotDmd    = True
-saturatedByOneShots n (_ :* sd) = isUsedOnce (peelManyCalls n sd)
+saturatedByOneShots n (_ :* sd) = isUsedOnce (enterManyCalls n sd)
 
 {- Note [Strict demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2198,7 +2236,7 @@ type DmdTransformer = SubDemand -> DmdType
 -- return how the function evaluates its free variables and arguments.
 dmdTransformSig :: DmdSig -> DmdTransformer
 dmdTransformSig (DmdSig dmd_ty@(DmdType _ arg_ds _)) sd
-  = multDmdType (peelManyCalls (length arg_ds) sd) dmd_ty
+  = multDmdType (enterManyCalls (length arg_ds) sd) dmd_ty
     -- see Note [Demands from unsaturated function calls]
     -- and Note [What are demand signatures?]
 

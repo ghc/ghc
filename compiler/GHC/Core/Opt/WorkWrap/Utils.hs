@@ -50,6 +50,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Name ( getOccFS )
 
 import GHC.Data.FastString
+import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Data.List.SetOps
 
@@ -163,6 +164,7 @@ type WwResult
   = ([Demand],              -- Demands for worker (value) args
      [CbvMark],             -- Cbv semantics for worker (value) args
      JoinArity,             -- Number of worker (type OR value) args
+     Demand,                -- Demand on the worker
      Id -> CoreExpr,        -- Wrapper body, lacking only the worker Id
      CoreExpr -> CoreExpr)  -- Worker body, lacking the original function rhs
 
@@ -175,7 +177,8 @@ mkWwBodies :: WwOpts
            -> [Var]          -- ^ Manifest args of original function
            -> Type           -- ^ Result type of the original function,
                              --   after being stripped of args
-           -> [Demand]       -- ^ Strictness of original function
+           -> [Demand]       -- ^ Argument Demands of original function
+           -> Demand         -- ^ Demand on the original function
            -> Cpr            -- ^ Info about function result
            -> UniqSM (Maybe WwResult)
 -- ^ Given a function definition
@@ -218,9 +221,9 @@ mkWwBodies :: WwOpts
 -- and beta-redexes]), which allows us to apply the same split to function body
 -- and its unfolding(s) alike.
 --
-mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
-  = do  { massertPpr (filter isId arg_vars `equalLength` demands)
-                     (text "wrong wrapper arity" $$ ppr fun_id $$ ppr arg_vars $$ ppr res_ty $$ ppr demands)
+mkWwBodies opts fun_id arg_vars res_ty arg_dmds fun_dmd res_cpr
+  = do  { massertPpr (filter isId arg_vars `equalLength` arg_dmds)
+                     (text "wrong wrapper arity" $$ ppr fun_id $$ ppr arg_vars $$ ppr res_ty $$ ppr arg_dmds)
 
         -- Clone and prepare arg_vars of the original fun RHS
         -- See Note [Freshen WW arguments]
@@ -233,31 +236,40 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
               res_ty' = GHC.Core.Subst.substTy subst res_ty
               init_cbv_marks = map (const NotMarkedCbv) cloned_arg_vars
 
-        ; (useful1, work_args_cbv, wrap_fn_str, fn_args)
-             <- mkWWstr opts cloned_arg_vars init_cbv_marks
+        ; let fun_card :* fun_sd  = fun_dmd
+              (arg_cards, res_sd) = peelManyCalls (length arg_dmds) fun_sd
+              init_arg_cards      = intersperseTyArgs cloned_arg_vars C_11 arg_cards
 
-        ; let (work_args, work_marks) = unzip work_args_cbv
+        ; (useful1, work_args_cbv_cards, wrap_fn_str, fn_args)
+             <- mkWWstr opts cloned_arg_vars init_cbv_marks init_arg_cards
+
+        ; let (work_args, work_marks, work_cards) = unzip3 work_args_cbv_cards
+        ; let (work_val_cards, _work_ty_cards) = partitionByList (map isId work_args) work_cards
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
-        ; (useful2, wrap_fn_cpr, work_fn_cpr)
-              <- mkWWcpr_entry opts res_ty' res_cpr
+        ; (useful2, work_res_sd, wrap_fn_cpr, work_fn_cpr)
+              <- mkWWcpr_entry opts res_ty' res_sd res_cpr
 
-        ; let (work_lam_args, work_call_args, work_call_cbv)
+        ; let (work_lam_args, work_call_args, work_call_cbv, work_call_cards)
                 | needsVoidWorkerArg fun_id arg_vars work_args
-                = addVoidWorkerArg work_args work_marks
+                = addVoidWorkerArg work_args work_marks work_val_cards
                 | otherwise
-                = (work_args, work_args, work_marks)
+                = (work_args, work_args, work_marks, work_val_cards)
 
-              call_work work_fn  = mkVarApps (Var work_fn) work_call_args
-              call_rhs fn_rhs = mkAppsBeta fn_rhs fn_args
+              call_work work_fn = mkVarApps (Var work_fn) work_call_args
+              call_rhs fn_rhs   = mkAppsBeta fn_rhs fn_args
                                   -- See Note [Join points and beta-redexes]
               wrapper_body = mkLams cloned_arg_vars . wrap_fn_cpr . wrap_fn_str . call_work
-              worker_body = mkLams work_lam_args . work_fn_cpr . call_rhs
-              (worker_args_dmds, work_val_cbvs)= unzip [(idDemandInfo v,cbv) | (v,cbv) <- zipEqual "mkWwBodies" work_call_args work_call_cbv, isId v]
+              worker_body  = mkLams work_lam_args . work_fn_cpr . call_rhs
+              (worker_args_dmds, work_val_cbvs) =
+                unzip [(idDemandInfo v,cbv) | (v,cbv) <- zipEqual "mkWwBodies" work_call_args work_call_cbv, isId v]
+              worker_demand = fun_card :* mkCalls work_call_cards work_res_sd
+
+        ; pprTraceM "worker demand" (ppr fun_id $$ ppr worker_demand $$ ppr work_call_cards)
 
         ; if ((useful1 && not only_one_void_argument) || useful2)
           then return (Just (worker_args_dmds, work_val_cbvs, length work_call_args,
-                       wrapper_body, worker_body))
+                       worker_demand, wrapper_body, worker_body))
           else return Nothing
         }
         -- We use an INLINE unconditionally, even if the wrapper turns out to be
@@ -275,7 +287,7 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
 
     -- Note [Do not split void functions]
     only_one_void_argument
-      | [d] <- demands
+      | [d] <- arg_dmds
       , [v] <- filter isId arg_vars
       , isAbsDmd d && isZeroBitTy (idType v)
       = True
@@ -298,6 +310,13 @@ isWorkerSmallEnough max_worker_args old_n_args vars
     -- variables which have no runtime representation.
     -- Also if the function took 82 arguments before (old_n_args), it's fine if
     -- it takes <= 82 arguments afterwards.
+
+intersperseTyArgs :: HasDebugCallStack => [Var] -> a -> [a] -> [a]
+intersperseTyArgs [] _ as = as
+intersperseTyArgs (v:vs) def as
+  | isTyVar v   = def : intersperseTyArgs vs def as
+  | a:as' <- as = a   : intersperseTyArgs vs def as'
+intersperseTyArgs _ _ _  = panic "intersperseTyArgs ran out of as"
 
 {-
 Note [Always do CPR w/w]
@@ -396,12 +415,13 @@ needsVoidWorkerArg fn_id wrap_args work_args
     needs_float_barrier = wrap_had_barrier && not work_has_barrier
 
 -- | Inserts a `Void#` arg before the first value argument (but after leading type args).
-addVoidWorkerArg :: [Var] -> [CbvMark]
+addVoidWorkerArg :: [Var] -> [CbvMark] -> [Card]
                  -> ([Var],     -- Lambda bound args
                      [Var],     -- Args at call site
-                     [CbvMark]) -- cbv semantics for the worker args.
-addVoidWorkerArg work_args cbv_marks
-  = (ty_args ++ voidArgId:rest, ty_args ++ voidPrimId:rest, NotMarkedCbv:cbv_marks)
+                     [CbvMark], -- cbv semantics for the worker args.
+                     [Card])    -- worker arg cardinalities
+addVoidWorkerArg work_args cbv_marks arg_cards
+  = (ty_args ++ voidArgId:rest, ty_args ++ voidPrimId:rest, NotMarkedCbv:cbv_marks, C_0N:arg_cards)
   where
     (ty_args, rest) = break isId work_args
 
@@ -728,7 +748,7 @@ real-world example involves unsafeCoerce:
   foreign import ccall "c_exit" c_exit :: IO ()
 Here CPR will tell you that `foo` returns a () constructor for sure, but trying
 to create a worker/wrapper for type `a` obviously fails.
-(This was a real example until ee8e792  in libraries/base.)
+(This was a real example until ee8e792 in libraries/base.)
 
 It does not seem feasible to avoid all such cases already in the analyser (and
 after all, the analysis is not really wrong), so we simply do nothing here in
@@ -811,28 +831,32 @@ mkWWstr :: WwOpts
         -> [Var]                         -- Wrapper args; have their demand info on them
                                          --  *Includes type variables*
         -> [CbvMark]                     -- cbv info for arguments
+        -> [Card]                        -- Call cardinalities for arguments derived from
+                                         -- wrapper function's demand
         -> UniqSM (Bool,                 -- Will this result in a useful worker
-                   [(Var,CbvMark)],      -- Worker args/their call-by-value semantics.
+                   [(Var,CbvMark,Card)], -- Worker args, their call-by-value semantics
+                                         -- and their call cardinalities
                    CoreExpr -> CoreExpr, -- Wrapper body, lacking the worker call
                                          -- and without its lambdas
                                          -- This fn adds the unboxing
                    [CoreExpr])           -- Reboxed args for the call to the
                                          -- original RHS. Corresponds one-to-one
                                          -- with the wrapper arg vars
-mkWWstr opts args cbv_info
-  = go args cbv_info
+mkWWstr opts args cbv_info cards
+  = go args cbv_info cards
   where
-    go_one arg cbv = mkWWstr_one opts arg cbv
+    go_one arg cbv card = mkWWstr_one opts arg cbv card
 
-    go []           _ = return (badWorker, [], nop_fn, [])
-    go (arg : args) (cbv:cbvs)
-      =               do { (useful1, args1, wrap_fn1, wrap_arg)  <- go_one arg cbv
-                         ; (useful2, args2, wrap_fn2, wrap_args) <- go args cbvs
+    go []           _          _ = return (badWorker, [], nop_fn, [])
+    go (arg : args) (cbv:cbvs) (card:cards)
+      =               do { (useful1, args1, wrap_fn1, wrap_arg)  <- go_one arg cbv card
+                         ; (useful2, args2, wrap_fn2, wrap_args) <- go args cbvs cards
                          ; return ( useful1 || useful2
                                   , args1 ++ args2
                                   , wrap_fn1 . wrap_fn2
                                   , wrap_arg:wrap_args ) }
-    go _ _ = panic "mkWWstr: Impossible - cbv/arg length missmatch"
+    go args cbvs cards = pprPanic "mkWWstr: Impossible - cbv/card/arg length missmatch"
+                                  $ ppr args $$ ppr cbvs $$ ppr cards
 
 ----------------------
 -- mkWWstr_one wrap_var = (useful, work_args, wrap_fn, wrap_arg)
@@ -844,8 +868,9 @@ mkWWstr opts args cbv_info
 mkWWstr_one :: WwOpts
             -> Var
             -> CbvMark
-            -> UniqSM (Bool, [(Var,CbvMark)], CoreExpr -> CoreExpr, CoreExpr)
-mkWWstr_one opts arg marked_cbv =
+            -> Card
+            -> UniqSM (Bool, [(Var,CbvMark,Card)], CoreExpr -> CoreExpr, CoreExpr)
+mkWWstr_one opts arg marked_cbv card =
   case wantToUnboxArg True fam_envs arg_ty arg_dmd of
     _ | isTyVar arg -> do_nothing
 
@@ -857,10 +882,10 @@ mkWWstr_one opts arg marked_cbv =
          -- (that's what mkAbsentFiller does)
       -> return (goodWorker, [], nop_fn, absent_filler)
 
-    Unbox dcpc ds -> unbox_one_arg opts arg ds dcpc marked_cbv
+    Unbox dcpc ds -> unbox_one_arg opts arg ds dcpc marked_cbv card
 
     Unlift -> return  ( wwForUnlifting opts
-                      , [(setIdUnfolding arg evaldUnfolding, MarkedCbv)]
+                      , [(setIdUnfolding arg evaldUnfolding, MarkedCbv, card)]
                       , nop_fn
                       , varToCoreExpr arg)
 
@@ -872,18 +897,19 @@ mkWWstr_one opts arg marked_cbv =
     arg_dmd    = idDemandInfo arg
     -- Type args don't get cbv marks
     arg_cbv    = if isTyVar arg then NotMarkedCbv else marked_cbv
-    do_nothing = return (badWorker, [(arg,arg_cbv)], nop_fn, varToCoreExpr arg)
+    do_nothing = return (badWorker, [(arg,arg_cbv,card)], nop_fn, varToCoreExpr arg)
 
 unbox_one_arg :: WwOpts
           -> Var
           -> [Demand]
           -> DataConPatContext
           -> CbvMark
-          -> UniqSM (Bool, [(Var,CbvMark)], CoreExpr -> CoreExpr, CoreExpr)
+          -> Card
+          -> UniqSM (Bool, [(Var,CbvMark,Card)], CoreExpr -> CoreExpr, CoreExpr)
 unbox_one_arg opts arg_var ds
           DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                             , dcpc_co = co }
-          _marked_cbv
+          _marked_cbv card
   = do { pat_bndrs_uniqs <- getUniquesM
        ; let ex_name_fss = map getOccFS $ dataConExTyCoVars dc
              -- Create new arguments we get when unboxing dc
@@ -897,7 +923,8 @@ unbox_one_arg opts arg_var ds
              cbv_arg_marks = zipWithEqual "unbox_one_arg" bangToMark (dataConRepStrictness dc) arg_ids'
              unf_args = zipWith setEvald arg_ids' cbv_arg_marks
              cbv_marks = (map (const NotMarkedCbv) ex_tvs') ++ cbv_arg_marks
-       ; (_sub_args_quality, worker_args, wrap_fn, wrap_args) <- mkWWstr opts (ex_tvs' ++ unf_args) cbv_marks
+             cards = takeList arg_ids' (card:repeat C_11)
+       ; (_sub_args_quality, worker_args, wrap_fn, wrap_args) <- mkWWstr opts (ex_tvs' ++ unf_args) cbv_marks cards
        ; let wrap_arg = mkConApp dc (map Type tc_args ++ wrap_args) `mkCast` mkSymCo co
        ; return (goodWorker, worker_args, unbox_fn . wrap_fn, wrap_arg) }
                           -- Don't pass the arg, rebox instead
@@ -1338,16 +1365,18 @@ See Note [Worker/wrapper for CPR] for an overview.
 mkWWcpr_entry
   :: WwOpts
   -> Type                              -- function body
+  -> SubDemand                         -- How the function (body) was eval'd
   -> Cpr                               -- CPR analysis results
-  -> UniqSM (Bool,            -- Is w/w'ing useful?
+  -> UniqSM (Bool,                     -- Is w/w'ing useful?
+             SubDemand,                -- How the worker function (body) is eval'd
              CoreExpr -> CoreExpr,     -- New wrapper. 'nop_fn' if not useful
              CoreExpr -> CoreExpr)     -- New worker.  'nop_fn' if not useful
 -- ^ Entrypoint to CPR W/W. See Note [Worker/wrapper for CPR] for an overview.
-mkWWcpr_entry opts body_ty body_cpr
-  | not (wo_cpr_anal opts) = return (badWorker, nop_fn, nop_fn)
+mkWWcpr_entry opts body_ty body_sd body_cpr
+  | not (wo_cpr_anal opts) = return (badWorker, body_sd, nop_fn, nop_fn)
   | otherwise = do
     -- Part (1)
-    res_bndr <- mk_res_bndr body_ty
+    res_bndr <- mk_res_bndr body_ty body_sd
     let bind_res_bndr body scope = mkDefaultCase body res_bndr scope
 
     -- Part (2)
@@ -1355,22 +1384,23 @@ mkWWcpr_entry opts body_ty body_cpr
       mkWWcpr_one opts res_bndr body_cpr
 
     -- Part (3)
-    let (unbox_transit_tup, transit_tup) = move_transit_vars transit_vars
+    let (work_body_sd, unbox_transit_tup, transit_tup) = move_transit_vars transit_vars
 
     -- Stacking unboxer (work_fn) and builder (wrap_fn) together
     let wrap_fn      = unbox_transit_tup rebuilt_result                 -- 3 2
         work_fn body = bind_res_bndr body (work_unpack_res transit_tup) -- 1 2 3
     return $ if not useful
-                then (badWorker, nop_fn, nop_fn)
-                else (goodWorker, wrap_fn, work_fn)
+                then (badWorker, body_sd, nop_fn, nop_fn)
+                else (goodWorker, work_body_sd, wrap_fn, work_fn)
 
 -- | Part (1) of Note [Worker/wrapper for CPR].
-mk_res_bndr :: Type -> UniqSM Id
-mk_res_bndr body_ty = do
+mk_res_bndr :: Type -> SubDemand -> UniqSM Id
+mk_res_bndr body_ty body_sd = do
   -- See Note [Linear types and CPR]
   bndr <- mkSysLocalOrCoVarM ww_prefix cprCaseBndrMult body_ty
   -- See Note [Record evaluated-ness in worker/wrapper]
-  pure (setCaseBndrEvald MarkedStrict bndr)
+  pure $ setCaseBndrEvald MarkedStrict bndr
+           `setIdDemandInfo` C_11 :* body_sd
 
 -- | What part (2) of Note [Worker/wrapper for CPR] collects.
 --
@@ -1378,11 +1408,11 @@ mk_res_bndr body_ty = do
 --   2. The list of transit variables (see the Note).
 --   3. The result builder expression for the wrapper.  The original case binder if not useful.
 --   4. The result unpacking expression for the worker. 'nop_fn' if not useful.
-type CprWwResultOne  = (Bool, OrdList Var,  CoreExpr , CoreExpr -> CoreExpr)
+type CprWwResultOne  = (Bool, OrdList Var,   CoreExpr,   CoreExpr -> CoreExpr)
 type CprWwResultMany = (Bool, OrdList Var, [CoreExpr], CoreExpr -> CoreExpr)
 
 mkWWcpr :: WwOpts -> [Id] -> [Cpr] -> UniqSM CprWwResultMany
-mkWWcpr _opts vars []   =
+mkWWcpr _opts vars [] =
   -- special case: No CPRs means all top (for example from FlatConCpr),
   -- hence stop WW.
   return (badWorker, toOL vars, map varToCoreExpr vars, nop_fn)
@@ -1422,13 +1452,19 @@ unbox_one_result opts res_bndr arg_cprs
         dataConRepFSInstPat (repeat ww_prefix) pat_bndrs_uniqs cprCaseBndrMult dc tc_args
   massert (null _exs) -- Should have been caught by wantToUnboxResult
 
+  -- Set the demand on arg_ids
+  let arity    = dataConRepArity dc
+      _ :* sd  = strictifyDmd $ idDemandInfo res_bndr -- strictifyDmd: Because we eval res_bndr
+      arg_dmds = (snd <$> viewProd arity sd) `orElse` replicate arity topDmd
+      arg_ids' = zipWith setIdDemandInfo arg_ids arg_dmds
+
   (nested_useful, transit_vars, con_args, work_unbox_res) <-
-    mkWWcpr opts arg_ids arg_cprs
+    mkWWcpr opts arg_ids' arg_cprs
 
   let -- rebuilt_result = (C a b |> sym co)
       rebuilt_result = mkConApp dc (map Type tc_args ++ con_args) `mkCast` mkSymCo co
       -- this_work_unbox_res alt = (case res_bndr |> co of C a b -> <alt>[a,b])
-      this_work_unbox_res = mkUnpackCase (Var res_bndr) co cprCaseBndrMult dc arg_ids
+      this_work_unbox_res = mkUnpackCase (Var res_bndr) co cprCaseBndrMult dc arg_ids'
 
   -- Don't try to WW an unboxed tuple return type when there's nothing inside
   -- to unbox further.
@@ -1442,14 +1478,16 @@ unbox_one_result opts res_bndr arg_cprs
 
 -- | Implements part (3) of Note [Worker/wrapper for CPR].
 --
--- If `move_transit_vars [a,b] = (unbox, tup)` then
+-- If `move_transit_vars [a,b] = (sd, unbox, tup)` then
 --     * `a` and `b` are the *transit vars* to be returned from the worker
 --       to the wrapper
 --     * `unbox scrut alt = (case <scrut> of (# a, b #) -> <alt>)`
 --     * `tup = (# a, b #)`
+--     * `sd` is the SubDemand on the worker body, reconstructed form the demand
+--       on transit vars that we carefully transfered over in mkWWcpr_one
 -- There is a special case for when there's 1 transit var,
 -- see Note [No unboxed tuple for single, unlifted transit var].
-move_transit_vars :: [Id] -> (CoreExpr -> CoreExpr -> CoreExpr, CoreExpr)
+move_transit_vars :: [Id] -> (SubDemand, CoreExpr -> CoreExpr -> CoreExpr, CoreExpr)
 move_transit_vars vars
   | [var] <- vars
   , let var_ty = idType var
@@ -1457,21 +1495,25 @@ move_transit_vars vars
   -- See Note [No unboxed tuple for single, unlifted transit var]
   --   * Wrapper: `unbox scrut alt = (case <scrut> of a -> <alt>)`
   --   * Worker:  `tup = a`
-  = ( \build_res wkr_call -> mkDefaultCase wkr_call var build_res
+  = ( subDemandIfEvaluated (strictifyDmd (idDemandInfo var))
+    , \build_res wkr_call -> mkDefaultCase wkr_call var build_res
     , varToCoreExpr var ) -- varToCoreExpr important here: var can be a coercion
                           -- Lacking this caused #10658
   | otherwise
   -- The general case: Just return an unboxed tuple from the worker
   --   * Wrapper: `unbox scrut alt = (case <scrut> of (# a, b #) -> <alt>)`
   --   * Worker:  `tup = (# a, b #)`
-  = ( \build_res wkr_call -> mkSingleAltCase wkr_call case_bndr
+  = ( body_sd
+    , \build_res wkr_call -> mkSingleAltCase wkr_call case_bndr
                                     (DataAlt tup_con) vars build_res
     , ubx_tup_app )
    where
     ubx_tup_app = mkCoreUbxTup (map idType vars) (map varToCoreExpr vars)
     tup_con     = tupleDataCon Unboxed (length vars)
+    body_sd     = mkProd Unboxed (map idDemandInfo vars)
     -- See also Note [Linear types and CPR]
     case_bndr   = mkWildValBinder cprCaseBndrMult (exprType ubx_tup_app)
+                   `setIdDemandInfo` C_11 :* body_sd
 
 
 {- Note [Worker/wrapper for CPR]

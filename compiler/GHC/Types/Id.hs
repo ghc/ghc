@@ -188,7 +188,8 @@ infixl  1 `setIdUnfolding`,
 
           `asJoinId`,
           `asJoinId_maybe`,
-          `setIdCbvMarks`
+          `setIdCbvMarks`,
+          `setCaseBndrEvald`
 
 {-
 ************************************************************************

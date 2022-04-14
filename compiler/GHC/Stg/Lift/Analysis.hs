@@ -326,7 +326,7 @@ tagSkeletonRhs bndr (StgRhsClosure fvs ccs upd bndrs body)
 rhsCard :: Id -> Card
 rhsCard bndr
   | is_thunk  = oneifyCard n
-  | otherwise = peelManyCalls (idArity bndr) cd
+  | otherwise = n `multCard` enterManyCalls (idArity bndr) cd
   where
     is_thunk = idArity bndr == 0
     -- Let's pray idDemandInfo is still OK after unarise...

@@ -1785,7 +1785,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
 
               (spec_lam_args, spec_call_args, spec_arity, spec_join_arity)
                   | needsVoidWorkerArg fn arg_bndrs spec_lam_args1
-                  , (spec_lam_args, spec_call_args, _) <- addVoidWorkerArg spec_lam_args1 []
+                  , (spec_lam_args, spec_call_args, _, _) <- addVoidWorkerArg spec_lam_args1 [] []
                       -- needsVoidWorkerArg: usual w/w hack to avoid generating
                       -- a spec_rhs of unlifted type and no args.
                       -- Unlike W/W we don't turn functions into strict workers
