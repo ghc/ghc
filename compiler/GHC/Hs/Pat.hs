@@ -39,7 +39,7 @@ module GHC.Hs.Pat (
 
         mkPrefixConPat, mkCharLitPat, mkNilPat, mkVisPat, expectVisPats,
 
-        isSimplePat,
+        isSimplePat, isSimpleMatchPat,
         looksLazyPatBind,
         isBangedLPat,
         gParPat, patNeedsParens, parenthesizePat, parenthesizeLMatchPat,
@@ -175,13 +175,11 @@ type instance XHsFieldBind _ = EpAnn [AddEpAnn]
 
 type instance XVisPat (GhcPass _) = NoExtField
 
-type instance XInvisTyVarPat GhcPs = NoExtField
-type instance XInvisTyVarPat GhcRn = NoExtField
-type instance XInvisTyVarPat GhcTc = DataConCantHappen
+type instance XInvisTyVarPat (GhcPass _) = NoExtField
 
 type instance XInvisWildTyPat GhcPs = NoExtField
 type instance XInvisWildTyPat GhcRn = NoExtField
-type instance XInvisWildTyPat GhcTc = DataConCantHappen
+type instance XInvisWildTyPat GhcTc = Type
 
 type instance XXMatchPat (GhcPass _) = DataConCantHappen
 
@@ -193,9 +191,8 @@ expectVisPats :: [LMatchPat GhcTc] -> [LPat GhcTc]
 expectVisPats xs = map toLPat xs
   where
     toLPat :: LMatchPat GhcTc -> LPat GhcTc
-    toLPat (L _ (VisPat _ pat))      = pat
-    toLPat (L _ (InvisTyVarPat x _)) = dataConCantHappen x
-    toLPat (L _ (InvisWildTyPat x))  = dataConCantHappen x
+    toLPat (L _ (VisPat _ pat)) = pat
+    toLPat _                    = panic "at the moment, @-binders are not allowed yet"
 
 -- ---------------------------------------------------------------------
 
@@ -231,6 +228,7 @@ data XXPatGhcTc
   -- for RebindableSyntax and other overloaded syntax such as OverloadedLists.
   -- See Note [Rebindable syntax and HsExpansion].
   | ExpansionPat (Pat GhcRn) (Pat GhcTc)
+
 
 -- See Note [Rebindable syntax and HsExpansion].
 data HsPatExpansion a b
@@ -318,9 +316,6 @@ instance OutputableBndrId p => Outputable (MatchPat (GhcPass p)) where
 
 pprLPat :: (OutputableBndrId p) => LPat (GhcPass p) -> SDoc
 pprLPat (L _ e) = pprPat e
-
-pprLMatchPat :: (OutputableBndrId p) => LMatchPat (GhcPass p) -> SDoc
-pprLMatchPat (L _ e) = ppr e
 
 -- | Print with type info if -dppr-debug is on
 pprPatBndr :: OutputableBndr name => name -> SDoc
@@ -654,6 +649,11 @@ isSimplePat p = case unLoc p of
   VarPat _ x -> Just (unLoc x)
   _ -> Nothing
 
+isSimpleMatchPat :: LMatchPat (GhcPass x) -> Maybe (IdP (GhcPass x))
+isSimpleMatchPat p = case unLoc p of
+  VisPat _ lpat -> isSimplePat lpat
+  InvisTyVarPat _ bndr -> Just (hsLTyVarName bndr)
+  _ -> Nothing
 
 {- Note [Unboxed sum patterns aren't irrefutable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -42,6 +42,7 @@ import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoNC
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
                                        , tcCheckPolyExpr )
 
+import GHC.Types.Basic ( Origin(..) )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
@@ -95,7 +96,7 @@ same number of arguments before using @tcMatches@ to do the work.
 
 tcMatchesFun :: LocatedN Id -- MatchContext Id
              -> MatchGroup GhcRn (LHsExpr GhcRn)
-             -> ExpRhoType    -- Expected type of function
+             -> ExpSigmaType      -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
                                 -- Returns type of body
 tcMatchesFun fun_id matches exp_ty
@@ -110,7 +111,7 @@ tcMatchesFun fun_id matches exp_ty
            -- unfilled thunk
         ; checkArgCounts fun_name matches
 
-        ; matchExpectedFunTys herald ctxt arity exp_ty $ \ pat_tys rhs_ty ->
+        ; matchExpectedFunTys herald ctxt matches exp_ty $ \ bndrs rhs_ty ->
              -- NB: exp_type may be polymorphic, but
              --     matchExpectedFunTys can cope with that
           tcScalingUsage Many $
@@ -120,10 +121,9 @@ tcMatchesFun fun_id matches exp_ty
           -- being scaled by Many. When let binders come with a
           -- multiplicity, then @tcMatchesFun@ will have to take
           -- a multiplicity argument, and scale accordingly.
-          tcMatches match_ctxt pat_tys rhs_ty matches }
+          tcMatches match_ctxt bndrs rhs_ty matches }
   where
     fun_name = idName (unLoc fun_id)
-    arity  = matchGroupArity matches
     herald = ExpectedFunTyMatches (NameThing fun_name) matches
     ctxt   = GenSigCtxt  -- Was: FunSigCtxt fun_name True
                          -- But that's wrong for f :: Int -> forall a. blah
@@ -156,7 +156,7 @@ tcMatchesCase :: (AnnoBody body) =>
                 -- wrapper goes from MatchGroup's ty to expected ty
 
 tcMatchesCase ctxt (Scaled scrut_mult scrut_ty) matches res_ty
-  = tcMatches ctxt [Scaled scrut_mult (mkCheckExpType scrut_ty)] res_ty matches
+  = tcMatches ctxt [ExpAnon VisArg (Scaled scrut_mult (mkCheckExpType scrut_ty))] res_ty matches
 
 tcMatchLambda :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
               -> TcMatchCtxt HsExpr
@@ -165,12 +165,15 @@ tcMatchLambda :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys
               -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
 tcMatchLambda herald match_ctxt match res_ty
   =  do { checkPatCounts (mc_what match_ctxt) match
-        ; matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty -> do
+        ; matchExpectedFunTys herald GenSigCtxt match' res_ty $ \ pat_tys rhs_ty -> do
             -- checking argument counts since this is also used for \cases
             tcMatches match_ctxt pat_tys rhs_ty match }
   where
-    n_pats | isEmptyMatchGroup match = 1   -- must be lambda-case
-           | otherwise               = matchGroupArity match
+    match' | isEmptyMatchGroup match = trivial_match_group
+           | otherwise               = match
+    trivial_match = mkMatch LambdaExpr [mkVisPat nlWildPatName] (L noSrcSpanA expr) emptyLocalBinds
+    trivial_match_group = mkMatchGroup FromSource (L noSrcSpanA [trivial_match])
+    expr = extractExpr herald
 
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 
@@ -217,48 +220,48 @@ type AnnoBody body
 
 -- | Type-check a MatchGroup.
 tcMatches :: (AnnoBody body ) => TcMatchCtxt body
-          -> [Scaled ExpSigmaTypeFRR] -- ^ Expected pattern types.
-          -> ExpRhoType               -- ^ Expected result-type of the Match.
+          -> [ExpTyCoBinder]     -- Expected pattern type binders
+          -> ExpRhoType          -- Expected result-type of the Match.
           -> MatchGroup GhcRn (LocatedA (body GhcRn))
           -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
 
-tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
+tcMatches ctxt bndrs rhs_ty (MG { mg_alts = L l matches
                                   , mg_ext = origin })
   | null matches  -- Deal with case e of {}
     -- Since there are no branches, no one else will fill in rhs_ty
     -- when in inference mode, so we must do it ourselves,
     -- here, using expTypeToType
   = do { tcEmitBindingUsage bottomUE
-       ; pat_tys <- mapM scaledExpTypeToType pat_tys
+       ; bndrs' <- mapM toTyCoBinder bndrs
        ; rhs_ty  <- expTypeToType rhs_ty
        ; return (MG { mg_alts = L l []
-                    , mg_ext = MatchGroupTc pat_tys rhs_ty origin
+                    , mg_ext = MatchGroupTc bndrs' rhs_ty origin
                     }) }
 
   | otherwise
-  = do { umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
+  = do { umatches <- mapM (tcCollectingUsage . tcMatch ctxt bndrs rhs_ty) matches
        ; let (usages,matches') = unzip umatches
        ; tcEmitBindingUsage $ supUEs usages
-       ; pat_tys  <- mapM readScaledExpType pat_tys
+       ; bndrs' <- mapM toTyCoBinder bndrs
        ; rhs_ty   <- readExpType rhs_ty
        ; return (MG { mg_alts   = L l matches'
-                    , mg_ext    = MatchGroupTc pat_tys rhs_ty origin
+                    , mg_ext    = MatchGroupTc bndrs' rhs_ty origin
                     }) }
 
 -------------
 tcMatch :: (AnnoBody body) => TcMatchCtxt body
-        -> [Scaled ExpSigmaType]        -- Expected pattern types
+        -> [ExpTyCoBinder]          -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
         -> LMatch GhcRn (LocatedA (body GhcRn))
         -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
 
-tcMatch ctxt pat_tys rhs_ty match
-  = wrapLocMA (tc_match ctxt pat_tys rhs_ty) match
+tcMatch ctxt bndrs rhs_ty match
+  = wrapLocMA (tc_match ctxt bndrs rhs_ty) match
   where
-    tc_match ctxt pat_tys rhs_ty
-             match@(Match { m_pats = pats, m_grhss = grhss })
+    tc_match ctxt bndrs rhs_ty
+             match@(Match { m_pats = lmatchpats, m_grhss = grhss })
       = add_match_ctxt match $
-        do { (pats', grhss') <- tcLMatchPats (mc_what ctxt) pats pat_tys $
+        do { (pats', grhss') <- tcLMatchPats (mc_what ctxt) lmatchpats bndrs $
                                 tcGRHSs ctxt grhss rhs_ty
            ; return (Match { m_ext = noAnn
                            , m_ctxt = mc_what ctxt, m_pats = pats'

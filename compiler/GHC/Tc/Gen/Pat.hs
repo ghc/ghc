@@ -100,8 +100,8 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
 
 -----------------
 tcLMatchPats :: HsMatchContext GhcTc
-             -> [LMatchPat GhcRn]            -- Patterns,
-             -> [Scaled ExpSigmaTypeFRR]         --   and their types
+             -> [LMatchPat GhcRn]      -- Patterns,
+             -> [ExpTyCoBinder]        --   and their types
              -> TcM a                  --   and the checker for the body
              -> TcM ([LMatchPat GhcTc], a)
 
@@ -350,24 +350,68 @@ tc_lpats tys penv pats
                penv
                (zipEqual "tc_lpats" pats tys)
 
-tc_lmatchpat :: Scaled ExpSigmaTypeFRR
+tc_lmatchpat :: ExpTyCoBinder
              -> Checker (LMatchPat GhcRn) (LMatchPat GhcTc)
-tc_lmatchpat pat_ty penv (L l (VisPat x pat)) thing_inside
-  = do  { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
-        ; return (L l (VisPat x pat'), res) }
-tc_lmatchpat _ _ _ _
-  = failWithTc (TcRnUnknownMessage $ mkPlainError noHints $ msg)
-  where
-    msg = text "@-binders in functions are not allowed yet"
+tc_lmatchpat (ExpAnon _ pat_ty) penv pat@(L l (VisPat x p)) thing_inside
+  = do { (pat', res) <- tc_lpat pat_ty penv p thing_inside
+       ; traceTc "tc_lmatchpat: current visible pattern" (ppr pat)
+       ; return (L l (VisPat x pat'), res) }
+tc_lmatchpat (ExpNamed (Bndr var _)) _ pat@(L l' (InvisTyVarPat _ (L l'' (UserTyVar y () (L l name))))) thing_inside
+  = do { let id = mkTyVar name (varType var)
+       ; res <- tcExtendTyVarEnv [id] thing_inside
+       ; traceTc "tc_lmatchpat: current invisible pattern" (ppr pat)
+       ; let newTyVarBdnr = L l'' (UserTyVar y () (L l id))
+       ; return (L l' (InvisTyVarPat noExtField newTyVarBdnr), res) }
+tc_lmatchpat _ _ (L _ (InvisTyVarPat _ (L _ (KindedTyVar _ _ _ _)))) _
+  = panic "it's not supported yet"
+tc_lmatchpat (ExpNamed (Bndr var _)) _ (L l' (InvisWildTyPat _)) thing_inside
+  = do { res <- thing_inside
+       ; return (L l' (InvisWildTyPat (varType var)), res) }
+tc_lmatchpat _ _ _ _ = panic "don't know"
 
-tc_lmatchpats :: [Scaled ExpSigmaTypeFRR]
+
+tc_lmatchpats :: [ExpTyCoBinder]
               -> Checker [LMatchPat GhcRn] [LMatchPat GhcTc]
 tc_lmatchpats tys penv pats
   = assertPpr (equalLength pats tys) (ppr pats $$ ppr tys) $
     tcMultiple (\ penv' (p,t) -> tc_lmatchpat t penv' p)
                penv
-               (zipEqual "tc_lmatchpat" pats tys)
+               (zipEqual "tc_lmatchpats" pats tys)
 
+{-
+tc_lmatchpats :: [ExpTyCoBinder]
+              -> Checker [LMatchPat GhcRn] [LMatchPat GhcTc]
+tc_lmatchpats [] _ _ thing_inside = do
+  { res <- thing_inside
+  ; return ([], res)
+  }
+tc_lmatchpats _ _ [] thing_inside = do
+  { res <- thing_inside
+  ; return ([], res)
+  }
+tc_lmatchpats (bndr : bndrs) penv (pat : pats) thing_inside =
+  do { (the_rest_ones,res) <- tc_lmatchpats bndrs penv pats thing_inside
+     ; case (bndr, pat) of
+         (ExpAnon _ pat_ty, L l (VisPat x lpat)) -> do
+           { (pat', res') <- tc_lpat pat_ty penv lpat thing_inside
+           ; traceTc "tc_lmatchpat: current visible pattern" (ppr pat)
+           ; let pat_tc = L l (VisPat x pat')
+           ; return (pat_tc : the_rest_ones, res')
+           }
+         (ExpNamed (Bndr var _), L l' (InvisTyVarPat x (L l name))) -> do
+           { let id = mkTyVar name (varType var)
+           ; res' <- tcExtendTyVarEnv [id] thing_inside
+           ; let pat_tc = L l' (InvisTyVarPat x (L l id))
+           ; return (pat_tc : the_rest_ones, res')
+           }
+         (ExpNamed (Bndr var _), L l' (InvisWildTyPat _)) -> do
+           { res' <- thing_inside
+           ; let pat_tc = L l' (InvisWildTyPat (varType var))
+           ; return (pat_tc : the_rest_ones, res')
+           }
+         (_,_) -> return (the_rest_ones,res)
+     }
+-}
 --------------------
 -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 checkManyPattern :: Scaled a -> TcM HsWrapper

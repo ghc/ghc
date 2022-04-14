@@ -46,7 +46,6 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr( debugPprType )
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep, makeTypeConcrete, hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
@@ -59,7 +58,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Types.Name( isSystemName )
-
+import GHC.Tc.Utils.Instantiate
 import GHC.Core.TyCon
 import GHC.Builtin.Types
 import GHC.Types.Var as Var
@@ -75,8 +74,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
 import GHC.Exts      ( inline )
-import Control.Monad
 import Control.Arrow ( second )
+import Control.Monad
 import qualified Data.Semigroup as S ( (<>) )
 
 {- *********************************************************************
@@ -351,10 +350,7 @@ Example:
     2. We inserted a cast around the whole lambda to make everything line up
        with the type signature.
 -}
-
--- | Use this function to split off arguments types when you have an
--- \"expected\" type.
---
+-- Use this one when you have an "expected" type.
 -- This function skolemises at each polytype.
 --
 -- Invariant: this function only applies the provided function
@@ -364,52 +360,58 @@ Example:
 matchExpectedFunTys :: forall a.
                        ExpectedFunTyOrigin -- See Note [Herald for matchExpectedFunTys]
                     -> UserTypeCtxt
-                    -> Arity
-                    -> ExpRhoType      -- Skolemised
-                    -> ([Scaled ExpSigmaTypeFRR] -> ExpRhoType -> TcM a)
+                    -> MatchGroup GhcRn (LHsExpr GhcRn)
+                    -> ExpSigmaType
+                    -> ([ExpTyCoBinder] -> ExpRhoType -> TcM a)
                     -> TcM (HsWrapper, a)
 -- If    matchExpectedFunTys n ty = (wrap, _)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
-matchExpectedFunTys herald ctx arity orig_ty thing_inside
+matchExpectedFunTys herald ctx matches orig_ty thing_inside
   = case orig_ty of
-      Check ty -> go [] arity ty
-      _        -> defer [] arity orig_ty
+      Check ty -> go [] value_pats trailing_type_pats ty
+      _        -> if all isVis pats then defer [] value_pats orig_ty else panic "my brain hurts"
   where
     -- Skolemise any foralls /before/ the zero-arg case
     -- so that we guarantee to return a rho-type
-    go acc_arg_tys n ty
+    go bndrs vals trails ty
       | (tvs, theta, _) <- tcSplitSigmaTy ty
       , not (null tvs && null theta)
+      , all isVis pats
       = do { (wrap_gen, (wrap_res, result)) <- tcSkolemise ctx ty $ \ty' ->
-                                               go acc_arg_tys n ty'
+                                               go bndrs vals trails ty'
            ; return (wrap_gen <.> wrap_res, result) }
 
     -- No more args; do this /before/ tcView, so
     -- that we do not unnecessarily unwrap synonyms
-    go acc_arg_tys 0 rho_ty
-      = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType rho_ty)
+    go bndrs 0 _ rho_ty
+      = do { result <- thing_inside (reverse bndrs) (mkCheckExpType rho_ty)
            ; return (idHsWrapper, result) }
 
-    go acc_arg_tys n ty
-      | Just ty' <- tcView ty = go acc_arg_tys n ty'
+    go bndrs vals trails ty
+      | Just ty' <- tcView ty = go bndrs vals trails ty'
 
-    go acc_arg_tys n (FunTy { ft_mult = mult, ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+    go bndrs vals trails (FunTy { ft_mult = mult, ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = assert (af == VisArg) $
-        do { let arg_pos = 1 + length acc_arg_tys -- for error messages only
+        do { let arg_pos = 1 + length (discardNamed bndrs) -- for error messages only
            ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
-           ; (wrap_res, result) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
-                                      (n-1) res_ty
+           ; (wrap_res, result) <- go (ExpAnon VisArg (Scaled mult $ mkCheckExpType arg_ty) : bndrs)
+                                      (vals-1) trails res_ty
            ; let wrap_arg = mkWpCastN arg_co
                  fun_wrap = mkWpFun wrap_arg wrap_res (Scaled mult arg_ty) res_ty
            ; return (fun_wrap, result) }
 
-    go acc_arg_tys n ty@(TyVarTy tv)
+    go bndrs vals trails (ForAllTy bndr@(Bndr var Specified) res_ty)
+      = do { (wrap_res, result) <- go (ExpNamed bndr : bndrs) vals (trails - 1) res_ty
+           ; return (WpTyLam var <.> wrap_res, result)
+           }
+
+    go bndrs n trails ty@(TyVarTy tv)
       | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go acc_arg_tys n ty'
-               Flexi        -> defer acc_arg_tys n (mkCheckExpType ty) }
+               Indirect ty' -> go bndrs n trails ty'
+               Flexi        -> defer bndrs n (mkCheckExpType ty) }
 
        -- In all other cases we bale out into ordinary unification
        -- However unlike the meta-tyvar case, we are sure that the
@@ -426,16 +428,17 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
-    go acc_arg_tys n ty = addErrCtxtM (mk_ctxt acc_arg_tys ty) $
-                          defer acc_arg_tys n (mkCheckExpType ty)
+    go bndrs vals _ ty = addErrCtxtM (mk_ctxt bndrs ty) $
+                         defer bndrs vals (mkCheckExpType ty)
 
     ------------
-    defer :: [Scaled ExpSigmaTypeFRR] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
-    defer acc_arg_tys n fun_ty
-      = do { let last_acc_arg_pos = length acc_arg_tys
+    defer :: [ExpTyCoBinder] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
+    defer bndrs n fun_ty
+      = do { let last_acc_arg_pos = length bndrs
            ; more_arg_tys <- mapM new_exp_arg_ty [last_acc_arg_pos + 1 .. last_acc_arg_pos + n]
            ; res_ty       <- newInferExpType
-           ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
+           ; let more_arg_tys' = map (\ty -> ExpAnon VisArg ty) more_arg_tys
+           ; result       <- thing_inside (reverse bndrs ++ more_arg_tys') res_ty
            ; more_arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) more_arg_tys
            ; res_ty       <- readExpType res_ty
            ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
@@ -449,13 +452,17 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
                  <*> newInferExpTypeFRR (FRRExpectedFunTy herald arg_pos)
 
     ------------
-    mk_ctxt :: [Scaled ExpSigmaTypeFRR] -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
+    mk_ctxt :: [ExpTyCoBinder] -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
     mk_ctxt arg_tys res_ty env
-      = mkFunTysMsg env herald arg_tys' res_ty arity
+      = mkFunTysMsg env herald arg_tys' res_ty value_pats
       where
         arg_tys' = map (\(Scaled u v) -> Scaled u (checkingExpType "matchExpectedFunTys" v)) $
-                   reverse arg_tys
+                   reverse (discardNamed arg_tys)
             -- this is safe b/c we're called from "go"
+    pats = matchGroupLMatchPats matches
+    value_pats = length (filter isVis pats)
+    trailing_type_pats = length (filter isInvis pats)
+
 
 mkFunTysMsg :: TidyEnv
             -> ExpectedFunTyOrigin

@@ -20,7 +20,7 @@ module GHC.HsToCore.Monad (
         Applicative(..),(<$>),
 
         duplicateLocalDs, newSysLocalDs,
-        newSysLocalsDs, newUniqueId,
+        newSysLocalsDs, newSysLocalsDs', newUniqueId,
         newFailLocalDs, newPredVarDs,
         getSrcSpanDs, putSrcSpanDs, putSrcSpanDsA,
         mkPrintUnqualifiedDs,
@@ -73,6 +73,7 @@ import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
+import GHC.Core.TyCo.Rep ( TyCoBinder(..) )
 
 import GHC.IfaceToCore
 
@@ -101,6 +102,7 @@ import GHC.Types.Literal ( mkLitString )
 import GHC.Types.CostCentre.State
 import GHC.Types.TyThing
 import GHC.Types.Error
+import GHC.Types.Var
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -386,6 +388,12 @@ newFailLocalDs = mkSysLocalM (fsLit "fail")
 
 newSysLocalsDs :: [Scaled Type] -> DsM [Id]
 newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs w t)
+
+newSysLocalsDs' :: [TyCoBinder] -> DsM [Id]
+newSysLocalsDs' = mapM newSysLocTyCoBinder where
+  newSysLocTyCoBinder (Anon _ (Scaled w t)) = newSysLocalDs w t
+  newSysLocTyCoBinder (Named (Bndr tv _))   = newSysLocalDs Many (varType tv)
+
 
 {-
 We can also reach out and either set/grab location information from

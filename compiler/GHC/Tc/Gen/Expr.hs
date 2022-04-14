@@ -754,9 +754,9 @@ tcSynArgE orig op sigma_ty syn_ty thing_inside
              , ( ( (result, arg_ty, res_ty, op_mult)
                  , res_wrapper )                     -- :: res_ty_out "->" res_ty
                , arg_wrapper1, [], arg_wrapper2 ) )  -- :: arg_ty "->" arg_ty_out
-               <- matchExpectedFunTys herald GenSigCtxt 1 (mkCheckExpType rho_ty) $
+               <- matchExpectedFunTys herald GenSigCtxt match_group (mkCheckExpType rho_ty) $
                   \ [arg_ty] res_ty ->
-                  do { arg_tc_ty <- expTypeToType (scaledThing arg_ty)
+                  do { arg_tc_ty <- expTypeToType (expTyBinderType arg_ty)
                      ; res_tc_ty <- expTypeToType res_ty
 
                          -- another nested arrow is too much for now,
@@ -767,7 +767,7 @@ tcSynArgE orig op sigma_ty syn_ty thing_inside
                                   (text "Too many nested arrows in SyntaxOpType" $$
                                    pprCtOrigin orig)
 
-                     ; let arg_mult = scaledMult arg_ty
+                     ; let arg_mult = expTyBinderMult arg_ty
                      ; tcSynArgA orig op arg_tc_ty [] arg_shape $
                        \ arg_results arg_res_mults ->
                        tcSynArgE orig op res_tc_ty res_shape $
@@ -782,6 +782,8 @@ tcSynArgE orig op sigma_ty syn_ty thing_inside
            ; return (result, match_wrapper <.> fun_wrap) }
       where
         herald = ExpectedFunTySyntaxOp orig op
+        match = mkMatch LambdaExpr [mkVisPat (L noSrcSpanA (WildPat noExtField))] (L noSrcSpanA op) emptyLocalBinds
+        match_group = mkMatchGroup Generated (L noSrcSpanA [match])
 
     go rho_ty (SynType the_ty)
       = do { wrap   <- tcSubTypePat orig GenSigCtxt the_ty rho_ty

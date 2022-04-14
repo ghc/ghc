@@ -61,8 +61,6 @@ module GHC.Parser.PostProcess (
         checkPrecP,           -- Int -> P Int
         checkContext,         -- HsType -> P HsContext
         checkPattern,         -- HsExp -> P HsPat
-        checkLMatchPattern,
-        mkInvisPatBuilder,
         checkPattern_details,
         incompleteDoBlock,
         ParseContext(..),
@@ -1330,7 +1328,7 @@ checkPatBind loc annsIn (L _ (BangPat (EpAnn _ ans cs) (L _ (VarPat _ v))))
                                     , mc_fixity = Prefix
                                     , mc_strictness = SrcStrict }
                   , m_pats = []
-                  , m_grhss = grhss }
+                 , m_grhss = grhss }
 
 checkPatBind loc annsIn lhs (L _ grhss) = do
   cs <- getCommentsFor loc
@@ -1385,7 +1383,6 @@ isFunLhs e = go e [] [] []
      where
        (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
    go (L loc (PatBuilderOpApp l (L loc' op) r (EpAnn loca anns cs))) es ops cps
-<<<<<<< HEAD
       | not (isRdrDataCon op)         -- We have found the function!
       = return (Just (L loc' op, Infix, (mk l:mk r:es), (anns ++ reverse ops ++ cps)))
       | otherwise                     -- Infix data con; keep going
@@ -1401,35 +1398,6 @@ isFunLhs e = go e [] [] []
    go (L _ (PatBuilderAppType pat _ (HsPS _ (L loc hs_ty)))) es ops cps
              | Just arg <- go_type_arg hs_ty
              = go pat (L loc (MatchPatBuilderMatchPat arg) : es) ops cps
-||||||| parent of cf7104c386 (parser and renamer checkpoint)
-        | not (isRdrDataCon op)         -- We have found the function!
-        = return (Just (L loc' op, Infix, (l:r:es), (anns ++ reverse ops ++ cps)))
-        | otherwise                     -- Infix data con; keep going
-        = do { mb_l <- go l es ops cps
-             ; case mb_l of
-                 Just (op', Infix, j : k : es', anns')
-                   -> return (Just (op', Infix, j : op_app : es', anns'))
-                   where
-                     op_app = L loc (PatBuilderOpApp k
-                               (L loc' op) r (EpAnn loca (reverse ops++cps) cs))
-                 _ -> return Nothing }
-=======
-      | not (isRdrDataCon op)         -- We have found the function!
-      = return (Just (L loc' op, Infix, (mk l:mk r:es), (anns ++ reverse ops ++ cps)))
-      | otherwise                     -- Infix data con; keep going
-      = do { mb_l <- go l es ops cps
-           ; return (join $ fmap reassociate mb_l) }
-        where
-          reassociate (op', Infix, j : L k_loc (MatchPatBuilderVisPat k) : es', anns')
-            = Just (op', Infix, j : op_app : es', anns')
-            where
-              op_app = mk $ L loc (PatBuilderOpApp (L k_loc k) (L loc' op) r
-                                    (EpAnn loca (reverse ops ++ cps) cs))
-          reassociate _other = Nothing
-   go (L _ (PatBuilderAppType pat (HsPS _ (L loc hs_ty)))) es ops cps
-             | Just arg <- go_type_arg hs_ty
-             = go pat (L loc (MatchPatBuilderMatchPat arg) : es) ops cps
->>>>>>> cf7104c386 (parser and renamer checkpoint)
    go _ _ _ _ = return Nothing
 
    go_type_arg :: HsType GhcPs -> Maybe (MatchPat GhcPs)

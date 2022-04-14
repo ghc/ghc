@@ -25,6 +25,7 @@ import GHC.Tc.Gen.Pat
 import GHC.Core.Multiplicity
 import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType, isManyDataConTy )
 import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
+import GHC.Core.TyCo.Rep ( TyCoBinder(..) )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Sig ( TcPragEnv, emptyPragEnv, completeSigFromId, lookupPragEnv
@@ -830,13 +831,13 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                     L (getLoc lpat) $
                     HsCase noExtField (nlHsVar scrutinee) $
                     MG{ mg_alts = L (l2l $ getLoc lpat) cases
-                      , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty Generated
+                      , mg_ext = MatchGroupTc [Anon VisArg (unrestricted pat_ty)] res_ty Generated
                       }
              body' = noLocA $
                      HsLam noExtField $
                      MG{ mg_alts = noLocA [mkSimpleMatch LambdaExpr
                                                          args body]
-                       , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty Generated
+                       , mg_ext = MatchGroupTc (map (\ty -> Anon VisArg (unrestricted ty)) [pat_ty, cont_ty, fail_ty]) res_ty Generated
                        }
              match = mkMatch (mkPrefixFunRhs (L loc patsyn_id)) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)

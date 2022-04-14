@@ -31,8 +31,8 @@ module GHC.Tc.Utils.TcType (
 
   ExpType(..), InferResult(..),
   ExpTypeFRR, ExpSigmaType, ExpSigmaTypeFRR,
-  ExpRhoType,
-  mkCheckExpType,
+  ExpRhoType, ExpTyCoBinder(..),
+  mkCheckExpType, toExpBinder, expTyBinderType, expTyBinderMult, discardNamed,
 
   SyntaxOpType(..), synKnownType, mkSynFunTys,
 
@@ -501,6 +501,33 @@ instance Outputable InferResult where
 mkCheckExpType :: TcType -> ExpType
 mkCheckExpType = Check
 
+data ExpTyCoBinder
+  = ExpNamed TyCoVarBinder    -- A type-lambda binder
+  | ExpAnon AnonArgFlag (Scaled ExpSigmaTypeFRR)
+                              -- A term-lambda binder. Type here can be CoercionTy.
+                              -- Visibility is determined by the AnonArgFlag
+
+expTyBinderType :: ExpTyCoBinder -> ExpSigmaTypeFRR
+expTyBinderType (ExpAnon _ exp_ty)      = scaledThing exp_ty
+expTyBinderType (ExpNamed (Bndr var _)) = mkCheckExpType (varType var)
+
+expTyBinderMult :: ExpTyCoBinder -> Mult
+expTyBinderMult (ExpAnon _ (Scaled m _)) = m
+expTyBinderMult _                        = Many
+
+toExpBinder :: TyCoBinder -> ExpTyCoBinder
+toExpBinder (Named tvb) = ExpNamed tvb
+toExpBinder (Anon flag (Scaled mult ty)) =
+  ExpAnon flag (Scaled mult (mkCheckExpType ty))
+
+discardNamed :: [ExpTyCoBinder] -> [Scaled ExpSigmaTypeFRR]
+discardNamed [] = []
+discardNamed ((ExpAnon _ ty) : bndrs) = ty : discardNamed bndrs
+discardNamed (_ : bndrs) = discardNamed bndrs
+
+instance Outputable ExpTyCoBinder where
+  ppr (ExpNamed tvb) = text "ExpNamed" <> ppr tvb
+  ppr (ExpAnon flag ty) = text "ExpAnon" <> ppr flag <> ppr ty
 
 {- *********************************************************************
 *                                                                      *

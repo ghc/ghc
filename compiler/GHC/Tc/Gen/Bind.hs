@@ -610,13 +610,14 @@ tcPolyCheck prag_fn
                 -- See Note [Instantiate sig with fresh variables]
 
                 let mono_id = mkLocalId mono_name (varMult poly_id) rho_ty in
+                let ty = if hasInvisPats matches then (idType poly_id) else rho_ty in
                 tcExtendBinderStack [TcIdBndr mono_id NotTopLevel] $
                 -- Why mono_id in the BinderStack?
                 --    See Note [Relevant bindings and the binder stack]
 
                 setSrcSpanA bind_loc $
                 tcMatchesFun (L nm_loc mono_id) matches
-                             (mkCheckExpType rho_ty)
+                             (mkCheckExpType ty)
 
        -- We make a funny AbsBinds, abstracting over nothing,
        -- just so we have somewhere to put the SpecPrags.

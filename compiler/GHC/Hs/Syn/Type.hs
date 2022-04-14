@@ -43,8 +43,9 @@ hsLPatType :: LPat GhcTc -> Type
 hsLPatType (L _ p) = hsPatType p
 
 hsLMatchPatType :: LMatchPat GhcTc -> Type
-hsLMatchPatType (L _ (VisPat _ p)) = hsPatType (unLoc p)
-hsLMatchPatType _                  = panic "@-binders in functions are not allowed yet"
+hsLMatchPatType (L _ (VisPat _ p))           = hsPatType (unLoc p)
+hsLMatchPatType (L _ (InvisTyVarPat _ bndr)) = hsTyVarBndrTy (unLoc bndr)
+hsLMatchPatType (L _ (InvisWildTyPat ty))    = ty
 
 hsPatType :: Pat GhcTc -> Type
 hsPatType (ParPat _ _ pat _)            = hsLPatType pat
@@ -198,7 +199,7 @@ lhsCmdTopType :: LHsCmdTop GhcTc -> Type
 lhsCmdTopType (L _ (HsCmdTop (CmdTopTc _ ret_ty _) _)) = ret_ty
 
 matchGroupTcType :: MatchGroupTc -> Type
-matchGroupTcType (MatchGroupTc args res _) = mkVisFunTys args res
+matchGroupTcType (MatchGroupTc args res _) = mkPiTys args res
 
 syntaxExprType :: SyntaxExpr GhcTc -> Type
 syntaxExprType (SyntaxExprTc e _ _) = hsExprType e

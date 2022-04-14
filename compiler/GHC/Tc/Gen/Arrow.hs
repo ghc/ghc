@@ -18,6 +18,7 @@ import GHC.Prelude
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckMonoExpr, tcInferRho, tcSyntaxOp
                                        , tcCheckPolyExpr )
 
+import GHC.Core.Type ( toAnonTyCoBinder )
 import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Match
@@ -343,13 +344,13 @@ tcCmdMatchLambda env
                  (cmd_stk, res_ty)
   = do { (co, arg_tys, cmd_stk') <- matchExpectedCmdArgs n_pats cmd_stk
 
-       ; let check_arg_tys = map (unrestricted . mkCheckExpType) arg_tys
+       ; let check_arg_tys = map (\ty -> ExpAnon VisArg ((unrestricted . mkCheckExpType) ty)) arg_tys
        ; matches' <- forM matches $
            addErrCtxt . pprMatchInCtxt . unLoc <*> tc_match check_arg_tys cmd_stk'
 
        ; let arg_tys' = map unrestricted arg_tys
              mg' = mg { mg_alts = L l matches'
-                      , mg_ext = MatchGroupTc arg_tys' res_ty origin }
+                      , mg_ext = MatchGroupTc (map toAnonTyCoBinder arg_tys') res_ty origin }
 
        ; return (mkWpCastN co, mg') }
   where

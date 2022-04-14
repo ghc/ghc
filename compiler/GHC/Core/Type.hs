@@ -49,7 +49,7 @@ module GHC.Core.Type (
         mkSpecForAllTy, mkSpecForAllTys,
         mkVisForAllTys, mkTyCoInvForAllTy,
         mkInfForAllTy, mkInfForAllTys,
-        splitForAllTyCoVars,
+        splitForAllTyVars, splitForAllTyCoVars,
         splitForAllReqTVBinders, splitForAllInvisTVBinders,
         splitForAllTyCoVarBinders,
         splitForAllTyCoVar_maybe, splitForAllTyCoVar,
@@ -100,8 +100,8 @@ module GHC.Core.Type (
         mkAnonBinder,
         isAnonTyCoBinder,
         binderVar, binderVars, binderType, binderArgFlag,
-        tyCoBinderType, tyCoBinderVar_maybe,
-        tyBinderType,
+        tyCoBinderType, tyCoBinderMult, tyCoBinderScaledType, tyCoBinderVar_maybe,
+        tyBinderType, toAnonTyCoBinder,
         binderRelevantType_maybe,
         isVisibleArgFlag, isInvisibleArgFlag, isVisibleBinder,
         isInvisibleBinder, isNamedBinder,
@@ -2364,6 +2364,16 @@ tyCoBinderVar_maybe _          = Nothing
 tyCoBinderType :: TyCoBinder -> Type
 tyCoBinderType (Named tvb) = binderType tvb
 tyCoBinderType (Anon _ ty)   = scaledThing ty
+
+tyCoBinderMult :: TyCoBinder -> Mult
+tyCoBinderMult (Anon _ ty) = scaledMult ty
+tyCoBinderMult _           = Many
+
+tyCoBinderScaledType :: TyCoBinder -> Scaled Type
+tyCoBinderScaledType bndr = Scaled (tyCoBinderMult bndr) (tyCoBinderType bndr)
+
+toAnonTyCoBinder :: Scaled Type -> TyCoBinder
+toAnonTyCoBinder scaled_ty = Anon VisArg scaled_ty
 
 tyBinderType :: TyBinder -> Type
 tyBinderType (Named (Bndr tv _))

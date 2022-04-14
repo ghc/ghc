@@ -38,11 +38,13 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Make
+import GHC.Core.Type (tyCoBinderScaledType)
 import GHC.HsToCore.Binds (dsHsWrapper)
 
 
 import GHC.Types.Id
 import GHC.Core.ConLike
+import GHC.Core.TyCo.Rep (TyCoBinder(..))
 import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Builtin.Names
@@ -531,7 +533,7 @@ multiple scrutinees)
 dsCmd ids local_vars stack_ty res_ty
       (HsCmdLamCase _ lc_variant match@MG { mg_ext = MatchGroupTc {mg_arg_tys = arg_tys} } )
       env_ids = do
-    arg_ids <- newSysLocalsDs arg_tys
+    arg_ids <- newSysLocalsDs (map tyCoBinderScaledType arg_tys)
 
     let match_ctxt = ArrowLamCaseAlt lc_variant
         pat_vars = mkVarSet arg_ids
@@ -805,7 +807,7 @@ dsCases ids local_vars stack_id stack_ty res_ty
     Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
       dsExpr (HsLamCase EpAnnNotUsed LamCase
         (MG { mg_alts = noLocA []
-            , mg_ext = MatchGroupTc [Scaled Many void_ty] res_ty Generated
+            , mg_ext = MatchGroupTc [Anon VisArg (Scaled Many void_ty)] res_ty Generated
             }))
 
       -- Replace the commands in the case with these tagged tuples,

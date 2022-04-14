@@ -103,7 +103,8 @@ module GHC.Tc.Utils.TcMType (
 
   ------------------------------
   -- Other
-  anyUnfilledCoercionHoles
+  anyUnfilledCoercionHoles,
+  toTyCoBinder, checkingExpBinder
   ) where
 
 import GHC.Prelude
@@ -2798,3 +2799,16 @@ instance Semigroup UnfilledCoercionHoleMonoid where
 
 instance Monoid UnfilledCoercionHoleMonoid where
   mempty = UCHM (return False)
+
+toTyCoBinder :: ExpTyCoBinder -> TcM TyCoBinder
+toTyCoBinder (ExpNamed tvb) = return (Named tvb)
+toTyCoBinder (ExpAnon flag scaled_exp_type) =
+  do { unExp <- readScaledExpType scaled_exp_type
+     ; return (Anon flag unExp) }
+
+checkingExpBinder :: String -> ExpTyCoBinder -> TyCoBinder
+checkingExpBinder str (ExpAnon flag (Scaled mult exp_type)) =
+  Anon flag (Scaled mult ty)
+  where
+    ty = checkingExpType str exp_type
+checkingExpBinder _ (ExpNamed tvb) = Named tvb

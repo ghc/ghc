@@ -35,7 +35,7 @@ module GHC.Tc.Types.Origin (
 
   -- * Arrow command origin
   FRRArrowContext(..), pprFRRArrowContext,
-  ExpectedFunTyOrigin(..), pprExpectedFunTyOrigin, pprExpectedFunTyHerald,
+  ExpectedFunTyOrigin(..), extractExpr, pprExpectedFunTyOrigin, pprExpectedFunTyHerald,
 
   ) where
 
@@ -1336,6 +1336,12 @@ data ExpectedFunTyOrigin
       LamCaseVariant
       !(HsExpr GhcRn)
        -- ^ the entire lambda-case expression
+
+extractExpr :: ExpectedFunTyOrigin -> HsExpr GhcRn
+extractExpr (ExpectedFunTySyntaxOp _ e) = e
+extractExpr (ExpectedFunTyViewPat e)    = e
+extractExpr (ExpectedFunTyLamCase _ e)  = e
+extractExpr _                           = panic "no expr"
 
 pprExpectedFunTyOrigin :: ExpectedFunTyOrigin
                        -> Int -- ^ argument position (starting at 1)
