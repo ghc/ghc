@@ -37,6 +37,7 @@ import GHC.Utils.Logger
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
+import GHC.Settings (Platform)
 
 data StgPipelineOpts = StgPipelineOpts
   { stgPipeline_phases      :: ![StgToDo]
@@ -44,6 +45,7 @@ data StgPipelineOpts = StgPipelineOpts
   , stgPipeline_lint        :: !(Maybe DiagOpts)
   -- ^ Should we lint the STG at various stages of the pipeline?
   , stgPipeline_pprOpts     :: !StgPprOpts
+  , stgPlatform             :: !Platform
   }
 
 newtype StgM a = StgM { _unStgM :: ReaderT Char IO a }
@@ -89,7 +91,7 @@ stg2stg logger ictxt opts this_mod binds
     stg_linter unarised
       | Just diag_opts <- stgPipeline_lint opts
       = lintStgTopBindings
-          logger
+          (stgPlatform opts) logger
           diag_opts ppr_opts
           ictxt this_mod unarised
       | otherwise
