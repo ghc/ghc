@@ -24,3 +24,7 @@ stg_decodeStackzh (gcptr stgStack) {
 
     return (stackEntries);
 }
+
+eqStackszh(P_ stack1, P_ stack2) {
+  return (stack1 == stack2);
+}

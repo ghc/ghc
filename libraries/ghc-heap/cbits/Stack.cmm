@@ -1,0 +1,179 @@
+// Uncomment to enable assertions during development
+// #define DEBUG 1
+
+#include "Cmm.h"
+
+// StgStack_marking was not available in the Stage0 compiler at the time of
+// writing. Because, it has been added to derivedConstants when Stack.cmm was
+// developed.
+#if defined(StgStack_marking)
+
+advanceStackFrameIterzh (P_ stack, W_ offsetWords) {
+  W_ frameSize;
+  (frameSize) = ccall stackFrameSize(stack, offsetWords);
+
+  P_ nextClosurePtr;
+  nextClosurePtr = (StgStack_sp(stack) + WDS(offsetWords) + WDS(frameSize));
+
+  P_ stackArrayPtr;
+  stackArrayPtr = stack + SIZEOF_StgHeader + OFFSET_StgStack_stack;
+
+  P_ stackBottom;
+  W_ stackSize, stackSizeInBytes;
+  stackSize = TO_W_(StgStack_stack_size(stack));
+  stackSizeInBytes = WDS(stackSize);
+  stackBottom = stackSizeInBytes + stackArrayPtr;
+
+  P_ newStack;
+  W_ newOffsetWords, hasNext;
+  if(nextClosurePtr < stackBottom) (likely: True) {
+    newStack = stack;
+    newOffsetWords = offsetWords + frameSize;
+    hasNext = 1;
+  } else {
+    P_ underflowFrameStack;
+    (underflowFrameStack) = ccall getUnderflowFrameStack(stack, offsetWords);
+    if (underflowFrameStack == NULL) (likely: True) {
+      newStack = NULL;
+      newOffsetWords = NULL;
+      hasNext = NULL;
+    } else {
+      newStack = underflowFrameStack;
+      newOffsetWords = NULL;
+      hasNext = 1;
+    }
+  }
+
+  return (newStack, newOffsetWords, hasNext);
+}
+
+getSmallBitmapzh(P_ stack, W_ offsetWords) {
+  P_ c;
+  c = StgStack_sp(stack) + WDS(offsetWords);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  W_ bitmap, size;
+  (bitmap) = ccall getBitmapWord(c);
+  (size) = ccall getBitmapSize(c);
+
+  return (bitmap, size);
+}
+
+getRetFunSmallBitmapzh(P_ stack, W_ offsetWords) {
+  P_ c;
+  c = StgStack_sp(stack) + WDS(offsetWords);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  W_ bitmap, size, specialType;
+  (bitmap) = ccall getRetFunBitmapWord(c);
+  (size) = ccall getRetFunBitmapSize(c);
+
+  return (bitmap, size);
+}
+
+getLargeBitmapzh(P_ stack, W_ offsetWords){
+  P_ c, stgArrBytes;
+  W_ size;
+  c = StgStack_sp(stack) + WDS(offsetWords);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  (stgArrBytes) = ccall getLargeBitmap(MyCapability(), c);
+  (size) = ccall getLargeBitmapSize(c);
+
+  return (stgArrBytes, size);
+}
+
+getBCOLargeBitmapzh(P_ stack, W_ offsetWords){
+  P_ c, stgArrBytes;
+  W_ size;
+  c = StgStack_sp(stack) + WDS(offsetWords);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  (stgArrBytes) = ccall getBCOLargeBitmap(MyCapability(), c);
+  (size) = ccall getBCOLargeBitmapSize(c);
+
+  return (stgArrBytes, size);
+}
+
+getRetFunLargeBitmapzh(P_ stack, W_ offsetWords){
+  P_ c, stgArrBytes;
+  W_ size;
+  c = StgStack_sp(stack) + WDS(offsetWords);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  (stgArrBytes) = ccall getRetFunLargeBitmap(MyCapability(), c);
+  (size) = ccall getRetFunSize(c);
+
+  return (stgArrBytes, size);
+}
+
+getWordzh(P_ stack, W_ offsetWords, W_ offsetBytes){
+  P_ wordAddr;
+  wordAddr = (StgStack_sp(stack) + WDS(offsetWords) + WDS(offsetBytes));
+  return (W_[wordAddr]);
+}
+
+getAddrzh(P_ stack, W_ offsetWords){
+  P_ addr;
+  addr = (StgStack_sp(stack) + WDS(offsetWords));
+  P_ ptr;
+  ptr = P_[addr];
+  return (ptr);
+}
+
+getUnderflowFrameNextChunkzh(P_ stack, W_ offsetWords){
+  P_ closurePtr;
+  closurePtr = (StgStack_sp(stack) + WDS(offsetWords));
+  ASSERT(LOOKS_LIKE_CLOURE_PTR(closurePtr));
+
+  P_ next_chunk;
+  (next_chunk) = ccall getUnderflowFrameNextChunk(closurePtr);
+  ASSERT(LOOKS_LIKE_CLOURE_PTR(next_chunk));
+  return (next_chunk);
+}
+
+getRetFunTypezh(P_ stack, W_ offsetWords){
+  P_ c;
+  c = StgStack_sp(stack) + WDS(offsetWords);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  W_ type;
+  (type) = ccall getRetFunType(c);
+  return (type);
+}
+
+getInfoTableAddrzh(P_ stack, W_ offsetWords){
+  P_ p, info;
+  p = StgStack_sp(stack) + WDS(offsetWords);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
+  info = %GET_STD_INFO(UNTAG(p));
+
+  return (info);
+}
+
+getStackInfoTableAddrzh(P_ stack){
+  P_ info;
+  info = %GET_STD_INFO(UNTAG(stack));
+  return (info);
+}
+
+getBoxedClosurezh(P_ stack, W_ offsetWords){
+  P_ ptr;
+  ptr = StgStack_sp(stack) + WDS(offsetWords);
+
+  P_ box;
+  (box) = ccall getBoxedClosure(ptr);
+  return (box);
+}
+
+getStackFieldszh(P_ stack){
+  bits32 size;
+  bits8 dirty, marking;
+
+  size = StgStack_stack_size(stack);
+  dirty = StgStack_dirty(stack);
+  marking = StgStack_marking(stack);
+
+  return (size, dirty, marking);
+}
+#endif

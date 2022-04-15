@@ -715,17 +715,17 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
             debugBelch("RET_FUN (%p) (type=%d)\n", ret_fun->fun, (int)fun_info->f.fun_type);
             switch (fun_info->f.fun_type) {
             case ARG_GEN:
-                printSmallBitmap(spBottom, sp+2,
+                printSmallBitmap(spBottom, sp+3,
                                  BITMAP_BITS(fun_info->f.b.bitmap),
                                  BITMAP_SIZE(fun_info->f.b.bitmap));
                 break;
             case ARG_GEN_BIG:
-                printLargeBitmap(spBottom, sp+2,
+                printLargeBitmap(spBottom, sp+3,
                                  GET_FUN_LARGE_BITMAP(fun_info),
                                  GET_FUN_LARGE_BITMAP(fun_info)->size);
                 break;
             default:
-                printSmallBitmap(spBottom, sp+2,
+                printSmallBitmap(spBottom, sp+3,
                                  BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
                                  BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]));
                 break;

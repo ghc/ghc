@@ -122,7 +122,7 @@ extern const StgWord16 closure_flags[];
 /*
  * A large bitmap.
  */
-typedef struct {
+typedef struct StgLargeBitmap_ {
   StgWord size;
   StgWord bitmap[];
 } StgLargeBitmap;

@@ -797,6 +797,7 @@ isSomeRODataLabel (IdLabel _ _ LocalInfoTable) = True
 isSomeRODataLabel (IdLabel _ _ BlockInfoTable) = True
 -- info table defined in cmm (.cmm)
 isSomeRODataLabel (CmmLabel _ _ _ CmmInfo) = True
+isSomeRODataLabel (CmmLabel _ _ _ CmmRetInfo) = True
 isSomeRODataLabel _lbl = False
 
 -- | Whether label is points to some kind of info table

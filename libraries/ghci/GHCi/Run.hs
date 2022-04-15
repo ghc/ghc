@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, RecordWildCards, MagicHash, ScopedTypeVariables, CPP,
-    UnboxedTuples #-}
+    UnboxedTuples, LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- |
@@ -94,7 +94,10 @@ run m = case m of
   StartTH -> startTH
   GetClosure ref -> do
     clos <- Heap.getClosureData =<< localRef ref
-    mapM (\(Heap.Box x) -> mkRemoteRef (HValue x)) clos
+    mapM (\case
+             Heap.Box x -> mkRemoteRef (HValue x)
+             r -> error $ "Unsupported Box: " ++ show r
+         ) clos
   Seq ref -> doSeq ref
   ResumeSeq ref -> resumeSeq ref
   _other -> error "GHCi.Run.run"

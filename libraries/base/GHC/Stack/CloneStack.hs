@@ -19,28 +19,46 @@ module GHC.Stack.CloneStack (
   StackEntry(..),
   cloneMyStack,
   cloneThreadStack,
-  decode
+  decode,
+  stackSnapshotToString
   ) where
 
 import Control.Concurrent.MVar
 import Data.Maybe (catMaybes)
 import Foreign
 import GHC.Conc.Sync
-import GHC.Exts (Int (I#), RealWorld, StackSnapshot#, ThreadId#, Array#, sizeofArray#, indexArray#, State#, StablePtr#)
+import GHC.Exts (Int (I#), RealWorld, StackSnapshot#, ThreadId#, Array#, sizeofArray#, indexArray#, State#, StablePtr#, Word#, unsafeCoerce#)
 import GHC.IO (IO (..))
 import GHC.InfoProv (InfoProv (..), InfoProvEnt, ipLoc, ipeProv, peekInfoProv)
 import GHC.Stable
+import GHC.Word
+import Numeric
 
 -- | A frozen snapshot of the state of an execution stack.
 --
 -- @since 4.17.0.0
 data StackSnapshot = StackSnapshot !StackSnapshot#
 
+instance Show StackSnapshot where
+   showsPrec _ stack rs =
+    "StackSnapshot(" ++  stackSnapshotToString stack ++ ")" ++ rs
+
+stackSnapshotToString :: StackSnapshot -> String
+stackSnapshotToString (StackSnapshot s#) = pad_out (showHex addr "")
+     where
+        addr = W# (unsafeCoerce# s#)
+        pad_out ls = '0':'x':ls
+
+instance Eq StackSnapshot where
+  (StackSnapshot s1#) == (StackSnapshot s2#) = (W# (eqStacks# s1# s2#)) > 0
+
 foreign import prim "stg_decodeStackzh" decodeStack# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, Array# (Ptr InfoProvEnt) #)
 
 foreign import prim "stg_cloneMyStackzh" cloneMyStack# :: State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
 foreign import prim "stg_sendCloneStackMessagezh" sendCloneStackMessage# :: ThreadId# -> StablePtr# PrimMVar -> State# RealWorld -> (# State# RealWorld, (# #) #)
+
+foreign import prim "eqStackszh" eqStacks# :: StackSnapshot# -> StackSnapshot# -> Word#
 
 {-
 Note [Stack Cloning]

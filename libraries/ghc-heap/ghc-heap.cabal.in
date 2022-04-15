@@ -30,6 +30,8 @@ library
   ghc-options:      -Wall
   if !os(ghcjs)
     cmm-sources:      cbits/HeapPrim.cmm
+                      cbits/Stack.cmm
+  c-sources:        cbits/Stack.c
 
   default-extensions: NoImplicitPrelude
 
@@ -37,6 +39,7 @@ library
                     GHC.Exts.Heap.Closures
                     GHC.Exts.Heap.ClosureTypes
                     GHC.Exts.Heap.Constants
+                    GHC.Exts.Heap.Decode
                     GHC.Exts.Heap.InfoTable
                     GHC.Exts.Heap.InfoTable.Types
                     GHC.Exts.Heap.InfoTableProf
@@ -48,3 +51,5 @@ library
                     GHC.Exts.Heap.ProfInfo.PeekProfInfo
                     GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingDisabled
                     GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled
+                    GHC.Exts.Stack.Constants
+                    GHC.Exts.Stack.Decode

@@ -471,6 +471,10 @@ instance Binary Heap.WhyBlocked
 instance Binary Heap.TsoFlags
 #endif
 
+#if MIN_VERSION_base(4,17,0)
+instance Binary Heap.RetFunType
+#endif
+
 instance Binary Heap.StgInfoTable
 instance Binary Heap.ClosureType
 instance Binary Heap.PrimType

@@ -57,3 +57,48 @@ test('parse_tso_flags',
 test('T21622',
      only_ways(['normal']),
      compile_and_run, [''])
+
+test('stack_big_ret',
+     [
+        extra_files(['TestUtils.hs']),
+        ignore_stdout,
+        ignore_stderr
+     ],
+     compile_and_run,
+     [''])
+
+# Options:
+# - `-kc512B -kb64B`: Make stack chunk size small to provoke underflow
+#   stack frames.
+test('stack_underflow',
+     [
+        extra_files(['TestUtils.hs']),
+        extra_run_opts('+RTS -kc512B -kb64B -RTS'),
+        ignore_stdout,
+        ignore_stderr
+     ],
+     compile_and_run,
+     [''])
+
+test('stack_stm_frames',
+     [
+        extra_files(['TestUtils.hs']),
+        ignore_stdout,
+        ignore_stderr
+      ],
+     compile_and_run,
+     [''])
+
+test('stack_misc_closures',
+     [
+        extra_files(['stack_misc_closures_c.c', 'stack_misc_closures_prim.cmm', 'TestUtils.hs']),
+        ignore_stdout,
+        ignore_stderr
+      ],
+     multi_compile_and_run,
+     ['stack_misc_closures',
+        [ ('stack_misc_closures_c.c', '')
+         ,('stack_misc_closures_prim.cmm', '')
+         ]
+      , '-debug' # Debug RTS to use checkSTACK() (Sanity.c)
+      ])
