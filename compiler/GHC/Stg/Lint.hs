@@ -30,6 +30,56 @@ with this note:
 Since then there were some attempts at enabling it again, as summarised in #14787.
 It's finally decided that we remove all type checking and only look for
 basic properties listed above.
+
+Note [Linting StgApp]
+~~~~~~~~~~~~~~~~~~~~~
+To lint an application of the form `f a_1 ... a_n`, we check that
+the representations of the arguments `a_1`, ..., `a_n` match those
+that the function expects.
+
+More precisely, suppose the types in the application `f a_1 ... a_n`
+are as follows:
+
+  f :: t_1 -> ... -> t_n -> res
+  a_1 :: s_1, ..., a_n :: s_n
+
+  t_1 :: TYPE r_1, ..., t_n :: TYPE r_n
+  s_1 :: TYPE p_1, ..., a_n :: TYPE p_n
+
+Then we must check that each r_i is compatible with s_i. Compatibility
+is weaker than on-the-nose equality: for example, IntRep and WordRep are
+compatible. See Note [Bad unsafe coercion] in GHC.Core.Lint.
+
+Wrinkle: it can sometimes happen that an argument type in the type of
+the function does not have a fixed runtime representation, i.e.
+there is an r_i such that runtimeRepPrimRep r_i crashes.
+See https://gitlab.haskell.org/ghc/ghc/-/issues/21399 for an example.
+Fixing this issue would require significant changes to the type system
+of STG, so for now we simply skip the Lint check when we detect such
+representation-polymorphic situations.
+
+Note [Typing the STG language]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Core, programs must be /well-typed/.  So if f :: ty1 -> ty2,
+then in the application (f e), we must have  e :: ty1
+
+STG is still a statically typed language, but the type system
+is much coarser. In particular, STG programs must be /well-kinded/.
+More precisely, if f :: ty1 -> ty2, then in the application (f e)
+where e :: ty1', we must have kind(ty1) = kind(ty1').
+
+So the STG type system does not distinguish beteen Int and Bool,
+but it /does/ distinguish beteen Int and Int#, because they have
+different kinds.  Actually, since all terms have kind (TYPE rep),
+we might say that the STG language is well-runtime-rep'd.
+
+This coarser type system makes fewer distinctions, and that allows
+many nonsensical programs (such as ('x' && "foo")) -- but all type
+systems accept buggy programs!  But the coarseness also permits
+some optimisations that are ill-typed in Core.  For example, see
+the module STG.CSE, which is all about doing CSE in STG that would
+be ill-typed in Core.  But it must still be well-kinded!
+
 -}
 
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts, TypeFamilies,
@@ -70,9 +120,14 @@ import Control.Applicative ((<|>))
 import Control.Monad
 import Data.Maybe
 import GHC.Utils.Misc
+import GHC.Core.Multiplicity (scaledThing)
+import GHC.Settings (Platform)
+import GHC.Core.TyCon (primRepCompatible)
+import GHC.Utils.Panic.Plain (panic)
 
 lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
-                   => Logger
+                   => Platform
+                   -> Logger
                    -> DiagOpts
                    -> StgPprOpts
                    -> InteractiveContext
@@ -82,9 +137,9 @@ lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
                    -> [GenStgTopBinding a]
                    -> IO ()
 
-lintStgTopBindings logger diag_opts opts ictxt this_mod unarised whodunnit binds
+lintStgTopBindings platform logger diag_opts opts ictxt this_mod unarised whodunnit binds
   = {-# SCC "StgLint" #-}
-    case initL diag_opts this_mod unarised opts top_level_binds (lint_binds binds) of
+    case initL platform diag_opts this_mod unarised opts top_level_binds (lint_binds binds) of
       Nothing  ->
         return ()
       Just msg -> do
@@ -195,22 +250,12 @@ lintStgExpr :: (OutputablePass a, BinderP a ~ Id) => GenStgExpr a -> LintM ()
 lintStgExpr (StgLit _) = return ()
 
 lintStgExpr e@(StgApp fun args) = do
-    lintStgVar fun
-    mapM_ lintStgArg args
+  lintStgVar fun
+  mapM_ lintStgArg args
+  lintAppCbvMarks e
+  lintStgAppReps fun args
 
-    lf <- getLintFlags
-    when (lf_unarised lf) $ do
-      -- A function which expects a unlifted argument as n'th argument
-      -- always needs to be applied to n arguments.
-      -- See Note [Strict Worker Ids].
-      let marks = fromMaybe [] $ idCbvMarks_maybe fun
-      if length (dropWhileEndLE (not . isMarkedCbv) marks) > length args
-        then addErrL $ hang (text "Undersatured cbv marked ID in App" <+> ppr e ) 2 $
-          (text "marks" <> ppr marks $$
-          text "args" <> ppr args $$
-          text "arity" <> ppr (idArity fun) $$
-          text "join_arity" <> ppr (isJoinId_maybe fun))
-        else return ()
+
 
 lintStgExpr app@(StgConApp con _n args _arg_tys) = do
     -- unboxed sums should vanish during unarise
@@ -283,6 +328,71 @@ lintConApp con args app = do
       addErrL (text "Constructor applied to incorrect number of arguments:" $$
                text "Application:" <> app)
 
+-- See Note [Linting StgApp]
+-- See Note [Typing the STG language]
+lintStgAppReps :: Id -> [StgArg] -> LintM ()
+lintStgAppReps _fun [] = return ()
+lintStgAppReps fun args = do
+  lf <- getLintFlags
+  let platform = lf_platform lf
+      (fun_arg_tys, _res) = splitFunTys (idType fun)
+      fun_arg_tys' = map (scaledThing ) fun_arg_tys :: [Type]
+      fun_arg_tys_reps, actual_arg_reps :: [Maybe [PrimRep]]
+      fun_arg_tys_reps = map typePrimRep_maybe fun_arg_tys'
+      actual_arg_reps = map (typePrimRep_maybe . stgArgType) args
+
+      match_args :: [Maybe [PrimRep]] -> [Maybe [PrimRep]] -> LintM ()
+      -- Might be wrongly typed as polymorphic. See #21399
+      match_args (Nothing:_) _   = return ()
+      match_args (_) (Nothing:_) = return ()
+      match_args (Just actual_rep:actual_reps_left) (Just expected_rep:expected_reps_left)
+        -- Common case, reps are exactly the same
+        | actual_rep == expected_rep
+        = match_args actual_reps_left expected_reps_left
+
+        -- Check for void rep which can be either an empty list *or* [VoidRep]
+        | isVoidRep actual_rep && isVoidRep expected_rep
+        = match_args actual_reps_left expected_reps_left
+
+        -- Some reps are compatible *even* if they are not the same. E.g. IntRep and WordRep.
+        -- We check for that here with primRepCompatible
+        | and $ zipWith (primRepCompatible platform) actual_rep expected_rep
+        = match_args actual_reps_left expected_reps_left
+
+        | otherwise = addErrL $ hang (text "Function type reps and function argument reps missmatched") 2 $
+            (text "In application " <> ppr fun <+> ppr args $$
+              text "argument rep:" <> ppr actual_rep $$
+              text "expected rep:" <> ppr expected_rep $$
+              -- text "expected reps:" <> ppr arg_ty_reps $$
+              text "unarised?:" <> ppr (lf_unarised lf))
+        where
+          isVoidRep [] = True
+          isVoidRep [VoidRep] = True
+          isVoidRep _ = False
+
+          -- n_arg_ty_reps = length arg_ty_reps
+
+      match_args _ _ = return () -- Functions are allowed to be over/under applied.
+
+  match_args actual_arg_reps fun_arg_tys_reps
+
+lintAppCbvMarks :: OutputablePass pass
+                => GenStgExpr pass -> LintM ()
+lintAppCbvMarks e@(StgApp fun args) = do
+  lf <- getLintFlags
+  when (lf_unarised lf) $ do
+    -- A function which expects a unlifted argument as n'th argument
+    -- always needs to be applied to n arguments.
+    -- See Note [Strict Worker Ids].
+    let marks = fromMaybe [] $ idCbvMarks_maybe fun
+    when (length (dropWhileEndLE (not . isMarkedCbv) marks) > length args) $ do
+      addErrL $ hang (text "Undersatured cbv marked ID in App" <+> ppr e ) 2 $
+        (text "marks" <> ppr marks $$
+        text "args" <> ppr args $$
+        text "arity" <> ppr (idArity fun) $$
+        text "join_arity" <> ppr (isJoinId_maybe fun))
+lintAppCbvMarks _ = panic "impossible - lintAppCbvMarks"
+
 {-
 ************************************************************************
 *                                                                      *
@@ -304,6 +414,7 @@ newtype LintM a = LintM
     deriving (Functor)
 
 data LintFlags = LintFlags { lf_unarised :: !Bool
+                           , lf_platform :: !Platform
                              -- ^ have we run the unariser yet?
                            }
 
@@ -329,9 +440,9 @@ pp_binders bs
     pp_binder b
       = hsep [ppr b, dcolon, ppr (idType b)]
 
-initL :: DiagOpts -> Module -> Bool -> StgPprOpts -> IdSet -> LintM a -> Maybe SDoc
-initL diag_opts this_mod unarised opts locals (LintM m) = do
-  let (_, errs) = m this_mod (LintFlags unarised) diag_opts opts [] locals emptyBag
+initL :: Platform -> DiagOpts -> Module -> Bool -> StgPprOpts -> IdSet -> LintM a -> Maybe SDoc
+initL platform diag_opts this_mod unarised opts locals (LintM m) = do
+  let (_, errs) = m this_mod (LintFlags unarised platform) diag_opts opts [] locals emptyBag
   if isEmptyBag errs then
       Nothing
   else

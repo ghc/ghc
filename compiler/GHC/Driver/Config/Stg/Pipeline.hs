@@ -21,6 +21,7 @@ initStgPipelineOpts dflags for_bytecode = StgPipelineOpts
       Just $ initDiagOpts dflags
   , stgPipeline_pprOpts = initStgPprOpts dflags
   , stgPipeline_phases = getStgToDo for_bytecode dflags
+  , stgPlatform = targetPlatform dflags
   }
 
 -- | Which Stg-to-Stg passes to run. Depends on flags, ways etc.
