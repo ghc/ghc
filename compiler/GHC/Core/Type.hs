@@ -149,7 +149,7 @@ module GHC.Core.Type (
         Kind,
 
         -- ** Finding the kind of a type
-        typeKind, tcTypeKind, typeHasFixedRuntimeRep, resultHasFixedRuntimeRep,
+        typeKind, tcTypeKind, typeHasFixedRuntimeRep,
         tcIsLiftedTypeKind, tcIsConstraintKind, tcReturnsConstraintKind,
         tcIsBoxedTypeKind, tcIsRuntimeTypeKind,
 
@@ -3193,16 +3193,6 @@ typeHasFixedRuntimeRep = go
     go (LitTy {})               = True
     go (ForAllTy _ ty)          = go ty
     go ty                       = isFixedRuntimeRepKind (typeKind ty)
-
--- | Looking past all pi-types, does the end result have a
--- fixed runtime rep, as per Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete?
---
--- Examples:
---
---   * False for @(forall r (a :: TYPE r). String -> a)@
---   * True for @(forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b -> Type)@
-resultHasFixedRuntimeRep :: Type -> Bool
-resultHasFixedRuntimeRep = typeHasFixedRuntimeRep . snd . splitPiTys
 
 {- **********************************************************************
 *                                                                       *

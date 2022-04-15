@@ -51,7 +51,6 @@ mkPrimOpId prim_op
            `setDmdSigInfo`         strict_sig
            `setCprSigInfo`         mkCprSig arity cpr
            `setInlinePragInfo`     neverInlinePragma
-           `setLevityInfoWithType` res_ty
                -- We give PrimOps a NOINLINE pragma so that we don't
                -- get silly warnings from Desugar.dsRule (the inline_shadows_rule
                -- test) about a RULE conflicting with a possible inlining

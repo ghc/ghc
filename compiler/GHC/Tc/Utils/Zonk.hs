@@ -78,7 +78,6 @@ import GHC.Types.Name.Env
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Id
-import GHC.Types.Id.Info
 import GHC.Types.TypeEnv
 import GHC.Types.SourceText
 import GHC.Types.Basic
@@ -385,7 +384,7 @@ zonkIdOccs env ids = map (zonkIdOcc env) ids
 zonkIdBndr :: ZonkEnv -> TcId -> TcM Id
 zonkIdBndr env v
   = do Scaled w' ty' <- zonkScaledTcTypeToTypeX env (idScaledType v)
-       return (modifyIdInfo (`setLevityInfoWithType` ty') (setIdMult (setIdType v ty') w'))
+       return (setIdMult (setIdType v ty') w')
 
 zonkIdBndrs :: ZonkEnv -> [TcId] -> TcM [Id]
 zonkIdBndrs env ids = mapM (zonkIdBndr env) ids

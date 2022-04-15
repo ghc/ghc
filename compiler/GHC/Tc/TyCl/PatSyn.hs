@@ -43,7 +43,7 @@ import GHC.Data.FastString
 import GHC.Types.Var
 import GHC.Types.Var.Env( emptyTidyEnv, mkInScopeSet )
 import GHC.Types.Id
-import GHC.Types.Id.Info( RecSelParent(..), setLevityInfoWithType )
+import GHC.Types.Id.Info( RecSelParent(..) )
 import GHC.Tc.Gen.Bind
 import GHC.Types.Basic
 import GHC.Tc.Solver
@@ -910,9 +910,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
 
            Just (builder_name, builder_ty, need_dummy_arg) ->  -- Normal case
     do { -- Bidirectional, so patSynBuilder returns Just
-         let pat_ty = patSynResultType patsyn
-             builder_id = modifyIdInfo (`setLevityInfoWithType` pat_ty) $
-                          mkExportedVanillaId builder_name builder_ty
+         let builder_id = mkExportedVanillaId builder_name builder_ty
                          -- See Note [Exported LocalIds] in GHC.Types.Id
              prags = lookupPragEnv prag_fn ps_name
              -- See Note [Pragmas for pattern synonyms]

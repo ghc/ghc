@@ -2280,7 +2280,6 @@ diffIdInfo env bndr1 bndr2
     && occInfo info1 == occInfo info2
     && demandInfo info1 == demandInfo info2
     && callArityInfo info1 == callArityInfo info2
-    && levityInfo info1 == levityInfo info2
   = locBind "in unfolding of" bndr1 bndr2 $
     diffUnfold env (realUnfoldingInfo info1) (realUnfoldingInfo info2)
   | otherwise
