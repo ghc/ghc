@@ -7,9 +7,6 @@
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack where
 
-import GHC.Exts.Heap.Closures (GenClosure (Int64Closure), closureSize)
-import GHC.Real (Integral)
-
 #if MIN_VERSION_base(4,16,0)
 import Prelude
 import GHC.Stack.CloneStack
