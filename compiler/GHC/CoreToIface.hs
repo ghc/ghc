@@ -458,7 +458,7 @@ toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
 toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info
   = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, cpr_hsinfo,
-               inline_hsinfo,  unfold_hsinfo, levity_hsinfo]
+               inline_hsinfo,  unfold_hsinfo]
                -- NB: strictness and arity must appear in the list before unfolding
                -- See GHC.IfaceToCore.tcUnfolding
   where
@@ -491,10 +491,6 @@ toIfaceIdInfo id_info
     inline_prag = inlinePragInfo id_info
     inline_hsinfo | isDefaultInlinePragma inline_prag = Nothing
                   | otherwise = Just (HsInline inline_prag)
-
-    ------------  Representation polymorphism  ----------
-    levity_hsinfo | isNeverRepPolyIdInfo id_info = Just HsLevity
-                  | otherwise                    = Nothing
 
 toIfaceJoinInfo :: Maybe JoinArity -> IfaceJoinInfo
 toIfaceJoinInfo (Just ar) = IfaceJoinPoint ar

@@ -479,7 +479,6 @@ mkDictSelId name clas
                 `setArityInfo`          1
                 `setDmdSigInfo`     strict_sig
                 `setCprSigInfo`            topCprSig
-                `setLevityInfoWithType` sel_ty
 
     info | new_tycon
          = base_info `setInlinePragInfo` alwaysInlinePragma
@@ -585,9 +584,6 @@ mkDataConWorkId wkr_name data_con
                    `setInlinePragInfo`     wkr_inline_prag
                    `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
                                                            -- even if arity = 0
-                   `setLevityInfoWithType` wkr_ty
-                     -- NB: unboxed tuples have workers, so we can't use
-                     -- setNeverRepPoly
 
     wkr_inline_prag = defaultInlinePragma { inl_rule = ConLike }
     wkr_arity = dataConRepArity data_con
@@ -598,7 +594,6 @@ mkDataConWorkId wkr_name data_con
                   `setArityInfo` 1      -- Arity 1
                   `setInlinePragInfo`     dataConWrapperInlinePragma
                   `setUnfoldingInfo`      newtype_unf
-                  `setLevityInfoWithType` wkr_ty
     id_arg1      = mkScaledTemplateLocal 1 (head arg_tys)
     res_ty_args  = mkTyCoVarTys univ_tvs
     newtype_unf  = assertPpr (isVanillaDataCon data_con && isSingleton arg_tys)
@@ -698,7 +693,6 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
                              -- We need to get the CAF info right here because GHC.Iface.Tidy
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
-                         `setLevityInfoWithType` wrap_ty
 
              wrap_sig = mkClosedDmdSig wrap_arg_dmds topDiv
 
@@ -1323,7 +1317,6 @@ mkFCallId uniq fcall ty
            `setArityInfo`          arity
            `setDmdSigInfo`     strict_sig
            `setCprSigInfo`            topCprSig
-           `setLevityInfoWithType` ty
 
     (bndrs, _) = tcSplitPiTys ty
     arity      = count isAnonTyCoBinder bndrs
@@ -1411,8 +1404,7 @@ noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineI
 proxyHashId :: Id
 proxyHashId
   = pcMiscPrelId proxyName ty
-       (noCafIdInfo `setUnfoldingInfo` evaldUnfolding -- Note [evaldUnfoldings]
-                    `setNeverRepPoly`  ty)
+       (noCafIdInfo `setUnfoldingInfo` evaldUnfolding) -- Note [evaldUnfoldings]
   where
     -- proxy# :: forall {k} (a:k). Proxy# k a
     --
@@ -1432,7 +1424,6 @@ nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts (Lit nullAddrLit)
-                       `setNeverRepPoly`   addrPrimTy
 
 ------------------------------------------------
 seqId :: Id     -- See Note [seqId magic]
@@ -1466,13 +1457,13 @@ seqId = pcMiscPrelId seqName ty info
 lazyId :: Id    -- See Note [lazyId magic]
 lazyId = pcMiscPrelId lazyIdName ty info
   where
-    info = noCafIdInfo `setNeverRepPoly` ty
+    info = noCafIdInfo
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
 
 noinlineId :: Id -- See Note [noinlineId magic]
 noinlineId = pcMiscPrelId noinlineIdName ty info
   where
-    info = noCafIdInfo `setNeverRepPoly` ty
+    info = noCafIdInfo
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
 
 oneShotId :: Id -- See Note [The oneShot function]
@@ -1784,8 +1775,7 @@ inlined.
 realWorldPrimId :: Id   -- :: State# RealWorld
 realWorldPrimId = pcMiscPrelId realWorldName realWorldStatePrimTy
                      (noCafIdInfo `setUnfoldingInfo` evaldUnfolding    -- Note [evaldUnfoldings]
-                                  `setOneShotInfo`   stateHackOneShot
-                                  `setNeverRepPoly`  realWorldStatePrimTy)
+                                  `setOneShotInfo`   stateHackOneShot)
 
 voidPrimId :: Id     -- Global constant :: Void#
                      -- The type Void# is now the same as (# #) (ticket #18441),
@@ -1794,8 +1784,7 @@ voidPrimId :: Id     -- Global constant :: Void#
                      -- We cannot define it in normal Haskell, since it's
                      -- a top-level unlifted value.
 voidPrimId  = pcMiscPrelId voidPrimIdName unboxedUnitTy
-                (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding defaultSimpleOpts rhs
-                             `setNeverRepPoly`  unboxedUnitTy)
+                (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding defaultSimpleOpts rhs)
     where rhs = Var (dataConWorkId unboxedUnitDataCon)
 
 

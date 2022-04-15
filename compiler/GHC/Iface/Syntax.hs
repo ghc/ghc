@@ -351,7 +351,6 @@ data IfaceInfoItem
   | HsUnfold        Bool             -- True <=> isStrongLoopBreaker is true
                     IfaceUnfolding   -- See Note [Expose recursive functions]
   | HsNoCafRefs
-  | HsLevity                         -- Present <=> never representation-polymorphic
   | HsLFInfo        IfaceLFInfo
   | HsTagSig        TagSig
 
@@ -1478,7 +1477,6 @@ instance Outputable IfaceInfoItem where
   ppr (HsDmdSig str)        = text "Strictness:" <+> ppr str
   ppr (HsCprSig cpr)        = text "CPR:" <+> ppr cpr
   ppr HsNoCafRefs           = text "HasNoCafRefs"
-  ppr HsLevity              = text "Never levity-polymorphic"
   ppr (HsLFInfo lf_info)    = text "LambdaFormInfo:" <+> ppr lf_info
   ppr (HsTagSig tag_sig)    = text "TagSig:" <+> ppr tag_sig
 
@@ -2244,7 +2242,6 @@ instance Binary IfaceInfoItem where
     put_ bh (HsUnfold lb ad)      = putByte bh 2 >> put_ bh lb >> put_ bh ad
     put_ bh (HsInline ad)         = putByte bh 3 >> put_ bh ad
     put_ bh HsNoCafRefs           = putByte bh 4
-    put_ bh HsLevity              = putByte bh 5
     put_ bh (HsCprSig cpr)        = putByte bh 6 >> put_ bh cpr
     put_ bh (HsLFInfo lf_info)    = putByte bh 7 >> put_ bh lf_info
     put_ bh (HsTagSig sig)        = putByte bh 8 >> put_ bh sig
@@ -2259,7 +2256,6 @@ instance Binary IfaceInfoItem where
                     return (HsUnfold lb ad)
             3 -> liftM HsInline $ get bh
             4 -> return HsNoCafRefs
-            5 -> return HsLevity
             6 -> HsCprSig <$> get bh
             7 -> HsLFInfo <$> get bh
             _ -> HsTagSig <$> get bh
@@ -2607,7 +2603,6 @@ instance NFData IfaceInfoItem where
     HsInline p -> p `seq` () -- TODO: seq further?
     HsUnfold b unf -> rnf b `seq` rnf unf
     HsNoCafRefs -> ()
-    HsLevity -> ()
     HsCprSig cpr -> cpr `seq` ()
     HsLFInfo lf_info -> lf_info `seq` () -- TODO: seq further?
     HsTagSig sig -> sig `seq` ()

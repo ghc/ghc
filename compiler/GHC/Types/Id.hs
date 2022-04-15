@@ -99,7 +99,6 @@ module GHC.Types.Id (
         idCafInfo, idLFInfo_maybe,
         idOneShotInfo, idStateHackOneShotInfo,
         idOccInfo,
-        isNeverRepPolyId,
 
         -- ** Writing 'IdInfo' fields
         setIdUnfolding, setCaseBndrEvald,
@@ -1077,6 +1076,3 @@ transferPolyIdInfo old_id abstract_wrt new_id
                                  `setOccInfo` new_occ_info
                                  `setDmdSigInfo` new_strictness
                                  `setCprSigInfo` old_cpr
-
-isNeverRepPolyId :: Id -> Bool
-isNeverRepPolyId = isNeverRepPolyIdInfo . idInfo
