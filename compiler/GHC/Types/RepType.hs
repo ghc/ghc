@@ -16,11 +16,13 @@ module GHC.Types.RepType
     PrimRep(..), primRepToRuntimeRep, primRepToType,
     countFunRepArgs, countConRepArgs, dataConRuntimeRepStrictness,
     tyConPrimRep, tyConPrimRep1,
+    runtimeRepPrimRep_maybe, kindPrimRep_maybe, typePrimRep_maybe,
 
     -- * Unboxed sum representation type
     ubxSumRepType, layoutUbxSum, typeSlotTy, SlotTy (..),
-    slotPrimRep, primRepSlot
-  ) where
+    slotPrimRep, primRepSlot,
+
+    ) where
 
 import GHC.Prelude
 
@@ -533,6 +535,14 @@ typePrimRep ty = kindPrimRep (text "typePrimRep" <+>
                               parens (ppr ty <+> dcolon <+> ppr (typeKind ty)))
                              (typeKind ty)
 
+-- | Discovers the primitive representation of a 'Type'. Returns
+-- a list of 'PrimRep': it's a list because of the possibility of
+-- no runtime representation (void) or multiple (unboxed tuple/sum)
+-- See also Note [Getting from RuntimeRep to PrimRep]
+-- Returns Nothing if rep can't be determined. Eg. levity polymorphic types.
+typePrimRep_maybe :: Type -> Maybe [PrimRep]
+typePrimRep_maybe ty = kindPrimRep_maybe (typeKind ty)
+
 -- | Like 'typePrimRep', but assumes that there is precisely one 'PrimRep' output;
 -- an empty list of PrimReps becomes a VoidRep.
 -- This assumption holds after unarise, see Note [Post-unarisation invariants].
@@ -576,6 +586,23 @@ kindPrimRep doc (TyConApp typ [runtime_rep])
 kindPrimRep doc ki
   = pprPanic "kindPrimRep" (ppr ki $$ doc)
 
+-- NB: We could implement the partial methods by calling into the maybe
+-- variants here. But then both would need to pass around the doc argument.
+
+-- | Take a kind (of shape @TYPE rr@) and produce the 'PrimRep's
+-- of values of types of this kind.
+-- See also Note [Getting from RuntimeRep to PrimRep]
+-- Returns Nothing if rep can't be determined. Eg. levity polymorphic types.
+kindPrimRep_maybe :: HasDebugCallStack => Kind -> Maybe [PrimRep]
+kindPrimRep_maybe ki
+  | Just ki' <- coreView ki
+  = kindPrimRep_maybe ki'
+kindPrimRep_maybe (TyConApp typ [runtime_rep])
+  = assert (typ `hasKey` tYPETyConKey) $
+    runtimeRepPrimRep_maybe runtime_rep
+kindPrimRep_maybe _ki
+  = Nothing
+
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
 -- it encodes. See also Note [Getting from RuntimeRep to PrimRep]
 -- The [PrimRep] is the final runtime representation /after/ unarisation
@@ -588,6 +615,20 @@ runtimeRepPrimRep doc rr_ty
   = fun args
   | otherwise
   = pprPanic "runtimeRepPrimRep" (doc $$ ppr rr_ty)
+
+-- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
+-- it encodes. See also Note [Getting from RuntimeRep to PrimRep]
+-- The [PrimRep] is the final runtime representation /after/ unarisation
+-- Returns Nothing if rep can't be determined. Eg. levity polymorphic types.
+runtimeRepPrimRep_maybe :: Type -> Maybe [PrimRep]
+runtimeRepPrimRep_maybe rr_ty
+  | Just rr_ty' <- coreView rr_ty
+  = runtimeRepPrimRep_maybe rr_ty'
+  | TyConApp rr_dc args <- rr_ty
+  , RuntimeRep fun <- tyConRuntimeRepInfo rr_dc
+  = Just $! fun args
+  | otherwise
+  = Nothing
 
 -- | Convert a 'PrimRep' to a 'Type' of kind RuntimeRep
 primRepToRuntimeRep :: PrimRep -> Type
