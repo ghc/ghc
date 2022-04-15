@@ -162,6 +162,18 @@ So we pass type arguments of the DataCon's TyCon in StgConApp to decide what
 layout to use. Note that unlifted values can't be let-bound, so we don't need
 types in StgRhsCon.
 
+Note [UnariseEnv]
+~~~~~~~~~~~~~~~~~~
+At any variable occurrence 'v',
+* If the UnariseEnv has a binding for 'v', the binding says what 'v' is bound to
+* If not, 'v' stands just for itself.
+
+Most variables are unaffected by unarisation, and (for efficiency) we don't put
+them in the UnariseEnv at all.  But NB: when we go under a binding for 'v' we must
+remember to delete 'v' from the UnariseEnv, lest occurrences of 'v' see the outer
+binding for the variable (#21396).
+
+
 Note [UnariseEnv can map to literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To avoid redundant case expressions when unarising unboxed sums, UnariseEnv
@@ -277,6 +289,8 @@ instance Outputable UnariseVal where
   ppr (UnaryVal arg)   = text "UnaryVal" <+> ppr arg
 
 -- | Extend the environment, checking the UnariseEnv invariant.
+-- The id is mapped to one or more things.
+-- See Note [UnariseEnv]
 extendRho :: UnariseEnv -> Id -> UnariseVal -> UnariseEnv
 extendRho rho x (MultiVal args)
   = ASSERT(all (isNvUnaryType . stgArgType) args)
@@ -284,6 +298,14 @@ extendRho rho x (MultiVal args)
 extendRho rho x (UnaryVal val)
   = ASSERT(isNvUnaryType (stgArgType val))
     extendVarEnv rho x (UnaryVal val)
+-- Properly shadow things from an outer scope.
+-- See Note [UnariseEnv]
+
+-- The id stands for itself so we don't record a mapping.
+-- See Note [UnariseEnv]
+extendRhoWithoutValue :: UnariseEnv -> Id -> UnariseEnv
+extendRhoWithoutValue rho x = delVarEnv rho x
+
 
 --------------------------------------------------------------------------------
 
@@ -693,7 +715,7 @@ unariseArgBinder is_con_arg rho x =
       -> do x' <- mkId (mkFastString "us") (primRepToType rep)
             return (extendRho rho x (MultiVal [StgVarArg x']), [x'])
       | otherwise
-      -> return (rho, [x])
+      -> return (extendRhoWithoutValue rho x, [x])
 
     reps -> do
       xs <- mkIds (mkFastString "us") (map primRepToType reps)
