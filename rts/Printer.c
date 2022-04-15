@@ -474,11 +474,32 @@ const char *info_update_frame(const StgClosure *closure)
         return "ERROR: Not an update frame!!!";
     }
 }
+// TODO: Remove later
+// Assumes little endian
+void printBits(size_t const size, void const * const ptr)
+{
+    unsigned char *b = (unsigned char*) ptr;
+    unsigned char byte;
+    int i, j;
+
+    for (i = size-1; i >= 0; i--) {
+        for (j = 7; j >= 0; j--) {
+            byte = (b[i] >> j) & 1;
+            debugBelch("%u", byte);
+        }
+    }
+    debugBelch("\n");
+}
 
 static void
 printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap,
                     uint32_t size )
 {
+    debugBelch("printSmallBitmap - payload %p\n", payload);
+    debugBelch("printSmallBitmap - bitmap ");
+    printBits(sizeof(StgWord), payload);
+    debugBelch("printSmallBitmap - size %u\n", size);
+
     uint32_t i;
 
     for(i = 0; i < size; i++, bitmap >>= 1 ) {
@@ -524,7 +545,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
     ASSERT(sp <= spBottom);
     for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
-
+        debugBelch("printStackChunk - spBottom : %p\n", spBottom);
+        debugBelch("printStackChunk - sp : %p\n", sp);
         info = get_itbl((StgClosure *)sp);
 
         switch (info->type) {
@@ -691,6 +713,9 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
 void printStack( StgStack *stack )
 {
+    debugBelch("printStack - stack : %p\n", stack);
+    debugBelch("printStack - sp : %p\n", stack->sp);
+
     printStackChunk( stack->sp, stack->stack + stack->stack_size );
 }
 

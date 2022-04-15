@@ -56,3 +56,7 @@ test('parse_tso_flags',
 test('T21622',
      only_ways(['normal']),
      compile_and_run, [''])
+
+test('decode_cloned_stack',
+     [only_ways(['normal'])],
+     compile_and_run, ['-debug -optc-g -g'])

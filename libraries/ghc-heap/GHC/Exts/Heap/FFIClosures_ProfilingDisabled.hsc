@@ -14,6 +14,8 @@ import GHC.Exts
 import GHC.Exts.Heap.ProfInfo.PeekProfInfo
 import GHC.Exts.Heap.ProfInfo.Types
 import GHC.Exts.Heap.Closures(WhatNext(..), WhyBlocked(..), TsoFlags(..))
+import Debug.Trace
+import Numeric
 
 data TSOFields = TSOFields {
     tso_what_next :: WhatNext,
@@ -102,10 +104,11 @@ data StackFields = StackFields {
 #if __GLASGOW_HASKELL__ >= 811
     stack_marking :: Word8,
 #endif
-    stack_sp :: Addr##
+    stack_sp :: Addr##,
+    stack_stack :: Addr##
 }
 
--- | Get non-closure fields from @StgStack_@ (@TSO.h@)
+-- | Get fields from @StgStack_@ (@TSO.h@)
 peekStackFields :: Ptr a -> IO StackFields
 peekStackFields ptr = do
     stack_size' <- (#peek struct StgStack_, stack_size) ptr ::IO Word32
@@ -114,8 +117,8 @@ peekStackFields ptr = do
     marking' <- (#peek struct StgStack_, marking) ptr
 #endif
     Ptr sp' <- (#peek struct StgStack_, sp) ptr
-
-    -- TODO decode the stack.
+    let Ptr stack' = (#ptr struct StgStack_, stack) ptr
+    traceM $ "stack' " ++ showAddr## stack'
 
     return StackFields {
         stack_size = stack_size',
@@ -123,6 +126,9 @@ peekStackFields ptr = do
 #if __GLASGOW_HASKELL__ >= 811
         stack_marking = marking',
 #endif
-        stack_sp = sp'
+        stack_sp = sp',
+        stack_stack = stack'
     }
 
+showAddr## :: Addr## -> String
+showAddr## addr## = (showHex $ I## (addr2Int## addr##)) ""
