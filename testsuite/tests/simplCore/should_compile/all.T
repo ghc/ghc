@@ -403,3 +403,5 @@ test('T21261', [ grep_errmsg(r'^(yes|no)') ], compile, ['-O -ddump-simpl -dno-ty
 test('T17966',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])
 # We expect to see a SPEC rule for $cm
 test('T19644',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])
+
+test('T21391', normal, compile, ['-O -dcore-lint'])

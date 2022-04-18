@@ -956,7 +956,8 @@ zapScSubst env = env { sc_subst = zapSubstEnv (sc_subst env) }
 
 extendScInScope :: ScEnv -> [Var] -> ScEnv
         -- Bring the quantified variables into scope
-extendScInScope env qvars = env { sc_subst = extendInScopeList (sc_subst env) qvars }
+extendScInScope env qvars
+  = env { sc_subst = extendSubstInScopeList (sc_subst env) qvars }
 
         -- Extend the substitution
 extendScSubst :: ScEnv -> Var -> OutExpr -> ScEnv

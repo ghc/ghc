@@ -22,7 +22,7 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Opt.Arity
-import GHC.Core.Subst hiding ( extendInScopeSet )
+import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Unfold
@@ -1260,7 +1260,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
     subst_in_scope (Right s) = substInScope s
 
     subst_extend_in_scope (Left in_scope) v = Left (in_scope `extendInScopeSet` v)
-    subst_extend_in_scope (Right s) v = Right (s `extendInScope` v)
+    subst_extend_in_scope (Right s) v = Right (s `extendSubstInScope` v)
 
     subst_co (Left {}) co = co
     subst_co (Right s) co = GHC.Core.Subst.substCo s co
