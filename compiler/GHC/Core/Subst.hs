@@ -24,7 +24,7 @@ module GHC.Core.Subst (
         emptySubst, mkEmptySubst, mkSubst, mkOpenSubst, substInScope, isEmptySubst,
         extendIdSubst, extendIdSubstList, extendTCvSubst, extendTvSubstList,
         extendSubst, extendSubstList, extendSubstWithVar, zapSubstEnv,
-        extendInScope, extendInScopeList, extendInScopeIds, GHC.Core.Subst.extendInScopeSet,
+        extendSubstInScope, extendSubstInScopeList, extendSubstInScopeSet,
         isInScope, setInScope, getTCvSubst, extendTvSubst, extendCvSubst,
         delBndr, delBndrs,
 
@@ -57,7 +57,6 @@ import GHC.Types.Var
 import GHC.Types.Tickish
 import GHC.Types.Id.Info
 import GHC.Types.Unique.Supply
-import GHC.Types.Unique.Set
 
 import GHC.Builtin.Names
 import GHC.Data.Maybe
@@ -285,33 +284,23 @@ mkOpenSubst in_scope pairs = Subst in_scope
 isInScope :: Var -> Subst -> Bool
 isInScope v (Subst in_scope _ _ _) = v `elemInScopeSet` in_scope
 
--- | Add the 'Var' to the in-scope set: as a side effect,
--- and remove any existing substitutions for it
-extendInScope :: Subst -> Var -> Subst
-extendInScope (Subst in_scope ids tvs cvs) v
+-- | Add the 'Var' to the in-scope set
+extendSubstInScope :: Subst -> Var -> Subst
+extendSubstInScope (Subst in_scope ids tvs cvs) v
   = Subst (in_scope `InScopeSet.extendInScopeSet` v)
-          (ids `delVarEnv` v) (tvs `delVarEnv` v) (cvs `delVarEnv` v)
+          ids tvs cvs
 
 -- | Add the 'Var's to the in-scope set: see also 'extendInScope'
-extendInScopeList :: Subst -> [Var] -> Subst
-extendInScopeList (Subst in_scope ids tvs cvs) vs
+extendSubstInScopeList :: Subst -> [Var] -> Subst
+extendSubstInScopeList (Subst in_scope ids tvs cvs) vs
   = Subst (in_scope `extendInScopeSetList` vs)
-          (ids `delVarEnvList` vs) (tvs `delVarEnvList` vs) (cvs `delVarEnvList` vs)
-
--- | Optimized version of 'extendInScopeList' that can be used if you are certain
--- all the things being added are 'Id's and hence none are 'TyVar's or 'CoVar's
-extendInScopeIds :: Subst -> [Id] -> Subst
-extendInScopeIds (Subst in_scope ids tvs cvs) vs
-  = Subst (in_scope `extendInScopeSetList` vs)
-          (ids `delVarEnvList` vs) tvs cvs
+          ids tvs cvs
 
 -- | Add the 'Var's to the in-scope set: see also 'extendInScope'
-extendInScopeSet :: Subst -> VarSet -> Subst
-extendInScopeSet (Subst in_scope ids tvs cvs) vs
+extendSubstInScopeSet :: Subst -> VarSet -> Subst
+extendSubstInScopeSet (Subst in_scope ids tvs cvs) vs
   = Subst (in_scope `extendInScopeSetSet` vs)
-          (ids `minus` vs) (tvs `minus` vs) (cvs `minus` vs)
-  where
-    minus env set = minusVarEnv env (getUniqSet set)
+          ids tvs cvs
 
 setInScope :: Subst -> InScopeSet -> Subst
 setInScope (Subst _ ids tvs cvs) in_scope = Subst in_scope ids tvs cvs

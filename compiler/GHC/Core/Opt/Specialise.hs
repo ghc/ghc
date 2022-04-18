@@ -68,7 +68,6 @@ import GHC.Utils.Panic.Plain( assert )
 import GHC.Unit.Module( Module )
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.External
-import GHC.Core.Unfold
 
 {-
 ************************************************************************
@@ -1296,7 +1295,7 @@ bringFloatedDictsIntoScope env uds =
   env{se_subst=subst'}
   where
    dx_bndrs = ud_bs_of_binds uds
-   subst'   = se_subst env `Core.extendInScopeSet` dx_bndrs
+   subst'   = se_subst env `Core.extendSubstInScopeSet` dx_bndrs
 
 specBind :: SpecEnv                     -- Use this for RHSs
          -> CoreBind                    -- Binders are already cloned by cloneBindSM,
@@ -1508,6 +1507,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 --                                        , text "spec_args: " <+> ppr spec_args
 --                                        , text "dx_binds:  " <+> ppr dx_binds
 --                                        , text "rhs_env2:  " <+> ppr (se_subst rhs_env2)
+--                                        , text "leftover_bndrs:" <+> pprIds leftover_bndrs
 --                                        , ppr dx_binds ]) $
 --             return ()
 
@@ -2374,12 +2374,12 @@ specHeader env (bndr : bndrs) (UnspecType : args)
 -- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
 -- the nitty-gritty), as a LHS rule and unfolding details.
 specHeader env (bndr : bndrs) (SpecDict d : args)
-  = do { bndr' <- newDictBndr env bndr -- See Note [Zap occ info in rule binders]
-       ; let (env', dx_bind, spec_dict) = bindAuxiliaryDict env bndr bndr' d
-       ; (_, env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-             <- specHeader env' bndrs args
+  = do { (env1, bndr') <- newDictBndr env bndr -- See Note [Zap occ info in rule binders]
+       ; let (env2, dx_bind, spec_dict) = bindAuxiliaryDict env1 bndr bndr' d
+       ; (_, env3, leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
+             <- specHeader env2 bndrs args
        ; pure ( True      -- Ha!  A useful specialisation!
-              , env''
+              , env3
               , leftover_bndrs
               -- See Note [Evidence foralls]
               , exprFreeIdsList (varToCoreExpr bndr') ++ rule_bs
@@ -2433,9 +2433,9 @@ specHeader env bndrs []
 bindAuxiliaryDict
   :: SpecEnv
   -> InId -> OutId -> OutExpr -- Original dict binder, and the witnessing expression
-  -> ( SpecEnv        -- Substitute for orig_dict_id
+  -> ( SpecEnv        -- Substitutes for orig_dict_id
      , Maybe DictBind -- Auxiliary dict binding, if any
-     , OutExpr)        -- Witnessing expression (always trivial)
+     , OutExpr)       -- Witnessing expression (always trivial)
 bindAuxiliaryDict env@(SE { se_subst = subst, se_interesting = interesting })
                   orig_dict_id fresh_dict_id dict_expr
 
@@ -2443,7 +2443,6 @@ bindAuxiliaryDict env@(SE { se_subst = subst, se_interesting = interesting })
   -- don’t bother creating a new dict binding; just substitute
   | Just dict_id <- getIdFromTrivialExpr_maybe dict_expr
   = let env' = env { se_subst = Core.extendSubst subst orig_dict_id dict_expr
-                                `Core.extendInScope` dict_id
                           -- See Note [Keep the old dictionaries interesting]
                    , se_interesting = interesting `extendVarSet` dict_id }
     in (env', Nothing, dict_expr)
@@ -2451,7 +2450,7 @@ bindAuxiliaryDict env@(SE { se_subst = subst, se_interesting = interesting })
   | otherwise  -- Non-trivial dictionary arg; make an auxiliary binding
   = let dict_bind = mkDB (NonRec fresh_dict_id dict_expr)
         env' = env { se_subst = Core.extendSubst subst orig_dict_id (Var fresh_dict_id)
-                                `Core.extendInScope` fresh_dict_id
+                                `Core.extendSubstInScope` fresh_dict_id
                       -- See Note [Make the new dictionaries interesting]
                    , se_interesting = interesting `extendVarSet` fresh_dict_id }
     in (env', Just dict_bind, Var fresh_dict_id)
@@ -3058,13 +3057,16 @@ cloneBindSM env@(SE { se_subst = subst, se_interesting = interesting }) (Rec pai
                                            [ v | (v,r) <- pairs, interestingDict env r ] }
        ; return (env', env', Rec (bndrs' `zip` map snd pairs)) }
 
-newDictBndr :: SpecEnv -> CoreBndr -> SpecM CoreBndr
+newDictBndr :: SpecEnv -> CoreBndr -> SpecM (SpecEnv, CoreBndr)
 -- Make up completely fresh binders for the dictionaries
 -- Their bindings are going to float outwards
-newDictBndr env b = do { uniq <- getUniqueM
-                        ; let n   = idName b
-                              ty' = substTy env (idType b)
-                        ; return (mkUserLocal (nameOccName n) uniq Many ty' (getSrcSpan n)) }
+newDictBndr env@(SE { se_subst = subst }) b
+  = do { uniq <- getUniqueM
+       ; let n    = idName b
+             ty'  = Core.substTy subst (idType b)
+             b'   = mkUserLocal (nameOccName n) uniq Many ty' (getSrcSpan n)
+             env' = env { se_subst = subst `Core.extendSubstInScope` b' }
+       ; pure (env', b') }
 
 newSpecIdSM :: Name -> Type -> IdDetails -> IdInfo -> SpecM Id
     -- Give the new Id a similar occurrence name to the old one
