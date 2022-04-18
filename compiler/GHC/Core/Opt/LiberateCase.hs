@@ -5,11 +5,13 @@
 -}
 
 
-module GHC.Core.Opt.LiberateCase ( liberateCase ) where
+module GHC.Core.Opt.LiberateCase
+  ( LibCaseOpts(..)
+  , liberateCase
+  ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
 import GHC.Core
 import GHC.Core.Unfold
 import GHC.Builtin.Types ( unitDataConId )
@@ -101,19 +103,17 @@ and the level of @h@ is zero (NB not one).
 ************************************************************************
 -}
 
-liberateCase :: DynFlags -> CoreProgram -> CoreProgram
-liberateCase dflags binds = do_prog (initLiberateCaseEnv dflags) binds
+liberateCase :: LibCaseOpts -> CoreProgram -> CoreProgram
+liberateCase opts binds = do_prog (initLiberateCaseEnv opts) binds
   where
     do_prog _   [] = []
     do_prog env (bind:binds) = bind' : do_prog env' binds
                              where
                                (env', bind') = libCaseBind env bind
 
-
-initLiberateCaseEnv :: DynFlags -> LibCaseEnv
-initLiberateCaseEnv dflags = LibCaseEnv
-   { lc_threshold = liberateCaseThreshold dflags
-   , lc_uf_opts   = unfoldingOpts dflags
+initLiberateCaseEnv :: LibCaseOpts -> LibCaseEnv
+initLiberateCaseEnv opts = LibCaseEnv
+   { lc_opts      = opts
    , lc_lvl       = 0
    , lc_lvl_env   = emptyVarEnv
    , lc_rec_env   = emptyVarEnv
@@ -388,6 +388,22 @@ lookupLevel env id
 {-
 ************************************************************************
 *                                                                      *
+         Options
+*                                                                      *
+************************************************************************
+-}
+
+-- | Options for the liberate case pass.
+data LibCaseOpts = LibCaseOpts
+  -- | Bomb-out size for deciding if potential liberatees are too big.
+  { lco_threshold :: !(Maybe Int)
+  -- | Unfolding options
+  , lco_unfolding_opts :: !UnfoldingOpts
+  }
+
+{-
+************************************************************************
+*                                                                      *
          The environment
 *                                                                      *
 ************************************************************************
@@ -398,14 +414,16 @@ type LibCaseLevel = Int
 topLevel :: LibCaseLevel
 topLevel = 0
 
+lc_threshold :: LibCaseEnv -> Maybe Int
+lc_threshold = lco_threshold . lc_opts
+
+lc_uf_opts :: LibCaseEnv -> UnfoldingOpts
+lc_uf_opts = lco_unfolding_opts . lc_opts
+
 data LibCaseEnv
   = LibCaseEnv {
-        lc_threshold :: Maybe Int,
-                -- ^ Bomb-out size for deciding if potential liberatees are too
-                -- big.
-
-        lc_uf_opts :: UnfoldingOpts,
-                -- ^ Unfolding options
+        lc_opts :: !LibCaseOpts,
+                -- ^ liberate case options
 
         lc_lvl :: LibCaseLevel, -- ^ Current level
                 -- The level is incremented when (and only when) going
