@@ -49,7 +49,6 @@ import GHC.Types.Demand    ( isUsedOnceDmd )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
 
 import GHC.Unit.Module
-import GHC.Builtin.Types ( unboxedUnitDataCon )
 import GHC.Data.FastString
 import GHC.Platform.Ways
 import GHC.Builtin.PrimOps ( PrimCall(..) )
@@ -462,15 +461,6 @@ coreToStgExpr (Case scrut bndr _ alts)
   where
     vars_alt :: CoreAlt -> CtsM StgAlt
     vars_alt (Alt con binders rhs)
-      | DataAlt c <- con, c == unboxedUnitDataCon
-      = -- This case is a bit smelly.
-        -- See Note [Nullary unboxed tuple] in GHC.Core.Type
-        -- where a nullary tuple is mapped to (State# World#)
-        assert (null binders) $
-        do { rhs2 <- coreToStgExpr rhs
-           ; return GenStgAlt{alt_con=DEFAULT,alt_bndrs=mempty,alt_rhs=rhs2}
-           }
-      | otherwise
       = let     -- Remove type variables
             binders' = filterStgBinders binders
         in
