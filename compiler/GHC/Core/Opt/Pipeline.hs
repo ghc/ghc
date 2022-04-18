@@ -13,6 +13,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
+import GHC.Driver.Config.Core.Opt.LiberateCase ( initLiberateCaseOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core
@@ -493,7 +494,7 @@ doCorePass pass guts = do
                                  updateBinds cseProgram
 
     CoreLiberateCase          -> {-# SCC "LiberateCase" #-}
-                                 updateBinds (liberateCase dflags)
+                                 updateBinds (liberateCase (initLiberateCaseOpts dflags))
 
     CoreDoFloatInwards        -> {-# SCC "FloatInwards" #-}
                                  updateBinds (floatInwards platform)
