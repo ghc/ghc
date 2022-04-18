@@ -22,7 +22,7 @@ module GHC.Core.Ppr (
         pprCoreExpr, pprParendExpr,
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
         pprCoreBindingWithSize, pprCoreBindingsWithSize,
-        pprCoreBinder, pprCoreBinders,
+        pprCoreBinder, pprCoreBinders, pprId, pprIds,
         pprRule, pprRules, pprOptCo,
         pprOcc, pprOccWithTick
     ) where
@@ -461,6 +461,13 @@ pprKindedTyVarBndr :: TyVar -> SDoc
 -- Print a type variable binder with its kind (but not if *)
 pprKindedTyVarBndr tyvar
   = text "@" <> pprTyVar tyvar
+
+-- pprId x prints x :: ty
+pprId :: Id -> SDoc
+pprId x = ppr x <+> dcolon <+> ppr (idType x)
+
+pprIds :: [Id] -> SDoc
+pprIds xs = sep (map pprId xs)
 
 -- pprIdBndr does *not* print the type
 -- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness
