@@ -1,4 +1,4 @@
-Left decodingerror002.in: hGetChar: invalid argument (invalid byte sequence)
+Left decodingerror002.in: hGetChar: invalid argument (cannot decode byte sequence starting from 200)
 Left decodingerror002.in: hGetChar: end of file
 ï¿½Left decodingerror002.in: hGetChar: end of file
 ÈLeft decodingerror002.in: hGetChar: end of file

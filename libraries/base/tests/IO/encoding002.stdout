@@ -5,7 +5,7 @@
 True
 
 == UTF-8: decoding
-"recoverDecode: invalid argument (invalid byte sequence)"
+"recoverDecode: invalid argument (cannot decode byte sequence starting from 237)"
 "Hi!"
 "Hi\65533\65533\65533!"
 "Hi\56557\56498\56448!"
@@ -16,7 +16,7 @@ True
 [72,105,128,33]
 
 == UTF-16LE: decoding
-"recoverDecode: invalid argument (invalid byte sequence)"
+"recoverDecode: invalid argument (cannot decode byte sequence starting from 255)"
 "Hi\65503\8671"
 "Hi\65533\65503\8671\65533"
 "Hi\56575\65503\8671\NUL"
@@ -27,7 +27,7 @@ True
 [72,0,105,0,128,33,0]
 
 == UTF-16BE: decoding
-"recoverDecode: invalid argument (invalid byte sequence)"
+"recoverDecode: invalid argument (cannot decode byte sequence starting from 223)"
 "Hi\65503\65280"
 "Hi\65533\65503\65280\65533"
 "Hi\56543\65503\65280!"
@@ -38,7 +38,7 @@ True
 [0,72,0,105,128,0,33]
 
 == UTF-32LE: decoding
-"recoverDecode: invalid argument (invalid byte sequence)"
+"recoverDecode: invalid argument (cannot decode byte sequence starting from 237)"
 "Hi\8448"
 "Hi\65533\65533\65533\8448\65533"
 "Hi\56557\56498\56448\8448\NUL"
@@ -49,7 +49,7 @@ True
 [72,0,0,0,105,0,0,0,128,33,0,0,0]
 
 == UTF-32BE: decoding
-"recoverDecode: invalid argument (invalid byte sequence)"
+"recoverDecode: invalid argument (cannot decode byte sequence starting from 0)"
 "Hi!"
 "Hi\65533\65533\65533\65533!"
 "Hi\NUL\56448\56498\56557!"
