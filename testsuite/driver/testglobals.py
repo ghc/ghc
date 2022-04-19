@@ -237,8 +237,7 @@ def getConfig():
     return config
 
 import os
-# Hold our modified GHC testrunning environment so we don't poison the current
-# python's environment.
+# This is the environment in which we run test subprocesses.
 global ghc_env
 ghc_env = os.environ.copy()
 
