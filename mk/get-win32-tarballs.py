@@ -11,7 +11,7 @@ from sys import stderr
 TARBALL_VERSION = '0.7'
 BASE_URL = "https://downloads.haskell.org/ghc/mingw/{}".format(TARBALL_VERSION)
 DEST = Path('ghc-tarballs/mingw-w64')
-ARCHS = ['i686', 'x86_64', 'sources']
+ARCHS = ['x86_64', 'sources']
 
 def file_url(arch: str, fname: str) -> str:
     return "{base}/{arch}/{fname}".format(
@@ -61,7 +61,7 @@ def main() -> None:
     parser.add_argument(
         'arch',
         choices=ARCHS + ['all'],
-        help="Architecture to fetch (either i686, x86_64, sources, or all)")
+        help="Architecture to fetch (either x86_64, sources, or all)")
     args = parser.parse_args()
 
     action = { 'download' : fetch_arch, 'verify' : verify, 'list' : list_arch }[args.mode]
