@@ -196,6 +196,8 @@ peekInfoProv infop = do
 -- The information is collect by looking at the info table address of a specific closure and
 -- then consulting a specially generated map (by `-finfo-table-map`) to find out where we think
 -- the best source position to describe that info table arose from.
+--
+-- @since 4.16.0.0
 whereFrom :: a -> IO (Maybe InfoProv)
 whereFrom obj = do
   ipe <- getIPE obj
