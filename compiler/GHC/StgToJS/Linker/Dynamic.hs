@@ -51,6 +51,7 @@
 module GHC.StgToJS.Linker.Dynamic
   ( ghcjsLink
   , ghcjsDoLink
+  , ghcjsLinkJsBinary
   ) where
 
 import GHC.StgToJS.Linker.Archive
@@ -73,8 +74,6 @@ import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 import GHC.Utils.Outputable hiding ((<>))
-import GHC.Driver.Phases
-import GHC.Driver.Pipeline
 import GHC.Driver.Session
 
 import GHC.Types.Unique.DFM
@@ -104,10 +103,12 @@ import qualified GHC.Data.Maybe as Maybe
 import GHC.Platform.Ways
 import GHC.Utils.Logger
 import GHC.Utils.Panic
-import GHC.Driver.Env.Types
 import GHC.StgToJS.Types
 import GHC.Utils.TmpFs (TmpFs)
 import qualified Data.Set as Set
+import Data.Maybe (isNothing, catMaybes)
+import GHC.Utils.Exception (tryIO)
+import Data.Either (partitionEithers)
 
 ---------------------------------------------------------------------------------
 -- Link libraries
@@ -115,27 +116,27 @@ import qualified Data.Set as Set
 ghcjsLink :: GhcjsEnv
           -> JSLinkConfig
           -> StgToJSConfig
-          -> HscEnv
           -> [FilePath] -- ^ extra JS files
           -> Bool       -- ^ build JavaScript?
           -> GhcLink    -- ^ what to link
           -> Logger
           -> TmpFs
+          -> DynFlags
           -> UnitEnv
           -> Bool
           -> HomePackageTable
           -> IO SuccessFlag
-ghcjsLink env lc_cfg cfg hsc_env extraJs buildJs ghcLink logger tmp_fs unit_env batch_attempt_linking pt
+ghcjsLink env lc_cfg cfg extraJs buildJs ghcLink logger tmp_fs dflags unit_env batch_attempt_linking pt
   | ghcLink == LinkInMemory || ghcLink == NoLink =
       return Succeeded
   | ghcLink == LinkStaticLib || ghcLink == LinkDynLib =
       if buildJs && Maybe.isJust (lcLinkJsLib lc_cfg)
-         then ghcjsLinkJsLib lc_cfg extraJs (hsc_dflags hsc_env) logger pt
+         then ghcjsLinkJsLib lc_cfg extraJs dflags logger pt
          else return Succeeded
   | otherwise = do
       when (buildJs && Maybe.isJust (lcLinkJsLib lc_cfg))
-        (void $ ghcjsLinkJsLib lc_cfg extraJs (hsc_dflags hsc_env) logger pt) -- FIXME Jeff: (2022,04): use return value and remove void
-      link' env lc_cfg cfg hsc_env extraJs buildJs logger tmp_fs unit_env batch_attempt_linking pt
+        (void $ ghcjsLinkJsLib lc_cfg extraJs dflags logger pt) -- FIXME Jeff: (2022,04): use return value and remove void
+      link' env lc_cfg cfg extraJs buildJs logger tmp_fs dflags unit_env batch_attempt_linking pt
 
 ghcjsLinkJsLib :: JSLinkConfig
                -> [FilePath] -- ^ extra JS files
@@ -181,37 +182,36 @@ ghcjsLinkJsBinary :: GhcjsEnv
                   -> [FilePath]
                   -> Logger
                   -> TmpFs
-                  -> HscEnv
+                  -> DynFlags
                   -> UnitEnv
                   -> [FilePath]
                   -> [UnitId]
                   -> IO ()
-ghcjsLinkJsBinary env lc_cfg cfg jsFiles _logger _tmpfs hsc_env _unit_env objs dep_pkgs =
-  void $ JSLink.link hsc_env env lc_cfg cfg exe mempty dep_pkgs objs' jsFiles isRoot mempty
+ghcjsLinkJsBinary env lc_cfg cfg jsFiles logger _tmpfs dflags u_env objs dep_pkgs =
+  void $ JSLink.link env lc_cfg cfg logger dflags u_env exe mempty dep_pkgs objs' jsFiles isRoot mempty
     where
       objs'    = map ObjFile objs
       isRoot _ = True
-      exe      = jsExeFileName (hsc_dflags hsc_env)
+      exe      = jsExeFileName dflags
 
 
 link' :: GhcjsEnv
       -> JSLinkConfig
       -> StgToJSConfig
-      -> HscEnv
       -> [FilePath]              -- extra js files
       -> Bool                    -- building JavaScript
       -> Logger                  -- Logger
       -> TmpFs                   -- tmp file system
+      -> DynFlags
       -> UnitEnv                 -- Unit Environment
       -> Bool                    -- attempt linking in batch mode?
       -> HomePackageTable        -- what to link
       -> IO SuccessFlag
 
-link' env lc_cfg cfg hsc_env extraJs buildJs logger tmpfs unit_env batch_attempt_linking hpt
+link' env lc_cfg cfg extraJs buildJs logger tmpfs dflags unit_env batch_attempt_linking hpt
    | batch_attempt_linking
    = do
         let
-            dflags     = hsc_dflags hsc_env
             staticLink = case ghcLink dflags of
                           LinkStaticLib -> True
                           _ -> False
@@ -240,7 +240,7 @@ link' env lc_cfg cfg hsc_env extraJs buildJs logger tmpfs unit_env batch_attempt
                 obj_files             = concatMap getOfiles linkables
                 exe_file              = exeFileName (targetPlatform dflags) staticLink (outputFile_ dflags)
 
-            linking_needed <- linkingNeeded logger dflags unit_env staticLink linkables pkg_deps
+            linking_needed <- dup_linkingNeeded logger dflags unit_env staticLink linkables pkg_deps
                               <&> (\case
                                     NeedsRecompile _reason -> True
                                     _                      -> False)
@@ -261,12 +261,19 @@ link' env lc_cfg cfg hsc_env extraJs buildJs logger tmpfs unit_env batch_attempt
                 -- to a lot of unused parameters. This is bad! We should be
                 -- employing the principle of least priviledge with these
                 -- functions. Untangle this later!
+
+                -- FIXME: Jeff (2022,04): link' is called by ghcjsLink, but in
+                -- ghcjsLink we scrutinize (ghcLink dflags), so this check is
+                -- redundant, clearly a better design is possible. As it stands
+                -- now this is a bunch of dead code, because the RHS of these
+                -- matches will be called by ghcjsLink before this function is
+                -- called.
                 let link = case ghcLink dflags of
                       LinkBinary    -> if buildJs
-                                       then ghcjsLinkJsBinary env lc_cfg cfg extraJs logger tmpfs hsc_env unit_env
-                                       else linkBinary                               logger tmpfs (hsc_dflags hsc_env) unit_env
-                      LinkStaticLib -> jsLinkStaticLib   logger tmpfs hsc_env unit_env
-                      LinkDynLib    -> linkDynLibCheck logger tmpfs hsc_env unit_env
+                                       then ghcjsLinkJsBinary env lc_cfg cfg extraJs logger tmpfs dflags unit_env
+                                       else linkBinary                               logger tmpfs dflags unit_env
+                      LinkStaticLib -> jsLinkStaticLib logger tmpfs dflags unit_env
+                      LinkDynLib    -> linkDynLibCheck logger tmpfs dflags unit_env
                       other         -> panicBadLink other
 
                 _ <- link obj_files pkg_deps
@@ -280,32 +287,89 @@ link' env lc_cfg cfg hsc_env extraJs buildJs logger tmpfs unit_env batch_attempt
                                 text "   Main.main not exported; not linking.")
         return Succeeded
 
+-- FIXME: Jeff (2022,04): Remove this function, its a direct duplication from
+-- GHC.Driver.Pipeline. We duplicate this function to avoid a cycling dependency
+-- between the pipeline and this file. To make sure this happens I've prefixed
+-- it with dup_ so it should look strange!
+dup_linkingNeeded :: Logger -> DynFlags -> UnitEnv -> Bool -> [Linkable] -> [UnitId] -> IO RecompileRequired
+dup_linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
+        -- if the modification time on the executable is later than the
+        -- modification times on all of the objects and libraries, then omit
+        -- linking (unless the -fforce-recomp flag was given).
+  let platform   = ue_platform unit_env
+      unit_state = ue_units unit_env
+      exe_file   = exeFileName platform staticLink (outputFile_ dflags)
+  e_exe_time <- tryIO $ getModificationUTCTime exe_file
+  case e_exe_time of
+    Left _  -> return $ NeedsRecompile MustCompile
+    Right t -> do
+        -- first check object files and extra_ld_inputs
+        let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
+        e_extra_times <- mapM (tryIO . getModificationUTCTime) extra_ld_inputs
+        let (errs,extra_times) = partitionEithers e_extra_times
+        let obj_times =  map linkableTime linkables ++ extra_times
+        if not (null errs) || any (t <) obj_times
+            then return $ needsRecompileBecause ObjectsChanged
+            else do
+                 -- next, check libraries. XXX this only checks Haskell libraries,
+                 -- not extra_libraries or -l things from the command line.
+                 let pkg_hslibs  = [ (collectLibraryDirs (ways dflags) [c], lib)
+                                   | Just c <- map (lookupUnitId unit_state) pkg_deps,
+                                     lib <- unitHsLibs (ghcNameVersion dflags) (ways dflags) c ]
+
+                 pkg_libfiles <- mapM (uncurry (dup_findHSLib platform (ways dflags))) pkg_hslibs
+                 if any isNothing pkg_libfiles
+                   then return $ needsRecompileBecause LibraryChanged
+                   else do
+                        e_lib_times <- mapM (tryIO . getModificationUTCTime)
+                                          (catMaybes pkg_libfiles)
+                        let (lib_errs,lib_times) = partitionEithers e_lib_times
+                        if not (null lib_errs) || any (t <) lib_times
+                           then return $ needsRecompileBecause LibraryChanged
+                           else do
+                            res <- checkLinkInfo logger dflags unit_env pkg_deps exe_file
+                            if res
+                              then return $ needsRecompileBecause FlagsChanged
+                              else return UpToDate
+
+-- FIXME: Jeff (2022,04): Remove this function, its a direct duplication from
+-- GHC.Driver.Pipeline. We duplicate this function to avoid a cycling dependency
+-- between the pipeline and this file. To make sure this happens I've prefixed
+-- it with dup_ so it should look strange!
+dup_findHSLib :: Platform -> Ways -> [String] -> String -> IO (Maybe FilePath)
+dup_findHSLib platform ws dirs lib = do
+  let batch_lib_file = if ws `hasNotWay` WayDyn
+                      then "lib" ++ lib <.> "a"
+                      else platformSOName platform lib
+  found <- filterM doesFileExist (map (</> batch_lib_file) dirs)
+  case found of
+    [] -> return Nothing
+    (x:_) -> return (Just x)
 
 panicBadLink :: GhcLink -> a
 panicBadLink other = panic ("link: GHC not built to link this way: " ++
                             show other)
 
-linkDynLibCheck :: Logger -> TmpFs -> HscEnv -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
-linkDynLibCheck logger tmpfs hsc_env unit_env o_files dep_packages
+linkDynLibCheck :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+linkDynLibCheck logger tmpfs dflags unit_env o_files dep_packages
  = do
-    let dflags = hsc_dflags hsc_env
     when (haveRtsOptsFlags dflags) $
       logOutput logger (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared."
                         $$ text "    Call hs_init_ghc() from your main() function to set these options.")
 
-    linkDynLib logger tmpfs (hsc_dflags hsc_env) unit_env o_files dep_packages
+    linkDynLib logger tmpfs dflags unit_env o_files dep_packages
 
 -- FIXME: Jeff: (2022,04): This function is possibly redundant. Compare to
 -- GHC.Linker.Static.linkStaticLib and decide and remove
-jsLinkStaticLib ::Logger -> TmpFs -> HscEnv -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
-jsLinkStaticLib logger tmpfs hsc_env _unit_env o_files dep_packages
+jsLinkStaticLib ::Logger -> TmpFs -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+jsLinkStaticLib logger tmpfs dflags u_env o_files dep_packages
   = -- XXX looks like this needs to be updated
 {-
  = do
     when (platformOS (targetPlatform dflags) `notElem` [OSiOS, OSDarwin]) $
       throwGhcExceptionIO (ProgramError "Static archive creation only supported on Darwin/OS X/iOS")
 -}
-    jsLinkBinary' True logger tmpfs (hsc_dflags hsc_env) (hsc_unit_env hsc_env) o_files dep_packages
+    jsLinkBinary' True logger tmpfs dflags u_env o_files dep_packages
 
 -- FIXME: Jeff: (2022,04): This function may be a duplicate functions from
 -- GHC.Linker.Static.linkBinary. Decide if that is the case and remove
@@ -508,22 +572,9 @@ jsLinkBinary' staticLink logger tmpfs dflags unit_env o_files dep_packages = do
                     ))
 
 
-ghcjsDoLink :: GhcjsEnv -> JSLinkConfig -> StgToJSConfig -> HscEnv -> Phase -> [FilePath] -> IO ()
-ghcjsDoLink env lc_cfg cfg hsc_env stop_phase o_files
-  | not (isStopLn stop_phase)
-  = return ()           -- We stopped before the linking phase
-  {-| native
-  = case ghcLink dflags of
-        NoLink     -> return ()
-        LinkBinary -> linkBinary      dflags o_files []
-        LinkDynLib -> linkDynLibCheck dflags o_files []
-        other      -> panicBadLink other -}
-  -- | isJust (gsLinkJsLib settings)
-  -- = void $ ghcjsLinkJsLib settings o_files dflags emptyHomePackageTable
-  | otherwise = do
-    -- void $ ghcjsLink env settings o_files True (ghcLink dflags) dflags True emptyHomePackageTable
-      let dflags = hsc_dflags hsc_env
-      case ghcLink (hsc_dflags hsc_env) of
+ghcjsDoLink :: GhcjsEnv -> JSLinkConfig -> StgToJSConfig -> DynFlags -> Logger -> UnitEnv -> [FilePath] -> IO ()
+ghcjsDoLink env lc_cfg cfg dflags logger u_env o_files
+  = do case ghcLink dflags of
         NoLink     -> return ()
         LinkBinary ->  do
           putStrLn $ "ghcjsDoLink: " ++ show (ghcLink dflags) ++ " " ++ show o_files
@@ -535,7 +586,7 @@ ghcjsDoLink env lc_cfg cfg hsc_env stop_phase o_files
                             then return output_fn
                             else do d <- getCurrentDirectory
                                     return $ normalise (d </> output_fn)
-          let dep_packages = case preloadUnitsInfo $ hsc_unit_env hsc_env of
+          let dep_packages = case preloadUnitsInfo u_env of
                       Maybe.Succeeded us -> us
                       Maybe.Failed err   -> pprPanic "Panic in ghcjsDoLink: " (ppr err)
 
@@ -549,10 +600,12 @@ ghcjsDoLink env lc_cfg cfg hsc_env stop_phase o_files
 
           void $
               JSLink.link
-              hsc_env
               env
               lc_cfg
               cfg
+              logger
+              dflags
+              u_env
               (full_output_fn <.> "jsexe")  -- output file or dir
               mempty                        -- include path for home package
               dep_package_ids               -- packages to link

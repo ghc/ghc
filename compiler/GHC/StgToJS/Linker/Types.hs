@@ -544,6 +544,13 @@ data GhcjsEnv = GhcjsEnv
   , pluginState       :: MVar (Maybe HscEnv)
   }
 
+newGhcjsEnv :: IO GhcjsEnv
+newGhcjsEnv = GhcjsEnv <$> newMVar M.empty
+                       <*> newMVar emptyTHRunnerState
+                       <*> newMVar 0
+                       <*> newMVar M.empty
+                       <*> newMVar Nothing
+
 data THRunnerState = THRunnerState
   { activeRunners :: Map String THRunner
   , idleRunners   :: [THRunner]
