@@ -42,6 +42,9 @@ import cpu_features
 os.environ['TERM'] = 'vt100'
 ghc_env['TERM'] = 'vt100'
 
+# Ensure that GHC doesn't go looking for environment files. See #21365.
+ghc_env['GHC_ENVIRONMENT'] = "-"
+
 global config
 config = getConfig() # get it from testglobals
 config.validate()
