@@ -18,7 +18,6 @@ import GHC.Unit.State
 import GHC.Unit.Env
 import GHC.Unit.Home
 import GHC.Utils.Encoding
-import GHC.Driver.Env.Types
 import GHC.Driver.Session
 
 import GHC.Prelude
@@ -47,10 +46,10 @@ moduleExportsSymbol m = mconcat
   ]
 
 -- FIXME: Use FastString
-encodeModule :: HscEnv -> Module -> String
-encodeModule env k
-  | isGhcjsPrimUnit env (moduleUnitId k) = "ghcjs-prim"
-  | isGhcjsThUnit   env (moduleUnitId k) = "ghcjs-th"
+encodeModule :: UnitEnv -> DynFlags -> Module -> String
+encodeModule u_env dflags k
+  | isGhcjsPrimUnit u_env dflags (moduleUnitId k) = "ghcjs-prim"
+  | isGhcjsThUnit   u_env dflags (moduleUnitId k) = "ghcjs-th"
   | otherwise                            = unitModuleString k
 
 {-
@@ -64,28 +63,28 @@ encodeModule env k
 -- In either case it will proliferate DynFlags throughout the Linker. So the fix
 -- should be to add flags to the Linker config so we do not need to carry HscEnv
 -- or DynFlags around.
-isGhcjsPrimUnit :: HscEnv -> UnitId -> Bool
-isGhcjsPrimUnit env pkgKey
+isGhcjsPrimUnit :: UnitEnv -> DynFlags -> UnitId -> Bool
+isGhcjsPrimUnit u_env dflags pkgKey
   =  pn == "ghcjs-prim" || -- FIXME: Jeff (2022,03): use UnitID only instead of
                            -- a hacky String comparison, same for
                            -- @isGhcjsThUnit@
      (GHC.Prelude.null pn && pkgKey == home_uid &&
-      elem "-DBOOTING_PACKAGE=ghcjs-prim" (opt_P $ hsc_dflags env))
+      elem "-DBOOTING_PACKAGE=ghcjs-prim" (opt_P dflags))
   where
-    pn = unitIdString . ue_current_unit $ hsc_unit_env env
+    pn = unitIdString . ue_current_unit $ u_env
     -- FIXME: Jeff (2022,03): remove call to unsafe. Only using this because I
     -- am unsure when exactly the home unit for the GhcJS prims gets
     -- instantiated
-    home_uid = homeUnitId . ue_unsafeHomeUnit $ hsc_unit_env env
+    home_uid = homeUnitId . ue_unsafeHomeUnit $ u_env
 
-isGhcjsThUnit :: HscEnv -> UnitId -> Bool
-isGhcjsThUnit env pkgKey
+isGhcjsThUnit :: UnitEnv -> DynFlags -> UnitId -> Bool
+isGhcjsThUnit u_env dflags pkgKey
   =  pn == "ghcjs-th" ||
      (GHC.Prelude.null pn && pkgKey == home_uid &&
-      elem "-DBOOTING_PACKAGE=ghcjs-th" (opt_P $ hsc_dflags env))
+      elem "-DBOOTING_PACKAGE=ghcjs-th" (opt_P dflags))
   where
-    home_uid = homeUnitId . ue_unsafeHomeUnit $ hsc_unit_env env
-    pn = unitIdString . ue_current_unit $ hsc_unit_env env
+    home_uid = homeUnitId   . ue_unsafeHomeUnit $ u_env
+    pn       = unitIdString . ue_current_unit   $ u_env
 
 -- FIXME: Jeff (2022,03): These return a UnitId, but I think they should be
 -- @RealUnit (Definite UnitId). Per the description of @GenUnit@ in
