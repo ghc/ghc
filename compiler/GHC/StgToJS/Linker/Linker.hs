@@ -117,10 +117,11 @@ import           System.Directory ( createDirectoryIfMissing
                                   )
 
 import Prelude
-import GHC.Driver.Session (targetWays_, settings)
+import GHC.Driver.Session (targetWays_, settings, DynFlags)
 import GHC.Settings (sTopDir)
 import GHC.Unit.Module.Name
 import GHC.Unit.Module (moduleStableString)
+import GHC.Utils.Logger (Logger)
 
 -- number of bytes linked per module
 type LinkerStats  = Map Module Int64
@@ -143,10 +144,12 @@ emptyArchiveState :: IO ArchiveState
 emptyArchiveState = ArchiveState <$> newIORef M.empty
 
 -- | link and write result to disk (jsexe directory)
-link :: HscEnv
-     -> GhcjsEnv
+link :: GhcjsEnv
      -> JSLinkConfig
      -> StgToJSConfig
+     -> Logger
+     -> DynFlags
+     -> UnitEnv
      -> FilePath               -- ^ output file/directory
      -> [FilePath]             -- ^ include path for home package
      -> [UnitId]               -- ^ packages to link
@@ -155,11 +158,11 @@ link :: HscEnv
      -> (ExportedFun -> Bool)  -- ^ functions from the objects to use as roots (include all their deps)
      -> Set ExportedFun        -- ^ extra symbols to link in
      -> IO ()
-link hsc_env env lc_cfg cfg out include pkgs objFiles jsFiles isRootFun extraStaticDeps
+link env lc_cfg cfg logger dflags u_env out include pkgs objFiles jsFiles isRootFun extraStaticDeps
   | lcNoJSExecutables lc_cfg = return ()
   | otherwise = do
       LinkResult lo lstats lmetasize _lfrefs llW lla llarch lbase <-
-        link' hsc_env env lc_cfg cfg out include pkgs objFiles jsFiles
+        link' env lc_cfg cfg dflags logger u_env out include pkgs objFiles jsFiles
               isRootFun extraStaticDeps
       let genBase = isJust (lcGenBase lc_cfg)
           jsExt | genBase   = "base.js"
@@ -176,7 +179,6 @@ link hsc_env env lc_cfg cfg out include pkgs objFiles jsFiles isRootFun extraSta
             -- - this line called out to the FromJSon Instance
             -- jsonFrefs  = Aeson.encode lfrefs
             jsonFrefs  = mempty
-            dflags     = hsc_dflags hsc_env
 
         BL.writeFile (out </> frefsFile <.> "json") jsonFrefs
         BL.writeFile (out </> frefsFile <.> "js")
@@ -200,7 +202,7 @@ link hsc_env env lc_cfg cfg out include pkgs objFiles jsFiles isRootFun extraSta
                       && not (usingBase lc_cfg)
                     )
                $ do
-                 let top = sTopDir . settings . hsc_dflags $ hsc_env
+                 let top = sTopDir . settings $ dflags
                  _ <- combineFiles lc_cfg top out
                  writeHtml    top out
                  writeRunMain top out
@@ -209,10 +211,12 @@ link hsc_env env lc_cfg cfg out include pkgs objFiles jsFiles isRootFun extraSta
                  writeExterns out
 
 -- | link in memory
-link' :: HscEnv
-      -> GhcjsEnv
+link' :: GhcjsEnv
       -> JSLinkConfig
       -> StgToJSConfig
+      -> DynFlags
+      -> Logger
+      -> UnitEnv
       -> String                     -- ^ target (for progress message)
       -> [FilePath]                 -- ^ include path for home package
       -> [UnitId]                   -- ^ packages to link
@@ -221,7 +225,7 @@ link' :: HscEnv
       -> (ExportedFun -> Bool)      -- ^ functions from the objects to use as roots (include all their deps)
       -> Set ExportedFun            -- ^ extra symbols to link in
       -> IO LinkResult
-link' hsc_env env lc_cfg cfg target _include pkgs objFiles jsFiles isRootFun extraStaticDeps
+link' env lc_cfg cfg dflags logger u_env target _include pkgs objFiles jsFiles isRootFun extraStaticDeps
   = do
   -- FIXME: Jeff (2022,04): This function has several helpers that should be
   -- factored out. In its current condition it is hard to read exactly whats
@@ -237,7 +241,7 @@ link' hsc_env env lc_cfg cfg target _include pkgs objFiles jsFiles isRootFun ext
           rootMods = map (moduleNameString . moduleName . head) . group . sort . map funModule . S.toList $ roots
           objPkgs  = map moduleUnitId $ nub (M.keys objDepsMap)
 
-      _ <- compilationProgressMsg (hsc_logger hsc_env) . text $
+      _ <- compilationProgressMsg logger . text $
                 case lcGenBase lc_cfg of
                   Just baseMod -> "Linking base bundle " ++ target ++ " (" ++ moduleNameString (moduleName baseMod) ++ ")"
                   _            -> "Linking " ++ target ++ " (" ++ intercalate "," rootMods ++ ")"
@@ -245,13 +249,13 @@ link' hsc_env env lc_cfg cfg target _include pkgs objFiles jsFiles isRootFun ext
         NoBase        -> return emptyBase
         BaseFile file -> loadBase file
         BaseState b   -> return b
-      (rdPkgs, rds) <- rtsDeps hsc_env pkgs
+      (rdPkgs, rds) <- rtsDeps u_env dflags pkgs
       -- c   <- newMVar M.empty
-      let rtsPkgs     =  map stringToUnitId ["@rts", "@rts_" ++ waysTag (targetWays_ $ hsc_dflags hsc_env)]
+      let rtsPkgs     =  map stringToUnitId ["@rts", "@rts_" ++ waysTag (targetWays_ $ dflags)]
           pkgs' :: [UnitId]
           pkgs'       = nub (rtsPkgs ++ rdPkgs ++ reverse objPkgs ++ reverse pkgs)
           pkgs''      = filter (not . isAlreadyLinked base) pkgs'
-          ue_state    = ue_units $ hsc_unit_env hsc_env
+          ue_state    = ue_units $ u_env
           -- pkgLibPaths = mkPkgLibPaths pkgs'
           -- getPkgLibPaths :: UnitId -> ([FilePath],[String])
           -- getPkgLibPaths k = fromMaybe ([],[]) (lookup k pkgLibPaths)
@@ -259,7 +263,7 @@ link' hsc_env env lc_cfg cfg target _include pkgs objFiles jsFiles isRootFun ext
       pkgArchs <- getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state pkgs'')
       (allDeps, code) <-
         collectDeps (objDepsMap `M.union` archsDepsMap)
-                    (pkgs' ++ [homeUnitId (ue_unsafeHomeUnit $ hsc_unit_env hsc_env)]) -- FIXME: dont use unsafe
+                    (pkgs' ++ [homeUnitId (ue_unsafeHomeUnit $ u_env)]) -- FIXME: dont use unsafe
                     (baseUnits base)
                     (roots `S.union` rds `S.union` extraStaticDeps)
                     (archsRequiredUnits ++ objRequiredUnits)
@@ -631,23 +635,24 @@ noStaticDeps = StaticDeps []
 --   parseJSON _          = mempty
 
 -- | dependencies for the RTS, these need to be always linked
-rtsDeps :: HscEnv -> [UnitId] -> IO ([UnitId], Set ExportedFun)
-rtsDeps hsc_env pkgs = readSystemDeps hsc_env pkgs "rtsdeps.yaml"
+rtsDeps :: UnitEnv -> DynFlags -> [UnitId] -> IO ([UnitId], Set ExportedFun)
+rtsDeps u_env dflags pkgs = readSystemDeps u_env dflags pkgs "rtsdeps.yaml"
 
 -- | dependencies for the Template Haskell, these need to be linked when running
 --   Template Haskell (in addition to the RTS deps)
-thDeps :: HscEnv -> [UnitId] -> IO ([UnitId], Set ExportedFun)
-thDeps hsc_env pkgs = readSystemDeps hsc_env pkgs "thdeps.yaml"
+thDeps :: UnitEnv -> DynFlags -> [UnitId] -> IO ([UnitId], Set ExportedFun)
+thDeps u_env dflags pkgs = readSystemDeps u_env dflags pkgs "thdeps.yaml"
 
 -- FIXME: Jeff (2022,03): fill in the ?
 -- | A helper function to read system dependencies that are hardcoded via a file
 -- path.
-readSystemDeps :: HscEnv      -- ^ HS Env
+readSystemDeps :: UnitEnv     -- ^ The unit envrionment
+               -> DynFlags
                -> [UnitId]    -- ^ Packages to ??
                -> FilePath    -- ^ File to read
                -> IO ([UnitId], Set ExportedFun)
-readSystemDeps hsc_env pkgs file = do
-  (deps_pkgs, deps_funs) <- readSystemDeps' hsc_env file
+readSystemDeps u_env dflags pkgs file = do
+  (deps_pkgs, deps_funs) <- readSystemDeps' u_env dflags file
   pure ( filter (`S.member` linked_pkgs) deps_pkgs
        , S.filter (\fun ->
                      moduleUnitId (funModule fun) `S.member` linked_pkgs) deps_funs
@@ -660,10 +665,11 @@ readSystemDeps hsc_env pkgs file = do
     linked_pkgs     = S.fromList pkgs
 
 
-readSystemDeps' :: HscEnv
+readSystemDeps' :: UnitEnv
+               -> DynFlags
                -> FilePath
                -> IO ([UnitId], Set ExportedFun)
-readSystemDeps' hsc_env file
+readSystemDeps' u_env dflags file
   -- hardcode contents to get rid of yaml dep
   -- XXX move runTHServer to some suitable wired-in package
   -- FIXME: Jeff (2022,03): Use types not string matches, These should be
@@ -703,7 +709,7 @@ readSystemDeps' hsc_env file
     zenc  = T.pack . zEncodeString . T.unpack
 
     mkHaskellSym :: Module -> ShortText -> ShortText -> ShortText
-    mkHaskellSym mod m s = "h$" <> zenc (T.pack (encodeModule hsc_env mod)
+    mkHaskellSym mod m s = "h$" <> zenc (T.pack (encodeModule u_env dflags mod)
                                        <> ":"
                                        <> m
                                        <> "."
@@ -755,16 +761,17 @@ readSystemWiredIn dflags = do
 
 type SDep = (ShortText, ShortText) -- ^ module/symbol
 
-staticDeps :: HscEnv
+staticDeps :: UnitEnv
+           -> DynFlags
            -> [(ShortText, Module)]   -- ^ wired-in package names / keys
            -> StaticDeps              -- ^ deps from yaml file
            -> (StaticDeps, Set UnitId, Set ExportedFun)
                                       -- ^ the StaticDeps contains the symbols
                                       --   for which no package could be found
-staticDeps hsc_env wiredin sdeps = mkDeps sdeps
+staticDeps u_env dflags wiredin sdeps = mkDeps sdeps
   where
     zenc  = T.pack . zEncodeString . T.unpack
-    u_st  = ue_units $ hsc_unit_env hsc_env
+    u_st  = ue_units u_env
     mkDeps (StaticDeps ds) =
       -- FIXME: Jeff (2022,03): this foldl' will leak memory due to the tuple
       -- and in the list in the fst position because the list is neither spine
@@ -808,7 +815,7 @@ staticDeps hsc_env wiredin sdeps = mkDeps sdeps
     -- FIXME: Jeff (2022,03): should mkSymb be in the UnitUtils?
     mkSymb :: Module -> ShortText -> ShortText -> ShortText
     mkSymb p m s  =
-      "h$" <> zenc (T.pack (encodeModule hsc_env p) <> ":" <> m <> "." <> s)
+      "h$" <> zenc (T.pack (encodeModule u_env dflags p) <> ":" <> m <> "." <> s)
 
 closePackageDeps :: UnitState -> Set UnitId -> Set UnitId
 closePackageDeps u_st pkgs
