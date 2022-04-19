@@ -206,12 +206,12 @@ install_wrappers: install_bin_libdir
 	$(foreach p, $(BINARY_NAMES),\
 		$(call installscript,$p,$(WrapperBinsDir)/$p,$(WrapperBinsDir),$(ActualBinsDir),$(ActualBinsDir)/$p,$(ActualLibsDir),$(docdir),$(includedir)))
 
-PKG_CONFS = $(shell find "$(ActualLibsDir)/package.conf.d" -name '*.conf' | sed 's:   :xxx:g')
+PKG_CONFS = $(shell find "$(ActualLibsDir)/package.conf.d" -name '*.conf' | sed "s:   :\0xxx\0:g")
 update_package_db: install_bin install_lib
 	@echo "$(PKG_CONFS)"
 	@echo "Updating the package DB"
 	$(foreach p, $(PKG_CONFS),\
-		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-\([0-9]*[0-9]\.\)*conf//g'),$(shell echo "$p" | sed 's:xxx:   :g'),$(docdir),$(shell mk/relpath.sh "$(ActualLibsDir)" "$(docdir)")))
+		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-\([0-9]*[0-9]\.\)*conf//g'),$(shell echo "$p" | sed 's:\0xxx\0:   :g'),$(docdir),$(shell mk/relpath.sh "$(ActualLibsDir)" "$(docdir)")))
 	'$(WrapperBinsDir)/$(CrossCompilePrefix)ghc-pkg' recache
 
 install_mingw:
