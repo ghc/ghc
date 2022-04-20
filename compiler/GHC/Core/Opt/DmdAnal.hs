@@ -338,14 +338,13 @@ dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
 -- | Mimic the effect of 'GHC.Core.Prep.mkFloat', which turns a non-trivial
 -- argument expression/RHS into a proper let-bound, memoised thunk (lifted) or a
 -- case (with unlifted scrutinee).
-anticipateANF :: CoreExpr -> Card -> DmdType -> DmdType
+anticipateANF :: AnalEnv -> CoreExpr -> Demand -> DmdType -> DmdType
 -- This code is *very* dense! See Note [Anticipating ANF in demand analysis] for
 -- an overview.
-anticipateANF e n_many dmd_ty
+anticipateANF env e dmd@(n_many:*_) dmd_ty
   -- See Note [Trivial bindings in demand analysis]:
   | Just v <- getIdFromTrivialExpr_maybe e -- when e is `v |> co`;
-  = adjustFvDemand (\(n:*sd) -> multCard n_many n :* sd) v $
-    multDmdType (oneifyCard n_many) dmd_ty
+  = dmdTransform env v dmd
 
   -- See Note [Call-by-value in demand analysis]:
   | Just Unlifted <- typeLevity_maybe (exprType e)
@@ -363,13 +362,13 @@ dmdAnalStar :: AnalEnv
             -> Demand   -- This one takes a *Demand*
             -> CoreExpr
             -> (PlusDmdArg, CoreExpr)
-dmdAnalStar env (n :* sd) e
+dmdAnalStar env dmd@(_ :* sd) e
   -- NB: (:*) expands AbsDmd and BotDmd as needed
   -- We need to analyse even in the absent case.
   -- See Note [Always analyse in virgin pass]
   | WithDmdType dmd_ty e' <- dmdAnal env sd e
   -- See Note [Anticipating ANF in demand analysis]
-  = (discardDmdArgs $ anticipateANF e n dmd_ty, e')
+  = (discardDmdArgs $ anticipateANF env e dmd dmd_ty, e')
 
 -- Main Demand Analsysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
@@ -385,7 +384,7 @@ dmdAnal' _ _ (Coercion co)
   = WithDmdType (unitDmdType (coercionDmdEnv co)) (Coercion co)
 
 dmdAnal' env dmd (Var var)
-  = WithDmdType (dmdTransform env var dmd) (Var var)
+  = WithDmdType (dmdTransform env var (C_11 :* dmd)) (Var var)
 
 dmdAnal' env dmd (Cast e co)
   = WithDmdType (dmd_ty `plusDmdType` mkPlusDmdArg (coercionDmdEnv co)) (Cast e' co)
@@ -1053,40 +1052,40 @@ strict in |y|.
 
 dmdTransform :: AnalEnv   -- ^ The analysis environment
              -> Id        -- ^ The variable
-             -> SubDemand -- ^ The evaluation context of the var
+             -> Demand -- ^ The evaluation context of the var
              -> DmdType   -- ^ The demand type unleashed by the variable in this
                           -- context. The returned DmdEnv includes the demand on
                           -- this function plus demand on its free variables
 -- See Note [What are demand signatures?] in "GHC.Types.Demand"
-dmdTransform env var sd
+dmdTransform env var dmd@(n :* sd)
   -- Data constructors
   | isDataConWorkId var
-  = dmdTransformDataConSig (idArity var) sd
+  = n1 `multDmdType` dmdTransformDataConSig (idArity var) sd
   -- Dictionary component selectors
   -- Used to be controlled by a flag.
   -- See #18429 for some perf measurements.
   | Just _ <- isClassOpId_maybe var
   = -- pprTrace "dmdTransform:DictSel" (ppr var $$ ppr (idDmdSig var) $$ ppr sd) $
-    dmdTransformDictSelSig (idDmdSig var) sd
+    n1 `multDmdType` dmdTransformDictSelSig (idDmdSig var) sd
   -- Imported functions
   | isGlobalId var
-  , let res = dmdTransformSig (idDmdSig var) sd
+  , let res = n1 `multDmdType` dmdTransformSig (idDmdSig var) sd
   = -- pprTrace "dmdTransform:import" (vcat [ppr var, ppr (idDmdSig var), ppr sd, ppr res])
     res
   -- Top-level or local let-bound thing for which we use LetDown ('useLetUp').
   -- In that case, we have a strictness signature to unleash in our AnalEnv.
   | Just (sig, top_lvl) <- lookupSigEnv env var
-  , let fn_ty = dmdTransformSig sig sd
+  , let fn_ty = n1 `multDmdType` dmdTransformSig sig sd
   = -- pprTrace "dmdTransform:LetDown" (vcat [ppr var, ppr sig, ppr sd, ppr fn_ty]) $
     case top_lvl of
-      NotTopLevel -> addVarDmd fn_ty var (C_11 :* sd)
+      NotTopLevel -> addVarDmd fn_ty var dmd
       TopLevel
         | isInterestingTopLevelFn var
         -- Top-level things will be used multiple times or not at
         -- all anyway, hence the multDmd below: It means we don't
         -- have to track whether @var@ is used strictly or at most
         -- once, because ultimately it never will.
-        -> addVarDmd fn_ty var (C_0N `multDmd` (C_11 :* sd)) -- discard strictness
+        -> addVarDmd fn_ty var (C_0N `multDmd` dmd) -- discard strictness and usage
         | otherwise
         -> fn_ty -- don't bother tracking; just annotate with 'topDmd' later
   -- Everything else:
@@ -1095,7 +1094,9 @@ dmdTransform env var sd
   --   * Case and constructor field binders
   | otherwise
   = -- pprTrace "dmdTransform:other" (vcat [ppr var, ppr boxity, ppr sd]) $
-    unitDmdType (unitVarEnv var (C_11 :* sd))
+    unitDmdType (unitVarEnv var dmd)
+  where
+    n1 = oneifyCard n
 
 {- *********************************************************************
 *                                                                      *

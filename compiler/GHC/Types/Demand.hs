@@ -60,7 +60,7 @@ module GHC.Types.Demand (
     -- *** PlusDmdArg
     PlusDmdArg, mkPlusDmdArg, discardDmdArgs,
     -- ** Other operations
-    lookupFvDemand, adjustFvDemand, peelFvDemand, addArgDemand, splitDmdTy, deferAfterPreciseException,
+    lookupFvDemand, peelFvDemand, addArgDemand, splitDmdTy, deferAfterPreciseException,
     keepAliveDmdType,
 
     -- * Demand signatures
@@ -1664,11 +1664,6 @@ peelFvDemand (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ p
   !fv' = fv `delVarEnv` id
   -- See Note [Default demand on free variables and arguments]
   !dmd  = lookupVarEnv fv id `orElse` defaultFvDmd res
-
--- | `adjustFvDemand f id ty` adjusts the free variable demand `dmd` on `id` in
--- `ty` (if it is was mentioned at all) to `f dmd`.
-adjustFvDemand :: (Demand -> Demand) -> Id -> DmdType -> DmdType
-adjustFvDemand f id ty@DmdType{dt_env=env} = ty{dt_env=adjustUFM f env id}
 
 addArgDemand :: Demand -> DmdType -> DmdType
 addArgDemand dmd (DmdType fv ds res) = DmdType fv (dmd:ds) res
