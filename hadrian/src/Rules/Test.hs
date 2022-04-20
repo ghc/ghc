@@ -21,12 +21,6 @@ import Utilities
 import Context.Type
 import qualified System.Directory as IO
 
-ghcConfigHsPath :: FilePath
-ghcConfigHsPath = "testsuite/mk/ghc-config.hs"
-
-ghcConfigProgPath :: FilePath
-ghcConfigProgPath = "test/bin/ghc-config" <.> exe
-
 checkPprProgPath, checkPprSourcePath :: FilePath
 checkPprProgPath = "test/bin/check-ppr" <.> exe
 checkPprSourcePath = "utils/check-ppr/Main.hs"
@@ -109,13 +103,6 @@ testRules = do
 
     testsuiteDeps
 
-    -- Using program shipped with testsuite to generate ghcconfig file.
-    root -/- ghcConfigProgPath %> \_ -> do
-        ghc0Path <- getCompilerPath "stage0"
-        -- Invoke via bash to work around #17362.
-        -- Reasons why this is required are not entirely clear.
-        cmd ["bash"] ["-c", ghc0Path ++ " " ++ ghcConfigHsPath ++ " -o " ++ (root -/- ghcConfigProgPath)]
-
     -- we need to create wrappers to test the stage1 compiler
     -- as the stage1 compiler needs the stage2 libraries
     -- to have any hope of passing tests.
@@ -179,11 +166,10 @@ testRules = do
         ghcPath <- getCompilerPath testGhc
         whenJust (stageOf testGhc) $ \stg ->
           need . (:[]) =<< programPath (Context stg ghc vanilla)
+        ghcConfigProgPath <- programPath =<< programContext Stage0 ghcConfig
         cwd <- liftIO $ IO.getCurrentDirectory
-        need [makeRelative cwd ghcPath]
-        need [root -/- ghcConfigProgPath]
-        cmd [FileStdout $ root -/- ghcConfigPath] (root -/- ghcConfigProgPath)
-            [ghcPath]
+        need [makeRelative cwd ghcPath, ghcConfigProgPath]
+        cmd [FileStdout $ root -/- ghcConfigPath] ghcConfigProgPath [ghcPath]
 
     root -/- timeoutPath %> \_ -> timeoutProgBuilder
 

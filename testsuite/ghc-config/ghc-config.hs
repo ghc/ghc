@@ -2,6 +2,7 @@ import System.Environment
 import System.Process
 import Data.Maybe
 
+main :: IO ()
 main = do
   [ghc] <- getArgs
 
