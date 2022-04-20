@@ -519,10 +519,15 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
 
        -- This check makes sure that we aren't suppressing the only error that will
        -- actually stop compilation
-       ; massert $
-           null simples ||                  -- no errors to report here
-           any ignoreConstraint simples ||  -- one error is ignorable (is reported elsewhere)
-           not (all ei_suppress tidy_items) -- not all error are suppressed
+       ; assertPprM
+           ( do { errs_already <- ifErrsM (return True) (return False)
+                ; return $
+                    errs_already ||                  -- we already reported an error (perhaps from an outer implication)
+                    null simples ||                  -- no errors to report here
+                    any ignoreConstraint simples ||  -- one error is ignorable (is reported elsewhere)
+                    not (all ei_suppress tidy_items) -- not all errors are suppressed
+                } )
+           (vcat [text "reportWanteds is suppressing all errors"])
 
          -- First, deal with any out-of-scope errors:
        ; let (out_of_scope, other_holes) = partition isOutOfScopeHole tidy_holes
