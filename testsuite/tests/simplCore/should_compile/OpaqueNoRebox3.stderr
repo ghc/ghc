@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 120, types: 47, coercions: 4, joins: 1/1}
+  = {terms: 122, types: 49, coercions: 4, joins: 1/1}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 OpaqueNoRebox3.$trModule4 :: GHC.Prim.Addr#
@@ -45,7 +45,7 @@ OpaqueNoRebox3.$trModule
 -- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
 f [InlPrag=OPAQUE] :: Int -> Int
 [GblId, Arity=1, Str=<1L>, Unf=OtherCon []]
-f = / (x :: Int) ->
+f = \ (x :: Int) ->
       case x of { GHC.Types.I# ipv -> GHC.Types.I# (GHC.Prim.+# ipv 1#) }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -110,10 +110,15 @@ lvl11 :: GHC.Prim.Addr#
 [GblId, Unf=OtherCon []]
 lvl11 = "patError"#
 
--- RHS size: {terms: 4, types: 2, coercions: 4, joins: 0/0}
-lvl12 :: Int
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl12 :: [Char]
+[GblId]
+lvl12 = GHC.CString.unpackCString# lvl11
+
+-- RHS size: {terms: 3, types: 2, coercions: 4, joins: 0/0}
+lvl13 :: Int
 [GblId, Str=b, Cpr=b]
-lvl12
+lvl13
   = error
       @GHC.Types.LiftedRep
       @Int
@@ -122,13 +127,13 @@ lvl12
                         <"callStack">_N <GHC.Stack.Types.CallStack>_N)
                :: GHC.Stack.Types.CallStack
                   ~R# (?callStack::GHC.Stack.Types.CallStack)))
-      (GHC.CString.unpackCString# lvl11)
+      lvl12
 
 Rec {
 -- RHS size: {terms: 50, types: 13, coercions: 0, joins: 1/1}
 g [Occ=LoopBreaker] :: Bool -> Bool -> Bool -> Int -> Int
 [GblId, Arity=4, Str=<SL><SL><L><1L>, Unf=OtherCon []]
-g = / (w :: Bool) (w1 :: Bool) (w2 :: Bool) (p :: Int) ->
+g = \ (w :: Bool) (w1 :: Bool) (w2 :: Bool) (p :: Int) ->
       join {
         fail_ [Dmd=M!P(L)] :: Int
         [LclId[JoinId(0)(Nothing)]]
@@ -139,7 +144,7 @@ g = / (w :: Bool) (w1 :: Bool) (w2 :: Bool) (p :: Int) ->
                   False -> g w GHC.Types.True GHC.Types.False p;
                   True -> f (f p)
                 };
-              True -> lvl12
+              True -> lvl13
             } } in
       case w of {
         False ->
@@ -159,3 +164,6 @@ g = / (w :: Bool) (w1 :: Bool) (w2 :: Bool) (p :: Int) ->
           }
       }
 end Rec }
+
+
+

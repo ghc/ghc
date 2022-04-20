@@ -32,6 +32,7 @@ import GHC.Core.FVs     ( exprsFreeVarsList )
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Core.DataCon
+import GHC.Core.Class( classTyVars )
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.Rules
 import GHC.Core.Type     hiding ( substTy )
@@ -45,6 +46,7 @@ import GHC.Unit.Module.ModGuts
 
 import GHC.Types.Literal ( litIsLifted )
 import GHC.Types.Id
+import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
@@ -662,6 +664,50 @@ information to adjust the calling convention of
 See Note [Tag Inference], Note [Strict Worker Ids] for more information on
 how we can take advantage of this.
 
+Note [Specialising on dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In #21386, SpecConstr saw this call:
+
+   $wgo 100# @.. ($fMonadStateT @.. @.. $fMonadIdentity)
+
+where $wgo :: Int# -> forall m. Monad m => blah
+
+You might think that the type-class Specialiser would have specialised
+this, but there are good reasons why not: the Specialiser ran too early.
+But regardless, SpecConstr can and should!  It's easy:
+
+* isValue: treat ($fblah d1 .. dn)
+  like a constructor application.
+
+* scApp: treat (op_sel d), a class method selection,
+  like a case expression
+
+* Float that dictionary application to top level, thus
+    lvl = $fMonadStateT @.. @.. $fMonadIdentity
+  so the call looks like
+    ($wgo 100# @.. lvl)
+
+  Why? This way dictionaries will appear as top level binders which we
+  can trivially match in rules.  (CSE runs before SpecConstr, so we
+  may hope to common-up duplicate top-level dictionaries.)
+  For the floating part, see the "Arguments" case of Note
+  [Floating to the top] in GHC.Core.Opt.SetLevels.
+
+  We could be more clever, perhaps, and generate a RULE like
+     $wgo _  @.. ($fMonadStateT @.. @.. $fMonadIdentity) = $s$wgo ...
+  but that would mean making argToPat able to spot dfun applications as
+  well as constructor applications.
+
+Wrinkles:
+* This should all work perfectly fine for newtype classes.  Mind you,
+  currently newtype classes are inlined fairly agressively, but we
+  may change that. And it would take extra code to exclude them, as
+  well as being unnecessary.
+
+* We (mis-) use LambdaVal for this purpose, because ConVal
+  requires us to list the data constructor and fields, and that
+  is (a) inconvenient and (b) unnecessary for class methods.
+
 -----------------------------------------------------
                 Stuff not yet handled
 -----------------------------------------------------
@@ -939,13 +985,13 @@ instance Outputable HowBound where
 scForce :: ScEnv -> Bool -> ScEnv
 scForce env b = env { sc_force = b }
 
-lookupHowBound :: ScEnv -> Id -> Maybe HowBound
+lookupHowBound :: ScEnv -> OutId -> Maybe HowBound
 lookupHowBound env id = lookupVarEnv (sc_how_bound env) id
 
-scSubstId :: ScEnv -> Id -> CoreExpr
+scSubstId :: ScEnv -> InId -> OutExpr
 scSubstId env v = lookupIdSubst (sc_subst env) v
 
-scSubstTy :: ScEnv -> Type -> Type
+scSubstTy :: ScEnv -> InType -> OutType
 scSubstTy env ty = substTy (sc_subst env) ty
 
 scSubstCo :: ScEnv -> Coercion -> Coercion
@@ -1310,7 +1356,7 @@ scExpr' env (Case scrut b ty alts)
           ; let (usg', b_occ:arg_occs) = lookupOccs usg (b':bs2)
                 scrut_occ = case con of
                                DataAlt dc -> ScrutOcc (unitUFM dc arg_occs)
-                               _          -> ScrutOcc emptyUFM
+                               _          -> evalScrutOcc
           ; return (usg', b_occ `combineOcc` scrut_occ, Alt con bs2 rhs') }
 
 scExpr' env (Let (NonRec bndr rhs) body)
@@ -1398,8 +1444,15 @@ scApp env (Var fn, args)        -- Function is a variable
             fn'@(Lam {}) -> scExpr (zapScSubst env) (doBeta fn' args')
                         -- Do beta-reduction and try again
 
-            Var fn' -> return (arg_usg `combineUsage` mkVarUsage env fn' args',
+            Var fn' -> return (arg_usg' `combineUsage` mkVarUsage env fn' args',
                                mkApps (Var fn') args')
+               where
+                 -- arg_usg': see Note [Specialising on dictionaries]
+                 arg_usg' | Just cls <- isClassOpId_maybe fn'
+                          , dict_arg : _ <- dropList (classTyVars cls) args'
+                          = setScrutOcc env arg_usg dict_arg evalScrutOcc
+                          | otherwise
+                          = arg_usg
 
             other_fn' -> return (arg_usg, mkApps other_fn' args') }
                 -- NB: doing this ignores any usage info from the substituted
@@ -1407,7 +1460,6 @@ scApp env (Var fn, args)        -- Function is a variable
                 --     we can fix it.
   where
     doBeta :: OutExpr -> [OutExpr] -> OutExpr
-    -- ToDo: adjust for System IF
     doBeta (Lam bndr body) (arg : args) = Let (NonRec bndr arg) (doBeta body args)
     doBeta fn              args         = mkApps fn args
 
@@ -2558,12 +2610,14 @@ isValue env (Tick t e)
 
 isValue _env expr       -- Maybe it's a constructor application
   | (Var fun, args, _) <- collectArgsTicks (not . tickishIsCode) expr
-  = case isDataConWorkId_maybe fun of
-
-        Just con | args `lengthAtLeast` dataConRepArity con
+  = case idDetails fun of
+        DataConWorkId con | args `lengthAtLeast` dataConRepArity con
                 -- Check saturated; might be > because the
                 --                  arity excludes type args
                 -> Just (ConVal (DataAlt con) args)
+
+        DFunId {} -> Just LambdaVal
+        -- DFunId: see Note [Specialising on dictionaries]
 
         _other | valArgCount args < idArity fun
                 -- Under-applied function

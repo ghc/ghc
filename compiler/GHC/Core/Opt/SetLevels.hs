@@ -104,7 +104,7 @@ import GHC.Types.Unique.Set   ( nonDetStrictFoldUniqSet )
 import GHC.Types.Unique.DSet  ( getUniqDSet )
 import GHC.Types.Var.Env
 import GHC.Types.Literal      ( litIsTrivial )
-import GHC.Types.Demand       ( DmdSig, Demand, isStrUsedDmd, splitDmdSig, prependArgsDmdSig )
+import GHC.Types.Demand       ( DmdSig, prependArgsDmdSig )
 import GHC.Types.Cpr          ( mkCprSig, botCpr )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
@@ -120,7 +120,6 @@ import GHC.Builtin.Names      ( runRWKey )
 import GHC.Data.FastString
 
 import GHC.Utils.FV
-import GHC.Utils.Monad  ( mapAccumLM )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -440,20 +439,12 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
         ; return (foldl' App lapp' rargs') }
 
   | otherwise
-  = do { (_, args') <- mapAccumLM lvl_arg stricts args
-            -- Take account of argument strictness; see
-            -- Note [Floating to the top]
+  = do { args' <- mapM (lvlMFE env False) args
+                  -- False: see "Arguments" in Note [Floating to the top]
        ; return (foldl' App (lookupVar env fn) args') }
   where
     n_val_args = count (isValArg . deAnnotate) args
     arity      = idArity fn
-
-    stricts :: [Demand]   -- True for strict /value/ arguments
-    stricts = case splitDmdSig (idDmdSig fn) of
-                (arg_ds, _) | arg_ds `lengthExceeds` n_val_args
-                            -> []
-                            | otherwise
-                            -> arg_ds
 
     -- Separate out the PAP that we are floating from the extra
     -- arguments, by traversing the spine until we have collected
@@ -465,19 +456,6 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
        | isValArg (deAnnotate a) = left (n-1) f (a:rargs)
        | otherwise               = left n     f (a:rargs)
     left _ _ _                   = panic "GHC.Core.Opt.SetLevels.lvlExpr.left"
-
-    is_val_arg :: CoreExprWithFVs -> Bool
-    is_val_arg (_, AnnType {}) = False
-    is_val_arg _               = True
-
-    lvl_arg :: [Demand] -> CoreExprWithFVs -> LvlM ([Demand], LevelledExpr)
-    lvl_arg strs arg | (str1 : strs') <- strs
-                     , is_val_arg arg
-                     = do { arg' <- lvlMFE env (isStrUsedDmd str1) arg
-                          ; return (strs', arg') }
-                     | otherwise
-                     = do { arg' <- lvlMFE env False arg
-                          ; return (strs, arg') }
 
 lvlApp env _ (fun, args)
   =  -- No PAPs that we can float: just carry on with the
@@ -791,8 +769,8 @@ escape a value lambda (and hence save work), for two reasons:
     instructions) into a static one. Minor because we are assuming
     we are not escaping a value lambda.
 
-But do not so if:
-     - the context is a strict, and
+But do not do so if (saves_alloc):
+     - the context is strict, and
      - the expression is not a HNF, and
      - the expression is not bottoming
 
@@ -824,10 +802,13 @@ Exammples:
 
 * Arguments
      t = f (g True)
-  If f is lazy, we /do/ float (g True) because then we can allocate
-  the thunk statically rather than dynamically.  But if f is strict
-  we don't (see the use of idDmdSig in lvlApp).  It's not clear
-  if this test is worth the bother: it's only about CAFs!
+  Prior to Apr 22 we didn't float (g True) to the top if f was strict.
+  But (a) this only affected CAFs, because if it escapes a value lambda
+          we'll definitely float it; so the complication of working out
+          argument strictness doesn't seem worth it.
+      (b) floating to the top helps SpecContr; see GHC.Core.Opt.SpecConstr
+          Note [Specialising on dictionaries].
+  So now we don't use strictness to affect argument floating.
 
 It's controlled by a flag (floatConsts), because doing this too
 early loses opportunities for RULES which (needless to say) are

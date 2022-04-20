@@ -1226,7 +1226,6 @@ there is only dictionary selection (no construction) involved
 
 Note [exprIsCheap]
 ~~~~~~~~~~~~~~~~~~
-
 See also Note [Interaction of exprIsWorkFree and lone variables] in GHC.Core.Unfold
 
 @exprIsCheap@ looks at a Core expression and returns \tr{True} if
