@@ -12,7 +12,7 @@
   * Introduce `GHC.ExecutablePath.executablePath`, which is more robust than
     `getExecutablePath` in cases when the executable has been deleted.
 
-  * Add `Data.Array.Byte` module, providing a boxed `ByteArray#`.
+  * Add `Data.Array.Byte` module, providing boxed `ByteArray#` and `MutableByteArray#` wrappers.
 
   * `fromEnum` for `Natural` now throws an error for any number that cannot be
     repesented exactly by an `Int` (#20291).
