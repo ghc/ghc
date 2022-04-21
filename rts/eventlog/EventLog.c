@@ -1542,6 +1542,10 @@ void flushLocalEventsBuf(Capability *cap)
 // Used during forkProcess.
 void flushAllCapsEventsBufs()
 {
+    if (!event_log_writer) {
+        return;
+    }
+
     ACQUIRE_LOCK(&eventBufMutex);
     printAndClearEventBuf(&eventBuf);
     RELEASE_LOCK(&eventBufMutex);
@@ -1554,6 +1558,10 @@ void flushAllCapsEventsBufs()
 
 void flushEventLog(Capability **cap USED_IF_THREADS)
 {
+    if (!event_log_writer) {
+        return;
+    }
+
     ACQUIRE_LOCK(&eventBufMutex);
     printAndClearEventBuf(&eventBuf);
     RELEASE_LOCK(&eventBufMutex);
