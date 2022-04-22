@@ -228,6 +228,15 @@ From a semantic point of view:
 
    because ``y`` can match against ``0``.
 
+-  A rule that has a forall binder with a polymorphic type, is likely to fail to fire. E. g., ::
+
+        {-# RULES forall (x :: forall a. Num a => a -> a).  f x = blah #-}
+
+   Here ``x`` has a polymorphic type.  This applies to a forall'd binder with a type class constraint, such as::
+
+        {-# RULES forall @m (x :: KnownNat m => Proxy m).  g x = blah #-}
+
+   See `#21093 <https://gitlab.haskell.org/ghc/ghc/-/issues/21093>`_ for discussion.
 
 .. _rules-inline:
 
