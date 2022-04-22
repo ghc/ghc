@@ -204,6 +204,40 @@ From a semantic point of view:
    (b) large or a redex, then it would not be substituted, and the rule
    would not fire.
 
+-  GHC will never match a forall'd variable in a template with an expression
+   which contains locally bound variables. For example, it is permitted to write
+   a rule which contains a case expression::
+
+        {-# RULES
+          "test/case-tup" forall (x :: (Int, Int)) (y :: Int) (z :: Int).
+            test (case x of (l, r) -> y) z = case x of (l, r) -> test y z
+          #-}
+
+   But the rule will not match when ``y`` contains either of ``l`` or ``r`` because
+   they are locally bound. Therefore the following application will fail to trigger
+   the rule::
+
+        prog :: (Int, Int) -> (Int, Int)
+        prog x = test (case x of (p, q) -> p) 0
+
+   because ``y`` would have to match against ``p`` (which is locally bound)
+   but it will fire for::
+
+        prog :: (Int, Int) -> (Int, Int)
+        prog x = test (case x of (p, q) -> 0) 0
+
+   because ``y`` can match against ``0``.
+
+-  A rule that has a forall binder with a polymorphic type, is likely to fail to fire. E. g., ::
+
+        {-# RULES forall (x :: forall a. Num a => a -> a).  f x = blah #-}
+
+   Here ``x`` has a polymorphic type.  This applies to a forall'd binder with a type class constraint, such as::
+
+        {-# RULES forall @m (x :: KnownNat m => Proxy m).  g x = blah #-}
+
+   See `#21093 <https://gitlab.haskell.org/ghc/ghc/-/issues/21093>`_ for discussion.
+
 .. _rules-inline:
 
 How rules interact with ``INLINE``/``NOINLINE`` pragmas
