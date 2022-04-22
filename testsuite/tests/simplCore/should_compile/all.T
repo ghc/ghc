@@ -401,3 +401,4 @@ test('T22272', normal, multimod_compile, ['T22272', '-O -fexpose-all-unfoldings 
 test('T22761', normal, multimod_compile, ['T22761', '-O2 -v0'])
 test('T23012', normal, compile, ['-O'])
 test('T21391', normal, compile, ['-O -dcore-lint'])
+test('T21391a', normal, compile, ['-O -dcore-lint'])
