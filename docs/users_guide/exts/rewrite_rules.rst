@@ -16,7 +16,7 @@ The programmer can specify rewrite rules as part of the source program
 (in a pragma). Here is an example: ::
 
       {-# RULES
-            "map/map"    forall f g xs.  map f (map g xs) = map (f.g) xs
+            "map/map"    forall f g xs.  map f (map g xs) = map (f . g) xs
         #-}
 
 Use the debug flag :ghc-flag:`-ddump-simpl-stats` to see what rules fired. If
@@ -48,7 +48,7 @@ From a syntactic point of view:
    the same column as the enclosing definitions. ::
 
          {-# RULES
-               "map/map"    forall f g xs.  map f (map g xs) = map (f.g) xs
+               "map/map"    forall f g xs.  map f (map g xs) = map (f . g) xs
                "map/append" forall f xs ys. map f (xs ++ ys) = map f xs ++ map f ys
            #-}
 
@@ -63,7 +63,7 @@ From a syntactic point of view:
    :ref:`phase-control`), immediately after the name of the rule. Thus: ::
 
          {-# RULES
-               "map/map" [2]  forall f g xs. map f (map g xs) = map (f.g) xs
+               "map/map" [2]  forall f g xs. map f (map g xs) = map (f . g) xs
            #-}
 
    The ``[2]`` means that the rule is active in Phase 2 and subsequent
