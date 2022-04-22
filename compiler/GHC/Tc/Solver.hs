@@ -1672,7 +1672,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
        ; tc_lvl <- TcM.getTcLevel
        ; let psig_tys = mkTyVarTys psig_qtvs ++ psig_theta
 
-             co_vars = coVarsOfTypes (psig_tys ++ taus)
+             co_vars = coVarsOfTypes (psig_tys ++ taus ++ candidates)
              co_var_tvs = closeOverKinds co_vars
                -- The co_var_tvs are tvs mentioned in the types of covars or
                -- coercion holes. We can't quantify over these covars, so we
