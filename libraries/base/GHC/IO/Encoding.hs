@@ -131,10 +131,35 @@ getFileSystemEncoding :: IO TextEncoding
 getForeignEncoding :: IO TextEncoding
 {-# NOINLINE getForeignEncoding #-}
 
--- | @since 4.5.0.0
-setLocaleEncoding, setFileSystemEncoding, setForeignEncoding :: TextEncoding -> IO ()
+-- | Set locale encoding for your program. The locale affects
+-- how 'Char's are encoded and decoded when serialized to bytes: e. g.,
+-- when you read or write files ('System.IO.readFile'', 'System.IO.writeFile')
+-- or use standard input/output ('System.IO.getLine', 'System.IO.putStrLn').
+-- For instance, if your program prints non-ASCII characters, it is prudent to execute
+--
+-- > setLocaleEncoding utf8
+--
+-- This is necessary, but not enough on Windows, where console is
+-- a stateful device, which needs to be configured using
+-- @System.Win32.Console.setConsoleOutputCP@ and restored back afterwards.
+-- These intricacies are covered by
+-- <https://hackage.haskell.org/package/code-page code-page> package,
+-- which offers a crossplatform @System.IO.CodePage.withCodePage@ bracket.
+--
+-- Wrong locale encoding typically causes error messages like
+-- "invalid argument (cannot decode byte sequence starting from ...)"
+-- or "invalid argument (cannot encode character ...)".
+--
+-- @since 4.5.0.0
+setLocaleEncoding :: TextEncoding -> IO ()
 {-# NOINLINE setLocaleEncoding #-}
+
+-- | @since 4.5.0.0
+setFileSystemEncoding :: TextEncoding -> IO ()
 {-# NOINLINE setFileSystemEncoding #-}
+
+-- | @since 4.5.0.0
+setForeignEncoding :: TextEncoding -> IO ()
 {-# NOINLINE setForeignEncoding #-}
 
 (getLocaleEncoding, setLocaleEncoding)         = mkGlobal initLocaleEncoding
