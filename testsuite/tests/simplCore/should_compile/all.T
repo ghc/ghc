@@ -405,3 +405,4 @@ test('T17966',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])
 test('T19644',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])
 
 test('T21391', normal, compile, ['-O -dcore-lint'])
+test('T21391a', normal, compile, ['-O -dcore-lint'])
