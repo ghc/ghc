@@ -44,7 +44,6 @@ import GHC.Utils.FV
 import GHC.Utils.Error( Validity'(..), Validity, allValid )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain ( assert )
 
 import GHC.Data.Pair             ( Pair(..) )
 import Data.List        ( nubBy )
@@ -552,7 +551,10 @@ closeWrtFunDeps :: [PredType] -> TyCoVarSet -> TyCoVarSet
 -- See Note [The liberal coverage condition]
 closeWrtFunDeps preds fixed_tvs
   | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
-  | otherwise   = assert (closeOverKinds fixed_tvs == fixed_tvs)
+  | otherwise   = assertPpr (closeOverKinds fixed_tvs == fixed_tvs)
+                    (vcat [ text "closeWrtFunDeps: fixed_tvs is not closed over kinds"
+                          , text "fixed_tvs:" <+> ppr fixed_tvs
+                          , text "closure:" <+> ppr (closeOverKinds fixed_tvs) ])
                 $ fixVarSet extend fixed_tvs
   where
 
