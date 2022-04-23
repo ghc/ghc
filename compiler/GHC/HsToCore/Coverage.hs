@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor            #-}
+{-# LANGUAGE MonadComprehensions      #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies             #-}
 
@@ -61,6 +62,7 @@ import Control.Monad
 import Data.List (isSuffixOf, intersperse)
 import Data.Array
 import Data.Time
+import Data.Traversable (for)
 import System.Directory
 
 import Trace.Hpc.Mix
@@ -141,8 +143,11 @@ addTicksToBinds (CoverageConfig
 
      let tickCount = tickBoxCount st
          entries = reverse $ mixEntries st
-     hashNo <- writeMixEntries dflags mod tickCount entries orig_file2
-     modBreaks <- mkModBreaks m_interp dflags mod tickCount entries
+     modBreaks <- for [i | i <- m_interp, breakpointsEnabled dflags] $
+       \interp -> mkModBreaks interp mod tickCount entries
+     hashNo <- if gopt Opt_Hpc dflags
+       then writeMixEntries (hpcDir dflags) mod tickCount entries orig_file2
+       else return 0 -- dummy hash when none are written
 
      putDumpFileMaybe logger Opt_D_dump_ticked "HPC" FormatHaskell
        (pprLHsBinds binds1)
@@ -164,24 +169,22 @@ guessSourceFile binds orig_file =
         _ -> orig_file
 
 
-mkModBreaks :: Maybe Interp -> DynFlags -> Module -> Int -> [MixEntry_] -> IO (Maybe ModBreaks)
-mkModBreaks m_interp dflags mod count entries
-  | Just interp <- m_interp
-  , breakpointsEnabled dflags = do
+mkModBreaks :: Interp -> Module -> Int -> [MixEntry_] -> IO ModBreaks
+mkModBreaks interp mod count entries
+  = do
     breakArray <- GHCi.newBreakArray interp (length entries)
     ccs <- mkCCSArray interp mod count entries
     let
            locsTicks  = listArray (0,count-1) [ span  | (span,_,_,_)  <- entries ]
            varsTicks  = listArray (0,count-1) [ vars  | (_,_,vars,_)  <- entries ]
            declsTicks = listArray (0,count-1) [ decls | (_,decls,_,_) <- entries ]
-    return $ Just $ emptyModBreaks
+    return $ emptyModBreaks
                        { modBreaks_flags = breakArray
                        , modBreaks_locs  = locsTicks
                        , modBreaks_vars  = varsTicks
                        , modBreaks_decls = declsTicks
                        , modBreaks_ccs   = ccs
                        }
-  | otherwise = return Nothing
 
 mkCCSArray
   :: Interp -> Module -> Int -> [MixEntry_]
@@ -199,12 +202,10 @@ mkCCSArray interp modul count entries
 
 
 writeMixEntries
-  :: DynFlags -> Module -> Int -> [MixEntry_] -> FilePath -> IO Int
-writeMixEntries dflags mod count entries filename
-  | not (gopt Opt_Hpc dflags) = return 0
-  | otherwise   = do
+  :: FilePath -> Module -> Int -> [MixEntry_] -> FilePath -> IO Int
+writeMixEntries hpc_dir mod count entries filename
+  = do
         let
-            hpc_dir = hpcDir dflags
             mod_name = moduleNameString (moduleName mod)
 
             hpc_mod_dir
