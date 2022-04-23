@@ -235,16 +235,19 @@ typedef struct {
 } StgMutVar;
 
 
-// Stack frames
-// ============
-//
-// See also StgStack in TSO.h
-//
-// These do not appear alone on the heap but always inside an StgStack or a
-// StgAP_STACK.
+/* ----------------------------------------------------------------------------
+   Stack frames
+   ------------------------------------------------------------------------- */
 
 
-// Stack frame
+/*
+ * See also StgStack in TSO.h
+ *
+ * These do not appear alone on the heap but always inside an StgStack or a
+ * StgAP_STACK.
+ */
+
+// Thunk update frame
 //
 // Closure types: UPDATE_FRAME
 typedef struct _StgUpdateFrame {
@@ -309,7 +312,13 @@ typedef struct {
 } StgRetFun;
 
 
-// Int or charlike things, these are statically allocated in StgMiscClosures.h
+
+/* ----------------------------------------------------------------------------
+   Special heap objects
+   ------------------------------------------------------------------------- */
+
+// Int or Char-like things, these are statically allocated in StgMiscClosures.h.
+// See Note [CHARLIKE and INTLIKE closures] in StgMiscClosures.h.
 //
 // Closure type: CONSTR_0_1
 typedef struct {
@@ -400,7 +409,10 @@ typedef struct {
 
 
 
-/* Concurrent communication objects */
+/* ----------------------------------------------------------------------------
+   Concurrent communication objects
+   ------------------------------------------------------------------------- */
+
 
 // Queue for threads waiting on an MVar
 //
@@ -427,8 +439,11 @@ typedef struct {
 } StgMVar;
 
 
-/* STM data structures
- *
+/* ----------------------------------------------------------------------------
+   STM data structures
+   ------------------------------------------------------------------------- */
+
+/*
  *  StgTVar defines the only type that can be updated through the STM
  *  interface.
  *
@@ -479,6 +494,10 @@ typedef struct {
 
 #define TREC_CHUNK_NUM_ENTRIES 16
 
+/*
+ * A chunk of TVar updates (`TRecEntry`s) belonging to an in-flight STM
+ * transaction.
+ */
 typedef struct StgTRecChunk_ {
   StgHeader                  header;
   struct StgTRecChunk_      *prev_chunk;
@@ -489,11 +508,11 @@ typedef struct StgTRecChunk_ {
 typedef enum {
   TREC_ACTIVE,        /* Transaction in progress, outcome undecided */
   TREC_CONDEMNED,     /* Transaction in progress, inconsistent / out of date reads */
-  TREC_COMMITTED,     /* Transaction has committed, now updating tvars */
   TREC_ABORTED,       /* Transaction has aborted, now reverting tvars */
   TREC_WAITING,       /* Transaction currently waiting */
 } TRecState;
 
+/* A transactional record */
 struct StgTRecHeader_ {
   StgHeader                  header;
   struct StgTRecHeader_     *enclosing_trec;
@@ -501,18 +520,21 @@ struct StgTRecHeader_ {
   TRecState                  state;
 };
 
+/* A stack frame delimiting an STM transaction */
 typedef struct {
   StgHeader   header;
   StgClosure *code;
   StgClosure *result;
 } StgAtomicallyFrame;
 
+/* A catch# handler introduced within an STM transaction */
 typedef struct {
   StgHeader   header;
   StgClosure *code;
   StgClosure *handler;
 } StgCatchSTMFrame;
 
+/* A catchRetry# handler */
 typedef struct {
   StgHeader      header;
   StgWord        running_alt_code;
