@@ -555,6 +555,7 @@ instance Bits Integer where
    zeroBits          = integerZero
    setBit x i        = integerSetBit x (fromIntegral i)
    clearBit x i      = integerClearBit x (fromIntegral i)
+   {-# INLINE clearBit #-}
    complementBit x i = integerComplementBit x (fromIntegral i)
 
    bit (I# i)  = integerBit# (int2Word# i)

@@ -617,6 +617,7 @@ integerSetBit !i (W# n) = integerSetBit# i n
 --
 -- @since 1.3
 integerClearBit# :: Integer -> Word# -> Integer
+{-# INLINE integerClearBit# #-}
 integerClearBit# n@(IS x) i
    | isTrue# (i `ltWord#` (WORD_SIZE_IN_BITS## `minusWord#` 1##))
    = IS (x `andI#` notI# (uncheckedIShiftL# 1# (word2Int# i)))
@@ -644,6 +645,7 @@ integerClearBit# (IN x) i = IN (bigNatAddWord#
 --
 -- @since 1.3
 integerClearBit :: Integer -> Word -> Integer
+{-# INLINE integerClearBit #-}
 integerClearBit !i (W# n) = integerClearBit# i n
 
 -- | Reverse the /n/-th bit.
