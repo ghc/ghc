@@ -71,9 +71,11 @@ is as follows. If the do-expression has the following form: ::
 
 where none of the variables defined by ``p1...pn`` are mentioned in ``E1...En``,
 and ``p1...pn`` are all variables or lazy patterns,
-then the expression will only require ``Applicative``. Otherwise, the expression
+then the expression will only require ``Applicative``. The do expression may also
+contain ``let`` statements anywhere, provided that the right-hand-sides of the ``let``
+bindings do not mention any of ``p1...pn``. Otherwise, the expression
 will require ``Monad``. The block may return a pure expression ``E`` depending
-upon the results ``p1...pn`` with either ``return`` or ``pure``.
+upon the results ``p1...pn`` and the ``let`` bindings, with either ``return`` or ``pure``.
 
 Note: the final statement must match one of these patterns exactly:
 
@@ -187,6 +189,3 @@ terms of ``Monad`` is to use the ``Monad`` operations directly, e.g. ::
     instance Applicative MyType where
         pure = return
         (<*>) = ap
-
-
-

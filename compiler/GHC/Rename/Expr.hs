@@ -2107,7 +2107,9 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
         if | L _ ApplicativeStmt{} <- last stmts' ->
              return (unLoc tup, emptyNameSet)
            | otherwise -> do
-             (ret, _) <- lookupQualifiedDoExpr (HsDoStmt ctxt) returnMName
+             -- Need 'pureAName' and not 'returnMName' here, so that it requires
+             -- 'Applicative' and not 'Monad' whenever possible (until #20540 is fixed).
+             (ret, _) <- lookupQualifiedDoExpr (HsDoStmt ctxt) pureAName
              let expr = HsApp noComments (noLocA ret) tup
              return (expr, emptyFVs)
      return ( ApplicativeArgMany
@@ -2125,19 +2127,19 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
 segments
   :: [(ExprLStmt GhcRn, FreeVars)]
   -> [[(ExprLStmt GhcRn, FreeVars)]]
-segments stmts = map fst $ merge $ reverse $ map reverse $ walk (reverse stmts)
+segments stmts = merge $ reverse $ map reverse $ walk (reverse stmts)
   where
     allvars = mkNameSet (concatMap (collectStmtBinders CollNoDictBinders . unLoc . fst) stmts)
 
     -- We would rather not have a segment that just has LetStmts in
-    -- it, so combine those with an adjacent segment where possible.
+    -- it, so combine those with the next segment where possible.
+    -- We don't merge it with the previous segment because the merged segment
+    -- would require 'Monad' while it may otherwise only require 'Applicative'.
     merge [] = []
     merge (seg : segs)
        = case rest of
-          [] -> [(seg,all_lets)]
-          ((s,s_lets):ss) | all_lets || s_lets
-               -> (seg ++ s, all_lets && s_lets) : ss
-          _otherwise -> (seg,all_lets) : rest
+          s:ss | all_lets -> (seg ++ s) : ss
+          _otherwise -> seg : rest
       where
         rest = merge segs
         all_lets = all (isLetStmt . fst) seg

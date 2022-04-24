@@ -2,6 +2,7 @@
 module Main where
 
 import Control.Applicative
+import Data.Maybe
 import Text.PrettyPrint as PP
 
 (a:b:c:d:e:f:g:h:_) = map (\c -> doc [c]) ['a'..]
@@ -85,7 +86,7 @@ test8 = do
   return () `const` (x2,x3,x4)
 
 -- test that Lets don't get in the way
--- ((a | (b; c)) | d) | e
+-- (((a | (b; c)) | d) | e) | pure
 test9 :: M ()
 test9 = do
   x1 <- a
@@ -109,7 +110,7 @@ test10 = do
   x5 <- e
   return (const () (x3,x4,x5))
 
--- (a | b)
+-- (a | b) | pure
 -- This demonstrated a bug in RnExpr.segments (#11612)
 test11 :: M ()
 test11 = do
@@ -160,10 +161,10 @@ instance Functor M where
 instance Applicative M where
   pure a = M $ \_ -> (Nothing, a)
   M f <*> M a = M $ \p ->
-    let (Just d1, f') = f True
-        (Just d2, a') = a True
+    let (d1, f') = f True
+        (d2, a') = a True
     in
-        (Just (maybeParen p (d1 <+> char '|' <+> d2)), f' a')
+        (Just (maybeParen p (fromMaybe (text "pure") d1 <+> char '|' <+> fromMaybe (text "pure") d2)), f' a')
 
 instance Monad M where
   return = pure
