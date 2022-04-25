@@ -69,6 +69,17 @@ Compiler
 - New :ghc-flag:`-fprof-late` that adds automatic CCS annotations to all
   top level functions *after* core optimisation have been run.
 
+- Typechecking plugins now support type-family rewriting. The ``TcPlugin``
+  datatype now contains an extra field, ``tcPluginRewrite``, which allows
+  typechecking plugin authors to specify which type families should be
+  rewritten by the plugin, returning for each type family application a
+  ``TcPluginRewriteResult``.
+  In addition, typechecking plugins now have the ability to emit new constraints
+  at the same time as contradictions. To account for these changes, the
+  ``TcPluginResult`` datatype has been renamed to ``TcPluginSolveResult``,
+  which bundles pattern synonyms ``TcPluginOk`` and ``TcPluginContradiction``
+  to recover the old interface.
+
 - A new type of plugin: defaulting plugins. These plugins can propose
   defaults for ambiguous variables that would otherwise cause errors
   just like the built-in defaulting mechanism.
