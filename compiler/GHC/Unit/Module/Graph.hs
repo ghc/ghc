@@ -11,6 +11,7 @@ module GHC.Unit.Module.Graph
    , extendMG
    , extendMGInst
    , extendMG'
+   , unionMG
    , isTemplateHaskellOrQQNonBoot
    , filterToposortToModules
    , mapMG
@@ -65,6 +66,8 @@ import GHC.Linker.Static.Utils
 
 import Data.Bifunctor
 import Data.Either
+import Data.Function
+import GHC.Data.List.SetOps
 
 -- | A '@ModuleGraphNode@' is a node in the '@ModuleGraph@'.
 -- Edges between nodes mark dependencies arising from module imports
@@ -98,6 +101,12 @@ instance Outputable ModuleGraphNode where
     InstantiationNode _ iuid -> ppr iuid
     ModuleNode nks ms -> ppr (ms_mnwib ms) <+> ppr nks
     LinkNode uid _     -> text "LN:" <+> ppr uid
+
+instance Eq ModuleGraphNode where
+  (==) = (==) `on` mkNodeKey
+
+instance Ord ModuleGraphNode where
+  compare = compare `on` mkNodeKey
 
 data NodeKey = NodeKey_Unit {-# UNPACK #-} !InstantiatedUnit
              | NodeKey_Module {-# UNPACK #-} !ModNodeKeyWithUid
@@ -149,6 +158,16 @@ mapMG f mg@ModuleGraph{..} = mg
   , mg_non_boot = mapModuleEnv f mg_non_boot
   }
 
+unionMG :: ModuleGraph -> ModuleGraph -> ModuleGraph
+unionMG a b =
+  let new_mss = nubOrdBy compare $ mg_mss a `mappend` mg_mss b
+  in ModuleGraph {
+        mg_mss = new_mss
+      , mg_trans_deps = mkTransDeps new_mss
+      , mg_non_boot = mg_non_boot a `plusModuleEnv` mg_non_boot b
+      }
+
+
 mgTransDeps :: ModuleGraph -> Map.Map NodeKey (Set.Set NodeKey)
 mgTransDeps = mg_trans_deps
 
@@ -176,14 +195,16 @@ isTemplateHaskellOrQQNonBoot ms =
 extendMG :: ModuleGraph -> [NodeKey] -> ModSummary -> ModuleGraph
 extendMG ModuleGraph{..} deps ms = ModuleGraph
   { mg_mss = ModuleNode deps ms : mg_mss
-  , mg_trans_deps = td
+  , mg_trans_deps = mkTransDeps (ModuleNode deps ms : mg_mss)
   , mg_non_boot = case isBootSummary ms of
       IsBoot -> mg_non_boot
       NotBoot -> extendModuleEnv mg_non_boot (ms_mod ms) ms
   }
-  where
-    (gg, _lookup_node) = moduleGraphNodes False (ModuleNode deps ms : mg_mss)
-    td = allReachable gg (mkNodeKey . node_payload)
+
+mkTransDeps :: [ModuleGraphNode] -> Map.Map NodeKey (Set.Set NodeKey)
+mkTransDeps mss =
+  let (gg, _lookup_node) = moduleGraphNodes False mss
+  in allReachable gg (mkNodeKey . node_payload)
 
 extendMGInst :: ModuleGraph -> UnitId -> InstantiatedUnit -> ModuleGraph
 extendMGInst mg uid depUnitId = mg
