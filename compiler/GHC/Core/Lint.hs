@@ -1003,7 +1003,10 @@ lintCoreExpr e@(App _ _)
        ; checkCanEtaExpand fun args app_ty
        ; return app_pair}
   where
-    (fun, args, _source_ticks) = collectArgsTicks tickishFloatable e
+    skipTick t = case collectFunSimple e of
+      (Var v) -> etaExpansionTick v t
+      _ -> tickishFloatable t
+    (fun, args, _source_ticks) = collectArgsTicks skipTick e
       -- We must look through source ticks to avoid #21152, for example:
       --
       -- reallyUnsafePtrEquality
@@ -1014,6 +1017,8 @@ lintCoreExpr e@(App _ _)
       -- To do this, we use `collectArgsTicks tickishFloatable` to match
       -- the eta expansion behaviour, as per Note [Eta expansion and source notes]
       -- in GHC.Core.Opt.Arity.
+      -- Sadly this was not quite enough. So we now also accept things that CorePrep will allow.
+      -- See Note [Ticks and mandatory eta expansion]
 
 lintCoreExpr (Lam var expr)
   = markAllJoinsBad $
@@ -1319,7 +1324,9 @@ The basic version of these functions checks that the argument is a
 subtype of the required type, as one would expect.
 -}
 
-
+-- Takes the functions type and arguments as argument.
+-- Returns the *result* of applying the function to arguments.
+-- e.g. f :: Int -> Bool -> Int would return `Int` as result type.
 lintCoreArgs  :: (LintedType, UsageEnv) -> [CoreArg] -> LintM (LintedType, UsageEnv)
 lintCoreArgs (fun_ty, fun_ue) args = foldM lintCoreArg (fun_ty, fun_ue) args
 

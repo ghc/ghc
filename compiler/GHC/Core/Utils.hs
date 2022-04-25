@@ -31,7 +31,7 @@ module GHC.Core.Utils (
         isCheapApp, isExpandableApp, isSaturatedConApp,
         exprIsTickedString, exprIsTickedString_maybe,
         exprIsTopLevelBindable,
-        altsAreExhaustive,
+        altsAreExhaustive, etaExpansionTick,
 
         -- * Equality
         cheapEqExpr, cheapEqExpr', eqExpr,
@@ -332,6 +332,11 @@ mkTick t orig_expr = mkTick' id id orig_expr
   -- non-counting part having laxer placement properties.
   canSplit = tickishCanSplit t && tickishPlace (mkNoCount t) /= tickishPlace t
 
+  -- mkTick' handles floating of ticks *into* the expression.
+  -- In this function, `top` is applied after adding the tick, and `rest` before.
+  -- This will result in applications that look like (top $ Tick t $ rest expr).
+  -- If we want to push the tick deeper, we pre-compose `top` with a function
+  -- adding the tick.
   mkTick' :: (CoreExpr -> CoreExpr) -- apply after adding tick (float through)
           -> (CoreExpr -> CoreExpr) -- apply before adding tick (float with)
           -> CoreExpr               -- current expression
@@ -1697,6 +1702,15 @@ altsAreExhaustive (Alt con1 _ _ : alts)
       -- enumerate all constructors, notably in a GADT match, but
       -- we behave conservatively here -- I don't think it's important
       -- enough to deserve special treatment
+
+-- | Should we look past this tick when eta-expanding the given function?
+--
+-- See Note [Ticks and mandatory eta expansion]
+-- Takes the function we are applying as argument.
+etaExpansionTick :: Id -> GenTickish pass -> Bool
+etaExpansionTick id t
+  = hasNoBinding id &&
+    ( tickishFloatable t || isProfTick t )
 
 {- Note [exprOkForSpeculation: case expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
