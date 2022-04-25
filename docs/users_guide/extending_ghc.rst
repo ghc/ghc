@@ -582,7 +582,7 @@ is defined thus:
       , tcPluginStop    :: s -> TcPluginM ()
       }
 
-    type TcPluginSolver = [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
+    type TcPluginSolver = [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult
 
     type TcPluginRewriter = RewriteEnv -> [Ct] -> [Type] -> TcPluginM TcPluginRewriteResult
 
@@ -615,7 +615,7 @@ The basic idea is as follows:
 
 -  During constraint solving, GHC repeatedly calls ``tcPluginSolve``.
    This function is provided with the current set of constraints, and
-   should return a ``TcPluginResult`` that indicates whether a
+   should return a ``TcPluginSolveResult`` that indicates whether a
    contradiction was found or progress was made. If the plugin solver
    makes progress, GHC will re-start the constraint solving pipeline,
    looping until a fixed point is reached.
