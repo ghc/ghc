@@ -79,7 +79,6 @@ import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Types.Name.Cache
 import GHC.Unit
-import GHC.Unit.State (lookupUnit)
 import GHC.Utils.Panic (handleGhcException)
 import GHC.Data.FastString
 

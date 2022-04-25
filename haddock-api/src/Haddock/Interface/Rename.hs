@@ -314,7 +314,8 @@ renameType t = case t of
   XHsType a                 -> pure (XHsType a)
   HsExplicitListTy _ a b  -> HsExplicitListTy noAnn a <$> mapM renameLType b
   HsExplicitTupleTy _ b   -> HsExplicitTupleTy noAnn <$> mapM renameLType b
-  HsSpliceTy _ s          -> renameHsSpliceTy s
+  HsSpliceTy (HsUntypedSpliceTop _ st)  _ -> renameType st
+  HsSpliceTy (HsUntypedSpliceNested _) _ -> error "renameType: not an top level type splice"
   HsWildCardTy _          -> pure (HsWildCardTy noAnn)
 
 
@@ -323,17 +324,6 @@ renameSigType (HsSig { sig_bndrs = bndrs, sig_body = body }) = do
   bndrs' <- renameOuterTyVarBndrs bndrs
   body'  <- renameLType body
   pure $ HsSig { sig_ext = noExtField, sig_bndrs = bndrs', sig_body = body' }
-
--- | Rename splices, but _only_ those that turn out to be for types.
--- I think this is actually safe for our possible inputs:
---
---  * the input is from after GHC's renamer, so should have an 'HsSpliced'
---  * the input is typechecked, and only 'HsSplicedTy' should get through that
---
-renameHsSpliceTy :: HsSplice GhcRn -> RnM (HsType DocNameI)
-renameHsSpliceTy (HsSpliced _ _ (HsSplicedTy t)) = renameType t
-renameHsSpliceTy (HsSpliced _ _ _) = error "renameHsSpliceTy: not an HsSplicedTy"
-renameHsSpliceTy _ = error "renameHsSpliceTy: not an HsSpliced"
 
 renameLHsQTyVars :: LHsQTyVars GhcRn -> RnM (LHsQTyVars DocNameI)
 renameLHsQTyVars (HsQTvs { hsq_explicit = tvs })

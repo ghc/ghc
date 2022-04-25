@@ -39,7 +39,6 @@ import GHC.Parser.PostProcess
 import GHC.Driver.Ppr ( showPpr, showSDoc )
 import GHC.Types.Name.Reader
 import GHC.Data.EnumSet as EnumSet
-import GHC.Utils.Trace
 
 processDocStrings :: DynFlags -> Maybe Package -> GlobalRdrEnv -> [HsDocString]
                   -> ErrMsgM (Maybe (MDoc Name))

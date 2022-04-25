@@ -36,5 +36,11 @@ aType = [t|
     [ (Double, String) ]
   |]
 
+typedExpr1 :: Code Q ()
+typedExpr1 = [|| () ||]
+
+typedExpr :: Code Q ()
+typedExpr = [|| const $$(typedExpr1) () ||]
+
 
 

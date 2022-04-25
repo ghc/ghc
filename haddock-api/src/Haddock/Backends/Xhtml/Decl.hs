@@ -32,7 +32,6 @@ import Haddock.Doc (combineDocumentation)
 import           Data.List             ( intersperse, sort )
 import qualified Data.Map as Map
 import           Data.Maybe
-import           Data.Void             ( absurd )
 import           Text.XHtml hiding     ( name, title, p, quote )
 
 import GHC.Core.Type ( Specificity(..) )
@@ -1263,7 +1262,7 @@ ppr_mono_ty (HsKindSig _ ty kind) u q e =
 ppr_mono_ty (HsListTy _ ty)       u q _ = brackets (ppr_mono_lty ty u q HideEmptyContexts)
 ppr_mono_ty (HsIParamTy _ (L _ n) ty) u q _ =
   ppIPName n <+> dcolon u <+> ppr_mono_lty ty u q HideEmptyContexts
-ppr_mono_ty (HsSpliceTy v _) _ _ _ = absurd v
+ppr_mono_ty (HsSpliceTy v _) _ _ _ = dataConCantHappen v
 ppr_mono_ty (HsRecTy {})        _ _ _ = toHtml "{..}"
        -- Can now legally occur in ConDeclGADT, the output here is to provide a
        -- placeholder in the signature, which is followed by the field

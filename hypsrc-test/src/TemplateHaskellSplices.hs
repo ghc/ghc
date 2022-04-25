@@ -7,3 +7,7 @@ import TemplateHaskellQuasiquotes
 $(aDecl)
 
 foo = id $(anExpression2)
+
+pat $(aPattern) = ()
+
+qux = id $$(typedExpr)

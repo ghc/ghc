@@ -16,7 +16,6 @@ import Haddock.Syb
 import Haddock.Types
 
 import GHC
-import GHC.Types.Basic ( PromotionFlag(..) )
 import GHC.Types.Name
 import GHC.Data.FastString
 import GHC.Builtin.Types ( listTyConName, unrestrictedFunTyConName )

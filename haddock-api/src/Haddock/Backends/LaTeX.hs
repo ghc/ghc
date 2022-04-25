@@ -40,7 +40,6 @@ import Data.Char
 import Control.Monad
 import Data.Maybe
 import Data.List            ( sort )
-import Data.Void            ( absurd )
 import Prelude hiding ((<>))
 
 import Haddock.Doc (combineDocumentation)
@@ -1120,7 +1119,7 @@ ppr_mono_ty (HsSumTy _ tys) u       = sumParens (map (ppLType u) tys)
 ppr_mono_ty (HsKindSig _ ty kind) u = parens (ppr_mono_lty ty u <+> dcolon u <+> ppLKind u kind)
 ppr_mono_ty (HsListTy _ ty)       u = brackets (ppr_mono_lty ty u)
 ppr_mono_ty (HsIParamTy _ (L _ n) ty) u = ppIPName n <+> dcolon u <+> ppr_mono_lty ty u
-ppr_mono_ty (HsSpliceTy v _)    _ = absurd v
+ppr_mono_ty (HsSpliceTy v _)    _ = dataConCantHappen v
 ppr_mono_ty (HsRecTy {})        _ = text "{..}"
 ppr_mono_ty (XHsType {})        _ = error "ppr_mono_ty HsCoreTy"
 ppr_mono_ty (HsExplicitListTy _ IsPromoted tys) u = Pretty.quote $ brackets $ hsep $ punctuate comma $ map (ppLType u) tys

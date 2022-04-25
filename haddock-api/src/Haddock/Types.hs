@@ -322,6 +322,7 @@ type instance IdP DocNameI = DocName
 instance CollectPass DocNameI where
   collectXXPat _ ext = dataConCantHappen ext
   collectXXHsBindsLR ext = dataConCantHappen ext
+  collectXSplicePat _ ext = dataConCantHappen ext
 
 instance NamedThing DocName where
   getName (Documented name _) = name
@@ -750,7 +751,7 @@ type instance XOpTy            DocNameI = EpAnn [AddEpAnn]
 type instance XParTy           DocNameI = EpAnn AnnParen
 type instance XIParamTy        DocNameI = EpAnn [AddEpAnn]
 type instance XKindSig         DocNameI = EpAnn [AddEpAnn]
-type instance XSpliceTy        DocNameI = Void       -- see `renameHsSpliceTy`
+type instance XSpliceTy        DocNameI = DataConCantHappen
 type instance XDocTy           DocNameI = EpAnn [AddEpAnn]
 type instance XBangTy          DocNameI = EpAnn [AddEpAnn]
 type instance XRecTy           DocNameI = EpAnn [AddEpAnn]
@@ -831,6 +832,8 @@ type instance XXConDeclField DocNameI = DataConCantHappen
 
 type instance XXPat DocNameI = DataConCantHappen
 type instance XXHsBindsLR DocNameI a = DataConCantHappen
+
+type instance XSplicePat DocNameI = DataConCantHappen
 
 type instance XCInjectivityAnn DocNameI = NoExtField
 
