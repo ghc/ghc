@@ -792,7 +792,7 @@ cpeRhsE env (Let bind body)
 
 cpeRhsE env (Tick tickish expr)
   -- Pull out ticks if they are allowed to be floated.
-  | floatableTick tickish
+  | tickishFloatable tickish
   = do { (floats, body) <- cpeRhsE env expr
          -- See [Floating Ticks in CorePrep]
        ; return (unitFloat (FloatTick tickish) `appendFloats` floats, body) }
@@ -1011,10 +1011,12 @@ cpeApp top_env expr
             -- Profiling ticks are slightly less strict so we expand their scope
             -- if they cover partial applications of things like primOps.
             -- See Note [Ticks and mandatory eta expansion]
-            | floatableTick tickish || isProfTick tickish
-            , Var vh <- head
+            -- Here we look inside `fun` before we make the final decision about
+            -- floating the tick which isn't optimal for perf. But this only makes
+            -- a difference if we have a non-floatable tick which is somewhat rare.
+            | Var vh <- head
             , Var head' <- lookupCorePrepEnv top_env vh
-            , hasNoBinding head'
+            , etaExpansionTick head' tickish
             = (head,as')
             where
               (head,as') = go fun (CpeTick tickish : as)
@@ -1145,7 +1147,7 @@ cpeApp top_env expr
           case info of
             CpeCast {} -> go infos n
             CpeTick tickish
-              | floatableTick tickish                 -> go infos n
+              | tickishFloatable tickish                 -> go infos n
               -- If we can't guarantee a tick will be floated out of the application
               -- we can't guarantee the value args following it will be applied.
               | otherwise                             -> n
@@ -2235,11 +2237,6 @@ wrapTicks (Floats flag floats0) expr =
                                              (ppr other)
         wrapBind t (NonRec binder rhs) = NonRec binder (mkTick t rhs)
         wrapBind t (Rec pairs)         = Rec (mapSnd (mkTick t) pairs)
-
-floatableTick :: GenTickish pass -> Bool
-floatableTick tickish =
-    tickishPlace tickish == PlaceNonLam &&
-    tickish `tickishScopesLike` SoftScope
 
 ------------------------------------------------------------------------------
 -- Numeric literals
