@@ -1,6 +1,6 @@
 cabal-version:        2.4
 name:                 haddock
-version:              2.24.0
+version:              2.26.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:
   This is Haddock, a tool for automatically generating documentation
@@ -33,7 +33,7 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==9.0.*
+tested-with:          GHC==9.2.*
 
 extra-source-files:
   CHANGES.md
@@ -148,7 +148,7 @@ executable haddock
   else
     -- in order for haddock's advertised version number to have proper meaning,
     -- we pin down to a single haddock-api version.
-    build-depends:  haddock-api == 2.24.0
+    build-depends:  haddock-api == 2.26.0
 
 test-suite html-test
   type:             exitcode-stdio-1.0

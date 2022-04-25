@@ -18,7 +18,7 @@ import Data.Maybe
 import Distribution.Text
 import Distribution.Types.PackageName
 import Distribution.InstalledPackageInfo
-import Distribution.Simple.Compiler
+import Distribution.Simple.Compiler (PackageDB(..))
 import Distribution.Simple.GHC
 import Distribution.Simple.PackageIndex
 import Distribution.Simple.Program

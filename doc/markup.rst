@@ -950,24 +950,30 @@ apostrophes themselves: to hyperlink ``foo'`` one would simply type
 
     -- | A prefix operator @'(++)'@ and an infix identifier @'`elem`'@.
 
-Emphasis, Bold and Monospaced Text
+Emphasis, Bold and Monospaced styled Text
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Emphasis may be added by surrounding text with ``/.../``. Other markup
-is valid inside emphasis. To have a forward slash inside of emphasis,
-just escape it: ``/fo\/o/``
+Text can be emphasized, made bold (strong) or monospaced (typewriter font) 
+by surrounding it with slashes, double-underscores or at-symbols: ::
 
-Bold (strong) text is indicated by surrounding it with ``__...__``.
-Other markup is valid inside bold. For example, ``__/foo/__`` will make
-the emphasised text ``foo`` bold. You don't have to escape a single
-underscore if you need it bold:
-``__This_text_with_underscores_is_bold__``.
+    -- | This is /emphasized text/, __bold text__ and @monospaced text@.
 
-Monospaced (or typewriter) text is indicated by surrounding it with
-``@...@``. Other markup is valid inside a monospaced span: for example
-``@'f' a b@`` will hyperlink the identifier ``f`` inside the code
-fragment, but ``@__FILE__@`` will render ``FILE`` in bold with no
-underscores, which may not be what you had in mind.
+Note that those styled texts must be kept on the same line: ::
+
+    -- | Styles /do not work
+    -- | when continuing on the next line/
+
+Other markup is valid inside emphasized, bold and monospaced text.
+
+Frequent special cases: 
+
+* To have a forward slash inside of emphasis, just escape it: ``/fo\/o/``.
+* There's no need to escape a single underscore if you need it
+  bold: ``__This_text_with_underscores_is_bold__``.
+* ``@'f' a b@`` will hyperlink the identifier ``f`` inside the code
+  fragment.
+* ``@__FILE__@`` will render ``FILE`` in bold with no underscores, 
+  which may not be what you had in mind.
 
 Linking to Modules
 ~~~~~~~~~~~~~~~~~~
@@ -1121,6 +1127,17 @@ followed by the URL enclosed in regular parentheses, for example: ::
 The link text is used as a description for the URL if the output
 format supports it.
 
+Hint: There's a `known issue <https://github.com/haskell/haddock/issues/774>`_ 
+that any inline link at the beginning of a line within a multi-line comment 
+isn't rendered correctly: ::
+   
+    {-| Some multi-line comment that has a
+    [link](https://example.com) and a
+    [reference link]: https://example.com
+    -}
+    
+Adding a space or a word in front of such a link can be used as a workaround.   
+   
 Images
 ~~~~~~
 

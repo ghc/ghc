@@ -114,4 +114,3 @@ highlightScript = "highlight.js"
 -- | Path to default CSS file.
 defaultCssFile :: FilePath -> FilePath
 defaultCssFile libdir = libdir </> "html" </> "solarized.css"
-
