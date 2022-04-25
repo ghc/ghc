@@ -46,8 +46,8 @@ rtsDependencies = do
     let headers =
             [ "ghcautoconf.h", "ghcplatform.h"
             , "DerivedConstants.h"
-            , "rts" -/- "EventTypes.h"
-            , "rts" -/- "EventLogConstants.h"
+            -- , "rts" -/- "EventTypes.h"
+            -- , "rts" -/- "EventLogConstants.h"
             ]
             ++ (if useSystemFfi then [] else libffiHeaderFiles)
     pure $ ((rtsPath -/- "include") -/-) <$> headers
@@ -139,8 +139,8 @@ generatePackageCode context@(Context stage pkg _) = do
         root -/- "**" -/- dir -/- "include/ghcautoconf.h" %> go generateGhcAutoconfH
         root -/- "**" -/- dir -/- "include/ghcplatform.h" %> go generateGhcPlatformH
         root -/- "**" -/- dir -/- "include/DerivedConstants.h" %> genPlatformConstantsHeader context
-        root -/- "**" -/- dir -/- "include/rts/EventLogConstants.h" %> genEventTypes "--event-types-defines"
-        root -/- "**" -/- dir -/- "include/rts/EventTypes.h" %> genEventTypes "--event-types-array"
+        -- root -/- "**" -/- dir -/- "include/rts/EventLogConstants.h" %> genEventTypes "--event-types-defines"
+        -- root -/- "**" -/- dir -/- "include/rts/EventTypes.h" %> genEventTypes "--event-types-array"
 
 genEventTypes :: String -> FilePath -> Action ()
 genEventTypes flag file = do

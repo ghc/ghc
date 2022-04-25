@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiWayIf #-}
+
 module Rules.Rts (rtsRules, needRtsLibffiTargets, needRtsSymLinks) where
 
 import qualified Data.Set as Set
@@ -121,13 +123,14 @@ needRtsLibffiTargets :: Stage -> Action [FilePath]
 needRtsLibffiTargets stage = do
     rtsPath      <- rtsBuildPath stage
     useSystemFfi <- flag UseSystemFfi
+    jsTarget     <- isJsTarget
 
     -- Header files (in the rts build dir).
     let headers = fmap ((rtsPath -/- "include") -/-) libffiHeaderFiles
 
-    if useSystemFfi
-    then return []
-    else do
+    if | jsTarget     -> return []
+       | useSystemFfi -> return []
+       | otherwise    -> do
         -- Need Libffi
         -- This returns the dynamic library files (in the Libffi build dir).
         needLibffi stage

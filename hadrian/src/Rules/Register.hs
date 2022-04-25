@@ -136,8 +136,8 @@ buildConf _ context@Context {..} _conf = do
         need [ path -/- "include/DerivedConstants.h"
              , path -/- "include/ghcautoconf.h"
              , path -/- "include/ghcplatform.h"
-             , path -/- "include/rts/EventLogConstants.h"
-             , path -/- "include/rts/EventTypes.h"
+             -- , path -/- "include/rts/EventLogConstants.h"
+             -- , path -/- "include/rts/EventTypes.h"
              ]
 
     -- we need to generate this file for GMP

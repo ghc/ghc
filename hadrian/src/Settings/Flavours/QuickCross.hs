@@ -1,4 +1,4 @@
-module Settings.Flavours.QuickCross (quickCrossFlavour) where
+module Settings.Flavours.QuickCross (quickCrossFlavour, quickJsFlavour) where
 
 import qualified Data.Set as Set
 
@@ -6,6 +6,15 @@ import Expression
 import Flavour
 import Oracles.Flag
 import {-# SOURCE #-} Settings.Default
+
+quickJsFlavour :: Flavour
+quickJsFlavour = defaultFlavour
+    { name        = "quick-js"
+    , args        = defaultBuilderArgs <> quickCrossArgs <> defaultPackageArgs
+    , dynamicGhcPrograms = pure False
+    , libraryWays = pure [vanilla]
+    , rtsWays     = pure [vanilla]
+                    }
 
 -- Please update doc/flavours.md when changing this file.
 quickCrossFlavour :: Flavour

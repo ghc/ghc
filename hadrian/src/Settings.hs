@@ -57,6 +57,7 @@ hadrianFlavours =
     , quickFlavour, quickValidateFlavour, quickDebugFlavour
     , quickestFlavour
     , quickCrossFlavour
+    , quickJsFlavour
     , ghcInGhciFlavour, validateFlavour, slowValidateFlavour
     ]
 
