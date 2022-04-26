@@ -2024,7 +2024,7 @@ isFloatTy, isDoubleTy,
     isFloatPrimTy, isDoublePrimTy,
     isIntegerTy, isNaturalTy,
     isIntTy, isWordTy, isBoolTy,
-    isUnitTy, isCharTy, isAnyTy :: Type -> Bool
+    isUnitTy, isCharTy :: Type -> Bool
 isFloatTy      = is_tc floatTyConKey
 isDoubleTy     = is_tc doubleTyConKey
 isFloatPrimTy  = is_tc floatPrimTyConKey
@@ -2036,7 +2036,16 @@ isWordTy       = is_tc wordTyConKey
 isBoolTy       = is_tc boolTyConKey
 isUnitTy       = is_tc unitTyConKey
 isCharTy       = is_tc charTyConKey
-isAnyTy        = is_tc anyTyConKey
+
+-- | Check whether the type is of the form @Any :: k@,
+-- returning the kind @k@.
+anyTy_maybe :: Type -> Maybe Kind
+anyTy_maybe ty
+  | Just (tc, [k]) <- splitTyConApp_maybe ty
+  , getUnique tc == anyTyConKey
+  = Just k
+  | otherwise
+  = Nothing
 
 -- | Is the type inhabited by machine floating-point numbers?
 --
@@ -2166,6 +2175,7 @@ data TypeCannotBeMarshaledReason
   | NotABoxedMarshalableTyCon
   | ForeignLabelNotAPtr
   | NotSimpleUnliftedType
+  | NotBoxedKindAny
 
 isFFIArgumentTy :: DynFlags -> Safety -> Type -> Validity' IllegalForeignTypeReason
 -- Checks for valid argument type for a 'foreign import'
@@ -2208,22 +2218,44 @@ isFFILabelTy ty = checkRepTyCon ok ty
           | otherwise
           = NotValid ForeignLabelNotAPtr
 
+-- | Check validity for a type of the form @Any :: k@.
+--
+-- This function returns:
+--
+--  - @Just IsValid@ for @Any :: Type@ and @Any :: UnliftedType@,
+--  - @Just (NotValid ..)@ for @Any :: k@ if @k@ is not a kind of boxed types,
+--  - @Nothing@ if the type is not @Any@.
+checkAnyTy :: Type -> Maybe (Validity' IllegalForeignTypeReason)
+checkAnyTy  ty
+  | Just ki <- anyTy_maybe ty
+  = Just $
+      if isBoxedTypeKind ki
+      then IsValid
+      -- NB: don't allow things like @Any :: TYPE IntRep@, as per #21305.
+      else NotValid (TypeCannotBeMarshaled ty NotBoxedKindAny)
+  | otherwise
+  = Nothing
+
 isFFIPrimArgumentTy :: DynFlags -> Type -> Validity' IllegalForeignTypeReason
 -- Checks for valid argument type for a 'foreign import prim'
--- Currently they must all be simple unlifted types, or the well-known type
--- Any, which can be used to pass the address to a Haskell object on the heap to
+-- Currently they must all be simple unlifted types, or Any (at kind Type or UnliftedType),
+-- which can be used to pass the address to a Haskell object on the heap to
 -- the foreign function.
 isFFIPrimArgumentTy dflags ty
-  | isAnyTy ty = IsValid
-  | otherwise  = checkRepTyCon (legalFIPrimArgTyCon dflags) ty
+  | Just validity <- checkAnyTy ty
+  = validity
+  | otherwise
+  = checkRepTyCon (legalFIPrimArgTyCon dflags) ty
 
 isFFIPrimResultTy :: DynFlags -> Type -> Validity' IllegalForeignTypeReason
 -- Checks for valid result type for a 'foreign import prim' Currently
 -- it must be an unlifted type, including unboxed tuples, unboxed
--- sums, or the well-known type Any.
+-- sums, or the well-known type Any (at kind Type or UnliftedType).
 isFFIPrimResultTy dflags ty
-  | isAnyTy ty = IsValid
-  | otherwise = checkRepTyCon (legalFIPrimResultTyCon dflags) ty
+  | Just validity <- checkAnyTy ty
+  = validity
+  | otherwise
+  = checkRepTyCon (legalFIPrimResultTyCon dflags) ty
 
 isFunPtrTy :: Type -> Bool
 isFunPtrTy ty

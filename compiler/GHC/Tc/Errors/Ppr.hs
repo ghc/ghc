@@ -782,6 +782,9 @@ instance Diagnostic TcRnMessage where
                   innerMsg $$ text "A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)"
                 NotSimpleUnliftedType ->
                   innerMsg $$ text "foreign import prim only accepts simple unlifted types"
+                NotBoxedKindAny ->
+                  text "Expected kind" <+> quotes (text "Type") <+> text "or" <+> quotes (text "UnliftedType") <> comma $$
+                  text "but" <+> quotes (ppr ty) <+> text "has kind" <+> quotes (ppr (typeKind ty))
             ForeignDynNotPtr expected ty ->
               vcat [ text "Expected: Ptr/FunPtr" <+> pprParendType expected <> comma, text "  Actual:" <+> ppr ty ]
             SafeHaskellMustBeInIO ->

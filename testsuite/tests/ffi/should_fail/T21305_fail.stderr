@@ -1,0 +1,7 @@
+
+T21305_fail.hs:7:1: error:
+    • Unacceptable argument type in foreign declaration:
+        Expected kind ‘Type’ or ‘UnliftedType’,
+        but ‘Any’ has kind ‘TYPE 'IntRep’
+    • When checking declaration:
+        foreign import prim safe "f" f :: Any @(TYPE IntRep) -> Any

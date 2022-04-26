@@ -224,3 +224,6 @@ test('IncallAffinity',
      ['IncallAffinity_c.c -no-hs-main'])
 
 test('T19237', normal, compile_and_run, ['T19237_c.c'])
+
+test('T21305', omit_ways(['ghci']), multi_compile_and_run,
+                 ['T21305', [('T21305_cmm.cmm', '')], ''])

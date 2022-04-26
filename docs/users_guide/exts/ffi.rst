@@ -295,9 +295,10 @@ calling convention ``prim``, e.g.: ::
 
 This is used to import functions written in Cmm code that follow an
 internal GHC calling convention. The arguments and results must be
-unboxed types, except that an argument may be of type ``Any`` (by way of
+unboxed types, except that an argument may be of type ``Any :: Type``
+or ``Any :: UnliftedType`` (which can be arranged by way of
 ``unsafeCoerce#``) and the result type is allowed to be an unboxed tuple
-or the type ``Any``.
+or the types ``Any :: Type`` or ``Any :: UnliftedType``.
 
 This feature is not intended for use outside of the core libraries that
 come with GHC. For more details see the
