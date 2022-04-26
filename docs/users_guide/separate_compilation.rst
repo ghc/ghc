@@ -1446,7 +1446,7 @@ generation are:
 .. ghc-flag:: -ddump-mod-cycles
     :shortdesc: Dump module cycles
     :type: dynamic
-    :category:
+    :category: misc
 
     Display a list of the cycles in the module graph. This is useful
     when trying to eliminate such cycles.
@@ -1461,7 +1461,7 @@ generation are:
 .. ghc-flag:: -dep-makefile ⟨file⟩
     :shortdesc: Use ⟨file⟩ as the makefile
     :type: dynamic
-    :category:
+    :category: redirect-output
 
     Use ⟨file⟩ as the makefile, rather than ``makefile`` or
     ``Makefile``. If ⟨file⟩ doesn't exist, ``mkdependHS`` creates it. We
@@ -1473,7 +1473,7 @@ generation are:
     :shortdesc: Make dependencies that declare that files with suffix
         ``.⟨suf⟩⟨osuf⟩`` depend on interface files with suffix ``.⟨suf⟩hi``
     :type: dynamic
-    :category:
+    :category: redirect-output
 
     Make dependencies that declare that files with suffix
     ``.⟨suf⟩⟨osuf⟩`` depend on interface files with suffix
@@ -1487,7 +1487,7 @@ generation are:
     :shortdesc: Regard ``⟨file⟩`` as "stable"; i.e., exclude it from having
         dependencies on it.
     :type: dynamic
-    :category:
+    :category: recompilation
 
     Regard ``⟨file⟩`` as "stable"; i.e., exclude it from having
     dependencies on it.
@@ -1495,7 +1495,7 @@ generation are:
 .. ghc-flag:: -include-pkg-deps
     :shortdesc: Regard modules imported from packages as unstable
     :type: dynamic
-    :category:
+    :category: recompilation
 
     Regard modules imported from packages as unstable, i.e., generate
     dependencies on any imported package modules (including ``Prelude``,
@@ -1508,7 +1508,7 @@ generation are:
 .. ghc-flag:: -include-cpp-deps
     :shortdesc: Include preprocessor dependencies
     :type: dynamic
-    :category:
+    :category: recompilation
 
     Output preprocessor dependencies. This only has an effect when the CPP
     language extension is enabled. These dependencies are files included with
