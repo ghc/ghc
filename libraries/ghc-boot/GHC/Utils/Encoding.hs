@@ -34,6 +34,8 @@ module GHC.Utils.Encoding (
         countUTF8Chars,
 
         -- * Z-encoding
+        UserString,
+        EncodedString,
         zEncodeString,
         zDecodeString,
 
