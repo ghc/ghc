@@ -3,13 +3,6 @@
 Result size of Tidy Core
   = {terms: 22, types: 20, coercions: 0, joins: 0/0}
 
-natural_to_word
-  = \ x ->
-      case x of {
-        NS x1 -> Just (W# x1);
-        NB ds -> Nothing
-      }
-
 integer_to_int
   = \ x ->
       case x of {
@@ -18,15 +11,22 @@ integer_to_int
         IN ds -> Nothing
       }
 
+natural_to_word
+  = \ x ->
+      case x of {
+        NS x1 -> Just (W# x1);
+        NB ds -> Nothing
+      }
+
 
 ------ Local rules for imported ids --------
-"SPEC/Test toIntegralSized @Integer @Int"
-    forall $dIntegral $dIntegral1 $dBits $dBits1.
-      toIntegralSized $dIntegral $dIntegral1 $dBits $dBits1
-      = integer_to_int
 "SPEC/Test toIntegralSized @Natural @Word"
     forall $dIntegral $dIntegral1 $dBits $dBits1.
       toIntegralSized $dIntegral $dIntegral1 $dBits $dBits1
       = natural_to_word
+"SPEC/Test toIntegralSized @Integer @Int"
+    forall $dIntegral $dIntegral1 $dBits $dBits1.
+      toIntegralSized $dIntegral $dIntegral1 $dBits $dBits1
+      = integer_to_int
 
 
