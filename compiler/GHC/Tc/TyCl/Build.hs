@@ -210,9 +210,7 @@ buildPatSyn :: Name -> Bool
             -> PatSynMatcher -> PatSynBuilder
             -> ([InvisTVBinder], ThetaType) -- ^ Univ and req
             -> ([InvisTVBinder], ThetaType) -- ^ Ex and prov
-            -> [Type]                       -- ^ Argument types
-                                            -- These must have a fixed RuntimeRep as per
-                                            -- Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+            -> [FRRType]                    -- ^ Argument types
             -> Type                         -- ^ Result type
             -> [FieldLabel]                 -- ^ Field labels for
                                             --   a record pattern synonym

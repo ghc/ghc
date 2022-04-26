@@ -152,13 +152,20 @@ tcRule (HsRule { rd_ext  = ext
 
        -- See Note [Re-quantify type variables in rules]
        ; forall_tkvs <- candidateQTyVarsOfTypes (rule_ty : map idType tpl_ids)
-       ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars forall_tkvs
+       ; let don't_default = nonDefaultableTyVarsOfWC residual_lhs_wanted
+       ; let weed_out = (`dVarSetMinusVarSet` don't_default)
+             quant_cands = forall_tkvs { dv_kvs = weed_out (dv_kvs forall_tkvs)
+                                       , dv_tvs = weed_out (dv_tvs forall_tkvs) }
+       ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars quant_cands
        ; traceTc "tcRule" (vcat [ pprFullRuleName rname
-                                , ppr forall_tkvs
-                                , ppr qtkvs
-                                , ppr rule_ty
-                                , ppr ty_bndrs
-                                , ppr (qtkvs ++ tpl_ids)
+                                , text "forall_tkvs:" <+> ppr forall_tkvs
+                                , text "quant_cands:" <+> ppr quant_cands
+                                , text "don't_default:" <+> ppr don't_default
+                                , text "residual_lhs_wanted:" <+> ppr residual_lhs_wanted
+                                , text "qtkvs:" <+> ppr qtkvs
+                                , text "rule_ty:" <+> ppr rule_ty
+                                , text "ty_bndrs:" <+> ppr ty_bndrs
+                                , text "qtkvs ++ tpl_ids:" <+> ppr (qtkvs ++ tpl_ids)
                                 , vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
                   ])
 
@@ -440,7 +447,6 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
                              do { ev_id <- newEvVar pred
                                 ; fillCoercionHole hole (mkTcCoVarCo ev_id)
                                 ; return ev_id }
-          NoDest -> pprPanic "mk_quant_ev: NoDest" (ppr ct)
     mk_quant_ev ct = pprPanic "mk_quant_ev" (ppr ct)
 
 
@@ -466,9 +472,9 @@ getRuleQuantCts wc
   = float_wc emptyVarSet wc
   where
     float_wc :: TcTyCoVarSet -> WantedConstraints -> (Cts, WantedConstraints)
-    float_wc skol_tvs (WC { wc_simple = simples, wc_impl = implics, wc_holes = holes })
+    float_wc skol_tvs (WC { wc_simple = simples, wc_impl = implics, wc_errors = errs })
       = ( simple_yes `andCts` implic_yes
-        , emptyWC { wc_simple = simple_no, wc_impl = implics_no, wc_holes = holes })
+        , emptyWC { wc_simple = simple_no, wc_impl = implics_no, wc_errors = errs })
      where
         (simple_yes, simple_no) = partitionBag (rule_quant_ct skol_tvs) simples
         (implic_yes, implics_no) = mapAccumBagL (float_implic skol_tvs)
@@ -486,10 +492,6 @@ getRuleQuantCts wc
       EqPred _ t1 t2
         | not (ok_eq t1 t2)
         -> False        -- Note [RULE quantification over equalities]
-      SpecialPred {}
-        -- Rules should not quantify over special predicates, as these
-        -- are a GHC implementation detail.
-        -> False
       _ -> tyCoVarsOfCt ct `disjointVarSet` skol_tvs
 
     ok_eq t1 t2

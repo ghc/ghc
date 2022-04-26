@@ -4,7 +4,9 @@ RepPolyDoBody2.hs:23:3: error:
         arising from a do statement
       does not have a fixed runtime representation.
       Its type is:
-        mb0 :: TYPE rep
+        mb0 :: TYPE c0
+      Cannot unify ‘rep’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
     • In a stmt of a 'do' block: undefined :: ()
       In the expression:
         do undefined :: ()
@@ -13,3 +15,5 @@ RepPolyDoBody2.hs:23:3: error:
           foo _
             = do undefined :: ()
                return ()
+    • Relevant bindings include
+        foo :: () -> ma (bound at RepPolyDoBody2.hs:22:1)

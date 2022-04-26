@@ -4,5 +4,7 @@ import GHC.Stack ( HasCallStack )
 
 data SkolemInfoAnon
 data SkolemInfo
+data FixedRuntimeRepContext
+data FixedRuntimeRepOrigin
 
 unkSkol :: HasCallStack => SkolemInfo

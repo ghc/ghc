@@ -4,7 +4,9 @@ RepPolyDoBind.hs:26:3: error:
         arising from a do statement
       does not have a fixed runtime representation.
       Its type is:
-        ma0 :: TYPE rep
+        ma0 :: TYPE c0
+      Cannot unify ‘rep’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
     • In a stmt of a 'do' block: a <- undefined
       In the expression:
         do a <- undefined
@@ -13,3 +15,5 @@ RepPolyDoBind.hs:26:3: error:
           foo _
             = do a <- undefined
                  return ()
+    • Relevant bindings include
+        foo :: () -> ma (bound at RepPolyDoBind.hs:25:1)

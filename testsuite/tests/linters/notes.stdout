@@ -83,7 +83,6 @@ ref    compiler/GHC/Tc/Instance/Family.hs:515:35:     Note [Constrained family i
 ref    compiler/GHC/Tc/Module.hs:698:15:     Note [Extra dependencies from .hs-boot files]
 ref    compiler/GHC/Tc/Module.hs:1904:19:     Note [Root-main id]
 ref    compiler/GHC/Tc/Module.hs:1974:6:     Note [Root-main id]
-ref    compiler/GHC/Tc/Solver.hs:2541:36:     Note [Kind generalisation and SigTvs]
 ref    compiler/GHC/Tc/Solver/Canonical.hs:1229:33:     Note [Canonical LHS]
 ref    compiler/GHC/Tc/Solver/Interact.hs:1638:9:     Note [No touchables as FunEq RHS]
 ref    compiler/GHC/Tc/Solver/Interact.hs:2292:12:     Note [The equality class story]

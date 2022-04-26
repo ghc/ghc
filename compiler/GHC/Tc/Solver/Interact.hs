@@ -140,13 +140,13 @@ solve_simple_wanteds :: WantedConstraints -> TcS WantedConstraints
 -- Try solving these constraints
 -- Affects the unification state (of course) but not the inert set
 -- The result is not necessarily zonked
-solve_simple_wanteds (WC { wc_simple = simples1, wc_impl = implics1, wc_holes = holes })
+solve_simple_wanteds (WC { wc_simple = simples1, wc_impl = implics1, wc_errors = errs })
   = nestTcS $
     do { solveSimples simples1
        ; (implics2, unsolved) <- getUnsolvedInerts
        ; return (WC { wc_simple = unsolved
                     , wc_impl   = implics1 `unionBags` implics2
-                    , wc_holes  = holes }) }
+                    , wc_errors = errs }) }
 
 {- Note [The solveSimpleWanteds loop]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -429,9 +429,6 @@ interactWithInertsStage wi
              CEqCan       {} -> interactEq      ics wi
              CIrredCan    {} -> interactIrred   ics wi
              CDictCan     {} -> interactDict    ics wi
-             CSpecialCan { cc_special_pred = spec } ->
-               case spec of
-                 IsReflPrimPred {} -> continueWith wi -- cannot have IsRefl# Givens, so nothing to interact with
              _ -> pprPanic "interactWithInerts" (ppr wi) }
                 -- CNonCanonical have been canonicalised
 
@@ -1895,11 +1892,6 @@ topReactionsStage work_item
 
            CIrredCan {} ->
              doTopReactOther work_item
-
-           CSpecialCan { cc_special_pred = spec } ->
-             case spec of
-               IsReflPrimPred {} -> continueWith work_item
-               -- No top-level interactions for IsRefl# constraints.
 
            -- Any other work item does not react with any top-level equations
            _  -> continueWith work_item }

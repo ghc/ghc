@@ -19,11 +19,10 @@ import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckMonoExpr, tcInferRho, tcSyntaxOp
                                        , tcCheckPolyExpr )
 
 import GHC.Hs
-import GHC.Hs.Syn.Type
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Match
 import GHC.Tc.Gen.Head( tcCheckId )
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_MustBeRefl )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Gen.Bind
@@ -45,8 +44,6 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-
-import qualified GHC.Data.Strict as Strict
 
 import Control.Monad
 
@@ -149,7 +146,7 @@ tcCmd  :: CmdEnv -> LHsCmd GhcRn -> CmdType -> TcM (LHsCmd GhcTc)
 tcCmd env (L loc cmd) cmd_ty@(_, res_ty)
   = setSrcSpan (locA loc) $ do
         { cmd' <- tc_cmd env cmd cmd_ty
-        ; hasFixedRuntimeRep_MustBeRefl (FRRArrow $ ArrowCmdResTy cmd) res_ty
+        ; hasFixedRuntimeRep_syntactic (FRRArrow $ ArrowCmdResTy cmd) res_ty
         ; return (L loc cmd') }
 
 tc_cmd :: CmdEnv -> HsCmd GhcRn  -> CmdType -> TcM (HsCmd GhcTc)
@@ -166,7 +163,7 @@ tc_cmd env (HsCmdLet x tkLet binds tkIn (L body_loc body)) res_ty
 tc_cmd env in_cmd@(HsCmdCase x scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
       (scrut', scrut_ty) <- tcInferRho scrut
-      hasFixedRuntimeRep_MustBeRefl
+      hasFixedRuntimeRep_syntactic
         (FRRArrow $ ArrowCmdCase)
         scrut_ty
       matches' <- tcCmdMatches env scrut_ty matches (stk, res_ty)
@@ -177,11 +174,8 @@ tc_cmd env cmd@(HsCmdLamCase x lc_variant match) cmd_ty
       do { let match_ctxt = ArrowLamCaseAlt lc_variant
          ; checkPatCounts (ArrowMatchCtxt match_ctxt) match
          ; (wrap, match') <-
-             tcCmdMatchLambda env match_ctxt mk_origin match cmd_ty
+             tcCmdMatchLambda env match_ctxt match cmd_ty
          ; return (mkHsCmdWrap wrap (HsCmdLamCase x lc_variant match')) }
-  where mk_origin = ArrowCmdLamCase . case lc_variant of
-          LamCase  -> const Strict.Nothing
-          LamCases -> Strict.Just
 
 tc_cmd env (HsCmdIf x NoSyntaxExprRn pred b1 b2) res_ty    -- Ordinary 'if'
   = do  { pred' <- tcCheckMonoExpr pred boolTy
@@ -234,7 +228,7 @@ tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (_, res_ty)
 
         ; arg' <- tcCheckMonoExpr arg arg_ty
 
-        ; hasFixedRuntimeRep_MustBeRefl
+        ; hasFixedRuntimeRep_syntactic
             (FRRArrow $ ArrowCmdArrApp (unLoc fun) (unLoc arg) ho_app)
             fun_ty
 
@@ -262,7 +256,7 @@ tc_cmd env cmd@(HsCmdApp x fun arg) (cmd_stk, res_ty)
     do  { arg_ty <- newOpenFlexiTyVarTy
         ; fun'   <- tcCmd env fun (mkPairTy arg_ty cmd_stk, res_ty)
         ; arg'   <- tcCheckMonoExpr arg arg_ty
-        ; hasFixedRuntimeRep_MustBeRefl
+        ; hasFixedRuntimeRep_syntactic
             (FRRArrow $ ArrowCmdApp (unLoc fun) (unLoc arg))
             arg_ty
         ; return (HsCmdApp x fun' arg') }
@@ -275,7 +269,7 @@ tc_cmd env cmd@(HsCmdApp x fun arg) (cmd_stk, res_ty)
 -- D;G |-a (\x.cmd) : (t,stk) --> res
 
 tc_cmd env (HsCmdLam x match) cmd_ty
-  = do { (wrap, match') <- tcCmdMatchLambda env KappaExpr ArrowCmdLam match cmd_ty
+  = do { (wrap, match') <- tcCmdMatchLambda env KappaExpr match cmd_ty
        ; return (mkHsCmdWrap wrap (HsCmdLam x match')) }
 
 -------------------------------------------
@@ -325,9 +319,7 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
 
 -- | Typechecking for case command alternatives. Used for 'HsCmdCase'.
 tcCmdMatches :: CmdEnv
-             -> TcType -- ^ Type of the scrutinee.
-                       -- Must have a fixed RuntimeRep as per
-                       -- Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete
+             -> TcTypeFRR -- ^ Type of the scrutinee.
              -> MatchGroup GhcRn (LHsCmd GhcRn)  -- ^ case alternatives
              -> CmdType
              -> TcM (MatchGroup GhcTc (LHsCmd GhcTc))
@@ -342,14 +334,11 @@ tcCmdMatches env scrut_ty matches (stk, res_ty)
 -- | Typechecking for 'HsCmdLam' and 'HsCmdLamCase'.
 tcCmdMatchLambda :: CmdEnv
                  -> HsArrowMatchContext
-                 -> (Int -> FRRArrowOrigin) -- ^ Function that creates an origin
-                                            -- given the index of a pattern
                  -> MatchGroup GhcRn (LHsCmd GhcRn)
                  -> CmdType
                  -> TcM (HsWrapper, MatchGroup GhcTc (LHsCmd GhcTc))
 tcCmdMatchLambda env
                  ctxt
-                 mk_origin
                  mg@MG { mg_alts = L l matches }
                  (cmd_stk, res_ty)
   = do { (co, arg_tys, cmd_stk') <- matchExpectedCmdArgs n_pats cmd_stk
@@ -373,19 +362,10 @@ tcCmdMatchLambda env
                                 tcPats match_ctxt pats arg_tys $
                                 tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
-           ; let arg_tys' = map (unrestricted . hsLPatType) pats'
-
-           ; zipWithM_
-               (\ (Scaled _ arg_ty) i ->
-                 hasFixedRuntimeRep_MustBeRefl (FRRArrow $ mk_origin i) arg_ty)
-               arg_tys'
-               [1..]
-
            ; return $ L mtch_loc (Match { m_ext = noAnn
                                         , m_ctxt = match_ctxt
                                         , m_pats = pats'
                                         , m_grhss = grhss' }) }
-
 
     match_ctxt = ArrowMatchCtxt ctxt
     pg_ctxt    = PatGuard match_ctxt
@@ -401,7 +381,7 @@ tcCmdMatchLambda env
                                                 (stk_ty, checkingExpType "tc_grhs" res_ty)
              ; return (GRHS x guards' rhs') }
 
-matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercionN, [TcType], TcType)
+matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercionN, [TcTypeFRR], TcType)
 matchExpectedCmdArgs 0 ty
   = return (mkTcNomReflCo ty, [], ty)
 matchExpectedCmdArgs n ty

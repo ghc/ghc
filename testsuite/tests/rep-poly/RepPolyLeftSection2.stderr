@@ -3,6 +3,10 @@ RepPolyLeftSection2.hs:14:11: error:
     • The argument ‘undefined’ of ‘f’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE r
+        a0 :: TYPE c0
+      Cannot unify ‘r’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
     • In the expression: undefined `f`
       In an equation for ‘test1’: test1 = (undefined `f`)
+    • Relevant bindings include
+        test1 :: a -> a (bound at RepPolyLeftSection2.hs:14:1)

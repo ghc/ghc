@@ -34,7 +34,7 @@ import GHC.Data.FastString
 import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_MustBeRefl )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Env
@@ -509,7 +509,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc closed bind_list
          CheckGen lbind sig -> tcPolyCheck prag_fn sig lbind
 
     ; mapM_ (\ poly_id ->
-        hasFixedRuntimeRep_MustBeRefl (FRRBinder $ idName poly_id) (idType poly_id))
+        hasFixedRuntimeRep_syntactic (FRRBinder $ idName poly_id) (idType poly_id))
         poly_ids
 
     ; traceTc "} End of bindings for" (vcat [ ppr binder_names, ppr rec_group
@@ -1384,7 +1384,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
             -- See Note [Existentials in pattern bindings]
         ; ((pat', nosig_mbis), pat_ty)
             <- addErrCtxt (patMonoBindsCtxt pat grhss) $
-               tcInfer $ \ exp_ty ->
+               tcInferFRR FRRPatBind $ \ exp_ty ->
                tcLetPat inst_sig_fun no_gen pat (unrestricted exp_ty) $
                  -- The above inferred type get an unrestricted multiplicity. It may be
                  -- worth it to try and find a finer-grained multiplicity here

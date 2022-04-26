@@ -8,12 +8,3 @@ RepPolyBinder.hs:11:1: error:
       does not have a fixed runtime representation.
       Its type is:
         b :: TYPE rep2
-
-RepPolyBinder.hs:11:17: error:
-    • The first argument of the view pattern
-        myId
-      does not have a fixed runtime representation.
-      Its type is:
-        b :: TYPE rep2
-    • In the pattern: myId -> bndr_b
-      In an equation for ‘foo’: foo bndr_a pat@(myId -> bndr_b) = ()

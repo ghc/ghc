@@ -1936,7 +1936,7 @@ mightBeUnlifted _             = True
 -- | Are we dealing with an expression or a pattern?
 --
 -- Used only for the textual output of certain error messages;
--- see the 'FRRDataConArg' constructor of 'FRROrigin'.
+-- see the 'FRRDataConArg' constructor of 'FixedRuntimeRepContext'.
 data ExprOrPat
   = Expression
   | Pattern

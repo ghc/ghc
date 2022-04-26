@@ -1,9 +1,14 @@
 
-T19615.hs:17:14: error:
+T19615.hs:17:21: error:
     • The argument ‘(f x)’ of ‘lift'’
       does not have a fixed runtime representation.
       Its type is:
-        b :: TYPE r'
-    • In the expression: lift' (f x) id
+        a0 :: TYPE c0
+      Cannot unify ‘r'’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
+    • In the first argument of ‘lift'’, namely ‘(f x)’
+      In the expression: lift' (f x) id
       In an equation for ‘mapF’: mapF f x = lift' (f x) id
-      In the instance declaration for ‘Call LiftedRep’
+    • Relevant bindings include
+        f :: a -> b (bound at T19615.hs:17:8)
+        mapF :: (a -> b) -> Lev a -> Lev b (bound at T19615.hs:17:3)

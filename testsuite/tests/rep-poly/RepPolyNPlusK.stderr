@@ -4,12 +4,3 @@ RepPolyNPlusK.hs:22:1: error:
     does not have a fixed runtime representation.
     Its type is:
       a :: TYPE rep1
-
-RepPolyNPlusK.hs:22:6: error:
-    • The first argument of the rebindable syntax operator ‘(>=)’
-        arising from the literal ‘2’
-      does not have a fixed runtime representation.
-      Its type is:
-        a :: TYPE rep1
-    • In the pattern: bndr_a+2
-      In an equation for ‘foo’: foo (bndr_a+2) = ()

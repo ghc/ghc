@@ -25,7 +25,7 @@ module GHC.Tc.Utils.TcMType (
   newOpenFlexiTyVar, newOpenFlexiTyVarTy, newOpenTypeKind,
   newOpenBoxedTypeKind,
   newMetaKindVar, newMetaKindVars, newMetaTyVarTyAtLevel,
-  newAnonMetaTyVar, cloneMetaTyVar,
+  newAnonMetaTyVar, newConcreteTyVar, cloneMetaTyVar,
   newCycleBreakerTyVar,
 
   newMultiplicityVar,
@@ -60,16 +60,18 @@ module GHC.Tc.Utils.TcMType (
   --------------------------------
   -- Expected types
   ExpType(..), ExpSigmaType, ExpRhoType,
-  mkCheckExpType, newInferExpType, tcInfer,
+  mkCheckExpType, newInferExpType, newInferExpTypeFRR,
+  tcInfer, tcInferFRR,
   readExpType, readExpType_maybe, readScaledExpType,
   expTypeToType, scaledExpTypeToType,
   checkingExpType_maybe, checkingExpType,
-  inferResultToType, fillInferResult, promoteTcType,
+  inferResultToType, ensureMonoType, promoteTcType,
 
   --------------------------------
   -- Zonking and tidying
   zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin, zonkTidyOrigins,
-  tidyEvVar, tidyCt, tidyHole,
+  zonkTidyFRRInfos,
+  tidyEvVar, tidyCt, tidyHole, tidyDelayedError,
     zonkTcTyVar, zonkTcTyVars,
   zonkTcTyVarToTcTyVar, zonkTcTyVarsToTcTyVars,
   zonkInvisTVBinder,
@@ -113,7 +115,6 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Monad        -- TcType, amongst others
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
-import {-# SOURCE #-} GHC.Tc.Utils.Unify( unifyType {- , unifyKind -} )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
@@ -198,12 +199,8 @@ newEvVar ty = do { name <- newSysName (predTypeOccName ty)
 newWantedWithLoc :: CtLoc -> PredType -> TcM CtEvidence
 newWantedWithLoc loc pty
   = do dst <- case classifyPredType pty of
-                EqPred {}
-                  -> HoleDest <$> newCoercionHole pty
-                SpecialPred s
-                  -> case s of
-                      IsReflPrimPred {} -> return NoDest
-                _ -> EvVarDest <$> newEvVar pty
+                EqPred {} -> HoleDest  <$> newCoercionHole pty
+                _         -> EvVarDest <$> newEvVar pty
        return $ CtWanted { ctev_dest      = dst
                          , ctev_pred      = pty
                          , ctev_loc       = loc
@@ -332,9 +329,6 @@ predTypeOccName ty = case classifyPredType ty of
     EqPred {}       -> mkVarOccFS (fsLit "co")
     IrredPred {}    -> mkVarOccFS (fsLit "irred")
     ForAllPred {}   -> mkVarOccFS (fsLit "df")
-    SpecialPred s    ->
-      case s of
-        IsReflPrimPred {} -> mkVarOccFS (fsLit "rfl")
 
 -- | Create a new 'Implication' with as many sensible defaults for its fields
 -- as possible. Note that the 'ic_tclvl', 'ic_binds', and 'ic_info' fields do
@@ -482,18 +476,42 @@ the ExpType with a tau-tv at the low TcLevel, hopefully to be worked
 out later by some means -- see fillInferResult, and Note [fillInferResult]
 
 This behaviour triggered in test gadt/gadt-escape1.
+
+Note [FixedRuntimeRep context in ExpType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sometimes, we want to be sure that we fill an ExpType with a type
+that has a syntactically fixed RuntimeRep (in the sense of
+Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete).
+
+Example:
+
+  pattern S a = (a :: (T :: TYPE R))
+
+We have to infer a type for `a` which has a syntactically fixed RuntimeRep.
+When it comes time to filling in the inferred type, we do the appropriate
+representation-polymorphism check, much like we do a level check
+as explained in Note [TcLevel of ExpType].
+
+See test case T21325.
 -}
 
 -- actual data definition is in GHC.Tc.Utils.TcType
 
 newInferExpType :: TcM ExpType
-newInferExpType
+newInferExpType = new_inferExpType Nothing
+
+newInferExpTypeFRR :: FixedRuntimeRepContext -> TcM ExpTypeFRR
+newInferExpTypeFRR frr_orig = new_inferExpType (Just frr_orig)
+
+new_inferExpType :: Maybe FixedRuntimeRepContext -> TcM ExpType
+new_inferExpType mb_frr_orig
   = do { u <- newUnique
        ; tclvl <- getTcLevel
        ; traceTc "newInferExpType" (ppr u <+> ppr tclvl)
        ; ref <- newMutVar Nothing
        ; return (Infer (IR { ir_uniq = u, ir_lvl = tclvl
-                           , ir_ref = ref })) }
+                           , ir_ref = ref
+                           , ir_frr = mb_frr_orig })) }
 
 -- | Extract a type out of an ExpType, if one exists. But one should always
 -- exist. Unless you're quite sure you know what you're doing.
@@ -563,118 +581,29 @@ order-independence we check for mono-type-ness even if it *is* filled in
 already.
 
 See also Note [TcLevel of ExpType] above, and
-Note [fillInferResult].
+Note [fillInferResult] in GHC.Tc.Utils.Unify.
 -}
 
 -- | Infer a type using a fresh ExpType
 -- See also Note [ExpType] in "GHC.Tc.Utils.TcMType"
+--
+-- Use 'tcInferFRR' if you require the type to have a fixed
+-- runtime representation.
 tcInfer :: (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
-tcInfer tc_check
-  = do { res_ty <- newInferExpType
+tcInfer = tc_infer Nothing
+
+-- | Like 'tcInfer', except it ensures that the resulting type
+-- has a syntactically fixed RuntimeRep as per Note [Fixed RuntimeRep] in
+-- GHC.Tc.Utils.Concrete.
+tcInferFRR :: FixedRuntimeRepContext -> (ExpSigmaTypeFRR -> TcM a) -> TcM (a, TcSigmaTypeFRR)
+tcInferFRR frr_orig = tc_infer (Just frr_orig)
+
+tc_infer :: Maybe FixedRuntimeRepContext -> (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
+tc_infer mb_frr tc_check
+  = do { res_ty <- new_inferExpType mb_frr
        ; result <- tc_check res_ty
        ; res_ty <- readExpType res_ty
        ; return (result, res_ty) }
-
-fillInferResult :: TcType -> InferResult -> TcM TcCoercionN
--- If co = fillInferResult t1 t2
---    => co :: t1 ~ t2
--- See Note [fillInferResult]
-fillInferResult act_res_ty (IR { ir_uniq = u, ir_lvl = res_lvl
-                               , ir_ref = ref })
-  = do { mb_exp_res_ty <- readTcRef ref
-       ; case mb_exp_res_ty of
-            Just exp_res_ty
-               -> do { traceTc "Joining inferred ExpType" $
-                       ppr u <> colon <+> ppr act_res_ty <+> char '~' <+> ppr exp_res_ty
-                     ; cur_lvl <- getTcLevel
-                     ; unless (cur_lvl `sameDepthAs` res_lvl) $
-                       ensureMonoType act_res_ty
-                     ; unifyType Nothing act_res_ty exp_res_ty }
-            Nothing
-               -> do { traceTc "Filling inferred ExpType" $
-                       ppr u <+> text ":=" <+> ppr act_res_ty
-                     ; (prom_co, act_res_ty) <- promoteTcType res_lvl act_res_ty
-                     ; writeTcRef ref (Just act_res_ty)
-                     ; return prom_co }
-     }
-
-
-{- Note [fillInferResult]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-When inferring, we use fillInferResult to "fill in" the hole in InferResult
-   data InferResult = IR { ir_uniq :: Unique
-                         , ir_lvl  :: TcLevel
-                         , ir_ref  :: IORef (Maybe TcType) }
-
-There are two things to worry about:
-
-1. What if it is under a GADT or existential pattern match?
-   - GADTs: a unification variable (and Infer's hole is similar) is untouchable
-   - Existentials: be careful about skolem-escape
-
-2. What if it is filled in more than once?  E.g. multiple branches of a case
-     case e of
-        T1 -> e1
-        T2 -> e2
-
-Our typing rules are:
-
-* The RHS of a existential or GADT alternative must always be a
-  monotype, regardless of the number of alternatives.
-
-* Multiple non-existential/GADT branches can have (the same)
-  higher rank type (#18412).  E.g. this is OK:
-      case e of
-        True  -> hr
-        False -> hr
-  where hr:: (forall a. a->a) -> Int
-  c.f. Section 7.1 of "Practical type inference for arbitrary-rank types"
-       We use choice (2) in that Section.
-       (GHC 8.10 and earlier used choice (1).)
-
-  But note that
-      case e of
-        True  -> hr
-        False -> \x -> hr x
-  will fail, because we still /infer/ both branches, so the \x will get
-  a (monotype) unification variable, which will fail to unify with
-  (forall a. a->a)
-
-For (1) we can detect the GADT/existential situation by seeing that
-the current TcLevel is greater than that stored in ir_lvl of the Infer
-ExpType.  We bump the level whenever we go past a GADT/existential match.
-
-Then, before filling the hole use promoteTcType to promote the type
-to the outer ir_lvl.  promoteTcType does this
-  - create a fresh unification variable alpha at level ir_lvl
-  - emits an equality alpha[ir_lvl] ~ ty
-  - fills the hole with alpha
-That forces the type to be a monotype (since unification variables can
-only unify with monotypes); and catches skolem-escapes because the
-alpha is untouchable until the equality floats out.
-
-For (2), we simply look to see if the hole is filled already.
-  - if not, we promote (as above) and fill the hole
-  - if it is filled, we simply unify with the type that is
-    already there
-
-There is one wrinkle.  Suppose we have
-   case e of
-      T1 -> e1 :: (forall a. a->a) -> Int
-      G2 -> e2
-where T1 is not GADT or existential, but G2 is a GADT.  Then supppose the
-T1 alternative fills the hole with (forall a. a->a) -> Int, which is fine.
-But now the G2 alternative must not *just* unify with that else we'd risk
-allowing through (e2 :: (forall a. a->a) -> Int).  If we'd checked G2 first
-we'd have filled the hole with a unification variable, which enforces a
-monotype.
-
-So if we check G2 second, we still want to emit a constraint that restricts
-the RHS to be a monotype. This is done by ensureMonoType, and it works
-by simply generating a constraint (alpha ~ ty), where alpha is a fresh
-unification variable.  We discard the evidence.
-
--}
 
 {- *********************************************************************
 *                                                                      *
@@ -864,7 +793,7 @@ metaInfoToTyVarName  meta_info =
        TyVarTv        -> fsLit "a"
        RuntimeUnkTv   -> fsLit "r"
        CycleBreakerTv -> fsLit "b"
-       ConcreteTv     -> fsLit "c"
+       ConcreteTv {}  -> fsLit "c"
 
 newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 newAnonMetaTyVar mi = newNamedAnonMetaTyVar (metaInfoToTyVarName mi) mi
@@ -908,6 +837,17 @@ cloneTyVarTyVar name kind
          -- when the Name is tidied we get 'a' rather than 'a0'
        ; traceTc "cloneTyVarTyVar" (ppr tyvar)
        ; return tyvar }
+
+-- | Create a new metavariable, of the given kind, which can only be unified
+-- with a concrete type.
+--
+-- Invariant: the kind must be concrete, as per Note [ConcreteTv].
+-- This is checked with an assertion.
+newConcreteTyVar :: HasDebugCallStack => ConcreteTvOrigin -> TcKind -> TcM TcTyVar
+newConcreteTyVar reason kind =
+  assertPpr (isConcrete kind)
+    (text "newConcreteTyVar: non-concrete kind" <+> ppr kind)
+  $ newAnonMetaTyVar (ConcreteTv reason) kind
 
 newPatSigTyVar :: Name -> Kind -> TcM TcTyVar
 newPatSigTyVar name kind
@@ -1863,9 +1803,7 @@ defaultTyVar :: DefaultingStrategy
              -> TcM Bool   -- True <=> defaulted away altogether
 defaultTyVar def_strat tv
   | not (isMetaTyVar tv)
-  = return False
-
-  | isTyVarTyVar tv
+  || isTyVarTyVar tv
     -- Do not default TyVarTvs. Doing so would violate the invariants
     -- on TyVarTvs; see Note [TyVarTv] in GHC.Tc.Utils.TcMType.
     -- #13343 is an example; #14555 is another
@@ -1874,8 +1812,6 @@ defaultTyVar def_strat tv
 
   | isRuntimeRepVar tv
   , default_ns_vars
-  -- Do not quantify over a RuntimeRep var
-  -- unless it is a TyVarTv, handled earlier
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; writeMetaTyVar tv liftedRepTy
        ; return True }
@@ -2414,21 +2350,37 @@ zonkWC :: WantedConstraints -> TcM WantedConstraints
 zonkWC wc = zonkWCRec wc
 
 zonkWCRec :: WantedConstraints -> TcM WantedConstraints
-zonkWCRec (WC { wc_simple = simple, wc_impl = implic, wc_holes = holes })
+zonkWCRec (WC { wc_simple = simple, wc_impl = implic, wc_errors = errs })
   = do { simple' <- zonkSimples simple
        ; implic' <- mapBagM zonkImplication implic
-       ; holes'  <- mapBagM zonkHole holes
-       ; return (WC { wc_simple = simple', wc_impl = implic', wc_holes = holes' }) }
+       ; errs'   <- mapBagM zonkDelayedError errs
+       ; return (WC { wc_simple = simple', wc_impl = implic', wc_errors = errs' }) }
 
 zonkSimples :: Cts -> TcM Cts
 zonkSimples cts = do { cts' <- mapBagM zonkCt cts
                      ; traceTc "zonkSimples done:" (ppr cts')
                      ; return cts' }
 
+zonkDelayedError :: DelayedError -> TcM DelayedError
+zonkDelayedError (DE_Hole hole)
+  = DE_Hole <$> zonkHole hole
+zonkDelayedError (DE_NotConcrete err)
+  = DE_NotConcrete <$> zonkNotConcreteError err
+
 zonkHole :: Hole -> TcM Hole
 zonkHole hole@(Hole { hole_ty = ty })
   = do { ty' <- zonkTcType ty
        ; return (hole { hole_ty = ty' }) }
+
+zonkNotConcreteError :: NotConcreteError -> TcM NotConcreteError
+zonkNotConcreteError err@(NCE_FRR { nce_frr_origin = frr_orig })
+  = do { frr_orig  <- zonkFRROrigin frr_orig
+       ; return $ err { nce_frr_origin = frr_orig  } }
+
+zonkFRROrigin :: FixedRuntimeRepOrigin -> TcM FixedRuntimeRepOrigin
+zonkFRROrigin (FixedRuntimeRepOrigin ty orig)
+  = do { ty' <- zonkTcType ty
+       ; return $ FixedRuntimeRepOrigin ty' orig }
 
 {- Note [zonkCt behaviour]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2667,9 +2619,6 @@ zonkTidyOrigin env (CycleBreakerOrigin orig)
 zonkTidyOrigin env (InstProvidedOrigin mod cls_inst)
   = do { (env1, is_tys') <- mapAccumLM zonkTidyTcType env (is_tys cls_inst)
        ; return (env1, InstProvidedOrigin mod (cls_inst {is_tys = is_tys'})) }
-zonkTidyOrigin env (FixedRuntimeRepOrigin ty frr_orig)
-  = do { (env1, ty') <- zonkTidyTcType env ty
-       ; return (env1, FixedRuntimeRepOrigin ty' frr_orig)}
 zonkTidyOrigin env (WantedSuperclassOrigin pty orig)
   = do { (env1, pty')  <- zonkTidyTcType env pty
        ; (env2, orig') <- zonkTidyOrigin env1 orig
@@ -2678,6 +2627,26 @@ zonkTidyOrigin env orig = return (env, orig)
 
 zonkTidyOrigins :: TidyEnv -> [CtOrigin] -> TcM (TidyEnv, [CtOrigin])
 zonkTidyOrigins = mapAccumLM zonkTidyOrigin
+
+zonkTidyFRRInfos :: TidyEnv
+                 -> [FixedRuntimeRepErrorInfo]
+                 -> TcM (TidyEnv, [FixedRuntimeRepErrorInfo])
+zonkTidyFRRInfos = go []
+  where
+    go zs env [] = return (env, reverse zs)
+    go zs env (FRR_Info { frr_info_origin = FixedRuntimeRepOrigin ty orig
+                        , frr_info_not_concrete = mb_not_conc } : tys)
+      = do { (env, ty) <- zonkTidyTcType env ty
+           ; (env, mb_not_conc) <- go_mb_not_conc env mb_not_conc
+           ; let info = FRR_Info { frr_info_origin = FixedRuntimeRepOrigin ty orig
+                                 , frr_info_not_concrete = mb_not_conc }
+           ; go (info:zs) env tys }
+
+    go_mb_not_conc env Nothing = return (env, Nothing)
+    go_mb_not_conc env (Just (tv, ty))
+      = do { (env, tv) <- return $ tidyOpenTyCoVar env tv
+           ; (env, ty) <- zonkTidyTcType env ty
+           ; return (env, Just (tv, ty)) }
 
 ----------------
 tidyCt :: TidyEnv -> Ct -> Ct
@@ -2693,6 +2662,20 @@ tidyCtEvidence env ctev = ctev { ctev_pred = tidyType env ty }
 
 tidyHole :: TidyEnv -> Hole -> Hole
 tidyHole env h@(Hole { hole_ty = ty }) = h { hole_ty = tidyType env ty }
+
+tidyDelayedError :: TidyEnv -> DelayedError -> DelayedError
+tidyDelayedError env (DE_Hole hole)
+  = DE_Hole $ tidyHole env hole
+tidyDelayedError env (DE_NotConcrete err)
+  = DE_NotConcrete $ tidyConcreteError env err
+
+tidyConcreteError :: TidyEnv -> NotConcreteError -> NotConcreteError
+tidyConcreteError env err@(NCE_FRR { nce_frr_origin = frr_orig })
+  = err { nce_frr_origin = tidyFRROrigin env frr_orig }
+
+tidyFRROrigin :: TidyEnv -> FixedRuntimeRepOrigin -> FixedRuntimeRepOrigin
+tidyFRROrigin env (FixedRuntimeRepOrigin ty orig)
+  = FixedRuntimeRepOrigin (tidyType env ty) orig
 
 ----------------
 tidyEvVar :: TidyEnv -> EvVar -> EvVar

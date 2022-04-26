@@ -27,10 +27,12 @@ test('T20330b', normal, compile, [''])
 test('T20423', normal, compile_fail, [''])
 test('T20423b', normal, compile_fail, [''])
 test('T20426', normal, compile_fail, [''])
+test('T21239', normal, compile, [''])
 
 test('LevPolyLet', normal, compile_fail, [''])
 test('PandocArrowCmd', normal, compile, [''])
 test('RepPolyApp', normal, compile_fail, [''])
+test('RepPolyArgument', normal, compile_fail, [''])
 test('RepPolyArrowCmd', normal, compile_fail, [''])
 test('RepPolyArrowFun', normal, compile_fail, [''])
 test('RepPolyBackpack1', normal, backpack_compile_fail, [''])
@@ -48,6 +50,8 @@ test('RepPolyDoBody2', normal, compile_fail, [''])
 test('RepPolyDoReturn', normal, compile, [''])
 test('RepPolyFFI', normal, compile, [''])
 test('RepPolyLambda', normal, compile_fail, [''])
+test('RepPolyInferPatBind', normal, compile_fail, [''])
+test('RepPolyInferPatSyn', normal, compile_fail, [''])
 test('RepPolyLeftSection1', normal, compile, [''])
 test('RepPolyLeftSection2', normal, compile_fail, [''])
 test('RepPolyMagic', normal, compile_fail, [''])
@@ -83,12 +87,17 @@ test('UnliftedNewtypesLevityBinder', normal, compile_fail, [''])
 ## The following tests require rewriting in RuntimeReps,            ##
 ## i.e. PHASE 2 of the FixedRuntimeRep plan.                        ##
 ##                                                                  ##
+## These tests work!                                                ##
+                                                                    ##
+test('T13105', normal, compile, [''])                               ##
+test('T17536b', normal, compile, [''])                              ##
+                                                                    ##
+## These don't!                                                     ##
 ## For the moment, we check that we get the expected error message, ##
 ## as we want to reject these in the typechecker instead of getting ##
 ## a compiler crash.                                                ##
-test('T13105', normal, compile_fail, [''])                          ##
+                                                                    ##
 test('T17021', normal, compile_fail, [''])                          ##
-test('T17536b', normal, compile_fail, [''])                         ##
 test('T20363', normal, compile_fail, [''])                          ##
 test('T20363_show_co', normal, compile_fail                         ##
     , ['-fprint-explicit-coercions'])                               ##

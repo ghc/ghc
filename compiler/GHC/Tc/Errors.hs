@@ -507,7 +507,7 @@ mkErrorItem ct
 ----------------------------------------------------------------
 reportWanteds :: SolverReportErrCtxt -> TcLevel -> WantedConstraints -> TcM ()
 reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
-                                 , wc_holes = holes })
+                                 , wc_errors = errs })
   | isEmptyWC wc = traceTc "reportWanteds empty WC" empty
   | otherwise
   = do { tidy_items <- mapMaybeM mkErrorItem tidy_cts
@@ -515,7 +515,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
                                          , text "Suppress =" <+> ppr (cec_suppress ctxt)
                                          , text "tidy_cts   =" <+> ppr tidy_cts
                                          , text "tidy_items =" <+> ppr tidy_items
-                                         , text "tidy_holes =" <+> ppr tidy_holes ])
+                                         , text "tidy_errs =" <+> ppr tidy_errs ])
 
        -- This check makes sure that we aren't suppressing the only error that will
        -- actually stop compilation
@@ -530,7 +530,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
            (vcat [text "reportWanteds is suppressing all errors"])
 
          -- First, deal with any out-of-scope errors:
-       ; let (out_of_scope, other_holes) = partition isOutOfScopeHole tidy_holes
+       ; let (out_of_scope, other_holes, not_conc_errs) = partition_errors tidy_errs
                -- don't suppress out-of-scope errors
              ctxt_for_scope_errs = ctxt { cec_suppress = False }
        ; (_, no_out_of_scope) <- askNoErrs $
@@ -544,6 +544,8 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
        ; let ctxt_for_insols = ctxt { cec_suppress = not no_out_of_scope }
        ; reportHoles tidy_items ctxt_for_insols other_holes
           -- holes never suppress
+
+       ; reportNotConcreteErrs ctxt_for_insols not_conc_errs
 
           -- See Note [Suppressing confusing errors]
        ; let (suppressed_items, items0) = partition suppress tidy_items
@@ -573,9 +575,25 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
          do { (_, more_leftovers) <- tryReporters ctxt3 report3 suppressed_items
             ; massertPpr (null more_leftovers) (ppr more_leftovers) } }
  where
-    env        = cec_tidy ctxt
-    tidy_cts   = bagToList (mapBag (tidyCt env)   simples)
-    tidy_holes = bagToList (mapBag (tidyHole env) holes)
+    env       = cec_tidy ctxt
+    tidy_cts  = bagToList (mapBag (tidyCt env)   simples)
+    tidy_errs = bagToList (mapBag (tidyDelayedError env) errs)
+
+    partition_errors :: [DelayedError] -> ([Hole], [Hole], [NotConcreteError])
+    partition_errors = go [] [] []
+      where
+        go out_of_scope other_holes syn_eqs []
+          = (out_of_scope, other_holes, syn_eqs)
+        go es1 es2 es3 (err:errs)
+          | (es1, es2, es3) <- go es1 es2 es3 errs
+          = case err of
+              DE_Hole hole
+                | isOutOfScopeHole hole
+                -> (hole : es1, es2, es3)
+                | otherwise
+                -> (es1, hole : es2, es3)
+              DE_NotConcrete err
+                -> (es1, es2, err : es3)
 
       -- See Note [Suppressing confusing errors]
     suppress :: ErrorItem -> Bool
@@ -594,10 +612,11 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     report1 = [ ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
 
               , given_eq_spec
-              , ("insoluble2",   utterly_wrong,  True, mkGroupReporter mkEqErr)
-              , ("skolem eq1",   very_wrong,     True, mkSkolReporter)
-              , ("skolem eq2",   skolem_eq,      True, mkSkolReporter)
-              , ("non-tv eq",    non_tv_eq,      True, mkSkolReporter)
+              , ("insoluble2",      utterly_wrong,  True, mkGroupReporter mkEqErr)
+              , ("skolem eq1",      very_wrong,     True, mkSkolReporter)
+              , ("FixedRuntimeRep", is_FRR,         True, mkGroupReporter mkFRRErr)
+              , ("skolem eq2",      skolem_eq,      True, mkSkolReporter)
+              , ("non-tv eq",       non_tv_eq,      True, mkSkolReporter)
 
                   -- The only remaining equalities are alpha ~ ty,
                   -- where alpha is untouchable; and representational equalities
@@ -611,7 +630,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     -- report2: we suppress these if there are insolubles elsewhere in the tree
     report2 = [ ("Implicit params", is_ip,           False, mkGroupReporter mkIPErr)
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
-              , ("FixedRuntimeRep", is_FRR,          False, mkGroupReporter mkFRRErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr) ]
 
     -- report3: suppressed errors should be reported as categorized by either report1
@@ -636,6 +654,9 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     very_wrong _ (EqPred NomEq ty1 ty2) = isSkolemTy tc_lvl ty1 && isRigidTy ty2
     very_wrong _ _                      = False
 
+    -- Representation-polymorphism errors, to be reported using mkFRRErr.
+    is_FRR item _ = isJust $ fixedRuntimeRepOrigin_maybe item
+
     -- Things like (a ~N b) or (a  ~N  F Bool)
     skolem_eq _ (EqPred NomEq ty1 _) = isSkolemTy tc_lvl ty1
     skolem_eq _ _                    = False
@@ -646,35 +667,19 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
 
     is_user_type_error item _ = isUserTypeError (errorItemPred item)
 
-    is_homo_equality item (EqPred _ ty1 ty2)
-      | FixedRuntimeRepOrigin {} <- errorItemOrigin item
-      -- Constraints with FixedRuntimeRep origin must be reported using mkFRRErr.
-      = False
-      | otherwise
+    is_homo_equality _ (EqPred _ ty1 ty2)
       = tcTypeKind ty1 `tcEqType` tcTypeKind ty2
     is_homo_equality _ _
       = False
 
-    is_equality item (EqPred {})
-      | FixedRuntimeRepOrigin {} <- errorItemOrigin item
-      -- Constraints with FixedRuntimeRep origin must be reported using mkFRRErr.
-      = False
-      | otherwise
-      = True
-    is_equality _ _
-      = False
+    is_equality _(EqPred {}) = True
+    is_equality _ _          = False
 
     is_dict _ (ClassPred {}) = True
     is_dict _ _              = False
 
     is_ip _ (ClassPred cls _) = isIPClass cls
     is_ip _ _                 = False
-
-    is_FRR item _
-      | FixedRuntimeRepOrigin {} <- errorItemOrigin item
-      = True
-    is_FRR _ _
-      = False
 
     is_irred _ (IrredPred {}) = True
     is_irred _ _              = False
@@ -890,6 +895,35 @@ zonkTidyTcLclEnvs tidy_env lcls = foldM go (tidy_env, emptyNameEnv) (concatMap t
                 (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env ty
                 return (tidy_env',  extendNameEnv name_env name tidy_ty)
 
+reportNotConcreteErrs :: SolverReportErrCtxt -> [NotConcreteError] -> TcM ()
+reportNotConcreteErrs _ [] = return ()
+reportNotConcreteErrs ctxt errs@(err0:_)
+  = do { msg <- mkErrorReport (ctLocEnv (nce_loc err0)) diag (Just ctxt) []
+       ; reportDiagnostic msg }
+
+  where
+
+    frr_origins = acc_errors errs
+    diag = TcRnSolverReport
+             [SolverReportWithCtxt ctxt (FixedRuntimeRepError frr_origins)]
+             ErrorWithoutFlag noHints
+
+    -- Accumulate the different kind of errors arising from syntactic equality.
+    -- (Only SynEq_FRR origin for the moment.)
+    acc_errors = go []
+      where
+        go frr_errs [] = frr_errs
+        go frr_errs (err:errs)
+          | frr_errs <- go frr_errs errs
+          = case err of
+              NCE_FRR
+                { nce_frr_origin = frr_orig
+                , nce_reasons = _not_conc } ->
+                FRR_Info
+                  { frr_info_origin       = frr_orig
+                  , frr_info_not_concrete = Nothing }
+                : frr_errs
+
 {- Note [Skip type holes rapidly]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have module with a /lot/ of partial type signatures, and we
@@ -1019,10 +1053,10 @@ reportGroup mk_err ctxt items
 
 -- See Note [No deferring for multiplicity errors]
 nonDeferrableOrigin :: CtOrigin -> Bool
-nonDeferrableOrigin NonLinearPatternOrigin     = True
-nonDeferrableOrigin (UsageEnvironmentOf {})    = True
-nonDeferrableOrigin (FixedRuntimeRepOrigin {}) = True
-nonDeferrableOrigin _                          = False
+nonDeferrableOrigin NonLinearPatternOrigin  = True
+nonDeferrableOrigin (UsageEnvironmentOf {}) = True
+nonDeferrableOrigin (FRROrigin {})          = True
+nonDeferrableOrigin _                       = False
 
 maybeReportError :: SolverReportErrCtxt
                  -> [ErrorItem]     -- items covered by the Report
@@ -1060,9 +1094,7 @@ addDeferredBinding ctxt err (EI { ei_evdest = Just dest, ei_pred = item_ty
              -> do { -- See Note [Deferred errors for coercion holes]
                      let co_var = coHoleCoVar hole
                    ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var err_tm
-                   ; fillCoercionHole hole (mkTcCoVarCo co_var) }
-           NoDest
-             -> return () }
+                   ; fillCoercionHole hole (mkTcCoVarCo co_var) } }
 addDeferredBinding _ _ _ = return ()    -- Do not set any evidence for Given
 
 mkErrorTerm :: SolverReportErrCtxt -> CtLoc -> Type  -- of the error term
@@ -1448,39 +1480,35 @@ mkIPErr ctxt items
 
 ----------------
 
--- | Report a representation-polymorphism error to the user: `ty` should have
--- a fixed runtime representation, but doesn't.
+-- | Report a representation-polymorphism error to the user:
+-- a type is required to havehave a fixed runtime representation,
+-- but doesn't.
 --
 -- See Note [Reporting representation-polymorphism errors] in GHC.Tc.Types.Origin.
-mkFRRErr :: SolverReportErrCtxt -> [ErrorItem] -> TcM SolverReport
+mkFRRErr :: HasDebugCallStack => SolverReportErrCtxt -> [ErrorItem] -> TcM SolverReport
 mkFRRErr ctxt items
-  = do { -- Zonk and tidy the error items.
-       ; (_tidy_env, tidied_origins) <-
-           zonkTidyOrigins (cec_tidy ctxt) (map errorItemOrigin items)
-         -- Then remove duplicates: only retain one 'CtOrigin' per representation-polymorphic type.
-       ; let frr_infos =
-              nubOrdBy (nonDetCmpType `on` frrInfo_type) $
-                zipWith frr_info tidied_origins (map errorItemPred items)
+  = do { -- Process the error items.
+       ; (_tidy_env, frr_infos) <-
+          zonkTidyFRRInfos (cec_tidy ctxt) $
+            -- Zonk/tidy to show useful variable names.
+          nubOrdBy (nonDetCmpType `on` (frr_type . frr_info_origin)) $
+            -- Remove duplicates: only one representation-polymorphism error per type.
+          map (expectJust "mkFRRErr" . fixedRuntimeRepOrigin_maybe)
+          items
        ; return $ important ctxt $ FixedRuntimeRepError frr_infos }
-  where
 
-    frr_info :: CtOrigin -> PredType -> FixedRuntimeRepErrorInfo
-    frr_info orig pty
-      | FixedRuntimeRepOrigin ty frr_orig <- orig
-      = FixedRuntimeRepErrorInfo
-        { frrInfo_origin     = frr_orig
-        , frrInfo_type       = ty
-        , frrInfo_isReflPrim = isIsReflPrimPred (classifyPredType pty)
-            -- NB: it's useful to categorise the error messages depending on
-            -- whether they were triggered by an 'IsRefl#' constraint or not,
-            -- so that we can print an extra explanatory message to the user.
-            --
-            -- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete.
-        }
-      | otherwise
-      = pprPanic "mkFRRErr: not a FixedRuntimeRep origin" $
-          vcat [ text "origin:" <+> ppr orig
-               , text "pty:"    <+> ppr pty ]
+-- | Whether to report something using the @FixedRuntimeRep@ mechanism.
+fixedRuntimeRepOrigin_maybe :: HasDebugCallStack => ErrorItem -> Maybe FixedRuntimeRepErrorInfo
+fixedRuntimeRepOrigin_maybe item
+  -- An error that arose directly from a representation-polymorphism check.
+  | FRROrigin frr_orig <- errorItemOrigin item
+  = Just $ FRR_Info { frr_info_origin = frr_orig
+                    , frr_info_not_concrete = Nothing }
+  -- Unsolved nominal equalities involving a concrete type variable,
+  -- such as @alpha[conc] ~# rr[sk]@ or @beta[conc] ~# RR@ for a
+  -- type family application @RR@, are handled by 'mkTyVarEqErr''.
+  | otherwise
+  = Nothing
 
 {-
 Note [Constraints include ...]
@@ -1621,10 +1649,10 @@ mkEqErr_help :: SolverReportErrCtxt
              -> ErrorItem
              -> TcType -> TcType -> TcM (AccReportMsgs, [GhcHint])
 mkEqErr_help ctxt item ty1 ty2
-  | Just (tv1, _) <- tcGetCastedTyVar_maybe ty1
-  = mkTyVarEqErr ctxt item tv1 ty2
-  | Just (tv2, _) <- tcGetCastedTyVar_maybe ty2
-  = mkTyVarEqErr ctxt item tv2 ty1
+  | Just casted_tv1 <- tcGetCastedTyVar_maybe ty1
+  = mkTyVarEqErr ctxt item casted_tv1 ty2
+  | Just casted_tv2 <- tcGetCastedTyVar_maybe ty2
+  = mkTyVarEqErr ctxt item casted_tv2 ty1
   | otherwise
   = return (reportEqErr ctxt item ty1 ty2 :| [], [])
 
@@ -1638,29 +1666,39 @@ reportEqErr ctxt item ty1 ty2
     eqInfos  = eqInfoMsgs ty1 ty2
 
 mkTyVarEqErr :: SolverReportErrCtxt -> ErrorItem
-             -> TcTyVar -> TcType -> TcM (AccReportMsgs, [GhcHint])
+             -> (TcTyVar, TcCoercionN) -> TcType -> TcM (AccReportMsgs, [GhcHint])
 -- tv1 and ty2 are already tidied
-mkTyVarEqErr ctxt item tv1 ty2
-  = do { traceTc "mkTyVarEqErr" (ppr item $$ ppr tv1 $$ ppr ty2)
-       ; mkTyVarEqErr' ctxt item tv1 ty2 }
+mkTyVarEqErr ctxt item casted_tv1 ty2
+  = do { traceTc "mkTyVarEqErr" (ppr item $$ ppr casted_tv1 $$ ppr ty2)
+       ; mkTyVarEqErr' ctxt item casted_tv1 ty2 }
 
 mkTyVarEqErr' :: SolverReportErrCtxt -> ErrorItem
-              -> TcTyVar -> TcType -> TcM (AccReportMsgs, [GhcHint])
-mkTyVarEqErr' ctxt item tv1 ty2
-     -- impredicativity is a simple error to understand; try it first
-  | check_eq_result `cterHasProblem` cteImpredicative = do
-  tyvar_eq_info <- extraTyVarEqInfo tv1 ty2
-  let
-      poly_msg = CannotUnifyWithPolytype item tv1 ty2
-      poly_msg_with_info
-        | isSkolemTyVar tv1
-        = mkTcReportWithInfo poly_msg tyvar_eq_info
-        | otherwise
-        = poly_msg
-      -- Unlike the other reports, this discards the old 'report_important'
-       -- instead of augmenting it.  This is because the details are not likely
-       -- to be helpful since this is just an unimplemented feature.
-  return (poly_msg_with_info <| headline_msg :| [], [])
+              -> (TcTyVar, TcCoercionN) -> TcType -> TcM (AccReportMsgs, [GhcHint])
+mkTyVarEqErr' ctxt item (tv1, co1) ty2
+
+  -- Is this a representation-polymorphism error, e.g.
+  -- alpha[conc] ~# rr[sk] ? If so, handle that first.
+  | Just frr_info <- mb_concrete_reason
+  = do
+      (_, infos) <- zonkTidyFRRInfos (cec_tidy ctxt) [frr_info]
+      return (FixedRuntimeRepError infos :| [], [])
+
+  -- Impredicativity is a simple error to understand; try it before
+  -- anything more complicated.
+  | check_eq_result `cterHasProblem` cteImpredicative
+  = do
+    tyvar_eq_info <- extraTyVarEqInfo tv1 ty2
+    let
+        poly_msg = CannotUnifyWithPolytype item tv1 ty2
+        poly_msg_with_info
+          | isSkolemTyVar tv1
+          = mkTcReportWithInfo poly_msg tyvar_eq_info
+          | otherwise
+          = poly_msg
+        -- Unlike the other reports, this discards the old 'report_important'
+        -- instead of augmenting it.  This is because the details are not likely
+        -- to be helpful since this is just an unimplemented feature.
+    return (poly_msg_with_info <| headline_msg :| [], [])
 
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
                        -- swapped in Solver.Canonical.canEqTyVarHomo
@@ -1690,7 +1728,7 @@ mkTyVarEqErr' ctxt item tv1 ty2
 
     -- This is wrinkle (4) in Note [Equalities with incompatible kinds] in
     -- GHC.Tc.Solver.Canonical
-  | hasCoercionHoleTy ty2
+  | hasCoercionHoleCo co1 || hasCoercionHoleTy ty2
   = return (mkBlockedEqErr item :| [], [])
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
@@ -1733,6 +1771,25 @@ mkTyVarEqErr' ctxt item tv1 ty2
     headline_msg = misMatchOrCND insoluble_occurs_check ctxt item ty1 ty2
     mismatch_msg = mkMismatchMsg item ty1 ty2
     add_sig      = maybeToList $ suggestAddSig ctxt ty1 ty2
+
+    -- The following doesn't use the cterHasProblem mechanism because
+    -- we need to retrieve the ConcreteTvOrigin. Just knowing whether
+    -- there is an error is not sufficient. See #21430.
+    mb_concrete_reason
+      | Just frr_orig <- isConcreteTyVar_maybe tv1
+      , not (isConcrete ty2)
+      = Just $ frr_reason frr_orig tv1 ty2
+      | Just (tv2, frr_orig) <- isConcreteTyVarTy_maybe ty2
+      , not (isConcreteTyVar tv1)
+      = Just $ frr_reason frr_orig tv2 ty1
+      -- NB: if it's an unsolved equality in which both sides are concrete
+      -- (e.g. a concrete type variable on both sides), then it's not a
+      -- representation-polymorphism problem.
+      | otherwise
+      = Nothing
+    frr_reason (ConcreteFRR frr_orig) conc_tv not_conc
+      = FRR_Info { frr_info_origin = frr_orig
+                 , frr_info_not_concrete = Just (conc_tv, not_conc) }
 
     ty1 = mkTyVarTy tv1
 

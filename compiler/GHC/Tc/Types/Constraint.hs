@@ -35,6 +35,7 @@ module GHC.Tc.Types.Constraint (
         CheckTyEqResult, CheckTyEqProblem, cteProblem, cterClearOccursCheck,
         cteOK, cteImpredicative, cteTypeFamily,
         cteInsolubleOccurs, cteSolubleOccurs, cterSetOccursCheckSoluble,
+
         cterHasNoProblem, cterHasProblem, cterHasOnlyProblem,
         cterRemoveProblem, cterHasOccursCheck, cterFromKind,
 
@@ -42,13 +43,16 @@ module GHC.Tc.Types.Constraint (
         eqCanEqLHS,
 
         Hole(..), HoleSort(..), isOutOfScopeHole,
+        DelayedError(..), NotConcreteError(..),
+        NotConcreteReason(..),
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         isSolvedWC, andWC, unionsWC, mkSimpleWC, mkImplicWC,
         addInsols, dropMisleading, addSimples, addImplics, addHoles,
+        addNotConcreteError, addDelayedErrors,
         tyCoVarsOfWC,
         tyCoVarsOfWCList, insolubleWantedCt, insolubleEqCt, insolubleCt,
-        insolubleImplic,
+        insolubleImplic, nonDefaultableTyVarsOfWC,
 
         Implication(..), implicationPrototype, checkTelescopeSkol,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
@@ -127,10 +131,12 @@ import Data.Monoid ( Endo(..) )
 import qualified Data.Semigroup as S
 import Control.Monad ( msum, when )
 import Data.Maybe ( mapMaybe )
+import Data.List.NonEmpty ( NonEmpty )
 
 -- these are for CheckTyEqResult
 import Data.Word  ( Word8 )
 import Data.List  ( intersperse )
+
 
 
 
@@ -253,15 +259,6 @@ data Ct
       --     look like this, with the payload in an
       --     auxiliary type
 
-  -- | A special canonical constraint:
-  -- a constraint that is used internally by GHC's typechecker.
-  --
-  -- See #20000.
-  | CSpecialCan {
-      cc_ev           :: CtEvidence,
-      cc_special_pred :: SpecialPred
-    }
-
 ------------
 -- | A 'CanEqLHS' is a type that can appear on the left of a canonical
 -- equality: a type variable or exactly-saturated type family application.
@@ -288,7 +285,28 @@ data QCInst  -- A much simplified version of ClsInst
 instance Outputable QCInst where
   ppr (QCI { qci_ev = ev }) = ppr ev
 
-------------
+------------------------------------------------------------------------------
+--
+-- Holes and other delayed errors
+--
+------------------------------------------------------------------------------
+
+-- | A delayed error, to be reported after constraint solving, in order to benefit
+-- from deferred unifications.
+data DelayedError
+  = DE_Hole Hole
+    -- ^ A hole (in a type or in a term).
+    --
+    -- See Note [Holes].
+  | DE_NotConcrete NotConcreteError
+    -- ^ A type could not be ensured to be concrete.
+    --
+    -- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete.
+
+instance Outputable DelayedError where
+  ppr (DE_Hole hole) = ppr hole
+  ppr (DE_NotConcrete err) = ppr err
+
 -- | A hole stores the information needed to report diagnostics
 -- about holes in terms (unbound identifiers or underscores) or
 -- in types (also called wildcards, as used in partial type
@@ -335,6 +353,45 @@ instance Outputable HoleSort where
   ppr (ExprHole ref) = text "ExprHole:" <+> ppr ref
   ppr TypeHole       = text "TypeHole"
   ppr ConstraintHole = text "ConstraintHole"
+
+-- | Why did we require that a certain type be concrete?
+data NotConcreteError
+  -- | Concreteness was required by a representation-polymorphism
+  -- check.
+  --
+  -- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete.
+  = NCE_FRR
+    { nce_loc        :: CtLoc
+      -- ^ Where did this check take place?
+    , nce_frr_origin :: FixedRuntimeRepOrigin
+      -- ^ Which representation-polymorphism check did we perform?
+    , nce_reasons    :: NonEmpty NotConcreteReason
+      -- ^ Why did the check fail?
+    }
+
+-- | Why did we decide that a type was not concrete?
+data NotConcreteReason
+  -- | The type contains a 'TyConApp' of a non-concrete 'TyCon'.
+  --
+  -- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
+  = NonConcreteTyCon TyCon [TcType]
+
+  -- | The type contains a type variable that could not be made
+  -- concrete (e.g. a skolem type variable).
+  | NonConcretisableTyVar TyVar
+
+  -- | The type contains a cast.
+  | ContainsCast TcType TcCoercionN
+
+  -- | The type contains a forall.
+  | ContainsForall TyCoVarBinder TcType
+
+  -- | The type contains a 'CoercionTy'.
+  | ContainsCoercionTy TcCoercion
+
+instance Outputable NotConcreteError where
+  ppr (NCE_FRR { nce_frr_origin = frr_orig })
+    = text "NCE_FRR" <+> parens (ppr (frr_type frr_orig))
 
 ------------
 -- | Used to indicate extra information about why a CIrredCan is irreducible
@@ -584,16 +641,13 @@ ctEvId :: HasDebugCallStack => Ct -> EvVar
 ctEvId ct = ctEvEvId (ctEvidence ct)
 
 -- | Returns the evidence 'Id' for the argument 'Ct'
--- when this 'Ct' is a 'Wanted' which can hold evidence
--- (i.e. doesn't have 'NoDest' 'TcEvDest').
+-- when this 'Ct' is a 'Wanted'.
 --
 -- Returns 'Nothing' otherwise.
 wantedEvId_maybe :: Ct -> Maybe EvVar
 wantedEvId_maybe ct
   = case ctEvidence ct of
-    ctev@(CtWanted { ctev_dest = dst })
-      | NoDest <- dst
-      -> Nothing
+    ctev@(CtWanted {})
       | otherwise
       -> Just $ ctEvEvId ctev
     CtGiven {}
@@ -632,8 +686,6 @@ instance Outputable Ct where
          CQuantCan (QCI { qci_pend_sc = pend_sc })
             | pend_sc   -> text "CQuantCan(psc)"
             | otherwise -> text "CQuantCan"
-         CSpecialCan { cc_special_pred = special_pred } ->
-           text "CSpecialCan" <> parens (ppr special_pred)
 
 -----------------------------------
 -- | Is a type a canonical LHS? That is, is it a tyvar or an exactly-saturated
@@ -751,10 +803,10 @@ tyCoVarsOfWCList = fvVarList . tyCoFVsOfWC
 -- computation. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoFVsOfWC :: WantedConstraints -> FV
 -- Only called on *zonked* things
-tyCoFVsOfWC (WC { wc_simple = simple, wc_impl = implic, wc_holes = holes })
+tyCoFVsOfWC (WC { wc_simple = simple, wc_impl = implic, wc_errors = errors })
   = tyCoFVsOfCts simple `unionFV`
     tyCoFVsOfBag tyCoFVsOfImplic implic `unionFV`
-    tyCoFVsOfBag tyCoFVsOfHole holes
+    tyCoFVsOfBag tyCoFVsOfDelayedError errors
 
 -- | Returns free variables of Implication as a composable FV computation.
 -- See Note [Deterministic FV] in "GHC.Utils.FV".
@@ -769,6 +821,10 @@ tyCoFVsOfImplic (Implic { ic_skols = skols
   = tyCoFVsVarBndrs skols  $
     tyCoFVsVarBndrs givens $
     tyCoFVsOfWC wanted
+
+tyCoFVsOfDelayedError :: DelayedError -> FV
+tyCoFVsOfDelayedError (DE_Hole hole) = tyCoFVsOfHole hole
+tyCoFVsOfDelayedError (DE_NotConcrete {}) = emptyFV
 
 tyCoFVsOfHole :: Hole -> FV
 tyCoFVsOfHole (Hole { hole_ty = ty }) = tyCoFVsOfType ty
@@ -963,13 +1019,13 @@ pprCts cts = vcat (map ppr (bagToList cts))
 data WantedConstraints
   = WC { wc_simple :: Cts              -- Unsolved constraints, all wanted
        , wc_impl   :: Bag Implication
-       , wc_holes  :: Bag Hole
+       , wc_errors :: Bag DelayedError
     }
 
 emptyWC :: WantedConstraints
 emptyWC = WC { wc_simple = emptyBag
              , wc_impl   = emptyBag
-             , wc_holes  = emptyBag }
+             , wc_errors = emptyBag }
 
 mkSimpleWC :: [CtEvidence] -> WantedConstraints
 mkSimpleWC cts
@@ -980,22 +1036,22 @@ mkImplicWC implic
   = emptyWC { wc_impl = implic }
 
 isEmptyWC :: WantedConstraints -> Bool
-isEmptyWC (WC { wc_simple = f, wc_impl = i, wc_holes = holes })
-  = isEmptyBag f && isEmptyBag i && isEmptyBag holes
+isEmptyWC (WC { wc_simple = f, wc_impl = i, wc_errors = errors })
+  = isEmptyBag f && isEmptyBag i && isEmptyBag errors
 
 -- | Checks whether a the given wanted constraints are solved, i.e.
 -- that there are no simple constraints left and all the implications
 -- are solved.
 isSolvedWC :: WantedConstraints -> Bool
-isSolvedWC WC {wc_simple = wc_simple, wc_impl = wc_impl, wc_holes = holes} =
-  isEmptyBag wc_simple && allBag (isSolvedStatus . ic_status) wc_impl && isEmptyBag holes
+isSolvedWC WC {wc_simple = wc_simple, wc_impl = wc_impl, wc_errors = errors} =
+  isEmptyBag wc_simple && allBag (isSolvedStatus . ic_status) wc_impl && isEmptyBag errors
 
 andWC :: WantedConstraints -> WantedConstraints -> WantedConstraints
-andWC (WC { wc_simple = f1, wc_impl = i1, wc_holes = h1 })
-      (WC { wc_simple = f2, wc_impl = i2, wc_holes = h2 })
+andWC (WC { wc_simple = f1, wc_impl = i1, wc_errors = e1 })
+      (WC { wc_simple = f2, wc_impl = i2, wc_errors = e2 })
   = WC { wc_simple = f1 `unionBags` f2
        , wc_impl   = i1 `unionBags` i2
-       , wc_holes  = h1 `unionBags` h2 }
+       , wc_errors = e1 `unionBags` e2 }
 
 unionsWC :: [WantedConstraints] -> WantedConstraints
 unionsWC = foldr andWC emptyWC
@@ -1014,28 +1070,39 @@ addInsols wc cts
 
 addHoles :: WantedConstraints -> Bag Hole -> WantedConstraints
 addHoles wc holes
-  = wc { wc_holes = holes `unionBags` wc_holes wc }
+  = wc { wc_errors = mapBag DE_Hole holes `unionBags` wc_errors wc }
+
+addNotConcreteError :: WantedConstraints -> NotConcreteError -> WantedConstraints
+addNotConcreteError wc err
+  = wc { wc_errors = unitBag (DE_NotConcrete err) `unionBags` wc_errors wc }
+
+addDelayedErrors :: WantedConstraints -> Bag DelayedError -> WantedConstraints
+addDelayedErrors wc errs
+  = wc { wc_errors = errs `unionBags` wc_errors wc }
 
 dropMisleading :: WantedConstraints -> WantedConstraints
 -- Drop misleading constraints; really just class constraints
 -- See Note [Constraints and errors] in GHC.Tc.Utils.Monad
 --   for why this function is so strange, treating the 'simples'
 --   and the implications differently.  Sigh.
-dropMisleading (WC { wc_simple = simples, wc_impl = implics, wc_holes = holes })
+dropMisleading (WC { wc_simple = simples, wc_impl = implics, wc_errors = errors })
   = WC { wc_simple = filterBag insolubleWantedCt simples
        , wc_impl   = mapBag drop_implic implics
-       , wc_holes  = filterBag isOutOfScopeHole holes }
+       , wc_errors = filterBag keep_delayed_error errors }
   where
     drop_implic implic
       = implic { ic_wanted = drop_wanted (ic_wanted implic) }
-    drop_wanted (WC { wc_simple = simples, wc_impl = implics, wc_holes = holes })
+    drop_wanted (WC { wc_simple = simples, wc_impl = implics, wc_errors = errors })
       = WC { wc_simple = filterBag keep_ct simples
            , wc_impl   = mapBag drop_implic implics
-           , wc_holes  = filterBag isOutOfScopeHole holes }
+           , wc_errors  = filterBag keep_delayed_error errors }
 
     keep_ct ct = case classifyPredType (ctPred ct) of
                     ClassPred {} -> False
                     _ -> True
+
+    keep_delayed_error (DE_Hole hole) = isOutOfScopeHole hole
+    keep_delayed_error (DE_NotConcrete {}) = True
 
 isSolvedStatus :: ImplicStatus -> Bool
 isSolvedStatus (IC_Solved {}) = True
@@ -1049,11 +1116,62 @@ isInsolubleStatus _               = False
 insolubleImplic :: Implication -> Bool
 insolubleImplic ic = isInsolubleStatus (ic_status ic)
 
+-- | Gather all the type variables from 'WantedConstraints'
+-- that it would be unhelpful to default. For the moment,
+-- these are only 'ConcreteTv' metavariables participating
+-- in a nominal equality whose other side is not concrete;
+-- it's usually better to report those as errors instead of
+-- defaulting.
+nonDefaultableTyVarsOfWC :: WantedConstraints -> TyCoVarSet
+-- Currently used in simplifyTop and in tcRule.
+-- TODO: should we also use this in decideQuantifiedTyVars, kindGeneralize{All,Some}?
+nonDefaultableTyVarsOfWC (WC { wc_simple = simples, wc_impl = implics, wc_errors = errs })
+  =             concatMapBag non_defaultable_tvs_of_ct simples
+  `unionVarSet` concatMapBag (nonDefaultableTyVarsOfWC . ic_wanted) implics
+  `unionVarSet` concatMapBag non_defaultable_tvs_of_err errs
+    where
+
+      concatMapBag :: (a -> TyVarSet) -> Bag a -> TyCoVarSet
+      concatMapBag f = foldr (\ r acc -> f r `unionVarSet` acc) emptyVarSet
+
+      -- Don't default ConcreteTv metavariables involved
+      -- in an equality with something non-concrete: it's usually
+      -- better to report the unsolved Wanted.
+      --
+      -- Example: alpha[conc] ~# rr[sk].
+      non_defaultable_tvs_of_ct :: Ct -> TyCoVarSet
+      non_defaultable_tvs_of_ct ct =
+        -- NB: using classifyPredType instead of inspecting the Ct
+        -- so that we deal uniformly with CNonCanonical (which come up in tcRule),
+        -- CEqCan (unsolved but potentially soluble, e.g. @alpha[conc] ~# RR@)
+        -- and CIrredCan.
+        case classifyPredType $ ctPred ct of
+          EqPred NomEq lhs rhs
+            | Just tv <- getTyVar_maybe lhs
+            , isConcreteTyVar tv
+            , not (isConcrete rhs)
+            -> unitVarSet tv
+            | Just tv <- getTyVar_maybe rhs
+            , isConcreteTyVar tv
+            , not (isConcrete lhs)
+            -> unitVarSet tv
+          _ -> emptyVarSet
+
+      -- Make sure to apply the same logic as above to delayed errors.
+      non_defaultable_tvs_of_err (DE_NotConcrete err)
+        = case err of
+            NCE_FRR { nce_frr_origin = frr } -> tyCoVarsOfType (frr_type frr)
+      non_defaultable_tvs_of_err (DE_Hole {}) = emptyVarSet
+
 insolubleWC :: WantedConstraints -> Bool
-insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_holes = holes })
+insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_errors = errors })
   =  anyBag insolubleWantedCt simples
   || anyBag insolubleImplic implics
-  || anyBag isOutOfScopeHole holes  -- See Note [Insoluble holes]
+  || anyBag is_insoluble errors
+
+    where
+      is_insoluble (DE_Hole hole) = isOutOfScopeHole hole -- See Note [Insoluble holes]
+      is_insoluble (DE_NotConcrete {}) = True
 
 insolubleWantedCt :: Ct -> Bool
 -- Definitely insoluble, in particular /excluding/ type-hole constraints
@@ -1120,11 +1238,11 @@ isOutOfScopeHole :: Hole -> Bool
 isOutOfScopeHole (Hole { hole_occ = occ }) = not (startsWithUnderscore occ)
 
 instance Outputable WantedConstraints where
-  ppr (WC {wc_simple = s, wc_impl = i, wc_holes = h})
+  ppr (WC {wc_simple = s, wc_impl = i, wc_errors = e})
    = text "WC" <+> braces (vcat
         [ ppr_bag (text "wc_simple") s
         , ppr_bag (text "wc_impl") i
-        , ppr_bag (text "wc_holes") h ])
+        , ppr_bag (text "wc_errors") e ])
 
 ppr_bag :: Outputable a => SDoc -> Bag a -> SDoc
 ppr_bag doc bag
@@ -1715,7 +1833,6 @@ So a Given has EvVar inside it rather than (as previously) an EvTerm.
 -- | A place for type-checking evidence to go after it is generated.
 --
 --  - Wanted equalities use HoleDest,
---  - IsRefl# constraints use NoDest,
 --  - other Wanteds use EvVarDest.
 data TcEvDest
   = EvVarDest EvVar         -- ^ bind this var to the evidence
@@ -1725,9 +1842,6 @@ data TcEvDest
   | HoleDest  CoercionHole  -- ^ fill in this hole with the evidence
               -- HoleDest is always used for type-equalities
               -- See Note [Coercion holes] in GHC.Core.TyCo.Rep
-
-  | NoDest  -- ^ we don't need to record any evidence.
-            -- This is used for 'IsRefl#' constraints.
 
 data CtEvidence
   = CtGiven    -- Truly given, not depending on subgoals
@@ -1787,12 +1901,10 @@ ctEvCoercion (CtWanted { ctev_dest = dest })
 ctEvCoercion ev
   = pprPanic "ctEvCoercion" (ppr ev)
 
-ctEvEvId :: HasDebugCallStack => CtEvidence -> EvVar
+ctEvEvId :: CtEvidence -> EvVar
 ctEvEvId (CtWanted { ctev_dest = EvVarDest ev }) = ev
 ctEvEvId (CtWanted { ctev_dest = HoleDest h })   = coHoleCoVar h
 ctEvEvId (CtGiven  { ctev_evar = ev })           = ev
-ctEvEvId wt@(CtWanted { ctev_dest = NoDest })
-  = pprPanic "ctEvEvId: NoDest" (ppr wt)
 
 ctEvUnique :: CtEvidence -> Unique
 ctEvUnique (CtGiven { ctev_evar = ev })    = varUnique ev
@@ -1801,7 +1913,6 @@ ctEvUnique (CtWanted { ctev_dest = dest }) = tcEvDestUnique dest
 tcEvDestUnique :: TcEvDest -> Unique
 tcEvDestUnique (EvVarDest ev_var) = varUnique ev_var
 tcEvDestUnique (HoleDest co_hole) = varUnique (coHoleCoVar co_hole)
-tcEvDestUnique NoDest = panic "tcEvDestUnique: NoDest"
 
 setCtEvLoc :: CtEvidence -> CtLoc -> CtEvidence
 setCtEvLoc ctev loc = ctev { ctev_loc = loc }
@@ -1832,12 +1943,10 @@ setCtEvPredType old_ctev new_pred
           new_dest = case dest of
             EvVarDest ev -> EvVarDest (setVarType ev new_pred)
             HoleDest h   -> HoleDest  (setCoHoleType h new_pred)
-            NoDest       -> NoDest
 
 instance Outputable TcEvDest where
   ppr (HoleDest h)   = text "hole" <> ppr h
   ppr (EvVarDest ev) = ppr ev
-  ppr NoDest         = text "NoDest"
 
 instance Outputable CtEvidence where
   ppr ev = ppr (ctEvFlavour ev)

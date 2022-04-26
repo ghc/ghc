@@ -3,24 +3,7 @@
   [2 of 2] Compiling NumberStuff      ( number-unknown\NumberStuff.hs, nothing )
 
 RepPolyBackpack1.bkp:17:5: error:
-    The first pattern in the equation for ‘funcA’
+    The second pattern in the equation for ‘funcA’
     does not have a fixed runtime representation.
     Its type is:
       Number l :: TYPE (Rep l)
-
-RepPolyBackpack1.bkp:17:17: error:
-    • The argument ‘x’ of ‘plus’
-      does not have a fixed runtime representation.
-      Its type is:
-        Number l :: TYPE (Rep l)
-    • In the expression: plus x (multiply x y)
-      In an equation for ‘funcA’: funcA x y = plus x (multiply x y)
-
-RepPolyBackpack1.bkp:17:25: error:
-    • The argument ‘x’ of ‘multiply’
-      does not have a fixed runtime representation.
-      Its type is:
-        Number l :: TYPE (Rep l)
-    • In the second argument of ‘plus’, namely ‘(multiply x y)’
-      In the expression: plus x (multiply x y)
-      In an equation for ‘funcA’: funcA x y = plus x (multiply x y)

@@ -43,7 +43,7 @@ import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Core.Multiplicity
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_MustBeRefl )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity( arityErr )
@@ -120,11 +120,13 @@ tcPats ctxt pats pat_tys thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
-tcInferPat :: HsMatchContext GhcTc -> LPat GhcRn
+tcInferPat :: FixedRuntimeRepContext
+           -> HsMatchContext GhcTc
+           -> LPat GhcRn
            -> TcM a
-           -> TcM ((LPat GhcTc, a), TcSigmaType)
-tcInferPat ctxt pat thing_inside
-  = tcInfer $ \ exp_ty ->
+           -> TcM ((LPat GhcTc, a), TcSigmaTypeFRR)
+tcInferPat frr_orig ctxt pat thing_inside
+  = tcInferFRR frr_orig $ \ exp_ty ->
     tc_lpat (unrestricted exp_ty) penv pat thing_inside
  where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
@@ -471,7 +473,7 @@ arrow type (t1 -> t2); hence using (tcInferRho expr).
 
 Then, when taking that arrow apart we want to get a *sigma* type
 (forall b. b->(Int,b)), because that's what we want to bind 'x' to.
-Fortunately that's what matchExpectedFunTySigma returns anyway.
+Fortunately that's what matchActualFunTySigma returns anyway.
 -}
 
 -- Type signatures in patterns
@@ -932,7 +934,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
         -- See test case T20363.
         ; zipWithM_
             ( \ i arg_sty ->
-              hasFixedRuntimeRep_MustBeRefl
+              hasFixedRuntimeRep_syntactic
                 (FRRDataConArg Pattern data_con i)
                 (scaledThing arg_sty)
             )
@@ -1044,7 +1046,8 @@ tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
         ; traceTc "instCall" (ppr req_wrap)
 
           -- Pattern synonyms can never have representation-polymorphic argument types,
-          -- as checked in 'GHC.Tc.Gen.Sig.tcPatSynSig' (see use of 'FixedRuntimeRepPatSynSigArg').
+          -- as checked in 'GHC.Tc.Gen.Sig.tcPatSynSig' (see use of 'FixedRuntimeRepPatSynSigArg')
+          -- and 'GHC.Tc.TyCl.PatSyn.tcInferPatSynDecl'.
           -- (If you want to lift this restriction, use 'hasFixedRuntimeRep' here, to match
           -- 'tcDataConPat'.)
         ; let

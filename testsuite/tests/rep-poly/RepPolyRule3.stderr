@@ -5,9 +5,6 @@ RepPolyRule3.hs:17:57: error:
       Its kind is:
         TYPE (F 'WordRep)
       (Use -fprint-explicit-coercions to see the full type.)
-      NB: GHC does not (yet) support rewriting in runtime representations.
-      Please comment on GHC ticket #13105 if this is causing you trouble.
-      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
     • In the expression: g x
       When checking the rewrite rule "g_id"
 
@@ -17,8 +14,5 @@ RepPolyRule3.hs:23:52: error:
       Its kind is:
         TYPE (F 'WordRep)
       (Use -fprint-explicit-coercions to see the full type.)
-      NB: GHC does not (yet) support rewriting in runtime representations.
-      Please comment on GHC ticket #13105 if this is causing you trouble.
-      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
     • In the expression: h x
       When checking the rewrite rule "h_id"

@@ -36,7 +36,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_MustBeRefl )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
@@ -403,7 +403,7 @@ Note [Checking for representation-polymorphic built-ins]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We cannot have representation-polymorphic or levity-polymorphic
 function arguments. See Note [Representation polymorphism invariants]
-in GHC.Core.  That is checked by the calls to `hasFixedRuntimeRep ` in
+in GHC.Core.  That is checked by the calls to `hasFixedRuntimeRep` in
 `tcEValArg`.
 
 But some /built-in/ functions have representation-polymorphic argument
@@ -567,7 +567,11 @@ hasFixedRuntimeRep_remainingValArgs applied_args app_res_rho = \case
     -- in the (possibly instantiated) inferred type of the function will
     -- be at least the arity of the function.
 
-    check_thing :: Outputable thing => thing -> Arity -> (Int -> FRROrigin) -> TcM ()
+    check_thing :: Outputable thing
+                => thing
+                -> Arity
+                -> (Int -> FixedRuntimeRepContext)
+                -> TcM ()
     check_thing thing arity mk_frr_orig = do
       traceTc "tcApp remainingValArgs check_thing" (debug_msg thing arity)
       go (nb_applied_vis_val_args + 1) (nb_applied_val_args + 1) arg_tys
@@ -590,7 +594,7 @@ hasFixedRuntimeRep_remainingValArgs applied_args app_res_rho = \case
               InvisArg ->
                 go i_visval (i_val + 1) tys
               VisArg   -> do
-                hasFixedRuntimeRep_MustBeRefl (mk_frr_orig i_visval) arg_ty
+                hasFixedRuntimeRep_syntactic (mk_frr_orig i_visval) arg_ty
                 go (i_visval + 1) (i_val + 1) tys
 
     -- A message containing all the relevant info, in case this functions

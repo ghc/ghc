@@ -3,6 +3,9 @@ T12973.hs:13:7: error:
     • The argument ‘3’ of ‘(+)’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE r
+        a0 :: TYPE c0
+      Cannot unify ‘r’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
     • In the expression: 3 + 4
       In an equation for ‘foo’: foo = 3 + 4
+    • Relevant bindings include foo :: a (bound at T12973.hs:13:1)

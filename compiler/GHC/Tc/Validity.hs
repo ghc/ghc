@@ -1677,7 +1677,6 @@ validDerivPred tv_set pred
        IrredPred {}   -> True   -- Accept (f a)
        EqPred {}      -> False  -- Reject equality constraints
        ForAllPred {}  -> False  -- Rejects quantified predicates
-       SpecialPred {} -> False  -- Rejects special predicates
 
 {-
 ************************************************************************
@@ -1814,10 +1813,6 @@ checkInstTermination theta head_pred
            -> check (foralld_tvs `extendVarSetList` tvs) head_pred'
               -- Termination of the quantified predicate itself is checked
               -- when the predicates are individually checked for validity
-         SpecialPred {} ->
-           pprPanic "checkInstTermination: unexpected special constraint" $
-             vcat [ text "pred:" <+> ppr pred
-                  , text "theta:" <+> ppr theta ]
 
    check2 foralld_tvs pred pred_size
      | not (null bad_tvs)     = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $

@@ -124,9 +124,6 @@ canonicalize (CEqCan { cc_ev     = ev
   = {-# SCC "canEqLeafTyVarEq" #-}
     canEqNC ev eq_rel (canEqLHSType lhs) rhs
 
-canonicalize (CSpecialCan { cc_ev = ev, cc_special_pred = special_pred })
-  = canSpecial ev special_pred
-
 canNC :: CtEvidence -> TcS (StopOrContinue Ct)
 canNC ev =
   case classifyPredType pred of
@@ -138,8 +135,6 @@ canNC ev =
                                   canIrred ev
       ForAllPred tvs th p   -> do traceTcS "canEvNC:forall" (ppr pred)
                                   canForAllNC ev tvs th p
-      SpecialPred spec      -> do traceTcS "canEvNC:special" (ppr pred)
-                                  canSpecial ev spec
 
   where
     pred = ctEvPred ev
@@ -750,9 +745,6 @@ canIrred ev
                                     -- in with a polytype. This is #18987.
                                     do traceTcS "canEvNC:forall" (ppr pred)
                                        canForAllNC ev tvs th p
-           SpecialPred {}        -> -- IrredPreds have kind Constraint, so cannot
-                                    -- become SpecialPreds
-                                    pprPanic "canIrred: SpecialPred" (ppr ev)
            IrredPred {}          -> continueWith $
                                     mkIrredCt IrredShapeReason new_ev } }
 
@@ -923,47 +915,7 @@ we just add it to TcS's local InstEnv of known instances,
 via addInertForall.  Then, if we look up (C x Int Bool), say,
 we'll find a match in the InstEnv.
 
-
 ************************************************************************
-*                                                                      *
-*                       Special predicates
-*                                                                      *
-********************************************************************* -}
-
--- | Canonicalise a 'SpecialPred' constraint.
-canSpecial :: CtEvidence -> SpecialPred -> TcS (StopOrContinue Ct)
-canSpecial ev special_pred =
-  case special_pred of
-    IsReflPrimPred lhs rhs ->
-      canIsReflPrim ev lhs rhs
-
--- | Canonicalise a 'IsRefl#' constraint: zonk the lhs and rhs,
--- and solve it if they are equal.
---
--- See Note [IsRefl#] in GHC.Tc.Utils.Concrete.
---
--- Important: we never rewrite the arguments to an 'IsRefl#' constraint
--- (we only zonk them), as rewriting would defeat the whole purpose of the constraint!
-canIsReflPrim :: CtEvidence -> TcType -> TcType -> TcS (StopOrContinue Ct)
-canIsReflPrim ev lhs rhs
-  = do { -- IsRefl# constraints should never appear in Givens.
-       ; massertPpr (not $ isGivenOrigin $ ctEvOrigin ev)
-           (text "canIsReflPrim: Given IsRefl# constraint" $$ ppr ev)
-       ; lhs <- zonkTcType lhs
-       ; rhs <- zonkTcType rhs
-       ; if lhs `tcEqType` rhs
-         then stopWith ev "Solved IsRefl#"
-         else
-    do { let new_pty  = mkIsReflPrimPred lhs rhs
-             new_ev   = setCtEvPredType ev new_pty
-             new_ct   = CSpecialCan { cc_ev = new_ev
-                                    , cc_special_pred = IsReflPrimPred lhs rhs }
-       ; traceTcS "canIsReflPrim continueWith" $
-           vcat [ text "new_ev =" <+> ppr new_ev
-                , text "lhs =" <+> ppr lhs, text "rhs =" <+> ppr rhs ]
-       ; continueWith new_ct }}
-
-{-**********************************************************************
 *                                                                      *
 *        Equalities
 *                                                                      *

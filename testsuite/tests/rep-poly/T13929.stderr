@@ -1,32 +1,28 @@
 
 T13929.hs:29:24: error:
-    • • The tuple argument in first position
-        does not have a fixed runtime representation.
-        Its type is:
-          GUnboxed f rf :: TYPE rf
-      • The tuple argument in second position
-        does not have a fixed runtime representation.
-        Its type is:
-          GUnboxed g rg :: TYPE rg
+    • The tuple argument in first position
+      does not have a fixed runtime representation.
+      Its type is:
+        a0 :: TYPE c1
+      Cannot unify ‘rf’ with the type variable ‘c1’
+      because it is not a concrete ‘RuntimeRep’.
     • In the expression: (# gunbox x, gunbox y #)
       In an equation for ‘gunbox’:
           gunbox (x :*: y) = (# gunbox x, gunbox y #)
       In the instance declaration for
         ‘GUnbox (f :*: g) ('TupleRep '[rf, rg])’
-
-T13929.hs:33:21: error:
-    • The unboxed sum does not have a fixed runtime representation.
-      Its type is:
-        GUnboxed (f :+: g) ('SumRep '[rf, rg]) :: TYPE ('SumRep '[rf, rg])
-    • In the expression: (# gunbox l | #)
-      In an equation for ‘gunbox’: gunbox (L1 l) = (# gunbox l | #)
-      In the instance declaration for
-        ‘GUnbox (f :+: g) ('SumRep '[rf, rg])’
+    • Relevant bindings include
+        x :: f p (bound at T13929.hs:29:13)
+        gunbox :: (:*:) f g p -> GUnboxed (f :*: g) ('TupleRep '[rf, rg])
+          (bound at T13929.hs:29:5)
 
 T13929.hs:34:21: error:
-    • The unboxed sum does not have a fixed runtime representation.
-      Its type is:
-        GUnboxed (f :+: g) ('SumRep '[rf, rg]) :: TYPE ('SumRep '[rf, rg])
+    • • The unboxed sum does not have a fixed runtime representation.
+        Its type is:
+          GUnboxed (f :+: g) ('SumRep '[rf, rg]) :: TYPE ('SumRep '[rf, rg])
+      • The unboxed sum does not have a fixed runtime representation.
+        Its type is:
+          GUnboxed (f :+: g) ('SumRep '[rf, rg]) :: TYPE ('SumRep '[rf, rg])
     • In the expression: (# | gunbox r #)
       In an equation for ‘gunbox’: gunbox (R1 r) = (# | gunbox r #)
       In the instance declaration for

@@ -1,6 +1,7 @@
 
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -22,14 +23,14 @@
 module GHC.Tc.Utils.TcType (
   --------------------------------
   -- Types
-  TcType, TcSigmaType, TcSigmaTypeFRR,
+  TcType, TcSigmaType, TcTypeFRR, TcSigmaTypeFRR,
   TcRhoType, TcTauType, TcPredType, TcThetaType,
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
   TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcInvisTVBinder, TcReqTVBinder,
   TcTyCon, MonoTcTyCon, PolyTcTyCon, TcTyConBinder, KnotTied,
 
   ExpType(..), InferResult(..),
-  ExpSigmaType, ExpSigmaTypeFRR,
+  ExpTypeFRR, ExpSigmaType, ExpSigmaTypeFRR,
   ExpRhoType,
   mkCheckExpType,
 
@@ -45,7 +46,8 @@ module GHC.Tc.Utils.TcType (
   MetaDetails(Flexi, Indirect), MetaInfo(..), skolemSkolInfo,
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
-  isConcreteTyVar,
+  ConcreteTvOrigin(..), isConcreteTyVar_maybe, isConcreteTyVar,
+  isConcreteTyVarTy, isConcreteTyVarTy_maybe,
   isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
@@ -216,6 +218,10 @@ import GHC.Core.Predicate
 import GHC.Types.RepType
 import GHC.Core.TyCon
 
+import {-# SOURCE #-} GHC.Tc.Types.Origin
+  ( SkolemInfo, unkSkol
+  , FixedRuntimeRepOrigin, FixedRuntimeRepContext )
+
 -- others:
 import GHC.Driver.Session
 import GHC.Core.FVs
@@ -240,7 +246,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
 import Data.List ( partition )
-import {-# SOURCE #-} GHC.Tc.Types.Origin ( unkSkol, SkolemInfo )
 
 
 {-
@@ -346,6 +351,11 @@ type TcCoVar = CoVar    -- Used only during type inference
 type TcType = Type      -- A TcType can have mutable type variables
 type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
 
+-- | A type which has a syntactically fixed RuntimeRep as per
+-- Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+type TcTypeFRR = TcType
+  -- TODO: consider making this a newtype.
+
 type TcTyVarBinder     = TyVarBinder
 type TcInvisTVBinder   = InvisTVBinder
 type TcReqTVBinder     = ReqTVBinder
@@ -361,8 +371,9 @@ type TcPredType     = PredType
 type TcThetaType    = ThetaType
 type TcSigmaType    = TcType
 
--- | A 'TcSigmaTypeFRR' is a 'TcSigmaType' which has a fixed 'RuntimeRep'
--- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+-- | A 'TcSigmaTypeFRR' is a 'TcSigmaType' which has a syntactically
+--  fixed 'RuntimeRep' in the sense of Note [Fixed RuntimeRep]
+-- in GHC.Tc.Utils.Concrete.
 --
 -- In particular, this means that:
 --
@@ -373,6 +384,8 @@ type TcSigmaType    = TcType
 -- we want to provide argument types which have a known runtime representation.
 -- See Note [Return arguments with a fixed RuntimeRep.
 type TcSigmaTypeFRR = TcSigmaType
+    -- TODO: consider making this a newtype.
+
 type TcRhoType      = TcType  -- Note [TcRhoType]
 type TcTauType      = TcType
 type TcKind         = Kind
@@ -438,17 +451,38 @@ data ExpType = Check TcType
              | Infer !InferResult
 
 data InferResult
-  = IR { ir_uniq :: Unique  -- For debugging only
+  = IR { ir_uniq :: Unique
+          -- ^ This 'Unique' is for debugging only
 
-       , ir_lvl  :: TcLevel -- See Note [TcLevel of ExpType] in GHC.Tc.Utils.TcMType
+       , ir_lvl  :: TcLevel
+         -- ^ See Note [TcLevel of ExpType] in GHC.Tc.Utils.TcMType
+
+       , ir_frr  :: Maybe FixedRuntimeRepContext
+         -- ^ See Note [FixedRuntimeRep context in ExpType] in GHC.Tc.Utils.TcMType
 
        , ir_ref  :: IORef (Maybe TcType) }
-         -- The type that fills in this hole should be a Type,
-         -- that is, its kind should be (TYPE rr) for some rr
+         -- ^ The type that fills in this hole should be a @Type@,
+         -- that is, its kind should be @TYPE rr@ for some @rr :: RuntimeRep@.
+         --
+         -- Additionally, if the 'ir_frr' field is @Just frr_orig@ then
+         -- @rr@ must be concrete, in the sense of Note [Concrete types]
+         -- in GHC.Tc.Utils.Concrete.
 
 type ExpSigmaType    = ExpType
+
+-- | An 'ExpType' which has a fixed RuntimeRep.
+--
+-- For a 'Check' 'ExpType', the stored 'TcType' must have
+-- a fixed RuntimeRep. For an 'Infer' 'ExpType', the 'ir_frr'
+-- field must be of the form @Just frr_orig@.
+type ExpTypeFRR      = ExpType
+
 -- | Like 'TcSigmaTypeFRR', but for an expected type.
-type ExpSigmaTypeFRR = ExpType
+--
+-- See 'ExpTypeFRR'.
+type ExpSigmaTypeFRR = ExpTypeFRR
+  -- TODO: consider making this a newtype.
+
 type ExpRhoType      = ExpType
 
 instance Outputable ExpType where
@@ -456,8 +490,12 @@ instance Outputable ExpType where
   ppr (Infer ir) = ppr ir
 
 instance Outputable InferResult where
-  ppr (IR { ir_uniq = u, ir_lvl = lvl })
-    = text "Infer" <> braces (ppr u <> comma <> ppr lvl)
+  ppr (IR { ir_uniq = u, ir_lvl = lvl, ir_frr = mb_frr })
+    = text "Infer" <> mb_frr_text <> braces (ppr u <> comma <> ppr lvl)
+    where
+      mb_frr_text = case mb_frr of
+        Just _  -> text "FRR"
+        Nothing -> empty
 
 -- | Make an 'ExpType' suitable for checking.
 mkCheckExpType :: TcType -> ExpType
@@ -587,6 +625,8 @@ data MetaDetails
   = Flexi  -- Flexi type variables unify to become Indirects
   | Indirect TcType
 
+-- | What restrictions are on this metavariable around unification?
+-- These are checked in GHC.Tc.Utils.Unify.startSolvingByUnification.
 data MetaInfo
    = TauTv         -- ^ This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
@@ -603,22 +643,32 @@ data MetaInfo
                      -- See Note [Type variable cycles] in
                      -- GHC.Tc.Solver.Canonical
 
-   | ConcreteTv
+   | ConcreteTv ConcreteTvOrigin
         -- ^ A unification variable that can only be unified
         -- with a concrete type, in the sense of
         -- Note [Concrete types] in GHC.Tc.Utils.Concrete.
         -- See Note [ConcreteTv] in GHC.Tc.Utils.Concrete.
+        -- See also Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete
+        -- for an overview of how this works in context.
 
 instance Outputable MetaDetails where
   ppr Flexi         = text "Flexi"
   ppr (Indirect ty) = text "Indirect" <+> ppr ty
 
 instance Outputable MetaInfo where
-  ppr TauTv          = text "tau"
-  ppr TyVarTv        = text "tyv"
-  ppr RuntimeUnkTv   = text "rutv"
-  ppr CycleBreakerTv = text "cbv"
-  ppr ConcreteTv     = text "conc"
+  ppr TauTv           = text "tau"
+  ppr TyVarTv         = text "tyv"
+  ppr RuntimeUnkTv    = text "rutv"
+  ppr CycleBreakerTv  = text "cbv"
+  ppr (ConcreteTv {}) = text "conc"
+
+-- | What caused us to create a 'ConcreteTv' metavariable?
+-- See Note [ConcreteTv] in GHC.Tc.Utils.Concrete.
+data ConcreteTvOrigin
+   -- | A 'ConcreteTv' used to enforce the representation-polymorphism invariants.
+   --
+   -- See 'FixedRuntimeRepOrigin' for more information.
+  = ConcreteFRR FixedRuntimeRepOrigin
 
 {- *********************************************************************
 *                                                                      *
@@ -1091,7 +1141,7 @@ isMetaTyVar tv
 
 -- isAmbiguousTyVar is used only when reporting type errors
 -- It picks out variables that are unbound, namely meta
--- type variables and the RuntimUnk variables created by
+-- type variables and the RuntimeUnk variables created by
 -- GHC.Runtime.Heap.Inspect.zonkRTTIType.  These are "ambiguous" in
 -- the sense that they stand for an as-yet-unknown type
 isAmbiguousTyVar tv
@@ -1113,14 +1163,31 @@ isCycleBreakerTyVar tv
 -- | Is this type variable a concrete type variable, i.e.
 -- it is a metavariable with 'ConcreteTv' 'MetaInfo'?
 --
--- Works with both 'TyVar' and 'TcTyVar'.
-isConcreteTyVar :: TcTyVar -> Bool
-isConcreteTyVar tv
+-- Returns the 'ConcreteTvOrigin' stored in the type variable
+-- if so, or 'Nothing' otherwise.
+isConcreteTyVar_maybe :: TcTyVar -> Maybe ConcreteTvOrigin
+isConcreteTyVar_maybe tv
   | isTcTyVar tv
-  , MetaTv { mtv_info = ConcreteTv } <- tcTyVarDetails tv
-  = True
+  , MetaTv { mtv_info = ConcreteTv conc_orig } <- tcTyVarDetails tv
+  = Just conc_orig
   | otherwise
-  = False
+  = Nothing
+
+-- | Is this type variable a concrete type variable, i.e.
+-- it is a metavariable with 'ConcreteTv' 'MetaInfo'?
+isConcreteTyVar :: TcTyVar -> Bool
+isConcreteTyVar = isJust . isConcreteTyVar_maybe
+
+-- | Is this type concrete type variable, i.e.
+-- a metavariable with 'ConcreteTv' 'MetaInfo'?
+isConcreteTyVarTy :: TcType -> Bool
+isConcreteTyVarTy = isJust . isConcreteTyVarTy_maybe
+
+-- | Is this type a concrete type variable? If so, return
+-- the associated 'TcTyVar' and 'ConcreteTvOrigin'.
+isConcreteTyVarTy_maybe :: TcType -> Maybe (TcTyVar, ConcreteTvOrigin)
+isConcreteTyVarTy_maybe (TyVarTy tv) = (tv, ) <$> isConcreteTyVar_maybe tv
+isConcreteTyVarTy_maybe _            = Nothing
 
 isMetaTyVarTy :: TcType -> Bool
 isMetaTyVarTy (TyVarTy tv) = isMetaTyVar tv
@@ -1933,9 +2000,6 @@ isImprovementPred ty
       ClassPred cls _    -> classHasFds cls
       IrredPred {}       -> True -- Might have equalities after reduction?
       ForAllPred {}      -> False
-      SpecialPred s      ->
-        case s of
-          IsReflPrimPred {} -> False
 
 {- Note [Expanding superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2067,7 +2131,6 @@ isRigidTy ty
   | Just {} <- tcSplitAppTy_maybe ty        = True
   | isForAllTy ty                           = True
   | otherwise                               = False
-
 
 {-
 ************************************************************************

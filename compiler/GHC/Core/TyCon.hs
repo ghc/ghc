@@ -1033,7 +1033,7 @@ Note [Representation-polymorphic TyCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To check for representation-polymorphism directly in the typechecker,
 e.g. when using GHC.Tc.Utils.TcMType.checkTypeHasFixedRuntimeRep,
-we need to compute whether a type has a fixed RuntimeRep,
+we need to compute whether a type has a syntactically fixed RuntimeRep,
 as per Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 
 It's useful to have a quick way to check whether a saturated application
@@ -2444,7 +2444,7 @@ setTcTyConKind tc@(TcTyCon {}) kind = let tc' = tc { tyConKind = kind
                                       in tc'
 setTcTyConKind tc              _    = pprPanic "setTcTyConKind" (ppr tc)
 
--- | Does this 'TyCon' have a fixed RuntimeRep when fully applied,
+-- | Does this 'TyCon' have a syntactically fixed RuntimeRep when fully applied,
 -- as per Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete?
 --
 -- False is safe. True means we're sure.

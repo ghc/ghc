@@ -37,6 +37,7 @@ module GHC.Tc.Errors.Types (
   , MissingSignature(..)
   , Exported(..)
   , HsDocContext(..)
+  , FixedRuntimeRepErrorInfo(..)
 
   , ErrorItem(..), errorItemOrigin, errorItemEqRel, errorItemPred, errorItemCtLoc
 
@@ -45,7 +46,6 @@ module GHC.Tc.Errors.Types (
   , SolverReportErrCtxt(..)
   , getUserGivens, discardProvCtxtGivens
   , TcSolverReportMsg(..), TcSolverReportInfo(..)
-  , FixedRuntimeRepErrorInfo(..)
   , CND_Extra(..)
   , mkTcReportWithInfo
   , FitsMbSuppressed(..)
@@ -69,7 +69,9 @@ import {-# SOURCE #-} GHC.Tc.Types (TcIdSigInfo)
 import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes (HoleFit)
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence (EvBindsVar)
-import GHC.Tc.Types.Origin (CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol), UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing, FRROrigin)
+import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
+                           , UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing
+                           , FixedRuntimeRepOrigin(..) )
 import GHC.Tc.Types.Rank (Rank)
 import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType)
 import GHC.Types.Error
@@ -2380,10 +2382,9 @@ data TcSolverReportMsg
       }
     -- TODO: combine 'Mismatch' and 'TypeEqMismatch' messages.
 
-   -- | A violation of the representation-polymorphism invariants,
-   -- i.e. an unsolved `Concrete# ty` constraint.
+   -- | A violation of the representation-polymorphism invariants.
    --
-   -- See 'FRROrigin' for more information.
+   -- See 'FixedRuntimeRepErrorInfo' and 'FixedRuntimeRepContext' for more information.
   | FixedRuntimeRepError [FixedRuntimeRepErrorInfo]
 
   -- | A skolem type variable escapes its scope.
@@ -2490,20 +2491,6 @@ data TcSolverReportMsg
     { unsafeOverlap_item    :: ErrorItem
     , unsafeOverlap_matches :: [ClsInst]
     , unsafeOverlapped      :: [ClsInst] }
-
--- | Stores the information we have when performing a
--- representation-polymorphism check.
-data FixedRuntimeRepErrorInfo
-  = FixedRuntimeRepErrorInfo
-    { frrInfo_origin     :: !FRROrigin
-        -- ^ Context for the representation-polymorphism check.
-    , frrInfo_type       :: !Type
-       -- ^ The type which we are insisting must have a fixed runtime representation.
-    , frrInfo_isReflPrim :: !Bool }
-        -- ^ Was this check due to 'IsRefl#', i.e. it's a PHASE 1 check?
-        --
-        -- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete.
-
 
 -- | Additional information to be given in a 'CouldNotDeduce' message,
 -- which is then passed on to 'mk_supplementary_ea_msg'.
@@ -2723,6 +2710,18 @@ discardMsg :: SDoc
 discardMsg = text "(Some bindings suppressed;" <+>
              text "use -fmax-relevant-binds=N or -fno-max-relevant-binds)"
 
+-- | Stores the information to be reported in a representation-polymorphism
+-- error message.
+data FixedRuntimeRepErrorInfo
+  = FRR_Info
+  { frr_info_origin       :: FixedRuntimeRepOrigin
+      -- ^ What is the original type we checked for
+      -- representation-polymorphism, and what specific
+      -- check did we perform?
+  , frr_info_not_concrete :: Maybe (TcTyVar, TcType)
+      -- ^ Which non-concrete type did we try to
+      -- unify this concrete type variable with?
+  }
 
 {-
 ************************************************************************

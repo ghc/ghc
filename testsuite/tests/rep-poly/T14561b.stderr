@@ -4,6 +4,10 @@ T14561b.hs:12:9: error:
       The first argument of ‘coerce’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE r
+        a0 :: TYPE c0
+      Cannot unify ‘r’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
     • In the expression: coerce
       In an equation for ‘badId’: badId = coerce
+    • Relevant bindings include
+        badId :: a -> a (bound at T14561b.hs:12:1)
