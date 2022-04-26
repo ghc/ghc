@@ -64,6 +64,7 @@ Now, hack on your copy and rebuild (with `make`) as necessary.
 Then start by making your commits however you want. When you're done, you can submit
 a pull request on Github for small changes. For larger changes the patch needs to be
 submitted to [GitLab](https://gitlab.haskell.org/ghc/ghc/merge_requests) for code review.
+Changes to the `base` library require a proposal to the [core libraries committee](https://github.com/haskell/core-libraries-committee/issues).
 The GHC Wiki has a good summary for the [overall process](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs). One or several reviewers will review your PR, and when they are ok with your changes, they will assign the PR to [Marge Bot](https://gitlab.haskell.org/marge-bot) which will automatically rebase, batch and then merge your PR (assuming the build passes).
 
 
