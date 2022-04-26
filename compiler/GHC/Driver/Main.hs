@@ -1747,8 +1747,8 @@ hscInteractive hsc_env cgguts location = do
 
 ------------------------------
 
-hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> IO (Maybe FilePath)
-hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
+hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)
+hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hsc_env $ do
     let dflags   = hsc_dflags hsc_env
         logger   = hsc_logger hsc_env
         hooks    = hsc_hooks hsc_env
@@ -1759,7 +1759,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
         do_info_table = gopt Opt_InfoTableMap dflags
         -- Make up a module name to give the NCG. We can't pass bottom here
         -- lest we reproduce #11784.
-        mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
+        mod_name = mkModuleName $ "Cmm$" ++ original_filename
         cmm_mod = mkHomeModule home_unit mod_name
     (cmm, ents) <- ioMsgMaybe
                $ do

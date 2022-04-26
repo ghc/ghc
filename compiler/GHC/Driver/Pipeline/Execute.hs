@@ -128,7 +128,7 @@ runPhase (T_Cmm pipe_env hsc_env input_fn) = do
   let dflags = hsc_dflags hsc_env
   let next_phase = hscPostBackendPhase HsSrcFile (backend dflags)
   output_fn <- phaseOutputFilenameNew next_phase pipe_env hsc_env Nothing
-  mstub <- hscCompileCmmFile hsc_env input_fn output_fn
+  mstub <- hscCompileCmmFile hsc_env (src_filename pipe_env) input_fn output_fn
   stub_o <- mapM (compileStub hsc_env) mstub
   let foreign_os = maybeToList stub_o
   return (foreign_os, output_fn)
