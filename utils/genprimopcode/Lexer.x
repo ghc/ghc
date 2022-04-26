@@ -77,4 +77,3 @@ get_tok = ParserM $ \i st ->
 lex_tok :: (Token -> ParserM a) -> ParserM a
 lex_tok cont = get_tok >>= cont
 }
-

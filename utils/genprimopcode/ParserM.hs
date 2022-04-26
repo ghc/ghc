@@ -1,6 +1,8 @@
+{-# LANGUAGE BinaryLiterals #-}
+
 module ParserM (
     -- Parser Monad
-    ParserM(..), AlexInput, run_parser,
+    ParserM(..), AlexInput(..), run_parser,
     -- Parser state
     St,
     StartCode, start_code, set_start_code,
@@ -12,7 +14,7 @@ module ParserM (
     -- Positions
     get_pos, show_pos,
     -- Input
-    alexGetChar, alexGetByte, alexInputPrevChar, input, position,
+    alexGetByte, alexInputPrevChar,
     -- Other
     happyError
  ) where
@@ -23,8 +25,9 @@ import Prelude hiding (fail)
 import Control.Monad.Fail (MonadFail (..))
 
 import Control.Monad (ap, liftM)
-import Data.Word (Word8)
+import Data.Bits ((.&.), (.|.), shiftR)
 import Data.Char (ord)
+import Data.Word (Word8)
 
 -- Parser Monad
 newtype ParserM a = ParserM (AlexInput -> St -> Either String (AlexInput, St, a))
@@ -49,7 +52,7 @@ instance MonadFail ParserM where
 
 run_parser :: ParserM a -> (String -> Either String a)
 run_parser (ParserM f)
- = \s -> case f (AlexInput init_pos s) init_state of
+ = \s -> case f (AlexInput init_pos [] s) init_state of
              Left es -> Left es
              Right (_, _, x) -> Right x
 
@@ -144,7 +147,7 @@ mkTv f str = ParserM (\i st -> Right (i, st, f str))
 data Pos = Pos !Int{- Line -} !Int{- Column -}
 
 get_pos :: ParserM Pos
-get_pos = ParserM $ \i@(AlexInput p _) st -> Right (i, st, p)
+get_pos = ParserM $ \i@(AlexInput p _ _) st -> Right (i, st, p)
 
 alexMove :: Pos -> Char -> Pos
 alexMove (Pos l _) '\n' = Pos (l+1) 1
@@ -152,25 +155,40 @@ alexMove (Pos l c) '\t' = Pos l ((c+8) `div` 8 * 8)
 alexMove (Pos l c) _    = Pos l (c+1)
 
 init_pos :: Pos
-init_pos = Pos 1 1
+init_pos = Pos 1 0
 
 show_pos :: Pos -> String
 show_pos (Pos l c) = "line " ++ show l ++ ", column " ++ show c
 
 -- Input
 
-data AlexInput = AlexInput {position :: !Pos, input :: String}
+data AlexInput = AlexInput
+  { position :: !Pos
+  , char_bytes :: [Word8]
+  , input :: String
+  }
 
--- alexGetByte is for Alex >= 3.0, alexGetChar for earlier
--- XXX no UTF-8; we should do this properly sometime
-alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
-alexGetByte (AlexInput p (x:xs)) = Just (fromIntegral (ord x),
-                                         AlexInput (alexMove p x) xs)
-alexGetByte (AlexInput _ []) = Nothing
+alexGetByte :: AlexInput -> Maybe (Word8, AlexInput)
+alexGetByte (AlexInput p (w:ws) cs)
+  = Just (w, AlexInput p ws cs)
+alexGetByte (AlexInput p [] (c:cs))
+  = alexGetByte (AlexInput (alexMove p c) (utf8_encode c) cs)
+alexGetByte (AlexInput _ [] [])
+  = Nothing
 
-alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
-alexGetChar (AlexInput p (x:xs)) = Just (x, AlexInput (alexMove p x) xs)
-alexGetChar (AlexInput _ []) = Nothing
+-- annoyingly, this doesn't seem to exist anywhere else as a standalone function
+utf8_encode :: Char -> [Word8]
+utf8_encode c = case ord c of
+  n | n < 0x80    -> [ fromIntegral n ]
+    | n < 0x800   -> [ fromIntegral $ 0b11000000 .|. (n `shiftR` 6)
+                     , fromIntegral $ 0b10000000 .|. (n .&. 0b111111) ]
+    | n < 0x10000 -> [ fromIntegral $ 0b11100000 .|. (n `shiftR` 12)
+                     , fromIntegral $ 0b10000000 .|. ((n `shiftR` 6) .&. 0b111111)
+                     , fromIntegral $ 0b10000000 .|. (n .&. 0b111111) ]
+    | otherwise   -> [ fromIntegral $ 0b11110000 .|. (n `shiftR` 18)
+                     , fromIntegral $ 0b10000000 .|. ((n `shiftR` 12) .&. 0b111111)
+                     , fromIntegral $ 0b10000000 .|. ((n `shiftR` 6) .&. 0b111111)
+                     , fromIntegral $ 0b10000000 .|. (n .&. 0b111111) ]
 
 alexInputPrevChar :: AlexInput -> Char
 alexInputPrevChar _ = error "Lexer doesn't implement alexInputPrevChar"
@@ -178,4 +196,3 @@ alexInputPrevChar _ = error "Lexer doesn't implement alexInputPrevChar"
 happyError :: ParserM a
 happyError = do p <- get_pos
                 fail $ "Parse error at " ++ show_pos p
-

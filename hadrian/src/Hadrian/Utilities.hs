@@ -18,7 +18,7 @@ module Hadrian.Utilities (
     -- * File system operations
     copyFile, copyFileUntracked, createFileLink, fixFile,
     makeExecutable, moveFile, removeFile, createDirectory, copyDirectory,
-    moveDirectory, removeDirectory, removeFile_,
+    moveDirectory, removeDirectory, removeFile_, writeFileChangedBS,
 
     -- * Diagnostic info
     Colour (..), ANSIColour (..), putColoured, shouldUseColor,
@@ -49,6 +49,7 @@ import Development.Shake.Classes
 import Development.Shake.FilePath
 import System.Environment (lookupEnv)
 
+import qualified Data.ByteString        as BS
 import qualified Control.Exception.Base as IO
 import qualified Data.HashMap.Strict    as Map
 import qualified System.Directory.Extra as IO
@@ -393,6 +394,25 @@ removeDirectory :: FilePath -> Action ()
 removeDirectory dir = do
     putProgressInfo $ "| Remove directory " ++ dir
     liftIO . whenM (IO.doesDirectoryExist dir) $ IO.removeDirectoryRecursive dir
+
+-- | Like Shake's 'writeFileChanged', but accepts a 'ByteString'.
+writeFileChangedBS :: FilePath -> BS.ByteString -> Action ()
+writeFileChangedBS name new = do
+    liftIO $ IO.createDirectoryIfMissing True $ takeDirectory name
+    exists <- liftIO $ IO.doesFileExist name
+    if exists
+      then do
+        old <- liftIO $ BS.readFile name
+        when (old /= new) $ do
+          liftIO $ removeFile_ name
+          do_write
+      else
+        do_write
+  where
+    do_write = do
+      putProgressInfo $ "| Write file " ++ name
+      liftIO $ BS.writeFile name new
+
 
 -- | Terminal output colours
 data Colour

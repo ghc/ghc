@@ -307,7 +307,8 @@ instance H.Builder Builder where
                 -- Capture stdout and write it to the output file.
                 captureStdout = do
                     Stdout stdout <- cmd' [path] buildArgs
-                    writeFileChanged output stdout
+                    -- see Note [Capture stdout as a ByteString]
+                    writeFileChangedBS output stdout
             case builder of
                 Ar Pack _ -> do
                     useTempFile <- flag ArSupportsAtFile
@@ -332,7 +333,8 @@ instance H.Builder Builder where
                 GenPrimopCode -> do
                     stdin <- readFile' input
                     Stdout stdout <- cmd' (Stdin stdin) [path] buildArgs
-                    writeFileChanged output stdout
+                    -- see Note [Capture stdout as a ByteString]
+                    writeFileChangedBS output stdout
 
                 GhcPkg Copy _ -> do
                     Stdout pkgDesc <- cmd' [path]
@@ -509,6 +511,19 @@ applyPatch dir patch = do
 --  tell if an Exit or ExitCode value is returned in `r`. So we use our own
 --  HasExit type class to provide the `hasExit` predicate that tells us if we
 --  should throw an exception as `cmd` would do in case of failure or not.
+--
+-- Note [Capture stdout as a ByteString]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- As of shake-0.19.6, capturing a process stdout as a `String` using `Stdout`
+-- mangles the encoding if it some other use of `Stdout` also captures it as a
+-- `ByteString`; see <https://github.com/ndmitchell/shake/issues/828>. This
+-- can cause us real problems, since `cmd'` (see Note [cmd wrapper]) *always*
+-- captures stdout as a `ByteString`.
+--
+-- Fortunately, a simple workaround is to avoid capturing stdout as a `String`
+-- in the first place. It’s usually unnecessary (and is in fact pointless work),
+-- as most of the time the captured output is immediately written to a file, so
+-- we can just treat it as an opaque binary stream.
 
 
 -- | Wrapper for Shake's 'cmd'
