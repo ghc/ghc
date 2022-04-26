@@ -1684,22 +1684,61 @@ primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Byte Arrays"
-        {Operations on {\tt ByteArray\#}. A {\tt ByteArray\#} is a just a region of
+        {A {\tt ByteArray\#} is a region of
          raw memory in the garbage-collected heap, which is not
-         scanned for pointers. It carries its own size (in bytes).
-         There are
-         three sets of operations for accessing byte array contents:
+         scanned for pointers. 
+         There are three sets of operations for accessing byte array contents:
          index for reading from immutable byte arrays, and read/write
          for mutable byte arrays.  Each set contains operations for a
          range of useful primitive data types.  Each operation takes
          an offset measured in terms of the size of the primitive type
-         being read or written.}
+         being read or written.
+
+         }
 
 ------------------------------------------------------------------------
 
 primtype ByteArray#
+{
+  A boxed, unlifted datatype representing a region of raw memory in the garbage-collected heap,
+  which is not scanned for pointers during garbage collection.
+
+  It is created by freezing a 'MutableByteArray#' with 'unsafeFreezeByteArray#'.
+  Freezing is essentially a no-op, as MutableByteArray# and ByteArray# share the same heap structure under the hood.
+
+  The immutable and mutable variants are commonly used for scenarios requiring high-performance data structures,
+  like Text, Primitive Vector, Unboxed Array, and ShortByteString.
+ 
+  Another application of fundamental importance is 'Integer', which is backed by 'ByteArray#'.
+ 
+  The representation on the heap of a Byte Array is:
+ 
+  > +------------+-----------------+-----------------------+
+  > |            |                 |                       |
+  > |   HEADER   | SIZE (in bytes) |       PAYLOAD         |
+  > |            |                 |                       |
+  > +------------+-----------------+-----------------------+
+ 
+  To obtain a pointer to actual payload (e.g., for FFI purposes) use 'byteArrayContents#' or 'mutableByteArrayContents#'.
+ 
+  Alternatively, enabling the UnliftedFFITypes extension
+  allows to mention 'ByteArray#' and 'MutableByteArray#' in FFI type signatures directly.
+}
 
 primtype MutableByteArray# s
+{ A mutable ByteAray#. It can be created in three ways:
+
+  * 'newByteArray#': Create an unpinned array.
+  * 'newPinnedByteArray#': This will create a pinned array,
+  * 'newAlignedPinnedByteArray#': This will create a pinned array, with a custom alignment.
+
+  Unpinned arrays can be moved around during garbage collection, so you must not store or pass pointers to these values
+  if there is a chance for the garbage collector to kick in. That said, even unpinned arrays can be passed to unsafe FFI calls,
+  because no garbage collection happens during these unsafe calls
+  (see [Guaranteed Call Safety](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/ffi.html#guaranteed-call-safety)
+  in the GHC Manual). For safe FFI calls, byte arrays must be not only pinned, but also kept alive by means of the keepAlive# function
+  for the duration of a call (that's because garbage collection cannot move a pinned array, but is free to scrap it altogether).
+}
 
 primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
    Int# -> State# s -> (# State# s, MutableByteArray# s #)
