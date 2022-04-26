@@ -38,11 +38,16 @@ newForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
 --
 -- ^Turns a plain memory reference into a foreign object by
 -- associating a finalizer - given by the monadic operation - with the
--- reference.  The storage manager will start the finalizer, in a
--- separate thread, some time after the last reference to the
--- 'ForeignPtr' is dropped.  There is no guarantee of promptness, and
+-- reference.
+--
+-- When finalization is triggered by GC, the storage manager will start the
+-- finalizer, in a separate thread, some time after the last reference to the
+-- @ForeignPtr@ is dropped.  There is __no guarantee of promptness__, and
 -- in fact there is no guarantee that the finalizer will eventually
--- run at all.
+-- run at all for GC-triggered finalization.
+--
+-- When finalization is triggered by explicitly calling @finalizeForeignPtr@,
+-- the finalizer will run immediately on the current Haskell thread.
 --
 -- Note that references from a finalizer do not necessarily prevent
 -- another object from being finalized.  If A's finalizer refers to B
