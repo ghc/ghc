@@ -237,9 +237,10 @@ simplTopBinds env0 (binds0, g)
         ; let res_vars = M.elems env_m_vars
         ; (all_floats, all_envs) <- liftIO (unzip <$> mapM readMVar res_vars)
 
-        ;
+        ; pprTraceM "binds_0" (vcat (map ppr binds0))
+        ; pprTraceM "binds_0" (ppr all_floats)
 
---        ; old_res <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 (map snd binds0)
+        ; old_res <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 (map snd binds0)
         ; freeTick SimplifierDone
         ; let new_res = (foldl' unionFloats (emptyFloats env1) all_floats ,  combine_envs env1 all_envs)
 
@@ -1670,6 +1671,7 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
 
   | otherwise
   = do { (env1, bndr1) <- simplNonRecBndr env bndr
+       ; pprTraceM "simpl_binder" (ppr bndr $$ ppr bndr1)
 
        -- Deal with strict bindings
        -- See Note [Dark corner with levity polymorphism]
