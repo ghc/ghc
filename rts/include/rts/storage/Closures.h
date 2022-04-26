@@ -339,17 +339,28 @@ typedef struct _StgStableName {
 // Closure types: WEAK
 typedef struct _StgWeak {
   StgHeader header;
+
+  // C finalizers, see StgCFinalizerList below
+  //
+  // Points to stg_NO_FINALIZER_closure to indicate no c finalizers.
   StgClosure *cfinalizers;
+
   StgClosure *key;
-  StgClosure *value; // the actual value
+  StgClosure *value; // the actual value references by the weak reference
+
+  // Haskell finalizer (type IO ())
+  //
+  // Points to stg_NO_FINALIZER_closure to indicate no Haskell finalizer.
   StgClosure *finalizer;
+
   struct _StgWeak *link;
 } StgWeak;
 
 
 // Linked list of c function pointer finalisers for a weak reference
 //
-// See the addCFinalizerToWeak# primop where these are constructed.
+// See the addCFinalizerToWeak# primop where these are constructed and
+// runCFinalizers (C) where they are consumed.
 //
 // Closure type: CONSTR
 typedef struct _StgCFinalizerList {
