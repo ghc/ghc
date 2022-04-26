@@ -59,9 +59,7 @@ data PatSyn
         psName        :: Name,
         psUnique      :: Unique,       -- Cached from Name
 
-        psArgs        :: [Type],       -- ^ Argument types.
-                                       -- These always have a fixed RuntimeRep as per
-                                       -- Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+        psArgs        :: [FRRType],    -- ^ Argument types
         psArity       :: Arity,        -- == length psArgs
         psInfix       :: Bool,         -- True <=> declared infix
         psFieldLabels :: [FieldLabel], -- List of fields for a
@@ -382,9 +380,7 @@ mkPatSyn :: Name
                                          -- variables and required dicts
          -> ([InvisTVBinder], ThetaType) -- ^ Existentially-quantified type
                                          -- variables and provided dicts
-         -> [Type]               -- ^ Original arguments
-                                 -- These must have a fixed RuntimeRep as per
-                                 -- Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+         -> [FRRType]            -- ^ Original arguments
          -> Type                 -- ^ Original result type
          -> PatSynMatcher        -- ^ Matcher
          -> PatSynBuilder        -- ^ Builder

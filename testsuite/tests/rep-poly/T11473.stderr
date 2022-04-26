@@ -4,11 +4,3 @@ T11473.hs:19:1: error:
     does not have a fixed runtime representation.
     Its type is:
       a :: TYPE r
-
-T11473.hs:19:11: error:
-    • The argument ‘x’ of ‘boxed’
-      does not have a fixed runtime representation.
-      Its type is:
-        a :: TYPE r
-    • In the expression: boxed x
-      In an equation for ‘hello’: hello x = boxed x

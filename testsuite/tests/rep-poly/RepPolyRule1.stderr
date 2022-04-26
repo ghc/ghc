@@ -1,8 +1,25 @@
 
-RepPolyRule1.hs:11:49: error:
+RepPolyRule1.hs:11:51: error:
     • The argument ‘x’ of ‘f’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE rep
-    • In the expression: f x
+        a1 :: TYPE c0
+      Cannot unify ‘rep’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
+    • In the first argument of ‘f’, namely ‘x’
+      In the expression: f x
       When checking the rewrite rule "f_id"
+    • Relevant bindings include
+        x :: a2 (bound at RepPolyRule1.hs:11:26)
+
+RepPolyRule1.hs:11:55: error:
+    • The argument ‘x’ of ‘f’
+      does not have a fixed runtime representation.
+      Its type is:
+        a1 :: TYPE c0
+      Cannot unify ‘rep’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
+    • In the expression: x
+      When checking the rewrite rule "f_id"
+    • Relevant bindings include
+        x :: a2 (bound at RepPolyRule1.hs:11:26)

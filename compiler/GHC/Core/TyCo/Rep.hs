@@ -32,7 +32,7 @@ module GHC.Core.TyCo.Rep (
         KindOrType, Kind,
         RuntimeRepType,
         KnotTied,
-        PredType, ThetaType,      -- Synonyms
+        PredType, ThetaType, FRRType,     -- Synonyms
         ArgFlag(..), AnonArgFlag(..),
 
         -- * Coercions
@@ -115,6 +115,10 @@ type Kind = Type
 
 -- | Type synonym used for types of kind RuntimeRep.
 type RuntimeRepType = Type
+
+-- A type with a syntactically fixed RuntimeRep, in the sense
+-- of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+type FRRType = Type
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint

@@ -106,7 +106,7 @@ module GHC.Tc.Utils.Monad(
   getConstraintVar, setConstraintVar,
   emitConstraints, emitStaticConstraints, emitSimple, emitSimples,
   emitImplication, emitImplications, emitInsoluble,
-  emitHole, emitHoles,
+  emitDelayedErrors, emitHole, emitHoles, emitNotConcreteError,
   discardConstraints, captureConstraints, tryCaptureConstraints,
   pushLevelAndCaptureConstraints,
   pushTcLevelM_, pushTcLevelM,
@@ -1816,6 +1816,12 @@ emitInsoluble ct
        ; lie_var <- getConstraintVar
        ; updTcRef lie_var (`addInsols` unitBag ct) }
 
+emitDelayedErrors :: Bag DelayedError -> TcM ()
+emitDelayedErrors errs
+  = do { traceTc "emitDelayedErrors" (ppr errs)
+       ; lie_var <- getConstraintVar
+       ; updTcRef lie_var (`addDelayedErrors` errs)}
+
 emitHole :: Hole -> TcM ()
 emitHole hole
   = do { traceTc "emitHole" (ppr hole)
@@ -1827,6 +1833,12 @@ emitHoles holes
   = do { traceTc "emitHoles" (ppr holes)
        ; lie_var <- getConstraintVar
        ; updTcRef lie_var (`addHoles` holes) }
+
+emitNotConcreteError :: NotConcreteError -> TcM ()
+emitNotConcreteError err
+  = do { traceTc "emitNotConcreteError" (ppr err)
+       ; lie_var <- getConstraintVar
+       ; updTcRef lie_var (`addNotConcreteError` err) }
 
 -- | Throw out any constraints emitted by the thing_inside
 discardConstraints :: TcM a -> TcM a

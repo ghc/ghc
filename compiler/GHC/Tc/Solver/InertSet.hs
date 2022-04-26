@@ -1263,9 +1263,6 @@ addInertItem tc_lvl ics@(IC { inert_irreds = irreds }) item@(CIrredCan {})
 addInertItem _ ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
   = ics { inert_dicts = addDict (inert_dicts ics) cls tys item }
 
-addInertItem _ ics@( IC { inert_irreds = irreds }) item@(CSpecialCan {})
-  = ics { inert_irreds = irreds `snocBag` item }
-
 addInertItem _ _ item
   = pprPanic "upd_inert set: can't happen! Inserting " $
     ppr item   -- Can't be CNonCanonical because they only land in inert_irreds
@@ -1621,7 +1618,7 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
       | otherwise
       = False
 
-    -- like canSolveByUnification, but allows cbv variables to unify
+    -- like startSolvingByUnification, but allows cbv variables to unify
     can_unify :: TcTyVar -> MetaInfo -> Type -> Bool
     can_unify _lhs_tv TyVarTv rhs_ty  -- see Example 3 from the Note
       | Just rhs_tv <- tcGetTyVar_maybe rhs_ty

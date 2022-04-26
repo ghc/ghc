@@ -1,0 +1,14 @@
+
+RepPolyInferPatBind.hs:21:1: error:
+    The binder ‘x’ does not have a fixed runtime representation.
+    Its type is:
+      T :: TYPE R
+
+RepPolyInferPatBind.hs:21:2: error:
+    • The pattern binding does not have a fixed runtime representation.
+      Its type is:
+        T :: TYPE R
+    • When checking that the pattern signature: T
+        fits the type of its context: T
+      In the pattern: x :: T
+      In a pattern binding: (x :: T) = x

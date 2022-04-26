@@ -29,12 +29,12 @@ module GHC.Tc.Types.Origin (
   -- * CtOrigin and CallStack
   isPushCallStackOrigin, callStackOriginFS,
   -- * FixedRuntimeRep origin
-  FRROrigin(..), pprFRROrigin,
+  FixedRuntimeRepOrigin(..), FixedRuntimeRepContext(..),
+  pprFixedRuntimeRepContext,
   StmtOrigin(..),
 
   -- * Arrow command origin
-  FRRArrowOrigin(..), pprFRRArrowOrigin,
-  -- * ExpectedFunTy origin
+  FRRArrowContext(..), pprFRRArrowContext,
   ExpectedFunTyOrigin(..), pprExpectedFunTyOrigin, pprExpectedFunTyHerald,
 
   ) where
@@ -60,7 +60,6 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 
 import GHC.Data.FastString
-import qualified GHC.Data.Strict as Strict
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -607,10 +606,8 @@ data CtOrigin
   | CycleBreakerOrigin
       CtOrigin   -- origin of the original constraint
       -- See Detail (7) of Note [Type variable cycles] in GHC.Tc.Solver.Canonical
-  | FixedRuntimeRepOrigin
-      !Type -- ^ The type being checked for representation polymorphism.
-            -- We record it here for access in 'GHC.Tc.Errors.mkFRRErr'.
-      !FRROrigin
+  | FRROrigin
+      FixedRuntimeRepOrigin
 
   | WantedSuperclassOrigin PredType CtOrigin
         -- From expanding out the superclasses of a Wanted; the PredType
@@ -820,11 +817,8 @@ pprCtOrigin (InstProvidedOrigin mod cls_inst)
 pprCtOrigin (CycleBreakerOrigin orig)
   = pprCtOrigin orig
 
-pprCtOrigin (FixedRuntimeRepOrigin _ frrOrig)
-  -- We ignore the type argument, as we would prefer
-  -- to report all types that don't have a fixed runtime representation at once,
-  -- in 'GHC.Tc.Errors.mkFRRErr'.
-  = pprFRROrigin frrOrig
+pprCtOrigin (FRROrigin {})
+  = ctoHerald <+> text "a representation-polymorphism check"
 
 pprCtOrigin (WantedSuperclassOrigin subclass_pred subclass_orig)
   = sep [ ctoHerald <+> text "a superclass required to satisfy" <+> quotes (ppr subclass_pred) <> comma
@@ -906,7 +900,7 @@ pprCtO (Shouldn'tHappenOrigin note) = text note
 pprCtO (ProvCtxtOrigin {})          = text "a provided constraint"
 pprCtO (InstProvidedOrigin {})      = text "a provided constraint"
 pprCtO (CycleBreakerOrigin orig)    = pprCtO orig
-pprCtO (FixedRuntimeRepOrigin {})   = text "a representation polymorphism check"
+pprCtO (FRROrigin {})               = text "a representation-polymorphism check"
 pprCtO GhcBug20076                  = text "GHC Bug #20076"
 pprCtO (WantedSuperclassOrigin {})  = text "a superclass constraint"
 pprCtO (InstanceSigOrigin {})       = text "a type signature in an instance"
@@ -942,42 +936,59 @@ callStackOriginFS orig               = mkFastString (showSDocUnsafe (pprCtO orig
 
 Note [Reporting representation-polymorphism errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we emit new Wanted constraints using GHC.Tc.Utils.Concrete.hasFixedRuntimeRep,
-we provide a 'CtOrigin' using the 'FixedRuntimeRepOrigin' constructor of,
-which keeps track of two things:
-  - the type which we want to ensure has a fixed runtime representation,
-  - the 'FRROrigin' explaining the nature of the check, e.g. a pattern,
-    a function application, a record update, ...
+As explained in Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete,
+to check that (ty :: ki) has a fixed runtime representation, we emit
+an equality constraint of the form
 
-If the constraint goes unsolved, we report it as follows:
-  - we detect that the unsolved Wanted has an 'FRROrigin' 'CtOrigin'
-    in GHC.Tc.Errors.reportWanteds using is_FRR,
-  - we assemble an error message in GHC.Tc.Errors.mkFRRErr.
+  ki ~# concrete_tv
 
-For example, if we try to write the program
+where concrete_tv is a concrete metavariable. In this situation, we attach
+a 'FixedRuntimeRepOrigin' to both the equality and the concrete type variable.
+The 'FixedRuntimeRepOrigin' consists of two pieces of information:
 
-  foo :: forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b -> ()
-  foo x y = ()
+  - the type 'ty' on which we performed the representation-polymorphism check,
+  - a 'FixedRuntimeRepContext' which explains why we needed to perform a check
+    (e.g. because 'ty' was the kind of a function argument, or of a bound variable
+    in a lambda abstraction, ...).
 
-we will get two unsolved Wanted constraints, namely
+This information gets passed along as we make progress on solving the constraint,
+and if we end up with an unsolved constraint we can report an informative error
+message to the user using the 'FixedRuntimeRepOrigin'.
 
-  r1 ~# concrete_tv1, with 'CtOrigin' FixedRuntimeRepOrigin a (FRRVarPattern x)
-  r2 ~# concrete_tv2, with 'CtOrigin' FixedRuntimeRepOrigin b (FRRVarPattern y)
+The error reporting goes through two different paths:
 
-These constraints will be processed in tandem by mkFRRErr,
-producing an error message of the form:
+  - constraints whose 'CtOrigin' contains a 'FixedRuntimeRepOrigin' are reported
+    using 'mkFRRErr' in 'reportWanteds',
+  - equality constraints in which one side is a concrete metavariable and the
+    other side is not concrete are reported using 'mkTyVarEqErr'. In this case,
+    we pass on the type variable and the non-concrete type for error reporting,
+    using the 'frr_info_not_concrete' field.
 
-  Representation-polymorphic types are not allowed here.
-    * The variable 'x' bound by the pattern
-      does not have a fixed runtime representation:
-        a :: TYPE r1
-    * The variable 'y' bound by the pattern
-      does not have a fixed runtime representation:
-        b :: TYPE r2
+This is why we have the 'FixedRuntimeRepErrorInfo' datatype: so that we can optionally
+include this extra message about an unsolved equality between a concrete type variable
+and a non-concrete type.
 -}
 
--- | In what context are we checking that a type has a fixed runtime representation?
-data FRROrigin
+-- | The context for a representation-polymorphism check.
+--
+-- For example, when typechecking @ \ (a :: k) -> ...@,
+-- we are checking the type @a@ because it's the type of
+-- a term variable bound in a lambda, so we use 'FRRBinder'.
+data FixedRuntimeRepOrigin
+  = FixedRuntimeRepOrigin
+    { frr_type    :: Type
+       -- ^ What type are we checking?
+       -- For example, `a[tau]` in `a[tau] :: TYPE rr[tau]`.
+
+    , frr_context :: FixedRuntimeRepContext
+      -- ^ What context requires a fixed runtime representation?
+    }
+
+-- | The context in which a representation-polymorphism check was performed.
+--
+-- Does not include the type on which the check was performed; see
+-- 'FixedRuntimeRepOrigin' for that.
+data FixedRuntimeRepContext
 
   -- | Record fields in record updates must have a fixed runtime representation.
   --
@@ -988,6 +999,16 @@ data FRROrigin
   --
   -- Test cases: LevPolyLet, RepPolyPatBind.
   | FRRBinder !Name
+
+  -- | Pattern binds must have a fixed runtime representation.
+  --
+  -- Test case: RepPolyInferPatBind.
+  | FRRPatBind
+
+  -- | Pattern synonym arguments must have a fixed runtime representation.
+  --
+  -- Test case: RepPolyInferPatSyn.
+  | FRRPatSynArg
 
   -- | The type of the scrutinee in a case statement must have a
   -- fixed runtime representation.
@@ -1051,8 +1072,8 @@ data FRROrigin
 
   -- | A representation-polymorphism check arising from arrow notation.
   --
-  -- See 'FRRArrowOrigin' for more details.
-  | FRRArrow !FRRArrowOrigin
+  -- See 'FRRArrowContext' for more details.
+  | FRRArrow !FRRArrowContext
 
   -- | A representation-polymorphic check arising from a call
   -- to 'matchExpectedFunTys' or 'matchActualFunTySigma'.
@@ -1061,22 +1082,27 @@ data FRROrigin
   | FRRExpectedFunTy
       !ExpectedFunTyOrigin
       !Int
-        -- ^ argument position (0-indexed)
+        -- ^ argument position (1-indexed)
 
 -- | Print the context for a @FixedRuntimeRep@ representation-polymorphism check.
 --
 -- Note that this function does not include the specific 'RuntimeRep'
--- which is not fixed. That information is added by 'GHC.Tc.Errors.mkFRRErr'.
-pprFRROrigin :: FRROrigin -> SDoc
-pprFRROrigin (FRRRecordUpdate lbl _arg)
+-- which is not fixed. That information is stored in 'FixedRuntimeRepOrigin'
+-- and is reported separately.
+pprFixedRuntimeRepContext :: FixedRuntimeRepContext -> SDoc
+pprFixedRuntimeRepContext (FRRRecordUpdate lbl _arg)
   = sep [ text "The record update at field"
         , quotes (ppr lbl) ]
-pprFRROrigin (FRRBinder binder)
+pprFixedRuntimeRepContext (FRRBinder binder)
   = sep [ text "The binder"
         , quotes (ppr binder) ]
-pprFRROrigin FRRCase
+pprFixedRuntimeRepContext FRRPatBind
+  = text "The pattern binding"
+pprFixedRuntimeRepContext FRRPatSynArg
+  = text "The pattern synonym argument pattern"
+pprFixedRuntimeRepContext FRRCase
   = text "The scrutinee of the case statement"
-pprFRROrigin (FRRDataConArg expr_or_pat con i)
+pprFixedRuntimeRepContext (FRRDataConArg expr_or_pat con i)
   = text "The" <+> what
   where
     arg, what :: SDoc
@@ -1088,33 +1114,33 @@ pprFRROrigin (FRRDataConArg expr_or_pat con i)
       = text "newtype constructor" <+> arg
       | otherwise
       = text "data constructor" <+> arg <+> text "in" <+> speakNth i <+> text "position"
-pprFRROrigin (FRRNoBindingResArg fn i)
+pprFixedRuntimeRepContext (FRRNoBindingResArg fn i)
   = vcat [ text "Unsaturated use of a representation-polymorphic primitive function."
          , text "The" <+> speakNth i <+> text "argument of" <+> quotes (ppr $ getName fn) ]
-pprFRROrigin (FRRTupleArg i)
+pprFixedRuntimeRepContext (FRRTupleArg i)
   = text "The tuple argument in" <+> speakNth i <+> text "position"
-pprFRROrigin (FRRTupleSection i)
+pprFixedRuntimeRepContext (FRRTupleSection i)
   = text "The" <+> speakNth i <+> text "component of the tuple section"
-pprFRROrigin FRRUnboxedSum
+pprFixedRuntimeRepContext FRRUnboxedSum
   = text "The unboxed sum"
-pprFRROrigin (FRRBodyStmt stmtOrig i)
+pprFixedRuntimeRepContext (FRRBodyStmt stmtOrig i)
   = vcat [ text "The" <+> speakNth i <+> text "argument to (>>)" <> comma
          , text "arising from the" <+> ppr stmtOrig <> comma ]
-pprFRROrigin FRRBodyStmtGuard
+pprFixedRuntimeRepContext FRRBodyStmtGuard
   = vcat [ text "The argument to" <+> quotes (text "guard") <> comma
          , text "arising from the" <+> ppr MonadComprehension <> comma ]
-pprFRROrigin (FRRBindStmt stmtOrig)
+pprFixedRuntimeRepContext (FRRBindStmt stmtOrig)
   = vcat [ text "The first argument to (>>=)" <> comma
          , text "arising from the" <+> ppr stmtOrig <> comma ]
-pprFRROrigin FRRBindStmtGuard
+pprFixedRuntimeRepContext FRRBindStmtGuard
   = sep [ text "The body of the bind statement" ]
-pprFRROrigin (FRRArrow arrowOrig)
-  = pprFRRArrowOrigin arrowOrig
-pprFRROrigin (FRRExpectedFunTy funTyOrig zero_indexed_arg)
-  = pprExpectedFunTyOrigin funTyOrig (zero_indexed_arg + 1)
+pprFixedRuntimeRepContext (FRRArrow arrowContext)
+  = pprFRRArrowContext arrowContext
+pprFixedRuntimeRepContext (FRRExpectedFunTy funTyOrig arg_pos)
+  = pprExpectedFunTyOrigin funTyOrig arg_pos
 
-instance Outputable FRROrigin where
-  ppr = pprFRROrigin
+instance Outputable FixedRuntimeRepContext where
+  ppr = pprFixedRuntimeRepContext
 
 -- | Are we in a @do@ expression or a monad comprehension?
 --
@@ -1136,8 +1162,9 @@ instance Outputable StmtOrigin where
 -- | While typechecking arrow notation, in which context
 -- did a representation polymorphism check arise?
 --
--- See 'FRROrigin' for more general origins of representation polymorphism checks.
-data FRRArrowOrigin
+-- See 'FixedRuntimeRepContext' for more general origins of
+-- representation polymorphism checks.
+data FRRArrowContext
 
   -- | The result of an arrow command does not have a fixed runtime representation.
   --
@@ -1156,25 +1183,11 @@ data FRRArrowOrigin
   -- Test cases: none.
   | ArrowCmdArrApp !(HsExpr GhcRn) !(HsExpr GhcRn) !HsArrAppType
 
-  -- | A pattern in an arrow command abstraction does not have
-  -- a fixed runtime representation.
-  --
-  -- Test cases: none.
-  | ArrowCmdLam !Int
-
   -- | The scrutinee type in an arrow command case statement does not have a
   -- fixed runtime representation.
   --
   -- Test cases: none.
   | ArrowCmdCase
-
-  -- | A pattern in an arrow command \cases statement does not
-  -- have a fixed runtime representation.
-  --
-  -- Test cases: none.
-  | ArrowCmdLamCase !(Strict.Maybe Int)
-      -- ^ @Nothing@ for @\case@, @Just@ the index of the pattern for @\cases@
-      -- (starting from  1)
 
   -- | The overall type of an arrow proc expression does not have
   -- a fixed runtime representation.
@@ -1182,34 +1195,27 @@ data FRRArrowOrigin
   -- Test case: RepPolyArrowFun.
   | ArrowFun !(HsExpr GhcRn)
 
-pprFRRArrowOrigin :: FRRArrowOrigin -> SDoc
-pprFRRArrowOrigin (ArrowCmdResTy cmd)
+pprFRRArrowContext :: FRRArrowContext -> SDoc
+pprFRRArrowContext (ArrowCmdResTy cmd)
   = vcat [ hang (text "The arrow command") 2 (quotes (ppr cmd)) ]
-pprFRRArrowOrigin (ArrowCmdApp fun arg)
+pprFRRArrowContext (ArrowCmdApp fun arg)
   = vcat [ text "The argument in the arrow command application of"
          , nest 2 (quotes (ppr fun))
          , text "to"
          , nest 2 (quotes (ppr arg)) ]
-pprFRRArrowOrigin (ArrowCmdArrApp fun arg ho_app)
+pprFRRArrowContext (ArrowCmdArrApp fun arg ho_app)
   = vcat [ text "The function in the" <+> pprHsArrType ho_app <+> text "of"
          , nest 2 (quotes (ppr fun))
          , text "to"
          , nest 2 (quotes (ppr arg)) ]
-pprFRRArrowOrigin (ArrowCmdLam i)
-  = vcat [ text "The" <+> speakNth i <+> text "pattern of the arrow command abstraction" ]
-pprFRRArrowOrigin ArrowCmdCase
+pprFRRArrowContext ArrowCmdCase
   = text "The scrutinee of the arrow case command"
-pprFRRArrowOrigin (ArrowCmdLamCase Strict.Nothing)
-  = text "The scrutinee of the arrow \\case command"
-pprFRRArrowOrigin (ArrowCmdLamCase (Strict.Just i))
-  = text "The" <+> speakNth i
-    <+> text "scrutinee of the arrow \\cases command"
-pprFRRArrowOrigin (ArrowFun fun)
+pprFRRArrowContext (ArrowFun fun)
   = vcat [ text "The return type of the arrow function"
          , nest 2 (quotes (ppr fun)) ]
 
-instance Outputable FRRArrowOrigin where
-  ppr = pprFRRArrowOrigin
+instance Outputable FRRArrowContext where
+  ppr = pprFRRArrowContext
 
 {- *********************************************************************
 *                                                                      *
@@ -1231,7 +1237,8 @@ instance Outputable FRRArrowOrigin where
 --     doesn't have a fixed RuntimeRep as per Note [Fixed RuntimeRep]
 --     in GHC.Tc.Utils.Concrete.
 --     Uses 'pprExpectedFunTyOrigin'.
---     See 'FRROrigin' for more general origins of representation polymorphism checks.
+--     See 'FixedRuntimeRepContext' for the situations in which
+--     representation-polymorphism checks are performed.
 data ExpectedFunTyOrigin
 
   -- | A rebindable syntax operator is expected to have a function type.

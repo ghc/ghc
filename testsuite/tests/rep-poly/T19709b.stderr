@@ -1,13 +1,11 @@
 
-T19709b.hs:11:7: error:
+T19709b.hs:11:15: error:
     • The argument ‘(error @Any "e2")’ of ‘levfun’
       does not have a fixed runtime representation.
       Its type is:
-        a0 :: TYPE Any
-    • In the first argument of ‘seq’, namely ‘levfun (error @Any "e2")’
+        a1 :: TYPE c0
+      Cannot unify ‘Any’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
+    • In the first argument of ‘levfun’, namely ‘(error @Any "e2")’
+      In the first argument of ‘seq’, namely ‘levfun (error @Any "e2")’
       In the expression: levfun (error @Any "e2") `seq` return []
-      In the expression:
-        let
-          levfun :: forall (r :: RuntimeRep) (a :: TYPE r). a -> ()
-          levfun = error "e1"
-        in levfun (error @Any "e2") `seq` return []

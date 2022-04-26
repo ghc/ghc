@@ -3,6 +3,10 @@ RepPolyTupleSection.hs:11:7: error:
     • The second component of the tuple section
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE r
+        t0 :: TYPE c0
+      Cannot unify ‘r’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
     • In the expression: (# 3#, #)
       In an equation for ‘foo’: foo = (# 3#, #)
+    • Relevant bindings include
+        foo :: a -> (# Int#, a #) (bound at RepPolyTupleSection.hs:11:1)

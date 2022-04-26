@@ -70,7 +70,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Instance.FunDeps
-import GHC.Tc.Utils.Concrete
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
@@ -825,7 +825,7 @@ hasFixedRuntimeRepRes std_nm user_expr ty = mapM_ do_check mb_arity
    do_check :: Arity -> TcM ()
    do_check arity =
      let res_ty = nTimes arity (snd . splitPiTy) ty
-     in hasFixedRuntimeRep_MustBeRefl (FRRArrow $ ArrowFun user_expr) res_ty
+     in hasFixedRuntimeRep_syntactic (FRRArrow $ ArrowFun user_expr) res_ty
    mb_arity :: Maybe Arity
    mb_arity -- arity of the arrow operation, counting type-level arguments
      | std_nm == arrAName     -- result used as an argument in, e.g., do_premap

@@ -18,9 +18,6 @@ module GHC.Core.Predicate (
   mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
   mkHeteroPrimEqPred, mkHeteroReprPrimEqPred,
 
-  -- Special predicates
-  SpecialPred(..), mkIsReflPrimPred, isIsReflPrimPred,
-
   -- Class predicates
   mkClassPred, isDictTy,
   isClassPred, isEqPredClass, isCTupleClass,
@@ -41,7 +38,6 @@ import GHC.Prelude
 
 import GHC.Core.Type
 import GHC.Core.Class
-import GHC.Core.TyCo.Ppr ( pprParendType )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Types.Var
@@ -49,7 +45,6 @@ import GHC.Core.Coercion
 import GHC.Core.Multiplicity ( scaledThing )
 
 import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim ( isReflPrimTyCon )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -57,7 +52,6 @@ import GHC.Utils.Panic
 import GHC.Data.FastString
 
 import Control.Monad ( guard )
-
 
 -- | A predicate in the solver. The solver tries to prove Wanted predicates
 -- from Given ones.
@@ -77,11 +71,6 @@ data Pred
   -- See Note [Quantified constraints] in GHC.Tc.Solver.Canonical
   | ForAllPred [TyVar] [PredType] PredType
 
-  -- | A special predicate, used internally in GHC.
-  --
-  -- See #20000.
-  | SpecialPred SpecialPred
-
   -- NB: There is no TuplePred case
   --     Tuple predicates like (Eq a, Ord b) are just treated
   --     as ClassPred, as if we had a tuple class with two superclasses
@@ -92,10 +81,6 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
     Just (tc, [_, _, ty1, ty2])
       | tc `hasKey` eqReprPrimTyConKey -> EqPred ReprEq ty1 ty2
       | tc `hasKey` eqPrimTyConKey     -> EqPred NomEq ty1 ty2
-
-    Just (tc, [_ki, lhs, rhs])
-      | tc `hasKey` isReflPrimTyConKey
-      -> SpecialPred (IsReflPrimPred lhs rhs)
 
     Just (tc, tys)
       | Just clas <- tyConClass_maybe tc
@@ -190,29 +175,6 @@ predTypeEqRel ty
   = ReprEq
   | otherwise
   = NomEq
-
--- --------------------- Special predicates ----------------------------------
-
--- | 'SpecialPred' describes all the special predicates
--- that are currently used in GHC.
---
--- These are different from the special typeclasses
--- (such as `KnownNat`, `Typeable`, `Coercible`, ...), as special predicates
--- can't be expressed as typeclasses, as they hold evidence of a different kind.
-data SpecialPred
-  -- | 'IsRefl#'.
-  = IsReflPrimPred Type Type
-
-instance Outputable SpecialPred where
-  ppr (IsReflPrimPred l r) =
-    text "IsRefl#" <+> pprParendType l <+> pprParendType r
-
-mkIsReflPrimPred :: Type -> Type -> PredType
-mkIsReflPrimPred lhs rhs = mkTyConApp isReflPrimTyCon [typeKind lhs, lhs, rhs]
-
-isIsReflPrimPred :: Pred -> Bool
-isIsReflPrimPred (SpecialPred (IsReflPrimPred {})) = True
-isIsReflPrimPred _ = False
 
 {-------------------------------------------
 Predicates on PredType

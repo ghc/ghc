@@ -1,0 +1,13 @@
+
+RepPolyArgument.hs:10:18: error:
+    • The argument ‘(undefined @(R @RuntimeRep))’ of ‘undefined’
+      does not have a fixed runtime representation.
+      Its type is:
+        t0 :: TYPE c0
+      Cannot unify ‘R’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
+    • In the first argument of ‘undefined’, namely
+        ‘(undefined @(R @RuntimeRep))’
+      In the expression: undefined (undefined @(R @RuntimeRep))
+      In an equation for ‘foo’:
+          foo = undefined (undefined @(R @RuntimeRep))

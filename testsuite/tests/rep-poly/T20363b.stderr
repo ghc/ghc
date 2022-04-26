@@ -1,50 +1,22 @@
 
-T20363b.hs:45:10: error:
-    • The newtype constructor pattern
-      does not have a fixed runtime representation.
-      Its type is:
-        NestedTuple 'Zero Addr# :: TYPE (NestedTupleRep 'Zero 'AddrRep)
-      NB: GHC does not (yet) support rewriting in runtime representations.
-      Please comment on GHC ticket #13105 if this is causing you trouble.
-      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
-    • In the pattern: MkNT (##)
-      In an equation for ‘test1b’: test1b (MkNT (##)) = 0
-
 T20363b.hs:48:10: error:
-    • The newtype constructor pattern
-      does not have a fixed runtime representation.
-      Its type is:
-        NestedTuple ('Suc 'Zero) Addr# :: TYPE
-                                            (NestedTupleRep ('Suc 'Zero) 'AddrRep)
-      NB: GHC does not (yet) support rewriting in runtime representations.
-      Please comment on GHC ticket #13105 if this is causing you trouble.
-      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
+    • • The newtype constructor pattern
+        does not have a fixed runtime representation.
+        Its type is:
+          NestedTuple ('Suc 'Zero) Addr# :: TYPE
+                                              (NestedTupleRep ('Suc 'Zero) 'AddrRep)
+      • The argument ‘(# nullAddr#, (##) #)’ of ‘MkNT’
+        does not have a fixed runtime representation.
+        Its type is:
+          NestedTuple ('Suc 'Zero) Addr# :: TYPE
+                                              (NestedTupleRep ('Suc 'Zero) 'AddrRep)
+      • The newtype constructor pattern
+        does not have a fixed runtime representation.
+        Its type is:
+          NestedTuple 'Zero Addr# :: TYPE (NestedTupleRep 'Zero 'AddrRep)
+      • The argument ‘(##)’ of ‘MkNT’
+        does not have a fixed runtime representation.
+        Its type is:
+          NestedTuple 'Zero Addr# :: TYPE (NestedTupleRep 'Zero 'AddrRep)
     • In the pattern: MkNT (# i, (##) #)
       In an equation for ‘test2b’: test2b (MkNT (# i, (##) #)) = i
-
-T20363b.hs:51:19: error:
-    • The argument ‘(##)’ of ‘MkNT’
-      does not have a fixed runtime representation.
-      Its type is:
-        NestedTuple 'Zero Addr# :: TYPE (NestedTupleRep 'Zero 'AddrRep)
-      NB: GHC does not (yet) support rewriting in runtime representations.
-      Please comment on GHC ticket #13105 if this is causing you trouble.
-      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
-    • In the first argument of ‘test1b’, namely ‘(MkNT (##))’
-      In the expression: test1b (MkNT (##))
-      In an equation for ‘test1c’: test1c = test1b (MkNT (##))
-
-T20363b.hs:54:21: error:
-    • The argument ‘(# nullAddr#, (##) #)’ of ‘MkNT’
-      does not have a fixed runtime representation.
-      Its type is:
-        NestedTuple ('Suc 'Zero) Addr# :: TYPE
-                                            (NestedTupleRep ('Suc 'Zero) 'AddrRep)
-      NB: GHC does not (yet) support rewriting in runtime representations.
-      Please comment on GHC ticket #13105 if this is causing you trouble.
-      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
-    • In the first argument of ‘test2b’, namely
-        ‘(MkNT (# nullAddr#, (##) #))’
-      In the expression: test2b (MkNT (# nullAddr#, (##) #))
-      In an equation for ‘test2c’:
-          test2c _ = test2b (MkNT (# nullAddr#, (##) #))

@@ -150,8 +150,8 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
 
        ; let (arg_names, is_infix) = collectPatSynArgInfo details
        ; (tclvl, wanted, ((lpat', args), pat_ty))
-            <- pushLevelAndCaptureConstraints  $
-               tcInferPat PatSyn lpat          $
+            <- pushLevelAndCaptureConstraints      $
+               tcInferPat FRRPatSynArg PatSyn lpat $
                mapM tcLookupId arg_names
 
        ; let (ex_tvs, prov_dicts) = tcCollectEx lpat'
@@ -669,9 +669,9 @@ tc_patsyn_finish :: LocatedN Name   -- ^ PatSyn Name
                  -> TcPragEnv
                  -> ([TcInvisTVBinder], [PredType], TcEvBinds, [EvVar])
                  -> ([TcInvisTVBinder], [TcType], [PredType], [EvTerm])
-                 -> ([LHsExpr GhcTc], [TcType])
+                 -> ([LHsExpr GhcTc], [TcTypeFRR])
                    -- ^ Pattern arguments and types.
-                   -- These must have a fixed RuntimeRep as per
+                   -- These must have a syntactically fixed RuntimeRep as per
                    -- Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
                  -> TcType            -- ^ Pattern type
                  -> [FieldLabel]      -- ^ Selector names

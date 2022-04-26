@@ -4,7 +4,11 @@ RepPolyMcBind.hs:26:16: error:
         arising from a statement in a monad comprehension
       does not have a fixed runtime representation.
       Its type is:
-        ma :: TYPE rep
+        ma0 :: TYPE c0
+      Cannot unify ‘rep’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
     • In a stmt of a monad comprehension: x <- undefined :: ma
       In the expression: [() | x <- undefined :: ma]
       In an equation for ‘foo’: foo _ = [() | x <- undefined :: ma]
+    • Relevant bindings include
+        foo :: () -> ma (bound at RepPolyMcBind.hs:26:1)

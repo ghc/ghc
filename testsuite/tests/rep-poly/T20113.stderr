@@ -4,7 +4,12 @@ T20113.hs:7:35: error:
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE rep
-    • The first pattern in the equation for ‘$sel:y_fld:MkY’
-      does not have a fixed runtime representation.
-      Its type is:
-        Y a :: TYPE rep
+    • In the pattern: MkY {y_fld = $sel:y_fld:MkY}
+      In an equation for ‘T20113.$sel:y_fld:MkY’:
+          T20113.$sel:y_fld:MkY MkY {y_fld = $sel:y_fld:MkY} = $sel:y_fld:MkY
+
+T20113.hs:7:35: error:
+    The first pattern in the equation for ‘$sel:y_fld:MkY’
+    does not have a fixed runtime representation.
+    Its type is:
+      Y a :: TYPE rep

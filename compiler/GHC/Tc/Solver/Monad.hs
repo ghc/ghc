@@ -648,8 +648,6 @@ removeInertCt is ct =
     CQuantCan {}     -> panic "removeInertCt: CQuantCan"
     CIrredCan {}     -> panic "removeInertCt: CIrredEvCan"
     CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
-    CSpecialCan { cc_special_pred = special_pred } ->
-      pprPanic "removeInertCt" (ppr "CSpecialCan" <+> parens (ppr special_pred))
 
 -- | Looks up a family application in the inerts.
 lookupFamAppInert :: (CtFlavourRole -> Bool)  -- can it rewrite the target?
@@ -1253,8 +1251,11 @@ touchabilityTest :: CtFlavour -> TcTyVar -> TcType -> TcS TouchabilityTestResult
 touchabilityTest flav tv1 rhs
   | flav /= Given  -- See Note [Do not unify Givens]
   , MetaTv { mtv_tclvl = tv_lvl, mtv_info = info } <- tcTyVarDetails tv1
-  , canSolveByUnification info rhs
-  = do { ambient_lvl  <- getTcLevel
+  = do { can_continue_solving <- wrapTcS $ startSolvingByUnification info rhs
+       ; if not can_continue_solving
+         then return Untouchable
+         else
+    do { ambient_lvl  <- getTcLevel
        ; given_eq_lvl <- getInnermostGivenEqLevel
 
        ; if | tv_lvl `sameDepthAs` ambient_lvl
@@ -1265,7 +1266,7 @@ touchabilityTest flav tv1 rhs
             -> return (TouchableOuterLevel free_metas tv_lvl)
 
             | otherwise
-            -> return Untouchable }
+            -> return Untouchable } }
   | otherwise
   = return Untouchable
   where
@@ -1605,7 +1606,6 @@ setWantedEq (HoleDest hole) co
   = do { useVars (coVarsOfCo co)
        ; fillCoercionHole hole co }
 setWantedEq (EvVarDest ev) _ = pprPanic "setWantedEq: EvVarDest" (ppr ev)
-setWantedEq NoDest         _ = panic "setWantedEq: NoDest"
 
 -- | Good for both equalities and non-equalities
 setWantedEvTerm :: TcEvDest -> EvTerm -> TcS ()
@@ -1621,8 +1621,6 @@ setWantedEvTerm (HoleDest hole) tm
 
 setWantedEvTerm (EvVarDest ev_id) tm
   = setEvBind (mkWantedEvBind ev_id tm)
-setWantedEvTerm NoDest tm
-  = pprPanic "setWantedEvTerm: NoDest" (ppr tm)
 
 {- Note [Yukky eq_sel for a HoleDest]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

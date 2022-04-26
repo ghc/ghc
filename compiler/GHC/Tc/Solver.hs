@@ -235,15 +235,16 @@ simplifyAndEmitFlatConstraints wanted
                                         -- any skolem variables here |  Note [Wrapping failing kind equalities]
                          ; emitImplication implic
                          ; failM }
-           Just (simples, holes)
+           Just (simples, errs)
               -> do { _ <- promoteTyVarSet (tyCoVarsOfCts simples)
                     ; traceTc "emitFlatConstraints }" $
                       vcat [ text "simples:" <+> ppr simples
-                           , text "holes:  " <+> ppr holes ]
-                    ; emitHoles holes -- Holes don't need promotion
+                           , text "errs:   " <+> ppr errs ]
+                      -- Holes and other delayed errors don't need promotion
+                    ; emitDelayedErrors errs
                     ; emitSimples simples } }
 
-floatKindEqualities :: WantedConstraints -> Maybe (Bag Ct, Bag Hole)
+floatKindEqualities :: WantedConstraints -> Maybe (Bag Ct, Bag DelayedError)
 -- Float out all the constraints from the WantedConstraints,
 -- Return Nothing if any constraints can't be floated (captured
 -- by skolems), or if there is an insoluble constraint, or
@@ -256,15 +257,15 @@ floatKindEqualities :: WantedConstraints -> Maybe (Bag Ct, Bag Hole)
 -- See Note [floatKindEqualities vs approximateWC]
 floatKindEqualities wc = float_wc emptyVarSet wc
   where
-    float_wc :: TcTyCoVarSet -> WantedConstraints -> Maybe (Bag Ct, Bag Hole)
+    float_wc :: TcTyCoVarSet -> WantedConstraints -> Maybe (Bag Ct, Bag DelayedError)
     float_wc trapping_tvs (WC { wc_simple = simples
                               , wc_impl = implics
-                              , wc_holes = holes })
+                              , wc_errors = errs })
       | all is_floatable simples
-      = do { (inner_simples, inner_holes)
+      = do { (inner_simples, inner_errs)
                 <- flatMapBagPairM (float_implic trapping_tvs) implics
            ; return ( simples `unionBags` inner_simples
-                    , holes `unionBags` inner_holes) }
+                    , errs `unionBags` inner_errs) }
       | otherwise
       = Nothing
       where
@@ -272,7 +273,7 @@ floatKindEqualities wc = float_wc emptyVarSet wc
            | insolubleEqCt ct = False
            | otherwise        = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs
 
-    float_implic :: TcTyCoVarSet -> Implication -> Maybe (Bag Ct, Bag Hole)
+    float_implic :: TcTyCoVarSet -> Implication -> Maybe (Bag Ct, Bag DelayedError)
     float_implic trapping_tvs (Implic { ic_wanted = wanted, ic_given_eqs = given_eqs
                                       , ic_skols = skols, ic_status = status })
       | isInsolubleStatus status
@@ -496,14 +497,22 @@ simplifyTopWanteds wanteds
       , gopt Opt_PrintExplicitRuntimeReps dflags -- See Note [Defaulting insolubles]
       = try_class_defaulting wc
       | otherwise
-      = do { free_tvs <- TcS.zonkTyCoVarsAndFVList (tyCoVarsOfWCList wc)
-           ; let meta_tvs = filter (isTyVar <&&> isMetaTyVar) free_tvs
-                   -- zonkTyCoVarsAndFV: the wc_first_go is not yet zonked
-                   -- filter isMetaTyVar: we might have runtime-skolems in GHCi,
-                   -- and we definitely don't want to try to assign to those!
-                   -- The isTyVar is needed to weed out coercion variables
+      = do { -- Need to zonk first, as the WantedConstraints are not yet zonked.
+           ; free_tvs <- TcS.zonkTyCoVarsAndFVList (tyCoVarsOfWCList wc)
+           ; let defaultable_tvs = filter can_default free_tvs
+                 can_default tv
+                   =   isTyVar tv
+                       -- Weed out coercion variables.
 
-           ; defaulted <- mapM defaultTyVarTcS meta_tvs   -- Has unification side effects
+                    && isMetaTyVar tv
+                       -- Weed out runtime-skolems in GHCi, which we definitely
+                       -- shouldn't try to default.
+
+                    && not (tv `elemVarSet` nonDefaultableTyVarsOfWC wc)
+                       -- Weed out variables for which defaulting would be unhelpful,
+                       -- e.g. alpha appearing in [W] alpha[conc] ~# rr[sk].
+
+           ; defaulted <- mapM defaultTyVarTcS defaultable_tvs -- Has unification side effects
            ; if or defaulted
              then do { wc_residual <- nestTcS (solveWanteds wc)
                             -- See Note [Must simplify after defaulting]
@@ -513,7 +522,7 @@ simplifyTopWanteds wanteds
     try_class_defaulting :: WantedConstraints -> TcS WantedConstraints
     try_class_defaulting wc
       | isEmptyWC wc || insolubleWC wc -- See Note [Defaulting insolubles]
-      = return wc
+      = try_callstack_defaulting wc
       | otherwise  -- See Note [When to do type-class defaulting]
       = do { something_happened <- applyDefaultingRules wc
                                    -- See Note [Top-level Defaulting Plan]
@@ -593,6 +602,20 @@ stupid, but perhaps a little strange.
 Another potential alternative would be to suppress *all* non-insoluble
 errors if there are *any* insoluble errors, anywhere, but that seems
 too drastic.
+
+Note [Don't default in syntactic equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When there are unsolved syntactic equalities such as
+
+  rr[sk] ~S# alpha[conc]
+
+we should not default alpha, lest we obtain a poor error message such as
+
+  Couldn't match kind `rr' with `LiftedRep'
+
+We would rather preserve the original syntactic equality to be
+reported to the user, especially as the concrete metavariable alpha
+might store an informative origin for the user.
 
 Note [Must simplify after defaulting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -797,9 +820,25 @@ If we default RuntimeRep-vars, we get
 
 which is just plain wrong.
 
-Conclusion: we should do RuntimeRep-defaulting on insolubles only when the user does not
-want to hear about RuntimeRep stuff -- that is, when -fprint-explicit-runtime-reps
-is not set.
+Another situation in which we don't want to default involves concrete metavariables.
+
+In equalities such as   alpha[conc] ~# rr[sk]  ,  alpha[conc] ~# RR beta[tau]
+for a type family RR (all at kind RuntimeRep), we would prefer to report a
+representation-polymorphism error rather than default alpha and get error:
+
+  Could not unify `rr` with `Lifted` / Could not unify `RR b0` with `Lifted`
+
+which is very confusing. For this reason, we weed out the concrete
+metavariables participating in such equalities in nonDefaultableTyVarsOfWC.
+Just looking at insolublity is not enough, as `alpha[conc] ~# RR beta[tau]` could
+become soluble after defaulting beta (see also #21430).
+
+Conclusion: we should do RuntimeRep-defaulting on insolubles only when the
+user does not want to hear about RuntimeRep stuff -- that is, when
+-fprint-explicit-runtime-reps is not set.
+However, we must still take care not to default concrete type variables
+participating in an equality with a non-concrete type, as seen in the
+last example above.
 -}
 
 ------------------
@@ -2216,7 +2255,7 @@ simplifyWantedsTcM wanted
        ; return result }
 
 solveWanteds :: WantedConstraints -> TcS WantedConstraints
-solveWanteds wc@(WC { wc_holes = holes })
+solveWanteds wc@(WC { wc_errors = errs })
   = do { cur_lvl <- TcS.getTcLevel
        ; traceTcS "solveWanteds {" $
          vcat [ text "Level =" <+> ppr cur_lvl
@@ -2225,8 +2264,8 @@ solveWanteds wc@(WC { wc_holes = holes })
        ; dflags <- getDynFlags
        ; solved_wc <- simplify_loop 0 (solverIterations dflags) True wc
 
-       ; holes' <- simplifyHoles holes
-       ; let final_wc = solved_wc { wc_holes = holes' }
+       ; errs' <- simplifyDelayedErrors errs
+       ; let final_wc = solved_wc { wc_errors = errs' }
 
        ; ev_binds_var <- getTcEvBindsVar
        ; bb <- TcS.getTcEvBindsMap ev_binds_var
@@ -2268,6 +2307,7 @@ simplify_loop n limit definitely_redo_implications
                                      , wc_impl = implics2 }) }
 
        ; unif_happened <- resetUnificationFlag
+       ; csTraceTcS $ text "unif_happened" <+> ppr unif_happened
          -- Note [The Unification Level Flag] in GHC.Tc.Solver.Monad
        ; maybe_simplify_again (n+1) limit unif_happened wc2 }
 
@@ -2483,12 +2523,12 @@ setImplicationStatus implic@(Implic { ic_status     = status
                  then Nothing
                  else Just final_implic }
  where
-   WC { wc_simple = simples, wc_impl = implics, wc_holes = holes } = wc
+   WC { wc_simple = simples, wc_impl = implics, wc_errors = errs } = wc
 
    pruned_implics = filterBag keep_me implics
    pruned_wc = WC { wc_simple = simples
                   , wc_impl   = pruned_implics
-                  , wc_holes  = holes }   -- do not prune holes; these should be reported
+                  , wc_errors = errs }   -- do not prune holes; these should be reported
 
    keep_me :: Implication -> Bool
    keep_me ic
@@ -2602,9 +2642,13 @@ neededEvVars implic@(Implic { ic_given = givens
      | otherwise = evVarsOfTerm rhs `unionVarSet` needs
 
 -------------------------------------------------
-simplifyHoles :: Bag Hole -> TcS (Bag Hole)
-simplifyHoles = mapBagM simpl_hole
+simplifyDelayedErrors :: Bag DelayedError -> TcS (Bag DelayedError)
+simplifyDelayedErrors = mapBagM simpl_err
   where
+    simpl_err :: DelayedError -> TcS DelayedError
+    simpl_err (DE_Hole hole) = DE_Hole <$> simpl_hole hole
+    simpl_err err@(DE_NotConcrete {}) = return err
+
     simpl_hole :: Hole -> TcS Hole
 
      -- See Note [Do not simplify ConstraintHoles]
@@ -2836,23 +2880,20 @@ ridiculous, but I (Richard E) don't see a good fix.
 -- | Like 'defaultTyVar', but in the TcS monad.
 defaultTyVarTcS :: TcTyVar -> TcS Bool
 defaultTyVarTcS the_tv
-  | isRuntimeRepVar the_tv
-  , not (isTyVarTyVar the_tv)
+  | isTyVarTyVar the_tv
     -- TyVarTvs should only be unified with a tyvar
     -- never with a type; c.f. GHC.Tc.Utils.TcMType.defaultTyVar
     -- and Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
+  = return False
+  | isRuntimeRepVar the_tv
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepTy
        ; return True }
   | isLevityVar the_tv
-  , not (isTyVarTyVar the_tv)
   = do { traceTcS "defaultTyVarTcS Levity" (ppr the_tv)
        ; unifyTyVar the_tv liftedDataConTy
        ; return True }
   | isMultiplicityVar the_tv
-  , not (isTyVarTyVar the_tv)  -- TyVarTvs should only be unified with a tyvar
-                             -- never with a type; c.f. TcMType.defaultTyVar
-                             -- See Note [Kind generalisation and SigTvs]
   = do { traceTcS "defaultTyVarTcS Multiplicity" (ppr the_tv)
        ; unifyTyVar the_tv manyDataConTy
        ; return True }

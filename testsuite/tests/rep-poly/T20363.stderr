@@ -5,8 +5,5 @@ T20363.hs:23:10: error:
       Its kind is:
         TYPE NilRep
       (Use -fprint-explicit-coercions to see the full type.)
-      NB: GHC does not (yet) support rewriting in runtime representations.
-      Please comment on GHC ticket #13105 if this is causing you trouble.
-      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
     • In the pattern: MkNT (##)
       In an equation for ‘test1b’: test1b (MkNT (##)) = 0

@@ -17,7 +17,7 @@ module GHC.Core.Type (
         -- $representation_types
         Type, ArgFlag(..), AnonArgFlag(..),
         Specificity(..),
-        KindOrType, PredType, ThetaType,
+        KindOrType, PredType, ThetaType, FRRType,
         Var, TyVar, isTyVar, TyCoVar, TyCoBinder, TyCoVarBinder, TyVarBinder,
         Mult, Scaled,
         KnotTied,
@@ -3177,7 +3177,7 @@ typeLiteralKind (NumTyLit {}) = naturalTy
 typeLiteralKind (StrTyLit {}) = typeSymbolKind
 typeLiteralKind (CharTyLit {}) = charTy
 
--- | Returns True if a type has a fixed runtime rep,
+-- | Returns True if a type has a syntactically fixed runtime rep,
 -- as per Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 --
 -- This function is equivalent to @('isFixedRuntimeRepKind' . 'typeKind')@,
@@ -3558,9 +3558,9 @@ isConcrete = go
       | isConcreteTyCon tc = all go tys
       | otherwise          = False
     go ForAllTy{}          = False
-    go (FunTy _ w t1 t2)   = go w && go t1 && go t2
-      -- NB: no need to check the kinds of 't1' and 't2'.
-      -- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
+    go (FunTy _ w t1 t2)   =  go w
+                           && go (typeKind t1) && go t1
+                           && go (typeKind t2) && go t2
     go LitTy{}             = True
     go CastTy{}            = False
     go CoercionTy{}        = False

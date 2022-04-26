@@ -1877,8 +1877,8 @@ pprTcSolverReportMsg ctxt
     maybe_num_args_msg = num_args_msg `orElse` empty
 
     count_args ty = count isVisibleBinder $ fst $ splitPiTys ty
-pprTcSolverReportMsg _ (FixedRuntimeRepError frr_infos) =
-  vcat (map make_msg frr_infos) $$ mustBeRefl_msg
+pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
+  vcat (map make_msg frr_origs)
   where
     -- Assemble the error message: pair up each origin with the corresponding type, e.g.
     --   • FixedRuntimeRep origin msg 1 ...
@@ -1886,16 +1886,21 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_infos) =
     --   • FixedRuntimeRep origin msg 2 ...
     --       b :: TYPE r2
     make_msg :: FixedRuntimeRepErrorInfo -> SDoc
-    make_msg
-      (FixedRuntimeRepErrorInfo
-        { frrInfo_origin = frr_orig
-        , frrInfo_type   = ty })
-      =
-        -- Add bullet points if there is more than one error.
-        (if length frr_infos > 1 then (bullet <+>) else id) $
-          vcat [ sep [ pprFRROrigin frr_orig
-                     , text "does not have a fixed runtime representation." ]
-               , type_printout ty ]
+    make_msg (FRR_Info { frr_info_origin =
+                           FixedRuntimeRepOrigin
+                             { frr_type    = ty
+                             , frr_context = frr_ctxt }
+                       , frr_info_not_concrete =
+                         mb_not_conc }) =
+      -- Add bullet points if there is more than one error.
+      (if length frr_origs > 1 then (bullet <+>) else id) $
+        vcat [ sep [ pprFixedRuntimeRepContext frr_ctxt
+                   , text "does not have a fixed runtime representation." ]
+             , type_printout ty
+             , case mb_not_conc of
+                Nothing -> empty
+                Just (conc_tv, not_conc) ->
+                  unsolved_concrete_eq_explanation conc_tv not_conc ]
 
     -- Don't print out the type (only the kind), if the type includes
     -- a confusing cast, unless the user passed -fprint-explicit-coercions.
@@ -1926,29 +1931,28 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_infos) =
     type_printout :: Type -> SDoc
     type_printout ty =
       sdocOption sdocPrintExplicitCoercions $ \ show_coercions ->
-        if confusing_cast ty && not show_coercions
+        if  confusing_cast ty && not show_coercions
         then vcat [ text "Its kind is:"
                   , nest 2 $ pprWithTYPE (typeKind ty)
                   , text "(Use -fprint-explicit-coercions to see the full type.)" ]
         else vcat [ text "Its type is:"
                   , nest 2 $ ppr ty <+> dcolon <+> pprWithTYPE (typeKind ty) ]
 
-    -- In PHASE 1 of FixedRuntimeRep, we don't allow rewriting in hasFixedRuntimeRep,
-    -- so we add a special message to explain this to the user.
-    --
-    -- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete.
-    give_mustBeRefl_msg :: Bool
-    give_mustBeRefl_msg = all frrInfo_isReflPrim frr_infos
-
-    mustBeRefl_msg :: SDoc
-    mustBeRefl_msg
-      | give_mustBeRefl_msg
-      = vcat
-         [ text "NB: GHC does not (yet) support rewriting in runtime representations."
-         , text "Please comment on GHC ticket #13105 if this is causing you trouble."
-         , text "<https://gitlab.haskell.org/ghc/ghc/-/issues/13105>" ]
-      | otherwise
-      = empty
+    unsolved_concrete_eq_explanation :: TcTyVar -> Type -> SDoc
+    unsolved_concrete_eq_explanation tv not_conc =
+          text "Cannot unify" <+> quotes (ppr not_conc)
+      <+> text "with the type variable" <+> quotes (ppr tv)
+      $$  text "because it is not a concrete" <+> what <> dot
+      where
+        ki = tyVarKind tv
+        what :: SDoc
+        what
+          | isRuntimeRepTy ki
+          = quotes (text "RuntimeRep")
+          | isLevityTy ki
+          = quotes (text "Levity")
+          | otherwise
+          = text "type"
 
 pprTcSolverReportMsg _ (SkolemEscape item implic esc_skols) =
   let

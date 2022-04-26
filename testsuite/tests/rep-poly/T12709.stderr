@@ -1,9 +1,11 @@
 
 T12709.hs:28:13: error:
-    • The argument ‘1 + 2 + 3’ of ‘(+)’
+    • The argument ‘1’ of ‘(+)’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE rep
+        a0 :: TYPE c0
+      Cannot unify ‘rep’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
     • In the expression: 1 + 2 + 3 + 4
       In an equation for ‘u’: u = 1 + 2 + 3 + 4
       In the expression:
@@ -11,3 +13,4 @@ T12709.hs:28:13: error:
           u :: Num (a :: TYPE rep) => a
           u = 1 + 2 + 3 + 4
         in BUB u u
+    • Relevant bindings include u :: a (bound at T12709.hs:28:9)

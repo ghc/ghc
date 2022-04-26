@@ -100,8 +100,6 @@ module GHC.Builtin.Types.Prim(
         eqPhantPrimTyCon,       -- ty1 ~P# ty2  (at role Phantom)
         equalityTyCon,
 
-        isReflPrimTyCon,
-
         -- * SIMD
 #include "primop-vector-tys-exports.hs-incl"
   ) where
@@ -163,7 +161,6 @@ unexposedPrimTyCons
   = [ eqPrimTyCon
     , eqReprPrimTyCon
     , eqPhantPrimTyCon
-    , isReflPrimTyCon
     ]
 
 -- | Primitive 'TyCon's that are defined in, and exported from, GHC.Prim.
@@ -236,8 +233,7 @@ charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int3
   stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName,
   weakPrimTyConName, threadIdPrimTyConName,
   eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName,
-  stackSnapshotPrimTyConName,
-  isReflPrimTyConName :: Name
+  stackSnapshotPrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
 int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey int8PrimTyCon
@@ -275,7 +271,6 @@ stackSnapshotPrimTyConName    = mkPrimTc (fsLit "StackSnapshot#") stackSnapshotP
 bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTyCon
 weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
-isReflPrimTyConName           = mkPrimTc (fsLit "IsRefl#") isReflPrimTyConKey isReflPrimTyCon
 
 {-
 ************************************************************************
@@ -988,26 +983,6 @@ equalityTyCon :: Role -> TyCon
 equalityTyCon Nominal          = eqPrimTyCon
 equalityTyCon Representational = eqReprPrimTyCon
 equalityTyCon Phantom          = eqPhantPrimTyCon
-
-{- *********************************************************************
-*                                                                      *
-                         IsRefl#
-*                                                                      *
-********************************************************************* -}
-
--- | The 'TyCon' for the 'IsRefl#' constraint.
---
--- @type IsRefl# :: forall k. k -> k -> TYPE (TupleRep '[])@
---
--- See Note [IsRefl#] in GHC.Tc.Utils.Concrete.
-isReflPrimTyCon :: TyCon
-isReflPrimTyCon =
-  mkPrimTyCon isReflPrimTyConName binders res_kind roles
-    where
-      -- Kind :: forall k. k -> k-> TYPE (TupleRep '[])
-      binders = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k, k])
-      res_kind = unboxedTupleKind []
-      roles   = [Nominal, Nominal, Nominal]
 
 {- *********************************************************************
 *                                                                      *

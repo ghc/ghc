@@ -8,7 +8,8 @@ module GHC.Tc.Types.Evidence (
   -- * HsWrapper
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
-  mkWpLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, collectHsWrapBinders,
+  mkWpLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR,
+  collectHsWrapBinders,
   idHsWrapper, isIdHsWrapper,
   pprHsWrapper, hsWrapDictBinders,
 
@@ -43,7 +44,9 @@ module GHC.Tc.Types.Evidence (
   mkTcReflCo, mkTcNomReflCo, mkTcRepReflCo,
   mkTcTyConAppCo, mkTcAppCo, mkTcFunCo,
   mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos,
-  mkTcSymCo, mkTcSymMCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcSubCo, maybeTcSymCo,
+  mkTcSymCo, mkTcSymMCo,
+  mkTcTransCo,
+  mkTcNthCo, mkTcLRCo, mkTcSubCo, maybeTcSymCo,
   maybeTcSubCo, tcDowngradeRole,
   mkTcAxiomRuleCo, mkTcGReflRightCo, mkTcGReflRightMCo, mkTcGReflLeftCo, mkTcGReflLeftMCo,
   mkTcPhantomCo,
@@ -225,7 +228,7 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpFun HsWrapper HsWrapper (Scaled TcType)
+  | WpFun HsWrapper HsWrapper (Scaled TcTypeFRR)
        -- (WpFun wrap1 wrap2 (w, t1))[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
@@ -283,16 +286,17 @@ c1 <.> c2    = c1 `WpCompose` c2
 
 -- | Smart constructor to create a 'WpFun' 'HsWrapper'.
 --
--- PRECONDITION: the "from" type of the first wrapper must have a
+-- PRECONDITION: the "from" type of the first wrapper must have a syntactically
 -- fixed RuntimeRep (see Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete).
 mkWpFun :: HsWrapper -> HsWrapper
-        -> Scaled TcType -- ^ the "from" type of the first wrapper
-                         -- MUST have a fixed RuntimeRep
-        -> TcType        -- ^ either type of the second wrapper (used only when the
-                         -- second wrapper is the identity)
+        -> Scaled TcTypeFRR -- ^ the "from" type of the first wrapper
+                            -- MUST have a fixed RuntimeRep
+        -> TcType           -- ^ either type of the second wrapper (used only when the
+                            -- second wrapper is the identity)
         -> HsWrapper
-  -- NB: can't check that the argument type has a fixed RuntimeRep with an assertion,
-  -- as we will only be able to know that after typechecking.
+  -- NB: we can't check that the argument type has a fixed RuntimeRep with an assertion,
+  -- because of [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep]
+  -- in GHC.Tc.Utils.Concrete.
 mkWpFun WpHole       WpHole       _             _  = WpHole
 mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  = WpCast (mkTcFunCo Representational (multToCo w) (mkTcRepReflCo t1) co2)
 mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) (mkTcRepReflCo t2))
