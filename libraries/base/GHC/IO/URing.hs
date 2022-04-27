@@ -16,14 +16,18 @@ import qualified GHC.Event.IntTable as IT
 import GHC.Event.Unique
 
 import qualified System.Linux.IO.URing as URing
-import System.Linux.IO.URing.Sqe
+import System.Linux.IO.URing.Sqe (SqeBuilder, UserData, SqeIndex)
+import qualified System.Linux.IO.URing.Sqe as URing.Sqe
+import qualified System.Linux.IO.URing.Ring as URing.Ring
 import System.Linux.IO.URing.Cqe (Cqe(..))
 
 type Completion = Int32 -> IO ()
 
+data PendingReq = PendingReq !SqeIndex !Completion
+
 data URingMgr = URingMgr { uring :: !URing.URing
                          , uniqueSource :: !UniqueSource
-                         , requests :: !(IT.IntTable Completion)
+                         , requests :: !(IT.IntTable PendingReq)
                          }
 
 mAX_REQS :: Int
@@ -49,13 +53,19 @@ submit' :: URingMgr
 submit' mgr mkSqe compl = do
     Unique u <- newUnique (uniqueSource mgr)
     let err = error "repeated IO request unique"
-    _ <- IT.insertWith err (fromIntegral u) compl (requests mgr)
-    mb_sqe <- URing.postSqe (uring mgr) (mkSqe $ fromIntegral u)
-    (sqeIdx, r) <- case mb_sqe of
-      Nothing -> error "failed to post" -- TODO
-      Just r -> pure r
-    _ <- URing.submit (uring mgr) 1
-    return r
+    sqeIdx_mb <- URing.Ring.getSqe (uring mgr)
+    case sqeIdx_mb of
+      Just sqeIdx -> do
+        _ <- IT.insertWith err (fromIntegral u) (PendingReq sqeIdx compl) (requests mgr)
+        let sqe = mkSqe (fromIntegral u)
+        r <- URing.Sqe.pokeSqe sqe (URing.Ring.sqePtr (uring mgr) sqeIdx)
+        pushRes <- URing.Ring.pushSqe (uring mgr) sqeIdx
+        if pushRes
+          then do
+              _ <- URing.submit (uring mgr) 1
+              return r
+          else URing.freeSqe (uring mgr) sqeIdx >> error "SQ full"
+      Nothing -> error "failed to get sqe" -- TODO
 
 submit :: (UserData -> SqeBuilder a)
        -> Completion
@@ -78,7 +88,7 @@ globalURingMgr = unsafePerformIO $ do
     newMVar mgr
 
 startCompletionThread :: URing.URing
-                      -> IT.IntTable Completion
+                      -> IT.IntTable PendingReq
                       -> IO ()
 startCompletionThread uring requests = go
   where
@@ -97,5 +107,7 @@ startCompletionThread uring requests = go
               mb_req <- IT.delete reqId requests
               case mb_req of
                 Nothing -> error "No request"
-                Just compl -> compl (cqeRes cqe)
+                Just (PendingReq sqe_idx compl) -> do
+                    URing.freeSqe uring sqe_idx
+                    compl (cqeRes cqe)
 
