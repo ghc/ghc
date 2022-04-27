@@ -382,6 +382,10 @@ def geometric_mean(xs):
       return 1
 
 def tabulate_metrics(metrics: List[PerfMetric]) -> None:
+    if metrics == []:
+        print("No perf metrics to tabulate.")
+        return
+
     abbrevLen = get_abbrev_hash_length()
     hasBaseline = any([x.baseline is not None for x in metrics])
     baselineCommitSet = set([x.baseline.commit for x in metrics if x.baseline is not None])
