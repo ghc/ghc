@@ -2,8 +2,8 @@
 <no location info>: warning: [-Wunused-packages]
     The following packages were specified via -package or -package-id flags,
     but were not needed for compilation:
-      - bytestring-0.11.2.0 (exposed by flag -package bytestring)
+      - bytestring-0.11.3.0 (exposed by flag -package bytestring)
       - ghc-9.3 (exposed by flag -package ghc)
-      - process-1.6.13.2 (exposed by flag -package process)
+      - process-1.6.14.0 (exposed by flag -package process)
 [1 of 2] Compiling Main             ( UnusedPackages.hs, UnusedPackages.o )
 [2 of 2] Linking UnusedPackages
