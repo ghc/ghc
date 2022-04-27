@@ -208,7 +208,9 @@ install_wrappers: install_bin_libdir
 
 PKG_CONFS = $(shell find "$(ActualLibsDir)/package.conf.d" -name '*.conf' | sed 's:   :xxx:g')
 update_package_db: install_bin install_lib
-	@echo "$(PKG_CONFS)"
+	@echo "Installing C++ standard library virtual package"
+	cp mk/system-cxx-std-lib-1.0.conf "$(ActualLibsDir)/"
+	
 	@echo "Updating the package DB"
 	$(foreach p, $(PKG_CONFS),\
 		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-\([0-9]*[0-9]\.\)*conf//g'),$(shell echo "$p" | sed 's:xxx:   :g'),$(docdir),$(shell mk/relpath.sh "$(ActualLibsDir)" "$(docdir)")))
