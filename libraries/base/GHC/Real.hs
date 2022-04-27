@@ -717,22 +717,21 @@ floated out before the rule has a chance to fire.
 Also desirable would be rules for (^^), but I haven't managed
 to get those to fire.
 
-Note: Trying to save multiplications by sharing the square for
-exponents 4 and 5 does not save time, indeed, for Double, it is
-up to twice slower, so the rules contain flat sequences of
-multiplications.
+Note: Since (*) is not associative for some types (e.g. Double), it is
+important that the RHS of these rules produce the same bracketing as
+would the actual implementation of (^). A mismatch here led to #19569.
 -}
 
 -- See Note [Powers with small exponent]
 {-# RULES
-"^2/Int"        forall x. x ^ (2 :: Int) = let u = x in u*u
-"^3/Int"        forall x. x ^ (3 :: Int) = let u = x in u*u*u
-"^4/Int"        forall x. x ^ (4 :: Int) = let u = x in u*u*u*u
-"^5/Int"        forall x. x ^ (5 :: Int) = let u = x in u*u*u*u*u
-"^2/Integer"    forall x. x ^ (2 :: Integer) = let u = x in u*u
-"^3/Integer"    forall x. x ^ (3 :: Integer) = let u = x in u*u*u
-"^4/Integer"    forall x. x ^ (4 :: Integer) = let u = x in u*u*u*u
-"^5/Integer"    forall x. x ^ (5 :: Integer) = let u = x in u*u*u*u*u
+"^2/Int"        forall x. x ^ (2 :: Int) = x*x
+"^3/Int"        forall x. x ^ (3 :: Int) = x*x*x
+"^4/Int"        forall x. x ^ (4 :: Int) = let u = x*x in u*u
+"^5/Int"        forall x. x ^ (5 :: Int) = let u = x*x in u*u*x
+"^2/Integer"    forall x. x ^ (2 :: Integer) = x*x
+"^3/Integer"    forall x. x ^ (3 :: Integer) = x*x*x
+"^4/Integer"    forall x. x ^ (4 :: Integer) = let u = x*x in u*u
+"^5/Integer"    forall x. x ^ (5 :: Integer) = let u = x*x in u*u*x
   #-}
 
 -------------------------------------------------------
