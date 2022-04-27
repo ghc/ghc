@@ -414,7 +414,7 @@ declAssignAll xs ys = mconcat (zipWith (||=) xs ys)
 --
 -- TODO: use FastString instead
 dataFieldCache :: Array Int ShortText
-dataFieldCache = listArray (1,nFieldCache) (map (ST.pack . ('d':) . show) [(1::Int)..nFieldCache])
+dataFieldCache = listArray (0,nFieldCache) (map (ST.pack . ('d':) . show) [(0::Int)..nFieldCache])
 
 nFieldCache :: Int
 nFieldCache  = 16384
@@ -432,7 +432,7 @@ dataFieldNames = fmap dataFieldName [1..nFieldCache]
 --
 -- TODO: use FastString instead
 dataCache :: Array Int ShortText
-dataCache = listArray (1,1024) (map (ST.pack . ("h$d"++) . show) [(1::Int)..1024])
+dataCache = listArray (0,1024) (map (ST.pack . ("h$d"++) . show) [(0::Int)..1024])
 
 allocData :: Int -> JExpr
 allocData i = toJExpr (TxtI (dataCache ! i))
@@ -441,7 +441,7 @@ allocData i = toJExpr (TxtI (dataCache ! i))
 --
 -- TODO: use FastString instead
 clsCache :: Array Int ShortText
-clsCache = listArray (1,1024) (map (ST.pack . ("h$c"++) . show) [(1::Int)..1024])
+clsCache = listArray (0,1024) (map (ST.pack . ("h$c"++) . show) [(0::Int)..1024])
 
 allocClsA :: Int -> JExpr
 allocClsA i = toJExpr (TxtI (clsCache ! i))
