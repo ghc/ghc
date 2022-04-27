@@ -430,37 +430,43 @@ initHeapProfiling(void)
     init_prof_locale();
     set_prof_locale();
 
-    char *prog;
+    char *stem;
 
-    prog = stgMallocBytes(strlen(prog_name) + 1, "initHeapProfiling");
-    strcpy(prog, prog_name);
+    if (RtsFlags.CcFlags.outputFileNameStem) {
+        stem = stgMallocBytes(strlen(RtsFlags.CcFlags.outputFileNameStem) + 1, "initHeapProfiling");
+        strcpy(stem, RtsFlags.CcFlags.outputFileNameStem);
+    } else {
+
+        stem = stgMallocBytes(strlen(prog_name) + 1, "initHeapProfiling");
+        strcpy(stem, prog_name);
 #if defined(mingw32_HOST_OS)
-    // on Windows, drop the .exe suffix if there is one
-    {
-        char *suff;
-        suff = strrchr(prog,'.');
-        if (suff != NULL && !strcmp(suff,".exe")) {
-            *suff = '\0';
-        }
-    }
+            // on Windows, drop the .exe suffix if there is one
+            {
+                char *suff;
+                suff = strrchr(stem,'.');
+                if (suff != NULL && !strcmp(suff,".exe")) {
+                    *suff = '\0';
+                }
+            }
 #endif
+    }
 
   if (RtsFlags.ProfFlags.doHeapProfile) {
     /* Initialise the log file name */
-    hp_filename = stgMallocBytes(strlen(prog) + 6, "hpFileName");
-    sprintf(hp_filename, "%s.hp", prog);
+    hp_filename = stgMallocBytes(strlen(stem) + 6, "hpFileName");
+    sprintf(hp_filename, "%s.hp", stem);
 
     /* open the log file */
     if ((hp_file = __rts_fopen(hp_filename, "w+")) == NULL) {
       debugBelch("Can't open profiling report file %s\n",
               hp_filename);
       RtsFlags.ProfFlags.doHeapProfile = 0;
-      stgFree(prog);
+      stgFree(stem);
       return;
     }
   }
 
-  stgFree(prog);
+  stgFree(stem);
 
 #if defined(PROFILING)
     if (doingLDVProfiling() && doingRetainerProfiling()) {
