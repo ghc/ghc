@@ -370,6 +370,7 @@ Library
         cbits/primFloat.c
         cbits/sysconf.c
         cbits/fs.c
+        cbits/syscall.c
 
     cmm-sources:
         cbits/CastFloatWord.cmm
@@ -437,18 +438,42 @@ Library
         exposed-modules:
             GHC.Event
         other-modules:
+            GHC.Event.Arr
+            GHC.Event.Array
             GHC.Event.Control
             GHC.Event.EPoll
+            GHC.Event.IntTable
+            GHC.Event.IntVar
+            GHC.Event.Internal
             GHC.Event.KQueue
             GHC.Event.Manager
+            GHC.Event.PSQ
             GHC.Event.Poll
             GHC.Event.Thread
             GHC.Event.TimerManager
+            GHC.Event.Unique
 
             System.CPUTime.Posix.ClockGetTime
             System.CPUTime.Posix.Times
             System.CPUTime.Posix.RUsage
             System.CPUTime.Unsupported
+
+        -- io-uring
+        other-modules:
+            GHC.Event.IoUring
+            System.Linux.IO.URing
+            System.Linux.IO.URing.Cqe
+            System.Linux.IO.URing.PollEvent
+            System.Linux.IO.URing.IoVec
+            System.Linux.IO.URing.Ring
+            System.Linux.IO.URing.Sqe
+            System.Linux.IO.URing.Barrier
+            System.Linux.IO.URing.PVar
+        c-sources:
+            cbits/syscall.c
+            cbits/hs_uring.c
+        cmm-sources:
+            cbits/barriers.cmm
 
     -- The Ports framework always passes this flag when building software that
     -- uses iconv to make iconv from Ports compatible with iconv from the base system

@@ -5,6 +5,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- |
 -- The event manager supports event notification on fds. Each fd may
@@ -54,13 +55,19 @@ module GHC.Event.Manager
     ) where
 
 #include "EventConfig.h"
+#include "HsBaseConfig.h"
 
 ------------------------------------------------------------------------
 -- Imports
 
 import Control.Concurrent.MVar (MVar, newMVar, putMVar,
                                 tryPutMVar, takeMVar, withMVar)
+#if defined(HAVE_IO_URING)
+import Foreign.C.String (CString, withCString)
+import Control.Exception (IOException, onException, catch)
+#else
 import Control.Exception (onException)
+#endif
 import Data.Bits ((.&.))
 import Data.Foldable (forM_)
 import Data.Functor (void)
@@ -87,6 +94,12 @@ import qualified GHC.Event.Internal as I
 
 #if defined(HAVE_KQUEUE)
 import qualified GHC.Event.KQueue as KQueue
+#elif defined(HAVE_IO_URING) && defined(HAVE_EPOLL)
+-- We want both, since Docker seccomp rules for Docker runtimes released before
+-- 2020-12-08 forbid io_uring related syscalls even if the header files for
+-- them are present and autoconf indicates that they are available.
+import qualified GHC.Event.IoUring as IoUring
+import qualified GHC.Event.EPoll  as EPoll
 #elif defined(HAVE_EPOLL)
 import qualified GHC.Event.EPoll  as EPoll
 #elif defined(HAVE_POLL)
@@ -169,6 +182,19 @@ handleControlEvent mgr fd _evt = do
 newDefaultBackend :: IO Backend
 #if defined(HAVE_KQUEUE)
 newDefaultBackend = KQueue.new
+#elif defined(HAVE_IO_URING) && defined(HAVE_EPOLL)
+-- Older Docker runtimes have a seccomp profile that causes io_uring
+-- related syscalls to fail with EPERM errno codes, resulting in an
+-- IOError. If that happens, use the "normal" Epoll backend.
+newDefaultBackend = IoUring.new `catch` \ (ex :: IOException) -> do
+  outputErrorMessage $ show ex
+  outputErrorMessage "Could not start io_uring IO manager backend, falling back to epoll()"
+  outputErrorMessage "based backend. A possible cause is that this program is running"
+  outputErrorMessage "inside a Docker container with a Docker runtime released before"
+  outputErrorMessage "2020-12-08. If that is the case, upgrade yourDocker runtime or"
+  outputErrorMessage "use a custom seccomp profile whitelisting the io_uring syscalls to"
+  outputErrorMessage "make use of the io_uring backend."
+  EPoll.new
 #elif defined(HAVE_EPOLL)
 newDefaultBackend = EPoll.new
 #elif defined(HAVE_POLL)
@@ -521,3 +547,22 @@ nullToNothing xs@(_:_) = Just xs
 
 unless :: Monad m => Bool -> m () -> m ()
 unless p = when (not p)
+
+#if defined(HAVE_IO_URING)
+-- Wrapped in defined() block because otherwise we get "defined but not used" errors
+-- from -Wunused-top-binds
+
+-- Fun problem: if we want to output an error message during startup of the IO manager,
+-- it is not possible to use the "normal" functions for this because they depend on the
+-- IO manager to be already present. To overcome this we use the debugBelch function from
+-- the RTS internals.
+outputErrorMessage :: String -> IO ()
+outputErrorMessage msg =
+    withCString "%s\n" $ \cfmt ->
+     withCString msg $ \cmsg ->
+      debugBelch cfmt cmsg
+
+foreign import ccall unsafe "HsBase.h debugBelch2"
+   debugBelch :: CString -> CString -> IO ()
+
+#endif
