@@ -13,11 +13,11 @@ config.compiler_always_flags = ghc_compiler_always_flags.split()
 # this group are 'optasm', 'optllvm', 'profasm', 'threaded1', 'threaded2',
 # 'profthreaded', 'ghci', and whichever of 'static/dyn' is not this GHC's
 # default mode. Other ways should be set explicitly from .T files.
-config.compile_ways       = ['normal', 'hpc']
-config.run_ways           = ['normal', 'hpc']
+config.compile_ways       = {'normal', 'hpc'}
+config.run_ways           = {'normal', 'hpc'}
 
 # ways that are not enabled by default, but can always be invoked explicitly
-config.other_ways         = ['prof', 'normal_h',
+config.other_ways         = {'prof', 'normal_h',
                              'prof_hc_hb','prof_hb',
                              'prof_hd','prof_hy','prof_hr',
                              'sanity',
@@ -31,26 +31,26 @@ config.other_ways         = ['prof', 'normal_h',
                              'nonmoving_thr',
                              'nonmoving_thr_ghc',
                              'compacting_gc',
-                             ]
+                             }
 
 if ghc_with_native_codegen:
-    config.compile_ways.append('optasm')
-    config.run_ways.append('optasm')
+    config.compile_ways.add('optasm')
+    config.run_ways.add('optasm')
 
 if config.have_interp:
-    config.run_ways.append('ghci')
+    config.run_ways.add('ghci')
 
 if ghc_with_threaded_rts:
-    config.run_ways.append('threaded1')
+    config.run_ways.add('threaded1')
     if ghc_with_smp:
         config.have_smp = True
-        config.run_ways.append('threaded2')
+        config.run_ways.add('threaded2')
         if config.speed == 0:
-            config.run_ways.append('nonmoving_thr')
+            config.run_ways.add('nonmoving_thr')
 
 if ghc_with_dynamic_rts:
     config.supports_dynamic_libs = True
-    config.run_ways.append('dyn')
+    config.run_ways.add('dyn')
 
 if windows:
     config.supports_dynamic_hs = False
@@ -58,11 +58,11 @@ if windows:
 
 # WinIO I/O manager for Windows
 if windows:
-    winio_ways = ['winio', 'winio_threaded']
+    winio_ways = {'winio', 'winio_threaded'}
     if config.speed == 0:
-        config.run_ways += winio_ways
+        config.run_ways |= winio_ways
     else:
-        config.other_ways += winio_ways
+        config.other_ways |= winio_ways
 
 config.way_flags = {
     'normal'       : [],
@@ -180,8 +180,8 @@ def get_compiler_info():
     if config.unregisterised:
         print("Unregisterised build; skipping LLVM ways...")
     elif config.have_llvm:
-        config.compile_ways.append('optllvm')
-        config.run_ways.append('optllvm')
+        config.compile_ways.add('optllvm')
+        config.run_ways.add('optllvm')
     else:
         print("Failed to find `llc` command; skipping LLVM ways...")
 
@@ -230,11 +230,11 @@ def get_compiler_info():
     config.have_profiling = test_compile(['-prof'])
 
     if config.have_profiling:
-        config.compile_ways.append('profasm')
-        config.run_ways.append('profasm')
+        config.compile_ways.add('profasm')
+        config.run_ways.add('profasm')
 
     if config.have_profiling and ghc_with_threaded_rts:
-        config.run_ways.append('profthreaded')
+        config.run_ways.add('profthreaded')
         ghc_env['HAVE_PROFILING'] = 'YES'
 
     # See Note [WayFlags]

@@ -108,12 +108,12 @@ class TestConfig:
         # Which ways to run tests (when compiling and running respectively)
         # Other ways are added from the command line if we have the appropriate
         # libraries.
-        self.compile_ways = [] # type: List[WayName]
-        self.run_ways     = [] # type: List[WayName]
-        self.other_ways   = [] # type: List[WayName]
+        self.compile_ways = set() # type: Set[WayName]
+        self.run_ways     = set() # type: Set[WayName]
+        self.other_ways   = set() # type: Set[WayName]
 
         # The ways selected via the command line.
-        self.cmdline_ways = [] # type: List[WayName]
+        self.cmdline_ways = set() # type: Set[WayName]
 
         # Lists of flags for each way
         self.way_flags = {}  # type: Dict[WayName, List[str]]

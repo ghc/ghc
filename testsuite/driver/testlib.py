@@ -73,7 +73,7 @@ def stopNow() -> None:
 def stopping() -> bool:
     return wantToStop
 
-_all_ways = None
+_all_ways = None # type: Optional[Set[WayName]]
 
 def get_all_ways() -> Set[WayName]:
     global _all_ways
@@ -1063,19 +1063,19 @@ def test_common_work(watcher: testutil.Watcher,
             all_ways = config.run_ways
         elif func == ghci_script:
             if WayName('ghci') in config.run_ways:
-                all_ways = [WayName('ghci')]
+                all_ways = {WayName('ghci')}
             else:
-                all_ways = []
+                all_ways = set()
         elif func in [makefile_test, run_command]:
             # makefile tests aren't necessarily runtime or compile-time
             # specific. Assume we can run them in all ways. See #16042 for what
             # happened previously.
-            all_ways = config.compile_ways + config.run_ways
+            all_ways = config.compile_ways | config.run_ways
         else:
-            all_ways = [WayName('normal')]
+            all_ways = {WayName('normal')}
 
         # A test itself can request extra ways by setting opts.extra_ways
-        all_ways = all_ways + [way for way in opts.extra_ways if way not in all_ways]
+        all_ways = all_ways | {way for way in opts.extra_ways if way not in all_ways}
 
         t.total_test_cases += len(all_ways)
 
@@ -1084,25 +1084,25 @@ def test_common_work(watcher: testutil.Watcher,
             not getTestOpts().skip \
             and (only_ways is None
                  or (only_ways is not None and way in only_ways)) \
-            and (config.cmdline_ways == [] or way in config.cmdline_ways) \
+            and (config.cmdline_ways == set() or way in config.cmdline_ways) \
             and (not (config.skip_perf_tests and isStatsTest())) \
             and (not (config.only_perf_tests and not isStatsTest())) \
             and way not in getTestOpts().omit_ways
 
         # Which ways we are asked to skip
-        do_ways = list(filter (ok_way,all_ways))
+        do_ways = set(filter(ok_way,all_ways))
 
         # Only run all ways in slow mode.
         # See Note [validate and testsuite speed] in toplevel Makefile.
         if config.accept:
             # Only ever run one way
-            do_ways = do_ways[:1]
+            do_ways = set(list(do_ways)[:1])
         elif config.speed > 0:
             # However, if we EXPLICITLY asked for a way (with extra_ways)
             # please test it!
-            explicit_ways = list(filter(lambda way: way in opts.extra_ways, do_ways))
-            other_ways = list(filter(lambda way: way not in opts.extra_ways, do_ways))
-            do_ways = other_ways[:1] + explicit_ways
+            explicit_ways = set(filter(lambda way: way in opts.extra_ways, do_ways))
+            other_ways = set(filter(lambda way: way not in opts.extra_ways, do_ways))
+            do_ways = set(list(other_ways)[:1]) | explicit_ways # TODO: why do we truncate other_ways
 
         # Find all files in the source directory that this test
         # depends on. Do this only once for all ways.
@@ -1136,7 +1136,7 @@ def test_common_work(watcher: testutil.Watcher,
         # If we are only reporting hadrian dependencies, then skip the test
         # and add its dependencies to the global set
         if do_ways and config.only_report_hadrian_deps:
-            do_ways = []
+            do_ways = set()
             config.hadrian_deps |= getTestOpts().hadrian_deps
 
         # Run the required tests...
@@ -1151,7 +1151,7 @@ def test_common_work(watcher: testutil.Watcher,
                 traceback.print_exc()
                 framework_fail(name, way, traceback.format_exc())
 
-        t.n_tests_skipped += len(set(all_ways) - set(do_ways))
+        t.n_tests_skipped += len(all_ways - do_ways)
         if getTestOpts().expect == 'missing-lib': t.n_missing_libs += 1
 
         if config.cleanup and do_ways:

@@ -106,7 +106,7 @@ if args.config:
         field, value = arg.split('=', 1)
         setattr(config, field, value)
 
-all_ways = config.run_ways+config.compile_ways+config.other_ways
+all_ways = config.run_ways | config.compile_ways | config.other_ways
 
 if args.rootdir:
     config.rootdirs = args.rootdir
@@ -132,10 +132,10 @@ if args.way:
         if way not in all_ways:
             print('WARNING: Unknown WAY %s in --way' % way)
         else:
-            config.cmdline_ways += [way]
+            config.cmdline_ways |= {way}
             if way in config.other_ways:
-                config.run_ways += [way]
-                config.compile_ways += [way]
+                config.run_ways |= {way}
+                config.compile_ways |= {way}
 
 if args.skipway:
     for way in args.skipway:
