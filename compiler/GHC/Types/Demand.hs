@@ -66,7 +66,7 @@ module GHC.Types.Demand (
     -- * Demand signatures
     DmdSig(..), mkDmdSigForArity, mkClosedDmdSig,
     splitDmdSig, dmdSigDmdEnv, hasDemandEnvSig,
-    nopSig, botSig, isTopSig, isDeadEndSig, appIsDeadEnd, trimBoxityDmdSig,
+    nopSig, botSig, isTopSig, isDeadEndSig, isDeadEndAppSig, trimBoxityDmdSig,
     -- ** Handling arity adjustments
     prependArgsDmdSig, etaConvertDmdSig,
 
@@ -1976,15 +1976,15 @@ onlyBoxedArguments (DmdSig (DmdType _ dmds _)) = all demandIsBoxed dmds
    subDemandIsboxed (Prod Unboxed _) = False
    subDemandIsboxed (Prod _ ds)      = all demandIsBoxed ds
 
--- | Returns true if an application to n args would diverge or throw an
+-- | Returns true if an application to n value args would diverge or throw an
 -- exception.
 --
 -- If a function having 'botDiv' is applied to a less number of arguments than
 -- its syntactic arity, we cannot say for sure that it is going to diverge.
 -- Hence this function conservatively returns False in that case.
 -- See Note [Dead ends].
-appIsDeadEnd :: DmdSig -> Int -> Bool
-appIsDeadEnd (DmdSig (DmdType _ ds res)) n
+isDeadEndAppSig :: DmdSig -> Int -> Bool
+isDeadEndAppSig (DmdSig (DmdType _ ds res)) n
   = isDeadEndDiv res && not (lengthExceeds ds n)
 
 trimBoxityDmdType :: DmdType -> DmdType
