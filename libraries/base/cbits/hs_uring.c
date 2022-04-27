@@ -5,7 +5,6 @@
 #include <stdio.h>
 
 #include "HsBaseConfig.h"
-#if defined(HAVE_IO_URING)
 
 #include "../include/syscall.h"
 #include "../include/hs_uring.h"
@@ -100,4 +99,3 @@ void hs_free_uring(struct hs_uring *uring) {
   free(uring);
 }
 
-#endif /* defined(HAVE_IO_URING) */

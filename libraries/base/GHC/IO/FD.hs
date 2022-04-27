@@ -48,6 +48,11 @@ import GHC.Windows
 import Data.Bool
 import GHC.IO.SubSystem ((<!>))
 #endif
+#if 1
+import qualified GHC.IO.URing as URing
+import qualified System.Linux.IO.URing.Sqe as URing.Sqe
+import System.Linux.IO.URing.IoVec (IoVec(..))
+#endif
 
 import Foreign
 import Foreign.C
@@ -568,8 +573,15 @@ indicates that there's no data, we call threadWaitRead.
 
 -}
 
+supportsIOURing = True
+
 readRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
 readRawBufferPtr loc !fd !buf !off !len
+  | supportsIOURing = do
+      let vec = IoVec { iovBase = buf', iovLen = len }
+      withArray [vec] $ \ptr_vecs -> do
+        r <- URing.submitAndBlock $ URing.Sqe.readv (fromIntegral (fdFD fd)) (-1) ptr_vecs 1
+        return (fromIntegral r)
   | isNonBlocking fd = unsafe_read -- unsafe is ok, it can't block
   | otherwise    = do r <- throwErrnoIfMinus1 loc
                                 (unsafe_fdReady (fdFD fd) 0 0 0)
@@ -581,8 +593,9 @@ readRawBufferPtr loc !fd !buf !off !len
                       throwErrnoIfMinus1RetryMayBlock loc call
                             (threadWaitRead (fromIntegral (fdFD fd)))
     read        = if threaded then safe_read else unsafe_read
-    unsafe_read = do_read (c_read (fdFD fd) (buf `plusPtr` off) len)
-    safe_read   = do_read (c_safe_read (fdFD fd) (buf `plusPtr` off) len)
+    unsafe_read = do_read (c_read (fdFD fd) buf' len)
+    safe_read   = do_read (c_safe_read (fdFD fd) buf' len)
+    buf' = buf `plusPtr` off
 
 -- return: -1 indicates EOF, >=0 is bytes read
 readRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
@@ -603,6 +616,11 @@ readRawBufferPtrNoBlock loc !fd !buf !off !len
 
 writeRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtr loc !fd !buf !off !len
+  | supportsIOURing = do
+      let vec = IoVec { iovBase = buf', iovLen = len }
+      withArray [vec] $ \ptr_vecs -> do
+        r <- URing.submitAndBlock $ URing.Sqe.writev (fromIntegral (fdFD fd)) (-1) ptr_vecs 1
+        return (fromIntegral r)
   | isNonBlocking fd = unsafe_write -- unsafe is ok, it can't block
   | otherwise   = do r <- unsafe_fdReady (fdFD fd) 1 0 0
                      if r /= 0
@@ -613,8 +631,9 @@ writeRawBufferPtr loc !fd !buf !off !len
                       throwErrnoIfMinus1RetryMayBlock loc call
                         (threadWaitWrite (fromIntegral (fdFD fd)))
     write         = if threaded then safe_write else unsafe_write
-    unsafe_write  = do_write (c_write (fdFD fd) (buf `plusPtr` off) len)
-    safe_write    = do_write (c_safe_write (fdFD fd) (buf `plusPtr` off) len)
+    unsafe_write  = do_write (c_write (fdFD fd) buf' len)
+    safe_write    = do_write (c_safe_write (fdFD fd) buf' len)
+    buf' = buf `plusPtr` off
 
 writeRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtrNoBlock loc !fd !buf !off !len

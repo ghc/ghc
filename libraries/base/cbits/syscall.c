@@ -1,5 +1,4 @@
 #include "HsBaseConfig.h"
-#if defined(HAVE_IO_URING)
 
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -46,4 +45,3 @@ int io_uring_setup(unsigned entries, struct io_uring_params *p)
   return syscall(__NR_io_uring_setup, entries, p);
 }
 
-#endif

@@ -461,6 +461,7 @@ Library
         -- io-uring
         other-modules:
             GHC.Event.IoUring
+            GHC.IO.URing
             System.Linux.IO.URing
             System.Linux.IO.URing.Cqe
             System.Linux.IO.URing.PollEvent
