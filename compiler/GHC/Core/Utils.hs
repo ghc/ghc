@@ -1087,7 +1087,7 @@ exprIsDeadEnd e
   | otherwise
   = go 0 e
   where
-    go n (Var v)                 = isDeadEndId v &&  n >= idArity v
+    go n (Var v)                 = isDeadEndAppSig (idDmdSig v) n
     go n (App e a) | isTypeArg a = go n e
                    | otherwise   = go (n+1) e
     go n (Tick _ e)              = go n e
