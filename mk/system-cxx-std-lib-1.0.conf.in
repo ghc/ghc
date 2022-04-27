@@ -1,0 +1,13 @@
+name:                 system-cxx-std-lib
+version:              1.0
+visibility:           public
+id:                   system-cxx-std-lib-1.0
+key:                  system-cxx-std-lib-1.0
+synopsis:             A placeholder for the system's C++ standard library implementation.
+category:             System
+abi:                  00000000000000000000000000000000
+exposed:              True
+exposed-modules:
+extra-libraries:      @CXX_STD_LIB_LIBS@
+library-dirs:         @CXX_STD_LIB_LIB_DIRS@
+dynamic-library-dirs: @CXX_STD_LIB_DYN_LIB_DIRS@

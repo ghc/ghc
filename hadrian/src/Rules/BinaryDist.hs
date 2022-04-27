@@ -313,7 +313,6 @@ bindistRules = do
         top <- topDirectory
         copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath
 
-
     -- Copy various configure-related files needed for a working
     -- './configure [...] && make install' workflow
     -- (see the list of files needed in the 'binary-dist' rule above, before
@@ -349,6 +348,7 @@ bindistInstallFiles =
     [ "config.sub", "config.guess", "install-sh"
     , "mk" -/- "config.mk.in", "mk" -/- "install.mk.in", "mk" -/- "project.mk"
     , "mk" -/- "relpath.sh"
+    , "mk" -/- "system-cxx-std-lib-1.0.conf.in"
     , "README", "INSTALL" ]
 
 -- | This auxiliary function gives us a top-level 'Filepath' that we can 'need'

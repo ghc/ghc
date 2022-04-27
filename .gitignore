@@ -181,6 +181,7 @@ _darcs/
 /mk/config.h.in
 /mk/config.mk
 /mk/config.mk.old
+/mk/system-cxx-std-lib-1.0.conf
 /mk/install.mk
 /mk/project.mk
 /mk/project.mk.old

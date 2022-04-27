@@ -28,6 +28,7 @@ module Base (
     stageBinPath, stageLibPath, templateHscPath,
     ghcBinDeps, ghcLibDeps, haddockDeps,
     relativePackageDbPath, packageDbPath, packageDbStamp, mingwStamp,
+    systemCxxStdLibConf, systemCxxStdLibConfPath
     ) where
 
 import Control.Applicative
@@ -93,6 +94,15 @@ packageDbPath stage = buildRoot <&> (-/- relativePackageDbPath stage)
 packageDbStamp :: FilePath
 packageDbStamp = ".stamp"
 
+systemCxxStdLibConf :: FilePath
+systemCxxStdLibConf = "system-cxx-std-lib-1.0.conf"
+
+-- | The name of the generated @system-cxx-std-lib-1.0.conf@ package database
+-- entry.
+systemCxxStdLibConfPath :: Stage -> Action FilePath
+systemCxxStdLibConfPath stage =
+    packageDbPath stage <&> (-/- systemCxxStdLibConf)
+
 -- | @bin@ directory for the given 'Stage' (including the build root)
 stageBinPath :: Stage -> Action FilePath
 stageBinPath stage = buildRoot <&> (-/- stageString stage -/- "bin")
@@ -103,11 +113,14 @@ stageLibPath stage = buildRoot <&> (-/- stageString stage -/- "lib")
 
 -- | Files the GHC library depends on
 ghcLibDeps :: Stage -> Action [FilePath]
-ghcLibDeps stage = mapM (\f -> stageLibPath stage <&> (-/- f))
-    [ "llvm-targets"
-    , "llvm-passes"
-    , "settings"
-    ]
+ghcLibDeps stage = do
+    ps <- mapM (\f -> stageLibPath stage <&> (-/- f))
+        [ "llvm-targets"
+        , "llvm-passes"
+        , "settings"
+        ]
+    cxxStdLib <- systemCxxStdLibConfPath stage
+    return (cxxStdLib : ps)
 
 -- | Files the GHC binary depends on.
 ghcBinDeps :: Stage -> Action [FilePath]

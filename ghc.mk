@@ -579,6 +579,10 @@ utils/check-ppr/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/check-exact/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/count-deps/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
+# ensure that system-cxx-std-lib is installed in the inplace compiler by
+# injecting a dependency from ghc-prim
+libraries/ghc-prim/dist-install/package-data.mk : inplace/lib/package.conf.d/system-cxx-std-lib-1.0.conf
+
 # add the final package.conf dependency: ghc-prim depends on RTS
 libraries/ghc-prim/dist-install/package-data.mk : rts/dist-install/package.conf.inplace
 endif
@@ -823,6 +827,12 @@ INSTALL_LIBRARY_DOCS += libraries/dist-haddock/*
 endif
 
 # -----------------------------------------------------------------------------
+# system-cxx-std-lib
+
+inplace/lib/package.conf.d/system-cxx-std-lib-1.0.conf : mk/system-cxx-std-lib-1.0.conf $(ghc-pkg_INPLACE)
+	"$(ghc-pkg_INPLACE)" update --force $<
+
+# -----------------------------------------------------------------------------
 # Creating a local mingw copy on Windows
 
 ifeq "$(Windows_Host)" "YES"
@@ -993,7 +1003,7 @@ INSTALL_DISTDIR_compiler = stage2
 
 # Now we can do the installation
 install_packages: install_libexecs
-install_packages: rts/dist-install/package.conf.install
+install_packages: rts/dist-install/package.conf.install mk/system-cxx-std-lib-1.0.conf.install
 	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
 	$(call removeTrees,"$(INSTALLED_PACKAGE_CONF)")
 	$(INSTALL_DIR) "$(INSTALLED_PACKAGE_CONF)"
@@ -1010,6 +1020,7 @@ install_packages: rts/dist-install/package.conf.install
 	                                  '$(docdir)/html/libraries'  \
 	                                  '$(GhcLibWays)'))
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/dist-install/package.conf.install
+	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update mk/system-cxx-std-lib-1.0.conf
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(ghc-cabal_INPLACE)" register                    \
@@ -1050,6 +1061,7 @@ $(eval $(call bindist-list,.,\
     packages \
     Makefile \
     mk/config.mk.in \
+    mk/system-cxx-std-lib-1.0.conf.in \
     $(INPLACE_BIN)/mkdirhier \
     utils/ghc-cabal/dist-install/build/tmp/ghc-cabal \
     $(BINDIST_WRAPPERS) \
