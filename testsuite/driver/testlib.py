@@ -29,11 +29,13 @@ import testutil
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
 from perf_notes import MetricChange, PerfStat, MetricOracles
-extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 from my_typing import *
 
 from threading import Timer
+
+# TODO: See #12223
+extra_src_files = {TestName('T4198'): {'exitminus1.c'}} # type: Dict[TestName, Set[str]]
 
 global pool_sema
 if config.use_threads:
@@ -263,7 +265,7 @@ def req_th( name, opts ):
     """
     req_interp(name, opts)
     if ghc_dynamic():
-        return _omit_ways(name, opts, ['profasm', 'profthreaded'])
+        return _omit_ways(name, opts, {'profasm', 'profthreaded'})
 
 def req_smp( name, opts ):
     if not config.have_smp:
@@ -303,7 +305,7 @@ def _use_specs( name, opts, specs ):
 
 # -----
 
-def _lint_ways(name: TestName, ways: List[WayName]) -> None:
+def _lint_ways(name: TestName, ways: Iterable[WayName]) -> None:
     """ Check that all of the ways in a list are valid. """
     unknown_ways = [way
                     for way in get_all_ways()
@@ -315,7 +317,7 @@ def _lint_ways(name: TestName, ways: List[WayName]) -> None:
 def expect_fail_for( ways: List[WayName] ):
     def helper( name: TestName, opts ):
         _lint_ways(name, ways)
-        opts.expect_fail_for = ways
+        opts.expect_fail_for = set(ways)
 
     return helper
 
@@ -335,7 +337,7 @@ def expect_broken_for( bug: IssueNumber, ways: List[WayName] ):
     def helper( name: TestName, opts ):
         _lint_ways(name, ways)
         record_broken(name, opts, bug)
-        opts.expect_fail_for = ways
+        opts.expect_fail_for = set(ways)
 
     return helper
 
@@ -357,9 +359,9 @@ def fragile( bug: IssueNumber ):
     Indicates that failures of this test should be ignored due to fragility
     documented in the given ticket.
     """
-    def helper( name, opts, bug=bug ):
+    def helper( name: TestName, opts, bug: IssueNumber=bug ):
         record_broken(name, opts, bug)
-        opts.fragile_ways += config.way_flags.keys()
+        opts.fragile_ways |= set(config.way_flags.keys())
 
     return helper
 
@@ -371,25 +373,25 @@ def fragile_for( bug: IssueNumber, ways: List[WayName] ):
     def helper( name: TestName, opts ):
         _lint_ways(name, ways)
         record_broken(name, opts, bug)
-        opts.fragile_ways += ways
+        opts.fragile_ways |= set(ways)
 
     return helper
 
 # -----
 
 def omit_ways( ways: List[WayName] ):
-    return lambda name, opts: _omit_ways(name, opts, ways)
+    return lambda name, opts: _omit_ways(name, opts, set(ways))
 
-def _omit_ways( name: TestName, opts, ways: List[WayName] ):
+def _omit_ways( name: TestName, opts, ways: Set[WayName] ):
     _lint_ways(name, ways)
-    opts.omit_ways += ways
+    opts.omit_ways |= ways
 
 # -----
 
 def only_ways( ways: List[WayName] ):
     def helper( name: TestName, opts ):
         _lint_ways(name, ways)
-        opts.only_ways = ways
+        opts.only_ways = set(ways)
 
     return helper
 
@@ -398,7 +400,7 @@ def only_ways( ways: List[WayName] ):
 def extra_ways( ways: List[WayName] ):
     def helper( name: TestName, opts ):
         _lint_ways(name, ways)
-        opts.extra_ways = ways
+        opts.extra_ways = set(ways)
 
     return helper
 
@@ -462,15 +464,15 @@ def _extra_hc_opts( name, opts, v ):
 
 # -----
 
-def extra_clean( files ):
+def extra_clean( files: List[str] ):
     # TODO. Remove all calls to extra_clean.
     return lambda _name, _opts: None
 
-def extra_files(files):
-    return lambda name, opts: _extra_files(name, opts, files)
+def extra_files(files: List[str]):
+    return lambda name, opts: _extra_files(name, opts, set(files))
 
-def _extra_files(name, opts, files):
-    opts.extra_files.extend(files)
+def _extra_files(name: TestName, opts, files: Set[str]):
+    opts.extra_files |= files
 
 # -----
 
@@ -533,7 +535,7 @@ def _collect_stats(name: TestName, opts, metrics, deviation, is_compiler_stats_t
         else:
             _extra_run_opts(name, opts, RESIDENCY_OPTS)
         # The nonmoving collector does not support -G1
-        _omit_ways(name, opts, [WayName(name) for name in ['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']])
+        _omit_ways(name, opts, {WayName(name) for name in ['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']})
 
     for metric_name in metrics:
         metric = '{}/{}'.format(tag, metric_name)
@@ -1114,7 +1116,7 @@ def test_common_work(watcher: testutil.Watcher,
                        if f.startswith(name) and not f == name and
                           not f.endswith(testdir_suffix) and
                           not os.path.splitext(f)[1] in do_not_copy)
-        for filename in (opts.extra_files + extra_src_files.get(name, [])):
+        for filename in (opts.extra_files | extra_src_files.get(name, set())):
             if filename.startswith('/'):
                 framework_fail(name, None,
                     'no absolute paths in extra_files please: ' + filename)

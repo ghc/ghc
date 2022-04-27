@@ -315,22 +315,22 @@ class TestOptions:
        self.skip = False
 
        # the test is known to be fragile in these ways
-       self.fragile_ways = [] # type: List[WayName]
+       self.fragile_ways = set() # type: Set[WayName]
 
        # skip these ways
-       self.omit_ways = [] # type: List[WayName]
+       self.omit_ways = set() # type: Set[WayName]
 
        # skip all ways except these (None == do all ways)
-       self.only_ways = None # type: Optional[List[WayName]]
+       self.only_ways = None # type: Optional[Set[WayName]]
 
        # add these ways to the default set
-       self.extra_ways = [] # type: List[WayName]
+       self.extra_ways = set() # type: Set[WayName]
 
        # the result we normally expect for this test
        self.expect = 'pass'
 
        # override the expected result for certain ways
-       self.expect_fail_for = [] # type: List[WayName]
+       self.expect_fail_for = set() # type: Set[WayName]
 
        # the stdin file that this test will use (None for <name>.stdin)
        self.srcdir = None # type: Optional[Path]
@@ -363,10 +363,10 @@ class TestOptions:
        self.exit_code = 0 # type: int
 
        # extra files to clean afterward
-       self.clean_files = [] # type: List[str]
+       self.clean_files = set() # type: Set[str]
 
        # extra files to copy to the testdir
-       self.extra_files = [] # type: List[str]
+       self.extra_files = set() # type: Set[str]
 
        # Map from metric to (function from way and commit to baseline value, allowed percentage deviation) e.g.
        #     { 'bytes allocated': (
