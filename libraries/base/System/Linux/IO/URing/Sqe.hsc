@@ -228,10 +228,10 @@ timeoutNCompletions ts n userd = do
     setOff (fromIntegral n)
     setUserData userd
 
--- | Vectored read.
+-- | Vectored read. Behaves similarly to @pwritev2@.
 readv
   :: Fd          -- ^ 'Fd' to read from
-  -> Word64      -- ^ offset in bytes
+  -> COff        -- ^ offset in bytes. If @-1@ the file offset will be used
   -> Ptr IoVec   -- ^ IO vectors
   -> Word32      -- ^ number of IO vectors
   -> UserData
@@ -240,16 +240,16 @@ readv fd offset iovs iov_cnt userd = do
     zeroIt
     setOpCode (#const IORING_OP_READV)
     setFd fd
-    setOff offset
+    setOff (fromIntegral offset)
     setAddr iovs
     setLen iov_cnt
     setFlags 0
     setUserData userd
 
--- | Vectored write.
+-- | Vectored write. Behaves similarly to @pwritev2@.
 writev
   :: Fd          -- ^ 'Fd' to read from
-  -> Word64      -- ^ offset in bytes
+  -> COff        -- ^ offset in bytes. If @-1@ the file offset will be used.
   -> Ptr IoVec   -- ^ IO vectors
   -> Word32      -- ^ number of IO vectors
   -> UserData
@@ -258,7 +258,7 @@ writev fd offset iovs iov_cnt userd = do
     zeroIt
     setOpCode (#const IORING_OP_WRITEV)
     setFd fd
-    setOff offset
+    setOff (fromIntegral offset)
     setAddr iovs
     setLen iov_cnt
     setFlags 0

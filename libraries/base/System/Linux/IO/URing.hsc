@@ -47,6 +47,6 @@ postSqe uring sqe = do
       pushRes <- pushSqe uring sqeIdx
       if pushRes
         then return (Just (sqeIdx, r))
-        else return Nothing
+        else freeSqe uring sqeIdx >> return Nothing
     Nothing -> return Nothing
 
