@@ -84,6 +84,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Literal
 import GHC.Types.Tickish
+import GHC.Types.Demand ( isDeadEndAppSig )
 import GHC.Core.DataCon
 import GHC.Builtin.PrimOps
 import GHC.Types.Id
@@ -1116,7 +1117,7 @@ exprIsDeadEnd e
   | otherwise
   = go 0 e
   where
-    go n (Var v)                 = isDeadEndId v &&  n >= idArity v
+    go n (Var v)                 = isDeadEndAppSig (idStrictness v) n
     go n (App e a) | isTypeArg a = go n e
                    | otherwise   = go (n+1) e
     go n (Tick _ e)              = go n e

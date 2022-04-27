@@ -60,7 +60,7 @@ module GHC.Types.Demand (
     -- * Demand signatures
     StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
     splitStrictSig, strictSigDmdEnv, hasDemandEnvSig,
-    nopSig, botSig, isTopSig, isDeadEndSig, appIsDeadEnd,
+    nopSig, botSig, isTopSig, isDeadEndSig, isDeadEndAppSig,
     -- ** Handling arity adjustments
     prependArgsStrictSig, etaConvertStrictSig,
 
@@ -1468,15 +1468,15 @@ isTopSig (StrictSig ty) = isTopDmdType ty
 isDeadEndSig :: StrictSig -> Bool
 isDeadEndSig (StrictSig (DmdType _ _ res)) = isDeadEndDiv res
 
--- | Returns true if an application to n args would diverge or throw an
+-- | Returns true if an application to n value args would diverge or throw an
 -- exception.
 --
 -- If a function having 'botDiv' is applied to a less number of arguments than
 -- its syntactic arity, we cannot say for sure that it is going to diverge.
 -- Hence this function conservatively returns False in that case.
 -- See Note [Dead ends].
-appIsDeadEnd :: StrictSig -> Int -> Bool
-appIsDeadEnd (StrictSig (DmdType _ ds res)) n
+isDeadEndAppSig :: StrictSig -> Int -> Bool
+isDeadEndAppSig (StrictSig (DmdType _ ds res)) n
   = isDeadEndDiv res && not (lengthExceeds ds n)
 
 prependArgsStrictSig :: Int -> StrictSig -> StrictSig
