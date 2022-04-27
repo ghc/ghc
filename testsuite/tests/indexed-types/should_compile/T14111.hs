@@ -3,7 +3,8 @@
 -- {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs ,ExplicitNamespaces#-}
 {-# LANGUAGE UnboxedTuples #-}
 

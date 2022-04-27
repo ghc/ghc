@@ -1,5 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
 module T13895 where
 
 import Data.Data (Data, Typeable)

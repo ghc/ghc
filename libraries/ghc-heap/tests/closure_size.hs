@@ -1,7 +1,8 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import GHC.Exts

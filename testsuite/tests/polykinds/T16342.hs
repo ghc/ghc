@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeInType, ConstrainedClassMethods, ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses, DataKinds, PolyKinds, ConstrainedClassMethods, ScopedTypeVariables #-}
 
 module T16342 where
 

@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs      #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
 module T16347 where
 
 import Data.Kind

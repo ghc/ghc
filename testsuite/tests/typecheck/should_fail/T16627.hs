@@ -1,4 +1,4 @@
-{-# language TypeInType, ScopedTypeVariables #-}
+{-# language DataKinds, PolyKinds, ScopedTypeVariables #-}
 module Silly where
 import Type.Reflection (Typeable, typeRep, TypeRep)
 import Type.Reflection.Unsafe (mkTrApp)

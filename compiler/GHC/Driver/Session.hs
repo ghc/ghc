@@ -3179,6 +3179,17 @@ deprecatedForExtension lang turn_on
       flag | turn_on   = lang
            | otherwise = "No" ++ lang
 
+deprecatedForExtensions :: [String] -> TurnOnFlag -> String
+deprecatedForExtensions [] _ = panic "new extension has not been specified"
+deprecatedForExtensions [lang] turn_on = deprecatedForExtension lang turn_on
+deprecatedForExtensions langExts turn_on
+    = "use " ++ xExt flags ++ " instead"
+    where
+      flags | turn_on = langExts
+            | otherwise = ("No" ++) <$> langExts
+
+      xExt fls = intercalate " and "  $ (\flag -> "-X" ++ flag) <$> fls
+
 useInstead :: String -> String -> TurnOnFlag -> String
 useInstead prefix flag turn_on
   = "Use " ++ prefix ++ no ++ flag ++ " instead"
@@ -3745,7 +3756,8 @@ xFlagsDeps = [
   flagSpec "TransformListComp"                LangExt.TransformListComp,
   flagSpec "TupleSections"                    LangExt.TupleSections,
   flagSpec "TypeApplications"                 LangExt.TypeApplications,
-  flagSpec "TypeInType"                       LangExt.TypeInType,
+  depFlagSpec' "TypeInType"                   LangExt.TypeInType
+    (deprecatedForExtensions ["DataKinds", "PolyKinds"]),
   flagSpec "TypeFamilies"                     LangExt.TypeFamilies,
   flagSpec "TypeOperators"                    LangExt.TypeOperators,
   flagSpec "TypeSynonymInstances"             LangExt.TypeSynonymInstances,

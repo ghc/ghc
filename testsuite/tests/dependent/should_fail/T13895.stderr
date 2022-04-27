@@ -1,5 +1,5 @@
 
-T13895.hs:10:14: error:
+T13895.hs:11:14: error:
     • Illegal constraint in a kind: forall k. Typeable k => k -> *
     • In the type signature:
         dataCast1 :: forall (a :: Type).

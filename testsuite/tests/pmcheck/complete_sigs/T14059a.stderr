@@ -1,10 +1,10 @@
 
-T14059a.hs:20:1: warning: [-Wincomplete-patterns (in -Wextra)]
+T14059a.hs:21:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘wibble’:
         Patterns of type  ‘SBool z’ not matched: SFalse
 
-T14059a.hs:23:1: warning: [-Wincomplete-patterns (in -Wextra)]
+T14059a.hs:24:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘wobble’:
         Patterns of type  ‘SBool z’ not matched: SFalse

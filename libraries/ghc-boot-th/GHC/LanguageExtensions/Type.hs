@@ -55,7 +55,7 @@ data Extension
    | BangPatterns
    | TypeFamilies
    | TypeFamilyDependencies
-   | TypeInType
+   | TypeInType               -- Deprecated
    | OverloadedStrings
    | OverloadedLists
    | NumDecimals

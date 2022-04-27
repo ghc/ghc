@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeInType, ExistentialQuantification #-}
+{-# LANGUAGE GADTs, PolyKinds, DataKinds, ExistentialQuantification #-}
 
 module T16221 where
 

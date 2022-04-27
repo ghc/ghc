@@ -1,6 +1,6 @@
 -- tests detection of specified variables in datatypes and patterns
 :set -fprint-explicit-foralls
-:set -XTypeInType -XExistentialQuantification -XPatternSynonyms
+:set -XDataKinds -XPolyKinds -XExistentialQuantification -XPatternSynonyms
 data P1 a = P1
 data P2 (a :: k) = P2
 data P3 k (a :: k) = P3

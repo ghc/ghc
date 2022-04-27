@@ -1,5 +1,5 @@
 
-T14887.hs:14:1: error:
+T14887.hs:15:1: error:
     • The kind of ‘Foo2’ is ill-scoped
         Inferred kind: Foo2 :: forall (a :: k). forall k -> (a :~: a) -> *
       NB: Specified variables (namely: (a :: k)) always come first

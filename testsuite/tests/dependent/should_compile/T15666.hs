@@ -1,6 +1,6 @@
 {-# LANGUAGE
   NoImplicitPrelude,
-  TypeInType, PolyKinds, DataKinds,
+  PolyKinds, DataKinds,
   ScopedTypeVariables,
   TypeFamilies,
   UndecidableInstances

@@ -1,5 +1,5 @@
 
-T15076.hs:10:8: error:
+T15076.hs:11:8: error:
     • Cannot generalise type; skolem ‘a’ would escape its scope
       if I tried to quantify (x0 :: a) in this type:
         forall a (f :: forall (x :: a). Proxy @{a} x -> *).

@@ -1,4 +1,4 @@
-{-# Language RankNTypes, TypeOperators, DataKinds, PolyKinds, GADTs, TypeInType, TypeFamilies #-}
+{-# Language RankNTypes, TypeOperators, DataKinds, PolyKinds, GADTs, TypeFamilies #-}
 
 module T15664 where
 

@@ -2,7 +2,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE TypeApplications #-}
 
 module ExplicitForAllRules1 where

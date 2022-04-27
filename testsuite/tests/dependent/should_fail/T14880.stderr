@@ -1,5 +1,5 @@
 
-T14880.hs:12:5: error:
+T14880.hs:13:5: error:
     • Cannot generalise type; skolem ‘arg’ would escape its scope
       if I tried to quantify (a0 :: arg) in this type:
         forall x arg.

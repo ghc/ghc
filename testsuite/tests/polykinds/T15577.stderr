@@ -1,5 +1,5 @@
 
-T15577.hs:20:18: error:
+T15577.hs:21:18: error:
     • Expecting one more argument to ‘f’
       Expected a type, but ‘f’ has kind ‘* -> *’
     • In the type ‘f’

@@ -1,5 +1,5 @@
 
-T15380.hs:17:16: error:
+T15380.hs:18:16: error:
     • Expecting one more argument to ‘To (M x)’
       Expected a type, but ‘To (M x)’ has kind ‘Rep (M x) -> M x’
     • In the type ‘To (M x)’

@@ -1,7 +1,8 @@
 {-# LANGUAGE GADTs                     #-}
 {-# LANGUAGE PatternSynonyms           #-}
 {-# LANGUAGE RankNTypes                #-}
-{-# LANGUAGE TypeInType                #-}
+{-# LANGUAGE PolyKinds                 #-}
+{-# LANGUAGE DataKinds                 #-}
 {-# LANGUAGE TypeOperators             #-}
 {-# LANGUAGE ViewPatterns              #-}
 

@@ -2,7 +2,7 @@
              DeriveGeneric, FlexibleInstances, DefaultSignatures,
              RankNTypes, RoleAnnotations, ScopedTypeVariables,
              MagicHash, KindSignatures, PolyKinds, TypeApplications, DataKinds,
-             GADTs, UnboxedTuples, UnboxedSums, TypeInType, TypeOperators,
+             GADTs, UnboxedTuples, UnboxedSums, TypeOperators,
              Trustworthy, DeriveFunctor, BangPatterns, RecordWildCards, ImplicitParams #-}
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}

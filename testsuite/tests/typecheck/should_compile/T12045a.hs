@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, GADTs, TypeApplications, TypeInType, DataKinds,
+{-# LANGUAGE PolyKinds, GADTs, TypeApplications, DataKinds,
     RankNTypes, ConstraintKinds, TypeFamilies #-}
 
 module T12045a where

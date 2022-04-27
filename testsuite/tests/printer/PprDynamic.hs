@@ -4,7 +4,7 @@ Stephanie Weirich, Richard Eisenberg, and Dimitrios Vytiniotis, 2016. -}
 {-#  LANGUAGE RankNTypes, PolyKinds, TypeOperators,
              ScopedTypeVariables, GADTs, FlexibleInstances,
              UndecidableInstances, RebindableSyntax,
-             DataKinds, MagicHash, AutoDeriveTypeable, TypeInType  #-}
+             DataKinds, MagicHash, AutoDeriveTypeable  #-}
 {-# OPTIONS_GHC -fno-warn-missing-methods -fno-warn-redundant-constraints #-}
 
 module Dynamic where

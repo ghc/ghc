@@ -1,5 +1,5 @@
 
-UnliftedNewtypesLevityBinder.hs:16:7: error:
+UnliftedNewtypesLevityBinder.hs:15:7: error:
     • The newtype constructor argument
       does not have a fixed runtime representation.
       Its type is:
@@ -9,4 +9,4 @@ UnliftedNewtypesLevityBinder.hs:16:7: error:
     • In the expression: IdentC
       In an equation for ‘bad’: bad = IdentC
     • Relevant bindings include
-        bad :: a -> Ident a (bound at UnliftedNewtypesLevityBinder.hs:16:1)
+        bad :: a -> Ident a (bound at UnliftedNewtypesLevityBinder.hs:15:1)

@@ -1,5 +1,5 @@
 
-T15629.hs:26:31: error:
+T15629.hs:27:31: error:
     • Couldn't match kind ‘z’ with ‘ab’
       Expected kind ‘F x ab ~> F x ab’,
         but ‘Comp (F1Sym :: x ~> F x z) F2Sym’ has kind ‘TyFun
@@ -7,10 +7,10 @@ T15629.hs:26:31: error:
                                                          -> *’
       ‘z’ is a rigid type variable bound by
         the type signature for ‘g’
-        at T15629.hs:26:17
+        at T15629.hs:27:17
       ‘ab’ is a rigid type variable bound by
         the type signature for ‘g’
-        at T15629.hs:26:19-20
+        at T15629.hs:27:19-20
     • In the first argument of ‘Proxy’, namely
         ‘((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab ~> F x ab)’
       In the type signature:

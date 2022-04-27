@@ -1,5 +1,5 @@
 
-T18451.hs:10:58: error:
+T18451.hs:11:58: error:
     • Expected kind ‘k0’, but ‘b’ has kind ‘k’
       Type variable kinds:
         a :: k0

@@ -1,5 +1,5 @@
 
-T14230a.hs:13:3: error:
+T14230a.hs:14:3: error:
     • Type indexes must match class instance head
       Expected: CD (*) (Maybe a)
         Actual: CD k a

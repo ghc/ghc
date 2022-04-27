@@ -1,6 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds, ExistentialQuantification, GADTs, PolyKinds, TypeOperators #-}
-{-# LANGUAGE TypeInType, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 {-  # LANGUAGE UndecidableInstances #-}
 module T15552 where
 

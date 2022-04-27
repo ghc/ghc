@@ -1,6 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds, GADTs, PolyKinds, RankNTypes, TypeOperators, TypeFamilies
-             , TypeApplications, TypeInType #-}
+             , TypeApplications #-}
 
 module DumpParsedAst where
 import Data.Kind

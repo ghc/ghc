@@ -1,6 +1,7 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
 module Bug where
 
 import Data.Kind

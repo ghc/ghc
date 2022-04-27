@@ -1,7 +1,8 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
 module T17008b where
 
 import Data.Kind

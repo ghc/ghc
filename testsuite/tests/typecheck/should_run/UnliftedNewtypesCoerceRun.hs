@@ -6,7 +6,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnboxedSums #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 
 import GHC.Int (Int(I#))

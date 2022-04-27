@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType, GADTs, KindSignatures #-}
+{-# LANGUAGE PolyKinds, GADTs, KindSignatures #-}
 
 module T16344 where
 

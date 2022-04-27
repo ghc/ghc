@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeInType, EmptyDataDecls #-}
+{-# LANGUAGE GADTs, DataKinds, PolyKinds, EmptyDataDecls #-}
 
 module T16263 where
 

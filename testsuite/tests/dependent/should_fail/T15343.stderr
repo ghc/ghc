@@ -1,5 +1,5 @@
 
-T15343.hs:14:18: error:
+T15343.hs:15:18: error:
     • Expecting one more argument to ‘WhySym’
       Expected kind ‘forall z. z’, but ‘WhySym’ has kind ‘* -> *’
     • In the type ‘WhySym’

@@ -1,6 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TemplateHaskell, DataKinds, PolyKinds
-             , TypeInType, TypeApplications, TypeFamilies  #-}
+             , TypeApplications, TypeFamilies  #-}
 
 module T12045TH1 where
 import Data.Kind

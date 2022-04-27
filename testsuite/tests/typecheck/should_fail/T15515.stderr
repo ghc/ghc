@@ -1,5 +1,5 @@
 
-T15515.hs:16:10: error:
+T15515.hs:17:10: error:
     • Illegal type synonym family application ‘F’ in instance:
         C @{F -> *} D
     • In the instance declaration for ‘C (D :: F -> Type)’

@@ -1,5 +1,5 @@
 
-UnliftedNewtypesCoerceFail.hs:15:8: error:
+UnliftedNewtypesCoerceFail.hs:14:8: error:
     • Unsaturated use of a representation-polymorphic primitive function.
       The first argument of ‘coerce’
       does not have a fixed runtime representation.
@@ -10,4 +10,4 @@ UnliftedNewtypesCoerceFail.hs:15:8: error:
     • In the expression: coerce
       In an equation for ‘goof’: goof = coerce
     • Relevant bindings include
-        goof :: x -> y (bound at UnliftedNewtypesCoerceFail.hs:15:1)
+        goof :: x -> y (bound at UnliftedNewtypesCoerceFail.hs:14:1)

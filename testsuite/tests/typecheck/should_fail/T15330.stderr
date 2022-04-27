@@ -1,5 +1,5 @@
 
-T15330.hs:11:6: error:
+T15330.hs:12:6: error:
     • Couldn't match type: [Char]
                      with: Proxy (T 'True)
       Expected: Proxy (T 'True)
@@ -7,7 +7,7 @@ T15330.hs:11:6: error:
     • In the expression: "foo"
       In an equation for ‘f1’: f1 = "foo"
 
-T15330.hs:15:6: error:
+T15330.hs:16:6: error:
     • Couldn't match type: [Char]
                      with: Proxy (t 'True)
       Expected: Proxy (t 'True)
@@ -15,4 +15,4 @@ T15330.hs:15:6: error:
     • In the expression: "foo"
       In an equation for ‘f2’: f2 = "foo"
     • Relevant bindings include
-        f2 :: Proxy (t 'True) (bound at T15330.hs:15:1)
+        f2 :: Proxy (t 'True) (bound at T15330.hs:16:1)

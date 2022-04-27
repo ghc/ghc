@@ -1,11 +1,11 @@
 
-T15215.hs:10:3: error:
+T15215.hs:11:3: error:
     • Non type-variable argument in the constraint: Show (Maybe a)
     • In the definition of data constructor ‘MkA’
       In the data type declaration for ‘A’
     Suggested fix: Perhaps you intended to use FlexibleContexts
 
-T15215.hs:17:14: error:
+T15215.hs:18:14: error:
     • Data constructor ‘MkB’ cannot be used here
         (it has an unpromotable context ‘Show a’)
     • In the first argument of ‘SA’, namely ‘MkB’

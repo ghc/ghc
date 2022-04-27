@@ -3,7 +3,6 @@
 {-# LANGUAGE UnliftedNewtypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TypeInType #-}
 
 module UnliftedNewtypesLevityBinder where
 

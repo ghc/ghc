@@ -1,5 +1,5 @@
 {-# LANGUAGE Haskell2010 #-}
-{-# LANGUAGE RankNTypes, GADTs, TypeOperators, PolyKinds, DataKinds, TypeFamilies, AllowAmbiguousTypes, UndecidableInstances, TypeInType #-}
+{-# LANGUAGE RankNTypes, GADTs, TypeOperators, PolyKinds, DataKinds, TypeFamilies, AllowAmbiguousTypes, UndecidableInstances #-}
 
 module T14246 where
 

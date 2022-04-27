@@ -1,18 +1,18 @@
 
-T15962.hs:27:11: error:
+T15962.hs:28:11: error:
     • Found hole: _ :: Big ks -> Big (Eval (Map Dual ks))
       Where: ‘ks’ is a rigid type variable bound by
                the type signature for:
                  dualBig :: forall (ks :: [OpKind]).
                             Big ks -> Big (Eval (Map Dual ks))
-               at T15962.hs:26:1-45
+               at T15962.hs:27:1-45
     • In an equation for ‘dualBig’: dualBig = _
     • Relevant bindings include
         dualBig :: Big ks -> Big (Eval (Map Dual ks))
-          (bound at T15962.hs:27:1)
+          (bound at T15962.hs:28:1)
       Valid hole fits include
         dualBig :: Big ks -> Big (Eval (Map Dual ks))
-          (bound at T15962.hs:27:1)
+          (bound at T15962.hs:28:1)
 
-T15962.hs:33:12: error:
+T15962.hs:34:12: error:
     Variable not in scope: iDontExist :: Big ('Conjunction : ks)

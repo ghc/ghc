@@ -1,5 +1,5 @@
 
-T14845_fail2.hs:14:14: error:
+T14845_fail2.hs:15:14: error:
     • Data constructor ‘MkA’ cannot be used here
         (it has an unpromotable context ‘Coercible a Int’)
     • In the first argument of ‘SA’, namely ‘MkA’

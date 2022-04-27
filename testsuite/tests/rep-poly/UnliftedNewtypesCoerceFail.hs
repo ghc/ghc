@@ -2,7 +2,6 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE UnliftedNewtypes #-}
 
 module Goof where

@@ -3,7 +3,6 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeInType #-}
 
 module T17723a (C(..)) where
 

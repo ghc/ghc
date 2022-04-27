@@ -1,12 +1,12 @@
 
-T16245a.hs:11:66: error:
+T16245a.hs:12:66: error:
     • Expected kind ‘k1’, but ‘b’ has kind ‘k2’
       ‘k2’ is a rigid type variable bound by
         the newtype declaration for ‘T’
-        at T16245a.hs:11:12
+        at T16245a.hs:12:12
       ‘k1’ is a rigid type variable bound by
         the newtype declaration for ‘T’
-        at T16245a.hs:11:1-67
+        at T16245a.hs:12:1-67
     • In the second argument of ‘SameKind’, namely ‘b’
       In the type ‘(forall (b :: k). SameKind a b)’
       In the definition of data constructor ‘MkT’

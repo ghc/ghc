@@ -63,6 +63,8 @@ Language
 Compiler
 ~~~~~~~~
 
+- The :extension:`TypeInType` is now marked as deprecated. Its meaning has been included 
+  in :extension:`PolyKinds` and :extension:`DataKinds`.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
