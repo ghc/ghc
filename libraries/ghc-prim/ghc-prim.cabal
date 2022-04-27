@@ -75,18 +75,19 @@ Library
         -- is just an empty shell.
         extra-libraries: c, m
 
-    c-sources:
-        cbits/atomic.c
-        cbits/bswap.c
-        cbits/bitrev.c
-        cbits/clz.c
-        cbits/ctz.c
-        cbits/debug.c
-        cbits/longlong.c
-        cbits/pdep.c
-        cbits/pext.c
-        cbits/popcnt.c
-        cbits/word2float.c
+    if !os(ghcjs)
+      c-sources:
+          cbits/atomic.c
+          cbits/bswap.c
+          cbits/bitrev.c
+          cbits/clz.c
+          cbits/ctz.c
+          cbits/debug.c
+          cbits/longlong.c
+          cbits/pdep.c
+          cbits/pext.c
+          cbits/popcnt.c
+          cbits/word2float.c
 
     -- We need to set the unit ID to ghc-prim (without a version number)
     -- as it's magic.
