@@ -692,6 +692,10 @@ AC_SUBST(CONF_HC_OPTS_STAGE0)
 AC_SUBST(CONF_HC_OPTS_STAGE1)
 AC_SUBST(CONF_HC_OPTS_STAGE2)
 
+dnl Identify C++ standard library flavour and location
+FP_FIND_CXX_STD_LIB
+AC_CONFIG_FILES([mk/system-cxx-std-lib-1.0.conf])
+
 dnl ** Set up the variables for the platform in the settings file.
 dnl May need to use gcc to find platform details.
 dnl --------------------------------------------------------------

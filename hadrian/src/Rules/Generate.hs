@@ -192,6 +192,9 @@ copyRules = do
         prefix -/- "html/**"           <~ return "utils/haddock/haddock-api/resources"
         prefix -/- "latex/**"          <~ return "utils/haddock/haddock-api/resources"
 
+        root -/- relativePackageDbPath stage -/- systemCxxStdLibConf %> \file -> do
+            copyFile ("mk" -/- "system-cxx-std-lib-1.0.conf") file
+
 generateRules :: Rules ()
 generateRules = do
     root <- buildRootRules
