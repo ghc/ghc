@@ -98,14 +98,14 @@
 -- This file is divided into named sections, each containing or more
 -- primop entries. Section headers have the format:
 --
---      section "section-name" {description}
+--      section "section-name" {haddock-description}
 --
 -- This information is used solely when producing documentation; it is
--- otherwise ignored.  The description is optional.
+-- otherwise ignored.  The haddock-description is optional.
 --
 -- The format of each primop entry is as follows:
 --
---      primop internal-name "name-in-program-text" category type {description} attributes
+--      primop internal-name "name-in-program-text" category type {haddock-description} attributes
 
 -- The default attribute values which apply if you don't specify
 -- other ones.  Attribute values can be True, False, or arbitrary
@@ -181,10 +181,6 @@ defaults
 -- prim` can be moved to a small library tailured to the features being
 -- implemented and dependencies of those features.
 
--- Currently, documentation is produced using latex, so contents of
--- description fields should be legal latex. Descriptions can contain
--- matched pairs of embedded curly brackets.
-
 -- Note [Levity and representation polymorphic primops]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- In the types of primops in this module,
@@ -221,17 +217,16 @@ defaults
 --      nor `b` and `p`, nor `o` and `v`, etc.
 
 section "The word size story."
-        {Haskell98 specifies that signed integers (type {\tt Int})
-         must contain at least 30 bits. GHC always implements {\tt
-         Int} using the primitive type {\tt Int\#}, whose size equals
-         the {\tt MachDeps.h} constant {\tt WORD\_SIZE\_IN\_BITS}.
-         This is normally set based on the {\tt config.h} parameter
-         {\tt SIZEOF\_HSWORD}, i.e., 32 bits on 32-bit machines, 64
+        {Haskell98 specifies that signed integers (type 'Int')
+         must contain at least 30 bits. GHC always implements
+         'Int' using the primitive type 'Int#', whose size equals
+         the @MachDeps.h@ constant @WORD\_SIZE\_IN\_BITS@.
+         This is normally set based on the @config.h@ parameter
+         @SIZEOF\_HSWORD@, i.e., 32 bits on 32-bit machines, 64
          bits on 64-bit machines.
 
-         GHC also implements a primitive unsigned integer type {\tt
-         Word\#} which always has the same number of bits as {\tt
-         Int\#}.
+         GHC also implements a primitive unsigned integer type
+         'Word#' which always has the same number of bits as 'Int#'.
 
          In addition, GHC supports families of explicit-sized integers
          and words at 8, 16, 32, and 64 bits, with the usual
@@ -239,11 +234,11 @@ section "The word size story."
          conversions.
 
          Finally, there are strongly deprecated primops for coercing
-         between {\tt Addr\#}, the primitive type of machine
-         addresses, and {\tt Int\#}.  These are pretty bogus anyway,
+         between 'Addr#', the primitive type of machine
+         addresses, and 'Int#'.  These are pretty bogus anyway,
          but will work on existing 32-bit and 64-bit GHC targets; they
-         are completely bogus when tag bits are used in {\tt Int\#},
-         so are not available in this case.  }
+         are completely bogus when tag bits are used in 'Int#',
+         so are not available in this case.}
 
 ------------------------------------------------------------------------
 section "Char#"
@@ -725,7 +720,7 @@ primop   IntMulMayOfloOp  "mulIntMayOflo#"
 
     If in doubt, return non-zero, but do make an effort to create the
     correct answer for small args, since otherwise the performance of
-    \texttt{(*) :: Integer -> Integer -> Integer} will be poor.
+    @(*) :: Integer -> Integer -> Integer@ will be poor.
    }
    with commutable = True
 
@@ -738,7 +733,7 @@ primop   IntQuotOp    "quotInt#"    GenPrimOp
 
 primop   IntRemOp    "remInt#"    GenPrimOp
    Int# -> Int# -> Int#
-   {Satisfies \texttt{(quotInt\# x y) *\# y +\# (remInt\# x y) == x}. The
+   {Satisfies @('quotInt#' x y) '*#' y '+#' ('remInt#' x y) == x@. The
     behavior is undefined if the second argument is zero.
    }
    with can_fail = True
@@ -765,25 +760,25 @@ primop   IntNotOp   "notI#"   GenPrimOp   Int# -> Int#
 
 primop   IntNegOp    "negateInt#"    GenPrimOp   Int# -> Int#
    {Unary negation.
-    Since the negative {\tt Int#} range extends one further than the
-    positive range, {\tt negateInt#} of the most negative number is an
-    identity operation. This way, {\tt negateInt#} is always its own inverse.}
+    Since the negative 'Int#' range extends one further than the
+    positive range, 'negateInt#' of the most negative number is an
+    identity operation. This way, 'negateInt#' is always its own inverse.}
 
 primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
          {Add signed integers reporting overflow.
-          First member of result is the sum truncated to an {\tt Int#};
-          second member is zero if the true sum fits in an {\tt Int#},
+          First member of result is the sum truncated to an 'Int#';
+          second member is zero if the true sum fits in an 'Int#',
           nonzero if overflow occurred (the sum is either too large
-          or too small to fit in an {\tt Int#}).}
+          or too small to fit in an 'Int#').}
    with code_size = 2
         commutable = True
 
 primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
          {Subtract signed integers reporting overflow.
-          First member of result is the difference truncated to an {\tt Int#};
-          second member is zero if the true difference fits in an {\tt Int#},
+          First member of result is the difference truncated to an 'Int#';
+          second member is zero if the true difference fits in an 'Int#',
           nonzero if overflow occurred (the difference is either too large
-          or too small to fit in an {\tt Int#}).}
+          or too small to fit in an 'Int#').}
    with code_size = 2
 
 primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Int#
@@ -815,22 +810,22 @@ primop   IntToWordOp "int2Word#" GenPrimOp Int# -> Word#
    with code_size = 0
 
 primop   IntToFloatOp   "int2Float#"      GenPrimOp  Int# -> Float#
-   {Convert an {\tt Int#} to the corresponding {\tt Float#} with the same
+   {Convert an 'Int#' to the corresponding 'Float#' with the same
     integral value (up to truncation due to floating-point precision). e.g.
-    {\tt int2Float# 1# == 1.0#}}
+    @'int2Float#' 1# == 1.0#@}
 primop   IntToDoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
-   {Convert an {\tt Int#} to the corresponding {\tt Double#} with the same
+   {Convert an 'Int#' to the corresponding 'Double#' with the same
     integral value (up to truncation due to floating-point precision). e.g.
-    {\tt int2Double# 1# == 1.0##}}
+    @'int2Double#' 1# == 1.0##@}
 
 primop   WordToFloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
-   {Convert an {\tt Word#} to the corresponding {\tt Float#} with the same
+   {Convert an 'Word#' to the corresponding 'Float#' with the same
     integral value (up to truncation due to floating-point precision). e.g.
-    {\tt word2Float# 1## == 1.0#}}
+    @'word2Float#' 1## == 1.0#@}
 primop   WordToDoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
-   {Convert an {\tt Word#} to the corresponding {\tt Double#} with the same
+   {Convert an 'Word#' to the corresponding 'Double#' with the same
     integral value (up to truncation due to floating-point precision). e.g.
-    {\tt word2Double# 1## == 1.0##}}
+    @'word2Double#' 1## == 1.0##@}
 
 primop   IntSllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
          {Shift left.  Result undefined if shift amount is not
@@ -855,7 +850,7 @@ primop   WordAddOp   "plusWord#"   GenPrimOp   Word# -> Word# -> Word#
 primop   WordAddCOp   "addWordC#"   GenPrimOp   Word# -> Word# -> (# Word#, Int# #)
          {Add unsigned integers reporting overflow.
           The first element of the pair is the result.  The second element is
-          the carry flag, which is nonzero on overflow. See also {\tt plusWord2#}.}
+          the carry flag, which is nonzero on overflow. See also 'plusWord2#'.}
    with code_size = 2
         commutable = True
 
@@ -868,7 +863,7 @@ primop   WordSubCOp   "subWordC#"   GenPrimOp   Word# -> Word# -> (# Word#, Int#
 primop   WordAdd2Op   "plusWord2#"   GenPrimOp   Word# -> Word# -> (# Word#, Word# #)
          {Add unsigned integers, with the high part (carry) in the first
           component of the returned pair and the low part in the second
-          component of the pair. See also {\tt addWordC#}.}
+          component of the pair. See also 'addWordC#'.}
    with code_size = 2
         commutable = True
 
@@ -1065,9 +1060,9 @@ primop   DoubleNegOp   "negateDouble#"  GenPrimOp   Double# -> Double#
 primop   DoubleFabsOp  "fabsDouble#"    GenPrimOp   Double# -> Double#
 
 primop   DoubleToIntOp   "double2Int#"          GenPrimOp  Double# -> Int#
-   {Truncates a {\tt Double#} value to the nearest {\tt Int#}.
+   {Truncates a 'Double#' value to the nearest 'Int#'.
     Results are undefined if the truncation if truncation yields
-    a value outside the range of {\tt Int#}.}
+    a value outside the range of 'Int#'.}
 
 primop   DoubleToFloatOp   "double2Float#" GenPrimOp Double# -> Float#
 
@@ -1176,7 +1171,7 @@ primop   DoubleDecode_2IntOp   "decodeDouble_2Int#" GenPrimOp
 
 primop   DoubleDecode_Int64Op   "decodeDouble_Int64#" GenPrimOp
    Double# -> (# Int64#, Int# #)
-   {Decode {\tt Double\#} into mantissa and base-2 exponent.}
+   {Decode 'Double#' into mantissa and base-2 exponent.}
    with out_of_line = True
 
 ------------------------------------------------------------------------
@@ -1219,9 +1214,9 @@ primop   FloatNegOp   "negateFloat#"      GenPrimOp    Float# -> Float#
 primop   FloatFabsOp  "fabsFloat#"        GenPrimOp    Float# -> Float#
 
 primop   FloatToIntOp   "float2Int#"      GenPrimOp  Float# -> Int#
-   {Truncates a {\tt Float#} value to the nearest {\tt Int#}.
+   {Truncates a 'Float#' value to the nearest 'Int#'.
     Results are undefined if the truncation if truncation yields
-    a value outside the range of {\tt Int#}.}
+    a value outside the range of 'Int#'.}
 
 primop   FloatExpOp   "expFloat#"      GenPrimOp
    Float# -> Float#
@@ -1322,12 +1317,12 @@ primop   FloatToDoubleOp   "float2Double#" GenPrimOp  Float# -> Double#
 primop   FloatDecode_IntOp   "decodeFloat_Int#" GenPrimOp
    Float# -> (# Int#, Int# #)
    {Convert to integers.
-    First {\tt Int\#} in result is the mantissa; second is the exponent.}
+    First 'Int#' in result is the mantissa; second is the exponent.}
    with out_of_line = True
 
 ------------------------------------------------------------------------
 section "Arrays"
-        {Operations on {\tt Array\#}.}
+        {Operations on 'Array#'.}
 ------------------------------------------------------------------------
 
 primtype Array# a
@@ -1473,9 +1468,9 @@ primop CasArrayOp  "casArray#" GenPrimOp
     on a success the new value is returned, and on a failure the actual old
     value (not the expected one) is returned. Implies a full memory barrier.
     The use of a pointer equality on a boxed value makes this function harder
-    to use correctly than {\tt casIntArray\#}. All of the difficulties
-    of using {\tt reallyUnsafePtrEquality\#} correctly apply to
-    {\tt casArray\#} as well.
+    to use correctly than 'casIntArray#'. All of the difficulties
+    of using 'reallyUnsafePtrEquality#' correctly apply to
+    'casArray#' as well.
    }
    with
    out_of_line = True
@@ -1486,10 +1481,10 @@ primop CasArrayOp  "casArray#" GenPrimOp
 ------------------------------------------------------------------------
 section "Small Arrays"
 
-        {Operations on {\tt SmallArray\#}. A {\tt SmallArray\#} works
-         just like an {\tt Array\#}, but with different space use and
+        {Operations on 'SmallArray#'. A 'SmallArray#' works
+         just like an 'Array#', but with different space use and
          performance characteristics (that are often useful with small
-         arrays). The {\tt SmallArray\#} and {\tt SmallMutableArray#}
+         arrays). The 'SmallArray#' and 'SmallMutableArray#'
          lack a `card table'. The purpose of a card table is to avoid
          having to scan every element of the array on each GC by
          keeping track of which elements have changed since the last GC
@@ -1497,11 +1492,11 @@ section "Small Arrays"
          of there being no card table is that the representation is
          somewhat smaller and the writes are somewhat faster (because
          the card table does not need to be updated). The disadvantage
-         of course is that for a {\tt SmallMutableArray#} the whole
+         of course is that for a 'SmallMutableArray#' the whole
          array has to be scanned on each GC. Thus it is best suited for
          use cases where the mutable array is not long lived, e.g.
          where a mutable array is initialised quickly and then frozen
-         to become an immutable {\tt SmallArray\#}.
+         to become an immutable 'SmallArray#'.
         }
 
 ------------------------------------------------------------------------
@@ -1523,7 +1518,7 @@ primop  ShrinkSmallMutableArrayOp_Char "shrinkSmallMutableArray#" GenPrimOp
    SmallMutableArray# s v -> Int# -> State# s -> State# s
    {Shrink mutable array to new specified size, in
     the specified state thread. The new size argument must be less than or
-    equal to the current size as reported by {\tt getSizeofSmallMutableArray\#}.}
+    equal to the current size as reported by 'getSizeofSmallMutableArray#'.}
    with out_of_line = True
         has_side_effects = True
 
@@ -1655,7 +1650,7 @@ primop  ThawSmallArrayOp "thawSmallArray#" GenPrimOp
 primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
    SmallMutableArray# s v -> Int# -> v -> v -> State# s -> (# State# s, Int#, v #)
    {Unsafe, machine-level atomic compare and swap on an element within an array.
-    See the documentation of {\tt casArray\#}.}
+    See the documentation of 'casArray#'.}
    with
    out_of_line = True
    has_side_effects = True
@@ -1663,9 +1658,9 @@ primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Byte Arrays"
-        {A {\tt ByteArray\#} is a region of
+        {A 'ByteArray#' is a region of
          raw memory in the garbage-collected heap, which is not
-         scanned for pointers. 
+         scanned for pointers.
          There are three sets of operations for accessing byte array contents:
          index for reading from immutable byte arrays, and read/write
          for mutable byte arrays.  Each set contains operations for a
@@ -1683,29 +1678,29 @@ primtype ByteArray#
   which is not scanned for pointers during garbage collection.
 
   It is created by freezing a 'MutableByteArray#' with 'unsafeFreezeByteArray#'.
-  Freezing is essentially a no-op, as MutableByteArray# and ByteArray# share the same heap structure under the hood.
+  Freezing is essentially a no-op, as 'MutableByteArray#' and 'ByteArray#' share the same heap structure under the hood.
 
   The immutable and mutable variants are commonly used for scenarios requiring high-performance data structures,
-  like Text, Primitive Vector, Unboxed Array, and ShortByteString.
- 
+  like @Text@, @Primitive Vector@, @Unboxed Array@, and @ShortByteString@.
+
   Another application of fundamental importance is 'Integer', which is backed by 'ByteArray#'.
- 
+
   The representation on the heap of a Byte Array is:
- 
+
   > +------------+-----------------+-----------------------+
   > |            |                 |                       |
   > |   HEADER   | SIZE (in bytes) |       PAYLOAD         |
   > |            |                 |                       |
   > +------------+-----------------+-----------------------+
- 
+
   To obtain a pointer to actual payload (e.g., for FFI purposes) use 'byteArrayContents#' or 'mutableByteArrayContents#'.
- 
-  Alternatively, enabling the UnliftedFFITypes extension
+
+  Alternatively, enabling the @UnliftedFFITypes@ extension
   allows to mention 'ByteArray#' and 'MutableByteArray#' in FFI type signatures directly.
 }
 
 primtype MutableByteArray# s
-{ A mutable ByteAray#. It can be created in three ways:
+{ A mutable 'ByteAray#'. It can be created in three ways:
 
   * 'newByteArray#': Create an unpinned array.
   * 'newPinnedByteArray#': This will create a pinned array,
@@ -1742,13 +1737,13 @@ primop  NewAlignedPinnedByteArrayOp_Char "newAlignedPinnedByteArray#" GenPrimOp
 
 primop  MutableByteArrayIsPinnedOp "isMutableByteArrayPinned#" GenPrimOp
    MutableByteArray# s -> Int#
-   {Determine whether a {\tt MutableByteArray\#} is guaranteed not to move
+   {Determine whether a 'MutableByteArray#' is guaranteed not to move
    during GC.}
    with out_of_line = True
 
 primop  ByteArrayIsPinnedOp "isByteArrayPinned#" GenPrimOp
    ByteArray# -> Int#
-   {Determine whether a {\tt ByteArray\#} is guaranteed not to move during GC.}
+   {Determine whether a 'ByteArray#' is guaranteed not to move during GC.}
    with out_of_line = True
 
 primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
@@ -1763,23 +1758,23 @@ primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> State# s
    {Shrink mutable byte array to new specified size (in bytes), in
     the specified state thread. The new size argument must be less than or
-    equal to the current size as reported by {\tt getSizeofMutableByteArray\#}.}
+    equal to the current size as reported by 'getSizeofMutableByteArray#'.}
    with out_of_line = True
         has_side_effects = True
 
 primop  ResizeMutableByteArrayOp_Char "resizeMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
    {Resize (unpinned) mutable byte array to new specified size (in bytes).
-    The returned {\tt MutableByteArray\#} is either the original
-    {\tt MutableByteArray\#} resized in-place or, if not possible, a newly
-    allocated (unpinned) {\tt MutableByteArray\#} (with the original content
+    The returned 'MutableByteArray#' is either the original
+    'MutableByteArray#' resized in-place or, if not possible, a newly
+    allocated (unpinned) 'MutableByteArray#' (with the original content
     copied over).
 
-    To avoid undefined behaviour, the original {\tt MutableByteArray\#} shall
-    not be accessed anymore after a {\tt resizeMutableByteArray\#} has been
+    To avoid undefined behaviour, the original 'MutableByteArray#' shall
+    not be accessed anymore after a 'resizeMutableByteArray#' has been
     performed.  Moreover, no reference to the old one should be kept in order
-    to allow garbage collection of the original {\tt MutableByteArray\#} in
-    case a new {\tt MutableByteArray\#} had to be allocated.}
+    to allow garbage collection of the original 'MutableByteArray#' in
+    case a new 'MutableByteArray#' had to be allocated.}
    with out_of_line = True
         has_side_effects = True
 
@@ -1808,12 +1803,12 @@ primop  GetSizeofMutableByteArrayOp "getSizeofMutableByteArray#" GenPrimOp
 
 primop  CompareByteArraysOp "compareByteArrays#" GenPrimOp
    ByteArray# -> Int# -> ByteArray# -> Int# -> Int# -> Int#
-   {{\tt compareByteArrays# src1 src1_ofs src2 src2_ofs n} compares
-    {\tt n} bytes starting at offset {\tt src1_ofs} in the first
-    {\tt ByteArray#} {\tt src1} to the range of {\tt n} bytes
-    (i.e. same length) starting at offset {\tt src2_ofs} of the second
-    {\tt ByteArray#} {\tt src2}.  Both arrays must fully contain the
-    specified ranges, but this is not checked.  Returns an {\tt Int#}
+   {@'compareByteArrays#' src1 src1_ofs src2 src2_ofs n@ compares
+    @n@ bytes starting at offset @src1_ofs@ in the first
+    'ByteArray#' @src1@ to the range of @n@ bytes
+    (i.e. same length) starting at offset @src2_ofs@ of the second
+    'ByteArray#' @src2@.  Both arrays must fully contain the
+    specified ranges, but this is not checked.  Returns an 'Int#'
     less than, equal to, or greater than zero if the range is found,
     respectively, to be byte-wise lexicographically less than, to
     match, or be greater than the second range.}
@@ -1822,10 +1817,10 @@ primop  CompareByteArraysOp "compareByteArrays#" GenPrimOp
 
 primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
   ByteArray# -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-  {{\tt copyByteArray# src src_ofs dst dst_ofs n} copies the range
-   starting at offset {\tt src_ofs} of length {\tt n} from the
-   {\tt ByteArray#} {\tt src} to the {\tt MutableByteArray#} {\tt dst}
-   starting at offset {\tt dst_ofs}.  Both arrays must fully contain
+  {@'copyByteArray#' src src_ofs dst dst_ofs n@ copies the range
+   starting at offset @src_ofs@ of length @n@ from the
+   'ByteArray#' @src@ to the 'MutableByteArray#' @dst@
+   starting at offset @dst_ofs@.  Both arrays must fully contain
    the specified ranges, but this is not checked.  The two arrays must
    not be the same array in different states, but this is not checked
    either.}
@@ -1883,8 +1878,8 @@ primop  CopyAddrToByteArrayOp "copyAddrToByteArray#" GenPrimOp
 
 primop  SetByteArrayOp "setByteArray#" GenPrimOp
   MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> State# s
-  {{\tt setByteArray# ba off len c} sets the byte range {\tt [off, off+len)} of
-   the {\tt MutableByteArray#} to the byte {\tt c}.}
+  {@'setByteArray#' ba off len c@ sets the byte range @[off, off+len)@ of
+   the 'MutableByteArray#' to the byte @c@.}
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
@@ -2017,11 +2012,11 @@ pseudoop "nullAddr#" Addr#
 
 primop   AddrAddOp "plusAddr#" GenPrimOp Addr# -> Int# -> Addr#
 primop   AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
-         {Result is meaningless if two {\tt Addr\#}s are so far apart that their
-         difference doesn't fit in an {\tt Int\#}.}
+         {Result is meaningless if two 'Addr#'s are so far apart that their
+         difference doesn't fit in an 'Int#'.}
 primop   AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
-         {Return the remainder when the {\tt Addr\#} arg, treated like an {\tt Int\#},
-          is divided by the {\tt Int\#} arg.}
+         {Return the remainder when the 'Addr#' arg, treated like an 'Int#',
+          is divided by the 'Int#' arg.}
 primop   AddrToIntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
         {Coerce directly from address to int.}
    with code_size = 0
@@ -2431,11 +2426,11 @@ section "Mutable variables"
 ------------------------------------------------------------------------
 
 primtype MutVar# s a
-        {A {\tt MutVar\#} behaves like a single-element mutable array.}
+        {A 'MutVar#' behaves like a single-element mutable array.}
 
 primop  NewMutVarOp "newMutVar#" GenPrimOp
    v -> State# s -> (# State# s, MutVar# s v #)
-   {Create {\tt MutVar\#} with specified initial value in specified state thread.}
+   {Create 'MutVar#' with specified initial value in specified state thread.}
    with
    out_of_line = True
    has_side_effects = True
@@ -2456,14 +2451,14 @@ primop  NewMutVarOp "newMutVar#" GenPrimOp
 
 primop  ReadMutVarOp "readMutVar#" GenPrimOp
    MutVar# s v -> State# s -> (# State# s, v #)
-   {Read contents of {\tt MutVar\#}. Result is not yet evaluated.}
+   {Read contents of 'MutVar#'. Result is not yet evaluated.}
    with
    -- See Note [Why MutVar# ops can't fail]
    has_side_effects = True
 
 primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    MutVar# s v -> v -> State# s -> State# s
-   {Write contents of {\tt MutVar\#}.}
+   {Write contents of 'MutVar#'.}
    with
    -- See Note [Why MutVar# ops can't fail]
    has_side_effects = True
@@ -2483,11 +2478,11 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
 
 primop  AtomicModifyMutVar2Op "atomicModifyMutVar2#" GenPrimOp
    MutVar# s a -> (a -> c) -> State# s -> (# State# s, a, c #)
-   { Modify the contents of a {\tt MutVar\#}, returning the previous
+   { Modify the contents of a 'MutVar#', returning the previous
      contents and the result of applying the given function to the
      previous contents. Note that this isn't strictly
      speaking the correct type for this function; it should really be
-     {\tt MutVar\# s a -> (a -> (a,b)) -> State\# s -> (\# State\# s, a, (a, b) \#)},
+     @'MutVar#' s a -> (a -> (a,b)) -> 'State#' s -> (# 'State#' s, a, (a, b) #)@,
      but we don't know about pairs here. }
    with
    out_of_line = True
@@ -2496,7 +2491,7 @@ primop  AtomicModifyMutVar2Op "atomicModifyMutVar2#" GenPrimOp
 
 primop  AtomicModifyMutVar_Op "atomicModifyMutVar_#" GenPrimOp
    MutVar# s a -> (a -> a) -> State# s -> (# State# s, a, a #)
-   { Modify the contents of a {\tt MutVar\#}, returning the previous
+   { Modify the contents of a 'MutVar#', returning the previous
      contents and the result of applying the given function to the
      previous contents. }
    with
@@ -2508,18 +2503,18 @@ primop  CasMutVarOp "casMutVar#" GenPrimOp
   MutVar# s v -> v -> v -> State# s -> (# State# s, Int#, v #)
    { Compare-and-swap: perform a pointer equality test between
      the first value passed to this function and the value
-     stored inside the {\tt MutVar\#}. If the pointers are equal,
+     stored inside the 'MutVar#'. If the pointers are equal,
      replace the stored value with the second value passed to this
      function, otherwise do nothing.
-     Returns the final value stored inside the {\tt MutVar\#}.
-     The {\tt Int\#} indicates whether a swap took place,
-     with {\tt 1\#} meaning that we didn't swap, and {\tt 0\#}
+     Returns the final value stored inside the 'MutVar#'.
+     The 'Int#' indicates whether a swap took place,
+     with @1#@ meaning that we didn't swap, and @0#@
      that we did.
      Implies a full memory barrier.
      Because the comparison is done on the level of pointers,
      all of the difficulties of using
-     {\tt reallyUnsafePtrEquality\#} correctly apply to
-     {\tt casMutVar\#} as well.
+     'reallyUnsafePtrEquality#' correctly apply to
+     'casMutVar#' as well.
    }
    with
    out_of_line = True
@@ -2672,7 +2667,7 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
 primop  NewTVarOp "newTVar#" GenPrimOp
        v
     -> State# s -> (# State# s, TVar# s v #)
-   {Create a new {\tt TVar\#} holding a specified initial value.}
+   {Create a new 'TVar#' holding a specified initial value.}
    with
    out_of_line  = True
    has_side_effects = True
@@ -2680,8 +2675,8 @@ primop  NewTVarOp "newTVar#" GenPrimOp
 primop  ReadTVarOp "readTVar#" GenPrimOp
        TVar# s v
     -> State# s -> (# State# s, v #)
-   {Read contents of {\tt TVar\#} inside an STM transaction,
-    i.e. within a call to {\tt atomically\#}.
+   {Read contents of 'TVar#' inside an STM transaction,
+    i.e. within a call to 'atomically#'.
     Does not force evaluation of the result.}
    with
    out_of_line  = True
@@ -2690,7 +2685,7 @@ primop  ReadTVarOp "readTVar#" GenPrimOp
 primop ReadTVarIOOp "readTVarIO#" GenPrimOp
        TVar# s v
     -> State# s -> (# State# s, v #)
-   {Read contents of {\tt TVar\#} outside an STM transaction.
+   {Read contents of 'TVar#' outside an STM transaction.
    Does not force evaluation of the result.}
    with
    out_of_line      = True
@@ -2700,7 +2695,7 @@ primop  WriteTVarOp "writeTVar#" GenPrimOp
        TVar# s v
     -> v
     -> State# s -> State# s
-   {Write contents of {\tt TVar\#}.}
+   {Write contents of 'TVar#'.}
    with
    out_of_line      = True
    has_side_effects = True
@@ -2708,24 +2703,24 @@ primop  WriteTVarOp "writeTVar#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Synchronized Mutable Variables"
-        {Operations on {\tt MVar\#}s. }
+        {Operations on 'MVar#'s. }
 ------------------------------------------------------------------------
 
 primtype MVar# s a
-        { A shared mutable variable ({\it not} the same as a {\tt MutVar\#}!).
-        (Note: in a non-concurrent implementation, {\tt (MVar\# a)} can be
-        represented by {\tt (MutVar\# (Maybe a))}.) }
+        { A shared mutable variable (/not/ the same as a 'MutVar#'!).
+        (Note: in a non-concurrent implementation, @('MVar#' a)@ can be
+        represented by @('MutVar#' (Maybe a))@.) }
 
 primop  NewMVarOp "newMVar#"  GenPrimOp
    State# s -> (# State# s, MVar# s v #)
-   {Create new {\tt MVar\#}; initially empty.}
+   {Create new 'MVar#'; initially empty.}
    with
    out_of_line = True
    has_side_effects = True
 
 primop  TakeMVarOp "takeMVar#" GenPrimOp
    MVar# s v -> State# s -> (# State# s, v #)
-   {If {\tt MVar\#} is empty, block until it becomes full.
+   {If 'MVar#' is empty, block until it becomes full.
    Then remove and return its contents, and set it empty.}
    with
    out_of_line      = True
@@ -2733,15 +2728,15 @@ primop  TakeMVarOp "takeMVar#" GenPrimOp
 
 primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
    MVar# s v -> State# s -> (# State# s, Int#, v #)
-   {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
-   Otherwise, return with integer 1 and contents of {\tt MVar\#}, and set {\tt MVar\#} empty.}
+   {If 'MVar#' is empty, immediately return with integer 0 and value undefined.
+   Otherwise, return with integer 1 and contents of 'MVar#', and set 'MVar#' empty.}
    with
    out_of_line      = True
    has_side_effects = True
 
 primop  PutMVarOp "putMVar#" GenPrimOp
    MVar# s v -> v -> State# s -> State# s
-   {If {\tt MVar\#} is full, block until it becomes empty.
+   {If 'MVar#' is full, block until it becomes empty.
    Then store value arg as its new contents.}
    with
    out_of_line      = True
@@ -2749,15 +2744,15 @@ primop  PutMVarOp "putMVar#" GenPrimOp
 
 primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
    MVar# s v -> v -> State# s -> (# State# s, Int# #)
-   {If {\tt MVar\#} is full, immediately return with integer 0.
-    Otherwise, store value arg as {\tt MVar\#}'s new contents, and return with integer 1.}
+   {If 'MVar#' is full, immediately return with integer 0.
+    Otherwise, store value arg as 'MVar#''s new contents, and return with integer 1.}
    with
    out_of_line      = True
    has_side_effects = True
 
 primop  ReadMVarOp "readMVar#" GenPrimOp
    MVar# s v -> State# s -> (# State# s, v #)
-   {If {\tt MVar\#} is empty, block until it becomes full.
+   {If 'MVar#' is empty, block until it becomes full.
    Then read its contents without modifying the MVar, without possibility
    of intervention from other threads.}
    with
@@ -2766,15 +2761,15 @@ primop  ReadMVarOp "readMVar#" GenPrimOp
 
 primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
    MVar# s v -> State# s -> (# State# s, Int#, v #)
-   {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
-   Otherwise, return with integer 1 and contents of {\tt MVar\#}.}
+   {If 'MVar#' is empty, immediately return with integer 0 and value undefined.
+   Otherwise, return with integer 1 and contents of 'MVar#'.}
    with
    out_of_line      = True
    has_side_effects = True
 
 primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    MVar# s v -> State# s -> (# State# s, Int# #)
-   {Return 1 if {\tt MVar\#} is empty; 0 otherwise.}
+   {Return 1 if 'MVar#' is empty; 0 otherwise.}
    with
    out_of_line = True
    has_side_effects = True
@@ -2782,36 +2777,36 @@ primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Synchronized I/O Ports"
-        {Operations on {\tt IOPort\#}s. }
+        {Operations on 'IOPort#'s. }
 ------------------------------------------------------------------------
 
 primtype IOPort# s a
-        { A shared I/O port is almost the same as a {\tt MVar\#}!).
+        { A shared I/O port is almost the same as a 'MVar#'!).
         The main difference is that IOPort has no deadlock detection or
         deadlock breaking code that forcibly releases the lock. }
 
 primop  NewIOPortOp "newIOPort#"  GenPrimOp
    State# s -> (# State# s, IOPort# s v #)
-   {Create new {\tt IOPort\#}; initially empty.}
+   {Create new 'IOPort#'; initially empty.}
    with
    out_of_line = True
    has_side_effects = True
 
 primop  ReadIOPortOp "readIOPort#" GenPrimOp
    IOPort# s v -> State# s -> (# State# s, v #)
-   {If {\tt IOPort\#} is empty, block until it becomes full.
+   {If 'IOPort#' is empty, block until it becomes full.
    Then remove and return its contents, and set it empty.
-   Throws an {\tt IOPortException} if another thread is already
-   waiting to read this {\tt IOPort\#}.}
+   Throws an 'IOPortException' if another thread is already
+   waiting to read this 'IOPort#'.}
    with
    out_of_line      = True
    has_side_effects = True
 
 primop  WriteIOPortOp "writeIOPort#" GenPrimOp
    IOPort# s v -> v -> State# s -> (# State# s, Int# #)
-   {If {\tt IOPort\#} is full, immediately return with integer 0,
-    throwing an {\tt IOPortException}.
-    Otherwise, store value arg as {\tt IOPort\#}'s new contents,
+   {If 'IOPort#' is full, immediately return with integer 0,
+    throwing an 'IOPortException'.
+    Otherwise, store value arg as 'IOPort#''s new contents,
     and return with integer 1. }
    with
    out_of_line      = True
@@ -2847,20 +2842,20 @@ section "Concurrency primitives"
 ------------------------------------------------------------------------
 
 primtype State# s
-        { {\tt State\#} is the primitive, unlifted type of states.  It has
-        one type parameter, thus {\tt State\# RealWorld}, or {\tt State\# s},
+        { 'State#' is the primitive, unlifted type of states.  It has
+        one type parameter, thus @'State#' 'RealWorld'@, or @'State#' s@,
         where s is a type variable. The only purpose of the type parameter
         is to keep different state threads separate.  It is represented by
         nothing at all. }
 
 primtype RealWorld
-        { {\tt RealWorld} is deeply magical.  It is {\it primitive}, but it is not
-        {\it unlifted} (hence {\tt ptrArg}).  We never manipulate values of type
-        {\tt RealWorld}; it's only used in the type system, to parameterise {\tt State\#}. }
+        { 'RealWorld' is deeply magical.  It is /primitive/, but it is not
+        /unlifted/ (hence @ptrArg@).  We never manipulate values of type
+        'RealWorld'; it's only used in the type system, to parameterise 'State#'. }
 
 primtype ThreadId#
         {(In a non-concurrent implementation, this can be a singleton
-        type, whose (unique) value is returned by {\tt myThreadId\#}.  The
+        type, whose (unique) value is returned by 'myThreadId#'.  The
         other operations can be omitted.)}
 
 primop  ForkOp "fork#" GenPrimOp
@@ -2935,11 +2930,11 @@ primtype Weak# b
 primop  MkWeakOp "mkWeak#" GenPrimOp
    v -> w -> (State# RealWorld -> (# State# RealWorld, c #))
      -> State# RealWorld -> (# State# RealWorld, Weak# w #)
-   { {\tt mkWeak# k v finalizer s} creates a weak reference to value {\tt k},
-     with an associated reference to some value {\tt v}. If {\tt k} is still
-     alive then {\tt v} can be retrieved using {\tt deRefWeak#}. Note that
-     the type of {\tt k} must be represented by a pointer (i.e. of kind {\tt
-     TYPE 'LiftedRep} or {\tt TYPE 'UnliftedRep}). }
+   { @'mkWeak#' k v finalizer s@ creates a weak reference to value @k@,
+     with an associated reference to some value @v@. If @k@ is still
+     alive then @v@ can be retrieved using 'deRefWeak#'. Note that
+     the type of @k@ must be represented by a pointer (i.e. of kind
+     @'TYPE' ''LiftedRep' or @'TYPE' ''UnliftedRep'@). }
    with
    has_side_effects = True
    out_of_line      = True
@@ -2953,12 +2948,12 @@ primop  MkWeakNoFinalizerOp "mkWeakNoFinalizer#" GenPrimOp
 primop  AddCFinalizerToWeakOp "addCFinalizerToWeak#" GenPrimOp
    Addr# -> Addr# -> Int# -> Addr# -> Weak# w
           -> State# RealWorld -> (# State# RealWorld, Int# #)
-   { {\tt addCFinalizerToWeak# fptr ptr flag eptr w} attaches a C
-     function pointer {\tt fptr} to a weak pointer {\tt w} as a finalizer. If
-     {\tt flag} is zero, {\tt fptr} will be called with one argument,
-     {\tt ptr}. Otherwise, it will be called with two arguments,
-     {\tt eptr} and {\tt ptr}. {\tt addCFinalizerToWeak#} returns
-     1 on success, or 0 if {\tt w} is already dead. }
+   { @'addCFinalizerToWeak#' fptr ptr flag eptr w@ attaches a C
+     function pointer @fptr@ to a weak pointer @w@ as a finalizer. If
+     @flag@ is zero, @fptr@ will be called with one argument,
+     @ptr@. Otherwise, it will be called with two arguments,
+     @eptr@ and @ptr@. 'addCFinalizerToWeak#' returns
+     1 on success, or 0 if @w@ is already dead. }
    with
    has_side_effects = True
    out_of_line      = True
@@ -2974,9 +2969,9 @@ primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
               (State# RealWorld -> (# State# RealWorld, b #) ) #)
    { Finalize a weak pointer. The return value is an unboxed tuple
      containing the new state of the world and an "unboxed Maybe",
-     represented by an {\tt Int#} and a (possibly invalid) finalization
-     action. An {\tt Int#} of {\tt 1} indicates that the finalizer is valid. The
-     return value {\tt b} from the finalizer should be ignored. }
+     represented by an 'Int#' and a (possibly invalid) finalization
+     action. An 'Int#' of @1@ indicates that the finalizer is valid. The
+     return value @b@ from the finalizer should be ignored. }
    with
    has_side_effects = True
    out_of_line      = True
@@ -3024,11 +3019,11 @@ primop  StableNameToIntOp "stableNameToInt#" GenPrimOp
 ------------------------------------------------------------------------
 section "Compact normal form"
 
-        {Primitives for working with compact regions. The {\tt ghc\-compact}
-         library and the {\tt compact} library demonstrate how to use these
+        {Primitives for working with compact regions. The @ghc-compact@
+         library and the @compact@ library demonstrate how to use these
          primitives. The documentation below draws a distinction between
          a CNF and a compact block. A CNF contains one or more compact
-         blocks. The source file {\tt rts\/sm\/CNF.c}
+         blocks. The source file @rts\/sm\/CNF.c@
          diagrams this relationship. When discussing a compact
          block, an additional distinction is drawn between capacity and
          utilized bytes. The capacity is the maximum number of bytes that
@@ -3082,7 +3077,7 @@ primop  CompactGetFirstBlockOp "compactGetFirstBlock#" GenPrimOp
 primop  CompactGetNextBlockOp "compactGetNextBlock#" GenPrimOp
    Compact# -> Addr# -> State# RealWorld -> (# State# RealWorld, Addr#, Word# #)
    { Given a CNF and the address of one its compact blocks, returns the
-     next compact block and its utilized size, or {\tt nullAddr\#} if the
+     next compact block and its utilized size, or 'nullAddr#' if the
      argument was the last compact block in the CNF. }
    with
    out_of_line      = True
@@ -3090,12 +3085,12 @@ primop  CompactGetNextBlockOp "compactGetNextBlock#" GenPrimOp
 primop  CompactAllocateBlockOp "compactAllocateBlock#" GenPrimOp
    Word# -> Addr# -> State# RealWorld -> (# State# RealWorld, Addr# #)
    { Attempt to allocate a compact block with the capacity (in
-     bytes) given by the first argument. The {\texttt Addr\#} is a pointer
-     to previous compact block of the CNF or {\texttt nullAddr\#} to create a
+     bytes) given by the first argument. The 'Addr#' is a pointer
+     to previous compact block of the CNF or 'nullAddr#' to create a
      new CNF with a single compact block.
 
      The resulting block is not known to the GC until
-     {\texttt compactFixupPointers\#} is called on it, and care must be taken
+     'compactFixupPointers#' is called on it, and care must be taken
      so that the address does not escape or memory will be leaked.
    }
    with
@@ -3118,10 +3113,10 @@ primop  CompactFixupPointersOp "compactFixupPointers#" GenPrimOp
 primop CompactAdd "compactAdd#" GenPrimOp
    Compact# -> a -> State# RealWorld -> (# State# RealWorld, a #)
    { Recursively add a closure and its transitive closure to a
-     {\texttt Compact\#} (a CNF), evaluating any unevaluated components
-     at the same time. Note: {\texttt compactAdd\#} is not thread-safe, so
-     only one thread may call {\texttt compactAdd\#} with a particular
-     {\texttt Compact\#} at any given time. The primop does not
+     'Compact#' (a CNF), evaluating any unevaluated components
+     at the same time. Note: 'compactAdd#' is not thread-safe, so
+     only one thread may call 'compactAdd#' with a particular
+     'Compact#' at any given time. The primop does not
      enforce any mutual exclusion; the caller is expected to
      arrange this. }
    with
@@ -3130,7 +3125,7 @@ primop CompactAdd "compactAdd#" GenPrimOp
 
 primop CompactAddWithSharing "compactAddWithSharing#" GenPrimOp
    Compact# -> a -> State# RealWorld -> (# State# RealWorld, a #)
-   { Like {\texttt compactAdd\#}, but retains sharing and cycles
+   { Like 'compactAdd#', but retains sharing and cycles
    during compaction. }
    with
    has_side_effects = True
@@ -3153,7 +3148,7 @@ section "Unsafe pointer equality"
 -- See Note [Levity and representation polymorphic primops]
 primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
    v -> w -> Int#
-   { Returns {\texttt 1\#} if the given pointers are equal and {\texttt 0\#} otherwise. }
+   { Returns @1#@ if the given pointers are equal and @0#@ otherwise. }
    with
    can_fail   = True -- See Note [reallyUnsafePtrEquality# can_fail]
 
@@ -3280,8 +3275,8 @@ section "Controlling object lifetime"
 -- See Note [Levity and representation polymorphic primops]
 primop KeepAliveOp "keepAlive#" GenPrimOp
    v -> State# RealWorld -> (State# RealWorld -> p) -> p
-   { \tt{keepAlive# x s k} keeps the value \tt{x} alive during the execution
-     of the computation \tt{k}. }
+   { @'keepAlive#' x s k@ keeps the value @x@ alive during the execution
+     of the computation @k@. }
    with
    strictness = { \ _arity -> mkClosedDmdSig [topDmd, topDmd, strictOnceApply1Dmd] topDiv }
 
@@ -3315,20 +3310,20 @@ primtype BCO
 
 primop   AddrToAnyOp "addrToAny#" GenPrimOp
    Addr# -> (# a #)
-   { Convert an {\tt Addr\#} to a followable Any type. }
+   { Convert an 'Addr#' to a followable Any type. }
    with
    code_size = 0
 
 primop   AnyToAddrOp "anyToAddr#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, Addr# #)
    { Retrieve the address of any Haskell value. This is
-     essentially an {\texttt unsafeCoerce\#}, but if implemented as such
+     essentially an 'unsafeCoerce#', but if implemented as such
      the core lint pass complains and fails to compile.
      As a primop, it is opaque to core/stg, and only appears
      in cmm (where the copy propagation pass will get rid of it).
      Note that "a" must be a value, not a thunk! It's too late
      for strictness analysis to enforce this, so you're on your
-     own to guarantee this. Also note that {\texttt Addr\#} is not a GC
+     own to guarantee this. Also note that 'Addr#' is not a GC
      pointer - up to you to guarantee that it does not become
      a dangling pointer immediately after you get it.}
    with
@@ -3336,24 +3331,24 @@ primop   AnyToAddrOp "anyToAddr#" GenPrimOp
 
 primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
    BCO -> (# a #)
-   { Wrap a BCO in a {\tt AP_UPD} thunk which will be updated with the value of
+   { Wrap a BCO in a @AP_UPD@ thunk which will be updated with the value of
      the BCO when evaluated. }
    with
    out_of_line = True
 
 primop  NewBCOOp "newBCO#" GenPrimOp
    ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO #)
-   { {\tt newBCO\# instrs lits ptrs arity bitmap} creates a new bytecode object. The
+   { @'newBCO#' instrs lits ptrs arity bitmap@ creates a new bytecode object. The
      resulting object encodes a function of the given arity with the instructions
-     encoded in {\tt instrs}, and a static reference table usage bitmap given by
-     {\tt bitmap}. }
+     encoded in @instrs@, and a static reference table usage bitmap given by
+     @bitmap@. }
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  UnpackClosureOp "unpackClosure#" GenPrimOp
    a -> (# Addr#, ByteArray#, Array# b #)
-   { {\tt unpackClosure\# closure} copies the closure and pointers in the
+   { @'unpackClosure#' closure@ copies the closure and pointers in the
      payload of the given closure into two new arrays, and returns a pointer to
      the first word of the closure's info table, a non-pointer array for the raw
      bytes of the closure, and a pointer array for the pointers in the payload. }
@@ -3362,7 +3357,7 @@ primop  UnpackClosureOp "unpackClosure#" GenPrimOp
 
 primop  ClosureSizeOp "closureSize#" GenPrimOp
    a -> Int#
-   { {\tt closureSize\# closure} returns the size of the given closure in
+   { @'closureSize#' closure@ returns the size of the given closure in
      machine words. }
    with
    out_of_line = True
@@ -3382,9 +3377,9 @@ primop  GetCCSOfOp "getCCSOf#" GenPrimOp
 
 primop  GetCurrentCCSOp "getCurrentCCS#" GenPrimOp
    a -> State# s -> (# State# s, Addr# #)
-   { Returns the current {\tt CostCentreStack} (value is {\tt NULL} if
+   { Returns the current 'CostCentreStack' (value is @NULL@ if
      not profiling).  Takes a dummy argument which can be used to
-     avoid the call to {\tt getCurrentCCS\#} being floated out by the
+     avoid the call to 'getCurrentCCS#' being floated out by the
      simplifier, which would result in an uninformative stack
      ("CAF"). }
 
@@ -3401,8 +3396,8 @@ section "Info Table Origin"
 ------------------------------------------------------------------------
 primop WhereFromOp "whereFrom#" GenPrimOp
    a -> State# s -> (# State# s, Addr# #)
-   { Returns the {\tt InfoProvEnt } for the info table of the given object
-     (value is {\tt NULL} if the table does not exist or there is no information
+   { Returns the @InfoProvEnt @ for the info table of the given object
+     (value is @NULL@ if the table does not exist or there is no information
      about the closure).}
    with
    out_of_line = True
@@ -3413,13 +3408,13 @@ section "Etc"
 ------------------------------------------------------------------------
 
 primtype FUN m a b
-  {The builtin function type, written in infix form as {\tt a # m -> b}.
-   Values of this type are functions taking inputs of type {\tt a} and
-   producing outputs of type {\tt b}. The multiplicity of the input is
-   {\tt m}.
+  {The builtin function type, written in infix form as @a # m -> b@.
+   Values of this type are functions taking inputs of type @a@ and
+   producing outputs of type @b@. The multiplicity of the input is
+   @m@.
 
-   Note that {\tt FUN m a b} permits representation polymorphism in both
-   {\tt a} and {\tt b}, so that types like {\tt Int\# -> Int\#} can still be
+   Note that @'FUN' m a b@ permits representation polymorphism in both
+   @a@ and @b@, so that types like @'Int#' -> 'Int#'@ can still be
    well-kinded.
   }
 
@@ -3427,78 +3422,78 @@ pseudoop "realWorld#"
    State# RealWorld
    { The token used in the implementation of the IO monad as a state monad.
      It does not pass any information at runtime.
-     See also {\tt GHC.Magic.runRW\#}. }
+     See also 'GHC.Magic.runRW#'. }
 
 pseudoop "void#"
    (# #)
    { This is an alias for the unboxed unit tuple constructor.
-     In earlier versions of GHC, {\tt void\#} was a value
-     of the primitive type {\tt Void\#}, which is now defined to be {\tt (\# \#)}.
+     In earlier versions of GHC, 'void#' was a value
+     of the primitive type 'Void#', which is now defined to be @(# #)@.
    }
    with deprecated_msg = { Use an unboxed unit tuple instead }
 
 primtype Proxy# a
-   { The type constructor {\tt Proxy#} is used to bear witness to some
+   { The type constructor 'Proxy#' is used to bear witness to some
    type variable. It's used when you want to pass around proxy values
-   for doing things like modelling type applications. A {\tt Proxy#}
+   for doing things like modelling type applications. A 'Proxy#'
    is not only unboxed, it also has a polymorphic kind, and has no
    runtime representation, being totally free. }
 
 pseudoop "proxy#"
    Proxy# a
-   { Witness for an unboxed {\tt Proxy#} value, which has no runtime
+   { Witness for an unboxed 'Proxy#' value, which has no runtime
    representation. }
 
 pseudoop   "seq"
    a -> b -> b
-   { The value of {\tt seq a b} is bottom if {\tt a} is bottom, and
-     otherwise equal to {\tt b}. In other words, it evaluates the first
-     argument {\tt a} to weak head normal form (WHNF). {\tt seq} is usually
+   { The value of @'seq' a b@ is bottom if @a@ is bottom, and
+     otherwise equal to @b@. In other words, it evaluates the first
+     argument @a@ to weak head normal form (WHNF). 'seq' is usually
      introduced to improve performance by avoiding unneeded laziness.
 
-     A note on evaluation order: the expression {\tt seq a b} does
-     {\it not} guarantee that {\tt a} will be evaluated before {\tt b}.
-     The only guarantee given by {\tt seq} is that the both {\tt a}
-     and {\tt b} will be evaluated before {\tt seq} returns a value.
-     In particular, this means that {\tt b} may be evaluated before
-     {\tt a}. If you need to guarantee a specific order of evaluation,
-     you must use the function {\tt pseq} from the "parallel" package. }
+     A note on evaluation order: the expression @'seq' a b@ does
+     /not/ guarantee that @a@ will be evaluated before @b@.
+     The only guarantee given by 'seq' is that the both @a@
+     and @b@ will be evaluated before 'seq' returns a value.
+     In particular, this means that @b@ may be evaluated before
+     @a@. If you need to guarantee a specific order of evaluation,
+     you must use the function 'pseq' from the "parallel" package. }
    with fixity = infixr 0
          -- This fixity is only the one picked up by Haddock. If you
          -- change this, do update 'ghcPrimIface' in 'GHC.Iface.Load'.
 
 pseudoop   "unsafeCoerce#"
    a -> b
-   { The function {\tt unsafeCoerce\#} allows you to side-step the typechecker entirely. That
+   { The function 'unsafeCoerce#' allows you to side-step the typechecker entirely. That
         is, it allows you to coerce any type into any other type. If you use this function,
         you had better get it right, otherwise segmentation faults await. It is generally
         used when you want to write a program that you know is well-typed, but where Haskell's
         type system is not expressive enough to prove that it is well typed.
 
-        The following uses of {\tt unsafeCoerce\#} are supposed to work (i.e. not lead to
+        The following uses of 'unsafeCoerce#' are supposed to work (i.e. not lead to
         spurious compile-time or run-time crashes):
 
-         * Casting any lifted type to {\tt Any}
+         * Casting any lifted type to 'Any'
 
-         * Casting {\tt Any} back to the real type
+         * Casting 'Any' back to the real type
 
          * Casting an unboxed type to another unboxed type of the same size.
            (Casting between floating-point and integral types does not work.
-           See the {\tt GHC.Float} module for functions to do work.)
+           See the "GHC.Float" module for functions to do work.)
 
          * Casting between two types that have the same runtime representation.  One case is when
            the two types differ only in "phantom" type parameters, for example
-           {\tt Ptr Int} to {\tt Ptr Float}, or {\tt [Int]} to {\tt [Float]} when the list is
-           known to be empty.  Also, a {\tt newtype} of a type {\tt T} has the same representation
-           at runtime as {\tt T}.
+           @'Ptr' 'Int'@ to @'Ptr' 'Float'@, or @['Int']@ to @['Float']@ when the list is
+           known to be empty.  Also, a @newtype@ of a type @T@ has the same representation
+           at runtime as @T@.
 
-        Other uses of {\tt unsafeCoerce\#} are undefined.  In particular, you should not use
-        {\tt unsafeCoerce\#} to cast a T to an algebraic data type D, unless T is also
-        an algebraic data type.  For example, do not cast {\tt Int->Int} to {\tt Bool}, even if
-        you later cast that {\tt Bool} back to {\tt Int->Int} before applying it.  The reasons
+        Other uses of 'unsafeCoerce#' are undefined.  In particular, you should not use
+        'unsafeCoerce#' to cast a T to an algebraic data type D, unless T is also
+        an algebraic data type.  For example, do not cast @'Int'->'Int'@ to 'Bool', even if
+        you later cast that 'Bool' back to @'Int'->'Int'@ before applying it.  The reasons
         have to do with GHC's internal representation details (for the cognoscenti, data values
         can be entered but function closures cannot).  If you want a safe type to cast things
-        to, use {\tt Any}, which is not an algebraic data type.
+        to, use 'Any', which is not an algebraic data type.
 
         }
    with can_fail = True
@@ -3515,7 +3510,7 @@ primop  TraceEventOp "traceEvent#" GenPrimOp
    Addr# -> State# s -> State# s
    { Emits an event via the RTS tracing framework.  The contents
      of the event is the zero-terminated byte string passed as the first
-     argument.  The event will be emitted either to the {\tt .eventlog} file,
+     argument.  The event will be emitted either to the @.eventlog@ file,
      or to stderr, depending on the runtime RTS flags. }
    with
    has_side_effects = True
@@ -3526,7 +3521,7 @@ primop  TraceEventBinaryOp "traceBinaryEvent#" GenPrimOp
    { Emits an event via the RTS tracing framework.  The contents
      of the event is the binary object passed as the first argument with
      the given length passed as the second argument. The event will be
-     emitted to the {\tt .eventlog} file. }
+     emitted to the @.eventlog@ file. }
    with
    has_side_effects = True
    out_of_line      = True
@@ -3535,7 +3530,7 @@ primop  TraceMarkerOp "traceMarker#" GenPrimOp
    Addr# -> State# s -> State# s
    { Emits a marker event via the RTS tracing framework.  The contents
      of the event is the zero-terminated byte string passed as the first
-     argument.  The event will be emitted either to the {\tt .eventlog} file,
+     argument.  The event will be emitted either to the @.eventlog@ file,
      or to stderr, depending on the runtime RTS flags. }
    with
    has_side_effects = True
@@ -3549,9 +3544,9 @@ primop  SetThreadAllocationCounter "setThreadAllocationCounter#" GenPrimOp
    out_of_line      = True
 
 primtype StackSnapshot#
-   { Haskell representation of a {\tt StgStack*} that was created (cloned)
-     with a function in {\tt GHC.Stack.CloneStack}. Please check the
-     documentation in this module for more detailed explanations. }
+   { Haskell representation of a @StgStack*@ that was created (cloned)
+     with a function in "GHC.Stack.CloneStack". Please check the
+     documentation in that module for more detailed explanations. }
 
 ------------------------------------------------------------------------
 section "Safe coercions"
@@ -3559,7 +3554,7 @@ section "Safe coercions"
 
 pseudoop   "coerce"
    Coercible a b => a -> b
-   { The function {\tt coerce} allows you to safely convert between values of
+   { The function 'coerce' allows you to safely convert between values of
      types that have the same representation with no run-time overhead. In the
      simplest case you can use it instead of a newtype constructor, to go from
      the newtype's concrete type to the abstract type. But it also works in
@@ -3567,9 +3562,9 @@ pseudoop   "coerce"
      concrete types.
 
      This function is representation-polymorphic, but the
-     {\tt RuntimeRep} type argument is marked as {\tt Inferred}, meaning
+     'RuntimeRep' type argument is marked as 'Inferred', meaning
      that it is not available for visible type application. This means
-     the typechecker will accept {\tt coerce @Int @Age 42}.
+     the typechecker will accept @'coerce' @'Int' @Age 42@.
    }
 
 ------------------------------------------------------------------------
@@ -3674,7 +3669,7 @@ primop VecQuotOp "quot#" GenPrimOp
 
 primop VecRemOp "rem#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
-   { Satisfies \texttt{(quot\# x y) times\# y plus\# (rem\# x y) == x}. }
+   { Satisfies @('quot#' x y) 'times#' y 'plus#' ('rem#' x y) == x@. }
    with can_fail = True
         llvm_only = True
         vector = INT_VECTOR_TYPES
@@ -3815,10 +3810,10 @@ section "Prefetch"
   architectures or vendor hardware. The manual can be found at
   http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html .
 
-  The {\tt prefetch*} family of operations has the order of operations
-  determined by passing around the {\tt State#} token.
+  The @prefetch*@ family of operations has the order of operations
+  determined by passing around the 'State#' token.
 
-  To get a "pure" version of these operations, use {\tt inlinePerformIO} which is quite safe in this context.
+  To get a "pure" version of these operations, use 'inlinePerformIO' which is quite safe in this context.
 
   It is important to note that while the prefetch operations will never change the
   answer to a pure computation, They CAN change the memory locations resident

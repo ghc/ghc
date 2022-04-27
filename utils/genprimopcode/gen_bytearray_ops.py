@@ -25,7 +25,7 @@ element_types = [
     ElementType("Addr",      "Addr#",        "machine address",                       MACH_WORD),
     ElementType("Float",     "Float#",       "single-precision floating-point value", 4),
     ElementType("Double",    "Double#",      "double-precision floating-point value", 8),
-    ElementType("StablePtr", "StablePtr# a", "{\\tt StablePtr#} value",               MACH_WORD),
+    ElementType("StablePtr", "StablePtr# a", "'StablePtr#' value",                    MACH_WORD),
 ]
 
 # TODO: Eventually when the sized integer primops use proper unboxed types we
@@ -141,4 +141,3 @@ for t in element_types:
            with has_side_effects = True
                 can_fail = True
     ''', **t._asdict())
-

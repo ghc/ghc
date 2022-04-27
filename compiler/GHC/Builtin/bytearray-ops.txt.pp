@@ -51,7 +51,7 @@ primop IndexByteArrayOp_Double "indexDoubleArray#" GenPrimOp
 
 primop IndexByteArrayOp_StablePtr "indexStablePtrArray#" GenPrimOp
    ByteArray# -> Int# -> StablePtr# a
-   {Read a {\tt StablePtr#} value; offset in machine words.}
+   {Read a 'StablePtr#' value; offset in machine words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int8 "indexInt8Array#" GenPrimOp
@@ -136,7 +136,7 @@ primop IndexByteArrayOp_Word8AsDouble "indexWord8ArrayAsDouble#" GenPrimOp
 
 primop IndexByteArrayOp_Word8AsStablePtr "indexWord8ArrayAsStablePtr#" GenPrimOp
    ByteArray# -> Int# -> StablePtr# a
-   {Read a {\tt StablePtr#} value; offset in bytes.}
+   {Read a 'StablePtr#' value; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsInt16 "indexWord8ArrayAsInt16#" GenPrimOp
@@ -218,7 +218,7 @@ primop ReadByteArrayOp_Double "readDoubleArray#" GenPrimOp
 
 primop ReadByteArrayOp_StablePtr "readStablePtrArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, StablePtr# a #)
-   {Read a {\tt StablePtr#} value; offset in machine words.}
+   {Read a 'StablePtr#' value; offset in machine words.}
    with has_side_effects = True
         can_fail = True
 
@@ -319,7 +319,7 @@ primop ReadByteArrayOp_Word8AsDouble "readWord8ArrayAsDouble#" GenPrimOp
 
 primop ReadByteArrayOp_Word8AsStablePtr "readWord8ArrayAsStablePtr#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, StablePtr# a #)
-   {Read a {\tt StablePtr#} value; offset in bytes.}
+   {Read a 'StablePtr#' value; offset in bytes.}
    with has_side_effects = True
         can_fail = True
 
@@ -408,7 +408,7 @@ primop WriteByteArrayOp_Double "writeDoubleArray#" GenPrimOp
 
 primop WriteByteArrayOp_StablePtr "writeStablePtrArray#" GenPrimOp
    MutableByteArray# s -> Int# -> StablePtr# a -> State# s -> State# s
-   {Write a {\tt StablePtr#} value; offset in machine words.}
+   {Write a 'StablePtr#' value; offset in machine words.}
    with has_side_effects = True
         can_fail = True
 
@@ -509,7 +509,7 @@ primop WriteByteArrayOp_Word8AsDouble "writeWord8ArrayAsDouble#" GenPrimOp
 
 primop WriteByteArrayOp_Word8AsStablePtr "writeWord8ArrayAsStablePtr#" GenPrimOp
    MutableByteArray# s -> Int# -> StablePtr# a -> State# s -> State# s
-   {Write a {\tt StablePtr#} value; offset in bytes.}
+   {Write a 'StablePtr#' value; offset in bytes.}
    with has_side_effects = True
         can_fail = True
 
