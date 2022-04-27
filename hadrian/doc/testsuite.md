@@ -17,6 +17,11 @@ built GHC before, this will also build a stage 2 GHC in
 the default flavour along with many libraries and programs
 needed by the tests.
 
+NOTE: The only build flavours which are expected to pass the testsuite are those
+tested in CI. If you use an untested flavour such as "Quick" then you run the
+risk that not all tests will pass. In particular you can rely on the `validate`
+and `perf` flavours being tested but no others.
+
 ## Running only a subset of the testsuite
 
 ### Specific tests

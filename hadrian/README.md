@@ -193,6 +193,11 @@ To run GHC testsuite, use `build test`. See
 flags, as well as about the equivalents of the features that the Make build
 system offers.
 
+NOTE: The only build flavours which are expected to pass the testsuite are those
+tested in CI. If you use an untested flavour such as "Quick" then you run the
+risk that not all tests will pass. In particular you can rely on the `validate`
+and `perf` flavours being tested but no others.
+
 `build selftest` runs tests of the build system. The current test coverage
 is close to zero (see [#197][test-issue]).
 
