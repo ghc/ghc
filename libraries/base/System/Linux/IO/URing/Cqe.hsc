@@ -1,10 +1,3 @@
-#include "HsBaseConfig.h"
-#if !defined(HAVE_IO_URING)
-
-module System.Linux.IO.URing.Cqe where
--- empty module for Cabal
-
-#else
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -45,4 +38,3 @@ instance Storable Cqe where
         #{poke struct io_uring_cqe, res} ptr cqeRes
         #{poke struct io_uring_cqe, flags} ptr cqeFlags
 
-#endif /* defined(HAVE_IO_URING) */

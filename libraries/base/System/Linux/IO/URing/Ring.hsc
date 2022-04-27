@@ -1,10 +1,3 @@
-#include "HsBaseConfig.h"
-#if !defined(HAVE_IO_URING)
-
-module System.Linux.IO.URing.Ring where
--- empty module for Cabal
-
-#else
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
@@ -332,4 +325,3 @@ foreign import ccall unsafe "io_uring_enter"
       -> Ptr a   -- ^ sig
       -> IO CInt
 
-#endif /* defined(HAVE_IO_URING) */

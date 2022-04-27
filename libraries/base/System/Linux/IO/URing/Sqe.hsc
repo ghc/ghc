@@ -1,10 +1,3 @@
-#include "HsBaseConfig.h"
-#if !defined(HAVE_IO_URING)
-
-module System.Linux.IO.URing.Sqe where
--- empty module
-
-#else
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -303,4 +296,3 @@ sqeSize = #{size struct io_uring_sqe}
 --       val <- peekField ptr
 --       return $ name ++ " = " ++ show val
 
-#endif /* defined(HAVE_IO_URING) */

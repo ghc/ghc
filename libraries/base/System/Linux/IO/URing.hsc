@@ -1,10 +1,3 @@
-#include "HsBaseConfig.h"
-#if !defined(HAVE_IO_URING)
-
-module System.Linux.IO.URing where
--- empty module for Cabal
-
-#else
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -57,4 +50,3 @@ postSqe uring sqe = do
         else return Nothing
     Nothing -> return Nothing
 
-#endif /* defined(HAVE_IO_URING) */
