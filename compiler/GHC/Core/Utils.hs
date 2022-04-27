@@ -119,7 +119,7 @@ import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
 import Data.Ord            ( comparing )
 import qualified Data.Set as Set
 import GHC.Types.RepType (isZeroBitTy)
-import GHC.Types.Demand (isStrictDmd, isAbsDmd)
+import GHC.Types.Demand (isStrictDmd, isAbsDmd, isDeadEndAppSig)
 
 {-
 ************************************************************************
@@ -1089,7 +1089,7 @@ exprIsDeadEnd e
   | otherwise
   = go 0 e
   where
-    go n (Var v)                 = isDeadEndId v &&  n >= idArity v
+    go n (Var v)                 = isDeadEndAppSig (idDmdSig v) n
     go n (App e a) | isTypeArg a = go n e
                    | otherwise   = go (n+1) e
     go n (Tick _ e)              = go n e

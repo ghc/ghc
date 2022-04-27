@@ -52,7 +52,7 @@ import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Make ( mkDictSelRhs )
 import GHC.Types.Id.Info
-import GHC.Types.Demand  ( appIsDeadEnd, isTopSig, isDeadEndSig )
+import GHC.Types.Demand  ( isDeadEndAppSig, isTopSig, isDeadEndSig )
 import GHC.Types.Cpr     ( mkCprSig, botCpr )
 import GHC.Types.Basic
 import GHC.Types.Name hiding (varName)
@@ -1277,7 +1277,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
 
     _bottom_hidden id_sig = case mb_bot_str of
                                   Nothing         -> False
-                                  Just (arity, _) -> not (appIsDeadEnd id_sig arity)
+                                  Just (arity, _) -> not (isDeadEndAppSig id_sig arity)
 
     --------- Unfolding ------------
     unf_info = realUnfoldingInfo idinfo
