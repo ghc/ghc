@@ -16,6 +16,7 @@ library
     -- set without version
     ghc-options: -this-unit-id rts
     include-dirs: include
+    c-sources: version.c -- dummy file to force the build of a .a lib
                   
     -- includes: Rts.h
     -- install-includes: MachDeps.h Rts.h RtsAPI.h Stg.h
