@@ -135,19 +135,18 @@ cqePtr uring (CqeIndex i) =
     off = fromIntegral i * cqeSize
     cqeSize = Foreign.Storable.sizeOf (undefined :: Cqe)
 
--- | Notify the kernel of new SQ submissions, optionally blocking until some
--- have completed.
+-- | Notify the kernel of new SQ submissions.
 submit
   :: URing
   -> Int       -- ^ number to submit
-  -> Maybe Int -- ^ minimum to complete
   -> IO Int
-submit uring to_submit min_complete = do
-    let flags = if isJust min_complete then #{const IORING_ENTER_GETEVENTS} else 0
+submit uring to_submit = do
+    let min_complete = 0
+        flags = 0
     fmap fromIntegral $ throwErrnoIfMinus1 "io_uring_enter" $ c_io_uring_enter_unsafe
       (uringFd uring)
       (fromIntegral to_submit)
-      (maybe 0 fromIntegral min_complete)
+      min_complete
       flags
       nullPtr
 
@@ -186,7 +185,7 @@ freeSqe uring sqeIdx = do
     pokeSqeLink (sqePtr uring sqeIdx) old
     writePVar (uringFreeSqe uring) sqeIdx
 
--- | Push a SQE on to the submission queue. Returns 'False' if the SQ is full.
+-- | Push a SQE onto the submission queue. Returns 'False' if the SQ is full.
 pushSqe :: URing -> SqeIndex -> IO Bool
 pushSqe uring sqeIdx = do
     tail0 <- peek (uringSQTail $ uringSQ uring)
