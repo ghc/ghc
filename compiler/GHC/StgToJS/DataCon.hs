@@ -44,8 +44,8 @@ genCon ctx con args
   -- FIXME: (Sylvain 2022-03-11) Do we support e.g. "data T = MkT Word64"? It
   -- would return two JExprs
 
-  | otherwise
-  = pprPanic "genCon: unhandled DataCon" (ppr con)
+  | xs <- concatMap typex_expr (ctxTarget ctx)
+  = pprPanic "genCon: unhandled DataCon" (ppr (con, args, xs))
 
 allocCon :: Ident -> DataCon -> CostCentreStack -> [JExpr] -> G JStat
 allocCon to con cc xs
