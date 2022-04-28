@@ -1337,6 +1337,8 @@ for example).
     :type: dynamic
     :category: linking
 
+    :default: on
+
     :since: 9.4.1
 
     This instructs the linker to produce an executable that supports Apple's

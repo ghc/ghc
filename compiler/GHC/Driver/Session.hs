@@ -2144,12 +2144,6 @@ dynamic_flags_deps = [
       (NoArg (setGeneralFlag Opt_SingleLibFolder))
   , make_ord_flag defGhcFlag "pie"            (NoArg (setGeneralFlag Opt_PICExecutable))
   , make_ord_flag defGhcFlag "no-pie"         (NoArg (unSetGeneralFlag Opt_PICExecutable))
-  , make_ord_flag defGhcFlag "fcompact-unwind"
-      (noArgM (\dflags -> do
-       if platformOS (targetPlatform dflags) == OSDarwin
-          then return (gopt_set dflags Opt_CompactUnwind)
-          else do addWarn "-compact-unwind is only implemented by the darwin platform. Ignoring."
-                  return dflags))
 
         ------- Specific phases  --------------------------------------------
     -- need to appear before -pgmL to be parsed as LLVM flags.
@@ -3523,7 +3517,13 @@ fFlagsDeps = [
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
   flagSpec "keep-cafs"                        Opt_KeepCAFs,
-  flagSpec "link-rts"                         Opt_LinkRts
+  flagSpec "link-rts"                         Opt_LinkRts,
+  flagSpec' "compact-unwind"                  Opt_CompactUnwind
+      (\turn_on -> updM (\dflags -> do
+        unless (platformOS (targetPlatform dflags) == OSDarwin && turn_on)
+               (addWarn "-compact-unwind is only implemented by the darwin platform. Ignoring.")
+        return dflags))
+
   ]
   ++ fHoleFlags
 
@@ -3812,7 +3812,8 @@ defaultFlags settings
       Opt_SharedImplib,
       Opt_SimplPreInlining,
       Opt_VersionMacros,
-      Opt_RPath
+      Opt_RPath,
+      Opt_CompactUnwind
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
