@@ -33,7 +33,10 @@ test('StarBinder', normal, compile, [''])
 
 test('Overflow', expect_broken_for(16543, ['hpc']), compile, [''])
 
-test('UnusedPackages', normal, multimod_compile,
+test('UnusedPackages', [normalise_version('bytestring')
+                       , normalise_version('base')
+                       , normalise_version('process')
+                       ], multimod_compile,
     ['UnusedPackages.hs', '-package=bytestring -package=base -package=process -package=ghc -Wunused-packages'])
 
 test('T18402', normal, compile, [''])
