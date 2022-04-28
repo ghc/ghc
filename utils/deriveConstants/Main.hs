@@ -421,7 +421,6 @@ wanteds os = concat
           ,closureSize Both "StgUpdateFrame"
           ,closureSize C    "StgCatchFrame"
           ,closureSize C    "StgStopFrame"
-          ,closureSize C    "StgDeadThreadFrame"
 
           ,closureSize  Both "StgMutArrPtrs"
           ,closureField Both "StgMutArrPtrs" "ptrs"

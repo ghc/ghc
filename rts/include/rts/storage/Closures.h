@@ -285,13 +285,6 @@ typedef struct {
     StgHeader  header;
 } StgStopFrame;
 
-// Stack frame indicating that the stack's owning thread has finished.
-//
-// Closure types: RET_SMALL
-typedef struct {
-    StgHeader  header;
-    StgClosure *result;
-} StgDeadThreadFrame;
 
 // A function return stack frame: used when saving the state for a
 // garbage collection at a function entry point.  The function
