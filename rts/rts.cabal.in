@@ -21,7 +21,7 @@ library
     c-sources: version.c
                   
     -- includes: Rts.h
-    -- install-includes: MachDeps.h Rts.h RtsAPI.h Stg.h
-    --                   ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
-    --                   -- ^ from include
-    --                   DerivedConstants.h
+    install-includes: MachDeps.h Rts.h RtsAPI.h Stg.h
+                      ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
+                      -- ^ from include
+                      DerivedConstants.h
