@@ -1,5 +1,9 @@
 {-# LANGUAGE TypeApplications #-}
-module Settings.Builders.RunTest (runTestBuilderArgs, runTestGhcFlags, assertSameCompilerArgs) where
+module Settings.Builders.RunTest (runTestBuilderArgs
+                                 , runTestGhcFlags
+                                 , assertSameCompilerArgs
+                                 , outOfTreeCompilerArgs
+                                 , TestCompilerArgs(..) ) where
 
 import Hadrian.Utilities
 import qualified System.FilePath
