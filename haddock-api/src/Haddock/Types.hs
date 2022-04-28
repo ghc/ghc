@@ -319,7 +319,7 @@ type instance NoGhcTc DocNameI = DocNameI
 type instance IdP DocNameI = DocName
 
 instance CollectPass DocNameI where
-  collectXXPat _ _ ext = dataConCantHappen ext
+  collectXXPat _ _ ext = noExtCon ext
 
 instance NamedThing DocName where
   getName (Documented name _) = name
@@ -760,11 +760,11 @@ type instance XXType           DocNameI = HsCoreTy
 
 type instance XHsForAllVis        DocNameI = NoExtField
 type instance XHsForAllInvis      DocNameI = NoExtField
-type instance XXHsForAllTelescope DocNameI = DataConCantHappen
+type instance XXHsForAllTelescope DocNameI = NoExtCon
 
 type instance XUserTyVar    DocNameI = NoExtField
 type instance XKindedTyVar  DocNameI = NoExtField
-type instance XXTyVarBndr   DocNameI = DataConCantHappen
+type instance XXTyVarBndr   DocNameI = NoExtCon
 
 type instance XCFieldOcc   DocNameI = DocName
 type instance XXFieldOcc   DocNameI = NoExtField
@@ -780,7 +780,7 @@ type instance XForeignExport  DocNameI = NoExtField
 type instance XForeignImport  DocNameI = NoExtField
 type instance XConDeclGADT    DocNameI = NoExtField
 type instance XConDeclH98     DocNameI = NoExtField
-type instance XXConDecl       DocNameI = DataConCantHappen
+type instance XXConDecl       DocNameI = NoExtCon
 
 type instance XDerivD     DocNameI = NoExtField
 type instance XInstD      DocNameI = NoExtField
@@ -791,10 +791,10 @@ type instance XTyClD      DocNameI = NoExtField
 type instance XNoSig            DocNameI = NoExtField
 type instance XCKindSig         DocNameI = NoExtField
 type instance XTyVarSig         DocNameI = NoExtField
-type instance XXFamilyResultSig DocNameI = DataConCantHappen
+type instance XXFamilyResultSig DocNameI = NoExtCon
 
 type instance XCFamEqn       DocNameI _ = NoExtField
-type instance XXFamEqn       DocNameI _ = DataConCantHappen
+type instance XXFamEqn       DocNameI _ = NoExtCon
 
 type instance XCClsInstDecl DocNameI = NoExtField
 type instance XCDerivDecl   DocNameI = NoExtField
@@ -811,23 +811,23 @@ type instance XClassDecl    DocNameI = NoExtField
 type instance XDataDecl     DocNameI = NoExtField
 type instance XSynDecl      DocNameI = NoExtField
 type instance XFamDecl      DocNameI = NoExtField
-type instance XXFamilyDecl  DocNameI = DataConCantHappen
-type instance XXTyClDecl    DocNameI = DataConCantHappen
+type instance XXFamilyDecl  DocNameI = NoExtCon
+type instance XXTyClDecl    DocNameI = NoExtCon
 
 type instance XHsWC DocNameI _ = NoExtField
 
 type instance XHsOuterExplicit    DocNameI _ = NoExtField
 type instance XHsOuterImplicit    DocNameI   = NoExtField
-type instance XXHsOuterTyVarBndrs DocNameI   = DataConCantHappen
+type instance XXHsOuterTyVarBndrs DocNameI   = NoExtCon
 
 type instance XHsSig      DocNameI = NoExtField
-type instance XXHsSigType DocNameI = DataConCantHappen
+type instance XXHsSigType DocNameI = NoExtCon
 
 type instance XHsQTvs        DocNameI = NoExtField
 type instance XConDeclField  DocNameI = NoExtField
-type instance XXConDeclField DocNameI = DataConCantHappen
+type instance XXConDeclField DocNameI = NoExtCon
 
-type instance XXPat DocNameI = DataConCantHappen
+type instance XXPat DocNameI = NoExtCon
 
 type instance XCInjectivityAnn DocNameI = NoExtField
 
