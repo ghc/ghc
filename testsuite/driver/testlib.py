@@ -34,6 +34,7 @@ extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 from my_typing import *
 
 from threading import Timer
+from collections import OrderedDict
 
 global pool_sema
 if config.use_threads:
@@ -1073,7 +1074,7 @@ def test_common_work(watcher: testutil.Watcher,
             all_ways = [WayName('normal')]
 
         # A test itself can request extra ways by setting opts.extra_ways
-        all_ways = all_ways + [way for way in opts.extra_ways if way not in all_ways]
+        all_ways = list(OrderedDict.fromkeys(all_ways + [way for way in opts.extra_ways if way not in all_ways]))
 
         t.total_test_cases += len(all_ways)
 
