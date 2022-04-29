@@ -4359,7 +4359,7 @@ checkValidDataCon dflags existential_ok tc con
         -- matches the type constructor; eg reject this:
         --   data T a where { MkT :: Bogus a }
         -- It's important to do this first:
-        --  see Note [rejigCon
+        --  see Note [rejigConRes]
         --  and c.f. Note [Check role annotations in a second pass]
 
         -- Check that the return type of the data constructor is an instance

@@ -1913,7 +1913,7 @@ generateMainBinding tcg_env main_name = do
     ; (ev_binds, main_expr) <- setMainCtxt main_name io_ty $
                                tcCheckMonoExpr main_expr_rn io_ty
 
-            -- See Note [Root-main id]
+            -- See Note [Root-main Id]
             -- Construct the binding
             --      :Main.main :: IO res_ty = runMainIO res_ty main
     ; run_main_id <- tcLookupId runMainIOName
@@ -1983,7 +1983,7 @@ the moving parts:
   - check that the export list does indeed export something called 'foo'
   - generateMainBinding: generate the root-main binding
        :Main.main = runMainIO M.foo
-  See Note [Root-main id]
+  See Note [Root-main Id]
 
 An annoying consequence of having both checkMainType and checkMain is
 that, when (but only when) -fdefer-type-errors is on, we may report an

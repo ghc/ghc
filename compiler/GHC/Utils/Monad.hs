@@ -355,8 +355,8 @@ function might be required. For example in FCode we use:
       where
         FCode m = FCode' $ oneShot (\cgInfoDown -> oneShot (\state ->m cgInfoDown state))
 
-INLINE pragmas and (>>)
-~~~~~~~~~~~~~~~~~~~~~~~
+Note [INLINE pragmas and (>>)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A nasty gotcha is described in #20008.  In brief, be careful if you get (>>) via
 its default method:
 

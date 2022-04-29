@@ -946,7 +946,7 @@ combineIdenticalAlts imposs_deflt_cons (Alt con1 bndrs1 rhs1 : rest_alts)
     imposs_deflt_cons' = imposs_deflt_cons `minusList` elim_cons
     elim_cons = elim_con1 ++ map (\(Alt con _ _) -> con) elim_rest
     elim_con1 = case con1 of     -- Don't forget con1!
-                  DEFAULT -> []  -- See Note [
+                  DEFAULT -> []
                   _       -> [con1]
 
     cheapEqTicked e1 e2 = cheapEqExpr' tickishFloatable e1 e2

@@ -1173,7 +1173,7 @@ tryUnfolding logger opts !case_depth id lone_variable
 
      UnfWhen { ug_arity = uf_arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
         | enough_args && (boring_ok || some_benefit || unfoldingVeryAggressive opts)
-                -- See Note [INLINE for small functions (3)]
+                -- See Note [INLINE for small functions] (3)
         -> traceInline logger opts id str (mk_doc some_benefit empty True) (Just unf_template)
         | otherwise
         -> traceInline logger opts id str (mk_doc some_benefit empty False) Nothing
@@ -1244,7 +1244,7 @@ tryUnfolding logger opts !case_depth id lone_variable
           = case cont_info of
               CaseCtxt   -> not (lone_variable && is_exp)  -- Note [Lone variables]
               ValAppCtxt -> True                           -- Note [Cast then apply]
-              RuleArgCtxt -> uf_arity > 0  -- See Note [Unfold info lazy contexts]
+              RuleArgCtxt -> uf_arity > 0  -- See Note [Unfold into lazy contexts]
               DiscArgCtxt -> uf_arity > 0  -- Note [Inlining in ArgCtxt]
               RhsCtxt     -> uf_arity > 0  --
               _other      -> False         -- See Note [Nested functions]

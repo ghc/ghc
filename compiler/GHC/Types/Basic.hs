@@ -1367,7 +1367,7 @@ isAlwaysActive AlwaysActive = True
 isAlwaysActive _            = False
 
 competesWith :: Activation -> Activation -> Bool
--- See Note [Activation competition]
+-- See Note [Competing activations]
 competesWith AlwaysActive      _                = True
 
 competesWith NeverActive       _                = False

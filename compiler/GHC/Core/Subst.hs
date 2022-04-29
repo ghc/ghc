@@ -97,8 +97,8 @@ data Subst
         -- This is what lets us deal with name capture properly
         -- It's a hard invariant to check...
         --
-        -- INVARIANT 2: The substitution is apply-once; see Note [Apply once] with
-        --              Types.TvSubstEnv
+        -- INVARIANT 2: The substitution is apply-once;
+        --              see Note [Substitutions apply only once] in GHC.Core.TyCo.Subst
         --
         -- INVARIANT 3: See Note [Extending the Subst]
 
@@ -108,7 +108,7 @@ Note [Extending the Subst]
 For a core Subst, which binds Ids as well, we make a different choice for Ids
 than we do for TyVars.
 
-For TyVars, see Note [Extending the TCvSubst] in GHC.Core.TyCo.Subst.
+For TyVars, see Note [Extending the TCvSubstEnv] in GHC.Core.TyCo.Subst.
 
 For Ids, we have a different invariant
         The IdSubstEnv is extended *only* when the Unique on an Id changes

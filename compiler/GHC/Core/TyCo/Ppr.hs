@@ -68,16 +68,10 @@ parens around the type, except for the atomic cases.  @pprParendType@
 works just by setting the initial context precedence very high.
 
 Note that any function which pretty-prints a @Type@ first converts the @Type@
-to an @IfaceType@. See Note [IfaceType and pretty-printing] in GHC.Iface.Type.
+to an @IfaceType@. See Note [Pretty printing via Iface syntax] in GHC.Types.TyThing.Ppr.
 
 See Note [Precedence in types] in GHC.Types.Basic.
 -}
-
---------------------------------------------------------
--- When pretty-printing types, we convert to IfaceType,
---   and pretty-print that.
--- See Note [Pretty printing via Iface syntax] in GHC.Types.TyThing.Ppr
---------------------------------------------------------
 
 pprType, pprParendType, pprTidiedType :: Type -> SDoc
 pprType       = pprPrecType topPrec

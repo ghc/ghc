@@ -1139,7 +1139,7 @@ mkWrapperName wrapperRef what nameBase
 
 {-
 Note [Generating fresh names for FFI wrappers]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to use a unique, rather than nextWrapperNum, to distinguish
 between FFI wrapper functions. However, the wrapper names that we
 generate are external names. This means that if a call to them ends up

@@ -1644,7 +1644,7 @@ we simply extend the CallKey with trailing UnspecArgs, so we'll
 generate a rule that completely saturates the DFun.
 
 There is an ASSERT that checks this, in the DFunUnfolding case of
-GHC.Core.Unfold.specUnfolding.
+GHC.Core.Unfold.Make.specUnfolding.
 
 Note [Specialisation Must Preserve Sharing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

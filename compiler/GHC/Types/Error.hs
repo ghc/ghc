@@ -355,8 +355,9 @@ data MessageClass
     -- emitting compiler diagnostics, use the smart constructor.
   deriving (Eq, Show)
 
-{- Note [Suppressing Messages]
-
+{-
+Note [Suppressing Messages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The 'SevIgnore' constructor is used to generate messages for diagnostics which
 are meant to be suppressed and not reported to the user: the classic example
 are warnings for which the user didn't enable the corresponding 'WarningFlag',

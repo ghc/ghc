@@ -283,7 +283,7 @@ tyCoVarsOfTypes tys = runTyCoVars (deep_tys tys)
 --   tyCoVarsOfTypes tys = closeOverKinds (shallowTyCoVarsOfTypes tys)
 
 tyCoVarsOfCo :: Coercion -> TyCoVarSet
--- See Note [Free variables of Coercions]
+-- See Note [Free variables of types]
 tyCoVarsOfCo co = runTyCoVars (deep_co co)
 
 tyCoVarsOfMCo :: MCoercion -> TyCoVarSet
