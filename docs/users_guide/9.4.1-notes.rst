@@ -3,6 +3,12 @@
 Version 9.4.1
 ==============
 
+The significant changes to the various parts of the compiler are listed in the
+following sections.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+10, 11, 12, or 13.
+
 Language
 ~~~~~~~~
 
