@@ -33,7 +33,7 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==9.0.*
+tested-with:          GHC==9.4.*
 
 extra-source-files:
   CHANGES.md
