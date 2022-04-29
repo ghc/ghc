@@ -6,12 +6,14 @@ environment for the Haskell functional programming language.
 
 For more information, visit GHC's web site:
 
-  http://www.haskell.org/ghc/
+  https://www.haskell.org/ghc/
 
 Information for developers of GHC can be found here:
 
-  https://gitlab.haskell.org/ghc/ghc/wikis/
+  https://gitlab.haskell.org/ghc/ghc/-/wikis/home
 
 
 For installation instructions, see the accompanying INSTALL file.
 
+
+Binaries, links and scripts, for runghc/runhaskell may vary across platforms.
