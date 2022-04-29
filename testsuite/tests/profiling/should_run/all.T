@@ -169,3 +169,5 @@ test('T15897',
 test('T17572', [], compile_and_run, [''])
 
 test('TraverseHeapTest', [only_ways(['prof'])], compile_and_run, ['-debug'])
+
+test('T21446', [], makefile_test, ['T21446'])
