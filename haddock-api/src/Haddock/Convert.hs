@@ -411,7 +411,6 @@ synifyDataCon use_gadt_syntax dc =
          return $ noLocA $ ConDeclGADT
            { con_g_ext  = noAnn
            , con_names  = [name]
-           , con_dcolon = noHsUniTok
            , con_bndrs  = noLocA outer_bndrs
            , con_mb_cxt = ctx
            , con_g_args = hat
