@@ -1,9 +1,11 @@
-## next (edit as necessary)
+## 0.9.0
+
+- Shipped with GHC 9.4.1
 
 - `magicDict` has been renamed to `withDict` and is now defined in
   `GHC.Magic.Dict` instead of `GHC.Prim`. `withDict` now has the type:
 
-  ```
+  ```haskell
   withDict :: forall {rr :: RuntimeRep} st dt (r :: TYPE rr). st -> (dt => r) -> r
   ```
 
@@ -11,7 +13,7 @@
   intermediate data type. For example, the `withTypeable` function from the
   `Data.Typeable` module can now be defined as:
 
-  ```
+  ```haskell
   withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
                => TypeRep a -> (Typeable a => r) -> r
   withTypeable rep k = withDict @(TypeRep a) @(Typeable a) rep k
@@ -33,25 +35,25 @@
 
   For example, `Array#` used to have kind:
 
-  ```
+  ```haskell
   Type -> UnliftedType
   ```
 
   but it now has kind:
 
-  ```
+  ```haskell
   forall {l :: Levity}. TYPE (BoxedRep l) -> UnliftedType
   ```
 
   Similarly, `MutVar#` used to have kind:
 
-  ```
+  ```haskell
   Type -> Type -> UnliftedType
   ```
 
   but it now has kind:
 
-  ```
+  ```haskell
   forall {l :: Levity}. Type -> TYPE (BoxedRep l) -> UnliftedType
   ```
 
@@ -94,7 +96,7 @@
 
   For example, the full type of `newMutVar#` is now:
 
-  ```
+  ```haskell
   newMutVar#
     :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)).
        a -> State# s -> (# State# s, MVar# s a #)
@@ -102,7 +104,7 @@
 
   and the full type of `writeSmallArray#` is:
 
-  ```
+  ```haskell
   writeSmallArray#
     :: forall {l :: Levity} s (a :: TYPE ('BoxedRep l)).
        SmallMutableArray# s a -> Int# -> a -> State# s -> State# s
@@ -115,7 +117,7 @@
 - `mkWeak#`, `mkWeakNoFinalizer#`, `touch#` and `keepAlive#` are now
   levity-polymorphic instead of representation-polymorphic. For instance:
 
-  ```
+  ```haskell
   mkWeakNoFinalizer#
     :: forall {l :: Levity} {k :: Levity}
               (a :: TYPE ('BoxedRep l))
@@ -132,7 +134,7 @@
 - Primitive functions for throwing and catching exceptions are now more polymorphic
   than before. For example, `catch#` now has type:
 
-  ```
+  ```haskell
   catch#
     :: forall {r :: RuntimeRep} {l :: Levity}
               (a :: TYPE r)
@@ -153,7 +155,7 @@
   Note in particular that `raise#` is now both representation-polymorphic
   (with an inferred `RuntimeRep` argument) and levity-polymorphic, with type:
 
-  ```
+  ```haskell
   raise# :: forall {l :: Levity} {r :: RuntimeRep}
                    (a :: TYPE (BoxedRep l))
                    (b :: TYPE r).
@@ -170,7 +172,7 @@
 - `reallyUnsafePtrEquality#` has been made more general, as it is now
    both levity-polymorphic and heterogeneous:
 
-  ```
+  ```haskell
   reallyUnsafePtrEquality#
     :: forall {l :: Levity} {k :: Levity}
               (a :: TYPE (BoxedRep l))
@@ -191,14 +193,14 @@
 
 - The following functions have been added to `GHC.Exts`:
 
-  ```
+  ```haskell
   sameArray# :: Array# a -> Array# a -> Int#
   sameSmallArray# :: SmallArray# a -> SmallArray# a -> Int#
   sameByteArray# :: ByteArray# -> ByteArray# -> Int#
   sameArrayArray# :: ArrayArray# -> ArrayArray# -> Int#
   ```
 
-## 0.8.0 (edit as necessary)
+## 0.8.0
 
 - Change array access primops to use type with size maxing the element size:
 
@@ -227,7 +229,7 @@
 	atomicCasWord32Addr# :: Addr# -> Word32# -> Word32# -> State# s -> (# State# s, Word32# #)
 	atomicCasWord64Addr# :: Addr# -> WORD64 -> WORD64 -> State# s -> (# State# s, WORD64 #)
 
-## 0.7.0 (edit as necessary)
+## 0.7.0
 
 - Shipped with GHC 9.0.1
 
@@ -266,7 +268,7 @@
   the soundness issues of the latter (see
   [#17760](https://gitlab.haskell.org/ghc/ghc/-/issues/17760)).
 
-## 0.6.1 (edit as necessary)
+## 0.6.1
 
 - Shipped with GHC 8.10.1
 

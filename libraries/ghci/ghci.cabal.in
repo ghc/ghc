@@ -72,8 +72,8 @@ library
     Build-Depends:
         rts,
         array            == 0.5.*,
-        base             >= 4.8 && < 4.17,
-        ghc-prim         >= 0.5.0 && < 0.9,
+        base             >= 4.8 && < 4.18,
+        ghc-prim         >= 0.5.0 && < 0.10,
         binary           == 0.8.*,
         bytestring       >= 0.10 && < 0.12,
         containers       >= 0.5 && < 0.7,
