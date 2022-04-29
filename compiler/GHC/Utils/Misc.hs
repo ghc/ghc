@@ -730,7 +730,7 @@ splitAtList xs ys = go 0# xs ys
       go n  []     bs     = (take (I# n) ys, bs) -- = splitAt n ys
       go n  (_:as) (_:bs) = go (n +# 1#) as bs
 
--- drop from the end of a list
+-- | drop from the end of a list
 dropTail :: Int -> [a] -> [a]
 -- Specification: dropTail n = reverse . drop n . reverse
 -- Better implementation due to Joachim Breitner
