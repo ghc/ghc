@@ -39,3 +39,12 @@ T15897:
 	"$(TEST_HC)" -prof -fprof-auto -debug -v0 T15897.hs
 	./T15897 10000000 +RTS -s -hc 2>/dev/null
 	./T15897 10000000 +RTS -s -hr 2>/dev/null
+
+.PHONY: T21446
+T21446:
+	$(RM) T21446
+	$(RM) stem.hp 
+	"$(TEST_HC)" -prof -rtsopts -v0 T21446.hs
+	./T21446 +RTS -hc -postem
+	[ -f stem.hp ]
+
