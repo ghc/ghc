@@ -12,6 +12,9 @@
 // ret addr and m arguments taking up n words are on the stack.
 // NB. x is a dummy argument attached to the 'for' label so that
 // BUILD_PAP can be used multiple times in the same function.
+// m: number of arguments provided
+// n: words on the stack for arguments (could be > m e.g. double args on x32)
+// f: function
 #define BUILD_PAP(m,n,f,x)                              \
     W_ pap;                                             \
     W_ size;                                            \
