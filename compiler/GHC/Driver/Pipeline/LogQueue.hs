@@ -100,10 +100,10 @@ dequeueLogQueueQueue (LogQueueQueue n lqq) = case IM.minViewWithKey lqq of
                                                 Just ((k, v), lqq') | k == n -> Just (v, LogQueueQueue (n + 1) lqq')
                                                 _ -> Nothing
 
-logThread :: Int -> Int -> Logger -> TVar Bool -- Signal that no more new logs will be added, clear the queue and exit
+logThread :: Logger -> TVar Bool -- Signal that no more new logs will be added, clear the queue and exit
                     -> TVar LogQueueQueue -- Queue for logs
                     -> IO (IO ())
-logThread _ _ logger stopped lqq_var = do
+logThread logger stopped lqq_var = do
   finished_var <- newEmptyMVar
   _ <- forkIO $ print_logs *> putMVar finished_var ()
   return (takeMVar finished_var)

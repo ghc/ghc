@@ -5116,7 +5116,7 @@ getJobserverFromEnv = do
   makeFlagsMaybe <- lookupEnv "GHC_MAKEFLAGS"
   pure $ do
     makeFlags <- makeFlagsMaybe
-    snd $ runCmdLine
+    snd $ runCmdLineP
       (processArgs
         [ defFlag
             "-jobserver-auth"
@@ -5127,5 +5127,9 @@ getJobserverFromEnv = do
             )
         ]
         (mkGeneralLocated "GHC_MAKEFLAGS env variable" <$> words makeFlags)
+        (\fp -> do
+            addWarn $ "Response files are not supported in GHC_MAKEFLAGS: " `mappend` fp
+            pure []
+        )
       )
       Nothing

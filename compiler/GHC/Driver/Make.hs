@@ -741,7 +741,7 @@ load' mhmi_cache how_much mHscMessage mod_graph = do
 
     setSession $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
     hsc_env <- getSession
-    (upsweep_ok, hsc_env1, new_cache) <- withDeferredDiagnostics $
+    (upsweep_ok, hsc_env1) <- withDeferredDiagnostics $
       liftIO $ upsweep worker_limit hsc_env mhmi_cache mHscMessage (toCache pruned_cache) build_plan
     setSession hsc_env1
     case upsweep_ok of
@@ -2605,7 +2605,7 @@ label_self thread_name = do
     CC.labelThread self_tid thread_name
 
 
-runPipelines :: Int -> HscEnv -> Maybe Messager -> [MakeAction] -> IO ()
+runPipelines :: WorkerLimit -> HscEnv -> Maybe Messager -> [MakeAction] -> IO ()
 -- Don't even initialise plugins if there are no pipelines
 runPipelines _ _ _ [] = return ()
 runPipelines n_job orig_hsc_env mHscMessager all_pipelines = do
@@ -2613,7 +2613,7 @@ runPipelines n_job orig_hsc_env mHscMessager all_pipelines = do
 
   plugins_hsc_env <- initializePlugins orig_hsc_env
   case n_job of
-    1 -> runSeqPipelines plugins_hsc_env mHscMessager all_pipelines
+    NumProcessors n | n <= 1 -> runSeqPipelines plugins_hsc_env mHscMessager all_pipelines
     _n -> runParPipelines n_job plugins_hsc_env mHscMessager all_pipelines
 
 runSeqPipelines :: HscEnv -> Maybe Messager -> [MakeAction] -> IO ()
@@ -2642,7 +2642,7 @@ runParPipelines worker_limit plugin_hsc_env mHscMessager all_pipelines = do
   -- will add it's LogQueue into this queue.
   log_queue_queue_var <- newTVarIO newLogQueueQueue
   -- Thread which coordinates the printing of logs
-  wait_log_thread <- logThread n_jobs (length all_pipelines) (hsc_logger plugin_hsc_env) stopped_var log_queue_queue_var
+  wait_log_thread <- logThread (hsc_logger plugin_hsc_env) stopped_var log_queue_queue_var
 
 
   -- Make the logger thread-safe, in case there is some output which isn't sent via the LogQueue.
