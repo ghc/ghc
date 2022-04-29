@@ -425,13 +425,17 @@ def tabulate_metrics(metrics: List[PerfMetric]) -> None:
         for x in metrics
         if x.baseline is not None
     ]
+    minimum = 0.0
+    maximum = 0.0
+    if len(changes) > 0:
+      minimum = 100 * (min(changes) - 1)
+      maximum = 100 * (max(changes) - 1)
     dataRows += [
         row(("", "", "", "", "", "", "", "")),
         row(("geo. mean", "", "", "", "", "", "{:+4.1f}%".format(100*(geometric_mean(changes)-1)), "")),
-        row(("minimum  ", "", "", "", "", "", "{:+4.1f}%".format(100*(min(changes)-1)), "")),
-        row(("maximum  ", "", "", "", "", "", "{:+4.1f}%".format(100*(max(changes)-1)), "")),
+        row(("minimum  ", "", "", "", "", "", "{:+4.1f}%".format(minimum), "")),
+        row(("maximum  ", "", "", "", "", "", "{:+4.1f}%".format(maximum), "")),
     ]
-
     print_table(headerRows, dataRows, 1)
     print("")
     if hasBaseline:
