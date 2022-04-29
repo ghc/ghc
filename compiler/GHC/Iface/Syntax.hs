@@ -704,7 +704,8 @@ instance Outputable IfaceDecl where
   ppr = pprIfaceDecl showToIface
 
 {-
-Note [Minimal complete definition] ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Minimal complete definition]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The minimal complete definition should only be included if a complete
 class definition is shown. Since the minimal complete definition is
 anonymous we can't reuse the same mechanism that is used for the
@@ -764,7 +765,7 @@ ppShowIface (ShowSub { ss_how_much = ShowIface }) doc = doc
 ppShowIface _                                     _   = Outputable.empty
 
 -- show if all sub-components or the complete interface is shown
-ppShowAllSubs :: ShowSub -> SDoc -> SDoc -- Note [Minimal complete definition]
+ppShowAllSubs :: ShowSub -> SDoc -> SDoc -- See Note [Minimal complete definition]
 ppShowAllSubs (ShowSub { ss_how_much = ShowSome [] _ }) doc = doc
 ppShowAllSubs (ShowSub { ss_how_much = ShowIface })     doc = doc
 ppShowAllSubs _                                         _   = Outputable.empty

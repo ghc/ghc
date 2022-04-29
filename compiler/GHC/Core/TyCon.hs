@@ -958,7 +958,7 @@ data TyCon
 
         -- See Note [The binders/kind/arity fields of a TyCon]
         tyConBinders :: [TyConTyCoBinder], -- ^ Full binders
-           -- TyConTyCoBinder: see Note [Promoted GADT data construtors]
+           -- TyConTyCoBinder: see Note [Promoted GADT data constructors]
         tyConResKind :: Kind,             -- ^ Result kind
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
@@ -2439,7 +2439,7 @@ setTcTyConKind :: TyCon -> Kind -> TyCon
 -- See Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType
 setTcTyConKind tc@(TcTyCon {}) kind = let tc' = tc { tyConKind = kind
                                                    , tyConNullaryTy = mkNakedTyConTy tc'
-                                                       -- see Note [Sharing nullary TyCons]
+                                                       -- see Note [Sharing nullary TyConApps]
                                                    }
                                       in tc'
 setTcTyConKind tc              _    = pprPanic "setTcTyConKind" (ppr tc)

@@ -503,7 +503,7 @@ $tab          { warnTab }
 -- when trying to be close to Haskell98
 
 -- Note [Lexing NumericUnderscores extension] (#14473)
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- NumericUnderscores extension allows underscores in numeric literals.
 -- Multiple underscores are represented with @numspc macro.
 -- To be simpler, we have only the definitions with underscores.

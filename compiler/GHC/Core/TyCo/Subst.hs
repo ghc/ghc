@@ -781,7 +781,7 @@ substTyCoVar subst tv
   | otherwise = CoercionTy $ substCoVar subst tv
 
 lookupTyVar :: TCvSubst -> TyVar  -> Maybe Type
-        -- See Note [Extending the TCvSubst]
+        -- See Note [Extending the TCvSubstEnv]
 lookupTyVar (TCvSubst _ tenv _) tv
   = assert (isTyVar tv )
     lookupVarEnv tenv tv
@@ -998,7 +998,7 @@ substTyVarBndrUsing subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
     no_change = no_kind_change && (new_var == old_var)
         -- no_change means that the new_var is identical in
         -- all respects to the old_var (same unique, same kind)
-        -- See Note [Extending the TCvSubst]
+        -- See Note [Extending the TCvSubstEnv]
         --
         -- In that case we don't need to extend the substitution
         -- to map old to new.  But instead we must zap any

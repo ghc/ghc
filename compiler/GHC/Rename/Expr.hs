@@ -2175,7 +2175,7 @@ segments stmts = map fst $ merge $ reverse $ map reverse $ walk (reverse stmts)
 
 {-
 Note [ApplicativeDo and strict patterns]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A strict pattern match is really a dependency.  For example,
 
 do
@@ -2230,7 +2230,7 @@ isStrictPattern (L loc pat) =
 
 {-
 Note [ApplicativeDo and refutable patterns]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Refutable patterns in do blocks are desugared to use the monadic 'fail' operation.
 This means that sometimes an applicative block needs to be wrapped in 'join' simply because
 of a refutable pattern, in order for the types to work out.

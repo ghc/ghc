@@ -4169,7 +4169,7 @@ Wrinkles
   GHC.Core.Opt.Simplify.Utils
 
 * Don't eta-expand a trivial expr, else each pass will eta-reduce it,
-  and then eta-expand again. See Note [Do not eta-expand trivial expressions]
+  and then eta-expand again. See Note [Which RHSs do we eta-expand?]
   in GHC.Core.Opt.Simplify.Utils.
 
 * Don't eta-expand join points; see Note [Do not eta-expand join points]

@@ -1985,7 +1985,7 @@ safeFlagCheck cmdl dflags =
                     "-fpackage-trust ignored;" ++
                     " must be specified with a Safe Haskell flag"]
 
-    -- Have we inferred Unsafe? See Note [GHC.Driver.Main . Safe Haskell Inference]
+    -- Have we inferred Unsafe? See Note [Safe Haskell Inference] in GHC.Driver.Main
     safeFlags = all (\(_,_,t,_) -> not $ t dflags) unsafeFlagsForInfer
 
 

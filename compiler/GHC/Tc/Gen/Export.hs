@@ -421,8 +421,7 @@ classifyGREs = partitionGreNames . map gre_name
 
 {-
 Note [Modules without a module header]
---------------------------------------------------
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Haskell 2010 report says in section 5.1:
 
 >> An abbreviated form of module, consisting only of the module body, is
@@ -523,7 +522,8 @@ lookupChildrenExport spec_parent rdr_items =
             IncorrectParent p c gs -> failWithDcErr p c gs
 
 
--- Note: [Typing Pattern Synonym Exports]
+-- Note [Typing Pattern Synonym Exports]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- It proved quite a challenge to precisely specify which pattern synonyms
 -- should be allowed to be bundled with which type constructors.
 -- In the end it was decided to be quite liberal in what we allow. Below is
@@ -567,8 +567,8 @@ lookupChildrenExport spec_parent rdr_items =
 --    type constructor.
 --
 --
--- Note: [Types of TyCon]
---
+-- Note [Types of TyCon]
+-- ~~~~~~~~~~~~~~~~~~~~~
 -- This check appears to be overly complicated, Richard asked why it
 -- is not simply just `isAlgTyCon`. The answer for this is that
 -- a classTyCon is also an `AlgTyCon` which we explicitly want to disallow.
