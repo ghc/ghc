@@ -35,7 +35,7 @@ module GHC.Core.Opt.Simplify.Env (
         doFloatFromRhs, getTopFloatBinds,
 
         -- * LetFloats
-        LetFloats, letFloatBinds, emptyLetFloats, unitLetFloat,
+        LetFloats(..), letFloatBinds, emptyLetFloats, unitLetFloat,
         addLetFlts,  mapLetFloats,
 
         -- * JoinFloats

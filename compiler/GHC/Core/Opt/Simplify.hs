@@ -9,6 +9,7 @@
 {-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE NamedFieldPuns #-}
 module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
 #include "HsVersions.h"
@@ -79,6 +80,10 @@ import GHC.Types.Var.Env
 import GHC.Types.Unique.FM
 import Control.Concurrent.QSem
 import Control.Exception
+import GHC.Core.Subst (Subst, substRecBndrs, substBind, mkEmptySubst, substInScope)
+import Data.Foldable
+import Data.Traversable
+import GHC.Data.OrdList (toOL)
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -214,6 +219,14 @@ too small to show up in benchmarks.
 ************************************************************************
 -}
 
+substSimplFloats :: Subst -> SimplFloats -> (Subst, SimplFloats)
+substSimplFloats subst sf@SimplFloats{sfJoinFloats, sfLetFloats = LetFloats bind_ol ff} = let
+  (new_subst, new_binds) = ASSERT (null sfJoinFloats)
+        mapAccumL substBind subst (toList bind_ol)
+  in (new_subst, sf { sfLetFloats = LetFloats (toOL new_binds) ff
+                    , sfInScope = sfInScope sf `unionInScope` substInScope new_subst
+                    })
+
 simplTopBinds :: SimplEnv -> ([(Int, InBind)], M.Map Int [Int]) -> SimplM (SimplFloats, SimplEnv)
 -- See Note [The big picture]
 simplTopBinds env0 (binds0, g)
@@ -237,14 +250,22 @@ simplTopBinds env0 (binds0, g)
         ; let res_vars = M.elems env_m_vars
         ; (all_floats, all_envs) <- liftIO (unzip <$> mapM readMVar res_vars)
 
-        ; pprTraceM "binds_0" (vcat (map ppr binds0))
-        ; pprTraceM "binds_0" (ppr all_floats)
+        -- ; pprTraceM "binds_0" (vcat (map ppr binds0))
+        -- ; pprTraceM "binds_0" (ppr all_floats)
 
         ; old_res <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 (map snd binds0)
         ; freeTick SimplifierDone
-        ; let new_res = (foldl' unionFloats (emptyFloats env1) all_floats ,  combine_envs env1 all_envs)
+        ; let
+            !combined_env = combine_envs env1 all_envs
+            (subst, combined_floats) = let
+              subst0 = mkEmptySubst (seInScope combined_env)
+              go (s,!facc) f = case substSimplFloats s f of
+                (t, g) -> (t, facc `unionFloats` g)
+              in foldl' go (subst0, emptyFloats combined_env) all_floats
+            (_,final_floats) = substSimplFloats subst combined_floats
+            final_env = combined_env { seInScope = seInScope combined_env `unionInScope` substInScope subst }
 
-        ; return new_res }
+        ; return (final_floats,final_env) }
   where
     combine_envs env0 envs =
       env0 { seInScope = foldr unionInScope (seInScope env0) (map seInScope envs)
@@ -1671,7 +1692,7 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
 
   | otherwise
   = do { (env1, bndr1) <- simplNonRecBndr env bndr
-       ; pprTraceM "simpl_binder" (ppr bndr $$ ppr bndr1)
+       -- ; pprTraceM "simpl_binder" (ppr bndr $$ ppr bndr1)
 
        -- Deal with strict bindings
        -- See Note [Dark corner with levity polymorphism]

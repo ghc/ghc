@@ -803,7 +803,8 @@ occAnalNonRecBind env lvl imp_rule_edges bndr rhs body_usage
 dumpCoreProgram :: Module -> OccEnv -> TopLevelFlag -> ImpRuleEdges -> [(Var,CoreExpr)]
                 -> UsageDetails -> IO ()
 dumpCoreProgram mod env lvl imp_rule_edges pairs body_usage
-  = mapM_ dumpSCC sccs
+  = pure ()
+  -- mapM_ dumpSCC sccs
   where
     sccs :: [(Int, SCC LetrecNode)]
     sccs =  zip [0..] $ stronglyConnCompFromEdgedVerticesUniqR nodes
