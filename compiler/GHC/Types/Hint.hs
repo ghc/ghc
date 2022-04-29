@@ -393,11 +393,16 @@ data GhcHint
         Test cases: ccfail004
     -}
   | SuggestImportingDataCon
-
   {- Found a pragma in the body of a module, suggest
      placing it in the header
   -}
   | SuggestPlacePragmaInHeader
+    {-| Suggest using pattern matching syntax for a non-bidirectional pattern synonym
+
+        Test cases: patsyn/should_fail/record-exquant
+                    typecheck/should_fail/T3176
+    -}
+  | SuggestPatternMatchingSyntax
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

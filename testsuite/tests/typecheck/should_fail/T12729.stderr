@@ -1,5 +1,5 @@
 
 T12729.hs:7:1: error:
     • Newtype has non-* return kind ‘TYPE 'IntRep’
-      Perhaps you intended to use UnliftedNewtypes
     • In the newtype declaration for ‘A’
+    Suggested fix: Perhaps you intended to use UnliftedNewtypes

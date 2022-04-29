@@ -497,8 +497,7 @@ tcInferRecSelId (FieldOcc sel_name lbl)
                            -- nor does it need the 'lifting' treatment
                            -- hence no checkTh stuff here
 
-                    _ -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
-                         ppr thing <+> text "used where a value identifier was expected" }
+                    _ -> failWithTc $ TcRnExpectedValueId thing }
 
 ------------------------
 
@@ -553,16 +552,7 @@ fieldNotInType p rdr
     UnknownSubordinate (text "field of type" <+> quotes (ppr p))
 
 notSelector :: Name -> TcRnMessage
-notSelector field
-  = TcRnUnknownMessage $ mkPlainError noHints $
-  hsep [quotes (ppr field), text "is not a record selector"]
-
-naughtyRecordSel :: OccName -> TcRnMessage
-naughtyRecordSel lbl
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    text "Cannot use record selector" <+> quotes (ppr lbl) <+>
-    text "as a function due to escaped type variables" $$
-    text "Probable fix: use pattern-matching syntax instead"
+notSelector = TcRnNotARecordSelector
 
 
 {- *********************************************************************
@@ -755,8 +745,7 @@ tc_infer_id id_name
              (tcTyThingTyCon_maybe -> Just tc) -> fail_tycon tc -- TyCon or TcTyCon
              ATyVar name _ -> fail_tyvar name
 
-             _ -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
-                  ppr thing <+> text "used where a value identifier was expected" }
+             _ -> failWithTc $ TcRnExpectedValueId thing }
   where
     fail_tycon tc = do
       gre <- getGlobalRdrEnv
@@ -803,7 +792,7 @@ check_local_id id
 
 check_naughty :: OccName -> TcId -> TcM ()
 check_naughty lbl id
-  | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel lbl)
+  | isNaughtyRecordSelector id = failWithTc (TcRnRecSelectorEscapedTyVar lbl)
   | otherwise                  = return ()
 
 tcInferDataCon :: DataCon -> TcM (HsExpr GhcTc, TcSigmaType)
@@ -840,10 +829,8 @@ tcInferPatSyn id_name ps
        Just (expr,ty) -> return (expr,ty)
        Nothing        -> failWithTc (nonBidirectionalErr id_name)
 
-nonBidirectionalErr :: Outputable name => name -> TcRnMessage
-nonBidirectionalErr name = TcRnUnknownMessage $ mkPlainError noHints $
-  text "non-bidirectional pattern synonym"
-  <+> quotes (ppr name) <+> text "used in an expression"
+nonBidirectionalErr :: Name -> TcRnMessage
+nonBidirectionalErr = TcRnPatSynNotBidirectional
 
 {- Note [Typechecking data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1007,7 +994,7 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
         -- bindings of the same splice proxy, but that doesn't
         -- matter, although it's a mite untidy.
     do  { let id_ty = idType id
-        ; checkTc (isTauTy id_ty) (polySpliceErr id)
+        ; checkTc (isTauTy id_ty) (TcRnSplicePolymorphicLocalVar id)
                -- If x is polymorphic, its occurrence sites might
                -- have different instantiations, so we can't use plain
                -- 'x' as the splice proxy name.  I don't know how to
@@ -1040,11 +1027,6 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
     id_name = idName id
 
 checkCrossStageLifting _ _ _ = return ()
-
-polySpliceErr :: Id -> TcRnMessage
-polySpliceErr id
-  = TcRnUnknownMessage $ mkPlainError noHints $
-  text "Can't splice the polymorphic local variable" <+> quotes (ppr id)
 
 {-
 Note [Lifting strings]

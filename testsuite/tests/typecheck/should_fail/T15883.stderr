@@ -1,5 +1,5 @@
 
 T15883.hs:9:1: error:
     • Newtype has non-* return kind ‘TYPE rep’
-      Perhaps you intended to use UnliftedNewtypes
     • In the newtype declaration for ‘Foo’
+    Suggested fix: Perhaps you intended to use UnliftedNewtypes

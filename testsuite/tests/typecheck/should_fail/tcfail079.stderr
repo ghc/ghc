@@ -1,5 +1,5 @@
 
 tcfail079.hs:9:1: error:
     • Newtype has non-* return kind ‘TYPE 'GHC.Types.IntRep’
-      Perhaps you intended to use UnliftedNewtypes
     • In the newtype declaration for ‘Unboxed’
+    Suggested fix: Perhaps you intended to use UnliftedNewtypes

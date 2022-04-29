@@ -634,8 +634,7 @@ tcHsDeriv hs_ty
              (kind_args, _) = splitFunTys (tcTypeKind pred)
        ; case getClassPredTys_maybe pred of
            Just (cls, tys) -> return (tvs, cls, tys, map scaledThing kind_args)
-           Nothing -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
-             (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
+           Nothing -> failWithTc $ TcRnIllegalDerivingItem hs_ty }
 
 -- | Typecheck a deriving strategy. For most deriving strategies, this is a
 -- no-op, but for the @via@ strategy, this requires typechecking the @via@ type.
@@ -1132,19 +1131,11 @@ tc_hs_type _ ty@(HsBangTy _ bang _) _
     -- While top-level bangs at this point are eliminated (eg !(Maybe Int)),
     -- other kinds of bangs are not (eg ((!Maybe) Int)). These kinds of
     -- bangs are invalid, so fail. (#7210, #14761)
-    = do { let bangError err = failWith $ TcRnUnknownMessage $ mkPlainError noHints $
-                 text "Unexpected" <+> text err <+> text "annotation:" <+> ppr ty $$
-                 text err <+> text "annotation cannot appear nested inside a type"
-         ; case bang of
-             HsSrcBang _ SrcUnpack _           -> bangError "UNPACK"
-             HsSrcBang _ SrcNoUnpack _         -> bangError "NOUNPACK"
-             HsSrcBang _ NoSrcUnpack SrcLazy   -> bangError "laziness"
-             HsSrcBang _ _ _                   -> bangError "strictness" }
+    = failWith $ TcRnUnexpectedAnnotation ty bang
 tc_hs_type _ ty@(HsRecTy {})      _
       -- Record types (which only show up temporarily in constructor
       -- signatures) should have been removed by now
-    = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
-       (text "Record syntax is illegal here:" <+> ppr ty)
+    = failWithTc $ TcRnIllegalRecordSyntax ty
 
 -- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSpliceType'.
 -- Here we get rid of it and add the finalizers to the global environment
@@ -1158,8 +1149,7 @@ tc_hs_type mode (HsSpliceTy _ (HsSpliced _ mod_finalizers (HsSplicedTy ty)))
 
 -- This should never happen; type splices are expanded by the renamer
 tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
-  = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
-     (text "Unexpected type splice:" <+> ppr ty)
+  = failWithTc $ TcRnUnexpectedTypeSplice ty
 
 ---------- Functions and applications
 tc_hs_type mode (HsFunTy _ mult ty1 ty2) exp_kind
@@ -1707,10 +1697,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
     n_initial_val_args _                    = 0
 
     ty_app_err arg ty
-      = failWith $ TcRnUnknownMessage $ mkPlainError noHints $
-          text "Cannot apply function of kind" <+> quotes (ppr ty)
-            $$ text "to visible kind argument" <+> quotes (ppr arg)
-
+      = failWith $ TcRnInvalidVisibleKindArgument arg ty
 
 mkAppTyM :: TCvSubst
          -> TcType -> TyCoBinder    -- fun, plus its top-level binder
@@ -2641,7 +2628,7 @@ matchUpSigWithDecl sig_tcbs sig_res_kind hs_bndrs thing_inside
            ; return ([], res) }
 
     go _ [] hs_bndrs
-      = failWithTc (tooManyBindersErr sig_res_kind hs_bndrs)
+      = failWithTc (TcRnTooManyBinders sig_res_kind hs_bndrs)
 
     go subst (tcb : tcbs') hs_bndrs
       | Bndr tv vis <- tcb
@@ -2699,13 +2686,6 @@ swizzleTcb swizzle_env subst (Bndr tv vis)
     -- There is no single binding site for 'k'.
     -- See Note [Source locations for implicitly bound type variables]
     -- in GHC.Tc.Rename.HsType
-
-tooManyBindersErr :: Kind -> [LHsTyVarBndr () GhcRn] -> TcRnMessage
-tooManyBindersErr ki bndrs = TcRnUnknownMessage $ mkPlainError noHints $
-   hang (text "Not a function kind:")
-      4 (ppr ki) $$
-   hang (text "but extra binders found:")
-      4 (fsep (map ppr bndrs))
 
 {- See Note [kcCheckDeclHeader_sig]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3022,15 +3002,7 @@ checkForDuplicateScopedTyVars scoped_prs
     report_dup :: (Name,Name) -> TcM ()
     report_dup (n1,n2)
       = setSrcSpan (getSrcSpan n2) $
-        addErrTc $ TcRnUnknownMessage $ mkPlainError noHints $
-        hang (text "Different names for the same type variable:") 2 info
-      where
-        info | nameOccName n1 /= nameOccName n2
-             = quotes (ppr n1) <+> text "and" <+> quotes (ppr n2)
-             | otherwise -- Same OccNames! See C2 in
-                         -- Note [Swizzling the tyvars before generaliseTcTyCon]
-             = vcat [ quotes (ppr n1) <+> text "bound at" <+> ppr (getSrcLoc n1)
-                    , quotes (ppr n2) <+> text "bound at" <+> ppr (getSrcLoc n2) ]
+        addErrTc $ TcRnDifferentNamesForTyVar n1 n2
 
 
 {- *********************************************************************
@@ -3753,31 +3725,6 @@ splitTyConKind skol_info in_scope avoid_occs kind
 
         ; return (go new_occs new_uniqs subst [] kind) }
 
--- | A description of whether something is a
---
--- * @data@ or @newtype@ ('DataDeclSort')
---
--- * @data instance@ or @newtype instance@ ('DataInstanceSort')
---
--- * @data family@ ('DataFamilySort')
---
--- At present, this data type is only consumed by 'checkDataKindSig'.
-data DataSort
-  = DataDeclSort     NewOrData
-  | DataInstanceSort NewOrData
-  | DataFamilySort
-
--- | Local helper type used in 'checkDataKindSig'.
---
--- Superficially similar to 'ContextKind', but it lacks 'AnyKind'
--- and 'AnyBoxedKind', and instead of @'TheKind' liftedTypeKind@
--- provides 'LiftedKind', which is much simpler to match on and
--- handle in 'isAllowedDataResKind'.
-data AllowedDataResKind
-  = AnyTYPEKind
-  | AnyBoxedKind
-  | LiftedKind
-
 isAllowedDataResKind :: AllowedDataResKind -> Kind -> Bool
 isAllowedDataResKind AnyTYPEKind  kind = tcIsRuntimeTypeKind kind
 isAllowedDataResKind AnyBoxedKind kind = tcIsBoxedTypeKind kind
@@ -3813,15 +3760,6 @@ checkDataKindSig data_sort kind
     res_kind = snd (tcSplitPiTys kind)
        -- Look for the result kind after
        -- peeling off any foralls and arrows
-
-    pp_dec :: SDoc
-    pp_dec = text $
-      case data_sort of
-        DataDeclSort     DataType -> "Data type"
-        DataDeclSort     NewType  -> "Newtype"
-        DataInstanceSort DataType -> "Data instance"
-        DataInstanceSort NewType  -> "Newtype instance"
-        DataFamilySort            -> "Data family"
 
     is_newtype :: Bool
     is_newtype =
@@ -3875,32 +3813,21 @@ checkDataKindSig data_sort kind
     is_kind_var | is_data_family = isJust (tcGetCastedTyVar_maybe res_kind)
                 | otherwise      = False
 
-    pp_allowed_kind dflags =
-      case allowed_kind dflags of
-        AnyTYPEKind  -> ppr tYPETyCon
-        AnyBoxedKind -> ppr boxedRepDataConTyCon
-        LiftedKind   -> ppr liftedTypeKind
-
     err_msg :: DynFlags -> TcRnMessage
-    err_msg dflags = TcRnUnknownMessage $ mkPlainError noHints $
-      sep [ sep [ pp_dec <+>
-                  text "has non-" <>
-                  pp_allowed_kind dflags
-                , (if is_data_family then text "and non-variable" else empty) <+>
-                  text "return kind" <+> quotes (ppr kind) ]
-          , ext_hint dflags ]
+    err_msg dflags =
+      TcRnInvalidReturnKind data_sort (allowed_kind dflags) kind (ext_hint dflags)
 
     ext_hint dflags
       | tcIsRuntimeTypeKind kind
       , is_newtype
       , not (xopt LangExt.UnliftedNewtypes dflags)
-      = text "Perhaps you intended to use UnliftedNewtypes"
+      = Just SuggestUnliftedNewtypes
       | tcIsBoxedTypeKind kind
       , is_datatype
       , not (xopt LangExt.UnliftedDatatypes dflags)
-      = text "Perhaps you intended to use UnliftedDatatypes"
+      = Just SuggestUnliftedDatatypes
       | otherwise
-      = empty
+      = Nothing
 
 -- | Checks that the result kind of a class is exactly `Constraint`, rejecting
 -- type synonyms and type families that reduce to `Constraint`. See #16826.
@@ -3908,9 +3835,7 @@ checkClassKindSig :: Kind -> TcM ()
 checkClassKindSig kind = checkTc (tcIsConstraintKind kind) err_msg
   where
     err_msg :: TcRnMessage
-    err_msg = TcRnUnknownMessage $ mkPlainError noHints $
-      text "Kind signature on a class must end with" <+> ppr constraintKind $$
-      text "unobscured by type families"
+    err_msg = TcRnClassKindNotConstraint kind
 
 tcbVisibilities :: TyCon -> [Type] -> [TyConBndrVis]
 -- Result is in 1-1 correspondence with orig_args
@@ -4378,22 +4303,7 @@ tc_lhs_kind_sig mode ctxt hs_kind
 
 promotionErr :: Name -> PromotionErr -> TcM a
 promotionErr name err
-  = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
-      (hang (pprPECategory err <+> quotes (ppr name) <+> text "cannot be used here")
-                   2 (parens reason))
-  where
-    reason = case err of
-               ConstrainedDataConPE pred
-                              -> text "it has an unpromotable context"
-                                 <+> quotes (ppr pred)
-               FamDataConPE   -> text "it comes from a data family instance"
-               NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
-               PatSynPE       -> text "pattern synonyms cannot be promoted"
-               RecDataConPE   -> same_rec_group_msg
-               ClassPE        -> same_rec_group_msg
-               TyConPE        -> same_rec_group_msg
-
-    same_rec_group_msg = text "it is defined and used in the same recursive group"
+  = failWithTc $ TcRnUnpromotableThing name err
 
 {-
 ************************************************************************

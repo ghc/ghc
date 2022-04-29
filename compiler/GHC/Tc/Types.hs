@@ -1147,25 +1147,6 @@ tcTyThingTyCon_maybe (AGlobal (ATyCon tc)) = Just tc
 tcTyThingTyCon_maybe (ATcTyCon tc_tc)      = Just tc_tc
 tcTyThingTyCon_maybe _                     = Nothing
 
-data PromotionErr
-  = TyConPE          -- TyCon used in a kind before we are ready
-                     --     data T :: T -> * where ...
-  | ClassPE          -- Ditto Class
-
-  | FamDataConPE     -- Data constructor for a data family
-                     -- See Note [AFamDataCon: not promoting data family constructors]
-                     -- in GHC.Tc.Utils.Env.
-  | ConstrainedDataConPE PredType
-                     -- Data constructor with a non-equality context
-                     -- See Note [Don't promote data constructors with
-                     --           non-equality contexts] in GHC.Tc.Gen.HsType
-  | PatSynPE         -- Pattern synonyms
-                     -- See Note [Don't promote pattern synonyms] in GHC.Tc.Utils.Env
-
-  | RecDataConPE     -- Data constructor in a recursive loop
-                     -- See Note [Recursion and promoting data constructors] in GHC.Tc.TyCl
-  | NoDataKindsDC    -- -XDataKinds not enabled (for a datacon)
-
 instance Outputable TcTyThing where     -- Debugging only
    ppr (AGlobal g)      = ppr g
    ppr elt@(ATcId {})   = text "Identifier" <>
@@ -1350,16 +1331,6 @@ instance Outputable IdBindingInfo where
   ppr (NonClosedLet fvs closed_type) =
     text "TopLevelLet" <+> ppr fvs <+> ppr closed_type
 
-instance Outputable PromotionErr where
-  ppr ClassPE                     = text "ClassPE"
-  ppr TyConPE                     = text "TyConPE"
-  ppr PatSynPE                    = text "PatSynPE"
-  ppr FamDataConPE                = text "FamDataConPE"
-  ppr (ConstrainedDataConPE pred) = text "ConstrainedDataConPE"
-                                      <+> parens (ppr pred)
-  ppr RecDataConPE                = text "RecDataConPE"
-  ppr NoDataKindsDC               = text "NoDataKindsDC"
-
 --------------
 pprTcTyThingCategory :: TcTyThing -> SDoc
 pprTcTyThingCategory = text . capitalise . tcTyThingCategory
@@ -1370,19 +1341,6 @@ tcTyThingCategory (ATyVar {})        = "type variable"
 tcTyThingCategory (ATcId {})         = "local identifier"
 tcTyThingCategory (ATcTyCon {})      = "local tycon"
 tcTyThingCategory (APromotionErr pe) = peCategory pe
-
---------------
-pprPECategory :: PromotionErr -> SDoc
-pprPECategory = text . capitalise . peCategory
-
-peCategory :: PromotionErr -> String
-peCategory ClassPE                = "class"
-peCategory TyConPE                = "type constructor"
-peCategory PatSynPE               = "pattern synonym"
-peCategory FamDataConPE           = "data constructor"
-peCategory ConstrainedDataConPE{} = "data constructor"
-peCategory RecDataConPE           = "data constructor"
-peCategory NoDataKindsDC          = "data constructor"
 
 {-
 ************************************************************************

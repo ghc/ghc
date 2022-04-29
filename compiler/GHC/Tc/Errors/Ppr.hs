@@ -21,6 +21,8 @@ module GHC.Tc.Errors.Ppr
 import GHC.Prelude
 
 import GHC.Builtin.Names
+import GHC.Builtin.Types (boxedRepDataConTyCon)
+import GHC.Builtin.Types.Prim (tYPETyCon)
 
 import GHC.Core.Coercion
 import GHC.Core.Unify     ( tcMatchTys )
@@ -802,6 +804,100 @@ instance Diagnostic TcRnMessage where
     TcRnInvalidCIdentifier target
       -> mkSimpleDecorated $
            sep [quotes (ppr target) <+> text "is not a valid C identifier"]
+    TcRnExpectedValueId thing
+      -> mkSimpleDecorated $
+           ppr thing <+> text "used where a value identifier was expected"
+    TcRnNotARecordSelector field
+      -> mkSimpleDecorated $
+           hsep [quotes (ppr field), text "is not a record selector"]
+    TcRnRecSelectorEscapedTyVar lbl
+      -> mkSimpleDecorated $
+           text "Cannot use record selector" <+> quotes (ppr lbl) <+>
+           text "as a function due to escaped type variables"
+    TcRnPatSynNotBidirectional name
+      -> mkSimpleDecorated $
+           text "non-bidirectional pattern synonym"
+           <+> quotes (ppr name) <+> text "used in an expression"
+    TcRnSplicePolymorphicLocalVar ident
+      -> mkSimpleDecorated $
+           text "Can't splice the polymorphic local variable" <+> quotes (ppr ident)
+    TcRnIllegalDerivingItem hs_ty
+      -> mkSimpleDecorated $
+           text "Illegal deriving item" <+> quotes (ppr hs_ty)
+    TcRnUnexpectedAnnotation ty bang
+      -> mkSimpleDecorated $
+           let err = case bang of
+                 HsSrcBang _ SrcUnpack _           -> "UNPACK"
+                 HsSrcBang _ SrcNoUnpack _         -> "NOUNPACK"
+                 HsSrcBang _ NoSrcUnpack SrcLazy   -> "laziness"
+                 HsSrcBang _ _ _                   -> "strictness"
+            in text "Unexpected" <+> text err <+> text "annotation:" <+> ppr ty $$
+               text err <+> text "annotation cannot appear nested inside a type"
+    TcRnIllegalRecordSyntax ty
+      -> mkSimpleDecorated $
+           text "Record syntax is illegal here:" <+> ppr ty
+    TcRnUnexpectedTypeSplice ty
+      -> mkSimpleDecorated $
+           text "Unexpected type splice:" <+> ppr ty
+    TcRnInvalidVisibleKindArgument arg ty
+      -> mkSimpleDecorated $
+           text "Cannot apply function of kind" <+> quotes (ppr ty)
+             $$ text "to visible kind argument" <+> quotes (ppr arg)
+    TcRnTooManyBinders ki bndrs
+      -> mkSimpleDecorated $
+           hang (text "Not a function kind:")
+              4 (ppr ki) $$
+           hang (text "but extra binders found:")
+              4 (fsep (map ppr bndrs))
+    TcRnDifferentNamesForTyVar n1 n2
+      -> mkSimpleDecorated $
+           hang (text "Different names for the same type variable:") 2 info
+         where
+           info | nameOccName n1 /= nameOccName n2
+                = quotes (ppr n1) <+> text "and" <+> quotes (ppr n2)
+                | otherwise -- Same OccNames! See C2 in
+                            -- Note [Swizzling the tyvars before generaliseTcTyCon]
+                = vcat [ quotes (ppr n1) <+> text "bound at" <+> ppr (getSrcLoc n1)
+                       , quotes (ppr n2) <+> text "bound at" <+> ppr (getSrcLoc n2) ]
+    TcRnInvalidReturnKind data_sort allowed_kind kind _suggested_ext
+      -> mkSimpleDecorated $
+           sep [ ppDataSort data_sort <+>
+                 text "has non-" <>
+                 allowed_kind_tycon
+               , (if is_data_family then text "and non-variable" else empty) <+>
+                 text "return kind" <+> quotes (ppr kind)
+               ]
+         where
+          is_data_family =
+            case data_sort of
+              DataDeclSort{}     -> False
+              DataInstanceSort{} -> False
+              DataFamilySort     -> True
+          allowed_kind_tycon =
+            case allowed_kind of
+              AnyTYPEKind  -> ppr tYPETyCon
+              AnyBoxedKind -> ppr boxedRepDataConTyCon
+              LiftedKind   -> ppr liftedTypeKind
+    TcRnClassKindNotConstraint _kind
+      -> mkSimpleDecorated $
+           text "Kind signature on a class must end with" <+> ppr constraintKind $$
+           text "unobscured by type families"
+    TcRnUnpromotableThing name err
+      -> mkSimpleDecorated $
+           (hang (pprPECategory err <+> quotes (ppr name) <+> text "cannot be used here")
+                        2 (parens reason))
+        where
+          reason = case err of
+                     ConstrainedDataConPE pred
+                                    -> text "it has an unpromotable context"
+                                       <+> quotes (ppr pred)
+                     FamDataConPE   -> text "it comes from a data family instance"
+                     NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
+                     PatSynPE       -> text "pattern synonyms cannot be promoted"
+                     RecDataConPE   -> same_rec_group_msg
+                     ClassPE        -> same_rec_group_msg
+                     TyConPE        -> same_rec_group_msg
+          same_rec_group_msg = text "it is defined and used in the same recursive group"
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1062,6 +1158,36 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnInvalidCIdentifier{}
       -> ErrorWithoutFlag
+    TcRnExpectedValueId{}
+      -> ErrorWithoutFlag
+    TcRnNotARecordSelector{}
+      -> ErrorWithoutFlag
+    TcRnRecSelectorEscapedTyVar{}
+      -> ErrorWithoutFlag
+    TcRnPatSynNotBidirectional{}
+      -> ErrorWithoutFlag
+    TcRnSplicePolymorphicLocalVar{}
+      -> ErrorWithoutFlag
+    TcRnIllegalDerivingItem{}
+      -> ErrorWithoutFlag
+    TcRnUnexpectedAnnotation{}
+      -> ErrorWithoutFlag
+    TcRnIllegalRecordSyntax{}
+      -> ErrorWithoutFlag
+    TcRnUnexpectedTypeSplice{}
+      -> ErrorWithoutFlag
+    TcRnInvalidVisibleKindArgument{}
+      -> ErrorWithoutFlag
+    TcRnTooManyBinders{}
+      -> ErrorWithoutFlag
+    TcRnDifferentNamesForTyVar{}
+      -> ErrorWithoutFlag
+    TcRnInvalidReturnKind{}
+      -> ErrorWithoutFlag
+    TcRnClassKindNotConstraint{}
+      -> ErrorWithoutFlag
+    TcRnUnpromotableThing{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -1320,6 +1446,39 @@ instance Diagnostic TcRnMessage where
              | UnliftedFFITypesNeeded <- why -> [suggestExtension LangExt.UnliftedFFITypes]
            _ -> noHints
     TcRnInvalidCIdentifier{}
+      -> noHints
+    TcRnExpectedValueId{}
+      -> noHints
+    TcRnNotARecordSelector{}
+      -> noHints
+    TcRnRecSelectorEscapedTyVar{}
+      -> [SuggestPatternMatchingSyntax]
+    TcRnPatSynNotBidirectional{}
+      -> noHints
+    TcRnSplicePolymorphicLocalVar{}
+      -> noHints
+    TcRnIllegalDerivingItem{}
+      -> noHints
+    TcRnUnexpectedAnnotation{}
+      -> noHints
+    TcRnIllegalRecordSyntax{}
+      -> noHints
+    TcRnUnexpectedTypeSplice{}
+      -> noHints
+    TcRnInvalidVisibleKindArgument{}
+      -> noHints
+    TcRnTooManyBinders{}
+      -> noHints
+    TcRnDifferentNamesForTyVar{}
+      -> noHints
+    TcRnInvalidReturnKind _ _ _ mb_suggest_unlifted_ext
+      -> case mb_suggest_unlifted_ext of
+           Nothing -> noHints
+           Just SuggestUnliftedNewtypes -> [suggestExtension LangExt.UnliftedNewtypes]
+           Just SuggestUnliftedDatatypes -> [suggestExtension LangExt.UnliftedDatatypes]
+    TcRnClassKindNotConstraint{}
+      -> noHints
+    TcRnUnpromotableThing{}
       -> noHints
 
 deriveInstanceErrReasonHints :: Class

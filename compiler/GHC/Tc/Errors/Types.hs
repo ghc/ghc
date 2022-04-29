@@ -14,6 +14,9 @@ module GHC.Tc.Errors.Types (
   , hasKinds
   , SuggestUndecidableInstances(..)
   , suggestUndecidableInstances
+  , SuggestUnliftedTypes(..)
+  , DataSort(..), ppDataSort
+  , AllowedDataResKind(..)
   , NotClosedReason(..)
   , SuggestPartialTypeSignatures(..)
   , suggestPartialTypeSignatures
@@ -52,6 +55,7 @@ module GHC.Tc.Errors.Types (
   , ValidHoleFits(..), noValidHoleFits
   , HoleFitDispConfig(..)
   , RelevantBindings(..), pprRelevantBindings
+  , PromotionErr(..), pprPECategory, peCategory
   , NotInScopeError(..), mkTcRnNotInScope
   , ImportError(..)
   , HoleError(..)
@@ -65,7 +69,7 @@ module GHC.Tc.Errors.Types (
 import GHC.Prelude
 
 import GHC.Hs
-import {-# SOURCE #-} GHC.Tc.Types (TcIdSigInfo)
+import {-# SOURCE #-} GHC.Tc.Types (TcIdSigInfo, TcTyThing)
 import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes (HoleFit)
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence (EvBindsVar)
@@ -101,7 +105,7 @@ import GHC.Driver.Backend (Backend)
 import GHC.Unit.State (UnitState)
 import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Basic
-import GHC.Utils.Misc (filterOut)
+import GHC.Utils.Misc (capitalise, filterOut)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.FastString (FastString)
 
@@ -1790,6 +1794,220 @@ data TcRnMessage where
   -}
   TcRnInvalidCIdentifier :: !CLabelString -> TcRnMessage
 
+  {- TcRnExpectedValueId is an error occurring when something that is not a
+      value identifier is used where one is expected.
+
+     Example(s): none
+
+    Test cases: none
+  -}
+  TcRnExpectedValueId :: !TcTyThing -> TcRnMessage
+
+  {- TcRnNotARecordSelector is an error for when something that is not a record
+     selector is used in a record pattern.
+
+     Example(s):
+     data Rec = MkRec { field :: Int }
+     r = Mkrec 1
+     r' = r { notAField = 2 }
+
+    Test cases: rename/should_fail/rnfail054
+                typecheck/should_fail/tcfail114
+  -}
+  TcRnNotARecordSelector :: !Name -> TcRnMessage
+
+  {- TcRnRecSelectorEscapedTyVar is an error indicating that a record field selector
+     containing an existential type variable is used as a function rather than in
+     a pattern match.
+
+     Example(s):
+     data Rec = forall a. Rec { field :: a }
+     field (Rec True)
+
+    Test cases: patsyn/should_fail/records-exquant
+                typecheck/should_fail/T3176
+  -}
+  TcRnRecSelectorEscapedTyVar :: !OccName -> TcRnMessage
+
+  {- TcRnPatSynNotBidirectional is an error for when a non-bidirectional pattern
+     synonym is used as a constructor.
+
+     Example(s):
+     pattern Five :: Int
+     pattern Five <- 5
+     five = Five
+
+    Test cases: patsyn/should_fail/records-no-uni-update
+                patsyn/should_fail/records-no-uni-update2
+  -}
+  TcRnPatSynNotBidirectional :: !Name -> TcRnMessage
+
+  {- TcRnSplicePolymorphicLocalVar is the error that occurs when the expression
+     inside typed template haskell brackets is a polymorphic local variable.
+
+     Example(s):
+     x = \(y :: forall a. a -> a) -> [|| y ||]
+
+    Test cases: quotes/T10384
+  -}
+  TcRnSplicePolymorphicLocalVar :: !Id -> TcRnMessage
+
+  {- TcRnIllegalDerivingItem is an error for when something other than a type class
+     appears in a deriving statement.
+
+     Example(s):
+     data X = X deriving Int
+
+    Test cases: deriving/should_fail/T5922
+  -}
+  TcRnIllegalDerivingItem :: !(LHsSigType GhcRn) -> TcRnMessage
+
+  {- TcRnUnexpectedAnnotation indicates the erroroneous use of an annotation such
+     as strictness, laziness, or unpacking.
+
+     Example(s):
+     data T = T { t :: Maybe {-# UNPACK #-} Int }
+     data C = C { f :: !IntMap Int }
+
+    Test cases: parser/should_fail/unpack_inside_type
+                typecheck/should_fail/T7210
+  -}
+  TcRnUnexpectedAnnotation :: !(HsType GhcRn) -> !HsSrcBang -> TcRnMessage
+
+  {- TcRnIllegalRecordSyntax is an error indicating an illegal use of record syntax.
+
+     Example(s):
+     data T = T Int { field :: Int }
+
+    Test cases: rename/should_fail/T7943
+                rename/should_fail/T9077
+  -}
+  TcRnIllegalRecordSyntax :: !(HsType GhcRn) -> TcRnMessage
+
+  {- TcRnUnexpectedTypeSplice is an error for a typed template haskell splice
+     appearing unexpectedly.
+
+     Example(s): none
+
+    Test cases: none
+  -}
+  TcRnUnexpectedTypeSplice :: !(HsType GhcRn) -> TcRnMessage
+
+  {- TcRnInvalidVisibleKindArgument is an error for a kind application on a
+     target type that cannot accept it.
+
+     Example(s):
+     bad :: Int @Type
+     bad = 1
+     type Foo :: forall a {b}. a -> b -> b
+     type Foo x y = y
+     type Bar = Foo @Bool @Int True 42
+
+    Test cases: indexed-types/should_fail/T16356_Fail3
+                typecheck/should_fail/ExplicitSpecificity7
+                typecheck/should_fail/T12045b
+                typecheck/should_fail/T12045c
+                typecheck/should_fail/T15592a
+                typecheck/should_fail/T15816
+  -}
+  TcRnInvalidVisibleKindArgument
+    :: !(LHsType GhcRn) -- ^ The visible kind argument
+    -> !Type -- ^ Target of the kind application
+    -> TcRnMessage
+
+  {- TcRnTooManyBinders is an error for a type constructor that is declared with
+     more arguments then its kind specifies.
+
+     Example(s):
+     type T :: Type -> (Type -> Type) -> Type
+     data T a (b :: Type -> Type) x1 (x2 :: Type -> Type)
+
+    Test cases: saks/should_fail/saks_fail008
+  -}
+  TcRnTooManyBinders :: !Kind -> ![LHsTyVarBndr () GhcRn] -> TcRnMessage
+
+  {- TcRnDifferentNamesForTyVar is an error that indicates different names being
+     used for the same type variable.
+
+     Example(s):
+     data SameKind :: k -> k -> *
+     data Q (a :: k1) (b :: k2) c = MkQ (SameKind a b)
+
+    Test cases: polykinds/T11203
+                polykinds/T11821a
+                saks/should_fail/T20916
+                typecheck/should_fail/T17566b
+                typecheck/should_fail/T17566c
+  -}
+  TcRnDifferentNamesForTyVar :: !Name -> !Name -> TcRnMessage
+
+  {- TcRnInvalidReturnKind is an error for a data declaration that has a kind signature
+     with an invalid result kind.
+
+     Example(s):
+     data family Foo :: Constraint
+
+    Test cases: typecheck/should_fail/T14048b
+                typecheck/should_fail/UnliftedNewtypesConstraintFamily
+                typecheck/should_fail/T12729
+                typecheck/should_fail/T15883
+                typecheck/should_fail/T16829a
+                typecheck/should_fail/T16829b
+                typecheck/should_fail/UnliftedNewtypesNotEnabled
+                typecheck/should_fail/tcfail079
+  -}
+  TcRnInvalidReturnKind
+    :: !DataSort -- ^ classification of thing being returned
+    -> !AllowedDataResKind -- ^ allowed kind
+    -> !Kind -- ^ the return kind
+    -> !(Maybe SuggestUnliftedTypes) -- ^ suggested extension
+    -> TcRnMessage
+
+  {- TcRnClassKindNotConstraint is an error for a type class that has a kind that
+     is not equivalent to Constraint.
+
+     Example(s):
+     type C :: Type -> Type
+     class C a
+
+    Test cases: saks/should_fail/T16826
+  -}
+  TcRnClassKindNotConstraint :: !Kind -> TcRnMessage
+
+  {- TcRnUnpromotableThing is an error that occurs when the user attempts to
+     use the promoted version of something which is not promotable.
+
+     Example(s):
+     data T :: T -> *
+     data X a where
+       MkX :: Show a => a -> X a
+     foo :: Proxy ('MkX 'True)
+     foo = Proxy
+
+    Test cases: dependent/should_fail/PromotedClass
+                dependent/should_fail/T14845_fail1
+                dependent/should_fail/T14845_fail2
+                dependent/should_fail/T15215
+                dependent/should_fail/T13780c
+                dependent/should_fail/T15245
+                polykinds/T5716
+                polykinds/T5716a
+                polykinds/T6129
+                polykinds/T7433
+                patsyn/should_fail/T11265
+                patsyn/should_fail/T9161-1
+                patsyn/should_fail/T9161-2
+                dependent/should_fail/SelfDep
+                polykinds/PolyKinds06
+                polykinds/PolyKinds07
+                polykinds/T13625
+                polykinds/T15116
+                polykinds/T15116a
+                saks/should_fail/T16727a
+                saks/should_fail/T16727b
+  -}
+  TcRnUnpromotableThing :: !Name -> !PromotionErr -> TcRnMessage
+
 -- | Specifies which backend code generators where expected for an FFI declaration
 data ExpectedBackends
   = COrAsmOrLlvm         -- ^ C, Asm, or LLVM
@@ -1872,6 +2090,44 @@ data SuggestUndecidableInstances
 suggestUndecidableInstances :: Bool -> SuggestUndecidableInstances
 suggestUndecidableInstances True  = YesSuggestUndecidableInstaces
 suggestUndecidableInstances False = NoSuggestUndecidableInstaces
+
+data SuggestUnliftedTypes
+  = SuggestUnliftedNewtypes
+  | SuggestUnliftedDatatypes
+
+-- | A description of whether something is a
+--
+-- * @data@ or @newtype@ ('DataDeclSort')
+--
+-- * @data instance@ or @newtype instance@ ('DataInstanceSort')
+--
+-- * @data family@ ('DataFamilySort')
+--
+-- At present, this data type is only consumed by 'checkDataKindSig'.
+data DataSort
+  = DataDeclSort     NewOrData
+  | DataInstanceSort NewOrData
+  | DataFamilySort
+
+ppDataSort :: DataSort -> SDoc
+ppDataSort data_sort = text $
+  case data_sort of
+    DataDeclSort     DataType -> "Data type"
+    DataDeclSort     NewType  -> "Newtype"
+    DataInstanceSort DataType -> "Data instance"
+    DataInstanceSort NewType  -> "Newtype instance"
+    DataFamilySort            -> "Data family"
+
+-- | Helper type used in 'checkDataKindSig'.
+--
+-- Superficially similar to 'ContextKind', but it lacks 'AnyKind'
+-- and 'AnyBoxedKind', and instead of @'TheKind' liftedTypeKind@
+-- provides 'LiftedKind', which is much simpler to match on and
+-- handle in 'isAllowedDataResKind'.
+data AllowedDataResKind
+  = AnyTYPEKind
+  | AnyBoxedKind
+  | LiftedKind
 
 -- | A data type to describe why a variable is not closed.
 -- See Note [Not-closed error messages] in GHC.Tc.Gen.Expr
@@ -2709,6 +2965,47 @@ pprRelevantBindings (RelevantBindings bds ran_out_of_fuel) =
 discardMsg :: SDoc
 discardMsg = text "(Some bindings suppressed;" <+>
              text "use -fmax-relevant-binds=N or -fno-max-relevant-binds)"
+
+data PromotionErr
+  = TyConPE          -- TyCon used in a kind before we are ready
+                     --     data T :: T -> * where ...
+  | ClassPE          -- Ditto Class
+
+  | FamDataConPE     -- Data constructor for a data family
+                     -- See Note [AFamDataCon: not promoting data family constructors]
+                     -- in GHC.Tc.Utils.Env.
+  | ConstrainedDataConPE PredType
+                     -- Data constructor with a non-equality context
+                     -- See Note [Don't promote data constructors with
+                     --           non-equality contexts] in GHC.Tc.Gen.HsType
+  | PatSynPE         -- Pattern synonyms
+                     -- See Note [Don't promote pattern synonyms] in GHC.Tc.Utils.Env
+
+  | RecDataConPE     -- Data constructor in a recursive loop
+                     -- See Note [Recursion and promoting data constructors] in GHC.Tc.TyCl
+  | NoDataKindsDC    -- -XDataKinds not enabled (for a datacon)
+
+instance Outputable PromotionErr where
+  ppr ClassPE                     = text "ClassPE"
+  ppr TyConPE                     = text "TyConPE"
+  ppr PatSynPE                    = text "PatSynPE"
+  ppr FamDataConPE                = text "FamDataConPE"
+  ppr (ConstrainedDataConPE pred) = text "ConstrainedDataConPE"
+                                      <+> parens (ppr pred)
+  ppr RecDataConPE                = text "RecDataConPE"
+  ppr NoDataKindsDC               = text "NoDataKindsDC"
+
+pprPECategory :: PromotionErr -> SDoc
+pprPECategory = text . capitalise . peCategory
+
+peCategory :: PromotionErr -> String
+peCategory ClassPE                = "class"
+peCategory TyConPE                = "type constructor"
+peCategory PatSynPE               = "pattern synonym"
+peCategory FamDataConPE           = "data constructor"
+peCategory ConstrainedDataConPE{} = "data constructor"
+peCategory RecDataConPE           = "data constructor"
+peCategory NoDataKindsDC          = "data constructor"
 
 -- | Stores the information to be reported in a representation-polymorphism
 -- error message.

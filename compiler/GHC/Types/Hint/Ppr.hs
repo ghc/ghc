@@ -197,6 +197,8 @@ instance Outputable GhcHint where
     SuggestPlacePragmaInHeader
       -> text "Perhaps you meant to place it in the module header?"
       $$ text "The module header is the section at the top of the file, before the" <+> quotes (text "module") <+> text "keyword"
+    SuggestPatternMatchingSyntax
+      -> text "Use pattern-matching syntax instead"
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

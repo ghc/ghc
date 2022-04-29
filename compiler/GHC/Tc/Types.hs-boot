@@ -11,6 +11,9 @@ data SelfBootInfo
 data TcIdSigInfo
 instance Outputable TcIdSigInfo
 
+data TcTyThing
+instance Outputable TcTyThing
+
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv
 getLclEnvTcLevel :: TcLclEnv -> TcLevel
 

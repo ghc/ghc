@@ -1,5 +1,5 @@
 
 T16829b.hs:10:1: error:
     • Newtype instance has non-* return kind ‘TYPE 'IntRep’
-      Perhaps you intended to use UnliftedNewtypes
     • In the newtype instance declaration for ‘T’
+    Suggested fix: Perhaps you intended to use UnliftedNewtypes
