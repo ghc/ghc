@@ -59,6 +59,10 @@ INFO_TABLE_RET (stg_restore_cccs, RET_SMALL, W_ info_ptr, W_ cccs)
     CCCS = Sp(1);
 #endif
     Sp_adj(2);
+
+    IF_DEBUG(sanity,
+      ccall checkStackFrame(Sp "ptr"));
+
     jump %ENTRY_CODE(Sp(0)) [*]; // NB. all registers live!
 }
 
