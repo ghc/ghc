@@ -183,3 +183,5 @@ test('TraverseHeapTest', [only_ways(['prof'])], compile_and_run, ['-debug'])
 # Check if -fno-prof-manual results in the manual cost center being ignored.
 test('ignore_scc', [], compile_and_run,
      ['-fno-prof-manual'])
+
+test('T21446', [], makefile_test, ['T21446'])
