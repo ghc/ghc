@@ -27,7 +27,6 @@ module GHC.IO.FD (
         setNonBlockingMode,
         readRawBufferPtr, readRawBufferPtrNoBlock, writeRawBufferPtr,
         stdin, stdout, stderr,
-        supportsIOURing
     ) where
 
 import GHC.Base
@@ -228,7 +227,7 @@ openFileWith filepath iomode non_blocking act1 act2 =
 
       oflags2 = oflags1 .|. binary_flags
 
-      oflags | supportsIOURing = oflags2
+      oflags | URing.supportsIOURing = oflags2
              | non_blocking = oflags2 .|. nonblock_flags
              | otherwise    = oflags2
     in do
@@ -459,7 +458,7 @@ dup2 fd fdto = do
 
 setNonBlockingMode :: FD -> Bool -> IO FD
 setNonBlockingMode fd set
-  | supportsIOURing = return fd
+  | URing.supportsIOURing = return fd
   | otherwise = do
   setNonBlockingFD (fdFD fd) set
 #if defined(mingw32_HOST_OS)
@@ -577,11 +576,9 @@ indicates that there's no data, we call threadWaitRead.
 
 -}
 
-supportsIOURing = True
-
 readRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
 readRawBufferPtr loc !fd !buf !off !len
-  | supportsIOURing = do
+  | URing.supportsIOURing = do
       let vec = IoVec { iovBase = buf', iovLen = len }
       withArray [vec] $ \ptr_vecs -> do
         r <- throwErrnoIfMinus1 loc
@@ -621,7 +618,7 @@ readRawBufferPtrNoBlock loc !fd !buf !off !len
 
 writeRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtr loc !fd !buf !off !len
-  | supportsIOURing = do
+  | URing.supportsIOURing = do
       let vec = IoVec { iovBase = buf', iovLen = len }
       withArray [vec] $ \ptr_vecs -> do
         r <- URing.submitAndBlock $ URing.Sqe.writev (fromIntegral (fdFD fd)) (-1) ptr_vecs 1

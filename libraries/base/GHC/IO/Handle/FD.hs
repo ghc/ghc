@@ -36,6 +36,7 @@ import GHC.IO.Exception
 import GHC.IO.IOMode
 import GHC.IO.Handle.Types
 import GHC.IO.Handle.Internals
+import qualified GHC.IO.URing as URing
 import qualified GHC.IO.FD as FD
 import qualified System.Posix.Internals as Posix
 
@@ -282,7 +283,7 @@ mkHandleFromFDNoFinalizer fd0 fd_type filepath iomode set_non_blocking mb_codec
   = do
 #if !defined(mingw32_HOST_OS)
     -- turn on non-blocking mode
-    fd <- if set_non_blocking && not FD.supportsIOURing
+    fd <- if set_non_blocking && not URing.supportsIOURing
              then FD.setNonBlockingMode fd0 True
              else return fd0
 #else

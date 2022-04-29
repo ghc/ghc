@@ -3,6 +3,7 @@
 module GHC.IO.URing
     ( submit
     , submitAndBlock
+    , supportsIOURing
     ) where
 
 import GHC.Base
@@ -20,6 +21,9 @@ import System.Linux.IO.URing.Sqe (SqeBuilder, UserData, SqeIndex)
 import qualified System.Linux.IO.URing.Sqe as URing.Sqe
 import qualified System.Linux.IO.URing.Ring as URing.Ring
 import System.Linux.IO.URing.Cqe (Cqe(..))
+
+supportsIOURing :: Bool
+supportsIOURing = True -- TODO: Feature test
 
 type Completion = Int32 -> IO ()
 
