@@ -282,7 +282,7 @@ mkHandleFromFDNoFinalizer fd0 fd_type filepath iomode set_non_blocking mb_codec
   = do
 #if !defined(mingw32_HOST_OS)
     -- turn on non-blocking mode
-    fd <- if set_non_blocking 
+    fd <- if set_non_blocking && not FD.supportsIOURing
              then FD.setNonBlockingMode fd0 True
              else return fd0
 #else

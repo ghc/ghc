@@ -64,7 +64,7 @@ submit' mgr mkSqe compl = do
           then do
               _ <- URing.submit (uring mgr) 1
               return r
-          else URing.freeSqe (uring mgr) sqeIdx >> error "SQ full"
+          else URing.freeSqe (uring mgr) sqeIdx >> error "SQ full" -- TODO
       Nothing -> error "failed to get sqe" -- TODO
 
 submit :: (UserData -> SqeBuilder a)

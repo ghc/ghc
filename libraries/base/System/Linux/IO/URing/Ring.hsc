@@ -160,7 +160,7 @@ submitAndWait
   -> IO Int
 submitAndWait uring to_submit min_complete = do
     let flags = #{const IORING_ENTER_GETEVENTS}
-    fmap fromIntegral $ throwErrnoIfMinus1 "io_uring_enter" $ c_io_uring_enter_safe
+    fmap fromIntegral $ throwErrnoIfMinus1Retry "io_uring_enter" $ c_io_uring_enter_safe
       (uringFd uring)
       (fromIntegral to_submit)
       (fromIntegral min_complete)

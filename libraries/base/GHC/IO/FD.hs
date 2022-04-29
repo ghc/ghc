@@ -26,7 +26,8 @@ module GHC.IO.FD (
         openFileWith, openFile, mkFD, release,
         setNonBlockingMode,
         readRawBufferPtr, readRawBufferPtrNoBlock, writeRawBufferPtr,
-        stdin, stdout, stderr
+        stdin, stdout, stderr,
+        supportsIOURing
     ) where
 
 import GHC.Base
@@ -227,7 +228,8 @@ openFileWith filepath iomode non_blocking act1 act2 =
 
       oflags2 = oflags1 .|. binary_flags
 
-      oflags | non_blocking = oflags2 .|. nonblock_flags
+      oflags | supportsIOURing = oflags2
+             | non_blocking = oflags2 .|. nonblock_flags
              | otherwise    = oflags2
     in do
       -- We want to be sure all the arguments to c_interruptible_open
@@ -456,7 +458,9 @@ dup2 fd fdto = do
   return fd{ fdFD = fdFD fdto } -- original FD, with the new fdFD
 
 setNonBlockingMode :: FD -> Bool -> IO FD
-setNonBlockingMode fd set = do
+setNonBlockingMode fd set
+  | supportsIOURing = return fd
+  | otherwise = do
   setNonBlockingFD (fdFD fd) set
 #if defined(mingw32_HOST_OS)
   return fd
@@ -580,7 +584,8 @@ readRawBufferPtr loc !fd !buf !off !len
   | supportsIOURing = do
       let vec = IoVec { iovBase = buf', iovLen = len }
       withArray [vec] $ \ptr_vecs -> do
-        r <- URing.submitAndBlock $ URing.Sqe.readv (fromIntegral (fdFD fd)) (-1) ptr_vecs 1
+        r <- throwErrnoIfMinus1 loc
+            $ URing.submitAndBlock $ URing.Sqe.readv (fromIntegral (fdFD fd)) (-1) ptr_vecs 1
         return (fromIntegral r)
   | isNonBlocking fd = unsafe_read -- unsafe is ok, it can't block
   | otherwise    = do r <- throwErrnoIfMinus1 loc
