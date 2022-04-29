@@ -1761,14 +1761,6 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
               -- changes (#4012).
               rule_name  = mkFastString ("SC:" ++ occNameString fn_occ ++ show rule_number)
               spec_name  = mkInternalName spec_uniq spec_occ fn_loc
---      ; pprTrace "spec_one {" (vcat [ text "function:" <+> ppr fn <+> ppr (idUnique fn)
---                                    , text "sc_count:" <+> ppr (sc_count env)
---                                    , text "pats:" <+> ppr pats
---                                    , text "-->" <+> ppr spec_name
---                                    , text "bndrs" <+> ppr arg_bndrs
---                                    , text "body" <+> ppr body
---                                    , text "how_bound" <+> ppr (sc_how_bound env) ]) $
---        return ()
 
         -- Specialise the body
         -- ; pprTraceM "body_subst_for" $ ppr (spec_occ) $$ ppr (sc_subst body_env)
@@ -1783,9 +1775,10 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                   = calcSpecInfo fn call_pat extra_bndrs
                   -- Annotate the variables with the strictness information from
                   -- the function (see Note [Strictness information in worker binders])
-
+              add_void_arg = needsVoidWorkerArg fn arg_bndrs spec_lam_args1
               (spec_lam_args, spec_call_args, spec_arity, spec_join_arity)
-                  | needsVoidWorkerArg fn arg_bndrs spec_lam_args1
+                  | add_void_arg
+                  -- See Note [SpecConst needs to add void args first]
                   , (spec_lam_args, spec_call_args, _) <- addVoidWorkerArg spec_lam_args1 []
                       -- needsVoidWorkerArg: usual w/w hack to avoid generating
                       -- a spec_rhs of unlifted type and no args.
@@ -1809,17 +1802,63 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
 
                 -- Conditionally use result of new worker-wrapper transform
               spec_rhs   = mkLams spec_lam_args spec_body
-              rule_rhs   = mkVarApps (Var spec_id) $
-                           dropTail (length extra_bndrs) spec_call_args
+              rule_rhs = mkVarApps (Var spec_id) $
+                              -- This will give us all the arguments we quantify over
+                              -- in the rule plus the void argument if present
+                              -- since `length(qvars) + void + length(extra_bndrs) = length spec_call_args`
+                              dropTail (length extra_bndrs) spec_call_args
               inline_act = idInlineActivation fn
               this_mod   = sc_module env
               rule       = mkRule this_mod True {- Auto -} True {- Local -}
                                   rule_name inline_act fn_name qvars pats rule_rhs
                            -- See Note [Transfer activation]
+
+        -- ; pprTrace "spec_one {" (vcat [ text "function:" <+> ppr fn <+> ppr (idUnique fn)
+        --                               , text "sc_count:" <+> ppr (sc_count env)
+        --                               , text "pats:" <+> ppr pats
+        --                               , text "call_pat:" <+> ppr call_pat
+        --                               , text "-->" <+> ppr spec_name
+        --                               , text "bndrs" <+> ppr arg_bndrs
+        --                               , text "extra_bndrs" <+> ppr extra_bndrs
+        --                               , text "spec_lam_args" <+> ppr spec_lam_args
+        --                               , text "spec_call_args" <+> ppr spec_call_args
+        --                               , text "rule_rhs" <+> ppr rule_rhs
+        --                               , text "adds_void_worker_arg" <+> ppr adds_void_worker_arg
+        --                               , text "body" <+> ppr body
+        --                               , text "spec_rhs" <+> ppr spec_rhs
+        --                               , text "how_bound" <+> ppr (sc_how_bound env) ]) $
+        --   return ()
         ; return (spec_usg, OS { os_pat = call_pat, os_rule = rule
                                , os_id = spec_id
                                , os_rhs = spec_rhs }) }
 
+{- Note [SpecConst needs to add void args first]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a function
+    f start @t = e
+We want to specialize for a partially applied call `f True`.
+See also Note [SpecConstr call patterns], second Wrinkle.
+Naively we would expect to get
+    $sf @t = $se
+    RULE: f True = $sf
+The specialized function only takes a single type argument
+so we add a void argument to prevent it from turning into
+a thunk. See Note [Protecting the last value argument] for details
+why. Normally we would add the void argument after the
+type argument giving us:
+    $sf :: forall t. Void# -> bla
+    $sf @t void = $se
+    RULE: f True = $sf void# (wrong)
+But if you look closely this wouldn't typecheck!
+If we substitute `f True` with `$sf void#` we expect the type argument to be applied first
+but we apply void# first.
+The easist fix seems to be just to add the void argument to the front of the arguments.
+Now we get:
+    $sf :: Void# -> forall t. bla
+    $sf void @t = $se
+    RULE: f True = $sf void#
+And now we can substitute `f True` with `$sf void#` with everything working out nicely!
+-}
 
 calcSpecInfo :: Id                     -- The original function
              -> CallPat                -- Call pattern
@@ -2251,11 +2290,16 @@ callToPats env bndr_occs call@(Call fn args con_env)
               "SpecConstr: bad covars"
               (ppr bad_covars $$ ppr call) $
           if interesting && isEmptyVarSet bad_covars
-          then
+          then do
               -- pprTraceM "callToPatsOut" (
-              --   text "fun" <> ppr fn $$
+              --         text "fn:" <+> ppr fn $$
+              --         text "args:" <+> ppr args $$
+              --         text "in_scope:" <+> ppr in_scope $$
+              --         -- text "in_scope:" <+> ppr in_scope $$
+              --         text "pat_fvs:" <+> ppr pat_fvs
+              --       )
               --   ppr (CP { cp_qvars = qvars', cp_args = pats })) >>
-                return (Just (CP { cp_qvars = qvars', cp_args = pats }))
+              return (Just (CP { cp_qvars = qvars', cp_args = pats }))
           else return Nothing }
 
     -- argToPat takes an actual argument, and returns an abstracted
@@ -2475,6 +2519,7 @@ setStrUnfolding id str
   = -- trace "setStrUnfolding3"
     id
 
+-- | wildCardPats are always boring
 wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg)
 wildCardPat ty str
   = do { uniq <- getUniqueM
