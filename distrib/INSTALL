@@ -1,6 +1,6 @@
 This is the INSTALL instructions for a binary distribution of GHC. For
 more details on what on earth this package is up to, please consult
-the README and ANNOUNCE.
+the accompanying README file.
 
 This distribution can be installed in a location of your choosing.
 
@@ -25,14 +25,14 @@ Now run:
 For more information, full GHC documentation is available from the
 main GHC site:
 
-  http://www.haskell.org/ghc
+  https://www.haskell.org/ghc/
 
 Bug reports/suggestions for improvement to the installation
 procedure/setup (as well as other GHC related troubles you're
 experiencing, of course), gratefully received.  Bug reporting
 instructions are here:
 
-  http://www.haskell.org/ghc/reportabug
+  https://gitlab.haskell.org/ghc/ghc/-/wikis/report-a-bug
 
 Enjoy,
 -- The GHC Team.
