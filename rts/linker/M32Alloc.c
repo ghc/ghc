@@ -405,6 +405,8 @@ void m32_allocator_free(m32_allocator *alloc)
 static void
 m32_allocator_push_filled_list(struct m32_page_t **head, struct m32_page_t *page)
 {
+  ASSERT_PAGE_TYPE(page, FILLED_PAGE);
+    // N.B. it's the caller's responsibility to set the pagetype to FILLED_PAGE
   m32_filled_page_set_next(page, *head);
   *head = page;
 }
@@ -535,6 +537,7 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
 
    // If we haven't found an empty page, flush the most filled one
    if (empty == -1) {
+      SET_PAGE_TYPE(alloc->pages[most_filled], FILLED_PAGE);
       m32_allocator_push_filled_list(&alloc->unprotected_list, alloc->pages[most_filled]);
       alloc->pages[most_filled] = NULL;
       empty = most_filled;
