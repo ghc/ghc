@@ -380,7 +380,7 @@ validate-x86_64-linux-deb10-make:
   extends: .build-x86_64-linux-deb10-make
   stage: full-build
   rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+    - if: '($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != "yes")'
 
 ############################################################
 # Validation via Pipelines (make)
