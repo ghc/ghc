@@ -317,9 +317,6 @@ instance OutputableBndrId p => Outputable (MatchPat (GhcPass p)) where
 pprLPat :: (OutputableBndrId p) => LPat (GhcPass p) -> SDoc
 pprLPat (L _ e) = pprPat e
 
-pprLMatchPat :: (OutputableBndrId p) => LMatchPat (GhcPass p) -> SDoc
-pprLMatchPat (L _ e) = ppr e
-
 -- | Print with type info if -dppr-debug is on
 pprPatBndr :: OutputableBndr name => name -> SDoc
 pprPatBndr var

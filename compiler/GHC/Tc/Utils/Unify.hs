@@ -63,6 +63,7 @@ import GHC.Types.Name( isSystemName )
 import GHC.Tc.Utils.Instantiate
 import GHC.Core.TyCon
 import GHC.Builtin.Types
+import GHC.Types.SrcLoc
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -434,24 +435,10 @@ matchExpectedFunTys herald ctx matches orig_ty thing_inside
                          defer bndrs vals (mkCheckExpType ty)
 
     ------------
-<<<<<<< HEAD
     defer :: [ExpTyCoBinder] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
     defer bndrs n fun_ty
       = do { let last_acc_arg_pos = length bndrs
            ; more_arg_tys <- mapM new_exp_arg_ty [last_acc_arg_pos + 1 .. last_acc_arg_pos + n]
-||||||| parent of 56d7fae044 (type checker checkpoint)
-    defer :: [Scaled ExpSigmaTypeFRR] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
-    defer acc_arg_tys n fun_ty
-      = do { more_arg_tys <- replicateM n (mkScaled <$> newFlexiTyVarTy multiplicityTy <*> newInferExpType)
-=======
-    pats = matchGroupLMatchPats matches
-    value_pats = length (filter isVis pats)
-    trailing_type_pats = length (filter isInvis pats)
-
-    defer :: [ExpTyCoBinder] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
-    defer bndrs n fun_ty
-      = do { more_arg_tys <- replicateM n (mkScaled <$> newFlexiTyVarTy multiplicityTy <*> newInferExpType)
->>>>>>> 56d7fae044 (type checker checkpoint)
            ; res_ty       <- newInferExpType
            ; let more_arg_tys' = map (\ty -> ExpAnon VisArg ty) more_arg_tys
            ; result       <- thing_inside (reverse bndrs ++ more_arg_tys') res_ty

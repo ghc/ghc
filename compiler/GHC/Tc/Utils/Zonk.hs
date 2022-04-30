@@ -1308,7 +1308,6 @@ zonkPat :: ZonkEnv -> LPat GhcTc -> TcM (ZonkEnv, LPat GhcTc)
 -- to the right)
 zonkPat env pat = wrapLocSndMA (zonk_pat env) pat
 
-<<<<<<< HEAD
 zonkLMatchPat :: ZonkEnv -> LMatchPat GhcTc -> TcM (ZonkEnv, LMatchPat GhcTc)
 zonkLMatchPat env (L l (VisPat x pat))
   = do { (env', p') <- zonkPat env pat
@@ -1321,18 +1320,6 @@ zonkLMatchPat env (L l (InvisTyVarPat t (L l' (UserTyVar x () (L l'' idp)))))
        }
 zonkLMatchPat env p = return (env, p)
 
-||||||| parent of 70932329bb (typechecker checkpoint)
-=======
-zonkLMatchPat :: ZonkEnv -> LMatchPat GhcTc -> TcM (ZonkEnv, LMatchPat GhcTc)
-zonkLMatchPat env (L l (VisPat x pat))
-  = do { (env', p') <- zonkPat env pat
-       ; return (env', L l (VisPat x p'))}
-zonkLMatchPat env (L l (InvisTyVarPat t (L l' idp)))
-  = do { (env', (L _ idp')) <- wrapLocSndM (zonkTyBndrX env) (L noSrcSpan idp)
-       ; return (env', L l (InvisTyVarPat t (L l' idp')))}
-zonkLMatchPat env p = return (env, p)
-
->>>>>>> 70932329bb (typechecker checkpoint)
 zonk_pat :: ZonkEnv -> Pat GhcTc -> TcM (ZonkEnv, Pat GhcTc)
 zonk_pat env (ParPat x lpar p rpar)
   = do  { (env', p') <- zonkPat env p
