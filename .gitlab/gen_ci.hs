@@ -394,6 +394,7 @@ data Artifacts
   = Artifacts { artifactPaths :: [String]
               , junitReport   :: String
               , expireIn      :: String
+              , artifactsWhen :: ArtifactsWhen
               }
 
 instance ToJSON Artifacts where
@@ -403,7 +404,15 @@ instance ToJSON Artifacts where
       ]
     , "expire_in" A..= expireIn
     , "paths" A..= artifactPaths
+    , "when" A..= artifactsWhen
     ]
+
+data ArtifactsWhen = ArtifactsOnSuccess | ArtifactsOnFailure | ArtifactsAlways
+
+instance ToJSON ArtifactsWhen where
+  toJSON ArtifactsOnSuccess = "on_success"
+  toJSON ArtifactsOnFailure = "on_failure"
+  toJSON ArtifactsAlways = "always"
 
 -----------------------------------------------------------------------------
 -- Rules, when do we run a job
@@ -594,6 +603,7 @@ job arch opsys buildConfig = (jobName, Job {..})
       , expireIn = "2 weeks"
       , artifactPaths = [binDistName arch opsys buildConfig ++ ".tar.xz"
                         ,"junit.xml"]
+      , artifactsWhen = ArtifactsAlways
       }
 
     jobCache
