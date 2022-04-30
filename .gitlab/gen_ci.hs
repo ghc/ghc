@@ -309,6 +309,11 @@ opsysVariables _ FreeBSD = mconcat
   , "GHC_VERSION" =: "9.2.2"
   , "CABAL_INSTALL_VERSION" =: "3.2.0.0"
   ]
+opsysVariables ARMv7 (Linux distro) =
+  distroVariables distro <>
+  mconcat [ -- ld.gold is affected by #16177 and therefore cannot be used.
+            "CONFIGURE_ARGS" =: "LD=ld.lld"
+          ]
 opsysVariables _ (Linux distro) = distroVariables distro
 opsysVariables AArch64 (Darwin {}) =
   mconcat [ "NIX_SYSTEM" =: "aarch64-darwin"
@@ -342,13 +347,14 @@ opsysVariables _ _ = mempty
 
 distroVariables :: LinuxDistro -> Variables
 distroVariables Alpine = mconcat
-  [ "CONFIGURE_ARGS" =: "--disable-ld-override"
+  [ -- Due to #20266
+    "CONFIGURE_ARGS" =: "--disable-ld-override"
   , "INSTALL_CONFIGURE_ARGS" =: "--disable-ld-override"
   , "HADRIAN_ARGS" =: "--docs=no-sphinx"
--- encoding004: due to lack of locale support
--- T10458, ghcilink002: due to #17869
--- linker_unload_native: due to musl not supporting any means of probing dynlib dependencies
--- (see Note [Object unloading]).
+    -- encoding004: due to lack of locale support
+    -- T10458, ghcilink002: due to #17869
+    -- linker_unload_native: due to musl not supporting any means of probing dynlib dependencies
+    -- (see Note [Object unloading]).
   , "BROKEN_TESTS" =: "encoding004 T10458 ghcilink002 linker_unload_native"
   ]
 distroVariables Fedora33 = mconcat
