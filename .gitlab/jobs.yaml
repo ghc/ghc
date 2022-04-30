@@ -171,7 +171,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-armv7-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "",
+      "CONFIGURE_ARGS": "LD=ld.lld ",
       "TEST_ENV": "armv7-linux-deb10-validate"
     }
   },
@@ -405,7 +405,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-armv7-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "",
+      "CONFIGURE_ARGS": "LD=ld.lld ",
       "TEST_ENV": "armv7-linux-deb10-validate",
       "XZ_OPT": "-9"
     }
@@ -1766,7 +1766,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-armv7-linux-deb10-perf",
       "BUILD_FLAVOUR": "perf",
-      "CONFIGURE_ARGS": "",
+      "CONFIGURE_ARGS": "LD=ld.lld ",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "armv7-linux-deb10-perf",
       "XZ_OPT": "-9"
