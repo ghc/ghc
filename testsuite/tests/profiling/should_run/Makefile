@@ -11,7 +11,7 @@ T7275:
 	# Suzanne should appear here, despite having produced only pinned
 	# allocations. Strip off the actual amounts and cost-center numbers since
 	# they will be non-determinstic.
-	grep suzanne T7275.hp | cut -f1 -d'	' | sed -e 's/([0-9]\+)//'
+	grep suzanne T7275.hp | cut -f1 -d'	' | sed -re 's/\([0-9]+\)//'
 
 .PHONY: T11489
 T11489:
