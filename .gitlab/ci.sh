@@ -283,7 +283,7 @@ function fetch_ghc() {
       $TAR -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
       case "$(uname)" in
         MSYS_*|MINGW*)
-          cp -r "ghc-${GHC_VERSION}*"/* "$toolchain"
+          cp -r ghc-${GHC_VERSION}*/* "$toolchain"
           ;;
         *)
           pushd "ghc-${GHC_VERSION}*"
