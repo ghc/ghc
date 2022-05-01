@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, GeneralizedNewtypeDeriving, DerivingStrategies, CPP #-}
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
--- gross hack: we manuvered ourselves into a position where we can't boot GHC with a LLVM based GHC anymore.
+-- gross hack: we maneuvered ourselves into a position where we can't boot GHC with a LLVM based GHC anymore.
 -- LLVM based GHC's fail to compile memcmp ffi calls.  These end up as memcmp$def in the llvm ir, however we
 -- don't have any prototypes and subsequently the llvm toolchain chokes on them.  Since 7fdcce6d, we use
 -- ShortText for the package database.  This however introduces this very module; which through inlining ends
@@ -10,7 +10,7 @@
 -- The solution thusly is to force late binding via the linker instead of inlining when comping with the
 -- bootstrap compiler.  This will produce a slower (slightly less optimised) stage1 compiler only.
 --
--- See issue 18857. hsyl20 deserves credit for coming up with the idea for the soltuion.
+-- See issue 18857. hsyl20 deserves credit for coming up with the idea for the solution.
 --
 -- This can be removed when we exit the boot compiler window. Thus once we drop GHC-9.2 as boot compiler,
 -- we can drop this code as well.
