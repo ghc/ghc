@@ -127,16 +127,19 @@ copyByteArray (MutableByteArray dst#) (I# doff#) (ByteArray src#) (I# soff#) (I#
   ST (\s# -> case copyByteArray# src# soff# dst# doff# sz# s# of
     s'# -> (# s'#, () #))
 
+-- | @since 4.17.0.0
 instance Data ByteArray where
   toConstr _ = error "toConstr"
   gunfold _ _ = error "gunfold"
   dataTypeOf _ = mkNoRepType "Data.Array.Byte.ByteArray"
 
+-- | @since 4.17.0.0
 instance Typeable s => Data (MutableByteArray s) where
   toConstr _ = error "toConstr"
   gunfold _ _ = error "gunfold"
   dataTypeOf _ = mkNoRepType "Data.Array.Byte.MutableByteArray"
 
+-- | @since 4.17.0.0
 instance Show ByteArray where
   showsPrec _ ba =
       showString "[" . go 0
@@ -167,6 +170,7 @@ sameByteArray ba1 ba2 =
     case reallyUnsafePtrEquality# (unsafeCoerce# ba1 :: ()) (unsafeCoerce# ba2 :: ()) of
       r -> isTrue# r
 
+-- | @since 4.17.0.0
 instance Eq ByteArray where
   ba1@(ByteArray ba1#) == ba2@(ByteArray ba2#)
     | sameByteArray ba1# ba2# = True
@@ -176,6 +180,7 @@ instance Eq ByteArray where
       n1 = sizeofByteArray ba1
       n2 = sizeofByteArray ba2
 
+-- | @since 4.17.0.0
 instance Eq (MutableByteArray s) where
   (==) (MutableByteArray arr#) (MutableByteArray brr#)
     = isTrue# (sameMutableByteArray# arr# brr#)
@@ -183,6 +188,7 @@ instance Eq (MutableByteArray s) where
 -- | Non-lexicographic ordering. This compares the lengths of
 -- the byte arrays first and uses a lexicographic ordering if
 -- the lengths are equal. Subject to change between major versions.
+-- @since 4.17.0.0
 instance Ord ByteArray where
   ba1@(ByteArray ba1#) `compare` ba2@(ByteArray ba2#)
     | sameByteArray ba1# ba2# = EQ
@@ -242,6 +248,7 @@ replicateByteArray n arr = runST $ do
   go 0
   unsafeFreezeByteArray marr
 
+-- | @since 4.17.0.0
 instance Semigroup ByteArray where
   (<>) = appendByteArray
   sconcat = mconcat . F.toList
@@ -251,10 +258,12 @@ instance Semigroup ByteArray where
     | otherwise = error "Data.Array.Byte#stimes: cannot allocate the requested amount of memory"
     where itgr = toInteger i :: Integer
 
+-- | @since 4.17.0.0
 instance Monoid ByteArray where
   mempty = emptyByteArray
   mconcat = concatByteArray
 
+-- | @since 4.17.0.0
 instance IsList ByteArray where
   type Item ByteArray = Word8
 
