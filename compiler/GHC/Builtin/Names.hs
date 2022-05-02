@@ -543,7 +543,7 @@ gHC_PRIM, gHC_PRIM_PANIC, gHC_PRIM_EXCEPTION,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
-    aRROW, gHC_DESUGAR, rANDOM, gHC_EXTS,
+    aRROW, gHC_DESUGAR, rANDOM, gHC_EXTS, gHC_IS_LIST,
     cONTROL_EXCEPTION_BASE, gHC_TYPEERROR, gHC_TYPELITS, gHC_TYPELITS_INTERNAL,
     gHC_TYPENATS, gHC_TYPENATS_INTERNAL,
     dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE :: Module
@@ -605,6 +605,7 @@ aRROW           = mkBaseModule (fsLit "Control.Arrow")
 gHC_DESUGAR = mkBaseModule (fsLit "GHC.Desugar")
 rANDOM          = mkBaseModule (fsLit "System.Random")
 gHC_EXTS        = mkBaseModule (fsLit "GHC.Exts")
+gHC_IS_LIST     = mkBaseModule (fsLit "GHC.IsList")
 cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
 gHC_GENERICS    = mkBaseModule (fsLit "GHC.Generics")
 gHC_TYPEERROR   = mkBaseModule (fsLit "GHC.TypeError")
@@ -1470,10 +1471,10 @@ zipName           = varQual gHC_LIST (fsLit "zip")    zipIdKey
 
 -- Overloaded lists
 isListClassName, fromListName, fromListNName, toListName :: Name
-isListClassName = clsQual gHC_EXTS (fsLit "IsList")    isListClassKey
-fromListName    = varQual gHC_EXTS (fsLit "fromList")  fromListClassOpKey
-fromListNName   = varQual gHC_EXTS (fsLit "fromListN") fromListNClassOpKey
-toListName      = varQual gHC_EXTS (fsLit "toList")    toListClassOpKey
+isListClassName = clsQual gHC_IS_LIST (fsLit "IsList")    isListClassKey
+fromListName    = varQual gHC_IS_LIST (fsLit "fromList")  fromListClassOpKey
+fromListNName   = varQual gHC_IS_LIST (fsLit "fromListN") fromListNClassOpKey
+toListName      = varQual gHC_IS_LIST (fsLit "toList")    toListClassOpKey
 
 -- HasField class ops
 getFieldName, setFieldName :: Name

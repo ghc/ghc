@@ -249,6 +249,7 @@ Library
         GHC.Int
         GHC.Integer
         GHC.Integer.Logarithms
+        GHC.IsList
         GHC.Ix
         GHC.List
         GHC.Maybe
