@@ -755,11 +755,11 @@ T16476b:
 	echo '-XCPP' >> unit-a
 	echo '-DTEST' >> unit-a
 	echo 'T16476b.hs' >> unit-a
-	
+
 	echo '--make' > resp
 	echo '-unit' > resp
 	echo '@unit-a' > resp
-	
+
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 @resp
 	./T16476b
 
@@ -767,3 +767,9 @@ T16476b:
 T20569:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c T20569/A.hs -i -iT20569 -hidir=interface
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c T20569/B.hs -i -iT20569 -hidir=interface
+
+.PHONY: T21349
+T21349:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 Main -working-dir T21349
+	[ ! -f T21349/B.o ] || (echo "object file exists" && exit 2)
+	[ ! -f T21349/B.hi ] || (echo "interface file exists" && exit 2)

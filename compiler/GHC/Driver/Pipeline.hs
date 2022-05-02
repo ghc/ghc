@@ -229,13 +229,12 @@ compileOne' mHscMessage
 
    debugTraceMsg logger 2 (text "compile: input file" <+> text input_fnpp)
 
-   let flags = hsc_dflags hsc_env0
-     in do unless (gopt Opt_KeepHiFiles flags) $
-               addFilesToClean tmpfs TFL_CurrentModule $
-                   [ml_hi_file $ ms_location summary]
-           unless (gopt Opt_KeepOFiles flags) $
-               addFilesToClean tmpfs TFL_GhcSession $
-                   [ml_obj_file $ ms_location summary]
+   unless (gopt Opt_KeepHiFiles lcl_dflags) $
+             addFilesToClean tmpfs TFL_CurrentModule $
+                 [ml_hi_file $ ms_location summary]
+   unless (gopt Opt_KeepOFiles lcl_dflags) $
+             addFilesToClean tmpfs TFL_GhcSession $
+                 [ml_obj_file $ ms_location summary]
 
    plugin_hsc_env <- initializePlugins hsc_env
    let pipe_env = mkPipeEnv NoStop input_fn pipelineOutput
