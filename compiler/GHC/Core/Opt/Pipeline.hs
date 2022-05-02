@@ -14,6 +14,7 @@ import GHC.Driver.Session
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
 import GHC.Driver.Config.Core.Opt.LiberateCase ( initLiberateCaseOpts )
+import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core
@@ -518,7 +519,9 @@ doCorePass pass guts = do
                                  updateBindsM (liftIO . cprAnalProgram logger fam_envs)
 
     CoreDoWorkerWrapper       -> {-# SCC "WorkWrap" #-}
-                                 updateBinds (wwTopBinds (mg_module guts) dflags fam_envs us)
+                                 updateBinds (wwTopBinds
+                                               (initWorkWrapOpts (mg_module guts) dflags fam_envs)
+                                               us)
 
     CoreDoSpecialising        -> {-# SCC "Specialise" #-}
                                  specProgram guts

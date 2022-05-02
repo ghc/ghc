@@ -5,18 +5,19 @@
 -}
 
 
-module GHC.Core.Opt.WorkWrap ( wwTopBinds ) where
+module GHC.Core.Opt.WorkWrap
+ ( WwOpts (..)
+ , wwTopBinds
+ )
+where
 
 import GHC.Prelude
-
-import GHC.Driver.Session
 
 import GHC.Core
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.Type
 import GHC.Core.Opt.WorkWrap.Utils
-import GHC.Core.FamInstEnv
 import GHC.Core.SimpleOpt
 
 import GHC.Types.Var
@@ -35,7 +36,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Monad
 import GHC.Utils.Trace
-import GHC.Unit.Types
 
 {-
 We take Core bindings whose binders have:
@@ -65,14 +65,12 @@ info for exported values).
 \end{enumerate}
 -}
 
-wwTopBinds :: Module -> DynFlags -> FamInstEnvs -> UniqSupply -> CoreProgram -> CoreProgram
+wwTopBinds :: WwOpts -> UniqSupply -> CoreProgram -> CoreProgram
 
-wwTopBinds this_mod dflags fam_envs us top_binds
+wwTopBinds ww_opts us top_binds
   = initUs_ us $ do
     top_binds' <- mapM (wwBind ww_opts) top_binds
     return (concat top_binds')
-  where
-    ww_opts = initWwOpts this_mod dflags fam_envs
 
 {-
 ************************************************************************

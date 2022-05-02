@@ -8,7 +8,7 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 {-# LANGUAGE ViewPatterns #-}
 
 module GHC.Core.Opt.WorkWrap.Utils
-   ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWWstr_one
+   ( WwOpts(..), mkWwBodies, mkWWstr, mkWWstr_one
    , needsVoidWorkerArg, addVoidWorkerArg
    , DataConPatContext(..)
    , UnboxingDecision(..), wantToUnboxArg
@@ -20,9 +20,6 @@ module GHC.Core.Opt.WorkWrap.Utils
 where
 
 import GHC.Prelude
-
-import GHC.Driver.Session
-import GHC.Driver.Config (initSimpleOpts)
 
 import GHC.Core
 import GHC.Core.Utils
@@ -151,15 +148,6 @@ data WwOpts
   -- | Generate workers even if the only effect is some args get passed
   -- unlifted. See Note [WW for calling convention]
   , wo_unlift_strict     :: !Bool
-  }
-
-initWwOpts :: Module -> DynFlags -> FamInstEnvs -> WwOpts
-initWwOpts this_mod dflags fam_envs = MkWwOpts
-  { wo_fam_envs          = fam_envs
-  , wo_simple_opts       = initSimpleOpts dflags
-  , wo_cpr_anal          = gopt Opt_CprAnal dflags
-  , wo_module            = this_mod
-  , wo_unlift_strict     = gopt Opt_WorkerWrapperUnlift dflags
   }
 
 type WwResult

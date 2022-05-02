@@ -390,6 +390,7 @@ Library
         GHC.Driver.Config.CmmToAsm
         GHC.Driver.Config.CmmToLlvm
         GHC.Driver.Config.Core.Opt.LiberateCase
+        GHC.Driver.Config.Core.Opt.WorkWrap
         GHC.Driver.Config.Diagnostic
         GHC.Driver.Config.Finder
         GHC.Driver.Config.HsToCore
