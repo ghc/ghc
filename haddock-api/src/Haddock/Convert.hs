@@ -19,7 +19,9 @@ module Haddock.Convert (
   PrintRuntimeReps(..),
 ) where
 
+#ifndef __HLINT__
 #include "HsVersions.h"
+#endif
 
 import GHC.Data.Bag ( emptyBag )
 import GHC.Types.Basic ( TupleSort(..), PromotionFlag(..), DefMethSpec(..), TopLevelFlag(..) )

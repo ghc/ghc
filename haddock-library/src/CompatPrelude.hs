@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 
-#if !MIN_VERSION_base(4,5,0)
+#ifdef __HLINT__
+#elif !MIN_VERSION_base(4,5,0)
 # error This module doesn't provide compat-shims for versions prior to base-4.5
 #endif
 
