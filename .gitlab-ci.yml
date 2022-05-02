@@ -250,6 +250,28 @@ lint-author:
     - if: $CI_MERGE_REQUEST_ID
     - *drafts-can-fail-lint
 
+lint-ci-config:
+  image: "nixos/nix:2.8.0"
+  extends: .lint
+  variables:
+    BUILD_FLAVOUR: default
+  before_script:
+    - mkdir -p ~/.cabal
+    - cp -Rf cabal-cache/* ~/.cabal || true
+  script:
+    - nix shell --extra-experimental-features nix-command --extra-experimental-features flakes nixpkgs#cabal-install -c cabal update
+    - .gitlab/generate_jobs
+        # 1 if .gitlab/generate_jobs changed the output of the generated config
+    - nix shell --extra-experimental-features nix-command --extra-experimental-features flakes nixpkgs#git -c git diff --exit-code
+  after_script:
+    - rm -Rf cabal-cache
+    - cp -Rf ~/.cabal cabal-cache
+  dependencies: []
+  cache:
+    key: lint-ci-$CACHE_REV
+    paths:
+      - cabal-cache
+
 lint-submods:
   extends: .lint-submods
   # Allow failure on merge requests since any necessary submodule patches may
