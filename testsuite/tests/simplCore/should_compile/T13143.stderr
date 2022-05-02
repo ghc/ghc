@@ -1,14 +1,14 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 71, types: 40, coercions: 0, joins: 0/0}
+  = {terms: 71, types: 41, coercions: 0, joins: 0/0}
 
 Rec {
 -- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
-  :: forall {a}. (# #) -> a
+  :: (# #) -> forall {a}. a
 [GblId, Arity=1, Str=<B>b, Cpr=b, Unf=OtherCon []]
-T13143.$wf = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.(##)
+T13143.$wf = \ _ [Occ=Dead] (@a) -> T13143.$wf GHC.Prim.(##) @a
 end Rec }
 
 -- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
@@ -20,8 +20,8 @@ f [InlPrag=[final]] :: forall a. Int -> a
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
-         Tmpl= \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.(##)}]
-f = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.(##)
+         Tmpl= \ (@a) _ [Occ=Dead] -> T13143.$wf GHC.Prim.(##) @a}]
+f = \ (@a) _ [Occ=Dead] -> T13143.$wf GHC.Prim.(##) @a
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule4 :: GHC.Prim.Addr#
@@ -59,13 +59,13 @@ T13143.$trModule :: GHC.Types.Module
 T13143.$trModule
   = GHC.Types.Module T13143.$trModule3 T13143.$trModule1
 
--- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
-lvl :: Int
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: forall {a}. a
 [GblId, Str=b, Cpr=b]
-lvl = T13143.$wf @Int GHC.Prim.(##)
+lvl = T13143.$wf GHC.Prim.(##)
 
 Rec {
--- RHS size: {terms: 28, types: 7, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 28, types: 8, coercions: 0, joins: 0/0}
 T13143.$wg [InlPrag=[2], Occ=LoopBreaker]
   :: Bool -> Bool -> GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId[StrictWorker([!, !, ~])],

@@ -395,15 +395,13 @@ needsVoidWorkerArg fn_id wrap_args work_args
     work_has_barrier    = any is_float_barrier work_args
     needs_float_barrier = wrap_had_barrier && not work_has_barrier
 
--- | Inserts a `Void#` arg before the first value argument (but after leading type args).
+-- | Inserts a `Void#` arg before the first argument.
 addVoidWorkerArg :: [Var] -> [CbvMark]
                  -> ([Var],     -- Lambda bound args
                      [Var],     -- Args at call site
                      [CbvMark]) -- cbv semantics for the worker args.
 addVoidWorkerArg work_args cbv_marks
-  = (ty_args ++ voidArgId:rest, ty_args ++ voidPrimId:rest, NotMarkedCbv:cbv_marks)
-  where
-    (ty_args, rest) = break isId work_args
+  = (voidArgId : work_args, voidPrimId:work_args, NotMarkedCbv:cbv_marks)
 
 {-
 Note [Protecting the last value argument]
