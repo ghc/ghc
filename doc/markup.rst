@@ -178,7 +178,7 @@ Deriving clauses
 Most instances are top-level, so can be documented as in
 :ref:`top-level-declaration`. The exception to this is instance that are
 come from a ``deriving`` clause on a datatype declaration. These can
-the documented like this: ::
+be documented like this: ::
 
     data D a = L a | M
       deriving ( Eq   -- ^ @since 4.5
