@@ -14,10 +14,10 @@ overloadedlistsfail01.hs:5:8: error:
 
 overloadedlistsfail01.hs:5:14: error:
     • Ambiguous type variable ‘a0’ arising from an overloaded list
-      prevents the constraint ‘(GHC.Exts.IsList a0)’ from being solved.
+      prevents the constraint ‘(GHC.IsList.IsList a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instance:
-        instance GHC.Exts.IsList [a] -- Defined in ‘GHC.Exts’
+        instance GHC.IsList.IsList [a] -- Defined in ‘GHC.IsList’
         ...plus four instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘print’, namely ‘[1]’
@@ -27,7 +27,7 @@ overloadedlistsfail01.hs:5:14: error:
 overloadedlistsfail01.hs:5:15: error:
     • Ambiguous type variable ‘a0’ arising from the literal ‘1’
       prevents the constraint ‘(Num
-                                  (GHC.Exts.Item a0))’ from being solved.
+                                  (GHC.IsList.Item a0))’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
         instance Num Integer -- Defined in ‘GHC.Num’

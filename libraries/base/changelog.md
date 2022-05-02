@@ -57,6 +57,8 @@
 
   * Re-export `augment` and `build` function from `GHC.List`
 
+  * Re-export the `IsList` typeclass from the new `GHC.IsList` module.
+
 ## 4.16.1.0 *Feb 2022*
 
   * Shipped with GHC 9.2.2

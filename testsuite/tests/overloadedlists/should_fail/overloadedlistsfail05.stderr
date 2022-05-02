@@ -1,7 +1,7 @@
 
 overloadedlistsfail05.hs:3:24: error:
     • Couldn't match type ‘Char’ with ‘Int’
-      Expected: GHC.Exts.Item [Int]
+      Expected: GHC.IsList.Item [Int]
         Actual: Char
     • In the expression: 'a'
       In the first argument of ‘length’, namely
