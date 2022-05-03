@@ -71,7 +71,7 @@ templateHaskellNames = [
     funDName, valDName, dataDName, newtypeDName, tySynDName,
     classDName, instanceWithOverlapDName,
     standaloneDerivWithStrategyDName, sigDName, kiSigDName, forImpDName,
-    pragInlDName, pragSpecDName, pragSpecInlDName, pragSpecInstDName,
+    pragInlDName, pragOpaqueDName, pragSpecDName, pragSpecInlDName, pragSpecInstDName,
     pragRuleDName, pragCompleteDName, pragAnnDName, defaultSigDName, defaultDName,
     dataFamilyDName, openTypeFamilyDName, closedTypeFamilyDName,
     dataInstDName, newtypeInstDName, tySynInstDName,
@@ -360,7 +360,7 @@ funDName, valDName, dataDName, newtypeDName, tySynDName, classDName,
     dataInstDName, newtypeInstDName, tySynInstDName, dataFamilyDName,
     openTypeFamilyDName, closedTypeFamilyDName, infixLDName, infixRDName,
     infixNDName, roleAnnotDName, patSynDName, patSynSigDName,
-    pragCompleteDName, implicitParamBindDName :: Name
+    pragCompleteDName, implicitParamBindDName, pragOpaqueDName :: Name
 funDName                         = libFun (fsLit "funD")                         funDIdKey
 valDName                         = libFun (fsLit "valD")                         valDIdKey
 dataDName                        = libFun (fsLit "dataD")                        dataDIdKey
@@ -375,6 +375,7 @@ defaultDName                     = libFun (fsLit "defaultD")                    
 defaultSigDName                  = libFun (fsLit "defaultSigD")                  defaultSigDIdKey
 forImpDName                      = libFun (fsLit "forImpD")                      forImpDIdKey
 pragInlDName                     = libFun (fsLit "pragInlD")                     pragInlDIdKey
+pragOpaqueDName                  = libFun (fsLit "pragOpaqueD")                  pragOpaqueDIdKey
 pragSpecDName                    = libFun (fsLit "pragSpecD")                    pragSpecDIdKey
 pragSpecInlDName                 = libFun (fsLit "pragSpecInlD")                 pragSpecInlDIdKey
 pragSpecInstDName                = libFun (fsLit "pragSpecInstD")                pragSpecInstDIdKey
@@ -595,11 +596,10 @@ quoteDecName        = qqFun (fsLit "quoteDec")  quoteDecKey
 quoteTypeName       = qqFun (fsLit "quoteType") quoteTypeKey
 
 -- data Inline = ...
-noInlineDataConName, inlineDataConName, inlinableDataConName, opaqueDataConName :: Name
+noInlineDataConName, inlineDataConName, inlinableDataConName :: Name
 noInlineDataConName  = thCon (fsLit "NoInline")  noInlineDataConKey
 inlineDataConName    = thCon (fsLit "Inline")    inlineDataConKey
 inlinableDataConName = thCon (fsLit "Inlinable") inlinableDataConKey
-opaqueDataConName    = thCon (fsLit "Opaque")    opaqueDataConKey
 
 -- data RuleMatch = ...
 conLikeDataConName, funLikeDataConName :: Name
@@ -702,11 +702,10 @@ modNameTyConKey         = mkPreludeTyConUnique 239
 -- If you want to change this, make sure you check in GHC.Builtin.Names
 
 -- data Inline = ...
-noInlineDataConKey, inlineDataConKey, inlinableDataConKey, opaqueDataConKey :: Unique
+noInlineDataConKey, inlineDataConKey, inlinableDataConKey :: Unique
 noInlineDataConKey  = mkPreludeDataConUnique 200
 inlineDataConKey    = mkPreludeDataConUnique 201
 inlinableDataConKey = mkPreludeDataConUnique 202
-opaqueDataConKey    = mkPreludeDataConUnique 203
 
 -- data RuleMatch = ...
 conLikeDataConKey, funLikeDataConKey :: Unique
@@ -888,7 +887,7 @@ funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey, classDIdKey,
     newtypeInstDIdKey, tySynInstDIdKey, standaloneDerivWithStrategyDIdKey,
     infixLDIdKey, infixRDIdKey, infixNDIdKey, roleAnnotDIdKey, patSynDIdKey,
     patSynSigDIdKey, pragCompleteDIdKey, implicitParamBindDIdKey,
-    kiSigDIdKey, defaultDIdKey :: Unique
+    kiSigDIdKey, defaultDIdKey, pragOpaqueDIdKey :: Unique
 funDIdKey                         = mkPreludeMiscIdUnique 320
 valDIdKey                         = mkPreludeMiscIdUnique 321
 dataDIdKey                        = mkPreludeMiscIdUnique 322
@@ -923,6 +922,7 @@ pragCompleteDIdKey                = mkPreludeMiscIdUnique 350
 implicitParamBindDIdKey           = mkPreludeMiscIdUnique 351
 kiSigDIdKey                       = mkPreludeMiscIdUnique 352
 defaultDIdKey                     = mkPreludeMiscIdUnique 353
+pragOpaqueDIdKey                   = mkPreludeMiscIdUnique 354
 
 -- type Cxt = ...
 cxtIdKey :: Unique

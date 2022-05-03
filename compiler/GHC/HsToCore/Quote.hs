@@ -1084,6 +1084,13 @@ rep_inline :: LocatedN Name
            -> SrcSpan
            -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_inline nm ispec loc
+  | Opaque {} <- inl_inline ispec
+  = do { nm1    <- lookupLOcc nm
+       ; opq <- repPragOpaque nm1
+       ; return [(loc, opq)]
+       }
+
+rep_inline nm ispec loc
   = do { nm1    <- lookupLOcc nm
        ; inline <- repInline $ inl_inline ispec
        ; rm     <- repRuleMatch $ inl_rule ispec
@@ -1118,7 +1125,11 @@ rep_specialiseInst ty loc
 
 repInline :: InlineSpec -> MetaM (Core TH.Inline)
 repInline (NoInline          _ )   = dataCon noInlineDataConName
-repInline (Opaque            _ )   = dataCon opaqueDataConName
+-- There is a mismatch between the TH and GHC representation because
+-- OPAQUE pragmas can't have phase activation annotations (which is
+-- enforced by the TH API), therefore they are desugared to OpaqueP rather than
+-- InlineP, see special case in rep_inline.
+repInline (Opaque            _ )   = panic "repInline: Opaque"
 repInline (Inline            _ )   = dataCon inlineDataConName
 repInline (Inlinable         _ )   = dataCon inlinableDataConName
 repInline NoUserInlinePrag        = notHandled ThNoUserInline
@@ -2601,6 +2612,9 @@ repPragInl :: Core TH.Name -> Core TH.Inline -> Core TH.RuleMatch
            -> Core TH.Phases -> MetaM (Core (M TH.Dec))
 repPragInl (MkC nm) (MkC inline) (MkC rm) (MkC phases)
   = rep2 pragInlDName [nm, inline, rm, phases]
+
+repPragOpaque :: Core TH.Name -> MetaM (Core (M TH.Dec))
+repPragOpaque (MkC nm) = rep2 pragOpaqueDName [nm]
 
 repPragSpec :: Core TH.Name -> Core (M TH.Type) -> Core TH.Phases
             -> MetaM (Core (M TH.Dec))
