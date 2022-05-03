@@ -231,8 +231,12 @@ calling the RTS, without iconv at all.
 -- an infinite loop).
 flushStdHandles :: IO ()
 flushStdHandles = do
-  hFlush stdout `catchAny` \_ -> return ()
-  hFlush stderr `catchAny` \_ -> return ()
+  hFlush stdout `catchException` handleExc
+  hFlush stderr `catchException` handleExc
+  where
+    handleExc se = do
+      handleFinalizerExc <- getFinalizerExceptionHandler
+      handleFinalizerExc se `catchException` (\(SomeException _) -> return ())
 
 safeExit, fastExit :: Int -> IO a
 safeExit = exitHelper useSafeExit

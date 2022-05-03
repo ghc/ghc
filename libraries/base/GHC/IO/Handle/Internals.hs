@@ -440,9 +440,11 @@ recoveringEncode codec from to = go from to
 handleFinalizer :: FilePath -> MVar Handle__ -> IO ()
 handleFinalizer fp m = do
   handle_ <- takeMVar m
-  (handle_', _) <- hClose_help handle_
+  (handle_', mb_exc) <- hClose_help handle_
   putMVar m handle_'
-  return ()
+  case mb_exc of
+    Just exc -> throwIO exc
+    Nothing -> return ()
 
 -- ---------------------------------------------------------------------------
 -- Allocating buffers
