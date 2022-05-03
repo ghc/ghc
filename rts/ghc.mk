@@ -57,7 +57,10 @@ ifneq "$(PORTING_HOST)" "YES"
 
 # unregisterised builds use the mini interpreter
 ifneq "$(GhcUnregisterised)" "YES"
+# use StgCRunAsm.S on ppc, ppc64, s390x, and riscv64
+ifneq "$(findstring $(TargetArch_CPP), ppc) $(findstring $(TargetArch_CPP), ppc64) $(findstring $(TargetArch_CPP), s390x) $(findstring $(TargetArch_CPP), riscv64)" ""
 rts_S_SRCS += rts/StgCRunAsm.S
+endif
 endif
 
 # select adjustor implementation. This much match the logic in rts.cabal.in.
