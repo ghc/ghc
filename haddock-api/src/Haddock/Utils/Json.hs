@@ -1,4 +1,3 @@
-{-# LANGUAGE ExplicitForAll    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes        #-}
 

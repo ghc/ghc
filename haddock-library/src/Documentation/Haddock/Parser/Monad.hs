@@ -1,9 +1,7 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 -- |
 -- Module      :  Documentation.Haddock.Parser.Monad
 -- Copyright   :  (c) Alec Theriault 2018-2019,

@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ViewPatterns #-}
 -- |
 -- Module      :  Documentation.Haddock.Parser.Identifier
 -- Copyright   :  (c) Alec Theriault 2019,

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE CPP, DeriveTraversable #-}
 
 -- |
 -- Module      :  Documentation.Haddock.Types

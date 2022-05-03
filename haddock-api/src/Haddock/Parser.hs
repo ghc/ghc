@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 -- |
 -- Module      :  Haddock.Parser
 -- Copyright   :  (c) Mateusz Kowalczyk 2013,
