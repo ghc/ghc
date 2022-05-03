@@ -123,7 +123,7 @@
    -------------------------------------------------------------------------- */
 #if defined(x86_64_HOST_ARCH)
 #  if defined(mingw32_HOST_OS)
-#    define STG_RUN_STACK_FRAME_SIZE 144
+#    define STG_RUN_STACK_FRAME_SIZE 240
 #  else
 #    define STG_RUN_STACK_FRAME_SIZE 48
 #  endif
