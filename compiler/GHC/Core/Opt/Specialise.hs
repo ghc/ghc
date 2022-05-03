@@ -40,6 +40,7 @@ import GHC.Builtin.Types  ( unboxedUnitTy )
 
 import GHC.Data.Maybe     ( mapMaybe, maybeToList, isJust )
 import GHC.Data.Bag
+import GHC.Data.OrdList
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
 
@@ -1332,12 +1333,12 @@ specBind rhs_env (NonRec fn rhs) body_uds
              final_binds :: [DictBind]
              -- See Note [From non-recursive to recursive]
              final_binds
-               | not (isEmptyBag dump_dbs)
+               | not (isNilOL dump_dbs)
                , not (null spec_defns)
                = [recWithDumpedDicts pairs dump_dbs]
                | otherwise
                = [mkDB $ NonRec b r | (b,r) <- pairs]
-                 ++ bagToList dump_dbs
+                 ++ fromOL dump_dbs
 
        ; if float_all then
              -- Rather than discard the calls mentioning the bound variables
@@ -2524,10 +2525,9 @@ data UsageDetails
     -- but there should be no calls *for* bs
 
 data FloatedDictBinds  -- See Note [Floated dictionary bindings]
-  = FDB { fdb_binds :: !(Bag DictBind)
+  = FDB { fdb_binds :: !(OrdList DictBind)
                -- The order is important;
-               -- in ds1 `unionBags` ds2, bindings in ds2 can depend on those in ds1
-               -- (Remember, Bags preserve order in GHC.)
+               -- in ds1 `appOL` ds2, bindings in ds2 can depend on those in ds1
 
         , fdb_bndrs :: !IdSet
     }          -- ^ The binders of 'fdb_binds'.
@@ -2568,7 +2568,7 @@ and continue.  But then we have to add $c== to the floats, and so on.
 These all float above the binding for 'f', and now we can
 successfully specialise 'f'.
 
-So the DictBinds in (ud_binds :: Bag DictBind) may contain
+So the DictBinds in (ud_binds :: OrdList DictBind) may contain
 non-dictionary bindings too.
 -}
 
@@ -2591,7 +2591,7 @@ emptyUDs = MkUD { ud_binds = emptyFDBs, ud_calls = emptyDVarEnv }
 
 
 emptyFDBs :: FloatedDictBinds
-emptyFDBs = FDB { fdb_binds = emptyBag, fdb_bndrs = emptyVarSet }
+emptyFDBs = FDB { fdb_binds = nilOL, fdb_bndrs = emptyVarSet }
 
 ------------------------------------------------------------
 type CallDetails  = DIdEnv CallInfoSet
@@ -2820,11 +2820,11 @@ thenFDBs :: FloatedDictBinds -> FloatedDictBinds -> FloatedDictBinds
 -- In (dbs1 `thenFDBs` dbs2), dbs2 may mention dbs1 but not vice versa
 thenFDBs (FDB { fdb_binds = dbs1, fdb_bndrs = bs1 })
          (FDB { fdb_binds = dbs2, fdb_bndrs = bs2 })
-  = FDB { fdb_binds = dbs1 `unionBags` dbs2
+  = FDB { fdb_binds = dbs1 `appOL` dbs2
         , fdb_bndrs = bs1  `unionVarSet` bs2 }
 
 -----------------------------
-_dictBindBndrs :: Bag DictBind -> [Id]
+_dictBindBndrs :: OrdList DictBind -> [Id]
 _dictBindBndrs dbs = foldr ((++) . bindersOf . db_bind) [] dbs
 
 -- | Construct a 'DictBind' from a 'CoreBind'
@@ -2858,13 +2858,13 @@ pair_fvs (bndr, rhs) = exprSomeFreeVars interesting rhs
 
 -- | Flatten a set of "dumped" 'DictBind's, and some other binding
 -- pairs, into a single recursive binding.
-recWithDumpedDicts :: [(Id,CoreExpr)] -> Bag DictBind -> DictBind
+recWithDumpedDicts :: [(Id,CoreExpr)] -> OrdList DictBind -> DictBind
 recWithDumpedDicts pairs dbs
   = DB { db_bind = Rec bindings
        , db_fvs = fvs `delVarSetList` map fst bindings }
   where
     (bindings, fvs) = foldr add ([], emptyVarSet)
-                                (dbs `snocBag` mkDB (Rec pairs))
+                                (dbs `snocOL` mkDB (Rec pairs))
     add (DB { db_bind = bind, db_fvs = fvs }) (prs_acc, fvs_acc)
       = case bind of
           NonRec b r -> ((b,r) : prs_acc, fvs')
@@ -2874,23 +2874,23 @@ recWithDumpedDicts pairs dbs
 
 snocDictBind :: UsageDetails -> DictBind -> UsageDetails
 snocDictBind uds@MkUD{ud_binds= FDB { fdb_binds = dbs, fdb_bndrs = bs }} db
-  = uds { ud_binds = FDB { fdb_binds = dbs `snocBag` db
+  = uds { ud_binds = FDB { fdb_binds = dbs `snocOL` db
                          , fdb_bndrs = bs `extendVarSetList` bindersOfDictBind db } }
 
 snocDictBinds :: UsageDetails -> [DictBind] -> UsageDetails
 -- Add ud_binds to the tail end of the bindings in uds
 snocDictBinds uds@MkUD{ud_binds=FDB{ fdb_binds = binds, fdb_bndrs = bs }} dbs
-  = uds { ud_binds = FDB { fdb_binds = binds `unionBags`        listToBag dbs
+  = uds { ud_binds = FDB { fdb_binds = binds `appOL`        (toOL dbs)
                          , fdb_bndrs = bs    `extendVarSetList` bindersOfDictBinds dbs } }
 
 consDictBind :: DictBind -> UsageDetails -> UsageDetails
 consDictBind db uds@MkUD{ud_binds=FDB{fdb_binds = binds, fdb_bndrs=bs}}
-  = uds { ud_binds = FDB { fdb_binds = db `consBag` binds
+  = uds { ud_binds = FDB { fdb_binds = db `consOL` binds
                          , fdb_bndrs = bs `extendVarSetList` bindersOfDictBind db } }
 
 consDictBinds :: [DictBind] -> UsageDetails -> UsageDetails
 consDictBinds dbs uds@MkUD{ud_binds=FDB{fdb_binds = binds, fdb_bndrs = bs}}
-  = uds { ud_binds = FDB{ fdb_binds = listToBag dbs `unionBags` binds
+  = uds { ud_binds = FDB{ fdb_binds = toOL dbs `appOL` binds
                         , fdb_bndrs = bs `extendVarSetList` bindersOfDictBinds dbs } }
 
 wrapDictBinds :: FloatedDictBinds -> [CoreBind] -> [CoreBind]
@@ -2899,17 +2899,17 @@ wrapDictBinds (FDB { fdb_binds = dbs }) binds
   where
     add (DB { db_bind = bind }) binds = bind : binds
 
-wrapDictBindsE :: Bag DictBind -> CoreExpr -> CoreExpr
+wrapDictBindsE :: OrdList DictBind -> CoreExpr -> CoreExpr
 wrapDictBindsE dbs expr
   = foldr add expr dbs
   where
     add (DB { db_bind = bind }) expr = Let bind expr
 
 ----------------------
-dumpUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, Bag DictBind)
+dumpUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, OrdList DictBind)
 -- Used at a lambda or case binder; just dump anything mentioning the binder
 dumpUDs bndrs uds@(MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
-  | null bndrs = (uds, emptyBag)  -- Common in case alternatives
+  | null bndrs = (uds, nilOL)  -- Common in case alternatives
   | otherwise  = -- pprTrace "dumpUDs" (ppr bndrs $$ ppr free_uds $$ ppr dump_dbs) $
                  (free_uds, dump_dbs)
   where
@@ -2920,7 +2920,7 @@ dumpUDs bndrs uds@(MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
                  deleteCallsFor bndrs orig_calls    -- Discard calls for bndr_set; there should be
                                                     -- no calls for any of the dicts in dump_dbs
 
-dumpBindUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, Bag DictBind, Bool)
+dumpBindUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, OrdList DictBind, Bool)
 -- Used at a let(rec) binding.
 -- We return a boolean indicating whether the binding itself is mentioned,
 -- directly or indirectly, by any of the ud_calls; in that case we want to
@@ -2977,7 +2977,7 @@ filterCalls (CIS fn call_bag) (FDB { fdb_binds = dbs })
     ok_call (CI { ci_fvs = fvs }) = fvs `disjointVarSet` dump_set
 
 ----------------------
-splitDictBinds :: FloatedDictBinds -> IdSet -> (FloatedDictBinds, Bag DictBind, IdSet)
+splitDictBinds :: FloatedDictBinds -> IdSet -> (FloatedDictBinds, OrdList DictBind, IdSet)
 -- splitDictBinds dbs bndrs returns
 --   (free_dbs, dump_dbs, dump_set)
 -- where
@@ -2990,18 +2990,18 @@ splitDictBinds (FDB { fdb_binds = dbs, fdb_bndrs = bs }) bndr_set
      , dump_dbs, dump_set)
    where
     (free_dbs, dump_dbs, dump_set)
-      = foldl' split_db (emptyBag, emptyBag, bndr_set) dbs
+      = foldl' split_db (nilOL, nilOL, bndr_set) dbs
                 -- Important that it's foldl' not foldr;
                 -- we're accumulating the set of dumped ids in dump_set
 
     split_db (free_dbs, dump_dbs, dump_idset) db
         | DB { db_bind = bind, db_fvs = fvs } <- db
         , dump_idset `intersectsVarSet` fvs     -- Dump it
-        = (free_dbs, dump_dbs `snocBag` db,
+        = (free_dbs, dump_dbs `snocOL` db,
            extendVarSetList dump_idset (bindersOf bind))
 
         | otherwise     -- Don't dump it
-        = (free_dbs `snocBag` db, dump_dbs, dump_idset)
+        = (free_dbs `snocOL` db, dump_dbs, dump_idset)
 
 
 ----------------------
