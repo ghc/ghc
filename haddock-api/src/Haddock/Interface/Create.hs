@@ -59,7 +59,6 @@ import GHC.Data.FastString (bytesFS, unpackFS)
 import GHC.Driver.Ppr (showSDoc)
 import GHC.HsToCore.Docs hiding (mkMaps)
 import GHC.IORef (readIORef)
-import GHC.Parser.Annotation (IsUnicodeSyntax (..))
 import GHC.Stack (HasCallStack)
 import GHC.Tc.Types hiding (IfM)
 import GHC.Tc.Utils.Monad (finalSafeMode)
@@ -75,11 +74,9 @@ import GHC.Types.SourceText (SourceText (..), sl_fs)
 import qualified GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Unit.Module as Module
 import GHC.Unit.Module.ModSummary (msHsFilePath)
-import GHC.Unit.Module.Warnings (WarningTxt (..), Warnings (..))
 import GHC.Unit.State (PackageName (..), UnitState, lookupModuleInAllUnits)
 import qualified GHC.Utils.Outputable as O
 import GHC.Utils.Panic (pprPanic)
-import GHC.HsToCore.Docs hiding (mkMaps)
 import GHC.Unit.Module.Warnings
 
 newtype IfEnv m = IfEnv
