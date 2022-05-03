@@ -116,8 +116,9 @@ StgFunPtr StgReturn(void)
  *
  * On X86 (both 32bit and 64bit) we keep the stack aligned on function calls at
  * a 16-byte boundary. This is done because on a number of architectures the
- * ABI requires this (x64, Mac OSX 32bit/64bit) as well as interfacing with
- * other libraries through the FFI.
+ * ABI requires this (e.g. the System V AMD64 ABI, Mac OS X 32-bit/64-bit ABIs,
+ * and the Win64 ABI) as well as interfacing with * other libraries through the
+ * FFI.
  *
  * As part of this arrangement we must maintain the stack at a 16-byte boundary
  * - word_size-bytes (so 16n - 4 for i386 and 16n - 8 for x64) on entry to a
@@ -406,19 +407,27 @@ StgRunIsImplementedInAssembler(void)
          * Additional callee saved registers on Win64. This must match
          * callClobberedRegisters in compiler/GHC/CmmToAsm/X86/Regs.hs as
          * both represent the Win64 calling convention.
+         *
+         * Note that we must save the entire 128-bit width of the XMM
+         * registers, as noted in #21465. Moreover, note that, due to the
+         * presence of the return address on the stack, %rsp+8 is
+         * 16-byte aligned. Since MOVAPS requires memory operands to be aligned
+         * to 16-bytes, we must add a word of padding here.
          */
-        "movq %%rdi,48(%%rax)\n\t"
-        "movq %%rsi,56(%%rax)\n\t"
-        "movq %%xmm6,  64(%%rax)\n\t"
-        "movq %%xmm7,  72(%%rax)\n\t"
-        "movq %%xmm8,  80(%%rax)\n\t"
-        "movq %%xmm9,  88(%%rax)\n\t"
-        "movq %%xmm10, 96(%%rax)\n\t"
-        "movq %%xmm11,104(%%rax)\n\t"
-        "movq %%xmm12,112(%%rax)\n\t"
-        "movq %%xmm13,120(%%rax)\n\t"
-        "movq %%xmm14,128(%%rax)\n\t"
-        "movq %%xmm15,136(%%rax)\n\t"
+        "movq %%rdi,   48(%%rax)\n\t"
+        "movq %%rsi,   56(%%rax)\n\t"
+        /* 8 bytes of padding for alignment */
+        "movaps %%xmm6,  72(%%rax)\n\t"
+        "movaps %%xmm7,  88(%%rax)\n\t"
+        "movaps %%xmm8, 104(%%rax)\n\t"
+        "movaps %%xmm9, 120(%%rax)\n\t"
+        "movaps %%xmm10,136(%%rax)\n\t"
+        "movaps %%xmm11,152(%%rax)\n\t"
+        "movaps %%xmm12,168(%%rax)\n\t"
+        "movaps %%xmm13,184(%%rax)\n\t"
+        "movaps %%xmm14,200(%%rax)\n\t"
+        "movaps %%xmm15,216(%%rax)\n\t"
+        /* 8 bytes of padding for alignment */
 #endif
 
 #if defined(ENABLE_UNWINDING)
@@ -507,18 +516,20 @@ StgRunIsImplementedInAssembler(void)
         "movq 32(%%rsp),%%r14\n\t"
         "movq 40(%%rsp),%%r15\n\t"
 #if defined(mingw32_HOST_OS)
-        "movq  48(%%rsp),%%rdi\n\t"
-        "movq  56(%%rsp),%%rsi\n\t"
-        "movq  64(%%rsp),%%xmm6\n\t"
-        "movq  72(%%rsp),%%xmm7\n\t"
-        "movq  80(%%rsp),%%xmm8\n\t"
-        "movq  88(%%rsp),%%xmm9\n\t"
-        "movq  96(%%rsp),%%xmm10\n\t"
-        "movq 104(%%rsp),%%xmm11\n\t"
-        "movq 112(%%rsp),%%xmm12\n\t"
-        "movq 120(%%rsp),%%xmm13\n\t"
-        "movq 128(%%rsp),%%xmm14\n\t"
-        "movq 136(%%rsp),%%xmm15\n\t"
+        "movq 48(%%rsp),%%rdi\n\t"
+        "movq 56(%%rsp),%%rsi\n\t"
+        /* 8 bytes of padding for alignment */
+        "movaps  72(%%rsp),%%xmm6\n\t"
+        "movaps  88(%%rsp),%%xmm7\n\t"
+        "movaps 104(%%rsp),%%xmm8\n\t"
+        "movaps 120(%%rsp),%%xmm9\n\t"
+        "movaps 136(%%rsp),%%xmm10\n\t"
+        "movaps 152(%%rsp),%%xmm11\n\t"
+        "movaps 168(%%rsp),%%xmm12\n\t"
+        "movaps 184(%%rsp),%%xmm13\n\t"
+        "movaps 200(%%rsp),%%xmm14\n\t"
+        "movaps 216(%%rsp),%%xmm15\n\t"
+        /* 8 bytes of padding for alignment */
 #endif
         "addq %1, %%rsp\n\t"
         "retq"

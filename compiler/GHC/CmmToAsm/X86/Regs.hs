@@ -390,9 +390,9 @@ callClobberedRegs platform
  | target32Bit platform = [eax,ecx,edx] ++ map regSingle (floatregnos platform)
  | platformOS platform == OSMinGW32
    = [rax,rcx,rdx,r8,r9,r10,r11]
-   -- Only xmm0-5 are caller-saves registers on 64bit windows.
-   -- ( https://docs.microsoft.com/en-us/cpp/build/register-usage )
-   -- For details check the Win64 ABI.
+   -- Only xmm0-5 are caller-saves registers on 64-bit windows.
+   -- For details check the Win64 ABI:
+   -- https://docs.microsoft.com/en-us/cpp/build/x64-software-conventions
    ++ map xmm [0  .. 5]
  | otherwise
     -- all xmm regs are caller-saves
