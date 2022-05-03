@@ -84,6 +84,10 @@ processModuleHeader dflags pkgName gre safety mayStr = do
   where
     failure = (emptyHaddockModInfo, Nothing)
 
+traverseSnd :: (Traversable t, Applicative f) => (a -> f b) -> t (x, a) -> f (t (x, b))
+traverseSnd f = traverse (\(x, a) ->
+                             (\b -> (x, b)) <$> f a)
+
 -- | Takes a 'GlobalRdrEnv' which (hopefully) contains all the
 -- definitions and a parsed comment and we attempt to make sense of
 -- where the identifiers in the comment point to. We're in effect
@@ -146,7 +150,7 @@ rename dflags gre = rn
       DocBold doc -> DocBold <$> rn doc
       DocMonospaced doc -> DocMonospaced <$> rn doc
       DocUnorderedList docs -> DocUnorderedList <$> traverse rn docs
-      DocOrderedList docs -> DocOrderedList <$> traverse rn docs
+      DocOrderedList docs -> DocOrderedList <$> traverseSnd rn docs
       DocDefList list -> DocDefList <$> traverse (\(a, b) -> (,) <$> rn a <*> rn b) list
       DocCodeBlock doc -> DocCodeBlock <$> rn doc
       DocIdentifierUnchecked x -> pure (DocIdentifierUnchecked x)

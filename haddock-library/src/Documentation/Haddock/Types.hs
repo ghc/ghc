@@ -124,7 +124,7 @@ data DocH mod id
   | DocMonospaced (DocH mod id)
   | DocBold (DocH mod id)
   | DocUnorderedList [DocH mod id]
-  | DocOrderedList [DocH mod id]
+  | DocOrderedList [(Int, DocH mod id)]
   | DocDefList [(DocH mod id, DocH mod id)]
   | DocCodeBlock (DocH mod id)
   | DocHyperlink (Hyperlink (DocH mod id))
@@ -154,7 +154,7 @@ instance Bifunctor DocH where
   bimap f g (DocMonospaced doc) = DocMonospaced (bimap f g doc)
   bimap f g (DocBold doc) = DocBold (bimap f g doc)
   bimap f g (DocUnorderedList docs) = DocUnorderedList (map (bimap f g) docs)
-  bimap f g (DocOrderedList docs) = DocOrderedList (map (bimap f g) docs)
+  bimap f g (DocOrderedList docs) = DocOrderedList (map (\(index, a) -> (index, bimap f g a)) docs)
   bimap f g (DocDefList docs) = DocDefList (map (bimap f g *** bimap f g) docs)
   bimap f g (DocCodeBlock doc) = DocCodeBlock (bimap f g doc)
   bimap f g (DocHyperlink (Hyperlink url lbl)) = DocHyperlink (Hyperlink url (fmap (bimap f g) lbl))
@@ -180,7 +180,7 @@ instance Bifoldable DocH where
   bifoldr f g z (DocMonospaced doc) = bifoldr f g z doc
   bifoldr f g z (DocBold doc) = bifoldr f g z doc
   bifoldr f g z (DocUnorderedList docs) = foldr (flip (bifoldr f g)) z docs
-  bifoldr f g z (DocOrderedList docs) = foldr (flip (bifoldr f g)) z docs
+  bifoldr f g z (DocOrderedList docs) = foldr (flip (bifoldr f g)) z (map snd docs)
   bifoldr f g z (DocDefList docs) = foldr (\(l, r) acc -> bifoldr f g (bifoldr f g acc l) r) z docs
   bifoldr f g z (DocCodeBlock doc) = bifoldr f g z doc
   bifoldr f g z (DocHeader (Header _ title)) = bifoldr f g z title
@@ -201,7 +201,8 @@ instance Bitraversable DocH where
   bitraverse f g (DocMonospaced doc) = DocMonospaced <$> bitraverse f g doc
   bitraverse f g (DocBold doc) = DocBold <$> bitraverse f g doc
   bitraverse f g (DocUnorderedList docs) = DocUnorderedList <$> traverse (bitraverse f g) docs
-  bitraverse f g (DocOrderedList docs) = DocOrderedList <$> traverse (bitraverse f g) docs
+  bitraverse f g (DocOrderedList docs) = DocOrderedList <$> traverseSnd (bitraverse f g) docs
+    where traverseSnd f' = traverse (\(x, a) -> (\b -> (x, b)) <$> f' a)
   bitraverse f g (DocDefList docs) = DocDefList <$> traverse (bitraverse (bitraverse f g) (bitraverse f g)) docs
   bitraverse f g (DocCodeBlock doc) = DocCodeBlock <$> bitraverse f g doc
   bitraverse f g (DocHyperlink (Hyperlink url lbl)) = DocHyperlink <$> (Hyperlink url <$> traverse (bitraverse f g) lbl)
@@ -246,7 +247,7 @@ data DocMarkupH mod id a = Markup
   , markupBold                 :: a -> a
   , markupMonospaced           :: a -> a
   , markupUnorderedList        :: [a] -> a
-  , markupOrderedList          :: [a] -> a
+  , markupOrderedList          :: [(Int,a)] -> a
   , markupDefList              :: [(a,a)] -> a
   , markupCodeBlock            :: a -> a
   , markupHyperlink            :: Hyperlink a -> a

@@ -820,7 +820,7 @@ spec = do
       it "can nest another type of list inside" $ do
         "* foo\n\n    1. bar" `shouldParseTo`
           DocUnorderedList [ DocParagraph "foo"
-                             <> DocOrderedList [DocParagraph "bar"]]
+                             <> DocOrderedList [(1, DocParagraph "bar")]]
 
       it "can nest a code block inside" $ do
         "* foo\n\n    @foo bar baz@" `shouldParseTo`
@@ -859,7 +859,7 @@ spec = do
           DocUnorderedList [ DocParagraph "foo"
                              <> DocUnorderedList [ DocParagraph "bar" ]
                            ]
-          <> DocOrderedList [ DocParagraph "baz" ]
+          <> DocOrderedList [ (1, DocParagraph "baz") ]
 
       it "allows arbitrary initial indent of a list" $ do
         unlines
@@ -883,20 +883,20 @@ spec = do
           DocDefList [ ("foo", "foov"
                                <> DocDefList [ ("bar", "barv") ])
                      ]
-          <> DocOrderedList [ DocParagraph "baz" ]
+          <> DocOrderedList [ (1, DocParagraph "baz") ]
 
       it "list order is preserved in presence of nesting + extra text" $ do
         "1. Foo\n\n    > Some code\n\n2. Bar\n\nSome text"
           `shouldParseTo`
-          DocOrderedList [ DocParagraph "Foo" <> DocCodeBlock "Some code"
-                         , DocParagraph "Bar"
+          DocOrderedList [ (1, DocParagraph "Foo" <> DocCodeBlock "Some code")
+                         , (2, DocParagraph "Bar")
                          ]
           <> DocParagraph (DocString "Some text")
 
         "1. Foo\n\n2. Bar\n\nSome text"
           `shouldParseTo`
-          DocOrderedList [ DocParagraph "Foo"
-                         , DocParagraph "Bar"
+          DocOrderedList [ (1, DocParagraph "Foo")
+                         , (2, DocParagraph "Bar")
                          ]
           <> DocParagraph (DocString "Some text")
 
@@ -980,9 +980,9 @@ spec = do
           , " 3. three"
           ]
         `shouldParseTo` DocOrderedList [
-            DocParagraph "one"
-          , DocParagraph "two"
-          , DocParagraph "three"
+            (1, DocParagraph "one")
+          , (1, DocParagraph "two")
+          , (3, DocParagraph "three")
           ]
 
       it "ignores empty lines between list items" $ do
@@ -992,12 +992,12 @@ spec = do
           , "2. two"
           ]
         `shouldParseTo` DocOrderedList [
-            DocParagraph "one"
-          , DocParagraph "two"
+            (1, DocParagraph "one")
+          , (2, DocParagraph "two")
           ]
 
       it "accepts an empty list item" $ do
-        "1." `shouldParseTo` DocOrderedList [DocParagraph DocEmpty]
+        "1." `shouldParseTo` DocOrderedList [(1, DocParagraph DocEmpty)]
 
       it "accepts multi-line list items" $ do
         unlines [
@@ -1007,12 +1007,12 @@ spec = do
           , "more two"
           ]
         `shouldParseTo` DocOrderedList [
-            DocParagraph "point one\n  more one"
-          , DocParagraph "point two\nmore two"
+            (1, DocParagraph "point one\n  more one")
+          , (1, DocParagraph "point two\nmore two")
           ]
 
       it "accepts markup in list items" $ do
-        "1. /foo/" `shouldParseTo` DocOrderedList [DocParagraph (DocEmphasis "foo")]
+        "1. /foo/" `shouldParseTo` DocOrderedList [(1, DocParagraph (DocEmphasis "foo"))]
 
       it "requires empty lines between list and other paragraphs" $ do
         unlines [
@@ -1022,7 +1022,7 @@ spec = do
           , ""
           , "baz"
           ]
-        `shouldParseTo` DocParagraph "foo" <> DocOrderedList [DocParagraph "bar"] <> DocParagraph "baz"
+        `shouldParseTo` DocParagraph "foo" <> DocOrderedList [(1, DocParagraph "bar")] <> DocParagraph "baz"
 
     context "when parsing definition lists" $ do
       it "parses a simple list" $ do
@@ -1109,8 +1109,8 @@ spec = do
                 ] `shouldParseTo`
           DocUnorderedList [ DocParagraph "bullet"
                            , DocParagraph "different bullet"]
-          <> DocOrderedList [ DocParagraph "ordered"
-                            , DocParagraph "different bullet"
+          <> DocOrderedList [ (1, DocParagraph "ordered")
+                            , (2, DocParagraph "different bullet")
                             ]
           <> DocDefList [ ("cat", "kitten")
                         , ("pineapple", "fruit")
