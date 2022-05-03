@@ -3639,7 +3639,7 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
         pure $ zip (repeat str_rdr) $ GHC.nameModule <$> names
 
     -- For every top-level identifier in scope, add the bids of the nested
-    -- declarations. See Note [ModBreaks.decls] in GHC.ByteCode.Types
+    -- declarations. See Note [Field modBreaks_decls] in GHC.ByteCode.Types
     addNestedDecls :: GhciMonad m => (String, Module) -> m [String]
     addNestedDecls (ident, mod) = do
         (_, decls) <- getModBreak mod

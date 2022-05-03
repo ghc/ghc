@@ -747,7 +747,7 @@ skolems.  They are used in two places:
 
 1. In kind signatures, see GHC.Tc.TyCl
       Note [Inferring kinds for type declarations]
-   and Note [Kind checking for GADTs]
+   and Note [Using TyVarTvs for kind-checking GADTs]
 
 2. In partial type signatures.  See GHC.Tc.Types
    Note [Quantified variables in partial type signatures]

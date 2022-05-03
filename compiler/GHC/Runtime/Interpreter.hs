@@ -200,7 +200,7 @@ interpCmd interp msg = case interpInstance interp of
   InternalInterp     -> run msg -- Just run it directly
 #endif
   ExternalInterp c i -> withIServ_ c i $ \iserv ->
-    uninterruptibleMask_ $ -- Note [uninterruptibleMask_]
+    uninterruptibleMask_ $ -- Note [uninterruptibleMask_ and interpCmd]
       iservCall iserv msg
 
 

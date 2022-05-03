@@ -621,7 +621,7 @@ instance Outputable Origin where
 -}
 
 -- | The semantics allowed for overlapping instances for a particular
--- instance. See Note [Safe Haskell isSafeOverlap] (in "GHC.Core.InstEnv") for a
+-- instance. See Note [Safe Haskell isSafeOverlap] in GHC.Core.InstEnv for a
 -- explanation of the `isSafeOverlap` field.
 --
 -- - 'GHC.Parser.Annotation.AnnKeywordId' :

@@ -1214,7 +1214,7 @@ ClosedLet means that
    - The fvs::RhsNames contains the free names of the RHS,
      excluding Global and ClosedLet ones.
 
-   - For the ClosedTypeId field see Note [Bindings with closed types]
+   - For the ClosedTypeId field see Note [Bindings with closed types: ClosedTypeId]
 
 For (static e) to be valid, we need for every 'x' free in 'e',
 that x's binding is floatable to the top level.  Specifically:

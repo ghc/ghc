@@ -553,7 +553,7 @@ tcExtendNameTyVarEnv binds thing_inside
     names = [(name, ATyVar name tv) | (name, tv) <- binds]
 
 isTypeClosedLetBndr :: Id -> Bool
--- See Note [Bindings with closed types] in GHC.Tc.Types
+-- See Note [Bindings with closed types: ClosedTypeId] in GHC.Tc.Types
 isTypeClosedLetBndr = noFreeVarsOfType . idType
 
 tcExtendRecIds :: [(Name, TcId)] -> TcM a -> TcM a
@@ -1125,7 +1125,7 @@ mkWrapperName :: (MonadIO m, HasModule m)
               => IORef (ModuleEnv Int) -> String -> String -> m FastString
 -- ^ @mkWrapperName ref what nameBase@
 --
--- See Note [Generating fresh names for ccall wrapper] for @ref@'s purpose.
+-- See Note [Generating fresh names for FFI wrappers] for @ref@'s purpose.
 mkWrapperName wrapperRef what nameBase
     = do thisMod <- getModule
          let pkg = unitString  (moduleUnit thisMod)
@@ -1187,9 +1187,6 @@ notFound name
        }
 
 wrongThingErr :: String -> TcTyThing -> Name -> TcM a
--- It's important that this only calls pprTcTyThingCategory, which in
--- turn does not look at the details of the TcTyThing.
--- See Note [Placeholder PatSyn kinds] in GHC.Tc.Gen.Bind
 wrongThingErr expected thing name
   = let msg = TcRnUnknownMessage $ mkPlainError noHints $
           (pprTcTyThingCategory thing <+> quotes (ppr name) <+>

@@ -2976,8 +2976,7 @@ data PromotionErr
                      -- in GHC.Tc.Utils.Env.
   | ConstrainedDataConPE PredType
                      -- Data constructor with a non-equality context
-                     -- See Note [Don't promote data constructors with
-                     --           non-equality contexts] in GHC.Tc.Gen.HsType
+                     -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep
   | PatSynPE         -- Pattern synonyms
                      -- See Note [Don't promote pattern synonyms] in GHC.Tc.Utils.Env
 

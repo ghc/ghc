@@ -944,7 +944,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
        -- clearer to duplicate it.  Still, if you fix a bug here,
        -- check there too!
 
-       -- See GHC.Tc.TyCl Note [Generalising in tcFamTyPatsGuts]
+       -- See GHC.Tc.TyCl Note [Generalising in tcTyFamInstEqnGuts]
        ; dvs  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
        ; qtvs <- quantifyTyVars skol_info TryNotToDefaultNonStandardTyVars dvs
        ; let final_tvs = scopedSort (qtvs ++ outer_tvs)

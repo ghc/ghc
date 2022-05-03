@@ -475,7 +475,7 @@ rnSpliceExpr splice
     run_expr_splice :: HsSplice GhcRn -> RnM (HsExpr GhcRn, FreeVars)
     run_expr_splice rn_splice
       | isTypedSplice rn_splice   -- Run it later, in the type checker
-      = do {  -- Ugh!  See Note [Splices] above
+      = do {  -- Ugh!  See Note [Free variables of typed splices] above
              traceRn "rnSpliceExpr: typed expression splice" empty
            ; lcl_rdr <- getLocalRdrEnv
            ; gbl_rdr <- getGlobalRdrEnv
