@@ -175,7 +175,7 @@ reportUnsolved wanted
 -- NB: Type-level holes are OK, because there are no bindings.
 -- See Note [Deferring coercion errors to runtime]
 -- Used by solveEqualities for kind equalities
---      (see Note [Fail fast on kind errors] in "GHC.Tc.Solver")
+--      (see Note [Failure in local type signatures] in GHC.Tc.Solver)
 reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted
   = do { ev_binds <- newNoTcEvBinds
@@ -2237,7 +2237,7 @@ something like
 Discussion in #9611.
 
 Note [Highlighting ambiguous type variables]
-~-------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we encounter ambiguous type variables (i.e. type variables
 that remain metavariables after type inference), we need a few more
 conditions before we can reason that *ambiguity* prevents constraints

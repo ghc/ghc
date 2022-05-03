@@ -273,8 +273,8 @@ mkMaps env instances decls =
     names _ decl = getMainDeclBinder env decl
 
 {-
-Note [1]:
----------
+Note [1]
+~~~~~~~~
 We relate ClsInsts to InstDecls and DerivDecls using the SrcSpans buried
 inside them. That should work for normal user-written instances (from
 looking at GHC sources). We can assume that commented instances are

@@ -847,7 +847,7 @@ decomposeRuleLhs :: DynFlags -> [Var] -> CoreExpr
                  -> Either DsMessage ([Var], Id, [CoreExpr])
 -- (decomposeRuleLhs bndrs lhs) takes apart the LHS of a RULE,
 -- The 'bndrs' are the quantified binders of the rules, but decomposeRuleLhs
--- may add some extra dictionary binders (see Note [Free dictionaries])
+-- may add some extra dictionary binders (see Note [Free dictionaries on rule LHS])
 --
 -- Returns an error message if the LHS isn't of the expected shape
 -- Note [Decomposing the left-hand side of a RULE]
@@ -881,8 +881,8 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
 
    orig_bndr_set = mkVarSet orig_bndrs
 
-        -- Add extra tyvar binders: Note [Free tyvars in rule LHS]
-        -- and extra dict binders: Note [Free dictionaries in rule LHS]
+        -- Add extra tyvar binders: Note [Free tyvars on rule LHS]
+        -- and extra dict binders: Note [Free dictionaries on rule LHS]
    mk_extra_bndrs fn_id args
      = scopedSort unbound_tvs ++ unbound_dicts
      where
@@ -940,7 +940,7 @@ Note [Decomposing the left-hand side of a RULE]
 There are several things going on here.
 * drop_dicts: see Note [Drop dictionary bindings on rule LHS]
 * simpleOptExpr: see Note [Simplify rule LHS]
-* extra_dict_bndrs: see Note [Free dictionaries]
+* extra_dict_bndrs: see Note [Free dictionaries on rule LHS]
 
 Note [Free tyvars on rule LHS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -997,7 +997,7 @@ drop_dicts drops dictionary bindings on the LHS where possible.
      --> f d
    Reasoning here is that there is only one d:Eq [Int], and so we can
    quantify over it. That makes 'd' free in the LHS, but that is later
-   picked up by extra_dict_bndrs (Note [Dead spec binders]).
+   picked up by extra_dict_bndrs (see Note [Unused spec binders]).
 
    NB 1: We can only drop the binding if the RHS doesn't bind
          one of the orig_bndrs, which we assume occur on RHS.

@@ -624,7 +624,7 @@ Note [Missed opportunity to retain higher-rank kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In 'kcTyClGroup', there is a missed opportunity to make kind
 inference work in a few more cases.  The idea is analogous
-to Note [Single function non-recursive binding special-case]:
+to Note [Special case for non-recursive function bindings]:
 
      * If we have an SCC with a single decl, which is non-recursive,
        instead of creating a unification variable representing the
@@ -1892,8 +1892,7 @@ DT3 Eta-expansion: Any forall-bound variables and function arguments in a result
     is produced by processing the return kind in etaExpandAlgTyCon,
     called in tcDataDefn.
 
-    See also Note [TyConBinders for the result kind signatures of a data type]
-    in GHC.Tc.Gen.HsType.
+    See also Note [splitTyConKind] in GHC.Tc.Gen.HsType.
 
 DT4 Datatype return kind restriction: A data type return kind must end
     in a type that, after type-synonym expansion, yields `TYPE LiftedRep`. By

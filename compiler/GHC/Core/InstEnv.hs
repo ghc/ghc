@@ -965,7 +965,7 @@ lookupInstEnv check_overlap_safe
                     (m:_) | isIncoherent (fst m) -> NoUnifiers
                     _                            -> all_unifs
 
-    -- NOTE [Safe Haskell isSafeOverlap]
+    -- Note [Safe Haskell isSafeOverlap]
     -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     -- We restrict code compiled in 'Safe' mode from overriding code
     -- compiled in any other mode. The rationale is that code compiled

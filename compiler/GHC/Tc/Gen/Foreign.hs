@@ -146,7 +146,7 @@ normaliseFfiType' env ty0 = runWriterT $ go Representational initRecTc ty0
 
         | isNewTyCon tc         -- Expand newtypes
         , Just rec_nts' <- checkRecTc rec_nts tc
-                   -- See Note [Expanding newtypes] in GHC.Core.TyCon
+                   -- See Note [Expanding newtypes and products] in GHC.Core.TyCon.RecWalk
                    -- We can't just use isRecursiveTyCon; sometimes recursion is ok:
                    --     newtype T = T (Ptr T)
                    --   Here, we don't reject the type for being recursive.

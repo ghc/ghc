@@ -75,7 +75,7 @@ A `Unique` in GHC is a Word-sized value composed of two pieces:
 The mask is typically an ASCII character.  It is typically used to make it easier
 to distinguish uniques constructed by different parts of the compiler.
 There is a (potentially incomplete) list of unique masks used given in
-GHC.Builtin.Uniques. See Note [Uniques-prelude - Uniques for wired-in Prelude things]
+GHC.Builtin.Uniques. See Note [Uniques for wired-in prelude things and known masks]
 
 `mkUnique` constructs a `Unique` from its pieces
   mkUnique :: Char -> Int -> Unique

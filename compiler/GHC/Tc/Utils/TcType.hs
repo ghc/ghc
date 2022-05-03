@@ -588,7 +588,7 @@ we would need to enforce the separation.
 -}
 
 -- A TyVarDetails is inside a TyVar
--- See Note [TyVars and TcTyVars]
+-- See Note [TyVars and TcTyVars during type checking]
 data TcTyVarDetails
   = SkolemTv      -- A skolem
        SkolemInfo

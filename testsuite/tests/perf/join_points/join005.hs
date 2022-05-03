@@ -16,8 +16,8 @@ sumOfMultiplesOf p ns
 It's hard to test for this, but what should happen is that go gets W/W'd and the
 worker is a join point (else Core Lint will complain). Interestingly, go is
 *not* CPR'd, because then the worker couldn't be a join point, but once the
-simplifier runs, the worker ends up returning Int# anyway. See Note [Don't CPR
-join points] in GHC.Core.Opt.WorkWrap.
+simplifier runs, the worker ends up returning Int# anyway. See Note [Don't w/w
+join points for CPR] in GHC.Core.Opt.WorkWrap.
 -}
 
 main = print $ sumOfMultiplesOf 2 [1..10]

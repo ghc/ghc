@@ -1362,7 +1362,7 @@ Then argsOneShots returns a [[OneShotInfo]] of
     [[OneShot,NoOneShotInfo,OneShot],  [OneShot]]
 The occurrence analyser propagates this one-shot infor to the
 binders \pqr and \xyz;
-see Note [Use one-shot information] in "GHC.Core.Opt.OccurAnal".
+see Note [Sources of one-shot information] in GHC.Core.Opt.OccurAnal.
 
 Note [Boxity in Poly]
 ~~~~~~~~~~~~~~~~~~~~~

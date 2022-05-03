@@ -180,7 +180,7 @@ Where mightMatch is defined like this:
   mightMatch []  []    = True   -- A perfectly sized match might match
   mightMatch key []    = True   -- A shorter lookup key matches everything
   mightMatch []  (_:_) = True   -- If the lookup key is longer, then still might match
-                                -- Note [RoughMatch and beta reduction]
+                                -- Note [RoughMap and beta reduction]
   mightMatch (k:ks) (lk:lks) =
     = case (k,lk) of
          -- Standard case, matching on a specific known TyCon.

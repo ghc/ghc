@@ -933,8 +933,8 @@ Note [Failure thunks and CPR]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (This note predates join points as formal entities (hence the quotation marks).
 We can't use actual join points here (see above); if we did, this would also
-solve the CPR problem, since join points don't get CPR'd. See Note [Don't CPR
-join points] in GHC.Core.Opt.WorkWrap.)
+solve the CPR problem, since join points don't get CPR'd. See Note [Don't w/w
+join points for CPR] in GHC.Core.Opt.WorkWrap.)
 
 When we make a failure point we ensure that it
 does not look like a thunk. Example:

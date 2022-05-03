@@ -1798,8 +1798,9 @@ wrap_tyarg (HsTypeArg l ki) = HsTypeArg l $ parenthesizeHsType appPrec ki
 wrap_tyarg ta@(HsArgPar {}) = ta -- Already parenthesized
 
 -- ---------------------------------------------------------------------
--- Note [Adding parens for splices]
 {-
+Note [Adding parens for splices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The hsSyn representation of parsed source explicitly contains all the original
 parens, as written in the source.
 

@@ -1402,12 +1402,8 @@ which applies more generally (not just within 'proc'), as it's a good
 plan in general to bypass the constraint simplification step entirely
 when it's not needed.
 
-************************************************************************
-*                                                                      *
-                Note [Pattern coercions]
-*                                                                      *
-************************************************************************
-
+Note [Pattern coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~
 In principle, these program would be reasonable:
 
         f :: (forall a. a->a) -> Int

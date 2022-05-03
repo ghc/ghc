@@ -985,7 +985,7 @@ typeKind normalise str = withSession $ \hsc_env ->
 
 {-
   Note [Querying instances for a type]
-
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   Here is the implementation of GHC proposal 41.
   (https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0041-ghci-instances.rst)
 

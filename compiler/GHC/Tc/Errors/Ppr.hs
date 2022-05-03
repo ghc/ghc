@@ -2234,7 +2234,7 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
     orig          = errorItemOrigin item
     pred          = errorItemPred item
     (clas, tys)   = getClassPredTys pred
-    -- See Note [Highlighting ambiguous type variables]
+    -- See Note [Highlighting ambiguous type variables] in GHC.Tc.Errors
     (ambig_kvs, ambig_tvs) = ambigTkvsOfTy pred
     ambigs = ambig_kvs ++ ambig_tvs
     has_ambigs = not (null ambigs)

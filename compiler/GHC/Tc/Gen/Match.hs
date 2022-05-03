@@ -546,7 +546,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
-             -- See Note [GroupStmt binder map] in GHC.Hs.Expr
+             -- See Note [TransStmt binder map] in GHC.Hs.Expr
              n_bndr_ids  = zipWith mk_n_bndr n_bndr_names bndr_ids
              bindersMap' = bndr_ids `zip` n_bndr_ids
 
@@ -739,7 +739,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
-             -- See Note [GroupStmt binder map] in GHC.Hs.Expr
+             -- See Note [TransStmt binder map] in GHC.Hs.Expr
              n_bndr_ids = zipWithEqual "tcMcStmt" mk_n_bndr n_bndr_names bndr_ids
              bindersMap' = bndr_ids `zip` n_bndr_ids
 
@@ -1005,7 +1005,7 @@ Otherwise the error shows up when checking the rebindable syntax, and
 the expected/inferred stuff is back to front (see #3613).
 
 Note [typechecking ApplicativeStmt]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 join ((\pat1 ... patn -> body) <$> e1 <*> ... <*> en)
 
 fresh type variables:
