@@ -2,6 +2,11 @@
 
 ## 4.18.0.0 *TBA*
 
+  * Exceptions thrown by weak pointer finalizers are now reported via a global
+    exception handler.
+  * Add `GHC.Weak.Finalize.{get,set}FinalizerExceptionHandler` which the user to
+    override the above-mentioned handler.
+
 ## 4.17.0.0 *TBA*
 
   * Add explicitly bidirectional `pattern TypeRep` to `Type.Reflection`.

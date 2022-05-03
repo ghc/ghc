@@ -15,6 +15,10 @@ Compiler
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+- Exceptions thrown by weak pointer finalizers are now caught and reported
+  via a global exception handler. By default this handler reports the error
+  to ``stderr`` although this can be changed using
+  ``GHC.Weak.Finalize.setFinalizerExceptionHandler``.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
