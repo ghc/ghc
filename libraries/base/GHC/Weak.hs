@@ -25,10 +25,18 @@ module GHC.Weak (
         mkWeak,
         deRefWeak,
         finalize,
-        runFinalizerBatch
+
+        -- * Handling exceptions
+        -- | When an exception is thrown by a finalizer called by the 
+        -- garbage collector, GHC calls a global handler which can be set with
+        -- 'setFinalizerExceptionHandler'. Note that any exceptions thrown by
+        -- this handler will be ignored.
+        setFinalizerExceptionHandler,
+        getFinalizerExceptionHandler
     ) where
 
 import GHC.Base
+import GHC.Weak.Finalize
 
 {-|
 A weak pointer object with a key and a value.  The value has type @v@.
@@ -131,25 +139,3 @@ Instance Eq (Weak v) where
   (Weak w1) == (Weak w2) = w1 `sameWeak#` w2
 -}
 
-
--- run a batch of finalizers from the garbage collector.  We're given
--- an array of finalizers and the length of the array, and we just
--- call each one in turn.
---
--- the IO primitives are inlined by hand here to get the optimal
--- code (sigh) --SDM.
-
-runFinalizerBatch :: Int -> Array# (State# RealWorld -> State# RealWorld)
-                  -> IO ()
-runFinalizerBatch (I# n) arr =
-   let  go m  = IO $ \s ->
-                  case m of
-                  0# -> (# s, () #)
-                  _  -> let !m' = m -# 1# in
-                        case indexArray# arr m' of { (# io #) ->
-                        case catch# (\p -> (# io p, () #))
-                                    (\_ s'' -> (# s'', () #)) s of          {
-                         (# s', _ #) -> unIO (go m') s'
-                        }}
-   in
-        go n

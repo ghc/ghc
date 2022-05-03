@@ -34,7 +34,7 @@ EXPORTS
 
 	base_GHCziTopHandler_flushStdHandles_closure
 
-        base_GHCziWeak_runFinalizzerBatch_closure
+    base_GHCziWeakziFinalizze_runFinalizzerBatch_closure
 	base_GHCziPack_unpackCString_closure
 	base_GHCziIOziException_blockedIndefinitelyOnMVar_closure
 	base_GHCziIOziException_blockedIndefinitelyOnSTM_closure

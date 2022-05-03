@@ -285,6 +285,7 @@ Library
         GHC.TypeNats.Internal
         GHC.Unicode
         GHC.Weak
+        GHC.Weak.Finalize
         GHC.Word
         Numeric
         Numeric.Natural
