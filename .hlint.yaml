@@ -12,7 +12,6 @@
 - ignore: {name: "Move map inside list comprehension"} # 2 hints
 - ignore: {name: "Redundant $"} # 11 hints
 - ignore: {name: "Redundant <$>"} # 3 hints
-- ignore: {name: "Redundant bang pattern"} # 1 hint
 - ignore: {name: "Redundant bracket"} # 44 hints
 - ignore: {name: "Redundant id"} # 1 hint
 - ignore: {name: "Redundant if"} # 3 hints

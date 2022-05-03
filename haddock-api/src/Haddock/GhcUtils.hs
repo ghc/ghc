@@ -556,7 +556,7 @@ stringBufferFromByteString bs =
 --
 -- /O(1)/
 takeStringBuffer :: Int -> StringBuffer -> ByteString
-takeStringBuffer !n !(S.StringBuffer fp _ cur) = BS.PS fp cur n
+takeStringBuffer !n (S.StringBuffer fp _ cur) = BS.PS fp cur n
 
 -- | Return the prefix of the first 'StringBuffer' that /isn't/ in the second
 -- 'StringBuffer'. **The behavior is undefined if the 'StringBuffers' use
