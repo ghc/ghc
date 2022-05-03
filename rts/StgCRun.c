@@ -405,19 +405,22 @@ StgRunIsImplementedInAssembler(void)
          * Additional callee saved registers on Win64. This must match
          * callClobberedRegisters in compiler/GHC/CmmToAsm/X86/Regs.hs as
          * both represent the Win64 calling convention.
+         *
+         * Note that we must save the entire 128-bit width of the XMM
+         * registers, as noted in #21465.
          */
-        "movq %%rdi,48(%%rax)\n\t"
-        "movq %%rsi,56(%%rax)\n\t"
+        "movq %%rdi,   48(%%rax)\n\t"
+        "movq %%rsi,   56(%%rax)\n\t"
         "movq %%xmm6,  64(%%rax)\n\t"
-        "movq %%xmm7,  72(%%rax)\n\t"
-        "movq %%xmm8,  80(%%rax)\n\t"
-        "movq %%xmm9,  88(%%rax)\n\t"
-        "movq %%xmm10, 96(%%rax)\n\t"
-        "movq %%xmm11,104(%%rax)\n\t"
-        "movq %%xmm12,112(%%rax)\n\t"
-        "movq %%xmm13,120(%%rax)\n\t"
-        "movq %%xmm14,128(%%rax)\n\t"
-        "movq %%xmm15,136(%%rax)\n\t"
+        "movq %%xmm7,  80(%%rax)\n\t"
+        "movq %%xmm8,  96(%%rax)\n\t"
+        "movq %%xmm9, 112(%%rax)\n\t"
+        "movq %%xmm10,128(%%rax)\n\t"
+        "movq %%xmm11,144(%%rax)\n\t"
+        "movq %%xmm12,160(%%rax)\n\t"
+        "movq %%xmm13,176(%%rax)\n\t"
+        "movq %%xmm14,192(%%rax)\n\t"
+        "movq %%xmm15,208(%%rax)\n\t"
 #endif
 
 #if defined(ENABLE_UNWINDING)
@@ -506,18 +509,18 @@ StgRunIsImplementedInAssembler(void)
         "movq 32(%%rsp),%%r14\n\t"
         "movq 40(%%rsp),%%r15\n\t"
 #if defined(mingw32_HOST_OS)
-        "movq  48(%%rsp),%%rdi\n\t"
-        "movq  56(%%rsp),%%rsi\n\t"
-        "movq  64(%%rsp),%%xmm6\n\t"
-        "movq  72(%%rsp),%%xmm7\n\t"
-        "movq  80(%%rsp),%%xmm8\n\t"
-        "movq  88(%%rsp),%%xmm9\n\t"
-        "movq  96(%%rsp),%%xmm10\n\t"
-        "movq 104(%%rsp),%%xmm11\n\t"
-        "movq 112(%%rsp),%%xmm12\n\t"
-        "movq 120(%%rsp),%%xmm13\n\t"
-        "movq 128(%%rsp),%%xmm14\n\t"
-        "movq 136(%%rsp),%%xmm15\n\t"
+        "movq 48(%%rsp),%%rdi\n\t"
+        "movq 56(%%rsp),%%rsi\n\t"
+        "movaps  64(%%rsp),%%xmm6\n\t"
+        "movaps  80(%%rsp),%%xmm7\n\t"
+        "movaps  96(%%rsp),%%xmm8\n\t"
+        "movaps 112(%%rsp),%%xmm9\n\t"
+        "movaps 128(%%rsp),%%xmm10\n\t"
+        "movaps 144(%%rsp),%%xmm11\n\t"
+        "movaps 160(%%rsp),%%xmm12\n\t"
+        "movaps 176(%%rsp),%%xmm13\n\t"
+        "movaps 192(%%rsp),%%xmm14\n\t"
+        "movaps 208(%%rsp),%%xmm15\n\t"
 #endif
         "addq %1, %%rsp\n\t"
         "retq"
