@@ -47,6 +47,7 @@ import Settings.Packages
 import Settings.Warnings
 import qualified Hadrian.Builder.Git
 import Settings.Builders.Win32Tarballs
+import Distribution.Simple.Program.GHC (GhcOptions(ghcOptNumJobs))
 
 -- | Packages that are built by default. You can change this in "UserSettings".
 defaultPackages :: Stage -> Action [Package]
@@ -94,6 +95,7 @@ stage0Packages = do
              , lintCommitMsg
              , lintSubmoduleRefs
              , lintWhitespace
+             , ghcJobserver
              ]
           ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                ]
@@ -135,6 +137,7 @@ stage1Packages = do
         , time
         , unlit
         , xhtml
+        , ghcJobserver
         ]
       , when (not cross)
         [ haddock

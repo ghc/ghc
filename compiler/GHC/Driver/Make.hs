@@ -2674,13 +2674,14 @@ runParPipelines worker_limit plugin_hsc_env mHscMessager all_pipelines = do
                     JobServer (r, w) -> do
                       (wait, signal) <- makeJobserverAcquireRelease r w
                       pure $ AbstractSem wait signal
-    -- Reset the number of capabilities once the upsweep ends.
+
   let env = MakeEnv { hsc_env = thread_safe_hsc_env
                     , withLogger = withParLog log_queue_queue_var
                     , compile_sem = abstract_sem
                     , env_messager = mHscMessager
                     }
 
+  -- Reset the number of capabilities once the upsweep ends.
   MC.bracket updNumCapabilities resetNumCapabilities $ \_ ->
     runAllPipelines worker_limit env all_pipelines
 
