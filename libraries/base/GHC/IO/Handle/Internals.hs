@@ -440,9 +440,39 @@ recoveringEncode codec from to = go from to
 handleFinalizer :: FilePath -> MVar Handle__ -> IO ()
 handleFinalizer fp m = do
   handle_ <- takeMVar m
-  (handle_', _) <- hClose_help handle_
+  (handle_', mb_exc) <- hClose_help handle_
   putMVar m handle_'
-  return ()
+  case mb_exc of
+    Just exc -> throwIO exc
+    Nothing -> return ()
+
+{-
+   Note [Handling exceptions during Handle finalization]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   Handles which become unreachable are flushed closed automatically by the
+   garbage collector, which calls 'GHC.IO.Handle.Internals.handleFinalizer'.
+   However, numerous things can go wrong during this process. For instance,
+   while we are flushing we may find that the handle's device is full. What to
+   do in this case?
+
+   For a long time we would simply ignore the failure. However, silently
+   ignoring failures is rarely a good option. For this reason the
+   'GHC.Weak.Finalizer.runFinalizerBatch' now catches exceptions and
+   dispatches them to a notification action (which can be set via
+   'GHC.Weak.Finalize.setFinalizerExceptionHandler').
+
+   This then poses the question of what happens if the exception notification
+   action itself throws an exception. We currently ignore such second-order
+   exceptions.
+
+   Note that stdout/stderr are handled a bit differently, since they are never
+   finalized by the GC. Instead, 'GHC.TopHandler.flushStdHandles' explicitly
+   catches exceptions from hFlush and dispatches them to the usual Weak
+   finalization exception notifier.
+
+   See #21336.
+
+ -}
 
 -- ---------------------------------------------------------------------------
 -- Allocating buffers

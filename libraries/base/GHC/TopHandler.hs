@@ -81,6 +81,7 @@ runMainIO main =
     do
       main_thread_id <- myThreadId
       weak_tid <- mkWeakThreadId main_thread_id
+      setFinalizerExceptionHandler handleFinalizerException
       case weak_tid of (Weak w) -> setMainThread w
       install_interrupt_handler $ do
            m <- deRefWeak weak_tid
@@ -226,13 +227,33 @@ calling the RTS, without iconv at all.
 -}
 
 
--- try to flush stdout/stderr, but don't worry if we fail
--- (these handles might have errors, and we don't want to go into
--- an infinite loop).
+-- try to flush stdout/stderr.
 flushStdHandles :: IO ()
 flushStdHandles = do
-  hFlush stdout `catchAny` \_ -> return ()
-  hFlush stderr `catchAny` \_ -> return ()
+  hFlush stdout `catchException` handleExc
+  -- In the event that we fail to flush stderr the default finalizer exception
+  -- handler (which prints to stderr) will also likely fail. However, we call it
+  -- anyways since the user may have set their own handler.
+  hFlush stderr `catchException` handleExc
+  where
+    -- We dispatch exceptions thrown by hFlush to the same action used to
+    -- handle Weak finalizers since this is where "normal" Handles (e.g. not
+    -- stderr/stdout) would be flushed.
+    --
+    -- See Note [Handling exceptions during Handle finalization] in
+    -- GHC.IO.Handle.Internals
+    handleExc se = do
+      handleFinalizerExc <- getFinalizerExceptionHandler
+      -- Swallow any exceptions thrown by the finalizer exception handler
+      handleFinalizerExc se `catchException` (\(SomeException _) -> return ())
+
+-- | See Note [Handling exceptions during Handle finalization] in
+-- GHC.IO.Handle.Internals
+handleFinalizerException :: SomeException -> IO ()
+handleFinalizerException se =
+    hPutStr stderr msg `catchException` (\(SomeException _) -> return ())
+  where
+    msg = "Exception during Weak# finalization (ignored): " ++ displayException se ++ "\n"
 
 safeExit, fastExit :: Int -> IO a
 safeExit = exitHelper useSafeExit

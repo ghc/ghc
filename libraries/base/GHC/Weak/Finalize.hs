@@ -49,6 +49,8 @@ runFinalizerBatch (I# n) arr =
         handleFinalizerExc <- getFinalizerExceptionHandler
         handleFinalizerExc se `catchException` (\(SomeException _) -> return ())
 
+-- See Note [Handling exceptions during Handle finalization] for the
+-- motivation for this mechanism.
 finalizerExceptionHandler :: IORef (SomeException -> IO ())
 finalizerExceptionHandler = unsafePerformIO $ newIORef (const $ return ())
 {-# NOINLINE finalizerExceptionHandler #-}
