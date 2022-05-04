@@ -1621,7 +1621,7 @@ tcIfaceDataAlt mult con inst_tys arg_strs rhs
 
 tcIdDetails :: Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _  IfVanillaId = return VanillaId
-tcIdDetails _  (IfStrictWorkerId dmds) = return $ StrictWorkerId dmds
+tcIdDetails _  (IfWorkerLikeId dmds) = return $ WorkerLikeId dmds
 tcIdDetails ty IfDFunId
   = return (DFunId (isNewTyCon (classTyCon cls)))
   where

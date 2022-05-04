@@ -91,7 +91,7 @@ It's notable that the worker is called *undersatured* in the wrapper.
 At runtime what happens is that the wrapper will allocate a PAP which
 once fully applied will call the worker. And all is fine.
 
-But what about a strict worker! Well the function returned by `f` would
+But what about a call by value function! Well the function returned by `f` would
 be a unknown call, so we lose the ability to enfore the invariant that
 cbv marked arguments from StictWorkerId's are actually properly tagged
 as the annotations would be unavailable at the (unknown) call site.

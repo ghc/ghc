@@ -68,18 +68,12 @@ Rec {
 -- RHS size: {terms: 28, types: 8, coercions: 0, joins: 0/0}
 T13143.$wg [InlPrag=[2], Occ=LoopBreaker]
   :: Bool -> Bool -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId[StrictWorker([!, !, ~])],
+[GblId[StrictWorker([!, !])],
  Arity=3,
  Str=<1L><1L><L>,
  Unf=OtherCon []]
 T13143.$wg
-  = \ (ds
-         :: Bool
-         Unf=OtherCon [])
-      (ds1
-         :: Bool
-         Unf=OtherCon [])
-      (ww :: GHC.Prim.Int#) ->
+  = \ (ds :: Bool) (ds1 :: Bool) (ww :: GHC.Prim.Int#) ->
       case ds of {
         False ->
           case ds1 of {

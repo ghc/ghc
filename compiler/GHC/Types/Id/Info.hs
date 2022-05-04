@@ -32,7 +32,7 @@ module GHC.Types.Id.Info (
         -- ** Zapping various forms of Info
         zapLamInfo, zapFragileInfo,
         zapDemandInfo, zapUsageInfo, zapUsageEnvInfo, zapUsedOnceInfo,
-        zapTailCallInfo, zapCallArityInfo, zapUnfolding,
+        zapTailCallInfo, zapCallArityInfo, trimUnfolding,
 
         -- ** The ArityInfo type
         ArityInfo,
@@ -174,31 +174,37 @@ data IdDetails
   | JoinId JoinArity (Maybe [CbvMark])
         -- ^ An 'Id' for a join point taking n arguments
         -- Note [Join points] in "GHC.Core"
-        -- Can also work as a StrictWorkerId if given `CbvMark`s.
-        -- See Note [Strict Worker Ids]
-  | StrictWorkerId [CbvMark]
-        -- ^ An 'Id' for a worker function, which expects some arguments to be
+        -- Can also work as a WorkerLikeId if given `CbvMark`s.
+        -- See Note [CBV Function Ids]
+        -- The [CbvMark] is always empty (and ignored) until after Tidy.
+  | WorkerLikeId [CbvMark]
+        -- ^ An 'Id' for a worker like function, which might expect some arguments to be
         -- passed both evaluated and tagged.
-        -- See Note [Strict Worker Ids]
+        -- Worker like functions are create by W/W and SpecConstr and we can expect that they
+        -- aren't used unapplied.
+        -- See Note [CBV Function Ids]
         -- See Note [Tag Inference]
+        -- The [CbvMark] is always empty (and ignored) until after Tidy for ids from the current
+        -- module.
 
-{- Note [Strict Worker Ids]
+{- Note [CBV Function Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A StrictWorkerId essentially constrains the calling convention for the given Id.
-It requires arguments marked as `MarkedCbv` to be passed evaluated+*properly tagged*.
+A WorkerLikeId essentially allows us to constrain the calling convention
+for the given Id. Each such Id carries with it a list of CbvMarks
+with each element representing a value argument. Arguments who have
+a matching `MarkedCbv` entry in the list need to be passed evaluated+*properly tagged*.
 
-While we were always able to express the fact that an argument is evaluated once we
-entered it's RHS via attaching a evaldUnfolding to it there used to be
-no way to express that an lifted argument is already properly tagged once we jump
-into the RHS.
-This means when branching on a value the RHS always needed to perform
-a tag check to ensure the argument wasn't an indirection (the evaldUnfolding
-already ruling out thunks).
-
-StrictWorkerIds give us this additional expressiveness which we use to improve
+CallByValueFunIds give us additional expressiveness which we use to improve
 runtime. This is all part of the TagInference work. See also Note [Tag Inference].
 
-The invariants around the arguments of Strict Worker Ids are then:
+They allows us to express the fact that an argument is not only evaluated to WHNF once we
+entered it's RHS but also that an lifted argument is already *properly tagged* once we jump
+into the RHS.
+This means when e.g. branching on such an argument the RHS doesn't needed to perform
+an eval check to ensure the argument isn't an indirection. All seqs on such an argument in
+the functions body become no-ops as well.
+
+The invariants around the arguments of call by value function like Ids are then:
 
 * In any call `(f e1 .. en)`, if `f`'s i'th argument is marked `MarkedCbv`,
   then the caller must ensure that the i'th argument
@@ -206,19 +212,25 @@ The invariants around the arguments of Strict Worker Ids are then:
   * is a properly tagged pointer to that value
 
 * The following functions (and only these functions) have `CbvMarks`:
-  * Any `StrictWorkerId`
+  * Any `WorkerLikeId`
   * Some `JoinId` bindings.
 
 This works analogous to the Strict Field Invariant. See also Note [Strict Field Invariant].
 
 To make this work what we do is:
-* If we think a function might benefit from passing certain arguments unlifted
-  for performance reasons we attach an evaldUnfolding to these arguments.
-* Either during W/W, but at latest during Tidy VanillaIds with arguments that
-  have evaldUnfoldings are turned into StrictWorkerIds.
-* During CorePrep calls to StrictWorkerIds are eta expanded.
+* During W/W and SpecConstr any worker/specialized binding we introduce
+  is marked as a worker binding by `asWorkerLikeId`.
+* W/W and SpecConstr further set OtherCon[] unfoldings on arguments which
+  represent contents of a strict fields.
+* During Tidy we look at all bindings.
+  For any callByValueLike Id and join point we mark arguments as cbv if they
+  Are strict. We don't do so for regular bindings.
+  See Note [Use CBV semantics only for join points and workers] for why.
+  We might have made some ids rhs *more* strict in order to make their arguments
+  be passed CBV. See Note [Call-by-value for worker args] for why.
+* During CorePrep calls to CallByValueFunIds are eta expanded.
 * During Stg CodeGen:
-  * When we call a binding that is a StrictWorkerId:
+  * When we see a call to a callByValueLike Id:
     * We check if all arguments marked to be passed unlifted are already tagged.
     * If they aren't we will wrap the call in case expressions which will evaluate+tag
       these arguments before jumping to the function.
@@ -226,10 +238,9 @@ To make this work what we do is:
   * When generating code for the RHS of a StrictWorker binding
     we omit tag checks when using arguments marked as tagged.
 
-We primarily use this for workers where we mark strictly demanded arguments
-and arguments representing strict fields as call-by-value during W/W. But we
-also check other functions during tidy and potentially turn some of them into
-strict workers and mark some of their arguments as call-by-value by looking at
+We only use this for workers and specialized versions of SpecConstr
+But we also check other functions during tidy and potentially turn some of them into
+call by value functions and mark some of their arguments as call-by-value by looking at
 argument unfoldings.
 
 NB: I choose to put the information into a new Id constructor since these are loaded
@@ -238,6 +249,23 @@ calling convention demands are available at all call sites. Putting it into
 IdInfo would require us at the very least to always decode the IdInfo
 just to decide if we need to throw it away or not after.
 
+Note [Use CBV semantics only for join points and workers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A function with cbv-semantics requires arguments to be visible
+and if no arguments are visible requires us to eta-expand it's
+call site. That is for a binding with three cbv arguments like
+`w[WorkerLikeId[!,!,!]]` we would need to eta expand undersaturated
+occurences like `map w xs` into `map (\x1 x2 x3 -> w x1 x2 x3) xs.
+
+In experiments it turned out that the code size increase of doing so
+can outweigh the performance benefits of doing so.
+So we only do this for join points, workers and
+specialized functions (from SpecConstr).
+Join points are naturally always called saturated so
+this problem can't occur for them.
+For workers and specialized functions there are also always at least
+some applied arguments as we won't inline the wrapper/apply their rule
+if there are unapplied occurances like `map f xs`.
 -}
 
 -- | Recursive Selector Parent
@@ -274,7 +302,7 @@ pprIdDetails VanillaId = empty
 pprIdDetails other     = brackets (pp other)
  where
    pp VanillaId               = panic "pprIdDetails"
-   pp (StrictWorkerId dmds)   = text "StrictWorker" <> parens (ppr dmds)
+   pp (WorkerLikeId dmds)   = text "StrictWorker" <> parens (ppr dmds)
    pp (DataConWorkId _)       = text "DataCon"
    pp (DataConWrapId _)       = text "DataConWrapper"
    pp (ClassOpId {})          = text "ClassOp"
@@ -439,7 +467,7 @@ setOccInfo        info oc = oc `seq` info { occInfo = oc }
 -- will inline.
 unfoldingInfo :: IdInfo -> Unfolding
 unfoldingInfo info
-  | isStrongLoopBreaker (occInfo info) = zapUnfolding $ realUnfoldingInfo info
+  | isStrongLoopBreaker (occInfo info) = trimUnfolding $ realUnfoldingInfo info
   | otherwise                          =                realUnfoldingInfo info
 
 setUnfoldingInfo :: IdInfo -> Unfolding -> IdInfo
@@ -784,9 +812,9 @@ zapFragileUnfolding unf
  | isEvaldUnfolding unf = evaldUnfolding
  | otherwise            = noUnfolding
 
-zapUnfolding :: Unfolding -> Unfolding
+trimUnfolding :: Unfolding -> Unfolding
 -- Squash all unfolding info, preserving only evaluated-ness
-zapUnfolding unf | isEvaldUnfolding unf = evaldUnfolding
+trimUnfolding unf | isEvaldUnfolding unf = evaldUnfolding
                  | otherwise            = noUnfolding
 
 zapTailCallInfo :: IdInfo -> Maybe IdInfo

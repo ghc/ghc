@@ -3016,7 +3016,7 @@ ppr_types debug type_env
       | otherwise = hasTopUserName id
                     && case idDetails id of
                          VanillaId    -> True
-                         StrictWorkerId{} -> True
+                         WorkerLikeId{} -> True
                          RecSelId {}  -> True
                          ClassOpId {} -> True
                          FCallId {}   -> True

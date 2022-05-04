@@ -381,7 +381,7 @@ data IfaceUnfolding
 
 data IfaceIdDetails
   = IfVanillaId
-  | IfStrictWorkerId [CbvMark]
+  | IfWorkerLikeId [CbvMark]
   | IfRecSelId (Either IfaceTyCon IfaceDecl) Bool
   | IfDFunId
 
@@ -1462,7 +1462,7 @@ instance Outputable IfaceConAlt where
 ------------------
 instance Outputable IfaceIdDetails where
   ppr IfVanillaId       = Outputable.empty
-  ppr (IfStrictWorkerId dmd) = text "StrWork" <> parens (ppr dmd)
+  ppr (IfWorkerLikeId dmd) = text "StrWork" <> parens (ppr dmd)
   ppr (IfRecSelId tc b) = text "RecSel" <+> ppr tc
                           <+> if b
                                 then text "<naughty>"
@@ -2227,14 +2227,14 @@ instance Binary IfaceAnnotation where
 instance Binary IfaceIdDetails where
     put_ bh IfVanillaId      = putByte bh 0
     put_ bh (IfRecSelId a b) = putByte bh 1 >> put_ bh a >> put_ bh b
-    put_ bh (IfStrictWorkerId dmds) = putByte bh 2 >> put_ bh dmds
+    put_ bh (IfWorkerLikeId dmds) = putByte bh 2 >> put_ bh dmds
     put_ bh IfDFunId         = putByte bh 3
     get bh = do
         h <- getByte bh
         case h of
             0 -> return IfVanillaId
             1 -> do { a <- get bh; b <- get bh; return (IfRecSelId a b) }
-            2 -> do { dmds <- get bh; return (IfStrictWorkerId dmds) }
+            2 -> do { dmds <- get bh; return (IfWorkerLikeId dmds) }
             _ -> return IfDFunId
 
 instance Binary IfaceInfoItem where
@@ -2592,7 +2592,7 @@ instance NFData IfaceBang where
 instance NFData IfaceIdDetails where
   rnf = \case
     IfVanillaId -> ()
-    IfStrictWorkerId dmds -> dmds `seqList` ()
+    IfWorkerLikeId dmds -> dmds `seqList` ()
     IfRecSelId (Left tycon) b -> rnf tycon `seq` rnf b
     IfRecSelId (Right decl) b -> rnf decl `seq` rnf b
     IfDFunId -> ()
