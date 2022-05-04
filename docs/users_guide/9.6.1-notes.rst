@@ -1,0 +1,24 @@
+.. _release-9-6-1:
+
+Version 9.6.1
+==============
+
+
+Language
+~~~~~~~~
+
+
+Compiler
+~~~~~~~~
+
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
+
+
+``ghc`` library
+~~~~~~~~~~~~~~~
