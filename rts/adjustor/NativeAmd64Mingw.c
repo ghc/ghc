@@ -20,16 +20,16 @@
         .context_ptr = (const struct AdjustorContext **) &NAME ## _adjustor_context, \
     };
 
-/* adjustors to handle calls with less than 6 integer arguments */
+/* adjustors to handle calls with less than 4 integer arguments */
 DECLARE_ADJUSTOR_TEMPLATE(simple_ccall);
 static struct AdjustorPool *simple_ccall_pool;
 
-/* adjustors to handle calls with 6 or more integer arguments where the fourth
+/* adjustors to handle calls with 4 or more integer arguments where the fourth
  * argument is a float */
 DECLARE_ADJUSTOR_TEMPLATE(complex_float_ccall);
 static struct AdjustorPool *complex_float_ccall_pool;
 
-/* adjustors to handle calls with 6 or more integer arguments where the fourth
+/* adjustors to handle calls with 4 or more integer arguments where the fourth
  * argument is not a float */
 DECLARE_ADJUSTOR_TEMPLATE(complex_nofloat_ccall);
 static struct AdjustorPool *complex_nofloat_ccall_pool;
