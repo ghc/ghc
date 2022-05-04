@@ -122,11 +122,12 @@ module GHC.Core.Type (
 
         -- *** Levity and boxity
         typeLevity_maybe,
-        isLiftedTypeKind, isUnliftedTypeKind, isBoxedTypeKind, pickyIsLiftedTypeKind,
+        isLiftedTypeKind, isUnliftedTypeKind, pickyIsLiftedTypeKind,
         isLiftedRuntimeRep, isUnliftedRuntimeRep, runtimeRepLevity_maybe,
         isBoxedRuntimeRep,
         isLiftedLevity, isUnliftedLevity,
         isUnliftedType, isBoxedType, isUnboxedTupleType, isUnboxedSumType,
+        kindBoxedRepLevity_maybe,
         mightBeLiftedType, mightBeUnliftedType,
         isStateType,
         isAlgType, isDataFamilyAppType,
@@ -664,16 +665,6 @@ kindRep_maybe kind
   | Just [arg] <- isTyConKeyApp_maybe tYPETyConKey kind = Just arg
   | otherwise                                           = Nothing
 
--- | Returns True if the kind classifies types which are allocated on
--- the GC'd heap and False otherwise. Note that this returns False for
--- representation-polymorphic kinds, which may be specialized to a kind that
--- classifies AddrRep or even unboxed kinds.
-isBoxedTypeKind :: Kind -> Bool
-isBoxedTypeKind kind
-  = case kindRep_maybe kind of
-      Just rep -> isBoxedRuntimeRep rep
-      Nothing  -> False
-
 -- | This version considers Constraint to be the same as *. Returns True
 -- if the argument is equivalent to Type/Constraint and False otherwise.
 -- See Note [Kind Constraint and kind Type]
@@ -753,6 +744,22 @@ runtimeRepLevity_maybe rep
         -- But be careful of type families (F tys) :: RuntimeRep,
         -- hence the isPromotedDataCon rr_tc
 runtimeRepLevity_maybe _ = Nothing
+
+-- | Check whether a kind is of the form @TYPE (BoxedRep Lifted)@
+-- or @TYPE (BoxedRep Unlifted)@.
+--
+-- Returns:
+--
+--  - @Just Lifted@ for @TYPE (BoxedRep Lifted)@ and @Type@,
+--  - @Just Unlifted@ for @TYPE (BoxedRep Unlifted)@ and @UnliftedType@,
+--  - @Nothing@ for anything else, e.g. @TYPE IntRep@, @TYPE (BoxedRep l)@, etc.
+kindBoxedRepLevity_maybe :: Type -> Maybe Levity
+kindBoxedRepLevity_maybe ty
+  | Just rep <- kindRep_maybe ty
+  , isBoxedRuntimeRep rep
+  = runtimeRepLevity_maybe rep
+  | otherwise
+  = Nothing
 
 -- | Check whether a type of kind 'RuntimeRep' is lifted.
 --

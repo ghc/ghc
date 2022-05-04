@@ -2289,10 +2289,10 @@ isFFILabelTy ty = checkRepTyCon ok ty
 --  - @Just (NotValid ..)@ for @Any :: k@ if @k@ is not a kind of boxed types,
 --  - @Nothing@ if the type is not @Any@.
 checkAnyTy :: Type -> Maybe (Validity' IllegalForeignTypeReason)
-checkAnyTy  ty
+checkAnyTy ty
   | Just ki <- anyTy_maybe ty
   = Just $
-      if isBoxedTypeKind ki
+      if isJust $ kindBoxedRepLevity_maybe ki
       then IsValid
       -- NB: don't allow things like @Any :: TYPE IntRep@, as per #21305.
       else NotValid (TypeCannotBeMarshaled ty NotBoxedKindAny)
