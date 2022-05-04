@@ -733,18 +733,9 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
                                    , text "do_ql" <+> ppr do_ql ])
        ; go emptyVarSet [] [] fun_sigma rn_args }
   where
-    fun_loc  = appCtxtLoc fun_ctxt
     fun_orig = exprCtOrigin (case fun_ctxt of
                                VAExpansion e _ -> e
                                VACall e _ _    -> e)
-    set_fun_ctxt thing_inside
-      | not (isGoodSrcSpan fun_loc)   -- noSrcSpan => no arguments
-      = thing_inside                  -- => context is already set
-      | otherwise
-      = setSrcSpan fun_loc $
-        case fun_ctxt of
-          VAExpansion orig _ -> addExprCtxt orig thing_inside
-          VACall {}          -> thing_inside
 
     -- Count value args only when complaining about a function
     -- applied to too many value args
@@ -803,9 +794,9 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
       | (tvs,   body1) <- tcSplitSomeForAllTyVars (inst_fun args) fun_ty
       , (theta, body2) <- tcSplitPhiTy body1
       , not (null tvs && null theta)
-      = do { (inst_tvs, wrap, fun_rho) <- set_fun_ctxt $
+      = do { (inst_tvs, wrap, fun_rho) <- addHeadCtxt fun_ctxt $
                                           instantiateSigma fun_orig tvs theta body2
-                 -- set_fun_ctxt: important for the class constraints
+                 -- addHeadCtxt: important for the class constraints
                  -- that may be emitted from instantiating fun_sigma
            ; go (delta `extendVarSetList` inst_tvs)
                 (addArgWrap wrap acc) so_far fun_rho args }
@@ -894,19 +885,26 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
 
 addArgCtxt :: AppCtxt -> LHsExpr GhcRn
            -> TcM a -> TcM a
--- Adds a "In the third argument of f, namely blah"
--- context, unless we are in generated code, in which case
--- use "In the expression: arg"
+-- There are two cases:
+-- * In the normal case, we add an informative context
+--      "In the third argument of f, namely blah"
+-- * If we are deep inside generated code (isGeneratedCode)
+--   or if all or part of this particular application is an expansion
+--   (VAExpansion), just use the less-informative context
+--       "In the expression: arg"
+--   Unless the arg is also a generated thing, in which case do nothing.
 ---See Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr
-addArgCtxt (VACall fun arg_no _) (L arg_loc arg) thing_inside
-  = setSrcSpanA arg_loc $
-    addErrCtxt (funAppCtxt fun arg arg_no) $
-    thing_inside
+addArgCtxt ctxt (L arg_loc arg) thing_inside
+  = do { in_generated_code <- inGeneratedCode
+       ; case ctxt of
+           VACall fun arg_no _ | not in_generated_code
+             -> setSrcSpanA arg_loc                    $
+                addErrCtxt (funAppCtxt fun arg arg_no) $
+                thing_inside
 
-addArgCtxt (VAExpansion {}) (L arg_loc arg) thing_inside
-  = setSrcSpanA arg_loc $
-    addExprCtxt arg    $  -- Auto-suppressed if arg_loc is generated
-    thing_inside
+           _ -> setSrcSpanA arg_loc $
+                addExprCtxt arg     $  -- Auto-suppressed if arg_loc is generated
+                thing_inside }
 
 {- *********************************************************************
 *                                                                      *

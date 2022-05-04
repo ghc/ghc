@@ -17,7 +17,6 @@ RecordDotSyntaxFail11.hs:8:3: error:
 
 RecordDotSyntaxFail11.hs:8:11: error:
     • No instance for (GHC.Records.HasField "baz" Int a0)
-        arising from a use of ‘GHC.Records.getField’
     • In the second argument of ‘($)’, namely ‘(.foo.bar.baz) a’
       In a stmt of a 'do' block: print $ (.foo.bar.baz) a
       In the expression:

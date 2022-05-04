@@ -20,7 +20,7 @@ module GHC.Rename.Utils (
         mkFieldEnv,
         badQualBndrErr, typeAppErr, badFieldConErr,
         wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genAppType,
-        genHsIntegralLit, genHsTyLit,
+        genHsIntegralLit, genHsTyLit, genSimpleConPat,
 
         newLocalBndrRn, newLocalBndrsRn,
 
@@ -676,3 +676,13 @@ genHsIntegralLit lit = wrapGenSpan $ HsLit noAnn (HsInt noExtField lit)
 
 genHsTyLit :: FastString -> HsType GhcRn
 genHsTyLit = HsTyLit noExtField . HsStrTy NoSourceText
+
+genSimpleConPat :: Name -> [Name] -> LPat GhcRn
+-- The pattern (C x1 .. xn)
+genSimpleConPat con args
+  = wrapGenSpan $ ConPat { pat_con_ext = noExtField
+                         , pat_con     = wrapGenSpan con
+                         , pat_args    = PrefixCon [] (map genVarPat args) }
+
+genVarPat :: Name -> LPat GhcRn
+genVarPat n = wrapGenSpan $ VarPat noExtField (wrapGenSpan n)

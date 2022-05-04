@@ -46,7 +46,7 @@ import GHC.Hs
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint
-import {-# SOURCE #-} GHC.Tc.Types (getLclEnvLoc)
+import {-# SOURCE #-} GHC.Tc.Types( getLclEnvLoc, lclEnvInGeneratedCode )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType
@@ -1913,7 +1913,7 @@ pprTcSolverReportMsg _
             , mismatch_item = item
             , mismatch_ty1  = ty1
             , mismatch_ty2  = ty2 })
-  = addArising (errorItemOrigin item) msg
+  = addArising (errorItemCtLoc item) msg
   where
     msg
       | (isLiftedRuntimeRep ty1 && isUnliftedRuntimeRep ty2) ||
@@ -1979,7 +1979,7 @@ pprTcSolverReportMsg ctxt
                   , teq_mismatch_expected = exp
                   , teq_mismatch_actual   = act
                   , teq_mismatch_what     = mb_thing })
-  = addArising orig $ pprWithExplicitKindsWhen ppr_explicit_kinds msg
+  = addArising ct_loc $ pprWithExplicitKindsWhen ppr_explicit_kinds msg
   where
     msg
       | isUnliftedTypeKind act, isLiftedTypeKind exp
@@ -2155,7 +2155,7 @@ pprTcSolverReportMsg _ (ExpectingMoreArguments n thing) =
 pprTcSolverReportMsg ctxt (UnboundImplicitParams (item :| items)) =
   let givens = getUserGivens ctxt
   in if null givens
-     then addArising (errorItemOrigin item) $
+     then addArising (errorItemCtLoc item) $
             sep [ text "Unbound implicit parameter" <> plural preds
                 , nest 2 (pprParendTheta preds) ]
      else pprTcSolverReportMsg ctxt (CouldNotDeduce givens (item :| items) Nothing)
@@ -2171,9 +2171,9 @@ pprTcSolverReportMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extr
   where
     main_msg
       | null useful_givens
-      = addArising orig (no_instance_msg <+> missing)
+      = addArising ct_loc (no_instance_msg <+> missing)
       | otherwise
-      = vcat (addArising orig (no_deduce_msg <+> missing)
+      = vcat (addArising ct_loc (no_deduce_msg <+> missing)
               : pp_givens useful_givens)
 
     supplementary = case mb_extra of
@@ -2181,7 +2181,8 @@ pprTcSolverReportMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extr
         -> Left []
       Just (CND_Extra level ty1 ty2)
         -> mk_supplementary_ea_msg ctxt level ty1 ty2 orig
-    orig = errorItemOrigin item
+    ct_loc = errorItemCtLoc item
+    orig   = ctLocOrigin ct_loc
     wanteds = map errorItemPred (item:others)
 
     no_instance_msg =
@@ -2203,7 +2204,7 @@ pprTcSolverReportMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extr
 
 pprTcSolverReportMsg ctxt (AmbiguityPreventsSolvingCt item ambigs) =
   pprTcSolverReportInfo ctxt (Ambiguity True ambigs) <+>
-  pprArising (errorItemOrigin item) $$
+  pprArising (errorItemCtLoc item) $$
   text "prevents the constraint" <+> quotes (pprParendType $ errorItemPred item)
   <+> text "from being solved."
 pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
@@ -2304,7 +2305,7 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
 
 pprTcSolverReportMsg (CEC {cec_encl = implics}) (OverlappingInstances item matches unifiers) =
   vcat
-    [ addArising orig $
+    [ addArising ct_loc $
         (text "Overlapping instances for"
         <+> pprType (mkClassPred clas tys))
     , ppUnless (null matching_givens) $
@@ -2339,7 +2340,8 @@ pprTcSolverReportMsg (CEC {cec_encl = implics}) (OverlappingInstances item match
                            , text "when compiling the other instance declarations"]
                ])]
   where
-    orig            = errorItemOrigin item
+    ct_loc          = errorItemCtLoc item
+    orig            = ctLocOrigin ct_loc
     pred            = errorItemPred item
     (clas, tys)     = getClassPredTys pred
     tyCoVars        = tyCoVarsOfTypesList tys
@@ -2363,7 +2365,7 @@ pprTcSolverReportMsg (CEC {cec_encl = implics}) (OverlappingInstances item match
                                           && isJust (tcMatchTys tys tys')
                      Nothing -> False
 pprTcSolverReportMsg _ (UnsafeOverlap item matches unsafe_overlapped) =
-  vcat [ addArising orig (text "Unsafe overlapping instances for"
+  vcat [ addArising ct_loc (text "Unsafe overlapping instances for"
                   <+> pprType (mkClassPred clas tys))
        , sep [text "The matching instance is:",
               nest 2 (pprInstance $ head matches)]
@@ -2375,7 +2377,7 @@ pprTcSolverReportMsg _ (UnsafeOverlap item matches unsafe_overlapped) =
               ]
        ]
   where
-    orig        = errorItemOrigin item
+    ct_loc      = errorItemCtLoc item
     pred        = errorItemPred item
     (clas, tys) = getClassPredTys pred
 
@@ -2906,20 +2908,28 @@ levelString :: TypeOrKind -> String
 levelString TypeLevel = "type"
 levelString KindLevel = "kind"
 
-pprArising :: CtOrigin -> SDoc
+pprArising :: CtLoc -> SDoc
 -- Used for the main, top-level error message
 -- We've done special processing for TypeEq, KindEq, givens
-pprArising (TypeEqOrigin {})         = empty
-pprArising (KindEqOrigin {})         = empty
-pprArising (AmbiguityCheckOrigin {}) = empty  -- the "In the ambiguity check" context
-                                              -- is sufficient; this would just be
-                                              -- repetitive
-pprArising orig | isGivenOrigin orig = empty
-                | otherwise          = pprCtOrigin orig
+pprArising ct_loc
+  | in_generated_code = empty  -- See Note ["Arising from" messages in generated code]
+  | suppress_origin   = empty
+  | otherwise         = pprCtOrigin orig
+  where
+    orig = ctLocOrigin ct_loc
+    in_generated_code = lclEnvInGeneratedCode (ctLocEnv ct_loc)
+    suppress_origin
+      | isGivenOrigin orig = True
+      | otherwise          = case orig of
+          TypeEqOrigin {}         -> True -- We've done special processing
+          KindEqOrigin {}         -> True -- for TypeEq, KindEq, givens
+          AmbiguityCheckOrigin {} -> True -- The "In the ambiguity check" context
+                                          -- is sufficient; more would be repetitive
+          _ -> False
 
 -- Add the "arising from..." part to a message
-addArising :: CtOrigin -> SDoc -> SDoc
-addArising orig msg = hang msg 2 (pprArising orig)
+addArising :: CtLoc -> SDoc -> SDoc
+addArising ct_loc msg = hang msg 2 (pprArising ct_loc)
 
 pprWithArising :: [Ct] -> SDoc
 -- Print something like
@@ -2931,13 +2941,26 @@ pprWithArising []
   = panic "pprWithArising"
 pprWithArising (ct:cts)
   | null cts
-  = addArising (ctLocOrigin loc) (pprTheta [ctPred ct])
+  = addArising loc (pprTheta [ctPred ct])
   | otherwise
   = vcat (map ppr_one (ct:cts))
   where
     loc = ctLoc ct
     ppr_one ct' = hang (parens (pprType (ctPred ct')))
                      2 (pprCtLoc (ctLoc ct'))
+
+{- Note ["Arising from" messages in generated code]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider code generated when we desugar code before typechecking;
+see Note [Rebindable syntax and HsExpansion].
+
+In this code, constraints may be generated, but we don't want to
+say "arising from a call of foo" if 'foo' doesn't appear in the
+users code.  We leave the actual CtOrigin untouched (partly because
+it is generated in many, many places), but suppress the "Arising from"
+message for constraints that originate in generated code.
+-}
+
 
 {- *********************************************************************
 *                                                                      *

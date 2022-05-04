@@ -31,7 +31,7 @@ module GHC.Tc.Types(
         Env(..),
         TcGblEnv(..), TcLclEnv(..),
         setLclEnvTcLevel, getLclEnvTcLevel,
-        setLclEnvLoc, getLclEnvLoc,
+        setLclEnvLoc, getLclEnvLoc, lclEnvInGeneratedCode,
         IfGblEnv(..), IfLclEnv(..),
         tcVisibleOrphanMods,
         RewriteEnv(..),
@@ -860,6 +860,9 @@ setLclEnvLoc env loc = env { tcl_loc = loc }
 
 getLclEnvLoc :: TcLclEnv -> RealSrcSpan
 getLclEnvLoc = tcl_loc
+
+lclEnvInGeneratedCode :: TcLclEnv -> Bool
+lclEnvInGeneratedCode = tcl_in_gen_code
 
 type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, SDoc))
         -- Monadic so that we have a chance

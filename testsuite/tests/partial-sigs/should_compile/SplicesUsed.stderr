@@ -12,8 +12,9 @@ SplicesUsed.hs:8:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
                the inferred type of <expression> :: w -> w
                at SplicesUsed.hs:8:14-23
     • In an expression type signature: _a -> _a
-      In the expression: id :: _a -> _a
       In the expression: (id :: _a -> _a) (Just True :: Maybe _)
+      In an equation for ‘maybeBool’:
+          maybeBool = (id :: _a -> _a) (Just True :: Maybe _)
     • Relevant bindings include
         maybeBool :: Maybe Bool (bound at SplicesUsed.hs:8:1)
 
@@ -81,4 +82,3 @@ SplicesUsed.hs:18:2: warning: [-Wpartial-type-signatures (in -Wdefault)]
                the inferred type of bar :: Bool -> w -> (Bool, w)
                at SplicesUsed.hs:18:2-11
     • In the type signature: bar :: _a -> _b -> (_a, _b)
-

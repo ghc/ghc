@@ -6,9 +6,11 @@ tcfail104.hs:16:12: error:
         Actual: (Char -> Char) -> Char -> Char
     • In the expression: \ x -> x
       In the expression:
-        if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)
-      In the expression:
         (if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)) id 'c'
+      In an equation for ‘f3’:
+          f3 v
+            = (if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x))
+                id 'c'
 
 tcfail104.hs:22:12: error:
     • Couldn't match type: forall a. a -> a
@@ -17,6 +19,8 @@ tcfail104.hs:22:12: error:
         Actual: (forall a. a -> a) -> Char -> Char
     • In the expression: \ (x :: forall a. a -> a) -> x
       In the expression:
-        if v then (\ x -> x) else (\ (x :: forall a. a -> a) -> x)
-      In the expression:
         (if v then (\ x -> x) else (\ (x :: forall a. a -> a) -> x)) id 'c'
+      In an equation for ‘f4’:
+          f4 v
+            = (if v then (\ x -> x) else (\ (x :: forall a. a -> a) -> x))
+                id 'c'

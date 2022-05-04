@@ -30,7 +30,7 @@ tcfail140.hs:17:8: error:
     • In the pattern: Just
       The lambda expression ‘\ Just x -> x’ has two value arguments,
         but its type ‘Maybe a -> a’ has only one
-      In the expression: (\ Just x -> x) :: Maybe a -> a
+      In the expression: ((\ Just x -> x) :: Maybe a -> a) (Just 1)
 
 tcfail140.hs:20:1: error:
     • Couldn't match expected type ‘Int’ with actual type ‘p0 -> Bool’

@@ -5,8 +5,8 @@ ExtraConstraintsWildcardInExpressionSignature.hs:5:20: warning: [-Wpartial-type-
                the inferred type of <expression> :: Eq a1 => a1 -> a1 -> Bool
                at ExtraConstraintsWildcardInExpressionSignature.hs:5:20-25
     • In an expression type signature: _ => _
-      In the expression: (==) :: _ => _
       In the expression: ((==) :: _ => _) x y
+      In an equation for ‘foo’: foo x y = ((==) :: _ => _) x y
     • Relevant bindings include
         y :: a
           (bound at ExtraConstraintsWildcardInExpressionSignature.hs:5:7)
@@ -21,8 +21,8 @@ ExtraConstraintsWildcardInExpressionSignature.hs:5:25: warning: [-Wpartial-type-
                the inferred type of <expression> :: Eq a1 => a1 -> a1 -> Bool
                at ExtraConstraintsWildcardInExpressionSignature.hs:5:20-25
     • In an expression type signature: _ => _
-      In the expression: (==) :: _ => _
       In the expression: ((==) :: _ => _) x y
+      In an equation for ‘foo’: foo x y = ((==) :: _ => _) x y
     • Relevant bindings include
         y :: a
           (bound at ExtraConstraintsWildcardInExpressionSignature.hs:5:7)

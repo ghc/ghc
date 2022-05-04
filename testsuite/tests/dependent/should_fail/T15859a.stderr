@@ -1,8 +1,8 @@
 
 T15859a.hs:19:26: error:
     • Expected kind ‘k0’, but ‘A’ has kind ‘forall k -> k -> *’
-      Cannot instantiate unification variable ‘k0’
+    • Cannot instantiate unification variable ‘k0’
       with a kind involving polytypes: forall k -> k -> *
     • In the first argument of ‘KindOf’, namely ‘A’
       In an expression type signature: KindOf A
-      In the expression: undefined :: KindOf A
+      In the expression: (undefined :: KindOf A) @Int

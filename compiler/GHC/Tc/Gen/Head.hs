@@ -31,7 +31,7 @@ module GHC.Tc.Gen.Head
        , tyConOf, tyConOfET, lookupParents, fieldNotInType
        , notSelector, nonBidirectionalErr
 
-       , addExprCtxt, addFunResCtxt ) where
+       , addHeadCtxt, addExprCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckMonoExprNC, tcCheckPolyExprNC )
 
@@ -431,12 +431,11 @@ tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
 --
 -- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
 tcInferAppHead (fun,ctxt) args
-  = setSrcSpan (appCtxtLoc ctxt) $
+  = addHeadCtxt ctxt $
     do { mb_tc_fun <- tcInferAppHead_maybe fun args
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
-            Nothing -> add_head_ctxt fun args $
-                       tcInfer (tcExpr fun) }
+            Nothing -> tcInfer (tcExpr fun) }
 
 tcInferAppHead_maybe :: HsExpr GhcRn
                      -> [HsExprArg 'TcpRn]
@@ -447,20 +446,23 @@ tcInferAppHead_maybe fun args
   = case fun of
       HsVar _ (L _ nm)          -> Just <$> tcInferId nm
       HsRecSel _ f              -> Just <$> tcInferRecSelId f
-      ExprWithTySig _ e hs_ty   -> add_head_ctxt fun args $
-                                   Just <$> tcExprWithSig e hs_ty
+      ExprWithTySig _ e hs_ty   -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit           -> Just <$> tcInferOverLit lit
       HsSpliceE _ (HsSpliced _ _ (HsSplicedExpr e))
                                 -> tcInferAppHead_maybe e args
       _                         -> return Nothing
 
-add_head_ctxt :: HsExpr GhcRn -> [HsExprArg 'TcpRn] -> TcM a -> TcM a
--- Don't push an expression context if the arguments are empty,
--- because it has already been pushed by tcExpr
-add_head_ctxt fun args thing_inside
-  | null args = thing_inside
-  | otherwise = addExprCtxt fun thing_inside
-
+addHeadCtxt :: AppCtxt -> TcM a -> TcM a
+addHeadCtxt fun_ctxt thing_inside
+  | not (isGoodSrcSpan fun_loc)   -- noSrcSpan => no arguments
+  = thing_inside                  -- => context is already set
+  | otherwise
+  = setSrcSpan fun_loc $
+    case fun_ctxt of
+      VAExpansion orig _ -> addExprCtxt orig thing_inside
+      VACall {}          -> thing_inside
+  where
+    fun_loc = appCtxtLoc fun_ctxt
 
 {- *********************************************************************
 *                                                                      *
