@@ -1291,7 +1291,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unf
       = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
       | otherwise
       = minimal_unfold_info
-    minimal_unfold_info = zapUnfolding unf_info
+    minimal_unfold_info = trimUnfolding unf_info
     unf_from_rhs = mkFinalUnfolding uf_opts InlineRhs final_sig tidy_rhs
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or

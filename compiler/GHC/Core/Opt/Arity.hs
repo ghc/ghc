@@ -2156,7 +2156,7 @@ eta-reduce that are specific to Core and GHC:
     See Note [Eta expanding primops].
 
  W. We may not undersaturate StrictWorkerIds.
-    See Note [Strict Worker Ids] in GHC.CoreToStg.Prep.
+    See Note [CBV Function Ids] in GHC.CoreToStg.Prep.
 
 Here is a list of historic accidents surrounding unsound eta-reduction:
 
@@ -2474,7 +2474,7 @@ canEtaReduceToArity fun dest_join_arity dest_arity =
 
     || ( dest_arity < idCbvMarkArity fun ) -- (W)
        -- Don't undersaturate StrictWorkerIds.
-       -- See Note [Strict Worker Ids] in GHC.CoreToStg.Prep.
+       -- See Note [CBV Function Ids] in GHC.CoreToStg.Prep.
 
     ||  isLinearType (idType fun) -- (L)
        -- Don't perform eta reduction on linear types.

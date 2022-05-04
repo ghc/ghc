@@ -74,7 +74,7 @@ module GHC.Types.Id (
         isDataConWrapId, isDataConWrapId_maybe,
         isDataConId_maybe,
         idDataCon,
-        isConLikeId, isDeadEndId, idIsFrom,
+        isConLikeId, isWorkerLikeId, isDeadEndId, idIsFrom,
         hasNoBinding,
 
         -- ** Join variables
@@ -99,7 +99,7 @@ module GHC.Types.Id (
         idOccInfo,
 
         -- ** Writing 'IdInfo' fields
-        setIdUnfolding, setCaseBndrEvald,
+        setIdUnfolding, zapIdUnfolding, setCaseBndrEvald,
         setIdArity,
         setIdCallArity,
 
@@ -114,6 +114,7 @@ module GHC.Types.Id (
         setIdCbvMarks,
         idCbvMarks_maybe,
         idCbvMarkArity,
+        asWorkerLikeId, asNonWorkerLikeId,
 
         idDemandInfo,
         idDmdSig,
@@ -126,7 +127,7 @@ module GHC.Types.Id (
 import GHC.Prelude
 
 import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding,
-                 isCompulsoryUnfolding, Unfolding( NoUnfolding ), isEvaldUnfolding )
+                 isCompulsoryUnfolding, Unfolding( NoUnfolding ), isEvaldUnfolding, hasSomeUnfolding, noUnfolding )
 
 import GHC.Types.Id.Info
 import GHC.Types.Basic
@@ -537,6 +538,15 @@ isDataConId_maybe id = case Var.idDetails id of
                          DataConWrapId con -> Just con
                          _                 -> Nothing
 
+-- | An Id for which we might require all callers to pass strict arguments properly tagged + evaluated.
+--
+-- See Note [CBV Function Ids]
+isWorkerLikeId :: Id -> Bool
+isWorkerLikeId id = case Var.idDetails id of
+  WorkerLikeId _  -> True
+  JoinId _ Just{}   -> True
+  _                 -> False
+
 isJoinId :: Var -> Bool
 -- It is convenient in GHC.Core.Opt.SetLevels.lvlMFE to apply isJoinId
 -- to the free vars of an expression, so it's convenient
@@ -588,7 +598,7 @@ hasNoBinding id = case Var.idDetails id of
   -- in 'checkCanEtaExpand'.
   --
   -- In particular, calling 'idUnfolding' rather than 'realIdUnfolding' here can
-  -- force the 'uf_tmpl' field, because 'zapUnfolding' forces the 'uf_is_value' field,
+  -- force the 'uf_tmpl' field, because 'trimUnfolding' forces the 'uf_is_value' field,
   -- and this field is usually computed in terms of the 'uf_tmpl' field,
   -- so we will force that as well.
   --
@@ -640,16 +650,24 @@ asJoinId id arity = warnPprTrace (not (isLocalId id))
     is_vanilla_or_join id = case Var.idDetails id of
                               VanillaId -> True
                               -- Can workers become join ids? Yes!
-                              StrictWorkerId {} -> pprTraceDebug "asJoinId (strict worker)" (ppr id) True
+                              WorkerLikeId {} -> pprTraceDebug "asJoinId (call by value function)" (ppr id) True
                               JoinId {} -> True
                               _         -> False
 
 zapJoinId :: Id -> Id
 -- May be a regular id already
-zapJoinId jid | isJoinId jid = zapIdTailCallInfo (jid `setIdDetails` VanillaId)
+zapJoinId jid | isJoinId jid = zapIdTailCallInfo (newIdDetails `seq` jid `setIdDetails` newIdDetails)
                                  -- Core Lint may complain if still marked
                                  -- as AlwaysTailCalled
               | otherwise    = jid
+              where
+                newIdDetails = case idDetails jid of
+                  -- We treat join points as CBV functions. Even after they are floated out.
+                  -- See Note [Use CBV semantics only for join points and workers]
+                  JoinId _ (Just marks) -> WorkerLikeId marks
+                  JoinId _ Nothing      -> WorkerLikeId []
+                  _                     -> panic "zapJoinId: newIdDetails can only be used if Id was a join Id."
+
 
 asJoinId_maybe :: Id -> Maybe JoinArity -> Id
 asJoinId_maybe id (Just arity) = asJoinId id arity
@@ -749,15 +767,15 @@ setIdTagSig id sig = modifyIdInfo (`setTagSig` sig) id
 -- | If all marks are NotMarkedStrict we just set nothing.
 setIdCbvMarks :: Id -> [CbvMark] -> Id
 setIdCbvMarks id marks
-  | not (any isMarkedCbv marks) = maybeModifyIdDetails (removeMarks $ idDetails id) id
+  | not (any isMarkedCbv marks) = id
   | otherwise =
       -- pprTrace "setMarks:" (ppr id <> text ":" <> ppr marks) $
       case idDetails id of
         -- good ol (likely worker) function
-        VanillaId ->      id `setIdDetails` (StrictWorkerId trimmedMarks)
+        VanillaId ->      id `setIdDetails` (WorkerLikeId trimmedMarks)
         JoinId arity _ -> id `setIdDetails` (JoinId arity (Just trimmedMarks))
-        -- Updating an existing strict worker.
-        StrictWorkerId _ -> id `setIdDetails` (StrictWorkerId trimmedMarks)
+        -- Updating an existing call by value function.
+        WorkerLikeId _ -> id `setIdDetails` (WorkerLikeId trimmedMarks)
         -- Do nothing for these
         RecSelId{} -> id
         DFunId{} -> id
@@ -769,15 +787,15 @@ setIdCbvMarks id marks
       -- (Currently) no point in passing args beyond the arity unlifted.
       -- We would have to eta expand all call sites to (length marks).
       -- Perhaps that's sensible but for now be conservative.
-      trimmedMarks = take (idArity id) marks
-      removeMarks details = case details of
-        JoinId arity (Just _) -> Just $ JoinId arity Nothing
-        StrictWorkerId _ -> Just VanillaId
-        _ -> Nothing
+      -- Similarly we don't need any lazy marks at the end of the list.
+      -- This way the length of the list is always exactly number of arguments
+      -- that must be visible to CodeGen. See See Note [CBV Function Ids]
+      -- for more details.
+      trimmedMarks = dropWhileEndLE (not . isMarkedCbv) $ take (idArity id) marks
 
 idCbvMarks_maybe :: Id -> Maybe [CbvMark]
 idCbvMarks_maybe id = case idDetails id of
-  StrictWorkerId marks -> Just marks
+  WorkerLikeId marks -> Just marks
   JoinId _arity marks  -> marks
   _                    -> Nothing
 
@@ -785,6 +803,26 @@ idCbvMarks_maybe id = case idDetails id of
 -- be passed unlifted.
 idCbvMarkArity :: Id -> Arity
 idCbvMarkArity fn = maybe 0 length (idCbvMarks_maybe fn)
+
+-- | Remove any cbv marks on arguments from a given Id.
+asNonWorkerLikeId :: Id -> Id
+asNonWorkerLikeId id =
+  let details = case idDetails id of
+        WorkerLikeId{}      -> Just $ VanillaId
+        JoinId arity Just{}   -> Just $ JoinId arity Nothing
+        _                     -> Nothing
+  in maybeModifyIdDetails details id
+
+-- | Turn this id into a WorkerLikeId if possible.
+asWorkerLikeId :: Id -> Id
+asWorkerLikeId id =
+  let details = case idDetails id of
+        WorkerLikeId{}      -> Nothing
+        JoinId _arity Just{}  -> Nothing
+        JoinId arity Nothing  -> Just (JoinId arity (Just []))
+        VanillaId             -> Just $ WorkerLikeId []
+        _                     -> Nothing
+  in maybeModifyIdDetails details id
 
 setCaseBndrEvald :: StrictnessMark -> Id -> Id
 -- Used for variables bound by a case expressions, both the case-binder
@@ -794,6 +832,12 @@ setCaseBndrEvald :: StrictnessMark -> Id -> Id
 setCaseBndrEvald str id
   | isMarkedStrict str = id `setIdUnfolding` evaldUnfolding
   | otherwise          = id
+
+-- | Similar to trimUnfolding, but also removes evaldness info.
+zapIdUnfolding :: Id -> Id
+zapIdUnfolding v
+  | isId v, hasSomeUnfolding (idUnfolding v) = setIdUnfolding v noUnfolding
+  | otherwise = v
 
         ---------------------------------
         -- SPECIALISATION

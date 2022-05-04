@@ -78,7 +78,6 @@ import GHC.Utils.Misc
 
 import Control.Monad
 
-
 {-
 The guts of the simplifier is in this module, but the driver loop for
 the simplifier is in GHC.Core.Opt.Pipeline
@@ -1705,8 +1704,9 @@ simplLamBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- Historically this had a special case for when a lambda-binder
 -- could have a stable unfolding;
 -- see Historical Note [Case binders and join points]
--- But now it is much simpler!
-simplLamBndr env bndr = simplBinder env bndr
+-- But now it is much simpler! We now only remove unfoldings.
+-- See Note [Never put `OtherCon` unfoldings on lambda binders]
+simplLamBndr env bndr = simplBinder env (zapIdUnfolding bndr)
 
 simplLamBndrs :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 simplLamBndrs env bndrs = mapAccumLM simplLamBndr env bndrs
@@ -3130,7 +3130,7 @@ simplAlt env scrut' _ case_bndr' cont' (Alt (LitAlt lit) bndrs rhs)
 simplAlt env scrut' _ case_bndr' cont' (Alt (DataAlt con) vs rhs)
   = do  { -- See Note [Adding evaluatedness info to pattern-bound variables]
           let vs_with_evals = addEvals scrut' con vs
-        ; (env', vs') <- simplLamBndrs env vs_with_evals
+        ; (env', vs') <- simplBinders env vs_with_evals
 
                 -- Bind the case-binder to (con args)
         ; let inst_tys' = tyConAppArgs (idType case_bndr')
@@ -3654,37 +3654,59 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
 mkDupableAlt :: Platform -> OutId
              -> JoinFloats -> OutAlt
              -> SimplM (JoinFloats, OutAlt)
-mkDupableAlt _platform case_bndr jfloats (Alt con bndrs' rhs')
-  | exprIsTrivial rhs'   -- See point (2) of Note [Duplicating join points]
-  = return (jfloats, Alt con bndrs' rhs')
+mkDupableAlt _platform case_bndr jfloats (Alt con alt_bndrs alt_rhs_in)
+  | exprIsTrivial alt_rhs_in   -- See point (2) of Note [Duplicating join points]
+  = return (jfloats, Alt con alt_bndrs alt_rhs_in)
 
   | otherwise
-  = do  { let rhs_ty'  = exprType rhs'
+  = do  { let rhs_ty'  = exprType alt_rhs_in
 
-              final_bndrs'
-                | isDeadBinder case_bndr = filter abstract_over bndrs'
-                | otherwise              = bndrs' ++ [case_bndr]
+              bangs
+                | DataAlt c <- con
+                = dataConRepStrictness c
+                | otherwise = []
 
-              abstract_over bndr
-                  | isTyVar bndr = True -- Abstract over all type variables just in case
-                  | otherwise    = not (isDeadBinder bndr)
-                        -- The deadness info on the new Ids is preserved by simplBinders
-              final_args = varsToCoreExprs final_bndrs'
+              abstracted_binders = abstract_binders alt_bndrs bangs
+
+              abstract_binders :: [Var] -> [StrictnessMark] -> [(Id,StrictnessMark)]
+              abstract_binders [] []
+                -- Abstract over the case binder too if it's used.
+                | isDeadBinder case_bndr  = []
+                | otherwise               = [(case_bndr,MarkedStrict)]
+              abstract_binders (alt_bndr:alt_bndrs) marks
+                -- Abstract over all type variables just in case
+                | isTyVar alt_bndr        = (alt_bndr,NotMarkedStrict) : abstract_binders alt_bndrs marks
+              abstract_binders (alt_bndr:alt_bndrs) (mark:marks)
+                -- The deadness info on the new Ids is preserved by simplBinders
+                -- We don't abstract over dead ids here.
+                | isDeadBinder alt_bndr   = abstract_binders alt_bndrs marks
+                | otherwise               = (alt_bndr,mark) : abstract_binders alt_bndrs marks
+              abstract_binders _ _ = pprPanic "abstrict_binders - failed to abstract" (ppr $ Alt con alt_bndrs alt_rhs_in)
+
+              filtered_binders = map fst abstracted_binders
+              -- We want to make any binder with an evaldUnfolding strict in the rhs.
+              -- See Note [Call-by-value for worker args] (which also applies to join points)
+              (rhs_with_seqs) = mkStrictFieldSeqs abstracted_binders alt_rhs_in
+
+              final_args = varsToCoreExprs filtered_binders
                            -- Note [Join point abstraction]
 
                 -- We make the lambdas into one-shot-lambdas.  The
                 -- join point is sure to be applied at most once, and doing so
                 -- prevents the body of the join point being floated out by
                 -- the full laziness pass
-              really_final_bndrs     = map one_shot final_bndrs'
+              final_bndrs     = map one_shot filtered_binders
               one_shot v | isId v    = setOneShotLambda v
                          | otherwise = v
-              join_rhs   = mkLams really_final_bndrs rhs'
 
-        ; join_bndr <- newJoinId final_bndrs' rhs_ty'
+              -- No lambda binder has an unfolding, but (currently) case binders can,
+              -- so we must zap them here.
+              join_rhs   = mkLams (map zapIdUnfolding final_bndrs) rhs_with_seqs
+
+        ; join_bndr <- newJoinId filtered_binders rhs_ty'
 
         ; let join_call = mkApps (Var join_bndr) final_args
-              alt'      = Alt con bndrs' join_call
+              alt'      = Alt con alt_bndrs join_call
 
         ; return ( jfloats `addJoinFlts` unitJoinFloat (NonRec join_bndr join_rhs)
                  , alt') }

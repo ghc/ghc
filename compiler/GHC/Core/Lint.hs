@@ -1685,6 +1685,11 @@ lintIdBndr top_lvl bind_site id thing_inside
        ; lintL (not (isCoVarType id_ty))
                (text "Non-CoVar has coercion type" <+> ppr id <+> dcolon <+> ppr id_ty)
 
+       -- Check that the lambda binder has no value or OtherCon unfolding.
+       -- See #21496
+       ; lintL (not (bind_site == LambdaBind && isEvaldUnfolding (idUnfolding id)))
+                (text "Lambda binder with value or OtherCon unfolding.")
+
        ; linted_ty <- addLoc (IdTy id) (lintValueType id_ty)
 
        ; addInScopeId id linted_ty $

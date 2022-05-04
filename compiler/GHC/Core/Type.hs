@@ -1508,7 +1508,7 @@ tyConAppArgs_maybe ty = case coreFullView ty of
     -> Just [w, rep1, rep2, arg, res]
   _ -> Nothing
 
-tyConAppArgs :: Type -> [Type]
+tyConAppArgs :: HasCallStack => Type -> [Type]
 tyConAppArgs ty = tyConAppArgs_maybe ty `orElse` pprPanic "tyConAppArgs" (ppr ty)
 
 tyConAppArgN :: Int -> Type -> Type

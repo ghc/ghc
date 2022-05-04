@@ -441,7 +441,7 @@ toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
 
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
 toIfaceIdDetails VanillaId                      = IfVanillaId
-toIfaceIdDetails (StrictWorkerId dmds)          = IfStrictWorkerId dmds
+toIfaceIdDetails (WorkerLikeId dmds)          = IfWorkerLikeId dmds
 toIfaceIdDetails (DFunId {})                    = IfDFunId
 toIfaceIdDetails (RecSelId { sel_naughty = n
                            , sel_tycon = tc })  =
@@ -524,7 +524,7 @@ toIfUnfolding lb (DFunUnfolding { df_bndrs = bndrs, df_args = args })
 
 toIfUnfolding _ (OtherCon {}) = Nothing
   -- The binding site of an Id doesn't have OtherCon, except perhaps
-  -- where we have called zapUnfolding; and that evald'ness info is
+  -- where we have called trimUnfolding; and that evald'ness info is
   -- not needed by importing modules
 
 toIfUnfolding _ BootUnfolding = Nothing

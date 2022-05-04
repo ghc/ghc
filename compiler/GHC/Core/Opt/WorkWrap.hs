@@ -36,6 +36,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Monad
 import GHC.Utils.Trace
+import GHC.Core.DataCon
 
 {-
 We take Core bindings whose binders have:
@@ -535,7 +536,7 @@ tryWW ww_opts is_rec fn_id rhs
   -- See Note [Drop absent bindings]
   | isAbsDmd (demandInfo fn_info)
   , not (isJoinId fn_id)
-  , Just filler <- mkAbsentFiller ww_opts fn_id
+  , Just filler <- mkAbsentFiller ww_opts fn_id NotMarkedStrict
   = return [(new_fn_id, filler)]
 
   -- See Note [Don't w/w INLINE things]
@@ -788,10 +789,10 @@ splitFun ww_opts fn_id rhs
 
 mkWWBindPair :: WwOpts -> Id -> IdInfo
              -> [Var] -> CoreExpr -> Unique -> Divergence
-             -> ([Demand],[CbvMark], JoinArity, Id -> CoreExpr, Expr CoreBndr -> CoreExpr)
+             -> ([Demand],JoinArity, Id -> CoreExpr, Expr CoreBndr -> CoreExpr)
              -> [(Id, CoreExpr)]
 mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
-             (work_demands, cbv_marks :: [CbvMark], join_arity, wrap_fn, work_fn)
+             (work_demands, join_arity, wrap_fn, work_fn)
   = -- pprTrace "mkWWBindPair" (ppr fn_id <+> ppr wrap_id <+> ppr work_id $$ ppr wrap_rhs) $
     [(work_id, work_rhs), (wrap_id, wrap_rhs)]
      -- Worker first, because wrapper mentions it
@@ -821,7 +822,8 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
       -- worker is join point iff wrapper is join point
       -- (see Note [Don't w/w join points for CPR])
 
-    work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
+    work_id  = asWorkerLikeId $
+               mkWorkerId work_uniq fn_id (exprType work_rhs)
                 `setIdOccInfo` occInfo fn_info
                         -- Copy over occurrence info from parent
                         -- Notably whether it's a loop breaker
@@ -846,10 +848,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
                         -- arity is consistent with the demand type goes
                         -- through
 
-                `setIdCbvMarks` cbv_marks
-
                 `asJoinId_maybe` work_join_arity
-                -- `setIdThing` (undefined cbv_marks)
 
     work_arity = length work_demands :: Int
 
@@ -1033,7 +1032,7 @@ splitThunk ww_opts is_rec x rhs
   = assert (not (isJoinId x)) $
     do { let x' = localiseId x -- See comment above
        ; (useful,_args, wrap_fn, fn_arg)
-           <- mkWWstr_one ww_opts x' NotMarkedCbv
+           <- mkWWstr_one ww_opts x' NotMarkedStrict
        ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn fn_arg)) ]
        ; if useful then assertPpr (isNonRec is_rec) (ppr x) -- The thunk must be non-recursive
                    return res
