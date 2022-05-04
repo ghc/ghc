@@ -1196,7 +1196,7 @@ getFixedTyVars upd_fld_occs univ_tvs cons
 disambiguateRecordBinds :: LHsExpr GhcRn -> TcRhoType
                  -> [LHsRecUpdField GhcRn] -> ExpRhoType
                  -> TcM [LHsFieldBind GhcTc (LAmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
-disambiguateRecordBinds record_expr record_rho rbnds res_ty
+disambiguateRecordBinds _record_expr _record_rho rbnds _res_ty
     -- Are all the fields unambiguous?
   = case mapM isUnambiguous rbnds of
                      -- If so, just skip to looking up the Ids
@@ -1229,7 +1229,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
     -- Given a the lists of possible parents for each field,
     -- identify a single parent
     identifyParent :: FamInstEnvs -> [[RecSelParent]] -> TcM RecSelParent
-    identifyParent fam_inst_envs possible_parents
+    identifyParent _fam_inst_envs possible_parents
       = case foldr1 intersect possible_parents of
         -- No parents for all fields: record update is ill-typed
         []  -> failWithTc (TcRnNoPossibleParentForFields rbnds)
@@ -1237,6 +1237,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
         -- Exactly one datatype with all the fields: use that
         [p] -> return p
 
+{-
         -- Multiple possible parents: try harder to disambiguate
         -- Can we get a parent TyCon from the pushed-in type?
         _:_ | Just p <- tyConOfET fam_inst_envs res_ty ->
@@ -1249,6 +1250,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
             , Just tc <- tyConOf fam_inst_envs record_rho
             -> do { reportAmbiguousField tc
                   ; return (RecSelData tc) }
+                  -}
 
         -- Nothing else we can try...
         _ -> failWithTc (TcRnBadOverloadedRecordUpdate rbnds)
@@ -1295,13 +1297,29 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
                }
            }
 
-    -- See Note [Deprecating ambiguous fields] in GHC.Tc.Gen.Head
+    -- See Note [Deprecating ambiguous fields]
+    {-
     reportAmbiguousField :: TyCon -> TcM ()
     reportAmbiguousField parent_type =
         setSrcSpan loc $ addDiagnostic $ TcRnAmbiguousField rupd parent_type
       where
         rupd = RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds, rupd_ext = noExtField }
         loc  = getLocA (head rbnds)
+        -}
+
+{-
+Note [Deprecating ambiguous fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the future, the -XDuplicateRecordFields extension will no longer support
+disambiguating record fields during type-checking (as described in Note
+[Disambiguating record fields]).  For now, the -Wambiguous-fields option will
+emit a warning whenever an ambiguous field is resolved using type information.
+In a subsequent GHC release, this functionality will be removed and the warning
+will turn into an ambiguity error in the renamer.
+
+For background information, see GHC proposal #366
+(https://github.com/ghc-proposals/ghc-proposals/pull/366).
+-}
 
 {-
 Game plan for record bindings
