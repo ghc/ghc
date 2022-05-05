@@ -48,7 +48,7 @@ import GHC.Types.Demand ( StrictSig(..), Demand, dmdTypeDepth, isStrUsedDmd
                         , mkClosedStrictSig, topDmd, seqDmd, isDeadEndDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
-import GHC.Types.Unique ( hasKey )
+import GHC.Types.Unique ( hasKey, minLocalUnique, maxLocalUnique, getKey, mkUniqueGrimily )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
@@ -62,7 +62,7 @@ import GHC.Types.Basic
 import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Utils.Logger
 import GHC.Types.Tickish
-import GHC.Types.Var    ( isTyCoVar )
+import GHC.Types.Var    ( isTyCoVar, setVarUnique )
 import GHC.Data.Maybe   ( isNothing, orElse )
 import Control.Monad
 import GHC.Utils.Outputable
@@ -80,10 +80,16 @@ import GHC.Types.Var.Env
 import GHC.Types.Unique.FM
 import Control.Concurrent.QSem
 import Control.Exception
-import GHC.Core.Subst (Subst, substRecBndrs, substBind, mkEmptySubst, substInScope)
+import GHC.Core.Subst (Subst, substRecBndrs, substBind, mkEmptySubst, substInScope, extendSubstWithVar)
 import Data.Foldable
 import Data.Traversable
 import GHC.Data.OrdList (toOL)
+import GHC.Types.Var.Set (IdSet, mkVarSet, dVarSetElems)
+import qualified Data.IntMap.Strict as IntMap
+import GHC.Types.Unique.Set (getUniqSet, isEmptyUniqSet, nonDetEltsUniqSet)
+import qualified Data.IntSet as IntSet
+import GHC.Types.Unique (Unique)
+import GHC.Types.Unique.Supply (uniqFromMask)
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -227,6 +233,47 @@ substSimplFloats subst sf@SimplFloats{sfJoinFloats, sfLetFloats = LetFloats bind
                     , sfInScope = sfInScope sf `unionInScope` substInScope new_subst
                     })
 
+
+simplEnvInscopeLocals :: SimplEnv -> IdSet
+simplEnvInscopeLocals env = let
+  inscope_intmap = ufmToSet_Directly . getUniqSet . getInScopeVars  . seInScope $ env
+  (_,xs0) = IntSet.split (getKey minLocalUnique) inscope_intmap
+  (xs, _) = IntSet.split (getKey maxLocalUnique) xs0
+  in mkVarSet
+     [ x
+     | y :: Unique <- [minLocalUnique,maxLocalUnique] ++
+                [ mkUniqueGrimily x | x <- IntSet.toList xs]
+     , Just x <- [lookupInScope_Directly (seInScope env) y]
+     ]
+
+simplSubstLocals :: SimplEnv -> (SimplFloats, SimplEnv) -> IO (SimplFloats, SimplEnv)
+simplSubstLocals env0 (this_float,this_env) = do
+    let
+      inscope_locals_acc = simplEnvInscopeLocals env0
+    ASSERT (isEmptyUniqSet inscope_locals_acc) pure ()
+    let
+      inscope_locals = simplEnvInscopeLocals this_env
+    new_ids <- for (nonDetEltsUniqSet inscope_locals) $ \x -> (x,) . setVarUnique x <$> uniqFromMask 'z'
+    let subst = foldr (\(old, new) acc -> extendSubstWithVar acc old new)
+                        (mkEmptySubst $ seInScope env0) new_ids
+        (_, new_floats) = substSimplFloats subst this_float
+    pure (new_floats, setInScopeFromF this_env new_floats)
+
+-- simplCombineEnvs :: MonadUnique m => SimplEnv -> [(SimplEnv, SimplFloats)] -> m (SimplFloats, SimplEnv)
+-- simplCombineEnvs env0 envs = foldlM go (emptyFloats env0, env0) envs where
+--   go (acc_floats, acc_env) (this_float, this_env) = do
+--     let
+--       inscope_locals_acc = simplEnvInscopeLocals acc_env
+--     ASSERT (null inscope_locals_acc) pure ()
+--     let
+--       inscope_locals = simplEnvInscopeLocals this_env
+--     new_ids <- for inscope_locals $ \x -> (x,) . setVarUnique x <$> getUniqueM
+--     let subst = foldr (\(old, new) acc -> extendSubstWithVar acc old new)
+--                         (mkEmptySubst $ seInScope acc_env) new_ids
+--         (_, new_floats) = substSimplFloats subst this_float
+--         floats = acc_floats `unionFloats` new_floats
+--     pure (setInScopeFromF acc_env floats, floats)
+
 simplTopBinds :: SimplEnv -> ([(Int, InBind)], M.Map Int [Int]) -> SimplM (SimplFloats, SimplEnv)
 -- See Note [The big picture]
 simplTopBinds env0 (binds0, g)
@@ -248,24 +295,19 @@ simplTopBinds env0 (binds0, g)
             return ((), sc)
 
         ; let res_vars = M.elems env_m_vars
-        ; all_floats_and_envs <- liftIO (mapM readMVar res_vars)
+        ; (floats, envs) <- unzip <$> liftIO (mapM readMVar res_vars)
 
         -- ; pprTraceM "binds_0" (vcat (map ppr binds0))
         -- ; pprTraceM "binds_0" (ppr all_floats)
 
-        ; old_res <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 (map snd binds0)
-        ; freeTick SimplifierDone
-        ; let
-            !combined_env = combine_envs env1 all_envs
-            (subst, combined_floats) = let
-              subst0 = mkEmptySubst (seInScope combined_env)
-              go (s,!facc) f = case substSimplFloats s f of
-                (t, g) -> (t, facc `unionFloats` g)
-              in foldl' go (subst0, emptyFloats combined_env) all_floats
-            (_,final_floats) = substSimplFloats subst combined_floats
-            final_env = combined_env { seInScope = seInScope combined_env `unionInScope` substInScope subst }
+        ; _old_res <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 (map snd binds0)
 
-        ; return (final_floats,final_env) }
+        ; let
+            env = combine_envs env1 envs
+            final_floats = foldl' addFloats (emptyFloats env1) floats
+
+        ; freeTick SimplifierDone
+        ; return (final_floats, setInScopeFromF env final_floats) }
   where
     combine_envs env0 envs =
       env0 { seInScope = foldr unionInScope (seInScope env0) (map seInScope envs)
@@ -280,10 +322,8 @@ simplTopBinds env0 (binds0, g)
         let my_var = fromJust (M.lookup k deps)
         let env' = combine_envs env1 envs
         bracket_ (waitQSem sem) (signalQSem sem) $ do
-          --pprTraceM "starting" (ppr k )
           ((floats, env''), _) <- unSM (simpl_bind env' b) te sc
-          putMVar my_var (floats, env'')
-        --pprTraceM "finished" (ppr k )
+          simplSubstLocals env' (floats,env'') >>= putMVar my_var
 
 
 
