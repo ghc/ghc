@@ -745,6 +745,9 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      , addValidateRule LLVMBackend (validateBuilds Amd64 (Linux Debian10) llvm)
 
      , disableValidate (standardBuilds Amd64 (Linux Debian11))
+     -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
+     -- not being at EOL until April 2023 and they still need tinfo5.
+     , disableValidate (standardBuilds Amd64 (Linux Debian9))
      , disableValidate (standardBuilds Amd64 (Linux Ubuntu2004))
      , disableValidate (standardBuilds Amd64 (Linux Centos7))
      -- Fedora33 job is always built with perf so there's one job in the normal
