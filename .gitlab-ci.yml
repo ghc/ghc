@@ -503,6 +503,40 @@ doc-tarball:
     - ls -lh
     - mv docs/*.tar.xz docs/index.html .
 
+hackage-doc-tarball:
+  stage: packaging
+  needs:
+    - job: x86_64-linux-fedora33-perf
+      optional: true
+    - job: nightly-x86_64-linux-fedora33-perf
+      optional: true
+    - job: release-x86_64-linux-fedora33-perf
+      optional: true
+    - job: source-tarball
+  tags:
+    - x86_64-linux
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  dependencies: null
+  variables:
+    # Don't clone the git repo..
+    GIT_STRATEGY: none
+  artifacts:
+    paths:
+      - hackage_docs
+  before_script:
+    - tar -xf ghc-*[0-9]-src.tar.xz
+    - tar -xf ghc-x86_64-linux-fedora33-perf.tar.xz -C ghc*/
+  script:
+    - cd ghc*/
+    - mv .gitlab/upload_ghc_libs.py .
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - ./upload_ghc_libs.py prepare --bindist ghc*linux/
+    - mv .upload-libs/docs ../hackage_docs
+  rules:
+    - if: $NIGHTLY
+    - if: '$RELEASE_JOB == "yes"'
+
 source-tarball:
   stage: full-build
   tags:
