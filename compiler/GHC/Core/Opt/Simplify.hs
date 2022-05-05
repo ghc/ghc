@@ -248,7 +248,7 @@ simplTopBinds env0 (binds0, g)
             return ((), sc)
 
         ; let res_vars = M.elems env_m_vars
-        ; (all_floats, all_envs) <- liftIO (unzip <$> mapM readMVar res_vars)
+        ; all_floats_and_envs <- liftIO (mapM readMVar res_vars)
 
         -- ; pprTraceM "binds_0" (vcat (map ppr binds0))
         -- ; pprTraceM "binds_0" (ppr all_floats)
@@ -303,6 +303,7 @@ simplTopBinds env0 (binds0, g)
                                       ; (floats, env2) <- simpl_binds env1 binds
                                       -- See Note [Bangs in the Simplifier]
                                       ; let !floats1 = float `addFloats` floats
+                                      ; -- TODO ^^^ should this be unionFloats?
                                       ; return (floats1, env2) }
 
     simpl_bind env (Rec pairs)
