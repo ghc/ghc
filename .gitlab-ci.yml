@@ -488,7 +488,7 @@ doc-tarball:
         || mv "ghc-x86_64-linux-deb10-perf.tar.xz" "$LINUX_BINDIST" \
         || true
       mv "ghc-x86_64-windows-validate.tar.xz" "$WINDOWS_BINDIST" \
-        || mv "ghc-x86-windows-perf.tar.xz" "$WINDOWS_BINDIST" \
+        || mv "ghc-x86_64-windows-perf.tar.xz" "$WINDOWS_BINDIST" \
         || true
       if [ ! -f "$LINUX_BINDIST" ]; then
         echo "Error: $LINUX_BINDIST does not exist. Did the Debian 9 job fail?"
