@@ -1306,6 +1306,7 @@ capture_constraints thing_inside
        ; res <- updLclEnv (\ env -> env { tcl_lie = lie_var }) $
                 thing_inside
        ; lie <- readTcRef lie_var
+       ; when debugIsOn (writeTcRef lie_var (error "capture_constraints: use after free"))
        ; return (res, lie) }
 
 capture_messages :: TcM r -> TcM (r, Messages TcRnMessage)
@@ -1318,7 +1319,10 @@ capture_messages thing_inside
   = do { msg_var <- newTcRef emptyMessages
        ; res     <- setErrsVar msg_var thing_inside
        ; msgs    <- readTcRef msg_var
+       ; when debugIsOn (writeTcRef msg_var (error "capture_messages: use after free"))
        ; return (res, msgs) }
+
+
 
 -----------------------
 -- (askNoErrs m) runs m
