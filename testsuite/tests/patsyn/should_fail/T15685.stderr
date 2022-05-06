@@ -9,7 +9,7 @@ T15685.hs:13:24: error:
         at T15685.hs:13:19-26
       ‘k’ is a rigid type variable bound by
         the inferred type of HereNil :: NS f as
-        at T15685.hs:13:9-15
+        at T15685.hs:13:1-26
     • In the pattern: Nil
       In the pattern: Here Nil
       In the declaration for pattern synonym ‘HereNil’

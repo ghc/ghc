@@ -1,5 +1,5 @@
 
-T14507.hs:21:9: error:
+T14507.hs:21:1: error:
     • Iceland Jack!  Iceland Jack! Stop torturing me!
       Pattern-bound variable x :: TypeRep a
         has a type that mentions pattern-bound coercion: co

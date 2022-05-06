@@ -1947,34 +1947,33 @@ skolemiseUnboundMetaTyVar skol_info tv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
-  type C :: Type -> Type -> Constraint
+* type C :: Type -> Type -> Constraint
   class (forall a. a b ~ a c) => C b c
 
-or
+* type T = forall a. Proxy a
 
-  type T = forall a. Proxy a
+* data (forall a. a b ~ a c) => T b c
 
-or
+* type instance F Int = Proxy Any
+  where Any :: forall k. k
 
-  data (forall a. a b ~ a c) => T b c
+In the first three cases we will infer a :: Type -> kappa, but then
+we get no further information on kappa. In the last, we will get
+  Proxy kappa Any
+but again will get no further info on kappa.
 
-We will infer a :: Type -> kappa... but then we get no further information
-on kappa. What to do?
-
+What do do?
  A. We could choose kappa := Type. But this only works when the kind of kappa
     is Type (true in this example, but not always).
  B. We could default to Any.
  C. We could quantify.
  D. We could error.
 
-We choose (D), as described in #17567. Discussion of alternatives is below.
+We choose (D), as described in #17567, and implement this choice in
+doNotQuantifyTyVars.  Dicsussion of alternativs A-C is below.
 
 NB: this is all rather similar to, but sadly not the same as
     Note [Naughty quantification candidates]
-
-(One last example: type instance F Int = Proxy Any, where the unconstrained
-kind variable is the inferred kind of Any. The four examples here illustrate
-all cases in which this Note applies.)
 
 To do this, we must take an extra step before doing the final zonk to create
 e.g. a TyCon. (There is no problem in the final term-level zonk. See the
@@ -1990,7 +1989,7 @@ RuntimeRep and Multiplicity variables.)
 Because no meta-variables remain after quantifying or erroring, we perform
 the zonk with NoFlexi, which panics upon seeing a meta-variable.
 
-Alternatives not implemented:
+Alternatives A-C, not implemented:
 
 A. As stated above, this works only sometimes. We might have a free
    meta-variable of kind Nat, for example.
@@ -2067,7 +2066,9 @@ doNotQuantifyTyVars dvs where_found
        ; unless (null leftover_metas) $
          do { let (tidy_env1, tidied_tvs) = tidyOpenTyCoVars emptyTidyEnv leftover_metas
             ; (tidy_env2, where_doc) <- where_found tidy_env1
-            ; let msg = TcRnUnknownMessage $ mkPlainError noHints $ pprWithExplicitKindsWhen True $
+            ; let msg = TcRnUnknownMessage            $
+                        mkPlainError noHints          $
+                        pprWithExplicitKindsWhen True $
                     vcat [ text "Uninferrable type variable"
                            <> plural tidied_tvs
                            <+> pprWithCommas pprTyVar tidied_tvs
