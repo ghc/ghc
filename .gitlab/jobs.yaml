@@ -2057,7 +2057,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "release-i386-linux-deb9-release": {
+  "release-i386-linux-deb9-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2067,7 +2067,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-i386-linux-deb9-release.tar.xz",
+        "ghc-i386-linux-deb9-release+no_split_sections.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2109,11 +2109,11 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-i386-linux-deb9-release",
-      "BUILD_FLAVOUR": "release",
+      "BIN_DIST_NAME": "ghc-i386-linux-deb9-release+no_split_sections",
+      "BUILD_FLAVOUR": "release+no_split_sections",
       "CONFIGURE_ARGS": "",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "i386-linux-deb9-release",
+      "TEST_ENV": "i386-linux-deb9-release+no_split_sections",
       "XZ_OPT": "-9"
     }
   },
@@ -2371,7 +2371,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-alpine3_12-release+fully_static": {
+  "release-x86_64-linux-alpine3_12-release+fully_static+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2381,7 +2381,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-alpine3_12-release+fully_static.tar.xz",
+        "ghc-x86_64-linux-alpine3_12-release+fully_static+no_split_sections.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2423,18 +2423,18 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-release+fully_static",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-release+fully_static+no_split_sections",
       "BROKEN_TESTS": "ghcilink002  encoding004 T10458 linker_unload_native",
-      "BUILD_FLAVOUR": "release+fully_static",
+      "BUILD_FLAVOUR": "release+fully_static+no_split_sections",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
-      "TEST_ENV": "x86_64-linux-alpine3_12-release+fully_static",
+      "TEST_ENV": "x86_64-linux-alpine3_12-release+fully_static+no_split_sections",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-centos7-release": {
+  "release-x86_64-linux-centos7-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2444,7 +2444,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-centos7-release.tar.xz",
+        "ghc-x86_64-linux-centos7-release+no_split_sections.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2486,12 +2486,12 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-centos7-release",
-      "BUILD_FLAVOUR": "release",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-centos7-release+no_split_sections",
+      "BUILD_FLAVOUR": "release+no_split_sections",
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "x86_64-linux-centos7-release",
+      "TEST_ENV": "x86_64-linux-centos7-release+no_split_sections",
       "XZ_OPT": "-9"
     }
   },
@@ -2675,7 +2675,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-deb9-release": {
+  "release-x86_64-linux-deb9-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2685,7 +2685,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-deb9-release.tar.xz",
+        "ghc-x86_64-linux-deb9-release+no_split_sections.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2727,11 +2727,11 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb9-release",
-      "BUILD_FLAVOUR": "release",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb9-release+no_split_sections",
+      "BUILD_FLAVOUR": "release+no_split_sections",
       "CONFIGURE_ARGS": "",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "x86_64-linux-deb9-release",
+      "TEST_ENV": "x86_64-linux-deb9-release+no_split_sections",
       "XZ_OPT": "-9"
     }
   },

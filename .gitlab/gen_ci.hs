@@ -119,6 +119,7 @@ data BuildConfig
                 , fullyStatic    :: Bool
                 , tablesNextToCode :: Bool
                 , threadSanitiser :: Bool
+                , noSplitSections :: Bool
                 }
 
 -- Extra arguments to pass to ./configure due to the BuildConfig
@@ -134,13 +135,14 @@ mkJobFlavour BuildConfig{..} = Flavour buildFlavour opts
     opts = [Llvm | llvmBootstrap] ++
            [Dwarf | withDwarf] ++
            [FullyStatic | fullyStatic] ++
-           [ThreadSanitiser | threadSanitiser]
+           [ThreadSanitiser | threadSanitiser] ++
+           [NoSplitSections | noSplitSections, buildFlavour == Release ]
 
 data Flavour = Flavour BaseFlavour [FlavourTrans]
 
-data FlavourTrans = Llvm | Dwarf | FullyStatic | ThreadSanitiser
+data FlavourTrans = Llvm | Dwarf | FullyStatic | ThreadSanitiser | NoSplitSections
 
-data BaseFlavour = Release | Validate | SlowValidate
+data BaseFlavour = Release | Validate | SlowValidate deriving Eq
 
 -----------------------------------------------------------------------------
 -- Build Configs
@@ -159,7 +161,11 @@ vanilla = BuildConfig
   , fullyStatic = False
   , tablesNextToCode = True
   , threadSanitiser = False
+  , noSplitSections = False
   }
+
+splitSectionsBroken :: BuildConfig -> BuildConfig
+splitSectionsBroken bc = bc { noSplitSections = True }
 
 nativeInt :: BuildConfig
 nativeInt = vanilla { bignumBackend = Native }
@@ -267,6 +273,7 @@ flavourString (Flavour base trans) = baseString base ++ concatMap (("+" ++) . fl
     flavourString Dwarf = "debug_info"
     flavourString FullyStatic = "fully_static"
     flavourString ThreadSanitiser = "thread_sanitizer"
+    flavourString NoSplitSections = "no_split_sections"
 
 -- The path to the docker image (just for linux builders)
 dockerImage :: Arch -> Opsys -> Maybe String
@@ -771,9 +778,9 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      , disableValidate (standardBuilds Amd64 (Linux Debian11))
      -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
      -- not being at EOL until April 2023 and they still need tinfo5.
-     , disableValidate (standardBuilds Amd64 (Linux Debian9))
+     , disableValidate (standardBuildsWithConfig Amd64 (Linux Debian9) (splitSectionsBroken vanilla))
      , disableValidate (standardBuilds Amd64 (Linux Ubuntu2004))
-     , disableValidate (standardBuilds Amd64 (Linux Centos7))
+     , disableValidate (standardBuildsWithConfig Amd64 (Linux Centos7) (splitSectionsBroken vanilla))
      -- Fedora33 job is always built with perf so there's one job in the normal
      -- validate pipeline which is built with perf.
      , (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig)
@@ -781,16 +788,16 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      -- This job is only for generating head.hackage docs
      , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
-     , fastCI (standardBuilds Amd64 Windows)
+     , fastCI (standardBuildsWithConfig Amd64 Windows vanilla)
      , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
      , standardBuilds Amd64 Darwin
      , allowFailureGroup (addValidateRule FreeBSDLabel (standardBuilds Amd64 FreeBSD13))
      , standardBuilds AArch64 Darwin
      , standardBuilds AArch64 (Linux Debian10)
      , allowFailureGroup (addValidateRule ARMLabel (standardBuilds ARMv7 (Linux Debian10)))
-     , standardBuilds I386 (Linux Debian9)
+     , standardBuildsWithConfig I386 (Linux Debian9) (splitSectionsBroken vanilla)
      -- Fully static build, in theory usable on any linux distribution.
-     , allowFailureGroup (fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine) static))
+     , allowFailureGroup (fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine) (splitSectionsBroken static)))
      , disableValidate (fullyStaticBrokenTests (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt)))
      -- Dynamically linked build, suitable for building your own static executables on alpine
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine) vanilla)

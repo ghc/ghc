@@ -6,7 +6,7 @@ import {-# SOURCE #-} Settings.Default
 
 -- Please update doc/flavours.md when changing this file.
 performanceFlavour :: Flavour
-performanceFlavour = defaultFlavour
+performanceFlavour = splitSections $ defaultFlavour
     { name = "perf"
     , args = defaultBuilderArgs <> performanceArgs <> defaultPackageArgs }
 
