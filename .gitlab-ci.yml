@@ -521,6 +521,7 @@ source-tarball:
     - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC fetch -o hadrian-bootstrap-sources-$GHC_VERSION
   rules:
     - if: $NIGHTLY
+    - if: '$RELEASE_JOB == "yes"'
 
 
 test-bootstrap:
