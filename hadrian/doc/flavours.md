@@ -15,6 +15,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
 <table>
   <tr>
     <th rowspan="3">Flavour</th>
+    <th rowspan="3">Split Sections</th>
     <th colspan="8">Extra arguments</th>
   </tr>
   <tr>
@@ -35,6 +36,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>default<br></td>
+    <td> </td>
     <td>-O<br>-H32m<br></td>
     <td>-O2<br>-H32m</td>
     <td></td>
@@ -46,6 +48,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>quick</td>
+    <td> </td>
     <td>-O0<br>-H64m</td>
     <td>-O0<br>-H64m</td>
     <td></td>
@@ -57,6 +60,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>quick-validate</td>
+    <td></td>
     <td>-O0<br>-H64m<br>-Werror</td>
     <td>-O0<br>-H64m<br>-Werror</td>
     <td></td>
@@ -68,6 +72,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>quick-debug</td>
+    <td></td>
     <td>-O0<br>-H64m</td>
     <td>-O0<br>-H64m</td>
     <td></td>
@@ -79,6 +84,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>quickest</td>
+    <td></td>
     <td>-O0<br>-H64m</td>
     <td>-O0<br>-H64m</td>
     <td></td>
@@ -90,6 +96,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>perf</td>
+    <td> Yes (on supported platforms) </td>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
     <td></td>
@@ -101,6 +108,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>bench</td>
+    <td></td>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
     <td></td>
@@ -112,6 +120,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>devel1</td>
+    <td></td>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
     <td></td>
@@ -123,6 +132,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>devel2</td>
+    <td></td>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
     <td></td>
@@ -134,6 +144,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>validate</td>
+    <td></td>
     <td>-O0<br>-H64m</td>
     <td>-fllvm-fill-undef-with-garbage</td>
     <td></td>
@@ -145,6 +156,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>slow-validate</td>
+    <td></td>
     <td>-O0<br>-H64m</td>
     <td>-fllvm-fill-undef-with-garbage</td>
     <td></td>
@@ -156,6 +168,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>static</td>
+    <td></td>
     <td>-O<br>-H64m<br>-fPIC -static</td>
     <td>-O<br>-H64m<br>-fPIC -static</td>
     <td></td>
