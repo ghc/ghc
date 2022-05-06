@@ -199,11 +199,39 @@ data AppCtxt
   = VAExpansion
        (HsExpr GhcRn)    -- Inside an expansion of this expression
        SrcSpan           -- The SrcSpan of the expression
-                         --    noSrcSpan if outermost
+                         --    noSrcSpan if outermost; see Note [AppCtxt]
 
   | VACall
        (HsExpr GhcRn) Int  -- In the third argument of function f
        SrcSpan             -- The SrcSpan of the application (f e1 e2 e3)
+                         --    noSrcSpan if outermost; see Note [AppCtxt]
+
+{- Note [AppCtxt]
+~~~~~~~~~~~~~~~~~
+In a call (f e1 ... en), we pair up each argument with an AppCtxt. For
+example, the AppCtxt for e3 allows us to say
+    "In the third argument of `f`"
+See splitHsApps.
+
+To do this we must take a quick look into the expression to find the
+function at the head (`f` in this case) and how many arguments it
+has. That is what the funcion top_ctxt does.
+
+If the function part is an expansion, we don't want to look further.
+For example, with rebindable syntax the expression
+    (if e1 then e2 else e3) e4 e5
+might expand to
+    (ifThenElse e1 e2 e3) e4 e5
+For e4 we an AppCtxt that says "In the first argument of (if ...)",
+not "In the fourth argument of ifThenElse".  So top_ctxt stops
+at expansions.
+
+The SrcSpan in an AppCtxt describes the whole call.  We initialise
+it to noSrcSpan, because splitHsApps deals in HsExpr not LHsExpr, so
+we don't have a span for the whole call; and we use that noSrcSpan in
+GHC.Tc.Gen.App.tcInstFun (set_fun_ctxt) to avoid pushing "In the expression `f`"
+a second time.
+-}
 
 appCtxtLoc :: AppCtxt -> SrcSpan
 appCtxtLoc (VAExpansion _ l) = l
@@ -249,6 +277,10 @@ splitHsApps :: HsExpr GhcRn
 -- See Note [splitHsApps]
 splitHsApps e = go e (top_ctxt 0 e) []
   where
+    top_ctxt :: Int -> HsExpr GhcRn -> AppCtxt
+    -- Always returns VACall fun n_val_args noSrcSpan
+    -- to initialise the argument splitting in 'go'
+    -- See Note [AppCtxt]
     top_ctxt n (HsPar _ _ fun _)           = top_lctxt n fun
     top_ctxt n (HsPragE _ _ fun)           = top_lctxt n fun
     top_ctxt n (HsAppType _ fun _)         = top_lctxt (n+1) fun
@@ -260,6 +292,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
 
     go :: HsExpr GhcRn -> AppCtxt -> [HsExprArg 'TcpRn]
        -> ((HsExpr GhcRn, AppCtxt), [HsExprArg 'TcpRn])
+    -- Modify the AppCtxt as we walk inwards, so it describes the next argument
     go (HsPar _ _ (L l fun) _)    ctxt args = go fun (set l ctxt) (EWrap (EPar ctxt)   : args)
     go (HsPragE _ p (L l fun))    ctxt args = go fun (set l ctxt) (EPrag      ctxt p   : args)
     go (HsAppType _ (L l fun) ty) ctxt args = go fun (dec l ctxt) (mkETypeArg ctxt ty  : args)
@@ -267,7 +300,8 @@ splitHsApps e = go e (top_ctxt 0 e) []
 
     -- See Note [Looking through HsExpanded]
     go (XExpr (HsExpanded orig fun)) ctxt args
-      = go fun (VAExpansion orig (appCtxtLoc ctxt)) (EWrap (EExpand orig) : args)
+      = go fun (VAExpansion orig (appCtxtLoc ctxt))
+               (EWrap (EExpand orig) : args)
 
     -- See Note [Desugar OpApp in the typechecker]
     go e@(OpApp _ arg1 (L l op) arg2) _ args
