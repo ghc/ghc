@@ -209,8 +209,8 @@ dsUnliftedBind (FunBind { fun_id = L l fun
   = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun))
                                      Nothing matches
        ; MASSERT( null args ) -- Functions aren't lifted
-       ; MASSERT( isIdHsWrapper co_fn )
-       ; let rhs' = mkOptTickBox tick rhs
+       ; core_wrap <- dsHsWrapper co_fn  -- Can be non-identity (#21516)
+       ; let rhs' = core_wrap (mkOptTickBox tick rhs)
        ; return (bindNonRec fun rhs' body) }
 
 dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
