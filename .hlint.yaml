@@ -58,6 +58,7 @@
 - ignore: {name: "Use tuple-section"} # 2 hints
 - ignore: {name: "Use unless"} # 1 hint
 - ignore: {name: "Use void"} # 1 hint
+- ignore: {name: "Use second"} # 3 hints
 # Module names (not all unique) where CPP can be used
 - extensions:
   - name: CPP
