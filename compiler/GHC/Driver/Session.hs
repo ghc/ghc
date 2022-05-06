@@ -4799,7 +4799,7 @@ makeDynFlagsConsistent dflags
 
  | gopt Opt_SplitSections dflags
  , platformHasSubsectionsViaSymbols (targetPlatform dflags)
-    = let dflags' = gopt_unuset dflags Opt_SplitSections
+    = let dflags' = gopt_unset dflags Opt_SplitSections
           warn = "-fsplit-sections is not useful on this platform " ++
                  "since it uses subsections-via-symbols. Ignoring."
       in loop dflags' warn
