@@ -10,27 +10,12 @@ OverloadedRecFldsFail06_A.hs:9:59: warning: [-Wunused-top-binds (in -Wextra, -Wu
     Defined but not used: ‘used_locally’
 [2 of 3] Compiling Main             ( overloadedrecfldsfail06.hs, overloadedrecfldsfail06.o )
 
-overloadedrecfldsfail06.hs:7:1: error: [-Wunused-imports (in -Wextra), -Werror=unused-imports]
-    The import of ‘Unused(unused), V(x), U(y), MkV, Unused’
-    from module ‘OverloadedRecFldsFail06_A’ is redundant
-
-overloadedrecfldsfail06.hs:8:1: error: [-Wunused-imports (in -Wextra), -Werror=unused-imports]
-    The qualified import of ‘OverloadedRecFldsFail06_A’ is redundant
-      except perhaps to import instances from ‘OverloadedRecFldsFail06_A’
-    To import instances alone, use: import OverloadedRecFldsFail06_A()
-
-overloadedrecfldsfail06.hs:9:1: error: [-Wunused-imports (in -Wextra), -Werror=unused-imports]
-    The qualified import of ‘V(y)’
-    from module ‘OverloadedRecFldsFail06_A’ is redundant
-
-overloadedrecfldsfail06.hs:10:1: error: [-Wunused-imports (in -Wextra), -Werror=unused-imports]
-    The qualified import of ‘U(x), U’
-    from module ‘OverloadedRecFldsFail06_A’ is redundant
-
-overloadedrecfldsfail06.hs:15:22: error: [-Wambiguous-fields (in -Wdefault), -Werror=ambiguous-fields]
-    The record update u {x = True} with type U is ambiguous.
-    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
-
-overloadedrecfldsfail06.hs:18:28: error: [-Wambiguous-fields (in -Wdefault), -Werror=ambiguous-fields]
-    The record update v {P.x = 3} with type V is ambiguous.
-    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
+overloadedrecfldsfail06.hs:15:18: error:
+    • Record update is ambiguous, and requires a type signature
+    • In the first argument of ‘print’, namely ‘(u {x = True} :: U)’
+      In a stmt of a 'do' block: print (u {x = True} :: U)
+      In the expression:
+        do print (u {x = True} :: U)
+           print ((\ MkV2 {y = y} -> y) v)
+           print (N.x v)
+           print (getY (v {P.x = 3}))
