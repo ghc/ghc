@@ -106,6 +106,7 @@ import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
+import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
 import GHC.Driver.Config.Logger   (initLogFlags)
 import GHC.Driver.Config.Parser   (initParserOpts)
 import GHC.Driver.Config.Stg.Ppr  (initStgPprOpts)
@@ -180,10 +181,10 @@ import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
 
 import GHC.Cmm
-import GHC.Cmm.Parser       ( parseCmmFile )
 import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
+import GHC.Cmm.Parser
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -1745,10 +1746,12 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
         -- lest we reproduce #11784.
         mod_name = mkModuleName $ "Cmm$" ++ original_filename
         cmm_mod = mkHomeModule home_unit mod_name
+        no_module = panic "hscCompileCmmFile: no module"
+        cmmpConfig = initCmmParserConfig dflags no_module
     (cmm, ents) <- ioMsgMaybe
                $ do
                   (warns,errs,cmm) <- withTiming logger (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
-                                       $ parseCmmFile dflags cmm_mod home_unit filename
+                                       $ parseCmmFile cmmpConfig cmm_mod home_unit filename
                   let msgs = warns `unionMessages` errs
                   return (GhcPsMessage <$> msgs, cmm)
     liftIO $ do

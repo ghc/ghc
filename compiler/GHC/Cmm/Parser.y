@@ -200,15 +200,10 @@ necessary to the stack to accommodate it (e.g. 2).
 {
 {-# LANGUAGE TupleSections #-}
 
-module GHC.Cmm.Parser ( parseCmmFile ) where
+module GHC.Cmm.Parser ( parseCmmFile, CmmParserConfig(..) ) where
 
 import GHC.Prelude
 import qualified Prelude -- for happy-generated code
-
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Driver.Config.Parser (initParserOpts)
-import GHC.Driver.Config.StgToCmm
 
 import GHC.Platform
 import GHC.Platform.Profile
@@ -929,8 +924,9 @@ nameToMachOp name =
 
 exprOp :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse CmmExpr)
 exprOp name args_code = do
-  profile     <- PD.getProfile
-  align_check <- gopt Opt_AlignmentSanitisation <$> getDynFlags
+  pdc     <- PD.getPDConfig
+  let profile = PD.pdProfile pdc
+  let align_check = PD.pdSanitizeAlignment pdc
   case lookupUFM (exprMacros profile align_check) name of
      Just f  -> return $ do
         args <- sequence args_code
@@ -1496,39 +1492,43 @@ initEnv profile = listToUFM [
   ]
   where platform = profilePlatform profile
 
+data CmmParserConfig = CmmParserConfig
+  { cmmpParserOpts :: !ParserOpts
+  , cmmpPDConfig :: !PDConfig
+  , cmmpStgToCmmConfig :: !StgToCmmConfig
+  }
 
-parseCmmFile :: DynFlags
+parseCmmFile :: CmmParserConfig
              -> Module
              -> HomeUnit
              -> FilePath
              -> IO (Messages PsMessage, Messages PsMessage, Maybe (CmmGroup, [InfoProvEnt]))
-parseCmmFile dflags this_mod home_unit filename = do
+parseCmmFile cmmpConfig this_mod home_unit filename = do
   buf <- hGetStringBuffer filename
   let
         init_loc = mkRealSrcLoc (mkFastString filename) 1 1
-        opts       = initParserOpts dflags
-        init_state = (initParserState opts buf init_loc) { lex_state = [0] }
+        init_state = (initParserState (cmmpParserOpts cmmpConfig) buf init_loc) { lex_state = [0] }
                 -- reset the lex_state: the Lexer monad leaves some stuff
                 -- in there we don't want.
-  case unPD cmmParse dflags home_unit init_state of
+        pdConfig = cmmpPDConfig cmmpConfig
+  case unPD cmmParse pdConfig home_unit init_state of
     PFailed pst -> do
         let (warnings,errors) = getPsMessages pst
         return (warnings, errors, Nothing)
     POk pst code -> do
         st <- initC
-        let fstate = F.initFCodeState (profilePlatform $ targetProfile dflags)
+        let fstate = F.initFCodeState (profilePlatform $ pdProfile pdConfig)
         let fcode = do
-              ((), cmm) <- getCmm $ unEC code "global" (initEnv (targetProfile dflags)) [] >> return ()
+              ((), cmm) <- getCmm $ unEC code "global" (initEnv (pdProfile pdConfig)) [] >> return ()
               -- See Note [Mapping Info Tables to Source Positions] (IPE Maps)
               let used_info = map (cmmInfoTableToInfoProvEnt this_mod)
                                               (mapMaybe topInfoTable cmm)
               ((), cmm2) <- getCmm $ mapM_ emitInfoTableProv used_info
               return (cmm ++ cmm2, used_info)
-            (cmm, _) = runC (initStgToCmmConfig dflags no_module) fstate st fcode
+            (cmm, _) = runC (cmmpStgToCmmConfig cmmpConfig) fstate st fcode
             (warnings,errors) = getPsMessages pst
         if not (isEmptyMessages errors)
          then return (warnings, errors, Nothing)
          else return (warnings, errors, Just cmm)
-  where
-        no_module = panic "parseCmmFile: no module"
+
 }

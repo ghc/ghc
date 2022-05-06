@@ -24,6 +24,7 @@ import qualified GHC.CmmToAsm.Reg.Graph.Stats as Color
 import qualified GHC.CmmToAsm.Reg.Linear.Base as Linear
 import qualified GHC.CmmToAsm.X86.Instr as X86.Instr
 import qualified GHC.CmmToAsm.X86 as X86
+import GHC.Driver.Config.Cmm.Parser
 import GHC.Driver.Config.CmmToAsm
 import GHC.Driver.Main
 import GHC.Driver.Env
@@ -48,6 +49,7 @@ import GHC.Driver.Errors
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Basic
 import GHC.Unit.Home
 import GHC.Unit.Finder
@@ -131,7 +133,9 @@ compileCmmForRegAllocStats logger dflags cmmFile ncgImplF us = do
 
     -- parse the cmm file and output any warnings or errors
     let fake_mod = mkHomeModule (hsc_home_unit hscEnv) (mkModuleName "fake")
-    (warnings, errors, parsedCmm) <- parseCmmFile dflags fake_mod (hsc_home_unit hscEnv) cmmFile
+        no_module = panic "compileCmmForRegAllocStats: no module"
+        cmmpConfig = initCmmParserConfig dflags no_module
+    (warnings, errors, parsedCmm) <- parseCmmFile cmmpConfig fake_mod (hsc_home_unit hscEnv) cmmFile
 
     -- print parser errors or warnings
     let !diag_opts = initDiagOpts dflags
