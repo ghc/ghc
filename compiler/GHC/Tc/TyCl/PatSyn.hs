@@ -76,13 +76,16 @@ import Data.List( partition, mapAccumL )
 ************************************************************************
 -}
 
-tcPatSynDecl :: PatSynBind GhcRn GhcRn
-             -> Maybe TcSigInfo
+tcPatSynDecl :: LocatedA (PatSynBind GhcRn GhcRn)
+             -> TcSigFun
              -> TcPragEnv -- See Note [Pragmas for pattern synonyms]
              -> TcM (LHsBinds GhcTc, TcGblEnv)
-tcPatSynDecl psb mb_sig prag_fn
-  = recoverM (recoverPSB psb) $
-    case mb_sig of
+tcPatSynDecl (L loc psb@(PSB { psb_id = L _ name })) sig_fn prag_fn
+  = setSrcSpanA loc $
+    addErrCtxt (text "In the declaration for pattern synonym"
+                <+> quotes (ppr name)) $
+    recoverM (recoverPSB psb) $
+    case (sig_fn name) of
       Nothing                 -> tcInferPatSynDecl psb prag_fn
       Just (TcPatSynSig tpsi) -> tcCheckPatSynDecl psb tpsi prag_fn
       _                       -> panic "tcPatSynDecl"
@@ -145,8 +148,7 @@ tcInferPatSynDecl :: PatSynBind GhcRn GhcRn
 tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
                        , psb_def = lpat, psb_dir = dir })
                   prag_fn
-  = addPatSynCtxt lname $
-    do { traceTc "tcInferPatSynDecl {" $ ppr name
+  = do { traceTc "tcInferPatSynDecl {" $ ppr name
 
        ; let (arg_names, is_infix) = collectPatSynArgInfo details
        ; (tclvl, wanted, ((lpat', args), pat_ty))
@@ -187,6 +189,16 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
                                               (tyCoVarsOfTypeDSet (idType arg))
                               , not (isEmptyDVarSet bad_cos) ]
        ; mapM_ dependentArgErr bad_args
+
+       -- Report un-quantifiable type variables:
+       -- see Note [Unquantified tyvars in a pattern synonym]
+       ; dvs <- candidateQTyVarsOfTypes prov_theta
+       ; let mk_doc tidy_env
+               = do { (tidy_env2, theta) <- zonkTidyTcTypes tidy_env prov_theta
+                    ; return ( tidy_env2
+                             , sep [ text "the provided context:"
+                                   , pprTheta theta ] ) }
+       ; doNotQuantifyTyVars dvs mk_doc
 
        ; traceTc "tcInferPatSynDecl }" $ (ppr name $$ ppr ex_tvs)
        ; rec_fields <- lookupConstructorFields name
@@ -345,6 +357,27 @@ But we simply don't allow that in types.  Maybe one day but not now.
 How to detect this situation?  We just look for free coercion variables
 in the types of any of the arguments to the matcher.  The error message
 is not very helpful, but at least we don't get a Lint error.
+
+Note [Unquantified tyvars in a pattern synonym]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#21479)
+
+   data T a where MkT :: Int -> T Char   -- A GADT
+   foo :: forall b. Bool -> T b          -- Somewhat strange type
+
+   pattern T1 <- (foo -> MkT)
+
+In the view pattern, foo is instantiated, let's say b :-> b0
+where b0 is a unification variable.  Then matching the GADT
+MkT will add the "provided" constraint b0~Char, so we might infer
+   pattern T1 :: () => (b0~Char) => Int -> Bool
+
+Nothing constrains that `b0`. We don't want to quantify over it.
+We don't want to to zonk to Any (we don't like Any showing up in
+user-visible types).  So we want to error here. See
+Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
+
+Hence the call to doNotQuantifyTyVars here.
 -}
 
 tcCheckPatSynDecl :: PatSynBind GhcRn GhcRn
@@ -358,8 +391,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                       , patsig_ex_bndrs   = explicit_ex_bndrs,   patsig_prov = prov_theta
                       , patsig_body_ty    = sig_body_ty }
                   prag_fn
-  = addPatSynCtxt lname $
-    do { traceTc "tcCheckPatSynDecl" $
+  = do { traceTc "tcCheckPatSynDecl" $
          vcat [ ppr implicit_bndrs, ppr explicit_univ_bndrs, ppr req_theta
               , ppr explicit_ex_bndrs, ppr prov_theta, ppr sig_body_ty ]
 
@@ -645,13 +677,6 @@ collectPatSynArgInfo details =
     PrefixCon _ names    -> (map unLoc names, False)
     InfixCon name1 name2 -> (map unLoc [name1, name2], True)
     RecCon names         -> (map (unLoc . recordPatSynPatVar) names, False)
-
-addPatSynCtxt :: LocatedN Name -> TcM a -> TcM a
-addPatSynCtxt (L loc name) thing_inside
-  = setSrcSpanA loc $
-    addErrCtxt (text "In the declaration for pattern synonym"
-                <+> quotes (ppr name)) $
-    thing_inside
 
 wrongNumberOfParmsErr :: Name -> Arity -> Arity -> TcM a
 wrongNumberOfParmsErr name decl_arity missing

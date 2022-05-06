@@ -1,0 +1,5 @@
+
+T21479.hs:13:1: error:
+    • Uninferrable type variable a0 in
+      the provided context: (a0 :: *) ~ (Int :: *)
+    • In the declaration for pattern synonym ‘T1’

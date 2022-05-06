@@ -429,9 +429,9 @@ tc_single :: forall thing.
           -> LHsBind GhcRn -> IsGroupClosed -> TcM thing
           -> TcM (LHsBinds GhcTc, thing)
 tc_single _top_lvl sig_fn prag_fn
-          (L _ (PatSynBind _ psb@PSB{ psb_id = L _ name }))
+          (L loc (PatSynBind _ psb))
           _ thing_inside
-  = do { (aux_binds, tcg_env) <- tcPatSynDecl psb (sig_fn name) prag_fn
+  = do { (aux_binds, tcg_env) <- tcPatSynDecl (L loc psb) sig_fn prag_fn
        ; thing <- setGblEnv tcg_env thing_inside
        ; return (aux_binds, thing)
        }
