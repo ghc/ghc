@@ -1,7 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE GADTs #-}
 
 module GHC.Cmm.Dominators
   (
@@ -41,7 +38,10 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 
-import GHC.Utils.Outputable(Outputable(..), text, int, hcat, (<+>))
+import GHC.Utils.Outputable( Outputable(..), text, int, hcat, (<+>)
+                           , showSDocUnsafe
+                           )
+import GHC.Utils.Misc
 import GHC.Utils.Panic
 
 
@@ -124,7 +124,7 @@ data GraphWithDominators node =
 -- numbering).  The result also includes the subgraph of the original
 -- graph that contains only the reachable blocks.
 graphWithDominators :: forall node .
-       (NonLocal node)
+       (NonLocal node, HasDebugCallStack)
        => GenCmmGraph node
        -> GraphWithDominators node
 
@@ -142,7 +142,7 @@ graphWithDominators g = GraphWithDominators (reachable rpblocks g) dmap rpmap
               where kvpair block i = (entryLabel block, RPNum i)
 
             labelIndex :: Label -> Int
-            labelIndex = flip (mapFindWithDefault undefined) imap
+            labelIndex = flip findLabelIn imap
               where imap :: LabelMap Int
                     imap = mapFromList $ zip rplabels' [0..]
             blockIndex = labelIndex . entryLabel
@@ -182,8 +182,13 @@ graphMap (CmmGraph { g_graph = GMany NothingO blockmap NothingO }) = blockmap
 -- | Use `gwdRPNumber` on the result of the dominator analysis to get
 -- a mapping from the `Label` of each reachable block to the reverse
 -- postorder number of that block.
-gwdRPNumber :: GraphWithDominators node -> Label -> RPNum
-gwdRPNumber g l = mapFindWithDefault unreachable l (gwd_rpnumbering g)
+gwdRPNumber :: HasDebugCallStack => GraphWithDominators node -> Label -> RPNum
+gwdRPNumber g l = findLabelIn l (gwd_rpnumbering g)
+
+findLabelIn :: HasDebugCallStack => Label -> LabelMap a -> a
+findLabelIn lbl = mapFindWithDefault failed lbl
+  where failed =
+            panic $ "label " ++ showSDocUnsafe (ppr lbl) ++ " not found in result of analysis"
 
 -- | Use `gwdDominatorsOf` on the result of the dominator analysis to get
 -- a mapping from the `Label` of each reachable block to the dominator
@@ -191,14 +196,15 @@ gwdRPNumber g l = mapFindWithDefault unreachable l (gwd_rpnumbering g)
 -- implementation is space-efficient: intersecting dominator
 -- sets share the representation of their intersection.
 
-gwdDominatorsOf :: GraphWithDominators node -> Label -> DominatorSet
-gwdDominatorsOf g lbl = mapFindWithDefault unreachable lbl (gwd_dominators g)
+gwdDominatorsOf :: HasDebugCallStack => GraphWithDominators node -> Label -> DominatorSet
+gwdDominatorsOf g lbl = findLabelIn lbl (gwd_dominators g)
 
 gwdDominatorTree :: GraphWithDominators node -> Tree.Tree Label
-gwdDominatorTree g = subtreeAt (g_entry (gwd_graph gwd))
+gwdDominatorTree gwd = subtreeAt (g_entry (gwd_graph gwd))
   where subtreeAt label = Tree.Node label $ map subtreeAt $ children label
         children l = mapFindWithDefault [] l child_map
-        child_map = mapFoldlWithKey addParent mapEmpty $ gwd_dominators g
+        child_map :: LabelMap [Label]
+        child_map = mapFoldlWithKey addParent mapEmpty $ gwd_dominators gwd
           where addParent cm _ EntryNode = cm
                 addParent cm lbl (ImmediateDominator p _) =
                     mapInsertWith (++) p [lbl] cm
@@ -207,6 +213,3 @@ gwdDominatorTree g = subtreeAt (g_entry (gwd_graph gwd))
 -- | Turn a function into an array.  Inspired by SML's `Array.tabulate`
 tabulate :: (Ix i) => (i, i) -> (i -> e) -> Array i e
 tabulate b f = listArray b $ map f $ range b
-
-unreachable :: a
-unreachable = panic "unreachable node in GraphWithDominators"
