@@ -31,6 +31,7 @@ import Text.Parsec.Combinator as P
 import Text.Parsec.Char as P
 import Control.Monad.Except
 import UserSettings
+import Oracles.Setting
 
 
 flavourTransformers :: Map String (Flavour -> Flavour)
@@ -134,13 +135,15 @@ enableTickyGhc =
 --   select which package gets built with split sections
 --   by passing a suitable predicate. If the predicate holds
 --   for a given package, then @split-sections@ is used when
---   building it. If the given flavour doesn't build
---   anything in a @dyn@-enabled way, then 'splitSections' is a no-op.
+--   building it. Note that this transformer doesn't do anything
+--   on darwin because on darwin platforms we always enable subsections
+--   via symbols.
 splitSectionsIf :: (Package -> Bool) -> Flavour -> Flavour
 splitSectionsIf pkgPredicate = addArgs $ do
-    way <- getWay
     pkg <- getPackage
-    (Dynamic `wayUnit` way) ? pkgPredicate pkg ?
+    osx <- expr isOsxTarget
+    not osx ? -- osx doesn't support split sections
+      pkgPredicate pkg ? -- Only apply to these packages
         builder (Ghc CompileHs) ? arg "-split-sections"
 
 -- | Like 'splitSectionsIf', but with a fixed predicate: use
