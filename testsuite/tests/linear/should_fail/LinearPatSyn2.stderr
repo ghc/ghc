@@ -1,5 +1,5 @@
 
-LinearPatSyn2.hs:6:9: error:
+LinearPatSyn2.hs:6:1: error:
     • Pattern synonyms do not support linear fields (GHC #18806):
         x %1 -> Maybe x
     • In the declaration for pattern synonym ‘J’

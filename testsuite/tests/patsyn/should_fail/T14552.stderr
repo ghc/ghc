@@ -1,5 +1,5 @@
 
-T14552.hs:22:9: error:
+T14552.hs:22:1: error:
     • Cannot generalise type; skolem ‘k’ would escape its scope
       if I tried to quantify (t0 :: k) in this type:
         forall k (w :: k --> *). Exp a0 (F @k @(*) w t0)

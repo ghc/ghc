@@ -3,7 +3,7 @@ T11667.hs:12:22: error:
     • Could not deduce (Num a) arising from the literal ‘42’
       from the context: Eq a
         bound by the signature for pattern synonym ‘Pat1’
-        at T11667.hs:12:9-12
+        at T11667.hs:12:1-23
       Possible fix:
         add (Num a) to the "required" context of
           the signature for pattern synonym ‘Pat1’

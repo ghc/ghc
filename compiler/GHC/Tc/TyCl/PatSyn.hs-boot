@@ -1,14 +1,14 @@
 module GHC.Tc.TyCl.PatSyn where
 
 import GHC.Hs    ( PatSynBind, LHsBinds )
-import GHC.Tc.Types ( TcM, TcSigInfo )
+import GHC.Tc.Types ( TcM )
 import GHC.Tc.Utils.Monad ( TcGblEnv)
 import GHC.Hs.Extension ( GhcRn, GhcTc )
-import Data.Maybe  ( Maybe )
-import GHC.Tc.Gen.Sig ( TcPragEnv )
+import GHC.Tc.Gen.Sig ( TcPragEnv, TcSigFun )
+import GHC.Parser.Annotation( LocatedA )
 
-tcPatSynDecl :: PatSynBind GhcRn GhcRn
-             -> Maybe TcSigInfo
+tcPatSynDecl :: LocatedA (PatSynBind GhcRn GhcRn)
+             -> TcSigFun
              -> TcPragEnv
              -> TcM (LHsBinds GhcTc, TcGblEnv)
 
