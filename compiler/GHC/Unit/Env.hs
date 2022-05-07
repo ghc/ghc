@@ -38,6 +38,7 @@ module GHC.Unit.Env
     , unitEnv_insert
     , unitEnv_delete
     , unitEnv_adjust
+    , unitEnv_alter
     , unitEnv_new
     , unitEnv_singleton
     , unitEnv_map
@@ -249,7 +250,7 @@ hugElts :: HomeUnitGraph -> [(UnitId, HomeUnitEnv)]
 hugElts hug = unitEnv_elts hug
 
 addHomeModInfoToHug :: HomeModInfo -> HomeUnitGraph -> HomeUnitGraph
-addHomeModInfoToHug hmi hug = unitEnv_alter go hmi_unit hug
+addHomeModInfoToHug hmi hug = unitEnv_adjust go hmi_unit hug
   where
     hmi_mod :: Module
     hmi_mod = mi_module (hm_iface hmi)
@@ -257,9 +258,8 @@ addHomeModInfoToHug hmi hug = unitEnv_alter go hmi_unit hug
     hmi_unit = toUnitId (moduleUnit hmi_mod)
     _hmi_mn   = moduleName hmi_mod
 
-    go :: Maybe HomeUnitEnv -> Maybe HomeUnitEnv
-    go Nothing = pprPanic "addHomeInfoToHug" (ppr hmi_mod)
-    go (Just hue) = Just (updateHueHpt (addHomeModInfoToHpt hmi) hue)
+    go :: HomeUnitEnv -> HomeUnitEnv
+    go = updateHueHpt (addHomeModInfoToHpt hmi)
 
 updateHueHpt :: (HomePackageTable -> HomePackageTable) -> HomeUnitEnv -> HomeUnitEnv
 updateHueHpt f hue = hue { homeUnitEnv_hpt = f (homeUnitEnv_hpt hue)}
