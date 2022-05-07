@@ -387,10 +387,7 @@ addWeightEdge from to weight cfg =
 
 delEdge :: BlockId -> BlockId -> CFG -> CFG
 delEdge from to m =
-    mapAlter remDest from m
-    where
-        remDest Nothing = Nothing
-        remDest (Just wm) = Just $ mapDelete to wm
+    mapAdjust (mapDelete to) from m
 
 
 -- | Destinations from bid ordered by weight (descending)
