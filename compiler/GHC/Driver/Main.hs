@@ -1746,8 +1746,7 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
         -- lest we reproduce #11784.
         mod_name = mkModuleName $ "Cmm$" ++ original_filename
         cmm_mod = mkHomeModule home_unit mod_name
-        no_module = panic "hscCompileCmmFile: no module"
-        cmmpConfig = initCmmParserConfig dflags no_module
+        cmmpConfig = initCmmParserConfig dflags
     (cmm, ents) <- ioMsgMaybe
                $ do
                   (warns,errs,cmm) <- withTiming logger (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())

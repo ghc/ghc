@@ -9,8 +9,7 @@ import GHC.Driver.Config.Parser
 import GHC.Driver.Config.StgToCmm
 import GHC.Driver.Session
 
-import GHC.Unit.Types
-
+import GHC.Utils.Panic
 
 initPDConfig :: DynFlags -> PDConfig
 initPDConfig dflags = PDConfig
@@ -18,10 +17,10 @@ initPDConfig dflags = PDConfig
   , pdSanitizeAlignment = gopt Opt_AlignmentSanitisation dflags
   }
 
-initCmmParserConfig :: DynFlags -> Module -> CmmParserConfig
-initCmmParserConfig dflags mod = CmmParserConfig
+initCmmParserConfig :: DynFlags -> CmmParserConfig
+initCmmParserConfig dflags = CmmParserConfig
   { cmmpParserOpts = initParserOpts dflags
   , cmmpPDConfig = initPDConfig dflags
-  , cmmpStgToCmmConfig = initStgToCmmConfig dflags mod
+  , cmmpStgToCmmConfig = initStgToCmmConfig dflags (panic "initCmmParserConfig: no module")
   }
 
