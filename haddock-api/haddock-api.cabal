@@ -46,7 +46,7 @@ library
   build-depends: base            ^>= 4.16.0
                , ghc             ^>= 9.2
                , ghc-paths       ^>= 0.1.0.9
-               , haddock-library ^>= 1.9.0
+               , haddock-library ^>= 1.10.0
                , xhtml           ^>= 3000.2.2
                , parsec          ^>= 3.1.13.0
 
@@ -182,7 +182,7 @@ test-suite spec
 
   build-depends: ghc             ^>= 9.2
                , ghc-paths       ^>= 0.1.0.12
-               , haddock-library ^>= 1.9.0
+               , haddock-library ^>= 1.10.0
                , xhtml           ^>= 3000.2.2
                , hspec           ^>= 2.9
                , parsec          ^>= 3.1.13.0
