@@ -40,10 +40,6 @@
   * Any Haskell type that wraps a C pointer type has been changed from
     `Ptr ()` to `CUIntPtr`. For typical glibc based platforms, the
     affected type is `CTimer`.
-  * The following Foreign C types now have an instance of `Ix`:
-    CChar, CSChar, CUChar, CShort, CUShort, CInt, CUInt, CLong, CULong,
-    CPtrdiff, CSize, CWchar, CSigAtomic, CLLong, CULLong, CBool, CIntPtr, CUIntPtr,
-    CIntMax, CUIntMax.
 
   * Remove instances of `MonadFail` for the `ST` monad (lazy and strict) as per
     the [Core Libraries proposal](https://github.com/haskell/core-libraries-committee/issues/33).
@@ -53,6 +49,15 @@
   * Add functions `traceWith`, `traceShowWith`, `traceEventWith` to
     `Debug.Trace`, per
     [CLC #36](https://github.com/haskell/core-libraries-committee/issues/36).
+
+## 4.16.1.0 *Feb 2022*
+
+  * Shipped with GHC 9.2.2
+
+  * The following Foreign C types now have an instance of `Ix`:
+    CChar, CSChar, CUChar, CShort, CUShort, CInt, CUInt, CLong, CULong,
+    CPtrdiff, CSize, CWchar, CSigAtomic, CLLong, CULLong, CBool, CIntPtr, CUIntPtr,
+    CIntMax, CUIntMax.
 
 ## 4.16.0.0 *Nov 2021*
 
