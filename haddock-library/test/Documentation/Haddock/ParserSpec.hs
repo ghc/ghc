@@ -121,6 +121,9 @@ spec = do
       it "can parse identifiers ending with a single quote" $ do
         "'foo''" `shouldParseTo` DocIdentifier "foo'"
 
+      it "can parse identifiers in backticks ending with a single quote" $ do
+        "`foo'`" `shouldParseTo` DocIdentifier "foo'"
+
       it "can parse an identifier containing a digit" $ do
         "'f0'" `shouldParseTo` DocIdentifier "f0"
 
