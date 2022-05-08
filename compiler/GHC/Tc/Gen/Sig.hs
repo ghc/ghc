@@ -68,9 +68,10 @@ import GHC.Utils.Misc as Utils ( singleton )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import GHC.Data.Maybe( orElse )
+import GHC.Data.Maybe( orElse, whenIsJust )
 
 import Data.Maybe( mapMaybe )
+import qualified Data.List.NonEmpty as NE
 import Control.Monad( unless )
 
 
@@ -631,14 +632,8 @@ addInlinePrags poly_id prags_for_me
          warn_multiple_inlines inl2 inls
        | otherwise
        = setSrcSpanA loc $
-         let dia = TcRnUnknownMessage $
-               mkPlainDiagnostic WarningWithoutFlag noHints $
-                 (hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
-                   2 (vcat (text "Ignoring all but the first"
-                            : map pp_inl (inl1:inl2:inls))))
+         let dia = TcRnMultipleInlinePragmas poly_id inl1 (inl2 NE.:| inls)
          in addDiagnosticTc dia
-
-    pp_inl (L loc prag) = ppr prag <+> parens (ppr loc)
 
 
 {- Note [Pattern synonym inline arity]
@@ -776,7 +771,7 @@ tcSpecPrags :: Id -> [LSig GhcRn]
 -- Reason: required by tcSubExp
 tcSpecPrags poly_id prag_sigs
   = do { traceTc "tcSpecPrags" (ppr poly_id <+> ppr spec_sigs)
-       ; unless (null bad_sigs) warn_discarded_sigs
+       ; whenIsJust (NE.nonEmpty bad_sigs) warn_discarded_sigs
        ; pss <- mapAndRecoverM (wrapLocMA (tcSpecPrag poly_id)) spec_sigs
        ; return $ concatMap (\(L l ps) -> map (L (locA l)) ps) pss }
   where
@@ -784,11 +779,8 @@ tcSpecPrags poly_id prag_sigs
     bad_sigs  = filter is_bad_sig prag_sigs
     is_bad_sig s = not (isSpecLSig s || isInlineLSig s || isSCCFunSig s)
 
-    warn_discarded_sigs
-      = let dia = TcRnUnknownMessage $
-              mkPlainDiagnostic WarningWithoutFlag noHints $
-                (hang (text "Discarding unexpected pragmas for" <+> ppr poly_id)
-                    2 (vcat (map (ppr . getLoc) bad_sigs)))
+    warn_discarded_sigs bad_sigs_ne
+      = let dia = TcRnUnexpectedPragmas poly_id bad_sigs_ne
         in addDiagnosticTc dia
 
 --------------
@@ -803,9 +795,7 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
 -- what the user wrote (#8537)
   = addErrCtxt (spec_ctxt prag) $
     do  { warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl)) $
-                 TcRnUnknownMessage $ mkPlainDiagnostic WarningWithoutFlag noHints
-                   (text "SPECIALISE pragma for non-overloaded function"
-                    <+> quotes (ppr fun_name))
+                 TcRnNonOverloadedSpecialisePragma fun_name
                     -- Note [SPECIALISE pragmas]
         ; spec_prags <- mapM tc_one hs_tys
         ; traceTc "tcSpecPrag" (ppr poly_id $$ nest 2 (vcat (map ppr spec_prags)))
@@ -867,20 +857,9 @@ tcImpSpec (name, prag)
       ; if hasSomeUnfolding (realIdUnfolding id)
            -- See Note [SPECIALISE pragmas for imported Ids]
         then tcSpecPrag id prag
-        else do { let dia = TcRnUnknownMessage $
-                        mkPlainDiagnostic WarningWithoutFlag noHints (impSpecErr name)
+        else do { let dia = TcRnSpecialiseNotVisible name
                 ; addDiagnosticTc dia
                 ; return [] } }
-
-impSpecErr :: Name -> SDoc
-impSpecErr name
-  = hang (text "You cannot SPECIALISE" <+> quotes (ppr name))
-       2 (vcat [ text "because its definition is not visible in this module"
-               , text "Hint: make sure" <+> ppr mod <+> text "is compiled with -O"
-               , text "      and that" <+> quotes (ppr name)
-                 <+> text "has an INLINABLE pragma" ])
-  where
-    mod = nameModule name
 
 {- Note [SPECIALISE pragmas for imported Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

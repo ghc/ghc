@@ -895,6 +895,48 @@ instance Diagnostic TcRnMessage where
                      ClassPE        -> same_rec_group_msg
                      TyConPE        -> same_rec_group_msg
           same_rec_group_msg = text "it is defined and used in the same recursive group"
+    TcRnMatchesHaveDiffNumArgs argsContext match1 bad_matches
+      -> mkSimpleDecorated $
+           (vcat [ pprArgsContext argsContext <+>
+                   text "have different numbers of arguments"
+                 , nest 2 (ppr (getLocA match1))
+                 , nest 2 (ppr (getLocA (NE.head bad_matches)))])
+        where
+          pprArgsContext = \case
+            EquationArgs name -> (text "Equations for" <+>) . quotes $ ppr name
+            PatternArgs matchCtx -> pprMatchContextNouns matchCtx
+    TcRnCannotBindScopedTyVarInPatSig sig_tvs
+      -> mkSimpleDecorated $
+           hang (text "You cannot bind scoped type variable"
+                  <> plural (NE.toList sig_tvs)
+                 <+> pprQuotedList (map fst $ NE.toList sig_tvs))
+              2 (text "in a pattern binding signature")
+    TcRnCannotBindTyVarsInPatBind _offenders
+      -> mkSimpleDecorated $
+           text "Binding type variables is not allowed in pattern bindings"
+    TcRnTooManyTyArgsInConPattern con_like expected_number actual_number
+      -> mkSimpleDecorated $
+           text "Too many type arguments in constructor pattern for" <+> quotes (ppr con_like) $$
+           text "Expected no more than" <+> ppr expected_number <> semi <+> text "got" <+> ppr actual_number
+    TcRnMultipleInlinePragmas poly_id fst_inl_prag inl_prags
+      -> mkSimpleDecorated $
+           hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
+             2 (vcat (text "Ignoring all but the first"
+                      : map pp_inl (fst_inl_prag : NE.toList inl_prags)))
+         where
+           pp_inl (L loc prag) = ppr prag <+> parens (ppr loc)
+    TcRnUnexpectedPragmas poly_id bad_sigs
+      -> mkSimpleDecorated $
+           hang (text "Discarding unexpected pragmas for" <+> ppr poly_id)
+              2 (vcat (map (ppr . getLoc) $ NE.toList bad_sigs))
+    TcRnNonOverloadedSpecialisePragma fun_name
+       -> mkSimpleDecorated $
+            text "SPECIALISE pragma for non-overloaded function"
+              <+> quotes (ppr fun_name)
+    TcRnSpecialiseNotVisible name
+      -> mkSimpleDecorated $
+         text "You cannot SPECIALISE" <+> quotes (ppr name)
+           <+> text "because its definition is not visible in this module"
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1185,6 +1227,22 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnpromotableThing{}
       -> ErrorWithoutFlag
+    TcRnMatchesHaveDiffNumArgs{}
+      -> ErrorWithoutFlag
+    TcRnCannotBindScopedTyVarInPatSig{}
+      -> ErrorWithoutFlag
+    TcRnCannotBindTyVarsInPatBind{}
+      -> ErrorWithoutFlag
+    TcRnTooManyTyArgsInConPattern{}
+      -> ErrorWithoutFlag
+    TcRnMultipleInlinePragmas{}
+      -> WarningWithoutFlag
+    TcRnUnexpectedPragmas{}
+      -> WarningWithoutFlag
+    TcRnNonOverloadedSpecialisePragma{}
+      -> WarningWithoutFlag
+    TcRnSpecialiseNotVisible{}
+      -> WarningWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -1477,6 +1535,22 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnpromotableThing{}
       -> noHints
+    TcRnMatchesHaveDiffNumArgs{}
+      -> noHints
+    TcRnCannotBindScopedTyVarInPatSig{}
+      -> noHints
+    TcRnCannotBindTyVarsInPatBind{}
+      -> noHints
+    TcRnTooManyTyArgsInConPattern{}
+      -> noHints
+    TcRnMultipleInlinePragmas{}
+      -> noHints
+    TcRnUnexpectedPragmas{}
+      -> noHints
+    TcRnNonOverloadedSpecialisePragma{}
+      -> noHints
+    TcRnSpecialiseNotVisible name
+      -> [SuggestSpecialiseVisibilityHints name]
 
 
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",

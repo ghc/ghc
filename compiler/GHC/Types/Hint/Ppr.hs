@@ -14,7 +14,7 @@ import GHC.Types.Hint
 
 import GHC.Hs.Expr ()   -- instance Outputable
 import GHC.Types.Id
-import GHC.Types.Name (NameSpace, pprDefinedAt, occNameSpace, pprNameSpace, isValNameSpace)
+import GHC.Types.Name (NameSpace, pprDefinedAt, occNameSpace, pprNameSpace, isValNameSpace, nameModule)
 import GHC.Types.Name.Reader (RdrName,ImpDeclSpec (..), rdrNameOcc, rdrNameSpace)
 import GHC.Types.SrcLoc (SrcSpan(..), srcSpanStartLine)
 import GHC.Unit.Module.Imported (ImportedModsVal(..))
@@ -199,6 +199,11 @@ instance Outputable GhcHint where
       $$ text "The module header is the section at the top of the file, before the" <+> quotes (text "module") <+> text "keyword"
     SuggestPatternMatchingSyntax
       -> text "Use pattern-matching syntax instead"
+    SuggestSpecialiseVisibilityHints name
+      -> text "Make sure" <+> ppr mod <+> text "is compiled with -O and that"
+           <+> quotes (ppr name) <+> text "has an INLINABLE pragma"
+         where
+           mod = nameModule name
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

@@ -71,7 +71,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Driver.Session ( getDynFlags )
 
-import GHC.Types.Error
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name
 import GHC.Types.Id
@@ -79,6 +78,7 @@ import GHC.Types.SrcLoc
 
 import Control.Monad
 import Control.Arrow ( second )
+import qualified Data.List.NonEmpty as NE
 
 {-
 ************************************************************************
@@ -1143,32 +1143,28 @@ number of args are used in each equation.
 
 checkArgCounts :: AnnoBody body
                => Name -> MatchGroup GhcRn (LocatedA (body GhcRn)) -> TcM ()
-checkArgCounts = check_match_pats . (text "Equations for" <+>) . quotes . ppr
+checkArgCounts = check_match_pats . EquationArgs
 
 -- @checkPatCounts@ takes a @[RenamedMatch]@ and decides whether the same
 -- number of patterns are used in each alternative
 checkPatCounts :: AnnoBody body
                => HsMatchContext GhcTc -> MatchGroup GhcRn (LocatedA (body GhcRn))
                -> TcM ()
-checkPatCounts = check_match_pats . pprMatchContextNouns
+checkPatCounts = check_match_pats . PatternArgs
 
 check_match_pats :: AnnoBody body
-                 => SDoc -> MatchGroup GhcRn (LocatedA (body GhcRn))
+                 => MatchArgsContext -> MatchGroup GhcRn (LocatedA (body GhcRn))
                  -> TcM ()
 check_match_pats _ (MG { mg_alts = L _ [] })
     = return ()
-check_match_pats err_msg (MG { mg_alts = L _ (match1:matches) })
-    | null bad_matches
-    = return ()
+check_match_pats matchContext (MG { mg_alts = L _ (match1:matches) })
+    | Just bad_matches <- mb_bad_matches
+    = failWithTc $ TcRnMatchesHaveDiffNumArgs matchContext match1 bad_matches
     | otherwise
-    = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
-      (vcat [ err_msg <+>
-              text "have different numbers of arguments"
-            , nest 2 (ppr (getLocA match1))
-            , nest 2 (ppr (getLocA (head bad_matches)))])
+    = return ()
   where
     n_args1 = args_in_match match1
-    bad_matches = [m | m <- matches, args_in_match m /= n_args1]
+    mb_bad_matches = NE.nonEmpty [m | m <- matches, args_in_match m /= n_args1]
 
     args_in_match :: (LocatedA (Match GhcRn body1) -> Int)
     args_in_match (L _ (Match { m_pats = pats })) = length pats

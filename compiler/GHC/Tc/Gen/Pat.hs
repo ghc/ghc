@@ -71,6 +71,7 @@ import GHC.Utils.Panic.Plain
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
 import Control.Monad
+import qualified Data.List.NonEmpty as NE
 import GHC.Data.List.SetOps ( getNth )
 
 {-
@@ -743,26 +744,29 @@ tcPatSig in_pat_bind sig res_ty
         -- and not already in scope. These are the ones
         -- that should be brought into scope
 
-        ; if null sig_tvs then do {
+        ; case NE.nonEmpty sig_tvs of
+            Nothing -> do {
                 -- Just do the subsumption check and return
                   wrap <- addErrCtxtM (mk_msg sig_ty) $
                           tcSubTypePat PatSigOrigin PatSigCtxt res_ty sig_ty
                 ; return (sig_ty, [], sig_wcs, wrap)
-        } else do
+                }
+            Just sig_tvs_ne -> do
                 -- Type signature binds at least one scoped type variable
 
                 -- A pattern binding cannot bind scoped type variables
                 -- It is more convenient to make the test here
                 -- than in the renamer
-        { when in_pat_bind (addErr (patBindSigErr sig_tvs))
+              when in_pat_bind
+                (addErr (TcRnCannotBindScopedTyVarInPatSig sig_tvs_ne))
 
-        -- Now do a subsumption check of the pattern signature against res_ty
-        ; wrap <- addErrCtxtM (mk_msg sig_ty) $
-                  tcSubTypePat PatSigOrigin PatSigCtxt res_ty sig_ty
+              -- Now do a subsumption check of the pattern signature against res_ty
+              wrap <- addErrCtxtM (mk_msg sig_ty) $
+                      tcSubTypePat PatSigOrigin PatSigCtxt res_ty sig_ty
 
-        -- Phew!
-        ; return (sig_ty, sig_tvs, sig_wcs, wrap)
-        } }
+              -- Phew!
+              return (sig_ty, sig_tvs, sig_wcs, wrap)
+       }
   where
     mk_msg sig_ty tidy_env
        = do { (tidy_env, sig_ty) <- zonkTidyTcType tidy_env sig_ty
@@ -773,13 +777,6 @@ tcPatSig in_pat_bind sig res_ty
                              , nest 2 (hang (text "fits the type of its context:")
                                           2 (ppr res_ty)) ]
             ; return (tidy_env, msg) }
-
-patBindSigErr :: [(Name,TcTyVar)] -> TcRnMessage
-patBindSigErr sig_tvs
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "You cannot bind scoped type variable" <> plural sig_tvs
-          <+> pprQuotedList (map fst sig_tvs))
-       2 (text "in a pattern binding signature")
 
 
 {- *********************************************************************
@@ -1253,7 +1250,7 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
         ; let con_spec_binders = filter ((== SpecifiedSpec) . binderArgFlag) $
                                  conLikeUserTyVarBinders con_like
         ; checkTc (type_args `leLength` con_spec_binders)
-                  (conTyArgArityErr con_like (length con_spec_binders) (length type_args))
+                  (TcRnTooManyTyArgsInConPattern con_like (length con_spec_binders) (length type_args))
 
         ; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
         ; (type_args', (arg_pats', res))
@@ -1332,9 +1329,10 @@ tcConTyArg penv rn_ty thing_inside
                -- the kinds of later patterns. In any case, it all gets checked
                -- by the calls to unifyType in tcConArgs, which will also unify
                -- kinds.
-       ; when (not (null sig_ibs) && inPatBind penv) $
-           addErr (TcRnUnknownMessage $ mkPlainError noHints $
-                     text "Binding type variables is not allowed in pattern bindings")
+       ; case NE.nonEmpty sig_ibs of
+           Just sig_ibs_ne | inPatBind penv ->
+             addErr (TcRnCannotBindTyVarsInPatBind sig_ibs_ne)
+           _ -> pure ()
        ; result <- tcExtendNameTyVarEnv sig_wcs $
                    tcExtendNameTyVarEnv sig_ibs $
                    thing_inside
@@ -1361,15 +1359,6 @@ addDataConStupidTheta data_con inst_tys
          -- NB: inst_tys can be longer than the univ tyvars
          --     because the constructor might have existentials
     inst_theta = substTheta tenv stupid_theta
-
-conTyArgArityErr :: ConLike
-                 -> Int   -- expected # of arguments
-                 -> Int   -- actual # of arguments
-                 -> TcRnMessage
-conTyArgArityErr con_like expected_number actual_number
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    text "Too many type arguments in constructor pattern for" <+> quotes (ppr con_like) $$
-    text "Expected no more than" <+> ppr expected_number <> semi <+> text "got" <+> ppr actual_number
 
 {-
 Note [Arrows and patterns]

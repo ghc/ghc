@@ -64,6 +64,7 @@ module GHC.Tc.Errors.Types (
   , UnsupportedCallConvention(..)
   , ExpectedBackends
   , ArgOrResult(..)
+  , MatchArgsContext(..)
   ) where
 
 import GHC.Prelude
@@ -2008,6 +2009,106 @@ data TcRnMessage where
   -}
   TcRnUnpromotableThing :: !Name -> !PromotionErr -> TcRnMessage
 
+  {- TcRnMatchesHaveDiffNumArgs is an error occurring when something has matches
+     that have different numbers of arguments
+
+     Example(s):
+     foo x = True
+     foo x y = False
+
+    Test cases: rename/should_fail/rnfail045
+                typecheck/should_fail/T20768_fail
+  -}
+  TcRnMatchesHaveDiffNumArgs
+    :: !MatchArgsContext
+    -> !(LocatedA (Match GhcRn body))
+    -> !(NE.NonEmpty (LocatedA (Match GhcRn body))) -- ^ bad matches
+    -> TcRnMessage
+
+  {- TcRnCannotBindScopedTyVarInPatSig is an error stating that scoped type
+     variables cannot be used in pattern bindings.
+
+     Example(s):
+     let (x :: a) = 5
+
+     Test cases: typecheck/should_compile/tc141
+  -}
+  TcRnCannotBindScopedTyVarInPatSig :: !(NE.NonEmpty (Name, TcTyVar)) -> TcRnMessage
+
+  {- TcRnCannotBindTyVarsInPatBind is an error for when type
+     variables are introduced in a pattern binding
+
+     Example(s):
+     Just @a x = Just True
+
+    Test cases: typecheck/should_fail/TyAppPat_PatternBinding
+                typecheck/should_fail/TyAppPat_PatternBindingExistential
+  -}
+  TcRnCannotBindTyVarsInPatBind :: !(NE.NonEmpty (Name, TcTyVar)) -> TcRnMessage
+
+  {- TcRnTooManyTyArgsInConPattern is an error occurring when a constructor pattern
+     has more than the expected number of type arguments
+
+     Example(s):
+     f (Just @Int @Bool x) = x
+
+    Test cases: typecheck/should_fail/TyAppPat_TooMany
+                typecheck/should_fail/T20443b
+  -}
+  TcRnTooManyTyArgsInConPattern
+    :: !ConLike
+    -> !Int -- ^ Expected number of args
+    -> !Int -- ^ Actual number of args
+    -> TcRnMessage
+
+  {- TcRnMultipleInlinePragmas is a warning signifying that multiple inline pragmas
+     reference the same definition.
+
+     Example(s):
+     {-# INLINE foo #-}
+     {-# INLINE foo #-}
+     foo :: Bool -> Bool
+     foo = id
+
+    Test cases: none
+  -}
+  TcRnMultipleInlinePragmas
+    :: !Id -- ^ Target of the pragmas
+    -> !(LocatedA InlinePragma) -- ^ The first pragma
+    -> !(NE.NonEmpty (LocatedA InlinePragma)) -- ^ Other pragmas
+    -> TcRnMessage
+
+  {- TcRnUnexpectedPragmas is a warning that occurrs when unexpected pragmas appear
+     in the source.
+
+     Example(s):
+
+    Test cases: none
+  -}
+  TcRnUnexpectedPragmas :: !Id -> !(NE.NonEmpty (LSig GhcRn)) -> TcRnMessage
+
+  {- TcRnNonOverloadedSpecialisePragma is a warning for a specialise pragma being
+     placed on a definition that is not overloaded.
+
+     Example(s):
+     {-# SPECIALISE foo :: Bool -> Bool #-}
+     foo :: Bool -> Bool
+     foo = id
+
+    Test cases: simplCore/should_compile/T8537
+                typecheck/should_compile/T10504
+  -}
+  TcRnNonOverloadedSpecialisePragma :: !(LIdP GhcRn) -> TcRnMessage
+
+  {- TcRnSpecialiseNotVisible is a warning that occurrs when the subject of a
+     SPECIALISE pragma has a definition that is not visible from the current module.
+
+     Example(s): none
+
+    Test cases: none
+  -}
+  TcRnSpecialiseNotVisible :: !Name -> TcRnMessage
+
 -- | Specifies which back ends can handle a requested foreign import or export
 type ExpectedBackends = [Backend]
 
@@ -3050,3 +3151,10 @@ data HsDocContext
   | SpliceTypeCtx (LHsType GhcPs)
   | ClassInstanceCtx
   | GenericCtx SDoc
+
+-- | Context for a mismatch in the number of arguments
+data MatchArgsContext
+  = EquationArgs
+      !Name -- ^ Name of the function
+  | PatternArgs
+      !(HsMatchContext GhcTc) -- ^ Pattern match specifics

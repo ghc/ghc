@@ -403,6 +403,12 @@ data GhcHint
                     typecheck/should_fail/T3176
     -}
   | SuggestPatternMatchingSyntax
+    {-| Suggest tips for making a definition visible for the purpose of writing
+        a SPECIALISE pragma for it in a different module.
+
+        Test cases: none
+    -}
+  | SuggestSpecialiseVisibilityHints Name
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
