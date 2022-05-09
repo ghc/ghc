@@ -77,13 +77,12 @@ generatedDependencies :: Expr [FilePath]
 generatedDependencies = do
     stage    <- getStage
     rtsPath  <- expr (rtsBuildPath stage)
+    useSystemFfi <- expr (flag UseSystemFfi)
     includes <- expr $ includesDependencies stage
     libDir <- expr $ stageLibPath stage
-    useSystemFfi <- expr (flag UseSystemFfi)
     mconcat [ package compiler ? compilerDependencies
             , package ghcPrim  ? ghcPrimDependencies
-            , package rts      ? return (
-                (if useSystemFfi then [] else fmap (rtsPath -/-) libffiHeaderFiles)
+            , package rts      ? return ((if useSystemFfi then pure [] else fmap (rtsPath -/-) libffiHeaderFiles)
                 ++ includes
                 ++ ((libDir -/-) <$> derivedConstantsFiles))
             , stage0 ? return includes ]
