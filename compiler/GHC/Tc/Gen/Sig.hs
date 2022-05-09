@@ -21,7 +21,8 @@ module GHC.Tc.Gen.Sig(
        tcInstSig,
 
        TcPragEnv, emptyPragEnv, lookupPragEnv, extendPragEnv,
-       mkPragEnv, tcSpecPrags, tcSpecWrapper, tcImpPrags, addInlinePrags
+       mkPragEnv, tcSpecPrags, tcSpecWrapper, tcImpPrags,
+       addInlinePrags, addInlinePragArity
    ) where
 
 import GHC.Prelude
@@ -66,7 +67,6 @@ import GHC.Unit.Module( getModule )
 import GHC.Utils.Misc as Utils ( singleton )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Trace
 
 import GHC.Data.Maybe( orElse )
 
@@ -577,28 +577,31 @@ mkPragEnv sigs binds
     prs = mapMaybe get_sig sigs
 
     get_sig :: LSig GhcRn -> Maybe (Name, LSig GhcRn)
-    get_sig (L l (SpecSig x lnm@(L _ nm) ty inl))
-      = Just (nm, L l $ SpecSig   x lnm ty (add_arity nm inl))
-    get_sig (L l (InlineSig x lnm@(L _ nm) inl))
-      = Just (nm, L l $ InlineSig x lnm    (add_arity nm inl))
-    get_sig (L l (SCCFunSig x st lnm@(L _ nm) str))
-      = Just (nm, L l $ SCCFunSig x st lnm str)
+    get_sig sig@(L _ (SpecSig _ (L _ nm) _ _))   = Just (nm, add_arity nm sig)
+    get_sig sig@(L _ (InlineSig _ (L _ nm) _))   = Just (nm, add_arity nm sig)
+    get_sig sig@(L _ (SCCFunSig _ _ (L _ nm) _)) = Just (nm, sig)
     get_sig _ = Nothing
 
-    add_arity n inl_prag   -- Adjust inl_sat field to match visible arity of function
-      | isInlinePragma inl_prag
-        -- add arity only for real INLINE pragmas, not INLINABLE
+    add_arity n sig  -- Adjust inl_sat field to match visible arity of function
       = case lookupNameEnv ar_env n of
-          Just ar -> inl_prag { inl_sat = Just ar }
-          Nothing -> warnPprTrace True "mkPragEnv no arity" (ppr n) $
-                     -- There really should be a binding for every INLINE pragma
-                     inl_prag
-      | otherwise
-      = inl_prag
+          Just ar -> addInlinePragArity ar sig
+          Nothing -> sig -- See Note [Pattern synonym inline arity]
 
     -- ar_env maps a local to the arity of its definition
     ar_env :: NameEnv Arity
     ar_env = foldr lhsBindArity emptyNameEnv binds
+
+addInlinePragArity :: Arity -> LSig GhcRn -> LSig GhcRn
+addInlinePragArity ar (L l (InlineSig x nm inl))  = L l (InlineSig x nm (add_inl_arity ar inl))
+addInlinePragArity ar (L l (SpecSig x nm ty inl)) = L l (SpecSig x nm ty (add_inl_arity ar inl))
+addInlinePragArity _ sig = sig
+
+add_inl_arity :: Arity -> InlinePragma -> InlinePragma
+add_inl_arity ar prag@(InlinePragma { inl_inline = inl_spec })
+  | Inline {} <- inl_spec  -- Add arity only for real INLINE pragmas, not INLINABLE
+  = prag { inl_sat = Just ar }
+  | otherwise
+  = prag
 
 lhsBindArity :: LHsBind GhcRn -> NameEnv Arity -> NameEnv Arity
 lhsBindArity (L _ (FunBind { fun_id = id, fun_matches = ms })) env
@@ -636,6 +639,25 @@ addInlinePrags poly_id prags_for_me
          in addDiagnosticTc dia
 
     pp_inl (L loc prag) = ppr prag <+> parens (ppr loc)
+
+
+{- Note [Pattern synonym inline arity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    {-# INLINE P #-}
+    pattern P x = (x, True)
+
+The INLINE pragma attaches to both the /matcher/ and the /builder/ for
+the pattern synonym; see Note [Pragmas for pattern synonyms] in
+GHC.Tc.TyCl.PatSyn.  But they have different inline arities (i.e. number
+of binders to which we apply the function before inlining), and we don't
+know what those arities are yet.  So for pattern synonyms we don't set
+the inl_sat field yet; instead we do so (via addInlinePragArity) in
+GHC.Tc.TyCl.PatSyn.tcPatSynMatcher and tcPatSynBuilderBind.
+
+It's a bit messy that we set the arities in different ways.  Perhaps we
+should add the arity later for all binders.  But it works fine like this.
+-}
 
 
 {- *********************************************************************

@@ -27,7 +27,8 @@ import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType, isManyDataConTy 
 import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Gen.Sig ( TcPragEnv, emptyPragEnv, completeSigFromId, lookupPragEnv, addInlinePrags )
+import GHC.Tc.Gen.Sig ( TcPragEnv, emptyPragEnv, completeSigFromId, lookupPragEnv
+                      , addInlinePrags, addInlinePragArity )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Zonk
@@ -757,7 +758,7 @@ tcPatSynMatcher :: LocatedN Name
                 -> TcType
                 -> TcM (PatSynMatcher, LHsBinds GhcTc)
 -- See Note [Matchers and builders for pattern synonyms] in GHC.Core.PatSyn
-tcPatSynMatcher (L loc name) lpat prag_fn
+tcPatSynMatcher (L loc ps_name) lpat prag_fn
                 (univ_tvs, req_theta, req_ev_binds, req_dicts)
                 (ex_tvs, ex_tys, prov_theta, prov_dicts)
                 (args, arg_tys) pat_ty
@@ -777,7 +778,7 @@ tcPatSynMatcher (L loc name) lpat prag_fn
 
              fail_ty  = mkVisFunTyMany unboxedUnitTy res_ty
 
-       ; matcher_name <- newImplicitBinder name mkMatcherOcc
+       ; matcher_name <- newImplicitBinder ps_name mkMatcherOcc
        ; scrutinee    <- newSysLocalId (fsLit "scrut") Many pat_ty
        ; cont         <- newSysLocalId (fsLit "cont")  Many cont_ty
        ; fail         <- newSysLocalId (fsLit "fail")  Many fail_ty
@@ -786,7 +787,7 @@ tcPatSynMatcher (L loc name) lpat prag_fn
        ; let matcher_tau   = mkVisFunTysMany [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkInfSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau
              matcher_id    = mkExportedVanillaId matcher_name matcher_sigma
-             patsyn_id     = mkExportedVanillaId name matcher_sigma
+             patsyn_id     = mkExportedVanillaId ps_name matcher_sigma
                              -- See Note [Exported LocalIds] in GHC.Types.Id
 
              inst_wrap = mkWpEvApps prov_dicts <.> mkWpTyApps ex_tys
@@ -823,16 +824,21 @@ tcPatSynMatcher (L loc name) lpat prag_fn
                     , mg_ext = MatchGroupTc [] res_ty
                     , mg_origin = Generated
                     }
-             prags = lookupPragEnv prag_fn name
+             matcher_arity = length req_theta + 3
              -- See Note [Pragmas for pattern synonyms]
 
-       ; matcher_prag_id <- addInlinePrags matcher_id prags
+       -- Add INLINE pragmas; see Note [Pragmas for pattern synonyms]
+       -- NB: prag_fn is keyed by the PatSyn Name, not the (internal) matcher name
+       ; matcher_prag_id <- addInlinePrags matcher_id              $
+                            map (addInlinePragArity matcher_arity) $
+                            lookupPragEnv prag_fn ps_name
+
        ; let bind = FunBind{ fun_id = L loc matcher_prag_id
                            , fun_matches = mg
                            , fun_ext = idHsWrapper
                            , fun_tick = [] }
              matcher_bind = unitBag (noLocA bind)
-       ; traceTc "tcPatSynMatcher" (ppr name $$ ppr (idType matcher_id))
+       ; traceTc "tcPatSynMatcher" (ppr ps_name $$ ppr (idType matcher_id))
        ; traceTc "tcPatSynMatcher" (ppr matcher_bind)
 
        ; return ((matcher_name, matcher_sigma, is_unlifted), matcher_bind) }
@@ -880,6 +886,7 @@ mkPatSynBuilder dir (L _ name)
                               mkPhiTy theta $
                               mkVisFunTysMany arg_tys $
                               pat_ty
+
        ; return (Just (builder_name, builder_sigma, need_dummy_arg)) }
 
 tcPatSynBuilderBind :: TcPragEnv
@@ -914,11 +921,17 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
              builder_id = modifyIdInfo (`setLevityInfoWithType` pat_ty) $
                           mkExportedVanillaId builder_name builder_ty
                          -- See Note [Exported LocalIds] in GHC.Types.Id
-             prags = lookupPragEnv prag_fn ps_name
-             -- See Note [Pragmas for pattern synonyms]
-             -- Keyed by the PatSyn Name, not the (internal) builder name
 
-       ; builder_id <- addInlinePrags builder_id prags
+             (_, req_theta, _, prov_theta, arg_tys, _) = patSynSigBndr patsyn
+             builder_arity = length req_theta + length prov_theta
+                             + length arg_tys
+                             + (if need_dummy_arg then 1 else 0)
+
+       -- Add INLINE pragmas; see Note [Pragmas for pattern synonyms]
+       -- NB: prag_fn is keyed by the PatSyn Name, not the (internal) builder name
+       ; builder_id <- addInlinePrags builder_id              $
+                       map (addInlinePragArity builder_arity) $
+                       lookupPragEnv prag_fn ps_name
 
        ; let match_group' | need_dummy_arg = add_dummy_arg match_group
                           | otherwise      = match_group
@@ -932,8 +945,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
 
        ; traceTc "tcPatSynBuilderBind {" $
          vcat [ ppr patsyn
-              , ppr builder_id <+> dcolon <+> ppr (idType builder_id)
-              , ppr prags ]
+              , ppr builder_id <+> dcolon <+> ppr (idType builder_id) ]
        ; (builder_binds, _) <- tcPolyCheck emptyPragEnv sig (noLocA bind)
        ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
        ; return builder_binds } } }
@@ -1193,18 +1205,19 @@ want to avoid difficult to decipher core lint errors!
 
 Note [Pragmas for pattern synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-INLINE and NOINLINE pragmas are supported for pattern synonyms. They affect both
-the matcher and the builder.
+INLINE and NOINLINE pragmas are supported for pattern synonyms.
+They affect both the matcher and the builder.
 (See Note [Matchers and builders for pattern synonyms] in PatSyn)
 
 For example:
     pattern InlinedPattern x = [x]
     {-# INLINE InlinedPattern #-}
+
     pattern NonInlinedPattern x = [x]
     {-# NOINLINE NonInlinedPattern #-}
 
-For pattern synonyms with explicit builders, only pragma for the entire pattern
-synonym is supported. For example:
+For pattern synonyms with explicit builders, only a pragma for the
+entire pattern synonym is supported. For example:
     pattern HeadC x <- x:xs where
       HeadC x = [x]
       -- This wouldn't compile: {-# INLINE HeadC #-}
@@ -1212,6 +1225,14 @@ synonym is supported. For example:
 
 When no pragma is provided for a pattern, the inlining decision might change
 between different versions of GHC.
+
+Implementation notes.  The prag_fn passed in to tcPatSynDecl will have a binding
+for the /pattern synonym/ Name, thus
+      InlinedPattern :-> INLINE
+From this we cook up an INLINE pragma for the matcher (in tcPatSynMatcher)
+and builder (in tcPatSynBuilderBind), by looking up the /pattern synonym/
+Name in the prag_fn, and then using addInlinePragArity to add the right
+inl_sat field to that INLINE pragma for the matcher or builder respectively.
  -}
 
 

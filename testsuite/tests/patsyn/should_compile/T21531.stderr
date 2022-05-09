@@ -1,0 +1,123 @@
+
+==================== Desugar (after optimization) ====================
+Result size of Desugar (after optimization)
+  = {terms: 61, types: 30, coercions: 3, joins: 0/0}
+
+-- RHS size: {terms: 19, types: 11, coercions: 1, joins: 0/0}
+T21531.$mAnd [InlPrag=INLINE (sat-args=3)]
+  :: forall {rep :: GHC.Types.RuntimeRep} {r :: TYPE rep}.
+     LGate -> ((# #) -> r) -> ((# #) -> r) -> r
+[LclIdX,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=3,unsat_ok=False,boring_ok=False)
+         Tmpl= \ (@(rep_a18L :: GHC.Types.RuntimeRep))
+                 (@(r_a18M :: TYPE rep_a18L))
+                 (scrut_a18O [Occ=Once1] :: LGate)
+                 (cont_a18P [Occ=Once1!] :: (# #) -> r_a18M)
+                 (fail_a18Q [Occ=Once1!] :: (# #) -> r_a18M) ->
+                 case ==
+                        @CChar
+                        Foreign.C.Types.$fEqCChar
+                        (scrut_a18O `cast` (T21531.N:LGate[0] :: LGate ~R# CChar))
+                        (fromInteger
+                           @CChar Foreign.C.Types.$fNumCChar (GHC.Num.Integer.IS 0#))
+                 of {
+                   False -> fail_a18Q GHC.Prim.void#;
+                   True -> cont_a18P GHC.Prim.void#
+                 }}]
+T21531.$mAnd
+  = \ (@(rep_a18L :: GHC.Types.RuntimeRep))
+      (@(r_a18M :: TYPE rep_a18L))
+      (scrut_a18O :: LGate)
+      (cont_a18P :: (# #) -> r_a18M)
+      (fail_a18Q :: (# #) -> r_a18M) ->
+      case ==
+             @CChar
+             Foreign.C.Types.$fEqCChar
+             (scrut_a18O `cast` (T21531.N:LGate[0] :: LGate ~R# CChar))
+             (fromInteger
+                @CChar Foreign.C.Types.$fNumCChar (GHC.Num.Integer.IS 0#))
+      of {
+        False -> fail_a18Q GHC.Prim.void#;
+        True -> cont_a18P GHC.Prim.void#
+      }
+
+-- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
+T21531.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 80 10}]
+T21531.$trModule
+  = GHC.Types.Module
+      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T21531"#)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep_a19g [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_a19g
+  = GHC.Types.KindRepTyConApp
+      Foreign.C.Types.$tcCChar (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 8, types: 0, coercions: 0, joins: 0/0}
+T21531.$tcLGate :: GHC.Types.TyCon
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 50 10}]
+T21531.$tcLGate
+  = GHC.Types.TyCon
+      1751240159874500841##64
+      16519490186165952419##64
+      T21531.$trModule
+      (GHC.Types.TrNameS "LGate"#)
+      0#
+      GHC.Types.krep$*
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep_a19h [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_a19h
+  = GHC.Types.KindRepTyConApp
+      T21531.$tcLGate (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_a19f [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_a19f = GHC.Types.KindRepFun $krep_a19g $krep_a19h
+
+-- RHS size: {terms: 8, types: 0, coercions: 0, joins: 0/0}
+T21531.$tc'LGate :: GHC.Types.TyCon
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 50 10}]
+T21531.$tc'LGate
+  = GHC.Types.TyCon
+      4309544208860551001##64
+      1328337796258811871##64
+      T21531.$trModule
+      (GHC.Types.TrNameS "'LGate"#)
+      0#
+      $krep_a19f
+
+-- RHS size: {terms: 4, types: 1, coercions: 2, joins: 0/0}
+T21531.$bAnd [InlPrag=INLINE (sat-args=0)] :: LGate
+[LclIdX,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=False, ConLike=False,
+         WorkFree=False, Expandable=False,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=False,boring_ok=True)
+         Tmpl= (fromInteger
+                  @CChar Foreign.C.Types.$fNumCChar (GHC.Num.Integer.IS 0#))
+               `cast` (Sym (T21531.N:LGate[0]) :: CChar ~R# LGate)}]
+T21531.$bAnd
+  = (fromInteger
+       @CChar Foreign.C.Types.$fNumCChar (GHC.Num.Integer.IS 0#))
+    `cast` (Sym (T21531.N:LGate[0]) :: CChar ~R# LGate)
+
+
+
