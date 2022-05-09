@@ -41,13 +41,15 @@ rtsDependencies :: Expr [FilePath]
 rtsDependencies = do
     stage   <- getStage
     rtsPath <- expr (rtsBuildPath stage)
+    useSystemFfi <- expr (flag UseSystemFfi)
+
     let headers =
             [ "ghcautoconf.h", "ghcplatform.h"
             , "DerivedConstants.h"
             , "rts" -/- "EventTypes.h"
             , "rts" -/- "EventLogConstants.h"
             ]
-            ++ libffiHeaderFiles
+            ++ (if useSystemFfi then [] else libffiHeaderFiles)
     pure $ ((rtsPath -/- "include") -/-) <$> headers
 
 genapplyDependencies :: Expr [FilePath]
