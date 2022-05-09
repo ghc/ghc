@@ -112,7 +112,6 @@ _darcs/
 /distrib/configure.ac
 /distrib/ghc.iss
 /docs/man
-/docs/index.html
 /docs/users_guide/.log
 /docs/users_guide/users_guide
 /docs/users_guide/ghc.1
