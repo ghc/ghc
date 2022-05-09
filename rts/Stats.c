@@ -182,6 +182,7 @@ initStats0(void)
             .copied_bytes = 0,
             .par_max_copied_bytes = 0,
             .par_balanced_copied_bytes = 0,
+            .block_fragmentation_bytes = 0,
             .sync_elapsed_ns = 0,
             .cpu_ns = 0,
             .elapsed_ns = 0,
@@ -482,6 +483,9 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
     stats.gc.copied_bytes = copied * sizeof(W_);
     stats.gc.par_max_copied_bytes = par_max_copied * sizeof(W_);
     stats.gc.par_balanced_copied_bytes = par_balanced_copied * sizeof(W_);
+    stats.gc.block_fragmentation_bytes =
+        (mblocks_allocated * BLOCKS_PER_MBLOCK
+         - n_alloc_blocks) * BLOCK_SIZE;
 
     bool stats_enabled =
         RtsFlags.GcFlags.giveStats != NO_GC_STATS ||
@@ -582,9 +586,7 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
                           stats.gc.gen,
                           stats.gc.copied_bytes,
                           stats.gc.slop_bytes,
-                          /* current loss due to fragmentation */
-                          (mblocks_allocated * BLOCKS_PER_MBLOCK
-                           - n_alloc_blocks) * BLOCK_SIZE,
+                          stats.gc.block_fragmentation_bytes,
                           par_n_threads,
                           stats.gc.par_max_copied_bytes,
                           stats.gc.copied_bytes,

@@ -36,6 +36,7 @@
     #10](https://github.com/haskell/core-libraries-committee/issues/10) for the
     related discussion, as well as [the migration
     guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/functor-combinator-instances-and-class1s.md).
+  * Add `gcdetails_block_fragmentation_bytes` to `GHC.Stats.GCDetails` to track heap fragmentation.
 
 ## 4.17.0.0 *August 2022*
 

@@ -159,6 +159,11 @@ data GCDetails = GCDetails {
   , gcdetails_par_max_copied_bytes :: Word64
     -- | In parallel GC, the amount of balanced data copied by all threads
   , gcdetails_par_balanced_copied_bytes :: Word64
+    -- | The amount of memory lost due to block fragmentation in bytes.
+    -- Block fragmentation is the difference between the amount of blocks retained by the RTS and the blocks that are in use.
+    -- This occurs when megablocks are only sparsely used, eg, when data that cannot be moved retains a megablock.
+    -- @since 4.17.0.0
+  , gcdetails_block_fragmentation_bytes :: Word64
     -- | The time elapsed during synchronisation before GC
   , gcdetails_sync_elapsed_ns :: RtsTime
     -- | The CPU time used during GC itself
@@ -241,6 +246,8 @@ getRTSStats = do
         (# peek GCDetails, par_max_copied_bytes) pgc
       gcdetails_par_balanced_copied_bytes <-
         (# peek GCDetails, par_balanced_copied_bytes) pgc
+      gcdetails_block_fragmentation_bytes <-
+        (# peek GCDetails, block_fragmentation_bytes) pgc
       gcdetails_sync_elapsed_ns <- (# peek GCDetails, sync_elapsed_ns) pgc
       gcdetails_cpu_ns <- (# peek GCDetails, cpu_ns) pgc
       gcdetails_elapsed_ns <- (# peek GCDetails, elapsed_ns) pgc

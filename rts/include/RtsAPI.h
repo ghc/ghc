@@ -155,6 +155,8 @@ typedef struct GCDetails_ {
   uint64_t mem_in_use_bytes;
     // Total amount of data copied during this GC
   uint64_t copied_bytes;
+    // Memory lost due to block fragmentation
+  uint64_t block_fragmentation_bytes;
     // In parallel GC, the max amount of data copied by any one thread
   uint64_t par_max_copied_bytes;
   // In parallel GC, the amount of balanced data copied by all threads
