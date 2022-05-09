@@ -12,7 +12,7 @@
 --
 -- Avoid using them as much as possible
 module GHC.Data.List.SetOps (
-        unionLists, minusList,
+        unionLists, unionListsOrd, minusList,
 
         -- Association lists
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
@@ -53,6 +53,19 @@ getNth xs n = assertPpr (xs `lengthExceeds` n) (ppr n $$ ppr xs) $
 ************************************************************************
 -}
 
+
+
+-- | Combines the two lists while keeping their order, placing the first argument
+-- first in the result.
+--
+-- Uses a set internally to record duplicates. This makes it slightly slower for
+-- very small lists but avoids quadratic behaviour for large lists.
+unionListsOrd :: (HasDebugCallStack, Outputable a, Ord a) => [a] -> [a] -> [a]
+unionListsOrd xs ys
+  -- Since both arguments don't have internal duplicates we can just take all of xs
+  -- and every element of ys that's not already in xs.
+  = let set_ys = S.fromList ys
+    in (filter (\e -> not $ S.member e set_ys) xs) ++ ys
 
 -- | Assumes that the arguments contain no duplicates
 unionLists :: (HasDebugCallStack, Outputable a, Eq a) => [a] -> [a] -> [a]
@@ -161,7 +174,7 @@ equivClasses cmp items   = NE.groupBy eq (L.sortBy cmp items)
     eq a b = case cmp a b of { EQ -> True; _ -> False }
 
 -- | Remove the duplicates from a list using the provided
--- comparison function.
+-- comparison function. Might change the order of elements.
 --
 -- Returns the list without duplicates, and accumulates
 -- all the duplicates in the second component of its result.

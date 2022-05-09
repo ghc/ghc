@@ -276,6 +276,9 @@ instance HasOccName GreName where
   occName (NormalGreName n) = occName n
   occName (FieldGreName fl) = occName fl
 
+instance Ord GreName where
+  compare = stableGreNameCmp
+
 -- | A 'Name' for internal use, but not for output to the user.  For fields, the
 -- 'OccName' will be the selector.  See Note [GreNames] in GHC.Types.Name.Reader.
 greNameMangledName :: GreName -> Name
@@ -315,10 +318,10 @@ plusAvail (AvailTC _ [])     a2@(AvailTC {})   = a2
 plusAvail a1@(AvailTC {})       (AvailTC _ []) = a1
 plusAvail (AvailTC n1 (s1:ss1)) (AvailTC n2 (s2:ss2))
   = case (NormalGreName n1==s1, NormalGreName n2==s2) of  -- Maintain invariant the parent is first
-       (True,True)   -> AvailTC n1 (s1 : (ss1 `unionLists` ss2))
-       (True,False)  -> AvailTC n1 (s1 : (ss1 `unionLists` (s2:ss2)))
-       (False,True)  -> AvailTC n1 (s2 : ((s1:ss1) `unionLists` ss2))
-       (False,False) -> AvailTC n1 ((s1:ss1) `unionLists` (s2:ss2))
+       (True,True)   -> AvailTC n1 (s1 : (ss1 `unionListsOrd` ss2))
+       (True,False)  -> AvailTC n1 (s1 : (ss1 `unionListsOrd` (s2:ss2)))
+       (False,True)  -> AvailTC n1 (s2 : ((s1:ss1) `unionListsOrd` ss2))
+       (False,False) -> AvailTC n1 ((s1:ss1) `unionListsOrd` (s2:ss2))
 plusAvail a1 a2 = pprPanic "GHC.Rename.Env.plusAvail" (hsep [ppr a1,ppr a2])
 
 -- | trims an 'AvailInfo' to keep only a single name
