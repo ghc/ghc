@@ -789,7 +789,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
            ((binds1, rules1), counts1) <-
              initSmpl logger dflags (mkRuleEnv rule_base2 vis_orphs) fam_envs sz $
                do { (floats, env1) <- {-# SCC "SimplTopBinds" #-}
-                                      simplTopBinds simpl_env tagged_binds
+                                      simplTopBinds (dopt Opt_D_dump_simpl dflags) simpl_env tagged_binds
 
                       -- Apply the substitution to rules defined in this module
                       -- for imported Ids.  Eg  RULE map my_f = blah

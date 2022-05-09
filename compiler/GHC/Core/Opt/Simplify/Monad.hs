@@ -7,7 +7,7 @@
 
 module GHC.Core.Opt.Simplify.Monad (
         -- The monad
-        SimplM(unSM, SM'),
+        SimplM(unSM, SM),
         initSmpl, traceSmpl,
         getSimplRules, getFamEnvs, getOptCoercionOpts,
 

@@ -40,7 +40,9 @@ module GHC.Core.Opt.Simplify.Env (
 
         -- * JoinFloats
         JoinFloat, JoinFloats, emptyJoinFloats,
-        wrapJoinFloats, wrapJoinFloatsX, unitJoinFloat, addJoinFlts
+        wrapJoinFloats, wrapJoinFloatsX, unitJoinFloat, addJoinFlts,
+
+        subst_id_bndr, extendInScopeSetBind
     ) where
 
 #include "HsVersions.h"
@@ -847,6 +849,7 @@ subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
               old_id adjust_type
   = ASSERT2( not (isCoVar old_id), ppr old_id )
     (env { seInScope = new_in_scope,
+
            seIdSubst = new_subst }, new_id)
     -- It's important that both seInScope and seIdSubst are updated with
     -- the new_id, /after/ applying adjust_type. That's why adjust_type

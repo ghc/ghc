@@ -670,7 +670,7 @@ add_info env old_bndr top_level new_rhs new_bndr
 
    old_unfolding = unfoldingInfo old_info
    new_unfolding | isStableUnfolding old_unfolding
-                 = substUnfolding subst old_unfolding
+                 = substUnfolding False subst old_unfolding
                  | otherwise
                  = unfolding_from_rhs
 

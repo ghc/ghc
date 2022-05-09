@@ -80,16 +80,22 @@ import GHC.Types.Var.Env
 import GHC.Types.Unique.FM
 import Control.Concurrent.QSem
 import Control.Exception
-import GHC.Core.Subst (Subst, substRecBndrs, substBind, mkEmptySubst, substInScope, extendSubstWithVar)
+import GHC.Core.Subst (Subst, substRecBndrs, substBind, mkEmptySubst, substInScope, extendSubstWithVar, substExpr, extendInScope, substIdOcc, isInScope, clone_id_hack, substIdInfo)
 import Data.Foldable
 import Data.Traversable
 import GHC.Data.OrdList (toOL)
-import GHC.Types.Var.Set (IdSet, mkVarSet, dVarSetElems)
+import GHC.Types.Var.Set (IdSet, mkVarSet, dVarSetElems, partitionVarSet, elemVarSet)
 import qualified Data.IntMap.Strict as IntMap
-import GHC.Types.Unique.Set (getUniqSet, isEmptyUniqSet, nonDetEltsUniqSet)
+import GHC.Types.Unique.Set (getUniqSet, isEmptyUniqSet, nonDetEltsUniqSet, addListToUniqSet, elementOfUniqSet, emptyUniqSet, addOneToUniqSet, UniqSet, mkUniqSet)
 import qualified Data.IntSet as IntSet
 import GHC.Types.Unique (Unique)
-import GHC.Types.Unique.Supply (uniqFromMask)
+import GHC.Types.Unique.Supply (uniqFromMask, initUs_)
+import GHC.Types.Unique (getUnique)
+import qualified Data.Monoid as Mon
+import Control.Applicative
+import GHC.Cmm.Dataflow.Collections (UniqueSet)
+import System.IO (fixIO)
+import Control.Monad.Fix
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -225,58 +231,69 @@ too small to show up in benchmarks.
 ************************************************************************
 -}
 
-substSimplFloats :: Subst -> SimplFloats -> (Subst, SimplFloats)
-substSimplFloats subst sf@SimplFloats{sfJoinFloats, sfLetFloats = LetFloats bind_ol ff} = let
-  (new_subst, new_binds) = ASSERT (null sfJoinFloats)
-        mapAccumL substBind subst (toList bind_ol)
-  in (new_subst, sf { sfLetFloats = LetFloats (toOL new_binds) ff
-                    , sfInScope = sfInScope sf `unionInScope` substInScope new_subst
-                    })
+-- TODO rename
+simplScc :: ResimplEnv -> [SimplR] -> InBind -> SimplM SimplR
+simplScc (should_trace, env0, our_binders) deps b = do
+  let traceM | should_trace = pprTraceM
+             | otherwise = \_ _ -> pure ()
+  let (_floats0, envs0) =  unzip $ deps
+
+  traceM "simplScc:start:(#deps,binders)" $ ppr (length deps, bindersOf b)
+  -- when (any (> 1) check) $ pprPanic "simplScc" $ ppr (floats0, b)
+  let
+    !inscope = foldr unionInScope (seInScope env0) (seInScope <$> envs0)
+    these_binds = bindersOfBinds [b]
+    inscope_less_ours = foldl' delInScopeSet inscope these_binds
+    no_collisions x y = plusUFM_C arrrrrg x y where
+      arrrrrg = pprPanic "collision" $ ppr (x,y)
+    env1 = env0 { seInScope = inscope, seIdSubst = foldr no_collisions emptyUFM (seIdSubst <$> envs0)
+                }
+
+  traceM  "simplScc:env1:" $ ppr env1
+  (floats1, env2) <- simpl_bind env1 b
+  traceM  "simplScc:simpl_bind:(floats1,env1)" $ ppr (floats1,env2)
+  -- pprTraceM "simplScc2" $ ppr b
 
 
-simplEnvInscopeLocals :: SimplEnv -> IdSet
-simplEnvInscopeLocals env = let
-  inscope_intmap = ufmToSet_Directly . getUniqSet . getInScopeVars  . seInScope $ env
-  (_,xs0) = IntSet.split (getKey minLocalUnique) inscope_intmap
-  (xs, _) = IntSet.split (getKey maxLocalUnique) xs0
-  in mkVarSet
-     [ x
-     | y :: Unique <- [minLocalUnique,maxLocalUnique] ++
-                [ mkUniqueGrimily x | x <- IntSet.toList xs]
-     , Just x <- [lookupInScope_Directly (seInScope env) y]
-     ]
 
-simplSubstLocals :: SimplEnv -> (SimplFloats, SimplEnv) -> IO (SimplFloats, SimplEnv)
-simplSubstLocals env0 (this_float,this_env) = do
-    let
-      inscope_locals_acc = simplEnvInscopeLocals env0
-    ASSERT (isEmptyUniqSet inscope_locals_acc) pure ()
-    let
-      inscope_locals = simplEnvInscopeLocals this_env
-    new_ids <- for (nonDetEltsUniqSet inscope_locals) $ \x -> (x,) . setVarUnique x <$> uniqFromMask 'z'
-    let subst = foldr (\(old, new) acc -> extendSubstWithVar acc old new)
-                        (mkEmptySubst $ seInScope env0) new_ids
-        (_, new_floats) = substSimplFloats subst this_float
-    pure (new_floats, setInScopeFromF this_env new_floats)
+  -- construct
+  (subst, new_binds) <-  getUniqueSupplyM >>= \x -> pure . initUs_ x $ mfix $ \ ~(subst0,_) -> let
+    go_id s i = do
+      u <- getUniqueM
+      pure $ case () of
+        _ | i `elemVarSet` our_binders -> let
+              j = maybeModifyIdInfo (substIdInfo True subst0 i (idInfo i)) i
+              in (extendInScope s j, j)
+          -- | is_local bndr  = subst_id_bndr acc_env bndr (flip setVarUnique u)
+          | isLocalId i -> let
+              (new_subst, new_bndr) = clone_id_hack True subst0 s (i, u)
+              in (extendSubstWithVar new_subst i new_bndr, new_bndr)
+          | otherwise -> (extendInScope s i, i)
+    go acc_subst bind = case bind of
+      NonRec i rhs -> do
+        (new_subst, new_id) <- go_id acc_subst i
+        pure (new_subst, NonRec new_id $ substExpr subst0 rhs)
+      Rec bs -> do
+        let f s (i,rhs) = do
+              (ns,ni) <- go_id s i
+              pure (ns, (ni, substExpr subst0  rhs))
+        (new_subst, bs1) <- mapAccumLM f acc_subst bs
+        pure (new_subst, Rec bs1)
+    in mapAccumLM go (mkEmptySubst inscope_less_ours) $ getTopFloatBinds  $ floats1
 
--- simplCombineEnvs :: MonadUnique m => SimplEnv -> [(SimplEnv, SimplFloats)] -> m (SimplFloats, SimplEnv)
--- simplCombineEnvs env0 envs = foldlM go (emptyFloats env0, env0) envs where
---   go (acc_floats, acc_env) (this_float, this_env) = do
---     let
---       inscope_locals_acc = simplEnvInscopeLocals acc_env
---     ASSERT (null inscope_locals_acc) pure ()
---     let
---       inscope_locals = simplEnvInscopeLocals this_env
---     new_ids <- for inscope_locals $ \x -> (x,) . setVarUnique x <$> getUniqueM
---     let subst = foldr (\(old, new) acc -> extendSubstWithVar acc old new)
---                         (mkEmptySubst $ seInScope acc_env) new_ids
---         (_, new_floats) = substSimplFloats subst this_float
---         floats = acc_floats `unionFloats` new_floats
---     pure (setInScopeFromF acc_env floats, floats)
+  let !floats2 = case sfLetFloats floats1 of
+        LetFloats _ ff -> let
+          lf = LetFloats (toOL new_binds) ff
+          in SimplFloats lf (sfJoinFloats floats1) (substInScope subst)
 
-simplTopBinds :: SimplEnv -> ([(Int, InBind)], M.Map Int [Int]) -> SimplM (SimplFloats, SimplEnv)
+  traceM  "simplScc:substSimplFloats:(subst0,subst1,floats2)" $ ppr (subst,floats2)
+
+  pure (floats2, setInScopeFromF env2 floats2)
+
+
+simplTopBinds :: Bool -> SimplEnv -> ([(Int, InBind)], M.Map Int [Int]) -> SimplM (SimplFloats, SimplEnv)
 -- See Note [The big picture]
-simplTopBinds env0 (binds0, g)
+simplTopBinds should_trace env0 (binds0, g)
   = do  {       -- Put all the top-level binders into scope at the start
                 -- so that if a rewrite rule has unexpectedly brought
                 -- anything into scope, then we don't get a complaint about that.
@@ -284,14 +301,15 @@ simplTopBinds env0 (binds0, g)
                 -- See note [Glomming] in "GHC.Core.Opt.OccurAnal".
         -- See Note [Bangs in the Simplifier]
         ; !env1 <- {-#SCC "simplTopBinds-simplRecBndrs" #-} simplRecBndrs env0 (bindersOfBinds (map snd binds0))
+        ; let my_binds = mkUniqSet [lookupRecBndr env1 x | x <- bindersOfBinds (map snd binds0)]
 
---        ; env_m_vars :: M.Map Int (MVar (SimplFloats, SimplEnv))
+--        ; env_m_vars :: M.Map Int (MVar (SimplFloats, SimplEnv, UniqSet Var))
         ; env_m_vars <- liftIO $ M.fromList <$> (sequence [(k,) <$> newEmptyMVar | (k,_) <- binds0])
 
 
         ; sem <- liftIO $ newQSem 8
-        ; SM' $ \te sc -> do
-            mapM_ (do_one sem env1 env_m_vars te sc) binds0
+        ; SM $ \te sc -> do
+            mapM_ (do_one sem (should_trace, env1, my_binds) env_m_vars te sc) binds0
             return ((), sc)
 
         ; let res_vars = M.elems env_m_vars
@@ -303,11 +321,22 @@ simplTopBinds env0 (binds0, g)
         ; _old_res <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 (map snd binds0)
 
         ; let
-            env = combine_envs env1 envs
-            final_floats = foldl' addFloats (emptyFloats env1) floats
+            !env = combine_envs env1 envs
+            !(final_floats, _) = foldl' go_sfs (emptyFloats env, emptyUniqSet) floats where
+              go_sfs acc sf = foldl' go_bind acc $ getTopFloatBinds sf where
+                go_bind bind_acc@(floats_acc, seen_set_acc) b = let
+                  bob = bindersOfBinds [b]
+                  is_seen = (`elementOfUniqSet` seen_set_acc)
+                  f = liftA2 (,) Mon.All Mon.Any . is_seen
+                  (Mon.All all_seen, Mon.Any any_seen) = foldMap f  bob
+                  in case () of
+                  _ | all_seen -> bind_acc
+                    | any_seen -> pprPanic "simplTopBinds:seenSome" $ ppr b
+                    | otherwise -> (floats_acc `extendFloats` b, seen_set_acc `addListToUniqSet` bob)
+
 
         ; freeTick SimplifierDone
-        ; return (final_floats, setInScopeFromF env final_floats) }
+        ; return (final_floats, env ) }
   where
     combine_envs env0 envs =
       env0 { seInScope = foldr unionInScope (seInScope env0) (map seInScope envs)
@@ -316,41 +345,37 @@ simplTopBinds env0 (binds0, g)
     do_one sem env1 deps te sc (k, b) = do
       ---pprTraceM "forking" (ppr k)
       forkIO $ do
-        let ds = (filter (/= k) $ fromJust $ M.lookup k g)
-        --print (k, ds)
-        (_, envs) <- unzip <$> mapM readMVar (mapMaybe (\di -> M.lookup di deps) ds)
-        let my_var = fromJust (M.lookup k deps)
-        let env' = combine_envs env1 envs
+        rs <- for [x | di <- g M.! k, di /= k, Just x <- [M.lookup di deps]] readMVar
         bracket_ (waitQSem sem) (signalQSem sem) $ do
-          ((floats, env''), _) <- unSM (simpl_bind env' b) te sc
-          simplSubstLocals env' (floats,env'') >>= putMVar my_var
+          let my_mv = deps M.! k
+          (fst <$> unSM (simplScc env1 rs b) te sc) >>= putMVar my_mv
 
 
 
+-- TODO we need to be threading SimplCount through as well
+type SimplR = (SimplFloats, SimplEnv)
+type ResimplEnv = (Bool, SimplEnv, UniqSet Var)
 
---    go :: M.Map Int (MVar SimplEnv) -> [Int] -> IO (MVar SimplEnv)
---    go m deps = let deps = map (\k -> M.lookup k m) deps
---                in _
+    -- We need to track the zapped top-level binders, because
+    -- they should have their fragile IdInfo zapped (notably occurrence info)
+    -- That's why we run down binds and bndrs' simultaneously.
+    --
+simpl_binds :: SimplEnv -> [InBind] -> SimplM (SimplFloats, SimplEnv)
+simpl_binds env []           = return (emptyFloats env, env)
+simpl_binds env (bind:binds) = do { (float,  env1) <- simpl_bind env bind
+                                  ; (floats, env2) <- simpl_binds env1 binds
+                                  -- See Note [Bangs in the Simplifier]
+                                  ; let !floats1 = float `addFloats` floats
+                                  ; -- TODO ^^^ should this be unionFloats?
+                                  ; return (floats1, env2) }
 
+simpl_bind :: SimplEnv -> InBind -> SimplM (SimplFloats, SimplEnv)
+simpl_bind env (Rec pairs)
+  = simplRecBind env TopLevel Nothing pairs
+simpl_bind env (NonRec b r)
+  = do { (env', b') <- addBndrRules env b (lookupRecBndr env b) Nothing
+       ; simplRecOrTopPair env' TopLevel NonRecursive Nothing b b' r }
 
-        -- We need to track the zapped top-level binders, because
-        -- they should have their fragile IdInfo zapped (notably occurrence info)
-        -- That's why we run down binds and bndrs' simultaneously.
-        --
-    simpl_binds :: SimplEnv -> [InBind] -> SimplM (SimplFloats, SimplEnv)
-    simpl_binds env []           = return (emptyFloats env, env)
-    simpl_binds env (bind:binds) = do { (float,  env1) <- simpl_bind env bind
-                                      ; (floats, env2) <- simpl_binds env1 binds
-                                      -- See Note [Bangs in the Simplifier]
-                                      ; let !floats1 = float `addFloats` floats
-                                      ; -- TODO ^^^ should this be unionFloats?
-                                      ; return (floats1, env2) }
-
-    simpl_bind env (Rec pairs)
-      = simplRecBind env TopLevel Nothing pairs
-    simpl_bind env (NonRec b r)
-      = do { (env', b') <- addBndrRules env b (lookupRecBndr env b) Nothing
-           ; simplRecOrTopPair env' TopLevel NonRecursive Nothing b b' r }
 
 {-
 ************************************************************************
@@ -4291,4 +4316,3 @@ for the RHS as well as the LHS, but that seems more conservative
 than necesary.  Allowing some inlining might, for example, eliminate
 a binding.
 -}
-

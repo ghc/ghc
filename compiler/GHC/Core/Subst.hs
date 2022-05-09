@@ -31,6 +31,7 @@ module GHC.Core.Subst (
         -- ** Substituting and cloning binders
         substBndr, substBndrs, substRecBndrs, substTyVarBndr, substCoVarBndr,
         cloneBndr, cloneBndrs, cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
+        clone_id_hack
 
     ) where
 
@@ -485,7 +486,7 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
         -- The lazy-set is because we're in a loop here, with
         -- rec_subst, when dealing with a mutually-recursive group
     new_id = maybeModifyIdInfo mb_new_info id2
-    mb_new_info = substIdInfo rec_subst id2 (idInfo id2)
+    mb_new_info = substIdInfo False rec_subst id2 (idInfo id2)
         -- NB: unfolding info may be zapped
 
         -- Extend the substitution if the unique has changed
@@ -535,19 +536,21 @@ cloneRecIdBndrs subst us ids
 
 -- Just like substIdBndr, except that it always makes a new unique
 -- It is given the unique to use
-clone_id    :: Subst                    -- Substitution for the IdInfo
+clone_id_hack    :: Bool -> Subst                    -- Substitution for the IdInfo
             -> Subst -> (Id, Unique)    -- Substitution and Id to transform
             -> (Subst, Id)              -- Transformed pair
 
-clone_id rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)
+clone_id_hack hack rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)
   = (Subst (in_scope `extendInScopeSet` new_id) new_idvs tvs new_cvs, new_id)
   where
     id1     = setVarUnique old_id uniq
     id2     = substIdType subst id1
-    new_id  = maybeModifyIdInfo (substIdInfo rec_subst id2 (idInfo old_id)) id2
+    new_id  = maybeModifyIdInfo (substIdInfo hack rec_subst id2 (idInfo old_id)) id2
     (new_idvs, new_cvs) | isCoVar old_id = (idvs, extendVarEnv cvs old_id (mkCoVarCo new_id))
                         | otherwise      = (extendVarEnv idvs old_id (Var new_id), cvs)
 
+
+clone_id = clone_id_hack False
 {-
 ************************************************************************
 *                                                                      *
@@ -612,11 +615,11 @@ substIdType subst@(Subst _ _ tv_env cv_env) id
 
 ------------------
 -- | Substitute into some 'IdInfo' with regard to the supplied new 'Id'.
-substIdInfo :: Subst -> Id -> IdInfo -> Maybe IdInfo
-substIdInfo subst new_id info
+substIdInfo :: Bool -> Subst -> Id -> IdInfo -> Maybe IdInfo
+substIdInfo hack subst new_id info
   | nothing_to_do = Nothing
   | otherwise     = Just (info `setRuleInfo`      substRuleInfo subst new_id old_rules
-                               `setUnfoldingInfo` substUnfolding subst old_unf)
+                               `setUnfoldingInfo` substUnfolding hack subst old_unf)
   where
     old_rules     = ruleInfo info
     old_unf       = unfoldingInfo info
@@ -627,23 +630,24 @@ substIdInfo subst new_id info
 -- NB: substUnfolding /discards/ any unfolding without
 --     without a Stable source.  This is usually what we want,
 --     but it may be a bit unexpected
-substUnfolding, substUnfoldingSC :: Subst -> Unfolding -> Unfolding
+substUnfolding, substUnfoldingSC :: Bool -> Subst -> Unfolding -> Unfolding
         -- Seq'ing on the returned Unfolding is enough to cause
         -- all the substitutions to happen completely
 
-substUnfoldingSC subst unf       -- Short-cut version
+substUnfoldingSC hack subst unf       -- Short-cut version
   | isEmptySubst subst = unf
-  | otherwise          = substUnfolding subst unf
+  | otherwise          = substUnfolding hack subst unf
 
-substUnfolding subst df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
+substUnfolding _hack subst df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
   = df { df_bndrs = bndrs', df_args = args' }
   where
     (subst',bndrs') = substBndrs subst bndrs
     args'           = map (substExpr subst') args
 
-substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
+substUnfolding hack subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
         -- Retain an InlineRule!
   | not (isStableSource src)  -- Zap an unstable unfolding, to save substitution work
+  && not hack
   = NoUnfolding
   | otherwise                 -- But keep a stable one!
   = seqExpr new_tmpl `seq`
@@ -651,7 +655,7 @@ substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
   where
     new_tmpl = substExpr subst tmpl
 
-substUnfolding _ unf = unf      -- NoUnfolding, OtherCon
+substUnfolding _ _ unf = unf      -- NoUnfolding, OtherCon
 
 ------------------
 substIdOcc :: Subst -> Id -> Id
