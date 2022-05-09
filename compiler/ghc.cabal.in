@@ -79,7 +79,7 @@ Library
                    containers >= 0.6.2.1 && < 0.7,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.5,
-                   template-haskell == 2.18.*,
+                   template-haskell == 2.19.*,
                    hpc        == 0.6.*,
                    transformers == 0.5.*,
                    exceptions == 0.10.*,
