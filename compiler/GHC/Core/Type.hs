@@ -276,12 +276,12 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
    , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
    , mkKindCo, mkSubCo
-   , decomposePiCos, coercionKind, coercionLKind
-   , coercionRKind, coercionType
-   , isReflexiveCo, seqCo
+   , decomposePiCos
+   , coercionKind, coercionLKind, coercionRKind, coercionType
+   , isGReflMCo, seqCo
    , topNormaliseNewType_maybe
    )
-import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isConcreteTyVar )
+import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isConcreteTyVar, tcEqType )
 
 -- others
 import GHC.Utils.Misc
@@ -1613,13 +1613,26 @@ splitCastTy_maybe ty
 -- Coercion for reflexivity, dropping it if it's reflexive.
 -- See @Note [Respecting definitional equality]@ in "GHC.Core.TyCo.Rep"
 mkCastTy :: Type -> Coercion -> Type
-mkCastTy orig_ty co | isReflexiveCo co = orig_ty  -- (EQ2) from the Note
+mkCastTy orig_ty co
+  | hackyIsReflexiveCo co = orig_ty  -- (EQ2) from the Note
 -- NB: Do the slow check here. This is important to keep the splitXXX
 -- functions working properly. Otherwise, we may end up with something
 -- like (((->) |> something_reflexive_but_not_obviously_so) biz baz)
 -- fails under splitFunTy_maybe. This happened with the cheaper check
 -- in test dependent/should_compile/dynamic-paper.
 mkCastTy orig_ty co = mk_cast_ty orig_ty co
+
+hackyIsReflexiveCo :: Coercion -> Bool
+-- This function distinguishes Constraint from Type, so that mkCastTy
+-- works ok in the typechecker as well as in Core.  See #21530 for the
+-- sad story.
+--
+-- I'm worried about invalidating (EQ2), but that is already squishy
+-- across the Tc-to-Core transition.
+hackyIsReflexiveCo (Refl {})       = True
+hackyIsReflexiveCo (GRefl _ _ mco) = isGReflMCo mco
+hackyIsReflexiveCo co              = ty1 `tcEqType` ty2
+  where Pair ty1 ty2 = coercionKind co
 
 -- | Like 'mkCastTy', but avoids checking the coercion for reflexivity,
 -- as that can be expensive.

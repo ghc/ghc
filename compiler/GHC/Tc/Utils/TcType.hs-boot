@@ -11,9 +11,10 @@ data MetaDetails
 data TcTyVarDetails
 pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 vanillaSkolemTvUnk :: HasCallStack => TcTyVarDetails
-isMetaTyVar :: TcTyVar -> Bool
+
+isMetaTyVar      :: TcTyVar -> Bool
 isTyConableTyVar :: TcTyVar -> Bool
-isConcreteTyVar :: TcTyVar -> Bool
+isConcreteTyVar  :: TcTyVar -> Bool
 
 tcEqType :: HasDebugCallStack => Type -> Type -> Bool
 

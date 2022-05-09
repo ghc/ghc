@@ -3081,7 +3081,9 @@ unifyWanted rewriters loc role orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
-    go (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
+    go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = s1, ft_res = t1 })
+       (FunTy { ft_af = af2, ft_mult = w2, ft_arg = s2, ft_res = t2 })
+      | af1 == af2  -- Important!  See #21530
       = do { co_s <- unifyWanted rewriters loc role s1 s2
            ; co_t <- unifyWanted rewriters loc role t1 t2
            ; co_w <- unifyWanted rewriters loc Nominal w1 w2

@@ -1,0 +1,11 @@
+
+T21530b.hs:14:7: error:
+    • Couldn't match kind ‘Constraint’ with ‘*’
+      When matching types
+        a0 :: *
+        Eq Int :: Constraint
+      Expected: Proxy a0
+        Actual: Proxy (Eq Int)
+    • In the first argument of ‘f’, namely ‘g’
+      In the expression: f g
+      In an equation for ‘h’: h = f g

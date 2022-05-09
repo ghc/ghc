@@ -34,10 +34,13 @@ mkSubCo :: HasDebugCallStack => Coercion -> Coercion
 mkProofIrrelCo :: Role -> Coercion -> Coercion -> Coercion -> Coercion
 mkAxiomRuleCo :: CoAxiomRule -> [Coercion] -> Coercion
 
-isGReflCo :: Coercion -> Bool
-isReflCo :: Coercion -> Bool
-isReflexiveCo :: Coercion -> Bool
-decomposePiCos :: HasDebugCallStack => Coercion -> Pair Type -> [Type] -> ([Coercion], Coercion)
+isGReflCo     :: Coercion  -> Bool
+isReflCo      :: Coercion  -> Bool
+isReflexiveCo :: Coercion  -> Bool
+isGReflMCo    :: MCoercion -> Bool
+
+decomposePiCos :: HasDebugCallStack
+               => Coercion -> Pair Type -> [Type] -> ([Coercion], Coercion)
 coVarKindsTypesRole :: HasDebugCallStack => CoVar -> (Kind, Kind, Type, Type, Role)
 coVarRole :: CoVar -> Role
 

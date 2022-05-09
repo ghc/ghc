@@ -1,0 +1,8 @@
+
+T21530a.hs:9:5: error:
+    • Couldn't match type: Eq a => a -> String
+                     with: a -> String
+      Expected: (forall a. Show a => a -> String) -> String
+        Actual: (forall a. (Show a, Eq a) => a -> String) -> String
+    • In the expression: f
+      In an equation for ‘g’: g = f
