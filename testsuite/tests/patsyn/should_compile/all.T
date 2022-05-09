@@ -80,3 +80,4 @@ test('T16682', [extra_files(['T16682.hs', 'T16682a.hs'])],
                multimod_compile, ['T16682', '-v0 -fwarn-incomplete-patterns -fno-code'])
 test('T17775-singleton', normal, compile, [''])
 test('T14630', normal, compile, ['-Wname-shadowing'])
+test('T21531', [ grep_errmsg(r'INLINE') ], compile, ['-ddump-ds'])
