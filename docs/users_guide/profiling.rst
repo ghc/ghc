@@ -554,14 +554,15 @@ enclosed between ``+RTS ... -RTS`` as usual):
 
 .. rts-flag:: -V ⟨secs⟩
 
-    :default: 0.02
+    :default: 0.001 when profiling, and 0.01 otherwise
 
     Sets the interval that the RTS clock ticks at, which is also the sampling
-    interval of the time and allocation profile. The default is 0.02 seconds.
-    The runtime uses a single timer signal to count ticks; this timer signal is
-    used to control the context switch timer (:ref:`using-concurrent`) and the
-    heap profiling timer :ref:`rts-options-heap-prof`. Also, the time profiler
-    uses the RTS timer signal directly to record time profiling samples.
+    interval of the time and allocation profile. The default is 0.001 seconds
+    when profiling, and 0.01 otherwise. The runtime uses a single timer signal
+    to count ticks; this timer signal is used to control the context switch
+    timer (:ref:`using-concurrent`) and the heap profiling timer
+    :ref:`rts-options-heap-prof`. Also, the time profiler uses the RTS timer
+    signal directly to record time profiling samples.
 
     Normally, setting the :rts-flag:`-V ⟨secs⟩` option directly is not
     necessary: the resolution of the RTS timer is adjusted automatically if a
