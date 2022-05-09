@@ -234,6 +234,7 @@ import GHC.Cmm.Info
 import GHC.Cmm.BlockId
 import GHC.Cmm.Lexer
 import GHC.Cmm.CLabel
+import GHC.Cmm.Parser.Config
 import GHC.Cmm.Parser.Monad hiding (getPlatform, getProfile)
 import qualified GHC.Cmm.Parser.Monad as PD
 import GHC.Cmm.CallConv
@@ -1491,12 +1492,6 @@ initEnv profile = listToUFM [
     VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB profile)) (wordWidth platform)) ))
   ]
   where platform = profilePlatform profile
-
-data CmmParserConfig = CmmParserConfig
-  { cmmpParserOpts :: !ParserOpts
-  , cmmpPDConfig :: !PDConfig
-  , cmmpStgToCmmConfig :: !StgToCmmConfig
-  }
 
 parseCmmFile :: CmmParserConfig
              -> Module

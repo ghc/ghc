@@ -198,6 +198,7 @@ Library
         GHC.Cmm.Node
         GHC.Cmm.Opt
         GHC.Cmm.Parser
+        GHC.Cmm.Parser.Config
         GHC.Cmm.Parser.Monad
         GHC.Cmm.Pipeline
         GHC.Cmm.Ppr

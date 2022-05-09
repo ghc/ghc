@@ -2,8 +2,7 @@ module GHC.Driver.Config.Cmm.Parser
   ( initCmmParserConfig
   ) where
 
-import GHC.Cmm.Parser
-import GHC.Cmm.Parser.Monad
+import GHC.Cmm.Parser.Config
 
 import GHC.Driver.Config.Parser
 import GHC.Driver.Config.StgToCmm

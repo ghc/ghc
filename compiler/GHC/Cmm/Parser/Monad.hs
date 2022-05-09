@@ -20,6 +20,8 @@ module GHC.Cmm.Parser.Monad (
 
 import GHC.Prelude
 
+import GHC.Cmm.Parser.Config
+
 import GHC.Platform
 import GHC.Platform.Profile
 
@@ -31,11 +33,6 @@ import GHC.Types.Error ( MsgEnvelope )
 import GHC.Types.SrcLoc
 import GHC.Unit.Types
 import GHC.Unit.Home
-
-data PDConfig = PDConfig
-  { pdProfile :: !Profile
-  , pdSanitizeAlignment :: !Bool -- ^ Insert alignment checks (cf @-falignment-sanitisation@)
-  }
 
 newtype PD a = PD { unPD :: PDConfig -> HomeUnit -> PState -> ParseResult a }
 
