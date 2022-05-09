@@ -871,7 +871,7 @@ pprStgRhs opts rhs = case rhs of
               4 (pprStgExpr opts body)
 
    StgRhsCon cc con mid _ticks args
-      -> hcat [ ppr cc, space
+      -> hcat [ if stgSccEnabled opts then ppr cc <> space else empty
               , case mid of
                   NoNumber -> empty
                   Numbered n -> hcat [ppr n, space]

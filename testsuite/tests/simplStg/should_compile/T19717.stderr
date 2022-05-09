@@ -8,11 +8,11 @@ Foo.f :: forall {a}. a -> [GHC.Maybe.Maybe a]
         let {
           sat [Occ=Once1] :: GHC.Maybe.Maybe a
           [LclId] =
-              CCCS GHC.Maybe.Just! [x1]; } in
+              GHC.Maybe.Just! [x1]; } in
         let {
           sat [Occ=Once1] :: [GHC.Maybe.Maybe a]
           [LclId] =
-              CCCS :! [sat GHC.Types.[]];
+              :! [sat GHC.Types.[]];
         } in  : [sat sat];
         };
 
