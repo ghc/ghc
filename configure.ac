@@ -1248,7 +1248,6 @@ AC_CONFIG_FILES(
   libraries/libiserv/libiserv.cabal
   libraries/template-haskell/template-haskell.cabal
   docs/users_guide/ghc_config.py
-  docs/index.html
   libraries/prologue.txt
   distrib/configure.ac
 ])
