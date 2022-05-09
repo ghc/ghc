@@ -313,7 +313,11 @@ schedule (Capability *initialCapability, Task *task)
     // waiting on an async I/O to complete with WinIO.
 
 #if defined(THREADED_RTS)
-    scheduleYield(&cap,task);
+    if (emptyRunQueue(cap)) {
+        // If we have nothing to do then yield the capability and wait until we
+        // are woken up again.
+        scheduleYield(&cap,task);
+    }
 
     if (emptyRunQueue(cap)) continue; // look for work again
 #endif
