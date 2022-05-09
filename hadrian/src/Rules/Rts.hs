@@ -121,7 +121,7 @@ needRtsLibffiTargets stage = do
     let headers = fmap ((rtsPath -/- "include") -/-) libffiHeaderFiles
 
     if useSystemFfi
-    then return headers
+    then return []
     else do
         -- Need Libffi
         -- This returns the dynamic library files (in the Libffi build dir).
