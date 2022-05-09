@@ -1412,9 +1412,9 @@ plusImportAvails
                    imp_trust_pkgs    = tpkgs1 `S.union` tpkgs2,
                    imp_trust_own_pkg = tself1 || tself2,
                    imp_boot_mods   = srs1 `plusModDeps` srcs2,
-                   imp_sig_mods      = sig_mods1 `unionLists` sig_mods2,
-                   imp_orphs         = orphs1 `unionLists` orphs2,
-                   imp_finsts        = finsts1 `unionLists` finsts2 }
+                   imp_sig_mods      = unionListsOrd sig_mods1 sig_mods2,
+                   imp_orphs         = unionListsOrd orphs1 orphs2,
+                   imp_finsts        = unionListsOrd finsts1 finsts2 }
 
 {-
 ************************************************************************
