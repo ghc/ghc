@@ -423,19 +423,6 @@ StgWord64 getPhysicalMemorySize (void)
     return physMemSize;
 }
 
-void setExecutable (void *p, W_ len, bool exec)
-{
-    DWORD dwOldProtect = 0;
-    if (VirtualProtect (p, len,
-                        exec ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE,
-                        &dwOldProtect) == 0)
-    {
-        sysErrorBelch("setExecutable: failed to protect 0x%p; old protection: "
-                      "%lu\n", p, (unsigned long)dwOldProtect);
-        stg_exit(EXIT_FAILURE);
-    }
-}
-
 #if defined(USE_LARGE_ADDRESS_SPACE)
 
 static void* heap_base = NULL;

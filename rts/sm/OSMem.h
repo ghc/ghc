@@ -17,7 +17,6 @@ void osReleaseFreeMemory(void);
 void osFreeAllMBlocks(void);
 size_t getPageSize (void);
 StgWord64 getPhysicalMemorySize (void);
-void setExecutable (void *p, W_ len, bool exec);
 bool osBuiltWithNumaSupport(void); // See #14956
 bool osNumaAvailable(void);
 uint32_t osNumaNodes(void);

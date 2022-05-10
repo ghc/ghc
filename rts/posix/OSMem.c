@@ -455,21 +455,6 @@ StgWord64 getPhysicalMemorySize (void)
     return physMemSize;
 }
 
-void setExecutable (void *p, W_ len, bool exec)
-{
-    StgWord pageSize = getPageSize();
-
-    /* malloced memory isn't executable by default on OpenBSD */
-    StgWord mask             = ~(pageSize - 1);
-    StgWord startOfFirstPage = ((StgWord)p          ) & mask;
-    StgWord startOfLastPage  = ((StgWord)p + len - 1) & mask;
-    StgWord size             = startOfLastPage - startOfFirstPage + pageSize;
-    if (mprotect((void*)startOfFirstPage, (size_t)size,
-                 (exec ? PROT_EXEC : 0) | PROT_READ | PROT_WRITE) != 0) {
-        barf("setExecutable: failed to protect 0x%p\n", p);
-    }
-}
-
 #if defined(USE_LARGE_ADDRESS_SPACE)
 
 static void *
