@@ -607,6 +607,7 @@ There are two cases.
 ------ Special case (B) -------
   For a pattern that is essentially just a tuple:
       * A product type, so cannot fail
+      * Boxed, so that it can be matched lazily
       * Only one level, so that
           - generating multiple matches is fine
           - seq'ing it evaluates the same as matching it
@@ -783,6 +784,7 @@ strip_bangs (L _ (BangPat _ p)) = strip_bangs p
 strip_bangs lp                  = lp
 
 is_flat_prod_lpat :: LPat GhcTc -> Bool
+-- Pattern is equivalent to a flat, boxed, lifted tuple
 is_flat_prod_lpat = is_flat_prod_pat . unLoc
 
 is_flat_prod_pat :: Pat GhcTc -> Bool
@@ -791,7 +793,9 @@ is_flat_prod_pat (TuplePat _ ps Boxed) = all is_triv_lpat ps
 is_flat_prod_pat (ConPat { pat_con  = L _ pcon
                          , pat_args = ps})
   | RealDataCon con <- pcon
-  , Just _ <- tyConSingleDataCon_maybe (dataConTyCon con)
+  , let tc = dataConTyCon con
+  , Just _ <- tyConSingleDataCon_maybe tc
+  , isLiftedAlgTyCon tc
   = all is_triv_lpat (hsConPatArgs ps)
 is_flat_prod_pat _ = False
 
