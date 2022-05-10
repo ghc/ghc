@@ -1,0 +1,4 @@
+[1 of 4] Compiling Common           ( Common.hs, Common.o )
+[2 of 4] Compiling CtIdPlugin       ( CtIdPlugin.hs, CtIdPlugin.o )
+[3 of 4] Compiling Definitions      ( Definitions.hs, Definitions.o )
+[4 of 4] Compiling TcPlugin_CtId    ( TcPlugin_CtId.hs, TcPlugin_CtId.o )

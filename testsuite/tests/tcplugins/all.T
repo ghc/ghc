@@ -84,3 +84,17 @@ test('TcPlugin_EmitWanted'
     , [ 'TcPlugin_EmitWanted.hs'
       , '-dynamic -package ghc' if have_dynamic() else '-package ghc ' ]
     )
+
+# See TcPlugin_CtId.hs for a description of this plugin.
+test('TcPlugin_CtId'
+    , [ extra_files(
+        [ 'Definitions.hs'
+        , 'Common.hs'
+        , 'CtIdPlugin.hs'
+        , 'TcPlugin_CtId.hs'
+        ])
+      ]
+    , multimod_compile
+    , [ 'TcPlugin_CtId.hs'
+      , '-dynamic -package ghc' if have_dynamic() else '-package ghc' ]
+    )

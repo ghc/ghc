@@ -67,6 +67,7 @@ data PluginDefs =
     , zero     :: !TyCon
     , succ     :: !TyCon
     , add      :: !TyCon
+    , ctIdFam  :: !TyCon
     }
 
 definitionsModule :: TcPluginM Module
@@ -87,6 +88,7 @@ lookupDefs = do
   ( promoteDataCon    -> zero ) <- tcLookupDataCon =<< lookupOrig defs ( mkDataOcc "Zero"     )
   ( promoteDataCon    -> succ ) <- tcLookupDataCon =<< lookupOrig defs ( mkDataOcc "Succ"     )
   add                           <- tcLookupTyCon   =<< lookupOrig defs ( mkTcOcc   "Add"      )
+  ctIdFam                       <- tcLookupTyCon   =<< lookupOrig defs ( mkTcOcc   "CtId"     )
   pure ( PluginDefs { .. } )
 
 mkPlugin :: ( [String] -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult )
