@@ -1501,9 +1501,12 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
               -> SpecM SpecInfo
     spec_call spec_acc@(rules_acc, pairs_acc, uds_acc) _ci@(CI { ci_key = call_args })
       = -- See Note [Specialising Calls]
-        do { let all_call_args | is_dfun   = call_args ++ repeat UnspecArg
+        do { let all_call_args | is_dfun   = saturating_call_args -- See Note [Specialising DFuns]
                                | otherwise = call_args
-                               -- See Note [Specialising DFuns]
+                 saturating_call_args = call_args ++ map mk_extra_dfun_arg (dropList call_args rhs_bndrs)
+                 mk_extra_dfun_arg bndr | isTyVar bndr = UnspecType
+                                        | otherwise = UnspecArg
+
            ; ( useful, rhs_env2, leftover_bndrs
              , rule_bndrs, rule_lhs_args
              , spec_bndrs1, dx_binds, spec_args) <- specHeader env_with_dict_bndrs
@@ -1641,8 +1644,8 @@ specLookupRule env fn args rules
 DFuns have a special sort of unfolding (DFunUnfolding), and these are
 hard to specialise a DFunUnfolding to give another DFunUnfolding
 unless the DFun is fully applied (#18120).  So, in the case of DFunIds
-we simply extend the CallKey with trailing UnspecArgs, so we'll
-generate a rule that completely saturates the DFun.
+we simply extend the CallKey with trailing UnspecTypes/UnspecArgs,
+so that we'll generate a rule that completely saturates the DFun.
 
 There is an ASSERT that checks this, in the DFunUnfolding case of
 GHC.Core.Unfold.Make.specUnfolding.
