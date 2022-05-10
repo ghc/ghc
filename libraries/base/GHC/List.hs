@@ -38,6 +38,9 @@ module GHC.List (
    zip, zip3, zipWith, zipWith3, unzip, unzip3,
    errorEmptyList,
 
+   -- * GHC List fusion
+   augment, build,
+
  ) where
 
 import Data.Maybe

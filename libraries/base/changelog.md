@@ -50,6 +50,8 @@
     `Debug.Trace`, per
     [CLC #36](https://github.com/haskell/core-libraries-committee/issues/36).
 
+  * Re-export `augment` and `build` function from `GHC.List`
+
 ## 4.16.1.0 *Feb 2022*
 
   * Shipped with GHC 9.2.2
