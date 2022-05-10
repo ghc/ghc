@@ -61,4 +61,3 @@ showtix_main flags (prog:modNames) = do
                  ]
 
        return ()
-

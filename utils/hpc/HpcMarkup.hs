@@ -483,4 +483,3 @@ red,green,yellow :: String
 red    = "#f20913"
 green  = "#60de51"
 yellow = "yellow"
-

@@ -142,4 +142,3 @@ findNotTickedFromTree (Node (_, []) children) = findNotTickedFromList children
 
 findNotTickedFromList :: [MixEntryDom [(BoxLabel,Bool)]] -> [PleaseTick]
 findNotTickedFromList = concatMap findNotTickedFromTree
-

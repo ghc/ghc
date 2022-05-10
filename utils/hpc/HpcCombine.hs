@@ -195,4 +195,3 @@ instance Strict Tix where
 instance Strict TixModule where
   strict (TixModule m1 p1 i1 t1) =
             ((((TixModule $! strict m1) $! strict p1) $! strict i1) $! strict t1)
-

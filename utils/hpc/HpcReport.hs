@@ -275,5 +275,3 @@ report_options
         . resetHpcDirsOpt
         . xmlOutputOpt
         . verbosityOpt
-
-

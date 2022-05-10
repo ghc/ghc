@@ -155,5 +155,3 @@ addParentToTree path (Node (pos,a) children) =
 
 addParentToList :: [a] -> [MixEntryDom [a]] -> [MixEntryDom ([a],[a])]
 addParentToList path nodes = map (addParentToTree path) nodes
-
-
