@@ -677,12 +677,27 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
            ppr binder)
 
        ; case splitDmdSig (idDmdSig binder) of
-           (demands, result_info) | isDeadEndDiv result_info ->
-             checkL (demands `lengthAtLeast` idArity binder)
-               (text "idArity" <+> ppr (idArity binder) <+>
-               text "exceeds arity imposed by the strictness signature" <+>
-               ppr (idDmdSig binder) <> colon <+>
-               ppr binder)
+           (demands, result_info) | isDeadEndDiv result_info -> do
+              let !num_demand_args = length demands
+                  !arity = idArity binder
+              -- We must have as many argument demands
+              -- as the arity for bottoming expressions.
+
+              -- If demand_args > arity then the expression
+              -- does usefull work without bottoming when applied to
+              -- arity arguments.
+
+              -- If demand_args < arity then the arity as wrong
+              -- as the binder does "work" (it bottoms) when applied
+              -- to less than arity arguments.
+
+              -- Both of those imply either arity or demand sig are wrong.
+              checkL (num_demand_args == arity || arity == 0)
+                  (text "idArity" <+> ppr (arity) <+>
+                  text "exceeds arity imposed by the strictness signature" <+>
+                  ppr (idDmdSig binder) <> colon <+>
+                  ppr binder)
+
            _ -> return ()
 
        ; addLoc (RuleOf binder) $ mapM_ (lintCoreRule binder binder_ty) (idCoreRules binder)
