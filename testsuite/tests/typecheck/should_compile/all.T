@@ -787,3 +787,5 @@ test('T19315', normal, compile, [''])
 
 test('T19535', normal, compile, [''])
 test('T21516', normal, compile, [''])
+test('T21519', normal, compile, [''])
+test('T21519a', normal, compile, [''])
