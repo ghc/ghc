@@ -1657,6 +1657,13 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       }
       else if (symStorageClass == IMAGE_SYM_CLASS_WEAK_EXTERNAL) {
           isWeak = true;
+          CHECK(getSymNumberOfAuxSymbols (info, sym) == 1);
+          CHECK(symValue == 0);
+          COFF_symbol_aux_weak_external *aux = (COFF_symbol_aux_weak_external *) (sym+1);
+          COFF_symbol* targetSym = &oc->info->symbols[aux->TagIndex];
+          int32_t targetSecNumber = getSymSectionNumber (info, targetSym);
+          Section *targetSection = targetSecNumber > 0 ? &oc->sections[targetSecNumber-1] : NULL;
+          addr = (SymbolAddr*) ((size_t) targetSection->start + getSymValue(info, targetSym));
       }
       else if (  secNumber == IMAGE_SYM_UNDEFINED && symValue > 0) {
          /* This symbol isn't in any section at all, ie, global bss.
