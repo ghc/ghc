@@ -116,7 +116,6 @@ import GHC.Runtime.Context        ( InteractiveContext )
 
 import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 
-import Control.Applicative ((<|>))
 import Control.Monad
 import Data.Maybe
 import GHC.Utils.Misc
@@ -499,15 +498,13 @@ checkPostUnariseConArg arg = case arg of
 -- Post-unarisation args and case alt binders should not have unboxed tuple,
 -- unboxed sum, or void types. Return what the binder is if it is one of these.
 checkPostUnariseId :: Id -> Maybe String
-checkPostUnariseId id =
-    let
-      id_ty = idType id
-      is_sum, is_tuple, is_void :: Maybe String
-      is_sum = guard (isUnboxedSumType id_ty) >> return "unboxed sum"
-      is_tuple = guard (isUnboxedTupleType id_ty) >> return "unboxed tuple"
-      is_void = guard (isZeroBitTy id_ty) >> return "void"
-    in
-      is_sum <|> is_tuple <|> is_void
+checkPostUnariseId id
+  | isUnboxedSumType id_ty   = Just "unboxed sum"
+  | isUnboxedTupleType id_ty = Just "unboxed tuple"
+  | isZeroBitTy id_ty        = Just "void"
+  | otherwise                = Nothing
+  where
+    id_ty = idType id
 
 addErrL :: SDoc -> LintM ()
 addErrL msg = LintM $ \_mod _lf df _opts loc _scope errs -> ((), addErr df errs msg loc)

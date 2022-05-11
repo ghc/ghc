@@ -4,7 +4,7 @@ module GHC.Core.Type where
 
 import GHC.Prelude
 import {-# SOURCE #-} GHC.Core.TyCon
-import {-# SOURCE #-} GHC.Core.TyCo.Rep( Type, Coercion )
+import {-# SOURCE #-} GHC.Core.TyCo.Rep( Type, RuntimeRepType, Coercion )
 import GHC.Utils.Misc
 
 isPredTy     :: HasDebugCallStack => Type -> Bool
@@ -22,7 +22,7 @@ isRuntimeRepTy :: Type -> Bool
 isLevityTy :: Type -> Bool
 isMultiplicityTy :: Type -> Bool
 isLiftedTypeKind :: Type -> Bool
-mkTYPEapp :: Type -> Type
+mkTYPEapp :: RuntimeRepType -> Type
 
 splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 tyConAppTyCon_maybe :: Type -> Maybe TyCon

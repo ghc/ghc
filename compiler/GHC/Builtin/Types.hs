@@ -179,6 +179,7 @@ import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import GHC.Unit.Module        ( Module )
 import GHC.Core.Type
 import qualified GHC.Core.TyCo.Rep as TyCoRep (Type(TyConApp))
+import GHC.Core.TyCo.Rep (RuntimeRepType)
 import GHC.Types.RepType
 import GHC.Core.DataCon
 import GHC.Core.ConLike
@@ -1530,7 +1531,7 @@ liftedRepTyCon
   where
     rhs = TyCoRep.TyConApp boxedRepDataConTyCon [liftedDataConTy]
 
-liftedRepTy :: Type
+liftedRepTy :: RuntimeRepType
 liftedRepTy = mkTyConTy liftedRepTyCon
 
 ----------------------
@@ -1541,7 +1542,7 @@ unliftedRepTyCon
   where
     rhs = TyCoRep.TyConApp boxedRepDataConTyCon [unliftedDataConTy]
 
-unliftedRepTy :: Type
+unliftedRepTy :: RuntimeRepType
 unliftedRepTy = mkTyConTy unliftedRepTyCon
 
 ----------------------
@@ -1552,7 +1553,7 @@ zeroBitRepTyCon
   where
     rhs = TyCoRep.TyConApp tupleRepDataConTyCon [mkPromotedListTy runtimeRepTy []]
 
-zeroBitRepTy :: Type
+zeroBitRepTy :: RuntimeRepType
 zeroBitRepTy = mkTyConTy zeroBitRepTyCon
 
 
@@ -1708,7 +1709,7 @@ intRepDataConTy,
   wordRepDataConTy,
   word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
   addrRepDataConTy,
-  floatRepDataConTy, doubleRepDataConTy :: Type
+  floatRepDataConTy, doubleRepDataConTy :: RuntimeRepType
 [intRepDataConTy,
    int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
    wordRepDataConTy,

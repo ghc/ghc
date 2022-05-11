@@ -2180,9 +2180,7 @@ fiddleCCall id
 
 newVar :: Type -> UniqSM Id
 newVar ty
- = seqType ty `seq` do
-     uniq <- getUniqueM
-     return (mkSysLocalOrCoVar (fsLit "sat") uniq Many ty)
+ = seqType ty `seq` mkSysLocalOrCoVarM (fsLit "sat") Many ty
 
 
 ------------------------------------------------------------------------------

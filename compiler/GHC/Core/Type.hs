@@ -651,7 +651,7 @@ isTyConKeyApp_maybe key ty
 -- | Extract the RuntimeRep classifier of a type from its kind. For example,
 -- @kindRep * = LiftedRep@; Panics if this is not possible.
 -- Treats * and Constraint as the same
-kindRep :: HasDebugCallStack => Kind -> Type
+kindRep :: HasDebugCallStack => Kind -> RuntimeRepType
 kindRep k = case kindRep_maybe k of
               Just r  -> r
               Nothing -> pprPanic "kindRep" (ppr k)
@@ -660,7 +660,7 @@ kindRep k = case kindRep_maybe k of
 -- For example, @kindRep_maybe * = Just LiftedRep@
 -- Returns 'Nothing' if the kind is not of form (TYPE rr)
 -- Treats * and Constraint as the same
-kindRep_maybe :: HasDebugCallStack => Kind -> Maybe Type
+kindRep_maybe :: HasDebugCallStack => Kind -> Maybe RuntimeRepType
 kindRep_maybe kind
   | Just [arg] <- isTyConKeyApp_maybe tYPETyConKey kind = Just arg
   | otherwise                                           = Nothing
@@ -1725,13 +1725,13 @@ mkTyConApp tycon tys@(ty1:rest)
     key = tyConUnique tycon
     bale_out = TyConApp tycon tys
 
-mkTYPEapp :: Type -> Type
+mkTYPEapp :: RuntimeRepType -> Type
 mkTYPEapp rr
   = case mkTYPEapp_maybe rr of
        Just ty -> ty
        Nothing -> TyConApp tYPETyCon [rr]
 
-mkTYPEapp_maybe :: Type -> Maybe Type
+mkTYPEapp_maybe :: RuntimeRepType -> Maybe Type
 -- ^ Given a @RuntimeRep@, applies @TYPE@ to it.
 -- On the fly it rewrites
 --      TYPE LiftedRep      -->   liftedTypeKind    (a synonym)
@@ -2529,12 +2529,12 @@ dropRuntimeRepArgs = dropWhile isRuntimeRepKindedTy
 -- @getRuntimeRep_maybe Int = Just LiftedRep@. Returns 'Nothing' if this is not
 -- possible.
 getRuntimeRep_maybe :: HasDebugCallStack
-                    => Type -> Maybe Type
+                    => Type -> Maybe RuntimeRepType
 getRuntimeRep_maybe = kindRep_maybe . typeKind
 
 -- | Extract the RuntimeRep classifier of a type. For instance,
 -- @getRuntimeRep_maybe Int = LiftedRep@. Panics if this is not possible.
-getRuntimeRep :: HasDebugCallStack => Type -> Type
+getRuntimeRep :: HasDebugCallStack => Type -> RuntimeRepType
 getRuntimeRep ty
   = case getRuntimeRep_maybe ty of
       Just r  -> r
@@ -3135,7 +3135,7 @@ tcIsConstraintKind ty
 -- | Like 'kindRep_maybe', but considers 'Constraint' to be distinct
 -- from 'Type'. For a version that treats them as the same type, see
 -- 'kindRep_maybe'.
-tcKindRep_maybe :: HasDebugCallStack => Kind -> Maybe Type
+tcKindRep_maybe :: HasDebugCallStack => Kind -> Maybe RuntimeRepType
 tcKindRep_maybe kind
   | Just (tc, [arg]) <- tcSplitTyConApp_maybe kind    -- Note: tcSplit here
   , tc `hasKey` tYPETyConKey    = Just arg

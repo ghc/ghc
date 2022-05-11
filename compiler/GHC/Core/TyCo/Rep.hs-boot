@@ -17,6 +17,7 @@ data Scaled a
 type Mult = Type
 
 type PredType = Type
+type RuntimeRepType = Type
 type Kind = Type
 type ThetaType = [PredType]
 type CoercionN = Coercion

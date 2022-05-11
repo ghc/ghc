@@ -316,7 +316,6 @@ basicKnownKeyNames
         newStablePtrName,
 
         -- GHC Extensions
-        groupWithName,
         considerAccessibleName,
 
         -- Strings and lists
@@ -1111,8 +1110,7 @@ alternativeClassKey = mkPreludeMiscIdUnique 754
 
 
 -- Functions for GHC extensions
-groupWithName, considerAccessibleName :: Name
-groupWithName          = varQual gHC_EXTS (fsLit "groupWith")          groupWithIdKey
+considerAccessibleName :: Name
 considerAccessibleName = varQual gHC_EXTS (fsLit "considerAccessible") considerAccessibleIdKey
 
 -- Random GHC.Base functions
@@ -2328,9 +2326,8 @@ inlineIdKey, noinlineIdKey :: Unique
 inlineIdKey                   = mkPreludeMiscIdUnique 120
 -- see below
 
-mapIdKey, groupWithIdKey, dollarIdKey, coercionTokenIdKey, considerAccessibleIdKey :: Unique
+mapIdKey, dollarIdKey, coercionTokenIdKey, considerAccessibleIdKey :: Unique
 mapIdKey                = mkPreludeMiscIdUnique 121
-groupWithIdKey          = mkPreludeMiscIdUnique 122
 dollarIdKey             = mkPreludeMiscIdUnique 123
 coercionTokenIdKey      = mkPreludeMiscIdUnique 124
 noinlineIdKey           = mkPreludeMiscIdUnique 125

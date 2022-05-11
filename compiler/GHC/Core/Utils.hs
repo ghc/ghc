@@ -103,7 +103,6 @@ import GHC.Types.Unique.Set
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps( minusList )
-import GHC.Data.Pair
 import GHC.Data.OrdList
 
 import GHC.Utils.Constants (debugIsOn)
@@ -139,7 +138,7 @@ exprType (Let bind body)
   , Type ty <- rhs           = substTyWithUnchecked [tv] [ty] (exprType body)
   | otherwise                = exprType body
 exprType (Case _ _ ty _)     = ty
-exprType (Cast _ co)         = pSnd (coercionKind co)
+exprType (Cast _ co)         = coercionRKind co
 exprType (Tick _ e)          = exprType e
 exprType (Lam binder expr)   = mkLamType binder (exprType expr)
 exprType e@(App _ _)

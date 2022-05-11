@@ -970,8 +970,7 @@ newLocal :: FastString   -- ^ a string which will form part of the 'Var'\'s name
          -> Scaled Type  -- ^ the type of the 'Var'
          -> UniqSM Var
 newLocal name_stem (Scaled w ty) =
-    do { uniq <- getUniqueM
-       ; return (mkSysLocalOrCoVar name_stem uniq w ty) }
+    mkSysLocalOrCoVarM name_stem w ty
          -- We should not have "OrCoVar" here, this is a bug (#17545)
 
 
@@ -1410,7 +1409,7 @@ proxyHashId
     --
     -- The visibility of the `k` binder is Inferred to match the type of the
     -- Proxy data constructor (#16293).
-    [kv,tv] = mkTemplateKiTyVars [liftedTypeKind] id
+    [kv,tv] = mkTemplateKiTyVar liftedTypeKind (\x -> [x])
     kv_ty   = mkTyVarTy kv
     tv_ty   = mkTyVarTy tv
     ty      = mkInfForAllTy kv $ mkSpecForAllTy tv $ mkProxyPrimTy kv_ty tv_ty

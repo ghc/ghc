@@ -578,11 +578,8 @@ tyConPrimRep1 tc = case tyConPrimRep tc of
 -- See also Note [Getting from RuntimeRep to PrimRep]
 kindPrimRep :: HasDebugCallStack => SDoc -> Kind -> [PrimRep]
 kindPrimRep doc ki
-  | Just ki' <- coreView ki
-  = kindPrimRep doc ki'
-kindPrimRep doc (TyConApp typ [runtime_rep])
-  = assert (typ `hasKey` tYPETyConKey) $
-    runtimeRepPrimRep doc runtime_rep
+  | Just runtime_rep <- kindRep_maybe ki
+  = runtimeRepPrimRep doc runtime_rep
 kindPrimRep doc ki
   = pprPanic "kindPrimRep" (ppr ki $$ doc)
 
@@ -606,7 +603,7 @@ kindPrimRep_maybe _ki
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
 -- it encodes. See also Note [Getting from RuntimeRep to PrimRep]
 -- The [PrimRep] is the final runtime representation /after/ unarisation
-runtimeRepPrimRep :: HasDebugCallStack => SDoc -> Type -> [PrimRep]
+runtimeRepPrimRep :: HasDebugCallStack => SDoc -> RuntimeRepType -> [PrimRep]
 runtimeRepPrimRep doc rr_ty
   | Just rr_ty' <- coreView rr_ty
   = runtimeRepPrimRep doc rr_ty'
@@ -631,7 +628,7 @@ runtimeRepPrimRep_maybe rr_ty
   = Nothing
 
 -- | Convert a 'PrimRep' to a 'Type' of kind RuntimeRep
-primRepToRuntimeRep :: PrimRep -> Type
+primRepToRuntimeRep :: PrimRep -> RuntimeRepType
 primRepToRuntimeRep rep = case rep of
   VoidRep       -> zeroBitRepTy
   LiftedRep     -> liftedRepTy

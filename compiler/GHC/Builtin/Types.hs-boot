@@ -1,7 +1,7 @@
 module GHC.Builtin.Types where
 
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
-import {-# SOURCE #-} GHC.Core.TyCo.Rep (Type, Kind)
+import {-# SOURCE #-} GHC.Core.TyCo.Rep (Type, Kind, RuntimeRepType)
 import {-# SOURCE #-} GHC.Core.DataCon  ( DataCon )
 
 import GHC.Types.Basic (Arity, TupleSort, Boxity, ConTag)
@@ -33,7 +33,7 @@ runtimeRepTy, levityTy :: Type
 boxedRepDataConTyCon, liftedDataConTyCon :: TyCon
 vecRepDataConTyCon, tupleRepDataConTyCon :: TyCon
 
-liftedRepTy, unliftedRepTy, zeroBitRepTy :: Type
+liftedRepTy, unliftedRepTy, zeroBitRepTy :: RuntimeRepType
 liftedDataConTy, unliftedDataConTy :: Type
 
 intRepDataConTy,
@@ -41,7 +41,7 @@ intRepDataConTy,
   wordRepDataConTy,
   word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
   addrRepDataConTy,
-  floatRepDataConTy, doubleRepDataConTy :: Type
+  floatRepDataConTy, doubleRepDataConTy :: RuntimeRepType
 
 vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy,
   vec64DataConTy :: Type

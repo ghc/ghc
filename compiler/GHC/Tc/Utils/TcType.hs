@@ -175,8 +175,8 @@ module GHC.Tc.Utils.TcType (
   substCoUnchecked, substCoWithUnchecked,
   substTheta,
 
-  isUnliftedType,       -- Source types are always lifted
-  isUnboxedTupleType,   -- Ditto
+  isUnliftedType,
+  isUnboxedTupleType,
   isPrimitiveType,
 
   tcView, coreView,
