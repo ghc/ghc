@@ -1628,7 +1628,10 @@ int ocTryLoad (ObjectCode* oc) {
 #   else
     barf("ocTryLoad: not implemented on this platform");
 #   endif
-    if (!r) { return r; }
+    if (!r) {
+        IF_DEBUG(linker, ocDebugBelch(oc, "resolution failed\n"));
+        return r;
+    }
 
     IF_DEBUG(linker, ocDebugBelch(oc, "protecting mappings\n"));
 #if defined(NEED_SYMBOL_EXTRAS)
