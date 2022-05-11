@@ -652,8 +652,8 @@ The key component of a typechecker plugin is a function of type
 
 ::
 
-    solve :: EvBindsVar -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
-    solve binds givens deriveds wanteds = ...
+    solve :: EvBindsVar -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
+    solve binds givens wanteds = ...
 
 This function will be invoked in two different ways:
 
@@ -679,8 +679,8 @@ i.e. in (1) it should return only Givens, and for (2) it should return only
 Wanteds; all other constraints will be ignored.
 
 If the plugin cannot make any progress, it should return
-``TcPluginSolveResult [] [] []``. Otherwise, if there were any new constraints, the
-main constraint solver will be re-invoked to simplify them, then the
+``TcPluginSolveResult [] [] []``. Otherwise, if there were any new constraints,
+the main constraint solver will be re-invoked to simplify them, then the
 plugin will be invoked again. The plugin is responsible for making sure
 that this process eventually terminates.
 
