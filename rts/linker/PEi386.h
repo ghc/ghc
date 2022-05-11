@@ -117,6 +117,12 @@ union _COFF_symbol {
     COFF_symbol_ex ex;
 } COFF_symbol;
 
+typedef
+struct {
+    uint32_t TagIndex;
+    uint32_t Characteristics;
+} COFF_symbol_aux_weak_external;
+
 /* A record for storing handles into DLLs. */
 typedef
 struct _OpenedDLL {
