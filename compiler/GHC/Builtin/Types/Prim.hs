@@ -107,7 +107,7 @@ module GHC.Builtin.Types.Prim(
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
-  ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind
+  ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind, unliftedTypeKind
   , boxedRepDataConTyCon, vecRepDataConTyCon
   , liftedRepTy, unliftedRepTy, zeroBitRepTy
   , intRepDataConTy
@@ -388,7 +388,7 @@ alphaTy, betaTy, gammaTy, deltaTy :: Type
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
 
 alphaTyVarsUnliftedRep :: [TyVar]
-alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat (mkTYPEapp unliftedRepTy)
+alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat unliftedTypeKind
 
 alphaTyVarUnliftedRep :: TyVar
 (alphaTyVarUnliftedRep:_) = alphaTyVarsUnliftedRep
@@ -406,7 +406,7 @@ runtimeRep1TyVarInf, runtimeRep2TyVarInf :: TyVarBinder
 runtimeRep1TyVarInf = mkTyVarBinder Inferred runtimeRep1TyVar
 runtimeRep2TyVarInf = mkTyVarBinder Inferred runtimeRep2TyVar
 
-runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty :: Type
+runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty :: RuntimeRepType
 runtimeRep1Ty = mkTyVarTy runtimeRep1TyVar
 runtimeRep2Ty = mkTyVarTy runtimeRep2TyVar
 runtimeRep3Ty = mkTyVarTy runtimeRep3TyVar
@@ -924,9 +924,6 @@ realWorldTy :: Type
 realWorldTy          = mkTyConTy realWorldTyCon
 realWorldStatePrimTy :: Type
 realWorldStatePrimTy = mkStatePrimTy realWorldTy        -- State# RealWorld
-
--- Note: the ``state-pairing'' types are not truly primitive,
--- so they are defined in \tr{GHC.Builtin.Types}, not here.
 
 
 mkProxyPrimTy :: Type -> Type -> Type

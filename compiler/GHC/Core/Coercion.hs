@@ -886,7 +886,7 @@ once ~# is made to be homogeneous.
 -- See Note [Unused coercion variable in ForAllCo]
 mkForAllCo :: TyCoVar -> CoercionN -> Coercion -> Coercion
 mkForAllCo v kind_co co
-  | assert (varType v `eqType` (pFst $ coercionKind kind_co)) True
+  | assert (varType v `eqType` (coercionLKind kind_co)) True
   , assert (isTyVar v || almostDevoidCoVarOfCo v co) True
   , Just (ty, r) <- isReflCo_maybe co
   , isGReflCo kind_co
@@ -899,7 +899,7 @@ mkForAllCo v kind_co co
 -- The kind of the tycovar should be the left-hand kind of the kind coercion.
 mkForAllCo_NoRefl :: TyCoVar -> CoercionN -> Coercion -> Coercion
 mkForAllCo_NoRefl v kind_co co
-  | assert (varType v `eqType` (pFst $ coercionKind kind_co)) True
+  | assert (varType v `eqType` (coercionLKind kind_co)) True
   , assert (isTyVar v || almostDevoidCoVarOfCo v co) True
   , assert (not (isReflCo co)) True
   , isCoVar v

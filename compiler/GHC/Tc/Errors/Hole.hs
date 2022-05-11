@@ -677,8 +677,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
     -- of only concrete hole fits like `sum`.
     mkRefTy :: Int -> TcM (TcType, [TcTyVar])
     mkRefTy refLvl = (wrapWithVars &&& id) <$> newTyVars
-      where newTyVars = replicateM refLvl $ setLvl <$>
-                            (newOpenTypeKind >>= newFlexiTyVar)
+      where newTyVars = replicateM refLvl $ setLvl <$> newOpenFlexiTyVar
             setLvl = flip setMetaTyVarTcLevel hole_lvl
             wrapWithVars vars = mkVisFunTysMany (map mkTyVarTy vars) hole_ty
 

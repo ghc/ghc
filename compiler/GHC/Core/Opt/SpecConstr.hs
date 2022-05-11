@@ -2522,11 +2522,11 @@ setStrUnfolding id str
 -- | wildCardPats are always boring
 wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg)
 wildCardPat ty str
-  = do { uniq <- getUniqueM
-       ; let id = mkSysLocalOrCoVar (fsLit "sc") uniq Many ty `setStrUnfolding` str
+  = do { id <- mkSysLocalOrCoVarM (fsLit "sc") Many ty
+       ; let id' = id `setStrUnfolding` str
        -- See Note [SpecConstr and evaluated unfoldings]
-       -- ; pprTraceM "wildCardPat" (ppr id <+> ppr (idUnfolding id))
-       ; return (False, varToCoreExpr id) }
+       -- ; pprTraceM "wildCardPat" (ppr id' <+> ppr (idUnfolding id'))
+       ; return (False, varToCoreExpr id') }
 
 isValue :: ValueEnv -> CoreExpr -> Maybe Value
 isValue _env (Lit lit)

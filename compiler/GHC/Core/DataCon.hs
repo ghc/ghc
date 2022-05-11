@@ -1555,7 +1555,7 @@ dataConInstUnivs dc dc_args = chkAppend dc_args $ map mkTyVarTy dc_args_suffix
                                     (text "dataConInstUnivs"
                                       <+> ppr dc_args
                                       <+> ppr (dataConUnivTyVars dc)) $
-                          splitAt (length dc_args) $ dataConUnivTyVars dc
+                          splitAtList dc_args $ dataConUnivTyVars dc
     (_, dc_args_suffix) = substTyVarBndrs prefix_subst dc_univs_suffix
     prefix_subst        = mkTvSubst prefix_in_scope prefix_env
     prefix_in_scope     = mkInScopeSet $ tyCoVarsOfTypes dc_args
