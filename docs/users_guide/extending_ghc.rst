@@ -652,8 +652,8 @@ The key component of a typechecker plugin is a function of type
 
 ::
 
-    solve :: [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
-    solve givens deriveds wanteds = ...
+    solve :: [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult
+    solve givens wanteds = ...
 
 This function will be invoked in two different ways:
 
@@ -676,11 +676,11 @@ The plugin can then respond with:
 
 The plugin must respond with constraints of the same flavour,
 i.e. in (1) it should return only Givens, and for (2) it should return only
-Wanteds (or Deriveds); all other constraints will be ignored.
+Wanteds; all other constraints will be ignored.
 
 If the plugin cannot make any progress, it should return
-``TcPluginSolveResult [] [] []``. Otherwise, if there were any new constraints, the
-main constraint solver will be re-invoked to simplify them, then the
+``TcPluginSolveResult [] [] []``. Otherwise, if there were any new constraints,
+the main constraint solver will be re-invoked to simplify them, then the
 plugin will be invoked again. The plugin is responsible for making sure
 that this process eventually terminates.
 
@@ -692,7 +692,7 @@ by solving or contradicting them).
 
 Constraints that have been solved by the plugin must be provided with
 evidence in the form of an ``EvTerm`` of the type of the constraint.
-This evidence is ignored for Given and Derived constraints, which GHC
+This evidence is ignored for Given constraints, which GHC
 "solves" simply by discarding them; typically this is used when they are
 uninformative (e.g. reflexive equations). For Wanted constraints, the
 evidence will form part of the Core term that is generated after
