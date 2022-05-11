@@ -10,8 +10,6 @@ canDelete = ["freebsd", "linux", "darwin"]
 
 main :: IO ()
 main = do
-  cwd <- getCurrentDirectory
-
   -- If executablePath = Nothing, then this platform
   -- cannot return the executable path.  So just exit
   -- with a success value.
@@ -22,18 +20,21 @@ main = do
     (True, Nothing) -> die "executablePath unexpected not defined"
     (True, Just k) -> pure k
 
-  -- At this point, the query should return the path to the
-  -- test program.  On some platforms this may have a file
-  -- extension (e.g. ".exe" on Windows).  Drop the extension
-  -- and compare to the expected path.
-  let expected = cwd </> "executablePath"
-  before <- fmap (fmap dropExtension) query >>= \r -> case r of
+  -- At this point, the query should return the path to the test program.
+  before <- query >>= \r -> case r of
     Nothing
       -> die "executablePath query unexpected returned Nothing"
-    Just path | path /= expected
-      -> die $ "executablePath query returned `" <> path <> "`; expected `" <> expected <> "`"
     Just path
       -> pure path
+
+  cwd <- getCurrentDirectory
+  let
+    -- On some platforms the executable has a file extension
+    -- (e.g. ".exe" on Windows). Drop the extension when comparing.
+    expected  = cwd </> "executablePath"
+    actual    = dropExtension before
+  unless (actual == expected) $
+      die $ "executablePath query returned `" <> actual <> "`; expected `" <> expected <> "`"
 
   unless (os `elem` canDelete)
     -- This OS cannot delete the executable file while it is
