@@ -378,6 +378,7 @@ usage_text[] = {
 "                 T = closure type",
 "                 d = closure description",
 "                 y = type description",
+"                 i = info table",
 "                 r = retainer",
 "                 b = biography (LAG,DRAG,VOID,USE)",
 "  A subset of closures may be selected thusly:",
@@ -400,6 +401,7 @@ usage_text[] = {
 #else /* PROFILING */
 "  -h       Heap residency profile (output file <program>.hp)",
 "  -hT      Produce a heap profile grouped by closure type",
+"  -hi      Produce a heap profile grouped by info table address",
 #endif /* PROFILING */
 
 "  -i<sec>  Time between heap profile samples (seconds, default: 0.1)",
