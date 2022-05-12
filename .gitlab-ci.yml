@@ -102,7 +102,7 @@ workflow:
 
 .release: &release
   variables:
-    BUILD_FLAVOUR: "perf"
+    BUILD_FLAVOUR: "release"
     XZ_OPT: "-9"
     IGNORE_PERF_FAILURES: "all"
     HADDOCK_HYPERLINKED_SOURCES: "YES"
@@ -457,14 +457,14 @@ doc-tarball:
       optional: true
     - job: nightly-x86_64-linux-deb10-validate
       optional: true
-    - job: release-x86_64-linux-deb10-perf
+    - job: release-x86_64-linux-deb10-release
       optional: true
 
     - job: x86_64-windows-validate
       optional: true
     - job: nightly-x86_64-windows-validate
       optional: true
-    - job: release-x86_64-windows-perf
+    - job: release-x86_64-windows-release
       optional: true
 
   tags:
@@ -485,10 +485,10 @@ doc-tarball:
     - |
       mv "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz" "$LINUX_BINDIST" \
         || mv "ghc-x86_64-linux-deb10-validate.tar.xz" "$LINUX_BINDIST" \
-        || mv "ghc-x86_64-linux-deb10-perf.tar.xz" "$LINUX_BINDIST" \
+        || mv "ghc-x86_64-linux-deb10-release.tar.xz" "$LINUX_BINDIST" \
         || true
       mv "ghc-x86_64-windows-validate.tar.xz" "$WINDOWS_BINDIST" \
-        || mv "ghc-x86_64-windows-perf.tar.xz" "$WINDOWS_BINDIST" \
+        || mv "ghc-x86_64-windows-release.tar.xz" "$WINDOWS_BINDIST" \
         || true
       if [ ! -f "$LINUX_BINDIST" ]; then
         echo "Error: $LINUX_BINDIST does not exist. Did the Debian 9 job fail?"
@@ -506,11 +506,11 @@ doc-tarball:
 hackage-doc-tarball:
   stage: packaging
   needs:
-    - job: x86_64-linux-fedora33-perf
+    - job: x86_64-linux-fedora33-release
       optional: true
-    - job: nightly-x86_64-linux-fedora33-perf
+    - job: nightly-x86_64-linux-fedora33-release
       optional: true
-    - job: release-x86_64-linux-fedora33-perf
+    - job: release-x86_64-linux-fedora33-release
       optional: true
     - job: source-tarball
   tags:
@@ -525,7 +525,7 @@ hackage-doc-tarball:
       - hackage_docs
   before_script:
     - tar -xf ghc-*[0-9]-src.tar.xz
-    - tar -xf ghc-x86_64-linux-fedora33-perf.tar.xz -C ghc*/
+    - tar -xf ghc-x86_64-linux-fedora33-release.tar.xz -C ghc*/
   script:
     - cd ghc*/
     - mv .gitlab/upload_ghc_libs.py .
@@ -600,13 +600,13 @@ test-bootstrap:
 .hackage:
   stage: testing
   needs:
-    - job: x86_64-linux-fedora33-perf
+    - job: x86_64-linux-fedora33-release
       optional: true
       artifacts: false
-    - job: nightly-x86_64-linux-fedora33-perf
+    - job: nightly-x86_64-linux-fedora33-release
       optional: true
       artifacts: false
-    - job: release-x86_64-linux-fedora33-perf
+    - job: release-x86_64-linux-fedora33-release
       optional: true
       artifacts: false
   variables:
@@ -664,11 +664,11 @@ perf-nofib:
   allow_failure: true
   stage: testing
   needs:
-    - job: x86_64-linux-fedora33-perf
+    - job: x86_64-linux-fedora33-release
       optional: true
-    - job: nightly-x86_64-linux-fedora33-perf
+    - job: nightly-x86_64-linux-fedora33-release
       optional: true
-    - job: release-x86_64-linux-fedora33-perf
+    - job: release-x86_64-linux-fedora33-release
       optional: true
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
   rules:
@@ -684,7 +684,7 @@ perf-nofib:
     - root=$(pwd)/ghc
     - |
       mkdir tmp
-      tar -xf ../ghc-x86_64-linux-fedora33-perf.tar.xz -C tmp
+      tar -xf ../ghc-x86_64-linux-fedora33-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
@@ -710,11 +710,11 @@ perf-nofib:
 perf:
   stage: testing
   needs:
-    - job: x86_64-linux-fedora33-perf
+    - job: x86_64-linux-fedora33-release
       optional: true
-    - job: nightly-x86_64-linux-fedora33-perf
+    - job: nightly-x86_64-linux-fedora33-release
       optional: true
-    - job: release-x86_64-linux-fedora33-perf
+    - job: release-x86_64-linux-fedora33-release
       optional: true
   dependencies: null
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
@@ -728,7 +728,7 @@ perf:
     - root=$(pwd)/ghc
     - |
       mkdir tmp
-      tar -xf ghc-x86_64-linux-fedora33-perf.tar.xz -C tmp
+      tar -xf ghc-x86_64-linux-fedora33-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
