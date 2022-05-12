@@ -309,8 +309,14 @@ resultSize xxs@(_:xs) t
       resultSize xs fr
   | otherwise = [(LiftedRep, 1)] -- possibly newtype family, must be boxed
 resultSize [] t
-  | isRuntimeRepKindedTy t' = []
-  | isRuntimeRepTy t' = []
+  -- FIXME: Jeff (2022,05): Is this check actually needed? If we have a runtime
+  -- rep kinded type can't we just call typePrimReps to get the PrimReps and
+  -- then primRep size just like in the catchall case? I don't see why this
+  -- doesn't work.
+  | isRuntimeRepKindedTy t' = pprPanic "resultSize: Type was RuntimeRepKinded don't know the size! " (ppr t')
+  -- Note that RuntimeRep from Builtins.Types hits this case. A singleton of
+  -- (LiftedRep, 1) is exactly what's returned by the otherwise case for
+  -- RuntimeRep.
   | Nothing <- isLiftedType_maybe t' = [(LiftedRep, 1)]
   | otherwise = fmap (\p -> (p, slotCount (primRepSize p))) (typePrimReps t)
   where
