@@ -1672,7 +1672,8 @@ Constraint Solver Plugins
 -- and Wanted constraints, and should return a 'TcPluginSolveResult'
 -- indicating which Wanted constraints it could solve, or whether any are
 -- insoluble.
-type TcPluginSolver = [Ct] -- ^ Givens
+type TcPluginSolver = EvBindsVar
+                   -> [Ct] -- ^ Givens
                    -> [Ct] -- ^ Wanteds
                    -> TcPluginM TcPluginSolveResult
 
@@ -1702,7 +1703,7 @@ data TcPlugin = forall s. TcPlugin
   { tcPluginInit :: TcPluginM s
     -- ^ Initialize plugin, when entering type-checker.
 
-  , tcPluginSolve :: s -> EvBindsVar -> TcPluginSolver
+  , tcPluginSolve :: s -> TcPluginSolver
     -- ^ Solve some constraints.
     --
     -- This function will be invoked at two points in the constraint solving

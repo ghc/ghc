@@ -3115,9 +3115,8 @@ withTcPlugins hsc_env m =
     case catMaybes $ mapPlugins (hsc_plugins hsc_env) tcPlugin of
        []      -> m  -- Common fast case
        plugins -> do
-                ev_binds_var <- newTcEvBinds
                 (solvers, rewriters, stops) <-
-                  unzip3 `fmap` mapM (start_plugin ev_binds_var) plugins
+                  unzip3 `fmap` mapM start_plugin plugins
                 let
                   rewritersUniqFM :: UniqFM TyCon [TcPluginRewriter]
                   !rewritersUniqFM = sequenceUFMList rewriters
@@ -3131,9 +3130,9 @@ withTcPlugins hsc_env m =
                   Left _ -> failM
                   Right res -> return res
   where
-  start_plugin ev_binds_var (TcPlugin start solve rewrite stop) =
+  start_plugin (TcPlugin start solve rewrite stop) =
     do s <- runTcPluginM start
-       return (solve s ev_binds_var, rewrite s, stop s)
+       return (solve s, rewrite s, stop s)
 
 withDefaultingPlugins :: HscEnv -> TcM a -> TcM a
 withDefaultingPlugins hsc_env m =

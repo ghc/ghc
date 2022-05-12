@@ -272,7 +272,8 @@ runTcPluginSolvers solvers all_cts
   where
     do_plugin :: TcPluginProgress -> TcPluginSolver -> TcS TcPluginProgress
     do_plugin p solver = do
-        result <- runTcPluginTcS (uncurry solver (pluginInputCts p))
+        ev_binds_var <- getTcEvBindsVar
+        result <- runTcPluginTcS (uncurry (solver ev_binds_var) (pluginInputCts p))
         return $ progress p result
 
     progress :: TcPluginProgress -> TcPluginSolveResult -> TcPluginProgress
