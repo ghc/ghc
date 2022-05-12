@@ -37,7 +37,7 @@ data Flavour = Flavour {
     ghcProfiled :: Bool,
     -- | Build GHC with the debug RTS.
     ghcDebugged :: Bool,
-    -- | Build GHC with debug assertions.
+    -- | Build GHC with debug assertions (-DDEBUG).
     ghcDebugAssertions :: Bool,
     -- | Build the GHC executable against the threaded runtime system.
     ghcThreaded :: Bool,
