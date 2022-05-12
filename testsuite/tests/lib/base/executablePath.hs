@@ -1,12 +1,14 @@
 import Control.Monad (unless)
 import System.Environment (executablePath, getArgs)
 import System.Directory (removeFile, getCurrentDirectory)
-import System.FilePath ((</>), dropExtension)
+import System.FilePath ((</>), dropExtension, equalFilePath)
 import System.Exit (exitSuccess, die)
 
-canQuery, canDelete :: [String]
-canQuery = ["mingw32", "freebsd", "linux", "darwin"]
-canDelete = ["freebsd", "linux", "darwin"]
+canQuery, canDelete, canQueryAfterDelete :: [String]
+canQuery = ["mingw32", "freebsd", "linux", "darwin", "netbsd"]
+canDelete = ["freebsd", "linux", "darwin", "netbsd"]
+canQueryAfterDelete = ["netbsd"]
+
 
 main :: IO ()
 main = do
@@ -33,7 +35,7 @@ main = do
     -- (e.g. ".exe" on Windows). Drop the extension when comparing.
     expected  = cwd </> "executablePath"
     actual    = dropExtension before
-  unless (actual == expected) $
+  unless (equalFilePath actual expected) $
       die $ "executablePath query returned `" <> actual <> "`; expected `" <> expected <> "`"
 
   unless (os `elem` canDelete)
@@ -44,7 +46,16 @@ main = do
   -- Remove the file
   removeFile before
 
-  -- Now query should return Nothing
+  -- Now query again, after deletion
   after <- query
-  unless (after == Nothing) $ die $
-    "executablePath expected to return Nothing, returned " <> show after
+  case after of
+    Nothing
+      | os `elem` canQueryAfterDelete
+      -> die "query failed after deletion, but expected success"
+      | otherwise
+      -> pure ()
+    Just _
+      | os `elem` canQueryAfterDelete
+      -> pure ()
+      | otherwise
+      -> die $ "query succeeded after deleted (result: " <> show after <> "), but expected failure"

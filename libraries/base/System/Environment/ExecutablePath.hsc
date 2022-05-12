@@ -102,6 +102,10 @@ getExecutablePath :: IO FilePath
 -- Note that for scripts and interactive sessions, the result is the path to
 -- the interpreter (e.g. ghci.)
 --
+-- Note also that while most operating systems return @Nothing@ if the
+-- executable file was deleted/unlinked, some (including NetBSD) return the
+-- original path.
+--
 -- @since 4.17.0.0
 executablePath :: Maybe (IO (Maybe FilePath))
 
