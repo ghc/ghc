@@ -140,7 +140,7 @@ data Flavour = Flavour BaseFlavour [FlavourTrans]
 
 data FlavourTrans = Llvm | Dwarf | FullyStatic | ThreadSanitiser
 
-data BaseFlavour = Perf | Validate | SlowValidate
+data BaseFlavour = Release | Validate | SlowValidate
 
 -----------------------------------------------------------------------------
 -- Build Configs
@@ -170,8 +170,8 @@ dwarf = vanilla { withDwarf = True }
 unreg :: BuildConfig
 unreg = vanilla { unregisterised = True }
 
-perf :: BuildConfig
-perf = vanilla { buildFlavour = Perf }
+releaseConfig :: BuildConfig
+releaseConfig = vanilla { buildFlavour = Release }
 
 debug :: BuildConfig
 debug = vanilla { buildFlavour = SlowValidate
@@ -258,7 +258,7 @@ testEnv arch opsys bc = intercalate "-" $
 flavourString :: Flavour -> String
 flavourString (Flavour base trans) = baseString base ++ concatMap (("+" ++) . flavourString) trans
   where
-    baseString Perf = "perf"
+    baseString Release = "release"
     baseString Validate = "validate"
     baseString SlowValidate = "slow-validate"
 
@@ -657,7 +657,7 @@ nightly arch opsys bc =
 
 -- | Make a normal release CI job
 release arch opsys bc =
-  let (n, j) = job arch opsys (bc { buildFlavour = Perf })
+  let (n, j) = job arch opsys (bc { buildFlavour = Release })
   in ("release-" ++ n, addJobRule ReleaseOnly . keepArtifacts "1 year" . ignorePerfFailures . highCompression $ j)
 
 -- Specific job modification functions
@@ -752,7 +752,7 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      , disableValidate (standardBuilds Amd64 (Linux Centos7))
      -- Fedora33 job is always built with perf so there's one job in the normal
      -- validate pipeline which is built with perf.
-     , (standardBuildsWithConfig Amd64 (Linux Fedora33) perf)
+     , (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig)
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
      , fastCI (standardBuilds Amd64 Windows)
      , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
