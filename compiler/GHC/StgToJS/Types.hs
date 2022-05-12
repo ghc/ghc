@@ -20,7 +20,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Monad.State.Strict
-import GHC.Utils.Outputable (Outputable (..), text, SDocContext)
+import GHC.Utils.Outputable (Outputable (..), text, SDocContext, (<+>), ($$))
 
 import GHC.Data.ShortText
 
@@ -276,7 +276,11 @@ data LinkableUnit = LinkableUnit
 data TypedExpr = TypedExpr
   { typex_typ  :: !PrimRep
   , typex_expr :: [JExpr]
-  }
+  } deriving stock Show
+
+instance Outputable TypedExpr where
+  ppr x = text "TypedExpr: " <+> ppr (typex_expr x)
+          $$  text "PrimReps: " <+> ppr (typex_typ x)
 
 data PrimRes
   = PrimInline JStat  -- ^ primop is inline, result is assigned directly
