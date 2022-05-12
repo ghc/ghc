@@ -20,7 +20,7 @@ module GHC.Core.Opt.Monad (
 
     -- * Counting
     SimplCount, doSimplTick, doFreeSimplTick, simplCountN,
-    pprSimplCount, plusSimplCount, zeroSimplCount,
+    pprSimplCount, plusSimplCount, zeroSimplCount, zeroSimplCount',
     isZeroSimplCount, hasDetailedCounts, Tick(..),
 
     -- * The monad
@@ -297,6 +297,7 @@ simplCountN :: SimplCount -> Int
 simplCountN (VerySimplCount n)         = n
 simplCountN (SimplCount { ticks = n }) = n
 
+
 zeroSimplCount dflags
                 -- This is where we decide whether to do
                 -- the VerySimpl version or the full-stats version
@@ -305,6 +306,11 @@ zeroSimplCount dflags
                 n_log = 0, log1 = [], log2 = []}
   | otherwise
   = VerySimplCount 0
+
+zeroSimplCount' :: Bool -> SimplCount
+zeroSimplCount' True  = SimplCount {ticks = 0, details = Map.empty, n_log = 0, log1 = [], log2 = []}
+zeroSimplCount' False = VerySimplCount 0
+
 
 isZeroSimplCount (VerySimplCount n)         = n==0
 isZeroSimplCount (SimplCount { ticks = n }) = n==0

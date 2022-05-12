@@ -8,7 +8,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TupleSections #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns -Wno-unused-imports #-}
 {-# LANGUAGE NamedFieldPuns #-}
 module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
@@ -40,7 +41,7 @@ import GHC.Core.DataCon
    ( DataCon, dataConWorkId, dataConRepStrictness
    , dataConRepArgTys, isUnboxedTupleDataCon
    , StrictnessMark (..) )
-import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
+import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..), zeroSimplCount', hasDetailedCounts )
 import GHC.Core
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
@@ -96,6 +97,8 @@ import Control.Applicative
 import GHC.Cmm.Dataflow.Collections (UniqueSet)
 import System.IO (fixIO)
 import Control.Monad.Fix
+import Data.IORef (newIORef)
+import Data.Functor ((<&>))
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -231,64 +234,101 @@ too small to show up in benchmarks.
 ************************************************************************
 -}
 
--- TODO rename
-simplScc :: ResimplEnv -> [SimplR] -> InBind -> SimplM SimplR
-simplScc (should_trace, env0, our_binders) deps b = do
-  let traceM | should_trace = pprTraceM
-             | otherwise = \_ _ -> pure ()
-  let (_floats0, envs0) =  unzip $ deps
+-- TODO we need to be threading SimplCount through as well
+type SimplR = (SimplFloats, SimplEnv, SimplCount)
+type ResimplEnv = (Bool, SimplEnv, UniqSet Var)
 
-  traceM "simplScc:start:(#deps,binders)" $ ppr (length deps, bindersOf b)
+-- TODO rename
+simplScc :: ResimplEnv -> [SimplR] -> InBind -> SimplM (SimplFloats, SimplEnv)
+simplScc (should_trace, env0, our_binders) deps b = do
+  let traceM | should_trace
+               && False
+             = pprTraceM
+             | otherwise = \_ _ -> pure ()
+  let (_floats0, envs0, _scs) =  unzip3 $ deps
+
+  -- traceM "simplScc:start:(#deps,binders)" $ ppr (length deps, bindersOf b)
   -- when (any (> 1) check) $ pprPanic "simplScc" $ ppr (floats0, b)
   let
     !inscope = foldr unionInScope (seInScope env0) (seInScope <$> envs0)
     these_binds = bindersOfBinds [b]
     inscope_less_ours = foldl' delInScopeSet inscope these_binds
-    no_collisions x y = plusUFM_C arrrrrg x y where
-      arrrrrg = pprPanic "collision" $ ppr (x,y)
-    env1 = env0 { seInScope = inscope, seIdSubst = foldr no_collisions emptyUFM (seIdSubst <$> envs0)
+    no_collisions x y = plusUFM_C f x y where
+      -- f x y = pprPanic "collision" $ ppr (x,y)
+      f x _ = x
+    env1 = env0 { seInScope = inscope
+                , seIdSubst = foldr no_collisions emptyUFM (seIdSubst <$> envs0)
                 }
 
-  traceM  "simplScc:env1:" $ ppr env1
+  -- traceM  "simplScc:env1:" $ ppr env1
   (floats1, env2) <- simpl_bind env1 b
-  traceM  "simplScc:simpl_bind:(floats1,env1)" $ ppr (floats1,env2)
+  -- traceM  "simplScc:simpl_bind:(floats1,env1)" $ ppr (floats1,env2)
   -- pprTraceM "simplScc2" $ ppr b
 
 
 
   -- construct
-  (subst, new_binds) <-  getUniqueSupplyM >>= \x -> pure . initUs_ x $ mfix $ \ ~(subst0,_) -> let
-    go_id s i = do
-      u <- getUniqueM
-      pure $ case () of
-        _ | i `elemVarSet` our_binders -> let
-              j = maybeModifyIdInfo (substIdInfo True subst0 i (idInfo i)) i
-              in (extendInScope s j, j)
-          -- | is_local bndr  = subst_id_bndr acc_env bndr (flip setVarUnique u)
-          | isLocalId i -> let
-              (new_subst, new_bndr) = clone_id_hack True subst0 s (i, u)
-              in (extendSubstWithVar new_subst i new_bndr, new_bndr)
-          | otherwise -> (extendInScope s i, i)
-    go acc_subst bind = case bind of
-      NonRec i rhs -> do
-        (new_subst, new_id) <- go_id acc_subst i
-        pure (new_subst, NonRec new_id $ substExpr subst0 rhs)
-      Rec bs -> do
-        let f s (i,rhs) = do
-              (ns,ni) <- go_id s i
-              pure (ns, (ni, substExpr subst0  rhs))
-        (new_subst, bs1) <- mapAccumLM f acc_subst bs
-        pure (new_subst, Rec bs1)
-    in mapAccumLM go (mkEmptySubst inscope_less_ours) $ getTopFloatBinds  $ floats1
+  (subst, !new_binds) <- getUniqueSupplyM <&> \us -> initUs_ us . mfix $ \ ~(subst_rec,_) -> let
+      go_id s i = do
+        u <- getUniqueM
+        pure $ case () of
+          _ | i `elemVarSet` our_binders -> let
+                j = maybeModifyIdInfo (substIdInfo True subst_rec i (idInfo i)) i
+                in if notNull $ i  `diffIdInfo'` j
+                   then pprPanic "simplScdc" $ ppr (i,idInfo i,j,idInfo j, i  `diffIdInfo'` j)
+                   else (extendInScope s j, j)
+            -- | is_local bndr  = subst_id_bndr acc_env bndr (flip setVarUnique u)
+            | isLocalId i -> let
+                (new_subst, new_bndr) = clone_id_hack True subst_rec s (i, u)
+                in if notNull $ i  `diffIdInfo'` new_bndr
+                   then pprPanic "simplScdc" $ ppr (i,idInfo i,new_bndr,idInfo new_bndr, i  `diffIdInfo'` new_bndr)
+                   else (new_subst, new_bndr)
+            | otherwise -> panic "dougrulz"
+              -- (extendInScope s i, i)
+      go acc_subst bind = case bind of
+        NonRec i rhs -> do
+          (new_subst, new_id) <- go_id acc_subst i
+          pure (new_subst, NonRec new_id $ substExpr subst_rec rhs)
+        Rec bs -> do
+          let f s (i,rhs) = do
+                (ns,ni) <- go_id s i
+                pure (ns, (ni, substExpr subst_rec  rhs))
+          (new_subst, bs1) <- mapAccumLM f acc_subst bs
+          pure (new_subst, Rec bs1)
+      in mapAccumLM go (mkEmptySubst inscope_less_ours) $ getTopFloatBinds  $ floats1
 
   let !floats2 = case sfLetFloats floats1 of
         LetFloats _ ff -> let
           lf = LetFloats (toOL new_binds) ff
           in SimplFloats lf (sfJoinFloats floats1) (substInScope subst)
+      !env3 = setInScopeFromF env2 floats2
 
-  traceM  "simplScc:substSimplFloats:(subst0,subst1,floats2)" $ ppr (subst,floats2)
+  let
+    inscope = seInScope env3
+    subst_IdSubst ids0 = let
+      go i = let
+        new_stale = case lookupInScope_Directly inscope i of
+          Nothing -> Mon.Endo (i:)
+          _ -> mempty
+        (new,xtra_stale) = case lookupWithDefaultUFM_Directly ids0 (panic "dougrulz") i  of
+          DoneId j -> (DoneId $ substIdOcc subst j, mempty)
+          DoneEx e mba -> (DoneEx (substExpr subst e) mba, mempty)
+          ContEx tvs cvs ids e -> case subst_IdSubst ids of
+            (fm, en) -> (ContEx tvs cvbs fm e, en)
+        in (Mon.Endo $ z -> addToUFM_Directly z i new, new_stale Mon.<> xtra_stale)
+      (e1,e2) = foldMap go $ nonDetKeysUFM ids0
+      in (Mon.appEndo e1 emptyUFM, e2)
+    (new_idsubst, stale_uniques) = subst_IdSubst $ seIdSubst env3
+    env4 = env3 { seIdSubst = new_idsubst }
 
-  pure (floats2, setInScopeFromF env2 floats2)
+  when (notNull stale_uniques) $ traceM "simplScc:stale_uniques:" $ ppr stale_uniques
+
+  traceM  "simplScc:substSimplFloats:(subst_rec,subst1,floats2)" $ ppr (subst,floats2)
+
+
+  -- TODO check (seIdSubst env2) doesn't have any stale ids
+
+  pure (floats2, env4)
 
 
 simplTopBinds :: Bool -> SimplEnv -> ([(Int, InBind)], M.Map Int [Int]) -> SimplM (SimplFloats, SimplEnv)
@@ -307,34 +347,38 @@ simplTopBinds should_trace env0 (binds0, g)
         ; env_m_vars <- liftIO $ M.fromList <$> (sequence [(k,) <$> newEmptyMVar | (k,_) <- binds0])
 
 
-        ; sem <- liftIO $ newQSem 8
-        ; SM $ \te sc -> do
-            mapM_ (do_one sem (should_trace, env1, my_binds) env_m_vars te sc) binds0
-            return ((), sc)
+        ; init_sc <- SM $ \te sc -> do
+            sem <- newQSem 8
+            let zero_sc = zeroSimplCount' $ hasDetailedCounts sc
+            mapM_ (do_one sem (should_trace, env1, my_binds) env_m_vars te zero_sc) binds0
+            return (sc, sc)
 
         ; let res_vars = M.elems env_m_vars
-        ; (floats, envs) <- unzip <$> liftIO (mapM readMVar res_vars)
+        ; (floats, envs, counts) <- unzip3 <$> liftIO (mapM readMVar res_vars)
 
         -- ; pprTraceM "binds_0" (vcat (map ppr binds0))
         -- ; pprTraceM "binds_0" (ppr all_floats)
 
-        ; _old_res <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 (map snd binds0)
+        -- ; _old_res <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 (map snd binds0)
 
         ; let
             !env = combine_envs env1 envs
-            !(final_floats, _) = foldl' go_sfs (emptyFloats env, emptyUniqSet) floats where
-              go_sfs acc sf = foldl' go_bind acc $ getTopFloatBinds sf where
-                go_bind bind_acc@(floats_acc, seen_set_acc) b = let
-                  bob = bindersOfBinds [b]
-                  is_seen = (`elementOfUniqSet` seen_set_acc)
-                  f = liftA2 (,) Mon.All Mon.Any . is_seen
-                  (Mon.All all_seen, Mon.Any any_seen) = foldMap f  bob
-                  in case () of
-                  _ | all_seen -> bind_acc
-                    | any_seen -> pprPanic "simplTopBinds:seenSome" $ ppr b
-                    | otherwise -> (floats_acc `extendFloats` b, seen_set_acc `addListToUniqSet` bob)
+            !final_floats = foldl' addFloats (emptyFloats env) floats
+            !final_counts = foldl' plusSimplCount init_sc counts
+              -- , _) =
+              -- foldl' go_sfs (emptyFloats env, emptyUniqSet) floats where
+              -- go_sfs acc sf = foldl' go_bind acc $ getTopFloatBinds sf where
+              --   go_bind bind_acc@(floats_acc, seen_set_acc) b = let
+              --     bob = bindersOfBinds [b]
+              --     is_seen = (`elementOfUniqSet` seen_set_acc)
+              --     f = liftA2 (,) Mon.All Mon.Any . is_seen
+              --     (Mon.All all_seen, Mon.Any any_seen) = foldMap f  bob
+              --     in case () of
+              --     _ | all_seen -> bind_acc
+              --       | any_seen -> pprPanic "simplTopBinds:seenSome" $ ppr b
+              --       | otherwise -> (floats_acc `extendFloats` b, seen_set_acc `addListToUniqSet` bob)
 
-
+        ; SM $ \_ _ -> pure ((), final_counts)
         ; freeTick SimplifierDone
         ; return (final_floats, env ) }
   where
@@ -342,19 +386,33 @@ simplTopBinds should_trace env0 (binds0, g)
       env0 { seInScope = foldr unionInScope (seInScope env0) (map seInScope envs)
            , seIdSubst = foldr plusUFM (seIdSubst env0) (map seIdSubst envs)  }
 
-    do_one sem env1 deps te sc (k, b) = do
+    do_one sem env1 deps te sc0 (k, b) = do
       ---pprTraceM "forking" (ppr k)
       forkIO $ do
         rs <- for [x | di <- g M.! k, di /= k, Just x <- [M.lookup di deps]] readMVar
         bracket_ (waitQSem sem) (signalQSem sem) $ do
-          let my_mv = deps M.! k
-          (fst <$> unSM (simplScc env1 rs b) te sc) >>= putMVar my_mv
+          let
+            my_mv = deps M.! k
+    --   zero = zeroSimplCount' $ hasDetailedCounts sc
+          ((f,e),sc) <- unSM (simplScc env1 rs b) te sc0
+          putMVar my_mv (f,e,sc)
+
+    -- transitive_deps_map = let
+    --   go k ds = foldMap (\x -> if x == k then mempty else transitive_deps_map M.! x) ds
+      -- in M.mapWithKey go g
+
+
+    -- init_count k = let
+    --   transitive_deps = let
+    --     go acc [] = acc
+    --     go acc (x : xs)
+    --       | x `elemVarSet` acc = go acc xs
+    --       | otherwise = go (go (x `IntMap.insert` acc) (g M.! x)) xs
+    --     in go (IntSet.singleton k) (g M.! k)
+    --   zero = zeroSimplCount' $ hasDetailedCounts sc
 
 
 
--- TODO we need to be threading SimplCount through as well
-type SimplR = (SimplFloats, SimplEnv)
-type ResimplEnv = (Bool, SimplEnv, UniqSet Var)
 
     -- We need to track the zapped top-level binders, because
     -- they should have their fragile IdInfo zapped (notably occurrence info)

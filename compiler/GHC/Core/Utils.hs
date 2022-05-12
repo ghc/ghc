@@ -63,7 +63,7 @@ module GHC.Core.Utils (
         isUnsafeEqualityProof,
 
         -- * Dumping stuff
-        dumpIdInfoOfProgram
+        dumpIdInfoOfProgram, diffIdInfo'
     ) where
 
 #include "HsVersions.h"
@@ -2277,6 +2277,22 @@ diffBinds top env binds1 = go (length binds1) env binds1
 
 -- | Find differences in @IdInfo@. We will especially check whether
 -- the unfoldings match, if present (see @diffUnfold@).
+diffIdInfo' :: Var -> Var -> [SDoc]
+diffIdInfo' bndr1 bndr2
+  | arityInfo info1 == arityInfo info2
+    && cafInfo info1 == cafInfo info2
+    && oneShotInfo info1 == oneShotInfo info2
+    && inlinePragInfo info1 == inlinePragInfo info2
+    && occInfo info1 == occInfo info2
+    && demandInfo info1 == demandInfo info2
+    && callArityInfo info1 == callArityInfo info2
+    && levityInfo info1 == levityInfo info2
+  = locBind "in unfolding of" bndr1 bndr2 $ []
+    -- diffUnfold env (unfoldingInfo info1) (unfoldingInfo info2)
+  | otherwise
+  = locBind "in Id info of" bndr1 bndr2
+    [fsep [pprBndr LetBind bndr1, text "/=", pprBndr LetBind bndr2]]
+  where info1 = idInfo bndr1; info2 = idInfo bndr2
 diffIdInfo :: RnEnv2 -> Var -> Var -> [SDoc]
 diffIdInfo env bndr1 bndr2
   | arityInfo info1 == arityInfo info2
