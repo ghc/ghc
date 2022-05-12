@@ -12,6 +12,7 @@ module Flavour
   , enableProfiledGhc
   , disableDynamicGhcPrograms
   , disableProfiledLibs
+  , enableHaddock
 
   , completeSetting
   , applySettings
@@ -49,6 +50,7 @@ flavourTransformers = M.fromList
     , "fully_static" =: fullyStatic
     , "collect_timings" =: collectTimings
     , "assertions" =: enableAssertions
+    , "haddock" =: enableHaddock
     ]
   where (=:) = (,)
 
@@ -125,6 +127,17 @@ enableTickyGhc =
       -- You generally need STG dumps to interpret ticky profiles
       , arg "-ddump-to-file"
       , arg "-ddump-stg-final"
+      ]
+
+-- | Enable Core, STG, and C-- linting in all compilations with the stage1 compiler.
+enableHaddock :: Flavour -> Flavour
+enableHaddock =
+    addArgs $ stage1 ? mconcat
+      [ builder (Ghc CompileHs) ? haddock
+      ]
+  where
+    haddock = mconcat
+      [ arg "-haddock"
       ]
 
 -- | Transform the input 'Flavour' so as to build with
@@ -227,7 +240,7 @@ fullyStatic flavour =
   where
     -- Remove any Way that contains a WayUnit of Dynamic
     prune :: Ways -> Ways
-    prune = fmap $ filter staticCompatible
+    prune = fmap $ Set.filter staticCompatible
 
     staticCompatible :: Way -> Bool
     staticCompatible = not . wayUnit Dynamic

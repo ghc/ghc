@@ -22,6 +22,7 @@ import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
 import Settings.Flavours.QuickCross
 import Settings.Flavours.Validate
+import Settings.Flavours.Release
 
 
 getArgs :: Args
@@ -52,6 +53,7 @@ hadrianFlavours :: [Flavour]
 hadrianFlavours =
     [ benchmarkFlavour, defaultFlavour, developmentFlavour Stage1
     , developmentFlavour Stage2, performanceFlavour
+    , releaseFlavour
     , quickFlavour, quickValidateFlavour, quickDebugFlavour
     , quickestFlavour
     , quickCrossFlavour

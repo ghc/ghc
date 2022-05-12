@@ -1379,7 +1379,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-fedora33-perf": {
+  "nightly-x86_64-linux-fedora33-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -1389,7 +1389,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora33-perf.tar.xz",
+        "ghc-x86_64-linux-fedora33-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -1431,12 +1431,12 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
-      "TEST_ENV": "x86_64-linux-fedora33-perf",
+      "TEST_ENV": "x86_64-linux-fedora33-release",
       "XZ_OPT": "-9"
     }
   },
@@ -1678,7 +1678,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "release-aarch64-darwin-perf": {
+  "release-aarch64-darwin-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -1688,7 +1688,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-aarch64-darwin-perf.tar.xz",
+        "ghc-aarch64-darwin-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -1730,19 +1730,19 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-aarch64-darwin-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-aarch64-darwin-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "aarch64-darwin",
-      "TEST_ENV": "aarch64-darwin-perf",
+      "TEST_ENV": "aarch64-darwin-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-aarch64-linux-deb10-perf": {
+  "release-aarch64-linux-deb10-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -1752,7 +1752,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-aarch64-linux-deb10-perf.tar.xz",
+        "ghc-aarch64-linux-deb10-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -1794,15 +1794,15 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "aarch64-linux-deb10-perf",
+      "TEST_ENV": "aarch64-linux-deb10-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-armv7-linux-deb10-perf": {
+  "release-armv7-linux-deb10-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -1812,7 +1812,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-armv7-linux-deb10-perf.tar.xz",
+        "ghc-armv7-linux-deb10-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -1854,15 +1854,15 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-armv7-linux-deb10-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-armv7-linux-deb10-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "LD=ld.lld ",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "armv7-linux-deb10-perf",
+      "TEST_ENV": "armv7-linux-deb10-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-i386-linux-deb9-perf": {
+  "release-i386-linux-deb9-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -1872,7 +1872,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-i386-linux-deb9-perf.tar.xz",
+        "ghc-i386-linux-deb9-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -1914,15 +1914,15 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-i386-linux-deb9-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-i386-linux-deb9-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "i386-linux-deb9-perf",
+      "TEST_ENV": "i386-linux-deb9-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-darwin-perf": {
+  "release-x86_64-darwin-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -1932,7 +1932,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-darwin-perf.tar.xz",
+        "ghc-x86_64-darwin-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -1974,21 +1974,21 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-darwin-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-x86_64-darwin-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "10.10",
       "NIX_SYSTEM": "x86_64-darwin",
-      "TEST_ENV": "x86_64-darwin-perf",
+      "TEST_ENV": "x86_64-darwin-release",
       "XZ_OPT": "-9",
       "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_utimensat": "no"
     }
   },
-  "release-x86_64-freebsd-perf": {
+  "release-x86_64-freebsd-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -1998,7 +1998,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-freebsd-perf.tar.xz",
+        "ghc-x86_64-freebsd-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2039,18 +2039,18 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-freebsd-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-x86_64-freebsd-release",
+      "BUILD_FLAVOUR": "release",
       "CABAL_INSTALL_VERSION": "3.2.0.0",
       "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
       "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "x86_64-freebsd-perf",
+      "TEST_ENV": "x86_64-freebsd-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-alpine3_12-int_native-perf+fully_static": {
+  "release-x86_64-linux-alpine3_12-int_native-release+fully_static": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2060,7 +2060,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-alpine3_12-int_native-perf+fully_static.tar.xz",
+        "ghc-x86_64-linux-alpine3_12-int_native-release+fully_static.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2102,18 +2102,18 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-int_native-perf+fully_static",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-int_native-release+fully_static",
       "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
-      "BUILD_FLAVOUR": "perf+fully_static",
+      "BUILD_FLAVOUR": "release+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
-      "TEST_ENV": "x86_64-linux-alpine3_12-int_native-perf+fully_static",
+      "TEST_ENV": "x86_64-linux-alpine3_12-int_native-release+fully_static",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-alpine3_12-perf+fully_static": {
+  "release-x86_64-linux-alpine3_12-release+fully_static": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2123,7 +2123,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-alpine3_12-perf+fully_static.tar.xz",
+        "ghc-x86_64-linux-alpine3_12-release+fully_static.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2165,18 +2165,18 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-perf+fully_static",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-release+fully_static",
       "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
-      "BUILD_FLAVOUR": "perf+fully_static",
+      "BUILD_FLAVOUR": "release+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
-      "TEST_ENV": "x86_64-linux-alpine3_12-perf+fully_static",
+      "TEST_ENV": "x86_64-linux-alpine3_12-release+fully_static",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-centos7-perf": {
+  "release-x86_64-linux-centos7-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2186,7 +2186,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-centos7-perf.tar.xz",
+        "ghc-x86_64-linux-centos7-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2228,16 +2228,16 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-centos7-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-centos7-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "x86_64-linux-centos7-perf",
+      "TEST_ENV": "x86_64-linux-centos7-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-deb10-perf": {
+  "release-x86_64-linux-deb10-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2247,7 +2247,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-deb10-perf.tar.xz",
+        "ghc-x86_64-linux-deb10-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2289,15 +2289,15 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "x86_64-linux-deb10-perf",
+      "TEST_ENV": "x86_64-linux-deb10-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-deb10-perf+debug_info": {
+  "release-x86_64-linux-deb10-release+debug_info": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2307,7 +2307,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-deb10-perf+debug_info.tar.xz",
+        "ghc-x86_64-linux-deb10-release+debug_info.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2349,15 +2349,15 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-perf+debug_info",
-      "BUILD_FLAVOUR": "perf+debug_info",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-release+debug_info",
+      "BUILD_FLAVOUR": "release+debug_info",
       "CONFIGURE_ARGS": "",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "x86_64-linux-deb10-perf+debug_info",
+      "TEST_ENV": "x86_64-linux-deb10-release+debug_info",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-deb11-perf": {
+  "release-x86_64-linux-deb11-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2367,7 +2367,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-deb11-perf.tar.xz",
+        "ghc-x86_64-linux-deb11-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2409,15 +2409,15 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "x86_64-linux-deb11-perf",
+      "TEST_ENV": "x86_64-linux-deb11-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-deb9-perf": {
+  "release-x86_64-linux-deb9-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2427,7 +2427,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-deb9-perf.tar.xz",
+        "ghc-x86_64-linux-deb9-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2469,15 +2469,15 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb9-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb9-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "x86_64-linux-deb9-perf",
+      "TEST_ENV": "x86_64-linux-deb9-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-fedora33-perf": {
+  "release-x86_64-linux-fedora33-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2487,7 +2487,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-fedora33-perf.tar.xz",
+        "ghc-x86_64-linux-fedora33-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2529,17 +2529,17 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "",
       "IGNORE_PERF_FAILURES": "all",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
-      "TEST_ENV": "x86_64-linux-fedora33-perf",
+      "TEST_ENV": "x86_64-linux-fedora33-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-fedora33-perf+debug_info": {
+  "release-x86_64-linux-fedora33-release+debug_info": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2549,7 +2549,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-fedora33-perf+debug_info.tar.xz",
+        "ghc-x86_64-linux-fedora33-release+debug_info.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2591,17 +2591,17 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-perf+debug_info",
-      "BUILD_FLAVOUR": "perf+debug_info",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release+debug_info",
+      "BUILD_FLAVOUR": "release+debug_info",
       "CONFIGURE_ARGS": "",
       "IGNORE_PERF_FAILURES": "all",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
-      "TEST_ENV": "x86_64-linux-fedora33-perf+debug_info",
+      "TEST_ENV": "x86_64-linux-fedora33-release+debug_info",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-ubuntu20_04-perf": {
+  "release-x86_64-linux-ubuntu20_04-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2611,7 +2611,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-ubuntu20_04-perf.tar.xz",
+        "ghc-x86_64-linux-ubuntu20_04-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2653,15 +2653,15 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu20_04-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu20_04-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "x86_64-linux-ubuntu20_04-perf",
+      "TEST_ENV": "x86_64-linux-ubuntu20_04-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-windows-int_native-perf": {
+  "release-x86_64-windows-int_native-release": {
     "after_script": [
       "bash .gitlab/ci.sh save_cache",
       "bash .gitlab/ci.sh clean"
@@ -2670,7 +2670,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-windows-int_native-perf.tar.xz",
+        "ghc-x86_64-windows-int_native-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2708,8 +2708,8 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-x86_64-windows-int_native-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-x86_64-windows-int_native-release",
+      "BUILD_FLAVOUR": "release",
       "CABAL_INSTALL_VERSION": "3.2.0.0",
       "CONFIGURE_ARGS": "",
       "GHC_VERSION": "9.2.2",
@@ -2717,11 +2717,11 @@
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
-      "TEST_ENV": "x86_64-windows-int_native-perf",
+      "TEST_ENV": "x86_64-windows-int_native-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-windows-perf": {
+  "release-x86_64-windows-release": {
     "after_script": [
       "bash .gitlab/ci.sh save_cache",
       "bash .gitlab/ci.sh clean"
@@ -2730,7 +2730,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-windows-perf.tar.xz",
+        "ghc-x86_64-windows-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2768,8 +2768,8 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-windows-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-x86_64-windows-release",
+      "BUILD_FLAVOUR": "release",
       "CABAL_INSTALL_VERSION": "3.2.0.0",
       "CONFIGURE_ARGS": "",
       "GHC_VERSION": "9.2.2",
@@ -2777,7 +2777,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
-      "TEST_ENV": "x86_64-windows-perf",
+      "TEST_ENV": "x86_64-windows-release",
       "XZ_OPT": "-9"
     }
   },
@@ -3671,7 +3671,7 @@
       "TEST_ENV": "x86_64-linux-deb9-validate"
     }
   },
-  "x86_64-linux-fedora33-perf": {
+  "x86_64-linux-fedora33-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -3681,7 +3681,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora33-perf.tar.xz",
+        "ghc-x86_64-linux-fedora33-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -3723,12 +3723,12 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-perf",
-      "BUILD_FLAVOUR": "perf",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
-      "TEST_ENV": "x86_64-linux-fedora33-perf"
+      "TEST_ENV": "x86_64-linux-fedora33-release"
     }
   },
   "x86_64-linux-fedora33-validate+debug_info": {
