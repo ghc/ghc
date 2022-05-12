@@ -69,6 +69,9 @@ data ExprCtx = ExprCtx
     --
     -- Variables and their index on the stack
 
+  , ctxLneFrameSize :: {-# UNPACK #-} !Int
+    -- ^ Cache the length of `ctxLneFrameVars`
+
   }
 
 -- | Initialize an expression context in the context of the given top-level
@@ -80,6 +83,7 @@ initExprCtx i = ExprCtx
   , ctxEvaluatedIds = emptyUniqSet
   , ctxLneFrameBs   = emptyUFM
   , ctxLneFrameVars = []
+  , ctxLneFrameSize = 0
   , ctxSrcSpan      = Nothing
   }
 
@@ -106,6 +110,7 @@ ctxUpdateLneFrame new_spilled_vars new_lne_ids ctx =
       new_frame_size = old_frame_size + length new_spilled_vars
   in ctx
     { ctxLneFrameBs   = addListToUFM (ctxLneFrameBs ctx) (map (,new_frame_size) new_lne_ids)
+    , ctxLneFrameSize = new_frame_size
     , ctxLneFrameVars = ctxLneFrameVars ctx ++ new_spilled_vars
                           -- FIXME: could we use a stack? (i.e. cons new variables)
     }
@@ -116,12 +121,8 @@ ctxClearLneFrame ctx =
   ctx
     { ctxLneFrameBs   = emptyUFM
     , ctxLneFrameVars = []
+    , ctxLneFrameSize = 0
     }
-
--- | Shrink the let-no-escape frame to the given size
-ctxLneFrameSize :: ExprCtx -> Int
-ctxLneFrameSize ctx = length (ctxLneFrameVars ctx)
- -- FIXME: cache the frame size?
 
 -- | Predicate: do we know for sure that the given Id is evaluated?
 ctxIsEvaluated :: ExprCtx -> Id -> Bool
@@ -152,5 +153,6 @@ ctxLneShrinkStack ctx n =
             , ppr n
             ])
       (ctx { ctxLneFrameVars = take n (ctxLneFrameVars ctx)
+           , ctxLneFrameSize = n
            }
       )
