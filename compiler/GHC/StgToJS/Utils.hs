@@ -10,6 +10,7 @@ where
 import GHC.Prelude
 
 import GHC.StgToJS.Types
+import GHC.StgToJS.ExprCtx
 
 import GHC.JS.Syntax
 import GHC.JS.Make

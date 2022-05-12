@@ -635,6 +635,7 @@ Library
         GHC.StgToJS.DataCon
         GHC.StgToJS.Deps
         GHC.StgToJS.Expr
+        GHC.StgToJS.ExprCtx
         GHC.StgToJS.FFI
         GHC.StgToJS.Heap
         GHC.StgToJS.Literal

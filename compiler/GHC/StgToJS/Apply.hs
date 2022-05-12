@@ -46,6 +46,7 @@ import GHC.JS.Make
 import GHC.StgToJS.Arg
 import GHC.StgToJS.Closure
 import GHC.StgToJS.DataCon
+import GHC.StgToJS.ExprCtx
 import GHC.StgToJS.Heap
 import GHC.StgToJS.Monad
 import GHC.StgToJS.Types
@@ -58,8 +59,6 @@ import GHC.StgToJS.Rts.Types
 import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Unique.Set
-import GHC.Types.Unique.FM
 import GHC.Types.CostCentre
 
 import GHC.Stg.Syntax
@@ -118,7 +117,7 @@ genApp ctx i args
                ,ExprInline Nothing)
 
     -- let-no-escape
-    | Just n <- lookupUFM (ctxLneFrameBs ctx) i
+    | Just n <- ctxLneBindingStackSize ctx i
     = do
       as'      <- concatMapM genArg args
       ei       <- jsEntryId i
@@ -137,7 +136,7 @@ genApp ctx i args
     | [] <- args
     , [vt] <- idVt i
     , isUnboxable vt
-    , i `elementOfUniqSet` (ctxEval ctx)
+    , ctxIsEvaluated ctx i
     = do
       let c = head (concatMap typex_expr $ ctxTarget ctx)
       is <- genIds i
@@ -149,7 +148,7 @@ genApp ctx i args
         _ -> panic "genApp: invalid size"
 
     | [] <- args
-    , i `elementOfUniqSet` (ctxEval ctx) || isStrictId i
+    , ctxIsEvaluated ctx i || isStrictId i
     = do
       a <- assignCoerce1 (ctxTarget ctx) . (alignIdExprs i) <$> genIds i
       settings <- getSettings
@@ -171,7 +170,7 @@ genApp ctx i args
               a' = case args of
                 [StgVarArg a'] -> a'
                 _              -> panic "genApp: unexpected arg"
-          if isStrictId a' || a' `elementOfUniqSet` (ctxEval ctx)
+          if isStrictId a' || ctxIsEvaluated ctx a'
             then return (t |= ai, ExprInline Nothing)
             else return (returnS (app "h$e" [ai]), ExprCont)
         _ -> panic "genApp: invalid size"

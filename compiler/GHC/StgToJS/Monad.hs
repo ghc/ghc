@@ -83,6 +83,7 @@ import GHC.JS.Syntax
 import GHC.JS.Make
 import GHC.JS.Transform
 
+import GHC.StgToJS.ExprCtx
 import GHC.StgToJS.Heap
 import GHC.StgToJS.Types
 import GHC.StgToJS.Regs
@@ -104,7 +105,6 @@ import GHC.Types.ForeignCall
 import GHC.Utils.Encoding (zEncodeString)
 import GHC.Utils.Outputable hiding ((<>))
 import GHC.Utils.Misc
-import GHC.Utils.Panic
 import qualified GHC.Utils.Monad.State.Strict as State
 import GHC.Data.FastString
 
@@ -531,14 +531,9 @@ pushOptimized xs = do
              | otherwise = InfixExpr SubOp sp (toJExpr (l - i))
 
 pushLneFrame :: HasDebugCallStack => Int -> ExprCtx -> G JStat
-pushLneFrame size ctx
-  | l < size  = panic $ "pushLneFrame: let-no-escape frame too short " ++
-                        show l ++ " < " ++ show size
-  | otherwise = pushOptimized' (take size $ ctxLneFrame ctx)
-  where
-    l = length (ctxLneFrame ctx)
-
-
+pushLneFrame size ctx =
+  let ctx' = ctxLneShrinkStack ctx size
+  in pushOptimized' (ctxLneFrameVars ctx')
 
 popUnknown :: [JExpr] -> G JStat
 popUnknown xs = popSkipUnknown 0 xs

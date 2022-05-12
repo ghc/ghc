@@ -21,6 +21,7 @@ import GHC.StgToJS.StgUtils
 import GHC.StgToJS.CoreUtils
 import GHC.StgToJS.Deps
 import GHC.StgToJS.Expr
+import GHC.StgToJS.ExprCtx
 import GHC.StgToJS.Monad
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
@@ -38,8 +39,6 @@ import GHC.Types.CostCentre
 import GHC.Types.ForeignStubs (ForeignStubs (..), getCHeader, getCStub)
 import GHC.Types.RepType
 import GHC.Types.Id
-import GHC.Types.Unique.FM
-import GHC.Types.Unique.Set
 import GHC.Types.Unique
 import GHC.Types.TyThing
 
@@ -299,7 +298,7 @@ genToplevelRhs i rhs = case rhs of
   StgRhsClosure _ext cc _upd_flag {- srt -} args body -> do
     eid@(TxtI eidt) <- jsEnIdI i
     (TxtI idt)   <- jsIdI i
-    body <- genBody (ExprCtx i [] emptyUniqSet emptyUniqSet emptyUFM [] Nothing) i R2 args body
+    body <- genBody (initExprCtx i) i R2 args body
     (lidents, lids) <- unzip <$> liftToGlobal (jsSaturate (Just "ghcjs_tmp_sat_") body)
     let lidents' = map (\(TxtI t) -> t) lidents
     CIStaticRefs sr0 <- genStaticRefsRhs rhs

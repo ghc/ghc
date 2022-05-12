@@ -17,6 +17,7 @@ import GHC.JS.Make
 import GHC.JS.Transform
 
 import GHC.StgToJS.Arg
+import GHC.StgToJS.ExprCtx
 import GHC.StgToJS.Monad
 import GHC.StgToJS.Types
 import GHC.StgToJS.Literal
