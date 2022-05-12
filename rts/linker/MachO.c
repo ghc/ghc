@@ -289,13 +289,23 @@ decodeAddend(ObjectCode * oc, Section * section, MachORelocationInfo * ri) {
     checkProddableBlock(oc, (void*)p, 1 << ri->r_length);
 
     switch(ri->r_type) {
-        case ARM64_RELOC_UNSIGNED:
+        case ARM64_RELOC_UNSIGNED: {
+            switch (ri->r_length) {
+                case 0: return signExtend(*(uint8_t*)p,  8 << ri->r_length);
+                case 1: return signExtend(*(uint16_t*)p, 8 << ri->r_length);
+                case 2: return signExtend(*(uint32_t*)p, 8 << ri->r_length);
+                case 3: return signExtend(*(uint64_t*)p, 8 << ri->r_length);
+                default:
+                    barf("Unsupported r_length (%d) for UNSIGNED relocation",
+                         ri->r_length);
+            }
+        }
         case ARM64_RELOC_SUBTRACTOR: {
             switch (ri->r_length) {
-                case 0: return signExtend(*(uint8_t*)p,  8 * (1 << ri->r_length));
-                case 1: return signExtend(*(uint16_t*)p, 8 * (1 << ri->r_length));
-                case 2: return signExtend(*(uint32_t*)p, 8 * (1 << ri->r_length));
-                case 3: return signExtend(*(uint64_t*)p, 8 * (1 << ri->r_length));
+                case 0: return signExtend(*(uint8_t*)p,  8 << ri->r_length);
+                case 1: return signExtend(*(uint16_t*)p, 8 << ri->r_length);
+                case 2: return signExtend(*(uint32_t*)p, 8 << ri->r_length);
+                case 3: return signExtend(*(uint64_t*)p, 8 << ri->r_length);
                 default:
                     barf("Unsupported r_length (%d) for SUBTRACTOR relocation",
                          ri->r_length);
@@ -356,10 +366,23 @@ encodeAddend(ObjectCode * oc, Section * section,
     checkProddableBlock(oc, (void*)p, 1 << ri->r_length);
 
     switch (ri->r_type) {
-        case ARM64_RELOC_UNSIGNED:
+        case ARM64_RELOC_UNSIGNED: {
+            if(!fitsBits(8 << ri->r_length, addend))
+                barf("Relocation out of range for UNSIGNED");
+            switch (ri->r_length) {
+                case 0: *(uint8_t*)p  = (uint8_t)addend; break;
+                case 1: *(uint16_t*)p = (uint16_t)addend; break;
+                case 2: *(uint32_t*)p = (uint32_t)addend; break;
+                case 3: *(uint64_t*)p = (uint64_t)addend; break;
+                default:
+                    barf("Unsupported r_length (%d) for UNSIGNED relocation",
+                         ri->r_length);
+            }
+            return;
+        }
         case ARM64_RELOC_SUBTRACTOR: {
             if(!fitsBits(8 << ri->r_length, addend))
-                barf("Relocation out of range for UNSIGNED/SUBTRACTOR");
+                barf("Relocation out of range for SUBTRACTOR");
             switch (ri->r_length) {
                 case 0: *(uint8_t*)p  = (uint8_t)addend; break;
                 case 1: *(uint16_t*)p = (uint16_t)addend; break;
@@ -471,6 +494,25 @@ freeGot(ObjectCode * oc) {
     oc->info->got_size = 0;
 }
 
+// Retrieve symbol value
+static uint64_t symbol_value(ObjectCode* oc, MachOSymbol* symbol) {
+  uint64_t value = 0;
+  if(symbol->nlist->n_type & N_EXT) {
+      /* external symbols should be able to be
+       * looked up via the lookupDependentSymbol function.
+       * Either through the global symbol hashmap
+       * or asking the system, if not found
+       * in the symbol hashmap
+       */
+      value = (uint64_t)lookupDependentSymbol((char*)symbol->name, oc, NULL);
+      if(!value)
+          barf("Could not lookup symbol: %s!", symbol->name);
+  } else {
+      value = (uint64_t)symbol->addr;    // address of the symbol.
+  }
+  return value;
+}
+
 static int
 relocateSectionAarch64(ObjectCode * oc, Section * section)
 {
@@ -498,43 +540,45 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
             case ARM64_RELOC_UNSIGNED: {
                 MachOSymbol* symbol = &oc->info->macho_symbols[ri->r_symbolnum];
                 int64_t addend = decodeAddend(oc, section, ri);
-                uint64_t value = 0;
-                if(symbol->nlist->n_type & N_EXT) {
-                    /* external symbols should be able to be
-                     * looked up via the lookupDependentSymbol function.
-                     * Either through the global symbol hashmap
-                     * or asking the system, if not found
-                     * in the symbol hashmap
-                     */
-                    value = (uint64_t)lookupDependentSymbol((char*)symbol->name, oc, NULL);
-                    if(!value)
-                        barf("Could not lookup symbol: %s!", symbol->name);
-                } else {
-                    value = (uint64_t)symbol->addr;    // address of the symbol.
-                }
+                uint64_t value = symbol_value(oc, symbol);
                 encodeAddend(oc, section, ri, value + addend);
                 break;
             }
             case ARM64_RELOC_SUBTRACTOR:
             {
-                MachOSymbol* symbol = &oc->info->macho_symbols[ri->r_symbolnum];
                 // subtractor and unsigned are called in tandem:
                 // first  pc <- pc - symbol address (SUBTRACTOR)
                 // second pc <- pc + symbol address (UNSIGNED)
                 // to achieve pc <- pc + target - base.
-                //
-                // the current implementation uses absolute addresses,
-                // which is simpler than trying to do this section
-                // relative, but could more easily lead to overflow.
-                //
+
+                // check that the following relocation exists and has the
+                // expected ARM64_RELOC_UNSIGNED type
                 if(!(i+1 < nreloc)
                    || !(section->info->relocation_info[i+1].r_type
                           == ARM64_RELOC_UNSIGNED))
                     barf("SUBTRACTOR relocation *must* be followed by UNSIGNED relocation.");
 
+                // we *know* that the next relocation is ARM64_RELOC_UNSIGNED
+                // (see above). So let's process both relocations and write the
+                // combined result in the target location. This prevents
+                // overflow. (Compared to trying to store the intermediate
+                // result which may not fit in the target bits).
+
+                // sub part (ARM64_RELOC_SUBTRACTOR)
+                MachOSymbol* symbol1 = &oc->info->macho_symbols[ri->r_symbolnum];
+                uint64_t sub_value = symbol_value(oc, symbol1);
+
+                // add part (ARM64_RELOC_UNSIGNED)
+                MachORelocationInfo * ri2 = &section->info->relocation_info[i+1];
+                MachOSymbol* symbol2 = &oc->info->macho_symbols[ri2->r_symbolnum];
+                uint64_t add_value = symbol_value(oc, symbol2);
+
+                // combine with addend and store
                 int64_t addend = decodeAddend(oc, section, ri);
-                int64_t value = (uint64_t)symbol->addr;
-                encodeAddend(oc, section, ri, addend - value);
+                encodeAddend(oc, section, ri, addend - sub_value + add_value);
+
+                // skip next relocation: we've already handled it
+                i += 1;
                 break;
             }
             case ARM64_RELOC_BRANCH26: {
