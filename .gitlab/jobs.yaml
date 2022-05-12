@@ -15,7 +15,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "aarch64-darwin-$CACHE_REV",
@@ -76,7 +77,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "aarch64-linux-deb10-$CACHE_REV",
@@ -133,7 +135,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "armv7-linux-deb10-$CACHE_REV",
@@ -171,7 +174,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-armv7-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "",
+      "CONFIGURE_ARGS": "LD=ld.lld ",
       "TEST_ENV": "armv7-linux-deb10-validate"
     }
   },
@@ -190,7 +193,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "i386-linux-deb9-$CACHE_REV",
@@ -247,7 +251,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "aarch64-darwin-$CACHE_REV",
@@ -309,7 +314,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "aarch64-linux-deb10-$CACHE_REV",
@@ -367,7 +373,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "armv7-linux-deb10-$CACHE_REV",
@@ -405,7 +412,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-armv7-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "",
+      "CONFIGURE_ARGS": "LD=ld.lld ",
       "TEST_ENV": "armv7-linux-deb10-validate",
       "XZ_OPT": "-9"
     }
@@ -425,7 +432,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "i386-linux-deb9-$CACHE_REV",
@@ -483,7 +491,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-darwin-$CACHE_REV",
@@ -547,7 +556,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-freebsd-$CACHE_REV",
@@ -586,7 +596,7 @@
       "BUILD_FLAVOUR": "validate",
       "CABAL_INSTALL_VERSION": "3.2.0.0",
       "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
-      "GHC_VERSION": "8.10.1",
+      "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "TEST_ENV": "x86_64-freebsd-validate",
       "XZ_OPT": "-9"
@@ -607,7 +617,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-alpine3_12-$CACHE_REV",
@@ -668,7 +679,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-alpine3_12-$CACHE_REV",
@@ -729,7 +741,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-centos7-$CACHE_REV",
@@ -787,7 +800,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -845,7 +859,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -903,7 +918,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -962,7 +978,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -1020,7 +1037,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -1078,7 +1096,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -1136,7 +1155,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -1194,7 +1214,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -1254,7 +1275,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb11-$CACHE_REV",
@@ -1312,7 +1334,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-fedora33-$CACHE_REV",
@@ -1372,7 +1395,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-fedora33-$CACHE_REV",
@@ -1432,7 +1456,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-ubuntu20_04-$CACHE_REV",
@@ -1489,7 +1514,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "no-caching",
@@ -1525,7 +1551,7 @@
       "BUILD_FLAVOUR": "validate",
       "CABAL_INSTALL_VERSION": "3.2.0.0",
       "CONFIGURE_ARGS": "",
-      "GHC_VERSION": "8.10.4",
+      "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
@@ -1547,7 +1573,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "no-caching",
@@ -1583,7 +1610,7 @@
       "BUILD_FLAVOUR": "validate",
       "CABAL_INSTALL_VERSION": "3.2.0.0",
       "CONFIGURE_ARGS": "",
-      "GHC_VERSION": "8.10.4",
+      "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
@@ -1606,7 +1633,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "aarch64-darwin-$CACHE_REV",
@@ -1669,7 +1697,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "aarch64-linux-deb10-$CACHE_REV",
@@ -1728,7 +1757,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "armv7-linux-deb10-$CACHE_REV",
@@ -1766,7 +1796,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-armv7-linux-deb10-perf",
       "BUILD_FLAVOUR": "perf",
-      "CONFIGURE_ARGS": "",
+      "CONFIGURE_ARGS": "LD=ld.lld ",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "armv7-linux-deb10-perf",
       "XZ_OPT": "-9"
@@ -1787,7 +1817,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "i386-linux-deb9-$CACHE_REV",
@@ -1846,7 +1877,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-darwin-$CACHE_REV",
@@ -1911,7 +1943,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-freebsd-$CACHE_REV",
@@ -1950,7 +1983,7 @@
       "BUILD_FLAVOUR": "perf",
       "CABAL_INSTALL_VERSION": "3.2.0.0",
       "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
-      "GHC_VERSION": "8.10.1",
+      "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "x86_64-freebsd-perf",
@@ -1972,7 +2005,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-alpine3_12-$CACHE_REV",
@@ -2034,7 +2068,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-alpine3_12-$CACHE_REV",
@@ -2096,7 +2131,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-centos7-$CACHE_REV",
@@ -2155,7 +2191,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -2214,7 +2251,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -2273,7 +2311,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb11-$CACHE_REV",
@@ -2332,7 +2371,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-fedora33-$CACHE_REV",
@@ -2393,7 +2433,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-fedora33-$CACHE_REV",
@@ -2454,7 +2495,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-ubuntu20_04-$CACHE_REV",
@@ -2512,7 +2554,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "no-caching",
@@ -2548,7 +2591,7 @@
       "BUILD_FLAVOUR": "perf",
       "CABAL_INSTALL_VERSION": "3.2.0.0",
       "CONFIGURE_ARGS": "",
-      "GHC_VERSION": "8.10.4",
+      "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
@@ -2571,7 +2614,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "no-caching",
@@ -2607,7 +2651,7 @@
       "BUILD_FLAVOUR": "perf",
       "CABAL_INSTALL_VERSION": "3.2.0.0",
       "CONFIGURE_ARGS": "",
-      "GHC_VERSION": "8.10.4",
+      "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
@@ -2631,7 +2675,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-darwin-$CACHE_REV",
@@ -2694,7 +2739,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-freebsd-$CACHE_REV",
@@ -2733,7 +2779,7 @@
       "BUILD_FLAVOUR": "validate",
       "CABAL_INSTALL_VERSION": "3.2.0.0",
       "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
-      "GHC_VERSION": "8.10.1",
+      "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "TEST_ENV": "x86_64-freebsd-validate"
     }
@@ -2753,7 +2799,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-alpine3_12-$CACHE_REV",
@@ -2813,7 +2860,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-alpine3_12-$CACHE_REV",
@@ -2873,7 +2921,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-centos7-$CACHE_REV",
@@ -2930,7 +2979,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -2987,7 +3037,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -3045,7 +3096,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -3103,7 +3155,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -3160,7 +3213,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -3217,7 +3271,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -3274,7 +3329,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -3331,7 +3387,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb10-$CACHE_REV",
@@ -3391,7 +3448,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-deb11-$CACHE_REV",
@@ -3448,7 +3506,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-fedora33-$CACHE_REV",
@@ -3507,7 +3566,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-fedora33-$CACHE_REV",
@@ -3566,7 +3626,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "x86_64-linux-ubuntu20_04-$CACHE_REV",
@@ -3622,7 +3683,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "no-caching",
@@ -3658,7 +3720,7 @@
       "BUILD_FLAVOUR": "validate",
       "CABAL_INSTALL_VERSION": "3.2.0.0",
       "CONFIGURE_ARGS": "",
-      "GHC_VERSION": "8.10.4",
+      "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
@@ -3679,7 +3741,8 @@
       ],
       "reports": {
         "junit": "junit.xml"
-      }
+      },
+      "when": "always"
     },
     "cache": {
       "key": "no-caching",
@@ -3715,7 +3778,7 @@
       "BUILD_FLAVOUR": "validate",
       "CABAL_INSTALL_VERSION": "3.2.0.0",
       "CONFIGURE_ARGS": "",
-      "GHC_VERSION": "8.10.4",
+      "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",

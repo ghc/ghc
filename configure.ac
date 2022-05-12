@@ -815,7 +815,7 @@ AC_PATH_PROG(SPHINXBUILD,sphinx-build)
 AC_CACHE_CHECK([for version of sphinx-build], fp_cv_sphinx_version,
 changequote(, )dnl
 [if test -n "$SPHINXBUILD"; then
-  fp_cv_sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed 's/.* \([0-9]\.[0-9]\.[0-9]\)/\1/' | head -n1`;
+  fp_cv_sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed -re 's/.* v?([0-9]\.[0-9]\.[0-9])/\1/' | head -n1`;
 fi;
 changequote([, ])dnl
 ])
