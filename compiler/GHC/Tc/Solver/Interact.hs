@@ -268,11 +268,11 @@ getTcPluginSolvers
 -- the plugin itself should perform this check if necessary.
 runTcPluginSolvers :: [TcPluginSolver] -> SplitCts -> TcS TcPluginProgress
 runTcPluginSolvers solvers all_cts
-  = foldM do_plugin initialProgress solvers
+  = do { ev_binds_var <- getTcEvBindsVar
+       ; foldM (do_plugin ev_binds_var) initialProgress solvers }
   where
-    do_plugin :: TcPluginProgress -> TcPluginSolver -> TcS TcPluginProgress
-    do_plugin p solver = do
-        ev_binds_var <- getTcEvBindsVar
+    do_plugin :: EvBindsVar -> TcPluginProgress -> TcPluginSolver -> TcS TcPluginProgress
+    do_plugin ev_binds_var p solver = do
         result <- runTcPluginTcS (uncurry (solver ev_binds_var) (pluginInputCts p))
         return $ progress p result
 
