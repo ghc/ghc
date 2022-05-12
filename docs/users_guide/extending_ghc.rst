@@ -577,12 +577,12 @@ is defined thus:
 
     data TcPlugin = forall s . TcPlugin
       { tcPluginInit    :: TcPluginM s
-      , tcPluginSolve   :: s -> EvBindsVar -> TcPluginSolver
+      , tcPluginSolve   :: s -> TcPluginSolver
       , tcPluginRewrite :: s -> UniqFM TyCon TcPluginRewriter
       , tcPluginStop    :: s -> TcPluginM ()
       }
 
-    type TcPluginSolver = [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult
+    type TcPluginSolver = EvBindsVar -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult
 
     type TcPluginRewriter = RewriteEnv -> [Ct] -> [Type] -> TcPluginM TcPluginRewriteResult
 
@@ -652,8 +652,8 @@ The key component of a typechecker plugin is a function of type
 
 ::
 
-    solve :: [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
-    solve givens deriveds wanteds = ...
+    solve :: EvBindsVar -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
+    solve binds givens deriveds wanteds = ...
 
 This function will be invoked in two different ways:
 
@@ -676,7 +676,7 @@ The plugin can then respond with:
 
 The plugin must respond with constraints of the same flavour,
 i.e. in (1) it should return only Givens, and for (2) it should return only
-Wanteds (or Deriveds); all other constraints will be ignored.
+Wanteds; all other constraints will be ignored.
 
 If the plugin cannot make any progress, it should return
 ``TcPluginSolveResult [] [] []``. Otherwise, if there were any new constraints, the
@@ -692,7 +692,7 @@ by solving or contradicting them).
 
 Constraints that have been solved by the plugin must be provided with
 evidence in the form of an ``EvTerm`` of the type of the constraint.
-This evidence is ignored for Given and Derived constraints, which GHC
+This evidence is ignored for Given constraints, which GHC
 "solves" simply by discarding them; typically this is used when they are
 uninformative (e.g. reflexive equations). For Wanted constraints, the
 evidence will form part of the Core term that is generated after
@@ -700,6 +700,11 @@ typechecking, and can be checked by ``-dcore-lint``. It is possible for
 the plugin to create equality axioms for use in evidence terms, but GHC
 does not check their consistency, and inconsistent axiom sets may lead
 to segfaults or other runtime misbehaviour.
+
+Evidence is required also when creating new Given constraints, which are
+usually implied by old ones. It is not uncommon that the evidence of a new
+Given constraint contains a removed constraint: the new one has replaced the
+removed one.
 
 .. _type-family-rewriting-with-plugins:
 
