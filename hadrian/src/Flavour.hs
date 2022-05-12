@@ -12,6 +12,7 @@ module Flavour
   , enableProfiledGhc
   , disableDynamicGhcPrograms
   , disableProfiledLibs
+  , enableLinting
 
   , completeSetting
   , applySettings
