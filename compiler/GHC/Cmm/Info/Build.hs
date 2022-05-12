@@ -167,16 +167,6 @@ Requires:
   - 64-bit architecture
   - small memory model
 
-Currently it is only enabled on x86_64 with TABLES_NEXT_TO_CODE.
-
-It is claimed that MachO doesn't support it due to #15169. However I believe
-that two kinds of SRT inlining have been confused:
-- inlining the SRT offset in the info->srt field
-  - should always be fine
-- inlining singleton SRT (i.e. SRT containing one reference)
-  - this can lead to a relative reference to an object external to the
-    compilation unit (c.f. #15169)
-
 We optimise the info table representation further.  The offset to the SRT can
 be stored in 32 bits (all code lives within a 2GB region in x86_64's small
 memory model), so we can save a word in the info table by storing the
@@ -1162,7 +1152,8 @@ oneSRT cfg staticFuns lbls caf_lbls isCAF cafs static_data_env = do
           not (labelDynamic this_mod platform (cmmExternalDynamicRefs cfg) lbl)
 
           -- MachO relocations can't express offsets between compilation units at
-          -- all, so we are always forced to build a singleton SRT in this case.
+          -- all, so we are always forced to build a singleton SRT in this case
+          -- (cf #15169)
             && (not (osMachOTarget $ platformOS $ profilePlatform profile)
                || isLocalCLabel this_mod lbl) -> do
 

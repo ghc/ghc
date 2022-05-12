@@ -156,16 +156,12 @@ typedef union {
 } StgClosureInfo;
 
 
-#if defined(x86_64_HOST_ARCH)
-#define SMALL_MEMORY_MODEL
-#endif
-
 // This is where we choose how to represent the SRT location in the info
 // table.  See the section "Referring to an SRT from the info table" in
 // Note [SRTs] in GHC.Cmm.Info.Build.
 //
 // Specifically we define one of the following:
-#if WORD_SIZE_IN_BITS == 64 && defined(SMALL_MEMORY_MODEL) && defined(TABLES_NEXT_TO_CODE)
+#if WORD_SIZE_IN_BITS == 64 && defined(TABLES_NEXT_TO_CODE)
 // On 64-bit platforms using the small memory model we can fit a pointer
 // offset in half a word, so put the SRT offset in the info->srt field
 // directly.
