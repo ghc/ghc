@@ -25,10 +25,13 @@ import GHC.StgToJS.CodeGen
 --
 -- Primitives
 -- ~~~~~~~~~~
--- TODO: pointer emulation (Addr#)
--- TODO: 64-bit primops
--- TODO: JSVal#
--- TODO: StablePtr#
+--  See GHC.StgToJS.Types:VarType
+--  - Addr#: represented with two fields: array (used as a namespace) and index
+--  - StablePtr#: similar to Addr# with array fixed to h$stablePtrBuf
+--  - Int64#/Word64#: represented with two fields: high, low
+--  - Float#/Double#: both represented as Javascript Double (no Float!)
+--  - JSVal#: any Javascript object (used to pass JS objects via FFI)
+--  - TVar#, MVar#, etc. are represented with a JS object
 --
 -- Foreign JavaScript imports
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
