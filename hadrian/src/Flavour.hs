@@ -13,6 +13,7 @@ module Flavour
   , disableDynamicGhcPrograms
   , disableProfiledLibs
   , enableLinting
+  , enableHaddock
 
   , completeSetting
   , applySettings
@@ -54,6 +55,7 @@ flavourTransformers = M.fromList
     , "debug_ghc" =: debugGhc Stage1
     , "debug_stage1_ghc" =: debugGhc Stage0
     , "lint" =: enableLinting
+    , "haddock" =: enableHaddock
     ]
   where (=:) = (,)
 
@@ -143,6 +145,17 @@ enableLinting =
       [ arg "-dcore-lint"
       , arg "-dstg-lint"
       -- Should be -dlint but currently -dcmm-lint fails due to #21563
+      ]
+
+-- | Enable Core, STG, and C-- linting in all compilations with the stage1 compiler.
+enableHaddock :: Flavour -> Flavour
+enableHaddock =
+    addArgs $ stage1 ? mconcat
+      [ builder (Ghc CompileHs) ? haddock
+      ]
+  where
+    haddock = mconcat
+      [ arg "-haddock"
       ]
 
 -- | Transform the input 'Flavour' so as to build with
