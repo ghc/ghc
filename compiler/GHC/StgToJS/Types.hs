@@ -278,16 +278,6 @@ data TypedExpr = TypedExpr
   , typex_expr :: [JExpr]
   }
 
-data ExprCtx = ExprCtx
-  { ctxTop        :: Id
-  , ctxTarget     :: [TypedExpr]
-  , ctxEval       :: UniqSet Id
-  , ctxLne        :: UniqSet Id     -- ^ all lne-bound things
-  , ctxLneFrameBs :: UniqFM Id Int  -- ^ binds in current lne frame (defined at size)
-  , ctxLneFrame   :: [(Id,Int)]     -- ^ contents of current lne frame
-  , ctxSrcSpan    :: Maybe RealSrcSpan
-  }
-
 data PrimRes
   = PrimInline JStat  -- ^ primop is inline, result is assigned directly
   | PRPrimCall JStat  -- ^ primop is async call, primop returns the next

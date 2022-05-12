@@ -20,6 +20,7 @@ import GHC.JS.Make
 
 import GHC.StgToJS.Apply
 import GHC.StgToJS.Arg
+import GHC.StgToJS.ExprCtx
 import GHC.StgToJS.FFI
 import GHC.StgToJS.Heap
 import GHC.StgToJS.Monad
@@ -37,7 +38,6 @@ import GHC.Types.CostCentre
 import GHC.Types.Tickish
 import GHC.Types.Var.Set
 import GHC.Types.Id
-import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.RepType
 
@@ -102,7 +102,7 @@ genExpr ctx stg = case stg of
     (stats, result) <- genExpr ctx e
     return (setSCCstats <> stats, result)
   StgTick (SourceNote span _sname) e
-    -> genExpr (ctx { ctxSrcSpan = Just span} ) e
+    -> genExpr (ctxSetSrcSpan span ctx) e
   StgTick _m e
     -> genExpr ctx e
 
@@ -124,7 +124,7 @@ genBind ctx bndr =
        j <- allocCls m . map snd . filter (isNothing . fst) $ zip jas bs
        return (j, addEvalRhs ctx bs)
    where
-     ctx' = clearCtxStack ctx
+     ctx' = ctxClearLneFrame ctx
 
      assign :: Id -> CgStgRhs -> G (Maybe JStat)
      assign b (StgRhsClosure _ _ccs {-[the_fv]-} _upd [] expr)
@@ -148,7 +148,7 @@ genBind ctx bndr =
                (tgt ||= ApplExpr (var ("h$c_sel_" <> ST.pack sel_tag)) [the_fvj])
              _ -> panic "genBind.assign: invalid size"
      assign b (StgRhsClosure _ext _ccs _upd [] expr)
-       | snd (isInlineExpr (ctxEval ctx) expr) = do
+       | snd (isInlineExpr (ctxEvaluatedIds ctx) expr) = do
            d   <- declIds b
            tgt <- genIds b
            let ctx' = ctx { ctxTarget = alignIdExprs b tgt }
@@ -159,8 +159,8 @@ genBind ctx bndr =
 
      addEvalRhs c [] = c
      addEvalRhs c ((b,r):xs)
-       | StgRhsCon{} <- r                       = addEvalRhs (addEval b c) xs
-       | (StgRhsClosure _ _ ReEntrant _ _) <- r = addEvalRhs (addEval b c) xs
+       | StgRhsCon{} <- r                       = addEvalRhs (ctxAssertEvaluated b c) xs
+       | (StgRhsClosure _ _ ReEntrant _ _) <- r = addEvalRhs (ctxAssertEvaluated b c) xs
        | otherwise                              = addEvalRhs c xs
 
 genBindLne :: HasDebugCallStack
@@ -168,22 +168,20 @@ genBindLne :: HasDebugCallStack
            -> CgStgBinding
            -> G (JStat, ExprCtx)
 genBindLne ctx bndr = do
+  -- compute live variables and the offsets where they will be stored in the
+  -- stack
   vis  <- map (\(x,y,_) -> (x,y)) <$>
             optimizeFree oldFrameSize (newLvs++map fst updBinds)
+  -- initialize updatable bindings to null_
   declUpds <- mconcat <$> mapM (fmap (||= null_) . jsIdI . fst) updBinds
-  let newFrameSize = oldFrameSize + length vis
-      ctx' = ctx
-        { ctxLne        = addListToUniqSet (ctxLne ctx) bound
-        , ctxLneFrameBs = addListToUFM (ctxLneFrameBs ctx) (map (,newFrameSize) bound)
-        , ctxLneFrame   = ctxLneFrame ctx ++ vis
-        }
+  -- update expression context to include the updated LNE frame
+  let ctx' = ctxUpdateLneFrame vis bound ctx
   mapM_ (uncurry $ genEntryLne ctx') binds
   return (declUpds, ctx')
   where
-    oldFrame     = ctxLneFrame ctx
-    oldFrameSize = length oldFrame
-    isOldLv i    = i `elementOfUniqSet` ctxLne ctx ||
-                   i `elem` map fst oldFrame
+    oldFrameSize = ctxLneFrameSize ctx
+    isOldLv i    = ctxIsLneBinding ctx i ||
+                   ctxIsLneLiveVar ctx i
     live         = liveVars $ mkDVarSet $ stgLneLive' bndr
     newLvs       = filter (not . isOldLv) (dVarSetElems live)
     binds = case bndr of
@@ -206,12 +204,12 @@ genBindLne ctx bndr = do
 genEntryLne :: HasDebugCallStack => ExprCtx -> Id -> CgStgRhs -> G ()
 genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body) =
   resetSlots $ do
-  let payloadSize = length frame
-      frame       = ctxLneFrame ctx
+  let payloadSize = ctxLneFrameSize ctx
+      vars        = ctxLneFrameVars ctx
       myOffset    =
         maybe (panic "genEntryLne: updatable binder not found in let-no-escape frame")
               ((payloadSize-) . fst)
-              (L.find ((==i) . fst . snd) (zip [0..] frame))
+              (L.find ((==i) . fst . snd) (zip [0..] vars))
       bh | isUpdatable update =
              jVar (\x -> mconcat
               [ x |= ApplExpr (var "h$bh_lne") [Sub sp (toJExpr myOffset), toJExpr (payloadSize+1)]
@@ -228,12 +226,12 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body) =
                 (CIRegs 0 $ concatMap idVt args)
                 (eii <> ", " <> ST.pack (renderWithContext defaultSDocContext (ppr i)))
                 (fixedLayout . reverse $
-                    map (stackSlotType . fst) (ctxLneFrame ctx))
+                    map (stackSlotType . fst) (ctxLneFrameVars ctx))
                 CIStackFrame
                 sr
   emitToplevel (ei ||= toJExpr f)
 genEntryLne ctx i (StgRhsCon cc con _mu _ticks args) = resetSlots $ do
-  let payloadSize = length (ctxLneFrame ctx)
+  let payloadSize = ctxLneFrameSize ctx
   ei@(TxtI _eii) <- jsEntryIdI i
   -- di <- enterDataCon con
   ii <- makeIdent
@@ -267,7 +265,7 @@ genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body) = res
                                 sr
   emitToplevel (ei ||= toJExpr (JFunc [] (mconcat [ll, llv, upd, setcc, body])))
   where
-    entryCtx = ExprCtx i [] (ctxEval ctx) (ctxLne ctx) emptyUFM [] (ctxSrcSpan ctx)
+    entryCtx = ctxSetTarget [] (ctxClearLneFrame ctx)
 
 genEntryType :: HasDebugCallStack => [Id] -> G CIType
 genEntryType []   = return CIThunk
@@ -370,15 +368,14 @@ loadLiveFun l = do
                             in  DeclStat v `mappend` (toJExpr v |= SelExpr d ident)
 
 popLneFrame :: Bool -> Int -> ExprCtx -> G JStat
-popLneFrame inEntry size ctx
-  | l < size  = panic $ "popLneFrame: let-no-escape frame too short: " ++
-                        show l ++ " < " ++ show size
-  | otherwise = popSkipI skip
-                  =<< mapM (\(i,n) -> (,SlotId i n) <$> genIdsIN i n)
-                           (take size $ ctxLneFrame ctx)
-  where
-    skip = if inEntry then 1 else 0 -- pop the frame header
-    l    = length (ctxLneFrame ctx)
+popLneFrame inEntry size ctx = do
+  let ctx' = ctxLneShrinkStack ctx size
+
+  is <- mapM (\(i,n) -> (,SlotId i n) <$> genIdsIN i n)
+             (ctxLneFrameVars ctx')
+
+  let skip = if inEntry then 1 else 0 -- pop the frame header
+  popSkipI skip is
 
 genUpdFrame :: UpdateFlag -> Id -> G JStat
 genUpdFrame u i
@@ -445,9 +442,6 @@ optimizeFree offset ids = do
       allSlots           = L.sortBy (compare `on` \(_,_,x,_) -> x) (fixed ++ remaining')
   return $ map (\(i,n,_,b) -> (i,n,b)) allSlots
 
-addEval :: Id -> ExprCtx -> ExprCtx
-addEval i ctx = ctx { ctxEval = addOneToUniqSet (ctxEval ctx) i }
-
 -- allocate local closures
 allocCls :: Maybe JStat -> [(Id, CgStgRhs)] -> G JStat
 allocCls dynMiddle xs = do
@@ -494,12 +488,11 @@ genCase :: HasDebugCallStack
         -> LiveVars
         -> G (JStat, ExprResult)
 genCase ctx bnd e at alts l
-  | snd (isInlineExpr (ctxEval ctx) e) = withNewIdent $ \ccsVar -> do
+  | snd (isInlineExpr (ctxEvaluatedIds ctx) e) = withNewIdent $ \ccsVar -> do
       bndi <- genIdsI bnd
-      let ctx' = ctx
-                  { ctxTop    = bnd
-                  , ctxTarget = alignIdExprs bnd (map toJExpr bndi)
-                  }
+      let ctx' = ctxSetTop bnd
+                  $ ctxSetTarget (alignIdExprs bnd (map toJExpr bndi))
+                  $ ctx
       (ej, r) <- genExpr ctx' e
       let d = case r of
                 ExprInline d0 -> d0
@@ -507,7 +500,7 @@ genCase ctx bnd e at alts l
                                      (pprStgExpr panicStgPprOpts e)
 
           ww = mempty -- if snd (isInlineExpr emptyUniqSet e) then mempty else [j| h$log('danger will robinson'); |]
-      (aj, ar) <- genAlts (addEval bnd ctx) bnd at d alts
+      (aj, ar) <- genAlts (ctxAssertEvaluated bnd ctx) bnd at d alts
       saveCCS <- ifProfiling (toJExpr ccsVar |= toJExpr jCurrentCCS)
       restoreCCS <- ifProfiling (toJExpr jCurrentCCS |= toJExpr ccsVar)
       return ( mconcat
@@ -522,11 +515,10 @@ genCase ctx bnd e at alts l
         , ar
          )
   | otherwise = do
-      rj       <- genRet (addEval bnd ctx) bnd at alts l
-      let ctx' = ctx
-                  { ctxTop    = bnd
-                  , ctxTarget = alignIdExprs bnd (map toJExpr [R1 ..])
-                  }
+      rj       <- genRet (ctxAssertEvaluated bnd ctx) bnd at alts l
+      let ctx' = ctxSetTop bnd
+                  $ ctxSetTarget (alignIdExprs bnd (map toJExpr [R1 ..]))
+                  $ ctx
       (ej, _r) <- genExpr ctx' e
       return (rj <> ej, ExprCont)
 
@@ -542,10 +534,10 @@ genRet ctx e at as l = withNewIdent f
     allRefs :: [Id]
     allRefs =  S.toList . S.unions $ fmap (exprRefs emptyUFM . alt_rhs) as
     lneLive :: Int
-    lneLive    = maximum $ 0 : map (fromMaybe 0 . lookupUFM (ctxLneFrameBs ctx)) allRefs
-    ctx'       = adjustCtxStack lneLive ctx
-    lneVars    = map fst $ take lneLive (ctxLneFrame ctx)
-    isLne i    = i `elem` lneVars || i `elementOfUniqSet` ctxLne ctx
+    lneLive    = maximum $ 0 : catMaybes (map (ctxLneBindingStackSize ctx) allRefs)
+    ctx'       = ctxLneShrinkStack ctx lneLive
+    lneVars    = map fst $ ctxLneFrameVars ctx'
+    isLne i    = ctxIsLneBinding ctx i || ctxIsLneLiveVar ctx' i
     nonLne     = filter (not . isLne) (dVarSetElems l)
 
     f :: Ident -> G JStat
@@ -584,7 +576,7 @@ genRet ctx e at as l = withNewIdent f
       rasv          <- verifyRuntimeReps (map (\(x,_,_)->x) free)
       restoreCCS    <- ifProfilingM $ popUnknown [jCurrentCCS]
       rlne          <- popLneFrame False lneLive ctx'
-      rlnev         <- verifyRuntimeReps (map fst $ take lneLive (ctxLneFrame ctx'))
+      rlnev         <- verifyRuntimeReps lneVars
       (alts, _altr) <- genAlts ctx' e at Nothing as
       return $ decs <> load <> loadv <> ras <> rasv <> restoreCCS <> rlne <> rlnev <> alts <>
                returnStack
@@ -846,20 +838,6 @@ branchResult = \case
   (_:es)
     | elem ExprCont es -> ExprCont
     | otherwise        -> ExprInline Nothing
-
-adjustCtxStack :: Int -> ExprCtx -> ExprCtx
-adjustCtxStack n ctx
-  | l < n     = panic $ "adjustCtxStack: let-no-escape stack too short: " ++
-                        show l ++ " < " ++ show n
-  | otherwise = ctx { ctxLneFrame = take n (ctxLneFrame ctx) }
-  where
-    l = length (ctxLneFrame ctx)
-
-clearCtxStack :: ExprCtx -> ExprCtx
-clearCtxStack ctx = ctx
-  { ctxLneFrameBs = emptyUFM
-  , ctxLneFrame   = []
-  }
 
 pushRetArgs :: HasDebugCallStack => [(Id,Int,Bool)] -> JExpr -> G JStat
 pushRetArgs free fun = do
