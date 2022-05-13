@@ -606,7 +606,7 @@ tcPolyCheck prag_fn
                 tcSkolemiseScoped ctxt (idType poly_id) $ \rho_ty ->
                 -- Unwraps multiple layers; e.g
                 --    f :: forall a. Eq a => forall b. Ord b => blah
-                -- NB: tcSkolemise makes fresh type variables
+                -- NB: tcSkolemiseScoped makes fresh type variables
                 -- See Note [Instantiate sig with fresh variables]
 
                 let mono_id = mkLocalId mono_name (varMult poly_id) rho_ty in

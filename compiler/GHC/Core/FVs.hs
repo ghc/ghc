@@ -622,7 +622,14 @@ dVarTypeTyCoVars :: Var -> DTyCoVarSet
 dVarTypeTyCoVars var = fvDVarSet $ varTypeTyCoFVs var
 
 varTypeTyCoFVs :: Var -> FV
-varTypeTyCoFVs var = tyCoFVsOfType (varType var)
+-- Find the free variables of a binder.
+-- In the case of ids, don't forget the multiplicity field!
+varTypeTyCoFVs var
+  = tyCoFVsOfType (varType var) `unionFV` mult_fvs
+  where
+    mult_fvs = case varMultMaybe var of
+                 Just mult -> tyCoFVsOfType mult
+                 Nothing   -> emptyFV
 
 idFreeVars :: Id -> VarSet
 idFreeVars id = assert (isId id) $ fvVarSet $ idFVs id

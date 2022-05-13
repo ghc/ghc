@@ -167,7 +167,7 @@ In the function ``h`` we use the record selectors ``return`` and
 ``MonadT`` data structure, rather than using pattern matching.
 
 
-.. _simple-subsumption:
+.. _subsumption:
 
 Subsumption
 -------------
@@ -209,13 +209,39 @@ A similar phenomenon occurs for operator sections. For example,
 ``(\`g3a\` "hello")`` is not well typed, but it can be made to typecheck by eta
 expanding it to ``\x -> x \`g3a\` "hello"``.
 
-Historical note.  Earlier versions of GHC allowed these now-rejected applications, by inserting
-automatic eta-expansions, as described in Section 4.6 of `Practical type inference for arbitrary-rank types <https://www.microsoft.com/en-us/research/publication/practical-type-inference-for-arbitrary-rank-types/>`__, where it is
-called "deep skolemisation".
-But these automatic eta-expansions may silently change the semantics of the user's program,
-and deep skolemisation was removed from the language by
-`GHC Proposal #287 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0287-simplify-subsumption.rst>`__.
-This proposal has many more examples.
+.. extension:: DeepSubsumption
+    :shortdesc: Enable deep subsumption
+
+    :since: 9.2.4
+
+    Relax the simple subsumption rules, implicitly inserting eta-expansions
+    when matching up function types with different quantification structures.
+
+The :extension:`DeepSubsumption` extension relaxes the aforementioned requirement that
+foralls must appear in the same place. GHC will instead automatically rewrite expressions
+like ``f x`` of type ``ty1 -> ty2`` to become ``(\ (y :: ty1) -> f x y)``; this is called eta-expansion.
+See Section 4.6 of
+`Practical type inference for arbitrary-rank types <https://www.microsoft.com/en-us/research/publication/practical-type-inference-for-arbitrary-rank-types/>`__,
+where this process is called "deep skolemisation".
+
+Note that these eta-expansions may silently change the semantics of the user's program: ::
+
+  h1 :: Int -> forall a. a -> a
+  h1 = undefined
+  h2 :: forall b. Int -> b -> b
+  h2 = h1
+
+With :extension:`DeepSubsumption`, GHC will accept these definitions,
+inserting an implicit eta-expansion: ::
+
+  h2 = \ i -> h1 i
+
+This means that ``h2 `seq` ()`` will not crash, even though ``h1 `seq` ()`` does crash.
+
+Historical note: Deep skolemisation was initially removed from the language by
+`GHC Proposal #287 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0287-simplify-subsumption.rst>`__,
+but was re-introduced as part of the :extension:`DeepSubsumption` extension following
+`GHC Proposal #511 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0511-deep-subsumption.rst>`__.
 
 .. _higher-rank-type-inference:
 

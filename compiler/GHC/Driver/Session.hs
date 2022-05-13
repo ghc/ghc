@@ -1380,7 +1380,8 @@ languageExtensions (Just Haskell2010)
        LangExt.PatternGuards,
        LangExt.DoAndIfThenElse,
        LangExt.FieldSelectors,
-       LangExt.RelaxedPolyRec]
+       LangExt.RelaxedPolyRec,
+       LangExt.DeepSubsumption ]
 
 languageExtensions (Just GHC2021)
     = [LangExt.ImplicitPrelude,
@@ -3715,6 +3716,7 @@ xFlagsDeps = [
   flagSpec "MagicHash"                        LangExt.MagicHash,
   flagSpec "MonadComprehensions"              LangExt.MonadComprehensions,
   flagSpec "MonoLocalBinds"                   LangExt.MonoLocalBinds,
+  flagSpec "DeepSubsumption"                  LangExt.DeepSubsumption,
   flagSpec "MonomorphismRestriction"          LangExt.MonomorphismRestriction,
   flagSpec "MultiParamTypeClasses"            LangExt.MultiParamTypeClasses,
   flagSpec "MultiWayIf"                       LangExt.MultiWayIf,

@@ -997,7 +997,7 @@ The expected type might have a forall at the type. Normally, we
 can't skolemise in kinds because we don't have type-level lambda.
 But here, we're at the top-level of an instance declaration, so
 we actually have a place to put the regeneralised variables.
-Thus: skolemise away. cf. GHC.Tc.Utils.Unify.tcSkolemise
+Thus: skolemise away. cf. GHC.Tc.Utils.Unify.tcTopSkolemise
 Examples in indexed-types/should_compile/T12369
 
 Note [Implementing eta reduction for data families]
