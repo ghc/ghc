@@ -113,7 +113,7 @@ module GHC.Tc.Solver.Monad (
                                              -- if the whole instance matcher simply belongs
                                              -- here
 
-    breakTyVarCycle_maybe, rewriterView
+    breakTyEqCycle_maybe, rewriterView
 ) where
 
 import GHC.Prelude
@@ -928,7 +928,7 @@ runTcSWithEvBinds = runTcSWithEvBinds' True False
 
 runTcSWithEvBinds' :: Bool -- ^ Restore type variable cycles afterwards?
                            -- Don't if you want to reuse the InertSet.
-                           -- See also Note [Type variable cycles]
+                           -- See also Note [Type equality cycles]
                            -- in GHC.Tc.Solver.Canonical
                    -> Bool
                    -> EvBindsVar
@@ -1826,21 +1826,20 @@ solverDepthError loc ty
 
 -- | Conditionally replace all type family applications in the RHS with fresh
 -- variables, emitting givens that relate the type family application to the
--- variable. See Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
+-- variable. See Note [Type equality cycles] in GHC.Tc.Solver.Canonical.
 -- This only works under conditions as described in the Note; otherwise, returns
 -- Nothing.
-breakTyVarCycle_maybe :: CtEvidence
-                      -> CheckTyEqResult   -- result of checkTypeEq
-                      -> CanEqLHS
-                      -> TcType     -- RHS
-                      -> TcS (Maybe (TcTyVar, ReductionN))
+breakTyEqCycle_maybe :: CtEvidence
+                     -> CheckTyEqResult   -- result of checkTypeEq
+                     -> CanEqLHS
+                     -> TcType     -- RHS
+                     -> TcS (Maybe ReductionN)
                          -- new RHS that doesn't have any type families
-                         -- TcTyVar is the LHS tv; convenient for the caller
-breakTyVarCycle_maybe (ctLocOrigin . ctEvLoc -> CycleBreakerOrigin _) _ _ _
+breakTyEqCycle_maybe (ctLocOrigin . ctEvLoc -> CycleBreakerOrigin _) _ _ _
   -- see Detail (7) of Note
   = return Nothing
 
-breakTyVarCycle_maybe ev cte_result (TyVarLHS lhs_tv) rhs
+breakTyEqCycle_maybe ev cte_result lhs rhs
   | NomEq <- eq_rel
 
   , cte_result `cterHasOnlyProblem` cteSolubleOccurs
@@ -1849,7 +1848,7 @@ breakTyVarCycle_maybe ev cte_result (TyVarLHS lhs_tv) rhs
 
   = do { should_break <- final_check
        ; if should_break then do { redn <- go rhs
-                                 ; return (Just (lhs_tv, redn)) }
+                                 ; return (Just redn) }
                          else return Nothing }
   where
     flavour = ctEvFlavour ev
@@ -1857,10 +1856,14 @@ breakTyVarCycle_maybe ev cte_result (TyVarLHS lhs_tv) rhs
 
     final_check = case flavour of
       Given  -> return True
-      Wanted -> do { result <- touchabilityTest Wanted lhs_tv rhs
-                   ; return $ case result of
-                       Untouchable -> False
-                       _           -> True }
+      Wanted    -- Wanteds work only with a touchable tyvar on the left
+                -- See "Wanted" section of the Note.
+        | TyVarLHS lhs_tv <- lhs ->
+          do { result <- touchabilityTest Wanted lhs_tv rhs
+             ; return $ case result of
+                          Untouchable -> False
+                          _           -> True }
+        | otherwise -> return False
 
     -- This could be considerably more efficient. See Detail (5) of Note.
     go :: TcType -> TcS ReductionN
@@ -1905,7 +1908,7 @@ breakTyVarCycle_maybe ev cte_result (TyVarLHS lhs_tv) rhs
                                                  fun_app new_ty
                  given_term = evCoercion $ mkNomReflCo new_ty  -- See Detail (4) of Note
            ; new_given <- newGivenEvVar new_loc (given_pred, given_term)
-           ; traceTcS "breakTyVarCycle replacing type family in Given" (ppr new_given)
+           ; traceTcS "breakTyEqCycle replacing type family in Given" (ppr new_given)
            ; emitWorkNC [new_given]
            ; updInertTcS $ \is ->
                is { inert_cycle_breakers = insertCycleBreakerBinding new_tv fun_app
@@ -1923,10 +1926,10 @@ breakTyVarCycle_maybe ev cte_result (TyVarLHS lhs_tv) rhs
     new_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
 
 -- does not fit scenario from Note
-breakTyVarCycle_maybe _ _ _ _ = return Nothing
+breakTyEqCycle_maybe _ _ _ _ = return Nothing
 
 -- | Fill in CycleBreakerTvs with the variables they stand for.
--- See Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
+-- See Note [Type equality cycles] in GHC.Tc.Solver.Canonical.
 restoreTyVarCycles :: InertSet -> TcM ()
 restoreTyVarCycles is
   = forAllCycleBreakerBindings_ (inert_cycle_breakers is) TcM.writeMetaTyVar
