@@ -356,20 +356,22 @@ Library
         System.Environment.ExecutablePath
         System.CPUTime.Utils
 
-    c-sources:
-        cbits/DarwinUtils.c
-        cbits/PrelIOUtils.c
-        cbits/SetEnv.c
-        cbits/iconv.c
-        cbits/inputReady.c
-        cbits/md5.c
-        cbits/primFloat.c
-        cbits/sysconf.c
-        cbits/fs.c
+    if !os(ghcjs)
+      c-sources:
+          cbits/DarwinUtils.c
+          cbits/PrelIOUtils.c
+          cbits/SetEnv.c
+          cbits/WCsubst.c
+          cbits/iconv.c
+          cbits/inputReady.c
+          cbits/md5.c
+          cbits/primFloat.c
+          cbits/sysconf.c
+          cbits/fs.c
 
-    cmm-sources:
-        cbits/CastFloatWord.cmm
-        cbits/StackCloningDecoding.cmm
+      cmm-sources:
+          cbits/CastFloatWord.cmm
+          cbits/StackCloningDecoding.cmm
 
     include-dirs: include
     includes:
