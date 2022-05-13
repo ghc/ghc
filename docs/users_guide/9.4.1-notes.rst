@@ -85,6 +85,8 @@ Compiler
   ``TcPluginResult`` datatype has been renamed to ``TcPluginSolveResult``,
   which bundles pattern synonyms ``TcPluginOk`` and ``TcPluginContradiction``
   to recover the old interface.
+  Typechecking plugins now have access to irreducible Given constraints, e.g.,
+  to enable the plugins to reduce the constraints.
 
 - A new type of plugin: defaulting plugins. These plugins can propose
   defaults for ambiguous variables that would otherwise cause errors
