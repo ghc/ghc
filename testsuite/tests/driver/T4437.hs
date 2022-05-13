@@ -41,6 +41,7 @@ expectedGhcOnlyExtensions =
     , "AlternativeLayoutRule"
     , "AlternativeLayoutRuleTransitional"
     , "OverloadedRecordUpdate"
+    , "DeepSubsumption"
     ]
 
 expectedCabalOnlyExtensions :: [String]

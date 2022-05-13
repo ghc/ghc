@@ -461,7 +461,7 @@ data CtOrigin
         -- We only need a CtOrigin on the first, because the location
         -- is pinned on the entire error message
 
-  | ExprHoleOrigin OccName   -- from an expression hole
+  | ExprHoleOrigin (Maybe OccName)   -- from an expression hole
   | TypeHoleOrigin OccName   -- from a type hole (partial type signature)
   | PatCheckOrigin      -- normalisation of a type during pattern-match checking
   | ListOrigin          -- An overloaded list
@@ -480,6 +480,13 @@ data CtOrigin
   | CycleBreakerOrigin
       CtOrigin   -- origin of the original constraint
       -- See Detail (7) of Note [Type equality cycles] in GHC.Tc.Solver.Canonical
+
+  | InstanceSigOrigin   -- from the sub-type check of an InstanceSig
+      Name   -- the method name
+      Type   -- the instance-sig type
+      Type   -- the instantiated type of the method
+  | AmbiguityCheckOrigin UserTypeCtxt
+  | GhcBug20076
 
 -- | The number of superclass selections needed to get this Given.
 -- If @d :: C ty@   has @ScDepth=2@, then the evidence @d@ will look
@@ -660,6 +667,18 @@ pprCtOrigin (InstProvidedOrigin mod cls_inst)
 pprCtOrigin (CycleBreakerOrigin orig)
   = pprCtOrigin orig
 
+pprCtOrigin (InstanceSigOrigin method_name sig_type orig_method_type)
+  = vcat [ ctoHerald <+> text "the check that an instance signature is more general"
+         , text "than the type of the method (instantiated for this instance)"
+         , hang (text "instance signature:")
+              2 (ppr method_name <+> dcolon <+> ppr sig_type)
+         , hang (text "instantiated method type:")
+              2 (ppr orig_method_type) ]
+
+pprCtOrigin (AmbiguityCheckOrigin ctxt)
+  = ctoHerald <+> text "a type ambiguity check for" $$
+    pprUserTypeCtxt ctxt
+
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
 
@@ -693,7 +712,8 @@ pprCtO DoOrigin              = text "a do statement"
 pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = text "a proc expression"
 pprCtO AnnOrigin             = text "an annotation"
-pprCtO (ExprHoleOrigin occ)  = text "a use of" <+> quotes (ppr occ)
+pprCtO (ExprHoleOrigin Nothing)  = text "an expression hole"
+pprCtO (ExprHoleOrigin (Just occ))  = text "a use of" <+> quotes (ppr occ)
 pprCtO (TypeHoleOrigin occ)  = text "a use of wildcard" <+> quotes (ppr occ)
 pprCtO PatCheckOrigin        = text "a pattern-match completeness check"
 pprCtO ListOrigin            = text "an overloaded list"
@@ -701,4 +721,7 @@ pprCtO StaticOrigin          = text "a static form"
 pprCtO NonLinearPatternOrigin = text "a non-linear pattern"
 pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
 pprCtO BracketOrigin         = text "a quotation bracket"
+pprCtO (InstanceSigOrigin {})  = text "a type signature in an instance"
+pprCtO (AmbiguityCheckOrigin {}) = text "a type ambiguity check"
+pprCtO GhcBug20076           = text "GHC Bug #20076"
 pprCtO _                     = panic "pprCtOrigin"

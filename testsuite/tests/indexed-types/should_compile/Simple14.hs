@@ -1,5 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, RankNTypes, FlexibleContexts, ScopedTypeVariables #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module Simple14 where
 
@@ -7,6 +8,7 @@ data EQ_ x y = EQ_
 
 -- Nov 2014: actually eqE has an ambiguous type
 -- Apr 2020: now it doesn't again
+-- Jun 2022: now it does again -- because of DeepSubsumption
 eqE :: EQ_ x y -> (x~y => EQ_ z z) -> p
 eqE x y = error "eqE"
 

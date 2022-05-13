@@ -763,7 +763,7 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
                  then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                           -- an ambiguous type and have AllowAmbiguousType
                                           -- e..g infer  x :: forall a. F a -> Int
-                 else tcSubTypeSigma ExprSigCtxt inferred_sigma my_sigma
+                 else tcSubTypeSigma ExprSigOrigin ExprSigCtxt inferred_sigma my_sigma
 
        ; traceTc "tcExpSig" (ppr qtvs $$ ppr givens $$ ppr inferred_sigma $$ ppr my_sigma)
        ; let poly_wrap = wrap

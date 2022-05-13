@@ -283,7 +283,7 @@ emitNewExprHole occ ty
        ; ref <- newTcRef (pprPanic "unfilled unbound-variable evidence" (ppr u))
        ; let her = HER ref ty u
 
-       ; loc <- getCtLocM (ExprHoleOrigin occ) (Just TypeLevel)
+       ; loc <- getCtLocM (ExprHoleOrigin (Just occ)) (Just TypeLevel)
 
        ; let hole = Hole { hole_sort = ExprHole her
                          , hole_occ  = occ

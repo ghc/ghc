@@ -966,7 +966,7 @@ The expected type might have a forall at the type. Normally, we
 can't skolemise in kinds because we don't have type-level lambda.
 But here, we're at the top-level of an instance declaration, so
 we actually have a place to put the regeneralised variables.
-Thus: skolemise away. cf. GHC.Tc.Utils.Unify.tcSkolemise
+Thus: skolemise away. cf. GHC.Tc.Utils.Unify.tcTopSkolemise
 Examples in indexed-types/should_compile/T12369
 
 Note [Implementing eta reduction for data families]
@@ -1901,8 +1901,9 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                                 --           checking instance-sig <= class-meth-sig
                                 -- The instance-sig is the focus here; the class-meth-sig
                                 -- is fixed (#18036)
+                   ; let orig = InstanceSigOrigin sel_name sig_ty local_meth_ty
                    ; hs_wrap <- addErrCtxtM (methSigCtxt sel_name sig_ty local_meth_ty) $
-                                tcSubTypeSigma ctxt sig_ty local_meth_ty
+                                tcSubTypeSigma orig ctxt sig_ty local_meth_ty
                    ; return (sig_ty, hs_wrap) }
 
        ; inner_meth_name <- newName (nameOccName sel_name)
