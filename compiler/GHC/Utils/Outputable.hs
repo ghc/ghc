@@ -90,7 +90,8 @@ module GHC.Utils.Outputable (
         QualifyName(..), queryQual,
         sdocOption,
         updSDocContext,
-        SDocContext (..), sdocWithContext, defaultSDocContext,
+        SDocContext (..), sdocWithContext,
+        defaultSDocContext, traceSDocContext,
         getPprStyle, withPprStyle, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, dumpStyle, asmStyle,
@@ -116,6 +117,7 @@ import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Utils.Ppr       ( Doc, Mode(..) )
 import GHC.Serialized
 import GHC.LanguageExtensions (Extension)
+import GHC.Utils.GlobalVars( unsafeHasPprDebug )
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -448,6 +450,18 @@ defaultSDocContext = SDC
   , sdocListTuplePuns               = True
   , sdocPrintTypeAbbreviations      = True
   , sdocUnitIdForUser               = ftext
+  }
+
+traceSDocContext :: SDocContext
+-- Used for pprTrace, when we want to see lots of info
+traceSDocContext = defaultSDocContext
+  { sdocPprDebug                    = unsafeHasPprDebug
+  , sdocPrintTypecheckerElaboration = True
+  , sdocPrintExplicitKinds          = True
+  , sdocPrintExplicitCoercions      = True
+  , sdocPrintExplicitRuntimeReps    = True
+  , sdocPrintExplicitForalls        = True
+  , sdocPrintEqualityRelations      = True
   }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
