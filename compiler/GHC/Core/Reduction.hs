@@ -469,7 +469,7 @@ unzipRedns = foldr accRedn (Reductions [] [])
 --
 --   unzipRedns <$> zipWithM f tys roles
 --
--- - GHC.Tc.Solver.Monad.breakTyVarCycle_maybe, with two calls of the form:
+-- - GHC.Tc.Solver.Monad.breakTyEqCycle_maybe, with two calls of the form:
 --
 --   unzipRedns <$> mapM f tys
 --

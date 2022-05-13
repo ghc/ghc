@@ -240,7 +240,7 @@ type CycleBreakerVarStack = NonEmpty [(TcTyVar, TcType)]
    -- first element in the stack corresponds to current implication;
    --   later elements correspond to outer implications
    -- used to undo the cycle-breaking needed to handle
-   -- Note [Type variable cycles] in GHC.Tc.Solver.Canonical
+   -- Note [Type equality cycles] in GHC.Tc.Solver.Canonical
    -- Why store the outer implications? For the use in mightEqualLater (only)
 
 data InertSet
@@ -1693,7 +1693,7 @@ This is best understood by example.
    where cbv = F a
 
    The cbv is a cycle-breaker var which stands for F a. See
-   Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
+   Note [Type equality cycles] in GHC.Tc.Solver.Canonical.
    This is just like case 6, and we say "no". Saying "no" here is
    essential in getting the parser to type-check, with its use of DisambECP.
 

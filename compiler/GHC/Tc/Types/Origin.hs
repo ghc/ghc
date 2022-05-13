@@ -605,7 +605,7 @@ data CtOrigin
 
   | CycleBreakerOrigin
       CtOrigin   -- origin of the original constraint
-      -- See Detail (7) of Note [Type variable cycles] in GHC.Tc.Solver.Canonical
+      -- See Detail (7) of Note [Type equality cycles] in GHC.Tc.Solver.Canonical
   | FRROrigin
       FixedRuntimeRepOrigin
 

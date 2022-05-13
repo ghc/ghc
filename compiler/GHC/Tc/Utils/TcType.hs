@@ -640,7 +640,7 @@ data MetaInfo
                    -- It /is/ allowed to unify with a polytype, unlike TauTv
 
    | CycleBreakerTv  -- Used to fix occurs-check problems in Givens
-                     -- See Note [Type variable cycles] in
+                     -- See Note [Type equality cycles] in
                      -- GHC.Tc.Solver.Canonical
 
    | ConcreteTv ConcreteTvOrigin

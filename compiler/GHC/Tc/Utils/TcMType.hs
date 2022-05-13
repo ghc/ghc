@@ -870,7 +870,7 @@ cloneAnonMetaTyVar info tv kind
         ; traceTc "cloneAnonMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar))
         ; return tyvar }
 
--- Make a new CycleBreakerTv. See Note [Type variable cycles]
+-- Make a new CycleBreakerTv. See Note [Type equality cycles]
 -- in GHC.Tc.Solver.Canonical.
 newCycleBreakerTyVar :: TcKind -> TcM TcTyVar
 newCycleBreakerTyVar kind
