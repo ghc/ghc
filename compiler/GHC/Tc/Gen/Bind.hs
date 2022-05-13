@@ -624,7 +624,7 @@ tcPolyCheck prag_fn
                 tcSkolemiseScoped ctxt (idType poly_id) $ \rho_ty ->
                 -- Unwraps multiple layers; e.g
                 --    f :: forall a. Eq a => forall b. Ord b => blah
-                -- NB: tcSkolemise makes fresh type variables
+                -- NB: tcSkolemiseScoped makes fresh type variables
                 -- See Note [Instantiate sig with fresh variables]
 
                 let mono_id = mkLocalId mono_name (varMult poly_id) rho_ty in
@@ -802,7 +802,7 @@ mkExport prag_fn insoluble qtvs theta
                                            -- an ambiguous type and have AllowAmbiguousType
                                            -- e..g infer  x :: forall a. F a -> Int
                   else addErrCtxtM (mk_impedance_match_msg mono_info sel_poly_ty poly_ty) $
-                       tcSubTypeSigma sig_ctxt sel_poly_ty poly_ty
+                       tcSubTypeSigma GhcBug20076 sig_ctxt sel_poly_ty poly_ty
 
         ; warn_missing_sigs <- woptM Opt_WarnMissingLocalSignatures
         ; when warn_missing_sigs $

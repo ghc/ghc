@@ -88,7 +88,7 @@ default type signatures.
 
 - Ignoring outermost contexts, a default type signature must match the original
   type signature according to
-  :ref:`GHC's subsumption rules <simple-subsumption>`. As a result, the order
+  :ref:`GHC's subsumption rules <subsumption>`. As a result, the order
   of type variables in the default signature is important. Recall the ``Foo``
   example from the previous section: ::
 
@@ -122,7 +122,7 @@ default type signatures.
 
       default bar :: forall b. (C', b ~ Int) => a -> b -> b
 
-- Because of :ref:`GHC's subsumption rules <simple-subsumption>` rules, there
+- Because of :ref:`GHC's subsumption rules <subsumption>` rules, there
   are relatively tight restrictions concerning nested or higher-rank
   ``forall``\ s (see :ref:`arbitrary-rank-polymorphism`). Consider this
   class: ::
