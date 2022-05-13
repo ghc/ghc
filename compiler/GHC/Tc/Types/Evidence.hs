@@ -221,6 +221,8 @@ maybeTcSymCo NotSwapped co = co
 ************************************************************************
 -}
 
+-- We write    wrap :: t1 ~> t2
+-- if       wrap[ e::t1 ] :: t2
 data HsWrapper
   = WpHole                      -- The identity coercion
 
@@ -229,12 +231,17 @@ data HsWrapper
        --
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
+       --
+       -- If wrap1 :: t2 ~> t3
+       --    wrap2 :: t1 ~> t2
+       --- Then (wrap1 `WpCompose` wrap2) :: t1 ~> t3
 
   | WpFun HsWrapper HsWrapper (Scaled TcTypeFRR)
-       -- (WpFun wrap1 wrap2 (w, t1))[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
-       -- So note that if  wrap1 :: exp_arg <= act_arg
-       --                  wrap2 :: act_res <= exp_res
-       --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) <= (exp_arg -> exp_res)
+       -- (WpFun wrap1 wrap2 (w, t1))[e] = \(x:_w exp_arg). wrap2[ e wrap1[x] ]
+       -- So note that if  e     :: act_arg -> act_res
+       --                  wrap1 :: exp_arg ~> act_arg
+       --                  wrap2 :: act_res ~> exp_res
+       --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) ~> (exp_arg -> exp_res)
        -- This isn't the same as for mkFunCo, but it has to be this way
        -- because we can't use 'sym' to flip around these HsWrappers
        -- The TcType is the "from" type of the first wrapper
