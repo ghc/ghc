@@ -39,7 +39,7 @@ module GHC.TypeNats
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), otherwise, withDict)
+import GHC.Base(Eq(..), Ord(..), otherwise, WithDict(..))
 import GHC.Types
 import GHC.Num.Natural(Natural)
 import GHC.Show(Show(..))
@@ -125,7 +125,7 @@ After inlining and simplification, this ends up looking something like this:
     where type T = Any Nat
 
 `KnownNat` is the constructor for dictionaries for the class `KnownNat`.
-See Note [withDict] in "GHC.HsToCore.Expr" for details on how
+See Note [withDict] in "GHC.Tc.Instance.Class" for details on how
 we actually construct the dictionary.
 
 Note that using `Any Nat` is not really correct, as multiple calls to
@@ -245,8 +245,8 @@ cmpNat x y = case compare (natVal x) (natVal y) of
 
 newtype SNat    (n :: Nat)    = SNat    Natural
 
--- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
+-- See Note [withDict] in "GHC.Tc.Instance.Class" in GHC
 withSNat :: forall a b.
             (KnownNat a => Proxy a -> b)
          -> SNat a      -> Proxy a -> b
-withSNat f x y = withDict @(SNat a) @(KnownNat a) x f y
+withSNat f x y = withDict @(KnownNat a) x f y

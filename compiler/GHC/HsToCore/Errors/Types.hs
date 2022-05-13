@@ -134,8 +134,6 @@ data DsMessage
 
   | DsCannotMixPolyAndUnliftedBindings !(HsBindLR GhcTc GhcTc)
 
-  | DsInvalidInstantiationDictAtType !Type
-
   | DsWrongDoBind !(LHsExpr GhcTc) !Type
 
   | DsUnusedDoBind !(LHsExpr GhcTc) !Type

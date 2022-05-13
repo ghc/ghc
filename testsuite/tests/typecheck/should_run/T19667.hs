@@ -21,7 +21,7 @@ symbolVal _ = case symbolSing :: SSymbol n of SSymbol x -> x
 -- See Note [NOINLINE someNatVal] in GHC.TypeNats
 {-# NOINLINE reifySymbol #-}
 reifySymbol :: forall r. String -> (forall (n :: Symbol). KnownSymbol n => Proxy n -> r) -> r
-reifySymbol n k = withDict @(SSymbol Any) @(KnownSymbol Any) (SSymbol n) (k @Any) (Proxy @(Any @Symbol))
+reifySymbol n k = withDict @(KnownSymbol Any) @(SSymbol Any) (SSymbol n) (k @Any) (Proxy @(Any @Symbol))
 
 main :: IO ()
 main = print $ reifySymbol "Hello World" symbolVal

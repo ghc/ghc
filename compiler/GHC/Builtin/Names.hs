@@ -222,7 +222,6 @@ basicKnownKeyNames
         ioTyConName, ioDataConName,
         runMainIOName,
         runRWName,
-        withDictName,
 
         -- Type representation types
         trModuleTyConName, trModuleDataConName,
@@ -258,6 +257,9 @@ basicKnownKeyNames
         starKindRepName,
         starArrStarKindRepName,
         starArrStarArrStarKindRepName,
+
+        -- WithDict
+        withDictClassName,
 
         -- Dynamic
         toDynName,
@@ -931,10 +933,9 @@ and it's convenient to write them all down in one place.
 wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
-runMainIOName, runRWName, withDictName :: Name
+runMainIOName, runRWName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 runRWName     = varQual gHC_MAGIC       (fsLit "runRW#")    runRWKey
-withDictName  = varQual gHC_MAGIC_DICT  (fsLit "withDict")  withDictKey
 
 orderingTyConName, ordLTDataConName, ordEQDataConName, ordGTDataConName :: Name
 orderingTyConName = tcQual  gHC_TYPES (fsLit "Ordering") orderingTyConKey
@@ -1403,6 +1404,10 @@ starKindRepName        = varQual gHC_TYPES         (fsLit "krep$*")         star
 starArrStarKindRepName = varQual gHC_TYPES         (fsLit "krep$*Arr*")     starArrStarKindRepKey
 starArrStarArrStarKindRepName = varQual gHC_TYPES  (fsLit "krep$*->*->*")   starArrStarArrStarKindRepKey
 
+-- WithDict
+withDictClassName :: Name
+withDictClassName     = clsQual gHC_MAGIC_DICT (fsLit "WithDict") withDictClassKey
+
 -- Custom type errors
 errorMessageTypeErrorFamName
   , typeErrorTextDataConName
@@ -1706,6 +1711,9 @@ ixClassKey              = mkPreludeClassUnique 18
 
 typeableClassKey :: Unique
 typeableClassKey        = mkPreludeClassUnique 20
+
+withDictClassKey :: Unique
+withDictClassKey        = mkPreludeClassUnique 21
 
 monadFixClassKey :: Unique
 monadFixClassKey        = mkPreludeClassUnique 28
@@ -2342,9 +2350,6 @@ naturalToDoubleIdKey   = mkPreludeMiscIdUnique 131
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 132
 rationalToDoubleIdKey  = mkPreludeMiscIdUnique 133
-
-withDictKey :: Unique
-withDictKey                   = mkPreludeMiscIdUnique 156
 
 coerceKey :: Unique
 coerceKey                     = mkPreludeMiscIdUnique 157

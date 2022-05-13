@@ -1,11 +1,15 @@
 
 T16646Fail.hs:16:5: error:
-    Invalid instantiation of ‘withDict’ at type: st -> (dt => r) -> r
+    • No instance for (WithDict cls meth) arising from a use of ‘withDict’
+      Possible fix:
+        add (WithDict cls meth) to the context of
+          the type signature for:
+            f :: forall (cls :: Constraint) meth r. meth -> (cls => r) -> r
+    • In the expression: withDict @cls @meth
+      In an equation for ‘f’: f = withDict @cls @meth
 
 T16646Fail.hs:22:5: error:
-    Invalid instantiation of ‘withDict’ at type:
-        Maybe a -> (C a => r) -> r
-
-T16646Fail.hs:28:13: error:
-    Invalid instantiation of ‘withDict’ at type:
-        (Any -> a) -> (Reifies Any a => Proxy Any -> r) -> Proxy Any -> r
+    • No instance for (WithDict (C a) (Maybe a))
+        arising from a use of ‘withDict’
+    • In the expression: withDict @(C a) @(Maybe a)
+      In an equation for ‘g’: g = withDict @(C a) @(Maybe a)
