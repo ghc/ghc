@@ -5,6 +5,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}  -- See Note [withDict has an ambiguous type]
 {-# LANGUAGE Unsafe #-}
 
 -----------------------------------------------------------------------------
@@ -40,3 +41,20 @@ import GHC.Types (RuntimeRep, TYPE)
 -- @Note [withDict]@ in "GHC.Tc.Instance.Class" in GHC.
 class WithDict cls meth where
   withDict :: forall {rr :: RuntimeRep} (r :: TYPE rr). meth -> (cls => r) -> r
+
+{- Note [withDict has an ambiguous type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The type of `withDict` is ambiguous.  Consider
+   foo :: forall cls meth. WithDict cls meth
+       => forall rr (r::rr). meth -> (cls => r) -> r
+   foo m k = withDict m k
+
+If we instantiate `withDict` with fresh unification variables, including cls0 for cls,
+there is nothing that forces the `cls` Wanted from the call to `k` to unify with the
+`cls0` Given from the call to `withDict`.  You have to give it a class argument:
+
+   foo m k = withDict @cls m k
+
+That's fine.  But it means we need -XAllowAmbiguousTypes for the withDict definition,
+at least with deep subsumption.
+-}

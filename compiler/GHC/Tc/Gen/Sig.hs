@@ -43,7 +43,7 @@ import GHC.Tc.Utils.Zonk
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Validity ( checkValidType )
-import GHC.Tc.Utils.Unify( tcSkolemise, unifyType )
+import GHC.Tc.Utils.Unify( tcTopSkolemise, unifyType )
 import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env( tcLookupId )
 import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
@@ -819,7 +819,7 @@ tcSpecWrapper :: UserTypeCtxt -> TcType -> TcType -> TcM HsWrapper
 -- See Note [Handling SPECIALISE pragmas], wrinkle 1
 tcSpecWrapper ctxt poly_ty spec_ty
   = do { (sk_wrap, inst_wrap)
-               <- tcSkolemise ctxt spec_ty $ \ spec_tau ->
+               <- tcTopSkolemise ctxt spec_ty $ \ spec_tau ->
                   do { (inst_wrap, tau) <- topInstantiate orig poly_ty
                      ; _ <- unifyType Nothing spec_tau tau
                             -- Deliberately ignore the evidence
