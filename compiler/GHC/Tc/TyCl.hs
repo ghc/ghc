@@ -4903,6 +4903,31 @@ Note that when checking whether two type signatures match, we must take care to
 split as many foralls as it takes to retrieve the tau types we which to check.
 See Note [Splitting nested sigma types in class type signatures].
 
+Extra note: July 22.  If we have
+   class C a b where
+      op :: op_ty
+      default op :: def_ty
+      op = blah
+
+then we'll generate something like
+   $gdm_op :: C a b => def_ty
+   $gdm_op = blah
+
+We expect to write an instance that looks (in effect) like this:
+   instance G => C t1 t2 where
+      op = $gdm_op  -- Added when you leave out binding for 'op'
+
+So we need that
+  assuming constraints G, and C t1 t2,
+  we have (def_ty[t1/a,t2/b] <= op_ty[t1/a,t2/b]
+
+In the validity check, we want to check that there is such a G.
+E.g. if we check  def_ty <= op_ty, and get an insoluble constraint
+(Int~Bool), we know there will never be such a G, and can complain.
+
+This seems to be a more general way of thinking about the problem.
+But no one is complaining, so it'll have to wait for another day
+
 Note [Splitting nested sigma types in class type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this type synonym and class definition:

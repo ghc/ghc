@@ -26,7 +26,7 @@ import GHC.Prelude
 import GHC.Data.Maybe
 
 -- friends:
-import GHC.Tc.Utils.Unify    ( tcSubTypeSigma )
+import GHC.Tc.Utils.Unify    ( tcSubTypeAmbiguity )
 import GHC.Tc.Solver         ( simplifyAmbiguityCheck )
 import GHC.Tc.Instance.Class ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..), AssocInstInfo(..) )
 import GHC.Core.TyCo.FVs
@@ -141,7 +141,9 @@ This neatly takes account of the functional dependency stuff above,
 and implicit parameter (see Note [Implicit parameters and ambiguity]).
 And this is what checkAmbiguity does.
 
-What about this, though?
+Note [The squishiness of the ambiguity check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What about this?
    g :: C [a] => Int
 Is every call to 'g' ambiguous?  After all, we might have
    instance C [a] where ...
@@ -151,6 +153,17 @@ with -XFlexibleInstances we could have
   instance C a where ...
 and now a call could be legal after all!  Well, we'll reject this
 unless the instance is available *here*.
+
+But even that's not quite right. Even a function with an utterly-ambiguous
+type like f :: Eq a => Int -> Int
+is still callable if you are prepared to use visible type application,
+thus (f @Bool x).
+
+In short, the ambiguity check is a good-faith attempt to say "you are likely
+to have trouble if your function has this type"; it is NOT the case that
+"you can't call this function without giving a type error".
+
+See also Note [Ambiguity check and deep subsumption] in GHC.Tc.Utils.Unify.
 
 Note [When to call checkAmbiguity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -220,7 +233,9 @@ checkAmbiguity ctxt ty
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
                             captureConstraints $
-                            tcSubTypeSigma (AmbiguityCheckOrigin ctxt) ctxt ty ty
+                            tcSubTypeAmbiguity ctxt ty ty
+                            -- See Note [Ambiguity check and deep subsumption]
+                            -- in GHC.Tc.Utils.Unify
        ; simplifyAmbiguityCheck ty wanted
 
        ; traceTc "Done ambiguity check for" (ppr ty) }

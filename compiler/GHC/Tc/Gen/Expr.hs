@@ -176,7 +176,7 @@ tcInferRhoNC (L loc expr)
 tcPolyExpr :: HsExpr GhcRn -> ExpSigmaType -> TcM (HsExpr GhcTc)
 tcPolyExpr expr res_ty
   = do { traceTc "tcPolyExpr" (ppr res_ty)
-       ; (wrap, expr') <- tcSkolemiseET GenSigCtxt res_ty $ \ res_ty ->
+       ; (wrap, expr') <- tcSkolemiseExpType GenSigCtxt res_ty $ \ res_ty ->
                           tcExpr expr res_ty
        ; return $ mkHsWrap wrap expr' }
 
@@ -732,7 +732,7 @@ tcSynArgE :: CtOrigin
            -- ^ returns a wrapper :: (type of right shape) "->" (type passed in)
 tcSynArgE orig op sigma_ty syn_ty thing_inside
   = do { (skol_wrap, (result, ty_wrapper))
-           <- tcSkolemise GenSigCtxt sigma_ty
+           <- tcTopSkolemise GenSigCtxt sigma_ty
                 (\ rho_ty -> go rho_ty syn_ty)
        ; return (result, skol_wrap <.> ty_wrapper) }
     where

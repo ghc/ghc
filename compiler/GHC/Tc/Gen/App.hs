@@ -352,8 +352,12 @@ tcApp rn_expr exp_res_ty
                  = addFunResCtxt rn_fun rn_args app_res_rho exp_res_ty $
                    thing_inside
 
-       ; res_co <- perhaps_add_res_ty_ctxt $
-                   unifyExpectedType rn_expr app_res_rho exp_res_ty
+       ; res_wrap <- perhaps_add_res_ty_ctxt $
+                     tcSubTypeNC (exprCtOrigin rn_expr) GenSigCtxt (Just $ HsExprRnThing rn_expr)
+                                 app_res_rho exp_res_ty
+                     -- Need tcSubType because of the possiblity of deep subsumption.
+                     -- app_res_rho and exp_res_ty are both rho-types, so without
+                     -- deep subsumption unifyExpectedType would be sufficient
 
        -- Typecheck the value arguments
        ; tc_args <- tcValArgs do_ql inst_args
@@ -380,7 +384,7 @@ tcApp rn_expr exp_res_ty
                                       , text "tc_expr:"     <+> ppr tc_expr ]) }
 
        -- Wrap the result
-       ; return (mkHsWrapCo res_co tc_expr) }
+       ; return (mkHsWrap res_wrap tc_expr) }
 
 --------------------
 wantQuickLook :: HsExpr GhcRn -> TcM Bool
