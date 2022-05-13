@@ -28,7 +28,7 @@ import Control.Monad.IO.Class
 pprTrace :: String -> SDoc -> a -> a
 pprTrace str doc x
   | unsafeHasNoDebugOutput = x
-  | otherwise              = pprDebugAndThen defaultSDocContext trace (text str) doc x
+  | otherwise              = pprDebugAndThen traceSDocContext trace (text str) doc x
 
 pprTraceM :: Applicative f => String -> SDoc -> f ()
 pprTraceM str doc = pprTrace str doc (pure ())
@@ -69,7 +69,7 @@ warnPprTrace _     _s _    x | not debugIsOn     = x
 warnPprTrace _     _s _msg x | unsafeHasNoDebugOutput = x
 warnPprTrace False _s _msg x = x
 warnPprTrace True   s  msg x
-  = pprDebugAndThen defaultSDocContext trace (text "WARNING:")
+  = pprDebugAndThen traceSDocContext trace (text "WARNING:")
                     (text s $$ msg $$ withFrozenCallStack traceCallStackDoc )
                     x
 
@@ -78,7 +78,7 @@ warnPprTrace True   s  msg x
 pprTraceUserWarning :: HasCallStack => SDoc -> a -> a
 pprTraceUserWarning msg x
   | unsafeHasNoDebugOutput = x
-  | otherwise = pprDebugAndThen defaultSDocContext trace (text "WARNING:")
+  | otherwise = pprDebugAndThen traceSDocContext trace (text "WARNING:")
                     (msg $$ withFrozenCallStack traceCallStackDoc )
                     x
 
