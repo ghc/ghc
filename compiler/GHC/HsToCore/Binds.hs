@@ -1105,6 +1105,21 @@ So for now, we ban them altogether as requested by #13290. See also #7398.
 *                                                                      *
 ************************************************************************
 
+Note [Desugaring WpFun]
+~~~~~~~~~~~~~~~~~~~~~~~
+See comments on WpFun in GHC.Tc.Types.Evidence for what WpFun means.
+Roughly:
+
+  (WpFun w_arg w_res)[ e ] = \x. w_res[ e w_arg[x] ]
+
+This eta-expansion risk duplicating work, if `e` is not in HNF.
+At one stage I thought we could avoid that by desugaring to
+      let f = e in \x. w_res[ f w_arg[x] ]
+But that /fundamentally/ doesn't work, because `w_res` may bind
+evidence that is used in `e`.
+
+This question arose when thinking about deep subsumption; see
+https://github.com/ghc-proposals/ghc-proposals/pull/287#issuecomment-1125419649).
 -}
 
 dsHsWrapper :: HsWrapper -> DsM (CoreExpr -> CoreExpr)
@@ -1117,9 +1132,7 @@ dsHsWrapper (WpLet ev_binds)  = do { bs <- dsTcEvBinds ev_binds
 dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
                                    ; return (w1 . w2) }
- -- See comments on WpFun in GHC.Tc.Types.Evidence for an explanation of what
- -- the specification of this clause is
-dsHsWrapper (WpFun c1 c2 (Scaled w t1))
+dsHsWrapper (WpFun c1 c2 (Scaled w t1))  -- See Note [Desugaring WpFun]
                               = do { x <- newSysLocalDs w t1
                                    ; w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
