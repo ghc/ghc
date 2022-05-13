@@ -1,0 +1,4 @@
+
+T19915.hs:5:10: error:
+    • Class ‘WithDict’ does not support user-specified instances.
+    • In the instance declaration for ‘WithDict a b’

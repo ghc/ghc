@@ -5,8 +5,9 @@
 - `magicDict` has been renamed to `withDict` and is now defined in
   `GHC.Magic.Dict` instead of `GHC.Prim`. `withDict` now has the type:
 
-  ```haskell
-  withDict :: forall {rr :: RuntimeRep} st dt (r :: TYPE rr). st -> (dt => r) -> r
+  ```
+  class WithDict cls meth where
+    withDict :: forall {rr :: RuntimeRep} (r :: TYPE rr). meth -> (cls => r) -> r
   ```
 
   Unlike `magicDict`, `withDict` can be used without defining an
@@ -16,10 +17,10 @@
   ```haskell
   withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
                => TypeRep a -> (Typeable a => r) -> r
-  withTypeable rep k = withDict @(TypeRep a) @(Typeable a) rep k
+  withTypeable rep k = withDict @(Typeable a) rep k
   ```
 
-  Note that the explicit type applications are required, as the call to
+  Note that the explicit type application is required, as the call to
   `withDict` would be ambiguous otherwise.
 
 - Primitive types and functions which handle boxed values are now levity-polymorphic,

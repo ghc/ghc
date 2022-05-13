@@ -1407,7 +1407,7 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
   -- instances for (~), (~~), or Coercible;
   -- but we DO want to allow them in quantified constraints:
   --   f :: (forall a b. Coercible a b => Coercible (m a) (m b)) => ...m...
-  | clas_nm `elem` [ heqTyConName, eqTyConName, coercibleTyConName ]
+  | clas_nm `elem` [ heqTyConName, eqTyConName, coercibleTyConName, withDictClassName ]
   , not quantified_constraint
   = failWithTc $ TcRnSpecialClassInst clas False
 

@@ -1,0 +1,16 @@
+
+T16646Fail2.hs:19:13: error:
+    • Couldn't match type: b0 -> a
+                     with: forall (proxy :: * -> *). proxy Any -> a
+        arising from a use of ‘withDict’
+    • In the expression:
+        withDict @(Reifies (Any @Type) a) @_ (const a) (k @Any) Proxy
+      In an equation for ‘reify’:
+          reify a k
+            = withDict @(Reifies (Any @Type) a) @_ (const a) (k @Any) Proxy
+    • Relevant bindings include
+        k :: forall s. Reifies s a => Proxy s -> r
+          (bound at T16646Fail2.hs:19:9)
+        a :: a (bound at T16646Fail2.hs:19:7)
+        reify :: a -> (forall s. Reifies s a => Proxy s -> r) -> r
+          (bound at T16646Fail2.hs:19:1)

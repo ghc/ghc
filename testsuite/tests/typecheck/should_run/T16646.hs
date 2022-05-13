@@ -22,8 +22,8 @@ instance KnownNat n => Reifies n Integer where
 
 reify :: forall a r. a -> (forall (s :: Type). Reifies s a => Proxy s -> r) -> r
 {-# NOINLINE reify #-} -- See Note [NOINLINE someNatVal] in GHC.TypeNats
-reify a k = withDict @(forall (proxy :: Type -> Type). proxy Any -> a)
-                     @(Reifies (Any @Type) a)
+reify a k = withDict @(Reifies (Any @Type) a)
+                     @(forall (proxy :: Type -> Type). proxy Any -> a)
                      (const a) (k @Any) Proxy
 
 class Given a where
@@ -32,7 +32,7 @@ class Given a where
 withGift :: forall a b.
             (Given a => Proxy a -> b)
          ->        a -> Proxy a -> b
-withGift f x y = withDict @a @(Given a) x f y
+withGift f x y = withDict @(Given a) @a x f y
 
 give :: forall a r. a -> (Given a => r) -> r
 give a k = withGift (\_ -> k) a Proxy
@@ -62,7 +62,7 @@ singInstance :: forall k (a :: k). Sing a -> SingInstance a
 singInstance s = with_sing_i SingInstance
   where
     with_sing_i :: (SingI a => SingInstance a) -> SingInstance a
-    with_sing_i si = withDict @(Sing a) @(SingI a) s si
+    with_sing_i si = withDict @(SingI a) @(Sing a) s si
 
 withSingI :: Sing n -> (SingI n => r) -> r
 withSingI sn r =

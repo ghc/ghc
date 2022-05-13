@@ -38,14 +38,19 @@ import GHC.Types.Var
 import GHC.Core.Predicate
 import GHC.Core.InstEnv
 import GHC.Core.Type
-import GHC.Core.Make ( mkCharExpr, mkNaturalExpr, mkStringExprFS )
+import GHC.Core.Make ( mkCharExpr, mkNaturalExpr, mkStringExprFS, mkCoreLams )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
 
+import GHC.Core ( Expr(Var, App, Cast, Let), Bind (NonRec) )
+import GHC.Types.Basic
+import GHC.Types.SourceText
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( splitAtList, fstOf3 )
+import GHC.Data.FastString
 
 import Data.Maybe
 
@@ -155,6 +160,7 @@ matchGlobalInst dflags short_cut clas tys
   = matchKnownChar dflags short_cut clas tys
   | isCTupleClass clas                = matchCTuple          clas tys
   | cls_name == typeableClassName     = matchTypeable        clas tys
+  | cls_name == withDictClassName     = matchWithDict             tys
   | clas `hasKey` heqTyConKey         = matchHeteroEquality       tys
   | clas `hasKey` eqTyConKey          = matchHomoEquality         tys
   | clas `hasKey` coercibleTyConKey   = matchCoercible            tys
@@ -428,6 +434,178 @@ makeLitDict clas ty et
     = pprPanic "makeLitDict" $
       text "Unexpected evidence for" <+> ppr (className clas)
       $$ vcat (map (ppr . idType) (classMethods clas))
+
+{- ********************************************************************
+*                                                                     *
+                   Class lookup for WithDict
+*                                                                     *
+***********************************************************************-}
+
+-- See Note [withDict]
+matchWithDict :: [Type] -> TcM ClsInstResult
+matchWithDict [cls, mty]
+    -- Check that cls is a class constraint `C t_1 ... t_n`, where
+    -- `dict_tc = C` and `dict_args = t_1 ... t_n`.
+  | Just (dict_tc, dict_args) <- tcSplitTyConApp_maybe cls
+    -- Check that C is a class of the form
+    -- `class C a_1 ... a_n where op :: meth_ty`
+    -- and in that case let
+    -- co :: C t1 ..tn ~R# inst_meth_ty
+  , Just (inst_meth_ty, co) <- tcInstNewTyCon_maybe dict_tc dict_args
+  = do { sv <- mkSysLocalM (fsLit "withDict_s") Many mty
+       ; k  <- mkSysLocalM (fsLit "withDict_k") Many (mkInvisFunTyMany cls openAlphaTy)
+
+       ; let evWithDict_type = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar] $
+                               mkVisFunTysMany [mty, mkInvisFunTyMany cls openAlphaTy] openAlphaTy
+
+       ; wd_id <- mkSysLocalM (fsLit "withDict_wd") Many evWithDict_type
+       ; let wd_id' = wd_id `setInlinePragma` inlineAfterSpecialiser
+
+       -- Given co2 : mty ~N# inst_meth_ty, construct the method of
+       -- the WithDict dictionary:
+       -- \@(r : RuntimeRep) @(a :: TYPE r) (sv : mty) (k :: cls => a) -> k (sv |> (sub co; sym co2))
+       ; let evWithDict co2 =
+               let wd_rhs = mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
+                            Var k `App` Cast (Var sv) (mkTcTransCo (mkTcSubCo co2) (mkTcSymCo co))
+               in Let (NonRec wd_id' wd_rhs) (Var wd_id')
+         -- Why a Let?  See (WD6) in Note [withDict]
+
+       ; tc <- tcLookupTyCon withDictClassName
+       ; let Just withdict_data_con
+                 = tyConSingleDataCon_maybe tc    -- "Data constructor"
+                                                  -- for WithDict
+             mk_ev [c] = evDataConApp withdict_data_con
+                            [cls, mty] [evWithDict (evTermCoercion (EvExpr c))]
+             mk_ev e   = pprPanic "matchWithDict" (ppr e)
+
+       ; return $ OneInst { cir_new_theta = [mkPrimEqPred mty inst_meth_ty]
+                          , cir_mk_ev     = mk_ev
+                          , cir_what      = BuiltinInstance }
+       }
+
+matchWithDict _
+  = return NoInstance
+
+inlineAfterSpecialiser :: InlinePragma
+-- Do not inline before the specialiser; but do so afterwards
+-- See (WD6) in Note [withDict]
+inlineAfterSpecialiser = alwaysInlinePragma `setInlinePragmaActivation`
+                         ActiveAfter NoSourceText 2
+
+{-
+Note [withDict]
+~~~~~~~~~~~~~~~
+The class `WithDict` is defined as:
+
+    class WithDict cls meth where
+        withDict :: forall {rr :: RuntimeRep} (r :: TYPE rr). meth -> (cls => r) -> r
+
+This class is special, like `Typeable`: GHC automatically solves
+for instances of `WithDict`, users cannot write their own.
+
+It is used to implement a primitive that we cannot define in Haskell
+but we can write in Core.
+
+`WithDict` is used to create dictionaries for classes with a single method.
+Consider a class like this:
+
+   class C a where
+     f :: T a
+
+We can use `withDict` to cast values of type `T a` into dictionaries for `C a`.
+To do this, we can define a function like this in the library:
+
+  withT :: T a -> (C a => b) -> b
+  withT t k = withDict @(C a) @(T a) t k
+
+Here:
+
+* The `cls` in `withDict` is instantiated to `C a`.
+
+* The `meth` in `withDict` is instantiated to `T a`.
+  The definition of `T` itself is irrelevant, only that `C a` is a class
+  with a single method of type `T a`.
+
+* The `r` in `withDict` is instantiated to `b`.
+
+For any single-method class C:
+   class C a1 .. an where op :: meth_ty
+
+The solver will solve the constraint `WithDict (C t1 .. tn) mty`
+as if the following instance declaration existed:
+
+instance (mty ~# inst_meth_ty) => WithDict (C t1..tn) mty where
+  withDict = \@{rr} @(r :: TYPE rr) (sv :: mty) (k :: C t1..tn => r) ->
+    k (sv |> (sub co2; sym co))
+
+That is, it matches on the first (constraint) argument of C; if C is
+a single-method class, the instance "fires" and emits an equality
+constraint `mty ~ inst_meth_ty`, where `inst_meth_ty` is `meth_ty[ti/ai]`.
+The coercion `co2` witnesses the equality `mty ~ inst_meth_ty`.
+
+The coercion `co` is a newtype coercion that coerces from `C t1 ... tn`
+to `inst_meth_ty`.
+This coercion is guaranteed to exist by virtue of the fact that
+C is a class with exactly one method and no superclasses, so it
+is treated like a newtype when compiled to Core.
+
+The condition that `C` is a single-method class is implemented in the
+guards of matchWithDict's definition.
+If the conditions are not held, the rewriting will not fire,
+and we'll report an unsolved constraint.
+
+Some further observations about `withDict`:
+
+(WD1) The `cls` in the type of withDict must be explicitly instantiated with
+      visible type application, as invoking `withDict` would be ambiguous
+      otherwise.
+
+      For examples of how `withDict` is used in the `base` library, see `withSNat`
+      in GHC.TypeNats, as well as `withSChar` and `withSSymbol` in GHC.TypeLits.
+
+(WD2) The `r` is representation-polymorphic, to support things like
+      `withTypeable` in `Data.Typeable.Internal`.
+
+(WD3) As an alternative to `withDict`, one could define functions like `withT`
+      above in terms of `unsafeCoerce`. This is more error-prone, however.
+
+(WD4) In order to define things like `reifySymbol` below:
+
+        reifySymbol :: forall r. String -> (forall (n :: Symbol). KnownSymbol n => r) -> r
+
+      `withDict` needs to be instantiated with `Any`, like so:
+
+        reifySymbol n k = withDict @(KnownSymbol Any) @String @r n (k @Any)
+
+      The use of `Any` is explained in Note [NOINLINE someNatVal] in
+      base:GHC.TypeNats.
+
+(WD5) In earlier implementations, `withDict` was implemented as an identifier
+      with special handling during either constant-folding or desugaring.
+      The current approach is more robust, previously the type of `withDict`
+      did not have a type-class constraint and was overly polymorphic.
+      See #19915.
+
+(WD6) In fact we desugar `withDict @(C t_1 ... t_n) @mty @{rr} @r` to
+         let wd = \sv k -> k (sv |> co)
+             {-# INLINE [2] #-}
+         in wd
+      The local `let` and INLINE pragma delays inlining `wd` until after the
+      type-class Specialiser has run.  This is super important. Suppose we
+      have calls
+          withDict A k
+          withDict B k
+      where k1, k2 :: C T -> blah.  If we inline those withDict calls we'll get
+          k (A |> co1)
+          k (B |> co2)
+      and the Specialiser will assume that those arguments (of type `C T`) are
+      the same, will specialise `k` for that type, and will call the same,
+      specialised function from both call sites.  #21575 is a concrete case in point.
+
+      Solution: delay inlining `withDict` until after the specialiser; that is,
+      until Phase 2.  This is not a Final Solution -- seee #21575 "Alas..".
+
+-}
 
 {- ********************************************************************
 *                                                                     *

@@ -261,16 +261,16 @@ cmpChar x y = case compare (charVal x) (charVal y) of
 
 newtype SSymbol (s :: Symbol) = SSymbol String
 
--- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
+-- See Note [withDict] in "GHC.Tc.Instance.Class" in GHC
 withSSymbol :: forall a b.
                (KnownSymbol a => Proxy a -> b)
             -> SSymbol a      -> Proxy a -> b
-withSSymbol f x y = withDict @(SSymbol a) @(KnownSymbol a) x f y
+withSSymbol f x y = withDict @(KnownSymbol a) x f y
 
 newtype SChar (s :: Char) = SChar Char
 
--- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
+-- See Note [withDict] in "GHC.Tc.Instance.Class" in GHC
 withSChar :: forall a b.
              (KnownChar a => Proxy a -> b)
             -> SChar a      -> Proxy a -> b
-withSChar f x y = withDict @(SChar a) @(KnownChar a) x f y
+withSChar f x y = withDict @(KnownChar a) x f y

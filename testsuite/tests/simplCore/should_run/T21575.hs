@@ -31,7 +31,7 @@ main = do
 toJSONBar :: Given Style => Bar -> Value
 
   give Normal (\gd -> toJSONBar gd e)
-  --> withDict @Style @(Given Style) Normal (toJSON e)
+  --> withDict @(Given Style) @Style Normal (toJSON e)
   --> toJSONBar ((Normal |> co) :: Given Style) e
 
   give Normal (\gd -> toJSONBar gd e')
@@ -40,7 +40,7 @@ toJSONBar :: Given Style => Bar -> Value
 --------- With new cast ------------
 
   give Normal (\gd -> toJSONBar gd e)
-  --> withDict @Style @(Given Style) Normal (\gd -> toJSONBar gd e)
+  --> withDict @(Given Style) @Style Normal (\gd -> toJSONBar gd e)
   --> ((\gd -> toJSONBar gd e) |> co) Normal
   --> (\gd' -> toJSonBar (gd' |> sym (co[1])) e) Normal
   --> toJSONBar (Normal |> co') e   -- Boo!
@@ -61,7 +61,7 @@ class Given a where
 
 give :: forall a r. a -> (Given a => r) -> r
 #if WITH_DICT
-give = withDict @a @(Given a)
+give = withDict @(Given a) @a
 #else
 give a k = unsafeCoerce (Gift k :: Gift a r) a
 

@@ -3,7 +3,6 @@
 
 module GHC.HsToCore.Errors.Ppr where
 
-import GHC.Builtin.Names (withDictName)
 import GHC.Core.Predicate (isEvVar)
 import GHC.Core.Type
 import GHC.Driver.Flags
@@ -181,11 +180,6 @@ instance Diagnostic DsMessage where
       -> mkSimpleDecorated $
            hang (text "You can't mix polymorphic and unlifted bindings:")
               2 (ppr bind)
-    DsInvalidInstantiationDictAtType wrapped_ty
-      -> mkSimpleDecorated $
-           hang (text "Invalid instantiation of" <+>
-                quotes (ppr withDictName) <+> text "at type:")
-             4 (ppr wrapped_ty)
     DsWrongDoBind _rhs elt_ty
       -> mkSimpleDecorated $ badMonadBind elt_ty
     DsUnusedDoBind _rhs elt_ty
@@ -235,7 +229,6 @@ instance Diagnostic DsMessage where
     DsAggregatedViewExpressions{}               -> WarningWithoutFlag
     DsUnbangedStrictPatterns{}                  -> WarningWithFlag Opt_WarnUnbangedStrictPatterns
     DsCannotMixPolyAndUnliftedBindings{}        -> ErrorWithoutFlag
-    DsInvalidInstantiationDictAtType{}          -> ErrorWithoutFlag
     DsWrongDoBind{}                             -> WarningWithFlag Opt_WarnWrongDoBind
     DsUnusedDoBind{}                            -> WarningWithFlag Opt_WarnUnusedDoBind
     DsRecBindsNotAllowedForUnliftedTys{}        -> ErrorWithoutFlag
@@ -276,7 +269,6 @@ instance Diagnostic DsMessage where
     DsWrongDoBind rhs _                         -> [SuggestBindToWildcard rhs]
     DsUnusedDoBind rhs _                        -> [SuggestBindToWildcard rhs]
     DsRecBindsNotAllowedForUnliftedTys{}        -> noHints
-    DsInvalidInstantiationDictAtType{}          -> noHints
     DsRuleMightInlineFirst _ lhs_id rule_act    -> [SuggestAddInlineOrNoInlinePragma lhs_id rule_act]
     DsAnotherRuleMightFireFirst _ bad_rule _    -> [SuggestAddPhaseToCompetingRule bad_rule]
 
