@@ -21,7 +21,7 @@
   STM_FG_LOCKS -- per-TVar exclusion : each TVar can be owned by at
                   most one TRec at any time.  This allows dynamically
                   non-conflicting transactions to commit in parallel.
-                  The implementation treats reads optimisitcally --
+                  The implementation treats reads optimistically --
                   extra versioning information is retained in the 
                   saw_update_by field of the TVars so that they do not 
                   need to be locked for reading.

@@ -381,7 +381,7 @@ WARNING_OPTS += -Wno-unused-label
 #WARNING_OPTS += -Wcast-qual
 
 # This one seems buggy on GCC 4.1.2, which is the only GCC version we
-# have that can bootstrap the SPARC build. We end up with lots of supurious
+# have that can bootstrap the SPARC build. We end up with lots of spurious
 # warnings of the form "cast increases required alignment of target type".
 # Some legitimate warnings can be fixed by adding an intermediate cast to
 # (void*), but we get others in rts/sm/GCUtils.c concerning the gct var

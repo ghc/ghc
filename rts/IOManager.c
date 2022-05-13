@@ -75,7 +75,7 @@ initIOManagerAfterFork(Capability **pcap USED_IF_THREADS_AND_NOT_MINGW32)
      * No Windows impl since no forking.
      *
      * TODO: figure out if it is necessary for the threaded MIO case for the
-     * starting of the IO managager threads to be synchronous. It would be
+     * starting of the IO manager threads to be synchronous. It would be
      * simpler if it could start them asynchronously and thus not have to
      * have the pcap as an inout param, that could be modified. In practice it
      * cannot be modified anyway since in the contexts where it is called

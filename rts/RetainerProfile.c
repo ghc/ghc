@@ -413,7 +413,7 @@ computeRetainerSet( traverseState *ts )
 
 /* -----------------------------------------------------------------------------
  * Perform retainer profiling.
- * N is the oldest generation being profilied, where the generations are
+ * N is the oldest generation being profiled, where the generations are
  * numbered starting at 0.
  * Invariants:
  * Note:

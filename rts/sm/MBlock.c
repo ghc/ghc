@@ -46,8 +46,8 @@ W_ mpc_misses = 0;
       that was committed, after the given one
 
   For both these calls, @state is an in-out parameter that points to
-  an opaque state threading the calls togheter. The calls should only
-  be used in an interation fashion. Pass NULL if @state is not
+  an opaque state threading the calls together. The calls should only
+  be used in an iteration fashion. Pass NULL if @state is not
   interesting,or pass a pointer to NULL if you don't have a state.
 
   void *getCommittedMBlocks(uint32_t n)

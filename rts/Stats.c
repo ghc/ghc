@@ -437,7 +437,7 @@ stat_startGC (Capability *cap, gc_thread *gct)
     // (though converted from Time=StgInt64 to EventTimestamp=StgWord64).
     // Here, as opposed to other places, the event is emitted on the cap
     // that initiates the GC and external tools expect it to have the same
-    // timestamp as used in +RTS -s calculcations.
+    // timestamp as used in +RTS -s calculations.
     traceEventGcStartAtT(cap,
                          TimeToNS(gct->gc_start_elapsed - start_init_elapsed));
 
@@ -594,7 +594,7 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
         // (though converted from Time=StgInt64 to EventTimestamp=StgWord64).
         // Here, as opposed to other places, the event is emitted on the cap
         // that initiates the GC and external tools expect it to have the same
-        // timestamp as used in +RTS -s calculcations.
+        // timestamp as used in +RTS -s calculations.
         traceEventGcEndAtT(cap, TimeToNS(stats.elapsed_ns));
 
         if (gen == RtsFlags.GcFlags.generations-1) { // major GC?
@@ -643,7 +643,7 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
 }
 
 /* -----------------------------------------------------------------------------
-   Called at the beginning of each Retainer Profiliing
+   Called at the beginning of each Retainer Profiling
    -------------------------------------------------------------------------- */
 #if defined(PROFILING)
 void
@@ -660,7 +660,7 @@ stat_startRP(void)
 #endif /* PROFILING */
 
 /* -----------------------------------------------------------------------------
-   Called at the end of each Retainer Profiliing
+   Called at the end of each Retainer Profiling
    -------------------------------------------------------------------------- */
 
 #if defined(PROFILING)

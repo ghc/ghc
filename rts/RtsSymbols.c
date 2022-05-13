@@ -96,7 +96,7 @@ extern char **environ;
  * if it is declared but not defined, allowing it to be defined by an object
  * which is loaded later. GHC generalizes this notion, allowing symbol
  * definitions to be declared as *strong*. A strong symbol is one which will
- * silently supercede definitions of the same name by later objects.
+ * silently supersede definitions of the same name by later objects.
  *
  * This is currently only used in the case of atexit() to workaround an
  * unfortunate interaction on musl systems (#20350). Specifically,

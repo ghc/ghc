@@ -6,7 +6,7 @@
 // The files in ELFRelocs/ have been taken from
 // the LLVM project. See ELFRelocs/LICENSE-LLVM.TXT
 // for the University of Illinois Open Source License
-// under which it is distrubuted.
+// under which it is distributed.
 //
 
 #pragma once

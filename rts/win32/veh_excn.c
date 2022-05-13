@@ -56,7 +56,7 @@
   software exceptions Which means previously when we registered VEH handlers
   we would also trap software exceptions. Which means when haskell code was
   loaded in a C++ or C# context we would swallow exceptions and terminate in
-  contexes that normally the runtime should be able to continue on, e.g. you
+  contexts that normally the runtime should be able to continue on, e.g. you
   could be handling the segfault in your C++ code, or the div by 0.
 
   We could not handle these exceptions, but GHCi would just die a horrible death
@@ -65,7 +65,7 @@
   So instead, we'll move to Continue handler, to run as late as possible, and
   also register a filter which calls any existing filter, and then runs the
   continue handlers, we then also only run as the last continue handler so we
-  don't supercede any other VCH handlers.
+  don't supersede any other VCH handlers.
 
   Lastly we'll also provide a way for users to disable the exception handling
   entirely so even if the new approach doesn't solve the issue they can work

@@ -91,7 +91,7 @@ INLINE_HEADER void freeStrHashTable ( StrHashTable *table, void (*freeDataFun)(v
 /*
  * Hash set API
  *
- * A hash set is bascially a hash table where values are NULL.
+ * A hash set is basically a hash table where values are NULL.
  */
 
 typedef struct hashtable HashSet;

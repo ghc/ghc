@@ -76,7 +76,7 @@ bool eventlog_enabled; // protected by state_change_mutex to ensure
  *  6. stop the writer
  *  7. release state_change_mutex
  *
- * Note that a corrollary of this is that !eventlog_enabled implies that the
+ * Note that a corollary of this is that !eventlog_enabled implies that the
  * eventlog buffers are all empty (modulo the block marker that all buffers
  * always have).
  *
@@ -302,7 +302,7 @@ postHeaderEvents(void)
     postInt32(&eventBuf, EVENT_DATA_BEGIN);
 }
 
-// These events will be reposted everytime we restart the eventlog
+// These events will be reposted every time we restart the eventlog
 void
 postInitEvent(EventlogInitPost post_init){
     ACQUIRE_LOCK(&state_change_mutex);
@@ -1341,7 +1341,7 @@ void postProfSampleCostCentre(Capability *cap,
 
 // This event is output at the start of profiling so the tick interval can
 // be reported. Once the tick interval is reported the total executation time
-// can be calculuated from how many samples there are.
+// can be calculated from how many samples there are.
 void postProfBegin(void)
 {
     ACQUIRE_LOCK(&eventBufMutex);

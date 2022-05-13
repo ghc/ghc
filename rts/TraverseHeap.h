@@ -112,7 +112,7 @@ typedef struct traverseState_ {
      * users for example by shifting the real data up by one bit.
      *
      * Since we don't want to have to scan the entire heap a second time just to
-     * reset the per-object visitied bit before/after the real traversal we make
+     * reset the per-object visited bit before/after the real traversal we make
      * the interpretation of this bit dependent on the value of a global
      * variable, 'flip' and "flip" this variable when we want to invalidate all
      * objects.

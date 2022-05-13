@@ -561,7 +561,7 @@ empty_handler (int sig STG_UNUSED)
 /* -----------------------------------------------------------------------------
    SIGTSTP handling
 
-   When a process is suspeended with ^Z and resumed again, the shell
+   When a process is suspended with ^Z and resumed again, the shell
    makes no attempt to save and restore the terminal settings.  So on
    resume, any terminal setting modifications we made (e.g. turning off
    ICANON due to hSetBuffering NoBuffering) may well be lost.  Hence,

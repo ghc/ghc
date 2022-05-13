@@ -589,7 +589,7 @@ overwritingMutableClosureOfs (StgClosure *p, uint32_t offset)
     //   - shrinkSmallMutableArray# (SMALL_MUT_ARR_PTRS)
     //
     // we can safely omit the Ldv_recordDead call. Since these closures are
-    // considered inherenlty used we don't need to track their destruction.
+    // considered inherently used we don't need to track their destruction.
 #if defined(PROFILING)
     ASSERT(isInherentlyUsed(get_itbl(p)->type) == true);
 #endif

@@ -47,7 +47,7 @@ includes_H_FILES_GENERATED = \
     ghcplatform.h
 
 # Unlike above, include generated files. We still need the previous list
-# without the generated files separtely and not just as part of this due to
+# without the generated files separately and not just as part of this due to
 # lingering issues like the derived constants generation snooping the RTS
 # headers.
 includes_dist_H_FILES = \

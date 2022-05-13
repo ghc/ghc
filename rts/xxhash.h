@@ -299,7 +299,7 @@ XXH_PUBLIC_API XXH32_hash_t XXH32 (const void* input, size_t length, XXH32_hash_
 /*******   Streaming   *******/
 
 /*
- * Streaming functions generate the xxHash value from an incrememtal input.
+ * Streaming functions generate the xxHash value from an incremental input.
  * This method is slower than single-call functions, due to state management.
  * For small inputs, prefer `XXH32()` and `XXH64()`, which are better optimized.
  *
@@ -835,7 +835,7 @@ XXH_PUBLIC_API XXH128_hash_t XXH128(const void* data, size_t len, XXH64_hash_t s
  *
  * The check costs one initial branch per hash, which is generally negligible, but not zero.
  * Moreover, it's not useful to generate binary for an additional code path
- * if memory access uses same instruction for both aligned and unaligned adresses.
+ * if memory access uses same instruction for both aligned and unaligned addresses.
  *
  * In these cases, the alignment check can be removed by setting this macro to 0.
  * Then the code will always use unaligned memory access.

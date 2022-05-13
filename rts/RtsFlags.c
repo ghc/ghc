@@ -2613,7 +2613,7 @@ overwrite files. This would be bad in the context of CGI scripts or
 setuid binaries. So we introduced a system where +RTS processing is more
 or less disabled unless you pass the -rtsopts flag at link time.
 
-This scheme is safe enough but it also really annoyes users. They have
+This scheme is safe enough but it also really annoys users. They have
 to use -rtsopts in many circumstances: with -threaded to use -N, with
 -eventlog to use -l, with -prof to use any of the profiling flags. Many
 users just set -rtsopts globally or in project .cabal files. Apart from

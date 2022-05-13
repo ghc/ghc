@@ -373,7 +373,7 @@ void registerAlertableWait (bool has_timeout, DWORD mssec)
 }
 
 /* Exported callback function that will be called by the RTS to collect the
-   finished overlapped entried belonging to the completed I/O requests.  The
+   finished overlapped entries belonging to the completed I/O requests.  The
    number of read entries will be returned in NUM.
 
    NOTE: This function isn't thread safe, but is intended to be called only

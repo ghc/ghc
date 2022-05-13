@@ -2269,7 +2269,7 @@ bool doIdleGCWork(Capability *cap STG_UNUSED, bool all)
  * usage when the live data size is much more reasonable (for example ghcide)
  *
  * Therefore we have a new (2021) strategy which starts by retaining up to 4 * live_bytes
- * of blocks before gradually returning uneeded memory back to the OS on subsequent
+ * of blocks before gradually returning unneeded memory back to the OS on subsequent
  * major GCs which are NOT caused by a heap overflow.
  *
  * Each major GC which is NOT caused by heap overflow increases the consec_idle_gcs

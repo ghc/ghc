@@ -17,7 +17,7 @@ needGotSlot(Elf_Sym * symbol) {
      * STB_WEAK.
      *
      * Any more restrictive filter here would result
-     * in a smaller GOT, which is preferrable.
+     * in a smaller GOT, which is preferable.
      */
     return ELF_ST_BIND(symbol->st_info) == STB_GLOBAL
         || ELF_ST_BIND(symbol->st_info) == STB_WEAK
@@ -87,7 +87,7 @@ fillGot(ObjectCode * oc) {
             if(needGotSlot(symbol->elf_sym)) {
 
                 /* no type are undefined symbols */
-                // Note STT_SECTION symbols should have their addres
+                // Note STT_SECTION symbols should have their address
                 // set prior to the fillGot call in ocResolve_ELF.
                 if(   STT_NOTYPE == ELF_ST_TYPE(symbol->elf_sym->st_info)
                    || STB_WEAK   == ELF_ST_BIND(symbol->elf_sym->st_info)) {

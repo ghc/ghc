@@ -524,7 +524,7 @@ retry_pop_stack:
             // we don't want any further exceptions to be caught,
             // until GHCi is ready to handle them.  This prevents
             // deadlock if an exception is raised in InteractiveUI,
-            // for exmplae.  Perhaps the stop_on_exception flag should
+            // for example.  Perhaps the stop_on_exception flag should
             // be per-thread.
             CInt[rts_stop_on_exception] = 0;
             ("ptr" ioAction) = ccall deRefStablePtr (W_[rts_breakpoint_io_action] "ptr");

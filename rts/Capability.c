@@ -7,7 +7,7 @@
  * A Capability represents the token required to execute STG code,
  * and all the state an OS thread/task needs to run Haskell code:
  * its STG registers, a pointer to its TSO, a nursery etc. During
- * STG execution, a pointer to the capabilitity is kept in a
+ * STG execution, a pointer to the capability is kept in a
  * register (BaseReg; actually it is a pointer to cap->r).
  *
  * Only in a THREADED_RTS build will there be multiple capabilities,

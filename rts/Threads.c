@@ -358,7 +358,7 @@ void
 migrateThread (Capability *from, StgTSO *tso, Capability *to)
 {
     // Sadly we can't assert this since migrateThread is called from
-    // scheduleDoGC, where we implicly own all capabilities.
+    // scheduleDoGC, where we implicitly own all capabilities.
     //ASSERT_FULL_CAPABILITY_INVARIANTS(from, getTask());
 
     traceEventMigrateThread (from, tso, to->no);

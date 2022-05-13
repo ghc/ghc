@@ -931,7 +931,7 @@ traverseSmallBitmap (traverseState *ts, StgPtr p, uint32_t size, StgWord bitmap,
  *
  *  Note:
  *
- *    This code was almost plagiarzied from GC.c! For each pointer,
+ *    This code was almost plagiarized from GC.c! For each pointer,
  *    traversePushClosure() is invoked instead of evacuate().
  */
 static void

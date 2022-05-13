@@ -80,7 +80,7 @@ EXTERN_INLINE StgWord atomic_dec(StgVolatilePtr p);
 /*
  * Busy-wait nop: this is a hint to the CPU that we are currently in a
  * busy-wait loop waiting for another CPU to change something.  On a
- * hypertreaded CPU it should yield to another thread, for example.
+ * hyperthreaded CPU it should yield to another thread, for example.
  */
 EXTERN_INLINE void busy_wait_nop(void);
 
