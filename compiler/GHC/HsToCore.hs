@@ -20,6 +20,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Config
+import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
 import GHC.Driver.Backend
 import GHC.Driver.Plugins
@@ -215,7 +216,11 @@ deSugar hsc_env
         ; safe_mode <- finalSafeMode dflags tcg_env
         ; (needed_mods, needed_pkgs) <- readIORef (tcg_th_needed_deps tcg_env)
 
-        ; usages <- mkUsageInfo hsc_env mod (imp_mods imports) used_names
+        ; let uc = initUsageConfig hsc_env
+        ; let plugins = hsc_plugins hsc_env
+        ; let fc = hsc_FC hsc_env
+        ; let unit_env = hsc_unit_env hsc_env
+        ; usages <- mkUsageInfo uc plugins fc unit_env mod (imp_mods imports) used_names
                       dep_files merged needed_mods needed_pkgs
         -- id_mod /= mod when we are processing an hsig, but hsigs
         -- never desugared and compiled (there's no code!)

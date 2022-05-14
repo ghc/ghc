@@ -393,6 +393,7 @@ Library
         GHC.Driver.Config.Diagnostic
         GHC.Driver.Config.Finder
         GHC.Driver.Config.HsToCore
+        GHC.Driver.Config.HsToCore.Usage
         GHC.Driver.Config.Logger
         GHC.Driver.Config.Parser
         GHC.Driver.Config.Stg.Debug

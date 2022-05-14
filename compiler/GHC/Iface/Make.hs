@@ -49,6 +49,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Ppr
 import GHC.Core.Unify( RoughMatchTc(..) )
 
+import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
 import GHC.Driver.Backend
 import GHC.Driver.Session
@@ -84,7 +85,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 
 import GHC.HsToCore.Docs
-import GHC.HsToCore.Usage ( mkUsageInfo, mkUsedNames )
+import GHC.HsToCore.Usage
 
 import GHC.Unit
 import GHC.Unit.Module.Warnings
@@ -210,6 +211,10 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary
           used_th <- readIORef tc_splice_used
           dep_files <- (readIORef dependent_files)
           (needed_links, needed_pkgs) <- readIORef (tcg_th_needed_deps tc_result)
+          let uc = initUsageConfig hsc_env
+              plugins = hsc_plugins hsc_env
+              fc = hsc_FC hsc_env
+              unit_env = hsc_unit_env hsc_env
           -- Do NOT use semantic module here; this_mod in mkUsageInfo
           -- is used solely to decide if we should record a dependency
           -- or not.  When we instantiate a signature, the semantic
@@ -217,7 +222,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary
           -- but if you pass that in here, we'll decide it's the local
           -- module and does not need to be recorded as a dependency.
           -- See Note [Identity versus semantic module]
-          usages <- mkUsageInfo hsc_env this_mod (imp_mods imports) used_names
+          usages <- mkUsageInfo uc plugins fc unit_env this_mod (imp_mods imports) used_names
                       dep_files merged needed_links needed_pkgs
 
           docs <- extractDocs (ms_hspp_opts mod_summary) tc_result
