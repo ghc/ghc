@@ -104,7 +104,6 @@ import GHC.Core.TyCon (TyCon, TyConFlavour)
 import GHC.Core.Type (Kind, Type, ThetaType, PredType)
 import GHC.Driver.Backend (Backend)
 import GHC.Unit.State (UnitState)
-import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Basic
 import GHC.Utils.Misc (capitalise, filterOut)
 import qualified GHC.LanguageExtensions as LangExt

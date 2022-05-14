@@ -61,7 +61,7 @@ import qualified GHC.Data.Strict as Strict
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
 
-import GHC.Unit.Module            ( ModuleName, ml_hs_file )
+import GHC.Unit.Module            ( ml_hs_file )
 import GHC.Unit.Module.ModSummary
 
 import qualified Data.Array as A

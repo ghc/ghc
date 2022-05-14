@@ -125,7 +125,6 @@ import GHC.Core.ConLike        ( ConLike(..) )
 import GHC.Core.Coercion.Axiom ( Role, fsFromRole )
 import GHC.Types.Name.Reader
 import GHC.Types.Name
-import GHC.Unit.Module (ModuleName)
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Fixity

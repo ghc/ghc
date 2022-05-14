@@ -22,8 +22,9 @@ import GHC.Utils.Panic
 import Data.Char
 
 -- | Source Statistics
-ppSourceStats :: Bool -> Located HsModule -> SDoc
-ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = imports, hsmodDecls = ldecls }))
+ppSourceStats :: Bool -> Located (HsModule GhcPs) -> SDoc
+ppSourceStats _ (L _ (XModule x)) = dataConCantHappen x
+ppSourceStats short (L _ (HsModule _ _ exports imports ldecls))
   = (if short then hcat else vcat)
         (map pp_val
             [("ExportAll        ", export_all), -- 1 if no export list

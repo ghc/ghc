@@ -521,6 +521,8 @@ merge_msg mod_name reqs =
 -- a final 'TcGblEnv' that matches the local signature and
 -- all required signatures.
 mergeSignatures :: HsParsedModule -> TcGblEnv -> ModIface -> TcRn TcGblEnv
+mergeSignatures (HsParsedModule { hpm_module = L _ (XModule ext) }) _ _
+  = dataConCantHappen ext
 mergeSignatures
   (HsParsedModule { hpm_module = L loc (HsModule { hsmodExports = mb_exports }),
                     hpm_src_files = src_files })

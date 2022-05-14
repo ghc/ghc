@@ -853,12 +853,12 @@ unitdecl :: { LHsUnitDecl PackageName }
                    NotBoot -> HsSrcFile
                    IsBoot  -> HsBootFile)
                  (reLoc $3)
-                 (sL1 $1 (HsModule noAnn (thdOf3 $7) (Just $3) $5 (fst $ sndOf3 $7) (snd $ sndOf3 $7) $4 Nothing)) }
+                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $7) $4 Nothing) (Just $3) $5 (fst $ sndOf3 $7) (snd $ sndOf3 $7))) }
         | 'signature' modid maybemodwarning maybeexports 'where' body
              { sL1 $1 $ DeclD
                  HsigFile
                  (reLoc $2)
-                 (sL1 $1 (HsModule noAnn (thdOf3 $6) (Just $2) $4 (fst $ sndOf3 $6) (snd $ sndOf3 $6) $3 Nothing)) }
+                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $6) $3 Nothing) (Just $2) $4 (fst $ sndOf3 $6) (snd $ sndOf3 $6))) }
         | 'dependency' unitid mayberns
              { sL1 $1 $ IncludeD (IncludeDecl { idUnitId = $2
                                               , idModRenaming = $3
@@ -878,26 +878,32 @@ unitdecl :: { LHsUnitDecl PackageName }
 -- either, and DEPRECATED is only expected to be used by people who really
 -- know what they are doing. :-)
 
-signature :: { Located HsModule }
+signature :: { Located (HsModule GhcPs) }
        : 'signature' modid maybemodwarning maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
-                acs (\cs-> (L loc (HsModule (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnSignature $1, mj AnnWhere $5] (fstOf3 $6)) cs)
-                              (thdOf3 $6) (Just $2) $4 (fst $ sndOf3 $6)
-                              (snd $ sndOf3 $6) $3 Nothing))
+                acs (\cs-> (L loc (HsModule (XModulePs
+                                               (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnSignature $1, mj AnnWhere $5] (fstOf3 $6)) cs)
+                                               (thdOf3 $6) $3 Nothing)
+                                            (Just $2) $4 (fst $ sndOf3 $6)
+                                            (snd $ sndOf3 $6)))
                     ) }
 
-module :: { Located HsModule }
+module :: { Located (HsModule GhcPs) }
        : 'module' modid maybemodwarning maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
-                acsFinal (\cs -> (L loc (HsModule (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1, mj AnnWhere $5] (fstOf3 $6)) cs)
-                               (thdOf3 $6) (Just $2) $4 (fst $ sndOf3 $6)
-                              (snd $ sndOf3 $6) $3 Nothing)
+                acsFinal (\cs -> (L loc (HsModule (XModulePs
+                                                     (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1, mj AnnWhere $5] (fstOf3 $6)) cs)
+                                                     (thdOf3 $6) $3 Nothing)
+                                                  (Just $2) $4 (fst $ sndOf3 $6)
+                                                  (snd $ sndOf3 $6))
                     )) }
         | body2
                 {% fileSrcSpan >>= \ loc ->
-                   acsFinal (\cs -> (L loc (HsModule (EpAnn (spanAsAnchor loc) (AnnsModule [] (fstOf3 $1)) cs)
-                                (thdOf3 $1) Nothing Nothing
-                               (fst $ sndOf3 $1) (snd $ sndOf3 $1) Nothing Nothing))) }
+                   acsFinal (\cs -> (L loc (HsModule (XModulePs
+                                                        (EpAnn (spanAsAnchor loc) (AnnsModule [] (fstOf3 $1)) cs)
+                                                        (thdOf3 $1) Nothing Nothing)
+                                                     Nothing Nothing
+                                                     (fst $ sndOf3 $1) (snd $ sndOf3 $1)))) }
 
 missing_module_keyword :: { () }
         : {- empty -}                           {% pushModuleContext }
@@ -942,21 +948,24 @@ top1    :: { ([LImportDecl GhcPs], [LHsDecl GhcPs]) }
 -----------------------------------------------------------------------------
 -- Module declaration & imports only
 
-header  :: { Located HsModule }
+header  :: { Located (HsModule GhcPs) }
         : 'module' modid maybemodwarning maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
-                   acs (\cs -> (L loc (HsModule (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] (AnnList Nothing Nothing Nothing [] [])) cs)
-                              NoLayoutInfo (Just $2) $4 $6 [] $3 Nothing
+                   acs (\cs -> (L loc (HsModule (XModulePs
+                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] (AnnList Nothing Nothing Nothing [] [])) cs)
+                                                   NoLayoutInfo $3 Nothing)
+                                                (Just $2) $4 $6 []
                           ))) }
         | 'signature' modid maybemodwarning maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
-                   acs (\cs -> (L loc (HsModule (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] (AnnList Nothing Nothing Nothing [] [])) cs)
-                           NoLayoutInfo (Just $2) $4 $6 [] $3 Nothing
+                   acs (\cs -> (L loc (HsModule (XModulePs
+                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] (AnnList Nothing Nothing Nothing [] [])) cs)
+                                                   NoLayoutInfo $3 Nothing)
+                                                (Just $2) $4 $6 []
                           ))) }
         | header_body2
                 {% fileSrcSpan >>= \ loc ->
-                   return (L loc (HsModule noAnn NoLayoutInfo Nothing Nothing $1 [] Nothing
-                          Nothing)) }
+                   return (L loc (HsModule (XModulePs noAnn NoLayoutInfo Nothing Nothing) Nothing Nothing $1 [])) }
 
 header_body :: { [LImportDecl GhcPs] }
         :  '{'            header_top            { $2 }
@@ -4361,7 +4370,7 @@ pvL a = do { av <- a
 -- This is the only parser entry point that deals with Haddock comments.
 -- The other entry points ('parseDeclaration', 'parseExpression', etc) do
 -- not insert them into the AST.
-parseModule :: P (Located HsModule)
+parseModule :: P (Located (HsModule GhcPs))
 parseModule = parseModuleNoHaddock >>= addHaddockToModule
 
 commentsA :: (Monoid ann) => SrcSpan -> EpAnnComments -> SrcSpanAnn' (EpAnn ann)

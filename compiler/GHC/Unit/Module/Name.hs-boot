@@ -1,6 +1,5 @@
-module GHC.Unit.Module.Name where
+module GHC.Unit.Module.Name (
+    module Language.Haskell.Syntax
+                            ) where
 
-import GHC.Prelude ()
-
-data ModuleName
-
+import {-# SOURCE #-} Language.Haskell.Syntax (ModuleName(..))

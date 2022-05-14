@@ -3,7 +3,7 @@ module GHC.Unit.Types where
 
 import GHC.Prelude ()
 import {-# SOURCE #-} GHC.Utils.Outputable
-import {-# SOURCE #-} GHC.Unit.Module.Name ( ModuleName )
+import {-# SOURCE #-} Language.Haskell.Syntax ( ModuleName )
 import Data.Kind (Type)
 
 data UnitId

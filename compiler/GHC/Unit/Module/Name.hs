@@ -1,7 +1,7 @@
 
 -- | The ModuleName type
 module GHC.Unit.Module.Name
-    ( ModuleName
+    ( module Language.Haskell.Syntax
     , pprModuleName
     , moduleNameFS
     , moduleNameString
@@ -12,6 +12,8 @@ module GHC.Unit.Module.Name
     , parseModuleName
     )
 where
+
+import {-# SOURCE #-} Language.Haskell.Syntax (ModuleName(..))
 
 import GHC.Prelude
 
@@ -28,9 +30,6 @@ import System.FilePath
 import qualified Text.ParserCombinators.ReadP as Parse
 import Text.ParserCombinators.ReadP (ReadP)
 import Data.Char (isAlphaNum)
-
--- | A ModuleName is essentially a simple string, e.g. @Data.List@.
-newtype ModuleName = ModuleName FastString deriving Show
 
 instance Uniquable ModuleName where
   getUnique (ModuleName nm) = getUnique nm
