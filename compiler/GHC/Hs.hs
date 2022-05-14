@@ -34,7 +34,7 @@ module GHC.Hs (
         Fixity,
 
         HsModule(..), AnnsModule(..),
-        HsParsedModule(..)
+        HsParsedModule(..), XModulePs(..)
 ) where
 
 -- friends:
@@ -58,53 +58,18 @@ import GHC.Hs.Instances () -- For Data instances
 import GHC.Utils.Outputable
 import GHC.Types.Fixity         ( Fixity )
 import GHC.Types.SrcLoc
-import GHC.Unit.Module          ( ModuleName )
 import GHC.Unit.Module.Warnings ( WarningTxt )
 
 -- libraries:
 import Data.Data hiding ( Fixity )
 
--- | Haskell Module
---
--- All we actually declare here is the top-level structure for a module.
-data HsModule
-  =  -- | 'GHC.Parser.Annotation.AnnKeywordId's
-     --
-     --  - 'GHC.Parser.Annotation.AnnModule','GHC.Parser.Annotation.AnnWhere'
-     --
-     --  - 'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnSemi',
-     --    'GHC.Parser.Annotation.AnnClose' for explicit braces and semi around
-     --    hsmodImports,hsmodDecls if this style is used.
-
-     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-    HsModule {
+-- | Haskell Module extension point: GHC specific 
+data XModulePs
+  = XModulePs {
       hsmodAnn :: EpAnn AnnsModule,
       hsmodLayout :: LayoutInfo,
         -- ^ Layout info for the module.
         -- For incomplete modules (e.g. the output of parseHeader), it is NoLayoutInfo.
-      hsmodName :: Maybe (LocatedA ModuleName),
-        -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
-        --     field is Nothing too)
-      hsmodExports :: Maybe (LocatedL [LIE GhcPs]),
-        -- ^ Export list
-        --
-        --  - @Nothing@: export list omitted, so export everything
-        --
-        --  - @Just []@: export /nothing/
-        --
-        --  - @Just [...]@: as you would expect...
-        --
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
-        --                                   ,'GHC.Parser.Annotation.AnnClose'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-      hsmodImports :: [LImportDecl GhcPs],
-        -- ^ We snaffle interesting stuff out of the imported interfaces early
-        -- on, adding that info to TyDecls/etc; so this list is often empty,
-        -- downstream.
-      hsmodDecls :: [LHsDecl GhcPs],
-        -- ^ Type, class, value, and interface signature decls
       hsmodDeprecMessage :: Maybe (LocatedP (WarningTxt GhcPs)),
         -- ^ reason\/explanation for warning/deprecation of this module
         --
@@ -121,8 +86,14 @@ data HsModule
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
    }
+   deriving Data
 
-deriving instance Data HsModule
+type instance XModule GhcPs = XModulePs
+type instance XModule GhcRn = DataConCantHappen
+type instance XModule GhcTc = DataConCantHappen
+type instance XXModule p = DataConCantHappen
+
+deriving instance Data (HsModule GhcPs)
 
 data AnnsModule
   = AnnsModule {
@@ -130,13 +101,15 @@ data AnnsModule
     am_decls :: AnnList
     } deriving (Data, Eq)
 
-instance Outputable HsModule where
+instance Outputable (HsModule GhcPs) where
+    
+    ppr (XModule ext) = dataConCantHappen ext
 
-    ppr (HsModule _ _ Nothing _ imports decls _ mbDoc)
+    ppr (HsModule (XModulePs _ _ _ mbDoc) Nothing _ imports decls)
       = pprMaybeWithDoc mbDoc $ pp_nonnull imports
                              $$ pp_nonnull decls
 
-    ppr (HsModule _ _ (Just name) exports imports decls deprec mbDoc)
+    ppr (HsModule (XModulePs _ _ deprec mbDoc) (Just name) exports imports decls)
       = pprMaybeWithDoc mbDoc $
         vcat
           [ case exports of
@@ -161,7 +134,7 @@ pp_nonnull [] = empty
 pp_nonnull xs = vcat (map ppr xs)
 
 data HsParsedModule = HsParsedModule {
-    hpm_module    :: Located HsModule,
+    hpm_module    :: Located (HsModule GhcPs),
     hpm_src_files :: [FilePath]
        -- ^ extra source files (e.g. from #includes).  The lexer collects
        -- these from '# <file> <line>' pragmas, which the C preprocessor

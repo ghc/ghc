@@ -24,6 +24,7 @@ module Language.Haskell.Syntax (
         module Language.Haskell.Syntax.Pat,
         module Language.Haskell.Syntax.Type,
         module Language.Haskell.Syntax.Extension,
+        ModuleName(..), HsModule(..)
 ) where
 
 import Language.Haskell.Syntax.Decls
@@ -33,6 +34,12 @@ import Language.Haskell.Syntax.Lit
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Type
+
+import GHC.Data.FastString
+import GHC.Data.Maybe (Maybe)
+import GHC.Prelude (Show)
+import GHC.Parser.Annotation
+import GHC.Hs.ImpExp (LIE, LImportDecl)
 
 {-
 Note [Language.Haskell.Syntax.* Hierarchy]
@@ -55,5 +62,47 @@ For more details, see
 https://gitlab.haskell.org/ghc/ghc/-/wikis/implementing-trees-that-grow
 -}
 
+-- | A ModuleName is essentially a simple string, e.g. @Data.List@.
+newtype ModuleName = ModuleName FastString deriving Show
 
--- TODO Add TTG parameter to 'HsModule' and move here.
+-- | Haskell Module
+--
+-- All we actually declare here is the top-level structure for a module.
+data HsModule p
+  =  -- | 'GHC.Parser.Annotation.AnnKeywordId's
+     --
+     --  - 'GHC.Parser.Annotation.AnnModule','GHC.Parser.Annotation.AnnWhere'
+     --
+     --  - 'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnSemi',
+     --    'GHC.Parser.Annotation.AnnClose' for explicit braces and semi around
+     --    hsmodImports,hsmodDecls if this style is used.
+
+     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+    HsModule {
+      hsmodExt :: XModule p,
+        -- ^ HsModule extension point
+      hsmodName :: Maybe (LocatedA ModuleName),
+        -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
+        --     field is Nothing too)
+      hsmodExports :: Maybe (LocatedL [LIE p]),
+        -- ^ Export list
+        --
+        --  - @Nothing@: export list omitted, so export everything
+        --
+        --  - @Just []@: export /nothing/
+        --
+        --  - @Just [...]@: as you would expect...
+        --
+        --
+        --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
+        --                                   ,'GHC.Parser.Annotation.AnnClose'
+
+        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+      hsmodImports :: [LImportDecl p],
+        -- ^ We snaffle interesting stuff out of the imported interfaces early
+        -- on, adding that info to TyDecls/etc; so this list is often empty,
+        -- downstream.
+      hsmodDecls :: [LHsDecl p]
+        -- ^ Type, class, value, and interface signature decls
+   }
+  | XModule (XXModule p)

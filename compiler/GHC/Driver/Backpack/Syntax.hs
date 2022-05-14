@@ -23,7 +23,6 @@ import GHC.Hs
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
 
-import GHC.Unit.Module.Name
 import GHC.Unit.Types
 import GHC.Unit.Info
 
@@ -65,7 +64,7 @@ type LHsUnit n = Located (HsUnit n)
 -- | A declaration in a package, e.g. a module or signature definition,
 -- or an include.
 data HsUnitDecl n
-    = DeclD   HscSource (Located ModuleName) (Located HsModule)
+    = DeclD   HscSource (Located ModuleName) (Located (HsModule GhcPs))
     | IncludeD   (IncludeDecl n)
 type LHsUnitDecl n = Located (HsUnitDecl n)
 

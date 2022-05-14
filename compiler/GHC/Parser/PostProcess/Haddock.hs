@@ -178,7 +178,7 @@ we have to use 'flattenBindsAndSigs' to traverse it in the correct order.
 -- to a parsed HsModule.
 --
 -- Reports badly positioned comments when -Winvalid-haddock is enabled.
-addHaddockToModule :: Located HsModule -> P (Located HsModule)
+addHaddockToModule :: Located (HsModule GhcPs) -> P (Located (HsModule GhcPs))
 addHaddockToModule lmod = do
   pState <- getPState
   let all_comments = toList (hdk_comments pState)
@@ -239,7 +239,7 @@ instance HasHaddock a => HasHaddock [a] where
 --        item4
 --      ) where
 --
-instance HasHaddock (Located HsModule) where
+instance HasHaddock (Located (HsModule GhcPs)) where
   addHaddock (L l_mod mod) = do
     -- Step 1, get the module header documentation comment:
     --
@@ -287,13 +287,13 @@ instance HasHaddock (Located HsModule) where
     --      data C = MkC  -- ^ Comment on MkC
     --      -- ^ Comment on C
     --
-    let layout_info = hsmodLayout mod
+    let layout_info = hsmodLayout (hsmodExt mod)
     hsmodDecls' <- addHaddockInterleaveItems layout_info (mkDocHsDecl layout_info) (hsmodDecls mod)
 
     pure $ L l_mod $
       mod { hsmodExports = hsmodExports'
           , hsmodDecls = hsmodDecls'
-          , hsmodHaddockModHeader = join @Maybe headerDocs }
+          , hsmodExt = (hsmodExt mod) { hsmodHaddockModHeader = join @Maybe headerDocs } }
 
 lexHsDocString :: HsDocString -> HsDoc GhcPs
 lexHsDocString = lexHsDoc parseIdentifier

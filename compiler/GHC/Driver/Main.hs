@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE GADTs #-}
@@ -2051,7 +2052,7 @@ hscDecls :: HscEnv
          -> IO ([TyThing], InteractiveContext)
 hscDecls hsc_env str = hscDeclsWithLocation hsc_env str "<interactive>" 1
 
-hscParseModuleWithLocation :: HscEnv -> String -> Int -> String -> IO HsModule
+hscParseModuleWithLocation :: HscEnv -> String -> Int -> String -> IO (HsModule GhcPs)
 hscParseModuleWithLocation hsc_env source line_num str = do
     L _ mod <-
       runInteractiveHsc hsc_env $
@@ -2198,14 +2199,15 @@ hscAddSptEntries hsc_env entries = do
 
 hscImport :: HscEnv -> String -> IO (ImportDecl GhcPs)
 hscImport hsc_env str = runInteractiveHsc hsc_env $ do
-    (L _ (HsModule{hsmodImports=is})) <-
-       hscParseThing parseModule str
-    case is of
-        [L _ i] -> return i
-        _ -> liftIO $ throwOneError $
-                 mkPlainErrorMsgEnvelope noSrcSpan $
-                 GhcPsMessage $ PsUnknownMessage $ mkPlainError noHints $
-                     text "parse error in import declaration"
+    hscParseThing parseModule str >>= \case
+      (L _ (XModule x)) -> dataConCantHappen x
+      (L _ (HsModule{hsmodImports=is})) ->
+        case is of
+            [L _ i] -> return i
+            _ -> liftIO $ throwOneError $
+                     mkPlainErrorMsgEnvelope noSrcSpan $
+                     GhcPsMessage $ PsUnknownMessage $ mkPlainError noHints $
+                         text "parse error in import declaration"
 
 -- | Typecheck an expression (but don't run it)
 hscTcExpr :: HscEnv

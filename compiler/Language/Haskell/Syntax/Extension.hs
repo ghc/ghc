@@ -397,6 +397,12 @@ type family XCInjectivityAnn  x
 type family XXInjectivityAnn  x
 
 -- =====================================================================
+-- Type families for the HsModule extension points
+
+type family XModule x
+type family XXModule x
+
+-- =====================================================================
 -- Type families for the HsExpr extension points
 
 type family XVar            x

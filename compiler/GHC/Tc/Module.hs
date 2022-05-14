@@ -239,12 +239,14 @@ tcRnModuleTcRnM :: HscEnv
                 -> TcRn TcGblEnv
 -- Factored out separately from tcRnModule so that a Core plugin can
 -- call the type checker directly
+tcRnModuleTcRnM _ _
+                (HsParsedModule (L _ (XModule x)) _)
+                _ = dataConCantHappen x
 tcRnModuleTcRnM hsc_env mod_sum
                 (HsParsedModule {
                    hpm_module =
-                      (L loc (HsModule _ _ maybe_mod export_ies
-                                       import_decls local_decls mod_deprec
-                                       maybe_doc_hdr)),
+                      (L loc (HsModule (XModulePs _ _ mod_deprec maybe_doc_hdr)
+                                       maybe_mod export_ies import_decls local_decls)),
                    hpm_src_files = src_files
                 })
                 (this_mod, prel_imp_loc)

@@ -30,7 +30,6 @@ import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Types.SourceText
-import GHC.Unit.Module
 import GHC.Utils.Outputable
 
 import Data.Data hiding (Fixity)

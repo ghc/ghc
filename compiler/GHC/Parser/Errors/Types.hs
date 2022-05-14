@@ -15,7 +15,6 @@ import GHC.Types.Error
 import GHC.Types.Hint
 import GHC.Types.Name.Occurrence (OccName)
 import GHC.Types.Name.Reader
-import GHC.Unit.Module.Name
 import GHC.Utils.Outputable
 import Data.List.NonEmpty (NonEmpty)
 import GHC.Types.SrcLoc (PsLoc)

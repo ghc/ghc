@@ -795,14 +795,16 @@ summariseRequirement pn mod_name = do
         ms_ghc_prim_import = False,
         ms_parsed_mod = Just (HsParsedModule {
                 hpm_module = L loc (HsModule {
-                        hsmodAnn = noAnn,
-                        hsmodLayout = NoLayoutInfo,
+                        hsmodExt = XModulePs {
+                            hsmodAnn = noAnn,
+                            hsmodLayout = NoLayoutInfo,
+                            hsmodDeprecMessage = Nothing,
+                            hsmodHaddockModHeader = Nothing
+                                             },
                         hsmodName = Just (L (noAnnSrcSpan loc) mod_name),
                         hsmodExports = Nothing,
                         hsmodImports = [],
-                        hsmodDecls = [],
-                        hsmodDeprecMessage = Nothing,
-                        hsmodHaddockModHeader = Nothing
+                        hsmodDecls = []
                     }),
                 hpm_src_files = []
             }),
@@ -816,7 +818,7 @@ summariseRequirement pn mod_name = do
 summariseDecl :: PackageName
               -> HscSource
               -> Located ModuleName
-              -> Located HsModule
+              -> Located (HsModule GhcPs)
               -> [NodeKey]
               -> BkpM ModuleGraphNode
 summariseDecl pn hsc_src (L _ modname) hsmod home_keys = hsModuleToModSummary home_keys pn hsc_src modname hsmod
@@ -830,7 +832,7 @@ hsModuleToModSummary :: [NodeKey]
                      -> PackageName
                      -> HscSource
                      -> ModuleName
-                     -> Located HsModule
+                     -> Located (HsModule GhcPs)
                      -> BkpM ModuleGraphNode
 hsModuleToModSummary home_keys pn hsc_src modname
                      hsmod = do
