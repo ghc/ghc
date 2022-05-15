@@ -531,7 +531,7 @@ tickScope :: FCode a -> FCode a
 tickScope code = do
         cfg <- getStgToCmmConfig
         fstate <- getFCodeState
-        if stgToCmmDebugLevel cfg == 0 then code else do
+        if not $ stgToCmmEmitDebugInfo cfg then code else do
           u <- newUnique
           let scope' = SubScope u (fcs_tickscope fstate)
           withFCodeState code fstate{ fcs_tickscope = scope' }
@@ -717,8 +717,8 @@ emitTick = emitCgStmt . CgStmt . CmmTick
 
 emitUnwind :: [(GlobalReg, Maybe CmmExpr)] -> FCode ()
 emitUnwind regs = do
-  debug_level <- stgToCmmDebugLevel <$> getStgToCmmConfig
-  when (debug_level > 0) $
+  debug <- stgToCmmEmitDebugInfo <$> getStgToCmmConfig
+  when debug $
      emitCgStmt $ CgStmt $ CmmUnwind regs
 
 emitAssign :: CmmReg  -> CmmExpr -> FCode ()
