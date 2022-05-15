@@ -4,9 +4,9 @@
 overloadedrecfldsfail11.hs:5:15: error:
     Ambiguous occurrence ‘foo’
     It could refer to
-       either the field ‘foo’,
+       either the field ‘foo’ of record ‘T’,
               imported from ‘OverloadedRecFldsFail11_A’ at overloadedrecfldsfail11.hs:3:1-32
               (and originally defined at OverloadedRecFldsFail11_A.hs:6:16-18)
-           or the field ‘foo’,
+           or the field ‘foo’ of record ‘S’,
               imported from ‘OverloadedRecFldsFail11_A’ at overloadedrecfldsfail11.hs:3:1-32
               (and originally defined at OverloadedRecFldsFail11_A.hs:5:16-18)

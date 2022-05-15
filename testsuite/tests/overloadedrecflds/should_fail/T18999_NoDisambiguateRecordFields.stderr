@@ -5,7 +5,7 @@ T18999_NoDisambiguateRecordFields.hs:6:13: error:
        either ‘Prelude.not’,
               imported from ‘Prelude’ at T18999_NoDisambiguateRecordFields.hs:2:8-40
               (and originally defined in ‘GHC.Classes’)
-           or the field ‘not’,
+           or the field ‘not’ of record ‘Foo’,
               defined at T18999_NoDisambiguateRecordFields.hs:4:18
 
 T18999_NoDisambiguateRecordFields.hs:8:11: error:
@@ -14,5 +14,5 @@ T18999_NoDisambiguateRecordFields.hs:8:11: error:
        either ‘Prelude.not’,
               imported from ‘Prelude’ at T18999_NoDisambiguateRecordFields.hs:2:8-40
               (and originally defined in ‘GHC.Classes’)
-           or the field ‘not’,
+           or the field ‘not’ of record ‘Foo’,
               defined at T18999_NoDisambiguateRecordFields.hs:4:18

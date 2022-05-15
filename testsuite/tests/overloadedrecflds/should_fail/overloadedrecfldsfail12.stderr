@@ -4,15 +4,17 @@
 overloadedrecfldsfail12.hs:13:5: error:
     Ambiguous occurrence ‘foo’
     It could refer to
-       either the field ‘foo’,
+       either the field ‘foo’ of record ‘T’,
               imported from ‘OverloadedRecFldsFail12_A’ at overloadedrecfldsfail12.hs:4:1-32
               (and originally defined at OverloadedRecFldsFail12_A.hs:5:16-18)
-           or the field ‘foo’, defined at overloadedrecfldsfail12.hs:6:16
+           or the field ‘foo’ of record ‘S’,
+              defined at overloadedrecfldsfail12.hs:6:16
 
 overloadedrecfldsfail12.hs:16:5: error:
     Ambiguous occurrence ‘foo’
     It could refer to
-       either the field ‘foo’,
+       either the field ‘foo’ of record ‘T’,
               imported from ‘OverloadedRecFldsFail12_A’ at overloadedrecfldsfail12.hs:4:1-32
               (and originally defined at OverloadedRecFldsFail12_A.hs:5:16-18)
-           or the field ‘foo’, defined at overloadedrecfldsfail12.hs:6:16
+           or the field ‘foo’ of record ‘S’,
+              defined at overloadedrecfldsfail12.hs:6:16

@@ -2,10 +2,10 @@
 NFSMixed.hs:5:18: error:
     Ambiguous occurrence ‘foo’
     It could refer to
-       either the field ‘foo’,
+       either the field ‘foo’ of record ‘Foo’,
               imported from ‘NFSMixedA’ at NFSMixed.hs:3:1-16
               (and originally defined at NFSMixedA.hs:4:18-20)
-           or the field ‘foo’,
+           or the field ‘foo’ of record ‘Bar’,
               imported from ‘NFSMixedA’ at NFSMixed.hs:3:1-16
               (and originally defined at NFSMixedA.hs:5:18-20)
            or ‘NFSMixedA.foo’,

@@ -1,7 +1,7 @@
 
-DRFUnused.hs:18:5:
+DRFUnused.hs:18:5: error:
     Ambiguous occurrence ‘foo’
     It could refer to
-       either the field ‘foo’, defined at DRFUnused.hs:12:16
-           or the field ‘foo’, defined at DRFUnused.hs:11:16
-           or the field ‘foo’, defined at DRFUnused.hs:10:16
+       either the field ‘foo’ of record ‘U’, defined at DRFUnused.hs:12:16
+           or the field ‘foo’ of record ‘T’, defined at DRFUnused.hs:11:16
+           or the field ‘foo’ of record ‘S’, defined at DRFUnused.hs:10:16
