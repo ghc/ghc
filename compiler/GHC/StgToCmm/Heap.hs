@@ -29,6 +29,7 @@ import GHC.Prelude hiding ((<*>))
 import GHC.Stg.Syntax
 import GHC.Cmm.Builder.Config
 import GHC.Cmm.CLabel
+import GHC.StgToCmm.Config (stgToCmmOmitYields)
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Monad

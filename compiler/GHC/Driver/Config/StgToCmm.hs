@@ -4,7 +4,7 @@ module GHC.Driver.Config.StgToCmm
 
 import GHC.StgToCmm.Config
 
-import GHC.Driver.Config.StgToCmm.Ticky
+import GHC.Driver.Config.Cmm.Builder
 import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.Platform
@@ -19,24 +19,17 @@ import Prelude
 initStgToCmmConfig :: DynFlags -> Module -> StgToCmmConfig
 initStgToCmmConfig dflags mod = StgToCmmConfig
   -- settings
-  { stgToCmmProfile       = profile
+  { stgToCmmBuilderCfg    = initCmmBuilderConfig dflags
   , stgToCmmThisModule    = mod
   , stgToCmmTmpDir        = tmpDir          dflags
   , stgToCmmContext       = initSDocContext dflags defaultDumpStyle
-  , stgToCmmEmitDebugInfo = debugLevel      dflags > 0
   , stgToCmmBinBlobThresh = b_blob
   , stgToCmmMaxInlAllocSize = maxInlineAllocSize           dflags
-  -- ticky options
-  , stgToCmmTickyCfg      = initCmmTickyConfig             dflags
   -- flags
   , stgToCmmLoopification = gopt Opt_Loopification         dflags
   , stgToCmmAlignCheck    = gopt Opt_AlignmentSanitisation dflags
   , stgToCmmOptHpc        = gopt Opt_Hpc                   dflags
   , stgToCmmFastPAPCalls  = gopt Opt_FastPAPCalls          dflags
-  , stgToCmmSCCProfiling  = sccProfilingEnabled            dflags
-  , stgToCmmEagerBlackHole = gopt Opt_EagerBlackHoling     dflags
-  , stgToCmmInfoTableMap  = gopt Opt_InfoTableMap          dflags
-  , stgToCmmOmitYields    = gopt Opt_OmitYields            dflags
   , stgToCmmOmitIfPragmas = gopt Opt_OmitInterfacePragmas  dflags
   , stgToCmmPIC           = gopt Opt_PIC                   dflags
   , stgToCmmPIE           = gopt Opt_PIE                   dflags

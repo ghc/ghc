@@ -17,6 +17,7 @@ import GHC.Prelude hiding ((<*>))
 
 import {-# SOURCE #-} GHC.StgToCmm.Bind ( cgBind )
 
+import GHC.StgToCmm.Config (stgToCmmProfile)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Env

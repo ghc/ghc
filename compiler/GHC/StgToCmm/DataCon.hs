@@ -22,6 +22,7 @@ import GHC.Platform
 import GHC.Stg.Syntax
 import GHC.Core  ( AltCon(..) )
 
+import GHC.StgToCmm.Config (stgToCmmProfile)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.Heap

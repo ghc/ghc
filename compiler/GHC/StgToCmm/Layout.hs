@@ -64,7 +64,10 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Data.FastString
 import Control.Monad
-import GHC.StgToCmm.Config (stgToCmmPlatform)
+import GHC.StgToCmm.Config ( stgToCmmPlatform
+                           , stgToCmmProfile
+                           , stgToCmmSCCProfiling
+                           )
 import GHC.StgToCmm.Types
 
 ------------------------------------------------------------------------

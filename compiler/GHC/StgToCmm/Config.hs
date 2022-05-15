@@ -2,12 +2,19 @@
 
 module GHC.StgToCmm.Config
   ( StgToCmmConfig(..)
+  , stgToCmmProfile
   , stgToCmmPlatform
+  , stgToCmmEmitDebugInfo
+  , stgToCmmSCCProfiling
+  , stgToCmmEagerBlackHole
+  , stgToCmmInfoTableMap
+  , stgToCmmOmitYields
   ) where
 
 import GHC.Platform
 import GHC.Platform.Profile
 import GHC.Platform.Profile.Class
+import GHC.Cmm.Builder.Config ( CmmBuilderConfig(..) )
 import GHC.StgToCmm.Ticky.Config
 import GHC.Unit.Module
 import GHC.Utils.Outputable
@@ -18,13 +25,12 @@ import GHC.Prelude
 
 -- This config is static and contains information only passed *downwards* by StgToCmm.Monad
 data StgToCmmConfig = StgToCmmConfig
+  { stgToCmmBuilderCfg    :: !CmmBuilderConfig   -- ^ Config for building C-- in general
   ----------------------------- General Settings --------------------------------
-  { stgToCmmProfile       :: !Profile            -- ^ Current profile
   , stgToCmmThisModule    :: Module              -- ^ The module being compiled. This field kept lazy for
                                                  -- Cmm/Parser.y which preloads it with a panic
   , stgToCmmTmpDir        :: !TempDir            -- ^ Temp Dir for files used in compilation
   , stgToCmmContext       :: !SDocContext        -- ^ Context for StgToCmm phase
-  , stgToCmmEmitDebugInfo :: !Bool               -- ^ Whether we wish to output debug information
   , stgToCmmBinBlobThresh :: !(Maybe Word)       -- ^ Threshold at which Binary literals (e.g. strings)
                                                  -- are either dumped to a file and a CmmFileEmbed literal
                                                  -- is emitted (over threshold), or become a CmmString
@@ -36,16 +42,10 @@ data StgToCmmConfig = StgToCmmConfig
                                                  -- @cgTopBinding@ in GHC.StgToCmm.
   , stgToCmmMaxInlAllocSize :: !Int              -- ^ Max size, in bytes, of inline array allocations.
   ---------------------------------- Flags --------------------------------------
-  , stgToCmmTickyCfg       :: !CmmTickyConfig    -- ^ Flags related to ticky
   , stgToCmmLoopification  :: !Bool              -- ^ Loopification enabled (cf @-floopification@)
   , stgToCmmAlignCheck     :: !Bool              -- ^ Insert alignment check (cf @-falignment-sanitisation@)
   , stgToCmmOptHpc         :: !Bool              -- ^ perform code generation for code coverage
   , stgToCmmFastPAPCalls   :: !Bool              -- ^
-  , stgToCmmSCCProfiling   :: !Bool              -- ^ Check if cost-centre profiling is enabled
-  , stgToCmmEagerBlackHole :: !Bool              -- ^
-  , stgToCmmInfoTableMap   :: !Bool              -- ^ true means generate C Stub for IPE map, See note [Mapping
-                                                 -- Info Tables to Source Positions]
-  , stgToCmmOmitYields     :: !Bool              -- ^ true means omit heap checks when no allocation is performed
   , stgToCmmOmitIfPragmas  :: !Bool              -- ^ true means don't generate interface programs (implied by -O0)
   , stgToCmmPIC            :: !Bool              -- ^ true if @-fPIC@
   , stgToCmmPIE            :: !Bool              -- ^ true if @-fPIE@
@@ -73,13 +73,30 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmAvx512f        :: !Bool              -- ^ check for Advanced Vector 512-bit Extensions
   }
 
+stgToCmmProfile :: StgToCmmConfig -> Profile
+stgToCmmProfile = platformProfile . stgToCmmBuilderCfg
 
 stgToCmmPlatform :: StgToCmmConfig -> Platform
 stgToCmmPlatform = profilePlatform . stgToCmmProfile
+
+stgToCmmEmitDebugInfo :: StgToCmmConfig -> Bool
+stgToCmmEmitDebugInfo = cmmBuilderEmitDebugInfo . stgToCmmBuilderCfg
+
+stgToCmmSCCProfiling :: StgToCmmConfig -> Bool
+stgToCmmSCCProfiling = cmmBuilderSCCProfiling . stgToCmmBuilderCfg
+
+stgToCmmEagerBlackHole :: StgToCmmConfig -> Bool
+stgToCmmEagerBlackHole = cmmBuilderEagerBlackHole . stgToCmmBuilderCfg
+
+stgToCmmInfoTableMap :: StgToCmmConfig -> Bool
+stgToCmmInfoTableMap = cmmBuilderInfoTableMap . stgToCmmBuilderCfg
+
+stgToCmmOmitYields :: StgToCmmConfig -> Bool
+stgToCmmOmitYields = cmmBuilderOmitYields . stgToCmmBuilderCfg
 
 
 instance ContainsPlatformProfile StgToCmmConfig where
   platformProfile = stgToCmmProfile
 
 instance ContainsCmmTickyConfig StgToCmmConfig where
-  cmmTickyConfig = stgToCmmTickyCfg
+  cmmTickyConfig = cmmTickyConfig . stgToCmmBuilderCfg
