@@ -77,7 +77,7 @@ import GHC.Types.Hint
 import GHC.Types.Error
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.Warnings  ( WarningTxt, pprWarningTxtForMsg )
+import GHC.Unit.Module.Warnings  ( WarningTxt )
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
@@ -275,7 +275,7 @@ lookupTopBndrRn which_suggest rdr_name =
           let occ = rdrNameOcc rdr_name
         ; when (isTcOcc occ && isSymOcc occ)
                (do { op_ok <- xoptM LangExt.TypeOperators
-                   ; unless op_ok (addErr (opDeclErr rdr_name)) })
+                   ; unless op_ok (addErr (TcRnIllegalTypeOperatorDecl rdr_name)) })
 
         ; env <- getGlobalRdrEnv
         ; case filter isLocalGRE (lookupGRE_RdrName rdr_name env) of
@@ -1111,10 +1111,10 @@ lookup_promoted rdr_name
 
 badVarInType :: RdrName -> RnM Name
 badVarInType rdr_name
-  = do { addErr (TcRnUnknownMessage $ mkPlainError noHints
-           (text "Illegal promoted term variable in a type:"
-                 <+> ppr rdr_name))
-       ; return (mkUnboundNameRdr rdr_name) }
+  = do { addErr (TcRnUnpromotableThing name TermVariablePE)
+       ; return name }
+      where
+        name = mkUnboundNameRdr rdr_name
 
 {- Note [Promoted variables in types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1553,33 +1553,21 @@ warnIfDeprecated gre@(GRE { gre_imp = iss })
                    -- See Note [Handling of deprecations]
          do { iface <- loadInterfaceForName doc name
             ; case lookupImpDeprec iface gre of
-                Just txt -> do
-                  let msg = TcRnUnknownMessage $
-                              mkPlainDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
-                                                noHints
-                                                (mk_msg imp_spec txt)
-
-                  addDiagnostic msg
+                Just deprText -> addDiagnostic $
+                  TcRnDeprecated {
+                    depr_occ = occ,
+                    depr_msg = deprText,
+                    depr_import_mod = importSpecModule imp_spec,
+                    depr_defined_mod = definedMod
+                  }
                 Nothing  -> return () } }
   | otherwise
   = return ()
   where
     occ = greOccName gre
     name = greMangledName gre
-    name_mod = assertPpr (isExternalName name) (ppr name) (nameModule name)
+    definedMod = moduleName $ assertPpr (isExternalName name) (ppr name) (nameModule name)
     doc = text "The name" <+> quotes (ppr occ) <+> text "is mentioned explicitly"
-
-    mk_msg imp_spec txt
-      = sep [ sep [ text "In the use of"
-                    <+> pprNonVarNameSpace (occNameSpace occ)
-                    <+> quotes (ppr occ)
-                  , parens imp_msg <> colon ]
-            , pprWarningTxtForMsg txt ]
-      where
-        imp_mod  = importSpecModule imp_spec
-        imp_msg  = text "imported from" <+> ppr imp_mod <> extra
-        extra | imp_mod == moduleName name_mod = Outputable.empty
-              | otherwise = text ", but defined in" <+> ppr name_mod
 
 lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe (WarningTxt GhcRn)
 lookupImpDeprec iface gre
@@ -2093,25 +2081,9 @@ lookupQualifiedDoName ctxt std_name
 
 -- Error messages
 
-opDeclErr :: RdrName -> TcRnMessage
-opDeclErr n
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Illegal declaration of a type or class operator" <+> quotes (ppr n))
-       2 (text "Use TypeOperators to declare operators in type and declarations")
-
 badOrigBinding :: RdrName -> TcRnMessage
 badOrigBinding name
-  | Just _ <- isBuiltInOcc_maybe occ
-  = TcRnUnknownMessage $ mkPlainError noHints $ text "Illegal binding of built-in syntax:" <+> ppr occ
-    -- Use an OccName here because we don't want to print Prelude.(,)
-  | otherwise
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    text "Cannot redefine a Name retrieved by a Template Haskell quote:" <+> ppr name
-    -- This can happen when one tries to use a Template Haskell splice to
-    -- define a top-level identifier with an already existing name, e.g.,
-    --
-    --   $(pure [ValD (VarP 'succ) (NormalB (ConE 'True)) []])
-    --
-    -- (See #13968.)
+  | Just _ <- isBuiltInOcc_maybe occ = TcRnIllegalBindingOfBuiltIn occ
+  | otherwise = TcRnNameByTemplateHaskellQuote name
   where
     occ = rdrNameOcc $ filterCTuple name

@@ -1,4 +1,8 @@
 
-T12686.hs:7:16: error: Illegal promoted term variable in a type: x
+T12686.hs:7:16:
+    Term variable ‘x’ cannot be used here
+      (term variables cannot be promoted)
 
-T12686.hs:12:19: error: Illegal promoted term variable in a type: a
+T12686.hs:12:19:
+    Term variable ‘a’ cannot be used here
+      (term variables cannot be promoted)

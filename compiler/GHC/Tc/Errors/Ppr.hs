@@ -69,6 +69,7 @@ import GHC.Types.Var.Env
 
 import GHC.Unit.State (pprWithUnitState, UnitState)
 import GHC.Unit.Module
+import GHC.Unit.Module.Warnings  ( pprWarningTxtForMsg )
 
 import GHC.Data.Bag
 import GHC.Data.FastString
@@ -668,6 +669,9 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            text "Illegal operator" <+> quotes (ppr op) <+>
            text "in type" <+> quotes (ppr overall_ty)
+    TcRnIllegalTypeOperatorDecl name
+      -> mkSimpleDecorated $
+        text "Illegal declaration of a type or class operator" <+> quotes (ppr name)
     TcRnGADTMonoLocalBinds
       -> mkSimpleDecorated $
             fsep [ text "Pattern matching on GADTs without MonoLocalBinds"
@@ -894,6 +898,7 @@ instance Diagnostic TcRnMessage where
                      RecDataConPE   -> same_rec_group_msg
                      ClassPE        -> same_rec_group_msg
                      TyConPE        -> same_rec_group_msg
+                     TermVariablePE -> text "term variables cannot be promoted"
           same_rec_group_msg = text "it is defined and used in the same recursive group"
     TcRnMatchesHaveDiffNumArgs argsContext match1 bad_matches
       -> mkSimpleDecorated $
@@ -937,6 +942,20 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
          text "You cannot SPECIALISE" <+> quotes (ppr name)
            <+> text "because its definition is not visible in this module"
+    TcRnNameByTemplateHaskellQuote name -> mkSimpleDecorated $
+      text "Cannot redefine a Name retrieved by a Template Haskell quote:" <+> ppr name
+    TcRnIllegalBindingOfBuiltIn name -> mkSimpleDecorated $
+       text "Illegal binding of built-in syntax:" <+> ppr name
+    TcRnDeprecated {depr_occ, depr_msg, depr_import_mod, depr_defined_mod} -> mkSimpleDecorated $
+      sep [ sep [ text "In the use of"
+                <+> pprNonVarNameSpace (occNameSpace depr_occ)
+                <+> quotes (ppr depr_occ)
+                , parens impMsg <> colon ]
+        , pprWarningTxtForMsg depr_msg ]
+        where
+          impMsg  = text "imported from" <+> ppr depr_import_mod <> extra
+          extra | depr_import_mod == depr_defined_mod = empty
+                | otherwise = text ", but defined in" <+> ppr depr_defined_mod
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1167,6 +1186,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnTypeEqualityRequiresOperators
     TcRnIllegalTypeOperator {}
       -> ErrorWithoutFlag
+    TcRnIllegalTypeOperatorDecl {}
+      -> ErrorWithoutFlag
     TcRnGADTMonoLocalBinds {}
       -> WarningWithFlag Opt_WarnGADTMonoLocalBinds
     TcRnIncorrectNameSpace {}
@@ -1243,6 +1264,12 @@ instance Diagnostic TcRnMessage where
       -> WarningWithoutFlag
     TcRnSpecialiseNotVisible{}
       -> WarningWithoutFlag
+    TcRnNameByTemplateHaskellQuote{}
+      -> ErrorWithoutFlag
+    TcRnIllegalBindingOfBuiltIn{}
+      -> ErrorWithoutFlag
+    TcRnDeprecated{}
+      -> WarningWithFlag Opt_WarnWarningsDeprecations
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -1467,6 +1494,8 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.TypeOperators]
     TcRnIllegalTypeOperator {}
       -> [suggestExtension LangExt.TypeOperators]
+    TcRnIllegalTypeOperatorDecl {}
+      -> [suggestExtension LangExt.TypeOperators]
     TcRnGADTMonoLocalBinds {}
       -> [suggestAnyExtension [LangExt.GADTs, LangExt.TypeFamilies]]
     TcRnIncorrectNameSpace nm is_th_use
@@ -1551,6 +1580,9 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnSpecialiseNotVisible name
       -> [SuggestSpecialiseVisibilityHints name]
+    TcRnNameByTemplateHaskellQuote{} -> noHints
+    TcRnIllegalBindingOfBuiltIn{} -> noHints
+    TcRnDeprecated{} -> noHints
 
 
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",

@@ -113,6 +113,7 @@ import GHC.Data.FastString (FastString)
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable hiding (TyCon)
 import qualified Data.Semigroup as Semigroup
+import GHC.Unit.Module.Warnings (WarningTxt)
 
 {-
 Note [Migrating TcM Messages]
@@ -1621,6 +1622,27 @@ data TcRnMessage where
   -}
   TcRnIllegalTypeOperator :: !SDoc -> !RdrName -> TcRnMessage
 
+  {-| TcRnIllegalTypeOperatorDecl is an error that occurs when a type or class
+      operator is declared without the TypeOperators extension.
+
+      See Note [Type and class operator definitions]
+
+      Example:
+        {-# LANGUAGE Haskell2010 #-}
+        {-# LANGUAGE MultiParamTypeClasses #-}
+
+        module T3265 where
+
+        data a :+: b = Left a | Right b
+
+        class a :*: b where {}
+
+
+      Test cases: T3265, tcfail173
+  -}
+  TcRnIllegalTypeOperatorDecl :: !RdrName -> TcRnMessage
+
+
   {-| TcRnGADTMonoLocalBinds is a warning controlled by -Wgadt-mono-local-binds
       that occurs when pattern matching on a GADT when -XMonoLocalBinds is off.
 
@@ -2006,6 +2028,7 @@ data TcRnMessage where
                 polykinds/T15116a
                 saks/should_fail/T16727a
                 saks/should_fail/T16727b
+                rename/should_fail/T12686
   -}
   TcRnUnpromotableThing :: !Name -> !PromotionErr -> TcRnMessage
 
@@ -2108,6 +2131,50 @@ data TcRnMessage where
     Test cases: none
   -}
   TcRnSpecialiseNotVisible :: !Name -> TcRnMessage
+
+  {- TcRnNameByTemplateHaskellQuote is an error that occurs when one tries
+     to use a Template Haskell splice to define a top-level identifier with
+     an already existing name.
+
+     (See issue #13968 (closed) on GHC's issue tracker for more details)
+
+     Example(s):
+
+       $(pure [ValD (VarP 'succ) (NormalB (ConE 'True)) []])
+
+     Test cases:
+      T13968
+  -}
+  TcRnNameByTemplateHaskellQuote :: !RdrName -> TcRnMessage
+
+  {- TcRnIllegalBindingOfBuiltIn is an error that occurs when one uses built-in
+     syntax for data constructors or class names.
+
+     Use an OccName here because we don't want to print Prelude.(,)
+
+     Test cases:
+      rename/should_fail/T14907b
+      rename/should_fail/rnfail042
+  -}
+  TcRnIllegalBindingOfBuiltIn :: !OccName -> TcRnMessage
+
+  {- TcRnDeprecated is a warning that can happen when usage of something
+     is deprecated.
+
+    Test cases:
+      DeprU
+      T5281
+      T5867
+      rn050
+      rn066
+      T3303
+  -}
+  TcRnDeprecated :: {
+    depr_occ :: OccName,
+    depr_msg :: WarningTxt GhcRn,
+    depr_import_mod :: ModuleName,
+    depr_defined_mod :: ModuleName
+  } -> TcRnMessage
 
 -- | Specifies which back ends can handle a requested foreign import or export
 type ExpectedBackends = [Backend]
@@ -3081,6 +3148,7 @@ data PromotionErr
 
   | RecDataConPE     -- Data constructor in a recursive loop
                      -- See Note [Recursion and promoting data constructors] in GHC.Tc.TyCl
+  | TermVariablePE   -- See Note [Promoted variables in types]
   | NoDataKindsDC    -- -XDataKinds not enabled (for a datacon)
 
 instance Outputable PromotionErr where
@@ -3092,6 +3160,7 @@ instance Outputable PromotionErr where
                                       <+> parens (ppr pred)
   ppr RecDataConPE                = text "RecDataConPE"
   ppr NoDataKindsDC               = text "NoDataKindsDC"
+  ppr TermVariablePE              = text "TermVariablePE"
 
 pprPECategory :: PromotionErr -> SDoc
 pprPECategory = text . capitalise . peCategory
@@ -3104,6 +3173,7 @@ peCategory FamDataConPE           = "data constructor"
 peCategory ConstrainedDataConPE{} = "data constructor"
 peCategory RecDataConPE           = "data constructor"
 peCategory NoDataKindsDC          = "data constructor"
+peCategory TermVariablePE         = "term variable"
 
 -- | Stores the information to be reported in a representation-polymorphism
 -- error message.

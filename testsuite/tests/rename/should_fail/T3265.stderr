@@ -1,8 +1,8 @@
 
 T3265.hs:8:8: error:
     Illegal declaration of a type or class operator ‘:+:’
-      Use TypeOperators to declare operators in type and declarations
+    Suggested fix: Perhaps you intended to use TypeOperators
 
 T3265.hs:10:9: error:
     Illegal declaration of a type or class operator ‘:*:’
-      Use TypeOperators to declare operators in type and declarations
+    Suggested fix: Perhaps you intended to use TypeOperators
