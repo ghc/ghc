@@ -2,37 +2,37 @@
 NoFieldSelectorsFail.hs:9:14: error:
     Ambiguous occurrence ‘foo’
     It could refer to
-       either the field ‘foo’,
+       either the field ‘foo’ of record ‘Foo’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
               (and originally defined at NoFieldSelectorsFailA.hs:5:18-20)
-           or the field ‘foo’,
+           or the field ‘foo’ of record ‘Bar’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
               (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
 
 NoFieldSelectorsFail.hs:12:15: error:
     Ambiguous occurrence ‘foo’
     It could refer to
-       either the field ‘foo’,
+       either the field ‘foo’ of record ‘Foo’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
               (and originally defined at NoFieldSelectorsFailA.hs:5:18-20)
-           or the field ‘foo’,
+           or the field ‘foo’ of record ‘Bar’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
               (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
 
 NoFieldSelectorsFail.hs:14:15: error:
     Ambiguous occurrence ‘foo’
     It could refer to
-       either the field ‘foo’,
+       either the field ‘foo’ of record ‘Foo’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
               (and originally defined at NoFieldSelectorsFailA.hs:5:18-20)
-           or the field ‘foo’,
+           or the field ‘foo’ of record ‘Bar’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
               (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
 
 NoFieldSelectorsFail.hs:16:15: error:
     Ambiguous occurrence ‘bar’
     It could refer to
-       either the field ‘bar’,
+       either the field ‘bar’ of record ‘Foo’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
               (and originally defined at NoFieldSelectorsFailA.hs:5:30-32)
            or ‘NoFieldSelectorsFailA.bar’,

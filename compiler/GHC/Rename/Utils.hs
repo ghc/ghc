@@ -549,12 +549,15 @@ addNameClashErrRn rdr_name gres
     --                            imported from ‘Prelude’ at T15487.hs:1:8-13
     --                     or ...
     -- See #15487
-    pp_greMangledName gre@(GRE { gre_name = child
+    pp_greMangledName gre@(GRE { gre_name = child, gre_par = par
                          , gre_lcl = lcl, gre_imp = iss }) =
       case child of
-        FieldGreName fl  -> text "the field" <+> quotes (ppr fl)
+        FieldGreName fl  -> text "the field" <+> quotes (ppr fl) <+> parent_info
         NormalGreName name -> quotes (pp_qual name <> dot <> ppr (nameOccName name))
       where
+        parent_info = case par of
+          NoParent -> empty
+          ParentIs { par_is = par_name } -> text "of record" <+> quotes (ppr par_name)
         pp_qual name
                 | lcl
                 = ppr (nameModule name)

@@ -1,0 +1,12 @@
+[1 of 2] Compiling T17420A          ( T17420A.hs, T17420A.o )
+[2 of 2] Compiling T17420           ( T17420.hs, T17420.o )
+
+T17420.hs:6:17: error:
+    Ambiguous occurrence ‘name’
+    It could refer to
+       either the field ‘name’ of record ‘Human’,
+              imported from ‘T17420A’ at T17420.hs:4:1-14
+              (and originally defined at T17420A.hs:5:22-25)
+           or the field ‘name’ of record ‘Dog’,
+              imported from ‘T17420A’ at T17420.hs:4:1-14
+              (and originally defined at T17420A.hs:4:18-21)

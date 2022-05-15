@@ -1,0 +1,40 @@
+
+overloadedrecfldswasrunnowfail06.hs:11:11: error:
+    Ambiguous occurrence ‘x’
+    It could refer to
+       either the field ‘x’ of record ‘U’,
+              defined at overloadedrecfldswasrunnowfail06.hs:8:18
+           or the field ‘x’ of record ‘T’,
+              defined at overloadedrecfldswasrunnowfail06.hs:7:16
+           or the field ‘x’ of record ‘S’,
+              defined at overloadedrecfldswasrunnowfail06.hs:6:16
+
+overloadedrecfldswasrunnowfail06.hs:13:11: error:
+    Ambiguous occurrence ‘x’
+    It could refer to
+       either the field ‘x’ of record ‘U’,
+              defined at overloadedrecfldswasrunnowfail06.hs:8:18
+           or the field ‘x’ of record ‘T’,
+              defined at overloadedrecfldswasrunnowfail06.hs:7:16
+           or the field ‘x’ of record ‘S’,
+              defined at overloadedrecfldswasrunnowfail06.hs:6:16
+
+overloadedrecfldswasrunnowfail06.hs:15:13: error:
+    Ambiguous occurrence ‘x’
+    It could refer to
+       either the field ‘x’ of record ‘U’,
+              defined at overloadedrecfldswasrunnowfail06.hs:8:18
+           or the field ‘x’ of record ‘T’,
+              defined at overloadedrecfldswasrunnowfail06.hs:7:16
+           or the field ‘x’ of record ‘S’,
+              defined at overloadedrecfldswasrunnowfail06.hs:6:16
+
+overloadedrecfldswasrunnowfail06.hs:21:20: error:
+    Ambiguous occurrence ‘x’
+    It could refer to
+       either the field ‘x’ of record ‘U’,
+              defined at overloadedrecfldswasrunnowfail06.hs:8:18
+           or the field ‘x’ of record ‘T’,
+              defined at overloadedrecfldswasrunnowfail06.hs:7:16
+           or the field ‘x’ of record ‘S’,
+              defined at overloadedrecfldswasrunnowfail06.hs:6:16

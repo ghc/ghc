@@ -3,8 +3,8 @@ GHCiDRF.foo :: T -> Int
 <interactive>:1:1: error:
     Ambiguous occurrence ‘GHCiDRF.bar’
     It could refer to
-       either the field ‘bar’, defined at GHCiDRF.hs:4:16
-           or the field ‘bar’, defined at GHCiDRF.hs:3:28
+       either the field ‘bar’ of record ‘U’, defined at GHCiDRF.hs:4:16
+           or the field ‘bar’ of record ‘T’, defined at GHCiDRF.hs:3:28
 type T :: *
 data T = MkT {foo :: Int, ...}
   	-- Defined at GHCiDRF.hs:3:16
