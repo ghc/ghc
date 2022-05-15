@@ -283,7 +283,7 @@ rnExpr (HsUnboundVar _ v)
 rnExpr (HsOverLabel _ v)
   = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpName
        ; return ( mkExpandedExpr (HsOverLabel noAnn v) $
-                  HsAppType noExtField (genLHsVar from_label) hs_ty_arg
+                  HsAppType noExtField (genLHsVar from_label) noHsTok hs_ty_arg
                 , fvs ) }
   where
     hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
@@ -314,12 +314,12 @@ rnExpr (HsApp x fun arg)
        ; (arg',fvArg) <- rnLExpr arg
        ; return (HsApp x fun' arg', fvFun `plusFV` fvArg) }
 
-rnExpr (HsAppType _ fun arg)
+rnExpr (HsAppType _ fun at arg)
   = do { type_app <- xoptM LangExt.TypeApplications
        ; unless type_app $ addErr $ typeAppErr "type" $ hswc_body arg
        ; (fun',fvFun) <- rnLExpr fun
        ; (arg',fvArg) <- rnHsWcType HsTypeCtx arg
-       ; return (HsAppType NoExtField fun' arg', fvFun `plusFV` fvArg) }
+       ; return (HsAppType NoExtField fun' at arg', fvFun `plusFV` fvArg) }
 
 rnExpr (OpApp _ e1 op e2)
   = do  { (e1', fv_e1) <- rnLExpr e1
@@ -2250,7 +2250,7 @@ isStrictPattern (L loc pat) =
     WildPat{}       -> False
     VarPat{}        -> False
     LazyPat{}       -> False
-    AsPat _ _ p     -> isStrictPattern p
+    AsPat _ _ _ p   -> isStrictPattern p
     ParPat _ _ p _  -> isStrictPattern p
     ViewPat _ _ p   -> isStrictPattern p
     SigPat _ p _    -> isStrictPattern p
@@ -2423,7 +2423,7 @@ isReturnApp monad_names (L loc e) mb_pure = case e of
   _otherwise -> Nothing
  where
   is_var f (L _ (HsPar _ _ e _)) = is_var f e
-  is_var f (L _ (HsAppType _ e _)) = is_var f e
+  is_var f (L _ (HsAppType _ e _ _)) = is_var f e
   is_var f (L _ (HsVar _ (L _ r))) = f r
        -- TODO: I don't know how to get this right for rebindable syntax
   is_var _ _ = False

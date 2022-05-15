@@ -1158,7 +1158,7 @@ checkPattern_details extraDetails pp = runPV_details extraDetails (pp >>= checkL
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
 checkLPat e@(L l _) = checkPat l e [] []
 
-checkPat :: SrcSpanAnnA -> LocatedA (PatBuilder GhcPs) -> [HsPatSigType GhcPs] -> [LPat GhcPs]
+checkPat :: SrcSpanAnnA -> LocatedA (PatBuilder GhcPs) -> [HsConPatTyArg GhcPs] -> [LPat GhcPs]
          -> PV (LPat GhcPs)
 checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
   | isRdrDataCon c = return . L loc $ ConPat
@@ -1171,8 +1171,8 @@ checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
   | (not (null args) && patIsRec c) = do
       ctx <- askParseContext
       patFail (locA l) . PsErrInPat e $ PEIP_RecPattern args YesPatIsRecursive ctx
-checkPat loc (L _ (PatBuilderAppType f t)) tyargs args =
-  checkPat loc f (t : tyargs) args
+checkPat loc (L _ (PatBuilderAppType f at t)) tyargs args =
+  checkPat loc f (HsConPatTyArg at t : tyargs) args
 checkPat loc (L _ (PatBuilderApp f e)) [] args = do
   p <- checkLPat e
   checkPat loc f [] (p : args)
@@ -1530,7 +1530,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   -- | Disambiguate "f x" (function application)
   mkHsAppPV :: SrcSpanAnnA -> LocatedA b -> LocatedA (FunArg b) -> PV (LocatedA b)
   -- | Disambiguate "f @t" (visible type application)
-  mkHsAppTypePV :: SrcSpanAnnA -> LocatedA b -> SrcSpan -> LHsType GhcPs -> PV (LocatedA b)
+  mkHsAppTypePV :: SrcSpanAnnA -> LocatedA b -> LHsToken "@" GhcPs -> LHsType GhcPs -> PV (LocatedA b)
   -- | Disambiguate "if ... then ... else ..."
   mkHsIfPV :: SrcSpan
          -> LHsExpr GhcPs
@@ -1583,7 +1583,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     :: SrcSpan -> LHsExpr GhcPs -> LocatedA b -> [AddEpAnn] -> PV (LocatedA b)
   -- | Disambiguate "a@b" (as-pattern)
   mkHsAsPatPV
-    :: SrcSpan -> LocatedN RdrName -> LocatedA b -> [AddEpAnn] -> PV (LocatedA b)
+    :: SrcSpan -> LocatedN RdrName -> LHsToken "@" GhcPs -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "~a" (lazy pattern)
   mkHsLazyPatPV :: SrcSpan -> LocatedA b -> [AddEpAnn] -> PV (LocatedA b)
   -- | Disambiguate "!a" (bang pattern)
@@ -1703,7 +1703,7 @@ instance DisambECP (HsCmd GhcPs) where
     in pp_op <> ppr c
   mkHsViewPatPV l a b _ = cmdFail l $
     ppr a <+> text "->" <+> ppr b
-  mkHsAsPatPV l v c _ = cmdFail l $
+  mkHsAsPatPV l v _ c = cmdFail l $
     pprPrefixOcc (unLoc v) <> text "@" <> ppr c
   mkHsLazyPatPV l c _ = cmdFail l $
     text "~" <> ppr c
@@ -1757,9 +1757,9 @@ instance DisambECP (HsExpr GhcPs) where
     checkExpBlockArguments e1
     checkExpBlockArguments e2
     return $ L l (HsApp (comment (realSrcSpan $ locA l) cs) e1 e2)
-  mkHsAppTypePV l e la t = do
+  mkHsAppTypePV l e at t = do
     checkExpBlockArguments e
-    return $ L l (HsAppType la e (mkHsWildCardBndrs t))
+    return $ L l (HsAppType noExtField e at (mkHsWildCardBndrs t))
   mkHsIfPV l c semi1 a semi2 b anns = do
     checkDoAndIfThenElse PsErrSemiColonsInCondExpr c semi1 a semi2 b
     cs <- getCommentsFor l
@@ -1799,7 +1799,7 @@ instance DisambECP (HsExpr GhcPs) where
     return $ L l (SectionR (comment (realSrcSpan l) cs) op e)
   mkHsViewPatPV l a b _ = addError (mkPlainErrorMsgEnvelope l $ PsErrViewPatInExpr a b)
                           >> return (L (noAnnSrcSpan l) (hsHoleExpr noAnn))
-  mkHsAsPatPV l v e   _ = addError (mkPlainErrorMsgEnvelope l $ PsErrTypeAppWithoutSpace (unLoc v) e)
+  mkHsAsPatPV l v _ e   = addError (mkPlainErrorMsgEnvelope l $ PsErrTypeAppWithoutSpace (unLoc v) e)
                           >> return (L (noAnnSrcSpan l) (hsHoleExpr noAnn))
   mkHsLazyPatPV l e   _ = addError (mkPlainErrorMsgEnvelope l $ PsErrLazyPatWithoutSpace e)
                           >> return (L (noAnnSrcSpan l) (hsHoleExpr noAnn))
@@ -1839,10 +1839,10 @@ instance DisambECP (PatBuilder GhcPs) where
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2      = return $ L l (PatBuilderApp p1 p2)
-  mkHsAppTypePV l p la t = do
+  mkHsAppTypePV l p at t = do
     cs <- getCommentsFor (locA l)
-    let anns = EpAnn (spanAsAnchor (combineSrcSpans la (getLocA t))) (EpaSpan (realSrcSpan la)) cs
-    return $ L l (PatBuilderAppType p (mkHsPatSigType anns t))
+    let anns = EpAnn (spanAsAnchor (getLocA t)) NoEpAnns cs
+    return $ L l (PatBuilderAppType p at (mkHsPatSigType anns t))
   mkHsIfPV l _ _ _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrIfThenElseInPat
   mkHsDoPV l _ _ _       = addFatalError $ mkPlainErrorMsgEnvelope l PsErrDoNotationInPat
   mkHsParPV l lpar p rpar   = return $ L (noAnnSrcSpan l) (PatBuilderPar lpar p rpar)
@@ -1881,10 +1881,10 @@ instance DisambECP (PatBuilder GhcPs) where
     p <- checkLPat b
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (PatBuilderPat (ViewPat (EpAnn (spanAsAnchor l) anns cs) a p))
-  mkHsAsPatPV l v e a = do
+  mkHsAsPatPV l v at e = do
     p <- checkLPat e
     cs <- getCommentsFor l
-    return $ L (noAnnSrcSpan l) (PatBuilderPat (AsPat (EpAnn (spanAsAnchor l) a cs) v p))
+    return $ L (noAnnSrcSpan l) (PatBuilderPat (AsPat (EpAnn (spanAsAnchor l) NoEpAnns cs) v at p))
   mkHsLazyPatPV l e a = do
     p <- checkLPat e
     cs <- getCommentsFor l

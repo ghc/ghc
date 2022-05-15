@@ -1002,7 +1002,7 @@ cvtl e = wrapLA (cvt e)
     cvt (AppTypeE e t) = do { e' <- cvtl e
                             ; t' <- cvtType t
                             ; let tp = parenthesizeHsType appPrec t'
-                            ; return $ HsAppType noSrcSpan e'
+                            ; return $ HsAppType noExtField e' noHsTok
                                      $ mkHsWildCardBndrs tp }
     cvt (LamE [] e)    = cvt e -- Degenerate case. We convert the body as its
                                -- own expression to avoid pretty-printing
@@ -1387,10 +1387,11 @@ cvtp (ConP s ts ps)    = do { s' <- cNameN s
                             ; ps' <- cvtPats ps
                             ; ts' <- mapM cvtType ts
                             ; let pps = map (parenthesizePat appPrec) ps'
+                                  pts = map (\t -> HsConPatTyArg noHsTok (mkHsPatSigType noAnn t)) ts'
                             ; return $ ConPat
                                 { pat_con_ext = noAnn
                                 , pat_con = s'
-                                , pat_args = PrefixCon (map (mkHsPatSigType noAnn) ts') pps
+                                , pat_args = PrefixCon pts pps
                                 }
                             }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameN s; p1' <- cvtPat p1; p2' <- cvtPat p2
@@ -1412,7 +1413,7 @@ cvtp (ParensP p)       = do { p' <- cvtPat p;
 cvtp (TildeP p)        = do { p' <- cvtPat p; return $ LazyPat noAnn p' }
 cvtp (BangP p)         = do { p' <- cvtPat p; return $ BangPat noAnn p' }
 cvtp (TH.AsP s p)      = do { s' <- vNameN s; p' <- cvtPat p
-                            ; return $ AsPat noAnn s' p' }
+                            ; return $ AsPat noAnn s' noHsTok p' }
 cvtp TH.WildP          = return $ WildPat noExtField
 cvtp (RecP c fs)       = do { c' <- cNameN c; fs' <- mapM cvtPatFld fs
                             ; return $ ConPat

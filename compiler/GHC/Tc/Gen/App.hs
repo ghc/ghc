@@ -427,9 +427,9 @@ tcValArgs do_ql args
   = mapM tc_arg args
   where
     tc_arg :: HsExprArg 'TcpInst -> TcM (HsExprArg 'TcpTc)
-    tc_arg (EPrag l p)           = return (EPrag l (tcExprPrag p))
-    tc_arg (EWrap w)             = return (EWrap w)
-    tc_arg (ETypeArg l hs_ty ty) = return (ETypeArg l hs_ty ty)
+    tc_arg (EPrag l p) = return (EPrag l (tcExprPrag p))
+    tc_arg (EWrap w)   = return (EWrap w)
+    tc_arg (ETypeArg l at hs_ty ty) = return (ETypeArg l at hs_ty ty)
 
     tc_arg eva@(EValArg { eva_arg = arg, eva_arg_ty = Scaled mult arg_ty
                         , eva_ctxt = ctxt })
@@ -594,14 +594,14 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
       = go1 delta (EPrag sp prag : acc) so_far fun_ty args
 
     -- Rule ITYARG from Fig 4 of the QL paper
-    go1 delta acc so_far fun_ty ( ETypeArg { eva_ctxt = ctxt, eva_hs_ty = hs_ty }
+    go1 delta acc so_far fun_ty ( ETypeArg { eva_ctxt = ctxt, eva_at = at, eva_hs_ty = hs_ty }
                                 : rest_args )
       | fun_is_out_of_scope   -- See Note [VTA for out-of-scope functions]
       = go delta acc so_far fun_ty rest_args
 
       | otherwise
       = do { (ty_arg, inst_ty) <- tcVTA fun_ty hs_ty
-           ; let arg' = ETypeArg { eva_ctxt = ctxt, eva_hs_ty = hs_ty, eva_ty = ty_arg }
+           ; let arg' = ETypeArg { eva_ctxt = ctxt, eva_at = at, eva_hs_ty = hs_ty, eva_ty = ty_arg }
            ; go delta (arg' : acc) so_far inst_ty rest_args }
 
     -- Rule IVAR from Fig 4 of the QL paper:

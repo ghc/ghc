@@ -475,9 +475,9 @@ addTickHsExpr (HsLamCase x lc_variant mgs) = liftM (HsLamCase x lc_variant)
                                                    (addTickMatchGroup True mgs)
 addTickHsExpr (HsApp x e1 e2)          = liftM2 (HsApp x) (addTickLHsExprNever e1)
                                                           (addTickLHsExpr      e2)
-addTickHsExpr (HsAppType x e ty)       = liftM3 HsAppType (return x)
-                                                          (addTickLHsExprNever e)
-                                                          (return ty)
+addTickHsExpr (HsAppType x e at ty) = do
+        e' <- addTickLHsExprNever e
+        return (HsAppType x e' at ty)
 addTickHsExpr (OpApp fix e1 e2 e3) =
         liftM4 OpApp
                 (return fix)

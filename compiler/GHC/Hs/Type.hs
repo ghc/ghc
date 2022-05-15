@@ -203,7 +203,7 @@ type instance XHsWC              GhcTc b = [Name]
 
 type instance XXHsWildCardBndrs (GhcPass _) _ = DataConCantHappen
 
-type instance XHsPS GhcPs = EpAnn EpaLocation
+type instance XHsPS GhcPs = EpAnnCO
 type instance XHsPS GhcRn = HsPSRn
 type instance XHsPS GhcTc = HsPSRn
 
@@ -252,7 +252,7 @@ mkHsWildCardBndrs :: thing -> HsWildCardBndrs GhcPs thing
 mkHsWildCardBndrs x = HsWC { hswc_body = x
                            , hswc_ext  = noExtField }
 
-mkHsPatSigType :: EpAnn EpaLocation -> LHsType GhcPs -> HsPatSigType GhcPs
+mkHsPatSigType :: EpAnnCO -> LHsType GhcPs -> HsPatSigType GhcPs
 mkHsPatSigType ann x = HsPS { hsps_ext  = ann
                             , hsps_body = x }
 

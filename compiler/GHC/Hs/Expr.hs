@@ -247,7 +247,7 @@ type instance XLamCase       (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XApp           (GhcPass _) = EpAnnCO
 
-type instance XAppTypeE      GhcPs = SrcSpan -- Where the `@` lives
+type instance XAppTypeE      GhcPs = NoExtField
 type instance XAppTypeE      GhcRn = NoExtField
 type instance XAppTypeE      GhcTc = Type
 
@@ -730,7 +730,7 @@ ppr_apps :: (OutputableBndrId p)
          -> SDoc
 ppr_apps (HsApp _ (L _ fun) arg)        args
   = ppr_apps fun (Left arg : args)
-ppr_apps (HsAppType _ (L _ fun) arg)    args
+ppr_apps (HsAppType _ (L _ fun) _ arg)  args
   = ppr_apps fun (Right arg : args)
 ppr_apps fun args = hang (ppr_expr fun) 2 (fsep (map pp args))
   where

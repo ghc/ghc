@@ -1837,7 +1837,7 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (HsLam _ _)                  = NoEntryVal
   getAnnotationEntry (HsLamCase an _ _)           = fromAnn an
   getAnnotationEntry (HsApp an _ _)               = fromAnn an
-  getAnnotationEntry (HsAppType _ _ _)            = NoEntryVal
+  getAnnotationEntry (HsAppType _ _ _ _)          = NoEntryVal
   getAnnotationEntry (OpApp an _ _ _)             = fromAnn an
   getAnnotationEntry (NegApp an _ _)              = fromAnn an
   getAnnotationEntry (HsPar an _ _ _)             = fromAnn an
@@ -1912,9 +1912,9 @@ instance ExactPrint (HsExpr GhcPs) where
     debugM $ "HsApp entered. p=" ++ show p
     markAnnotated e1
     markAnnotated e2
-  exact (HsAppType ss fun arg) = do
+  exact (HsAppType _ fun at arg) = do
     markAnnotated fun
-    printStringAtSs ss "@"
+    markToken at
     markAnnotated arg
   exact (OpApp _an e1 e2 e3) = do
     markAnnotated e1
@@ -3547,7 +3547,7 @@ instance ExactPrint (Pat GhcPs) where
   getAnnotationEntry (WildPat _)              = NoEntryVal
   getAnnotationEntry (VarPat _ _)             = NoEntryVal
   getAnnotationEntry (LazyPat an _)           = fromAnn an
-  getAnnotationEntry (AsPat an _ _)           = fromAnn an
+  getAnnotationEntry (AsPat an _ _ _)         = fromAnn an
   getAnnotationEntry (ParPat an _ _ _)        = fromAnn an
   getAnnotationEntry (BangPat an _)           = fromAnn an
   getAnnotationEntry (ListPat an _)           = fromAnn an
@@ -3573,9 +3573,9 @@ instance ExactPrint (Pat GhcPs) where
   exact (LazyPat an pat) = do
     markEpAnn an AnnTilde
     markAnnotated pat
-  exact (AsPat an n pat) = do
+  exact (AsPat _an n at pat) = do
     markAnnotated n
-    markEpAnn an AnnAt
+    markToken at
     markAnnotated pat
   exact (ParPat _an lpar pat rpar) = do
     markToken lpar
@@ -3633,10 +3633,7 @@ instance ExactPrint (Pat GhcPs) where
 
 instance ExactPrint (HsPatSigType GhcPs) where
   getAnnotationEntry = const NoEntryVal
-
-  exact (HsPS an ty) = do
-    markAnnKw an id AnnAt
-    markAnnotated ty
+  exact (HsPS _ ty) = markAnnotated ty
 
 -- ---------------------------------------------------------------------
 
@@ -3693,6 +3690,9 @@ exactUserCon an c details          = do
   exactConArgs details
   markEpAnn an AnnCloseC
 
+instance ExactPrint (HsConPatTyArg GhcPs) where
+  getAnnotationEntry _ = NoEntryVal
+  exact (HsConPatTyArg at tyarg) = markToken at >> markAnnotated tyarg
 
 exactConArgs ::HsConPatDetails GhcPs -> EPP ()
 exactConArgs (PrefixCon tyargs pats) = markAnnotated tyargs >> markAnnotated pats

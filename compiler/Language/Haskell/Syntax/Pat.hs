@@ -23,6 +23,7 @@ module Language.Haskell.Syntax.Pat (
         ConLikeP,
 
         HsConPatDetails, hsConPatArgs,
+        HsConPatTyArg(..),
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
@@ -69,7 +70,9 @@ data Pat p
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | AsPat       (XAsPat p)
-                (LIdP p) (LPat p)    -- ^ As pattern
+                (LIdP p)
+               !(LHsToken "@" p)
+                (LPat p)    -- ^ As pattern
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnAt'
 
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
@@ -217,9 +220,15 @@ type family ConLikeP x
 
 -- ---------------------------------------------------------------------
 
+-- | Type argument in a data constructor pattern,
+--   e.g. the @\@a@ in @f (Just \@a x) = ...@.
+data HsConPatTyArg p =
+  HsConPatTyArg
+    !(LHsToken "@" p)
+     (HsPatSigType p)
 
 -- | Haskell Constructor Pattern Details
-type HsConPatDetails p = HsConDetails (HsPatSigType (NoGhcTc p)) (LPat p) (HsRecFields p (LPat p))
+type HsConPatDetails p = HsConDetails (HsConPatTyArg (NoGhcTc p)) (LPat p) (HsRecFields p (LPat p))
 
 hsConPatArgs :: forall p . (UnXRec p) => HsConPatDetails p -> [LPat p]
 hsConPatArgs (PrefixCon _ ps) = ps
@@ -352,6 +361,9 @@ hsRecFieldSel = foExt . unXRec @p . hfbLHS
 *                                                                      *
 ************************************************************************
 -}
+
+instance Outputable (HsPatSigType p) => Outputable (HsConPatTyArg p) where
+  ppr (HsConPatTyArg _ ty) = char '@' <> ppr ty
 
 instance (Outputable arg, Outputable (XRec p (HsRecField p arg)))
       => Outputable (HsRecFields p arg) where

@@ -403,7 +403,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; pat_ty <- expTypeToType (scaledThing pat_ty)
         ; return (mkHsWrapPat mult_wrap (WildPat pat_ty) pat_ty, res) }
 
-  AsPat x (L nm_loc name) pat -> do
+  AsPat x (L nm_loc name) at pat -> do
         { mult_wrap <- checkManyPattern pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; (wrap, bndr_id) <- setSrcSpanA nm_loc (tcPatBndr penv name pat_ty)
@@ -418,7 +418,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
             --
             -- If you fix it, don't forget the bindInstsOfPatIds!
         ; pat_ty <- readExpType (scaledThing pat_ty)
-        ; return (mkHsWrapPat (wrap <.> mult_wrap) (AsPat x (L nm_loc bndr_id) pat') pat_ty, res) }
+        ; return (mkHsWrapPat (wrap <.> mult_wrap) (AsPat x (L nm_loc bndr_id) at pat') pat_ty, res) }
 
   ViewPat _ expr pat -> do
         { mult_wrap <- checkManyPattern pat_ty
@@ -1320,8 +1320,8 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
           -- dataConFieldLabels will be empty (and each field in the pattern
           -- will generate an error below).
 
-tcConTyArg :: Checker (HsPatSigType GhcRn) TcType
-tcConTyArg penv rn_ty thing_inside
+tcConTyArg :: Checker (HsConPatTyArg GhcRn) TcType
+tcConTyArg penv (HsConPatTyArg _ rn_ty) thing_inside
   = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt HM_TyAppPat rn_ty AnyKind
                -- AnyKind is a bit suspect: it really should be the kind gotten
                -- from instantiating the constructor type. But this would be

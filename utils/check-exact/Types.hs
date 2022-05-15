@@ -156,7 +156,6 @@ instance Outputable Comment where
 -- AST.
 data KeywordId = G AnnKeywordId  -- ^ A normal keyword
                | AnnSemiSep          -- ^ A separating comma
-               | AnnTypeApp          -- ^ Visible type application annotation
                | AnnComment Comment
                | AnnString String    -- ^ Used to pass information from
                                      -- Delta to Print when we have to work
@@ -167,7 +166,6 @@ data KeywordId = G AnnKeywordId  -- ^ A normal keyword
 instance Show KeywordId where
   show (G gc)          = "(G " ++ show gc ++ ")"
   show AnnSemiSep      = "AnnSemiSep"
-  show AnnTypeApp      = "AnnTypeApp"
   show (AnnComment dc) = "(AnnComment " ++ show dc ++ ")"
   show (AnnString s)   = "(AnnString " ++ s ++ ")"
 

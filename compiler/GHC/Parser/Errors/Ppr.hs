@@ -445,7 +445,7 @@ instance Diagnostic PsMessage where
                  PEIP_NegApp -> text "-" <> ppr s
                  PEIP_TypeArgs peipd_tyargs
                    | not (null peipd_tyargs) -> ppr s <+> vcat [
-                               hsep [text "@" <> ppr t | t <- peipd_tyargs]
+                               hsep (map ppr peipd_tyargs)
                              , text "Type applications in patterns are only allowed on data constructors."
                              ]
                    | otherwise -> ppr s

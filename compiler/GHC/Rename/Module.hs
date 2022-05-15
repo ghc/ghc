@@ -1325,7 +1325,7 @@ validRuleLhs foralls lhs
     check (OpApp _ e1 op e2)              = checkl op `mplus` checkl_e e1
                                                       `mplus` checkl_e e2
     check (HsApp _ e1 e2)                 = checkl e1 `mplus` checkl_e e2
-    check (HsAppType _ e _)               = checkl e
+    check (HsAppType _ e _ _)             = checkl e
     check (HsVar _ lv)
       | (unLoc lv) `notElem` foralls      = Nothing
     check other                           = Just other  -- Failure

@@ -1271,7 +1271,7 @@ tcCollectEx pat = go pat
 
     go1 :: Pat GhcTc -> ([TyVar], [EvVar])
     go1 (LazyPat _ p)      = go p
-    go1 (AsPat _ _ p)      = go p
+    go1 (AsPat _ _ _ p)    = go p
     go1 (ParPat _ _ p _)   = go p
     go1 (BangPat _ p)      = go p
     go1 (ListPat _ ps)     = mergeMany . map go $ ps

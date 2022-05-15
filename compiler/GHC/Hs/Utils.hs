@@ -244,7 +244,7 @@ mkHsAppsWith
 mkHsAppsWith mkLocated = foldl' (mkHsAppWith mkLocated)
 
 mkHsAppType :: LHsExpr GhcRn -> LHsWcType GhcRn -> LHsExpr GhcRn
-mkHsAppType e t = addCLocAA t_body e (HsAppType noExtField e paren_wct)
+mkHsAppType e t = addCLocAA t_body e (HsAppType noExtField e noHsTok paren_wct)
   where
     t_body    = hswc_body t
     paren_wct = t { hswc_body = parenthesizeHsType appPrec t_body }
@@ -1188,7 +1188,7 @@ collect_pat flag pat bndrs = case pat of
   WildPat _             -> bndrs
   LazyPat _ pat         -> collect_lpat flag pat bndrs
   BangPat _ pat         -> collect_lpat flag pat bndrs
-  AsPat _ a pat         -> unXRec @p a : collect_lpat flag pat bndrs
+  AsPat _ a _ pat       -> unXRec @p a : collect_lpat flag pat bndrs
   ViewPat _ _ pat       -> collect_lpat flag pat bndrs
   ParPat _ _ pat _      -> collect_lpat flag pat bndrs
   ListPat _ pats        -> foldr (collect_lpat flag) bndrs pats
@@ -1584,7 +1584,7 @@ lPatImplicits = hs_lpat
 
     hs_pat (LazyPat _ pat)      = hs_lpat pat
     hs_pat (BangPat _ pat)      = hs_lpat pat
-    hs_pat (AsPat _ _ pat)      = hs_lpat pat
+    hs_pat (AsPat _ _ _ pat)    = hs_lpat pat
     hs_pat (ViewPat _ _ pat)    = hs_lpat pat
     hs_pat (ParPat _ _ pat _)   = hs_lpat pat
     hs_pat (ListPat _ pats)     = hs_lpats pats

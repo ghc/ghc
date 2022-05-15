@@ -172,12 +172,15 @@ hard_hole_fits.hs:22:28: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
            (and originally defined in ‘GHC.Enum’))
 
-hard_hole_fits.hs:23:35: warning: [-Wtyped-holes (in -Wdefault)]
+hard_hole_fits.hs:23:38: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In an equation for ‘testMe’: testMe (HsAppType xate gl hwcb) = _
+    • In an equation for ‘testMe’:
+          testMe (HsAppType xate gl at hwcb) = _
     • Relevant bindings include
         hwcb :: Language.Haskell.Syntax.Type.LHsWcType
                   (Language.Haskell.Syntax.Extension.NoGhcTc GhcPs)
+          (bound at hard_hole_fits.hs:23:30)
+        at :: Language.Haskell.Syntax.Extension.LHsToken "@" GhcPs
           (bound at hard_hole_fits.hs:23:27)
         gl :: LHsExpr GhcPs (bound at hard_hole_fits.hs:23:24)
         xate :: Language.Haskell.Syntax.Extension.XAppTypeE GhcPs

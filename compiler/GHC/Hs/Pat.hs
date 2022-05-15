@@ -28,6 +28,7 @@ module GHC.Hs.Pat (
         XXPatGhcTc(..),
 
         HsConPatDetails, hsConPatArgs,
+        HsConPatTyArg(..),
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
@@ -94,7 +95,7 @@ type instance XLazyPat GhcPs = EpAnn [AddEpAnn] -- For '~'
 type instance XLazyPat GhcRn = NoExtField
 type instance XLazyPat GhcTc = NoExtField
 
-type instance XAsPat   GhcPs = EpAnn [AddEpAnn] -- For '@'
+type instance XAsPat   GhcPs = EpAnnCO
 type instance XAsPat   GhcRn = NoExtField
 type instance XAsPat   GhcTc = NoExtField
 
@@ -307,7 +308,7 @@ pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
 pprPat (BangPat _ pat)          = char '!' <> pprParendLPat appPrec pat
-pprPat (AsPat _ name pat)       = hcat [pprPrefixOcc (unLoc name), char '@',
+pprPat (AsPat _ name _ pat)     = hcat [pprPrefixOcc (unLoc name), char '@',
                                         pprParendLPat appPrec pat]
 pprPat (ViewPat _ expr pat)     = hcat [pprLExpr expr, text " -> ", ppr pat]
 pprPat (ParPat _ _ pat _)      = parens (ppr pat)
@@ -382,7 +383,7 @@ pprConArgs :: (OutputableBndrId p,
                      Outputable (Anno (IdGhcP p)))
            => HsConPatDetails (GhcPass p) -> SDoc
 pprConArgs (PrefixCon ts pats) = fsep (pprTyArgs ts : map (pprParendLPat appPrec) pats)
-  where pprTyArgs tyargs = fsep (map (\ty -> char '@' <> ppr ty) tyargs)
+  where pprTyArgs tyargs = fsep (map ppr tyargs)
 pprConArgs (InfixCon p1 p2)    = sep [ pprParendLPat appPrec p1
                                      , pprParendLPat appPrec p2 ]
 pprConArgs (RecCon rpats)      = ppr rpats
@@ -475,7 +476,7 @@ looksLazyLPat = looksLazyPat . unLoc
 
 looksLazyPat :: Pat (GhcPass p) -> Bool
 looksLazyPat (ParPat _ _ p _)  = looksLazyLPat p
-looksLazyPat (AsPat _ _ p)     = looksLazyLPat p
+looksLazyPat (AsPat _ _ _ p)   = looksLazyLPat p
 looksLazyPat (BangPat {})  = False
 looksLazyPat (VarPat {})   = False
 looksLazyPat (WildPat {})  = False
@@ -542,7 +543,7 @@ isIrrefutableHsPat' is_strict = goL
       | otherwise          = True
     go (BangPat _ pat)     = goL pat
     go (ParPat _ _ pat _)  = goL pat
-    go (AsPat _ _ pat)     = goL pat
+    go (AsPat _ _ _ pat)   = goL pat
     go (ViewPat _ _ pat)   = goL pat
     go (SigPat _ pat _)    = goL pat
     go (TuplePat _ pats _) = all goL pats
@@ -699,7 +700,7 @@ collectEvVarsPat :: Pat GhcTc -> Bag EvVar
 collectEvVarsPat pat =
   case pat of
     LazyPat _ p      -> collectEvVarsLPat p
-    AsPat _ _ p      -> collectEvVarsLPat p
+    AsPat _ _ _ p    -> collectEvVarsLPat p
     ParPat  _ _ p _  -> collectEvVarsLPat p
     BangPat _ p      -> collectEvVarsLPat p
     ListPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps

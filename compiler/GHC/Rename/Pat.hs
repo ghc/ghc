@@ -77,7 +77,7 @@ import GHC.Core.DataCon
 import GHC.Driver.Session ( getDynFlags, xopt_DuplicateRecordFields )
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, ap, guard, forM, unless )
+import Control.Monad       ( when, ap, guard, unless )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Ratio
@@ -551,10 +551,10 @@ rnPatAndThen mk (NPlusKPat _ rdr (L l lit) _ _ _ )
                                       (L l lit') lit' ge minus) }
                 -- The Report says that n+k patterns must be in Integral
 
-rnPatAndThen mk (AsPat _ rdr pat)
+rnPatAndThen mk (AsPat _ rdr at pat)
   = do { new_name <- newPatLName mk rdr
        ; pat' <- rnLPatAndThen mk pat
-       ; return (AsPat noExtField new_name pat') }
+       ; return (AsPat noExtField new_name at pat') }
 
 rnPatAndThen mk p@(ViewPat _ expr pat)
   = do { liftCps $ do { vp_flag <- xoptM LangExt.ViewPatterns
@@ -626,8 +626,7 @@ rnConPatAndThen :: NameMaker
 rnConPatAndThen mk con (PrefixCon tyargs pats)
   = do  { con' <- lookupConCps con
         ; liftCps check_lang_exts
-        ; tyargs' <- forM tyargs $ \t ->
-            liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t
+        ; tyargs' <- mapM rnConPatTyArg tyargs
         ; pats' <- rnLPatsAndThen mk pats
         ; return $ ConPat
             { pat_con_ext = noExtField
@@ -642,12 +641,15 @@ rnConPatAndThen mk con (PrefixCon tyargs pats)
       type_app      <- xoptM LangExt.TypeApplications
       unless (scoped_tyvars && type_app) $
         case listToMaybe tyargs of
-          Nothing    -> pure ()
+          Nothing -> pure ()
           Just tyarg -> addErr $ TcRnUnknownMessage $ mkPlainError noHints $
             hang (text "Illegal visible type application in a pattern:"
-                    <+> quotes (char '@' <> ppr tyarg))
+                    <+> quotes (ppr tyarg))
                2 (text "Both ScopedTypeVariables and TypeApplications are"
                     <+> text "required to use this feature")
+    rnConPatTyArg (HsConPatTyArg at t) = do
+      t' <- liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t
+      return (HsConPatTyArg at t')
 
 rnConPatAndThen mk con (InfixCon pat1 pat2)
   = do  { con' <- lookupConCps con

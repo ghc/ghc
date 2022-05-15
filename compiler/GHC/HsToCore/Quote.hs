@@ -1511,7 +1511,8 @@ repE (HsLamCase _ LamCases (MG { mg_alts = (L _ ms) }))
                         ; core_ms <- coreListM matchTyConName ms'
                         ; repLamCases core_ms }
 repE (HsApp _ x y)   = do {a <- repLE x; b <- repLE y; repApp a b}
-repE (HsAppType _ e t) = do { a <- repLE e
+repE (HsAppType _ e _ t)
+                       = do { a <- repLE e
                             ; s <- repLTy (hswc_body t)
                             ; repAppType a s }
 
@@ -2055,7 +2056,7 @@ repP (LitPat _ l)       = do { l2 <- repLiteral l; repPlit l2 }
 repP (VarPat _ x)       = do { x' <- lookupBinder (unLoc x); repPvar x' }
 repP (LazyPat _ p)      = do { p1 <- repLP p; repPtilde p1 }
 repP (BangPat _ p)      = do { p1 <- repLP p; repPbang p1 }
-repP (AsPat _ x p)      = do { x' <- lookupNBinder x; p1 <- repLP p
+repP (AsPat _ x _ p)    = do { x' <- lookupNBinder x; p1 <- repLP p
                              ; repPaspat x' p1 }
 repP (ParPat _ _ p _)   = repLP p
 repP (ListPat _ ps)     = do { qs <- repLPs ps; repPlist qs }
@@ -2068,7 +2069,8 @@ repP (ConPat NoExtField dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of
          PrefixCon tyargs ps -> do { qs <- repLPs ps
-                                   ; ts <- repListM typeTyConName (repTy . unLoc . hsps_body) tyargs
+                                   ; let unwrapTyArg (HsConPatTyArg _ t) = unLoc (hsps_body t)
+                                   ; ts <- repListM typeTyConName (repTy . unwrapTyArg) tyargs
                                    ; repPcon con_str ts qs }
          RecCon rec   -> do { fps <- repListM fieldPatTyConName rep_fld (rec_flds rec)
                             ; repPrec con_str fps }

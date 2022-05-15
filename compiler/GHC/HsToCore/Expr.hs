@@ -841,7 +841,7 @@ dsHsWrapped orig_hs_expr
        = go wrap hs_e
     go wrap1 (XExpr (WrapExpr (HsWrap wrap2 hs_e)))
        = go (wrap1 <.> wrap2) hs_e
-    go wrap (HsAppType ty (L _ hs_e) _)
+    go wrap (HsAppType ty (L _ hs_e) _ _)
        = go (wrap <.> WpTyApp ty) hs_e
 
     go wrap (HsVar _ (L _ var))

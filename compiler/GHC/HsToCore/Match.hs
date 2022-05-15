@@ -430,7 +430,7 @@ tidy1 v _ (VarPat _ (L _ var))
 
         -- case v of { x@p -> mr[] }
         -- = case v of { p -> let x=v in mr[] }
-tidy1 v o (AsPat _ (L _ var) pat)
+tidy1 v o (AsPat _ (L _ var) _ pat)
   = do  { (wrap, pat') <- tidy1 v o (unLoc pat)
         ; return (wrapBind var v . wrap, pat') }
 
@@ -517,8 +517,8 @@ tidy_bang_pat v o _ (SigPat _ (L l p) _) = tidy_bang_pat v o l p
 
 -- Push the bang-pattern inwards, in the hope that
 -- it may disappear next time
-tidy_bang_pat v o l (AsPat x v' p)
-  = tidy1 v o (AsPat x v' (L l (BangPat noExtField p)))
+tidy_bang_pat v o l (AsPat x v' at p)
+  = tidy1 v o (AsPat x v' at (L l (BangPat noExtField p)))
 tidy_bang_pat v o l (XPat (CoPat w p t))
   = tidy1 v o (XPat $ CoPat w (BangPat noExtField (L l p)) t)
 

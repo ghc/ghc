@@ -202,7 +202,6 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 data AnnKeywordId
     = AnnAnyclass
     | AnnAs
-    | AnnAt
     | AnnBang  -- ^ '!'
     | AnnBackquote -- ^ '`'
     | AnnBy
@@ -413,6 +412,9 @@ data EpaLocation = EpaSpan !RealSrcSpan
 -- generated code (e.g. by TH).
 data TokenLocation = NoTokenLoc | TokenLoc !EpaLocation
                deriving (Data,Eq)
+
+instance Outputable a => Outputable (GenLocated TokenLocation a) where
+  ppr (L _ x) = ppr x
 
 -- | Spacing between output items when exact printing.  It captures
 -- the spacing from the current print position on the page to the

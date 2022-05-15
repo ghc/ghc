@@ -371,6 +371,7 @@ data HsExpr p
 
   | HsAppType (XAppTypeE p) -- After typechecking: the type argument
               (LHsExpr p)
+             !(LHsToken "@" p)
               (LHsWcType (NoGhcTc p))  -- ^ Visible type application
        --
        -- Explicit type argument; e.g  f @Int x y

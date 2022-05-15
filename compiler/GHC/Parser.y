@@ -2769,7 +2769,7 @@ fexp    :: { ECP }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         | fexp PREFIX_AT atype       { ECP $
                                         unECP $1 >>= \ $1 ->
-                                        mkHsAppTypePV (noAnnSrcSpan $ comb2 (reLoc $1) (reLoc $>)) $1 (getLoc $2) $3 }
+                                        mkHsAppTypePV (noAnnSrcSpan $ comb2 (reLoc $1) (reLoc $>)) $1 (hsTok $2) $3 }
 
         | 'static' aexp              {% runPV (unECP $2) >>= \ $2 ->
                                         fmap ecpFromExp $
@@ -2782,7 +2782,7 @@ aexp    :: { ECP }
         : qvar TIGHT_INFIX_AT aexp
                                 { ECP $
                                    unECP $3 >>= \ $3 ->
-                                     mkHsAsPatPV (comb2 (reLocN $1) (reLoc $>)) $1 $3 [mj AnnAt $2] }
+                                     mkHsAsPatPV (comb2 (reLocN $1) (reLoc $>)) $1 (hsTok $2) $3 }
 
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer

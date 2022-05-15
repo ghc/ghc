@@ -33,7 +33,6 @@ keywordToString kw =
       (G AnnValStr ) -> mkErr kw
       (G AnnName   ) -> mkErr kw
       (G AnnAs     ) -> "as"
-      (G AnnAt     ) -> "@"
       (G AnnBang   ) -> "!"
       (G AnnBackquote ) -> "`"
       (G AnnBy     ) -> "by"
@@ -126,5 +125,4 @@ keywordToString kw =
       (G AnnRarrowtailU) -> "⤜"
       (G AnnlarrowtailU) -> "⤙"
       (G AnnrarrowtailU) -> "⤚"
-      AnnTypeApp             -> "@"
       (G AnnVia) -> "via"

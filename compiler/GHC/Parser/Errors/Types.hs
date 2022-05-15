@@ -504,7 +504,7 @@ data ParseContext
 data PsErrInPatDetails
   = PEIP_NegApp
     -- ^ Negative application pattern?
-  | PEIP_TypeArgs [HsPatSigType GhcPs]
+  | PEIP_TypeArgs [HsConPatTyArg GhcPs]
     -- ^ The list of type arguments for the pattern
   | PEIP_RecPattern [LPat GhcPs]    -- ^ The pattern arguments
                     !PatIsRecursive -- ^ Is the parsed pattern recursive?

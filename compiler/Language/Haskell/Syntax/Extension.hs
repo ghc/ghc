@@ -23,7 +23,7 @@ module Language.Haskell.Syntax.Extension where
 
 import GHC.Prelude
 
-import GHC.TypeLits (Symbol, KnownSymbol)
+import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import Data.Data hiding ( Fixity )
 import Data.Kind (Type)
 import GHC.Utils.Outputable
@@ -730,3 +730,10 @@ type LHsUniToken tok utok p = XRec p (HsUniToken tok utok)
 data HsUniToken (tok :: Symbol) (utok :: Symbol) = HsNormalTok | HsUnicodeTok
 
 deriving instance (KnownSymbol tok, KnownSymbol utok) => Data (HsUniToken tok utok)
+
+instance KnownSymbol tok => Outputable (HsToken tok) where
+   ppr _ = text (symbolVal (Proxy :: Proxy tok))
+
+instance (KnownSymbol tok, KnownSymbol utok) => Outputable (HsUniToken tok utok) where
+   ppr HsNormalTok  = text (symbolVal (Proxy :: Proxy tok))
+   ppr HsUnicodeTok = text (symbolVal (Proxy :: Proxy utok))

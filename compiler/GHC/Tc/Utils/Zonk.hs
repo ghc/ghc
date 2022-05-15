@@ -771,10 +771,10 @@ zonkExpr env (HsApp x e1 e2)
        new_e2 <- zonkLExpr env e2
        return (HsApp x new_e1 new_e2)
 
-zonkExpr env (HsAppType ty e t)
+zonkExpr env (HsAppType ty e at t)
   = do new_e <- zonkLExpr env e
        new_ty <- zonkTcTypeToTypeX env ty
-       return (HsAppType new_ty new_e t)
+       return (HsAppType new_ty new_e at t)
        -- NB: the type is an HsType; can't zonk that!
 
 zonkExpr env (HsTypedBracket hsb_tc body)
@@ -1317,10 +1317,10 @@ zonk_pat env (BangPat x pat)
   = do  { (env', pat') <- zonkPat env pat
         ; return (env',  BangPat x pat') }
 
-zonk_pat env (AsPat x (L loc v) pat)
+zonk_pat env (AsPat x (L loc v) at pat)
   = do  { v' <- zonkIdBndr env v
         ; (env', pat') <- zonkPat (extendIdZonkEnv env v') pat
-        ; return (env', AsPat x (L loc v') pat') }
+        ; return (env', AsPat x (L loc v') at pat') }
 
 zonk_pat env (ViewPat ty expr pat)
   = do  { expr' <- zonkLExpr env expr

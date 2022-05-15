@@ -119,7 +119,7 @@ desugarPat x pat = case pat of
 
   -- (x@pat)   ==>   Desugar pat with x as match var and handle impedance
   --                 mismatch with incoming match var
-  AsPat _ (L _ y) p -> (mkPmLetVar y x ++) <$> desugarLPat y p
+  AsPat _ (L _ y) _ p -> (mkPmLetVar y x ++) <$> desugarLPat y p
 
   SigPat _ p _ty -> desugarLPat x p
 
