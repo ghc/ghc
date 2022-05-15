@@ -22,7 +22,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmThisModule    = mod
   , stgToCmmTmpDir        = tmpDir          dflags
   , stgToCmmContext       = initSDocContext dflags defaultDumpStyle
-  , stgToCmmDebugLevel    = debugLevel      dflags
+  , stgToCmmEmitDebugInfo = debugLevel      dflags > 0
   , stgToCmmBinBlobThresh = b_blob
   , stgToCmmMaxInlAllocSize = maxInlineAllocSize           dflags
   -- ticky options

@@ -22,8 +22,8 @@ data StgToCmmConfig = StgToCmmConfig
                                                  -- Cmm/Parser.y which preloads it with a panic
   , stgToCmmTmpDir        :: !TempDir            -- ^ Temp Dir for files used in compilation
   , stgToCmmContext       :: !SDocContext        -- ^ Context for StgToCmm phase
-  , stgToCmmDebugLevel    :: !Int                -- ^ The verbosity of debug messages
-  , stgToCmmBinBlobThresh :: !(Maybe Word)        -- ^ Threshold at which Binary literals (e.g. strings)
+  , stgToCmmEmitDebugInfo :: !Bool               -- ^ Whether we wish to output debug information
+  , stgToCmmBinBlobThresh :: !(Maybe Word)       -- ^ Threshold at which Binary literals (e.g. strings)
                                                  -- are either dumped to a file and a CmmFileEmbed literal
                                                  -- is emitted (over threshold), or become a CmmString
                                                  -- Literal (under or at threshold). CmmFileEmbed is only supported
