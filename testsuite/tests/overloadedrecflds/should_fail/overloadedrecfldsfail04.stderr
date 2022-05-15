@@ -4,9 +4,9 @@
 overloadedrecfldsfail04.hs:9:6: error:
     Ambiguous occurrence ‘I.x’
     It could refer to
-       either the field ‘x’,
+       either the field ‘x’ of record ‘V’,
               imported from ‘OverloadedRecFldsFail04_A’ at overloadedrecfldsfail04.hs:6:1-37
               (and originally defined at OverloadedRecFldsFail04_A.hs:6:16)
-           or the field ‘x’,
+           or the field ‘x’ of record ‘U’,
               imported from ‘OverloadedRecFldsFail04_A’ at overloadedrecfldsfail04.hs:6:1-37
               (and originally defined at OverloadedRecFldsFail04_A.hs:5:16)
