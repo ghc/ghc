@@ -14,10 +14,8 @@ import GHC.Core.TyCon
 
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Set
 import GHC.Types.Var
 import GHC.Types.ForeignCall
-import GHC.Types.SrcLoc
 
 import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Outputable (Outputable (..), text, SDocContext, (<+>), ($$))
