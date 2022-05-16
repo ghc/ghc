@@ -19,6 +19,7 @@ import GHC.Core.TyCon
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Outputable
 
 assignToTypedExprs :: [TypedExpr] -> [JExpr] -> JStat
 assignToTypedExprs tes es =
@@ -37,7 +38,11 @@ assignToExprCtx ctx es = assignToTypedExprs (ctxTarget ctx) es
 assignCoerce1 :: HasDebugCallStack => [TypedExpr] -> [TypedExpr] -> JStat
 assignCoerce1 [x] [y] = assignCoerce x y
 assignCoerce1 []  []  = mempty
-assignCoerce1 _   _   = panic $ "assignTypedExprs1: lengths do not match"
+assignCoerce1 x   y   = pprPanic "assignCoerce1"
+                          (vcat [ text "lengths do not match"
+                                , ppr x
+                                , ppr y
+                                ])
 
 -- | Assign p2 to p1 with optional coercion
 assignCoerce :: TypedExpr -> TypedExpr -> JStat
