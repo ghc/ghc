@@ -507,7 +507,8 @@ getInertGivens :: TcS [Ct]
 -- Returns the Given constraints in the inert set
 getInertGivens
   = do { inerts <- getInertCans
-       ; let all_cts = foldDicts (:) (inert_dicts inerts)
+       ; let all_cts = foldIrreds (:) (inert_irreds inerts)
+                     $ foldDicts (:) (inert_dicts inerts)
                      $ foldFunEqs (++) (inert_funeqs inerts)
                      $ foldDVarEnv (++) [] (inert_eqs inerts)
        ; return (filter isGivenCt all_cts) }
@@ -645,9 +646,14 @@ removeInertCt is ct =
 
     CEqCan    { cc_lhs  = lhs, cc_rhs = rhs } -> delEq is lhs rhs
 
+    CIrredCan {}     -> is { inert_irreds = filterBag (not . eqCt ct) $ inert_irreds is }
+
     CQuantCan {}     -> panic "removeInertCt: CQuantCan"
-    CIrredCan {}     -> panic "removeInertCt: CIrredEvCan"
     CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
+
+eqCt :: Ct -> Ct -> Bool
+-- Equality via ctEvId
+eqCt c c' = ctEvId c == ctEvId c'
 
 -- | Looks up a family application in the inerts.
 lookupFamAppInert :: (CtFlavourRole -> Bool)  -- can it rewrite the target?

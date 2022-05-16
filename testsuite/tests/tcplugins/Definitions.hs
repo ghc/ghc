@@ -28,6 +28,9 @@ class MyClass a where
 type MyTyFam :: Type -> Type -> Type
 type family MyTyFam a b where
 
+type CtId :: Constraint -> Constraint
+type family CtId a where
+
 data Nat = Zero | Succ Nat
 
 type Add :: Nat -> Nat -> Nat

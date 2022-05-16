@@ -577,12 +577,12 @@ is defined thus:
 
     data TcPlugin = forall s . TcPlugin
       { tcPluginInit    :: TcPluginM s
-      , tcPluginSolve   :: s -> EvBindsVar -> TcPluginSolver
+      , tcPluginSolve   :: s -> TcPluginSolver
       , tcPluginRewrite :: s -> UniqFM TyCon TcPluginRewriter
       , tcPluginStop    :: s -> TcPluginM ()
       }
 
-    type TcPluginSolver = [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult
+    type TcPluginSolver = EvBindsVar -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult
 
     type TcPluginRewriter = RewriteEnv -> [Ct] -> [Type] -> TcPluginM TcPluginRewriteResult
 
@@ -652,8 +652,8 @@ The key component of a typechecker plugin is a function of type
 
 ::
 
-    solve :: [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult
-    solve givens wanteds = ...
+    solve :: EvBindsVar -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult
+    solve binds givens wanteds = ...
 
 This function will be invoked in two different ways:
 
@@ -700,6 +700,11 @@ typechecking, and can be checked by ``-dcore-lint``. It is possible for
 the plugin to create equality axioms for use in evidence terms, but GHC
 does not check their consistency, and inconsistent axiom sets may lead
 to segfaults or other runtime misbehaviour.
+
+Evidence is required also when creating new Given constraints, which are
+usually implied by old ones. It is not uncommon that the evidence of a new
+Given constraint contains a removed constraint: the new one has replaced the
+removed one.
 
 .. _type-family-rewriting-with-plugins:
 
