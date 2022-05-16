@@ -102,3 +102,4 @@ test('T20203', normal, compile, ['-O -dsuppress-all -dsuppress-uniques -dno-type
 test('T19313', normal, compile_and_run, [''])
 test('UnliftedArgRule', normal, compile_and_run, [''])
 test('T21229', normal, compile_and_run, ['-O'])
+test('T21575', normal, compile_and_run, ['-O'])

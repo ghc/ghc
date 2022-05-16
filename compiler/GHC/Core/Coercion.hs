@@ -1708,9 +1708,8 @@ has to do in its full generality.  See #18413.
 %************************************************************************
 -}
 
--- | If @co :: T ts ~ rep_ty@ then:
---
--- > instNewTyCon_maybe T ts = Just (rep_ty, co)
+-- | If `instNewTyCon_maybe T ts = Just (rep_ty, co)`
+--   then `co :: T ts ~R# rep_ty`
 --
 -- Checks for a newtype, and for being saturated
 instNewTyCon_maybe :: TyCon -> [Type] -> Maybe (Type, Coercion)

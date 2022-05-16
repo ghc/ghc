@@ -1140,14 +1140,25 @@ ds_withDict wrapped_ty
     -- `meth_tvs = a_1 ... a_n` and `co` is a newtype coercion between
     -- `C` and `meth_ty`.
   , Just (inst_meth_ty, co) <- instNewTyCon_maybe dict_tc dict_args
+    --    co :: C t1 ..tn ~R# st
     -- Check that `st` is equal to `meth_ty[t_i/a_i]`.
   , st `eqType` inst_meth_ty
-  = do { sv <- newSysLocalDs mult1 st
+ = do { sv <- newSysLocalDs mult1 st
        ; k  <- newSysLocalDs mult2 dt_to_r
-       ; pure $ mkLams [sv, k] $ Var k `App` Cast (Var sv) (mkSymCo co) }
+       ; let wd_rhs = mkLams [sv, k] $ Var k `App` Cast (Var sv) (mkSymCo co)
+       ; wd_id <- newSysLocalDs Many (exprType wd_rhs)
+       ; let wd_id' = wd_id `setInlinePragma` inlineAfterSpecialiser
+       ; pure $ Let (NonRec wd_id' wd_rhs) (Var wd_id') }
+         -- Why a Let?  See (WD8) in Note [withDict]
 
   | otherwise
   = errDsCoreExpr (DsInvalidInstantiationDictAtType wrapped_ty)
+
+inlineAfterSpecialiser :: InlinePragma
+-- Do not inline before the specialiser; but do so afterwards
+-- See (WD8) in Note [withDict]
+inlineAfterSpecialiser = alwaysInlinePragma `setInlinePragmaActivation`
+                         ActiveAfter NoSourceText 2
 
 {- Note [withDict]
 ~~~~~~~~~~~~~~~~~~
@@ -1202,7 +1213,7 @@ Where:
   That is, C must be a class with exactly one method and no superclasses.
 
 * The `mtype` argument to withDict must be equal to `meth_type[t_i/a_i]`,
-  which is instantied type of C's method.
+  which is instantiated type of C's method.
 
 * `co` is a newtype coercion that, when applied to `t_1 ... t_n`, coerces from
   `C t_1 ... t_n` to `mtype`. This coercion is guaranteed to exist by virtue of
@@ -1213,66 +1224,86 @@ These requirements are implemented in the guards in ds_withDict's definition.
 
 Some further observations about `withDict`:
 
-* Every use of `withDict` must be instantiated at a /particular/ class C.
-  It's a bit like representation polymorphism: we don't allow class-polymorphic
-  calls of `withDict`. We check this in the desugarer -- and then we
-  can immediately replace this invocation of `withDict` with appropriate
-  class-specific Core code.
+(WD1) Every use of `withDict` must be instantiated at a /particular/ class C.
+      It's a bit like representation polymorphism: we don't allow class-polymorphic
+      calls of `withDict`. We check this in the desugarer -- and then we
+      can immediately replace this invocation of `withDict` with appropriate
+      class-specific Core code.
 
-* The `dt` in the type of withDict must be explicitly instantiated with
-  visible type application, as invoking `withDict` would be ambiguous
-  otherwise.
+(WD2) The `dt` in the type of withDict must be explicitly instantiated with
+      visible type application, as invoking `withDict` would be ambiguous
+      otherwise.
 
-* For examples of how `withDict` is used in the `base` library, see `withSNat`
-  in GHC.TypeNats, as well as `withSChar` and `withSSymbol` in GHC.TypeLits.
+      For examples of how `withDict` is used in the `base` library, see `withSNat`
+      in GHC.TypeNats, as well as `withSChar` and `withSSymbol` in GHC.TypeLits.
 
-* The `r` is representation-polymorphic,
-  to support things like `withTypeable` in `Data.Typeable.Internal`.
+(WD3) The `r` is representation-polymorphic, to support things like
+      `withTypeable` in `Data.Typeable.Internal`.
 
-* As an alternative to `withDict`, one could define functions like `withT`
-  above in terms of `unsafeCoerce`. This is more error-prone, however.
+(WD4) As an alternative to `withDict`, one could define functions like `withT`
+      above in terms of `unsafeCoerce`. This is more error-prone, however.
 
-* In order to define things like `reifySymbol` below:
+(WD5) In order to define things like `reifySymbol` below:
 
-    reifySymbol :: forall r. String -> (forall (n :: Symbol). KnownSymbol n => r) -> r
+        reifySymbol :: forall r. String -> (forall (n :: Symbol). KnownSymbol n => r) -> r
 
-  `withDict` needs to be instantiated with `Any`, like so:
+      `withDict` needs to be instantiated with `Any`, like so:
 
-    reifySymbol n k = withDict @String @(KnownSymbol Any) @r n (k @Any)
+        reifySymbol n k = withDict @String @(KnownSymbol Any) @r n (k @Any)
 
-  The use of `Any` is explained in Note [NOINLINE someNatVal] in
-  base:GHC.TypeNats.
+      The use of `Any` is explained in Note [NOINLINE someNatVal] in
+      base:GHC.TypeNats.
 
-* The only valid way to apply `withDict` is as described above. Applying
-  `withDict` in any other way will result in a non-recoverable error during
-  desugaring. In other words, GHC will never execute the `withDict` function
-  in compiled code.
+(WD6) The only valid way to apply `withDict` is as described above. Applying
+      `withDict` in any other way will result in a non-recoverable error during
+      desugaring. In other words, GHC will never execute the `withDict` function
+      in compiled code.
 
-  In theory, this means that we don't need to define a binding for `withDict`
-  in GHC.Magic.Dict. In practice, we define a binding anyway, for two reasons:
+      In theory, this means that we don't need to define a binding for `withDict`
+      in GHC.Magic.Dict. In practice, we define a binding anyway, for two reasons:
 
-    - To give it Haddocks, and
-    - To define the type of `withDict`, which GHC can find in
-      GHC.Magic.Dict.hi.
+        - To give it Haddocks, and
+        - To define the type of `withDict`, which GHC can find in
+          GHC.Magic.Dict.hi.
 
-  Because we define a binding for `withDict`, we have to provide a right-hand
-  side for its definition. We somewhat arbitrarily choose:
+      Because we define a binding for `withDict`, we have to provide a right-hand
+      side for its definition. We somewhat arbitrarily choose:
 
-    withDict = panicError "Non rewritten withDict"#
+        withDict = panicError "Non rewritten withDict"#
 
-  This should never be reachable anyway, but just in case ds_withDict fails
-  to rewrite away `withDict`, this ensures that the program won't get very far.
+      This should never be reachable anyway, but just in case ds_withDict fails
+      to rewrite away `withDict`, this ensures that the program won't get very far.
 
-* One could conceivably implement this special case for `withDict` as a
-  constant-folding rule instead of during desugaring. We choose not to do so
-  for the following reasons:
+(WD7) One could conceivably implement this special case for `withDict` as a
+      constant-folding rule instead of during desugaring. We choose not to do so
+      for the following reasons:
 
-  - Having a constant-folding rule would require that `withDict`'s definition
-    be wired in to the compiler so as to prevent `withDict` from inlining too
-    early. Implementing the special case in the desugarer, on the other hand,
-    only requires that `withDict` be known-key.
+      - Having a constant-folding rule would require that `withDict`'s definition
+        be wired in to the compiler so as to prevent `withDict` from inlining too
+        early. Implementing the special case in the desugarer, on the other hand,
+        only requires that `withDict` be known-key.
 
-  - If the constant-folding rule were to fail, we want to throw a compile-time
-    error, which is trickier to do with the way that GHC.Core.Opt.ConstantFold
-    is set up.
+      - If the constant-folding rule were to fail, we want to throw a compile-time
+        error, which is trickier to do with the way that GHC.Core.Opt.ConstantFold
+        is set up.
+
+(WD8) In fact we desugar `withDict @{rr} @mtype @(C t_1 ... t_n) @r` to
+         let wd = \sv k -> k (sv |> co)
+             {-# INLINE [2] #-}
+         in wd
+
+      The local `let` and INLINE pragma delays inlining `wd` until after the
+      type-class Specialiser has run.  This is super important. Suppose we
+      have calls
+          withDict A k
+          withDict B k
+      where k1, k2 :: C T -> blah.  If we inline those withDict calls we'll get
+          k (A |> co1)
+          k (B |> co2)
+      and the Specialiser will assume that those arguments (of type `C T`) are
+      the same, will specialise `k` for that type, and will call the same,
+      specialised function from both call sites.  #21575 is a concrete case in point.
+
+      Solution: delay inlining `withDict` until after the specialiser; that is,
+      until Phase 2.  This is not a Final Solution -- seee #21575 "Alas..".
 -}
