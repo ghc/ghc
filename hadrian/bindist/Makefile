@@ -160,65 +160,64 @@ lib/settings :
 # We need to install binaries relative to libraries.
 BINARIES = $(wildcard ./bin/*)
 install_bin_libdir:
-	@echo "Copying binaries to $(ActualBinsDir)"
-	$(INSTALL_DIR) "$(ActualBinsDir)"
+	@echo "Copying binaries to $(DESTDIR)$(ActualBinsDir)"
+	$(INSTALL_DIR) "$(DESTDIR)$(ActualBinsDir)"
 	for i in $(BINARIES); do \
-		cp -R $$i "$(ActualBinsDir)"; \
+		cp -R $$i "$(DESTDIR)$(ActualBinsDir)"; \
 	done
 
 install_bin_direct:
-	@echo "Copying binaries to $(WrapperBinsDir)"
-	$(INSTALL_DIR) "$(WrapperBinsDir)"
-	cp ./bin/* "$(WrapperBinsDir)/"
+	@echo "Copying binaries to $(DESTDIR)$(WrapperBinsDir)"
+	$(INSTALL_DIR) "$(DESTDIR)$(WrapperBinsDir)"
+	cp ./bin/* "$(DESTDIR)$(WrapperBinsDir)/"
 
 LIBRARIES = $(wildcard ./lib/*)
 install_lib: lib/settings
-	@echo "Copying libraries to $(ActualLibsDir)"
-	$(INSTALL_DIR) "$(ActualLibsDir)"
+	@echo "Copying libraries to $(DESTDIR)$(ActualLibsDir)"
+	$(INSTALL_DIR) "$(DESTDIR)$(ActualLibsDir)"
 	for i in $(LIBRARIES); do \
-		cp -R $$i "$(ActualLibsDir)/"; \
+		cp -R $$i "$(DESTDIR)$(ActualLibsDir)/"; \
 	done
 
 INCLUDES = $(wildcard ./include/*)
 install_includes:
-	@echo "Copying include files to $(includedir)"
-	$(INSTALL_DIR) "$(includedir)"
+	@echo "Copying include files to $(DESTDIR)$(includedir)"
+	$(INSTALL_DIR) "$(DESTDIR)$(includedir)"
 	for i in $(INCLUDES); do \
-		cp -R $$i "$(includedir)/"; \
+		cp -R $$i "$(DESTDIR)$(includedir)/"; \
 	done
 
 DOCS = $(wildcard ./docs/*)
 install_docs:
-	@echo "Copying docs to $(docdir)"
-	$(INSTALL_DIR) "$(docdir)"
+	@echo "Copying docs to $(DESTDIR)$(docdir)"
+	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
 	for i in $(DOCS); do \
-		cp -R $$i "$(docdir)/"; \
+		cp -R $$i "$(DESTDIR)$(docdir)/"; \
 	done
 	if [ -d docs-utils ]; then \
-		$(INSTALL_DATA) docs-utils/prologue.txt "$(docdir)/html/libraries/"; \
-		$(INSTALL_SCRIPT) docs-utils/gen_contents_index "$(docdir)/html/libraries/"; \
+		$(INSTALL_DATA) docs-utils/prologue.txt "$(DESTDIR)$(docdir)/html/libraries/"; \
+		$(INSTALL_SCRIPT) docs-utils/gen_contents_index "$(DESTDIR)$(docdir)/html/libraries/"; \
 	fi
 
 BINARY_NAMES=$(shell ls ./wrappers/)
 install_wrappers: install_bin_libdir
 	@echo "Installing wrapper scripts"
-	$(INSTALL_DIR) "$(WrapperBinsDir)"
+	$(INSTALL_DIR) "$(DESTDIR)$(WrapperBinsDir)"
 	$(foreach p, $(BINARY_NAMES),\
-		$(call installscript,$p,$(WrapperBinsDir)/$p,$(WrapperBinsDir),$(ActualBinsDir),$(ActualBinsDir)/$p,$(ActualLibsDir),$(docdir),$(includedir)))
+		$(call installscript,$p,$(DESTDIR)$(WrapperBinsDir)/$p,$(WrapperBinsDir),$(ActualBinsDir),$(ActualBinsDir)/$p,$(ActualLibsDir),$(docdir),$(includedir)))
 
-PKG_CONFS = $(shell find "$(ActualLibsDir)/package.conf.d" -name '*.conf' | sed "s:   :\0xxx\0:g")
+PKG_CONFS = $(shell find "$(DESTDIR)$(ActualLibsDir)/package.conf.d" -name '*.conf' | sed "s:   :\0xxx\0:g")
 update_package_db: install_bin install_lib
 	@echo "Installing C++ standard library virtual package"
-	cp mk/system-cxx-std-lib-1.0.conf "$(ActualLibsDir)/"
-	
+	cp mk/system-cxx-std-lib-1.0.conf "$(DESTDIR)$(ActualLibsDir)/"
 	@echo "Updating the package DB"
 	$(foreach p, $(PKG_CONFS),\
 		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-\([0-9]*[0-9]\.\)*conf//g'),$(shell echo "$p" | sed 's:\0xxx\0:   :g'),$(docdir),$(shell mk/relpath.sh "$(ActualLibsDir)" "$(docdir)")))
-	'$(WrapperBinsDir)/$(CrossCompilePrefix)ghc-pkg' recache
+	'$(DESTDIR)$(ActualBinsDir)/$(CrossCompilePrefix)ghc-pkg' --global-package-db "$(DESTDIR)$(ActualLibsDir)/package.conf.d" recache
 
 install_mingw:
 	@echo "Installing MingGW"
-	$(INSTALL_DIR) "$(prefix)/mingw"
-	cp -R ./mingw "$(prefix)"
+	$(INSTALL_DIR) "$(DESTDIR)$(prefix)/mingw"
+	cp -R ./mingw "$(DESTDIR)$(prefix)"
 # END INSTALL
 # ----------------------------------------------------------------------
