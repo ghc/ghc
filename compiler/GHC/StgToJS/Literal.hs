@@ -45,16 +45,18 @@ genLit = \case
         emitStatic strOffT (StaticUnboxed (StaticUnboxedStringOffset str)) Nothing
         return [ ValExpr (JVar strLit), ValExpr (JVar strOff) ]
   LitNullAddr              -> return [ null_, ValExpr (JInt 0) ]
-  LitNumber LitNumInt i    -> return [ toJExpr i ]
-  LitNumber LitNumInt8 i   -> return [ toJExpr i ]
-  LitNumber LitNumInt16 i  -> return [ toJExpr i ]
-  LitNumber LitNumInt32 i  -> return [ toJExpr i ]
-  LitNumber LitNumInt64 i  -> return [ toJExpr (Bits.shiftR i 32), toJExpr (toSigned i) ]
-  LitNumber LitNumWord w   -> return [ toJExpr (toSigned w) ]
-  LitNumber LitNumWord8  w -> return [ toJExpr (toSigned w) ]
-  LitNumber LitNumWord16 w -> return [ toJExpr (toSigned w) ]
-  LitNumber LitNumWord32 w -> return [ toJExpr (toSigned w) ]
-  LitNumber LitNumWord64 w -> return [ toJExpr (toSigned (Bits.shiftR w 32)), toJExpr (toSigned w) ]
+  LitNumber nt v           -> case nt of
+    LitNumInt     -> return [ toJExpr v ]
+    LitNumInt8    -> return [ toJExpr v ]
+    LitNumInt16   -> return [ toJExpr v ]
+    LitNumInt32   -> return [ toJExpr v ]
+    LitNumInt64   -> return [ toJExpr (Bits.shiftR v 32), toJExpr (toSigned v) ]
+    LitNumWord    -> return [ toJExpr (toSigned v) ]
+    LitNumWord8   -> return [ toJExpr (toSigned v) ]
+    LitNumWord16  -> return [ toJExpr (toSigned v) ]
+    LitNumWord32  -> return [ toJExpr (toSigned v) ]
+    LitNumWord64  -> return [ toJExpr (toSigned (Bits.shiftR v 32)), toJExpr (toSigned v) ]
+    LitNumBigNat  -> panic "genLit: unexpected BigNat that should have been removed in CorePrep"
   LitFloat r               -> return [ toJExpr (r2f r) ]
   LitDouble r              -> return [ toJExpr (r2d r) ]
   LitLabel name _size fod
@@ -65,8 +67,7 @@ genLit = \case
     | otherwise              -> return [ toJExpr (TxtI . ST.pack $ "h$" ++ unpackFS name)
                                        , ValExpr (JInt 0)
                                        ]
-  -- FIXME: handle other LitNumbers, LitRubbish, etc.
-  l -> pprPanic "genLit" (ppr l)
+  LitRubbish _rep -> return [ null_ ]
 
 -- | generate a literal for the static init tables
 genStaticLit :: Literal -> G [StaticLit]
