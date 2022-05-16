@@ -781,6 +781,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-centos7-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
       "TEST_ENV": "x86_64-linux-centos7-validate",
       "XZ_OPT": "-9"
     }
@@ -2230,6 +2231,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-centos7-release",
       "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "x86_64-linux-centos7-release",
       "XZ_OPT": "-9"
@@ -3080,6 +3082,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-centos7-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
       "TEST_ENV": "x86_64-linux-centos7-validate"
     }
   },

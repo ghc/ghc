@@ -357,6 +357,9 @@ distroVariables Alpine = mconcat
     -- (see Note [Object unloading]).
   , "BROKEN_TESTS" =: "encoding004 T10458 ghcilink002 linker_unload_native"
   ]
+distroVariables Centos7 = mconcat [
+  "HADRIAN_ARGS" =: "--docs=no-sphinx"
+  ]
 distroVariables Fedora33 = mconcat
   -- LLC/OPT do not work for some reason in our fedora images
   -- These tests fail with this error: T11649 T5681 T7571 T8131b
