@@ -251,10 +251,10 @@ are of equal length.  Alastair Reid thinks this should only happen if
 DEBUGging on; hey, why not?
 -}
 
-zipEqual        :: String -> [a] -> [b] -> [(a,b)]
-zipWithEqual    :: String -> (a->b->c) -> [a]->[b]->[c]
-zipWith3Equal   :: String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
-zipWith4Equal   :: String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
+zipEqual        :: HasDebugCallStack => String -> [a] -> [b] -> [(a,b)]
+zipWithEqual    :: HasDebugCallStack => String -> (a->b->c) -> [a]->[b]->[c]
+zipWith3Equal   :: HasDebugCallStack => String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
+zipWith4Equal   :: HasDebugCallStack => String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
 
 #if !defined(DEBUG)
 zipEqual      _ = zip
