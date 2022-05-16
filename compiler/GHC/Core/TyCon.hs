@@ -1181,7 +1181,9 @@ data AlgTyConRhs
                         -- See Note [Newtype eta]
         nt_co :: CoAxiom Unbranched,
                              -- The axiom coercion that creates the @newtype@
-                             -- from the representation 'Type'.
+                             -- from the representation 'Type'.  The axiom witnesses
+                             -- a representational coercion:
+                             --   nt_co :: N ty1 ~R# rep_tys
 
                              -- See Note [Newtype coercions]
                              -- Invariant: arity = #tvs in nt_etad_rhs;
