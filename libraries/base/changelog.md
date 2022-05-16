@@ -47,6 +47,9 @@
     that are used in these methods and provide an API to interact with these
     types, per
     [CLC proposal #85](https://github.com/haskell/core-libraries-committee/issues/85).
+  * The `Enum` instance of `Down a` now enumerates values in the opposite
+    order as the `Enum a` instance, per
+    [CLC proposal #51](https://github.com/haskell/core-libraries-committee/issues/51).
 
 ## 4.17.0.0 *August 2022*
 

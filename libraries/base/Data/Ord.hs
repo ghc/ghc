@@ -24,11 +24,11 @@ module Data.Ord (
    clamp,
  ) where
 
-import Data.Bits (Bits, FiniteBits)
+import Data.Bits (Bits, FiniteBits, complement)
 import Foreign.Storable (Storable)
 import GHC.Ix (Ix)
 import GHC.Base
-import GHC.Enum (Bounded(..))
+import GHC.Enum (Bounded(..), Enum(..))
 import GHC.Float (Floating, RealFloat)
 import GHC.Num
 import GHC.Read
@@ -145,6 +145,26 @@ instance Ord a => Ord (Down a) where
 instance Bounded a => Bounded (Down a) where
     minBound = Down maxBound
     maxBound = Down minBound
+
+-- | Swaps @'succ'@ and @'pred'@ of the underlying type.
+--
+-- @since 4.18.0.0
+instance (Enum a, Bounded a, Eq a) => Enum (Down a) where
+    succ = fmap pred
+    pred = fmap succ
+
+    -- Here we use the fact that 'comparing (complement @Int)' behaves
+    -- as an order-swapping `compare @Int`.
+    fromEnum = complement . fromEnum . getDown
+    toEnum = Down . toEnum . complement
+
+    enumFrom (Down x)
+        | x == minBound
+        = [Down x] -- We can't rely on 'enumFromThen _ (pred @a minBound)` behaving nicely,
+                   -- since 'enumFromThen _' might be strict and 'pred minBound' might throw
+        | otherwise
+        = coerce $ enumFromThen x (pred x)
+    enumFromThen (Down x) (Down y) = coerce $ enumFromThen x y
 
 -- | @since 4.11.0.0
 instance Functor Down where
