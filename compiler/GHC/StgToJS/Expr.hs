@@ -608,7 +608,7 @@ genAlts ctx e at me alts = do
         dids     <- mconcat <$> mapM declIds bs
         bss      <- concatMapM genIds bs
         (ej, er) <- genExpr ctx expr
-        return (dids <> assignAllEqual bss ie <> ej, er)
+        return (dids <> assignAll bss ie <> ej, er)
 
     PrimAlt tc
       -> do
