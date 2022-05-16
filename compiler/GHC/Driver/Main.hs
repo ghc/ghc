@@ -1718,41 +1718,50 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         -- top-level function, so withTiming isn't very useful here.
         -- Hence we have one withTiming for the whole backend, the
         -- next withTiming after this will be "Assembler" (hard code only).
-        withTiming logger
-                   (text "CodeGen"<+>brackets (ppr this_mod))
-                   (const ()) $ do
-          case backend dflags of
-            JavaScript -> do
-              let js_config = initStgToJSConfig dflags
-              stgToJS logger js_config stg_binds this_mod spt_entries foreign_stubs0 cost_centre_info output_filename
-              let cg_infos      = Nothing
-              let stub_c_exists = Nothing
-              let foreign_fps   = []
-              return (output_filename, stub_c_exists, foreign_fps, cg_infos)
+        let do_code_gen =
+              withTiming logger (text "CodeGen"<+>brackets (ppr this_mod)) (const ())
+              $ case backend dflags of
+                  JavaScript ->
+                    do
+                    let js_config = initStgToJSConfig dflags
+                        cg_infos      = Nothing
+                        stub_c_exists = Nothing
+                        foreign_fps   = []
 
-            _          -> do
-              cmms <- {-# SCC "StgToCmm" #-}
-                              doCodeGen hsc_env this_mod denv data_tycons
-                                  cost_centre_info
-                                  stg_binds hpc_info
+                    -- do the unfortunately effectual business
+                    stgToJS logger js_config stg_binds this_mod spt_entries foreign_stubs0 cost_centre_info output_filename
+                    return (output_filename, stub_c_exists, foreign_fps, cg_infos)
 
-              ------------------  Code output -----------------------
-              rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
-                          case cmmToRawCmmHook hooks of
-                              Nothing -> cmmToRawCmm logger profile cmms
-                              Just h  -> h dflags (Just this_mod) cmms
+                  _          ->
+                    do
+                    cmms <- {-# SCC "StgToCmm" #-}
+                      doCodeGen hsc_env this_mod denv data_tycons
+                      cost_centre_info
+                      stg_binds hpc_info
 
-              let dump a = do
-                    unless (null a) $
-                      putDumpFileMaybe logger Opt_D_dump_cmm_raw "Raw Cmm" FormatCMM (pdoc platform a)
-                    return a
-                  rawcmms1 = Stream.mapM dump rawcmms0
+                    ------------------  Code output -----------------------
+                    rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
+                      case cmmToRawCmmHook hooks of
+                        Nothing -> cmmToRawCmm logger profile cmms
+                        Just h  -> h dflags (Just this_mod) cmms
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
-                <- {-# SCC "codeOutput" #-}
-                  codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod output_filename location
-                  foreign_stubs foreign_files dependencies rawcmms1
-            return (output_filename, stub_c_exists, foreign_fps, Just cg_infos)
+                    let dump a = do
+                          unless (null a) $ putDumpFileMaybe logger Opt_D_dump_cmm_raw "Raw Cmm" FormatCMM (pdoc platform a)
+                          return a
+                        rawcmms1 = Stream.mapM dump rawcmms0
+
+                    let foreign_stubs st = foreign_stubs0
+                                           `appendStubC` prof_init
+                                           `appendStubC` cgIPEStub st
+
+                    (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
+                      <- {-# SCC "codeOutput" #-}
+                      codeOutput logger        tmpfs           dflags   (hsc_units hsc_env)
+                                 this_mod      output_filename location foreign_stubs
+                                 foreign_files dependencies    rawcmms1
+
+                    return (output_filename, stub_c_exists, foreign_fps, Just cg_infos)
+        do_code_gen
 
 
 hscInteractive :: HscEnv
