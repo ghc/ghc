@@ -14,7 +14,7 @@
 
 #pragma once
 
-#if defined(UnregisterisedCompiler)
+#if defined(UnregisterisedCompiler) || defined(js_HOST_ARCH)
 #if !defined(NO_REGS)
 #define NO_REGS
 #endif
@@ -24,6 +24,9 @@
  * Defining NO_REGS causes no global registers to be used.  NO_REGS is
  * typically defined by GHC, via a command-line option passed to gcc,
  * when the -funregisterised flag is given.
+ *
+ * It is also enabled for target architectures that really lack registers, such
+ * as JavaScript.
  *
  * NB. When NO_REGS is on, calling & return conventions may be
  * different.  For example, all function arguments will be passed on
