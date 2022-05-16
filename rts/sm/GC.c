@@ -2303,3 +2303,81 @@ bool doIdleGCWork(Capability *cap STG_UNUSED, bool all)
  * place, so we always keep that much. If using compacting or nonmoving then we need a lower number,
  * so we just retain at least `1.2 * live_bytes` for some protection.
  */
+
+/* Note [-Fd and thrashing]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * See the discussion on #21483 and how low we should scale memory usage and whether
+ * the current behaviour will result in thrashing.
+ *
+ >  The post is correct to say that we need 2L memory to do copying collection
+ >  when there is L live bytes. But it seems to ignore the fact that we don't
+ >  collect until the heap has grown to F*L bytes (where F=2 by default), which
+ >  means that in a steady state of L live bytes we actually need (1+F)L bytes
+ >  (plus the nursery). This is where the original default of returning memory
+ >  above (2+F)L came from: we know we need (1+F)L, plus a bit for the nursery,
+ >  plus we add on another L so that we don't thrash.
+
+ >  If I'm understanding the way -Fd works, it will return memory until we're
+ >  below the 3L value, which will definitely lead to thrashing because we'll
+ >  reallocate the memory to get back to 3L at the next major GC, assuming L
+ >  remains constant.
+
+ >  I think you would want to decay from (2+F)L to (1+F)L, but no lower than
+ >  that. Also, saying that we're "scaling F" is not really the right way to
+ >  think about it, since F is not actually changing, it's the fudge factor we
+ >  want to change.
+
+ * The situation where -Fd kicks in is when the process is idle (ie not
+ * allocating at all), if a process is idle then the memory usage returns down to
+ * a minimal baseline (2L) over quite an extended period by default. Which I
+ * think is what you want because if your program memory usage was increasing,
+ * this is the state you would get into during an idle period. The expectation is
+ * that the amount of program the RTS retains is related to the actual live bytes
+ * rather than the historical memory usage of the program.
+
+ * You are then right, that if after this idle period then we start allocating
+ * again then we will need to get more memory from the OS but this is on the scale
+ * of 10s of minutes rather than milliseconds or seconds (due to the delay
+ * factor).
+ *
+ * It seems in your reply you assume that there will certainly be a major GC due
+ * to allocation in the near future -- but this isn't true. I am often leaving a
+ * high memory consumption Haskell process idle for periods of days/weeks on my
+ * machine and so if that retained 3*L bytes then I would certainly notice!
+ *
+ *
+ * > True enough, I was mainly thinking about programs that allocate continuously.
+ * >
+ * > So let's be a bit more precise
+ * >
+ * >     At the next major GC, the program will need (1+F)L
+ * >     Until the next major GC, it needs from L up to FL bytes
+ * >
+ * > (ignoring the nursery and other things, for simplicity)
+ * >
+ * > if you expect to be in state (2) for a long time, then you could free as
+ * > much memory as you like. Indeed you could free everything except the nursery
+ * > and L after a major GC. Gradually freeing memory instead is a way to say "if
+ * > I've already been idle for a while, then I'm likely to be idle for a while
+ * > longer", which might be true (but it's a hypothesis, like the generational
+ * > hypothesis).
+ * > So if we're hypothesising that the program is idle, why stop freeing at 2L, why not go further?
+ *
+ * Because to my understanding when you are idle you are going to do an idle
+ * major collection which will require 2L so if you free below that you will
+ * get thrashing.
+ *
+ * > But why would you do an idle GC at all in that case? If the program is
+ * > mostly idle, and we think it's going to be mostly idle in the future, and
+ * > we've already free'd all the memory, then there's no reason to do any more
+ * > idle GCs.
+ *
+ * I think it's rare for programs to be completely idle for long periods. Even
+ * during "idle" periods, there is probably still a small amount of allocation
+ * happening before each idle period (hence the reason for flags like -Iw which
+ * prevent many idle collections happening in close succession during periods
+ * of "idleness".
+ *
+
+*/
