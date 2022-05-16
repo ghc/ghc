@@ -127,6 +127,12 @@ genApp ctx i args
       a <- adjSp 1 -- for the header (which will only be written when the thread is suspended)
       return (ra <> p <> a <> returnS ei, ExprCont)
 
+    -- proxy#
+    | [] <- args
+    , getUnique i == proxyHashKey
+    , [top] <- concatMap typex_expr (ctxTarget ctx)
+    = return (top |= null_, ExprInline Nothing)
+
     | [] <- args
     , isUnboxedTupleType (idType i) || isStrictType (idType i)
     = do
