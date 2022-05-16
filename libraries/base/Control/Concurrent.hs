@@ -105,17 +105,25 @@ module Control.Concurrent (
 
     ) where
 
+-- JavaScript platform doesn't support bound threads
+#if !defined(js_HOST_ARCH)
+#define SUPPORT_BOUND_THREADS
+#endif
+
 import Control.Exception.Base as Exception
 
 import GHC.Conc hiding (threadWaitRead, threadWaitWrite,
                         threadWaitReadSTM, threadWaitWriteSTM)
+
+#if defined(SUPPORT_BOUND_THREADS)
 import GHC.IO           ( unsafeUnmask, catchException )
 import GHC.IORef        ( newIORef, readIORef, writeIORef )
 import GHC.Base
-
-import System.Posix.Types ( Fd )
 import Foreign.StablePtr
 import Foreign.C.Types
+#endif
+
+import System.Posix.Types ( Fd )
 
 #if defined(mingw32_HOST_OS)
 import Foreign.C
@@ -249,6 +257,27 @@ this means forking subthreads to do the work using 'forkIO', and
 waiting for the results in the main thread.
 
 -}
+
+#if !defined(SUPPORT_BOUND_THREADS)
+forkOS :: IO () -> IO ThreadId
+forkOS _ = error "forkOS not supported on this architecture"
+
+forkOSWithUnmask :: ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
+forkOSWithUnmask _ = error "forkOS not supported on this architecture"
+
+isCurrentThreadBound :: IO Bool
+isCurrentThreadBound = pure False
+
+runInBoundThread :: IO a -> IO a
+runInBoundThread action = action
+
+runInUnboundThread :: IO a -> IO a
+runInUnboundThread action = action
+
+rtsSupportsBoundThreads :: Bool
+rtsSupportsBoundThreads = False
+#else
+
 
 -- | 'True' if bound threads are supported.
 -- If @rtsSupportsBoundThreads@ is 'False', 'isCurrentThreadBound'
@@ -389,6 +418,8 @@ runInUnboundThread action = do
 
 unsafeResult :: Either SomeException a -> IO a
 unsafeResult = either Exception.throwIO return
+
+#endif
 
 -- ---------------------------------------------------------------------------
 -- threadWaitRead/threadWaitWrite
