@@ -203,7 +203,7 @@ enableProfiledGhc :: Flavour -> Flavour
 enableProfiledGhc flavour =
     enableLateCCS flavour { rtsWays = do
                 ws <- rtsWays flavour
-                pure $ (Set.map (\w -> w <> profiling) ws) <> ws
+                pure $ (Set.map (\w -> if wayUnit Dynamic w then w else w <> profiling) ws) <> ws
             , libraryWays = (Set.singleton profiling <>) <$> (libraryWays flavour)
             , ghcProfiled = (>= Stage1)
             }
