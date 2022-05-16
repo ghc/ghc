@@ -175,6 +175,12 @@ several ways
      no longer does that.  So we need a separate map/unsafeCoerce
      RULE, in this module.
 
+     Adding these RULES means we must delay inlinine unsafeCoerce
+     until the RULES have had a chance to fire; hence the INLINE[1]
+     pragma on unsafeCoerce.  (Side note: this has the coincidental
+     benefit of making the unsafeCoerce-based version of the `reflection`
+     library work -- see #21575.)
+
 There are yet more wrinkles
 
 (U9) unsafeCoerce works only over types of kind `Type`.
@@ -236,6 +242,9 @@ unsafeEqualityProof = case unsafeEqualityProof @a @b of UnsafeRefl -> UnsafeRefl
 --   case unsafeEqualityProof of UnsafeRefl -> case blah of ...
 --
 -- which is definitely better.
+--
+-- Why delay inlining to Phase 1?  Because of the RULES for map/unsafeCoerce;
+-- see (U8) in Note [Implementing unsafeCoerce]
 
 -- | Coerce a value from one type to another, bypassing the type-checker.
 --
