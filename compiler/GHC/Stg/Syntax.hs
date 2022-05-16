@@ -61,7 +61,7 @@ module GHC.Stg.Syntax (
         -- ppr
         StgPprOpts(..),
         panicStgPprOpts, shortStgPprOpts,
-        pprStgArg, pprStgExpr, pprStgRhs, pprStgBinding,
+        pprStgArg, pprStgExpr, pprStgRhs, pprStgBinding, pprStgAlt,
         pprGenStgTopBinding, pprStgTopBinding,
         pprGenStgTopBindings, pprStgTopBindings
     ) where
