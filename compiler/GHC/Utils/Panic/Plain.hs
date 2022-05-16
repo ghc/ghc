@@ -101,11 +101,12 @@ throwPlainGhcException :: PlainGhcException -> a
 throwPlainGhcException = Exception.throw
 
 -- | Panics and asserts.
-panic, sorry, pgmError :: String -> a
+panic, sorry, pgmError :: HasCallStack => String -> a
 panic    x = unsafeDupablePerformIO $ do
    stack <- ccsToStrings =<< getCurrentCCS x
+   let doc = unlines $ fmap ("  "++) $ lines (prettyCallStack callStack)
    if null stack
-      then throwPlainGhcException (PlainPanic x)
+      then throwPlainGhcException (PlainPanic (x ++ '\n' : doc))
       else throwPlainGhcException (PlainPanic (x ++ '\n' : renderStack stack))
 
 sorry    x = throwPlainGhcException (PlainSorry x)
