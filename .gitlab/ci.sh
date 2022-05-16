@@ -539,6 +539,27 @@ function build_hadrian() {
 
 }
 
+# run's `make DESTDIR=$1 install` and then
+# merges the file tree to the actual destination $2,
+# ensuring that `DESTDIR` is properly honoured by the
+# build system
+function make_install_destdir() {
+  local destdir=$1
+  local instdir=$2
+
+  mkdir -p "$destdir"
+  mkdir -p "$instdir"
+  run "$MAKE" DESTDIR="$destdir" install
+  # check for empty dir portably
+  # https://superuser.com/a/667100
+  if find "$instdir" -mindepth 1 -maxdepth 1 | read; then
+    fail "$instdir is not empty!"
+  fi
+  info "merging file tree from $destdir to $instdir"
+  cp -a "$destdir/$instdir"/* "$instdir"/
+  "$instdir"/bin/ghc-pkg recache
+}
+
 function test_hadrian() {
   if [ -n "${CROSS_TARGET:-}" ]; then
     info "Can't test cross-compiled build."
@@ -582,8 +603,8 @@ function test_hadrian() {
         ;;
       *)
         read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
-        run ./configure --prefix="$TOP"/_build/install "${args[@]+"${args[@]}"}" 
-        run "$MAKE" install
+        run ./configure --prefix="$TOP"/_build/install "${args[@]+"${args[@]}"}"
+        make_install_destdir "$TOP"/destdir "$TOP"/_build/install
         ;;
     esac
     cd ../../../
