@@ -4,30 +4,33 @@
 (L
  { KindSigs.hs:1:1 }
  (HsModule
-  (EpAnn
-   (Anchor
-    { KindSigs.hs:1:1 }
-    (UnchangedAnchor))
-   (AnnsModule
-    [(AddEpAnn AnnModule (EpaSpan { KindSigs.hs:6:1-6 }))
-    ,(AddEpAnn AnnWhere (EpaSpan { KindSigs.hs:6:17-21 }))]
-    (AnnList
-     (Nothing)
-     (Nothing)
-     (Nothing)
+  (XModulePs
+   (EpAnn
+    (Anchor
+     { KindSigs.hs:1:1 }
+     (UnchangedAnchor))
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { KindSigs.hs:6:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { KindSigs.hs:6:17-21 }))]
+     (AnnList
+      (Nothing)
+      (Nothing)
+      (Nothing)
+      []
+      []))
+    (EpaCommentsBalanced
      []
-     []))
-   (EpaCommentsBalanced
-    []
-    [(L
-      (Anchor
-       { KindSigs.hs:36:1 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaEofComment)
-       { KindSigs.hs:36:1 }))]))
-  (VirtualBraces
-   (1))
+     [(L
+       (Anchor
+        { KindSigs.hs:36:1 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaEofComment)
+        { KindSigs.hs:36:1 }))]))
+   (VirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:6:8-15 })
@@ -36,20 +39,22 @@
   [(L
     (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:8:1-16 })
     (ImportDecl
-     (EpAnn
-      (Anchor
-       { KindSigs.hs:8:1-6 }
-       (UnchangedAnchor))
-      (EpAnnImportDecl
-       (EpaSpan { KindSigs.hs:8:1-6 })
-       (Nothing)
-       (Nothing)
-       (Nothing)
-       (Nothing)
-       (Nothing))
-      (EpaComments
-       []))
-     (NoSourceText)
+     (XImportDeclPass
+      (EpAnn
+       (Anchor
+        { KindSigs.hs:8:1-6 }
+        (UnchangedAnchor))
+       (EpAnnImportDecl
+        (EpaSpan { KindSigs.hs:8:1-6 })
+        (Nothing)
+        (Nothing)
+        (Nothing)
+        (Nothing)
+        (Nothing))
+       (EpaComments
+        []))
+      (NoSourceText)
+      (False))
      (L
       (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:8:8-16 })
       {ModuleName: Data.Kind})
@@ -57,7 +62,6 @@
      (NotBoot)
      (False)
      (NotQualified)
-     (False)
      (Nothing)
      (Nothing)))]
   [(L
@@ -1512,8 +1516,6 @@
                    {OccName: True}))))))]
             (EmptyLocalBinds
              (NoExtField)))))]))
-      [])))]
-  (Nothing)
-  (Nothing)))
+      [])))]))
 
 

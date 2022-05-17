@@ -284,6 +284,7 @@ Language.Haskell.Syntax.Binds
 Language.Haskell.Syntax.Decls
 Language.Haskell.Syntax.Expr
 Language.Haskell.Syntax.Extension
+Language.Haskell.Syntax.ImpExp
 Language.Haskell.Syntax.Lit
 Language.Haskell.Syntax.Pat
 Language.Haskell.Syntax.Type

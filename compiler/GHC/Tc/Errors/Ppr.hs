@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -1694,11 +1695,11 @@ dodgy_msg kind tc ie
           quotes (ppr tc) <+> text "has (in-scope) constructors or class methods,",
           text "but it has none" ]
 
-dodgy_msg_insert :: forall p . IdP (GhcPass p) -> IE (GhcPass p)
+dodgy_msg_insert :: forall p . (Anno (IdP (GhcPass p)) ~ SrcSpanAnnN) => IdP (GhcPass p) -> IE (GhcPass p)
 dodgy_msg_insert tc = IEThingAll noAnn ii
   where
-    ii :: LIEWrappedName (IdP (GhcPass p))
-    ii = noLocA (IEName $ noLocA tc)
+    ii :: LIEWrappedName (GhcPass p)
+    ii = noLocA (IEName noExtField $ noLocA tc)
 
 pprTypeDoesNotHaveFixedRuntimeRep :: Type -> FixedRuntimeRepProvenance -> SDoc
 pprTypeDoesNotHaveFixedRuntimeRep ty prov =

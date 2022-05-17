@@ -9,6 +9,7 @@ which is declared in the various \tr{Hs*} modules.  This module,
 therefore, is almost nothing but re-exporting.
 -}
 
+{-# OPTIONS_GHC -Wno-orphans    #-} -- Outputable
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -63,7 +64,7 @@ import GHC.Unit.Module.Warnings ( WarningTxt )
 -- libraries:
 import Data.Data hiding ( Fixity )
 
--- | Haskell Module extension point: GHC specific 
+-- | Haskell Module extension point: GHC specific
 data XModulePs
   = XModulePs {
       hsmodAnn :: EpAnn AnnsModule,
@@ -88,10 +89,12 @@ data XModulePs
    }
    deriving Data
 
-type instance XModule GhcPs = XModulePs
-type instance XModule GhcRn = DataConCantHappen
-type instance XModule GhcTc = DataConCantHappen
+type instance XCModule GhcPs = XModulePs
+type instance XCModule GhcRn = DataConCantHappen
+type instance XCModule GhcTc = DataConCantHappen
 type instance XXModule p = DataConCantHappen
+
+type instance Anno ModuleName = SrcSpanAnnA
 
 deriving instance Data (HsModule GhcPs)
 
@@ -102,14 +105,19 @@ data AnnsModule
     } deriving (Data, Eq)
 
 instance Outputable (HsModule GhcPs) where
-    
-    ppr (XModule ext) = dataConCantHappen ext
-
-    ppr (HsModule (XModulePs _ _ _ mbDoc) Nothing _ imports decls)
+    ppr (HsModule { hsmodExt = XModulePs { hsmodHaddockModHeader = mbDoc }
+                  , hsmodName = Nothing
+                  , hsmodImports = imports
+                  , hsmodDecls = decls })
       = pprMaybeWithDoc mbDoc $ pp_nonnull imports
                              $$ pp_nonnull decls
 
-    ppr (HsModule (XModulePs _ _ deprec mbDoc) (Just name) exports imports decls)
+    ppr (HsModule { hsmodExt = XModulePs { hsmodDeprecMessage = deprec
+                                         , hsmodHaddockModHeader = mbDoc }
+                  , hsmodName = (Just name)
+                  , hsmodExports = exports
+                  , hsmodImports = imports
+                  , hsmodDecls = decls })
       = pprMaybeWithDoc mbDoc $
         vcat
           [ case exports of

@@ -4,30 +4,33 @@
 (L
  { T20846.hs:1:1 }
  (HsModule
-  (EpAnn
-   (Anchor
-    { T20846.hs:1:1 }
-    (UnchangedAnchor))
-   (AnnsModule
-    [(AddEpAnn AnnModule (EpaSpan { T20846.hs:1:1-6 }))
-    ,(AddEpAnn AnnWhere (EpaSpan { T20846.hs:1:15-19 }))]
-    (AnnList
-     (Nothing)
-     (Nothing)
-     (Nothing)
+  (XModulePs
+   (EpAnn
+    (Anchor
+     { T20846.hs:1:1 }
+     (UnchangedAnchor))
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { T20846.hs:1:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { T20846.hs:1:15-19 }))]
+     (AnnList
+      (Nothing)
+      (Nothing)
+      (Nothing)
+      []
+      []))
+    (EpaCommentsBalanced
      []
-     []))
-   (EpaCommentsBalanced
-    []
-    [(L
-      (Anchor
-       { T20846.hs:5:1 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaEofComment)
-       { T20846.hs:5:1 }))]))
-  (VirtualBraces
-   (1))
+     [(L
+       (Anchor
+        { T20846.hs:5:1 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaEofComment)
+        { T20846.hs:5:1 }))]))
+   (VirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:1:8-13 })
@@ -149,8 +152,6 @@
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
              (NoExtField)))))]))
-      [])))]
-  (Nothing)
-  (Nothing)))
+      [])))]))
 
 

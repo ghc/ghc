@@ -4,30 +4,45 @@
 (L
  { T17544_kw.hs:1:1 }
  (HsModule
-  (EpAnn
-   (Anchor
-    { T17544_kw.hs:1:1 }
-    (UnchangedAnchor))
-   (AnnsModule
-    [(AddEpAnn AnnModule (EpaSpan { T17544_kw.hs:11:1-6 }))
-    ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:13:13-17 }))]
-    (AnnList
-     (Nothing)
-     (Nothing)
-     (Nothing)
+  (XModulePs
+   (EpAnn
+    (Anchor
+     { T17544_kw.hs:1:1 }
+     (UnchangedAnchor))
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { T17544_kw.hs:11:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:13:13-17 }))]
+     (AnnList
+      (Nothing)
+      (Nothing)
+      (Nothing)
+      []
+      []))
+    (EpaCommentsBalanced
      []
-     []))
-   (EpaCommentsBalanced
-    []
-    [(L
-      (Anchor
-       { T17544_kw.hs:25:1 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaEofComment)
-       { T17544_kw.hs:25:1 }))]))
-  (VirtualBraces
-   (1))
+     [(L
+       (Anchor
+        { T17544_kw.hs:25:1 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaEofComment)
+        { T17544_kw.hs:25:1 }))]))
+   (VirtualBraces
+    (1))
+   (Nothing)
+   (Just
+    (L
+     { T17544_kw.hs:12:3-33 }
+     (WithHsDocIdentifiers
+      (MultiLineDocString
+       (HsDocStringNext)
+       (:|
+        (L
+         { T17544_kw.hs:12:7-33 }
+         (HsDocStringChunk
+          " Bad comment for the module"))
+        []))
+      []))))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:13:3-11 })
@@ -341,20 +356,6 @@
               (HsDocStringChunk
                " Bad comment for clsmethod"))
              []))
-           []))))])))]
-  (Nothing)
-  (Just
-   (L
-    { T17544_kw.hs:12:3-33 }
-    (WithHsDocIdentifiers
-     (MultiLineDocString
-      (HsDocStringNext)
-      (:|
-       (L
-        { T17544_kw.hs:12:7-33 }
-        (HsDocStringChunk
-         " Bad comment for the module"))
-       []))
-     [])))))
+           []))))])))]))
 
 

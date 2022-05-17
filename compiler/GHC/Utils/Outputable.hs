@@ -104,10 +104,11 @@ module GHC.Utils.Outputable (
 
     ) where
 
+import {-# SOURCE #-} Language.Haskell.Syntax.ImpExp ( ModuleName )
+
 import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
-import {-# SOURCE #-}   Language.Haskell.Syntax( ModuleName )
 import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 
 import GHC.Utils.BufHandle (BufHandle)

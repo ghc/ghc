@@ -1110,14 +1110,12 @@ importdecl :: { LImportDecl GhcPs }
                              , importDeclAnnAs        = fst $8
                              }
                   ; fmap reLocA $ acs (\cs -> L (comb5 $1 (reLoc $6) $7 (snd $8) $9) $
-                      ImportDecl { ideclExt = EpAnn (glR $1) anns cs
-                                  , ideclSourceSrc = snd $ fst $2
+                      ImportDecl { ideclExt = XImportDeclPass (EpAnn (glR $1) anns cs) (snd $ fst $2) False
                                   , ideclName = $6, ideclPkgQual = snd $5
                                   , ideclSource = snd $2, ideclSafe = snd $3
                                   , ideclQualified = snd $ importDeclQualifiedStyle mPreQual mPostQual
-                                  , ideclImplicit = False
                                   , ideclAs = unLoc (snd $8)
-                                  , ideclHiding = unLoc $9 })
+                                  , ideclImportList = unLoc $9 })
                   }
                 }
 
@@ -1148,20 +1146,20 @@ maybeas :: { (Maybe EpaLocation,Located (Maybe (LocatedA ModuleName))) }
                                                  ,sLL $1 (reLoc $>) (Just $2)) }
         | {- empty -}                          { (Nothing,noLoc Nothing) }
 
-maybeimpspec :: { Located (Maybe (Bool, LocatedL [LIE GhcPs])) }
+maybeimpspec :: { Located (Maybe (ImportListInterpretation, LocatedL [LIE GhcPs])) }
         : impspec                  {% let (b, ie) = unLoc $1 in
                                        checkImportSpec ie
                                         >>= \checkedIe ->
                                           return (L (gl $1) (Just (b, checkedIe)))  }
         | {- empty -}              { noLoc Nothing }
 
-impspec :: { Located (Bool, LocatedL [LIE GhcPs]) }
+impspec :: { Located (ImportListInterpretation, LocatedL [LIE GhcPs]) }
         :  '(' exportlist ')'               {% do { es <- amsrl (sLL $1 $> $ fromOL $ snd $2)
                                                                (AnnList Nothing (Just $ mop $1) (Just $ mcp $3) (fst $2) [])
-                                                  ; return $ sLL $1 $> (False, es)} }
+                                                  ; return $ sLL $1 $> (Exactly, es)} }
         |  'hiding' '(' exportlist ')'      {% do { es <- amsrl (sLL $1 $> $ fromOL $ snd $3)
                                                                (AnnList Nothing (Just $ mop $2) (Just $ mcp $4) (mj AnnHiding $1:fst $3) [])
-                                                  ; return $ sLL $1 $> (True, es)} }
+                                                  ; return $ sLL $1 $> (EverythingBut, es)} }
 
 -----------------------------------------------------------------------------
 -- Fixity Declarations

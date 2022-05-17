@@ -1,4 +1,6 @@
+{-# OPTIONS_GHC -Wno-orphans      #-} -- Outputable and IEWrappedName
 {-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
@@ -14,12 +16,13 @@
 GHC.Hs.ImpExp: Abstract syntax: imports, exports, interfaces
 -}
 
-module GHC.Hs.ImpExp where
+module GHC.Hs.ImpExp
+    ( module Language.Haskell.Syntax.ImpExp
+    , module GHC.Hs.ImpExp
+    ) where
 
 import GHC.Prelude
 
-import GHC.Unit.Module        ( ModuleName, IsBootInterface(..) )
-import GHC.Hs.Doc
 import GHC.Types.SourceText   ( SourceText(..) )
 import GHC.Types.FieldLabel   ( FieldLabel )
 
@@ -27,8 +30,9 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import Language.Haskell.Syntax.Extension
-import GHC.Hs.Extension
+import Language.Haskell.Syntax.ImpExp
 import GHC.Parser.Annotation
+import GHC.Hs.Extension
 import GHC.Types.Name
 import GHC.Types.PkgQual
 
@@ -38,28 +42,14 @@ import Data.Maybe
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Import and export declaration lists}
+    Import and export declaration lists
 *                                                                      *
 ************************************************************************
 
-One per \tr{import} declaration in a module.
+One per import declaration in a module.
 -}
 
--- | Located Import Declaration
-type LImportDecl pass = XRec pass (ImportDecl pass)
-        -- ^ When in a list this may have
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 type instance Anno (ImportDecl (GhcPass p)) = SrcSpanAnnA
-
--- | If/how an import is 'qualified'.
-data ImportDeclQualifiedStyle
-  = QualifiedPre  -- ^ 'qualified' appears in prepositive position.
-  | QualifiedPost -- ^ 'qualified' appears in postpositive position.
-  | NotQualified  -- ^ Not qualified.
-  deriving (Eq, Data)
 
 -- | Given two possible located 'qualified' tokens, compute a style
 -- (in a conforming Haskell program only one of the two can be not
@@ -77,55 +67,39 @@ isImportDeclQualified :: ImportDeclQualifiedStyle -> Bool
 isImportDeclQualified NotQualified = False
 isImportDeclQualified _ = True
 
--- | Import Declaration
---
--- A single Haskell @import@ declaration.
-data ImportDecl pass
-  = ImportDecl {
-      ideclExt       :: XCImportDecl pass,
-      ideclSourceSrc :: SourceText,
-                                 -- Note [Pragma source text] in GHC.Types.SourceText
-      ideclName      :: XRec pass ModuleName, -- ^ Module name.
-      ideclPkgQual   :: ImportDeclPkgQual pass,  -- ^ Package qualifier.
-      ideclSource    :: IsBootInterface,      -- ^ IsBoot <=> {-\# SOURCE \#-} import
-      ideclSafe      :: Bool,          -- ^ True => safe import
-      ideclQualified :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
-      ideclImplicit  :: Bool,          -- ^ True => implicit import (of Prelude)
-      ideclAs        :: Maybe (XRec pass ModuleName),  -- ^ as Module
-      ideclHiding    :: Maybe (Bool, XRec pass [LIE pass])
-                                       -- ^ (True => hiding, names)
-    }
-  | XImportDecl !(XXImportDecl pass)
-     -- ^
-     --  'GHC.Parser.Annotation.AnnKeywordId's
-     --
-     --  - 'GHC.Parser.Annotation.AnnImport'
-     --
-     --  - 'GHC.Parser.Annotation.AnnOpen', 'GHC.Parser.Annotation.AnnClose' for ideclSource
-     --
-     --  - 'GHC.Parser.Annotation.AnnSafe','GHC.Parser.Annotation.AnnQualified',
-     --    'GHC.Parser.Annotation.AnnPackageName','GHC.Parser.Annotation.AnnAs',
-     --    'GHC.Parser.Annotation.AnnVal'
-     --
-     --  - 'GHC.Parser.Annotation.AnnHiding','GHC.Parser.Annotation.AnnOpen',
-     --    'GHC.Parser.Annotation.AnnClose' attached
-     --     to location in ideclHiding
 
-     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-
-type family ImportDeclPkgQual pass
 type instance ImportDeclPkgQual GhcPs = RawPkgQual
 type instance ImportDeclPkgQual GhcRn = PkgQual
 type instance ImportDeclPkgQual GhcTc = PkgQual
 
-type instance XCImportDecl  GhcPs = EpAnn EpAnnImportDecl
-type instance XCImportDecl  GhcRn = NoExtField
-type instance XCImportDecl  GhcTc = NoExtField
+type instance XCImportDecl  GhcPs = XImportDeclPass
+type instance XCImportDecl  GhcRn = XImportDeclPass
+type instance XCImportDecl  GhcTc = DataConCantHappen
+                                 -- Note [Pragma source text] in GHC.Types.SourceText
+
+data XImportDeclPass = XImportDeclPass
+    { ideclAnn        :: EpAnn EpAnnImportDecl
+    , ideclSourceText :: SourceText
+    , ideclImplicit   :: Bool
+        -- ^ GHC generates an `ImportDecl` to represent the invisible `import Prelude`
+        -- that appears in any file that omits `import Prelude`, setting
+        -- this field to indicate that the import doesn't appear in the
+        -- original source. True => implicit import (of Prelude)
+    }
+    deriving (Data)
 
 type instance XXImportDecl  (GhcPass _) = DataConCantHappen
 
 type instance Anno ModuleName = SrcSpanAnnA
 type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnL
+
+deriving instance Data (IEWrappedName GhcPs)
+deriving instance Data (IEWrappedName GhcRn)
+deriving instance Data (IEWrappedName GhcTc)
+
+deriving instance Eq (IEWrappedName GhcPs)
+deriving instance Eq (IEWrappedName GhcRn)
+deriving instance Eq (IEWrappedName GhcTc)
 
 -- ---------------------------------------------------------------------
 
@@ -144,33 +118,36 @@ data EpAnnImportDecl = EpAnnImportDecl
 
 simpleImportDecl :: ModuleName -> ImportDecl GhcPs
 simpleImportDecl mn = ImportDecl {
-      ideclExt       = noAnn,
-      ideclSourceSrc = NoSourceText,
-      ideclName      = noLocA mn,
-      ideclPkgQual   = NoRawPkgQual,
-      ideclSource    = NotBoot,
-      ideclSafe      = False,
-      ideclImplicit  = False,
-      ideclQualified = NotQualified,
-      ideclAs        = Nothing,
-      ideclHiding    = Nothing
+      ideclExt        = XImportDeclPass noAnn NoSourceText False,
+      ideclName       = noLocA mn,
+      ideclPkgQual    = NoRawPkgQual,
+      ideclSource     = NotBoot,
+      ideclSafe       = False,
+      ideclQualified  = NotQualified,
+      ideclAs         = Nothing,
+      ideclImportList = Nothing
     }
 
 instance (OutputableBndrId p
          , Outputable (Anno (IE (GhcPass p)))
          , Outputable (ImportDeclPkgQual (GhcPass p)))
        => Outputable (ImportDecl (GhcPass p)) where
-    ppr (ImportDecl { ideclSourceSrc = mSrcText, ideclName = mod'
+    ppr (ImportDecl { ideclExt = impExt, ideclName = mod'
                     , ideclPkgQual = pkg
                     , ideclSource = from, ideclSafe = safe
-                    , ideclQualified = qual, ideclImplicit = implicit
-                    , ideclAs = as, ideclHiding = spec })
-      = hang (hsep [text "import", ppr_imp from, pp_implicit implicit, pp_safe safe,
+                    , ideclQualified = qual
+                    , ideclAs = as, ideclImportList = spec })
+      = hang (hsep [text "import", ppr_imp impExt from, pp_implicit impExt, pp_safe safe,
                     pp_qual qual False, ppr pkg, ppr mod', pp_qual qual True, pp_as as])
              4 (pp_spec spec)
       where
-        pp_implicit False = empty
-        pp_implicit True = text "(implicit)"
+        pp_implicit ext =
+            let implicit = case ghcPass @p of
+                            GhcPs | XImportDeclPass { ideclImplicit = implicit } <- ext -> implicit
+                            GhcRn | XImportDeclPass { ideclImplicit = implicit } <- ext -> implicit
+                            GhcTc -> dataConCantHappen ext
+            in if implicit then text "(implicit)"
+                           else empty
 
         pp_qual QualifiedPre False = text "qualified" -- Prepositive qualifier/prepositive position.
         pp_qual QualifiedPost True = text "qualified" -- Postpositive qualifier/postpositive position.
@@ -184,14 +161,19 @@ instance (OutputableBndrId p
         pp_as Nothing   = empty
         pp_as (Just a)  = text "as" <+> ppr a
 
-        ppr_imp IsBoot = case mSrcText of
-                          NoSourceText   -> text "{-# SOURCE #-}"
-                          SourceText src -> text src <+> text "#-}"
-        ppr_imp NotBoot = empty
+        ppr_imp ext IsBoot =
+            let mSrcText = case ghcPass @p of
+                                GhcPs | XImportDeclPass { ideclSourceText = mst } <- ext -> mst
+                                GhcRn | XImportDeclPass { ideclSourceText = mst } <- ext -> mst
+                                GhcTc -> dataConCantHappen ext
+            in case mSrcText of
+                  NoSourceText   -> text "{-# SOURCE #-}"
+                  SourceText src -> text src <+> text "#-}"
+        ppr_imp _ NotBoot = empty
 
         pp_spec Nothing             = empty
-        pp_spec (Just (False, (L _ ies))) = ppr_ies ies
-        pp_spec (Just (True, (L _ ies))) = text "hiding" <+> ppr_ies ies
+        pp_spec (Just (Exactly, (L _ ies))) = ppr_ies ies
+        pp_spec (Just (EverythingBut, (L _ ies))) = text "hiding" <+> ppr_ies ies
 
         ppr_ies []  = text "()"
         ppr_ies ies = char '(' <+> interpp'SP ies <+> char ')'
@@ -204,85 +186,14 @@ instance (OutputableBndrId p
 ************************************************************************
 -}
 
--- | A name in an import or export specification which may have
--- adornments. Used primarily for accurate pretty printing of
--- ParsedSource, and API Annotation placement. The
--- 'GHC.Parser.Annotation' is the location of the adornment in
--- the original source.
-data IEWrappedName name
-  = IEName                (LocatedN name)  -- ^ no extra
-  | IEPattern EpaLocation (LocatedN name)  -- ^ pattern X
-  | IEType    EpaLocation (LocatedN name)  -- ^ type (:+:)
-  deriving (Eq,Data)
+type instance XIEName    (GhcPass _) = NoExtField
+type instance XIEPattern (GhcPass _) = EpaLocation
+type instance XIEType    (GhcPass _) = EpaLocation
+type instance XXIEWrappedName (GhcPass _) = DataConCantHappen
 
--- | Located name with possible adornment
--- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnType',
---         'GHC.Parser.Annotation.AnnPattern'
-type LIEWrappedName name = LocatedA (IEWrappedName name)
--- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+type instance Anno (IEWrappedName (GhcPass _)) = SrcSpanAnnA
 
-
--- | Located Import or Export
-type LIE pass = XRec pass (IE pass)
-        -- ^ When in a list this may have
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnComma'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 type instance Anno (IE (GhcPass p)) = SrcSpanAnnA
-
--- | Imported or exported entity.
-data IE pass
-  = IEVar       (XIEVar pass) (LIEWrappedName (IdP pass))
-        -- ^ Imported or Exported Variable
-
-  | IEThingAbs  (XIEThingAbs pass) (LIEWrappedName (IdP pass))
-        -- ^ Imported or exported Thing with Absent list
-        --
-        -- The thing is a Class/Type (can't tell)
-        --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnPattern',
-        --             'GHC.Parser.Annotation.AnnType','GHC.Parser.Annotation.AnnVal'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-        -- See Note [Located RdrNames] in GHC.Hs.Expr
-  | IEThingAll  (XIEThingAll pass) (LIEWrappedName (IdP pass))
-        -- ^ Imported or exported Thing with All imported or exported
-        --
-        -- The thing is a Class/Type and the All refers to methods/constructors
-        --
-        -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen',
-        --       'GHC.Parser.Annotation.AnnDotdot','GHC.Parser.Annotation.AnnClose',
-        --                                 'GHC.Parser.Annotation.AnnType'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-        -- See Note [Located RdrNames] in GHC.Hs.Expr
-
-  | IEThingWith (XIEThingWith pass)
-                (LIEWrappedName (IdP pass))
-                IEWildcard
-                [LIEWrappedName (IdP pass)]
-        -- ^ Imported or exported Thing With given imported or exported
-        --
-        -- The thing is a Class/Type and the imported or exported things are
-        -- methods/constructors and record fields; see Note [IEThingWith]
-        -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen',
-        --                                   'GHC.Parser.Annotation.AnnClose',
-        --                                   'GHC.Parser.Annotation.AnnComma',
-        --                                   'GHC.Parser.Annotation.AnnType'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | IEModuleContents  (XIEModuleContents pass) (XRec pass ModuleName)
-        -- ^ Imported or exported module contents
-        --
-        -- (Export Only)
-        --
-        -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnModule'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | IEGroup             (XIEGroup pass) Int (LHsDoc pass) -- ^ Doc section heading
-  | IEDoc               (XIEDoc pass) (LHsDoc pass)       -- ^ Some documentation
-  | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc
-  | XIE !(XXIE pass)
 
 type instance XIEVar             GhcPs = NoExtField
 type instance XIEVar             GhcRn = NoExtField
@@ -306,9 +217,6 @@ type instance XIEDocNamed        (GhcPass _) = NoExtField
 type instance XXIE               (GhcPass _) = DataConCantHappen
 
 type instance Anno (LocatedA (IE (GhcPass p))) = SrcSpanAnnA
-
--- | Imported or Exported Wildcard
-data IEWildcard = NoIEWildcard | IEWildcard Int deriving (Eq, Data)
 
 {-
 Note [IEThingWith]
@@ -355,27 +263,27 @@ ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []
 ieNames (IEDocNamed       {})     = []
 
-ieWrappedLName :: IEWrappedName name -> LocatedN name
-ieWrappedLName (IEName      ln) = ln
-ieWrappedLName (IEPattern _ ln) = ln
-ieWrappedLName (IEType    _ ln) = ln
+ieWrappedLName :: IEWrappedName (GhcPass p) -> LIdP (GhcPass p)
+ieWrappedLName (IEName    _ (L l n)) = L l n
+ieWrappedLName (IEPattern _ (L l n)) = L l n
+ieWrappedLName (IEType    _ (L l n)) = L l n
 
-ieWrappedName :: IEWrappedName name -> name
+ieWrappedName :: IEWrappedName (GhcPass p) -> IdP (GhcPass p)
 ieWrappedName = unLoc . ieWrappedLName
 
 
-lieWrappedName :: LIEWrappedName name -> name
+lieWrappedName :: LIEWrappedName (GhcPass p) -> IdP (GhcPass p)
 lieWrappedName (L _ n) = ieWrappedName n
 
-ieLWrappedName :: LIEWrappedName name -> LocatedN name
+ieLWrappedName :: LIEWrappedName (GhcPass p) -> LIdP (GhcPass p)
 ieLWrappedName (L _ n) = ieWrappedLName n
 
-replaceWrappedName :: IEWrappedName name1 -> name2 -> IEWrappedName name2
-replaceWrappedName (IEName      (L l _)) n = IEName      (L l n)
+replaceWrappedName :: IEWrappedName GhcPs -> IdP GhcRn -> IEWrappedName GhcRn
+replaceWrappedName (IEName    x (L l _)) n = IEName    x (L l n)
 replaceWrappedName (IEPattern r (L l _)) n = IEPattern r (L l n)
 replaceWrappedName (IEType    r (L l _)) n = IEType    r (L l n)
 
-replaceLWrappedName :: LIEWrappedName name1 -> name2 -> LIEWrappedName name2
+replaceLWrappedName :: LIEWrappedName GhcPs -> IdP GhcRn -> LIEWrappedName GhcRn
 replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
 
 instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
@@ -403,18 +311,18 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
     ppr (IEDoc _ doc)             = ppr doc
     ppr (IEDocNamed _ string)     = text ("<IEDocNamed: " ++ string ++ ">")
 
-instance (HasOccName name) => HasOccName (IEWrappedName name) where
+instance (HasOccName (IdP (GhcPass p)), OutputableBndrId p) => HasOccName (IEWrappedName (GhcPass p)) where
   occName w = occName (ieWrappedName w)
 
-instance (OutputableBndr name) => OutputableBndr (IEWrappedName name) where
+instance OutputableBndrId p => OutputableBndr (IEWrappedName (GhcPass p)) where
   pprBndr bs   w = pprBndr bs   (ieWrappedName w)
   pprPrefixOcc w = pprPrefixOcc (ieWrappedName w)
   pprInfixOcc  w = pprInfixOcc  (ieWrappedName w)
 
-instance (OutputableBndr name) => Outputable (IEWrappedName name) where
-  ppr (IEName      n) = pprPrefixOcc (unLoc n)
-  ppr (IEPattern _ n) = text "pattern" <+> pprPrefixOcc (unLoc n)
-  ppr (IEType    _ n) = text "type"    <+> pprPrefixOcc (unLoc n)
+instance OutputableBndrId p => Outputable (IEWrappedName (GhcPass p)) where
+  ppr (IEName    _ (L _ n)) = pprPrefixOcc n
+  ppr (IEPattern _ (L _ n)) = text "pattern" <+> pprPrefixOcc n
+  ppr (IEType    _ (L _ n)) = text "type"    <+> pprPrefixOcc n
 
 pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
 pprImpExp name = type_pref <+> pprPrefixOcc name

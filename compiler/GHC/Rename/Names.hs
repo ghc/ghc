@@ -308,8 +308,9 @@ rnImportDecl this_mod
              (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name
                                      , ideclPkgQual = raw_pkg_qual
                                      , ideclSource = want_boot, ideclSafe = mod_safe
-                                     , ideclQualified = qual_style, ideclImplicit = implicit
-                                     , ideclAs = as_mod, ideclHiding = imp_details }), import_reason)
+                                     , ideclQualified = qual_style
+                                     , ideclExt = XImportDeclPass { ideclImplicit = implicit }
+                                     , ideclAs = as_mod, ideclImportList = imp_details }), import_reason)
   = setSrcSpanA loc $ do
 
     case raw_pkg_qual of
@@ -355,7 +356,7 @@ rnImportDecl this_mod
     -- Check for a missing import list (Opt_WarnMissingImportList also
     -- checks for T(..) items but that is done in checkDodgyImport below)
     case imp_details of
-        Just (False, _) -> return () -- Explicit import list
+        Just (Exactly, _) -> return () -- Explicit import list
         _  | implicit   -> return () -- Do not bleat for implicit imports
            | qual_only  -> return ()
            | otherwise  -> whenWOptM Opt_WarnMissingImportList $ do
@@ -402,8 +403,8 @@ rnImportDecl this_mod
 
     let gbl_env = mkGlobalRdrEnv gres
 
-        is_hiding | Just (True,_) <- imp_details = True
-                  | otherwise                    = False
+        is_hiding | Just (EverythingBut,_) <- imp_details = True
+                  | otherwise                             = False
 
         -- should the import be safe?
         mod_safe' = mod_safe
@@ -437,16 +438,14 @@ rnImportDecl this_mod
     warnUnqualifiedImport decl iface
 
     let new_imp_decl = ImportDecl
-          { ideclExt       = noExtField
-          , ideclSourceSrc = ideclSourceSrc decl
+          { ideclExt       = ideclExt decl
           , ideclName      = ideclName decl
           , ideclPkgQual   = pkg_qual
           , ideclSource    = ideclSource decl
           , ideclSafe      = mod_safe'
           , ideclQualified = ideclQualified decl
-          , ideclImplicit  = ideclImplicit decl
           , ideclAs        = ideclAs decl
-          , ideclHiding    = new_imp_details
+          , ideclImportList = new_imp_details
           }
 
     return (L loc new_imp_decl, gbl_env, imports, mi_hpc iface)
@@ -622,8 +621,8 @@ warnUnqualifiedImport decl iface =
     has_import_list =
       -- We treat a `hiding` clause as not having an import list although
       -- it's not entirely clear this is the right choice.
-      case ideclHiding decl of
-        Just (False, _) -> True
+      case ideclImportList decl of
+        Just (Exactly, _) -> True
         _               -> False
     bad_import =
          not is_qual
@@ -1187,8 +1186,8 @@ See T16745 for a test of this.
 filterImports
     :: ModIface
     -> ImpDeclSpec                     -- The span for the entire import decl
-    -> Maybe (Bool, LocatedL [LIE GhcPs])    -- Import spec; True => hiding
-    -> RnM (Maybe (Bool, LocatedL [LIE GhcRn]), -- Import spec w/ Names
+    -> Maybe (ImportListInterpretation, LocatedL [LIE GhcPs])    -- Import spec; True => hiding
+    -> RnM (Maybe (ImportListInterpretation, LocatedL [LIE GhcRn]), -- Import spec w/ Names
             [GlobalRdrElt])                   -- Same again, but in GRE form
 filterImports iface decl_spec Nothing
   = return (Nothing, gresFromAvails (Just imp_spec) (mi_exports iface))
@@ -1210,8 +1209,8 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
             pruned_avails = filterAvails keep all_avails
             hiding_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
 
-            gres | want_hiding = gresFromAvails (Just hiding_spec) pruned_avails
-                 | otherwise   = concatMap (gresFromIE decl_spec) items2
+            gres | want_hiding == EverythingBut = gresFromAvails (Just hiding_spec) pruned_avails
+                 | otherwise = concatMap (gresFromIE decl_spec) items2
 
         return (Just (want_hiding, L l (map fst items2)), gres)
   where
@@ -1341,7 +1340,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                              -- associated type
 
         IEThingAbs _ (L l tc')
-            | want_hiding   -- hiding ( C )
+            | want_hiding == EverythingBut   -- hiding ( C )
                        -- Here the 'C' can be a data constructor
                        --  *or* a type/class, or even both
             -> let tc = ieWrappedName tc'
@@ -1403,8 +1402,8 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
              , availTC parent [n] [])
 
         handle_bad_import m = catchIELookup m $ \err -> case err of
-          BadImport ie | want_hiding -> return ([], [BadImportW ie])
-          _                          -> failLookupWith err
+          BadImport ie | want_hiding == EverythingBut -> return ([], [BadImportW ie])
+          _ -> failLookupWith err
 
 type IELookupM = MaybeErr IELookupError
 
@@ -1480,8 +1479,8 @@ mkChildEnv gres = foldr add emptyNameEnv gres
 findChildren :: NameEnv [a] -> Name -> [a]
 findChildren env n = lookupNameEnv env n `orElse` []
 
-lookupChildren :: [GreName] -> [LIEWrappedName RdrName]
-               -> MaybeErr [LIEWrappedName RdrName]   -- The ones for which the lookup failed
+lookupChildren :: [GreName] -> [LIEWrappedName GhcPs]
+               -> MaybeErr [LIEWrappedName GhcPs]   -- The ones for which the lookup failed
                            ([LocatedA Name], [Located FieldLabel])
 -- (lookupChildren all_kids rdr_items) maps each rdr_item to its
 -- corresponding Name all_kids, if the former exists
@@ -1699,7 +1698,7 @@ warnUnusedImportDecls :: TcGblEnv -> HscSource -> RnM ()
 warnUnusedImportDecls gbl_env hsc_src
   = do { uses <- readMutVar (tcg_used_gres gbl_env)
        ; let user_imports = filterOut
-                              (ideclImplicit . unLoc)
+                              (ideclImplicit . ideclExt . unLoc)
                               (tcg_rn_imports gbl_env)
                 -- This whole function deals only with *user* imports
                 -- both for warning about unnecessary ones, and for
@@ -1731,7 +1730,7 @@ findImportUsage imports used_gres
     import_usage = mkImportMap used_gres
 
     unused_decl :: LImportDecl GhcRn -> (LImportDecl GhcRn, [GlobalRdrElt], [Name])
-    unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
+    unused_decl decl@(L loc (ImportDecl { ideclImportList = imps }))
       = (decl, used_gres, nameSetElemsStable unused_imps)
       where
         used_gres = lookupSrcLoc (srcSpanEnd $ locA loc) import_usage
@@ -1743,7 +1742,7 @@ findImportUsage imports used_gres
 
         unused_imps   -- Not trivial; see eg #7454
           = case imps of
-              Just (False, L _ imp_ies) ->
+              Just (Exactly, L _ imp_ies) ->
                                  foldr (add_unused . unLoc) emptyNameSet imp_ies
               _other -> emptyNameSet -- No explicit import list => no unused-name list
 
@@ -1822,11 +1821,11 @@ warnUnusedImport :: WarningFlag -> NameEnv (FieldLabelString, Parent)
 warnUnusedImport flag fld_env (L loc decl, used, unused)
 
   -- Do not warn for 'import M()'
-  | Just (False,L _ []) <- ideclHiding decl
+  | Just (Exactly, L _ []) <- ideclImportList decl
   = return ()
 
   -- Note [Do not warn about Prelude hiding]
-  | Just (True, L _ hides) <- ideclHiding decl
+  | Just (EverythingBut, L _ hides) <- ideclImportList decl
   , not (null hides)
   , pRELUDE_NAME == unLoc (ideclName decl)
   = return ()
@@ -1843,7 +1842,7 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
 
   -- Only one import is unused, with `SrcSpan` covering only the unused item instead of
   -- the whole import statement
-  | Just (_, L _ imports) <- ideclHiding decl
+  | Just (_, L _ imports) <- ideclImportList decl
   , length unused == 1
   , Just (L loc _) <- find (\(L _ ie) -> ((ieName ie) :: Name) `elem` unused) imports
   = let dia = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints msg2
@@ -1910,7 +1909,7 @@ getMinimalImports = fmap combine . mapM mk_minimal
   where
     mk_minimal (L l decl, used_gres, unused)
       | null unused
-      , Just (False, _) <- ideclHiding decl
+      , Just (Exactly, _) <- ideclImportList decl
       = return (L l decl)
       | otherwise
       = do { let ImportDecl { ideclName    = L _ mod_name
@@ -1919,7 +1918,7 @@ getMinimalImports = fmap combine . mapM mk_minimal
            ; iface <- loadSrcInterface doc mod_name is_boot pkg_qual
            ; let used_avails = gresToAvailInfo used_gres
                  lies = map (L l) (concatMap (to_ie iface) used_avails)
-           ; return (L l (decl { ideclHiding = Just (False, L (l2l l) lies) })) }
+           ; return (L l (decl { ideclImportList = Just (Exactly, L (l2l l) lies) })) }
       where
         doc = text "Compute minimal imports for" <+> ppr decl
 
@@ -1970,8 +1969,8 @@ getMinimalImports = fmap combine . mapM mk_minimal
 
     merge :: [LImportDecl GhcRn] -> LImportDecl GhcRn
     merge []                     = error "getMinimalImports: unexpected empty list"
-    merge decls@((L l decl) : _) = L l (decl { ideclHiding = Just (False, L (noAnnSrcSpan (locA l)) lies) })
-      where lies = concatMap (unLoc . snd) $ mapMaybe (ideclHiding . unLoc) decls
+    merge decls@((L l decl) : _) = L l (decl { ideclImportList = Just (Exactly, L (noAnnSrcSpan (locA l)) lies) })
+      where lies = concatMap (unLoc . snd) $ mapMaybe (ideclImportList . unLoc) decls
 
 
 printMinimalImports :: HscSource -> [ImportDeclUsage] -> RnM ()
@@ -2000,16 +1999,16 @@ printMinimalImports hsc_src imports_w_usage
         basefn = moduleNameString (moduleName this_mod) ++ suffix
 
 
-to_ie_post_rn_var :: (HasOccName name) => LocatedA name -> LIEWrappedName name
+to_ie_post_rn_var :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
 to_ie_post_rn_var (L l n)
   | isDataOcc $ occName n = L l (IEPattern (EpaSpan $ la2r l) (L (la2na l) n))
-  | otherwise             = L l (IEName                       (L (la2na l) n))
+  | otherwise             = L l (IEName    noExtField         (L (la2na l) n))
 
 
-to_ie_post_rn :: (HasOccName name) => LocatedA name -> LIEWrappedName name
+to_ie_post_rn :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
 to_ie_post_rn (L l n)
   | isTcOcc occ && isSymOcc occ = L l (IEType (EpaSpan $ la2r l) (L (la2na l) n))
-  | otherwise                   = L l (IEName                    (L (la2na l) n))
+  | otherwise                   = L l (IEName noExtField         (L (la2na l) n))
   where occ = occName n
 
 {-

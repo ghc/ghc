@@ -23,8 +23,7 @@ import Data.Char
 
 -- | Source Statistics
 ppSourceStats :: Bool -> Located (HsModule GhcPs) -> SDoc
-ppSourceStats _ (L _ (XModule x)) = dataConCantHappen x
-ppSourceStats short (L _ (HsModule _ _ exports imports ldecls))
+ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = imports, hsmodDecls = ldecls }))
   = (if short then hcat else vcat)
         (map pp_val
             [("ExportAll        ", export_all), -- 1 if no export list
@@ -123,7 +122,7 @@ ppSourceStats short (L _ (HsModule _ _ exports imports ldecls))
 
     import_info :: LImportDecl GhcPs -> (Int, Int, Int, Int, Int, Int, Int)
     import_info (L _ (ImportDecl { ideclSafe = safe, ideclQualified = qual
-                                 , ideclAs = as, ideclHiding = spec }))
+                                 , ideclAs = as, ideclImportList = spec }))
         = add7 (1, safe_info safe, qual_info qual, as_info as, 0,0,0) (spec_info spec)
 
     safe_info False = 0
@@ -133,8 +132,8 @@ ppSourceStats short (L _ (HsModule _ _ exports imports ldecls))
     as_info Nothing  = 0
     as_info (Just _) = 1
     spec_info Nothing           = (0,0,0,0,1,0,0)
-    spec_info (Just (False, _)) = (0,0,0,0,0,1,0)
-    spec_info (Just (True, _))  = (0,0,0,0,0,0,1)
+    spec_info (Just (Exactly, _)) = (0,0,0,0,0,1,0)
+    spec_info (Just (EverythingBut, _))  = (0,0,0,0,0,0,1)
 
     data_info (DataDecl { tcdDataDefn = HsDataDefn
                                           { dd_cons = cs

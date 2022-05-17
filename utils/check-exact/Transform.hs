@@ -979,7 +979,7 @@ moveTrailingComments first second = do
 -- ---------------------------------------------------------------------
 
 anchorEof :: ParsedSource -> ParsedSource
-anchorEof (L l m@(HsModule an _lo _mn _exps _imps _decls _ _)) = L l (m { hsmodAnn = an' })
+anchorEof (L l m@(HsModule (XModulePs an _lo _ _) _mn _exps _imps _decls)) = L l (m { hsmodExt = (hsmodExt m){ hsmodAnn = an' } })
   where
     an' = addCommentOrigDeltasAnn an
 
@@ -1128,12 +1128,12 @@ class (Data t) => HasDecls t where
 -- ---------------------------------------------------------------------
 
 instance HasDecls ParsedSource where
-  hsDecls (L _ (HsModule _ _lo _mn _exps _imps decls _ _)) = return decls
-  replaceDecls (L l (HsModule a lo mname exps imps _decls deps haddocks)) decls
+  hsDecls (L _ (HsModule (XModulePs _ _lo _ _) _mn _exps _imps decls)) = return decls
+  replaceDecls (L l (HsModule (XModulePs a lo deps haddocks) mname exps imps _decls)) decls
     = do
         logTr "replaceDecls LHsModule"
         -- modifyAnnsT (captureOrder m decls)
-        return (L l (HsModule a lo mname exps imps decls deps haddocks))
+        return (L l (HsModule (XModulePs a lo deps haddocks) mname exps imps decls))
 
 -- ---------------------------------------------------------------------
 

@@ -20,6 +20,7 @@ module Language.Haskell.Syntax (
         module Language.Haskell.Syntax.Binds,
         module Language.Haskell.Syntax.Decls,
         module Language.Haskell.Syntax.Expr,
+        module Language.Haskell.Syntax.ImpExp,
         module Language.Haskell.Syntax.Lit,
         module Language.Haskell.Syntax.Pat,
         module Language.Haskell.Syntax.Type,
@@ -30,16 +31,13 @@ module Language.Haskell.Syntax (
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Expr
+import Language.Haskell.Syntax.ImpExp
 import Language.Haskell.Syntax.Lit
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Type
 
-import GHC.Data.FastString
-import GHC.Data.Maybe (Maybe)
-import GHC.Prelude (Show)
-import GHC.Parser.Annotation
-import GHC.Hs.ImpExp (LIE, LImportDecl)
+import Data.Maybe (Maybe)
 
 {-
 Note [Language.Haskell.Syntax.* Hierarchy]
@@ -62,9 +60,6 @@ For more details, see
 https://gitlab.haskell.org/ghc/ghc/-/wikis/implementing-trees-that-grow
 -}
 
--- | A ModuleName is essentially a simple string, e.g. @Data.List@.
-newtype ModuleName = ModuleName FastString deriving Show
-
 -- | Haskell Module
 --
 -- All we actually declare here is the top-level structure for a module.
@@ -79,12 +74,12 @@ data HsModule p
 
      -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
     HsModule {
-      hsmodExt :: XModule p,
+      hsmodExt :: XCModule p,
         -- ^ HsModule extension point
-      hsmodName :: Maybe (LocatedA ModuleName),
+      hsmodName :: Maybe (XRec p ModuleName),
         -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
         --     field is Nothing too)
-      hsmodExports :: Maybe (LocatedL [LIE p]),
+      hsmodExports :: Maybe (XRec p [LIE p]),
         -- ^ Export list
         --
         --  - @Nothing@: export list omitted, so export everything
@@ -99,10 +94,8 @@ data HsModule p
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
       hsmodImports :: [LImportDecl p],
-        -- ^ We snaffle interesting stuff out of the imported interfaces early
-        -- on, adding that info to TyDecls/etc; so this list is often empty,
-        -- downstream.
       hsmodDecls :: [LHsDecl p]
         -- ^ Type, class, value, and interface signature decls
    }
-  | XModule (XXModule p)
+  | XModule !(XXModule p)
+

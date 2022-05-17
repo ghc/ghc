@@ -1,7 +1,8 @@
+{-# OPTIONS_GHC -Wno-orphans #-} -- Outputable and Module Name
 
 -- | The ModuleName type
 module GHC.Unit.Module.Name
-    ( module Language.Haskell.Syntax
+    ( ModuleName
     , pprModuleName
     , moduleNameFS
     , moduleNameString
@@ -13,7 +14,7 @@ module GHC.Unit.Module.Name
     )
 where
 
-import {-# SOURCE #-} Language.Haskell.Syntax (ModuleName(..))
+import {-# SOURCE #-} Language.Haskell.Syntax.ImpExp (ModuleName(..))
 
 import GHC.Prelude
 

@@ -320,7 +320,7 @@ enrichHie ts (hsGrp, imports, exports, docs) ev_bs insts tcs =
   runIdentity $ flip evalStateT initState $ flip runReaderT SourceInfo $ do
     tasts <- toHie $ fmap (BC RegularBind ModuleScope) ts
     rasts <- processGrp hsGrp
-    imps <- toHie $ filter (not . ideclImplicit . unLoc) imports
+    imps <- toHie $ filter (not . ideclImplicit . ideclExt . unLoc) imports
     exps <- toHie $ fmap (map $ IEC Export . fst) exports
     docs <- toHie docs
     -- Add Instance bindings
@@ -2066,7 +2066,7 @@ instance ToHie (RScoped (LocatedAn NoEpAnns (RuleBndr GhcRn))) where
 
 instance ToHie (LocatedA (ImportDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
-      ImportDecl { ideclName = name, ideclAs = as, ideclHiding = hidden } ->
+      ImportDecl { ideclName = name, ideclAs = as, ideclImportList = hidden } ->
         [ toHie $ IEC Import name
         , toHie $ fmap (IEC ImportAs) as
         , maybe (pure []) goIE hidden
@@ -2077,7 +2077,12 @@ instance ToHie (LocatedA (ImportDecl GhcRn)) where
         , toHie $ map (IEC c) liens
         ]
         where
-         c = if hiding then ImportHiding else Import
+         -- ROMES:TODO: I notice some overlap here with Iface types, eventually
+         -- we could join these
+         c = case hiding of
+               Exactly -> Import
+               EverythingBut -> ImportHiding
+
 
 instance ToHie (IEContext (LocatedA (IE GhcRn))) where
   toHie (IEC c (L span ie)) = concatM $ makeNode ie (locA span) : case ie of
@@ -2102,16 +2107,16 @@ instance ToHie (IEContext (LocatedA (IE GhcRn))) where
       IEDoc _ d -> [toHie d]
       IEDocNamed _ _ -> []
 
-instance ToHie (IEContext (LIEWrappedName Name)) where
+instance ToHie (IEContext (LocatedA (IEWrappedName GhcRn))) where
   toHie (IEC c (L span iewn)) = concatM $ makeNodeA iewn span : case iewn of
-      IEName n ->
-        [ toHie $ C (IEThing c) n
+      IEName _ (L l n) ->
+        [ toHie $ C (IEThing c) (L l n)
         ]
-      IEPattern _ p ->
-        [ toHie $ C (IEThing c) p
+      IEPattern _ (L l p) ->
+        [ toHie $ C (IEThing c) (L l p)
         ]
-      IEType _ n ->
-        [ toHie $ C (IEThing c) n
+      IEType _ (L l n) ->
+        [ toHie $ C (IEThing c) (L l n)
         ]
 
 instance ToHie (IEContext (Located FieldLabel)) where
