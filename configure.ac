@@ -346,6 +346,58 @@ AC_SUBST(TargetHasRTSLinker)
 # Requires FPTOOLS_SET_PLATFORMS_VARS to be run first.
 FP_FIND_ROOT
 
+if test "$TargetOS" = "ghcjs"
+then
+
+    AC_ARG_VAR(EMSDK,[Use as the full path to Emscripten. [default=autodetect]])
+    AC_ARG_VAR(EMSDK_LLVM,[Use as the full path to Emscripten LLVM. [default=autodetect]])
+
+    if test "$EMSDK" != "" ; then
+        echo "Using emsdk: $EMSDK"
+    else
+        echo -e "Error: Could not find Emscripten SDK.\nCheck the EMSDK environment variable."
+        exit 1
+    fi
+
+    if test "$EMSDK_LLVM" != "" ; then
+        echo "Using emsdk LLVM: $EMSDK_LLVM"
+    else
+        echo -e "Error: Could not find LLVM for Emscripten SDK.\nCheck the EMSDK_LLVM environment variable."
+        exit 1
+    fi
+
+    test -d inplace || mkdir inplace
+
+    ghcjsbin="$hardtop/inplace/ghcjs_toolchain/bin/"
+    mkdir -p $ghcjsbin
+
+    echo "#!/usr/bin/env bash"                         > "$ghcjsbin/js-unknown-ghcjs-cc"
+    echo "exec \"$EMSDK/emcc\" \"\$@\""                >> "$ghcjsbin/js-unknown-ghcjs-cc"
+    chmod 755 "$ghcjsbin/js-unknown-ghcjs-cc"
+
+    echo "#!/usr/bin/env bash"                         > "$ghcjsbin/js-unknown-ghcjs-ar"
+    echo "\\nexec \"$EMSDK_LLVM/bin/llvm-ar\" \"\$@\"" >> "$ghcjsbin/js-unknown-ghcjs-ar"
+    chmod 755 "$ghcjsbin/js-unknown-ghcjs-ar"
+
+    echo "#!/usr/bin/env bash"                           > "$ghcjsbin/js-unknown-ghcjs-ranlib"
+    echo "nexec \"$EMSDK_LLVM/bin/llvm-ranlib\" \"\$@\"" >> "$ghcjsbin/js-unknown-ghcjs-ranlib"
+    chmod 755 "$ghcjsbin/js-unknown-ghcjs-ranlib"
+
+    echo "#!/usr/bin/env bash"                           > "$ghcjsbin/js-unknown-ghcjs-nm"
+    echo "nexec \"$EMSDK_LLVM/bin/llvm-nm\" \"\$@\""     >> "$ghcjsbin/js-unknown-ghcjs-nm"
+    chmod 755 "$ghcjsbin/js-unknown-ghcjs-nm"
+
+    dnl the linker shouldn't be used because GHC does the JS linking.
+    dnl it makes no harm to pass emscripten's one here though and it avoids
+    dnl dealing with the rest of the build system that assumes that a linker is
+    dnl available.
+    echo "#!/usr/bin/env bash"                       > "$ghcjsbin/js-unknown-ghcjs-ld"
+    echo "nexec \"$EMSDK_LLVM/bin/llvm-ld\" \"\$@\"" >> "$ghcjsbin/js-unknown-ghcjs-ld"
+    chmod 755 "$ghcjsbin/js-unknown-ghcjs-ld"
+
+    export PATH=$ghcjsbin:$PATH
+fi
+
 # Extract and configure the Windows toolchain
 if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
     FP_SETUP_WINDOWS_TOOLCHAIN
