@@ -41,8 +41,9 @@ nitpick_ignore = [
 ]
 
 rst_prolog = """
-.. |llvm-version| replace:: {llvm_version}
-""".format(llvm_version=ghc_config.llvm_version)
+.. |llvm-version-min| replace:: {llvm_version_min}
+.. |llvm-version-max| replace:: {llvm_version_max}
+""".format(llvm_version_min=ghc_config.llvm_version_min, llvm_version_max=ghc_config.llvm_version_max)
 
 # General information about the project.
 project = u'Glasgow Haskell Compiler'
