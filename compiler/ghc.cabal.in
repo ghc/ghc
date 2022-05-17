@@ -285,6 +285,7 @@ Library
         GHC.CmmToLlvm.Ppr
         GHC.CmmToLlvm.Regs
         GHC.Cmm.Dominators
+        GHC.Cmm.Reducibility
         GHC.Cmm.Type
         GHC.Cmm.Utils
         GHC.Core
@@ -373,6 +374,7 @@ Library
         GHC.Data.FiniteMap
         GHC.Data.Graph.Base
         GHC.Data.Graph.Color
+        GHC.Data.Graph.Collapse
         GHC.Data.Graph.Directed
         GHC.Data.Graph.Inductive.Graph
         GHC.Data.Graph.Inductive.PatriciaTree
@@ -803,6 +805,9 @@ Library
         GHC.Utils.Ppr.Colour
         GHC.Utils.TmpFs
         GHC.Utils.Trace
+        GHC.Wasm.ControlFlow
+        GHC.Wasm.ControlFlow.FromCmm
+        GHC.Wasm.ControlFlow.ToAsm
 
         Language.Haskell.Syntax
         Language.Haskell.Syntax.Basic

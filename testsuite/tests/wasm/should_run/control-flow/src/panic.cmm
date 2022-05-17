@@ -1,0 +1,8 @@
+myswitch (bits32 n) {
+  switch [0 .. 4] n {
+    case 0, 1: { foreign "C" A(); return (666); }
+    case 2: { foreign "C" B(); return (555); }
+    case 4: { foreign "C" C(); return (444); }
+    default: { foreign "C" D(); return (333); }
+  }
+}

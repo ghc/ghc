@@ -1,0 +1,22 @@
+section "comment" {
+  mycomment:
+  bits8 [] "see https://medium.com/leaningtech/solving-the-structured-control-flow-problem-once-and-for-all-5123117b1ee2";
+}
+
+hardswitch(bits32 n) {
+
+  bits32 m;
+  (m) = foreign "C" A();
+  switch [0 .. 4] (m) {
+   case 0:
+    { foreign "C" B(); goto c1; }
+   case 1:
+    { c1: foreign "C" C(); goto c2; }
+   case 2:
+    { c2: foreign "C" D(); goto c3; }
+   default:
+    { c3: foreign "C" E(); goto finish; }
+  }
+  finish:
+  return();
+}

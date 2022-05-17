@@ -1,3 +1,5 @@
+ref    compiler/GHC/Cmm/Reducibility.hs:52:1:     Note [Reducibility resources]
+ref    compiler/GHC/Cmm/Reducibility.hs:142:1:     Note [Reducibility resources]
 ref    compiler/GHC/Core/Coercion/Axiom.hs:458:2:     Note [RoughMap and rm_empty]
 ref    compiler/GHC/Core/Opt/OccurAnal.hs:857:15:     Note [Loop breaking]
 ref    compiler/GHC/Core/Opt/SetLevels.hs:1598:30:     Note [Top level scope]
@@ -77,4 +79,3 @@ ref    testsuite/tests/typecheck/should_compile/tc231.hs:12:16:     Note [Import
 ref    testsuite/tests/typecheck/should_fail/UnliftedNewtypesMultiFieldGadt.hs:11:28:     Note [Kind-checking the field type]
 ref    testsuite/tests/typecheck/should_fail/tcfail093.hs:13:7:     Note [Important subtlety in oclose]
 ref    validate:412:14:     Note [Why is there no stage1 setup function?]
-

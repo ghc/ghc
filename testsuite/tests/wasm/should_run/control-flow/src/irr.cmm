@@ -1,0 +1,19 @@
+section "comment" {
+  mycomment:
+  bits8 [] "The classic irreducible flow graph, modified so it doesn't loop forever (so we can test it";
+}
+
+
+irr1 (bits32 n) {
+  A:
+    foreign "C" A();
+    if (n > 1) goto B;
+  C:
+    foreign "C" C();
+    if (n > 3) goto B;
+    return (888);
+  B: 
+    foreign "C" B();
+    if (n > 2) goto C;
+    return (999);
+}
