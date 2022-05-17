@@ -1,5 +1,13 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.16.2.0 *May 2022*
+
+  * Shipped with GHC 9.2.2
+
+  * Export GHC.Event.Internal on Windows (#21245)
+
+  # Documentation Fixes
+
 ## 4.16.1.0 *Feb 2022*
 
   * Shipped with GHC 9.2.2
