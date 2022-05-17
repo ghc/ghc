@@ -6,13 +6,17 @@
 #
 # The primary effect of this is updating CONF_CC_OPTS_STAGE[12] to
 # explicitly ask the compiler to generate code for the $TargetPlatform.
+#
+# $1 = CC
+# $2 = CC_OPTS variable
+# $3 = CXX_OPTS variable
+# $4 = GCC_LINK_OPTS variable
 AC_DEFUN([FP_CC_SUPPORTS_TARGET],
 [
-   AC_REQUIRE([AC_PROG_CC])
    AC_REQUIRE([GHC_LLVM_TARGET_SET_VAR])
-   AC_MSG_CHECKING([whether $1 CC supports --target])
+   AC_MSG_CHECKING([whether $1 supports --target])
    echo 'int main() { return 0; }' > conftest.c
-   if $CC --target=$LlvmTarget -Werror conftest.c > /dev/null 2>&1 ; then
+   if $1 --target=$LlvmTarget -Werror conftest.c > /dev/null 2>&1 ; then
        CONF_CC_SUPPORTS_TARGET=YES
        AC_MSG_RESULT([yes])
    else
@@ -22,12 +26,9 @@ AC_DEFUN([FP_CC_SUPPORTS_TARGET],
    rm -f conftest.c conftest
 
    if test $CONF_CC_SUPPORTS_TARGET = YES ; then
-       CONF_CC_OPTS_STAGE1="--target=$LlvmTarget $CONF_CC_OPTS_STAGE1"
-       CONF_CC_OPTS_STAGE2="--target=$LlvmTarget $CONF_CC_OPTS_STAGE2"
-       CONF_CXX_OPTS_STAGE1="--target=$LlvmTarget $CONF_CXX_OPTS_STAGE1"
-       CONF_CXX_OPTS_STAGE2="--target=$LlvmTarget $CONF_CXX_OPTS_STAGE2"
-       CONF_GCC_LINKER_OPTS_STAGE1="--target=$LlvmTarget $CONF_GCC_LINKER_OPTS_STAGE1"
-       CONF_GCC_LINKER_OPTS_STAGE2="--target=$LlvmTarget $CONF_GCC_LINKER_OPTS_STAGE2"
+       $2="--target=$LlvmTarget $$2"
+       $3="--target=$LlvmTarget $$3"
+       $4="--target=$LlvmTarget $$4"
    fi
 ])
 

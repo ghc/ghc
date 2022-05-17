@@ -201,7 +201,8 @@ AC_SUBST(TargetHasGnuNonexecStack)
 
 dnl ** See whether cc supports --target=<triple> and set
 dnl CONF_CC_OPTS_STAGE[12] accordingly.
-FP_CC_SUPPORTS_TARGET
+FP_CC_SUPPORTS_TARGET([$CC], [CONF_CC_OPTS_STAGE1], [CONF_CXX_OPTS_STAGE1], [CONF_GCC_LINK_OPTS_STAGE1])
+FP_CC_SUPPORTS_TARGET([$CC], [CONF_CC_OPTS_STAGE2], [CONF_CXX_OPTS_STAGE2], [CONF_GCC_LINK_OPTS_STAGE2])
 
 dnl TargetWordSize for settings file
 AC_CHECK_SIZEOF(void *, 4)
