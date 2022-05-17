@@ -1,0 +1,23 @@
+loop (bits32 n) {
+  A:
+    foreign "C" A();
+  B: 
+    foreign "C" B();
+  C:
+    foreign "C" C();
+    if (n > 3) goto A;
+  D:
+    foreign "C" D();
+    if (n > 4) goto H;
+  E:
+    foreign "C" E();
+    if (n > 5) goto B;
+  F:
+    foreign "C" F();
+    if (n > 6) goto A;
+  G:
+    foreign "C" G();
+  H:
+    foreign "C" H();
+    return(0);
+}

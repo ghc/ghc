@@ -1,0 +1,6 @@
+self (bits32 n) {
+ A:
+   n = n - 1;
+   if (n > 0) goto A;
+   return (n);
+}

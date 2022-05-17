@@ -1,0 +1,9 @@
+decrement(bits32 n) {
+ A: 
+  if (n > 0) {
+    n = n - 1;
+    goto A;
+  }
+  return (n);
+}
+

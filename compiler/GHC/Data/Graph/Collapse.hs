@@ -19,7 +19,7 @@ import GHC.Prelude
 
 import Control.Exception
 import Control.Monad
-import Data.List
+import Data.List (delete, union, insert, intersect)
 import Data.Semigroup
 
 import GHC.Cmm.Dataflow.Label
@@ -105,10 +105,7 @@ forceMatch node g = case match node g of (Just c, g') -> (c, g')
                                          _ -> panicDump node g
  where panicDump :: Graph gr => Node -> gr s b -> any
        panicDump k _g =
-        panic ("/* failed to match node " ++ show k ++ " */"
-               -- $$ dotGraph pprCollapseInfo (selected k) g
-               -- for a more informative panic, import DotGraph and turn this on
-              )
+         panic $ "GHC.Data.Graph.Collapse failed to match node " ++ show k
 
 -- | Rewrite the label of a given node.
 updateNode :: DynGraph gr => (s -> s) -> Node -> gr s b -> gr s b
@@ -250,7 +247,7 @@ anySplittable g = case splittable of
 collapseInductiveGraph :: (DynGraph gr, Supernode s m, VizCollapseMonad m gr s)
                        => gr s () -> m (gr s ())
 collapseInductiveGraph g = drain g worklist
-  where worklist :: [[Node]] -- ^ nodes with exactly one predecessor
+  where worklist :: [[Node]] -- nodes with exactly one predecessor
         worklist = [filter (singlePred g) $ nodes g]
 
         drain g [] = if singletonGraph g then finalGraph g >> return g

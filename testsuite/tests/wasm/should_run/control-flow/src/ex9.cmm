@@ -1,0 +1,15 @@
+ex10 (bits32 n) {
+  A:
+    foreign "C" A();
+  B: 
+    foreign "C" B();
+    if (n > 2) goto A;
+  C:
+    foreign "C" C();
+    if (n > 3) goto E;
+  D: foreign "C" D();
+     goto F;
+  E: foreign "C" E();
+  F: foreign "C" F();
+    return(333);
+}

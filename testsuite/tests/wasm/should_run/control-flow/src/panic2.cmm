@@ -1,0 +1,7 @@
+ex10 (bits32 n) {
+  C:
+    if (n > 3) { goto D; } else { goto E; }
+  D: 
+  E: 
+    return(333);
+}

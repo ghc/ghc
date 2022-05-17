@@ -1,0 +1,22 @@
+myswitch (bits32 n) {
+  switch [0 .. 4] n {
+    case 0, 1: { foreign "C" A(); goto next; }
+    case 2: { foreign "C" B(); goto inner; }
+    case 4: { inner: foreign "C" C(); goto next; }
+    default: { foreign "C" D(); goto next; }
+  }
+  next:
+  switch [0 .. 4] n {
+    case 0, 1: { foreign "C" G(); goto finish; }
+    case 2: { foreign "C" H(); goto inner2; }
+    case 4: { foreign "C" J(); goto finish; }
+    case 3: { inner2: foreign "C" I(); 
+               switch [0 .. 1] n {
+                 case 0: { foreign "C" I0(); goto finish; }
+                 case 1: { foreign "C" I1(); goto finish; }
+               }
+            }
+  }
+  finish: 
+    return();
+}

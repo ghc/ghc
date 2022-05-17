@@ -32,11 +32,13 @@ Description : Representation of control-flow portion of the WebAssembly instruct
 -- an inference algorithm over the code.
 
 
+-- | Representation of WebAssembly control flow.
+-- Type parameter `s` is the type of (unspecified) statements.
+-- It might be instantiated with an open Cmm block or with a sequence
+-- of Wasm instructions.
+-- Parameter `e` is the type of expressions.
+
 data WasmControl s e where
-  -- ^ Type parameter `s` is the type of (unspecified) statements.
-  -- It might be instantiated with an open Cmm block or with a sequence
-  -- of Wasm instructions.
-  -- Parameter `e` is the type of expressions.
 
   WasmBlock :: WasmControl s e -> WasmControl s e
   WasmLoop  :: WasmControl s e -> WasmControl s e
@@ -81,9 +83,9 @@ instance Monoid (WasmControl s e) where
 
 
 brTableLimit :: Int
-brTableLimit = 65520
   -- ^ Size of the largest table that is deemed acceptable in a `br_table` instruction.
   --
   -- Source: https://chromium.googlesource.com/v8/v8/+/master/src/wasm/wasm-limits.h#51
   -- See also discussion at https://github.com/WebAssembly/spec/issues/607, which shows
   -- that major browsers agree.
+brTableLimit = 65520

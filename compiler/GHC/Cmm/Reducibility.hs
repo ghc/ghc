@@ -11,6 +11,28 @@ module GHC.Cmm.Reducibility
   )
 where
 
+import GHC.Prelude hiding (splitAt, succ)
+
+import Control.Monad
+import Data.List (nub)
+import Data.Maybe
+import Data.Semigroup
+import qualified Data.Sequence as Seq
+
+import GHC.Cmm
+import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Dominators
+import GHC.Cmm.Dataflow.Graph hiding (addBlock)
+import GHC.Cmm.Dataflow.Label
+import GHC.Data.Graph.Collapse
+import GHC.Data.Graph.Inductive.Graph
+import GHC.Data.Graph.Inductive.PatriciaTree
+import GHC.Types.Unique.Supply
+import GHC.Utils.Panic
+
 {-|
 Module      : GHC.Cmm.Reducibility
 Description : Tell if a `CmmGraph` is reducible, or make it so
@@ -30,28 +52,6 @@ For more on reducibility and related analyses and algorithms, see
 Note [Reducibility resources]
 -}
 
-
-import GHC.Prelude hiding (splitAt, succ)
-
-import Control.Monad
-import Data.List hiding (splitAt)
-import Data.Maybe
-import Data.Semigroup
-import qualified Data.Sequence as Seq
-
-import GHC.Cmm
-import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow
-import GHC.Cmm.Dataflow.Collections
-import GHC.Cmm.Dataflow.Block
-import GHC.Cmm.Dominators
-import GHC.Cmm.Dataflow.Graph hiding (addBlock)
-import GHC.Cmm.Dataflow.Label
-import GHC.Data.Graph.Collapse
-import GHC.Data.Graph.Inductive.Graph
-import GHC.Data.Graph.Inductive.PatriciaTree
-import GHC.Types.Unique.Supply
-import GHC.Utils.Panic
 
 
 

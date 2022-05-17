@@ -1,0 +1,14 @@
+fig1b (bits32 n) {
+  A:
+    foreign "C" A();
+    if (n > 1) goto B;
+    goto C;
+  B: 
+    foreign "C" B();
+    goto D;
+  C:
+    foreign "C" C();
+  D:
+    foreign "C" D();
+    return(2020);
+}

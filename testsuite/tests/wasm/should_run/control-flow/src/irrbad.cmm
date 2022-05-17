@@ -1,0 +1,26 @@
+section "comment" {
+  mycomment:
+  bits8 [] "An irreducible flow graph that can't be made reducible by node splitting alone (Hecht, page 117)";
+}
+
+double_loop (bits32 n) {
+  A:
+    foreign "C" A();
+    if (n > 1) goto B;
+  C:
+    foreign "C" C();
+    if (n > 3) goto B;
+    goto E;
+  B: 
+    foreign "C" B();
+    if (n > 2) goto C;
+    goto D;
+  D:
+    foreign "C" D();
+    if (n > 4) goto B;
+    return (888);
+  E:
+    foreign "C" E();
+    if (n > 5) goto C;
+    return (999);
+}

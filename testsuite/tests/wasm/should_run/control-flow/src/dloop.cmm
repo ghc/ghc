@@ -1,0 +1,15 @@
+double_loop (bits32 n) {
+  A:
+    foreign "C" A();
+    if (n > 1) goto B;
+  C:
+    foreign "C" C();
+    if (n > 3) goto A;
+    goto D;
+  B: 
+    foreign "C" B();
+    if (n > 2) goto A;
+  D:
+    foreign "C" D();
+    return (999);
+}
