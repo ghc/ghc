@@ -1270,10 +1270,13 @@ runStmt input step = do
          setDumpFilePrefix ic
            -- `-ddump-to-file` must work for normal GHCi compilations /
            --     evaluations. (#17500)
-         HsModule { hsmodDecls = decls, hsmodImports = imports } <-
-            liftIO (hscParseModuleWithLocation hsc_env source line input)
-         run_imports imports
-         run_decls decls
+         -- Use >>= \case instead of MonadFail desugaring to take into
+         -- consideration `instance XXModule p = DataConCantHappen`.
+         -- Tracked in #15681
+         liftIO (hscParseModuleWithLocation hsc_env source line input) >>= \case
+           HsModule { hsmodDecls = decls, hsmodImports = imports } -> do
+             run_imports imports
+             run_decls decls
   where
     exec_complete = GHC.ExecComplete (Right []) 0
 
@@ -2908,10 +2911,10 @@ iiSubsumes (IIDecl d1) (IIDecl d2)      -- A bit crude
   =  unLoc (ideclName d1) == unLoc (ideclName d2)
      && ideclAs d1 == ideclAs d2
      && (not (isImportDeclQualified (ideclQualified d1)) || isImportDeclQualified (ideclQualified d2))
-     && (ideclHiding d1 `hidingSubsumes` ideclHiding d2)
+     && (ideclImportList d1 `hidingSubsumes` ideclImportList d2)
   where
-     _                    `hidingSubsumes` Just (False,L _ []) = True
-     Just (False, L _ xs) `hidingSubsumes` Just (False,L _ ys)
+     _                    `hidingSubsumes` Just (Exactly,L _ []) = True
+     Just (Exactly, L _ xs) `hidingSubsumes` Just (Exactly,L _ ys)
                                                            = all (`elem` xs) ys
      h1                   `hidingSubsumes` h2              = h1 == h2
 iiSubsumes _ _ = False

@@ -4,37 +4,40 @@
 (L
  { Test20297.hs:1:1 }
  (HsModule
-  (EpAnn
-   (Anchor
-    { Test20297.hs:1:1 }
-    (UnchangedAnchor))
-   (AnnsModule
-    [(AddEpAnn AnnModule (EpaSpan { Test20297.hs:2:1-6 }))
-    ,(AddEpAnn AnnWhere (EpaSpan { Test20297.hs:2:18-22 }))]
-    (AnnList
-     (Nothing)
-     (Nothing)
-     (Nothing)
-     []
-     []))
-   (EpaCommentsBalanced
-    [(L
-      (Anchor
-       { Test20297.hs:1:1-33 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaBlockComment
-        "{-# OPTIONS -ddump-parsed-ast #-}")
-       { Test20297.hs:1:1 }))]
-    [(L
-      (Anchor
-       { Test20297.hs:12:1 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaEofComment)
-       { Test20297.hs:12:1 }))]))
-  (VirtualBraces
-   (1))
+  (XModulePs
+   (EpAnn
+    (Anchor
+     { Test20297.hs:1:1 }
+     (UnchangedAnchor))
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { Test20297.hs:2:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { Test20297.hs:2:18-22 }))]
+     (AnnList
+      (Nothing)
+      (Nothing)
+      (Nothing)
+      []
+      []))
+    (EpaCommentsBalanced
+     [(L
+       (Anchor
+        { Test20297.hs:1:1-33 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaBlockComment
+         "{-# OPTIONS -ddump-parsed-ast #-}")
+        { Test20297.hs:1:1 }))]
+     [(L
+       (Anchor
+        { Test20297.hs:12:1 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaEofComment)
+        { Test20297.hs:12:1 }))]))
+   (VirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { Test20297.hs:2:8-16 })
@@ -342,9 +345,7 @@
                          (NoExtField)))))]))
                   []))]}
               [])))))]))
-      [])))]
-  (Nothing)
-  (Nothing)))
+      [])))]))
 
 
 
@@ -353,37 +354,40 @@
 (L
  { Test20297.ppr.hs:1:1 }
  (HsModule
-  (EpAnn
-   (Anchor
-    { Test20297.ppr.hs:1:1 }
-    (UnchangedAnchor))
-   (AnnsModule
-    [(AddEpAnn AnnModule (EpaSpan { Test20297.ppr.hs:2:1-6 }))
-    ,(AddEpAnn AnnWhere (EpaSpan { Test20297.ppr.hs:2:18-22 }))]
-    (AnnList
-     (Nothing)
-     (Nothing)
-     (Nothing)
-     []
-     []))
-   (EpaCommentsBalanced
-    [(L
-      (Anchor
-       { Test20297.ppr.hs:1:1-33 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaBlockComment
-        "{-# OPTIONS -ddump-parsed-ast #-}")
-       { Test20297.ppr.hs:1:1 }))]
-    [(L
-      (Anchor
-       { Test20297.ppr.hs:9:25 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaEofComment)
-       { Test20297.ppr.hs:9:20 }))]))
-  (VirtualBraces
-   (1))
+  (XModulePs
+   (EpAnn
+    (Anchor
+     { Test20297.ppr.hs:1:1 }
+     (UnchangedAnchor))
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { Test20297.ppr.hs:2:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { Test20297.ppr.hs:2:18-22 }))]
+     (AnnList
+      (Nothing)
+      (Nothing)
+      (Nothing)
+      []
+      []))
+    (EpaCommentsBalanced
+     [(L
+       (Anchor
+        { Test20297.ppr.hs:1:1-33 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaBlockComment
+         "{-# OPTIONS -ddump-parsed-ast #-}")
+        { Test20297.ppr.hs:1:1 }))]
+     [(L
+       (Anchor
+        { Test20297.ppr.hs:9:25 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaEofComment)
+        { Test20297.ppr.hs:9:20 }))]))
+   (VirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { Test20297.ppr.hs:2:8-16 })
@@ -670,8 +674,6 @@
                          (NoExtField)))))]))
                   []))]}
               [])))))]))
-      [])))]
-  (Nothing)
-  (Nothing)))
+      [])))]))
 
 

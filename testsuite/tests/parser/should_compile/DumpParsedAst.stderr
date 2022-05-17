@@ -4,30 +4,33 @@
 (L
  { DumpParsedAst.hs:1:1 }
  (HsModule
-  (EpAnn
-   (Anchor
-    { DumpParsedAst.hs:1:1 }
-    (UnchangedAnchor))
-   (AnnsModule
-    [(AddEpAnn AnnModule (EpaSpan { DumpParsedAst.hs:5:1-6 }))
-    ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAst.hs:5:22-26 }))]
-    (AnnList
-     (Nothing)
-     (Nothing)
-     (Nothing)
+  (XModulePs
+   (EpAnn
+    (Anchor
+     { DumpParsedAst.hs:1:1 }
+     (UnchangedAnchor))
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { DumpParsedAst.hs:5:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAst.hs:5:22-26 }))]
+     (AnnList
+      (Nothing)
+      (Nothing)
+      (Nothing)
+      []
+      []))
+    (EpaCommentsBalanced
      []
-     []))
-   (EpaCommentsBalanced
-    []
-    [(L
-      (Anchor
-       { DumpParsedAst.hs:25:1 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaEofComment)
-       { DumpParsedAst.hs:25:1 }))]))
-  (VirtualBraces
-   (1))
+     [(L
+       (Anchor
+        { DumpParsedAst.hs:25:1 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaEofComment)
+        { DumpParsedAst.hs:25:1 }))]))
+   (VirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:5:8-20 })
@@ -36,20 +39,22 @@
   [(L
     (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:6:1-16 })
     (ImportDecl
-     (EpAnn
-      (Anchor
-       { DumpParsedAst.hs:6:1-6 }
-       (UnchangedAnchor))
-      (EpAnnImportDecl
-       (EpaSpan { DumpParsedAst.hs:6:1-6 })
-       (Nothing)
-       (Nothing)
-       (Nothing)
-       (Nothing)
-       (Nothing))
-      (EpaComments
-       []))
-     (NoSourceText)
+     (XImportDeclPass
+      (EpAnn
+       (Anchor
+        { DumpParsedAst.hs:6:1-6 }
+        (UnchangedAnchor))
+       (EpAnnImportDecl
+        (EpaSpan { DumpParsedAst.hs:6:1-6 })
+        (Nothing)
+        (Nothing)
+        (Nothing)
+        (Nothing)
+        (Nothing))
+       (EpaComments
+        []))
+      (NoSourceText)
+      (False))
      (L
       (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:6:8-16 })
       {ModuleName: Data.Kind})
@@ -57,7 +62,6 @@
      (NotBoot)
      (False)
      (NotQualified)
-     (False)
      (Nothing)
      (Nothing)))]
   [(L
@@ -1529,8 +1533,6 @@
                     {FastString: "hello"})))))))]
             (EmptyLocalBinds
              (NoExtField)))))]))
-      [])))]
-  (Nothing)
-  (Nothing)))
+      [])))]))
 
 

@@ -100,7 +100,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
 
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Type
-import GHC.Hs.Doc
+import GHC.Hs.Doc -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 import GHC.Core.TyCon
 import GHC.Types.Basic
 import GHC.Types.ForeignCall

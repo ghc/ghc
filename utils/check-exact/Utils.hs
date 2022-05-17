@@ -229,10 +229,10 @@ insertCppComments ::  ParsedSource -> [LEpaComment] -> ParsedSource
 insertCppComments (L l p) cs = L l p'
   where
     ncs = EpaComments cs
-    an' = case GHC.hsmodAnn p of
+    an' = case GHC.hsmodAnn $ GHC.hsmodExt p of
       (EpAnn a an ocs) -> EpAnn a an (ocs <> ncs)
       unused -> unused
-    p' = p { GHC.hsmodAnn = an' }
+    p' = p { GHC.hsmodExt = (GHC.hsmodExt p) { GHC.hsmodAnn = an' } } 
 
 -- ---------------------------------------------------------------------
 

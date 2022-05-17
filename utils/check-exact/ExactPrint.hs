@@ -398,11 +398,11 @@ instance (ExactPrint a) => ExactPrint (Maybe a) where
 -- ---------------------------------------------------------------------
 
 -- | 'Located (HsModule GhcPs)' corresponds to 'ParsedSource'
-instance ExactPrint HsModule where
-  getAnnotationEntry hsmod = fromAnn (hsmodAnn hsmod)
+instance ExactPrint (HsModule GhcPs) where
+  getAnnotationEntry hsmod = fromAnn (hsmodAnn $ hsmodExt hsmod)
 
-  exact hsmod@(HsModule EpAnnNotUsed _ _ _ _ _ _ _) = withPpr hsmod
-  exact (HsModule an _lo mmn mexports imports decls mdeprec mbDoc) = do
+  exact hsmod@(HsModule (XModulePs EpAnnNotUsed _ _ _) _ _ _ _) = withPpr hsmod
+  exact (HsModule (XModulePs an _lo mdeprec mbDoc) mmn mexports imports decls) = do
 
     markAnnotated mbDoc
 
@@ -760,9 +760,9 @@ instance ExactPrint (LocatedP (WarningTxt GhcPs)) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (ImportDecl GhcPs) where
-  getAnnotationEntry idecl = fromAnn (ideclExt idecl)
-  exact x@(ImportDecl EpAnnNotUsed _ _ _ _ _ _ _ _ _) = withPpr x
-  exact (ImportDecl ann@(EpAnn _ an _) msrc modname mpkg _src safeflag qualFlag _impl mAs hiding) = do
+  getAnnotationEntry idecl = fromAnn (ideclAnn $ ideclExt idecl)
+  exact x@(ImportDecl{ ideclExt = XImportDeclPass{ ideclAnn = EpAnnNotUsed } }) = withPpr x
+  exact (ImportDecl (XImportDeclPass ann@(EpAnn _ an _) msrc _impl) modname mpkg _src safeflag qualFlag mAs hiding) = do
 
     markAnnKw ann importDeclAnnImport AnnImport
 
@@ -3515,10 +3515,10 @@ instance ExactPrint (IE GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (IEWrappedName RdrName) where
+instance ExactPrint (IEWrappedName GhcPs) where
   getAnnotationEntry = const NoEntryVal
 
-  exact (IEName n) = markAnnotated n
+  exact (IEName _ n) = markAnnotated n
   exact (IEPattern r n) = do
     printStringAtAA r "pattern"
     markAnnotated n

@@ -4,46 +4,49 @@
 (L
  { DumpParsedAstComments.hs:1:1 }
  (HsModule
-  (EpAnn
-   (Anchor
-    { DumpParsedAstComments.hs:1:1 }
-    (UnchangedAnchor))
-   (AnnsModule
-    [(AddEpAnn AnnModule (EpaSpan { DumpParsedAstComments.hs:5:1-6 }))
-    ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAstComments.hs:5:30-34
-                                    }))]
-    (AnnList
-     (Nothing)
-     (Nothing)
-     (Nothing)
-     []
-     []))
-   (EpaCommentsBalanced
-    [(L
-      (Anchor
-       { DumpParsedAstComments.hs:1:1-28 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaBlockComment
-        "{-# LANGUAGE Haskell2010 #-}")
-       { DumpParsedAstComments.hs:1:1 }))
-    ,(L
-      (Anchor
-       { DumpParsedAstComments.hs:(2,1)-(4,4) }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaBlockComment
-        "{-\n  Block comment at the beginning\n  -}")
-       { DumpParsedAstComments.hs:1:1-28 }))]
-    [(L
-      (Anchor
-       { DumpParsedAstComments.hs:13:1 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaEofComment)
-       { DumpParsedAstComments.hs:13:1 }))]))
-  (VirtualBraces
-   (1))
+  (XModulePs
+   (EpAnn
+    (Anchor
+     { DumpParsedAstComments.hs:1:1 }
+     (UnchangedAnchor))
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { DumpParsedAstComments.hs:5:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAstComments.hs:5:30-34
+                                     }))]
+     (AnnList
+      (Nothing)
+      (Nothing)
+      (Nothing)
+      []
+      []))
+    (EpaCommentsBalanced
+     [(L
+       (Anchor
+        { DumpParsedAstComments.hs:1:1-28 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaBlockComment
+         "{-# LANGUAGE Haskell2010 #-}")
+        { DumpParsedAstComments.hs:1:1 }))
+     ,(L
+       (Anchor
+        { DumpParsedAstComments.hs:(2,1)-(4,4) }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaBlockComment
+         "{-\n  Block comment at the beginning\n  -}")
+        { DumpParsedAstComments.hs:1:1-28 }))]
+     [(L
+       (Anchor
+        { DumpParsedAstComments.hs:13:1 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaEofComment)
+        { DumpParsedAstComments.hs:13:1 }))]))
+   (VirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:5:8-28 })
@@ -277,8 +280,6 @@
                     {FastString: "hello"})))))))]
             (EmptyLocalBinds
              (NoExtField)))))]))
-      [])))]
-  (Nothing)
-  (Nothing)))
+      [])))]))
 
 

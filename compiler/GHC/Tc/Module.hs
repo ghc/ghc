@@ -239,9 +239,6 @@ tcRnModuleTcRnM :: HscEnv
                 -> TcRn TcGblEnv
 -- Factored out separately from tcRnModule so that a Core plugin can
 -- call the type checker directly
-tcRnModuleTcRnM _ _
-                (HsParsedModule (L _ (XModule x)) _)
-                _ = dataConCantHappen x
 tcRnModuleTcRnM hsc_env mod_sum
                 (HsParsedModule {
                    hpm_module =
@@ -285,7 +282,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                                      ++ import_decls))
         ; let { mkImport mod_name = noLocA
                 $ (simpleImportDecl mod_name)
-                  { ideclHiding = Just (False, noLocA [])}}
+                  { ideclImportList = Just (Exactly, noLocA [])}}
         ; let { withReason t imps = map (,text t) imps }
         ; let { all_imports = withReason "is implicitly imported" prel_imports
                   ++ withReason "is directly imported" import_decls
@@ -1652,7 +1649,7 @@ tcPreludeClashWarn warnFlag name = do
 
         -- Implicit (Prelude) import?
         isImplicit :: ImportDecl GhcRn -> Bool
-        isImplicit = ideclImplicit
+        isImplicit = ideclImplicit . ideclExt
 
         -- Unqualified import?
         isUnqualified :: ImportDecl GhcRn -> Bool
@@ -1662,17 +1659,17 @@ tcPreludeClashWarn warnFlag name = do
         --   Nothing -> No explicit imports
         --   Just (False, <names>) -> Explicit import list of <names>
         --   Just (True , <names>) -> Explicit hiding of <names>
-        importListOf :: ImportDecl GhcRn -> Maybe (Bool, [Name])
-        importListOf = fmap toImportList . ideclHiding
+        importListOf :: ImportDecl GhcRn -> Maybe (ImportListInterpretation, [Name])
+        importListOf = fmap toImportList . ideclImportList
           where
             toImportList (h, loc) = (h, map (ieName . unLoc) (unLoc loc))
 
         isExplicit :: ImportDecl GhcRn -> Bool
         isExplicit x = case importListOf x of
             Nothing -> False
-            Just (False, explicit)
+            Just (Exactly, explicit)
                 -> nameOccName name `elem`    map nameOccName explicit
-            Just (True, hidden)
+            Just (EverythingBut, hidden)
                 -> nameOccName name `notElem` map nameOccName hidden
 
         -- Check whether the given name would be imported (unqualified) from

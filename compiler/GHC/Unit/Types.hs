@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-orphans #-} -- instance Binary IsBootInterface
+
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -104,6 +106,8 @@ import Data.Function
 import Data.Bifunctor
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
+
+import {-# SOURCE #-} Language.Haskell.Syntax.ImpExp (IsBootInterface(..))
 
 ---------------------------------------------------------------------
 -- MODULES
@@ -632,13 +636,6 @@ wiredInUnitIds =
 -- themselves, however, one should use not 'IsBoot' or conflate signatures and
 -- modules in opposition to boot interfaces. Instead, one should use
 -- 'DriverPhases.HscSource'. See Note [HscSource types].
-
--- | Indicates whether a module name is referring to a boot interface (hs-boot
--- file) or regular module (hs file). We need to treat boot modules specially
--- when building compilation graphs, since they break cycles. Regular source
--- files and signature files are treated equivalently.
-data IsBootInterface = NotBoot | IsBoot
-  deriving (Eq, Ord, Show, Data)
 
 instance Binary IsBootInterface where
   put_ bh ib = put_ bh $

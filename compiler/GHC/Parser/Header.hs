@@ -145,16 +145,18 @@ mkPrelImports this_mod loc implicit_prelude import_decls
       loc' = noAnnSrcSpan loc
       preludeImportDecl :: LImportDecl GhcPs
       preludeImportDecl
-        = L loc' $ ImportDecl { ideclExt       = noAnn,
-                                ideclSourceSrc = NoSourceText,
+        = L loc' $ ImportDecl { ideclExt       = XImportDeclPass
+                                                    { ideclAnn = noAnn
+                                                    , ideclSourceText = NoSourceText
+                                                    , ideclImplicit  = True   -- Implicit!
+                                                    },
                                 ideclName      = L loc' pRELUDE_NAME,
                                 ideclPkgQual   = NoRawPkgQual,
                                 ideclSource    = NotBoot,
                                 ideclSafe      = False,  -- Not a safe import
                                 ideclQualified = NotQualified,
-                                ideclImplicit  = True,   -- Implicit!
                                 ideclAs        = Nothing,
-                                ideclHiding    = Nothing  }
+                                ideclImportList = Nothing  }
 
 --------------------------------------------------------------
 -- Get options

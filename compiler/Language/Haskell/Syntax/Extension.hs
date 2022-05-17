@@ -399,7 +399,7 @@ type family XXInjectivityAnn  x
 -- =====================================================================
 -- Type families for the HsModule extension points
 
-type family XModule x
+type family XCModule x
 type family XXModule x
 
 -- =====================================================================
@@ -686,6 +686,7 @@ type family XXFieldOcc x
 -- ImportDecl type families
 type family XCImportDecl       x
 type family XXImportDecl       x
+type family ImportDeclPkgQual  x -- stores the package qualifier in an import statement
 
 -- -------------------------------------
 -- IE type families
@@ -700,6 +701,13 @@ type family XIEDocNamed        x
 type family XXIE               x
 
 -- -------------------------------------
+-- IEWrappedName type families
+type family XIEName p
+type family XIEPattern p
+type family XIEType p
+type family XXIEWrappedName p
+
+
 
 -- =====================================================================
 -- Misc

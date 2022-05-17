@@ -2199,8 +2199,10 @@ hscAddSptEntries hsc_env entries = do
 
 hscImport :: HscEnv -> String -> IO (ImportDecl GhcPs)
 hscImport hsc_env str = runInteractiveHsc hsc_env $ do
+    -- Use >>= \case instead of MonadFail desugaring to take into
+    -- consideration `instance XXModule p = DataConCantHappen`.
+    -- Tracked in #15681
     hscParseThing parseModule str >>= \case
-      (L _ (XModule x)) -> dataConCantHappen x
       (L _ (HsModule{hsmodImports=is})) ->
         case is of
             [L _ i] -> return i

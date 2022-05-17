@@ -119,7 +119,7 @@ withDynFlags libdir action = ghcWrapper libdir $ do
 
 -- ---------------------------------------------------------------------
 
-parseFile :: GHC.DynFlags -> FilePath -> String -> GHC.ParseResult (GHC.Located GHC.HsModule)
+parseFile :: GHC.DynFlags -> FilePath -> String -> GHC.ParseResult (GHC.Located (GHC.HsModule GHC.GhcPs))
 parseFile = runParser GHC.parseModule
 
 -- ---------------------------------------------------------------------
@@ -275,10 +275,10 @@ postParseTransform parseRes = fmap mkAnns parseRes
 fixModuleTrailingComments :: GHC.ParsedSource -> GHC.ParsedSource
 fixModuleTrailingComments (GHC.L l p) = GHC.L l p'
   where
-    an' = case GHC.hsmodAnn p of
+    an' = case GHC.hsmodAnn $ GHC.hsmodExt p of
       (GHC.EpAnn a an ocs) -> GHC.EpAnn a an (rebalance (GHC.am_decls an) ocs)
       unused -> unused
-    p' = p { GHC.hsmodAnn = an' }
+    p' = p { GHC.hsmodExt = (GHC.hsmodExt p){ GHC.hsmodAnn = an' } }
     -- p'  = error $ "fixModuleTrailingComments: an'=" ++ showAst an'
 
     rebalance :: GHC.AnnList -> GHC.EpAnnComments -> GHC.EpAnnComments

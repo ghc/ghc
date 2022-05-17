@@ -4,49 +4,54 @@
 (L
  { mod185.hs:1:1 }
  (HsModule
-  (EpAnn
-   (Anchor
-    { mod185.hs:1:1 }
-    (UnchangedAnchor))
-   (AnnsModule
-    []
-    (AnnList
-     (Nothing)
-     (Nothing)
-     (Nothing)
+  (XModulePs
+   (EpAnn
+    (Anchor
+     { mod185.hs:1:1 }
+     (UnchangedAnchor))
+    (AnnsModule
      []
-     []))
-   (EpaCommentsBalanced
-    []
-    [(L
-      (Anchor
-       { mod185.hs:6:1 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaEofComment)
-       { mod185.hs:6:1 }))]))
-  (VirtualBraces
-   (1))
+     (AnnList
+      (Nothing)
+      (Nothing)
+      (Nothing)
+      []
+      []))
+    (EpaCommentsBalanced
+     []
+     [(L
+       (Anchor
+        { mod185.hs:6:1 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaEofComment)
+        { mod185.hs:6:1 }))]))
+   (VirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
   (Nothing)
   (Nothing)
   [(L
     (SrcSpanAnn (EpAnnNotUsed) { mod185.hs:3:1-24 })
     (ImportDecl
-     (EpAnn
-      (Anchor
-       { mod185.hs:3:1-6 }
-       (UnchangedAnchor))
-      (EpAnnImportDecl
-       (EpaSpan { mod185.hs:3:1-6 })
-       (Nothing)
-       (Nothing)
-       (Just
-        (EpaSpan { mod185.hs:3:16-24 }))
-       (Nothing)
-       (Nothing))
-      (EpaComments
-       []))
-     (NoSourceText)
+     (XImportDeclPass
+      (EpAnn
+       (Anchor
+        { mod185.hs:3:1-6 }
+        (UnchangedAnchor))
+       (EpAnnImportDecl
+        (EpaSpan { mod185.hs:3:1-6 })
+        (Nothing)
+        (Nothing)
+        (Just
+         (EpaSpan { mod185.hs:3:16-24 }))
+        (Nothing)
+        (Nothing))
+       (EpaComments
+        []))
+      (NoSourceText)
+      (False))
      (L
       (SrcSpanAnn (EpAnnNotUsed) { mod185.hs:3:8-14 })
       {ModuleName: Prelude})
@@ -54,7 +59,6 @@
      (NotBoot)
      (False)
      (QualifiedPost)
-     (False)
      (Nothing)
      (Nothing)))]
   [(L
@@ -125,8 +129,6 @@
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
              (NoExtField)))))]))
-      [])))]
-  (Nothing)
-  (Nothing)))
+      [])))]))
 
 

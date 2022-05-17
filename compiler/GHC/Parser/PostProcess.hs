@@ -2787,7 +2787,7 @@ mkModuleImpExp anns (L l specname) subs = do
             let withs = map unLoc xs
                 pos   = maybe NoIEWildcard IEWildcard
                           (findIndex isImpExpQcWildcard withs)
-                ies :: [LocatedA (IEWrappedName RdrName)]
+                ies :: [LocatedA (IEWrappedName GhcPs)]
                 ies   = wrapped $ filter (not . isImpExpQcWildcard . unLoc) xs
             in (\newName
                         -> IEThingWith ann (L l newName) pos ies)
@@ -2806,8 +2806,9 @@ mkModuleImpExp anns (L l specname) subs = do
     ieNameVal (ImpExpQcType _ ln) = unLoc ln
     ieNameVal (ImpExpQcWildcard)  = panic "ieNameVal got wildcard"
 
-    ieNameFromSpec (ImpExpQcName   ln) = IEName   ln
-    ieNameFromSpec (ImpExpQcType r ln) = IEType r ln
+    ieNameFromSpec :: ImpExpQcSpec -> IEWrappedName GhcPs
+    ieNameFromSpec (ImpExpQcName   (L l n)) = IEName noExtField (L l n)
+    ieNameFromSpec (ImpExpQcType r (L l n)) = IEType r (L l n)
     ieNameFromSpec (ImpExpQcWildcard)  = panic "ieName got wildcard"
 
     wrapped = map (mapLoc ieNameFromSpec)

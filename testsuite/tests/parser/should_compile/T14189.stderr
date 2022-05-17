@@ -167,8 +167,10 @@
   [(L
     (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:1:8-13 })
     (ImportDecl
-     (NoExtField)
-     (NoSourceText)
+     (XImportDeclPass
+      (EpAnnNotUsed)
+      (NoSourceText)
+      (True))
      (L
       (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:1:8-13 })
       {ModuleName: Prelude})
@@ -176,7 +178,6 @@
      (NotBoot)
      (False)
      (NotQualified)
-     (True)
      (Nothing)
      (Nothing)))]
   (Just
@@ -194,6 +195,7 @@
        (L
         (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:3-8 })
         (IEName
+         (NoExtField)
          (L
           (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:3-8 })
           {Name: T14189.MyType})))
@@ -201,6 +203,7 @@
        [(L
          (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:13-14 })
          (IEName
+          (NoExtField)
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:13-14 })
            {Name: T14189.NT})))]))

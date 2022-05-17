@@ -190,7 +190,7 @@ rnExports explicit_mod exports
                  | explicit_mod = exports
                  | has_main
                           = Just (noLocA [noLocA (IEVar noExtField
-                                     (noLocA (IEName $ noLocA default_main)))])
+                                     (noLocA (IEName noExtField $ noLocA default_main)))])
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
                  | otherwise = Nothing
@@ -369,8 +369,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
 
 
-    lookup_ie_with :: LIEWrappedName RdrName -> [LIEWrappedName RdrName]
-                   -> RnM (Located Name, [LIEWrappedName Name], [Name],
+    lookup_ie_with :: LIEWrappedName GhcPs -> [LIEWrappedName GhcPs]
+                   -> RnM (Located Name, [LIEWrappedName GhcRn], [Name],
                            [Located FieldLabel])
     lookup_ie_with (L l rdr) sub_rdrs
         = do name <- lookupGlobalOccRn $ ieWrappedName rdr
@@ -381,7 +381,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                             , map (ieWrappedName . unLoc) non_flds
                             , flds)
 
-    lookup_ie_all :: IE GhcPs -> LIEWrappedName RdrName
+    lookup_ie_all :: IE GhcPs -> LIEWrappedName GhcPs
                   -> RnM (Located Name, [Name], [FieldLabel])
     lookup_ie_all ie (L l rdr) =
           do name <- lookupGlobalOccRn $ ieWrappedName rdr
@@ -476,8 +476,8 @@ If the module has NO main function:
 
 
 
-lookupChildrenExport :: Name -> [LIEWrappedName RdrName]
-                     -> RnM ([LIEWrappedName Name], [Located FieldLabel])
+lookupChildrenExport :: Name -> [LIEWrappedName GhcPs]
+                     -> RnM ([LIEWrappedName GhcRn], [Located FieldLabel])
 lookupChildrenExport spec_parent rdr_items =
   do
     xs <- mapAndReportM doOne rdr_items
@@ -492,8 +492,8 @@ lookupChildrenExport spec_parent rdr_items =
           | ns == tcName  = [dataName, tcName]
           | otherwise = [ns]
         -- Process an individual child
-        doOne :: LIEWrappedName RdrName
-              -> RnM (Either (LIEWrappedName Name) (Located FieldLabel))
+        doOne :: LIEWrappedName GhcPs
+              -> RnM (Either (LIEWrappedName GhcRn) (Located FieldLabel))
         doOne n = do
 
           let bareName = (ieWrappedName . unLoc) n
@@ -513,7 +513,7 @@ lookupChildrenExport spec_parent rdr_items =
           case name of
             NameNotFound -> do { ub <- reportUnboundName unboundName
                                ; let l = getLoc n
-                               ; return (Left (L l (IEName (L (la2na l) ub))))}
+                               ; return (Left (L l (IEName noExtField (L (la2na l) ub))))}
             FoundChild par child -> do { checkPatSynParent spec_parent par child
                                        ; return $ case child of
                                            FieldGreName fl   -> Right (L (getLocA n) fl)

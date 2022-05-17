@@ -4,37 +4,40 @@
 (L
  { Test20239.hs:1:1 }
  (HsModule
-  (EpAnn
-   (Anchor
-    { Test20239.hs:1:1 }
-    (UnchangedAnchor))
-   (AnnsModule
-    [(AddEpAnn AnnModule (EpaSpan { Test20239.hs:1:1-6 }))
-    ,(AddEpAnn AnnWhere (EpaSpan { Test20239.hs:1:18-22 }))]
-    (AnnList
-     (Nothing)
-     (Nothing)
-     (Nothing)
-     []
-     []))
-   (EpaCommentsBalanced
-    [(L
-      (Anchor
-       { Test20239.hs:3:1-28 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaLineComment
-        "-- | Leading Haddock Comment")
-       { Test20239.hs:1:18-22 }))]
-    [(L
-      (Anchor
-       { Test20239.hs:8:1 }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaEofComment)
-       { Test20239.hs:7:34-63 }))]))
-  (VirtualBraces
-   (1))
+  (XModulePs
+   (EpAnn
+    (Anchor
+     { Test20239.hs:1:1 }
+     (UnchangedAnchor))
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { Test20239.hs:1:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { Test20239.hs:1:18-22 }))]
+     (AnnList
+      (Nothing)
+      (Nothing)
+      (Nothing)
+      []
+      []))
+    (EpaCommentsBalanced
+     [(L
+       (Anchor
+        { Test20239.hs:3:1-28 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaLineComment
+         "-- | Leading Haddock Comment")
+        { Test20239.hs:1:18-22 }))]
+     [(L
+       (Anchor
+        { Test20239.hs:8:1 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaEofComment)
+        { Test20239.hs:7:34-63 }))]))
+   (VirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:1:8-16 })
@@ -317,11 +320,9 @@
                            (HsBoxedOrConstraintTuple)
                            [])))))))))))))])
             (Nothing)))]
-         []))))))]
-  (Nothing)
-  (Nothing)))
+         []))))))]))
 
 
 
-Test20239.hs:4:15:
+Test20239.hs:4:15: error:
     Not in scope: type constructor or class ‘Method’
