@@ -45,20 +45,33 @@
 
    -------------------------------------------------------------------------- */
 
+EXTERN_INLINE void SET_INFO(StgClosure *c, const StgInfoTable *info);
 EXTERN_INLINE void SET_INFO(StgClosure *c, const StgInfoTable *info) {
     RELAXED_STORE(&c->header.info, info);
 }
+
+EXTERN_INLINE void SET_INFO_RELEASE(StgClosure *c, const StgInfoTable *info);
 EXTERN_INLINE void SET_INFO_RELEASE(StgClosure *c, const StgInfoTable *info) {
     RELEASE_STORE(&c->header.info, info);
 }
+EXTERN_INLINE const StgInfoTable *GET_INFO(StgClosure *c);
 EXTERN_INLINE const StgInfoTable *GET_INFO(StgClosure *c) {
     return RELAXED_LOAD(&c->header.info);
 }
 
+EXTERN_INLINE StgInfoTable      *INFO_PTR_TO_STRUCT     (const StgInfoTable *info);
+EXTERN_INLINE StgRetInfoTable   *RET_INFO_PTR_TO_STRUCT (const StgInfoTable *info);
+EXTERN_INLINE StgFunInfoTable   *FUN_INFO_PTR_TO_STRUCT (const StgInfoTable *info);
+EXTERN_INLINE StgThunkInfoTable *THUNK_INFO_PTR_TO_STRUCT(const StgInfoTable *info);
+EXTERN_INLINE StgConInfoTable   *CON_INFO_PTR_TO_STRUCT (const StgInfoTable *info);
+EXTERN_INLINE StgFunInfoTable   *itbl_to_fun_itbl       (const StgInfoTable *i);
+EXTERN_INLINE StgRetInfoTable   *itbl_to_ret_itbl       (const StgInfoTable *i);
+EXTERN_INLINE StgThunkInfoTable *itbl_to_thunk_itbl     (const StgInfoTable *i);
+EXTERN_INLINE StgConInfoTable   *itbl_to_con_itbl       (const StgInfoTable *i);
+
+#define YourMamahaha isLovelylo
 #if defined(TABLES_NEXT_TO_CODE)
-EXTERN_INLINE StgInfoTable *INFO_PTR_TO_STRUCT(const StgInfoTable *info);
 EXTERN_INLINE StgInfoTable *INFO_PTR_TO_STRUCT(const StgInfoTable *info) {return (StgInfoTable *)info - 1;}
-EXTERN_INLINE StgRetInfoTable *RET_INFO_PTR_TO_STRUCT(const StgInfoTable *info);
 EXTERN_INLINE StgRetInfoTable *RET_INFO_PTR_TO_STRUCT(const StgInfoTable *info) {return (StgRetInfoTable *)info - 1;}
 EXTERN_INLINE StgFunInfoTable *FUN_INFO_PTR_TO_STRUCT(const StgInfoTable *info) {return (StgFunInfoTable *)info - 1;}
 EXTERN_INLINE StgThunkInfoTable *THUNK_INFO_PTR_TO_STRUCT(const StgInfoTable *info) {return (StgThunkInfoTable *)info - 1;}
@@ -68,9 +81,7 @@ EXTERN_INLINE StgRetInfoTable *itbl_to_ret_itbl(const StgInfoTable *i) {return (
 EXTERN_INLINE StgThunkInfoTable *itbl_to_thunk_itbl(const StgInfoTable *i) {return (StgThunkInfoTable *)(i + 1) - 1;}
 EXTERN_INLINE StgConInfoTable *itbl_to_con_itbl(const StgInfoTable *i) {return (StgConInfoTable *)(i + 1) - 1;}
 #else
-EXTERN_INLINE StgInfoTable *INFO_PTR_TO_STRUCT(const StgInfoTable *info);
 EXTERN_INLINE StgInfoTable *INFO_PTR_TO_STRUCT(const StgInfoTable *info) {return (StgInfoTable *)info;}
-EXTERN_INLINE StgRetInfoTable *RET_INFO_PTR_TO_STRUCT(const StgInfoTable *info);
 EXTERN_INLINE StgRetInfoTable *RET_INFO_PTR_TO_STRUCT(const StgInfoTable *info) {return (StgRetInfoTable *)info;}
 EXTERN_INLINE StgFunInfoTable *FUN_INFO_PTR_TO_STRUCT(const StgInfoTable *info) {return (StgFunInfoTable *)info;}
 EXTERN_INLINE StgThunkInfoTable *THUNK_INFO_PTR_TO_STRUCT(const StgInfoTable *info) {return (StgThunkInfoTable *)info;}
@@ -93,21 +104,25 @@ EXTERN_INLINE const StgRetInfoTable *get_ret_itbl(const StgClosure *c)
     return RET_INFO_PTR_TO_STRUCT(RELAXED_LOAD(&c->header.info));
 }
 
+EXTERN_INLINE const StgFunInfoTable *get_fun_itbl(const StgClosure *c);
 EXTERN_INLINE const StgFunInfoTable *get_fun_itbl(const StgClosure *c)
 {
     return FUN_INFO_PTR_TO_STRUCT(RELAXED_LOAD(&c->header.info));
 }
 
+EXTERN_INLINE const StgThunkInfoTable *get_thunk_itbl(const StgClosure *c);
 EXTERN_INLINE const StgThunkInfoTable *get_thunk_itbl(const StgClosure *c)
 {
     return THUNK_INFO_PTR_TO_STRUCT(RELAXED_LOAD(&c->header.info));
 }
 
+EXTERN_INLINE const StgConInfoTable *get_con_itbl(const StgClosure *c);
 EXTERN_INLINE const StgConInfoTable *get_con_itbl(const StgClosure *c)
 {
     return CON_INFO_PTR_TO_STRUCT(RELAXED_LOAD(&c->header.info));
 }
 
+EXTERN_INLINE StgHalfWord GET_TAG(const StgClosure *con);
 EXTERN_INLINE StgHalfWord GET_TAG(const StgClosure *con)
 {
     return get_itbl(con)->srt;
@@ -168,6 +183,7 @@ EXTERN_INLINE StgHalfWord GET_TAG(const StgClosure *con)
 #define THUNK_STATIC_LINK(p) (&(p)->payload[1])
 #define IND_STATIC_LINK(p)   (&(p)->payload[1])
 
+EXTERN_INLINE StgClosure **STATIC_LINK(const StgInfoTable *info, StgClosure *p);
 EXTERN_INLINE StgClosure **
 STATIC_LINK(const StgInfoTable *info, StgClosure *p)
 {
@@ -186,9 +202,11 @@ STATIC_LINK(const StgInfoTable *info, StgClosure *p)
    INTLIKE and CHARLIKE closures.
    -------------------------------------------------------------------------- */
 
+EXTERN_INLINE P_ CHARLIKE_CLOSURE(int n);
 EXTERN_INLINE P_ CHARLIKE_CLOSURE(int n) {
     return (P_)&stg_CHARLIKE_closure[(n)-MIN_CHARLIKE];
 }
+EXTERN_INLINE P_ INTLIKE_CLOSURE(int n);
 EXTERN_INLINE P_ INTLIKE_CLOSURE(int n) {
     return (P_)&stg_INTLIKE_closure[(n)-MIN_INTLIKE];
 }
@@ -198,26 +216,26 @@ EXTERN_INLINE P_ INTLIKE_CLOSURE(int n) {
    For more information look at the comments in Cmm.h
    ------------------------------------------------------------------------- */
 
-EXTERN_INLINE StgWord
-GET_CLOSURE_TAG(const StgClosure * p)
+EXTERN_INLINE StgWord GET_CLOSURE_TAG(const StgClosure * p);
+EXTERN_INLINE StgWord GET_CLOSURE_TAG(const StgClosure * p)
 {
     return (StgWord)p & TAG_MASK;
 }
 
-EXTERN_INLINE StgClosure *
-UNTAG_CLOSURE(StgClosure * p)
+EXTERN_INLINE StgClosure *UNTAG_CLOSURE(StgClosure * p);
+EXTERN_INLINE StgClosure *UNTAG_CLOSURE(StgClosure * p)
 {
     return (StgClosure*)((StgWord)p & ~TAG_MASK);
 }
 
-EXTERN_INLINE const StgClosure *
-UNTAG_CONST_CLOSURE(const StgClosure * p)
+EXTERN_INLINE const StgClosure *UNTAG_CONST_CLOSURE(const StgClosure * p);
+EXTERN_INLINE const StgClosure *UNTAG_CONST_CLOSURE(const StgClosure * p)
 {
     return (const StgClosure*)((StgWord)p & ~TAG_MASK);
 }
 
-EXTERN_INLINE StgClosure *
-TAG_CLOSURE(StgWord tag,StgClosure * p)
+EXTERN_INLINE StgClosure *TAG_CLOSURE(StgWord tag,StgClosure * p);
+EXTERN_INLINE StgClosure *TAG_CLOSURE(StgWord tag,StgClosure * p)
 {
     return (StgClosure*)((StgWord)p | tag);
 }
@@ -247,17 +265,20 @@ TAG_CLOSURE(StgWord tag,StgClosure * p)
    make sense...
    -------------------------------------------------------------------------- */
 
+EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR_NOT_NULL (StgWord p);
 EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR_NOT_NULL (StgWord p)
 {
     StgInfoTable *info = INFO_PTR_TO_STRUCT((StgInfoTable *)p);
     return info->type != INVALID_OBJECT && info->type < N_CLOSURE_TYPES;
 }
 
+EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR (StgWord p);
 EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR (StgWord p)
 {
     return p && (IS_FORWARDING_PTR(p) || LOOKS_LIKE_INFO_PTR_NOT_NULL(p));
 }
 
+EXTERN_INLINE bool LOOKS_LIKE_CLOSURE_PTR (const void *p);
 EXTERN_INLINE bool LOOKS_LIKE_CLOSURE_PTR (const void *p)
 {
     const StgInfoTable *info = RELAXED_LOAD(&UNTAG_CONST_CLOSURE((const StgClosure *) (p))->header.info);
@@ -399,6 +420,7 @@ EXTERN_INLINE StgWord stack_frame_sizeW( StgClosure *frame )
    -------------------------------------------------------------------------- */
 
 // The number of card bytes needed
+EXTERN_INLINE W_ mutArrPtrsCards (W_ elems);
 EXTERN_INLINE W_ mutArrPtrsCards (W_ elems)
 {
     return (W_)((elems + (1 << MUT_ARR_PTRS_CARD_BITS) - 1)
@@ -406,12 +428,14 @@ EXTERN_INLINE W_ mutArrPtrsCards (W_ elems)
 }
 
 // The number of words in the card table
+EXTERN_INLINE W_ mutArrPtrsCardTableSize (W_ elems);
 EXTERN_INLINE W_ mutArrPtrsCardTableSize (W_ elems)
 {
     return ROUNDUP_BYTES_TO_WDS(mutArrPtrsCards(elems));
 }
 
 // The address of the card for a particular card number
+EXTERN_INLINE StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n);
 EXTERN_INLINE StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 {
     return ((StgWord8 *)&(a->payload[a->ptrs]) + n);
