@@ -689,8 +689,10 @@ LLVMTarget_CPP=`    echo "$LlvmTarget"`
 AC_SUBST(LLVMTarget_CPP)
 
 dnl ** See whether cc supports --target=<triple> and set
-dnl CONF_CC_OPTS_STAGE[12] accordingly.
-FP_CC_SUPPORTS_TARGET
+dnl CONF_CC_OPTS_STAGE[012] accordingly.
+FP_CC_SUPPORTS_TARGET([$CC_STAGE0], [CONF_CC_OPTS_STAGE0], [CONF_CXX_OPTS_STAGE0], [CONF_GCC_LINKER_OPTS_STAGE0])
+FP_CC_SUPPORTS_TARGET([$CC], [CONF_CC_OPTS_STAGE1], [CONF_CXX_OPTS_STAGE1], [CONF_GCC_LINKER_OPTS_STAGE1])
+FP_CC_SUPPORTS_TARGET([$CC], [CONF_CC_OPTS_STAGE2], [CONF_CXX_OPTS_STAGE2], [CONF_GCC_LINKER_OPTS_STAGE2])
 
 # See rules/distdir-way-opts.mk for details.
 # Flags passed to the C compiler
