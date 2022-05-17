@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
 
@@ -29,17 +28,19 @@ module GHC.Unicode (
         isLower, isAlpha,  isDigit,
         isOctDigit, isHexDigit, isAlphaNum,
         isPunctuation, isSymbol,
-        toUpper, toLower, toTitle,
-        wgencat
+        toUpper, toLower, toTitle
     ) where
 
 import GHC.Base
-import GHC.Char        (chr)
 import GHC.Real
 import GHC.Enum ( Enum (..), Bounded (..) )
 import GHC.Ix ( Ix (..) )
 import GHC.Num
-import {-# SOURCE #-} Data.Version
+import GHC.Unicode.Internal.Version
+import qualified GHC.Unicode.Internal.Char.UnicodeData.GeneralCategory as GC
+import qualified GHC.Unicode.Internal.Char.UnicodeData.SimpleLowerCaseMapping as C
+import qualified GHC.Unicode.Internal.Char.UnicodeData.SimpleTitleCaseMapping as C
+import qualified GHC.Unicode.Internal.Char.UnicodeData.SimpleUpperCaseMapping as C
 
 -- Data.Char.chr already imports this and we need to define a Show instance
 -- for GeneralCategory
@@ -48,12 +49,9 @@ import GHC.Show ( Show )
 -- $setup
 -- >>> import Prelude
 
-#include "HsBaseConfig.h"
-#include "UnicodeVersion.h"
-
--- | Version of Unicode standard used by @base@.
-unicodeVersion :: Version
-unicodeVersion = makeVersion UNICODE_VERSION_NUMS
+-- [NOTE] The constructors of 'GeneralCategory' must be in the same order they
+-- are listed in the Unicode Standard, because some functions
+-- (e.g. 'generalCategory') rely on the 'Enum' instance.
 
 -- | Unicode General Categories (column 2 of the UnicodeData table) in
 -- the order they are listed in the Unicode standard (the Unicode
@@ -173,8 +171,9 @@ data GeneralCategory
 -- >>> generalCategory ' '
 -- Space
 --
+{-# INLINE generalCategory #-}
 generalCategory :: Char -> GeneralCategory
-generalCategory c = toEnum $ fromIntegral $ wgencat $ fromIntegral $ ord c
+generalCategory = toEnum . GC.generalCategory
 
 -- | Selects the first 128 characters of the Unicode character set,
 -- corresponding to the ASCII character set.
@@ -199,10 +198,25 @@ isAsciiUpper c          =  c >= 'A' && c <= 'Z'
 -- | Selects control characters, which are the non-printing characters of
 -- the Latin-1 subset of Unicode.
 isControl               :: Char -> Bool
+-- Select characters with category 'Control'.
+-- By definition (https://www.unicode.org/reports/tr44/#General_Category_Values)
+-- “a C0 or C1 control code”, i.e. the 0x00-0x1f, 0x7f, and 0x80-0x9f.
+isControl c = case generalCategory c of
+        Control -> True
+        _       -> False
 
 -- | Selects printable Unicode characters
 -- (letters, numbers, marks, punctuation, symbols and spaces).
 isPrint                 :: Char -> Bool
+isPrint c = case generalCategory c of
+        LineSeparator      -> False
+        ParagraphSeparator -> False
+        Control            -> False
+        Format             -> False
+        Surrogate          -> False
+        PrivateUse         -> False
+        NotAssigned        -> False
+        _                  -> True
 
 -- | Returns 'True' for any Unicode space character, and the control
 -- characters @\\t@, @\\n@, @\\r@, @\\f@, @\\v@.
@@ -215,7 +229,7 @@ isSpace                 :: Char -> Bool
 -- so we'll do it like this until there's a way around that.
 isSpace c
   | uc <= 0x377 = uc == 32 || uc - 0x9 <= 4 || uc == 0xa0
-  | otherwise = iswspace (ord c) /= 0
+  | otherwise = generalCategory c == Space
   where
     uc = fromIntegral (ord c) :: Word
 
@@ -223,14 +237,28 @@ isSpace c
 -- Title case is used by a small number of letter ligatures like the
 -- single-character form of /Lj/.
 isUpper                 :: Char -> Bool
+isUpper c = case generalCategory c of
+        UppercaseLetter -> True
+        TitlecaseLetter -> True
+        _               -> False
 
 -- | Selects lower-case alphabetic Unicode characters (letters).
 isLower                 :: Char -> Bool
+isLower c = case generalCategory c of
+        LowercaseLetter -> True
+        _               -> False
 
 -- | Selects alphabetic Unicode characters (lower-case, upper-case and
 -- title-case letters, plus letters of caseless scripts and modifiers letters).
 -- This function is equivalent to 'Data.Char.isLetter'.
 isAlpha                 :: Char -> Bool
+isAlpha c = case generalCategory c of
+        UppercaseLetter -> True
+        LowercaseLetter -> True
+        TitlecaseLetter -> True
+        ModifierLetter  -> True
+        OtherLetter     -> True
+        _               -> False
 
 -- | Selects alphabetic or numeric Unicode characters.
 --
@@ -239,6 +267,17 @@ isAlpha                 :: Char -> Bool
 -- 'isDigit'. Such characters may be part of identifiers but are not used by
 -- the printer and reader to represent numbers.
 isAlphaNum              :: Char -> Bool
+isAlphaNum c = case generalCategory c of
+        UppercaseLetter -> True
+        LowercaseLetter -> True
+        TitlecaseLetter -> True
+        ModifierLetter  -> True
+        OtherLetter     -> True
+        DecimalNumber   -> True
+        LetterNumber    -> True
+        OtherNumber     -> True
+        _               -> False
+
 
 -- | Selects ASCII digits, i.e. @\'0\'@..@\'9\'@.
 isDigit                 :: Char -> Bool
@@ -352,64 +391,20 @@ isSymbol c = case generalCategory c of
 
 -- | Convert a letter to the corresponding upper-case letter, if any.
 -- Any other character is returned unchanged.
+{-# INLINE toUpper #-}
 toUpper                 :: Char -> Char
+toUpper = C.toSimpleUpperCase
 
 -- | Convert a letter to the corresponding lower-case letter, if any.
 -- Any other character is returned unchanged.
+{-# INLINE toLower #-}
 toLower                 :: Char -> Char
+toLower = C.toSimpleLowerCase
 
 -- | Convert a letter to the corresponding title-case or upper-case
 -- letter, if any.  (Title case differs from upper case only for a small
 -- number of ligature letters.)
 -- Any other character is returned unchanged.
+{-# INLINE toTitle #-}
 toTitle                 :: Char -> Char
-
--- -----------------------------------------------------------------------------
--- Implementation with the supplied auto-generated Unicode character properties
--- table
-
--- Regardless of the O/S and Library, use the functions contained in WCsubst.c
-
-isAlpha    c = iswalpha (ord c) /= 0
-isAlphaNum c = iswalnum (ord c) /= 0
-isControl  c = iswcntrl (ord c) /= 0
-isPrint    c = iswprint (ord c) /= 0
-isUpper    c = iswupper (ord c) /= 0
-isLower    c = iswlower (ord c) /= 0
-
-toLower c = chr (towlower (ord c))
-toUpper c = chr (towupper (ord c))
-toTitle c = chr (towtitle (ord c))
-
-foreign import ccall unsafe "u_iswalpha"
-  iswalpha :: Int -> Int
-
-foreign import ccall unsafe "u_iswalnum"
-  iswalnum :: Int -> Int
-
-foreign import ccall unsafe "u_iswcntrl"
-  iswcntrl :: Int -> Int
-
-foreign import ccall unsafe "u_iswspace"
-  iswspace :: Int -> Int
-
-foreign import ccall unsafe "u_iswprint"
-  iswprint :: Int -> Int
-
-foreign import ccall unsafe "u_iswlower"
-  iswlower :: Int -> Int
-
-foreign import ccall unsafe "u_iswupper"
-  iswupper :: Int -> Int
-
-foreign import ccall unsafe "u_towlower"
-  towlower :: Int -> Int
-
-foreign import ccall unsafe "u_towupper"
-  towupper :: Int -> Int
-
-foreign import ccall unsafe "u_towtitle"
-  towtitle :: Int -> Int
-
-foreign import ccall unsafe "u_gencat"
-  wgencat :: Int -> Int
+toTitle = C.toSimpleTitleCase

@@ -347,6 +347,12 @@ Library
         GHC.Event.PSQ
         GHC.Event.Unique
         -- GHC.IOPort -- TODO: hide again after debug
+        GHC.Unicode.Internal.Bits
+        GHC.Unicode.Internal.Char.UnicodeData.GeneralCategory
+        GHC.Unicode.Internal.Char.UnicodeData.SimpleLowerCaseMapping
+        GHC.Unicode.Internal.Char.UnicodeData.SimpleTitleCaseMapping
+        GHC.Unicode.Internal.Char.UnicodeData.SimpleUpperCaseMapping
+        GHC.Unicode.Internal.Version
         System.Environment.ExecutablePath
         System.CPUTime.Utils
 
@@ -354,7 +360,6 @@ Library
         cbits/DarwinUtils.c
         cbits/PrelIOUtils.c
         cbits/SetEnv.c
-        cbits/WCsubst.c
         cbits/iconv.c
         cbits/inputReady.c
         cbits/md5.c
@@ -371,7 +376,6 @@ Library
         HsBase.h
     install-includes:
         HsBase.h
-        WCsubst.h
         consUtils.h
 
     -- OS Specific

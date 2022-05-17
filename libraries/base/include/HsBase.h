@@ -132,7 +132,6 @@
 #if HAVE_VFORK_H
 #include <vfork.h>
 #endif
-#include "WCsubst.h"
 
 #if defined(_WIN32)
 /* in Win32Utils.c */

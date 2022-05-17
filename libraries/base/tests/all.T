@@ -34,6 +34,7 @@ test('unicode002',
      when(platform('i386-unknown-openbsd'), expect_fail),
      compile_and_run,
      [''])
+test('unicode003', normal, compile_and_run, [''])
 test('data-fixed-show-read', normal, compile_and_run, [''])
 test('showDouble', normal, compile_and_run, [''])
 test('readDouble001', normal, compile_and_run, [''])

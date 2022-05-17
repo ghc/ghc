@@ -251,7 +251,7 @@ hasSuffix fn = any (`T.isSuffixOf` fn) suffixes
     suffixes = T.words ".hs .hsc .lhs .cabal .c .h .lhs-boot .hs-boot .x .y"
 
 autogenFiles :: [ Text ]
-autogenFiles = [ "WCsubst.c", "iconv.c", "Table.hs" ]
+autogenFiles = [ "iconv.c", "Table.hs" ]
 
 ignoredPrefixes :: [Text]
 ignoredPrefixes = [ "testsuite/", "libraries/base/tests"
