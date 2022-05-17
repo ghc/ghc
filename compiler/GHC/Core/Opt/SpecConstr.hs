@@ -1906,9 +1906,12 @@ calcSpecInfo fn (CP { cp_qvars = qvars, cp_args = pats }) extra_bndrs
 
     go_one :: DmdEnv -> Demand -> CoreExpr -> DmdEnv
     go_one env d          (Var v) = extendVarEnv_C plusDmd env v d
-    go_one env (_n :* cd) e -- NB: _n does not have to be strict
+    go_one env (n :* cd) e -- NB: n does not have to be strict
       | (Var _, args) <- collectArgs e
-      , Just (_b, ds) <- viewProd (length args) cd -- TODO: We may want to look at boxity _b, though...
+      , Just (b, ds) <- viewProd (length args) cd
+      , not (isStrict n && b == Boxed)
+          -- but if n is strict and Boxity Analysis said "don't unbox", then
+          -- it's probably a bad idea to unbox! See Note [Boxity in SpecConstr]
       = go env ds args
     go_one env _  _ = env
 
@@ -1975,6 +1978,26 @@ the worker’s arguments, for the benefit of later passes. The function
 handOutStrictnessInformation decomposes the strictness annotation calculated by
 calcSpecStrictness and attaches them to the variables.
 
+Note [Boxity in SpecConstr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If the demand on a argument binder is strict and Boxity analysis says that we
+use the box, it's probably a bad idea to specialise away the box.
+Otherwise, worker/wrapper would have unboxed the arg before.
+
+In fact, why do we only look at Boxity in the strict case? Why not look at it
+if the argument was used lazily?
+Because in the lazy case, Boxity will (almost) always be Boxed, even though the
+function body might never need the box.
+See Note [No lazy, Unboxed demands in demand signature].
+
+Without a doubt we could preserve boxity on lazy args if we see more clients of
+Boxity information than just WW and SpecConstr, but then we'd have to
+
+  * Ignore lazy, unboxed demand in worker/wrapper
+  * Which in turn would have to be anticipiated when unleashing Boxity
+    signatures at call sites during Boxity analysis.
+
+What we have now is comparatively simple and works.
 
 ************************************************************************
 *                                                                      *
