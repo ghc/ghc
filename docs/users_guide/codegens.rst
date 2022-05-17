@@ -50,8 +50,8 @@ compiler <https://clang.llvm.org>`__ compiler available on your ``PATH``.
 
 .. note::
 
-    Note that this GHC release expects an LLVM version in the |llvm-version|
-    release series.
+    Note that this GHC release expects an LLVM version in the |llvm-version-min|
+    up to |llvm-version-max| (not inclusive) release series.
 
 To install LLVM and Clang:
 

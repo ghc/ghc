@@ -20,4 +20,5 @@ lib_versions = {
 
 version = '@ProjectVersion@'
 
-llvm_version = '@LlvmVersion@'
+llvm_version_min = '@LlvmMinVersion@'
+llvm_version_max = '@LlvmMaxVersion@'
