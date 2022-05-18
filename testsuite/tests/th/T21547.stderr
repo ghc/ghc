@@ -1,0 +1,9 @@
+
+T21547.hs:9:14: error:
+    • GHC stage restriction:
+        instance for ‘base-4.16.0.0:Data.Typeable.Internal.Typeable
+                        T’ is used in a top-level splice, quasi-quote, or annotation,
+        and must be imported, not defined locally
+    • In the expression: foo [|| T () ||]
+      In the Template Haskell splice $$(foo [|| T () ||])
+      In the expression: $$(foo [|| T () ||])
