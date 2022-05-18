@@ -56,8 +56,8 @@ import GHC.Utils.Panic
 -- dominator tree.  In many circumstances the immediate dominator
 -- will be the only dominator of interest.
 
-data DominatorSet = ImmediateDominator { ds_label  :: Label
-                                       , ds_parent :: DominatorSet
+data DominatorSet = ImmediateDominator { ds_label  :: Label -- ^ Label of the immediate dominator.
+                                       , ds_parent :: DominatorSet -- ^ Set of nodes dominating the immediate dominator.
                                        }
                   | EntryNode
   deriving (Eq)
