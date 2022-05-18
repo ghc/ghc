@@ -582,7 +582,7 @@ function test_hadrian() {
         ;;
       *)
         read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
-        run ./configure --prefix="$TOP"/_build/install "${args[@]}"
+        run ./configure --prefix="$TOP"/_build/install "${args[@]+"${args[@]}"}" 
         run "$MAKE" install
         ;;
     esac
