@@ -30,6 +30,11 @@ test('staticcallstack002',
      ], compile_and_run,
      ['-O0 -g3 -fdistinct-constructor-tables -finfo-table-map'])
 
+test('T21455',
+     [extra_run_opts('+RTS -hT -postem')],
+     compile_and_run,
+     [''])
+
 
 # Below this line, run tests only with profiling ways.
 setTestOpts(req_profiling)
