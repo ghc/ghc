@@ -163,9 +163,7 @@ packageArgs = do
 
         ---------------------------------- text --------------------------------
         , package text ? mconcat
-          -- Disable SIMDUTF by default due to packaging difficulties
-          -- described in #20724.
-          [ builder (Cabal Flags) ? arg "-simdutf"
+          [ stage0 ? builder (Cabal Flags) ? arg "-simdutf"
           -- https://github.com/haskell/text/issues/415
           , builder Ghc ? input "**/Data/Text/Encoding.hs"  ? arg "-Wno-unused-imports" ]
 
