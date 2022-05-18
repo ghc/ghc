@@ -293,6 +293,7 @@ test('T16978a', normal, compile, ['-O'])
 test('T16978b', normal, compile, ['-O'])
 test('T16979a', normal, compile, ['-O'])
 test('T16979b', normal, compile, ['-O'])
+test('T21577', normal, compile, ['-O'])
 test('T17140',
      [extra_files(['T17140a.hs'])],
      makefile_test,
