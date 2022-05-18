@@ -150,7 +150,7 @@ import GHC.Types.Error ( mkPlainError, noHints )
 
 import GHC.Types.Name
 import GHC.Types.TyThing
-import GHC.Unit.Module ( HasModule, getModule )
+import GHC.Unit.Module ( HasModule, getModule, extractModule )
 import GHC.Types.Name.Reader ( GlobalRdrEnv, GlobalRdrElt )
 import qualified GHC.Rename.Env as TcM
 import GHC.Types.Var
@@ -1385,17 +1385,83 @@ checkWellStagedDFun :: CtLoc -> InstanceWhat -> PredType -> TcS ()
 -- Here we can't use the equality function from the instance in the splice
 
 checkWellStagedDFun loc what pred
-  | TopLevInstance { iw_dfun_id = dfun_id } <- what
-  , let bind_lvl = TcM.topIdLvl dfun_id
-  , bind_lvl > impLevel
-  = wrapTcS $ TcM.setCtLocM loc $
-    do { use_stage <- TcM.getStage
-       ; TcM.checkWellStaged pp_thing bind_lvl (thLevel use_stage) }
-
-  | otherwise
-  = return ()    -- Fast path for common case
+  = do
+      mbind_lvl <- checkWellStagedInstanceWhat what
+      case mbind_lvl of
+        Just bind_lvl | bind_lvl > impLevel ->
+          wrapTcS $ TcM.setCtLocM loc $ do
+              { use_stage <- TcM.getStage
+              ; TcM.checkWellStaged pp_thing bind_lvl (thLevel use_stage) }
+        _ ->
+          return ()
   where
     pp_thing = text "instance for" <+> quotes (ppr pred)
+
+-- | Returns the ThLevel of evidence for the solved constraint (if it has evidence)
+-- See Note [Well-staged instance evidence]
+checkWellStagedInstanceWhat :: InstanceWhat -> TcS (Maybe ThLevel)
+checkWellStagedInstanceWhat what
+  | TopLevInstance { iw_dfun_id = dfun_id } <- what
+    = return $ Just (TcM.topIdLvl dfun_id)
+  | BuiltinTypeableInstance tc <- what
+    = do
+        cur_mod <- extractModule <$> getGblEnv
+        return $ Just (if nameIsLocalOrFrom cur_mod (tyConName tc)
+                        then outerLevel
+                        else impLevel)
+  | otherwise = return Nothing
+
+{-
+Note [Well-staged instance evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Evidence for instances must obey the same level restrictions as normal bindings.
+In particular, it is forbidden to use an instance in a top-level splice in the
+module which the instance is defined. This is because the evidence is bound at
+the top-level and top-level definitions are forbidden from being using in top-level splices in
+the same module.
+
+For example, suppose you have a function..  foo :: Show a => Code Q a -> Code Q ()
+then the following program is disallowed,
+
+```
+data T a = T a deriving (Show)
+
+main :: IO ()
+main =
+  let x = $$(foo [|| T () ||])
+  in return ()
+```
+
+because the `foo` function (used in a top-level splice) requires `Show T` evidence,
+which is defined at the top-level and therefore fails with an error that we have violated
+the stage restriction.
+
+```
+Main.hs:12:14: error:
+    • GHC stage restriction:
+        instance for ‘Show
+                        (T ())’ is used in a top-level splice, quasi-quote, or annotation,
+        and must be imported, not defined locally
+    • In the expression: foo [|| T () ||]
+      In the Template Haskell splice $$(foo [|| T () ||])
+      In the expression: $$(foo [|| T () ||])
+   |
+12 |   let x = $$(foo [|| T () ||])
+   |
+```
+
+Solving a `Typeable (T t1 ...tn)` constraint generates code that relies on
+`$tcT`, the `TypeRep` for `T`; and we must check that this reference to `$tcT`
+is well staged.  It's easy to know the stage of `$tcT`: for imported TyCons it
+will be `impLevel`, and for local TyCons it will be `toplevel`.
+
+Therefore the `InstanceWhat` type had to be extended with
+a special case for `Typeable`, which recorded the TyCon the evidence was for and
+could them be used to check that we were not attempting to evidence in a stage incorrect
+manner.
+
+-}
 
 pprEq :: TcType -> TcType -> SDoc
 pprEq ty1 ty2 = pprParendType ty1 <+> char '~' <+> pprParendType ty2

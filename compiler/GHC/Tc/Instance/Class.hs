@@ -33,6 +33,7 @@ import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name, pprDefinedAt )
 import GHC.Types.Var.Env ( VarEnv )
 import GHC.Types.Id
+import GHC.Types.Var
 
 import GHC.Core.Predicate
 import GHC.Core.InstEnv
@@ -96,13 +97,22 @@ data ClsInstResult
 
   | NotSure      -- Multiple matches and/or one or more unifiers
 
-data InstanceWhat
-  = BuiltinInstance
-  | BuiltinEqInstance   -- A built-in "equality instance"; see the
-                        -- GHC.Tc.Solver.InertSet Note [Solved dictionaries]
-  | LocalInstance
-  | TopLevInstance { iw_dfun_id   :: DFunId
-                   , iw_safe_over :: SafeOverlapping }
+data InstanceWhat  -- How did we solve this constraint?
+  = BuiltinEqInstance    -- Built-in solver for (t1 ~ t2), (t1 ~~ t2), Coercible t1 t2
+                         -- See GHC.Tc.Solver.InertSet Note [Solved dictionaries]
+
+  | BuiltinTypeableInstance TyCon   -- Built-in solver for Typeable (T t1 .. tn)
+                         -- See Note [Well-staged instance evidence]
+
+  | BuiltinInstance      -- Built-in solver for (C t1 .. tn) where C is
+                         --   KnownNat, .. etc (classes with no top-level evidence)
+
+  | LocalInstance        -- Solved by a quantified constraint
+                         -- See GHC.Tc.Solver.InertSet Note [Solved dictionaries]
+
+  | TopLevInstance       -- Solved by a top-level instance decl
+      { iw_dfun_id   :: DFunId
+      , iw_safe_over :: SafeOverlapping }
 
 instance Outputable ClsInstResult where
   ppr NoInstance = text "NoInstance"
@@ -113,6 +123,7 @@ instance Outputable ClsInstResult where
 
 instance Outputable InstanceWhat where
   ppr BuiltinInstance   = text "a built-in instance"
+  ppr BuiltinTypeableInstance {} = text "a built-in typeable instance"
   ppr BuiltinEqInstance = text "a built-in equality instance"
   ppr LocalInstance     = text "a locally-quantified instance"
   ppr (TopLevInstance { iw_dfun_id = dfun })
@@ -127,6 +138,7 @@ instanceReturnsDictCon :: InstanceWhat -> Bool
 -- See Note [Solved dictionaries] in GHC.Tc.Solver.InertSet
 instanceReturnsDictCon (TopLevInstance {}) = True
 instanceReturnsDictCon BuiltinInstance     = True
+instanceReturnsDictCon BuiltinTypeableInstance {} = True
 instanceReturnsDictCon BuiltinEqInstance   = False
 instanceReturnsDictCon LocalInstance       = False
 
@@ -462,9 +474,10 @@ doFunTy clas ty mult arg_ty ret_ty
 doTyConApp :: Class -> Type -> TyCon -> [Kind] -> TcM ClsInstResult
 doTyConApp clas ty tc kind_args
   | tyConIsTypeable tc
-  = return $ OneInst { cir_new_theta = (map (mk_typeable_pred clas) kind_args)
-                     , cir_mk_ev     = mk_ev
-                     , cir_what      = BuiltinInstance }
+  = do
+     return $ OneInst { cir_new_theta = (map (mk_typeable_pred clas) kind_args)
+                      , cir_mk_ev     = mk_ev
+                      , cir_what      = BuiltinTypeableInstance tc }
   | otherwise
   = return NoInstance
   where
