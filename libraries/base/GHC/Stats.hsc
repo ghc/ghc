@@ -105,23 +105,20 @@ data RTSStats = RTSStats {
     -- | Total elapsed time (at the previous GC)
   , elapsed_ns :: RtsTime
 
-    -- | The CPU time used during the post-mark pause phase of the concurrent
-    -- nonmoving GC.
+    -- | The total CPU time used during the post-mark pause phase of the
+    -- concurrent nonmoving GC.
   , nonmoving_gc_sync_cpu_ns :: RtsTime
-    -- | The time elapsed during the post-mark pause phase of the concurrent
-    -- nonmoving GC.
+    -- | The total time elapsed during the post-mark pause phase of the
+    -- concurrent nonmoving GC.
   , nonmoving_gc_sync_elapsed_ns :: RtsTime
-    -- | The maximum time elapsed during the post-mark pause phase of the
+    -- | The maximum elapsed length of any post-mark pause phase of the
     -- concurrent nonmoving GC.
   , nonmoving_gc_sync_max_elapsed_ns :: RtsTime
-    -- | The CPU time used during the post-mark pause phase of the concurrent
-    -- nonmoving GC.
+    -- | The total CPU time used by the nonmoving GC.
   , nonmoving_gc_cpu_ns :: RtsTime
-    -- | The time elapsed during the post-mark pause phase of the concurrent
-    -- nonmoving GC.
+    -- | The total time elapsed during which there is a nonmoving GC active.
   , nonmoving_gc_elapsed_ns :: RtsTime
-    -- | The maximum time elapsed during the post-mark pause phase of the
-    -- concurrent nonmoving GC.
+    -- | The maximum time elapsed during any nonmoving GC cycle.
   , nonmoving_gc_max_elapsed_ns :: RtsTime
 
     -- | Details about the most recent GC
