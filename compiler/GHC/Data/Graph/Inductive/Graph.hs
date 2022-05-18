@@ -1,5 +1,8 @@
 -- (c) 1999-2005 by Martin Erwig (see copyright at bottom)
 -- | Static and Dynamic Inductive Graphs
+--
+-- Code is from Hackage `fgl` package version 5.7.0.3
+--
 module GHC.Data.Graph.Inductive.Graph (
     -- * General Type Defintions
     -- ** Node and Edge Types
