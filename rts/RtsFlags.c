@@ -400,6 +400,7 @@ usage_text[] = {
 #else /* PROFILING */
 "  -h       Heap residency profile (output file <program>.hp)",
 "  -hT      Produce a heap profile grouped by closure type",
+"  -po<file>  Override profiling output file name prefix (program name by default)",
 #endif /* PROFILING */
 
 "  -i<sec>  Time between heap profile samples (seconds, default: 0.1)",
@@ -1377,6 +1378,21 @@ error = true;
               case 'P': /* detailed cost centre profiling (time/alloc) */
               case 'p': /* cost centre profiling (time/alloc) */
                 OPTION_SAFE;
+#if !defined(PROFILING)
+                switch (rts_argv[arg][2]) {
+                  case 'o':
+                      if (rts_argv[arg][3] == '\0') {
+                        errorBelch("flag -po expects an argument");
+                        error = true;
+                        break;
+                      }
+                      RtsFlags.CcFlags.outputFileNameStem = rts_argv[arg]+3;
+                      break;
+                  default:
+                      PROFILING_BUILD_ONLY();
+
+                } break;
+#else
                 PROFILING_BUILD_ONLY(
                 switch (rts_argv[arg][2]) {
                   case 'a':
@@ -1411,6 +1427,7 @@ error = true;
                     goto check_rest;
                 }
                 ) break;
+#endif /* PROFILING */
 
               case 'R':
                   OPTION_SAFE;
