@@ -16,6 +16,9 @@
 -- * 'Data.Graph.Inductive.Graph.nmap'
 --
 -- * 'Data.Graph.Inductive.Graph.emap'
+--
+-- Code is from Hackage `fgl` package version 5.7.0.3
+
 
 module GHC.Data.Graph.Inductive.PatriciaTree
     ( Gr
