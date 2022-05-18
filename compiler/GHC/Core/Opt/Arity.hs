@@ -1794,7 +1794,8 @@ pushCoercionIntoLambda in_scope x e co
             -- so we extend the substitution with x |-> (x' |> sym co1).
       in Just (x', substExpr subst e `mkCast` co2)
     | otherwise
-    = pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
+      -- See #21555 / #21577 for a case where this trace fired but the cause was benign
+    = -- pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
       Nothing
 
 pushCoDataCon :: DataCon -> [CoreExpr] -> Coercion
