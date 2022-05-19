@@ -709,9 +709,7 @@ readSystemDeps' u_env dflags file
     zenc  = T.pack . zEncodeString . T.unpack
 
     mkHaskellSym :: Module -> ShortText -> ShortText -> ShortText
-    mkHaskellSym mod m s = "h$" <> zenc (T.pack (encodeModule u_env dflags mod)
-                                       <> ":"
-                                       <> m
+    mkHaskellSym mod _m s = "h$" <> zenc (T.pack (encodeModule u_env dflags mod)
                                        <> "."
                                        <> s)
     mkJsModule :: String -> String -> GenModule Unit
@@ -795,7 +793,7 @@ staticDeps u_env dflags wiredin sdeps = mkDeps sdeps
                  Nothing -> pprPanic ("Package key for wired-in dependency could not be found.`"
                                      ++ "I looked for: "
                                      ++ T.unpack mod_name
-                                     ++ " receieved " ++ moduleNameString (moduleName mod)
+                                     ++ " received " ++ moduleNameString (moduleName mod)
                                      ++ " but could not find: " ++ unitString mod_uid
                                      ++ " in the UnitState."
                                      ++ " Here is too much info for you: ")
@@ -814,8 +812,8 @@ staticDeps u_env dflags wiredin sdeps = mkDeps sdeps
     -- ShortText
     -- FIXME: Jeff (2022,03): should mkSymb be in the UnitUtils?
     mkSymb :: Module -> ShortText -> ShortText -> ShortText
-    mkSymb p m s  =
-      "h$" <> zenc (T.pack (encodeModule u_env dflags p) <> ":" <> m <> "." <> s)
+    mkSymb p _m s  =
+      "h$" <> zenc (T.pack (encodeModule u_env dflags p) <> "." <> s)
 
 closePackageDeps :: UnitState -> Set UnitId -> Set UnitId
 closePackageDeps u_st pkgs
