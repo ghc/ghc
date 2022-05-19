@@ -31,7 +31,7 @@
 --   fail = {- ...fail implementation... -}
 -- @
 --
--- See <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>
+-- See <https://gitlab.haskell.org/haskell/prime/-/wikis/libraries/proposals/monad-fail>
 -- for more details.
 --
 -- @since 4.9.0.0
