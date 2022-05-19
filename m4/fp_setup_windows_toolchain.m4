@@ -78,6 +78,7 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
     # for the runtime, libc++ and libc++abi for the C++ standard library
     # implementation, and libunwind for C++ unwinding.
     mingwbin="$hardtop/inplace/mingw/bin/"
+    mingwlib="$hardtop/inplace/mingw/lib/"
 
     CC="${mingwbin}clang.exe"
     CXX="${mingwbin}clang++.exe"
@@ -93,6 +94,11 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
 
     CONF_GCC_LINKER_OPTS_STAGE1="-fuse-ld=lld $cflags"
     CONF_GCC_LINKER_OPTS_STAGE2="-fuse-ld=lld $cflags"
+
+    # On Windows we can't easily dynamically-link against libc++ since there is
+    # no RPATH support, meaning that the loader will have no way of finding our
+    # libc++.dll
+    CXX_STD_LIB_LIBS=":${mingwlib}/libc++.a :${mingwlib}/libc++abi.a"
 
     LD="${mingwbin}ld.lld.exe"
     NM="${mingwbin}llvm-nm.exe"
