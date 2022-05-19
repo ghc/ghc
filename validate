@@ -294,7 +294,7 @@ if [ $build_only -eq 1 ] ||
             $hadrian binary-dist --docs=no-sphinx
             cfgdir="$(dirname "$(find $hadrian_build_root/bindist/ -name 'configure' | head -1)")"
             cd "$cfgdir"
-            ./configure --prefix="$basedir/$bindistdir" && make install
+            ./configure --prefix="$basedir/$bindistdir" && $make install
             cd "$basedir"
             "$ghc" -e 'Data.Text.IO.putStrLn (Data.Text.pack "bindist test: OK")'
         fi
