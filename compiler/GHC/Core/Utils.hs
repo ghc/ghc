@@ -26,8 +26,8 @@ module GHC.Core.Utils (
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsDeadEnd,
         getIdFromTrivialExpr_maybe,
         exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
-        exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
-        exprIsConLike,
+        exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprOkForSpecEval,
+        exprIsWorkFree, exprIsConLike,
         isCheapApp, isExpandableApp, isSaturatedConApp,
         exprIsTickedString, exprIsTickedString_maybe,
         exprIsTopLevelBindable,
@@ -86,6 +86,7 @@ import GHC.Core.Map.Expr ( eqCoreExpr )
 import GHC.Builtin.Names ( makeStaticName, unsafeEqualityProofIdKey )
 import GHC.Builtin.PrimOps
 
+import GHC.Data.Graph.UnVar
 import GHC.Types.Var
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Env
@@ -1563,45 +1564,55 @@ it's applied only to dictionaries.
 -- side effects, and can't diverge or raise an exception.
 
 exprOkForSpeculation, exprOkForSideEffects :: CoreExpr -> Bool
-exprOkForSpeculation = expr_ok primOpOkForSpeculation
-exprOkForSideEffects = expr_ok primOpOkForSideEffects
+exprOkForSpeculation = expr_ok fun_always_ok primOpOkForSpeculation
+exprOkForSideEffects = expr_ok fun_always_ok primOpOkForSideEffects
 
-expr_ok :: (PrimOp -> Bool) -> CoreExpr -> Bool
-expr_ok _ (Lit _)      = True
-expr_ok _ (Type _)     = True
-expr_ok _ (Coercion _) = True
+fun_always_ok :: Id -> Bool
+fun_always_ok _ = True
 
-expr_ok primop_ok (Var v)    = app_ok primop_ok v []
-expr_ok primop_ok (Cast e _) = expr_ok primop_ok e
-expr_ok primop_ok (Lam b e)
-                 | isTyVar b = expr_ok primop_ok  e
+-- | A special version of 'exprOkForSpeculation' used during
+-- Note [Speculative evaluation]. When the predicate arg `fun_ok` returns False
+-- for `b`, then `b` is never considered ok-for-spec.
+exprOkForSpecEval :: (Id -> Bool) -> CoreExpr -> Bool
+exprOkForSpecEval fun_ok = expr_ok fun_ok primOpOkForSpeculation
+
+expr_ok :: (Id -> Bool) -> (PrimOp -> Bool) -> CoreExpr -> Bool
+expr_ok _ _ (Lit _)      = True
+expr_ok _ _ (Type _)     = True
+expr_ok _ _ (Coercion _) = True
+
+expr_ok fun_ok primop_ok (Var v)    = app_ok fun_ok primop_ok v []
+expr_ok fun_ok primop_ok (Cast e _) = expr_ok fun_ok primop_ok e
+expr_ok fun_ok primop_ok (Lam b e)
+                 | isTyVar b = expr_ok fun_ok primop_ok  e
                  | otherwise = True
 
 -- Tick annotations that *tick* cannot be speculated, because these
 -- are meant to identify whether or not (and how often) the particular
 -- source expression was evaluated at runtime.
-expr_ok primop_ok (Tick tickish e)
+expr_ok fun_ok primop_ok (Tick tickish e)
    | tickishCounts tickish = False
-   | otherwise             = expr_ok primop_ok e
+   | otherwise             = expr_ok fun_ok primop_ok e
 
-expr_ok _ (Let {}) = False
+expr_ok _ _ (Let {}) = False
   -- Lets can be stacked deeply, so just give up.
   -- In any case, the argument of exprOkForSpeculation is
   -- usually in a strict context, so any lets will have been
   -- floated away.
 
-expr_ok primop_ok (Case scrut bndr _ alts)
+expr_ok fun_ok primop_ok (Case scrut bndr _ alts)
   =  -- See Note [exprOkForSpeculation: case expressions]
-     expr_ok primop_ok scrut
+     expr_ok fun_ok primop_ok scrut
   && isUnliftedType (idType bndr)
       -- OK to call isUnliftedType: binders always have a fixed RuntimeRep
-  && all (\(Alt _ _ rhs) -> expr_ok primop_ok rhs) alts
+  && all (\(Alt _ _ rhs) -> expr_ok fun_ok primop_ok rhs) alts
   && altsAreExhaustive alts
 
-expr_ok primop_ok other_expr
+expr_ok fun_ok primop_ok other_expr
   | (expr, args) <- collectArgs other_expr
   = case stripTicksTopE (not . tickishCounts) expr of
-        Var f            -> app_ok primop_ok f args
+        Var f ->
+           app_ok fun_ok primop_ok f args
 
         -- 'LitRubbish' is the only literal that can occur in the head of an
         -- application and will not be matched by the above case (Var /= Lit).
@@ -1615,8 +1626,11 @@ expr_ok primop_ok other_expr
         _ -> False
 
 -----------------------------
-app_ok :: (PrimOp -> Bool) -> Id -> [CoreExpr] -> Bool
-app_ok primop_ok fun args
+app_ok :: (Id -> Bool) -> (PrimOp -> Bool) -> Id -> [CoreExpr] -> Bool
+app_ok fun_ok primop_ok fun args
+  | not (fun_ok fun)
+  = False -- This code path is only taken for Note [Speculative evaluation]
+  | otherwise
   = case idDetails fun of
       DFunId new_type ->  not new_type
          -- DFuns terminate, unless the dict is implemented
@@ -1630,7 +1644,7 @@ app_ok primop_ok fun args
       PrimOpId op
         | primOpIsDiv op
         , [arg1, Lit lit] <- args
-        -> not (isZeroLit lit) && expr_ok primop_ok arg1
+        -> not (isZeroLit lit) && expr_ok fun_ok primop_ok arg1
               -- Special case for dividing operations that fail
               -- In general they are NOT ok-for-speculation
               -- (which primop_ok will catch), but they ARE OK
@@ -1679,7 +1693,7 @@ app_ok primop_ok fun args
        | Just Lifted <- typeLevity_maybe (scaledThing ty)
        = True -- See Note [Primops with lifted arguments]
        | otherwise
-       = expr_ok primop_ok arg
+       = expr_ok fun_ok primop_ok arg
 
 -----------------------------
 altsAreExhaustive :: [Alt b] -> Bool

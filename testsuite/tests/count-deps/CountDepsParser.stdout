@@ -1,4 +1,4 @@
-Found 289 GHC.Parser module dependencies
+Found 290 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.PrimOps.Ids
@@ -74,6 +74,7 @@ GHC.Data.FastString
 GHC.Data.FastString.Env
 GHC.Data.FiniteMap
 GHC.Data.Graph.Directed
+GHC.Data.Graph.UnVar
 GHC.Data.IOEnv
 GHC.Data.List.SetOps
 GHC.Data.Maybe
