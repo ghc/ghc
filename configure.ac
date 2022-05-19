@@ -13,7 +13,7 @@ dnl
 # see what flags are available. (Better yet, read the documentation!)
 #
 
-AC_INIT([The Glorious Glasgow Haskell Compilation System], [9.2.2], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [9.2.3], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
     # Version on HEAD must be X.Y (not X.Y.Z) for ProjectVersionMunged variable
     # to be useful (cf #19058)
 

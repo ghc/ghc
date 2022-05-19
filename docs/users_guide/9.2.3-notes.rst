@@ -1,0 +1,118 @@
+.. _release-9-2-3:
+
+Version 9.2.3
+==============
+
+The significant changes to the various parts of the compiler are listed in the
+following sections.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+9, 10, 11, or 12.
+
+Compiler
+--------
+
+- Fix a bug causing compiler panics on certain RULE declarations (:ghc-ticket:`20820`).
+
+- Fix a typechecker regression on certain programs involving type families and type equality constraints (:ghc-ticket:`21473`, :ghc-ticket:`21515`).
+
+- Fix a typechecker regression affecting programs involving quantified constraints and superclasses (:ghc-ticket:`20582`)
+
+- Fix a typechecker bug causing compiler panics on certain programs involing GADTs and Type Families (:ghc-ticket:`20820`).
+
+- Fix a typechecker panic on certain programs involving typed holes (:ghc-ticket:`21130`).
+
+- Fix a typechecker panic arising from uninferrable variables in a pattern synonym (:ghc-ticket:`21479`).
+
+- Various other typechecker bug fixes (:ghc-ticket:`21531`, :ghc-ticket:`21516`, :ghc-ticket:`21519`).
+
+- Ensure that XMM registers are preserved according to the calling convention on Win64 (:ghc-ticket:`21465`).
+
+- Fix a bug in the STG pipeline leading to segfaults in certain situations (:ghc-ticket:`21396`).
+
+- Fix a code generator bug causing CAFs to be incorrectly GC'd (:ghc-ticket:`20959`).
+
+- Improve error messages for OverloadedRecordFields in the case of ambiguous fields (:ghc-ticket:`17420`).
+
+- Improve warnings for redundant constraints (:ghc-ticket:`20602`).
+
+Runtime system
+--------------
+
+- Fix a bug with RTS accounting resulting in computing incorrect and negative productivity stats (:ghc-ticket:`21082`).
+
+GHCi
+----
+
+- Fix a bug causing certain type signatures to be pretty printed in a unpleasant way (:ghc-ticket:`20974`).
+
+Core libraries
+--------------
+
+- Bump ``bytestring`` to 0.11.3.1 fixing a critical linking bug causing GHC 9.2.2 to be unusable on Windows (:ghc-ticket:`21196`).
+
+- ``base``: Export GHC.Event.Internal on Windows (:ghc-ticket:`21245`).
+
+
+Build system and packaging
+--------------------------
+
+- Use POSIX compatible shell syntax for redirecting output during configure (:ghc-ticket:`20760`).
+
+- Only copy and install libffi headers when using in-tree libffi (:ghc-ticket:`21485`, :ghc-ticket:`21487`).
+
+- Add support for bootstrapping hadrian without needing ``cabal-install``.
+
+- Allow installing hadrian generated binary distributions to paths including the string "xxx" (:ghc-ticket:`21402`)
+
+- Allow installing hadrian generated binary distributions to paths including the string "xxx" (:ghc-ticket:`21402`)
+
+- Allow bootstrapping from GHC 9.2.
+
+- Allow running the testsuite using Python 3.10.
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal:     Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+
+
