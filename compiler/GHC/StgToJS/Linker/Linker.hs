@@ -701,7 +701,7 @@ readSystemDeps' u_env dflags file
   where
 
     d :: String -> String -> [String] -> [ExportedFun]
-    d pkg mod symbols = map (let pkg_module = mkJsModule pkg
+    d pkg mod symbols = map (let pkg_module = mkJsModule pkg mod
                               in ExportedFun pkg_module
                                  . mkHaskellSym pkg_module (T.pack mod)
                                  . T.pack)
@@ -714,8 +714,8 @@ readSystemDeps' u_env dflags file
                                        <> m
                                        <> "."
                                        <> s)
-    mkJsModule :: String -> GenModule Unit
-    mkJsModule pkg = mkModule (RealUnit (Definite (stringToUnitId pkg))) (mkModuleName pkg)
+    mkJsModule :: String -> String -> GenModule Unit
+    mkJsModule pkg mod = mkModule (RealUnit (Definite (stringToUnitId pkg))) (mkModuleName mod)
 
 {-
   b  <- readBinaryFile (getLibDir dflags </> file)
