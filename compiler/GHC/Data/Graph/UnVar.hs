@@ -17,7 +17,7 @@ equal to g, but twice as expensive and large.
 module GHC.Data.Graph.UnVar
     ( UnVarSet
     , emptyUnVarSet, mkUnVarSet, varEnvDom, unionUnVarSet, unionUnVarSets
-    , extendUnVarSet, delUnVarSet
+    , extendUnVarSet, extendUnVarSetList, delUnVarSet, delUnVarSetList
     , elemUnVarSet, isEmptyUnVarSet
     , UnVarGraph
     , emptyUnVarGraph
@@ -63,6 +63,9 @@ isEmptyUnVarSet (UnVarSet s) = S.null s
 delUnVarSet :: UnVarSet -> Var -> UnVarSet
 delUnVarSet (UnVarSet s) v = UnVarSet $ k v `S.delete` s
 
+delUnVarSetList :: UnVarSet -> [Var] -> UnVarSet
+delUnVarSetList s vs = s `minusUnVarSet` mkUnVarSet vs
+
 minusUnVarSet :: UnVarSet -> UnVarSet -> UnVarSet
 minusUnVarSet (UnVarSet s) (UnVarSet s') = UnVarSet $ s `S.difference` s'
 
@@ -77,6 +80,9 @@ varEnvDom ae = UnVarSet $ ufmToSet_Directly ae
 
 extendUnVarSet :: Var -> UnVarSet -> UnVarSet
 extendUnVarSet v (UnVarSet s) = UnVarSet $ S.insert (k v) s
+
+extendUnVarSetList :: [Var] -> UnVarSet -> UnVarSet
+extendUnVarSetList vs s = s `unionUnVarSet` mkUnVarSet vs
 
 unionUnVarSet :: UnVarSet -> UnVarSet -> UnVarSet
 unionUnVarSet (UnVarSet set1) (UnVarSet set2) = UnVarSet (set1 `S.union` set2)

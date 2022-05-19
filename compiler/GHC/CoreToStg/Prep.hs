@@ -50,6 +50,7 @@ import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Data.FastString
 import GHC.Data.Pair
+import GHC.Data.Graph.UnVar
 
 import GHC.Utils.Error
 import GHC.Utils.Misc
@@ -603,7 +604,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
                      | otherwise
                      = addFloat floats new_float
 
-             new_float = mkFloat dmd is_unlifted bndr1 rhs1
+             new_float = mkFloat env dmd is_unlifted bndr1 rhs1
 
        ; return (env2, floats1, Nothing) }
 
@@ -617,24 +618,27 @@ cpeBind top_lvl env (NonRec bndr rhs)
 
 cpeBind top_lvl env (Rec pairs)
   | not (isJoinId (head bndrs))
-  = do { (env', bndrs1) <- cpCloneBndrs env bndrs
+  = do { (env, bndrs1) <- cpCloneBndrs env bndrs
+       ; let env' = enterRecGroupRHSs env bndrs1
        ; stuff <- zipWithM (cpePair top_lvl Recursive topDmd False env')
                            bndrs1 rhss
 
        ; let (floats_s, rhss1) = unzip stuff
              all_pairs = foldrOL add_float (bndrs1 `zip` rhss1)
                                            (concatFloats floats_s)
-
+       -- use env below, so that we reset cpe_rec_ids
        ; return (extendCorePrepEnvList env (bndrs `zip` bndrs1),
                  unitFloat (FloatLet (Rec all_pairs)),
                  Nothing) }
 
   | otherwise -- See Note [Join points and floating]
-  = do { (env', bndrs1) <- cpCloneBndrs env bndrs
+  = do { (env, bndrs1) <- cpCloneBndrs env bndrs
+       ; let env' = enterRecGroupRHSs env bndrs1
        ; pairs1 <- zipWithM (cpeJoinPair env') bndrs1 rhss
 
        ; let bndrs2 = map fst pairs1
-       ; return (extendCorePrepEnvList env' (bndrs `zip` bndrs2),
+       -- use env below, so that we reset cpe_rec_ids
+       ; return (extendCorePrepEnvList env (bndrs `zip` bndrs2),
                  emptyFloats,
                  Just (Rec pairs1)) }
   where
@@ -666,7 +670,7 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
                else warnPprTrace True "CorePrep: silly extra arguments:" (ppr bndr) $
                                -- Note [Silly extra arguments]
                     (do { v <- newVar (idType bndr)
-                        ; let float = mkFloat topDmd False v rhs2
+                        ; let float = mkFloat env topDmd False v rhs2
                         ; return ( addFloat floats2 float
                                  , cpeEtaExpand arity (Var v)) })
 
@@ -1510,7 +1514,7 @@ cpeArg env dmd arg
        ; if okCpeArg arg2
          then do { v <- newVar arg_ty
                  ; let arg3      = cpeEtaExpand (exprArity arg2) arg2
-                       arg_float = mkFloat dmd is_unlifted v arg3
+                       arg_float = mkFloat env dmd is_unlifted v arg3
                  ; return (addFloat floats2 arg_float, varToCoreExpr v) }
          else return (floats2, arg2)
        }
@@ -1656,6 +1660,66 @@ to allocate a thunk for it, whose closure must be retained as
 long as the callee might evaluate it. And if it is evaluated on
 most code paths anyway, we get to turn the unknown eval in the
 callee into a known call at the call site.
+
+However, we must be very careful not to speculate recursive calls!
+Doing so might well change termination behavior.
+
+That comes up in practice for DFuns, which are considered ok-for-spec,
+because they always immediately return a constructor.
+Not so if you speculate the recursive call, as #20836 shows:
+
+  class Foo m => Foo m where
+    runFoo :: m a -> m a
+  newtype Trans m a = Trans { runTrans :: m a }
+  instance Monad m => Foo (Trans m) where
+    runFoo = id
+
+(NB: class Foo m => Foo m` looks weird and needs -XUndecidableSuperClasses. The
+example in #20836 is more compelling, but boils down to the same thing.)
+This program compiles to the following DFun for the `Trans` instance:
+
+  Rec {
+  $fFooTrans
+    = \ @m $dMonad -> C:Foo ($fFooTrans $dMonad) (\ @a -> id)
+  end Rec }
+
+Note that the DFun immediately terminates and produces a dictionary, just
+like DFuns ought to, but it calls itself recursively to produce the `Foo m`
+dictionary. But alas, if we treat `$fFooTrans` as always-terminating, so
+that we can speculate its calls, and hence use call-by-value, we get:
+
+  $fFooTrans
+    = \ @m $dMonad -> case ($fFooTrans $dMonad) of sc ->
+                      C:Foo sc (\ @a -> id)
+
+and that's an infinite loop!
+Note that this bad-ness only happens in `$fFooTrans`'s own RHS. In the
+*body* of the letrec, it's absolutely fine to use call-by-value on
+`foo ($fFooTrans d)`.
+
+Our solution is this: we track in cpe_rec_ids the set of enclosing
+recursively-bound Ids, the RHSs of which we are currently transforming and then
+in 'exprOkForSpecEval' (a special entry point to 'exprOkForSpeculation',
+basically) we'll say that any binder in this set is not ok-for-spec.
+
+Note if we have a letrec group `Rec { f1 = rhs1; ...; fn = rhsn }`, and we
+prep up `rhs1`, we have to include not only `f1`, but all binders of the group
+`f1..fn` in this set, otherwise our fix is not robust wrt. mutual recursive
+DFuns.
+
+NB: If at some point we decide to have a termination analysis for general
+functions (#8655, !1866), we need to take similar precautions for (guarded)
+recursive functions:
+
+  repeat x = x : repeat x
+
+Same problem here: As written, repeat evaluates rapidly to WHNF. So `repeat x`
+is a cheap call that we are willing to speculate, but *not* in repeat's RHS.
+Fortunately, pce_rec_ids already has all the information we need in that case.
+
+The problem is very similar to Note [Eta reduction in recursive RHSs].
+Here as well as there it is *unsound* to change the termination properties
+of the very function whose termination properties we are exploiting.
 -}
 
 data FloatingBind
@@ -1702,8 +1766,8 @@ data OkToSpec
                         -- ok-to-speculate unlifted bindings
    | NotOkToSpec        -- Some not-ok-to-speculate unlifted bindings
 
-mkFloat :: Demand -> Bool -> Id -> CpeRhs -> FloatingBind
-mkFloat dmd is_unlifted bndr rhs
+mkFloat :: CorePrepEnv -> Demand -> Bool -> Id -> CpeRhs -> FloatingBind
+mkFloat env dmd is_unlifted bndr rhs
   | is_strict || ok_for_spec -- See Note [Speculative evaluation]
   , not is_hnf  = FloatCase rhs bndr DEFAULT [] ok_for_spec
     -- Don't make a case for a HNF binding, even if it's strict
@@ -1730,7 +1794,8 @@ mkFloat dmd is_unlifted bndr rhs
   where
     is_hnf      = exprIsHNF rhs
     is_strict   = isStrUsedDmd dmd
-    ok_for_spec = exprOkForSpeculation rhs
+    ok_for_spec = exprOkForSpecEval (not . is_rec_call) rhs
+    is_rec_call = (`elemUnVarSet` cpe_rec_ids env)
 
 emptyFloats :: Floats
 emptyFloats = Floats OkToSpec nilOL
@@ -1941,6 +2006,8 @@ data CorePrepEnv
         --      and Note [CorePrep inlines trivial CoreExpr not Id] (#12076)
 
         , cpe_tyco_env :: Maybe CpeTyCoEnv -- See Note [CpeTyCoEnv]
+
+        , cpe_rec_ids         :: UnVarSet -- Faster OutIdSet; See Note [Speculative evaluation]
     }
 
 mkInitialCorePrepEnv :: CorePrepConfig -> CorePrepEnv
@@ -1948,6 +2015,7 @@ mkInitialCorePrepEnv cfg = CPE
       { cpe_config        = cfg
       , cpe_env           = emptyVarEnv
       , cpe_tyco_env      = Nothing
+      , cpe_rec_ids       = emptyUnVarSet
       }
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
@@ -1968,6 +2036,10 @@ lookupCorePrepEnv cpe id
   = case lookupVarEnv (cpe_env cpe) id of
         Nothing  -> Var id
         Just exp -> exp
+
+enterRecGroupRHSs :: CorePrepEnv -> [OutId] -> CorePrepEnv
+enterRecGroupRHSs env grp
+  = env { cpe_rec_ids = extendUnVarSetList grp (cpe_rec_ids env) }
 
 ------------------------------------------------------------------------------
 --           CpeTyCoEnv
@@ -2270,4 +2342,3 @@ mkConvertNumLiteral platform home_unit lookup_global = do
 
 
    return convertNumLit
-

@@ -76,6 +76,7 @@ GHC.Data.FastString
 GHC.Data.FastString.Env
 GHC.Data.FiniteMap
 GHC.Data.Graph.Directed
+GHC.Data.Graph.UnVar
 GHC.Data.IOEnv
 GHC.Data.List.SetOps
 GHC.Data.Maybe
