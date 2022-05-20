@@ -67,6 +67,9 @@ library
         extra-bundled-libraries: Cffi-6
       else
         extra-bundled-libraries: Cffi
+      install-includes: ffi.h ffitarget.h
+      -- ^ see Note [Packaging libffi headers] in
+      -- GHC.Driver.CodeOutput.
 
     -- The make build system does something special in config.mk.in
     -- for generating profiled, debugged, etc builds of those
@@ -152,9 +155,6 @@ library
                       ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                       -- ^ from ../includes
                       DerivedConstants.h
-                      ffi.h ffitarget.h
-                      -- ^ see Note [Packaging libffi headers] in
-                      -- GHC.Driver.CodeOutput.
                       -- ^ generated
                       rts/Adjustor.h
                       rts/ExecPage.h

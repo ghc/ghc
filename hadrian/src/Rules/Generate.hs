@@ -50,8 +50,9 @@ compilerDependencies = do
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
     rtsPath <- expr (rtsBuildPath stage)
     libDir <- expr $ stageLibPath stage
+    useSystemFfi <- expr (flag UseSystemFfi)
     mconcat [ return $ (libDir -/-) <$> derivedConstantsFiles
-            , notStage0 ? return ((rtsPath -/-) <$> libffiHeaderFiles)
+            , notStage0 ? not useSystemFfi ? return ((rtsPath -/-) <$> libffiHeaderFiles)
             , return $ fmap (ghcPath -/-)
                   [ "primop-can-fail.hs-incl"
                   , "primop-code-size.hs-incl"
@@ -78,9 +79,11 @@ generatedDependencies = do
     rtsPath  <- expr (rtsBuildPath stage)
     includes <- expr $ includesDependencies stage
     libDir <- expr $ stageLibPath stage
+    useSystemFfi <- expr (flag UseSystemFfi)
     mconcat [ package compiler ? compilerDependencies
             , package ghcPrim  ? ghcPrimDependencies
-            , package rts      ? return (fmap (rtsPath -/-) libffiHeaderFiles
+            , package rts      ? return (
+                (if useSystemFfi then [] else fmap (rtsPath -/-) libffiHeaderFiles)
                 ++ includes
                 ++ ((libDir -/-) <$> derivedConstantsFiles))
             , stage0 ? return includes ]

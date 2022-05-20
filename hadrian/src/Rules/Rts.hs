@@ -118,11 +118,8 @@ needRtsLibffiTargets stage = do
     rtsPath      <- rtsBuildPath stage
     useSystemFfi <- flag UseSystemFfi
 
-    -- Header files (in the rts build dir).
-    let headers = fmap (rtsPath -/-) libffiHeaderFiles
-
     if useSystemFfi
-    then return headers
+    then return []
     else do
         -- Need Libffi
         -- This returns the dynamic library files (in the Libffi build dir).
