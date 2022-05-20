@@ -1,7 +1,6 @@
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
-include mk/install.mk
 include mk/config.mk
 
 .PHONY: default
