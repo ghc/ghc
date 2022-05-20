@@ -1,43 +1,62 @@
 #include "BufferBuilder.h"
+#include "JitObject.h"
+#include "LinkerInternals.h"
+#include "RtsUtils.h"
 
-void *build_jit_object_coff(ObjectCode *oc)
+/*
+ * GDB JIT interface
+ */
+
+typedef enum
 {
-    struct BufferBuilder bb = buffer_builder_new(4096);
+  JIT_NOACTION = 0,
+  JIT_REGISTER_FN,
+  JIT_UNREGISTER_FN
+} jit_actions_t;
 
-    // COFF header
-    buffer_builder_uint16(bb, IMAGE_FILE_MACHINE_AMD64);
-    buffer_builder_uint16(bb, 1); // NumberOfSections
-    buffer_builder_uint32(bb, 0); // TimeDateStamp
-    uint32_t *ptr_to_symbol_table = buffer_builder_uint32(bb, 0); // PointerToSymbolTable
-    buffer_builder_uint32(bb, n_syms); // NumberOfSymbols
-    buffer_builder_uint16(bb, 0); // SizeOfOptionalHeader
-    buffer_builder_uint16(bb, 0); // Characteristics
+struct jit_code_entry
+{
+  struct jit_code_entry *next_entry;
+  struct jit_code_entry *prev_entry;
+  const char *symfile_addr;
+  uint64_t symfile_size;
+};
 
-    // Sections
-    buffer_builder_push(bb, ".text\0\0\0", 8); // Name
-    buffer_builder_uint32(bb, sect_sz);        // VirtualSize
-    buffer_builder_uint32(bb, sect_base);      // VirtualAddress
-    buffer_builder_uint32(bb, 0);              // SizeOfRawData
-    buffer_builder_uint32(bb, 0);              // PointerToRawData
-    buffer_builder_uint32(bb, 0);              // PointerToRelocations
-    buffer_builder_uint32(bb, 0);              // PointerToLinenumbers
-    buffer_builder_uint16(bb, 0);              // NumberOfRelocations
-    buffer_builder_uint16(bb, 0);              // NumberOfLinenumbers
-    buffer_builder_uint32(bb, 0);              // Characteristics
+struct jit_descriptor
+{
+  uint32_t version;
+  /* This type should be jit_actions_t, but we use uint32_t
+     to be explicit about the bitwidth.  */
+  uint32_t action_flag;
+  struct jit_code_entry *relevant_entry;
+  struct jit_code_entry *first_entry;
+};
 
-    struct BufferBuilder strings = buffer_builder_new(4096);
-    for (int i=0; i < oc->n_symbols; i++) {
-        Symbol_t *sym = oc->symbols[i];
-        size_t offset = buffer_builder_filled_size(strings);
-        buffer_builder_push(strings, sym->name);
-        buffer_builder_uint32(bb, 0);
-        buffer_builder_uint32(bb, offset); // RawName index
-        buffer_builder_uint32(bb, value);  // Value
-        buffer_builder_uint16(bb, 1);      // SectionNumber
-        buffer_builder_uint8(bb, 0x20);    // StorageClass
-        buffer_builder_uint8(bb, 0);       // NumberOfAuxSymbols
-    }
+/* GDB puts a breakpoint in this function.  */
+void __jit_debug_register_code(void);
+void __attribute__((noinline)) __jit_debug_register_code() { };
 
-    buffer_builder_append(bb, strings);
-    return bb->start;
+/* Make sure to specify the version statically, because the
+   debugger may check the version before we can set it.  */
+struct jit_descriptor __jit_debug_descriptor = { 1, 0, 0, 0 };
+
+/*
+ * Registering a JIT object
+ */
+
+void register_jit_object(ObjectCode *oc)
+{
+    struct BufferBuilder buf = build_jit_object(oc);
+
+    struct jit_code_entry *code_entry = stgMallocBytes(sizeof(struct jit_code_entry), "register_jit_object");
+    code_entry->next_entry = __jit_debug_descriptor.first_entry;
+    code_entry->prev_entry = NULL;
+    code_entry->symfile_addr = (const char *) buf.buffer;
+    code_entry->symfile_size = buffer_builder_filled_size(&buf);
+
+    __jit_debug_descriptor.action_flag = JIT_REGISTER_FN;
+    __jit_debug_descriptor.first_entry = code_entry;
+    __jit_debug_descriptor.relevant_entry = code_entry;
+    __jit_debug_register_code();
 }
+

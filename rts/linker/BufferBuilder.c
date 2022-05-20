@@ -1,15 +1,12 @@
 #include "Rts.h"
-
-struct BufferBuilder {
-    uint8_t *buffer; // start of buffer
-    uint8_t *head;   // next unfilled byte
-    uint8_t *end     // end of buffer
-};
+#include "RtsUtils.h"
+#include "BufferBuilder.h"
+#include <string.h>
 
 struct BufferBuilder buffer_builder_new(size_t initial_sz)
 {
     uint8_t *buffer = stgMallocBytes(initial_sz, "new_buffer_builder");
-    return struct BufferBuilder {
+    return (struct BufferBuilder) {
         .buffer = buffer,
         .head = buffer,
         .end = buffer + initial_sz,
@@ -62,15 +59,3 @@ void buffer_builder_append(struct BufferBuilder *bb, struct BufferBuilder *src)
     buffer_builder_push(bb, bb->buffer, sz);
 }
 
-#define DEFINE_BUILDER(ty) \
-    void buffer_builder_#ty(struct BufferBuilder *bb, ty#_t x) \
-        { return (ty#_t *) buffer_builder_push(bb, &x, sizeof(x)); }
-DEFINE_BUILDER(uint8)
-DEFINE_BUILDER(uint16)
-DEFINE_BUILDER(uint32)
-DEFINE_BUILDER(uint64)
-DEFINE_BUILDER(int8)
-DEFINE_BUILDER(int16)
-DEFINE_BUILDER(int32)
-DEFINE_BUILDER(int64)
-#undef DEFINE_BUILDER

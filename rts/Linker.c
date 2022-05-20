@@ -1630,6 +1630,8 @@ int ocTryLoad (ObjectCode* oc) {
 #   endif
     if (!r) { return r; }
 
+    register_jit_object(oc);
+
     IF_DEBUG(linker, ocDebugBelch(oc, "protecting mappings\n"));
 #if defined(NEED_SYMBOL_EXTRAS)
     ocProtectExtras(oc);
