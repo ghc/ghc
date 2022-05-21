@@ -1,0 +1,70 @@
+
+==================== Parser AST ====================
+
+(L
+ { T20718b.hs:1:1 }
+ (HsModule
+  (EpAnn
+   (Anchor
+    { T20718b.hs:1:1 }
+    (UnchangedAnchor))
+   (AnnsModule
+    [(AddEpAnn AnnModule (EpaSpan { T20718b.hs:4:1-6 }))
+    ,(AddEpAnn AnnWhere (EpaSpan { T20718b.hs:4:16-20 }))]
+    (AnnList
+     (Nothing)
+     (Nothing)
+     (Nothing)
+     []
+     []))
+   (EpaCommentsBalanced
+    [(L
+      (Anchor
+       { T20718b.hs:1:1-19 }
+       (UnchangedAnchor))
+      (EpaComment
+       (EpaLineComment
+        "-- header comment 1")
+       { T20718b.hs:1:1 }))
+    ,(L
+      (Anchor
+       { T20718b.hs:2:1-19 }
+       (UnchangedAnchor))
+      (EpaComment
+       (EpaLineComment
+        "-- header comment 2")
+       { T20718b.hs:1:1-19 }))
+    ,(L
+      (Anchor
+       { T20718b.hs:6:1-21 }
+       (UnchangedAnchor))
+      (EpaComment
+       (EpaLineComment
+        "-- trailing comment 1")
+       { T20718b.hs:4:16-20 }))
+    ,(L
+      (Anchor
+       { T20718b.hs:7:1-21 }
+       (UnchangedAnchor))
+      (EpaComment
+       (EpaLineComment
+        "-- trailing comment 2")
+       { T20718b.hs:6:1-21 }))]
+    [(L
+      (Anchor
+       { T20718b.hs:8:1 }
+       (UnchangedAnchor))
+      (EpaComment
+       (EpaEofComment)
+       { T20718b.hs:7:1-21 }))]))
+  (VirtualBraces
+   (1))
+  (Just
+   (L
+    (SrcSpanAnn (EpAnnNotUsed) { T20718b.hs:4:8-14 })
+    {ModuleName: T20718b}))
+  (Nothing)
+  []
+  []
+  (Nothing)
+  (Nothing)))
