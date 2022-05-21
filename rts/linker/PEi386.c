@@ -1487,13 +1487,11 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       /* Exception Unwind information. See Note [Exception Unwinding].  */
       if (0 == strncmp(".xdata"    , section->info->name, 6 )) {
           kind = SECTIONKIND_EXCEPTION_UNWIND;
-          oc->info->xdata = &oc->sections[i];
       }
 
       /* Exception handler tables, See Note [Exception Unwinding].  */
       if (0 == strncmp(".pdata"    , section->info->name, 6 )) {
           kind = SECTIONKIND_EXCEPTION_TABLE;
-          oc->info->pdata = &oc->sections[i];
       }
 
       if (0==strncmp(".idata", section->info->name, 6)) {
@@ -1556,10 +1554,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
       // Allocate memory for the section.
       uint8_t *start;
-      if (kind == SECTIONKIND_CODE_OR_RODATA) {
-          start = m32_alloc(oc->rx_m32, sz, alignment);
-      } else {
+      if (section->info->props & IMAGE_SCN_MEM_WRITE) {
           start = m32_alloc(oc->rw_m32, sz, alignment);
+      } else {
+          start = m32_alloc(oc->rx_m32, sz, alignment);
       }
       if (!start) {
         barf("Could not allocate any heap memory from private heap (requested %" FMT_SizeT " bytes).",
@@ -1994,6 +1992,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
       /* Register the exceptions inside this OC.
          See Note [Exception Unwinding].  */
       if (section.kind == SECTIONKIND_EXCEPTION_TABLE) {
+          oc->info->pdata = &oc->sections[i];
 #if defined(x86_64_HOST_ARCH)
           unsigned numEntries = section.size / sizeof(RUNTIME_FUNCTION);
           if (numEntries == 0)
@@ -2010,6 +2009,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
             return false;
           }
 #endif /* x86_64_HOST_ARCH.  */
+      } else if (section.kind == SECTIONKIND_EXCEPTION_UNWIND) {
+          oc->info->xdata = &oc->sections[i];
       }
    }
 
