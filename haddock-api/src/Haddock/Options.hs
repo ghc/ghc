@@ -15,6 +15,7 @@
 module Haddock.Options (
   parseHaddockOpts,
   Flag(..),
+  Visibility(..),
   getUsage,
   optTitle,
   outputDir,
@@ -361,18 +362,31 @@ ghcFlags flags = [ option | Flag_OptGhc option <- flags ]
 reexportFlags :: [Flag] -> [String]
 reexportFlags flags = [ option | Flag_Reexport option <- flags ]
 
+data Visibility = Visible | Hidden
+  deriving (Eq, Show)
 
-readIfaceArgs :: [Flag] -> [(DocPaths, FilePath)]
+readIfaceArgs :: [Flag] -> [(DocPaths, Visibility, FilePath)]
 readIfaceArgs flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
   where
-    parseIfaceOption :: String -> (DocPaths, FilePath)
+    parseIfaceOption :: String -> (DocPaths, Visibility, FilePath)
     parseIfaceOption str =
       case break (==',') str of
         (fpath, ',':rest) ->
           case break (==',') rest of
-            (src, ',':file) -> ((fpath, Just src), file)
-            (file, _) -> ((fpath, Nothing), file)
-        (file, _) -> (("", Nothing), file)
+            (src, ',':rest') ->
+              let src' = case src of
+                    "" -> Nothing
+                    _  -> Just src
+              in
+              case break (==',') rest' of
+                (visibility, ',':file) | visibility == "hidden" ->
+                  ((fpath, src'), Hidden, file)
+                                       | otherwise ->
+                  ((fpath, src'), Visible, file)
+                (file, _) ->
+                  ((fpath, src'), Visible, file)
+            (file, _) -> ((fpath, Nothing), Visible, file)
+        (file, _) -> (("", Nothing), Visible, file)
 
 
 -- | Like 'listToMaybe' but returns the last element instead of the first.
