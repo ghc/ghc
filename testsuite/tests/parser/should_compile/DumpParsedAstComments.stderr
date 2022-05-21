@@ -21,20 +21,20 @@
    (EpaCommentsBalanced
     [(L
       (Anchor
-       { DumpParsedAstComments.hs:(2,1)-(4,4) }
-       (UnchangedAnchor))
-      (EpaComment
-       (EpaBlockComment
-        "{-/n  Block comment at the beginning/n  -}")
-       { DumpParsedAstComments.hs:1:1-28 }))
-    ,(L
-      (Anchor
        { DumpParsedAstComments.hs:1:1-28 }
        (UnchangedAnchor))
       (EpaComment
        (EpaBlockComment
         "{-# LANGUAGE Haskell2010 #-}")
-       { DumpParsedAstComments.hs:1:1 }))]
+       { DumpParsedAstComments.hs:1:1 }))
+    ,(L
+      (Anchor
+       { DumpParsedAstComments.hs:(2,1)-(4,4) }
+       (UnchangedAnchor))
+      (EpaComment
+       (EpaBlockComment
+        "{-/n  Block comment at the beginning/n  -}")
+       { DumpParsedAstComments.hs:1:1-28 }))]
     [(L
       (Anchor
        { DumpParsedAstComments.hs:13:1 }

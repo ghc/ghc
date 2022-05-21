@@ -2967,7 +2967,7 @@ instance MonadP PV where
       PV_Ok s {
          pv_header_comments = header_comments',
          pv_comment_q = comment_q'
-       } (EpaCommentsBalanced (Strict.fromMaybe [] header_comments') (reverse newAnns))
+       } (EpaCommentsBalanced (Strict.fromMaybe [] header_comments') newAnns)
 
 {- Note [Parser-Validator Details]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -3009,7 +3009,7 @@ instance MonadP P where
       POk s {
          header_comments = header_comments',
          comment_q = comment_q'
-       } (EpaCommentsBalanced (Strict.fromMaybe [] header_comments') (reverse newAnns))
+       } (EpaCommentsBalanced (Strict.fromMaybe [] header_comments') newAnns)
 
 getCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
 getCommentsFor (RealSrcSpan l _) = allocateCommentsP l
@@ -3554,7 +3554,7 @@ allocateComments ss comment_q =
     comment_q' = before ++ after
     newAnns = middle
   in
-    (comment_q', newAnns)
+    (comment_q', reverse newAnns)
 
 allocatePriorComments
   :: RealSrcSpan
@@ -3569,24 +3569,20 @@ allocatePriorComments ss comment_q mheader_comments =
     comment_q'= after
   in
     case mheader_comments of
-      Strict.Nothing -> (Strict.Just newAnns, comment_q', [])
-      Strict.Just _ -> (mheader_comments, comment_q', newAnns)
+      Strict.Nothing -> (Strict.Just (reverse newAnns), comment_q', [])
+      Strict.Just _ -> (mheader_comments, comment_q', reverse newAnns)
 
 allocateFinalComments
   :: RealSrcSpan
   -> [LEpaComment]
   -> Strict.Maybe [LEpaComment]
   -> (Strict.Maybe [LEpaComment], [LEpaComment], [LEpaComment])
-allocateFinalComments ss comment_q mheader_comments =
-  let
-    cmp (L l _) = anchor l <= ss
-    (before,after) = partition cmp comment_q
-    newAnns = after
-    comment_q'= before
-  in
-    case mheader_comments of
-      Strict.Nothing -> (Strict.Just newAnns, [], comment_q')
-      Strict.Just _ -> (mheader_comments, [], comment_q' ++ newAnns)
+allocateFinalComments _ss comment_q mheader_comments =
+  -- We ignore the RealSrcSpan as the parser currently provides a
+  -- point span at (1,1).
+  case mheader_comments of
+    Strict.Nothing -> (Strict.Just (reverse comment_q), [], [])
+    Strict.Just _ -> (mheader_comments, [], reverse comment_q)
 
 commentToAnnotation :: RealLocated Token -> LEpaComment
 commentToAnnotation (L l (ITdocComment s ll))   = mkLEpaComment l ll (EpaDocComment s)
