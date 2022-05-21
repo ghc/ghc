@@ -1,0 +1,162 @@
+
+==================== Parser AST ====================
+
+(L
+ { T20718.hs:1:1 }
+ (HsModule
+  (EpAnn
+   (Anchor
+    { T20718.hs:1:1 }
+    (UnchangedAnchor))
+   (AnnsModule
+    [(AddEpAnn AnnModule (EpaSpan { T20718.hs:3:1-6 }))
+    ,(AddEpAnn AnnWhere (EpaSpan { T20718.hs:3:15-19 }))]
+    (AnnList
+     (Nothing)
+     (Nothing)
+     (Nothing)
+     []
+     []))
+   (EpaCommentsBalanced
+    [(L
+      (Anchor
+       { T20718.hs:1:1-16 }
+       (UnchangedAnchor))
+      (EpaComment
+       (EpaLineComment
+        "-- top of file 1")
+       { T20718.hs:1:1 }))
+    ,(L
+      (Anchor
+       { T20718.hs:2:1-16 }
+       (UnchangedAnchor))
+      (EpaComment
+       (EpaLineComment
+        "-- top of file 2")
+       { T20718.hs:1:1-16 }))
+    ,(L
+      (Anchor
+       { T20718.hs:5:1-11 }
+       (UnchangedAnchor))
+      (EpaComment
+       (EpaLineComment
+        "-- before 1")
+       { T20718.hs:3:15-19 }))
+    ,(L
+      (Anchor
+       { T20718.hs:6:1-11 }
+       (UnchangedAnchor))
+      (EpaComment
+       (EpaLineComment
+        "-- before 2")
+       { T20718.hs:5:1-11 }))]
+    [(L
+      (Anchor
+       { T20718.hs:12:1 }
+       (UnchangedAnchor))
+      (EpaComment
+       (EpaEofComment)
+       { T20718.hs:11:1-8 }))]))
+  (VirtualBraces
+   (1))
+  (Just
+   (L
+    (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:3:8-13 })
+    {ModuleName: T20718}))
+  (Nothing)
+  []
+  [(L
+    (SrcSpanAnn (EpAnn
+                 (Anchor
+                  { T20718.hs:8:1-5 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [(L
+                    (Anchor
+                     { T20718.hs:10:1-8 }
+                     (UnchangedAnchor))
+                    (EpaComment
+                     (EpaLineComment
+                      "-- end 1")
+                     { T20718.hs:8:5 }))
+                  ,(L
+                    (Anchor
+                     { T20718.hs:11:1-8 }
+                     (UnchangedAnchor))
+                    (EpaComment
+                     (EpaLineComment
+                      "-- end 2")
+                     { T20718.hs:10:1-8 }))])) { T20718.hs:8:1-5 })
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      (L
+       (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:1 })
+       (Unqual
+        {OccName: x}))
+      (MG
+       (NoExtField)
+       (L
+        (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:1-5 })
+        [(L
+          (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:1-5 })
+          (Match
+           (EpAnn
+            (Anchor
+             { T20718.hs:8:1-5 }
+             (UnchangedAnchor))
+            []
+            (EpaComments
+             []))
+           (FunRhs
+            (L
+             (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:1 })
+             (Unqual
+              {OccName: x}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (EpaComments
+             [])
+            [(L
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { T20718.hs:8:3-5 })
+              (GRHS
+               (EpAnn
+                (Anchor
+                 { T20718.hs:8:3-5 }
+                 (UnchangedAnchor))
+                (GrhsAnn
+                 (Nothing)
+                 (AddEpAnn AnnEqual (EpaSpan { T20718.hs:8:3 })))
+                (EpaComments
+                 []))
+               []
+               (L
+                (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:5 })
+                (HsOverLit
+                 (EpAnn
+                  (Anchor
+                   { T20718.hs:8:5 }
+                   (UnchangedAnchor))
+                  (NoEpAnns)
+                  (EpaComments
+                   []))
+                 (OverLit
+                  (NoExtField)
+                  (HsIntegral
+                   (IL
+                    (SourceText 1)
+                    (False)
+                    (1))))))))]
+            (EmptyLocalBinds
+             (NoExtField)))))])
+       (FromSource))
+      [])))]
+  (Nothing)
+  (Nothing)))
