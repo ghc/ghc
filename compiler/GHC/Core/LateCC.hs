@@ -23,7 +23,7 @@ import GHC.Types.Var
 import GHC.Unit.Types
 import GHC.Data.FastString
 import GHC.Core
-import GHC.Core.Opt.Monad
+import GHC.Plugins.Monad
 import GHC.Core.Utils (mkTick)
 import GHC.Types.Id
 import GHC.Driver.Session

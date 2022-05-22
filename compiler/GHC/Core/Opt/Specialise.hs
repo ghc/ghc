@@ -6,7 +6,9 @@
 \section[Specialise]{Stamping out overloading, and (optionally) polymorphism}
 -}
 
-module GHC.Core.Opt.Specialise ( specProgram, specUnfolding ) where
+module GHC.Core.Opt.Specialise
+  ( SpecialiseOpts(..), specProgram, specUnfolding
+  ) where
 
 import GHC.Prelude
 
@@ -21,7 +23,6 @@ import GHC.Core.Type  hiding( substTy, extendTvSubstList, zapSubst )
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate
 import GHC.Core.Coercion( Coercion )
-import GHC.Core.Opt.Monad
 import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
@@ -44,6 +45,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DFM
 import GHC.Types.Name
+import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
 import GHC.Types.Var      ( isLocalVar )
@@ -53,13 +55,14 @@ import GHC.Types.Id
 import GHC.Types.Error
 
 import GHC.Utils.Error ( mkMCDiagnostic )
+import GHC.Utils.Logger
 import GHC.Utils.Monad    ( foldlM )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Trace
 
-import GHC.Unit.Module( Module )
+import GHC.Unit.Module( Module, ModuleSet )
 import GHC.Unit.Module.ModGuts
 import GHC.Core.Unfold
 
@@ -590,11 +593,11 @@ Hence, the invariant is this:
 -}
 
 -- | Specialise calls to type-class overloaded functions occurring in a program.
-specProgram :: ModGuts -> CoreM ModGuts
-specProgram guts@(ModGuts { mg_module = this_mod
-                          , mg_rules = local_rules
-                          , mg_binds = binds })
-  = do { dflags <- getDynFlags
+specProgram :: Logger -> SpecialiseOpts -> ModGuts -> IO ModGuts
+specProgram logger opts guts@(ModGuts { mg_module = this_mod
+                                      , mg_rules = local_rules
+                                      , mg_binds = binds })
+  = do {
 
               -- We need to start with a Subst that knows all the things
               -- that are in scope, so that the substitution engine doesn't
@@ -604,7 +607,14 @@ specProgram guts@(ModGuts { mg_module = this_mod
        ; let top_env = SE { se_subst = Core.mkEmptySubst $ mkInScopeSetList $
                                        bindersOfBinds binds
                           , se_module = this_mod
-                          , se_dflags = dflags }
+                          , se_dflags = so_dflags opts
+                          , se_external_rule_base = so_external_rule_base opts
+                          , se_rule_base = so_rule_base opts
+                          , se_uniq_mask = so_uniq_mask opts
+                          , se_unqual = so_unqual opts
+                          , se_loc = so_loc opts
+                          , se_visible_orphan_mods = so_visible_orphan_mods opts
+                          }
 
              go []           = return ([], emptyUDs)
              go (bind:binds) = do (bind', binds', uds') <- specBind TopLevel top_env bind $ \_ ->
@@ -612,9 +622,9 @@ specProgram guts@(ModGuts { mg_module = this_mod
                                   return (bind' ++ binds', uds')
 
              -- Specialise the bindings of this module
-       ; (binds', uds) <- runSpecM (go binds)
+       ; (binds', uds) <- runSpecM (so_uniq_mask opts) (go binds)
 
-       ; (spec_rules, spec_binds) <- specImports top_env local_rules uds
+       ; (spec_rules, spec_binds) <- specImports logger top_env local_rules uds
 
        ; return (guts { mg_binds = spec_binds ++ binds'
                       , mg_rules = spec_rules ++ local_rules }) }
@@ -647,21 +657,22 @@ See #10491
 *                                                                      *
 ********************************************************************* -}
 
-specImports :: SpecEnv
+specImports :: Logger
+            -> SpecEnv
             -> [CoreRule]
             -> UsageDetails
-            -> CoreM ([CoreRule], [CoreBind])
-specImports top_env local_rules
+            -> IO ([CoreRule], [CoreBind])
+specImports logger top_env local_rules
             (MkUD { ud_binds = dict_binds, ud_calls = calls })
   | not $ gopt Opt_CrossModuleSpecialise (se_dflags top_env)
     -- See Note [Disabling cross-module specialisation]
   = return ([], wrapDictBinds dict_binds [])
 
   | otherwise
-  = do { hpt_rules <- getRuleBase
+  = do { let hpt_rules = se_rule_base top_env
        ; let rule_base = extendRuleBaseList hpt_rules local_rules
 
-       ; (spec_rules, spec_binds) <- spec_imports top_env [] rule_base
+       ; (spec_rules, spec_binds) <- spec_imports logger top_env [] rule_base
                                                   dict_binds calls
 
              -- Don't forget to wrap the specialized bindings with
@@ -677,17 +688,18 @@ specImports top_env local_rules
     }
 
 -- | Specialise a set of calls to imported bindings
-spec_imports :: SpecEnv          -- Passed in so that all top-level Ids are in scope
-             -> [Id]             -- Stack of imported functions being specialised
-                                 -- See Note [specImport call stack]
-             -> RuleBase         -- Rules from this module and the home package
-                                 -- (but not external packages, which can change)
-             -> FloatedDictBinds -- Dict bindings, used /only/ for filterCalls
-                                 -- See Note [Avoiding loops in specImports]
-             -> CallDetails      -- Calls for imported things
-             -> CoreM ( [CoreRule]   -- New rules
-                      , [CoreBind] ) -- Specialised bindings
-spec_imports top_env callers rule_base dict_binds calls
+spec_imports :: Logger
+             -> SpecEnv           -- Passed in so that all top-level Ids are in scope
+             -> [Id]              -- Stack of imported functions being specialised
+                                  -- See Note [specImport call stack]
+             -> RuleBase          -- Rules from this module and the home package
+                                  -- (but not external packages, which can change)
+             -> FloatedDictBinds  -- Dict bindings, used /only/ for filterCalls
+                                  -- See Note [Avoiding loops in specImports]
+             -> CallDetails       -- Calls for imported things
+             -> IO ( [CoreRule]   -- New rules
+                   , [CoreBind] ) -- Specialised bindings
+spec_imports logger top_env callers rule_base dict_binds calls
   = do { let import_calls = dVarEnvElts calls
 --       ; debugTraceMsg (text "specImports {" <+>
 --                         vcat [ text "calls:" <+> ppr import_calls
@@ -697,26 +709,27 @@ spec_imports top_env callers rule_base dict_binds calls
 
        ; return (rules, spec_binds) }
   where
-    go :: RuleBase -> [CallInfoSet] -> CoreM ([CoreRule], [CoreBind])
+    go :: RuleBase -> [CallInfoSet] -> IO ([CoreRule], [CoreBind])
     go _ [] = return ([], [])
     go rb (cis : other_calls)
       = do { -- debugTraceMsg (text "specImport {" <+> ppr cis)
-           ; (rules1, spec_binds1) <- spec_import top_env callers rb dict_binds cis
+           ; (rules1, spec_binds1) <- spec_import logger top_env callers rb dict_binds cis
            ; -- debugTraceMsg (text "specImport }" <+> ppr cis)
 
            ; (rules2, spec_binds2) <- go (extendRuleBaseList rb rules1) other_calls
            ; return (rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
 
-spec_import :: SpecEnv               -- Passed in so that all top-level Ids are in scope
+spec_import :: Logger
+            -> SpecEnv               -- Passed in so that all top-level Ids are in scope
             -> [Id]                  -- Stack of imported functions being specialised
                                      -- See Note [specImport call stack]
             -> RuleBase              -- Rules from this module
             -> FloatedDictBinds      -- Dict bindings, used /only/ for filterCalls
                                      -- See Note [Avoiding loops in specImports]
             -> CallInfoSet           -- Imported function and calls for it
-            -> CoreM ( [CoreRule]    -- New rules
-                     , [CoreBind] )  -- Specialised bindings
-spec_import top_env callers rb dict_binds cis@(CIS fn _)
+            -> IO ( [CoreRule]       -- New rules
+                  , [CoreBind] )     -- Specialised bindings
+spec_import logger top_env callers rb dict_binds cis@(CIS fn _)
   | isIn "specImport" fn callers
   = return ([], [])     -- No warning.  This actually happens all the time
                         -- when specialising a recursive function, because
@@ -730,14 +743,15 @@ spec_import top_env callers rb dict_binds cis@(CIS fn _)
   = do {     -- Get rules from the external package state
              -- We keep doing this in case we "page-fault in"
              -- more rules as we go along
-       ; external_rule_base <- getExternalRuleBase
-       ; vis_orphs <- getVisibleOrphanMods
+       ; let external_rule_base = se_external_rule_base top_env
+       ; let mask = se_uniq_mask top_env
+       ; let vis_orphs = se_visible_orphan_mods top_env
        ; let rules_for_fn = getRules (RuleEnv [rb, external_rule_base] vis_orphs) fn
 
        ; -- debugTraceMsg (text "specImport1" <+> vcat [ppr fn, ppr good_calls, ppr rhs])
        ; (rules1, spec_pairs, MkUD { ud_binds = dict_binds1, ud_calls = new_calls })
-            <- runSpecM $ specCalls True top_env dict_binds
-                             rules_for_fn good_calls fn rhs
+             <- runSpecM mask $ specCalls True top_env dict_binds
+                                          rules_for_fn good_calls fn rhs
 
        ; let spec_binds1 = [NonRec b r | (b,r) <- spec_pairs]
              -- After the rules kick in we may get recursion, but
@@ -745,8 +759,9 @@ spec_import top_env callers rb dict_binds cis@(CIS fn _)
              -- See Note [Glom the bindings if imported functions are specialised]
 
               -- Now specialise any cascaded calls
-       ; -- debugTraceMsg (text "specImport 2" <+> (ppr fn $$ ppr rules1 $$ ppr spec_binds1))
-       ; (rules2, spec_binds2) <- spec_imports top_env
+       -- ; debugTraceMsg (text "specImport 2" <+> (ppr fn $$ ppr rules1 $$ ppr spec_binds1))
+       ; (rules2, spec_binds2) <- spec_imports logger
+                                               top_env
                                                (fn:callers)
                                                (extendRuleBaseList rb rules1)
                                                (dict_binds `thenFDBs` dict_binds1)
@@ -758,7 +773,7 @@ spec_import top_env callers rb dict_binds cis@(CIS fn _)
        ; return (rules2 ++ rules1, final_binds) }
 
   | otherwise
-  = do { tryWarnMissingSpecs dflags callers fn good_calls
+  = do { tryWarnMissingSpecs logger top_env callers fn good_calls
        ; return ([], [])}
 
   where
@@ -796,10 +811,10 @@ canSpecImport dflags fn
 -- if there is at least one imported function being specialized,
 -- and if all imported functions are marked with an inline pragma
 -- Use the most specific warning as the reason.
-tryWarnMissingSpecs :: DynFlags -> [Id] -> Id -> [CallInfo] -> CoreM ()
+tryWarnMissingSpecs :: Logger -> SpecEnv -> [Id] -> Id -> [CallInfo] -> IO ()
 -- See Note [Warning about missed specialisations]
-tryWarnMissingSpecs dflags callers fn calls_for_fn
-  | isClassOpId fn = return () -- See Note [Missed specialisation for ClassOps]
+tryWarnMissingSpecs logger top_env callers fn calls_for_fn
+  | isClassOpId fn = return () -- See Note [Missed specialization for ClassOps]
   | wopt Opt_WarnMissedSpecs dflags
     && not (null callers)
     && allCallersInlined                  = doWarn $ WarningWithFlag Opt_WarnMissedSpecs
@@ -807,14 +822,20 @@ tryWarnMissingSpecs dflags callers fn calls_for_fn
   | otherwise                             = return ()
   where
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
+    dflags = se_dflags top_env
     diag_opts = initDiagOpts dflags
-    doWarn reason =
-      msg (mkMCDiagnostic diag_opts reason)
-        (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
-                2 (vcat [ text "when specialising" <+> quotes (ppr caller)
-                        | caller <- callers])
+    doWarn reason = let
+      msg_class = mkMCDiagnostic diag_opts reason
+      loc = se_loc top_env
+      sty = mkErrStyle (se_unqual top_env)
+      doc = vcat
+          [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
+                  2 (vcat [ text "when specialising" <+> quotes (ppr caller)
+                          | caller <- callers])
           , whenPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
-          , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) ])
+          , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn)
+          ]
+      in logMsg logger msg_class loc (withPprStyle sty doc)
 
 {- Note [Missed specialisation for ClassOps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1064,6 +1085,16 @@ the specialisations for imported bindings recursive.
 ************************************************************************
 -}
 
+data SpecialiseOpts = SpecialiseOpts
+  { so_dflags :: !DynFlags
+  , so_loc :: !SrcSpan
+  , so_rule_base :: !RuleBase
+  , so_external_rule_base :: !RuleBase
+  , so_uniq_mask :: !Char
+  , so_unqual :: !PrintUnqualified
+  , so_visible_orphan_mods :: !ModuleSet
+  }
+
 data SpecEnv
   = SE { se_subst :: Core.Subst
              -- We carry a substitution down:
@@ -1074,6 +1105,12 @@ data SpecEnv
 
        , se_module :: Module
        , se_dflags :: DynFlags
+       , se_external_rule_base  :: RuleBase
+       , se_loc    :: SrcSpan
+       , se_rule_base :: RuleBase
+       , se_uniq_mask :: Char
+       , se_unqual :: PrintUnqualified
+       , se_visible_orphan_mods :: ModuleSet
      }
 
 instance Outputable SpecEnv where
@@ -3040,10 +3077,13 @@ deleteCallsFor bs calls = delDVarEnvList calls bs
 
 type SpecM a = UniqSM a
 
-runSpecM :: SpecM a -> CoreM a
-runSpecM thing_inside
-  = do { us <- getUniqueSupplyM
-       ; return (initUs_ us thing_inside) }
+runSpecM :: Char   -- ^ Mask
+         -> SpecM a
+         -> IO a
+runSpecM mask thing_inside
+  = do
+    us <- mkSplitUniqSupply mask
+    return (initUs_ us thing_inside)
 
 mapAndCombineSM :: (a -> SpecM (b, UsageDetails)) -> [a] -> SpecM ([b], UsageDetails)
 mapAndCombineSM _ []     = return ([], emptyUDs)

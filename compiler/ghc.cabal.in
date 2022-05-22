@@ -307,6 +307,7 @@ Library
         GHC.Core.Opt.Arity
         GHC.Core.Opt.CallArity
         GHC.Core.Opt.CallerCC
+        GHC.Core.Opt.CallerCC.Filter
         GHC.Core.Opt.ConstantFold
         GHC.Core.Opt.CprAnal
         GHC.Core.Opt.CSE
@@ -315,7 +316,6 @@ Library
         GHC.Core.Opt.FloatIn
         GHC.Core.Opt.FloatOut
         GHC.Core.Opt.LiberateCase
-        GHC.Core.Opt.Monad
         GHC.Core.Opt.OccurAnal
         GHC.Core.Opt.Pipeline
         GHC.Core.Opt.Pipeline.Types
@@ -329,6 +329,7 @@ Library
         GHC.Core.Opt.Specialise
         GHC.Core.Opt.StaticArgs
         GHC.Core.Opt.Stats
+        GHC.Core.Opt.Utils
         GHC.Core.Opt.WorkWrap
         GHC.Core.Opt.WorkWrap.Utils
         GHC.Core.PatSyn
@@ -402,8 +403,11 @@ Library
         GHC.Driver.Config.Core.Lint
         GHC.Driver.Config.Core.Lint.Interactive
         GHC.Driver.Config.Core.Opt.Arity
+        GHC.Driver.Config.Core.Opt.CallerCC
         GHC.Driver.Config.Core.Opt.LiberateCase
         GHC.Driver.Config.Core.Opt.Simplify
+        GHC.Driver.Config.Core.Opt.SpecConstr
+        GHC.Driver.Config.Core.Opt.Specialise
         GHC.Driver.Config.Core.Opt.WorkWrap
         GHC.Driver.Config.Core.Rules
         GHC.Driver.Config.CoreToStg.Prep
@@ -557,6 +561,7 @@ Library
         GHC.Platform.X86
         GHC.Platform.X86_64
         GHC.Plugins
+        GHC.Plugins.Monad
         GHC.Prelude
         GHC.Rename.Bind
         GHC.Rename.Doc

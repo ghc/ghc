@@ -3,19 +3,16 @@
 
 -}
 
-
 {-# LANGUAGE DeriveFunctor #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
-module GHC.Core.Opt.Monad (
-    -- * Types used in core-to-core passes
-    FloatOutSwitches(..),
+module GHC.Plugins.Monad (
+    -- * Plugins
+    bindsOnlyPass,
 
     -- * The monad
     CoreM, runCoreM,
 
-    mapDynFlagsCoreM, dropSimplCount,
+    mapDynFlagsCoreM,
 
     -- ** Reading from the monad
     getHscEnv, getModule,
@@ -26,7 +23,7 @@ module GHC.Core.Opt.Monad (
     getPrintUnqualified, getSrcSpanM,
 
     -- ** Writing to the monad
-    addSimplCount,
+    addSimplCount, dropSimplCount,
 
     -- ** Lifting into the monad
     liftIO, liftIOWithCount,
@@ -47,8 +44,10 @@ import GHC.Driver.Env
 
 import GHC.Core
 import GHC.Core.Opt.Stats ( SimplCount, zeroSimplCount, plusSimplCount )
+import GHC.Core.Opt.Utils
 
-import GHC.Types.Annotations
+import GHC.Runtime.Context ( InteractiveContext )
+
 import GHC.Types.Unique.Supply
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
@@ -62,46 +61,27 @@ import GHC.Utils.Monad
 import GHC.Data.IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified GHC.Data.IOEnv  as IOEnv
 
-import GHC.Runtime.Context ( InteractiveContext )
-
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.External
 
-import Data.Bifunctor ( bimap )
-import Data.Dynamic
+import Data.Typeable ( Typeable )
 import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
 
-data FloatOutSwitches = FloatOutSwitches {
-  floatOutLambdas   :: Maybe Int,  -- ^ Just n <=> float lambdas to top level, if
-                                   -- doing so will abstract over n or fewer
-                                   -- value variables
-                                   -- Nothing <=> float all lambdas to top level,
-                                   --             regardless of how many free variables
-                                   -- Just 0 is the vanilla case: float a lambda
-                                   --    iff it has no free vars
+{-
+************************************************************************
+*                                                                      *
+          Abstraction of core-to-core passes to run.
+*                                                                      *
+************************************************************************
+-}
 
-  floatOutConstants :: Bool,       -- ^ True <=> float constants to top level,
-                                   --            even if they do not escape a lambda
-  floatOutOverSatApps :: Bool,
-                             -- ^ True <=> float out over-saturated applications
-                             --            based on arity information.
-                             -- See Note [Floating over-saturated applications]
-                             -- in GHC.Core.Opt.SetLevels
-  floatToTopLevelOnly :: Bool      -- ^ Allow floating to the top level only.
-  }
-instance Outputable FloatOutSwitches where
-    ppr = pprFloatOutSwitches
-
-pprFloatOutSwitches :: FloatOutSwitches -> SDoc
-pprFloatOutSwitches sw
-  = text "FOS" <+> (braces $
-     sep $ punctuate comma $
-     [ text "Lam ="    <+> ppr (floatOutLambdas sw)
-     , text "Consts =" <+> ppr (floatOutConstants sw)
-     , text "OverSatApps ="   <+> ppr (floatOutOverSatApps sw) ])
+bindsOnlyPass :: (CoreProgram -> CoreM CoreProgram) -> ModGuts -> CoreM ModGuts
+bindsOnlyPass pass guts
+  = do { binds' <- pass (mg_binds guts)
+       ; return (guts { mg_binds = binds' }) }
 
 {-
 ************************************************************************
@@ -142,7 +122,7 @@ plusWriter w1 w2 = CoreWriter {
 
 type CoreIOEnv = IOEnv CoreReader
 
--- | The monad used by Core-to-Core passes to register simplification statistics.
+-- | The monad used by Core plugin passes to register simplification statistics.
 --  Also used to have common state (in the form of UniqueSupply) for generating Uniques.
 newtype CoreM a = CoreM { unCoreM :: CoreIOEnv (a, CoreWriter) }
     deriving (Functor)
@@ -320,36 +300,15 @@ get_eps = do
 getAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (ModuleEnv [a], NameEnv [a])
 getAnnotations deserialize guts = do
      hsc_env <- getHscEnv
-     ann_env <- liftIO $ prepareAnnotations hsc_env (Just guts)
-     return (deserializeAnns deserialize ann_env)
+     liftIO $ getAnnotationsFromHscEnv hsc_env deserialize guts
 
 -- | Get at most one annotation of a given type per annotatable item.
 getFirstAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (ModuleEnv a, NameEnv a)
-getFirstAnnotations deserialize guts
-  = bimap mod name <$> getAnnotations deserialize guts
-  where
-    mod = mapModuleEnv head . filterModuleEnv (const $ not . null)
-    name = mapNameEnv head . filterNameEnv (not . null)
+getFirstAnnotations deserialize guts = do
+     hsc_env <- getHscEnv
+     liftIO $ getFirstAnnotationsFromHscEnv hsc_env deserialize guts
 
 {-
-Note [Annotations]
-~~~~~~~~~~~~~~~~~~
-A Core-to-Core pass that wants to make use of annotations calls
-getAnnotations or getFirstAnnotations at the beginning to obtain a UniqFM with
-annotations of a specific type. This produces all annotations from interface
-files read so far. However, annotations from interface files read during the
-pass will not be visible until getAnnotations is called again. This is similar
-to how rules work and probably isn't too bad.
-
-The current implementation could be optimised a bit: when looking up
-annotations for a thing from the HomePackageTable, we could search directly in
-the module where the thing is defined rather than building one UniqFM which
-contains all annotations we know of. This would work because annotations can
-only be given to things defined in the same module. However, since we would
-only want to deserialise every annotation once, we would have to build a cache
-for every module in the HTP. In the end, it's probably not worth it as long as
-we aren't using annotations heavily.
-
 ************************************************************************
 *                                                                      *
                 Direct screen output

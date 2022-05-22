@@ -16,21 +16,18 @@ ToDo [Oct 2013]
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Core.Opt.SpecConstr(
+        SpecConstrOpts(..),
         specConstrProgram,
         SpecConstrAnnotation(..)
     ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Session ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
-                          , gopt, hasPprDebug )
-
 import GHC.Core
 import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.Unfold
 import GHC.Core.FVs     ( exprsFreeVarsList, exprFreeVars )
-import GHC.Core.Opt.Monad
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Core.DataCon
 import GHC.Core.Class( classTyVars )
@@ -52,6 +49,7 @@ import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
+import GHC.Types.Name.Env ( NameEnv )
 import GHC.Types.Tickish
 import GHC.Types.Basic
 import GHC.Types.Demand
@@ -74,7 +72,6 @@ import GHC.Utils.Trace
 import GHC.Builtin.Names ( specTyConKey )
 
 import GHC.Exts( SpecConstrAnnotation(..) )
-import GHC.Serialized   ( deserializeWithData )
 
 import Control.Monad    ( zipWithM )
 import Data.List (nubBy, sortBy, partition, dropWhileEnd, mapAccumL )
@@ -760,14 +757,17 @@ unbox the strict fields, because T is polymorphic!)
 ************************************************************************
 -}
 
-specConstrProgram :: ModGuts -> CoreM ModGuts
-specConstrProgram guts
-  = do { env0 <- initScEnv guts
-       ; us   <- getUniqueSupplyM
-       ; let (_usg, binds') = initUs_ us $
-                              scTopBinds env0 (mg_binds guts)
+specConstrProgram
+  :: NameEnv SpecConstrAnnotation
+  -> UniqSupply
+  -> SpecConstrOpts
+  -> ModGuts -> ModGuts
+specConstrProgram annos us opts guts = let
+  env0 = initScEnv opts annos (mg_binds guts)
+  (_usg, binds') = initUs_ us $
+                   scTopBinds env0 (mg_binds guts)
 
-       ; return (guts { mg_binds = binds' }) }
+  in guts { mg_binds = binds' }
 
 scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind])
 scTopBinds _env []     = return (nullUsage, [])
@@ -925,33 +925,18 @@ instance Outputable Value where
    ppr LambdaVal         = text "<Lambda>"
 
 ---------------------
-initScOpts :: DynFlags -> Module -> SpecConstrOpts
-initScOpts dflags this_mod = SpecConstrOpts
-        { sc_max_args    = maxWorkerArgs dflags,
-          sc_debug       = hasPprDebug dflags,
-          sc_uf_opts     = unfoldingOpts dflags,
-          sc_module      = this_mod,
-          sc_size        = specConstrThreshold dflags,
-          sc_count       = specConstrCount     dflags,
-          sc_recursive   = specConstrRecursive dflags,
-          sc_keen        = gopt Opt_SpecConstrKeen dflags
-        }
-
-initScEnv :: ModGuts -> CoreM ScEnv
-initScEnv guts
-  = do { dflags    <- getDynFlags
-       ; (_, anns) <- getFirstAnnotations deserializeWithData guts
-       ; this_mod  <- getModule
-       ; return (SCE { sc_opts        = initScOpts dflags this_mod,
-                       sc_force       = False,
-                       sc_subst       = init_subst,
-                       sc_how_bound   = emptyVarEnv,
-                       sc_vals        = emptyVarEnv,
-                       sc_annotations = anns }) }
+initScEnv :: SpecConstrOpts -> UniqFM Name SpecConstrAnnotation -> [Bind Var] -> ScEnv
+initScEnv opts anns binds
+  = SCE { sc_opts        = opts,
+          sc_force       = False,
+          sc_subst       = init_subst,
+          sc_how_bound   = emptyVarEnv,
+          sc_vals        = emptyVarEnv,
+          sc_annotations = anns }
   where
     init_subst = mkEmptySubst $ mkInScopeSet $ mkVarSet $
-                 bindersOfBinds (mg_binds guts)
-        -- Acccount for top-level bindings that are not in dependency order;
+                 bindersOfBinds binds
+        -- Account for top-level bindings that are not in dependency order;
         -- see Note [Glomming] in GHC.Core.Opt.OccurAnal
         -- Easiest thing is to bring all the top level binders into scope at once,
         -- as if  at once, as if all the top-level decls were mutually recursive.

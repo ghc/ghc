@@ -254,7 +254,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
 import GHC.Settings
 import GHC.CmmToAsm.CFG.Weight
-import {-# SOURCE #-} GHC.Core.Opt.CallerCC
+import GHC.Core.Opt.CallerCC.Filter
 
 import GHC.SysTools.Terminal ( stderrSupportsAnsiColors )
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
@@ -495,7 +495,7 @@ data DynFlags = DynFlags {
                                         --   this feature. See 'GHC.StgToCmm.Config'.
   liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
-                                        --   See 'GHC.Core.Opt.Monad.FloatOutSwitches'
+                                        --   See 'GHC.Core.Opt.Utils.FloatOutSwitches'
 
   liftLamsRecArgs       :: Maybe Int,   -- ^ Maximum number of arguments after lambda lifting a
                                         --   recursive function.
