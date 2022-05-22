@@ -1890,7 +1890,7 @@ instance ExactPrint (HsExpr GhcPs) where
       NoSourceText -> withPpr x
 
   exact (HsLit _an lit) = withPpr lit
-  exact (HsLam _ (MG _ (L _ [match]) _)) = do
+  exact (HsLam _ (MG _ (L _ [match]))) = do
     markAnnotated match
       -- markExpr _ (HsLam _ (MG _ (L _ [match]) _)) = do
       --   setContext (Set.singleton LambdaExpr) $ do
@@ -2205,13 +2205,13 @@ instance ExactPrint (HsSplice GhcPs) where
 -- TODO:AZ: combine these instances
 instance ExactPrint (MatchGroup GhcPs (LocatedA (HsExpr GhcPs))) where
   getAnnotationEntry = const NoEntryVal
-  exact (MG _ matches _) = do
+  exact (MG _ matches) = do
     -- TODO:AZ use SortKey, in MG ann.
     markAnnotated matches
 
 instance ExactPrint (MatchGroup GhcPs (LocatedA (HsCmd GhcPs))) where
   getAnnotationEntry = const NoEntryVal
-  exact (MG _ matches _) = do
+  exact (MG _ matches) = do
     -- TODO:AZ use SortKey, in MG ann.
     markAnnotated matches
 

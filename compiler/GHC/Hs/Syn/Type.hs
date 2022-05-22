@@ -192,7 +192,7 @@ lhsCmdTopType :: LHsCmdTop GhcTc -> Type
 lhsCmdTopType (L _ (HsCmdTop (CmdTopTc _ ret_ty _) _)) = ret_ty
 
 matchGroupTcType :: MatchGroupTc -> Type
-matchGroupTcType (MatchGroupTc args res) = mkVisFunTys args res
+matchGroupTcType (MatchGroupTc args res _) = mkVisFunTys args res
 
 syntaxExprType :: SyntaxExpr GhcTc -> Type
 syntaxExprType (SyntaxExprTc e _ _) = hsExprType e

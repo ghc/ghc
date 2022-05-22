@@ -43,7 +43,6 @@ import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
-import GHC.Core.Type
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -1039,19 +1038,12 @@ patterns in each equation.
 -}
 
 data MatchGroup p body
-  = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result
-       , mg_alts    :: XRec p [LMatch p body]  -- The alternatives
-       , mg_origin  :: Origin }
+  = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result, and origin
+       , mg_alts    :: XRec p [LMatch p body] } -- The alternatives
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
      -- where there are n patterns
   | XMatchGroup !(XXMatchGroup p body)
-
-data MatchGroupTc
-  = MatchGroupTc
-       { mg_arg_tys :: [Scaled Type]  -- Types of the arguments, t1..tn
-       , mg_res_ty  :: Type    -- Type of the result, tr
-       } deriving Data
 
 -- | Located Match
 type LMatch id body = XRec id (Match id body)

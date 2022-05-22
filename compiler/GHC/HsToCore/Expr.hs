@@ -732,8 +732,8 @@ dsDo ctx stmts
                            (MG { mg_alts = noLocA [mkSimpleMatch
                                                     LambdaExpr
                                                     [mfix_pat] body]
-                               , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty
-                               , mg_origin = Generated })
+                               , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty Generated
+                               })
         mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
         body         = noLocA $ HsDo body_ty
                                 ctx (noLocA (rec_stmts ++ [ret_stmt]))

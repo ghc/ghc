@@ -230,7 +230,7 @@
        (Unqual
         {OccName: foo}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:(10,1)-(12,3) })
         [(L
@@ -381,8 +381,7 @@
                      (NoExtField)
                      (NoExtField)))])))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -476,7 +475,7 @@
        (Unqual
         {OccName: bar}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:(15,1)-(19,3) })
         [(L
@@ -593,8 +592,7 @@
                      (NoExtField)
                      (NoExtField)))])))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -682,7 +680,7 @@
        (Unqual
         {OccName: baz}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:22:1-30 })
         [(L
@@ -831,8 +829,7 @@
                      (NoExtField)
                      (NoExtField)))])))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -852,7 +849,7 @@
        (Unqual
         {OccName: a}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:24:1-13 })
         [(L
@@ -900,8 +897,7 @@
                   (Unqual
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -921,7 +917,7 @@
        (Unqual
         {OccName: b}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:25:1-13 })
         [(L
@@ -969,8 +965,7 @@
                   (Unqual
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -991,7 +986,7 @@
        (Unqual
         {OccName: s}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:26:1-13 })
         [(L
@@ -1039,8 +1034,7 @@
                   (Unqual
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -1375,7 +1369,7 @@
        (Unqual
         {OccName: f}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:32:1-7 })
         [(L
@@ -1442,8 +1436,7 @@
                   (Unqual
                    {OccName: x}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -1466,7 +1459,7 @@
        (Unqual
         {OccName: x}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:34:8-35 })
         [(L
@@ -1568,7 +1561,7 @@
                         (Unqual
                          {OccName: y}))
                        (MG
-                        (NoExtField)
+                        (FromSource)
                         (L
                          (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:34:19-21 })
                          [(L
@@ -1625,8 +1618,7 @@
                                      (False)
                                      (2))))))))]
                              (EmptyLocalBinds
-                              (NoExtField)))))])
-                        (FromSource))
+                              (NoExtField)))))]))
                        []))
                     ,(L
                       (SrcSpanAnn (EpAnn
@@ -1651,7 +1643,7 @@
                         (Unqual
                          {OccName: z}))
                        (MG
-                        (NoExtField)
+                        (FromSource)
                         (L
                          (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:34:24-26 })
                          [(L
@@ -1708,8 +1700,7 @@
                                      (False)
                                      (3))))))))]
                              (EmptyLocalBinds
-                              (NoExtField)))))])
-                        (FromSource))
+                              (NoExtField)))))]))
                        []))]}
                    []))
                  (L
@@ -1725,8 +1716,7 @@
                     (Unqual
                      {OccName: y}))))))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -1746,7 +1736,7 @@
        (Unqual
         {OccName: fot}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:(36,1)-(44,4) })
         [(L
@@ -1822,7 +1812,7 @@
                     (Unqual
                      {OccName: x}))))
                  (MG
-                  (NoExtField)
+                  (FromSource)
                   (L
                    (SrcSpanAnn (EpAnn
                                 (Anchor
@@ -2124,11 +2114,9 @@
                              (SourceText 'd')
                              ('d'))))))]
                        (EmptyLocalBinds
-                        (NoExtField)))))])
-                  (FromSource))))))]
+                        (NoExtField)))))]))))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))]
   (Nothing)
   (Nothing)))

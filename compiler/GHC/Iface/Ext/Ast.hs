@@ -879,11 +879,14 @@ instance ( HiePass p
          , ToHie (LocatedA (body (GhcPass p)))
          ) => ToHie (MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))) where
   toHie mg = case mg of
-    MG{ mg_alts = (L span alts) , mg_origin = origin} ->
+    MG{ mg_alts = (L span alts) } ->
       local (setOrigin origin) $ concatM
         [ locOnly (locA span)
         , toHie alts
         ]
+    where origin = case hiePass @p of
+             HieRn -> mg_ext mg
+             HieTc -> mg_origin $ mg_ext mg
 
 setOrigin :: Origin -> NodeOrigin -> NodeOrigin
 setOrigin FromSource _ = SourceInfo

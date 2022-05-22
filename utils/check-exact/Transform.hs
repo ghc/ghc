@@ -263,8 +263,8 @@ captureOrder ls = AnnSortKey $ map (rs . getLocA) ls
 -- ---------------------------------------------------------------------
 
 captureMatchLineSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
-captureMatchLineSpacing (L l (ValD x (FunBind a b (MG c (L d ms ) e) f)))
-                       = L l (ValD x (FunBind a b (MG c (L d ms') e) f))
+captureMatchLineSpacing (L l (ValD x (FunBind a b (MG c (L d ms )) f)))
+                       = L l (ValD x (FunBind a b (MG c (L d ms')) f))
     where
       ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
       ms' = captureLineSpacing ms
@@ -447,8 +447,8 @@ getEntryDP anns ast =
 -- ---------------------------------------------------------------------
 
 setEntryDPDecl :: LHsDecl GhcPs -> DeltaPos -> LHsDecl GhcPs
-setEntryDPDecl decl@(L _  (ValD x (FunBind a b (MG c (L d ms ) e) f))) dp
-                   = L l' (ValD x (FunBind a b (MG c (L d ms') e) f))
+setEntryDPDecl decl@(L _  (ValD x (FunBind a b (MG c (L d ms )) f))) dp
+                   = L l' (ValD x (FunBind a b (MG c (L d ms')) f))
     where
       L l' _ = setEntryDP' decl dp
       ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
@@ -552,8 +552,8 @@ transferEntryDP' la lb = do
 
 
 pushDeclDP :: HsDecl GhcPs -> DeltaPos -> HsDecl GhcPs
-pushDeclDP (ValD x (FunBind a b (MG c (L d  ms ) e) f)) dp
-          = ValD x (FunBind a b (MG c (L d' ms') e) f)
+pushDeclDP (ValD x (FunBind a b (MG c (L d  ms )) f)) dp
+          = ValD x (FunBind a b (MG c (L d' ms')) f)
     where
       L d' _ = setEntryDP' (L d ms) dp
       ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
@@ -623,7 +623,7 @@ balanceComments first second = do
 -- 'Match' if that 'Match' needs to be manipulated.
 balanceCommentsFB :: (Monad m)
   => LHsBind GhcPs -> LocatedA b -> TransformT m (LHsBind GhcPs, LocatedA b)
-balanceCommentsFB (L lf (FunBind x n (MG mx (L lm matches) o) t)) second = do
+balanceCommentsFB (L lf (FunBind x n (MG o (L lm matches)) t)) second = do
   logTr $ "balanceCommentsFB entered: " ++ showGhc (ss2range $ locA lf)
   -- There are comments on lf.  We need to
   -- + Keep the prior ones here
@@ -655,7 +655,7 @@ balanceCommentsFB (L lf (FunBind x n (MG mx (L lm matches) o) t)) second = do
         _  -> (m'',lf')
   logTr $ "balanceCommentsMatch done"
   -- return (L lf'' (FunBind x n (MG mx (L lm (reverse (m''':ms))) o) t), second')
-  balanceComments' (L lf'' (FunBind x n (MG mx (L lm (reverse (m''':ms))) o) t)) second'
+  balanceComments' (L lf'' (FunBind x n (MG o (L lm (reverse (m''':ms)))) t)) second'
 balanceCommentsFB f s = balanceComments' f s
 
 -- | Move comments on the same line as the end of the match into the
@@ -1372,7 +1372,7 @@ hsDeclsGeneric t = q t
     -- ---------------------------------
 
     lhsbind :: (Monad m) => LHsBind GhcPs -> TransformT m [LHsDecl GhcPs]
-    lhsbind (L _ (FunBind _ _ (MG _ (L _ matches) _) _)) = do
+    lhsbind (L _ (FunBind _ _ (MG _ (L _ matches)) _)) = do
         dss <- mapM hsDecls matches
         return (concat dss)
     lhsbind p@(L _ (PatBind{})) = do

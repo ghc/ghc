@@ -692,7 +692,7 @@ addLocaLDecl6 libdir lp = do
         [de1'',d2] <- balanceCommentsList decls0
 
         let de1 = captureMatchLineSpacing de1''
-        let L _ (ValD _ (FunBind _ _ (MG _ (L _ ms) _) _)) = de1
+        let L _ (ValD _ (FunBind _ _ (MG _ (L _ ms)) _)) = de1
         let [ma1,_ma2] = ms
 
         (de1',_) <- modifyValD (getLocA ma1) de1 $ \_m decls -> do

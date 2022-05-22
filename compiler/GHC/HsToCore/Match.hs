@@ -762,8 +762,8 @@ JJQC 30-Nov-1997
 -}
 
 matchWrapper ctxt scrs (MG { mg_alts = L _ matches
-                             , mg_ext = MatchGroupTc arg_tys rhs_ty
-                             , mg_origin = origin })
+                           , mg_ext = MatchGroupTc arg_tys rhs_ty origin
+                           })
   = do  { dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
 

@@ -501,7 +501,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdCase _ exp match) env_ids = do
     stack_id <- newSysLocalDs Many stack_ty
     (match', core_choices)
       <- dsCases ids local_vars stack_id stack_ty res_ty match
-    let MG{ mg_ext = MatchGroupTc _ sum_ty } = match'
+    let MG{ mg_ext = MatchGroupTc _ sum_ty _ } = match'
         in_ty = envStackType env_ids stack_ty
 
     core_body <- dsExpr (HsCase noExtField exp match')
@@ -544,7 +544,7 @@ dsCmd ids local_vars stack_ty res_ty
       (match', core_choices)
         <- dsCases ids local_vars' stack_id stack_ty' res_ty match
 
-      let MG{ mg_ext = MatchGroupTc _ sum_ty } = match'
+      let MG{ mg_ext = MatchGroupTc _ sum_ty _ } = match'
           in_ty = envStackType env_ids stack_ty'
           discrims = map nlHsVar arg_ids
       (discrim_vars, matching_code)
@@ -756,8 +756,8 @@ dsCases :: DsCmdEnv                               -- arrow combinators
                 CoreExpr)                         -- desugared choices
 dsCases ids local_vars stack_id stack_ty res_ty
         (MG { mg_alts = L l matches
-            , mg_ext = MatchGroupTc arg_tys _
-            , mg_origin = origin }) = do
+            , mg_ext = MatchGroupTc arg_tys _ origin
+            }) = do
 
   -- Extract and desugar the leaf commands in the case, building tuple
   -- expressions that will (after tagging) replace these leaves
@@ -805,8 +805,8 @@ dsCases ids local_vars stack_id stack_ty res_ty
     Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
       dsExpr (HsLamCase EpAnnNotUsed LamCase
         (MG { mg_alts = noLocA []
-            , mg_ext = MatchGroupTc [Scaled Many void_ty] res_ty
-            , mg_origin = Generated }))
+            , mg_ext = MatchGroupTc [Scaled Many void_ty] res_ty Generated
+            }))
 
       -- Replace the commands in the case with these tagged tuples,
       -- yielding a HsExpr Id we can feed to dsExpr.
@@ -816,8 +816,8 @@ dsCases ids local_vars stack_id stack_ty res_ty
   -- Note that we replace the MatchGroup result type by sum_ty,
   -- which is the type of matches'
   return (MG { mg_alts = L l matches'
-             , mg_ext = MatchGroupTc arg_tys sum_ty
-             , mg_origin = origin },
+             , mg_ext = MatchGroupTc arg_tys sum_ty origin
+             },
           core_choices)
 
 {-

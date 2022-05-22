@@ -75,7 +75,7 @@
        (Unqual
         {OccName: main}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { mod185.hs:5:1-24 })
         [(L
@@ -124,8 +124,7 @@
                    {ModuleName: Prelude}
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))]
   (Nothing)
   (Nothing)))

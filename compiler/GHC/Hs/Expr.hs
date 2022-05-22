@@ -1292,9 +1292,16 @@ instance (OutputableBndrId p) => Outputable (HsCmdTop (GhcPass p)) where
 ************************************************************************
 -}
 
-type instance XMG         GhcPs b = NoExtField
-type instance XMG         GhcRn b = NoExtField
+type instance XMG         GhcPs b = Origin
+type instance XMG         GhcRn b = Origin
 type instance XMG         GhcTc b = MatchGroupTc
+
+data MatchGroupTc
+  = MatchGroupTc
+       { mg_arg_tys :: [Scaled Type]  -- Types of the arguments, t1..tn
+       , mg_res_ty  :: Type    -- Type of the result, tr
+       , mg_origin  :: Origin  -- Origin (Generated vs FromSource)
+       } deriving Data
 
 type instance XXMatchGroup (GhcPass _) b = DataConCantHappen
 

@@ -1457,7 +1457,7 @@
        (Unqual
         {OccName: main}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:24:1-23 })
         [(L
@@ -1528,8 +1528,7 @@
                     (SourceText "hello")
                     {FastString: "hello"})))))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))]
   (Nothing)
   (Nothing)))

@@ -33,7 +33,7 @@
        (UnchangedAnchor))
       (EpaComment
        (EpaBlockComment
-        "{-/n  Block comment at the beginning/n  -}")
+        "{-\n  Block comment at the beginning\n  -}")
        { DumpParsedAstComments.hs:1:1-28 }))]
     [(L
       (Anchor
@@ -76,7 +76,7 @@
        (Unqual
         {OccName: foo}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:(7,1)-(9,3)
                                       })
@@ -185,8 +185,7 @@
                      (NoExtField)
                      (NoExtField)))])))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -206,7 +205,7 @@
        (Unqual
         {OccName: main}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:12:1-23 })
         [(L
@@ -277,8 +276,9 @@
                     (SourceText "hello")
                     {FastString: "hello"})))))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))]
   (Nothing)
   (Nothing)))
+
+

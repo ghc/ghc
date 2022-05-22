@@ -66,7 +66,7 @@
        (Unqual
         {OccName: bar}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { Test20297.hs:(5,1)-(7,7) })
         [(L
@@ -140,8 +140,7 @@
               (NoAnnSortKey)
               {Bag(LocatedA (HsBind GhcPs)):
                []}
-              [])))))])
-       (FromSource))
+              [])))))]))
       [])))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -161,7 +160,7 @@
        (Unqual
         {OccName: foo}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { Test20297.hs:(9,1)-(11,26) })
         [(L
@@ -250,7 +249,7 @@
                    (Unqual
                     {OccName: doStuff}))
                   (MG
-                   (NoExtField)
+                   (FromSource)
                    (L
                     (SrcSpanAnn (EpAnnNotUsed) { Test20297.hs:11:9-26 })
                     [(L
@@ -340,11 +339,9 @@
                                  (NoExtField)
                                  (NoExtField)))])))))]
                         (EmptyLocalBinds
-                         (NoExtField)))))])
-                   (FromSource))
+                         (NoExtField)))))]))
                   []))]}
-              [])))))])
-       (FromSource))
+              [])))))]))
       [])))]
   (Nothing)
   (Nothing)))
@@ -411,7 +408,7 @@
        (Unqual
         {OccName: bar}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { Test20297.ppr.hs:(3,1)-(5,7) })
         [(L
@@ -478,8 +475,7 @@
               (NoAnnSortKey)
               {Bag(LocatedA (HsBind GhcPs)):
                []}
-              [])))))])
-       (FromSource))
+              [])))))]))
       [])))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -499,7 +495,7 @@
        (Unqual
         {OccName: foo}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { Test20297.ppr.hs:(6,1)-(9,24) })
         [(L
@@ -581,7 +577,7 @@
                    (Unqual
                     {OccName: doStuff}))
                   (MG
-                   (NoExtField)
+                   (FromSource)
                    (L
                     (SrcSpanAnn (EpAnnNotUsed) { Test20297.ppr.hs:9:7-24 })
                     [(L
@@ -671,11 +667,11 @@
                                  (NoExtField)
                                  (NoExtField)))])))))]
                         (EmptyLocalBinds
-                         (NoExtField)))))])
-                   (FromSource))
+                         (NoExtField)))))]))
                   []))]}
-              [])))))])
-       (FromSource))
+              [])))))]))
       [])))]
   (Nothing)
   (Nothing)))
+
+

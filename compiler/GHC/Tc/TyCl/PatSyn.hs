@@ -830,15 +830,13 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                     L (getLoc lpat) $
                     HsCase noExtField (nlHsVar scrutinee) $
                     MG{ mg_alts = L (l2l $ getLoc lpat) cases
-                      , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty
-                      , mg_origin = Generated
+                      , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty Generated
                       }
              body' = noLocA $
                      HsLam noExtField $
                      MG{ mg_alts = noLocA [mkSimpleMatch LambdaExpr
                                                          args body]
-                       , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty
-                       , mg_origin = Generated
+                       , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty Generated
                        }
              match = mkMatch (mkPrefixFunRhs (L loc patsyn_id)) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
@@ -846,8 +844,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                              (EmptyLocalBinds noExtField)
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
              mg = MG{ mg_alts = L (l2l $ getLoc match) [match]
-                    , mg_ext = MatchGroupTc [] res_ty
-                    , mg_origin = Generated
+                    , mg_ext = MatchGroupTc [] res_ty Generated
                     }
              matcher_arity = length req_theta + 3
              -- See Note [Pragmas for pattern synonyms]

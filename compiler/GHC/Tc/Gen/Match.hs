@@ -223,7 +223,7 @@ tcMatches :: (AnnoBody body ) => TcMatchCtxt body
           -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
 
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
-                                  , mg_origin = origin })
+                                  , mg_ext = origin })
   | null matches  -- Deal with case e of {}
     -- Since there are no branches, no one else will fill in rhs_ty
     -- when in inference mode, so we must do it ourselves,
@@ -232,8 +232,8 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
        ; pat_tys <- mapM scaledExpTypeToType pat_tys
        ; rhs_ty  <- expTypeToType rhs_ty
        ; return (MG { mg_alts = L l []
-                    , mg_ext = MatchGroupTc pat_tys rhs_ty
-                    , mg_origin = origin }) }
+                    , mg_ext = MatchGroupTc pat_tys rhs_ty origin
+                    }) }
 
   | otherwise
   = do { umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
@@ -242,8 +242,8 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
        ; pat_tys  <- mapM readScaledExpType pat_tys
        ; rhs_ty   <- readExpType rhs_ty
        ; return (MG { mg_alts   = L l matches'
-                    , mg_ext    = MatchGroupTc pat_tys rhs_ty
-                    , mg_origin = origin }) }
+                    , mg_ext    = MatchGroupTc pat_tys rhs_ty origin
+                    }) }
 
 -------------
 tcMatch :: (AnnoBody body) => TcMatchCtxt body

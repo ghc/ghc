@@ -674,14 +674,14 @@ zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
             -> MatchGroup GhcTc (LocatedA (body GhcTc))
             -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
 zonkMatchGroup env zBody (MG { mg_alts = L l ms
-                             , mg_ext = MatchGroupTc arg_tys res_ty
-                             , mg_origin = origin })
+                             , mg_ext = MatchGroupTc arg_tys res_ty origin
+                             })
   = do  { ms' <- mapM (zonkMatch env zBody) ms
         ; arg_tys' <- zonkScaledTcTypesToTypesX env arg_tys
         ; res_ty'  <- zonkTcTypeToTypeX env res_ty
         ; return (MG { mg_alts = L l ms'
-                     , mg_ext = MatchGroupTc arg_tys' res_ty'
-                     , mg_origin = origin }) }
+                     , mg_ext = MatchGroupTc arg_tys' res_ty' origin
+                     }) }
 
 zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
           => ZonkEnv

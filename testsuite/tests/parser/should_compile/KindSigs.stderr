@@ -843,7 +843,7 @@
        (Unqual
         {OccName: qux}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:23:1-12 })
         [(L
@@ -915,8 +915,7 @@
                   (Exact
                    {Name: ()}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -1464,7 +1463,7 @@
        (Unqual
         {OccName: true}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:35:1-11 })
         [(L
@@ -1512,8 +1511,7 @@
                   (Unqual
                    {OccName: True}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))]
   (Nothing)
   (Nothing)))

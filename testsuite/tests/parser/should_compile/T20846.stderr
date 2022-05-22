@@ -89,7 +89,7 @@
        (Unqual
         {OccName: ++++}))
       (MG
-       (NoExtField)
+       (FromSource)
        (L
         (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:4:1-18 })
         [(L
@@ -148,8 +148,9 @@
                   (Unqual
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))])
-       (FromSource))
+             (NoExtField)))))]))
       [])))]
   (Nothing)
   (Nothing)))
+
+

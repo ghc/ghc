@@ -339,7 +339,7 @@ tcCmdMatchLambda :: CmdEnv
                  -> TcM (HsWrapper, MatchGroup GhcTc (LHsCmd GhcTc))
 tcCmdMatchLambda env
                  ctxt
-                 mg@MG { mg_alts = L l matches }
+                 mg@MG { mg_alts = L l matches, mg_ext = origin }
                  (cmd_stk, res_ty)
   = do { (co, arg_tys, cmd_stk') <- matchExpectedCmdArgs n_pats cmd_stk
 
@@ -349,7 +349,7 @@ tcCmdMatchLambda env
 
        ; let arg_tys' = map unrestricted arg_tys
              mg' = mg { mg_alts = L l matches'
-                      , mg_ext = MatchGroupTc arg_tys' res_ty }
+                      , mg_ext = MatchGroupTc arg_tys' res_ty origin }
 
        ; return (mkWpCastN co, mg') }
   where

@@ -200,7 +200,7 @@ unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
 unguardedRHS an loc rhs = [L (noAnnSrcSpan loc) (GRHS an [] rhs)]
 
 type AnnoBody p body
-  = ( XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ NoExtField
+  = ( XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ Origin
     , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))] ~ SrcSpanAnnL
     , Anno (Match (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnA
     )
@@ -209,9 +209,8 @@ mkMatchGroup :: AnnoBody p body
              => Origin
              -> LocatedL [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
              -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
-mkMatchGroup origin matches = MG { mg_ext = noExtField
-                                 , mg_alts = matches
-                                 , mg_origin = origin }
+mkMatchGroup origin matches = MG { mg_ext = origin
+                                 , mg_alts = matches }
 
 mkLamCaseMatchGroup :: AnnoBody p body
                     => Origin
@@ -257,7 +256,7 @@ mkHsAppType e t = addCLocAA t_body e (HsAppType noExtField e paren_wct)
 mkHsAppTypes :: LHsExpr GhcRn -> [LHsWcType GhcRn] -> LHsExpr GhcRn
 mkHsAppTypes = foldl' mkHsAppType
 
-mkHsLam :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ NoExtField)
+mkHsLam :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
         => [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> LHsExpr (GhcPass p)
@@ -880,7 +879,7 @@ mkPatSynBind name details lpat dir anns = PatSynBind noExtField psb
 -- |If any of the matches in the 'FunBind' are infix, the 'FunBind' is
 -- considered infix.
 isInfixFunBind :: forall id1 id2. UnXRec id2 => HsBindLR id1 id2 -> Bool
-isInfixFunBind (FunBind { fun_matches = MG _ matches _ })
+isInfixFunBind (FunBind { fun_matches = MG _ matches })
   = any (isInfixMatch . unXRec @id2) (unXRec @id2 matches)
 isInfixFunBind _ = False
 
