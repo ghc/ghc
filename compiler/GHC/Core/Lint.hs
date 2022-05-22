@@ -56,7 +56,7 @@ import GHC.Core.Unify
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Opt.Arity    ( typeArity )
 
-import GHC.Core.Opt.Monad
+import GHC.Plugins.Monad
 
 import GHC.Types.Literal
 import GHC.Types.Var as Var
@@ -3448,7 +3448,7 @@ lintAnnots pname pass guts = {-# SCC "lintAnnots" #-} do
     let binds = flattenBinds $ mg_binds nguts
         binds' = flattenBinds $ mg_binds nguts'
         (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'
-    when (not (null diffs)) $ GHC.Core.Opt.Monad.putMsg $ vcat
+    when (not (null diffs)) $ GHC.Plugins.Monad.putMsg $ vcat
       [ lint_banner "warning" pname
       , text "Core changes with annotations:"
       , withPprStyle defaultDumpStyle $ nest 2 $ vcat diffs

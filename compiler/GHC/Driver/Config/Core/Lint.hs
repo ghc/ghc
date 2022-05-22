@@ -21,7 +21,7 @@ import GHC.Core.Lint.Interactive
 import GHC.Core.Opt.Pipeline.Types
 import GHC.Core.Opt.Simplify ( SimplifyOpts(..) )
 import GHC.Core.Opt.Simplify.Env ( SimplMode(..) )
-import GHC.Core.Opt.Monad
+import GHC.Plugins.Monad
 import GHC.Core.Coercion
 
 import GHC.Types.Basic ( CompilerPhase(..) )

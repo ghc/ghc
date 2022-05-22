@@ -1,15 +1,16 @@
 module GHC.Core.Opt.Pipeline.Types (
     -- * Configuration of the core-to-core passes
     CorePluginPass, CoreToDo(..),
-    bindsOnlyPass, pprPassDetails,
+    pprPassDetails,
   ) where
 
 import GHC.Prelude
 
-import GHC.Core ( CoreProgram )
-import GHC.Core.Opt.Monad ( CoreM, FloatOutSwitches )
 import GHC.Core.Opt.Simplify ( SimplifyOpts(..) )
 
+import GHC.Core.Opt.Utils ( FloatOutSwitches )
+
+import GHC.Plugins.Monad ( CoreM )
 import GHC.Types.Basic  ( CompilerPhase(..) )
 import GHC.Unit.Module.ModGuts
 import GHC.Utils.Outputable as Outputable
@@ -25,11 +26,6 @@ import GHC.Utils.Outputable as Outputable
 
 -- | A description of the plugin pass itself
 type CorePluginPass = ModGuts -> CoreM ModGuts
-
-bindsOnlyPass :: (CoreProgram -> CoreM CoreProgram) -> ModGuts -> CoreM ModGuts
-bindsOnlyPass pass guts
-  = do { binds' <- pass (mg_binds guts)
-       ; return (guts { mg_binds = binds' }) }
 
 data CoreToDo           -- These are diff core-to-core passes,
                         -- which may be invoked in any order,

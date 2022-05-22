@@ -14,6 +14,9 @@ import GHC.Driver.Session
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
 import GHC.Driver.Config.Core.Lint ( endPass )
+import GHC.Driver.Config.Core.Opt.CallerCC ( initCallerCCOpts )
+import GHC.Driver.Config.Core.Opt.SpecConstr ( initSpecConstrOpts )
+import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )
 import GHC.Driver.Config.Core.Opt.LiberateCase ( initLiberateCaseOpts )
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyOpts, initSimplMode, initGentleSimplMode )
 import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
@@ -29,14 +32,15 @@ import GHC.Core.Lint    ( lintAnnots )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Opt.Simplify ( simplifyExpr, simplifyPgm )
 import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Opt.Monad
 import GHC.Core.Opt.Pipeline.Types
+import GHC.Core.Opt.Utils        ( FloatOutSwitches(..)
+                                 , getFirstAnnotationsFromHscEnv )
 import GHC.Core.Opt.FloatIn      ( floatInwards )
 import GHC.Core.Opt.FloatOut     ( floatOutwards )
 import GHC.Core.Opt.LiberateCase ( liberateCase )
 import GHC.Core.Opt.StaticArgs   ( doStaticArgs )
-import GHC.Core.Opt.Specialise   ( specProgram)
-import GHC.Core.Opt.SpecConstr   ( specConstrProgram)
+import GHC.Core.Opt.Specialise   ( specProgram )
+import GHC.Core.Opt.SpecConstr   ( specConstrProgram )
 import GHC.Core.Opt.DmdAnal
 import GHC.Core.Opt.CprAnal      ( cprAnalProgram )
 import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
@@ -46,6 +50,10 @@ import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
 import GHC.Core.LateCC           (addLateCostCentres)
 import GHC.Core.Seq (seqBinds)
 import GHC.Core.FamInstEnv
+
+import GHC.Plugins.Monad
+
+import GHC.Serialized   ( deserializeWithData )
 
 import GHC.Utils.Error  ( withTiming )
 import GHC.Utils.Logger as Logger
@@ -503,14 +511,21 @@ doCorePass pass guts = do
                                                (initWorkWrapOpts (mg_module guts) dflags fam_envs)
                                                us)
 
-    CoreDoSpecialising        -> {-# SCC "Specialise" #-}
-                                 specProgram guts
+    CoreDoSpecialising        -> {-# SCC "Specialise" #-} do
+                                   specialise_opts <- initSpecialiseOpts
+                                   liftIO $ specProgram logger specialise_opts guts
 
-    CoreDoSpecConstr          -> {-# SCC "SpecConstr" #-}
-                                 specConstrProgram guts
+    CoreDoSpecConstr          -> {-# SCC "SpecConstr" #-} do
+      this_mod <- getModule
+      hsc_env <- getHscEnv
+      (_, annos) <- liftIO $ getFirstAnnotationsFromHscEnv hsc_env deserializeWithData guts
+      return $ specConstrProgram
+        annos us
+        (initSpecConstrOpts dflags this_mod)
+        guts
 
     CoreAddCallerCcs          -> {-# SCC "AddCallerCcs" #-}
-                                 addCallerCostCentres guts
+                                 return (addCallerCostCentres (initCallerCCOpts dflags) guts)
 
     CoreAddLateCcs            -> {-# SCC "AddLateCcs" #-}
                                  return (addLateCostCentres prof_count_entries guts)
