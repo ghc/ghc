@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -259,6 +260,24 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hfbLHS
 *                                                                      *
 ************************************************************************
 -}
+
+instance Outputable (HsPatSigType p) => Outputable (HsConPatTyArg p) where
+  ppr (HsConPatTyArg _ ty) = char '@' <> ppr ty
+
+instance (Outputable arg, Outputable (XRec p (HsRecField p arg)), XRec p RecFieldsDotDot ~ Located RecFieldsDotDot)
+      => Outputable (HsRecFields p arg) where
+  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
+        = braces (fsep (punctuate comma (map ppr flds)))
+  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just (unLoc -> n) })
+        = braces (fsep (punctuate comma (map ppr (take n flds) ++ [dotdot])))
+        where
+          dotdot = text ".." <+> whenPprDebug (ppr (drop n flds))
+
+instance (Outputable p, OutputableBndr p, Outputable arg)
+      => Outputable (HsFieldBind p arg) where
+  ppr (HsFieldBind { hfbLHS = f, hfbRHS = arg,
+                     hfbPun = pun })
+    = pprPrefixOcc f <+> (ppUnless pun $ equals <+> ppr arg)
 
 instance OutputableBndrId p => Outputable (Pat (GhcPass p)) where
     ppr = pprPat
@@ -734,3 +753,4 @@ type instance Anno (Pat (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsOverLit (GhcPass p)) = SrcAnn NoEpAnns
 type instance Anno ConLike = SrcSpanAnnN
 type instance Anno (HsFieldBind lhs rhs) = SrcSpanAnnA
+type instance Anno RecFieldsDotDot = SrcSpan

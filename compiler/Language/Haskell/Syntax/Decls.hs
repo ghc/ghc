@@ -100,11 +100,13 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
 
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Type
+import Language.Haskell.Syntax.Extension
+
 import GHC.Hs.Doc -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
+
 import GHC.Core.TyCon
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
-import Language.Haskell.Syntax.Extension
 import GHC.Types.Name.Set
 import GHC.Types.Fixity
 
@@ -116,7 +118,7 @@ import GHC.Types.SourceText
 import GHC.Core.Type
 import GHC.Unit.Module.Warnings
 
-import GHC.Data.Maybe
+import Data.Maybe
 import Data.Data        hiding (TyCon,Fixity, Infix)
 import Data.Void
 

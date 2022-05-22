@@ -970,9 +970,6 @@ renameSigs ctxt sigs
 -- Doesn't seem worth much trouble to sort this.
 
 renameSig :: HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeVars)
-renameSig _ (IdSig _ x)
-  = return (IdSig noExtField x, emptyFVs)    -- Actually this never occurs
-
 renameSig ctxt sig@(TypeSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRnN ctxt sig) vs
         ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
@@ -992,7 +989,7 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
     ty_ctxt = GenericCtx (text "a class method signature for"
                           <+> quotes (ppr v1))
 
-renameSig _ (SpecInstSig _ src ty)
+renameSig _ (SpecInstSig (_, src) ty)
   = do  { checkInferredVars doc inf_msg ty
         ; (new_ty, fvs) <- rnHsSigType doc TypeLevel ty
           -- Check if there are any nested `forall`s or contexts, which are
@@ -1001,7 +998,7 @@ renameSig _ (SpecInstSig _ src ty)
           -- GHC.Hs.Type).
         ; addNoNestedForallsContextsErr doc (text "SPECIALISE instance type")
             (getLHsInstDeclHead new_ty)
-        ; return (SpecInstSig noAnn src new_ty,fvs) }
+        ; return (SpecInstSig (noAnn, src) new_ty,fvs) }
   where
     doc = SpecInstSigCtx
     inf_msg = Just (text "Inferred type variables are not allowed")
@@ -1031,9 +1028,9 @@ renameSig ctxt (FixSig _ fsig)
   = do  { new_fsig <- rnSrcFixityDecl ctxt fsig
         ; return (FixSig noAnn new_fsig, emptyFVs) }
 
-renameSig ctxt sig@(MinimalSig _ s (L l bf))
+renameSig ctxt sig@(MinimalSig (_, s) (L l bf))
   = do new_bf <- traverse (lookupSigOccRnN ctxt sig) bf
-       return (MinimalSig noAnn s (L l new_bf), emptyFVs)
+       return (MinimalSig (noAnn, s) (L l new_bf), emptyFVs)
 
 renameSig ctxt sig@(PatSynSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRnN ctxt sig) vs
@@ -1043,13 +1040,13 @@ renameSig ctxt sig@(PatSynSig _ vs ty)
     ty_ctxt = GenericCtx (text "a pattern synonym signature for"
                           <+> ppr_sig_bndrs vs)
 
-renameSig ctxt sig@(SCCFunSig _ st v s)
+renameSig ctxt sig@(SCCFunSig (_, st) v s)
   = do  { new_v <- lookupSigOccRnN ctxt sig v
-        ; return (SCCFunSig noAnn st new_v s, emptyFVs) }
+        ; return (SCCFunSig (noAnn, st) new_v s, emptyFVs) }
 
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn
-renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
+renameSig _ctxt sig@(CompleteMatchSig (_, s) (L l bf) mty)
   = do new_bf <- traverse lookupLocatedOccRn bf
        new_mty  <- traverse lookupLocatedOccRn mty
 
@@ -1058,7 +1055,7 @@ renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
          -- Why 'any'? See Note [Orphan COMPLETE pragmas]
          addErrCtxt (text "In" <+> ppr sig) $ failWithTc orphanError
 
-       return (CompleteMatchSig noAnn s (L l new_bf) new_mty, emptyFVs)
+       return (CompleteMatchSig (noAnn, s) (L l new_bf) new_mty, emptyFVs)
   where
     orphanError :: TcRnMessage
     orphanError = TcRnUnknownMessage $ mkPlainError noHints $
@@ -1108,10 +1105,6 @@ okHsSig ctxt (L _ sig)
      (FixSig {}, InstDeclCtxt {}) -> False
      (FixSig {}, _)               -> True
 
-     (IdSig {}, TopSigCtxt {})   -> True
-     (IdSig {}, InstDeclCtxt {}) -> True
-     (IdSig {}, _)               -> False
-
      (InlineSig {}, HsBootCtxt {}) -> False
      (InlineSig {}, _)             -> True
 
@@ -1132,6 +1125,11 @@ okHsSig ctxt (L _ sig)
      (CompleteMatchSig {}, TopSigCtxt {} ) -> True
      (CompleteMatchSig {}, _)              -> False
 
+     (XSig {}, TopSigCtxt {})   -> True
+     (XSig {}, InstDeclCtxt {}) -> True
+     (XSig {}, _)               -> False
+
+
 -------------------
 findDupSigs :: [LSig GhcPs] -> [NonEmpty (LocatedN RdrName, Sig GhcPs)]
 -- Check for duplicates on RdrName version,
@@ -1151,7 +1149,7 @@ findDupSigs sigs
     expand_sig sig@(TypeSig _ ns _)              = [(n,sig) | n <- ns]
     expand_sig sig@(ClassOpSig _ _ ns _)         = [(n,sig) | n <- ns]
     expand_sig sig@(PatSynSig _ ns  _ )          = [(n,sig) | n <- ns]
-    expand_sig sig@(SCCFunSig _ _ n _)           = [(n,sig)]
+    expand_sig sig@(SCCFunSig (_, _) n _)           = [(n,sig)]
     expand_sig _ = []
 
     matching_sig :: (LocatedN RdrName, Sig GhcPs) -> (LocatedN RdrName, Sig GhcPs) -> Bool --AZ

@@ -189,7 +189,7 @@ tcTySigs hs_sigs
        ; return (poly_ids, lookupNameEnv env) }
 
 tcTySig :: LSig GhcRn -> TcM [TcSigInfo]
-tcTySig (L _ (IdSig _ id))
+tcTySig (L _ (XSig (IdSig id)))
   = do { let ctxt = FunSigCtxt (idName id) NoRRC
                     -- NoRRC: do not report redundant constraints
                     -- The user has no control over the signature!
@@ -581,7 +581,7 @@ mkPragEnv sigs binds
     get_sig :: LSig GhcRn -> Maybe (Name, LSig GhcRn)
     get_sig sig@(L _ (SpecSig _ (L _ nm) _ _))   = Just (nm, add_arity nm sig)
     get_sig sig@(L _ (InlineSig _ (L _ nm) _))   = Just (nm, add_arity nm sig)
-    get_sig sig@(L _ (SCCFunSig _ _ (L _ nm) _)) = Just (nm, sig)
+    get_sig sig@(L _ (SCCFunSig _ (L _ nm) _)) = Just (nm, sig)
     get_sig _ = Nothing
 
     add_arity n sig  -- Adjust inl_sat field to match visible arity of function

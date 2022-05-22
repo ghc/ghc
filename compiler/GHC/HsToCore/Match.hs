@@ -27,7 +27,7 @@ import GHC.Platform
 
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
 
-import GHC.Types.Basic ( Origin(..), isGenerated, Boxity(..) )
+import GHC.Types.Basic ( Origin(..), isGenerated )
 import GHC.Types.SourceText
 import GHC.Driver.Session
 import GHC.Hs

@@ -71,7 +71,7 @@ import GHC.Types.Error
 import GHC.Utils.Misc
 import GHC.Types.Fixity ( compareFixity, negateFixity
                         , Fixity(..), FixityDirection(..), LexicalFixity(..) )
-import GHC.Types.Basic  ( PromotionFlag(..), isPromoted, TypeOrKind(..) )
+import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain

@@ -208,7 +208,7 @@ tcCompleteSigs sigs =
       -- combinations are invalid it will be found so at match sites.
       -- There it is also where we consider if the type of the pattern match is
       -- compatible with the result type constructor 'mb_tc'.
-      doOne (L loc c@(CompleteMatchSig _ext _src_txt (L _ ns) mb_tc_nm))
+      doOne (L loc c@(CompleteMatchSig (_ext, _src_txt) (L _ ns) mb_tc_nm))
         = fmap Just $ setSrcSpanA loc $ addErrCtxt (text "In" <+> ppr c) $ do
             cls   <- mkUniqDSet <$> mapM (addLocMA tcLookupConLike) ns
             mb_tc <- traverse @Maybe tcLookupLocatedTyCon mb_tc_nm
@@ -658,7 +658,7 @@ tcPolyCheck _prag_fn sig bind
 funBindTicks :: SrcSpan -> TcId -> Module -> [LSig GhcRn]
              -> TcM [CoreTickish]
 funBindTicks loc fun_id mod sigs
-  | (mb_cc_str : _) <- [ cc_name | L _ (SCCFunSig _ _ _ cc_name) <- sigs ]
+  | (mb_cc_str : _) <- [ cc_name | L _ (SCCFunSig _ _ cc_name) <- sigs ]
       -- this can only be a singleton list, as duplicate pragmas are rejected
       -- by the renamer
   , let cc_str

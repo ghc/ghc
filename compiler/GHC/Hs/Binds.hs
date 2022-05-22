@@ -600,6 +600,10 @@ pprTicks pp_no_debug pp_when_debug
          then pp_when_debug
          else pp_no_debug
 
+instance Outputable (XRec a RdrName) => Outputable (RecordPatSynField a) where
+    ppr (RecordPatSynField { recordPatSynField = v }) = ppr v
+
+
 {-
 ************************************************************************
 *                                                                      *
@@ -651,19 +655,27 @@ instance OutputableBndrId p => Outputable (IPBind (GhcPass p)) where
 type instance XTypeSig          (GhcPass p) = EpAnn AnnSig
 type instance XPatSynSig        (GhcPass p) = EpAnn AnnSig
 type instance XClassOpSig       (GhcPass p) = EpAnn AnnSig
-type instance XIdSig            (GhcPass p) = NoExtField -- No anns, generated
 type instance XFixSig           (GhcPass p) = EpAnn [AddEpAnn]
 type instance XInlineSig        (GhcPass p) = EpAnn [AddEpAnn]
 type instance XSpecSig          (GhcPass p) = EpAnn [AddEpAnn]
-type instance XSpecInstSig      (GhcPass p) = EpAnn [AddEpAnn]
-type instance XMinimalSig       (GhcPass p) = EpAnn [AddEpAnn]
-type instance XSCCFunSig        (GhcPass p) = EpAnn [AddEpAnn]
-type instance XCompleteMatchSig (GhcPass p) = EpAnn [AddEpAnn]
-
-type instance XXSig             (GhcPass p) = DataConCantHappen
+type instance XSpecInstSig      (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
+type instance XMinimalSig       (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
+type instance XSCCFunSig        (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
+type instance XCompleteMatchSig (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
+    -- SourceText: Note [Pragma source text] in GHC.Types.SourceText
+type instance XXSig             GhcPs = DataConCantHappen
+type instance XXSig             GhcRn = IdSig
+type instance XXSig             GhcTc = IdSig
 
 type instance XFixitySig  (GhcPass p) = NoExtField
 type instance XXFixitySig (GhcPass p) = DataConCantHappen
+
+-- | A type signature in generated code, notably the code
+-- generated for record selectors. We simply record the desired Id
+-- itself, replete with its name, type and IdDetails. Otherwise it's
+-- just like a type signature: there should be an accompanying binding
+newtype IdSig = IdSig { unIdSig :: Id }
+    deriving Data
 
 data AnnSig
   = AnnSig {
@@ -714,7 +726,6 @@ ppr_sig (TypeSig _ vars ty)  = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig _ is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
   | otherwise                = pprVarSig (map unLoc vars) (ppr ty)
-ppr_sig (IdSig _ id)         = pprVarSig [id] (ppr (varType id))
 ppr_sig (FixSig _ fix_sig)   = ppr fix_sig
 ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_inline = spec }))
   = pragSrcBrackets (inlinePragmaSource inl) pragmaSrc (pprSpec (unLoc var)
@@ -729,20 +740,20 @@ ppr_sig (InlineSig _ var inl)
       ppr_pfx = case inlinePragmaSource inl of
         SourceText src -> text src
         NoSourceText   -> text "{-#" <+> inlinePragmaName (inl_inline inl)
-ppr_sig (SpecInstSig _ src ty)
+ppr_sig (SpecInstSig (_, src) ty)
   = pragSrcBrackets src "{-# pragma" (text "instance" <+> ppr ty)
-ppr_sig (MinimalSig _ src bf)
+ppr_sig (MinimalSig (_, src) bf)
   = pragSrcBrackets src "{-# MINIMAL" (pprMinimalSig bf)
 ppr_sig (PatSynSig _ names sig_ty)
   = text "pattern" <+> pprVarSig (map unLoc names) (ppr sig_ty)
-ppr_sig (SCCFunSig _ src fn mlabel)
+ppr_sig (SCCFunSig (_, src) fn mlabel)
   = pragSrcBrackets src "{-# SCC" (ppr_fn <+> maybe empty ppr mlabel )
       where
         ppr_fn = case ghcPass @p of
           GhcPs -> ppr fn
           GhcRn -> ppr fn
           GhcTc -> ppr fn
-ppr_sig (CompleteMatchSig _ src cs mty)
+ppr_sig (CompleteMatchSig (_, src) cs mty)
   = pragSrcBrackets src "{-# COMPLETE"
       ((hsep (punctuate comma (map ppr_n (unLoc cs))))
         <+> opt_sig)
@@ -752,6 +763,40 @@ ppr_sig (CompleteMatchSig _ src cs mty)
         GhcPs -> ppr n
         GhcRn -> ppr n
         GhcTc -> ppr n
+ppr_sig (XSig x) = case ghcPass @p of
+                      GhcRn | IdSig id <- x -> pprVarSig [id] (ppr (varType id))
+                      GhcTc | IdSig id <- x -> pprVarSig [id] (ppr (varType id))
+
+hsSigDoc :: forall p. IsPass p => Sig (GhcPass p) -> SDoc
+hsSigDoc (TypeSig {})           = text "type signature"
+hsSigDoc (PatSynSig {})         = text "pattern synonym signature"
+hsSigDoc (ClassOpSig _ is_deflt _ _)
+ | is_deflt                     = text "default type signature"
+ | otherwise                    = text "class method signature"
+hsSigDoc (SpecSig _ _ _ inl)    = (inlinePragmaName . inl_inline $ inl) <+> text "pragma"
+hsSigDoc (InlineSig _ _ prag)   = (inlinePragmaName . inl_inline $ prag) <+> text "pragma"
+-- Using the 'inlinePragmaName' function ensures that the pragma name for any
+-- one of the INLINE/INLINABLE/NOINLINE pragmas are printed after being extracted
+-- from the InlineSpec field of the pragma.
+hsSigDoc (SpecInstSig (_, src) _)  = text (extractSpecPragName src) <+> text "instance pragma"
+hsSigDoc (FixSig {})            = text "fixity declaration"
+hsSigDoc (MinimalSig {})        = text "MINIMAL pragma"
+hsSigDoc (SCCFunSig {})         = text "SCC pragma"
+hsSigDoc (CompleteMatchSig {})  = text "COMPLETE pragma"
+hsSigDoc (XSig _)               = case ghcPass @p of
+                                    GhcRn -> text "id signature"
+                                    GhcTc -> text "id signature"
+
+-- | Extracts the name for a SPECIALIZE instance pragma. In 'hsSigDoc', the src
+-- field of 'SpecInstSig' signature contains the SourceText for a SPECIALIZE
+-- instance pragma of the form: "SourceText {-# SPECIALIZE"
+--
+-- Extraction ensures that all variants of the pragma name (with a 'Z' or an
+-- 'S') are output exactly as used in the pragma.
+extractSpecPragName :: SourceText -> String
+extractSpecPragName srcTxt =  case (words $ show srcTxt) of
+     (_:_:pragName:_) -> filter (/= '\"') pragName
+     _                -> pprPanic "hsSigDoc: Misformed SPECIALISE instance pragma:" (ppr srcTxt)
 
 instance OutputableBndrId p
        => Outputable (FixitySig (GhcPass p)) where

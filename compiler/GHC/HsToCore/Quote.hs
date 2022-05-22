@@ -989,16 +989,16 @@ rep_sig (L loc (PatSynSig _ nms ty))
 rep_sig (L loc (ClassOpSig _ is_deflt nms ty))
   | is_deflt     = mapM (rep_ty_sig defaultSigDName (locA loc) ty) nms
   | otherwise    = mapM (rep_ty_sig sigDName (locA loc) ty) nms
-rep_sig d@(L _ (IdSig {}))           = pprPanic "rep_sig IdSig" (ppr d)
 rep_sig (L loc (FixSig _ fix_sig))   = rep_fix_d (locA loc) fix_sig
 rep_sig (L loc (InlineSig _ nm ispec))= rep_inline nm ispec (locA loc)
 rep_sig (L loc (SpecSig _ nm tys ispec))
   = concatMapM (\t -> rep_specialise nm t ispec (locA loc)) tys
-rep_sig (L loc (SpecInstSig _ _ ty))  = rep_specialiseInst ty (locA loc)
+rep_sig (L loc (SpecInstSig _ ty))  = rep_specialiseInst ty (locA loc)
 rep_sig (L _   (MinimalSig {}))       = notHandled ThMinimalPragmas
 rep_sig (L _   (SCCFunSig {}))        = notHandled ThSCCPragmas
-rep_sig (L loc (CompleteMatchSig _ _st cls mty))
+rep_sig (L loc (CompleteMatchSig _ cls mty))
   = rep_complete_sig cls mty (locA loc)
+rep_sig d@(L _ (XSig {}))             = pprPanic "rep_sig IdSig" (ppr d)
 
 -- Desugar the explicit type variable binders in an 'LHsSigType', making
 -- sure not to gensym them.

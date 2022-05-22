@@ -27,23 +27,27 @@ module Language.Haskell.Syntax.Pat (
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
+        RecFieldsDotDot,
         hsRecFields, hsRecFieldSel, hsRecFieldsArgs,
     ) where
-
-import GHC.Prelude
 
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr (SyntaxExpr, LHsExpr, HsUntypedSplice)
 
 -- friends:
+import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Lit
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
-import GHC.Types.Basic
--- others:
-import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
-import GHC.Utils.Outputable
-import GHC.Types.SrcLoc
+
 -- libraries:
+import Data.Maybe
+import Data.Functor
+import Data.Foldable
+import Data.Traversable
+import Data.Bool
+import Data.Int
+import Data.Function
+import Data.List
 
 type LPat p = XRec p (Pat p)
 
@@ -132,7 +136,7 @@ data Pat p
   | SumPat      (XSumPat p)        -- after typechecker, types of the alternative
                 (LPat p)           -- Sum sub-pattern
                 ConTag             -- Alternative (one-based)
-                Arity              -- Arity (INVARIANT: ≥ 2)
+                SumWidth           -- Arity (INVARIANT: ≥ 2)
     -- ^ Anonymous sum pattern
     --
     -- - 'GHC.Parser.Annotation.AnnKeywordId' :
@@ -243,10 +247,12 @@ data HsRecFields p arg         -- A bunch of record fields
                                 --      { x = 3, y = True }
         -- Used for both expressions and patterns
   = HsRecFields { rec_flds   :: [LHsRecField p arg],
-                  rec_dotdot :: Maybe (Located Int) }  -- Note [DotDot fields]
+                  rec_dotdot :: Maybe (XRec p RecFieldsDotDot) }  -- Note [DotDot fields]
   -- AZ:The XRec for LHsRecField makes the derivings fail.
   -- deriving (Functor, Foldable, Traversable)
 
+-- Type synonym to be able to have a specific XRec instance for the Int in `rec_dotdot`
+type RecFieldsDotDot = Int
 
 -- Note [DotDot fields]
 -- ~~~~~~~~~~~~~~~~~~~~
@@ -353,29 +359,3 @@ hsRecFieldsArgs rbinds = map (hfbRHS . unXRec @p) (rec_flds rbinds)
 hsRecFieldSel :: forall p arg. UnXRec p => HsRecField p arg -> XCFieldOcc p
 hsRecFieldSel = foExt . unXRec @p . hfbLHS
 
-
-{-
-************************************************************************
-*                                                                      *
-*              Printing patterns
-*                                                                      *
-************************************************************************
--}
-
-instance Outputable (HsPatSigType p) => Outputable (HsConPatTyArg p) where
-  ppr (HsConPatTyArg _ ty) = char '@' <> ppr ty
-
-instance (Outputable arg, Outputable (XRec p (HsRecField p arg)))
-      => Outputable (HsRecFields p arg) where
-  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
-        = braces (fsep (punctuate comma (map ppr flds)))
-  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just (unLoc -> n) })
-        = braces (fsep (punctuate comma (map ppr (take n flds) ++ [dotdot])))
-        where
-          dotdot = text ".." <+> whenPprDebug (ppr (drop n flds))
-
-instance (Outputable p, OutputableBndr p, Outputable arg)
-      => Outputable (HsFieldBind p arg) where
-  ppr (HsFieldBind { hfbLHS = f, hfbRHS = arg,
-                     hfbPun = pun })
-    = pprPrefixOcc f <+> (ppUnless pun $ equals <+> ppr arg)

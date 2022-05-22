@@ -122,6 +122,8 @@ import GHC.Types.SourceText
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Data
 import qualified Data.Semigroup as Semi
+import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
+import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag)
 
 {-
 ************************************************************************
@@ -194,12 +196,6 @@ type FullArgCount = Int
 *                                                                      *
 ************************************************************************
 -}
-
--- | A *one-index* constructor tag
---
--- Type of the tags associated with each constructor possibility or superclass
--- selector
-type ConTag = Int
 
 -- | A *zero-indexed* constructor tag
 type ConTagZ = Int
@@ -401,16 +397,6 @@ unSwap IsSwapped  f a b = f b a
 *                                                                      *
 ********************************************************************* -}
 
--- | Is a TyCon a promoted data constructor or just a normal type constructor?
-data PromotionFlag
-  = NotPromoted
-  | IsPromoted
-  deriving ( Eq, Data )
-
-isPromoted :: PromotionFlag -> Bool
-isPromoted IsPromoted  = True
-isPromoted NotPromoted = False
-
 instance Outputable PromotionFlag where
   ppr NotPromoted = text "NotPromoted"
   ppr IsPromoted  = text "IsPromoted"
@@ -497,15 +483,6 @@ instance Outputable TopLevelFlag where
 *                                                                      *
 ************************************************************************
 -}
-
-data Boxity
-  = Boxed
-  | Unboxed
-  deriving( Eq, Data )
-
-isBoxed :: Boxity -> Bool
-isBoxed Boxed   = True
-isBoxed Unboxed = False
 
 instance Outputable Boxity where
   ppr Boxed   = text "Boxed"

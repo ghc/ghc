@@ -25,6 +25,7 @@ module Language.Haskell.Syntax.Expr where
 
 import GHC.Prelude
 
+import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Lit
@@ -35,7 +36,6 @@ import Language.Haskell.Syntax.Binds
 -- others:
 import GHC.Core.DataCon (FieldLabelString)
 import GHC.Types.Name
-import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
@@ -437,8 +437,8 @@ data HsExpr p
   --  the expression, (arity - alternative) after it
   | ExplicitSum
           (XExplicitSum p)
-          ConTag --  Alternative (one-based)
-          Arity  --  Sum arity
+          ConTag   --  Alternative (one-based)
+          SumWidth --  Sum arity
           (LHsExpr p)
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnCase',

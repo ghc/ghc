@@ -403,7 +403,7 @@ findMinimalDef :: [LSig GhcRn] -> Maybe ClassMinimalDef
 findMinimalDef = firstJusts . map toMinimalDef
   where
     toMinimalDef :: LSig GhcRn -> Maybe ClassMinimalDef
-    toMinimalDef (L _ (MinimalSig _ _ (L _ bf))) = Just (fmap unLoc bf)
+    toMinimalDef (L _ (MinimalSig _ (L _ bf))) = Just (fmap unLoc bf)
     toMinimalDef _                               = Nothing
 
 {-
