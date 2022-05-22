@@ -78,7 +78,7 @@ module GHC.Core.Opt.SetLevels (
 import GHC.Prelude
 
 import GHC.Core
-import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
+import GHC.Core.Opt.Utils ( FloatOutSwitches(..) )
 import GHC.Core.Utils   ( exprType, exprIsHNF
                         , exprOkForSpeculation
                         , exprIsTopLevelBindable

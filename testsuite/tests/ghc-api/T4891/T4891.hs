@@ -2,7 +2,6 @@
 module Main where
 
 import GHC.ByteCode.Linker
-import GHC.Core.Opt.Monad
 import Data.Array
 import GHC.Core.DataCon
 import GHC
@@ -22,6 +21,7 @@ import Data.Maybe
 import GHC.Data.Bag
 import GHC.Utils.Outputable
 import GHC.Driver.Monad
+import GHC.Driver.Session
 import X
 
 import System.Environment

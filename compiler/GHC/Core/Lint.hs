@@ -44,7 +44,6 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Stats ( coreBindsStats )
-import GHC.Core.Opt.Monad
 import GHC.Core.DataCon
 import GHC.Core.Ppr
 import GHC.Core.Coercion
@@ -61,6 +60,8 @@ import GHC.Core.Unify
 import GHC.Core.InstEnv      ( instanceDFunId, instEnvElts )
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Opt.Arity    ( typeArity )
+
+import GHC.Plugins.Monad
 
 import GHC.Types.Literal
 import GHC.Types.Var as Var
@@ -284,24 +285,30 @@ data EndPassConfig = EndPassConfig
 
   , ep_lintPassResult :: !(Maybe LintPassResultConfig)
   -- ^ Whether we should lint the result of this pass.
+
+  , ep_printUnqual :: !PrintUnqualified
+
+  , ep_dumpFlag :: !(Maybe DumpFlag)
+
+  , ep_prettyPass :: !SDoc
+
+  , ep_passDetails :: !SDoc
   }
 
 endPassIO :: Logger
           -> EndPassConfig
-          -> PrintUnqualified
-          -> CoreToDo -> CoreProgram -> [CoreRule]
+          -> CoreProgram -> [CoreRule]
           -> IO ()
 -- Used by the IO-is CorePrep too
-endPassIO logger cfg print_unqual
-           pass binds rules
-  = do { dumpPassResult logger (ep_dumpCoreSizes cfg) print_unqual mb_flag
-                        (renderWithContext defaultSDocContext (ppr pass))
-                        (pprPassDetails pass) binds rules
+endPassIO logger cfg binds rules
+  = do { dumpPassResult logger (ep_dumpCoreSizes cfg) (ep_printUnqual cfg) mb_flag
+                        (renderWithContext defaultSDocContext (ep_prettyPass cfg))
+                        (ep_passDetails cfg) binds rules
        ; for_ (ep_lintPassResult cfg) $ \lp_cfg ->
-           lintPassResult' logger lp_cfg pass binds
+           lintPassResult' logger lp_cfg binds
        }
   where
-    mb_flag = case coreDumpFlag pass of
+    mb_flag = case ep_dumpFlag cfg of
                 Just flag | logHasDumpFlag logger flag                    -> Just flag
                           | logHasDumpFlag logger Opt_D_verbose_core2core -> Just flag
                 _ -> Nothing
@@ -339,33 +346,6 @@ dumpPassResult logger dump_core_sizes unqual mb_flag hdr extra_info binds rules
                     , text "------ Local rules for imported ids --------"
                     , pprRules rules ]
 
-coreDumpFlag :: CoreToDo -> Maybe DumpFlag
-coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_verbose_core2core
-coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_verbose_core2core
-coreDumpFlag CoreDoFloatInwards       = Just Opt_D_verbose_core2core
-coreDumpFlag (CoreDoFloatOutwards {}) = Just Opt_D_verbose_core2core
-coreDumpFlag CoreLiberateCase         = Just Opt_D_verbose_core2core
-coreDumpFlag CoreDoStaticArgs         = Just Opt_D_verbose_core2core
-coreDumpFlag CoreDoCallArity          = Just Opt_D_dump_call_arity
-coreDumpFlag CoreDoExitify            = Just Opt_D_dump_exitify
-coreDumpFlag CoreDoDemand             = Just Opt_D_dump_stranal
-coreDumpFlag CoreDoCpr                = Just Opt_D_dump_cpranal
-coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
-coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
-coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
-coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse
-coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds_preopt
-coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds
-coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
-coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
-
-coreDumpFlag CoreAddCallerCcs         = Nothing
-coreDumpFlag CoreAddLateCcs           = Nothing
-coreDumpFlag CoreDoPrintCore          = Nothing
-coreDumpFlag (CoreDoRuleCheck {})     = Nothing
-coreDumpFlag CoreDoNothing            = Nothing
-coreDumpFlag (CoreDoPasses {})        = Nothing
-
 {-
 ************************************************************************
 *                                                                      *
@@ -375,28 +355,30 @@ coreDumpFlag (CoreDoPasses {})        = Nothing
 -}
 
 data LintPassResultConfig = LintPassResultConfig
-  { lpr_diagOpts      :: !DiagOpts
-  , lpr_platform      :: !Platform
-  , lpr_makeLintFlags :: !(CoreToDo -> LintFlags)
-  , lpr_localsInScope :: ![Var]
+  { lpr_diagOpts         :: !DiagOpts
+  , lpr_platform         :: !Platform
+  , lpr_makeLintFlags    :: !LintFlags
+  , lpr_showLintWarnings :: !Bool
+  , lpr_passPpr          :: !SDoc
+  , lpr_localsInScope    :: ![Var]
   }
 
 lintPassResult' :: Logger -> LintPassResultConfig
-                -> CoreToDo -> CoreProgram -> IO ()
-lintPassResult' logger cfg pass binds
+                -> CoreProgram -> IO ()
+lintPassResult' logger cfg binds
   = do { let warns_and_errs = lintCoreBindings'
                (LintConfig
                 { l_diagOpts = lpr_diagOpts cfg
                 , l_platform = lpr_platform cfg
-                , l_flags    = lpr_makeLintFlags cfg pass
+                , l_flags    = lpr_makeLintFlags cfg
                 , l_vars     = lpr_localsInScope cfg
                 })
                binds
        ; Err.showPass logger $
            "Core Linted result of " ++
-           renderWithContext defaultSDocContext (ppr pass)
+           renderWithContext defaultSDocContext (lpr_passPpr cfg)
        ; displayLintResults logger
-                            (showLintWarnings pass) (ppr pass)
+                            (lpr_showLintWarnings cfg) (lpr_passPpr cfg)
                             (pprCoreBindings binds) warns_and_errs
        }
 
@@ -432,17 +414,6 @@ lint_banner :: String -> SDoc -> SDoc
 lint_banner string pass = text "*** Core Lint"      <+> text string
                           <+> text ": in result of" <+> pass
                           <+> text "***"
-
-showLintWarnings :: CoreToDo -> Bool
--- Disable Lint warnings on the first simplifier pass, because
--- there may be some INLINE knots still tied, which is tiresomely noisy
-showLintWarnings = \case
-  (CoreDoSimplify
-    (CoreDoSimplifyOpts
-      _
-      (SimplMode { sm_phase = InitialPhase })))
-    -> False
-  _ -> True
 
 interactiveInScope :: InteractiveContext -> [Var]
 -- In GHCi we may lint expressions, or bindings arising from 'deriving'
@@ -3514,7 +3485,7 @@ lintAnnots pname pass guts = {-# SCC "lintAnnots" #-} do
     let binds = flattenBinds $ mg_binds nguts
         binds' = flattenBinds $ mg_binds nguts'
         (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'
-    when (not (null diffs)) $ GHC.Core.Opt.Monad.putMsg $ vcat
+    when (not (null diffs)) $ GHC.Plugins.Monad.putMsg $ vcat
       [ lint_banner "warning" pname
       , text "Core changes with annotations:"
       , withPprStyle defaultDumpStyle $ nest 2 $ vcat diffs

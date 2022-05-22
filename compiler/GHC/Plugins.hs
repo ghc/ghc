@@ -6,7 +6,7 @@
 -- with saying "import GHC.Plugins".
 --
 -- Particularly interesting modules for plugin writers include
--- "GHC.Core" and "GHC.Core.Opt.Monad".
+-- "GHC.Core" and "GHC.Plugins.Monad".
 module GHC.Plugins
    ( module GHC.Driver.Plugins
    , module GHC.Types.Name.Reader
@@ -16,7 +16,9 @@ module GHC.Plugins
    , module GHC.Types.Id
    , module GHC.Types.Id.Info
    , module GHC.Types.PkgQual
-   , module GHC.Core.Opt.Monad
+   , module GHC.Core.Opt.Utils
+   , module GHC.Core.Opt.Pipeline.Types
+   , module GHC.Plugins.Monad
    , module GHC.Core
    , module GHC.Types.Literal
    , module GHC.Core.DataCon
@@ -82,7 +84,8 @@ import GHC.Types.Id       hiding  ( lazySetIdInfo, setIdExported, setIdNotExport
 import GHC.Types.Id.Info
 
 -- Core
-import GHC.Core.Opt.Monad
+import GHC.Core.Opt.Utils
+import GHC.Core.Opt.Pipeline.Types
 import GHC.Core
 import GHC.Types.Literal
 import GHC.Core.DataCon
@@ -112,6 +115,8 @@ import GHC.Core.TyCon
 import GHC.Builtin.Types
 import GHC.Driver.Env
 import GHC.Types.Basic
+
+import GHC.Plugins.Monad
 
 -- Collections and maps
 import GHC.Types.Var.Set
@@ -152,8 +157,8 @@ import GHC.Hs                  ( HsParsedModule )
 
 import qualified Language.Haskell.TH as TH
 
-{- This instance is defined outside GHC.Core.Opt.Monad so that
-   GHC.Core.Opt.Monad does not depend on GHC.Tc.Utils.Env -}
+{- This instance is defined outside GHC.Plugins.Monad so that
+   GHC.Plugins.Monad does not depend on GHC.Tc.Utils.Env -}
 instance MonadThings CoreM where
     lookupThing name = do { hsc_env <- getHscEnv
                           ; liftIO $ lookupGlobal hsc_env name }

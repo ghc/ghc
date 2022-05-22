@@ -14,6 +14,8 @@ import GHC.Driver.Session
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
 import GHC.Driver.Config.Core.Lint ( endPass, lintPassResult )
+import GHC.Driver.Config.Core.Opt.CallerCC ( initCallerCCOpts )
+import GHC.Driver.Config.Core.Opt.SpecConstr ( initSpecConstrOpts )
 import GHC.Driver.Config.Core.Opt.LiberateCase ( initLiberateCaseOpts )
 import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
@@ -29,17 +31,19 @@ import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop, dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( dumpPassResult, lintAnnots )
+import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..), CoreDoSimplifyOpts(..) )
 import GHC.Core.Opt.Simplify       ( simplTopBinds, simplExpr, simplImpRules )
 import GHC.Core.Opt.Simplify.Utils ( simplEnvForGHCi, activeRule, activeUnfolding )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Opt.Monad
+import GHC.Core.Opt.Utils        ( FloatOutSwitches(..), SimplMode(..), floatEnable
+                                 , simplCountN, getFirstAnnotationsFromHscEnv )
 import GHC.Core.Opt.FloatIn      ( floatInwards )
 import GHC.Core.Opt.FloatOut     ( floatOutwards )
 import GHC.Core.Opt.LiberateCase ( liberateCase )
 import GHC.Core.Opt.StaticArgs   ( doStaticArgs )
-import GHC.Core.Opt.Specialise   ( specProgram)
-import GHC.Core.Opt.SpecConstr   ( specConstrProgram)
+import GHC.Core.Opt.Specialise   ( SpecialiseOpts(..), specProgram )
+import GHC.Core.Opt.SpecConstr   ( specConstrProgram )
 import GHC.Core.Opt.DmdAnal
 import GHC.Core.Opt.CprAnal      ( cprAnalProgram )
 import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
@@ -49,6 +53,10 @@ import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
 import GHC.Core.LateCC           (addLateCostCentres)
 import GHC.Core.Seq (seqBinds)
 import GHC.Core.FamInstEnv
+
+import GHC.Plugins.Monad
+
+import GHC.Serialized   ( deserializeWithData )
 
 import GHC.Utils.Error  ( withTiming )
 import GHC.Utils.Logger as Logger
@@ -389,6 +397,15 @@ getCoreToDo logger dflags
       flatten_todos passes ++ flatten_todos rest
     flatten_todos (todo : rest) = todo : flatten_todos rest
 
+-- The core-to-core pass ordering is derived from the DynFlags:
+runWhen :: Bool -> CoreToDo -> CoreToDo
+runWhen True  do_this = do_this
+runWhen False _       = CoreDoNothing
+
+runMaybe :: Maybe a -> (a -> CoreToDo) -> CoreToDo
+runMaybe (Just x) f = f x
+runMaybe Nothing  _ = CoreDoNothing
+
 {- Note [Inline in InitialPhase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In GHC 8 and earlier we did not inline anything in the InitialPhase. But that is
@@ -526,14 +543,21 @@ doCorePass pass guts = do
                                                (initWorkWrapOpts (mg_module guts) dflags fam_envs)
                                                us)
 
-    CoreDoSpecialising        -> {-# SCC "Specialise" #-}
-                                 specProgram guts
+    CoreDoSpecialising        -> {-# SCC "Specialise" #-} do
+                                   specialise_opts <- initSpecialiseOpts
+                                   liftIO $ specProgram logger specialise_opts guts
 
-    CoreDoSpecConstr          -> {-# SCC "SpecConstr" #-}
-                                 specConstrProgram guts
+    CoreDoSpecConstr          -> {-# SCC "SpecConstr" #-} do
+      this_mod <- getModule
+      hsc_env <- getHscEnv
+      (_, annos) <- liftIO $ getFirstAnnotationsFromHscEnv hsc_env deserializeWithData guts
+      liftIO $ specConstrProgram
+        annos us
+        (initSpecConstrOpts dflags this_mod)
+        guts
 
     CoreAddCallerCcs          -> {-# SCC "AddCallerCcs" #-}
-                                 addCallerCostCentres guts
+                                 return (addCallerCostCentres (initCallerCCOpts dflags) guts)
 
     CoreAddLateCcs            -> {-# SCC "AddLateCcs" #-}
                                  addLateCostCentres guts
@@ -552,6 +576,37 @@ doCorePass pass guts = do
     CoreDesugarOpt            -> pprPanic "doCorePass" (ppr pass)
     CoreTidy                  -> pprPanic "doCorePass" (ppr pass)
     CorePrep                  -> pprPanic "doCorePass" (ppr pass)
+
+{-
+************************************************************************
+*                                                                      *
+        Initialize options for the optimization passes
+*                                                                      *
+************************************************************************
+
+These initialization functions will be moved to the 'GHC.Driver.Config.Core.Opt'
+namespace as part of the refactoring which is tracked in T17957.
+-}
+
+initSpecialiseOpts :: CoreM SpecialiseOpts
+initSpecialiseOpts = do
+  dflags <- getDynFlags
+  hsc_env <- getHscEnv
+  eps <- liftIO $ hscEPS hsc_env
+  loc <- getSrcSpanM
+  rule_base <- getRuleBase
+  mask <- getUniqMask
+  unqual <- getPrintUnqualified
+  vis_orphans <- getVisibleOrphanMods
+  return SpecialiseOpts
+    { so_dflags = dflags
+    , so_external_rule_base = eps_rule_base eps
+    , so_loc = loc
+    , so_rule_base = rule_base
+    , so_uniq_mask = mask
+    , so_unqual = unqual
+    , so_visible_orphan_mods = vis_orphans
+    }
 
 {-
 ************************************************************************
@@ -760,7 +815,7 @@ simplifyPgmIO cfg@(CoreDoSimplifyOpts max_iterations mode)
                   ; return (getTopFloatBinds floats, rules1) } ;
 
                 -- Stop if nothing happened; don't dump output
-                -- See Note [Which transformations are innocuous] in GHC.Core.Opt.Monad
+                -- See Note [Which transformations are innocuous] in GHC.Core.Opt.Utils
            if isZeroSimplCount counts1 then
                 return ( "Simplifier reached fixed point", iteration_no
                        , totalise (counts1 : counts_so_far)  -- Include "free" ticks

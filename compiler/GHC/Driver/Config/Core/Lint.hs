@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module GHC.Driver.Config.Core.Lint
   ( endPass
   , endPassHscEnvIO
@@ -19,7 +20,9 @@ import GHC.Driver.Config.Diagnostic
 
 import GHC.Core
 import GHC.Core.Ppr
-import GHC.Core.Opt.Monad
+import GHC.Core.Opt.Pipeline.Types
+import GHC.Core.Opt.Utils ( SimplMode(..) )
+import GHC.Plugins.Monad
 import GHC.Core.Coercion
 
 import GHC.Core.Lint
@@ -27,6 +30,8 @@ import GHC.Core.Lint
 import GHC.Runtime.Context
 
 import GHC.Data.Bag
+
+import GHC.Types.Basic ( CompilerPhase(..) )
 
 import GHC.Utils.Outputable as Outputable
 
@@ -50,8 +55,8 @@ endPassHscEnvIO hsc_env print_unqual pass binds rules
   = do { let dflags  = hsc_dflags hsc_env
        ; endPassIO
            (hsc_logger hsc_env)
-           (initEndPassConfig (hsc_IC hsc_env) dflags)
-           print_unqual pass binds rules
+           (initEndPassConfig (hsc_IC hsc_env) dflags print_unqual pass)
+           binds rules
        }
 
 lintPassResult :: HscEnv -> CoreToDo -> CoreProgram -> IO ()
@@ -61,8 +66,8 @@ lintPassResult hsc_env pass binds
   | otherwise
   = lintPassResult'
     (hsc_logger hsc_env)
-    (initLintPassResultConfig (hsc_IC hsc_env) dflags)
-    pass binds
+    (initLintPassResultConfig (hsc_IC hsc_env) dflags pass)
+    binds
   where
     dflags = hsc_dflags hsc_env
 
@@ -89,21 +94,65 @@ lintInteractiveExpr what hsc_env expr
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
 
-initEndPassConfig :: InteractiveContext -> DynFlags -> EndPassConfig
-initEndPassConfig ic dflags = EndPassConfig
+initEndPassConfig :: InteractiveContext -> DynFlags -> PrintUnqualified -> CoreToDo -> EndPassConfig
+initEndPassConfig ic dflags print_unqual pass = EndPassConfig
   { ep_dumpCoreSizes = not (gopt Opt_SuppressCoreSizes dflags)
   , ep_lintPassResult = if gopt Opt_DoCoreLinting dflags
-      then Just $ initLintPassResultConfig ic dflags
+      then Just $ initLintPassResultConfig ic dflags pass
       else Nothing
+  , ep_printUnqual = print_unqual
+  , ep_dumpFlag = coreDumpFlag pass
+  , ep_prettyPass = ppr pass
+  , ep_passDetails = pprPassDetails pass
   }
 
-initLintPassResultConfig :: InteractiveContext -> DynFlags -> LintPassResultConfig
-initLintPassResultConfig ic dflags = LintPassResultConfig
+coreDumpFlag :: CoreToDo -> Maybe DumpFlag
+coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_verbose_core2core
+coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_verbose_core2core
+coreDumpFlag CoreDoFloatInwards       = Just Opt_D_verbose_core2core
+coreDumpFlag (CoreDoFloatOutwards {}) = Just Opt_D_verbose_core2core
+coreDumpFlag CoreLiberateCase         = Just Opt_D_verbose_core2core
+coreDumpFlag CoreDoStaticArgs         = Just Opt_D_verbose_core2core
+coreDumpFlag CoreDoCallArity          = Just Opt_D_dump_call_arity
+coreDumpFlag CoreDoExitify            = Just Opt_D_dump_exitify
+coreDumpFlag CoreDoDemand             = Just Opt_D_dump_stranal
+coreDumpFlag CoreDoCpr                = Just Opt_D_dump_cpranal
+coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
+coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
+coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
+coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse
+coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds_preopt
+coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds
+coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
+coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
+
+coreDumpFlag CoreAddCallerCcs         = Nothing
+coreDumpFlag CoreAddLateCcs           = Nothing
+coreDumpFlag CoreDoPrintCore          = Nothing
+coreDumpFlag (CoreDoRuleCheck {})     = Nothing
+coreDumpFlag CoreDoNothing            = Nothing
+coreDumpFlag (CoreDoPasses {})        = Nothing
+
+initLintPassResultConfig :: InteractiveContext -> DynFlags -> CoreToDo -> LintPassResultConfig
+initLintPassResultConfig ic dflags pass = LintPassResultConfig
   { lpr_diagOpts      = initDiagOpts dflags
   , lpr_platform      = targetPlatform dflags
-  , lpr_makeLintFlags = perPassFlags dflags
+  , lpr_makeLintFlags = perPassFlags dflags pass
+  , lpr_showLintWarnings = showLintWarnings pass
+  , lpr_passPpr = ppr pass
   , lpr_localsInScope = interactiveInScope ic
   }
+
+showLintWarnings :: CoreToDo -> Bool
+-- Disable Lint warnings on the first simplifier pass, because
+-- there may be some INLINE knots still tied, which is tiresomely noisy
+showLintWarnings = \case
+  (CoreDoSimplify
+    (CoreDoSimplifyOpts
+      _
+      (SimplMode { sm_phase = InitialPhase })))
+    -> False
+  _ -> True
 
 perPassFlags :: DynFlags -> CoreToDo -> LintFlags
 perPassFlags dflags pass

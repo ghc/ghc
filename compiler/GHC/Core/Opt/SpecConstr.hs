@@ -15,21 +15,18 @@ ToDo [Oct 2013]
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Core.Opt.SpecConstr(
+        SpecConstrOpts(..),
         specConstrProgram,
         SpecConstrAnnotation(..)
     ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Session ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
-                          , gopt, hasPprDebug )
-
 import GHC.Core
 import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.Unfold
 import GHC.Core.FVs     ( exprsFreeVarsList )
-import GHC.Core.Opt.Monad
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Core.DataCon
 import GHC.Core.Class( classTyVars )
@@ -50,6 +47,7 @@ import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
+import GHC.Types.Name.Env ( NameEnv )
 import GHC.Types.Tickish
 import GHC.Types.Basic
 import GHC.Types.Demand
@@ -72,7 +70,6 @@ import GHC.Utils.Trace
 import GHC.Builtin.Names ( specTyConKey )
 
 import GHC.Exts( SpecConstrAnnotation(..) )
-import GHC.Serialized   ( deserializeWithData )
 
 import Control.Monad    ( zipWithM )
 import Data.List (nubBy, sortBy, partition, dropWhileEnd, mapAccumL )
@@ -761,17 +758,12 @@ unbox the strict fields, because T is polymorphic!)
 ************************************************************************
 -}
 
-specConstrProgram :: ModGuts -> CoreM ModGuts
-specConstrProgram guts
+specConstrProgram :: NameEnv SpecConstrAnnotation -> UniqSupply -> SpecConstrOpts -> ModGuts -> IO ModGuts
+specConstrProgram annos us sc_opts guts
   = do
-      dflags <- getDynFlags
-      us     <- getUniqueSupplyM
-      (_, annos) <- getFirstAnnotations deserializeWithData guts
-      this_mod <- getModule
-      -- pprTraceM "specConstrInput" (ppr $ mg_binds guts)
       let binds' = reverse $ fst $ initUs us $ do
                     -- Note [Top-level recursive groups]
-                    (env, binds) <- goEnv (initScEnv (initScOpts dflags this_mod) annos)
+                    (env, binds) <- goEnv (initScEnv sc_opts annos)
                                           (mg_binds guts)
                         -- binds is identical to (mg_binds guts), except that the
                         -- binders on the LHS have been replaced by extendBndr
@@ -943,18 +935,6 @@ instance Outputable Value where
    ppr LambdaVal         = text "<Lambda>"
 
 ---------------------
-initScOpts :: DynFlags -> Module -> SpecConstrOpts
-initScOpts dflags this_mod = SpecConstrOpts
-        { sc_max_args    = maxWorkerArgs dflags,
-          sc_debug       = hasPprDebug dflags,
-          sc_uf_opts     = unfoldingOpts dflags,
-          sc_module      = this_mod,
-          sc_size        = specConstrThreshold dflags,
-          sc_count       = specConstrCount     dflags,
-          sc_recursive   = specConstrRecursive dflags,
-          sc_keen        = gopt Opt_SpecConstrKeen dflags
-        }
-
 initScEnv :: SpecConstrOpts -> UniqFM Name SpecConstrAnnotation -> ScEnv
 initScEnv opts anns
   = SCE { sc_opts        = opts,

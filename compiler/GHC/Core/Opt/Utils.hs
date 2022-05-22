@@ -4,53 +4,22 @@
 -}
 
 
-{-# LANGUAGE DeriveFunctor #-}
-
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module GHC.Core.Opt.Monad (
+module GHC.Core.Opt.Utils (
     -- * Configuration of the core-to-core passes
-    CoreToDo(..), runWhen, runMaybe,
-    CoreDoSimplifyOpts(..), SimplMode(..),
+    SimplMode(..),
     FloatOutSwitches(..),
     FloatEnable(..),
     floatEnable,
-    pprPassDetails,
-
-    -- * Plugins
-    CorePluginPass, bindsOnlyPass,
 
     -- * Counting
     SimplCount, doSimplTick, doFreeSimplTick, simplCountN,
     pprSimplCount, plusSimplCount, zeroSimplCount,
     isZeroSimplCount, hasDetailedCounts, Tick(..),
 
-    -- * The monad
-    CoreM, runCoreM,
-
-    mapDynFlagsCoreM, dropSimplCount,
-
-    -- ** Reading from the monad
-    getHscEnv, getModule,
-    getRuleBase, getExternalRuleBase,
-    getDynFlags, getPackageFamInstEnv,
-    getInteractiveContext,
-    getVisibleOrphanMods, getUniqMask,
-    getPrintUnqualified, getSrcSpanM,
-
-    -- ** Writing to the monad
-    addSimplCount,
-
-    -- ** Lifting into the monad
-    liftIO, liftIOWithCount,
-
     -- ** Dealing with annotations
-    getAnnotations, getFirstAnnotations,
-
-    -- ** Screen output
-    putMsg, putMsgS, errorMsg, errorMsgS, msg,
-    fatalErrorMsg, fatalErrorMsgS,
-    debugTraceMsg, debugTraceMsgS,
+    getAnnotationsFromHscEnv, getFirstAnnotationsFromHscEnv,
   ) where
 
 import GHC.Prelude hiding ( read )
@@ -58,31 +27,21 @@ import GHC.Prelude hiding ( read )
 import GHC.Driver.Session
 import GHC.Driver.Env
 
-import GHC.Core
 import GHC.Core.Unfold
 
 import GHC.Types.Basic  ( CompilerPhase(..) )
 import GHC.Types.Annotations
 import GHC.Types.Var
-import GHC.Types.Unique.Supply
 import GHC.Types.Name.Env
-import GHC.Types.SrcLoc
 import GHC.Types.Error
 
-import GHC.Utils.Error ( errorDiagnostic )
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Logger
-import GHC.Utils.Monad
 
 import GHC.Data.FastString
-import GHC.Data.IOEnv hiding     ( liftIO, failM, failWithM )
-import qualified GHC.Data.IOEnv  as IOEnv
-
-import GHC.Runtime.Context ( InteractiveContext )
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
-import GHC.Unit.External
 
 import Data.Bifunctor ( bimap )
 import Data.List (intersperse, groupBy, sortBy)
@@ -92,89 +51,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
 import Data.Word
-import Control.Monad
-import Control.Applicative ( Alternative(..) )
 import GHC.Utils.Panic (throwGhcException, GhcException(..), panic)
-
-{-
-************************************************************************
-*                                                                      *
-              The CoreToDo type and related types
-          Abstraction of core-to-core passes to run.
-*                                                                      *
-************************************************************************
--}
-
-data CoreDoSimplifyOpts = CoreDoSimplifyOpts
-        Int                    -- Max iterations
-        SimplMode
-
-data CoreToDo           -- These are diff core-to-core passes,
-                        -- which may be invoked in any order,
-                        -- as many times as you like.
-
-  = CoreDoSimplify !CoreDoSimplifyOpts
-  -- ^ The core-to-core simplifier.
-  | CoreDoPluginPass String CorePluginPass
-  | CoreDoFloatInwards
-  | CoreDoFloatOutwards FloatOutSwitches
-  | CoreLiberateCase
-  | CoreDoPrintCore
-  | CoreDoStaticArgs
-  | CoreDoCallArity
-  | CoreDoExitify
-  | CoreDoDemand
-  | CoreDoCpr
-  | CoreDoWorkerWrapper
-  | CoreDoSpecialising
-  | CoreDoSpecConstr
-  | CoreCSE
-  | CoreDoRuleCheck CompilerPhase String   -- Check for non-application of rules
-                                           -- matching this string
-  | CoreDoNothing                -- Useful when building up
-  | CoreDoPasses [CoreToDo]      -- lists of these things
-
-  | CoreDesugar    -- Right after desugaring, no simple optimisation yet!
-  | CoreDesugarOpt -- CoreDesugarXXX: Not strictly a core-to-core pass, but produces
-                       --                 Core output, and hence useful to pass to endPass
-
-  | CoreTidy
-  | CorePrep
-  | CoreAddCallerCcs
-  | CoreAddLateCcs
-
-instance Outputable CoreToDo where
-  ppr (CoreDoSimplify _)       = text "Simplifier"
-  ppr (CoreDoPluginPass s _)   = text "Core plugin: " <+> text s
-  ppr CoreDoFloatInwards       = text "Float inwards"
-  ppr (CoreDoFloatOutwards f)  = text "Float out" <> parens (ppr f)
-  ppr CoreLiberateCase         = text "Liberate case"
-  ppr CoreDoStaticArgs         = text "Static argument"
-  ppr CoreDoCallArity          = text "Called arity analysis"
-  ppr CoreDoExitify            = text "Exitification transformation"
-  ppr CoreDoDemand             = text "Demand analysis"
-  ppr CoreDoCpr                = text "Constructed Product Result analysis"
-  ppr CoreDoWorkerWrapper      = text "Worker Wrapper binds"
-  ppr CoreDoSpecialising       = text "Specialise"
-  ppr CoreDoSpecConstr         = text "SpecConstr"
-  ppr CoreCSE                  = text "Common sub-expression"
-  ppr CoreDesugar              = text "Desugar (before optimization)"
-  ppr CoreDesugarOpt           = text "Desugar (after optimization)"
-  ppr CoreTidy                 = text "Tidy Core"
-  ppr CoreAddCallerCcs         = text "Add caller cost-centres"
-  ppr CoreAddLateCcs           = text "Add late core cost-centres"
-  ppr CorePrep                 = text "CorePrep"
-  ppr CoreDoPrintCore          = text "Print core"
-  ppr (CoreDoRuleCheck {})     = text "Rule check"
-  ppr CoreDoNothing            = text "CoreDoNothing"
-  ppr (CoreDoPasses passes)    = text "CoreDoPasses" <+> ppr passes
-
-pprPassDetails :: CoreToDo -> SDoc
-pprPassDetails (CoreDoSimplify cfg) = vcat [ text "Max iterations =" <+> int n
-                                           , ppr md ]
-  where CoreDoSimplifyOpts n md = cfg
-pprPassDetails _ = Outputable.empty
-
 
 data FloatEnable  -- Controls local let-floating
   = FloatDisabled      -- Do no local let-floating
@@ -285,32 +162,6 @@ pprFloatOutSwitches sw
      [ text "Lam ="    <+> ppr (floatOutLambdas sw)
      , text "Consts =" <+> ppr (floatOutConstants sw)
      , text "OverSatApps ="   <+> ppr (floatOutOverSatApps sw) ])
-
--- The core-to-core pass ordering is derived from the DynFlags:
-runWhen :: Bool -> CoreToDo -> CoreToDo
-runWhen True  do_this = do_this
-runWhen False _       = CoreDoNothing
-
-runMaybe :: Maybe a -> (a -> CoreToDo) -> CoreToDo
-runMaybe (Just x) f = f x
-runMaybe Nothing  _ = CoreDoNothing
-
-{-
-
-************************************************************************
-*                                                                      *
-             Types for Plugins
-*                                                                      *
-************************************************************************
--}
-
--- | A description of the plugin pass itself
-type CorePluginPass = ModGuts -> CoreM ModGuts
-
-bindsOnlyPass :: (CoreProgram -> CoreM CoreProgram) -> ModGuts -> CoreM ModGuts
-bindsOnlyPass pass guts
-  = do { binds' <- pass (mg_binds guts)
-       ; return (guts { mg_binds = binds' }) }
 
 {-
 ************************************************************************
@@ -621,203 +472,6 @@ cmpEqTick _                             _                               = EQ
 {-
 ************************************************************************
 *                                                                      *
-             Monad and carried data structure definitions
-*                                                                      *
-************************************************************************
--}
-
-data CoreReader = CoreReader {
-        cr_hsc_env             :: HscEnv,
-        cr_rule_base           :: RuleBase,
-        cr_module              :: Module,
-        cr_print_unqual        :: PrintUnqualified,
-        cr_loc                 :: SrcSpan,   -- Use this for log/error messages so they
-                                             -- are at least tagged with the right source file
-        cr_visible_orphan_mods :: !ModuleSet,
-        cr_uniq_mask           :: !Char      -- Mask for creating unique values
-}
-
--- Note: CoreWriter used to be defined with data, rather than newtype.  If it
--- is defined that way again, the cw_simpl_count field, at least, must be
--- strict to avoid a space leak (#7702).
-newtype CoreWriter = CoreWriter {
-        cw_simpl_count :: SimplCount
-}
-
-emptyWriter :: DynFlags -> CoreWriter
-emptyWriter dflags = CoreWriter {
-        cw_simpl_count = zeroSimplCount dflags
-    }
-
-plusWriter :: CoreWriter -> CoreWriter -> CoreWriter
-plusWriter w1 w2 = CoreWriter {
-        cw_simpl_count = (cw_simpl_count w1) `plusSimplCount` (cw_simpl_count w2)
-    }
-
-type CoreIOEnv = IOEnv CoreReader
-
--- | The monad used by Core-to-Core passes to register simplification statistics.
---  Also used to have common state (in the form of UniqueSupply) for generating Uniques.
-newtype CoreM a = CoreM { unCoreM :: CoreIOEnv (a, CoreWriter) }
-    deriving (Functor)
-
-instance Monad CoreM where
-    mx >>= f = CoreM $ do
-            (x, w1) <- unCoreM mx
-            (y, w2) <- unCoreM (f x)
-            let w = w1 `plusWriter` w2
-            return $ seq w (y, w)
-            -- forcing w before building the tuple avoids a space leak
-            -- (#7702)
-
-instance Applicative CoreM where
-    pure x = CoreM $ nop x
-    (<*>) = ap
-    m *> k = m >>= \_ -> k
-
-instance Alternative CoreM where
-    empty   = CoreM Control.Applicative.empty
-    m <|> n = CoreM (unCoreM m <|> unCoreM n)
-
-instance MonadPlus CoreM
-
-instance MonadUnique CoreM where
-    getUniqueSupplyM = do
-        mask <- read cr_uniq_mask
-        liftIO $! mkSplitUniqSupply mask
-
-    getUniqueM = do
-        mask <- read cr_uniq_mask
-        liftIO $! uniqFromMask mask
-
-runCoreM :: HscEnv
-         -> RuleBase
-         -> Char -- ^ Mask
-         -> Module
-         -> ModuleSet
-         -> PrintUnqualified
-         -> SrcSpan
-         -> CoreM a
-         -> IO (a, SimplCount)
-runCoreM hsc_env rule_base mask mod orph_imps print_unqual loc m
-  = liftM extract $ runIOEnv reader $ unCoreM m
-  where
-    reader = CoreReader {
-            cr_hsc_env = hsc_env,
-            cr_rule_base = rule_base,
-            cr_module = mod,
-            cr_visible_orphan_mods = orph_imps,
-            cr_print_unqual = print_unqual,
-            cr_loc = loc,
-            cr_uniq_mask = mask
-        }
-
-    extract :: (a, CoreWriter) -> (a, SimplCount)
-    extract (value, writer) = (value, cw_simpl_count writer)
-
-{-
-************************************************************************
-*                                                                      *
-             Core combinators, not exported
-*                                                                      *
-************************************************************************
--}
-
-nop :: a -> CoreIOEnv (a, CoreWriter)
-nop x = do
-    r <- getEnv
-    return (x, emptyWriter $ (hsc_dflags . cr_hsc_env) r)
-
-read :: (CoreReader -> a) -> CoreM a
-read f = CoreM $ getEnv >>= (\r -> nop (f r))
-
-write :: CoreWriter -> CoreM ()
-write w = CoreM $ return ((), w)
-
--- \subsection{Lifting IO into the monad}
-
--- | Lift an 'IOEnv' operation into 'CoreM'
-liftIOEnv :: CoreIOEnv a -> CoreM a
-liftIOEnv mx = CoreM (mx >>= (\x -> nop x))
-
-instance MonadIO CoreM where
-    liftIO = liftIOEnv . IOEnv.liftIO
-
--- | Lift an 'IO' operation into 'CoreM' while consuming its 'SimplCount'
-liftIOWithCount :: IO (SimplCount, a) -> CoreM a
-liftIOWithCount what = liftIO what >>= (\(count, x) -> addSimplCount count >> return x)
-
-{-
-************************************************************************
-*                                                                      *
-             Reader, writer and state accessors
-*                                                                      *
-************************************************************************
--}
-
-getHscEnv :: CoreM HscEnv
-getHscEnv = read cr_hsc_env
-
-getRuleBase :: CoreM RuleBase
-getRuleBase = read cr_rule_base
-
-getExternalRuleBase :: CoreM RuleBase
-getExternalRuleBase = eps_rule_base <$> get_eps
-
-getVisibleOrphanMods :: CoreM ModuleSet
-getVisibleOrphanMods = read cr_visible_orphan_mods
-
-getPrintUnqualified :: CoreM PrintUnqualified
-getPrintUnqualified = read cr_print_unqual
-
-getSrcSpanM :: CoreM SrcSpan
-getSrcSpanM = read cr_loc
-
-addSimplCount :: SimplCount -> CoreM ()
-addSimplCount count = write (CoreWriter { cw_simpl_count = count })
-
-getUniqMask :: CoreM Char
-getUniqMask = read cr_uniq_mask
-
--- Convenience accessors for useful fields of HscEnv
-
--- | Adjust the dyn flags passed to the arugment action
-mapDynFlagsCoreM :: (DynFlags -> DynFlags) -> CoreM a -> CoreM a
-mapDynFlagsCoreM f m = CoreM $ do
-  !e <- getEnv
-  let !e' = e { cr_hsc_env = hscUpdateFlags f $ cr_hsc_env e }
-  liftIO $ runIOEnv e' $! unCoreM m
-
--- | Drop the single count of the argument action so it doesn't effect
--- the total.
-dropSimplCount :: CoreM a -> CoreM a
-dropSimplCount m = CoreM $ do
-  (a, _) <- unCoreM m
-  unCoreM $ pure a
-
-instance HasDynFlags CoreM where
-    getDynFlags = fmap hsc_dflags getHscEnv
-
-instance HasLogger CoreM where
-    getLogger = fmap hsc_logger getHscEnv
-
-instance HasModule CoreM where
-    getModule = read cr_module
-
-getInteractiveContext :: CoreM InteractiveContext
-getInteractiveContext = hsc_IC <$> getHscEnv
-
-getPackageFamInstEnv :: CoreM PackageFamInstEnv
-getPackageFamInstEnv = eps_fam_inst_env <$> get_eps
-
-get_eps :: CoreM ExternalPackageState
-get_eps = do
-    hsc_env <- getHscEnv
-    liftIO $ hscEPS hsc_env
-
-{-
-************************************************************************
-*                                                                      *
              Dealing with annotations
 *                                                                      *
 ************************************************************************
@@ -831,16 +485,15 @@ get_eps = do
 -- annotations.
 --
 -- See Note [Annotations]
-getAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (ModuleEnv [a], NameEnv [a])
-getAnnotations deserialize guts = do
-     hsc_env <- getHscEnv
-     ann_env <- liftIO $ prepareAnnotations hsc_env (Just guts)
-     return (deserializeAnns deserialize ann_env)
+getAnnotationsFromHscEnv :: Typeable a => HscEnv -> ([Word8] -> a) -> ModGuts -> IO (ModuleEnv [a], NameEnv [a])
+getAnnotationsFromHscEnv hsc_env deserialize guts = do
+   ann_env <- prepareAnnotations hsc_env (Just guts)
+   return (deserializeAnns deserialize ann_env)
 
 -- | Get at most one annotation of a given type per annotatable item.
-getFirstAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (ModuleEnv a, NameEnv a)
-getFirstAnnotations deserialize guts
-  = bimap mod name <$> getAnnotations deserialize guts
+getFirstAnnotationsFromHscEnv :: Typeable a => HscEnv -> ([Word8] -> a) -> ModGuts -> IO (ModuleEnv a, NameEnv a)
+getFirstAnnotationsFromHscEnv hsc_env deserialize guts
+  = bimap mod name <$> getAnnotationsFromHscEnv hsc_env deserialize guts
   where
     mod = mapModuleEnv head . filterModuleEnv (const $ not . null)
     name = mapNameEnv head . filterNameEnv (not . null)
@@ -849,11 +502,12 @@ getFirstAnnotations deserialize guts
 Note [Annotations]
 ~~~~~~~~~~~~~~~~~~
 A Core-to-Core pass that wants to make use of annotations calls
-getAnnotations or getFirstAnnotations at the beginning to obtain a UniqFM with
-annotations of a specific type. This produces all annotations from interface
-files read so far. However, annotations from interface files read during the
-pass will not be visible until getAnnotations is called again. This is similar
-to how rules work and probably isn't too bad.
+getAnnotationsFromHscEnv or getFirstAnnotationsFromHscEnv at the beginning to
+obtain a UniqFM with annotations of a specific type. This produces all
+annotations from interface files read so far. However, annotations from
+interface files read during the pass will not be visible until
+getAnnotationsFromHscEnv is called again. This is similar to how rules work and
+probably isn't too bad.
 
 The current implementation could be optimised a bit: when looking up
 annotations for a thing from the HomePackageTable, we could search directly in
@@ -863,56 +517,4 @@ only be given to things defined in the same module. However, since we would
 only want to deserialise every annotation once, we would have to build a cache
 for every module in the HTP. In the end, it's probably not worth it as long as
 we aren't using annotations heavily.
-
-************************************************************************
-*                                                                      *
-                Direct screen output
-*                                                                      *
-************************************************************************
 -}
-
-msg :: MessageClass -> SDoc -> CoreM ()
-msg msg_class doc = do
-    logger <- getLogger
-    loc    <- getSrcSpanM
-    unqual <- getPrintUnqualified
-    let sty = case msg_class of
-                MCDiagnostic _ _ -> err_sty
-                MCDump           -> dump_sty
-                _                -> user_sty
-        err_sty  = mkErrStyle unqual
-        user_sty = mkUserStyle unqual AllTheWay
-        dump_sty = mkDumpStyle unqual
-    liftIO $ logMsg logger msg_class loc (withPprStyle sty doc)
-
--- | Output a String message to the screen
-putMsgS :: String -> CoreM ()
-putMsgS = putMsg . text
-
--- | Output a message to the screen
-putMsg :: SDoc -> CoreM ()
-putMsg = msg MCInfo
-
--- | Output an error to the screen. Does not cause the compiler to die.
-errorMsgS :: String -> CoreM ()
-errorMsgS = errorMsg . text
-
--- | Output an error to the screen. Does not cause the compiler to die.
-errorMsg :: SDoc -> CoreM ()
-errorMsg doc = msg errorDiagnostic doc
-
--- | Output a fatal error to the screen. Does not cause the compiler to die.
-fatalErrorMsgS :: String -> CoreM ()
-fatalErrorMsgS = fatalErrorMsg . text
-
--- | Output a fatal error to the screen. Does not cause the compiler to die.
-fatalErrorMsg :: SDoc -> CoreM ()
-fatalErrorMsg = msg MCFatal
-
--- | Output a string debugging message at verbosity level of @-v@ or higher
-debugTraceMsgS :: String -> CoreM ()
-debugTraceMsgS = debugTraceMsg . text
-
--- | Outputs a debugging message at verbosity level of @-v@ or higher
-debugTraceMsg :: SDoc -> CoreM ()
-debugTraceMsg = msg MCDump

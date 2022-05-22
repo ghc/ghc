@@ -48,7 +48,7 @@ import GHC.Driver.Session
 import GHC.Core
 import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
-import GHC.Core.Opt.Monad        ( SimplMode(..), Tick(..), floatEnable )
+import GHC.Core.Opt.Utils        ( SimplMode(..), Tick(..), floatEnable )
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
@@ -928,7 +928,7 @@ interestingArg env e = go env 0 e
 ************************************************************************
 
 The SimplMode controls several switches; see its definition in
-GHC.Core.Opt.Monad
+GHC.Core.Opt.Utils
         sm_rules      :: Bool     -- Whether RULES are enabled
         sm_inline     :: Bool     -- Whether inlining is enabled
         sm_case_case  :: Bool     -- Whether case-of-case is enabled

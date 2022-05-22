@@ -160,8 +160,8 @@ import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Multiplicity
 import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
-import GHC.Core.Opt.Monad      ( CoreToDo (..))
 import GHC.Core.Opt.Pipeline
+import GHC.Core.Opt.Pipeline.Types ( CoreToDo (..))
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv

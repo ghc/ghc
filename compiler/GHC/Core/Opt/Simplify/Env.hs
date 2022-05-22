@@ -47,7 +47,7 @@ module GHC.Core.Opt.Simplify.Env (
 import GHC.Prelude
 
 import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Opt.Monad        ( SimplMode(..), FloatEnable (..) )
+import GHC.Core.Opt.Utils        ( SimplMode(..), FloatEnable (..) )
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Multiplicity     ( scaleScaled )

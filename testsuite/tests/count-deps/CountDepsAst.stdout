@@ -36,10 +36,11 @@ GHC.Core.Map.Expr
 GHC.Core.Map.Type
 GHC.Core.Multiplicity
 GHC.Core.Opt.Arity
-GHC.Core.Opt.CallerCC
+GHC.Core.Opt.CallerCC.Filter
 GHC.Core.Opt.ConstantFold
-GHC.Core.Opt.Monad
 GHC.Core.Opt.OccurAnal
+GHC.Core.Opt.Pipeline.Types
+GHC.Core.Opt.Utils
 GHC.Core.PatSyn
 GHC.Core.Ppr
 GHC.Core.Predicate
@@ -153,6 +154,7 @@ GHC.Platform.S390X
 GHC.Platform.Ways
 GHC.Platform.X86
 GHC.Platform.X86_64
+GHC.Plugins.Monad
 GHC.Prelude
 GHC.Runtime.Context
 GHC.Runtime.Eval.Types
@@ -272,7 +274,6 @@ GHC.Utils.Lexeme
 GHC.Utils.Logger
 GHC.Utils.Misc
 GHC.Utils.Monad
-GHC.Utils.Monad.State.Strict
 GHC.Utils.Outputable
 GHC.Utils.Panic
 GHC.Utils.Panic.Plain

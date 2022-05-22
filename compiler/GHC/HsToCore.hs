@@ -55,7 +55,7 @@ import GHC.Core.Coercion
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
 import GHC.Core.Rules
-import GHC.Core.Opt.Monad ( CoreToDo(..) )
+import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Ppr
 
 import GHC.Builtin.Names
