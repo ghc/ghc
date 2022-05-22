@@ -21,8 +21,6 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 module Language.Haskell.Syntax.Binds where
 
-import GHC.Prelude
-
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   ( LHsExpr
   , MatchGroup
@@ -32,19 +30,18 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Pat
 
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
-import GHC.Types.Name.Reader(RdrName)
+
 import GHC.Types.Basic
-import GHC.Types.SourceText
 import GHC.Types.Tickish
-import GHC.Types.Var
 import GHC.Types.Fixity
 import GHC.Data.Bag
-import GHC.Data.BooleanFormula (LBooleanFormula)
 
-import GHC.Utils.Outputable
-import GHC.Utils.Panic (pprPanic)
+import GHC.Data.BooleanFormula (LBooleanFormula)
+import GHC.Types.SourceText (StringLiteral)
 
 import Data.Void
+import Data.Bool
+import Data.Maybe
 
 {-
 ************************************************************************
@@ -372,13 +369,6 @@ data Sig pass
       --           'GHC.Parser.Annotation.AnnDcolon'
   | ClassOpSig (XClassOpSig pass) Bool [LIdP pass] (LHsSigType pass)
 
-        -- | A type signature in generated code, notably the code
-        -- generated for record selectors.  We simply record
-        -- the desired Id itself, replete with its name, type
-        -- and IdDetails.  Otherwise it's just like a type
-        -- signature: there should be an accompanying binding
-  | IdSig (XIdSig pass) Id
-
         -- | An ordinary fixity declaration
         --
         -- >     infixl 8 ***
@@ -435,8 +425,7 @@ data Sig pass
         --      'GHC.Parser.Annotation.AnnInstance','GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | SpecInstSig (XSpecInstSig pass) SourceText (LHsSigType pass)
-                  -- Note [Pragma source text] in GHC.Types.SourceText
+  | SpecInstSig (XSpecInstSig pass) (LHsSigType pass)
 
         -- | A minimal complete definition pragma
         --
@@ -447,9 +436,7 @@ data Sig pass
         --      'GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | MinimalSig (XMinimalSig pass)
-               SourceText (LBooleanFormula (LIdP pass))
-               -- Note [Pragma source text] in GHC.Types.SourceText
+  | MinimalSig (XMinimalSig pass) (LBooleanFormula (LIdP pass))
 
         -- | A "set cost centre" pragma for declarations
         --
@@ -460,7 +447,6 @@ data Sig pass
         -- > {-# SCC funName "cost_centre_name" #-}
 
   | SCCFunSig  (XSCCFunSig pass)
-               SourceText     -- Note [Pragma source text] in GHC.Types.SourceText
                (LIdP pass)    -- Function name
                (Maybe (XRec pass StringLiteral))
        -- | A complete match pragma
@@ -471,7 +457,6 @@ data Sig pass
        -- complete matchings which, for example, arise from pattern
        -- synonym definitions.
   | CompleteMatchSig (XCompleteMatchSig pass)
-                     SourceText
                      (XRec pass [LIdP pass])
                      (Maybe (LIdP pass))
   | XSig !(XXSig pass)
@@ -490,7 +475,7 @@ isFixityLSig _                 = False
 isTypeLSig :: forall p. UnXRec p => LSig p -> Bool  -- Type signatures
 isTypeLSig (unXRec @p -> TypeSig {})    = True
 isTypeLSig (unXRec @p -> ClassOpSig {}) = True
-isTypeLSig (unXRec @p -> IdSig {})      = True
+isTypeLSig (unXRec @p -> XSig {})       = True
 isTypeLSig _                    = False
 
 isSpecLSig :: forall p. UnXRec p => LSig p -> Bool
@@ -525,36 +510,6 @@ isSCCFunSig _                    = False
 isCompleteMatchSig :: forall p. UnXRec p => LSig p -> Bool
 isCompleteMatchSig (unXRec @p -> CompleteMatchSig {} ) = True
 isCompleteMatchSig _                            = False
-
-hsSigDoc :: Sig name -> SDoc
-hsSigDoc (TypeSig {})           = text "type signature"
-hsSigDoc (PatSynSig {})         = text "pattern synonym signature"
-hsSigDoc (ClassOpSig _ is_deflt _ _)
- | is_deflt                     = text "default type signature"
- | otherwise                    = text "class method signature"
-hsSigDoc (IdSig {})             = text "id signature"
-hsSigDoc (SpecSig _ _ _ inl)    = (inlinePragmaName . inl_inline $ inl) <+> text "pragma"
-hsSigDoc (InlineSig _ _ prag)   = (inlinePragmaName . inl_inline $ prag) <+> text "pragma"
--- Using the 'inlinePragmaName' function ensures that the pragma name for any
--- one of the INLINE/INLINABLE/NOINLINE pragmas are printed after being extracted
--- from the InlineSpec field of the pragma.
-hsSigDoc (SpecInstSig _ src _)  = text (extractSpecPragName src) <+> text "instance pragma"
-hsSigDoc (FixSig {})            = text "fixity declaration"
-hsSigDoc (MinimalSig {})        = text "MINIMAL pragma"
-hsSigDoc (SCCFunSig {})         = text "SCC pragma"
-hsSigDoc (CompleteMatchSig {})  = text "COMPLETE pragma"
-hsSigDoc (XSig {})              = text "XSIG TTG extension"
-
--- | Extracts the name for a SPECIALIZE instance pragma. In 'hsSigDoc', the src
--- field of 'SpecInstSig' signature contains the SourceText for a SPECIALIZE
--- instance pragma of the form: "SourceText {-# SPECIALIZE"
---
--- Extraction ensures that all variants of the pragma name (with a 'Z' or an
--- 'S') are output exactly as used in the pragma.
-extractSpecPragName :: SourceText -> String
-extractSpecPragName srcTxt =  case (words $ show srcTxt) of
-     (_:_:pragName:_) -> filter (/= '\"') pragName
-     _                -> pprPanic "hsSigDoc: Misformed SPECIALISE instance pragma:" (ppr srcTxt)
 
 {-
 ************************************************************************
@@ -605,9 +560,6 @@ when we have a different name for the local and top-level binder,
 making the distinction between the two names clear.
 
 -}
-instance Outputable (XRec a RdrName) => Outputable (RecordPatSynField a) where
-    ppr (RecordPatSynField { recordPatSynField = v }) = ppr v
-
 
 -- | Haskell Pattern Synonym Direction
 data HsPatSynDir id

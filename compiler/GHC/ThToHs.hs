@@ -857,7 +857,7 @@ cvtPragmaD (SpecialiseP nm ty inline phases)
 cvtPragmaD (SpecialiseInstP ty)
   = do { ty' <- cvtSigType ty
        ; returnJustLA $ Hs.SigD noExtField $
-         SpecInstSig noAnn (SourceText "{-# SPECIALISE") ty' }
+         SpecInstSig (noAnn, (SourceText "{-# SPECIALISE")) ty' }
 
 cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
   = do { let nm' = mkFastString nm
@@ -906,7 +906,7 @@ cvtPragmaD (CompleteP cls mty)
   = do { cls'  <- wrapL $ mapM cNameN cls
        ; mty'  <- traverse tconNameN mty
        ; returnJustLA $ Hs.SigD noExtField
-                   $ CompleteMatchSig noAnn NoSourceText cls' mty' }
+                   $ CompleteMatchSig (noAnn, NoSourceText) cls' mty' }
 
 dfltActivation :: TH.Inline -> Activation
 dfltActivation TH.NoInline = NeverActive

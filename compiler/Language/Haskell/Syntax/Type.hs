@@ -30,18 +30,20 @@ module Language.Haskell.Syntax.Type (
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
         HsWildCardBndrs(..),
-        HsPatSigType(..), HsPSRn(..),
+        HsPatSigType(..),
         HsSigType(..), LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
         HsContext, LHsContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
-        HsArg(..), numVisibleArgs, pprHsArgsApp,
+        HsArg(..),
         LHsTypeArg,
 
         LBangType, BangType,
         HsSrcBang(..), HsImplBang(..),
         SrcStrictness(..), SrcUnpackedness(..),
+        Boxity(..), PromotionFlag(..),
+        isBoxed, isPromoted,
 
         ConDeclField(..), LConDeclField,
 
@@ -56,29 +58,47 @@ module Language.Haskell.Syntax.Type (
         hsPatSigType,
     ) where
 
-import GHC.Prelude
-
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Basic
 
 import GHC.Types.SourceText
-import GHC.Types.Name( Name )
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.DataCon( HsSrcBang(..), HsImplBang(..),
                          SrcStrictness(..), SrcUnpackedness(..) )
 import GHC.Core.Type
-import GHC.Hs.Doc
-import GHC.Types.Basic
-import GHC.Types.Fixity
 import GHC.Types.SrcLoc
-import GHC.Utils.Outputable
-import GHC.Data.FastString
-import GHC.Utils.Misc ( count )
 import GHC.Parser.Annotation
+
+import GHC.Hs.Doc
+import GHC.Data.FastString
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Void
+import Data.Maybe
+import Data.Eq
+import Data.Bool
+import Data.Char
+import GHC.Num (Integer)
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Promotion flag}
+*                                                                      *
+************************************************************************
+-}
+
+-- | Is a TyCon a promoted data constructor or just a normal type constructor?
+data PromotionFlag
+  = NotPromoted
+  | IsPromoted
+  deriving ( Eq, Data )
+
+isPromoted :: PromotionFlag -> Bool
+isPromoted IsPromoted  = True
+isPromoted NotPromoted = False
 
 {-
 ************************************************************************
@@ -422,14 +442,6 @@ data HsPatSigType pass
     }
   | XHsPatSigType !(XXHsPatSigType pass)
 
--- | The extension field for 'HsPatSigType', which is only used in the
--- renamer onwards. See @Note [Pattern signature binders and scoping]@.
-data HsPSRn = HsPSRn
-  { hsps_nwcs    :: [Name] -- ^ Wildcard names
-  , hsps_imp_tvs :: [Name] -- ^ Implicitly bound variable names
-  }
-  deriving Data
-
 -- | Located Haskell Signature Type
 type LHsSigType   pass = XRec pass (HsSigType pass)               -- Implicit only
 
@@ -679,14 +691,6 @@ newtype HsIPName = HsIPName FastString
 
 hsIPNameFS :: HsIPName -> FastString
 hsIPNameFS (HsIPName n) = n
-
-instance Outputable HsIPName where
-    ppr (HsIPName n) = char '?' <> ftext n -- Ordinary implicit parameters
-
-instance OutputableBndr HsIPName where
-    pprBndr _ n   = ppr n         -- Simple for now
-    pprInfixOcc  n = ppr n
-    pprPrefixOcc n = ppr n
 
 --------------------------------------------------
 
@@ -1081,12 +1085,6 @@ data HsConDetails tyarg arg rec
 noTypeArgs :: [Void]
 noTypeArgs = []
 
-instance (Outputable tyarg, Outputable arg, Outputable rec)
-         => Outputable (HsConDetails tyarg arg rec) where
-  ppr (PrefixCon tyargs args) = text "PrefixCon:" <+> hsep (map (\t -> text "@" <> ppr t) tyargs) <+> ppr args
-  ppr (RecCon rec)            = text "RecCon:" <+> ppr rec
-  ppr (InfixCon l r)          = text "InfixCon:" <+> ppr [l, r]
-
 {-
 Note [ConDeclField passs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1203,64 +1201,9 @@ data HsArg tm ty
                          -- SrcSpan is location of the `@`
   | HsArgPar SrcSpan -- See Note [HsArgPar]
 
-numVisibleArgs :: [HsArg tm ty] -> Arity
-numVisibleArgs = count is_vis
-  where is_vis (HsValArg _) = True
-        is_vis _            = False
-
 -- type level equivalent
 type LHsTypeArg p = HsArg (LHsType p) (LHsKind p)
 
--- | @'pprHsArgsApp' id fixity args@ pretty-prints an application of @id@
--- to @args@, using the @fixity@ to tell whether @id@ should be printed prefix
--- or infix. Examples:
---
--- @
--- pprHsArgsApp T Prefix [HsTypeArg Bool, HsValArg Int]                        = T \@Bool Int
--- pprHsArgsApp T Prefix [HsTypeArg Bool, HsArgPar, HsValArg Int]              = (T \@Bool) Int
--- pprHsArgsApp (++) Infix [HsValArg Char, HsValArg Double]                    = Char ++ Double
--- pprHsArgsApp (++) Infix [HsValArg Char, HsValArg Double, HsVarArg Ordering] = (Char ++ Double) Ordering
--- @
-pprHsArgsApp :: (OutputableBndr id, Outputable tm, Outputable ty)
-             => id -> LexicalFixity -> [HsArg tm ty] -> SDoc
-pprHsArgsApp thing fixity (argl:argr:args)
-  | Infix <- fixity
-  = let pp_op_app = hsep [ ppr_single_hs_arg argl
-                         , pprInfixOcc thing
-                         , ppr_single_hs_arg argr ] in
-    case args of
-      [] -> pp_op_app
-      _  -> ppr_hs_args_prefix_app (parens pp_op_app) args
-
-pprHsArgsApp thing _fixity args
-  = ppr_hs_args_prefix_app (pprPrefixOcc thing) args
-
--- | Pretty-print a prefix identifier to a list of 'HsArg's.
-ppr_hs_args_prefix_app :: (Outputable tm, Outputable ty)
-                        => SDoc -> [HsArg tm ty] -> SDoc
-ppr_hs_args_prefix_app acc []         = acc
-ppr_hs_args_prefix_app acc (arg:args) =
-  case arg of
-    HsValArg{}  -> ppr_hs_args_prefix_app (acc <+> ppr_single_hs_arg arg) args
-    HsTypeArg{} -> ppr_hs_args_prefix_app (acc <+> ppr_single_hs_arg arg) args
-    HsArgPar{}  -> ppr_hs_args_prefix_app (parens acc) args
-
--- | Pretty-print an 'HsArg' in isolation.
-ppr_single_hs_arg :: (Outputable tm, Outputable ty)
-                  => HsArg tm ty -> SDoc
-ppr_single_hs_arg (HsValArg tm)    = ppr tm
-ppr_single_hs_arg (HsTypeArg _ ty) = char '@' <> ppr ty
--- GHC shouldn't be constructing ASTs such that this case is ever reached.
--- Still, it's possible some wily user might construct their own AST that
--- allows this to be reachable, so don't fail here.
-ppr_single_hs_arg (HsArgPar{})     = empty
-
--- | This instance is meant for debug-printing purposes. If you wish to
--- pretty-print an application of 'HsArg's, use 'pprHsArgsApp' instead.
-instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
-  ppr (HsValArg tm)     = text "HsValArg"  <+> ppr tm
-  ppr (HsTypeArg sp ty) = text "HsTypeArg" <+> ppr sp <+> ppr ty
-  ppr (HsArgPar sp)     = text "HsArgPar"  <+> ppr sp
 {-
 Note [HsArgPar]
 ~~~~~~~~~~~~~~~
@@ -1275,8 +1218,6 @@ The SrcSpan is the span of the original HsPar
 [HsValArg arg1, HsArgPar span1, HsValArg arg2, HsValArg arg3, HsArgPar span2]
 
 -}
-
---------------------------------
 
 
 {-
@@ -1312,17 +1253,6 @@ deriving instance (
   , Eq (XXFieldOcc pass)
   ) => Eq (FieldOcc pass)
 
-instance Outputable (XRec pass RdrName) => Outputable (FieldOcc pass) where
-  ppr = ppr . foLabel
-
-instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (FieldOcc pass) where
-  pprInfixOcc  = pprInfixOcc . unXRec @pass . foLabel
-  pprPrefixOcc = pprPrefixOcc . unXRec @pass . foLabel
-
-instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
-  pprInfixOcc  = pprInfixOcc . unLoc
-  pprPrefixOcc = pprPrefixOcc . unLoc
-
 -- | Located Ambiguous Field Occurence
 type LAmbiguousFieldOcc pass = XRec pass (AmbiguousFieldOcc pass)
 
@@ -1350,11 +1280,3 @@ data AmbiguousFieldOcc pass
 *                                                                      *
 ************************************************************************
 -}
-
-instance Outputable HsTyLit where
-    ppr = ppr_tylit
---------------------------
-ppr_tylit :: HsTyLit -> SDoc
-ppr_tylit (HsNumTy source i) = pprWithSourceText source (integer i)
-ppr_tylit (HsStrTy source s) = pprWithSourceText source (text (show s))
-ppr_tylit (HsCharTy source c) = pprWithSourceText source (text (show c))

@@ -2580,7 +2580,7 @@ sigdecl :: { LHsDecl GhcPs }
                 {% let (dcolon, tc) = $3
                    in acsA
                        (\cs -> sLL $1 $>
-                         (SigD noExtField (CompleteMatchSig (EpAnn (glR $1) ([ mo $1 ] ++ dcolon ++ [mc $4]) cs) (getCOMPLETE_PRAGs $1) $2 tc))) }
+                         (SigD noExtField (CompleteMatchSig ((EpAnn (glR $1) ([ mo $1 ] ++ dcolon ++ [mc $4]) cs), (getCOMPLETE_PRAGs $1)) $2 tc))) }
 
         -- This rule is for both INLINE and INLINABLE pragmas
         | '{-# INLINE' activation qvarcon '#-}'
@@ -2591,12 +2591,12 @@ sigdecl :: { LHsDecl GhcPs }
                 {% acsA (\cs -> (sLL $1 $> $ SigD noExtField (InlineSig (EpAnn (glR $1) [mo $1, mc $3] cs) $2
                             (mkOpaquePragma (getOPAQUE_PRAGs $1))))) }
         | '{-# SCC' qvar '#-}'
-          {% acsA (\cs -> sLL $1 $> (SigD noExtField (SCCFunSig (EpAnn (glR $1) [mo $1, mc $3] cs) (getSCC_PRAGs $1) $2 Nothing))) }
+          {% acsA (\cs -> sLL $1 $> (SigD noExtField (SCCFunSig ((EpAnn (glR $1) [mo $1, mc $3] cs), (getSCC_PRAGs $1)) $2 Nothing))) }
 
         | '{-# SCC' qvar STRING '#-}'
           {% do { scc <- getSCC $3
                 ; let str_lit = StringLiteral (getSTRINGs $3) scc Nothing
-                ; acsA (\cs -> sLL $1 $> (SigD noExtField (SCCFunSig (EpAnn (glR $1) [mo $1, mc $4] cs) (getSCC_PRAGs $1) $2 (Just ( sL1a $3 str_lit))))) }}
+                ; acsA (\cs -> sLL $1 $> (SigD noExtField (SCCFunSig ((EpAnn (glR $1) [mo $1, mc $4] cs), (getSCC_PRAGs $1)) $2 (Just ( sL1a $3 str_lit))))) }}
 
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% acsA (\cs ->
@@ -2611,11 +2611,11 @@ sigdecl :: { LHsDecl GhcPs }
 
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
                 {% acsA (\cs -> sLL $1 $>
-                                  $ SigD noExtField (SpecInstSig (EpAnn (glR $1) [mo $1,mj AnnInstance $2,mc $4] cs) (getSPEC_PRAGs $1) $3)) }
+                                  $ SigD noExtField (SpecInstSig ((EpAnn (glR $1) [mo $1,mj AnnInstance $2,mc $4] cs), (getSPEC_PRAGs $1)) $3)) }
 
         -- A minimal complete definition
         | '{-# MINIMAL' name_boolformula_opt '#-}'
-            {% acsA (\cs -> sLL $1 $> $ SigD noExtField (MinimalSig (EpAnn (glR $1) [mo $1,mc $3] cs) (getMINIMAL_PRAGs $1) $2)) }
+            {% acsA (\cs -> sLL $1 $> $ SigD noExtField (MinimalSig ((EpAnn (glR $1) [mo $1,mc $3] cs), (getMINIMAL_PRAGs $1)) $2)) }
 
 activation :: { ([AddEpAnn],Maybe Activation) }
         -- See Note [%shift: activation -> {- empty -}]

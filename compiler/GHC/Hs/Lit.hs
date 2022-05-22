@@ -25,14 +25,15 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Hs.Expr( pprExpr )
 
-import Language.Haskell.Syntax.Lit
-
+import GHC.Types.Basic (PprPrec(..), topPrec )
+import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Types.SourceText
 import GHC.Core.Type
 import GHC.Utils.Outputable
+import GHC.Hs.Extension
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
-import GHC.Hs.Extension
+import Language.Haskell.Syntax.Lit
 
 {-
 ************************************************************************
@@ -103,6 +104,37 @@ type instance XXOverLit (GhcPass _) = DataConCantHappen
 overLitType :: HsOverLit GhcTc -> Type
 overLitType (OverLit OverLitTc{ ol_type = ty } _) = ty
 
+-- | @'hsOverLitNeedsParens' p ol@ returns 'True' if an overloaded literal
+-- @ol@ needs to be parenthesized under precedence @p@.
+hsOverLitNeedsParens :: PprPrec -> HsOverLit x -> Bool
+hsOverLitNeedsParens p (OverLit { ol_val = olv }) = go olv
+  where
+    go :: OverLitVal -> Bool
+    go (HsIntegral x)   = p > topPrec && il_neg x
+    go (HsFractional x) = p > topPrec && fl_neg x
+    go (HsIsString {})  = False
+hsOverLitNeedsParens _ (XOverLit { }) = False
+
+-- | @'hsLitNeedsParens' p l@ returns 'True' if a literal @l@ needs
+-- to be parenthesized under precedence @p@.
+hsLitNeedsParens :: PprPrec -> HsLit x -> Bool
+hsLitNeedsParens p = go
+  where
+    go (HsChar {})        = False
+    go (HsCharPrim {})    = False
+    go (HsString {})      = False
+    go (HsStringPrim {})  = False
+    go (HsInt _ x)        = p > topPrec && il_neg x
+    go (HsIntPrim _ x)    = p > topPrec && x < 0
+    go (HsWordPrim {})    = False
+    go (HsInt64Prim _ x)  = p > topPrec && x < 0
+    go (HsWord64Prim {})  = False
+    go (HsInteger _ x _)  = p > topPrec && x < 0
+    go (HsRat _ x _)      = p > topPrec && fl_neg x
+    go (HsFloatPrim _ x)  = p > topPrec && fl_neg x
+    go (HsDoublePrim _ x) = p > topPrec && fl_neg x
+    go (XLit _)           = False
+
 -- | Convert a literal from one index type to another
 convertLit :: HsLit (GhcPass p1) -> HsLit (GhcPass p2)
 convertLit (HsChar a x)       = HsChar a x
@@ -161,6 +193,11 @@ instance OutputableBndrId p
   ppr (OverLit {ol_val=val, ol_ext=ext})
         = ppr val <+> (whenPprDebug (parens (pprXOverLit (ghcPass @p) ext)))
 
+instance Outputable OverLitVal where
+  ppr (HsIntegral i)     = pprWithSourceText (il_text i) (integer (il_value i))
+  ppr (HsFractional f)   = ppr f
+  ppr (HsIsString st s)  = pprWithSourceText st (pprHsString s)
+
 -- | pmPprHsLit pretty prints literals and is used when pretty printing pattern
 -- match warnings. All are printed the same (i.e., without hashes if they are
 -- primitive and not wrapped in constructors if they are boxed). This happens
@@ -181,3 +218,4 @@ pmPprHsLit (HsInteger _ i _)  = integer i
 pmPprHsLit (HsRat _ f _)      = ppr f
 pmPprHsLit (HsFloatPrim _ f)  = ppr f
 pmPprHsLit (HsDoublePrim _ d) = ppr d
+

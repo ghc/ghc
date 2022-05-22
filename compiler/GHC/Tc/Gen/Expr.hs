@@ -1376,7 +1376,7 @@ desugarRecordUpd record_expr rbnds res_ty
              upd_ids_lhs = [ (NonRecursive, unitBag $ genSimpleFunBind (idName id) [] rhs)
                            | (_, (id, rhs)) <- upd_ids ]
              mk_idSig :: (Name, (Id, LHsExpr GhcRn)) -> LSig GhcRn
-             mk_idSig (_, (id, _)) = L gen $ IdSig noExtField id
+             mk_idSig (_, (id, _)) = L gen $ XSig $ IdSig id
                -- We let-bind variables using 'IdSig' in order to accept
                -- record updates involving higher-rank types.
                -- See Wrinkle [Using IdSig] in Note [Record Updates].

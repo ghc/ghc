@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -112,8 +113,10 @@ import GHC.Hs.Doc
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
+import GHC.Utils.Misc (count)
 
 import Data.Maybe
+import Data.Data (Data)
 
 import qualified Data.Semigroup as S
 
@@ -206,6 +209,14 @@ type instance XXHsWildCardBndrs (GhcPass _) _ = DataConCantHappen
 type instance XHsPS GhcPs = EpAnnCO
 type instance XHsPS GhcRn = HsPSRn
 type instance XHsPS GhcTc = HsPSRn
+
+-- | The extension field for 'HsPatSigType', which is only used in the
+-- renamer onwards. See @Note [Pattern signature binders and scoping]@.
+data HsPSRn = HsPSRn
+  { hsps_nwcs    :: [Name] -- ^ Wildcard names
+  , hsps_imp_tvs :: [Name] -- ^ Implicitly bound variable names
+  }
+  deriving Data
 
 type instance XXHsPatSigType (GhcPass _) = DataConCantHappen
 
@@ -530,6 +541,66 @@ lhsTypeArgSrcSpan arg = case arg of
   HsValArg  tm    -> getLocA tm
   HsTypeArg at ty -> at `combineSrcSpans` getLocA ty
   HsArgPar  sp    -> sp
+
+--------------------------------
+
+numVisibleArgs :: [HsArg tm ty] -> Arity
+numVisibleArgs = count is_vis
+  where is_vis (HsValArg _) = True
+        is_vis _            = False
+
+--------------------------------
+
+-- | @'pprHsArgsApp' id fixity args@ pretty-prints an application of @id@
+-- to @args@, using the @fixity@ to tell whether @id@ should be printed prefix
+-- or infix. Examples:
+--
+-- @
+-- pprHsArgsApp T Prefix [HsTypeArg Bool, HsValArg Int]                        = T \@Bool Int
+-- pprHsArgsApp T Prefix [HsTypeArg Bool, HsArgPar, HsValArg Int]              = (T \@Bool) Int
+-- pprHsArgsApp (++) Infix [HsValArg Char, HsValArg Double]                    = Char ++ Double
+-- pprHsArgsApp (++) Infix [HsValArg Char, HsValArg Double, HsVarArg Ordering] = (Char ++ Double) Ordering
+-- @
+pprHsArgsApp :: (OutputableBndr id, Outputable tm, Outputable ty)
+             => id -> LexicalFixity -> [HsArg tm ty] -> SDoc
+pprHsArgsApp thing fixity (argl:argr:args)
+  | Infix <- fixity
+  = let pp_op_app = hsep [ ppr_single_hs_arg argl
+                         , pprInfixOcc thing
+                         , ppr_single_hs_arg argr ] in
+    case args of
+      [] -> pp_op_app
+      _  -> ppr_hs_args_prefix_app (parens pp_op_app) args
+
+pprHsArgsApp thing _fixity args
+  = ppr_hs_args_prefix_app (pprPrefixOcc thing) args
+
+-- | Pretty-print a prefix identifier to a list of 'HsArg's.
+ppr_hs_args_prefix_app :: (Outputable tm, Outputable ty)
+                        => SDoc -> [HsArg tm ty] -> SDoc
+ppr_hs_args_prefix_app acc []         = acc
+ppr_hs_args_prefix_app acc (arg:args) =
+  case arg of
+    HsValArg{}  -> ppr_hs_args_prefix_app (acc <+> ppr_single_hs_arg arg) args
+    HsTypeArg{} -> ppr_hs_args_prefix_app (acc <+> ppr_single_hs_arg arg) args
+    HsArgPar{}  -> ppr_hs_args_prefix_app (parens acc) args
+
+-- | Pretty-print an 'HsArg' in isolation.
+ppr_single_hs_arg :: (Outputable tm, Outputable ty)
+                  => HsArg tm ty -> SDoc
+ppr_single_hs_arg (HsValArg tm)    = ppr tm
+ppr_single_hs_arg (HsTypeArg _ ty) = char '@' <> ppr ty
+-- GHC shouldn't be constructing ASTs such that this case is ever reached.
+-- Still, it's possible some wily user might construct their own AST that
+-- allows this to be reachable, so don't fail here.
+ppr_single_hs_arg (HsArgPar{})     = empty
+
+-- | This instance is meant for debug-printing purposes. If you wish to
+-- pretty-print an application of 'HsArg's, use 'pprHsArgsApp' instead.
+instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
+  ppr (HsValArg tm)     = text "HsValArg"  <+> ppr tm
+  ppr (HsTypeArg sp ty) = text "HsTypeArg" <+> ppr sp <+> ppr ty
+  ppr (HsArgPar sp)     = text "HsArgPar"  <+> ppr sp
 
 --------------------------------
 
@@ -918,6 +989,41 @@ instance Outputable thing
 instance (OutputableBndrId p)
        => Outputable (HsPatSigType (GhcPass p)) where
     ppr (HsPS { hsps_body = ty }) = ppr ty
+
+
+instance Outputable HsTyLit where
+    ppr = ppr_tylit
+
+instance Outputable HsIPName where
+    ppr (HsIPName n) = char '?' <> ftext n -- Ordinary implicit parameters
+
+instance OutputableBndr HsIPName where
+    pprBndr _ n   = ppr n         -- Simple for now
+    pprInfixOcc  n = ppr n
+    pprPrefixOcc n = ppr n
+
+instance (Outputable tyarg, Outputable arg, Outputable rec)
+         => Outputable (HsConDetails tyarg arg rec) where
+  ppr (PrefixCon tyargs args) = text "PrefixCon:" <+> hsep (map (\t -> text "@" <> ppr t) tyargs) <+> ppr args
+  ppr (RecCon rec)            = text "RecCon:" <+> ppr rec
+  ppr (InfixCon l r)          = text "InfixCon:" <+> ppr [l, r]
+
+instance Outputable (XRec pass RdrName) => Outputable (FieldOcc pass) where
+  ppr = ppr . foLabel
+
+instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (FieldOcc pass) where
+  pprInfixOcc  = pprInfixOcc . unXRec @pass . foLabel
+  pprPrefixOcc = pprPrefixOcc . unXRec @pass . foLabel
+
+instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
+  pprInfixOcc  = pprInfixOcc . unLoc
+  pprPrefixOcc = pprPrefixOcc . unLoc
+
+
+ppr_tylit :: HsTyLit -> SDoc
+ppr_tylit (HsNumTy source i) = pprWithSourceText source (integer i)
+ppr_tylit (HsStrTy source s) = pprWithSourceText source (text (show s))
+ppr_tylit (HsCharTy source c) = pprWithSourceText source (text (show c))
 
 pprAnonWildCard :: SDoc
 pprAnonWildCard = char '_'

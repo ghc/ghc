@@ -1698,7 +1698,6 @@ instance HiePass p => ToHie (SigContext (LocatedA (Sig (GhcPass p)))) where
               _  -> toHie $ map (C $ TyDecl) names
           , toHie $ TS (UnresolvedScope (map unLoc names) msp) typ
           ]
-        IdSig _ _ -> []
         FixSig _ fsig ->
           [ toHie $ L sp fsig
           ]
@@ -1709,21 +1708,22 @@ instance HiePass p => ToHie (SigContext (LocatedA (Sig (GhcPass p)))) where
           [ toHie $ (C Use) name
           , toHie $ map (TS (ResolvedScopes [])) typs
           ]
-        SpecInstSig _ _ typ ->
+        SpecInstSig _ typ ->
           [ toHie $ TS (ResolvedScopes []) typ
           ]
-        MinimalSig _ _ form ->
+        MinimalSig _ form ->
           [ toHie form
           ]
-        SCCFunSig _ _ name mtxt ->
+        SCCFunSig _ name mtxt ->
           [ toHie $ (C Use) name
           , maybe (pure []) (locOnly . getLocA) mtxt
           ]
-        CompleteMatchSig _ _ (L ispan names) typ ->
+        CompleteMatchSig _ (L ispan names) typ ->
           [ locOnly ispan
           , toHie $ map (C Use) names
           , toHie $ fmap (C Use) typ
           ]
+        XSig _ -> []
 
 instance ToHie (TScoped (LocatedA (HsSigType GhcRn))) where
   toHie (TS tsc (L span t@HsSig{sig_bndrs=bndrs,sig_body=body})) = concatM $ makeNodeA t span :

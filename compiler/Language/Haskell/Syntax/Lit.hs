@@ -18,18 +18,21 @@
 -- | Source-language literals
 module Language.Haskell.Syntax.Lit where
 
-import GHC.Prelude
+import Language.Haskell.Syntax.Extension
 
-import GHC.Types.Basic (PprPrec(..), topPrec )
+import GHC.Utils.Panic
 import GHC.Types.SourceText
 import GHC.Core.Type
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
+
 import GHC.Data.FastString
-import Language.Haskell.Syntax.Extension
 
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
+import Data.Bool
+import Data.Ord
+import Data.Eq
+import Data.Char
+import GHC.Integer (Integer) -- ROMES:TODO where is integer
 
 {-
 ************************************************************************
@@ -147,38 +150,3 @@ instance Ord OverLitVal where
   compare (HsIsString _ _)    (HsIntegral   _)    = GT
   compare (HsIsString _ _)    (HsFractional _)    = GT
 
-instance Outputable OverLitVal where
-  ppr (HsIntegral i)     = pprWithSourceText (il_text i) (integer (il_value i))
-  ppr (HsFractional f)   = ppr f
-  ppr (HsIsString st s)  = pprWithSourceText st (pprHsString s)
-
--- | @'hsLitNeedsParens' p l@ returns 'True' if a literal @l@ needs
--- to be parenthesized under precedence @p@.
-hsLitNeedsParens :: PprPrec -> HsLit x -> Bool
-hsLitNeedsParens p = go
-  where
-    go (HsChar {})        = False
-    go (HsCharPrim {})    = False
-    go (HsString {})      = False
-    go (HsStringPrim {})  = False
-    go (HsInt _ x)        = p > topPrec && il_neg x
-    go (HsIntPrim _ x)    = p > topPrec && x < 0
-    go (HsWordPrim {})    = False
-    go (HsInt64Prim _ x)  = p > topPrec && x < 0
-    go (HsWord64Prim {})  = False
-    go (HsInteger _ x _)  = p > topPrec && x < 0
-    go (HsRat _ x _)      = p > topPrec && fl_neg x
-    go (HsFloatPrim _ x)  = p > topPrec && fl_neg x
-    go (HsDoublePrim _ x) = p > topPrec && fl_neg x
-    go (XLit _)           = False
-
--- | @'hsOverLitNeedsParens' p ol@ returns 'True' if an overloaded literal
--- @ol@ needs to be parenthesized under precedence @p@.
-hsOverLitNeedsParens :: PprPrec -> HsOverLit x -> Bool
-hsOverLitNeedsParens p (OverLit { ol_val = olv }) = go olv
-  where
-    go :: OverLitVal -> Bool
-    go (HsIntegral x)   = p > topPrec && il_neg x
-    go (HsFractional x) = p > topPrec && fl_neg x
-    go (HsIsString {})  = False
-hsOverLitNeedsParens _ (XOverLit { }) = False
