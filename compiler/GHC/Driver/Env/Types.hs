@@ -44,6 +44,11 @@ instance ContainsDynFlags HscEnv where
 instance HasLogger Hsc where
     getLogger = Hsc $ \e w -> return (hsc_logger e, w)
 
+instance ContainsLogger HscEnv where
+    extractLogger h = hsc_logger h
+
+instance ContainsHooks HscEnv where
+    extractHooks h = hsc_hooks h
 
 -- | HscEnv is like 'GHC.Driver.Monad.Session', except that some of the fields are immutable.
 -- An HscEnv is used to compile a single module from plain Haskell source

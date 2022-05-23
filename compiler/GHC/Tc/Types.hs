@@ -24,11 +24,12 @@
 -- For state that is global and should be returned at the end (e.g not part
 -- of the stack mechanism), you should use a TcRef (= IORef) to store them.
 module GHC.Tc.Types(
-        TcRnIf, TcRn, TcM, RnM, IfM, IfL, IfG, -- The monad is opaque outside this module
+        TcRnIfDs, TcRnIf, TcRn,
+        TcM, RnM, IfM, IfL, IfG, -- The monad is opaque outside this module
         TcRef,
 
         -- The environment types
-        Env(..),
+        Env'(..), Env,
         TcGblEnv(..), TcLclEnv(..),
         setLclEnvTcLevel, getLclEnvTcLevel,
         setLclEnvLoc, getLclEnvLoc, lclEnvInGeneratedCode,
@@ -216,7 +217,8 @@ data NameShape = NameShape {
 The monad itself has to be defined here, because it is mentioned by ErrCtxt
 -}
 
-type TcRnIf a b = IOEnv (Env a b)
+type TcRnIfDs t a b = IOEnv (Env' t a b)
+type TcRnIf a b = TcRnIfDs HscEnv a b
 type TcRn       = TcRnIf TcGblEnv TcLclEnv    -- Type inference
 type IfM lcl    = TcRnIf IfGblEnv lcl         -- Iface stuff
 type IfG        = IfM ()                      --    Top level
@@ -238,9 +240,9 @@ type TcM  = TcRn
 -- We 'stack' these envs through the Reader like monad infrastructure
 -- as we move into an expression (although the change is focused in
 -- the lcl type).
-data Env gbl lcl
+data Env' top gbl lcl
   = Env {
-        env_top  :: !HscEnv, -- Top-level stuff that never changes
+        env_top  :: !top,    -- Top-level stuff that never changes
                              -- Includes all info about imported things
                              -- BangPattern is to fix leak, see #15111
 
@@ -252,16 +254,18 @@ data Env gbl lcl
         env_lcl  :: lcl      -- Nested stuff; changes as we go into
     }
 
-instance ContainsDynFlags (Env gbl lcl) where
-    extractDynFlags env = hsc_dflags (env_top env)
+type Env = Env' HscEnv
 
-instance ContainsHooks (Env gbl lcl) where
-    extractHooks env = hsc_hooks (env_top env)
+instance ContainsDynFlags top => ContainsDynFlags (Env' top gbl lcl) where
+    extractDynFlags env = extractDynFlags (env_top env)
 
-instance ContainsLogger (Env gbl lcl) where
-    extractLogger env = hsc_logger (env_top env)
+instance ContainsHooks top => ContainsHooks (Env' top gbl lcl) where
+    extractHooks env = extractHooks (env_top env)
 
-instance ContainsModule gbl => ContainsModule (Env gbl lcl) where
+instance ContainsLogger top => ContainsLogger (Env' top gbl lcl) where
+    extractLogger env = extractLogger (env_top env)
+
+instance ContainsModule gbl => ContainsModule (Env' top gbl lcl) where
     extractModule env = extractModule (env_gbl env)
 
 {-

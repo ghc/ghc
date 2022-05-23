@@ -471,32 +471,32 @@ initTcRnIf uniq_mask hsc_env gbl_env lcl_env thing_inside
 discardResult :: TcM a -> TcM ()
 discardResult a = a >> return ()
 
-getTopEnv :: TcRnIf gbl lcl HscEnv
+getTopEnv :: TcRnIfDs top gbl lcl top
 getTopEnv = do { env <- getEnv; return (env_top env) }
 
-updTopEnv :: (HscEnv -> HscEnv) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+updTopEnv :: (top -> top) -> TcRnIfDs top gbl lcl a -> TcRnIfDs top gbl lcl a
 updTopEnv upd = updEnv (\ env@(Env { env_top = top }) ->
                           env { env_top = upd top })
 
-getGblEnv :: TcRnIf gbl lcl gbl
+getGblEnv :: TcRnIfDs top gbl lcl gbl
 getGblEnv = do { Env{..} <- getEnv; return env_gbl }
 
-updGblEnv :: (gbl -> gbl) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+updGblEnv :: (gbl -> gbl) -> TcRnIfDs top gbl lcl a -> TcRnIfDs top gbl lcl a
 updGblEnv upd = updEnv (\ env@(Env { env_gbl = gbl }) ->
                           env { env_gbl = upd gbl })
 
-setGblEnv :: gbl' -> TcRnIf gbl' lcl a -> TcRnIf gbl lcl a
+setGblEnv :: gbl' -> TcRnIfDs top gbl' lcl a -> TcRnIfDs top gbl lcl a
 setGblEnv gbl_env = updEnv (\ env -> env { env_gbl = gbl_env })
 
-getLclEnv :: TcRnIf gbl lcl lcl
+getLclEnv :: TcRnIfDs top gbl lcl lcl
 getLclEnv = do { Env{..} <- getEnv; return env_lcl }
 
-updLclEnv :: (lcl -> lcl) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+updLclEnv :: (lcl -> lcl) -> TcRnIfDs top gbl lcl a -> TcRnIfDs top gbl lcl a
 updLclEnv upd = updEnv (\ env@(Env { env_lcl = lcl }) ->
                           env { env_lcl = upd lcl })
 
 
-setLclEnv :: lcl' -> TcRnIf gbl lcl' a -> TcRnIf gbl lcl a
+setLclEnv :: lcl' -> TcRnIfDs top gbl lcl' a -> TcRnIfDs top gbl lcl a
 setLclEnv lcl_env = updEnv (\ env -> env { env_lcl = lcl_env })
 
 restoreLclEnv :: TcLclEnv -> TcRnIf gbl TcLclEnv a -> TcRnIf gbl TcLclEnv a
@@ -507,13 +507,13 @@ restoreLclEnv new_lcl_env = updLclEnv upd
                                    , tcl_lie   = tcl_lie   old_lcl_env
                                    , tcl_usage = tcl_usage old_lcl_env }
 
-getEnvs :: TcRnIf gbl lcl (gbl, lcl)
+getEnvs :: TcRnIfDs top gbl lcl (gbl, lcl)
 getEnvs = do { env <- getEnv; return (env_gbl env, env_lcl env) }
 
-setEnvs :: (gbl', lcl') -> TcRnIf gbl' lcl' a -> TcRnIf gbl lcl a
+setEnvs :: (gbl', lcl') -> TcRnIfDs top gbl' lcl' a -> TcRnIfDs top gbl lcl a
 setEnvs (gbl_env, lcl_env) = setGblEnv gbl_env . setLclEnv lcl_env
 
-updEnvs :: ((gbl,lcl) -> (gbl, lcl)) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+updEnvs :: ((gbl,lcl) -> (gbl, lcl)) -> TcRnIfDs top gbl lcl a -> TcRnIfDs top gbl lcl a
 updEnvs upd_envs = updEnv upd
   where
     upd env@(Env { env_gbl = gbl, env_lcl = lcl })
@@ -749,13 +749,13 @@ instance MonadUnique (IOEnv (Env gbl lcl)) where
 newTcRef :: a -> TcRnIf gbl lcl (TcRef a)
 newTcRef = newMutVar
 
-readTcRef :: TcRef a -> TcRnIf gbl lcl a
+readTcRef :: TcRef a -> TcRnIfDs top gbl lcl a
 readTcRef = readMutVar
 
-writeTcRef :: TcRef a -> a -> TcRnIf gbl lcl ()
+writeTcRef :: TcRef a -> a -> TcRnIfDs top gbl lcl ()
 writeTcRef = writeMutVar
 
-updTcRef :: TcRef a -> (a -> a) -> TcRnIf gbl lcl ()
+updTcRef :: TcRef a -> (a -> a) -> TcRnIfDs top gbl lcl ()
 -- Returns ()
 updTcRef ref fn = liftIO $ modifyIORef' ref fn
 
@@ -2263,7 +2263,7 @@ we can use uninterruptibleMask_ to avoid the situation.
 -}
 
 -- | Get the next cost centre index associated with a given name.
-getCCIndexM :: (gbl -> TcRef CostCentreState) -> FastString -> TcRnIf gbl lcl CostCentreIndex
+getCCIndexM :: (gbl -> TcRef CostCentreState) -> FastString -> TcRnIfDs top gbl lcl CostCentreIndex
 getCCIndexM get_ccs nm = do
   env <- getGblEnv
   let cc_st_ref = get_ccs env

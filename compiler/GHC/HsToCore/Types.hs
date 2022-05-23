@@ -17,7 +17,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Types.Name.Reader (GlobalRdrEnv)
 import GHC.Hs (LForeignDecl, HsExpr, GhcTc)
-import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv, CompleteMatches)
+import GHC.Tc.Types (TcRnIfDs, IfGblEnv, IfLclEnv, CompleteMatches)
 import GHC.HsToCore.Pmc.Types (Nablas)
 import GHC.HsToCore.Errors.Types
 import GHC.Core (CoreExpr)
@@ -25,6 +25,7 @@ import GHC.Core.FamInstEnv
 import GHC.Utils.Outputable as Outputable
 import GHC.Unit.Module
 import GHC.Driver.Hooks (DsForeignsHook)
+import GHC.Driver.Session (DynFlags)
 import GHC.Data.OrdList (OrdList)
 import GHC.Types.ForeignStubs (ForeignStubs)
 
@@ -87,8 +88,13 @@ data DsMetaVal
   | DsSplice (HsExpr GhcTc) -- These bindings are introduced by
                             -- the PendingSplices on a Hs*Bracket
 
+data DsTopEnv = DsTopEnv
+  { ds_dflags :: DynFlags
+  , ds_hook :: DsForeignsHook
+  }
+
 -- | Desugaring monad. See also 'TcM'.
-type DsM = TcRnIf DsGblEnv DsLclEnv
+type DsM = TcRnIfDs DsTopEnv DsGblEnv DsLclEnv
 
 -- See Note [The Decoupling Abstract Data Hack]
 type instance DsForeignsHook = [LForeignDecl GhcTc] -> DsM (ForeignStubs, OrdList (Id, CoreExpr))
