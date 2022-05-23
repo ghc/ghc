@@ -1544,7 +1544,7 @@ locateLib
   -> [FilePath]
   -> String
   -> IO LibrarySpec
-locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
+locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib0
   | not is_hs
     -- For non-Haskell libraries (e.g. gmp, iconv):
     --   first look in library-dirs for a dynamic library (on User paths only)
@@ -1602,22 +1602,35 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
      gcc    = False
      user   = True
 
+     -- Emulate ld's behavior of treating $LIB in `-l:$LIB` as a literal file
+     -- name
+     (lib, verbatim) = case lib0 of
+       ':' : rest -> (rest, True)
+       other      -> (other, False)
+
      obj_file
        | is_hs && loading_profiled_hs_libs = lib <.> "p_o"
        | otherwise = lib <.> "o"
      dyn_obj_file = lib <.> "dyn_o"
-     arch_files = [ "lib" ++ lib ++ lib_tag <.> "a"
-                  , lib <.> "a" -- native code has no lib_tag
-                  , "lib" ++ lib, lib
-                  ]
+     arch_files
+       | verbatim = [lib]
+       | otherwise = [ "lib" ++ lib ++ lib_tag <.> "a"
+                     , lib <.> "a" -- native code has no lib_tag
+                     , "lib" ++ lib
+                     , lib
+                     ]
      lib_tag = if is_hs && loading_profiled_hs_libs then "_p" else ""
 
      loading_profiled_hs_libs = interpreterProfiled interp
      loading_dynamic_hs_libs  = interpreterDynamic  interp
 
-     import_libs  = [ lib <.> "lib"           , "lib" ++ lib <.> "lib"
-                    , "lib" ++ lib <.> "dll.a", lib <.> "dll.a"
-                    ]
+     import_libs
+       | verbatim = [lib]
+       | otherwise = [ lib <.> "lib"
+                     , "lib" ++ lib <.> "lib"
+                     , "lib" ++ lib <.> "dll.a"
+                     , lib <.> "dll.a"
+                     ]
 
      hs_dyn_lib_name = lib ++ dynLibSuffix (ghcNameVersion dflags)
      hs_dyn_lib_file = platformHsSOName platform hs_dyn_lib_name
@@ -1625,9 +1638,16 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
 #if defined(CAN_LOAD_DLL)
      so_name     = platformSOName platform lib
      lib_so_name = "lib" ++ so_name
-     dyn_lib_file = case (arch, os) of
-                             (ArchX86_64, OSSolaris2) -> "64" </> so_name
-                             _ -> so_name
+     dyn_lib_file
+       | verbatim && any (`isExtensionOf` lib) [".so", ".dylib", ".dll"]
+       = lib
+
+       | ArchX86_64 <- arch
+       , OSSolaris2 <- os
+       = "64" </> so_name
+
+       | otherwise
+        = so_name
 #endif
 
      findObject    = liftM (fmap $ Objects . (:[]))  $ findFile dirs obj_file
