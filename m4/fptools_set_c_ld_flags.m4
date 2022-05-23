@@ -93,13 +93,6 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $5="$$5 -D_THREAD_SAFE"
         ;;
 
-    x86_64-*-openbsd*)
-        # We need -z wxneeded at least to link ghc-stage2 to workaround
-        # W^X issue in GHCi on OpenBSD current (as of Aug 2016)
-        $3="$$3 -Wl,-z,wxneeded"
-        $4="$$4 -z wxneeded"
-        ;;
-
     esac
 
     AC_MSG_RESULT([done])
