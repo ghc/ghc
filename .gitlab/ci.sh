@@ -549,7 +549,7 @@ function make_install_destdir() {
 
   mkdir -p "$destdir"
   mkdir -p "$instdir"
-  run "$MAKE" DESTDIR="$destdir" install
+  run "$MAKE" DESTDIR="$destdir" install || fail "make install failed"
   # check for empty dir portably
   # https://superuser.com/a/667100
   if find "$instdir" -mindepth 1 -maxdepth 1 | read; then
