@@ -327,6 +327,14 @@ classify tok =
     ITprimstring        {} -> TkString
     ITprimint           {} -> TkNumber
     ITprimword          {} -> TkNumber
+    ITprimint8          {} -> TkNumber
+    ITprimint16         {} -> TkNumber
+    ITprimint32         {} -> TkNumber
+    ITprimint64         {} -> TkNumber
+    ITprimword8         {} -> TkNumber
+    ITprimword16        {} -> TkNumber
+    ITprimword32        {} -> TkNumber
+    ITprimword64        {} -> TkNumber
     ITprimfloat         {} -> TkNumber
     ITprimdouble        {} -> TkNumber
 
