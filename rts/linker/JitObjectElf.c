@@ -1,4 +1,11 @@
-#include "BufferBuilder.h"
+/*
+ * GDB JIT object interface
+ *
+ * This module is responsible for generating and registering dummy interface
+ * files with gdb for reporting symbols loaded by GHC's runtime linker.
+ */
+
+#include "Rts.h"
 #include "elf_compat.h"
 #include "linker/Elf.h"
 #include "JitObject.h"
@@ -7,99 +14,176 @@
 
 #include <string.h>
 
-#define TEXT_SECTION_IDX 1
+#define CC WSTR("clang")
 
-struct BufferBuilder build_jit_object(ObjectCode *oc)
+struct temp_file {
+    pathchar *path;
+    FILE *handle;
+};
+
+static struct temp_file create_temp_file(pathchar *prefix, pathchar *suffix)
 {
-    struct BufferBuilder bb = buffer_builder_new(4096);
-
-    // ELF header
-    Elf64_Ehdr ehdr = {
-        .e_ident = {
-            ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3,
-            ELFCLASS64,
-            ELFDATA2LSB,
-            EV_CURRENT,
-        },
-        .e_type = ET_REL,
-        .e_machine = EM_386,
-        .e_version = EV_CURRENT,
-        .e_entry = 0,
-        .e_phoff = 0,
-        .e_shoff = 0, // will be filled in later
-        .e_flags = 0,
-        .e_ehsize = sizeof(Elf64_Ehdr),
-        .e_phentsize = sizeof(Elf64_Phdr),
-        .e_phnum = 0,
-        .e_shentsize = sizeof(Elf64_Shdr),
-        .e_shnum = 2,
-        .e_shstrndx =  0,
-    };
-
-    Elf64_Ehdr *ehdr_ptr = buffer_builder_push_struct(&bb, ehdr);
-
-    // String table
-    struct BufferBuilder strings = buffer_builder_new(4096);
-    buffer_builder_uint8(&strings, 0);
-
-    // Section table
-    struct BufferBuilder shtab = buffer_builder_new(4096);
-    Elf64_Shdr shtab_zero_ent = {
-        .sh_name = 0,
-        .sh_type = SHT_NULL,
-        .sh_flags = 0,
-        .sh_addr = 0,
-        .sh_offset = 0,
-        .sh_size = 0,
-        .sh_link = SHN_UNDEF,
-        .sh_info = 0,
-        .sh_addralign = 0,
-        .sh_entsize = 0,
-    };
-    buffer_builder_push_struct(&shtab, shtab_zero_ent);
-
-    Elf64_Shdr shtab_text_ent = {
-        .sh_name = 1,
-        .sh_type = SHT_NULL,
-        .sh_flags = SHF_ALLOC | SHF_EXECINSTR,
-        .sh_addr = 0,
-        .sh_offset = 0, // will be filled in later
-        .sh_size = 0,
-        .sh_link = SHN_UNDEF,
-        .sh_info = 0,
-        .sh_addralign = 0,
-        .sh_entsize = 0,
-    };
-    buffer_builder_push_struct(&shtab, shtab_zero_ent);
-
-    // Symbol table
-    struct BufferBuilder symtab = buffer_builder_new(4096);
-    Elf64_Sym symtab_zero_ent = {
-        .st_name = 0,
-        .st_value = 0,
-        .st_size = 0,
-        .st_info = 0,
-        .st_other = 0,
-        .st_shndx = SHN_UNDEF,
-    };
-    buffer_builder_push_struct(&symtab, symtab_zero_ent);
-
-    for (int i=0; i < oc->n_symbols; i++) {
-        Symbol_t *sym = &oc->symbols[i];
-        size_t sym_name_offset = buffer_builder_filled_size(&strings);
-        buffer_builder_push(&strings, sym->name, strlen(sym->name)+1);
-
-        Elf64_Sym symtab_ent = {
-            .st_name = sym_name_offset,
-            .st_value = hi,
-            .st_size = 0,
-            .st_info = 0,
-            .st_other = 0,
-            .st_shndx = TEXT_SECTION_IDX,
-        };
-        buffer_builder_push_struct(&symtab, symtab_ent);
+#if defined(mingw32_HOST_OS)
+    // Windows doesn't have a sane temporary file interface that allows setting
+    // of a file suffix. Doing this correctly is quite tiresome so we instead
+    // use this hack since this is just a debugging facility.
+    GUID guid;
+    ZeroMemory(&guid, sizeof (guid));
+    if (CoCreateGuid(&guid) != S_OK) {
+        goto fail;
     }
 
-    return bb;
+    RPC_WSTR guid_str;
+    if (UuidToStringW ((UUID*)&guid, &guid_str) != S_OK) {
+        goto fail;
+    }
+
+    size_t path_len = pathlen(prefix) + pathlen(guid_str) + pathlen(suffix) + 1;
+    CHECK(path_len < MAX_PATH);
+    pathchar *path = stgMallocBytes(sizeof(pathchar) * path_len, "create_temp_file");
+    pathcopy(path, prefix);
+    pathcopy(path + pathlen(path), guid_str);
+    pathcopy(path + pathlen(path), suffix);
+
+    FILE *handle = pathopen(path, WSTR("w+"));
+    if (handle == NULL) {
+        debugBelch("build_asm: Failed to create temporary file handle: %s\n", strerror(errno));
+        goto fail;
+    }
+
+    return (struct temp_file) {
+        .path = path,
+        .handle = handle,
+    };
+#else
+    size_t path_len = strlen(prefix) + 6 + strlen(suffix) + 1;
+    char *path = stgMallocBytes(path_len, "create_temp_file");
+    snprintf(path, path_len, "%sXXXXXX%s", prefix, suffix);
+
+    int fd = mkstemp(path);
+    if (fd == -1) {
+        debugBelch("build_asm: Failed to create temporary file: %s\n", strerror(errno));
+        goto fail;
+    }
+
+    FILE *handle = fdopen(fd, "w+");
+    if (handle == NULL) {
+        debugBelch("build_asm: Failed to create temporary file handle: %s\n", strerror(errno));
+        goto fail;
+    }
+
+    return (struct temp_file) {
+        .path = path,
+        .handle = handle,
+    };
+#endif
+
+fail:
+    return (struct temp_file) {
+        .path = NULL,
+        .handle = NULL,
+    };
 }
 
+/* Returns path to assembler source file */
+static pathchar* build_asm(ObjectCode *oc)
+{
+    struct temp_file f = create_temp_file(WSTR("jit-object"), WSTR(".s"));
+    if (f.path == NULL) {
+        debugBelch("Failed to open JIT object source file: %s\n", strerror(errno));
+        return NULL;
+    }
+
+    //fprintf(f.handle, ".text\n");
+    for (int i=0; i < oc->n_symbols; i++) {
+        const Symbol_t *sym = &oc->symbols[i];
+        if (sym->name) {
+            fprintf(f.handle, ".global %s\n", sym->name);
+#if defined(OBJFORMAT_PEi386)
+            //fprintf(f.handle, ".def %s; .scl 2; .type 32; .endef\n", sym->name);
+#else
+            fprintf(f.handle, ".type %s, %%object\n", sym->name);
+#endif
+            fprintf(f.handle, ".set %s, 0x%" PRIxPTR "\n", sym->name, (uintptr_t) sym->addr);
+        }
+    }
+
+    fclose(f.handle);
+    return f.path;
+}
+
+static ssize_t get_file_size(FILE *f) {
+    long orig_off = ftell(f);
+    if (orig_off == -1) {
+        return -1;
+    }
+    if (fseek(f, 0L, SEEK_END) == -1) {
+        return -1;
+    }
+    long sz = ftell(f);
+    if (sz == -1) {
+        return -1;
+    }
+
+    if (fseek(f, 0L, SEEK_SET) == -1) {
+        return -1;
+    }
+    return sz;
+}
+
+struct JitObject build_jit_object(ObjectCode *oc)
+{
+    pathchar *s_path = build_asm(oc);
+    if (s_path == NULL) {
+        goto fail;
+    }
+
+    struct temp_file f = create_temp_file(WSTR("jit-object"), WSTR(".o"));
+    if (f.path == NULL) {
+        debugBelch("build_jit_object: Failed to create temporary file: %s\n", strerror(errno));
+        goto fail;
+    }
+
+    // Assemble it
+    const int sz = snprintf(NULL, 0, "%" PATH_FMT" -c %" PATH_FMT" -o %" PATH_FMT, CC, s_path, f.path);
+    char *cmdline = malloc(sz+1);
+    snprintf(cmdline, sz+1, "%" PATH_FMT " -c %" PATH_FMT " -o %" PATH_FMT, CC, s_path, f.path);
+    int ret = system(cmdline);
+    free(cmdline);
+    free(s_path);
+    free(f.path);
+    
+    if (ret != 0) {
+        debugBelch("Error assembling JIT object (exit code %d)\n", ret);
+        fclose(f.handle);
+        goto fail;
+    }
+
+    // Read the resulting object
+    ssize_t o_size = get_file_size(f.handle);
+    if (o_size == -1) {
+        debugBelch("Error reading JIT object: %s\n", strerror(errno));
+        goto fail;
+    } else if (o_size == 0) {
+        debugBelch("Assembler produced empty object\n");
+        goto fail;
+    }
+
+    uint8_t *buffer = stgMallocBytes(o_size, "build_jit_object");
+    if (fread(buffer, 1, o_size, f.handle) != (size_t) o_size) {
+        debugBelch("Error reading JIT object: %s\n", strerror(errno));
+        goto fail;
+    }
+    fclose(f.handle);
+
+    return (struct JitObject) {
+        .buffer = buffer,
+        .size = o_size,
+    };
+
+fail:
+    return (struct JitObject) {
+        .buffer = NULL,
+        .size = 0,
+    };
+}

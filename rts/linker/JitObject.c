@@ -1,4 +1,3 @@
-#include "BufferBuilder.h"
 #include "JitObject.h"
 #include "LinkerInternals.h"
 #include "RtsUtils.h"
@@ -46,13 +45,17 @@ struct jit_descriptor __jit_debug_descriptor = { 1, 0, 0, 0 };
 
 void register_jit_object(ObjectCode *oc)
 {
-    struct BufferBuilder buf = build_jit_object(oc);
+    struct JitObject obj = build_jit_object(oc);
+    if (obj.buffer == NULL) {
+        debugBelch("Failed to build JIT object for %s\n", OC_INFORMATIVE_FILENAME(oc));
+        return;
+    }
 
     struct jit_code_entry *code_entry = stgMallocBytes(sizeof(struct jit_code_entry), "register_jit_object");
     code_entry->next_entry = __jit_debug_descriptor.first_entry;
     code_entry->prev_entry = NULL;
-    code_entry->symfile_addr = (const char *) buf.buffer;
-    code_entry->symfile_size = buffer_builder_filled_size(&buf);
+    code_entry->symfile_addr = (const char *) obj.buffer;
+    code_entry->symfile_size = obj.size;
 
     __jit_debug_descriptor.action_flag = JIT_REGISTER_FN;
     __jit_debug_descriptor.first_entry = code_entry;

@@ -471,11 +471,8 @@ library
       asm-sources: StgCRunAsm.S
 
     -- gdb JIT object logic
-    if os(mingw32)
-      c-sources: linker/JitObjectCoff.c
-    else
-      if os(linux) || os(freebsd)
-        c-sources: linker/JitObjectElf.c
+    if os(linux) || os(freebsd)
+      c-sources: linker/JitObjectElf.c
 
     c-sources: Adjustor.c
                adjustor/AdjustorPool.c
@@ -555,7 +552,6 @@ library
                hooks/OnExit.c
                hooks/OutOfHeap.c
                hooks/StackOverflow.c
-               linker/BufferBuilder.c
                linker/CacheFlush.c
                linker/Elf.c
                linker/JitObject.c
