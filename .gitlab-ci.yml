@@ -556,6 +556,7 @@ source-tarball:
   rules:
     - if: $NIGHTLY
     - if: '$RELEASE_JOB == "yes"'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
 
 
 test-bootstrap:
@@ -589,6 +590,7 @@ test-bootstrap:
   rules:
     - if: $NIGHTLY
     - if: '$RELEASE_JOB == "yes"'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
 
 
 ############################################################
