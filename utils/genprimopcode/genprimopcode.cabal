@@ -17,6 +17,10 @@ Category: Development
 build-type: Simple
 cabal-version: 2.0
 
+Flag build-tool-depends
+    Description: Use build-tool-depends
+    Default: True
+
 Executable genprimopcode
     Default-Language: Haskell2010
     Main-Is: Main.hs
@@ -26,4 +30,5 @@ Executable genprimopcode
                    Syntax
     Build-Depends: base       >= 4   && < 5,
                    array
-    build-tool-depends: alex:alex >= 3.2.6, happy:happy >= 1.20.0
+    if flag(build-tool-depends)
+      build-tool-depends: alex:alex >= 3.2.6, happy:happy >= 1.20.0
