@@ -359,7 +359,7 @@ makeIdIdent i mn suffix0 mod = TxtI txt
 
     suffix = idTypeSuffix suffix0
     mns = maybe "" (('_':).show) mn
-    name = renderWithContext defaultSDocContext . ppr . localiseName . getName $ i
+    name = renderWithContext defaultSDocContext . pprNameUnqualified . getName $ i
 
 
 
