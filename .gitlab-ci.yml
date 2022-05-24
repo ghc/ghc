@@ -574,6 +574,9 @@ test-bootstrap:
     - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC --bootstrap-sources hadrian-bootstrap-sources-*.tar.gz
     - export HADRIAN_PATH="$PWD/_build/bin/hadrian"
     - .gitlab/ci.sh setup
+    # Bootstrapping should not depend on HAPPY or ALEX so set them to false
+    # so the build fails if they are invoked.
+    - export HAPPY=/bin/false; export ALEX=/bin/false
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_hadrian
     - .gitlab/ci.sh test_hadrian
