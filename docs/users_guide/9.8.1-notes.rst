@@ -6,6 +6,10 @@ Version 9.8.1
 Language
 ~~~~~~~~
 
+- There is a new extension :extension:`ExtendedLiterals`, which enables
+  sized primitive literals, e.g. ``123#Int8`` is a literal of type ``Int8#``.
+  See the GHC proposal `#451 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0451-sized-literals.rst>`_.
+
 Compiler
 ~~~~~~~~
 

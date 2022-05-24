@@ -194,6 +194,10 @@ $docsym    = [\| \^ \* \$]
 @exponent     = @numspc [eE] [\-\+]? @decimal
 @bin_exponent = @numspc [pP] [\-\+]? @decimal
 
+@binarylit      = 0[bB] @numspc @binary
+@octallit       = 0[oO] @numspc @octal
+@hexadecimallit = 0[xX] @numspc @hexadecimal
+
 @qual = (@conid \.)+
 @qvarid = @qual @varid
 @qconid = @qual @conid
@@ -517,15 +521,15 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 --
 <0> {
   -- Normal integral literals (:: Num a => a, from Integer)
-  @decimal                                                                   { tok_num positive 0 0 decimal }
-  0[bB] @numspc @binary                / { ifExtension BinaryLiteralsBit }   { tok_num positive 2 2 binary }
-  0[oO] @numspc @octal                                                       { tok_num positive 2 2 octal }
-  0[xX] @numspc @hexadecimal                                                 { tok_num positive 2 2 hexadecimal }
-  @negative @decimal                   / { negLitPred }                      { tok_num negative 1 1 decimal }
-  @negative 0[bB] @numspc @binary      / { negLitPred `alexAndPred`
-                                           ifExtension BinaryLiteralsBit }   { tok_num negative 3 3 binary }
-  @negative 0[oO] @numspc @octal       / { negLitPred }                      { tok_num negative 3 3 octal }
-  @negative 0[xX] @numspc @hexadecimal / { negLitPred }                      { tok_num negative 3 3 hexadecimal }
+  @decimal                                                      { tok_num positive 0 0 decimal }
+  @binarylit                / { ifExtension BinaryLiteralsBit } { tok_num positive 2 2 binary }
+  @octallit                                                     { tok_num positive 2 2 octal }
+  @hexadecimallit                                               { tok_num positive 2 2 hexadecimal }
+  @negative @decimal        / { negLitPred }                    { tok_num negative 1 1 decimal }
+  @negative @binarylit      / { negLitPred `alexAndPred`
+                                ifExtension BinaryLiteralsBit } { tok_num negative 3 3 binary }
+  @negative @octallit       / { negLitPred }                    { tok_num negative 3 3 octal }
+  @negative @hexadecimallit / { negLitPred }                    { tok_num negative 3 3 hexadecimal }
 
   -- Normal rational literals (:: Fractional a => a, from Rational)
   @floating_point                                                            { tok_frac 0 tok_float }
@@ -540,31 +544,116 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   -- Unboxed ints (:: Int#) and words (:: Word#)
   -- It's simpler (and faster?) to give separate cases to the negatives,
   -- especially considering octal/hexadecimal prefixes.
-  @decimal                          \# / { ifExtension MagicHashBit }        { tok_primint positive 0 1 decimal }
-  0[bB] @numspc @binary             \# / { ifExtension MagicHashBit `alexAndPred`
-                                           ifExtension BinaryLiteralsBit }   { tok_primint positive 2 3 binary }
-  0[oO] @numspc @octal              \# / { ifExtension MagicHashBit }        { tok_primint positive 2 3 octal }
-  0[xX] @numspc @hexadecimal        \# / { ifExtension MagicHashBit }        { tok_primint positive 2 3 hexadecimal }
-  @negative @decimal                \# / { negHashLitPred }                  { tok_primint negative 1 2 decimal }
-  @negative 0[bB] @numspc @binary   \# / { negHashLitPred `alexAndPred`
-                                           ifExtension BinaryLiteralsBit }   { tok_primint negative 3 4 binary }
-  @negative 0[oO] @numspc @octal    \# / { negHashLitPred }                  { tok_primint negative 3 4 octal }
-  @negative 0[xX] @numspc @hexadecimal \#
-                                       / { negHashLitPred }                  { tok_primint negative 3 4 hexadecimal }
+  @decimal                     \# / { ifExtension MagicHashBit }        { tok_primint positive 0 1 decimal }
+  @binarylit                   \# / { ifExtension MagicHashBit `alexAndPred`
+                                      ifExtension BinaryLiteralsBit }   { tok_primint positive 2 3 binary }
+  @octallit                    \# / { ifExtension MagicHashBit }        { tok_primint positive 2 3 octal }
+  @hexadecimallit              \# / { ifExtension MagicHashBit }        { tok_primint positive 2 3 hexadecimal }
+  @negative @decimal           \# / { negHashLitPred MagicHashBit }     { tok_primint negative 1 2 decimal }
+  @negative @binarylit         \# / { negHashLitPred MagicHashBit `alexAndPred`
+                                      ifExtension BinaryLiteralsBit }   { tok_primint negative 3 4 binary }
+  @negative @octallit          \# / { negHashLitPred MagicHashBit }     { tok_primint negative 3 4 octal }
+  @negative @hexadecimallit    \# / { negHashLitPred MagicHashBit }     { tok_primint negative 3 4 hexadecimal }
 
-  @decimal                       \# \# / { ifExtension MagicHashBit }        { tok_primword 0 2 decimal }
-  0[bB] @numspc @binary          \# \# / { ifExtension MagicHashBit `alexAndPred`
-                                           ifExtension BinaryLiteralsBit }   { tok_primword 2 4 binary }
-  0[oO] @numspc @octal           \# \# / { ifExtension MagicHashBit }        { tok_primword 2 4 octal }
-  0[xX] @numspc @hexadecimal     \# \# / { ifExtension MagicHashBit }        { tok_primword 2 4 hexadecimal }
+  @decimal                  \# \# / { ifExtension MagicHashBit }        { tok_primword 0 2 decimal }
+  @binarylit                \# \# / { ifExtension MagicHashBit `alexAndPred`
+                                      ifExtension BinaryLiteralsBit }   { tok_primword 2 4 binary }
+  @octallit                 \# \# / { ifExtension MagicHashBit }        { tok_primword 2 4 octal }
+  @hexadecimallit           \# \# / { ifExtension MagicHashBit }        { tok_primword 2 4 hexadecimal }
 
   -- Unboxed floats and doubles (:: Float#, :: Double#)
   -- prim_{float,double} work with signed literals
   @floating_point                  \# / { ifExtension MagicHashBit }        { tok_frac 1 tok_primfloat }
   @floating_point               \# \# / { ifExtension MagicHashBit }        { tok_frac 2 tok_primdouble }
 
-  @negative @floating_point        \# / { negHashLitPred }                  { tok_frac 1 tok_primfloat }
-  @negative @floating_point     \# \# / { negHashLitPred }                  { tok_frac 2 tok_primdouble }
+  @negative @floating_point        \# / { negHashLitPred MagicHashBit }     { tok_frac 1 tok_primfloat }
+  @negative @floating_point     \# \# / { negHashLitPred MagicHashBit }     { tok_frac 2 tok_primdouble }
+
+  @decimal                  \#"Int8"   / { ifExtension ExtendedLiteralsBit } { tok_primint8 positive 0 decimal }
+  @binarylit                \#"Int8"   / { ifExtension ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primint8 positive 2 binary }
+  @octallit                 \#"Int8"   / { ifExtension ExtendedLiteralsBit } { tok_primint8 positive 2 octal }
+  @hexadecimallit           \#"Int8"   / { ifExtension ExtendedLiteralsBit } { tok_primint8 positive 2 hexadecimal }
+  @negative @decimal        \#"Int8"   / { negHashLitPred ExtendedLiteralsBit } { tok_primint8 negative 1 decimal }
+  @negative @binarylit      \#"Int8"   / { negHashLitPred ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primint8 negative 3 binary }
+  @negative @octallit       \#"Int8"   / { negHashLitPred ExtendedLiteralsBit } { tok_primint8 negative 3 octal }
+  @negative @hexadecimallit \#"Int8"   / { negHashLitPred ExtendedLiteralsBit } { tok_primint8 negative 3 hexadecimal }
+
+  @decimal                  \#"Int16"  / { ifExtension ExtendedLiteralsBit } { tok_primint16 positive 0 decimal }
+  @binarylit                \#"Int16"  / { ifExtension ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primint16 positive 2 binary }
+  @octallit                 \#"Int16"  / { ifExtension ExtendedLiteralsBit } { tok_primint16 positive 2 octal }
+  @hexadecimallit           \#"Int16"  / { ifExtension ExtendedLiteralsBit } { tok_primint16 positive 2 hexadecimal }
+  @negative @decimal        \#"Int16"  / { negHashLitPred ExtendedLiteralsBit} { tok_primint16 negative 1 decimal }
+  @negative @binarylit      \#"Int16"  / { negHashLitPred ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primint16 negative 3 binary }
+  @negative @octallit       \#"Int16"  / { negHashLitPred ExtendedLiteralsBit} { tok_primint16 negative 3 octal }
+  @negative @hexadecimallit \#"Int16"  / { negHashLitPred ExtendedLiteralsBit} { tok_primint16 negative 3 hexadecimal }
+
+  @decimal                  \#"Int32"  / { ifExtension ExtendedLiteralsBit } { tok_primint32 positive 0 decimal }
+  @binarylit                \#"Int32"  / { ifExtension ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primint32 positive 2 binary }
+  @octallit                 \#"Int32"  / { ifExtension ExtendedLiteralsBit } { tok_primint32 positive 2 octal }
+  @hexadecimallit           \#"Int32"  / { ifExtension ExtendedLiteralsBit } { tok_primint32 positive 2 hexadecimal }
+  @negative @decimal        \#"Int32"  / { negHashLitPred ExtendedLiteralsBit } { tok_primint32 negative 1 decimal }
+  @negative @binarylit      \#"Int32"  / { negHashLitPred ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primint32 negative 3 binary }
+  @negative @octallit       \#"Int32"  / { negHashLitPred ExtendedLiteralsBit} { tok_primint32 negative 3 octal }
+  @negative @hexadecimallit \#"Int32"  / { negHashLitPred ExtendedLiteralsBit} { tok_primint32 negative 3 hexadecimal }
+
+  @decimal                  \#"Int64"  / { ifExtension ExtendedLiteralsBit } { tok_primint64 positive 0 decimal }
+  @binarylit                \#"Int64"  / { ifExtension ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primint64 positive 2 binary }
+  @octallit                 \#"Int64"  / { ifExtension ExtendedLiteralsBit } { tok_primint64 positive 2 octal }
+  @hexadecimallit           \#"Int64"  / { ifExtension ExtendedLiteralsBit } { tok_primint64 positive 2 hexadecimal }
+  @negative @decimal        \#"Int64"  / { negHashLitPred ExtendedLiteralsBit } { tok_primint64 negative 1 decimal }
+  @negative @binarylit      \#"Int64"  / { negHashLitPred ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primint64 negative 3 binary }
+  @negative @octallit       \#"Int64"  / { negHashLitPred ExtendedLiteralsBit } { tok_primint64 negative 3 octal }
+  @negative @hexadecimallit \#"Int64"  / { negHashLitPred ExtendedLiteralsBit } { tok_primint64 negative 3 hexadecimal }
+
+  @decimal                  \#"Int"    / { ifExtension ExtendedLiteralsBit } { tok_primint positive 0 4 decimal }
+  @binarylit                \#"Int"    / { ifExtension ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primint positive 2 6 binary }
+  @octallit                 \#"Int"    / { ifExtension ExtendedLiteralsBit } { tok_primint positive 2 6 octal }
+  @hexadecimallit           \#"Int"    / { ifExtension ExtendedLiteralsBit } { tok_primint positive 2 6 hexadecimal }
+  @negative @decimal        \#"Int"    / { negHashLitPred ExtendedLiteralsBit } { tok_primint negative 1 5 decimal }
+  @negative @binarylit      \#"Int"    / { negHashLitPred ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primint negative 3 7 binary }
+  @negative @octallit       \#"Int"    / { negHashLitPred ExtendedLiteralsBit } { tok_primint negative 3 7 octal }
+  @negative @hexadecimallit \#"Int"    / { negHashLitPred ExtendedLiteralsBit } { tok_primint negative 3 7 hexadecimal }
+
+  @decimal                  \#"Word8"  / { ifExtension ExtendedLiteralsBit } { tok_primword8 0 decimal }
+  @binarylit                \#"Word8"  / { ifExtension ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primword8 2 binary }
+  @octallit                 \#"Word8"  / { ifExtension ExtendedLiteralsBit } { tok_primword8 2 octal }
+  @hexadecimallit           \#"Word8"  / { ifExtension ExtendedLiteralsBit } { tok_primword8 2 hexadecimal }
+
+  @decimal                  \#"Word16" / { ifExtension ExtendedLiteralsBit } { tok_primword16 0 decimal }
+  @binarylit                \#"Word16" / { ifExtension ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primword16 2 binary }
+  @octallit                 \#"Word16" / { ifExtension ExtendedLiteralsBit } { tok_primword16 2 octal }
+  @hexadecimallit           \#"Word16" / { ifExtension ExtendedLiteralsBit } { tok_primword16 2 hexadecimal }
+
+  @decimal                  \#"Word32" / { ifExtension ExtendedLiteralsBit } { tok_primword32 0 decimal }
+  @binarylit                \#"Word32" / { ifExtension ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primword32 2 binary }
+  @octallit                 \#"Word32" / { ifExtension ExtendedLiteralsBit } { tok_primword32 2 octal }
+  @hexadecimallit           \#"Word32" / { ifExtension ExtendedLiteralsBit } { tok_primword32 2 hexadecimal }
+
+  @decimal                  \#"Word64" / { ifExtension ExtendedLiteralsBit } { tok_primword64 0 decimal }
+  @binarylit                \#"Word64" / { ifExtension ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primword64 2 binary }
+  @octallit                 \#"Word64" / { ifExtension ExtendedLiteralsBit } { tok_primword64 2 octal }
+  @hexadecimallit           \#"Word64" / { ifExtension ExtendedLiteralsBit } { tok_primword64 2 hexadecimal }
+
+  @decimal                  \#"Word"   / { ifExtension ExtendedLiteralsBit } { tok_primword 0 5 decimal }
+  @binarylit                \#"Word"   / { ifExtension ExtendedLiteralsBit `alexAndPred`
+                                           ifExtension BinaryLiteralsBit }   { tok_primword 2 7 binary }
+  @octallit                 \#"Word"   / { ifExtension ExtendedLiteralsBit } { tok_primword 2 7 octal }
+  @hexadecimallit           \#"Word"   / { ifExtension ExtendedLiteralsBit } { tok_primword 2 7 hexadecimal }
+
 }
 
 -- Strings and chars are lexed by hand-written code.  The reason is
@@ -866,6 +955,14 @@ data Token
   | ITprimstring SourceText ByteString -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITprimint    SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITprimword   SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITprimint8   SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITprimint16  SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITprimint32  SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITprimint64  SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITprimword8  SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITprimword16 SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITprimword32 SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITprimword64 SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITprimfloat  FractionalLit
   | ITprimdouble FractionalLit
 
@@ -1281,10 +1378,10 @@ negLitPred =
       alexNotPred precededByClosingToken
 
 -- Check if we should parse an unboxed negative literal (e.g. -123#) as a single token.
-negHashLitPred :: AlexAccPred ExtsBitmap
-negHashLitPred = prefix_minus `alexAndPred` magic_hash
+negHashLitPred :: ExtBits -> AlexAccPred ExtsBitmap
+negHashLitPred ext = prefix_minus `alexAndPred` magic_hash
   where
-    magic_hash = ifExtension MagicHashBit
+    magic_hash = ifExtension ext -- Either MagicHashBit or ExtendedLiteralsBit
     prefix_minus =
       -- Note [prefix_minus in negLitPred and negHashLitPred]
       alexNotPred precededByClosingToken
@@ -1828,6 +1925,40 @@ decimal = (10,octDecDigit)
 binary = (2,octDecDigit)
 octal = (8,octDecDigit)
 hexadecimal = (16,hexDigit)
+
+-- | Helper for defining @IntX@ primitive literal parsers (specifically for
+--   the ExtendedLiterals extension, such as @123#Int8@).
+tok_primintX :: (SourceText -> Integer -> Token)
+             -> Int
+             -> (Integer -> Integer)
+             -> Int
+             -> (Integer, (Char->Int)) -> Action
+tok_primintX itint addlen transint transbuf =
+    tok_integral itint transint transbuf (transbuf+addlen)
+
+tok_primint8,     tok_primint16,  tok_primint32,  tok_primint64
+    :: (Integer -> Integer)
+    -> Int -> (Integer, (Char->Int)) -> Action
+tok_primint8  = tok_primintX ITprimint8   5
+tok_primint16 = tok_primintX ITprimint16  6
+tok_primint32 = tok_primintX ITprimint32  6
+tok_primint64 = tok_primintX ITprimint64  6
+
+-- | Helper for defining @WordX@ primitive literal parsers (specifically for
+--   the ExtendedLiterals extension, such as @234#Word8@).
+tok_primwordX :: (SourceText -> Integer -> Token)
+              -> Int
+              -> Int
+              -> (Integer, (Char->Int)) -> Action
+tok_primwordX itint addlen transbuf =
+    tok_integral itint positive transbuf (transbuf+addlen)
+
+tok_primword8, tok_primword16, tok_primword32, tok_primword64
+    :: Int -> (Integer, (Char->Int)) -> Action
+tok_primword8  = tok_primwordX ITprimword8  6
+tok_primword16 = tok_primwordX ITprimword16 7
+tok_primword32 = tok_primwordX ITprimword32 7
+tok_primword64 = tok_primwordX ITprimword64 7
 
 -- readSignificandExponentPair can understand negative rationals, exponents, everything.
 tok_frac :: Int -> (String -> Token) -> Action
@@ -2903,6 +3034,7 @@ data ExtBits
   | NoLexicalNegationBit   -- See Note [Why not LexicalNegationBit]
   | OverloadedRecordDotBit
   | OverloadedRecordUpdateBit
+  | ExtendedLiteralsBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2982,6 +3114,7 @@ mkParserOpts extensionFlags diag_opts supported
       .|. NoLexicalNegationBit        `xoptNotBit` LangExt.LexicalNegation -- See Note [Why not LexicalNegationBit]
       .|. OverloadedRecordDotBit      `xoptBit` LangExt.OverloadedRecordDot
       .|. OverloadedRecordUpdateBit   `xoptBit` LangExt.OverloadedRecordUpdate  -- Enable testing via 'getBit OverloadedRecordUpdateBit' in the parser (RecordDotSyntax parsing uses that information).
+      .|. ExtendedLiteralsBit         `xoptBit` LangExt.ExtendedLiterals
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream

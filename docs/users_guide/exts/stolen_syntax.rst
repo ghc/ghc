@@ -80,6 +80,9 @@ The following syntax is stolen:
 ⟨varid⟩, ``#``\ ⟨char⟩, ``#``, ⟨string⟩, ``#``, ⟨integer⟩, ``#``, ⟨float⟩, ``#``, ⟨float⟩, ``##``
     Stolen by: :extension:`MagicHash`
 
+⟨integer⟩, ``#(Int|Word)(8|16|32|64)?``
+    Stolen by: :extension:`ExtendedLiterals`
+
 ``(#``, ``#)``
     Stolen by: :extension:`UnboxedTuples`
 

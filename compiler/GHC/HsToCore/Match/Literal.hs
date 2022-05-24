@@ -106,7 +106,13 @@ dsLit l = do
     HsCharPrim   _ c -> return (Lit (LitChar c))
     HsIntPrim    _ i -> return (Lit (mkLitIntWrap platform i))
     HsWordPrim   _ w -> return (Lit (mkLitWordWrap platform w))
+    HsInt8Prim   _ i -> return (Lit (mkLitInt8Wrap i))
+    HsInt16Prim  _ i -> return (Lit (mkLitInt16Wrap i))
+    HsInt32Prim  _ i -> return (Lit (mkLitInt32Wrap i))
     HsInt64Prim  _ i -> return (Lit (mkLitInt64Wrap i))
+    HsWord8Prim  _ w -> return (Lit (mkLitWord8Wrap w))
+    HsWord16Prim _ w -> return (Lit (mkLitWord16Wrap w))
+    HsWord32Prim _ w -> return (Lit (mkLitWord32Wrap w))
     HsWord64Prim _ w -> return (Lit (mkLitWord64Wrap w))
 
     -- This can be slow for very large literals. See Note [FractionalLit representation]
@@ -455,10 +461,23 @@ getSimpleIntegralLit :: HsLit GhcTc -> Maybe (Integer, Type)
 getSimpleIntegralLit (HsInt _ IL{ il_value = i }) = Just (i, intTy)
 getSimpleIntegralLit (HsIntPrim _ i)    = Just (i, intPrimTy)
 getSimpleIntegralLit (HsWordPrim _ i)   = Just (i, wordPrimTy)
+getSimpleIntegralLit (HsInt8Prim _ i)   = Just (i, int8PrimTy)
+getSimpleIntegralLit (HsInt16Prim _ i)  = Just (i, int16PrimTy)
+getSimpleIntegralLit (HsInt32Prim _ i)  = Just (i, int32PrimTy)
 getSimpleIntegralLit (HsInt64Prim _ i)  = Just (i, int64PrimTy)
+getSimpleIntegralLit (HsWord8Prim _ i)  = Just (i, word8PrimTy)
+getSimpleIntegralLit (HsWord16Prim _ i) = Just (i, word16PrimTy)
+getSimpleIntegralLit (HsWord32Prim _ i) = Just (i, word32PrimTy)
 getSimpleIntegralLit (HsWord64Prim _ i) = Just (i, word64PrimTy)
 getSimpleIntegralLit (HsInteger _ i ty) = Just (i, ty)
-getSimpleIntegralLit _ = Nothing
+
+getSimpleIntegralLit HsChar{}           = Nothing
+getSimpleIntegralLit HsCharPrim{}       = Nothing
+getSimpleIntegralLit HsString{}         = Nothing
+getSimpleIntegralLit HsStringPrim{}     = Nothing
+getSimpleIntegralLit HsRat{}            = Nothing
+getSimpleIntegralLit HsFloatPrim{}      = Nothing
+getSimpleIntegralLit HsDoublePrim{}     = Nothing
 
 -- | Extract the Char if the expression is a Char literal.
 getLHsCharLit :: LHsExpr GhcTc -> Maybe Char
@@ -638,7 +657,13 @@ hsLitKey :: Platform -> HsLit GhcTc -> Literal
 -- HsLit does not.
 hsLitKey platform (HsIntPrim    _ i)  = mkLitIntWrap  platform i
 hsLitKey platform (HsWordPrim   _ w)  = mkLitWordWrap platform w
+hsLitKey _        (HsInt8Prim   _ i)  = mkLitInt8Wrap   i
+hsLitKey _        (HsInt16Prim  _ i)  = mkLitInt16Wrap  i
+hsLitKey _        (HsInt32Prim  _ i)  = mkLitInt32Wrap  i
 hsLitKey _        (HsInt64Prim  _ i)  = mkLitInt64Wrap  i
+hsLitKey _        (HsWord8Prim  _ w)  = mkLitWord8Wrap  w
+hsLitKey _        (HsWord16Prim _ w)  = mkLitWord16Wrap w
+hsLitKey _        (HsWord32Prim _ w)  = mkLitWord32Wrap w
 hsLitKey _        (HsWord64Prim _ w)  = mkLitWord64Wrap w
 hsLitKey _        (HsCharPrim   _ c)  = mkLitChar            c
 -- This following two can be slow. See Note [FractionalLit representation]

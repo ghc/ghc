@@ -19,6 +19,9 @@ your program, you must first import ``GHC.Exts`` to bring them into
 scope. Many of them have names ending in ``#``, and to mention such names
 you need the :extension:`MagicHash` extension.
 
+To enable defining literals for other primitive data types, see the
+:extension:`ExtendedLiterals` extension.
+
 The primops make extensive use of `unboxed types <#glasgow-unboxed>`__
 and `unboxed tuples <#unboxed-tuples>`__, which we briefly summarise
 here.
