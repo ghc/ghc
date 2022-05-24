@@ -12,6 +12,10 @@ Category: Development
 build-type: Simple
 cabal-version: 2.0
 
+Flag build-tool-depends
+    Description: Use build-tool-depends
+    Default: True
+
 Executable hpc
     Default-Language: Haskell2010
     Main-Is: Main.hs
@@ -36,4 +40,5 @@ Executable hpc
                    array      >= 0.1 && < 0.6,
                    hpc        >= 0.6.1 && < 0.7
 
-    build-tool-depends: happy:happy >= 1.20.0
+    if flag(build-tool-depends)
+      build-tool-depends: happy:happy >= 1.20.0
