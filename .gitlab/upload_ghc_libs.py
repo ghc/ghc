@@ -115,17 +115,13 @@ def prepare_sdist(pkg: Package):
     res_path = shutil.copy(sdist, OUT_DIR)
     return os.path.relpath(res_path, OUT_DIR)
 
-def upload_pkg_sdist(sdist : Path, pkg : Package):
-    stamp = WORK_DIR / f'{pkg.name}-sdist'
+def upload_pkg_sdist(sdist : Path, pkg : Package, publish : bool):
+    publish_tag = '-publish' if publish else ''
+    stamp = WORK_DIR / f'{pkg.name}-sdist{publish_tag}'
     if stamp.is_file():
         return
     print(f'Uploading package {pkg.name}...')
     cabal_upload(sdist)
-
-    print()
-    print('Check over candidate on Hackage and press enter when ready...')
-    input()
-    cabal_upload(sdist, publish=True)
     stamp.write_text('')
 
 def get_version(cabal_file: Path) -> Optional[str]:
@@ -152,19 +148,20 @@ def prepare_docs(bindist: Path, pkg: Package):
     run(['tar', '-czf', OUT_DIR / tarball, '-H', 'ustar', '-C', tmp.name, stem])
     return tarball
 
-def upload_docs(tarball : Path, pkg : Package):
-    stamp = WORK_DIR / f'{pkg.name}-docs'
+def upload_docs(tarball : Path, pkg : Package, publish : bool):
+    publish_tag = '-publish' if publish else ''
+    stamp = WORK_DIR / f'{pkg.name}-docs{publish_tag}'
     if stamp.is_file():
         return
     # Upload the documentation tarball
     print(f'Uploading documentation for {pkg.name}...')
-    cabal_upload(tarball, publish=True, extra_args=['--documentation'])
+    cabal_upload(tarball, publish=publish, extra_args=['--documentation'])
     stamp.write_text('')
 
-def upload_pkg(pkg: Package, d : Path, meta):
+def upload_pkg(pkg: Package, d : Path, meta, publish : bool):
     print(f'Uploading {pkg.name}...')
-    upload_pkg_sdist(d / meta['sdist'], pkg)
-    upload_docs(d / meta['docs'], pkg)
+    upload_pkg_sdist(d / meta['sdist'], pkg, publish=publish)
+    upload_docs(d / meta['docs'], pkg, publish=publish)
 
 def prepare_pkg(bindist : Path, pkg : Package):
     if pkg.path.exists():
@@ -189,19 +186,20 @@ def main() -> None:
 
     parser_prepare = subparsers.add_parser('prepare')
     parser_prepare.add_argument('--bindist', required=True, type=Path, help='extracted binary distribution')
+
     parser_upload = subparsers.add_parser('upload')
     parser_upload.add_argument('--docs', required = True, type=Path, help='folder created by --prepare')
+    parser_upload.add_argument('--publish', action='store_true', help='Publish Hackage packages instead of just uploading candidates')
     args = parser.parse_args()
 
     pkgs = args.pkg
-    if pkgs == []:
-        pkgs = PACKAGES.keys()
-
     for pkg_name in pkgs:
         assert pkg_name in PACKAGES
 
-
     if args.command == "prepare":
+        if pkgs == []:
+            pkgs = PACKAGES.keys()
+
         manifest = {}
         for pkg_name in pkgs:
             print(pkg_name)
@@ -217,8 +215,9 @@ def main() -> None:
         with open(manifest_path / 'manifest.pickle', 'rb') as fin:
             manifest = pickle.load(fin)
         for pkg, item in manifest.items():
-            print(pkg, item)
-            upload_pkg(pkg, manifest_path, item)
+            if pkgs != [] and pkg.name in pkgs:
+                print(pkg, item)
+                upload_pkg(pkg, manifest_path, item, publish=args.publish)
 
 if __name__ == '__main__':
     main()
