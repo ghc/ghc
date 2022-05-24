@@ -213,16 +213,19 @@ soeZapSubst :: SimpleOptEnv -> SimpleOptEnv
 soeZapSubst env@(SOE { soe_subst = subst })
   = env { soe_inl = emptyVarEnv, soe_subst = zapSubstEnv subst }
 
-soeSetInScope :: SimpleOptEnv -> SimpleOptEnv -> SimpleOptEnv
--- Take in-scope set from env1, and the rest from env2
-soeSetInScope (SOE { soe_subst = subst1 })
-              env2@(SOE { soe_subst = subst2 })
-  = env2 { soe_subst = setInScope subst2 (substInScope subst1) }
+soeInScope :: SimpleOptEnv -> InScopeSet
+soeInScope (SOE { soe_subst = subst }) = substInScope subst
+
+soeSetInScope :: InScopeSet -> SimpleOptEnv -> SimpleOptEnv
+soeSetInScope in_scope env2@(SOE { soe_subst = subst2 })
+  = env2 { soe_subst = setInScope subst2 in_scope }
 
 ---------------
-simple_opt_clo :: SimpleOptEnv -> SimpleClo -> OutExpr
-simple_opt_clo env (e_env, e)
-  = simple_opt_expr (soeSetInScope env e_env) e
+simple_opt_clo :: InScopeSet
+               -> SimpleClo
+               -> OutExpr
+simple_opt_clo in_scope (e_env, e)
+  = simple_opt_expr (soeSetInScope in_scope e_env) e
 
 simple_opt_expr :: HasCallStack => SimpleOptEnv -> InExpr -> OutExpr
 simple_opt_expr env expr
@@ -235,7 +238,7 @@ simple_opt_expr env expr
     ---------------
     go (Var v)
        | Just clo <- lookupVarEnv (soe_inl env) v
-       = simple_opt_clo env clo
+       = simple_opt_clo in_scope clo
        | otherwise
        = lookupIdSubst (soe_subst env) v
 
@@ -316,12 +319,12 @@ simple_app :: HasDebugCallStack => SimpleOptEnv -> InExpr -> [SimpleClo] -> Core
 
 simple_app env (Var v) as
   | Just (env', e) <- lookupVarEnv (soe_inl env) v
-  = simple_app (soeSetInScope env env') e as
+  = simple_app (soeSetInScope (soeInScope env) env') e as
 
   | let unf = idUnfolding v
   , isCompulsoryUnfolding (idUnfolding v)
   , isAlwaysActive (idInlineActivation v)
-    -- See Note [Unfold compulsory unfoldings in LHSs]
+    -- See Note [Unfold compulsory unfoldings in RULE LHSs]
   = simple_app (soeZapSubst env) (unfoldingTemplate unf) as
 
   | otherwise
@@ -348,7 +351,7 @@ simple_app env e@(Lam {}) as@(_:_)
         needsCaseBinding (idType b') (snd a)
         -- This arg must not be inlined (side-effects) and cannot be let-bound,
         -- due to the let-can-float invariant. So simply case-bind it here.
-      , let a' = simple_opt_clo env a
+      , let a' = simple_opt_clo (soeInScope env) a
       = mkDefaultCase a' b' $ do_beta env' body as
 
       | (env'', mb_pr) <- simple_bind_pair env' b (Just b') a NotTopLevel
@@ -384,10 +387,18 @@ simple_app env e as
   = finish_app env (simple_opt_expr env e) as
 
 finish_app :: SimpleOptEnv -> OutExpr -> [SimpleClo] -> OutExpr
-finish_app _ fun []
-  = fun
-finish_app env fun (arg:args)
-  = finish_app env (App fun (simple_opt_clo env arg)) args
+-- See Note [Eliminate casts in function position]
+finish_app env (Cast (Lam x e) co) as@(_:_)
+  | not (isTyVar x) && not (isCoVar x)
+  , assert (not $ x `elemVarSet` tyCoVarsOfCo co) True
+  , Just (x',e') <- pushCoercionIntoLambda (soeInScope env) x e co
+  = simple_app (soeZapSubst env) (Lam x' e') as
+
+finish_app env fun args
+  = foldl mk_app fun args
+  where
+    in_scope = soeInScope env
+    mk_app fun arg = App fun (simple_opt_clo in_scope arg)
 
 ----------------------
 simple_opt_bind :: SimpleOptEnv -> InBind -> TopLevelFlag
@@ -449,16 +460,17 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
     stable_unf = isStableUnfolding (idUnfolding in_bndr)
     active     = isAlwaysActive (idInlineActivation in_bndr)
     occ        = idOccInfo in_bndr
+    in_scope   = substInScope subst
 
     out_rhs | Just join_arity <- isJoinId_maybe in_bndr
             = simple_join_rhs join_arity
             | otherwise
-            = simple_opt_clo env clo
+            = simple_opt_clo in_scope clo
 
     simple_join_rhs join_arity -- See Note [Preserve join-binding arity]
       = mkLams join_bndrs' (simple_opt_expr env_body join_body)
       where
-        env0 = soeSetInScope env rhs_env
+        env0 = soeSetInScope in_scope rhs_env
         (join_bndrs, join_body) = collectNBinders join_arity in_rhs
         (env_body, join_bndrs') = subst_opt_bndrs env0 join_bndrs
 
@@ -553,6 +565,53 @@ trivial ones.  But we do here!  Why?  In the simple optimiser
 Those differences obviate the reasons for not inlining a trivial rhs,
 and increase the benefit for doing so.  So we unconditionally inline trivial
 rhss here.
+
+Note [Eliminate casts in function position]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following program:
+
+  type R :: Type -> RuntimeRep
+  type family R a where { R Float = FloatRep; R Double = DoubleRep }
+  type F :: forall (a :: Type) -> TYPE (R a)
+  type family F a where { F Float = Float#  ; F Double = Double# }
+
+  type N :: forall (a :: Type) -> TYPE (R a)
+  newtype N a = MkN (F a)
+
+As MkN is a newtype, its unfolding is a lambda which wraps its argument
+in a cast:
+
+  MkN :: forall (a :: Type). F a -> N a
+  MkN = /\a \(x::F a). x |> co_ax
+    -- recall that F a :: TYPE (R a)
+
+This is a representation-polymorphic lambda, in which the binder has an unknown
+representation (R a). We can't compile such a lambda on its own, but we can
+compile instantiations, such as `MkN @Float` or `MkN @Double`.
+
+Our strategy to avoid running afoul of the representation-polymorphism
+invariants of Note [Representation polymorphism invariants] in GHC.Core is thus:
+
+  1. Give the newtype a compulsory unfolding (it has no binding, as we can't
+     define lambdas with representation-polymorphic value binders in source Haskell).
+  2. Rely on the optimiser to beta-reduce away any representation-polymorphic
+     value binders.
+
+For example, consider the application
+
+    MkN @Float 34.0#
+
+After inlining MkN we'll get
+
+   ((/\a \(x:F a). x |> co_ax) @Float) |> co 34#
+
+where co :: (F Float -> N Float) ~ (Float# ~ N Float)
+
+But to actually beta-reduce that lambda, we need to push the 'co'
+inside the `\x` with pushCoecionIntoLambda.  Hence the extra
+equation for Cast-of-Lam in finish_app.
+
+This is regrettably delicate.
 
 Note [Preserve join-binding arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -717,8 +776,8 @@ we don't know what phase we're in.  Here's an example
 When inlining 'foo' in 'bar' we want the let-binding for 'inner'
 to remain visible until Phase 1
 
-Note [Unfold compulsory unfoldings in LHSs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Unfold compulsory unfoldings in RULE LHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When the user writes `RULES map coerce = coerce` as a rule, the rule
 will only ever match if simpleOptExpr replaces coerce by its unfolding
 on the LHS, because that is the core that the rule matching engine
@@ -999,7 +1058,7 @@ Now we are optimising
    case $WMkT (I# 3) |> sym axT of I# y -> ...
 we clearly want to simplify this. If $WMkT did not have a compulsory
 unfolding, we would end up with
-   let a = I#3 in case a of I# y -> ...
+   let a = I# 3 in case a of I# y -> ...
 because in general, we do this on-the-fly beta-reduction
    (\x. e) blah  -->  let x = blah in e
 and then float the let.  (Substitution would risk duplicating 'blah'.)
