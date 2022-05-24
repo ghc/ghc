@@ -960,6 +960,8 @@ machOps = listToUFM $
         ( "eq",         MO_Eq ),
         ( "ne",         MO_Ne ),
         ( "mul",        MO_Mul ),
+        ( "mulmayoflo",  MO_S_MulMayOflo ),
+        ( "mulmayoflou", MO_U_MulMayOflo ),
         ( "neg",        MO_S_Neg ),
         ( "quot",       MO_S_Quot ),
         ( "rem",        MO_S_Rem ),
