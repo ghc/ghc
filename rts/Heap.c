@@ -224,13 +224,18 @@ StgWord collect_pointers(StgClosure *closure, StgClosure *ptrs[]) {
             ptrs[nptrs++] = (StgClosure *)((StgTSO *)closure)->bq;
 
             break;
-        case WEAK:
-            ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->cfinalizers;
-            ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->key;
-            ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->value;
-            ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->finalizer;
-            ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->link;
+        case WEAK: {
+            StgWeak *w = (StgWeak *)closure;
+            ptrs[nptrs++] = (StgClosure *) w->cfinalizers;
+            ptrs[nptrs++] = (StgClosure *) w->key;
+            ptrs[nptrs++] = (StgClosure *) w->value;
+            ptrs[nptrs++] = (StgClosure *) w->finalizer;
+            // link may be NULL which is not a valid GC pointer
+            if (w->link) {
+                ptrs[nptrs++] = (StgClosure *) w->link;
+            }
             break;
+        }
 
         default:
             fprintf(stderr,"closurePtrs: Cannot handle type %s yet\n",

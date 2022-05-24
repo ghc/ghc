@@ -155,7 +155,7 @@ exWeakClosure = WeakClosure
     , key = asBox []
     , value = asBox []
     , finalizer = asBox []
-    , link = asBox []
+    , weakLink = Nothing
     }
 
 exIntClosure :: Closure
