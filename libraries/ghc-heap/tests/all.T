@@ -52,5 +52,5 @@ test('parse_tso_flags',
      ],
      compile_and_run, [''])
 test('T21622',
-     [expect_broken(21622), only_ways(['normal'])],
+     only_ways(['normal']),
      compile_and_run, [''])

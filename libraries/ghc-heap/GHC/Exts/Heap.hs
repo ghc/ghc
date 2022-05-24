@@ -338,14 +338,17 @@ getClosureDataFromHeapRepPrim getConDesc decodeCCS itbl heapRep pts = do
 
         --  pure $ OtherClosure itbl pts rawHeapWords
         --
-        WEAK ->
+        WEAK -> do
             pure $ WeakClosure
                 { info = itbl
                 , cfinalizers = pts !! 0
                 , key = pts !! 1
                 , value = pts !! 2
                 , finalizer = pts !! 3
-                , link = pts !! 4
+                , weakLink = case drop 4 pts of
+                           []  -> Nothing
+                           [p] -> Just p
+                           _   -> error $ "Expected 4 or 5 words in WEAK, found " ++ show (length pts)
                 }
         TSO | [ u_lnk, u_gbl_lnk, tso_stack, u_trec, u_blk_ex, u_bq] <- pts
                 -> withArray rawHeapWords (\ptr -> do
