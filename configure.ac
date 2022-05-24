@@ -226,8 +226,12 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.10],
-    [AC_MSG_ERROR([GHC version 8.10 or later is required to compile GHC.])])
+
+dnl ** Check minimum required bootstrap version. N.B. We currently allow
+dnl bootstrapping with the last two major releases.
+MinBootGhcVersion="9.0"
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[$MinBootGhcVersion],
+    [AC_MSG_ERROR([GHC version $MinBootGhcVersion or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then
