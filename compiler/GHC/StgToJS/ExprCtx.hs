@@ -1,5 +1,20 @@
 {-# LANGUAGE TupleSections #-}
 
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.StgToJS.ExprCtx
+-- Copyright   :  (c) The University of Glasgow 2001
+-- License     :  BSD-style (see the file LICENSE)
+--
+-- Maintainer  :  Jeffrey Young  <jeffrey.young@iohk.io>
+--                Luite Stegeman <luite.stegeman@iohk.io>
+--                Sylvain Henry  <sylvain.henry@iohk.io>
+--                Josh Meredith  <josh.meredith@iohk.io>
+-- Stability   :  experimental
+--
+-- TODO: Write my description!
+-----------------------------------------------------------------------------
+
 module GHC.StgToJS.ExprCtx
   ( ExprCtx
   , initExprCtx
