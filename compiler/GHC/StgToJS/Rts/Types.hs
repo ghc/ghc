@@ -11,6 +11,7 @@
 -- Maintainer  :  Jeffrey Young  <jeffrey.young@iohk.io>
 --                Luite Stegeman <luite.stegeman@iohk.io>
 --                Sylvain Henry  <sylvain.henry@iohk.io>
+--                Josh Meredith  <josh.meredith@iohk.io>
 -- Stability   :  experimental
 --
 -- Types and utility functions used in the JS RTS.

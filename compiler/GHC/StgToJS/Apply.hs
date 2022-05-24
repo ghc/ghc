@@ -5,30 +5,18 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.StgToJS.Rts.Apply
+-- Module      :  GHC.StgToJS.Apply
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file LICENSE)
 --
 -- Maintainer  :  Jeffrey Young  <jeffrey.young@iohk.io>
 --                Luite Stegeman <luite.stegeman@iohk.io>
 --                Sylvain Henry  <sylvain.henry@iohk.io>
+--                Josh Meredith  <josh.meredith@iohk.io>
 -- Stability   :  experimental
 --
---  Code generator for STG applications. Use specialized "apply" functions for
---  common cases when possible.
 --
---  This module also contains code to generate these various apply functions
---  for the RTS, for speeding up function application in the most common cases.
---  The code is generated because it contains lots of repeating patterns, and to
---  make it more flexible when changing the RTS (for example how arguments are
---  passed)
---
---  The code in here can be a bit hard to read due to all the generated
---  low-level access things. Reading rts.js for a compiled program can be
---  easier (the file is always the same unless you change low-level RTS
---  options)
---
---  FIXME: add selector thunks and let the gc follow them
+-- TODO: Write my description!
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Apply
