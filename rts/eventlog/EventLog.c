@@ -454,6 +454,7 @@ finishCapEventLogging(void)
             if (capEventBuf[c].begin != NULL) {
                 printAndClearEventBuf(&capEventBuf[c]);
                 stgFree(capEventBuf[c].begin);
+                capEventBuf[c].begin = NULL;
             }
         }
     }
@@ -525,6 +526,7 @@ freeEventLoggingBuffer(void)
 {
     if (capEventBuf != NULL)  {
         stgFree(capEventBuf);
+        capEventBuf = NULL;
     }
 }
 
