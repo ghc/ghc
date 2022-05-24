@@ -438,3 +438,10 @@ Runtime system
 - A new argument has been added to the ``HsOpTy`` constructor of the ``HsType``
   datatype, to track the presence of a promotion tick. Plugins which manipulate
   the Haskell AST will need to take this change into account.
+
+``ghc-heap`` library
+~~~~~~~~~~~~~~~
+
+- The ``link`` field of ``GHC.Exts.Heap.WeakClosure`` has been replaced with a
+  ``weakLink`` field which is ``Nothing`` if and only if ``link`` would have
+  been NULL.

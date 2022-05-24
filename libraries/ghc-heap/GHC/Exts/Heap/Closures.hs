@@ -41,6 +41,7 @@ import GHC.Exts.Heap.InfoTableProf ()
 import GHC.Exts.Heap.ProfInfo.Types
 
 import Data.Bits
+import Data.Foldable (toList)
 import Data.Int
 import Data.Word
 import GHC.Exts
@@ -228,8 +229,8 @@ data GenClosure b
         , mccPayload :: ![b]            -- ^ Array payload
         }
 
-    -- | An @MVar#@, with a queue of thread state objects blocking on them
-    | MVarClosure
+  -- | An @MVar#@, with a queue of thread state objects blocking on them
+  | MVarClosure
     { info       :: !StgInfoTable
     , queueHead  :: !b              -- ^ Pointer to head of queue
     , queueTail  :: !b              -- ^ Pointer to tail of queue
@@ -265,7 +266,7 @@ data GenClosure b
         , key         :: !b
         , value       :: !b
         , finalizer   :: !b
-        , link        :: !b -- ^ next weak pointer for the capability, can be NULL.
+        , weakLink    :: !(Maybe b) -- ^ next weak pointer for the capability
         }
 
   -- | Representation of StgTSO: A Thread State Object. The values for
@@ -420,7 +421,7 @@ allClosures (MVarClosure {..}) = [queueHead,queueTail,value]
 allClosures (IOPortClosure {..}) = [queueHead,queueTail,value]
 allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
-allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer, link]
+allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer] ++ Data.Foldable.toList weakLink
 allClosures (OtherClosure {..}) = hvalues
 allClosures _ = []
 
