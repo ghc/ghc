@@ -588,6 +588,7 @@ test-bootstrap:
     BUILD_FLAVOUR: "validate"
   rules:
     - if: $NIGHTLY
+    - if: '$RELEASE_JOB == "yes"'
 
 
 ############################################################
