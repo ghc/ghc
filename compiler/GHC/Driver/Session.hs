@@ -3758,6 +3758,7 @@ xFlagsDeps = [
   flagSpec "ExplicitForAll"                   LangExt.ExplicitForAll,
   flagSpec "ExplicitNamespaces"               LangExt.ExplicitNamespaces,
   flagSpec "ExtendedDefaultRules"             LangExt.ExtendedDefaultRules,
+  flagSpec "ExtendedLiterals"                 LangExt.ExtendedLiterals,
   flagSpec "FlexibleContexts"                 LangExt.FlexibleContexts,
   flagSpec "FlexibleInstances"                LangExt.FlexibleInstances,
   flagSpec "ForeignFunctionInterface"         LangExt.ForeignFunctionInterface,

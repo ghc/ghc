@@ -718,6 +718,14 @@ are the most common patterns, rewritten as regular expressions for clarity:
  PRIMSTRING     { L _ (ITprimstring _ _) }
  PRIMINTEGER    { L _ (ITprimint    _ _) }
  PRIMWORD       { L _ (ITprimword   _ _) }
+ PRIMINTEGER8   { L _ (ITprimint8   _ _) }
+ PRIMINTEGER16  { L _ (ITprimint16  _ _) }
+ PRIMINTEGER32  { L _ (ITprimint32  _ _) }
+ PRIMINTEGER64  { L _ (ITprimint64  _ _) }
+ PRIMWORD8      { L _ (ITprimword8  _ _) }
+ PRIMWORD16     { L _ (ITprimword16 _ _) }
+ PRIMWORD32     { L _ (ITprimword32 _ _) }
+ PRIMWORD64     { L _ (ITprimword64 _ _) }
  PRIMFLOAT      { L _ (ITprimfloat  _) }
  PRIMDOUBLE     { L _ (ITprimdouble _) }
 
@@ -3873,6 +3881,22 @@ literal :: { Located (HsLit GhcPs) }
                                                     $ getPRIMINTEGER $1 }
         | PRIMWORD          { sL1 $1 $ HsWordPrim   (getPRIMWORDs $1)
                                                     $ getPRIMWORD $1 }
+        | PRIMINTEGER8      { sL1 $1 $ HsInt8Prim   (getPRIMINTEGER8s $1)
+                                                    $ getPRIMINTEGER8 $1 }
+        | PRIMINTEGER16     { sL1 $1 $ HsInt16Prim  (getPRIMINTEGER16s $1)
+                                                    $ getPRIMINTEGER16 $1 }
+        | PRIMINTEGER32     { sL1 $1 $ HsInt32Prim  (getPRIMINTEGER32s $1)
+                                                    $ getPRIMINTEGER32 $1 }
+        | PRIMINTEGER64     { sL1 $1 $ HsInt64Prim  (getPRIMINTEGER64s $1)
+                                                    $ getPRIMINTEGER64 $1 }
+        | PRIMWORD8         { sL1 $1 $ HsWord8Prim  (getPRIMWORD8s $1)
+                                                    $ getPRIMWORD8 $1 }
+        | PRIMWORD16        { sL1 $1 $ HsWord16Prim (getPRIMWORD16s $1)
+                                                    $ getPRIMWORD16 $1 }
+        | PRIMWORD32        { sL1 $1 $ HsWord32Prim (getPRIMWORD32s $1)
+                                                    $ getPRIMWORD32 $1 }
+        | PRIMWORD64        { sL1 $1 $ HsWord64Prim (getPRIMWORD64s $1)
+                                                    $ getPRIMWORD64 $1 }
         | PRIMCHAR          { sL1 $1 $ HsCharPrim   (getPRIMCHARs $1)
                                                     $ getPRIMCHAR $1 }
         | PRIMSTRING        { sL1 $1 $ HsStringPrim (getPRIMSTRINGs $1)
@@ -3913,43 +3937,59 @@ bars :: { ([SrcSpan],Int) }     -- One or more bars
 happyError :: P a
 happyError = srcParseFail
 
-getVARID        (L _ (ITvarid    x)) = x
-getCONID        (L _ (ITconid    x)) = x
-getVARSYM       (L _ (ITvarsym   x)) = x
-getCONSYM       (L _ (ITconsym   x)) = x
-getDO           (L _ (ITdo      x)) = x
-getMDO          (L _ (ITmdo     x)) = x
-getQVARID       (L _ (ITqvarid   x)) = x
-getQCONID       (L _ (ITqconid   x)) = x
-getQVARSYM      (L _ (ITqvarsym  x)) = x
-getQCONSYM      (L _ (ITqconsym  x)) = x
-getIPDUPVARID   (L _ (ITdupipvarid   x)) = x
-getLABELVARID   (L _ (ITlabelvarid _ x)) = x
-getCHAR         (L _ (ITchar   _ x)) = x
-getSTRING       (L _ (ITstring _ x)) = x
-getINTEGER      (L _ (ITinteger x))  = x
-getRATIONAL     (L _ (ITrational x)) = x
-getPRIMCHAR     (L _ (ITprimchar _ x)) = x
-getPRIMSTRING   (L _ (ITprimstring _ x)) = x
-getPRIMINTEGER  (L _ (ITprimint  _ x)) = x
-getPRIMWORD     (L _ (ITprimword _ x)) = x
-getPRIMFLOAT    (L _ (ITprimfloat x)) = x
-getPRIMDOUBLE   (L _ (ITprimdouble x)) = x
-getINLINE       (L _ (ITinline_prag _ inl conl)) = (inl,conl)
-getSPEC_INLINE  (L _ (ITspec_inline_prag src True))  = (Inline src,FunLike)
-getSPEC_INLINE  (L _ (ITspec_inline_prag src False)) = (NoInline src,FunLike)
+getVARID          (L _ (ITvarid    x)) = x
+getCONID          (L _ (ITconid    x)) = x
+getVARSYM         (L _ (ITvarsym   x)) = x
+getCONSYM         (L _ (ITconsym   x)) = x
+getDO             (L _ (ITdo      x)) = x
+getMDO            (L _ (ITmdo     x)) = x
+getQVARID         (L _ (ITqvarid   x)) = x
+getQCONID         (L _ (ITqconid   x)) = x
+getQVARSYM        (L _ (ITqvarsym  x)) = x
+getQCONSYM        (L _ (ITqconsym  x)) = x
+getIPDUPVARID     (L _ (ITdupipvarid   x)) = x
+getLABELVARID     (L _ (ITlabelvarid _ x)) = x
+getCHAR           (L _ (ITchar   _ x)) = x
+getSTRING         (L _ (ITstring _ x)) = x
+getINTEGER        (L _ (ITinteger x))  = x
+getRATIONAL       (L _ (ITrational x)) = x
+getPRIMCHAR       (L _ (ITprimchar _ x)) = x
+getPRIMSTRING     (L _ (ITprimstring _ x)) = x
+getPRIMINTEGER    (L _ (ITprimint  _ x)) = x
+getPRIMWORD       (L _ (ITprimword _ x)) = x
+getPRIMINTEGER8   (L _ (ITprimint8 _ x)) = x
+getPRIMINTEGER16  (L _ (ITprimint16 _ x)) = x
+getPRIMINTEGER32  (L _ (ITprimint32 _ x)) = x
+getPRIMINTEGER64  (L _ (ITprimint64 _ x)) = x
+getPRIMWORD8      (L _ (ITprimword8 _ x)) = x
+getPRIMWORD16     (L _ (ITprimword16 _ x)) = x
+getPRIMWORD32     (L _ (ITprimword32 _ x)) = x
+getPRIMWORD64     (L _ (ITprimword64 _ x)) = x
+getPRIMFLOAT      (L _ (ITprimfloat x)) = x
+getPRIMDOUBLE     (L _ (ITprimdouble x)) = x
+getINLINE         (L _ (ITinline_prag _ inl conl)) = (inl,conl)
+getSPEC_INLINE    (L _ (ITspec_inline_prag src True))  = (Inline src,FunLike)
+getSPEC_INLINE    (L _ (ITspec_inline_prag src False)) = (NoInline src,FunLike)
 getCOMPLETE_PRAGs (L _ (ITcomplete_prag x)) = x
-getVOCURLY      (L (RealSrcSpan l _) ITvocurly) = srcSpanStartCol l
+getVOCURLY        (L (RealSrcSpan l _) ITvocurly) = srcSpanStartCol l
 
-getINTEGERs     (L _ (ITinteger (IL src _ _))) = src
-getCHARs        (L _ (ITchar       src _)) = src
-getSTRINGs      (L _ (ITstring     src _)) = src
-getPRIMCHARs    (L _ (ITprimchar   src _)) = src
-getPRIMSTRINGs  (L _ (ITprimstring src _)) = src
-getPRIMINTEGERs (L _ (ITprimint    src _)) = src
-getPRIMWORDs    (L _ (ITprimword   src _)) = src
+getINTEGERs       (L _ (ITinteger (IL src _ _))) = src
+getCHARs          (L _ (ITchar       src _)) = src
+getSTRINGs        (L _ (ITstring     src _)) = src
+getPRIMCHARs      (L _ (ITprimchar   src _)) = src
+getPRIMSTRINGs    (L _ (ITprimstring src _)) = src
+getPRIMINTEGERs   (L _ (ITprimint    src _)) = src
+getPRIMWORDs      (L _ (ITprimword   src _)) = src
+getPRIMINTEGER8s  (L _ (ITprimint8   src _)) = src
+getPRIMINTEGER16s (L _ (ITprimint16  src _)) = src
+getPRIMINTEGER32s (L _ (ITprimint32  src _)) = src
+getPRIMINTEGER64s (L _ (ITprimint64  src _)) = src
+getPRIMWORD8s     (L _ (ITprimword8  src _)) = src
+getPRIMWORD16s    (L _ (ITprimword16 src _)) = src
+getPRIMWORD32s    (L _ (ITprimword32 src _)) = src
+getPRIMWORD64s    (L _ (ITprimword64 src _)) = src
 
-getLABELVARIDs   (L _ (ITlabelvarid src _)) = src
+getLABELVARIDs    (L _ (ITlabelvarid src _)) = src
 
 -- See Note [Pragma source text] in "GHC.Types.SourceText" for the following
 getINLINE_PRAGs       (L _ (ITinline_prag       _ inl _)) = inlineSpecSource inl

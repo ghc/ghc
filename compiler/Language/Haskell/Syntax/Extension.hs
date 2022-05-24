@@ -568,7 +568,13 @@ type family XHsStringPrim x
 type family XHsInt x
 type family XHsIntPrim x
 type family XHsWordPrim x
+type family XHsInt8Prim x
+type family XHsInt16Prim x
+type family XHsInt32Prim x
 type family XHsInt64Prim x
+type family XHsWord8Prim x
+type family XHsWord16Prim x
+type family XHsWord32Prim x
 type family XHsWord64Prim x
 type family XHsInteger x
 type family XHsRat x
