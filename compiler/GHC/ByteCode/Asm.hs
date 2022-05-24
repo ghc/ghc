@@ -302,7 +302,7 @@ runAsm platform long_jumps e = go
           words = concatMap expand ops
           expand (SmallOp w) = [w]
           expand (LabelOp w) = expand (Op (e w))
-          expand (Op w) = if largeOps then largeArg platform w else [fromIntegral w]
+          expand (Op w) = if largeOps then largeArg platform (fromIntegral w) else [fromIntegral w]
 --        expand (LargeOp w) = largeArg platform w
       state $ \(st_i0,st_l0,st_p0) ->
         let st_i1 = addListToSS st_i0 (opcode : words)
@@ -345,13 +345,14 @@ inspectAsm platform long_jumps initial_offset
 largeArgInstr :: Word16 -> Word16
 largeArgInstr bci = bci_FLAG_LARGE_ARGS .|. bci
 
-largeArg :: Platform -> Word -> [Word16]
+largeArg :: Platform -> Word64 -> [Word16]
 largeArg platform w = case platformWordSize platform of
    PW8 -> [fromIntegral (w `shiftR` 48),
            fromIntegral (w `shiftR` 32),
            fromIntegral (w `shiftR` 16),
            fromIntegral w]
-   PW4 -> [fromIntegral (w `shiftR` 16),
+   PW4 -> assert (w < fromIntegral (maxBound :: Word32)) $
+          [fromIntegral (w `shiftR` 16),
            fromIntegral w]
 
 largeArg16s :: Platform -> Word
