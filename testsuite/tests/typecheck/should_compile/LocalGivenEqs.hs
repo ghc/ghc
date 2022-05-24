@@ -18,7 +18,7 @@ us [G] b ~ (Body b) GhcPs. In order to infer the type of happy_var_2, we need to
 float some wanted out past this equality. We have Note [Let-bound skolems]
 in GHC.Tc.Solver.Monad to consider this Given equality to be let-like, and thus
 not prevent floating. But, note that the equality isn't quite let-like, because
-it mentions b in its RHS. It thus triggers Note [Type variable cycles in Givens]
+it mentions b in its RHS. It thus triggers Note [Type equality cycles]
 in GHC.Tc.Solver.Canonical. That Note says we change the situation to
   [G] b ~ cbv GhcPs
   [G] Body b ~ cbv

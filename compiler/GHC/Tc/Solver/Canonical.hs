@@ -2322,7 +2322,6 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
      -- type families are OK here
      -- NB: no occCheckExpand here; see Note [Rewriting synonyms] in GHC.Tc.Solver.Rewrite
 
-
               -- a ~R# b a is soluble if b later turns out to be Identity
              result = case eq_rel of
                         NomEq  -> result0
@@ -2338,27 +2337,27 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
                  ; continueWith (CEqCan { cc_ev = new_ev, cc_lhs = lhs
                                         , cc_rhs = rhs, cc_eq_rel = eq_rel }) }
 
-         else do { m_stuff <- breakTyVarCycle_maybe ev result lhs rhs
-                           -- See Note [Type variable cycles];
+         else do { m_stuff <- breakTyEqCycle_maybe ev result lhs rhs
+                           -- See Note [Type equality cycles];
                            -- returning Nothing is the vastly common case
                  ; case m_stuff of
                      { Nothing ->
                          do { traceTcS "canEqCanLHSFinish can't make a canonical"
                                        (ppr lhs $$ ppr rhs)
                             ; continueWith (mkIrredCt reason new_ev) }
-                     ; Just (lhs_tv, co, new_rhs) ->
+                     ; Just (co, new_rhs) ->
               do { traceTcS "canEqCanLHSFinish breaking a cycle" $
                             ppr lhs $$ ppr rhs
                  ; traceTcS "new RHS:" (ppr new_rhs)
 
                    -- This check is Detail (1) in the Note
-                 ; if cterHasOccursCheck (checkTyVarEq dflags lhs_tv new_rhs)
+                 ; if cterHasOccursCheck (checkTypeEq dflags lhs new_rhs)
 
-                   then do { traceTcS "Note [Type variable cycles] Detail (1)"
+                   then do { traceTcS "Note [Type equality cycles] Detail (1)"
                                       (ppr new_rhs)
                            ; continueWith (mkIrredCt reason new_ev) }
 
-                   else do { -- See Detail (6) of Note [Type variable cycles]
+                   else do { -- See Detail (6) of Note [Type equality cycles]
                              new_new_ev <- rewriteEqEvidence new_ev NotSwapped
                                              lhs_ty new_rhs
                                              (mkTcNomReflCo lhs_ty) co
@@ -2580,7 +2579,7 @@ NOT (necessarily) expand the type synonym, since for the purpose of
 good error messages we want to leave type synonyms unexpanded as much
 as possible.  Hence the ps_xi1, ps_xi2 argument passed to canEqCanLHS.
 
-Note [Type variable cycles]
+Note [Type equality cycles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this situation (from indexed-types/should_compile/GivenLoop):
 
@@ -2594,14 +2593,20 @@ or (typecheck/should_compile/T19682b):
   *[WD] alpha ~ (Arg alpha -> Res alpha)
   [W] C alpha
 
+or (typecheck/should_compile/T21515):
+
+  type family Code a
+  *[G] Code a ~ '[ '[ Head (Head (Code a)) ] ]
+  [W] Code a ~ '[ '[ alpha ] ]
+
 In order to solve the final Wanted, we must use the starred constraint
-for rewriting. But note that both starred constraints have occurs-check failures,
+for rewriting. But note that all starred constraints have occurs-check failures,
 and so we can't straightforwardly add these to the inert set and
 use them for rewriting. (NB: A rigid type constructor is at the
-top of both RHSs. If the type family were at the top, we'd just reorient
-in canEqTyVarFunEq.)
+top of all RHSs, preventing reorienting in canEqTyVarFunEq in the tyvar
+cases.)
 
-The key idea is to replace the type family applications in the RHS of the
+The key idea is to replace the outermost type family applications in the RHS of the
 starred constraints with a fresh variable, which we'll call a cycle-breaker
 variable, or cbv. Then, relate the cbv back with the original type family application
 via new equality constraints. Our situations thus become:
@@ -2619,8 +2624,14 @@ or
   [WD] Res alpha ~ cbv2
   [W] C alpha
 
+or
+
+  [G] Code a ~ '[ '[ cbv ] ]
+  [G] Head (Head (Code a)) ~ cbv
+  [W] Code a ~ '[ '[ alpha ] ]
+
 This transformation (creating the new types and emitting new equality
-constraints) is done in breakTyVarCycle_maybe.
+constraints) is done in breakTyEqCycle_maybe.
 
 The details depend on whether we're working with a Given or a Derived.
 (Note that the Wanteds are really WDs, above. This is because Wanteds
@@ -2643,30 +2654,30 @@ Of course, we don't want our fresh variables leaking into e.g. error messages.
 So we fill in the metavariables with their original type family applications
 after we're done running the solver (in nestImplicTcS and runTcSWithEvBinds).
 This is done by restoreTyVarCycles, which uses the inert_cycle_breakers field in
-InertSet, which contains the pairings invented in breakTyVarCycle_maybe.
+InertSet, which contains the pairings invented in breakTyEqCycle_maybe.
 
 That is:
 
 We transform
-  [G] g : a ~ ...(F a)...
+  [G] g : lhs ~ ...(F lhs)...
 to
-  [G] (Refl a) : F a ~ cbv      -- CEqCan
-  [G] g        : a ~ ...cbv...  -- CEqCan
+  [G] (Refl lhs) : F lhs ~ cbv      -- CEqCan
+  [G] g          : lhs ~ ...cbv...  -- CEqCan
 
 Note that
 * `cbv` is a fresh cycle breaker variable.
 * `cbv` is a is a meta-tyvar, but it is completely untouchable.
 * We track the cycle-breaker variables in inert_cycle_breakers in InertSet
-* We eventually fill in the cycle-breakers, with `cbv := F a`.
+* We eventually fill in the cycle-breakers, with `cbv := F lhs`.
   No one else fills in cycle-breakers!
-* In inert_cycle_breakers, we remember the (cbv, F a) pair; that is, we
-  remember the /original/ type.  The [G] F a ~ cbv constraint may be rewritten
-  by other givens (eg if we have another [G] a ~ (b,c), but at the end we
-  still fill in with cbv := F a
+* The evidence for the new `F lhs ~ cbv` constraint is Refl, because we know
+  this fill-in is ultimately going to happen.
+* In inert_cycle_breakers, we remember the (cbv, F lhs) pair; that is, we
+  remember the /original/ type.  The [G] F lhs ~ cbv constraint may be rewritten
+  by other givens (eg if we have another [G] lhs ~ (b,c)), but at the end we
+  still fill in with cbv := F lhs
 * This fill-in is done when solving is complete, by restoreTyVarCycles
   in nestImplicTcS and runTcSWithEvBinds.
-* The evidence for the new `F a ~ cbv` constraint is Refl, because we know this fill-in is
-  ultimately going to happen.
 
 Wanted/Derived
 --------------
@@ -2684,12 +2695,18 @@ and we turn this into
 
 where cbv1 and cbv2 are fresh TauTvs. Why TauTvs? See [Why TauTvs] below.
 
-Critically, we emit the constraint directly instead of calling unifyWanted.
+Critically, we emit the two new constraints (the last two above)
+directly instead of calling unifyWanted. (Otherwise, we'd end up unifying cbv1
+and cbv2 immediately, achieving nothing.)
 Next, we unify alpha := cbv1 -> cbv2, having eliminated the occurs check. This
-unification happens in the course of normal behavior of top-level
+unification -- which must be the next step after breaking the cycles --
+happens in the course of normal behavior of top-level
 interactions, later in the solver pipeline. We know this unification will
-indeed happen, because breakTyVarCycle_maybe, which decides whether to apply
-this logic, goes to pains to make sure unification will succeed. Now, we're
+indeed happen because breakTyEqCycle_maybe, which decides whether to apply
+this logic, checks to ensure unification will succeed in its final_check.
+(In particular, the LHS must be a touchable tyvar, never a type family. We don't
+yet have an example of where this logic is needed with a type family, and it's
+unclear how to handle this case, so we're skipping for now.) Now, we're
 here (including further context from our original example, from the top of the
 Note):
 
@@ -2764,8 +2781,9 @@ In all cases
 ------------
 
 We detect this scenario by the following characteristics:
- - a constraint with a tyvar on its LHS
- - with a soluble occurs-check failure
+ - a constraint with a soluble occurs-check failure
+   (as indicated by the cteSolubleOccurs bit set in a CheckTyEqResult
+   from checkTypeEq)
  - and a nominal equality
  - and either
     - a Given flavour (but see also Detail (7) below)
@@ -2791,29 +2809,31 @@ Details:
 
  (1) We don't look under foralls, at all, when substituting away type family
      applications, because doing so can never be fruitful. Recall that we
-     are in a case like [G] a ~ forall b. ... a ....   Until we have a type
-     family that can pull the body out from a forall, this will always be
+     are in a case like [G] lhs ~ forall b. ... lhs ....   Until we have a type
+     family that can pull the body out from a forall (e.g. type instance F (forall b. ty) = ty),
+     this will always be
      insoluble. Note also that the forall cannot be in an argument to a
      type family, or that outer type family application would already have
      been substituted away.
 
-     However, we still must check to make sure that breakTyVarCycle_maybe actually
-     succeeds in getting rid of all occurrences of the offending variable. If
+     However, we still must check to make sure that breakTyEqCycle_maybe actually
+     succeeds in getting rid of all occurrences of the offending lhs. If
      one is hidden under a forall, this won't be true. A similar problem can
      happen if the variable appears only in a kind
      (e.g. k ~ ... (a :: k) ...). So we perform an additional check after
-     performing the substitution. It is tiresome to re-run all of checkTyVarEq
+     performing the substitution. It is tiresome to re-run all of checkTypeEq
      here, but reimplementing just the occurs-check is even more tiresome.
 
      Skipping this check causes typecheck/should_fail/GivenForallLoop and
      polykinds/T18451 to loop.
 
  (2) Our goal here is to avoid loops in rewriting. We can thus skip looking
-     in coercions, as we don't rewrite in coercions. (This is another reason
+     in coercions, as we don't rewrite in coercions in the algorithm in
+     GHC.Solver.Rewrite. (This is another reason
      we need to re-check that we've gotten rid of all occurrences of the
      offending variable.)
 
- (3) As we're substituting, we can build ill-kinded
+ (3) As we're substituting as described in this Note, we can build ill-kinded
      types. For example, if we have Proxy (F a) b, where (b :: F a), then
      replacing this with Proxy cbv b is ill-kinded. However, we will later
      set cbv := F a, and so the zonked type will be well-kinded again.
@@ -2833,9 +2853,13 @@ Details:
      we will eventually set the cycle-breaker variable to be the type family,
      and then, after the zonk, all will be well.
 
- (5) The approach here is inefficient. For instance, we could choose to
-     affect only type family applications that mention the offending variable:
-     in a ~ (F b, G a), we need to replace only G a, not F b. Furthermore,
+ (5) The approach here is inefficient because it replaces every (outermost)
+     type family application with a type variable, regardless of whether that
+     particular appplication is implicated in the occurs check.  An alternative
+     would be to replce only type-family applications that meantion the offending LHS.
+     For instance, we could choose to
+     affect only type family applications that mention the offending LHS:
+     e.g. in a ~ (F b, G a), we need to replace only G a, not F b. Furthermore,
      we could try to detect cases like a ~ (F a, F a) and use the same
      tyvar to replace F a. (Cf.
      Note [Flattening type-family applications when matching instances]
@@ -2846,9 +2870,10 @@ Details:
      performant solution seems unworthwhile.
 
  (6) We often get the predicate associated with a constraint from its
-     evidence. We thus must not only make sure the generated CEqCan's
-     fields have the updated RHS type, but we must also update the
-     evidence itself. This is done by the call to rewriteEqEvidence
+     evidence with ctPred. We thus must not only make sure the generated
+     CEqCan's fields have the updated RHS type (that is, the one produced
+     by replacing type family applications with fresh variables),
+     but we must also update the evidence itself. This is done by the call to rewriteEqEvidence
      in canEqCanLHSFinish.
 
  (7) We don't wish to apply this magic on the equalities created
@@ -2888,12 +2913,12 @@ Details:
      occurs-check bit set (only).
 
      We track these equalities by giving them a special CtOrigin,
-     CycleBreakerOrigin. This works for both Givens and WDs, as
-     we need the logic in the WD case for e.g. typecheck/should_fail/T17139.
+     CycleBreakerOrigin. This works for both Givens and Wanteds, as
+     we need the logic in the W case for e.g. typecheck/should_fail/T17139.
 
  (8) We really want to do this all only when there is a soluble occurs-check
      failure, not when other problems arise (such as an impredicative
-     equality like alpha ~ forall a. a -> a). That is why breakTyVarCycle_maybe
+     equality like alpha ~ forall a. a -> a). That is why breakTyEqCycle_maybe
      uses cterHasOnlyProblem when looking at the result of checkTypeEq, which
      checks for many of the invariants on a CEqCan.
 -}
