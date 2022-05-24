@@ -418,11 +418,16 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces ins
   (errors, installedIndexes) <-
     partitionEithers
       <$> traverse
-            (\ifaceFile ->
+            (\ifaceFile -> do
               let indexFile = takeDirectory ifaceFile
-                    FilePath.</> "doc-index.json" in
-                  bimap (indexFile,) (map (fixLink ifaceFile))
-              <$> eitherDecodeFile @[JsonIndexEntry] indexFile)
+                    FilePath.</> "doc-index.json"
+              a <- doesFileExist indexFile
+              if a then
+                    bimap (indexFile,) (map (fixLink ifaceFile))
+                <$> eitherDecodeFile @[JsonIndexEntry] indexFile
+                   else
+                    return (Right [])
+            )
             installedIfacesPaths
   traverse_ (\(indexFile, err) -> putStrLn $ "haddock: Coudn't parse " ++ indexFile ++ ": " ++ err)
             errors
