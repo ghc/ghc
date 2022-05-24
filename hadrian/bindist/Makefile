@@ -16,6 +16,13 @@ default:
 # TODO : find if a better function exists
 eq=$(and $(findstring $(1),$(2)),$(findstring $(2),$(1)))
 
+# the following is the work around suggested by @carter in #17418 during install
+# time.  This should help us with code signing issues by removing extended
+# attributes from all files.
+ifeq "$(Darwin_Host)" "YES"
+XATTR ?= /usr/bin/xattr
+endif
+
 define installscript
 # $1 = package name
 # $2 = wrapper path
@@ -158,6 +165,8 @@ install_bin_libdir:
 	for i in $(BINARIES); do \
 		cp -R $$i "$(DESTDIR)$(ActualBinsDir)"; \
 	done
+	# Work around #17418 on Darwin
+	if [ -e "${XATTR}" ]; then "${XATTR}" -c -r "$(DESTDIR)$(ActualBinsDir)"; fi
 
 install_bin_direct:
 	@echo "Copying binaries to $(DESTDIR)$(WrapperBinsDir)"
