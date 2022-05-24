@@ -572,6 +572,7 @@ test-bootstrap:
     NO_BOOT: "1"
   rules:
     - if: $NIGHTLY
+    - if: '$RELEASE_JOB == "yes"'
 
 
 ############################################################
