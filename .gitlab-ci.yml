@@ -522,6 +522,7 @@ generate-hadrian-bootstrap-sources:
   rules:
     - if: $NIGHTLY
     - if: '$RELEASE_JOB == "yes"'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
 
 
 package-hadrian-bootstrap-sources:
@@ -573,6 +574,7 @@ test-bootstrap:
   rules:
     - if: $NIGHTLY
     - if: '$RELEASE_JOB == "yes"'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
 
 
 ############################################################
