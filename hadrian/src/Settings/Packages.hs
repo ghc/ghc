@@ -73,6 +73,7 @@ packageArgs = do
           , builder (Cabal Flags) ? mconcat
             [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"
             , notM cross `cabalFlag` "terminfo"
+            , arg "-build-tool-depends"
             ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
@@ -202,6 +203,14 @@ packageArgs = do
         , package runGhc ?
           builder Ghc ? input "**/Main.hs" ?
           (\version -> ["-cpp", "-DVERSION=" ++ show version]) <$> getSetting ProjectVersion
+
+        --------------------------------- genprimopcode ------------------------
+        , package genprimopcode
+          ? builder (Cabal Flags) ? arg "-build-tool-depends"
+
+        --------------------------------- hpcBin ----------------------------------
+        , package hpcBin
+          ? builder (Cabal Flags) ? arg "-build-tool-depends"
         ]
 
 ghcBignumArgs :: Args

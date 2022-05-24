@@ -390,6 +390,10 @@ instance H.Builder Builder where
 isOptional :: Builder -> Bool
 isOptional = \case
     Objdump  -> True
+    -- alex and happy are not required when building source distributions
+    -- and ./configure will complain if they are not available when building in-tree
+    Happy    -> True
+    Alex     -> True
     _        -> False
 
 -- | Determine the location of a system 'Builder'.
