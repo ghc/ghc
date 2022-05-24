@@ -395,8 +395,8 @@ lookupLevel env id
 
 -- | Options for the liberate case pass.
 data LibCaseOpts = LibCaseOpts
-  -- | Bomb-out size for deciding if potential liberatees are too big.
-  { lco_threshold :: !(Maybe Int)
+  { -- | Bomb-out size for deciding if potential liberatees are too big.
+    lco_threshold :: !(Maybe Int)
   -- | Unfolding options
   , lco_unfolding_opts :: !UnfoldingOpts
   }
