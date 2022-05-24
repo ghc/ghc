@@ -6,6 +6,7 @@ module Rules.Register (
 import Base
 import Context
 import Expression ( getContextData )
+import Oracles.Setting
 import Hadrian.BuildPath
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
@@ -130,15 +131,26 @@ buildConf _ context@Context {..} _conf = do
     path <- buildPath context
 
     -- Special package cases (these should ideally be rolled into Cabal).
-    when (package == rts) $
+    when (package == rts) $ do
+        jsTarget <- isJsTarget
+
         -- If Cabal knew about "generated-headers", we could read them from the
         -- 'configuredCabal' information, and just "need" them here.
-        need [ path -/- "include/DerivedConstants.h"
-             , path -/- "include/ghcautoconf.h"
-             , path -/- "include/ghcplatform.h"
-             -- , path -/- "include/rts/EventLogConstants.h"
-             -- , path -/- "include/rts/EventTypes.h"
+        let common_headers =
+              [ path -/- "include/DerivedConstants.h"
+              , path -/- "include/ghcautoconf.h"
+              , path -/- "include/ghcplatform.h"
+              ]
+            -- headers only required for the native RTS
+            native_headers =
+             [ path -/- "include/rts/EventLogConstants.h"
+             , path -/- "include/rts/EventTypes.h"
              ]
+            headers
+              | jsTarget  = common_headers
+              | otherwise = common_headers ++ native_headers
+
+        need headers
 
     -- we need to generate this file for GMP
     when (package == ghcBignum) $ do

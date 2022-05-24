@@ -41,15 +41,21 @@ rtsDependencies :: Expr [FilePath]
 rtsDependencies = do
     stage   <- getStage
     rtsPath <- expr (rtsBuildPath stage)
-    useSystemFfi <- expr (flag UseSystemFfi)
-
-    let headers =
+    jsTarget <- expr isJsTarget
+    let -- headers common to native and JS RTS
+        common_headers =
             [ "ghcautoconf.h", "ghcplatform.h"
             , "DerivedConstants.h"
-            -- , "rts" -/- "EventTypes.h"
-            -- , "rts" -/- "EventLogConstants.h"
             ]
-            ++ (if useSystemFfi then [] else libffiHeaderFiles)
+        -- headers specific to the native RTS
+        native_headers =
+            [ "rts" -/- "EventTypes.h"
+            , "rts" -/- "EventLogConstants.h"
+            ]
+            ++ libffiHeaderFiles
+        headers
+          | jsTarget  = common_headers
+          | otherwise = common_headers ++ native_headers
     pure $ ((rtsPath -/- "include") -/-) <$> headers
 
 genapplyDependencies :: Expr [FilePath]
@@ -139,8 +145,8 @@ generatePackageCode context@(Context stage pkg _) = do
         root -/- "**" -/- dir -/- "include/ghcautoconf.h" %> go generateGhcAutoconfH
         root -/- "**" -/- dir -/- "include/ghcplatform.h" %> go generateGhcPlatformH
         root -/- "**" -/- dir -/- "include/DerivedConstants.h" %> genPlatformConstantsHeader context
-        -- root -/- "**" -/- dir -/- "include/rts/EventLogConstants.h" %> genEventTypes "--event-types-defines"
-        -- root -/- "**" -/- dir -/- "include/rts/EventTypes.h" %> genEventTypes "--event-types-array"
+        root -/- "**" -/- dir -/- "include/rts/EventLogConstants.h" %> genEventTypes "--event-types-defines"
+        root -/- "**" -/- dir -/- "include/rts/EventTypes.h" %> genEventTypes "--event-types-array"
 
 genEventTypes :: String -> FilePath -> Action ()
 genEventTypes flag file = do

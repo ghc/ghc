@@ -10,21 +10,670 @@ source-repository head
     location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   rts
 
+flag libm
+  default: @CabalHaveLibm@
+flag librt
+  default: @CabalHaveLibrt@
+flag libdl
+  default: @CabalHaveLibdl@
+flag use-system-libffi
+  default: @CabalUseSystemLibFFI@
+flag libffi-adjustors
+  default: @CabalLibffiAdjustors@
+flag need-pthread
+  default: @CabalNeedLibpthread@
+flag libbfd
+  default: @CabalHaveLibbfd@
+flag mingwex
+  default: @CabalMingwex@
+flag need-atomic
+  default: @CabalNeedLibatomic@
+flag libdw
+  default: @CabalHaveLibdw@
+flag libnuma
+  default: @CabalHaveLibNuma@
+flag 64bit
+  default: @Cabal64bit@
+flag leading-underscore
+  default: @CabalLeadingUnderscore@
+flag smp
+  default: True
+flag find-ptr
+  default: False
+-- Some cabal flags used to control the flavours we want to produce
+-- for libHSrts in hadrian. By default, we just produce vanilla and
+-- threaded. The flags "compose": if you enable debug and profiling,
+-- you will produce vanilla, _thr, _debug, _p but also _thr_p,
+-- _thr_debug_p and so on.
+flag profiling
+  default: False
+flag debug
+  default: False
+flag logging
+  default: False
+flag dynamic
+  default: False
+flag thread-sanitizer
+  description:
+    Enable checking for data races using the ThreadSanitizer (TSAN)
+    mechanism supported by GCC and Clang. See Note [ThreadSanitizer]
+    in @rts/include/rts/TSANUtils.h@.
+  default: False
+
 library
     -- rts is a wired in package and
     -- expects the unit-id to be
     -- set without version
     ghc-options: -this-unit-id rts
-    include-dirs: include
 
-    -- dummy file to force the build of a .a lib
-    c-sources: version.c
-                  
-    -- includes: Rts.h
-    install-includes: HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
-                      ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
-                      -- ^ from include
-                      DerivedConstants.h
-                      stg/MachRegs.h
-                      stg/MachRegsForHost.h
-                      stg/Types.h
+    exposed: True
+    exposed-modules:
+
+    if os(ghcjs)
+
+      include-dirs: include
+      -- dummy file to force the build of a .a lib
+      c-sources: version.c
+
+      install-includes: HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
+                        ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
+                        DerivedConstants.h
+                        stg/MachRegs.h
+                        stg/MachRegsForHost.h
+                        stg/Types.h
+
+    else
+      -- If we are using an in-tree libffi then we must declare it as a bundled
+      -- library to ensure that Cabal installs it.
+      if !flag(use-system-libffi)
+        if os(windows)
+          extra-bundled-libraries: Cffi-6
+        else
+          extra-bundled-libraries: Cffi
+
+      -- The make build system does something special in config.mk.in
+      -- for generating profiled, debugged, etc builds of those
+      -- libraries, but we need to be transparent for hadrian which
+      -- gets information about the rts "package" through Cabal and
+      -- this cabal file. We therefore declare several
+      -- flavours to be available when passing the suitable (combination of)
+      -- flag(s) when configuring the RTS from hadrian, using Cabal.
+      extra-library-flavours: _thr
+
+      if flag(profiling)
+        extra-library-flavours: _p _thr_p
+        if flag(debug)
+          extra-library-flavours: _debug_p _thr_debug_p
+      if flag(debug)
+        extra-library-flavours: _debug _thr_debug
+        if flag(dynamic)
+          extra-dynamic-library-flavours: _debug _thr_debug
+      if flag(logging)
+        extra-library-flavours: _l _thr_l
+        if flag(dynamic)
+          extra-dynamic-library-flavours: _l _thr_l
+      if flag(dynamic)
+        extra-dynamic-library-flavours: _thr
+
+      if flag(thread-sanitizer)
+        cc-options: -fsanitize=thread
+        ld-options: -fsanitize=thread
+        extra-libraries: tsan
+
+      if os(linux)
+         -- the RTS depends upon libc. while this dependency is generally
+         -- implicitly added by `cc`, we must explicitly add it here to ensure
+         -- that it is ordered correctly with libpthread, since ghc-prim.cabal
+         -- also explicitly lists libc. See #19029.
+         extra-libraries: c
+      if flag(libm)
+         -- for ldexp()
+         extra-libraries: m
+      if flag(librt)
+         extra-libraries: rt
+      if flag(libdl)
+         extra-libraries: dl
+      if flag(use-system-libffi)
+         extra-libraries: ffi
+      if os(windows)
+         extra-libraries:
+            -- for the linker
+            wsock32 gdi32 winmm
+            -- for crash dump
+            dbghelp
+            -- for process information
+            psapi
+         -- TODO: Hadrian will use this cabal file, so drop WINVER from Hadrian's configs.
+         -- Minimum supported Windows version.
+         -- These numbers can be found at:
+         --  https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
+         -- If we're compiling on windows, enforce that we only support Windows 7+
+         -- Adding this here means it doesn't have to be done in individual .c files
+         -- and also centralizes the versioning.
+         cpp-options: -D_WIN32_WINNT=0x06010000
+         cc-options: -D_WIN32_WINNT=0x06010000
+      if flag(need-pthread)
+         -- for pthread_getthreadid_np, pthread_create, ...
+         extra-libraries: pthread
+      if flag(need-atomic)
+         -- for sub-word-sized atomic operations (#19119)
+         extra-libraries: atomic
+      if flag(libbfd)
+         -- for debugging
+         extra-libraries: bfd iberty
+      if flag(mingwex)
+         extra-libraries: mingwex
+      if flag(libdw)
+         -- for backtraces
+         extra-libraries: elf dw
+      if flag(libnuma)
+         extra-libraries: numa
+      if !flag(smp)
+         cpp-options: -DNOSMP
+
+      include-dirs: include
+                    @FFIIncludeDir@
+                    @LibdwIncludeDir@
+
+
+      includes: Rts.h
+      install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
+                        ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
+                        -- ^ from include
+                        DerivedConstants.h ffi.h ffitarget.h
+                        rts/EventLogConstants.h
+                        rts/EventTypes.h
+                        -- ^ generated
+                        rts/Adjustor.h
+                        rts/ExecPage.h
+                        rts/BlockSignals.h
+                        rts/Bytecodes.h
+                        rts/Config.h
+                        rts/Constants.h
+                        rts/EventLogFormat.h
+                        rts/EventLogWriter.h
+                        rts/FileLock.h
+                        rts/Flags.h
+                        rts/ForeignExports.h
+                        rts/GetTime.h
+                        rts/Globals.h
+                        rts/Hpc.h
+                        rts/IOInterface.h
+                        rts/Libdw.h
+                        rts/LibdwPool.h
+                        rts/Linker.h
+                        rts/Main.h
+                        rts/Messages.h
+                        rts/NonMoving.h
+                        rts/OSThreads.h
+                        rts/Parallel.h
+                        rts/PrimFloat.h
+                        rts/Profiling.h
+                        rts/IPE.h
+                        rts/PosixSource.h
+                        rts/Signals.h
+                        rts/SpinLock.h
+                        rts/StableName.h
+                        rts/StablePtr.h
+                        rts/StaticPtrTable.h
+                        rts/TTY.h
+                        rts/Threads.h
+                        rts/Ticky.h
+                        rts/Time.h
+                        rts/Timer.h
+                        rts/TSANUtils.h
+                        rts/Types.h
+                        rts/Utils.h
+                        rts/prof/CCS.h
+                        rts/prof/Heap.h
+                        rts/prof/LDV.h
+                        rts/storage/Block.h
+                        rts/storage/ClosureMacros.h
+                        rts/storage/ClosureTypes.h
+                        rts/storage/Closures.h
+                        rts/storage/FunTypes.h
+                        rts/storage/Heap.h
+                        rts/storage/GC.h
+                        rts/storage/InfoTables.h
+                        rts/storage/MBlock.h
+                        rts/storage/TSO.h
+                        stg/DLL.h
+                        stg/MachRegs.h
+                        stg/MachRegsForHost.h
+                        stg/MiscClosures.h
+                        stg/Prim.h
+                        stg/Regs.h
+                        stg/SMP.h
+                        stg/Ticky.h
+                        stg/Types.h
+      if flag(64bit)
+        if flag(leading-underscore)
+          ld-options:
+            "-Wl,-u,_hs_atomic_add64"
+            "-Wl,-u,_hs_atomic_sub64"
+            "-Wl,-u,_hs_atomic_and64"
+            "-Wl,-u,_hs_atomic_nand64"
+            "-Wl,-u,_hs_atomic_or64"
+            "-Wl,-u,_hs_atomic_xor64"
+            "-Wl,-u,_hs_atomicread64"
+            "-Wl,-u,_hs_atomicwrite64"
+        else
+          ld-options:
+            "-Wl,-u,hs_atomic_add64"
+            "-Wl,-u,hs_atomic_sub64"
+            "-Wl,-u,hs_atomic_and64"
+            "-Wl,-u,hs_atomic_nand64"
+            "-Wl,-u,hs_atomic_or64"
+            "-Wl,-u,hs_atomic_xor64"
+            "-Wl,-u,hs_atomicread64"
+            "-Wl,-u,hs_atomicwrite64"
+      if flag(leading-underscore)
+        ld-options:
+           "-Wl,-u,_base_GHCziTopHandler_runIO_closure"
+           "-Wl,-u,_base_GHCziTopHandler_runNonIO_closure"
+           "-Wl,-u,_ghczmprim_GHCziTuple_Z0T_closure"
+           "-Wl,-u,_ghczmprim_GHCziTypes_True_closure"
+           "-Wl,-u,_ghczmprim_GHCziTypes_False_closure"
+           "-Wl,-u,_base_GHCziPack_unpackCString_closure"
+           "-Wl,-u,_base_GHCziWeak_runFinalizzerBatch_closure"
+           "-Wl,-u,_base_GHCziIOziException_stackOverflow_closure"
+           "-Wl,-u,_base_GHCziIOziException_heapOverflow_closure"
+           "-Wl,-u,_base_GHCziIOziException_allocationLimitExceeded_closure"
+           "-Wl,-u,_base_GHCziIOziException_blockedIndefinitelyOnMVar_closure"
+           "-Wl,-u,_base_GHCziIOziException_blockedIndefinitelyOnSTM_closure"
+           "-Wl,-u,_base_GHCziIOziException_cannotCompactFunction_closure"
+           "-Wl,-u,_base_GHCziIOziException_cannotCompactPinned_closure"
+           "-Wl,-u,_base_GHCziIOziException_cannotCompactMutable_closure"
+           "-Wl,-u,_base_GHCziIOPort_doubleReadException_closure"
+           "-Wl,-u,_base_ControlziExceptionziBase_nonTermination_closure"
+           "-Wl,-u,_base_ControlziExceptionziBase_nestedAtomically_closure"
+           "-Wl,-u,_base_GHCziEventziThread_blockedOnBadFD_closure"
+           "-Wl,-u,_base_GHCziConcziSync_runSparks_closure"
+           "-Wl,-u,_base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+           "-Wl,-u,_base_GHCziConcziIO_interruptIOManager_closure"
+           "-Wl,-u,_base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
+           "-Wl,-u,_base_GHCziConcziSignal_runHandlersPtr_closure"
+           "-Wl,-u,_base_GHCziTopHandler_flushStdHandles_closure"
+           "-Wl,-u,_base_GHCziTopHandler_runMainIO_closure"
+           "-Wl,-u,_ghczmprim_GHCziTypes_Czh_con_info"
+           "-Wl,-u,_ghczmprim_GHCziTypes_Izh_con_info"
+           "-Wl,-u,_ghczmprim_GHCziTypes_Fzh_con_info"
+           "-Wl,-u,_ghczmprim_GHCziTypes_Dzh_con_info"
+           "-Wl,-u,_ghczmprim_GHCziTypes_Wzh_con_info"
+           "-Wl,-u,_base_GHCziPtr_Ptr_con_info"
+           "-Wl,-u,_base_GHCziPtr_FunPtr_con_info"
+           "-Wl,-u,_base_GHCziInt_I8zh_con_info"
+           "-Wl,-u,_base_GHCziInt_I16zh_con_info"
+           "-Wl,-u,_base_GHCziInt_I32zh_con_info"
+           "-Wl,-u,_base_GHCziInt_I64zh_con_info"
+           "-Wl,-u,_base_GHCziWord_W8zh_con_info"
+           "-Wl,-u,_base_GHCziWord_W16zh_con_info"
+           "-Wl,-u,_base_GHCziWord_W32zh_con_info"
+           "-Wl,-u,_base_GHCziWord_W64zh_con_info"
+           "-Wl,-u,_base_GHCziStable_StablePtr_con_info"
+           "-Wl,-u,_hs_atomic_add8"
+           "-Wl,-u,_hs_atomic_add16"
+           "-Wl,-u,_hs_atomic_add32"
+           "-Wl,-u,_hs_atomic_sub8"
+           "-Wl,-u,_hs_atomic_sub16"
+           "-Wl,-u,_hs_atomic_sub32"
+           "-Wl,-u,_hs_atomic_and8"
+           "-Wl,-u,_hs_atomic_and16"
+           "-Wl,-u,_hs_atomic_and32"
+           "-Wl,-u,_hs_atomic_nand8"
+           "-Wl,-u,_hs_atomic_nand16"
+           "-Wl,-u,_hs_atomic_nand32"
+           "-Wl,-u,_hs_atomic_or8"
+           "-Wl,-u,_hs_atomic_or16"
+           "-Wl,-u,_hs_atomic_or32"
+           "-Wl,-u,_hs_atomic_xor8"
+           "-Wl,-u,_hs_atomic_xor16"
+           "-Wl,-u,_hs_atomic_xor32"
+           "-Wl,-u,_hs_cmpxchg8"
+           "-Wl,-u,_hs_cmpxchg16"
+           "-Wl,-u,_hs_cmpxchg32"
+           "-Wl,-u,_hs_cmpxchg64"
+           "-Wl,-u,_hs_xchg8"
+           "-Wl,-u,_hs_xchg16"
+           "-Wl,-u,_hs_xchg32"
+           "-Wl,-u,_hs_xchg64"
+           "-Wl,-u,_hs_atomicread8"
+           "-Wl,-u,_hs_atomicread16"
+           "-Wl,-u,_hs_atomicread32"
+           "-Wl,-u,_hs_atomicwrite8"
+           "-Wl,-u,_hs_atomicwrite16"
+           "-Wl,-u,_hs_atomicwrite32"
+           "-Wl,-u,_base_GHCziStackziCloneStack_StackSnapshot_closure"
+
+        if flag(find-ptr)
+          -- This symbol is useful in gdb, but not referred to anywhere,
+          -- so we need to force it to be included in the binary.
+          ld-options: "-Wl,-u,_findPtr"
+
+      else
+        ld-options:
+           "-Wl,-u,base_GHCziTopHandler_runIO_closure"
+           "-Wl,-u,base_GHCziTopHandler_runNonIO_closure"
+           "-Wl,-u,ghczmprim_GHCziTuple_Z0T_closure"
+           "-Wl,-u,ghczmprim_GHCziTypes_True_closure"
+           "-Wl,-u,ghczmprim_GHCziTypes_False_closure"
+           "-Wl,-u,base_GHCziPack_unpackCString_closure"
+           "-Wl,-u,base_GHCziWeak_runFinalizzerBatch_closure"
+           "-Wl,-u,base_GHCziIOziException_stackOverflow_closure"
+           "-Wl,-u,base_GHCziIOziException_heapOverflow_closure"
+           "-Wl,-u,base_GHCziIOziException_allocationLimitExceeded_closure"
+           "-Wl,-u,base_GHCziIOziException_blockedIndefinitelyOnMVar_closure"
+           "-Wl,-u,base_GHCziIOziException_blockedIndefinitelyOnSTM_closure"
+           "-Wl,-u,base_GHCziIOziException_cannotCompactFunction_closure"
+           "-Wl,-u,base_GHCziIOziException_cannotCompactPinned_closure"
+           "-Wl,-u,base_GHCziIOziException_cannotCompactMutable_closure"
+           "-Wl,-u,base_GHCziIOPort_doubleReadException_closure"
+           "-Wl,-u,base_ControlziExceptionziBase_nonTermination_closure"
+           "-Wl,-u,base_ControlziExceptionziBase_nestedAtomically_closure"
+           "-Wl,-u,base_GHCziEventziThread_blockedOnBadFD_closure"
+           "-Wl,-u,base_GHCziConcziSync_runSparks_closure"
+           "-Wl,-u,base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+           "-Wl,-u,base_GHCziConcziIO_interruptIOManager_closure"
+           "-Wl,-u,base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
+           "-Wl,-u,base_GHCziConcziSignal_runHandlersPtr_closure"
+           "-Wl,-u,base_GHCziTopHandler_flushStdHandles_closure"
+           "-Wl,-u,base_GHCziTopHandler_runMainIO_closure"
+           "-Wl,-u,ghczmprim_GHCziTypes_Czh_con_info"
+           "-Wl,-u,ghczmprim_GHCziTypes_Izh_con_info"
+           "-Wl,-u,ghczmprim_GHCziTypes_Fzh_con_info"
+           "-Wl,-u,ghczmprim_GHCziTypes_Dzh_con_info"
+           "-Wl,-u,ghczmprim_GHCziTypes_Wzh_con_info"
+           "-Wl,-u,base_GHCziPtr_Ptr_con_info"
+           "-Wl,-u,base_GHCziPtr_FunPtr_con_info"
+           "-Wl,-u,base_GHCziInt_I8zh_con_info"
+           "-Wl,-u,base_GHCziInt_I16zh_con_info"
+           "-Wl,-u,base_GHCziInt_I32zh_con_info"
+           "-Wl,-u,base_GHCziInt_I64zh_con_info"
+           "-Wl,-u,base_GHCziWord_W8zh_con_info"
+           "-Wl,-u,base_GHCziWord_W16zh_con_info"
+           "-Wl,-u,base_GHCziWord_W32zh_con_info"
+           "-Wl,-u,base_GHCziWord_W64zh_con_info"
+           "-Wl,-u,base_GHCziStable_StablePtr_con_info"
+           "-Wl,-u,hs_atomic_add8"
+           "-Wl,-u,hs_atomic_add16"
+           "-Wl,-u,hs_atomic_add32"
+           "-Wl,-u,hs_atomic_sub8"
+           "-Wl,-u,hs_atomic_sub16"
+           "-Wl,-u,hs_atomic_sub32"
+           "-Wl,-u,hs_atomic_and8"
+           "-Wl,-u,hs_atomic_and16"
+           "-Wl,-u,hs_atomic_and32"
+           "-Wl,-u,hs_atomic_nand8"
+           "-Wl,-u,hs_atomic_nand16"
+           "-Wl,-u,hs_atomic_nand32"
+           "-Wl,-u,hs_atomic_or8"
+           "-Wl,-u,hs_atomic_or16"
+           "-Wl,-u,hs_atomic_or32"
+           "-Wl,-u,hs_atomic_xor8"
+           "-Wl,-u,hs_atomic_xor16"
+           "-Wl,-u,hs_atomic_xor32"
+           "-Wl,-u,hs_cmpxchg8"
+           "-Wl,-u,hs_cmpxchg16"
+           "-Wl,-u,hs_cmpxchg32"
+           "-Wl,-u,hs_cmpxchg64"
+           "-Wl,-u,hs_xchg8"
+           "-Wl,-u,hs_xchg16"
+           "-Wl,-u,hs_xchg32"
+           "-Wl,-u,hs_xchg64"
+           "-Wl,-u,hs_atomicread8"
+           "-Wl,-u,hs_atomicread16"
+           "-Wl,-u,hs_atomicread32"
+           "-Wl,-u,hs_atomicwrite8"
+           "-Wl,-u,hs_atomicwrite16"
+           "-Wl,-u,hs_atomicwrite32"
+           "-Wl,-u,base_GHCziStackziCloneStack_StackSnapshot_closure"
+
+        if flag(find-ptr)
+          -- This symbol is useful in gdb, but not referred to anywhere,
+          -- so we need to force it to be included in the binary.
+          ld-options: "-Wl,-u,findPtr"
+           -- This symbol is useful in gdb, but not referred to anywhere,
+           -- so we need to force it to be included in the binary.
+           "-Wl,-u,findPtr"
+
+      if os(windows)
+        if flag(leading-underscore)
+          ld-options:
+             "-Wl,-u,_base_GHCziEventziWindows_processRemoteCompletion_closure"
+        else
+          ld-options:
+             "-Wl,-u,base_GHCziEventziWindows_processRemoteCompletion_closure"
+
+      if os(osx)
+        ld-options: "-Wl,-search_paths_first"
+                    -- See Note [fd_set_overflow]
+                    "-Wl,-U,___darwin_check_fd_set_overflow"
+        if !arch(x86_64) && !arch(aarch64)
+           ld-options: -read_only_relocs warning
+
+      cmm-sources: Apply.cmm
+                   Compact.cmm
+                   Exception.cmm
+                   HeapStackCheck.cmm
+                   PrimOps.cmm
+                   StgMiscClosures.cmm
+                   StgStartup.cmm
+                   StgStdThunks.cmm
+                   Updates.cmm
+                   -- AutoApply is generated
+                   AutoApply.cmm
+
+      -- Adjustor stuff
+      if flag(libffi-adjustors)
+        c-sources: adjustor/LibffiAdjustor.c
+      else
+        -- Use GHC's native adjustors
+        if arch(i386)
+          asm-sources: AdjustorAsm.S
+          c-sources: adjustor/Nativei386.c
+        if arch(x86_64)
+          if os(mingw32)
+            asm-sources: adjustor/NativeAmd64MingwAsm.S
+            c-sources: adjustor/NativeAmd64Mingw.c
+          else
+            asm-sources: adjustor/NativeAmd64Asm.S
+            c-sources: adjustor/NativeAmd64.c
+        if arch(ppc) || arch(ppc64)
+          asm-sources: AdjustorAsm.S
+          c-sources: adjustor/NativePowerPC.c
+        if arch(ia64)
+          c-sources: adjustor/NativeIA64.c
+
+      -- Use assembler STG entrypoint on archictures where it is used
+      if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64)
+        asm-sources: StgCRunAsm.S
+
+      c-sources: Adjustor.c
+                 adjustor/AdjustorPool.c
+                 ExecPage.c
+                 Arena.c
+                 Capability.c
+                 CheckUnload.c
+                 CloneStack.c
+                 ClosureFlags.c
+                 ClosureSize.c
+                 Disassembler.c
+                 FileLock.c
+                 ForeignExports.c
+                 Globals.c
+                 Hash.c
+                 Heap.c
+                 Hpc.c
+                 HsFFI.c
+                 Inlines.c
+                 Interpreter.c
+                 IOManager.c
+                 LdvProfile.c
+                 Libdw.c
+                 LibdwPool.c
+                 Linker.c
+                 ReportMemoryMap.c
+                 Messages.c
+                 OldARMAtomic.c
+                 PathUtils.c
+                 Pool.c
+                 Printer.c
+                 ProfHeap.c
+                 ProfilerReport.c
+                 ProfilerReportJson.c
+                 Profiling.c
+                 IPE.c
+                 Proftimer.c
+                 RaiseAsync.c
+                 RetainerProfile.c
+                 RetainerSet.c
+                 RtsAPI.c
+                 RtsDllMain.c
+                 RtsFlags.c
+                 RtsMain.c
+                 RtsMessages.c
+                 RtsStartup.c
+                 RtsSymbolInfo.c
+                 RtsSymbols.c
+                 RtsUtils.c
+                 STM.c
+                 Schedule.c
+                 Sparks.c
+                 SpinLock.c
+                 StableName.c
+                 StablePtr.c
+                 StaticPtrTable.c
+                 Stats.c
+                 StgCRun.c
+                 StgPrimFloat.c
+                 Task.c
+                 ThreadLabels.c
+                 ThreadPaused.c
+                 Threads.c
+                 Ticky.c
+                 Timer.c
+                 TopHandler.c
+                 Trace.c
+                 TraverseHeap.c
+                 TraverseHeapTest.c
+                 WSDeque.c
+                 Weak.c
+                 eventlog/EventLog.c
+                 eventlog/EventLogWriter.c
+                 hooks/FlagDefaults.c
+                 hooks/LongGCSync.c
+                 hooks/MallocFail.c
+                 hooks/OnExit.c
+                 hooks/OutOfHeap.c
+                 hooks/StackOverflow.c
+                 linker/CacheFlush.c
+                 linker/Elf.c
+                 linker/LoadArchive.c
+                 linker/M32Alloc.c
+                 linker/MMap.c
+                 linker/MachO.c
+                 linker/macho/plt.c
+                 linker/macho/plt_aarch64.c
+                 linker/PEi386.c
+                 linker/SymbolExtras.c
+                 linker/elf_got.c
+                 linker/elf_plt.c
+                 linker/elf_plt_aarch64.c
+                 linker/elf_plt_arm.c
+                 linker/elf_reloc.c
+                 linker/elf_reloc_aarch64.c
+                 linker/elf_tlsgd.c
+                 linker/elf_util.c
+                 sm/BlockAlloc.c
+                 sm/CNF.c
+                 sm/Compact.c
+                 sm/Evac.c
+                 sm/Evac_thr.c
+                 sm/GC.c
+                 sm/GCAux.c
+                 sm/GCUtils.c
+                 sm/MBlock.c
+                 sm/MarkWeak.c
+                 sm/NonMoving.c
+                 sm/NonMovingCensus.c
+                 sm/NonMovingMark.c
+                 sm/NonMovingScav.c
+                 sm/NonMovingShortcut.c
+                 sm/NonMovingSweep.c
+                 sm/Sanity.c
+                 sm/Scav.c
+                 sm/Scav_thr.c
+                 sm/Storage.c
+                 sm/Sweep.c
+                 fs.c
+                 -- I wish we had wildcards..., this would be:
+                 -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
+
+      if os(windows)
+         c-sources: win32/AsyncMIO.c
+                    win32/AsyncWinIO.c
+                    win32/AwaitEvent.c
+                    win32/ConsoleHandler.c
+                    win32/GetEnv.c
+                    win32/GetTime.c
+                    win32/MIOManager.c
+                    win32/OSMem.c
+                    win32/OSThreads.c
+                    win32/ThrIOManager.c
+                    win32/Ticker.c
+                    win32/WorkQueue.c
+                    win32/veh_excn.c
+                    -- win32/**/*.c
+      else
+         c-sources: posix/GetEnv.c
+                    posix/GetTime.c
+                    posix/Ticker.c
+                    posix/OSMem.c
+                    posix/OSThreads.c
+                    posix/Select.c
+                    posix/Signals.c
+                    posix/TTY.c
+                    -- ticker/*.c
+                    -- We don't want to compile posix/ticker/*.c, these will be #included
+                    -- from Ticker.c
+
+
+-- Note [fd_set_overflow]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+-- In this note is the very sad tale of __darwin_fd_set_overflow.
+-- The 8.10.5 release was broken because it was built in an environment
+-- where the libraries were provided by XCode 12.*, these libraries introduced
+-- a reference to __darwin_fd_set_overflow via the FD_SET macro which is used in
+-- Select.c. Unfortunately, this symbol is not available with XCode 11.* which
+-- led to a linker error when trying to link anything. This is almost certainly
+-- a bug in XCode but we still have to work around it.
+
+-- Undefined symbols for architecture x86_64:
+--  "___darwin_check_fd_set_overflow", referenced from:
+--      _awaitEvent in libHSrts.a(Select.o)
+-- ld: symbol(s) not found for architecture x86_64
+
+-- One way to fix this is to upgrade your version of xcode, but this would
+-- force the upgrade on users prematurely. Fortunately it also seems safe to pass
+-- the linker option "-Wl,-U,___darwin_check_fd_set_overflow" because the usage of
+-- the symbol is guarded by a guard to check if it's defined.
+
+-- __header_always_inline int
+-- __darwin_check_fd_set(int _a, const void *_b)
+-- {
+--    if ((uintptr_t)&__darwin_check_fd_set_overflow != (uintptr_t) 0) {
+--#if defined(_DARWIN_UNLIMITED_SELECT) || defined(_DARWIN_C_SOURCE)
+--        return __darwin_check_fd_set_overflow(_a, _b, 1);
+--#else
+--        return __darwin_check_fd_set_overflow(_a, _b, 0);
+--#endif
+--    } else {
+--        return 1;
+--    }
+--}
+
+-- Across the internet there are many other reports of this issue
+--  See: https://github.com/mono/mono/issues/19393
+--     , https://github.com/sitsofe/fio/commit/b6a1e63a1ff607692a3caf3c2db2c3d575ba2320
+
+-- The issue was originally reported in #19950
