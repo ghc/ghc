@@ -91,7 +91,7 @@ install: install_bin install_lib install_includes
 install: install_docs update_package_db
 
 ActualBinsDir=${ghclibdir}/bin
-ifeq "$(TargetOS_CPP)" "mingw32"
+ifeq "$(RelocatableBuild)" "YES"
 ActualLibsDir=${ghclibdir}
 else
 ActualLibsDir=${ghclibdir}/lib
