@@ -1,0 +1,9 @@
+
+EtaExpandStupid2.hs:16:8: error:
+    • No instance for (Num c) arising from a use of ‘MkD4’
+      Possible fix:
+        add (Num c) to the context of
+          the type signature for:
+            foo4 :: forall c. Int -> c -> D4 Float# Int c
+    • In the expression: MkD4 (9.0# `timesFloat#` 17.0#)
+      In an equation for ‘foo4’: foo4 = MkD4 (9.0# `timesFloat#` 17.0#)
