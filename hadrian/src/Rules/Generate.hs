@@ -54,7 +54,7 @@ rtsDependencies = do
 genapplyDependencies :: Expr [FilePath]
 genapplyDependencies = do
     stage   <- getStage
-    rtsPath <- expr (rtsBuildPath $ succ stage)
+    rtsPath <- expr (rtsBuildPath $ succStage stage)
     ((stage /= Stage3) ?) $ pure $ ((rtsPath -/- "include") -/-) <$>
         [ "ghcautoconf.h", "ghcplatform.h" ]
 
@@ -174,7 +174,7 @@ genPlatformConstantsHeader context file = do
 copyRules :: Rules ()
 copyRules = do
     root <- buildRootRules
-    forM_ [Stage0 ..] $ \stage -> do
+    forM_ allStages $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
 
             infixl 1 <~
@@ -199,7 +199,7 @@ generateRules = do
     (root -/- "ghc-stage2") <~+ ghcWrapper Stage2
     (root -/- "ghc-stage3") <~+ ghcWrapper Stage3
 
-    forM_ [Stage0 ..] $ \stage -> do
+    forM_ allStages $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
             go gen file = generate file (semiEmptyTarget stage) gen
         (prefix -/- "settings") %> go generateSettings
@@ -223,11 +223,11 @@ emptyTarget = vanillaContext (error "Rules.Generate.emptyTarget: unknown stage")
 -- | GHC wrapper scripts used for passing the path to the right package database
 -- when invoking in-tree GHC executables.
 ghcWrapper :: Stage -> Expr String
-ghcWrapper Stage0 = error "Stage0 GHC does not require a wrapper script to run."
+ghcWrapper (Stage0 {}) = error "Stage0 GHC does not require a wrapper script to run."
 ghcWrapper stage  = do
     dbPath  <- expr $ (</>) <$> topDirectory <*> packageDbPath stage
     ghcPath <- expr $ (</>) <$> topDirectory
-                            <*> programPath (vanillaContext (pred stage) ghc)
+                            <*> programPath (vanillaContext (predStage stage) ghc)
     return $ unwords $ map show $ [ ghcPath ]
                                ++ (if stage == Stage1
                                      then ["-no-global-package-db"
@@ -246,7 +246,7 @@ generateGhcPlatformH :: Expr String
 generateGhcPlatformH = do
     trackGenerateHs
     stage    <- getStage
-    let chooseSetting x y = getSetting $ if stage == Stage0 then x else y
+    let chooseSetting x y = getSetting $ case stage of { Stage0 {} -> x; _ -> y }
     buildPlatform  <- chooseSetting BuildPlatform HostPlatform
     buildArch      <- chooseSetting BuildArch     HostArch
     buildOs        <- chooseSetting BuildOs       HostOs
@@ -361,7 +361,7 @@ generateSettings = do
 generateConfigHs :: Expr String
 generateConfigHs = do
     stage <- getStage
-    let chooseSetting x y = getSetting $ if stage == Stage0 then x else y
+    let chooseSetting x y = getSetting $ case stage of { Stage0 {} -> x; _ -> y }
     buildPlatform <- chooseSetting BuildPlatform HostPlatform
     hostPlatform <- chooseSetting HostPlatform TargetPlatform
     trackGenerateHs
@@ -394,8 +394,15 @@ generateConfigHs = do
         , "cBooterVersion        = " ++ show cBooterVersion
         , ""
         , "cStage                :: String"
-        , "cStage                = show (" ++ show (fromEnum stage + 1) ++ " :: Int)"
+        , "cStage                = show (" ++ stageString stage ++ " :: Int)"
         ]
+  where
+    stageString (Stage0 InTreeLibs) = "1"
+    stageString Stage1 = "2"
+    stageString Stage2 = "3"
+    stageString Stage3 = "4"
+    stageString (Stage0 GlobalLibs) = error "stageString: StageBoot"
+
 
 -- | Generate @ghcautoconf.h@ header.
 generateGhcAutoconfH :: Expr String

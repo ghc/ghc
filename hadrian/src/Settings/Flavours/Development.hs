@@ -8,12 +8,17 @@ import {-# SOURCE #-} Settings.Default
 -- Please update doc/flavours.md when changing this file.
 developmentFlavour :: Stage -> Flavour
 developmentFlavour ghcStage = defaultFlavour
-    { name = "devel" ++ show (fromEnum ghcStage)
+    { name = "devel" ++ stageString ghcStage
     , args = defaultBuilderArgs <> developmentArgs ghcStage <> defaultPackageArgs
     , libraryWays = pure [vanilla]
     , rtsWays = pure [vanilla, debug, threaded, threadedDebug]
     , dynamicGhcPrograms = return False
     , ghcDebugAssertions = True }
+    where
+      stageString Stage2 = "2"
+      stageString Stage1 = "1"
+      stageString Stage3 = "3"
+      stageString s = error ("developmentFlavour not support for " ++ show s)
 
 developmentArgs :: Stage -> Args
 developmentArgs ghcStage = do
@@ -25,5 +30,5 @@ developmentArgs ghcStage = do
                                  package cabal ? pure ["-O0"]]
         , hsLibrary  = notStage0 ? arg "-dcore-lint"
         , hsCompiler = mconcat [stage0 ? arg "-O2",
-                                succ stage == ghcStage ? pure ["-O0"]]
-        , hsGhc      = succ stage == ghcStage ? pure ["-O0"] }
+                                 stage == predStage ghcStage ? pure ["-O0"]]
+        , hsGhc      = stage == predStage ghcStage ? pure ["-O0"] }

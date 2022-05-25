@@ -34,7 +34,7 @@ buildProgramRules rs = do
         writeFile' stampPath "OK"
 
     -- Rules for programs that are actually built by hadrian.
-    forM_ [Stage0 ..] $ \stage ->
+    forM_ allStages $ \stage ->
         [ root -/- stageString stage -/- "bin"     -/- "*"
         , root -/- stageString stage -/- "lib/bin" -/- "*" ] |%> \bin -> do
             programContexts <- getProgramContexts stage
@@ -76,13 +76,13 @@ lookupProgramContext wholePath progs = lookup (takeFileName wholePath) progs
 
 buildProgram :: FilePath -> Context -> [(Resource, Int)] -> Action ()
 buildProgram bin ctx@(Context{..}) rs = do
-  -- Custom dependencies: this should be modeled better in the
-  -- Cabal file somehow.
-  -- TODO: Is this still needed? See 'runtimeDependencies'.
+
   when (package == hsc2hs) $ do
     -- 'Hsc2hs' needs the @template-hsc.h@ file.
     template <- templateHscPath stage
     need [template]
+  -- Custom dependencies: this should be modeled better in the
+  -- Cabal file somehow.
   when (package == ghc) $ do
     need =<< ghcBinDeps stage
   when (package == haddock) $ do
@@ -100,18 +100,18 @@ buildProgram bin ctx@(Context{..}) rs = do
   cross <- flag CrossCompiling
   -- For cross compiler, copy @stage0/bin/<pgm>@ to @stage1/bin/@.
   case (cross, stage) of
-    (True, s) | s > Stage0 -> do
-        srcDir <- buildRoot <&> (-/- (stageString Stage0 -/- "bin"))
+    (True, s) | s > stage0InTree -> do
+        srcDir <- buildRoot <&> (-/- (stageString stage0InTree -/- "bin"))
         copyFile (srcDir -/- takeFileName bin) bin
-    (False, s) | s > Stage0 && (package `elem` [touchy, unlit]) -> do
-        srcDir <- stageLibPath Stage0 <&> (-/- "bin")
+    (False, s) | s > stage0InTree && (package `elem` [touchy, unlit]) -> do
+        srcDir <- stageLibPath stage0InTree <&> (-/- "bin")
         copyFile (srcDir -/- takeFileName bin) bin
     _ -> buildBinary rs bin ctx
 
 buildBinary :: [(Resource, Int)] -> FilePath -> Context -> Action ()
 buildBinary rs bin context@Context {..} = do
     needLibrary =<< contextDependencies context
-    when (stage > Stage0) $ do
+    when (stage > stage0InTree) $ do
         ways <- interpretInContext context (getLibraryWays <> getRtsWays)
         needLibrary [ (rtsContext stage) { way = w } | w <- ways ]
     asmSrcs <- interpretInContext context (getContextData asmSrcs)

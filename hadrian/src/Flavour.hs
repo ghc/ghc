@@ -493,7 +493,7 @@ builderSetting =
           , ("deps", FindCDependencies CDep)
           ]
 
-        stages = map (\stg -> (stageString stg, stg)) [minBound..maxBound]
+        stages = map (\stg -> (stageString stg, stg)) allStages
 
         pkgs = map (\pkg -> (pkgName pkg, pkg)) (ghcPackages ++ userPackages)
 

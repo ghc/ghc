@@ -23,7 +23,7 @@ simplePackageTargets :: Rules ()
 simplePackageTargets = traverse_ simpleTarget targets
 
   where targets = [ (stage, target)
-                  | stage <- [minBound..maxBound]
+                  | stage <- allStages
                   , target <- knownPackages
                   ]
 
@@ -53,10 +53,11 @@ getLibraryPath :: Stage -> Package -> Action FilePath
 getLibraryPath stage pkg = pkgConfFile (vanillaContext stage pkg)
 
 getProgramPath :: Stage -> Package -> Action FilePath
-getProgramPath Stage0 _ =
-  error ("Cannot build a stage 0 executable target: " ++
-         "it is the boot compiler's toolchain")
-getProgramPath stage pkg = programPath (vanillaContext (pred stage) pkg)
+getProgramPath stage pkg =
+  case stage of
+    (Stage0 GlobalLibs) -> error "Can't build executable in stageBoot"
+    (Stage0 InTreeLibs) -> programPath (vanillaContext stage0Boot pkg)
+    s -> programPath (vanillaContext (predStage s) pkg)
 
 
 -- | A phony @autocomplete@ rule that prints all valid setting keys

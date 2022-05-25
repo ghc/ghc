@@ -21,7 +21,7 @@ packageArgs = do
 
         -- Check if the bootstrap compiler has the same version as the one we
         -- are building. This is used to build cross-compilers
-        bootCross = (==) <$> ghcVersionStage Stage0 <*> ghcVersionStage Stage1
+        bootCross = (==) <$> ghcVersionStage (stage0InTree) <*> ghcVersionStage Stage1
 
     cursesIncludeDir <- getSetting CursesIncludeDir
     cursesLibraryDir <- getSetting CursesLibDir

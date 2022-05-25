@@ -111,7 +111,10 @@ compiler.
 
 -- | Is the build currently in stage 0?
 stage0 :: Predicate
-stage0 = stage Stage0
+stage0 =  p <$> getStage
+  where
+    p (Stage0 {}) = True
+    p _ = False
 
 -- | Is the build currently in stage 1?
 stage1 :: Predicate
@@ -123,7 +126,8 @@ stage2 = stage Stage2
 
 -- | Is the build /not/ in stage 0 right now?
 notStage0 :: Predicate
-notStage0 = notM stage0
+notStage0 = notM Expression.stage0
+
 
 -- | Whether or not the bootstrapping compiler provides a threaded RTS. We need
 --   to know this when building stage 1, since stage 1 links against the

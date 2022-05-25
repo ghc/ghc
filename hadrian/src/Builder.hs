@@ -199,18 +199,20 @@ instance NFData   Builder
 -- 'Stage' and GHC 'Package').
 builderProvenance :: Builder -> Maybe Context
 builderProvenance = \case
-    DeriveConstants  -> context Stage0 deriveConstants
-    GenApply         -> context Stage0 genapply
-    GenPrimopCode    -> context Stage0 genprimopcode
-    Ghc _ Stage0     -> Nothing
-    Ghc _ stage      -> context (pred stage) ghc
-    GhcPkg _ Stage0  -> Nothing
-    GhcPkg _ s       -> context (pred s) ghcPkg
+    DeriveConstants  -> context stage0Boot deriveConstants
+    GenApply         -> context stage0Boot genapply
+    GenPrimopCode    -> context stage0Boot genprimopcode
+    Ghc _ (Stage0 {})-> Nothing
+    Ghc _ stage      -> context (predStage stage) ghc
+    GhcPkg _ (Stage0 {}) -> Nothing
+    GhcPkg _ s       -> context (predStage s) ghcPkg
     Haddock _        -> context Stage1 haddock
+    Hsc2Hs _         -> context stage0Boot hsc2hs
+    Unlit            -> context stage0Boot unlit
+
+    -- Never used
     Hpc              -> context Stage1 hpcBin
-    Hp2Ps            -> context Stage0 hp2ps
-    Hsc2Hs _         -> context Stage0 hsc2hs
-    Unlit            -> context Stage0 unlit
+    Hp2Ps            -> context stage0Boot hp2ps
     _                -> Nothing
   where
     context s p = Just $ vanillaContext s p
@@ -226,19 +228,19 @@ instance H.Builder Builder where
         Autoreconf dir -> return [dir -/- "configure.ac"]
         Configure  dir -> return [dir -/- "configure"]
 
-        Ghc _ Stage0 -> do
+        Ghc _ (Stage0 {}) -> do
           -- Read the boot GHC version here to make sure we rebuild when it
           -- changes (#18001).
           _bootGhcVersion <- setting GhcVersion
           pure []
         Ghc _ stage -> do
             root <- buildRoot
-            touchyPath <- programPath (vanillaContext Stage0 touchy)
+            touchyPath <- programPath (vanillaContext (Stage0 InTreeLibs) touchy)
             unlitPath  <- builderPath Unlit
 
             -- GHC from the previous stage is used to build artifacts in the
             -- current stage. Need the previous stage's GHC deps.
-            ghcdeps <- ghcBinDeps (pred stage)
+            ghcdeps <- ghcBinDeps (predStage stage)
 
             return $ [ unlitPath ]
                   ++ ghcdeps
@@ -394,15 +396,15 @@ isOptional = \case
 systemBuilderPath :: Builder -> Action FilePath
 systemBuilderPath builder = case builder of
     Alex            -> fromKey "alex"
-    Ar _ Stage0     -> fromKey "system-ar"
+    Ar _ (Stage0 {})-> fromKey "system-ar"
     Ar _ _          -> fromKey "ar"
     Autoreconf _    -> stripExe =<< fromKey "autoreconf"
-    Cc  _  Stage0   -> fromKey "system-cc"
+    Cc  _  (Stage0 {}) -> fromKey "system-cc"
     Cc  _  _        -> fromKey "cc"
     -- We can't ask configure for the path to configure!
     Configure _     -> return "configure"
-    Ghc _  Stage0   -> fromKey "system-ghc"
-    GhcPkg _ Stage0 -> fromKey "system-ghc-pkg"
+    Ghc _  (Stage0 {})   -> fromKey "system-ghc"
+    GhcPkg _ (Stage0 {}) -> fromKey "system-ghc-pkg"
     Happy           -> fromKey "happy"
     HsCpp           -> fromKey "hs-cpp"
     Ld _            -> fromKey "ld"
@@ -414,7 +416,7 @@ systemBuilderPath builder = case builder of
     -- parameters. E.g. building a cross-compiler on and for x86_64
     -- which will target ppc64 means that MergeObjects Stage0 will use
     -- x86_64 linker and MergeObject _ will use ppc64 linker.
-    MergeObjects Stage0 -> fromKey "system-merge-objects"
+    MergeObjects (Stage0 {}) -> fromKey "system-merge-objects"
     MergeObjects _  -> fromKey "merge-objects"
     Make _          -> fromKey "make"
     Makeinfo        -> fromKey "makeinfo"

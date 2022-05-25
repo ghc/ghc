@@ -38,7 +38,7 @@ cabalInstallArgs = builder (Cabal Install) ?  do
 -- of the stage 2 compiler
 assertNoBuildRootLeak :: Args -> Args
 assertNoBuildRootLeak args = do
-  libPaths <- expr $ mapM stageLibPath [Stage0 ..]
+  libPaths <- expr $ mapM stageLibPath allStages
   xs <- args
   pure $ assert (not $ any (\arg -> or [libPath `isInfixOf` arg && not ("package.conf.d" `isSuffixOf` arg)
                                        | libPath <- libPaths]) xs)
@@ -204,8 +204,8 @@ configureArgs cFlags' ldFlags' = do
         ]
 
 bootPackageConstraints :: Args
-bootPackageConstraints = stage0 ? do
-    bootPkgs <- expr $ stagePackages Stage0
+bootPackageConstraints = (stage0InTree ==) <$> getStage ? do
+    bootPkgs <- expr $ stagePackages stage0InTree
     let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
     constraints <- expr $ forM (sort pkgs) $ \pkg -> do
         version <- pkgVersion pkg
