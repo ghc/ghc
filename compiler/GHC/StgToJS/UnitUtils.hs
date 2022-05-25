@@ -6,8 +6,6 @@ module GHC.StgToJS.UnitUtils
   , moduleExportsSymbol
   , getPackageName
   , encodeModule
-  , ghcjsPrimUnit
-  , ghcjsThUnit
   ) where
 
 
@@ -85,34 +83,6 @@ isGhcjsThUnit u_env dflags pkgKey
   where
     home_uid = homeUnitId   . ue_unsafeHomeUnit $ u_env
     pn       = unitIdString . ue_current_unit   $ u_env
-
--- FIXME: Jeff (2022,03): These return a UnitId, but I think they should be
--- @RealUnit (Definite UnitId). Per the description of @GenUnit@ in
--- Ghc.Unit.Types: a RealUnit is a UnitId that is closed or fully instantiated.
--- These should be fully instantiated, and Definite. See Note [Wired-in units]
--- in GHC.Unit.Types for a similar scenario for the NCG
-ghcjsPrimUnit :: UnitState -> UnitId
-ghcjsPrimUnit env =
-  case prims of
-    ((_,k):_) -> k
-    _         -> error "Package `ghcjs-prim' is required to link executables"
-  where
-    prims = filter ((=="ghcjs-prim").fst)
-                   (searchModule env (mkModuleName "GHCJS.Prim"))
-
-ghcjsThUnit :: UnitState -> UnitId
-ghcjsThUnit env =
-  case prims of
-    ((_,k):_) -> k
-    _         -> error "Package `ghcjs-th' is required to link executables"
-  where
-    prims = filter ((=="ghcjs-th").fst)
-                   (searchModule env (mkModuleName "GHCJS.Prim.TH.Eval"))
-
-searchModule :: UnitState -> ModuleName -> [(String, UnitId)]
-searchModule env =
-  fmap ((\k -> (getPackageName env k, k)) . moduleUnitId . fst)
-  . lookupModuleInAllUnits env
 
 getPackageName :: UnitState -> UnitId -> String
 getPackageName u_st = maybe "" unitPackageNameString . lookupUnitId u_st
