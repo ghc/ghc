@@ -24,7 +24,7 @@ ghcBuilderArgs = mconcat
       -- config at build time.
       -- See Note [Genapply target as host for RTS macros].
       stage <- getStage
-      nextStageRtsBuildDir <- expr $ rtsBuildPath $ succ stage
+      nextStageRtsBuildDir <- expr $ rtsBuildPath $ succStage stage
       let nextStageRtsBuildIncludeDir = nextStageRtsBuildDir </> "include"
       builder Ghc ? arg ("-I" ++ nextStageRtsBuildIncludeDir)
   , compileAndLinkHs, compileC, compileCxx, findHsDependencies

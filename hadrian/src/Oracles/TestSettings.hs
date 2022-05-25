@@ -118,7 +118,7 @@ fullPath stage pkg = programPath =<< programContext stage pkg
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc
 stageOfTestCompiler :: String -> Maybe Stage
-stageOfTestCompiler "stage1" = Just Stage0
+stageOfTestCompiler "stage1" = Just stage0InTree
 stageOfTestCompiler "stage2" = Just Stage1
 stageOfTestCompiler "stage3" = Just Stage2
 stageOfTestCompiler _ = Nothing

@@ -16,10 +16,10 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     hOs     <- getSetting HostOs
     tArch   <- getSetting TargetArch
     tOs     <- getSetting TargetOs
-    version <- if stage == Stage0
-               then expr ghcCanonVersion
-               else getSetting ProjectVersionInt
-    tmpl <- (top -/-) <$> expr (templateHscPath Stage0)
+    version <- case stage of
+                  Stage0 {} -> expr ghcCanonVersion
+                  _ ->  getSetting ProjectVersionInt
+    tmpl <- (top -/-) <$> expr (templateHscPath stage0Boot)
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
             , notM isWinTarget ? notM (flag CrossCompiling) ? arg "--cross-safe"

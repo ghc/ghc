@@ -62,10 +62,10 @@ testDependencies = do
     putBuild "==== Dependencies of the 'ghc-bin' binary"
     ghcDeps <- pkgDependencies ghc
     test $ pkgName compiler `elem` ghcDeps
-    stage0Deps <- contextDependencies (vanillaContext Stage0 ghc)
+    stage0Deps <- contextDependencies (vanillaContext stage0InTree ghc)
     stage1Deps <- contextDependencies (vanillaContext Stage1 ghc)
     stage2Deps <- contextDependencies (vanillaContext Stage2 ghc)
-    test $ vanillaContext Stage0 compiler `notElem` stage1Deps
+    test $ vanillaContext stage0InTree compiler `notElem` stage1Deps
     test $ vanillaContext Stage1 compiler `elem`    stage1Deps
     test $ vanillaContext Stage2 compiler `notElem` stage1Deps
     test $ stage1Deps /= stage0Deps
@@ -102,7 +102,7 @@ testPackages :: Action ()
 testPackages = do
     putBuild "==== Check system configuration"
     putBuild "==== Packages, interpretInContext, configuration flags"
-    forM_ [Stage0 ..] $ \stage -> do
+    forM_ allStages $ \stage -> do
         pkgs <- stagePackages stage
         when (win32 `elem` pkgs) . test $ windowsHost
         when (unix  `elem` pkgs) . test $ not windowsHost

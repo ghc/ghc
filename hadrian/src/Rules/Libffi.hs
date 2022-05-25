@@ -156,7 +156,7 @@ libffiRules :: Rules ()
 libffiRules = do
   _ <- addOracleCache $ \ (LibffiDynLibs stage)
                          -> readFileLines =<< dynLibManifest stage
-  forM_ [Stage1 ..] $ \stage -> do
+  forM_ [Stage1, Stage2, Stage3] $ \stage -> do
     root <- buildRootRules
     let path       = root -/- stageString stage
         libffiPath = path -/- pkgName libffi -/- "build"

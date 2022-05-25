@@ -224,12 +224,12 @@ typecheck-testsuite:
     BUILD_FLAVOUR: default
   script:
     - .gitlab/ci.sh configure
-    - .gitlab/ci.sh run_hadrian stage1:exe:lint-submodule-refs
+    - .gitlab/ci.sh run_hadrian stage0:exe:lint-submodule-refs
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
     - "echo Linting submodule changes between $base..$CI_COMMIT_SHA"
     - git submodule foreach git remote update
-    - _build/stage0/bin/lint-submodule-refs . $(git rev-list $base..$CI_COMMIT_SHA)
+    - _build/stageBoot/bin/lint-submodule-refs . $(git rev-list $base..$CI_COMMIT_SHA)
   dependencies: []
 
 # We allow the submodule checker to fail when run on merge requests (to
@@ -287,10 +287,10 @@ lint-submods-branch:
     BUILD_FLAVOUR: default
   script:
     - .gitlab/ci.sh configure
-    - .gitlab/ci.sh run_hadrian stage1:exe:lint-submodule-refs
+    - .gitlab/ci.sh run_hadrian stage0:exe:lint-submodule-refs
     - "echo Linting submodule changes between $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA"
     - git submodule foreach git remote update
-    - _build/stage0/bin/lint-submodule-refs . $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
+    - _build/stageBoot/bin/lint-submodule-refs . $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'

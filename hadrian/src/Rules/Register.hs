@@ -109,11 +109,12 @@ registerPackageRules rs stage = do
 
         when (pkg == compiler) $ need =<< ghcLibDeps stage
 
-        isBoot <- (pkg `notElem`) <$> stagePackages Stage0
+        -- Only used in guard when Stage0 {} but can be GlobalLibs or InTreeLibs
+        isBoot <- (pkg `notElem`) <$> stagePackages stage
 
         let ctx = Context stage pkg vanilla
         case stage of
-            Stage0 | isBoot -> copyConf  rs ctx conf
+            Stage0 _ | isBoot -> copyConf  rs ctx conf
             _               -> buildConf rs ctx conf
 
 buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()

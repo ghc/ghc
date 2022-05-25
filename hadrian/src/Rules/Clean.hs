@@ -22,7 +22,7 @@ clean = do
 cleanSourceTree :: Action ()
 cleanSourceTree = do
     path <- buildRoot
-    forM_ [Stage0 ..] $ removeDirectory . (path -/-) . stageString
+    forM_ allStages $ removeDirectory . (path -/-) . stageString
     removeDirectory "sdistprep"
 
 cleanMingwTarballs :: Action ()

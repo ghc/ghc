@@ -72,10 +72,10 @@ parseGhcPkgPath root after = do
 -- To be kept in sync with Stage.hs's stageString function
 -- | Parse @"stageX"@ into a 'Stage'.
 parseStage :: Parsec.Parsec String () Stage
-parseStage = (Parsec.string "stage" *> Parsec.choice
-    [ Parsec.string (show n) $> toEnum n
-    | n <- map fromEnum [minBound .. maxBound :: Stage]
-    ]) Parsec.<?> "stage string"
+parseStage = Parsec.choice
+    [ n <$ Parsec.try (Parsec.string (stageString n))
+    | n <- allStages
+    ] Parsec.<?> "stage string"
 
 -- To be kept in sync with the show instances in 'Way.Type', until we perhaps
 -- use some bidirectional parsing/pretty printing approach or library.

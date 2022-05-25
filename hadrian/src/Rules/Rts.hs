@@ -24,7 +24,7 @@ rtsRules = priority 3 $ do
             rtsLibFilePath'
 
     -- Libffi
-    forM_ [Stage1 ..] $ \ stage -> do
+    forM_ [Stage1, Stage2, Stage3 ] $ \ stage -> do
         let buildPath = root -/- buildDir (rtsContext stage)
 
         -- Header files

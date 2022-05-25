@@ -66,8 +66,8 @@ checkPrograms =
     [ CheckProgram "test:check-ppr" checkPprProgPath checkPprSourcePath checkPprExtra checkPpr id id
     , CheckProgram "test:check-exact" checkExactProgPath checkExactSourcePath checkExactExtra checkExact id id
     , CheckProgram "test:count-deps" countDepsProgPath countDepsSourcePath countDepsExtra countDeps id id
-    , CheckProgram "lint:notes" noteLinterProgPath  noteLinterSourcePath  noteLinterExtra  lintNotes  (const Stage0)  id
-    , CheckProgram "lint:whitespace"  whitespaceLinterProgPath  whitespaceLinterSourcePath  whitespaceLinterExtra  lintWhitespace  (const Stage0)  (filter (/= lintersCommon))
+    , CheckProgram "lint:notes" noteLinterProgPath  noteLinterSourcePath  noteLinterExtra  lintNotes  (const stage0Boot)  id
+    , CheckProgram "lint:whitespace"  whitespaceLinterProgPath  whitespaceLinterSourcePath  whitespaceLinterExtra  lintWhitespace  (const stage0Boot)  (filter (/= lintersCommon))
     ]
 
 inTreeOutTree :: (Stage -> Action b) -> Action b -> Action b
@@ -162,7 +162,7 @@ testRules = do
         ghcPath <- getCompilerPath testGhc
         whenJust (stageOf testGhc) $ \stg ->
           need . (:[]) =<< programPath (Context stg ghc vanilla)
-        ghcConfigProgPath <- programPath =<< programContext Stage0 ghcConfig
+        ghcConfigProgPath <- programPath =<< programContext stage0InTree ghcConfig
         cwd <- liftIO $ IO.getCurrentDirectory
         need [makeRelative cwd ghcPath, ghcConfigProgPath]
         cmd [FileStdout $ root -/- ghcConfigPath] ghcConfigProgPath [ghcPath]
@@ -256,7 +256,7 @@ timeoutProgBuilder = do
     root    <- buildRoot
     if windowsHost
         then do
-            prog <- programPath =<< programContext Stage0 timeout
+            prog <- programPath =<< programContext stage0InTree timeout
             copyFile prog (root -/- timeoutPath)
         else do
             python <- builderPath Python
@@ -272,26 +272,26 @@ needTestsuitePackages :: Stage -> Action ()
 needTestsuitePackages stg = do
   allpkgs <- packages <$> flavour
   -- We need the libraries of the successor stage
-  libpkgs <- map (Stage1,) . filter isLibrary <$> allpkgs (succ stg)
+  libpkgs <- map (Stage1,) . filter isLibrary <$> allpkgs (succStage stg)
   -- And the executables of the current stage
   exepkgs <- map (stg,) . filter isProgram <$> allpkgs stg
   -- Don't require lib:ghc or lib:cabal when testing the stage1 compiler
   -- This is a hack, but a major usecase for testing the stage1 compiler is
   -- so that we can use it even if ghc stage2 fails to build
   -- Unfortunately, we still need the liba
-  let pkgs = filter (\(_,p) -> not $ "iserv" `isInfixOf` pkgName p || ((pkgName p `elem` ["ghc", "Cabal"]) && stg == Stage0))
+  let pkgs = filter (\(_,p) -> not $ "iserv" `isInfixOf` pkgName p || ((pkgName p `elem` ["ghc", "Cabal"]) && isStage0 stg))
                     (libpkgs ++ exepkgs ++ [ (stg,timeout) | windowsHost ])
   need =<< mapM (uncurry pkgFile) pkgs
   cross <- flag CrossCompiling
   when (not cross) $ needIservBins stg
   root <- buildRoot
   -- require the shims for testing stage1
-  need =<< sequence [(\f -> root -/- "stage1-test/bin" -/- takeFileName f) <$> (pkgFile Stage0 p) | (Stage0,p) <- exepkgs]
+  need =<< sequence [(\f -> root -/- "stage1-test/bin" -/- takeFileName f) <$> (pkgFile stage0InTree p) | (Stage0 InTreeLibs,p) <- exepkgs]
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc
 stageOf :: String -> Maybe Stage
-stageOf "stage1" = Just Stage0
+stageOf "stage1" = Just stage0InTree
 stageOf "stage2" = Just Stage1
 stageOf "stage3" = Just Stage2
 stageOf _ = Nothing
@@ -305,7 +305,7 @@ needIservBins stg = do
     -- Only build iserv binaries if all dependencies are built the right
     -- way already. In particular this fixes the case of no_profiled_libs
     -- not working with the testsuite, see #19624
-    canBuild Stage0 _ = pure Nothing
+    canBuild (Stage0 {}) _ = pure Nothing
     canBuild stg w = do
       contextDeps <- contextDependencies (Context stg iserv w)
       ws <- forM contextDeps $ \c ->
