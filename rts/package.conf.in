@@ -108,7 +108,6 @@ ld-options:
          , "-Wl,-u,_base_GHCziConcziSync_runSparks_closure"
          , "-Wl,-u,_base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
          , "-Wl,-u,_base_GHCziConcziIO_interruptIOManager_closure"
-         , "-Wl,-u,_base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
          , "-Wl,-u,_base_GHCziConcziSignal_runHandlersPtr_closure"
          , "-Wl,-u,_base_GHCziPerCapability_capabilitiesChanged_closure"
 #if defined(mingw32_HOST_OS)
@@ -222,7 +221,6 @@ ld-options:
          , "-Wl,-u,base_GHCziConcziSync_runSparks_closure"
          , "-Wl,-u,base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
          , "-Wl,-u,base_GHCziConcziIO_interruptIOManager_closure"
-         , "-Wl,-u,base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
          , "-Wl,-u,base_GHCziConcziSignal_runHandlersPtr_closure"
          , "-Wl,-u,base_GHCziPerCapability_capabilitiesChanged_closure"
 #if defined(mingw32_HOST_OS)
