@@ -249,7 +249,7 @@ link' env lc_cfg cfg dflags logger u_env target _include pkgs objFiles jsFiles i
         NoBase        -> return emptyBase
         BaseFile file -> loadBase file
         BaseState b   -> return b
-      (rdPkgs, rds) <- rtsDeps u_env dflags pkgs
+      (rdPkgs, rds) <- rtsDeps pkgs
       -- c   <- newMVar M.empty
       let rtsPkgs     =  map stringToUnitId ["@rts", "@rts_" ++ waysTag (targetWays_ $ dflags)]
           pkgs' :: [UnitId]
@@ -635,24 +635,22 @@ noStaticDeps = StaticDeps []
 --   parseJSON _          = mempty
 
 -- | dependencies for the RTS, these need to be always linked
-rtsDeps :: UnitEnv -> DynFlags -> [UnitId] -> IO ([UnitId], Set ExportedFun)
-rtsDeps u_env dflags pkgs = readSystemDeps u_env dflags pkgs "rtsdeps.yaml"
+rtsDeps :: [UnitId] -> IO ([UnitId], Set ExportedFun)
+rtsDeps pkgs = readSystemDeps pkgs "rtsdeps.yaml"
 
 -- | dependencies for the Template Haskell, these need to be linked when running
 --   Template Haskell (in addition to the RTS deps)
-thDeps :: UnitEnv -> DynFlags -> [UnitId] -> IO ([UnitId], Set ExportedFun)
-thDeps u_env dflags pkgs = readSystemDeps u_env dflags pkgs "thdeps.yaml"
+thDeps :: [UnitId] -> IO ([UnitId], Set ExportedFun)
+thDeps pkgs = readSystemDeps pkgs "thdeps.yaml"
 
 -- FIXME: Jeff (2022,03): fill in the ?
 -- | A helper function to read system dependencies that are hardcoded via a file
 -- path.
-readSystemDeps :: UnitEnv     -- ^ The unit envrionment
-               -> DynFlags
-               -> [UnitId]    -- ^ Packages to ??
+readSystemDeps :: [UnitId]    -- ^ Packages to ??
                -> FilePath    -- ^ File to read
                -> IO ([UnitId], Set ExportedFun)
-readSystemDeps u_env dflags pkgs file = do
-  (deps_pkgs, deps_funs) <- readSystemDeps' u_env dflags file
+readSystemDeps pkgs file = do
+  (deps_pkgs, deps_funs) <- readSystemDeps' file
   pure ( filter (`S.member` linked_pkgs) deps_pkgs
        , S.filter (\fun ->
                      moduleUnitId (funModule fun) `S.member` linked_pkgs) deps_funs
@@ -665,43 +663,43 @@ readSystemDeps u_env dflags pkgs file = do
     linked_pkgs     = S.fromList pkgs
 
 
-readSystemDeps' :: UnitEnv
-               -> DynFlags
-               -> FilePath
-               -> IO ([UnitId], Set ExportedFun)
-readSystemDeps' u_env dflags file
+readSystemDeps' :: FilePath -> IO ([UnitId], Set ExportedFun)
+readSystemDeps' file
   -- hardcode contents to get rid of yaml dep
   -- XXX move runTHServer to some suitable wired-in package
   -- FIXME: Jeff (2022,03): Use types not string matches, These should be
   -- wired-in just like in GHC and thus we should make them top level
   -- definitions
-  | file == "thdeps.yaml" = pure ( [stringToUnitId "base"]
-                                 , S.fromList $ d "base" "GHCJS.Prim.TH.Eval" ["runTHServer"])
-  | file == "rtsdeps.yaml" = pure ( [stringToUnitId "base"
-                                    , stringToUnitId "ghc-prim"
-                                    , stringToUnitId "integer-wired-in"
+  | file == "thdeps.yaml" = pure ( [ baseUnitId ]
+                                 , S.fromList $ d baseUnitId "GHCJS.Prim.TH.Eval" ["runTHServer"])
+  | file == "rtsdeps.yaml" = pure ( [ baseUnitId
+                                    , primUnitId
+                                    , bignumUnitId
                                     ]
                                   , S.fromList $ concat
-                                  [ d "base" "GHC.Conc.Sync" ["reportError"]
-                                  , d "base" "Control.Exception.Base" ["nonTermination"]
-                                  , d "base" "GHC.Exception.Type" ["SomeException"]
-                                  , d "base" "GHC.TopHandler" ["runMainIO", "topHandler"]
-                                  , d "base" "GHC.Base" ["$fMonadIO"]
-                                  , d "base" "GHC.Maybe" ["Nothing", "Just"]
-                                  , d "base" "GHC.Ptr" ["Ptr"]
-                                  , d "ghc-prim" "GHC.Types" [":", "[]"]
-                                  , d "ghc-prim" "GHC.Tuple" ["(,)", "(,,)", "(,,,)", "(,,,,)", "(,,,,,)","(,,,,,,)", "(,,,,,,,)", "(,,,,,,,,)", "(,,,,,,,,,)"]
-                                  , d "integer-wired-in" "GHC.Integer.Type" ["S#", "Jp#", "Jn#"]
-                                  , d "ghc-prim" "GHC.Types" [ "JSVal" ]
-                                  , d "base" "GHCJS.Prim" ["JSException", "$fShowJSException", "$fExceptionJSException", "resolve", "resolveIO", "toIO"]
-                                  , d "base" "GHCJS.Prim.Internal" ["wouldBlock", "blockedIndefinitelyOnMVar", "blockedIndefinitelyOnSTM", "ignoreException", "setCurrentThreadResultException", "setCurrentThreadResultValue"]
+                                  [ d baseUnitId "GHC.Conc.Sync" ["reportError"]
+                                  , d baseUnitId "Control.Exception.Base" ["nonTermination"]
+                                  , d baseUnitId "GHC.Exception.Type" ["SomeException"]
+                                  , d baseUnitId "GHC.TopHandler" ["runMainIO", "topHandler"]
+                                  , d baseUnitId "GHC.Base" ["$fMonadIO"]
+                                  , d baseUnitId "GHC.Maybe" ["Nothing", "Just"]
+                                  , d baseUnitId "GHC.Ptr" ["Ptr"]
+                                  , d primUnitId "GHC.Types" [":", "[]"]
+                                  , d primUnitId "GHC.Tuple" ["(,)", "(,,)", "(,,,)", "(,,,,)", "(,,,,,)","(,,,,,,)", "(,,,,,,,)", "(,,,,,,,,)", "(,,,,,,,,,)"]
+                                  -- FIXME Sylvain (2022,05): no longer valid
+                                  -- integer constructors, and GHCJS prim stuff
+                                  -- that doesn't exist yet
+                                  -- , d bignumUnitId "GHC.Integer.Type" ["S#", "Jp#", "Jn#"]
+                                  -- , d primUnitId "GHC.Types" [ "JSVal" ]
+                                  -- , d baseUnitId "GHCJS.Prim" ["JSException", "$fShowJSException", "$fExceptionJSException", "resolve", "resolveIO", "toIO"]
+                                  -- , d baseUnitId "GHCJS.Prim.Internal" ["wouldBlock", "blockedIndefinitelyOnMVar", "blockedIndefinitelyOnSTM", "ignoreException", "setCurrentThreadResultException", "setCurrentThreadResultValue"]
                                   ]
                                   )
   | otherwise = pure (mempty, mempty)
   where
 
-    d :: String -> String -> [String] -> [ExportedFun]
-    d pkg mod symbols = map (let pkg_module = mkJsModule pkg mod
+    d :: UnitId -> String -> [String] -> [ExportedFun]
+    d uid mod symbols = map (let pkg_module = mkJsModule uid mod
                               in ExportedFun pkg_module
                                  . mkHaskellSym pkg_module (T.pack mod)
                                  . T.pack)
@@ -709,11 +707,11 @@ readSystemDeps' u_env dflags file
     zenc  = T.pack . zEncodeString . T.unpack
 
     mkHaskellSym :: Module -> ShortText -> ShortText -> ShortText
-    mkHaskellSym mod _m s = "h$" <> zenc (T.pack (encodeModule u_env dflags mod)
+    mkHaskellSym mod _m s = "h$" <> zenc (T.pack (unitModuleString mod)
                                        <> "."
                                        <> s)
-    mkJsModule :: String -> String -> GenModule Unit
-    mkJsModule pkg mod = mkModule (RealUnit (Definite (stringToUnitId pkg))) (mkModuleName mod)
+    mkJsModule :: UnitId -> String -> GenModule Unit
+    mkJsModule uid mod = mkModule (RealUnit (Definite uid)) (mkModuleName mod)
 
 {-
   b  <- readBinaryFile (getLibDir dflags </> file)
@@ -722,7 +720,7 @@ readSystemDeps' u_env dflags file
     Left err -> panic $ "could not read " ++ depsName ++
                         " dependencies from " ++ file ++ ":\n" ++ err
     Right sdeps ->
-      let (StaticDeps unresolved, pkgs, funs) = staticDeps dflags wi sdeps
+      let (StaticDeps unresolved, pkgs, funs) = staticDeps wi sdeps
       in  case unresolved of
             ((p,_,_):_) ->
                   panic $ "Package `" ++ T.unpack p ++ "' is required for " ++
@@ -760,13 +758,12 @@ readSystemWiredIn dflags = do
 type SDep = (ShortText, ShortText) -- ^ module/symbol
 
 staticDeps :: UnitEnv
-           -> DynFlags
            -> [(ShortText, Module)]   -- ^ wired-in package names / keys
            -> StaticDeps              -- ^ deps from yaml file
            -> (StaticDeps, Set UnitId, Set ExportedFun)
                                       -- ^ the StaticDeps contains the symbols
                                       --   for which no package could be found
-staticDeps u_env dflags wiredin sdeps = mkDeps sdeps
+staticDeps u_env wiredin sdeps = mkDeps sdeps
   where
     zenc  = T.pack . zEncodeString . T.unpack
     u_st  = ue_units u_env
@@ -813,7 +810,7 @@ staticDeps u_env dflags wiredin sdeps = mkDeps sdeps
     -- FIXME: Jeff (2022,03): should mkSymb be in the UnitUtils?
     mkSymb :: Module -> ShortText -> ShortText -> ShortText
     mkSymb p _m s  =
-      "h$" <> zenc (T.pack (encodeModule u_env dflags p) <> "." <> s)
+      "h$" <> zenc (T.pack (unitModuleString p) <> "." <> s)
 
 closePackageDeps :: UnitState -> Set UnitId -> Set UnitId
 closePackageDeps u_st pkgs
