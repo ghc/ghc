@@ -9,6 +9,8 @@ module GHC.IO.URing
 import GHC.Base
 import GHC.Conc
 import GHC.MVar
+import GHC.Num ((-), (+))
+import GHC.PerCapability
 import GHC.Real
 import GHC.IO.Unsafe (unsafePerformIO)
 import Data.Int
@@ -23,7 +25,7 @@ import qualified System.Linux.IO.URing.Ring as URing.Ring
 import System.Linux.IO.URing.Cqe (Cqe(..))
 
 supportsIOURing :: Bool
-supportsIOURing = True -- TODO: Feature test
+supportsIOURing = False -- TODO: Feature test
 
 type Completion = Int32 -> IO ()
 
@@ -47,13 +49,27 @@ type FreeSqEvent = MVar ()
 mAX_REQS :: Int
 mAX_REQS = 256
 
-newURingMgr :: IO URingMgr
-newURingMgr = do
+getSystemURingManager :: IO (Maybe URingMgr)
+getSystemURingManager
+  | not supportsIOURing = return Nothing
+  | otherwise = do
+      Just `fmap` getPerCapability uringMgrs
+
+uringMgrs :: PerCapability URingMgr
+uringMgrs = unsafePerformIO $ do
+    let new_cap = newURingMgr
+        free_cap mgr = return () -- TODO
+    newPerCapability new_cap free_cap
+    -- TODO: shared CAF
+{-# NOINLINE uringMgrs #-}
+
+newURingMgr :: Int -> IO URingMgr
+newURingMgr cap = do
     ring <- URing.newURing mAX_REQS
     usrc <- newSource
     reqs <- IT.new mAX_REQS
     free_sq <- newEmptyMVar
-    _ <- forkIO (startCompletionThread ring reqs free_sq)
+    _ <- forkOn cap (startCompletionThread ring reqs free_sq)
     return URingMgr { uring = ring
                     , uniqueSource = usrc
                     , requests = reqs
@@ -103,12 +119,10 @@ submitAndBlock mkSqe = do
     takeMVar mvar
 
 withURingMgr :: (URingMgr -> IO a) -> IO a
-withURingMgr = withMVar globalURingMgr
-
-globalURingMgr :: MVar URingMgr
-globalURingMgr = unsafePerformIO $ do
-    mgr <- newURingMgr
-    newMVar mgr
+withURingMgr f = do
+    Just mgr <- getSystemURingManager
+    -- TODO: lock URingMgr
+    f mgr
 
 startCompletionThread
     :: URing.URing
