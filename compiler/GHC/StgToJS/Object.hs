@@ -141,6 +141,12 @@ data Deps = Deps
   , depsBlocks          :: !(Array Int BlockDeps)  -- ^ info about each block
   } deriving (Generic)
 
+instance Outputable Deps where
+  ppr d = vcat
+    [ hcat [ text "module: ", pprModule (depsModule d) ]
+    , hcat [ text "exports: ", ppr (M.keys (depsHaskellExported d)) ]
+    ]
+
 -- | Where are the dependencies
 data DepsLocation = ObjectFile  FilePath           -- ^ In an object file at path
                   | ArchiveFile FilePath           -- ^ In a Ar file at path
