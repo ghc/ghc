@@ -150,7 +150,7 @@ executable haddock
   else
     -- in order for haddock's advertised version number to have proper meaning,
     -- we pin down to a single haddock-api version.
-    build-depends:  haddock-api == 2.26.0
+    build-depends:  haddock-api == 2.26.1
 
 test-suite html-test
   type:             exitcode-stdio-1.0

@@ -1,6 +1,6 @@
 cabal-version:        2.0
 name:                 haddock-api
-version:              2.26.0
+version:              2.26.1
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
