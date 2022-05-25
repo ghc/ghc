@@ -23,7 +23,7 @@ free variables.
 -}
 
 module GHC.Rename.Expr (
-        rnLExpr, rnExpr, rnStmts,
+        rnLExpr, rnExpr, rnStmts, mkExpandedExpr,
         AnnoBody
    ) where
 
@@ -150,6 +150,41 @@ but several have a little bit of special treatment:
   The typechecker turns `OpApp` into a use of `HsExpansion`
   on the fly, in GHC.Tc.Gen.Head.splitHsApps.  RebindableSyntax
   does not affect this.
+
+* RecordUpd: we desugar record updates into case expressions,
+  in GHC.Tc.Gen.Expr.tcExpr.
+
+  Example:
+
+    data T p q = T1 { x :: Int, y :: Bool, z :: Char }
+               | T2 { v :: Char }
+               | T3 { x :: Int }
+               | T4 { p :: Float, y :: Bool, x :: Int }
+               | T5
+
+    e { x=e1, y=e2 }
+      ===>
+    let { x' = e1; y' = e2 } in
+    case e of
+       T1 _ _ z -> T1 x' y' z
+       T4 p _ _ -> T4 p y' x'
+
+  See Note [Record Updates] in GHC.Tc.Gen.Expr for more details.
+
+  This is done in the typechecker, not the renamer, for two reasons:
+
+    - (Until we implement GHC proposal #366)
+      We need to know the type of the record to disambiguate its fields.
+
+    - We use the type signature of the data constructor to provide IdSigs
+      to the let-bound variables (x', y' in the example above). This is
+      needed to accept programs such as
+
+        data R b = MkR { f :: (forall a. a -> a) -> (Int,b), c :: Int }
+        foo r = r { f = \ k -> (k 3, k 'x') }
+
+      in which an updated field has a higher-rank type.
+      See Wrinkle [Using IdSig] in Note [Record Updates] in GHC.Tc.Gen.Expr.
 
 Note [Overloaded labels]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1154,9 +1189,10 @@ rnStmt ctxt rnBody (L loc (RecStmt { recS_stmts = L _ rec_stmts })) thing_inside
   = do  { (return_op, fvs1)  <- lookupQualifiedDoStmtName ctxt returnMName
         ; (mfix_op,   fvs2)  <- lookupQualifiedDoStmtName ctxt mfixName
         ; (bind_op,   fvs3)  <- lookupQualifiedDoStmtName ctxt bindMName
-        ; let empty_rec_stmt = emptyRecStmtName { recS_ret_fn  = return_op
-                                                , recS_mfix_fn = mfix_op
-                                                , recS_bind_fn = bind_op }
+        ; let empty_rec_stmt = (emptyRecStmtName :: StmtLR GhcRn GhcRn (LocatedA (body GhcRn)))
+                                { recS_ret_fn  = return_op
+                                , recS_mfix_fn = mfix_op
+                                , recS_bind_fn = bind_op }
 
         -- Step1: Bring all the binders of the mdo into scope
         -- (Remember that this also removes the binders from the

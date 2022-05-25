@@ -61,7 +61,7 @@ module GHC.Types.SrcLoc (
 
         -- ** Predicates on SrcSpan
         isGoodSrcSpan, isOneLineSpan, isZeroWidthSpan,
-        containsSpan,
+        containsSpan, isNoSrcSpan,
 
         -- * StringBuffer locations
         BufPos(..),
@@ -447,6 +447,10 @@ generatedSrcSpan   = UnhelpfulSpan UnhelpfulGenerated
 isGeneratedSrcSpan :: SrcSpan -> Bool
 isGeneratedSrcSpan (UnhelpfulSpan UnhelpfulGenerated) = True
 isGeneratedSrcSpan _                                  = False
+
+isNoSrcSpan :: SrcSpan -> Bool
+isNoSrcSpan (UnhelpfulSpan UnhelpfulNoLocationInfo) = True
+isNoSrcSpan _                                       = False
 
 -- | Create a "bad" 'SrcSpan' that has not location information
 mkGeneralSrcSpan :: FastString -> SrcSpan

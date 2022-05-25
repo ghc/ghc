@@ -345,13 +345,17 @@ emptyRecStmtName :: (Anno [GenLocated
                         ~ SrcSpanAnnL)
                  => StmtLR GhcRn GhcRn bodyR
 emptyRecStmtId   :: Stmt GhcTc (LocatedA (HsCmd GhcTc))
-mkRecStmt        :: (Anno [GenLocated
+
+mkRecStmt :: forall (idL :: Pass) bodyR.
+                    (Anno [GenLocated
                              (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
                              (StmtLR (GhcPass idL) GhcPs bodyR)]
                         ~ SrcSpanAnnL)
                  => EpAnn AnnList
                  -> LocatedL [LStmtLR (GhcPass idL) GhcPs bodyR]
                  -> StmtLR (GhcPass idL) GhcPs bodyR
+mkRecStmt anns stmts  = (emptyRecStmt' anns :: StmtLR (GhcPass idL) GhcPs bodyR)
+                             { recS_stmts = stmts }
 
 
 mkHsIntegral     i  = OverLit noExtField (HsIntegral       i)
@@ -438,7 +442,6 @@ emptyRecStmt     = emptyRecStmt' noAnn
 emptyRecStmtName = emptyRecStmt' noExtField
 emptyRecStmtId   = emptyRecStmt' unitRecStmtTc
                                         -- a panic might trigger during zonking
-mkRecStmt anns stmts  = (emptyRecStmt' anns) { recS_stmts = stmts }
 
 mkLetStmt :: EpAnn [AddEpAnn] -> HsLocalBinds GhcPs -> StmtLR GhcPs GhcPs (LocatedA b)
 mkLetStmt anns binds = LetStmt anns binds

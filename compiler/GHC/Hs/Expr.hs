@@ -163,21 +163,6 @@ instance Outputable SyntaxExprTc where
 
   ppr NoSyntaxExprTc = text "<no syntax expr>"
 
--- | Extra data fields for a 'RecordUpd', added by the type checker
-data RecordUpdTc = RecordUpdTc
-      { rupd_cons :: [ConLike]
-                -- Filled in by the type checker to the
-                -- _non-empty_ list of DataCons that have
-                -- all the upd'd fields
-
-      , rupd_in_tys  :: [Type]  -- Argument types of *input* record type
-      , rupd_out_tys :: [Type]  --             and  *output* record type
-                -- For a data family, these are the type args of the
-                -- /representation/ type constructor
-
-      , rupd_wrap :: HsWrapper  -- See Note [Record Update HsWrapper]
-      }
-
 -- | HsWrap appears only in typechecker output
 data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
                             (hs_syn GhcTc) -- the thing that is wrapped
@@ -397,7 +382,10 @@ type instance XRecordCon     GhcTc = PostTcExpr   -- Instantiated constructor fu
 
 type instance XRecordUpd     GhcPs = EpAnn [AddEpAnn]
 type instance XRecordUpd     GhcRn = NoExtField
-type instance XRecordUpd     GhcTc = RecordUpdTc
+type instance XRecordUpd     GhcTc = DataConCantHappen
+  -- We desugar record updates in the typechecker.
+  -- See [Handling overloaded and rebindable constructs],
+  -- and [Record Updates] in GHC.Tc.Gen.Expr.
 
 type instance XGetField     GhcPs = EpAnnCO
 type instance XGetField     GhcRn = NoExtField

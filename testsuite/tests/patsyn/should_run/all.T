@@ -26,3 +26,4 @@ test('T11224', normal, compile_and_run, ['-Wincomplete-patterns -Woverlapping-pa
 test('T13688', omit_ways(['profasm', 'profthreaded']), multimod_compile_and_run, ['T13688', '-v0'])
 # Requires UnboxedSums, which GHCi does not support.
 test('T14228', omit_ways(['ghci']), compile_and_run, [''])
+test('records-poly-update', normal, compile_and_run, [''])

@@ -46,4 +46,4 @@ rebindable11.hs:19:53: error:
     • Couldn't match expected type ‘Bool’ with actual type ‘Char’
     • In the second argument of ‘(==)’, namely ‘'a'’
       In the expression: True == 'a'
-      In the ‘field’ field of a record
+      In the expression: if True == 'a' then () else ()

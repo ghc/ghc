@@ -4,10 +4,12 @@ tcfail102.hs:1:14: warning: [-Wdeprecated-flags (in -Wdefault)]
 
 tcfail102.hs:9:7: error:
     • Could not deduce (Integral (Ratio a))
-        arising from a record update
       from the context: Integral a
         bound by the type signature for:
                    f :: forall a. Integral a => P (Ratio a) -> P (Ratio a)
         at tcfail102.hs:8:1-45
-    • In the expression: x {p = p x}
+    • In a record update at field ‘p’,
+      with type constructor ‘P’
+      and data constructor ‘P’.
+      In the expression: x {p = p x}
       In an equation for ‘f’: f x = x {p = p x}

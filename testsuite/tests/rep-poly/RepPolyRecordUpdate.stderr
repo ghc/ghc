@@ -20,7 +20,10 @@ RepPolyRecordUpdate.hs:13:9: error:
         a0 :: TYPE c1
       Cannot unify ‘rep’ with the type variable ‘c1’
       because it is not a concrete ‘RuntimeRep’.
-    • In the expression: x {fld = meth ()}
+    • In a record update at field ‘fld’,
+      with type constructor ‘X’
+      and data constructor ‘MkX’.
+      In the expression: x {fld = meth ()}
       In an equation for ‘upd’: upd x = x {fld = meth ()}
     • Relevant bindings include
         upd :: X b -> X a (bound at RepPolyRecordUpdate.hs:13:1)

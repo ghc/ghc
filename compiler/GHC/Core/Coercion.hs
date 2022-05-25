@@ -44,7 +44,6 @@ module GHC.Core.Coercion (
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
         mkKindCo,
         castCoercionKind, castCoercionKind1, castCoercionKind2,
-        mkFamilyTyConAppCo,
 
         mkHeteroCoercionType,
         mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
@@ -1613,29 +1612,6 @@ castCoercionKind g h1 h2
   = castCoercionKind2 g r t1 t2 h1 h2
   where
     (Pair t1 t2, r) = coercionKindRole g
-
-mkFamilyTyConAppCo :: TyCon -> [CoercionN] -> CoercionN
--- ^ Given a family instance 'TyCon' and its arg 'Coercion's, return the
--- corresponding family 'Coercion'.  E.g:
---
--- > data family T a
--- > data instance T (Maybe b) = MkT b
---
--- Where the instance 'TyCon' is :RTL, so:
---
--- > mkFamilyTyConAppCo :RTL (co :: a ~# Int) = T (Maybe a) ~# T (Maybe Int)
---
--- cf. 'mkFamilyTyConApp'
-mkFamilyTyConAppCo tc cos
-  | Just (fam_tc, fam_tys) <- tyConFamInst_maybe tc
-  , let tvs = tyConTyVars tc
-        fam_cos = assertPpr (tvs `equalLength` cos) (ppr tc <+> ppr cos) $
-                  map (liftCoSubstWith Nominal tvs cos) fam_tys
-  = mkTyConAppCo Nominal fam_tc fam_cos
-  | otherwise
-  = mkTyConAppCo Nominal tc cos
-
--- See Note [Newtype coercions] in GHC.Core.TyCon
 
 mkPiCos :: Role -> [Var] -> Coercion -> Coercion
 mkPiCos r vs co = foldr (mkPiCo r) co vs

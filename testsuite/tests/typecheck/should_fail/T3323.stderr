@@ -1,5 +1,34 @@
 
-T3323.hs:18:7:
-    Record update for insufficiently polymorphic field: haDevice :: dev
-    In the expression: h {haDevice = undefined}
-    In an equation for ‘f’: f h = h {haDevice = undefined}
+T3323.hs:18:7: error:
+    • Could not deduce (GHC.IO.Device.RawIO dev0)
+      from the context: (GHC.IO.Device.RawIO dev,
+                         GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev,
+                         base-4.16.0.0:Data.Typeable.Internal.Typeable dev)
+        bound by a pattern with constructor:
+                   Handle__ :: forall dev enc_state dec_state.
+                               (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev,
+                                GHC.IO.BufferedIO.BufferedIO dev,
+                                base-4.16.0.0:Data.Typeable.Internal.Typeable dev) =>
+                               dev
+                               -> HandleType
+                               -> GHC.IORef.IORef (GHC.IO.Buffer.Buffer GHC.Word.Word8)
+                               -> BufferMode
+                               -> GHC.IORef.IORef (dec_state, GHC.IO.Buffer.Buffer GHC.Word.Word8)
+                               -> GHC.IORef.IORef (GHC.IO.Buffer.Buffer GHC.IO.Buffer.CharBufElem)
+                               -> GHC.IORef.IORef (BufferList GHC.IO.Buffer.CharBufElem)
+                               -> Maybe (GHC.IO.Encoding.Types.TextEncoder enc_state)
+                               -> Maybe (GHC.IO.Encoding.Types.TextDecoder dec_state)
+                               -> Maybe GHC.IO.Encoding.Types.TextEncoding
+                               -> Newline
+                               -> Newline
+                               -> Maybe (GHC.MVar.MVar Handle__)
+                               -> Handle__,
+                 in a case alternative
+        at T3323.hs:18:7-28
+      The type variable ‘dev0’ is ambiguous
+    • In a record update at field ‘haDevice’,
+      with type constructor ‘Handle__’,
+      data constructor ‘Handle__’
+      and existential variables ‘dev’, ‘enc_state’, ‘dec_state’.
+      In the expression: h {haDevice = undefined}
+      In an equation for ‘f’: f h = h {haDevice = undefined}

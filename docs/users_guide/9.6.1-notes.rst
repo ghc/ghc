@@ -7,6 +7,58 @@ Version 9.6.1
 Language
 ~~~~~~~~
 
+- Record updates for GADTs and other existential datatypes are now
+  fully supported.
+
+  For example: ::
+
+    data D b where
+      MkD :: { fld1 :: a -> a, fld2 :: a -> (), fld3 :: b } -> D b
+
+    foo :: D b -> D b
+    foo d = d { fld1 = id, fld2 = const () }
+
+  In this example, we have an existential variable ``a``, and we update
+  all fields whose type involves ``a`` at once, so the update is valid.
+
+  A side-effect of this change is that GHC now rejects some record updates
+  involving fields whose types contain type families (these record updates
+  were previously erroneously accepted).
+
+  Example: ::
+
+    type family F a where
+      F Int   = Char
+      F Float = Char
+
+    data T b = MkT { x :: [Int], y :: [F b] }
+
+    emptyT :: forall b. T b
+    emptyT = MkT [] []
+
+    bar :: T Int
+    bar = emptyT { x = [3] }
+
+  In this example, we can't infer the type of ``emptyT`` in ``bar``: it could be
+  ``T Int``, but it could also be ``T Float`` because the type family ``F``
+  is not injective and ``T Float ~ T Int``. Indeed, the following typechecks ::
+
+    baz :: T Int
+    baz = case ( emptyT :: T Float ) of { MkT _ y -> MkT [3] y }
+
+  This means that the type of ``emptyT`` is ambiguous in the definition
+  of ``bar`` above, and thus GHC rejects the record update: ::
+
+    Couldn't match type `F b0' with `Char'
+    Expected: [F Int]
+      Actual: [F b0]
+    NB: ‘F’ is a non-injective type family
+    The type variable ‘b0’ is ambiguous
+
+  To fix these issues, add a type signature to the expression that the
+  record update is applied to (``emptyT`` in the example above), or
+  add an injectivity annotation to the type family in the case that
+  the type family is in fact injective.
 
 Compiler
 ~~~~~~~~

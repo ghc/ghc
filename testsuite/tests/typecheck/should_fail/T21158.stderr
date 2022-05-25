@@ -1,0 +1,29 @@
+
+T21158.hs:12:14: error:
+    • Couldn't match type: F b0
+                     with: F b
+      Expected: [F b]
+        Actual: [F b0]
+      NB: ‘F’ is a non-injective type family
+      The type variable ‘b0’ is ambiguous
+    • In a record update at field ‘x’,
+      with type constructor ‘T’
+      and data constructor ‘MkT’.
+      In the expression: emptyT {x = newx}
+      In an equation for ‘foo1’: foo1 newx = emptyT {x = newx}
+    • Relevant bindings include
+        foo1 :: [Int] -> T b (bound at T21158.hs:12:1)
+
+T21158.hs:15:49: error:
+    • Couldn't match type: F b1
+                     with: F b
+      Expected: [F b]
+        Actual: [F b1]
+      NB: ‘F’ is a non-injective type family
+      The type variable ‘b1’ is ambiguous
+    • In the second argument of ‘MkT’, namely ‘y’
+      In the expression: MkT newx y
+      In a case alternative: MkT x y -> MkT newx y
+    • Relevant bindings include
+        y :: [F b1] (bound at T21158.hs:15:35)
+        foo2 :: [Int] -> T b (bound at T21158.hs:15:1)

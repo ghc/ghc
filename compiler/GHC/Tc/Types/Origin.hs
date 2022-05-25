@@ -990,10 +990,14 @@ data FixedRuntimeRepOrigin
 -- 'FixedRuntimeRepOrigin' for that.
 data FixedRuntimeRepContext
 
+  -- | Record fields in record construction must have a fixed runtime
+  -- representation.
+  = FRRRecordCon !RdrName !(HsExpr GhcTc)
+
   -- | Record fields in record updates must have a fixed runtime representation.
   --
   -- Test case: RepPolyRecordUpdate.
-  = FRRRecordUpdate !RdrName !(HsExpr GhcTc)
+  | FRRRecordUpdate !Name !(HsExpr GhcRn)
 
   -- | Variable binders must have a fixed runtime representation.
   --
@@ -1090,6 +1094,9 @@ data FixedRuntimeRepContext
 -- which is not fixed. That information is stored in 'FixedRuntimeRepOrigin'
 -- and is reported separately.
 pprFixedRuntimeRepContext :: FixedRuntimeRepContext -> SDoc
+pprFixedRuntimeRepContext (FRRRecordCon lbl _arg)
+  = sep [ text "The field", quotes (ppr lbl)
+        , text "of the record constructor" ]
 pprFixedRuntimeRepContext (FRRRecordUpdate lbl _arg)
   = sep [ text "The record update at field"
         , quotes (ppr lbl) ]

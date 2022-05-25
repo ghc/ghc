@@ -1,0 +1,25 @@
+
+T12957a.hs:25:35: warning: [-Winaccessible-code (in -Wdefault)]
+    • Inaccessible code in
+        a pattern with constructor: BFields :: [()] -> Fields 'B,
+        in a case alternative
+      Couldn't match type ‘'A’ with ‘'B’
+    • In a record update at field ‘list’,
+      with type constructor ‘Fields’
+      and data constructor ‘BFields’.
+      In the expression: emptyA {list = [a]}
+      In a record update at field ‘sFields’,
+      with type constructor ‘S’
+      and data constructor ‘S’.
+
+T12957a.hs:25:35: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘'B’ with ‘'A’
+      Expected: Fields 'A
+        Actual: Fields 'B
+    • In a record update at field ‘list’,
+      with type constructor ‘Fields’
+      and data constructor ‘BFields’.
+      In the expression: emptyA {list = [a]}
+      In a record update at field ‘sFields’,
+      with type constructor ‘S’
+      and data constructor ‘S’.

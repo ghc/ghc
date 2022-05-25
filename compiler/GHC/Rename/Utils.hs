@@ -21,6 +21,8 @@ module GHC.Rename.Utils (
         badQualBndrErr, typeAppErr, badFieldConErr,
         wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genAppType,
         genHsIntegralLit, genHsTyLit, genSimpleConPat,
+        genVarPat, genWildPat,
+        genSimpleFunBind, genFunBind,
 
         newLocalBndrRn, newLocalBndrsRn,
 
@@ -55,7 +57,7 @@ import GHC.Types.SourceText ( SourceText(..), IntegralLit )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Types.Basic  ( TopLevelFlag(..) )
+import GHC.Types.Basic  ( TopLevelFlag(..), Origin(Generated) )
 import GHC.Data.List.SetOps ( removeDups )
 import GHC.Data.Maybe ( whenIsJust )
 import GHC.Driver.Session
@@ -680,12 +682,32 @@ genHsIntegralLit lit = wrapGenSpan $ HsLit noAnn (HsInt noExtField lit)
 genHsTyLit :: FastString -> HsType GhcRn
 genHsTyLit = HsTyLit noExtField . HsStrTy NoSourceText
 
-genSimpleConPat :: Name -> [Name] -> LPat GhcRn
--- The pattern (C x1 .. xn)
-genSimpleConPat con args
+genSimpleConPat :: Name -> [LPat GhcRn] -> LPat GhcRn
+-- The pattern (C p1 .. pn)
+genSimpleConPat con pats
   = wrapGenSpan $ ConPat { pat_con_ext = noExtField
                          , pat_con     = wrapGenSpan con
-                         , pat_args    = PrefixCon [] (map genVarPat args) }
+                         , pat_args    = PrefixCon [] pats }
 
 genVarPat :: Name -> LPat GhcRn
 genVarPat n = wrapGenSpan $ VarPat noExtField (wrapGenSpan n)
+
+genWildPat :: LPat GhcRn
+genWildPat = wrapGenSpan $ WildPat noExtField
+
+genSimpleFunBind :: Name -> [LPat GhcRn]
+                 -> LHsExpr GhcRn -> LHsBind GhcRn
+genSimpleFunBind fun pats expr
+  = L gen $ genFunBind (L gen fun)
+        [mkMatch (mkPrefixFunRhs (L gen fun)) pats expr
+                 emptyLocalBinds]
+  where
+    gen = noAnnSrcSpan generatedSrcSpan
+
+genFunBind :: LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
+           -> HsBind GhcRn
+genFunBind fn ms
+  = FunBind { fun_id = fn
+            , fun_matches = mkMatchGroup Generated (wrapGenSpan ms)
+            , fun_ext = emptyNameSet
+            , fun_tick = [] }

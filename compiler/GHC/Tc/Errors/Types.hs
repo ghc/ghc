@@ -82,7 +82,7 @@ import GHC.Types.Error
 import GHC.Types.Hint (UntickedPromotedThing(..))
 import GHC.Types.FieldLabel (FieldLabelString)
 import GHC.Types.ForeignCall (CLabelString)
-import GHC.Types.Name (Name, OccName, getSrcLoc)
+import GHC.Types.Name (Name, OccName, getSrcLoc, getSrcSpan)
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing (TyThing)
@@ -2950,14 +2950,15 @@ pprRelevantBindings :: RelevantBindings -> SDoc
 -- This function should be in "GHC.Tc.Errors.Ppr",
 -- but's it's here for the moment as it's needed in "GHC.Tc.Errors".
 pprRelevantBindings (RelevantBindings bds ran_out_of_fuel) =
-  ppUnless (null bds) $
+  ppUnless (null rel_bds) $
     hang (text "Relevant bindings include")
-       2 (vcat (map ppr_binding bds) $$ ppWhen ran_out_of_fuel discardMsg)
+       2 (vcat (map ppr_binding rel_bds) $$ ppWhen ran_out_of_fuel discardMsg)
   where
     ppr_binding (nm, tidy_ty) =
       sep [ pprPrefixOcc nm <+> dcolon <+> ppr tidy_ty
           , nest 2 (parens (text "bound at"
                <+> ppr (getSrcLoc nm)))]
+    rel_bds = filter (not . isGeneratedSrcSpan . getSrcSpan . fst) bds
 
 discardMsg :: SDoc
 discardMsg = text "(Some bindings suppressed;" <+>

@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -128,11 +128,11 @@ data ModIfacePhase
 -- | Selects a IfaceDecl representation.
 -- For fully instantiated interfaces we also maintain
 -- a fingerprint, which is used for recompilation checks.
-type family IfaceDeclExts (phase :: ModIfacePhase) where
+type family IfaceDeclExts (phase :: ModIfacePhase) = decl | decl -> phase where
   IfaceDeclExts 'ModIfaceCore = IfaceDecl
   IfaceDeclExts 'ModIfaceFinal = (Fingerprint, IfaceDecl)
 
-type family IfaceBackendExts (phase :: ModIfacePhase) where
+type family IfaceBackendExts (phase :: ModIfacePhase) = bk | bk -> phase where
   IfaceBackendExts 'ModIfaceCore = ()
   IfaceBackendExts 'ModIfaceFinal = ModIfaceBackend
 

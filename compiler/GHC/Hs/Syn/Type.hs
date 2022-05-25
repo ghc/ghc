@@ -116,11 +116,7 @@ hsExprType (HsLet _ _ _ _ body) = lhsExprType body
 hsExprType (HsDo ty _ _) = ty
 hsExprType (ExplicitList ty _) = mkListTy ty
 hsExprType (RecordCon con_expr _ _) = hsExprType con_expr
-hsExprType e@(RecordUpd (RecordUpdTc { rupd_cons = cons, rupd_out_tys = out_tys }) _ _) =
-  case cons of
-    con_like:_ -> conLikeResTy con_like out_tys
-    []         -> pprPanic "hsExprType: RecordUpdTc with empty rupd_cons"
-                           (ppr e)
+hsExprType (RecordUpd v _ _) = dataConCantHappen v
 hsExprType (HsGetField { gf_ext = v }) = dataConCantHappen v
 hsExprType (HsProjection { proj_ext = v }) = dataConCantHappen v
 hsExprType (ExprWithTySig _ e _) = lhsExprType e

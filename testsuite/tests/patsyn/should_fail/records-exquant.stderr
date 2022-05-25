@@ -4,8 +4,3 @@ records-exquant.hs:8:7: error:
     • In the expression: a (Showable True)
       In an equation for ‘qux’: qux = a (Showable True)
     Suggested fix: Use pattern-matching syntax instead
-
-records-exquant.hs:10:7: error:
-    • Record update for insufficiently polymorphic field: a :: a
-    • In the expression: (Showable ()) {a = True}
-      In an equation for ‘foo’: foo = (Showable ()) {a = True}
