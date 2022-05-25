@@ -124,6 +124,7 @@ import GHC.Data.FastString
 import GHC.Data.ShortText as ST
 
 import GHC.Utils.Misc
+import GHC.Utils.Outputable (ppr, Outputable, hcat, vcat, text)
 
 data Header = Header
   { hdrModuleName :: !BS.ByteString
@@ -193,6 +194,12 @@ data ExportedFun = ExportedFun
   { funModule  :: !Module
   , funSymbol  :: !ShortText
   } deriving (Eq, Ord)
+
+instance Outputable ExportedFun where
+  ppr (ExportedFun m f) = vcat
+    [ hcat [ text "module: ", pprModule m ]
+    , hcat [ text "symbol: ", ppr f ]
+    ]
 
 -- we need to store the size separately, since getting a HashMap's size is O(n)
 data SymbolTable

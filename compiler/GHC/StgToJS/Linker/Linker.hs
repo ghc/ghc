@@ -485,7 +485,7 @@ getDeps loaded_deps base fun startlu = go' S.empty (S.fromList startlu) (S.toLis
               Nothing -> pprPanic "getDeps.go': object file not loaded for:  " $ pprModule key
               Just (Deps _m _r e _b) ->
                  let lun :: Int
-                     lun = fromMaybe (pprPanic "exported function not found: " $ pprModule key)
+                     lun = fromMaybe (pprPanic "exported function not found: " $ ppr f)
                                      (M.lookup f e)
                      lu  = (key, lun)
                  in  go' result (addOpen result open [lu]) fs
