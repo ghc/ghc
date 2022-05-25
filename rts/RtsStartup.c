@@ -210,6 +210,7 @@ static void initBuiltinGcRoots(void)
     getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);
     getStablePtr((StgPtr)interruptIOManager_closure);
     getStablePtr((StgPtr)ioManagerCapabilitiesChanged_closure);
+    getStablePtr((StgPtr)capabilitiesChanged_closure);
 #if !defined(mingw32_HOST_OS)
     getStablePtr((StgPtr)blockedOnBadFD_closure);
     getStablePtr((StgPtr)runHandlersPtr_closure);
