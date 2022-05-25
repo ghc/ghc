@@ -182,15 +182,19 @@ setting key = lookupSystemConfig $ case key of
     TargetHasRtsLinker -> "target-has-rts-linker"
     BourneShell        -> "bourne-shell"
 
+bootIsStage0 :: Stage -> Stage
+bootIsStage0 (Stage0 {}) = Stage0 InTreeLibs
+bootIsStage0 s = s
+
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the
 -- result.
 settingList :: SettingList -> Action [String]
 settingList key = fmap words $ lookupSystemConfig $ case key of
-    ConfCcArgs        stage -> "conf-cc-args-"         ++ stageString stage
-    ConfCppArgs       stage -> "conf-cpp-args-"        ++ stageString stage
-    ConfGccLinkerArgs stage -> "conf-gcc-linker-args-" ++ stageString stage
-    ConfLdLinkerArgs  stage -> "conf-ld-linker-args-"  ++ stageString stage
-    ConfMergeObjectsArgs stage -> "conf-merge-objects-args-"  ++ stageString stage
+    ConfCcArgs        stage -> "conf-cc-args-"         ++ stageString (bootIsStage0 stage)
+    ConfCppArgs       stage -> "conf-cpp-args-"        ++ stageString (bootIsStage0 stage)
+    ConfGccLinkerArgs stage -> "conf-gcc-linker-args-" ++ stageString (bootIsStage0 stage)
+    ConfLdLinkerArgs  stage -> "conf-ld-linker-args-"  ++ stageString (bootIsStage0 stage)
+    ConfMergeObjectsArgs stage -> "conf-merge-objects-args-"  ++ stageString (bootIsStage0 stage)
     HsCppArgs               -> "hs-cpp-args"
 
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the
@@ -316,7 +320,7 @@ topDirectory :: Action FilePath
 topDirectory = fixAbsolutePathOnWindows =<< setting GhcSourcePath
 
 ghcVersionStage :: Stage -> Action String
-ghcVersionStage Stage0 = setting GhcVersion
+ghcVersionStage (Stage0 {}) = setting GhcVersion
 ghcVersionStage _      = setting ProjectVersion
 
 -- | The file suffix used for libraries of a given build 'Way'. For example,

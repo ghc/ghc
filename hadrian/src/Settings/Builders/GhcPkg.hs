@@ -35,7 +35,7 @@ ghcPkgBuilderArgs = mconcat
         config    <- expr $ pkgInplaceConfig context
         stage     <- getStage
         pkgDb     <- expr $ packageDbPath stage
-        mconcat [ notStage0 ? use_db pkgDb
+        mconcat [ notM stage0 ? use_db pkgDb
                 , arg "update"
                 , arg "--force"
                 , verbosity < Verbose ? arg "-v0"

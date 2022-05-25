@@ -264,7 +264,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ "config.os="       ++ show os
             , arg "-e", arg $ "config.arch="     ++ show arch
             , arg "-e", arg $ "config.platform=" ++ show platform
-            , arg "-e", arg $ "config.stage="    ++ show (fromEnum (C.stage ctx) + 1)
+            , arg "-e", arg $ "config.stage="    ++ show (stageNumber (C.stage ctx))
 
             , arg "--config", arg $ "gs=gs"                           -- Use the default value as in test.mk
             , arg "--config", arg $ "timeout_prog=" ++ show (top -/- timeoutProg)
@@ -280,6 +280,12 @@ runTestBuilderArgs = builder Testsuite ? do
 
       where emitWhenSet Nothing  _ = mempty
             emitWhenSet (Just v) f = f v
+
+            stageNumber (Stage0 GlobalLibs) = error "stageNumber stageBoot"
+            stageNumber (Stage0 InTreeLibs) = 1
+            stageNumber Stage1 = 2
+            stageNumber Stage2 = 3
+            stageNumber Stage3 = 4
 
 -- | Command line arguments for running GHC's test script.
 getTestArgs :: Args

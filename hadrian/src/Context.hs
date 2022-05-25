@@ -57,7 +57,7 @@ libPath Context {..} = buildRoot <&> (-/- (stageString stage -/- "lib"))
 distDir :: Stage -> Action FilePath
 distDir st = do
     let (os,arch) = case st of
-            Stage0 -> (HostOs , HostArch)
+            Stage0 {} -> (HostOs , HostArch)
             _      -> (TargetOs, TargetArch)
     version        <- ghcVersionStage st
     hostOs         <- cabalOsString <$> setting os

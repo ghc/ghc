@@ -53,7 +53,7 @@ flavourTransformers = M.fromList
     , "collect_timings" =: collectTimings
     , "assertions" =: enableAssertions
     , "debug_ghc" =: debugGhc Stage1
-    , "debug_stage1_ghc" =: debugGhc Stage0
+    , "debug_stage1_ghc" =: debugGhc stage0InTree
     , "lint" =: enableLinting
     , "haddock" =: enableHaddock
     ]
@@ -515,7 +515,7 @@ builderSetting =
           , ("deps", FindCDependencies CDep)
           ]
 
-        stages = map (\stg -> (stageString stg, stg)) [minBound..maxBound]
+        stages = map (\stg -> (stageString stg, stg)) allStages
 
         pkgs = map (\pkg -> (pkgName pkg, pkg)) (ghcPackages ++ userPackages)
 

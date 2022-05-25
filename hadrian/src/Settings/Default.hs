@@ -50,7 +50,8 @@ import Settings.Builders.Win32Tarballs
 
 -- | Packages that are built by default. You can change this in "UserSettings".
 defaultPackages :: Stage -> Action [Package]
-defaultPackages Stage0 = stage0Packages
+defaultPackages (Stage0 GlobalLibs) = stageBootPackages
+defaultPackages (Stage0 InTreeLibs) = stage0Packages
 defaultPackages Stage1 = stage1Packages
 defaultPackages Stage2 = stage2Packages
 defaultPackages Stage3 = return []
@@ -59,19 +60,26 @@ defaultPackages Stage3 = return []
 defaultBignumBackend :: String
 defaultBignumBackend = "gmp"
 
+-- These packages are things needed to do the build.. so they are only built by
+-- boot compiler, with global package database. By default we will only build these
+-- packages in StageBoot so if you also need to distribute anything here then add
+-- it to `stage0packages` or `stage1packages` as appropiate.
+stageBootPackages :: Action [Package]
+stageBootPackages = return [lintersCommon, lintCommitMsg, lintSubmoduleRefs, lintWhitespace, lintNotes, hsc2hs, compareSizes, deriveConstants, genapply, genprimopcode, unlit ]
+
 -- | Packages built in 'Stage0' by default. You can change this in "UserSettings".
 stage0Packages :: Action [Package]
 stage0Packages = do
     cross <- flag CrossCompiling
+    winTarget  <- isWinTarget
     return $ [ binary
+             , bytestring
              , cabalSyntax
              , cabal
-             , compareSizes
              , compiler
-             , deriveConstants
+             , directory
+             , process
              , exceptions
-             , genapply
-             , genprimopcode
              , ghc
              , runGhc
              , ghcBoot
@@ -85,15 +93,12 @@ stage0Packages = do
              , hpcBin
              , mtl
              , parsec
+             , time
              , templateHaskell
              , text
              , transformers
              , unlit
-             , lintersCommon
-             , lintNotes
-             , lintCommitMsg
-             , lintSubmoduleRefs
-             , lintWhitespace
+             , if winTarget then win32 else unix
              ]
           ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                ]
@@ -113,10 +118,8 @@ stage1Packages = do
       [ libraries0 -- Build all Stage0 libraries in Stage1
       , [ array
         , base
-        , bytestring
         , containers
         , deepseq
-        , directory
         , exceptions
         , filepath
         , ghc
@@ -129,10 +132,8 @@ stage1Packages = do
         , hsc2hs
         , integerGmp
         , pretty
-        , process
         , rts
         , stm
-        , time
         , unlit
         , xhtml
         ]
@@ -143,7 +144,6 @@ stage1Packages = do
         , libiserv
         , runGhc
         ]
-      , if winTarget then [ win32 ] else [ unix ]
       , when (winTarget && not cross)
         [ touchy
          -- See Note [Hadrian's ghci-wrapper package]
