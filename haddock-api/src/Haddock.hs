@@ -420,7 +420,10 @@ render logger dflags unit_state flags sinceQual qual ifaces installedIfaces extS
             ppJsonIndex odir sourceUrls' opt_wiki_urls
                         unicode Nothing qual
                         ifaces
-                        (nub $ map (\(_,a,_) -> a) installedIfaces)
+                        ( nub
+                        . map (\(_,a,_) -> a)
+                        . filter (\(v,_,_) -> v == Visible)
+                        $ installedIfaces)
 
   when (Flag_Html `elem` flags) $ do
     withTiming logger dflags' "ppHtml" (const ()) $ do
