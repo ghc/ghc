@@ -9,7 +9,6 @@ import System.Exit (exitFailure)
 
 lintRules :: Rules ()
 lintRules = do
-  root <- buildRootRules
   "lint:base" ~> lint base
   "lint:compiler" ~> lint compiler
   "libraries" -/- "base" -/- "include" -/- "HsBaseConfig.h" %> \_ ->
