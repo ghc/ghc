@@ -63,6 +63,7 @@ PRELUDE_CLOSURE(base_GHCziConcziIO_ensureIOManagerIsRunning_closure);
 PRELUDE_CLOSURE(base_GHCziConcziIO_interruptIOManager_closure);
 PRELUDE_CLOSURE(base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure);
 PRELUDE_CLOSURE(base_GHCziConcziSignal_runHandlersPtr_closure);
+PRELUDE_CLOSURE(base_GHCziPerCapability_capabilitiesChanged_closure);
 #if defined(mingw32_HOST_OS)
 PRELUDE_CLOSURE(base_GHCziEventziWindows_processRemoteCompletion_closure);
 #endif
