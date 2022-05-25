@@ -1724,13 +1724,18 @@ pushCoTyArg co ty
         -- co2 :: ty1[ (ty|>co1)/a1 ] ~ ty2[ ty/a2 ]
         -- Arg of mkInstCo is always nominal, hence mkNomReflCo
 
+-- | If @pushCoValArg co = Just (co_arg, co_res)@, then
+--
+-- > (\x.body) |> co  =  (\y. let { x = y |> co_arg } in body) |> co_res)
+--
+-- or, equivalently
+--
+-- > (fun |> co) arg  =  (fun (arg |> co_arg)) |> co_res
+--
+-- If the LHS is well-typed, then so is the RHS. In particular, the argument
+-- @arg |> co_arg@ is guaranteed to have a fixed 'RuntimeRep', in the sense of
+-- Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 pushCoValArg :: CoercionR -> Maybe (MCoercionR, MCoercionR)
--- We have (fun |> co) arg
--- Push the coercion through to return
---         (fun (arg |> co_arg)) |> co_res
--- 'co' is always Representational
--- If the second returned Coercion is actually Nothing, then no cast is necessary;
--- the returned coercion would have been reflexive.
 pushCoValArg co
   -- The following is inefficient - don't do `eqType` here, the coercion
   -- optimizer will take care of it. See #14737.
@@ -1742,17 +1747,25 @@ pushCoValArg co
 
   | isFunTy tyL
   , (co_mult, co1, co2) <- decomposeFunCo Representational co
+      -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
+      -- then co1 :: tyL1 ~ tyR1
+      --      co2 :: tyL2 ~ tyR2
+
   , isReflexiveCo co_mult
     -- We can't push the coercion in the case where co_mult isn't reflexivity:
     -- it could be an unsafe axiom, and losing this information could yield
     -- ill-typed terms. For instance (fun x ::(1) Int -> (fun _ -> () |> co) x)
     -- with co :: (Int -> ()) ~ (Int %1 -> ()), would reduce to (fun x ::(1) Int
-    -- -> (fun _ ::(Many) Int -> ()) x) which is ill-typed
+    -- -> (fun _ ::(Many) Int -> ()) x) which is ill-typed.
 
-              -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
-              -- then co1 :: tyL1 ~ tyR1
-              --      co2 :: tyL2 ~ tyR2
-  = assertPpr (isFunTy tyR) (ppr co $$ ppr arg) $
+  , typeHasFixedRuntimeRep new_arg_ty
+    -- We can't push the coercion inside if it would give rise to
+    -- a representation-polymorphic argument.
+
+  = assertPpr (isFunTy tyL && isFunTy tyR)
+     (vcat [ text "co:" <+> ppr co
+           , text "old_arg_ty:" <+> ppr old_arg_ty
+           , text "new_arg_ty:" <+> ppr new_arg_ty ]) $
     Just (coToMCo (mkSymCo co1), coToMCo co2)
     -- Critically, coToMCo to checks for ReflCo; the whole coercion may not
     -- be reflexive, but either of its components might be
@@ -1762,7 +1775,8 @@ pushCoValArg co
   | otherwise
   = Nothing
   where
-    arg = funArgTy tyR
+    old_arg_ty = funArgTy tyR
+    new_arg_ty = funArgTy tyL
     Pair tyL tyR = coercionKind co
 
 pushCoercionIntoLambda
@@ -1780,6 +1794,9 @@ pushCoercionIntoLambda in_scope x e co
     , isReflexiveCo co_mult
       -- We can't push the coercion in the case where co_mult isn't
       -- reflexivity. See pushCoValArg for more details.
+    , typeHasFixedRuntimeRep t1
+      -- We can't push the coercion into the lambda if it would create
+      -- a representation-polymorphic binder.
     = let
           -- Should we optimize the coercions here?
           -- Otherwise they might not match too well
@@ -1794,9 +1811,7 @@ pushCoercionIntoLambda in_scope x e co
             -- so we extend the substitution with x |-> (x' |> sym co1).
       in Just (x', substExpr subst e `mkCast` co2)
     | otherwise
-      -- See #21555 / #21577 for a case where this trace fired but the cause was benign
-    = -- pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
-      Nothing
+    = Nothing
 
 pushCoDataCon :: DataCon -> [CoreExpr] -> Coercion
               -> Maybe (DataCon

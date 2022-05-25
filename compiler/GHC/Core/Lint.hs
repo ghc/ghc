@@ -1166,8 +1166,9 @@ checkCanEtaExpand :: CoreExpr   -- ^ the function (head of the application) we a
                   -> LintedType -- ^ the instantiated type of the overall application
                   -> LintM ()
 checkCanEtaExpand (Var fun_id) args app_ty
-  | hasNoBinding fun_id
-  = checkL (null bad_arg_tys) err_msg
+  = do { do_rep_poly_checks <- lf_check_fixed_rep <$> getLintFlags
+       ; when (do_rep_poly_checks && hasNoBinding fun_id) $
+           checkL (null bad_arg_tys) err_msg }
     where
       arity :: Arity
       arity = idArity fun_id
