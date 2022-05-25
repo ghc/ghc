@@ -93,18 +93,20 @@ prepForeignCall _ _ _ =
 
 
 freeForeignCallInfo :: Ptr C_ffi_cif -> IO ()
-freeForeignCallInfo p = do
 #if !defined(js_HOST_ARCH)
+freeForeignCallInfo p = do
   free ((#ptr ffi_cif, arg_types) p)
   free p
 #else
+freeForeignCallInfo _ =
   error "GHCi.FFI.freeForeignCallInfo: Called with JS_HOST_ARCH! Perhaps you need to run configure?"
 #endif
 
-data C_ffi_type
 data C_ffi_cif
 
 #if !defined(js_HOST_ARCH)
+data C_ffi_type
+
 strError :: C_ffi_status -> String
 strError r
   | r == fFI_BAD_ABI
