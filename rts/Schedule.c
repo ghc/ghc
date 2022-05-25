@@ -2329,7 +2329,6 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
     }
 
     // Notify IO manager that the number of capabilities has changed.
-    rts_evalIO(&cap, ioManagerCapabilitiesChanged_closure, NULL);
     rts_evalIO(&cap, capabilitiesChanged_closure, NULL);
 
     startTimer();

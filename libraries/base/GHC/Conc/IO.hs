@@ -27,7 +27,6 @@
 
 module GHC.Conc.IO
         ( ensureIOManagerIsRunning
-        , ioManagerCapabilitiesChanged
         , interruptIOManager
 
         -- * Waiting
@@ -86,13 +85,6 @@ interruptIOManager :: IO ()
 interruptIOManager = return ()
 #else
 interruptIOManager = Windows.interruptIOManager
-#endif
-
-ioManagerCapabilitiesChanged :: IO ()
-#if !defined(mingw32_HOST_OS)
-ioManagerCapabilitiesChanged = Event.ioManagerCapabilitiesChanged
-#else
-ioManagerCapabilitiesChanged = return ()
 #endif
 
 -- | Block the current thread until data is available to read on the

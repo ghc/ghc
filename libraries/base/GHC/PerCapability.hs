@@ -7,17 +7,23 @@ module GHC.PerCapability
     , newPerCapability
     , getPerCapability
     , freePerCapability
-      -- Internal
+    , forEachCapability_
+    , forEachCapability
+      -- * Finite maps over capabilities
+    , PerCapMap
+    , lookupPerCapMap
+      -- * Internal
     , capabilitiesChanged
     ) where
 
+import GHC.Arr
 import GHC.Base
 import GHC.Conc.Sync (getNumCapabilities, myThreadId, threadCapability, yield)
 import GHC.Num ((-), (+))
 import Data.Foldable (mapM_, forM_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef, atomicModifyIORef)
 import GHC.IOArray (IOArray, newIOArray, readIOArray, writeIOArray,
-                    boundsIOArray)
+                    boundsIOArray, unsafeFreezeIOArray)
 import GHC.IO (unsafePerformIO)
 
 -- | An array of values, one per capability
@@ -122,3 +128,45 @@ capabilitiesChanged = do
 uninitPerCap :: a
 uninitPerCap = error "Uninitialized PerCapability slot"
 
+-- | An immutable map from capabilities to values.
+newtype PerCapMap a = PerCapMap (Array Int a)
+
+lookupPerCapMap :: PerCapMap a -> Int -> Maybe a
+lookupPerCapMap (PerCapMap arr) i
+  | (l,u) <- GHC.Arr.bounds arr
+  , i >= l && i <= u
+  = Just $ unsafeAt arr i
+  | otherwise
+  = Nothing
+
+-- | Perform an action on each per-capability value. Note that this makes no
+-- attempt exclude concurrent accesses; it is the caller's responsibility to
+-- ensure avoid races.
+forEachCapability_
+    :: PerCapability a
+    -> (Int -> a -> IO ())
+    -> IO ()
+forEachCapability_ pc f = do
+    arr <- readIORef (pcArr pc)
+    let (low, high) = boundsIOArray arr
+    forM_ [low .. high] $ \i -> do
+        x <- readIOArray arr i
+        f i x
+
+-- | Perform an action on each per-capability value, collecting the results in
+-- an array.  Note that this makes no attempt exclude concurrent accesses; it
+-- is the caller's responsibility to ensure avoid races.
+forEachCapability
+    :: PerCapability a
+    -> (Int -> a -> IO b)
+    -> IO (PerCapMap b)
+forEachCapability pc f = do
+    arr <- readIORef (pcArr pc)
+    let (low, high) = boundsIOArray arr
+    res_arr <- newIOArray (low, high) (error "forEachCapability: uninit")
+    forM_ [low .. high] $ \i -> do
+        x <- readIOArray arr i
+        r <- f i x
+        writeIOArray res_arr i r
+
+    PerCapMap `fmap` unsafeFreezeIOArray res_arr

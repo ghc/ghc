@@ -38,7 +38,7 @@ idleCpuUsage = do
 
 main :: IO ()
 main = do
-  (Just eventMgr) <- getSystemEventManager
+  (_, eventMgr) <- getSystemEventManager
   fd <- makeTestSocketFd
 
   let getAvgCpuUsage = do
