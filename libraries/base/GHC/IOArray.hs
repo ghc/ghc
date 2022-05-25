@@ -21,7 +21,8 @@ module GHC.IOArray (
         IOArray(..),
         newIOArray, unsafeReadIOArray, unsafeWriteIOArray,
         readIOArray, writeIOArray,
-        boundsIOArray
+        boundsIOArray,
+        unsafeFreezeIOArray
     ) where
 
 import GHC.Base
@@ -74,4 +75,8 @@ writeIOArray (IOArray marr) i e = stToIO (writeSTArray marr i e)
 {-# INLINE boundsIOArray #-}
 boundsIOArray :: IOArray i e -> (i,i)
 boundsIOArray (IOArray marr) = boundsSTArray marr
+
+{-# INLINE unsafeFreezeIOArray #-}
+unsafeFreezeIOArray :: IOArray i e -> IO (Array i e)
+unsafeFreezeIOArray (IOArray marr) = stToIO (unsafeFreezeSTArray marr)
 
