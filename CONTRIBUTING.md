@@ -74,3 +74,4 @@ cabal v2-test html-test latex-test hoogle-test hypsrc-test \
 
 
 [SSCCE]: http://sscce.org/
+[CoC]: ./CODE_OF_CONDUCT.md
