@@ -11,13 +11,9 @@ import System.Posix.Files (stdFileMode)
 import qualified Control.Monad.Catch as MC
 
 import Data.Foldable
-import Control.Monad.IO.Class
 import Control.Monad
-import Control.Concurrent.MVar
 import Control.Concurrent.QSem
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TMVar
-import Control.Monad.STM
 import Data.Time
 import GHC.Data.OrdList
 import Data.Functor
@@ -120,41 +116,88 @@ sjReleaseThread tv = do
         Right () -> atomically $ modifySjs_ tv $ \sjs -> pure ((), sjs { sjTokensOwned = sjTokensOwned sjs - 1 })
   pure $ SJLSReleasing tid tv_b
 
+sjTryAcquire :: TVar SemaphoreJobserver -> SemaphoreJobserverLoopState -> STM (IO SemaphoreJobserverLoopState)
+sjTryAcquire tv SJLSIdle = do
+  SemaphoreJobserver
+    { sjTokensFree } <- readTVar tv
+  guard $ sjTokensFree == 0
+  pure $ sjAcquireThread tv
+sjTryAcquire _ _ = retry
+
+sjTryRelease :: TVar SemaphoreJobserver -> SemaphoreJobserverLoopState -> STM (IO SemaphoreJobserverLoopState)
+sjTryRelease tv SJLSIdle = do
+  SemaphoreJobserver
+    { sjTokensFree, sjTokensOwned, sjWaiting 
+    } <- readTVar tv
+  guard $ length sjWaiting == 0 && sjTokensFree > 0 && sjTokensOwned > 1
+  pure $ sjReleaseThread tv
+sjTryRelease _ _ = retry
+
+
+sjTryNoticeIdle :: TVar SemaphoreJobserver -> SemaphoreJobserverLoopState -> STM (IO SemaphoreJobserverLoopState)
+sjTryNoticeIdle tv ls = case ls of
+  SJLSAcquiring _ tv_b -> sync_num_caps tv_b
+  SJLSReleasing _ tv_b -> sync_num_caps tv_b
+  _ -> retry
+  where
+    sync_num_caps tv_b = do
+      readTVar tv_b >>= guard
+      SemaphoreJobserver
+        { sjTokensOwned
+        } <- readTVar tv
+      pure $ do
+        x <- getNumCapabilities
+        when (x /= sjTokensOwned) $ setNumCapabilities sjTokensOwned
+        pure SJLSIdle
+
+
+sjTryStopThread ::  TVar SemaphoreJobserver -> SemaphoreJobserverLoopState -> STM (IO SemaphoreJobserverLoopState)
+sjTryStopThread tv ls = case ls of
+  SJLSAcquiring tid _ -> do
+    readTVar tv >>= guard . (== 0) . length . sjWaiting
+    pure $ kill_thread_and_idle tid
+  SJLSReleasing tid _ -> do
+    readTVar tv >>= guard . (> 0) . length . sjWaiting
+    pure $ kill_thread_and_idle tid
+  _ -> retry
+  where
+    kill_thread_and_idle tid = killThread tid $> SJLSIdle
+
 
 semaphoreJobserverLoop :: TVar SemaphoreJobserver -> IO ()
 semaphoreJobserverLoop tv = loop SJLSIdle where
   loop s = do
-    action <- atomically $ do
-      sjs <- readTVar tv >>= normaliseSemaphoreJobserver
-      let
-        kill_thread_and_return_idle tid = killThread tid $> SJLSIdle
-        -- TODO we can make this much nicer by 'asum'ing several STM ops together
-        -- TODO the returned action also needs to call setNumCapabilities
-        -- TODO rate limiting via registerDelay
-      case (sjTokensOwned sjs, sjTokensFree sjs, sjWaiting sjs, s) of
-        (_, 0, NilOL, SJLSIdle) -> retry
-        (_, 0, NilOL, SJLSAcquiring tid _) ->
-          pure $ kill_thread_and_return_idle tid
-        (_, 0, NilOL, SJLSReleasing tid _) ->
-          pure $ kill_thread_and_return_idle tid
-        (num_owned, x, NilOL, SJLSIdle)
-          | x > 0, num_owned > 1 -> do
-              modifySjs_ tv $ \sjs0 -> let
-                sjs = sjs0 { sjTokensFree = sjTokensFree sjs0 - 1 }
-                in pure (sjReleaseThread tv, sjs)
-        (_, x, NilOL, SJLSAcquiring tid _)
-          | x > 0 -> pure $ kill_thread_and_return_idle tid
-        (_, x, NilOL, SJLSReleasing _ tv_b)
-          | x > 0 -> do
-              readTVar tv_b >>= guard
-              pure $ pure SJLSIdle
-        (_, 0, _ `ConsOL` _, SJLSIdle) -> pure (sjReleaseThread tv)
-        (_, 0, _ `ConsOL` _, SJLSAcquiring _ tv_b) -> do
-          readTVar tv_b >>= guard
-          pure $ pure SJLSIdle
-        (_, 0, _ `ConsOL` _, SJLSReleasing tid _) ->
-          pure $ kill_thread_and_return_idle tid
-        _ -> panic "semaphoreJobserverLoop"
+    action <- atomically $ asum $ (\x -> x tv s) <$> [sjTryRelease, sjTryAcquire, sjTryNoticeIdle, sjTryStopThread ]
+      -- sjs <- readTVar tv >>= normaliseSemaphoreJobserver
+      -- let
+      --   kill_thread_and_return_idle tid = killThread tid $> SJLSIdle
+      --   -- TODO we can make this much nicer by 'asum'ing several STM ops together
+      --   -- TODO the returned action also needs to call setNumCapabilities
+      --   -- TODO rate limiting via registerDelay
+      -- case (sjTokensOwned sjs, sjTokensFree sjs, sjWaiting sjs, s) of
+      --   (_, 0, NilOL, SJLSIdle) -> retry
+      --   (_, 0, NilOL, SJLSAcquiring tid _) ->
+      --     pure $ kill_thread_and_return_idle tid
+      --   (_, 0, NilOL, SJLSReleasing tid _) ->
+      --     pure $ kill_thread_and_return_idle tid
+      --   (num_owned, x, NilOL, SJLSIdle)
+      --     | x > 0, num_owned > 1 -> do
+      --         modifySjs_ tv $ \sjs0 -> let
+      --           sjs = sjs0 { sjTokensFree = sjTokensFree sjs0 - 1 }
+      --           in pure (sjReleaseThread tv, sjs)
+      --   (_, x, NilOL, SJLSAcquiring tid _)
+      --     | x > 0 -> pure $ kill_thread_and_return_idle tid
+      --   (_, x, NilOL, SJLSReleasing _ tv_b)
+      --     | x > 0 -> do
+      --         readTVar tv_b >>= guard
+      --         pure $ pure SJLSIdle
+      --   (_, 0, _ `ConsOL` _, SJLSIdle) -> pure (sjAcquireThread tv)
+      --   (_, 0, _ `ConsOL` _, SJLSAcquiring _ tv_b) -> do
+      --     readTVar tv_b >>= guard
+      --     pure $ pure SJLSIdle
+      --   (_, 0, _ `ConsOL` _, SJLSReleasing tid _) ->
+      --     pure $ kill_thread_and_return_idle tid
+      --   _ -> panic "semaphoreJobserverLoop"
     action >>= loop
 
 makeSemaphoreJobserver :: FilePath -> IO AbstractSem
