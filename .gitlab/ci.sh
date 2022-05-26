@@ -528,7 +528,7 @@ function build_hadrian() {
 
   # N.B. First build Hadrian, unsetting MACOSX_DEPLOYMENT_TARGET which may warn
   # if the bootstrap libraries were built with a different version expectation.
-  MACOSX_DEPLOYMENT_TARGET="" run_hadrian stage1:exe:ghc-bin
+  MACOSX_DEPLOYMENT_TARGET="" run_hadrian -V stage1:exe:ghc-bin
 
   if [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian build-cabal -V
