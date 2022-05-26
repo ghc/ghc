@@ -1210,11 +1210,11 @@ rnStmt ctxt rnBody (L loc (RecStmt { recS_stmts = L _ rec_stmts })) thing_inside
                               segs
           -- See Note [Deterministic ApplicativeDo and RecursiveDo desugaring]
         ; (thing, fvs_later) <- thing_inside bndrs
-        -- In interactive mode, assume that all variables are used later
+        -- In interactive mode, all variables could be used later. So we pass whether
+        -- we are in GHCi along to segmentRecStmts. See Note [What is "used later" in a rec stmt]
         ; is_interactive <- isInteractiveModule . tcg_mod <$> getGblEnv
         ; let
-             final_fvs_later = if is_interactive then Nothing else Just fvs_later
-             (rec_stmts', fvs) = segmentRecStmts (locA loc) ctxt empty_rec_stmt segs final_fvs_later
+             (rec_stmts', fvs) = segmentRecStmts (locA loc) ctxt empty_rec_stmt segs (fvs_later, is_interactive)
         -- We aren't going to try to group RecStmts with
         -- ApplicativeDo, so attaching empty FVs is fine.
         ; return ( ((zip rec_stmts' (repeat emptyNameSet)), thing)
@@ -1567,16 +1567,19 @@ segmentRecStmts :: AnnoBody body
                 => SrcSpan -> HsStmtContext GhcRn
                 -> Stmt GhcRn (LocatedA (body GhcRn))
                 -> [Segment (LStmt GhcRn (LocatedA (body GhcRn)))]
-                -> Maybe FreeVars -- Nothing when in interactive mode, everything can be used later
-                                  -- Note [What is "used later" in a rec stmt]
+                -> (FreeVars, Bool)
+                    -- ^ The free variables used in later statements.
+                    -- If the boolean is 'True', this might be an underestimate
+                    -- because we are in GHCi, and might thus be missing some "used later"
+                    -- FVs. See Note [What is "used later" in a rec stmt]
                 -> ([LStmt GhcRn (LocatedA (body GhcRn))], FreeVars)
 
-segmentRecStmts loc ctxt empty_rec_stmt segs mfvs_later
+segmentRecStmts loc ctxt empty_rec_stmt segs (fvs_later, might_be_more_fvs_later)
   | null segs
   = ([], final_fv_uses)
 
   | HsDoStmt (MDoExpr _) <- ctxt
-  = segsToStmts empty_rec_stmt grouped_segs later_ids
+  = segsToStmts empty_rec_stmt grouped_segs fvs_later
                -- Step 4: Turn the segments into Stmts
                 --         Use RecStmt when and only when there are fwd refs
                 --         Also gather up the uses from the end towards the
@@ -1586,19 +1589,22 @@ segmentRecStmts loc ctxt empty_rec_stmt segs mfvs_later
   | otherwise
   = ([ L (noAnnSrcSpan loc) $
        empty_rec_stmt { recS_stmts = noLocA ss
-                      , recS_later_ids = nameSetElemsStable later_ids
+                      , recS_later_ids = nameSetElemsStable final_fvs_later
                       , recS_rec_ids   = nameSetElemsStable
                                            (defs `intersectNameSet` uses) }]
           -- See Note [Deterministic ApplicativeDo and RecursiveDo desugaring]
     , uses `plusFV` final_fv_uses)
 
   where
-    final_fv_uses = case mfvs_later of
-                  Nothing -> defs
-                  Just later -> uses `plusFV` later
-    later_ids = case mfvs_later of
-                  Nothing -> defs
-                  Just fvs_later -> defs `intersectNameSet` fvs_later
+    (final_fv_uses, final_fvs_later)
+      | might_be_more_fvs_later
+      = (defs, defs)
+        -- If there might be more uses later (e.g. we are in GHCi and have not
+        -- yet seen the whole rec statement), conservatively assume that everything
+        -- will be used later (as is possible).
+      | otherwise
+      = ( uses `plusFV` fvs_later
+        , defs `intersectNameSet` fvs_later )
 
     (defs_s, uses_s, _, ss) = unzip4 segs
     defs = plusFVs defs_s
@@ -1677,7 +1683,7 @@ glom it together with the first two groups
 
 Note [What is "used later" in a rec stmt]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We desugar a recursive Stmt to somethign like
+We desugar a recursive Stmt to something like
 
   (a,_,c) <- mfix (\(a,b,_) -> do { ... ; return (a,b,c) })
   ...stuff after the rec...
@@ -1693,8 +1699,9 @@ after the `rec` (#20206).  For example, we might have
     ghci>  print y
 
 So we have to assume that *all* the variables bound in the `rec` are used
-afterwards.  We use `Nothing` in the argument to segmentRecStmts to signal
-that all the variables are used.
+afterwards.  We pass a Boolean to segmentRecStmts to signal such a situation,
+in which case that function conservatively assumes that everything might well
+be used later.
 -}
 
 glomSegments :: HsStmtContext GhcRn
