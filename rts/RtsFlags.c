@@ -1449,7 +1449,7 @@ error = true;
 #if !defined(PROFILING)
                 switch (rts_argv[arg][2]) {
                   case '\0':
-                    errorBelch("-h is deprecated and will be removed in the next release (9.4),\nuse -hT instead.");
+                    errorBelch("-h is deprecated, use -hT instead.");
 
                     FALLTHROUGH;
                   case 'T':
@@ -2214,7 +2214,7 @@ static bool read_heap_profiling_flag(const char *arg)
     bool error = false;
     switch (arg[2]) {
     case '\0':
-      errorBelch("-h is deprecated and will be removed in the next release (9.4),\nuse -hc instead.");
+      errorBelch("-h is deprecated, use -hc instead.");
       FALLTHROUGH;
     case 'C':
     case 'c':
