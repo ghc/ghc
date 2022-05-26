@@ -21,8 +21,6 @@
 -- Stability   :  stable
 -- Portability :  non-portable (local universal quantification)
 --
--- \"Scrap your boilerplate\" --- Generic programming in Haskell.  See
--- <http://www.haskell.org/haskellwiki/Research_papers/Generics#Scrap_your_boilerplate.21>.
 -- This module provides the 'Data' class with its primitives for
 -- generic programming, along with instances for many datatypes. It
 -- corresponds to a merge between the previous "Data.Generics.Basics"
@@ -30,8 +28,8 @@
 -- not present in this module were moved to the
 -- @Data.Generics.Instances@ module in the @syb@ package.
 --
--- For more information, please visit the new
--- SYB wiki: <http://www.cs.uu.nl/wiki/bin/view/GenericProgramming/SYB>.
+-- \"Scrap your boilerplate\" --- Generic programming in Haskell.  See
+-- <https://wiki.haskell.org/Research_papers/Generics#Scrap_your_boilerplate.21>.
 --
 -----------------------------------------------------------------------------
 
