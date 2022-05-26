@@ -2,7 +2,7 @@
 {-# language NamedFieldPuns #-}
 -- |
 
-module GHC.Driver.MakeSem(AbstractSem(..), withAbstractSem, makeSemaphoreJobserver) where
+module GHC.Driver.MakeSem(AbstractSem(..), withAbstractSem, runPosixSemaphoreAbstractSem) where
 
 import GHC.Prelude
 
@@ -12,7 +12,7 @@ import qualified Control.Monad.Catch as MC
 
 import Data.Foldable
 import Control.Monad
-import Control.Concurrent.QSem
+import Control.Concurrent.MVar
 import Control.Concurrent.STM
 import Data.Time
 import GHC.Data.OrdList
@@ -24,7 +24,6 @@ import GHC.IO.Exception
 --  -j1 case or a jobserver
 data AbstractSem = AbstractSem { acquireSem :: IO ()
                                , releaseSem :: IO ()
-                               , cleanupSem :: IO ()
                                }
 
 withAbstractSem :: AbstractSem -> IO b -> IO b
@@ -40,7 +39,9 @@ data SemaphoreJobserver
   }
 
 data SemaphoreJobserverLoopState
-  = SJLSIdle | SJLSAcquiring ThreadId (TVar Bool)| SJLSReleasing ThreadId (TVar Bool)
+  = SJLSIdle
+  | SJLSAcquiring ThreadId (TMVar (Maybe MC.SomeException))
+  | SJLSReleasing ThreadId (TMVar (Maybe MC.SomeException))
 
 
 -- TODO pull out each operation that twiddles the SemaphoreJobserver into a named function
@@ -87,61 +88,76 @@ modifySjs_ tv = fmap fst . modifySjs tv
 sjAcquireThread :: TVar SemaphoreJobserver -> IO SemaphoreJobserverLoopState
 sjAcquireThread tv = do
   sem <- atomically $ sjSem <$> readTVar tv
-  tv_b <- newTVarIO False
+  r_tmv <- newEmptyTMVarIO
   tid <- forkIOWithUnmask $ \unmask -> do
-    flip MC.finally (atomically $ writeTVar tv_b True) $ do
-      r <- MC.try $ unmask $ semWait sem
-      case r of
-        -- TODO if this is not ThreadKilled then we need to report this back
-        Left e | Just ThreadKilled <- MC.fromException e
-            -> pure ()
-        Right () -> atomically $ modifySjs_ tv $ \sjs -> pure ((), sjs
-          { sjTokensOwned = sjTokensOwned sjs + 1
-          , sjTokensFree = sjTokensFree sjs + 1})
-  pure $ SJLSAcquiring tid tv_b
+    MC.try (unmask $ semPost sem) >>= \x -> atomically $ do
+      r <- case x of
+        Left (e :: MC.SomeException) -> pure $ case MC.fromException e of
+          Just ThreadKilled -> Nothing
+          _ -> Just e
+        Right () -> do
+          modifySjs_ tv $ \sjs -> pure ((), sjs
+            { sjTokensOwned = sjTokensOwned sjs + 1
+            , sjTokensFree = sjTokensFree sjs + 1})
+          pure Nothing
+      putTMVar r_tmv r
+
+  pure $ SJLSAcquiring tid r_tmv
 
 sjReleaseThread :: TVar SemaphoreJobserver -> IO SemaphoreJobserverLoopState
 sjReleaseThread tv = do
   sem <- atomically $ sjSem <$> readTVar tv
-  tv_b <- newTVarIO False
-  tid <- forkIOWithUnmask $ \unmask -> do
-    flip MC.finally (atomically $ writeTVar tv_b True) $ do
-      r <- MC.try $ unmask $ semPost sem
-      case r of
-        -- TODO if this is not ThreadKilled then we need to report this back
-        Left (e :: MC.SomeException)
-          -- | Just ThreadKilled <- MC.fromException e
-            -> atomically $ modifySjs_ tv $ \sjs -> pure
-              ((), sjs { sjTokensFree = sjTokensFree sjs + 1 })
-        Right () -> atomically $ modifySjs_ tv $ \sjs -> pure ((), sjs { sjTokensOwned = sjTokensOwned sjs - 1 })
-  pure $ SJLSReleasing tid tv_b
+  r_tmv <- newEmptyTMVarIO
+  MC.mask_ $ do
+    still_good <- atomically $ modifySjs_ tv $ \sjs -> if sjGuardRelease sjs
+      then pure (True, sjs { sjTokensFree = sjTokensFree sjs - 1 })
+      else pure (False, sjs)
+    if not still_good
+      then pure SJLSIdle
+      else do
+      tid <- forkIOWithUnmask $ \unmask -> do
+        x <- MC.try (unmask $ semPost sem)
+        atomically $ do
+          r <- case x of
+            Left (e :: MC.SomeException) -> do
+              modifySjs_ tv $ \sjs -> pure
+                ((), sjs { sjTokensFree = sjTokensFree sjs + 1 })
+              pure $ case MC.fromException e of
+                Just ThreadKilled -> Nothing
+                _ -> Just e
+            Right () -> do
+              modifySjs_ tv $ \sjs -> pure ((), sjs { sjTokensOwned = sjTokensOwned sjs - 1 })
+              pure Nothing
+          putTMVar r_tmv r
+      pure $ SJLSReleasing tid r_tmv
 
 sjTryAcquire :: TVar SemaphoreJobserver -> SemaphoreJobserverLoopState -> STM (IO SemaphoreJobserverLoopState)
 sjTryAcquire tv SJLSIdle = do
   SemaphoreJobserver
-    { sjTokensFree } <- readTVar tv
-  guard $ sjTokensFree == 0
+    { sjTokensFree, sjWaiting } <- readTVar tv
+  guard $ sjTokensFree == 0 && length sjWaiting > 0
   pure $ sjAcquireThread tv
 sjTryAcquire _ _ = retry
 
+sjGuardRelease :: SemaphoreJobserver -> Bool
+sjGuardRelease SemaphoreJobserver { sjTokensFree, sjTokensOwned, sjWaiting} =
+  length sjWaiting == 0 && sjTokensFree > 0 && sjTokensOwned > 1
+
 sjTryRelease :: TVar SemaphoreJobserver -> SemaphoreJobserverLoopState -> STM (IO SemaphoreJobserverLoopState)
 sjTryRelease tv SJLSIdle = do
-  SemaphoreJobserver
-    { sjTokensFree, sjTokensOwned, sjWaiting 
-    } <- readTVar tv
-  guard $ length sjWaiting == 0 && sjTokensFree > 0 && sjTokensOwned > 1
+  readTVar tv >>= guard . sjGuardRelease
   pure $ sjReleaseThread tv
 sjTryRelease _ _ = retry
 
 
 sjTryNoticeIdle :: TVar SemaphoreJobserver -> SemaphoreJobserverLoopState -> STM (IO SemaphoreJobserverLoopState)
 sjTryNoticeIdle tv ls = case ls of
-  SJLSAcquiring _ tv_b -> sync_num_caps tv_b
-  SJLSReleasing _ tv_b -> sync_num_caps tv_b
+  SJLSAcquiring _ tmv -> sync_num_caps tmv
+  SJLSReleasing _ tmv -> sync_num_caps tmv
   _ -> retry
   where
-    sync_num_caps tv_b = do
-      readTVar tv_b >>= guard
+    sync_num_caps tmv = do
+      takeTMVar tmv >>= maybe (pure ()) MC.throwM
       SemaphoreJobserver
         { sjTokensOwned
         } <- readTVar tv
@@ -167,54 +183,45 @@ sjTryStopThread tv ls = case ls of
 semaphoreJobserverLoop :: TVar SemaphoreJobserver -> IO ()
 semaphoreJobserverLoop tv = loop SJLSIdle where
   loop s = do
-    action <- atomically $ asum $ (\x -> x tv s) <$> [sjTryRelease, sjTryAcquire, sjTryNoticeIdle, sjTryStopThread ]
-      -- sjs <- readTVar tv >>= normaliseSemaphoreJobserver
-      -- let
-      --   kill_thread_and_return_idle tid = killThread tid $> SJLSIdle
-      --   -- TODO we can make this much nicer by 'asum'ing several STM ops together
-      --   -- TODO the returned action also needs to call setNumCapabilities
-      --   -- TODO rate limiting via registerDelay
-      -- case (sjTokensOwned sjs, sjTokensFree sjs, sjWaiting sjs, s) of
-      --   (_, 0, NilOL, SJLSIdle) -> retry
-      --   (_, 0, NilOL, SJLSAcquiring tid _) ->
-      --     pure $ kill_thread_and_return_idle tid
-      --   (_, 0, NilOL, SJLSReleasing tid _) ->
-      --     pure $ kill_thread_and_return_idle tid
-      --   (num_owned, x, NilOL, SJLSIdle)
-      --     | x > 0, num_owned > 1 -> do
-      --         modifySjs_ tv $ \sjs0 -> let
-      --           sjs = sjs0 { sjTokensFree = sjTokensFree sjs0 - 1 }
-      --           in pure (sjReleaseThread tv, sjs)
-      --   (_, x, NilOL, SJLSAcquiring tid _)
-      --     | x > 0 -> pure $ kill_thread_and_return_idle tid
-      --   (_, x, NilOL, SJLSReleasing _ tv_b)
-      --     | x > 0 -> do
-      --         readTVar tv_b >>= guard
-      --         pure $ pure SJLSIdle
-      --   (_, 0, _ `ConsOL` _, SJLSIdle) -> pure (sjAcquireThread tv)
-      --   (_, 0, _ `ConsOL` _, SJLSAcquiring _ tv_b) -> do
-      --     readTVar tv_b >>= guard
-      --     pure $ pure SJLSIdle
-      --   (_, 0, _ `ConsOL` _, SJLSReleasing tid _) ->
-      --     pure $ kill_thread_and_return_idle tid
-      --   _ -> panic "semaphoreJobserverLoop"
+    action <- atomically $ asum $ (\x -> x tv s) <$>
+      [ sjTryRelease
+      , sjTryAcquire
+      , sjTryNoticeIdle
+      , sjTryStopThread
+      ]
     action >>= loop
 
-makeSemaphoreJobserver :: FilePath -> IO AbstractSem
+makeSemaphoreJobserver :: FilePath -> IO (AbstractSem, IO ())
 makeSemaphoreJobserver sem_path = do
   sjSem <- semOpen sem_path (OpenSemFlags { semCreate = False, semExclusive = False }) stdFileMode 0
   let
     init_sjs = SemaphoreJobserver { sjSem, sjTokensOwned = 1, sjTokensFree = 1, sjWaiting = NilOL }
   sjs_tv <- newTVarIO init_sjs
-  loop_tid <- forkIO $ semaphoreJobserverLoop sjs_tv
+  loop_res_mv <- newEmptyMVar
+  loop_tid <- forkIOWithUnmask $ \unmask -> do
+    r <- try $ unmask $ semaphoreJobserverLoop sjs_tv
+    putMVar loop_res_mv $ case r of
+      Left e
+        | Just ThreadKilled <- fromException e -> Nothing
+        | otherwise -> Just e
+      Right () -> Nothing
   let
     acquireSem = acquireSemaphoreJobserver sjs_tv
     releaseSem = releaseSemaphoreJobserver sjs_tv
-    cleanupSem = killThread loop_tid
-  pure AbstractSem{..}
+    cleanupSem = do
+      -- this is interruptible
+      killThread loop_tid
+      takeMVar loop_res_mv >>= maybe (pure ()) MC.throwM
+
+  pure (AbstractSem{..}, cleanupSem)
   
 
-
-
-
-
+runPosixSemaphoreAbstractSem :: FilePath -> (AbstractSem -> IO a) -> IO a
+runPosixSemaphoreAbstractSem s action = MC.mask $ \unmask -> do
+  (abs, cleanup) <- makeSemaphoreJobserver s
+  r <- try $ unmask $ action abs
+  case r of
+    Left (e1 :: MC.SomeException) -> do
+      (_ :: Either MC.SomeException ()) <-  MC.try cleanup
+      MC.throwM e1
+    Right x -> cleanup $> x

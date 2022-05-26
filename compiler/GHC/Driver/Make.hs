@@ -2631,18 +2631,35 @@ runSeqPipelines :: HscEnv -> Maybe Messager -> [MakeAction] -> IO ()
 runSeqPipelines plugin_hsc_env mHscMessager all_pipelines =
   let env = MakeEnv { hsc_env = plugin_hsc_env
                     , withLogger = \_ k -> k id
-                    , compile_sem = AbstractSem (return ()) (return ()) (return ())
+                    , compile_sem = AbstractSem (return ()) (return ())
                     , env_messager = mHscMessager
                     }
   in runAllPipelines (NumProcessors 1) env all_pipelines
 
-mkAbstractSem :: WorkerLimit -> IO AbstractSem
-mkAbstractSem worker_limit = case worker_limit of
-  NumProcessors n_jobs -> do
-    compile_sem <- newQSem n_jobs
-    pure $ AbstractSem (waitQSem compile_sem) (signalQSem compile_sem) (pure ())
-  JobServer f -> makeSemaphoreJobserver f
+  -- TODO remove this capabilities management, it will be handled by the semaphore
 
+runNjobsAbstractSem :: Int -> (AbstractSem -> IO a) -> IO a
+runNjobsAbstractSem n_jobs action = do
+  compile_sem <- newQSem n_jobs
+  n_capabilities <- getNumCapabilities
+  n_cpus <- getNumProcessors
+  let
+    asem = AbstractSem (waitQSem compile_sem) (signalQSem compile_sem)
+    set_num_caps n = unless (n_capabilities /= 1) $ setNumCapabilities n
+    updNumCapabilities =  do
+      -- Setting number of capabilities more than
+      -- CPU count usually leads to high userspace
+      -- lock contention. #9221
+      set_num_caps $ min n_jobs n_cpus
+    resetNumCapabilities = set_num_caps n_capabilities
+  MC.bracket_ updNumCapabilities resetNumCapabilities $ action asem
+
+runWorkerLimit :: WorkerLimit -> (AbstractSem -> IO a) -> IO a
+runWorkerLimit worker_limit action = case worker_limit of
+    NumProcessors n_jobs ->
+      runNjobsAbstractSem n_jobs action
+    JobServer s ->
+      runPosixSemaphoreAbstractSem s action
 
 -- | Build and run a pipeline
 runParPipelines :: WorkerLimit -- ^ How to limit work parallelism
@@ -2667,34 +2684,17 @@ runParPipelines worker_limit plugin_hsc_env mHscMessager all_pipelines = do
   thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger plugin_hsc_env)
   let thread_safe_hsc_env = plugin_hsc_env { hsc_logger = thread_safe_logger }
 
-  -- TODO remove this capabilities management, it will be handled by the semaphore
-  let updNumCapabilities = liftIO $ do
-          n_capabilities <- getNumCapabilities
-          n_cpus <- getNumProcessors
-          -- Setting number of capabilities more than
-          -- CPU count usually leads to high userspace
-          -- lock contention. #9221
-          let n_caps = case worker_limit of
-                         NumProcessors n_jobs -> min n_jobs n_cpus
-                         JobServer _ -> n_cpus
-          unless (n_capabilities /= 1) $ setNumCapabilities n_caps
-          return n_capabilities
 
-  let resetNumCapabilities orig_n = do
-          liftIO $ setNumCapabilities orig_n
-          atomically $ writeTVar stopped_var True
-          wait_log_thread
-
-  abstract_sem <- mkAbstractSem worker_limit
-  let env = MakeEnv { hsc_env = thread_safe_hsc_env
-                    , withLogger = withParLog log_queue_queue_var
-                    , compile_sem = abstract_sem
-                    , env_messager = mHscMessager
-                    }
-
-  -- Reset the number of capabilities once the upsweep ends.
-  MC.bracket updNumCapabilities resetNumCapabilities $ \_ ->
+  runWorkerLimit worker_limit $ \abstract_sem -> do
+    let env = MakeEnv { hsc_env = thread_safe_hsc_env
+                      , withLogger = withParLog log_queue_queue_var
+                      , compile_sem = abstract_sem
+                      , env_messager = mHscMessager
+                      }
+    -- Reset the number of capabilities once the upsweep ends.
     runAllPipelines worker_limit env all_pipelines
+    atomically $ writeTVar stopped_var True
+    wait_log_thread
 
 withLocalTmpFS :: RunMakeM a -> RunMakeM a
 withLocalTmpFS act = do
