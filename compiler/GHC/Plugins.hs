@@ -26,7 +26,7 @@ module GHC.Plugins
    , module GHC.Core.Make
    , module GHC.Core.FVs
    , module GHC.Core.Subst
-   , module GHC.Core.Rules
+   , module GHC.Core.Rules.Apply
    , module GHC.Types.Annotations
    , module GHC.Driver.Session
    , module GHC.Driver.Ppr
@@ -96,7 +96,7 @@ import GHC.Core.FVs
 import GHC.Core.Subst hiding( substTyVarBndr, substCoVarBndr, extendCvSubst, extendSubstInScopeSet )
        -- These names are also exported by Type
 
-import GHC.Core.Rules
+import GHC.Core.Rules.Apply
 import GHC.Types.Annotations
 import GHC.Types.Meta
 

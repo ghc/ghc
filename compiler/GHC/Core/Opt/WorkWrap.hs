@@ -14,6 +14,7 @@ where
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Rules
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.Type

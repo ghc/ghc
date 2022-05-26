@@ -21,12 +21,14 @@ module GHC.Core.SimpleOpt (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Rules
 import GHC.Core.Opt.Arity
 import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
+import GHC.Core.Unfoldings
 import GHC.Core.Make ( FloatBind(..), mkWildValBinder )
 import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
 import GHC.Types.Literal
@@ -1416,7 +1418,7 @@ exprIsLambda_maybe will, given an expression `e`, try to turn it into the form
 casts (using the Push rule), and it unfolds function calls if the unfolding
 has a greater arity than arguments are present.
 
-Currently, it is used in GHC.Core.Rules.match, and is required to make
+Currently, it is used in GHC.Core.Rules.Apply.match, and is required to make
 "map coerce = coerce" match.
 -}
 

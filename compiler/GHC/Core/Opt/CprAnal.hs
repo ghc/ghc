@@ -27,6 +27,7 @@ import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Utils
 import GHC.Core
+import GHC.Core.Unfoldings
 import GHC.Core.Seq
 import GHC.Core.Opt.WorkWrap.Utils
 

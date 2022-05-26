@@ -126,8 +126,12 @@ module GHC.Types.Id (
 
 import GHC.Prelude
 
-import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding,
-                 isCompulsoryUnfolding, Unfolding( NoUnfolding ), isEvaldUnfolding, hasSomeUnfolding, noUnfolding )
+import GHC.Core.Unfoldings ( Unfolding( NoUnfolding )
+                           , isStableUnfolding, evaldUnfolding
+                           , isCompulsoryUnfolding, isEvaldUnfolding
+                           , hasSomeUnfolding, noUnfolding
+                           )
+import GHC.Core.Rules( CoreRule)
 
 import GHC.Types.Id.Info
 import GHC.Types.Basic

@@ -15,6 +15,8 @@ module GHC.Core.Tidy (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Rules
+import GHC.Core.Unfoldings
 import GHC.Core.Type
 
 import GHC.Core.Seq ( seqUnfolding )

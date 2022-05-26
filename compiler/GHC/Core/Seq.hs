@@ -13,6 +13,8 @@ module GHC.Core.Seq (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Rules
+import GHC.Core.Unfoldings
 import GHC.Types.Id.Info
 import GHC.Types.Demand( seqDemand, seqDmdSig )
 import GHC.Types.Cpr( seqCprSig )

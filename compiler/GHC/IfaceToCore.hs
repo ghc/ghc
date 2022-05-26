@@ -57,10 +57,12 @@ import GHC.Core.TyCo.Subst ( substTyCoVars )
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core
+import GHC.Core.Rules
 import GHC.Core.RoughMap( RoughMatchTc(..) )
 import GHC.Core.Utils
 import GHC.Core.Unfold( calcUnfoldingGuidance )
 import GHC.Core.Unfold.Make
+import GHC.Core.Unfoldings
 import GHC.Core.Lint
 import GHC.Core.Make
 import GHC.Core.Class

@@ -75,7 +75,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Utils
 import GHC.Builtin.PrimOps    ( allThePrimOps, primOpFixity, primOpOcc )
 
-import GHC.Core.Rules
+import GHC.Core.Rules.Apply
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv

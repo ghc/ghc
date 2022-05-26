@@ -45,6 +45,7 @@ module GHC.Core.Opt.Simplify.Utils (
 import GHC.Prelude hiding (head, init, last, tail)
 
 import GHC.Core
+import GHC.Core.Rules
 import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Inline
@@ -54,10 +55,11 @@ import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
 import GHC.Core.FVs
 import GHC.Core.Utils
-import GHC.Core.Rules( RuleEnv, getRules )
+import GHC.Core.Rules.Apply ( RuleEnv, getRules )
 import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
+import GHC.Core.Unfoldings
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type     hiding( substTy )
 import GHC.Core.Coercion hiding( substCo )
@@ -1065,7 +1067,7 @@ including those in the LHS of rules.
 This can cause somewhat surprising results; for instance, in #18162 we found
 that a rule template contained ticks in its arguments, because
 postInlineUnconditionally substituted in a trivial expression that contains
-ticks. See Note [Tick annotations in RULE matching] in GHC.Core.Rules for
+ticks. See Note [Tick annotations in RULE matching] in GHC.Core.Rules.Apply for
 details.
 
 Note [Cast swizzling on rule LHSs]

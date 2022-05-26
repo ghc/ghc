@@ -49,7 +49,7 @@ import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env( tcLookupId )
 import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
 
-import GHC.Core( hasSomeUnfolding )
+import GHC.Core.Unfoldings ( hasSomeUnfolding )
 import GHC.Core.Type ( mkTyVarBinders )
 import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep( mkNakedFunTy )

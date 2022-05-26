@@ -28,7 +28,7 @@ import GHC.Types.Id        ( Id, mkSysLocalOrCoVarM )
 import GHC.Types.Id.Info   ( IdDetails(..), vanillaIdInfo, setArityInfo )
 import GHC.Core.Type       ( Type, Mult )
 import GHC.Core.Opt.Stats
-import GHC.Core.Rules
+import GHC.Core.Rules.Apply
 import GHC.Core.Utils      ( mkLamTypes )
 import GHC.Types.Unique.Supply
 import GHC.Driver.Flags

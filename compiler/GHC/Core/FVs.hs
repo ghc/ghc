@@ -58,6 +58,8 @@ module GHC.Core.FVs (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Rules
+import GHC.Core.Unfoldings
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name.Set
@@ -65,6 +67,7 @@ import GHC.Types.Name
 import GHC.Types.Tickish
 import GHC.Types.Var.Set
 import GHC.Types.Var
+import GHC.Core.Annotated
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs

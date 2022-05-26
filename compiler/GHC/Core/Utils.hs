@@ -69,6 +69,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core
+import GHC.Core.Unfoldings
 import GHC.Core.Ppr
 import GHC.Core.DataCon
 import GHC.Core.Type as Type

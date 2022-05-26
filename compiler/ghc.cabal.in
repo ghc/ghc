@@ -291,6 +291,7 @@ Library
         GHC.Cmm.Type
         GHC.Cmm.Utils
         GHC.Core
+        GHC.Core.Annotated
         GHC.Core.Class
         GHC.Core.Coercion
         GHC.Core.Coercion.Axiom
@@ -335,12 +336,14 @@ Library
         GHC.Core.Opt.Stats
         GHC.Core.Opt.WorkWrap
         GHC.Core.Opt.WorkWrap.Utils
+        GHC.Core.Orphans
         GHC.Core.PatSyn
         GHC.Core.Ppr
         GHC.Types.TyThing.Ppr
         GHC.Core.Predicate
         GHC.Core.Reduction
         GHC.Core.Rules
+        GHC.Core.Rules.Apply
         GHC.Core.Rules.Config
         GHC.Core.Seq
         GHC.Core.SimpleOpt
@@ -364,6 +367,7 @@ Library
         GHC.Core.RoughMap
         GHC.Core.Unfold
         GHC.Core.Unfold.Make
+        GHC.Core.Unfoldings
         GHC.Core.Unify
         GHC.Core.UsageEnv
         GHC.Core.Utils

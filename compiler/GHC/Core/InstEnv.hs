@@ -36,7 +36,7 @@ import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Tc.Utils.TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
-import GHC.Core ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
+import GHC.Core.Orphans ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
 import GHC.Core.RoughMap
 import GHC.Core.Class
 import GHC.Core.Unify

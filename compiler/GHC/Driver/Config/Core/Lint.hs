@@ -16,6 +16,7 @@ import GHC.Driver.Session
 import GHC.Driver.Config.Diagnostic
 
 import GHC.Core
+import GHC.Core.Rules
 import GHC.Core.Lint
 import GHC.Core.Lint.Interactive
 import GHC.Core.Opt.Pipeline.Types

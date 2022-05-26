@@ -4,7 +4,7 @@ module GHC.Unit.Module.ModDetails
    )
 where
 
-import GHC.Core         ( CoreRule )
+import GHC.Core.Rules  ( CoreRule )
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv ( InstEnv, emptyInstEnv )
 

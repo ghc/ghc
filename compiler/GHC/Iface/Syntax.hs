@@ -49,7 +49,8 @@ import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey,
 import GHC.Types.Unique ( hasKey )
 import GHC.Iface.Type
 import GHC.Iface.Recomp.Binary
-import GHC.Core( IsOrphan, isOrphan, UnfoldingCache(..) )
+import GHC.Core.Orphans ( IsOrphan, isOrphan )
+import GHC.Core.Unfoldings ( UnfoldingCache(..) )
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core.Class

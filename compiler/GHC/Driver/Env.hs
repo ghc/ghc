@@ -60,7 +60,7 @@ import GHC.Unit.Home.ModInfo
 import GHC.Unit.Env
 import GHC.Unit.External
 
-import GHC.Core         ( CoreRule )
+import GHC.Core.Rules   ( CoreRule )
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv
 

@@ -43,7 +43,7 @@ import GHC.Prelude hiding ( read )
 import GHC.Driver.Session
 import GHC.Driver.Env
 
-import GHC.Core.Rules     ( RuleBase, RuleEnv, mkRuleEnv )
+import GHC.Core.Rules.Apply ( RuleBase, RuleEnv, mkRuleEnv )
 import GHC.Core.Opt.Stats ( SimplCount, zeroSimplCount, plusSimplCount )
 
 import GHC.Types.Annotations

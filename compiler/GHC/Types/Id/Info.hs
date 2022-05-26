@@ -87,7 +87,8 @@ module GHC.Types.Id.Info (
 
 import GHC.Prelude
 
-import GHC.Core
+import GHC.Core.Rules
+import GHC.Core.Unfoldings
 import GHC.Core.Class
 import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Types.Name

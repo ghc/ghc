@@ -1490,7 +1490,7 @@ The main effects of CONLIKE are:
     - A CoreUnfolding has a field that caches exprIsExpandable
 
     - The rule matcher consults this field.  See
-      Note [Expanding variables] in GHC.Core.Rules.
+      Note [Expanding variables] in GHC.Core.Rules.Apply.
 
 Note [OPAQUE pragma]
 ~~~~~~~~~~~~~~~~~~~~

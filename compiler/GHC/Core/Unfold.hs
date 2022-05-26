@@ -38,6 +38,7 @@ module GHC.Core.Unfold (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Unfoldings
 import GHC.Core.Utils
 import GHC.Types.Id
 import GHC.Core.DataCon

@@ -23,8 +23,10 @@ import GHC.Tc.Types
 import GHC.Tc.Utils.Env
 
 import GHC.Core
+import GHC.Core.Rules
 import GHC.Core.Unfold
 -- import GHC.Core.Unfold.Make
+import GHC.Core.Unfoldings
 import GHC.Core.FVs
 import GHC.Core.Tidy
 import GHC.Core.Seq         ( seqBinds )

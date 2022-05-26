@@ -6,7 +6,8 @@ module GHC.HsToCore.Errors.Types where
 
 import GHC.Prelude
 
-import GHC.Core (CoreRule, CoreExpr, RuleName)
+import GHC.Core (CoreExpr)
+import GHC.Core.Rules (CoreRule, RuleName)
 import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Driver.Session

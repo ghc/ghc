@@ -25,6 +25,8 @@ module GHC.Core.Opt.OccurAnal (
 import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Core
+import GHC.Core.Rules
+import GHC.Core.Unfoldings
 import GHC.Core.FVs
 import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
                           mkCastMCo, mkTicks )

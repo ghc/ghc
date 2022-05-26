@@ -18,7 +18,8 @@ import GHC.Unit.Module.Warnings
 
 import GHC.Core.InstEnv ( InstEnv, ClsInst )
 import GHC.Core.FamInstEnv
-import GHC.Core         ( CoreProgram, CoreRule )
+import GHC.Core         ( CoreProgram )
+import GHC.Core.Rules   ( CoreRule )
 import GHC.Core.TyCon
 import GHC.Core.PatSyn
 
@@ -67,7 +68,7 @@ data ModGuts
                                          -- ^ Family instances declared in this module
         mg_patsyns   :: ![PatSyn],       -- ^ Pattern synonyms declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
-                                         -- See Note [Overall plumbing for rules] in "GHC.Core.Rules"
+                                         -- See Note [Overall plumbing for rules] in "GHC.Core.Rules.Apply"
         mg_binds     :: !CoreProgram,    -- ^ Bindings for this module
         mg_foreign   :: !ForeignStubs,   -- ^ Foreign exports declared in this module
         mg_foreign_files :: ![(ForeignSrcLang, FilePath)],

@@ -23,6 +23,7 @@ import GHC.Platform
 
 import GHC.Core
 import GHC.Core.Opt.Arity( isOneShotBndr )
+import GHC.Core.Annotated
 import GHC.Core.Make hiding ( wrapFloats )
 import GHC.Core.Utils
 import GHC.Core.FVs

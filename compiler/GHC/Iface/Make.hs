@@ -37,6 +37,8 @@ import GHC.CoreToIface
 
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core
+import GHC.Core.Orphans
+import GHC.Core.Rules
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom

@@ -48,14 +48,16 @@ import GHC.Core.Type
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCon       ( tyConDataCons )
 import GHC.Core
+import GHC.Core.Rules
 import GHC.Core.FVs       ( exprsSomeFreeVarsList, exprFreeVars )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
+import GHC.Core.Unfoldings
 import GHC.Core.Coercion
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
-import GHC.Core.Rules
+import GHC.Core.Rules.Apply
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Ppr
 

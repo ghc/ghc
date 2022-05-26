@@ -21,6 +21,7 @@ import GHC.Core.Utils   ( mkAltExpr
 import GHC.Core.FVs     ( exprFreeVars )
 import GHC.Core.Type    ( tyConAppArgs )
 import GHC.Core
+import GHC.Core.Unfoldings
 import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Types.Tickish

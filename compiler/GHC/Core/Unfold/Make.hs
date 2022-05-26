@@ -23,6 +23,7 @@ where
 import GHC.Prelude
 import GHC.Core
 import GHC.Core.Unfold
+import GHC.Core.Unfoldings
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Core.DataCon

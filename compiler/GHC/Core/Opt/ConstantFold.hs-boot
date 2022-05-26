@@ -1,8 +1,8 @@
 module GHC.Core.Opt.ConstantFold where
 
-import GHC.Prelude
-import GHC.Core
-import GHC.Builtin.PrimOps
-import GHC.Types.Name
+import GHC.Prelude ( Maybe )
+import GHC.Core.Rules( CoreRule )
+import GHC.Builtin.PrimOps ( PrimOp )
+import GHC.Types.Name ( Name )
 
 primOpRules ::  Name -> PrimOp -> Maybe CoreRule

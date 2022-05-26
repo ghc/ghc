@@ -27,6 +27,8 @@ import GHC.Core
 import GHC.Core.Make      ( mkLitRubbish )
 import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
+import GHC.Core.Rules.Apply
+import GHC.Core.Unfoldings
 import GHC.Core.Utils     ( exprIsTrivial
                           , mkCast, exprType
                           , stripTicksTop, mkInScopeSetBndrs )

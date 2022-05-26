@@ -48,6 +48,8 @@ import GHC.Builtin.Names
 
 import GHC.Core
 import GHC.Core.Opt.Arity( typeOneShot )
+import GHC.Core.Rules
+import GHC.Core.Unfoldings
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep

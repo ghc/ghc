@@ -43,6 +43,8 @@ import GHC.Types.Name ( Name, nameOccName )
 import GHC.Types.Basic
 
 import GHC.Core
+import GHC.Core.Rules
+import GHC.Core.Unfoldings
 import GHC.Core.Make
 import GHC.Core.SimpleOpt (  exprIsConApp_maybe, exprIsLiteral_maybe )
 import GHC.Core.DataCon ( DataCon,dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )

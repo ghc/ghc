@@ -37,6 +37,8 @@ module GHC.Core.Subst (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Rules
+import GHC.Core.Unfoldings
 import GHC.Core.FVs
 import GHC.Core.Seq
 import GHC.Core.Utils

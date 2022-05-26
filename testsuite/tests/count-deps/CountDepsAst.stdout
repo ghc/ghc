@@ -56,6 +56,7 @@ GHC.Core.Predicate
 GHC.Core.Reduction
 GHC.Core.RoughMap
 GHC.Core.Rules
+GHC.Core.Rules.Apply
 GHC.Core.Rules.Config
 GHC.Core.Seq
 GHC.Core.SimpleOpt

@@ -179,7 +179,7 @@ import GHC.Core.Opt.Pipeline.Types      ( CoreToDo (..))
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Core.Rules
+import GHC.Core.Rules.Apply
 import GHC.Core.Stats
 import GHC.Core.LateCC (addLateCostCentresPgm)
 

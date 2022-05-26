@@ -11,6 +11,7 @@ import GHC.Driver.Flags
 
 import GHC.Core
 import GHC.Core.Rules
+import GHC.Core.Rules.Apply
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
@@ -22,6 +23,7 @@ import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Stats ( simplCountN )
 import GHC.Core.FamInstEnv
+import GHC.Core.Unfoldings
 
 import GHC.Utils.Error  ( withTiming )
 import GHC.Utils.Logger as Logger

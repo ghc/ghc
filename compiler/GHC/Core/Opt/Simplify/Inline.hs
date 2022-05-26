@@ -23,6 +23,7 @@ import GHC.Driver.Flags
 
 import GHC.Core
 import GHC.Core.Unfold
+import GHC.Core.Unfoldings
 import GHC.Types.Id
 import GHC.Types.Basic  ( Arity, RecFlag(..) )
 import GHC.Utils.Logger

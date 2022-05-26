@@ -6,7 +6,7 @@ module GHC.Driver.Config.Core.Opt.Simplify
 
 import GHC.Prelude
 
-import GHC.Core.Rules ( RuleBase )
+import GHC.Core.Rules.Apply ( RuleBase )
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Opt.Simplify ( SimplifyExprOpts(..), SimplifyOpts(..) )
 import GHC.Core.Opt.Simplify.Env ( FloatEnable(..), SimplMode(..) )

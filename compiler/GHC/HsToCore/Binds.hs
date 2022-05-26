@@ -39,6 +39,9 @@ import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
 
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
+import GHC.Core.Rules
+import GHC.Core.Orphans
+import GHC.Core.Unfoldings
 import GHC.Core.SimpleOpt    ( simpleOptExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Make
@@ -51,7 +54,7 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity
-import GHC.Core.Rules
+import GHC.Core.Rules.Apply
 import GHC.Core.TyCo.Compare( eqType )
 
 import GHC.Builtin.Names

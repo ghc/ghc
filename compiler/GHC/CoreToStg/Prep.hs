@@ -41,6 +41,7 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal
 import GHC.Core.TyCo.Rep( UnivCoProvenance(..) )
+import GHC.Core.Unfoldings
 
 import GHC.Data.Maybe
 import GHC.Data.OrdList

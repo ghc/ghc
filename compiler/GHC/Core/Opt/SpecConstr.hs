@@ -29,6 +29,7 @@ import GHC.Driver.Session ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
                           , gopt, hasPprDebug )
 
 import GHC.Core
+import GHC.Core.Rules
 import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.Unfold
@@ -40,8 +41,9 @@ import GHC.Core.Opt.OccurAnal( scrutBinderSwap_maybe )
 import GHC.Core.DataCon
 import GHC.Core.Class( classTyVars )
 import GHC.Core.Coercion hiding( substCo )
-import GHC.Core.Rules
+import GHC.Core.Rules.Apply
 import GHC.Core.Predicate ( typeDeterminesValue )
+import GHC.Core.Unfoldings
 import GHC.Core.Type     hiding ( substTy )
 import GHC.Core.TyCon   (TyCon, tyConName )
 import GHC.Core.Multiplicity
@@ -2586,19 +2588,19 @@ argToPat1 env in_scope val_env (Tick _ arg) arg_occ arg_str
         -- Ignore Notes.  In particular, we want to ignore any InlineMe notes
         -- Perhaps we should not ignore profiling notes, but I'm going to
         -- ride roughshod over them all for now.
-        --- See Note [Tick annotations in RULE matching] in GHC.Core.Rules
+        --- See Note [Tick annotations in RULE matching] in GHC.Core.Rules.Apply
 
 argToPat1 env in_scope val_env (Let _ arg) arg_occ arg_str
   = argToPat env in_scope val_env arg arg_occ arg_str
-        -- See Note [Matching lets] in "GHC.Core.Rules"
+        -- See Note [Matching lets] in "GHC.Core.Rules.Apply"
         -- Look through let expressions
         -- e.g.         f (let v = rhs in (v,w))
         -- Here we can specialise for f (v,w)
         -- because the rule-matcher will look through the let.
 
-{- Disabled; see Note [Matching cases] in "GHC.Core.Rules"
+{- Disabled; see Note [Matching cases] in "GHC.Core.Rules.Apply"
 argToPat env in_scope val_env (Case scrut _ _ [(_, _, rhs)]) arg_occ
-  | exprOkForSpeculation scrut  -- See Note [Matching cases] in "GHC.Core.Rules"
+  | exprOkForSpeculation scrut  -- See Note [Matching cases] in "GHC.Core.Rules.Apply"
   = argToPat env in_scope val_env rhs arg_occ
 -}
 
@@ -2702,7 +2704,7 @@ argToPat1 env in_scope val_env (Var v) arg_occ arg_str
 --      And by not wild-carding we tend to get forall'd
 --      variables that are in scope, which in turn can
 --      expose the weakness in let-matching
---      See Note [Matching lets] in GHC.Core.Rules
+--      See Note [Matching lets] in GHC.Core.Rules.Apply
 
   -- Check for a variable bound inside the function.
   -- Don't make a wild-card, because we may usefully share

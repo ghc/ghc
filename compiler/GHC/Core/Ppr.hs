@@ -30,6 +30,8 @@ module GHC.Core.Ppr (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Rules
+import GHC.Core.Unfoldings
 import GHC.Core.Stats (exprStats)
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Literal( pprLiteral )

@@ -66,6 +66,7 @@ module GHC.Core.Opt.SetLevels (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Annotated
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
 import GHC.Core.Utils   ( exprType, exprIsHNF
                         , exprOkForSpeculation
@@ -81,6 +82,7 @@ import GHC.Core.Type    ( Type, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet
                         , typeHasFixedRuntimeRep
                         )
+import GHC.Core.Unfoldings ( isStableUnfolding )
 import GHC.Core.Multiplicity     ( pattern ManyTy )
 
 import GHC.Types.Id

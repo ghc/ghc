@@ -7,7 +7,7 @@ import GHC.Types.TyThing   ( TyThing )
 import GHC.Tc.Types        ( IfL )
 import GHC.Core.InstEnv    ( ClsInst )
 import GHC.Core.FamInstEnv ( FamInst )
-import GHC.Core         ( CoreRule )
+import GHC.Core.Rules      ( CoreRule )
 import GHC.Types.CompleteMatch
 import GHC.Types.Annotations ( Annotation )
 import GHC.Types.Name

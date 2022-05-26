@@ -21,8 +21,9 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core
+import GHC.Core.Rules
 import GHC.Core.Opt.CSE  ( cseProgram )
-import GHC.Core.Rules   ( RuleBase, mkRuleBase, ruleCheckProgram, getRules )
+import GHC.Core.Rules.Apply    ( RuleBase, mkRuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( lintAnnots )

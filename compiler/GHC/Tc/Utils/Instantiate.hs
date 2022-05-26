@@ -51,7 +51,8 @@ import GHC.Hs.Syn.Type   ( hsLitType )
 
 import GHC.Core.InstEnv
 import GHC.Core.Predicate
-import GHC.Core ( Expr(..), isOrphan ) -- For the Coercion constructor
+import GHC.Core ( Expr(Coercion) )
+import GHC.Core.Orphans ( isOrphan )
 import GHC.Core.Type
 import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Core.Class( Class )

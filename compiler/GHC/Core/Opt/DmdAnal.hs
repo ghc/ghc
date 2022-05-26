@@ -19,6 +19,8 @@ import GHC.Prelude
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Types.Demand   -- All of it
 import GHC.Core
+import GHC.Core.Rules
+import GHC.Core.Unfoldings
 import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Utils.Outputable
 import GHC.Types.Var.Env

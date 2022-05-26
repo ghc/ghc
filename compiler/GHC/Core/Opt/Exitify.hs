@@ -40,6 +40,7 @@ import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core
+import GHC.Core.Annotated
 import GHC.Core.Utils
 import GHC.Utils.Monad.State.Strict
 import GHC.Builtin.Uniques

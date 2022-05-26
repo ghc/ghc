@@ -59,6 +59,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
 
 import GHC.Core
+import GHC.Core.Unfoldings
 import GHC.Core.FVs         (exprFreeVars)
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Map.Expr

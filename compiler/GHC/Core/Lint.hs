@@ -38,6 +38,7 @@ import GHC.Unit.Module.ModGuts
 import GHC.Platform
 
 import GHC.Core
+import GHC.Core.Rules
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Stats ( coreBindsStats )
@@ -60,6 +61,7 @@ import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Opt.Arity    ( typeArity, exprIsDeadEnd )
 
 import GHC.Core.Opt.Monad
+import GHC.Core.Unfoldings
 
 import GHC.Types.Literal
 import GHC.Types.Var as Var
@@ -2037,7 +2039,7 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
     rhs_fvs = exprFreeVars rhs
 
     is_bad_bndr :: Var -> Bool
-    -- See Note [Unbound RULE binders] in GHC.Core.Rules
+    -- See Note [Unbound RULE binders] in GHC.Core.Rules.Apply
     is_bad_bndr bndr = not (bndr `elemVarSet` lhs_fvs)
                     && bndr `elemVarSet` rhs_fvs
                     && isNothing (isReflCoVar_maybe bndr)

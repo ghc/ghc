@@ -34,7 +34,7 @@ import GHC.Iface.Load
 import GHC.Iface.Recomp.Flags
 import GHC.Iface.Env
 
-import GHC.Core
+import GHC.Core.Orphans
 import GHC.Tc.Utils.Monad
 import GHC.Hs
 
