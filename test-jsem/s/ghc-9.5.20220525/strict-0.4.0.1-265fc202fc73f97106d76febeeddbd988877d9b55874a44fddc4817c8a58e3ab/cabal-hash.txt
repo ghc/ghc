@@ -1,0 +1,12 @@
+pkgid: strict-0.4.0.1
+component: ComponentLib
+src: dff6abc08ad637e51891bb8b475778c40926c51219eda60fd64f0d9680226241
+pkg-config-deps: 
+deps: assoc-1.0.2-43178e679ad43d5cc902054fe097405ae0dc62a074e9ade5dec5f9f4813da1c7, base-4.16.0.0, binary-0.8.9.0, bytestring-0.11.3.0, deepseq-1.4.7.0, ghc-prim-0.8.0, hashable-1.4.0.2-a9439a2c596bfe829ec44bfdc1fdbf931e5e07ff8101aac2a9e3f6661f8a6ff7, text-2.0, these-1.1.1.1-9179b57438a3bf0d43b63d483c67e829dc03c2847d901d43eb8424cd11922467, transformers-0.5.6.2
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: +assoc
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

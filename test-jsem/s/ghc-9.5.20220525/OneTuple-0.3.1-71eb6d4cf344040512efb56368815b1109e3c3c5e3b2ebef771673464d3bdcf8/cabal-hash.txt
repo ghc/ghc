@@ -1,0 +1,11 @@
+pkgid: OneTuple-0.3.1
+component: ComponentLib
+src: 98853682d52fb4cc37a45cd186fbd77cf2565d3df5171acc4cf026427e103eef
+pkg-config-deps: 
+deps: base-4.16.0.0, ghc-prim-0.8.0, template-haskell-2.18.0.0
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

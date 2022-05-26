@@ -1,0 +1,12 @@
+pkgid: bifunctors-5.5.12
+component: ComponentLib
+src: c6067772009772764cdbd585057cc88902876378686bc391fe7b0d1eb66e715d
+pkg-config-deps: 
+deps: base-4.16.0.0, base-orphans-0.8.6-3df389de8b2fe83c133332d1f843f25d4a883772215acc7e59e66bf5ea9b2bcc, comonad-5.0.8-7fc7a95b38b8b99cc43b924d457184e2bd69e701f57b40d31f2ca4ff757789aa, containers-0.6.5.1, tagged-0.8.6.1-565a8159c5b13523d7d4e4309b17c8b542a6a499095bbf284f7a94123b0d4697, template-haskell-2.18.0.0, th-abstraction-0.4.3.0-8ebdacf28b7477cb04ba7295915030cadb4e31a9e5737cd53b851e6bb293caa1, transformers-0.5.6.2
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: +semigroups +tagged
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

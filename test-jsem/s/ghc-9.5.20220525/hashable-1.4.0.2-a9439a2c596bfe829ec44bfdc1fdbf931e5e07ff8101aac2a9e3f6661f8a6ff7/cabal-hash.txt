@@ -1,0 +1,12 @@
+pkgid: hashable-1.4.0.2
+component: ComponentLib
+src: 83606edd356d914c075ecd44f6d5fe91a3b186aa0683c8dd8c9a7e8e22a47600
+pkg-config-deps: 
+deps: base-4.16.0.0, bytestring-0.11.3.0, containers-0.6.5.1, deepseq-1.4.7.0, ghc-bignum-1.3, ghc-prim-0.8.0, text-2.0
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: +containers +integer-gmp -random-initial-seed
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

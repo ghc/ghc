@@ -1,0 +1,11 @@
+pkgid: profunctors-5.6.2
+component: ComponentLib
+src: 65955d7b50525a4a3bccdab1d982d2ae342897fd38140d5a94b5ef3800d8c92a
+pkg-config-deps: 
+deps: base-4.16.0.0, base-orphans-0.8.6-3df389de8b2fe83c133332d1f843f25d4a883772215acc7e59e66bf5ea9b2bcc, bifunctors-5.5.12-accc936ee36e13cc140432e413bd827b30f08957d77326668fdbcaeb81ba11ae, comonad-5.0.8-7fc7a95b38b8b99cc43b924d457184e2bd69e701f57b40d31f2ca4ff757789aa, contravariant-1.5.5-265923254210eee5e17fb9749af5b191f0404267a2b3432c4b41be2c68e0743e, distributive-0.6.2.1-c2074f7e843ad696c96b680dfc04e674b71ba8d62b4683e719fe9259b980ce7f, tagged-0.8.6.1-565a8159c5b13523d7d4e4309b17c8b542a6a499095bbf284f7a94123b0d4697, transformers-0.5.6.2
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

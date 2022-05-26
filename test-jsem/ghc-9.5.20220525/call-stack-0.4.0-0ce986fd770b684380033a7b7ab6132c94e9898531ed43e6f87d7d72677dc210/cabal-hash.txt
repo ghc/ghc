@@ -1,0 +1,11 @@
+pkgid: call-stack-0.4.0
+component: ComponentLib
+src: 430bcf8a3404f7e55319573c0b807b1356946f0c8f289bb3d9afb279c636b87b
+pkg-config-deps: 
+deps: base-4.16.0.0
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

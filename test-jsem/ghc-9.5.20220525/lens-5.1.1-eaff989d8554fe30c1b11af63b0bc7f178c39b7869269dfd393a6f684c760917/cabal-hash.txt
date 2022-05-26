@@ -1,0 +1,12 @@
+pkgid: lens-5.1.1
+component: ComponentLib
+src: cc4e99fc5d989e98ab0df7577183fe9ad5d74c63a44dc2607abcc22daba8b322
+pkg-config-deps: 
+deps: array-0.5.4.0, assoc-1.0.2-43178e679ad43d5cc902054fe097405ae0dc62a074e9ade5dec5f9f4813da1c7, base-4.16.0.0, base-orphans-0.8.6-3df389de8b2fe83c133332d1f843f25d4a883772215acc7e59e66bf5ea9b2bcc, bifunctors-5.5.12-accc936ee36e13cc140432e413bd827b30f08957d77326668fdbcaeb81ba11ae, bytestring-0.11.3.0, call-stack-0.4.0-0ce986fd770b684380033a7b7ab6132c94e9898531ed43e6f87d7d72677dc210, comonad-5.0.8-7fc7a95b38b8b99cc43b924d457184e2bd69e701f57b40d31f2ca4ff757789aa, containers-0.6.5.1, contravariant-1.5.5-265923254210eee5e17fb9749af5b191f0404267a2b3432c4b41be2c68e0743e, distributive-0.6.2.1-c2074f7e843ad696c96b680dfc04e674b71ba8d62b4683e719fe9259b980ce7f, exceptions-0.10.4, filepath-1.4.2.1, free-5.1.8-92476d5790d59b0c327d1e12db44a17873cad7a21f0db0aace4d9479075cebef, ghc-prim-0.8.0, hashable-1.4.0.2-a9439a2c596bfe829ec44bfdc1fdbf931e5e07ff8101aac2a9e3f6661f8a6ff7, indexed-traversable-0.1.2-09bccd3e21277af1917becf6aa72a1c7791c5364e4f98f27ba5e4d2e68ee77d9, indexed-traversable-instances-0.1.1-286494b2f4180aff98a1bd11218dab42273af5cad4119d9a05782cad417dec9a, kan-extensions-5.2.4-e4b7fbf9d6bb44ad7eab79011690191b051222c7e4d35481c290c9b1013a27c6, mtl-2.2.2, parallel-3.2.2.0-b996cbcc6edac2a4254fcec12b6c0e6b3aa70506bece1f5f1b17b6b298a56c8d, profunctors-5.6.2-e93959bfbcb6eafbcda7ca9f357d665b78e4c66227e2213fb8671e648cc67d61, reflection-2.1.6-98b04df02474d89c8767809390dd7e6485751d2c96cb632af1b9937578becf75, semigroupoids-5.3.7-56505fddf665f3314804d5afa8d6371873b3131e536f338bbd22591632af90d3, strict-0.4.0.1-265fc202fc73f97106d76febeeddbd988877d9b55874a44fddc4817c8a58e3ab, tagged-0.8.6.1-565a8159c5b13523d7d4e4309b17c8b542a6a499095bbf284f7a94123b0d4697, template-haskell-2.18.0.0, text-2.0, th-abstraction-0.4.3.0-8ebdacf28b7477cb04ba7295915030cadb4e31a9e5737cd53b851e6bb293caa1, these-1.1.1.1-9179b57438a3bf0d43b63d483c67e829dc03c2847d901d43eb8424cd11922467, transformers-0.5.6.2, transformers-compat-0.7.1-381e2c63f0f96b837d1fdced12151ed0ecd1c5f82068033ee23e98097106cf81, unordered-containers-0.2.19.1-9f401e1a249c73e6a148743a1c7be1e945e4f493639a6d46cb61a5fe4bcc60f5, vector-0.12.3.1-3909336e342eed01a0d45234925d9a3f4d4090bf5df1d17b32d61fdd0626ed1b
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: -benchmark-uniplate -dump-splices +inlining -j +test-hunit +test-properties +test-templates +trustworthy
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

@@ -1,0 +1,11 @@
+pkgid: assoc-1.0.2
+component: ComponentLib
+src: d8988dc6e8718c7a3456515b769c9336aeeec730cf86fc5175247969ff8f144f
+pkg-config-deps: 
+deps: base-4.16.0.0, bifunctors-5.5.12-accc936ee36e13cc140432e413bd827b30f08957d77326668fdbcaeb81ba11ae, tagged-0.8.6.1-565a8159c5b13523d7d4e4309b17c8b542a6a499095bbf284f7a94123b0d4697
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

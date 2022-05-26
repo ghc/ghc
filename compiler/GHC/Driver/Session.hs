@@ -271,7 +271,6 @@ import Data.Functor.Identity
 
 import Data.Ord
 import Data.Char
-import Data.Functor
 import Data.List (intercalate, sortBy)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
@@ -289,7 +288,6 @@ import qualified GHC.Data.EnumSet as EnumSet
 
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
-import System.Posix (Fd, getFdStatus)
 
 -- Note [Updating flag description in the User's Guide]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -465,7 +463,7 @@ data DynFlags = DynFlags {
     --   in --make mode, ignored with a warning if jobServerAuth is specified.
     --   If unspecified, compile with a single job.
 
-  jobServerAuth         :: Maybe (Fd, Fd),
+  jobServerPath         :: Maybe FilePath,
     -- ^ A pair (read, write) of files which act as an interface to a jobserver
     -- using the GNU Make jobserver protocol.
 
@@ -1101,7 +1099,6 @@ initDynFlags dflags = do
        (adjustCols maybeGhcColoursEnv . adjustCols maybeGhcColorsEnv)
        (useColor dflags, colScheme dflags)
  tmp_dir <- normalise <$> getTemporaryDirectory
- jsAuth <- getJobserverFromEnv
  return dflags{
         useUnicode    = useUnicode',
         useColor      = useColor',
@@ -1110,8 +1107,7 @@ initDynFlags dflags = do
         rtldInfo      = refRtldInfo,
         rtccInfo      = refRtccInfo,
         rtasmInfo     = refRtasmInfo,
-        tmpDir        = TempDir tmp_dir,
-        jobServerAuth = jsAuth
+        tmpDir        = TempDir tmp_dir
         }
 
 -- | The normal 'DynFlags'. Note that they are not suitable for use in this form
@@ -1151,7 +1147,7 @@ defaultDynFlags mySettings =
         strictnessBefore        = [],
 
         parMakeCount            = Nothing,
-        jobServerAuth           = Nothing,
+        jobServerPath           = Nothing,
 
         enableTimeStats         = False,
         ghcHeapSize             = Nothing,
@@ -1954,22 +1950,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
 -- | Perform checks and fixes on DynFlags which require IO
 dynFlagsIOCheck :: DynFlags -> IO (DynFlags, [Located String])
-dynFlagsIOCheck dflags = do
-  case jobServerAuth dflags of
-    Nothing     -> pure (dflags, [])
-    Just (r, w) -> do
-      let isAccessible fd =
-            (True <$ getFdStatus fd) `catchIOError` const (pure False)
-      ok <- isAccessible r <&&> isAccessible w
-      if ok
-        then pure (dflags, [])
-        else pure
-          ( dflags { jobServerAuth = Nothing }
-          , [ mkGeneralLocated
-                "when checking dynflags"
-                "jobserver r and w files are not both open and acessible, ignoring jobserver"
-            ]
-          )
+dynFlagsIOCheck dflags = pure (dflags, [])
 
 -- | Check (and potentially disable) any extensions that aren't allowed
 -- in safe mode.
@@ -2118,8 +2099,7 @@ dynamic_flags_deps = [
                  -- as specifying that the number of
                  -- parallel builds is equal to the
                  -- result of getNumProcessors
-  , make_ord_flag defGhcFlag "-jobserver-auth"
-        (doubleWordSuffix (\n m d -> d { jobServerAuth = Just (fromIntegral n, fromIntegral m) }))
+  , make_ord_flag defGhcFlag "jsem" $ hasArg $ \f d -> d { jobServerPath = Just f }
   , make_ord_flag defFlag "instantiated-with"   (sepArg setUnitInstantiations)
   , make_ord_flag defFlag "this-component-id"   (sepArg setUnitInstanceOf)
 
@@ -4191,9 +4171,6 @@ sepArg fn = SepArg (upd . fn)
 intSuffix :: (Int -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffix fn = IntSuffix (\n -> upd (fn n))
 
-doubleWordSuffix :: (Word -> Word -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
-doubleWordSuffix fn = DoubleWordSuffix (\n m -> upd (fn n m))
-
 intSuffixM :: (Int -> DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffixM fn = IntSuffix (\n -> updM (fn n))
 
@@ -4877,10 +4854,10 @@ makeDynFlagsConsistent dflags
  , Nothing <- outputFile dflags
  = pgmError "--output must be specified when using --merge-objs"
 
- | Just _ <- jobServerAuth dflags
+ | Just _ <- jobServerPath dflags
  , Just _ <- parMakeCount dflags
    = loop dflags{parMakeCount = Nothing}
-         "`-j` argument is ignored when GHC has a jobserver specified in its environment or arguments"
+         "`-j` argument is ignored when using `-jsem`"
 
  | otherwise = (dflags, [])
     where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")
@@ -5110,26 +5087,3 @@ updatePlatformConstants dflags mconstants = do
   let dflags1   = dflags { targetPlatform = platform1 }
   return dflags1
 
--- | Parse the GHC_MAKEFLAGS env variable for `--jobserver-auth=r,w`
-getJobserverFromEnv :: IO (Maybe (Fd, Fd))
-getJobserverFromEnv = do
-  makeFlagsMaybe <- lookupEnv "GHC_MAKEFLAGS"
-  pure $ do
-    makeFlags <- makeFlagsMaybe
-    snd $ runCmdLineP
-      (processArgs
-        [ defFlag
-            "-jobserver-auth"
-            (DoubleWordSuffix
-              (\r w -> liftEwM
-                (putCmdLineState (Just (fromIntegral r, fromIntegral w)))
-              )
-            )
-        ]
-        (mkGeneralLocated "GHC_MAKEFLAGS env variable" <$> words makeFlags)
-        (\fp -> do
-            addWarn $ "Response files are not supported in GHC_MAKEFLAGS: " `mappend` fp
-            pure []
-        )
-      )
-      Nothing

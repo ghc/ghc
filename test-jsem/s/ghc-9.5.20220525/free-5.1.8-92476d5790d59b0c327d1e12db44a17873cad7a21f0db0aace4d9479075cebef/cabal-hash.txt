@@ -1,0 +1,11 @@
+pkgid: free-5.1.8
+component: ComponentLib
+src: 7977448bb18857d0669cfd1f08a8410f0295a8641b239ac7c5db4a6ff8518340
+pkg-config-deps: 
+deps: base-4.16.0.0, comonad-5.0.8-7fc7a95b38b8b99cc43b924d457184e2bd69e701f57b40d31f2ca4ff757789aa, containers-0.6.5.1, distributive-0.6.2.1-c2074f7e843ad696c96b680dfc04e674b71ba8d62b4683e719fe9259b980ce7f, exceptions-0.10.4, indexed-traversable-0.1.2-09bccd3e21277af1917becf6aa72a1c7791c5364e4f98f27ba5e4d2e68ee77d9, mtl-2.2.2, profunctors-5.6.2-e93959bfbcb6eafbcda7ca9f357d665b78e4c66227e2213fb8671e648cc67d61, semigroupoids-5.3.7-56505fddf665f3314804d5afa8d6371873b3131e536f338bbd22591632af90d3, template-haskell-2.18.0.0, th-abstraction-0.4.3.0-8ebdacf28b7477cb04ba7295915030cadb4e31a9e5737cd53b851e6bb293caa1, transformers-0.5.6.2, transformers-base-0.4.6-badd91d0c51c824f2038491c365a1d6965c834cfa21b160cc1a9516294f9408f
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

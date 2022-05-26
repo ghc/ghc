@@ -76,6 +76,7 @@ import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.Main
 import GHC.Driver.JobServer
+import GHC.Driver.MakeSem
 
 import GHC.Parser.Header
 
@@ -644,13 +645,34 @@ createBuildPlan mod_graph maybe_top_mod =
               (vcat [text "Build plan missing nodes:", (text "PLAN:" <+> ppr (sum (map countMods build_plan))), (text "GRAPH:" <+> ppr (length (mgModSummaries' mod_graph )))])
               build_plan
 
+-- data ParMakeMode = ParallelMake | SequentialMake
+--   deriving (Eq, Show)
+
+mkWorkerLimit :: DynFlags -> IO WorkerLimit
+mkWorkerLimit dflags = do
+  let
+    num_procs x
+      | x > 1 = NumProcessors x
+      | otherwise = NumProcessors 1
+  case jobServerPath dflags of
+    Just f -> pure (JobServer f)
+    Nothing -> case parMakeCount dflags of
+      Nothing -> pure $ num_procs 1
+      Just ParMakeNumProcessors -> num_procs <$> getNumProcessors
+      Just (ParMakeThisMany n) -> pure $ num_procs n
+
+isWorkerLimitSequential :: WorkerLimit -> Bool
+isWorkerLimitSequential (NumProcessors x) =  x <= 1
+isWorkerLimitSequential _ = False
+
 -- | This describes what we use to limit the number of jobs, either we limit it
 -- ourselves to a specific number or we have an external jobserver limit it for
 -- us.
 data WorkerLimit
   = NumProcessors Int
-  | JobServer (Fd, Fd)
+  | JobServer FilePath
   deriving (Eq)
+
 
 -- | Generalized version of 'load' which also supports a custom
 -- 'Messager' (for reporting progress) and 'ModuleGraph' (generally
@@ -732,12 +754,7 @@ load' mhmi_cache how_much mHscMessage mod_graph = do
     liftIO $ debugTraceMsg logger 2 (hang (text "Ready for upsweep")
                                     2 (ppr build_plan))
 
-    worker_limit <- case jobServerAuth dflags of
-                Just js -> pure (JobServer js)
-                Nothing -> NumProcessors <$> case parMakeCount dflags of
-                  Nothing -> pure 1
-                  Just ParMakeNumProcessors -> liftIO getNumProcessors
-                  Just (ParMakeThisMany n) -> pure n
+    worker_limit <- liftIO $ mkWorkerLimit dflags
 
     setSession $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
     hsc_env <- getSession
@@ -997,13 +1014,7 @@ getBuildMap = gets buildDep
 type BuildM a = StateT BuildLoopState IO a
 
 
--- | Abstraction over the operations of a semaphore which allows usage with the
---  -j1 case or a jobserver
-data AbstractSem = AbstractSem { acquireSem :: IO ()
-                               , releaseSem :: IO () }
 
-withAbstractSem :: AbstractSem -> IO b -> IO b
-withAbstractSem sem = MC.bracket_ (acquireSem sem) (releaseSem sem)
 
 -- | Environment used when compiling a module
 data MakeEnv = MakeEnv { hsc_env :: !HscEnv -- The basic HscEnv which will be augmented for each module
@@ -2620,10 +2631,17 @@ runSeqPipelines :: HscEnv -> Maybe Messager -> [MakeAction] -> IO ()
 runSeqPipelines plugin_hsc_env mHscMessager all_pipelines =
   let env = MakeEnv { hsc_env = plugin_hsc_env
                     , withLogger = \_ k -> k id
-                    , compile_sem = AbstractSem (return ()) (return ())
+                    , compile_sem = AbstractSem (return ()) (return ()) (return ())
                     , env_messager = mHscMessager
                     }
   in runAllPipelines (NumProcessors 1) env all_pipelines
+
+mkAbstractSem :: WorkerLimit -> IO AbstractSem
+mkAbstractSem worker_limit = case worker_limit of
+  NumProcessors n_jobs -> do
+    compile_sem <- newQSem n_jobs
+    pure $ AbstractSem (waitQSem compile_sem) (signalQSem compile_sem) (pure ())
+  JobServer f -> makeSemaphoreJobserver f
 
 
 -- | Build and run a pipeline
@@ -2649,7 +2667,7 @@ runParPipelines worker_limit plugin_hsc_env mHscMessager all_pipelines = do
   thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger plugin_hsc_env)
   let thread_safe_hsc_env = plugin_hsc_env { hsc_logger = thread_safe_logger }
 
-  -- TODO Ellie, update capabilities with jobserver
+  -- TODO remove this capabilities management, it will be handled by the semaphore
   let updNumCapabilities = liftIO $ do
           n_capabilities <- getNumCapabilities
           n_cpus <- getNumProcessors
@@ -2667,14 +2685,7 @@ runParPipelines worker_limit plugin_hsc_env mHscMessager all_pipelines = do
           atomically $ writeTVar stopped_var True
           wait_log_thread
 
-  abstract_sem <- case worker_limit of
-                    NumProcessors n_jobs -> do
-                      compile_sem <- newQSem n_jobs
-                      pure $ AbstractSem (waitQSem compile_sem) (signalQSem compile_sem)
-                    JobServer (r, w) -> do
-                      (wait, signal) <- makeJobserverAcquireRelease r w
-                      pure $ AbstractSem wait signal
-
+  abstract_sem <- mkAbstractSem worker_limit
   let env = MakeEnv { hsc_env = thread_safe_hsc_env
                     , withLogger = withParLog log_queue_queue_var
                     , compile_sem = abstract_sem
@@ -2702,7 +2713,7 @@ withLocalTmpFS act = do
 -- | Run the given actions and then wait for them all to finish.
 runAllPipelines :: WorkerLimit -> MakeEnv -> [MakeAction] -> IO ()
 runAllPipelines worker_limit env acts = do
-  let single_worker = worker_limit == NumProcessors 1
+  let single_worker = isWorkerLimitSequential worker_limit
       spawn_actions :: IO [ThreadId]
       spawn_actions = if single_worker
         then (:[]) <$> (forkIOWithUnmask $ \unmask -> void $ runLoop (\io -> io unmask) env acts)

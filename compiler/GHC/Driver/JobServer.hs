@@ -53,226 +53,226 @@ import Control.Monad.Trans.Maybe
 --   RlsIdle      :: RlsState ()
 
 
-data RlsState a
-  = RlsAcquiring
-    { raThreadId :: !ThreadId
-    , raWaits :: !(OrdList (TMVar a))
-    }
-  | RlsReleasing
-    { rrThreadId :: !ThreadId
-    , rrReleases :: !(Map UTCTime (OrdList a)) -- ^ tokens we have but don't need anymore
-    }
-  | RlsIdle
+-- data RlsState a
+--   = RlsAcquiring
+--     { raThreadId :: !ThreadId
+--     , raWaits :: !(OrdList (TMVar a))
+--     }
+--   | RlsReleasing
+--     { rrThreadId :: !ThreadId
+--     , rrReleases :: !(Map UTCTime (OrdList a)) -- ^ tokens we have but don't need anymore
+--     }
+--   | RlsIdle
 
-data RateLimitedSemaphore a
-  = RateLimitedSemaphore
-  { rlsState :: !(TMVar (RlsState a))
-  , rlsLastContact :: !(TVar UTCTime)
-  , rlsTimeout :: !Integer -- microseconds
-  , rlsAcquireIO :: !(IO a)
-  , rlsReleaseIO :: !(a -> IO ())
-  }
+-- data RateLimitedSemaphore a
+--   = RateLimitedSemaphore
+--   { rlsState :: !(TMVar (RlsState a))
+--   , rlsLastContact :: !(TVar UTCTime)
+--   , rlsTimeout :: !Integer -- microseconds
+--   , rlsAcquireIO :: !(IO a)
+--   , rlsReleaseIO :: !(a -> IO ())
+--   }
 
-rlsAcquireThread :: RateLimitedSemaphore a -> IO ()
-rlsAcquireThread rls@(RateLimitedSemaphore st_tmv lc_tmv timeout) = do
-  now <- getCurrentTime
-  last_contact <- atomically $ readTVar lc_tmv
-  let
-    contact_delay = diffTimeToPicoseconds (now `diffUTCTime` last_contact) `div` 1000
-  can_contact_tv <- if contact_delay < timeout
-    then registerDelay (fromIntegral $ timeout - contact_delay)
-    else newTVarIO True
-  lc <- atomically $ do
-    readTVar can_contact_tv >>= guard
-    lc <- readTVar lc_tmv
-  if lc /= last_contact
-    then rlsAcquireThread rls
-    else do
-    a <- rlsAcquireIO
-  
-
-
-
-  lc <- atomically $ rlsLastContact <$> readTVar tv
-  tid <- forkIO $ undefined
-  atomically $ do
-    RateLimitedSemaphore st lc <- readTVar tv
-    case st of
-      RlsIdle -> do
-        tmv <- newEmptyTMVar
-        writeTVar tv $ RlsAcquiring tid (unitOL tmv)
-        pure tmv
-
-
-rlsAcquire :: RateLimitedSemaphore a -> IO a
-rlsAcquire rls@(RateLimitedSemaphore st_tmv _) = mask $ \unmask -> do
-  -- atomically is interruptible if it blocks
-  (r_tmv, st1_io) <- atomically $ do
-    r_tmv <- newEmptyTMVar
-    st0 <- takeTMVar st_tmv
-    let
-      mk_new_acquire_state = do
-        tid <- forkIO $ rlsAcquireThread rls
-        pure (RlsAcquiring tid $ unitOL tmv)
-      view_first_release m = case Map.minViewWithKey m of
-          Nothing -> Nothing
-          Just ((_,NilOL), m') -> view_first_release m'
-          Just ((k, a `ConsOL` as), m') -> Just $ (a, Map.insert k as m')
-      st1_io = case st0 of
-        RlsAcquiring tid waits -> pure $ RlsAcquiring tid $ waits `SnocOL` tmv
-        RlsIdle -> mk_new_acquire_state
-        RlsReleasing tid releases -> case view_first_release releases of
-          Nothing -> mk_new_acquire_state
-          Just (r, releases') -> atomically $ writeTMVar r_tmv r
-  st1 <- st1_io
-  atomically $ putTMVar tmv
-  unmask $ atomically $ takeTMVar r_tmv
-
-rlsRelease ::
-
-rlsAct :: (IO a, a -> IO ()) -> NominalDiffTime -> TVar (RateLimitedSemaphore a) -> IO ()
-rlsAct (acq, rel) limit tv = mask $ \unmask -> do
-  let try_fork_releaser last_release_t a = do
-        r_tmv <- newTMVarIO a
-        tid <- forkIO $ mask_ $ do
-          mb_x <- atomically $ swapTMVar tmv Nothing `orElse` (putTMVar r_tmv Nothing $> Nothing)
-          for_ mb_x $ rel
-        pure $ RlsReleasing tid r_tmv
-      fork_acquirer = forkIO $ mask_ $ do
-        x <- acq
-        now <- getCurrentTime
-        atomically $ do
-          rls <- readTVar tv
-          new_rls <- case rlsWaits rls of
-            NilOL -> pure rls { rlsReleases = Map.insert now x $ rlsReleases rls }
-            ConsOL w w_rest -> putTMVar w x $> rls { rlsWaits = w_rest }
-          putTVar tv new_rls
-
-
-  action <- atomically $ do
-    rls <- readTVar tv
-    (action, new_rls) <- case rlsState rls of
-      RlsAcquiring tid
-        | null . rlsWaits $ rls -> pure killThread tid
-            -- we are acquiring, but we don't need a token anymore
-            now <- getCurrentTime
-
-          -- kill the thread that is mid-acquire
-          --
-          killThread tid
-          case Map.minViewWithKey (rlsReleases rls) of
-            Just ((t,a),new_map)
-              | limit `addUTCTime` t > now -> do
-                  fork_releaser a
-            _ -> pure rls {rlsState = RlsIdle}
-      | otherwise -> pure rls
-    RlsReleasing tid tmv
-      | ConsOL x rest <- rlsWaits rls -> mask_ $ do
-          mb_x <- atomically $ swapTMVar tmv Nothing `orElse` putTMVar tmv Nothing
-          case mb_x of
-            Nothing -> pure rls { rlsState = RlsIdle  }
-
-    RlsIdle
-      | ConsOL {} <- rlsWaits rls -> fork_acquirer
-      |
-
-
-                -- we have a token, even though we don't need it any more
-
-
-          
-
-
-rlsTalk :: NominalDiffTime -> TVar (RateLimitedSemaphore a) -> IO (IO ())
-rlsTalk lim tv = do
-  now <- getCurrentTime
-  let init_last_release = -lim `addUTCTime` now
-  x_tv <- newTVar (0, init_last_release)
-
-  let
-    loop last_release_t = do
-      atomically $ do
-        rls <- readTMVar tv
-
-
-    handler = undefined
-  tid <- forkFinally (loop $ ) handler
-  pure $ killThread tid
-
-
--- | A general adapter for an abstract ...
---
+-- rlsAcquireThread :: RateLimitedSemaphore a -> IO ()
+-- rlsAcquireThread rls@(RateLimitedSemaphore st_tmv lc_tmv timeout) = do
+--   now <- getCurrentTime
+--   last_contact <- atomically $ readTVar lc_tmv
+--   let
+--     contact_delay = diffTimeToPicoseconds (now `diffUTCTime` last_contact) `div` 1000
+--   can_contact_tv <- if contact_delay < timeout
+--     then registerDelay (fromIntegral $ timeout - contact_delay)
+--     else newTVarIO True
+--   lc <- atomically $ do
+--     readTVar can_contact_tv >>= guard
+--     lc <- readTVar lc_tmv
+--   if lc /= last_contact
+--     then rlsAcquireThread rls
+--     else do
+--     a <- rlsAcquireIO
 
 
 
 
-emptyRateLimitedSemaphore :: RateLimitedSemaphore a
-emptyRateLimitedSemaphore = RateLimitedSemaphore mempty mempty
-
-rlsAddWait :: TMVar a -> RateLimitedSemaphore a -> RateLimitedSemaphore a
-rlsAddWait x rls = rls { rlsWaits = rlsWaits rls `SnocOL` x }
-
-rlsAddRelease :: UTCTime -> a -> RateLimitedSemaphore a -> RateLimitedSemaphore a
-rlsAddRelease t x rls = rls
-  { rlsReleases = Map.insertWith mappend t (unitOL x) $ rlsReleases rls
-  }
-
-rlsAcquire :: TVar (RateLimitedSemaphore a)-> IO a
-rlsAcquire tv = do
-  tmv <- newEmptyTMVarIO
-  mb_v <- atomically $ do
-    rls <- rlsAddWait tmv <$> readTVar tv
-    rlsNormaliseM rls >>= writeTVar tv
-    tryTakeTMVar tmv
-  -- It's important that we complete the above transaction before we wait
-  -- properly on the tmvar, otherwise other actors won't see our updates to tv
-  maybe (atomically $ takeTMVar tmv) pure mb_v
-
-rlsRelease :: UTCTime -> a -> TVar (RateLimitedSemaphore a) -> STM ()
-rlsRelease t x tv = do
-  rls <- rlsAddRelease t x <$> readTVar tv
-  rlsNormaliseM rls >>= writeTVar tv
-
-rlsNormaliseM :: RateLimitedSemaphore a -> STM (RateLimitedSemaphore a)
-rlsNormaliseM rls0 = let
-  (rls, stm) = rlsNormalise rls0
-  in stm $> rls
-
-rlsNormalise :: RateLimitedSemaphore a -> (RateLimitedSemaphore a, STM ())
-rlsNormalise rls0@RateLimitedSemaphore{..} = let
-  go NilOL r_map = pure rls0 { rlsReleases = r_map, rlsWaits = NilOL }
-  go waits@(ConsOL next_tmv rest_tmv) r_map = case Map.minViewWithKey r_map of
-    Nothing -> pure rls0 { rlsReleases = r_map, rlsWaits = waits }
-    Just ((k, releases_ol), new_map) -> case releases_ol of
-      NilOL -> panic "rlsNormalise"
-      ConsOL x rest -> let
-        new_releases
-          | NilOL <- rest = new_map
-          | otherwise = Map.insert k rest new_map
-        in do
-        CPS.tell $ unitOL (next_tmv, x)
-        go rest_tmv new_releases
-  (new_rls, ol_a_tmvs) = CPS.runWriter $ go rlsWaits rlsReleases
-  in (new_rls, for_ ol_a_tmvs $ \(tmv, x) -> putTMVar tmv x)
+--   lc <- atomically $ rlsLastContact <$> readTVar tv
+--   tid <- forkIO $ undefined
+--   atomically $ do
+--     RateLimitedSemaphore st lc <- readTVar tv
+--     case st of
+--       RlsIdle -> do
+--         tmv <- newEmptyTMVar
+--         writeTVar tv $ RlsAcquiring tid (unitOL tmv)
+--         pure tmv
 
 
-rlsAcquireThread :: IO a -> TVar (RateLimitedSemaphore a) -> IO ThreadId
-rlsAcquireThread acquire0 tv = forkIO $ undefined
+-- rlsAcquire :: RateLimitedSemaphore a -> IO a
+-- rlsAcquire rls@(RateLimitedSemaphore st_tmv _) = mask $ \unmask -> do
+--   -- atomically is interruptible if it blocks
+--   (r_tmv, st1_io) <- atomically $ do
+--     r_tmv <- newEmptyTMVar
+--     st0 <- takeTMVar st_tmv
+--     let
+--       mk_new_acquire_state = do
+--         tid <- forkIO $ rlsAcquireThread rls
+--         pure (RlsAcquiring tid $ unitOL tmv)
+--       view_first_release m = case Map.minViewWithKey m of
+--           Nothing -> Nothing
+--           Just ((_,NilOL), m') -> view_first_release m'
+--           Just ((k, a `ConsOL` as), m') -> Just $ (a, Map.insert k as m')
+--       st1_io = case st0 of
+--         RlsAcquiring tid waits -> pure $ RlsAcquiring tid $ waits `SnocOL` tmv
+--         RlsIdle -> mk_new_acquire_state
+--         RlsReleasing tid releases -> case view_first_release releases of
+--           Nothing -> mk_new_acquire_state
+--           Just (r, releases') -> atomically $ writeTMVar r_tmv r
+--   st1 <- st1_io
+--   atomically $ putTMVar tmv
+--   unmask $ atomically $ takeTMVar r_tmv
+
+-- rlsRelease ::
+
+-- rlsAct :: (IO a, a -> IO ()) -> NominalDiffTime -> TVar (RateLimitedSemaphore a) -> IO ()
+-- rlsAct (acq, rel) limit tv = mask $ \unmask -> do
+--   let try_fork_releaser last_release_t a = do
+--         r_tmv <- newTMVarIO a
+--         tid <- forkIO $ mask_ $ do
+--           mb_x <- atomically $ swapTMVar tmv Nothing `orElse` (putTMVar r_tmv Nothing $> Nothing)
+--           for_ mb_x $ rel
+--         pure $ RlsReleasing tid r_tmv
+--       fork_acquirer = forkIO $ mask_ $ do
+--         x <- acq
+--         now <- getCurrentTime
+--         atomically $ do
+--           rls <- readTVar tv
+--           new_rls <- case rlsWaits rls of
+--             NilOL -> pure rls { rlsReleases = Map.insert now x $ rlsReleases rls }
+--             ConsOL w w_rest -> putTMVar w x $> rls { rlsWaits = w_rest }
+--           putTVar tv new_rls
+
+
+--   action <- atomically $ do
+--     rls <- readTVar tv
+--     (action, new_rls) <- case rlsState rls of
+--       RlsAcquiring tid
+--         | null . rlsWaits $ rls -> pure killThread tid
+--             -- we are acquiring, but we don't need a token anymore
+--             now <- getCurrentTime
+
+--           -- kill the thread that is mid-acquire
+--           --
+--           killThread tid
+--           case Map.minViewWithKey (rlsReleases rls) of
+--             Just ((t,a),new_map)
+--               | limit `addUTCTime` t > now -> do
+--                   fork_releaser a
+--             _ -> pure rls {rlsState = RlsIdle}
+--       | otherwise -> pure rls
+--     RlsReleasing tid tmv
+--       | ConsOL x rest <- rlsWaits rls -> mask_ $ do
+--           mb_x <- atomically $ swapTMVar tmv Nothing `orElse` putTMVar tmv Nothing
+--           case mb_x of
+--             Nothing -> pure rls { rlsState = RlsIdle  }
+
+--     RlsIdle
+--       | ConsOL {} <- rlsWaits rls -> fork_acquirer
+--       |
+
+
+--                 -- we have a token, even though we don't need it any more
 
 
 
 
 
+-- rlsTalk :: NominalDiffTime -> TVar (RateLimitedSemaphore a) -> IO (IO ())
+-- rlsTalk lim tv = do
+--   now <- getCurrentTime
+--   let init_last_release = -lim `addUTCTime` now
+--   x_tv <- newTVar (0, init_last_release)
 
-rateLimitedSemaphore :: DiffTime -> (IO (), IO ()) -> IO (ThreadId, IO (), IO ())
-rateLimitedSemaphore limit (acquire0, release0) = do
-  tv <- newTVarIO emptyRateLimitedSemaphore
-  limited_tv <- newTVarIO False
-        threadDelay $ fromIntegral $ diffTimeToPicoseconds limit * 1000
-        atomically $ writeTVar limited_tv False
-      getCurrentTime
-    State.put now
-  undefined
+--   let
+--     loop last_release_t = do
+--       atomically $ do
+--         rls <- readTMVar tv
+
+
+--     handler = undefined
+--   tid <- forkFinally (loop $ ) handler
+--   pure $ killThread tid
+
+
+-- -- | A general adapter for an abstract ...
+-- --
+
+
+
+
+-- emptyRateLimitedSemaphore :: RateLimitedSemaphore a
+-- emptyRateLimitedSemaphore = RateLimitedSemaphore mempty mempty
+
+-- rlsAddWait :: TMVar a -> RateLimitedSemaphore a -> RateLimitedSemaphore a
+-- rlsAddWait x rls = rls { rlsWaits = rlsWaits rls `SnocOL` x }
+
+-- rlsAddRelease :: UTCTime -> a -> RateLimitedSemaphore a -> RateLimitedSemaphore a
+-- rlsAddRelease t x rls = rls
+--   { rlsReleases = Map.insertWith mappend t (unitOL x) $ rlsReleases rls
+--   }
+
+-- rlsAcquire :: TVar (RateLimitedSemaphore a)-> IO a
+-- rlsAcquire tv = do
+--   tmv <- newEmptyTMVarIO
+--   mb_v <- atomically $ do
+--     rls <- rlsAddWait tmv <$> readTVar tv
+--     rlsNormaliseM rls >>= writeTVar tv
+--     tryTakeTMVar tmv
+--   -- It's important that we complete the above transaction before we wait
+--   -- properly on the tmvar, otherwise other actors won't see our updates to tv
+--   maybe (atomically $ takeTMVar tmv) pure mb_v
+
+-- rlsRelease :: UTCTime -> a -> TVar (RateLimitedSemaphore a) -> STM ()
+-- rlsRelease t x tv = do
+--   rls <- rlsAddRelease t x <$> readTVar tv
+--   rlsNormaliseM rls >>= writeTVar tv
+
+-- rlsNormaliseM :: RateLimitedSemaphore a -> STM (RateLimitedSemaphore a)
+-- rlsNormaliseM rls0 = let
+--   (rls, stm) = rlsNormalise rls0
+--   in stm $> rls
+
+-- rlsNormalise :: RateLimitedSemaphore a -> (RateLimitedSemaphore a, STM ())
+-- rlsNormalise rls0@RateLimitedSemaphore{..} = let
+--   go NilOL r_map = pure rls0 { rlsReleases = r_map, rlsWaits = NilOL }
+--   go waits@(ConsOL next_tmv rest_tmv) r_map = case Map.minViewWithKey r_map of
+--     Nothing -> pure rls0 { rlsReleases = r_map, rlsWaits = waits }
+--     Just ((k, releases_ol), new_map) -> case releases_ol of
+--       NilOL -> panic "rlsNormalise"
+--       ConsOL x rest -> let
+--         new_releases
+--           | NilOL <- rest = new_map
+--           | otherwise = Map.insert k rest new_map
+--         in do
+--         CPS.tell $ unitOL (next_tmv, x)
+--         go rest_tmv new_releases
+--   (new_rls, ol_a_tmvs) = CPS.runWriter $ go rlsWaits rlsReleases
+--   in (new_rls, for_ ol_a_tmvs $ \(tmv, x) -> putTMVar tmv x)
+
+
+-- rlsAcquireThread :: IO a -> TVar (RateLimitedSemaphore a) -> IO ThreadId
+-- rlsAcquireThread acquire0 tv = forkIO $ undefined
+
+
+
+
+
+
+-- rateLimitedSemaphore :: DiffTime -> (IO (), IO ()) -> IO (ThreadId, IO (), IO ())
+-- rateLimitedSemaphore limit (acquire0, release0) = do
+--   tv <- newTVarIO emptyRateLimitedSemaphore
+--   limited_tv <- newTVarIO False
+--         threadDelay $ fromIntegral $ diffTimeToPicoseconds limit * 1000
+--         atomically $ writeTVar limited_tv False
+--       getCurrentTime
+--     State.put now
+--   undefined
 
 -- | 'makeJobserverAcquireRelease r w' takes two fds and returns an 'acquire'
 -- and 'release' action which correspond to taking and replacing job slots as

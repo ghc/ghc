@@ -1,0 +1,11 @@
+pkgid: kan-extensions-5.2.4
+component: ComponentLib
+src: e8c63fbe2af4a9d2b3b08e30e8b80ab76a0c1871a8528573b41f6bc837d0cd62
+pkg-config-deps: 
+deps: adjunctions-4.4.1-063c1e55b00471bdbd338b49eedeb8ecb6b102cb2f004dc257692951654fa0b4, array-0.5.4.0, base-4.16.0.0, comonad-5.0.8-7fc7a95b38b8b99cc43b924d457184e2bd69e701f57b40d31f2ca4ff757789aa, containers-0.6.5.1, contravariant-1.5.5-265923254210eee5e17fb9749af5b191f0404267a2b3432c4b41be2c68e0743e, distributive-0.6.2.1-c2074f7e843ad696c96b680dfc04e674b71ba8d62b4683e719fe9259b980ce7f, free-5.1.8-92476d5790d59b0c327d1e12db44a17873cad7a21f0db0aace4d9479075cebef, invariant-0.5.6-627dcab6861e4f134363ec305ec44ed2bd905e0c20368f5e657e4a8b55e4d685, mtl-2.2.2, profunctors-5.6.2-e93959bfbcb6eafbcda7ca9f357d665b78e4c66227e2213fb8671e648cc67d61, semigroupoids-5.3.7-56505fddf665f3314804d5afa8d6371873b3131e536f338bbd22591632af90d3, tagged-0.8.6.1-565a8159c5b13523d7d4e4309b17c8b542a6a499095bbf284f7a94123b0d4697, transformers-0.5.6.2, transformers-compat-0.7.1-381e2c63f0f96b837d1fdced12151ed0ecd1c5f82068033ee23e98097106cf81
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

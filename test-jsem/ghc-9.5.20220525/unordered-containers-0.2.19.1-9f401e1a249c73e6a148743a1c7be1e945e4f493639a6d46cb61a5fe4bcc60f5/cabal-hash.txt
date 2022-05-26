@@ -1,0 +1,12 @@
+pkgid: unordered-containers-0.2.19.1
+component: ComponentLib
+src: 1b27bec5e0d522b27a6029ebf4c4a6d40acbc083c787008e32fb55c4b1d128d2
+pkg-config-deps: 
+deps: base-4.16.0.0, deepseq-1.4.7.0, hashable-1.4.0.2-a9439a2c596bfe829ec44bfdc1fdbf931e5e07ff8101aac2a9e3f6661f8a6ff7, template-haskell-2.18.0.0
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: -debug
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

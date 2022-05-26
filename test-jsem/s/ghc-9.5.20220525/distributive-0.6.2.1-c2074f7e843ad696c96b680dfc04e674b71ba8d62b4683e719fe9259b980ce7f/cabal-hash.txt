@@ -1,0 +1,12 @@
+pkgid: distributive-0.6.2.1
+component: ComponentLib
+src: d7351392e078f58caa46630a4b9c643e1e2e9dddee45848c5c8358e7b1316b91
+pkg-config-deps: 
+deps: base-4.16.0.0, base-orphans-0.8.6-3df389de8b2fe83c133332d1f843f25d4a883772215acc7e59e66bf5ea9b2bcc, tagged-0.8.6.1-565a8159c5b13523d7d4e4309b17c8b542a6a499095bbf284f7a94123b0d4697, transformers-0.5.6.2
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: +semigroups +tagged
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

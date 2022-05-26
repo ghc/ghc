@@ -1,0 +1,12 @@
+pkgid: tagged-0.8.6.1
+component: ComponentLib
+src: f5e0fcf95f0bb4aa63f428f2c01955a41ea1a42cfcf39145ed631f59a9616c02
+pkg-config-deps: 
+deps: base-4.16.0.0, deepseq-1.4.7.0, template-haskell-2.18.0.0, transformers-0.5.6.2
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: +deepseq +transformers
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

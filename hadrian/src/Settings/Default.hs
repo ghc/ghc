@@ -95,7 +95,6 @@ stage0Packages = do
              , lintCommitMsg
              , lintSubmoduleRefs
              , lintWhitespace
-             , ghcJobserver
              ]
           ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                ]
@@ -137,7 +136,6 @@ stage1Packages = do
         , time
         , unlit
         , xhtml
-        , ghcJobserver
         ]
       , when (not cross)
         [ haddock

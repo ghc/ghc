@@ -1,0 +1,12 @@
+pkgid: reflection-2.1.6
+component: ComponentLib
+src: bf3e14917ebb329a53701a3cce0afe670f20037a0148dbfa5cbfa574ed6ba6cd
+pkg-config-deps: 
+deps: base-4.16.0.0, template-haskell-2.18.0.0
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: -slow +template-haskell
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

@@ -1,0 +1,12 @@
+pkgid: semigroupoids-5.3.7
+component: ComponentLib
+src: 6d45cdb6c58c75ca588859b80b2c92b6f48590a03e065c24ce5d767a6a963799
+pkg-config-deps: 
+deps: base-4.16.0.0, base-orphans-0.8.6-3df389de8b2fe83c133332d1f843f25d4a883772215acc7e59e66bf5ea9b2bcc, bifunctors-5.5.12-accc936ee36e13cc140432e413bd827b30f08957d77326668fdbcaeb81ba11ae, comonad-5.0.8-7fc7a95b38b8b99cc43b924d457184e2bd69e701f57b40d31f2ca4ff757789aa, containers-0.6.5.1, contravariant-1.5.5-265923254210eee5e17fb9749af5b191f0404267a2b3432c4b41be2c68e0743e, distributive-0.6.2.1-c2074f7e843ad696c96b680dfc04e674b71ba8d62b4683e719fe9259b980ce7f, hashable-1.4.0.2-a9439a2c596bfe829ec44bfdc1fdbf931e5e07ff8101aac2a9e3f6661f8a6ff7, tagged-0.8.6.1-565a8159c5b13523d7d4e4309b17c8b542a6a499095bbf284f7a94123b0d4697, template-haskell-2.18.0.0, transformers-0.5.6.2, transformers-compat-0.7.1-381e2c63f0f96b837d1fdced12151ed0ecd1c5f82068033ee23e98097106cf81, unordered-containers-0.2.19.1-9f401e1a249c73e6a148743a1c7be1e945e4f493639a6d46cb61a5fe4bcc60f5
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: +comonad +containers +contravariant +distributive +tagged +unordered-containers
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

@@ -1,0 +1,12 @@
+pkgid: void-0.7.3
+component: ComponentLib
+src: 53af758ddc37dc63981671e503438d02c6f64a2d8744e9bec557a894431f7317
+pkg-config-deps: 
+deps: base-4.16.0.0
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: -safe
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

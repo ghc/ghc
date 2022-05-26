@@ -1,0 +1,11 @@
+pkgid: parallel-3.2.2.0
+component: ComponentLib
+src: 170453a71a2a8b31cca63125533f7771d7debeb639700bdabdd779c34d8a6ef6
+pkg-config-deps: 
+deps: array-0.5.4.0, base-4.16.0.0, containers-0.6.5.1, deepseq-1.4.7.0, ghc-prim-0.8.0
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

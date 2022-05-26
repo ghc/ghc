@@ -1,0 +1,11 @@
+pkgid: indexed-traversable-instances-0.1.1
+component: ComponentLib
+src: 100ed1023b541328b04bcec0964b9f9d5fc93285fc23a2ac6873bf8597439a44
+pkg-config-deps: 
+deps: OneTuple-0.3.1-71eb6d4cf344040512efb56368815b1109e3c3c5e3b2ebef771673464d3bdcf8, base-4.16.0.0, indexed-traversable-0.1.2-09bccd3e21277af1917becf6aa72a1c7791c5364e4f98f27ba5e4d2e68ee77d9, tagged-0.8.6.1-565a8159c5b13523d7d4e4309b17c8b542a6a499095bbf284f7a94123b0d4697, unordered-containers-0.2.19.1-9f401e1a249c73e6a148743a1c7be1e945e4f493639a6d46cb61a5fe4bcc60f5, vector-0.12.3.1-3909336e342eed01a0d45234925d9a3f4d4090bf5df1d17b32d61fdd0626ed1b
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

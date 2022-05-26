@@ -1,0 +1,12 @@
+pkgid: comonad-5.0.8
+component: ComponentLib
+src: ef6cdf2cc292cc43ee6aa96c581b235fdea8ab44a0bffb24dc79ae2b2ef33d13
+pkg-config-deps: 
+deps: base-4.16.0.0, containers-0.6.5.1, distributive-0.6.2.1-c2074f7e843ad696c96b680dfc04e674b71ba8d62b4683e719fe9259b980ce7f, indexed-traversable-0.1.2-09bccd3e21277af1917becf6aa72a1c7791c5364e4f98f27ba5e4d2e68ee77d9, tagged-0.8.6.1-565a8159c5b13523d7d4e4309b17c8b542a6a499095bbf284f7a94123b0d4697, transformers-0.5.6.2, transformers-compat-0.7.1-381e2c63f0f96b837d1fdced12151ed0ecd1c5f82068033ee23e98097106cf81
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: +containers +distributive +indexed-traversable
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

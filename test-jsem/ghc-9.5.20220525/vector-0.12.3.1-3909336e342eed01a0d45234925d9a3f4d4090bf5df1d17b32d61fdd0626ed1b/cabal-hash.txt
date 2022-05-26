@@ -1,0 +1,12 @@
+pkgid: vector-0.12.3.1
+component: ComponentLib
+src: fb4a53c02bd4d7fdf155c0604da9a5bb0f3b3bfce5d9960aea11c2ae235b9f35
+pkg-config-deps: 
+deps: base-4.16.0.0, deepseq-1.4.7.0, ghc-prim-0.8.0, primitive-0.7.4.0-96807e2b950df7597871fc71498827a39063991dd095a67b91c82d0611a135f0
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: +boundschecks -internalchecks -unsafechecks -wall
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

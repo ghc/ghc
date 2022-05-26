@@ -1,0 +1,11 @@
+pkgid: th-abstraction-0.4.3.0
+component: ComponentLib
+src: c8bb13e31d1d22a99168536a35c66e1091a6e4274b9841a023eac52c2bd3de06
+pkg-config-deps: 
+deps: base-4.16.0.0, containers-0.6.5.1, ghc-prim-0.8.0, template-haskell-2.18.0.0
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

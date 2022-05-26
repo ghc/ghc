@@ -1,0 +1,12 @@
+pkgid: semigroups-0.20
+component: ComponentLib
+src: 902d2e33c96b40a89de5957f2a9e097197afcc35e257e45b32ebe770993673e1
+pkg-config-deps: 
+deps: base-4.16.0.0
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: +binary +bytestring -bytestring-builder +containers +deepseq +hashable +tagged +template-haskell +text +transformers +unordered-containers
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

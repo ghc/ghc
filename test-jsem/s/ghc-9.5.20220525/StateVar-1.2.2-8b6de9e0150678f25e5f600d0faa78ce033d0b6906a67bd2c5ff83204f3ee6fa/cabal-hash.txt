@@ -1,0 +1,11 @@
+pkgid: StateVar-1.2.2
+component: ComponentLib
+src: 5e4b39da395656a59827b0280508aafdc70335798b50e5d6fd52596026251825
+pkg-config-deps: 
+deps: base-4.16.0.0, stm-2.5.1.0, transformers-0.5.6.2
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

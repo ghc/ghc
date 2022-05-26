@@ -1,0 +1,12 @@
+pkgid: transformers-compat-0.7.1
+component: ComponentLib
+src: ac0b861534c14d3cfd61534f474674e3b634b8decea072ffd4d21f8b59f35080
+pkg-config-deps: 
+deps: base-4.16.0.0, ghc-prim-0.8.0, transformers-0.5.6.2
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+flags: -five +five-three -four +generic-deriving +mtl -three -two
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz

@@ -1,0 +1,11 @@
+pkgid: indexed-traversable-0.1.2
+component: ComponentLib
+src: 516858ee7198b1fed1b93c665157f9855fd947379db7f115d48c1b0d670e698d
+pkg-config-deps: 
+deps: array-0.5.4.0, base-4.16.0.0, containers-0.6.5.1, transformers-0.5.6.2
+compilerid: ghc-9.5.20220525
+platform: x86_64-linux
+shared-lib: True
+stripped-exe: False
+debug-info: 0
+ghc-options: -jsem /dougrulz
