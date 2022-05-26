@@ -3,6 +3,10 @@
 Thank you for contributing to Haddock! Here is the information you will need in
 order to make your contribution
 
+## Code of Conduct
+
+We need you to read, acknowledge, and abide by our [Code of Conduct][CoC].
+
 ## Reporting issues
 
 Please open a ticket if you get an unexpected behaviour from Haddock!  

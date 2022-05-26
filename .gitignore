@@ -35,3 +35,5 @@ cabal.project.local
 cabal.project.local~
 
 .stack-work/
+
+.hspec-failures
