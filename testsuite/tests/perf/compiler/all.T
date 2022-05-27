@@ -634,7 +634,9 @@ test('hard_hole_fits', # Testing multiple hole-fits with lots in scope for #1687
      compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -package ghc'])
 
 test('T16875',  # Testing one hole-fit with a lot in scope for #16875
-     collect_compiler_stats('bytes allocated', 2),
+     # This test is very sensitive to environmental differences.. we should fix
+     # that but for now the failure threshold is 4% (see #21557)
+     collect_compiler_stats('bytes allocated', 4),
      compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -package ghc'])
 
 test ('T20261',
