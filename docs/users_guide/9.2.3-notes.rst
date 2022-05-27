@@ -65,8 +65,6 @@ Build system and packaging
 
 - Allow installing hadrian generated binary distributions to paths including the string "xxx" (:ghc-ticket:`21402`)
 
-- Allow installing hadrian generated binary distributions to paths including the string "xxx" (:ghc-ticket:`21402`)
-
 - Allow bootstrapping from GHC 9.2.
 
 - Allow running the testsuite using Python 3.10.
