@@ -285,7 +285,7 @@ The available mode flags are:
        single: run mode
        single: GHCi
 
-    Run a script's ``main`` entry-point. Similar to ``runghc`` this will by
+    Run a script's ``main`` entry-point. Similar to ``runghc``/``runhaskell`` this will by
     default use the bytecode interpreter. If the command-line contains a ``--``
     argument then all arguments that follow will be passed to the script. All
     arguments that precede ``--`` are interpreted as GHC arguments.
