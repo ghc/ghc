@@ -563,7 +563,14 @@ hGetEcho handle = do
          _            -> IODevice.getEcho haDevice
 
 -- | Is the handle connected to a terminal?
-
+--
+-- On Windows the result of 'hIsTerminalDevide' might be misleading,
+-- because non-native terminals, such as MinTTY used in MSYS and Cygwin environments,
+-- are implemented via redirection.
+-- Use @System.Win32.Types.withHandleToHANDLE System.Win32.MinTTY.isMinTTYHandle@
+-- to recognise it. Also consider @ansi-terminal@ package for crossplatform terminal
+-- support.
+--
 hIsTerminalDevice :: Handle -> IO Bool
 hIsTerminalDevice handle =
     withHandle_ "hIsTerminalDevice" handle $ \ Handle__{..} -> do
