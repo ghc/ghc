@@ -1411,7 +1411,6 @@ distclean : clean
 	$(call removeFiles,docs/users_guide/ug-book.xml)
 	$(call removeFiles,docs/users_guide/ug-ent.xml)
 	$(call removeFiles,docs/users_guide/ghc_config.py)
-	$(call removeFiles,docs/index.html)
 	$(call removeFiles,libraries/prologue.txt)
 	$(call removeFiles,distrib/configure.ac)
 	$(call removeFiles,ch01.html ch02.html index.html)
