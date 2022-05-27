@@ -381,12 +381,12 @@ unrestrictedModuleImports idecls =
              ]
 
     isInteresting idecl =
-      case ideclHiding idecl of
+      case ideclImportList idecl of
         -- i) no subset selected
         Nothing             -> True
         -- ii) an import with a hiding clause
         -- without any names
-        Just (True, L _ []) -> True
+        Just (EverythingBut, L _ []) -> True
         -- iii) any other case of qualification
         _                   -> False
 
