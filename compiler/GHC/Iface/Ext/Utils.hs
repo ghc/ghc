@@ -61,7 +61,7 @@ renderHieType dflags ht = showSDoc dflags (ppr $ hieTypeToIface ht)
 
 resolveVisibility :: Type -> [Type] -> [(Bool,Type)]
 resolveVisibility kind ty_args
-  = go (mkEmptyTCvSubst in_scope) kind ty_args
+  = go (mkEmptySubst in_scope) kind ty_args
   where
     in_scope = mkInScopeSet (tyCoVarsOfTypes ty_args)
 

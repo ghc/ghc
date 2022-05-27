@@ -789,7 +789,7 @@ eqSpecPreds spec = [ mkPrimEqPred (mkTyVarTy tv) ty
 -- | Substitute in an 'EqSpec'. Precondition: if the LHS of the EqSpec
 -- is mapped in the substitution, it is mapped to a type variable, not
 -- a full type.
-substEqSpec :: TCvSubst -> EqSpec -> EqSpec
+substEqSpec :: Subst -> EqSpec -> EqSpec
 substEqSpec subst (EqSpec tv ty)
   = EqSpec tv' (substTy subst ty)
   where

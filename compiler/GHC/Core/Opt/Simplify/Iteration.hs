@@ -1312,7 +1312,7 @@ simplCoercionF env co cont
 
 simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
 simplCoercion env co
-  = do { let opt_co = optCoercion opts (getTCvSubst env) co
+  = do { let opt_co = optCoercion opts (getSubst env) co
        ; seqCo opt_co `seq` return opt_co }
   where
     opts = seOptCoercionOpts env

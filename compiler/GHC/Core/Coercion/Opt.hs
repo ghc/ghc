@@ -119,14 +119,14 @@ newtype OptCoercionOpts = OptCoercionOpts
    { optCoercionEnabled :: Bool  -- ^ Enable coercion optimisation (reduce its size)
    }
 
-optCoercion :: OptCoercionOpts -> TCvSubst -> Coercion -> NormalCo
+optCoercion :: OptCoercionOpts -> Subst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion,
 --   *and* optimises it to reduce its size
 optCoercion opts env co
   | optCoercionEnabled opts = optCoercion' env co
   | otherwise               = substCo env co
 
-optCoercion' :: TCvSubst -> Coercion -> NormalCo
+optCoercion' :: Subst -> Coercion -> NormalCo
 optCoercion' env co
   | debugIsOn
   = let out_co = opt_co1 lc False co
@@ -280,7 +280,7 @@ opt_co4 env sym rep r (FunCo _r cow co1 co2)
     cow' = opt_co1 env sym cow
 
 opt_co4 env sym rep r (CoVarCo cv)
-  | Just co <- lookupCoVar (lcTCvSubst env) cv
+  | Just co <- lookupCoVar (lcSubst env) cv
   = opt_co4_wrap (zapLiftingContext env) sym rep r co
 
   | ty1 `eqType` ty2   -- See Note [Optimise CoVarCo to Refl]

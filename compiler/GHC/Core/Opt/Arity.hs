@@ -56,7 +56,7 @@ import GHC.Core.Predicate ( isDictTy, isEvVar, isCallStackPredTy )
 import GHC.Core.Multiplicity
 
 -- We have two sorts of substitution:
---   GHC.Core.Subst.Subst, and GHC.Core.TyCo.TCvSubst
+--   GHC.Core.Subst.Subst, and GHC.Core.TyCo.Subst
 -- Both have substTy, substCo  Hence need for qualification
 import GHC.Core.Subst    as Core
 import GHC.Core.Type     as Type
@@ -1877,7 +1877,7 @@ etaInfoApp in_scope expr eis
       where
         (subst1, b1) = Core.substBndr subst b
         alts' = map subst_alt alts
-        ty'   = etaInfoAppTy (Core.substTy subst ty) eis
+        ty'   = etaInfoAppTy (substTyUnchecked subst ty) eis
         subst_alt (Alt con bs rhs) = Alt con bs' (go subst2 rhs eis)
                  where
                   (subst2,bs') = Core.substBndrs subst1 bs
@@ -1940,18 +1940,18 @@ mkEtaWW
 mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
   = go 0 orig_oss empty_subst orig_ty
   where
-    empty_subst = mkEmptyTCvSubst in_scope
+    empty_subst = mkEmptySubst in_scope
 
     go :: Int                -- For fresh names
        -> [OneShotInfo]      -- Number of value args to expand to
-       -> TCvSubst -> Type   -- We are really looking at subst(ty)
+       -> Subst -> Type   -- We are really looking at subst(ty)
        -> (InScopeSet, EtaInfo)
     -- (go [o1,..,on] subst ty) = (in_scope, EI [b1,..,bn] co)
     --    co :: subst(ty) ~ b1_ty -> ... -> bn_ty -> tr
 
     go _ [] subst _
        ----------- Done!  No more expansion needed
-       = (getTCvInScope subst, EI [] MRefl)
+       = (getSubstInScope subst, EI [] MRefl)
 
     go n oss@(one_shot:oss1) subst ty
        ----------- Forall types  (forall a. ty)
@@ -1998,7 +1998,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
                          -- but its type isn't a function, or a binder
                          -- does not have a fixed runtime representation
        = warnPprTrace True "mkEtaWW" ((ppr orig_oss <+> ppr orig_ty) $$ ppr_orig_expr)
-         (getTCvInScope subst, EI [] MRefl)
+         (getSubstInScope subst, EI [] MRefl)
         -- This *can* legitimately happen:
         -- e.g.  coerce Int (\x. x) Essentially the programmer is
         -- playing fast and loose with types (Happy does this a lot).
@@ -2846,12 +2846,12 @@ etaBodyForJoinPoint need_args body
       = pprPanic "etaBodyForJoinPoint" $ int need_args $$
                                          ppr body $$ ppr (exprType body)
 
-    init_subst e = mkEmptyTCvSubst (mkInScopeSet (exprFreeVars e))
+    init_subst e = mkEmptySubst (mkInScopeSet (exprFreeVars e))
 
 
 
 --------------
-freshEtaId :: Int -> TCvSubst -> Scaled Type -> (TCvSubst, Id)
+freshEtaId :: Int -> Subst -> Scaled Type -> (Subst, Id)
 -- Make a fresh Id, with specified type (after applying substitution)
 -- It should be "fresh" in the sense that it's not in the in-scope set
 -- of the TvSubstEnv; and it should itself then be added to the in-scope
@@ -2863,8 +2863,8 @@ freshEtaId n subst ty
       = (subst', eta_id')
       where
         Scaled mult' ty' = Type.substScaledTyUnchecked subst ty
-        eta_id' = uniqAway (getTCvInScope subst) $
+        eta_id' = uniqAway (getSubstInScope subst) $
                   mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) mult' ty'
                   -- "OrCoVar" since this can be used to eta-expand
                   -- coercion abstractions
-        subst'  = extendTCvInScope subst eta_id'
+        subst'  = extendSubstInScope subst eta_id'

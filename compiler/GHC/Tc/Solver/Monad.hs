@@ -1614,11 +1614,11 @@ newFlexiTcSTy knd = wrapTcS (TcM.newFlexiTyVarTy knd)
 cloneMetaTyVar :: TcTyVar -> TcS TcTyVar
 cloneMetaTyVar tv = wrapTcS (TcM.cloneMetaTyVar tv)
 
-instFlexiX :: TCvSubst -> [TKVar] -> TcS TCvSubst
+instFlexiX :: Subst -> [TKVar] -> TcS Subst
 instFlexiX subst tvs
   = wrapTcS (foldlM instFlexiHelper subst tvs)
 
-instFlexiHelper :: TCvSubst -> TKVar -> TcM TCvSubst
+instFlexiHelper :: Subst -> TKVar -> TcM Subst
 -- Makes fresh tyvar, extends the substitution, and the in-scope set
 instFlexiHelper subst tv
   = do { uniq <- TcM.newUnique
@@ -1637,7 +1637,7 @@ matchGlobalInst :: DynFlags
 matchGlobalInst dflags short_cut cls tys
   = wrapTcS (TcM.matchGlobalInst dflags short_cut cls tys)
 
-tcInstSkolTyVarsX :: SkolemInfo -> TCvSubst -> [TyVar] -> TcS (TCvSubst, [TcTyVar])
+tcInstSkolTyVarsX :: SkolemInfo -> Subst -> [TyVar] -> TcS (Subst, [TcTyVar])
 tcInstSkolTyVarsX skol_info subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX skol_info subst tvs
 
 -- Creating and setting evidence variables and CtFlavors

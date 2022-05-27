@@ -1,4 +1,3 @@
-
 {-# LANGUAGE Strict #-} -- See Note [Avoiding space leaks in toIface*]
 
 -- | Functions for converting Core things to interface file things.
@@ -338,7 +337,7 @@ toIfaceAppArgsX :: VarSet -> Kind -> [Type] -> IfaceAppArgs
 -- Is 'blib' visible?  It depends on the visibility flag on j,
 -- so we have to substitute for k.  Annoying!
 toIfaceAppArgsX fr kind ty_args
-  = go (mkEmptyTCvSubst in_scope) kind ty_args
+  = go (mkEmptySubst in_scope) kind ty_args
   where
     in_scope = mkInScopeSet (tyCoVarsOfTypes ty_args)
 
@@ -363,7 +362,7 @@ toIfaceAppArgsX fr kind ty_args
 
     go env ty ts@(t1:ts1)
       | not (isEmptyTCvSubst env)
-      = go (zapTCvSubst env) (substTy env ty) ts
+      = go (zapSubst env) (substTy env ty) ts
         -- See Note [Care with kind instantiation] in GHC.Core.Type
 
       | otherwise

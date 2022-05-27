@@ -178,7 +178,7 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
            con_arg_constraints
              :: (CtOrigin -> TypeOrKind
                           -> Type
-                          -> [(ThetaSpec, Maybe TCvSubst)])
+                          -> [(ThetaSpec, Maybe Subst)])
              -> (ThetaSpec, [TyVar], [TcType], DerivInstTys)
            con_arg_constraints get_arg_constraints
              = let -- Constraints from the fields of each data constructor.
@@ -215,8 +215,8 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
                    -- kinds with (* -> *).
                    -- See Note [Inferring the instance context]
                    subst        = foldl' composeTCvSubst
-                                         emptyTCvSubst (catMaybes mbSubsts)
-                   unmapped_tvs = filter (\v -> v `notElemTCvSubst` subst
+                                         emptySubst (catMaybes mbSubsts)
+                   unmapped_tvs = filter (\v -> v `notElemSubst` subst
                                              && not (v `isInScope` subst)) tvs
                    (subst', _)  = substTyVarBndrs subst unmapped_tvs
                    stupid_theta_origin = mkDirectThetaSpec
@@ -236,13 +236,13 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
                           || is_generic1
 
            get_gen1_constraints :: Class -> CtOrigin -> TypeOrKind -> Type
-                                -> [(ThetaSpec, Maybe TCvSubst)]
+                                -> [(ThetaSpec, Maybe Subst)]
            get_gen1_constraints functor_cls orig t_or_k ty
               = mk_functor_like_constraints orig t_or_k functor_cls $
                 get_gen1_constrained_tys last_tv ty
 
            get_std_constrained_tys :: CtOrigin -> TypeOrKind -> Type
-                                   -> [(ThetaSpec, Maybe TCvSubst)]
+                                   -> [(ThetaSpec, Maybe Subst)]
            get_std_constrained_tys orig t_or_k ty
                | is_functor_like
                = mk_functor_like_constraints orig t_or_k main_cls $
@@ -253,7 +253,7 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
 
            mk_functor_like_constraints :: CtOrigin -> TypeOrKind
                                        -> Class -> [Type]
-                                       -> [(ThetaSpec, Maybe TCvSubst)]
+                                       -> [(ThetaSpec, Maybe Subst)]
            -- 'cls' is usually main_cls (Functor or Traversable etc), but if
            -- main_cls = Generic1, then 'cls' can be Functor; see
            -- get_gen1_constraints

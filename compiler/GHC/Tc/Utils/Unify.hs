@@ -1370,7 +1370,7 @@ deeplySkolemise :: SkolemInfo -> TcSigmaType
 deeplySkolemise skol_info ty
   = go init_subst ty
   where
-    init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
+    init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
 
     go subst ty
       | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
@@ -1397,7 +1397,7 @@ deeplyInstantiate :: CtOrigin -> TcType -> TcM (HsWrapper, Type)
 deeplyInstantiate orig ty
   = go init_subst ty
   where
-    init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
+    init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
 
     go subst ty
       | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty

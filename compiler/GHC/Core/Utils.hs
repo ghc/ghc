@@ -2101,7 +2101,7 @@ dataConInstPat fss uniqs mult con inst_tys
     (full_subst, ex_bndrs) = mapAccumL mk_ex_var univ_subst
                                        (zip3 ex_tvs ex_fss ex_uniqs)
 
-    mk_ex_var :: TCvSubst -> (TyCoVar, FastString, Unique) -> (TCvSubst, TyCoVar)
+    mk_ex_var :: Subst -> (TyCoVar, FastString, Unique) -> (Subst, TyCoVar)
     mk_ex_var subst (tv, fs, uniq) = (Type.extendTCvSubstWithClone subst tv
                                        new_tv
                                      , new_tv)

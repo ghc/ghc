@@ -1,4 +1,3 @@
-
 {-# LANGUAGE MultiWayIf      #-}
 {-# LANGUAGE TupleSections   #-}
 
@@ -1072,35 +1071,35 @@ newOpenBoxedTypeKind
        ; let rr = mkTyConApp boxedRepDataConTyCon [lev]
        ; return (mkTYPEapp rr) }
 
-newMetaTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
+newMetaTyVars :: [TyVar] -> TcM (Subst, [TcTyVar])
 -- Instantiate with META type variables
 -- Note that this works for a sequence of kind, type, and coercion variables
 -- variables.  Eg    [ (k:*), (a:k->k) ]
 --             Gives [ (k7:*), (a8:k7->k7) ]
-newMetaTyVars = newMetaTyVarsX emptyTCvSubst
-    -- emptyTCvSubst has an empty in-scope set, but that's fine here
+newMetaTyVars = newMetaTyVarsX emptySubst
+    -- emptySubst has an empty in-scope set, but that's fine here
     -- Since the tyvars are freshly made, they cannot possibly be
     -- captured by any existing for-alls.
 
-newMetaTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
+newMetaTyVarsX :: Subst -> [TyVar] -> TcM (Subst, [TcTyVar])
 -- Just like newMetaTyVars, but start with an existing substitution.
 newMetaTyVarsX subst = mapAccumLM newMetaTyVarX subst
 
-newMetaTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
+newMetaTyVarX :: Subst -> TyVar -> TcM (Subst, TcTyVar)
 -- Make a new unification variable tyvar whose Name and Kind come from
 -- an existing TyVar. We substitute kind variables in the kind.
 newMetaTyVarX = new_meta_tv_x TauTv
 
-newMetaTyVarTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
+newMetaTyVarTyVarX :: Subst -> TyVar -> TcM (Subst, TcTyVar)
 -- Just like newMetaTyVarX, but make a TyVarTv
 newMetaTyVarTyVarX = new_meta_tv_x TyVarTv
 
-newWildCardX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
+newWildCardX :: Subst -> TyVar -> TcM (Subst, TcTyVar)
 newWildCardX subst tv
   = do { new_tv <- newAnonMetaTyVar TauTv (substTy subst (tyVarKind tv))
        ; return (extendTvSubstWithClone subst tv new_tv, new_tv) }
 
-new_meta_tv_x :: MetaInfo -> TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
+new_meta_tv_x :: MetaInfo -> Subst -> TyVar -> TcM (Subst, TcTyVar)
 new_meta_tv_x info subst tv
   = do  { new_tv <- cloneAnonMetaTyVar info tv substd_kind
         ; let subst1 = extendTvSubstWithClone subst tv new_tv

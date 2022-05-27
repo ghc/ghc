@@ -38,7 +38,7 @@ import GHC.Core.Coercion hiding ( getCvSubstEnv )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs   ( tyCoVarsOfCoList, tyCoFVsOfTypes )
-import GHC.Core.TyCo.Subst ( mkTvSubst )
+import GHC.Core.TyCo.Subst ( mkTvSubst, emptyIdSubstEnv )
 import GHC.Core.RoughMap
 import GHC.Core.Map.Type
 import GHC.Utils.FV( FV, fvVarList )
@@ -133,27 +133,27 @@ type BindFun = TyCoVar -> Type -> BindFlag
 -- always used on top-level types, so we can bind any of the
 -- free variables of the LHS.
 -- See also Note [tcMatchTy vs tcMatchTyKi]
-tcMatchTy :: Type -> Type -> Maybe TCvSubst
+tcMatchTy :: Type -> Type -> Maybe Subst
 tcMatchTy ty1 ty2 = tcMatchTys [ty1] [ty2]
 
-tcMatchTyX_BM :: BindFun -> TCvSubst
-              -> Type -> Type -> Maybe TCvSubst
+tcMatchTyX_BM :: BindFun -> Subst
+              -> Type -> Type -> Maybe Subst
 tcMatchTyX_BM bind_me subst ty1 ty2
   = tc_match_tys_x bind_me False subst [ty1] [ty2]
 
 -- | Like 'tcMatchTy', but allows the kinds of the types to differ,
 -- and thus matches them as well.
 -- See also Note [tcMatchTy vs tcMatchTyKi]
-tcMatchTyKi :: Type -> Type -> Maybe TCvSubst
+tcMatchTyKi :: Type -> Type -> Maybe Subst
 tcMatchTyKi ty1 ty2
   = tc_match_tys alwaysBindFun True [ty1] [ty2]
 
 -- | This is similar to 'tcMatchTy', but extends a substitution
 -- See also Note [tcMatchTy vs tcMatchTyKi]
-tcMatchTyX :: TCvSubst            -- ^ Substitution to extend
+tcMatchTyX :: Subst            -- ^ Substitution to extend
            -> Type                -- ^ Template
            -> Type                -- ^ Target
-           -> Maybe TCvSubst
+           -> Maybe Subst
 tcMatchTyX subst ty1 ty2
   = tc_match_tys_x alwaysBindFun False subst [ty1] [ty2]
 
@@ -161,7 +161,7 @@ tcMatchTyX subst ty1 ty2
 -- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTys :: [Type]         -- ^ Template
            -> [Type]         -- ^ Target
-           -> Maybe TCvSubst -- ^ One-shot; in principle the template
+           -> Maybe Subst -- ^ One-shot; in principle the template
                              -- variables could be free in the target
 tcMatchTys tys1 tys2
   = tc_match_tys alwaysBindFun False tys1 tys2
@@ -170,25 +170,25 @@ tcMatchTys tys1 tys2
 -- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTyKis :: [Type]         -- ^ Template
              -> [Type]         -- ^ Target
-             -> Maybe TCvSubst -- ^ One-shot substitution
+             -> Maybe Subst -- ^ One-shot substitution
 tcMatchTyKis tys1 tys2
   = tc_match_tys alwaysBindFun True tys1 tys2
 
 -- | Like 'tcMatchTys', but extending a substitution
 -- See also Note [tcMatchTy vs tcMatchTyKi]
-tcMatchTysX :: TCvSubst       -- ^ Substitution to extend
+tcMatchTysX :: Subst       -- ^ Substitution to extend
             -> [Type]         -- ^ Template
             -> [Type]         -- ^ Target
-            -> Maybe TCvSubst -- ^ One-shot substitution
+            -> Maybe Subst -- ^ One-shot substitution
 tcMatchTysX subst tys1 tys2
   = tc_match_tys_x alwaysBindFun False subst tys1 tys2
 
 -- | Like 'tcMatchTyKis', but extending a substitution
 -- See also Note [tcMatchTy vs tcMatchTyKi]
-tcMatchTyKisX :: TCvSubst        -- ^ Substitution to extend
+tcMatchTyKisX :: Subst        -- ^ Substitution to extend
               -> [Type]          -- ^ Template
               -> [Type]          -- ^ Target
-              -> Maybe TCvSubst  -- ^ One-shot substitution
+              -> Maybe Subst  -- ^ One-shot substitution
 tcMatchTyKisX subst tys1 tys2
   = tc_match_tys_x alwaysBindFun True subst tys1 tys2
 
@@ -197,27 +197,27 @@ tc_match_tys :: BindFun
              -> Bool          -- ^ match kinds?
              -> [Type]
              -> [Type]
-             -> Maybe TCvSubst
+             -> Maybe Subst
 tc_match_tys bind_me match_kis tys1 tys2
-  = tc_match_tys_x bind_me match_kis (mkEmptyTCvSubst in_scope) tys1 tys2
+  = tc_match_tys_x bind_me match_kis (mkEmptySubst in_scope) tys1 tys2
   where
     in_scope = mkInScopeSet (tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2)
 
 -- | Worker for 'tcMatchTysX' and 'tcMatchTyKisX'
 tc_match_tys_x :: BindFun
                -> Bool          -- ^ match kinds?
-               -> TCvSubst
+               -> Subst
                -> [Type]
                -> [Type]
-               -> Maybe TCvSubst
-tc_match_tys_x bind_me match_kis (TCvSubst in_scope tv_env cv_env) tys1 tys2
+               -> Maybe Subst
+tc_match_tys_x bind_me match_kis (Subst in_scope id_env tv_env cv_env) tys1 tys2
   = case tc_unify_tys bind_me
                       False  -- Matching, not unifying
                       False  -- Not an injectivity check
                       match_kis
                       (mkRnEnv2 in_scope) tv_env cv_env tys1 tys2 of
       Unifiable (tv_env', cv_env')
-        -> Just $ TCvSubst in_scope tv_env' cv_env'
+        -> Just $ Subst in_scope id_env tv_env' cv_env'
       _ -> Nothing
 
 -- | This one is called from the expression matcher,
@@ -460,12 +460,12 @@ indexed-types/should_compile/Overlap14.
 -- | Simple unification of two types; all type variables are bindable
 -- Precondition: the kinds are already equal
 tcUnifyTy :: Type -> Type       -- All tyvars are bindable
-          -> Maybe TCvSubst
+          -> Maybe Subst
                        -- A regular one-shot (idempotent) substitution
 tcUnifyTy t1 t2 = tcUnifyTys alwaysBindFun [t1] [t2]
 
 -- | Like 'tcUnifyTy', but also unifies the kinds
-tcUnifyTyKi :: Type -> Type -> Maybe TCvSubst
+tcUnifyTyKi :: Type -> Type -> Maybe Subst
 tcUnifyTyKi t1 t2 = tcUnifyTyKis alwaysBindFun [t1] [t2]
 
 -- | Unify two types, treating type family applications as possibly unifying
@@ -476,7 +476,7 @@ tcUnifyTyWithTFs :: Bool  -- ^ True <=> do two-way unification;
                           --   See end of sec 5.2 from the paper
                  -> InScopeSet     -- Should include the free tyvars of both Type args
                  -> Type -> Type   -- Types to unify
-                 -> Maybe TCvSubst
+                 -> Maybe Subst
 -- This algorithm is an implementation of the "Algorithm U" presented in
 -- the paper "Injective type families for Haskell", Figures 2 and 3.
 -- The code is incorporated with the standard unifier for convenience, but
@@ -493,14 +493,14 @@ tcUnifyTyWithTFs twoWay in_scope t1 t2
   where
     rn_env   = mkRnEnv2 in_scope
 
-    maybe_fix | twoWay    = niFixTCvSubst in_scope
+    maybe_fix | twoWay    = niFixSubst in_scope
               | otherwise = mkTvSubst in_scope -- when matching, don't confuse
                                                -- domain with range
 
 -----------------
 tcUnifyTys :: BindFun
            -> [Type] -> [Type]
-           -> Maybe TCvSubst
+           -> Maybe Subst
                                 -- ^ A regular one-shot (idempotent) substitution
                                 -- that unifies the erased types. See comments
                                 -- for 'tcUnifyTysFG'
@@ -515,7 +515,7 @@ tcUnifyTys bind_fn tys1 tys2
 -- | Like 'tcUnifyTys' but also unifies the kinds
 tcUnifyTyKis :: BindFun
              -> [Type] -> [Type]
-             -> Maybe TCvSubst
+             -> Maybe Subst
 tcUnifyTyKis bind_fn tys1 tys2
   = case tcUnifyTyKisFG bind_fn tys1 tys2 of
       Unifiable result -> Just result
@@ -523,7 +523,7 @@ tcUnifyTyKis bind_fn tys1 tys2
 
 -- This type does double-duty. It is used in the UM (unifier monad) and to
 -- return the final result. See Note [Fine-grained unification]
-type UnifyResult = UnifyResultM TCvSubst
+type UnifyResult = UnifyResultM Subst
 
 -- | See Note [Unification result]
 data UnifyResultM a = Unifiable a        -- the subst that unifies the types
@@ -591,7 +591,7 @@ tc_unify_tys_fg match_kis bind_fn tys1 tys2
   = do { (env, _) <- tc_unify_tys bind_fn True False match_kis rn_env
                                   emptyTvSubstEnv emptyCvSubstEnv
                                   tys1 tys2
-       ; return $ niFixTCvSubst in_scope env }
+       ; return $ niFixSubst in_scope env }
   where
     in_scope = mkInScopeSet $ tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2
     rn_env   = mkRnEnv2 in_scope
@@ -727,13 +727,13 @@ variables in the in-scope set; it is used only to ensure no
 shadowing.
 -}
 
-niFixTCvSubst :: InScopeSet -> TvSubstEnv -> TCvSubst
+niFixSubst :: InScopeSet -> TvSubstEnv -> Subst
 -- Find the idempotent fixed point of the non-idempotent substitution
 -- This is surprisingly tricky:
 --   see Note [Finding the substitution fixpoint]
 -- ToDo: use laziness instead of iteration?
-niFixTCvSubst in_scope tenv
-  | not_fixpoint = niFixTCvSubst in_scope (mapVarEnv (substTy subst) tenv)
+niFixSubst in_scope tenv
+  | not_fixpoint = niFixSubst in_scope (mapVarEnv (substTy subst) tenv)
   | otherwise    = subst
   where
     range_fvs :: FV
@@ -754,7 +754,7 @@ niFixTCvSubst in_scope tenv
                   (mkTvSubst in_scope tenv)
                   free_tvs
 
-    add_free_tv :: TCvSubst -> TyVar -> TCvSubst
+    add_free_tv :: Subst -> TyVar -> Subst
     add_free_tv subst tv
       = extendTvSubst subst tv (mkTyVarTy tv')
      where
@@ -1435,11 +1435,11 @@ getTvSubstEnv = UM $ \state -> Unifiable (state, um_tv_env state)
 getCvSubstEnv :: UM CvSubstEnv
 getCvSubstEnv = UM $ \state -> Unifiable (state, um_cv_env state)
 
-getSubst :: UMEnv -> UM TCvSubst
+getSubst :: UMEnv -> UM Subst
 getSubst env = do { tv_env <- getTvSubstEnv
                   ; cv_env <- getCvSubstEnv
                   ; let in_scope = rnInScopeSet (um_rn_env env)
-                  ; return (mkTCvSubst in_scope (tv_env, cv_env)) }
+                  ; return (mkSubst in_scope tv_env cv_env emptyIdSubstEnv) }
 
 extendTvEnv :: TyVar -> Type -> UM ()
 extendTvEnv tv ty = UM $ \state ->
@@ -1529,7 +1529,7 @@ liftCoMatch tmpls ty co
   = do { cenv1 <- ty_co_match menv emptyVarEnv ki ki_co ki_ki_co ki_ki_co
        ; cenv2 <- ty_co_match menv cenv1       ty co
                               (mkNomReflCo co_lkind) (mkNomReflCo co_rkind)
-       ; return (LC (mkEmptyTCvSubst in_scope) cenv2) }
+       ; return (LC (mkEmptySubst in_scope) cenv2) }
   where
     menv     = ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope }
     in_scope = mkInScopeSet (tmpls `unionVarSet` tyCoVarsOfCo co)
@@ -1577,7 +1577,7 @@ ty_co_match menv subst ty co lkco rkco
 ty_co_match menv subst ty co lkco rkco
   | CastTy ty' co' <- ty
      -- See Note [Matching in the presence of casts (1)]
-  = let empty_subst  = mkEmptyTCvSubst (rnInScopeSet (me_env menv))
+  = let empty_subst  = mkEmptySubst (rnInScopeSet (me_env menv))
         substed_co_l = substCo (liftEnvSubstLeft empty_subst subst)  co'
         substed_co_r = substCo (liftEnvSubstRight empty_subst subst) co'
     in
@@ -1867,7 +1867,7 @@ There are wrinkles, of course:
    variables outside of their scope: note that its domain is the *unrenamed*
    variables. This means that the substitution gets "pushed down" (like a
    reader monad) while the in-scope set gets threaded (like a state monad).
-   Because a TCvSubst contains its own in-scope set, we don't carry a TCvSubst;
+   Because a Subst contains its own in-scope set, we don't carry a Subst;
    instead, we just carry a TvSubstEnv down, tying it to the InScopeSet
    traveling separately as necessary.
 
@@ -2039,7 +2039,7 @@ coreFlattenTyFamApp tv_subst env fam_tc fam_args
         in (env'', ty')
   where
     arity = tyConArity fam_tc
-    tcv_subst = TCvSubst (fe_in_scope env) tv_subst emptyVarEnv
+    tcv_subst = Subst (fe_in_scope env) emptyIdSubstEnv tv_subst emptyVarEnv
     (sat_fam_args, leftover_args) = assert (arity <= length fam_args) $
                                     splitAt arity fam_args
     -- Apply the substitution before looking up an application in the

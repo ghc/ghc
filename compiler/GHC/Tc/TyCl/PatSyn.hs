@@ -436,7 +436,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
          -- expected type. Even though the tyvars in the type are
          -- already skolems, this step changes their TcLevels,
          -- avoiding level-check errors when unifying.
-       ; (skol_subst0, skol_univ_bndrs) <- skolemiseTvBndrsX skol_info emptyTCvSubst univ_bndrs
+       ; (skol_subst0, skol_univ_bndrs) <- skolemiseTvBndrsX skol_info emptySubst univ_bndrs
        ; (skol_subst, skol_ex_bndrs)    <- skolemiseTvBndrsX skol_info skol_subst0   ex_bndrs
        ; let skol_univ_tvs   = binderVars skol_univ_bndrs
              skol_ex_tvs     = binderVars skol_ex_bndrs
@@ -457,7 +457,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
            tcExtendNameTyVarEnv univ_tv_prs $
            tcCheckPat PatSyn lpat (unrestricted skol_pat_ty)   $
            do { let in_scope    = mkInScopeSetList skol_univ_tvs
-                    empty_subst = mkEmptyTCvSubst in_scope
+                    empty_subst = mkEmptySubst in_scope
               ; (inst_subst, ex_tvs') <- mapAccumLM newMetaTyVarX empty_subst skol_ex_tvs
                     -- newMetaTyVarX: see the "Existential type variables"
                     -- part of Note [Checking against a pattern signature]
@@ -494,7 +494,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                           (args', skol_arg_tys)
                           skol_pat_ty rec_fields }
   where
-    tc_arg :: TCvSubst -> Name -> Type -> TcM (LHsExpr GhcTc)
+    tc_arg :: Subst -> Name -> Type -> TcM (LHsExpr GhcTc)
      -- Look up the variable actually bound by lpat
      -- and check that it has the expected type
     tc_arg subst arg_name arg_ty
@@ -515,8 +515,8 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                 -- See Note [Pattern synonyms and higher rank types]
            ; return (mkLHsWrap wrap $ nlHsVar arg_id) }
 
-skolemiseTvBndrsX :: SkolemInfo -> TCvSubst -> [VarBndr TyVar flag]
-                  -> TcM (TCvSubst, [VarBndr TcTyVar flag])
+skolemiseTvBndrsX :: SkolemInfo -> Subst -> [VarBndr TyVar flag]
+                  -> TcM (Subst, [VarBndr TcTyVar flag])
 -- Make new TcTyVars, all skolems with levels, but do not clone
 -- The level is one level deeper than the current level
 -- See Note [Skolemising when checking a pattern synonym]
@@ -525,8 +525,8 @@ skolemiseTvBndrsX skol_info orig_subst tvs
        ; let pushed_lvl = pushTcLevel tc_lvl
              details    = SkolemTv skol_info pushed_lvl False
 
-             mk_skol_tv_x :: TCvSubst -> VarBndr TyVar flag
-                          -> (TCvSubst, VarBndr TcTyVar flag)
+             mk_skol_tv_x :: Subst -> VarBndr TyVar flag
+                          -> (Subst, VarBndr TcTyVar flag)
              mk_skol_tv_x subst (Bndr tv flag)
                = (subst', Bndr new_tv flag)
                where

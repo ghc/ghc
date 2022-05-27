@@ -696,7 +696,7 @@ cseOneExpr e = cseExpr env e
   where env = emptyCSEnv {cs_subst = mkEmptySubst (mkInScopeSet (exprFreeVars e)) }
 
 cseExpr :: CSEnv -> InExpr -> OutExpr
-cseExpr env (Type t)              = Type (substTy (csEnvSubst env) t)
+cseExpr env (Type t)              = Type (substTyUnchecked (csEnvSubst env) t)
 cseExpr env (Coercion c)          = Coercion (substCo (csEnvSubst env) c)
 cseExpr _   (Lit lit)             = Lit lit
 cseExpr env (Var v)               = lookupSubst env v
@@ -714,7 +714,7 @@ cseCase env scrut bndr ty alts
   = Case scrut1 bndr3 ty' $
     combineAlts (map cse_alt alts)
   where
-    ty' = substTy (csEnvSubst env) ty
+    ty' = substTyUnchecked (csEnvSubst env) ty
     (cse_done, scrut1) = try_for_cse env scrut
 
     bndr1 = zapIdOccInfo bndr

@@ -2585,7 +2585,7 @@ tcDefaultAssocDecl fam_tc
            ])
        ; let subst = case traverse getTyVar_maybe pats of
                        Just cpt_tvs -> zipTvSubst cpt_tvs (mkTyVarTys fam_tvs)
-                       Nothing      -> emptyTCvSubst
+                       Nothing      -> emptySubst
                        -- The Nothing case can only be reached in invalid
                        -- associated type family defaults. In such cases, we
                        -- simply create an empty substitution and let GHC fall
@@ -3798,7 +3798,7 @@ rejigConRes :: [KnotTied TyConBinder]  -- Template for result type; e.g.
                 [InvisTVBinder],  -- The constructor's rejigged, user-written
                                   -- type variables
                 [EqSpec],         -- Equality predicates
-                TCvSubst)         -- Substitution to apply to argument types
+                Subst)            -- Substitution to apply to argument types
         -- We don't check that the TyCon given in the ResTy is
         -- the same as the parent tycon, because checkValidDataCon will do it
 -- NB: All arguments may potentially be knot-tied
@@ -3847,7 +3847,7 @@ rejigConRes tc_tvbndrs res_tmpl dc_tvbndrs res_ty
         -- albeit bogus, relying on checkValidDataCon to check the
         --  bad-result-type error before seeing that the other fields look odd
         -- See Note [rejigConRes]
-  = (tc_tvs, dc_tvs `minusList` tc_tvs, dc_tvbndrs, [], emptyTCvSubst)
+  = (tc_tvs, dc_tvs `minusList` tc_tvs, dc_tvbndrs, [], emptySubst)
   where
     dc_tvs = binderVars dc_tvbndrs
     tc_tvs = binderVars tc_tvbndrs
@@ -3995,28 +3995,28 @@ certainly degrade error messages a bit, though.
 -- See Note [mkGADTVars].
 mkGADTVars :: [TyVar]    -- ^ The tycon vars
            -> [TyVar]    -- ^ The datacon vars
-           -> TCvSubst   -- ^ The matching between the template result type
+           -> Subst   -- ^ The matching between the template result type
                          -- and the actual result type
            -> ( [TyVar]
               , [EqSpec]
-              , TCvSubst ) -- ^ The univ. variables, the GADT equalities,
+              , Subst ) -- ^ The univ. variables, the GADT equalities,
                            -- and a subst to apply to the GADT equalities
                            -- and existentials.
 mkGADTVars tmpl_tvs dc_tvs subst
   = choose [] [] empty_subst empty_subst tmpl_tvs
   where
     in_scope = mkInScopeSet (mkVarSet tmpl_tvs `unionVarSet` mkVarSet dc_tvs)
-               `unionInScope` getTCvInScope subst
-    empty_subst = mkEmptyTCvSubst in_scope
+               `unionInScope` getSubstInScope subst
+    empty_subst = mkEmptySubst in_scope
 
     choose :: [TyVar]           -- accumulator of univ tvs, reversed
            -> [EqSpec]          -- accumulator of GADT equalities, reversed
-           -> TCvSubst          -- template substitution
-           -> TCvSubst          -- res. substitution
+           -> Subst          -- template substitution
+           -> Subst          -- res. substitution
            -> [TyVar]           -- template tvs (the univ tvs passed in)
            -> ( [TyVar]         -- the univ_tvs
               , [EqSpec]        -- GADT equalities
-              , TCvSubst )       -- a substitution to fix kinds in ex_tvs
+              , Subst )       -- a substitution to fix kinds in ex_tvs
 
     choose univs eqs _t_sub r_sub []
       = (reverse univs, reverse eqs, r_sub)

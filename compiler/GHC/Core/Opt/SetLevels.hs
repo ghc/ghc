@@ -1,4 +1,3 @@
-
 {-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -363,7 +362,7 @@ don't want @lvlExpr@ to turn the scrutinee of the @case@ into an MFE
 If there were another lambda in @r@'s rhs, it would get level-2 as well.
 -}
 
-lvlExpr env (_, AnnType ty)     = return (Type (GHC.Core.Subst.substTy (le_subst env) ty))
+lvlExpr env (_, AnnType ty)     = return (Type (substTyUnchecked (le_subst env) ty))
 lvlExpr env (_, AnnCoercion co) = return (Coercion (substCo (le_subst env) co))
 lvlExpr env (_, AnnVar v)       = return (lookupVar env v)
 lvlExpr _   (_, AnnLit lit)     = return (Lit lit)
@@ -492,7 +491,7 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
        ; alts' <- mapM (lvl_alt alts_env) alts
        ; return (Case scrut' case_bndr' ty' alts') }
   where
-    ty' = substTy (le_subst env) ty
+    ty' = substTyUnchecked (le_subst env) ty
 
     incd_lvl = incMinorLvl (le_ctxt_lvl env)
     dest_lvl = maxFvLevel (const True) env scrut_fvs
@@ -623,7 +622,7 @@ lvlMFE ::  LevelEnv             -- Level of in-scope names/tyvars
 -- the expression, so that it can itself be floated.
 
 lvlMFE env _ (_, AnnType ty)
-  = return (Type (GHC.Core.Subst.substTy (le_subst env) ty))
+  = return (Type (substTyUnchecked (le_subst env) ty))
 
 -- No point in floating out an expression wrapped in a coercion or note
 -- If we do we'll transform  lvl = e |> co
@@ -1719,7 +1718,7 @@ newPolyBndrs dest_lvl
                              mkSysLocal (mkFastString str) uniq (idMult bndr) poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
-                             poly_ty = mkLamTypes abs_vars (GHC.Core.Subst.substTy subst (idType bndr))
+                             poly_ty = mkLamTypes abs_vars (substTyUnchecked subst (idType bndr))
 
     -- If we are floating a join point to top level, it stops being
     -- a join point.  Otherwise it continues to be a join point,

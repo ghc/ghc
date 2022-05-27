@@ -616,7 +616,7 @@ mkDataConWorkId wkr_name data_con
 type Unboxer = Var -> UniqSM ([Var], CoreExpr -> CoreExpr)
   -- Unbox: bind rep vars by decomposing src var
 
-data Boxer = UnitBox | Boxer (TCvSubst -> UniqSM ([Var], CoreExpr))
+data Boxer = UnitBox | Boxer (Subst -> UniqSM ([Var], CoreExpr))
   -- Box:   build src arg using these rep vars
 
 -- | Data Constructor Boxer

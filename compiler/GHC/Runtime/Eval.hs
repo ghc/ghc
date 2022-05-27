@@ -621,10 +621,10 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
      = do { name <- newInteractiveBinder hsc_env occ (getSrcSpan old_id)
           ; return (Id.mkVanillaGlobalWithInfo name ty (idInfo old_id)) }
 
-   newTyVars :: UniqSupply -> [TcTyVar] -> TCvSubst
+   newTyVars :: UniqSupply -> [TcTyVar] -> Subst
      -- Similarly, clone the type variables mentioned in the types
      -- we have here, *and* make them all RuntimeUnk tyvars
-   newTyVars us tvs = foldl' new_tv emptyTCvSubst (tvs `zip` uniqsFromSupply us)
+   newTyVars us tvs = foldl' new_tv emptySubst (tvs `zip` uniqsFromSupply us)
    new_tv subst (tv,uniq) = extendTCvSubstWithClone subst tv new_tv
     where
      new_tv = mkRuntimeUnkTyVar (setNameUnique (tyVarName tv) uniq)
@@ -1146,7 +1146,7 @@ checkForExistence clsInst mb_inst_tys = do
       Just (_, tys@(_:_)) -> all isTyVarTy tys
       _                   -> isTyVarTy ty
 
-  empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType (idType $ is_dfun clsInst)))
+  empty_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType (idType $ is_dfun clsInst)))
 
   {- Create a ClsInst with instantiated arguments and constraints.
 

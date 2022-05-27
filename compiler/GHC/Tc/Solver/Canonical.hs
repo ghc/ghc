@@ -867,7 +867,7 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
     -- TcLclEnv for the implication, and that in turn sets the location
     -- for the Givens when solving the constraint (#21006)
     do { skol_info <- mkSkolemInfo QuantCtxtSkol
-       ; let empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
+       ; let empty_subst = mkEmptySubst $ mkInScopeSet $
                            tyCoVarsOfTypes (pred:theta) `delVarSetList` tvs
        ; (subst, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst tvs
        ; given_ev_vars <- mapM newEvVar (substTheta subst theta)
@@ -1210,7 +1210,7 @@ can_eq_nc_forall ev eq_rel s1 s2
                 ; canEqHardFailure ev s1 s2 }
         else
    do { traceTcS "Creating implication for polytype equality" $ ppr ev
-      ; let empty_subst1 = mkEmptyTCvSubst $ mkInScopeSet free_tvs
+      ; let empty_subst1 = mkEmptySubst $ mkInScopeSet free_tvs
       ; skol_info <- mkSkolemInfo (UnifyForAllSkol phi1)
       ; (subst1, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst1 $
                               binderVars bndrs1
@@ -1218,7 +1218,7 @@ can_eq_nc_forall ev eq_rel s1 s2
       ; let phi1' = substTy subst1 phi1
 
             -- Unify the kinds, extend the substitution
-            go :: [TcTyVar] -> TCvSubst -> [TyVarBinder]
+            go :: [TcTyVar] -> Subst -> [TyVarBinder]
                -> TcS (TcCoercion, Cts)
             go (skol_tv:skol_tvs) subst (bndr2:bndrs2)
               = do { let tv2 = binderVar bndr2
@@ -1239,7 +1239,7 @@ can_eq_nc_forall ev eq_rel s1 s2
 
             go _ _ _ = panic "cna_eq_nc_forall"  -- case (s:ss) []
 
-            empty_subst2 = mkEmptyTCvSubst (getTCvInScope subst1)
+            empty_subst2 = mkEmptySubst (getSubstInScope subst1)
 
       ; (lvl, (all_co, wanteds)) <- pushLevelNoWorkList (ppr skol_info) $
                                     go skol_tvs empty_subst2 bndrs2

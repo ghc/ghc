@@ -2759,7 +2759,7 @@ buildDataConInstArgEnv rep_tc rep_tc_args =
 -- | Apply a substitution to all of the 'Type's contained in a 'DerivInstTys'.
 -- See @Note [Instantiating field types in stock deriving]@ for why we need to
 -- substitute into a 'DerivInstTys' in the first place.
-substDerivInstTys :: TCvSubst -> DerivInstTys -> DerivInstTys
+substDerivInstTys :: Subst -> DerivInstTys -> DerivInstTys
 substDerivInstTys subst
   dit@(DerivInstTys { dit_cls_tys = cls_tys, dit_tc_args = tc_args
                     , dit_rep_tc = rep_tc, dit_rep_tc_args = rep_tc_args })

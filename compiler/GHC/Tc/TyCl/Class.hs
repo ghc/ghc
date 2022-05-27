@@ -505,7 +505,7 @@ inst_decl_ctxt doc = hang (text "In the instance declaration for")
                         2 (quotes doc)
 
 tcATDefault :: SrcSpan
-            -> TCvSubst
+            -> Subst
             -> NameSet
             -> ClassATItem
             -> TcM [FamInst]

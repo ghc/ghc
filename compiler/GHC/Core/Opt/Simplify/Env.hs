@@ -30,7 +30,7 @@ module GHC.Core.Opt.Simplify.Env (
         -- * Simplifying 'Id' binders
         simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
         simplBinder, simplBinders,
-        substTy, substTyVar, getTCvSubst,
+        substTy, substTyVar, getSubst,
         substCo, substCoVar,
 
         -- * Floats
@@ -60,6 +60,7 @@ import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Multiplicity     ( scaleScaled )
 import GHC.Core.Unfold
+import GHC.Core.TyCo.Subst (emptyIdSubstEnv)
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -368,7 +369,7 @@ pprSimplEnv env
              | otherwise = ppr v
 
 type SimplIdSubst = IdEnv SimplSR -- IdId |--> OutExpr
-        -- See Note [Extending the Subst] in GHC.Core.Subst
+        -- See Note [Extending the IdSubstEnv] in GHC.Core.Subst
 
 -- | A substitution result.
 data SimplSR
@@ -1223,34 +1224,34 @@ See also Note [Return type for join points] and Note [Join points and case-of-ca
 ************************************************************************
 -}
 
-getTCvSubst :: SimplEnv -> TCvSubst
-getTCvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env
+getSubst :: SimplEnv -> Subst
+getSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env
                       , seCvSubst = cv_env })
-  = mkTCvSubst in_scope (tv_env, cv_env)
+  = mkSubst in_scope tv_env cv_env emptyIdSubstEnv
 
 substTy :: HasDebugCallStack => SimplEnv -> Type -> Type
-substTy env ty = Type.substTy (getTCvSubst env) ty
+substTy env ty = Type.substTy (getSubst env) ty
 
 substTyVar :: SimplEnv -> TyVar -> Type
-substTyVar env tv = Type.substTyVar (getTCvSubst env) tv
+substTyVar env tv = Type.substTyVar (getSubst env) tv
 
 substTyVarBndr :: SimplEnv -> TyVar -> (SimplEnv, TyVar)
 substTyVarBndr env tv
-  = case Type.substTyVarBndr (getTCvSubst env) tv of
-        (TCvSubst in_scope' tv_env' cv_env', tv')
+  = case Type.substTyVarBndr (getSubst env) tv of
+        (Subst in_scope' _ tv_env' cv_env', tv')
            -> (env { seInScope = in_scope', seTvSubst = tv_env', seCvSubst = cv_env' }, tv')
 
 substCoVar :: SimplEnv -> CoVar -> Coercion
-substCoVar env tv = Coercion.substCoVar (getTCvSubst env) tv
+substCoVar env tv = Coercion.substCoVar (getSubst env) tv
 
 substCoVarBndr :: SimplEnv -> CoVar -> (SimplEnv, CoVar)
 substCoVarBndr env cv
-  = case Coercion.substCoVarBndr (getTCvSubst env) cv of
-        (TCvSubst in_scope' tv_env' cv_env', cv')
+  = case Coercion.substCoVarBndr (getSubst env) cv of
+        (Subst in_scope' _ tv_env' cv_env', cv')
            -> (env { seInScope = in_scope', seTvSubst = tv_env', seCvSubst = cv_env' }, cv')
 
 substCo :: SimplEnv -> Coercion -> Coercion
-substCo env co = Coercion.substCo (getTCvSubst env) co
+substCo env co = Coercion.substCo (getSubst env) co
 
 ------------------
 substIdType :: SimplEnv -> Id -> Id
@@ -1264,6 +1265,6 @@ substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv
                 -- in a Note in the id's type itself
   where
     no_free_vars = noFreeVarsOfType old_ty && noFreeVarsOfType old_w
-    subst = TCvSubst in_scope tv_env cv_env
+    subst = Subst in_scope emptyIdSubstEnv tv_env cv_env
     old_ty = idType id
     old_w  = varMult id

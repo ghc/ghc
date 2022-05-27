@@ -324,7 +324,7 @@ improveClsFD clas_tvs fd
 
                     meta_tvs = [ setVarType tv (substTy subst (varType tv))
                                | tv <- qtvs
-                               , tv `notElemTCvSubst` subst
+                               , tv `notElemSubst` subst
                                , tv `elemVarSet` rtys1_tvs ]
                         -- meta_tvs are the quantified type variables
                         -- that have not been substituted out
@@ -343,7 +343,7 @@ improveClsFD clas_tvs fd
                         --              whose kind mentions that kind variable! #6015, #6068
                         --          (c) no need to include tyvars not in rtys1
   where
-    init_subst     = mkEmptyTCvSubst $ mkInScopeSet $
+    init_subst     = mkEmptySubst $ mkInScopeSet $
                      mkVarSet qtvs `unionVarSet` tyCoVarsOfTypes ltys2
     (ltys1, rtys1) = instFD fd clas_tvs tys_inst
     (ltys2, rtys2) = instFD fd clas_tvs tys_actual

@@ -1,4 +1,3 @@
-
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
@@ -75,7 +74,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim (tYPETyCon)
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Subst (elemTCvSubst)
+import GHC.Core.TyCo.Subst (elemSubst)
 import GHC.Core.Type
 import GHC.Tc.Solver   (tcNormalise, tcCheckGivens, tcCheckWanteds)
 import GHC.Core.Unify    (tcMatchTy)
@@ -918,7 +917,7 @@ addCoreCt nabla x e = do
           ex_tys                 = map exprToType ex_ty_args
           vis_args               = reverse $ take arty $ reverse val_args
       uniq_supply <- lift $ lift $ getUniqueSupplyM
-      let (_, ex_tvs) = cloneTyVarBndrs (mkEmptyTCvSubst in_scope) dc_ex_tvs uniq_supply
+      let (_, ex_tvs) = cloneTyVarBndrs (mkEmptySubst in_scope) dc_ex_tvs uniq_supply
           ty_cts      = equateTys (map mkTyVarTy ex_tvs) ex_tys
       -- 1. @x ≁ ⊥@ if 'K' is not a Newtype constructor (#18341)
       when (not (isNewDataCon dc)) $
@@ -1477,7 +1476,7 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
 -- Make sure that @ty@ is normalised before.
 --
 -- See Note [Matching against a ConLike result type].
-matchConLikeResTy :: FamInstEnvs -> TyState -> Type -> ConLike -> DsM (Maybe TCvSubst)
+matchConLikeResTy :: FamInstEnvs -> TyState -> Type -> ConLike -> DsM (Maybe Subst)
 matchConLikeResTy env _              ty (RealDataCon dc) = pure $ do
   (rep_tc, tc_args, _co) <- splitReprTyConApp_maybe env ty
   if rep_tc == dataConTyCon dc
@@ -1486,7 +1485,7 @@ matchConLikeResTy env _              ty (RealDataCon dc) = pure $ do
 matchConLikeResTy _   (TySt _ inert) ty (PatSynCon ps) = {-# SCC "matchConLikeResTy" #-} runMaybeT $ do
   let (univ_tvs,req_theta,_,_,_,con_res_ty) = patSynSig ps
   subst <- MaybeT $ pure $ tcMatchTy con_res_ty ty
-  guard $ all (`elemTCvSubst` subst) univ_tvs -- See the Note about T11336b
+  guard $ all (`elemSubst` subst) univ_tvs -- See the Note about T11336b
   if null req_theta
     then pure subst
     else do

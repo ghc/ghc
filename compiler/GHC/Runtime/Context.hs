@@ -441,7 +441,7 @@ icExtendGblRdrEnv env tythings
                              _            -> False
     is_sub_bndr _ = False
 
-substInteractiveContext :: InteractiveContext -> TCvSubst -> InteractiveContext
+substInteractiveContext :: InteractiveContext -> Subst -> InteractiveContext
 substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst
   | isEmptyTCvSubst subst = ictxt
   | otherwise             = ictxt { ic_tythings = map subst_ty tts }

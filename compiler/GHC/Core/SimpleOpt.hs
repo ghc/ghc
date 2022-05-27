@@ -212,10 +212,10 @@ emptyEnv opts = SOE { soe_inl     = emptyVarEnv
 
 soeZapSubst :: SimpleOptEnv -> SimpleOptEnv
 soeZapSubst env@(SOE { soe_subst = subst })
-  = env { soe_inl = emptyVarEnv, soe_subst = zapSubstEnv subst }
+  = env { soe_inl = emptyVarEnv, soe_subst = zapSubst subst }
 
 soeInScope :: SimpleOptEnv -> InScopeSet
-soeInScope (SOE { soe_subst = subst }) = substInScope subst
+soeInScope (SOE { soe_subst = subst }) = getSubstInScope subst
 
 soeSetInScope :: InScopeSet -> SimpleOptEnv -> SimpleOptEnv
 soeSetInScope in_scope env2@(SOE { soe_subst = subst2 })
@@ -241,7 +241,7 @@ simple_opt_expr env expr
   where
     rec_ids      = soe_rec_ids env
     subst        = soe_subst env
-    in_scope     = substInScope subst
+    in_scope     = getSubstInScope subst
     in_scope_env = (in_scope, simpleUnfoldingFun)
 
     ---------------
@@ -252,7 +252,7 @@ simple_opt_expr env expr
        = lookupIdSubst (soe_subst env) v
 
     go (App e1 e2)      = simple_app env e1 [(env,e2)]
-    go (Type ty)        = Type     (substTy subst ty)
+    go (Type ty)        = Type     (substTyUnchecked subst ty)
     go (Coercion co)    = Coercion (go_co co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
@@ -285,14 +285,14 @@ simple_opt_expr env expr
       = go rhs
 
       | otherwise
-      = Case e' b' (substTy subst ty)
+      = Case e' b' (substTyUnchecked subst ty)
                    (map (go_alt env') as)
       where
         e' = go e
         (env', b') = subst_opt_bndr env b
 
     ----------------------
-    go_co co = optCoercion (so_co_opts (soe_opts env)) (getTCvSubst subst) co
+    go_co co = optCoercion (so_co_opts (soe_opts env)) subst co
 
     ----------------------
     go_alt env (Alt con bndrs rhs)
@@ -452,12 +452,12 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
                  in_bndr mb_out_bndr clo@(rhs_env, in_rhs)
                  top_level
   | Type ty <- in_rhs        -- let a::* = TYPE ty in <body>
-  , let out_ty = substTy (soe_subst rhs_env) ty
+  , let out_ty = substTyUnchecked (soe_subst rhs_env) ty
   = assertPpr (isTyVar in_bndr) (ppr in_bndr $$ ppr in_rhs) $
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion co <- in_rhs
-  , let out_co = optCoercion (so_co_opts (soe_opts env)) (getTCvSubst (soe_subst rhs_env)) co
+  , let out_co = optCoercion (so_co_opts (soe_opts env)) (soe_subst rhs_env) co
   = assert (isCoVar in_bndr)
     (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
 
@@ -474,7 +474,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
     stable_unf = isStableUnfolding (idUnfolding in_bndr)
     active     = isAlwaysActive (idInlineActivation in_bndr)
     occ        = idOccInfo in_bndr
-    in_scope   = substInScope subst
+    in_scope   = getSubstInScope subst
 
     out_rhs | Just join_arity <- isJoinId_maybe in_bndr
             = simple_join_rhs join_arity
@@ -712,7 +712,7 @@ subst_opt_id_bndr env@(SOE { soe_subst = subst, soe_inl = inl }) old_id
     Subst in_scope id_subst tv_subst cv_subst = subst
 
     id1    = uniqAway in_scope old_id
-    id2    = updateIdTypeAndMult (substTy subst) id1
+    id2    = updateIdTypeAndMult (substTyUnchecked subst) id1
     new_id = zapFragileIdInfo id2
              -- Zaps rules, unfolding, and fragile OccInfo
              -- The unfolding and rules will get added back later, by add_info
@@ -1258,7 +1258,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
            go subst'' (float:floats) expr cont
 
     go (Right sub) floats (Var v) cont
-       = go (Left (substInScope sub))
+       = go (Left (getSubstInScope sub))
             floats
             (lookupIdSubst sub v)
             cont
@@ -1330,7 +1330,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
     -- The Left case is wildly dominant
 
     subst_in_scope (Left in_scope) = in_scope
-    subst_in_scope (Right s) = substInScope s
+    subst_in_scope (Right s) = getSubstInScope s
 
     subst_extend_in_scope (Left in_scope) v = Left (in_scope `extendInScopeSet` v)
     subst_extend_in_scope (Right s) v = Right (s `extendSubstInScope` v)

@@ -1,4 +1,3 @@
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
@@ -1239,7 +1238,7 @@ Wrinkles:
 
 tcConArgs :: ConLike
           -> [Scaled TcSigmaTypeFRR]
-          -> TCvSubst            -- Instantiating substitution for constructor type
+          -> Subst            -- Instantiating substitution for constructor type
           -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcTc)
 tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
   PrefixCon type_args arg_pats -> do

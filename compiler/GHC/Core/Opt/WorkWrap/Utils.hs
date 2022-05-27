@@ -220,7 +220,7 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
               empty_subst = mkEmptySubst (mkInScopeSet args_free_tcvs)
               zapped_arg_vars = map zap_var arg_vars
               (subst, cloned_arg_vars) = cloneBndrs empty_subst uniq_supply zapped_arg_vars
-              res_ty' = GHC.Core.Subst.substTy subst res_ty
+              res_ty' = substTyUnchecked subst res_ty
               init_str_marks = map (const NotMarkedStrict) cloned_arg_vars
 
         ; (useful1, work_args_str, wrap_fn_str, fn_args)
@@ -1166,7 +1166,7 @@ dubiousDataConInstArgTys dc tc_args = arg_tys
   where
     univ_tvs = dataConUnivTyVars dc
     ex_tvs   = dataConExTyCoVars dc
-    subst    = extendTCvInScopeList (zipTvSubst univ_tvs tc_args) ex_tvs
+    subst    = extendSubstInScopeList (zipTvSubst univ_tvs tc_args) ex_tvs
     arg_tys  = map (GHC.Core.Type.substTy subst . scaledThing) (dataConRepArgTys dc)
 
 findTypeShape :: FamInstEnvs -> Type -> TypeShape

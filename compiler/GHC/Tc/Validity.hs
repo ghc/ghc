@@ -1,4 +1,3 @@
-
 {-# LANGUAGE DerivingStrategies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -2272,7 +2271,7 @@ checkConsistentFamInst (InClsInst { ai_class = clas
     -- For check_match, bind_me, see
     -- Note [Matching in the consistent-instantiation check]
     check_match :: [(Type,Type,ArgFlag)] -> TcM ()
-    check_match triples = go emptyTCvSubst emptyTCvSubst triples
+    check_match triples = go emptySubst emptySubst triples
 
     go _ _ [] = return ()
     go lr_subst rl_subst ((ty1,ty2,vis):triples)

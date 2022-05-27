@@ -67,7 +67,7 @@ pprintClosureCommand bindThings force str = do
 
   -- Obtain the terms and the recovered type information
   let ids = [id | AnId id <- pprintables]
-  (subst, terms) <- mapAccumLM go emptyTCvSubst ids
+  (subst, terms) <- mapAccumLM go emptySubst ids
 
   -- Apply the substitutions obtained after recovering the types
   modifySession $ \hsc_env ->
@@ -101,7 +101,7 @@ pprintClosureCommand bindThings force str = do
       liftIO $ printOutputForUser logger unqual $ vcat sdocs
 
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
-   go :: GhcMonad m => TCvSubst -> Id -> m (TCvSubst, Term)
+   go :: GhcMonad m => Subst -> Id -> m (Subst, Term)
    go subst id = do
        let id' = updateIdTypeAndMult (substTy subst) id
            id_ty' = idType id'
@@ -124,7 +124,7 @@ pprintClosureCommand bindThings force str = do
                                  (fsep $ [text "RTTI Improvement for", ppr id,
                                   text "old substitution:" , ppr subst,
                                   text "new substitution:" , ppr subst'])
-                           ; return (subst `unionTCvSubst` subst', term')}
+                           ; return (subst `unionSubst` subst', term')}
 
    tidyTermTyVars :: GhcMonad m => Term -> m Term
    tidyTermTyVars t =

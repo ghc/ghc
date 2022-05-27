@@ -645,9 +645,9 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
                           DerivErrDerivingViaWrongKind inst_ty_kind via_ty via_kind)
 
                let Just kind_subst = mb_match
-                   ki_subst_range  = getTCvSubstRangeFVs kind_subst
+                   ki_subst_range  = getSubstRangeTyCoFVs kind_subst
                    -- See Note [Unification of two kind variables in deriving]
-                   unmapped_tkvs = filter (\v -> v `notElemTCvSubst` kind_subst
+                   unmapped_tkvs = filter (\v -> v `notElemSubst` kind_subst
                                         && not (v `elemVarSet` ki_subst_range))
                                           tvs
                    (subst, _)    = substTyVarBndrs kind_subst unmapped_tkvs
@@ -769,9 +769,9 @@ deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
               propagate_subst kind_subst tkvs' cls_tys' tc_args' mb_deriv_strat'
                 = (final_tkvs, final_cls_tys, final_tc_args, final_mb_deriv_strat)
                 where
-                  ki_subst_range  = getTCvSubstRangeFVs kind_subst
+                  ki_subst_range  = getSubstRangeTyCoFVs kind_subst
                   -- See Note [Unification of two kind variables in deriving]
-                  unmapped_tkvs   = filter (\v -> v `notElemTCvSubst` kind_subst
+                  unmapped_tkvs   = filter (\v -> v `notElemSubst` kind_subst
                                          && not (v `elemVarSet` ki_subst_range))
                                            tkvs'
                   (subst, _)           = substTyVarBndrs kind_subst unmapped_tkvs
@@ -1008,7 +1008,7 @@ the type variable binder for c, since its kind is (k2 -> k2 -> *).
 
 We used to accomplish this by doing the following:
 
-    unmapped_tkvs = filter (`notElemTCvSubst` kind_subst) all_tkvs
+    unmapped_tkvs = filter (`notElemSubst` kind_subst) all_tkvs
     (subst, _)    = substTyVarBndrs kind_subst unmapped_tkvs
 
 Where all_tkvs contains all kind variables in the class and instance types (in
@@ -1024,9 +1024,9 @@ in an ill-kinded instance (this caused #11837).
 
 To prevent this, we need to filter out any variable from all_tkvs which either
 
-1. Appears in the domain of kind_subst. notElemTCvSubst checks this.
+1. Appears in the domain of kind_subst. notElemSubst checks this.
 2. Appears in the range of kind_subst. To do this, we compute the free
-   variable set of the range of kind_subst with getTCvSubstRangeFVs, and check
+   variable set of the range of kind_subst with getSubstRangeTyCoFVs, and check
    if a kind variable appears in that set.
 
 Note [Eta-reducing type synonyms]

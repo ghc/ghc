@@ -1,4 +1,3 @@
-
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE RankNTypes          #-}
@@ -1572,12 +1571,12 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
            -- Note that in a typical application (F t1 t2 t3),
            -- the 'fun' is just a TyCon, so tcTypeKind is fast
 
-        empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
+        empty_subst = mkEmptySubst $ mkInScopeSet $
                       tyCoVarsOfType fun_ki
 
     go :: Int             -- The # of the next argument
        -> TcType          -- Function applied to some args
-       -> TCvSubst        -- Applies to function kind
+       -> Subst        -- Applies to function kind
        -> TcKind          -- Function kind
        -> [LHsTypeArg GhcRn]    -- Un-type-checked args
        -> TcM (TcType, TcKind)  -- Result type and its kind
@@ -1687,7 +1686,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
           | otherwise
           = fallthrough
 
-        zapped_subst   = zapTCvSubst subst
+        zapped_subst   = zapSubst subst
         substed_fun_ki = substTy subst fun_ki
         hs_ty          = appTypeToArg orig_hs_ty (take (n-1) orig_hs_args)
 
@@ -1700,10 +1699,10 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
     ty_app_err arg ty
       = failWith $ TcRnInvalidVisibleKindArgument arg ty
 
-mkAppTyM :: TCvSubst
+mkAppTyM :: Subst
          -> TcType -> TyCoBinder    -- fun, plus its top-level binder
          -> TcType                  -- arg
-         -> TcM (TCvSubst, TcType)  -- Extended subst, plus (fun arg)
+         -> TcM (Subst, TcType)  -- Extended subst, plus (fun arg)
 -- Precondition: the application (fun arg) is well-kinded after zonking
 --               That is, the application makes sense
 --
@@ -2581,7 +2580,7 @@ kcCheckDeclHeader_sig sig_kind name flav
         -- Why? So that the TyConBinders of the TyCon will lexically scope over the
         -- associated types and methods of a class.
         ; let swizzle_env = mkVarEnv (map swap implicit_prs)
-              (subst, swizzled_tcbs) = mapAccumL (swizzleTcb swizzle_env) emptyTCvSubst all_tcbs
+              (subst, swizzled_tcbs) = mapAccumL (swizzleTcb swizzle_env) emptySubst all_tcbs
               swizzled_kind          = substTy subst tycon_res_kind
               all_tv_prs             = mkTyVarNamePairs (binderVars swizzled_tcbs)
 
@@ -2621,7 +2620,7 @@ matchUpSigWithDecl
 -- Invariant: Length of returned TyConBinders + length of excess TyConBinders
 --            = length of incoming TyConBinders
 matchUpSigWithDecl sig_tcbs sig_res_kind hs_bndrs thing_inside
-  = go emptyTCvSubst sig_tcbs hs_bndrs
+  = go emptySubst sig_tcbs hs_bndrs
   where
     go subst tcbs []
       = do { let (subst', tcbs') = substTyConBindersX subst tcbs
@@ -2663,16 +2662,16 @@ matchUpSigWithDecl sig_tcbs sig_res_kind hs_bndrs thing_inside
            ; discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
              unifyKind (Just (NameThing hs_nm)) sig_kind expected_kind }
 
-substTyConBinderX :: TCvSubst -> TyConBinder -> (TCvSubst, TyConBinder)
+substTyConBinderX :: Subst -> TyConBinder -> (Subst, TyConBinder)
 substTyConBinderX subst (Bndr tv vis)
   = (subst', Bndr tv' vis)
   where
     (subst', tv') = substTyVarBndr subst tv
 
-substTyConBindersX :: TCvSubst -> [TyConBinder] -> (TCvSubst, [TyConBinder])
+substTyConBindersX :: Subst -> [TyConBinder] -> (Subst, [TyConBinder])
 substTyConBindersX = mapAccumL substTyConBinderX
 
-swizzleTcb :: VarEnv Name -> TCvSubst -> TyConBinder -> (TCvSubst, TyConBinder)
+swizzleTcb :: VarEnv Name -> Subst -> TyConBinder -> (Subst, TyConBinder)
 swizzleTcb swizzle_env subst (Bndr tv vis)
   = (subst', Bndr tv2 vis)
   where
@@ -3698,7 +3697,7 @@ splitTyConKind skol_info in_scope avoid_occs kind
                          -- Note [Avoid name clashes for associated data types]
                          , not (occ `elem` avoid_occs) ]
               new_uniqs = uniqsFromSupply uniqs
-              subst = mkEmptyTCvSubst in_scope
+              subst = mkEmptySubst in_scope
               details = SkolemTv skol_info (pushTcLevel lvl) False
                         -- As always, allocate skolems one level in
 
@@ -3713,7 +3712,7 @@ splitTyConKind skol_info in_scope avoid_occs kind
                         arg'   = substTy subst (scaledThing arg)
                         name   = mkInternalName uniq occ loc
                         tv     = mkTcTyVar name arg' details
-                        subst' = extendTCvInScope subst tv
+                        subst' = extendSubstInScope subst tv
                         (uniq:uniqs') = uniqs
                         (occ:occs')   = occs
 
@@ -3843,7 +3842,7 @@ tcbVisibilities :: TyCon -> [Type] -> [TyConBndrVis]
 tcbVisibilities tc orig_args
   = go (tyConKind tc) init_subst orig_args
   where
-    init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfTypes orig_args))
+    init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfTypes orig_args))
     go _ _ []
       = []
 

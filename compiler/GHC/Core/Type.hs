@@ -193,25 +193,26 @@ module GHC.Core.Type (
 
         -- * Main type substitution data types
         TvSubstEnv,     -- Representation widely visible
-        TCvSubst(..),    -- Representation visible to a few friends
+        IdSubstEnv,
+        Subst(..),    -- Representation visible to a few friends
 
         -- ** Manipulating type substitutions
-        emptyTvSubstEnv, emptyTCvSubst, mkEmptyTCvSubst,
+        emptyTvSubstEnv, emptySubst, mkEmptySubst,
 
-        mkTCvSubst, zipTvSubst, mkTvSubstPrs,
+        mkSubst, zipTvSubst, mkTvSubstPrs,
         zipTCvSubst,
-        notElemTCvSubst,
-        getTvSubstEnv, setTvSubstEnv,
-        zapTCvSubst, getTCvInScope, getTCvSubstRangeFVs,
-        extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
+        notElemSubst,
+        getTvSubstEnv,
+        zapSubst, getSubstInScope, setInScope, getSubstRangeTyCoFVs,
+        extendSubstInScope, extendSubstInScopeList, extendSubstInScopeSet,
         extendTCvSubst, extendCvSubst,
         extendTvSubst, extendTvSubstBinderAndInScope,
         extendTvSubstList, extendTvSubstAndInScope,
         extendTCvSubstList,
         extendTvSubstWithClone,
         extendTCvSubstWithClone,
-        isInScope, composeTCvSubstEnv, composeTCvSubst, zipTyEnv, zipCoEnv,
-        isEmptyTCvSubst, unionTCvSubst,
+        isInScope, composeTCvSubst, zipTyEnv, zipCoEnv,
+        isEmptySubst, unionSubst, isEmptyTCvSubst,
 
         -- ** Performing substitution on types and kinds
         substTy, substTys, substScaledTy, substScaledTys, substTyWith, substTysWith, substTheta,
@@ -486,7 +487,7 @@ expand_syn tvs rhs arg_tys
   | null tvs      = mkAppTys rhs arg_tys
   | otherwise     = go empty_subst tvs arg_tys
   where
-    empty_subst = mkEmptyTCvSubst in_scope
+    empty_subst = mkEmptySubst in_scope
     in_scope = mkInScopeSet $ shallowTyCoVarsOfTypes $ arg_tys
       -- The free vars of 'rhs' should all be bound by 'tenv',
       -- so we only need the free vars of tys
@@ -550,7 +551,7 @@ expandTypeSynonyms :: Type -> Type
 --
 -- Keep this synchronized with 'synonymTyConsOfType'
 expandTypeSynonyms ty
-  = go (mkEmptyTCvSubst in_scope) ty
+  = go (mkEmptySubst in_scope) ty
   where
     in_scope = mkInScopeSet (tyCoVarsOfType ty)
 
@@ -1360,7 +1361,7 @@ piResultTy_maybe ty arg = case coreFullView ty of
   FunTy { ft_res = res } -> Just res
 
   ForAllTy (Bndr tv _) res
-    -> let empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
+    -> let empty_subst = mkEmptySubst $ mkInScopeSet $
                          tyCoVarsOfTypes [arg,res]
        in Just (substTy (extendTCvSubst empty_subst tv arg) res)
 
@@ -1402,9 +1403,9 @@ piResultTys ty orig_args@(arg:args)
   | otherwise
   = pprPanic "piResultTys1" (ppr ty $$ ppr orig_args)
   where
-    init_subst = mkEmptyTCvSubst $ mkInScopeSet (tyCoVarsOfTypes (ty:orig_args))
+    init_subst = mkEmptySubst $ mkInScopeSet (tyCoVarsOfTypes (ty:orig_args))
 
-    go :: TCvSubst -> Type -> [Type] -> Type
+    go :: Subst -> Type -> [Type] -> Type
     go subst ty [] = substTyUnchecked subst ty
 
     go subst ty all_args@(arg:args)
@@ -1641,7 +1642,7 @@ mk_cast_ty orig_ty co = go orig_ty
       , let fvs = tyCoVarsOfCo co
       = -- have to make sure that pushing the co in doesn't capture the bound var!
         if tv `elemVarSet` fvs
-        then let empty_subst = mkEmptyTCvSubst (mkInScopeSet fvs)
+        then let empty_subst = mkEmptySubst (mkInScopeSet fvs)
                  (subst, tv') = substVarBndr empty_subst tv
              in ForAllTy (Bndr tv' vis) (substTy subst inner_ty `mk_cast_ty` co)
         else ForAllTy (Bndr tv vis) (inner_ty `mk_cast_ty` co)
@@ -2281,7 +2282,7 @@ appTyArgFlags ty = fun_kind_arg_flags (typeKind ty)
 -- kind aligns with the corresponding position in the argument kind), determine
 -- each argument's visibility ('Inferred', 'Specified', or 'Required').
 fun_kind_arg_flags :: Kind -> [Type] -> [ArgFlag]
-fun_kind_arg_flags = go emptyTCvSubst
+fun_kind_arg_flags = go emptySubst
   where
     go subst ki arg_tys
       | Just ki' <- coreView ki = go subst ki' arg_tys

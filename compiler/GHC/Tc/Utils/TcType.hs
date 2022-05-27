@@ -1,4 +1,3 @@
-
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
@@ -158,15 +157,15 @@ module GHC.Tc.Utils.TcType (
   isVisibleBinder, isInvisibleBinder,
 
   -- Type substitutions
-  TCvSubst(..),         -- Representation visible to a few friends
-  TvSubstEnv, emptyTCvSubst, mkEmptyTCvSubst,
+  Subst(..),         -- Representation visible to a few friends
+  TvSubstEnv, emptySubst, mkEmptySubst,
   zipTvSubst,
-  mkTvSubstPrs, notElemTCvSubst, unionTCvSubst,
-  getTvSubstEnv, setTvSubstEnv, getTCvInScope, extendTCvInScope,
-  extendTCvInScopeList, extendTCvInScopeSet, extendTvSubstAndInScope,
+  mkTvSubstPrs, notElemSubst, unionSubst,
+  getTvSubstEnv, getSubstInScope, extendSubstInScope,
+  extendSubstInScopeList, extendSubstInScopeSet, extendTvSubstAndInScope,
   Type.lookupTyVar, Type.extendTCvSubst, Type.substTyVarBndr,
   Type.extendTvSubst,
-  isInScope, mkTCvSubst, mkTvSubst, zipTyEnv, zipCoEnv,
+  isInScope, mkSubst, mkTvSubst, zipTyEnv, zipCoEnv,
   Type.substTy, substTys, substScaledTys, substTyWith, substTyWithCoVars,
   substTyAddInScope,
   substTyUnchecked, substTysUnchecked, substScaledTyUnchecked,

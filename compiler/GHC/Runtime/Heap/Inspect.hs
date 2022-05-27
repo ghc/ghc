@@ -637,7 +637,7 @@ as expected.
 -}
 
 
-instTyVars :: [TyVar] -> TR (TCvSubst, [TcTyVar])
+instTyVars :: [TyVar] -> TR (Subst, [TcTyVar])
 -- Instantiate fresh mutable type variables from some TyVars
 -- This function preserves the print-name, which helps error messages
 instTyVars tvs
@@ -1101,7 +1101,7 @@ findPtrTyss i tys = foldM step (i, []) tys
 -- improveType <base_type> <rtti_type>
 -- The types can contain skolem type variables, which need to be treated as normal vars.
 -- In particular, we want them to unify with things.
-improveRTTIType :: HscEnv -> RttiType -> RttiType -> Maybe TCvSubst
+improveRTTIType :: HscEnv -> RttiType -> RttiType -> Maybe Subst
 improveRTTIType _ base_ty new_ty = U.tcUnifyTyKi base_ty new_ty
 
 getDataConArgTys :: DataCon -> Type -> TR [Type]

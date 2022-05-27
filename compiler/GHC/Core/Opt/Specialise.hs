@@ -1,5 +1,3 @@
-
-
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 {-
@@ -19,7 +17,7 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 
 import GHC.Tc.Utils.TcType hiding( substTy )
 
-import GHC.Core.Type  hiding( substTy, extendTvSubstList )
+import GHC.Core.Type  hiding( substTy, extendTvSubstList, zapSubst )
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate
 import GHC.Core.Coercion( Coercion )
@@ -1650,7 +1648,7 @@ specLookupRule env fn args rules
   = lookupRule ropts (in_scope, realIdUnfolding) (const True) fn args rules
   where
     dflags   = se_dflags env
-    in_scope = Core.substInScope (se_subst env)
+    in_scope = getSubstInScope (se_subst env)
     ropts    = initRuleOpts dflags
 
 {- Note [Specialising DFuns]
@@ -3063,10 +3061,10 @@ extendInScope env@(SE { se_subst = subst }) bndr
 
 zapSubst :: SpecEnv -> SpecEnv
 zapSubst env@(SE { se_subst = subst })
-  = env { se_subst = Core.zapSubstEnv subst }
+  = env { se_subst = Core.zapSubst subst }
 
 substTy :: SpecEnv -> Type -> Type
-substTy env ty = Core.substTy (se_subst env) ty
+substTy env ty = substTyUnchecked (se_subst env) ty
 
 substCo :: SpecEnv -> Coercion -> Coercion
 substCo env co = Core.substCo (se_subst env) co
@@ -3101,7 +3099,7 @@ newDictBndr :: SpecEnv -> CoreBndr -> SpecM (SpecEnv, CoreBndr)
 newDictBndr env@(SE { se_subst = subst }) b
   = do { uniq <- getUniqueM
        ; let n    = idName b
-             ty'  = Core.substTy subst (idType b)
+             ty'  = substTyUnchecked subst (idType b)
              b'   = mkUserLocal (nameOccName n) uniq Many ty' (getSrcSpan n)
              env' = env { se_subst = subst `Core.extendSubstInScope` b' }
        ; pure (env', b') }

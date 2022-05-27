@@ -1,4 +1,3 @@
-
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
@@ -1859,19 +1858,19 @@ emitFunDepWanteds work_rewriters fd_eqns
 
      | otherwise
      = do { traceTcS "emitFunDepWanteds 2" (ppr (ctl_depth loc) $$ ppr tvs $$ ppr eqs)
-          ; subst <- instFlexiX emptyTCvSubst tvs  -- Takes account of kind substitution
+          ; subst <- instFlexiX emptySubst tvs  -- Takes account of kind substitution
           ; mapM_ (do_one_eq loc all_rewriters subst) (reverse eqs) }
                -- See Note [Reverse order of fundep equations]
      where
        all_rewriters = work_rewriters S.<> rewriters
 
     do_one_eq loc rewriters subst (Pair ty1 ty2)
-       = unifyWanted rewriters loc Nominal (Type.substTy subst' ty1) ty2
+       = unifyWanted rewriters loc Nominal (substTyUnchecked subst' ty1) ty2
          -- ty2 does not mention fd_qtvs, so no need to subst it.
          -- See GHC.Tc.Instance.Fundeps Note [Improving against instances]
          --     Wrinkle (1)
       where
-         subst' = extendTCvInScopeSet subst (tyCoVarsOfType ty1)
+         subst' = extendSubstInScopeSet subst (tyCoVarsOfType ty1)
          -- The free vars of ty1 aren't just fd_qtvs: ty1 is the result
          -- of matching with the [W] constraint. So we add its free
          -- vars to InScopeSet, to satisfy substTy's invariants, even
@@ -2082,7 +2081,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
           -> (a -> [Type])           -- get LHS of an axiom
           -> (a -> Type)             -- get RHS of an axiom
           -> (a -> Maybe CoAxBranch) -- Just => apartness check required
-          -> [( [Type], TCvSubst, [TyVar], Maybe CoAxBranch )]
+          -> [( [Type], Subst, [TyVar], Maybe CoAxBranch )]
              -- Result:
              -- ( [arguments of a matching axiom]
              -- , RHS-unifying substitution
@@ -2102,7 +2101,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
                    -- in telescope order e.g. (k:*) (a:k)
 
       injImproveEqns :: [Bool]
-                     -> ([Type], TCvSubst, [TyCoVar], Maybe CoAxBranch)
+                     -> ([Type], Subst, [TyCoVar], Maybe CoAxBranch)
                      -> TcS [TypeEqn]
       injImproveEqns inj_args (ax_args, subst, unsubstTvs, cabr)
         = do { subst <- instFlexiX subst unsubstTvs
@@ -2577,4 +2576,3 @@ information as described in Note [Replacement vs keeping], 2a.
 Test case: typecheck/should_compile/T20582.
 
 -}
-

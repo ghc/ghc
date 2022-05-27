@@ -49,8 +49,8 @@ import GHC.Core.Utils     ( exprType, mkTick, mkTicks
 import GHC.Core.Ppr       ( pprRules )
 import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Core.Type as Type
-   ( Type, TCvSubst, extendTvSubst, extendCvSubst
-   , mkEmptyTCvSubst, substTy, getTyVar_maybe )
+   ( Type, extendTvSubst, extendCvSubst
+   , substTy, getTyVar_maybe )
 import GHC.Core.TyCo.Ppr( pprParendType )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )
@@ -600,7 +600,7 @@ matchN  :: InScopeEnv
 matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es rhs
   = do  { rule_subst <- match_exprs init_menv emptyRuleSubst tmpl_es target_es
         ; let (_, matched_es) = mapAccumL (lookup_tmpl rule_subst)
-                                          (mkEmptyTCvSubst in_scope) $
+                                          (mkEmptySubst in_scope) $
                                 tmpl_vars `zip` tmpl_vars1
               bind_wrapper = rs_binds rule_subst
                              -- Floated bindings; see Note [Matching lets]
@@ -615,7 +615,7 @@ matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es rhs
                    , rv_fltR  = mkEmptySubst (rnInScopeSet init_rn_env)
                    , rv_unf   = id_unf }
 
-    lookup_tmpl :: RuleSubst -> TCvSubst -> (InVar,OutVar) -> (TCvSubst, CoreExpr)
+    lookup_tmpl :: RuleSubst -> Subst -> (InVar,OutVar) -> (Subst, CoreExpr)
                    -- Need to return a RuleSubst solely for the benefit of mk_fake_ty
     lookup_tmpl (RS { rs_tv_subst = tv_subst, rs_id_subst = id_subst })
                 tcv_subst (tmpl_var, tmpl_var1)

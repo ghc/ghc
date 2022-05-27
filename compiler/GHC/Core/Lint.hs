@@ -1437,7 +1437,7 @@ lintCaseExpr scrut var alt_ty alts =
 
         -- Don't use lintIdBndr on var, because unboxed tuple is legitimate
 
-     ; subst <- getTCvSubst
+     ; subst <- getSubst
      ; ensureEqTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
        -- See GHC.Core Note [Case expression invariants] item (7)
 
@@ -1602,15 +1602,15 @@ lintTyBndr = lintTyCoBndr  -- We could specialise it, I guess
 
 lintTyCoBndr :: TyCoVar -> (LintedTyCoVar -> LintM a) -> LintM a
 lintTyCoBndr tcv thing_inside
-  = do { subst <- getTCvSubst
+  = do { subst <- getSubst
        ; kind' <- lintType (varType tcv)
-       ; let tcv' = uniqAway (getTCvInScope subst) $
+       ; let tcv' = uniqAway (getSubstInScope subst) $
                     setVarType tcv kind'
              subst' = extendTCvSubstWithClone subst tcv tcv'
        ; when (isCoVar tcv) $
          lintL (isCoVarType kind')
                (text "CoVar with non-coercion type:" <+> pprTyVar tcv)
-       ; updateTCvSubst subst' (thing_inside tcv') }
+       ; updateSubst subst' (thing_inside tcv') }
 
 lintIdBndrs :: forall a. TopLevelFlag -> [Id] -> ([LintedId] -> LintM a) -> LintM a
 lintIdBndrs top_lvl ids thing_inside
@@ -1710,7 +1710,7 @@ lintType (TyVarTy tv)
   = failWithL (mkBadTyVarMsg tv)
 
   | otherwise
-  = do { subst <- getTCvSubst
+  = do { subst <- getSubst
        ; case lookupTyVar subst tv of
            Just linted_ty -> return linted_ty
 
@@ -1926,7 +1926,7 @@ lint_app doc kfn arg_tys
            ; unless (ka `eqType` kv_kind) $
              addErrL (fail_msg (text "Forall:" <+> (ppr kv $$ ppr kv_kind $$
                                                     ppr ta <+> dcolon <+> ppr ka)))
-           ; return $ substTy (extendTCvSubst (mkEmptyTCvSubst in_scope) kv ta) kfn }
+           ; return $ substTy (extendTCvSubst (mkEmptySubst in_scope) kv ta) kfn }
 
     go_app _ kfn ta
        = failWithL (fail_msg (text "Not a fun:" <+> (ppr kfn $$ ppr ta)))
@@ -2071,7 +2071,7 @@ lintCoercion (CoVarCo cv)
                   2 (text "With offending type:" <+> ppr (varType cv)))
 
   | otherwise
-  = do { subst <- getTCvSubst
+  = do { subst <- getSubst
        ; case lookupCoVar subst cv of
            Just linted_co -> return linted_co ;
            Nothing
@@ -2371,8 +2371,8 @@ lintCoercion co@(AxiomInstCo con ind cos)
        ; unless (cos `equalLength` (ktvs ++ cvs)) $
            bad_ax (text "lengths")
        ; cos' <- mapM lintCoercion cos
-       ; subst <- getTCvSubst
-       ; let empty_subst = zapTCvSubst subst
+       ; subst <- getSubst
+       ; let empty_subst = zapSubst subst
        ; _ <- foldlM check_ki (empty_subst, empty_subst)
                               (zip3 (ktvs ++ cvs) roles cos')
        ; let fam_tc = coAxiomTyCon con
@@ -2601,7 +2601,7 @@ compatible_branches (CoAxBranch { cab_tvs = tvs1
   = -- we need to freshen ax2 w.r.t. ax1
     -- do this by pretending tvs1 are in scope when processing tvs2
     let in_scope       = mkInScopeSetList tvs1
-        subst0         = mkEmptyTCvSubst in_scope
+        subst0         = mkEmptySubst in_scope
         (subst, _)     = substTyVarBndrs subst0 tvs2
         lhs2'          = substTys subst lhs2
         rhs2'          = substTy  subst rhs2
@@ -2625,13 +2625,13 @@ data LintEnv
   = LE { le_flags :: LintFlags       -- Linting the result of this pass
        , le_loc   :: [LintLocInfo]   -- Locations
 
-       , le_subst :: TCvSubst  -- Current TyCo substitution
+       , le_subst :: Subst  -- Current TyCo substitution
                                --    See Note [Linting type lets]
             -- /Only/ substitutes for type variables;
             --        but might clone CoVars
             -- We also use le_subst to keep track of
             -- in-scope TyVars and CoVars (but not Ids)
-            -- Range of the TCvSubst is LintedType/LintedCo
+            -- Range of the Subst is LintedType/LintedCo
 
        , le_ids   :: VarEnv (Id, LintedType)    -- In-scope Ids
             -- Used to check that occurrences have an enclosing binder.
@@ -2858,7 +2858,7 @@ initL cfg m
   where
     (tcvs, ids) = partition isTyCoVar $ l_vars cfg
     env = LE { le_flags = l_flags cfg
-             , le_subst = mkEmptyTCvSubst (mkInScopeSetList tcvs)
+             , le_subst = mkEmptySubst (mkInScopeSetList tcvs)
              , le_ids   = mkVarEnv [(id, (id,idType id)) | id <- ids]
              , le_joins = emptyVarSet
              , le_loc = []
@@ -2961,8 +2961,8 @@ extendTvSubstL tv ty m
   = LintM $ \ env errs ->
     unLintM m (env { le_subst = Type.extendTvSubst (le_subst env) tv ty }) errs
 
-updateTCvSubst :: TCvSubst -> LintM a -> LintM a
-updateTCvSubst subst' m
+updateSubst :: Subst -> LintM a -> LintM a
+updateSubst subst' m
   = LintM $ \ env errs -> unLintM m (env { le_subst = subst' }) errs
 
 markAllJoinsBad :: LintM a -> LintM a
@@ -2976,14 +2976,14 @@ markAllJoinsBadIf False m = m
 getValidJoins :: LintM IdSet
 getValidJoins = LintM (\ env errs -> (Just (le_joins env), errs))
 
-getTCvSubst :: LintM TCvSubst
-getTCvSubst = LintM (\ env errs -> (Just (le_subst env), errs))
+getSubst :: LintM Subst
+getSubst = LintM (\ env errs -> (Just (le_subst env), errs))
 
 getUEAliases :: LintM (NameEnv UsageEnv)
 getUEAliases = LintM (\ env errs -> (Just (le_ue_aliases env), errs))
 
 getInScope :: LintM InScopeSet
-getInScope = LintM (\ env errs -> (Just (getTCvInScope $ le_subst env), errs))
+getInScope = LintM (\ env errs -> (Just (getSubstInScope $ le_subst env), errs))
 
 lookupIdInScope :: Id -> LintM (Id, LintedType)
 lookupIdInScope id_occ
@@ -3183,7 +3183,7 @@ mkCaseAltMsg e ty1 ty2
                    text "Annotation on case:" <+> ppr ty2,
                    text "Alt Rhs:" <+> ppr e ])
 
-mkScrutMsg :: Id -> Type -> Type -> TCvSubst -> SDoc
+mkScrutMsg :: Id -> Type -> Type -> Subst -> SDoc
 mkScrutMsg var var_ty scrut_ty subst
   = vcat [text "Result binder in case doesn't match scrutinee:" <+> ppr var,
           text "Result binder type:" <+> ppr var_ty,--(idType var),

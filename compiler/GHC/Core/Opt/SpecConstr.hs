@@ -972,13 +972,13 @@ scSubstId :: ScEnv -> InId -> OutExpr
 scSubstId env v = lookupIdSubst (sc_subst env) v
 
 scSubstTy :: ScEnv -> InType -> OutType
-scSubstTy env ty = substTy (sc_subst env) ty
+scSubstTy env ty = substTyUnchecked (sc_subst env) ty
 
 scSubstCo :: ScEnv -> Coercion -> Coercion
 scSubstCo env co = substCo (sc_subst env) co
 
 zapScSubst :: ScEnv -> ScEnv
-zapScSubst env = env { sc_subst = zapSubstEnv (sc_subst env) }
+zapScSubst env = env { sc_subst = zapSubst (sc_subst env) }
 
 extendScInScope :: ScEnv -> [Var] -> ScEnv
         -- Bring the quantified variables into scope
@@ -2345,7 +2345,7 @@ callToPats :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
         --      over the following term variables
         -- The [CoreExpr] are the argument patterns for the rule
 callToPats env bndr_occs call@(Call fn args con_env)
-  = do  { let in_scope = substInScope (sc_subst env)
+  = do  { let in_scope = getSubstInScope (sc_subst env)
 
         ; arg_tripples <- zipWith3M (argToPat env in_scope con_env) args bndr_occs (map (const NotMarkedStrict) args)
                    -- This zip trims the args to be no longer than

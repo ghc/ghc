@@ -97,7 +97,7 @@ module GHC.Core.Coercion (
         liftCoSubstVarBndrUsing, isMappedByLC,
 
         mkSubstLiftingContext, zapLiftingContext,
-        substForAllCoBndrUsingLC, lcTCvSubst, lcInScopeSet,
+        substForAllCoBndrUsingLC, lcSubst, lcInScopeSet,
 
         LiftCoEnv, LiftingContext(..), liftEnvSubstLeft, liftEnvSubstRight,
         substRightCo, substLeftCo, swapLiftCoEnv, lcSubstLeft, lcSubstRight,
@@ -469,13 +469,13 @@ decomposePiCos :: HasDebugCallStack
 decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
   = go [] (orig_subst,orig_k1) orig_co (orig_subst,orig_k2) orig_args
   where
-    orig_subst = mkEmptyTCvSubst $ mkInScopeSet $
+    orig_subst = mkEmptySubst $ mkInScopeSet $
                  tyCoVarsOfTypes orig_args `unionVarSet` tyCoVarsOfCo orig_co
 
     go :: [CoercionN]      -- accumulator for argument coercions, reversed
-       -> (TCvSubst,Kind)  -- Lhs kind of coercion
+       -> (Subst,Kind)  -- Lhs kind of coercion
        -> CoercionN        -- coercion originally applied to the function
-       -> (TCvSubst,Kind)  -- Rhs kind of coercion
+       -> (Subst,Kind)  -- Rhs kind of coercion
        -> [Type]           -- Arguments to that function
        -> ([CoercionN], Coercion)
     -- Invariant:  co :: subst1(k1) ~ subst2(k2)
@@ -512,9 +512,9 @@ decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
         go (arg_co : acc_arg_cos) (subst1,t1) res_co (subst2,t2) tys
 
       | not (isEmptyTCvSubst subst1) || not (isEmptyTCvSubst subst2)
-      = go acc_arg_cos (zapTCvSubst subst1, substTy subst1 k1)
+      = go acc_arg_cos (zapSubst subst1, substTy subst1 k1)
                        co
-                       (zapTCvSubst subst2, substTy subst1 k2)
+                       (zapSubst subst2, substTy subst1 k2)
                        (ty:tys)
 
       -- tys might not be empty, if the left-hand type of the original coercion
@@ -1900,7 +1900,7 @@ This follows the lifting context extension definition in the
 -- See Note [Lifting coercions over types: liftCoSubst]
 -- ----------------------------------------------------
 
-data LiftingContext = LC TCvSubst LiftCoEnv
+data LiftingContext = LC Subst LiftCoEnv
   -- in optCoercion, we need to lift when optimizing InstCo.
   -- See Note [Optimising InstCo] in GHC.Core.Coercion.Opt
   -- We thus propagate the substitution from GHC.Core.Coercion.Opt here.
@@ -1941,14 +1941,14 @@ liftCoSubst r lc@(LC subst env) ty
   | otherwise         = ty_co_subst lc r ty
 
 emptyLiftingContext :: InScopeSet -> LiftingContext
-emptyLiftingContext in_scope = LC (mkEmptyTCvSubst in_scope) emptyVarEnv
+emptyLiftingContext in_scope = LC (mkEmptySubst in_scope) emptyVarEnv
 
 mkLiftingContext :: [(TyCoVar,Coercion)] -> LiftingContext
 mkLiftingContext pairs
-  = LC (mkEmptyTCvSubst $ mkInScopeSet $ tyCoVarsOfCos (map snd pairs))
+  = LC (mkEmptySubst $ mkInScopeSet $ tyCoVarsOfCos (map snd pairs))
        (mkVarEnv pairs)
 
-mkSubstLiftingContext :: TCvSubst -> LiftingContext
+mkSubstLiftingContext :: Subst -> LiftingContext
 mkSubstLiftingContext subst = LC subst emptyVarEnv
 
 -- | Extend a lifting context with a new mapping.
@@ -1969,7 +1969,7 @@ extendLiftingContextAndInScope :: LiftingContext  -- ^ Original LC
                                -> Coercion        -- ^ to this coercion
                                -> LiftingContext
 extendLiftingContextAndInScope (LC subst env) tv co
-  = extendLiftingContext (LC (extendTCvInScopeSet subst (tyCoVarsOfCo co)) env) tv co
+  = extendLiftingContext (LC (extendSubstInScopeSet subst (tyCoVarsOfCo co)) env) tv co
 
 -- | Extend a lifting context with existential-variable bindings.
 -- See Note [extendLiftingContextEx]
@@ -1985,7 +1985,7 @@ extendLiftingContextEx lc@(LC subst env) ((v,ty):rest)
 -- works with existentially bound variables, which are considered to have
 -- nominal roles.
   | isTyVar v
-  = let lc' = LC (subst `extendTCvInScopeSet` tyCoVarsOfType ty)
+  = let lc' = LC (subst `extendSubstInScopeSet` tyCoVarsOfType ty)
                  (extendVarEnv env v $
                   mkGReflRightCo Nominal
                                  ty
@@ -2003,7 +2003,7 @@ extendLiftingContextEx lc@(LC subst env) ((v,ty):rest)
         kco     = mkTyConAppCo Nominal (equalityTyCon r)
                                [ mkKindCo lift_s1, mkKindCo lift_s2
                                , lift_s1         , lift_s2          ]
-        lc'     = LC (subst `extendTCvInScopeSet` tyCoVarsOfCo co)
+        lc'     = LC (subst `extendSubstInScopeSet` tyCoVarsOfCo co)
                      (extendVarEnv env v
                         (mkProofIrrelCo Nominal kco co $
                           (mkSymCo lift_s1) `mkTransCo` co `mkTransCo` lift_s2))
@@ -2014,7 +2014,7 @@ extendLiftingContextEx lc@(LC subst env) ((v,ty):rest)
 
 -- | Erase the environments in a lifting context
 zapLiftingContext :: LiftingContext -> LiftingContext
-zapLiftingContext (LC subst _) = LC (zapTCvSubst subst) emptyVarEnv
+zapLiftingContext (LC subst _) = LC (zapSubst subst) emptyVarEnv
 
 -- | Like 'substForAllCoBndr', but works on a lifting context
 substForAllCoBndrUsingLC :: Bool
@@ -2165,14 +2165,14 @@ liftCoSubstTyVarBndrUsing :: (r -> CoercionN)              -- ^ coercion getter
                           -> (LiftingContext, TyVar, r)
 liftCoSubstTyVarBndrUsing view_co fun lc@(LC subst cenv) old_var
   = assert (isTyVar old_var) $
-    ( LC (subst `extendTCvInScope` new_var) new_cenv
+    ( LC (subst `extendSubstInScope` new_var) new_cenv
     , new_var, stuff )
   where
     old_kind = tyVarKind old_var
     stuff    = fun lc old_kind
     eta      = view_co stuff
     k1       = coercionLKind eta
-    new_var  = uniqAway (getTCvInScope subst) (setVarType old_var k1)
+    new_var  = uniqAway (getSubstInScope subst) (setVarType old_var k1)
 
     lifted   = mkGReflRightCo Nominal (TyVarTy new_var) eta
                -- :: new_var ~ new_var |> eta
@@ -2185,14 +2185,14 @@ liftCoSubstCoVarBndrUsing :: (r -> CoercionN)              -- ^ coercion getter
                           -> (LiftingContext, CoVar, r)
 liftCoSubstCoVarBndrUsing view_co fun lc@(LC subst cenv) old_var
   = assert (isCoVar old_var) $
-    ( LC (subst `extendTCvInScope` new_var) new_cenv
+    ( LC (subst `extendSubstInScope` new_var) new_cenv
     , new_var, stuff )
   where
     old_kind = coVarKind old_var
     stuff    = fun lc old_kind
     eta      = view_co stuff
     k1       = coercionLKind eta
-    new_var  = uniqAway (getTCvInScope subst) (setVarType old_var k1)
+    new_var  = uniqAway (getSubstInScope subst) (setVarType old_var k1)
 
     -- old_var :: s1  ~r s2
     -- eta     :: (s1' ~r s2') ~N (t1 ~r t2)
@@ -2232,21 +2232,21 @@ substRightCo lc co
 swapLiftCoEnv :: LiftCoEnv -> LiftCoEnv
 swapLiftCoEnv = mapVarEnv mkSymCo
 
-lcSubstLeft :: LiftingContext -> TCvSubst
+lcSubstLeft :: LiftingContext -> Subst
 lcSubstLeft (LC subst lc_env) = liftEnvSubstLeft subst lc_env
 
-lcSubstRight :: LiftingContext -> TCvSubst
+lcSubstRight :: LiftingContext -> Subst
 lcSubstRight (LC subst lc_env) = liftEnvSubstRight subst lc_env
 
-liftEnvSubstLeft :: TCvSubst -> LiftCoEnv -> TCvSubst
+liftEnvSubstLeft :: Subst -> LiftCoEnv -> Subst
 liftEnvSubstLeft = liftEnvSubst pFst
 
-liftEnvSubstRight :: TCvSubst -> LiftCoEnv -> TCvSubst
+liftEnvSubstRight :: Subst -> LiftCoEnv -> Subst
 liftEnvSubstRight = liftEnvSubst pSnd
 
-liftEnvSubst :: (forall a. Pair a -> a) -> TCvSubst -> LiftCoEnv -> TCvSubst
+liftEnvSubst :: (forall a. Pair a -> a) -> Subst -> LiftCoEnv -> Subst
 liftEnvSubst selector subst lc_env
-  = composeTCvSubst (TCvSubst emptyInScopeSet tenv cenv) subst
+  = composeTCvSubst (Subst emptyInScopeSet emptyIdSubstEnv tenv cenv) subst
   where
     pairs            = nonDetUFMToList lc_env
                        -- It's OK to use nonDetUFMToList here because we
@@ -2266,12 +2266,12 @@ liftEnvSubst selector subst lc_env
         equality_ty = selector (coercionKind co)
 
 -- | Extract the underlying substitution from the LiftingContext
-lcTCvSubst :: LiftingContext -> TCvSubst
-lcTCvSubst (LC subst _) = subst
+lcSubst :: LiftingContext -> Subst
+lcSubst (LC subst _) = subst
 
 -- | Get the 'InScopeSet' from a 'LiftingContext'
 lcInScopeSet :: LiftingContext -> InScopeSet
-lcInScopeSet (LC subst _) = getTCvInScope subst
+lcInScopeSet (LC subst _) = getSubstInScope subst
 
 {-
 %************************************************************************
@@ -2431,7 +2431,7 @@ coercionRKind co
          -- kind_co always has kind @Type@, thus @isGReflCo@
        | otherwise                = go_forall empty_subst co
        where
-         empty_subst = mkEmptyTCvSubst (mkInScopeSet $ tyCoVarsOfCo co)
+         empty_subst = mkEmptySubst (mkInScopeSet $ tyCoVarsOfCo co)
 
     go_ax_inst ax ind tys
       | CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
@@ -2457,9 +2457,9 @@ coercionRKind co
       where
         k2  = coercionRKind k_co
         tv2 = setTyVarKind tv1 (substTy subst k2)
-        subst' | isGReflCo k_co = extendTCvInScope subst tv1
+        subst' | isGReflCo k_co = extendSubstInScope subst tv1
                  -- kind_co always has kind @Type@, thus @isGReflCo@
-               | otherwise      = extendTvSubst (extendTCvInScope subst tv2) tv1 $
+               | otherwise      = extendTvSubst (extendSubstInScope subst tv2) tv1 $
                                   TyVarTy tv2 `mkCastTy` mkSymCo k_co
 
     go_forall subst (ForAllCo cv1 k_co co)
@@ -2482,8 +2482,8 @@ coercionRKind co
 
         cv2     = setVarType cv1 (substTy subst k2)
         n_subst = eta1 `mkTransCo` (mkCoVarCo cv2) `mkTransCo` (mkSymCo eta2)
-        subst'  | isReflCo k_co = extendTCvInScope subst cv1
-                | otherwise     = extendCvSubst (extendTCvInScope subst cv2)
+        subst'  | isReflCo k_co = extendSubstInScope subst cv1
+                | otherwise     = extendCvSubst (extendSubstInScope subst cv2)
                                                 cv1 n_subst
 
     go_forall subst other_co
@@ -2666,7 +2666,7 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
             eta1 = mkNthCo r 2 kind_co'
             eta2 = mkNthCo r 3 kind_co'
 
-            subst = mkEmptyTCvSubst $ mkInScopeSet $
+            subst = mkEmptySubst $ mkInScopeSet $
                       tyCoVarsOfType ty2 `unionVarSet` tyCoVarsOfCo kind_co
             ty2'  = substTy (extendCvSubst subst cv2 $ mkSymCo eta1 `mkTransCo`
                                                        mkCoVarCo cv1 `mkTransCo`
