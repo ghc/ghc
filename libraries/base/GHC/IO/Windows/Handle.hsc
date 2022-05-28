@@ -140,7 +140,7 @@ instance GHC.IO.Device.RawIO (Io NativeHandle) where
 
 -- | @since 4.11.0.0
 instance GHC.IO.Device.RawIO (Io ConsoleHandle) where
-  read             = consoleRead
+  read             = consoleRead True
   readNonBlocking  = consoleReadNonBlocking
   write            = consoleWrite
   writeNonBlocking = consoleWriteNonBlocking
@@ -420,6 +420,9 @@ foreign import WINDOWS_CCONV safe "windows.h WriteConsoleW"
 foreign import WINDOWS_CCONV safe "windows.h ReadConsoleInputW"
   c_read_console_input :: HANDLE -> PINPUT_RECORD -> DWORD -> LPDWORD -> IO BOOL
 
+foreign import WINDOWS_CCONV safe "windows.h GetNumberOfConsoleInputEvents"
+  c_get_num_console_inputs :: HANDLE -> LPDWORD -> IO BOOL
+
 type LPSECURITY_ATTRIBUTES = LPVOID
 
 -- -----------------------------------------------------------------------------
@@ -571,8 +574,8 @@ consoleWriteNonBlocking hwnd ptr _offset bytes
          val <- fromIntegral <$> peek res
          return val
 
-consoleRead :: Io ConsoleHandle -> Ptr Word8 -> Word64 -> Int -> IO Int
-consoleRead hwnd ptr _offset bytes
+consoleRead :: Bool -> Io ConsoleHandle -> Ptr Word8 -> Word64 -> Int -> IO Int
+consoleRead blocking hwnd ptr _offset bytes
   = withUTF16ToGhcInternal ptr bytes $ \reqBytes w_ptr ->
       alloca $ \res -> do
        cooked <- isCooked hwnd
@@ -589,7 +592,7 @@ consoleRead hwnd ptr _offset bytes
        -- and instead have by default a pipe/file based std handles.  Which
        -- means the cooked behaviour is best when used in a native Windows
        -- terminal such as cmd, powershell or ConEmu.
-       case cooked of
+       case cooked || not blocking of
         False -> do
           debugIO "consoleRead :: un-cooked I/O read."
           -- eotControl allows us to handle control characters like EOL
@@ -627,9 +630,27 @@ consoleRead hwnd ptr _offset bytes
           -- but for now I'm only interested in key presses.
           let entries = fromIntegral $ reqBytes `div` (#size INPUT_RECORD)
           allocaBytes entries $ \p_inputs ->
-            readEvent p_inputs entries res w_ptr
+            maybeReadEvent p_inputs entries res w_ptr
 
-    where readEvent p_inputs entries res w_ptr = do
+          -- Check to see if we have been explicitly asked to do a non-blocking
+          -- I/O, and if we were, make sure that if we didn't have any console
+          -- events that we don't block.
+    where maybeReadEvent p_inputs entries res w_ptr =
+            case (not blocking) of
+              True -> do
+                avail <- with (0 :: DWORD) $ \num_events_ptr -> do
+                  failIfFalse_ "GHC.IO.Handle.consoleRead [non-blocking]" $
+                    c_get_num_console_inputs (toHANDLE hwnd) num_events_ptr
+                  peek num_events_ptr
+                debugIO $ "consoleRead [avail] :: " ++ show avail
+                if avail > 0
+                  then readEvent p_inputs entries res w_ptr
+                  else return 0
+              False -> readEvent p_inputs entries res w_ptr
+
+          -- Unconditionally issue the first read, but conditionally
+          -- do the recursion.
+          readEvent p_inputs entries res w_ptr = do
             failIfFalse_ "GHC.IO.Handle.consoleRead" $
               c_read_console_input (toHANDLE hwnd) p_inputs
                                    (fromIntegral entries) res
@@ -638,7 +659,7 @@ consoleRead hwnd ptr _offset bytes
             read <- cobble b_read w_ptr p_inputs
             if read > 0
                then return $ fromIntegral read
-               else readEvent p_inputs entries res w_ptr
+               else maybeReadEvent p_inputs entries res w_ptr
 
           -- Dereference and read console input records.  We only read the bare
           -- minimum required to know which key/sequences were pressed.  To do
@@ -678,7 +699,7 @@ consoleRead hwnd ptr _offset bytes
 consoleReadNonBlocking :: Io ConsoleHandle -> Ptr Word8 -> Word64 -> Int
                        -> IO (Maybe Int)
 consoleReadNonBlocking hwnd ptr offset bytes
-  = Just <$> consoleRead hwnd ptr offset bytes
+  = Just <$> consoleRead False hwnd ptr offset bytes
 
 -- -----------------------------------------------------------------------------
 -- Operations on file handles
