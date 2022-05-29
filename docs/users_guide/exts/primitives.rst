@@ -150,7 +150,6 @@ Unboxed tuples
 
     :since: 6.8.1
 
-
 Unboxed tuples aren't really exported by ``GHC.Exts``; they are a
 syntactic extension (:extension:`UnboxedTuples`). An
 unboxed tuple looks like this: ::
@@ -213,6 +212,7 @@ Unboxed sums
 .. extension:: UnboxedSums
     :shortdesc: Enable unboxed sums.
 
+    :implied by: :extension:`UnboxedTuples`
     :since: 8.2.1
 
     Enable the use of unboxed sum syntax.

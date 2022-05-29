@@ -53,7 +53,9 @@ Deriving ``Functor`` instances
     :shortdesc: Enable deriving for the Functor class.
         Implied by :extension:`DeriveTraversable`.
 
+    :implied by: :extension:`DeriveTraversable`
     :since: 7.10.1
+    :status: Included in :extension:`GHC2021`
 
     Allow automatic deriving of instances for the ``Functor`` typeclass.
 
@@ -247,7 +249,9 @@ Deriving ``Foldable`` instances
     :shortdesc: Enable deriving for the Foldable class.
         Implied by :extension:`DeriveTraversable`.
 
+    :implied by: :extension:`DeriveTraversable`
     :since: 7.10.1
+    :status: Included in :extension:`GHC2021`
 
     Allow automatic deriving of instances for the ``Foldable`` typeclass.
 
@@ -389,6 +393,7 @@ Deriving ``Traversable`` instances
         Implies :extension:`DeriveFunctor` and :extension:`DeriveFoldable`.
 
     :implies: :extension:`DeriveFoldable`, :extension:`DeriveFunctor`
+    :implied by: :extension:`GHC2021`
     :since: 7.10.1
 
     Allow automatic deriving of instances for the ``Traversable`` typeclass.
@@ -465,9 +470,9 @@ Deriving ``Data`` instances
 
 .. extension:: DeriveDataTypeable
     :shortdesc: Enable deriving for the ``Data`` class.
-       Implied by (deprecated) ``AutoDeriveTypeable``.
 
     :since: 6.8.1
+    :status: Included in :extension:`GHC2021`
 
     Enable automatic deriving of instances for the ``Data`` typeclass
 
@@ -521,6 +526,7 @@ Deriving ``Lift`` instances
     :shortdesc: Enable deriving for the Lift class
 
     :since: 8.0.1
+    :status: Included in :extension:`GHC2021`
 
     Enable automatic deriving of instances for the ``Lift`` typeclass for
     Template Haskell.
@@ -583,5 +589,3 @@ also works for these types:
         lift (IntHash i) = [| IntHash i |]
         liftTyped (IntHash i) = [|| IntHash i ||]
     -}
-
-

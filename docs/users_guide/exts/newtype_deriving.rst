@@ -9,6 +9,8 @@ Generalised derived instances for newtypes
 
     :since: 6.8.1. British spelling since 8.6.1.
 
+    :status: Included in :extension:`GHC2021`
+
     Enable GHC's cunning generalised deriving mechanism for ``newtype``\s
 
 When you define an abstract type using ``newtype``, you may want the new
@@ -365,5 +367,3 @@ Note that :extension:`DerivingVia` (see :ref:`deriving-via`) uses essentially
 the same specification to derive instances of associated type families as well
 (except that it uses the ``via`` type instead of the underlying ``rep-type``
 of a newtype).
-
-

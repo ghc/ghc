@@ -8,6 +8,8 @@ Stand-alone deriving declarations
 
     :since: 6.8.1
 
+    :status: Included in :extension:`GHC2021`
+
     Allow the use of stand-alone ``deriving`` declarations.
 
 GHC allows stand-alone ``deriving`` declarations, enabled by
@@ -111,5 +113,3 @@ ordinary deriving:
 
    GHC always treats the *last* parameter of the instance (``Foo`` in
    this example) as the type whose instance is being derived.
-
-

@@ -8,6 +8,8 @@ Tuple sections
 
     :since: 6.12
 
+    :status: Included in :extension:`GHC2021`
+
     Allow the use of tuple section syntax
 
 The :extension:`TupleSections` extension enables partially applied
@@ -39,5 +41,3 @@ Because there is no unboxed unit tuple, the following expression ::
       (# #)
 
 continues to stand for the unboxed singleton tuple data constructor.
-
-

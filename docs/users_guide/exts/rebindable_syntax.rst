@@ -7,6 +7,7 @@ Rebindable syntax and the implicit Prelude import
     :shortdesc: Don't implicitly ``import Prelude``.
         Implied by :extension:`RebindableSyntax`.
 
+    :implied by: :extension:`RebindableSyntax`
     :since: 6.8.1
 
     Don't import ``Prelude`` by default.
@@ -126,6 +127,7 @@ Postfix operators
     :shortdesc: Enable postfix operators.
 
     :since: 7.10.1
+    :status: Included in :extension:`GHC2021`
 
     Allow the use of post-fix operators
 
@@ -151,5 +153,3 @@ function postfix.
 
 The extension does not extend to the left-hand side of function
 definitions; you must define such a function in prefix form.
-
-

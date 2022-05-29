@@ -45,7 +45,10 @@ Relaxed rules for the instance head
     :shortdesc: Enable type synonyms in instance heads.
       Implied by :extension:`FlexibleInstances`.
 
+    :implied by: :extension:`FlexibleInstances`
     :since: 6.8.1
+
+    :status: Included in :extension:`GHC2021`
 
     Allow definition of type class instances for type synonyms.
 
@@ -54,7 +57,10 @@ Relaxed rules for the instance head
         Implies :extension:`TypeSynonymInstances`.
 
     :implies: :extension:`TypeSynonymInstances`
+
     :since: 6.8.1
+
+    :status: Included in :extension:`GHC2021`
 
     Allow definition of type class instances with arbitrary nested types in the
     instance head.
@@ -326,6 +332,8 @@ Overlapping instances
 
     :since: 6.8.1
 
+    :status: Deprecated
+
     Deprecated extension to weaken checks intended to ensure instance resolution
     termination.
 
@@ -334,6 +342,8 @@ Overlapping instances
         Implies :extension:`OverlappingInstances`.
 
     :since: 6.8.1
+
+    :status: Deprecated
 
     Deprecated extension to weaken checks intended to ensure instance resolution
     termination.
@@ -576,6 +586,8 @@ Instance signatures: type signatures in instance declarations
     :shortdesc: Enable instance signatures.
 
     :since: 7.6.1
+
+    :status: Included in :extension:`GHC2021`
 
     Allow type signatures for members in instance definitions.
 

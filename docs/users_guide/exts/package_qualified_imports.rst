@@ -31,5 +31,3 @@ package being built.
    from one package to another, rendering any package-qualified imports broken.
    See also :ref:`package-thinning-and-renaming` for an alternative way of
    disambiguating between module names.
-
-

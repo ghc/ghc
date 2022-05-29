@@ -8,6 +8,8 @@ Constrained class method types
 
     :since: 6.8.1
 
+    :status: Included in :extension:`GHC2021`
+
     Allows the definition of further constraints on individual class methods.
 
 Haskell 98 prohibits class method types to mention constraints on the
@@ -39,5 +41,3 @@ GHC lifts this restriction with language extension
 :extension:`ConstrainedClassMethods`. The restriction is a pretty stupid one in
 the first place, so :extension:`ConstrainedClassMethods` is implied by
 :extension:`MultiParamTypeClasses`.
-
-

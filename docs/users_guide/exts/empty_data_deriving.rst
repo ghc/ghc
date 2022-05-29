@@ -8,6 +8,7 @@ Deriving instances for empty data types
                 empty data types.
 
     :since: 8.4.1
+    :status: Included in :extension:`Haskell2010`, :extension:`GHC2021`
 
     Allow deriving instances of standard type classes for empty data types.
 
@@ -43,5 +44,3 @@ used in conjunction with empty data types. These include:
 * Type classes which require their own extensions to be enabled to be derived,
   such as :extension:`DeriveFunctor` (see :ref:`deriving-extra`)
 * :extension:`DeriveAnyClass` (see :ref:`derive-any-class`)
-
-

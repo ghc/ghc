@@ -9,6 +9,8 @@ Nullary type classes
 
     :since: 7.8.1
 
+    :status: Deprecated
+
     Allow use and definition of type classes with no parameters. This extension
     has been replaced by :extension:`MultiParamTypeClasses`.
 
@@ -35,5 +37,3 @@ dependence with: ::
 
       instance RiemannHypothesis where
         assumeRH = id
-
-

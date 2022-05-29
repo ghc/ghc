@@ -41,6 +41,8 @@ Bang patterns
 
     :since: 6.8.1
 
+    :status: Included in :extension:`GHC2021`
+
     Allow use of bang pattern syntax.
 
 GHC supports an extension of pattern matching called *bang patterns*,
@@ -197,6 +199,7 @@ Strict-by-default pattern bindings
     :shortdesc: Make bindings in the current module strict by default.
 
     :implies: :extension:`StrictData`
+
     :since: 8.0.1
 
     Make bindings in the current module strict by default.
@@ -511,6 +514,3 @@ intuitive: ::
         let f = /\a \(d::Eq a). fst (member, True) in body
 
 Note that the bang has no effect at all in this case
-
-
-

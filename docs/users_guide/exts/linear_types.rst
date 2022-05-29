@@ -5,6 +5,7 @@ Linear types
     :shortdesc: Enable linear types.
 
     :since: 9.0.1
+    :status: Experimental
 
     Enable the linear arrow ``a %1 -> b`` and the multiplicity-polymorphic arrow
     ``a %m -> b``.

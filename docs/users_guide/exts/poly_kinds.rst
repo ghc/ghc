@@ -9,6 +9,7 @@ Kind polymorphism
 
     :implies: :extension:`PolyKinds`, :extension:`DataKinds`, :extension:`KindSignatures`
     :since: 8.0.1
+    :status: Deprecated
 
     The extension :extension:`TypeInType` is now deprecated: its sole effect is
     to switch on :extension:`PolyKinds`
@@ -20,6 +21,8 @@ Kind polymorphism
 
     :implies: :extension:`KindSignatures`
     :since: 7.4.1
+
+    :status: Included in :extension:`GHC2021`
 
     Allow kind polymorphic types.
 
@@ -251,6 +254,7 @@ Complete user-supplied kind signatures and polymorphic recursion
     :shortdesc: Enable detection of complete user-supplied kind signatures.
 
     :since: 8.10.1
+    :status: Included in :extension:`Haskell98`, :extension:`Haskell2010`
 
 NB! This is a legacy feature, see :extension:`StandaloneKindSignatures` for the
 modern replacement.
@@ -384,6 +388,7 @@ Standalone kind signatures and polymorphic recursion
 
     :implies: :extension:`NoCUSKs`
     :since: 8.10.1
+    :status: Included in :extension:`GHC2021`
 
 Just as in type inference, kind inference for recursive types can only
 use *monomorphic* recursion. Consider this (contrived) example: ::
@@ -904,6 +909,7 @@ The kind ``Type``
     :shortdesc: Treat ``*`` as ``Data.Kind.Type``.
 
     :since: 8.6.1
+    :status: Included in :extension:`Haskell98`, :extension:`Haskell2010`, :extension:`GHC2021`
 
     Treat the unqualified uses of the ``*`` type operator as nullary and desugar
     to ``Data.Kind.Type``.
@@ -1085,5 +1091,3 @@ Examples::
    single: TYPE
    single: levity polymorphism
    single: representation polymorphism
-
-

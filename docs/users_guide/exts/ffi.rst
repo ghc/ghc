@@ -12,6 +12,8 @@ Foreign function interface (FFI)
 
     :since: 6.8.1
 
+    :status: Included in :extension:`Haskell2010`, :extension:`GHC2021`
+
     Allow use of the Haskell foreign function interface.
 
 GHC (mostly) conforms to the Haskell Foreign Function Interface as specified
@@ -287,6 +289,8 @@ Primitive imports
     :shortdesc: Enable prim calling convention. Intended for internal use only.
 
     :since: 6.12.1
+
+    :status: InternalUseOnly
 
 With :extension:`GHCForeignImportPrim`, GHC extends the FFI with an additional
 calling convention ``prim``, e.g.: ::

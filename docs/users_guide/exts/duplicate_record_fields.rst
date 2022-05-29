@@ -7,6 +7,7 @@ Duplicate record fields
     :shortdesc: Allow definition of record types with identically-named fields.
 
     :implies: :extension:`DisambiguateRecordFields`
+
     :since: 8.0.1
 
     Allow definition of record types with identically-named fields.
@@ -43,7 +44,7 @@ When :extension:`DuplicateRecordFields` is enabled, an ambiguous field must be e
 as part of its datatype, rather than at the top level. For example, the
 following is legal: ::
 
-    module M 
+    module M
       ( S(x)
       , T(..)
       ) where

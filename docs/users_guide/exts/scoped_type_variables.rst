@@ -9,7 +9,10 @@ Lexically scoped type variables
     :shortdesc: Enable lexically-scoped type variables.
 
     :implies: :extension:`ExplicitForAll`
+
     :since: 6.8.1
+
+    :status: Included in :extension:`GHC2021`
 
     Enable lexical scoping of type variables explicitly introduced with
     ``forall``.

@@ -9,6 +9,7 @@ Arbitrary-rank polymorphism
 
     :implies: :extension:`ExplicitForAll`
     :since: 6.8.1
+    :status: Included in :extension:`GHC2021`
 
     Allow types of arbitrary rank.
 
@@ -17,6 +18,7 @@ Arbitrary-rank polymorphism
         Synonym for :extension:`RankNTypes`.
 
     :since: 6.8.1
+    :status: Deprecated
 
     A deprecated alias of :extension:`RankNTypes`.
 
@@ -342,5 +344,3 @@ so no implicit quantification happens, and the declaration is rejected
 (with "``f`` is out of scope").  Solution: use an explicit ``forall``: ::
 
       data PackMap a b s t = PackMap (forall f. Monad f => (a -> f b) -> s -> f t)
-
-

@@ -8,6 +8,8 @@ Numeric underscores
 
     :since: 8.6.1
 
+    :status: Included in :extension:`GHC2021`
+
     Allow the use of underscores in numeric literals.
 
 GHC allows for numeric literals to be given in decimal, octal, hexadecimal,
@@ -85,5 +87,3 @@ About validity:
     h2 = 0x_ffff     -- valid
     h3 = 0x__ffff    -- valid
     h4 = _0xffff     -- invalid
-
-
