@@ -2753,21 +2753,21 @@ data Type = ForallT [TyVarBndr Specificity] Cxt Type -- ^ @forall \<vars\>. \<ct
           | ParensT Type                   -- ^ @(T)@
 
           -- See Note [Representing concrete syntax in types]
-          | TupleT Int                     -- ^ @(,), (,,), etc.@
-          | UnboxedTupleT Int              -- ^ @(\#,\#), (\#,,\#), etc.@
-          | UnboxedSumT SumArity           -- ^ @(\#|\#), (\#||\#), etc.@
+          | TupleT Int                     -- ^ @(,)@, @(,,)@, etc.
+          | UnboxedTupleT Int              -- ^ @(\#,\#)@, @(\#,,\#)@, etc.
+          | UnboxedSumT SumArity           -- ^ @(\#|\#)@, @(\#||\#)@, etc.
           | ArrowT                         -- ^ @->@
           | MulArrowT                      -- ^ @%n ->@
                                            --
                                            -- Generalised arrow type with multiplicity argument
           | EqualityT                      -- ^ @~@
           | ListT                          -- ^ @[]@
-          | PromotedTupleT Int             -- ^ @'(), '(,), '(,,), etc.@
+          | PromotedTupleT Int             -- ^ @'()@, @'(,)@, @'(,,)@, etc.
           | PromotedNilT                   -- ^ @'[]@
-          | PromotedConsT                  -- ^ @(':)@
+          | PromotedConsT                  -- ^ @'(:)@
           | StarT                          -- ^ @*@
           | ConstraintT                    -- ^ @Constraint@
-          | LitT TyLit                     -- ^ @0,1,2, etc.@
+          | LitT TyLit                     -- ^ @0@, @1@, @2@, etc.
           | WildCardT                      -- ^ @_@
           | ImplicitParamT String Type     -- ^ @?x :: t@
       deriving( Show, Eq, Ord, Data, Generic )
