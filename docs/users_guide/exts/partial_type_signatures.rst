@@ -125,6 +125,8 @@ Named Wildcards
 
     :since: 7.10.1
 
+    :status: Included in :extension:`GHC2021`
+
     Allow naming of wildcards (e.g. ``_x``) in type signatures.
 
 Type wildcards can also be named by giving the underscore an identifier
@@ -355,5 +357,3 @@ splices.
        {-# LANGUAGE TemplateHaskell #-}
        foo :: $( [t| _ |] ) -> a
        foo x = x
-
-

@@ -8,6 +8,8 @@ The ``Constraint`` kind
 
     :since: 7.4.1
 
+    :status: Included in :extension:`GHC2021`
+
     Allow types of kind ``Constraint`` to be used in contexts.
 
 Normally, *constraints* (which appear in types to the left of the ``=>``

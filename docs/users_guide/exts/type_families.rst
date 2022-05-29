@@ -10,6 +10,7 @@ Type families
 
     :implies: :extension:`MonoLocalBinds`, :extension:`KindSignatures`,
               :extension:`ExplicitNamespaces`
+    :implied by: :extension:`TypeFamilyDependencies`
     :since: 6.8.1
 
     Allow use and definition of indexed type and data families.
@@ -1129,6 +1130,7 @@ Injective type families
         Implies :extension:`TypeFamilies`.
 
     :implies: :extension:`TypeFamilies`
+
     :since: 8.0.1
 
     Allow functional dependency annotations on type families. This allows one to
@@ -1251,5 +1253,3 @@ injectivity of a type family:
 Note that for the purpose of injectivity check in bullets (4) and (5)
 GHC uses a special variant of unification algorithm that treats type
 family applications as possibly unifying with anything.
-
-

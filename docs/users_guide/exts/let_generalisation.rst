@@ -7,6 +7,7 @@ Let-generalisation
     :shortdesc: Enable do not generalise local bindings.
         Implied by :extension:`TypeFamilies` and :extension:`GADTs`.
 
+    :implied by: :extension:`TypeFamilies`, :extension:`GADTs`
     :since: 6.12.1
 
     Infer less polymorphic types for local bindings by default.

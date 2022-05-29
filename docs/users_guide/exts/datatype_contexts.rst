@@ -8,6 +8,8 @@ Data type contexts
 
     :since: 7.0.1
 
+    :status: Deprecated, Included in :extension:`Haskell98`, :extension:`Haskell2010`
+
     Allow contexts on ``data`` types.
 
 Haskell allows datatypes to be given contexts, e.g. ::
@@ -22,5 +24,3 @@ give constructors with types: ::
 This is widely considered a misfeature, and is going to be removed from
 the language. In GHC, it is controlled by the deprecated extension
 ``DatatypeContexts``.
-
-

@@ -8,6 +8,8 @@ Record puns
 
     :since: 6.10.1
 
+    :status: Included in :extension:`GHC2021`
+
     Allow use of record puns.
 
 Record puns are enabled by the language extension :extension:`NamedFieldPuns`.
@@ -61,5 +63,3 @@ Note that:
 
    (This is useful if the field selector ``a`` for constructor ``M.C``
    is only in scope in qualified form.)
-
-

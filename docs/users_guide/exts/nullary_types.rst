@@ -8,6 +8,8 @@ Data types with no constructors
 
     :since: 6.8.1
 
+    :status: Included in :extension:`GHC2021` and :extension:`Haskell2010`
+
     Allow definition of empty ``data`` types.
 
 With the :extension:`EmptyDataDecls` extension, GHC lets you declare a
@@ -34,4 +36,3 @@ can be useful when defining "phantom types".
 In conjunction with the :extension:`EmptyDataDeriving` extension, empty data
 declarations can also derive instances of standard type classes
 (see :ref:`empty-data-deriving`).
-

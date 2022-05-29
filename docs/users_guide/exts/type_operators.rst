@@ -8,7 +8,10 @@ Type operators
         Implies :extension:`ExplicitNamespaces`.
 
     :implies: :extension:`ExplicitNamespaces`
+
     :since: 6.8.1
+
+    :status: Included in :extension:`GHC2021`
 
     Allow the use and definition of types with operator names.
 
@@ -29,7 +32,7 @@ in types.
 
      x :: Int `Either` Bool
      x = Left 5
-       
+
 -  There is now some potential ambiguity in import and export lists; for
    example if you write ``import M( (+) )`` do you mean the *function*
    ``(+)`` or the *type constructor* ``(+)``? The default is the former,

@@ -8,6 +8,8 @@ Visible type application
 
     :since: 8.0.1
 
+    :status: Included in :extension:`GHC2021`
+
     Allow the use of type application syntax.
 
 The :extension:`TypeApplications` extension allows you to use
@@ -322,7 +324,7 @@ Type arguments appearing in patterns can influence the inferred type of a defini
     foo (Nothing @Int) = 0
     foo (Just x) = x
 
-will have inferred type:: 
+will have inferred type::
 
     foo :: Maybe Int -> Int
 

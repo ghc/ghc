@@ -6,7 +6,10 @@ Declaring data types with explicit constructor signatures
 .. extension:: GADTSyntax
     :shortdesc: Enable generalised algebraic data type syntax.
 
+    :implied by: :extensions:`GADTs`
     :since: 7.2.1
+
+    :status: Included in :extension:`GHC2021`
 
     Allow the use of GADT syntax in data type definitions (but not GADTs
     themselves; for this see :extension:`GADTs`)
@@ -376,5 +379,3 @@ type declarations.
           infix 6 (:--:)
           data T a where
             (:--:) :: Int -> Bool -> T Int
-
-

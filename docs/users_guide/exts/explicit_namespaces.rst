@@ -8,6 +8,7 @@ Explicit namespaces in import/export
         entries in imports and exports (:ref:`explicit-namespaces`).
         Implied by :extension:`TypeOperators` and :extension:`TypeFamilies`.
 
+    :implied by: :extension:`TypeOperators`, :extension:`TypeFamilies`
     :since: 7.6.1
 
     Enable use of explicit namespaces in module export lists.

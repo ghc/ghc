@@ -147,6 +147,8 @@ Context-free syntax
 
     :since: 7.2.1
 
+    :status: Included in :extension:`Haskell98`
+
     Allow nested contexts to be at the same indentation level as
     its enclosing context.
 

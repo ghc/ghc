@@ -301,5 +301,3 @@ Although we have given only a few examples here, it should be clear that
 the addition of dependency information can help to make multiple
 parameter classes more useful in practice, avoiding ambiguity problems,
 and allowing more general sets of instance declarations.
-
-

@@ -96,6 +96,8 @@ enabled, then it can range of types of kind ``k -> Type``, for any kind ``k``.
 
     :since: 7.2.1
 
+    :status: Included in :extension:`GHC2021`
+
     Allow automatic deriving of instances for the ``Generic`` typeclass.
 
 

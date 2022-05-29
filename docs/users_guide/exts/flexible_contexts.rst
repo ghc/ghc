@@ -7,6 +7,7 @@ Loosening restrictions on class contexts
     :shortdesc: Remove some restrictions on class contexts
 
     :since: 6.8.1
+    :status: Included in :extension:`GHC2021`
 
     Remove the type-variable restriction on class contexts.
 
@@ -20,7 +21,7 @@ type-variable)* or *(class (type-variable type1 type2 ... typen))*. With
 
 This extension does not affect equality constraints in an instance
 context; they are permitted by :extension:`TypeFamilies` or :extension:`GADTs`.
-      
+
 Note that :extension:`FlexibleContexts` affects usages of class constraints,
 in type signatures and other contexts. In contrast, :extension:`FlexibleInstances`
 loosens a similar restriction in place when declaring a new instance.

@@ -7,7 +7,10 @@ Explicitly-kinded quantification
     :shortdesc: Enable kind signatures.
         Implied by :extension:`TypeFamilies` and :extension:`PolyKinds`.
 
+    :implied by: :extension:`TypeFamilies`, :extension:`PolyKinds`
     :since: 6.8.1
+
+    :status: Included in :extension:`GHC2021`
 
     Allow explicit kind signatures on type variables.
 
@@ -61,5 +64,3 @@ The syntax is
        atype ::= '(' ctype '::' kind ')
 
 The parentheses are required.
-
-

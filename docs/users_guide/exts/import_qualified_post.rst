@@ -8,6 +8,8 @@ Writing qualified in postpositive position
 
     :since: 8.10.1
 
+    :status: Included in :extension:`GHC2021`
+
     ``ImportQualifiedPost`` allows the syntax ``import M qualified``, that is, to annotate a module as qualified by writing ``qualified`` after the module name.
 
 To import a qualified module usually you must specify ``qualified`` in prepositive position : ``import qualified M``. This often leads to a "hanging indent" (which is automatically inserted by some autoformatters and common in many code bases. For example:
