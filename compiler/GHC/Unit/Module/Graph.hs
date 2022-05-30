@@ -40,6 +40,7 @@ module GHC.Unit.Module.Graph
 where
 
 import GHC.Prelude
+import GHC.Platform
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -252,7 +253,8 @@ showModMsg dflags _ (LinkNode {}) =
                           _ -> False
 
           platform  = targetPlatform dflags
-          exe_file  = exeFileName platform staticLink (outputFile_ dflags)
+          arch_os   = platformArchOS platform
+          exe_file  = exeFileName arch_os staticLink (outputFile_ dflags)
       in text exe_file
 showModMsg _ _ (InstantiationNode _uid indef_unit) =
   ppr $ instUnitInstanceOf indef_unit

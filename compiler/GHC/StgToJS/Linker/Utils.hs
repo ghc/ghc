@@ -13,7 +13,6 @@
 -- Various utilies used in the JS Linker
 --
 ----------------------------- FIXMEs -------------------------------------------
---  - implement Windows check for @addExeExtension@
 --  - resolve macOS comment in @writeBinaryFile@
 --  - remove redundant function @jsExeFileName@
 -----------------------------------------------------------------------------
@@ -37,12 +36,6 @@ import           Prelude
 import GHC.Platform
 import Data.List (isPrefixOf)
 
-addExeExtension :: FilePath -> FilePath
-addExeExtension = id
-{- FIXME: Jeff (2022,03): with FIXME: after Windows FIXME in Linker, fix this too
-  | Platform.isWindows = (<.> "exe")
-  | otherwise          = id
--}
 
 {-
       macOS has trouble writing more than 2GiB at once to a file

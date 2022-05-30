@@ -362,30 +362,20 @@ link :: GhcLink                 -- ^ interactive or batch
 -- will succeed.
 
 link ghcLink logger tmpfs hooks dflags unit_env batch_attempt_linking mHscMessage hpt
-  -- short circuit to use JS backend linker
-  | backend dflags == JavaScript =
-    do -- Begin the intiialization for JS backend.
-      jsEnv <- liftIO newGhcjsEnv
-      let cfg            = initStgToJSConfig dflags
-          lc_cfg         = mempty
-          extra_js_files = mempty
-      -- now jump to the JS Linker
-      ghcjsLink jsEnv lc_cfg cfg extra_js_files True
-                ghcLink logger tmpfs dflags unit_env batch_attempt_linking hpt
-  | otherwise = case linkHook hooks of
-                  Nothing -> case ghcLink of
-                    NoLink        -> return Succeeded
-                    LinkBinary    -> normal_link
-                    LinkStaticLib -> normal_link
-                    LinkDynLib    -> normal_link
-                    LinkMergedObj -> normal_link
-                    LinkInMemory
-                      | platformMisc_ghcWithInterpreter $ platformMisc dflags
-                       -- Not Linking...(demand linker will do the job)
-                        -> return Succeeded
-                      | otherwise
-                        -> panicBadLink LinkInMemory
-                  Just h  -> h ghcLink dflags batch_attempt_linking hpt
+  = case linkHook hooks of
+      Nothing -> case ghcLink of
+        NoLink        -> return Succeeded
+        LinkBinary    -> normal_link
+        LinkStaticLib -> normal_link
+        LinkDynLib    -> normal_link
+        LinkMergedObj -> normal_link
+        LinkInMemory
+          | platformMisc_ghcWithInterpreter $ platformMisc dflags
+           -- Not Linking...(demand linker will do the job)
+            -> return Succeeded
+          | otherwise
+            -> panicBadLink LinkInMemory
+      Just h  -> h ghcLink dflags batch_attempt_linking hpt
   where
     normal_link = link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessage hpt
 
@@ -422,7 +412,9 @@ link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
             -- the linkables to link
             linkables = map (expectJust "link".hm_linkable) home_mod_infos
 
+        debugTraceMsg logger 3 (text "link: hmi ..." $$ vcat (map (ppr . mi_module . hm_iface) home_mod_infos))
         debugTraceMsg logger 3 (text "link: linkables are ..." $$ vcat (map ppr linkables))
+        debugTraceMsg logger 3 (text "link: pkg deps are ..." $$ vcat (map ppr pkg_deps))
 
         -- check for the -no-link flag
         if isNoLink (ghcLink dflags)
@@ -433,7 +425,8 @@ link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
         let getOfiles LM{ linkableUnlinked } = map nameOfObject (filter isObject linkableUnlinked)
             obj_files = concatMap getOfiles linkables
             platform  = targetPlatform dflags
-            exe_file  = exeFileName platform staticLink (outputFile_ dflags)
+            arch_os   = platformArchOS platform
+            exe_file  = exeFileName arch_os staticLink (outputFile_ dflags)
 
         linking_needed <- linkingNeeded logger dflags unit_env staticLink linkables pkg_deps
 
@@ -445,13 +438,20 @@ link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
 
 
         -- Don't showPass in Batch mode; doLink will do that for us.
-        let link = case ghcLink dflags of
-                LinkBinary    -> linkBinary logger tmpfs
-                LinkStaticLib -> linkStaticLib logger
-                LinkDynLib    -> linkDynLibCheck logger tmpfs
-                other         -> panicBadLink other
+        let isJS = backend dflags == JavaScript
 
-        link dflags unit_env obj_files pkg_deps
+        case ghcLink dflags of
+          LinkBinary
+            | isJS      -> do
+              js_env <- liftIO newGhcjsEnv
+              let lc_cfg   = mempty
+              let extra_js = mempty
+              let cfg      = initStgToJSConfig dflags
+              jsLinkBinary js_env lc_cfg cfg extra_js logger tmpfs dflags unit_env obj_files pkg_deps
+            | otherwise -> linkBinary logger tmpfs dflags unit_env obj_files pkg_deps
+          LinkStaticLib -> linkStaticLib logger dflags unit_env obj_files pkg_deps
+          LinkDynLib    -> linkDynLibCheck logger tmpfs dflags unit_env obj_files pkg_deps
+          other         -> panicBadLink other
 
         debugTraceMsg logger 3 (text "link: done")
 
@@ -471,7 +471,8 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         -- linking (unless the -fforce-recomp flag was given).
   let platform   = ue_platform unit_env
       unit_state = ue_units unit_env
-      exe_file   = exeFileName platform staticLink (outputFile_ dflags)
+      arch_os    = platformArchOS platform
+      exe_file   = exeFileName arch_os staticLink (outputFile_ dflags)
   e_exe_time <- tryIO $ getModificationUTCTime exe_file
   case e_exe_time of
     Left _  -> return $ NeedsRecompile MustCompile
@@ -555,32 +556,32 @@ compileFile hsc_env stop_phase (src, _mb_phase) = do
 
 
 doLink :: HscEnv -> [FilePath] -> IO ()
-doLink hsc_env o_files =
-  do
-    let
-        dflags   = hsc_dflags   hsc_env
-        logger   = hsc_logger   hsc_env
-        unit_env = hsc_unit_env hsc_env
-        tmpfs    = hsc_tmpfs    hsc_env
-    if backend dflags /= JavaScript
-      -- take the more likely path first
-      then case ghcLink dflags of
-             NoLink        -> return ()
-             LinkBinary    -> linkBinary         logger tmpfs dflags unit_env o_files []
-             LinkStaticLib -> linkStaticLib      logger       dflags unit_env o_files []
-             LinkDynLib    -> linkDynLibCheck    logger tmpfs dflags unit_env o_files []
-             LinkMergedObj
-               | Just out <- outputFile dflags
-               , let objs = [ f | FileOption _ f <- ldInputs dflags ]
-                           -> joinObjectFiles hsc_env (o_files ++ objs) out
-               | otherwise -> panic "Output path must be specified for LinkMergedObj"
-             other         -> panicBadLink other
-      -- now check the rare case
-      else
-      do let cfg            = initStgToJSConfig dflags
-             lc_cfg         = mempty
-         jsEnv <- liftIO newGhcjsEnv
-         ghcjsDoLink jsEnv lc_cfg cfg dflags logger unit_env o_files
+doLink hsc_env o_files = do
+  let
+    dflags   = hsc_dflags   hsc_env
+    logger   = hsc_logger   hsc_env
+    unit_env = hsc_unit_env hsc_env
+    tmpfs    = hsc_tmpfs    hsc_env
+    isJS     = backend dflags == JavaScript
+
+  case ghcLink dflags of
+    NoLink        -> return ()
+    LinkBinary
+      | isJS      -> do
+        js_env <- liftIO newGhcjsEnv
+        let lc_cfg   = mempty
+        let extra_js = mempty
+        let cfg      = initStgToJSConfig dflags
+        jsLinkBinary js_env lc_cfg cfg extra_js logger tmpfs dflags unit_env o_files []
+      | otherwise -> linkBinary logger tmpfs dflags unit_env o_files []
+    LinkStaticLib -> linkStaticLib      logger       dflags unit_env o_files []
+    LinkDynLib    -> linkDynLibCheck    logger tmpfs dflags unit_env o_files []
+    LinkMergedObj
+      | Just out <- outputFile dflags
+      , let objs = [ f | FileOption _ f <- ldInputs dflags ]
+                  -> joinObjectFiles hsc_env (o_files ++ objs) out
+      | otherwise -> panic "Output path must be specified for LinkMergedObj"
+    other         -> panicBadLink other
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support), and cc files.
