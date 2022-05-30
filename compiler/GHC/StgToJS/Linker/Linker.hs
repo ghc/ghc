@@ -55,6 +55,11 @@
 
 module GHC.StgToJS.Linker.Linker where
 
+import Prelude
+
+import GHC.Platform.Ways
+import GHC.Platform.Host (hostPlatformArchOS)
+
 import           GHC.StgToJS.Linker.Types
 import           GHC.StgToJS.Linker.Utils
 import           GHC.StgToJS.Linker.Compactor
@@ -77,7 +82,6 @@ import           GHC.Unit.Env
 import           GHC.Unit.Home
 import           GHC.Unit.Types
 import           GHC.Utils.Error
-import           GHC.Platform.Ways
 import           GHC.Driver.Env.Types
 import           GHC.Data.ShortText       (ShortText)
 import qualified GHC.Data.ShortText       as T
@@ -107,7 +111,6 @@ import qualified Data.Set                 as S
 import           GHC.Generics (Generic)
 
 import           System.FilePath (splitPath, (<.>), (</>), dropExtension)
-import           System.IO
 import           System.Directory ( createDirectoryIfMissing
                                   , doesFileExist
                                   , getCurrentDirectory
@@ -116,12 +119,13 @@ import           System.Directory ( createDirectoryIfMissing
                                   , getPermissions
                                   )
 
-import Prelude
 import GHC.Driver.Session (targetWays_, settings, DynFlags)
 import GHC.Settings (sTopDir)
 import GHC.Unit.Module.Name
 import GHC.Unit.Module (moduleStableString)
 import GHC.Utils.Logger (Logger)
+
+import GHC.Linker.Static.Utils (exeFileName)
 
 -- number of bytes linked per module
 type LinkerStats  = Map Module Int64
@@ -225,7 +229,7 @@ link' :: GhcjsEnv
       -> (ExportedFun -> Bool)      -- ^ functions from the objects to use as roots (include all their deps)
       -> Set ExportedFun            -- ^ extra symbols to link in
       -> IO LinkResult
-link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles jsFiles isRootFun extraStaticDeps
+link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFiles isRootFun extraStaticDeps
   = do
   -- FIXME: Jeff (2022,04): This function has several helpers that should be
   -- factored out. In its current condition it is hard to read exactly whats
@@ -249,12 +253,15 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles jsFile
         NoBase        -> return emptyBase
         BaseFile file -> loadBase file
         BaseState b   -> return b
+
       (rdPkgs, rds) <- rtsDeps pkgs
 
       -- c   <- newMVar M.empty
+      let preload_units = preloadUnits (ue_units unit_env)
+
       let rtsPkgs     =  map stringToUnitId ["@rts", "@rts_" ++ waysTag (targetWays_ $ dflags)]
           pkgs' :: [UnitId]
-          pkgs'       = nub (rtsPkgs ++ rdPkgs ++ reverse objPkgs ++ reverse pkgs)
+          pkgs'       = nub (rtsPkgs ++ preload_units ++ rdPkgs ++ reverse objPkgs ++ reverse pkgs)
           pkgs''      = filter (not . isAlreadyLinked base) pkgs'
           ue_state    = ue_units $ unit_env
           -- pkgLibPaths = mkPkgLibPaths pkgs'
@@ -272,13 +279,21 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles jsFile
              renderLinker lc_cfg cfg (baseCompactorState base) rds code
           base'  = Base compactorState (nub $ basePkgs base ++ pkgs'')
                          (allDeps `S.union` baseUnits base)
-      (alreadyLinkedBefore, alreadyLinkedAfter) <- getShims [] (filter (isAlreadyLinked base) pkgs')
-      (shimsBefore, shimsAfter) <- getShims jsFiles pkgs''
-      return $ LinkResult outJs stats metaSize
-                 (concatMap (\(_,_,_,_,_,r) -> r) code)
-                 (filter (`notElem` alreadyLinkedBefore) shimsBefore)
-                 (filter (`notElem` alreadyLinkedAfter)  shimsAfter)
-                 pkgArchs base'
+
+      -- FIXME: (Sylvain, 2022-05): disabled because it comes from shims.
+      -- Just delete?
+      -- (alreadyLinkedBefore, alreadyLinkedAfter) <- getShims [] (filter (isAlreadyLinked base) pkgs')
+      -- (shimsBefore, shimsAfter) <- getShims jsFiles pkgs''
+      return $ LinkResult
+        { linkOut         = outJs
+        , linkOutStats    = stats
+        , linkOutMetaSize = metaSize
+        , linkForeignRefs = concatMap (\(_,_,_,_,_,r) -> r) code
+        , linkLibRTS      = [] -- (filter (`notElem` alreadyLinkedBefore) shimsBefore)
+        , linkLibA        = [] -- (filter (`notElem` alreadyLinkedAfter)  shimsAfter)
+        , linkLibAArch    = pkgArchs
+        , linkBase        = base'
+        }
   where
     isAlreadyLinked :: Base -> UnitId -> Bool
     isAlreadyLinked b uid = uid `elem` basePkgs b
@@ -404,7 +419,8 @@ writeRunner _settings out =
   -- need to check then does the flag need to exist?
   {-when (lcBuildRunner _settings) $ -} do
   cd    <- getCurrentDirectory
-  let runner  = cd </> addExeExtension (dropExtension out)
+  let arch_os = hostPlatformArchOS
+  let runner  = cd </> exeFileName arch_os False (Just (dropExtension out))
       srcFile = out </> "all" <.> "js"
   -- nodeSettings <- readNodeSettings dflags
       nodePgm :: B.ByteString
