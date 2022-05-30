@@ -142,9 +142,7 @@ enableLinting =
       ]
   where
     lint = mconcat
-      [ arg "-dcore-lint"
-      , arg "-dstg-lint"
-      -- Should be -dlint but currently -dcmm-lint fails due to #21563
+      [ arg "-dlint"
       ]
 
 -- | Enable Core, STG, and C-- linting in all compilations with the stage1 compiler.
