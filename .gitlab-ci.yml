@@ -587,6 +587,7 @@ test-bootstrap:
     TEST_ENV: "x86_64-linux-deb10-hadrian"
     BIN_DIST_NAME: "ghc-x86_64-deb10-linux"
     BUILD_FLAVOUR: "validate"
+    NO_BOOT: "1"
   rules:
     - if: $NIGHTLY
     - if: '$RELEASE_JOB == "yes"'
