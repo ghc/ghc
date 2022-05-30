@@ -64,23 +64,27 @@ it is supported by both gcc and clang. Anecdotally nvcc supports
 -}
 
 linkBinary :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
-linkBinary logger tmpfs dflags unit_env o_files dep_units = do
+linkBinary = linkBinary' False
+
+linkBinary' :: Bool -> Logger -> TmpFs -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
     let platform   = ue_platform unit_env
         unit_state = ue_units unit_env
         toolSettings' = toolSettings dflags
         verbFlags = getVerbFlags dflags
-        output_fn = exeFileName platform False (outputFile_ dflags)
+        arch_os   = platformArchOS platform
+        output_fn = exeFileName arch_os staticLink (outputFile_ dflags)
         namever   = ghcNameVersion dflags
         ways_     = ways dflags
-
-    -- get the full list of packages to link with, by combining the
-    -- explicit packages with the auto packages and all of their
-    -- dependencies, and eliminating duplicates.
 
     full_output_fn <- if isAbsolute output_fn
                       then return output_fn
                       else do d <- getCurrentDirectory
                               return $ normalise (d </> output_fn)
+
+    -- get the full list of packages to link with, by combining the
+    -- explicit packages with the auto packages and all of their
+    -- dependencies, and eliminating duplicates.
     pkgs <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_units)
     let pkg_lib_paths     = collectLibraryDirs ways_ pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
@@ -267,7 +271,8 @@ linkStaticLib logger dflags unit_env o_files dep_units = do
   let platform  = ue_platform unit_env
       extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
       modules = o_files ++ extra_ld_inputs
-      output_fn = exeFileName platform True (outputFile_ dflags)
+      arch_os = platformArchOS platform
+      output_fn = exeFileName arch_os True (outputFile_ dflags)
       namever = ghcNameVersion dflags
       ways_   = ways dflags
 
