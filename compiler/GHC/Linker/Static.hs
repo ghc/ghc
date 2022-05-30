@@ -70,6 +70,8 @@ linkBinary logger tmpfs dflags unit_env o_files dep_units = do
         toolSettings' = toolSettings dflags
         verbFlags = getVerbFlags dflags
         output_fn = exeFileName platform False (outputFile_ dflags)
+        namever   = ghcNameVersion dflags
+        ways_     = ways dflags
 
     -- get the full list of packages to link with, by combining the
     -- explicit packages with the auto packages and all of their
@@ -80,12 +82,12 @@ linkBinary logger tmpfs dflags unit_env o_files dep_units = do
                       else do d <- getCurrentDirectory
                               return $ normalise (d </> output_fn)
     pkgs <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_units)
-    let pkg_lib_paths     = collectLibraryDirs (ways dflags) pkgs
+    let pkg_lib_paths     = collectLibraryDirs ways_ pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
-           ways dflags `hasWay` WayDyn
+           ways_ `hasWay` WayDyn
             = let libpath = if gopt Opt_RelativeDynlibPaths dflags
                             then "$ORIGIN" </>
                                  (l `makeRelativeTo` full_output_fn)
@@ -106,7 +108,7 @@ linkBinary logger tmpfs dflags unit_env o_files dep_units = do
               in ["-L" ++ l] ++ rpathlink ++ rpath
          | osMachOTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
-           ways dflags `hasWay` WayDyn &&
+           ways_ `hasWay` WayDyn &&
            useXLinkerRPath dflags (platformOS platform)
             = let libpath = if gopt Opt_RelativeDynlibPaths dflags
                             then "@loader_path" </>
@@ -118,7 +120,7 @@ linkBinary logger tmpfs dflags unit_env o_files dep_units = do
     pkg_lib_path_opts <-
       if gopt Opt_SingleLibFolder dflags
       then do
-        libs <- getLibs dflags unit_env dep_units
+        libs <- getLibs namever ways_ unit_env dep_units
         tmpDir <- newTempDir logger tmpfs (tmpDir dflags)
         sequence_ [ copyFile lib (tmpDir </> basename)
                   | (lib, basename) <- libs]
@@ -148,7 +150,7 @@ linkBinary logger tmpfs dflags unit_env o_files dep_units = do
         = ([],[])
 
     pkg_link_opts <- do
-        (package_hs_libs, extra_libs, other_flags) <- getUnitLinkOpts dflags unit_env dep_units
+        (package_hs_libs, extra_libs, other_flags) <- getUnitLinkOpts namever ways_ unit_env dep_units
         return $ other_flags ++ dead_strip
                   ++ pre_hs_libs ++ package_hs_libs ++ post_hs_libs
                   ++ extra_libs
@@ -266,6 +268,8 @@ linkStaticLib logger dflags unit_env o_files dep_units = do
       extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
       modules = o_files ++ extra_ld_inputs
       output_fn = exeFileName platform True (outputFile_ dflags)
+      namever = ghcNameVersion dflags
+      ways_   = ways dflags
 
   full_output_fn <- if isAbsolute output_fn
                     then return output_fn
@@ -282,7 +286,7 @@ linkStaticLib logger dflags unit_env o_files dep_units = do
         | otherwise
         = filter ((/= rtsUnitId) . unitId) pkg_cfgs_init
 
-  archives <- concatMapM (collectArchives dflags) pkg_cfgs
+  archives <- concatMapM (collectArchives namever ways_) pkg_cfgs
 
   ar <- foldl mappend
         <$> (Archive <$> mapM loadObj modules)

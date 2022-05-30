@@ -192,7 +192,7 @@ mkNoteObjsToLinkIntoBinary logger tmpfs dflags unit_env dep_packages = do
 -- See Note [LinkInfo section]
 getLinkInfo :: DynFlags -> UnitEnv -> [UnitId] -> IO String
 getLinkInfo dflags unit_env dep_packages = do
-    package_link_opts <- getUnitLinkOpts dflags unit_env dep_packages
+    package_link_opts <- getUnitLinkOpts (ghcNameVersion dflags) (ways dflags) unit_env dep_packages
     pkg_frameworks <- if not (platformUsesFrameworks (ue_platform unit_env))
       then return []
       else do

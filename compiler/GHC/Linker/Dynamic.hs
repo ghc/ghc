@@ -83,7 +83,10 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
          | gopt Opt_LinkRts dflags = pkgs_with_rts
          | otherwise               = pkgs_without_rts
         pkg_link_opts = package_hs_libs ++ extra_libs ++ other_flags
-          where (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs
+          where
+            namever = ghcNameVersion dflags
+            ways_   = ways dflags
+            (package_hs_libs, extra_libs, other_flags) = collectLinkOpts namever ways_ pkgs
 
         -- probably _stub.o files
         -- and last temporary shared object file
