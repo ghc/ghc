@@ -2764,7 +2764,7 @@ data Type = ForallT [TyVarBndr Specificity] Cxt Type -- ^ @forall \<vars\>. \<ct
           | ListT                          -- ^ @[]@
           | PromotedTupleT Int             -- ^ @'(), '(,), '(,,), etc.@
           | PromotedNilT                   -- ^ @'[]@
-          | PromotedConsT                  -- ^ @(':)@
+          | PromotedConsT                  -- ^ @':@
           | StarT                          -- ^ @*@
           | ConstraintT                    -- ^ @Constraint@
           | LitT TyLit                     -- ^ @0,1,2, etc.@
