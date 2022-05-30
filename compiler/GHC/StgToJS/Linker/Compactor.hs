@@ -774,12 +774,8 @@ compact ln_cfg cfg cs0 rtsDeps0 input0
   let rtsDeps1 = rtsDeps0 ++
                  map (<> "_e") rtsDeps0 ++
                  map (<> "_con_e") rtsDeps0
-      -- FIXME: Jeff (2022,03): I've removed the real worker @packStrings@ to
-      -- get the Linker compiling. This linker will be very slow, when the time
-      -- comes, we need to uncomment packStrings and actually implement it to do
-      -- the link time compiling
-      -- (cs1, input1) = packStrings settings dflags cs0 input0
-  in  renameInternals ln_cfg cfg cs0 rtsDeps1 input0
+      (cs1, input1) = packStrings ln_cfg cs0 input0
+  in  renameInternals ln_cfg cfg cs1 rtsDeps1 input1
 
 
 -- hash compactification
