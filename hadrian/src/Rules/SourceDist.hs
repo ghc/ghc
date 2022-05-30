@@ -125,10 +125,38 @@ prepareTree dest = do
       let target = dest -/- source
       copyFileSourceDist (top -/- source) target
     copyAlexHappyFiles
+    copyBootFiles
   where
 
     getFiles = filter treeFilter . split (=='\NUL')
     treeFilter file = not (null file) && not ("testsuite//" ?== file)
+
+    -- Copy files created by running ./boot
+    copyBootFiles = do
+      top <- topDirectory
+      forM_ bootFiles $ \file -> do
+        let src_file = top -/- file
+            dest_file = top -/- dest -/- file
+        createFileLink src_file dest_file
+      -- And move ./boot so we can't accidentally call it in CI
+      moveFile (dest -/- "boot") (dest -/- "boot.source")
+
+    bootFiles =
+      [ pkgPath process -/- "include" -/- "HsProcessConfig.h.in"
+      , pkgPath process -/- "configure"
+      , pkgPath ghcBignum -/- "configure"
+      , pkgPath base -/- "configure"
+      , pkgPath base -/- "include" -/- "HsBaseConfig.h.in"
+      , pkgPath directory -/- "configure"
+      , pkgPath directory -/- "HsDirectoryConfig.h.in"
+      , pkgPath time -/- "configure"
+      , pkgPath time -/- "lib" -/- "include" -/- "HsTimeConfig.h.in"
+      , pkgPath unix -/- "configure"
+      , pkgPath unix -/- "include" -/- "HsUnixConfig.h.in"
+      , pkgPath terminfo -/- "configure"
+      , "configure"
+      , "aclocal.m4"
+      , "mk" -/- "config.h.in" ]
 
     copyAlexHappyFiles =
       forM_ alexHappyFiles $ \(stg, pkg, inp, out) -> do
