@@ -158,11 +158,11 @@ link :: GhcjsEnv
      -> (ExportedFun -> Bool)  -- ^ functions from the objects to use as roots (include all their deps)
      -> Set ExportedFun        -- ^ extra symbols to link in
      -> IO ()
-link env lc_cfg cfg logger dflags u_env out include pkgs objFiles jsFiles isRootFun extraStaticDeps
+link env lc_cfg cfg logger dflags unit_env out include pkgs objFiles jsFiles isRootFun extraStaticDeps
   | lcNoJSExecutables lc_cfg = return ()
   | otherwise = do
       LinkResult lo lstats lmetasize _lfrefs llW lla llarch lbase <-
-        link' env lc_cfg cfg dflags logger u_env out include pkgs objFiles jsFiles
+        link' env lc_cfg cfg dflags logger unit_env out include pkgs objFiles jsFiles
               isRootFun extraStaticDeps
       let genBase = isJust (lcGenBase lc_cfg)
           jsExt | genBase   = "base.js"
@@ -225,7 +225,7 @@ link' :: GhcjsEnv
       -> (ExportedFun -> Bool)      -- ^ functions from the objects to use as roots (include all their deps)
       -> Set ExportedFun            -- ^ extra symbols to link in
       -> IO LinkResult
-link' env lc_cfg cfg dflags logger u_env target _include pkgs objFiles jsFiles isRootFun extraStaticDeps
+link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles jsFiles isRootFun extraStaticDeps
   = do
   -- FIXME: Jeff (2022,04): This function has several helpers that should be
   -- factored out. In its current condition it is hard to read exactly whats
@@ -250,12 +250,13 @@ link' env lc_cfg cfg dflags logger u_env target _include pkgs objFiles jsFiles i
         BaseFile file -> loadBase file
         BaseState b   -> return b
       (rdPkgs, rds) <- rtsDeps pkgs
+
       -- c   <- newMVar M.empty
       let rtsPkgs     =  map stringToUnitId ["@rts", "@rts_" ++ waysTag (targetWays_ $ dflags)]
           pkgs' :: [UnitId]
           pkgs'       = nub (rtsPkgs ++ rdPkgs ++ reverse objPkgs ++ reverse pkgs)
           pkgs''      = filter (not . isAlreadyLinked base) pkgs'
-          ue_state    = ue_units $ u_env
+          ue_state    = ue_units $ unit_env
           -- pkgLibPaths = mkPkgLibPaths pkgs'
           -- getPkgLibPaths :: UnitId -> ([FilePath],[String])
           -- getPkgLibPaths k = fromMaybe ([],[]) (lookup k pkgLibPaths)
@@ -263,7 +264,7 @@ link' env lc_cfg cfg dflags logger u_env target _include pkgs objFiles jsFiles i
       pkgArchs <- getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state pkgs'')
       (allDeps, code) <-
         collectDeps (objDepsMap `M.union` archsDepsMap)
-                    (pkgs' ++ [homeUnitId (ue_unsafeHomeUnit $ u_env)]) -- FIXME: dont use unsafe
+                    (pkgs' ++ [homeUnitId (ue_unsafeHomeUnit $ unit_env)]) -- FIXME: dont use unsafe
                     (baseUnits base)
                     (roots `S.union` rds `S.union` extraStaticDeps)
                     (archsRequiredUnits ++ objRequiredUnits)
@@ -763,10 +764,10 @@ staticDeps :: UnitEnv
            -> (StaticDeps, Set UnitId, Set ExportedFun)
                                       -- ^ the StaticDeps contains the symbols
                                       --   for which no package could be found
-staticDeps u_env wiredin sdeps = mkDeps sdeps
+staticDeps unit_env wiredin sdeps = mkDeps sdeps
   where
     zenc  = T.pack . zEncodeString . T.unpack
-    u_st  = ue_units u_env
+    u_st  = ue_units unit_env
     mkDeps (StaticDeps ds) =
       -- FIXME: Jeff (2022,03): this foldl' will leak memory due to the tuple
       -- and in the list in the fst position because the list is neither spine
