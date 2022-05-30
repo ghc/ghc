@@ -76,6 +76,7 @@ Environment variables affecting both build systems:
                     during installation of test toolchain.
   NIX_SYSTEM        On Darwin, the target platform of the desired toolchain
                     (either "x86-64-darwin" or "aarch-darwin")
+  NO_BOOT           Whether to run ./boot or not, used when testing the source dist
 
 Environment variables determining build configuration of Make system:
 
@@ -404,9 +405,11 @@ EOF
 }
 
 function configure() {
-  start_section "booting"
-  run python3 boot
-  end_section "booting"
+  if [[ -z "${NO_BOOT:-}" ]]; then
+    start_section "booting"
+    run python3 boot
+    end_section "booting"
+  fi
 
   read -r -a args <<< "${CONFIGURE_ARGS:-}"
   if [[ -n "${target_triple:-}" ]]; then
