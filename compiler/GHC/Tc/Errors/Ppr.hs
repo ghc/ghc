@@ -718,6 +718,11 @@ instance Diagnostic TcRnMessage where
     TcRnNotInScope err name imp_errs _
       -> mkSimpleDecorated $
            pprScopeError name err $$ vcat (map ppr imp_errs)
+    TcRnTermNameInType name _
+      -> mkSimpleDecorated $
+           quotes (ppr name) <+>
+             (text "is a term-level binding") $+$
+             (text " and can not be used at the type level.")
     TcRnUntickedPromotedThing thing
       -> mkSimpleDecorated $
          text "Unticked promoted" <+> what
@@ -1475,6 +1480,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnNotInScope {}
       -> ErrorWithoutFlag
+    TcRnTermNameInType {}
+      -> ErrorWithoutFlag
     TcRnUntickedPromotedThing {}
       -> WarningWithFlag Opt_WarnUntickedPromotedConstructors
     TcRnIllegalBuiltinSyntax {}
@@ -1878,6 +1885,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnNotInScope err _ _ hints
       -> scopeErrorHints err ++ hints
+    TcRnTermNameInType _ hints
+      -> hints
     TcRnUntickedPromotedThing thing
       -> [SuggestAddTick thing]
     TcRnIllegalBuiltinSyntax {}

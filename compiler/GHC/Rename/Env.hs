@@ -1097,12 +1097,27 @@ lookup_demoted rdr_name
                                      | otherwise
                                      = star_is_type_hints
                     ; unboundNameX looking_for rdr_name suggestion } }
+  | Just demoted_rdr_name <- demoteRdrNameTv rdr_name,
+    isQual rdr_name
+  = report_qualified_term_in_types rdr_name demoted_rdr_name
 
   | otherwise
   = reportUnboundName' (lf_which looking_for) rdr_name
 
   where
     looking_for = LF WL_Constructor WL_Anywhere
+
+-- Report a qualified variable name in a type signature:
+--   badSig :: Prelude.head
+--             ^^^^^^^^^^^
+report_qualified_term_in_types :: RdrName -> RdrName -> RnM Name
+report_qualified_term_in_types rdr_name demoted_rdr_name =
+  do { mName <- lookupGlobalOccRn_maybe demoted_rdr_name
+     ; case mName of
+         (Just _) -> termNameInType looking_for rdr_name demoted_rdr_name []
+         Nothing -> unboundTermNameInTypes looking_for rdr_name demoted_rdr_name }
+  where
+    looking_for = LF WL_Constructor WL_Global
 
 -- If the given RdrName can be promoted to the type level and its promoted variant is in scope,
 -- lookup_promoted returns the corresponding type-level Name.
@@ -1152,13 +1167,25 @@ its namespace to DataName and do a second lookup.
 The final result (after the renamer) will be:
   HsTyVar ("Zero", DataName)
 
-Another case of demotion happens when the compiler needs to check
+Another case of demotion happens when the user tries to
+use a qualified term at the type level:
+
+  f :: Prelude.id -> Int
+
+This signature passes the parser to be caught by the renamer.
+It allows the compiler to create more informative error messages.
+
+'Prelude.id' in the type signature is parsed as
+  HsTyVar ("id", TvName)
+
+To separate the case of a typo from the case of an
+intentional attempt to use an imported term's name the compiler demotes
+the namespace to VarName (using 'demoteTvNameSpace') and does a lookup.
+
+The same type of demotion happens when the compiler needs to check
 if a name of a type variable has already been used for a term that is in scope.
 We need to do it to check if a user should change the name
 to make his code compatible with the RequiredTypeArguments extension.
-
-This type of demotion is made via demoteTvNameSpace.
-
 
 Note [Promotion]
 ~~~~~~~~~~~~~~~

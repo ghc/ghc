@@ -2263,6 +2263,10 @@ atype :: { LHsType GhcPs }
         | STRING               { reLocA $ sLL $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGs $1)
                                                                      (getSTRING  $1) }
         | '_'                  { reLocA $ sL1 $1 $ mkAnonWildCardTy }
+        -- Type variables are never exported, so `M.tyvar` will be rejected by the renamer.
+        -- We let it pass the parser because the renamer can generate a better error message.
+        | QVARID                      {% let qname = mkQual tvName (getQVARID $1)
+                                         in  acsa (\cs -> sL1a $1 (HsTyVar (EpAnn (glR $1) [] cs) NotPromoted (sL1n $1 $ qname)))}
 
 -- An inst_type is what occurs in the head of an instance decl
 --      e.g.  (Foo a, Gaz b) => Wibble a b

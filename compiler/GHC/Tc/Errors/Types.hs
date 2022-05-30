@@ -1717,6 +1717,7 @@ data TcRnMessage where
                  -> [ImportError]    -- ^ import errors that are relevant
                  -> [GhcHint]        -- ^ hints, e.g. enable DataKinds to refer to a promoted data constructor
                  -> TcRnMessage
+  TcRnTermNameInType :: RdrName -> [GhcHint] -> TcRnMessage
 
   {-| TcRnUntickedPromotedThing is a warning (controlled with -Wunticked-promoted-constructors)
       that is triggered by an unticked occurrence of a promoted data constructor.

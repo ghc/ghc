@@ -1,0 +1,8 @@
+T21605d.hs:3:9: [GHC-37479]
+    ‘Prelude.id’ is a term-level binding
+     and can not be used at the type level.
+    Suggested fix:
+      Perhaps use one of these:
+        type constructor or class ‘Prelude.Eq’ (imported from Prelude),
+        type constructor or class ‘Prelude.IO’ (imported from Prelude),
+        type constructor or class ‘Prelude.Ord’ (imported from Prelude)

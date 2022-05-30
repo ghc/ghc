@@ -432,6 +432,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnSectionWithoutParentheses"                 = 95880
   GhcDiagnosticCode "TcRnIllegalImplicitParameterBindings"          = 50730
   GhcDiagnosticCode "TcRnIllegalTupleSection"                       = 59155
+  GhcDiagnosticCode "TcRnTermNameInType"                            = 37479
 
   GhcDiagnosticCode "TcRnUntickedPromotedThing"                     = 49957
   GhcDiagnosticCode "TcRnIllegalBuiltinSyntax"                      = 39716

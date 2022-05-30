@@ -18,8 +18,11 @@ module GHC.Rename.Unbound
    , LookingFor(..)
    , unboundName
    , unboundNameX
+   , unboundTermNameInTypes
+   , IsTermInTypes(..)
    , notInScopeErr
    , nameSpacesRelated
+   , termNameInType
    )
 where
 
@@ -32,6 +35,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
 import GHC.Utils.Misc
+import GHC.Utils.Panic (panic)
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -93,6 +97,8 @@ data LookingFor = LF { lf_which :: WhatLooking
                      , lf_where :: WhereLooking
                      }
 
+data IsTermInTypes = UnknownTermInTypes RdrName | TermInTypes RdrName | NoTermInTypes
+
 mkUnboundNameRdr :: RdrName -> Name
 mkUnboundNameRdr rdr = mkUnboundName (rdrNameOcc rdr)
 
@@ -107,11 +113,24 @@ unboundName lf rdr = unboundNameX lf rdr []
 
 unboundNameX :: LookingFor -> RdrName -> [GhcHint] -> RnM Name
 unboundNameX looking_for rdr_name hints
+  = unboundNameOrTermInType NoTermInTypes looking_for rdr_name hints
+
+unboundTermNameInTypes :: LookingFor -> RdrName -> RdrName  -> RnM Name
+unboundTermNameInTypes looking_for rdr_name demoted_rdr_name
+  = unboundNameOrTermInType (UnknownTermInTypes demoted_rdr_name) looking_for rdr_name []
+
+-- Catches imported qualified terms in type signatures
+-- with proper error message and suggestions
+termNameInType :: LookingFor -> RdrName -> RdrName -> [GhcHint] -> RnM Name
+termNameInType looking_for rdr_name demoted_rdr_name external_hints
+  = unboundNameOrTermInType (TermInTypes demoted_rdr_name) looking_for rdr_name external_hints
+
+unboundNameOrTermInType :: IsTermInTypes -> LookingFor -> RdrName -> [GhcHint] -> RnM Name
+unboundNameOrTermInType if_term_in_type looking_for rdr_name hints
   = do  { dflags <- getDynFlags
         ; let show_helpful_errors = gopt Opt_HelpfulErrors dflags
-              err = notInScopeErr (lf_where looking_for) rdr_name
         ; if not show_helpful_errors
-          then addErr $ TcRnNotInScope err rdr_name [] hints
+          then addErr $ make_error [] hints
           else do { local_env  <- getLocalRdrEnv
                   ; global_env <- getGlobalRdrEnv
                   ; impInfo <- getImports
@@ -122,9 +141,19 @@ unboundNameX looking_for rdr_name hints
                             dflags hpt currmod global_env local_env impInfo
                             rdr_name
                   ; addErr $
-                      TcRnNotInScope err rdr_name imp_errs (hints ++ suggs) }
+                      make_error imp_errs (hints ++ suggs) }
         ; return (mkUnboundNameRdr rdr_name) }
+    where
+      name_to_search = case if_term_in_type of
+        NoTermInTypes                   -> rdr_name
+        UnknownTermInTypes demoted_name -> demoted_name
+        TermInTypes demoted_name        -> demoted_name
 
+      err = notInScopeErr (lf_where looking_for) name_to_search
+
+      make_error imp_errs hints = case if_term_in_type of
+        TermInTypes demoted_name -> TcRnTermNameInType demoted_name hints
+        _ -> TcRnNotInScope err name_to_search imp_errs hints
 
 notInScopeErr :: WhereLooking -> RdrName -> NotInScopeError
 notInScopeErr where_look rdr_name
@@ -288,7 +317,7 @@ importSuggestions looking_for global_env hpt currMod imports rdr_name
   (mod_name, occ_name) = case rdr_name of
     Unqual occ_name        -> (Nothing, occ_name)
     Qual mod_name occ_name -> (Just mod_name, occ_name)
-    _                      -> error "importSuggestions: dead code"
+    _                      -> panic "importSuggestions: dead code"
 
 
   -- What import statements provide "Mod" at all

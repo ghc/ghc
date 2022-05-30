@@ -2039,7 +2039,7 @@ extract_hs_tv_bndrs_kvs tv_bndrs =
 
 extract_tv :: LocatedN RdrName -> FreeKiTyVars -> FreeKiTyVars
 extract_tv tv acc =
-  if isRdrTyVar (unLoc tv) then tv:acc else acc
+  if isRdrTyVar (unLoc tv) && (not . isQual) (unLoc tv) then tv:acc else acc
 
 -- Deletes duplicates in a list of Located things. This is used to:
 --
