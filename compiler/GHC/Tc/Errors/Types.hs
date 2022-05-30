@@ -2158,22 +2158,22 @@ data TcRnMessage where
   -}
   TcRnIllegalBindingOfBuiltIn :: !OccName -> TcRnMessage
 
-  {- TcRnDeprecated is a warning that can happen when usage of something
-     is deprecated.
+  {- TcRnPragmaWarning is a warning that can happen when usage of something
+     is warned or deprecated by pragma.
 
     Test cases:
       DeprU
       T5281
       T5867
       rn050
-      rn066
+      rn066 (here is a warning, not deprecation)
       T3303
   -}
-  TcRnDeprecated :: {
-    depr_occ :: OccName,
-    depr_msg :: WarningTxt GhcRn,
-    depr_import_mod :: ModuleName,
-    depr_defined_mod :: ModuleName
+  TcRnPragmaWarning :: {
+    pragma_warning_occ :: OccName,
+    pragma_warning_msg :: WarningTxt GhcRn,
+    pragma_warning_import_mod :: ModuleName,
+    pragma_warning_defined_mod :: ModuleName
   } -> TcRnMessage
 
 -- | Specifies which back ends can handle a requested foreign import or export

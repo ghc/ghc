@@ -1554,11 +1554,11 @@ warnIfDeprecated gre@(GRE { gre_imp = iss })
          do { iface <- loadInterfaceForName doc name
             ; case lookupImpDeprec iface gre of
                 Just deprText -> addDiagnostic $
-                  TcRnDeprecated {
-                    depr_occ = occ,
-                    depr_msg = deprText,
-                    depr_import_mod = importSpecModule imp_spec,
-                    depr_defined_mod = definedMod
+                  TcRnPragmaWarning {
+                    pragma_warning_occ = occ,
+                    pragma_warning_msg = deprText,
+                    pragma_warning_import_mod = importSpecModule imp_spec,
+                    pragma_warning_defined_mod = definedMod
                   }
                 Nothing  -> return () } }
   | otherwise

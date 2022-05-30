@@ -946,17 +946,17 @@ instance Diagnostic TcRnMessage where
       text "Cannot redefine a Name retrieved by a Template Haskell quote:" <+> ppr name
     TcRnIllegalBindingOfBuiltIn name -> mkSimpleDecorated $
        text "Illegal binding of built-in syntax:" <+> ppr name
-    TcRnDeprecated {depr_occ, depr_msg, depr_import_mod, depr_defined_mod} -> mkSimpleDecorated $
-      sep [ sep [ text "In the use of"
-                <+> pprNonVarNameSpace (occNameSpace depr_occ)
-                <+> quotes (ppr depr_occ)
+    TcRnPragmaWarning {pragma_warning_occ, pragma_warning_msg, pragma_warning_import_mod, pragma_warning_defined_mod}
+      -> mkSimpleDecorated $
+        sep [ sep [ text "In the use of"
+                <+> pprNonVarNameSpace (occNameSpace pragma_warning_occ)
+                <+> quotes (ppr pragma_warning_occ)
                 , parens impMsg <> colon ]
-        , pprWarningTxtForMsg depr_msg ]
-        where
-          impMsg  = text "imported from" <+> ppr depr_import_mod <> extra
-          extra | depr_import_mod == depr_defined_mod = empty
-                | otherwise = text ", but defined in" <+> ppr depr_defined_mod
-
+          , pprWarningTxtForMsg pragma_warning_msg ]
+          where
+            impMsg  = text "imported from" <+> ppr pragma_warning_import_mod <> extra
+            extra | pragma_warning_import_mod == pragma_warning_defined_mod = empty
+                  | otherwise = text ", but defined in" <+> ppr pragma_warning_defined_mod
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -1268,7 +1268,7 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalBindingOfBuiltIn{}
       -> ErrorWithoutFlag
-    TcRnDeprecated{}
+    TcRnPragmaWarning{}
       -> WarningWithFlag Opt_WarnWarningsDeprecations
 
   diagnosticHints = \case
@@ -1582,7 +1582,7 @@ instance Diagnostic TcRnMessage where
       -> [SuggestSpecialiseVisibilityHints name]
     TcRnNameByTemplateHaskellQuote{} -> noHints
     TcRnIllegalBindingOfBuiltIn{} -> noHints
-    TcRnDeprecated{} -> noHints
+    TcRnPragmaWarning{} -> noHints
 
 
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",
