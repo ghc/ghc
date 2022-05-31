@@ -195,10 +195,13 @@ link env lc_cfg cfg logger dflags unit_env out include pkgs objFiles jsFiles isR
           BL.writeFile (out </> "rts.js") (BLC.pack (T.unpack rtsDeclsText)
                                            <> BL.fromChunks withRts
                                            <> BLC.pack (T.unpack $ rtsText cfg))
-        lla'    <- mapM (tryReadShimFile dflags) lla
-        llarch' <- mapM (readShimsArchive dflags) llarch
-        BL.writeFile (out </> "lib" <.> jsExt)
-                     (BL.fromChunks $ llarch' ++ lla')
+        -- FIXME (Sylvain, 2022-05): disable shims
+        -- lla'    <- mapM (tryReadShimFile dflags) lla
+        -- llarch' <- mapM (readShimsArchive dflags) llarch
+        -- let lib_js = BL.fromChunks $ llarch' ++ lla'
+        let lib_js = BL.empty
+        BL.writeFile (out </> "lib" <.> jsExt) lib_js
+
         if genBase
           then generateBase out lbase
           else when (    not (lcOnlyOut lc_cfg)
@@ -211,7 +214,8 @@ link env lc_cfg cfg logger dflags unit_env out include pkgs objFiles jsFiles isR
                  writeHtml    top out
                  writeRunMain top out
                  writeRunner lc_cfg out
-                 writeWebAppManifest top out
+                 -- FIXME (Sylvain 2022-05): disabled for now
+                 -- writeWebAppManifest top out
                  writeExterns out
 
 -- | link in memory
@@ -382,9 +386,9 @@ combineFiles :: JSLinkConfig
              -> IO ()
 combineFiles cfg top fp = do
   files   <- mapM (B.readFile.(fp</>)) ["rts.js", "lib.js", "out.js"]
-  runMain <- if   lcNoHsMain cfg
-             then pure mempty
-             else B.readFile (top </> "runmain.js")
+  let runMain
+        | lcNoHsMain cfg = mempty
+        | otherwise      = runMainJS
   writeBinaryFile (fp</>"all.js") (mconcat (files ++ [runMain]))
 
 -- | write the index.html file that loads the program if it does not exit
@@ -394,9 +398,24 @@ writeHtml :: FilePath -- ^ top level library directory
 writeHtml top out = do
   e <- doesFileExist htmlFile
   unless e $
-    B.readFile (top </>"template.html") >>= B.writeFile htmlFile
+    B.writeFile htmlFile templateHtml
   where
     htmlFile = out </> "index.html"
+
+
+templateHtml :: B.ByteString
+templateHtml =
+  "<!DOCTYPE html>\
+  \<html>\
+  \  <head>\
+  \    <script language=\"javascript\" src=\"rts.js\"></script>\
+  \    <script language=\"javascript\" src=\"lib.js\"></script>\
+  \    <script language=\"javascript\" src=\"out.js\"></script>\
+  \  </head>\
+  \  <body>\
+  \  </body>\
+  \  <script language=\"javascript\" src=\"runmain.js\" defer></script>\
+  \</html>"
 
 -- | write the runmain.js file that will be run with defer so that it runs after
 -- index.html is loaded
@@ -406,9 +425,12 @@ writeRunMain :: FilePath -- ^ top level library directory
 writeRunMain top out = do
   e <- doesFileExist runMainFile
   unless e $
-    B.readFile (top </> "runmain.js") >>= B.writeFile runMainFile
+    B.writeFile runMainFile runMainJS
   where
     runMainFile = out </> "runmain.js"
+
+runMainJS :: B.ByteString
+runMainJS = "h$main(h$mainZCZCMainzimain);\n"
 
 -- FIXME: Jeff (2022,03): Use Newtypes instead of Strings for these directories
 writeRunner :: JSLinkConfig -- ^ Settings
