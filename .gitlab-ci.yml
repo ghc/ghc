@@ -76,6 +76,14 @@ workflow:
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0-9]+\.[0-9]+/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
 
+# which versions of GHC to allow bootstrap with
+.bootstrap_matrix : &bootstrap_matrix
+  matrix:
+    - GHC_VERSION: 9.0.2
+      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10-ghc9_0:$DOCKER_REV"
+    - GHC_VERSION: 9.2.2
+      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+
 # Allow linters to fail on draft MRs.
 # This must be explicitly transcluded in lint jobs which
 # override `rules:`
@@ -546,12 +554,28 @@ source-tarball:
   artifacts:
     paths:
       - ghc-*.tar.xz
-      - hadrian-bootstrap-sources-*.tar.gz
   script:
     - ./boot
     - ./configure
     - ./hadrian/build source-dist
     - mv _build/source-dist/*.xz  .
+  rules:
+    - if: $NIGHTLY
+    - if: '$RELEASE_JOB == "yes"'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
+
+generate-hadrian-bootstrap-sources:
+  stage: full-build
+  tags:
+    - x86_64-linux
+  image: "$DOCKER_IMAGE"
+  dependencies: []
+  parallel: *bootstrap_matrix
+  artifacts:
+    paths:
+      - hadrian-bootstrap-sources-*.tar.gz
+  script:
+    - bash -c "[ $($GHC --numeric-version) = $GHC_VERSION ] || { echo $GHC_VERSION is not the same as the version of $GHC && exit 1; }"
     - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC fetch -o hadrian-bootstrap-sources-$GHC_VERSION
   rules:
     - if: $NIGHTLY
@@ -559,20 +583,37 @@ source-tarball:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
 
 
-test-bootstrap:
+package-hadrian-bootstrap-sources:
   stage: full-build
-  needs: [source-tarball]
   tags:
     - x86_64-linux
+  needs: ["generate-hadrian-bootstrap-sources"]
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  artifacts:
+    paths:
+      - hadrian-bootstrap-sources-all.tar.gz
+  script:
+    - tar -czvf hadrian-bootstrap-sources-all.tar.gz hadrian-bootstrap-sources-*.tar.gz
+  rules:
+    - if: $NIGHTLY
+    - if: '$RELEASE_JOB == "yes"'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
+
+test-bootstrap:
+  stage: full-build
+  needs: [generate-hadrian-bootstrap-sources, source-tarball]
+  tags:
+    - x86_64-linux
+  image: "$DOCKER_IMAGE"
+  parallel: *bootstrap_matrix
   dependencies: null
   script:
     - mkdir test-bootstrap
     - tar -xf ghc-*[0-9]-src.tar.xz -C test-bootstrap
     - tar -xf ghc-*-testsuite.tar.xz -C test-bootstrap
-    - cp hadrian-bootstrap-sources-*.tar.gz test-bootstrap/ghc-*
+    - cp hadrian-bootstrap-sources-$GHC_VERSION.tar.gz test-bootstrap/ghc-*
     - pushd test-bootstrap/ghc-*
-    - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC --bootstrap-sources hadrian-bootstrap-sources-*.tar.gz
+    - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC --bootstrap-sources hadrian-bootstrap-sources-$GHC_VERSION.tar.gz
     - export HADRIAN_PATH="$PWD/_build/bin/hadrian"
     - .gitlab/ci.sh setup
     # Bootstrapping should not depend on HAPPY or ALEX so set them to false
