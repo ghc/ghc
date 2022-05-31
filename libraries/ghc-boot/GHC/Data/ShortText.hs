@@ -29,6 +29,7 @@ module GHC.Data.ShortText (
         -- * ShortText
         ShortText(..),
         -- ** Conversion to and from String
+        singleton,
         pack,
         unpack,
         -- ** Operations
@@ -75,6 +76,10 @@ byteLength st = SBS.length $ contents st
 -- | /O(n)/ Convert a 'String' into a 'ShortText'.
 pack :: String -> ShortText
 pack s = unsafeDupablePerformIO $ ShortText <$> utf8EncodeShortByteString s
+
+-- | Create a singleton
+singleton :: Char -> ShortText
+singleton s = pack [s]
 
 -- | /O(n)/ Convert a 'ShortText' into a 'String'.
 unpack :: ShortText -> String
