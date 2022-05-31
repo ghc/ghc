@@ -454,6 +454,13 @@ Library
     if os(freebsd)
         cc-options: -DLIBICONV_PLUG
 
+    if os(ghcjs)
+        exposed-modules:
+            -- FIXME: Luite (2022,05): remove GHCJS name
+            GHCJS.Prim
+            GHCJS.Prim.Internal
+            GHCJS.Prim.Internal.Build
+
     -- We need to set the unit id to base (without a version number)
     -- as it's magic.
     ghc-options: -this-unit-id base
