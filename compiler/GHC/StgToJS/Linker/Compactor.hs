@@ -300,7 +300,11 @@ renameInternals ln_cfg cfg cs0 rtsDeps stats0a = (cs, stats, meta)
 
     renamed :: State CompactorState ([JStat], JStat)
     renamed
-      | csDebugAlloc cfg || csProf cfg = do -- FIXME: Jeff (2022,03): Move these Way flags into JSLinkConfig
+      -- | csDebugAlloc cfg || csProf cfg = do -- FIXME: Jeff (2022,03): Move these Way flags into JSLinkConfig
+
+      -- FIXME (Sylvain, 2022-05): forced for now until packStrings creates a
+      -- proper string table
+      | True = do
         cs <- get
         let renamedStats = map (\(s,_,_) -> identsS' (lookupRenamed cs) s) stats0
             statics      = map (renameStaticInfo cs)  $
@@ -774,8 +778,9 @@ compact ln_cfg cfg cs0 rtsDeps0 input0
   let rtsDeps1 = rtsDeps0 ++
                  map (<> "_e") rtsDeps0 ++
                  map (<> "_con_e") rtsDeps0
-      (cs1, input1) = packStrings ln_cfg cs0 input0
-  in  renameInternals ln_cfg cfg cs1 rtsDeps1 input1
+      -- FIXME (Sylvain, 2022-05): disabled (again)
+      -- (cs1, input1) = packStrings ln_cfg cs0 input0
+  in  renameInternals ln_cfg cfg cs0 rtsDeps1 input0
 
 
 -- hash compactification
