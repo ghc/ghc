@@ -78,6 +78,8 @@ import qualified Data.Set as Set
 ************************************************************************
 -}
 
+-- | Configuration for compilation pass to support Haskell Program
+-- Coverage.
 data CoverageConfig = CoverageConfig
   { coverageConfig_logger   :: Logger
 
@@ -90,11 +92,11 @@ data CoverageConfig = CoverageConfig
 addTicksToBinds
         :: CoverageConfig
         -> Module
-        -> ModLocation          -- ... off the current module
-        -> NameSet              -- Exported Ids.  When we call addTicksToBinds,
+        -> ModLocation          -- ^ location of the current module
+        -> NameSet              -- ^ Exported Ids.  When we call addTicksToBinds,
                                 -- isExportedId doesn't work yet (the desugarer
                                 -- hasn't set it), so we have to work from this set.
-        -> [TyCon]              -- Type constructor in this module
+        -> [TyCon]              -- ^ Type constructors in this module
         -> LHsBinds GhcTc
         -> IO (LHsBinds GhcTc, HpcInfo, Maybe ModBreaks)
 
@@ -225,15 +227,16 @@ writeMixEntries dflags mod count entries filename
 
 
 -- -----------------------------------------------------------------------------
--- TickDensity: where to insert ticks
+-- TickDensity
 
+-- | Where to insert ticks
 data TickDensity
-  = TickForCoverage       -- for Hpc
-  | TickForBreakPoints    -- for GHCi
-  | TickAllFunctions      -- for -prof-auto-all
-  | TickTopFunctions      -- for -prof-auto-top
-  | TickExportedFunctions -- for -prof-auto-exported
-  | TickCallSites         -- for stack tracing
+  = TickForCoverage       -- ^ for Hpc
+  | TickForBreakPoints    -- ^ for GHCi
+  | TickAllFunctions      -- ^ for -prof-auto-all
+  | TickTopFunctions      -- ^ for -prof-auto-top
+  | TickExportedFunctions -- ^ for -prof-auto-exported
+  | TickCallSites         -- ^ for stack tracing
   deriving Eq
 
 mkDensity :: TickishType -> DynFlags -> TickDensity
@@ -251,10 +254,10 @@ mkDensity tickish dflags = case tickish of
 
 -- | Decide whether to add a tick to a binding or not.
 shouldTickBind  :: TickDensity
-                -> Bool         -- top level?
-                -> Bool         -- exported?
-                -> Bool         -- simple pat bind?
-                -> Bool         -- INLINE pragma?
+                -> Bool         -- ^ top level?
+                -> Bool         -- ^ exported?
+                -> Bool         -- ^ simple pat bind?
+                -> Bool         -- ^ INLINE pragma?
                 -> Bool
 
 shouldTickBind density top_lev exported _simple_pat inline
@@ -1064,8 +1067,17 @@ data TickTransEnv = TTE { fileName     :: FastString
 
 --      deriving Show
 
-data TickishType = ProfNotes | HpcTicks | Breakpoints | SourceNotes
-                 deriving (Eq)
+-- | Reasons why we need ticks,
+data TickishType
+  -- | For profiling
+  = ProfNotes
+  -- | For Haskell Program Coverage
+  | HpcTicks
+  -- | For ByteCode interpreter break points
+  | Breakpoints
+  -- | For source notes
+  | SourceNotes
+  deriving (Eq)
 
 coveragePasses :: DynFlags -> [TickishType]
 coveragePasses dflags =
@@ -1315,7 +1327,6 @@ type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
 --  and the mix entries. We cheat, and hash the show'd string.
 -- This hash only has to be hashed at Mix creation time,
 -- and is for sanity checking only.
-
 mixHash :: FilePath -> UTCTime -> Int -> [MixEntry] -> Int
 mixHash file tm tabstop entries = fromIntegral $ hashString
         (show $ Mix file tm 0 tabstop entries)
@@ -1326,6 +1337,9 @@ mixHash file tm tabstop entries = fromIntegral $ hashString
 *              initialisation
 *                                                                      *
 ************************************************************************
+-}
+
+{- | Create HPC initialization C code for a module
 
 Each module compiled with -fhpc declares an initialisation function of
 the form `hpc_init_<module>()`, which is emitted into the _stub.c file
@@ -1335,12 +1349,13 @@ executed at startup time.
 The function's purpose is to call hs_hpc_module to register this
 module with the RTS, and it looks something like this:
 
-static void hpc_init_Main(void) __attribute__((constructor));
-static void hpc_init_Main(void)
-{extern StgWord64 _hpc_tickboxes_Main_hpc[];
- hs_hpc_module("Main",8,1150288664,_hpc_tickboxes_Main_hpc);}
+> static void hpc_init_Main(void) __attribute__((constructor));
+> static void hpc_init_Main(void)
+> {
+>   extern StgWord64 _hpc_tickboxes_Main_hpc[];
+>   hs_hpc_module("Main",8,1150288664,_hpc_tickboxes_Main_hpc);
+> }
 -}
-
 hpcInitCode :: Platform -> Module -> HpcInfo -> CStub
 hpcInitCode _ _ (NoHpcInfo {}) = mempty
 hpcInitCode platform this_mod (HpcInfo tickCount hashNo)
