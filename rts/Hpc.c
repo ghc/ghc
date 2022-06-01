@@ -241,7 +241,7 @@ startupHpc(void)
 
 /*
  * Called on a per-module basis, by a constructor function compiled
- * with each module (see GHC.HsToCore.Coverage.hpcInitCode), declaring
+ * with each module (see GHC.HsToCore.Ticks.hpcInitCode), declaring
  * where the tix boxes are stored in memory. This memory can be uninitized,
  * because we will initialize it with either the contents of the tix
  * file, or all zeros.

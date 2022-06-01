@@ -122,7 +122,7 @@ but several have a little bit of special treatment:
 * HsIf (if-the-else)
      if b then e1 else e2  ==>  ifThenElse b e1 e2
   We do this /only/ if rebindable syntax is on, because the coverage
-  checker looks for HsIf (see GHC.HsToCore.Coverage.addTickHsExpr)
+  checker looks for HsIf (see GHC.HsToCore.Ticks.addTickHsExpr)
   That means the typechecker and desugarer need to understand HsIf
   for the non-rebindable-syntax case.
 

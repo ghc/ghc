@@ -645,7 +645,7 @@ backendSptIsDynamic (Named ViaC) = False
 backendSptIsDynamic (Named Interpreter) = True
 backendSptIsDynamic (Named NoBackend) = False
 
--- | If this flag is set, then "GHC.HsToCore.Coverage"
+-- | If this flag is set, then "GHC.HsToCore.Ticks"
 -- inserts `Breakpoint` ticks.  Used only for the
 -- interpreter.
 backendWantsBreakpointTicks :: Backend -> Bool

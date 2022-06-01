@@ -453,7 +453,6 @@ Library
         GHC.HsToCore
         GHC.HsToCore.Arrows
         GHC.HsToCore.Binds
-        GHC.HsToCore.Coverage
         GHC.HsToCore.Docs
         GHC.HsToCore.Errors.Ppr
         GHC.HsToCore.Errors.Types
@@ -478,6 +477,7 @@ Library
         GHC.HsToCore.Pmc.Types
         GHC.HsToCore.Pmc.Utils
         GHC.HsToCore.Quote
+        GHC.HsToCore.Ticks
         GHC.HsToCore.Types
         GHC.HsToCore.Usage
         GHC.HsToCore.Utils

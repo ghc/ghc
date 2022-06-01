@@ -765,7 +765,7 @@ and abstractions to get back to an Id, with getIdFromTrivialExpr.
 
 Second, we have to ensure that we never try to substitute a literal
 for an Id in a breakpoint.  We ensure this by never storing an Id with
-an unlifted type in a Breakpoint - see GHC.HsToCore.Coverage.mkTickish.
+an unlifted type in a Breakpoint - see GHC.HsToCore.Ticks.mkTickish.
 Breakpoints can't handle free variables with unlifted types anyway.
 -}
 

@@ -10,8 +10,8 @@
 (c) University of Glasgow, 2007
 -}
 
-module GHC.HsToCore.Coverage
-  ( CoverageConfig (..)
+module GHC.HsToCore.Ticks
+  ( TicksConfig (..)
   , addTicksToBinds
   , hpcInitCode
   ) where
@@ -80,19 +80,19 @@ import qualified Data.Set as Set
 ************************************************************************
 -}
 
--- | Configuration for compilation pass to support Haskell Program
--- Coverage.
-data CoverageConfig = CoverageConfig
-  { coverageConfig_logger   :: Logger
+-- | Configuration for compilation pass to add tick for instrumentation
+-- to binding sites.
+data TicksConfig = TicksConfig
+  { ticksConfig_logger   :: Logger
 
   -- FIXME: replace this with the specific fields of DynFlags we care about.
-  , coverageConfig_dynFlags :: DynFlags
+  , ticksConfig_dynFlags :: DynFlags
 
-  , coverageConfig_mInterp  :: Maybe Interp
+  , ticksConfig_mInterp  :: Maybe Interp
   }
 
 addTicksToBinds
-        :: CoverageConfig
+        :: TicksConfig
         -> Module
         -> ModLocation          -- ^ location of the current module
         -> NameSet              -- ^ Exported Ids.  When we call addTicksToBinds,
@@ -102,10 +102,10 @@ addTicksToBinds
         -> LHsBinds GhcTc
         -> IO (LHsBinds GhcTc, HpcInfo, Maybe ModBreaks)
 
-addTicksToBinds (CoverageConfig
-                 { coverageConfig_logger = logger
-                 , coverageConfig_dynFlags = dflags
-                 , coverageConfig_mInterp = m_interp
+addTicksToBinds (TicksConfig
+                 { ticksConfig_logger = logger
+                 , ticksConfig_dynFlags = dflags
+                 , ticksConfig_mInterp = m_interp
                  })
                 mod mod_loc exports tyCons binds
   | let passes = coveragePasses dflags

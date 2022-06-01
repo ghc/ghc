@@ -33,7 +33,7 @@ import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Binds
 import GHC.HsToCore.Foreign.Decl
-import GHC.HsToCore.Coverage
+import GHC.HsToCore.Ticks
 import GHC.HsToCore.Docs
 
 import GHC.Tc.Types
@@ -152,10 +152,10 @@ deSugar hsc_env
         ; (binds_cvr, ds_hpc_info, modBreaks)
                          <- if not (isHsBootOrSig hsc_src)
                               then addTicksToBinds
-                                       (CoverageConfig
-                                        { coverageConfig_logger = hsc_logger hsc_env
-                                        , coverageConfig_dynFlags = hsc_dflags hsc_env
-                                        , coverageConfig_mInterp = hsc_interp hsc_env
+                                       (TicksConfig
+                                        { ticksConfig_logger = hsc_logger hsc_env
+                                        , ticksConfig_dynFlags = hsc_dflags hsc_env
+                                        , ticksConfig_mInterp = hsc_interp hsc_env
                                         })
                                        mod mod_loc
                                        export_set (typeEnvTyCons type_env) binds
