@@ -246,6 +246,7 @@ import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
 import GHC.Types.Basic ( IntWithInf, treatZeroAsInf )
+import GHC.Types.ProfAuto
 import qualified GHC.Types.FieldLabel as FieldLabel
 import GHC.Data.FastString
 import GHC.Utils.TmpFs
@@ -758,14 +759,6 @@ instance (Monad m, HasDynFlags m) => HasDynFlags (ExceptT e m) where
 
 class ContainsDynFlags t where
     extractDynFlags :: t -> DynFlags
-
-data ProfAuto
-  = NoProfAuto         -- ^ no SCC annotations added
-  | ProfAutoAll        -- ^ top-level and nested functions are annotated
-  | ProfAutoTop        -- ^ top-level functions annotated only
-  | ProfAutoExports    -- ^ exported functions annotated only
-  | ProfAutoCalls      -- ^ annotate call-sites
-  deriving (Eq,Enum)
 
 -----------------------------------------------------------------------------
 -- Accessessors from 'DynFlags'

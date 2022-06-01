@@ -12,14 +12,12 @@
 module GHC.HsToCore.Ticks
   ( TicksConfig (..)
   , Tick (..)
+  , TickishType (..)
   , addTicksToBinds
   , isGoodSrcSpan'
   ) where
 
 import GHC.Prelude as Prelude
-
-import GHC.Driver.Session
-import GHC.Driver.Backend
 
 import GHC.Hs
 import GHC.Unit
@@ -31,6 +29,8 @@ import GHC.Data.Maybe
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Data.SizedSeq
+
+import GHC.Driver.Flags (DumpFlag(..))
 
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
@@ -45,6 +45,7 @@ import GHC.Types.Name
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.Tickish
+import GHC.Types.ProfAuto
 
 import Control.Monad
 import Data.List (isSuffixOf, intersperse)
@@ -65,10 +66,17 @@ import qualified Data.Set as Set
 -- | Configuration for compilation pass to add tick for instrumentation
 -- to binding sites.
 data TicksConfig = TicksConfig
-  { ticksConfig_logger   :: Logger
+  { ticks_passes       :: ![TickishType]
+  -- ^ What purposes do we need ticks for
 
-  -- FIXME: replace this with the specific fields of DynFlags we care about.
-  , ticksConfig_dynFlags :: DynFlags
+  , ticks_profAuto     :: !ProfAuto
+  -- ^ What kind of {-# SCC #-} to add automatically
+
+  , ticks_countEntries :: !Bool
+  -- ^ Whether to count the entries to functions
+  --
+  -- Requires extra synchronization which can vastly degrade
+  -- performance.
   }
 
 data Tick = Tick
@@ -80,7 +88,8 @@ data Tick = Tick
 
 
 addTicksToBinds
-        :: TicksConfig
+        :: Logger
+        -> TicksConfig
         -> Module
         -> ModLocation          -- ^ location of the current module
         -> NameSet              -- ^ Exported Ids.  When we call addTicksToBinds,
@@ -90,12 +99,9 @@ addTicksToBinds
         -> LHsBinds GhcTc
         -> IO (LHsBinds GhcTc, Maybe (FilePath, SizedSeq Tick))
 
-addTicksToBinds (TicksConfig
-                 { ticksConfig_logger = logger
-                 , ticksConfig_dynFlags = dflags
-                 })
+addTicksToBinds logger cfg
                 mod mod_loc exports tyCons binds
-  | let passes = coveragePasses dflags
+  | let passes = ticks_passes cfg
   , not (null passes)
   , Just orig_file <- ml_hs_file mod_loc = do
 
@@ -105,7 +111,7 @@ addTicksToBinds (TicksConfig
             let env = TTE
                       { fileName     = mkFastString orig_file2
                       , declPath     = []
-                      , tte_countEntries = gopt Opt_ProfCountEntries dflags
+                      , tte_countEntries = ticks_countEntries cfg
                       , exports      = exports
                       , inlines      = emptyVarSet
                       , inScope      = emptyVarSet
@@ -114,7 +120,7 @@ addTicksToBinds (TicksConfig
                                                              RealSrcSpan l _ -> Just l
                                                              UnhelpfulSpan _ -> Nothing)
                                                 tyCons
-                      , density      = mkDensity tickish dflags
+                      , density      = mkDensity tickish $ ticks_profAuto cfg
                       , this_mod     = mod
                       , tickishType  = tickish
                       }
@@ -158,13 +164,13 @@ data TickDensity
   | TickCallSites         -- ^ for stack tracing
   deriving Eq
 
-mkDensity :: TickishType -> DynFlags -> TickDensity
-mkDensity tickish dflags = case tickish of
+mkDensity :: TickishType -> ProfAuto -> TickDensity
+mkDensity tickish pa = case tickish of
   HpcTicks             -> TickForCoverage
   SourceNotes          -> TickForCoverage
   Breakpoints          -> TickForBreakPoints
   ProfNotes ->
-    case profAuto dflags of
+    case pa of
       ProfAutoAll      -> TickAllFunctions
       ProfAutoTop      -> TickTopFunctions
       ProfAutoExports  -> TickExportedFunctions
@@ -245,7 +251,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
 
   -- See Note [inline sccs]
   tickish <- tickishType `liftM` getEnv
-  if inline && tickish == ProfNotes then return (L pos funBind) else do
+  case tickish of { ProfNotes | inline -> return (L pos funBind); _ -> do
 
   (fvs, mg) <-
         getFreeVars $
@@ -272,6 +278,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
   let mbCons = maybe Prelude.id (:)
   return $ L pos $ funBind { fun_matches = mg
                            , fun_tick = tick `mbCons` fun_tick funBind }
+  }
 
    where
    -- a binding is a simple pattern binding if it is a funbind with
@@ -1000,20 +1007,6 @@ data TickishType
   -- | For source notes
   | SourceNotes
   deriving (Eq)
-
-coveragePasses :: DynFlags -> [TickishType]
-coveragePasses dflags =
-    ifa (breakpointsEnabled dflags)          Breakpoints $
-    ifa (gopt Opt_Hpc dflags)                HpcTicks $
-    ifa (sccProfilingEnabled dflags &&
-         profAuto dflags /= NoProfAuto)      ProfNotes $
-    ifa (needSourceNotes dflags)          SourceNotes []
-  where ifa f x xs | f         = x:xs
-                   | otherwise = xs
-
--- | Should we produce 'Breakpoint' ticks?
-breakpointsEnabled :: DynFlags -> Bool
-breakpointsEnabled dflags = backendWantsBreakpointTicks (backend dflags)
 
 -- | Tickishs that only make sense when their source code location
 -- refers to the current file. This might not always be true due to

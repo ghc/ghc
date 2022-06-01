@@ -20,6 +20,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Config
+import GHC.Driver.Config.HsToCore.Ticks
 import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
 import GHC.Driver.Backend
@@ -155,10 +156,8 @@ deSugar hsc_env
         ; (binds_cvr, m_tickInfo)
                          <- if not (isHsBootOrSig hsc_src)
                               then addTicksToBinds
-                                       (TicksConfig
-                                        { ticksConfig_logger = hsc_logger hsc_env
-                                        , ticksConfig_dynFlags = hsc_dflags hsc_env
-                                        })
+                                       (hsc_logger hsc_env)
+                                       (initTicksConfig (hsc_dflags hsc_env))
                                        mod mod_loc
                                        export_set (typeEnvTyCons type_env) binds
                               else return (binds, Nothing)
