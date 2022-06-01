@@ -1,4 +1,4 @@
-
+{-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -34,6 +34,8 @@ import GHC.HsToCore.Expr
 import GHC.HsToCore.Binds
 import GHC.HsToCore.Foreign.Decl
 import GHC.HsToCore.Ticks
+import GHC.HsToCore.Breakpoints
+import GHC.HsToCore.Coverage
 import GHC.HsToCore.Docs
 
 import GHC.Tc.Types
@@ -62,6 +64,7 @@ import GHC.Builtin.Types
 import GHC.Data.FastString
 import GHC.Data.Maybe    ( expectJust )
 import GHC.Data.OrdList
+import GHC.Data.SizedSeq ( sizeSS )
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -92,6 +95,7 @@ import GHC.Unit.Module.Deps
 
 import Data.List (partition)
 import Data.IORef
+import Data.Traversable (for)
 
 {-
 ************************************************************************
@@ -147,19 +151,35 @@ deSugar hsc_env
      do { -- Desugar the program
         ; let export_set = availsToNameSet exports
               bcknd      = backend dflags
-              hpcInfo    = emptyHpcInfo other_hpc_info
 
-        ; (binds_cvr, ds_hpc_info, modBreaks)
+        ; (binds_cvr, m_tickInfo)
                          <- if not (isHsBootOrSig hsc_src)
                               then addTicksToBinds
                                        (TicksConfig
                                         { ticksConfig_logger = hsc_logger hsc_env
                                         , ticksConfig_dynFlags = hsc_dflags hsc_env
-                                        , ticksConfig_mInterp = hsc_interp hsc_env
                                         })
                                        mod mod_loc
                                        export_set (typeEnvTyCons type_env) binds
-                              else return (binds, hpcInfo, Nothing)
+                              else return (binds, Nothing)
+        ; modBreaks <- for
+           [ (i, s)
+           | i <- hsc_interp hsc_env
+           , (_, s) <- m_tickInfo
+           , backendWantsBreakpointTicks (backend dflags)
+           ]
+           $ \(interp, specs) -> mkModBreaks interp mod specs
+
+        ; ds_hpc_info <- case m_tickInfo of
+            Just (orig_file2, ticks)
+              | gopt Opt_Hpc $ hsc_dflags hsc_env
+              -> do
+              hashNo <- if gopt Opt_Hpc $ hsc_dflags hsc_env
+                then writeMixEntries (hpcDir dflags) mod ticks orig_file2
+                else return 0 -- dummy hash when none are written
+              pure $ HpcInfo (fromIntegral $ sizeSS ticks) hashNo
+            _ -> pure $ emptyHpcInfo other_hpc_info
+
         ; (msgs, mb_res) <- initDs hsc_env tcg_env $
                        do { ds_ev_binds <- dsEvBinds ev_binds
                           ; core_prs <- dsTopLHsBinds binds_cvr

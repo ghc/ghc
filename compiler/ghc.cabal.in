@@ -453,6 +453,8 @@ Library
         GHC.HsToCore
         GHC.HsToCore.Arrows
         GHC.HsToCore.Binds
+        GHC.HsToCore.Breakpoints
+        GHC.HsToCore.Coverage
         GHC.HsToCore.Docs
         GHC.HsToCore.Errors.Ppr
         GHC.HsToCore.Errors.Types

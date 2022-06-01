@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveFunctor            #-}
-{-# LANGUAGE MonadComprehensions      #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies             #-}
 
@@ -12,8 +11,9 @@
 
 module GHC.HsToCore.Ticks
   ( TicksConfig (..)
+  , Tick (..)
   , addTicksToBinds
-  , hpcInitCode
+  , isGoodSrcSpan'
   ) where
 
 import GHC.Prelude as Prelude
@@ -21,13 +21,8 @@ import GHC.Prelude as Prelude
 import GHC.Driver.Session
 import GHC.Driver.Backend
 
-import qualified GHC.Runtime.Interpreter as GHCi
-import GHCi.RemoteTypes
-import GHC.ByteCode.Types
-import GHC.Stack.CCS
 import GHC.Hs
 import GHC.Unit
-import GHC.Cmm.CLabel
 
 import GHC.Core.Type
 import GHC.Core.TyCon
@@ -35,40 +30,27 @@ import GHC.Core.TyCon
 import GHC.Data.Maybe
 import GHC.Data.FastString
 import GHC.Data.Bag
+import GHC.Data.SizedSeq
 
-import GHC.Platform
-
-import GHC.Runtime.Interpreter.Types
-
-import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Monad
 import GHC.Utils.Logger
-
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Name.Set hiding (FreeVars)
 import GHC.Types.Name
-import GHC.Types.HpcInfo
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
-import GHC.Types.ForeignStubs
 import GHC.Types.Tickish
 
 import Control.Monad
 import Data.List (isSuffixOf, intersperse)
-import Data.Array
-import Data.Time
-import Data.Traversable (for)
-import System.Directory
 
 import Trace.Hpc.Mix
-import Trace.Hpc.Util
 
-import qualified Data.ByteString as BS
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -87,9 +69,15 @@ data TicksConfig = TicksConfig
 
   -- FIXME: replace this with the specific fields of DynFlags we care about.
   , ticksConfig_dynFlags :: DynFlags
-
-  , ticksConfig_mInterp  :: Maybe Interp
   }
+
+data Tick = Tick
+  { tick_loc   :: SrcSpan   -- ^ Tick source span
+  , tick_path  :: [String]  -- ^ Path to the declaration
+  , tick_ids   :: [OccName] -- ^ Identifiers being bound
+  , tick_label :: BoxLabel  -- ^ Label for the tick counter
+  }
+
 
 addTicksToBinds
         :: TicksConfig
@@ -100,12 +88,11 @@ addTicksToBinds
                                 -- hasn't set it), so we have to work from this set.
         -> [TyCon]              -- ^ Type constructors in this module
         -> LHsBinds GhcTc
-        -> IO (LHsBinds GhcTc, HpcInfo, Maybe ModBreaks)
+        -> IO (LHsBinds GhcTc, Maybe (FilePath, SizedSeq Tick))
 
 addTicksToBinds (TicksConfig
                  { ticksConfig_logger = logger
                  , ticksConfig_dynFlags = dflags
-                 , ticksConfig_mInterp = m_interp
                  })
                 mod mod_loc exports tyCons binds
   | let passes = coveragePasses dflags
@@ -134,27 +121,16 @@ addTicksToBinds (TicksConfig
                 (binds',_,st') = unTM (addTickLHsBinds binds) env st
             in (binds', st')
 
-          initState = TT { tickBoxCount = 0
-                         , mixEntries   = []
-                         , ccIndices    = newCostCentreState
-                         }
+          (binds1,st) = foldr tickPass (binds, initTTState) passes
 
-          (binds1,st) = foldr tickPass (binds, initState) passes
-
-     let tickCount = tickBoxCount st
-         entries = reverse $ mixEntries st
-     modBreaks <- for [i | i <- m_interp, breakpointsEnabled dflags] $
-       \interp -> mkModBreaks interp mod tickCount entries
-     hashNo <- if gopt Opt_Hpc dflags
-       then writeMixEntries (hpcDir dflags) mod tickCount entries orig_file2
-       else return 0 -- dummy hash when none are written
+          extendedMixEntries = ticks st
 
      putDumpFileMaybe logger Opt_D_dump_ticked "HPC" FormatHaskell
        (pprLHsBinds binds1)
 
-     return (binds1, HpcInfo tickCount hashNo, modBreaks)
+     return (binds1, Just (orig_file2, extendedMixEntries))
 
-  | otherwise = return (binds, emptyHpcInfo False, Nothing)
+  | otherwise = return (binds, Nothing)
 
 guessSourceFile :: LHsBinds GhcTc -> FilePath -> FilePath
 guessSourceFile binds orig_file =
@@ -167,64 +143,6 @@ guessSourceFile binds orig_file =
         (file_name:_) | ".hsc" `isSuffixOf` unpackFS file_name
                       -> unpackFS file_name
         _ -> orig_file
-
-
-mkModBreaks :: Interp -> Module -> Int -> [MixEntry_] -> IO ModBreaks
-mkModBreaks interp mod count entries
-  = do
-    breakArray <- GHCi.newBreakArray interp (length entries)
-    ccs <- mkCCSArray interp mod count entries
-    let
-           locsTicks  = listArray (0,count-1) [ span  | (span,_,_,_)  <- entries ]
-           varsTicks  = listArray (0,count-1) [ vars  | (_,_,vars,_)  <- entries ]
-           declsTicks = listArray (0,count-1) [ decls | (_,decls,_,_) <- entries ]
-    return $ emptyModBreaks
-                       { modBreaks_flags = breakArray
-                       , modBreaks_locs  = locsTicks
-                       , modBreaks_vars  = varsTicks
-                       , modBreaks_decls = declsTicks
-                       , modBreaks_ccs   = ccs
-                       }
-
-mkCCSArray
-  :: Interp -> Module -> Int -> [MixEntry_]
-  -> IO (Array BreakIndex (RemotePtr GHC.Stack.CCS.CostCentre))
-mkCCSArray interp modul count entries
-  | GHCi.interpreterProfiled interp = do
-      let module_str = moduleNameString (moduleName modul)
-      costcentres <- GHCi.mkCostCentres interp module_str (map mk_one entries)
-      return (listArray (0,count-1) costcentres)
-  | otherwise = return (listArray (0,-1) [])
- where
-    mk_one (srcspan, decl_path, _, _) = (name, src)
-      where name = concat (intersperse "." decl_path)
-            src = renderWithContext defaultSDocContext (ppr srcspan)
-
-
-writeMixEntries
-  :: FilePath -> Module -> Int -> [MixEntry_] -> FilePath -> IO Int
-writeMixEntries hpc_dir mod count entries filename
-  = do
-        let
-            mod_name = moduleNameString (moduleName mod)
-
-            hpc_mod_dir
-              | moduleUnit mod == mainUnit  = hpc_dir
-              | otherwise = hpc_dir ++ "/" ++ unitString (moduleUnit mod)
-
-            tabStop = 8 -- <tab> counts as a normal char in GHC's
-                        -- location ranges.
-
-        createDirectoryIfMissing True hpc_mod_dir
-        modTime <- getModificationUTCTime filename
-        let entries' = [ (hpcPos, box)
-                       | (span,_,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
-        when (entries' `lengthIsNot` count) $
-          panic "the number of .mix entries are inconsistent"
-        let hashNo = mixHash filename modTime tabStop entries'
-        mixCreate hpc_mod_dir mod_name
-                       $ Mix filename modTime (toHash hashNo) tabStop entries'
-        return hashNo
 
 
 -- -----------------------------------------------------------------------------
@@ -1038,17 +956,20 @@ addTickArithSeqInfo (FromThenTo e1 e2 e3) =
                 (addTickLHsExpr e2)
                 (addTickLHsExpr e3)
 
-data TickTransState = TT { tickBoxCount:: !Int
-                         , mixEntries  :: [MixEntry_]
+data TickTransState = TT { ticks       :: !(SizedSeq Tick)
                          , ccIndices   :: !CostCentreState
                          }
 
-addMixEntry :: MixEntry_ -> TM Int
+initTTState :: TickTransState
+initTTState = TT { ticks        = emptySS
+                 , ccIndices    = newCostCentreState
+                 }
+
+addMixEntry :: Tick -> TM Int
 addMixEntry ent = do
-  c <- tickBoxCount <$> getState
+  c <- fromIntegral . sizeSS . ticks <$> getState
   setState $ \st ->
-    st { tickBoxCount = c + 1
-       , mixEntries = ent : mixEntries st
+    st { ticks = addToSS (ticks st) ent
        }
   return c
 
@@ -1250,7 +1171,12 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
           --   * the simplifier might try to substitute a literal for
           --     the Id, and we can't handle that.
 
-      me = (pos, decl_path, map (nameOccName.idName) ids, boxLabel)
+      me = Tick
+        { tick_loc   = pos
+        , tick_path  = decl_path
+        , tick_ids   = map (nameOccName.idName) ids
+        , tick_label = boxLabel
+        }
 
       cc_name | topOnly   = head decl_path
               | otherwise = concat (intersperse "." decl_path)
@@ -1290,26 +1216,25 @@ mkBinTickBoxHpc :: (Bool -> BoxLabel) -> SrcSpan -> LHsExpr GhcTc
 mkBinTickBoxHpc boxLabel pos e = do
   env <- getEnv
   binTick <- HsBinTick
-    <$> addMixEntry (pos,declPath env, [],boxLabel True)
-    <*> addMixEntry (pos,declPath env, [],boxLabel False)
+    <$> addMixEntry (Tick { tick_loc = pos
+                          , tick_path = declPath env
+                          , tick_ids = []
+                          , tick_label = boxLabel True
+                          })
+    <*> addMixEntry (Tick { tick_loc = pos
+                          , tick_path = declPath env
+                          , tick_ids = []
+                          , tick_label = boxLabel False
+                          })
     <*> pure e
   tick <- HpcTick (this_mod env)
-    <$> addMixEntry (pos,declPath env, [],ExpBox False)
+    <$> addMixEntry (Tick { tick_loc = pos
+                          , tick_path = declPath env
+                          , tick_ids = []
+                          , tick_label = ExpBox False
+                          })
   let pos' = noAnnSrcSpan pos
   return $ L pos' $ XExpr $ HsTick tick (L pos' (XExpr binTick))
-
-mkHpcPos :: SrcSpan -> HpcPos
-mkHpcPos pos@(RealSrcSpan s _)
-   | isGoodSrcSpan' pos = toHpcPos (srcSpanStartLine s,
-                                    srcSpanStartCol s,
-                                    srcSpanEndLine s,
-                                    srcSpanEndCol s - 1)
-                              -- the end column of a SrcSpan is one
-                              -- greater than the last column of the
-                              -- span (see SrcLoc), whereas HPC
-                              -- expects to the column range to be
-                              -- inclusive, hence we subtract one above.
-mkHpcPos _ = panic "bad source span; expected such spans to be filtered out"
 
 hpcSrcSpan :: SrcSpan
 hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")
@@ -1320,66 +1245,3 @@ matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
         matchCount :: LMatch GhcTc body -> Int
         matchCount (L _ (Match { m_grhss = GRHSs _ grhss _ }))
           = length grhss
-
-type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
-
--- For the hash value, we hash everything: the file name,
---  the timestamp of the original source file, the tab stop,
---  and the mix entries. We cheat, and hash the show'd string.
--- This hash only has to be hashed at Mix creation time,
--- and is for sanity checking only.
-mixHash :: FilePath -> UTCTime -> Int -> [MixEntry] -> Int
-mixHash file tm tabstop entries = fromIntegral $ hashString
-        (show $ Mix file tm 0 tabstop entries)
-
-{-
-************************************************************************
-*                                                                      *
-*              initialisation
-*                                                                      *
-************************************************************************
--}
-
-{- | Create HPC initialization C code for a module
-
-Each module compiled with -fhpc declares an initialisation function of
-the form `hpc_init_<module>()`, which is emitted into the _stub.c file
-and annotated with __attribute__((constructor)) so that it gets
-executed at startup time.
-
-The function's purpose is to call hs_hpc_module to register this
-module with the RTS, and it looks something like this:
-
-> static void hpc_init_Main(void) __attribute__((constructor));
-> static void hpc_init_Main(void)
-> {
->   extern StgWord64 _hpc_tickboxes_Main_hpc[];
->   hs_hpc_module("Main",8,1150288664,_hpc_tickboxes_Main_hpc);
-> }
--}
-hpcInitCode :: Platform -> Module -> HpcInfo -> CStub
-hpcInitCode _ _ (NoHpcInfo {}) = mempty
-hpcInitCode platform this_mod (HpcInfo tickCount hashNo)
- = initializerCStub platform fn_name decls body
-  where
-    fn_name = mkInitializerStubLabel this_mod "hpc"
-    decls = text "extern StgWord64 " <> tickboxes <> text "[]" <> semi
-    body = text "hs_hpc_module" <>
-              parens (hcat (punctuate comma [
-                  doubleQuotes full_name_str,
-                  int tickCount, -- really StgWord32
-                  int hashNo,    -- really StgWord32
-                  tickboxes
-                ])) <> semi
-
-    tickboxes = pprCLabel platform CStyle (mkHpcTicksLabel $ this_mod)
-
-    module_name  = hcat (map (text.charToC) $ BS.unpack $
-                         bytesFS (moduleNameFS (moduleName this_mod)))
-    package_name = hcat (map (text.charToC) $ BS.unpack $
-                         bytesFS (unitFS  (moduleUnit this_mod)))
-    full_name_str
-       | moduleUnit this_mod == mainUnit
-       = module_name
-       | otherwise
-       = package_name <> char '/' <> module_name
