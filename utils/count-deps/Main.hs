@@ -40,8 +40,7 @@ printDeps libdir modName dot = do
   if not dot then
     do
       let modules = Map.keys modGraph
-          num = length modules
-      putStrLn $ "Found " ++ show num ++ " " ++ modName ++ " module dependencies"
+      putStrLn $ "Found " ++ modName ++ " module dependencies"
       forM_ modules putStrLn
   else
     -- * Copy the digraph output to a file ('deps.dot' say)

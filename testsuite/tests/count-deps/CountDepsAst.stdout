@@ -1,4 +1,4 @@
-Found 287 Language.Haskell.Syntax module dependencies
+Found Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.PrimOps.Ids
