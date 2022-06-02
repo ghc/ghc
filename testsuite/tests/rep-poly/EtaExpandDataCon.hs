@@ -39,7 +39,6 @@ newtype N3 a where
 
 foo3 :: (a %1 -> N3 a) -> N3 a
 foo3 = MkN3
-
 type D4 :: TYPE FloatRep -> Type -> Type
 data D4 a b = MkD4 a b b
 

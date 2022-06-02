@@ -2153,14 +2153,14 @@ splitPiTys ty = split ty ty []
 --   newtype N a = MkN (a -> N a)
 --   getRuntimeArgTys (N a) == repeat (a, VisArg)
 -- @
-getRuntimeArgTys :: Type -> [(Type, AnonArgFlag)]
+getRuntimeArgTys :: Type -> [(Scaled Type, AnonArgFlag)]
 getRuntimeArgTys = go
   where
-    go :: Type -> [(Type, AnonArgFlag)]
+    go :: Type -> [(Scaled Type, AnonArgFlag)]
     go (ForAllTy _ res)
       = go res
-    go (FunTy { ft_arg = arg, ft_res = res, ft_af = af })
-      = (arg, af) : go res
+    go (FunTy { ft_mult = w, ft_arg = arg, ft_res = res, ft_af = af })
+      = (Scaled w arg, af) : go res
     go ty
       | Just ty' <- coreView ty
       = go ty'

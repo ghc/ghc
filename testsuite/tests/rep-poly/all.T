@@ -83,6 +83,8 @@ test('RepPolyTupleSection', normal, compile_fail, [''])
 test('RepPolyUnboxedPatterns', normal, compile_fail, [''])
 test('RepPolyUnliftedDatatype', normal, compile, [''])
 test('RepPolyUnliftedDatatype2', normal, compile, ['-O'])
+test('RepPolyUnliftedNewtype', normal, compile,
+     ['-fno-warn-partial-type-signatures -fno-warn-deprecated-flags'])
 test('RepPolyWildcardPattern', normal, compile_fail, [''])
 test('RepPolyWrappedVar', normal, compile_fail, [''])
 test('RepPolyWrappedVar2', normal, compile, [''])
@@ -110,4 +112,5 @@ test('T20363_show_co', normal, compile_fail                         ##
 test('T20363b', normal, compile_fail, [''])                         ##
 test('RepPolyCase2', normal, compile_fail, [''])                    ##
 test('RepPolyRule3', normal, compile_fail, [''])                    ##
+test('RepPolyTuple2', normal, compile_fail, ['']) ## see #21683     ##
 ######################################################################

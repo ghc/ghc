@@ -826,7 +826,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                      then [mkHsCaseAlt lpat  cont']
                      else [mkHsCaseAlt lpat  cont',
                            mkHsCaseAlt lwpat fail']
-             body = mkLHsWrap (mkWpLet req_ev_binds) $
+             body = mkLHsWrap (mkWpEvLet req_ev_binds) $
                     L (getLoc lpat) $
                     HsCase noExtField (nlHsVar scrutinee) $
                     MG{ mg_alts = L (l2l $ getLoc lpat) cases
@@ -1009,7 +1009,7 @@ patSynBuilderOcc ps
   = Just $
     if add_void_arg
     then ( builder_expr   -- still just return builder_expr; the void# arg
-                          -- is added by dsConLike in the desugarer
+                          -- is added by dsHsConLike in the desugarer
          , tcFunResultTy builder_ty )
     else (builder_expr, builder_ty)
 

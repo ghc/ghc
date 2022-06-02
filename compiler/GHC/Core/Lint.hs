@@ -922,7 +922,7 @@ lintCoreExpr (Lit lit)
   = return (literalType lit, zeroUE)
 
 lintCoreExpr (Cast expr co)
-  = do (expr_ty, ue) <- markAllJoinsBad   $ lintCoreExpr expr
+  = do (expr_ty, ue) <- markAllJoinsBad $ lintCoreExpr expr
        to_ty <- lintCastExpr expr expr_ty co
        return (to_ty, ue)
 
@@ -1216,7 +1216,7 @@ checkCanEtaExpand (Var fun_id) args app_ty
             = ty : go (i+1) bndrs
 
       bad_arg_tys :: [Type]
-      bad_arg_tys = check_args . map fst $ getRuntimeArgTys app_ty
+      bad_arg_tys = check_args . map (scaledThing . fst) $ getRuntimeArgTys app_ty
         -- We use 'getRuntimeArgTys' to find all the argument types,
         -- including those hidden under newtypes. For example,
         -- if `FunNT a b` is a newtype around `a -> b`, then

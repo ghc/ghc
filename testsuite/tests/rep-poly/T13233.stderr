@@ -1,24 +1,26 @@
 
 T13233.hs:14:11: error:
-    • The data constructor argument in second position
-      does not have a fixed runtime representation.
-      Its type is:
-        b1 :: TYPE c3
-      Cannot unify ‘rep’ with the type variable ‘c3’
-      because it is not a concrete ‘RuntimeRep’.
+    • • The data constructor argument in first position
+        does not have a fixed runtime representation.
+        Its type is:
+          a :: TYPE rep
+      • The data constructor argument in second position
+        does not have a fixed runtime representation.
+        Its type is:
+          a :: TYPE rep
     • In the first argument of ‘bar’, namely ‘(#,#)’
       In the expression: bar (#,#)
       In an equation for ‘baz’: baz = bar (#,#)
-    • Relevant bindings include
-        baz :: a -> a -> (# a, a #) (bound at T13233.hs:14:1)
 
 T13233.hs:22:16: error:
-    • The data constructor argument in second position
-      does not have a fixed runtime representation.
-      Its type is:
-        b0 :: TYPE c1
-      Cannot unify ‘rep2’ with the type variable ‘c1’
-      because it is not a concrete ‘RuntimeRep’.
+    • • The data constructor argument in first position
+        does not have a fixed runtime representation.
+        Its type is:
+          a :: TYPE rep1
+      • The data constructor argument in second position
+        does not have a fixed runtime representation.
+        Its type is:
+          b :: TYPE rep2
     • In the first argument of ‘obscure’, namely ‘(#,#)’
       In the expression: obscure (#,#)
       In an equation for ‘quux’: quux = obscure (#,#)

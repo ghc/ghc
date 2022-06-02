@@ -250,6 +250,8 @@ in wrapper_reqd in GHC.Types.Id.Make.mkDataConRep.
 * Type variables may be permuted; see MkId
   Note [Data con wrappers and GADT syntax]
 
+* Datatype contexts require dropping some dictionary arguments.
+  See Note [Instantiating stupid theta].
 
 Note [The stupid context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1449,9 +1451,9 @@ dataConWrapperType :: DataCon -> Type
 -- mentions the family tycon, not the internal one.
 dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
                              dcOtherTheta = theta, dcOrigArgTys = arg_tys,
-                             dcOrigResTy = res_ty })
+                             dcOrigResTy = res_ty, dcStupidTheta = stupid })
   = mkInvisForAllTys user_tvbs $
-    mkInvisFunTysMany theta $
+    mkInvisFunTysMany (stupid ++ theta) $
     mkVisFunTys arg_tys $
     res_ty
 

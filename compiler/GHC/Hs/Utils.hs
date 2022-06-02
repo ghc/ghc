@@ -457,7 +457,11 @@ mkHsCharPrimLit :: Char -> HsLit (GhcPass p)
 mkHsCharPrimLit c = HsChar NoSourceText c
 
 mkConLikeTc :: ConLike -> HsExpr GhcTc
-mkConLikeTc con = XExpr (ConLikeTc con [] [])
+mkConLikeTc con = XExpr (ConLikeTc con arg_tys)
+  where
+    arg_tys = case con of
+      RealDataCon dc -> dataConOrigArgTys dc
+      PatSynCon {}   -> []
 
 {-
 ************************************************************************
@@ -812,7 +816,7 @@ mkHsWrapPatCo co pat ty | isTcReflCo co = pat
                         | otherwise     = XPat $ CoPat (mkWpCastN co) pat ty
 
 mkHsDictLet :: TcEvBinds -> LHsExpr GhcTc -> LHsExpr GhcTc
-mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
+mkHsDictLet ev_binds expr = mkLHsWrap (mkWpEvLet ev_binds) expr
 
 {-
 l

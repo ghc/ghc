@@ -31,7 +31,7 @@ import GHC.Prelude
 import Language.Haskell.Syntax.Binds
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprFunBind, pprPatBind )
-import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
+import {-# SOURCE #-} GHC.Hs.Pat  ( pprLPat )
 
 import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
@@ -679,7 +679,6 @@ data TcSpecPrags
   = IsDefaultMethod     -- ^ Super-specialised: a default method should
                         -- be macro-expanded at every call site
   | SpecPrags [LTcSpecPrag]
-  deriving Data
 
 -- | Located Type checker Specification Pragmas
 type LTcSpecPrag = Located TcSpecPrag
@@ -692,7 +691,6 @@ data TcSpecPrag
         InlinePragma
   -- ^ The Id to be specialised, a wrapper that specialises the
   -- polymorphic function, and inlining spec for the specialised function
-  deriving Data
 
 noSpecPrags :: TcSpecPrags
 noSpecPrags = SpecPrags []

@@ -33,6 +33,7 @@ import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
+import GHC.Tc.Types.Evidence
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -66,6 +67,10 @@ deriving instance Data (HsBindLR GhcTc GhcTc)
 deriving instance Data AbsBinds
 
 deriving instance Data ABExport
+deriving instance Data HsWrapper
+deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
+deriving instance Data TcSpecPrags
+deriving instance Data TcSpecPrag
 
 -- deriving instance DataId p => Data (RecordPatSynField p)
 deriving instance Data (RecordPatSynField GhcPs)

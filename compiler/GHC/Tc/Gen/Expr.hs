@@ -325,7 +325,6 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        ; let expr'       = ExplicitTuple x tup_args1 boxity
              missing_tys = [Scaled mult ty | (Missing (Scaled mult _), ty) <- zip tup_args1 arg_tys]
 
-             -- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
              -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
              act_res_ty = mkVisFunTys missing_tys (mkTupleTy1 boxity arg_tys)
 

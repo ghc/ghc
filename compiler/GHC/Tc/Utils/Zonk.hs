@@ -891,12 +891,12 @@ zonkExpr env (XExpr (WrapExpr (HsWrap co_fn expr)))
 zonkExpr env (XExpr (ExpansionExpr (HsExpanded a b)))
   = XExpr . ExpansionExpr . HsExpanded a <$> zonkExpr env b
 
-zonkExpr env (XExpr (ConLikeTc con tvs tys))
-  = XExpr . ConLikeTc con tvs <$> mapM zonk_scale tys
+zonkExpr env (XExpr (ConLikeTc con arg_tys))
+  = XExpr . ConLikeTc con <$> mapM zonk_scale arg_tys
   where
     zonk_scale (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX env m <*> pure ty
-    -- Only the multiplicity can contain unification variables
-    -- The tvs come straight from the data-con, and so are strictly redundant
+    -- Only the multiplicities can contain unification variables;
+    -- the types come straight from the data constructor.
     -- See Wrinkles of Note [Typechecking data constructors] in GHC.Tc.Gen.Head
 
 zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
@@ -1037,8 +1037,14 @@ zonkCoFn env (WpTyLam tv)   = assert (isImmutableTyVar tv) $
                                  ; return (env', WpTyLam tv') }
 zonkCoFn env (WpTyApp ty)   = do { ty' <- zonkTcTypeToTypeX env ty
                                  ; return (env, WpTyApp ty') }
-zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkTcEvBinds env bs
-                                 ; return (env1, WpLet bs') }
+zonkCoFn env (WpEvLet bs)   = do { (env1, bs') <- zonkTcEvBinds env bs
+                                 ; return (env1, WpEvLet bs') }
+zonkCoFn env (WpHsLet id rhs) = do { rhs' <- zonkExpr env rhs
+                                              -- NB: important to zonk RHS first, so that
+                                              -- the 'Id' has the most up-to-date type.
+                                   ; id' <- zonkId id
+                                   ; let env' = extendIdZonkEnv env id'
+                                   ; return (env', WpHsLet id' rhs') }
 zonkCoFn env (WpMultCoercion co) = do { co' <- zonkCoToCo env co
                                       ; return (env, WpMultCoercion co') }
 

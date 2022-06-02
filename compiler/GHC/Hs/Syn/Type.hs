@@ -138,7 +138,7 @@ hsExprType (HsStatic (_, ty) _s) = ty
 hsExprType (HsPragE _ _ e) = lhsExprType e
 hsExprType (XExpr (WrapExpr (HsWrap wrap e))) = hsWrapperType wrap $ hsExprType e
 hsExprType (XExpr (ExpansionExpr (HsExpanded _ tc_e))) = hsExprType tc_e
-hsExprType (XExpr (ConLikeTc con _ _)) = conLikeType con
+hsExprType (XExpr (ConLikeTc con _)) = conLikeType con
 hsExprType (XExpr (HsTick _ e)) = lhsExprType e
 hsExprType (XExpr (HsBinTick _ _ e)) = lhsExprType e
 
@@ -186,7 +186,8 @@ hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
     go (WpEvApp _)        = liftPRType $ funResultTy
     go (WpTyLam tv)       = liftPRType $ mkForAllTy tv Inferred
     go (WpTyApp ta)       = \(ty,tas) -> (ty, ta:tas)
-    go (WpLet _)          = id
+    go (WpEvLet _)        = id
+    go (WpHsLet {})       = id
     go (WpMultCoercion _) = id
 
 lhsCmdTopType :: LHsCmdTop GhcTc -> Type

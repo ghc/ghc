@@ -30,7 +30,7 @@ import GHC.Driver.Config
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.Module
 
-import {-# SOURCE #-}   GHC.HsToCore.Expr  ( dsLExpr )
+import {-# SOURCE #-}   GHC.HsToCore.Expr  ( dsExpr, dsLExpr )
 import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 
 import GHC.HsToCore.Monad
@@ -697,7 +697,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              (spec_bndrs, spec_app) = collectHsWrapBinders spec_co
                -- spec_co looks like
                --         \spec_bndrs. [] spec_args
-               -- perhaps with the body of the lambda wrapped in some WpLets
+               -- perhaps with the body of the lambda wrapped in some WpEvLets
                -- E.g. /\a \(d:Eq a). let d2 = $df d in [] (Maybe a) d2
 
        ; core_app <- dsHsWrapper spec_app
@@ -1127,13 +1127,16 @@ dsHsWrapper WpHole            = return $ \e -> e
 dsHsWrapper (WpTyApp ty)      = return $ \e -> App e (Type ty)
 dsHsWrapper (WpEvLam ev)      = return $ Lam ev
 dsHsWrapper (WpTyLam tv)      = return $ Lam tv
-dsHsWrapper (WpLet ev_binds)  = do { bs <- dsTcEvBinds ev_binds
+dsHsWrapper (WpHsLet id rhs)  = do { rhs <- dsExpr rhs
+                                   ; return (mkCoreLet (NonRec id rhs)) }
+dsHsWrapper (WpEvLet ev_binds)= do { bs <- dsTcEvBinds ev_binds
                                    ; return (mkCoreLets bs) }
 dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
                                    ; return (w1 . w2) }
 dsHsWrapper (WpFun c1 c2 (Scaled w t1))  -- See Note [Desugaring WpFun]
-                              = do { x <- newSysLocalDs w t1
+                              = do { x <- setOneShotLambda <$> newSysLocalDs w t1
+                                          -- SLD TODO: debugging perf regressions in eta-expansion.
                                    ; w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
                                    ; let app f a = mkCoreAppDs (text "dsHsWrapper") f a

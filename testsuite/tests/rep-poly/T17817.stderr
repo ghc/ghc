@@ -4,15 +4,6 @@ T17817.hs:16:10: error:
       The first argument of ‘mkWeak#’
       does not have a fixed runtime representation.
       Its type is:
-        a0 :: TYPE ('BoxedRep c0)
-      Cannot unify ‘l’ with the type variable ‘c0’
-      because it is not a concrete ‘Levity’.
+        a :: TYPE ('BoxedRep l)
     • In the expression: mkWeak#
       In an equation for ‘primop’: primop = mkWeak#
-    • Relevant bindings include
-        primop :: a
-                  -> b
-                  -> (State# RealWorld -> (# State# RealWorld, c #))
-                  -> State# RealWorld
-                  -> (# State# RealWorld, Weak# b #)
-          (bound at T17817.hs:16:1)

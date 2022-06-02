@@ -261,7 +261,7 @@ dsExpr e@(XExpr ext_expr_tc)
   = case ext_expr_tc of
       ExpansionExpr (HsExpanded _ b) -> dsExpr b
       WrapExpr {}                    -> dsHsWrapped e
-      ConLikeTc con tvs tys          -> dsConLike con tvs tys
+      ConLikeTc con _                -> dsHsConLike con
       -- Hpc Support
       HsTick tickish e -> do
         e' <- dsLExpr e
@@ -767,29 +767,11 @@ dsHsConLike (PatSynCon ps)
   | Just (builder_name, _, add_void) <- patSynBuilder ps
   = do { builder_id <- dsLookupGlobalId builder_name
        ; return (if add_void
-                 then mkCoreApp (text "dsConLike" <+> ppr ps)
+                 then mkCoreApp (text "dsPatSynCon" <+> ppr ps)
                                 (Var builder_id) (Var voidPrimId)
                  else Var builder_id) }
   | otherwise
-  = pprPanic "dsConLike" (ppr ps)
-
-dsConLike :: ConLike -> [TcTyVar] -> [Scaled Type] -> DsM CoreExpr
--- This function desugars ConLikeTc
--- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
---     for what is going on here
-dsConLike con tvs tys
-  = do { ds_con <- dsHsConLike con
-       ; ids    <- newSysLocalsDs tys
-                   -- newSysLocalDs: /can/ be lev-poly; see
-       ; return (mkLams tvs $
-                 mkLams ids $
-                 ds_con `mkTyApps` mkTyVarTys tvs
-                        `mkVarApps` drop_stupid ids) }
-  where
-
-    drop_stupid = dropList (conLikeStupidTheta con)
-    -- drop_stupid: see Note [Instantiating stupid theta]
-    --              in GHC.Tc.Gen.Head
+  = pprPanic "dsHsConLike" (ppr ps)
 
 {-
 ************************************************************************

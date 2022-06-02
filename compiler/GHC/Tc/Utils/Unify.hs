@@ -1118,7 +1118,7 @@ tcSkolemiseScoped ctxt expected_ty thing_inside
                 tcExtendNameTyVarEnv tv_prs               $
                 thing_inside rho_ty
 
-       ; return (wrap <.> mkWpLet ev_binds, res) }
+       ; return (wrap <.> mkWpEvLet ev_binds, res) }
 
 tcSkolemise ctxt expected_ty thing_inside
   | isRhoTy expected_ty  -- Short cut for common case
@@ -1136,9 +1136,9 @@ tcSkolemise ctxt expected_ty thing_inside
               <- checkConstraints (getSkolemInfo skol_info) skol_tvs given $
                  thing_inside rho_ty
 
-        ; return (wrap <.> mkWpLet ev_binds, result) }
+        ; return (wrap <.> mkWpEvLet ev_binds, result) }
           -- The ev_binds returned by checkConstraints is very
-          -- often empty, in which case mkWpLet is a no-op
+          -- often empty, in which case mkWpEvLet is a no-op
 
 -- | Variant of 'tcSkolemise' that takes an ExpType
 tcSkolemiseET :: UserTypeCtxt -> ExpSigmaType

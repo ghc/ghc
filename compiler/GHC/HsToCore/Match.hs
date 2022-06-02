@@ -1072,7 +1072,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp (XExpr (ExpansionExpr (HsExpanded _ b))) (XExpr (ExpansionExpr (HsExpanded _ b'))) =
       exp b b'
     exp (HsVar _ i) (HsVar _ i') =  i == i'
-    exp (XExpr (ConLikeTc c _ _)) (XExpr (ConLikeTc c' _ _)) = c == c'
+    exp (XExpr (ConLikeTc c _)) (XExpr (ConLikeTc c' _)) = c == c'
     -- the instance for IPName derives using the id, so this works if the
     -- above does
     exp (HsIPVar _ i) (HsIPVar _ i') = i == i'

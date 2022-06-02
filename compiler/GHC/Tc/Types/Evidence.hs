@@ -8,7 +8,7 @@ module GHC.Tc.Types.Evidence (
   -- * HsWrapper
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
-  mkWpLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR,
+  mkWpLams, mkWpHsLet, mkWpEvLet, mkWpFun, mkWpCastN, mkWpCastR,
   collectHsWrapBinders,
   idHsWrapper, isIdHsWrapper,
   pprHsWrapper, hsWrapDictBinders,
@@ -64,6 +64,10 @@ module GHC.Tc.Types.Evidence (
   ) where
 
 import GHC.Prelude
+
+import Language.Haskell.Syntax.Expr  ( HsExpr )
+import GHC.Hs.Extension              ( GhcTc )
+import {-# SOURCE #-} GHC.Hs.Expr    () -- Outputable (HsExpr GhcTc)
 
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
@@ -258,13 +262,14 @@ data HsWrapper
   | WpTyApp KindOrType  -- [] t    the 't' is a type (not coercion)
 
 
-  | WpLet TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
+  | WpEvLet TcEvBinds           -- Non-empty (or possibly non-empty) evidence bindings,
                                 -- so that the identity coercion is always exactly WpHole
+
+  | WpHsLet Id (HsExpr GhcTc)
 
   | WpMultCoercion Coercion     -- Require that a Coercion be reflexive; otherwise,
                                 -- error in the desugarer. See GHC.Tc.Utils.Unify
                                 -- Note [Wrapper returned from tcSubMult]
-  deriving Data.Data
 
 -- | The Semigroup instance is a bit fishy, since @WpCompose@, as a data
 -- constructor, is "syntactic" and not associative. Concretely, if @a@, @b@,
@@ -337,10 +342,13 @@ mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
 mkWpLams :: [Var] -> HsWrapper
 mkWpLams ids = mk_co_lam_fn WpEvLam ids
 
-mkWpLet :: TcEvBinds -> HsWrapper
+mkWpEvLet :: TcEvBinds -> HsWrapper
 -- This no-op is a quite a common case
-mkWpLet (EvBinds b) | isEmptyBag b = WpHole
-mkWpLet ev_binds                   = WpLet ev_binds
+mkWpEvLet (EvBinds b) | isEmptyBag b = WpHole
+mkWpEvLet ev_binds                   = WpEvLet ev_binds
+
+mkWpHsLet :: Id -> HsExpr GhcTc -> HsWrapper
+mkWpHsLet = WpHsLet
 
 mk_co_lam_fn :: (a -> HsWrapper) -> [a] -> HsWrapper
 mk_co_lam_fn f as = foldr (\x wrap -> f x <.> wrap) WpHole as
@@ -362,7 +370,7 @@ hsWrapDictBinders :: HsWrapper -> Bag DictId
 -- (only) to allow the pattern-match overlap checker to know what Given
 -- dictionaries are in scope.
 --
--- We specifically do not collect dictionaries bound in a 'WpLet'. These are
+-- We specifically do not collect dictionaries bound in a 'WpEvLet'. These are
 -- either superclasses of lambda-bound ones, or (extremely numerous) results of
 -- binding Wanted dictionaries.  We definitely don't want all those cluttering
 -- up the Given dictionaries for pattern-match overlap checking!
@@ -376,7 +384,8 @@ hsWrapDictBinders wrap = go wrap
    go (WpEvApp {})        = emptyBag
    go (WpTyLam {})        = emptyBag
    go (WpTyApp {})        = emptyBag
-   go (WpLet   {})        = emptyBag
+   go (WpEvLet {})        = emptyBag
+   go (WpHsLet {})        = emptyBag
    go (WpMultCoercion {}) = emptyBag
 
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
@@ -991,7 +1000,8 @@ pprHsWrapper wrap pp_thing_inside
     help it (WpTyApp ty)  = no_parens  $ sep [it True, text "@" <> pprParendType ty]
     help it (WpEvLam id)  = add_parens $ sep [ text "\\" <> pprLamBndr id <> dot, it False]
     help it (WpTyLam tv)  = add_parens $ sep [text "/\\" <> pprLamBndr tv <> dot, it False]
-    help it (WpLet binds) = add_parens $ sep [text "let" <+> braces (ppr binds), it False]
+    help it (WpHsLet id rhs)= add_parens $ sep [text "let" <+> braces (ppr id <+> text "=" <+> ppr rhs), it False]
+    help it (WpEvLet binds)= add_parens $ sep [text "let" <+> braces (ppr binds), it False]
     help it (WpMultCoercion co)   = add_parens $ sep [it False, nest 2 (text "<multiplicity coercion>"
                                               <+> pprParendCo co)]
 

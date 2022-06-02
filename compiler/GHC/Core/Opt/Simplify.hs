@@ -2904,9 +2904,11 @@ doCaseToLet scrut case_bndr
   | isTyCoVar case_bndr    -- Respect GHC.Core
   = isTyCoArg scrut        -- Note [Core type and coercion invariant]
 
-  | isUnliftedType (idType case_bndr)
-    -- OK to call isUnliftedType: scrutinees always have a fixed RuntimeRep (see FRRCase)
-  = exprOkForSpeculation scrut
+ | isUnliftedType (exprType scrut)
+   -- We can call isUnliftedType here: scrutinees always have a fixed RuntimeRep (see FRRCase).
+   -- Note however that we must check 'scrut' (which is an 'OutExpr') and not 'case_bndr'
+   -- (which is an 'InId'): see Note [Dark corner with representation polymorphism].
+ = exprOkForSpeculation scrut
 
   | otherwise  -- Scrut has a lifted type
   = exprIsHNF scrut

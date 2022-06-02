@@ -1073,7 +1073,7 @@ isTrueLHsExpr (L _ (HsVar _ (L _ v)))
      || v `hasKey` getUnique trueDataConId
                                               = Just return
         -- trueDataConId doesn't have the same unique as trueDataCon
-isTrueLHsExpr (L _ (XExpr (ConLikeTc con _ _)))
+isTrueLHsExpr (L _ (XExpr (ConLikeTc con _)))
   | con `hasKey` getUnique trueDataCon = Just return
 isTrueLHsExpr (L _ (XExpr (HsTick tickish e)))
     | Just ticks <- isTrueLHsExpr e
