@@ -25,7 +25,7 @@ mkModBreaks interp mod extendedMixEntries
     let count = fromIntegral $ sizeSS extendedMixEntries
         entries = ssElts extendedMixEntries
 
-    breakArray <- GHCi.newBreakArray interp (length entries)
+    breakArray <- GHCi.newBreakArray interp count
     ccs <- mkCCSArray interp mod count entries
     let
            locsTicks  = listArray (0,count-1) [ tick_loc  t | t <- entries ]
