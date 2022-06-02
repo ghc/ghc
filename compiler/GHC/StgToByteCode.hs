@@ -69,7 +69,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Tickish
 
 import Data.List ( genericReplicate, genericLength, intersperse
-                 , partition, scanl', sort, sortBy, zip4, zip6, nub )
+                 , partition, scanl', sortBy, zip4, zip6 )
 import Foreign hiding (shiftL, shiftR)
 import Control.Monad
 import Data.Char
@@ -89,6 +89,7 @@ import GHC.Stack.CCS
 import Data.Either ( partitionEithers )
 
 import GHC.Stg.Syntax
+import qualified Data.IntSet as IntSet
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -991,16 +992,16 @@ doCase d s p scrut bndr alts
 
         pointers =
           extra_pointers ++
-          sort (filter (< bitmap_size') (map (+extra_slots) rel_slots))
+          filter (< bitmap_size') (map (+extra_slots) rel_slots)
           where
-          binds = Map.toList p
           -- NB: unboxed tuple cases bind the scrut binder to the same offset
           -- as one of the alt binders, so we have to remove any duplicates here:
-          rel_slots = nub $ map fromIntegral $ concatMap spread binds
-          spread (id, offset) | isUnboxedTupleType (idType id) ||
-                                isUnboxedSumType (idType id) = []
-                              | isFollowableArg (bcIdArgRep platform id) = [ rel_offset ]
-                              | otherwise                      = []
+          -- 'toAscList' takes care of sorting the result, which was previously done after the application of 'filter'.
+          rel_slots = IntSet.toAscList $ IntSet.fromList $ Map.elems $ Map.mapMaybeWithKey spread p
+          spread id offset | isUnboxedTupleType (idType id) ||
+                             isUnboxedSumType (idType id) = Nothing
+                           | isFollowableArg (bcIdArgRep platform id) = Just (fromIntegral rel_offset)
+                           | otherwise                      = Nothing
                 where rel_offset = trunc16W $ bytesToWords platform (d - offset)
 
         bitmap = intsToReverseBitmap platform bitmap_size'{-size-} pointers
