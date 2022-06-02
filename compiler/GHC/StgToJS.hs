@@ -1,0 +1,150 @@
+module GHC.StgToJS
+  ( stgToJS
+  )
+where
+
+import GHC.StgToJS.CodeGen
+
+
+-- Note [StgToJS design]
+-- ~~~~~~~~~~~~~~~~~~~~~
+--
+-- StgToJS ("JS backend") is adapted from GHCJS [GHCJS2013].
+--
+-- Haskell to JavaScript
+-- ~~~~~~~~~~~~~~~~~~~~~
+-- StgToJS converts STG into a JavaScript AST (in GHC.JS) that has been adapted
+-- from JMacro [JMacro].
+--
+-- Tail calls: translated code is tail call optimized through a trampoline,
+-- since JavaScript implementations don't always support tail calls.
+--  TODO: add GHCJS optimizer for this to be true
+--
+-- JavaScript ASTs are then optimized. A dataflow analysis is performed and then
+-- dead code and redundant assignments are removed.
+--
+-- Primitives
+-- ~~~~~~~~~~
+-- TODO: pointer emulation (Addr#)
+-- TODO: 64-bit primops
+-- TODO: JSVal#
+-- TODO: StablePtr#
+--
+-- Foreign JavaScript imports
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- StgToJS supports inline JavaScript code. Example:
+--
+--    > foreign import javascript unsafe
+--    >   "$1 + $2"
+--    >   plus :: Int -> Int -> Int
+--
+-- The parser is inherited from JMacro and supports local variable declarations,
+-- loops, etc. Local variables are converted to hygienic names to avoid capture.
+--
+-- TODO: argument order for multi-values primreps (Int64#, Word64#, Addr#)
+-- TODO: "$c" safe call continuation?
+--
+-- Memory management
+-- ~~~~~~~~~~~~~~~~~
+-- Stack: the Haskell stack is implemented with a dynamically growing JavaScript
+-- array ("h$stack").
+--  TODO: does it shrink sometimes?
+--  TODO: what are the elements of the stack? one JS object per stack frame?
+--
+-- Heap: objects on the heap ("closures") are represented as JavaScript objects
+-- with the following fields:
+--
+--  { f: function -- entry function
+--  , m: meta     -- meta data
+--  , d1: x       -- closure specific fields
+--  , d2: y
+--  }
+--
+-- Every heap object has an entry function "f".
+--
+-- Similarly to info tables in native code generation, the JS function object
+-- "f" also contains some metadata about the Haskell object:
+--
+--    { t: closure type
+--    , a: constructor tag / fun arity
+--    }
+--
+-- Note that functions in JS are objects so if "f" is a function we can:
+--  - call it, e.g. "f(arg0,arg1...)"
+--  - get/set its metadata, e.g. "var closureType = f.t"
+--
+-- THUNK =
+--  { f  = returns the object reduced to WHNF
+--  , m  = ?
+--  , d1 = ?
+--  , d2 = ?
+--  }
+--
+-- FUN =
+--  { f  = function itself
+--  , m  = ?
+--  , d1 = free variable 1
+--  , d2 = free variable 2
+--  }
+--
+-- PAP =
+--  { f  = ?
+--  , m  = ?
+--  , d1 = ?
+--  , d2 =
+--    { d1 = PAP arity
+--    }
+--  }
+--
+-- CON =
+--  { f  = entry function of the datacon worker
+--  , m  = 0
+--  , d1 = first arg
+--  , d2 = arity = 2: second arg
+--         arity > 2: { d1, d2, ...} object with remaining args (starts with "d1 = x2"!)
+--  }
+--
+-- BLACKHOLE =
+--  { f  = h$blackhole
+--  , m  = ?
+--  , d1 = owning TSO
+--  , d2 = waiters array
+--  }
+--
+-- StackFrame closures are *not* represented as JS objects. Instead they are
+-- "unpacked" in the stack, i.e. a stack frame occupies a few slots in the JS
+-- array representing the stack ("h$stack").
+--
+-- When a shared thunk is entered, it is overriden with a black hole ("eager
+-- blackholing") and an update frame is pushed on the stack.
+--
+-- Interaction with JavaScript's garbage collector
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Using JS objects to represent Haskell heap objects means that JS's GC does
+-- most of the memory management work.
+--
+-- However, GHC extends Haskell with features that rely on GC layer violation
+-- (weak references, finalizers, etc.). To support these features, a heap scan
+-- is can be performed (using TSOs, StablePtr, etc. as roots) to mark reachable
+-- objects. Scanning the heap is an expensive operation, but fortunately it
+-- doesn't need to happen too often and it can be disabled.
+--
+-- TODO: importance of eager blackholing
+--
+-- Concurrency
+-- ~~~~~~~~~~~
+-- The scheduler is implemented in JS and runs in a single JavaScript thread
+-- (similarly to the C RTS not using `-threaded`).
+--
+-- The scheduler relies on callbacks/continuations to interact with other JS
+-- codes (user interface, etc.). In particular, safe foreign import can use "$c"
+-- as a continuation function to return to Haskell code.
+--
+-- TODO: is this still true since 2013 or are we using more recent JS features now?
+-- TODO: synchronous threads
+--
+--
+-- REFERENCES
+--  * [GHCJS2013] "Demo Proposal: GHCJS, Concurrent Haskell in the Browser", Luite Stegeman,
+--    2013 (https://www.haskell.org/haskell-symposium/2013/ghcjs.pdf)
+--  * [JMacro] https://hackage.haskell.org/package/jmacro

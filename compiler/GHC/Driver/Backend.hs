@@ -193,8 +193,6 @@ import GHC.Platform
 ---------------------------------------------------------------------------------
 
 
-
-
 platformDefaultBackend :: Platform -> Backend
 platformDefaultBackend platform = if
       | platformUnregisterised platform -> viaCBackend
@@ -216,6 +214,14 @@ platformNcgSupported platform = if
          ArchAArch64   -> True
          _             -> False
 
+-- | Will this backend produce an object file on the disk?
+backendProducesObject :: Backend -> Bool
+backendProducesObject ViaC        = True
+backendProducesObject NCG         = True
+backendProducesObject LLVM        = True
+backendProducesObject JavaScript  = True
+backendProducesObject Interpreter = False
+backendProducesObject NoBackend   = False
 
 
 -- | A value of type @Backend@ represents one of GHC's back ends.
@@ -246,7 +252,7 @@ instance Show Backend where
   show = backendDescription
 
 
-ncgBackend, llvmBackend, viaCBackend, interpreterBackend, noBackend
+ncgBackend, llvmBackend, viaCBackend, interpreterBackend, jsBackend, noBackend
     :: Backend
 
 -- | The native code generator.
@@ -272,6 +278,23 @@ ncgBackend = Named NCG
 --
 -- See "GHC.CmmToLlvm"
 llvmBackend = Named LLVM
+
+-- | The JavaScript Backend
+--
+-- Compiles Stg code to JS, the relies on the
+-- JS toolchain to produce workable code.
+--
+-- Notable points are:
+-- 1. The JS backend /does not/ rely on GHC's native RTS or linker.
+-- 2. Instead, the JS backend writes its own RTS. This RTS is split between
+-- Haskell (see "GHC.StgToJS.Rts") and JavaScript (see "js" directory in root of
+-- GHC project).
+-- 3. "Linking" in the JS backend is not actually linking, rather it is merging
+-- JS concrete syntax with static guarentees that all symbols used are defined
+-- before their call sites (see "GHC.StgToJS.Linker").
+--
+-- See "GHC.StgToJS"
+jsBackend = Named JavaScript
 
 -- | Via-C ("unregisterised") backend.
 --
@@ -328,8 +351,9 @@ noBackend = Named NoBackend
 -- it without mutual recursion across module boundaries.)
 
 data PrimitiveImplementation
-    = LlvmPrimitives -- ^ Primitives supported by LLVM
-    | NcgPrimitives  -- ^ Primitives supported by the native code generator
+    = LlvmPrimitives    -- ^ Primitives supported by LLVM
+    | NcgPrimitives     -- ^ Primitives supported by the native code generator
+    | JSPrimitives      -- ^ Primitives supported by JS backend
     | GenericPrimitives -- ^ Primitives supported by all back ends
   deriving Show
 
@@ -343,6 +367,8 @@ data PrimitiveImplementation
 data DefunctionalizedAssemblerProg
   = StandardAssemblerProg
        -- ^ Use the standard system assembler
+  | JSAssemblerProg
+       -- ^ JS Backend compile to JS via Stg, and so does not use any assembler
   | DarwinClangAssemblerProg
        -- ^ If running on Darwin, use the assembler from the @clang@
        -- toolchain.  Otherwise use the standard system assembler.
@@ -359,6 +385,8 @@ data DefunctionalizedAssemblerProg
 data DefunctionalizedAssemblerInfoGetter
   = StandardAssemblerInfoGetter
        -- ^ Interrogate the standard system assembler
+  | JSAssemblerInfoGetter
+       -- ^ If using the JS backend; return 'Emscripten'
   | DarwinClangAssemblerInfoGetter
        -- ^ If running on Darwin, return `Clang`; otherwise
        -- interrogate the standard system assembler.
@@ -386,6 +414,7 @@ data DefunctionalizedCodeOutput
   = NcgCodeOutput
   | ViaCCodeOutput
   | LlvmCodeOutput
+  | JSCodeOutput
 
 
 -- | Names a function that tells the driver what should happen after
@@ -406,6 +435,7 @@ data DefunctionalizedPostHscPipeline
   = NcgPostHscPipeline
   | ViaCPostHscPipeline
   | LlvmPostHscPipeline
+  | JSPostHscPipeline
   | NoPostHscPipeline -- ^ After code generation, nothing else need happen.
 
 -- | Names a function that tells the driver what command-line options
@@ -431,42 +461,46 @@ data DefunctionalizedCDefs
 -- issuing warning messages /only/.  If code depends on
 -- what's in the string, you deserve what happens to you.
 backendDescription :: Backend -> String
-backendDescription (Named NCG) = "native code generator"
-backendDescription (Named LLVM) = "LLVM"
-backendDescription (Named ViaC) = "compiling via C"
+backendDescription (Named NCG)         = "native code generator"
+backendDescription (Named LLVM)        = "LLVM"
+backendDescription (Named ViaC)        = "compiling via C"
+backendDescription (Named JavaScript)  = "compiling to JavaScript via emscripten"
 backendDescription (Named Interpreter) = "byte-code interpreter"
-backendDescription (Named NoBackend) = "no code generated"
+backendDescription (Named NoBackend)   = "no code generated"
 
 -- | This flag tells the compiler driver whether the back
 -- end will write files: interface files and object files.
 -- It is typically true for "real" back ends that generate
 -- code into the filesystem.  (That means, not the interpreter.)
 backendWritesFiles :: Backend -> Bool
-backendWritesFiles (Named NCG) = True
-backendWritesFiles (Named LLVM) = True
-backendWritesFiles (Named ViaC) = True
+backendWritesFiles (Named NCG)         = True
+backendWritesFiles (Named LLVM)        = True
+backendWritesFiles (Named ViaC)        = True
+backendDescription (Named JavaScript)  = True
 backendWritesFiles (Named Interpreter) = False
-backendWritesFiles (Named NoBackend) = False
+backendWritesFiles (Named NoBackend)   = False
 
 -- | When the back end does write files, this value tells
 -- the compiler in what manner of file the output should go:
 -- temporary, persistent, or specific.
 backendPipelineOutput :: Backend -> PipelineOutput
-backendPipelineOutput (Named NCG) = Persistent
+backendPipelineOutput (Named NCG)  = Persistent
 backendPipelineOutput (Named LLVM) = Persistent
 backendPipelineOutput (Named ViaC) = Persistent
+backendPipelineOutput (Named JavaScript)  = Persistent
 backendPipelineOutput (Named Interpreter) = NoOutputFile
-backendPipelineOutput (Named NoBackend) = NoOutputFile
+backendPipelineOutput (Named NoBackend)   = NoOutputFile
 
 -- | This flag tells the driver whether the back end can
 -- reuse code (bytecode or object code) that has been
 -- loaded dynamically.  Likely true only of the interpreter.
 backendCanReuseLoadedCode :: Backend -> Bool
-backendCanReuseLoadedCode (Named NCG) = False
-backendCanReuseLoadedCode (Named LLVM) = False
-backendCanReuseLoadedCode (Named ViaC) = False
+backendCanReuseLoadedCode (Named NCG)         = False
+backendCanReuseLoadedCode (Named LLVM)        = False
+backendCanReuseLoadedCode (Named ViaC)        = False
+backendCanReuseLoadedCode (Named JavaScript)  = False
 backendCanReuseLoadedCode (Named Interpreter) = True
-backendCanReuseLoadedCode (Named NoBackend) = False
+backendCanReuseLoadedCode (Named NoBackend)   = False
 
 -- | It is is true of every back end except @-fno-code@
 -- that it "generates code."  Surprisingly, this property
@@ -486,33 +520,36 @@ backendCanReuseLoadedCode (Named NoBackend) = False
 --     to date).
 --
 backendGeneratesCode :: Backend -> Bool
-backendGeneratesCode (Named NCG) = True
-backendGeneratesCode (Named LLVM) = True
-backendGeneratesCode (Named ViaC) = True
+backendGeneratesCode (Named NCG)         = True
+backendGeneratesCode (Named LLVM)        = True
+backendGeneratesCode (Named ViaC)        = True
+backendGeneratesCode (Named JavaScript)  = True
 backendGeneratesCode (Named Interpreter) = True
-backendGeneratesCode (Named NoBackend) = False
+backendGeneratesCode (Named NoBackend)   = False
 
 -- | When set, this flag turns on interface writing for
 -- Backpack.  It should probably be the same as
 -- `backendGeneratesCode`, but it is kept distinct for
 -- reasons described in Note [-fno-code mode].
 backendSupportsInterfaceWriting :: Backend -> Bool
-backendSupportsInterfaceWriting (Named NCG) = True
-backendSupportsInterfaceWriting (Named LLVM) = True
-backendSupportsInterfaceWriting (Named ViaC) = True
+backendSupportsInterfaceWriting (Named NCG)         = True
+backendSupportsInterfaceWriting (Named LLVM)        = True
+backendSupportsInterfaceWriting (Named ViaC)        = True
+backendSupportsInterfaceWriting (Named JavaScript)  = True
 backendSupportsInterfaceWriting (Named Interpreter) = True
-backendSupportsInterfaceWriting (Named NoBackend) = False
+backendSupportsInterfaceWriting (Named NoBackend)   = False
 
 -- | When preparing code for this back end, the type
 -- checker should pay attention to SPECIALISE pragmas.  If
 -- this flag is `False`, then the type checker ignores
 -- SPECIALISE pragmas (for imported things?).
 backendRespectsSpecialise :: Backend -> Bool
-backendRespectsSpecialise (Named NCG) = True
-backendRespectsSpecialise (Named LLVM) = True
-backendRespectsSpecialise (Named ViaC) = True
+backendRespectsSpecialise (Named NCG)         = True
+backendRespectsSpecialise (Named LLVM)        = True
+backendRespectsSpecialise (Named ViaC)        = True
+backendRespectsSpecialise (Named JavaScript)  = True
 backendRespectsSpecialise (Named Interpreter) = False
-backendRespectsSpecialise (Named NoBackend) = False
+backendRespectsSpecialise (Named NoBackend)   = False
 
 -- | This back end wants the `mi_globals` field of a
 -- `ModIface` to be populated (with the top-level bindings
@@ -521,11 +558,12 @@ backendRespectsSpecialise (Named NoBackend) = False
 -- (After typechecking a module, Haddock wants access to
 -- the module's `GlobalRdrEnv`.)
 backendWantsGlobalBindings :: Backend -> Bool
-backendWantsGlobalBindings (Named NCG) = False
-backendWantsGlobalBindings (Named LLVM) = False
-backendWantsGlobalBindings (Named ViaC) = False
+backendWantsGlobalBindings (Named NCG)         = False
+backendWantsGlobalBindings (Named LLVM)        = False
+backendWantsGlobalBindings (Named ViaC)        = False
+backendWantsGlobalBindings (Named JavaScript)  = False
 backendWantsGlobalBindings (Named Interpreter) = True
-backendWantsGlobalBindings (Named NoBackend) = True
+backendWantsGlobalBindings (Named NoBackend)   = True
 
 -- | The back end targets a technology that implements
 -- `switch` natively.  (For example, LLVM or C.) Therefore
@@ -533,11 +571,12 @@ backendWantsGlobalBindings (Named NoBackend) = True
 -- form into a decision tree with jump tables at the
 -- leaves.
 backendHasNativeSwitch :: Backend -> Bool
-backendHasNativeSwitch (Named NCG) = False
-backendHasNativeSwitch (Named LLVM) = True
-backendHasNativeSwitch (Named ViaC) = True
+backendHasNativeSwitch (Named NCG)         = False
+backendHasNativeSwitch (Named LLVM)        = True
+backendHasNativeSwitch (Named ViaC)        = True
+backendHasNativeSwitch (Named JavaScript)  = True
 backendHasNativeSwitch (Named Interpreter) = False
-backendHasNativeSwitch (Named NoBackend) = False
+backendHasNativeSwitch (Named NoBackend)   = False
 
 -- | As noted in the documentation for
 -- `PrimitiveImplementation`, certain primitives have
@@ -546,11 +585,12 @@ backendHasNativeSwitch (Named NoBackend) = False
 -- "GHC.StgToCmm.Prim" what implementations to use with
 -- this back end.
 backendPrimitiveImplementation :: Backend -> PrimitiveImplementation
-backendPrimitiveImplementation (Named NCG) = NcgPrimitives
-backendPrimitiveImplementation (Named LLVM) = LlvmPrimitives
-backendPrimitiveImplementation (Named ViaC) = GenericPrimitives
+backendPrimitiveImplementation (Named NCG)         = NcgPrimitives
+backendPrimitiveImplementation (Named LLVM)        = LlvmPrimitives
+backendPrimitiveImplementation (Named JavaScript)  = JSPrimitives
+backendPrimitiveImplementation (Named ViaC)        = GenericPrimitives
 backendPrimitiveImplementation (Named Interpreter) = GenericPrimitives
-backendPrimitiveImplementation (Named NoBackend) = GenericPrimitives
+backendPrimitiveImplementation (Named NoBackend)   = GenericPrimitives
 
 -- | When this value is `IsValid`, the back end is
 -- compatible with vector instructions.  When it is
@@ -560,6 +600,7 @@ backendSimdValidity :: Backend -> Validity' String
 backendSimdValidity (Named NCG) = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
 backendSimdValidity (Named LLVM) = IsValid
 backendSimdValidity (Named ViaC) = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
+backendSimdJavaScript (Named JavaScript) = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
 backendSimdValidity (Named Interpreter) = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
 backendSimdValidity (Named NoBackend) = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
 
@@ -567,11 +608,12 @@ backendSimdValidity (Named NoBackend) = NotValid $ unlines ["SIMD vector instruc
 -- binary blobs.  See Note [Embedding large binary blobs]
 -- in "GHC.CmmToAsm.Ppr".
 backendSupportsEmbeddedBlobs :: Backend -> Bool
-backendSupportsEmbeddedBlobs (Named NCG) = True
-backendSupportsEmbeddedBlobs (Named LLVM) = False
-backendSupportsEmbeddedBlobs (Named ViaC) = False
+backendSupportsEmbeddedBlobs (Named NCG)         = True
+backendSupportsEmbeddedBlobs (Named LLVM)        = False
+backendSupportsEmbeddedBlobs (Named ViaC)        = False
+backendSupportsEmbeddedBlobs (Named JavaScript)  = False
 backendSupportsEmbeddedBlobs (Named Interpreter) = False
-backendSupportsEmbeddedBlobs (Named NoBackend) = False
+backendSupportsEmbeddedBlobs (Named NoBackend)   = False
 
 -- | This flag tells the compiler driver that the back end
 -- does not support every target platform; it supports
@@ -581,22 +623,24 @@ backendSupportsEmbeddedBlobs (Named NoBackend) = False
 -- platform support, the driver fails over to the LLVM
 -- back end.
 backendNeedsPlatformNcgSupport :: Backend -> Bool
-backendNeedsPlatformNcgSupport (Named NCG) = True
-backendNeedsPlatformNcgSupport (Named LLVM) = False
-backendNeedsPlatformNcgSupport (Named ViaC) = False
+backendNeedsPlatformNcgSupport (Named NCG)         = True
+backendNeedsPlatformNcgSupport (Named LLVM)        = False
+backendNeedsPlatformNcgSupport (Named ViaC)        = False
+backendNeedsPlatformNcgSupport (Named JavaScript)  = False
 backendNeedsPlatformNcgSupport (Named Interpreter) = False
-backendNeedsPlatformNcgSupport (Named NoBackend) = False
+backendNeedsPlatformNcgSupport (Named NoBackend)   = False
 
 -- | This flag is set if the back end can generate code
 -- for proc points.  If the flag is not set, then a Cmm
 -- pass needs to split proc points (that is, turn each
 -- proc point into a standalone procedure).
 backendSupportsUnsplitProcPoints :: Backend -> Bool
-backendSupportsUnsplitProcPoints (Named NCG) = True
-backendSupportsUnsplitProcPoints (Named LLVM) = False
-backendSupportsUnsplitProcPoints (Named ViaC) = False
+backendSupportsUnsplitProcPoints (Named NCG)         = True
+backendSupportsUnsplitProcPoints (Named LLVM)        = False
+backendSupportsUnsplitProcPoints (Named ViaC)        = False
+backendSupportsUnsplitProcPoints (Named JavaScript)  = False
 backendSupportsUnsplitProcPoints (Named Interpreter) = False
-backendSupportsUnsplitProcPoints (Named NoBackend) = False
+backendSupportsUnsplitProcPoints (Named NoBackend)   = False
 
 -- | This flag guides the driver in resolving issues about
 -- API support on the target platform. If the flag is set,
@@ -609,113 +653,124 @@ backendSupportsUnsplitProcPoints (Named NoBackend) = False
 --      this back end can replace compilation via C.
 --
 backendSwappableWithViaC :: Backend -> Bool
-backendSwappableWithViaC (Named NCG) = True
-backendSwappableWithViaC (Named LLVM) = True
-backendSwappableWithViaC (Named ViaC) = False
+backendSwappableWithViaC (Named NCG)         = True
+backendSwappableWithViaC (Named LLVM)        = True
+backendSwappableWithViaC (Named ViaC)        = False
+backendSwappableWithViaC (Named JavaScript)  = False
 backendSwappableWithViaC (Named Interpreter) = False
-backendSwappableWithViaC (Named NoBackend) = False
+backendSwappableWithViaC (Named NoBackend)   = False
 
 -- | This flag is true if the back end works *only* with
 -- the unregisterised ABI.
 backendUnregisterisedAbiOnly :: Backend -> Bool
-backendUnregisterisedAbiOnly (Named NCG) = False
-backendUnregisterisedAbiOnly (Named LLVM) = False
-backendUnregisterisedAbiOnly (Named ViaC) = True
+backendUnregisterisedAbiOnly (Named NCG)         = False
+backendUnregisterisedAbiOnly (Named LLVM)        = False
+backendUnregisterisedAbiOnly (Named ViaC)        = True
+backendUnregisterisedAbiOnly (Named JavaScript)  = False
 backendUnregisterisedAbiOnly (Named Interpreter) = False
-backendUnregisterisedAbiOnly (Named NoBackend) = False
+backendUnregisterisedAbiOnly (Named NoBackend)   = False
 
 -- | This flag is set if the back end generates C code in
 -- a @.hc@ file.  The flag lets the compiler driver know
 -- if the command-line flag @-C@ is meaningful.
 backendGeneratesHc :: Backend -> Bool
-backendGeneratesHc (Named NCG) = False
-backendGeneratesHc (Named LLVM) = False
-backendGeneratesHc (Named ViaC) = True
+backendGeneratesHc (Named NCG)         = False
+backendGeneratesHc (Named LLVM)        = False
+backendGeneratesHc (Named ViaC)        = True
+backendGeneratesHc (Named JavaScript)  = False
 backendGeneratesHc (Named Interpreter) = False
-backendGeneratesHc (Named NoBackend) = False
+backendGeneratesHc (Named NoBackend)   = False
 
 -- | This flag says whether SPT (static pointer table)
 -- entries will be inserted dynamically if needed.  If
 -- this flag is `False`, then "GHC.Iface.Tidy" should emit C
 -- stubs that initialize the SPT entries.
 backendSptIsDynamic :: Backend -> Bool
-backendSptIsDynamic (Named NCG) = False
-backendSptIsDynamic (Named LLVM) = False
-backendSptIsDynamic (Named ViaC) = False
+backendSptIsDynamic (Named NCG)         = False
+backendSptIsDynamic (Named LLVM)        = False
+backendSptIsDynamic (Named ViaC)        = False
+backendSptIsDynamic (Named JavaScript)  = False
 backendSptIsDynamic (Named Interpreter) = True
-backendSptIsDynamic (Named NoBackend) = False
+backendSptIsDynamic (Named NoBackend)   = False
 
 -- | If this flag is set, then "GHC.HsToCore.Ticks"
 -- inserts `Breakpoint` ticks.  Used only for the
 -- interpreter.
 backendWantsBreakpointTicks :: Backend -> Bool
-backendWantsBreakpointTicks (Named NCG) = False
-backendWantsBreakpointTicks (Named LLVM) = False
-backendWantsBreakpointTicks (Named ViaC) = False
+backendWantsBreakpointTicks (Named NCG)         = False
+backendWantsBreakpointTicks (Named LLVM)        = False
+backendWantsBreakpointTicks (Named ViaC)        = False
+backendWantsBreakpointTicks (Named JavaScript)  = False
 backendWantsBreakpointTicks (Named Interpreter) = True
-backendWantsBreakpointTicks (Named NoBackend) = False
+backendWantsBreakpointTicks (Named NoBackend)   = False
 
 -- | If this flag is set, then the driver forces the
 -- optimization level to 0, issuing a warning message if
 -- the command line requested a higher optimization level.
 backendForcesOptimization0 :: Backend -> Bool
-backendForcesOptimization0 (Named NCG) = False
-backendForcesOptimization0 (Named LLVM) = False
-backendForcesOptimization0 (Named ViaC) = False
+backendForcesOptimization0 (Named NCG)         = False
+backendForcesOptimization0 (Named LLVM)        = False
+backendForcesOptimization0 (Named ViaC)        = False
+backendForcesOptimization0 (Named JavaScript)  = False
 backendForcesOptimization0 (Named Interpreter) = True
-backendForcesOptimization0 (Named NoBackend) = False
+backendForcesOptimization0 (Named NoBackend)   = False
 
 -- | I don't understand exactly how this works.  But if
 -- this flag is set *and* another condition is met, then
 -- @ghc/Main.hs@ will alter the `DynFlags` so that all the
 -- `hostFullWays` are asked for.  It is set only for the interpreter.
 backendNeedsFullWays :: Backend -> Bool
-backendNeedsFullWays (Named NCG) = False
-backendNeedsFullWays (Named LLVM) = False
-backendNeedsFullWays (Named ViaC) = False
+backendNeedsFullWays (Named NCG)         = False
+backendNeedsFullWays (Named LLVM)        = False
+backendNeedsFullWays (Named ViaC)        = False
+backendNeedsFullWays (Named JavaScript)  = False
 backendNeedsFullWays (Named Interpreter) = True
-backendNeedsFullWays (Named NoBackend) = False
+backendNeedsFullWays (Named NoBackend)   = False
 
 -- | This flag is also special for the interpreter: if a
 -- message about a module needs to be shown, do we know
 -- anything special about where the module came from?  The
 -- Boolean argument is a `recomp` flag.
 backendSpecialModuleSource :: Backend -> Bool -> Maybe String
-backendSpecialModuleSource (Named NCG) = const Nothing
-backendSpecialModuleSource (Named LLVM) = const Nothing
-backendSpecialModuleSource (Named ViaC) = const Nothing
+backendSpecialModuleSource (Named NCG)         = const Nothing
+backendSpecialModuleSource (Named LLVM)        = const Nothing
+backendSpecialModuleSource (Named ViaC)        = const Nothing
+backendSpecialModuleSource (Named JavaScript)  = const Nothing
 backendSpecialModuleSource (Named Interpreter) = \b -> if b then Just "interpreted" else Nothing
-backendSpecialModuleSource (Named NoBackend) = const (Just "nothing")
+backendSpecialModuleSource (Named NoBackend)   = const (Just "nothing")
 
 -- | This flag says whether the back end supports Haskell
 -- Program Coverage (HPC). If not, the compiler driver
 -- will ignore the `-fhpc` option (and will issue a
 -- warning message if it is used).
 backendSupportsHpc :: Backend -> Bool
-backendSupportsHpc (Named NCG) = True
-backendSupportsHpc (Named LLVM) = True
-backendSupportsHpc (Named ViaC) = True
+backendSupportsHpc (Named NCG)         = True
+backendSupportsHpc (Named LLVM)        = True
+backendSupportsHpc (Named ViaC)        = True
+backendSupportsHpc (Named JavaScript)  = False
 backendSupportsHpc (Named Interpreter) = False
-backendSupportsHpc (Named NoBackend) = True
+backendSupportsHpc (Named NoBackend)   = True
 
 -- | This flag says whether the back end supports foreign
 -- import of C functions.  ("Supports" means "does not
 -- barf on," so @-fno-code@ supports foreign C imports.)
 backendSupportsCImport :: Backend -> Bool
-backendSupportsCImport (Named NCG) = True
-backendSupportsCImport (Named LLVM) = True
-backendSupportsCImport (Named ViaC) = True
+backendSupportsCImport (Named NCG)         = True
+backendSupportsCImport (Named LLVM)        = True
+backendSupportsCImport (Named ViaC)        = True
+backendSupportsCImport (Named JavaScript)  = False
 backendSupportsCImport (Named Interpreter) = True
-backendSupportsCImport (Named NoBackend) = True
+backendSupportsCImport (Named NoBackend)   = True
 
 -- | This flag says whether the back end supports foreign
 -- export of Haskell functions to C.
 backendSupportsCExport :: Backend -> Bool
-backendSupportsCExport (Named NCG) = True
-backendSupportsCExport (Named LLVM) = True
-backendSupportsCExport (Named ViaC) = True
+backendSupportsCExport (Named NCG)         = True
+backendSupportsCExport (Named LLVM)        = True
+backendSupportsCExport (Named ViaC)        = True
+backendSupportsCExport (Named JavaScript)  = False
 backendSupportsCExport (Named Interpreter) = False
-backendSupportsCExport (Named NoBackend) = True
+backendSupportsCExport (Named NoBackend)   = True
 
 -- | This (defunctionalized) function runs the assembler
 -- used on the code that is written by this back end.  A
@@ -730,11 +785,12 @@ backendSupportsCExport (Named NoBackend) = True
 --
 -- This field is usually defaulted.
 backendAssemblerProg :: Backend -> DefunctionalizedAssemblerProg
-backendAssemblerProg (Named NCG) = StandardAssemblerProg
+backendAssemblerProg (Named NCG)  = StandardAssemblerProg
 backendAssemblerProg (Named LLVM) = DarwinClangAssemblerProg
 backendAssemblerProg (Named ViaC) = StandardAssemblerProg
+backendAssemblerProg (Named JavaScript)  = JSAssemblerProg
 backendAssemblerProg (Named Interpreter) = StandardAssemblerProg
-backendAssemblerProg (Named NoBackend) = StandardAssemblerProg
+backendAssemblerProg (Named NoBackend)   = StandardAssemblerProg
 
 -- | This (defunctionalized) function is used to retrieve
 -- an enumeration value that characterizes the C/assembler
@@ -748,11 +804,12 @@ backendAssemblerProg (Named NoBackend) = StandardAssemblerProg
 --
 -- This field is usually defaulted.
 backendAssemblerInfoGetter :: Backend -> DefunctionalizedAssemblerInfoGetter
-backendAssemblerInfoGetter (Named NCG) = StandardAssemblerInfoGetter
-backendAssemblerInfoGetter (Named LLVM) = DarwinClangAssemblerInfoGetter
-backendAssemblerInfoGetter (Named ViaC) = StandardAssemblerInfoGetter
+backendAssemblerInfoGetter (Named NCG)         = StandardAssemblerInfoGetter
+backendAssemblerInfoGetter (Named LLVM)        = DarwinClangAssemblerInfoGetter
+backendAssemblerInfoGetter (Named ViaC)        = StandardAssemblerInfoGetter
+backendAssemblerInfoGetter (Named JavaScript)  = JSAssemblerInfoGetter
 backendAssemblerInfoGetter (Named Interpreter) = StandardAssemblerInfoGetter
-backendAssemblerInfoGetter (Named NoBackend) = StandardAssemblerInfoGetter
+backendAssemblerInfoGetter (Named NoBackend)   = StandardAssemblerInfoGetter
 
 -- | When using this back end, it may be necessary or
 -- advisable to pass some `-D` options to a C compiler.
@@ -768,11 +825,12 @@ backendAssemblerInfoGetter (Named NoBackend) = StandardAssemblerInfoGetter
 --
 -- This field is usually defaulted.
 backendCDefs :: Backend -> DefunctionalizedCDefs
-backendCDefs (Named NCG) = NoCDefs
-backendCDefs (Named LLVM) = LlvmCDefs
-backendCDefs (Named ViaC) = NoCDefs
+backendCDefs (Named NCG)         = NoCDefs
+backendCDefs (Named LLVM)        = LlvmCDefs
+backendCDefs (Named ViaC)        = NoCDefs
+backendCDefs (Named JavaScript)  = NoCDefs
 backendCDefs (Named Interpreter) = NoCDefs
-backendCDefs (Named NoBackend) = NoCDefs
+backendCDefs (Named NoBackend)   = NoCDefs
 
 -- | This (defunctionalized) function generates code and
 -- writes it to a file.  The type of the function is
@@ -786,11 +844,12 @@ backendCDefs (Named NoBackend) = NoCDefs
 -- > -> Stream IO RawCmmGroup a -- results from `StgToCmm`
 -- > -> IO a
 backendCodeOutput :: Backend -> DefunctionalizedCodeOutput
-backendCodeOutput (Named NCG) = NcgCodeOutput
-backendCodeOutput (Named LLVM) = LlvmCodeOutput
-backendCodeOutput (Named ViaC) = ViaCCodeOutput
+backendCodeOutput (Named NCG)         = NcgCodeOutput
+backendCodeOutput (Named LLVM)        = LlvmCodeOutput
+backendCodeOutput (Named ViaC)        = ViaCCodeOutput
+backendCodeOutput (Named JavaScript)  = JSCodeOutput
 backendCodeOutput (Named Interpreter) = panic "backendCodeOutput: interpreterBackend"
-backendCodeOutput (Named NoBackend) = panic "backendCodeOutput: noBackend"
+backendCodeOutput (Named NoBackend)   = panic "backendCodeOutput: noBackend"
 
 -- | This (defunctionalized) function tells the compiler
 -- driver what else has to be run after code output.
@@ -804,9 +863,10 @@ backendCodeOutput (Named NoBackend) = panic "backendCodeOutput: noBackend"
 -- > -> FilePath
 -- > -> m (Maybe FilePath)
 backendPostHscPipeline :: Backend -> DefunctionalizedPostHscPipeline
-backendPostHscPipeline (Named NCG) = NcgPostHscPipeline
+backendPostHscPipeline (Named NCG)  = NcgPostHscPipeline
 backendPostHscPipeline (Named LLVM) = LlvmPostHscPipeline
 backendPostHscPipeline (Named ViaC) = ViaCPostHscPipeline
+backendPostHscPipeline (Named JavaScript)  = JSPostHscPipeline
 backendPostHscPipeline (Named Interpreter) = NoPostHscPipeline
 backendPostHscPipeline (Named NoBackend) = NoPostHscPipeline
 
@@ -817,21 +877,23 @@ backendPostHscPipeline (Named NoBackend) = NoPostHscPipeline
 -- value gives instructions like "run the C compiler",
 -- "run the assembler," or "run the LLVM Optimizer."
 backendNormalSuccessorPhase :: Backend -> Phase
-backendNormalSuccessorPhase (Named NCG) = As False
+backendNormalSuccessorPhase (Named NCG)  = As False
 backendNormalSuccessorPhase (Named LLVM) = LlvmOpt
 backendNormalSuccessorPhase (Named ViaC) = HCc
+backendNormalSuccessorPhase (Named JavaScript)  = StopLn
 backendNormalSuccessorPhase (Named Interpreter) = StopLn
-backendNormalSuccessorPhase (Named NoBackend) = StopLn
+backendNormalSuccessorPhase (Named NoBackend)   = StopLn
 
 -- | Name of the back end, if any.  Used to migrate legacy
 -- clients of the GHC API.  Code within the GHC source
 -- tree should not refer to a back end's name.
 backendName :: Backend -> BackendName
-backendName (Named NCG) = NCG
+backendName (Named NCG)  = NCG
 backendName (Named LLVM) = LLVM
 backendName (Named ViaC) = ViaC
+backendName (Named JavaScript)  = JavaScript
 backendName (Named Interpreter) = Interpreter
-backendName (Named NoBackend) = NoBackend
+backendName (Named NoBackend)   = NoBackend
 
 
 
@@ -842,6 +904,7 @@ allBackends :: [Backend]
 allBackends = [ ncgBackend
               , llvmBackend
               , viaCBackend
+              , jsBackend
               , interpreterBackend
               , noBackend
               ]

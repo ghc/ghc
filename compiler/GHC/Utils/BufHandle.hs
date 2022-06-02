@@ -20,6 +20,7 @@ module GHC.Utils.BufHandle (
         bPutFS,
         bPutFZS,
         bPutPtrString,
+        bPutShortText,
         bPutReplicate,
         bFlush,
   ) where
@@ -28,6 +29,7 @@ import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Data.FastMutInt
+import GHC.Data.ShortText as ST
 
 import Control.Monad    ( when )
 import Data.ByteString (ByteString)
@@ -83,6 +85,10 @@ bPutFZS b fs = bPutBS b $ fastZStringToByteString fs
 
 bPutBS :: BufHandle -> ByteString -> IO ()
 bPutBS b bs = BS.unsafeUseAsCStringLen bs $ bPutCStringLen b
+
+bPutShortText :: BufHandle -> ShortText -> IO ()
+bPutShortText b t = bPutStr b (ST.unpack t)
+  -- TODO: optimize this! Don't pass through String
 
 bPutCStringLen :: BufHandle -> CStringLen -> IO ()
 bPutCStringLen b@(BufHandle buf r hdl) cstr@(ptr, len) = do

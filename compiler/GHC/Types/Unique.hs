@@ -40,6 +40,8 @@ module GHC.Types.Unique (
         nonDetCmpUnique,
         isValidKnownKeyUnique,
 
+        iToBase62,
+
         -- ** Local uniques
         -- | These are exposed exclusively for use by 'GHC.Types.Var.Env.uniqAway', which
         -- has rather peculiar needs. See Note [Local uniques].
