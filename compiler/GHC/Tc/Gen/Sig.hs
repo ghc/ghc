@@ -505,7 +505,7 @@ tcInstSig :: TcIdSigInfo -> TcM TcIdSigInst
 -- Instantiate a type signature; only used with plan InferGen
 tcInstSig sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
-    do { (tv_prs, theta, tau) <- tcInstTypeBndrs poly_id
+    do { (tv_prs, theta, tau) <- tcInstTypeBndrs (idType poly_id)
               -- See Note [Pattern bindings and complete signatures]
 
        ; return (TISI { sig_inst_sig   = sig
@@ -522,6 +522,7 @@ tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
     do { traceTc "Staring partial sig {" (ppr hs_sig)
        ; (wcs, wcx, tv_prs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
          -- See Note [Checking partial type signatures] in GHC.Tc.Gen.HsType
+
        ; let inst_sig = TISI { sig_inst_sig   = hs_sig
                              , sig_inst_skols = tv_prs
                              , sig_inst_wcs   = wcs

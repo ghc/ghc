@@ -96,7 +96,8 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBindersN,
-                                  tcInstInvisibleTyBinder, tcSkolemiseInvisibleBndrs )
+                                  tcInstInvisibleTyBinder, tcSkolemiseInvisibleBndrs,
+                                  tcInstTypeBndrs )
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim
 import GHC.Types.Error
@@ -3975,12 +3976,13 @@ tcHsPartialSigType ctxt sig_ty
        -- See Note [Extra-constraint holes in partial type signatures]
        ; mapM_ emitNamedTypeHole wcs
 
-       -- Zonk, so that any nested foralls can "see" their occurrences
-       -- See Note [Checking partial type signatures], and in particular
-       -- Note [Levels for wildcards]
-       ; outer_tv_bndrs <- mapM zonkInvisTVBinder outer_tv_bndrs
-       ; theta          <- mapM zonkTcType theta
-       ; tau            <- zonkTcType tau
+         -- The "tau" from tcHsPartialSigType might very well have some foralls
+         -- at the top, hidden behind a type synonym. Instantiate them! E.g.
+         --    type T x = forall b. x -> b -> b
+         --    f :: forall a. T (a,_)
+         -- We must instantiate the `forall b` just as we do the `forall a`!
+         -- Missing this led to #21667.
+       ; (tv_prs', theta', tau) <- tcInstTypeBndrs tau
 
          -- We return a proper (Name,InvisTVBinder) environment, to be sure that
          -- we bring the right name into scope in the function body.
@@ -3989,6 +3991,13 @@ tcHsPartialSigType ctxt sig_ty
              outer_bndr_names = hsOuterTyVarNames hs_outer_bndrs
              tv_prs :: [(Name,InvisTVBinder)]
              tv_prs = outer_bndr_names `zip` outer_tv_bndrs
+
+       -- Zonk, so that any nested foralls can "see" their occurrences
+       -- See Note [Checking partial type signatures], and in particular
+       -- Note [Levels for wildcards]
+       ; tv_prs <- mapSndM zonkInvisTVBinder (tv_prs ++ tv_prs')
+       ; theta  <- mapM    zonkTcType        (theta ++ theta')
+       ; tau    <- zonkTcType                tau
 
       -- NB: checkValidType on the final inferred type will be
       --     done later by checkInferredPolyId.  We can't do it
@@ -4042,7 +4051,7 @@ we do the following
   source-code LHsSigWcType
 
 * Then, for f and g /separately/, we call tcInstSig, which in turn
-  call tchsPartialSig (defined near this Note).  It kind-checks the
+  call tcHsPartialSig (defined near this Note).  It kind-checks the
   LHsSigWcType, creating fresh unification variables for each "_"
   wildcard.  It's important that the wildcards for f and g are distinct
   because they might get instantiated completely differently.  E.g.
