@@ -476,10 +476,10 @@ tcInstType inst_tyvars id
     (tyvars, rho) = tcSplitForAllInvisTyVars (idType id)
     (theta, tau)  = tcSplitPhiTy rho
 
-tcInstTypeBndrs :: Id -> TcM ([(Name, InvisTVBinder)], TcThetaType, TcType)
+tcInstTypeBndrs :: Type -> TcM ([(Name, InvisTVBinder)], TcThetaType, TcType)
                      -- (type vars, preds (incl equalities), rho)
 -- Instantiate the binders of a type signature with TyVarTvs
-tcInstTypeBndrs id
+tcInstTypeBndrs poly_ty
   | null tyvars   -- There may be overloading despite no type variables;
                   --      (?x :: Int) => Int -> Int
   = return ([], theta, tau)
@@ -489,7 +489,7 @@ tcInstTypeBndrs id
              subst'  = extendTCvInScopeSet subst (tyCoVarsOfType rho)
        ; return (tv_prs, substTheta subst' theta, substTy subst' tau) }
   where
-    (tyvars, rho) = splitForAllInvisTVBinders (idType id)
+    (tyvars, rho) = splitForAllInvisTVBinders poly_ty
     (theta, tau)  = tcSplitPhiTy rho
 
     inst_invis_bndr :: TCvSubst -> InvisTVBinder

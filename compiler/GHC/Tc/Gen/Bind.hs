@@ -505,7 +505,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc closed bind_list
     ; traceTc "Generalisation plan" (ppr plan)
     ; result@(_, poly_ids) <- case plan of
          NoGen              -> tcPolyNoGen rec_tc prag_fn sig_fn bind_list
-         InferGen mn        -> tcPolyInfer rec_tc prag_fn sig_fn mn bind_list
+         InferGen           -> tcPolyInfer rec_tc prag_fn sig_fn bind_list
          CheckGen lbind sig -> tcPolyCheck prag_fn sig lbind
 
     ; mapM_ (\ poly_id ->
@@ -698,20 +698,20 @@ tcPolyInfer
   :: RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
   -> TcPragEnv -> TcSigFun
-  -> Bool         -- True <=> apply the monomorphism restriction
   -> [LHsBind GhcRn]
   -> TcM (LHsBinds GhcTc, [TcId])
-tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
+tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
   = do { (tclvl, wanted, (binds', mono_infos))
              <- pushLevelAndCaptureConstraints  $
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
 
+       ; apply_mr <- checkMonomorphismRestriction mono_infos bind_list
+       ; traceTc "tcPolyInfer" (ppr apply_mr $$ ppr (map mbi_sig mono_infos))
+
        ; let name_taus  = [ (mbi_poly_name info, idType (mbi_mono_id info))
                           | info <- mono_infos ]
              sigs       = [ sig | MBI { mbi_sig = Just sig } <- mono_infos ]
-             infer_mode = if mono then ApplyMR else NoRestrictions
-
-       ; mapM_ (checkOverloadedSig mono) sigs
+             infer_mode = if apply_mr then ApplyMR else NoRestrictions
 
        ; traceTc "simplifyInfer call" (ppr tclvl $$ ppr name_taus $$ ppr wanted)
        ; ((qtvs, givens, ev_binds, insoluble), residual)
@@ -739,6 +739,59 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
        ; traceTc "Binding:" (ppr (poly_ids `zip` map idType poly_ids))
        ; return (unitBag abs_bind, poly_ids) }
          -- poly_ids are guaranteed zonked by mkExport
+
+checkMonomorphismRestriction :: [MonoBindInfo] -> [LHsBind GhcRn] -> TcM Bool
+-- True <=> apply the MR
+checkMonomorphismRestriction mbis lbinds
+  | null partial_sigs  -- The normal case
+  = do { mr_on <- xoptM LangExt.MonomorphismRestriction
+       ; let mr_applies = mr_on && any (restricted . unLoc) lbinds
+       ; when mr_applies $ mapM_ checkOverloadedSig sigs
+       ; return mr_applies }
+
+  | otherwise    -- See Note [Partial type signatures and the monomorphism restriction]
+  = return (all is_mono_psig partial_sigs)
+
+  where
+    sigs, partial_sigs :: [TcIdSigInst]
+    sigs          = [sig | MBI { mbi_sig = Just sig } <- mbis]
+    partial_sigs  = [sig | sig@(TISI { sig_inst_sig = PartialSig {} }) <- sigs]
+
+    complete_sig_bndrs :: NameSet
+    complete_sig_bndrs
+      = mkNameSet [ idName bndr
+                  | TISI { sig_inst_sig = CompleteSig { sig_bndr = bndr }} <- sigs ]
+
+    is_mono_psig (TISI { sig_inst_theta = theta, sig_inst_wcx = mb_extra_constraints })
+       = null theta && isNothing mb_extra_constraints
+
+    -- The Haskell 98 monomorphism restriction
+    restricted (PatBind {})                              = True
+    restricted (VarBind { var_id = v })                  = no_sig v
+    restricted (FunBind { fun_id = v, fun_matches = m }) = restricted_match m
+                                                           && no_sig (unLoc v)
+    restricted b = pprPanic "isRestrictedGroup/unrestricted" (ppr b)
+
+    restricted_match mg = matchGroupArity mg == 0
+        -- No args => like a pattern binding
+        -- Some args => a function binding
+
+    no_sig nm = not (nm `elemNameSet` complete_sig_bndrs)
+
+checkOverloadedSig :: TcIdSigInst -> TcM ()
+-- Example:
+--   f :: Eq a => a -> a
+--   K f = e
+-- The MR applies, but the signature is overloaded, and it's
+-- best to complain about this directly
+-- c.f #11339
+checkOverloadedSig sig
+  | not (null (sig_inst_theta sig))
+  , let orig_sig = sig_inst_sig sig
+  = setSrcSpan (sig_loc orig_sig) $
+    failWith $ TcRnOverloadedSig orig_sig
+  | otherwise
+  = return ()
 
 --------------
 mkExport :: TcPragEnv
@@ -994,22 +1047,6 @@ warnMissingSignatures id
         ; let dia = TcRnPolymorphicBinderMissingSig (idName id) tidy_ty
         ; addDiagnosticTcM (env1, dia) }
 
-checkOverloadedSig :: Bool -> TcIdSigInst -> TcM ()
--- Example:
---   f :: Eq a => a -> a
---   K f = e
--- The MR applies, but the signature is overloaded, and it's
--- best to complain about this directly
--- c.f #11339
-checkOverloadedSig monomorphism_restriction_applies sig
-  | not (null (sig_inst_theta sig))
-  , monomorphism_restriction_applies
-  , let orig_sig = sig_inst_sig sig
-  = setSrcSpan (sig_loc orig_sig) $
-    failWith $ TcRnOverloadedSig orig_sig
-  | otherwise
-  = return ()
-
 {- Note [Partial type signatures and generalisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If /any/ of the signatures in the group is a partial type signature
@@ -1035,13 +1072,32 @@ It might be possible to fix these difficulties somehow, but there
 doesn't seem much point.  Indeed, adding a partial type signature is a
 way to get per-binding inferred generalisation.
 
-We apply the MR if /all/ of the partial signatures lack a context.
-In particular (#11016):
+Note [Partial type signatures and the monomorphism restriction]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We apply the MR if /none/ of the partial signatures has a context. e.g.
+   f :: _ -> Int
+   f x = rhs
+The partial type signature says, in effect, "there is no context", which
+amounts to appplying the MR. Indeed, saying
+   f :: _
+   f = rhs
+is a way for forcing the MR to apply.
+
+But we /don't/ want to apply the MR if the partial signatures do have
+a context  e.g. (#11016):
    f2 :: (?loc :: Int) => _
    f2 = ?loc
 It's stupid to apply the MR here.  This test includes an extra-constraints
 wildcard; that is, we don't apply the MR if you write
    f3 :: _ => blah
+
+But watch out.  We don't want to apply the MR to
+   type Wombat a = forall b. Eq b => ...b...a...
+   f4 :: Wombat _
+Here f4 doesn't /look/ as if it has top-level overloading, but in fact it
+does, hidden under Wombat.  We can't "see" that because we only have access
+to the HsType at the moment.  That's why we do the check in
+checkMonomorphismRestriction.
 
 Note [Quantified variables in partial type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1632,79 +1688,55 @@ data GeneralisationPlan
   = NoGen               -- No generalisation, no AbsBinds
 
   | InferGen            -- Implicit generalisation; there is an AbsBinds
-       Bool             --   True <=> apply the MR; generalise only unconstrained type vars
 
-  | CheckGen (LHsBind GhcRn) TcIdSigInfo
-                        -- One FunBind with a signature
-                        -- Explicit generalisation
+  | CheckGen            -- One FunBind with a complete signature:
+       (LHsBind GhcRn)  --   do explicit generalisation
+       TcIdSigInfo      -- Always CompleteSig
 
 -- A consequence of the no-AbsBinds choice (NoGen) is that there is
 -- no "polymorphic Id" and "monmomorphic Id"; there is just the one
 
 instance Outputable GeneralisationPlan where
   ppr NoGen          = text "NoGen"
-  ppr (InferGen b)   = text "InferGen" <+> ppr b
+  ppr InferGen       = text "InferGen"
   ppr (CheckGen _ s) = text "CheckGen" <+> ppr s
 
 decideGeneralisationPlan
    :: DynFlags -> TopLevelFlag -> IsGroupClosed -> TcSigFun
    -> [LHsBind GhcRn] -> GeneralisationPlan
 decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
-  | has_partial_sigs                         = InferGen (and partial_sig_mrs)
   | Just (bind, sig) <- one_funbind_with_sig = CheckGen bind sig
-  | do_not_generalise                        = NoGen
-  | otherwise                                = InferGen mono_restriction
+  | generalise_binds                         = InferGen
+  | otherwise                                = NoGen
   where
-    binds = map unLoc lbinds
-
-    partial_sig_mrs :: [Bool]
-    -- One for each partial signature (so empty => no partial sigs)
-    -- The Bool is True if the signature has no constraint context
-    --      so we should apply the MR
-    -- See Note [Partial type signatures and generalisation]
-    partial_sig_mrs
-      = [ null $ fromMaybeContext mtheta
-        | TcIdSig (PartialSig { psig_hs_ty = hs_ty })
-            <- mapMaybe sig_fn (collectHsBindListBinders CollNoDictBinders lbinds)
-        , let (mtheta, _) = splitLHsQualTy (hsSigWcType hs_ty) ]
-
-    has_partial_sigs = not (null partial_sig_mrs)
-
-    mono_restriction  = xopt LangExt.MonomorphismRestriction dflags
-                     && any restricted binds
-
-    do_not_generalise
-      | isTopLevel top_lvl             = False
+    generalise_binds
+      | isTopLevel top_lvl             = True
         -- See Note [Always generalise top-level bindings]
 
-      | IsGroupClosed _ True <- closed = False
+      | IsGroupClosed _ True <- closed = True
         -- The 'True' means that all of the group's
         -- free vars have ClosedTypeId=True; so we can ignore
         -- -XMonoLocalBinds, and generalise anyway
 
-      | otherwise = xopt LangExt.MonoLocalBinds dflags
+      | has_partial_sigs = True
+        -- See Note [Partial type signatures and generalisation]
+
+      | otherwise = not (xopt LangExt.MonoLocalBinds dflags)
 
     -- With OutsideIn, all nested bindings are monomorphic
-    -- except a single function binding with a signature
+    -- except a single function binding with a complete signature
     one_funbind_with_sig
       | [lbind@(L _ (FunBind { fun_id = v }))] <- lbinds
-      , Just (TcIdSig sig) <- sig_fn (unLoc v)
+      , Just (TcIdSig sig@(CompleteSig {})) <- sig_fn (unLoc v)
       = Just (lbind, sig)
       | otherwise
       = Nothing
 
-    -- The Haskell 98 monomorphism restriction
-    restricted (PatBind {})                              = True
-    restricted (VarBind { var_id = v })                  = no_sig v
-    restricted (FunBind { fun_id = v, fun_matches = m }) = restricted_match m
-                                                           && no_sig (unLoc v)
-    restricted b = pprPanic "isRestrictedGroup/unrestricted" (ppr b)
-
-    restricted_match mg = matchGroupArity mg == 0
-        -- No args => like a pattern binding
-        -- Some args => a function binding
-
-    no_sig n = not (hasCompleteSig sig_fn n)
+    binders          = collectHsBindListBinders CollNoDictBinders lbinds
+    has_partial_sigs = any has_partial_sig binders
+    has_partial_sig nm = case sig_fn nm of
+      Just (TcIdSig (PartialSig {})) -> True
+      _                              -> False
 
 isClosedBndrGroup :: TcTypeEnv -> Bag (LHsBind GhcRn) -> IsGroupClosed
 isClosedBndrGroup type_env binds

@@ -12,8 +12,11 @@ failing left right afb s = case pins t of
   [] -> right afb s
   _  -> t afb
   where
-    t :: Applicative f => (a -> f b) -> f t
     -- Works because of MonoLocalBinds
+    -- But the type signature (from T11339b) is wrong:
+    --   t :: Applicative f => (a -> f b) -> f t
+    -- The type signature forces us to generalise, but the MR applies,
+    --  so the function can't be overloaded
     Bazaar { getBazaar = t } = left sell s
 
     sell :: a -> Bazaar a b b
