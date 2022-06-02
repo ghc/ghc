@@ -703,6 +703,12 @@ assembler.
 
     Dump the final assembly produced by the native code generator.
 
+.. ghc-flag:: -ddump-js
+    :shortdesc: Dump final JavaScript code
+    :type: dynamic
+
+    Dump the final JavaScript code produced by the JavaScript code generator.
+
 
 Miscellaneous backend dumps
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

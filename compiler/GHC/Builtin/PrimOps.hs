@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Builtin.PrimOps (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,
@@ -17,7 +18,7 @@ module GHC.Builtin.PrimOps (
         primOpOutOfLine, primOpCodeSize,
         primOpOkForSpeculation, primOpOkForSideEffects,
         primOpIsCheap, primOpFixity, primOpDocs,
-        primOpIsDiv,
+        primOpIsDiv, primOpIsReallyInline,
 
         getPrimOpResultInfo,  isComparisonPrimOp, PrimOpResultInfo(..),
 
@@ -804,3 +805,12 @@ data PrimCall = PrimCall CLabelString Unit
 instance Outputable PrimCall where
   ppr (PrimCall lbl pkgId)
         = text "__primcall" <+> ppr pkgId <+> ppr lbl
+
+-- | Indicate if a primop is really inline: that is, it isn't out-of-line and it
+-- isn't SeqOp/DataToTagOp which are two primops that evaluate their argument
+-- hence induce thread/stack/heap changes.
+primOpIsReallyInline :: PrimOp -> Bool
+primOpIsReallyInline = \case
+  SeqOp       -> False
+  DataToTagOp -> False
+  p           -> not (primOpOutOfLine p)

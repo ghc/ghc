@@ -203,6 +203,7 @@ data DumpFormat
    | FormatASM       -- ^ Assembly code
    | FormatC         -- ^ C code/header
    | FormatLLVM      -- ^ LLVM bytecode
+   | FormatJS        -- ^ JavaScript code
    | FormatText      -- ^ Unstructured dump
    deriving (Show,Eq)
 

@@ -27,6 +27,7 @@ data BackendName
    = NCG           -- ^ Names the native code generator backend.
    | LLVM          -- ^ Names the LLVM backend.
    | ViaC          -- ^ Names the Via-C backend.
+   | JavaScript    -- ^ Names the JS backend.
    | Interpreter   -- ^ Names the ByteCode interpreter.
    | NoBackend     -- ^ Names the `-fno-code` backend.
  deriving (Eq, Show)

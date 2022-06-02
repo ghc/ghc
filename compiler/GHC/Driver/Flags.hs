@@ -75,6 +75,7 @@ data DumpFlag
    | Opt_D_dump_asm_stats
    | Opt_D_dump_c_backend
    | Opt_D_dump_llvm
+   | Opt_D_dump_js
    | Opt_D_dump_core_stats
    | Opt_D_dump_deriv
    | Opt_D_dump_ds

@@ -1,7 +1,7 @@
 
 -- | The ModuleName type
 module GHC.Unit.Module.Name
-    ( ModuleName
+    ( ModuleName (..)
     , pprModuleName
     , moduleNameFS
     , moduleNameString

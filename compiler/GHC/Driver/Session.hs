@@ -2447,6 +2447,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_core_stats)
   , make_ord_flag defGhcFlag "ddump-asm"
         (setDumpFlag Opt_D_dump_asm)
+  , make_ord_flag defGhcFlag "ddump-js"
+        (setDumpFlag Opt_D_dump_js)
   , make_ord_flag defGhcFlag "ddump-asm-native"
         (setDumpFlag Opt_D_dump_asm_native)
   , make_ord_flag defGhcFlag "ddump-asm-liveness"
@@ -2897,6 +2899,7 @@ dynamic_flags_deps = [
          (deprecate $ "The -fvia-C flag does nothing; " ++
                       "it will be removed in a future GHC release"))
   , make_ord_flag defGhcFlag "fllvm"            (NoArg (setObjBackend llvmBackend))
+  , make_ord_flag defGhcFlag "fjavascript"      (NoArg (upd $ \dfs -> dfs { backend = JavaScript}))
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
                   d { ghcLink=NoLink }) >> setBackend noBackend))

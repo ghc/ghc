@@ -54,6 +54,7 @@
 -fimplicit-params
 -fimplicit-prelude
 -firrefutable-tuples
+-fjavascript
 -fmax-errors
 -fmax-pmcheck-iterations
 -fmonomorphism-restriction

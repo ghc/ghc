@@ -124,6 +124,7 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
                                              final_stream
                  ViaCCodeOutput -> outputC logger dflags filenm final_stream pkg_deps
                  LlvmCodeOutput -> outputLlvm logger llvm_config dflags filenm final_stream
+                 JSCodeOutput   -> outputJS logger llvm_config dflags filenm final_stream
         ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
@@ -214,6 +215,18 @@ outputLlvm logger llvm_config dflags filenm cmm_stream = do
   {-# SCC "llvm_output" #-} doOutput filenm $
     \f -> {-# SCC "llvm_CodeGen" #-}
       llvmCodeGen logger lcg_config f cmm_stream
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{JavaScript}
+*                                                                      *
+************************************************************************
+-}
+outputJS :: Logger -> LlvmConfigCache -> DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
+outputJS _ _ _ _ _ = panic $ "codeOutput: Hit JavaScript case. You should never reach here!"
+                           ++ "\nThe JS backend should shortcircuit to StgToJS after Stg."
+                           ++ "\nIf you reached this point then you've somehow made it to Cmm!"
 
 {-
 ************************************************************************
