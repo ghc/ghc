@@ -12,9 +12,9 @@ quickJsFlavour = defaultFlavour
     { name        = "quick-js"
     , args        = defaultBuilderArgs <> quickJsArgs <> defaultPackageArgs
     , dynamicGhcPrograms = pure False
-    , libraryWays = pure [vanilla]
-    , rtsWays     = pure [vanilla]
-                    }
+    , libraryWays = pure $ Set.singleton vanilla
+    , rtsWays     = pure $ Set.singleton vanilla
+    }
 
 -- Same as quickCrossArgs (until it bitrots) but don't enable -fllvm
 quickJsArgs :: Args
