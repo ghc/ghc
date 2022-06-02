@@ -1,7 +1,10 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 
 module Main where
+
+import Prelude
 
 import GHC.Driver.Env
 import GHC.Unit.Module
@@ -13,7 +16,9 @@ import Control.Monad.IO.Class
 import System.Environment
 import GHC.Unit.Module.Deps
 import Data.Map.Strict qualified as Map
+#if __GLASGOW_HASKELL >= 905
 import Data.Set qualified as Set
+#endif
 
 -- Example invocation:
 --  inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` "GHC.Parser"
@@ -49,6 +54,9 @@ printDeps libdir modName dot = do
     --   'tred deps.dot > deps-tred.dot && dot -Tpdf -o deps.pdf deps-tred.dot'
     putStr $ dotSpec modName modGraph
 
+type DepMap = Map.Map ModuleNameWithIsBoot Deps
+type Deps = [ModuleNameWithIsBoot]
+
 calcDeps :: String -> FilePath -> IO (Map.Map ModuleName [ModuleName])
 calcDeps modName libdir =
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
@@ -58,12 +66,12 @@ calcDeps modName libdir =
         (df, _, _) <- parseDynamicFlags logger df [noLoc "-package=ghc"]
         setSessionDynFlags df
         env <- getSession
-        loop env Map.empty [mkModuleName modName]
+        loop env Map.empty [GWIB (mkModuleName modName) NotBoot]
   where
     -- Source imports are only guaranteed to show up in the 'mi_deps'
     -- of modules that import them directly and don’t propagate
     -- transitively so we loop.
-    loop :: HscEnv -> Map.Map ModuleName [ModuleName] -> [ModuleName] -> Ghc (Map.Map ModuleName [ModuleName])
+    loop :: HscEnv -> DepMap -> Deps -> Ghc DepMap
     loop env modules (m : ms) =
       if m `Map.member` modules
         then loop env modules ms
@@ -77,5 +85,9 @@ calcDeps modName libdir =
     mkModule :: ModuleName -> Module
     mkModule = Module (stringToUnit "ghc")
 
-    modDeps :: ModIface -> [ModuleName]
-    modDeps mi = map (gwib_mod . snd) $ Set.toList $ dep_direct_mods (mi_deps mi)
+    modDeps :: ModIface -> [ModuleNameWithIsBoot]
+#if __GLASGOW_HASKELL < 906
+    modDeps mi = map dep_mods (mi_deps mi)
+#else
+    modDeps mi = map snd $ Set.toList $ dep_direct_mods (mi_deps mi)
+#endif
