@@ -111,8 +111,8 @@ genUnits m ss spt_entries foreign_stubs
                                    go 2 Object.emptySymbolTable ss
     where
       go :: HasDebugCallStack
-         => Int                 -- ^ the block we're generating (block 0 is the global unit for the module)
-         -> Object.SymbolTable  -- ^ the shared symbol table
+         => Int                 -- the block we're generating (block 0 is the global unit for the module)
+         -> Object.SymbolTable  -- the shared symbol table
          -> [CgStgTopBinding]
          -> G (Object.SymbolTable, [LinkableUnit])
       go !n st (x:xs) = do
@@ -121,7 +121,7 @@ genUnits m ss spt_entries foreign_stubs
         return (st'', maybe lus (:lus) mlu)
       go _ st []     = return (st, [])
 
-      -- | Generate the global unit that all other blocks in the module depend on
+      --   Generate the global unit that all other blocks in the module depend on
       --   used for cost centres and static initializers
       --   the global unit has no dependencies, exports the moduleGlobalSymbol
       generateGlobalBlock :: HasDebugCallStack
@@ -179,7 +179,7 @@ genUnits m ss spt_entries foreign_stubs
                  : lus
                )
 
-      -- | Generate the linkable unit for one binding or group of
+      --   Generate the linkable unit for one binding or group of
       --   mutually recursive bindings
       generateBlock :: HasDebugCallStack
                     => Object.SymbolTable

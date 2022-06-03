@@ -300,10 +300,14 @@ renameInternals ln_cfg cfg cs0 rtsDeps stats0a = (cs, stats, meta)
 
     renamed :: State CompactorState ([JStat], JStat)
     renamed
-      -- | csDebugAlloc cfg || csProf cfg = do -- FIXME: Jeff (2022,03): Move these Way flags into JSLinkConfig
+      -- \| csDebugAlloc cfg || csProf cfg = do -- FIXME: Jeff (2022,03): Move these Way flags into JSLinkConfig
 
       -- FIXME (Sylvain, 2022-05): forced for now until packStrings creates a
-      -- proper string table
+      -- proper string table.
+      -- NOTE (Jeff, 2022-06): I've commented out the block of code for the
+      -- otherwise case in the below guard. This is to silence warnings about
+      -- the redundant pattern match. Once packStrings works make sure to
+      -- re-enable and remove this comment and previous fixme
       | True = do
         cs <- get
         let renamedStats = map (\(s,_,_) -> identsS' (lookupRenamed cs) s) stats0
@@ -317,6 +321,7 @@ renameInternals ln_cfg cfg cs0 rtsDeps stats0a = (cs, stats, meta)
                    mconcat (map (staticInitStat $ csProf cfg) statics) <>
                    mconcat (map (closureInfoStat True) infos)
         return (renamedStats, meta)
+       {-
       | otherwise = do
         -- collect all global objects and entries, add them to the renaming table
         mapM_ (\(_, cis, sis) -> do
@@ -373,7 +378,9 @@ renameInternals ln_cfg cfg cs0 rtsDeps stats0a = (cs, stats, meta)
                                      , `staticBlock`);
                        h$staticDelayed = [];
                      |] -}
+
         return (renamedStats, meta)
+        -}
 
 -- | initialize a global object. all global objects have to be declared (staticInfoDecl) first
 --   (this is only used with -debug, normal init would go through the static data table)
@@ -650,7 +657,7 @@ encodeStatic0 cs (StaticInfo _to sv _)
     obj   = objectIdx "encodeStatic" cs
     entry = entryIdx  "encodeStatic" cs
     lbl   = labelIdx  "encodeStatic" cs
-    -- | an argument is either a reference to a heap object or a primitive value
+    --   an argument is either a reference to a heap object or a primitive value
     encodeArg (StaticLitArg (BoolLit b)) =
       [0 + fromEnum b]
     encodeArg (StaticLitArg (IntLit 0)) =

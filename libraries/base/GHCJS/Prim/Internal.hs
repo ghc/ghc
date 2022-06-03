@@ -13,7 +13,6 @@ module GHCJS.Prim.Internal ( blockedIndefinitelyOnMVar
 import           Control.Exception
 
 import           GHCJS.Prim
-import           GHC.Exts
 
 wouldBlock :: SomeException
 wouldBlock = toException WouldBlockException

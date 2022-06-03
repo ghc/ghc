@@ -81,7 +81,7 @@ jsExeFileName dflags
       -- unmunge the extension
       let s' = dropPrefix "js_" (drop 1 $ takeExtension s)
                     -- FIXME: add this check when support for Windows check is added
-      in if Prelude.null s' -- || (Platform.isWindows && map toLower s' == "exe")
+      in if Prelude.null s' -- \|\| (Platform.isWindows && map toLower s' == "exe")
            then dropExtension s <.> jsexeExtension
            else dropExtension s <.> s'
   | otherwise =
