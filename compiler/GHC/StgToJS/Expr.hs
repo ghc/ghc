@@ -34,6 +34,7 @@ import GHC.StgToJS.StgUtils
 import GHC.StgToJS.CoreUtils
 import GHC.StgToJS.Utils
 
+import GHC.Types.Basic
 import GHC.Types.CostCentre
 import GHC.Types.Tickish
 import GHC.Types.Var.Set
@@ -49,6 +50,7 @@ import GHC.Builtin.PrimOps
 import GHC.Core
 import GHC.Core.TyCon
 import GHC.Core.DataCon
+import GHC.Core.Opt.Arity (isOneShotBndr)
 import GHC.Core.Type hiding (typeSize)
 
 import GHC.Utils.Misc
@@ -317,7 +319,7 @@ resultSize [] t
   -- Note that RuntimeRep from Builtins.Types hits this case. A singleton of
   -- (LiftedRep, 1) is exactly what's returned by the otherwise case for
   -- RuntimeRep.
-  | Nothing <- isLiftedType_maybe t' = [(LiftedRep, 1)]
+  | Nothing <- typeLevity_maybe t' = [(LiftedRep, 1)]
   | otherwise = fmap (\p -> (p, slotCount (primRepSize p))) (typePrimReps t)
   where
     t' = unwrapType t
@@ -420,7 +422,7 @@ genStaticRefs lv
   | otherwise         = do
       unfloated <- State.gets gsUnfloated
       let xs = filter (\x -> not (elemUFM x unfloated ||
-                                  isLiftedType_maybe (idType x) == Just False))
+                                  typeLevity_maybe (idType x) == Just Unlifted))
                       (dVarSetElems sv)
       CIStaticRefs . catMaybes <$> mapM getStaticRef xs
   where

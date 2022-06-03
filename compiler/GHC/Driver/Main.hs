@@ -1720,8 +1720,8 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         -- next withTiming after this will be "Assembler" (hard code only).
         let do_code_gen =
               withTiming logger (text "CodeGen"<+>brackets (ppr this_mod)) (const ())
-              $ case backend dflags of
-                  JavaScript ->
+              $ case backendCodeOutput (backend dflags) of
+                  JSCodeOutput ->
                     do
                     let js_config = initStgToJSConfig dflags
                         cg_infos      = Nothing
@@ -1756,9 +1756,10 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
                     (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
                       <- {-# SCC "codeOutput" #-}
-                      codeOutput logger        tmpfs           dflags   (hsc_units hsc_env)
-                                 this_mod      output_filename location foreign_stubs
-                                 foreign_files dependencies    rawcmms1
+                      codeOutput logger           tmpfs              llvm_config
+                                 dflags          (hsc_units hsc_env) this_mod
+                                 output_filename location            foreign_stubs
+                                 foreign_files   dependencies        rawcmms1
 
                     return (output_filename, stub_c_exists, foreign_fps, Just cg_infos)
         do_code_gen

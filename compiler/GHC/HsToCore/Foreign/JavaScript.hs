@@ -205,21 +205,25 @@ mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
                <> parens (acc <> comma <> mkHObj arg_hty <> parens arg_cname)
 
   -- finally, the whole darn thing
-  js_bits = CStub $
-    space $$
-    fun_proto  $$
-    vcat
-     [ lbrace
-     ,   text "return" <+> text "await" <+>
-         text "h$rts_eval" <> parens (
-                (if is_IO_res_ty
-                       then expr_to_run
-                       else text "h$rts_toIO" <> parens expr_to_run)
-                 <> comma <+> unboxResType
-             ) <> semi
-     , rbrace
-     ] $$
-     fun_export
+  js_bits = CStub { getCStub        = js_sdoc
+                  , getInitializers = mempty
+                  , getFinalizers   = mempty
+                  }
+       where js_sdoc = space
+               $$ fun_proto
+               $$ vcat
+                 [ lbrace
+                 ,   text "return"
+                     <+> text "await"
+                     <+> text "h$rts_eval"
+                     <> parens ((if is_IO_res_ty
+                                 then expr_to_run
+                                 else text "h$rts_toIO" <> parens expr_to_run)
+                                <> comma <+> unboxResType)
+                     <> semi
+                 , rbrace
+                 ]
+               $$ fun_export
 
 idClosureText :: Id -> SDoc
 idClosureText i

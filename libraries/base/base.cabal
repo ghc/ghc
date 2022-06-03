@@ -361,7 +361,6 @@ Library
           cbits/DarwinUtils.c
           cbits/PrelIOUtils.c
           cbits/SetEnv.c
-          cbits/WCsubst.c
           cbits/iconv.c
           cbits/inputReady.c
           cbits/md5.c

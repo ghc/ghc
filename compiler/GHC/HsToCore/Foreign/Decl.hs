@@ -37,9 +37,7 @@ import GHC.Utils.Outputable
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Data.OrdList
-import GHC.Utils.Panic
 import GHC.Driver.Hooks
-import GHC.Unit.Module
 
 import Data.List (unzip4)
 
