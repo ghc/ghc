@@ -414,3 +414,4 @@ test('T21391', normal, compile, ['-O -dcore-lint'])
 test('T21391a', normal, compile, ['-O -dcore-lint'])
 # We don't want to see a thunk allocation for the insertBy expression after CorePrep.
 test('T21392', [ grep_errmsg(r'sat.* :: \[\(.*Unique, .*Int\)\]'), expect_broken(21392) ], compile, ['-O -ddump-prep -dno-typeable-binds -dsuppress-uniques'])
+test('T21689', [extra_files(['T21689a.hs'])], multimod_compile, ['T21689', '-v0 -O'])
