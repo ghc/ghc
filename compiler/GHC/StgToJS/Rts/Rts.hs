@@ -254,7 +254,7 @@ stackManip = mconcat (map mkPush [1..32]) <>
                                                    [1..] as))
                in funName ||= toJExpr fun
 
-    -- | partial pushes, based on bitmap, increases Sp by highest bit
+    -- partial pushes, based on bitmap, increases Sp by highest bit
     mkPpush :: Integer -> JStat
     mkPpush sig | sig Bits..&. (sig+1) == 0 = mempty -- already handled by h$p
     mkPpush sig = let funName = TxtI $ T.pack ("h$pp" ++ show sig)

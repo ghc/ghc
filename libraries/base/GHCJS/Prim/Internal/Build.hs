@@ -141,7 +141,6 @@ module GHCJS.Prim.Internal.Build
   ) where
 
 import GHCJS.Prim
-import GHC.Prim
 import GHC.Exts
 import Unsafe.Coerce
 import System.IO.Unsafe
@@ -154,7 +153,7 @@ type A = JSVal -- array
 
 seqTupList :: [(a,b)] -> [(a,b)]
 seqTupList xs = go xs `seq` xs
-  where go ((x1,x2):xs) = x1 `seq` x2 `seq` go xs
+  where go ((y1,y2):ys) = y1 `seq` y2 `seq` go ys
         go []           = ()
 
 foreign import javascript unsafe "$r = [];" js_emptyArrayI :: A
