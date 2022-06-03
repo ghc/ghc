@@ -1857,17 +1857,17 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         -- Hence we have one withTiming for the whole backend, the
         -- next withTiming after this will be "Assembler" (hard code only).
         withTiming logger (text "CodeGen"<+>brackets (ppr this_mod)) (const ())
-        $ case backend dflags of
-            JavaScript ->
+        $ case backendCodeOutput (backend dflags) of
+            JSCodeOutput ->
               do
               let js_config = initStgToJSConfig dflags
-                  cg_infos      = Nothing
+                  cmm_cg_infos  = Nothing
                   stub_c_exists = Nothing
                   foreign_fps   = []
 
               -- do the unfortunately effectual business
               stgToJS logger js_config stg_binds this_mod spt_entries foreign_stubs0 cost_centre_info output_filename
-              return (output_filename, stub_c_exists, foreign_fps, cg_infos)
+              return (output_filename, stub_c_exists, foreign_fps, stg_cg_infos, cmm_cg_infos)
 
             _          ->
               do

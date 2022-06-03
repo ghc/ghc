@@ -28,9 +28,9 @@ import GHC.Cmm
 import GHC.Cmm.CLabel
 
 import GHC.Driver.Session
-import GHC.Driver.Config.Finder    (initFinderOpts)
-import GHC.Driver.Config.CmmToAsm  (initNCGConfig)
-import GHC.Driver.Config.CmmToLlvm (initLlvmCgConfig)
+import GHC.Driver.Config.Finder    ( initFinderOpts   )
+import GHC.Driver.Config.CmmToAsm  ( initNCGConfig    )
+import GHC.Driver.Config.CmmToLlvm ( initLlvmCgConfig )
 import GHC.Driver.LlvmConfigCache  (LlvmConfigCache)
 import GHC.Driver.Ppr
 import GHC.Driver.Backend
@@ -45,8 +45,9 @@ import GHC.Utils.TmpFs
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
-import GHC.Utils.Exception (bracket)
+import GHC.Utils.Exception ( bracket )
 import GHC.Utils.Ppr (Mode(..))
+import GHC.Utils.Panic.Plain ( pgmError )
 
 import GHC.Unit
 import GHC.Unit.Finder      ( mkStubPaths )
@@ -225,9 +226,9 @@ outputLlvm logger llvm_config dflags filenm cmm_stream = do
 ************************************************************************
 -}
 outputJS :: Logger -> LlvmConfigCache -> DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
-outputJS _ _ _ _ _ = panic $ "codeOutput: Hit JavaScript case. You should never reach here!"
-                           ++ "\nThe JS backend should shortcircuit to StgToJS after Stg."
-                           ++ "\nIf you reached this point then you've somehow made it to Cmm!"
+outputJS _ _ _ _ _ = pgmError $ "codeOutput: Hit JavaScript case. You should never reach here!"
+                              ++ "\nThe JS backend should shortcircuit to StgToJS after Stg."
+                              ++ "\nIf you reached this point then you've somehow made it to Cmm!"
 
 {-
 ************************************************************************

@@ -221,6 +221,12 @@ runClang logger dflags args = traceSystoolCommand logger "clang" $ do
         throwIO err
     )
 
+runEmscripten :: Logger -> DynFlags -> [Option] -> IO ()
+runEmscripten logger dflags args = traceSystoolCommand logger "emcc" $ do
+  let (p,args0) = pgm_a dflags
+      args1     = args0 ++ args
+  runSomething logger "Emscripten" p args1
+
 -- | Figure out which version of LLVM we are running this session
 figureLlvmVersion :: Logger -> DynFlags -> IO (Maybe LlvmVersion)
 figureLlvmVersion logger dflags = traceSystoolCommand logger "llc" $ do

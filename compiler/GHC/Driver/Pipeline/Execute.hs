@@ -346,6 +346,8 @@ applyAssemblerInfoGetter
     -> Logger -> DynFlags -> Platform -> IO CompilerInfo
 applyAssemblerInfoGetter StandardAssemblerInfoGetter logger dflags _platform =
     getAssemblerInfo logger dflags
+applyAssemblerInfoGetter JSAssemblerInfoGetter _ _ _ =
+    pure Emscripten
 applyAssemblerInfoGetter DarwinClangAssemblerInfoGetter logger dflags platform =
     if platformOS platform == OSDarwin then
         pure Clang
@@ -357,6 +359,8 @@ applyAssemblerProg
     -> Logger -> DynFlags -> Platform -> [Option] -> IO ()
 applyAssemblerProg StandardAssemblerProg logger dflags _platform =
     runAs logger dflags
+applyAssemblerProg JSAssemblerProg logger dflags _platform =
+    runEmscripten logger dflags
 applyAssemblerProg DarwinClangAssemblerProg logger dflags platform =
     if platformOS platform == OSDarwin then
         runClang logger dflags

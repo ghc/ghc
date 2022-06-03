@@ -4943,6 +4943,7 @@ data CompilerInfo
    | Clang
    | AppleClang
    | AppleClang51
+   | Emscripten
    | UnknownCC
    deriving Eq
 
