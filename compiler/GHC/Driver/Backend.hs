@@ -222,15 +222,6 @@ platformJSSupported platform
   | platformArch platform == ArchJavaScript = True
   | otherwise                               = False
 
--- | Will this backend produce an object file on the disk?
-backendProducesObject :: Backend -> Bool
-backendProducesObject ViaC        = True
-backendProducesObject NCG         = True
-backendProducesObject LLVM        = True
-backendProducesObject JavaScript  = True
-backendProducesObject Interpreter = False
-backendProducesObject NoBackend   = False
-
 
 -- | A value of type @Backend@ represents one of GHC's back ends.
 -- The set of back ends cannot be extended except by modifying the
@@ -484,7 +475,7 @@ backendWritesFiles :: Backend -> Bool
 backendWritesFiles (Named NCG)         = True
 backendWritesFiles (Named LLVM)        = True
 backendWritesFiles (Named ViaC)        = True
-backendDescription (Named JavaScript)  = True
+backendWritesFiles (Named JavaScript)  = True
 backendWritesFiles (Named Interpreter) = False
 backendWritesFiles (Named NoBackend)   = False
 
@@ -605,12 +596,12 @@ backendPrimitiveImplementation (Named NoBackend)   = GenericPrimitives
 -- `NotValid`, it carries a message that is shown to
 -- users.
 backendSimdValidity :: Backend -> Validity' String
-backendSimdValidity (Named NCG) = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
-backendSimdValidity (Named LLVM) = IsValid
-backendSimdValidity (Named ViaC) = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
-backendSimdJavaScript (Named JavaScript) = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
+backendSimdValidity (Named NCG)         = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
+backendSimdValidity (Named LLVM)        = IsValid
+backendSimdValidity (Named ViaC)        = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
+backendSimdValidity (Named JavaScript)  = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
 backendSimdValidity (Named Interpreter) = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
-backendSimdValidity (Named NoBackend) = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
+backendSimdValidity (Named NoBackend)   = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
 
 -- | This flag says whether the back end supports large
 -- binary blobs.  See Note [Embedding large binary blobs]
@@ -766,7 +757,7 @@ backendSupportsCImport :: Backend -> Bool
 backendSupportsCImport (Named NCG)         = True
 backendSupportsCImport (Named LLVM)        = True
 backendSupportsCImport (Named ViaC)        = True
-backendSupportsCImport (Named JavaScript)  = False
+backendSupportsCImport (Named JavaScript)  = True
 backendSupportsCImport (Named Interpreter) = True
 backendSupportsCImport (Named NoBackend)   = True
 
@@ -776,7 +767,7 @@ backendSupportsCExport :: Backend -> Bool
 backendSupportsCExport (Named NCG)         = True
 backendSupportsCExport (Named LLVM)        = True
 backendSupportsCExport (Named ViaC)        = True
-backendSupportsCExport (Named JavaScript)  = False
+backendSupportsCExport (Named JavaScript)  = True
 backendSupportsCExport (Named Interpreter) = False
 backendSupportsCExport (Named NoBackend)   = True
 

@@ -64,8 +64,9 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
           b_blob  = if not ncg then Nothing else binBlobThreshold dflags
           (ncg, llvm) = case backendPrimitiveImplementation bk_end of
                           GenericPrimitives -> (False, False)
-                          NcgPrimitives -> (True, False)
-                          LlvmPrimitives -> (False, True)
+                          JSPrimitives      -> (False, False)
+                          NcgPrimitives     -> (True, False)
+                          LlvmPrimitives    -> (False, True)
           x86ish  = case platformArch platform of
                       ArchX86    -> True
                       ArchX86_64 -> True
