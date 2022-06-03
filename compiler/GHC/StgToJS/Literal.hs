@@ -81,7 +81,7 @@ genStaticLit = \case
     --  GHC.Utils.Encoding
     --  2) We should perhaps add a different LitBin constructor that would
     --  benefit other backends?
-    -- | invalid UTF8         -> return [ BinLit str, IntLit 0]
+    -- \|  invalid UTF8         -> return [ BinLit str, IntLit 0]
   LitNullAddr              -> return [ NullLit, IntLit 0 ]
   LitNumber LitNumInt i    -> return [ IntLit (fromIntegral i) ]
   LitNumber LitNumInt8 i   -> return [ IntLit (fromIntegral i) ]

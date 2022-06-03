@@ -106,7 +106,7 @@ idVt :: HasDebugCallStack => Id -> [VarType]
 idVt = typeVt . idType
 
 typeVt :: HasDebugCallStack => Type -> [VarType]
-typeVt t | isRuntimeRepKindedTy t {- || isRuntimeRepTy t -} = []
+typeVt t | isRuntimeRepKindedTy t = []
 typeVt t = map primRepVt (typePrimRep t)-- map uTypeVt (repTypeArgs t)
 
 -- only use if you know it's not an unboxed tuple
