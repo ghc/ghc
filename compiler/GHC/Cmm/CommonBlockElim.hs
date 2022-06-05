@@ -22,12 +22,12 @@ import Data.Maybe (mapMaybe)
 import qualified Data.List as List
 import Data.Word
 import qualified Data.Map as M
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import qualified GHC.Data.TrieMap as TM
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import Control.Arrow (first, second)
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NE
 
 -- -----------------------------------------------------------------------------
 -- Eliminate common blocks
@@ -81,7 +81,7 @@ iterate subst blocks
     | mapNull new_substs = subst
     | otherwise = iterate subst' updated_blocks
   where
-    grouped_blocks :: [[(Key, [DistinctBlocks])]]
+    grouped_blocks :: [[(Key, NonEmpty DistinctBlocks)]]
     grouped_blocks = map groupByLabel blocks
 
     merged_blocks :: [[(Key, DistinctBlocks)]]
@@ -106,9 +106,8 @@ mergeBlocks subst existing new = go new
         -- This block is not a duplicate, keep it.
         Nothing -> second (b:) $ go bs
 
-mergeBlockList :: Subst -> [DistinctBlocks] -> (Subst, DistinctBlocks)
-mergeBlockList _ [] = pprPanic "mergeBlockList" empty
-mergeBlockList subst (b:bs) = go mapEmpty b bs
+mergeBlockList :: Subst -> NonEmpty DistinctBlocks -> (Subst, DistinctBlocks)
+mergeBlockList subst (b:|bs) = go mapEmpty b bs
   where
     go !new_subst1 b [] = (new_subst1, b)
     go !new_subst1 b1 (b2:bs) = go new_subst b bs
@@ -301,15 +300,15 @@ copyTicks env g
 
 -- Group by [Label]
 -- See Note [Compressed TrieMap] in GHC.Core.Map.Expr about the usage of GenMap.
-groupByLabel :: [(Key, DistinctBlocks)] -> [(Key, [DistinctBlocks])]
+groupByLabel :: [(Key, DistinctBlocks)] -> [(Key, NonEmpty DistinctBlocks)]
 groupByLabel =
-  go (TM.emptyTM :: TM.ListMap (TM.GenMap LabelMap) (Key, [DistinctBlocks]))
+  go (TM.emptyTM :: TM.ListMap (TM.GenMap LabelMap) (Key, NonEmpty DistinctBlocks))
     where
       go !m [] = TM.foldTM (:) m []
       go !m ((k,v) : entries) = go (TM.alterTM k adjust m) entries
         where --k' = map (getKey . getUnique) k
-              adjust Nothing       = Just (k,[v])
-              adjust (Just (_,vs)) = Just (k,v:vs)
+              adjust Nothing       = Just (k, pure v)
+              adjust (Just (_,vs)) = Just (k, v NE.<| vs)
 
 groupByInt :: (a -> Int) -> [a] -> [[a]]
 groupByInt f xs = nonDetEltsUFM $ List.foldl' go emptyUFM xs
