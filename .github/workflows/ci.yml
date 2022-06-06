@@ -15,12 +15,12 @@ jobs:
         os: [ubuntu-latest]
         cabal: ["3.6"]
         ghc:
-          - "9.2.1"
+          - "9.2.2"
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
-    - uses: haskell/actions/setup@v1
+    - uses: haskell/actions/setup@v2
       id: setup-haskell-cabal
       name: Setup Haskell
       with:
@@ -32,29 +32,29 @@ jobs:
     # not include documentation, and we need documentation to run Haddock tests.
     # Therefore, we reinstall GHC to ensure that we have the documentation we
     # need.
-
-    # TODO: Only reinstall GHC when the docs are actually missing. (If we're
-    # using a GHC version that is not preinstalled by GitHub, then we will be
-    # using a GHC installed by ghcup, which should have documentation.)
     - name: Reinstall GHC with docs
       run: |
-        ghcup rm ghc ${{ matrix.ghc }}
-        ghcup install ghc ${{ matrix.ghc }}
+        if [[ ! -e ~/.ghcup/ghc/${{ matrix.ghc }}/share/doc ]]; then
+          ghcup install ghc --force ${{ matrix.ghc }} --set
+        fi
 
-    - name: Freeze
+    - name: Setup
       run: |
+        cabal configure --with-compiler ghc-${{ matrix.ghc }} --enable-tests --enable-benchmarks --test-show-details=direct
         cabal freeze
- 
+
     - uses: actions/cache@v2
       name: Cache ~/.cabal/store
       with:
         path: |
           ${{ steps.setup-haskell-cabal.outputs.cabal-store }}
+          dist-newstyle
         key: ${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('cabal.project.freeze') }}
+        restore-keys: |
+          ${{ runner.os }}-cabal-${{ matrix.ghc }}
 
     - name: Build
       run: |
-        cabal configure --enable-tests --enable-benchmarks --test-show-details=direct
         cabal build all
 
     - name: Test
