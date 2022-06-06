@@ -1,5 +1,5 @@
 
-T4966.hs:3:14: warning:
+T4966.hs:3:14: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 T4966.hs:35:30: warning: [-Wmissing-methods (in -Wdefault)]

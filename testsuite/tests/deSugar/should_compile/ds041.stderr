@@ -1,5 +1,5 @@
 
-ds041.hs:1:14: warning:
+ds041.hs:1:14: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 ds041.hs:16:7: warning: [-Wmissing-fields (in -Wdefault)]

@@ -46,10 +46,14 @@ handleFlagWarnings :: Logger -> DynFlags -> [CmdLine.Warn] -> IO ()
 handleFlagWarnings logger dflags warns = do
   let warns' = filter (shouldPrintWarning dflags . CmdLine.warnReason)  warns
 
+      toWarnReason CmdLine.ReasonDeprecatedFlag = Reason Opt_WarnDeprecatedFlags
+      toWarnReason CmdLine.ReasonUnrecognisedFlag = Reason Opt_WarnUnrecognisedWarningFlags
+      toWarnReason CmdLine.NoReason = NoReason
+
       -- It would be nicer if warns :: [Located SDoc], but that
       -- has circular import problems.
-      bag = listToBag [ mkPlainWarnMsg loc (text warn)
-                      | CmdLine.Warn _ (L loc warn) <- warns' ]
+      bag = listToBag [ makeIntoWarning (toWarnReason reason) (mkPlainWarnMsg loc (text warn))
+                      | CmdLine.Warn reason (L loc warn) <- warns' ]
 
   printOrThrowWarnings logger dflags bag
 

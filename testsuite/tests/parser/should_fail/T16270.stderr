@@ -1,5 +1,5 @@
 
-T16270.hs:3:12: warning:
+T16270.hs:3:12: warning: [-Wdeprecated-flags (in -Wdefault)]
     -Werror=missing-space-after-bang is deprecated: bang patterns can no longer be written with a space
 
 T16270.hs:8:1: warning: [-Wtabs (in -Wdefault)]
