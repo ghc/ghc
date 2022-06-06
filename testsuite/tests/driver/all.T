@@ -289,6 +289,7 @@ test('T16737',
 test('T17143', exit_code(1), run_command, ['{compiler} T17143.hs -S -fno-code'])
 test('T17786', unless(opsys('mingw32'), skip), makefile_test, [])
 test('T18369', normal, compile, ['-O'])
+test('T21682', normal, compile_fail, ['-Werror=unrecognised-warning-flags -Wfoo'])
 test('FullGHCVersion', normal, compile_and_run, ['-package ghc-boot'])
 test('OneShotTH', normal, makefile_test, [])
 test('T17481', normal, makefile_test, [])

@@ -1,0 +1,3 @@
+
+on the commandline: error: [-Wunrecognised-warning-flags, -Werror=unrecognised-warning-flags]
+    unrecognised warning flag: -Wfoo
