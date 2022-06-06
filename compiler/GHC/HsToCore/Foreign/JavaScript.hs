@@ -396,7 +396,7 @@ showFFIType t = getOccString (getName (typeTyCon t))
 
 typeTyCon :: Type -> TyCon
 typeTyCon ty
-  -- | UnaryRep rep_ty <- repType ty
+  -- UnaryRep rep_ty <- repType ty
   | Just (tc, _) <- tcSplitTyConApp_maybe (unwrapType ty) -- rep_ty
   = tc
   | otherwise

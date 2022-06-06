@@ -255,12 +255,12 @@ unsafeUnpackJSStringUtf8## a = js_unsafeUnpackJSStringUtf8## a
 -- reduce the spine and all list elements to whnf
 seqList :: [a] -> [a]
 seqList xs = go xs `seq` xs
-  where go (x:xs) = x `seq` go xs
+  where go (y:ys) = y `seq` go ys
         go []     = ()
 
 seqListSpine :: [a] -> [a]
 seqListSpine xs = go xs `seq` xs
-  where go (x:xs) = go xs
+  where go (y:ys) = go ys
         go []     = ()
 
 foreign import javascript unsafe "h$toHsString($1)"
