@@ -1,0 +1,29 @@
+pull_request_rules:
+  # rebase+merge strategy
+  - actions:
+      queue:
+        name: default
+        # Merge into master with a merge commit
+        method: merge
+        # Update the pr branch with rebase, so the history is clean
+        update_method: rebase
+    name: Put pull requests in the rebase+merge queue
+    conditions:
+      - label=merge me
+      - '#approved-reviews-by>=1'
+  # merge+squash strategy
+  - actions:
+      queue:
+        name: default
+        method: squash
+        # both update methods get absorbed by the squash, so we use the most
+        # reliable
+        update_method: merge
+    name: Put pull requests in the squash+merge queue
+    conditions:
+      - label=squash+merge me
+      - '#approved-reviews-by>=1'
+
+queue_rules:
+  - name: default
+    conditions: []
