@@ -1,6 +1,6 @@
 cabal-version:        2.4
 name:                 haddock
-version:              2.26.0
+version:              2.26.1
 synopsis:             A documentation-generation tool for Haskell libraries
 description:
   This is Haddock, a tool for automatically generating documentation
