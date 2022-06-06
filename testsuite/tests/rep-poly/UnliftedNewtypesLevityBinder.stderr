@@ -1,12 +1,9 @@
 
 UnliftedNewtypesLevityBinder.hs:15:7: error:
-    • The newtype constructor argument
+    • Unsaturated use of a representation-polymorphic newtype constructor.
+      The first argument of ‘IdentC’
       does not have a fixed runtime representation.
       Its type is:
-        a0 :: TYPE c0
-      Cannot unify ‘r’ with the type variable ‘c0’
-      because it is not a concrete ‘RuntimeRep’.
+        a :: TYPE r
     • In the expression: IdentC
       In an equation for ‘bad’: bad = IdentC
-    • Relevant bindings include
-        bad :: a -> Ident a (bound at UnliftedNewtypesLevityBinder.hs:15:1)

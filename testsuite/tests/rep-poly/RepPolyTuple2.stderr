@@ -1,0 +1,10 @@
+
+RepPolyTuple2.hs:21:9: error:
+    • Unsaturated use of a representation-polymorphic data constructor.
+      The second argument of ‘(#,#)’
+      does not have a fixed runtime representation.
+      Its type is:
+        b :: TYPE RR
+    • In the expression: (#,#) @LiftedRep @RR (expensive x)
+      In an equation for ‘tup’:
+          tup x = (#,#) @LiftedRep @RR (expensive x)

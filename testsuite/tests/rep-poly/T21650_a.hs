@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, DatatypeContexts, MagicHash, UnliftedNewtypes, TypeFamilies #-}
 
-module EtaExpandNewtypeTF where
+module T21650_a where
 
 import Data.Kind
 import GHC.Exts

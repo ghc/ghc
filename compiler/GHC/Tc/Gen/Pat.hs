@@ -930,7 +930,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
         ; zipWithM_
             ( \ i arg_sty ->
               hasFixedRuntimeRep_syntactic
-                (FRRDataConArg Pattern data_con i)
+                (FRRDataConPatArg data_con i)
                 (scaledThing arg_sty)
             )
             [1..]

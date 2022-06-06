@@ -4,10 +4,6 @@ UnliftedNewtypesCoerceFail.hs:14:8: error:
       The first argument of ‘coerce’
       does not have a fixed runtime representation.
       Its type is:
-        a0 :: TYPE c0
-      Cannot unify ‘rep’ with the type variable ‘c0’
-      because it is not a concrete ‘RuntimeRep’.
+        x :: TYPE rep
     • In the expression: coerce
       In an equation for ‘goof’: goof = coerce
-    • Relevant bindings include
-        goof :: x -> y (bound at UnliftedNewtypesCoerceFail.hs:14:1)

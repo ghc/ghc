@@ -773,23 +773,21 @@ dsHsConLike (PatSynCon ps)
   | otherwise
   = pprPanic "dsConLike" (ppr ps)
 
-dsConLike :: ConLike -> [TcTyVar] -> [Scaled Type] -> DsM CoreExpr
--- This function desugars ConLikeTc
+-- | This function desugars 'ConLikeTc': it eta-expands
+-- data constructors to make linear types work.
+--
 -- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
---     for what is going on here
+dsConLike :: ConLike -> [TcTyVar] -> [Scaled Type] -> DsM CoreExpr
 dsConLike con tvs tys
   = do { ds_con <- dsHsConLike con
        ; ids    <- newSysLocalsDs tys
-                   -- newSysLocalDs: /can/ be lev-poly; see
+           -- NB: these 'Id's may be representation-polymorphic;
+           -- see Wrinkle [Representation-polymorphic lambda] in
+           -- Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
        ; return (mkLams tvs $
                  mkLams ids $
                  ds_con `mkTyApps` mkTyVarTys tvs
-                        `mkVarApps` drop_stupid ids) }
-  where
-
-    drop_stupid = dropList (conLikeStupidTheta con)
-    -- drop_stupid: see Note [Instantiating stupid theta]
-    --              in GHC.Tc.Gen.Head
+                        `mkVarApps` ids) }
 
 {-
 ************************************************************************

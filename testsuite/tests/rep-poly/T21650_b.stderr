@@ -1,0 +1,18 @@
+
+T21650_b.hs:34:7: error:
+    • Unsaturated use of a representation-polymorphic newtype constructor.
+      The first argument of ‘MkN’
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE (RR T1 t2)
+    • In the expression: MkN
+      In an equation for ‘foo’: foo = MkN
+
+T21650_b.hs:37:7: error:
+    • Unsaturated use of a representation-polymorphic newtype constructor.
+      The first argument of ‘MkN’
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE (RR T1 t2)
+    • In the expression: MkN
+      In an equation for ‘bar’: bar = MkN

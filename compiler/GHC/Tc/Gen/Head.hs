@@ -43,6 +43,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
 import GHC.Types.Error
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
@@ -321,24 +322,315 @@ splitHsApps e = go e (top_ctxt 0 e) []
     dec l (VACall f n _)        = VACall f (n-1) (locA l)
     dec _ ctxt@(VAExpansion {}) = ctxt
 
-rebuildHsApps :: HsExpr GhcTc -> AppCtxt -> [HsExprArg 'TcpTc]-> HsExpr GhcTc
-rebuildHsApps fun _ [] = fun
-rebuildHsApps fun ctxt (arg : args)
+-- | Rebuild an application: takes a type-checked application head
+-- expression together with arguments in the form of typechecked 'HsExprArg's
+-- and returns a typechecked application of the head to the arguments.
+--
+-- This performs a representation-polymorphism check to ensure that the
+-- remaining value arguments in an application have a fixed RuntimeRep.
+--
+-- See Note [Checking for representation-polymorphic built-ins].
+rebuildHsApps :: HsExpr GhcTc
+                      -- ^ the function being applied
+              -> AppCtxt
+              -> [HsExprArg 'TcpTc]
+                      -- ^ the arguments to the function
+              -> TcRhoType
+                      -- ^ result type of the application
+              -> TcM (HsExpr GhcTc)
+rebuildHsApps fun ctxt args app_res_rho
+  = do { tcRemainingValArgs args app_res_rho fun
+       ; return $ rebuild_hs_apps fun ctxt args }
+
+-- | The worker function for 'rebuildHsApps': simply rebuilds
+-- an application chain in which arguments are specified as
+-- typechecked 'HsExprArg's.
+rebuild_hs_apps :: HsExpr GhcTc
+                      -- ^ the function being applied
+              -> AppCtxt
+              -> [HsExprArg 'TcpTc]
+                      -- ^ the arguments to the function
+              -> HsExpr GhcTc
+rebuild_hs_apps fun _ [] = fun
+rebuild_hs_apps fun ctxt (arg : args)
   = case arg of
       EValArg { eva_arg = ValArg arg, eva_ctxt = ctxt' }
-        -> rebuildHsApps (HsApp noAnn lfun arg) ctxt' args
-      ETypeArg { eva_hs_ty = hs_ty, eva_ty  = ty, eva_ctxt = ctxt' }
-        -> rebuildHsApps (HsAppType ty lfun hs_ty) ctxt' args
+        -> rebuild_hs_apps (HsApp noAnn lfun arg) ctxt' args
+      ETypeArg { eva_hs_ty = hs_ty, eva_ty = ty, eva_ctxt = ctxt' }
+        -> rebuild_hs_apps (HsAppType ty lfun hs_ty) ctxt' args
       EPrag ctxt' p
-        -> rebuildHsApps (HsPragE noExtField p lfun) ctxt' args
+        -> rebuild_hs_apps (HsPragE noExtField p lfun) ctxt' args
       EWrap (EPar ctxt')
-        -> rebuildHsApps (gHsPar lfun) ctxt' args
+        -> rebuild_hs_apps (gHsPar lfun) ctxt' args
       EWrap (EExpand orig)
-        -> rebuildHsApps (XExpr (ExpansionExpr (HsExpanded orig fun))) ctxt args
+        -> rebuild_hs_apps (XExpr (ExpansionExpr (HsExpanded orig fun))) ctxt args
       EWrap (EHsWrap wrap)
-        -> rebuildHsApps (mkHsWrap wrap fun) ctxt args
+        -> rebuild_hs_apps (mkHsWrap wrap fun) ctxt args
   where
     lfun = L (noAnnSrcSpan $ appCtxtLoc ctxt) fun
+
+{- Note [Checking for representation-polymorphic built-ins]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We cannot have representation-polymorphic or levity-polymorphic
+function arguments. See Note [Representation polymorphism invariants]
+in GHC.Core.  That is checked by the calls to `hasFixedRuntimeRep` in
+`tcEValArg`.
+
+But some /built-in/ functions have representation-polymorphic argument
+types. Users can't define such Ids; they are all GHC built-ins or data
+constructors.  Specifically they are:
+
+1. A few wired-in Ids such as coerce and unsafeCoerce#,
+2. Primops, such as raise#.
+3. Newtype constructors with `UnliftedNewtypes` which have
+   a representation-polymorphic argument.
+4. Representation-polymorphic data constructors: unboxed tuples
+   and unboxed sums.
+
+For (1) consider
+  badId :: forall r (a :: TYPE r). a -> a
+  badId = unsafeCoerce# @r @r @a @a
+
+The wired-in function
+  unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                   (a :: TYPE r1) (b :: TYPE r2).
+                   a -> b
+has a convenient but representation-polymorphic type. It has no
+binding; instead it has a compulsory unfolding, after which we
+would have
+  badId = /\r /\(a :: TYPE r). \(x::a). ...body of unsafeCorece#...
+And this is no good because of that rep-poly \(x::a).  So we want
+to reject this.
+
+On the other hand
+  goodId :: forall (a :: Type). a -> a
+  goodId = unsafeCoerce# @LiftedRep @LiftedRep @a @a
+
+is absolutely fine, because after we inline the unfolding, the \(x::a)
+is representation-monomorphic.
+
+Test cases: T14561, RepPolyWrappedVar2.
+
+For primops (2) the situation is similar; they are eta-expanded in
+CorePrep to be saturated, and that eta-expansion must not add a
+representation-polymorphic lambda.
+
+Test cases: T14561b, RepPolyWrappedVar, UnliftedNewtypesCoerceFail.
+
+For (3), consider a representation-polymorphic newtype with
+UnliftedNewtypes:
+
+  type Id :: forall r. TYPE r -> TYPE r
+  newtype Id a where { MkId :: a }
+
+  bad :: forall r (a :: TYPE r). a -> Id a
+  bad = MkId @r @a             -- Want to reject
+
+  good :: forall (a :: Type). a -> Id a
+  good = MkId @LiftedRep @a   -- Want to accept
+
+Test cases: T18481, UnliftedNewtypesLevityBinder
+
+So these cases need special treatment. We add a special case
+in tcApp to check whether an application of an Id has any remaining
+representation-polymorphic arguments, after instantiation and application
+of previous arguments.  This is achieved by the tcRemainingValArgs
+function, which computes the types of the remaining value arguments, and checks
+that each of these have a fixed runtime representation.
+
+Note that this function also ensures that data constructors always
+appear saturated, by performing eta-expansion if necessary.
+See Note [Typechecking data constructors].
+
+Wrinkle [Arity]
+
+  We don't want to check for arguments past the arity of the function.
+
+  For example
+
+      raise# :: forall {r :: RuntimeRep} (a :: Type) (b :: TYPE r). a -> b
+
+  has arity 1, so an instantiation such as:
+
+      foo :: forall w r (z :: TYPE r). w -> z -> z
+      foo = raise# @w @(z -> z)
+
+  is unproblematic.  This means we must take care not to perform a
+  representation-polymorphism check on `z`.
+
+  To achieve this, we consult the arity of the 'Id' which is the head
+  of the application (or just use 1 for a newtype constructor),
+  and keep track of how many value-level arguments we have seen,
+  to ensure we stop checking once we reach the arity.
+  This is slightly complicated by the need to include both visible
+  and invisible arguments, as the arity counts both:
+  see GHC.Tc.Gen.Head.countVisAndInvisValArgs.
+
+  Test cases: T20330{a,b}
+
+Wrinkle [Syntactic check]
+
+  We only perform a syntactic check in tcRemainingValArgs. That is,
+  we will reject partial applications such as:
+
+    type RR :: RuntimeREp
+    type family RR where { RR = IntRep }
+    type T :: TYPE RR
+    type family T where { T = Int# }
+
+    (# , #) @LiftedRep @RR e1
+
+  Why do we reject? Wee would need to elaborate this partial application
+  of (# , #) as follows:
+
+    let x1 = e1
+    in
+      ( \ @(ty2 :: TYPE RR) (x2 :: ty2 |> TYPE RR[0])
+      -> ( ( (# , #) @LiftedRep @RR @Char @ty2 x1 ) |> co1 )
+           x2
+      ) |> co2
+
+  That is, we need to cast the partial application
+
+    (# , #) @LiftedRep @RR @Char @ty2 x1
+
+  so that the next argument we provide to it has a fixed RuntimeRep,
+  and then eta-expand it. This is quite tricky, and other parts
+  of the compiler aren't set up to handle this mix of applications
+  and casts (e.g. checkCanEtaExpand in GHC.Core.Lint).
+
+  So we refrain from doing so, and instead limit ourselves to a simple syntactic
+  check. See the wiki page https://gitlab.haskell.org/ghc/ghc/-/wikis/Remaining-ValArgs
+  for a more in-depth discussion.
+-}
+
+-- | Typecheck the remaining value arguments in a partial application,
+-- ensuring they have a fixed RuntimeRep in the sense of Note [Fixed RuntimeRep]
+-- in GHC.Tc.Utils.Concrete.
+--
+-- Example:
+--
+-- > repPolyId :: forall r (a :: TYPE r). a -> a
+-- > repPolyId = coerce
+--
+-- This is an invalid instantiation of 'coerce', as we can't eta expand it
+-- to
+--
+-- > \@r \@(a :: TYPE r) (x :: a) -> coerce @r @a @a x
+--
+-- because the binder `x` does not have a fixed runtime representation.
+tcRemainingValArgs :: HasDebugCallStack
+                   => [HsExprArg 'TcpTc]
+                   -> TcRhoType
+                   -> HsExpr GhcTc
+                   -> TcM ()
+tcRemainingValArgs applied_args app_res_rho fun = case fun of
+
+  HsVar _ (L _ fun_id)
+
+    -- (1): unsafeCoerce#
+    -- 'unsafeCoerce#' is peculiar: it is patched in manually as per
+    -- Note [Wiring in unsafeCoerce#] in GHC.HsToCore.
+    -- Unfortunately, even though its arity is set to 1 in GHC.HsToCore.mkUnsafeCoercePrimPair,
+    -- at this stage, if we query idArity, we get 0. This is because
+    -- we end up looking at the non-patched version of unsafeCoerce#
+    -- defined in Unsafe.Coerce, and that one indeed has arity 0.
+    --
+    -- We thus manually specify the correct arity of 1 here.
+    | idName fun_id == unsafeCoercePrimName
+    -> tc_remaining_args 1 (RepPolyWiredIn fun_id)
+
+    -- (2): primops and other wired-in representation-polymorphic functions,
+    -- such as 'rightSection', 'oneShot', etc; see bindings with Compulsory unfoldings
+    -- in GHC.Types.Id.Make
+    | isWiredInName (idName fun_id) && hasNoBinding fun_id
+    -> tc_remaining_args (idArity fun_id) (RepPolyWiredIn fun_id)
+       -- NB: idArity consults the IdInfo of the Id. This can be a problem
+       -- in the presence of hs-boot files, as we might not have finished
+       -- typechecking; inspecting the IdInfo at this point can cause
+       -- strange Core Lint errors (see #20447).
+       -- We avoid this entirely by only checking wired-in names,
+       -- as those are the only ones this check is applicable to anyway.
+
+  XExpr (ConLikeTc (RealDataCon con) _ _)
+    -- (3): Representation-polymorphic newtype constructors.
+    | isNewDataCon con
+    -- (4): Unboxed tuples and unboxed sums
+    || isUnboxedTupleDataCon con
+    || isUnboxedSumDataCon con
+    -> tc_remaining_args (dc_val_arity con) (RepPolyDataCon con)
+
+  _ -> return ()
+
+  where
+
+    dc_val_arity :: DataCon -> Arity
+    dc_val_arity con = count (not . isEqPrimPred) (dataConTheta con)
+                     + length (dataConStupidTheta con)
+                     + dataConSourceArity con
+      -- Count how many value-level arguments this data constructor expects:
+      --    - dictionary arguments from the context (including the stupid context),
+      --    - source value arguments.
+      -- Tests: EtaExpandDataCon, EtaExpandStupid{1,2}.
+
+    nb_applied_vis_val_args :: Int
+    nb_applied_vis_val_args = count isHsValArg applied_args
+
+    nb_applied_val_args :: Int
+    nb_applied_val_args = countVisAndInvisValArgs applied_args
+
+    tc_remaining_args :: Arity -> RepPolyFun -> TcM ()
+    tc_remaining_args arity rep_poly_fun =
+      tc_rem_args
+        (nb_applied_vis_val_args + 1)
+        (nb_applied_val_args + 1)
+        rem_arg_tys
+
+      where
+
+      rem_arg_tys :: [(Scaled Type, AnonArgFlag)]
+      rem_arg_tys = getRuntimeArgTys app_res_rho
+        -- We do not need to zonk app_res_rho first, because the number of arrows
+        -- in the (possibly instantiated) inferred type of the function will
+        -- be at least the arity of the function.
+
+      -- The following function is essentially "mapM hasFixedRuntimeRep rem_arg_tys",
+      -- but we need to keep track of indices for error messages, hence the manual recursion.
+      tc_rem_args :: Int
+                     -- visible value argument index, starting from 1
+                     -- (only used to report the argument position in error messages)
+                  -> Int
+                     -- value argument index, starting from 1
+                     -- used to count up to the arity to ensure that
+                     -- we don't check too many argument types
+                  -> [(Scaled Type, AnonArgFlag)]
+                     -- run-time argument types
+                  -> TcM ()
+      tc_rem_args _ i_val _
+        | i_val > arity
+        = return ()
+      tc_rem_args _ _ []
+        -- Should never happen: it would mean that the arity is higher
+        -- than the number of arguments apparent from the type.
+        = pprPanic "tcRemainingValArgs" debug_msg
+      tc_rem_args i_visval !i_val ((Scaled _ arg_ty, af) : tys)
+        = do { let (i_visval', arg_pos) =
+                     case af of { InvisArg -> ( i_visval    , ArgPosInvis )
+                                ; VisArg   -> ( i_visval + 1, ArgPosVis i_visval ) }
+                   frr_ctxt = FRRNoBindingResArg rep_poly_fun arg_pos
+             ; hasFixedRuntimeRep_syntactic frr_ctxt arg_ty
+                 -- Why is this a syntactic check? See Wrinkle [Syntactic check] in
+                 -- Note [Checking for representation-polymorphic built-ins].
+             ; tc_rem_args i_visval' (i_val + 1) tys }
+
+      debug_msg :: SDoc
+      debug_msg =
+        vcat
+          [ text "app_head =" <+> ppr fun
+          , text "arity =" <+> ppr arity
+          , text "applied_args =" <+> ppr applied_args
+          , text "nb_applied_val_args =" <+> ppr nb_applied_val_args ]
+
 
 isHsValArg :: HsExprArg id -> Bool
 isHsValArg (EValArg {}) = True
@@ -845,8 +1137,11 @@ tcInferDataCon con
 
        ; let full_theta  = stupid_theta ++ theta
              all_arg_tys = map unrestricted full_theta ++ scaled_arg_tys
-                -- stupid-theta must come first
+                -- We are building the type of the data con wrapper, so the
+                -- type must precisely match the construction in
+                -- GHC.Core.DataCon.dataConWrapperType.
                 -- See Note [Instantiating stupid theta]
+                -- in GHC.Core.DataCon.
 
        ; return ( XExpr (ConLikeTc (RealDataCon con) tvs all_arg_tys)
                 , mkInvisForAllTys tvbs $ mkPhiTy full_theta $
@@ -868,22 +1163,31 @@ tcInferPatSyn id_name ps
 nonBidirectionalErr :: Name -> TcRnMessage
 nonBidirectionalErr = TcRnPatSynNotBidirectional
 
-{- Note [Typechecking data constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Adding the implicit parameter to 'assert']
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The typechecker transforms (assert e1 e2) to (assertError e1 e2).
+This isn't really the Right Thing because there's no way to "undo"
+if you want to see the original source code in the typechecker
+output.  We'll have fix this in due course, when we care more about
+being able to reconstruct the exact original program.
+
+Note [Typechecking data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As per Note [Polymorphisation of linear fields] in
 GHC.Core.Multiplicity, linear fields of data constructors get a
 polymorphic multiplicity when the data constructor is used as a term:
 
     Just :: forall {p} a. a %p -> Maybe a
 
-So at an occurrence of a data constructor we do the following,
-mostly in tcInferDataCon:
+So at an occurrence of a data constructor we do the following:
 
-1. Get its type, say
-    K :: forall (r :: RuntimeRep) (a :: TYPE r). a %1 -> T r a
-   Note the %1: it is linear
+1. Typechecking, in tcInferDataCon.
 
-2. We are going to return a ConLikeTc, thus:
+  a. Get the original type of the constructor, say
+     K :: forall (r :: RuntimeRep) (a :: TYPE r). a %1 -> T r a
+     Note the %1: it is linear
+
+  b. We are going to return a ConLikeTc, thus:
      XExpr (ConLikeTc K [r,a] [Scaled p a])
       :: forall (r :: RuntimeRep) (a :: TYPE r). a %p -> T r a
    where 'p' is a fresh multiplicity unification variable.
@@ -893,93 +1197,71 @@ mostly in tcInferDataCon:
    the fresh multiplicity variable in the ConLikeTc; along with
    the type of the ConLikeTc. This is done by linear_to_poly.
 
-3. If the argument is not linear (perhaps explicitly declared as
+   If the argument is not linear (perhaps explicitly declared as
    non-linear by the user), don't bother with this.
 
-4. The (ConLikeTc K [r,a] [Scaled p a]) is later desugared by
-   GHC.HsToCore.Expr.dsConLike to:
+2. Desugaring, in dsConLike.
+
+  a. The (ConLikeTc K [r,a] [Scaled p a]) is desugared to
      (/\r (a :: TYPE r). \(x %p :: a). K @r @a x)
    which has the desired type given in the previous bullet.
+
    The 'p' is the multiplicity unification variable, which
    will by now have been unified to something, or defaulted in
    `GHC.Tc.Utils.Zonk.commitFlexi`. So it won't just be an
    (unbound) variable.
 
+   So a saturated application (K e), where e::Int will desugar to
+     (/\r (a :: TYPE r). ..etc..)
+        @LiftedRep @Int e
+   and all those lambdas will beta-reduce away in the simple optimiser
+   (see Wrinkle [Representation-polymorphic lambdas] below).
+
+   But for an /unsaturated/ application, such as `map (K @LiftedRep @Int) xs`,
+   beta reduction will leave (\x %Many :: Int. K x), which is the type `map`
+   expects whereas if we had just plain K, with its linear type, we'd
+   get a type mismatch. That's why we do this funky desugaring.
+
 Wrinkles
 
-* Note that the [TcType] is strictly redundant anyway; those are the
-  type variables from the dataConUserTyVarBinders of the data constructor.
-  Similarly in the [Scaled TcType] field of ConLikeTc, the types come directly
-  from the data constructor.  The only bit that /isn't/ redundant is the
-  fresh multiplicity variables!
+  [ConLikeTc arguments]
 
-  So an alternative would be to define ConLikeTc like this:
-      | ConLikeTc [TcType]    -- Just the multiplicity variables
-  But then the desugarer would need to repeat some of the work done here.
-  So for now at least ConLikeTc records this strictly-redundant info.
+    Note that the [TcType] argument to ConLikeTc is strictly redundant; those are
+    the type variables from the dataConUserTyVarBinders of the data constructor.
+    Similarly in the [Scaled TcType] field of ConLikeTc, the types come directly
+    from the data constructor.  The only bit that /isn't/ redundant is the
+    fresh multiplicity variables!
 
-* The lambda expression we produce in (4) can have representation-polymorphic
-  arguments, as indeed in (/\r (a :: TYPE r). \(x %p :: a). K @r @a x),
-  we have a lambda-bound variable x :: (a :: TYPE r).
-  This goes against the representation polymorphism invariants given in
-  Note [Representation polymorphism invariants] in GHC.Core. The trick is that
-  this this lambda will always be instantiated in a way that upholds the invariants.
-  This is achieved as follows:
+    So an alternative would be to define ConLikeTc like this:
+        | ConLikeTc [TcType]    -- Just the multiplicity variables
+    But then the desugarer would need to repeat some of the work done here.
+    So for now at least ConLikeTc records this strictly-redundant info.
 
-    A. Any arguments to such lambda abstractions are guaranteed to have
-       a fixed runtime representation. This is enforced in 'tcApp' by
-       'matchActualFunTySigma'.
+  [Representation-polymorphic lambdas]
 
-    B. If there are fewer arguments than there are bound term variables,
-       hasFixedRuntimeRep_remainingValArgs will ensure that we are still
-       instantiating at a representation-monomorphic type, e.g.
+    The lambda expression we produce in (4) can have representation-polymorphic
+    arguments, as indeed in (/\r (a :: TYPE r). \(x %p :: a). K @r @a x),
+    we have a lambda-bound variable x :: (a :: TYPE r).
+    This goes against the representation polymorphism invariants given in
+    Note [Representation polymorphism invariants] in GHC.Core. The trick is that
+    this this lambda will always be instantiated in a way that upholds the invariants.
+    This is achieved as follows:
 
-       ( /\r (a :: TYPE r). \ (x %p :: a). K @r @a x) @IntRep @Int#
-         :: Int# -> T IntRep Int#
+      A. Any arguments to such lambda abstractions are guaranteed to have
+         a fixed runtime representation. This is enforced in 'tcApp' by
+         'matchActualFunTySigma'.
 
-  We then rely on the simple optimiser to beta reduce the lambda.
+      B. If there are fewer arguments than there are bound term variables,
+         hasFixedRuntimeRep_remainingValArgs will ensure that we are still
+         instantiating at a representation-monomorphic type, e.g.
 
-* See Note [Instantiating stupid theta] for an extra wrinkle
+         ( /\r (a :: TYPE r). \ (x %p :: a). K @r @a x) @IntRep @Int#
+           :: Int# -> T IntRep Int#
 
-
-Note [Adding the implicit parameter to 'assert']
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The typechecker transforms (assert e1 e2) to (assertError e1 e2).
-This isn't really the Right Thing because there's no way to "undo"
-if you want to see the original source code in the typechecker
-output.  We'll have fix this in due course, when we care more about
-being able to reconstruct the exact original program.
-
-
-Note [Instantiating stupid theta]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider a data type with a "stupid theta" (see
-Note [The stupid context] in GHC.Core.DataCon):
-
-  data Ord a => T a = MkT (Maybe a)
-
-We want to generate an Ord constraint for every use of MkT; but
-we also want to allow visible type application, such as
-   MkT @Int
-
-So we generate (ConLikeTc MkT [a] [Ord a, Maybe a]), with type
-   forall a. Ord a => Maybe a -> T a
-
-Now visible type application will work fine. But we desugar the
-ConLikeTc to
-   /\a \(d:Ord a) (x:Maybe a). MkT x
-Notice that 'd' is dropped in this desugaring. We don't need it;
-it was only there to generate a Wanted constraint. (That is why
-it is stupid.)  To achieve this:
-
-* We put the stupid-thata at the front of the list of argument
-  types in ConLikeTc
-
-* GHC.HsToCore.Expr.dsConLike generates /lambdas/ for all the
-  arguments, but drops the stupid-theta arguments when building the
-  /application/.
-
-Nice.
+      C. In the output of the desugarer in (4) above, we have a representation
+         polymorphic lambda, which Lint would normally reject. So for that one
+         pass, we switch off Lint's representation-polymorphism checks; see
+         the `lf_check_fixed_rep` flag in `LintFlags`.
 -}
 
 {-

@@ -7,7 +7,7 @@
 {-# LANGUAGE UnliftedNewtypes #-}
 {-# LANGUAGE LinearTypes #-}
 
-module EtaExpandNewtypeTF2 where
+module T21650_b where
 
 import Data.Kind
 import GHC.Exts
