@@ -679,8 +679,10 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
 
   | otherwise
   = do { wrap_args <- mapM (newLocal (fsLit "conrep")) wrap_arg_tys
-       ; wrap_body <- mk_rep_app (wrap_args `zip` dropList eq_spec unboxers)
+       ; wrap_body <- mk_rep_app (dropList stupid_theta wrap_args `zip` dropList eq_spec unboxers)
                                  initial_wrap_app
+                        -- Drop the stupid theta arguments, as per
+                        -- Note [Instantiating stupid theta] in GHC.Core.DataCon.
 
        ; let wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty wrap_info
              wrap_info = noCafIdInfo
@@ -735,6 +737,7 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
   where
     (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
       = dataConFullSig data_con
+    stupid_theta = dataConStupidTheta data_con
     wrap_tvs     = dataConUserTyVars data_con
     res_ty_args  = substTyVars (mkTvSubstPrs (map eqSpecPair eq_spec)) univ_tvs
 
@@ -745,7 +748,7 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
     ev_ibangs    = map (const HsLazy) ev_tys
     orig_bangs   = dataConSrcBangs data_con
 
-    wrap_arg_tys = (map unrestricted theta) ++ orig_arg_tys
+    wrap_arg_tys = (map unrestricted $ stupid_theta ++ theta) ++ orig_arg_tys
     wrap_arity   = count isCoVar ex_tvs + length wrap_arg_tys
              -- The wrap_args are the arguments *other than* the eq_spec
              -- Because we are going to apply the eq_spec args manually in the
@@ -784,6 +787,10 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
                      -- worker expects, it needs a data con wrapper to reorder
                      -- the type variables.
                      -- See Note [Data con wrappers and GADT syntax].
+      || not (null stupid_theta)
+                     -- If the data constructor has a datatype context,
+                     -- we need a wrapper in order to drop the stupid arguments.
+                     -- See Note [Instantiating stupid theta] in GHC.Core.DataCon.
 
     initial_wrap_app = Var (dataConWorkId data_con)
                        `mkTyApps`  res_ty_args

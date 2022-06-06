@@ -4,23 +4,15 @@ RepPolyMagic.hs:12:7: error:
       The second argument of ‘seq’
       does not have a fixed runtime representation.
       Its type is:
-        b0 :: TYPE c1
-      Cannot unify ‘r’ with the type variable ‘c1’
-      because it is not a concrete ‘RuntimeRep’.
+        b :: TYPE r
     • In the expression: seq
       In an equation for ‘foo’: foo = seq
-    • Relevant bindings include
-        foo :: a -> b -> b (bound at RepPolyMagic.hs:12:1)
 
 RepPolyMagic.hs:15:7: error:
     • Unsaturated use of a representation-polymorphic primitive function.
       The second argument of ‘oneShot’
       does not have a fixed runtime representation.
       Its type is:
-        a0 :: TYPE c0
-      Cannot unify ‘r’ with the type variable ‘c0’
-      because it is not a concrete ‘RuntimeRep’.
+        a :: TYPE r
     • In the expression: oneShot
       In an equation for ‘bar’: bar = oneShot
-    • Relevant bindings include
-        bar :: (a -> a) -> a -> a (bound at RepPolyMagic.hs:15:1)

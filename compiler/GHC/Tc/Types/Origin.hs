@@ -31,7 +31,7 @@ module GHC.Tc.Types.Origin (
   -- * FixedRuntimeRep origin
   FixedRuntimeRepOrigin(..), FixedRuntimeRepContext(..),
   pprFixedRuntimeRepContext,
-  StmtOrigin(..),
+  StmtOrigin(..), RepPolyFun(..), ArgPos(..),
 
   -- * Arrow command origin
   FRRArrowContext(..), pprFRRArrowContext,
@@ -1021,21 +1021,17 @@ data FixedRuntimeRepContext
   -- Test cases: RepPolyCase{1,2}.
   | FRRCase
 
-  -- | An instantiation of a newtype/data constructor in which
+  -- | An instantiation of a newtype/data constructor pattern in which
   -- an argument type does not have a fixed runtime representation.
   --
-  -- The argument can either be an expression or a pattern.
-  --
-  -- Test cases:
-  --  Expression: UnliftedNewtypesLevityBinder.
-  --     Pattern: T20363.
-  | FRRDataConArg !ExprOrPat !DataCon !Int
+  -- Test case: T20363.
+  | FRRDataConPatArg !DataCon !Int
 
-  -- | An instantiation of an 'Id' with no binding (e.g. `coerce`, `unsafeCoerce#`)
+  -- | An instantiation of a function with no binding (e.g. `coerce`, `unsafeCoerce#`, an unboxed tuple 'DataCon')
   -- in which one of the remaining arguments types does not have a fixed runtime representation.
   --
-  -- Test cases: RepPolyWrappedVar, T14561, UnliftedNewtypesCoerceFail.
-  | FRRNoBindingResArg !Id !Int
+  -- Test cases: RepPolyWrappedVar, T14561, UnliftedNewtypesLevityBinder, UnliftedNewtypesCoerceFail.
+  | FRRNoBindingResArg !RepPolyFun !ArgPos
 
   -- | Arguments to unboxed tuples must have fixed runtime representations.
   --
@@ -1110,21 +1106,33 @@ pprFixedRuntimeRepContext FRRPatSynArg
   = text "The pattern synonym argument pattern"
 pprFixedRuntimeRepContext FRRCase
   = text "The scrutinee of the case statement"
-pprFixedRuntimeRepContext (FRRDataConArg expr_or_pat con i)
+pprFixedRuntimeRepContext (FRRDataConPatArg con i)
   = text "The" <+> what
   where
-    arg, what :: SDoc
-    arg = case expr_or_pat of
-      Expression -> text "argument"
-      Pattern    -> text "pattern"
+    what :: SDoc
     what
       | isNewDataCon con
-      = text "newtype constructor" <+> arg
+      = text "newtype constructor pattern"
       | otherwise
-      = text "data constructor" <+> arg <+> text "in" <+> speakNth i <+> text "position"
-pprFixedRuntimeRepContext (FRRNoBindingResArg fn i)
-  = vcat [ text "Unsaturated use of a representation-polymorphic primitive function."
-         , text "The" <+> speakNth i <+> text "argument of" <+> quotes (ppr $ getName fn) ]
+      = text "data constructor pattern in" <+> speakNth i <+> text "position"
+pprFixedRuntimeRepContext (FRRNoBindingResArg fn arg_pos)
+  = vcat [ text "Unsaturated use of a representation-polymorphic" <+> what_fun <> dot
+         , what_arg <+> text "argument of" <+> quotes (ppr fn) ]
+  where
+    what_fun, what_arg :: SDoc
+    what_fun = case fn of
+      RepPolyWiredIn {} -> text "primitive function"
+      RepPolyDataCon dc -> what_con <+> text "constructor"
+        where
+          what_con :: SDoc
+          what_con
+            | isNewDataCon dc
+            = text "newtype"
+            | otherwise
+            = text "data"
+    what_arg = case arg_pos of
+      ArgPosInvis -> text "An invisible"
+      ArgPosVis i -> text "The" <+> speakNth i
 pprFixedRuntimeRepContext (FRRTupleArg i)
   = text "The tuple argument in" <+> speakNth i <+> text "position"
 pprFixedRuntimeRepContext (FRRTupleSection i)
@@ -1160,6 +1168,30 @@ data StmtOrigin
 instance Outputable StmtOrigin where
   ppr MonadComprehension = text "monad comprehension"
   ppr DoNotation         = quotes ( text "do" ) <+> text "statement"
+
+-- | A function with representation-polymorphic arguments,
+-- such as @coerce@ or @(#, #)@.
+--
+-- Used for reporting partial applications of representation-polymorphic
+-- functions in error messages.
+data RepPolyFun
+  = RepPolyWiredIn !Id
+    -- ^ A wired-in function with representation-polymorphic
+    -- arguments, such as 'coerce'.
+  | RepPolyDataCon !DataCon
+    -- ^ A data constructor with representation-polymorphic arguments,
+    -- such as an unboxed tuple or a newtype constructor with @-XUnliftedNewtypes@.
+
+instance Outputable RepPolyFun where
+  ppr (RepPolyWiredIn id) = ppr id
+  ppr (RepPolyDataCon dc) = ppr dc
+
+-- | The position of an argument (to be reported in an error message).
+data ArgPos
+  = ArgPosInvis
+    -- ^ Invisible argument: don't report its position to the user.
+  | ArgPosVis !Int
+    -- ^ Visible argument in i-th position.
 
 {- *********************************************************************
 *                                                                      *

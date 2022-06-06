@@ -250,6 +250,8 @@ in wrapper_reqd in GHC.Types.Id.Make.mkDataConRep.
 * Type variables may be permuted; see MkId
   Note [Data con wrappers and GADT syntax]
 
+* Datatype contexts require dropping some dictionary arguments.
+  See Note [Instantiating stupid theta].
 
 Note [The stupid context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -282,7 +284,7 @@ gets inferred type
 
 I say the context is "stupid" because the dictionaries passed
 are immediately discarded -- they do nothing and have no benefit.
-(See Note [Instantiating stupid theta] in GHC.Tc.Gen.Head.)
+(See Note [Instantiating stupid theta].)
 It's a flaw in the language.
 
 GHC has made some efforts to correct this flaw. In GHC, datatype contexts
@@ -325,6 +327,30 @@ Some other notes about stupid contexts:
   reason, GHC disallows combining datatype contexts with GADT syntax. As a
   result, dcStupidTheta is always empty for data types defined using GADT
   syntax.
+
+Note [Instantiating stupid theta]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a data type with a "stupid theta" (see
+Note [The stupid context]):
+
+  data Ord a => T a = MkT (Maybe a)
+
+We want to generate an Ord constraint for every use of MkT; but
+we also want to allow visible type application, such as
+
+   MkT @Int
+
+To achieve this, the wrapper for a data (or newtype) constructor
+with a datatype context contains a lambda which drops the dictionary
+argments corresponding to the datatype context:
+
+   /\a \(_d:Ord a). MkT @a
+
+Notice that the wrapper discards the dictionary argument d.
+We don't need it; it was only there to generate a Wanted constraint.
+(That is why it is stupid.)
+
+This all happens in GHC.Types.Id.Make.mkDataConRep.
 
 ************************************************************************
 *                                                                      *
@@ -1449,9 +1475,10 @@ dataConWrapperType :: DataCon -> Type
 -- mentions the family tycon, not the internal one.
 dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
                              dcOtherTheta = theta, dcOrigArgTys = arg_tys,
-                             dcOrigResTy = res_ty })
+                             dcOrigResTy = res_ty,
+                             dcStupidTheta = stupid_theta })
   = mkInvisForAllTys user_tvbs $
-    mkInvisFunTysMany theta $
+    mkInvisFunTysMany (stupid_theta ++ theta) $
     mkVisFunTys arg_tys $
     res_ty
 

@@ -52,6 +52,7 @@ RnFail055.hs-boot:15:1: error:
     The roles do not match.
     Roles on abstract types default to ‘representational’ in boot files.
     The datatype contexts do not match
+    The constructors do not match: The types for ‘T2’ differ
 
 RnFail055.hs-boot:17:11: error:
     ‘T3’ is exported by the hs-boot file, but not exported by the module

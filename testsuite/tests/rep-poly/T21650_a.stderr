@@ -1,0 +1,18 @@
+
+T21650_a.hs:25:8: error:
+    • Unsaturated use of a representation-polymorphic newtype constructor.
+      The first argument of ‘MkN’
+      does not have a fixed runtime representation.
+      Its type is:
+        F Float :: TYPE (R Float)
+    • In the expression: MkN
+      In an equation for ‘foo1’: foo1 = MkN
+
+T21650_a.hs:28:10: error:
+    • Unsaturated use of a representation-polymorphic newtype constructor.
+      The first argument of ‘MkN’
+      does not have a fixed runtime representation.
+      Its type is:
+        F Double :: TYPE (R Double)
+    • In the expression: MkN
+      In an equation for ‘foo2’: foo2 _ = MkN

@@ -28,11 +28,9 @@ test('T20423', normal, compile_fail, [''])
 test('T20423b', normal, compile_fail, [''])
 test('T20426', normal, compile_fail, [''])
 test('T21239', normal, compile, [''])
+test('T21544', normal, compile, ['-Wno-deprecated-flags'])
 
 test('EtaExpandDataCon', normal, compile, ['-O'])
-test('EtaExpandDataFamily', expect_broken(21544), compile, [''])
-test('EtaExpandNewtypeTF', expect_broken(21650), compile, ['-Wno-deprecated-flags'])
-test('EtaExpandNewtypeTF2', expect_broken(21650), compile, ['-Wno-deprecated-flags'])
 test('EtaExpandStupid1', normal, compile, ['-Wno-deprecated-flags'])
 test('EtaExpandStupid2', normal, compile_fail, ['-Wno-deprecated-flags'])
 test('LevPolyLet', normal, compile_fail, [''])
@@ -83,31 +81,35 @@ test('RepPolyTupleSection', normal, compile_fail, [''])
 test('RepPolyUnboxedPatterns', normal, compile_fail, [''])
 test('RepPolyUnliftedDatatype', normal, compile, [''])
 test('RepPolyUnliftedDatatype2', normal, compile, ['-O'])
+test('RepPolyUnliftedNewtype', normal, compile,
+     ['-fno-warn-partial-type-signatures -fno-warn-deprecated-flags'])
 test('RepPolyWildcardPattern', normal, compile_fail, [''])
 test('RepPolyWrappedVar', normal, compile_fail, [''])
 test('RepPolyWrappedVar2', normal, compile, [''])
 test('UnliftedNewtypesCoerceFail', normal, compile_fail, [''])
 test('UnliftedNewtypesLevityBinder', normal, compile_fail, [''])
 
-######################################################################
-## The following tests require rewriting in RuntimeReps,            ##
-## i.e. PHASE 2 of the FixedRuntimeRep plan.                        ##
-##                                                                  ##
-## These tests work!                                                ##
-                                                                    ##
-test('T13105', normal, compile, [''])                               ##
-test('T17536b', normal, compile, [''])                              ##
-                                                                    ##
-## These don't!                                                     ##
-## For the moment, we check that we get the expected error message, ##
-## as we want to reject these in the typechecker instead of getting ##
-## a compiler crash.                                                ##
-                                                                    ##
-test('T17021', normal, compile_fail, [''])                          ##
-test('T20363', normal, compile_fail, [''])                          ##
-test('T20363_show_co', normal, compile_fail                         ##
-    , ['-fprint-explicit-coercions'])                               ##
-test('T20363b', normal, compile_fail, [''])                         ##
-test('RepPolyCase2', normal, compile_fail, [''])                    ##
-test('RepPolyRule3', normal, compile_fail, [''])                    ##
-######################################################################
+###############################################################################
+## The following tests require rewriting in RuntimeReps,                     ##
+## i.e. PHASE 2 of the FixedRuntimeRep plan.                                 ##
+##                                                                           ##
+## These tests work!                                                         ##
+                                                                             ##
+test('T13105', normal, compile, [''])                                        ##
+test('T17536b', normal, compile, [''])                                       ##
+                                                                             ##
+## These don't!                                                              ##
+## For the moment, we check that we get the expected error message,          ##
+## as we want to reject these in the typechecker instead of getting          ##
+## a compiler crash.                                                         ##
+                                                                             ##
+test('T17021', normal, compile_fail, [''])                                   ##
+test('T20363', normal, compile_fail, [''])                                   ##
+test('T20363_show_co', normal, compile_fail, ['-fprint-explicit-coercions']) ##
+test('T20363b', normal, compile_fail, [''])                                  ##
+test('RepPolyCase2', normal, compile_fail, [''])                             ##
+test('RepPolyRule3', normal, compile_fail, [''])                             ##
+test('RepPolyTuple2', normal, compile_fail, ['']) ## see #21683              ##
+test('T21650_a', normal, compile_fail, ['-Wno-deprecated-flags'])            ##
+test('T21650_b', normal, compile_fail, ['-Wno-deprecated-flags'])            ##
+###############################################################################

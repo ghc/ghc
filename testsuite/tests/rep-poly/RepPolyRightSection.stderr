@@ -4,10 +4,6 @@ RepPolyRightSection.hs:14:11: error:
       The third argument of ‘rightSection’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE c0
-      Cannot unify ‘r’ with the type variable ‘c0’
-      because it is not a concrete ‘RuntimeRep’.
+        a :: TYPE r
     • In the expression: `g` undefined
       In an equation for ‘test2’: test2 = (`g` undefined)
-    • Relevant bindings include
-        test2 :: a -> a (bound at RepPolyRightSection.hs:14:1)

@@ -4,10 +4,6 @@ T14561.hs:12:9: error:
       The first argument of ‘unsafeCoerce#’
       does not have a fixed runtime representation.
       Its type is:
-        a0 :: TYPE c0
-      Cannot unify ‘r’ with the type variable ‘c0’
-      because it is not a concrete ‘RuntimeRep’.
+        a :: TYPE r
     • In the expression: unsafeCoerce#
       In an equation for ‘badId’: badId = unsafeCoerce#
-    • Relevant bindings include
-        badId :: a -> a (bound at T14561.hs:12:1)
