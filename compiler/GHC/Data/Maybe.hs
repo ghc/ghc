@@ -32,7 +32,7 @@ import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Exception (SomeException(..))
 import Data.Maybe
-import Data.Foldable ( foldlM )
+import Data.Foldable ( foldlM, for_ )
 import GHC.Utils.Misc (HasCallStack)
 import Data.List.NonEmpty ( NonEmpty )
 
@@ -71,8 +71,7 @@ expectJust _   (Just x) = x
 expectJust err Nothing  = error ("expectJust " ++ err)
 
 whenIsJust :: Monad m => Maybe a -> (a -> m ()) -> m ()
-whenIsJust (Just x) f = f x
-whenIsJust Nothing  _ = return ()
+whenIsJust = for_
 
 -- | Flipped version of @fromMaybe@, useful for chaining.
 orElse :: Maybe a -> a -> a

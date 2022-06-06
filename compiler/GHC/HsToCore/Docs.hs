@@ -534,7 +534,7 @@ filterDecls = filter (isHandled . unXRec @p . fst)
 
 -- | Go through all class declarations and filter their sub-declarations
 filterClasses :: forall p doc. (IsPass p) => [(LHsDecl (GhcPass p), doc)] -> [(LHsDecl (GhcPass p), doc)]
-filterClasses = map (first (mapLoc filterClass))
+filterClasses = map (first (fmap filterClass))
   where
     filterClass (TyClD x c@(ClassDecl {})) =
       TyClD x $ c { tcdSigs =
@@ -554,7 +554,7 @@ mkDecls :: (struct -> [GenLocated l decl])
         -> (decl -> hsDecl)
         -> struct
         -> [GenLocated l hsDecl]
-mkDecls field con = map (mapLoc con) . field
+mkDecls field con = map (fmap con) . field
 
 -- | Extracts out individual maps of documentation added via Template Haskell's
 -- @putDoc@.

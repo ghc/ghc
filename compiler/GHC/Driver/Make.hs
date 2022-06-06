@@ -3,6 +3,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -967,8 +968,7 @@ these modules together.
 -- | Simple wrapper around MVar which allows a functor instance.
 data ResultVar b = forall a . ResultVar (a -> b) (MVar (Maybe a))
 
-instance Functor ResultVar where
-  fmap f (ResultVar g var) = ResultVar (f . g) var
+deriving instance Functor ResultVar
 
 mkResultVar :: MVar (Maybe a) -> ResultVar a
 mkResultVar = ResultVar id

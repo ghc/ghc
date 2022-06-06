@@ -462,7 +462,7 @@ addHoleFitDocs fits =
      ; if showDocs
        then do { dflags <- getDynFlags
                ; mb_local_docs <- extractDocs dflags =<< getGblEnv
-               ; (mods_without_docs, fits') <- mapAccumM (upd mb_local_docs) Set.empty fits
+               ; (mods_without_docs, fits') <- mapAccumLM (upd mb_local_docs) Set.empty fits
                ; report mods_without_docs
                ; return fits' }
        else return fits }

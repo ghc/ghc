@@ -153,9 +153,10 @@ import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Platform
 import GHC.Types.Unique.Set
-import GHC.Utils.Misc
 import GHC.Core.Ppr ( {- instances -} )
 import GHC.Types.SrcLoc
+
+import qualified Data.Semigroup as S
 
 -- -----------------------------------------------------------------------------
 -- The CLabel type
@@ -343,26 +344,26 @@ newtype NeedExternDecl
 -- code-generation. See Note [Unique Determinism and code generation]
 instance Ord CLabel where
   compare (IdLabel a1 b1 c1) (IdLabel a2 b2 c2) =
-    compare a1 a2 `thenCmp`
-    compare b1 b2 `thenCmp`
+    compare a1 a2 S.<>
+    compare b1 b2 S.<>
     compare c1 c2
   compare (CmmLabel a1 b1 c1 d1) (CmmLabel a2 b2 c2 d2) =
-    compare a1 a2 `thenCmp`
-    compare b1 b2 `thenCmp`
+    compare a1 a2 S.<>
+    compare b1 b2 S.<>
     -- This non-determinism is "safe" in the sense that it only affects object code,
     -- which is currently not covered by GHC's determinism guarantees. See #12935.
-    uniqCompareFS c1 c2 `thenCmp`
+    uniqCompareFS c1 c2 S.<>
     compare d1 d2
   compare (RtsLabel a1) (RtsLabel a2) = compare a1 a2
   compare (LocalBlockLabel u1) (LocalBlockLabel u2) = nonDetCmpUnique u1 u2
   compare (ForeignLabel a1 b1 c1 d1) (ForeignLabel a2 b2 c2 d2) =
-    uniqCompareFS a1 a2 `thenCmp`
-    compare b1 b2 `thenCmp`
-    compare c1 c2 `thenCmp`
+    uniqCompareFS a1 a2 S.<>
+    compare b1 b2 S.<>
+    compare c1 c2 S.<>
     compare d1 d2
   compare (AsmTempLabel u1) (AsmTempLabel u2) = nonDetCmpUnique u1 u2
   compare (AsmTempDerivedLabel a1 b1) (AsmTempDerivedLabel a2 b2) =
-    compare a1 a2 `thenCmp`
+    compare a1 a2 S.<>
     lexicalCompareFS b1 b2
   compare (StringLitLabel u1) (StringLitLabel u2) =
     nonDetCmpUnique u1 u2
@@ -373,10 +374,10 @@ instance Ord CLabel where
   compare (IPE_Label a1) (IPE_Label a2) =
     compare a1 a2
   compare (ModuleLabel m1 k1) (ModuleLabel m2 k2) =
-    compare m1 m2 `thenCmp`
+    compare m1 m2 S.<>
     compare k1 k2
   compare (DynamicLinkerLabel a1 b1) (DynamicLinkerLabel a2 b2) =
-    compare a1 a2 `thenCmp`
+    compare a1 a2 S.<>
     compare b1 b2
   compare PicBaseLabel PicBaseLabel = EQ
   compare (DeadStripPreventer a1) (DeadStripPreventer a2) =

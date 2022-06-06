@@ -176,6 +176,7 @@ import GHC.Data.List.SetOps
 import GHC.Data.Bag
 import qualified GHC.Data.BooleanFormula as BF
 
+import Data.Functor.Classes ( liftEq )
 import Data.List ( sortBy, sort )
 import Data.Ord
 import Data.Data ( Data )
@@ -1065,7 +1066,7 @@ checkBootTyCon is_boot tc1 tc2
                  (text "The types of" <+> pname1 <+>
                   text "are different") `andThenCheck`
            if is_boot
-               then check (eqMaybeBy eqDM def_meth1 def_meth2)
+               then check (liftEq eqDM def_meth1 def_meth2)
                           (text "The default methods associated with" <+> pname1 <+>
                            text "are different")
                else check (subDM op_ty1 def_meth1 def_meth2)
@@ -1114,15 +1115,15 @@ checkBootTyCon is_boot tc1 tc2
        eqATDef _ _ = False
 
        eqFD (as1,bs1) (as2,bs2) =
-         eqListBy (eqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
-         eqListBy (eqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
+         liftEq (eqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
+         liftEq (eqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
     in
     checkRoles roles1 roles2 `andThenCheck`
           -- Checks kind of class
-    check (eqListBy eqFD clas_fds1 clas_fds2)
+    check (liftEq eqFD clas_fds1 clas_fds2)
           (text "The functional dependencies do not match") `andThenCheck`
     checkUnless (isAbstractTyCon tc1) $
-    check (eqListBy (eqTypeX env) sc_theta1 sc_theta2)
+    check (liftEq (eqTypeX env) sc_theta1 sc_theta2)
           (text "The class constraints do not match") `andThenCheck`
     checkListBy eqSig op_stuff1 op_stuff2 (text "methods") `andThenCheck`
     checkListBy eqAT ats1 ats2 (text "associated types") `andThenCheck`
@@ -1190,7 +1191,7 @@ checkBootTyCon is_boot tc1 tc2
   , Just env <- eqVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = assert (tc1 == tc2) $
     checkRoles roles1 roles2 `andThenCheck`
-    check (eqListBy (eqTypeX env)
+    check (liftEq (eqTypeX env)
                      (tyConStupidTheta tc1) (tyConStupidTheta tc2))
           (text "The datatype contexts do not match") `andThenCheck`
     eqAlgRhs tc1 (algTyConRhs tc1) (algTyConRhs tc2)
@@ -1336,7 +1337,7 @@ checkBootTyCon is_boot tc1 tc2
          check (dataConIsInfix c1 == dataConIsInfix c2)
                (text "The fixities of" <+> pname1 <+>
                 text "differ") `andThenCheck`
-         check (eqListBy eqHsBang (dataConImplBangs c1) (dataConImplBangs c2))
+         check (liftEq eqHsBang (dataConImplBangs c1) (dataConImplBangs c2))
                (text "The strictness annotations for" <+> pname1 <+>
                 text "differ") `andThenCheck`
          check (map flSelector (dataConFieldLabels c1) == map flSelector (dataConFieldLabels c2))
@@ -1367,7 +1368,7 @@ checkBootTyCon is_boot tc1 tc2
                                      , cab_lhs = lhs2, cab_rhs = rhs2 })
       | Just env1 <- eqVarBndrs emptyRnEnv2 tvs1 tvs2
       , Just env  <- eqVarBndrs env1        cvs1 cvs2
-      = eqListBy (eqTypeX env) lhs1 lhs2 &&
+      = liftEq (eqTypeX env) lhs1 lhs2 &&
         eqTypeX env rhs1 rhs2
 
       | otherwise = False

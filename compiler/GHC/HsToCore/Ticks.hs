@@ -35,7 +35,6 @@ import GHC.Driver.Flags (DumpFlag(..))
 
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Monad
 import GHC.Utils.Logger
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
@@ -528,7 +527,7 @@ addTickHsExpr (HsIf x e1 e2 e3) =
                 (addTickLHsExprOptAlt True e3)
 addTickHsExpr (HsMultiIf ty alts)
   = do { let isOneOfMany = case alts of [_] -> False; _ -> True
-       ; alts' <- mapM (liftL $ addTickGRHS isOneOfMany False) alts
+       ; alts' <- mapM (traverse $ addTickGRHS isOneOfMany False) alts
        ; return $ HsMultiIf ty alts' }
 addTickHsExpr (HsLet x tkLet binds tkIn e) =
         bindLocals (collectLocalBinders CollNoDictBinders binds) $ do
@@ -586,7 +585,7 @@ addTickHsExpr e@(HsProjection {})    = return e
 addTickHsExpr (HsProc x pat cmdtop) =
         liftM2 (HsProc x)
                 (addTickLPat pat)
-                (liftL (addTickHsCmdTop) cmdtop)
+                (traverse (addTickHsCmdTop) cmdtop)
 addTickHsExpr (XExpr (WrapExpr (HsWrap w e))) =
         liftM (XExpr . WrapExpr . HsWrap w) $
               (addTickHsExpr e)        -- Explicitly no tick on inside
@@ -615,7 +614,7 @@ addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup GhcTc (LHsExpr GhcTc)
                   -> TM (MatchGroup GhcTc (LHsExpr GhcTc))
 addTickMatchGroup is_lam mg@(MG { mg_alts = L l matches }) = do
   let isOneOfMany = matchesOneOfMany matches
-  matches' <- mapM (liftL (addTickMatch isOneOfMany is_lam)) matches
+  matches' <- mapM (traverse (addTickMatch isOneOfMany is_lam)) matches
   return $ mg { mg_alts = L l matches' }
 
 addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
@@ -631,7 +630,7 @@ addTickGRHSs :: Bool -> Bool -> GRHSs GhcTc (LHsExpr GhcTc)
 addTickGRHSs isOneOfMany isLambda (GRHSs x guarded local_binds) =
   bindLocals binders $ do
     local_binds' <- addTickHsLocalBinds local_binds
-    guarded' <- mapM (liftL (addTickGRHS isOneOfMany isLambda)) guarded
+    guarded' <- mapM (traverse (addTickGRHS isOneOfMany isLambda)) guarded
     return $ GRHSs x guarded' local_binds'
   where
     binders = collectLocalBinders CollNoDictBinders local_binds
@@ -665,7 +664,7 @@ addTickLStmts' :: (Maybe (Bool -> BoxLabel)) -> [ExprLStmt GhcTc] -> TM a
                -> TM ([ExprLStmt GhcTc], a)
 addTickLStmts' isGuard lstmts res
   = bindLocals (collectLStmtsBinders CollNoDictBinders lstmts) $
-    do { lstmts' <- mapM (liftL (addTickStmt isGuard)) lstmts
+    do { lstmts' <- mapM (traverse (addTickStmt isGuard)) lstmts
        ; a <- res
        ; return (lstmts', a) }
 
@@ -709,7 +708,7 @@ addTickStmt isGuard stmt@(TransStmt { trS_stmts = stmts
                                     , trS_ret = returnExpr, trS_bind = bindExpr
                                     , trS_fmap = liftMExpr }) = do
     t_s <- addTickLStmts isGuard stmts
-    t_y <- fmapMaybeM  addTickLHsExprRHS by
+    t_y <- traverse  addTickLHsExprRHS by
     t_u <- addTickLHsExprRHS using
     t_f <- addTickSyntaxExpr hpcSrcSpan returnExpr
     t_b <- addTickSyntaxExpr hpcSrcSpan bindExpr
@@ -782,7 +781,7 @@ addTickHsIPBinds :: HsIPBinds GhcTc -> TM (HsIPBinds GhcTc)
 addTickHsIPBinds (IPBinds dictbinds ipbinds) =
         liftM2 IPBinds
                 (return dictbinds)
-                (mapM (liftL (addTickIPBind)) ipbinds)
+                (mapM (traverse (addTickIPBind)) ipbinds)
 
 addTickIPBind :: IPBind GhcTc -> TM (IPBind GhcTc)
 addTickIPBind (IPBind x nm e) =
@@ -859,7 +858,7 @@ addTickHsCmd (HsCmdArrForm x e f fix cmdtop) =
                (addTickLHsExpr e)
                (return f)
                (return fix)
-               (mapM (liftL (addTickHsCmdTop)) cmdtop)
+               (mapM (traverse (addTickHsCmdTop)) cmdtop)
 
 addTickHsCmd (XCmd (HsWrap w cmd)) =
   liftM XCmd $
@@ -871,7 +870,7 @@ addTickHsCmd (XCmd (HsWrap w cmd)) =
 addTickCmdMatchGroup :: MatchGroup GhcTc (LHsCmd GhcTc)
                      -> TM (MatchGroup GhcTc (LHsCmd GhcTc))
 addTickCmdMatchGroup mg@(MG { mg_alts = (L l matches) }) = do
-  matches' <- mapM (liftL addTickCmdMatch) matches
+  matches' <- mapM (traverse addTickCmdMatch) matches
   return $ mg { mg_alts = L l matches' }
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
@@ -884,7 +883,7 @@ addTickCmdGRHSs :: GRHSs GhcTc (LHsCmd GhcTc) -> TM (GRHSs GhcTc (LHsCmd GhcTc))
 addTickCmdGRHSs (GRHSs x guarded local_binds) =
   bindLocals binders $ do
     local_binds' <- addTickHsLocalBinds local_binds
-    guarded' <- mapM (liftL addTickCmdGRHS) guarded
+    guarded' <- mapM (traverse addTickCmdGRHS) guarded
     return $ GRHSs x guarded' local_binds'
   where
     binders = collectLocalBinders CollNoDictBinders local_binds
@@ -907,7 +906,7 @@ addTickLCmdStmts' :: [LStmt GhcTc (LHsCmd GhcTc)] -> TM a
                   -> TM ([LStmt GhcTc (LHsCmd GhcTc)], a)
 addTickLCmdStmts' lstmts res
   = bindLocals binders $ do
-        lstmts' <- mapM (liftL addTickCmdStmt) lstmts
+        lstmts' <- mapM (traverse addTickCmdStmt) lstmts
         a <- res
         return (lstmts', a)
   where

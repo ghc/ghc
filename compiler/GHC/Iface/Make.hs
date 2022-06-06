@@ -77,7 +77,7 @@ import GHC.Types.CompleteMatch
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Misc  hiding ( eqListBy )
+import GHC.Utils.Misc
 import GHC.Utils.Logger
 import GHC.Utils.Trace
 

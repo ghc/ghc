@@ -1315,7 +1315,7 @@ topNormaliseType_maybe env ty
 
     unwrapNewTypeStepper' :: NormaliseStepper (Coercion, MCoercionN)
     unwrapNewTypeStepper' rec_nts tc tys
-      = mapStepResult (, MRefl) $ unwrapNewTypeStepper rec_nts tc tys
+      = (, MRefl) <$> unwrapNewTypeStepper rec_nts tc tys
 
       -- second coercion below is the kind coercion relating the original type's kind
       -- to the normalised type's kind

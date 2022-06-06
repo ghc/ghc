@@ -84,9 +84,6 @@ module GHC.Types.SrcLoc (
         pprLocated,
         pprLocatedAlways,
 
-        -- ** Modifying Located
-        mapLoc,
-
         -- ** Combining and comparing Located values
         eqLocated, cmpLocated, cmpBufSpan,
         combineLocs, addCLoc,
@@ -94,8 +91,6 @@ module GHC.Types.SrcLoc (
         spans, isSubspanOf, isRealSubspanOf,
         sortLocated, sortRealLocated,
         lookupSrcLoc, lookupSrcSpan,
-
-        liftL,
 
         -- * Parser locations
         PsLoc(..),
@@ -129,7 +124,7 @@ import Data.Data
 import Data.List (sortBy, intercalate)
 import Data.Function (on)
 import qualified Data.Map as Map
-import qualified Data.Semigroup
+import qualified Data.Semigroup as S
 
 {-
 ************************************************************************
@@ -637,9 +632,7 @@ srcSpanToRealSrcSpan _ = Nothing
 -- We want to order RealSrcSpans first by the start point, then by the
 -- end point.
 instance Ord RealSrcSpan where
-  a `compare` b =
-     (realSrcSpanStart a `compare` realSrcSpanStart b) `thenCmp`
-     (realSrcSpanEnd   a `compare` realSrcSpanEnd   b)
+  compare = on compare realSrcSpanStart S.<> on compare realSrcSpanEnd
 
 instance Show RealSrcLoc where
   show (SrcLoc filename row col)
@@ -740,9 +733,6 @@ data GenLocated l e = L l e
 type Located = GenLocated SrcSpan
 type RealLocated = GenLocated RealSrcSpan
 
-mapLoc :: (a -> b) -> GenLocated l a -> GenLocated l b
-mapLoc = fmap
-
 unLoc :: GenLocated l e -> e
 unLoc (L _ e) = e
 
@@ -821,10 +811,8 @@ pprLocatedAlways (L l e) =
 leftmost_smallest, leftmost_largest, rightmost_smallest :: SrcSpan -> SrcSpan -> Ordering
 rightmost_smallest = compareSrcSpanBy (flip compare)
 leftmost_smallest = compareSrcSpanBy compare
-leftmost_largest = compareSrcSpanBy $ \a b ->
-  (realSrcSpanStart a `compare` realSrcSpanStart b)
-    `thenCmp`
-  (realSrcSpanEnd b `compare` realSrcSpanEnd a)
+leftmost_largest = compareSrcSpanBy $
+  on compare realSrcSpanStart S.<> flip (on compare realSrcSpanEnd)
 
 compareSrcSpanBy :: (RealSrcSpan -> RealSrcSpan -> Ordering) -> SrcSpan -> SrcSpan -> Ordering
 compareSrcSpanBy cmp (RealSrcSpan a _) (RealSrcSpan b _) = cmp a b
@@ -853,11 +841,6 @@ isRealSubspanOf src parent
     | srcSpanFile parent /= srcSpanFile src = False
     | otherwise = realSrcSpanStart parent <= realSrcSpanStart src &&
                   realSrcSpanEnd parent   >= realSrcSpanEnd src
-
-liftL :: Monad m => (a -> m b) -> GenLocated l a -> m (GenLocated l b)
-liftL f (L loc a) = do
-  a' <- f a
-  return $ L loc a'
 
 getRealSrcSpan :: RealLocated a -> RealSrcSpan
 getRealSrcSpan (L l _) = l

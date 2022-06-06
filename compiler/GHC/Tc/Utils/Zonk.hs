@@ -353,7 +353,7 @@ zonkEnvIds (ZonkEnv { ze_id_env = id_env})
   -- immediately by creating a TypeEnv
 
 zonkLIdOcc :: ZonkEnv -> LocatedN TcId -> LocatedN Id
-zonkLIdOcc env = mapLoc (zonkIdOcc env)
+zonkLIdOcc env = fmap (zonkIdOcc env)
 
 zonkIdOcc :: ZonkEnv -> TcId -> Id
 -- Ids defined in this module should be in the envt;
@@ -1178,7 +1178,7 @@ zonkStmt env _ (TransStmt { trS_stmts = stmts, trS_bndrs = binderMap
     ; (env1, bind_op') <- zonkSyntaxExpr env bind_op
     ; bind_arg_ty' <- zonkTcTypeToTypeX env1 bind_arg_ty
     ; (env2, stmts') <- zonkStmts env1 zonkLExpr stmts
-    ; by'        <- fmapMaybeM (zonkLExpr env2) by
+    ; by'        <- traverse (zonkLExpr env2) by
     ; using'     <- zonkLExpr env2 using
 
     ; (env3, return_op') <- zonkSyntaxExpr env2 return_op

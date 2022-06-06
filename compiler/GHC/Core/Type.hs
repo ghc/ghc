@@ -296,6 +296,7 @@ import GHC.Types.Unique ( nonDetCmpUnique )
 
 import GHC.Data.Maybe   ( orElse, expectJust, isJust )
 import Control.Monad    ( guard )
+import qualified Data.Semigroup as S
 -- import GHC.Utils.Trace
 
 -- $type_classification
@@ -2882,7 +2883,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     go env (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
         -- NB: nonDepCmpTypeX does the kind check requested by
         -- Note [Equality on FunTys] in GHC.Core.TyCo.Rep
-      = liftOrdering (nonDetCmpTypeX env s1 s2 `thenCmp` nonDetCmpTypeX env t1 t2)
+      = liftOrdering (nonDetCmpTypeX env s1 s2 S.<> nonDetCmpTypeX env t1 t2)
           `thenCmpTy` go env w1 w2
         -- Comparing multiplicities last because the test is usually true
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
@@ -2916,8 +2917,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
 -------------
 nonDetCmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering
 nonDetCmpTypesX _   []        []        = EQ
-nonDetCmpTypesX env (t1:tys1) (t2:tys2) = nonDetCmpTypeX env t1 t2
-                                          `thenCmp`
+nonDetCmpTypesX env (t1:tys1) (t2:tys2) = nonDetCmpTypeX env t1 t2 S.<>
                                           nonDetCmpTypesX env tys1 tys2
 nonDetCmpTypesX _   []        _         = LT
 nonDetCmpTypesX _   _         []        = GT

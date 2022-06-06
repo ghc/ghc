@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -51,8 +52,7 @@ module GHC.Core.Coercion (
         -- ** Decomposition
         instNewTyCon_maybe,
 
-        NormaliseStepper, NormaliseStepResult(..), composeSteppers,
-        mapStepResult, unwrapNewTypeStepper,
+        NormaliseStepper, NormaliseStepResult(..), composeSteppers, unwrapNewTypeStepper,
         topNormaliseNewType_maybe, topNormaliseTypeX,
 
         decomposeCo, decomposeFunCo, decomposePiCos, getCoVar_maybe,
@@ -1712,17 +1712,12 @@ data NormaliseStepResult ev
   | NS_Step RecTcChecker Type ev    -- ^ We stepped, yielding new bits;
                                     -- ^ ev is evidence;
                                     -- Usually a co :: old type ~ new type
+  deriving (Functor)
 
 instance Outputable ev => Outputable (NormaliseStepResult ev) where
   ppr NS_Done           = text "NS_Done"
   ppr NS_Abort          = text "NS_Abort"
   ppr (NS_Step _ ty ev) = sep [text "NS_Step", ppr ty, ppr ev]
-
-mapStepResult :: (ev1 -> ev2)
-              -> NormaliseStepResult ev1 -> NormaliseStepResult ev2
-mapStepResult f (NS_Step rec_nts ty ev) = NS_Step rec_nts ty (f ev)
-mapStepResult _ NS_Done                 = NS_Done
-mapStepResult _ NS_Abort                = NS_Abort
 
 -- | Try one stepper and then try the next, if the first doesn't make
 -- progress.

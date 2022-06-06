@@ -132,6 +132,7 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.Time.LocalTime ( getZonedTime )
 import Data.Time.Format ( formatTime, defaultTimeLocale )
 import Data.Version ( showVersion )
+import qualified Data.Semigroup as S
 import Prelude hiding ((<>))
 
 import GHC.Utils.Exception as Exception hiding (catch, mask, handle)
@@ -1416,9 +1417,7 @@ printTypeOfNames names
  = mapM_ (printTypeOfName ) $ sortBy compareNames names
 
 compareNames :: Name -> Name -> Ordering
-n1 `compareNames` n2 =
-  (compare `on` getOccString) n1 n2 `thenCmp`
-  (SrcLoc.leftmost_smallest `on` getSrcSpan) n1 n2
+compareNames = on compare getOccString S.<> on SrcLoc.leftmost_smallest getSrcSpan
 
 printTypeOfName :: GHC.GhcMonad m => Name -> m ()
 printTypeOfName n
@@ -3844,10 +3843,7 @@ enclosingTickSpan md (RealSrcSpan src _) = do
  where
 
 leftmostLargestRealSrcSpan :: RealSrcSpan -> RealSrcSpan -> Ordering
-leftmostLargestRealSrcSpan a b =
-  (realSrcSpanStart a `compare` realSrcSpanStart b)
-     `thenCmp`
-  (realSrcSpanEnd b `compare` realSrcSpanEnd a)
+leftmostLargestRealSrcSpan = on compare realSrcSpanStart S.<> on (flip compare) realSrcSpanEnd
 
 traceCmd :: GhciMonad m => String -> m ()
 traceCmd arg

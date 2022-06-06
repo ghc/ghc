@@ -57,6 +57,7 @@ import GHC.Utils.Outputable (empty)
 import Data.List (sortBy, partition, nub)
 import Data.List.NonEmpty ( pattern (:|), NonEmpty )
 import Data.Function ( on )
+import qualified Data.Semigroup as S
 
 {-
 ************************************************************************
@@ -303,10 +304,7 @@ importSuggestions looking_for global_env hpt currMod imports rdr_name
   pick = listToMaybe . sortBy cmp . filter select
     where select imv = case mod_name of Just name -> imv_name imv == name
                                         Nothing   -> not (imv_qualified imv)
-          cmp a b =
-            (compare `on` imv_is_hiding) a b
-              `thenCmp`
-            (SrcLoc.leftmost_smallest `on` imv_span) a b
+          cmp = on compare imv_is_hiding S.<> on SrcLoc.leftmost_smallest imv_span
 
   -- Which of these would export a 'foo'
   -- (all of these are restricted imports, because if they were not, we

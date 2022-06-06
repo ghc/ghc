@@ -48,13 +48,14 @@ import GHC.Utils.Binary
 import GHC.Data.List.SetOps
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc
 import GHC.Utils.Constants (debugIsOn)
 
 import Data.Data ( Data )
 import Data.Either ( partitionEithers )
+import Data.Functor.Classes ( liftCompare )
 import Data.List ( find )
 import Data.Maybe
+import qualified Data.Semigroup as S
 
 -- -----------------------------------------------------------------------------
 -- The AvailInfo type
@@ -166,8 +167,7 @@ See also Note [GreNames] in GHC.Types.Name.Reader.
 stableAvailCmp :: AvailInfo -> AvailInfo -> Ordering
 stableAvailCmp (Avail c1)     (Avail c2)     = c1 `stableGreNameCmp` c2
 stableAvailCmp (Avail {})     (AvailTC {})   = LT
-stableAvailCmp (AvailTC n ns) (AvailTC m ms) = (n `stableNameCmp` m) `thenCmp`
-                                               (cmpList stableGreNameCmp ns ms)
+stableAvailCmp (AvailTC n ns) (AvailTC m ms) = stableNameCmp n m S.<> liftCompare stableGreNameCmp ns ms
 stableAvailCmp (AvailTC {})   (Avail {})     = GT
 
 stableGreNameCmp :: GreName -> GreName -> Ordering

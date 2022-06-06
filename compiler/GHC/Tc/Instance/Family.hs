@@ -558,8 +558,7 @@ tcTopNormaliseNewTypeTF_maybe faminsts rdr_env ty
     -- which would lead to terrible error messages
     unwrap_newtype_instance rec_nts tc tys
       | Just (tc', tys', co) <- tcLookupDataFamInst_maybe faminsts tc tys
-      = mapStepResult (\(gres, co1) -> (gres, co `mkTransCo` co1)) $
-        unwrap_newtype rec_nts tc' tys'
+      = fmap (mkTransCo co) <$> unwrap_newtype rec_nts tc' tys'
       | otherwise = NS_Done
 
     unwrap_newtype rec_nts tc tys
@@ -567,8 +566,7 @@ tcTopNormaliseNewTypeTF_maybe faminsts rdr_env ty
       , Just gre <- lookupGRE_Name rdr_env (dataConName con)
            -- This is where we check that the
            -- data constructor is in scope
-      = mapStepResult (\co -> (unitBag gre, co)) $
-        unwrapNewTypeStepper rec_nts tc tys
+      = (,) (unitBag gre) <$> unwrapNewTypeStepper rec_nts tc tys
 
       | otherwise
       = NS_Done

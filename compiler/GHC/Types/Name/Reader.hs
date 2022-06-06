@@ -97,6 +97,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.Data
 import Data.List( sortBy )
+import qualified Data.Semigroup as S
 import GHC.Data.Bag
 
 {-
@@ -341,10 +342,10 @@ instance Ord RdrName where
 
     compare (Qual _ _)   (Exact _)    = GT
     compare (Qual _ _)   (Unqual _)   = GT
-    compare (Qual m1 o1) (Qual m2 o2) = (o1 `compare` o2) `thenCmp` (m1 `compare` m2)
+    compare (Qual m1 o1) (Qual m2 o2) = compare o1 o2 S.<> compare m1 m2
     compare (Qual _ _)   (Orig _ _)   = LT
 
-    compare (Orig m1 o1) (Orig m2 o2) = (o1 `compare` o2) `thenCmp` (m1 `compare` m2)
+    compare (Orig m1 o1) (Orig m2 o2) = compare o1 o2 S.<> compare m1 m2
     compare (Orig _ _)   _            = GT
 
 {-
@@ -1245,8 +1246,7 @@ bestImport iss
     -- earlier declaration wins over later
     best (ImpSpec { is_item = item1, is_decl = d1 })
          (ImpSpec { is_item = item2, is_decl = d2 })
-      = (is_qual d1 `compare` is_qual d2) `thenCmp`
-        (best_item item1 item2)           `thenCmp`
+      = (is_qual d1 `compare` is_qual d2) S.<> best_item item1 item2 S.<>
         SrcLoc.leftmost_smallest (is_dloc d1) (is_dloc d2)
 
     best_item :: ImpItemSpec -> ImpItemSpec -> Ordering

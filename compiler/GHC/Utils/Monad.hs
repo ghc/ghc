@@ -11,16 +11,12 @@ module GHC.Utils.Monad
         , zipWith3M, zipWith3M_, zipWith4M, zipWithAndUnzipM
         , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M, mapAndUnzip5M
         , mapAccumLM
-        , liftFstM, liftSndM
         , mapSndM
         , concatMapM
         , mapMaybeM
-        , fmapMaybeM, fmapEitherM
         , anyM, allM, orM
         , foldlM, foldlM_, foldrM
-        , maybeMapM
         , whenM, unlessM
-        , filterOutM
         ) where
 
 -------------------------------------------------------------------------------
@@ -161,17 +157,8 @@ mapAccumLM f s xs =
     go s [] = return (s, [])
 
 -- | Monadic version of mapSnd
-mapSndM :: Monad m => (b -> m c) -> [(a,b)] -> m [(a,c)]
-mapSndM f xs = go xs
-  where
-    go []         = return []
-    go ((a,b):xs) = do { c <- f b; rs <- go xs; return ((a,c):rs) }
-
-liftFstM :: Monad m => (a -> b) -> m (a, r) -> m (b, r)
-liftFstM f thing = do { (a,r) <- thing; return (f a, r) }
-
-liftSndM :: Monad m => (a -> b) -> m (r, a) -> m (r, b)
-liftSndM f thing = do { (r,a) <- thing; return (r, f a) }
+mapSndM :: (Applicative m, Traversable f) => (b -> m c) -> f (a,b) -> m (f (a,c))
+mapSndM = traverse . traverse
 
 -- | Monadic version of concatMap
 concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
@@ -181,16 +168,6 @@ concatMapM f xs = liftM concat (mapM f xs)
 mapMaybeM :: Applicative m => (a -> m (Maybe b)) -> [a] -> m [b]
 mapMaybeM f = foldr g (pure [])
   where g a = liftA2 (maybe id (:)) (f a)
-
--- | Monadic version of fmap
-fmapMaybeM :: (Monad m) => (a -> m b) -> Maybe a -> m (Maybe b)
-fmapMaybeM _ Nothing  = return Nothing
-fmapMaybeM f (Just x) = f x >>= (return . Just)
-
--- | Monadic version of fmap
-fmapEitherM :: Monad m => (a -> m b) -> (c -> m d) -> Either a c -> m (Either b d)
-fmapEitherM fl _ (Left  a) = fl a >>= (return . Left)
-fmapEitherM _ fr (Right b) = fr b >>= (return . Right)
 
 -- | Monadic version of 'any', aborts the computation at the first @True@ value
 anyM :: Monad m => (a -> m Bool) -> [a] -> m Bool
@@ -216,11 +193,6 @@ orM m1 m2 = m1 >>= \x -> if x then return True else m2
 foldlM_ :: (Monad m, Foldable t) => (a -> b -> m a) -> a -> t b -> m ()
 foldlM_ = foldM_
 
--- | Monadic version of fmap specialised for Maybe
-maybeMapM :: Monad m => (a -> m b) -> (Maybe a -> m (Maybe b))
-maybeMapM _ Nothing  = return Nothing
-maybeMapM m (Just x) = liftM Just $ m x
-
 -- | Monadic version of @when@, taking the condition in the monad
 whenM :: Monad m => m Bool -> m () -> m ()
 whenM mb thing = do { b <- mb
@@ -230,11 +202,6 @@ whenM mb thing = do { b <- mb
 unlessM :: Monad m => m Bool -> m () -> m ()
 unlessM condM acc = do { cond <- condM
                        ; unless cond acc }
-
--- | Like 'filterM', only it reverses the sense of the test.
-filterOutM :: (Applicative m) => (a -> m Bool) -> [a] -> m [a]
-filterOutM p =
-  foldr (\ x -> liftA2 (\ flg -> if flg then id else (x:)) (p x)) (pure [])
 
 {- Note [The one-shot state monad trick]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

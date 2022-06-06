@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingVia #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -57,7 +58,7 @@ import GHC.Types.Unique.Supply
 import GHC.Utils.Logger
 
 import Data.Maybe (fromJust)
-import Control.Monad (ap)
+import Control.Monad.Trans.State (StateT (..))
 import Data.List (sortBy, groupBy, isPrefixOf)
 import Data.Ord (comparing)
 
@@ -275,15 +276,8 @@ type LlvmEnvMap = UniqFM Unique LlvmType
 
 -- | The Llvm monad. Wraps @LlvmEnv@ state as well as the @IO@ monad
 newtype LlvmM a = LlvmM { runLlvmM :: LlvmEnv -> IO (a, LlvmEnv) }
-    deriving (Functor)
-
-instance Applicative LlvmM where
-    pure x = LlvmM $ \env -> return (x, env)
-    (<*>) = ap
-
-instance Monad LlvmM where
-    m >>= f  = LlvmM $ \env -> do (x, env') <- runLlvmM m env
-                                  runLlvmM (f x) env'
+    deriving stock (Functor)
+    deriving (Applicative, Monad) via StateT LlvmEnv IO
 
 instance HasLogger LlvmM where
     getLogger = LlvmM $ \env -> return (envLogger env, env)

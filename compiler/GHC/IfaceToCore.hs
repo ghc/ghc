@@ -871,7 +871,7 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = name
                               , ifFieldLabels = field_labels })
   = do { traceIf (text "tc_iface_decl" <+> ppr name)
        ; matcher <- tc_pr if_matcher
-       ; builder <- fmapMaybeM tc_pr if_builder
+       ; builder <- traverse tc_pr if_builder
        ; bindIfaceForAllBndrs univ_bndrs $ \univ_tvs -> do
        { bindIfaceForAllBndrs ex_bndrs $ \ex_tvs -> do
        { patsyn <- forkM (mk_doc name) $

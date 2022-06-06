@@ -1,5 +1,6 @@
 
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -1786,7 +1787,7 @@ instance DisambECP (HsExpr GhcPs) where
     return $ L (noAnnSrcSpan l) (ExplicitList (EpAnn (spanAsAnchor l) anns cs) xs)
   mkHsSplicePV sp@(L l _) = do
     cs <- getCommentsFor l
-    return $ mapLoc (HsUntypedSplice (EpAnn (spanAsAnchor l) NoEpAnns cs)) sp
+    return $ fmap (HsUntypedSplice (EpAnn (spanAsAnchor l) NoEpAnns cs)) sp
   mkHsRecordPV opts l lrec a (fbinds, ddLoc) anns = do
     cs <- getCommentsFor l
     r <- mkRecConstrOrUpdate opts a lrec (fbinds, ddLoc) (EpAnn (spanAsAnchor l) anns cs)
@@ -2811,7 +2812,7 @@ mkModuleImpExp anns (L l specname) subs = do
     ieNameFromSpec (ImpExpQcType r (L l n)) = IEType r (L l n)
     ieNameFromSpec (ImpExpQcWildcard)  = panic "ieName got wildcard"
 
-    wrapped = map (mapLoc ieNameFromSpec)
+    wrapped = map (fmap ieNameFromSpec)
 
 mkTypeImpExp :: LocatedN RdrName   -- TcCls or Var name space
              -> P (LocatedN RdrName)
@@ -2887,6 +2888,7 @@ data PV_Accum =
     }
 
 data PV_Result a = PV_Ok PV_Accum a | PV_Failed PV_Accum
+  deriving (Foldable, Functor, Traversable)
 
 -- During parsing, we make use of several monadic effects: reporting parse errors,
 -- accumulating warnings, adding API annotations, and checking for extensions. These
@@ -2908,9 +2910,7 @@ data PV_Result a = PV_Ok PV_Accum a | PV_Failed PV_Accum
 --   abParser :: forall x. DisambAB x => P (PV x)
 --
 newtype PV a = PV { unPV :: PV_Context -> PV_Accum -> PV_Result a }
-
-instance Functor PV where
-  fmap = liftM
+  deriving (Functor)
 
 instance Applicative PV where
   pure a = a `seq` PV (\_ acc -> PV_Ok acc a)

@@ -53,6 +53,8 @@ import GHC.Types.Var.Set
 import Control.Monad
 import Control.Monad.Trans.Class  (lift)
 import Control.Monad.Trans.Reader (ask)
+import Data.Function              (on)
+import Data.Functor.Classes       (liftEq)
 import Data.List                  (sortBy)
 import Data.Maybe
 
@@ -685,7 +687,7 @@ simplifyInstanceContexts infer_specs
              else
                 iterate_deriv (n+1) new_solns }
 
-    eqSolution a b = eqListBy (eqListBy eqType) (canSolution a) (canSolution b)
+    eqSolution = (liftEq . liftEq) eqType `on` canSolution
        -- Canonicalise for comparison
        -- See Note [Deterministic simplifyInstanceContexts]
     canSolution = map (sortBy nonDetCmpType)

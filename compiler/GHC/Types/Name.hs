@@ -101,6 +101,7 @@ import GHC.Utils.Panic
 
 import Control.DeepSeq
 import Data.Data
+import qualified Data.Semigroup as S
 
 {-
 ************************************************************************
@@ -535,7 +536,7 @@ cmpName n1 n2 = n_uniq n1 `nonDetCmpUnique` n_uniq n2
 stableNameCmp :: Name -> Name -> Ordering
 stableNameCmp (Name { n_sort = s1, n_occ = occ1 })
               (Name { n_sort = s2, n_occ = occ2 })
-  = (s1 `sort_cmp` s2) `thenCmp` (occ1 `compare` occ2)
+  = sort_cmp s1 s2 S.<> compare occ1 occ2
     -- The ordinary compare on OccNames is lexicographic
   where
     -- Later constructors are bigger

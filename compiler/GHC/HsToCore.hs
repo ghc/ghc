@@ -359,8 +359,7 @@ deSugarExpr hsc_env tc_expr = do
 addExportFlagsAndRules
     :: Backend -> NameSet -> NameSet -> [CoreRule]
     -> [(Id, t)] -> [(Id, t)]
-addExportFlagsAndRules bcknd exports keep_alive rules prs
-  = mapFst add_one prs
+addExportFlagsAndRules bcknd exports keep_alive rules = mapFst add_one
   where
     add_one bndr = add_rules name (add_export name bndr)
        where

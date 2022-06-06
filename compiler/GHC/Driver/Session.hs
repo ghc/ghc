@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE LambdaCase #-}
@@ -1842,6 +1843,7 @@ parseDynamicFilePragma :: MonadIO m => DynFlags -> [Located String]
 parseDynamicFilePragma = parseDynamicFlagsFull flagsDynamic False
 
 newtype CmdLineP s a = CmdLineP (forall m. (Monad m) => StateT s m a)
+  deriving (Functor)
 
 instance Monad (CmdLineP s) where
     CmdLineP k >>= f = CmdLineP (k >>= \x -> case f x of CmdLineP g -> g)
@@ -1850,9 +1852,6 @@ instance Monad (CmdLineP s) where
 instance Applicative (CmdLineP s) where
     pure x = CmdLineP (pure x)
     (<*>) = ap
-
-instance Functor (CmdLineP s) where
-    fmap f (CmdLineP k) = CmdLineP (fmap f k)
 
 getCmdLineState :: CmdLineP s s
 getCmdLineState = CmdLineP State.get

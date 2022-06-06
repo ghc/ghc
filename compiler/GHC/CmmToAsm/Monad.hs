@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -20,7 +22,6 @@ module GHC.CmmToAsm.Monad (
         addImmediateSuccessorNat,
         updateCfgNat,
         getUniqueNat,
-        mapAccumLNat,
         setDeltaNat,
         getConfig,
         getPlatform,
@@ -66,10 +67,9 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique         ( Unique )
 import GHC.Unit.Module
 
-import Control.Monad    ( ap )
-
 import GHC.Utils.Outputable (SDoc, ppr)
 import GHC.Utils.Panic      (pprPanic)
+import GHC.Utils.Monad.State.Strict (State (..), runState, state)
 import GHC.Utils.Misc
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.CFG.Weight
@@ -120,8 +120,14 @@ data NatM_State
 
 type DwarfFiles = UniqFM FastString (FastString, Int)
 
-newtype NatM result = NatM (NatM_State -> (result, NatM_State))
-    deriving (Functor)
+newtype NatM a = NatM' (State NatM_State a)
+  deriving stock (Functor)
+  deriving (Applicative, Monad) via State NatM_State
+
+pattern NatM :: (NatM_State -> (a, NatM_State)) -> NatM a
+pattern NatM f <- NatM' (runState -> f)
+  where NatM f  = NatM' (state f)
+{-# COMPLETE NatM #-}
 
 unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a
@@ -142,15 +148,7 @@ mkNatM_State us delta config
                         }
 
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
-initNat init_st m
-        = case unNat m init_st of { (r,st) -> (r,st) }
-
-instance Applicative NatM where
-      pure = returnNat
-      (<*>) = ap
-
-instance Monad NatM where
-  (>>=) = thenNat
+initNat = flip unNat
 
 instance MonadUnique NatM where
   getUniqueSupplyM = NatM $ \st ->
@@ -160,27 +158,6 @@ instance MonadUnique NatM where
   getUniqueM = NatM $ \st ->
       case takeUniqFromSupply (natm_us st) of
           (uniq, us') -> (uniq, st {natm_us = us'})
-
-thenNat :: NatM a -> (a -> NatM b) -> NatM b
-thenNat expr cont
-        = NatM $ \st -> case unNat expr st of
-                        (result, st') -> unNat (cont result) st'
-
-returnNat :: a -> NatM a
-returnNat result
-        = NatM $ \st ->  (result, st)
-
-mapAccumLNat :: (acc -> x -> NatM (acc, y))
-                -> acc
-                -> [x]
-                -> NatM (acc, [y])
-
-mapAccumLNat _ b []
-  = return (b, [])
-mapAccumLNat f b (x:xs)
-  = do (b__2, x__2)  <- f b x
-       (b__3, xs__2) <- mapAccumLNat f b__2 xs
-       return (b__3, x__2:xs__2)
 
 getUniqueNat :: NatM Unique
 getUniqueNat = NatM $ \ st ->
@@ -241,9 +218,7 @@ addImmediateSuccessorNat block succ = do
 
 getBlockIdNat :: NatM BlockId
 getBlockIdNat
- = do   u <- getUniqueNat
-        return (mkBlockId u)
-
+ = mkBlockId <$> getUniqueNat
 
 getNewLabelNat :: NatM CLabel
 getNewLabelNat

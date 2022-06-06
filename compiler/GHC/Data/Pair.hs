@@ -4,7 +4,7 @@ Traversable instances.
 -}
 
 
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module GHC.Data.Pair
    ( Pair(..)
@@ -22,7 +22,7 @@ import GHC.Utils.Outputable
 import qualified Data.Semigroup as Semi
 
 data Pair a = Pair { pFst :: a, pSnd :: a }
-  deriving (Functor)
+  deriving (Foldable, Functor, Traversable)
 -- Note that Pair is a *unary* type constructor
 -- whereas (,) is binary
 
@@ -33,12 +33,6 @@ data Pair a = Pair { pFst :: a, pSnd :: a }
 instance Applicative Pair where
   pure x = Pair x x
   (Pair f g) <*> (Pair x y) = Pair (f x) (g y)
-
-instance Foldable Pair where
-  foldMap f (Pair x y) = f x `mappend` f y
-
-instance Traversable Pair where
-  traverse f (Pair x y) = Pair <$> f x <*> f y
 
 instance Semi.Semigroup a => Semi.Semigroup (Pair a) where
   Pair a1 b1 <> Pair a2 b2 =  Pair (a1 Semi.<> a2) (b1 Semi.<> b2)

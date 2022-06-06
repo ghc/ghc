@@ -28,7 +28,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Avail
 import GHC.Types.Unique
 import qualified GHC.Utils.Outputable as O ( (<>) )
-import GHC.Utils.Misc
 import GHC.Utils.Panic
 
 import qualified Data.Array as A
@@ -41,6 +40,7 @@ import Data.Word                  ( Word8 )
 import Control.Applicative        ( (<|>) )
 import Data.Coerce                ( coerce  )
 import Data.Function              ( on )
+import qualified Data.Semigroup as S
 
 type Span = RealSrcSpan
 
@@ -751,9 +751,9 @@ data HieName
   deriving (Eq)
 
 instance Ord HieName where
-  compare (ExternalName a b c) (ExternalName d e f) = compare (a,b) (d,e) `thenCmp` leftmost_smallest c f
+  compare (ExternalName a b c) (ExternalName d e f) = compare (a,b) (d,e) S.<> leftmost_smallest c f
     -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
-  compare (LocalName a b) (LocalName c d) = compare a c `thenCmp` leftmost_smallest b d
+  compare (LocalName a b) (LocalName c d) = compare a c S.<> leftmost_smallest b d
     -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
   compare (KnownKeyName a) (KnownKeyName b) = nonDetCmpUnique a b
     -- Not actually non deterministic as it is a KnownKey

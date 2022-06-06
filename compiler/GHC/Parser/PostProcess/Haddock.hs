@@ -1308,7 +1308,7 @@ reportExtraDocs =
 ********************************************************************* -}
 
 mkDocHsDecl :: LayoutInfo -> PsLocated HdkComment -> Maybe (LHsDecl GhcPs)
-mkDocHsDecl layout_info a = mapLoc (DocD noExtField) <$> mkDocDecl layout_info a
+mkDocHsDecl layout_info a = fmap (DocD noExtField) <$> mkDocDecl layout_info a
 
 mkDocDecl :: LayoutInfo -> PsLocated HdkComment -> Maybe (LDocDecl GhcPs)
 mkDocDecl layout_info (L l_comment hdk_comment)
@@ -1530,7 +1530,7 @@ mcons = maybe id (:)
 
 -- Map a function over a list of located items.
 mapLL :: (a -> b) -> [GenLocated l a] -> [GenLocated l b]
-mapLL f = map (mapLoc f)
+mapLL f = map (fmap f)
 
 {- Note [Old solution: Haddock in the grammar]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

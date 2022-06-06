@@ -1,6 +1,9 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingVia   #-}
 {-# LANGUAGE GADTs         #-}
 {-# LANGUAGE LambdaCase    #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -48,6 +51,7 @@ import GHC.Types.Unique
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Monad.State.Strict (State (..), runState, state)
 import GHC.Utils.Misc
 import GHC.Utils.Trace
 
@@ -57,7 +61,6 @@ import Data.Char
 import Data.List (intersperse)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Control.Monad (ap)
 import GHC.Float
 
 -- --------------------------------------------------------------------------
@@ -1234,14 +1237,14 @@ pprExternDecl platform lbl
         <> semi
 
 type TEState = (UniqSet LocalReg, Map CLabel ())
-newtype TE a = TE { unTE :: TEState -> (a, TEState) } deriving (Functor)
+newtype TE a = TE' (State TEState a)
+  deriving stock (Functor)
+  deriving (Applicative, Monad) via State TEState
 
-instance Applicative TE where
-      pure a = TE $ \s -> (a, s)
-      (<*>) = ap
-
-instance Monad TE where
-   TE m >>= k  = TE $ \s -> case m s of (a, s') -> unTE (k a) s'
+pattern TE :: (TEState -> (a, TEState)) -> TE a
+pattern TE f <- TE' (runState -> f)
+  where TE f  = TE' (state f)
+{-# COMPLETE TE #-}
 
 te_lbl :: CLabel -> TE ()
 te_lbl lbl = TE $ \(temps,lbls) -> ((), (temps, Map.insert lbl () lbls))

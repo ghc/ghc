@@ -44,7 +44,7 @@ import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Misc as Utils hiding ( eqListBy )
+import GHC.Utils.Misc as Utils
 import GHC.Utils.Binary
 import GHC.Utils.Fingerprint
 import GHC.Utils.Exception

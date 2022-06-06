@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RankNTypes #-}
 
 -------------------------------------------------------------------------------
@@ -38,7 +39,7 @@ import Data.List (sortBy, intercalate, stripPrefix)
 
 import GHC.ResponseFile
 import Control.Exception (IOException, catch)
-import Control.Monad (liftM, ap)
+import Control.Monad (ap)
 import Control.Monad.IO.Class
 
 --------------------------------------------------------
@@ -138,9 +139,7 @@ type Warns = Bag Warn
 newtype EwM m a = EwM { unEwM :: Located String -- Current parse arg
                               -> Errs -> Warns
                               -> m (Errs, Warns, a) }
-
-instance Monad m => Functor (EwM m) where
-    fmap = liftM
+  deriving (Functor)
 
 instance Monad m => Applicative (EwM m) where
     pure v = EwM (\_ e w -> return (e, w, v))

@@ -41,7 +41,6 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Unit.Types
-import GHC.Utils.Misc
 import Data.List (sortBy, sort)
 import Data.Ord
 
@@ -50,6 +49,7 @@ import Data.Map (Map)
 import Data.Set (Set)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.Semigroup as S
 import qualified GHC.Data.FiniteMap as Map
 import GHC.Utils.Outputable
 
@@ -87,7 +87,7 @@ instance Outputable NDModule where
 
 instance Ord NDModule where
   compare (NDModule (Module p1 n1)) (NDModule (Module p2 n2)) =
-    (getUnique p1 `nonDetCmpUnique` getUnique p2) `thenCmp`
+    (getUnique p1 `nonDetCmpUnique` getUnique p2) S.<>
     (getUnique n1 `nonDetCmpUnique` getUnique n2)
 
 filterModuleEnv :: (Module -> a -> Bool) -> ModuleEnv a -> ModuleEnv a

@@ -45,11 +45,11 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
+import Data.Functor.Classes (liftCompare)
 import Data.Maybe
 import Data.List (tails,sortBy)
 import GHC.Types.Unique (nonDetCmpUnique)
 import GHC.Utils.Constants (debugIsOn)
-import GHC.Utils.Misc
 
 
 ------------------------
@@ -912,7 +912,7 @@ instance Ord CmmTickScope where
   compare GlobalScope    _               = LT
   compare _              GlobalScope     = GT
   compare (SubScope u _) (SubScope u' _) = nonDetCmpUnique u u'
-  compare scope scope'                   = cmpList nonDetCmpUnique
+  compare scope scope'                   = liftCompare nonDetCmpUnique
      (sortBy nonDetCmpUnique $ scopeUniques scope)
      (sortBy nonDetCmpUnique $ scopeUniques scope')
 

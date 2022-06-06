@@ -2427,7 +2427,7 @@ forall :: { Located ([AddEpAnn], Maybe [LHsTyVarBndr Specificity GhcPs]) }
         | {- empty -}                 { noLoc ([], Nothing) }
 
 constr_stuff :: { Located (LocatedN RdrName, HsConDeclH98Details GhcPs) }
-        : infixtype       {% fmap (reLoc. (mapLoc (\b -> (dataConBuilderCon b,
+        : infixtype       {% fmap (reLoc. (fmap (\b -> (dataConBuilderCon b,
                                                           dataConBuilderDetails b))))
                                      (runPV $1) }
 
@@ -2935,7 +2935,7 @@ aexp2   :: { ECP }
 
         -- Template Haskell Extension
         | splice_untyped { ECP $ pvA $ mkHsSplicePV $1 }
-        | splice_typed   { ecpFromExp $ mapLoc (uncurry HsTypedSplice) (reLocA $1) }
+        | splice_typed   { ecpFromExp $ fmap (uncurry HsTypedSplice) (reLocA $1) }
 
         | SIMPLEQUOTE  qvar     {% fmap ecpFromExp $ acsA (\cs -> sLL $1 (reLocN $>) $ HsUntypedBracket (EpAnn (glR $1) [mj AnnSimpleQuote $1] cs) (VarBr noExtField True  $2)) }
         | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ acsA (\cs -> sLL $1 (reLocN $>) $ HsUntypedBracket (EpAnn (glR $1) [mj AnnSimpleQuote $1] cs) (VarBr noExtField True  $2)) }
@@ -2973,8 +2973,8 @@ projection
         | PREFIX_PROJ field  {% acs (\cs -> sLL $1 (reLoc $>) ((sLLa $1 (reLoc $>) $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) $2) :| [])) }
 
 splice_exp :: { LHsExpr GhcPs }
-        : splice_untyped { mapLoc (HsUntypedSplice noAnn) (reLocA $1) }
-        | splice_typed   { mapLoc (uncurry HsTypedSplice) (reLocA $1) }
+        : splice_untyped { fmap (HsUntypedSplice noAnn) (reLocA $1) }
+        | splice_typed   { fmap (uncurry HsTypedSplice) (reLocA $1) }
 
 splice_untyped :: { Located (HsUntypedSplice GhcPs) }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer

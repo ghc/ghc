@@ -271,7 +271,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
             ; expr' <- tcCheckMonoExpr expr ty
-            ; let d = mapLoc (toDict ipClass p ty) expr'
+            ; let d = fmap (toDict ipClass p ty) expr'
             ; return (ip_id, (IPBind ip_id l_name d)) }
 
     -- Coerces a `t` into a dictionary for `IP "x" t`.
