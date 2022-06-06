@@ -8,7 +8,7 @@
 module GHCJS.Prim ( JSVal(..), JSVal#
                   , JSException(..)
                   , WouldBlockException(..)
--- #ifdef ghcjs_HOST_OS
+#ifdef js_HOST_ARCH
                   , toIO
                   , resolve
                   , resolveIO
@@ -35,7 +35,7 @@ module GHCJS.Prim ( JSVal(..), JSVal#
                   , unpackJSStringUtf8##
                   , unsafeUnpackJSStringUtf8##
 
--- #endif
+#endif
                   ) where
 
 import           Data.Typeable (Typeable)
@@ -52,13 +52,13 @@ import           GHC.IO
   argument or result.
 -}
 
--- #ifdef ghcjs_HOST_OS
+#ifdef js_HOST_ARCH
 data JSVal  = JSVal ByteArray#
 type JSVal# = ByteArray#
--- #else
--- data JSVal  = JSVal Addr#
--- type JSVal# = Addr#
--- #endif
+#else
+data JSVal  = JSVal Addr#
+type JSVal# = Addr#
+#endif
 
 {-
   When a JavaScript exception is raised inside
@@ -74,7 +74,7 @@ instance Show JSException where
   show (JSException _ xs) = "JavaScript exception: " ++ xs
 
 -- FIXME: Luite (2022,05): appropriate CPP conditionals
--- #ifdef ghcjs_HOST_OS
+#ifdef js_HOST_ARCH
 
 {-# NOINLINE toIO #-}
 toIO :: Exts.Any -> IO Exts.Any
@@ -321,7 +321,7 @@ foreign import javascript unsafe "$1($2)"
 foreign import javascript unsafe "$1($2)"
   js_callback_jsval :: JSVal# -> JSVal -> IO ()
 
--- #endif
+#endif
 
 {- | If a synchronous thread tries to do something that can only
      be done asynchronously, and the thread is set up to not
