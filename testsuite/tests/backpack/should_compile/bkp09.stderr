@@ -1,5 +1,5 @@
 
-bkp09.bkp:1:26: warning:
+bkp09.bkp:1:26: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 [1 of 5] Processing p
   [1 of 1] Compiling H[sig]           ( p/H.hsig, nothing )

@@ -1,5 +1,5 @@
 
-SafeInfered05.hs:3:14: warning:
+SafeInfered05.hs:3:14: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
 
 SafeInfered05_A.hs:3:16: warning: [-Wsafe]

@@ -1,8 +1,8 @@
 
-RnFail055.hs:2:73: warning:
+RnFail055.hs:2:73: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
-RnFail055.hs-boot:2:73: warning:
+RnFail055.hs-boot:2:73: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 RnFail055.hs-boot:5:1: error:

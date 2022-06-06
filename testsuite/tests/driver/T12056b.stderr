@@ -1,2 +1,3 @@
 
-on the commandline: warning: unrecognised warning flag: -Wbar
+on the commandline: warning: [-Wunrecognised-warning-flags (in -Wdefault)]
+    unrecognised warning flag: -Wbar

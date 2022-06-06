@@ -1,5 +1,5 @@
 
-T17567StupidTheta.hs:1:37: warning:
+T17567StupidTheta.hs:1:37: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 T17567StupidTheta.hs:6:1: error:
