@@ -48,7 +48,7 @@ import GHC.Utils.Encoding
 import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import qualified GHC.Utils.Monad.State.Strict as State
+import qualified Control.Monad.Trans.State.Strict as State
 import GHC.Utils.Outputable hiding ((<>))
 
 import qualified Data.Set as S
@@ -56,6 +56,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Monoid
 import Control.Monad
+import Control.Monad.Trans.Class
 import Data.Bifunctor
 
 -- | Code generator for JavaScript
@@ -77,7 +78,7 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
 
     -- TODO: add dump pass for optimized STG ast for JS
 
-  let obj = runG config this_mod unfloated_binds $ do
+  obj <- runG config this_mod unfloated_binds $ do
         ifProfilingM $ initCostCentres cccs
         (sym_table, lus) <- genUnits this_mod stg_binds spt_entries foreign_stubs
 
@@ -87,12 +88,13 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
            return (ts ++ luOtherExports u, luStat u)
 
         deps <- genDependencyData this_mod lus
-        pure $! Object.object' (moduleName this_mod) sym_table deps (map (second BL.fromStrict) p)
+        lift $ Object.object' (moduleName this_mod) sym_table deps (map (second BL.fromStrict) p)
 
   -- Doc to dump when -ddump-js is enabled
   let mod_name = renderWithContext defaultSDocContext (ppr this_mod)
+  o <- Object.readObject mod_name obj
   putDumpFileMaybe logger Opt_D_dump_js "JavaScript code" FormatJS
-    $ vcat (fmap (docToSDoc . jsToDoc . Object.oiStat) (Object.readObject mod_name obj))
+    $ vcat (fmap (docToSDoc . jsToDoc . Object.oiStat) o)
 
   BL.writeFile output_fn obj
 
@@ -235,7 +237,7 @@ serializeLinkableUnit :: HasDebugCallStack
                       -> G (Object.SymbolTable, [ShortText], BS.ByteString)
 serializeLinkableUnit _m st i ci si stat rawStat fe fi = do
   !i' <- mapM idStr i
-  let !(!st', !o) = Object.serializeStat st ci si stat rawStat fe fi
+  !(!st', !o) <- lift $ Object.serializeStat st ci si stat rawStat fe fi
   return (st', i', o) -- deepseq results?
     where
       idStr i = itxt <$> jsIdI i
