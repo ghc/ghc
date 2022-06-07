@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
@@ -15,9 +16,10 @@
 -- Reading and writing the .haddock interface file
 -----------------------------------------------------------------------------
 module Haddock.InterfaceFile (
-  InterfaceFile(..), ifUnitId, ifModule,
-  readInterfaceFile, nameCacheFromGhc, freshNameCache, NameCacheAccessor,
-  writeInterfaceFile, binaryInterfaceVersion, binaryInterfaceVersionCompatibility
+  InterfaceFile(..), PackageInfo(..), ifUnitId, ifModule,
+  PackageInterfaces(..), mkPackageInterfaces, ppPackageInfo, readInterfaceFile,
+  nameCacheFromGhc, freshNameCache, NameCacheAccessor, writeInterfaceFile,
+  binaryInterfaceVersion, binaryInterfaceVersionCompatibility
 ) where
 
 
@@ -30,9 +32,12 @@ import Data.IORef
 import Data.List (mapAccumR)
 import qualified Data.Map as Map
 import Data.Map (Map)
+import Data.Version
 import Data.Word
+import Text.ParserCombinators.ReadP (readP_to_S)
 
 import GHC.Iface.Binary (getSymtabName, getDictFastString)
+import GHC.Unit.State
 import GHC.Utils.Binary
 import GHC.Data.FastMutInt
 import GHC.Data.FastString
@@ -46,11 +51,43 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 
+import Haddock.Options (Visibility (..))
+
 data InterfaceFile = InterfaceFile {
   ifLinkEnv         :: LinkEnv,
+  -- | Package meta data.  Currently it only consist of a package name, which
+  -- is not read from the interface file, but inferred from its name.
+  --
+  -- issue #
+  ifPackageInfo     :: PackageInfo,
   ifInstalledIfaces :: [InstalledInterface]
 }
 
+data PackageInfo = PackageInfo {
+  piPackageName    :: PackageName,
+  piPackageVersion :: Data.Version.Version
+}
+
+ppPackageInfo :: PackageInfo -> String
+ppPackageInfo (PackageInfo name version) | version == makeVersion []
+                                         = unpackFS (unPackageName name)
+ppPackageInfo (PackageInfo name version) = unpackFS (unPackageName name) ++ "-" ++ showVersion version
+
+data PackageInterfaces = PackageInterfaces {
+  piPackageInfo         :: PackageInfo,
+  piVisibility          :: Visibility,
+  piInstalledInterfaces :: [InstalledInterface]
+}
+
+mkPackageInterfaces :: Visibility -> InterfaceFile -> PackageInterfaces
+mkPackageInterfaces piVisibility
+                    InterfaceFile { ifPackageInfo
+                                  , ifInstalledIfaces
+                                  } = 
+  PackageInterfaces { piPackageInfo = ifPackageInfo
+                    , piVisibility
+                    , piInstalledInterfaces = ifInstalledIfaces
+                    }
 
 ifModule :: InterfaceFile -> Module
 ifModule if_ =
@@ -95,10 +132,10 @@ binaryInterfaceMagic = 0xD0Cface
 --
 binaryInterfaceVersion :: Word16
 #if MIN_VERSION_ghc(9,2,0) && !MIN_VERSION_ghc(9,3,0)
-binaryInterfaceVersion = 38
+binaryInterfaceVersion = 39
 
 binaryInterfaceVersionCompatibility :: [Word16]
-binaryInterfaceVersionCompatibility = [37, binaryInterfaceVersion]
+binaryInterfaceVersionCompatibility = [37, 38, binaryInterfaceVersion]
 #elif defined(__HLINT__)
 #else
 #error Unsupported GHC version
@@ -139,7 +176,7 @@ writeInterfaceFile filename iface = do
   let bh = setUserData bh0 $ newWriteState (putName bin_symtab)
                                            (putName bin_symtab)
                                            (putFastString bin_dict)
-  put_ bh iface
+  putInterfaceFile_ bh iface
 
   -- write the symtab pointer at the front of the file
   symtab_p <- tellBin bh
@@ -228,7 +265,7 @@ readInterfaceFile (get_name_cache, set_name_cache) filename bypass_checks = do
                                                   (getDictFastString dict)
 
       -- load the actual data
-      iface <- liftIO $ get bh1
+      iface <- liftIO $ getInterfaceFile bh1 version
       return (Right iface)
  where
    with_name_cache :: forall a.
@@ -372,16 +409,48 @@ instance (Ord k, Binary k, Binary v) => Binary (Map k v) where
   put_ bh m = put_ bh (Map.toList m)
   get bh = fmap (Map.fromList) (get bh)
 
+instance Binary PackageInfo where
+  put_ bh PackageInfo { piPackageName, piPackageVersion } = do
+    put_ bh (unPackageName piPackageName)
+    put_ bh (showVersion piPackageVersion)
+  get bh = do
+    name <- PackageName <$> get bh
+    versionString <- get bh
+    let version = case readP_to_S parseVersion versionString of
+          [] -> makeVersion []
+          vs -> fst (last vs)
+    return $ PackageInfo name version
 
 instance Binary InterfaceFile where
-  put_ bh (InterfaceFile env ifaces) = do
+  put_ bh (InterfaceFile env info ifaces) = do
     put_ bh env
+    put_ bh info
     put_ bh ifaces
 
   get bh = do
     env    <- get bh
+    info   <- get bh
     ifaces <- get bh
-    return (InterfaceFile env ifaces)
+    return (InterfaceFile env info ifaces)
+
+
+putInterfaceFile_ :: BinHandle -> InterfaceFile -> IO ()
+putInterfaceFile_ bh (InterfaceFile env info ifaces) = do
+  put_ bh env
+  put_ bh info
+  put_ bh ifaces
+
+getInterfaceFile :: BinHandle -> Word16 -> IO InterfaceFile
+getInterfaceFile bh v | v <= 38 = do
+  env    <- get bh
+  let info = PackageInfo (PackageName mempty) (makeVersion [])
+  ifaces <- get bh
+  return (InterfaceFile env info ifaces)
+getInterfaceFile bh _ = do
+  env    <- get bh
+  info   <- get bh
+  ifaces <- get bh
+  return (InterfaceFile env info ifaces)
 
 
 instance Binary InstalledInterface where

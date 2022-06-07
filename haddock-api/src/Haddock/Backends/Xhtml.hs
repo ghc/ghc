@@ -28,7 +28,9 @@ import Haddock.Backends.Xhtml.Names
 import Haddock.Backends.Xhtml.Themes
 import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
+import Haddock.InterfaceFile (PackageInfo (..), PackageInterfaces (..), ppPackageInfo)
 import Haddock.ModuleTree
+import Haddock.Options (Visibility (..))
 import Haddock.Types
 import Haddock.Version
 import Haddock.Utils
@@ -78,6 +80,7 @@ ppHtml :: UnitState
        -> Maybe String                 -- ^ The index URL (--use-index)
        -> Bool                         -- ^ Whether to use unicode in output (--use-unicode)
        -> Maybe String                 -- ^ Package name
+       -> PackageInfo                  -- ^ Package info
        -> QualOption                   -- ^ How to qualify names
        -> Bool                         -- ^ Output pretty html (newlines and indenting)
        -> Bool                         -- ^ Also write Quickjump index
@@ -86,7 +89,7 @@ ppHtml :: UnitState
 ppHtml state doctitle maybe_package ifaces reexported_ifaces odir prologue
         themes maybe_mathjax_url maybe_source_url maybe_wiki_url
         maybe_base_url maybe_contents_url maybe_index_url unicode
-        pkg qual debug withQuickjump = do
+        pkg packageInfo qual debug withQuickjump = do
   let
     visible_ifaces = filter visible ifaces
     visible i = OptHide `notElem` ifaceOptions i
@@ -94,7 +97,12 @@ ppHtml state doctitle maybe_package ifaces reexported_ifaces odir prologue
   when (isNothing maybe_contents_url) $
     ppHtmlContents state odir doctitle maybe_package
         themes maybe_mathjax_url maybe_index_url maybe_source_url maybe_wiki_url
-        (map toInstalledIface visible_ifaces ++ reexported_ifaces)
+        [PackageInterfaces
+          { piPackageInfo = packageInfo
+          , piVisibility  = Visible
+          , piInstalledInterfaces = map toInstalledIface visible_ifaces
+                                 ++ reexported_ifaces
+          }]
         False -- we don't want to display the packages in a single-package contents
         prologue debug pkg (makeContentsQual qual)
 
@@ -277,30 +285,42 @@ ppHtmlContents
    -> Maybe String
    -> SourceURLs
    -> WikiURLs
-   -> [InstalledInterface] -> Bool -> Maybe (MDoc GHC.RdrName)
+   -> [PackageInterfaces] -> Bool -> Maybe (MDoc GHC.RdrName)
    -> Bool
    -> Maybe Package  -- ^ Current package
    -> Qualification  -- ^ How to qualify names
    -> IO ()
 ppHtmlContents state odir doctitle _maybe_package
   themes mathjax_url maybe_index_url
-  maybe_source_url maybe_wiki_url ifaces showPkgs prologue debug pkg qual = do
-  let tree = mkModuleTree state showPkgs
-         [(instMod iface, toInstalledDescription iface)
-         | iface <- ifaces
-         , not (instIsSig iface)]
-      sig_tree = mkModuleTree state showPkgs
-         [(instMod iface, toInstalledDescription iface)
-         | iface <- ifaces
-         , instIsSig iface]
+  maybe_source_url maybe_wiki_url packages showPkgs prologue debug pkg qual = do
+  let trees =
+        [ ( piPackageInfo pinfo
+          , mkModuleTree state showPkgs
+            [(instMod iface, toInstalledDescription iface)
+            | iface <- piInstalledInterfaces pinfo
+            , not (instIsSig iface)
+            ]
+          )
+        | pinfo <- packages
+        ]
+      sig_trees =
+        [ ( piPackageInfo pinfo
+          , mkModuleTree state showPkgs
+            [(instMod iface, toInstalledDescription iface)
+            | iface <- piInstalledInterfaces pinfo
+            , instIsSig iface
+            ]
+          )
+        | pinfo <- packages
+        ]
       html =
         headHtml doctitle themes mathjax_url Nothing +++
         bodyHtml doctitle Nothing
           maybe_source_url maybe_wiki_url
           Nothing maybe_index_url << [
             ppPrologue pkg qual doctitle prologue,
-            ppSignatureTree pkg qual sig_tree,
-            ppModuleTree pkg qual tree
+            ppSignatureTrees pkg qual sig_trees,
+            ppModuleTrees pkg qual trees
           ]
   createDirectoryIfMissing True odir
   writeUtf8File (joinPath [odir, contentsHtmlFile]) (renderToString debug html)
@@ -315,17 +335,37 @@ ppPrologue _ _ _ Nothing = noHtml
 ppPrologue pkg qual title (Just doc) =
   divDescription << (h1 << title +++ docElement thediv (rdrDocToHtml pkg qual doc))
 
+ppSignatureTrees :: Maybe Package -> Qualification -> [(PackageInfo, [ModuleTree])] -> Html
+ppSignatureTrees _ _ tss | all (null . snd) tss = mempty
+ppSignatureTrees pkg qual [(info, ts)] = 
+  divPackageList << (sectionName << "Signatures" +++ ppSignatureTree pkg qual "n" info ts)
+ppSignatureTrees pkg qual tss =
+  divModuleList <<
+    (sectionName << "Signatures"
+     +++ concatHtml [ ppSignatureTree pkg qual("n."++show i++".") info ts
+                    | (i, (info, ts)) <- zip [(1::Int)..] tss
+                    ])
 
-ppSignatureTree :: Maybe Package -> Qualification -> [ModuleTree] -> Html
-ppSignatureTree _ _ [] = mempty
-ppSignatureTree pkg qual ts =
-  divModuleList << (sectionName << "Signatures" +++ mkNodeList pkg qual [] "n" ts)
+ppSignatureTree :: Maybe Package -> Qualification -> String -> PackageInfo -> [ModuleTree] -> Html
+ppSignatureTree _ _ _ _ [] = mempty
+ppSignatureTree pkg qual p info ts =
+  divModuleList << (sectionName << ppPackageInfo info +++ mkNodeList pkg qual [] p ts)
 
+ppModuleTrees :: Maybe Package -> Qualification -> [(PackageInfo, [ModuleTree])] -> Html
+ppModuleTrees _ _ tss | all (null . snd) tss = mempty
+ppModuleTrees pkg qual [(info, ts)] =
+  divModuleList << (sectionName << "Modules" +++ ppModuleTree pkg qual "n" info ts)
+ppModuleTrees pkg qual tss =
+  divPackageList <<
+    (sectionName << "Packages"
+     +++ concatHtml [ppModuleTree pkg qual ("n."++show i++".") info ts
+                    | (i, (info, ts)) <- zip [(1::Int)..] tss
+                    ])
 
-ppModuleTree :: Maybe Package -> Qualification -> [ModuleTree] -> Html
-ppModuleTree _ _ [] = mempty
-ppModuleTree pkg qual ts =
-  divModuleList << (sectionName << "Modules" +++ mkNodeList pkg qual [] "n" ts)
+ppModuleTree :: Maybe Package -> Qualification -> String -> PackageInfo -> [ModuleTree] -> Html
+ppModuleTree _ _ _ _ [] = mempty
+ppModuleTree pkg qual p info ts =
+  divModuleList << (sectionName << ppPackageInfo info +++ mkNodeList pkg qual [] p ts)
 
 
 mkNodeList :: Maybe Package -> Qualification -> [String] -> String -> [ModuleTree] -> Html

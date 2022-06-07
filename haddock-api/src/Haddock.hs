@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -199,11 +200,17 @@ haddockWithGhc ghc args = handleTopExceptions $ do
 
     if not (null files) then do
       (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
+      let packageInfo = PackageInfo { piPackageName =
+                                        fromMaybe (PackageName mempty) (optPackageName flags)
+                                    , piPackageVersion =
+                                        fromMaybe (makeVersion []) (optPackageVersion flags)
+                                    }
 
       -- Dump an "interface file" (.haddock file), if requested.
       forM_ (optDumpInterfaceFile flags) $ \path -> liftIO $ do
         writeInterfaceFile path InterfaceFile {
             ifInstalledIfaces = map toInstalledIface ifaces
+          , ifPackageInfo     = packageInfo
           , ifLinkEnv         = homeLinks
           }
 
@@ -277,9 +284,9 @@ renderStep logger dflags unit_state flags sinceQual nameQual pkgs interfaces = d
                           , ifaceFile)) pkgs)
   let
     installedIfaces =
-      concatMap
+      map
         (\(_, showModules, ifaceFilePath, ifaceFile)
-          -> (showModules,ifaceFilePath,) <$> ifInstalledIfaces ifaceFile)
+          -> (ifaceFilePath, mkPackageInterfaces showModules ifaceFile))
         pkgs
     extSrcMap = Map.fromList $ do
       ((_, Just path), _, _, ifile) <- pkgs
@@ -296,10 +303,16 @@ renderStep logger dflags unit_state flags sinceQual nameQual pkgs interfaces = d
 
 -- | Render the interfaces with whatever backend is specified in the flags.
 render :: Logger -> DynFlags -> UnitState -> [Flag] -> SinceQual -> QualOption -> [Interface]
-       -> [(Visibility, FilePath, InstalledInterface)] -> Map Module FilePath -> IO ()
-render logger dflags unit_state flags sinceQual qual ifaces installedIfaces extSrcMap = do
+       -> [(FilePath, PackageInterfaces)] -> Map Module FilePath -> IO ()
+render logger dflags unit_state flags sinceQual qual ifaces packages extSrcMap = do
 
   let
+    packageInfo = PackageInfo { piPackageName    = fromMaybe (PackageName mempty)
+                                                 $ optPackageName flags
+                              , piPackageVersion = fromMaybe (makeVersion [])
+                                                 $ optPackageVersion flags
+                              }
+
     title                = fromMaybe "" (optTitle flags)
     unicode              = Flag_UseUnicode `elem` flags
     pretty               = Flag_PrettyHtml `elem` flags
@@ -317,10 +330,32 @@ render logger dflags unit_state flags sinceQual qual ifaces installedIfaces extS
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
-    -- /All/ visible interfaces including external package modules.
-    allIfaces        = map ((Visible,) . toInstalledIface) ifaces
-                    ++ map (\(showModules,_,iface) -> (showModules,iface)) installedIfaces
-    allVisibleIfaces = [ i | (Visible, i) <- allIfaces, OptHide `notElem` instOptions i ]
+    -- /All/ interfaces including external package modules, grouped by
+    -- interface file (package).
+    allPackages      :: [PackageInterfaces]
+    allPackages      = [PackageInterfaces
+                         { piPackageInfo = packageInfo
+                         , piVisibility  = Visible
+                         , piInstalledInterfaces  = map toInstalledIface ifaces
+                         }]
+                    ++ map snd packages
+
+    -- /All/ visible interfaces including external package modules, grouped by
+    -- interface file (package).
+    allVisiblePackages :: [PackageInterfaces]
+    allVisiblePackages = [ pinfo { piInstalledInterfaces =
+                                     filter (\i -> OptHide `notElem` instOptions i)
+                                            piInstalledInterfaces
+                                 }
+                         | pinfo@PackageInterfaces
+                             { piVisibility = Visible
+                             , piInstalledInterfaces
+                             } <- allPackages
+                         ]
+
+    -- /All/ installed interfaces.
+    allInstalledIfaces :: [InstalledInterface]
+    allInstalledIfaces = concatMap (piInstalledInterfaces . snd) packages
 
     pkgMod           = fmap ifaceMod (listToMaybe ifaces)
     pkgKey           = fmap moduleUnit pkgMod
@@ -364,7 +399,7 @@ render logger dflags unit_state flags sinceQual qual ifaces installedIfaces extS
     sourceUrls' = (srcBase, srcModule', pkgSrcMap', pkgSrcLMap')
 
     installedMap :: Map Module InstalledInterface
-    installedMap = Map.fromList [ (unwire (instMod iface), iface) | (_, _, iface) <- installedIfaces ]
+    installedMap = Map.fromList [ (unwire (instMod iface), iface) | iface <- allInstalledIfaces ]
 
     -- The user gives use base-4.9.0.0, but the InstalledInterface
     -- records the *wired in* identity base.  So untranslate it
@@ -400,7 +435,7 @@ render logger dflags unit_state flags sinceQual qual ifaces installedIfaces extS
       _ <- {-# SCC ppHtmlIndex #-}
            ppHtmlIndex odir title pkgStr
                   themes opt_mathjax opt_contents_url sourceUrls' opt_wiki_urls
-                  allVisibleIfaces pretty
+                  (concatMap piInstalledInterfaces allVisiblePackages) pretty
       return ()
 
     unless withBaseURL $
@@ -411,7 +446,7 @@ render logger dflags unit_state flags sinceQual qual ifaces installedIfaces extS
       _ <- {-# SCC ppHtmlContents #-}
            ppHtmlContents unit_state odir title pkgStr
                      themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
-                     allVisibleIfaces True prologue pretty
+                     allVisiblePackages True prologue pretty
                      sincePkg (makeContentsQual qual)
       return ()
     copyHtmlBits odir libDir themes withQuickjump
@@ -421,9 +456,9 @@ render logger dflags unit_state flags sinceQual qual ifaces installedIfaces extS
                         unicode Nothing qual
                         ifaces
                         ( nub
-                        . map (\(_,a,_) -> a)
-                        . filter (\(v,_,_) -> v == Visible)
-                        $ installedIfaces)
+                        . map fst
+                        . filter ((== Visible) . piVisibility . snd)
+                        $ packages)
 
   when (Flag_Html `elem` flags) $ do
     withTiming logger dflags' "ppHtml" (const ()) $ do
@@ -431,8 +466,8 @@ render logger dflags unit_state flags sinceQual qual ifaces installedIfaces extS
            ppHtml unit_state title pkgStr visibleIfaces reexportedIfaces odir
                   prologue
                   themes opt_mathjax sourceUrls' opt_wiki_urls opt_base_url
-                  opt_contents_url opt_index_url unicode sincePkg qual
-                  pretty withQuickjump
+                  opt_contents_url opt_index_url unicode sincePkg packageInfo
+                  qual pretty withQuickjump
       return ()
     unless withBaseURL $ do
       copyHtmlBits odir libDir themes withQuickjump
@@ -496,7 +531,8 @@ readInterfaceFiles name_cache_accessor pairs bypass_version_check = do
           putStrLn ("   " ++ err)
           putStrLn "Skipping this interface."
           return Nothing
-        Right f -> return (Just (paths, showModules, file, f))
+        Right f ->
+          return (Just (paths, showModules, file, f ))
 
 
 -------------------------------------------------------------------------------
