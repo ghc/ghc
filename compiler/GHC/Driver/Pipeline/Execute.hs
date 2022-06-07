@@ -122,6 +122,7 @@ runPhase (T_CmmCpp pipe_env hsc_env input_fn) = do
         (hsc_dflags hsc_env)
         (hsc_unit_env hsc_env)
         False{-not raw-}
+        []
         input_fn output_fn
   return output_fn
 runPhase (T_Cmm pipe_env hsc_env input_fn) = do
@@ -625,6 +626,7 @@ runCppPhase hsc_env input_fn output_fn = do
            (hsc_dflags hsc_env)
            (hsc_unit_env hsc_env)
            True{-raw-}
+           []
            input_fn output_fn
   return output_fn
 
@@ -969,8 +971,8 @@ offsetIncludePaths dflags (IncludeSpecs incs quotes impl) =
 -- | Run CPP
 --
 -- UnitEnv is needed to compute MIN_VERSION macros
-doCpp :: Logger -> TmpFs -> DynFlags -> UnitEnv -> Bool -> FilePath -> FilePath -> IO ()
-doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
+doCpp :: Logger -> TmpFs -> DynFlags -> UnitEnv -> Bool -> [Option] -> FilePath -> FilePath -> IO ()
+doCpp logger tmpfs dflags unit_env raw extra_opts input_fn output_fn = do
     let hscpp_opts = picPOpts dflags
     let cmdline_include_paths = offsetIncludePaths dflags (includePaths dflags)
     let unit_state = ue_units unit_env
@@ -1060,6 +1062,7 @@ doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
                     ++ map GHC.SysTools.Option avx_defs
                     ++ map GHC.SysTools.Option io_manager_defs
                     ++ mb_macro_include
+                    ++ extra_opts
         -- Set the language mode to assembler-with-cpp when preprocessing. This
         -- alleviates some of the C99 macro rules relating to whitespace and the hash
         -- operator, which we tend to abuse. Clang in particular is not very happy
