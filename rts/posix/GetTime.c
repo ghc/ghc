@@ -138,7 +138,8 @@ Time getProcessCPUTime(void)
     {
         struct rusage t;
         getrusage(RUSAGE_SELF, &t);
-        return SecondsToTime(t.ru_utime.tv_sec) + USToTime(t.ru_utime.tv_usec);
+        return SecondsToTime(t.ru_utime.tv_sec + t.ru_stime.tv_sec)
+                + USToTime(t.ru_utime.tv_usec + t.ru_stime.tv_usec);
     }
 }
 
