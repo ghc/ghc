@@ -398,8 +398,10 @@ cprFix orig_env orig_pairs
   where
     init_sig id
       -- See Note [CPR for data structures]
-      | isDataStructure id = topCprSig
-      | otherwise          = mkCprSig 0 botCpr
+      -- Don't set the sig to bottom in this case, because cprAnalBind won't
+      -- update it to something reasonable. Result: Assertion error in WW
+      | isDataStructure id || isDFunId id = topCprSig
+      | otherwise                         = mkCprSig 0 botCpr
     -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
     orig_virgin = ae_virgin orig_env
     init_pairs | orig_virgin  = [(setIdCprSig id (init_sig id), rhs) | (id, rhs) <- orig_pairs ]
@@ -464,10 +466,10 @@ cprAnalBind env id rhs
   | isDFunId id -- Never give DFuns the CPR property; we'll never save allocs.
   = (id,  rhs,  extendSigEnv env id topCprSig)
   -- See Note [CPR for data structures]
-  | isDataStructure id
-  = (id,  rhs,  env) -- Data structure => no code => no need to analyse rhs
+  | isDataStructure id -- Data structure => no code => no need to analyse rhs
+  = (id,  rhs,  env)
   | otherwise
-  = (id', rhs', env')
+  = (id `setIdCprSig` sig',       rhs', env')
   where
     (rhs_ty, rhs')  = cprAnal env rhs
     -- possibly trim thunk CPR info
@@ -481,7 +483,6 @@ cprAnalBind env id rhs
     -- See Note [The OPAQUE pragma and avoiding the reboxing of results]
     sig' | isOpaquePragma (idInlinePragma id) = topCprSig
          | otherwise                          = sig
-    id'  = setIdCprSig id sig'
     env' = extendSigEnv env id sig'
 
     -- See Note [CPR for thunks]
