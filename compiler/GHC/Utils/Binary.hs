@@ -34,6 +34,7 @@ module GHC.Utils.Binary
     SymbolTable, Dictionary,
 
    BinData(..), dataHandle, handleData,
+   packBinBuffer, unpackBinBuffer,
 
    openBinMem,
 --   closeBin,
@@ -114,6 +115,8 @@ import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import           Data.Map (Map)
+import qualified Data.Map as M
 #if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 #endif
@@ -186,6 +189,23 @@ withBinBuffer (BinMem _ ix_r _ arr_r) action = do
   ix <- readFastMutInt ix_r
   action $ BS.fromForeignPtr arr 0 ix
 
+packBinBuffer :: BinHandle -> IO ByteString
+packBinBuffer bh@(BinMem _ ix_r _ _) = do
+  l <- readFastMutInt ix_r
+  here <- tellBin bh
+  seekBin bh (BinPtr 0)
+  b <- BS.create l $ \dest -> do
+    getPrim bh l (\src -> BS.memcpy dest src l)
+  seekBin bh here
+  return b
+
+unpackBinBuffer :: Int -> ByteString -> IO BinHandle
+unpackBinBuffer n from = do
+  bh <- openBinMem n
+  BS.unsafeUseAsCString from $ \ptr -> do
+    putPrim bh n (\op -> BS.memcpy op (castPtr ptr) n)
+  seekBin bh (BinPtr 0)
+  return bh
 
 ---------------------------------------------------------------
 -- Bin
@@ -651,6 +671,10 @@ instance Binary a => Binary [a] where
 instance (Binary a, Ord a) => Binary (Set a) where
   put_ bh s = put_ bh (Set.toList s)
   get bh = Set.fromList <$> get bh
+
+instance (Ord k, Binary k, Binary v) => Binary (Map k v) where
+  put_ bh = put_ bh . M.toList
+  get bh = M.fromList <$> get bh
 
 instance Binary a => Binary (NonEmpty a) where
     put_ bh = put_ bh . NonEmpty.toList

@@ -41,7 +41,7 @@ import GHC.Unit.Module
 import GHC.Utils.Encoding
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import qualified GHC.Utils.Monad.State.Strict as State
+import qualified Control.Monad.Trans.State.Strict as State
 
 --------------------------------------------------------------------------------
 -- Initialization
