@@ -73,6 +73,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Builtin.Uniques
 
 import GHC.Data.FastString
+import GHC.Data.Graph.UnVar
 import GHC.Data.Pair
 
 import GHC.Utils.GlobalVars( unsafeHasNoStateHack )
@@ -2043,15 +2044,6 @@ This test is made by `ok_fun` in tryEtaReduce.
    with both type and dictionary lambdas; hence the slightly
    ad-hoc (all ok_lam bndrs)
 
-3. (See fun_arity in tryEtaReduce.) We have to hide `f`'s `idArity` in
-   its own RHS, lest we suffer from the last point of Note [Arity
-   robustness] in GHC.Core.Opt.Simplify.Env. There we have `f = \x. f x`
-   and we should not eta-reduce to `f=f`. Which might change a
-   terminating program (think @f `seq` e@) to a non-terminating one.
-   So we check for being a loop breaker first. However for GlobalIds
-   we can look at the arity; and for primops we must, since they have
-   no unfolding.  [SG: Perhaps this is rather a soundness subtlety?]
-
 Of course, eta reduction is not always sound. See Note [Eta reduction soundness]
 for when it is.
 
@@ -2132,6 +2124,12 @@ case where `e` is trivial):
 
     See Note [Eta reduction based on evaluation context] for the implementation
     details. This criterion is tested extensively in T21261.
+
+ R. Note [Eta reduction in recursive RHSs] tells us that we should not
+    eta-reduce `f` in its own RHS and describes our fix.
+    There we have `f = \x. f x` and we should not eta-reduce to `f=f`. Which
+    might change a terminating program (think @f `seq` e@) to a non-terminating
+    one.
 
  E. (See fun_arity in tryEtaReduce.) As a perhaps special case on the
     boundary of (A) and (S), when we know that a fun binder `f` is in
@@ -2276,15 +2274,73 @@ Then this is how the pieces are put together:
     sub-demands `Cn` and see whether all of the n's (here: `S=C_1N` and
     `1=C_11`) were strict. And strict they are! Thus, it will eta-reduce
     `\x y. e x y` to `e`.
+
+Note [Eta reduction in recursive RHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following recursive function:
+  f = \x. ....g (\y. f y)....
+The recursive call of f in its own RHS seems like a fine opportunity for
+eta-reduction because f has arity 1. And often it is!
+
+Alas, that is unsound in general if the eta-reduction happens in a tail context.
+Making the arity visible in the RHS allows us to eta-reduce
+  f = \x -> f x
+to
+  f = f
+which means we optimise terminating programs like (f `seq` ()) into
+non-terminating ones. Nor is this problem just for tail calls.  Consider
+  f = id (\x -> f x)
+where we have (for some reason) not yet inlined `id`.  We must not eta-reduce to
+  f = id f
+because that will then simplify to `f = f` as before.
+
+An immediate idea might be to look at whether the called function is a local
+loopbreaker and refrain from eta-expanding. But that doesn't work for mutually
+recursive function like in #21652:
+  f = g
+  g* x = f x
+Here, g* is the loopbreaker but f isn't.
+
+What can we do?
+
+Fix 1: Zap `idArity` when analysing recursive RHSs and re-attach the info when
+    entering the let body.
+    Has the disadvantage that other transformations which make use of arity
+    (such as dropping of `seq`s when arity > 0) will no longer work in the RHS.
+    Plus it requires non-trivial refactorings to both the simple optimiser (in
+    the way `subst_opt_bndr` is used) as well as the Simplifier (in the way
+    `simplRecBndrs` and `simplRecJoinBndrs` is used), modifying the SimplEnv's
+    substitution twice in the process. A very complicated stop-gap.
+
+Fix 2: Pass the set of enclosing recursive binders to `tryEtaReduce`; these are
+    the ones we should not eta-reduce. All call-site must maintain this set.
+    Example:
+      rec { f1 = ....rec { g = ... (\x. g x)...(\y. f2 y)... }...
+          ; f2 = ...f1... }
+    when eta-reducing those inner lambdas, we need to know that we are in the
+    rec group for {f1, f2, g}.
+    This is very much like the solution in Note [Speculative evaluation] in
+    GHC.CoreToStg.Prep.
+    It is a bit tiresome to maintain this info, because it means another field
+    in SimplEnv and SimpleOptEnv.
+
+We implement Fix (2) because of it isn't as complicated to maintain as (1).
+Plus, it is the correct fix to begin with. After all, the arity is correct,
+but doing the transformation isn't. The moving parts are:
+  * A field `scRecIds` in `SimplEnv` tracks the enclosing recursive binders
+  * We extend the `scRecIds` set in `GHC.Core.Opt.Simplify.simplRecBind`
+  * We consult the set in `is_eta_reduction_sound` in `tryEtaReduce`
+The situation is very similar to Note [Speculative evaluation] which has the
+same fix.
 -}
 
 -- | `tryEtaReduce [x,y,z] e sd` returns `Just e'` if `\x y z -> e` is evaluated
 -- according to `sd` and can soundly and gainfully be eta-reduced to `e'`.
 -- See Note [Eta reduction soundness]
 -- and Note [Eta reduction makes sense] when that is the case.
-tryEtaReduce :: [Var] -> CoreExpr -> SubDemand -> Maybe CoreExpr
+tryEtaReduce :: UnVarSet -> [Var] -> CoreExpr -> SubDemand -> Maybe CoreExpr
 -- Return an expression equal to (\bndrs. body)
-tryEtaReduce bndrs body eval_sd
+tryEtaReduce rec_ids bndrs body eval_sd
   = go (reverse bndrs) body (mkRepReflCo (exprType body))
   where
     incoming_arity = count isId bndrs -- See Note [Eta reduction makes sense], point (2)
@@ -2347,9 +2403,11 @@ tryEtaReduce bndrs body eval_sd
     ---------------
     -- See Note [Eta reduction soundness], this is THE place to check soundness!
     is_eta_reduction_sound fun =
+      -- Don't eta-reduce in fun in its own recursive RHSs
+      not (fun `elemUnVarSet` rec_ids)               -- criterion (R)
       -- Check that eta-reduction won't make the program stricter...
-      (fun_arity fun >= incoming_arity            -- criterion (A) and (E)
-        || all_calls_with_arity incoming_arity)   -- criterion (S)
+      && (fun_arity fun >= incoming_arity            -- criterion (A) and (E)
+           || all_calls_with_arity incoming_arity)   -- criterion (S)
       -- ... and that the function can be eta reduced to arity 0
       -- without violating invariants of Core and GHC
       && canEtaReduceToArity fun 0 0              -- criteria (L), (J), (W), (B)
@@ -2358,9 +2416,6 @@ tryEtaReduce bndrs body eval_sd
 
     ---------------
     fun_arity fun
-       | isLocalId fun
-       , isStrongLoopBreaker (idOccInfo fun) = 0
-           -- See Note [Eta reduction makes sense], point (3)
        | arity > 0                           = arity
        | isEvaldUnfolding (idUnfolding fun)  = 1
            -- See Note [Eta reduction soundness], criterion (E)

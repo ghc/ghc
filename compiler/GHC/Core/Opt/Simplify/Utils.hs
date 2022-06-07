@@ -1662,6 +1662,7 @@ rebuildLam env bndrs body cont
        ; try_eta dflags bndrs body }
   where
     mode     = getMode env
+    rec_ids  = seRecIds env
     in_scope = getInScope env  -- Includes 'bndrs'
     mb_rhs   = contIsRhs cont
 
@@ -1678,7 +1679,7 @@ rebuildLam env bndrs body cont
     try_eta dflags bndrs body
       | -- Try eta reduction
         gopt Opt_DoEtaReduction dflags
-      , Just etad_lam <- tryEtaReduce bndrs body (eval_sd dflags)
+      , Just etad_lam <- tryEtaReduce rec_ids bndrs body (eval_sd dflags)
       = do { tick (EtaReduction (head bndrs))
            ; return etad_lam }
 

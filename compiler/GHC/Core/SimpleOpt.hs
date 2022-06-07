@@ -52,6 +52,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )
+import GHC.Data.Graph.UnVar
 import Data.List (mapAccumL)
 import qualified Data.ByteString as BS
 
@@ -191,6 +192,10 @@ data SimpleOptEnv
 
         , soe_subst :: Subst
              -- ^ Deals with cloning; includes the InScopeSet
+
+        , soe_rec_ids :: !UnVarSet
+             -- ^ Fast OutVarSet tracking which recursive RHSs we are analysing.
+             -- See Note [Eta reduction in recursive RHSs]
         }
 
 instance Outputable SimpleOptEnv where
@@ -200,9 +205,10 @@ instance Outputable SimpleOptEnv where
                    <+> text "}"
 
 emptyEnv :: SimpleOpts -> SimpleOptEnv
-emptyEnv opts = SOE { soe_inl   = emptyVarEnv
-                    , soe_subst = emptySubst
-                    , soe_opts  = opts  }
+emptyEnv opts = SOE { soe_inl     = emptyVarEnv
+                    , soe_subst   = emptySubst
+                    , soe_rec_ids = emptyUnVarSet
+                    , soe_opts    = opts  }
 
 soeZapSubst :: SimpleOptEnv -> SimpleOptEnv
 soeZapSubst env@(SOE { soe_subst = subst })
@@ -215,6 +221,13 @@ soeSetInScope :: InScopeSet -> SimpleOptEnv -> SimpleOptEnv
 soeSetInScope in_scope env2@(SOE { soe_subst = subst2 })
   = env2 { soe_subst = setInScope subst2 in_scope }
 
+enterRecGroupRHSs :: SimpleOptEnv -> [OutBndr] -> (SimpleOptEnv -> (SimpleOptEnv, r))
+                  -> (SimpleOptEnv, r)
+enterRecGroupRHSs env bndrs k
+  = (env'{soe_rec_ids = soe_rec_ids env}, r)
+  where
+    (env', r) = k env{soe_rec_ids = extendUnVarSetList bndrs (soe_rec_ids env)}
+
 ---------------
 simple_opt_clo :: InScopeSet
                -> SimpleClo
@@ -226,6 +239,7 @@ simple_opt_expr :: HasCallStack => SimpleOptEnv -> InExpr -> OutExpr
 simple_opt_expr env expr
   = go expr
   where
+    rec_ids      = soe_rec_ids env
     subst        = soe_subst env
     in_scope     = substInScope subst
     in_scope_env = (in_scope, simpleUnfoldingFun)
@@ -288,14 +302,17 @@ simple_opt_expr env expr
 
     ----------------------
     -- go_lam tries eta reduction
+    -- It is quite important that it does so. I tried removing this code and
+    -- got a lot of regressions, e.g., +11% ghc/alloc in T18223 and many
+    -- run/alloc increases. Presumably RULEs are affected.
     go_lam env bs' (Lam b e)
        = go_lam env' (b':bs') e
        where
          (env', b') = subst_opt_bndr env b
     go_lam env bs' e
        | so_eta_red (soe_opts env)
-       , Just etad_e <- tryEtaReduce bs e' topSubDmd = etad_e
-       | otherwise                                   = mkLams bs e'
+       , Just etad_e <- tryEtaReduce rec_ids bs e' topSubDmd = etad_e
+       | otherwise                                           = mkLams bs e'
        where
          bs = reverse bs'
          e' = simple_opt_expr env e
@@ -408,12 +425,13 @@ simple_opt_bind env (NonRec b r) top_level
     (env', mb_pr) = simple_bind_pair env b' Nothing (env,r') top_level
 
 simple_opt_bind env (Rec prs) top_level
-  = (env'', res_bind)
+  = (env2, res_bind)
   where
     res_bind          = Just (Rec (reverse rev_prs'))
     prs'              = joinPointBindings_maybe prs `orElse` prs
-    (env', bndrs')    = subst_opt_bndrs env (map fst prs')
-    (env'', rev_prs') = foldl' do_pr (env', []) (prs' `zip` bndrs')
+    (env1, bndrs')    = subst_opt_bndrs env (map fst prs')
+    (env2, rev_prs')  = enterRecGroupRHSs env1 bndrs' $ \env ->
+                          foldl' do_pr (env, []) (prs' `zip` bndrs')
     do_pr (env, prs) ((b,r), b')
        = (env', case mb_pr of
                   Just pr -> pr : prs
