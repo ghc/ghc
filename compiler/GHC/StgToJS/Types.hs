@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 
 module GHC.StgToJS.Types where
 
@@ -294,18 +295,53 @@ newtype ExprValData = ExprValData [JExpr]
   deriving newtype (Eq, Ord, Show)
 
 -- closure types
-data ClosureType = Thunk | Fun | Pap | Con | Blackhole | StackFrame
+data ClosureType
+  = Thunk
+  | Fun
+  | Pap
+  | Con
+  | Blackhole
+  | StackFrame
   deriving (Show, Eq, Ord, Enum, Bounded)
 
---
 ctNum :: ClosureType -> Int
 ctNum Fun        = 1
 ctNum Con        = 2
-ctNum Thunk      = 0 -- 4
-ctNum Pap        = 3 -- 8
--- ctNum Ind        = 4 -- 16
-ctNum Blackhole  = 5 -- 32
+ctNum Thunk      = 0
+ctNum Pap        = 3
+ctNum Blackhole  = 5
 ctNum StackFrame = -1
+
+ctJsName :: ClosureType -> String
+ctJsName = \case
+  Thunk      -> "CLOSURE_TYPE_THUNK"
+  Fun        -> "CLOSURE_TYPE_FUN"
+  Pap        -> "CLOSURE_TYPE_PAP"
+  Con        -> "CLOSURE_TYPE_CON"
+  Blackhole  -> "CLOSURE_TYPE_BLACKHOLE"
+  StackFrame -> "CLOSURE_TYPE_STACKFRAME"
 
 instance ToJExpr ClosureType where
   toJExpr e = toJExpr (ctNum e)
+
+
+data ThreadStatus
+  = Running
+  | Blocked
+  | Finished
+  | Died
+  deriving (Show, Eq, Ord, Enum, Bounded)
+
+threadStatusNum :: ThreadStatus -> Int
+threadStatusNum = \case
+  Running  -> 0
+  Blocked  -> 1
+  Finished -> 16
+  Died     -> 17
+
+threadStatusJsName :: ThreadStatus -> String
+threadStatusJsName = \case
+  Running  -> "THREAD_RUNNING"
+  Blocked  -> "THREAD_BLOCKED"
+  Finished -> "THREAD_FINISHED"
+  Died     -> "THREAD_DIED"

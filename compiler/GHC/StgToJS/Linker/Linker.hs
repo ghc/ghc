@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE LambdaCase        #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -110,20 +111,23 @@ import qualified Data.Set                 as S
 
 import           GHC.Generics (Generic)
 
-import           System.FilePath (splitPath, (<.>), (</>), dropExtension)
+import           System.FilePath (splitPath, (<.>), (</>), dropExtension, isExtensionOf)
+import           System.Environment (lookupEnv)
 import           System.Directory ( createDirectoryIfMissing
                                   , doesFileExist
                                   , getCurrentDirectory
                                   , Permissions(..)
                                   , setPermissions
                                   , getPermissions
+                                  , listDirectory
                                   )
 
-import GHC.Driver.Session (targetWays_, settings, DynFlags)
+import GHC.Driver.Session (targetWays_, settings, DynFlags(..), addGlobalInclude)
 import GHC.Settings (sTopDir)
 import GHC.Unit.Module.Name
 import GHC.Unit.Module (moduleStableString)
 import GHC.Utils.Logger (Logger)
+import GHC.Utils.TmpFs (TmpFs)
 
 import GHC.Linker.Static.Utils (exeFileName)
 
@@ -152,6 +156,7 @@ link :: GhcjsEnv
      -> JSLinkConfig
      -> StgToJSConfig
      -> Logger
+     -> TmpFs
      -> DynFlags
      -> UnitEnv
      -> FilePath               -- ^ output file/directory
@@ -162,7 +167,7 @@ link :: GhcjsEnv
      -> (ExportedFun -> Bool)  -- ^ functions from the objects to use as roots (include all their deps)
      -> Set ExportedFun        -- ^ extra symbols to link in
      -> IO ()
-link env lc_cfg cfg logger dflags unit_env out include pkgs objFiles jsFiles isRootFun extraStaticDeps
+link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFiles isRootFun extraStaticDeps
   | lcNoJSExecutables lc_cfg = return ()
   | otherwise = do
       LinkResult lo lstats lmetasize _lfrefs llW lla llarch lbase <-
@@ -191,12 +196,26 @@ link env lc_cfg cfg logger dflags unit_env out include pkgs objFiles jsFiles isR
           let statsFile = if genBase then "out.base.stats" else "out.stats"
           writeFile (out </> statsFile) (linkerStats lmetasize lstats)
         unless (lcNoRts lc_cfg) $ do
-          withRts <- mapM (tryReadShimFile dflags) llW
+          -- Sylvain (2022-06): find RTS js files (shims) via an environment variable...
+          -- Remove when all files are located via Cabal's js-sources
+          let is_js_file f = "js" `isExtensionOf` f || "pp" `isExtensionOf` f
+          static_rts_dir <- lookupEnv "JS_RTS_PATH" >>= \case
+            Nothing  -> pure []
+            Just dir -> pure dir
+          static_rts_files <- (fmap (static_rts_dir </>) . filter is_js_file) <$> listDirectory static_rts_dir
+
+          let all_rts_js     = llW ++ static_rts_files
+              -- FIXME (Jeff, 2022-06): dflags_with_js is a dirty workaround to
+              -- include all js.pp and .h files in the ghc/js directory. Once we
+              -- have real js-sources in Cabal remove this line:
+              dflags_with_js = dflags {includePaths = addGlobalInclude (includePaths dflags) [static_rts_dir] }
+
+          withRts <- mapM (tryReadShimFile logger tmpfs dflags_with_js unit_env) all_rts_js
           BL.writeFile (out </> "rts.js") (BLC.pack (T.unpack rtsDeclsText)
                                            <> BL.fromChunks withRts
                                            <> BLC.pack (T.unpack $ rtsText cfg))
         -- FIXME (Sylvain, 2022-05): disable shims
-        -- lla'    <- mapM (tryReadShimFile dflags) lla
+        -- lla'    <- mapM (tryReadShimFile logger tmpfs dflags unit_env) lla
         -- llarch' <- mapM (readShimsArchive dflags) llarch
         -- let lib_js = BL.fromChunks $ llarch' ++ lla'
         let lib_js = BL.empty

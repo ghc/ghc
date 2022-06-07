@@ -137,8 +137,8 @@ jsLinkBinary      :: GhcjsEnv
                   -> [FilePath]
                   -> [UnitId]
                   -> IO ()
-jsLinkBinary env lc_cfg cfg jsFiles logger _tmpfs dflags u_env objs dep_pkgs =
-  void $ JSLink.link env lc_cfg cfg logger dflags u_env exe mempty dep_pkgs objs' jsFiles isRoot mempty
+jsLinkBinary env lc_cfg cfg jsFiles logger tmpfs dflags u_env objs dep_pkgs =
+  void $ JSLink.link env lc_cfg cfg logger tmpfs dflags u_env exe mempty dep_pkgs objs' jsFiles isRoot mempty
     where
       objs'    = map ObjFile objs
       isRoot _ = True
