@@ -777,12 +777,12 @@ andArityType :: ArityType -> ArityType -> ArityType
 andArityType (AT (os1:oss1) div1) (AT (os2:oss2) div2)
   | AT oss' div' <- andArityType (AT oss1 div1) (AT oss2 div2)
   = AT ((os1 `bestOneShot` os2) : oss') div' -- See Note [Combining case branches]
-andArityType (AT []         div1) at2
+andArityType at1@(AT []         div1) at2
   | isDeadEndDiv div1 = at2                  -- Note [ABot branches: max arity wins]
-  | otherwise         = takeWhileOneShot at2 -- See Note [Combining case branches]
-andArityType at1                  (AT []         div2)
+  | otherwise         = at1                  -- See Note [Combining case branches]
+andArityType at1                  at2@(AT []         div2)
   | isDeadEndDiv div2 = at1                  -- Note [ABot branches: max arity wins]
-  | otherwise         = takeWhileOneShot at1 -- See Note [Combining case branches]
+  | otherwise         = at2                  -- See Note [Combining case branches]
 
 {- Note [ABot branches: max arity wins]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -795,24 +795,13 @@ So we need \??.⊥ for the whole thing, the /max/ of both arities.
 
 Note [Combining case branches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  go = \x. let z = go e0
-               go2 = \x. case x of
-                           True  -> z
-                           False -> \s(one-shot). e1
-           in go2 x
-We *really* want to respect the one-shot annotation provided by the
-user and eta-expand go and go2.
-When combining the branches of the case we have
-     T `andAT` \1.T
-and we want to get \1.T.
-But if the inner lambda wasn't one-shot (\?.T) we don't want to do this.
-(We need a usage analysis to justify that.)
 
-So we combine the best of the two branches, on the (slightly dodgy)
-basis that if we know one branch is one-shot, then they all must be.
-Surprisingly, this means that the one-shot arity type is effectively the top
-element of the lattice.
+Unless we can conclude that **all** branches are safe to eta-expand then we
+must pessimisticaly conclude that we can't eta-expand. See #21694 for where this
+went wrong.
+We can do better in the long run, but for the 9.4/9.2 branches we choose to simply
+ignore oneshot annotations for the time being.
+
 
 Note [Arity trimming]
 ~~~~~~~~~~~~~~~~~~~~~
