@@ -57,7 +57,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Outputable (ppr, renderWithContext, defaultSDocContext)
-import qualified GHC.Utils.Monad.State.Strict as State
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified GHC.Data.ShortText as ST
 import qualified GHC.Data.List.SetOps as ListSetOps
 

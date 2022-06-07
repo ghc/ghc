@@ -658,12 +658,12 @@ extractDeps ar_state units deps loc =
       let selector n _  = n `IS.member` modUnits || isGlobalUnit n
       x <- case loc of
         ObjectFile o  -> collectCode =<< readObjectFileKeys selector o
-        ArchiveFile a -> collectCode
-                        . readObjectKeys (a ++ ':':moduleNameString (moduleName mod)) selector
+        ArchiveFile a -> (collectCode
+                        <=< readObjectKeys (a ++ ':':moduleNameString (moduleName mod)) selector)
                         =<< readArObject ar_state mod a
                             --  error ("Ar.readObject: " ++ a ++ ':' : T.unpack mod))
                             -- Ar.readObject (mkModuleName $ T.unpack mod) a)
-        InMemory n b  -> collectCode $ readObjectKeys n selector b
+        InMemory n b  -> collectCode =<< readObjectKeys n selector b
       -- evaluate (rnf x) -- See FIXME Re: NFData instance on Safety and
                           -- ForeignJSRefs below
       return x
@@ -963,15 +963,15 @@ loadArchiveDeps' :: [FilePath]
 loadArchiveDeps' archives = do
   archDeps <- forM archives $ \file -> do
     (Ar.Archive entries) <- Ar.loadAr file
-    pure (mapMaybe (readEntry file) entries)
+    catMaybes <$> mapM (readEntry file) entries
   return (prepareLoadedDeps $ concat archDeps)
     where
-      readEntry :: FilePath -> Ar.ArchiveEntry -> Maybe (Deps, DepsLocation)
+      readEntry :: FilePath -> Ar.ArchiveEntry -> IO (Maybe (Deps, DepsLocation))
       readEntry ar_file ar_entry
         | isObjFile (Ar.filename ar_entry) =
-            fmap (,ArchiveFile ar_file)
+            fmap (,ArchiveFile ar_file) <$>
                  (readDepsMaybe (ar_file ++ ':':Ar.filename ar_entry) (BL.fromStrict $ Ar.filedata ar_entry))
-        | otherwise = Nothing
+        | otherwise = return Nothing
 
 
 isObjFile :: FilePath -> Bool
@@ -993,7 +993,7 @@ requiredUnits d = map (depsModule d,) (IS.toList $ depsRequired d)
 -- read dependencies from an object that might have already been into memory
 -- pulls in all Deps from an archive
 readDepsFile' :: LinkedObj -> IO (Deps, DepsLocation)
-readDepsFile' (ObjLoaded name bs) = pure . (,InMemory name bs) $
+readDepsFile' (ObjLoaded name bs) = (,InMemory name bs) <$>
                                     readDeps name bs
 readDepsFile' (ObjFile file)      =
   (,ObjectFile file) <$> readDepsFile file

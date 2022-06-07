@@ -105,7 +105,7 @@ import GHC.Types.ForeignCall
 import GHC.Utils.Encoding (zEncodeString)
 import GHC.Utils.Outputable hiding ((<>))
 import GHC.Utils.Misc
-import qualified GHC.Utils.Monad.State.Strict as State
+import qualified Control.Monad.Trans.State.Strict as State
 import GHC.Data.FastString
 
 import qualified Data.Map  as M
@@ -118,8 +118,8 @@ import Data.Array
 import Data.Monoid
 import Control.Monad
 
-runG :: StgToJSConfig -> Module -> UniqFM Id CgStgExpr -> G a -> a
-runG config m unfloat action = State.evalState action (initState config m unfloat)
+runG :: StgToJSConfig -> Module -> UniqFM Id CgStgExpr -> G a -> IO a
+runG config m unfloat action = State.evalStateT action (initState config m unfloat)
 
 initState :: StgToJSConfig -> Module -> UniqFM Id CgStgExpr -> GenState
 initState config m unfloat = GenState

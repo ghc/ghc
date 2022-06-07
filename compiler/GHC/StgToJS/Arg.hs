@@ -36,7 +36,7 @@ import GHC.Types.Id
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import qualified GHC.Utils.Monad.State.Strict as State
+import qualified Control.Monad.Trans.State.Strict as State
 
 genStaticArg :: HasDebugCallStack => StgArg -> G [StaticArg]
 genStaticArg a = case a of

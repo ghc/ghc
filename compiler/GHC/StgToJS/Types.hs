@@ -18,7 +18,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Types.ForeignCall
 
-import GHC.Utils.Monad.State.Strict
+import Control.Monad.Trans.State.Strict
 import GHC.Utils.Outputable (Outputable (..), text, SDocContext, (<+>), ($$))
 
 import GHC.Data.ShortText
@@ -33,7 +33,7 @@ import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
 import           Control.DeepSeq
 
-type G = State GenState
+type G = StateT GenState IO
 
 data GenState = GenState
   { gsSettings  :: StgToJSConfig          -- ^ codegen settings, read-only
