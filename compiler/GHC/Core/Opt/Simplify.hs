@@ -256,9 +256,11 @@ simplRecBind :: SimplEnv -> BindContext
              -> [(InId, InExpr)]
              -> SimplM (SimplFloats, SimplEnv)
 simplRecBind env0 bind_cxt pairs0
-  = do  { (env_with_info, triples) <- mapAccumLM add_rules env0 pairs0
-        ; (rec_floats, env1) <- go env_with_info triples
-        ; return (mkRecFloats rec_floats, env1) }
+  = do  { (env1, triples) <- mapAccumLM add_rules env0 pairs0
+        ; let new_bndrs = map sndOf3 triples
+        ; (rec_floats, env2) <- enterRecGroupRHSs env1 new_bndrs $ \env ->
+            go env triples
+        ; return (mkRecFloats rec_floats, env2) }
   where
     add_rules :: SimplEnv -> (InBndr,InExpr) -> SimplM (SimplEnv, (InBndr, OutBndr, InExpr))
         -- Add the (substituted) rules to the binder

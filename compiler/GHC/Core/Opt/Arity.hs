@@ -35,11 +35,11 @@ import GHC.Driver.Session ( DynFlags, GeneralFlag(..), gopt )
 
 import GHC.Core
 import GHC.Core.FVs
-import GHC.Core.Utils
+import GHC.Core.Utils hiding (canEtaReduceToArity)
 import GHC.Core.DataCon
 import GHC.Core.TyCon     ( tyConArity )
 import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
-import GHC.Core.Predicate ( isDictTy, isCallStackPredTy )
+import GHC.Core.Predicate ( isDictTy, isCallStackPredTy, isEvVar )
 import GHC.Core.Multiplicity
 
 -- We have two sorts of substitution:
@@ -59,6 +59,7 @@ import GHC.Types.Tickish
 
 import GHC.Builtin.Uniques
 import GHC.Data.FastString
+import GHC.Data.Graph.UnVar
 import GHC.Data.Pair
 
 import GHC.Utils.Constants (debugIsOn)
@@ -1618,6 +1619,482 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
         -- playing fast and loose with types (Happy does this a lot).
         -- So we simply decline to eta-expand.  Otherwise we'd end up
         -- with an explicit lambda having a non-function type
+
+
+{-
+************************************************************************
+*                                                                      *
+                Eta reduction
+*                                                                      *
+************************************************************************
+
+Note [Eta reduction makes sense]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC's eta reduction transforms
+   \x y. <fun> x y  --->  <fun>
+We discuss when this is /sound/ in Note [Eta reduction soundness].
+But even assuming it is sound, when is it /desirable/.  That
+is what we discuss here.
+
+This test is made by `ok_fun` in tryEtaReduce.
+
+1. We want to eta-reduce only if we get all the way to a trivial
+   expression; we don't want to remove extra lambdas unless we are
+   going to avoid allocating this thing altogether.
+
+   Trivial means *including* casts and type lambdas:
+     * `\x. f x |> co  -->  f |> (ty(x) -> co)` (provided `co` doesn't mention `x`)
+     * `/\a. \x. f @(Maybe a) x -->  /\a. f @(Maybe a)`
+   See Note [Do not eta reduce PAPs] for why we insist on a trivial head.
+
+2. Type and dictionary abstraction. Regardless of whether 'f' is a value, it
+   is always sound to reduce /type lambdas/, thus:
+        (/\a -> f a)  -->   f
+   Moreover, we always want to, because it makes RULEs apply more often:
+      This RULE:    `forall g. foldr (build (/\a -> g a))`
+      should match  `foldr (build (/\b -> ...something complex...))`
+   and the simplest way to do so is eta-reduce `/\a -> g a` in the RULE to `g`.
+
+   The type checker can insert these eta-expanded versions,
+   with both type and dictionary lambdas; hence the slightly
+   ad-hoc (all ok_lam bndrs)
+
+Of course, eta reduction is not always sound. See Note [Eta reduction soundness]
+for when it is.
+
+When there are multiple arguments, we might get multiple eta-redexes. Example:
+   \x y. e x y
+   ==> { reduce \y. (e x) y in context \x._ }
+   \x. e x
+   ==> { reduce \x. e x in context _ }
+   e
+And (1) implies that we never want to stop with `\x. e x`, because that is not a
+trivial expression. So in practice, the implementation works by considering a
+whole group of leading lambdas to reduce.
+
+These delicacies are why we don't simply use 'exprIsTrivial' and 'exprIsHNF'
+in 'tryEtaReduce'. Alas.
+
+Note [Eta reduction soundness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC's eta reduction transforms
+   \x y. <fun> x y  --->  <fun>
+For soundness, we obviously require that `x` and `y`
+to not occur free. But what /other/ restrictions are there for
+eta reduction to be sound?
+
+We discuss separately what it means for eta reduction to be
+/desirable/, in Note [Eta reduction makes sense].
+
+Eta reduction is *not* a sound transformation in general, because it
+may change termination behavior if *value* lambdas are involved:
+  `bot`  /=  `\x. bot x`   (as can be observed by a simple `seq`)
+The past has shown that oversight of this fact can not only lead to endless
+loops or exceptions, but also straight out *segfaults*.
+
+Nevertheless, we can give the following criteria for when it is sound to
+perform eta reduction on an expression with n leading lambdas `\xs. e xs`
+(checked in 'is_eta_reduction_sound' in 'tryEtaReduce', which focuses on the
+case where `e` is trivial):
+
+ A. It is sound to eta-reduce n arguments as long as n does not exceed the
+    `exprArity` of `e`. (Needs Arity analysis.)
+    This criterion exploits information about how `e` is *defined*.
+
+    Example: If `e = \x. bot` then we know it won't diverge until it is called
+    with one argument. Hence it is safe to eta-reduce `\x. e x` to `e`.
+    By contrast, it would be *unsound* to eta-reduce 2 args, `\x y. e x y` to `e`:
+    `e 42` diverges when `(\x y. e x y) 42` does not.
+
+ S. It is sound to eta-reduce n arguments in an evaluation context in which all
+    calls happen with at least n arguments. (Needs Strictness analysis.)
+    NB: This treats evaluations like a call with 0 args.
+    NB: This criterion exploits information about how `e` is *used*.
+
+    Example: Given a function `g` like
+      `g c = Just (c 1 2 + c 2 3)`
+    it is safe to eta-reduce the arg in `g (\x y. e x y)` to `g e` without
+    knowing *anything* about `e` (perhaps it's a parameter occ itself), simply
+    because `g` always calls its parameter with 2 arguments.
+    It is also safe to eta-reduce just one arg, e.g., `g (\x. e x)` to `g e`.
+    By contrast, it would *unsound* to eta-reduce 3 args in a call site
+    like `g (\x y z. e x y z)` to `g e`, because that diverges when
+    `e = \x y. bot`.
+
+    Could we relax to "*At least one call in the same trace* is with n args"?
+    (NB: Strictness analysis can only answer this relaxed question, not the
+     original formulation.)
+    Consider what happens for
+      ``g2 c = c True `seq` c False 42``
+    Here, `g2` will call `c` with 2 arguments (if there is a call at all).
+    But it is unsound to eta-reduce the arg in `g2 (\x y. e x y)` to `g2 e`
+    when `e = \x. if x then bot else id`, because the latter will diverge when
+    the former would not.
+
+    On the other hand, with `-fno-pendantic-bottoms` , we will have eta-expanded
+    the definition of `e` and then eta-reduction is sound
+    (see Note [Dealing with bottom]).
+    Consequence: We have to check that `-fpedantic-bottoms` is off; otherwise
+    eta-reduction based on demands is in fact unsound.
+
+    See Note [Eta reduction based on evaluation context] for the implementation
+    details. This criterion is tested extensively in T21261.
+
+ R. Note [Eta reduction in recursive RHSs] tells us that we should not
+    eta-reduce `f` in its own RHS and describes our fix.
+    There we have `f = \x. f x` and we should not eta-reduce to `f=f`. Which
+    might change a terminating program (think @f `seq` e@) to a non-terminating
+    one.
+
+ E. (See fun_arity in tryEtaReduce.) As a perhaps special case on the
+    boundary of (A) and (S), when we know that a fun binder `f` is in
+    WHNF, we simply assume it has arity 1 and apply (A).  Example:
+       g f = f `seq` \x. f x
+    Here it's sound eta-reduce `\x. f x` to `f`, because `f` can't be bottom
+    after the `seq`. This turned up in #7542.
+
+And here are a few more technical criteria for when it is *not* sound to
+eta-reduce that are specific to Core and GHC:
+
+ L. With linear types, eta-reduction can break type-checking:
+      f :: A ⊸ B
+      g :: A -> B
+      g = \x. f x
+    The above is correct, but eta-reducing g would yield g=f, the linter will
+    complain that g and f don't have the same type. NB: Not unsound in the
+    dynamic semantics, but unsound according to the static semantics of Core.
+
+ J. We may not undersaturate join points.
+    See Note [Invariants on join points] in GHC.Core, and #20599.
+
+ B. We may not undersaturate functions with no binding.
+    See Note [Eta expanding primops].
+
+ W. We may not undersaturate StrictWorkerIds.
+    See Note [Strict Worker Ids] in GHC.CoreToStg.Prep.
+
+Here is a list of historic accidents surrounding unsound eta-reduction:
+
+* Consider
+        f = \x.f x
+        h y = case (case y of { True -> f `seq` True; False -> False }) of
+                True -> ...; False -> ...
+  If we (unsoundly) eta-reduce f to get f=f, the strictness analyser
+  says f=bottom, and replaces the (f `seq` True) with just
+  (f `cast` unsafe-co).
+  [SG in 2022: I don't think worker/wrapper would do this today.]
+  BUT, as things stand, 'f' got arity 1, and it *keeps* arity 1 (perhaps also
+  wrongly). So CorePrep eta-expands the definition again, so that it does not
+  terminate after all.
+  Result: seg-fault because the boolean case actually gets a function value.
+  See #1947.
+
+* Never *reduce* arity. For example
+      f = \xy. g x y
+  Then if h has arity 1 we don't want to eta-reduce because then
+  f's arity would decrease, and that is bad
+  [SG in 2022: I don't understand this point. There is no `h`, perhaps that
+   should have been `g`. Even then, this proposed eta-reduction is invalid by
+   criterion (A), which might actually be the point this anecdote is trying to
+   make. Perhaps the "no arity decrease" idea is also related to
+   Note [Arity robustness]?]
+
+Note [Do not eta reduce PAPs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+I considered eta-reducing if the result is a PAP:
+   \x. f e1 e2 x  ==>   f e1 e2
+
+This reduces clutter, sometimes a lot. See Note [Do not eta-expand PAPs]
+in GHC.Core.Opt.Simplify.Utils, where we are careful not to eta-expand
+a PAP.  If eta-expanding is bad, then eta-reducing is good!
+
+Also the code generator likes eta-reduced PAPs; see GHC.CoreToStg.Prep
+Note [No eta reduction needed in rhsToBody].
+
+But note that we don't want to eta-reduce
+     \x y.  f <expensive> x y
+to
+     f <expensive>
+The former has arity 2, and repeats <expensive> for every call of the
+function; the latter has arity 0, and shares <expensive>.  We don't want
+to change behaviour.  Hence the call to exprIsCheap in ok_fun.
+
+I noticed this when examining #18993 and, although it is delicate,
+eta-reducing to a PAP happens to fix the regression in #18993.
+
+HOWEVER, if we transform
+   \x. f y x   ==>   f y
+that might mean that f isn't saturated any more, and does not inline.
+This led to some other regressions.
+
+TL;DR currrently we do /not/ eta reduce if the result is a PAP.
+
+Note [Eta reduction with casted arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    (\(x:t3). f (x |> g)) :: t3 -> t2
+  where
+    f :: t1 -> t2
+    g :: t3 ~ t1
+This should be eta-reduced to
+
+    f |> (sym g -> t2)
+
+So we need to accumulate a coercion, pushing it inward (past
+variable arguments only) thus:
+   f (x |> co_arg) |> co  -->  (f |> (sym co_arg -> co)) x
+   f (x:t)         |> co  -->  (f |> (t -> co)) x
+   f @ a           |> co  -->  (f |> (forall a.co)) @ a
+   f @ (g:t1~t2)   |> co  -->  (f |> (t1~t2 => co)) @ (g:t1~t2)
+These are the equations for ok_arg.
+
+Note [Eta reduction with casted function]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Since we are pushing a coercion inwards, it is easy to accommodate
+    (\xy. (f x |> g) y)
+    (\xy. (f x y) |> g)
+
+See the `(Cast e co)` equation for `go` in `tryEtaReduce`.  The
+eta-expander pushes those casts outwards, so you might think we won't
+ever see a cast here, but if we have
+  \xy. (f x y |> g)
+we will call tryEtaReduce [x,y] (f x y |> g), and we'd like that to
+work.  This happens in GHC.Core.Opt.Simplify.Utils.mkLam, where
+eta-expansion may be turned off (by sm_eta_expand).
+
+Note [Eta reduction based on evaluation context]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Eta reduction soundness], criterion (S) allows us to eta-reduce
+`g (\x y. e x y)` to `g e` when we know that `g` always calls its parameter with
+at least 2 arguments. So how do we read that off `g`'s demand signature?
+
+Let's take the simple example of #21261, where `g` (actually, `f`) is defined as
+  g c = c 1 2 + c 3 4
+Then this is how the pieces are put together:
+
+  * Demand analysis infers `<SCS(C1(L))>` for `g`'s demand signature
+
+  * When the Simplifier next simplifies the argument in `g (\x y. e x y)`, it
+    looks up the *evaluation context* of the argument in the form of the
+    sub-demand `CS(C1(L))` and stores it in the 'SimplCont'.
+    (Why does it drop the outer evaluation cardinality of the demand, `S`?
+    Because it's irrelevant! When we simplify an expression, we do so under the
+    assumption that it is currently under evaluation.)
+    This sub-demand literally says "Whenever this expression is evaluated, it
+    is also called with two arguments, potentially multiple times".
+
+  * Then the simplifier takes apart the lambda and simplifies the lambda group
+    and then calls 'tryEtaReduce' when rebuilding the lambda, passing the
+    evaluation context `CS(C1(L))` along. Then we simply peel off 2 call
+    sub-demands `Cn` and see whether all of the n's (here: `S=C_1N` and
+    `1=C_11`) were strict. And strict they are! Thus, it will eta-reduce
+    `\x y. e x y` to `e`.
+
+Note [Eta reduction in recursive RHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following recursive function:
+  f = \x. ....g (\y. f y)....
+The recursive call of f in its own RHS seems like a fine opportunity for
+eta-reduction because f has arity 1. And often it is!
+
+Alas, that is unsound in general if the eta-reduction happens in a tail context.
+Making the arity visible in the RHS allows us to eta-reduce
+  f = \x -> f x
+to
+  f = f
+which means we optimise terminating programs like (f `seq` ()) into
+non-terminating ones. Nor is this problem just for tail calls.  Consider
+  f = id (\x -> f x)
+where we have (for some reason) not yet inlined `id`.  We must not eta-reduce to
+  f = id f
+because that will then simplify to `f = f` as before.
+
+An immediate idea might be to look at whether the called function is a local
+loopbreaker and refrain from eta-expanding. But that doesn't work for mutually
+recursive function like in #21652:
+  f = g
+  g* x = f x
+Here, g* is the loopbreaker but f isn't.
+
+What can we do?
+
+Fix 1: Zap `idArity` when analysing recursive RHSs and re-attach the info when
+    entering the let body.
+    Has the disadvantage that other transformations which make use of arity
+    (such as dropping of `seq`s when arity > 0) will no longer work in the RHS.
+    Plus it requires non-trivial refactorings to both the simple optimiser (in
+    the way `subst_opt_bndr` is used) as well as the Simplifier (in the way
+    `simplRecBndrs` and `simplRecJoinBndrs` is used), modifying the SimplEnv's
+    substitution twice in the process. A very complicated stop-gap.
+
+Fix 2: Pass the set of enclosing recursive binders to `tryEtaReduce`; these are
+    the ones we should not eta-reduce. All call-site must maintain this set.
+    Example:
+      rec { f1 = ....rec { g = ... (\x. g x)...(\y. f2 y)... }...
+          ; f2 = ...f1... }
+    when eta-reducing those inner lambdas, we need to know that we are in the
+    rec group for {f1, f2, g}.
+    This is very much like the solution in Note [Speculative evaluation] in
+    GHC.CoreToStg.Prep.
+    It is a bit tiresome to maintain this info, because it means another field
+    in SimplEnv and SimpleOptEnv.
+
+We implement Fix (2) because of it isn't as complicated to maintain as (1).
+Plus, it is the correct fix to begin with. After all, the arity is correct,
+but doing the transformation isn't. The moving parts are:
+  * A field `scRecIds` in `SimplEnv` tracks the enclosing recursive binders
+  * We extend the `scRecIds` set in `GHC.Core.Opt.Simplify.simplRecBind`
+  * We consult the set in `is_eta_reduction_sound` in `tryEtaReduce`
+The situation is very similar to Note [Speculative evaluation] which has the
+same fix.
+-}
+
+-- | `tryEtaReduce [x,y,z] e sd` returns `Just e'` if `\x y z -> e` is evaluated
+-- according to `sd` and can soundly and gainfully be eta-reduced to `e'`.
+-- See Note [Eta reduction soundness]
+-- and Note [Eta reduction makes sense] when that is the case.
+tryEtaReduce :: UnVarSet -> [Var] -> CoreExpr -> SubDemand -> Maybe CoreExpr
+-- Return an expression equal to (\bndrs. body)
+tryEtaReduce rec_ids bndrs body eval_sd
+  = go (reverse bndrs) body (mkRepReflCo (exprType body))
+  where
+    incoming_arity = count isId bndrs -- See Note [Eta reduction makes sense], point (2)
+
+    go :: [Var]            -- Binders, innermost first, types [a3,a2,a1]
+       -> CoreExpr         -- Of type tr
+       -> Coercion         -- Of type tr ~ ts
+       -> Maybe CoreExpr   -- Of type a1 -> a2 -> a3 -> ts
+    -- See Note [Eta reduction with casted arguments]
+    -- for why we have an accumulating coercion
+    --
+    -- Invariant: (go bs body co) returns an expression
+    --            equivalent to (\(reverse bs). body |> co)
+
+    -- See Note [Eta reduction with casted function]
+    go bs (Cast e co1) co2
+      = go bs e (co1 `mkTransCo` co2)
+
+    go bs (Tick t e) co
+      | tickishFloatable t
+      = fmap (Tick t) $ go bs e co
+      -- Float app ticks: \x -> Tick t (e x) ==> Tick t e
+
+    go (b : bs) (App fun arg) co
+      | Just (co', ticks) <- ok_arg b arg co (exprType fun)
+      = fmap (flip (foldr mkTick) ticks) $ go bs fun co'
+            -- Float arg ticks: \x -> e (Tick t x) ==> Tick t e
+
+    go remaining_bndrs fun co
+      | all isTyVar remaining_bndrs
+            -- If all the remaining_bnrs are tyvars, then the etad_exp
+            --    will be trivial, which is what we want.
+            -- e.g. We might have  /\a \b. f [a] b, and we want to
+            --      eta-reduce to  /\a. f [a]
+            -- We don't want to give up on this one: see #20040
+            -- See Note [Eta reduction makes sense], point (1)
+      , remaining_bndrs `ltLength` bndrs
+            -- Only reply Just if /something/ has happened
+      , ok_fun fun
+      , let etad_expr = mkLams (reverse remaining_bndrs) (mkCast fun co)
+            used_vars = exprFreeVars etad_expr
+            reduced_bndrs = mkVarSet (dropList remaining_bndrs bndrs)
+      , used_vars `disjointVarSet` reduced_bndrs
+          -- Check for any of the binders free in the result,
+          -- including the accumulated coercion
+          -- See Note [Eta reduction makes sense], intro and point (1)
+      = Just etad_expr
+
+    go _remaining_bndrs _fun  _  = -- pprTrace "tER fail" (ppr _fun $$ ppr _remaining_bndrs) $
+                                   Nothing
+
+    ---------------
+    -- See Note [Eta reduction makes sense], point (1)
+    ok_fun (App fun (Type {})) = ok_fun fun
+    ok_fun (Cast fun _)        = ok_fun fun
+    ok_fun (Tick _ expr)       = ok_fun expr
+    ok_fun (Var fun_id)        = is_eta_reduction_sound fun_id || all ok_lam bndrs
+    ok_fun _fun                = False
+
+    ---------------
+    -- See Note [Eta reduction soundness], this is THE place to check soundness!
+    is_eta_reduction_sound fun =
+      -- Don't eta-reduce in fun in its own recursive RHSs
+      not (fun `elemUnVarSet` rec_ids)               -- criterion (R)
+      -- Check that eta-reduction won't make the program stricter...
+      && (fun_arity fun >= incoming_arity            -- criterion (A) and (E)
+           || all_calls_with_arity incoming_arity)   -- criterion (S)
+      -- ... and that the function can be eta reduced to arity 0
+      -- without violating invariants of Core and GHC
+      && canEtaReduceToArity fun 0 0              -- criteria (L), (J), (W), (B)
+    all_calls_with_arity n = isStrict (peelManyCalls n eval_sd)
+       -- See Note [Eta reduction based on evaluation context]
+
+    ---------------
+    fun_arity fun
+       | arity > 0                           = arity
+       | isEvaldUnfolding (idUnfolding fun)  = 1
+           -- See Note [Eta reduction soundness], criterion (E)
+       | otherwise                           = 0
+       where
+         arity = idArity fun
+
+    ---------------
+    ok_lam v = isTyVar v || isEvVar v
+    -- See Note [Eta reduction makes sense], point (2)
+
+    ---------------
+    ok_arg :: Var              -- Of type bndr_t
+           -> CoreExpr         -- Of type arg_t
+           -> Coercion         -- Of kind (t1~t2)
+           -> Type             -- Type (arg_t -> t1) of the function
+                               --      to which the argument is supplied
+           -> Maybe (Coercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
+                               --   (and similarly for tyvars, coercion args)
+                    , [CoreTickish])
+    -- See Note [Eta reduction with casted arguments]
+    ok_arg bndr (Type ty) co _
+       | Just tv <- getTyVar_maybe ty
+       , bndr == tv  = Just (mkHomoForAllCos [tv] co, [])
+    ok_arg bndr (Var v) co fun_ty
+       | bndr == v
+       , let mult = idMult bndr
+       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
+       = Just (mkFunResCo Representational (idScaledType bndr) co, [])
+    ok_arg bndr (Cast e co_arg) co fun_ty
+       | (ticks, Var v) <- stripTicksTop tickishFloatable e
+       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , bndr == v
+       , fun_mult `eqType` idMult bndr
+       = Just (mkFunCo Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
+       -- The simplifier combines multiple casts into one,
+       -- so we can have a simple-minded pattern match here
+    ok_arg bndr (Tick t arg) co fun_ty
+       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty
+       = Just (co', t:ticks)
+
+    ok_arg _ _ _ _ = Nothing
+
+-- | Can we eta-reduce the given function to the specified arity?
+-- See Note [Eta reduction soundness], criteria (B), (J), (W) and (L).
+canEtaReduceToArity :: Id -> JoinArity -> Arity -> Bool
+canEtaReduceToArity fun dest_join_arity dest_arity =
+  not $
+        hasNoBinding fun -- (B)
+       -- Don't undersaturate functions with no binding.
+
+    ||  ( isJoinId fun && dest_join_arity < idJoinArity fun ) -- (J)
+       -- Don't undersaturate join points.
+       -- See Note [Invariants on join points] in GHC.Core, and #20599
+
+    || ( dest_arity < idCbvMarkArity fun ) -- (W)
+       -- Don't undersaturate StrictWorkerIds.
+       -- See Note [Strict Worker Ids] in GHC.CoreToStg.Prep.
+
+    ||  isLinearType (idType fun) -- (L)
+       -- Don't perform eta reduction on linear types.
+       -- If `f :: A %1-> B` and `g :: A -> B`,
+       -- then `g x = f x` is OK but `g = f` is not.
 
 
 {- *********************************************************************
