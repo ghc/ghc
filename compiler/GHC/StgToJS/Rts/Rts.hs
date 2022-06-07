@@ -135,7 +135,7 @@ closureConstructors s = BlockStat
   , declClsConstr "h$c2" ["f", "x1", "x2"] $ Closure
       { clEntry  = var "f"
       , clField1 = var "x1"
-      , clField2 = var "v2"
+      , clField2 = var "x2"
       , clMeta   = 0
       , clCC     = ccVal
       }
