@@ -1610,6 +1610,7 @@ mkLam env bndrs body cont
        ; mkLam' dflags bndrs body }
   where
     mode = getMode env
+    rec_ids  = seRecIds env
 
     mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
     mkLam' dflags bndrs body@(Lam {})
@@ -1633,7 +1634,7 @@ mkLam env bndrs body cont
 
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
-      , Just etad_lam <- {-# SCC "tryee" #-} tryEtaReduce bndrs body
+      , Just etad_lam <- {-# SCC "tryee" #-} tryEtaReduce rec_ids bndrs body
       = do { tick (EtaReduction (head bndrs))
            ; return etad_lam }
 

@@ -2429,8 +2429,8 @@ need to address that here.
 
 -- When updating this function, make sure to update
 -- CorePrep.tryEtaReducePrep as well!
-tryEtaReduce :: [Var] -> CoreExpr -> Maybe CoreExpr
-tryEtaReduce bndrs body
+tryEtaReduce :: UnVarSet -> [Var] -> CoreExpr -> Maybe CoreExpr
+tryEtaReduce rec_ids bndrs body
   = go (reverse bndrs) body (mkRepReflCo (exprType body))
   where
     incoming_arity = count isId bndrs
@@ -2469,14 +2469,15 @@ tryEtaReduce bndrs body
     ok_fun _fun                = False
 
     ---------------
-    ok_fun_id fun = -- There are arguments to reduce...
-                    fun_arity fun >= incoming_arity &&
-                    -- ... and the function can be eta reduced to arity 0
-                    canEtaReduceToArity fun 0 0
+    ok_fun_id fun =
+      -- Don't eta-reduce in fun in its own recursive RHSs
+      not (fun `elemUnVarSet` rec_ids) &&            -- criterion (R)
+      -- There are arguments to reduce...
+      fun_arity fun >= incoming_arity &&
+      -- ... and the function can be eta reduced to arity 0
+      canEtaReduceToArity fun 0 0
     ---------------
     fun_arity fun             -- See Note [Arity care]
-       | isLocalId fun
-       , isStrongLoopBreaker (idOccInfo fun) = 0
        | arity > 0                           = arity
        | isEvaldUnfolding (idUnfolding fun)  = 1
             -- See Note [Eta reduction of an eval'd function]

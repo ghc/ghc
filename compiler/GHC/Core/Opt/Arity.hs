@@ -505,6 +505,67 @@ Suppose f = \xy. x+y
 Then  f             :: \??.T
       f v           :: \?.T
       f <expensive> :: T
+
+
+
+Note [Eta reduction in recursive RHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following recursive function:
+  f = \x. ....g (\y. f y)....
+The recursive call of f in its own RHS seems like a fine opportunity for
+eta-reduction because f has arity 1. And often it is!
+
+Alas, that is unsound in general if the eta-reduction happens in a tail context.
+Making the arity visible in the RHS allows us to eta-reduce
+  f = \x -> f x
+to
+  f = f
+which means we optimise terminating programs like (f `seq` ()) into
+non-terminating ones. Nor is this problem just for tail calls.  Consider
+  f = id (\x -> f x)
+where we have (for some reason) not yet inlined `id`.  We must not eta-reduce to
+  f = id f
+because that will then simplify to `f = f` as before.
+
+An immediate idea might be to look at whether the called function is a local
+loopbreaker and refrain from eta-expanding. But that doesn't work for mutually
+recursive function like in #21652:
+  f = g
+  g* x = f x
+Here, g* is the loopbreaker but f isn't.
+
+What can we do?
+
+Fix 1: Zap `idArity` when analysing recursive RHSs and re-attach the info when
+    entering the let body.
+    Has the disadvantage that other transformations which make use of arity
+    (such as dropping of `seq`s when arity > 0) will no longer work in the RHS.
+    Plus it requires non-trivial refactorings to both the simple optimiser (in
+    the way `subst_opt_bndr` is used) as well as the Simplifier (in the way
+    `simplRecBndrs` and `simplRecJoinBndrs` is used), modifying the SimplEnv's
+    substitution twice in the process. A very complicated stop-gap.
+
+Fix 2: Pass the set of enclosing recursive binders to `tryEtaReduce`; these are
+    the ones we should not eta-reduce. All call-site must maintain this set.
+    Example:
+      rec { f1 = ....rec { g = ... (\x. g x)...(\y. f2 y)... }...
+          ; f2 = ...f1... }
+    when eta-reducing those inner lambdas, we need to know that we are in the
+    rec group for {f1, f2, g}.
+    This is very much like the solution in Note [Speculative evaluation] in
+    GHC.CoreToStg.Prep.
+    It is a bit tiresome to maintain this info, because it means another field
+    in SimplEnv and SimpleOptEnv.
+
+We implement Fix (2) because of it isn't as complicated to maintain as (1).
+Plus, it is the correct fix to begin with. After all, the arity is correct,
+but doing the transformation isn't. The moving parts are:
+  * A field `scRecIds` in `SimplEnv` tracks the enclosing recursive binders
+  * We extend the `scRecIds` set in `GHC.Core.Opt.Simplify.simplRecBind`
+  * We consult the set in `is_eta_reduction_sound` in `tryEtaReduce`
+The situation is very similar to Note [Speculative evaluation] which has the
+same fix.
+
 -}
 
 

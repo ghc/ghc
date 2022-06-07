@@ -17,7 +17,7 @@ module GHC.Core.Opt.Simplify.Env (
         zapSubstEnv, setSubstEnv, bumpCaseDepth,
         getInScope, setInScopeFromE, setInScopeFromF,
         setInScopeSet, modifyInScope, addNewInScopeIds,
-        getSimplRules,
+        getSimplRules, enterRecGroupRHSs,
 
         -- * Substitution results
         SimplSR(..), mkContEx, substId, lookupRecBndr, refineFromInScope,
@@ -55,6 +55,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Data.OrdList
+import GHC.Data.Graph.UnVar
 import GHC.Types.Id as Id
 import GHC.Core.Make            ( mkWildValBinder )
 import GHC.Driver.Session       ( DynFlags )
@@ -95,6 +96,10 @@ data SimplEnv
       , seTvSubst   :: TvSubstEnv      -- InTyVar |--> OutType
       , seCvSubst   :: CvSubstEnv      -- InCoVar |--> OutCoercion
       , seIdSubst   :: SimplIdSubst    -- InId    |--> OutExpr
+
+        -- | Fast OutVarSet tracking which recursive RHSs we are analysing.
+        -- See Note [Eta reduction in recursive RHSs] in GHC.Core.Opt.Arity.
+      , seRecIds :: !UnVarSet
 
      ----------- Dynamic part of the environment -----------
      -- Dynamic in the sense of describing the setup where
@@ -286,6 +291,7 @@ mkSimplEnv mode
              , seTvSubst   = emptyVarEnv
              , seCvSubst   = emptyVarEnv
              , seIdSubst   = emptyVarEnv
+             , seRecIds    = emptyUnVarSet
              , seCaseDepth = 0 }
         -- The top level "enclosing CC" is "SUBSUMED".
 
@@ -390,6 +396,13 @@ modifyInScope :: SimplEnv -> CoreBndr -> SimplEnv
 -- which has more information
 modifyInScope env@(SimplEnv {seInScope = in_scope}) v
   = env {seInScope = extendInScopeSet in_scope v}
+
+enterRecGroupRHSs :: SimplEnv -> [OutBndr] -> (SimplEnv -> SimplM (r, SimplEnv))
+                  -> SimplM (r, SimplEnv)
+enterRecGroupRHSs env bndrs k = do
+  --pprTraceM "enterRecGroupRHSs" (ppr bndrs)
+  (r, env'') <- k env{seRecIds = extendUnVarSetList bndrs (seRecIds env)}
+  return (r, env''{seRecIds = seRecIds env})
 
 {- Note [Setting the right in-scope set]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -886,31 +899,18 @@ seqIds (id:ids) = seqId id `seq` seqIds ids
 Note [Arity robustness]
 ~~~~~~~~~~~~~~~~~~~~~~~
 We *do* transfer the arity from the in_id of a let binding to the
-out_id.  This is important, so that the arity of an Id is visible in
-its own RHS.  For example:
-        f = \x. ....g (\y. f y)....
-We can eta-reduce the arg to g, because f is a value.  But that
-needs to be visible.
+out_id so that its arity is visible in its RHS. Examples:
 
-This interacts with the 'state hack' too:
-        f :: Bool -> IO Int
-        f = \x. case x of
-                  True  -> f y
-                  False -> \s -> ...
-Can we eta-expand f?  Only if we see that f has arity 1, and then we
-take advantage of the 'state hack' on the result of
-(f y) :: State# -> (State#, Int) to expand the arity one more.
-
-There is a disadvantage though.  Making the arity visible in the RHS
-allows us to eta-reduce
-        f = \x -> f x
-to
-        f = f
-which technically is not sound.   This is very much a corner case, so
-I'm not worried about it.  Another idea is to ensure that f's arity
-never decreases; its arity started as 1, and we should never eta-reduce
-below that.
-
+  * f = \x y. let g = \p q. f (p+q) in Just (...g..g...)
+    Here we want to give `g` arity 3 and eta-expand. `findRhsArity` will have a
+    hard time figuring that out when `f` only has arity 0 in its own RHS.
+  * f = \x y. ....(f `seq` blah)....
+    We want to drop the seq.
+  * f = \x. g (\y. f y)
+    You'd think we could eta-reduce `\y. f y` to `f` here. And indeed, that is true.
+    Unfortunately, it is not sound in general to eta-reduce in f's RHS.
+    Example: `f = \x. f x`. See Note [Eta reduction in recursive RHSs] for how
+    we prevent that.
 
 Note [Robust OccInfo]
 ~~~~~~~~~~~~~~~~~~~~~

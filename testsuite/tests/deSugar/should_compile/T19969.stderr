@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 12, types: 18, coercions: 0, joins: 0/0}
+  = {terms: 8, types: 14, coercions: 0, joins: 0/0}
 
 Rec {
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
@@ -10,7 +10,7 @@ f [Occ=LoopBreaker] :: [Int] -> [Int]
 f = \ (x :: [Int]) -> f x
 end Rec }
 
--- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 g [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
 [GblId,
  Arity=1,
@@ -19,10 +19,10 @@ g [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=True)
-         Tmpl= \ (x [Occ=Once1] :: [Int]) -> f x}]
-g = \ (x :: [Int]) -> f x
+         Tmpl= f}]
+g = f
 
--- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 h [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
 [GblId,
  Arity=1,
@@ -31,8 +31,8 @@ h [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=True)
-         Tmpl= \ (x [Occ=Once1] :: [Int]) -> f x}]
-h = \ (x :: [Int]) -> f x
+         Tmpl= f}]
+h = f
 
 
 
