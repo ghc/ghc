@@ -669,11 +669,8 @@ schemeT d s p (StgConApp con _cn args _tys)
    | otherwise
    = do alloc_con <- mkConAppCode d s p con args
         platform <- profilePlatform <$> getProfile
-        return (alloc_con         `appOL`
-                mkSlideW 1 (bytesToWords platform $ d - s) `snocOL`
-                if isUnliftedTypeKind (tyConResKind (dataConTyCon con))
-                then RETURN_UNLIFTED P
-                else ENTER)
+        return (alloc_con `appOL`
+          mkSlideW 1 (bytesToWords platform $ d - s) `snocOL` RETURN_UNLIFTED P)
 
    -- Case 4: Tail call of function
 schemeT d s p (StgApp fn args)

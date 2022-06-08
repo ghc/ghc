@@ -864,7 +864,7 @@ do_apply:
         default:
         defer_apply_to_sched:
             IF_DEBUG(interpreter,
-                     debugBelch("Cannot apply compiled function; yielding to scheduler\n"));
+                     debugBelch("Cannot apply compiled function; yielding to scheduler\nSp = %p\n\n", Sp));
             Sp_subW(2);
             SpW(1) = (W_)tagged_obj;
             SpW(0) = (W_)&stg_enter_info;
