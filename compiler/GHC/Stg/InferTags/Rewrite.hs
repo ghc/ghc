@@ -20,6 +20,7 @@ where
 
 import GHC.Prelude
 
+import GHC.Builtin.PrimOps ( PrimOp(..) )
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
@@ -346,6 +347,19 @@ fvArgs args = do
 
 type IsScrut = Bool
 
+rewriteArgs :: [StgArg] -> RM [StgArg]
+rewriteArgs = mapM rewriteArg
+rewriteArg :: StgArg -> RM StgArg
+rewriteArg (StgVarArg v) = StgVarArg <$!> rewriteId v
+rewriteArg  (lit@StgLitArg{}) = return lit
+
+-- Attach a tagSig if it's tagged
+rewriteId :: Id -> RM Id
+rewriteId v = do
+    is_tagged <- isTagged v
+    if is_tagged then return $! setIdTagSig v (TagSig TagProper)
+                 else return v
+
 rewriteExpr :: IsScrut -> InferStgExpr -> RM TgStgExpr
 rewriteExpr _ (e@StgCase {})          = rewriteCase e
 rewriteExpr _ (e@StgLet {})           = rewriteLet e
@@ -355,7 +369,10 @@ rewriteExpr _ e@(StgConApp {})        = rewriteConApp e
 
 rewriteExpr isScrut e@(StgApp {})     = rewriteApp isScrut e
 rewriteExpr _ (StgLit lit)           = return $! (StgLit lit)
+rewriteExpr _ (StgOpApp op@(StgPrimOp DataToTagOp)  args res_ty) = do
+        (StgOpApp op) <$!> rewriteArgs args <*> pure res_ty
 rewriteExpr _ (StgOpApp op args res_ty) = return $! (StgOpApp op args res_ty)
+
 
 rewriteCase :: InferStgExpr -> RM TgStgExpr
 rewriteCase (StgCase scrut bndr alt_type alts) =
@@ -415,6 +432,7 @@ rewriteApp True (StgApp f []) = do
     -- isTagged looks at more than the result of our analysis.
     -- So always update here if useful.
     let f' = if f_tagged
+                -- TODO: We might consisder using a subst env instead of setting the sig only for select places.
                 then setIdTagSig f (TagSig TagProper)
                 else f
     return $! StgApp f' []

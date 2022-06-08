@@ -76,6 +76,8 @@ cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
 
 -- dataToTag# :: a -> Int#
 -- See Note [dataToTag# magic] in GHC.Core.Opt.ConstantFold
+-- TODO: There are some more optimization ideas for this code path
+-- in #21710
 cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   platform <- getPlatform
   emitComment (mkFastString "dataToTag#")
@@ -92,15 +94,7 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   -- the constructor index is too large to fit in the pointer and therefore
   -- we must look in the info table. See Note [Tagging big families].
 
-  slow_path <- getCode $ do
-      tmp <- newTemp (bWord platform)
-      _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
-      profile     <- getProfile
-      align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
-      emitAssign (CmmLocal result_reg)
-        $ getConstrTag profile align_check (cmmUntag platform (CmmReg (CmmLocal tmp)))
-
-  fast_path <- getCode $ do
+  (fast_path :: CmmAGraph) <- getCode $ do
       -- Return the constructor index from the pointer tag
       return_ptr_tag <- getCode $ do
           emitAssign (CmmLocal result_reg)
@@ -113,8 +107,22 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
             $ getConstrTag profile align_check (cmmUntag platform amode)
 
       emit =<< mkCmmIfThenElse' is_too_big_tag return_info_tag return_ptr_tag (Just False)
-
-  emit =<< mkCmmIfThenElse' is_tagged fast_path slow_path (Just True)
+  -- If we know the argument is already tagged there is no need to generate code to evaluate it
+  -- so we skip straight to the fast path. If we don't know if there is a tag we take the slow
+  -- path which evaluates the argument before fetching the tag.
+  case (idTagSig_maybe a) of
+    Just sig
+      | isTaggedSig sig
+      -> emit fast_path
+    _ -> do
+          slow_path <- getCode $ do
+              tmp <- newTemp (bWord platform)
+              _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
+              profile     <- getProfile
+              align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
+              emitAssign (CmmLocal result_reg)
+                $ getConstrTag profile align_check (cmmUntag platform (CmmReg (CmmLocal tmp)))
+          emit =<< mkCmmIfThenElse' is_tagged fast_path slow_path (Just True)
   emitReturn [CmmReg $ CmmLocal result_reg]
 
 
