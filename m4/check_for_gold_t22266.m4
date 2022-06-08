@@ -10,7 +10,7 @@
 # Sets $result to 0 if not affected, 1 otherwise
 AC_DEFUN([CHECK_FOR_GOLD_T22266],[
     AC_MSG_CHECKING([for ld.gold object merging bug (binutils 22266)])
-    if ! $1 --version | grep -q "GNU gold"; then
+    if ! $1 --version | grep -q "GNU gold" 2>/dev/null; then
         # Not gold
         result=0
     elif test "$cross_compiling" = "yes"; then
