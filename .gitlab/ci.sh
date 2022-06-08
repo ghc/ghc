@@ -613,13 +613,14 @@ function test_hadrian() {
     cd ../../../
     test_compiler="$TOP/_build/install/bin/ghc$exe"
 
-    # Disabled, see #21072
-    # run_hadrian \
-    #  test \
-    #  --test-root-dirs=testsuite/tests/stage1 \
-    #  --test-compiler=stage1 \
-    #  "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian stage1 test"
-    #info "STAGE1_TEST=$?"
+    if [[ "${WINDOWS_HOST}" == "no" ]]; then
+      run_hadrian \
+        test \
+        --test-root-dirs=testsuite/tests/stage1 \
+        --test-compiler=stage1 \
+        "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian stage1 test"
+      info "STAGE1_TEST=$?"
+    fi
 
     # Ensure the resulting compiler has the correct bignum-flavour
     test_compiler_backend=$(${test_compiler} -e "GHC.Num.Backend.backendName")
@@ -749,9 +750,11 @@ case "$(uname)" in
     exe=".exe"
     # N.B. cabal-install expects CABAL_DIR to be a Windows path
     CABAL_DIR="$(cygpath -w "$CABAL_DIR")"
+    WINDOWS_HOST="yes"
     ;;
   *)
     exe=""
+    WINDOWS_HOST="no"
     ;;
 esac
 
