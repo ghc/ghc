@@ -180,19 +180,19 @@ echo "using THREADS=${threads}" >&2
 
 configure_cmd="./configure"
 
-# Set up configuration, commands for building
-if [ "$use_hadrian" = "NO" ]; then
+make="gmake"
+if type gmake > /dev/null 2> /dev/null ; then
     make="gmake"
-    if type gmake > /dev/null 2> /dev/null ; then
-        make="gmake"
-    else
-        make="make"
-    fi
-    if [ $be_quiet -eq 1 ]; then
-        # See Note [Default build system verbosity].
-        make="$make -s"
-    fi
 else
+    make="make"
+fi
+if [ $be_quiet -eq 1 ]; then
+    # See Note [Default build system verbosity].
+    make="$make -s"
+fi
+
+# Set up configuration, commands for building
+if [ "$use_hadrian" = "YES" ]; then
     if [ "$use_stack" = "NO" ]; then
         hadrian/build --help > /dev/null
         echo "Entering ./hadrian directory..."
