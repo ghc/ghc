@@ -1069,6 +1069,7 @@ doCpp logger tmpfs dflags unit_env raw extra_opts input_fn output_fn = do
         -- about this.
                     ++ [ GHC.SysTools.Option     "-x"
                        , GHC.SysTools.Option     "assembler-with-cpp"
+                       , GHC.SysTools.Option     "-P" -- disable line markers
                        , GHC.SysTools.Option     input_fn
         -- We hackily use Option instead of FileOption here, so that the file
         -- name is not back-slashed on Windows.  cpp is capable of
