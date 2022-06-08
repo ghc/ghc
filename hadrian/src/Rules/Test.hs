@@ -107,18 +107,20 @@ testRules = do
     -- as the stage1 compiler needs the stage2 libraries
     -- to have any hope of passing tests.
     root -/- "stage1-test/bin/*" %> \path -> do
+
+      bin_path <- stageBinPath stage0InTree
       let prog = takeBaseName path
-          stage0prog = root -/- "stage0/bin" -/- prog <.> exe
+          stage0prog = bin_path -/- prog <.> exe
       need [stage0prog]
       abs_prog_path <- liftIO (IO.canonicalizePath stage0prog)
       -- Use the stage1 package database
       pkgDb <- liftIO . IO.makeAbsolute =<< packageDbPath Stage1
       if prog `elem` ["ghc","runghc"] then do
-          let flags = [ "-no-user-package-db", "-hide-package", "ghc" , "-package-env","-","-package-db",pkgDb]
+          let flags = [ "-no-global-package-db", "-no-user-package-db", "-hide-package", "ghc" , "-package-env","-","-package-db",pkgDb]
           writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
           makeExecutable path
       else if prog == "ghc-pkg" then do
-        let flags = ["--no-user-package-db", "--global-package-db", pkgDb]
+        let flags = ["-no-global-package-db", "--no-user-package-db", "--global-package-db", pkgDb]
         writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
         makeExecutable path
       else createFileLink abs_prog_path path
@@ -181,7 +183,10 @@ testRules = do
         -- for example "docs_haddock"
         -- We then need to go and build these dependencies
         extra_targets <- words <$> askWithResources [] (test_target GetExtraDeps)
-        need $ filter (isOkToBuild args) extra_targets
+        let ok_to_build = filter (isOkToBuild args) extra_targets
+        putVerbose $ " | ExtraTargets: " ++ intercalate ", " extra_targets
+        putVerbose $ " | ExtraTargets (ok-to-build): " ++ intercalate ", " ok_to_build
+        need ok_to_build
 
         -- Prepare Ghc configuration file for input compiler.
         need [root -/- timeoutPath]
@@ -244,7 +249,7 @@ testRules = do
 -- We should have built them already by this point, but
 isOkToBuild :: TestArgs -> String -> Bool
 isOkToBuild args target
-   = stageOf (testCompiler args) `elem` [Just Stage1, Just Stage2]
+   = isJust (stageOf (testCompiler args))
   || testHasInTreeFiles args
   || target `elem` map cp_target checkPrograms
 
@@ -285,8 +290,18 @@ needTestsuitePackages stg = do
   cross <- flag CrossCompiling
   when (not cross) $ needIservBins stg
   root <- buildRoot
+  liftIO $ print stg
   -- require the shims for testing stage1
-  need =<< sequence [(\f -> root -/- "stage1-test/bin" -/- takeFileName f) <$> (pkgFile stage0InTree p) | (Stage0 InTreeLibs,p) <- exepkgs]
+  when (stg == stage0InTree) $ do
+   -- Windows not supported as the wrapper scripts don't work on windows.. we could
+   -- support it with a separate .bat or C wrapper code path but seems overkill when no-one will
+   -- probably ever try and do this.
+    when windowsHost $ do
+      putFailure $ unlines [ "Testing stage1 compiler with windows is currently unsupported,"
+                             , "if you desire to do this then please open a ticket"]
+      fail "Testing stage1 is not supported"
+
+    need =<< sequence [(\f -> root -/- "stage1-test/bin" -/- takeFileName f) <$> (pkgFile stage0InTree p) | (Stage0 InTreeLibs,p) <- exepkgs]
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc
