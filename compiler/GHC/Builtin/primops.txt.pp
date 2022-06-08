@@ -3289,6 +3289,8 @@ section "Tag to enum stuff"
 
 primop  DataToTagOp "dataToTag#" GenPrimOp
    a -> Int#  -- Zero-indexed; the first constructor has tag zero
+   { Evaluates the argument and returns the tag of the result.
+     Tags are Zero-indexed; the first constructor has tag zero. }
    with
    strictness = { \ _arity -> mkClosedDmdSig [evalDmd] topDiv }
    -- See Note [dataToTag# magic] in GHC.Core.Opt.ConstantFold
