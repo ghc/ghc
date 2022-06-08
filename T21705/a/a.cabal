@@ -1,0 +1,8 @@
+name: a
+version: 0
+build-type: Simple
+
+library
+  exposed-modules:
+    Foo
+  build-depends: base

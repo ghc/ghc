@@ -1,0 +1,11 @@
+name: c
+version: 0
+build-type: Simple
+
+library
+  exposed-modules:
+    Bar
+  build-depends: base
+               , b
+  --ghc-options: -trust a
+  ghc-options: -trust b

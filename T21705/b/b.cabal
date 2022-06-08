@@ -1,0 +1,9 @@
+name: b
+version: 0
+build-type: Simple
+
+library
+  reexported-modules:
+    Foo
+  build-depends: base
+               , a
