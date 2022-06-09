@@ -2159,9 +2159,9 @@ withDeferredDiagnostics f = do
     let deferDiagnostics _dflags !msgClass !srcSpan !msg = do
           let action = logMsg logger msgClass srcSpan msg
           case msgClass of
-            MCDiagnostic SevWarning _reason
+            MCDiagnostic SevWarning _reason _code
               -> atomicModifyIORef' warnings $ \i -> (action: i, ())
-            MCDiagnostic SevError _reason
+            MCDiagnostic SevError _reason _code
               -> atomicModifyIORef' errors   $ \i -> (action: i, ())
             MCFatal
               -> atomicModifyIORef' fatals   $ \i -> (action: i, ())

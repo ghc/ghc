@@ -20,7 +20,7 @@ printMessages :: Diagnostic a => Logger -> DiagOpts -> Messages a -> IO ()
 printMessages logger opts msgs
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = (diag_ppr_ctx opts) { sdocStyle = style }
-                in logMsg logger (MCDiagnostic sev . diagnosticReason $ dia) s $
+                in logMsg logger (MCDiagnostic sev (diagnosticReason dia) (diagnosticCode dia)) s $
                    withPprStyle style (messageWithHints ctx dia)
               | MsgEnvelope { errMsgSpan      = s,
                               errMsgDiagnostic = dia,

@@ -1505,7 +1505,7 @@ load_dyn interp hsc_env crash_early dll = do
         else
           when (diag_wopt Opt_WarnMissedExtraSharedLib diag_opts)
             $ logMsg logger
-                (mkMCDiagnostic diag_opts $ WarningWithFlag Opt_WarnMissedExtraSharedLib)
+                (mkMCDiagnostic diag_opts (WarningWithFlag Opt_WarnMissedExtraSharedLib) Nothing)
                   noSrcSpan $ withPprStyle defaultUserStyle (note err)
   where
     diag_opts = initDiagOpts (hsc_dflags hsc_env)
@@ -1673,7 +1673,7 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
       , not loading_dynamic_hs_libs
       , interpreterProfiled interp
       = do
-          let diag = mkMCDiagnostic diag_opts WarningWithoutFlag
+          let diag = mkMCDiagnostic diag_opts WarningWithoutFlag Nothing
           logMsg logger diag noSrcSpan $ withPprStyle defaultErrStyle $
             text "Interpreter failed to load profiled static library" <+> text lib <> char '.' $$
               text " \tTrying dynamic library instead. If this fails try to rebuild" <+>

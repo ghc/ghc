@@ -327,7 +327,7 @@ makeThreadSafe logger = do
 -- See Note [JSON Error Messages]
 --
 jsonLogAction :: LogAction
-jsonLogAction _ (MCDiagnostic SevIgnore _) _ _ = return () -- suppress the message
+jsonLogAction _ (MCDiagnostic SevIgnore _ _) _ _ = return () -- suppress the message
 jsonLogAction logflags msg_class srcSpan msg
   =
     defaultLogActionHPutStrDoc logflags True stdout
@@ -344,13 +344,13 @@ defaultLogAction :: LogAction
 defaultLogAction logflags msg_class srcSpan msg
   | log_dopt Opt_D_dump_json logflags = jsonLogAction logflags msg_class srcSpan msg
   | otherwise = case msg_class of
-      MCOutput                 -> printOut msg
-      MCDump                   -> printOut (msg $$ blankLine)
-      MCInteractive            -> putStrSDoc msg
-      MCInfo                   -> printErrs msg
-      MCFatal                  -> printErrs msg
-      MCDiagnostic SevIgnore _ -> pure () -- suppress the message
-      MCDiagnostic _sev _rea   -> printDiagnostics
+      MCOutput                     -> printOut msg
+      MCDump                       -> printOut (msg $$ blankLine)
+      MCInteractive                -> putStrSDoc msg
+      MCInfo                       -> printErrs msg
+      MCFatal                      -> printErrs msg
+      MCDiagnostic SevIgnore _ _   -> pure () -- suppress the message
+      MCDiagnostic _sev _rea _code -> printDiagnostics
     where
       printOut   = defaultLogActionHPrintDoc  logflags False stdout
       printErrs  = defaultLogActionHPrintDoc  logflags False stderr

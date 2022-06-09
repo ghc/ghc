@@ -124,13 +124,13 @@ diagReasonSeverity opts reason = case reason of
 
 -- | Make a 'MessageClass' for a given 'DiagnosticReason', consulting the
 -- 'DiagOpts.
-mkMCDiagnostic :: DiagOpts -> DiagnosticReason -> MessageClass
-mkMCDiagnostic opts reason = MCDiagnostic (diagReasonSeverity opts reason) reason
+mkMCDiagnostic :: DiagOpts -> DiagnosticReason -> Maybe DiagnosticCode -> MessageClass
+mkMCDiagnostic opts reason code = MCDiagnostic (diagReasonSeverity opts reason) reason code
 
 -- | Varation of 'mkMCDiagnostic' which can be used when we are /sure/ the
--- input 'DiagnosticReason' /is/ 'ErrorWithoutFlag'.
+-- input 'DiagnosticReason' /is/ 'ErrorWithoutFlag' and there is no diagnostic code.
 errorDiagnostic :: MessageClass
-errorDiagnostic = MCDiagnostic SevError ErrorWithoutFlag
+errorDiagnostic = MCDiagnostic SevError ErrorWithoutFlag Nothing
 
 --
 -- Creating MsgEnvelope(s)
@@ -241,7 +241,7 @@ pprLocMsgEnvelope (MsgEnvelope { errMsgSpan      = s
                                , errMsgContext   = unqual })
   = sdocWithContext $ \ctx ->
     withErrStyle unqual $
-      mkLocMessage (MCDiagnostic sev (diagnosticReason e)) s (formatBulleted ctx $ diagnosticMessage e)
+      mkLocMessage (MCDiagnostic sev (diagnosticReason e) (diagnosticCode e)) s (formatBulleted ctx $ diagnosticMessage e)
 
 sortMsgBag :: Maybe DiagOpts -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
 sortMsgBag mopts = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList

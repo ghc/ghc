@@ -814,7 +814,7 @@ tryWarnMissingSpecs dflags callers fn calls_for_fn
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
     diag_opts = initDiagOpts dflags
     doWarn reason =
-      msg (mkMCDiagnostic diag_opts reason)
+      msg (mkMCDiagnostic diag_opts reason Nothing)
         (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
                 2 (vcat [ text "when specialising" <+> quotes (ppr caller)
                         | caller <- callers])

@@ -367,7 +367,7 @@ data MessageClass
     -- ^ Log messages intended for end users.
     -- No file\/line\/column stuff.
 
-  | MCDiagnostic Severity DiagnosticReason
+  | MCDiagnostic Severity DiagnosticReason (Maybe DiagnosticCode)
     -- ^ Diagnostics from the compiler. This constructor is very powerful as
     -- it allows the construction of a 'MessageClass' with a completely
     -- arbitrary permutation of 'Severity' and 'DiagnosticReason'. As such,
@@ -376,7 +376,11 @@ data MessageClass
     -- and manipulate diagnostic messages directly, for example inside
     -- 'GHC.Utils.Error'. In all the other circumstances, /especially/ when
     -- emitting compiler diagnostics, use the smart constructor.
-  deriving (Eq, Show)
+    --
+    -- The @Maybe 'DiagnosticCode'@ field carries a code (if available) for
+    -- this diagnostic. If you are creating a message not tied to any
+    -- error-message type, then use Nothing. In the long run, this really
+    -- should always have a 'DiagnosticCode'. See Note [Diagnostic codes].
 
 {-
 Note [Suppressing Messages]
@@ -434,8 +438,8 @@ instance ToJson MessageClass where
   json MCInteractive = JSString "MCInteractive"
   json MCDump = JSString "MCDump"
   json MCInfo = JSString "MCInfo"
-  json (MCDiagnostic sev reason) =
-    JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason)
+  json (MCDiagnostic sev reason code) =
+    JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason <+> ppr code)
 
 instance Show (MsgEnvelope DiagnosticMessage) where
     show = showMsgEnvelope
@@ -476,21 +480,26 @@ mkLocMessageWarningGroups show_warn_groups msg_class locn msg
 
           msg_title =
             case msg_class of
-              MCDiagnostic SevError _reason   -> text "error:"
-              MCDiagnostic SevWarning _reason -> text "warning:"
-              MCFatal                         -> text "fatal:"
-              _                               -> empty
+              MCDiagnostic SevError _reason _code   -> text "error:"
+              MCDiagnostic SevWarning _reason _code -> text "warning:"
+              MCFatal                               -> text "fatal:"
+              _                                     -> empty
 
           warning_flag_doc =
             case msg_class of
-              MCDiagnostic sev reason
+              MCDiagnostic sev reason _code
                 | Just str <- flag_msg sev reason -> brackets (coloured msg_colour (text str))
               _                                   -> empty
+
+          diag_code_doc =
+            case msg_class of
+              MCDiagnostic _ _ (Just code) -> ppr code
+              _                            -> empty
 
           -- Add prefixes, like    Foo.hs:34: warning:
           --                           <the warning message>
           header = locn' <> colon <+>
-                   coloured msg_colour msg_title <+> warning_flag_doc
+                   coloured msg_colour msg_title <+> warning_flag_doc <+> diag_code_doc
 
       in coloured (Col.sMessage col_scheme)
                   (hang (coloured (Col.sHeader col_scheme) header) 4
@@ -521,10 +530,10 @@ mkLocMessageWarningGroups show_warn_groups msg_class locn msg
 
 
 getMessageClassColour :: MessageClass -> Col.Scheme -> Col.PprColour
-getMessageClassColour (MCDiagnostic SevError _reason)   = Col.sError
-getMessageClassColour (MCDiagnostic SevWarning _reason) = Col.sWarning
-getMessageClassColour MCFatal                           = Col.sFatal
-getMessageClassColour _                                 = const mempty
+getMessageClassColour (MCDiagnostic SevError _reason _code)   = Col.sError
+getMessageClassColour (MCDiagnostic SevWarning _reason _code) = Col.sWarning
+getMessageClassColour MCFatal                                 = Col.sFatal
+getMessageClassColour _                                       = const mempty
 
 getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
@@ -665,6 +674,7 @@ partitionMessages (Messages xs) = bimap Messages Messages (partitionBag isWarnin
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 "RAE": Write note.
 Talk about difference between DiagnosticCode and GhcDiagnosticCode.
+Talk about aspirations to remove Maybe.
 -}
 
 -- | A diagnostic code (called an "error code" in its specification
