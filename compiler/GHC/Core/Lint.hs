@@ -673,7 +673,7 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
     go AllowAtTopLevel
       | (binders0, rhs') <- collectTyBinders rhs
       , Just (fun, t, info, e) <- collectMakeStaticArgs rhs'
-      = markAllJoinsBad $
+      = markAllJoinsBad non_join_let $
         foldr
         -- imitate @lintCoreExpr (Lam ...)@
         lintLambda
@@ -682,7 +682,8 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
             lintCoreArgs fun_ty_ue [Type t, info, e]
         )
         binders0
-    go _ = markAllJoinsBad $ lintCoreExpr rhs
+    go _ = markAllJoinsBad non_join_let $ lintCoreExpr rhs
+    non_join_let = text "Join point used inside non-join let " <+> ppr _bndr
 
 -- | Lint the RHS of a join point with expected join arity of @n@ (see Note
 -- [Join points] in "GHC.Core").
@@ -695,8 +696,10 @@ lintJoinLams join_arity enforce rhs
     go n expr | Just bndr <- enforce -- Join point with too few RHS lambdas
               = failWithL $ mkBadJoinArityMsg bndr join_arity n rhs
               | otherwise -- Future join point, not yet eta-expanded
-              = markAllJoinsBad $ lintCoreExpr expr
+              = markAllJoinsBad join_reason $ lintCoreExpr expr
                 -- Body of lambda is not a tail position
+              where
+                join_reason = text "Body of lambda is not a tail position"
 
 lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
 lintIdUnfolding bndr bndr_ty uf
@@ -873,7 +876,7 @@ lintCoreExpr (Lit lit)
   = return (literalType lit, zeroUE)
 
 lintCoreExpr (Cast expr co)
-  = do (expr_ty, ue) <- markAllJoinsBad   $ lintCoreExpr expr
+  = do (expr_ty, ue) <- markAllJoinsBad (text "Join point occurrence inside a cast")  $ lintCoreExpr expr
        to_ty <- lintCastExpr expr expr_ty co
        return (to_ty, ue)
 
@@ -883,7 +886,8 @@ lintCoreExpr (Tick tickish expr)
                                  checkDeadIdOcc id
                                  lookupIdInScope id
          _                  -> return ()
-       markAllJoinsBadIf block_joins $ lintCoreExpr expr
+       markAllJoinsBadIf block_joins (text "Join point under non softscope tick.") $
+                         lintCoreExpr expr
   where
     block_joins = not (tickish `tickishScopesLike` SoftScope)
       -- TODO Consider whether this is the correct rule. It is consistent with
@@ -950,7 +954,7 @@ lintCoreExpr e@(App _ _)
        ; let lintRunRWCont :: CoreArg -> LintM (LintedType, UsageEnv)
              lintRunRWCont expr@(Lam _ _) =
                 lintJoinLams 1 (Just fun) expr
-             lintRunRWCont other = markAllJoinsBad $ lintCoreExpr other
+             lintRunRWCont other = markAllJoinsBad (text "Join point in dubious runRW Cont") $ lintCoreExpr other
              -- TODO: Look through ticks?
        ; (arg3_ty, ue3) <- lintRunRWCont arg3
        ; app_ty <- lintValApp arg3 fun_ty2 arg3_ty ue2 ue3
@@ -980,7 +984,7 @@ lintCoreExpr e@(App _ _)
       -- See Note [Ticks and mandatory eta expansion]
 
 lintCoreExpr (Lam var expr)
-  = markAllJoinsBad $
+  = markAllJoinsBad (text "Join point under lambda with binder:" <+> ppr var) $
     lintLambda var $ lintCoreExpr expr
 
 lintCoreExpr (Case scrut var alt_ty alts)
@@ -1049,7 +1053,7 @@ lintCoreFun (Lam var body) nargs
   = lintLambda var $ lintCoreFun body (nargs - 1)
 
 lintCoreFun expr nargs
-  = markAllJoinsBadIf (nargs /= 0) $
+  = markAllJoinsBadIf (nargs /= 0) (text "lintCoreFun") $
       -- See Note [Join points are less general than the paper]
     lintCoreExpr expr
 ------------------
@@ -1101,8 +1105,9 @@ checkJoinOcc var n_args
        ; case mb_join_arity_bndr of {
            Nothing -> -- Binder is not a join point
                       do { join_set <- getValidJoins
+                         ; cause <- getJoinInvalidationReason var
                          ; addErrL (text "join set " <+> ppr join_set $$
-                                    invalidJoinOcc var) } ;
+                                    invalidJoinOcc var cause) } ;
 
            Just join_arity_bndr ->
 
@@ -1128,7 +1133,7 @@ checkCanEtaExpand (Var fun_id) args app_ty
   = do { do_rep_poly_checks <- lf_check_fixed_rep <$> getLintFlags
        ; when (do_rep_poly_checks && hasNoBinding fun_id) $
            checkL (null bad_arg_tys) err_msg }
-    where
+               where
       arity :: Arity
       arity = idArity fun_id
 
@@ -1300,7 +1305,7 @@ lintCoreArg (fun_ty, ue) (Type arg_ty)
        ; return (res, ue) }
 
 lintCoreArg (fun_ty, fun_ue) arg
-  = do { (arg_ty, arg_ue) <- markAllJoinsBad $ lintCoreExpr arg
+  = do { (arg_ty, arg_ue) <- markAllJoinsBad (text "lintCoreArg") $ lintCoreExpr arg
            -- See Note [Representation polymorphism invariants] in GHC.Core
        ; flags <- getLintFlags
 
@@ -1415,7 +1420,7 @@ lintCaseExpr scrut var alt_ty alts =
   do { let e = Case scrut var alt_ty alts   -- Just for error messages
 
      -- Check the scrutinee
-     ; (scrut_ty, scrut_ue) <- markAllJoinsBad $ lintCoreExpr scrut
+     ; (scrut_ty, scrut_ue) <- markAllJoinsBad (text "Join point in case scrutinee") $ lintCoreExpr scrut
           -- See Note [Join points are less general than the paper]
           -- in GHC.Core
      ; let scrut_mult = varMult var
@@ -1962,7 +1967,7 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                                 mkBadJoinPointRuleMsg fun join_arity rule
                                -- See Note [Rules for join points]
                              ; lintCoreExpr rhs }
-                     _ -> markAllJoinsBad $ lintCoreExpr rhs
+                     _ -> markAllJoinsBad (text "Join point in undersaturated rule") $ lintCoreExpr rhs
        ; ensureEqTys lhs_ty rhs_ty $
          (rule_doc <+> vcat [ text "lhs type:" <+> ppr lhs_ty
                             , text "rhs type:" <+> ppr rhs_ty
@@ -2633,10 +2638,10 @@ compatible_branches (CoAxBranch { cab_tvs = tvs1
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 data LintEnv
-  = LE { le_flags :: LintFlags       -- Linting the result of this pass
+  = LE { le_flags :: !LintFlags       -- Linting the result of this pass
        , le_loc   :: [LintLocInfo]   -- Locations
 
-       , le_subst :: TCvSubst  -- Current TyCo substitution
+       , le_subst :: !TCvSubst  -- Current TyCo substitution
                                --    See Note [Linting type lets]
             -- /Only/ substitutes for type variables;
             --        but might clone CoVars
@@ -2644,32 +2649,36 @@ data LintEnv
             -- in-scope TyVars and CoVars (but not Ids)
             -- Range of the TCvSubst is LintedType/LintedCo
 
-       , le_ids   :: VarEnv (Id, LintedType)    -- In-scope Ids
+       , le_ids   :: !(VarEnv (Id, LintedType))    -- In-scope Ids
             -- Used to check that occurrences have an enclosing binder.
             -- The Id is /pre-substitution/, used to check that
             -- the occurrence has an identical type to the binder
             -- The LintedType is used to return the type of the occurrence,
             -- without having to lint it again.
 
-       , le_joins :: IdSet     -- Join points in scope that are valid
+       , le_joins :: !IdSet     -- Join points in scope that are valid
                                -- A subset of the InScopeSet in le_subst
                                -- See Note [Join points]
 
-       , le_ue_aliases :: NameEnv UsageEnv -- Assigns usage environments to the
+       , le_invadlid_join_reason :: !(VarEnv SDoc)
+            -- ^ Gives reason why we invalidated a join id in this scope.
+            -- Just here to make debugging easier.
+
+       , le_ue_aliases :: !(NameEnv UsageEnv) -- Assigns usage environments to the
                                            -- alias-like binders, as found in
                                            -- non-recursive lets.
 
-       , le_platform   :: Platform         -- ^ Target platform
-       , le_diagOpts   :: DiagOpts         -- ^ Target platform
+       , le_platform   :: !Platform         -- ^ Target platform
+       , le_diagOpts   :: !DiagOpts         -- ^ Target platform
        }
 
 data LintFlags
-  = LF { lf_check_global_ids           :: Bool -- See Note [Checking for global Ids]
-       , lf_check_inline_loop_breakers :: Bool -- See Note [Checking for INLINE loop breakers]
-       , lf_check_static_ptrs :: StaticPtrCheck -- ^ See Note [Checking StaticPtrs]
-       , lf_report_unsat_syns :: Bool -- ^ See Note [Linting type synonym applications]
-       , lf_check_linearity :: Bool -- ^ See Note [Linting linearity]
-       , lf_check_fixed_rep :: Bool -- See Note [Checking for representation polymorphism]
+  = LF { lf_check_global_ids           :: !Bool -- See Note [Checking for global Ids]
+       , lf_check_inline_loop_breakers :: !Bool -- See Note [Checking for INLINE loop breakers]
+       , lf_check_static_ptrs :: !StaticPtrCheck -- ^ See Note [Checking StaticPtrs]
+       , lf_report_unsat_syns :: !Bool -- ^ See Note [Linting type synonym applications]
+       , lf_check_linearity :: !Bool -- ^ See Note [Linting linearity]
+       , lf_check_fixed_rep :: !Bool -- See Note [Checking for representation polymorphism]
     }
 
 -- See Note [Checking StaticPtrs]
@@ -2832,23 +2841,23 @@ getPlatform :: LintM Platform
 getPlatform = LintM (\ e errs -> (Just (le_platform e), errs))
 
 data LintLocInfo
-  = RhsOf Id            -- The variable bound
-  | OccOf Id            -- Occurrence of id
-  | LambdaBodyOf Id     -- The lambda-binder
-  | RuleOf Id           -- Rules attached to a binder
-  | UnfoldingOf Id      -- Unfolding of a binder
+  = RhsOf !Id            -- The variable bound
+  | OccOf !Id            -- Occurrence of id
+  | LambdaBodyOf !Id     -- The lambda-binder
+  | RuleOf !Id           -- Rules attached to a binder
+  | UnfoldingOf !Id      -- Unfolding of a binder
   | BodyOfLetRec [Id]   -- One of the binders
-  | CaseAlt CoreAlt     -- Case alternative
-  | CasePat CoreAlt     -- The *pattern* of the case alternative
-  | CaseTy CoreExpr     -- The type field of a case expression
+  | CaseAlt !CoreAlt     -- Case alternative
+  | CasePat !CoreAlt     -- The *pattern* of the case alternative
+  | CaseTy !CoreExpr     -- The type field of a case expression
                         -- with this scrutinee
-  | IdTy Id             -- The type field of an Id binder
-  | AnExpr CoreExpr     -- Some expression
-  | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
+  | IdTy !Id             -- The type field of an Id binder
+  | AnExpr !CoreExpr     -- Some expression
+  | ImportedUnfolding !SrcLoc -- Some imported unfolding (ToDo: say which)
   | TopLevelBindings
-  | InType Type         -- Inside a type
-  | InCo   Coercion     -- Inside a coercion
-  | InAxiom (CoAxiom Branched)   -- Inside a CoAxiom
+  | InType !Type         -- Inside a type
+  | InCo   !Coercion     -- Inside a coercion
+  | InAxiom !(CoAxiom Branched)   -- Inside a CoAxiom
 
 data LintConfig = LintConfig
   { l_diagOpts   :: !DiagOpts         -- ^ Diagnostics opts
@@ -2872,6 +2881,7 @@ initL cfg m
              , le_subst = mkEmptyTCvSubst (mkInScopeSet (mkVarSet tcvs))
              , le_ids   = mkVarEnv [(id, (id,idType id)) | id <- ids]
              , le_joins = emptyVarSet
+             , le_invadlid_join_reason = emptyVarEnv
              , le_loc = []
              , le_ue_aliases = emptyNameEnv
              , le_platform = l_platform cfg
@@ -2976,16 +2986,32 @@ updateTCvSubst :: TCvSubst -> LintM a -> LintM a
 updateTCvSubst subst' m
   = LintM $ \ env errs -> unLintM m (env { le_subst = subst' }) errs
 
-markAllJoinsBad :: LintM a -> LintM a
-markAllJoinsBad m
-  = LintM $ \ env errs -> unLintM m (env { le_joins = emptyVarSet }) errs
+markAllJoinsBad :: SDoc -> LintM a -> LintM a
+markAllJoinsBad reason m
+  = LintM $ \ env errs ->
+      let invalidated_joins = le_joins env
+          invalidated_reasons =
+            nonDetStrictFoldVarSet addInvalid
+                                   (le_invadlid_join_reason env)
+                                   invalidated_joins
+          addInvalid j invalid_joins = extendVarEnv invalid_joins j reason
+      in
+      unLintM m (env { le_joins = emptyVarSet, le_invadlid_join_reason = invalidated_reasons }) errs
 
-markAllJoinsBadIf :: Bool -> LintM a -> LintM a
-markAllJoinsBadIf True  m = markAllJoinsBad m
-markAllJoinsBadIf False m = m
+markAllJoinsBadIf :: Bool -> SDoc -> LintM a -> LintM a
+markAllJoinsBadIf True  reason m = markAllJoinsBad reason m
+markAllJoinsBadIf False _reason m = m
 
 getValidJoins :: LintM IdSet
 getValidJoins = LintM (\ env errs -> (Just (le_joins env), errs))
+
+getJoinInvalidationReason :: Id -> LintM SDoc
+getJoinInvalidationReason j
+  = LintM (\ env errs ->
+              let r = lookupVarEnv (le_invadlid_join_reason env) j :: Maybe SDoc
+                  r' = fromMaybe (text "Unknown") r :: SDoc
+              in
+              ( Just r', errs))
 
 getTCvSubst :: LintM TCvSubst
 getTCvSubst = LintM (\ env errs -> (Just (le_subst env), errs))
@@ -3375,10 +3401,12 @@ mkBadJoinArityMsg var ar n rhs
            text "Rhs = " <+> ppr rhs
            ]
 
-invalidJoinOcc :: Var -> SDoc
-invalidJoinOcc var
+invalidJoinOcc :: Var -> SDoc -> SDoc
+invalidJoinOcc var reason
   = vcat [ text "Invalid occurrence of a join variable:" <+> ppr var
-         , text "The binder is either not a join point, or not valid here" ]
+         , text "The binder is either not a join point, or not valid here"
+         , text "We might have invalidated it for this loc because:"
+         , reason]
 
 mkBadJumpMsg :: Var -> Int -> Int -> SDoc
 mkBadJumpMsg var ar nargs
