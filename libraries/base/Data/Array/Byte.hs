@@ -117,15 +117,15 @@ byteArrayFromListN n ys = runST $ do
 -- | Copy a slice of an immutable byte array to a mutable byte array.
 --
 -- /Note:/ this function does not do bounds or overlap checking.
-copyByteArray
+unsafeCopyByteArray
   :: MutableByteArray s -- ^ destination array
   -> Int                -- ^ offset into destination array
   -> ByteArray          -- ^ source array
   -> Int                -- ^ offset into source array
   -> Int                -- ^ number of bytes to copy
   -> ST s ()
-{-# INLINE copyByteArray #-}
-copyByteArray (MutableByteArray dst#) (I# doff#) (ByteArray src#) (I# soff#) (I# sz#) =
+{-# INLINE unsafeCopyByteArray #-}
+unsafeCopyByteArray (MutableByteArray dst#) (I# doff#) (ByteArray src#) (I# soff#) (I# sz#) =
   ST (\s# -> case copyByteArray# src# soff# dst# doff# sz# s# of
     s'# -> (# s'#, () #))
 
@@ -133,15 +133,15 @@ copyByteArray (MutableByteArray dst#) (I# doff#) (ByteArray src#) (I# soff#) (I#
 -- or to the same mutable byte array.
 --
 -- /Note:/ this function does not do bounds checking.
-copyMutableByteArray
+unsafeCopyMutableByteArray
   :: MutableByteArray s -- ^ destination array
   -> Int                -- ^ offset into destination array
   -> MutableByteArray s -- ^ source array
   -> Int                -- ^ offset into source array
   -> Int                -- ^ number of bytes to copy
   -> ST s ()
-{-# INLINE copyMutableByteArray #-}
-copyMutableByteArray (MutableByteArray dst#) (I# doff#) (MutableByteArray src#) (I# soff#) (I# sz#) =
+{-# INLINE unsafeCopyMutableByteArray #-}
+unsafeCopyMutableByteArray (MutableByteArray dst#) (I# doff#) (MutableByteArray src#) (I# soff#) (I# sz#) =
   ST (\s# -> case copyMutableByteArray# src# soff# dst# doff# sz# s# of
     s'# -> (# s'#, () #))
 
@@ -230,8 +230,8 @@ appendByteArray ba1 ba2 = runST $ do
       totSz = fromMaybe (sizeOverflowError "appendByteArray")
                         (checkedIntAdd n1 n2)
   marr <- newByteArray totSz
-  copyByteArray marr 0  ba1 0 n1
-  copyByteArray marr n1 ba2 0 n2
+  unsafeCopyByteArray marr 0  ba1 0 n1
+  unsafeCopyByteArray marr n1 ba2 0 n2
   unsafeFreezeByteArray marr
 
 -- | Concatenate a list of 'ByteArray's.
@@ -248,7 +248,7 @@ concatByteArray arrs = runST $ do
 pasteByteArrays :: MutableByteArray s -> Int -> [ByteArray] -> ST s ()
 pasteByteArrays !_ !_ [] = return ()
 pasteByteArrays !marr !ix (x : xs) = do
-  copyByteArray marr ix x 0 (sizeofByteArray x)
+  unsafeCopyByteArray marr ix x 0 (sizeofByteArray x)
   pasteByteArrays marr (ix + sizeofByteArray x) xs
 
 -- | An array of zero length.
@@ -284,14 +284,14 @@ stimesPositiveInt n arr = runST $ do
   let inpSz = sizeofByteArray arr
       tarSz = fromMaybe stimesOverflowErr (checkedIntMultiply n inpSz)
   marr <- newByteArray tarSz
-  copyByteArray marr 0 arr 0 inpSz
+  unsafeCopyByteArray marr 0 arr 0 inpSz
   let
     halfTarSz = (tarSz - 1) `div` 2
     go copied
       | copied <= halfTarSz = do
-          copyMutableByteArray marr copied marr 0 copied
+          unsafeCopyMutableByteArray marr copied marr 0 copied
           go (copied + copied)
-      | otherwise = copyMutableByteArray marr copied marr 0 (tarSz - copied)
+      | otherwise = unsafeCopyMutableByteArray marr copied marr 0 (tarSz - copied)
   go inpSz
   unsafeFreezeByteArray marr
 
