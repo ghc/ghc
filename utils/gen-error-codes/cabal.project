@@ -1,0 +1,3 @@
+packages: gen-error-codes.cabal
+with-compiler: /you/must/set/the/compiler/to/your/local/build/of/ghc
+allow-newer: all

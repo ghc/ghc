@@ -780,6 +780,12 @@ instance Diagnostic PsMessage where
     PsErrIllegalGadtRecordMultiplicity{}          -> noHints
     PsErrInvalidCApiImport {}                     -> noHints
 
+  diagnosticCode _ = Nothing  -- "RAE"
+
+instance GhcDiagnostic PsMessage where
+  usedDiagnosticCodes = []
+  retiredDiagnosticCodes = []
+
 psHeaderMessageDiagnostic :: PsHeaderMessage -> DecoratedSDoc
 psHeaderMessageDiagnostic = \case
   PsErrParseLanguagePragma

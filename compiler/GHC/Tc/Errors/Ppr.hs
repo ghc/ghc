@@ -1552,6 +1552,11 @@ instance Diagnostic TcRnMessage where
     TcRnSpecialiseNotVisible name
       -> [SuggestSpecialiseVisibilityHints name]
 
+  diagnosticCode _ = Nothing  -- "RAE"
+
+instance GhcDiagnostic TcRnMessage where
+  usedDiagnosticCodes = []
+  retiredDiagnosticCodes = []
 
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",
 -- and so on.  The `and` stands for any `conjunction`, which is passed in.

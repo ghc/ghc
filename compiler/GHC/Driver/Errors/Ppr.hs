@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic {DriverMessage, GhcMessage}
 
 module GHC.Driver.Errors.Ppr where
@@ -10,8 +11,10 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.Flags
 import GHC.Driver.Session
 import GHC.HsToCore.Errors.Ppr ()
+import GHC.HsToCore.Errors.Types ( DsMessage )
 import GHC.Parser.Errors.Ppr ()
 import GHC.Tc.Errors.Ppr ()
+import GHC.Tc.Errors.Types ( TcRnMessage )
 import GHC.Types.Error
 import GHC.Unit.Types
 import GHC.Utils.Outputable
@@ -69,6 +72,32 @@ instance Diagnostic GhcMessage where
       -> diagnosticHints m
     GhcUnknownMessage m
       -> diagnosticHints m
+
+  diagnosticCode = \case
+    GhcPsMessage m
+      -> diagnosticCode m
+    GhcTcRnMessage m
+      -> diagnosticCode m
+    GhcDsMessage m
+      -> diagnosticCode m
+    GhcDriverMessage m
+      -> diagnosticCode m
+    GhcUnknownMessage m
+      -> diagnosticCode m
+
+instance GhcDiagnostic GhcMessage where
+  usedDiagnosticCodes = concat [ usedDiagnosticCodes @PsMessage
+                               , usedDiagnosticCodes @TcRnMessage
+                               , usedDiagnosticCodes @DsMessage
+                               , usedDiagnosticCodes @DriverMessage
+                               ]
+
+  retiredDiagnosticCodes = concat [ retiredDiagnosticCodes @PsMessage
+                                  , retiredDiagnosticCodes @TcRnMessage
+                                  , retiredDiagnosticCodes @DsMessage
+                                  , retiredDiagnosticCodes @DriverMessage
+                                  ]
+
 
 instance Diagnostic DriverMessage where
   diagnosticMessage = \case
@@ -311,3 +340,62 @@ instance Diagnostic DriverMessage where
       -> noHints
     DriverHomePackagesNotClosed {}
       -> noHints
+
+  diagnosticCode = fromGhcDiagnosticCode $ \case
+    DriverUnknownMessage {} -> Nothing
+    DriverPsHeaderMessage {} -> Just 34188
+    DriverMissingHomeModules{} -> Just 32850
+    DriverUnknownHiddenModules {} -> Just 38189
+    DriverUnknownReexportedModules {} -> Just 68286
+    DriverUnusedPackages{} -> Just 42258
+    DriverUnnecessarySourceImports{} -> Just 88907
+    DriverDuplicatedModuleDeclaration{} -> Just 29235
+    DriverModuleNotFound{} -> Just 82272
+    DriverFileModuleNameMismatch{} -> Just 28623
+    DriverUnexpectedSignature{} -> Just 66004
+    DriverFileNotFound{} -> Just 49196
+    DriverStaticPointersNotSupported -> Just 77799
+    DriverBackpackModuleNotFound{} -> Just 19971
+    DriverUserDefinedRuleIgnored{} -> Just 56147
+    DriverMixedSafetyImport{} -> Just 70172
+    DriverCannotLoadInterfaceFile{} -> Just 37141
+    DriverInferredSafeModule{} -> Just 58656
+    DriverMarkedTrustworthyButInferredSafe{} -> Just 19244
+    DriverInferredSafeImport{} -> Just 82658
+    DriverCannotImportUnsafeModule{} -> Just 44360
+    DriverMissingSafeHaskellMode{} -> Just 29747
+    DriverPackageNotTrusted{} -> Just 8674
+    DriverCannotImportFromUntrustedPackage{} -> Just 75165
+    DriverRedirectedNoMain {} -> Just 95379
+    DriverHomePackagesNotClosed {} -> Just 3271
+
+instance GhcDiagnostic DriverMessage where
+  usedDiagnosticCodes =
+    [ 34188
+    , 32850
+    , 38189
+    , 68286
+    , 42258
+    , 88907
+    , 29235
+    , 82272
+    , 26823
+    , 66004
+    , 49196
+    , 77799
+    , 19971
+    , 56147
+    , 70172
+    , 37141
+    , 58656
+    , 19244
+    , 82658
+    , 44360
+    , 29747
+    , 8674
+    , 75165
+    , 95379
+    , 3271
+    ]
+
+  retiredDiagnosticCodes = []

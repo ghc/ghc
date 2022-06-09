@@ -32,7 +32,7 @@ module GHC.Utils.Error (
 
         -- ** Construction
         DiagOpts (..), diag_wopt, diag_fatal_wopt,
-        emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn,
+        emptyMessages, mkDecorated, mkLocMessage,
         mkMsgEnvelope, mkPlainMsgEnvelope, mkPlainErrorMsgEnvelope,
         mkErrorMsgEnvelope,
         mkMCDiagnostic, errorDiagnostic, diagReasonSeverity,

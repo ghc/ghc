@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}  -- for usedDiagnosticCodes and retiredDiagnosticCodes
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -23,6 +24,7 @@ module GHC.Types.Error
    , MessageClass (..)
    , Severity (..)
    , Diagnostic (..)
+   , GhcDiagnostic (..)
    , DiagnosticMessage (..)
    , DiagnosticReason (..)
    , DiagnosticHint (..)
@@ -54,7 +56,7 @@ module GHC.Types.Error
 
    , pprMessageBag
    , mkLocMessage
-   , mkLocMessageAnn
+   , mkLocMessageWarningGroups
    , getCaretDiagnostic
    -- * Queries
    , isIntrinsicErrorMessage
@@ -65,6 +67,15 @@ module GHC.Types.Error
    , partitionMessages
    , errorsFound
    , errorsOrFatalWarningsFound
+
+   -- * Diagnostic codes
+   , DiagnosticCode
+   , mkDiagnosticCode
+   , GhcDiagnosticCode
+   , prefixGhcDiagnosticCode
+   , fromGhcDiagnosticCode
+   , numDigitsInGhcDiagnosticCode
+   , ghcDiagnosticCodeNumber
    )
 where
 
@@ -80,10 +91,15 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 import GHC.Utils.Json
+import GHC.Utils.Panic.Plain
 
 import Data.Bifunctor
 import Data.Foldable    ( fold )
 import GHC.Types.Hint
+import Text.Printf      ( printf )
+import qualified Data.List.NonEmpty as NE
+import Data.List ( intercalate )
+
 
 {-
 Note [Messages]
@@ -191,39 +207,6 @@ mapDecoratedSDoc :: (SDoc -> SDoc) -> DecoratedSDoc -> DecoratedSDoc
 mapDecoratedSDoc f (Decorated s1) =
   Decorated (map f s1)
 
-{-
-Note [Rendering Messages]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Turning 'Messages' into something that renders nicely for the user is one of
-the last steps, and it happens typically at the application's boundaries (i.e.
-from the 'Driver' upwards).
-
-For now (see #18516) this class has few instance, but the idea is that as the
-more domain-specific types are defined, the more instances we would get. For
-example, given something like:
-
-  data TcRnDiagnostic
-    = TcRnOutOfScope ..
-    | ..
-
-  newtype TcRnMessage = TcRnMessage (DiagnosticMessage TcRnDiagnostic)
-
-We could then define how a 'TcRnDiagnostic' is displayed to the user. Rather
-than scattering pieces of 'SDoc' around the codebase, we would write once for
-all:
-
-  instance Diagnostic TcRnDiagnostic where
-    diagnosticMessage (TcRnMessage msg) = case diagMessage msg of
-      TcRnOutOfScope .. -> Decorated [text "Out of scope error ..."]
-      ...
-
-This way, we can easily write generic rendering functions for errors that all
-they care about is the knowledge that a given type 'e' has a 'Diagnostic'
-constraint.
-
--}
-
 -- | A class identifying a diagnostic.
 -- Dictionary.com defines a diagnostic as:
 --
@@ -235,9 +218,48 @@ constraint.
 -- message was generated in the first place. See also Note [Rendering
 -- Messages].
 class Diagnostic a where
+  -- | Extract the error message text from a 'Diagnostic'.
   diagnosticMessage :: a -> DecoratedSDoc
+
+  -- | Extract the reason for this diagnostic. For warnings,
+  -- a 'DiagnosticReason' includes the warning flag
   diagnosticReason  :: a -> DiagnosticReason
+
+  -- | Extract any hints a user might use to repair their
+  -- code to avoid this diagnostic.
   diagnosticHints   :: a -> [GhcHint]
+
+  -- | Get the error code associated with this 'Diagnostic'.
+  -- This can return 'Nothing' for at leat two reasons:
+  --
+  -- 1. The message might be from a plugin that does not supply codes.
+  -- 2. The message might not yet have been assigned a code. See also
+  -- 'ghcDiagnosticCode'.
+  --
+  -- Ideally, case (2) would not happen, but because
+  -- some errors in GHC still use the old system of just writing the
+  -- error message in-place (instead of using a dedicated error type
+  -- and constructor), we do not have error codes for all errors.
+  -- #18516 tracks our progress toward this goal.
+  --
+  -- Instances of 'Diagnostic' within GHC may wish to use 'fromGhcDiagnosticCode'
+  -- to make defining this easier.
+  diagnosticCode    :: a -> Maybe DiagnosticCode
+
+-- | A class identifying diagnostic message types within GHC.
+-- This class does /not/ include plugin diagnostics, but every type
+-- within GHC that implements 'Diagnostic' should also implement this
+-- class.
+class Diagnostic a => GhcDiagnostic a where
+  -- | This list contains every diagnostic code used by a constructor
+  -- of this diagnostic type. NB: 'usedDiagnosticCodes' has an ambiguous
+  -- type and must be called using -XTypeApplications.
+  usedDiagnosticCodes :: [GhcDiagnosticCode]
+
+  -- | This list contains every diagnostic code previously used by a
+  -- constructor of this diagnostic type. NB: 'retiredDiagnosticCodes' has an
+  -- ambiguous type and must be called using -XTypeApplications.
+  retiredDiagnosticCodes :: [GhcDiagnosticCode]
 
 pprDiagnostic :: Diagnostic e => e -> SDoc
 pprDiagnostic e = vcat [ ppr (diagnosticReason e)
@@ -264,6 +286,7 @@ instance Diagnostic DiagnosticMessage where
   diagnosticMessage = diagMessage
   diagnosticReason  = diagReason
   diagnosticHints   = diagHints
+  diagnosticCode _  = Nothing
 
 -- | Helper function to use when no hints can be provided. Currently this function
 -- can be used to construct plain 'DiagnosticMessage' and add hints to them, but
@@ -425,13 +448,17 @@ showMsgEnvelope err =
 pprMessageBag :: Bag SDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 
--- | Make an unannotated error message with location info.
-mkLocMessage :: MessageClass -> SrcSpan -> SDoc -> SDoc
-mkLocMessage = mkLocMessageAnn Nothing
+mkLocMessage
+  :: MessageClass                       -- ^ What kind of message?
+  -> SrcSpan                            -- ^ location
+  -> SDoc                               -- ^ message
+  -> SDoc
+mkLocMessage = mkLocMessageWarningGroups True
 
--- | Make a possibly annotated error message with location info.
-mkLocMessageAnn
-  :: Maybe String                       -- ^ optional annotation
+-- | Make an error message with location info, specifying whether to show
+-- warning groups (if applicable).
+mkLocMessageWarningGroups
+  :: Bool                               -- ^ Print warning groups (if applicable)?
   -> MessageClass                       -- ^ What kind of message?
   -> SrcSpan                            -- ^ location
   -> SDoc                               -- ^ message
@@ -439,35 +466,59 @@ mkLocMessageAnn
   -- Always print the location, even if it is unhelpful.  Error messages
   -- are supposed to be in a standard format, and one without a location
   -- would look strange.  Better to say explicitly "<no location info>".
-mkLocMessageAnn ann msg_class locn msg
+mkLocMessageWarningGroups show_warn_groups msg_class locn msg
     = sdocOption sdocColScheme $ \col_scheme ->
       let locn' = sdocOption sdocErrorSpans $ \case
                      True  -> ppr locn
                      False -> ppr (srcSpanStart locn)
 
-          msgColour = getMessageClassColour msg_class col_scheme
+          msg_colour = getMessageClassColour msg_class col_scheme
 
-          -- Add optional information
-          optAnn = case ann of
-            Nothing -> text ""
-            Just i  -> text " [" <> coloured msgColour (text i) <> text "]"
+          msg_title =
+            case msg_class of
+              MCDiagnostic SevError _reason   -> text "error:"
+              MCDiagnostic SevWarning _reason -> text "warning:"
+              MCFatal                         -> text "fatal:"
+              _                               -> empty
+
+          warning_flag_doc =
+            case msg_class of
+              MCDiagnostic sev reason
+                | Just str <- flag_msg sev reason -> brackets (coloured msg_colour (text str))
+              _                                   -> empty
 
           -- Add prefixes, like    Foo.hs:34: warning:
           --                           <the warning message>
           header = locn' <> colon <+>
-                   coloured msgColour msgText <> optAnn
+                   coloured msg_colour msg_title <+> warning_flag_doc
 
       in coloured (Col.sMessage col_scheme)
                   (hang (coloured (Col.sHeader col_scheme) header) 4
                         msg)
 
   where
-    msgText =
-      case msg_class of
-        MCDiagnostic SevError _reason   -> text "error:"
-        MCDiagnostic SevWarning _reason -> text "warning:"
-        MCFatal                         -> text "fatal:"
-        _                               -> empty
+      flag_msg :: Severity -> DiagnosticReason -> Maybe String
+      flag_msg SevIgnore _                 =  panic "Called flag_msg with SevIgnore"
+      flag_msg SevError WarningWithoutFlag =  Just "-Werror"
+      flag_msg SevError (WarningWithFlag wflag) =
+        let name = NE.head (warnFlagNames wflag) in
+        Just $ "-W" ++ name ++ warn_flag_grp wflag ++
+               ", -Werror=" ++ name
+      flag_msg SevError ErrorWithoutFlag = Nothing
+      flag_msg SevWarning WarningWithoutFlag = Nothing
+      flag_msg SevWarning (WarningWithFlag wflag) =
+        let name = NE.head (warnFlagNames wflag) in
+        Just ("-W" ++ name ++ warn_flag_grp wflag)
+      flag_msg SevWarning ErrorWithoutFlag =
+        panic "SevWarning with ErrorWithoutFlag"
+
+      warn_flag_grp flag
+          | show_warn_groups =
+                case smallestWarningGroups flag of
+                    [] -> ""
+                    groups -> " (in " ++ intercalate ", " (map ("-W"++) groups) ++ ")"
+          | otherwise = ""
+
 
 getMessageClassColour :: MessageClass -> Col.Scheme -> Col.PprColour
 getMessageClassColour (MCDiagnostic SevError _reason)   = Col.sError
@@ -603,3 +654,86 @@ getErrorMessages (Messages xs) = fst $ partitionBag isIntrinsicErrorMessage xs
 -- warnings, and the second the errors.
 partitionMessages :: Diagnostic e => Messages e -> (Messages e, Messages e)
 partitionMessages (Messages xs) = bimap Messages Messages (partitionBag isWarningMessage xs)
+
+----------------------------------------------------------------
+--                                                            --
+-- Diagnostic Codes                                           --
+--                                                            --
+----------------------------------------------------------------
+
+{- Note [Diagnostic codes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+"RAE": Write note.
+Talk about difference between DiagnosticCode and GhcDiagnosticCode.
+-}
+
+-- | A diagnostic code (called an "error code" in its specification
+-- at "RAE": TODO) has a prefix and a suffix. Briefly, the prefix is
+-- an alphanumeric string assigned by the Haskell Foundation (in order
+-- to keep codes from different tools distinct). The suffix is a string
+-- of digits uniquely identifying a diagnostic.
+--
+-- To make a 'DiagnosticCode' from a 'GhcDiagnosticCode', see 'prefixGhcDiagnosticCode'.
+--
+-- See also Note [Diagnostic codes]
+data DiagnosticCode = MkDiagnosticCode SDoc SDoc
+
+mkDiagnosticCode :: SDoc   -- ^ prefix of diagnostic code; must be assiged by Haskell Foundation
+                 -> SDoc   -- ^ suffix of diagnostic code; must be a string of digits
+                 -> DiagnosticCode
+mkDiagnosticCode = MkDiagnosticCode
+
+instance Outputable DiagnosticCode where
+  ppr (MkDiagnosticCode prefix suffix) = brackets $ prefix <> char '-' <> suffix
+
+-- | Convert the GHC-specific 'GhcDiagnosticCode' to a tool-agnostic
+-- 'DiagnosticCode' by adding the @GHC-@ prefix.
+prefixGhcDiagnosticCode :: GhcDiagnosticCode -> DiagnosticCode
+prefixGhcDiagnosticCode (MkGhcDiagnosticCode n)
+  = MkDiagnosticCode (text ghcDiagnosticCodePrefix) (text ppr_n)
+  where
+    ppr_n = printf format_string n
+    format_string = "%0" ++ show numDigitsInGhcDiagnosticCode ++ "d"
+
+-- | Make defining 'diagnosticCode' easier within GHC. Example usage:
+--
+-- @
+--   instance Diagnostic MyMessage where
+--     diagnosticCode = fromGhcDiagnosticCode $ \case
+--       ...
+-- @
+fromGhcDiagnosticCode :: (a -> Maybe GhcDiagnosticCode) -> a -> Maybe DiagnosticCode
+fromGhcDiagnosticCode mk_ghc_dc = fmap prefixGhcDiagnosticCode . mk_ghc_dc
+
+-- | The code used within GHC to label a diagnostic. See Note [Diagnostic codes].
+newtype GhcDiagnosticCode = MkGhcDiagnosticCode Int
+  deriving (Eq, Ord)
+
+-- | Make it easy to write code without using the constructor
+instance Num GhcDiagnosticCode where
+  fromInteger = MkGhcDiagnosticCode . fromInteger
+
+  (+) = panic "adding GhcDiagnosticCodes"
+  (-) = panic "subtracting GhcDiagnosticCodes"
+  (*) = panic "multiplying GhcDiagnosticCodes"
+  abs = panic "abs GhcDiagnosticCode"
+  negate = panic "negate GhcDiagnosticCode"
+  signum = panic "signum GhcDiagnosticCode"
+
+-- | Extract the diagnostic code number from a 'GhcDiagnosticCode'
+ghcDiagnosticCodeNumber :: GhcDiagnosticCode -> Int
+ghcDiagnosticCodeNumber (MkGhcDiagnosticCode n) = n
+
+-- | The Haskell-Foundation-assigned prefix for GHC's diagnostic codes.
+ghcDiagnosticCodePrefix :: String
+ghcDiagnosticCodePrefix = "GHC"
+
+-- | The minimum number of digits of a diagnostic code. Codes are prefixed
+-- with 0s to print this many digits.
+numDigitsInGhcDiagnosticCode :: Int
+numDigitsInGhcDiagnosticCode = 5
+
+-- This instance outputs the full diagnostic code, including its "GHC-"
+-- prefix, and wraps it in brackets for visual distinction.
+instance Outputable GhcDiagnosticCode where
+  ppr = ppr . prefixGhcDiagnosticCode

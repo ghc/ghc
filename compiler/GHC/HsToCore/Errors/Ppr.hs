@@ -272,6 +272,12 @@ instance Diagnostic DsMessage where
     DsRuleMightInlineFirst _ lhs_id rule_act    -> [SuggestAddInlineOrNoInlinePragma lhs_id rule_act]
     DsAnotherRuleMightFireFirst _ bad_rule _    -> [SuggestAddPhaseToCompetingRule bad_rule]
 
+  diagnosticCode _ = Nothing  -- "RAE"
+
+instance GhcDiagnostic DsMessage where
+  usedDiagnosticCodes = []
+  retiredDiagnosticCodes = []
+
 {-
 Note [Suggest NegativeLiterals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

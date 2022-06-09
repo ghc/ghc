@@ -426,7 +426,7 @@ basicKnownKeyNames
         rationalToDoubleName,
 
         -- Other classes
-        randomClassName, randomGenClassName, monadPlusClassName,
+        monadPlusClassName,
 
         -- Type-level naturals
         knownNatClassName, knownSymbolClassName, knownCharClassName,
@@ -1574,11 +1574,8 @@ toAnnotationWrapperName :: Name
 toAnnotationWrapperName = varQual gHC_DESUGAR (fsLit "toAnnotationWrapper") toAnnotationWrapperIdKey
 
 -- Other classes, needed for type defaulting
-monadPlusClassName, randomClassName, randomGenClassName,
-    isStringClassName :: Name
+monadPlusClassName, isStringClassName :: Name
 monadPlusClassName  = clsQual mONAD (fsLit "MonadPlus")      monadPlusClassKey
-randomClassName     = clsQual rANDOM (fsLit "Random")        randomClassKey
-randomGenClassName  = clsQual rANDOM (fsLit "RandomGen")     randomGenClassKey
 isStringClassName   = clsQual dATA_STRING (fsLit "IsString") isStringClassKey
 
 -- Type-level naturals

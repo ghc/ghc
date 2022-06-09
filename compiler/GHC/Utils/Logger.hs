@@ -93,8 +93,7 @@ import System.Directory
 import System.FilePath  ( takeDirectory, (</>) )
 import qualified Data.Set as Set
 import Data.Set (Set)
-import Data.List (intercalate, stripPrefix)
-import qualified Data.List.NonEmpty as NE
+import Data.List (stripPrefix)
 import Data.Time
 import System.IO
 import Control.Monad
@@ -351,15 +350,15 @@ defaultLogAction logflags msg_class srcSpan msg
       MCInfo                   -> printErrs msg
       MCFatal                  -> printErrs msg
       MCDiagnostic SevIgnore _ -> pure () -- suppress the message
-      MCDiagnostic sev rea     -> printDiagnostics sev rea
+      MCDiagnostic _sev _rea   -> printDiagnostics
     where
       printOut   = defaultLogActionHPrintDoc  logflags False stdout
       printErrs  = defaultLogActionHPrintDoc  logflags False stderr
       putStrSDoc = defaultLogActionHPutStrDoc logflags False stdout
       -- Pretty print the warning flag, if any (#10752)
-      message sev rea = mkLocMessageAnn (flagMsg sev rea) msg_class srcSpan msg
+      message = mkLocMessageWarningGroups (log_show_warn_groups logflags) msg_class srcSpan msg
 
-      printDiagnostics severity reason = do
+      printDiagnostics = do
         hPutChar stderr '\n'
         caretDiagnostic <-
             if log_show_caret logflags
@@ -367,34 +366,11 @@ defaultLogAction logflags msg_class srcSpan msg
             else pure empty
         printErrs $ getPprStyle $ \style ->
           withPprStyle (setStyleColoured True style)
-            (message severity reason $+$ caretDiagnostic)
+            (message $+$ caretDiagnostic)
         -- careful (#2302): printErrs prints in UTF-8,
         -- whereas converting to string first and using
         -- hPutStr would just emit the low 8 bits of
         -- each unicode char.
-
-      flagMsg :: Severity -> DiagnosticReason -> Maybe String
-      flagMsg SevIgnore _                 =  panic "Called flagMsg with SevIgnore"
-      flagMsg SevError WarningWithoutFlag =  Just "-Werror"
-      flagMsg SevError (WarningWithFlag wflag) = do
-        let name = NE.head (warnFlagNames wflag)
-        return $
-          "-W" ++ name ++ warnFlagGrp wflag ++
-          ", -Werror=" ++ name
-      flagMsg SevError ErrorWithoutFlag = Nothing
-      flagMsg SevWarning WarningWithoutFlag = Nothing
-      flagMsg SevWarning (WarningWithFlag wflag) = do
-        let name = NE.head (warnFlagNames wflag)
-        return ("-W" ++ name ++ warnFlagGrp wflag)
-      flagMsg SevWarning ErrorWithoutFlag =
-        panic "SevWarning with ErrorWithoutFlag"
-
-      warnFlagGrp flag
-          | log_show_warn_groups logflags =
-                case smallestWarningGroups flag of
-                    [] -> ""
-                    groups -> " (in " ++ intercalate ", " (map ("-W"++) groups) ++ ")"
-          | otherwise = ""
 
 -- | Like 'defaultLogActionHPutStrDoc' but appends an extra newline.
 defaultLogActionHPrintDoc :: LogFlags -> Bool -> Handle -> SDoc -> IO ()
