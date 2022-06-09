@@ -780,10 +780,247 @@ instance Diagnostic PsMessage where
     PsErrIllegalGadtRecordMultiplicity{}          -> noHints
     PsErrInvalidCApiImport {}                     -> noHints
 
-  diagnosticCode _ = Nothing  -- "RAE"
+  diagnosticCode = fromGhcDiagnosticCode $ \case
+    PsUnknownMessage {}                           -> Nothing
+    PsHeaderMessage  m                            -> case m of
+      PsErrParseLanguagePragma{} -> Just 68686
+      PsErrUnsupportedExt{} -> Just 46537
+      PsErrParseOptionsPragma{} -> Just 24342
+      PsErrUnknownOptionsPragma{} -> Just 4924
+    PsWarnBidirectionalFormatChars{}              -> Just 3272
+    PsWarnTab{}                                   -> Just 94817
+    PsWarnTransitionalLayout{}                    -> Just 93617
+    PsWarnOperatorWhitespaceExtConflict{}         -> Just 47082
+    PsWarnOperatorWhitespace{}                    -> Just 40798
+    PsWarnHaddockInvalidPos                       -> Just 94458
+    PsWarnHaddockIgnoreMulti                      -> Just 5641
+    PsWarnStarBinder                              -> Just 21887
+    PsWarnStarIsType                              -> Just 39567
+    PsWarnUnrecognisedPragma                      -> Just 42044
+    PsWarnMisplacedPragma{}                       -> Just 28007
+    PsWarnImportPreQualified                      -> Just 7924
+    PsErrLexer{}                                  -> Just 21231
+    PsErrCmmLexer                                 -> Just 75725
+    PsErrCmmParser{}                              -> Just 9848
+    PsErrParse{}                                  -> Just 58481
+    PsErrTypeAppWithoutSpace{}                    -> Just 84077
+    PsErrLazyPatWithoutSpace{}                    -> Just 27207
+    PsErrBangPatWithoutSpace{}                    -> Just 95644
+    PsErrInvalidInfixHole                         -> Just 45106
+    PsErrExpectedHyphen                           -> Just 44524
+    PsErrSpaceInSCC                               -> Just 76176
+    PsErrEmptyDoubleQuotes{}                      -> Just 11861
+    PsErrLambdaCase{}                             -> Just 51179
+    PsErrEmptyLambda{}                            -> Just 71614
+    PsErrLinearFunction{}                         -> Just 31574
+    PsErrMultiWayIf{}                             -> Just 28985
+    PsErrOverloadedRecordUpdateNotEnabled{}       -> Just 82135
+    PsErrNumUnderscores{}                         -> Just 62330
+    PsErrIllegalBangPattern{}                     -> Just 79767
+    PsErrOverloadedRecordDotInvalid{}             -> Just 26832
+    PsErrIllegalPatSynExport                      -> Just 89515
+    PsErrOverloadedRecordUpdateNoQualifiedFields  -> Just 94863
+    PsErrExplicitForall{}                         -> Just 25955
+    PsErrIllegalQualifiedDo{}                     -> Just 40280
+    PsErrQualifiedDoInCmd{}                       -> Just 54089
+    PsErrRecordSyntaxInPatSynDecl{}               -> Just 28021
+    PsErrEmptyWhereInPatSynDecl{}                 -> Just 13248
+    PsErrInvalidWhereBindInPatSynDecl{}           -> Just 24737
+    PsErrNoSingleWhereBindInPatSynDecl{}          -> Just 65536
+    PsErrDeclSpliceNotAtTopLevel{}                -> Just 8451
+    PsErrMultipleNamesInStandaloneKindSignature{} -> Just 42569
+    PsErrIllegalExplicitNamespace                 -> Just 47007
+    PsErrUnallowedPragma{}                        -> Just 85314
+    PsErrImportPostQualified                      -> Just 87491
+    PsErrImportQualifiedTwice                     -> Just 5661
+    PsErrIllegalImportBundleForm                  -> Just 81284
+    PsErrInvalidRuleActivationMarker              -> Just 50396
+    PsErrMissingBlock                             -> Just 16849
+    PsErrUnsupportedBoxedSumExpr{}                -> Just 9550
+    PsErrUnsupportedBoxedSumPat{}                 -> Just 16863
+    PsErrUnexpectedQualifiedConstructor{}         -> Just 73413
+    PsErrTupleSectionInPat{}                      -> Just 9646
+    PsErrOpFewArgs{}                              -> Just 24180
+    PsErrVarForTyCon{}                            -> Just 18208
+    PsErrMalformedEntityString                    -> Just 26204
+    PsErrDotsInRecordUpdate                       -> Just 70712
+    PsErrInvalidDataCon{}                         -> Just 46574
+    PsErrInvalidInfixDataCon{}                    -> Just 30670
+    PsErrIllegalPromotionQuoteDataCon{}           -> Just 80236
+    PsErrUnpackDataCon                            -> Just 40845
+    PsErrUnexpectedKindAppInDataCon{}             -> Just 83653
+    PsErrInvalidRecordCon{}                       -> Just 8195
+    PsErrIllegalUnboxedStringInPat{}              -> Just 69925
+    PsErrIllegalUnboxedFloatingLitInPat{}         -> Just 76595
+    PsErrDoNotationInPat{}                        -> Just 6446
+    PsErrIfThenElseInPat                          -> Just 45696
+    PsErrLambdaCaseInPat{}                        -> Just 7636
+    PsErrCaseInPat                                -> Just 53786
+    PsErrLetInPat                                 -> Just 78892
+    PsErrLambdaInPat                              -> Just 482
+    PsErrArrowExprInPat{}                         -> Just 4584
+    PsErrArrowCmdInPat{}                          -> Just 98980
+    PsErrArrowCmdInExpr{}                         -> Just 66043
+    PsErrViewPatInExpr{}                          -> Just 66228
+    PsErrLambdaCmdInFunAppCmd{}                   -> Just 12178
+    PsErrCaseCmdInFunAppCmd{}                     -> Just 92971
+    PsErrLambdaCaseCmdInFunAppCmd{}               -> Just 47171
+    PsErrIfCmdInFunAppCmd{}                       -> Just 97005
+    PsErrLetCmdInFunAppCmd{}                      -> Just 70526
+    PsErrDoCmdInFunAppCmd{}                       -> Just 77808
+    PsErrDoInFunAppExpr{}                         -> Just 52095
+    PsErrMDoInFunAppExpr{}                        -> Just 67630
+    PsErrLambdaInFunAppExpr{}                     -> Just 6074
+    PsErrCaseInFunAppExpr{}                       -> Just 25037
+    PsErrLambdaCaseInFunAppExpr{}                 -> Just 77182
+    PsErrLetInFunAppExpr{}                        -> Just 90355
+    PsErrIfInFunAppExpr{}                         -> Just 1239
+    PsErrProcInFunAppExpr{}                       -> Just 4807
+    PsErrMalformedTyOrClDecl{}                    -> Just 47568
+    PsErrIllegalWhereInDataDecl                   -> Just 36952
+    PsErrIllegalDataTypeContext{}                 -> Just 87429
+    PsErrPrimStringInvalidChar                    -> Just 43080
+    PsErrSuffixAT                                 -> Just 33856
+    PsErrPrecedenceOutOfRange{}                   -> Just 25078
+    PsErrSemiColonsInCondExpr{}                   -> Just 75254
+    PsErrSemiColonsInCondCmd{}                    -> Just 18910
+    PsErrAtInPatPos                               -> Just 8382
+    PsErrParseErrorOnInput{}                      -> Just 66418
+    PsErrMalformedDecl{}                          -> Just 85316
+    PsErrUnexpectedTypeAppInDecl{}                -> Just 45054
+    PsErrNotADataCon{}                            -> Just 25742
+    PsErrInferredTypeVarNotAllowed                -> Just 57342
+    PsErrIllegalTraditionalRecordSyntax{}         -> Just 65719
+    PsErrParseErrorInCmd{}                        -> Just 3790
+    PsErrInPat{}                                  -> Just 7626
+    PsErrIllegalRoleName{}                        -> Just 9009
+    PsErrInvalidTypeSignature{}                   -> Just 94426
+    PsErrUnexpectedTypeInDecl{}                   -> Just 77878
+    PsErrInvalidPackageName{}                     -> Just 21926
+    PsErrParseRightOpSectionInPat{}               -> Just 72516
+    PsErrIllegalGadtRecordMultiplicity{}          -> Just 37475
+    PsErrInvalidCApiImport {}                     -> Just 72744
 
 instance GhcDiagnostic PsMessage where
-  usedDiagnosticCodes = []
+  usedDiagnosticCodes =
+    [ 68686
+    , 46537
+    , 24342
+    , 4924
+    , 3272
+    , 94817
+    , 93617
+    , 47082
+    , 40798
+    , 94458
+    , 5641
+    , 21887
+    , 39567
+    , 42044
+    , 28007
+    , 7924
+    , 21231
+    , 75725
+    , 9848
+    , 58481
+    , 84077
+    , 27207
+    , 95644
+    , 45106
+    , 44524
+    , 76176
+    , 11861
+    , 51179
+    , 71614
+    , 31574
+    , 28985
+    , 82135
+    , 62330
+    , 79767
+    , 26832
+    , 89515
+    , 94863
+    , 25955
+    , 40280
+    , 54089
+    , 28021
+    , 13248
+    , 24737
+    , 65536
+    , 8451
+    , 42569
+    , 47007
+    , 85314
+    , 87491
+    , 5661
+    , 81284
+    , 50396
+    , 16849
+    , 9550
+    , 16863
+    , 73413
+    , 9646
+    , 24180
+    , 18208
+    , 26204
+    , 70712
+    , 46574
+    , 30670
+    , 80236
+    , 40845
+    , 83653
+    , 8195
+    , 69925
+    , 76595
+    , 6446
+    , 45696
+    , 7636
+    , 53786
+    , 78892
+    , 482
+    , 4584
+    , 98980
+    , 66043
+    , 66228
+    , 12178
+    , 92971
+    , 47171
+    , 97005
+    , 70526
+    , 77808
+    , 52095
+    , 67630
+    , 6074
+    , 25037
+    , 77182
+    , 90355
+    , 1239
+    , 4807
+    , 47568
+    , 36952
+    , 87429
+    , 43080
+    , 33856
+    , 25078
+    , 75254
+    , 18910
+    , 8382
+    , 66418
+    , 85316
+    , 45054
+    , 25742
+    , 57342
+    , 65719
+    , 3790
+    , 7626
+    , 9009
+    , 94426
+    , 77878
+    , 21926
+    , 72516
+    , 37475
+    , 72744
+    ]
   retiredDiagnosticCodes = []
 
 psHeaderMessageDiagnostic :: PsHeaderMessage -> DecoratedSDoc

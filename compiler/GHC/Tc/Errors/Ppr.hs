@@ -1552,10 +1552,410 @@ instance Diagnostic TcRnMessage where
     TcRnSpecialiseNotVisible name
       -> [SuggestSpecialiseVisibilityHints name]
 
-  diagnosticCode _ = Nothing  -- "RAE"
+  diagnosticCode = fromGhcDiagnosticCode go
+    where
+    go = \case
+      TcRnUnknownMessage {} -> Nothing
+      TcRnMessageWithInfo _ (TcRnMessageDetailed _ m) -> go m
+
+        -- This just gets the code from the top message. We could do better with a more flexible
+        -- design around diagnostic codes.
+      TcRnSolverReport (SolverReportWithCtxt { reportContent = msg } : _) _ _ -> get_code msg
+        where
+          get_code = \case
+            TcReportWithInfo inner_msg _ -> get_code inner_msg
+            BadTelescope {} -> Just 97739
+            UserTypeError {} -> Just 64725
+            ReportHoleError {} -> Just 88464
+            CannotUnifyWithPolytype {} -> Just 91028
+            Mismatch {} -> Just 18872
+            KindMismatch {} -> Just 89223
+            TypeEqMismatch {} -> Just 46956   -- this should probably be split up
+            FixedRuntimeRepError {} -> Just 55287
+            SkolemEscape {} -> Just 83865
+            UntouchableVariable {} -> Just 34699
+            BlockedEquality {} -> Just 6200
+            ExpectingMoreArguments {} -> Just 81325
+            UnboundImplicitParams {} -> Just 91416
+            CouldNotDeduce {} -> Just 5617
+            AmbiguityPreventsSolvingCt {} -> Just 78125
+            CannotResolveInstance {} -> Just 39999
+            OverlappingInstances {} -> Just 43085
+            UnsafeOverlap {} -> Just 36705
+      TcRnSolverReport [] _ _ -> panic "empty TcRnSolverReport in diagnosticCode"
+
+      TcRnRedundantConstraints {} -> Just 30606
+      TcRnInaccessibleCode {} -> Just 40564
+      TcRnTypeDoesNotHaveFixedRuntimeRep{} -> Just 18478
+      TcRnImplicitLift{} -> Just 846
+      TcRnUnusedPatternBinds{} -> Just 61367
+      TcRnDodgyImports{} -> Just 99623
+      TcRnDodgyExports{} -> Just 75356
+      TcRnMissingImportList{} -> Just 77037
+      TcRnUnsafeDueToPlugin{} -> Just 1687
+      TcRnModMissingRealSrcSpan{} -> Just 84170
+      TcRnIdNotExportedFromModuleSig{} -> Just 44188
+      TcRnIdNotExportedFromLocalSig{} -> Just 50058
+      TcRnShadowedName{} -> Just 63397
+      TcRnDuplicateWarningDecls{} -> Just 711
+      TcRnSimplifierTooManyIterations{} -> Just 95822
+      TcRnIllegalPatSynDecl{} -> Just 82077
+      TcRnLinearPatSyn{} -> Just 15172
+      TcRnEmptyRecordUpdate -> Just 20825
+      TcRnIllegalFieldPunning{} -> Just 44287
+      TcRnIllegalWildcardsInRecord{} -> Just 37132
+      TcRnIllegalWildcardInType{} -> Just 65507
+      TcRnDuplicateFieldName{} -> Just 85524
+      TcRnIllegalViewPattern{} -> Just 22406
+      TcRnCharLiteralOutOfRange{} -> Just 17268
+      TcRnIllegalWildcardsInConstructor{} -> Just 47217
+      TcRnIgnoringAnnotations{} -> Just 66649
+      TcRnAnnotationInSafeHaskell -> Just 68934
+      TcRnInvalidTypeApplication{} -> Just 95781
+      TcRnTagToEnumMissingValArg -> Just 36495
+      TcRnTagToEnumUnspecifiedResTy{} -> Just 8522
+      TcRnTagToEnumResTyNotAnEnum{} -> Just 49356
+      TcRnArrowIfThenElsePredDependsOnResultTy -> Just 55868
+      TcRnIllegalHsBootFileDecl -> Just 58195
+      TcRnRecursivePatternSynonym{} -> Just 72489
+      TcRnPartialTypeSigTyVarMismatch{} -> Just 88793
+      TcRnPartialTypeSigBadQuantifier{} -> Just 94185
+      TcRnMissingSignature{} -> Just 38417
+      TcRnPolymorphicBinderMissingSig{} -> Just 64414
+      TcRnOverloadedSig{} -> Just 16675
+      TcRnTupleConstraintInst{} -> Just 69012
+      TcRnAbstractClassInst{} -> Just 51758
+      TcRnNoClassInstHead{} -> Just 56538
+      TcRnUserTypeError{} -> Just 47403
+      TcRnConstraintInKind{} -> Just 1259
+      TcRnUnboxedTupleOrSumTypeFuncArg{} -> Just 19590
+      TcRnLinearFuncInKind{} -> Just 13218
+      TcRnForAllEscapeError{} -> Just 31147
+      TcRnVDQInTermType{} -> Just 51580
+      TcRnBadQuantPredHead{} -> Just 2550
+      TcRnIllegalTupleConstraint{} -> Just 77539
+      TcRnNonTypeVarArgInConstraint{} -> Just 80003
+      TcRnIllegalImplicitParam{} -> Just 75863
+      TcRnIllegalConstraintSynonymOfKind{} -> Just 75844
+      TcRnIllegalClassInst{} -> Just 53946
+      TcRnOversaturatedVisibleKindArg{} -> Just 45474
+      TcRnBadAssociatedType{} -> Just 38351
+      TcRnForAllRankErr{} -> Just 91510
+      TcRnMonomorphicBindings{} -> Just 55524
+      TcRnOrphanInstance{} -> Just 90177
+      TcRnFunDepConflict{} -> Just 46208
+      TcRnDupInstanceDecls{} -> Just 59692
+      TcRnConflictingFamInstDecls{} -> Just 34447
+      TcRnFamInstNotInjective{} -> Just 5175
+      TcRnBangOnUnliftedType{} -> Just 55666
+      TcRnMultipleDefaultDeclarations{} -> Just 99565
+      TcRnBadDefaultType{} -> Just 88933
+      TcRnPatSynBundledWithNonDataCon{} -> Just 66775
+      TcRnPatSynBundledWithWrongType{} -> Just 66025
+      TcRnDupeModuleExport{} -> Just 51876
+      TcRnExportedModNotImported{} -> Just 90973
+      TcRnNullExportedModule{} -> Just 64649
+      TcRnMissingExportList{} -> Just 85401
+      TcRnExportHiddenComponents{} -> Just 94558
+      TcRnDuplicateExport{} -> Just 47854
+      TcRnExportedParentChildMismatch{} -> Just 88993
+      TcRnConflictingExports{} -> Just 69158
+      TcRnAmbiguousField{} -> Just 2256
+      TcRnMissingFields{} -> Just 20125
+      TcRnFieldUpdateInvalidType{} -> Just 63055
+      TcRnNoConstructorHasAllFields{} -> Just 14392
+      TcRnMixedSelectors{} -> Just 40887
+      TcRnMissingStrictFields{} -> Just 95909
+      TcRnNoPossibleParentForFields{} -> Just 33238
+      TcRnBadOverloadedRecordUpdate{} -> Just 99339
+      TcRnStaticFormNotClosed{} -> Just 88431
+      TcRnUselessTypeable -> Just 90584
+      TcRnDerivingDefaults{} -> Just 20042
+      TcRnNonUnaryTypeclassConstraint{} -> Just 73993
+      TcRnPartialTypeSignatures{} -> Just 60661
+      TcRnCannotDeriveInstance _ _ _ _ rea
+        -> case rea of
+             DerivErrNotWellKinded{}                 -> Just 62016
+             DerivErrSafeHaskellGenericInst          -> Just 7214
+             DerivErrDerivingViaWrongKind{}          -> Just 63174
+             DerivErrNoEtaReduce{}                   -> Just 38996
+             DerivErrBootFileFound                   -> Just 30903
+             DerivErrDataConsNotAllInScope{}         -> Just 54540
+             DerivErrGNDUsedOnData                   -> Just 10333
+             DerivErrNullaryClasses                  -> Just 4956
+             DerivErrLastArgMustBeApp                -> Just 28323
+             DerivErrNoFamilyInstance{}              -> Just 82614
+             DerivErrNotStockDeriveable{}            -> Just 158
+             DerivErrHasAssociatedDatatypes{}        -> Just 34611
+             DerivErrNewtypeNonDeriveableClass       -> Just 82023
+             DerivErrCannotEtaReduceEnough{}         -> Just 26557
+             DerivErrOnlyAnyClassDeriveable{}        -> Just 23244
+             DerivErrNotDeriveable{}                 -> Just 38178
+             DerivErrNotAClass{}                     -> Just 63388
+             DerivErrNoConstructors{}                -> Just 64560
+             DerivErrLangExtRequired{}               -> Just 86639
+             DerivErrDunnoHowToDeriveForType{}       -> Just 48959
+             DerivErrMustBeEnumType{}                -> Just 30750
+             DerivErrMustHaveExactlyOneConstructor{} -> Just 37542
+             DerivErrMustHaveSomeParameters{}        -> Just 45539
+             DerivErrMustNotHaveClassContext{}       -> Just 16588
+             DerivErrBadConstructor{}                -> Just 16437
+             DerivErrGenerics{}                      -> Just 30367
+             DerivErrEnumOrProduct{}                 -> Just 58291
+      TcRnLazyGADTPattern -> Just 87005
+      TcRnArrowProcGADTPattern -> Just 64525
+      TcRnSpecialClassInst {} -> Just 97044
+      TcRnForallIdentifier {} -> Just 64088
+      TcRnTypeEqualityOutOfScope -> Just 12003
+      TcRnTypeEqualityRequiresOperators -> Just 58520
+      TcRnIllegalTypeOperator {} -> Just 62547
+      TcRnGADTMonoLocalBinds {} -> Just 58008
+      TcRnIncorrectNameSpace {} -> Just 31891
+      TcRnNotInScope {} -> Just 76037
+      TcRnUntickedPromotedThing {} -> Just 49957
+      TcRnIllegalBuiltinSyntax {} -> Just 39716
+      TcRnWarnDefaulting {} -> Just 18042
+      TcRnForeignImportPrimExtNotSet{} -> Just 49692
+      TcRnForeignImportPrimSafeAnn{} -> Just 26133
+      TcRnForeignFunctionImportAsValue{} -> Just 76251
+      TcRnFunPtrImportWithoutAmpersand{} -> Just 57989
+      TcRnIllegalForeignDeclBackend{} -> Just 3355
+      TcRnUnsupportedCallConv{} -> Just 1245
+      TcRnIllegalForeignType _ reason -> case reason of
+        TypeCannotBeMarshaled _ sub_reason -> case sub_reason of
+          NotADataType{} -> Just 31136
+          NewtypeDataConNotInScope{} -> Just 72317
+          UnliftedFFITypesNeeded{} -> Just 10964
+          NotABoxedMarshalableTyCon{} -> Just 89401
+          ForeignLabelNotAPtr{} -> Just 26070
+          NotSimpleUnliftedType{} -> Just 43510
+          NotBoxedKindAny{} -> Just 64097
+        ForeignDynNotPtr{} -> Just 27555
+        SafeHaskellMustBeInIO{} -> Just 57638
+        IOResultExpected{} -> Just 41843
+        UnexpectedNestedForall{} -> Just 92994
+        LinearTypesNotAllowed{} -> Just 57396
+        OneArgExpected{} -> Just 91490
+        AtLeastOneArgExpected{} -> Just 7641
+      TcRnInvalidCIdentifier{} -> Just 95774
+      TcRnExpectedValueId{} -> Just 1570
+      TcRnNotARecordSelector{} -> Just 47535
+      TcRnRecSelectorEscapedTyVar{} -> Just 55876
+      TcRnPatSynNotBidirectional{} -> Just 16444
+      TcRnSplicePolymorphicLocalVar{} -> Just 6568
+      TcRnIllegalDerivingItem{} -> Just 11913
+      TcRnUnexpectedAnnotation{} -> Just 18932
+      TcRnIllegalRecordSyntax{} -> Just 89246
+      TcRnUnexpectedTypeSplice{} -> Just 39180
+      TcRnInvalidVisibleKindArgument{} -> Just 20967
+      TcRnTooManyBinders{} -> Just 5989
+      TcRnDifferentNamesForTyVar{} -> Just 17370
+      TcRnInvalidReturnKind{} -> Just 55233
+      TcRnClassKindNotConstraint{} -> Just 80768
+      TcRnUnpromotableThing{} -> Just 88634
+      TcRnMatchesHaveDiffNumArgs{} -> Just 91938
+      TcRnCannotBindScopedTyVarInPatSig{} -> Just 46131
+      TcRnCannotBindTyVarsInPatBind{} -> Just 48361
+      TcRnTooManyTyArgsInConPattern{} -> Just 1629
+      TcRnMultipleInlinePragmas{} -> Just 96665
+      TcRnUnexpectedPragmas{} -> Just 88293
+      TcRnNonOverloadedSpecialisePragma{} -> Just 35827
+      TcRnSpecialiseNotVisible{} -> Just 85337
 
 instance GhcDiagnostic TcRnMessage where
-  usedDiagnosticCodes = []
+  usedDiagnosticCodes =
+    [ 97739
+    , 64725
+    , 80464
+    , 91028
+    , 18872
+    , 89223
+    , 46956
+    , 55287
+    , 83865
+    , 34699
+    , 6200
+    , 81325
+    , 91416
+    , 5617
+    , 78125
+    , 39999
+    , 43085
+    , 36705
+    , 30606
+    , 40564
+    , 18478
+    , 846
+    , 61367
+    , 99623
+    , 75356
+    , 77037
+    , 1687
+    , 84170
+    , 44188
+    , 50058
+    , 63397
+    , 711
+    , 95822
+    , 82077
+    , 15172
+    , 20825
+    , 44287
+    , 37132
+    , 65507
+    , 85524
+    , 22406
+    , 17268
+    , 47217
+    , 66649
+    , 68934
+    , 95781
+    , 36495
+    , 8522
+    , 49356
+    , 55868
+    , 58195
+    , 72489
+    , 88793
+    , 94185
+    , 38417
+    , 64414
+    , 16675
+    , 69012
+    , 51758
+    , 56538
+    , 47403
+    , 1259
+    , 19590
+    , 13218
+    , 31147
+    , 51580
+    , 2550
+    , 77539
+    , 80003
+    , 75863
+    , 75844
+    , 53946
+    , 45474
+    , 38351
+    , 91510
+    , 55524
+    , 90177
+    , 46208
+    , 59692
+    , 34447
+    , 5175
+    , 55666
+    , 99565
+    , 88933
+    , 66775
+    , 66025
+    , 51876
+    , 90973
+    , 64649
+    , 85401
+    , 94558
+    , 47854
+    , 88993
+    , 69158
+    , 2256
+    , 20125
+    , 63055
+    , 14392
+    , 40887
+    , 95909
+    , 33238
+    , 99339
+    , 88431
+    , 90584
+    , 20042
+    , 73993
+    , 60661
+    , 62016
+    , 7214
+    , 63174
+    , 38996
+    , 30903
+    , 54540
+    , 10333
+    , 4956
+    , 28323
+    , 82614
+    , 158
+    , 34611
+    , 82023
+    , 26557
+    , 23244
+    , 38178
+    , 63388
+    , 64560
+    , 86639
+    , 48959
+    , 30750
+    , 37542
+    , 45539
+    , 16588
+    , 16437
+    , 30367
+    , 58291
+    , 87005
+    , 64525
+    , 97044
+    , 64088
+    , 12003
+    , 58520
+    , 62547
+    , 58008
+    , 31891
+    , 76037
+    , 49957
+    , 39716
+    , 18042
+    , 49692
+    , 26133
+    , 76251
+    , 57989
+    , 3355
+    , 1245
+    , 31136
+    , 72317
+    , 10964
+    , 89401
+    , 26070
+    , 43510
+    , 64097
+    , 27555
+    , 57638
+    , 41843
+    , 92994
+    , 57396
+    , 91490
+    , 7641
+    , 95774
+    , 1570
+    , 47535
+    , 55876
+    , 16444
+    , 6568
+    , 11913
+    , 18932
+    , 89246
+    , 39180
+    , 20967
+    , 5989
+    , 17370
+    , 55233
+    , 80768
+    , 88634
+    , 91938
+    , 46131
+    , 48361
+    , 1629
+    , 96665
+    , 88293
+    , 35827
+    , 85337
+    ]
   retiredDiagnosticCodes = []
 
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",

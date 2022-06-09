@@ -272,10 +272,66 @@ instance Diagnostic DsMessage where
     DsRuleMightInlineFirst _ lhs_id rule_act    -> [SuggestAddInlineOrNoInlinePragma lhs_id rule_act]
     DsAnotherRuleMightFireFirst _ bad_rule _    -> [SuggestAddPhaseToCompetingRule bad_rule]
 
-  diagnosticCode _ = Nothing  -- "RAE"
+  diagnosticCode = fromGhcDiagnosticCode $ \case
+    DsUnknownMessage{}                          -> Nothing
+    DsEmptyEnumeration                          -> Just 10190
+    DsIdentitiesFound{}                         -> Just 4214
+    DsOverflowedLiterals{}                      -> Just 97441
+    DsRedundantBangPatterns{}                   -> Just 38520
+    DsOverlappingPatterns{}                     -> Just 53633
+    DsInaccessibleRhs{}                         -> Just 94210
+    DsMaxPmCheckModelsReached{}                 -> Just 61505
+    DsNonExhaustivePatterns {}                  -> Just 62161
+    DsTopLevelBindsNotAllowed{}                 -> Just 48099
+    DsUselessSpecialiseForClassMethodSelector{} -> Just 93315
+    DsUselessSpecialiseForNoInlineFunction{}    -> Just 38524
+    DsMultiplicityCoercionsNotSupported{}       -> Just 59840
+    DsOrphanRule{}                              -> Just 58181
+    DsRuleLhsTooComplicated{}                   -> Just 69441
+    DsRuleIgnoredDueToConstructor{}             -> Just 828
+    DsRuleBindersNotBound{}                     -> Just 40548
+    DsMultipleConForNewtype{}                   -> Just 5380
+    DsLazyPatCantBindVarsOfUnliftedType{}       -> Just 17879
+    DsNotYetHandledByTH{}                       -> Just 65904
+    DsAggregatedViewExpressions{}               -> Just 19551
+    DsUnbangedStrictPatterns{}                  -> Just 21030
+    DsCannotMixPolyAndUnliftedBindings{}        -> Just 20036
+    DsWrongDoBind{}                             -> Just 8838
+    DsUnusedDoBind{}                            -> Just 81995
+    DsRecBindsNotAllowedForUnliftedTys{}        -> Just 20185
+    DsRuleMightInlineFirst{}                    -> Just 95396
+    DsAnotherRuleMightFireFirst{}               -> Just 87502
 
 instance GhcDiagnostic DsMessage where
-  usedDiagnosticCodes = []
+  usedDiagnosticCodes =
+    [ 10190
+    , 4214
+    , 97441
+    , 38520
+    , 53633
+    , 94210
+    , 61505
+    , 62161
+    , 48099
+    , 93315
+    , 38524
+    , 59840
+    , 58181
+    , 69441
+    , 828
+    , 40548
+    , 5380
+    , 17879
+    , 65904
+    , 19551
+    , 21030
+    , 20036
+    , 8838
+    , 81995
+    , 20185
+    , 95396
+    , 87502
+    ]
   retiredDiagnosticCodes = []
 
 {-
