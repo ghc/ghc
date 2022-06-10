@@ -193,7 +193,21 @@ StrHashTable *symhash;
 #if defined(THREADED_RTS)
 /* This protects all the Linker's global state */
 Mutex linker_mutex;
+
+/*
+ * This protects native code that we want to free from freeNativeCode.
+ * We want a separate mutex here so that we are able to queue up freeNativeCode_
+ * calls while a long dlopen is taking place, and then free them after
+ * unlocking the mutex.
+ */
+Mutex free_native_code_mutex;
 #endif
+
+/* List of objects that are waiting to be freed after being checked by
+ * CheckUnload(). Protected by free_native_code_mutex. */
+ObjectCode *to_free_native_objects = NULL; /* initially empty */
+
+static void tryFreeNativeCode ( void );
 
 /* Generic wrapper function to try and Resolve and RunInit oc files */
 int ocTryLoad( ObjectCode* oc );
@@ -469,6 +483,7 @@ initLinker_ (int retain_cafs)
 
 #if defined(THREADED_RTS)
     initMutex(&linker_mutex);
+    initMutex(&free_native_code_mutex);
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
     initMutex(&dl_mutex);
 #endif
@@ -1385,9 +1400,17 @@ void freeObjectCode (ObjectCode *oc)
 {
     if (oc->type == DYNAMIC_OBJECT) {
 #if defined(OBJFORMAT_ELF)
-        ACQUIRE_LOCK(&dl_mutex);
-        freeNativeCode_ELF(oc);
-        RELEASE_LOCK(&dl_mutex);
+        /* We don't actually free the object here since this may require that
+         * we take the dl_mutex, which can be held for long durations due to
+         * dlopen. Instead we add the object to the to-be-freed queue and 
+         * opportunistically process this queue if the lock is available.
+         */
+        ACQUIRE_LOCK(&free_native_code_mutex);
+        oc->next = to_free_native_objects;
+        to_free_native_objects = oc;
+        RELEASE_LOCK(&free_native_code_mutex);
+        tryFreeNativeCode();
+        return;
 #else
         barf("freeObjectCode: This shouldn't happen");
 #endif
@@ -2104,6 +2127,12 @@ void * loadNativeObj (pathchar *path, char **errmsg)
    ACQUIRE_LOCK(&linker_mutex);
    void *r = loadNativeObj_ELF(path, errmsg);
    RELEASE_LOCK(&linker_mutex);
+
+   // If we are calling loadNativeObj a lot we may build up a queue of objects
+   // to clean up, so do that here at the very least to prevent the caller of
+   // this to grow memory unboundedly.
+   tryFreeNativeCode();
+
    return r;
 }
 #else
@@ -2127,10 +2156,12 @@ HsInt unloadNativeObj (void *handle)
         next = nc->next_loaded_object; // we might move nc
 
         if (nc->type == DYNAMIC_OBJECT && nc->dlopen_handle == handle) {
+            // Mark object for unloading. It will eventually be unloaded by
+            // CheckUnload when it becomes unreachable.
             nc->status = OBJECT_UNLOADED;
             n_unloaded_objects += 1;
 
-            // dynamic objects have no symbols
+            // N.B. dynamic objects have no symbols
             CHECK(nc->symbols == NULL);
             freeOcStablePtrs(nc);
 
@@ -2149,10 +2180,59 @@ HsInt unloadNativeObj (void *handle)
     if (unloadedAnyObj) {
         return 1;
     } else {
-        errorBelch("unloadObjNativeObj_ELF: can't find `%p' to unload", handle);
+        errorBelch("unloadObjNativeObj: can't find `%p' to unload", handle);
         return 0;
     }
 }
+
+// Actually free a (unreachable) native object.
+static void freeNativeObj_ ( ObjectCode *oc )
+{
+    ASSERT(oc->type == DYNAMIC_OBJECT);
+#if defined(OBJFORMAT_ELF)
+    freeNativeCode_ELF(oc);
+#endif
+}
+
+// Attempt to free any native code slated for unloading. However, does nothing
+// if dl_mutex is taken (since we don't want the GC to block on long dlopen
+// operations).
+static void tryFreeNativeCode ( void )
+{
+  ObjectCode *nc, *next;
+
+  while (true) {
+    ACQUIRE_LOCK(&free_native_code_mutex);
+    nc = to_free_native_objects;
+    to_free_native_objects = NULL;
+    RELEASE_LOCK(&free_native_code_mutex);
+
+    if (nc == NULL) {
+        return;
+    }
+
+  #if defined(THREADED_RTS)
+    if (TRY_ACQUIRE_LOCK(&dl_mutex) != 0) {
+        IF_DEBUG(linker, debugBelch("Unable to acquire dl lock, not pruning"
+                                    "native objs."));
+        ACQUIRE_LOCK(&free_native_code_mutex);
+        // re-add this to the list
+        nc->next = to_free_native_objects;
+        to_free_native_objects = nc;
+        RELEASE_LOCK(&free_native_code_mutex);
+        return;
+    }
+  #endif
+
+    while (nc) {
+        next = nc->next;
+        freeNativeObj_(nc);
+        nc = next;
+    }
+    RELEASE_LOCK(&dl_mutex);
+  }
+}
+
 
 /* -----------------------------------------------------------------------------
  * Segment management
