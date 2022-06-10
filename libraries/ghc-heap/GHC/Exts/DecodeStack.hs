@@ -7,7 +7,13 @@
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack where
 
-#if MIN_VERSION_base(4,16,0)
+#if MIN_VERSION_base(4,17,0)
+import Data.Bits (Bits (shift))
+import Foreign (Storable (peekElemOff))
+import GHC.Base (Word, plusAddr#, thenIO)
+import GHC.Exts.Heap (Closure, GenClosure (payload))
+import GHC.Exts.Heap.StackFFI (peekSmallBitmapWord)
+
 import Prelude
 import GHC.Stack.CloneStack
 import GHC.Exts.Heap
@@ -17,6 +23,37 @@ import GHC.Exts
 import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 import Numeric
 
+data BitmapPayload = Closure Addr# | Primitive Word
+  deriving (Eq)
+
+instance Show BitmapPayload where
+  show (Primitive w) = "Primitive " ++ show w
+  show (Closure addr#) = "Closure " ++ showAddr# addr#
+
+-- TODO There are likely more. See MiscClosures.h
+data SpecialRetSmall =
+  None |
+  ApV |
+  ApF |
+  ApD |
+  ApL |
+  ApN |
+  ApP |
+  ApPP |
+  ApPPP |
+  ApPPPP |
+  ApPPPPP |
+  ApPPPPPP |
+  RetV |
+  RetP |
+  RetN |
+  RetF |
+  RetD |
+  RetL |
+  RestoreCCCS |
+  RestoreCCCSEval
+  deriving (Enum, Eq,Show)
+
 data StackFrame =
   UpdateFrame |
   CatchFrame |
@@ -25,7 +62,7 @@ data StackFrame =
   AtomicallyFrame |
   UnderflowFrame |
   StopFrame |
-  RetSmall |
+  RetSmall SpecialRetSmall [BitmapPayload] |
   RetBig |
   RetFun |
   RetBCO
@@ -33,6 +70,7 @@ data StackFrame =
 
 foreign import ccall "stackFrameSizeW" stackFrameSizeW :: Addr# -> Word
 foreign import ccall "getItbl" getItbl :: Addr# -> Ptr StgInfoTable
+foreign import ccall "getSpecialRetSmall" getSpecialRetSmall :: Addr# -> Word
 
 decodeStack :: StackSnapshot -> IO [StackFrame]
 decodeStack (StackSnapshot stack) = do
@@ -84,7 +122,14 @@ toStackFrame sp = do
   traceM $ "itbl " ++ show itbl
   pure $ case tipe itbl of
      RET_BCO -> RetBCO
-     RET_SMALL -> RetSmall
+     RET_SMALL -> do
+       let special = ((toEnum . fromInteger . toInteger) (getSpecialRetSmall sp))
+           -- TODO: Use word size here, not just 8
+           payloadAddr# = plusAddr# sp (toInt# 8)
+       bitmapSize <- peekBitmapSize sp
+       bitmap <- peekSmallBitmapWord sp payloads
+       payloads <- peekBitmapPayloadArray bitmapSize bitmap
+       pure $ RetSmall special payloads
      RET_BIG -> RetBig
      RET_FUN -> RetFun
      UPDATE_FRAME -> UpdateFrame
@@ -96,6 +141,23 @@ toStackFrame sp = do
      CATCH_STM_FRAME -> CatchStmFrame
      _ -> error $ "Unexpected closure type on stack: " ++ show (tipe itbl)
 
+-- TODO: Use Ptr instead of Addr# (in all possible places)?
+peekBitmapPayloadArray          ::  Word -> Ptr BitmapPayload -> IO [BitmapPayload]
+peekBitmapPayloadArray size ptr | size == 0 = pure []
+                 | otherwise = f (size-1) []
+  where
+    f 0 acc = do e <- peekBitmapPayload ptr 0; pure (e:acc)
+    f n acc = do e <- peekBitmapPayload ptr n; f (n-1) (e:acc)
+
+peekBitmapPayload :: Ptr BitmapPayload -> Word -> IO BitmapPayload
+peekBitmapPayload ptr index = if bitmap .&. (1 `shiftL` index) == 0 then do
+  -- Closure
+                                e <- peekElemOff ptr  index
+                                pure $ Closure e
+  else do
+  -- Primitive
+                                e <- peekElemOff ptr index
+                                pure $ Primitive e
 -- | Converts to 'Int#'
 -- An 'Integral' can be bigger than the domain of 'Int#'. This function drops
 -- the additional bits. So, the caller should better make sure that this
@@ -112,4 +174,5 @@ showAddr# addr# = showHex (addrToInt addr#) ""
 
 addrToInt:: Addr# -> Int
 addrToInt addr# = I# (addr2Int# addr#)
+
 #endif

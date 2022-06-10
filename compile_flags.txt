@@ -2,4 +2,4 @@
 -Irts
 -Irts/include
 -I.hie-bios/stage0/lib
-
+-DDEBUG
