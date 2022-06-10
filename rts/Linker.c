@@ -172,6 +172,18 @@ extern void iconv();
 
      This phase may transition an ObjectCode from `OBJECT_LOADED` to `OBJECT_RESOLVED`
 
+   * Eventually the user may ask for the object to be unloaded using
+     `unloadObj`. At this point the object's status is set to
+     `OBJECT_UNLOADED`, it is removed from the `loaded_objects` list and its
+     symbols are removed from the symbol table. However, its mappings are not
+     yet freed since there may still be references to the object.
+
+   * During major GCs the garbage collector marks objects which it finds
+     references to (using `markObjectCode`)
+
+   * Eventually when an object marked for unloading is finally deemed unreachable
+     by the GC it is unmapped and freed using `freeObjectCode`.
+
    When a new scope is introduced (e.g. a new module imported) GHCi does a full re-link
    by calling unloadObj and starting over.
    When a new declaration or statement is performed ultimately lookupSymbol is called
