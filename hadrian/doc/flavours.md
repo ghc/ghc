@@ -231,9 +231,8 @@ The supported transformers are listed below:
             It is recommended that you use this in conjunction with `no_dynamic_ghc` since
             GHC does not support loading of profiled libraries with the
             dynamic linker. You should use a flavour that builds profiling libs and rts,
-            i.e. not <code>quick</code>.
-
-            This flag adds cost centres with the -fprof-late flag. </td>
+            i.e. not <code>quick</code>. <br>
+            This flag adds cost centres with the -fprof-late flag.</td>
     </tr>
     <tr>
         <td><code>no_dynamic_ghc</code></td>
