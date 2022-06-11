@@ -22,6 +22,7 @@ module GHC.Types.RepType
     ubxSumRepType, layoutUbxSum, typeSlotTy, SlotTy (..),
     slotPrimRep, primRepSlot,
 
+    isVirtualTyCon,
     ) where
 
 import GHC.Prelude
@@ -674,3 +675,22 @@ primRepToRuntimeRep rep = case rep of
 -- See also Note [RuntimeRep and PrimRep]
 primRepToType :: PrimRep -> Type
 primRepToType = anyTypeOfKind . mkTYPEapp . primRepToRuntimeRep
+
+isVirtualTyCon :: TyCon -> Bool
+isVirtualTyCon tc
+  -- Exactly one constructor
+  | [dc] <- tyConDataCons tc
+  -- No constraints (TODO: maybe allow equalities? Do we have to check dataConEqSpec?)
+  , [] <- filter (not . isZeroBitTy) (dataConOtherTheta dc)
+  -- There's an exactly one non-void field
+  , [(field, strictness)] <- filter (not . isZeroBitTy . fst) $
+                             zipWithEqual "isVirtualTyCon" (\a b -> (scaledThing a, b))
+                             (dataConOrigArgTys dc) (dataConImplBangs dc)
+  -- That field is boxed
+  , isBoxedType field
+  -- That field is either unlifted or strict
+  , isUnliftedType field || (case strictness of HsStrict -> True; _ -> False)
+  -- Result is boxed
+  , isBoxedType (dataConOrigResTy dc)
+  = True
+isVirtualTyCon _ = False
