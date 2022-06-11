@@ -66,8 +66,6 @@ StgReturn:
         addi 12,1,-(8*18)
         bl _restgpr1_14
         b _restfpr_14
-
-	.section	.note.GNU-stack,"",@progbits
 # else // linux_HOST_OS
 # error Only Linux support for power64 little endian right now.
 # endif
@@ -231,8 +229,6 @@ StgReturn:
 	.cfi_endproc
 	.size StgReturn, .-StgReturn
 
-	.section	.note.GNU-stack,"",@progbits
-
 #elif defined(riscv64_HOST_ARCH)
 # define STACK_FRAME_SIZE (RESERVED_C_STACK_BYTES+208)
 	.text
@@ -374,8 +370,11 @@ StgReturn:
 	ret
 	.cfi_endproc
 	.size StgReturn, .-StgReturn
-
-	.section	.note.GNU-stack,"",@progbits
 #endif
 
 #endif /* !USE_MINIINTERPRETER */
+
+/* mark stack as nonexecutable */
+#if defined(__linux__) && defined(__ELF__)
+.section .note.GNU-stack,"",@progbits
+#endif
