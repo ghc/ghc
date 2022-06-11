@@ -38,10 +38,12 @@ import GHC.Types.CostCentre
 import GHC.Unit
 import GHC.Core.DataCon
 import GHC.Data.FastString
+import GHC.Types.Basic
 import GHC.Types.Id
+import {-# SOURCE #-} GHC.StgToCmm.Bind
 import GHC.Types.Id.Info( CafInfo( NoCafRefs ) )
 import GHC.Types.Name (isInternalName)
-import GHC.Types.RepType (countConRepArgs)
+import GHC.Types.RepType (countConRepArgs, isVirtualTyCon, virtualDataConType, VirtualConType(..), isVirtualDataCon)
 import GHC.Types.Literal
 import GHC.Builtin.Utils
 import GHC.Utils.Panic
@@ -52,8 +54,10 @@ import GHC.Utils.Monad (mapMaybeM)
 import Control.Monad
 import Data.Char
 import GHC.StgToCmm.Config (stgToCmmPlatform)
-import GHC.StgToCmm.TagCheck (checkConArgsStatic, checkConArgsDyn)
+import GHC.StgToCmm.TagCheck (checkConArgsStatic, checkConArgsDyn, emitTagAssertion, emitTagAssertionId)
 import GHC.Utils.Outputable
+import GHC.Utils.Trace
+import Data.Maybe
 
 ---------------------------------------------------------------
 --      Top-level constructors
@@ -76,6 +80,14 @@ cgTopRhsCon cfg id con mn args
     -- but for Internal ones we can drop it altogether
     -- See Note [About the NameSorts] in "GHC.Types.Name" for Internal/External
     (static_info, static_code)
+
+  -- Virtual constructor, just return the argument.
+  | virtualDataConType con == VirtualBoxed
+  , [NonVoid (StgVarArg x)] <- args
+  = panic "topRhsCon" $ let fake_rhs = StgApp x []
+    in
+      pprTrace "cgTopRhsCon" (ppr id $$ ppr con $$ ppr args) $
+      cgTopRhsClosure platform NonRecursive id dontCareCCS Updatable [] fake_rhs
 
   -- Otherwise generate a closure for the constructor.
   | otherwise
@@ -191,6 +203,32 @@ The reason for having a separate argument, rather than looking at
 the addr modes of the args is that we may be in a "knot", and
 premature looking at the args will cause the compiler to black-hole!
 -}
+-------- buildDynCon': Virtual constructor -----------
+buildDynCon' binder mn actually_bound ccs con args
+  | virtualDataConType con == VirtualBoxed
+  , [NonVoid (StgVarArg arg)] <- assert (length args == 1) args
+  = do
+      cfg <- getStgToCmmConfig
+      let platform = stgToCmmPlatform cfg
+
+      m_arg_cg_info <- (getCgInfo_maybe $ idName arg)
+      case m_arg_cg_info of
+        Just arg_info -> do
+          emitTagAssertionId "buildDynConVirt:" arg
+
+          -- A virtual con is just the arguments info under another name.
+          let fake_con_info = arg_info { cg_id = binder }
+
+          return (fake_con_info, return mempty)
+        Nothing -> panic "buildDynCon': LFInfo for VCon args unknown" (ppr binder <> text " = " <> ppr con <+> ppr args)
+
+          -- let !lf_info = mkLFArgument arg
+
+          -- (id_info, reg) <- rhsIdInfo binder lf_info
+          -- emit $ mkAssign (CmmLocal reg) ((CmmReg $ CmmLocal $ idToReg platform $ NonVoid arg))
+          -- bindArgToGivenReg (NonVoid arg) reg
+          -- return (id_info, return mempty)
+
 -------- buildDynCon': the general case -----------
 buildDynCon' binder mn actually_bound ccs con args
   = do  { (id_info, reg) <- rhsIdInfo binder lf_info
@@ -382,7 +420,13 @@ bindConArgs :: AltCon -> LocalReg -> [NonVoid Id] -> FCode [LocalReg]
 -- binders args, assuming that we have just returned from a 'case' which
 -- found a con
 bindConArgs (DataAlt con) base args
-  = assert (not (isUnboxedTupleDataCon con)) $
+  | isVirtualDataCon con
+  , [NonVoid arg] <- assert (length args == 1) args
+  = do
+      bindArgToGivenReg (NonVoid arg) base
+      return [base]
+
+  | otherwise = assert (not (isUnboxedTupleDataCon con)) $
     do profile <- getProfile
        platform <- getPlatform
        let (_, _, args_w_offsets) = mkVirtConstrOffsets profile (addIdReps args)

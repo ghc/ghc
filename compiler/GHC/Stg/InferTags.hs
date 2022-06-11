@@ -17,7 +17,7 @@ import GHC.Types.Name
 import GHC.Stg.Syntax
 import GHC.Types.Basic ( CbvMark (..) )
 import GHC.Types.Unique.Supply (mkSplitUniqSupply)
-import GHC.Types.RepType (dataConRuntimeRepStrictness)
+import GHC.Types.RepType (dataConRuntimeRepStrictness, isVirtualTyCon, isVirtualDataCon)
 import GHC.Core (AltCon(..))
 import Data.List (mapAccumL)
 import GHC.Utils.Outputable
@@ -593,6 +593,10 @@ time and there doesn't seem to huge benefit to doing differently.
 -- See Note [Constructor TagSigs]
 inferConTag :: TagEnv p -> DataCon -> [StgArg] -> TagInfo
 inferConTag env con args
+  | isVirtualDataCon con
+  = TagDunno
+  -- TODO: This should only be needed for top lvl rhss, but I haven't threaded
+  -- the top level flag through yet
   | isUnboxedTupleDataCon con
   = TagTuple $ map (flatten_arg_tag . lookupInfo env) args
   | otherwise =

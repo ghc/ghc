@@ -45,7 +45,7 @@ import GHC.Types.Id
 import GHC.Builtin.PrimOps
 import GHC.Core.TyCon
 import GHC.Core.Type        ( isUnliftedType )
-import GHC.Types.RepType    ( isZeroBitTy, countConRepArgs, mightBeFunTy )
+import GHC.Types.RepType    ( isZeroBitTy, countConRepArgs, mightBeFunTy, isVirtualTyCon )
 import GHC.Types.CostCentre ( CostCentreStack, currentCCS )
 import GHC.Types.Tickish
 import GHC.Data.Maybe
@@ -65,7 +65,7 @@ import GHC.Platform.Profile (profileIsProfiling)
 --              cgExpr: the main function
 ------------------------------------------------------------------------
 
-cgExpr  :: CgStgExpr -> FCode ReturnKind
+cgExpr  :: HasCallStack => CgStgExpr -> FCode ReturnKind
 
 cgExpr (StgApp fun args)     = cgIdApp fun args
 
@@ -127,7 +127,19 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
 
 
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
-cgExpr (StgConApp con mn args _) = cgConApp con mn args
+cgExpr (StgConApp con mn args _)
+  -- Unlike for a regular con for a virtual con we
+  -- might have to evaluate the argument here!
+  | isVirtualTyCon (dataConTyCon con)
+  , arg <- getArg args
+  = cgExpr (StgApp arg [])
+  | otherwise
+  = cgConApp con mn args
+  where
+      getArg args
+        | [StgVarArg arg] <- args
+        = arg
+        | otherwise = pprPanic "Very odd virtalCon" (ppr con <> ppr args)
 cgExpr (StgTick t e)         = cgTick t >> cgExpr e
 cgExpr (StgLit lit)          = do cmm_expr <- cgLit lit
                                   emitReturn [cmm_expr]
@@ -426,7 +438,7 @@ data GcPlan
                         -- of the case alternative(s) into the upstream check
 
 -------------------------------------
-cgCase :: CgStgExpr -> Id -> AltType -> [CgStgAlt] -> FCode ReturnKind
+cgCase :: HasCallStack => CgStgExpr -> Id -> AltType -> [CgStgAlt] -> FCode ReturnKind
 
 {-
 Note [Scrutinising VoidRep]
@@ -672,7 +684,7 @@ chooseReturnBndrs _ _ _ = panic "chooseReturnBndrs"
                              -- MultiValAlt has only one alternative
 
 -------------------------------------
-cgAlts :: (GcPlan,ReturnKind) -> NonVoid Id -> AltType -> [CgStgAlt]
+cgAlts :: HasCallStack => (GcPlan,ReturnKind) -> NonVoid Id -> AltType -> [CgStgAlt]
        -> FCode ReturnKind
 -- At this point the result of the case are in the binders
 cgAlts gc_plan _bndr PolyAlt [alt]
@@ -921,7 +933,7 @@ cgAlts _ _ _ _ = panic "cgAlts"
 --
 
 -------------------
-cgAlgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
+cgAlgAltRhss :: HasCallStack => (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
              -> FCode ( Maybe CmmAGraphScoped
                       , [(ConTagZ, CmmAGraphScoped)] )
 cgAlgAltRhss gc_plan bndr alts
@@ -941,7 +953,7 @@ cgAlgAltRhss gc_plan bndr alts
 
 
 -------------------
-cgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
+cgAltRhss :: HasCallStack => (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
           -> FCode [(AltCon, CmmAGraphScoped)]
 cgAltRhss gc_plan bndr alts = do
   platform <- getPlatform
@@ -976,6 +988,13 @@ cgConApp con mn stg_args
        ; tickyUnboxedTupleReturn (length arg_exprs)
        ; emitReturn arg_exprs }
 
+  -- Virtual constructor, just return the argument.
+  | isVirtualTyCon (dataConTyCon con)
+  , [StgVarArg arg] <- assert (length stg_args == 1) stg_args
+  = do
+      info <- getCgIdInfo arg
+      emitReturn [idInfoToAmode info]
+
   | otherwise   --  Boxed constructors; allocate and return
   = assertPpr (stg_args `lengthIs` countConRepArgs con)
               (ppr con <> parens (ppr (countConRepArgs con)) <+> ppr stg_args) $
@@ -991,7 +1010,7 @@ cgConApp con mn stg_args
         ; tickyReturnNewCon (length stg_args)
         ; emitReturn [idInfoToAmode idinfo] }
 
-cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
+cgIdApp :: HasCallStack => Id -> [StgArg] -> FCode ReturnKind
 cgIdApp fun_id args = do
     platform       <- getPlatform
     fun_info       <- getCgIdInfo fun_id

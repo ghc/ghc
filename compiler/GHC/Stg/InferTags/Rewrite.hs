@@ -425,6 +425,7 @@ rewriteApp :: InferStgExpr -> RM TgStgExpr
 rewriteApp (StgApp f []) = do
     f' <- rewriteId f
     return $! StgApp f' []
+
 rewriteApp (StgApp f args)
     -- pprTrace "rewriteAppOther" (ppr f <+> ppr args) False
     -- = undefined

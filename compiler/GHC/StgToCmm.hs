@@ -11,7 +11,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.StgToCmm ( codeGen ) where
+module GHC.StgToCmm ( codeGen, cgTopRhs ) where
 
 import GHC.Prelude as Prelude
 

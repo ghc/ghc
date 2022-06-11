@@ -9,7 +9,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.StgToCmm.TagCheck
-  ( emitTagAssertion, emitArgTagCheck, checkArg, whenCheckTags,
+  ( emitTagAssertion, emitTagAssertionId, emitArgTagCheck, checkArg, whenCheckTags,
     checkArgStatic, checkFunctionArgTags,checkConArgsStatic,checkConArgsDyn) where
 
 #include "ClosureTypes.h"
@@ -50,7 +50,7 @@ checkFunctionArgTags msg f args = whenCheckTags $ do
     -- Only check args marked as strict, and only lifted ones.
     let cbv_args = filter (isBoxedType . idType) $ filterByList (map isMarkedCbv marks) args
     -- Get their (cmm) address
-    arg_infos <- mapM getCgIdInfo cbv_args
+    arg_infos <- mapM getCgIdInfo $ cbv_args
     let arg_cmms = map idInfoToAmode arg_infos
     mapM_ (\(cmm,arg) -> emitTagAssertion (showPprUnsafe $ msg <+> ppr arg) cmm)  (zip arg_cmms cbv_args)
 
@@ -81,7 +81,7 @@ whenCheckTags act = do
 -- * A tag is present
 -- * Or the object is a PAP (for which zero is the proper tag)
 emitTagAssertion :: String -> CmmExpr -> FCode ()
-emitTagAssertion onWhat fun = do
+emitTagAssertion onWhat fun = whenCheckTags $ do
   { platform <- getPlatform
   ; lret <- newBlockId
   ; lno_tag <- newBlockId
@@ -98,6 +98,12 @@ emitTagAssertion onWhat fun = do
   ; emitBarf ("Tag inference failed on:" ++ onWhat)
   ; emitLabel lret
   }
+
+emitTagAssertionId :: String -> Id -> FCode ()
+emitTagAssertionId msg arg = do
+  id_info <- getCgIdInfo arg
+  let CmmLoc cmm = cg_loc id_info
+  emitTagAssertion msg cmm
 
 -- | Jump to the first block if the argument closure is subject
 --   to tagging requirements. Otherwise jump to the 2nd one.

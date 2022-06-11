@@ -101,6 +101,7 @@ import Data.Coerce (coerce)
 import qualified Data.ByteString.Char8 as BS8
 import GHC.StgToCmm.Config
 import GHC.Stg.InferTags.TagSig (isTaggedSig)
+import GHC.Utils.Trace (pprTrace)
 
 -----------------------------------------------------------------------------
 --                Data types and synonyms
@@ -514,6 +515,9 @@ getCallMethod :: StgToCmmConfig
               -> Maybe SelfLoopInfo -- can we perform a self-recursive tail-call
               -> CallMethod
 
+-- getCallMethod cfg name id lf  n_args v_args cg_loc self_loop
+--   -- | pprTrace "getCallMethod" (ppr (name, id, lf,  n_args, v_args, self_loop) $$ ppr (idTagSig_maybe id)) False
+--   -- = undefined
 getCallMethod cfg _ id _  n_args v_args _cg_loc (Just (self_loop_id, block_id, args))
   | stgToCmmLoopification cfg
   , id == self_loop_id

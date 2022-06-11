@@ -64,6 +64,8 @@ import GHC.Data.FastString
 import GHC.Data.List.SetOps
 
 import Control.Monad
+import GHC.Utils.Trace
+import GHC.Types.RepType (isVirtualDataCon)
 
 ------------------------------------------------------------------------
 --              Top-level bindings
@@ -82,6 +84,7 @@ cgTopRhsClosure :: Platform
                 -> (CgIdInfo, FCode ())
 
 cgTopRhsClosure platform rec id ccs upd_flag args body =
+  -- pprTrace "cgTopRhsClosure" (ppr id $$ ppr body) $
   let closure_label = mkClosureLabel (idName id) (idCafInfo id)
       cg_id_info    = litIdInfo platform id lf_info (CmmLabel closure_label)
       lf_info       = mkClosureLFInfo platform id TopLevel [] upd_flag args
@@ -134,7 +137,7 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
 --              Non-top-level bindings
 ------------------------------------------------------------------------
 
-cgBind :: CgStgBinding -> FCode ()
+cgBind :: HasCallStack => CgStgBinding -> FCode ()
 cgBind (StgNonRec name rhs)
   = do  { (info, fcode) <- cgRhs name rhs
         ; addBindC info
@@ -285,11 +288,14 @@ mkRhsClosure    profile _ _check_tags bndr _cc
   , StgCase (StgApp scrutinee [{-no args-}])
          _   -- ignore bndr
          (AlgAlt _)
-         [GenStgAlt{ alt_con   = DataAlt _
+         [GenStgAlt{ alt_con   = DataAlt con
                    , alt_bndrs = params
                    , alt_rhs   = sel_expr}] <- strip expr
   , StgApp selectee [{-no args-}] <- strip sel_expr
   , the_fv == scrutinee                -- Scrutinee is the only free variable
+
+  -- Virtual data cons just return themselves.
+  , not $ isVirtualDataCon con
 
   , let (_, _, params_w_offsets) = mkVirtConstrOffsets profile (addIdReps (assertNonVoidIds params))
                                    -- pattern binders are always non-void,
@@ -457,7 +463,7 @@ mkClosureLFInfo platform bndr top fvs upd_flag args
 --              The code for closures
 ------------------------------------------------------------------------
 
-closureCodeBody :: Bool            -- whether this is a top-level binding
+closureCodeBody :: HasCallStack => Bool            -- whether this is a top-level binding
                 -> Id              -- the closure's name
                 -> ClosureInfo     -- Lots of information about this closure
                 -> CostCentreStack -- Optional cost centre attached to closure
