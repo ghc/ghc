@@ -8,11 +8,8 @@
 module GHC.Exts.DecodeStack where
 
 #if MIN_VERSION_base(4,17,0)
-import Data.Bits (Bits (shift))
+import Data.Bits
 import Foreign (Storable (peekElemOff))
-import GHC.Base (Word, plusAddr#, thenIO)
-import GHC.Exts.Heap (Closure, GenClosure (payload))
-import GHC.Exts.Heap.StackFFI (peekSmallBitmapWord)
 
 import Prelude
 import GHC.Stack.CloneStack
@@ -23,12 +20,12 @@ import GHC.Exts
 import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 import Numeric
 
-data BitmapPayload = Closure Addr# | Primitive Word
+data BitmapPayload = Closure Word | Primitive Word
   deriving (Eq)
 
 instance Show BitmapPayload where
   show (Primitive w) = "Primitive " ++ show w
-  show (Closure addr#) = "Closure " ++ showAddr# addr#
+  show (Closure ptr) = "Closure " ++ show ptr -- showAddr# addr#
 
 -- TODO There are likely more. See MiscClosures.h
 data SpecialRetSmall =
@@ -71,6 +68,8 @@ data StackFrame =
 foreign import ccall "stackFrameSizeW" stackFrameSizeW :: Addr# -> Word
 foreign import ccall "getItbl" getItbl :: Addr# -> Ptr StgInfoTable
 foreign import ccall "getSpecialRetSmall" getSpecialRetSmall :: Addr# -> Word
+foreign import ccall "getBitmapSize" getBitmapSize :: Ptr StgInfoTable -> Word
+foreign import ccall "getBitmapWord" getBitmapWord :: Ptr StgInfoTable -> Word
 
 decodeStack :: StackSnapshot -> IO [StackFrame]
 decodeStack (StackSnapshot stack) = do
@@ -117,47 +116,59 @@ decodeStackFrame buttom sp = do
 toStackFrame :: Addr# -> IO StackFrame
 toStackFrame sp = do
   let itblPtr = getItbl sp
-      closureSize = stackFrameSizeW sp
   itbl <- peekItbl itblPtr
   traceM $ "itbl " ++ show itbl
-  pure $ case tipe itbl of
-     RET_BCO -> RetBCO
-     RET_SMALL -> do
+  case tipe itbl of
+     RET_BCO -> pure RetBCO
+     RET_SMALL ->
        let special = ((toEnum . fromInteger . toInteger) (getSpecialRetSmall sp))
            -- TODO: Use word size here, not just 8
            payloadAddr# = plusAddr# sp (toInt# 8)
-       bitmapSize <- peekBitmapSize sp
-       bitmap <- peekSmallBitmapWord sp payloads
-       payloads <- peekBitmapPayloadArray bitmapSize bitmap
-       pure $ RetSmall special payloads
-     RET_BIG -> RetBig
-     RET_FUN -> RetFun
-     UPDATE_FRAME -> UpdateFrame
-     CATCH_FRAME -> CatchFrame
-     UNDERFLOW_FRAME ->UnderflowFrame
-     STOP_FRAME -> StopFrame
-     ATOMICALLY_FRAME -> AtomicallyFrame
-     CATCH_RETRY_FRAME -> CatchRetryFrame
-     CATCH_STM_FRAME -> CatchStmFrame
+           bitmapSize = getBitmapSize itblPtr
+           bitmapWord = getBitmapWord itblPtr
+       in
+         do
+            payloads <- peekBitmapPayloadArray bitmapSize bitmapWord (Ptr payloadAddr#)
+            pure $ RetSmall special payloads
+     RET_BIG -> pure RetBig
+     RET_FUN -> pure RetFun
+     UPDATE_FRAME -> pure UpdateFrame
+     CATCH_FRAME -> pure CatchFrame
+     UNDERFLOW_FRAME -> pure UnderflowFrame
+     STOP_FRAME -> pure StopFrame
+     ATOMICALLY_FRAME -> pure AtomicallyFrame
+     CATCH_RETRY_FRAME -> pure CatchRetryFrame
+     CATCH_STM_FRAME -> pure CatchStmFrame
      _ -> error $ "Unexpected closure type on stack: " ++ show (tipe itbl)
 
 -- TODO: Use Ptr instead of Addr# (in all possible places)?
-peekBitmapPayloadArray          ::  Word -> Ptr BitmapPayload -> IO [BitmapPayload]
-peekBitmapPayloadArray size ptr | size == 0 = pure []
-                 | otherwise = f (size-1) []
+peekBitmapPayloadArray ::  Word -> Word -> Ptr Word -> IO [BitmapPayload]
+peekBitmapPayloadArray bitmapSize bitmapWord ptr = go bitmapSize []
   where
-    f 0 acc = do e <- peekBitmapPayload ptr 0; pure (e:acc)
-    f n acc = do e <- peekBitmapPayload ptr n; f (n-1) (e:acc)
+    go :: Word -> [BitmapPayload] -> IO [BitmapPayload]
+    go 0 acc = pure acc
+    go n acc = do
+                  e <- peekBitmapPayload ptr (n - 1) bitmapWord
+                  go (n - 2) (e:acc)
 
-peekBitmapPayload :: Ptr BitmapPayload -> Word -> IO BitmapPayload
-peekBitmapPayload ptr index = if bitmap .&. (1 `shiftL` index) == 0 then do
-  -- Closure
-                                e <- peekElemOff ptr  index
-                                pure $ Closure e
-  else do
-  -- Primitive
-                                e <- peekElemOff ptr index
-                                pure $ Primitive e
+-- | Fetch a single closure payload
+-- As the decission about the value to marshall
+-- to depends on the bitmap, only a `Word` is peeked.
+peekBitmapPayload :: Ptr Word -> Word -> Word -> IO BitmapPayload
+peekBitmapPayload ptr index bitmapWord = do
+        e <- (peekElemOff ptr i :: IO Word)
+        pure $ if isClosure then
+            Closure e
+        else
+            Primitive e
+  where
+   isClosure :: Bool
+   isClosure = (bitmapWord .&. mask) == 0
+   mask :: Word
+   mask = 1 `shiftL` i
+   i :: Int
+   i = (fromInteger.toInteger) index
+
 -- | Converts to 'Int#'
 -- An 'Integral' can be bigger than the domain of 'Int#'. This function drops
 -- the additional bits. So, the caller should better make sure that this

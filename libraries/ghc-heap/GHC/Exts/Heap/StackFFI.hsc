@@ -20,10 +20,12 @@ peekSmallBitmapWord itbl =
   in
     (#peek struct StgInfoTable_, layout.bitmap) ptr
 
+-- TODO: unused
 -- #define BITMAP_SIZE(bitmap) ((bitmap) & BITMAP_SIZE_MASK)
 bitmapSize :: Word -> Word
 bitmapSize bitmap = bitmap .&. (#const BITMAP_SIZE_MASK)
 
+-- TODO: unused
 -- #define BITMAP_BITS(bitmap) ((bitmap) >> BITMAP_BITS_SHIFT)
 bitmapBits :: Word -> Word
 bitmapBits bitmap = bitmap `shiftR` (#const BITMAP_BITS_SHIFT)

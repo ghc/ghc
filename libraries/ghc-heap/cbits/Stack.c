@@ -5,7 +5,7 @@
 StgWord stackFrameSizeW(StgClosure *frame) { return stack_frame_sizeW(frame); }
 
 // Only exists to make the get_itbl macro available in Haskell code (via FFI).
-StgInfoTable *getItbl(StgClosure *closure) {
+const StgInfoTable *getItbl(StgClosure *closure) {
   // printObj(closure);
   return get_itbl(closure);
 };
@@ -55,4 +55,16 @@ StgWord getSpecialRetSmall(StgPtr sp) {
   } else {
     return 0;
   }
+}
+
+// TODO: Consider to use HSC
+StgWord getBitmapSize(StgInfoTable *info){
+  StgWord bitmap = info->layout.bitmap;
+  return BITMAP_SIZE(bitmap);
+}
+
+// TODO: Consider to use HSC
+StgWord getBitmapWord(StgInfoTable *info){
+  StgWord bitmap = info->layout.bitmap;
+  return BITMAP_BITS(bitmap);
 }
