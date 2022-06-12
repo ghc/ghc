@@ -1235,7 +1235,7 @@ mkLevPolyDataTyConRhs fixed_lev cons
 --
 -- Use 'mkLevPolyDataConRhs' if the datatype can be levity-polymorphic.
 mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
-mkDataTyConRhs = mkLevPolyDataTyConRhs False
+mkDataTyConRhs = mkLevPolyDataTyConRhs True
 
 -- | Some promoted datacons signify extra info relevant to GHC. For example,
 -- the @IntRep@ constructor of @RuntimeRep@ corresponds to the 'IntRep'
