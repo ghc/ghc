@@ -40,6 +40,8 @@ instance Outputable GhcHint where
             in  header <+> hcat (intersperse (text ", ") (map ppr exts)) $$ extraUserInfo
           SuggestExtensionInOrderTo extraUserInfo ext ->
             (text "Use" <+> ppr ext) $$ extraUserInfo
+    SuggestCorrectPragmaName suggestions
+      -> text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
     SuggestMissingDo
       -> text "Possibly caused by a missing 'do'?"
     SuggestLetInDo

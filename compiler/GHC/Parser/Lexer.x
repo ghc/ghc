@@ -371,8 +371,16 @@ $tab          { warnTab }
 }
 
 <0,option_prags> {
-  "{-#"  { warnThen PsWarnUnrecognisedPragma
-                    (nested_comment ) }
+
+-- This code would eagerly accept and hence discard, e.g., "LANGUAGE MagicHash".
+--  "{-#" $whitechar* $pragmachar+
+--        $whitechar+ $pragmachar+
+--        { warn_unknown_prag twoWordPrags }
+
+  "{-#" $whitechar* $pragmachar+
+        { warn_unknown_prag (Map.unions [ oneWordPrags, fileHeaderPrags, ignoredPrags, linePrags ]) }
+
+  "{-#" { warn_unknown_prag Map.empty }
 }
 
 -- '0' state: ordinary lexemes
@@ -3505,7 +3513,14 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
                                               _ -> prag'
                           canon_ws s = unwords (map canonical (words s))
 
-
+warn_unknown_prag :: Map String Action -> Action
+warn_unknown_prag prags span buf len = do
+  let uppercase    = map toUpper
+      unknown_prag = uppercase (clean_pragma (lexemeToString buf len))
+      suggestions  = map uppercase (Map.keys prags)
+  addPsMessage (RealSrcSpan (psRealSpan span) Strict.Nothing) $
+    PsWarnUnrecognisedPragma unknown_prag suggestions
+  nested_comment span buf len
 
 {-
 %************************************************************************

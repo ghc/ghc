@@ -105,8 +105,9 @@ instance Diagnostic PsMessage where
              <+> quotes (text "Data.Kind.Type")
           $$ text "relies on the StarIsType extension, which will become"
           $$ text "deprecated in the future."
-    PsWarnUnrecognisedPragma
+    PsWarnUnrecognisedPragma prag _
       -> mkSimpleDecorated $ text "Unrecognised pragma"
+                          <> if null prag then empty else text ":" <+> text prag
     PsWarnMisplacedPragma prag
       -> mkSimpleDecorated $ text "Misplaced" <+> pprFileHeaderPragmaType prag <+> text "pragma"
     PsWarnImportPreQualified
@@ -511,7 +512,7 @@ instance Diagnostic PsMessage where
     PsWarnHaddockIgnoreMulti                      -> WarningWithFlag Opt_WarnInvalidHaddock
     PsWarnStarBinder                              -> WarningWithFlag Opt_WarnStarBinder
     PsWarnStarIsType                              -> WarningWithFlag Opt_WarnStarIsType
-    PsWarnUnrecognisedPragma                      -> WarningWithFlag Opt_WarnUnrecognisedPragmas
+    PsWarnUnrecognisedPragma{}                    -> WarningWithFlag Opt_WarnUnrecognisedPragmas
     PsWarnMisplacedPragma{}                       -> WarningWithFlag Opt_WarnMisplacedPragmas
     PsWarnImportPreQualified                      -> WarningWithFlag Opt_WarnPrepositiveQualifiedModule
     PsErrLexer{}                                  -> ErrorWithoutFlag
@@ -628,7 +629,12 @@ instance Diagnostic PsMessage where
     PsWarnHaddockIgnoreMulti                      -> noHints
     PsWarnStarBinder                              -> [SuggestQualifyStarOperator]
     PsWarnStarIsType                              -> [SuggestUseTypeFromDataKind Nothing]
-    PsWarnUnrecognisedPragma                      -> noHints
+    PsWarnUnrecognisedPragma ""  _                -> noHints
+    PsWarnUnrecognisedPragma p   avail            ->
+      let suggestions = fuzzyMatch p avail
+       in if null suggestions
+          then noHints
+          else [SuggestCorrectPragmaName suggestions]
     PsWarnMisplacedPragma{}                       -> [SuggestPlacePragmaInHeader]
     PsWarnImportPreQualified                      -> [ SuggestQualifiedAfterModuleName
                                                      , suggestExtension LangExt.ImportQualifiedPost]

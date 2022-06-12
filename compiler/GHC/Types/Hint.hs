@@ -136,6 +136,14 @@ data GhcHint
 
     -}
   | SuggestExtension !LanguageExtensionHint
+    {-| Suggests possible corrections of a misspelled pragma. Its argument
+        represents all applicable suggestions.
+
+        Example: {-# LNGUAGE BangPatterns #-}
+
+        Test case(s): parser/should_compile/T21589
+    -}
+  | SuggestCorrectPragmaName ![String]
     {-| Suggests that a monadic code block is probably missing a \"do\" keyword.
 
         Example:

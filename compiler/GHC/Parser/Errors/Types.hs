@@ -117,8 +117,9 @@ data PsMessage
    -}
    | PsWarnTransitionalLayout !TransLayoutReason
 
-   -- | Unrecognised pragma
-   | PsWarnUnrecognisedPragma
+   -- | Unrecognised pragma. First field is the actual pragma name which
+   -- might be empty. Second field is the set of valid candidate pragmas.
+   | PsWarnUnrecognisedPragma !String ![String]
    | PsWarnMisplacedPragma !FileHeaderPragmaType
 
    -- | Invalid Haddock comment position

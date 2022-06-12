@@ -1,6 +1,6 @@
 
 <interactive>:19:1: warning: [-Wunrecognised-pragmas (in -Wdefault)]
-    Unrecognised pragma
+    Unrecognised pragma: FOO
 
 <interactive>:61:1: error:
     • Role mismatch on variable b:
