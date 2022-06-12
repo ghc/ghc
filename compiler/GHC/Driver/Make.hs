@@ -1564,8 +1564,12 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
           = loopSummaries next (done, pkgs, summarised)
           -- Didn't work out what the imports mean yet, now do that.
           | otherwise = do
+             putStr "loopSummaries1: "
+             print (moduleName $ ms_mod ms)
              (final_deps, pkgs1, done', summarised') <- loopImports (calcDeps ms) done summarised
              -- This has the effect of finding a .hs file if we are looking at the .hs-boot file.
+             putStr "loopSummaries2: "
+             putStrLn (showPprUnsafe final_deps)
              (_, _, done'', summarised'') <- loopImports (maybeToList hs_file_for_boot) done' summarised'
              loopSummaries next (M.insert k (ModuleNode final_deps ms) done'', pkgs1 `Set.union` pkgs, summarised'')
           where
@@ -1603,19 +1607,29 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 loopImports ss done summarised
           | otherwise
           = do
+               putStr "loopImports: "
+               print mod
                mb_s <- summariseModule hsc_env home_unit old_summary_map
                                        is_boot wanted_mod mb_pkg
                                        Nothing excl_mods
                case mb_s of
-                   NotThere -> loopImports ss done summarised
+                   NotThere -> do
+                    putStrLn "loopImports: NotThere"
+                    loopImports ss done summarised
                    External uid -> do
+                    putStrLn "loopImports: External"
                     (other_deps, pkgs, done', summarised') <- loopImports ss done summarised
                     return (other_deps, Set.insert (homeUnitId home_unit, uid) pkgs, done', summarised')
                    FoundInstantiation iud -> do
+                    putStrLn "loopImports: FoundInstantiation"
                     (other_deps, pkgs, done', summarised') <- loopImports ss done summarised
                     return (NodeKey_Unit iud : other_deps, pkgs, done', summarised')
-                   FoundHomeWithError (_uid, e) ->  loopImports ss done (Map.insert cache_key [(Left e)] summarised)
+                   FoundHomeWithError (_uid, e) ->  do
+                    putStrLn "loopImports: FoundHomeWithError"
+                    loopImports ss done (Map.insert cache_key [(Left e)] summarised)
                    FoundHome s -> do
+                     putStrLn "loopImports: FoundHome"
+                     putStrLn (showPprUnsafe s)
                      (done', pkgs1, summarised') <-
                        loopSummaries [s] (done, Set.empty, Map.insert cache_key [Right s] summarised)
                      (other_deps, pkgs2, final_done, final_summarised) <- loopImports ss done' summarised'

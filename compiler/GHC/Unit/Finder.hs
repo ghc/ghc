@@ -154,11 +154,11 @@ findImportedModuleNoHsc
   -> IO FindResult
 findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
   case mb_pkg of
-    NoPkgQual  -> unqual_import
+    NoPkgQual  -> putStrLn "findImportedModuleNoHsc: NoPkgQual" >> unqual_import
     ThisPkg uid | (homeUnitId <$> mhome_unit) == Just uid -> home_import
                 | Just os <- lookup uid other_fopts -> home_pkg_import (uid, os)
                 | otherwise -> pprPanic "findImportModule" (ppr mod_name $$ ppr mb_pkg $$ ppr (homeUnitId <$> mhome_unit) $$ ppr uid $$ ppr (map fst all_opts))
-    OtherPkg _ -> pkg_import
+    OtherPkg _ -> putStrLn "findImportedModuleNoHsc: OtherPkg" >> pkg_import
   where
     all_opts = case mhome_unit of
                 Nothing -> other_fopts
@@ -166,7 +166,7 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
 
 
     home_import = case mhome_unit of
-                   Just home_unit -> findHomeModule fc fopts home_unit mod_name
+                   Just home_unit -> putStrLn "findImportedModuleNoHsc: home_import" >> findHomeModule fc fopts home_unit mod_name
                    Nothing -> pure $ NoPackage (panic "findImportedModule: no home-unit")
 
 
@@ -349,6 +349,8 @@ uncacheModule fc home_unit mod_name = do
 findHomeModule :: FinderCache -> FinderOpts -> HomeUnit -> ModuleName -> IO FindResult
 findHomeModule fc fopts  home_unit mod_name = do
   let uid       = homeUnitAsUnit home_unit
+  putStr "findHomeModule: "
+  putStrLn (showPprUnsafe $ homeUnitId home_unit)
   r <- findInstalledHomeModule fc fopts (homeUnitId home_unit) mod_name
   return $ case r of
     InstalledFound loc _ -> Found loc (mkHomeModule home_unit mod_name)
@@ -406,6 +408,8 @@ findHomePackageModule fc fopts  home_unit mod_name = do
 --  call this.)
 findInstalledHomeModule :: FinderCache -> FinderOpts -> UnitId -> ModuleName -> IO InstalledFindResult
 findInstalledHomeModule fc fopts home_unit mod_name = do
+  putStr "findInstalledHomeModule: "
+  print fopts
   homeSearchCache fc home_unit mod_name $
    let
      maybe_working_dir = finder_workingDirectory fopts
@@ -518,7 +522,7 @@ searchPathExts :: [FilePath]      -- paths to search
                   ]
                -> IO InstalledFindResult
 
-searchPathExts paths mod exts = search to_search
+searchPathExts paths mod exts = putStr "searchPathExts: " >> print paths >> search to_search
   where
     basename = moduleNameSlashes (moduleName mod)
 
