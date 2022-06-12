@@ -87,6 +87,7 @@ toolTargets = [ array
              , bytestring
              , templateHaskell
              , containers
+             , countDeps
              , deepseq
              , directory
              , exceptions

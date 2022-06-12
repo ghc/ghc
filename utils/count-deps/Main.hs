@@ -1,19 +1,38 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
+import Prelude
+
 import GHC.Driver.Env
+import GHC.Data.IOEnv
+import GHC.Unit.Finder
+import GHC.Unit.Env
+import GHC.Unit.Home
 import GHC.Unit.Module
+import GHC.Unit.Module.Graph
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.State
+import GHC.Utils.Outputable
 import GHC.Driver.Session
 import GHC.Driver.Main
+import GHC.Driver.Make
+import GHC.Types.SourceFile
+import GHC.Iface.Load
+import GHC.Tc.Types
 import GHC
 import Control.Monad
 import Control.Monad.IO.Class
 import System.Environment
 import GHC.Unit.Module.Deps
 import Data.Map.Strict qualified as Map
+#if __GLASGOW_HASKELL >= 905
 import Data.Set qualified as Set
+#endif
+import Data.List (isPrefixOf)
 
 -- Example invocation:
 --  inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` "GHC.Parser"
@@ -35,8 +54,8 @@ dotSpec name g =
 printDeps :: String -> String -> Bool -> IO ()
 printDeps libdir modName dot = do
   modGraph <-
-    Map.map (map moduleNameString) .
-      Map.mapKeys moduleNameString <$> calcDeps modName libdir
+    Map.map (map modNodeLabel) .
+      Map.mapKeys modNodeLabel <$> calcDeps modName libdir
   if not dot then
     do
       let modules = Map.keys modGraph
@@ -48,33 +67,42 @@ printDeps libdir modName dot = do
     --   'tred deps.dot > deps-tred.dot && dot -Tpdf -o deps.pdf deps-tred.dot'
     putStr $ dotSpec modName modGraph
 
-calcDeps :: String -> FilePath -> IO (Map.Map ModuleName [ModuleName])
+modNodeLabel :: ModuleNameWithIsBoot -> String
+modNodeLabel (GWIB mod NotBoot) = moduleNameString mod
+modNodeLabel (GWIB mod IsBoot) = moduleNameString mod ++ " (hs-boot)"
+
+type DepMap = Map.Map ModuleNameWithIsBoot Deps
+type Deps = [ModuleNameWithIsBoot]
+
+calcDeps :: String -> FilePath -> IO (Map.Map ModuleNameWithIsBoot [ModuleNameWithIsBoot])
 calcDeps modName libdir =
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     runGhc (Just libdir) $ do
         df <- getSessionDynFlags
         logger <- getLogger
-        (df, _, _) <- parseDynamicFlags logger df [noLoc "-package=ghc"]
+        (df, _, _) <- parseDynamicFlags logger df [noLoc "-v", noLoc "-i=../../compiler"]
         setSessionDynFlags df
-        env <- getSession
-        loop env Map.empty [mkModuleName modName]
+        let tid = TargetFile modName Nothing
+        setTargets [Target tid False (UnitId "main") Nothing]
+        mod_graph <- depanal [] False
+        let nodes = mgModSummaries' mod_graph
+        liftIO $  print (length nodes)
+        let edges = map nodeToEdges nodes
+        return $ Map.fromList edges
   where
-    -- Source imports are only guaranteed to show up in the 'mi_deps'
-    -- of modules that import them directly and don’t propagate
-    -- transitively so we loop.
-    loop :: HscEnv -> Map.Map ModuleName [ModuleName] -> [ModuleName] -> Ghc (Map.Map ModuleName [ModuleName])
-    loop env modules (m : ms) =
-      if m `Map.member` modules
-        then loop env modules ms
-        else do
-          mi <- liftIO $ hscGetModuleInterface env (mkModule m)
-          let deps = modDeps mi
-          modules <- return $ Map.insert m [] modules
-          loop env (Map.insert m deps modules) $ ms ++ filter (not . (`Map.member` modules)) deps
-    loop _ modules [] = return modules
+    nodeToEdges (ModuleNode _ ms) = (msModName ms, modImports ms)
+    nodeToEdges _ = error "unknown mod graph node"
 
-    mkModule :: ModuleName -> Module
-    mkModule = Module (stringToUnit "ghc")
+    msModName ms = case ms_hsc_src ms of
+      HsSrcFile -> GWIB (ms_mod_name ms) NotBoot
+      HsBootFile -> GWIB (ms_mod_name ms) IsBoot
+      HsigFile -> error "HsigFile found"
 
-    modDeps :: ModIface -> [ModuleName]
-    modDeps mi = map (gwib_mod . snd) $ Set.toList $ dep_direct_mods (mi_deps mi)
+    modImports :: ModSummary -> [ModuleNameWithIsBoot]
+    modImports ms = map mkBoot (modNames (ms_srcimps ms)) ++
+                    map mkNonBoot (modNames (ms_textual_imps ms))
+
+    mkBoot mod = GWIB mod IsBoot
+    mkNonBoot mod = GWIB mod NotBoot
+
+    modNames = map (unLoc . snd)
