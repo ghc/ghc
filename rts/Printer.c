@@ -497,7 +497,7 @@ printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap,
 {
     debugBelch("printSmallBitmap - payload %p\n", payload);
     debugBelch("printSmallBitmap - bitmap ");
-    printBits(sizeof(StgWord), payload);
+    printBits(sizeof(StgWord), &bitmap);
     debugBelch("printSmallBitmap - size %u\n", size);
 
     uint32_t i;
@@ -612,6 +612,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                 debugBelch("RET_SMALL (%p)\n", info);
             }
             StgWord bitmap = info->layout.bitmap;
+            debugBelch("printStackChunk - RET_SMALL - bitmap: %lu \n", bitmap);
             printSmallBitmap(spBottom, sp+1,
                              BITMAP_BITS(bitmap), BITMAP_SIZE(bitmap));
             continue;

@@ -66,5 +66,8 @@ StgWord getBitmapSize(StgInfoTable *info){
 // TODO: Consider to use HSC
 StgWord getBitmapWord(StgInfoTable *info){
   StgWord bitmap = info->layout.bitmap;
-  return BITMAP_BITS(bitmap);
+  debugBelch("getBitmapWord - bitmap : %lu \n", bitmap);
+  StgWord bitmapWord = BITMAP_BITS(bitmap);
+  debugBelch("getBitmapWord - bitmapWord : %lu \n", bitmapWord);
+  return bitmapWord;
 }

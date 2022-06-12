@@ -128,6 +128,8 @@ toStackFrame sp = do
            bitmapWord = getBitmapWord itblPtr
        in
          do
+            traceM $ "toStackFrame - RET_SMALL - bitmapSize " ++ show bitmapSize
+            traceM $ "toStackFrame - RET_SMALL - bitmapWord " ++ show bitmapWord
             payloads <- peekBitmapPayloadArray bitmapSize bitmapWord (Ptr payloadAddr#)
             pure $ RetSmall special payloads
      RET_BIG -> pure RetBig
@@ -143,19 +145,21 @@ toStackFrame sp = do
 
 -- TODO: Use Ptr instead of Addr# (in all possible places)?
 peekBitmapPayloadArray ::  Word -> Word -> Ptr Word -> IO [BitmapPayload]
-peekBitmapPayloadArray bitmapSize bitmapWord ptr = go bitmapSize []
+peekBitmapPayloadArray bitmapSize bitmapWord ptr = go 0 []
   where
     go :: Word -> [BitmapPayload] -> IO [BitmapPayload]
-    go 0 acc = pure acc
-    go n acc = do
-                  e <- peekBitmapPayload ptr (n - 1) bitmapWord
-                  go (n - 2) (e:acc)
+    go index acc | index >= bitmapSize = pure acc
+    go index acc = do
+                  e <- peekBitmapPayload ptr index bitmapWord
+                  go (index + 1) (e:acc)
 
 -- | Fetch a single closure payload
 -- As the decission about the value to marshall
 -- to depends on the bitmap, only a `Word` is peeked.
 peekBitmapPayload :: Ptr Word -> Word -> Word -> IO BitmapPayload
 peekBitmapPayload ptr index bitmapWord = do
+        traceM $ "peekBitmapPayload - ptr " ++ show ptr
+        traceM $ "peekBitmapPayload - index " ++ show index
         e <- (peekElemOff ptr i :: IO Word)
         pure $ if isClosure then
             Closure e
