@@ -22,6 +22,7 @@ import GHC.Core.Type
 
 import GHC.Builtin.PrimOps
 import GHC.Tc.Utils.TcType (isBoolTy)
+import GHC.Utils.Encoding (zEncodeString)
 
 import GHC.Data.ShortText (ShortText)
 import qualified GHC.Data.ShortText as ST
@@ -45,14 +46,12 @@ genPrim _ _ OrdOp             [r] [x]   = PrimInline $ r |= x
 
 genPrim _ _ IntAddOp          [r] [x,y] = PrimInline $ r |= trunc (Add x y)
 genPrim _ _ IntSubOp          [r] [x,y] = PrimInline $ r |= trunc (Sub x y)
-genPrim _ _ IntMulOp          [r] [x,y] =
-    PrimInline $ r |= app "h$mulInt32" [x, y]
+genPrim _ _ IntMulOp          [r] [x,y] = PrimInline $ r |= app "h$mulInt32" [x, y]
 -- fixme may will give the wrong result in case of overflow
-genPrim _ _ IntMulMayOfloOp   [r] [x,y] =
-    PrimInline $ jVar \tmp -> mconcat
-      [ tmp |= Mul x y
-      , r   |= if01 (tmp .===. trunc tmp)
-      ]
+genPrim _ _ IntMulMayOfloOp   [r] [x,y] = PrimInline $ jVar \tmp -> mconcat
+                                            [ tmp |= Mul x y
+                                            , r   |= if01 (tmp .===. trunc tmp)
+                                            ]
 genPrim _ _ IntQuotOp         [r] [x,y] = PrimInline $ r |= trunc (Div x y)
 genPrim _ _ IntRemOp          [r] [x,y] = PrimInline $ r |= Mod x y
 genPrim _ _ IntQuotRemOp    [q,r] [x,y] = PrimInline $ mconcat
@@ -167,6 +166,40 @@ genPrim _ _ Word16GtOp         [r] [x,y] = PrimInline $ r |= if10 (x .>. y)
 genPrim _ _ Word16LeOp         [r] [x,y] = PrimInline $ r |= if10 (x .<=. y)
 genPrim _ _ Word16LtOp         [r] [x,y] = PrimInline $ r |= if10 (x .<. y)
 genPrim _ _ Word16NeOp         [r] [x,y] = PrimInline $ r |= if10 (x .!==. y)
+
+genPrim _ _ Int32ToIntOp       [r] [x]   = PrimInline $ r |= x
+genPrim _ _ IntToInt32Op       [r] [x]   = PrimInline $ r |= x
+genPrim p t Int32NegOp         rs  xs    = genPrim p t IntNegOp rs xs
+genPrim p t Int32AddOp         rs  xs    = genPrim p t IntAddOp rs xs
+genPrim p t Int32SubOp         rs  xs    = genPrim p t IntSubOp rs xs
+genPrim p t Int32MulOp         rs  xs    = genPrim p t IntMulOp rs xs
+genPrim p t Int32QuotOp        rs  xs    = genPrim p t IntQuotOp rs xs
+genPrim p t Int32RemOp         rs  xs    = genPrim p t IntRemOp rs xs
+genPrim p t Int32QuotRemOp     rs  xs    = genPrim p t IntQuotRemOp rs xs
+
+genPrim p t Int32EqOp          rs  xs    = genPrim p t IntEqOp rs xs
+genPrim p t Int32GeOp          rs  xs    = genPrim p t IntGeOp rs xs
+genPrim p t Int32GtOp          rs  xs    = genPrim p t IntGtOp rs xs
+genPrim p t Int32LeOp          rs  xs    = genPrim p t IntLeOp rs xs
+genPrim p t Int32LtOp          rs  xs    = genPrim p t IntLtOp rs xs
+genPrim p t Int32NeOp          rs  xs    = genPrim p t IntNeOp rs xs
+
+genPrim _ _ Word32ToWordOp     [r] [x]   = PrimInline $ r |= x
+genPrim _ _ WordToWord32Op     [r] [x]   = PrimInline $ r |= x
+genPrim p t Word32NotOp        rs  xs    = genPrim p t WordNotOp rs xs
+genPrim p t Word32AddOp        rs  xs    = genPrim p t WordAddOp rs xs
+genPrim p t Word32SubOp        rs  xs    = genPrim p t WordSubOp rs xs
+genPrim p t Word32MulOp        rs  xs    = genPrim p t WordMulOp rs xs
+genPrim p t Word32QuotOp       rs  xs    = genPrim p t WordQuotOp rs xs
+genPrim p t Word32RemOp        rs  xs    = genPrim p t WordRemOp rs xs
+genPrim p t Word32QuotRemOp    rs  xs    = genPrim p t WordQuotRemOp rs xs
+
+genPrim p t Word32EqOp         rs  xs    = genPrim p t WordEqOp rs xs
+genPrim p t Word32GeOp         rs  xs    = genPrim p t WordGeOp rs xs
+genPrim p t Word32GtOp         rs  xs    = genPrim p t WordGtOp rs xs
+genPrim p t Word32LeOp         rs  xs    = genPrim p t WordLeOp rs xs
+genPrim p t Word32LtOp         rs  xs    = genPrim p t WordLtOp rs xs
+genPrim p t Word32NeOp         rs  xs    = genPrim p t WordNeOp rs xs
 
 genPrim _ _ WordAddOp         [r] [x,y] = PrimInline $ r |= trunc (x `Add` y)
 genPrim _ _ WordAddCOp      [r,c] [x,y] = PrimInline $
@@ -534,11 +567,11 @@ genPrim _ _ WriteByteArrayOp_Addr [] [a,i,e1,e2] = PrimInline $ mconcat
                                                       [ ifS (Not (a .^ "arr")) (a .^ "arr" |= ValExpr (JList [])) mempty
                                                       , a .^ "arr" .! (i .<<. two_) |= ValExpr (JList [e1, e2])
                                                       ]
-genPrim _ _ WriteByteArrayOp_Float [] [a,i,e] = PrimInline $ f3_ a i |= e
-genPrim _ _ WriteByteArrayOp_Double [] [a,i,e] = PrimInline $ f6_ a i |= e
-genPrim _ _ WriteByteArrayOp_StablePtr [] [a,i,_e1,e2]     = PrimInline $ i3_ a i |= e2
+genPrim _ _ WriteByteArrayOp_Float     [] [a,i,e]      = PrimInline $ f3_ a i |= e
+genPrim _ _ WriteByteArrayOp_Double    [] [a,i,e]      = PrimInline $ f6_ a i |= e
+genPrim _ _ WriteByteArrayOp_StablePtr [] [a,i,_e1,e2] = PrimInline $ i3_ a i |= e2
 
-genPrim _ _ WriteByteArrayOp_Int8 [] [a,i,e] = PrimInline $ dv_s_i8 a i e
+genPrim _ _ WriteByteArrayOp_Int8  [] [a,i,e]     = PrimInline $ dv_s_i8 a i e
 genPrim _ _ WriteByteArrayOp_Int16 [] [a,i,e]     = PrimInline $ dv_s_i16 a (i .<<. one_) e
 genPrim _ _ WriteByteArrayOp_Int32 [] [a,i,e]     = PrimInline $ i3_ a i |= e
 genPrim _ _ WriteByteArrayOp_Int64 [] [a,i,e1,e2] =
@@ -546,7 +579,7 @@ genPrim _ _ WriteByteArrayOp_Int64 [] [a,i,e1,e2] =
     [ i3_ a (Add (i .<<. one_) one_) |= e1
     , i3_ a (i .<<. one_) |= e2
     ]
-genPrim _ _ WriteByteArrayOp_Word8 [] [a,i,e]     = PrimInline $ u8_ a i |= e
+genPrim _ _ WriteByteArrayOp_Word8  [] [a,i,e]     = PrimInline $ u8_ a i |= e
 genPrim _ _ WriteByteArrayOp_Word16 [] [a,i,e]     = PrimInline $ u1_ a i |= e
 genPrim _ _ WriteByteArrayOp_Word32 [] [a,i,e]     = PrimInline $ i3_ a i |= e
 genPrim _ _ WriteByteArrayOp_Word64 [] [a,i,e1,e2] =
@@ -910,6 +943,13 @@ genPrim _ _ TraceEventOp       [] [ed,eo]     = PrimInline $ appS "h$traceEvent"
 genPrim _ _ TraceEventBinaryOp [] [ed,eo,len] = PrimInline $ appS "h$traceEventBinary" [ed,eo,len]
 genPrim _ _ TraceMarkerOp      [] [ed,eo]     = PrimInline $ appS "h$traceMarker" [ed,eo]
 
+-- FIXME: Sylvain (2022-06) We want to support every primop, or disable them
+-- explicitly. So we should remove this catch-all case ultimately, or make it
+-- crash at compilation time.
+-- Sadly, we can't check for a complete match on primops with the code as it is
+-- written, because we match on args and results at the same time which are
+-- lists and there is no type-level information linking the primop and the number
+-- of args/results.
 genPrim _ _ op rs as = PrimInline $ mconcat
   [ appS "h$log" [toJExpr $ mconcat
       [ "warning, unhandled primop: "
@@ -917,7 +957,7 @@ genPrim _ _ op rs as = PrimInline $ mconcat
       , " "
       , show (length rs, length as)
       ]]
-  , appS (ST.pack $ "h$primop_" ++ renderWithContext defaultSDocContext (ppr op)) as
+  , appS (ST.pack $ "h$primop_" ++ zEncodeString (renderWithContext defaultSDocContext (ppr op))) as
     -- copyRes
   , mconcat $ zipWith (\r reg -> r |= toJExpr reg) rs (enumFrom Ret1)
   ]
