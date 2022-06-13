@@ -1829,7 +1829,7 @@ split_ty_app ty = go ty []
     go (ParensT t) as' = do { loc <- getL; go t (HsArgPar loc: as') }
     go f as           = return (f,as)
 
-cvtTyLit :: TH.TyLit -> HsTyLit
+cvtTyLit :: TH.TyLit -> HsTyLit (GhcPass p)
 cvtTyLit (TH.NumTyLit i) = HsNumTy NoSourceText i
 cvtTyLit (TH.StrTyLit s) = HsStrTy NoSourceText (fsLit s)
 cvtTyLit (TH.CharTyLit c) = HsCharTy NoSourceText c

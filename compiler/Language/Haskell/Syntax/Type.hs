@@ -63,7 +63,6 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Basic
 
-import GHC.Types.SourceText
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.DataCon( HsSrcBang(..), HsImplBang(..),
                          SrcStrictness(..), SrcUnpackedness(..) )
@@ -885,7 +884,7 @@ data HsType pass
 
       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
-  | HsTyLit (XTyLit pass) HsTyLit      -- A promoted numeric literal.
+  | HsTyLit (XTyLit pass) (HsTyLit pass)      -- A promoted numeric literal.
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
@@ -909,14 +908,12 @@ data HsType pass
 type HsCoreTy = Type
 
 
--- Note [Literal source text] in GHC.Types.Basic for SourceText fields in
--- the following
 -- | Haskell Type Literal
-data HsTyLit
-  = HsNumTy SourceText Integer
-  | HsStrTy SourceText FastString
-  | HsCharTy SourceText Char
-    deriving Data
+data HsTyLit pass
+  = HsNumTy  (XNumTy pass) Integer
+  | HsStrTy  (XStrTy pass) FastString
+  | HsCharTy (XCharTy pass) Char
+  | XTyLit   !(XXTyLit pass)
 
 -- | Denotes the type of arrows in the surface language
 data HsArrow pass

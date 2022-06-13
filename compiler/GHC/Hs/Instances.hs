@@ -494,6 +494,11 @@ deriving instance Data (HsType GhcPs)
 deriving instance Data (HsType GhcRn)
 deriving instance Data (HsType GhcTc)
 
+-- deriving instance (DataIdLR p p) => Data (HsTyLit p)
+deriving instance Data (HsTyLit GhcPs)
+deriving instance Data (HsTyLit GhcRn)
+deriving instance Data (HsTyLit GhcTc)
+
 -- deriving instance Data (HsLinearArrowTokens p)
 deriving instance Data (HsLinearArrowTokens GhcPs)
 deriving instance Data (HsLinearArrowTokens GhcRn)
