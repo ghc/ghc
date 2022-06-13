@@ -15,12 +15,16 @@
 {-# LANGUAGE UndecidableInstances    #-} -- Wrinkle in Note [Trees That Grow]
                                          -- in module Language.Haskell.Syntax.Extension
 
+{-# OPTIONS_GHC -Wno-orphans #-} -- Outputable
+
 module GHC.Hs.Extension where
 
 -- This module captures the type families to precisely identify the extension
 -- points for GHC.Hs syntax
 
 import GHC.Prelude
+
+import GHC.TypeLits (KnownSymbol, symbolVal)
 
 import Data.Data hiding ( Fixity )
 import Language.Haskell.Syntax.Extension
@@ -239,3 +243,18 @@ type instance Anno (HsUniToken tok utok) = TokenLocation
 
 noHsUniTok :: GenLocated TokenLocation (HsUniToken tok utok)
 noHsUniTok = L NoTokenLoc HsNormalTok
+
+--- Outputable
+
+instance Outputable NoExtField where
+  ppr _ = text "NoExtField"
+
+instance Outputable DataConCantHappen where
+  ppr = dataConCantHappen
+
+instance KnownSymbol tok => Outputable (HsToken tok) where
+   ppr _ = text (symbolVal (Proxy :: Proxy tok))
+
+instance (KnownSymbol tok, KnownSymbol utok) => Outputable (HsUniToken tok utok) where
+   ppr HsNormalTok  = text (symbolVal (Proxy :: Proxy tok))
+   ppr HsUnicodeTok = text (symbolVal (Proxy :: Proxy utok))

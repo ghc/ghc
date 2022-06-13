@@ -300,7 +300,8 @@ hard_hole_fits.hs:29:38: warning: [-Wtyped-holes (in -Wdefault)]
     • In an equation for ‘testMe’:
           testMe (ExplicitTuple xet gls box) = _
     • Relevant bindings include
-        box :: GHC.Types.Basic.Boxity (bound at hard_hole_fits.hs:29:31)
+        box :: Language.Haskell.Syntax.Basic.Boxity
+          (bound at hard_hole_fits.hs:29:31)
         gls :: [HsTupArg GhcPs] (bound at hard_hole_fits.hs:29:27)
         xet :: Language.Haskell.Syntax.Extension.XExplicitTuple GhcPs
           (bound at hard_hole_fits.hs:29:23)
@@ -320,14 +321,18 @@ hard_hole_fits.hs:30:35: warning: [-Wtyped-holes (in -Wdefault)]
     • In an equation for ‘testMe’: testMe (ExplicitSum xes n i gl) = _
     • Relevant bindings include
         gl :: LHsExpr GhcPs (bound at hard_hole_fits.hs:30:29)
-        i :: GHC.Types.Basic.Arity (bound at hard_hole_fits.hs:30:27)
-        n :: GHC.Types.Basic.ConTag (bound at hard_hole_fits.hs:30:25)
+        i :: Language.Haskell.Syntax.Basic.SumWidth
+          (bound at hard_hole_fits.hs:30:27)
+        n :: Language.Haskell.Syntax.Basic.ConTag
+          (bound at hard_hole_fits.hs:30:25)
         xes :: Language.Haskell.Syntax.Extension.XExplicitSum GhcPs
           (bound at hard_hole_fits.hs:30:21)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
       Valid hole fits include
-        n :: GHC.Types.Basic.ConTag (bound at hard_hole_fits.hs:30:25)
-        i :: GHC.Types.Basic.Arity (bound at hard_hole_fits.hs:30:27)
+        n :: Language.Haskell.Syntax.Basic.ConTag
+          (bound at hard_hole_fits.hs:30:25)
+        i :: Language.Haskell.Syntax.Basic.SumWidth
+          (bound at hard_hole_fits.hs:30:27)
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20

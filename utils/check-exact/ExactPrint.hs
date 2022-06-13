@@ -944,18 +944,18 @@ instance ExactPrint (ForeignDecl GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint ForeignImport where
+instance ExactPrint (ForeignImport GhcPs) where
   getAnnotationEntry = const NoEntryVal
-  exact (CImport cconv safety@(L ll _) _mh _imp (L ls src)) = do
+  exact (CImport (L ls src) cconv safety@(L ll _) _mh _imp) = do
     markAnnotated cconv
     unless (ll == noSrcSpan) $ markAnnotated safety
     unless (ls == noSrcSpan) $ markExternalSourceText ls src ""
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint ForeignExport where
+instance ExactPrint (ForeignExport GhcPs) where
   getAnnotationEntry = const NoEntryVal
-  exact (CExport spec (L ls src)) = do
+  exact (CExport (L ls src) spec) = do
     debugM $ "CExport starting"
     markAnnotated spec
     unless (ls == noSrcSpan) $ markExternalSourceText ls src ""
@@ -983,8 +983,8 @@ instance ExactPrint CCallConv where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (WarnDecls GhcPs) where
-  getAnnotationEntry (Warnings an _ _) = fromAnn an
-  exact (Warnings an src warns) = do
+  getAnnotationEntry (Warnings (an,_) _) = fromAnn an
+  exact (Warnings (an,src) warns) = do
     markAnnOpen an src "{-# WARNING" -- Note: might be {-# DEPRECATED
     markAnnotated warns
     markLocatedAALS an id AnnClose (Just "#-}")
@@ -1024,8 +1024,8 @@ instance ExactPrint FastString where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (RuleDecls GhcPs) where
-  getAnnotationEntry (HsRules an _ _) = fromAnn an
-  exact (HsRules an src rules) = do
+  getAnnotationEntry (HsRules (an,_) _) = fromAnn an
+  exact (HsRules (an, src) rules) = do
     case src of
       NoSourceText      -> markLocatedAALS an id AnnOpen  (Just "{-# RULES")
       SourceText srcTxt -> markLocatedAALS an id AnnOpen  (Just srcTxt)
@@ -1036,8 +1036,8 @@ instance ExactPrint (RuleDecls GhcPs) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (RuleDecl GhcPs) where
-  getAnnotationEntry (HsRule {rd_ext = an}) = fromAnn an
-  exact (HsRule an ln act mtybndrs termbndrs lhs rhs) = do
+  getAnnotationEntry (HsRule {rd_ext = (an,_)}) = fromAnn an
+  exact (HsRule (an,_) ln act mtybndrs termbndrs lhs rhs) = do
     debugM "HsRule entered"
     markAnnotated ln
     debugM "HsRule after ln"
@@ -1309,9 +1309,9 @@ instance ExactPrint (HsBind GhcPs) where
   getAnnotationEntry VarBind{} = NoEntryVal
   getAnnotationEntry PatSynBind{} = NoEntryVal
 
-  exact (FunBind _ _ matches _) = do
+  exact (FunBind _ _ matches) = do
     markAnnotated matches
-  exact (PatBind _ pat grhss _) = do
+  exact (PatBind _ pat grhss) = do
     markAnnotated pat
     markAnnotated grhss
   exact (PatSynBind _ bind) = markAnnotated bind
@@ -1593,14 +1593,13 @@ instance ExactPrint (Sig GhcPs) where
   getAnnotationEntry (TypeSig a _ _)  = fromAnn a
   getAnnotationEntry (PatSynSig a _ _) = fromAnn a
   getAnnotationEntry (ClassOpSig a _ _ _) = fromAnn a
-  getAnnotationEntry (IdSig {}) = NoEntryVal
   getAnnotationEntry (FixSig a _) = fromAnn a
   getAnnotationEntry (InlineSig a _ _) = fromAnn a
   getAnnotationEntry (SpecSig a _ _ _) = fromAnn a
-  getAnnotationEntry (SpecInstSig a _ _) = fromAnn a
-  getAnnotationEntry (MinimalSig a _ _) = fromAnn a
-  getAnnotationEntry (SCCFunSig a _ _ _) = fromAnn a
-  getAnnotationEntry (CompleteMatchSig a _ _ _) = fromAnn a
+  getAnnotationEntry (SpecInstSig (a, _) _) = fromAnn a
+  getAnnotationEntry (MinimalSig (a, _) _) = fromAnn a
+  getAnnotationEntry (SCCFunSig (a, _) _ _) = fromAnn a
+  getAnnotationEntry (CompleteMatchSig (a, _) _ _) = fromAnn a
 
 -- instance Annotate (Sig GhcPs) where
 
@@ -1615,9 +1614,6 @@ instance ExactPrint (Sig GhcPs) where
   exact (ClassOpSig an is_deflt vars ty)
     | is_deflt  = markLocatedAAL an asRest AnnDefault >> exactVarSig an vars ty
     | otherwise = exactVarSig an vars ty
-
---   markAST _ (IdSig {}) =
---     traceM "warning: Introduced after renaming"
 
   exact (FixSig an (FixitySig _ names (Fixity src v fdir))) = do
     let fixstr = case fdir of
@@ -1650,7 +1646,7 @@ instance ExactPrint (Sig GhcPs) where
     markAnnotated typs
     markLocatedAALS an id AnnClose (Just "#-}")
 
-  exact (SpecInstSig an src typ) = do
+  exact (SpecInstSig (an, src) typ) = do
     markAnnOpen an src "{-# SPECIALISE"
     markEpAnn an AnnInstance
     markAnnotated typ
@@ -1663,7 +1659,7 @@ instance ExactPrint (Sig GhcPs) where
 --     markWithString AnnClose "#-}" -- '#-}'
 --     markTrailingSemi
 
-  exact (MinimalSig an src formula) = do
+  exact (MinimalSig (an, src) formula) = do
     markAnnOpen an src "{-# MINIMAL"
     markAnnotated formula
     markLocatedAALS an id AnnClose (Just "#-}")
@@ -1674,13 +1670,13 @@ instance ExactPrint (Sig GhcPs) where
 --     markWithString AnnClose "#-}"
 --     markTrailingSemi
 
-  exact (SCCFunSig an src ln ml) = do
+  exact (SCCFunSig (an, src) ln ml) = do
     markAnnOpen an src "{-# SCC"
     markAnnotated ln
     markAnnotated ml
     markLocatedAALS an id AnnClose (Just "#-}")
 
-  exact (CompleteMatchSig an src cs mty) = do
+  exact (CompleteMatchSig (an, src) cs mty) = do
     markAnnOpen an src "{-# COMPLETE"
     markAnnotated cs
     case mty of
@@ -1689,8 +1685,6 @@ instance ExactPrint (Sig GhcPs) where
         markEpAnn an AnnDcolon
         markAnnotated ty
     markLocatedAALS an id AnnClose (Just "#-}")
-
-  exact x = error $ "exact Sig for:" ++ showAst x
 
 -- ---------------------------------------------------------------------
 
@@ -1746,9 +1740,9 @@ instance ExactPrint (DefaultDecl GhcPs) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (AnnDecl GhcPs) where
-  getAnnotationEntry (HsAnnotation an _ _ _) = fromAnn an
+  getAnnotationEntry (HsAnnotation (an, _) _ _) = fromAnn an
 
-  exact (HsAnnotation an src prov e) = do
+  exact (HsAnnotation (an, src) prov e) = do
     markAnnOpenP an src "{-# ANN"
     case prov of
       (ValueAnnProvenance n) -> markAnnotated n
@@ -2126,7 +2120,7 @@ exactMdo an (Just module_name) kw = markLocatedAALS an al_rest kw (Just n)
 instance ExactPrint (HsPragE GhcPs) where
   getAnnotationEntry HsPragSCC{}  = NoEntryVal
 
-  exact (HsPragSCC an st sl) = do
+  exact (HsPragSCC (an, st) sl) = do
     markAnnOpenP an st "{-# SCC"
     let txt = sourceTextToString (sl_st sl) (unpackFS $ sl_fs sl)
     markLocatedAALS an apr_rest AnnVal    (Just txt) -- optional

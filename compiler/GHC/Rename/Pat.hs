@@ -689,13 +689,13 @@ rnHsRecPatsAndThen mk (L _ con)
   where
     mkVarPat l n = VarPat noExtField (L (noAnnSrcSpan l) n)
     rn_field (L l fld, n') =
-      do { arg' <- rnLPatAndThen (nested_mk dd mk n') (hfbRHS fld)
+      do { arg' <- rnLPatAndThen (nested_mk dd mk (RecFieldsDotDot n')) (hfbRHS fld)
          ; return (L l (fld { hfbRHS = arg' })) }
 
     loc = maybe noSrcSpan getLoc dd
 
     -- Get the arguments of the implicit binders
-    implicit_binders fs (unLoc -> n) = collectPatsBinders CollNoDictBinders implicit_pats
+    implicit_binders fs (unLoc -> RecFieldsDotDot n) = collectPatsBinders CollNoDictBinders implicit_pats
       where
         implicit_pats = map (hfbRHS . unLoc) (drop n fs)
 
@@ -794,12 +794,12 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                              , hfbPun      = pun })) }
 
 
-    rn_dotdot :: Maybe (Located Int)      -- See Note [DotDot fields] in GHC.Hs.Pat
+    rn_dotdot :: Maybe (Located RecFieldsDotDot)      -- See Note [DotDot fields] in GHC.Hs.Pat
               -> Maybe Name -- The constructor (Nothing for an
                                 --    out of scope constructor)
               -> [LHsRecField GhcRn (LocatedA arg)] -- Explicit fields
               -> RnM ([LHsRecField GhcRn (LocatedA arg)])   -- Field Labels we need to fill in
-    rn_dotdot (Just (L loc n)) (Just con) flds -- ".." on record construction / pat match
+    rn_dotdot (Just (L loc (RecFieldsDotDot n))) (Just con) flds -- ".." on record construction / pat match
       | not (isUnboundName con) -- This test is because if the constructor
                                 -- isn't in scope the constructor lookup will add
                                 -- an error but still return an unbound name. We

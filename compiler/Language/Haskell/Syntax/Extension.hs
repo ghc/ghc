@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes     #-} -- for unXRec, etc.
+{-# LANGUAGE CPP                     #-}
 {-# LANGUAGE ConstraintKinds         #-}
 {-# LANGUAGE DataKinds               #-}
 {-# LANGUAGE DeriveDataTypeable      #-}
@@ -21,12 +22,17 @@ module Language.Haskell.Syntax.Extension where
 -- This module captures the type families to precisely identify the extension
 -- points for GHC.Hs syntax
 
-import GHC.Prelude
+import GHC.TypeLits (Symbol, KnownSymbol)
 
-import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
+#if MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
+import Data.Type.Equality (type (~))
+#endif
+
 import Data.Data hiding ( Fixity )
 import Data.Kind (Type)
-import GHC.Utils.Outputable
+
+import Data.Eq
+import Data.Ord
 
 {-
 Note [Trees That Grow]
@@ -73,9 +79,6 @@ See also Note [IsPass] and Note [NoGhcTc] in GHC.Hs.Extension.
 data NoExtField = NoExtField
   deriving (Data,Eq,Ord)
 
-instance Outputable NoExtField where
-  ppr _ = text "NoExtField"
-
 -- | Used when constructing a term with an unused extension point.
 noExtField :: NoExtField
 noExtField = NoExtField
@@ -110,9 +113,6 @@ See also [DataConCantHappen and strict fields].
 -}
 data DataConCantHappen
   deriving (Data,Eq,Ord)
-
-instance Outputable DataConCantHappen where
-  ppr = dataConCantHappen
 
 -- | Eliminate a 'DataConCantHappen'. See Note [Constructor cannot occur].
 dataConCantHappen :: DataConCantHappen -> a
@@ -755,10 +755,3 @@ type LHsUniToken tok utok p = XRec p (HsUniToken tok utok)
 data HsUniToken (tok :: Symbol) (utok :: Symbol) = HsNormalTok | HsUnicodeTok
 
 deriving instance (KnownSymbol tok, KnownSymbol utok) => Data (HsUniToken tok utok)
-
-instance KnownSymbol tok => Outputable (HsToken tok) where
-   ppr _ = text (symbolVal (Proxy :: Proxy tok))
-
-instance (KnownSymbol tok, KnownSymbol utok) => Outputable (HsUniToken tok utok) where
-   ppr HsNormalTok  = text (symbolVal (Proxy :: Proxy tok))
-   ppr HsUnicodeTok = text (symbolVal (Proxy :: Proxy utok))

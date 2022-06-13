@@ -95,6 +95,7 @@ import Language.Haskell.Syntax.Type
 import {-# SOURCE #-} GHC.Hs.Expr ( pprUntypedSplice, HsUntypedSpliceResult(..) )
 
 import Language.Haskell.Syntax.Extension
+import GHC.Core.DataCon( SrcStrictness(..), SrcUnpackedness(..), HsImplBang(..) )
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
 
@@ -338,6 +339,13 @@ type instance XWildCardTy      (GhcPass _) = NoExtField
 
 type instance XXType         (GhcPass _) = HsCoreTy
 
+-- An escape hatch for tunnelling a Core 'Type' through 'HsType'.
+-- For more details on how this works, see:
+--
+-- * @Note [Renaming HsCoreTys]@ in "GHC.Rename.HsType"
+--
+-- * @Note [Typechecking HsCoreTys]@ in "GHC.Tc.Gen.HsType"
+type HsCoreTy = Type
 
 type instance XNumTy         (GhcPass _) = SourceText
 type instance XStrTy         (GhcPass _) = SourceText

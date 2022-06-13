@@ -143,8 +143,7 @@
               (NoAnnSortKey)
               {Bag(LocatedA (HsBind GhcPs)):
                []}
-              [])))))]))
-      [])))
+              [])))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -342,10 +341,8 @@
                                  (NoExtField)
                                  (NoExtField)))])))))]
                         (EmptyLocalBinds
-                         (NoExtField)))))]))
-                  []))]}
-              [])))))]))
-      [])))]))
+                         (NoExtField)))))]))))]}
+              [])))))])))))]))
 
 
 
@@ -479,8 +476,7 @@
               (NoAnnSortKey)
               {Bag(LocatedA (HsBind GhcPs)):
                []}
-              [])))))]))
-      [])))
+              [])))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -671,9 +667,6 @@
                                  (NoExtField)
                                  (NoExtField)))])))))]
                         (EmptyLocalBinds
-                         (NoExtField)))))]))
-                  []))]}
-              [])))))]))
-      [])))]))
-
+                         (NoExtField)))))]))))]}
+              [])))))])))))]))
 

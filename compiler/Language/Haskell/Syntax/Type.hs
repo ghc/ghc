@@ -6,7 +6,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
@@ -20,12 +19,12 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 module Language.Haskell.Syntax.Type (
-        Mult, HsScaled(..),
+        HsScaled(..),
         hsMult, hsScaledThing,
         HsArrow(..),
         HsLinearArrowTokens(..),
 
-        HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
+        HsType(..), LHsType, HsKind, LHsKind,
         HsForAllTelescope(..), HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
@@ -40,10 +39,8 @@ module Language.Haskell.Syntax.Type (
         LHsTypeArg,
 
         LBangType, BangType,
-        HsSrcBang(..), HsImplBang(..),
-        SrcStrictness(..), SrcUnpackedness(..),
-        Boxity(..), PromotionFlag(..),
-        isBoxed, isPromoted,
+        HsSrcBang(..),
+        PromotionFlag(..), isPromoted,
 
         ConDeclField(..), LConDeclField,
 
@@ -61,17 +58,14 @@ module Language.Haskell.Syntax.Type (
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Basic
 
 import GHC.Types.Name.Reader ( RdrName )
-import GHC.Core.DataCon( HsSrcBang(..), HsImplBang(..),
-                         SrcStrictness(..), SrcUnpackedness(..) )
-import GHC.Core.Type
-import GHC.Types.SrcLoc
-import GHC.Parser.Annotation
+import GHC.Core.DataCon( HsSrcBang(..) )
+import GHC.Core.Type (Specificity)
+import GHC.Types.SrcLoc (SrcSpan)
 
-import GHC.Hs.Doc
-import GHC.Data.FastString
+import GHC.Hs.Doc (LHsDoc)
+import GHC.Data.FastString (FastString)
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Void
@@ -79,7 +73,7 @@ import Data.Maybe
 import Data.Eq
 import Data.Bool
 import Data.Char
-import GHC.Num (Integer)
+import Prelude (Integer)
 
 {-
 ************************************************************************
@@ -899,14 +893,6 @@ data HsType pass
   | XHsType
       !(XXType pass)
 
--- An escape hatch for tunnelling a Core 'Type' through 'HsType'.
--- For more details on how this works, see:
---
--- * @Note [Renaming HsCoreTys]@ in "GHC.Rename.HsType"
---
--- * @Note [Typechecking HsCoreTys]@ in "GHC.Tc.Gen.HsType"
-type HsCoreTy = Type
-
 
 -- | Haskell Type Literal
 data HsTyLit pass
@@ -1191,7 +1177,7 @@ if they correspond to a visible 'forall'.
 ************************************************************************
 -}
 
--- Arguments in an expression/type after splitting
+-- | Arguments in an expression/type after splitting
 data HsArg tm ty
   = HsValArg tm   -- Argument is an ordinary expression     (f arg)
   | HsTypeArg SrcSpan ty -- Argument is a visible type application (f @ty)
@@ -1265,8 +1251,8 @@ type LAmbiguousFieldOcc pass = XRec pass (AmbiguousFieldOcc pass)
 -- See Note [HsRecField and HsRecUpdField] in "GHC.Hs.Pat".
 -- See Note [Located RdrNames] in "GHC.Hs.Expr".
 data AmbiguousFieldOcc pass
-  = Unambiguous (XUnambiguous pass) (LocatedN RdrName)
-  | Ambiguous   (XAmbiguous pass)   (LocatedN RdrName)
+  = Unambiguous (XUnambiguous pass) (XRec pass RdrName)
+  | Ambiguous   (XAmbiguous pass)   (XRec pass RdrName)
   | XAmbiguousFieldOcc !(XXAmbiguousFieldOcc pass)
 
 

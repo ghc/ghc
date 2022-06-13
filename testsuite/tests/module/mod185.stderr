@@ -128,7 +128,4 @@
                    {ModuleName: Prelude}
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))]))
-
-
+             (NoExtField)))))])))))]))

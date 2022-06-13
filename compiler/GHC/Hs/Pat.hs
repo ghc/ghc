@@ -33,6 +33,7 @@ module GHC.Hs.Pat (
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
+        RecFieldsDotDot(..),
         hsRecFields, hsRecFieldSel, hsRecFieldId, hsRecFieldsArgs,
         hsRecUpdFieldId, hsRecUpdFieldOcc, hsRecUpdFieldRdr,
 
@@ -268,7 +269,7 @@ instance (Outputable arg, Outputable (XRec p (HsRecField p arg)), XRec p RecFiel
       => Outputable (HsRecFields p arg) where
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
         = braces (fsep (punctuate comma (map ppr flds)))
-  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just (unLoc -> n) })
+  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just (unLoc -> RecFieldsDotDot n) })
         = braces (fsep (punctuate comma (map ppr (take n flds) ++ [dotdot])))
         where
           dotdot = text ".." <+> whenPprDebug (ppr (drop n flds))

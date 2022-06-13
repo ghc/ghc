@@ -30,18 +30,17 @@ module Language.Haskell.Syntax.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep, FunDep(..),
   HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
-  NewOrData(..), newOrDataToFlavour,
+  NewOrData(..),
   StandaloneKindSig(..), LStandaloneKindSig,
 
   -- ** Class or type declarations
-  TyClDecl(..), LTyClDecl, DataDeclRn(..),
+  TyClDecl(..), LTyClDecl,
   TyClGroup(..),
   tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
   tyClGroupKindSigs,
   isClassDecl, isDataDecl, isSynDecl,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
   isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
-  countTyClDecls,
   tyClDeclTyVars,
   FamilyDecl(..), LFamilyDecl,
 
@@ -58,7 +57,7 @@ module Language.Haskell.Syntax.Decls (
   -- ** Deriving strategies
   DerivStrategy(..), LDerivStrategy,
   -- ** @RULE@ declarations
-  LRuleDecls,RuleDecls(..),RuleDecl(..),LRuleDecl,HsRuleRn(..),
+  LRuleDecls,RuleDecls(..),RuleDecl(..),LRuleDecl,
   RuleBndr(..),LRuleBndr,
   collectRuleBndrSigTys,
   -- ** @default@ declarations
@@ -90,8 +89,6 @@ module Language.Haskell.Syntax.Decls (
     ) where
 
 -- friends:
-import GHC.Prelude
-
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   ( HsExpr, HsUntypedSplice )
         -- Because Expr imports Decls via HsBracket
@@ -99,23 +96,28 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Basic (Role)
 
-import GHC.Hs.Doc -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
+import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName, Activation)
+import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
+import GHC.Types.Fixity (LexicalFixity)
 
-import GHC.Core.TyCon
-import GHC.Types.Basic
-import GHC.Types.ForeignCall
-import GHC.Types.Name.Set
-import GHC.Types.Fixity
+import GHC.Core.Type (Specificity)
+import GHC.Unit.Module.Warnings (WarningTxt)
 
--- others:
-import GHC.Utils.Misc
-import GHC.Types.SrcLoc
-import GHC.Core.Type
-import GHC.Unit.Module.Warnings
+import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 
+import Control.Monad
 import Data.Data        hiding (TyCon, Fixity, Infix)
 import Data.Void
+import Data.Maybe
+import Data.String
+import Data.Function
+import Data.Eq
+import Data.Int
+import Data.Bool
+import Prelude (Show)
+import qualified Data.List
 
 {-
 ************************************************************************
@@ -470,12 +472,6 @@ data FunDep pass
 
 type LHsFunDep pass = XRec pass (FunDep pass)
 
-data DataDeclRn = DataDeclRn
-             { tcdDataCusk :: Bool    -- ^ does this have a CUSK?
-                 -- See Note [CUSKs: complete user-supplied kind signatures]
-             , tcdFVs      :: NameSet }
-  deriving Data
-
 {- Note [TyVar binders for associated decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For an /associated/ data, newtype, or type-family decl, the LHsQTyVars
@@ -568,21 +564,6 @@ isDataFamilyDecl _other      = False
 tyClDeclTyVars :: TyClDecl pass -> LHsQTyVars pass
 tyClDeclTyVars (FamDecl { tcdFam = FamilyDecl { fdTyVars = tvs } }) = tvs
 tyClDeclTyVars d = tcdTyVars d
-
-countTyClDecls :: [TyClDecl pass] -> (Int, Int, Int, Int, Int)
-        -- class, synonym decls, data, newtype, family decls
-countTyClDecls decls
- = (count isClassDecl    decls,
-    count isSynDecl      decls,  -- excluding...
-    count isDataTy       decls,  -- ...family...
-    count isNewTy        decls,  -- ...instances
-    count isFamilyDecl   decls)
- where
-   isDataTy DataDecl{ tcdDataDefn = HsDataDefn { dd_ND = DataType } } = True
-   isDataTy _                                                       = False
-
-   isNewTy DataDecl{ tcdDataDefn = HsDataDefn { dd_ND = NewType } } = True
-   isNewTy _                                                      = False
 
 
 {- Note [CUSKs: complete user-supplied kind signatures]
@@ -715,16 +696,16 @@ data TyClGroup pass  -- See Note [TyClGroups and dependency analysis]
 
 
 tyClGroupTyClDecls :: [TyClGroup pass] -> [LTyClDecl pass]
-tyClGroupTyClDecls = concatMap group_tyclds
+tyClGroupTyClDecls = Data.List.concatMap group_tyclds
 
 tyClGroupInstDecls :: [TyClGroup pass] -> [LInstDecl pass]
-tyClGroupInstDecls = concatMap group_instds
+tyClGroupInstDecls = Data.List.concatMap group_instds
 
 tyClGroupRoleDecls :: [TyClGroup pass] -> [LRoleAnnotDecl pass]
-tyClGroupRoleDecls = concatMap group_roles
+tyClGroupRoleDecls = Data.List.concatMap group_roles
 
 tyClGroupKindSigs :: [TyClGroup pass] -> [LStandaloneKindSig pass]
-tyClGroupKindSigs = concatMap group_kisigs
+tyClGroupKindSigs = Data.List.concatMap group_kisigs
 
 
 {- *********************************************************************
@@ -1004,12 +985,6 @@ data NewOrData
   = NewType                     -- ^ @newtype Blah ...@
   | DataType                    -- ^ @data Blah ...@
   deriving( Eq, Data )                -- Needed because Demand derives Eq
-
--- | Convert a 'NewOrData' to a 'TyConFlavour'
-newOrDataToFlavour :: NewOrData -> TyConFlavour
-newOrDataToFlavour NewType  = NewtypeFlavour
-newOrDataToFlavour DataType = DataTypeFlavour
-
 
 -- | Located data Constructor Declaration
 type LConDecl pass = XRec pass (ConDecl pass)
@@ -1548,8 +1523,8 @@ data ForeignImport pass = -- import of a C entity
                           --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
                           --
                           CImport  (XCImport pass)
-                                   (Located CCallConv) -- ccall or stdcall
-                                   (Located Safety)  -- interruptible, safe or unsafe
+                                   (XRec pass CCallConv) -- ccall or stdcall
+                                   (XRec pass Safety)  -- interruptible, safe or unsafe
                                    (Maybe Header)       -- name of C header
                                    CImportSpec          -- details of the C entity
                         | XForeignImport !(XXForeignImport pass)
@@ -1565,7 +1540,7 @@ data CImportSpec = CLabel    CLabelString     -- import address of a C label
 -- specification of an externally exported entity in dependence on the calling
 -- convention
 --
-data ForeignExport pass = CExport  (XCExport pass) (Located CExportSpec) -- contains the calling convention
+data ForeignExport pass = CExport  (XCExport pass) (XRec pass CExportSpec) -- contains the calling convention
                         | XForeignExport !(XXForeignExport pass)
 
 
@@ -1612,9 +1587,6 @@ data RuleDecl pass
     --           'GHC.Parser.Annotation.AnnForall','GHC.Parser.Annotation.AnnDot',
     --           'GHC.Parser.Annotation.AnnEqual',
   | XRuleDecl !(XXRuleDecl pass)
-
-data HsRuleRn = HsRuleRn NameSet NameSet -- Free-vars from the LHS and RHS
-  deriving Data
 
 -- | Located Rule Binder
 type LRuleBndr pass = XRec pass (RuleBndr pass)

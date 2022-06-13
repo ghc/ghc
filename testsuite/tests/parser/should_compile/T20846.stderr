@@ -151,7 +151,4 @@
                   (Unqual
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))]))
-
-
+             (NoExtField)))))])))))]))

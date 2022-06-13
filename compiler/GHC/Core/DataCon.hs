@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# OPTIONS_GHC -Wno-orphans #-} -- Outputable, Binary
 
 module GHC.Core.DataCon (
         -- * Main data types
@@ -66,6 +67,8 @@ module GHC.Core.DataCon (
     ) where
 
 import GHC.Prelude
+
+import Language.Haskell.Syntax.Basic
 
 import {-# SOURCE #-} GHC.Types.Id.Make ( DataConBoxer )
 import GHC.Core.Type as Type
@@ -752,22 +755,6 @@ data HsImplBang
     -- ^ Strict and unpacked field
     -- co :: arg-ty ~ product-ty HsBang
   deriving Data.Data
-
--- | Source Strictness
---
--- What strictness annotation the user wrote
-data SrcStrictness = SrcLazy -- ^ Lazy, ie '~'
-                   | SrcStrict -- ^ Strict, ie '!'
-                   | NoSrcStrict -- ^ no strictness annotation
-     deriving (Eq, Data.Data)
-
--- | Source Unpackedness
---
--- What unpackedness the user requested
-data SrcUnpackedness = SrcUnpack -- ^ {-# UNPACK #-} specified
-                     | SrcNoUnpack -- ^ {-# NOUNPACK #-} specified
-                     | NoSrcUnpack -- ^ no unpack pragma
-     deriving (Eq, Data.Data)
 
 
 

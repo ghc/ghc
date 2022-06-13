@@ -532,7 +532,7 @@ dsExpr (SectionL x _ _)  = dataConCantHappen x
 dsExpr (SectionR x _ _)  = dataConCantHappen x
 
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
-ds_prag_expr (HsPragSCC _ _ cc) expr = do
+ds_prag_expr (HsPragSCC _ cc) expr = do
     dflags <- getDynFlags
     if sccProfilingEnabled dflags && gopt Opt_ProfManualCcs dflags
       then do

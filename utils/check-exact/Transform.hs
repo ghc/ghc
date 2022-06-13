@@ -263,8 +263,8 @@ captureOrder ls = AnnSortKey $ map (rs . getLocA) ls
 -- ---------------------------------------------------------------------
 
 captureMatchLineSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
-captureMatchLineSpacing (L l (ValD x (FunBind a b (MG c (L d ms )) f)))
-                       = L l (ValD x (FunBind a b (MG c (L d ms')) f))
+captureMatchLineSpacing (L l (ValD x (FunBind a b (MG c (L d ms )))))
+                       = L l (ValD x (FunBind a b (MG c (L d ms'))))
     where
       ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
       ms' = captureLineSpacing ms
@@ -447,8 +447,8 @@ getEntryDP anns ast =
 -- ---------------------------------------------------------------------
 
 setEntryDPDecl :: LHsDecl GhcPs -> DeltaPos -> LHsDecl GhcPs
-setEntryDPDecl decl@(L _  (ValD x (FunBind a b (MG c (L d ms )) f))) dp
-                   = L l' (ValD x (FunBind a b (MG c (L d ms')) f))
+setEntryDPDecl decl@(L _  (ValD x (FunBind a b (MG c (L d ms ))))) dp
+                   = L l' (ValD x (FunBind a b (MG c (L d ms'))))
     where
       L l' _ = setEntryDP' decl dp
       ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
@@ -552,8 +552,8 @@ transferEntryDP' la lb = do
 
 
 pushDeclDP :: HsDecl GhcPs -> DeltaPos -> HsDecl GhcPs
-pushDeclDP (ValD x (FunBind a b (MG c (L d  ms )) f)) dp
-          = ValD x (FunBind a b (MG c (L d' ms')) f)
+pushDeclDP (ValD x (FunBind a b (MG c (L d  ms )))) dp
+          = ValD x (FunBind a b (MG c (L d' ms')))
     where
       L d' _ = setEntryDP' (L d ms) dp
       ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
@@ -623,7 +623,7 @@ balanceComments first second = do
 -- 'Match' if that 'Match' needs to be manipulated.
 balanceCommentsFB :: (Monad m)
   => LHsBind GhcPs -> LocatedA b -> TransformT m (LHsBind GhcPs, LocatedA b)
-balanceCommentsFB (L lf (FunBind x n (MG o (L lm matches)) t)) second = do
+balanceCommentsFB (L lf (FunBind x n (MG o (L lm matches)))) second = do
   logTr $ "balanceCommentsFB entered: " ++ showGhc (ss2range $ locA lf)
   -- There are comments on lf.  We need to
   -- + Keep the prior ones here
@@ -655,7 +655,7 @@ balanceCommentsFB (L lf (FunBind x n (MG o (L lm matches)) t)) second = do
         _  -> (m'',lf')
   logTr $ "balanceCommentsMatch done"
   -- return (L lf'' (FunBind x n (MG mx (L lm (reverse (m''':ms))) o) t), second')
-  balanceComments' (L lf'' (FunBind x n (MG o (L lm (reverse (m''':ms)))) t)) second'
+  balanceComments' (L lf'' (FunBind x n (MG o (L lm (reverse (m''':ms)))))) second'
 balanceCommentsFB f s = balanceComments' f s
 
 -- | Move comments on the same line as the end of the match into the
@@ -1221,7 +1221,7 @@ hsDeclsPatBindD x = error $ "hsDeclsPatBindD called for:" ++ showGhc x
 -- for 'hsDecls' \/ 'replaceDecls'. 'hsDeclsPatBind' \/ 'replaceDeclsPatBind' is
 -- idempotent.
 hsDeclsPatBind :: (Monad m) => LHsBind GhcPs -> TransformT m [LHsDecl GhcPs]
-hsDeclsPatBind (L _ (PatBind _ _ (GRHSs _ _grhs lb) _)) = hsDeclsValBinds lb
+hsDeclsPatBind (L _ (PatBind _ _ (GRHSs _ _grhs lb))) = hsDeclsValBinds lb
 hsDeclsPatBind x = error $ "hsDeclsPatBind called for:" ++ showGhc x
 
 -- -------------------------------------
@@ -1243,7 +1243,7 @@ replaceDeclsPatBindD x _ = error $ "replaceDeclsPatBindD called for:" ++ showGhc
 -- idempotent.
 replaceDeclsPatBind :: (Monad m) => LHsBind GhcPs -> [LHsDecl GhcPs]
                     -> TransformT m (LHsBind GhcPs)
-replaceDeclsPatBind (L l (PatBind x a (GRHSs xr rhss binds) b)) newDecls
+replaceDeclsPatBind (L l (PatBind x a (GRHSs xr rhss binds))) newDecls
     = do
         logTr "replaceDecls PatBind"
         -- Need to throw in a fresh where clause if the binds were empty,
@@ -1261,7 +1261,7 @@ replaceDeclsPatBind (L l (PatBind x a (GRHSs xr rhss binds) b)) newDecls
         -- modifyAnnsT (captureOrderAnnKey (mkAnnKey p) newDecls)
         binds'' <- replaceDeclsValbinds WithWhere binds newDecls
         -- let binds' = L (getLoc binds) binds''
-        return (L l (PatBind x a (GRHSs xr rhss binds'') b))
+        return (L l (PatBind x a (GRHSs xr rhss binds'')))
 replaceDeclsPatBind x _ = error $ "replaceDeclsPatBind called for:" ++ showGhc x
 
 -- ---------------------------------------------------------------------
@@ -1372,7 +1372,7 @@ hsDeclsGeneric t = q t
     -- ---------------------------------
 
     lhsbind :: (Monad m) => LHsBind GhcPs -> TransformT m [LHsDecl GhcPs]
-    lhsbind (L _ (FunBind _ _ (MG _ (L _ matches)) _)) = do
+    lhsbind (L _ (FunBind _ _ (MG _ (L _ matches)))) = do
         dss <- mapM hsDecls matches
         return (concat dss)
     lhsbind p@(L _ (PatBind{})) = do
