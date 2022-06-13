@@ -857,8 +857,8 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
 
        ; let bind = FunBind{ fun_id = L loc matcher_prag_id
                            , fun_matches = mg
-                           , fun_ext = idHsWrapper
-                           , fun_tick = [] }
+                           , fun_ext = (idHsWrapper, [])
+                           }
              matcher_bind = unitBag (noLocA bind)
        ; traceTc "tcPatSynMatcher" (ppr ps_name $$ ppr (idType matcher_id))
        ; traceTc "tcPatSynMatcher" (ppr matcher_bind)
@@ -959,7 +959,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
              bind = FunBind { fun_id      = L loc (idName builder_id)
                             , fun_matches = match_group'
                             , fun_ext     = emptyNameSet
-                            , fun_tick    = [] }
+                            }
 
              sig = completeSigFromId (PatSynCtxt ps_name) builder_id
 

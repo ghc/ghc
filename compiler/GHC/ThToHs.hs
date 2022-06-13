@@ -222,7 +222,7 @@ cvtDec (TH.ValD pat body ds)
           PatBind { pat_lhs = pat'
                   , pat_rhs = GRHSs emptyComments body' ds'
                   , pat_ext = noAnn
-                  , pat_ticks = ([],[]) } }
+                  } }
 
 cvtDec (TH.FunD nm cls)
   | null cls

@@ -710,4 +710,4 @@ genFunBind fn ms
   = FunBind { fun_id = fn
             , fun_matches = mkMatchGroup Generated (wrapGenSpan ms)
             , fun_ext = emptyNameSet
-            , fun_tick = [] }
+            }

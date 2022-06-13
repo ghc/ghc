@@ -836,11 +836,11 @@ type AnnoBody p body
 instance HiePass p => ToHie (BindContext (LocatedA (HsBind (GhcPass p)))) where
   toHie (BC context scope b@(L span bind)) =
     concatM $ getTypeNode b : case bind of
-      FunBind{fun_id = name, fun_matches = matches, fun_ext = wrap} ->
+      FunBind{fun_id = name, fun_matches = matches, fun_ext = ext} ->
         [ toHie $ C (ValBind context scope $ getRealSpanA span) name
         , toHie matches
         , case hiePass @p of
-            HieTc -> toHie $ L span wrap
+            HieTc | (wrap, _) <- ext -> toHie $ L span wrap
             _ -> pure []
         ]
       PatBind{pat_lhs = lhs, pat_rhs = rhs} ->

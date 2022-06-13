@@ -154,8 +154,8 @@ dsHsBind dflags (VarBind { var_id = var
 
 dsHsBind dflags b@(FunBind { fun_id = L loc fun
                            , fun_matches = matches
-                           , fun_ext = co_fn
-                           , fun_tick = tick })
+                           , fun_ext = (co_fn, tick)
+                           })
  = do   { (args, body) <- addTyCs FromSource (hsWrapDictBinders co_fn) $
                           -- FromSource might not be accurate (we don't have any
                           -- origin annotations for things in this module), but at
@@ -185,8 +185,8 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
           return (force_var, [core_binds]) }
 
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
-                         , pat_ext = ty
-                         , pat_ticks = (rhs_tick, var_ticks) })
+                         , pat_ext = (ty, (rhs_tick, var_ticks))
+                         })
   = do  { rhss_nablas <- pmcGRHSs PatBindGuards grhss
         ; body_expr <- dsGuarded grhss ty rhss_nablas
         ; let body' = mkOptTickBox rhs_tick body_expr

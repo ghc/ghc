@@ -535,12 +535,12 @@ zonk_lbind env = wrapLocMA (zonk_bind env)
 
 zonk_bind :: ZonkEnv -> HsBind GhcTc -> TcM (HsBind GhcTc)
 zonk_bind env bind@(PatBind { pat_lhs = pat, pat_rhs = grhss
-                            , pat_ext = ty})
+                            , pat_ext = (ty, ticks)})
   = do  { (_env, new_pat) <- zonkPat env pat            -- Env already extended
         ; new_grhss <- zonkGRHSs env zonkLExpr grhss
         ; new_ty    <- zonkTcTypeToTypeX env ty
         ; return (bind { pat_lhs = new_pat, pat_rhs = new_grhss
-                       , pat_ext = new_ty }) }
+                       , pat_ext = (new_ty, ticks) }) }
 
 zonk_bind env (VarBind { var_ext = x
                        , var_id = var, var_rhs = expr })
@@ -552,13 +552,13 @@ zonk_bind env (VarBind { var_ext = x
 
 zonk_bind env bind@(FunBind { fun_id = L loc var
                             , fun_matches = ms
-                            , fun_ext = co_fn })
+                            , fun_ext = (co_fn, ticks) })
   = do { new_var <- zonkIdBndr env var
        ; (env1, new_co_fn) <- zonkCoFn env co_fn
        ; new_ms <- zonkMatchGroup env1 zonkLExpr ms
        ; return (bind { fun_id = L loc new_var
                       , fun_matches = new_ms
-                      , fun_ext = new_co_fn }) }
+                      , fun_ext = (new_co_fn, ticks) }) }
 
 zonk_bind env (XHsBindsLR (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                                     , abs_ev_binds = ev_binds
@@ -585,7 +585,7 @@ zonk_bind env (XHsBindsLR (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
       | has_sig
       , (L loc bind@(FunBind { fun_id      = (L mloc mono_id)
                              , fun_matches = ms
-                             , fun_ext     = co_fn })) <- lbind
+                             , fun_ext     = (co_fn, ticks) })) <- lbind
       = do { new_mono_id <- updateIdTypeAndMultM (zonkTcTypeToTypeX env) mono_id
                             -- Specifically /not/ zonkIdBndr; we do not want to
                             -- complain about a representation-polymorphic binder
@@ -594,7 +594,7 @@ zonk_bind env (XHsBindsLR (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
            ; return $ L loc $
              bind { fun_id      = L mloc new_mono_id
                   , fun_matches = new_ms
-                  , fun_ext     = new_co_fn } }
+                  , fun_ext     = (new_co_fn, ticks) } }
       | otherwise
       = zonk_lbind env lbind   -- The normal case
 
