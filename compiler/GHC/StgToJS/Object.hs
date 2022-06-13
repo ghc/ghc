@@ -153,6 +153,9 @@ data DepsLocation = ObjectFile  FilePath           -- ^ In an object file at pat
                   | InMemory    String ByteString  -- ^ In memory
                   deriving (Eq, Show)
 
+instance Outputable DepsLocation where
+  ppr x = text (show x)
+
 data BlockDeps = BlockDeps
   { blockBlockDeps       :: [Int]         -- ^ dependencies on blocks in this object
   , blockFunDeps         :: [ExportedFun] -- ^ dependencies on exported symbols in other objects

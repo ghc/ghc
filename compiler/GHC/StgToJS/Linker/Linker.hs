@@ -76,7 +76,7 @@ import           GHC.StgToJS.Printer
 
 import qualified GHC.SysTools.Ar          as Ar
 import           GHC.Utils.Encoding
-import           GHC.Utils.Outputable (ppr, text)
+import           GHC.Utils.Outputable hiding ((<>))
 import           GHC.Utils.Panic
 import           GHC.Unit.State
 import           GHC.Unit.Env
@@ -86,6 +86,7 @@ import           GHC.Utils.Error
 import           GHC.Driver.Env.Types
 import           GHC.Data.ShortText       (ShortText)
 import qualified GHC.Data.ShortText       as T
+import           GHC.Data.FastString (unpackFS)
 
 import           Control.Concurrent.MVar
 import           Control.Monad
@@ -108,6 +109,7 @@ import qualified Data.Map.Strict          as M
 import           Data.Maybe
 import           Data.Set                 (Set)
 import qualified Data.Set                 as S
+import           Data.Word
 
 import           GHC.Generics (Generic)
 
@@ -122,8 +124,7 @@ import           System.Directory ( createDirectoryIfMissing
                                   , listDirectory
                                   )
 
-import GHC.Driver.Session (targetWays_, settings, DynFlags(..), addGlobalInclude)
-import GHC.Settings (sTopDir)
+import GHC.Driver.Session (targetWays_, DynFlags(..), addGlobalInclude)
 import GHC.Unit.Module.Name
 import GHC.Unit.Module (moduleStableString)
 import GHC.Utils.Logger (Logger)
@@ -131,19 +132,20 @@ import GHC.Utils.TmpFs (TmpFs)
 
 import GHC.Linker.Static.Utils (exeFileName)
 
--- number of bytes linked per module
-type LinkerStats  = Map Module Int64
+newtype LinkerStats  = LinkerStats
+  { bytesPerModule :: Map Module Word64 -- ^ number of bytes linked per module
+  }
 
 -- | result of a link pass
 data LinkResult = LinkResult
-  { linkOut         :: BL.ByteString -- ^ compiled Haskell code
-  , linkOutStats    :: LinkerStats   -- ^ statistics about generated code
-  , linkOutMetaSize :: Int64         -- ^ size of packed metadata in generated code
-  , linkForeignRefs :: [ForeignJSRef]  -- ^ foreign code references in compiled haskell code
-  , linkLibRTS      :: [FilePath]    -- ^ library code to load with the RTS
-  , linkLibA        :: [FilePath]    -- ^ library code to load after RTS
-  , linkLibAArch    :: [FilePath]    -- ^ library code to load from archives after RTS
-  , linkBase        :: Base          -- ^ base metadata to use if we want to link incrementally against this result
+  { linkOut         :: B.ByteString   -- ^ compiled Haskell code
+  , linkOutStats    :: LinkerStats    -- ^ statistics about generated code
+  , linkOutMetaSize :: Int64          -- ^ size of packed metadata in generated code
+  , linkForeignRefs :: [ForeignJSRef] -- ^ foreign code references in compiled haskell code
+  , linkLibRTS      :: [FilePath]     -- ^ library code to load with the RTS
+  , linkLibA        :: [FilePath]     -- ^ library code to load after RTS
+  , linkLibAArch    :: [FilePath]     -- ^ library code to load from archives after RTS
+  , linkBase        :: Base           -- ^ base metadata to use if we want to link incrementally against this result
   } deriving (Generic)
 
 newtype ArchiveState = ArchiveState { loadedArchives :: IORef (Map FilePath Ar.Archive) }
@@ -170,14 +172,14 @@ link :: GhcjsEnv
 link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFiles isRootFun extraStaticDeps
   | lcNoJSExecutables lc_cfg = return ()
   | otherwise = do
-      LinkResult lo lstats lmetasize _lfrefs llW lla llarch lbase <-
-        link' env lc_cfg cfg dflags logger unit_env out include pkgs objFiles jsFiles
-              isRootFun extraStaticDeps
+      link_res <- link' env lc_cfg cfg dflags logger unit_env out include pkgs objFiles jsFiles
+                    isRootFun extraStaticDeps
+
       let genBase = isJust (lcGenBase lc_cfg)
           jsExt | genBase   = "base.js"
                 | otherwise = "js"
       createDirectoryIfMissing False out
-      BL.writeFile (out </> "out" <.> jsExt) lo
+      B.writeFile (out </> "out" <.> jsExt) (linkOut link_res)
       unless (lcOnlyOut lc_cfg) $ do
         let frefsFile   = if genBase then "out.base.frefs" else "out.frefs"
             -- FIXME: Jeff (2022,03): GHCJS used Aeson to encode Foreign
@@ -186,7 +188,7 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
             -- we'll need to find an alternative coding strategy to write these
             -- out. See the commented instance for FromJSON StaticDeps below.
             -- - this line called out to the FromJSon Instance
-            -- jsonFrefs  = Aeson.encode lfrefs
+            -- jsonFrefs  = Aeson.encode (linkForeignRefs link_res)
             jsonFrefs  = mempty
 
         BL.writeFile (out </> frefsFile <.> "json") jsonFrefs
@@ -194,17 +196,18 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
                      ("h$checkForeignRefs(" <> jsonFrefs <> ");")
         unless (lcNoStats lc_cfg) $ do
           let statsFile = if genBase then "out.base.stats" else "out.stats"
-          writeFile (out </> statsFile) (linkerStats lmetasize lstats)
+          let stats = linkerStats (linkOutMetaSize link_res) (linkOutStats link_res)
+          writeFile (out </> statsFile) stats
         unless (lcNoRts lc_cfg) $ do
           -- Sylvain (2022-06): find RTS js files (shims) via an environment variable...
           -- Remove when all files are located via Cabal's js-sources
           let is_js_file f = "js" `isExtensionOf` f || "pp" `isExtensionOf` f
           static_rts_dir <- lookupEnv "JS_RTS_PATH" >>= \case
-            Nothing  -> pure []
+            Nothing  -> error "JS_RTS_PATH env var not set: can't link the RTS!"
             Just dir -> pure dir
           static_rts_files <- (fmap (static_rts_dir </>) . filter is_js_file) <$> listDirectory static_rts_dir
 
-          let all_rts_js     = llW ++ static_rts_files
+          let all_rts_js     = linkLibRTS link_res ++ static_rts_files
               -- FIXME (Jeff, 2022-06): dflags_with_js is a dirty workaround to
               -- include all js.pp and .h files in the ghc/js directory. Once we
               -- have real js-sources in Cabal remove this line:
@@ -215,23 +218,22 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
                                            <> BL.fromChunks withRts
                                            <> BLC.pack (T.unpack $ rtsText cfg))
         -- FIXME (Sylvain, 2022-05): disable shims
-        -- lla'    <- mapM (tryReadShimFile logger tmpfs dflags unit_env) lla
-        -- llarch' <- mapM (readShimsArchive dflags) llarch
+        -- lla'    <- mapM (tryReadShimFile logger tmpfs dflags unit_env) (linkLibA link_res)
+        -- llarch' <- mapM (readShimsArchive dflags) (linkLibArch link_res)
         -- let lib_js = BL.fromChunks $ llarch' ++ lla'
         let lib_js = BL.empty
         BL.writeFile (out </> "lib" <.> jsExt) lib_js
 
         if genBase
-          then generateBase out lbase
+          then generateBase out (linkBase link_res)
           else when (    not (lcOnlyOut lc_cfg)
                       && not (lcNoRts   lc_cfg)
                       && not (usingBase lc_cfg)
                     )
                $ do
-                 let top = sTopDir . settings $ dflags
-                 _ <- combineFiles lc_cfg top out
-                 writeHtml    top out
-                 writeRunMain top out
+                 _ <- combineFiles lc_cfg out
+                 writeHtml    out
+                 writeRunMain out
                  writeRunner lc_cfg out
                  -- FIXME (Sylvain 2022-05): disabled for now
                  -- writeWebAppManifest top out
@@ -272,6 +274,7 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
                 case lcGenBase lc_cfg of
                   Just baseMod -> "Linking base bundle " ++ target ++ " (" ++ moduleNameString (moduleName baseMod) ++ ")"
                   _            -> "Linking " ++ target ++ " (" ++ intercalate "," rootMods ++ ")"
+
       base <- case lcUseBase lc_cfg of
         NoBase        -> return emptyBase
         BaseFile file -> loadBase file
@@ -292,16 +295,29 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
           -- getPkgLibPaths k = fromMaybe ([],[]) (lookup k pkgLibPaths)
       (archsDepsMap, archsRequiredUnits) <- loadArchiveDeps env =<< getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state pkgs')
       pkgArchs <- getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state pkgs'')
-      (allDeps, code) <-
-        collectDeps (objDepsMap `M.union` archsDepsMap)
-                    (pkgs' ++ [homeUnitId (ue_unsafeHomeUnit $ unit_env)]) -- FIXME: dont use unsafe
-                    (baseUnits base)
-                    (roots `S.union` rds `S.union` extraStaticDeps)
-                    (archsRequiredUnits ++ objRequiredUnits)
+
+      logInfo logger $ hang (text "Linking with archives:") 2 (vcat (fmap text pkgArchs))
+
+      -- compute dependencies
+      let dep_units      = pkgs' ++ [homeUnitId (ue_unsafeHomeUnit $ unit_env)] -- FIXME: dont use unsafe
+          dep_map        = objDepsMap `M.union` archsDepsMap
+          excluded_units = baseUnits base -- already linked units
+          dep_fun_roots  = roots `S.union` rds `S.union` extraStaticDeps
+          dep_unit_roots = archsRequiredUnits ++ objRequiredUnits
+
+      all_deps <- getDeps (fmap fst dep_map) excluded_units dep_fun_roots dep_unit_roots
+
+      logInfo logger $ hang (text "Units to link:") 2 (vcat (fmap ppr dep_units))
+      -- logInfo logger $ hang (text "Dependency map:") 2 (ppr dep_map)
+      -- logInfo logger $ hang (text "All deps:") 2 (vcat (fmap ppr (S.toList all_deps)))
+
+      -- retrieve code for dependencies
+      code <- collectDeps dep_map dep_units all_deps
+
       let (outJs, metaSize, compactorState, stats) =
              renderLinker lc_cfg cfg (baseCompactorState base) rds code
           base'  = Base compactorState (nub $ basePkgs base ++ pkgs'')
-                         (allDeps `S.union` baseUnits base)
+                         (all_deps `S.union` baseUnits base)
 
       -- FIXME: (Sylvain, 2022-05): disabled because it comes from shims.
       -- Just delete?
@@ -311,7 +327,7 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
         { linkOut         = outJs
         , linkOutStats    = stats
         , linkOutMetaSize = metaSize
-        , linkForeignRefs = concatMap (\(_,_,_,_,_,r) -> r) code
+        , linkForeignRefs = concatMap mc_frefs code
         , linkLibRTS      = [] -- (filter (`notElem` alreadyLinkedBefore) shimsBefore)
         , linkLibA        = [] -- (filter (`notElem` alreadyLinkedAfter)  shimsAfter)
         , linkLibAArch    = pkgArchs
@@ -328,52 +344,92 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
                    , getInstalledPackageHsLibs u_st k)
                    ))
 
-renderLinker :: JSLinkConfig
-             -> StgToJSConfig
-             -> CompactorState
-             -> Set ExportedFun
-             -> [(Module, JStat, ShortText, [ClosureInfo], [StaticInfo], [ForeignJSRef])] -- ^ linked code per module
-             -> (BL.ByteString, Int64, CompactorState, LinkerStats)
-renderLinker settings cfg renamerState rtsDeps code =
-  let
-      (_renamerState', compacted, meta) = compact settings cfg renamerState (map funSymbol $ S.toList rtsDeps) (map (\(_,s,_,ci,si,_) -> (s,ci,si)) code)
-      pe = (<>"\n") . show . pretty
-      rendered  = fmap pe compacted
-      renderedMeta = pe meta
-      renderedExports = concatMap T.unpack . filter (not . T.null) $ map (\(_,_,rs,_,_,_) -> rs) code
-      mkStat (m,_,_,_,_,_) b = (m, BL.length . BLC.pack $ b)
-  in ( BL.fromStrict $ BC.pack $ mconcat [mconcat rendered, renderedMeta, renderedExports]
-     , BL.length $ BL.fromStrict $ BC.pack renderedMeta
-     , renamerState
-     , M.fromList $ zipWith mkStat code rendered
-     )
 
+data ModuleCode = ModuleCode
+  { mc_module   :: !Module
+  , mc_js_code  :: !JStat
+  , mc_exports  :: !ShortText        -- ^ rendered exports
+  , mc_closures :: ![ClosureInfo]
+  , mc_statics  :: ![StaticInfo]
+  , mc_frefs    :: ![ForeignJSRef]
+  }
+
+renderLinker
+  :: JSLinkConfig
+  -> StgToJSConfig
+  -> CompactorState
+  -> Set ExportedFun
+  -> [ModuleCode] -- ^ linked code per module
+  -> (B.ByteString, Int64, CompactorState, LinkerStats)
+renderLinker settings cfg renamer_state rtsDeps code =
+  ( rendered_all
+  , meta_length
+  , renamer_state'
+  , stats
+  )
+  where
+    -- extract ModuleCode fields required to make a LinkedUnit
+    code_to_linked_unit c = LinkedUnit
+      { lu_js_code  = mc_js_code c
+      , lu_closures = mc_closures c
+      , lu_statics  = mc_statics c
+      }
+    -- call the compactor
+    (renamer_state', compacted, meta) = compact settings cfg renamer_state
+                                          (map funSymbol $ S.toList rtsDeps)
+                                          (map code_to_linked_unit code)
+    -- render result into JS code
+    rendered_all     = mconcat [mconcat rendered_mods, rendered_meta, rendered_exports]
+    rendered_mods    = fmap render_js compacted
+    rendered_meta    = render_js meta
+    render_js        = BC.pack . (<>"\n") . show . pretty
+                         -- FIXME (Sylvain 2022-06): this must be utterly slow.
+                         -- Replace with something faster.
+    rendered_exports = BC.pack . concatMap T.unpack . filter (not . T.null) $ map mc_exports code
+                         -- FIXME (Sylvain 2022-06): this must also be utterly slow.
+                         -- Replace with something faster.
+    meta_length      = fromIntegral (BC.length rendered_meta)
+    -- make LinkerStats entry for the given ModuleCode.
+    -- For now, only associate generated code size in bytes to each module
+    mk_stat c b = (mc_module c, fromIntegral . BC.length $ b)
+    stats = LinkerStats $ M.fromList $ zipWith mk_stat code rendered_mods
+
+-- | Render linker stats
 linkerStats :: Int64         -- ^ code size of packed metadata
             -> LinkerStats   -- ^ code size per module
             -> String
 linkerStats meta s =
-  intercalate "\n\n" [packageStats, moduleStats, metaStats] <> "\n\n"
+  -- FIXME (Sylvain 2022-06): this function shouldn't use String. Use faster Doc
+  -- pretty-printing instead
+  intercalate "\n\n" [meta_stats, package_stats, module_stats] <> "\n\n"
   where
-    ps = M.fromListWith (+) . map (\(m,s) -> (moduleName m,s)) . M.toList $ s
+    meta_stats = "number of modules: " <> show (length bytes_per_mod)
+                 <> "\npacked metadata:   " <> show meta
+
+    bytes_per_mod = M.toList $ bytesPerModule s
+
+    show_unit (UnitId fs) = unpackFS fs
+
+    ps :: Map UnitId Word64
+    ps = M.fromListWith (+) . map (\(m,s) -> (moduleUnitId m,s)) $ bytes_per_mod
+
     pad :: Int -> String -> String
     pad n t = let l = length t
               in  if l < n then t <> replicate (n-l) ' ' else t
 
-    pkgMods :: [[(Module,Int64)]]
-    pkgMods = groupBy ((==) `on` fst) (M.toList s)
+    pkgMods :: [[(Module,Word64)]]
+    pkgMods = groupBy ((==) `on` (moduleUnitId . fst)) bytes_per_mod
 
-    showMod :: (Module, Int64) -> String
-    showMod (m,s) = pad 40 ("    " <> moduleStableString m <> ":") <> show s
+    showMod :: (Module, Word64) -> String
+    showMod (m,s) = pad 40 ("    " <> moduleStableString m <> ":") <> show s <> "\n"
 
-    packageStats :: String
-    packageStats = "code size summary per package:\n\n"
-                   <> concatMap (\(p,s) -> pad 25 (show p <> ":") <> show s) (M.toList ps)
+    package_stats :: String
+    package_stats = "code size summary per package (in bytes):\n\n"
+                     <> concatMap (\(p,s) -> pad 25 (show_unit p <> ":") <> show s <> "\n") (M.toList ps)
 
-    moduleStats :: String
-    moduleStats = "code size per module:\n\n" <> unlines (map (concatMap showMod) pkgMods)
+    module_stats :: String
+    module_stats = "code size per module (in bytes):\n\n" <> unlines (map (concatMap showMod) pkgMods)
 
-    metaStats :: String
-    metaStats = "packed metadata: " <> show meta
 
 splitPath' :: FilePath -> [FilePath]
 splitPath' = map (filter (`notElem` ("/\\"::String))) . splitPath
@@ -400,10 +456,9 @@ getShims = panic "Panic from getShims: Shims not implemented! no to shims!"
      directly with node.js or SpiderMonkey jsshell
  -}
 combineFiles :: JSLinkConfig
-             -> FilePath      -- ^ top level dir
              -> FilePath
              -> IO ()
-combineFiles cfg top fp = do
+combineFiles cfg fp = do
   files   <- mapM (B.readFile.(fp</>)) ["rts.js", "lib.js", "out.js"]
   let runMain
         | lcNoHsMain cfg = mempty
@@ -411,15 +466,14 @@ combineFiles cfg top fp = do
   writeBinaryFile (fp</>"all.js") (mconcat (files ++ [runMain]))
 
 -- | write the index.html file that loads the program if it does not exit
-writeHtml :: FilePath -- ^ top level library directory
-          -> FilePath -- ^ output directory
-          -> IO ()
-writeHtml top out = do
+writeHtml
+  :: FilePath -- ^ output directory
+  -> IO ()
+writeHtml out = do
+  let htmlFile = out </> "index.html"
   e <- doesFileExist htmlFile
   unless e $
     B.writeFile htmlFile templateHtml
-  where
-    htmlFile = out </> "index.html"
 
 
 templateHtml :: B.ByteString
@@ -438,15 +492,14 @@ templateHtml =
 
 -- | write the runmain.js file that will be run with defer so that it runs after
 -- index.html is loaded
-writeRunMain :: FilePath -- ^ top level library directory
-             -> FilePath -- ^ output directory
-             -> IO ()
-writeRunMain top out = do
+writeRunMain
+  :: FilePath -- ^ output directory
+  -> IO ()
+writeRunMain out = do
+  let runMainFile = out </> "runmain.js"
   e <- doesFileExist runMainFile
   unless e $
     B.writeFile runMainFile runMainJS
-  where
-    runMainFile = out </> "runmain.js"
 
 runMainJS :: B.ByteString
 runMainJS = "h$main(h$mainZCZCMainzimain);\n"
@@ -565,37 +618,32 @@ getDeps loaded_deps base fun startlu = go' S.empty (S.fromList startlu) (S.toLis
 -- | collect dependencies for a set of roots
 collectDeps :: Map Module (Deps, DepsLocation) -- ^ Dependency map
             -> [UnitId]                        -- ^ packages, code linked in this order
-            -> Set LinkableUnit                -- ^ do not include these
-            -> Set ExportedFun                 -- ^ roots
-            -> [LinkableUnit]                  -- ^ more roots
-            -> IO ( Set LinkableUnit
-                  , [(Module, JStat, ShortText, [ClosureInfo], [StaticInfo], [ForeignJSRef])]
-                  )
-collectDeps mod_deps packages base roots units = do
-  allDeps <- getDeps (fmap fst mod_deps) base roots units
+            -> Set LinkableUnit                -- ^ All dependencides
+            -> IO [ModuleCode]
+collectDeps mod_deps packages all_deps = do
+
   -- read ghc-prim first, since we depend on that for static initialization
   let packages' = uncurry (++) $ partition (== primUnitId) (nub packages)
 
       units_by_module :: Map Module IntSet
       units_by_module = M.fromListWith IS.union $
-                      map (\(m,n) -> (m, IS.singleton n)) (S.toList allDeps)
+                      map (\(m,n) -> (m, IS.singleton n)) (S.toList all_deps)
 
       mod_deps_bypkg :: Map UnitId [(Deps, DepsLocation)]
-      mod_deps_bypkg = M.mapKeys moduleUnitId
-                       $ M.fromListWith (++)
-                        (map (\(m,v) -> (m,[v])) (M.toList mod_deps))
+      mod_deps_bypkg = M.fromListWith (++)
+                        (map (\(m,v) -> (moduleUnitId m,[v])) (M.toList mod_deps))
 
   ar_state <- emptyArchiveState
   code <- fmap (catMaybes . concat) . forM packages' $ \pkg ->
     mapM (uncurry $ extractDeps ar_state units_by_module)
          (fromMaybe [] $ M.lookup pkg mod_deps_bypkg)
-  return (allDeps, code)
+  return code
 
 extractDeps :: ArchiveState
             -> Map Module IntSet
             -> Deps
             -> DepsLocation
-            -> IO (Maybe (Module, JStat, ShortText, [ClosureInfo], [StaticInfo], [ForeignJSRef]))
+            -> IO (Maybe ModuleCode)
 extractDeps ar_state units deps loc =
   case M.lookup mod units of
     Nothing       -> return Nothing
@@ -617,12 +665,14 @@ extractDeps ar_state units deps loc =
     -- FIXME: Jeff (2022,03): remove this hacky reimplementation of unlines
     newline       = T.pack "\n"
     unlines'      = intersperse newline . map oiRaw
-    collectCode l = let x = ( mod
-                            , mconcat (map oiStat l)
-                            , mconcat (unlines' l)
-                            , concatMap oiClInfo l
-                            , concatMap oiStatic l
-                            , concatMap oiFImports l)
+    collectCode l = let x = ModuleCode
+                              { mc_module   = mod
+                              , mc_js_code  = mconcat (map oiStat l)
+                              , mc_exports  = mconcat (unlines' l)
+                              , mc_closures = concatMap oiClInfo l
+                              , mc_statics  = concatMap oiStatic l
+                              , mc_frefs    = concatMap oiFImports l
+                              }
                 -- FIXME: (2022,04): this evaluate and rnf require an NFData
                 -- instance on ForeignJSRef which in turn requries a NFData
                 -- instance on Safety. Does this even make sense? We'll skip
@@ -649,7 +699,7 @@ readArObject ar_state mod ar_file = do
         = False
 
   -- XXX this shouldn't be an exception probably    
-  pure $ maybe (error $ "could not find object for module "
+  pure $! maybe (error $ "could not find object for module "
                 ++ moduleNameString (moduleName mod)
                 ++ " in "
                 ++ ar_file)
