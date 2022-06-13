@@ -1429,7 +1429,7 @@ repTy (HsIParamTy _ n t) = do
 
 repTy ty                      = notHandled (ThExoticFormOfType ty)
 
-repTyLit :: HsTyLit -> MetaM (Core (M TH.TyLit))
+repTyLit :: HsTyLit (GhcPass p) -> MetaM (Core (M TH.TyLit))
 repTyLit (HsNumTy _ i) = do
                          platform <- getPlatform
                          rep2 numTyLitName [mkIntegerExpr platform i]

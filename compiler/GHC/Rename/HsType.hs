@@ -703,12 +703,13 @@ rnHsTyKi env sumTy@(HsSumTy x tys)
        ; return (HsSumTy x tys', fvs) }
 
 -- Ensure that a type-level integer is nonnegative (#8306, #8412)
-rnHsTyKi env tyLit@(HsTyLit _ t)
+rnHsTyKi env tyLit@(HsTyLit src t)
   = do { data_kinds <- xoptM LangExt.DataKinds
        ; unless data_kinds (addErr (dataKindsErr env tyLit))
        ; when (negLit t) (addErr negLitErr)
-       ; return (HsTyLit noExtField t, emptyFVs) }
+       ; return (HsTyLit src (rnHsTyLit t), emptyFVs) }
   where
+    negLit :: HsTyLit (GhcPass p) -> Bool
     negLit (HsStrTy _ _) = False
     negLit (HsNumTy _ i) = i < 0
     negLit (HsCharTy _ _) = False
@@ -778,6 +779,13 @@ rnHsTyKi env ty@(HsExplicitTupleTy _ tys)
 rnHsTyKi env (HsWildCardTy _)
   = do { checkAnonWildCard env
        ; return (HsWildCardTy noExtField, emptyFVs) }
+
+
+rnHsTyLit :: HsTyLit GhcPs -> HsTyLit GhcRn
+rnHsTyLit (HsStrTy x s) = HsStrTy x s
+rnHsTyLit (HsNumTy x i) = HsNumTy x i
+rnHsTyLit (HsCharTy x c) = HsCharTy x c
+
 
 rnHsArrow :: RnTyKiEnv -> HsArrow GhcPs -> RnM (HsArrow GhcRn, FreeVars)
 rnHsArrow _env (HsUnrestrictedArrow arr) = return (HsUnrestrictedArrow arr, emptyFVs)

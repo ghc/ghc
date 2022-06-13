@@ -662,6 +662,13 @@ type family XWildCardTy      x
 type family XXType           x
 
 -- ---------------------------------------------------------------------
+-- HsTyLit type families
+type family XNumTy           x
+type family XStrTy           x
+type family XCharTy          x
+type family XXTyLit          x
+
+-- ---------------------------------------------------------------------
 -- HsForAllTelescope type families
 type family XHsForAllVis        x
 type family XHsForAllInvis      x

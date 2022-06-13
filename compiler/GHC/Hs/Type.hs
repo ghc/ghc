@@ -339,6 +339,12 @@ type instance XWildCardTy      (GhcPass _) = NoExtField
 type instance XXType         (GhcPass _) = HsCoreTy
 
 
+type instance XNumTy         (GhcPass _) = SourceText
+type instance XStrTy         (GhcPass _) = SourceText
+type instance XCharTy        (GhcPass _) = SourceText
+type instance XXTyLit        (GhcPass _) = DataConCantHappen
+
+
 oneDataConHsTy :: HsType GhcRn
 oneDataConHsTy = HsTyVar noAnn NotPromoted (noLocA oneDataConName)
 
@@ -991,7 +997,8 @@ instance (OutputableBndrId p)
     ppr (HsPS { hsps_body = ty }) = ppr ty
 
 
-instance Outputable HsTyLit where
+instance (OutputableBndrId p)
+       => Outputable (HsTyLit (GhcPass p)) where
     ppr = ppr_tylit
 
 instance Outputable HsIPName where
@@ -1020,7 +1027,7 @@ instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (Ge
   pprPrefixOcc = pprPrefixOcc . unLoc
 
 
-ppr_tylit :: HsTyLit -> SDoc
+ppr_tylit :: (HsTyLit (GhcPass p)) -> SDoc
 ppr_tylit (HsNumTy source i) = pprWithSourceText source (integer i)
 ppr_tylit (HsStrTy source s) = pprWithSourceText source (text (show s))
 ppr_tylit (HsCharTy source c) = pprWithSourceText source (text (show c))
