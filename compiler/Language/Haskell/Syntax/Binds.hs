@@ -31,8 +31,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 
-import GHC.Types.Basic
-import GHC.Types.Tickish
+import GHC.Types.Basic (InlinePragma)
 import GHC.Types.Fixity
 import GHC.Data.Bag
 
@@ -200,9 +199,8 @@ data HsBindLR idL idR
 
         fun_id :: LIdP idL, -- Note [fun_id in Match] in GHC.Hs.Expr
 
-        fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
+        fun_matches :: MatchGroup idR (LHsExpr idR)  -- ^ The payload
 
-        fun_tick :: [CoreTickish] -- ^ Ticks to put on the rhs, if any
     }
 
   -- | Pattern Binding
@@ -221,10 +219,7 @@ data HsBindLR idL idR
   | PatBind {
         pat_ext    :: XPatBind idL idR,
         pat_lhs    :: LPat idL,
-        pat_rhs    :: GRHSs idR (LHsExpr idR),
-        pat_ticks  :: ([CoreTickish], [[CoreTickish]])
-               -- ^ Ticks to put on the rhs, if any, and ticks to put on
-               -- the bound variables.
+        pat_rhs    :: GRHSs idR (LHsExpr idR)
     }
 
   -- | Variable Binding

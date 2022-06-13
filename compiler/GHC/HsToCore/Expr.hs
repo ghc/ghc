@@ -188,8 +188,8 @@ dsUnliftedBind (XHsBindsLR (AbsBinds { abs_tvs = [], abs_ev_vars = []
 
 dsUnliftedBind (FunBind { fun_id = L l fun
                         , fun_matches = matches
-                        , fun_ext = co_fn
-                        , fun_tick = tick }) body
+                        , fun_ext = (co_fn, tick)
+                        }) body
                -- Can't be a bang pattern (that looks like a PatBind)
                -- so must be simply unboxed
   = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun)) Nothing matches
@@ -199,7 +199,7 @@ dsUnliftedBind (FunBind { fun_id = L l fun
        ; return (bindNonRec fun rhs' body) }
 
 dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
-                        , pat_ext = ty }) body
+                        , pat_ext = (ty, _) }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body
     do { match_nablas <- pmcGRHSs PatBindGuards grhss

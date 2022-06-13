@@ -53,6 +53,7 @@ import Data.List (isSuffixOf, intersperse)
 
 import Trace.Hpc.Mix
 
+import Data.Bifunctor (second)
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -286,7 +287,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
 
   let mbCons = maybe Prelude.id (:)
   return $ L pos $ funBind { fun_matches = mg
-                           , fun_tick = tick `mbCons` fun_tick funBind }
+                           , fun_ext = second (tick `mbCons`) (fun_ext funBind) }
   }
 
    where
@@ -317,7 +318,7 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
 
     let mbCons = maybe id (:)
 
-    let (initial_rhs_ticks, initial_patvar_tickss) = pat_ticks pat'
+    let (initial_rhs_ticks, initial_patvar_tickss) = snd $ pat_ext pat'
 
     -- Allocate the ticks
 
@@ -333,7 +334,7 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
           (zipWith mbCons patvar_ticks
                           (initial_patvar_tickss ++ repeat []))
 
-    return $ L pos $ pat' { pat_ticks = (rhs_ticks, patvar_tickss) }
+    return $ L pos $ pat' { pat_ext = second (const (rhs_ticks, patvar_tickss)) (pat_ext pat') }
 
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind

@@ -28,12 +28,13 @@ module GHC.Hs.Binds
 
 import GHC.Prelude
 
+import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Binds
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprFunBind, pprPatBind )
 import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
 
-import Language.Haskell.Syntax.Extension
+import GHC.Types.Tickish
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
 import GHC.Hs.Type
@@ -95,9 +96,11 @@ type instance XFunBind    (GhcPass pL) GhcRn = NameSet
 -- extension field contains the locally-bound free variables of this
 -- defn. See Note [Bind free vars]
 
-type instance XFunBind    (GhcPass pL) GhcTc = HsWrapper
--- ^ After the type-checker, the FunBind extension field contains a
--- coercion from the type of the MatchGroup to the type of the Id.
+        -- fun_tick :: [CoreTickish] 
+type instance XFunBind    (GhcPass pL) GhcTc = (HsWrapper, [CoreTickish])
+-- ^ After the type-checker, the FunBind extension field contains
+-- the ticks to put on the rhs, if any, and a coercion from the
+-- type of the MatchGroup to the type of the Id.
 -- Example:
 --
 -- @
@@ -113,7 +116,10 @@ type instance XFunBind    (GhcPass pL) GhcTc = HsWrapper
 
 type instance XPatBind    GhcPs (GhcPass pR) = EpAnn [AddEpAnn]
 type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- See Note [Bind free vars]
-type instance XPatBind    GhcTc (GhcPass pR) = Type    -- Type of the GRHSs
+type instance XPatBind    GhcTc (GhcPass pR) =
+    ( Type                  -- Type of the GRHSs
+    , ( [CoreTickish]       -- Ticks to put on the rhs, if any
+      , [[CoreTickish]] ) ) -- and ticks to put on the bound variables.
 
 type instance XVarBind    (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XPatSynBind (GhcPass pL) (GhcPass pR) = NoExtField
@@ -512,13 +518,26 @@ ppr_monobind (VarBind { var_id = var, var_rhs = rhs })
   = sep [pprBndr CasePatBind var, nest 2 $ equals <+> pprExpr (unLoc rhs)]
 ppr_monobind (FunBind { fun_id = fun,
                         fun_matches = matches,
-                        fun_tick = ticks,
-                        fun_ext = wrap })
-  = pprTicks empty (if null ticks then empty
-                    else text "-- ticks = " <> ppr ticks)
+                        fun_ext = ext })
+  = pprTicks empty ticksDoc
     $$  whenPprDebug (pprBndr LetBind (unLoc fun))
     $$  pprFunBind  matches
-    $$  whenPprDebug (pprIfTc @idR $ ppr wrap)
+    $$  whenPprDebug (pprIfTc @idR $ wrapDoc)
+        where
+            ticksDoc :: SDoc
+            ticksDoc = case ghcPass @idR of
+                         GhcPs -> empty
+                         GhcRn -> empty
+                         GhcTc | (_, ticks) <- ext ->
+                             if null ticks
+                                then empty
+                                else text "-- ticks = " <> ppr ticks
+            wrapDoc :: SDoc
+            wrapDoc = case ghcPass @idR of
+                        GhcPs -> empty
+                        GhcRn -> empty
+                        GhcTc | (wrap, _) <- ext -> ppr wrap
+
 
 ppr_monobind (PatSynBind _ psb) = ppr psb
 ppr_monobind (XHsBindsLR b) = case ghcPass @idL of

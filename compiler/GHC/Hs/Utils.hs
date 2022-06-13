@@ -830,7 +830,7 @@ mkFunBind origin fn ms
   = FunBind { fun_id = fn
             , fun_matches = mkMatchGroup origin (noLocA ms)
             , fun_ext = noExtField
-            , fun_tick = [] }
+            }
 
 mkTopFunBind :: Origin -> LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
              -> HsBind GhcRn
@@ -839,7 +839,7 @@ mkTopFunBind origin fn ms = FunBind { fun_id = fn
                                     , fun_matches = mkMatchGroup origin (noLocA ms)
                                     , fun_ext  = emptyNameSet -- NB: closed
                                                               --     binding
-                                    , fun_tick = [] }
+                                    }
 
 mkHsVarBind :: SrcSpan -> RdrName -> LHsExpr GhcPs -> LHsBind GhcPs
 mkHsVarBind loc var rhs = mkSimpleGeneratedFunBind loc var [] rhs

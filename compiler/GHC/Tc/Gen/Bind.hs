@@ -634,8 +634,8 @@ tcPolyCheck prag_fn
 
        ; let bind' = FunBind { fun_id      = L nm_loc poly_id2
                              , fun_matches = matches'
-                             , fun_ext     = wrap_gen <.> wrap_res
-                             , fun_tick    = tick }
+                             , fun_ext     = (wrap_gen <.> wrap_res, tick)
+                             }
 
              export = ABE { abe_wrap  = idHsWrapper
                           , abe_poly  = poly_id
@@ -1254,7 +1254,7 @@ tcMonoBinds is_rec sig_fn no_gen
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
                                fun_matches = matches',
-                               fun_ext = co_fn, fun_tick = [] },
+                               fun_ext = (co_fn, []) },
                   [MBI { mbi_poly_name = name
                        , mbi_sig       = Nothing
                        , mbi_mono_id   = mono_id }]) }
@@ -1275,7 +1275,7 @@ tcMonoBinds is_rec sig_fn no_gen
 
        ; return ( unitBag $ L b_loc $
                      PatBind { pat_lhs = pat', pat_rhs = grhss'
-                             , pat_ext = pat_ty, pat_ticks = ([],[]) }
+                             , pat_ext = (pat_ty, ([],[])) }
 
                 , mbis ) }
   where
@@ -1507,8 +1507,8 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
                                  matches (mkCheckExpType $ idType mono_id)
         ; return ( FunBind { fun_id = L (noAnnSrcSpan loc) mono_id
                            , fun_matches = matches'
-                           , fun_ext = co_fn
-                           , fun_tick = [] } ) }
+                           , fun_ext = (co_fn, [])
+                           } ) }
 
 tcRhs (TcPatBind infos pat' grhss pat_ty)
   = -- When we are doing pattern bindings we *don't* bring any scoped
@@ -1521,8 +1521,7 @@ tcRhs (TcPatBind infos pat' grhss pat_ty)
                     tcGRHSsPat grhss (mkCheckExpType pat_ty)
 
         ; return ( PatBind { pat_lhs = pat', pat_rhs = grhss'
-                           , pat_ext = pat_ty
-                           , pat_ticks = ([],[]) } )}
+                           , pat_ext = (pat_ty, ([],[])) } )}
 
 tcExtendTyVarEnvForRhs :: Maybe TcIdSigInst -> TcM a -> TcM a
 tcExtendTyVarEnvForRhs Nothing thing_inside

@@ -686,7 +686,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
     fromDecl (L loc decl@(ValD _ (PatBind _
                                  -- AZ: where should these anns come from?
                          pat@(L _ (ConPat noAnn ln@(L _ name) details))
-                               rhs _))) =
+                               rhs))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr (locA loc) decl
            ; match <- case details of
@@ -1306,8 +1306,7 @@ makeFunBind :: LocatedN RdrName -> LocatedL [LMatch GhcPs (LHsExpr GhcPs)]
 makeFunBind fn ms
   = FunBind { fun_ext = noExtField,
               fun_id = fn,
-              fun_matches = mkMatchGroup FromSource ms,
-              fun_tick = [] }
+              fun_matches = mkMatchGroup FromSource ms }
 
 -- See Note [FunBind vs PatBind]
 checkPatBind :: SrcSpan
@@ -1329,7 +1328,7 @@ checkPatBind loc annsIn (L _ (BangPat (EpAnn _ ans cs) (L _ (VarPat _ v))))
 
 checkPatBind loc annsIn lhs (L _ grhss) = do
   cs <- getCommentsFor loc
-  return (PatBind (EpAnn (spanAsAnchor loc) annsIn cs) lhs grhss ([],[]))
+  return (PatBind (EpAnn (spanAsAnchor loc) annsIn cs) lhs grhss)
 
 checkValSigLhs :: LHsExpr GhcPs -> P (LocatedN RdrName)
 checkValSigLhs (L _ (HsVar _ lrdr@(L _ v)))
