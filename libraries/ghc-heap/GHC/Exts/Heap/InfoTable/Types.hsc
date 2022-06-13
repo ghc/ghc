@@ -37,4 +37,4 @@ data StgInfoTable = StgInfoTable {
    tipe   :: ClosureType,
    srtlen :: HalfWord,
    code   :: Maybe ItblCodes -- Just <=> TABLES_NEXT_TO_CODE
-  } deriving (Show, Generic)
+  } deriving (Eq, Show, Generic)

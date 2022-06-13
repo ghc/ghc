@@ -4,6 +4,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RankNTypes #-}
+
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack where
 
@@ -19,9 +26,9 @@ import Debug.Trace
 import GHC.Exts
 import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 import Numeric
+import qualified GHC.Exts.Heap.Closures as CL
 
-data BitmapPayload = Closure Word | Primitive Word
-  deriving (Eq)
+data BitmapPayload = Closure CL.Closure | Primitive Word
 
 instance Show BitmapPayload where
   show (Primitive w) = "Primitive " ++ show w
@@ -63,13 +70,14 @@ data StackFrame =
   RetBig |
   RetFun |
   RetBCO
-  deriving (Eq, Show)
+  deriving (Show)
 
 foreign import ccall "stackFrameSizeW" stackFrameSizeW :: Addr# -> Word
 foreign import ccall "getItbl" getItbl :: Addr# -> Ptr StgInfoTable
 foreign import ccall "getSpecialRetSmall" getSpecialRetSmall :: Addr# -> Word
 foreign import ccall "getBitmapSize" getBitmapSize :: Ptr StgInfoTable -> Word
 foreign import ccall "getBitmapWord" getBitmapWord :: Ptr StgInfoTable -> Word
+foreign import prim "stg_unpackClosurezh" unpackClosure_prim# :: Word# -> (# Addr#, ByteArray#, Array# b #)
 
 decodeStack :: StackSnapshot -> IO [StackFrame]
 decodeStack (StackSnapshot stack) = do
@@ -161,10 +169,12 @@ peekBitmapPayload ptr index bitmapWord = do
         traceM $ "peekBitmapPayload - ptr " ++ show ptr
         traceM $ "peekBitmapPayload - index " ++ show index
         e <- (peekElemOff ptr i :: IO Word)
-        pure $ if isClosure then
-            Closure e
+        if isClosure then
+          do
+            c <- getClosureDataFromHeapObject' (toWord# e)
+            pure $ Closure c
         else
-            Primitive e
+            pure $ Primitive e
   where
    isClosure :: Bool
    isClosure = (bitmapWord .&. mask) == 0
@@ -172,6 +182,27 @@ peekBitmapPayload ptr index bitmapWord = do
    mask = 1 `shiftL` i
    i :: Int
    i = (fromInteger.toInteger) index
+
+getClosureDataFromHeapObject'
+    :: Word#
+    -- ^ Heap object to decode.
+    -> IO Closure
+    -- ^ Heap representation of the closure.
+getClosureDataFromHeapObject' x = do
+    case unpackClosure_prim# x of
+        (# infoTableAddr, heapRep, pointersArray #) -> do
+            let infoTablePtr = Ptr infoTableAddr
+                ptrList = [case indexArray# pointersArray i of
+                                (# ptr #) -> Box ptr
+                            | I# i <- [0..I# (sizeofArray# pointersArray) - 1]
+                            ]
+
+            infoTable <- peekItbl infoTablePtr
+            case tipe infoTable of
+                TSO   -> pure $ UnsupportedClosure infoTable
+                STACK -> pure $ UnsupportedClosure infoTable
+                _ -> getClosureDataFromHeapRep heapRep infoTablePtr ptrList
+
 
 -- | Converts to 'Int#'
 -- An 'Integral' can be bigger than the domain of 'Int#'. This function drops
@@ -183,6 +214,9 @@ integralToInt# w = toInt# $ (fromInteger . toInteger) w
 -- | Unbox 'Int#' from 'Int'
 toInt# :: Int -> Int#
 toInt# (I# i) = i
+
+toWord# :: Word -> Word#
+toWord# (W# w#) = w#
 
 showAddr# :: Addr# -> String
 showAddr# addr# = showHex (addrToInt addr#) ""

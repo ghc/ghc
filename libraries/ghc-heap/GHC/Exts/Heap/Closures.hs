@@ -354,7 +354,7 @@ data GenClosure b
   | UnsupportedClosure
         { info       :: !StgInfoTable
         }
-  deriving (Show, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Generic, Functor, Foldable, Traversable)
 
 
 data PrimType
