@@ -46,6 +46,8 @@ module GHC.HsToCore.Utils (
 
 import GHC.Prelude
 
+import Language.Haskell.Syntax.Basic (Boxity(..))
+
 import {-# SOURCE #-} GHC.HsToCore.Match ( matchSimply )
 import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsLExpr, dsSyntaxExpr )
 

@@ -188,8 +188,7 @@
                      (NoExtField)
                      (NoExtField)))])))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))
+             (NoExtField)))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -279,7 +278,4 @@
                     (SourceText "hello")
                     {FastString: "hello"})))))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))]))
-
-
+             (NoExtField)))))])))))]))

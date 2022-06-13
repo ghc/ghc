@@ -31,8 +31,8 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 
-import GHC.Types.Fixity
-import GHC.Data.Bag
+import GHC.Types.Fixity (Fixity)
+import GHC.Data.Bag (Bag)
 import GHC.Types.Basic (InlinePragma)
 
 import GHC.Data.BooleanFormula (LBooleanFormula)

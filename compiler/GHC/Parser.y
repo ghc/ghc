@@ -2757,13 +2757,13 @@ prag_e :: { Located (HsPragE GhcPs) }
       : '{-# SCC' STRING '#-}'      {% do { scc <- getSCC $2
                                           ; acs (\cs -> (sLL $1 $>
                                              (HsPragSCC
-                                                (EpAnn (glR $1) (AnnPragma (mo $1) (mc $3) [mj AnnValStr $2]) cs)
-                                                (getSCC_PRAGs $1)
+                                                ((EpAnn (glR $1) (AnnPragma (mo $1) (mc $3) [mj AnnValStr $2]) cs),
+                                                (getSCC_PRAGs $1))
                                                 (StringLiteral (getSTRINGs $2) scc Nothing))))} }
       | '{-# SCC' VARID  '#-}'      {% acs (\cs -> (sLL $1 $>
                                              (HsPragSCC
-                                               (EpAnn (glR $1) (AnnPragma (mo $1) (mc $3) [mj AnnVal $2]) cs)
-                                               (getSCC_PRAGs $1)
+                                               ((EpAnn (glR $1) (AnnPragma (mo $1) (mc $3) [mj AnnVal $2]) cs),
+                                               (getSCC_PRAGs $1))
                                                (StringLiteral NoSourceText (getVARID $2) Nothing)))) }
 
 fexp    :: { ECP }

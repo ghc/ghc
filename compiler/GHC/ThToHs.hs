@@ -788,7 +788,7 @@ cvtForD (ExportF callconv as nm ty)
         ; l <- getL
         ; let e = CExport (L l (SourceText as)) (L l (CExportStatic (SourceText as)
                                                 (mkFastString as)
-                                                (cvt_conv callconv))) 
+                                                (cvt_conv callconv)))
         ; return $ ForeignExport { fd_e_ext = noAnn
                                  , fd_name = nm'
                                  , fd_sig_ty = ty'

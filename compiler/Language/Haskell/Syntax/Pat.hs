@@ -1,4 +1,5 @@
 
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -8,7 +9,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-
 (c) The University of Glasgow 2006
@@ -27,7 +27,7 @@ module Language.Haskell.Syntax.Pat (
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
-        RecFieldsDotDot,
+        RecFieldsDotDot(..),
         hsRecFields, hsRecFieldSel, hsRecFieldsArgs,
     ) where
 
@@ -45,9 +45,12 @@ import Data.Functor
 import Data.Foldable
 import Data.Traversable
 import Data.Bool
+import Data.Data
+import Data.Eq
+import Data.Ord
 import Data.Int
 import Data.Function
-import Data.List
+import qualified Data.List
 
 type LPat p = XRec p (Pat p)
 
@@ -236,7 +239,7 @@ type HsConPatDetails p = HsConDetails (HsConPatTyArg (NoGhcTc p)) (LPat p) (HsRe
 
 hsConPatArgs :: forall p . (UnXRec p) => HsConPatDetails p -> [LPat p]
 hsConPatArgs (PrefixCon _ ps) = ps
-hsConPatArgs (RecCon fs)      = map (hfbRHS . unXRec @p) (rec_flds fs)
+hsConPatArgs (RecCon fs)      = Data.List.map (hfbRHS . unXRec @p) (rec_flds fs)
 hsConPatArgs (InfixCon p1 p2) = [p1,p2]
 
 -- | Haskell Record Fields
@@ -251,8 +254,9 @@ data HsRecFields p arg         -- A bunch of record fields
   -- AZ:The XRec for LHsRecField makes the derivings fail.
   -- deriving (Functor, Foldable, Traversable)
 
--- Type synonym to be able to have a specific XRec instance for the Int in `rec_dotdot`
-type RecFieldsDotDot = Int
+-- | Newtype to be able to have a specific XRec instance for the Int in `rec_dotdot`
+newtype RecFieldsDotDot = RecFieldsDotDot { unRecFieldsDotDot :: Int }
+    deriving (Data, Eq, Ord)
 
 -- Note [DotDot fields]
 -- ~~~~~~~~~~~~~~~~~~~~
@@ -351,10 +355,10 @@ data HsFieldBind lhs rhs = HsFieldBind {
 -- See also Note [Disambiguating record fields] in GHC.Tc.Gen.Head.
 
 hsRecFields :: forall p arg.UnXRec p => HsRecFields p arg -> [XCFieldOcc p]
-hsRecFields rbinds = map (hsRecFieldSel . unXRec @p) (rec_flds rbinds)
+hsRecFields rbinds = Data.List.map (hsRecFieldSel . unXRec @p) (rec_flds rbinds)
 
 hsRecFieldsArgs :: forall p arg. UnXRec p => HsRecFields p arg -> [arg]
-hsRecFieldsArgs rbinds = map (hfbRHS . unXRec @p) (rec_flds rbinds)
+hsRecFieldsArgs rbinds = Data.List.map (hfbRHS . unXRec @p) (rec_flds rbinds)
 
 hsRecFieldSel :: forall p arg. UnXRec p => HsRecField p arg -> XCFieldOcc p
 hsRecFieldSel = foExt . unXRec @p . hfbLHS

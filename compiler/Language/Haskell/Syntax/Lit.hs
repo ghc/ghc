@@ -20,11 +20,11 @@ module Language.Haskell.Syntax.Lit where
 
 import Language.Haskell.Syntax.Extension
 
-import GHC.Utils.Panic
-import GHC.Types.SourceText
-import GHC.Core.Type
+import GHC.Utils.Panic (panic)
+import GHC.Types.SourceText (IntegralLit, FractionalLit, SourceText, negateIntegralLit, negateFractionalLit)
+import GHC.Core.Type (Type)
 
-import GHC.Data.FastString
+import GHC.Data.FastString (FastString, lexicalCompareFS)
 
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
@@ -32,7 +32,7 @@ import Data.Bool
 import Data.Ord
 import Data.Eq
 import Data.Char
-import GHC.Integer (Integer) -- ROMES:TODO where is integer
+import Prelude (Integer)
 
 {-
 ************************************************************************

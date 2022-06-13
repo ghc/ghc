@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-orphans     #-} -- Outputable
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE GADTs               #-}
@@ -34,6 +35,8 @@ module GHC.Core.Coercion.Axiom (
        ) where
 
 import GHC.Prelude
+
+import Language.Haskell.Syntax.Basic (Role(..))
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType )
@@ -494,14 +497,6 @@ instance Outputable CoAxBranch where
 
 Roles are defined here to avoid circular dependencies.
 -}
-
--- See Note [Roles] in GHC.Core.Coercion
--- defined here to avoid cyclic dependency with GHC.Core.Coercion
---
--- Order of constructors matters: the Ord instance coincides with the *super*typing
--- relation on roles.
-data Role = Nominal | Representational | Phantom
-  deriving (Eq, Ord, Data.Data)
 
 -- These names are slurped into the parser code. Changing these strings
 -- will change the **surface syntax** that GHC accepts! If you want to

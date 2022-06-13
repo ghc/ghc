@@ -1609,7 +1609,7 @@ lPatImplicits = hs_lpat
             (explicit, implicit) = partitionEithers [if pat_explicit then Left fld else Right fld
                                                     | (i, fld) <- [0..] `zip` rec_flds fs
                                                     ,  let  pat_explicit =
-                                                              maybe True ((i<) . unLoc)
+                                                              maybe True ((i<) . unRecFieldsDotDot . unLoc)
                                                                          (rec_dotdot fs)]
             err_loc = maybe (getLocA n) getLoc (rec_dotdot fs)
 

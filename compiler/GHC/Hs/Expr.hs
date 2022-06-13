@@ -37,6 +37,7 @@ import GHC.Hs.Decls() -- import instances
 import GHC.Hs.Pat
 import GHC.Hs.Lit
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Basic (FieldLabelString)
 import GHC.Hs.Extension
 import GHC.Hs.Type
 import GHC.Hs.Binds
@@ -386,7 +387,7 @@ data AnnsIf
 
 -- ---------------------------------------------------------------------
 
-type instance XSCC           (GhcPass _) = EpAnn AnnPragma
+type instance XSCC           (GhcPass _) = (EpAnn AnnPragma, SourceText)
 type instance XXPragE        (GhcPass _) = DataConCantHappen
 
 type instance XCDotFieldOcc (GhcPass _) = EpAnn AnnFieldLabel
@@ -871,7 +872,7 @@ isAtomicHsExpr (XExpr x)
 isAtomicHsExpr _ = False
 
 instance Outputable (HsPragE (GhcPass p)) where
-  ppr (HsPragSCC _ st (StringLiteral stl lbl _)) =
+  ppr (HsPragSCC (_, st) (StringLiteral stl lbl _)) =
     pprWithSourceText st (text "{-# SCC")
      -- no doublequotes if stl empty, for the case where the SCC was written
      -- without quotes.
@@ -1110,6 +1111,46 @@ type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd 
     --      wrap :: arg1 "->" arg2
     -- Then (XCmd (HsWrap wrap cmd)) :: arg2 --> res
 
+-- | Command Syntax Table (for Arrow syntax)
+type CmdSyntaxTable p = [(Name, HsExpr p)]
+-- See Note [CmdSyntaxTable]
+
+{-
+Note [CmdSyntaxTable]
+~~~~~~~~~~~~~~~~~~~~~
+Used only for arrow-syntax stuff (HsCmdTop), the CmdSyntaxTable keeps
+track of the methods needed for a Cmd.
+
+* Before the renamer, this list is an empty list
+
+* After the renamer, it takes the form @[(std_name, HsVar actual_name)]@
+  For example, for the 'arr' method
+   * normal case:            (GHC.Control.Arrow.arr, HsVar GHC.Control.Arrow.arr)
+   * with rebindable syntax: (GHC.Control.Arrow.arr, arr_22)
+             where @arr_22@ is whatever 'arr' is in scope
+
+* After the type checker, it takes the form [(std_name, <expression>)]
+  where <expression> is the evidence for the method.  This evidence is
+  instantiated with the class, but is still polymorphic in everything
+  else.  For example, in the case of 'arr', the evidence has type
+         forall b c. (b->c) -> a b c
+  where 'a' is the ambient type of the arrow.  This polymorphism is
+  important because the desugarer uses the same evidence at multiple
+  different types.
+
+This is Less Cool than what we normally do for rebindable syntax, which is to
+make fully-instantiated piece of evidence at every use site.  The Cmd way
+is Less Cool because
+  * The renamer has to predict which methods are needed.
+    See the tedious GHC.Rename.Expr.methodNamesCmd.
+
+  * The desugarer has to know the polymorphic type of the instantiated
+    method. This is checked by Inst.tcSyntaxName, but is less flexible
+    than the rest of rebindable syntax, where the type is less
+    pre-ordained.  (And this flexibility is useful; for example we can
+    typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)
+-}
+
 data CmdTopTc
   = CmdTopTc Type    -- Nested tuple of inputs on the command's stack
              Type    -- return type of the command
@@ -1118,6 +1159,7 @@ data CmdTopTc
 type instance XCmdTop  GhcPs = NoExtField
 type instance XCmdTop  GhcRn = CmdSyntaxTable GhcRn -- See Note [CmdSyntaxTable]
 type instance XCmdTop  GhcTc = CmdTopTc
+
 
 type instance XXCmdTop (GhcPass _) = DataConCantHappen
 
@@ -1859,11 +1901,23 @@ instance Outputable LamCaseVariant where
     LamCase  -> "LamCase"
     LamCases -> "LamCases"
 
+lamCaseKeyword :: LamCaseVariant -> SDoc
+lamCaseKeyword LamCase  = text "\\case"
+lamCaseKeyword LamCases = text "\\cases"
+
+pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
+pprExternalSrcLoc (StringLiteral _ src _,(n1,n2),(n3,n4))
+  = ppr (src,(n1,n2),(n3,n4))
+
 instance Outputable HsArrowMatchContext where
   ppr ProcExpr                     = text "ProcExpr"
   ppr ArrowCaseAlt                 = text "ArrowCaseAlt"
   ppr (ArrowLamCaseAlt lc_variant) = parens $ text "ArrowLamCaseAlt" <+> ppr lc_variant
   ppr KappaExpr                    = text "KappaExpr"
+
+pprHsArrType :: HsArrAppType -> SDoc
+pprHsArrType HsHigherOrderApp = text "higher order arrow application"
+pprHsArrType HsFirstOrderApp  = text "first order arrow application"
 
 -----------------
 
@@ -1931,6 +1985,145 @@ pprStmtInCtxt ctxt stmt
     ppr_stmt (TransStmt { trS_by = by, trS_using = using
                         , trS_form = form }) = pprTransStmt by using form
     ppr_stmt stmt = pprStmt stmt
+
+matchSeparator :: HsMatchContext p -> SDoc
+matchSeparator FunRhs{}         = text "="
+matchSeparator CaseAlt          = text "->"
+matchSeparator LamCaseAlt{}     = text "->"
+matchSeparator IfAlt            = text "->"
+matchSeparator LambdaExpr       = text "->"
+matchSeparator ArrowMatchCtxt{} = text "->"
+matchSeparator PatBindRhs       = text "="
+matchSeparator PatBindGuards    = text "="
+matchSeparator StmtCtxt{}       = text "<-"
+matchSeparator RecUpd           = text "=" -- This can be printed by the pattern
+                                       -- match checker trace
+matchSeparator ThPatSplice  = panic "unused"
+matchSeparator ThPatQuote   = panic "unused"
+matchSeparator PatSyn       = panic "unused"
+
+pprMatchContext :: (Outputable (IdP p), UnXRec p)
+                => HsMatchContext p -> SDoc
+pprMatchContext ctxt
+  | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
+  | otherwise    = text "a"  <+> pprMatchContextNoun ctxt
+  where
+    want_an (FunRhs {})                = True  -- Use "an" in front
+    want_an (ArrowMatchCtxt ProcExpr)  = True
+    want_an (ArrowMatchCtxt KappaExpr) = True
+    want_an _                          = False
+
+pprMatchContextNoun :: forall p. (Outputable (IdP p), UnXRec p)
+                    => HsMatchContext p -> SDoc
+pprMatchContextNoun (FunRhs {mc_fun=fun})   = text "equation for"
+                                              <+> quotes (ppr (unXRec @p fun))
+pprMatchContextNoun CaseAlt                 = text "case alternative"
+pprMatchContextNoun (LamCaseAlt lc_variant) = lamCaseKeyword lc_variant
+                                              <+> text "alternative"
+pprMatchContextNoun IfAlt                   = text "multi-way if alternative"
+pprMatchContextNoun RecUpd                  = text "record-update construct"
+pprMatchContextNoun ThPatSplice             = text "Template Haskell pattern splice"
+pprMatchContextNoun ThPatQuote              = text "Template Haskell pattern quotation"
+pprMatchContextNoun PatBindRhs              = text "pattern binding"
+pprMatchContextNoun PatBindGuards           = text "pattern binding guards"
+pprMatchContextNoun LambdaExpr              = text "lambda abstraction"
+pprMatchContextNoun (ArrowMatchCtxt c)      = pprArrowMatchContextNoun c
+pprMatchContextNoun (StmtCtxt ctxt)         = text "pattern binding in"
+                                              $$ pprAStmtContext ctxt
+pprMatchContextNoun PatSyn                  = text "pattern synonym declaration"
+
+pprMatchContextNouns :: forall p. (Outputable (IdP p), UnXRec p)
+                     => HsMatchContext p -> SDoc
+pprMatchContextNouns (FunRhs {mc_fun=fun})   = text "equations for"
+                                               <+> quotes (ppr (unXRec @p fun))
+pprMatchContextNouns PatBindGuards           = text "pattern binding guards"
+pprMatchContextNouns (ArrowMatchCtxt c)      = pprArrowMatchContextNouns c
+pprMatchContextNouns (StmtCtxt ctxt)         = text "pattern bindings in"
+                                               $$ pprAStmtContext ctxt
+pprMatchContextNouns ctxt                    = pprMatchContextNoun ctxt <> char 's'
+
+pprArrowMatchContextNoun :: HsArrowMatchContext -> SDoc
+pprArrowMatchContextNoun ProcExpr                     = text "arrow proc pattern"
+pprArrowMatchContextNoun ArrowCaseAlt                 = text "case alternative within arrow notation"
+pprArrowMatchContextNoun (ArrowLamCaseAlt lc_variant) = lamCaseKeyword lc_variant
+                                                        <+> text "alternative within arrow notation"
+pprArrowMatchContextNoun KappaExpr                    = text "arrow kappa abstraction"
+
+pprArrowMatchContextNouns :: HsArrowMatchContext -> SDoc
+pprArrowMatchContextNouns ArrowCaseAlt                 = text "case alternatives within arrow notation"
+pprArrowMatchContextNouns (ArrowLamCaseAlt lc_variant) = lamCaseKeyword lc_variant
+                                                         <+> text "alternatives within arrow notation"
+pprArrowMatchContextNouns ctxt                         = pprArrowMatchContextNoun ctxt <> char 's'
+
+-----------------
+pprAStmtContext, pprStmtContext :: (Outputable (IdP p), UnXRec p)
+                                => HsStmtContext p -> SDoc
+pprAStmtContext (HsDoStmt flavour) = pprAHsDoFlavour flavour
+pprAStmtContext ctxt = text "a" <+> pprStmtContext ctxt
+
+-----------------
+pprStmtContext (HsDoStmt flavour) = pprHsDoFlavour flavour
+pprStmtContext (PatGuard ctxt) = text "pattern guard for" $$ pprMatchContext ctxt
+pprStmtContext ArrowExpr       = text "'do' block in an arrow command"
+
+-- Drop the inner contexts when reporting errors, else we get
+--     Unexpected transform statement
+--     in a transformed branch of
+--          transformed branch of
+--          transformed branch of monad comprehension
+pprStmtContext (ParStmtCtxt c) =
+  ifPprDebug (sep [text "parallel branch of", pprAStmtContext c])
+             (pprStmtContext c)
+pprStmtContext (TransStmtCtxt c) =
+  ifPprDebug (sep [text "transformed branch of", pprAStmtContext c])
+             (pprStmtContext c)
+
+pprAHsDoFlavour, pprHsDoFlavour :: HsDoFlavour -> SDoc
+pprAHsDoFlavour flavour = article <+> pprHsDoFlavour flavour
+  where
+    pp_an = text "an"
+    pp_a  = text "a"
+    article = case flavour of
+                  MDoExpr Nothing -> pp_an
+                  GhciStmtCtxt  -> pp_an
+                  _             -> pp_a
+pprHsDoFlavour (DoExpr m)      = prependQualified m (text "'do' block")
+pprHsDoFlavour (MDoExpr m)     = prependQualified m (text "'mdo' block")
+pprHsDoFlavour ListComp        = text "list comprehension"
+pprHsDoFlavour MonadComp       = text "monad comprehension"
+pprHsDoFlavour GhciStmtCtxt    = text "interactive GHCi command"
+
+prependQualified :: Maybe ModuleName -> SDoc -> SDoc
+prependQualified Nothing  t = t
+prependQualified (Just _) t = text "qualified" <+> t
+
+{-
+************************************************************************
+*                                                                      *
+FieldLabelStrings
+*                                                                      *
+************************************************************************
+-}
+
+instance (UnXRec p, Outputable (XRec p FieldLabelString)) => Outputable (FieldLabelStrings p) where
+  ppr (FieldLabelStrings flds) =
+    hcat (punctuate dot (map (ppr . unXRec @p) flds))
+
+instance (UnXRec p, Outputable (XRec p FieldLabelString)) => OutputableBndr (FieldLabelStrings p) where
+  pprInfixOcc = pprFieldLabelStrings
+  pprPrefixOcc = pprFieldLabelStrings
+
+instance (UnXRec p,  Outputable (XRec p FieldLabelString)) => OutputableBndr (Located (FieldLabelStrings p)) where
+  pprInfixOcc = pprInfixOcc . unLoc
+  pprPrefixOcc = pprInfixOcc . unLoc
+
+pprFieldLabelStrings :: forall p. (UnXRec p, Outputable (XRec p FieldLabelString)) => FieldLabelStrings p -> SDoc
+pprFieldLabelStrings (FieldLabelStrings flds) =
+    hcat (punctuate dot (map (ppr . unXRec @p) flds))
+
+instance Outputable(XRec p FieldLabelString) => Outputable (DotFieldOcc p) where
+  ppr (DotFieldOcc _ s) = ppr s
+  ppr XDotFieldOcc{} = text "XDotFieldOcc"
 
 {-
 ************************************************************************

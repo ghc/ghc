@@ -92,12 +92,10 @@ import GHC.Data.FastString.Env
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
 
+import Language.Haskell.Syntax.Basic (FieldLabelString)
+
 import Data.Bool
 import Data.Data
-
--- | Field labels are just represented as strings;
--- they are not necessarily unique (even within a module)
-type FieldLabelString = FastString
 
 -- | A map from labels to all the auxiliary information
 type FieldLabelEnv = DFastStringEnv FieldLabel

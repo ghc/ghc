@@ -919,8 +919,7 @@
                   (Exact
                    {Name: ()}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))
+             (NoExtField)))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -1515,7 +1514,4 @@
                   (Unqual
                    {OccName: True}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))]))
-
-
+             (NoExtField)))))])))))]))

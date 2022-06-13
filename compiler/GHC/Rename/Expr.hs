@@ -404,7 +404,7 @@ rnExpr (HsPragE x prag expr)
        ; return (HsPragE x (rn_prag prag) expr', fvs_expr) }
   where
     rn_prag :: HsPragE GhcPs -> HsPragE GhcRn
-    rn_prag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
+    rn_prag (HsPragSCC x ann) = HsPragSCC x ann
 
 rnExpr (HsLam x matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLExpr matches

@@ -25,6 +25,8 @@ where
 import GHC.Prelude
 import GHC.Platform
 
+import Language.Haskell.Syntax.Basic (Boxity(..))
+
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
 
 import GHC.Types.Basic ( Origin(..), isGenerated )

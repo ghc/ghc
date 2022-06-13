@@ -120,11 +120,13 @@ import GHC.Types.Name.Set
 import GHC.Types.Fixity
 
 -- others:
+import GHC.Utils.Misc (count)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Core.Type
+import GHC.Core.TyCon (TyConFlavour(NewtypeFlavour,DataTypeFlavour))
 import GHC.Types.ForeignCall
 
 import GHC.Data.Bag
@@ -343,6 +345,12 @@ type instance XDataDecl     GhcPs = EpAnn [AddEpAnn]
 type instance XDataDecl     GhcRn = DataDeclRn
 type instance XDataDecl     GhcTc = DataDeclRn
 
+data DataDeclRn = DataDeclRn
+             { tcdDataCusk :: Bool    -- ^ does this have a CUSK?
+                 -- See Note [CUSKs: complete user-supplied kind signatures]
+             , tcdFVs      :: NameSet }
+  deriving Data
+
 type instance XClassDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey, LayoutInfo)  -- See Note [Class LayoutInfo]
   -- TODO:AZ:tidy up AnnSortKey above
 type instance XClassDecl    GhcRn = NameSet -- FVs
@@ -381,6 +389,21 @@ tyClDeclLName (FamDecl { tcdFam = fd })     = familyDeclLName fd
 tyClDeclLName (SynDecl { tcdLName = ln })   = ln
 tyClDeclLName (DataDecl { tcdLName = ln })  = ln
 tyClDeclLName (ClassDecl { tcdLName = ln }) = ln
+
+countTyClDecls :: [TyClDecl pass] -> (Int, Int, Int, Int, Int)
+        -- class, synonym decls, data, newtype, family decls
+countTyClDecls decls
+ = (count isClassDecl    decls,
+    count isSynDecl      decls,  -- excluding...
+    count isDataTy       decls,  -- ...family...
+    count isNewTy        decls,  -- ...instances
+    count isFamilyDecl   decls)
+ where
+   isDataTy DataDecl{ tcdDataDefn = HsDataDefn { dd_ND = DataType } } = True
+   isDataTy _                                                       = False
+
+   isNewTy DataDecl{ tcdDataDefn = HsDataDefn { dd_ND = NewType } } = True
+   isNewTy _                                                      = False
 
 -- FIXME: tcdName is commonly used by both GHC and third-party tools, so it
 -- needs to be polymorphic in the pass
@@ -900,6 +923,10 @@ instDeclDataFamInsts inst_decls
     do_one (L _ (DataFamInstD { dfid_inst = fam_inst }))      = [fam_inst]
     do_one (L _ (TyFamInstD {}))                              = []
 
+-- | Convert a 'NewOrData' to a 'TyConFlavour'
+newOrDataToFlavour :: NewOrData -> TyConFlavour
+newOrDataToFlavour NewType  = NewtypeFlavour
+newOrDataToFlavour DataType = DataTypeFlavour
 
 instance Outputable NewOrData where
   ppr NewType  = text "newtype"
@@ -1090,6 +1117,9 @@ type instance XHsRule       GhcPs = (EpAnn HsRuleAnn, SourceText)
 type instance XHsRule       GhcRn = (HsRuleRn, SourceText)
 type instance XHsRule       GhcTc = (HsRuleRn, SourceText)
 
+data HsRuleRn = HsRuleRn NameSet NameSet -- Free-vars from the LHS and RHS
+  deriving Data
+
 type instance XXRuleDecl    (GhcPass _) = DataConCantHappen
 
 type instance Anno (SourceText, RuleName) = SrcAnn NoEpAnns
@@ -1279,3 +1309,6 @@ type instance Anno (WarnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (AnnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (RoleAnnotDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (Maybe Role) = SrcAnn NoEpAnns
+type instance Anno CCallConv   = SrcSpan
+type instance Anno Safety      = SrcSpan
+type instance Anno CExportSpec = SrcSpan

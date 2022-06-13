@@ -386,8 +386,7 @@
                      (NoExtField)
                      (NoExtField)))])))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))
+             (NoExtField)))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -597,8 +596,7 @@
                      (NoExtField)
                      (NoExtField)))])))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))
+             (NoExtField)))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -834,8 +832,7 @@
                      (NoExtField)
                      (NoExtField)))])))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))
+             (NoExtField)))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -902,8 +899,7 @@
                   (Unqual
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))
+             (NoExtField)))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -970,8 +966,7 @@
                   (Unqual
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))
+             (NoExtField)))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -1039,8 +1034,7 @@
                   (Unqual
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))
+             (NoExtField)))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -1441,8 +1435,7 @@
                   (Unqual
                    {OccName: x}))))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))
+             (NoExtField)))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -1623,8 +1616,7 @@
                                      (False)
                                      (2))))))))]
                              (EmptyLocalBinds
-                              (NoExtField)))))]))
-                       []))
+                              (NoExtField)))))]))))
                     ,(L
                       (SrcSpanAnn (EpAnn
                                    (Anchor
@@ -1705,8 +1697,7 @@
                                      (False)
                                      (3))))))))]
                              (EmptyLocalBinds
-                              (NoExtField)))))]))
-                       []))]}
+                              (NoExtField)))))]))))]}
                    []))
                  (L
                   (TokenLoc
@@ -1721,8 +1712,7 @@
                     (Unqual
                      {OccName: y}))))))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))
+             (NoExtField)))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -2121,7 +2111,4 @@
                        (EmptyLocalBinds
                         (NoExtField)))))]))))))]
             (EmptyLocalBinds
-             (NoExtField)))))]))
-      [])))]))
-
-
+             (NoExtField)))))])))))]))

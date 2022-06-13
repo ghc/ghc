@@ -96,7 +96,6 @@ type instance XFunBind    (GhcPass pL) GhcRn = NameSet
 -- extension field contains the locally-bound free variables of this
 -- defn. See Note [Bind free vars]
 
-        -- fun_tick :: [CoreTickish] 
 type instance XFunBind    (GhcPass pL) GhcTc = (HsWrapper, [CoreTickish])
 -- ^ After the type-checker, the FunBind extension field contains
 -- the ticks to put on the rhs, if any, and a coercion from the
