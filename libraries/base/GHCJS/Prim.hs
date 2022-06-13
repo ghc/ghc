@@ -258,11 +258,6 @@ seqList xs = go xs `seq` xs
   where go (y:ys) = y `seq` go ys
         go []     = ()
 
-seqListSpine :: [a] -> [a]
-seqListSpine xs = go xs `seq` xs
-  where go (y:ys) = go ys
-        go []     = ()
-
 foreign import javascript unsafe "h$toHsString($1)"
   js_fromJSString :: JSVal -> Exts.Any
 
