@@ -231,6 +231,16 @@ deriving instance Data (ForeignDecl GhcPs)
 deriving instance Data (ForeignDecl GhcRn)
 deriving instance Data (ForeignDecl GhcTc)
 
+-- deriving instance (DataIdLR p p) => Data (ForeignImport p)
+deriving instance Data (ForeignImport GhcPs)
+deriving instance Data (ForeignImport GhcRn)
+deriving instance Data (ForeignImport GhcTc)
+
+-- deriving instance (DataIdLR p p) => Data (ForeignExport p)
+deriving instance Data (ForeignExport GhcPs)
+deriving instance Data (ForeignExport GhcRn)
+deriving instance Data (ForeignExport GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (RuleDecls p)
 deriving instance Data (RuleDecls GhcPs)
 deriving instance Data (RuleDecls GhcRn)

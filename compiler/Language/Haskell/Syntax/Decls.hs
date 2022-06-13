@@ -46,7 +46,7 @@ module Language.Haskell.Syntax.Decls (
   FamilyDecl(..), LFamilyDecl,
 
   -- ** Instance declarations
-  InstDecl(..), LInstDecl, FamilyInfo(..), pprFlavour,
+  InstDecl(..), LInstDecl, FamilyInfo(..),
   TyFamInstDecl(..), LTyFamInstDecl,
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
@@ -57,12 +57,10 @@ module Language.Haskell.Syntax.Decls (
   DerivDecl(..), LDerivDecl,
   -- ** Deriving strategies
   DerivStrategy(..), LDerivStrategy,
-  derivStrategyName,
   -- ** @RULE@ declarations
   LRuleDecls,RuleDecls(..),RuleDecl(..),LRuleDecl,HsRuleRn(..),
   RuleBndr(..),LRuleBndr,
   collectRuleBndrSigTys,
-  pprFullRuleName,
   -- ** @default@ declarations
   DefaultDecl(..), LDefaultDecl,
   -- ** Template haskell declaration splice
@@ -111,15 +109,12 @@ import GHC.Types.Name.Set
 import GHC.Types.Fixity
 
 -- others:
-import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Types.SrcLoc
-import GHC.Types.SourceText
 import GHC.Core.Type
 import GHC.Unit.Module.Warnings
 
-import Data.Maybe
-import Data.Data        hiding (TyCon,Fixity, Infix)
+import Data.Data        hiding (TyCon, Fixity, Infix)
 import Data.Void
 
 {-
@@ -258,9 +253,6 @@ data SpliceDecoration
   = DollarSplice  -- ^ $splice
   | BareSplice    -- ^ bare splice
   deriving (Data, Eq, Show)
-
-instance Outputable SpliceDecoration where
-  ppr x = text $ show x
 
 {-
 ************************************************************************
@@ -884,18 +876,6 @@ data FamilyInfo pass
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
 
 
-------------- Pretty printing FamilyDecls -----------
-
-pprFlavour :: FamilyInfo pass -> SDoc
-pprFlavour DataFamily            = text "data"
-pprFlavour OpenTypeFamily        = text "type"
-pprFlavour (ClosedTypeFamily {}) = text "type"
-
-instance Outputable (FamilyInfo pass) where
-  ppr info = pprFlavour info <+> text "family"
-
-
-
 {- *********************************************************************
 *                                                                      *
                Data types and data constructors
@@ -1231,10 +1211,6 @@ data HsConDeclGADTDetails pass
    = PrefixConGADT [HsScaled pass (LBangType pass)]
    | RecConGADT (XRec pass [LConDeclField pass]) (LHsUniToken "->" "→" pass)
 
-instance Outputable NewOrData where
-  ppr NewType  = text "newtype"
-  ppr DataType = text "data"
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1482,14 +1458,6 @@ data DerivStrategy pass
   | ViaStrategy (XViaStrategy pass)
                      -- ^ @-XDerivingVia@
 
--- | A short description of a @DerivStrategy'@.
-derivStrategyName :: DerivStrategy a -> SDoc
-derivStrategyName = text . go
-  where
-    go StockStrategy    {} = "stock"
-    go AnyclassStrategy {} = "anyclass"
-    go NewtypeStrategy  {} = "newtype"
-    go ViaStrategy      {} = "via"
 
 {-
 ************************************************************************
@@ -1538,13 +1506,13 @@ data ForeignDecl pass
       { fd_i_ext  :: XForeignImport pass   -- Post typechecker, rep_ty ~ sig_ty
       , fd_name   :: LIdP pass             -- defines this name
       , fd_sig_ty :: LHsSigType pass       -- sig_ty
-      , fd_fi     :: ForeignImport }
+      , fd_fi     :: ForeignImport pass }
 
   | ForeignExport
       { fd_e_ext  :: XForeignExport pass   -- Post typechecker, rep_ty ~ sig_ty
       , fd_name   :: LIdP pass             -- uses this name
       , fd_sig_ty :: LHsSigType pass       -- sig_ty
-      , fd_fe     :: ForeignExport }
+      , fd_fe     :: ForeignExport pass }
         -- ^
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnForeign',
         --           'GHC.Parser.Annotation.AnnImport','GHC.Parser.Annotation.AnnExport',
@@ -1565,27 +1533,26 @@ data ForeignDecl pass
 -- Specification Of an imported external entity in dependence on the calling
 -- convention
 --
-data ForeignImport = -- import of a C entity
-                     --
-                     --  * the two strings specifying a header file or library
-                     --   may be empty, which indicates the absence of a
-                     --   header or object specification (both are not used
-                     --   in the case of `CWrapper' and when `CFunction'
-                     --   has a dynamic target)
-                     --
-                     --  * the calling convention is irrelevant for code
-                     --   generation in the case of `CLabel', but is needed
-                     --   for pretty printing
-                     --
-                     --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
-                     --
-                     CImport  (Located CCallConv) -- ccall or stdcall
-                              (Located Safety)  -- interruptible, safe or unsafe
-                              (Maybe Header)       -- name of C header
-                              CImportSpec          -- details of the C entity
-                              (Located SourceText) -- original source text for
-                                                   -- the C entity
-  deriving Data
+data ForeignImport pass = -- import of a C entity
+                          --
+                          --  * the two strings specifying a header file or library
+                          --   may be empty, which indicates the absence of a
+                          --   header or object specification (both are not used
+                          --   in the case of `CWrapper' and when `CFunction'
+                          --   has a dynamic target)
+                          --
+                          --  * the calling convention is irrelevant for code
+                          --   generation in the case of `CLabel', but is needed
+                          --   for pretty printing
+                          --
+                          --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
+                          --
+                          CImport  (XCImport pass)
+                                   (Located CCallConv) -- ccall or stdcall
+                                   (Located Safety)  -- interruptible, safe or unsafe
+                                   (Maybe Header)       -- name of C header
+                                   CImportSpec          -- details of the C entity
+                        | XForeignImport !(XXForeignImport pass)
 
 -- details of an external C entity
 --
@@ -1598,46 +1565,9 @@ data CImportSpec = CLabel    CLabelString     -- import address of a C label
 -- specification of an externally exported entity in dependence on the calling
 -- convention
 --
-data ForeignExport = CExport  (Located CExportSpec) -- contains the calling
-                                                    -- convention
-                              (Located SourceText)  -- original source text for
-                                                    -- the C entity
-  deriving Data
+data ForeignExport pass = CExport  (XCExport pass) (Located CExportSpec) -- contains the calling convention
+                        | XForeignExport !(XXForeignExport pass)
 
--- pretty printing of foreign declarations
---
-
-instance Outputable ForeignImport where
-  ppr (CImport  cconv safety mHeader spec (L _ srcText)) =
-    ppr cconv <+> ppr safety
-      <+> pprWithSourceText srcText (pprCEntity spec "")
-    where
-      pp_hdr = case mHeader of
-               Nothing -> empty
-               Just (Header _ header) -> ftext header
-
-      pprCEntity (CLabel lbl) _ =
-        doubleQuotes $ text "static" <+> pp_hdr <+> char '&' <> ppr lbl
-      pprCEntity (CFunction (StaticTarget st _lbl _ isFun)) src =
-        if dqNeeded then doubleQuotes ce else empty
-          where
-            dqNeeded = (take 6 src == "static")
-                    || isJust mHeader
-                    || not isFun
-                    || st /= NoSourceText
-            ce =
-                  -- We may need to drop leading spaces first
-                  (if take 6 src == "static" then text "static" else empty)
-              <+> pp_hdr
-              <+> (if isFun then empty else text "value")
-              <+> (pprWithSourceText st empty)
-      pprCEntity (CFunction DynamicTarget) _ =
-        doubleQuotes $ text "dynamic"
-      pprCEntity CWrapper _ = doubleQuotes $ text "wrapper"
-
-instance Outputable ForeignExport where
-  ppr (CExport  (L _ (CExportStatic _ lbl cconv)) _) =
-    ppr cconv <+> char '"' <> ppr lbl <> char '"'
 
 {-
 ************************************************************************
@@ -1650,10 +1580,8 @@ instance Outputable ForeignExport where
 -- | Located Rule Declarations
 type LRuleDecls pass = XRec pass (RuleDecls pass)
 
-  -- Note [Pragma source text] in GHC.Types.SourceText
 -- | Rule Declarations
 data RuleDecls pass = HsRules { rds_ext   :: XCRuleDecls pass
-                              , rds_src   :: SourceText
                               , rds_rules :: [LRuleDecl pass] }
   | XRuleDecls !(XXRuleDecls pass)
 
@@ -1665,7 +1593,7 @@ data RuleDecl pass
   = HsRule -- Source rule
        { rd_ext  :: XHsRule pass
            -- ^ After renamer, free-vars from the LHS and RHS
-       , rd_name :: XRec pass (SourceText,RuleName)
+       , rd_name :: XRec pass RuleName
            -- ^ Note [Pragma source text] in "GHC.Types.Basic"
        , rd_act  :: Activation
        , rd_tyvs :: Maybe [LHsTyVarBndr () (NoGhcTc pass)]
@@ -1705,9 +1633,6 @@ data RuleBndr pass
 collectRuleBndrSigTys :: [RuleBndr pass] -> [HsPatSigType pass]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ _ ty <- bndrs]
 
-pprFullRuleName :: GenLocated a (SourceText, RuleName) -> SDoc
-pprFullRuleName (L _ (st, n)) = pprWithSourceText st (doubleQuotes $ ftext n)
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1728,10 +1653,6 @@ data DocDecl pass
 
 deriving instance (Data pass, Data (IdP pass)) => Data (DocDecl pass)
 
--- Okay, I need to reconstruct the document comments, but for now:
-instance Outputable (DocDecl name) where
-  ppr _ = text "<document comment>"
-
 docDeclDoc :: DocDecl pass -> LHsDoc pass
 docDeclDoc (DocCommentNext d) = d
 docDeclDoc (DocCommentPrev d) = d
@@ -1751,10 +1672,8 @@ We use exported entities for things to deprecate.
 -- | Located Warning Declarations
 type LWarnDecls pass = XRec pass (WarnDecls pass)
 
- -- Note [Pragma source text] in GHC.Types.SourceText
 -- | Warning pragma Declarations
 data WarnDecls pass = Warnings { wd_ext      :: XWarnings pass
-                               , wd_src      :: SourceText
                                , wd_warnings :: [LWarnDecl pass]
                                }
   | XWarnDecls !(XXWarnDecls pass)
@@ -1781,7 +1700,6 @@ type LAnnDecl pass = XRec pass (AnnDecl pass)
 -- | Annotation Declaration
 data AnnDecl pass = HsAnnotation
                       (XHsAnnotation pass)
-                      SourceText -- Note [Pragma source text] in GHC.Types.SourceText
                       (AnnProvenance pass) (XRec pass (HsExpr pass))
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
       --           'GHC.Parser.Annotation.AnnType'

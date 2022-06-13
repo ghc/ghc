@@ -48,7 +48,7 @@ warnAnns anns@(L loc _ : _)
        ; return [] }
 
 tcAnnotation :: LAnnDecl GhcRn -> TcM Annotation
-tcAnnotation (L loc ann@(HsAnnotation _ _ provenance expr)) = do
+tcAnnotation (L loc ann@(HsAnnotation _ provenance expr)) = do
     -- Work out what the full target of this annotation was
     mod <- getModule
     let target = annProvenanceToTarget mod provenance

@@ -474,7 +474,7 @@ dsRule (L loc (HsRule { rd_name = name
               fn_name   = idName fn_id
               simpl_opts = initSimpleOpts dflags
               final_rhs = simpleOptExpr simpl_opts rhs''    -- De-crap it
-              rule_name = snd (unLoc name)
+              rule_name = unLoc name
               final_bndrs_set = mkVarSet final_bndrs
               arg_ids = filterOut (`elemVarSet` final_bndrs_set) $
                         exprsSomeFreeVarsList isId args

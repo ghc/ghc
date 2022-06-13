@@ -354,6 +354,10 @@ type family XXDefaultDecl      x
 type family XForeignImport     x
 type family XForeignExport     x
 type family XXForeignDecl      x
+type family XCImport           x
+type family XXForeignImport    x
+type family XCExport           x
+type family XXForeignExport    x
 
 -- -------------------------------------
 -- RuleDecls type families

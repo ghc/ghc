@@ -1999,22 +1999,22 @@ instance ToHie (LocatedA (ForeignDecl GhcRn)) where
         , toHie fe
         ]
 
-instance ToHie ForeignImport where
-  toHie (CImport (L a _) (L b _) _ _ (L c _)) = concatM $
+instance ToHie (ForeignImport GhcRn) where
+  toHie (CImport (L c _) (L a _) (L b _) _ _) = concatM $
     [ locOnly a
     , locOnly b
     , locOnly c
     ]
 
-instance ToHie ForeignExport where
-  toHie (CExport (L a _) (L b _)) = concatM $
+instance ToHie (ForeignExport GhcRn) where
+  toHie (CExport (L b _) (L a _)) = concatM $
     [ locOnly a
     , locOnly b
     ]
 
 instance ToHie (LocatedA (WarnDecls GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
-      Warnings _ _ warnings ->
+      Warnings _ warnings ->
         [ toHie warnings
         ]
 
@@ -2026,7 +2026,7 @@ instance ToHie (LocatedA (WarnDecl GhcRn)) where
 
 instance ToHie (LocatedA (AnnDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
-      HsAnnotation _ _ prov expr ->
+      HsAnnotation _ prov expr ->
         [ toHie prov
         , toHie expr
         ]
@@ -2038,7 +2038,7 @@ instance ToHie (AnnProvenance GhcRn) where
 
 instance ToHie (LocatedA (RuleDecls GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
-      HsRules _ _ rules ->
+      HsRules _ rules ->
         [ toHie rules
         ]
 
