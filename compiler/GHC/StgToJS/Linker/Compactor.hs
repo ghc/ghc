@@ -310,11 +310,11 @@ renameInternals ln_cfg cfg cs0 rtsDeps stats0a = (cs, stats, meta)
       -- re-enable and remove this comment and previous fixme
       | True = do
         cs <- get
-        let renamedStats = map (\(s,_,_) -> identsS' (lookupRenamed cs) s) stats0
+        let renamedStats = map (identsS' (lookupRenamed cs) . lu_js_code) stats0
             statics      = map (renameStaticInfo cs)  $
-                               concatMap (\(_,_,x) -> x) stats0
+                               concatMap lu_statics stats0
             infos        = map (renameClosureInfo cs) $
-                               concatMap (\(_,x,_) -> x) stats0
+                               concatMap lu_closures stats0
             -- render metadata as individual statements
             meta = mconcat (map staticDeclStat statics) <>
                    identsS' (lookupRenamed cs) stbs <>
@@ -405,15 +405,14 @@ staticDeclStat (StaticInfo si sv _) =
   let si' = TxtI si
       ssv (StaticUnboxed u)       = Just (ssu u)
       ssv (StaticThunk Nothing)   = Nothing
-      ssv _                       = Just (app "h$d" []) -- error "StaticUnboxed" -- Just [je| h$d() |]
-      ssu (StaticUnboxedBool b)   = app "h$p" [toJExpr b] -- error "StaticUnboxedBool" -- [je| h$p(`b`) |]
-      ssu (StaticUnboxedInt i)    = app "h$p" [toJExpr i] -- error "StaticUnboxedInt" -- [je| h$p(`i`) |]
-      ssu (StaticUnboxedDouble d) = app "h$p" [toJExpr (unSaneDouble d)] -- error "StaticUnboxedDouble" -- [je| h$p(`unSaneDouble d`) |]
+      ssv _                       = Just (app "h$d" [])
+      ssu (StaticUnboxedBool b)   = app "h$p" [toJExpr b]
+      ssu (StaticUnboxedInt i)    = app "h$p" [toJExpr i]
+      ssu (StaticUnboxedDouble d) = app "h$p" [toJExpr (unSaneDouble d)]
       ssu (StaticUnboxedString str) = ApplExpr (initStr str) []
       ssu StaticUnboxedStringOffset {} = 0
   -- FIXME, we shouldn't do h$di, we need to record the statement to init the thunks
   in  maybe (appS "h$di" [toJExpr si']) (\v -> DeclStat si' `mappend` (toJExpr si' |= v)) (ssv sv)
-      -- error "staticDeclStat" -- maybe [j| h$di(`si'`); |] (\v -> DeclStat si' <> error "staticDeclStat" {- [j| `si'` = `v`; |]-}) (ssv sv)
 
 initStr :: BS.ByteString -> JExpr
 initStr str = app "h$str" [ValExpr (JStr . T.pack . BSC.unpack $! str)]
@@ -793,8 +792,8 @@ compact ln_cfg cfg cs0 rtsDeps0 input0
 -- hash compactification
 
 dedupeBodies :: [ShortText]
-             -> [(JStat, [ClosureInfo], [StaticInfo])]
-             -> (JStat, [(JStat, [ClosureInfo], [StaticInfo])])
+             -> [LinkedUnit]
+             -> (JStat, [LinkedUnit])
 dedupeBodies rtsDeps input = (renderBuildFunctions bfN bfCB, input')
   where
     (bfN, bfCB, input') = rewriteBodies globals hdefsR hdefs input
@@ -802,12 +801,10 @@ dedupeBodies rtsDeps input = (renderBuildFunctions bfN bfCB, input')
                              (map (\(k, s, bs) -> (bs, (s, [k]))) hdefs0)
     hdefsR  = M.fromList $ map (\(k, _, bs) -> (k, bs)) hdefs0
     hdefs0 :: [(ShortText, Int, BS.ByteString)]
-    hdefs0  = concatMap (\(b,_,_) ->
-                          (map (\(k,h) ->
+    hdefs0  = concatMap ((map (\(k,h) ->
                             let (s,fh, _deps) = finalizeHash' h
                             in (k, s, fh))
-                        . hashDefinitions globals) b
-                        )
+                        . hashDefinitions globals) . lu_js_code)
                         input
     globals = List.foldl' (flip S.delete) (findAllGlobals input) rtsDeps
 
@@ -883,13 +880,12 @@ rewriteBodies globals idx1 idx2 input = (bfsNormal, bfsCycleBreaker, input')
     idx2' :: Map BS.ByteString (Int, [ShortText])
     idx2' = M.filter (\(s, xs) -> dedupeBody (length xs) s) idx2
 
-    rewriteBlock :: (JStat, [ClosureInfo], [StaticInfo])
-                 -> ([BuildFunction], LinkedUnit)
-    rewriteBlock (st, cis, sis) =
+    rewriteBlock :: LinkedUnit -> ([BuildFunction], LinkedUnit)
+    rewriteBlock (LinkedUnit st cis sis) =
       let (bfs, st') = rewriteFunctions st
       -- remove the declarations for things that we just deduped
           st''       = removeDecls (S.fromList $ map bfName bfs) st'
-      in  (bfs, (st'', cis, sis))
+      in  (bfs, LinkedUnit st'' cis sis)
 
     removeDecls :: Set ShortText -> JStat -> JStat
     removeDecls t (BlockStat ss) = BlockStat (map (removeDecls t) ss)
@@ -987,12 +983,12 @@ nub' = go S.empty
 data HashIdx = HashIdx (Map ShortText Hash) (Map Hash ShortText)
 
 dedupe :: [ShortText]
-       -> [(JStat, [ClosureInfo], [StaticInfo])]
-       -> [(JStat, [ClosureInfo], [StaticInfo])]
+       -> [LinkedUnit]
+       -> [LinkedUnit]
 dedupe rtsDeps input
 --  | dumpHashIdx idx
   =
-  map (\(st,cis,sis) -> dedupeBlock idx st cis sis) input
+  map (dedupeBlock idx) input
   where
     idx    = HashIdx hashes hr
     hashes0 = buildHashes rtsDeps input
@@ -1004,15 +1000,13 @@ dedupe rtsDeps input
     pickShortest = List.minimumBy (compare `on` T.codepointLength)
 
 dedupeBlock :: HashIdx
-            -> JStat
-            -> [ClosureInfo]
-            -> [StaticInfo]
             -> LinkedUnit
-dedupeBlock hi st ci si =
-  ( dedupeStat hi st
-  , mapMaybe (dedupeClosureInfo hi) ci
-  , mapMaybe (dedupeStaticInfo hi) si
-  )
+            -> LinkedUnit
+dedupeBlock hi (LinkedUnit st ci si) = LinkedUnit
+  { lu_js_code  = dedupeStat hi st
+  , lu_closures = mapMaybe (dedupeClosureInfo hi) ci
+  , lu_statics  = mapMaybe (dedupeStaticInfo hi) si
+  }
 
 dedupeStat :: HashIdx -> JStat -> JStat
 dedupeStat hi = go
@@ -1119,7 +1113,7 @@ buildHashes rtsDeps xss
   where
     globals = List.foldl' (flip S.delete) (findAllGlobals xss) rtsDeps
     hashes0 = M.unions (map buildHashesBlock xss)
-    buildHashesBlock (st, cis, sis) =
+    buildHashesBlock (LinkedUnit st cis sis) =
       let hdefs = hashDefinitions globals st
           hcis  = map hashClosureInfo cis
           hsis  = map hashStaticInfo (filter (not . ignoreStatic) sis)
@@ -1128,9 +1122,9 @@ buildHashes rtsDeps xss
 findAllGlobals :: [LinkedUnit] -> Set ShortText
 findAllGlobals xss = S.fromList $ concatMap f xss
   where
-    f (_, cis, sis) =
-      map (\(ClosureInfo i _ _ _ _ _) -> i) cis ++
-      map (\(StaticInfo i _ _) -> i) sis
+    f (LinkedUnit _js_code closures statics) =
+      map (\(ClosureInfo i _ _ _ _ _) -> i) closures ++
+      map (\(StaticInfo i _ _) -> i) statics
 
 fixHashes :: Map ShortText Hash -> Map ShortText Hash
 fixHashes hashes = fmap (second (map replaceHash)) hashes

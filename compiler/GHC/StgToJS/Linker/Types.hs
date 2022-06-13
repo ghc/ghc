@@ -516,7 +516,11 @@ instance Semigroup JSLinkConfig where
 -- StgToJS.Linker.Types.LinkableUnit and StgToJS.Types.LinkableUnit
 type LinkableUnit = (Module, Int)
 
-type LinkedUnit = (JStat, [ClosureInfo], [StaticInfo])
+data LinkedUnit = LinkedUnit
+  { lu_js_code  :: !JStat
+  , lu_closures :: ![ClosureInfo]
+  , lu_statics  :: ![StaticInfo]
+  }
 
 -- TODO: Jeff: (2022,03):  Where to move LinkedObj
 -- | An object file that's either already in memory (with name) or on disk
