@@ -735,8 +735,8 @@ repDataFamInstD (DataFamInstDecl { dfid_eqn =
 
 repForD :: LForeignDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repForD (L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
-                                  , fd_fi = CImport (L _ cc)
-                                                    (L _ s) mch cis _ }))
+                                  , fd_fi = CImport _ (L _ cc)
+                                                    (L _ s) mch cis }))
  = do MkC name' <- lookupLOcc name
       MkC typ' <- repHsSigType typ
       MkC cc' <- repCCallConv cc
@@ -816,7 +816,7 @@ repRuleD (L loc (HsRule { rd_name = n
                          ; tm_bndrs' <- repListM ruleBndrTyConName
                                                 repRuleBndr
                                                 tm_bndrs
-                         ; n'   <- coreStringLit $ unpackFS $ snd $ unLoc n
+                         ; n'   <- coreStringLit $ unpackFS $ unLoc n
                          ; act' <- repPhases act
                          ; lhs' <- repLE lhs
                          ; rhs' <- repLE rhs
@@ -840,7 +840,7 @@ repRuleBndr (L _ (RuleBndrSig _ n sig))
        ; rep2 typedRuleVarName [n', ty'] }
 
 repAnnD :: LAnnDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
-repAnnD (L loc (HsAnnotation _ _ ann_prov (L _ exp)))
+repAnnD (L loc (HsAnnotation _ ann_prov (L _ exp)))
   = do { target <- repAnnProv ann_prov
        ; exp'   <- repE exp
        ; dec    <- repPragAnn target exp'

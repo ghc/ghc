@@ -758,11 +758,10 @@ cvtForD (ImportF callconv safety from nm ty) =
      ; if -- the prim and javascript calling conventions do not support headers
           -- and are inserted verbatim, analogous to mkImport in GHC.Parser.PostProcess
           |  callconv == TH.Prim || callconv == TH.JavaScript
-          -> mk_imp (CImport (L l (cvt_conv callconv)) (L l safety') Nothing
+          -> mk_imp (CImport (L l $ quotedSourceText from) (L l (cvt_conv callconv)) (L l safety') Nothing
                              (CFunction (StaticTarget (SourceText from)
                                                       (mkFastString from) Nothing
-                                                      True))
-                             (L l $ quotedSourceText from))
+                                                      True)))
           |  Just impspec <- parseCImport (L l (cvt_conv callconv)) (L l safety')
                                           (mkFastString (TH.nameBase nm))
                                           from (L l $ quotedSourceText from)
@@ -787,10 +786,9 @@ cvtForD (ExportF callconv as nm ty)
   = do  { nm' <- vNameN nm
         ; ty' <- cvtSigType ty
         ; l <- getL
-        ; let e = CExport (L l (CExportStatic (SourceText as)
-                                              (mkFastString as)
-                                              (cvt_conv callconv)))
-                                              (L l (SourceText as))
+        ; let e = CExport (L l (SourceText as)) (L l (CExportStatic (SourceText as)
+                                                (mkFastString as)
+                                                (cvt_conv callconv))) 
         ; return $ ForeignExport { fd_e_ext = noAnn
                                  , fd_name = nm'
                                  , fd_sig_ty = ty'
@@ -861,14 +859,14 @@ cvtPragmaD (SpecialiseInstP ty)
 
 cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
   = do { let nm' = mkFastString nm
-       ; rd_name' <- returnLA (quotedSourceText nm,nm')
+       ; rd_name' <- returnLA nm'
        ; let act = cvtPhases phases AlwaysActive
        ; ty_bndrs' <- traverse cvtTvs ty_bndrs
        ; tm_bndrs' <- mapM cvtRuleBndr tm_bndrs
        ; lhs'   <- cvtl lhs
        ; rhs'   <- cvtl rhs
        ; rule <- returnLA $
-                   HsRule { rd_ext  = noAnn
+                   HsRule { rd_ext  = (noAnn, quotedSourceText nm)
                           , rd_name = rd_name'
                           , rd_act  = act
                           , rd_tyvs = ty_bndrs'
@@ -876,8 +874,7 @@ cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
                           , rd_lhs  = lhs'
                           , rd_rhs  = rhs' }
        ; returnJustLA $ Hs.RuleD noExtField
-            $ HsRules { rds_ext = noAnn
-                      , rds_src = SourceText "{-# RULES"
+            $ HsRules { rds_ext = (noAnn, SourceText "{-# RULES")
                       , rds_rules = [rule] }
 
           }
@@ -893,7 +890,7 @@ cvtPragmaD (AnnP target exp)
            n' <- vcName n
            wrapParLA ValueAnnProvenance n'
        ; returnJustLA $ Hs.AnnD noExtField
-                     $ HsAnnotation noAnn (SourceText "{-# ANN") target' exp'
+                     $ HsAnnotation (noAnn, (SourceText "{-# ANN")) target' exp'
        }
 
 -- NB: This is the only place in GHC.ThToHs that makes use of the `setL`

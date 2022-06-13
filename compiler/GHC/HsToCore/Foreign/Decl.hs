@@ -93,8 +93,8 @@ dsForeigns' fos = do
 
    do_decl (ForeignExport { fd_name = L _ id
                           , fd_e_ext = co
-                          , fd_fe = CExport
-                              (L _ (CExportStatic _ ext_nm cconv)) _ }) = do
+                          , fd_fe = CExport _
+                              (L _ (CExportStatic _ ext_nm cconv)) }) = do
       (h, c, _, _) <- dsFExport id co ext_nm cconv False
       return (h, c, [id], [])
 
@@ -126,9 +126,9 @@ because it exposes the boxing to the call site.
 
 dsFImport :: Id
           -> Coercion
-          -> ForeignImport
+          -> ForeignImport (GhcPass p)
           -> DsM ([Binding], CHeader, CStub)
-dsFImport id co (CImport cconv safety mHeader spec _) =
+dsFImport id co (CImport _ cconv safety mHeader spec) =
     dsCImport id co spec (unLoc cconv) (unLoc safety) mHeader
 
 {-

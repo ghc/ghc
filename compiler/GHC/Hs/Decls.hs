@@ -187,6 +187,10 @@ partitionBindsAndSigs = go
           -> (bs, ss, ts, tfis, dfis, L l d : docs)
         _ -> pprPanic "partitionBindsAndSigs" (ppr decl)
 
+-- Okay, I need to reconstruct the document comments, but for now:
+instance Outputable (DocDecl name) where
+  ppr _ = text "<document comment>"
+
 type instance XCHsGroup (GhcPass _) = NoExtField
 type instance XXHsGroup (GhcPass _) = DataConCantHappen
 
@@ -316,6 +320,11 @@ instance OutputableBndrId p
   ppr (SpliceDecl _ (L _ e) DollarSplice) = pprUntypedSplice True Nothing e
   ppr (SpliceDecl _ (L _ e) BareSplice)   = pprUntypedSplice False Nothing e
 
+instance Outputable SpliceDecoration where
+  ppr x = text $ show x
+
+
+
 {-
 ************************************************************************
 *                                                                      *
@@ -343,6 +352,17 @@ type instance XXTyClDecl    (GhcPass _) = DataConCantHappen
 
 type instance XCTyFamInstDecl (GhcPass _) = EpAnn [AddEpAnn]
 type instance XXTyFamInstDecl (GhcPass _) = DataConCantHappen
+
+------------- Pretty printing FamilyDecls -----------
+
+pprFlavour :: FamilyInfo pass -> SDoc
+pprFlavour DataFamily            = text "data"
+pprFlavour OpenTypeFamily        = text "type"
+pprFlavour (ClosedTypeFamily {}) = text "type"
+
+instance Outputable (FamilyInfo pass) where
+  ppr info = pprFlavour info <+> text "family"
+
 
 -- Dealing with names
 
@@ -590,6 +610,15 @@ instance OutputableBndrId p
           case dcs of
             Just (L _ via@ViaStrategy{}) -> (empty, ppr via)
             _                            -> (ppDerivStrategy dcs, empty)
+
+-- | A short description of a @DerivStrategy'@.
+derivStrategyName :: DerivStrategy a -> SDoc
+derivStrategyName = text . go
+  where
+    go StockStrategy    {} = "stock"
+    go AnyclassStrategy {} = "anyclass"
+    go NewtypeStrategy  {} = "newtype"
+    go ViaStrategy      {} = "via"
 
 type instance XDctSingle (GhcPass _) = NoExtField
 type instance XDctMulti  (GhcPass _) = NoExtField
@@ -871,6 +900,11 @@ instDeclDataFamInsts inst_decls
     do_one (L _ (DataFamInstD { dfid_inst = fam_inst }))      = [fam_inst]
     do_one (L _ (TyFamInstD {}))                              = []
 
+
+instance Outputable NewOrData where
+  ppr NewType  = text "newtype"
+  ppr DataType = text "data"
+
 {-
 ************************************************************************
 *                                                                      *
@@ -987,6 +1021,14 @@ type instance XForeignExport   GhcTc = Coercion
 
 type instance XXForeignDecl    (GhcPass _) = DataConCantHappen
 
+type instance XCImport (GhcPass _) = Located SourceText -- original source text for the C entity
+type instance XXForeignImport  (GhcPass _) = DataConCantHappen
+
+type instance XCExport (GhcPass _) = Located SourceText -- original source text for the C entity
+type instance XXForeignExport  (GhcPass _) = DataConCantHappen
+
+-- pretty printing of foreign declarations
+
 instance OutputableBndrId p
        => Outputable (ForeignDecl (GhcPass p)) where
   ppr (ForeignImport { fd_name = n, fd_sig_ty = ty, fd_fi = fimport })
@@ -996,6 +1038,40 @@ instance OutputableBndrId p
     hang (text "foreign export" <+> ppr fexport <+> ppr n)
        2 (dcolon <+> ppr ty)
 
+instance OutputableBndrId p
+       => Outputable (ForeignImport (GhcPass p)) where
+  ppr (CImport (L _ srcText) cconv safety mHeader spec) =
+    ppr cconv <+> ppr safety
+      <+> pprWithSourceText srcText (pprCEntity spec "")
+    where
+      pp_hdr = case mHeader of
+               Nothing -> empty
+               Just (Header _ header) -> ftext header
+
+      pprCEntity (CLabel lbl) _ =
+        doubleQuotes $ text "static" <+> pp_hdr <+> char '&' <> ppr lbl
+      pprCEntity (CFunction (StaticTarget st _lbl _ isFun)) src =
+        if dqNeeded then doubleQuotes ce else empty
+          where
+            dqNeeded = (take 6 src == "static")
+                    || isJust mHeader
+                    || not isFun
+                    || st /= NoSourceText
+            ce =
+                  -- We may need to drop leading spaces first
+                  (if take 6 src == "static" then text "static" else empty)
+              <+> pp_hdr
+              <+> (if isFun then empty else text "value")
+              <+> (pprWithSourceText st empty)
+      pprCEntity (CFunction DynamicTarget) _ =
+        doubleQuotes $ text "dynamic"
+      pprCEntity CWrapper _ = doubleQuotes $ text "wrapper"
+
+instance OutputableBndrId p
+       => Outputable (ForeignExport (GhcPass p)) where
+  ppr (CExport _ (L _ (CExportStatic _ lbl cconv))) =
+    ppr cconv <+> char '"' <> ppr lbl <> char '"'
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1004,15 +1080,15 @@ instance OutputableBndrId p
 ************************************************************************
 -}
 
-type instance XCRuleDecls    GhcPs = EpAnn [AddEpAnn]
-type instance XCRuleDecls    GhcRn = NoExtField
-type instance XCRuleDecls    GhcTc = NoExtField
+type instance XCRuleDecls    GhcPs = (EpAnn [AddEpAnn], SourceText)
+type instance XCRuleDecls    GhcRn = SourceText
+type instance XCRuleDecls    GhcTc = SourceText
 
 type instance XXRuleDecls    (GhcPass _) = DataConCantHappen
 
-type instance XHsRule       GhcPs = EpAnn HsRuleAnn
-type instance XHsRule       GhcRn = HsRuleRn
-type instance XHsRule       GhcTc = HsRuleRn
+type instance XHsRule       GhcPs = (EpAnn HsRuleAnn, SourceText)
+type instance XHsRule       GhcRn = (HsRuleRn, SourceText)
+type instance XHsRule       GhcTc = (HsRuleRn, SourceText)
 
 type instance XXRuleDecl    (GhcPass _) = DataConCantHappen
 
@@ -1037,19 +1113,24 @@ type instance XRuleBndrSig  (GhcPass _) = EpAnn [AddEpAnn]
 type instance XXRuleBndr    (GhcPass _) = DataConCantHappen
 
 instance (OutputableBndrId p) => Outputable (RuleDecls (GhcPass p)) where
-  ppr (HsRules { rds_src = st
+  ppr (HsRules { rds_ext = ext
                , rds_rules = rules })
     = pprWithSourceText st (text "{-# RULES")
           <+> vcat (punctuate semi (map ppr rules)) <+> text "#-}"
+              where st = case ghcPass @p of
+                           GhcPs | (_, st) <- ext -> st
+                           GhcRn -> ext
+                           GhcTc -> ext
 
 instance (OutputableBndrId p) => Outputable (RuleDecl (GhcPass p)) where
-  ppr (HsRule { rd_name = name
+  ppr (HsRule { rd_ext  = ext
+              , rd_name = name
               , rd_act  = act
               , rd_tyvs = tys
               , rd_tmvs = tms
               , rd_lhs  = lhs
               , rd_rhs  = rhs })
-        = sep [pprFullRuleName name <+> ppr act,
+        = sep [pprFullRuleName st name <+> ppr act,
                nest 4 (pp_forall_ty tys <+> pp_forall_tm tys
                                         <+> pprExpr (unLoc lhs)),
                nest 6 (equals <+> pprExpr (unLoc rhs)) ]
@@ -1058,10 +1139,18 @@ instance (OutputableBndrId p) => Outputable (RuleDecl (GhcPass p)) where
           pp_forall_ty (Just qtvs) = forAllLit <+> fsep (map ppr qtvs) <> dot
           pp_forall_tm Nothing | null tms = empty
           pp_forall_tm _ = forAllLit <+> fsep (map ppr tms) <> dot
+          st = case ghcPass @p of
+                 GhcPs | (_, st) <- ext -> st
+                 GhcRn | (_, st) <- ext -> st
+                 GhcTc | (_, st) <- ext -> st
 
 instance (OutputableBndrId p) => Outputable (RuleBndr (GhcPass p)) where
    ppr (RuleBndr _ name) = ppr name
    ppr (RuleBndrSig _ name ty) = parens (ppr name <> dcolon <> ppr ty)
+
+pprFullRuleName :: SourceText -> GenLocated a (RuleName) -> SDoc
+pprFullRuleName st (L _ n) = pprWithSourceText st (doubleQuotes $ ftext n)
+
 
 {-
 ************************************************************************
@@ -1071,9 +1160,9 @@ instance (OutputableBndrId p) => Outputable (RuleBndr (GhcPass p)) where
 ************************************************************************
 -}
 
-type instance XWarnings      GhcPs = EpAnn [AddEpAnn]
-type instance XWarnings      GhcRn = NoExtField
-type instance XWarnings      GhcTc = NoExtField
+type instance XWarnings      GhcPs = (EpAnn [AddEpAnn], SourceText)
+type instance XWarnings      GhcRn = SourceText
+type instance XWarnings      GhcTc = SourceText
 
 type instance XXWarnDecls    (GhcPass _) = DataConCantHappen
 
@@ -1083,9 +1172,13 @@ type instance XXWarnDecl    (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
         => Outputable (WarnDecls (GhcPass p)) where
-    ppr (Warnings _ (SourceText src) decls)
+    ppr (Warnings ext decls)
       = text src <+> vcat (punctuate comma (map ppr decls)) <+> text "#-}"
-    ppr (Warnings _ NoSourceText _decls) = panic "WarnDecls"
+      where src = case ghcPass @p of
+              GhcPs | (_, SourceText src) <- ext -> src
+              GhcRn | SourceText src <- ext -> src
+              GhcTc | SourceText src <- ext -> src
+              _ -> panic "WarnDecls"
 
 instance OutputableBndrId p
        => Outputable (WarnDecl (GhcPass p)) where
@@ -1101,11 +1194,11 @@ instance OutputableBndrId p
 ************************************************************************
 -}
 
-type instance XHsAnnotation (GhcPass _) = EpAnn AnnPragma
+type instance XHsAnnotation (GhcPass _) = (EpAnn AnnPragma, SourceText)
 type instance XXAnnDecl     (GhcPass _) = DataConCantHappen
 
 instance (OutputableBndrId p) => Outputable (AnnDecl (GhcPass p)) where
-    ppr (HsAnnotation _ _ provenance expr)
+    ppr (HsAnnotation _ provenance expr)
       = hsep [text "{-#", pprAnnProvenance provenance, pprExpr (unLoc expr), text "#-}"]
 
 pprAnnProvenance :: OutputableBndrId p => AnnProvenance (GhcPass p) -> SDoc

@@ -103,23 +103,22 @@ tcRules :: [LRuleDecls GhcRn] -> TcM [LRuleDecls GhcTc]
 tcRules decls = mapM (wrapLocMA tcRuleDecls) decls
 
 tcRuleDecls :: RuleDecls GhcRn -> TcM (RuleDecls GhcTc)
-tcRuleDecls (HsRules { rds_src = src
+tcRuleDecls (HsRules { rds_ext = src
                      , rds_rules = decls })
    = do { tc_decls <- mapM (wrapLocMA tcRule) decls
-        ; return $ HsRules { rds_ext   = noExtField
-                           , rds_src   = src
+        ; return $ HsRules { rds_ext   = src
                            , rds_rules = tc_decls } }
 
 tcRule :: RuleDecl GhcRn -> TcM (RuleDecl GhcTc)
 tcRule (HsRule { rd_ext  = ext
-               , rd_name = rname@(L _ (_,name))
+               , rd_name = rname@(L _ name)
                , rd_act  = act
                , rd_tyvs = ty_bndrs
                , rd_tmvs = tm_bndrs
                , rd_lhs  = lhs
                , rd_rhs  = rhs })
   = addErrCtxt (ruleCtxt name)  $
-    do { traceTc "---- Rule ------" (pprFullRuleName rname)
+    do { traceTc "---- Rule ------" (pprFullRuleName (snd ext) rname)
        ; skol_info <- mkSkolemInfo (RuleSkol name)
         -- Note [Typechecking rules]
        ; (tc_lvl, stuff) <- pushTcLevelM $
@@ -128,7 +127,7 @@ tcRule (HsRule { rd_ext  = ext
        ; let (id_bndrs, lhs', lhs_wanted
                       , rhs', rhs_wanted, rule_ty) = stuff
 
-       ; traceTc "tcRule 1" (vcat [ pprFullRuleName rname
+       ; traceTc "tcRule 1" (vcat [ pprFullRuleName (snd ext) rname
                                   , ppr lhs_wanted
                                   , ppr rhs_wanted ])
 
@@ -157,7 +156,7 @@ tcRule (HsRule { rd_ext  = ext
              quant_cands = forall_tkvs { dv_kvs = weed_out (dv_kvs forall_tkvs)
                                        , dv_tvs = weed_out (dv_tvs forall_tkvs) }
        ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars quant_cands
-       ; traceTc "tcRule" (vcat [ pprFullRuleName rname
+       ; traceTc "tcRule" (vcat [ pprFullRuleName (snd ext) rname
                                 , text "forall_tkvs:" <+> ppr forall_tkvs
                                 , text "quant_cands:" <+> ppr quant_cands
                                 , text "don't_default:" <+> ppr don't_default

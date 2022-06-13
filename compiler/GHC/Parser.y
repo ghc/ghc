@@ -1222,9 +1222,9 @@ topdecl :: { LHsDecl GhcPs }
         | 'default' '(' comma_types0 ')'        {% acsA (\cs -> sLL $1 $>
                                                     (DefD noExtField (DefaultDecl (EpAnn (glR $1) [mj AnnDefault $1,mop $2,mcp $4] cs) $3))) }
         | 'foreign' fdecl                       {% acsA (\cs -> sLL $1 $> ((snd $ unLoc $2) (EpAnn (glR $1) (mj AnnForeign $1:(fst $ unLoc $2)) cs))) }
-        | '{-# DEPRECATED' deprecations '#-}'   {% acsA (\cs -> sLL $1 $> $ WarningD noExtField (Warnings (EpAnn (glR $1) [mo $1,mc $3] cs) (getDEPRECATED_PRAGs $1) (fromOL $2))) }
-        | '{-# WARNING' warnings '#-}'          {% acsA (\cs -> sLL $1 $> $ WarningD noExtField (Warnings (EpAnn (glR $1) [mo $1,mc $3] cs) (getWARNING_PRAGs $1) (fromOL $2))) }
-        | '{-# RULES' rules '#-}'               {% acsA (\cs -> sLL $1 $> $ RuleD noExtField (HsRules (EpAnn (glR $1) [mo $1,mc $3] cs) (getRULES_PRAGs $1) (reverse $2))) }
+        | '{-# DEPRECATED' deprecations '#-}'   {% acsA (\cs -> sLL $1 $> $ WarningD noExtField (Warnings ((EpAnn (glR $1) [mo $1,mc $3] cs), (getDEPRECATED_PRAGs $1)) (fromOL $2))) }
+        | '{-# WARNING' warnings '#-}'          {% acsA (\cs -> sLL $1 $> $ WarningD noExtField (Warnings ((EpAnn (glR $1) [mo $1,mc $3] cs), (getWARNING_PRAGs $1)) (fromOL $2))) }
+        | '{-# RULES' rules '#-}'               {% acsA (\cs -> sLL $1 $> $ RuleD noExtField (HsRules ((EpAnn (glR $1) [mo $1,mc $3] cs), (getRULES_PRAGs $1)) (reverse $2))) }
         | annotation { $1 }
         | decl_no_th                            { $1 }
 
@@ -1840,8 +1840,8 @@ rule    :: { LRuleDecl GhcPs }
          {%runPV (unECP $4) >>= \ $4 ->
            runPV (unECP $6) >>= \ $6 ->
            acsA (\cs -> (sLLlA $1 $> $ HsRule
-                                   { rd_ext = EpAnn (glR $1) ((fstOf3 $3) (mj AnnEqual $5 : (fst $2))) cs
-                                   , rd_name = L (noAnnSrcSpan $ gl $1) (getSTRINGs $1, getSTRING $1)
+                                   { rd_ext = (EpAnn (glR $1) ((fstOf3 $3) (mj AnnEqual $5 : (fst $2))) cs, getSTRINGs $1)
+                                   , rd_name = L (noAnnSrcSpan $ gl $1) (getSTRING $1)
                                    , rd_act = (snd $2) `orElse` AlwaysActive
                                    , rd_tyvs = sndOf3 $3, rd_tmvs = thdOf3 $3
                                    , rd_lhs = $4, rd_rhs = $6 })) }
@@ -1998,20 +1998,20 @@ stringlist :: { Located (OrdList (Located StringLiteral)) }
 annotation :: { LHsDecl GhcPs }
     : '{-# ANN' name_var aexp '#-}'      {% runPV (unECP $3) >>= \ $3 ->
                                             acsA (\cs -> sLL $1 $> (AnnD noExtField $ HsAnnotation
-                                            (EpAnn (glR $1) (AnnPragma (mo $1) (mc $4) []) cs)
-                                            (getANN_PRAGs $1)
+                                            ((EpAnn (glR $1) (AnnPragma (mo $1) (mc $4) []) cs),
+                                            (getANN_PRAGs $1))
                                             (ValueAnnProvenance $2) $3)) }
 
     | '{-# ANN' 'type' otycon aexp '#-}' {% runPV (unECP $4) >>= \ $4 ->
                                             acsA (\cs -> sLL $1 $> (AnnD noExtField $ HsAnnotation
-                                            (EpAnn (glR $1) (AnnPragma (mo $1) (mc $5) [mj AnnType $2]) cs)
-                                            (getANN_PRAGs $1)
+                                            ((EpAnn (glR $1) (AnnPragma (mo $1) (mc $5) [mj AnnType $2]) cs),
+                                            (getANN_PRAGs $1))
                                             (TypeAnnProvenance $3) $4)) }
 
     | '{-# ANN' 'module' aexp '#-}'      {% runPV (unECP $3) >>= \ $3 ->
                                             acsA (\cs -> sLL $1 $> (AnnD noExtField $ HsAnnotation
-                                                (EpAnn (glR $1) (AnnPragma (mo $1) (mc $4) [mj AnnModule $2]) cs)
-                                                (getANN_PRAGs $1)
+                                                ((EpAnn (glR $1) (AnnPragma (mo $1) (mc $4) [mj AnnModule $2]) cs),
+                                                (getANN_PRAGs $1))
                                                  ModuleAnnProvenance $3)) }
 
 -----------------------------------------------------------------------------

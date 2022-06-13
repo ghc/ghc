@@ -1732,7 +1732,7 @@ data TcRnMessage where
 
     Test cases: ffi/should_fail/T20116
   -}
-  TcRnForeignImportPrimExtNotSet :: ForeignImport -> TcRnMessage
+  TcRnForeignImportPrimExtNotSet :: ForeignImport p -> TcRnMessage
 
   {- TcRnForeignImportPrimSafeAnn is an error declaring that the safe/unsafe
      annotation should not be used with @prim@ foreign imports.
@@ -1742,7 +1742,7 @@ data TcRnMessage where
 
     Test cases: None
   -}
-  TcRnForeignImportPrimSafeAnn :: ForeignImport -> TcRnMessage
+  TcRnForeignImportPrimSafeAnn :: ForeignImport p -> TcRnMessage
 
   {- TcRnForeignFunctionImportAsValue is an error explaining that foreign @value@
      imports cannot have function types.
@@ -1752,7 +1752,7 @@ data TcRnMessage where
 
     Test cases: ffi/should_fail/capi_value_function
   -}
-  TcRnForeignFunctionImportAsValue :: ForeignImport -> TcRnMessage
+  TcRnForeignFunctionImportAsValue :: ForeignImport p -> TcRnMessage
 
   {- TcRnFunPtrImportWithoutAmpersand is a warning controlled by @-Wdodgy-foreign-imports@
      that informs the user of a possible missing @&@ in the declaration of a
@@ -1763,7 +1763,7 @@ data TcRnMessage where
 
     Test cases: ffi/should_compile/T1357
   -}
-  TcRnFunPtrImportWithoutAmpersand :: ForeignImport -> TcRnMessage
+  TcRnFunPtrImportWithoutAmpersand :: ForeignImport p -> TcRnMessage
 
   {- TcRnIllegalForeignDeclBackend is an error occurring when a foreign import declaration
      is not compatible with the code generation backend being used.
@@ -1773,7 +1773,7 @@ data TcRnMessage where
     Test cases: None
   -}
   TcRnIllegalForeignDeclBackend
-    :: Either ForeignExport ForeignImport
+    :: Either (ForeignExport p) (ForeignImport p)
     -> Backend
     -> ExpectedBackends
     -> TcRnMessage
@@ -1787,7 +1787,7 @@ data TcRnMessage where
 
     Test cases: None
   -}
-  TcRnUnsupportedCallConv :: Either ForeignExport ForeignImport -> UnsupportedCallConvention -> TcRnMessage
+  TcRnUnsupportedCallConv :: Either (ForeignExport p) (ForeignImport p) -> UnsupportedCallConvention -> TcRnMessage
 
   {- TcRnIllegalForeignType is an error for when a type appears in a foreign
      function signature that is not compatible with the FFI.

@@ -319,12 +319,12 @@ findDupRdrNames = findDupsEq (\ x -> \ y -> rdrNameOcc (unLoc x) == rdrNameOcc (
 -}
 
 rnAnnDecl :: AnnDecl GhcPs -> RnM (AnnDecl GhcRn, FreeVars)
-rnAnnDecl ann@(HsAnnotation _ s provenance expr)
+rnAnnDecl ann@(HsAnnotation (_, s) provenance expr)
   = addErrCtxt (annCtxt ann) $
     do { (provenance', provenance_fvs) <- rnAnnProvenance provenance
        ; (expr', expr_fvs) <- setStage (Splice Untyped) $
                               rnLExpr expr
-       ; return (HsAnnotation noAnn s provenance' expr',
+       ; return (HsAnnotation (noAnn, s) provenance' expr',
                  provenance_fvs `plusFV` expr_fvs) }
 
 rnAnnProvenance :: AnnProvenance GhcPs
@@ -381,7 +381,7 @@ rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
        ; return (ForeignExport { fd_e_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
-                               , fd_fe = spec }
+                               , fd_fe = (\(CExport x c) -> CExport x c) spec }
                 , fvs `addOneFV` unLoc name') }
         -- NB: a foreign export is an *occurrence site* for name, so
         --     we add it to the free-variable list.  It might, for example,
@@ -392,9 +392,9 @@ rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
 --      package, so if they get inlined across a package boundary we'll still
 --      know where they're from.
 --
-patchForeignImport :: Unit -> ForeignImport -> ForeignImport
-patchForeignImport unit (CImport cconv safety fs spec src)
-        = CImport cconv safety fs (patchCImportSpec unit spec) src
+patchForeignImport :: Unit -> (ForeignImport GhcPs) -> (ForeignImport GhcRn)
+patchForeignImport unit (CImport ext cconv safety fs spec)
+        = CImport ext cconv safety fs (patchCImportSpec unit spec)
 
 patchCImportSpec :: Unit -> CImportSpec -> CImportSpec
 patchCImportSpec unit spec
@@ -1219,15 +1219,15 @@ standaloneDerivErr
 -}
 
 rnHsRuleDecls :: RuleDecls GhcPs -> RnM (RuleDecls GhcRn, FreeVars)
-rnHsRuleDecls (HsRules { rds_src = src
+rnHsRuleDecls (HsRules { rds_ext = (_, src)
                        , rds_rules = rules })
   = do { (rn_rules,fvs) <- rnList rnHsRuleDecl rules
-       ; return (HsRules { rds_ext = noExtField
-                         , rds_src = src
+       ; return (HsRules { rds_ext = src
                          , rds_rules = rn_rules }, fvs) }
 
 rnHsRuleDecl :: RuleDecl GhcPs -> RnM (RuleDecl GhcRn, FreeVars)
-rnHsRuleDecl (HsRule { rd_name = rule_name
+rnHsRuleDecl (HsRule { rd_ext  = (_, st)
+                     , rd_name = rule_name
                      , rd_act  = act
                      , rd_tyvs = tyvs
                      , rd_tmvs = tmvs
@@ -1238,13 +1238,13 @@ rnHsRuleDecl (HsRule { rd_name = rule_name
        ; checkDupRdrNamesN rdr_names_w_loc
        ; checkShadowedRdrNames rdr_names_w_loc
        ; names <- newLocalBndrsRn rdr_names_w_loc
-       ; let doc = RuleCtx (snd $ unLoc rule_name)
+       ; let doc = RuleCtx (unLoc rule_name)
        ; bindRuleTyVars doc tyvs $ \ tyvs' ->
          bindRuleTmVars doc tyvs' tmvs names $ \ tmvs' ->
     do { (lhs', fv_lhs') <- rnLExpr lhs
        ; (rhs', fv_rhs') <- rnLExpr rhs
-       ; checkValidRule (snd $ unLoc rule_name) names lhs' fv_lhs'
-       ; return (HsRule { rd_ext  = HsRuleRn fv_lhs' fv_rhs'
+       ; checkValidRule (unLoc rule_name) names lhs' fv_lhs'
+       ; return (HsRule { rd_ext  = (HsRuleRn fv_lhs' fv_rhs', st)
                         , rd_name = rule_name
                         , rd_act  = act
                         , rd_tyvs = tyvs'

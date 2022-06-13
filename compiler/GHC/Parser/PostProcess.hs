@@ -2650,7 +2650,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
                              PsErrMalformedEntityString
         Just importSpec -> return importSpec
 
-    isCWrapperImport (CImport _ _ _ CWrapper _) = True
+    isCWrapperImport (CImport _ _ _ _ CWrapper) = True
     isCWrapperImport _ = False
 
     -- currently, all the other import conventions only support a symbol name in
@@ -2661,7 +2661,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
                         then mkExtName (unLoc v)
                         else entity
         funcTarget = CFunction (StaticTarget esrc entity' Nothing True)
-        importSpec = CImport cconv safety Nothing funcTarget (L loc esrc)
+        importSpec = CImport (L loc esrc) cconv safety Nothing funcTarget
 
     returnSpec spec = return $ \ann -> ForD noExtField $ ForeignImport
           { fd_i_ext  = ann
@@ -2677,7 +2677,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
 -- that one.
 parseCImport :: Located CCallConv -> Located Safety -> FastString -> String
              -> Located SourceText
-             -> Maybe ForeignImport
+             -> Maybe (ForeignImport (GhcPass p))
 parseCImport cconv safety nm str sourceText =
  listToMaybe $ map fst $ filter (null.snd) $
      readP_to_S parse str
@@ -2704,7 +2704,7 @@ parseCImport cconv safety nm str sourceText =
                        | id_char c -> pfail
                       _            -> return ()
 
-   mk h n = CImport cconv safety h n sourceText
+   mk h n = CImport sourceText cconv safety h n
 
    hdr_char c = not (isSpace c)
    -- header files are filenames, which can contain
@@ -2739,8 +2739,7 @@ mkExport :: Located CCallConv
 mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty)
  = return $ \ann -> ForD noExtField $
    ForeignExport { fd_e_ext = ann, fd_name = v, fd_sig_ty = ty
-                 , fd_fe = CExport (L lc (CExportStatic esrc entity' cconv))
-                                   (L le esrc) }
+                 , fd_fe = CExport (L le esrc) (L lc (CExportStatic esrc entity' cconv)) }
   where
     entity' | nullFS entity = mkExtName (unLoc v)
             | otherwise     = entity
