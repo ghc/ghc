@@ -94,7 +94,7 @@ else
 install_bin: install_bin_libdir install_wrappers
 endif
 
-install: install_bin install_lib install_includes
+install: install_bin install_lib
 install: install_docs update_package_db
 
 ActualBinsDir=${ghclibdir}/bin
@@ -185,14 +185,6 @@ install_lib: lib/settings
 	$(INSTALL_DIR) "$(DESTDIR)$(ActualLibsDir)"
 	for i in $(LIBRARIES); do \
 		cp -R $$i "$(DESTDIR)$(ActualLibsDir)/"; \
-	done
-
-INCLUDES = $(wildcard ./include/*)
-install_includes:
-	@echo "Copying include files to $(DESTDIR)$(includedir)"
-	$(INSTALL_DIR) "$(DESTDIR)$(includedir)"
-	for i in $(INCLUDES); do \
-		cp -R $$i "$(DESTDIR)$(includedir)/"; \
 	done
 
 DOCS = $(wildcard ./docs/*)
