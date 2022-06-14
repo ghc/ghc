@@ -221,7 +221,6 @@ cgRhs id (StgRhsCon cc con mn _ts args)
 {- See Note [GC recovery] in "GHC.StgToCmm.Closure" -}
 cgRhs id (StgRhsClosure fvs cc upd_flag args body)
   = do
-    checkFunctionArgTags (text "TagCheck Failed: Rhs of" <> ppr id) id args
     profile <- getProfile
     check_tags <- stgToCmmDoTagCheck <$> getStgToCmmConfig
     use_std_ap_thunk <- stgToCmmTickyAP <$> getStgToCmmConfig
@@ -490,6 +489,7 @@ closureCodeBody top_lvl bndr cl_info cc [] body fv_details
      lf_info  = closureLFInfo cl_info
      info_tbl = mkCmmInfo cl_info bndr cc
 
+-- Functions
 closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
   = let nv_args = nonVoidIds args
         arity = length args
@@ -531,7 +531,7 @@ closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
                 -- Load free vars out of closure *after*
                 -- heap check, to reduce live vars over check
                 ; when node_points $ load_fvs node lf_info fv_bindings
-                ; checkFunctionArgTags (text "TagCheck failed - Argument to local function:" <> ppr bndr) bndr (map fromNonVoid nv_args)
+                ; checkFunctionArgTags (text "TagCheck failed - Argument to local function:" <> ppr bndr) bndr args
                 ; void $ cgExpr body
                 }}}
 
