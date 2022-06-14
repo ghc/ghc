@@ -977,7 +977,7 @@ removeBindingShadowing bindings = reverse $ fst $ foldl
 
 
 -- | Get target platform
-getPlatform :: TcM Platform
+getPlatform :: TcRnIf a b Platform
 getPlatform = targetPlatform <$> getDynFlags
 
 ---------------------------
