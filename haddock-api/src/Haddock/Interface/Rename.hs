@@ -308,7 +308,7 @@ renameType t = case t of
     doc' <- renameLDocHsSyn doc
     return (HsDocTy noAnn ty' doc')
 
-  HsTyLit _ x -> return (HsTyLit noAnn x)
+  HsTyLit _ x -> return (HsTyLit noAnn (renameTyLit x))
 
   HsRecTy _ a               -> HsRecTy noAnn <$> mapM renameConDeclFieldField a
   XHsType a                 -> pure (XHsType a)
@@ -317,6 +317,12 @@ renameType t = case t of
   HsSpliceTy (HsUntypedSpliceTop _ st)  _ -> renameType st
   HsSpliceTy (HsUntypedSpliceNested _) _ -> error "renameType: not an top level type splice"
   HsWildCardTy _          -> pure (HsWildCardTy noAnn)
+
+renameTyLit :: HsTyLit GhcRn -> HsTyLit DocNameI
+renameTyLit t = case t of
+  HsNumTy  _ v -> HsNumTy noExtField v
+  HsStrTy  _ v -> HsStrTy noExtField v
+  HsCharTy _ v -> HsCharTy noExtField v
 
 
 renameSigType :: HsSigType GhcRn -> RnM (HsSigType DocNameI)
@@ -576,9 +582,9 @@ renameSig sig = case sig of
   FixSig _ (FixitySig _ lnames fixity) -> do
     lnames' <- mapM renameL lnames
     return $ FixSig noExtField (FixitySig noExtField lnames' fixity)
-  MinimalSig _ src (L l s) -> do
+  MinimalSig _ (L l s) -> do
     s' <- traverse (traverse lookupRnNoWarn) s
-    return $ MinimalSig noExtField src (L l s')
+    return $ MinimalSig noExtField (L l s')
   -- we have filtered out all other kinds of signatures in Interface.Create
   _ -> error "expected TypeSig"
 
@@ -587,11 +593,17 @@ renameForD :: ForeignDecl GhcRn -> RnM (ForeignDecl DocNameI)
 renameForD (ForeignImport _ lname ltype x) = do
   lname' <- renameL lname
   ltype' <- renameLSigType ltype
-  return (ForeignImport noExtField lname' ltype' x)
+  return (ForeignImport noExtField lname' ltype' (renameForI x))
 renameForD (ForeignExport _ lname ltype x) = do
   lname' <- renameL lname
   ltype' <- renameLSigType ltype
-  return (ForeignExport noExtField lname' ltype' x)
+  return (ForeignExport noExtField lname' ltype' (renameForE x))
+
+renameForI :: ForeignImport GhcRn -> ForeignImport DocNameI
+renameForI (CImport _ cconv safety mHeader spec) = CImport noExtField cconv safety mHeader spec
+
+renameForE :: ForeignExport GhcRn -> ForeignExport DocNameI
+renameForE (CExport _ spec) = CExport noExtField spec
 
 
 renameInstD :: InstDecl GhcRn -> RnM (InstDecl DocNameI)

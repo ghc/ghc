@@ -44,9 +44,7 @@ import Control.Monad.Writer.Strict (Writer, WriterT, MonadWriter(..), lift, runW
 import Data.Typeable (Typeable)
 import Data.Map (Map)
 import Data.Data (Data)
-import Data.Void (Void)
 import Documentation.Haddock.Types
-import GHC.Types.Basic (PromotionFlag(..))
 import GHC.Types.Fixity (Fixity(..))
 import GHC.Types.Var (Specificity)
 
@@ -761,6 +759,11 @@ type instance XTyLit           DocNameI = EpAnn [AddEpAnn]
 type instance XWildCardTy      DocNameI = EpAnn [AddEpAnn]
 type instance XXType           DocNameI = HsCoreTy
 
+type instance XNumTy           DocNameI = NoExtField
+type instance XStrTy           DocNameI = NoExtField
+type instance XCharTy          DocNameI = NoExtField
+type instance XXTyLit          DocNameI = DataConCantHappen
+
 type instance XHsForAllVis        DocNameI = NoExtField
 type instance XHsForAllInvis      DocNameI = NoExtField
 type instance XXHsForAllTelescope DocNameI = DataConCantHappen
@@ -781,6 +784,13 @@ type instance XMinimalSig  DocNameI = NoExtField
 
 type instance XForeignExport  DocNameI = NoExtField
 type instance XForeignImport  DocNameI = NoExtField
+
+type instance XCImport  DocNameI = NoExtField
+type instance XCExport  DocNameI = NoExtField
+
+type instance XXForeignImport DocNameI = DataConCantHappen
+type instance XXForeignExport DocNameI = DataConCantHappen
+
 type instance XConDeclGADT    DocNameI = NoExtField
 type instance XConDeclH98     DocNameI = NoExtField
 type instance XXConDecl       DocNameI = DataConCantHappen

@@ -24,7 +24,6 @@ import Haddock.GhcUtils
 import GHC.Utils.Ppr hiding (Doc, quote)
 import qualified GHC.Utils.Ppr as Pretty
 
-import GHC.Types.Basic        ( PromotionFlag(..), isPromoted )
 import GHC hiding (fromMaybeContext )
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name        ( nameOccName )
@@ -1155,7 +1154,7 @@ ppr_mono_ty (HsTyLit _ t) u = ppr_tylit t u
 ppr_mono_ty (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
 
 
-ppr_tylit :: HsTyLit -> Bool -> LaTeX
+ppr_tylit :: HsTyLit DocNameI -> Bool -> LaTeX
 ppr_tylit (HsNumTy _ n) _ = integer n
 ppr_tylit (HsStrTy _ s) _ = text (show s)
 ppr_tylit (HsCharTy _ c) _ = text (show c)

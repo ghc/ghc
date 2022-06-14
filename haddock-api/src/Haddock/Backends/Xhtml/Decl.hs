@@ -35,7 +35,6 @@ import           Data.Maybe
 import           Text.XHtml hiding     ( name, title, p, quote )
 
 import GHC.Core.Type ( Specificity(..) )
-import GHC.Types.Basic (PromotionFlag(..), isPromoted)
 import GHC hiding (LexicalFixity(..), fromMaybeContext)
 import GHC.Exts
 import GHC.Types.Name
@@ -609,7 +608,7 @@ ppClassDecl summary links instances fixities loc d subdocs
       ]
 
     -- Minimal complete definition
-    minimalBit = case [ s | MinimalSig _ _ (L _ s) <- sigs ] of
+    minimalBit = case [ s | MinimalSig _ (L _ s) <- sigs ] of
       -- Miminal complete definition = every shown method
       And xs : _ | sort [getName n | L _ (Var (L _ n)) <- xs] ==
                    sort [getName n | ClassOpSig _ _ ns _ <- sigs, L _ n <- ns]
@@ -1300,7 +1299,7 @@ ppr_mono_ty (HsDocTy _ ty _) unicode qual emptyCtxts
 ppr_mono_ty (HsWildCardTy _) _ _ _ = char '_'
 ppr_mono_ty (HsTyLit _ n) _ _ _ = ppr_tylit n
 
-ppr_tylit :: HsTyLit -> Html
+ppr_tylit :: HsTyLit DocNameI -> Html
 ppr_tylit (HsNumTy _ n) = toHtml (show n)
 ppr_tylit (HsStrTy _ s) = toHtml (show s)
 ppr_tylit (HsCharTy _ c) = toHtml (show c)

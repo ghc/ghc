@@ -64,7 +64,6 @@ import GHC.Tc.Types hiding (IfM)
 import GHC.Tc.Utils.Monad (finalSafeMode)
 import GHC.Types.Avail hiding (avail)
 import qualified GHC.Types.Avail as Avail
-import GHC.Types.Basic (PromotionFlag (..))
 import GHC.Types.Name (getOccString, getSrcSpan, isDataConName, isValName, nameIsLocalOrFrom, nameOccName, emptyOccEnv)
 import GHC.Types.Name.Env (lookupNameEnv)
 import GHC.Types.Name.Reader (GlobalRdrEnv, greMangledName, lookupGlobalRdrEnv)
@@ -755,7 +754,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
 
                   L loc (TyClD _ ClassDecl {..}) -> do
                     mdef <- minimalDef t
-                    let sig = maybeToList $ fmap (noLocA . MinimalSig noAnn NoSourceText . noLocA . fmap noLocA) mdef
+                    let sig = maybeToList $ fmap (noLocA . MinimalSig (noAnn, NoSourceText) . noLocA . fmap noLocA) mdef
                     availExportDecl avail
                       (L loc $ TyClD noExtField ClassDecl { tcdSigs = sig ++ tcdSigs, .. }) docs_
 

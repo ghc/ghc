@@ -20,7 +20,7 @@ module Haddock.Convert (
 ) where
 
 import GHC.Data.Bag ( emptyBag )
-import GHC.Types.Basic ( TupleSort(..), PromotionFlag(..), DefMethSpec(..), TopLevelFlag(..) )
+import GHC.Types.Basic ( TupleSort(..), DefMethSpec(..), TopLevelFlag(..) )
 import GHC.Types.SourceText (SourceText(..))
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Core.Class
@@ -131,7 +131,7 @@ tyThingToLHsDecl prr t = case t of
          , tcdFDs = map (\ (l,r) -> noLocA
                         (FunDep noAnn (map (noLocA . getName) l) (map (noLocA . getName) r)) ) $
                          snd $ classTvsFds cl
-         , tcdSigs = noLocA (MinimalSig noAnn NoSourceText . noLocA . fmap noLocA $ classMinimalDef cl) :
+         , tcdSigs = noLocA (MinimalSig (noAnn, NoSourceText) . noLocA . fmap noLocA $ classMinimalDef cl) :
                       [ noLocA tcdSig
                       | clsOp <- classOpItems cl
                       , tcdSig <- synifyTcIdSig vs clsOp ]
@@ -823,7 +823,7 @@ synifyPatSynType ps =
        (\vs -> implicitForAll ts vs [] prov_theta (synifyType WithinType))
        (mkVisFunTys arg_tys res_ty)
 
-synifyTyLit :: TyLit -> HsTyLit
+synifyTyLit :: TyLit -> HsTyLit GhcRn
 synifyTyLit (NumTyLit n) = HsNumTy NoSourceText n
 synifyTyLit (StrTyLit s) = HsStrTy NoSourceText s
 synifyTyLit (CharTyLit c) = HsCharTy NoSourceText c

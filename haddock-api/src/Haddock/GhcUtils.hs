@@ -37,7 +37,6 @@ import GHC.Types.Name
 import GHC.Unit.Module
 import GHC
 import GHC.Driver.Session
-import GHC.Types.Basic
 import GHC.Types.SrcLoc  ( advanceSrcLoc )
 import GHC.Types.Var     ( Specificity, VarBndr(..), TyVarBinder
                          , tyVarKind, updateTyVarKind, isInvisibleArgFlag )
@@ -76,7 +75,7 @@ filterSigNames p (FixSig _ (FixitySig _ ns ty)) =
   case filter (p . unLoc) ns of
     []       -> Nothing
     filtered -> Just (FixSig noAnn (FixitySig noExtField filtered ty))
-filterSigNames _ orig@(MinimalSig _ _ _)      = Just orig
+filterSigNames _ orig@(MinimalSig _ _)      = Just orig
 filterSigNames p (TypeSig _ ns ty) =
   case filter (p . unLoc) ns of
     []       -> Nothing
