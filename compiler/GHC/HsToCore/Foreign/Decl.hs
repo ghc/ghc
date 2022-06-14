@@ -128,10 +128,11 @@ dsFImport :: Id
           -> Coercion
           -> ForeignImport
           -> DsM ([Binding], CHeader, CStub)
-dsFImport id co (CImport cconv safety mHeader spec _) =
-  case unLoc cconv of
-    JavaScriptCallConv -> dsJsImport id co spec (unLoc cconv) (unLoc safety) mHeader
-    _                  -> dsCImport  id co spec (unLoc cconv) (unLoc safety) mHeader
+dsFImport id co (CImport cconv safety mHeader spec _) = do
+  platform <- getPlatform
+  case platformArch platform of
+    ArchJavaScript -> dsJsImport id co spec (unLoc cconv) (unLoc safety) mHeader
+    _              -> dsCImport  id co spec (unLoc cconv) (unLoc safety) mHeader
 
 {-
 ************************************************************************
@@ -166,9 +167,11 @@ dsFExport :: Id                 -- Either the exported Id,
                  , String       -- string describing type to pass to createAdj.
                  , Int          -- size of args to stub function
                  )
-dsFExport fn_id co ext_name cconv is_dyn = case cconv of
-  JavaScriptCallConv -> dsJsFExport fn_id co ext_name cconv is_dyn
-  _                  -> dsCFExport  fn_id co ext_name cconv is_dyn
+dsFExport fn_id co ext_name cconv is_dyn = do
+  platform <- getPlatform
+  case platformArch platform of
+    ArchJavaScript -> dsJsFExport fn_id co ext_name cconv is_dyn
+    _              -> dsCFExport  fn_id co ext_name cconv is_dyn
 
 {-
 @foreign import "wrapper"@ (previously "foreign export dynamic") lets
