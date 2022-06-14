@@ -43,17 +43,16 @@ import GHC.Data.FastString (mkFastString)
 
 import qualified Data.Map as M
 
--- | Check all arguments marked as already tagged for a function
--- are tagged by inserting runtime checks.
+-- | Check all arguments marked as cbv for the presence of a tag *at runtime*.
 checkFunctionArgTags :: SDoc -> Id -> [Id] -> FCode ()
 checkFunctionArgTags msg f args = whenCheckTags $ do
   onJust (return ()) (idCbvMarks_maybe f) $ \marks -> do
     -- Only check args marked as strict, and only lifted ones.
-    let cbv_args = filter (isLiftedRuntimeRep . idType) $ filterByList (map isMarkedCbv marks) args
+    let cbv_args = filter (isBoxedType . idType) $ filterByList (map isMarkedCbv marks) args
     -- Get their (cmm) address
     arg_infos <- mapM getCgIdInfo cbv_args
     let arg_cmms = map idInfoToAmode arg_infos
-    mapM_ (emitTagAssertion (showPprUnsafe msg))  (arg_cmms)
+    mapM_ (\(cmm,arg) -> emitTagAssertion (showPprUnsafe $ msg <+> ppr arg) cmm)  (zip arg_cmms cbv_args)
 
 -- | Check all required-tagged arguments of a constructor are tagged *at compile time*.
 checkConArgsStatic :: SDoc -> DataCon -> [StgArg] -> FCode ()
@@ -133,7 +132,7 @@ needsArgTag closure fail lpass = do
 emitArgTagCheck :: SDoc -> [CbvMark] -> [Id] -> FCode ()
 emitArgTagCheck info marks args = whenCheckTags $ do
   mod <- getModuleName
-  let cbv_args = filter (isLiftedRuntimeRep . idType) $ filterByList (map isMarkedCbv marks) args
+  let cbv_args = filter (isBoxedType . idType) $ filterByList (map isMarkedCbv marks) args
   arg_infos <- mapM getCgIdInfo cbv_args
   let arg_cmms = map idInfoToAmode arg_infos
       mk_msg arg = showPprUnsafe (text "Untagged arg:" <> (ppr mod) <> char ':' <> info <+> ppr arg)
