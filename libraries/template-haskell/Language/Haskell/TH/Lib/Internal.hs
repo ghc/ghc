@@ -20,12 +20,12 @@ module Language.Haskell.TH.Lib.Internal where
 
 import Language.Haskell.TH.Syntax hiding (Role, InjectivityAnn)
 import qualified Language.Haskell.TH.Syntax as TH
-import Control.Applicative(liftA, liftA2)
+import Control.Applicative(liftA, Applicative(..))
 import qualified Data.Kind as Kind (Type)
 import Data.Word( Word8 )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import GHC.Exts (TYPE)
-import Prelude
+import Prelude hiding (Applicative(..))
 
 ----------------------------------------------------------
 -- * Type synonyms

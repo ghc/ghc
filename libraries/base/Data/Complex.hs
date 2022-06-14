@@ -35,6 +35,7 @@ module Data.Complex
 
         )  where
 
+import Prelude hiding (Applicative(..))
 import GHC.Base (Applicative (..))
 import GHC.Generics (Generic, Generic1)
 import GHC.Float (Floating(..))

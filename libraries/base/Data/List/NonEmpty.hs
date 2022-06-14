@@ -102,7 +102,7 @@ import           Prelude             hiding (break, cycle, drop, dropWhile,
                                       last, length, map, repeat, reverse,
                                       scanl, scanl1, scanr, scanr1, span,
                                       splitAt, tail, take, takeWhile,
-                                      unzip, zip, zipWith, (!!))
+                                      unzip, zip, zipWith, (!!), Applicative(..))
 import qualified Prelude
 
 import           Control.Applicative (Applicative (..), Alternative (many))

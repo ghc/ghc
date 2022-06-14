@@ -39,7 +39,7 @@ import GHC.IO.Unsafe    ( unsafeDupableInterleaveIO )
 import Control.Monad (liftM)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Fix (MonadFix (..))
-import Control.Applicative (liftA2)
+import Control.Applicative (Applicative(..))
 import Control.Exception (BlockedIndefinitelyOnMVar (..), catch, throwIO)
 import Control.Exception.Base (FixIOException (..))
 import Control.Concurrent.MVar (newEmptyMVar, readMVar, putMVar)
@@ -60,7 +60,7 @@ import GHC.Lexeme       ( startsVarSym, startsVarId )
 import GHC.ForeignSrcLang.Type
 import Language.Haskell.TH.LanguageExtensions
 import Numeric.Natural
-import Prelude
+import Prelude hiding (Applicative(..))
 import Foreign.ForeignPtr
 import Foreign.C.String
 import Foreign.C.Types

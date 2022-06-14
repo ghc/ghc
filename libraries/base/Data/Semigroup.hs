@@ -98,7 +98,7 @@ module Data.Semigroup (
   , ArgMax
   ) where
 
-import           Prelude             hiding (foldr1)
+import           Prelude             hiding (foldr1, Applicative(..))
 
 import GHC.Base (Semigroup(..))
 

@@ -178,10 +178,10 @@ import Language.Haskell.TH.Lib.Internal hiding
 import qualified Language.Haskell.TH.Lib.Internal as Internal
 import Language.Haskell.TH.Syntax
 
-import Control.Applicative ( liftA2 )
+import Control.Applicative (Applicative(..))
 import Foreign.ForeignPtr
 import Data.Word
-import Prelude
+import Prelude hiding (Applicative(..))
 
 -- All definitions below represent the "old" API, since their definitions are
 -- different in Language.Haskell.TH.Lib.Internal. Please think carefully before
