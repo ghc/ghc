@@ -1,7 +1,7 @@
 {- | The public face of Template Haskell
 
 For other documentation, refer to:
-<http://www.haskell.org/haskellwiki/Template_Haskell>
+<https://wiki.haskell.org/Template_Haskell>
 
 -}
 {-# LANGUAGE Safe #-}

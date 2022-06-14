@@ -26,6 +26,9 @@ module Language.Haskell.TH.Syntax
       -- * Language extensions
     , module Language.Haskell.TH.LanguageExtensions
     , ForeignSrcLang(..)
+    -- * Notes
+    -- ** Unresolved Infix
+    -- $infix
     ) where
 
 import Data.Data hiding (Fixity(..))
@@ -2083,6 +2086,7 @@ Note [Unresolved infix]
 ~~~~~~~~~~~~~~~~~~~~~~~
 -}
 {- $infix #infix#
+
 When implementing antiquotation for quasiquoters, one often wants
 to parse strings into expressions:
 
