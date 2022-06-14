@@ -202,18 +202,13 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
           -- Sylvain (2022-06): find RTS js files (shims) via an environment variable...
           -- Remove when all files are located via Cabal's js-sources
           let is_js_file f = "js" `isExtensionOf` f || "pp" `isExtensionOf` f
-          static_rts_dir <- lookupEnv "JS_RTS_PATH" >>= \case
+          static_rts_files <- lookupEnv "JS_RTS_PATH" >>= \case
             Nothing  -> error "JS_RTS_PATH env var not set: can't link the RTS!"
-            Just dir -> pure dir
-          static_rts_files <- (fmap (static_rts_dir </>) . filter is_js_file) <$> listDirectory static_rts_dir
+            Just dir -> (fmap (dir </>) . filter is_js_file) <$> listDirectory dir
 
           let all_rts_js     = linkLibRTS link_res ++ static_rts_files
-              -- FIXME (Jeff, 2022-06): dflags_with_js is a dirty workaround to
-              -- include all js.pp and .h files in the ghc/js directory. Once we
-              -- have real js-sources in Cabal remove this line:
-              dflags_with_js = dflags {includePaths = addGlobalInclude (includePaths dflags) [static_rts_dir] }
 
-          withRts <- mapM (tryReadShimFile logger tmpfs dflags_with_js unit_env) all_rts_js
+          withRts <- mapM (tryReadShimFile logger tmpfs dflags unit_env) all_rts_js
           BL.writeFile (out </> "rts.js") (BLC.pack (T.unpack rtsDeclsText)
                                            <> BL.fromChunks withRts
                                            <> BLC.pack (T.unpack $ rtsText cfg))
