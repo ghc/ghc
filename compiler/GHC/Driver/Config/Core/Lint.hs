@@ -3,7 +3,6 @@ module GHC.Driver.Config.Core.Lint
   ( endPass
   , lintPassResult
   , lintCoreBindings
-  , lintInteractiveExpr
   , initEndPassConfig
   , initLintAnnotationsConfig
   , initLintPassResultConfig
@@ -19,16 +18,11 @@ import GHC.Driver.Session
 import GHC.Driver.Config.Diagnostic
 
 import GHC.Core
-import GHC.Core.Ppr
+import GHC.Core.Lint
+import GHC.Core.Lint.Interactive
 import GHC.Core.Opt.Pipeline.Types
 import GHC.Core.Opt.Utils ( SimplMode(..) )
 import GHC.Core.Coercion
-
-import GHC.Core.Lint
-
-import GHC.Runtime.Context
-
-import GHC.Data.Bag
 
 import GHC.Types.Basic ( CompilerPhase(..) )
 import GHC.Types.SrcLoc ( SrcSpan )
@@ -46,7 +40,7 @@ endPass hsc_env print_unqual pass binds rules
   = do { let dflags  = hsc_dflags hsc_env
        ; endPassIO
            (hsc_logger hsc_env)
-           (initEndPassConfig (hsc_IC hsc_env) dflags print_unqual pass)
+           (initEndPassConfig dflags (interactiveInScope $ hsc_IC hsc_env) print_unqual pass)
            binds rules
        }
 
@@ -57,7 +51,7 @@ lintPassResult hsc_env pass binds
   | otherwise
   = lintPassResult'
     (hsc_logger hsc_env)
-    (initLintPassResultConfig (hsc_IC hsc_env) dflags pass)
+    (initLintPassResultConfig dflags (interactiveInScope $ hsc_IC hsc_env) pass)
     binds
   where
     dflags = hsc_dflags hsc_env
@@ -72,24 +66,11 @@ lintCoreBindings dflags coreToDo vars -- binds
       , l_vars     = vars
       }
 
-lintInteractiveExpr :: SDoc -- ^ The source of the linted expression
-                    -> HscEnv -> CoreExpr -> IO ()
-lintInteractiveExpr what hsc_env expr
-  | not (gopt Opt_DoCoreLinting dflags)
-  = return ()
-  | Just err <- lintExpr (initLintConfig dflags $ interactiveInScope $ hsc_IC hsc_env) expr
-  = displayLintResults logger False what (pprCoreExpr expr) (emptyBag, err)
-  | otherwise
-  = return ()
-  where
-    dflags = hsc_dflags hsc_env
-    logger = hsc_logger hsc_env
-
-initEndPassConfig :: InteractiveContext -> DynFlags -> PrintUnqualified -> CoreToDo -> EndPassConfig
-initEndPassConfig ic dflags print_unqual pass = EndPassConfig
+initEndPassConfig :: DynFlags -> [Var] -> PrintUnqualified -> CoreToDo -> EndPassConfig
+initEndPassConfig dflags extra_vars print_unqual pass = EndPassConfig
   { ep_dumpCoreSizes = not (gopt Opt_SuppressCoreSizes dflags)
   , ep_lintPassResult = if gopt Opt_DoCoreLinting dflags
-      then Just $ initLintPassResultConfig ic dflags pass
+      then Just $ initLintPassResultConfig dflags extra_vars pass
       else Nothing
   , ep_printUnqual = print_unqual
   , ep_dumpFlag = coreDumpFlag pass
@@ -133,14 +114,14 @@ coreDumpFlag (CoreDoRuleCheck {})     = Nothing
 coreDumpFlag CoreDoNothing            = Nothing
 coreDumpFlag (CoreDoPasses {})        = Nothing
 
-initLintPassResultConfig :: InteractiveContext -> DynFlags -> CoreToDo -> LintPassResultConfig
-initLintPassResultConfig ic dflags pass = LintPassResultConfig
+initLintPassResultConfig :: DynFlags -> [Var] -> CoreToDo -> LintPassResultConfig
+initLintPassResultConfig dflags extra_vars pass = LintPassResultConfig
   { lpr_diagOpts      = initDiagOpts dflags
   , lpr_platform      = targetPlatform dflags
   , lpr_makeLintFlags = perPassFlags dflags pass
   , lpr_showLintWarnings = showLintWarnings pass
   , lpr_passPpr = ppr pass
-  , lpr_localsInScope = interactiveInScope ic
+  , lpr_localsInScope = extra_vars
   }
 
 showLintWarnings :: CoreToDo -> Bool

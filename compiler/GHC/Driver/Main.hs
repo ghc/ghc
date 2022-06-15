@@ -112,7 +112,8 @@ import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
-import GHC.Driver.Config.Core.Lint ( endPass, lintInteractiveExpr )
+import GHC.Driver.Config.Core.Lint ( endPass )
+import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
 import GHC.Driver.Config.CoreToStg.Prep
 import GHC.Driver.Config.Logger   (initLogFlags)
 import GHC.Driver.Config.Parser   (initParserOpts)
@@ -155,6 +156,7 @@ import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result)
 import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
 import GHC.Core
+import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Multiplicity
@@ -1695,7 +1697,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
           corePrepPgm
             (hsc_logger hsc_env)
             cp_cfg
-            (initCorePrepPgmConfig (hsc_IC hsc_env) (hsc_dflags hsc_env))
+            (initCorePrepPgmConfig (hsc_dflags hsc_env) (interactiveInScope $ hsc_IC hsc_env))
             this_mod location core_binds data_tycons
 
         -----------------  Convert to STG ------------------
@@ -1778,7 +1780,7 @@ hscInteractive hsc_env cgguts location = do
       corePrepPgm
         (hsc_logger hsc_env)
         cp_cfg
-        (initCorePrepPgmConfig (hsc_IC hsc_env) (hsc_dflags hsc_env))
+        (initCorePrepPgmConfig (hsc_dflags hsc_env) (interactiveInScope $ hsc_IC hsc_env))
         this_mod location core_binds data_tycons
 
     (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
@@ -1971,7 +1973,7 @@ myCoreToStg logger dflags ictxt for_bytecode this_mod ml prepd_binds = do
 
     stg_binds_with_fvs
         <- {-# SCC "Stg2Stg" #-}
-           stg2stg logger ictxt (initStgPipelineOpts dflags for_bytecode)
+           stg2stg logger (interactiveInScope ictxt) (initStgPipelineOpts dflags for_bytecode)
                    this_mod stg_binds
 
     putDumpFileMaybe logger Opt_D_dump_stg_cg "CodeGenInput STG:" FormatSTG
@@ -2125,7 +2127,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
       corePrepPgm
         (hsc_logger hsc_env)
         cp_cfg
-        (initCorePrepPgmConfig (hsc_IC hsc_env) (hsc_dflags hsc_env))
+        (initCorePrepPgmConfig (hsc_dflags hsc_env) (interactiveInScope $ hsc_IC hsc_env))
         this_mod iNTERACTIVELoc core_binds data_tycons
 
     (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)

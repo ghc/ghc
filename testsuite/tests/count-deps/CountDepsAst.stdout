@@ -31,6 +31,7 @@ GHC.Core.FVs
 GHC.Core.FamInstEnv
 GHC.Core.InstEnv
 GHC.Core.Lint
+GHC.Core.Lint.Interactive
 GHC.Core.Make
 GHC.Core.Map.Expr
 GHC.Core.Map.Type

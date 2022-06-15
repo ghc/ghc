@@ -9,8 +9,8 @@ import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Config.Core.Lint
-import GHC.Runtime.Context ( InteractiveContext )
 import GHC.Tc.Utils.Env
+import GHC.Types.Var
 import GHC.Utils.Outputable ( alwaysQualify )
 
 import GHC.CoreToStg.Prep
@@ -27,8 +27,8 @@ initCorePrepConfig hsc_env = do
       , cp_convertNumLit = convertNumLit
       }
 
-initCorePrepPgmConfig :: InteractiveContext -> DynFlags -> CorePrepPgmConfig
-initCorePrepPgmConfig ic dflags = CorePrepPgmConfig
-  { cpPgm_endPassConfig     = initEndPassConfig ic dflags alwaysQualify CorePrep
+initCorePrepPgmConfig :: DynFlags -> [Var] -> CorePrepPgmConfig
+initCorePrepPgmConfig dflags extra_vars = CorePrepPgmConfig
+  { cpPgm_endPassConfig     = initEndPassConfig dflags extra_vars alwaysQualify CorePrep
   , cpPgm_generateDebugInfo = needSourceNotes dflags
   }
