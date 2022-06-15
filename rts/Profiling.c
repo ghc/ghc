@@ -565,7 +565,7 @@ pushCostCentre (CostCentreStack *ccs, CostCentre *cc)
                     // someone modified ccs->indexTable while
                     // we did not hold the lock, so we must
                     // check it again:
-                    temp_ccs = isInIndexTable(ixtable,cc);
+                    temp_ccs = isInIndexTable(ccs->indexTable, cc);
                     if (temp_ccs != EMPTY_STACK)
                     {
                         RELEASE_LOCK(&ccs_mutex);
