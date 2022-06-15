@@ -44,6 +44,13 @@ genPrim _ _ CharLtOp          [r] [x,y] = PrimInline $ r |= if10 (x .<. y)
 genPrim _ _ CharLeOp          [r] [x,y] = PrimInline $ r |= if10 (x .<=. y)
 genPrim _ _ OrdOp             [r] [x]   = PrimInline $ r |= x
 
+genPrim _ _ Int8ToWord8Op     [r] [x]   = PrimInline $ r |= x
+genPrim _ _ Word8ToInt8Op     [r] [x]   = PrimInline $ r |= x
+genPrim _ _ Int16ToWord16Op   [r] [x]   = PrimInline $ r |= x
+genPrim _ _ Word16ToInt16Op   [r] [x]   = PrimInline $ r |= x
+genPrim _ _ Int32ToWord32Op   [r] [x]   = PrimInline $ r |= x
+genPrim _ _ Word32ToInt32Op   [r] [x]   = PrimInline $ r |= x
+
 genPrim _ _ IntAddOp          [r] [x,y] = PrimInline $ r |= trunc (Add x y)
 genPrim _ _ IntSubOp          [r] [x,y] = PrimInline $ r |= trunc (Sub x y)
 genPrim _ _ IntMulOp          [r] [x,y] = PrimInline $ r |= app "h$mulInt32" [x, y]
