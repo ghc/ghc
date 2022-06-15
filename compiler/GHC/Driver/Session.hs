@@ -3501,7 +3501,8 @@ fFlagsDeps = [
       (\turn_on -> updM (\dflags -> do
         unless (platformOS (targetPlatform dflags) == OSDarwin && turn_on)
                (addWarn "-compact-unwind is only implemented by the darwin platform. Ignoring.")
-        return dflags))
+        return dflags)),
+  flagSpec "suppress-error-contexts"          Opt_SuppressErrorContext
 
   ]
   ++ fHoleFlags

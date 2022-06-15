@@ -166,6 +166,8 @@ data ErrInfo = ErrInfo {
 data TcRnMessageDetailed
   = TcRnMessageDetailed !ErrInfo
                         -- ^ Extra info associated with the message
+                        !Bool
+                        -- ^ Suppress extra context information
                         !TcRnMessage
 
 -- | An error which might arise during typechecking/renaming.

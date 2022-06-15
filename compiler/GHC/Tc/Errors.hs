@@ -1171,9 +1171,12 @@ mkErrorReport tcl_env msg mb_ctxt supplementary
              ErrInfo
                (fromMaybe empty mb_context)
                (vcat $ map (pprSolverReportSupplementary hfdc) supplementary)
+       ; detailed_msg <- mkDetailedMessage err_info msg
        ; mkTcRnMessage
            (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
-           (TcRnMessageWithInfo unit_state $ TcRnMessageDetailed err_info msg) }
+           (TcRnMessageWithInfo unit_state $ detailed_msg) }
+
+
 
 -- | Pretty-print supplementary information, to add to an error report.
 pprSolverReportSupplementary :: HoleFitDispConfig -> SolverReportSupplementary -> SDoc

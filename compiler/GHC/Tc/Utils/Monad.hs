@@ -70,7 +70,7 @@ module GHC.Tc.Utils.Monad(
   addErrAt, addErrs,
   checkErr,
   addMessages,
-  discardWarnings,
+  discardWarnings, mkDetailedMessage,
 
   -- * Usage environment
   tcCollectingUsage, tcScalingUsage, tcEmitBindingUsage,
@@ -1068,7 +1068,12 @@ addErrAt :: SrcSpan -> TcRnMessage -> TcRn ()
 addErrAt loc msg = do { ctxt <- getErrCtxt
                       ; tidy_env <- tcInitTidyEnv
                       ; err_info <- mkErrInfo tidy_env ctxt
-                      ; add_long_err_at loc (TcRnMessageDetailed (ErrInfo err_info Outputable.empty) msg) }
+                      ; detailed_msg <- mkDetailedMessage (ErrInfo err_info Outputable.empty) msg
+                      ; add_long_err_at loc detailed_msg }
+
+mkDetailedMessage :: ErrInfo -> TcRnMessage -> TcM TcRnMessageDetailed
+mkDetailedMessage err_info msg =
+  TcRnMessageDetailed err_info <$> goptM Opt_SuppressErrorContext <*> pure msg
 
 addErrs :: [(SrcSpan,TcRnMessage)] -> TcRn ()
 addErrs msgs = mapM_ add msgs
@@ -1601,7 +1606,8 @@ addDiagnosticTcM (env0, msg)
  = do { ctxt <- getErrCtxt
       ; extra <- mkErrInfo env0 ctxt
       ; let err_info = ErrInfo extra Outputable.empty
-      ; add_diagnostic (TcRnMessageDetailed err_info msg) }
+      ; detailed_msg <- mkDetailedMessage err_info msg
+      ; add_diagnostic detailed_msg }
 
 -- | A variation of 'addDiagnostic' that takes a function to produce a 'TcRnDsMessage'
 -- given some additional context about the diagnostic.
@@ -1623,13 +1629,13 @@ addTcRnDiagnostic msg = do
 -- | Display a diagnostic for the current source location, taken from
 -- the 'TcRn' monad.
 addDiagnostic :: TcRnMessage -> TcRn ()
-addDiagnostic msg = add_diagnostic (TcRnMessageDetailed no_err_info msg)
+addDiagnostic msg = add_diagnostic =<< mkDetailedMessage no_err_info msg
 
 -- | Display a diagnostic for a given source location.
 addDiagnosticAt :: SrcSpan -> TcRnMessage -> TcRn ()
 addDiagnosticAt loc msg = do
   unit_state <- hsc_units <$> getTopEnv
-  let dia = TcRnMessageDetailed no_err_info msg
+  dia <-  mkDetailedMessage no_err_info msg
   mkTcRnMessage loc (TcRnMessageWithInfo unit_state dia) >>= reportDiagnostic
 
 -- | Display a diagnostic, with an optional flag, for the current source
@@ -1652,7 +1658,7 @@ add_err_tcm :: TidyEnv -> TcRnMessage -> SrcSpan
             -> TcM ()
 add_err_tcm tidy_env msg loc ctxt
  = do { err_info <- mkErrInfo tidy_env ctxt ;
-        add_long_err_at loc (TcRnMessageDetailed (ErrInfo err_info Outputable.empty) msg) }
+        add_long_err_at loc =<< (mkDetailedMessage (ErrInfo err_info Outputable.empty) msg) }
 
 mkErrInfo :: TidyEnv -> [ErrCtxt] -> TcM SDoc
 -- Tidy the error info, trimming excessive contexts

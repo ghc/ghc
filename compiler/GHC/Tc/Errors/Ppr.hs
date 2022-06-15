@@ -97,8 +97,8 @@ instance Diagnostic TcRnMessage where
       -> diagnosticMessage m
     TcRnMessageWithInfo unit_state msg_with_info
       -> case msg_with_info of
-           TcRnMessageDetailed err_info msg
-             -> messageWithInfoDiagnosticMessage unit_state err_info (diagnosticMessage msg)
+           TcRnMessageDetailed err_info suppress_ctx msg
+             -> messageWithInfoDiagnosticMessage unit_state err_info suppress_ctx (diagnosticMessage msg)
     TcRnSolverReport msgs _ _
       -> mkDecorated $
            map pprSolverReportWithCtxt msgs
@@ -962,7 +962,7 @@ instance Diagnostic TcRnMessage where
       -> diagnosticReason m
     TcRnMessageWithInfo _ msg_with_info
       -> case msg_with_info of
-           TcRnMessageDetailed _ m -> diagnosticReason m
+           TcRnMessageDetailed _ _ m -> diagnosticReason m
     TcRnSolverReport _ reason _
       -> reason -- Error, or a Warning if we are deferring type errors
     TcRnRedundantConstraints {}
@@ -1276,7 +1276,7 @@ instance Diagnostic TcRnMessage where
       -> diagnosticHints m
     TcRnMessageWithInfo _ msg_with_info
       -> case msg_with_info of
-           TcRnMessageDetailed _ m -> diagnosticHints m
+           TcRnMessageDetailed _ _ m -> diagnosticHints m
     TcRnSolverReport _ _ hints
       -> hints
     TcRnRedundantConstraints{}
@@ -1679,10 +1679,11 @@ deriveInstanceErrReasonHints cls newtype_deriving = \case
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
+                                 -> Bool
                                  -> DecoratedSDoc
                                  -> DecoratedSDoc
-messageWithInfoDiagnosticMessage unit_state ErrInfo{..} important =
-  let err_info' = map (pprWithUnitState unit_state) [errInfoContext, errInfoSupplementary]
+messageWithInfoDiagnosticMessage unit_state ErrInfo{..} suppress_ctxt important =
+  let err_info' = map (pprWithUnitState unit_state) ([errInfoContext | not suppress_ctxt] ++ [errInfoSupplementary])
       in (mapDecoratedSDoc (pprWithUnitState unit_state) important) `unionDecoratedSDoc`
          mkDecorated err_info'
 

@@ -375,6 +375,9 @@ data GeneralFlag
    | Opt_SuppressTimestamps -- ^ Suppress timestamps in dumps
    | Opt_SuppressCoreSizes  -- ^ Suppress per binding Core size stats in dumps
 
+   -- Error message suppression
+   | Opt_SuppressErrorContext
+
    -- temporary flags
    | Opt_AutoLinkPackages
    | Opt_ImplicitImportQualified
