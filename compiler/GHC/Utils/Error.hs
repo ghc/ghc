@@ -228,20 +228,20 @@ formatBulleted ctx (unDecorated -> docs)
     msgs    = filter (not . Outputable.isEmpty ctx) docs
     starred = (bullet<+>)
 
-pprMessages :: Diagnostic e => Messages e -> SDoc
-pprMessages = vcat . pprMsgEnvelopeBagWithLoc . getMessages
+pprMessages :: Diagnostic e => DiagnosticOpts e -> Messages e -> SDoc
+pprMessages e = vcat . pprMsgEnvelopeBagWithLoc e . getMessages
 
-pprMsgEnvelopeBagWithLoc :: Diagnostic e => Bag (MsgEnvelope e) -> [SDoc]
-pprMsgEnvelopeBagWithLoc bag = [ pprLocMsgEnvelope item | item <- sortMsgBag Nothing bag ]
+pprMsgEnvelopeBagWithLoc :: Diagnostic e => DiagnosticOpts e -> Bag (MsgEnvelope e) -> [SDoc]
+pprMsgEnvelopeBagWithLoc e bag = [ pprLocMsgEnvelope e item | item <- sortMsgBag Nothing bag ]
 
-pprLocMsgEnvelope :: Diagnostic e => MsgEnvelope e -> SDoc
-pprLocMsgEnvelope (MsgEnvelope { errMsgSpan      = s
+pprLocMsgEnvelope :: Diagnostic e => DiagnosticOpts e -> MsgEnvelope e -> SDoc
+pprLocMsgEnvelope opts (MsgEnvelope { errMsgSpan      = s
                                , errMsgDiagnostic = e
                                , errMsgSeverity  = sev
                                , errMsgContext   = unqual })
   = sdocWithContext $ \ctx ->
     withErrStyle unqual $
-      mkLocMessage (MCDiagnostic sev (diagnosticReason e)) s (formatBulleted ctx $ diagnosticMessage e)
+      mkLocMessage (MCDiagnostic sev (diagnosticReason e)) s (formatBulleted ctx $ diagnosticMessage opts e)
 
 sortMsgBag :: Maybe DiagOpts -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
 sortMsgBag mopts = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList

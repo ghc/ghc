@@ -175,7 +175,7 @@ data TcRnMessage where
   {-| Simply wraps a generic 'Diagnostic' message @a@. It can be used by plugins
       to provide custom diagnostic messages originated during typechecking/renaming.
   -}
-  TcRnUnknownMessage :: (Diagnostic a, Typeable a) => a -> TcRnMessage
+  TcRnUnknownMessage :: (DiagnosticOpts a ~ (), Diagnostic a, Typeable a) => a -> TcRnMessage
 
   {-| TcRnMessageWithInfo is a constructor which is used when extra information is needed
       to be provided in order to qualify a diagnostic and where it was originated (and why).

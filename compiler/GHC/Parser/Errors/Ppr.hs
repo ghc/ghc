@@ -3,6 +3,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic PsMessage
 
@@ -33,9 +34,11 @@ import Data.List.NonEmpty (NonEmpty((:|)))
 
 
 instance Diagnostic PsMessage where
-  diagnosticMessage = \case
+  type DiagnosticOpts PsMessage = ()
+  defaultDiagnosticOpts = ()
+  diagnosticMessage _ = \case
     PsUnknownMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage () m
 
     PsHeaderMessage m
       -> psHeaderMessageDiagnostic m
@@ -499,7 +502,7 @@ instance Diagnostic PsMessage where
             ]
     PsErrInvalidCApiImport {} -> mkSimpleDecorated $ vcat [ text "Wrapper stubs can't be used with CApiFFI."]
 
-  diagnosticReason  = \case
+  diagnosticReason = \case
     PsUnknownMessage m                            -> diagnosticReason m
     PsHeaderMessage  m                            -> psHeaderMessageReason m
     PsWarnBidirectionalFormatChars{}              -> WarningWithFlag Opt_WarnUnicodeBidirectionalFormatCharacters
@@ -616,7 +619,7 @@ instance Diagnostic PsMessage where
     PsErrIllegalGadtRecordMultiplicity{}          -> ErrorWithoutFlag
     PsErrInvalidCApiImport {}                     -> ErrorWithoutFlag
 
-  diagnosticHints  = \case
+  diagnosticHints = \case
     PsUnknownMessage m                            -> diagnosticHints m
     PsHeaderMessage  m                            -> psHeaderMessageHints m
     PsWarnBidirectionalFormatChars{}              -> noHints

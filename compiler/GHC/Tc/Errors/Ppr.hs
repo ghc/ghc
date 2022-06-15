@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic TcRnMessage
 
@@ -92,13 +93,15 @@ import GHC.Types.Name.Env
 
 
 instance Diagnostic TcRnMessage where
-  diagnosticMessage = \case
+  type DiagnosticOpts TcRnMessage = ()
+  defaultDiagnosticOpts = ()
+  diagnosticMessage m = \case
     TcRnUnknownMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage () m
     TcRnMessageWithInfo unit_state msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed err_info suppress_ctx msg
-             -> messageWithInfoDiagnosticMessage unit_state err_info suppress_ctx (diagnosticMessage msg)
+             -> messageWithInfoDiagnosticMessage unit_state err_info suppress_ctx (diagnosticMessage m msg)
     TcRnSolverReport msgs _ _
       -> mkDecorated $
            map pprSolverReportWithCtxt msgs

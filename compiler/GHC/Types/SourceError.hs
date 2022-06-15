@@ -59,7 +59,7 @@ instance Show SourceError where
   show (SourceError msgs) =
       renderWithContext defaultSDocContext
     . vcat
-    . pprMsgEnvelopeBagWithLoc
+    . pprMsgEnvelopeBagWithLoc undefined
     . getMessages
     $ msgs
 

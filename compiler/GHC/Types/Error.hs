@@ -4,6 +4,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeApplications #-}
 
 module GHC.Types.Error
    ( -- * Messages
@@ -235,13 +238,15 @@ constraint.
 -- message was generated in the first place. See also Note [Rendering
 -- Messages].
 class Diagnostic a where
-  diagnosticMessage :: a -> DecoratedSDoc
+  type DiagnosticOpts a
+  defaultDiagnosticOpts :: DiagnosticOpts a
+  diagnosticMessage :: DiagnosticOpts a -> a -> DecoratedSDoc
   diagnosticReason  :: a -> DiagnosticReason
   diagnosticHints   :: a -> [GhcHint]
 
-pprDiagnostic :: Diagnostic e => e -> SDoc
+pprDiagnostic :: forall e . Diagnostic e => e -> SDoc
 pprDiagnostic e = vcat [ ppr (diagnosticReason e)
-                       , nest 2 (vcat (unDecorated (diagnosticMessage e))) ]
+                       , nest 2 (vcat (unDecorated (diagnosticMessage (defaultDiagnosticOpts @e) e))) ]
 
 -- | A generic 'Hint' message, to be used with 'DiagnosticMessage'.
 data DiagnosticHint = DiagnosticHint !SDoc
@@ -261,7 +266,9 @@ data DiagnosticMessage = DiagnosticMessage
   }
 
 instance Diagnostic DiagnosticMessage where
-  diagnosticMessage = diagMessage
+  type DiagnosticOpts DiagnosticMessage = ()
+  defaultDiagnosticOpts = ()
+  diagnosticMessage _ = diagMessage
   diagnosticReason  = diagReason
   diagnosticHints   = diagHints
 
@@ -420,7 +427,7 @@ instance Show (MsgEnvelope DiagnosticMessage) where
 -- | Shows an 'MsgEnvelope'.
 showMsgEnvelope :: Diagnostic a => MsgEnvelope a -> String
 showMsgEnvelope err =
-  renderWithContext defaultSDocContext (vcat (unDecorated . diagnosticMessage $ errMsgDiagnostic err))
+  renderWithContext defaultSDocContext (vcat (unDecorated . (diagnosticMessage undefined) $ errMsgDiagnostic err))
 
 pprMessageBag :: Bag SDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))

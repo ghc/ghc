@@ -1224,7 +1224,7 @@ runMeta' show_code ppr_hs run_and_convert expr
         -- cases.
         ; logger <- getLogger
         ; diag_opts <- initDiagOpts <$> getDynFlags
-        ; liftIO $ printMessages logger diag_opts ds_msgs
+        ; liftIO $ printMessages logger () diag_opts ds_msgs
 
         ; ds_expr <- case mb_ds_expr of
             Nothing      -> failM   -- Case (a) from Note [Errors in desugaring a splice]

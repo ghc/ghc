@@ -1105,7 +1105,7 @@ mkErrorTerm ctxt ct_loc ty (SolverReport { sr_important_msgs = important, sr_sup
                   (TcRnSolverReport important ErrorWithoutFlag noHints) (Just ctxt) supp
          -- This will be reported at runtime, so we always want "error:" in the report, never "warning:"
        ; dflags <- getDynFlags
-       ; let err_msg = pprLocMsgEnvelope msg
+       ; let err_msg = pprLocMsgEnvelope undefined msg
              err_str = showSDoc dflags $
                        err_msg $$ text "(deferred type error)"
 

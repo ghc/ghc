@@ -1,4 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module GHC.HsToCore.Errors.Types where
 
@@ -27,7 +28,7 @@ type MaxPmCheckModels = Int
 -- | Diagnostics messages emitted during desugaring.
 data DsMessage
   -- | Simply wraps a generic 'Diagnostic' message.
-  = forall a. (Diagnostic a, Typeable a) => DsUnknownMessage a
+  = forall a. (DiagnosticOpts a ~ (), Diagnostic a, Typeable a) => DsUnknownMessage a
 
     {-| DsEmptyEnumeration is a warning (controlled by the -Wempty-enumerations flag) that is
         emitted if an enumeration is empty.

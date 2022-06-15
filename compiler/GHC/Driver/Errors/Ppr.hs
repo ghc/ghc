@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic {DriverMessage, GhcMessage}
 
 module GHC.Driver.Errors.Ppr where
@@ -34,17 +35,19 @@ suggestInstantiatedWith pi_mod_name insts =
 
 
 instance Diagnostic GhcMessage where
-  diagnosticMessage = \case
+  type DiagnosticOpts GhcMessage = ()
+  defaultDiagnosticOpts = ()
+  diagnosticMessage _ = \case
     GhcPsMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage () m
     GhcTcRnMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage () m
     GhcDsMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage () m
     GhcDriverMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage () m
     GhcUnknownMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage () m
 
   diagnosticReason = \case
     GhcPsMessage m
@@ -71,11 +74,13 @@ instance Diagnostic GhcMessage where
       -> diagnosticHints m
 
 instance Diagnostic DriverMessage where
-  diagnosticMessage = \case
+  type DiagnosticOpts DriverMessage = ()
+  defaultDiagnosticOpts = ()
+  diagnosticMessage _ = \case
     DriverUnknownMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage () m
     DriverPsHeaderMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage () m
     DriverMissingHomeModules missing buildingCabalPackage
       -> let msg | buildingCabalPackage == YesBuildingCabalPackage
                  = hang

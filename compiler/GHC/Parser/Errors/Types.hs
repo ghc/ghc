@@ -1,4 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module GHC.Parser.Errors.Types where
 
@@ -68,7 +69,7 @@ data PsMessage
         arbitrary messages to be embedded. The typical use case would be GHC plugins
         willing to emit custom diagnostics.
     -}
-   forall a. (Diagnostic a, Typeable a) => PsUnknownMessage a
+   forall a. (DiagnosticOpts a ~ (), Diagnostic a, Typeable a) => PsUnknownMessage a
 
     {-| A group of parser messages emitted in 'GHC.Parser.Header'.
         See Note [Messages from GHC.Parser.Header].

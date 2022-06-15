@@ -381,7 +381,7 @@ handleWarningsThrowErrors (warnings, errors) = do
     logDiagnostics (GhcPsMessage <$> warnings)
     logger <- getLogger
     let (wWarns, wErrs) = partitionMessages warnings
-    liftIO $ printMessages logger diag_opts wWarns
+    liftIO $ printMessages logger () diag_opts wWarns
     throwErrors $ fmap GhcPsMessage $ errors `unionMessages` wErrs
 
 -- | Deal with errors and warnings returned by a compilation step
@@ -1580,7 +1580,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
     whyUnsafe' df = vcat [ quotes pprMod <+> text "has been inferred as unsafe!"
                          , text "Reason:"
                          , nest 4 $ (vcat $ badFlags df) $+$
-                                    (vcat $ pprMsgEnvelopeBagWithLoc (getMessages whyUnsafe)) $+$
+                                    (vcat $ pprMsgEnvelopeBagWithLoc undefined (getMessages whyUnsafe)) $+$
                                     (vcat $ badInsts $ tcg_insts tcg_env)
                          ]
     badFlags df   = concatMap (badFlag df) unsafeFlagsForInfer

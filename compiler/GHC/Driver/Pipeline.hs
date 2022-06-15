@@ -161,7 +161,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
     to_driver_messages :: Messages GhcMessage -> Messages DriverMessage
     to_driver_messages msgs = case traverse to_driver_message msgs of
       Nothing    -> pprPanic "non-driver message in preprocess"
-                             (vcat $ pprMsgEnvelopeBagWithLoc (getMessages msgs))
+                             (vcat $ pprMsgEnvelopeBagWithLoc undefined (getMessages msgs))
       Just msgs' -> msgs'
 
     to_driver_message = \case

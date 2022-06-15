@@ -83,7 +83,7 @@ data GhcMessage where
   -- 'Diagnostic' constraint ensures that worst case scenario we can still
   -- render this into something which can be eventually converted into a
   -- 'DecoratedSDoc'.
-  GhcUnknownMessage :: forall a. (Diagnostic a, Typeable a) => a -> GhcMessage
+  GhcUnknownMessage :: forall a. (DiagnosticOpts a ~ (), Diagnostic a, Typeable a) => a -> GhcMessage
 
 -- | Creates a new 'GhcMessage' out of any diagnostic. This function is also
 -- provided to ease the integration of #18516 by allowing diagnostics to be
@@ -91,7 +91,7 @@ data GhcMessage where
 -- conversion can happen gradually. This function should not be needed within
 -- GHC, as it would typically be used by plugin or library authors (see
 -- comment for the 'GhcUnknownMessage' type constructor)
-ghcUnknownMessage :: (Diagnostic a, Typeable a) => a -> GhcMessage
+ghcUnknownMessage :: (DiagnosticOpts a ~ (), Diagnostic a, Typeable a) => a -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage
 
 -- | Abstracts away the frequent pattern where we are calling 'ioMsgMaybe' on
@@ -110,7 +110,7 @@ type DriverMessages = Messages DriverMessage
 -- | A message from the driver.
 data DriverMessage where
   -- | Simply wraps a generic 'Diagnostic' message @a@.
-  DriverUnknownMessage :: (Diagnostic a, Typeable a) => a -> DriverMessage
+  DriverUnknownMessage :: (DiagnosticOpts a ~ (), Diagnostic a, Typeable a) => a -> DriverMessage
   -- | A parse error in parsing a Haskell file header during dependency
   -- analysis
   DriverPsHeaderMessage :: !PsMessage -> DriverMessage

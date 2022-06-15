@@ -1,4 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic DsMessage
 
 module GHC.HsToCore.Errors.Ppr where
@@ -20,9 +22,11 @@ import GHC.HsToCore.Pmc.Ppr
 
 
 instance Diagnostic DsMessage where
-  diagnosticMessage = \case
+  type DiagnosticOpts DsMessage = ()
+  defaultDiagnosticOpts = ()
+  diagnosticMessage _ = \case
     DsUnknownMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage () m
     DsEmptyEnumeration
       -> mkSimpleDecorated $ text "Enumeration is empty"
     DsIdentitiesFound conv_fn type_of_conv
@@ -235,7 +239,7 @@ instance Diagnostic DsMessage where
     DsRuleMightInlineFirst{}                    -> WarningWithFlag Opt_WarnInlineRuleShadowing
     DsAnotherRuleMightFireFirst{}               -> WarningWithFlag Opt_WarnInlineRuleShadowing
 
-  diagnosticHints  = \case
+  diagnosticHints = \case
     DsUnknownMessage m          -> diagnosticHints m
     DsEmptyEnumeration          -> noHints
     DsIdentitiesFound{}         -> noHints

@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module GHC.Driver.Errors (
     printOrThrowDiagnostics
   , printMessages
@@ -16,8 +17,8 @@ import GHC.Utils.Outputable (hang, ppr, ($$), SDocContext,  text, withPprStyle, 
 import GHC.Utils.Logger
 import qualified GHC.Driver.CmdLine as CmdLine
 
-printMessages :: Diagnostic a => Logger -> DiagOpts -> Messages a -> IO ()
-printMessages logger opts msgs
+printMessages :: forall a . Diagnostic a => Logger -> DiagnosticOpts a -> DiagOpts -> Messages a -> IO ()
+printMessages logger msg_opts opts msgs
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = (diag_ppr_ctx opts) { sdocStyle = style }
                 in logMsg logger (MCDiagnostic sev . diagnosticReason $ dia) s $
@@ -30,7 +31,7 @@ printMessages logger opts msgs
   where
     messageWithHints :: Diagnostic a => SDocContext -> a -> SDoc
     messageWithHints ctx e =
-      let main_msg = formatBulleted ctx $ diagnosticMessage e
+      let main_msg = formatBulleted ctx $ diagnosticMessage msg_opts e
           in case diagnosticHints e of
                []  -> main_msg
                [h] -> main_msg $$ hang (text "Suggested fix:") 2 (ppr h)
@@ -56,7 +57,7 @@ printOrThrowDiagnostics logger opts msgs
   | errorsOrFatalWarningsFound msgs
   = throwErrors msgs
   | otherwise
-  = printMessages logger opts msgs
+  = printMessages logger () opts msgs
 
 -- | Convert a 'PsError' into a wrapped 'DriverMessage'; use it
 -- for dealing with parse errors when the driver is doing dependency analysis.
