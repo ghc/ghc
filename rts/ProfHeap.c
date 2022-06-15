@@ -436,7 +436,7 @@ initHeapProfiling(void)
 
   if (RtsFlags.ProfFlags.doHeapProfile) {
     /* Initialise the log file name */
-    hp_filename = stgMallocBytes(strlen(prog) + 6, "hpFileName");
+    hp_filename = stgMallocBytes(strlen(prog) + 4, "hpFileName");
     sprintf(hp_filename, "%s.hp", prog);
 
     /* open the log file */
