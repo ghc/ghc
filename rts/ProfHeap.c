@@ -668,10 +668,10 @@ closureSatisfiesConstraints( const StgClosure* p )
 #else
    bool b;
 
-   // The CCS has a selected field to indicate whether this closure is
+   // The CCS has a flags field to indicate whether this closure is
    // deselected by not being mentioned in the module, CC, or CCS
    // selectors.
-   if (!p->header.prof.ccs->selected) {
+   if (!ccsIsSelected(p->header.prof.ccs)) {
        return false;
    }
 

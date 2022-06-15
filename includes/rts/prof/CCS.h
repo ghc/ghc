@@ -54,9 +54,7 @@ typedef struct CostCentreStack_ {
     StgWord64  scc_count;       // Count of times this CCS is entered
                                 // align 8 (Note [struct alignment])
 
-    StgWord    selected;        // is this CCS shown in the heap
-                                // profile? (zero if excluded via -hc
-                                // -hm etc.)
+    StgWord    flags;           // Various boolean flags. See below.
 
     StgWord    time_ticks;      // number of time ticks accumulated by
                                 // this CCS
@@ -72,6 +70,22 @@ typedef struct CostCentreStack_ {
                                 // (calculated at the end)
 } CostCentreStack;
 
+// CCS flags and accessors
+#define CCS_SELECTED 1          // is this CCS shown in the heap
+                                // profile? (zero if excluded via -hc
+                                // -hm etc.)
+
+INLINE_HEADER bool ccsIsSelected(CostCentreStack const*ccs) {
+    return ccs->flags & CCS_SELECTED;
+}
+
+INLINE_HEADER void ccsSetSelected(CostCentreStack *ccs, bool selected) {
+    if (selected) {
+        ccs->flags |= CCS_SELECTED;
+    } else {
+        ccs->flags &= ~CCS_SELECTED;
+    }
+}
 
 /* -----------------------------------------------------------------------------
  * Start and stop the profiling timer.  These can be called from
@@ -202,7 +216,7 @@ extern CostCentre * RTS_VAR(CC_LIST);               // registered CC list
             .indexTable          = NULL,                 \
             .root                = NULL,                 \
             .depth               = 0,                    \
-            .selected            = 0,                    \
+            .flags               = 0,                    \
             .scc_count           = 0,                    \
             .time_ticks          = 0,                    \
             .mem_alloc           = 0,                    \

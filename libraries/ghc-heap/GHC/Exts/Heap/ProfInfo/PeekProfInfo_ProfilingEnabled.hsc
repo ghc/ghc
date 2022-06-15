@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MagicHash #-}
 
@@ -71,7 +72,11 @@ peekCostCentreStack loopBreakers costCenterCacheRef ptr = do
         ccs_root' <- peekCostCentreStack loopBreakers' costCenterCacheRef ccs_root_ptr
         ccs_depth' <- (#peek struct CostCentreStack_, depth) ptr
         ccs_scc_count' <- (#peek struct CostCentreStack_, scc_count) ptr
-        ccs_selected' <- (#peek struct CostCentreStack_, selected) ptr
+#if MIN_VERSION_rts(1,0,3)
+        ccs_flags'    <- (#peek struct CostCentreStack_, flags) ptr
+#else
+        ccs_selected'    <- (#peek struct CostCentreStack_, selected) ptr
+#endif
         ccs_time_ticks' <- (#peek struct CostCentreStack_, time_ticks) ptr
         ccs_mem_alloc' <- (#peek struct CostCentreStack_, mem_alloc) ptr
         ccs_inherited_alloc' <- (#peek struct CostCentreStack_, inherited_alloc) ptr
@@ -85,7 +90,11 @@ peekCostCentreStack loopBreakers costCenterCacheRef ptr = do
             ccs_root = ccs_root',
             ccs_depth = ccs_depth',
             ccs_scc_count = ccs_scc_count',
+#if MIN_VERSION_rts(1,0,3)
+            ccs_flags = ccs_flags',
+#else
             ccs_selected = ccs_selected',
+#endif
             ccs_time_ticks = ccs_time_ticks',
             ccs_mem_alloc = ccs_mem_alloc',
             ccs_inherited_alloc = ccs_inherited_alloc',

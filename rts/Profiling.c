@@ -120,7 +120,8 @@ static  CostCentreStack * actualPush      ( CostCentreStack *, CostCentre * );
 static  CostCentreStack * isInIndexTable  ( IndexTable *, CostCentre * );
 static  IndexTable *      addToIndexTable ( IndexTable *, CostCentreStack *,
                                             CostCentre *, bool );
-static  void              ccsSetSelected  ( CostCentreStack *ccs );
+static  void              ccsDecideSelected
+                                          ( CostCentreStack *ccs );
 static  void              aggregateCCCosts( CostCentreStack *ccs );
 static  void              registerCC      ( CostCentre *cc );
 static  void              registerCCS     ( CostCentreStack *ccs );
@@ -193,7 +194,7 @@ void initProfiling (void)
     CCS_LIST = CCS_LIST->prevStack;
     CCS_MAIN->prevStack = NULL;
     CCS_MAIN->root = CCS_MAIN;
-    ccsSetSelected(CCS_MAIN);
+    ccsDecideSelected(CCS_MAIN);
 
     refreshProfilingCCSs();
 
@@ -462,19 +463,19 @@ void enterFunCCS (StgRegTable *reg, CostCentreStack *ccsfn)
    -------------------------------------------------------------------------- */
 
 static void
-ccsSetSelected (CostCentreStack *ccs)
+ccsDecideSelected (CostCentreStack *ccs)
 {
     if (RtsFlags.ProfFlags.modSelector) {
         if (! strMatchesSelector (ccs->cc->module,
                                   RtsFlags.ProfFlags.modSelector) ) {
-            ccs->selected = 0;
+            ccsSetSelected(ccs, false);
             return;
         }
     }
     if (RtsFlags.ProfFlags.ccSelector) {
         if (! strMatchesSelector (ccs->cc->label,
                                   RtsFlags.ProfFlags.ccSelector) ) {
-            ccs->selected = 0;
+            ccsSetSelected(ccs, false);
             return;
         }
     }
@@ -488,12 +489,12 @@ ccsSetSelected (CostCentreStack *ccs)
             }
         }
         if (c == NULL) {
-            ccs->selected = 0;
+            ccsSetSelected(ccs, false);
             return;
         }
     }
 
-    ccs->selected = 1;
+    ccsSetSelected(ccs, true);
     return;
 }
 
@@ -649,7 +650,7 @@ actualPush_ (CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs)
     new_ccs->inherited_alloc = 0;
 
     // Set the selected field.
-    ccsSetSelected(new_ccs);
+    ccsSetSelected(new_ccs, true);
 
     /* update the memoization table for the parent stack */
     ccs->indexTable = addToIndexTable(ccs->indexTable, new_ccs, cc,

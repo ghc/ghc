@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module GHC.Exts.Heap.ProfInfo.Types where
@@ -24,7 +25,11 @@ data CostCentreStack = CostCentreStack {
     ccs_root :: Maybe CostCentreStack,
     ccs_depth :: Word,
     ccs_scc_count :: Word64,
+#if MIN_VERSION_rts(1,0,3)
+    ccs_flags :: Word,
+#else
     ccs_selected :: Word,
+#endif
     ccs_time_ticks :: Word,
     ccs_mem_alloc :: Word64,
     ccs_inherited_alloc :: Word64,
