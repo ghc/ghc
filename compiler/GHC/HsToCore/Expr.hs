@@ -45,7 +45,6 @@ import GHC.Tc.Utils.Monad
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.Multiplicity
-import GHC.Core.Coercion( instNewTyCon_maybe, mkSymCo )
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
