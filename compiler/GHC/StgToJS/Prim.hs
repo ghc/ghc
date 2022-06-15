@@ -445,6 +445,7 @@ genPrim _ _ NewAlignedPinnedByteArrayOp_Char  [r] [l,_align]  = PrimInline (newB
 genPrim _ _ MutableByteArrayIsPinnedOp        [r] [_]         = PrimInline $ r |= one_
 genPrim _ _ ByteArrayIsPinnedOp               [r] [_]         = PrimInline $ r |= one_
 genPrim _ _ ByteArrayContents_Char            [a,o] [b]       = PrimInline $ mconcat [a |= b, o |= zero_]
+genPrim _ _ MutableByteArrayContents_Char     [a,o] [b]       = PrimInline $ mconcat [a |= b, o |= zero_]
 genPrim _ _ ShrinkMutableByteArrayOp_Char     [] [a,n]        = PrimInline $ appS "h$shrinkMutableByteArray" [a,n]
 genPrim _ _ ResizeMutableByteArrayOp_Char     [r] [a,n]       = PrimInline $ r |= app "h$resizeMutableByteArray" [a,n]
 genPrim _ _ UnsafeFreezeByteArrayOp           [a] [b]         = PrimInline $ a |= b
