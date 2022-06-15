@@ -34,7 +34,7 @@ void exitUnloadCheck(void);
 bool prepareUnloadCheck(void);
 
 // Mark object code of a static closure address as 'live'
-void markObjectCode(const void *addr);
+void markObjectCode(const StgClosure *addr);
 
 // Call after major GC to unload unused and unmarked object code
 void checkUnload(void);

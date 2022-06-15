@@ -418,11 +418,17 @@ static bool markObjectLive(void *data STG_UNUSED, StgWord key, const void *value
     return true; // for hash table iteration
 }
 
-void markObjectCode(const void *addr)
+void markObjectCode(const StgClosure *addr)
 {
     if (global_s_indices == NULL) {
         return;
     }
+
+#if defined(PROFILING)
+    // mark CCS as referenced by the heap so it is not pruned while
+    // generating the profile snapshot
+    ccsSetReferenced(addr->header.prof.ccs, true);
+#endif
 
     // This should be checked at the call site
     ASSERT(!HEAP_ALLOCED(addr));
@@ -453,6 +459,84 @@ bool prepareUnloadCheck()
     return true;
 }
 
+#if defined(PROFILING)
+// Prune the CCS tree.
+//
+// Assumes CCS_REFERENCED bit has been set on all CCSs referenced by the heap.
+// Resulting CCS tree has CCS_REFERENCED bit cleared on all CCSs.
+static CostCentreStack *
+gcCostCentreStacks (CostCentreStack *ccs)
+{
+    CostCentreStack *ccs1;
+    IndexTable *i, **prev;
+
+    prev = &ccs->indexTable;
+    for (i = ccs->indexTable; i != NULL; i = i->next) {
+        if (i->back_edge) { continue; }
+
+        ccs1 = gcCostCentreStacks(i->ccs);
+        if (ccs1 == NULL) {
+            *prev = i->next;
+        } else {
+            prev = &(i->next);
+        }
+    }
+
+    if (   ccsIsReferenced(ccs)
+        || ( ccs->indexTable != NULL )
+        || specialCCS(ccs)
+        || ccs->scc_count
+        || ccs->time_ticks
+        || ccs->mem_alloc) {
+        ccsSetReferenced(ccs, false);
+        return ccs;
+    } else {
+        return NULL;
+    }
+}
+
+static bool objectContains (ObjectCode *oc, const void *addr)
+{
+    int i;
+
+     if (oc != NULL) {
+        for (i = 0; i < oc->n_sections; i++) {
+            if (oc->sections[i].kind != SECTIONKIND_OTHER) {
+                if ((W_)addr >= (W_)oc->sections[i].start &&
+                    (W_)addr <  (W_)oc->sections[i].start
+                                + oc->sections[i].size) {
+                    return true;
+                }
+            }
+        }
+    }
+
+     return false;
+}
+
+//
+// Remove all CostCentres which are statically allocated in the given object
+// from the global CC_LIST.
+//
+static void gcCostCentres(ObjectCode *oc)
+{
+    CostCentre *cc, *prev, *next;
+    prev = NULL;
+    for (cc = CC_LIST; cc != NULL; cc = next) {
+        next = cc->link;
+        if (objectContains(oc, cc)) {
+            if (prev == NULL) {
+                CC_LIST = cc->link;
+            } else {
+                prev->link = cc->link;
+            }
+        } else {
+          prev = cc;
+        }
+    }
+}
+#endif /* PROFILING */
+
 void checkUnload()
 {
     if (global_s_indices == NULL) {
@@ -477,6 +561,12 @@ void checkUnload()
     for (ObjectCode *oc = old_objects; oc != NULL; oc = next) {
         next = oc->next;
         ASSERT(oc->status == OBJECT_UNLOADED);
+
+#if defined(PROFILING)
+        // The CCS tree isn't keeping this object alive, and it is unloaded,
+        // so we can prune the global CC_LIST of any CCs from this object.
+        gcCostCentres(oc);
+#endif
 
         removeOCSectionIndices(s_indices, oc);
 

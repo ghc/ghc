@@ -76,6 +76,8 @@ typedef struct CostCentreStack_ {
                                 // -hm etc.)
 #define CCS_VISIBLE 2           // should the CCS be shown in the profile
                                 // report? (e.g. the -p output)
+#define CCS_REFERENCED 4        // is this CCS referenced by a live heap object?
+                                // set by CheckUnload
 
 INLINE_HEADER bool ccsIsSelected(CostCentreStack const*ccs) {
     return ccs->flags & CCS_SELECTED;
@@ -98,6 +100,18 @@ INLINE_HEADER void ccsSetVisible(CostCentreStack *ccs, bool visible) {
         ccs->flags |= CCS_VISIBLE;
     } else {
         ccs->flags &= ~CCS_VISIBLE;
+    }
+}
+
+INLINE_HEADER bool ccsIsReferenced(CostCentreStack const *ccs) {
+    return ccs->flags & CCS_REFERENCED;
+}
+
+INLINE_HEADER void ccsSetReferenced(CostCentreStack *ccs, bool referenced) {
+    if (referenced) {
+        ccs->flags |= CCS_REFERENCED;
+    } else {
+        ccs->flags &= ~CCS_REFERENCED;
     }
 }
 
