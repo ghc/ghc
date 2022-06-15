@@ -308,7 +308,7 @@ pprOp plat op = case op of
   OpReg w r           -> pprReg w r
   OpRegExt w r x 0 -> pprReg w r <> comma <+> pprExt x
   OpRegExt w r x i -> pprReg w r <> comma <+> pprExt x <> comma <+> char '#' <> int i
-  OpRegShift w r s i -> pprReg w r <> comma <+> pprShift s <> comma <+> char '#' <> int i
+  OpRegShift w r s i -> pprReg w r <> comma <+> pprShift s <+> char '#' <> int i
   OpImm im          -> pprIm plat im
   OpImmShift im s i -> pprIm plat im <> comma <+> pprShift s <+> char '#' <> int i
   -- TODO: Address compuation always use registers as 64bit -- is this correct?
