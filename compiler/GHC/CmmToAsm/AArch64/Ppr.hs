@@ -387,6 +387,8 @@ pprInstr platform instr = case instr of
   MUL  o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> text "\tfmul"  <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
     | otherwise -> text "\tmul"  <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  SMULH o1 o2 o3 -> text "\tsmulh"  <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+  SMULL o1 o2 o3 -> text "\tsmull"  <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
   NEG  o1 o2
     | isFloatOp o1 && isFloatOp o2 -> text "\tfneg"  <+> pprOp platform o1 <> comma <+> pprOp platform o2
     | otherwise -> text "\tneg"  <+> pprOp platform o1 <> comma <+> pprOp platform o2
