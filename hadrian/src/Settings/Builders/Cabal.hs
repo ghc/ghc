@@ -60,8 +60,6 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
             , withStaged $ Cc CompileC
             , notStage0 ? with (Ld stage)
             , withStaged (Ar Pack)
-            , with Alex
-            , with Happy
             -- Update Target.trackArgument if changing these:
             , verbosity < Chatty ?
               pure [ "-v0", "--configure-option=--quiet"
