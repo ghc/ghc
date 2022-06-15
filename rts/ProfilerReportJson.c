@@ -79,28 +79,30 @@ logCostCentres(FILE *prof_file)
 static void
 logCostCentreStack(FILE *prof_file, CostCentreStack const *ccs)
 {
-    fprintf(prof_file,
-            "{\"id\": %" FMT_Int ", "
-            "\"entries\": %" FMT_Word64 ", "
-            "\"alloc\": %" FMT_Word64 ", "
-            "\"ticks\": %" FMT_Word ", ",
-            ccs->cc->ccID,
-            ccs->scc_count,
-            ccs->mem_alloc * sizeof(W_),
-            ccs->time_ticks);
+    if (ccsIsVisible(ccs)) {
+        fprintf(prof_file,
+                "{\"id\": %" FMT_Int ", "
+                "\"entries\": %" FMT_Word64 ", "
+                "\"alloc\": %" FMT_Word64 ", "
+                "\"ticks\": %" FMT_Word ", ",
+                ccs->cc->ccID,
+                ccs->scc_count,
+                ccs->mem_alloc * sizeof(W_),
+                ccs->time_ticks);
 
-    bool need_comma = false;
-    fprintf(prof_file, "\"children\": [");
-    for (IndexTable *i = ccs->indexTable; i != 0; i = i->next) {
-        if (!i->back_edge) {
-            if (need_comma) {
-                fprintf(prof_file, ",");
+        bool need_comma = false;
+        fprintf(prof_file, "\"children\": [");
+        for (IndexTable *i = ccs->indexTable; i != 0; i = i->next) {
+            if (!i->back_edge) {
+                if (need_comma) {
+                    fprintf(prof_file, ",");
+                }
+                logCostCentreStack(prof_file, i->ccs);
+                need_comma = true;
             }
-            logCostCentreStack(prof_file, i->ccs);
-            need_comma = true;
         }
+        fprintf(prof_file, "]}\n");
     }
-    fprintf(prof_file, "]}\n");
 }
 
 void

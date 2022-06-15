@@ -193,10 +193,12 @@ findCCSMaxLens(CostCentreStack const *ccs, uint32_t indent, uint32_t *max_label_
 
     cc = ccs->cc;
 
-    *max_label_len = stg_max(*max_label_len, indent + strlen_utf8(cc->label));
-    *max_module_len = stg_max(*max_module_len, strlen_utf8(cc->module));
-    *max_src_len = stg_max(*max_src_len, strlen_utf8(cc->srcloc));
-    *max_id_len = stg_max(*max_id_len, numDigits(ccs->ccsID));
+    if (ccsIsVisible(ccs)) {
+        *max_label_len = stg_max(*max_label_len, indent + strlen_utf8(cc->label));
+        *max_module_len = stg_max(*max_module_len, strlen_utf8(cc->module));
+        *max_src_len = stg_max(*max_src_len, strlen_utf8(cc->srcloc));
+        *max_id_len = stg_max(*max_id_len, numDigits(ccs->ccsID));
+    }
 
     for (i = ccs->indexTable; i != 0; i = i->next) {
         if (!i->back_edge) {
@@ -219,7 +221,7 @@ logCCS(FILE *prof_file, CostCentreStack const *ccs, ProfilerTotals totals,
 
     /* Only print cost centres with non 0 data ! */
 
-    if (!ignoreCCS(ccs))
+    if (!ignoreCCS(ccs) && ccsIsVisible(ccs))
         /* force printing of *all* cost centres if -Pa */
     {
 

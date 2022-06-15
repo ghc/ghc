@@ -110,19 +110,17 @@ static  CostCentreStack * appendCCS       ( CostCentreStack *ccs1,
                                             CostCentreStack *ccs2 );
 static  CostCentreStack * actualPush_     ( CostCentreStack *ccs, CostCentre *cc,
                                             CostCentreStack *new_ccs );
-static  void              inheritCosts    ( CostCentreStack *ccs );
-static  ProfilerTotals    countTickss     ( CostCentreStack const *ccs );
+static  ProfilerTotals    aggregateCostData ( CostCentreStack *ccs );
 static  CostCentreStack * checkLoop       ( CostCentreStack *ccs,
                                             CostCentre *cc );
 static  void              sortCCSTree     ( CostCentreStack *ccs );
-static  CostCentreStack * pruneCCSTree    ( CostCentreStack *ccs );
+static  void              resetCCSData( CostCentreStack *ccs );
 static  CostCentreStack * actualPush      ( CostCentreStack *, CostCentre * );
 static  CostCentreStack * isInIndexTable  ( IndexTable *, CostCentre * );
 static  IndexTable *      addToIndexTable ( IndexTable *, CostCentreStack *,
                                             CostCentre *, bool );
 static  void              ccsDecideSelected
                                           ( CostCentreStack *ccs );
-static  void              aggregateCCCosts( CostCentreStack *ccs );
 static  void              registerCC      ( CostCentre *cc );
 static  void              registerCCS     ( CostCentreStack *ccs );
 
@@ -634,6 +632,7 @@ actualPush_ (CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs)
     new_ccs->prevStack = ccs;
     new_ccs->root = ccs->root;
     new_ccs->depth = ccs->depth + 1;
+    new_ccs->flags = 0;
 
     new_ccs->indexTable = EMPTY_TABLE;
 
@@ -727,17 +726,28 @@ reportCCSProfiling( void )
     stopProfTimer();
     if (RtsFlags.CcFlags.doCostCentres == 0) return;
 
-    ProfilerTotals totals = countTickss(CCS_MAIN);
-    aggregateCCCosts(CCS_MAIN);
-    inheritCosts(CCS_MAIN);
-    CostCentreStack *stack = pruneCCSTree(CCS_MAIN);
-    sortCCSTree(stack);
+    genCCSProfileReport(prof_file);
+}
+
+void
+genCCSProfileReport(FILE *fp)
+{
+    // Writing the report involves reordering index tables in the CCS tree
+    // and nodes in the CC_LIST, so we take the mutex.
+    ACQUIRE_LOCK(&ccs_mutex);
+
+    ProfilerTotals totals = aggregateCostData(CCS_MAIN);
+    sortCCSTree(CCS_MAIN);
 
     if (RtsFlags.CcFlags.doCostCentres == COST_CENTRES_JSON) {
-        writeCCSReportJson(prof_file, stack, totals);
+        writeCCSReportJson(fp, CCS_MAIN, totals);
     } else {
-        writeCCSReport(prof_file, stack, totals);
+        writeCCSReport(fp, CCS_MAIN, totals);
     }
+
+    resetCCSData(CCS_MAIN);
+
+    RELEASE_LOCK(&ccs_mutex);
 }
 
 /* -----------------------------------------------------------------------------
@@ -746,100 +756,71 @@ reportCCSProfiling( void )
 
 /* Helper */
 static void
-countTickss_(CostCentreStack const *ccs, ProfilerTotals *totals)
+aggregateCostData_(CostCentreStack *ccs, ProfilerTotals *totals)
 {
-    if (!ignoreCCS(ccs)) {
+    bool showInReport =
+        (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_ALL
+          /* force printing of *all* cost centres if -P -P */ )
+        || ccs->scc_count
+        || ccs->time_ticks
+        || ccs->mem_alloc;
+    bool ignored = ignoreCCS(ccs);
+
+    if (!ignored) {
         totals->total_alloc += ccs->mem_alloc;
         totals->total_prof_ticks += ccs->time_ticks;
+        ccs->inherited_alloc += ccs->mem_alloc;
+        ccs->inherited_ticks += ccs->time_ticks;
     }
+
+    ccs->cc->mem_alloc += ccs->mem_alloc;
+    ccs->cc->time_ticks += ccs->time_ticks;
+
     for (IndexTable *i = ccs->indexTable; i != NULL; i = i->next) {
         if (!i->back_edge) {
-            countTickss_(i->ccs, totals);
+            aggregateCostData_(i->ccs, totals);
+            if (!ignored) {
+                ccs->inherited_ticks += i->ccs->inherited_ticks;
+                ccs->inherited_alloc += i->ccs->inherited_alloc;
+            }
+            showInReport = showInReport || ccsIsVisible(i->ccs);
         }
     }
+
+    ccsSetVisible(ccs, showInReport);
 }
 
 /* Traverse the cost centre stack tree and accumulate
  * total ticks/allocations.
  */
 static ProfilerTotals
-countTickss(CostCentreStack const *ccs)
+aggregateCostData(CostCentreStack *ccs)
 {
     ProfilerTotals totals = {0,0};
-    countTickss_(ccs, &totals);
+    aggregateCostData_(ccs, &totals);
     return totals;
 }
 
-/* Traverse the cost centre stack tree and inherit ticks & allocs.
- */
 static void
-inheritCosts(CostCentreStack *ccs)
+resetCCSData( CostCentreStack *ccs )
 {
     IndexTable *i;
 
-    if (ignoreCCS(ccs)) { return; }
+    ccs->scc_count = 0;
+    ccs->time_ticks = 0;
+    ccs->cc->time_ticks = 0;
+    ccs->mem_alloc = 0;
+    ccs->cc->mem_alloc = 0;
+    ccs->inherited_ticks = 0;
+    ccs->inherited_alloc = 0;
 
-    ccs->inherited_ticks += ccs->time_ticks;
-    ccs->inherited_alloc += ccs->mem_alloc;
-
-    for (i = ccs->indexTable; i != NULL; i = i->next)
+    for (i = ccs->indexTable; i != NULL; i = i->next) {
         if (!i->back_edge) {
-            inheritCosts(i->ccs);
-            ccs->inherited_ticks += i->ccs->inherited_ticks;
-            ccs->inherited_alloc += i->ccs->inherited_alloc;
-        }
-
-    return;
-}
-
-static void
-aggregateCCCosts( CostCentreStack *ccs )
-{
-    IndexTable *i;
-
-    ccs->cc->mem_alloc += ccs->mem_alloc;
-    ccs->cc->time_ticks += ccs->time_ticks;
-
-    for (i = ccs->indexTable; i != 0; i = i->next) {
-        if (!i->back_edge) {
-            aggregateCCCosts(i->ccs);
+            resetCCSData(i->ccs);
         }
     }
 }
 
-//
-// Prune CCSs with zero entries, zero ticks or zero allocation from
-// the tree, unless COST_CENTRES_ALL is on.
-//
-static CostCentreStack *
-pruneCCSTree (CostCentreStack *ccs)
-{
-    CostCentreStack *ccs1;
-    IndexTable *i, **prev;
-
-    prev = &ccs->indexTable;
-    for (i = ccs->indexTable; i != 0; i = i->next) {
-        if (i->back_edge) { continue; }
-
-        ccs1 = pruneCCSTree(i->ccs);
-        if (ccs1 == NULL) {
-            *prev = i->next;
-        } else {
-            prev = &(i->next);
-        }
-    }
-
-    if ( (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_ALL
-          /* force printing of *all* cost centres if -P -P */ )
-
-         || ( ccs->indexTable != 0 )
-         || ( ccs->scc_count || ccs->time_ticks || ccs->mem_alloc )
-        ) {
-        return ccs;
-    } else {
-        return NULL;
-    }
-}
 
 static IndexTable*
 insertIndexTableInSortedList(IndexTable* tbl, IndexTable* sortedList)

@@ -42,6 +42,7 @@ typedef struct {
 #if defined(PROFILING)
 
 void reportCCSProfiling ( void );
+void genCCSProfileReport(FILE *fp);
 
 void fprintCCS( FILE *f, CostCentreStack *ccs );
 void fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso);

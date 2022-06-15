@@ -74,6 +74,8 @@ typedef struct CostCentreStack_ {
 #define CCS_SELECTED 1          // is this CCS shown in the heap
                                 // profile? (zero if excluded via -hc
                                 // -hm etc.)
+#define CCS_VISIBLE 2           // should the CCS be shown in the profile
+                                // report? (e.g. the -p output)
 
 INLINE_HEADER bool ccsIsSelected(CostCentreStack const*ccs) {
     return ccs->flags & CCS_SELECTED;
@@ -84,6 +86,18 @@ INLINE_HEADER void ccsSetSelected(CostCentreStack *ccs, bool selected) {
         ccs->flags |= CCS_SELECTED;
     } else {
         ccs->flags &= ~CCS_SELECTED;
+    }
+}
+
+INLINE_HEADER bool ccsIsVisible(CostCentreStack const *ccs) {
+    return ccs->flags & CCS_VISIBLE;
+}
+
+INLINE_HEADER void ccsSetVisible(CostCentreStack *ccs, bool visible) {
+    if (visible) {
+        ccs->flags |= CCS_VISIBLE;
+    } else {
+        ccs->flags &= ~CCS_VISIBLE;
     }
 }
 
