@@ -124,7 +124,7 @@ import           System.Directory ( createDirectoryIfMissing
                                   , listDirectory
                                   )
 
-import GHC.Driver.Session (targetWays_, DynFlags(..), addGlobalInclude)
+import GHC.Driver.Session (targetWays_, DynFlags(..))
 import GHC.Unit.Module.Name
 import GHC.Unit.Module (moduleStableString)
 import GHC.Utils.Logger (Logger)
@@ -132,7 +132,7 @@ import GHC.Utils.TmpFs (TmpFs)
 
 import GHC.Linker.Static.Utils (exeFileName)
 
-newtype LinkerStats  = LinkerStats
+newtype LinkerStats = LinkerStats
   { bytesPerModule :: Map Module Word64 -- ^ number of bytes linked per module
   }
 
@@ -180,6 +180,8 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
                 | otherwise = "js"
       createDirectoryIfMissing False out
       B.writeFile (out </> "out" <.> jsExt) (linkOut link_res)
+
+      -- dump foreign references file (.frefs)
       unless (lcOnlyOut lc_cfg) $ do
         let frefsFile   = if genBase then "out.base.frefs" else "out.frefs"
             -- FIXME: Jeff (2022,03): GHCJS used Aeson to encode Foreign
@@ -194,29 +196,38 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
         BL.writeFile (out </> frefsFile <.> "json") jsonFrefs
         BL.writeFile (out </> frefsFile <.> "js")
                      ("h$checkForeignRefs(" <> jsonFrefs <> ");")
+
+        -- dump stats
         unless (lcNoStats lc_cfg) $ do
           let statsFile = if genBase then "out.base.stats" else "out.stats"
           let stats = linkerStats (linkOutMetaSize link_res) (linkOutStats link_res)
           writeFile (out </> statsFile) stats
+
+        -- Sylvain (2022-06): find RTS js files (shims) via an environment variable...
+        -- Remove when all files are located via Cabal's js-sources
+        let is_js_file f = "js" `isExtensionOf` f || "pp" `isExtensionOf` f
+        let find_env_shims env_var = do
+              lookupEnv env_var >>= \case
+                Nothing  -> error (env_var ++ " env var not set!")
+                Just dir -> do
+                  (fmap (dir </>) . filter is_js_file) <$> listDirectory dir
+
+        -- link with the RTS
         unless (lcNoRts lc_cfg) $ do
-          -- Sylvain (2022-06): find RTS js files (shims) via an environment variable...
-          -- Remove when all files are located via Cabal's js-sources
-          let is_js_file f = "js" `isExtensionOf` f || "pp" `isExtensionOf` f
-          static_rts_files <- lookupEnv "JS_RTS_PATH" >>= \case
-            Nothing  -> error "JS_RTS_PATH env var not set: can't link the RTS!"
-            Just dir -> (fmap (dir </>) . filter is_js_file) <$> listDirectory dir
+          static_rts_files <- find_env_shims "JS_RTS_PATH"
+          let all_rts_js = linkLibRTS link_res ++ static_rts_files
 
-          let all_rts_js     = linkLibRTS link_res ++ static_rts_files
+          rts_js_bss <- mapM (tryReadShimFile logger tmpfs dflags unit_env) all_rts_js
+          BL.writeFile (out </> "rts.js") (BLC.pack rtsDeclsText
+                                           <> BL.fromChunks rts_js_bss
+                                           <> BLC.pack (rtsText cfg))
 
-          withRts <- mapM (tryReadShimFile logger tmpfs dflags unit_env) all_rts_js
-          BL.writeFile (out </> "rts.js") (BLC.pack (T.unpack rtsDeclsText)
-                                           <> BL.fromChunks withRts
-                                           <> BLC.pack (T.unpack $ rtsText cfg))
-        -- FIXME (Sylvain, 2022-05): disable shims
-        -- lla'    <- mapM (tryReadShimFile logger tmpfs dflags unit_env) (linkLibA link_res)
+        static_base_files <- find_env_shims "JS_BASE_PATH"
+        let all_lib_js = linkLibA link_res ++ static_base_files
+        lla'    <- mapM (tryReadShimFile logger tmpfs dflags unit_env) all_lib_js
         -- llarch' <- mapM (readShimsArchive dflags) (linkLibArch link_res)
         -- let lib_js = BL.fromChunks $ llarch' ++ lla'
-        let lib_js = BL.empty
+        let lib_js = BL.fromChunks lla'
         BL.writeFile (out </> "lib" <.> jsExt) lib_js
 
         if genBase
@@ -280,6 +291,7 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
       -- c   <- newMVar M.empty
       let preload_units = preloadUnits (ue_units unit_env)
 
+      -- FIXME (Sylvain 2022-06): what are these "@rts" units?
       let rtsPkgs     =  map stringToUnitId ["@rts", "@rts_" ++ waysTag (targetWays_ $ dflags)]
           pkgs' :: [UnitId]
           pkgs'       = nub (rtsPkgs ++ preload_units ++ rdPkgs ++ reverse objPkgs ++ reverse pkgs)
@@ -294,6 +306,7 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
       logInfo logger $ hang (text "Linking with archives:") 2 (vcat (fmap text pkgArchs))
 
       -- compute dependencies
+      -- FIXME (Sylvain 2022-06): why are we appending the home unit here?
       let dep_units      = pkgs' ++ [homeUnitId (ue_unsafeHomeUnit $ unit_env)] -- FIXME: dont use unsafe
           dep_map        = objDepsMap `M.union` archsDepsMap
           excluded_units = baseUnits base -- already linked units
@@ -315,7 +328,6 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
                          (all_deps `S.union` baseUnits base)
 
       -- FIXME: (Sylvain, 2022-05): disabled because it comes from shims.
-      -- Just delete?
       -- (alreadyLinkedBefore, alreadyLinkedAfter) <- getShims [] (filter (isAlreadyLinked base) pkgs')
       -- (shimsBefore, shimsAfter) <- getShims jsFiles pkgs''
       return $ LinkResult
