@@ -30,7 +30,8 @@ import GHC.Core.Unfold.Make
 import GHC.Core
 import GHC.Core.Rules
 import GHC.Core.Utils     ( exprIsTrivial, getIdFromTrivialExpr_maybe
-                          , mkCast, exprType )
+                          , mkCast, exprType
+                          , stripTicksTop )
 import GHC.Core.FVs
 import GHC.Core.TyCo.Rep (TyCoBinder (..))
 import GHC.Core.Opt.Arity     ( collectBindersPushingCo
@@ -2275,7 +2276,7 @@ isSpecDict _             = False
 -- We will use the running example from Note [Specialising Calls]:
 --
 --     f :: forall a b c. Int -> Eq a => Show b => c -> Blah
---     f @a @b @c i dEqA dShowA x = blah
+--     f @a @b @c i dEqA dShowB x = blah
 --
 -- Suppose we decide to specialise it at the following pattern:
 --
@@ -2291,7 +2292,7 @@ isSpecDict _             = False
 -- and the specialisation '$sf'
 --
 --     $sf :: forall c. Int -> c -> Blah
---     $sf = SUBST[a :-> T1, b :-> T2, dEqA :-> dEqT1, dShowA :-> dShow1] (\@c i x -> blah)
+--     $sf = SUBST[a :-> T1, b :-> T2, dEqA :-> dEqT1, dShowB :-> dShow1] (\@c i x -> blah)
 --
 -- where dShow1 is a floated binding created by bindAuxiliaryDict.
 --
@@ -2299,7 +2300,7 @@ isSpecDict _             = False
 -- running example. The result of 'specHeader' for this example is as follows:
 --
 --    ( -- Returned arguments
---      env + [a :-> T1, b :-> T2, dEqA :-> dEqT1, dShowA :-> dShow1]
+--      env + [a :-> T1, b :-> T2, dEqA :-> dEqT1, dShowB :-> dShow1]
 --    , [x]
 --
 --      -- RULE helpers
@@ -2682,7 +2683,7 @@ singleCall id args
 
 mkCallUDs :: SpecEnv -> OutExpr -> [OutExpr] -> UsageDetails
 mkCallUDs env fun args
-  | Var f <- fun
+  | (_, Var f) <- stripTicksTop tickishFloatable fun -- See Note [Ticks on applications]
   = -- pprTraceWith "mkCallUDs" (\res -> vcat [ ppr f, ppr args, ppr res ]) $
     mkCallUDs' env f args
   | otherwise
@@ -2734,6 +2735,22 @@ mkCallUDs' env f args
 
     mk_spec_arg _ (Anon VisArg _)
       = UnspecArg
+
+{-
+Note [Ticks on applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ticks such as source location annotations can sometimes make their way
+onto applications (see e.g. #21697). So if we see something like
+
+    App (Tick _ f) e
+
+we need to descend below the tick to find what the real function being
+applied is.
+
+The resulting RULE also has to be able to match this annotated use
+site, so we only look through ticks that RULE matching looks through
+(see Note [Tick annotations in RULE matching] in GHC.Core.Rules).
+-}
 
 wantCallsFor :: SpecEnv -> Id -> Bool
 wantCallsFor _env _f = True
