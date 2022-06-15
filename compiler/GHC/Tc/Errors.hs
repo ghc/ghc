@@ -1108,7 +1108,7 @@ mkErrorTerm ctxt ct_loc ty (SolverReport { sr_important_msg = important, sr_supp
                   (TcRnSolverReport important ErrorWithoutFlag noHints) (Just ctxt) supp
          -- This will be reported at runtime, so we always want "error:" in the report, never "warning:"
        ; dflags <- getDynFlags
-       ; let err_msg = pprLocMsgEnvelope msg
+       ; let err_msg = pprLocMsgEnvelope (initTcMessageOpts dflags) msg
              err_str = showSDoc dflags $
                        err_msg $$ text "(deferred type error)"
 
@@ -1174,9 +1174,12 @@ mkErrorReport tcl_env msg mb_ctxt supplementary
              ErrInfo
                (fromMaybe empty mb_context)
                (vcat $ map (pprSolverReportSupplementary hfdc) supplementary)
+       ; let detailed_msg = mkDetailedMessage err_info msg
        ; mkTcRnMessage
            (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
-           (TcRnMessageWithInfo unit_state $ TcRnMessageDetailed err_info msg) }
+           (TcRnMessageWithInfo unit_state $ detailed_msg) }
+
+
 
 -- | Pretty-print supplementary information, to add to an error report.
 pprSolverReportSupplementary :: HoleFitDispConfig -> SolverReportSupplementary -> SDoc

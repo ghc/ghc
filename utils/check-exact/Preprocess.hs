@@ -17,7 +17,6 @@ module Preprocess
 import qualified GHC            as GHC hiding (parseModule)
 
 import qualified Control.Monad.IO.Class as GHC
-import qualified GHC.Data.Bag          as GHC
 import qualified GHC.Data.FastString   as GHC
 import qualified GHC.Data.StringBuffer as GHC
 import qualified GHC.Driver.Config.Parser as GHC
@@ -28,16 +27,17 @@ import qualified GHC.Driver.Pipeline   as GHC
 import qualified GHC.Fingerprint.Type  as GHC
 import qualified GHC.Parser.Lexer      as GHC
 import qualified GHC.Settings          as GHC
-import qualified GHC.Types.Error       as GHC (getErrorMessages, DiagnosticMessage(..))
+import qualified GHC.Types.Error       as GHC
 import qualified GHC.Types.SourceError as GHC
 import qualified GHC.Types.SourceFile  as GHC
 import qualified GHC.Types.SrcLoc      as GHC
 import qualified GHC.Utils.Error       as GHC
 import qualified GHC.Utils.Fingerprint as GHC
+import qualified GHC.Utils.Outputable  as GHC
 import GHC.Types.SrcLoc (mkSrcSpan, mkSrcLoc)
 import GHC.Data.FastString (mkFastString)
 
-import Data.List (isPrefixOf, intercalate)
+import Data.List (isPrefixOf)
 import Data.Maybe
 import Types
 import Utils
@@ -218,25 +218,19 @@ getPreprocessedSrcDirectPrim cppOptions src_fn = do
       new_env = hsc_env { GHC.hsc_dflags = injectCppOptions cppOptions dfs }
   r <- GHC.liftIO $ GHC.preprocess new_env src_fn Nothing (Just (GHC.Cpp GHC.HsSrcFile))
   case r of
-    Left err -> error $ showErrorMessages $ fmap GHC.GhcDriverMessage err
+    Left err -> error $ showErrorMessages err
     Right (dflags', hspp_fn) -> do
       buf <- GHC.liftIO $ GHC.hGetStringBuffer hspp_fn
       txt <- GHC.liftIO $ readFileGhc hspp_fn
       return (txt, buf, dflags')
 
-showErrorMessages :: GHC.ErrorMessages -> String
-showErrorMessages msgs = intercalate "\n"
-    $ map (show @(GHC.MsgEnvelope GHC.DiagnosticMessage) . fmap toDiagnosticMessage)
-    $ GHC.bagToList
-    $ GHC.getErrorMessages msgs
-
--- | Show Error Messages relies on show instance for MsgEnvelope DiagnosticMessage
--- We convert a known Diagnostic into this generic version
-toDiagnosticMessage :: GHC.Diagnostic e => e -> GHC.DiagnosticMessage
-toDiagnosticMessage msg = GHC.DiagnosticMessage { diagMessage = GHC.diagnosticMessage msg
-                                                , diagReason  = GHC.diagnosticReason  msg
-                                                , diagHints   = GHC.diagnosticHints   msg
-                                                }
+showErrorMessages :: GHC.Messages GHC.DriverMessage -> String
+showErrorMessages msgs =
+  GHC.renderWithContext GHC.defaultSDocContext
+    $ GHC.vcat
+    $ GHC.pprMsgEnvelopeBagWithLocDefault
+    $ GHC.getMessages
+    $ msgs
 
 injectCppOptions :: CppOptions -> GHC.DynFlags -> GHC.DynFlags
 injectCppOptions CppOptions{..} dflags =

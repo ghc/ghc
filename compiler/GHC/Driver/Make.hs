@@ -4,6 +4,7 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -2407,7 +2408,8 @@ wrapAction :: HscEnv -> IO a -> IO (Maybe a)
 wrapAction hsc_env k = do
   let lcl_logger = hsc_logger hsc_env
       lcl_dynflags = hsc_dflags hsc_env
-  let logg err = printMessages lcl_logger (initDiagOpts lcl_dynflags) (srcErrorMessages err)
+      print_config = initPrintConfig lcl_dynflags
+  let logg err = printMessages lcl_logger print_config (initDiagOpts lcl_dynflags) (srcErrorMessages err)
   -- MP: It is a bit strange how prettyPrintGhcErrors handles some errors but then we handle
   -- SourceError and ThreadKilled differently directly below. TODO: Refactor to use `catches`
   -- directly. MP should probably use safeTry here to not catch async exceptions but that will regress performance due to

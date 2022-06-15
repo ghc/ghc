@@ -182,12 +182,13 @@ data TcRnMessageDetailed
                         !TcRnMessage
   deriving Generic
 
-mkTcRnUnknownMessage :: (Diagnostic a, Typeable a) => a -> TcRnMessage
+mkTcRnUnknownMessage :: (Diagnostic a, Typeable a, DiagnosticOpts a ~ NoDiagnosticOpts)
+                     => a -> TcRnMessage
 mkTcRnUnknownMessage diag = TcRnUnknownMessage (UnknownDiagnostic diag)
 
 -- | An error which might arise during typechecking/renaming.
 data TcRnMessage where
-  {-| Simply wraps a generic 'Diagnostic' message @a@. It can be used by plugins
+  {-| Simply wraps an unknown 'Diagnostic' message @a@. It can be used by plugins
       to provide custom diagnostic messages originated during typechecking/renaming.
   -}
   TcRnUnknownMessage :: UnknownDiagnostic -> TcRnMessage

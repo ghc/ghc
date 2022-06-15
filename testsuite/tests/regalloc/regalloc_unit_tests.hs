@@ -140,7 +140,8 @@ compileCmmForRegAllocStats logger home_unit dflags cmmFile ncgImplF us = do
 
     -- print parser errors or warnings
     let !diag_opts = initDiagOpts dflags
-    mapM_ (printMessages logger diag_opts) [warnings, errors]
+        !print_config = initPsMessageOpts dflags
+    mapM_ (printMessages logger print_config diag_opts) [warnings, errors]
 
     let initTopSRT = emptySRT thisMod
     cmmGroup <- fmap snd $ cmmPipeline logger cmm_config initTopSRT $ fst $ fromJust parsedCmm

@@ -5,6 +5,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic PsMessage
 
@@ -36,9 +38,11 @@ import Data.List.NonEmpty (NonEmpty((:|)))
 
 
 instance Diagnostic PsMessage where
-  diagnosticMessage = \case
-    PsUnknownMessage m
-      -> diagnosticMessage m
+  type DiagnosticOpts PsMessage = NoDiagnosticOpts
+  defaultDiagnosticOpts = NoDiagnosticOpts
+  diagnosticMessage _ = \case
+    PsUnknownMessage (UnknownDiagnostic @e m)
+      -> diagnosticMessage (defaultDiagnosticOpts @e) m
 
     PsHeaderMessage m
       -> psHeaderMessageDiagnostic m
@@ -509,7 +513,7 @@ instance Diagnostic PsMessage where
           , nest 2 $ text "but" <+> quotes (ppr tycon) <+> text "has" <+> speakN n ]
       , text "In the newtype declaration for" <+> quotes (ppr tycon) ]
 
-  diagnosticReason  = \case
+  diagnosticReason = \case
     PsUnknownMessage m                            -> diagnosticReason m
     PsHeaderMessage  m                            -> psHeaderMessageReason m
     PsWarnBidirectionalFormatChars{}              -> WarningWithFlag Opt_WarnUnicodeBidirectionalFormatCharacters
@@ -627,7 +631,7 @@ instance Diagnostic PsMessage where
     PsErrInvalidCApiImport {}                     -> ErrorWithoutFlag
     PsErrMultipleConForNewtype {}                 -> ErrorWithoutFlag
 
-  diagnosticHints  = \case
+  diagnosticHints = \case
     PsUnknownMessage m                            -> diagnosticHints m
     PsHeaderMessage  m                            -> psHeaderMessageHints m
     PsWarnBidirectionalFormatChars{}              -> noHints

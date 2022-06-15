@@ -317,7 +317,7 @@ initTcDsForSolver thing_inside
          thing_inside
        ; case mb_ret of
            Just ret -> pure ret
-           Nothing  -> pprPanic "initTcDsForSolver" (vcat $ pprMsgEnvelopeBagWithLoc (getErrorMessages msgs)) }
+           Nothing  -> pprPanic "initTcDsForSolver" (vcat $ pprMsgEnvelopeBagWithLocDefault (getErrorMessages msgs)) }
 
 mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> IORef (Messages DsMessage) -> IORef CostCentreState

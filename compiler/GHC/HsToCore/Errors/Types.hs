@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module GHC.HsToCore.Errors.Types where
 

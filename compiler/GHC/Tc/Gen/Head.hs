@@ -1099,9 +1099,8 @@ tc_infer_id id_name
         hint_msg = vcat $ map ppr hints
         import_err_msg = vcat $ map ppr import_errs
         info = ErrInfo { errInfoContext = pprov, errInfoSupplementary = import_err_msg $$ hint_msg }
-        msg = TcRnMessageWithInfo unit_state
-            $ TcRnMessageDetailed info (TcRnIncorrectNameSpace nm False)
-      failWithTc msg
+      failWithTc $ TcRnMessageWithInfo unit_state (
+              mkDetailedMessage info (TcRnIncorrectNameSpace nm False))
 
     get_suggestions ns = do
        let occ = mkOccNameFS ns (occNameFS (occName id_name))

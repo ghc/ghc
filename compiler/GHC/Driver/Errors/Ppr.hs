@@ -1,6 +1,8 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic {DriverMessage, GhcMessage}
 
 module GHC.Driver.Errors.Ppr (
@@ -26,6 +28,8 @@ import GHC.Types.SrcLoc
 import Data.Version
 
 import Language.Haskell.Syntax.Decls (RuleDecl(..))
+import GHC.Tc.Errors.Types (TcRnMessage)
+import GHC.HsToCore.Errors.Types (DsMessage)
 
 --
 -- Suggestions
@@ -36,19 +40,23 @@ suggestInstantiatedWith :: ModuleName -> GenInstantiations UnitId -> [Instantiat
 suggestInstantiatedWith pi_mod_name insts =
   [ InstantiationSuggestion k v | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name) : insts) ]
 
-
 instance Diagnostic GhcMessage where
-  diagnosticMessage = \case
+  type DiagnosticOpts GhcMessage = GhcMessageOpts
+  defaultDiagnosticOpts = GhcMessageOpts (defaultDiagnosticOpts @PsMessage)
+                                         (defaultDiagnosticOpts @TcRnMessage)
+                                         (defaultDiagnosticOpts @DsMessage)
+                                         (defaultDiagnosticOpts @DriverMessage)
+  diagnosticMessage opts = \case
     GhcPsMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage (psMessageOpts opts) m
     GhcTcRnMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage (tcMessageOpts opts) m
     GhcDsMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage (dsMessageOpts opts) m
     GhcDriverMessage m
-      -> diagnosticMessage m
-    GhcUnknownMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage (driverMessageOpts opts) m
+    GhcUnknownMessage (UnknownDiagnostic @e m)
+      -> diagnosticMessage (defaultDiagnosticOpts @e) m
 
   diagnosticReason = \case
     GhcPsMessage m
@@ -77,11 +85,13 @@ instance Diagnostic GhcMessage where
   diagnosticCode = constructorCode
 
 instance Diagnostic DriverMessage where
-  diagnosticMessage = \case
-    DriverUnknownMessage m
-      -> diagnosticMessage m
+  type DiagnosticOpts DriverMessage = DriverMessageOpts
+  defaultDiagnosticOpts = DriverMessageOpts (defaultDiagnosticOpts @PsMessage)
+  diagnosticMessage opts = \case
+    DriverUnknownMessage (UnknownDiagnostic @e m)
+      -> diagnosticMessage (defaultDiagnosticOpts @e) m
     DriverPsHeaderMessage m
-      -> diagnosticMessage m
+      -> diagnosticMessage (psDiagnosticOpts opts) m
     DriverMissingHomeModules missing buildingCabalPackage
       -> let msg | buildingCabalPackage == YesBuildingCabalPackage
                  = hang

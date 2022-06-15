@@ -51,7 +51,8 @@ main = do
       case mres of
         Nothing -> do
           let diag_opts = initDiagOpts dflags
-          printMessages logger diag_opts warnings
-          printMessages logger diag_opts errors
+              print_config = initTcMessageOpts dflags
+          printMessages logger print_config diag_opts warnings
+          printMessages logger print_config diag_opts errors
         Just (t, _) -> do
           putStrLn $ showSDoc dflags (debugPprType t)

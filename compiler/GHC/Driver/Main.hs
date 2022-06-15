@@ -4,6 +4,7 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
@@ -381,9 +382,10 @@ getHscEnv = Hsc $ \e w -> return (e, w)
 handleWarnings :: Hsc ()
 handleWarnings = do
     diag_opts <- initDiagOpts <$> getDynFlags
+    print_config <- initPrintConfig <$> getDynFlags
     logger <- getLogger
     w <- getDiagnostics
-    liftIO $ printOrThrowDiagnostics logger diag_opts w
+    liftIO $ printOrThrowDiagnostics logger print_config diag_opts w
     clearDiagnostics
 
 -- | log warning in the monad, and if there are errors then
@@ -401,7 +403,7 @@ handleWarningsThrowErrors (warnings, errors) = do
     logDiagnostics (GhcPsMessage <$> warnings)
     logger <- getLogger
     let (wWarns, wErrs) = partitionMessages warnings
-    liftIO $ printMessages logger diag_opts wWarns
+    liftIO $ printMessages logger NoDiagnosticOpts diag_opts wWarns
     throwErrors $ fmap GhcPsMessage $ errors `unionMessages` wErrs
 
 -- | Deal with errors and warnings returned by a compilation step
@@ -1067,6 +1069,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
   let bcknd  = backend dflags
       hsc_src = ms_hsc_src summary
       diag_opts = initDiagOpts dflags
+      print_config = initPrintConfig dflags
 
   -- Desugar, if appropriate
   --
@@ -1081,7 +1084,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
 
   -- Report the warnings from both typechecking and desugar together
   w <- getDiagnostics
-  liftIO $ printOrThrowDiagnostics logger diag_opts (unionMessages tc_warnings w)
+  liftIO $ printOrThrowDiagnostics logger print_config diag_opts (unionMessages tc_warnings w)
   clearDiagnostics
 
   -- Simplify, if appropriate, and (whether we simplified or not) generate an
@@ -1657,7 +1660,7 @@ checkPkgTrust pkgs = do
 -- may call it on modules using Trustworthy or Unsafe flags so as to allow
 -- warning flags for safety to function correctly. See Note [Safe Haskell
 -- Inference].
-markUnsafeInfer :: Diagnostic e => TcGblEnv -> Messages e -> Hsc TcGblEnv
+markUnsafeInfer :: forall e . Diagnostic e => TcGblEnv -> Messages e -> Hsc TcGblEnv
 markUnsafeInfer tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
@@ -1686,7 +1689,9 @@ markUnsafeInfer tcg_env whyUnsafe = do
     whyUnsafe' df = vcat [ quotes pprMod <+> text "has been inferred as unsafe!"
                          , text "Reason:"
                          , nest 4 $ (vcat $ badFlags df) $+$
-                                    (vcat $ pprMsgEnvelopeBagWithLoc (getMessages whyUnsafe)) $+$
+                                    -- MP: Using defaultDiagnosticOpts here is not right but it's also not right to handle these
+                                    -- unsafety error messages in an unstructured manner.
+                                    (vcat $ pprMsgEnvelopeBagWithLoc (defaultDiagnosticOpts @e) (getMessages whyUnsafe)) $+$
                                     (vcat $ badInsts $ tcg_insts tcg_env)
                          ]
     badFlags df   = concatMap (badFlag df) unsafeFlagsForInfer

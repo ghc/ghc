@@ -106,8 +106,9 @@ doBackpack [src_filename] = do
                         -- Not doing so caused #20396.
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
     liftIO $ checkProcessArgsResult unhandled_flags
-    liftIO $ printOrThrowDiagnostics logger (initDiagOpts dflags) (GhcPsMessage <$> p_warns)
-    liftIO $ handleFlagWarnings logger (initDiagOpts dflags) warns
+    let print_config = initPrintConfig dflags
+    liftIO $ printOrThrowDiagnostics logger print_config (initDiagOpts dflags) (GhcPsMessage <$> p_warns)
+    liftIO $ handleFlagWarnings logger print_config (initDiagOpts dflags) warns
     -- TODO: Preprocessing not implemented
 
     buf <- liftIO $ hGetStringBuffer src_filename

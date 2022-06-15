@@ -1,9 +1,10 @@
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic TcRnMessage
 
@@ -95,15 +96,16 @@ import Data.Ord ( comparing )
 import Data.Bifunctor
 import GHC.Types.Name.Env
 
-
 instance Diagnostic TcRnMessage where
-  diagnosticMessage = \case
-    TcRnUnknownMessage m
-      -> diagnosticMessage m
+  type DiagnosticOpts TcRnMessage = NoDiagnosticOpts
+  defaultDiagnosticOpts = NoDiagnosticOpts
+  diagnosticMessage opts = \case
+    TcRnUnknownMessage (UnknownDiagnostic @e m)
+      -> diagnosticMessage (defaultDiagnosticOpts @e) m
     TcRnMessageWithInfo unit_state msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed err_info msg
-             -> messageWithInfoDiagnosticMessage unit_state err_info (diagnosticMessage msg)
+             -> messageWithInfoDiagnosticMessage unit_state err_info (diagnosticMessage opts msg)
     TcRnSolverReport msg _ _
       -> mkSimpleDecorated $ pprSolverReportWithCtxt msg
     TcRnRedundantConstraints redundants (info, show_info)

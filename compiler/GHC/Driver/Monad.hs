@@ -147,7 +147,8 @@ logDiagnostics warns = do
   dflags <- getSessionDynFlags
   logger <- getLogger
   let !diag_opts = initDiagOpts dflags
-  liftIO $ printOrThrowDiagnostics logger diag_opts warns
+      !print_config = initPrintConfig dflags
+  liftIO $ printOrThrowDiagnostics logger print_config diag_opts warns
 
 -- -----------------------------------------------------------------------------
 -- | A minimal implementation of a 'GhcMonad'.  If you need a custom monad,
@@ -224,7 +225,8 @@ printException err = do
   dflags <- getDynFlags
   logger <- getLogger
   let !diag_opts = initDiagOpts dflags
-  liftIO $ printMessages logger diag_opts (srcErrorMessages err)
+      !print_config = initPrintConfig dflags
+  liftIO $ printMessages logger print_config diag_opts (srcErrorMessages err)
 
 -- | A function called to log warnings and errors.
 type WarnErrLogger = forall m. (HasDynFlags m , MonadIO m, HasLogger m) => Maybe SourceError -> m ()

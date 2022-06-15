@@ -4,7 +4,10 @@
 
 module GHC.Driver.Errors.Types (
     GhcMessage(..)
-  , DriverMessage(..), DriverMessages, PsMessage(PsHeaderMessage)
+  , GhcMessageOpts(..)
+  , DriverMessage(..)
+  , DriverMessageOpts(..)
+  , DriverMessages, PsMessage(PsHeaderMessage)
   , BuildingCabalPackage(..)
   , WarningMessages
   , ErrorMessages
@@ -91,13 +94,20 @@ data GhcMessage where
 
   deriving Generic
 
+
+data GhcMessageOpts = GhcMessageOpts { psMessageOpts :: DiagnosticOpts PsMessage
+                                     , tcMessageOpts :: DiagnosticOpts TcRnMessage
+                                     , dsMessageOpts :: DiagnosticOpts DsMessage
+                                     , driverMessageOpts :: DiagnosticOpts DriverMessage
+                                     }
+
 -- | Creates a new 'GhcMessage' out of any diagnostic. This function is also
 -- provided to ease the integration of #18516 by allowing diagnostics to be
 -- wrapped into the general (but structured) 'GhcMessage' type, so that the
 -- conversion can happen gradually. This function should not be needed within
 -- GHC, as it would typically be used by plugin or library authors (see
 -- comment for the 'GhcUnknownMessage' type constructor)
-ghcUnknownMessage :: (Diagnostic a, Typeable a) => a -> GhcMessage
+ghcUnknownMessage :: (DiagnosticOpts a ~ NoDiagnosticOpts, Diagnostic a, Typeable a) => a -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage . UnknownDiagnostic
 
 -- | Abstracts away the frequent pattern where we are calling 'ioMsgMaybe' on
@@ -117,6 +127,7 @@ type DriverMessages = Messages DriverMessage
 data DriverMessage where
   -- | Simply wraps a generic 'Diagnostic' message @a@.
   DriverUnknownMessage :: UnknownDiagnostic -> DriverMessage
+
   -- | A parse error in parsing a Haskell file header during dependency
   -- analysis
   DriverPsHeaderMessage :: !PsMessage -> DriverMessage
@@ -358,6 +369,9 @@ data DriverMessage where
   DriverHomePackagesNotClosed :: ![UnitId] -> DriverMessage
 
 deriving instance Generic DriverMessage
+
+data DriverMessageOpts =
+  DriverMessageOpts { psDiagnosticOpts :: DiagnosticOpts PsMessage }
 
 -- | Pass to a 'DriverMessage' the information whether or not the
 -- '-fbuilding-cabal-package' flag is set.

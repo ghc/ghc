@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor   #-}
 {-# LANGUAGE RankNTypes      #-}
 {-# LANGUAGE ViewPatterns    #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-
 (c) The AQUA Project, Glasgow University, 1994-1998
@@ -25,9 +26,9 @@ module GHC.Utils.Error (
         errorsFound, isEmptyMessages,
 
         -- ** Formatting
-        pprMessageBag, pprMsgEnvelopeBagWithLoc,
+        pprMessageBag, pprMsgEnvelopeBagWithLoc, pprMsgEnvelopeBagWithLocDefault,
         pprMessages,
-        pprLocMsgEnvelope,
+        pprLocMsgEnvelope, pprLocMsgEnvelopeDefault,
         formatBulleted,
 
         -- ** Construction
@@ -228,14 +229,22 @@ formatBulleted ctx (unDecorated -> docs)
     msgs    = filter (not . Outputable.isEmpty ctx) docs
     starred = (bullet<+>)
 
-pprMessages :: Diagnostic e => Messages e -> SDoc
-pprMessages = vcat . pprMsgEnvelopeBagWithLoc . getMessages
+pprMessages :: Diagnostic e => DiagnosticOpts e -> Messages e -> SDoc
+pprMessages e = vcat . pprMsgEnvelopeBagWithLoc e . getMessages
 
-pprMsgEnvelopeBagWithLoc :: Diagnostic e => Bag (MsgEnvelope e) -> [SDoc]
-pprMsgEnvelopeBagWithLoc bag = [ pprLocMsgEnvelope item | item <- sortMsgBag Nothing bag ]
+pprMsgEnvelopeBagWithLoc :: Diagnostic e => DiagnosticOpts e -> Bag (MsgEnvelope e) -> [SDoc]
+pprMsgEnvelopeBagWithLoc e bag = [ pprLocMsgEnvelope e item | item <- sortMsgBag Nothing bag ]
 
-pprLocMsgEnvelope :: Diagnostic e => MsgEnvelope e -> SDoc
-pprLocMsgEnvelope (MsgEnvelope { errMsgSpan      = s
+-- | Print the messages with the suitable default configuration, usually not what you want but sometimes you don't really
+-- care about what the configuration is (for example, if the message is in a panic).
+pprMsgEnvelopeBagWithLocDefault :: forall e . Diagnostic e => Bag (MsgEnvelope e) -> [SDoc]
+pprMsgEnvelopeBagWithLocDefault bag = [ pprLocMsgEnvelopeDefault item | item <- sortMsgBag Nothing bag ]
+
+pprLocMsgEnvelopeDefault :: forall e . Diagnostic e => MsgEnvelope e -> SDoc
+pprLocMsgEnvelopeDefault = pprLocMsgEnvelope (defaultDiagnosticOpts @e)
+
+pprLocMsgEnvelope :: Diagnostic e => DiagnosticOpts e -> MsgEnvelope e -> SDoc
+pprLocMsgEnvelope opts (MsgEnvelope { errMsgSpan      = s
                                , errMsgDiagnostic = e
                                , errMsgSeverity  = sev
                                , errMsgContext   = unqual })
@@ -244,7 +253,7 @@ pprLocMsgEnvelope (MsgEnvelope { errMsgSpan      = s
       mkLocMessage
         (MCDiagnostic sev (diagnosticReason e) (diagnosticCode e))
         s
-        (formatBulleted ctx $ diagnosticMessage e)
+        (formatBulleted ctx $ diagnosticMessage opts e)
 
 sortMsgBag :: Maybe DiagOpts -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
 sortMsgBag mopts = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList

@@ -4,6 +4,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeApplications #-}
 
 module GHC.Types.Error
    ( -- * Messages
@@ -31,6 +34,8 @@ module GHC.Types.Error
    , mkPlainError
    , mkDecoratedDiagnostic
    , mkDecoratedError
+
+   , NoDiagnosticOpts(..)
 
    -- * Hints and refactoring actions
    , GhcHint (..)
@@ -211,11 +216,16 @@ mapDecoratedSDoc f (Decorated s1) =
 -- GHC's case, it can be an error or a warning) and the /reason/ why such
 -- message was generated in the first place.
 class Diagnostic a where
+
+  -- | Type of configuration options for the diagnostic.
+  type DiagnosticOpts a
+  defaultDiagnosticOpts :: DiagnosticOpts a
+
   -- | Extract the error message text from a 'Diagnostic'.
-  diagnosticMessage :: a -> DecoratedSDoc
+  diagnosticMessage :: DiagnosticOpts a -> a -> DecoratedSDoc
 
   -- | Extract the reason for this diagnostic. For warnings,
-  -- a 'DiagnosticReason' includes the warning flag
+  -- a 'DiagnosticReason' includes the warning flag.
   diagnosticReason  :: a -> DiagnosticReason
 
   -- | Extract any hints a user might use to repair their
@@ -238,17 +248,25 @@ class Diagnostic a where
 
 -- | An existential wrapper around an unknown diagnostic.
 data UnknownDiagnostic where
-  UnknownDiagnostic :: (Typeable diag, Diagnostic diag) => diag -> UnknownDiagnostic
+  UnknownDiagnostic :: (DiagnosticOpts a ~ NoDiagnosticOpts, Diagnostic a, Typeable a)
+                    => a -> UnknownDiagnostic
 
 instance Diagnostic UnknownDiagnostic where
-  diagnosticMessage (UnknownDiagnostic diag) = diagnosticMessage diag
-  diagnosticReason  (UnknownDiagnostic diag) = diagnosticReason  diag
-  diagnosticHints   (UnknownDiagnostic diag) = diagnosticHints   diag
-  diagnosticCode    (UnknownDiagnostic diag) = diagnosticCode    diag
+  type DiagnosticOpts UnknownDiagnostic = NoDiagnosticOpts
+  defaultDiagnosticOpts = NoDiagnosticOpts
+  diagnosticMessage _ (UnknownDiagnostic diag) = diagnosticMessage NoDiagnosticOpts diag
+  diagnosticReason    (UnknownDiagnostic diag) = diagnosticReason  diag
+  diagnosticHints     (UnknownDiagnostic diag) = diagnosticHints   diag
+  diagnosticCode      (UnknownDiagnostic diag) = diagnosticCode    diag
 
-pprDiagnostic :: Diagnostic e => e -> SDoc
+-- A fallback 'DiagnosticOpts' which can be used when there are no options
+-- for a particular diagnostic.
+data NoDiagnosticOpts = NoDiagnosticOpts
+
+pprDiagnostic :: forall e . Diagnostic e => e -> SDoc
 pprDiagnostic e = vcat [ ppr (diagnosticReason e)
-                       , nest 2 (vcat (unDecorated (diagnosticMessage e))) ]
+                       , nest 2 (vcat (unDecorated (diagnosticMessage opts e))) ]
+  where opts = defaultDiagnosticOpts @e
 
 -- | A generic 'Hint' message, to be used with 'DiagnosticMessage'.
 data DiagnosticHint = DiagnosticHint !SDoc
@@ -268,7 +286,9 @@ data DiagnosticMessage = DiagnosticMessage
   }
 
 instance Diagnostic DiagnosticMessage where
-  diagnosticMessage = diagMessage
+  type DiagnosticOpts DiagnosticMessage = NoDiagnosticOpts
+  defaultDiagnosticOpts = NoDiagnosticOpts
+  diagnosticMessage _ = diagMessage
   diagnosticReason  = diagReason
   diagnosticHints   = diagHints
   diagnosticCode _  = Nothing
@@ -429,10 +449,10 @@ instance ToJson MessageClass where
 instance Show (MsgEnvelope DiagnosticMessage) where
     show = showMsgEnvelope
 
--- | Shows an 'MsgEnvelope'.
-showMsgEnvelope :: Diagnostic a => MsgEnvelope a -> String
+-- | Shows an 'MsgEnvelope'. Only use this for debugging.
+showMsgEnvelope :: forall a . Diagnostic a => MsgEnvelope a -> String
 showMsgEnvelope err =
-  renderWithContext defaultSDocContext (vcat (unDecorated . diagnosticMessage $ errMsgDiagnostic err))
+  renderWithContext defaultSDocContext (vcat (unDecorated . (diagnosticMessage (defaultDiagnosticOpts @a)) $ errMsgDiagnostic err))
 
 pprMessageBag :: Bag SDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))

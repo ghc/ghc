@@ -8,6 +8,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeApplications #-}
 
 -----------------------------------------------------------------------------
 --
@@ -162,7 +163,8 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
     to_driver_messages :: Messages GhcMessage -> Messages DriverMessage
     to_driver_messages msgs = case traverse to_driver_message msgs of
       Nothing    -> pprPanic "non-driver message in preprocess"
-                             (vcat $ pprMsgEnvelopeBagWithLoc (getMessages msgs))
+                             -- MP: Default config is fine here as it's just in a panic.
+                             (vcat $ pprMsgEnvelopeBagWithLoc (defaultDiagnosticOpts @GhcMessage) (getMessages msgs))
       Just msgs' -> msgs'
 
     to_driver_message = \case
@@ -690,8 +692,9 @@ preprocessPipeline pipe_env hsc_env input_fn = do
             -- Reparse with original hsc_env so that we don't get duplicated options
             use (T_FileArgs hsc_env pp_fn)
 
-  liftIO (printOrThrowDiagnostics (hsc_logger hsc_env) (initDiagOpts dflags3) (GhcPsMessage <$> p_warns3))
-  liftIO (handleFlagWarnings (hsc_logger hsc_env) (initDiagOpts dflags3) warns3)
+  let print_config = initPrintConfig dflags3
+  liftIO (printOrThrowDiagnostics (hsc_logger hsc_env) print_config (initDiagOpts dflags3) (GhcPsMessage <$> p_warns3))
+  liftIO (handleFlagWarnings (hsc_logger hsc_env) print_config (initDiagOpts dflags3) warns3)
   return (dflags3, pp_fn)
 
 

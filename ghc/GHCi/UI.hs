@@ -3136,7 +3136,7 @@ newDynFlags interactive_only minus_opts = do
       idflags0 <- GHC.getInteractiveDynFlags
       (idflags1, leftovers, warns) <- DynFlags.parseDynamicFlagsCmdLine idflags0 lopts
 
-      liftIO $ handleFlagWarnings logger (initDiagOpts idflags1) warns
+      liftIO $ handleFlagWarnings logger (initPrintConfig idflags1) (initDiagOpts idflags1) warns
       when (not $ null leftovers)
            (throwGhcException . CmdLineError
             $ "Some flags have not been recognized: "

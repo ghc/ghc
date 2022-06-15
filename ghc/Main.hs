@@ -247,7 +247,7 @@ main' postLoadMode units dflags0 args flagWarnings = do
   handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
-         liftIO $ handleFlagWarnings logger4 (initDiagOpts dflags4) flagWarnings'
+         liftIO $ handleFlagWarnings logger4 (initPrintConfig dflags4) (initDiagOpts dflags4) flagWarnings'
 
   liftIO $ showBanner postLoadMode dflags4
 
@@ -779,7 +779,7 @@ initMulti unitArgsFiles  = do
     handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
-         liftIO $ handleFlagWarnings logger (initDiagOpts dflags2) warns
+         liftIO $ handleFlagWarnings logger (initPrintConfig dflags2) (initDiagOpts dflags2) warns
 
     let (dflags3, srcs, objs) = parseTargetFiles dflags2 (map unLoc fileish_args)
         dflags4 = offsetDynFlags dflags3

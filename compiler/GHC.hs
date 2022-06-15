@@ -929,7 +929,8 @@ checkNewDynFlags logger dflags = do
   -- See Note [DynFlags consistency]
   let (dflags', warnings) = makeDynFlagsConsistent dflags
   let diag_opts = initDiagOpts dflags
-  liftIO $ handleFlagWarnings logger diag_opts (map (Warn WarningWithoutFlag) warnings)
+      print_config = initPrintConfig dflags
+  liftIO $ handleFlagWarnings logger print_config diag_opts (map (Warn WarningWithoutFlag) warnings)
   return dflags'
 
 checkNewInteractiveDynFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
@@ -939,7 +940,8 @@ checkNewInteractiveDynFlags logger dflags0 = do
   if xopt LangExt.StaticPointers dflags0
   then do
     let diag_opts = initDiagOpts dflags0
-    liftIO $ printOrThrowDiagnostics logger diag_opts $ singleMessage
+        print_config = initPrintConfig dflags0
+    liftIO $ printOrThrowDiagnostics logger print_config diag_opts $ singleMessage
       $ fmap GhcDriverMessage
       $ mkPlainMsgEnvelope diag_opts interactiveSrcSpan DriverStaticPointersNotSupported
     return $ xopt_unset dflags0 LangExt.StaticPointers
