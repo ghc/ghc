@@ -260,22 +260,24 @@ rtsPackageArgs = package rts ? do
     libnumaIncludeDir <- getSetting LibnumaIncludeDir
     libnumaLibraryDir <- getSetting LibnumaLibDir
 
-    -- Arguments passed to GHC when compiling C and .cmm sources.
-    let ghcArgs = mconcat
-          [ arg "-Irts"
-          , arg $ "-I" ++ path
-          , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
+    -- CPP arguments passed to GHC when compiling C and .cmm sources.
+    let cppArgs = mconcat
+          [ arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
           , arg $ "-DCOMPILING_RTS"
           , notM targetSupportsSMP           ? arg "-DNOSMP"
-          , way `elem` [debug, debugDynamic] ? pure [ "-DTICKY_TICKY"
-                                                    , "-optc-DTICKY_TICKY"]
+          , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
-          , notM targetSupportsSMP           ? pure [ "-DNOSMP"
-                                                    , "-optc-DNOSMP" ]
+          , notM targetSupportsSMP           ? arg "-DNOSMP"
           ]
+
+    -- Arguments passed to GHC when compiling C and .cmm sources.
+    let ghcArgs = mconcat
+          [ arg "-Irts"
+          , arg $ "-I" ++ path
+          ] <> cppArgs
 
     let cArgs = mconcat
           [ rtsWarnings
@@ -377,7 +379,9 @@ rtsPackageArgs = package rts ? do
         , builder (Cc (FindCDependencies CDep)) ? cArgs
         , builder (Cc (FindCDependencies CxxDep)) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
+        , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cppArgs
         , builder (Ghc CompileCppWithGhc) ? map ("-optcxx" ++) <$> cArgs
+        , builder (Ghc CompileCppWithGhc) ? map ("-optcxx" ++) <$> cppArgs
         , builder Ghc ? ghcArgs
 
         , builder HsCpp ? pure
