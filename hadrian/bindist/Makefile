@@ -1,7 +1,6 @@
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
-include mk/install.mk
 include mk/config.mk
 
 .PHONY: default
@@ -30,22 +29,22 @@ define installscript
 # to it. This implementation is a bit hacky and depends on consistency
 # of program names. For hadrian build this will work as programs have a
 # consistent naming procedure.
-	if [ -L wrappers/$1 ]; then echo "$1 is a symlink"; fi
-	@if [ -L wrappers/$1 ]; then \
-		cp -RP wrappers/$1 $2; \
-	else								 \
-		rm -f '$2' && 		 \
-		$(CREATE_SCRIPT) '$2' && \
-		echo "#!$(SHELL)" >>  '$2'  && \
-		echo "exedir=\"$4\"" >> '$2'  && \
-		echo "exeprog=\"$1\"" >> '$2'  && \
-		echo "executablename=\"$5\"" >> '$2'  && \
-		echo "bindir=\"$3\"" >> '$2'  && \
-		echo "libdir=\"$6\"" >> '$2'  && \
-		echo "docdir=\"$7\"" >> '$2'  && \
-		echo "includedir=\"$8\"" >> '$2'  && \
-		echo "" >> '$2'  && \
-		cat wrappers/$1 >> '$2'  && \
+	if [ -L 'wrappers/$1' ]; then echo "$1 is a symlink"; fi
+	@if [ -L 'wrappers/$1' ]; then \
+		cp -RP 'wrappers/$1' '$2'; \
+	else \
+		rm -f '$2'                                                                      && \
+		$(CREATE_SCRIPT) '$2'                                                           && \
+		echo "#!$(SHELL)"                                                       >> '$2' && \
+		echo 'bindir="$$(dirname "$$(realpath "$$0")")"'                        >> '$2' && \
+		echo "exedir=\"\$$bindir/$$(realpath -m --relative-to "$3" "$4")\""     >> '$2' && \
+		echo "exeprog=\"$1\""                                                   >> '$2' && \
+		echo 'executablename="$$exedir/$$exeprog"'                              >> '$2' && \
+		echo "libdir=\"\$$bindir/$$(realpath -m --relative-to "$3" "$6")\""     >> '$2' && \
+		echo "docdir=\"\$$bindir/$$(realpath -m --relative-to "$3" "$7")\""     >> '$2' && \
+		echo "includedir=\"\$$bindir/$$(realpath -m --relative-to "$3" "$8")\"" >> '$2' && \
+		echo ""                                                                 >> '$2' && \
+		cat 'wrappers/$1'                                                       >> '$2' && \
 		$(EXECUTABLE_FILE) '$2' ; \
 	fi
 	@echo "$1 installed to $2"
@@ -88,7 +87,7 @@ install: install_bin install_lib install_includes
 install: install_docs update_package_db
 
 ActualBinsDir=${ghclibdir}/bin
-ifeq "$(TargetOS_CPP)" "mingw32"
+ifeq "$(RelocatableBuild)" "YES"
 ActualLibsDir=${ghclibdir}
 else
 ActualLibsDir=${ghclibdir}/lib

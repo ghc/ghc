@@ -181,13 +181,11 @@ else
 GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_GHC_PROGRAMS)),YES,NO)
 endif
 
-# On Windows we normally want to make a relocatable bindist, to we
-# ignore flags like libdir
-ifeq "$(Windows_Host)" "YES"
+# We want to install libraries in $(prefix)/lib and not
+# $(prefix)/lib/ghc-$version, to avoid hard-coding ghc versions
+# in the build system. We do this (rather indirectly) by unconditionally
+# enabling 'RelocatableBuild'.
 RelocatableBuild = YES
-else
-RelocatableBuild = NO
-endif
 
 # needs to be after $(RelocatableBuild) is set above
 include $(TOP)/mk/install.mk
