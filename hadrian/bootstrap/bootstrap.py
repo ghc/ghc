@@ -29,7 +29,7 @@ from typing import Set, Optional, Dict, List, Tuple, \
 
 #logging.basicConfig(level=logging.INFO)
 
-BUILDDIR    = Path('_build')
+BUILDDIR    = Path('.')
 
 BINDIR      = BUILDDIR / 'bin'            # binaries go there (--bindir)
 DISTDIR     = BUILDDIR / 'dists'          # --builddir
@@ -465,20 +465,12 @@ Alternatively, you could use `bootstrap.py -d {args.deps} fetch -o $TARBALL` to 
         bootstrap(info, ghc)
         hadrian_path = (BINDIR / 'hadrian').resolve()
 
-        archive = make_archive(hadrian_path)
-
         print(dedent(f'''
             Bootstrapping finished!
 
             The resulting hadrian executable can be found at
 
                 {hadrian_path}
-
-            It have been archived for distribution in
-
-                {archive}
-
-            You can use this executable to build GHC.
         '''))
     else:
       print(f"No such command: {args.command}")
