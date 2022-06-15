@@ -713,11 +713,17 @@ bool
 ignoreCCS (CostCentreStack const *ccs)
 {
     return RtsFlags.CcFlags.doCostCentres < COST_CENTRES_ALL &&
-        (   ccs == CCS_OVERHEAD
-         || ccs == CCS_DONT_CARE
-         || ccs == CCS_GC
-         || ccs == CCS_SYSTEM
-         || ccs == CCS_IDLE);
+        specialCCS(ccs);
+}
+
+bool
+specialCCS (CostCentreStack const *ccs)
+{
+    return ccs == CCS_OVERHEAD
+        || ccs == CCS_DONT_CARE
+        || ccs == CCS_GC
+        || ccs == CCS_SYSTEM
+        || ccs == CCS_IDLE;
 }
 
 void
