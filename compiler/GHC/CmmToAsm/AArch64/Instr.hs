@@ -80,6 +80,8 @@ regUsageOfInstr platform instr = case instr of
   MSUB dst src1 src2 src3  -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   MUL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   NEG dst src              -> usage (regOp src, regOp dst)
+  SMULH dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
+  SMULL dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
   SDIV dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
   SUB dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   UDIV dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -209,6 +211,8 @@ patchRegsOfInstr instr env = case instr of
     MSUB o1 o2 o3 o4 -> MSUB (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
     MUL o1 o2 o3   -> MUL (patchOp o1) (patchOp o2) (patchOp o3)
     NEG o1 o2      -> NEG (patchOp o1) (patchOp o2)
+    SMULH o1 o2 o3 -> SMULH (patchOp o1) (patchOp o2)  (patchOp o3)
+    SMULL o1 o2 o3 -> SMULL (patchOp o1) (patchOp o2)  (patchOp o3)
     SDIV o1 o2 o3  -> SDIV (patchOp o1) (patchOp o2) (patchOp o3)
     SUB o1 o2 o3   -> SUB  (patchOp o1) (patchOp o2) (patchOp o3)
     UDIV o1 o2 o3  -> UDIV (patchOp o1) (patchOp o2) (patchOp o3)
@@ -562,8 +566,8 @@ data Instr
     -- | SMADDL ...
     -- | SMNEGL ...
     -- | SMSUBL ...
-    -- | SMULH ...
-    -- | SMULL ...
+    | SMULH Operand Operand Operand
+    | SMULL Operand Operand Operand
     | SUB Operand Operand Operand -- rd = rn - op2
     -- | SUBS ...
     | UDIV Operand Operand Operand -- rd = rn ÷ rm
