@@ -32,7 +32,7 @@ module GHC (
         GhcMode(..), GhcLink(..),
         parseDynamicFlags, parseTargetFiles,
         getSessionDynFlags,
-        setTopSessionDynFlags,
+        setTopSessionDynFlags, setTopSessionInteractiveDynFlags,
         setSessionDynFlags,
         setUnitDynFlags,
         getProgramDynFlags, setProgramDynFlags,
@@ -701,13 +701,14 @@ setTopSessionDynFlags dflags = do
       return Nothing
 #endif
 
-
   modifySession $ \h -> hscSetFlags dflags
-                        h{ hsc_IC = (hsc_IC h){ ic_dflags = dflags }
-                         , hsc_interp = hsc_interp h <|> interp
-                         }
+                        h{ hsc_interp = hsc_interp h <|> interp }
 
   invalidateModSummaryCache
+
+setTopSessionInteractiveDynFlags :: GhciMonad m => DynFlags -> m ()
+setTopSessionInteractiveDynFlags dflags = do
+  modifyInteractiveContext $ \ic -> ic{ ic_dflags = dflags }
 
 -- | Sets the program 'DynFlags'.  Note: this invalidates the internal
 -- cached module graph, causing more work to be done the next time
@@ -796,31 +797,28 @@ getProgramDynFlags = getSessionDynFlags
 -- Note: this cannot be used for changes to packages.  Use
 -- 'setSessionDynFlags', or 'setProgramDynFlags' and then copy the
 -- 'unitState' into the interactive @DynFlags@.
-setInteractiveDynFlags :: GhcMonad m => DynFlags -> m ()
+setInteractiveDynFlags :: GhciMonad m => DynFlags -> m ()
 setInteractiveDynFlags dflags = do
   logger <- getLogger
   dflags' <- checkNewDynFlags logger dflags
   dflags'' <- checkNewInteractiveDynFlags logger dflags'
-  modifySessionM $ \hsc_env0 -> do
-    let ic0 = hsc_IC hsc_env0
-
+  hsc_env <- getSession
+  modifyInteractiveContextM $ \ic0 -> do
     -- Initialise (load) plugins in the interactive environment with the new
     -- DynFlags
-    plugin_env <- liftIO $ initializePlugins $ mkInteractiveHscEnv $
-                    hsc_env0 { hsc_IC = ic0 { ic_dflags = dflags'' }}
+    let ic1 = ic0{ ic_dflags = dflags'' }
+    plugin_env <- liftIO $ initializePlugins (mkInteractiveHscEnv hsc_env ic1) ic1
 
     -- Update both plugins cache and DynFlags in the interactive context.
-    return $ hsc_env0
-                { hsc_IC = ic0
-                    { ic_plugins = hsc_plugins plugin_env
-                    , ic_dflags  = hsc_dflags  plugin_env
-                    }
+    return $ ic0
+                { ic_plugins = hsc_plugins plugin_env
+                , ic_dflags  = hsc_dflags  plugin_env
                 }
 
 
 -- | Get the 'DynFlags' used to evaluate interactive expressions.
-getInteractiveDynFlags :: GhcMonad m => m DynFlags
-getInteractiveDynFlags = withSession $ \h -> return (ic_dflags (hsc_IC h))
+getInteractiveDynFlags :: GhciMonad m => m DynFlags
+getInteractiveDynFlags = ic_dflags <$> getInteractiveContext
 
 
 parseDynamicFlags
@@ -1285,8 +1283,10 @@ compileCore simplify fn = do
              hsc_env <- getSession
              simpl_guts <- liftIO $ do
                plugins <- readIORef (tcg_th_coreplugins tcg)
-               hscSimplify hsc_env plugins mod_guts
-             tidy_guts <- liftIO $ hscTidy hsc_env simpl_guts
+               -- TODO interactive context?
+               hscSimplify hsc_env (emptyInteractiveContext $ hsc_dflags hsc_env) plugins mod_guts
+             -- TODO interactive context?
+             tidy_guts <- liftIO $ hscTidy hsc_env Nothing simpl_guts
              return $ Left tidy_guts
           else
              return $ Right mod_guts
@@ -1334,19 +1334,21 @@ isLoadedModule uid m = withSession $ \hsc_env ->
   return $! isJust (lookupHug (hsc_HUG hsc_env) uid m)
 
 -- | Return the bindings for the current interactive session.
-getBindings :: GhcMonad m => m [TyThing]
-getBindings = withSession $ \hsc_env ->
-    return $ icInScopeTTs $ hsc_IC hsc_env
+getBindings :: GhciMonad m => m [TyThing]
+getBindings = icInScopeTTs <$> getInteractiveContext
 
 -- | Return the instances for the current interactive session.
-getInsts :: GhcMonad m => m ([ClsInst], [FamInst])
-getInsts = withSession $ \hsc_env ->
-    let (inst_env, fam_env) = ic_instances (hsc_IC hsc_env)
-    in return (instEnvElts inst_env, fam_env)
+getInsts :: GhciMonad m => m ([ClsInst], [FamInst])
+getInsts = do
+  ic <- getInteractiveContext
+  let (inst_env, fam_env) = ic_instances ic
+  return (instEnvElts inst_env, fam_env)
 
-getPrintUnqual :: GhcMonad m => m PrintUnqualified
-getPrintUnqual = withSession $ \hsc_env -> do
-  return $ icPrintUnqual (hsc_unit_env hsc_env) (hsc_IC hsc_env)
+getPrintUnqual :: GhciMonad m => m PrintUnqualified
+getPrintUnqual = do
+  hsc_env <- getSession
+  ic <- getInteractiveContext
+  return $ icPrintUnqual (hsc_unit_env hsc_env) ic
 
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
@@ -1363,16 +1365,18 @@ data ModuleInfo = ModuleInfo {
 
 
 -- | Request information about a loaded 'Module'
-getModuleInfo :: GhcMonad m => Module -> m (Maybe ModuleInfo)  -- XXX: Maybe X
-getModuleInfo mdl = withSession $ \hsc_env -> do
+getModuleInfo :: GhciMonad m => Module -> m (Maybe ModuleInfo)  -- XXX: Maybe X
+getModuleInfo mdl = do
+  hsc_env <- getSession
+  ic <- getInteractiveContext
   if moduleUnitId mdl `S.member` hsc_all_home_unit_ids hsc_env
         then liftIO $ getHomeModuleInfo hsc_env mdl
-        else liftIO $ getPackageModuleInfo hsc_env mdl
+        else liftIO $ getPackageModuleInfo hsc_env ic mdl
 
-getPackageModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
-getPackageModuleInfo hsc_env mdl
+getPackageModuleInfo :: HscEnv -> InteractiveContext -> Module -> IO (Maybe ModuleInfo)
+getPackageModuleInfo hsc_env ic mdl
   = do  eps <- hscEPS hsc_env
-        iface <- hscGetModuleInterface hsc_env mdl
+        iface <- hscGetModuleInterface hsc_env ic mdl
         let
             avails = mi_exports iface
             pte    = eps_PTE eps
@@ -1487,13 +1491,13 @@ findGlobalAnns deserialize target = withSession $ \hsc_env -> do
     return (findAnns deserialize ann_env target)
 
 -- | get the GlobalRdrEnv for a session
-getGRE :: GhcMonad m => m GlobalRdrEnv
-getGRE = withSession $ \hsc_env-> return $ icReaderEnv (hsc_IC hsc_env)
+getGRE :: GhciMonad m => m GlobalRdrEnv
+getGRE = icReaderEnv <$> getInteractiveContext
 
 -- | Retrieve all type and family instances in the environment, indexed
 -- by 'Name'. Each name's lists will contain every instance in which that name
 -- is mentioned in the instance head.
-getNameToInstancesIndex :: GhcMonad m
+getNameToInstancesIndex :: GhciMonad m
   => [Module]        -- ^ visible modules. An orphan instance will be returned
                      -- if it is visible from at least one module in the list.
   -> Maybe [Module]  -- ^ modules to load. If this is not specified, we load
@@ -1501,9 +1505,10 @@ getNameToInstancesIndex :: GhcMonad m
   -> m (Messages TcRnMessage, Maybe (NameEnv ([ClsInst], [FamInst])))
 getNameToInstancesIndex visible_mods mods_to_load = do
   hsc_env <- getSession
-  liftIO $ runTcInteractive hsc_env $
+  ic <- getInteractiveContext
+  liftIO $ runTcInteractive hsc_env ic $
     do { case mods_to_load of
-           Nothing -> loadUnqualIfaces hsc_env (hsc_IC hsc_env)
+           Nothing -> loadUnqualIfaces hsc_env ic
            Just mods ->
              let doc = text "Need interface for reporting instances in scope"
              in initIfaceTcRn $ mapM_ (loadSysInterface doc) mods
@@ -1728,30 +1733,35 @@ lookupLoadedHomeModule uid mod_name = withSession $ \hsc_env ->
 --
 -- We return True to indicate the import is safe and False otherwise
 -- although in the False case an error may be thrown first.
-isModuleTrusted :: GhcMonad m => Module -> m Bool
-isModuleTrusted m = withSession $ \hsc_env ->
-    liftIO $ hscCheckSafe hsc_env m noSrcSpan
+isModuleTrusted :: GhciMonad m => Module -> m Bool
+isModuleTrusted m = do
+  hsc_env <- getSession
+  ic <- getInteractiveContext
+  liftIO $ hscCheckSafe hsc_env (Just ic) m noSrcSpan
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
-moduleTrustReqs :: GhcMonad m => Module -> m (Bool, Set UnitId)
-moduleTrustReqs m = withSession $ \hsc_env ->
-    liftIO $ hscGetSafe hsc_env m noSrcSpan
+moduleTrustReqs :: GhciMonad m => Module -> m (Bool, Set UnitId)
+moduleTrustReqs m = do
+  hsc_env <- getSession
+  ic <- getInteractiveContext
+  liftIO $ hscGetSafe hsc_env (Just ic) m noSrcSpan
 
 -- | Set the monad GHCi lifts user statements into.
 --
 -- Checks that a type (in string form) is an instance of the
 -- @GHC.GHCi.GHCiSandboxIO@ type class. Sets it to be the GHCi monad if it is,
 -- throws an error otherwise.
-setGHCiMonad :: GhcMonad m => String -> m ()
-setGHCiMonad name = withSession $ \hsc_env -> do
-    ty <- liftIO $ hscIsGHCiMonad hsc_env name
-    modifySession $ \s ->
-        let ic = (hsc_IC s) { ic_monad = ty }
-        in s { hsc_IC = ic }
+setGHCiMonad :: GhciMonad m => String -> m ()
+setGHCiMonad name = do
+  hsc_env <- getSession
+  ic0 <- getInteractiveContext
+  ty <- liftIO $ hscIsGHCiMonad hsc_env ic0 name
+  modifyInteractiveContext $ \ic ->
+    ic { ic_monad = ty }
 
 -- | Get the monad GHCi lifts user statements into.
-getGHCiMonad :: GhcMonad m => m Name
-getGHCiMonad = fmap (ic_monad . hsc_IC) getSession
+getGHCiMonad :: GhciMonad m => m Name
+getGHCiMonad = ic_monad <$> getInteractiveContext
 
 getHistorySpan :: GhcMonad m => History -> m SrcSpan
 getHistorySpan h = withSession $ \hsc_env ->
@@ -1761,17 +1771,20 @@ obtainTermFromVal :: GhcMonad m => Int ->  Bool -> Type -> a -> m Term
 obtainTermFromVal bound force ty a = withSession $ \hsc_env ->
     liftIO $ GHC.Runtime.Eval.obtainTermFromVal hsc_env bound force ty a
 
-obtainTermFromId :: GhcMonad m => Int -> Bool -> Id -> m Term
-obtainTermFromId bound force id = withSession $ \hsc_env ->
-    liftIO $ GHC.Runtime.Eval.obtainTermFromId hsc_env bound force id
+obtainTermFromId :: GhciMonad m => Int -> Bool -> Id -> m Term
+obtainTermFromId bound force id = do
+  hsc_env <- getSession
+  ic <- getInteractiveContext
+  liftIO $ GHC.Runtime.Eval.obtainTermFromId hsc_env ic bound force id
 
 
 -- | Returns the 'TyThing' for a 'Name'.  The 'Name' may refer to any
 -- entity known to GHC, including 'Name's defined using 'runStmt'.
-lookupName :: GhcMonad m => Name -> m (Maybe TyThing)
-lookupName name =
-     withSession $ \hsc_env ->
-       liftIO $ hscTcRcLookupName hsc_env name
+lookupName :: GhciMonad m => Name -> m (Maybe TyThing)
+lookupName name = do
+  hsc_env <- getSession
+  ic <- getInteractiveContext
+  liftIO $ hscTcRcLookupName hsc_env ic name
 
 -- -----------------------------------------------------------------------------
 -- Pure API

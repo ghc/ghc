@@ -13,6 +13,7 @@
 -- -----------------------------------------------------------------------------
 
 module GHC.Runtime.Eval (
+        GhciMonad(..), modifyInteractiveContextM,
         Resume(..), History(..),
         execStmt, execStmt', ExecOptions(..), execOptions, ExecResult(..), resumeExec,
         runDecls, runDeclsWithLocation, runParsedDecls,
@@ -47,6 +48,7 @@ module GHC.Runtime.Eval (
 import GHC.Prelude
 
 import GHC.Driver.Monad
+import GHC.Driver.Monad.Interactive
 import GHC.Driver.Main
 import GHC.Driver.Errors.Types ( hoistTcRnMessage )
 import GHC.Driver.Env
@@ -140,8 +142,8 @@ import GHC.Unit.Env
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
 
-getResumeContext :: GhcMonad m => m [Resume]
-getResumeContext = withSession (return . ic_resume . hsc_IC)
+getResumeContext :: GhciMonad m => m [Resume]
+getResumeContext = ic_resume <$> getInteractiveContext
 
 mkHistory :: HscEnv -> ForeignHValue -> BreakInfo -> History
 mkHistory hsc_env hval bi = History hval bi (findEnclosingDecls hsc_env bi)
@@ -168,11 +170,10 @@ findEnclosingDecls hsc_env (BreakInfo modl ix) =
    in modBreaks_decls mb ! ix
 
 -- | Update fixity environment in the current interactive context.
-updateFixityEnv :: GhcMonad m => FixityEnv -> m ()
+updateFixityEnv :: GhciMonad m => FixityEnv -> m ()
 updateFixityEnv fix_env = do
-  hsc_env <- getSession
-  let ic = hsc_IC hsc_env
-  setSession $ hsc_env { hsc_IC = ic { ic_fix_env = fix_env } }
+  ic <- getInteractiveContext
+  setInteractiveContext $ ic { ic_fix_env = fix_env }
 
 -- -----------------------------------------------------------------------------
 -- execStmt
@@ -188,16 +189,17 @@ execOptions = ExecOptions
 
 -- | Run a statement in the current interactive context.
 execStmt
-  :: GhcMonad m
+  :: GhciMonad m
   => String             -- ^ a statement (bind or expression)
   -> ExecOptions
   -> m ExecResult
 execStmt input exec_opts@ExecOptions{..} = do
     hsc_env <- getSession
+    ic <- getInteractiveContext
 
     mb_stmt <-
       liftIO $
-      runInteractiveHsc hsc_env $
+      runInteractiveHsc hsc_env ic $
       hscParseStmtWithLocation execSourceFile execLineNumber input
 
     case mb_stmt of
@@ -208,18 +210,19 @@ execStmt input exec_opts@ExecOptions{..} = do
 -- | Like `execStmt`, but takes a parsed statement as argument. Useful when
 -- doing preprocessing on the AST before execution, e.g. in GHCi (see
 -- GHCi.UI.runStmt).
-execStmt' :: GhcMonad m => GhciLStmt GhcPs -> String -> ExecOptions -> m ExecResult
+execStmt' :: GhciMonad m => GhciLStmt GhcPs -> String -> ExecOptions -> m ExecResult
 execStmt' stmt stmt_text ExecOptions{..} = do
     hsc_env <- getSession
+    ic <- getInteractiveContext
     let interp = hscInterp hsc_env
 
     -- Turn off -fwarn-unused-local-binds when running a statement, to hide
     -- warnings about the implicit bindings we introduce.
-    let ic       = hsc_IC hsc_env -- use the interactive dflags
-        idflags' = ic_dflags ic `wopt_unset` Opt_WarnUnusedLocalBinds
-        hsc_env' = mkInteractiveHscEnv (hsc_env{ hsc_IC = ic{ ic_dflags = idflags' }})
+    let idflags' = ic_dflags ic `wopt_unset` Opt_WarnUnusedLocalBinds
+        ic' = ic { ic_dflags = idflags' }
+        hsc_env' = mkInteractiveHscEnv hsc_env ic'
 
-    r <- liftIO $ hscParsedStmt hsc_env' stmt
+    r <- liftIO $ hscParsedStmt hsc_env' ic' stmt
 
     case r of
       Nothing ->
@@ -234,37 +237,39 @@ execStmt' stmt stmt_text ExecOptions{..} = do
               let eval_opts = initEvalOpts idflags' (isStep execSingleStep)
               evalStmt interp eval_opts (execWrap hval)
 
-        let ic = hsc_IC hsc_env
-            bindings = (ic_tythings ic, ic_gre_cache ic)
+        ic <- getInteractiveContext
+        let bindings = (ic_tythings ic, ic_gre_cache ic)
 
             size = ghciHistSize idflags'
 
         handleRunStatus execSingleStep stmt_text bindings ids
                         status (emptyHistory size)
 
-runDecls :: GhcMonad m => String -> m [Name]
+runDecls :: GhciMonad m => String -> m [Name]
 runDecls = runDeclsWithLocation "<interactive>" 1
 
 -- | Run some declarations and return any user-visible names that were brought
 -- into scope.
-runDeclsWithLocation :: GhcMonad m => String -> Int -> String -> m [Name]
+runDeclsWithLocation :: GhciMonad m => String -> Int -> String -> m [Name]
 runDeclsWithLocation source line_num input = do
     hsc_env <- getSession
-    decls <- liftIO (hscParseDeclsWithLocation hsc_env source line_num input)
+    ic <- getInteractiveContext
+    decls <- liftIO (hscParseDeclsWithLocation hsc_env ic source line_num input)
     runParsedDecls decls
 
 -- | Like `runDeclsWithLocation`, but takes parsed declarations as argument.
 -- Useful when doing preprocessing on the AST before execution, e.g. in GHCi
 -- (see GHCi.UI.runStmt).
-runParsedDecls :: GhcMonad m => [LHsDecl GhcPs] -> m [Name]
+runParsedDecls :: GhciMonad m => [LHsDecl GhcPs] -> m [Name]
 runParsedDecls decls = do
     hsc_env <- getSession
-    (tyThings, ic) <- liftIO (hscParsedDecls hsc_env decls)
+    ic0 <- getInteractiveContext
+    (tyThings, ic) <- liftIO (hscParsedDecls hsc_env ic0 decls)
 
-    setSession $ hsc_env { hsc_IC = ic }
+    setInteractiveContext ic
     hsc_env <- getSession
-    hsc_env' <- liftIO $ rttiEnvironment hsc_env
-    setSession hsc_env'
+    ic1 <- liftIO $ rttiEnvironment hsc_env ic
+    setInteractiveContext ic1
     return $ filter (not . isDerivedOccName . nameOccName)
              -- For this filter, see Note [What to show to users]
            $ map getName tyThings
@@ -279,7 +284,7 @@ them. The relevant predicate is OccName.isDerivedOccName.
 See #11051 for more background and examples.
 -}
 
-withVirtualCWD :: GhcMonad m => m a -> m a
+withVirtualCWD :: GhciMonad m => m a -> m a
 withVirtualCWD m = do
   hsc_env <- getSession
 
@@ -288,7 +293,7 @@ withVirtualCWD m = do
   case interpInstance <$> hsc_interp hsc_env of
     Just (ExternalInterp {}) -> m
     _ -> do
-      let ic = hsc_IC hsc_env
+      ic <- getInteractiveContext
       let set_cwd = do
             dir <- liftIO $ getCurrentDirectory
             case ic_cwd ic of
@@ -298,20 +303,21 @@ withVirtualCWD m = do
 
           reset_cwd orig_dir = do
             virt_dir <- liftIO $ getCurrentDirectory
-            hsc_env <- getSession
-            let old_IC = hsc_IC hsc_env
-            setSession hsc_env{  hsc_IC = old_IC{ ic_cwd = Just virt_dir } }
+            old_ic <- getInteractiveContext
+            setInteractiveContext old_ic{ ic_cwd = Just virt_dir }
             liftIO $ setCurrentDirectory orig_dir
 
       MC.bracket set_cwd reset_cwd $ \_ -> m
 
-parseImportDecl :: GhcMonad m => String -> m (ImportDecl GhcPs)
-parseImportDecl expr = withSession $ \hsc_env -> liftIO $ hscImport hsc_env expr
+parseImportDecl :: GhciMonad m => String -> m (ImportDecl GhcPs)
+parseImportDecl expr = withSession $ \hsc_env -> do
+  ic <- getInteractiveContext
+  liftIO $ hscImport hsc_env ic expr
 
 emptyHistory :: Int -> BoundedList History
 emptyHistory size = nilBL size
 
-handleRunStatus :: GhcMonad m
+handleRunStatus :: GhciMonad m
                 => SingleStep -> String
                 -> ResumeBindings
                 -> [Id]
@@ -369,8 +375,9 @@ handleRunStatus step expr bindings final_ids status history
              modl = mi_module (hm_iface hmi)
              bp | is_exception = Nothing
                 | otherwise = Just (BreakInfo modl ix)
-         (hsc_env1, names, span, decl) <- liftIO $
-           bindLocalsAtBreakpoint hsc_env apStack_fhv bp
+         ictxt0 <- getInteractiveContext
+         (ictxt1, names, span, decl) <- liftIO $
+           bindLocalsAtBreakpoint hsc_env ictxt0 apStack_fhv bp
          let
            resume = Resume
              { resumeStmt = expr, resumeContext = resume_ctxt_fhv
@@ -381,20 +388,21 @@ handleRunStatus step expr bindings final_ids status history
              , resumeDecl = decl
              , resumeCCS = ccs
              , resumeHistoryIx = 0 }
-           hsc_env2 = pushResume hsc_env1 resume
+           ictxt2 = pushResume ictxt1 resume
 
-         setSession hsc_env2
+         setInteractiveContext ictxt2
          return (ExecBreak names bp)
 
     -- Completed successfully
     | EvalComplete allocs (EvalSuccess hvals) <- status
     = do hsc_env <- getSession
-         let final_ic = extendInteractiveContextWithIds (hsc_IC hsc_env) final_ids
+         ic <- getInteractiveContext
+         let final_ic = extendInteractiveContextWithIds ic final_ids
              final_names = map getName final_ids
              interp = hscInterp hsc_env
          liftIO $ Loader.extendLoadedEnv interp (zip final_names hvals)
-         hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
-         setSession hsc_env'
+         ic' <- liftIO $ rttiEnvironment hsc_env final_ic
+         setInteractiveContext ic'
          return (ExecComplete (Right final_names) allocs)
 
     -- Completed with an exception
@@ -407,13 +415,13 @@ handleRunStatus step expr bindings final_ids status history
 #endif
 
 
-resumeExec :: GhcMonad m => (SrcSpan->Bool) -> SingleStep -> Maybe Int
+resumeExec :: GhciMonad m => (SrcSpan->Bool) -> SingleStep -> Maybe Int
            -> m ExecResult
 resumeExec canLogSpan step mbCnt
  = do
    hsc_env <- getSession
-   let ic = hsc_IC hsc_env
-       resume = ic_resume ic
+   ic <- getInteractiveContext
+   let resume = ic_resume ic
 
    case resume of
      [] -> liftIO $
@@ -426,7 +434,7 @@ resumeExec canLogSpan step mbCnt
             ic' = ic { ic_tythings = resume_tmp_te,
                        ic_gre_cache = resume_gre_cache,
                        ic_resume   = rs }
-        setSession hsc_env{ hsc_IC = ic' }
+        setInteractiveContext ic'
 
         -- remove any bindings created since the breakpoint from the
         -- linker's environment
@@ -472,16 +480,17 @@ setupBreakpoint hsc_env brkInfo cnt = do
   _ <- liftIO $ GHCi.storeBreakpoint interp breakarray ix cnt
   pure ()
 
-back :: GhcMonad m => Int -> m ([Name], Int, SrcSpan, String)
+back :: GhciMonad m => Int -> m ([Name], Int, SrcSpan, String)
 back n = moveHist (+n)
 
-forward :: GhcMonad m => Int -> m ([Name], Int, SrcSpan, String)
+forward :: GhciMonad m => Int -> m ([Name], Int, SrcSpan, String)
 forward n = moveHist (subtract n)
 
-moveHist :: GhcMonad m => (Int -> Int) -> m ([Name], Int, SrcSpan, String)
+moveHist :: GhciMonad m => (Int -> Int) -> m ([Name], Int, SrcSpan, String)
 moveHist fn = do
   hsc_env <- getSession
-  case ic_resume (hsc_IC hsc_env) of
+  ic <- getInteractiveContext
+  case ic_resume ic of
      [] -> liftIO $
            throwGhcExceptionIO (ProgramError "not stopped at a breakpoint")
      (r:rs) -> do
@@ -496,13 +505,13 @@ moveHist fn = do
 
         let
           update_ic apStack mb_info = do
-            (hsc_env1, names, span, decl) <-
-              liftIO $ bindLocalsAtBreakpoint hsc_env apStack mb_info
-            let ic = hsc_IC hsc_env1
-                r' = r { resumeHistoryIx = new_ix }
-                ic' = ic { ic_resume = r':rs }
+            ic <- getInteractiveContext
+            (ic1, names, span, decl) <-
+              liftIO $ bindLocalsAtBreakpoint hsc_env ic apStack mb_info
+            let r' = r { resumeHistoryIx = new_ix }
+                ic2 = ic1 { ic_resume = r':rs }
 
-            setSession hsc_env1{ hsc_IC = ic' }
+            setInteractiveContext ic2
 
             return (names, new_ix, span, decl)
 
@@ -527,34 +536,34 @@ result_fs = fsLit "_result"
 
 bindLocalsAtBreakpoint
         :: HscEnv
+        -> InteractiveContext
         -> ForeignHValue
         -> Maybe BreakInfo
-        -> IO (HscEnv, [Name], SrcSpan, String)
+        -> IO (InteractiveContext, [Name], SrcSpan, String)
 
 -- Nothing case: we stopped when an exception was raised, not at a
 -- breakpoint.  We have no location information or local variables to
 -- bind, all we can do is bind a local variable to the exception
 -- value.
-bindLocalsAtBreakpoint hsc_env apStack Nothing = do
+bindLocalsAtBreakpoint hsc_env ictxt0 apStack Nothing = do
    let exn_occ = mkVarOccFS (fsLit "_exception")
        span    = mkGeneralSrcSpan (fsLit "<unknown>")
-   exn_name <- newInteractiveBinder hsc_env exn_occ span
+   exn_name <- newInteractiveBinder hsc_env ictxt0 exn_occ span
 
    let e_fs    = fsLit "e"
        e_name  = mkInternalName (getUnique e_fs) (mkTyVarOccFS e_fs) span
        e_tyvar = mkRuntimeUnkTyVar e_name liftedTypeKind
        exn_id  = Id.mkVanillaGlobal exn_name (mkTyVarTy e_tyvar)
 
-       ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 [exn_id]
        interp = hscInterp hsc_env
    --
    Loader.extendLoadedEnv interp [(exn_name, apStack)]
-   return (hsc_env{ hsc_IC = ictxt1 }, [exn_name], span, "<exception thrown>")
+   return (ictxt1, [exn_name], span, "<exception thrown>")
 
 -- Just case: we stopped at a breakpoint, we have information about the location
 -- of the breakpoint and the free variables of the expression.
-bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
+bindLocalsAtBreakpoint hsc_env ictxt0 apStack_fhv (Just BreakInfo{..}) = do
    let
        hmi       = expectJust "bindLocalsAtBreakpoint" $
                      lookupHpt (hsc_HPT hsc_env) (moduleName breakInfo_module)
@@ -594,7 +603,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
                       map (substTy tv_subst . idType) filtered_ids
 
    new_ids     <- zipWith3M mkNewId occs'' tidy_tys filtered_ids
-   result_name <- newInteractiveBinder hsc_env (mkVarOccFS result_fs) span
+   result_name <- newInteractiveBinder hsc_env ictxt0 (mkVarOccFS result_fs) span
 
    let result_id = Id.mkVanillaGlobal result_name
                      (substTy tv_subst result_ty)
@@ -602,15 +611,14 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
 
        final_ids | result_ok = result_id : new_ids
                  | otherwise = new_ids
-       ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 final_ids
        names  = map idName new_ids
 
    let fhvs = catMaybes mb_hValues
    Loader.extendLoadedEnv interp (zip names fhvs)
    when result_ok $ Loader.extendLoadedEnv interp [(result_name, apStack_fhv)]
-   hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
-   return (hsc_env1, if result_ok then result_name:names else names, span, decl)
+   ictxt2 <- rttiEnvironment hsc_env ictxt1
+   return (ictxt2, if result_ok then result_name:names else names, span, decl)
   where
         -- We need a fresh Unique for each Id we bind, because the linker
         -- state is single-threaded and otherwise we'd spam old bindings
@@ -618,7 +626,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
         -- saved/restored, but not the linker state.  See #1743, test break026.
    mkNewId :: OccName -> Type -> Id -> IO Id
    mkNewId occ ty old_id
-     = do { name <- newInteractiveBinder hsc_env occ (getSrcSpan old_id)
+     = do { name <- newInteractiveBinder hsc_env ictxt0 occ (getSrcSpan old_id)
           ; return (Id.mkVanillaGlobalWithInfo name ty (idInfo old_id)) }
 
    newTyVars :: UniqSupply -> [TcTyVar] -> TCvSubst
@@ -648,31 +656,31 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
        joinOccs = zipWithEqual "bindLocalsAtBreakpoint" joinOcc
        joinOcc mbV oc = (\(a,b) c -> (a,b,c)) <$> mbV <*> pure oc
 
-rttiEnvironment :: HscEnv -> IO HscEnv
-rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
-   let tmp_ids = [id | AnId id <- ic_tythings ic]
+rttiEnvironment :: HscEnv -> InteractiveContext -> IO InteractiveContext
+rttiEnvironment hsc_env ic0 = do
+   let tmp_ids = [id | AnId id <- ic_tythings ic0]
        incompletelyTypedIds =
            [id | id <- tmp_ids
                , not $ noSkolems id
                , (occNameFS.nameOccName.idName) id /= result_fs]
-   foldM improveTypes hsc_env (map idName incompletelyTypedIds)
+   foldM (improveTypes hsc_env) ic0 (map idName incompletelyTypedIds)
     where
      noSkolems = noFreeVarsOfType . idType
-     improveTypes hsc_env@HscEnv{hsc_IC=ic} name = do
+     improveTypes hsc_env ic name = do
       let tmp_ids = [id | AnId id <- ic_tythings ic]
           Just id = find (\i -> idName i == name) tmp_ids
       if noSkolems id
-         then return hsc_env
+         then return ic
          else do
-           mb_new_ty <- reconstructType hsc_env 10 id
+           mb_new_ty <- reconstructType hsc_env ic 10 id
            let old_ty = idType id
            case mb_new_ty of
-             Nothing -> return hsc_env
+             Nothing -> return ic
              Just new_ty -> do
               case improveRTTIType hsc_env old_ty new_ty of
                Nothing -> return $
                         warnPprTrace True (":print failed to calculate the "
-                                           ++ "improvement for a type") empty hsc_env
+                                           ++ "improvement for a type") empty ic
                Just subst -> do
                  let logger = hsc_logger hsc_env
                  putDumpFileMaybe logger Opt_D_dump_rtti "RTTI"
@@ -680,14 +688,12 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
                    (fsep [text "RTTI Improvement for", ppr id, equals,
                           ppr subst])
 
-                 let ic' = substInteractiveContext ic subst
-                 return hsc_env{hsc_IC=ic'}
+                 pure $ substInteractiveContext ic subst
 
-pushResume :: HscEnv -> Resume -> HscEnv
-pushResume hsc_env resume = hsc_env { hsc_IC = ictxt1 }
-  where
-        ictxt0 = hsc_IC hsc_env
-        ictxt1 = ictxt0 { ic_resume = resume : ic_resume ictxt0 }
+pushResume :: InteractiveContext -> Resume -> InteractiveContext
+pushResume ictxt0 resume = ictxt0
+  { ic_resume = resume : ic_resume ictxt0
+  }
 
 
   {-
@@ -721,29 +727,29 @@ pushResume hsc_env resume = hsc_env { hsc_IC = ictxt1 }
 -- -----------------------------------------------------------------------------
 -- Abandoning a resume context
 
-abandon :: GhcMonad m => m Bool
+abandon :: GhciMonad m => m Bool
 abandon = do
    hsc_env <- getSession
-   let ic = hsc_IC hsc_env
-       resume = ic_resume ic
+   ic <- getInteractiveContext
+   let resume = ic_resume ic
        interp = hscInterp hsc_env
    case resume of
       []    -> return False
       r:rs  -> do
-         setSession hsc_env{ hsc_IC = ic { ic_resume = rs } }
+         setInteractiveContext ic{ ic_resume = rs }
          liftIO $ abandonStmt interp (resumeContext r)
          return True
 
-abandonAll :: GhcMonad m => m Bool
+abandonAll :: GhciMonad m => m Bool
 abandonAll = do
    hsc_env <- getSession
-   let ic = hsc_IC hsc_env
-       resume = ic_resume ic
+   ic <- getInteractiveContext
+   let resume = ic_resume ic
        interp = hscInterp hsc_env
    case resume of
       []  -> return False
       rs  -> do
-         setSession hsc_env{ hsc_IC = ic { ic_resume = [] } }
+         setInteractiveContext ic{ ic_resume = [] }
          liftIO $ mapM_ (abandonStmt interp. resumeContext) rs
          return True
 
@@ -783,30 +789,33 @@ fromListBL bound l = BL (length l) bound l []
 -- We retain in scope all the things defined at the prompt, and kept
 -- in ic_tythings.  (Indeed, they shadow stuff from ic_imports.)
 
-setContext :: GhcMonad m => [InteractiveImport] -> m ()
+setContext :: GhciMonad m => [InteractiveImport] -> m ()
 setContext imports
   = do { hsc_env <- getSession
        ; let dflags = hsc_dflags hsc_env
-       ; all_env_err <- liftIO $ findGlobalRdrEnv hsc_env imports
+       ; old_ic <- getInteractiveContext
+       ; all_env_err <- liftIO $ findGlobalRdrEnv hsc_env old_ic imports
        ; case all_env_err of
            Left (mod, err) ->
                liftIO $ throwGhcExceptionIO (formatError dflags mod err)
            Right all_env -> do {
-       ; let old_ic         = hsc_IC hsc_env
-             !final_gre_cache = ic_gre_cache old_ic `replaceImportEnv` all_env
-       ; setSession
-         hsc_env{ hsc_IC = old_ic { ic_imports   = imports
-                                  , ic_gre_cache = final_gre_cache }}}}
+       ; let !final_gre_cache = ic_gre_cache old_ic `replaceImportEnv` all_env
+       ; setInteractiveContext
+           old_ic { ic_imports   = imports
+                  , ic_gre_cache = final_gre_cache
+                  }
+       }}
   where
     formatError dflags mod err = ProgramError . showSDoc dflags $
       text "Cannot add module" <+> ppr mod <+>
       text "to context:" <+> text err
 
-findGlobalRdrEnv :: HscEnv -> [InteractiveImport]
+findGlobalRdrEnv :: HscEnv -> InteractiveContext 
+                 -> [InteractiveImport]
                  -> IO (Either (ModuleName, String) GlobalRdrEnv)
 -- Compute the GlobalRdrEnv for the interactive context
-findGlobalRdrEnv hsc_env imports
-  = do { idecls_env <- hscRnImportDecls hsc_env idecls
+findGlobalRdrEnv hsc_env ic imports
+  = do { idecls_env <- hscRnImportDecls hsc_env ic idecls
                     -- This call also loads any orphan modules
        ; return $ case partitionEithers (map mkEnv imods) of
            ([], imods_env) -> Right (foldr plusGlobalRdrEnv idecls_env imods_env)
@@ -834,9 +843,8 @@ mkTopLevEnv hpt modl
 -- | Get the interactive evaluation context, consisting of a pair of the
 -- set of modules from which we take the full top-level scope, and the set
 -- of modules from which we take just the exports respectively.
-getContext :: GhcMonad m => m [InteractiveImport]
-getContext = withSession $ \HscEnv{ hsc_IC=ic } ->
-             return (ic_imports ic)
+getContext :: GhciMonad m => m [InteractiveImport]
+getContext = ic_imports <$> getInteractiveContext
 
 -- | Returns @True@ if the specified module is interpreted, and hence has
 -- its full top-level scope available.
@@ -853,15 +861,16 @@ moduleIsInterpreted modl = withSession $ \h ->
 -- are in scope (qualified or otherwise).  Otherwise we list a whole lot too many!
 -- The exact choice of which ones to show, and which to hide, is a judgement call.
 --      (see #1581)
-getInfo :: GhcMonad m => Bool -> Name
+getInfo :: GhciMonad m => Bool -> Name
         -> m (Maybe (TyThing,Fixity,[ClsInst],[FamInst], SDoc))
 getInfo allInfo name
   = withSession $ \hsc_env ->
-    do mb_stuff <- liftIO $ hscTcRnGetInfo hsc_env name
+    do ic <- getInteractiveContext
+       mb_stuff <- liftIO $ hscTcRnGetInfo hsc_env ic name
        case mb_stuff of
          Nothing -> return Nothing
          Just (thing, fixity, cls_insts, fam_insts, docs) -> do
-           let rdr_env = icReaderEnv (hsc_IC hsc_env)
+           let rdr_env = icReaderEnv ic
 
            -- Filter the instances based on whether the constituent names of their
            -- instance heads are all in scope.
@@ -883,16 +892,17 @@ getInfo allInfo name
                | otherwise              = True
 
 -- | Returns all names in scope in the current interactive context
-getNamesInScope :: GhcMonad m => m [Name]
-getNamesInScope = withSession $ \hsc_env ->
-  return (map greMangledName (globalRdrEnvElts (icReaderEnv (hsc_IC hsc_env))))
+getNamesInScope :: GhciMonad m => m [Name]
+getNamesInScope =
+  map greMangledName . globalRdrEnvElts . icReaderEnv
+  <$> getInteractiveContext
 
 -- | Returns all 'RdrName's in scope in the current interactive
 -- context, excluding any that are internally-generated.
-getRdrNamesInScope :: GhcMonad m => m [RdrName]
-getRdrNamesInScope = withSession $ \hsc_env -> do
+getRdrNamesInScope :: GhciMonad m => m [RdrName]
+getRdrNamesInScope = do
+  ic <- getInteractiveContext
   let
-      ic = hsc_IC hsc_env
       gbl_rdrenv = icReaderEnv ic
       gbl_names = concatMap greRdrNames $ globalRdrEnvElts gbl_rdrenv
   -- Exclude internally generated names; see e.g. #11328
@@ -901,13 +911,15 @@ getRdrNamesInScope = withSession $ \hsc_env -> do
 
 -- | Parses a string as an identifier, and returns the list of 'Name's that
 -- the identifier can refer to in the current interactive context.
-parseName :: GhcMonad m => String -> m [Name]
-parseName str = withSession $ \hsc_env -> liftIO $
-   do { lrdr_name <- hscParseIdentifier hsc_env str
-      ; hscTcRnLookupRdrName hsc_env lrdr_name }
+parseName :: GhciMonad m => String -> m [Name]
+parseName str = withSession $ \hsc_env -> do
+  ic <- getInteractiveContext
+  liftIO $ do
+    lrdr_name <- hscParseIdentifier hsc_env ic str
+    hscTcRnLookupRdrName hsc_env ic lrdr_name
 
 
-getDocs :: GhcMonad m
+getDocs :: GhciMonad m
         => Name
         -> m (Either GetDocsFailure (Maybe [HsDoc GhcRn], IntMap (HsDoc GhcRn)))
            -- TODO: What about docs for constructors etc.?
@@ -919,7 +931,8 @@ getDocs name =
          if isInteractiveModule mod
            then pure (Left InteractiveName)
            else do
-             iface <- liftIO $ hscGetModuleInterface hsc_env mod
+             ic <- getInteractiveContext
+             iface <- liftIO $ hscGetModuleInterface hsc_env ic mod
              case mi_docs iface of
                Nothing -> pure (Left (NoDocsInIface mod compiled))
                Just Docs { docs_decls = decls
@@ -967,18 +980,20 @@ instance Outputable GetDocsFailure where
 
 -- | Get the type of an expression
 -- Returns the type as described by 'TcRnExprMode'
-exprType :: GhcMonad m => TcRnExprMode -> String -> m Type
+exprType :: GhciMonad m => TcRnExprMode -> String -> m Type
 exprType mode expr = withSession $ \hsc_env -> do
-   ty <- liftIO $ hscTcExpr hsc_env mode expr
+   ic <- getInteractiveContext
+   ty <- liftIO $ hscTcExpr hsc_env ic mode expr
    return $ tidyType emptyTidyEnv ty
 
 -- -----------------------------------------------------------------------------
 -- Getting the kind of a type
 
 -- | Get the kind of a  type
-typeKind  :: GhcMonad m => Bool -> String -> m (Type, Kind)
-typeKind normalise str = withSession $ \hsc_env ->
-   liftIO $ hscKcType hsc_env normalise str
+typeKind :: GhciMonad m => Bool -> String -> m (Type, Kind)
+typeKind normalise str = withSession $ \hsc_env -> do
+   ic <- getInteractiveContext
+   liftIO $ hscKcType hsc_env ic normalise str
 
 -- ----------------------------------------------------------------------------
 -- Getting the class instances for a type
@@ -1027,23 +1042,25 @@ typeKind normalise str = withSession $ \hsc_env ->
 -}
 
 -- Find all instances that match a provided type
-getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
-getInstancesForType ty = withSession $ \hsc_env ->
-  liftIO $ runInteractiveHsc hsc_env $
-    ioMsgMaybe $ hoistTcRnMessage $ runTcInteractive hsc_env $ do
+getInstancesForType :: GhciMonad m => Type -> m [ClsInst]
+getInstancesForType ty = withSession $ \hsc_env -> do
+  ic <- getInteractiveContext
+  liftIO $ runInteractiveHsc hsc_env ic $
+    ioMsgMaybe $ hoistTcRnMessage $ runTcInteractive hsc_env ic $ do
       -- Bring class and instances from unqualified modules into scope, this fixes #16793.
-      loadUnqualIfaces hsc_env (hsc_IC hsc_env)
+      loadUnqualIfaces hsc_env ic
       matches <- findMatchingInstances ty
 
       fmap catMaybes . forM matches $ uncurry checkForExistence
 
 -- Parse a type string and turn any holes into skolems
-parseInstanceHead :: GhcMonad m => String -> m Type
+parseInstanceHead :: GhciMonad m => String -> m Type
 parseInstanceHead str = withSession $ \hsc_env0 -> do
-  (ty, _) <- liftIO $ runInteractiveHsc hsc_env0 $ do
+  ic <- getInteractiveContext
+  (ty, _) <- liftIO $ runInteractiveHsc hsc_env0 ic $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
-    ioMsgMaybe $ hoistTcRnMessage $ tcRnType hsc_env SkolemiseFlexi True ty
+    ioMsgMaybe $ hoistTcRnMessage $ tcRnType hsc_env ic SkolemiseFlexi True ty
 
   return ty
 
@@ -1171,25 +1188,26 @@ checkForExistence clsInst mb_inst_tys = do
 
 -- | Parse an expression, the parsed expression can be further processed and
 -- passed to compileParsedExpr.
-parseExpr :: GhcMonad m => String -> m (LHsExpr GhcPs)
-parseExpr expr = withSession $ \hsc_env ->
-  liftIO $ runInteractiveHsc hsc_env $ hscParseExpr expr
+parseExpr :: GhciMonad m => String -> m (LHsExpr GhcPs)
+parseExpr expr = withSession $ \hsc_env -> do
+  ic <- getInteractiveContext
+  liftIO $ runInteractiveHsc hsc_env ic $ hscParseExpr expr
 
 -- | Compile an expression, run it, and deliver the resulting HValue.
-compileExpr :: GhcMonad m => String -> m HValue
+compileExpr :: GhciMonad m => String -> m HValue
 compileExpr expr = do
   parsed_expr <- parseExpr expr
   compileParsedExpr parsed_expr
 
 -- | Compile an expression, run it, and deliver the resulting HValue.
-compileExprRemote :: GhcMonad m => String -> m ForeignHValue
+compileExprRemote :: GhciMonad m => String -> m ForeignHValue
 compileExprRemote expr = do
   parsed_expr <- parseExpr expr
   compileParsedExprRemote parsed_expr
 
 -- | Compile a parsed expression (before renaming), run it, and deliver
 -- the resulting HValue.
-compileParsedExprRemote :: GhcMonad m => LHsExpr GhcPs -> m ForeignHValue
+compileParsedExprRemote :: GhciMonad m => LHsExpr GhcPs -> m ForeignHValue
 compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
   let dflags = hsc_dflags hsc_env
   let interp = hscInterp hsc_env
@@ -1205,7 +1223,8 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
         ValBinds NoAnnSortKey
                      (unitBag $ mkHsVarBind loc' (getRdrName expr_name) expr) []
 
-  pstmt <- liftIO $ hscParsedStmt hsc_env let_stmt
+  ic <- getInteractiveContext
+  pstmt <- liftIO $ hscParsedStmt hsc_env ic let_stmt
   let (hvals_io, fix_env) = case pstmt of
         Just ([_id], hvals_io', fix_env') -> (hvals_io', fix_env')
         _ -> panic "compileParsedExprRemote"
@@ -1219,14 +1238,14 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
       liftIO $ throwIO (fromSerializableException e)
     _ -> panic "compileParsedExpr"
 
-compileParsedExpr :: GhcMonad m => LHsExpr GhcPs -> m HValue
+compileParsedExpr :: GhciMonad m => LHsExpr GhcPs -> m HValue
 compileParsedExpr expr = do
    fhv <- compileParsedExprRemote expr
    interp <- hscInterp <$> getSession
    liftIO $ wormhole interp fhv
 
 -- | Compile an expression, run it and return the result as a Dynamic.
-dynCompileExpr :: GhcMonad m => String -> m Dynamic
+dynCompileExpr :: GhciMonad m => String -> m Dynamic
 dynCompileExpr expr = do
   parsed_expr <- parseExpr expr
   -- > Data.Dynamic.toDyn expr
@@ -1269,16 +1288,16 @@ obtainTermFromVal hsc_env _bound _force _ty _x = case interpInstance interp of
   where
     interp = hscInterp hsc_env
 
-obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
-obtainTermFromId hsc_env bound force id =  do
+obtainTermFromId :: HscEnv -> InteractiveContext -> Int -> Bool -> Id -> IO Term
+obtainTermFromId hsc_env ic bound force id =  do
   (hv, _, _) <- Loader.loadName (hscInterp hsc_env) hsc_env (varName id)
-  cvObtainTerm hsc_env bound force (idType id) hv
+  cvObtainTerm hsc_env ic bound force (idType id) hv
 
 -- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
-reconstructType :: HscEnv -> Int -> Id -> IO (Maybe Type)
-reconstructType hsc_env bound id = do
+reconstructType :: HscEnv -> InteractiveContext -> Int -> Id -> IO (Maybe Type)
+reconstructType hsc_env ic bound id = do
   (hv, _, _) <- Loader.loadName (hscInterp hsc_env) hsc_env (varName id)
-  cvReconstructType hsc_env bound (idType id) hv
+  cvReconstructType hsc_env ic bound (idType id) hv
 
 mkRuntimeUnkTyVar :: Name -> Kind -> TyVar
 mkRuntimeUnkTyVar name kind = mkTcTyVar name kind RuntimeUnk

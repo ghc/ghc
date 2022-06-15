@@ -16,6 +16,7 @@ import GHC.Driver.Session
 import GHC.Driver.Config.Diagnostic
 
 import GHC.Core.Lint
+import GHC.Core.Lint.Interactive
 import GHC.Core.Opt.Config
 import GHC.Core.Opt.Simplify ( SimplifyOpts(..) )
 import GHC.Core.Opt.Simplify.Env ( SimplMode(..) )

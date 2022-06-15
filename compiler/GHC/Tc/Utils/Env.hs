@@ -143,34 +143,37 @@ import GHC.Driver.Env.KnotVars
 *                                                                      *
 ********************************************************************* -}
 
-lookupGlobal :: HscEnv -> Name -> IO TyThing
+lookupGlobal :: HscEnv -> Maybe InteractiveContext -> Name -> IO TyThing
 -- A variant of lookupGlobal_maybe for the clients which are not
 -- interested in recovering from lookup failure and accept panic.
-lookupGlobal hsc_env name
+lookupGlobal hsc_env m_ic name
   = do  {
-          mb_thing <- lookupGlobal_maybe hsc_env name
+          mb_thing <- lookupGlobal_maybe hsc_env m_ic name
         ; case mb_thing of
             Succeeded thing -> return thing
             Failed msg      -> pprPanic "lookupGlobal" msg
         }
 
-lookupGlobal_maybe :: HscEnv -> Name -> IO (MaybeErr SDoc TyThing)
+lookupGlobal_maybe :: HscEnv -> Maybe InteractiveContext -> Name -> IO (MaybeErr SDoc TyThing)
 -- This may look up an Id that one has previously looked up.
 -- If so, we are going to read its interface file, and add its bindings
 -- to the ExternalPackageTable.
-lookupGlobal_maybe hsc_env name
+lookupGlobal_maybe hsc_env m_ic name
   = do  {    -- Try local envt
-          let mod = icInteractiveModule (hsc_IC hsc_env)
-              mhome_unit = hsc_home_unit_maybe hsc_env
-              tcg_semantic_mod = homeModuleInstantiation mhome_unit mod
+          let m_tcg_semantic_mod = flip fmap m_ic $ \ic -> let
+                mod = icInteractiveModule ic
+                mhome_unit = hsc_home_unit_maybe hsc_env
+                in homeModuleInstantiation mhome_unit mod
 
-        ; if nameIsLocalOrFrom tcg_semantic_mod name
-              then (return
-                (Failed (text "Can't find local name: " <+> ppr name)))
-                  -- Internal names can happen in GHCi
-              else
-           -- Try home package table and external package table
-          lookupImported_maybe hsc_env name
+        ; case m_tcg_semantic_mod of 
+            Just tcg_semantic_mod
+              | nameIsLocalOrFrom tcg_semantic_mod name
+              -> return
+                (Failed (text "Can't find local name: " <+> ppr name))
+                -- Internal names can happen in GHCi
+            _ ->
+                -- Try home package table and external package table
+                lookupImported_maybe hsc_env name
         }
 
 lookupImported_maybe :: HscEnv -> Name -> IO (MaybeErr SDoc TyThing)
@@ -192,16 +195,16 @@ importDecl_maybe hsc_env name
   | otherwise
   = initIfaceLoad hsc_env (importDecl name)
 
-ioLookupDataCon :: HscEnv -> Name -> IO DataCon
-ioLookupDataCon hsc_env name = do
-  mb_thing <- ioLookupDataCon_maybe hsc_env name
+ioLookupDataCon :: HscEnv -> Maybe InteractiveContext -> Name -> IO DataCon
+ioLookupDataCon hsc_env m_ic name = do
+  mb_thing <- ioLookupDataCon_maybe hsc_env m_ic name
   case mb_thing of
     Succeeded thing -> return thing
     Failed msg      -> pprPanic "lookupDataConIO" msg
 
-ioLookupDataCon_maybe :: HscEnv -> Name -> IO (MaybeErr SDoc DataCon)
-ioLookupDataCon_maybe hsc_env name = do
-    thing <- lookupGlobal hsc_env name
+ioLookupDataCon_maybe :: HscEnv -> Maybe InteractiveContext -> Name -> IO (MaybeErr SDoc DataCon)
+ioLookupDataCon_maybe hsc_env m_ic name = do
+    thing <- lookupGlobal hsc_env m_ic name
     return $ case thing of
         AConLike (RealDataCon con) -> Succeeded con
         _                          -> Failed $

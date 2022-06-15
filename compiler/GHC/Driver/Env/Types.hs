@@ -11,7 +11,6 @@ import GHC.Driver.Session ( ContainsDynFlags(..), HasDynFlags(..), DynFlags )
 import GHC.Driver.LlvmConfigCache (LlvmConfigCache)
 
 import GHC.Prelude
-import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types ( Interp )
 import GHC.Types.Error ( Messages )
 import GHC.Types.Name.Cache
@@ -67,9 +66,6 @@ data HscEnv
 
         hsc_mod_graph :: ModuleGraph,
                 -- ^ The module graph of the current session
-
-        hsc_IC :: InteractiveContext,
-                -- ^ The context for evaluating interactive statements
 
         hsc_NC  :: {-# UNPACK #-} !NameCache,
                 -- ^ Global Name cache so that each Name gets a single Unique.

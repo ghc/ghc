@@ -33,6 +33,7 @@ import GHCi.Message ( fromSerializableException )
 
 import GHC.Core.DataCon
 import GHC.Core.Type
+import GHC.Runtime.Context ( InteractiveContext )
 import GHC.Types.RepType
 import GHC.Core.Multiplicity
 import qualified GHC.Core.Unify as U
@@ -529,16 +530,16 @@ type GhciType = Type
 --------------------------------
 type TR a = TcM a
 
-runTR :: HscEnv -> TR a -> IO a
-runTR hsc_env thing = do
-  mb_val <- runTR_maybe hsc_env thing
+runTR :: HscEnv -> InteractiveContext -> TR a -> IO a
+runTR hsc_env ic thing = do
+  mb_val <- runTR_maybe hsc_env ic thing
   case mb_val of
     Nothing -> error "unable to :print the term"
     Just x  -> return x
 
-runTR_maybe :: HscEnv -> TR a -> IO (Maybe a)
-runTR_maybe hsc_env thing_inside
-  = do { (_errs, res) <- initTcInteractive hsc_env thing_inside
+runTR_maybe :: HscEnv -> InteractiveContext -> TR a -> IO (Maybe a)
+runTR_maybe hsc_env ic thing_inside
+  = do { (_errs, res) <- initTcInteractive hsc_env ic thing_inside
        ; return res }
 
 -- | Term Reconstruction trace
@@ -708,12 +709,13 @@ addConstraint actual expected = do
 --
 cvObtainTerm
     :: HscEnv
+    -> InteractiveContext
     -> Int      -- ^ How many times to recurse for subterms
     -> Bool     -- ^ Force thunks
     -> RttiType -- ^ Type of the object to reconstruct
     -> ForeignHValue   -- ^ Object to reconstruct
     -> IO Term
-cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
+cvObtainTerm hsc_env ic max_depth force old_ty hval = runTR hsc_env ic $ do
   -- we quantify existential tyvars as universal,
   -- as this is needed to be able to manipulate
   -- them properly
@@ -990,11 +992,12 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
 --
 cvReconstructType
     :: HscEnv
+    -> InteractiveContext
     -> Int       -- ^ How many times to recurse for subterms
     -> GhciType  -- ^ Type to refine
     -> ForeignHValue  -- ^ Refine the type using this value
     -> IO (Maybe Type)
-cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
+cvReconstructType hsc_env ic max_depth old_ty hval = runTR_maybe hsc_env ic $ do
    traceTR (text "RTTI started with initial type " <> ppr old_ty)
    let sigma_old_ty@(old_tvs, _) = quantifyType old_ty
    new_ty <-

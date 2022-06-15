@@ -19,6 +19,7 @@ import GHC
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Monad
+import GHC.Driver.Monad.Interactive
 import GHC.Driver.Env
 
 import GHC.Linker.Loader
@@ -55,7 +56,7 @@ import Data.IORef
 -------------------------------------
 -- | The :print & friends commands
 -------------------------------------
-pprintClosureCommand :: GhcMonad m => Bool -> Bool -> String -> m ()
+pprintClosureCommand :: GhciMonad m => Bool -> Bool -> String -> m ()
 pprintClosureCommand bindThings force str = do
   tythings <- (catMaybes . concat) `liftM`
                  mapM (\w -> GHC.parseName w >>=
@@ -70,8 +71,8 @@ pprintClosureCommand bindThings force str = do
   (subst, terms) <- mapAccumLM go emptyTCvSubst ids
 
   -- Apply the substitutions obtained after recovering the types
-  modifySession $ \hsc_env ->
-    hsc_env{hsc_IC = substInteractiveContext (hsc_IC hsc_env) subst}
+  modifyInteractiveContext $ \ic ->
+    substInteractiveContext ic subst
 
   -- Finally, print the Results
   docterms <- mapM showTerm terms
@@ -94,14 +95,14 @@ pprintClosureCommand bindThings force str = do
           text "is not eligible for the :print, :sprint or :force commands."
 
    -- Helper to print out the results of :print and friends
-   printSDocs :: GhcMonad m => [SDoc] -> m ()
+   printSDocs :: GhciMonad m => [SDoc] -> m ()
    printSDocs sdocs = do
       logger <- getLogger
       unqual <- GHC.getPrintUnqual
       liftIO $ printOutputForUser logger unqual $ vcat sdocs
 
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
-   go :: GhcMonad m => TCvSubst -> Id -> m (TCvSubst, Term)
+   go :: GhciMonad m => TCvSubst -> Id -> m (TCvSubst, Term)
    go subst id = do
        let id' = updateIdTypeAndMult (substTy subst) id
            id_ty' = idType id'
@@ -126,10 +127,10 @@ pprintClosureCommand bindThings force str = do
                                   text "new substitution:" , ppr subst'])
                            ; return (subst `unionTCvSubst` subst', term')}
 
-   tidyTermTyVars :: GhcMonad m => Term -> m Term
-   tidyTermTyVars t =
-     withSession $ \hsc_env -> do
-     let env_tvs      = tyThingsTyCoVars $ ic_tythings $ hsc_IC hsc_env
+   tidyTermTyVars :: GhciMonad m => Term -> m Term
+   tidyTermTyVars t = do
+     ic <- getInteractiveContext
+     let env_tvs      = tyThingsTyCoVars $ ic_tythings ic
          my_tvs       = termTyCoVars t
          tvs          = env_tvs `minusVarSet` my_tvs
          tyvarOccName = nameOccName . tyVarName
@@ -141,32 +142,32 @@ pprintClosureCommand bindThings force str = do
 
 -- | Give names, and bind in the interactive environment, to all the suspensions
 --   included (inductively) in a term
-bindSuspensions :: GhcMonad m => Term -> m Term
+bindSuspensions :: GhciMonad m => Term -> m Term
 bindSuspensions t = do
       hsc_env <- getSession
+      ictxt <- getInteractiveContext
       inScope <- GHC.getBindings
-      let ictxt        = hsc_IC hsc_env
-          prefix       = "_t"
+      let prefix       = "_t"
           alreadyUsedNames = map (occNameString . nameOccName . getName) inScope
           availNames   = map ((prefix++) . show) [(1::Int)..] \\ alreadyUsedNames
       availNames_var  <- liftIO $ newIORef availNames
-      (t', stuff)     <- liftIO $ foldTerm (nameSuspensionsAndGetInfos hsc_env availNames_var) t
+      (t', stuff)     <- liftIO $ foldTerm (nameSuspensionsAndGetInfos hsc_env ictxt availNames_var) t
       let (names, tys, fhvs) = unzip3 stuff
       let ids = [ mkVanillaGlobal name ty
                 | (name,ty) <- zip names tys]
           new_ic = extendInteractiveContextWithIds ictxt ids
           interp = hscInterp hsc_env
       liftIO $ extendLoadedEnv interp (zip names fhvs)
-      setSession hsc_env {hsc_IC = new_ic }
+      setInteractiveContext new_ic
       return t'
      where
 
 --    Processing suspensions. Give names and recopilate info
-        nameSuspensionsAndGetInfos :: HscEnv -> IORef [String]
+        nameSuspensionsAndGetInfos :: HscEnv -> InteractiveContext -> IORef [String]
                                    -> TermFold (IO (Term, [(Name,Type,ForeignHValue)]))
-        nameSuspensionsAndGetInfos hsc_env freeNames = TermFold
+        nameSuspensionsAndGetInfos hsc_env ic freeNames = TermFold
                       {
-                        fSuspension = doSuspension hsc_env freeNames
+                        fSuspension = doSuspension hsc_env ic freeNames
                       , fTerm = \ty dc v tt -> do
                                     tt' <- sequence tt
                                     let (terms,names) = unzip tt'
@@ -180,14 +181,14 @@ bindSuspensions t = do
                                     (term, names) <- t
                                     return (RefWrap ty term, names)
                       }
-        doSuspension hsc_env freeNames ct ty hval _name = do
+        doSuspension hsc_env ic freeNames ct ty hval _name = do
           name <- atomicModifyIORef' freeNames (\x->(tail x, head x))
-          n <- newGrimName hsc_env name
+          n <- newGrimName hsc_env ic name
           return (Suspension ct ty hval (Just n), [(n,ty,hval)])
 
 
 --  A custom Term printer to enable the use of Show instances
-showTerm :: GhcMonad m => Term -> m SDoc
+showTerm :: GhciMonad m => Term -> m SDoc
 showTerm term = do
     dflags       <- GHC.getSessionDynFlags
     if gopt Opt_PrintEvldWithShow dflags
@@ -198,20 +199,21 @@ showTerm term = do
     if not (isFullyEvaluatedTerm t)
      then return Nothing
      else do
-        let set_session = do
+        let set_ic = do
                 hsc_env <- getSession
-                (new_env, bname) <- bindToFreshName hsc_env ty "showme"
-                setSession new_env
+                old_ic <- getInteractiveContext
+                (new_ic, bname) <- bindToFreshName hsc_env old_ic ty "showme"
+                setInteractiveContext new_ic
 
                 -- this disables logging of errors
                 let noop_log _ _ _ _ = return ()
                 pushLogHookM (const noop_log)
 
-                return (hsc_env, bname)
+                return (old_ic, bname)
 
-            reset_session (old_env,_) = setSession old_env
+            reset_ic (old_ic,_) = setInteractiveContext old_ic
 
-        MC.bracket set_session reset_session $ \(_,bname) -> do
+        MC.bracket set_ic reset_ic $ \(_,bname) -> do
            hsc_env <- getSession
            dflags  <- GHC.getSessionDynFlags
            let expr = "Prelude.return (Prelude.show " ++
@@ -238,20 +240,20 @@ showTerm term = do
   needsParens txt = ' ' `elem` txt
 
 
-  bindToFreshName hsc_env ty userName = do
-    name <- newGrimName hsc_env userName
+  bindToFreshName hsc_env ic ty userName = do
+    name <- newGrimName hsc_env ic userName
     let id       = mkVanillaGlobal name ty
-        new_ic   = extendInteractiveContextWithIds (hsc_IC hsc_env) [id]
-    return (hsc_env {hsc_IC = new_ic }, name)
+        new_ic   = extendInteractiveContextWithIds ic [id]
+    return (new_ic, name)
 
 --    Create new uniques and give them sequentially numbered names
-newGrimName :: MonadIO m => HscEnv -> String -> m Name
-newGrimName hsc_env userName
-  = liftIO (newInteractiveBinder hsc_env occ noSrcSpan)
+newGrimName :: MonadIO m => HscEnv -> InteractiveContext -> String -> m Name
+newGrimName hsc_env ic userName
+  = liftIO (newInteractiveBinder hsc_env ic occ noSrcSpan)
   where
     occ = mkOccName varName userName
 
-pprTypeAndContents :: GhcMonad m => Id -> m SDoc
+pprTypeAndContents :: GhciMonad m => Id -> m SDoc
 pprTypeAndContents id = do
   dflags  <- GHC.getSessionDynFlags
   let pcontents = gopt Opt_PrintBindContents dflags

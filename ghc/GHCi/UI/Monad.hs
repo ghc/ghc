@@ -84,6 +84,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 data GHCiState = GHCiState
      {
+        other_state    :: InteractiveContext,
         progname       :: String,
         args           :: [String],
         evalWrapper    :: ForeignHValue, -- ^ of type @IO a -> IO a@

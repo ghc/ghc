@@ -21,18 +21,19 @@ import GHC.Data.Maybe
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Builtin.Names
+import GHC.Runtime.Context ( InteractiveContext )
 import GHC.Tc.Utils.Env (lookupGlobal_maybe)
 import GHC.Types.TyThing
 import GHC.Platform.Ways
 
 import qualified GHC.LanguageExtensions as LangExt
 
-initTidyOpts :: HscEnv -> IO TidyOpts
-initTidyOpts hsc_env = do
+initTidyOpts :: HscEnv -> Maybe InteractiveContext -> IO TidyOpts
+initTidyOpts hsc_env m_ic = do
   let dflags = hsc_dflags hsc_env
   static_ptr_opts <- if not (xopt LangExt.StaticPointers dflags)
     then pure Nothing
-    else Just <$> initStaticPtrOpts hsc_env
+    else Just <$> initStaticPtrOpts hsc_env m_ic
   pure $ TidyOpts
     { opt_name_cache        = hsc_NC hsc_env
     , opt_collect_ccs       = ways dflags `hasWay` WayProf
@@ -45,11 +46,11 @@ initTidyOpts hsc_env = do
     , opt_static_ptr_opts   = static_ptr_opts
     }
 
-initStaticPtrOpts :: HscEnv -> IO StaticPtrOpts
-initStaticPtrOpts hsc_env = do
+initStaticPtrOpts :: HscEnv -> Maybe InteractiveContext -> IO StaticPtrOpts
+initStaticPtrOpts hsc_env m_ic = do
   let dflags = hsc_dflags hsc_env
 
-  let lookupM n = lookupGlobal_maybe hsc_env n >>= \case
+  let lookupM n = lookupGlobal_maybe hsc_env m_ic n >>= \case
         Succeeded r -> pure r
         Failed err  -> pprPanic "initStaticPtrOpts: couldn't find" (ppr (err,n))
 

@@ -63,6 +63,7 @@ import GHC.Parser.Header
 import GHC.Data.StringBuffer
 import GHC.Types.SourceError
 import GHC.Unit.Finder
+import GHC.Runtime.Context (emptyInteractiveContext)
 import GHC.Runtime.Loader
 import Data.IORef
 import GHC.Types.Name.Env
@@ -553,7 +554,9 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               final_iface <- mkFullIface hsc_env partial_iface Nothing
               hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
 
-              (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env cgguts mod_location
+              -- TODO need persisted interactive context?
+              let ic = emptyInteractiveContext dflags
+              (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env ic cgguts mod_location
 
               stub_o <- case hasStub of
                         Nothing -> return []
@@ -699,7 +702,8 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   -- run the compiler!
   let msg :: Messager
       msg hsc_env _ what _ = oneShotMsg (hsc_logger hsc_env) what
-  plugin_hsc_env' <- initializePlugins hsc_env
+  -- TODO plugins should not need an interactive context
+  plugin_hsc_env' <- initializePlugins hsc_env (emptyInteractiveContext dflags)
 
   -- Need to set the knot-tying mutable variable for interface
   -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.

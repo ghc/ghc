@@ -22,11 +22,14 @@ import GHC.Core.Rules ( mkRuleBase )
 import GHC.Core.Opt ( CoreOptEnv (..), runCorePasses )
 import GHC.Core.Opt.Stats    ( SimplCountM, runSimplCountM, pprSimplCount )
 
+import GHC.Runtime.Context
+
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.Deps
 
 import GHC.Types.Name.Ppr
+import GHC.Types.Var ( Var )
 
 import GHC.Utils.Logger as Logger
 
@@ -41,28 +44,32 @@ import Control.Monad.IO.Class
 
 -- | Run Core2Core simplifier. The list of String is a list of (Core) plugin
 -- module names added via TH (cf 'addCorePlugin').
-hscSimplify :: HscEnv -> [String] -> ModGuts -> IO ModGuts
-hscSimplify hsc_env plugins modguts =
-    runHsc hsc_env $ hscSimplify' plugins modguts
+hscSimplify :: HscEnv -> InteractiveContext -> [String] -> ModGuts -> IO ModGuts
+hscSimplify hsc_env ic plugins modguts =
+    runHsc hsc_env $ hscSimplify' ic plugins modguts
 
 -- | Run Core2Core simplifier. The list of String is a list of (Core) plugin
 -- module names added via TH (cf 'addCorePlugin').
-hscSimplify' :: [String] -> ModGuts -> Hsc ModGuts
-hscSimplify' plugins ds_result = do
+hscSimplify' :: InteractiveContext -> [String] -> ModGuts -> Hsc ModGuts
+hscSimplify' ic plugins ds_result = do
     hsc_env <- getHscEnv
     hsc_env_with_plugins <- if null plugins -- fast path
         then return hsc_env
         else liftIO $ initializePlugins
-                    $ hscUpdateFlags (\dflags -> foldr addPluginModuleName dflags plugins)
-                      hsc_env
+            (hscUpdateFlags (\dflags -> foldr addPluginModuleName dflags plugins) hsc_env)
+            ic
     {-# SCC "Core2Core" #-}
-      liftIO $ core2core hsc_env_with_plugins ds_result
+      liftIO $ core2core
+        hsc_env_with_plugins (interactiveInScope ic)
+        ds_result
 
-core2core :: HscEnv -> ModGuts -> IO ModGuts
-core2core hsc_env guts@(ModGuts { mg_module  = mod
-                                , mg_loc     = loc
-                                , mg_deps    = deps
-                                , mg_rdr_env = rdr_env })
+core2core :: HscEnv -> [Var] -> ModGuts -> IO ModGuts
+core2core hsc_env
+          extra_vars
+          guts@(ModGuts { mg_module  = mod
+                        , mg_loc     = loc
+                        , mg_deps    = deps
+                        , mg_rdr_env = rdr_env })
   = do { let builtin_passes = getCoreToDo dflags extra_vars
 
        ; (guts2, stats) <- runSimplCountM dump_simpl_stats $ do
@@ -80,7 +87,6 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
     dflags           = hsc_dflags hsc_env
     logger           = hsc_logger hsc_env
     dump_simpl_stats = logHasDumpFlag logger Opt_D_dump_simpl_stats
-    extra_vars       = interactiveInScope (hsc_IC hsc_env)
     home_pkg_rules   = hptRules hsc_env (moduleUnitId mod) (GWIB { gwib_mod = moduleName mod
                                                                  , gwib_isBoot = NotBoot })
     hpt_rule_base  = mkRuleBase home_pkg_rules
@@ -99,7 +105,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
       , co_visOrphans    = mkModuleSet (mod : dep_orphs deps)
       , co_hasPprDebug   = hasPprDebug dflags
       , co_getEps        = hscEPS hsc_env
-      , co_extraVars     = interactiveInScope $ hsc_IC hsc_env
+      , co_extraVars     = extra_vars
       , co_specConstrAnn = fmap snd . getFirstAnnotationsFromHscEnv hsc_env deserializeWithData
       , co_endPassCfg    = \pass -> initEndPassConfig dflags extra_vars (co_printUnqual env) pass
       , co_lintAnnotationsCfg = \pass -> initLintAnnotationsConfig dflags loc (co_printUnqual env) pass

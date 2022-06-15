@@ -50,7 +50,6 @@ import GHC.Core
 import GHC.Core.FVs       ( exprsSomeFreeVarsList )
 import GHC.Core.EndPass   ( EndPassConfig(..), endPassIO )
 import GHC.Core.Lint      ( LintFlags(..) )
-import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
@@ -75,6 +74,8 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Logger
+
+import GHC.Runtime.Context ( InteractiveContext )
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -212,7 +213,6 @@ deSugar hsc_env
         -- we want F# to be in scope in the foreign marshalling code!
         -- You might think it doesn't matter, but the simplifier brings all top-level
         -- things into the in-scope set before simplifying; so we get no unfolding for F#!
-              extra_vars = interactiveInScope $ hsc_IC hsc_env
 
         ; let desugar_before_ppr = text "Desugar (before optimization)"
         ; let desugar_before_flags = (defaultLintFlags dflags)
@@ -231,7 +231,7 @@ deSugar hsc_env
         ; let desugar_before_cfg = EndPassConfig
                 { ep_dumpCoreSizes = not (gopt Opt_SuppressCoreSizes dflags)
                 , ep_lintPassResult = maybeInitLintPassResultConfig dflags
-                    extra_vars
+                    [] -- TODO No GHCi in this use-case?
                     desugar_before_flags
                     desugar_before_ppr
                     True
@@ -258,7 +258,7 @@ deSugar hsc_env
         ; let desugar_after_cfg = EndPassConfig
                 { ep_dumpCoreSizes = not (gopt Opt_SuppressCoreSizes dflags)
                 , ep_lintPassResult = maybeInitLintPassResultConfig dflags
-                    extra_vars
+                    [] -- TODO No GHCi in this use-case?
                     desugar_after_flags
                     desugar_after_ppr
                     True
@@ -267,6 +267,7 @@ deSugar hsc_env
                 , ep_prettyPass = desugar_after_ppr
                 , ep_passDetails = empty
                 }
+        -- TODO interactive vars in scope?
         ; endPassIO (hsc_logger hsc_env) desugar_after_cfg ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
@@ -366,14 +367,14 @@ So we pull out the type/coercion variables (which are in dependency order),
 and Rec the rest.
 -}
 
-deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages DsMessage, Maybe CoreExpr)
-deSugarExpr hsc_env tc_expr = do
+deSugarExpr :: HscEnv -> InteractiveContext -> LHsExpr GhcTc -> IO (Messages DsMessage, Maybe CoreExpr)
+deSugarExpr hsc_env ic tc_expr = do
     let logger = hsc_logger hsc_env
 
     showPass logger "Desugar"
 
     -- Do desugaring
-    (tc_msgs, mb_result) <- runTcInteractive hsc_env $
+    (tc_msgs, mb_result) <- runTcInteractive hsc_env ic $
                             initDsTc $
                             dsLExpr tc_expr
 

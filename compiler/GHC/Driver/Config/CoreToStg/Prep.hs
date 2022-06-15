@@ -7,8 +7,9 @@ import GHC.Prelude
 
 import GHC.Driver.Env
 import GHC.Driver.Session
-import GHC.Driver.Config.Core.EndPass ()
+--import GHC.Driver.Config.Core.EndPass ()
 import GHC.Driver.Config.Core.Lint ( defaultLintFlags, maybeInitLintPassResultConfig )
+import GHC.Runtime.Context ( InteractiveContext )
 import GHC.Tc.Utils.Env
 import GHC.Types.Var
 import GHC.Utils.Outputable
@@ -20,12 +21,12 @@ import GHC.CoreToStg.Prep
 
 import qualified GHC.LanguageExtensions as LangExt
 
-initCorePrepConfig :: HscEnv -> IO CorePrepConfig
-initCorePrepConfig hsc_env = do
+initCorePrepConfig :: HscEnv -> Maybe InteractiveContext -> IO CorePrepConfig
+initCorePrepConfig hsc_env m_ic = do
    convertNumLit <- do
      let platform = targetPlatform $ hsc_dflags hsc_env
          home_unit = hsc_home_unit hsc_env
-         lookup_global = lookupGlobal hsc_env
+         lookup_global = lookupGlobal hsc_env m_ic
      mkConvertNumLiteral platform home_unit lookup_global
    return $ CorePrepConfig
       { cp_catchNonexhaustiveCases = gopt Opt_CatchNonexhaustiveCases $ hsc_dflags hsc_env

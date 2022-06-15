@@ -163,7 +163,8 @@ import qualified Language.Haskell.TH as TH
    GHC.Plugins.Monad does not depend on GHC.Tc.Utils.Env -}
 instance MonadThings CoreM where
     lookupThing name = do { hsc_env <- getHscEnv
-                          ; liftIO $ lookupGlobal hsc_env name }
+                          -- TODO interactive context?
+                          ; liftIO $ lookupGlobal hsc_env Nothing name }
 
 {-
 ************************************************************************

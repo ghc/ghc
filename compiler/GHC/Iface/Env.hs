@@ -77,11 +77,11 @@ newGlobalBinder mod occ loc
                   (vcat [ ppr mod <+> ppr occ <+> ppr loc, ppr name]))
        ; return name }
 
-newInteractiveBinder :: HscEnv -> OccName -> SrcSpan -> IO Name
+newInteractiveBinder :: HscEnv -> InteractiveContext -> OccName -> SrcSpan -> IO Name
 -- Works in the IO monad, and gets the Module
 -- from the interactive context
-newInteractiveBinder hsc_env occ loc = do
-  let mod = icInteractiveModule (hsc_IC hsc_env)
+newInteractiveBinder hsc_env ic occ loc = do
+  let mod = icInteractiveModule ic
   allocateGlobalBinder (hsc_NC hsc_env) mod occ loc
 
 allocateGlobalBinder

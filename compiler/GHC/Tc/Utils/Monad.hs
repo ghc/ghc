@@ -53,7 +53,7 @@ module GHC.Tc.Utils.Monad(
   debugTc,
 
   -- * Typechecker global environment
-  getIsGHCi, getGHCiMonad, getInteractivePrintName,
+  getIsGHCi,
   tcIsHsBootOrSig, tcIsHsig, tcSelfBootInfo, getGlobalRdrEnv,
   getRdrEnvs, getImports,
   getFixityEnv, extendFixityEnv, getRecFieldEnv,
@@ -418,11 +418,11 @@ initTcWithGbl hsc_env gbl_env loc do_this
       ; return (msgs, final_res)
       }
 
-initTcInteractive :: HscEnv -> TcM a -> IO (Messages TcRnMessage, Maybe a)
+initTcInteractive :: HscEnv -> InteractiveContext -> TcM a -> IO (Messages TcRnMessage, Maybe a)
 -- Initialise the type checker monad for use in GHCi
-initTcInteractive hsc_env thing_inside
+initTcInteractive hsc_env ic thing_inside
   = initTc hsc_env HsSrcFile False
-           (icInteractiveModule (hsc_IC hsc_env))
+           (icInteractiveModule ic)
            (realSrcLocSpan interactive_src_loc)
            thing_inside
   where
@@ -909,12 +909,6 @@ traceOptIf flag doc
 getIsGHCi :: TcRn Bool
 getIsGHCi = do { mod <- getModule
                ; return (isInteractiveModule mod) }
-
-getGHCiMonad :: TcRn Name
-getGHCiMonad = do { hsc <- getTopEnv; return (ic_monad $ hsc_IC hsc) }
-
-getInteractivePrintName :: TcRn Name
-getInteractivePrintName = do { hsc <- getTopEnv; return (ic_int_print $ hsc_IC hsc) }
 
 tcIsHsBootOrSig :: TcRn Bool
 tcIsHsBootOrSig = do { env <- getGblEnv; return (isHsBootOrSig (tcg_src env)) }

@@ -18,7 +18,6 @@ module GHC.Plugins.Monad (
     getHscEnv, getModule,
     getRuleBase, getExternalRuleBase,
     getDynFlags, getPackageFamInstEnv,
-    getInteractiveContext,
     getVisibleOrphanMods, getUniqMask,
     getPrintUnqualified, getSrcSpanM,
 
@@ -47,8 +46,6 @@ import GHC.Core
 import GHC.Core.Opt.Stats
   ( SimplCount, zeroSimplCount, plusSimplCount
   )
-
-import GHC.Runtime.Context ( InteractiveContext )
 
 import GHC.Types.Unique.Supply
 import GHC.Types.Name.Env
@@ -272,9 +269,6 @@ instance HasLogger CoreM where
 
 instance HasModule CoreM where
     getModule = read cr_module
-
-getInteractiveContext :: CoreM InteractiveContext
-getInteractiveContext = hsc_IC <$> getHscEnv
 
 getPackageFamInstEnv :: CoreM PackageFamInstEnv
 getPackageFamInstEnv = eps_fam_inst_env <$> get_eps

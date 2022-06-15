@@ -28,6 +28,7 @@ import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 
 import GHC.Linker.Loader       ( loadModule, loadName )
+import GHC.Runtime.Context     ( InteractiveContext )
 import GHC.Runtime.Interpreter ( wormhole )
 import GHC.Runtime.Interpreter.Types
 
@@ -73,8 +74,8 @@ import Data.List (unzip4)
 -- flags. Should be called after command line arguments are parsed, but before
 -- actual compilation starts. Idempotent operation. Should be re-called if
 -- pluginModNames or pluginModNameOpts changes.
-initializePlugins :: HscEnv -> IO HscEnv
-initializePlugins hsc_env
+initializePlugins :: HscEnv -> InteractiveContext -> IO HscEnv
+initializePlugins hsc_env ic
     -- plugins not changed
   | loaded_plugins <- loadedPlugins (hsc_plugins hsc_env)
   , map lpModuleName loaded_plugins == reverse (pluginModNames dflags)
@@ -82,7 +83,7 @@ initializePlugins hsc_env
   , all same_args loaded_plugins
   = return hsc_env -- no need to reload plugins FIXME: doesn't take static plugins into account
   | otherwise
-  = do (loaded_plugins, links, pkgs) <- loadPlugins hsc_env
+  = do (loaded_plugins, links, pkgs) <- loadPlugins hsc_env ic
        let plugins' = (hsc_plugins hsc_env) { loadedPlugins = loaded_plugins, loadedPluginDeps = (links, pkgs) }
        let hsc_env' = hsc_env { hsc_plugins = plugins' }
        withPlugins (hsc_plugins hsc_env') driverPlugin hsc_env'
@@ -92,8 +93,8 @@ initializePlugins hsc_env
     argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
     dflags = hsc_dflags hsc_env
 
-loadPlugins :: HscEnv -> IO ([LoadedPlugin], [Linkable], PkgsLoaded)
-loadPlugins hsc_env
+loadPlugins :: HscEnv -> InteractiveContext -> IO ([LoadedPlugin], [Linkable], PkgsLoaded)
+loadPlugins hsc_env ic
   = do { unless (null to_load) $
            checkExternalInterpreter hsc_env
        ; plugins_with_deps <- mapM loadPlugin to_load
@@ -109,15 +110,15 @@ loadPlugins hsc_env
       where
         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]
-    loadPlugin = loadPlugin' (mkVarOcc "plugin") pluginTyConName hsc_env
+    loadPlugin = loadPlugin' (mkVarOcc "plugin") pluginTyConName hsc_env ic
 
 
-loadFrontendPlugin :: HscEnv -> ModuleName -> IO (FrontendPlugin, [Linkable], PkgsLoaded)
-loadFrontendPlugin hsc_env mod_name = do
+loadFrontendPlugin :: HscEnv -> InteractiveContext -> ModuleName -> IO (FrontendPlugin, [Linkable], PkgsLoaded)
+loadFrontendPlugin hsc_env ic mod_name = do
     checkExternalInterpreter hsc_env
     (plugin, _iface, links, pkgs)
       <- loadPlugin' (mkVarOcc "frontendPlugin") frontendPluginTyConName
-           hsc_env mod_name
+           hsc_env ic mod_name
     return (plugin, links, pkgs)
 
 -- #14335
@@ -127,11 +128,11 @@ checkExternalInterpreter hsc_env = case interpInstance <$> hsc_interp hsc_env of
     -> throwIO (InstallationError "Plugins require -fno-external-interpreter")
   _ -> pure ()
 
-loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface, [Linkable], PkgsLoaded)
-loadPlugin' occ_name plugin_name hsc_env mod_name
+loadPlugin' :: OccName -> Name -> HscEnv -> InteractiveContext -> ModuleName -> IO (a, ModIface, [Linkable], PkgsLoaded)
+loadPlugin' occ_name plugin_name hsc_env ic mod_name
   = do { let plugin_rdr_name = mkRdrQual mod_name occ_name
              dflags = hsc_dflags hsc_env
-       ; mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name
+       ; mb_name <- lookupRdrNameInModuleForPlugins hsc_env ic mod_name
                         plugin_rdr_name
        ; case mb_name of {
             Nothing ->
@@ -141,8 +142,8 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           , ppr plugin_rdr_name ]) ;
             Just (name, mod_iface) ->
 
-     do { plugin_tycon <- forceLoadTyCon hsc_env plugin_name
-        ; eith_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
+     do { plugin_tycon <- forceLoadTyCon hsc_env ic plugin_name
+        ; eith_plugin <- getValueSafely hsc_env ic name (mkTyConTy plugin_tycon)
         ; case eith_plugin of
             Left actual_type ->
                 throwGhcExceptionIO (CmdLineError $
@@ -158,28 +159,28 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
 
 -- | Force the interfaces for the given modules to be loaded. The 'SDoc' parameter is used
 -- for debugging (@-ddump-if-trace@) only: it is shown as the reason why the module is being loaded.
-forceLoadModuleInterfaces :: HscEnv -> SDoc -> [Module] -> IO ()
-forceLoadModuleInterfaces hsc_env doc modules
-    = (initTcInteractive hsc_env $
+forceLoadModuleInterfaces :: HscEnv -> InteractiveContext -> SDoc -> [Module] -> IO ()
+forceLoadModuleInterfaces hsc_env ic doc modules
+    = (initTcInteractive hsc_env ic $
        initIfaceTcRn $
        mapM_ (loadPluginInterface doc) modules)
       >> return ()
 
 -- | Force the interface for the module containing the name to be loaded. The 'SDoc' parameter is used
 -- for debugging (@-ddump-if-trace@) only: it is shown as the reason why the module is being loaded.
-forceLoadNameModuleInterface :: HscEnv -> SDoc -> Name -> IO ()
-forceLoadNameModuleInterface hsc_env reason name = do
+forceLoadNameModuleInterface :: HscEnv -> InteractiveContext -> SDoc -> Name -> IO ()
+forceLoadNameModuleInterface hsc_env ic reason name = do
     let name_modules = mapMaybe nameModule_maybe [name]
-    forceLoadModuleInterfaces hsc_env reason name_modules
+    forceLoadModuleInterfaces hsc_env ic reason name_modules
 
 -- | Load the 'TyCon' associated with the given name, come hell or high water. Fails if:
 --
 -- * The interface could not be loaded
 -- * The name is not that of a 'TyCon'
 -- * The name did not exist in the loaded module
-forceLoadTyCon :: HscEnv -> Name -> IO TyCon
-forceLoadTyCon hsc_env con_name = do
-    forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of loadTyConTy") con_name
+forceLoadTyCon :: HscEnv -> InteractiveContext -> Name -> IO TyCon
+forceLoadTyCon hsc_env ic con_name = do
+    forceLoadNameModuleInterface hsc_env ic (text "contains a name used in an invocation of loadTyConTy") con_name
 
     mb_con_thing <- lookupType hsc_env con_name
     case mb_con_thing of
@@ -198,10 +199,10 @@ forceLoadTyCon hsc_env con_name = do
 -- * If the Name does not exist in the module
 -- * If the link failed
 
-getValueSafely :: HscEnv -> Name -> Type -> IO (Either Type (a, [Linkable], PkgsLoaded))
-getValueSafely hsc_env val_name expected_type = do
+getValueSafely :: HscEnv -> InteractiveContext -> Name -> Type -> IO (Either Type (a, [Linkable], PkgsLoaded))
+getValueSafely hsc_env ic val_name expected_type = do
   eith_hval <- case getValueSafelyHook hooks of
-    Nothing -> getHValueSafely interp hsc_env val_name expected_type
+    Nothing -> getHValueSafely interp hsc_env ic val_name expected_type
     Just h  -> h                      hsc_env val_name expected_type
   case eith_hval of
     Left actual_type -> return (Left actual_type)
@@ -213,9 +214,9 @@ getValueSafely hsc_env val_name expected_type = do
     logger = hsc_logger hsc_env
     hooks  = hsc_hooks hsc_env
 
-getHValueSafely :: Interp -> HscEnv -> Name -> Type -> IO (Either Type (HValue, [Linkable], PkgsLoaded))
-getHValueSafely interp hsc_env val_name expected_type = do
-    forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of getHValueSafely") val_name
+getHValueSafely :: Interp -> HscEnv -> InteractiveContext -> Name -> Type -> IO (Either Type (HValue, [Linkable], PkgsLoaded))
+getHValueSafely interp hsc_env ic val_name expected_type = do
+    forceLoadNameModuleInterface hsc_env ic (text "contains a name used in an invocation of getHValueSafely") val_name
     -- Now look up the names for the value and type constructor in the type environment
     mb_val_thing <- lookupType hsc_env val_name
     case mb_val_thing of
@@ -269,9 +270,10 @@ lessUnsafeCoerce logger context what = do
 -- being compiled.  This was introduced by 57d6798.
 --
 -- Need the module as well to record information in the interface file
-lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName
+lookupRdrNameInModuleForPlugins :: HscEnv -> InteractiveContext 
+                                -> ModuleName -> RdrName
                                 -> IO (Maybe (Name, ModIface))
-lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
+lookupRdrNameInModuleForPlugins hsc_env ic mod_name rdr_name = do
     let dflags     = hsc_dflags hsc_env
     let fopts      = initFinderOpts dflags
     let fc         = hsc_FC hsc_env
@@ -283,7 +285,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     case found_module of
         Found _ mod -> do
             -- Find the exports of the module
-            (_, mb_iface) <- initTcInteractive hsc_env $
+            (_, mb_iface) <- initTcInteractive hsc_env ic $
                              initIfaceTcRn $
                              loadPluginInterface doc mod
             case mb_iface of

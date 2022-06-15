@@ -58,6 +58,7 @@ import GHC.Tc.Utils.Backpack
 import GHC.Tc.Utils.Monad  ( initIfaceCheck )
 
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Context ( emptyInteractiveContext )
 import qualified GHC.Linker.Loader as Linker
 import GHC.Linker.Types
 
@@ -721,7 +722,7 @@ load' mhmi_cache how_much mHscMessage mod_graph = do
     -- write an empty HPT to allow the old HPT to be GC'd.
 
     let pruneHomeUnitEnv hme = hme { homeUnitEnv_hpt = emptyHomePackageTable }
-    setSession $ discardIC $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
+    setSession $ {- discardIC $ -} hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
 
     -- Unload everything
     liftIO $ unload interp hsc_env
@@ -753,7 +754,7 @@ loadFinish :: GhcMonad m => SuccessFlag -> m SuccessFlag
 -- Empty the interactive context and set the module context to the topmost
 -- newly loaded module, or the Prelude if none were loaded.
 loadFinish all_ok
-  = do modifySession discardIC
+  = do -- modifyInteractiveContext discardIC
        return all_ok
 
 
@@ -2610,7 +2611,8 @@ runPipelines _ _ _ [] = return ()
 runPipelines n_job orig_hsc_env mHscMessager all_pipelines = do
   liftIO $ label_self "main --make thread"
 
-  plugins_hsc_env <- initializePlugins orig_hsc_env
+  -- TODO plugins should not need an interactive context
+  plugins_hsc_env <- initializePlugins orig_hsc_env $ emptyInteractiveContext $ hsc_dflags orig_hsc_env
   case n_job of
     1 -> runSeqPipelines plugins_hsc_env mHscMessager all_pipelines
     _n -> runParPipelines n_job plugins_hsc_env mHscMessager all_pipelines

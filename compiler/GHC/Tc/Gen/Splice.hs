@@ -78,6 +78,7 @@ import GHC.Iface.Load
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Context ( emptyInteractiveContext )
 
 import GHC.Rename.Splice( traceSplice, SpliceInfo(..))
 import GHC.Rename.Expr
@@ -1237,8 +1238,10 @@ runMeta' show_code ppr_hs run_and_convert expr
         -- Compile and link it; might fail if linking fails
         ; src_span <- getSrcSpanM
         ; traceTc "About to run (desugared)" (ppr ds_expr)
+        -- TODO Template Haskell is not GHCi, should not need this
+        ; let ic = emptyInteractiveContext $ hsc_dflags hsc_env
         ; either_hval <- tryM $ liftIO $
-                         GHC.Driver.Main.hscCompileCoreExpr hsc_env src_span ds_expr
+                         GHC.Driver.Main.hscCompileCoreExpr hsc_env ic src_span ds_expr
         ; case either_hval of {
             Left exn   -> fail_with_exn "compile and link" exn ;
             Right (hval, needed_mods, needed_pkgs) -> do
@@ -1606,7 +1609,9 @@ getExternalModIface nm = do
           Nothing -> pure Nothing
           Just modNm -> do
             hsc_env <- getTopEnv
-            iface <- liftIO $ hscGetModuleInterface hsc_env modNm
+            -- TODO Template Haskell is not GHCi, should not need this
+            let ic = emptyInteractiveContext $ hsc_dflags hsc_env
+            iface <- liftIO $ hscGetModuleInterface hsc_env ic modNm
             pure (Just iface)
 
 -- | Find the GHC name of the first instance that matches the TH type

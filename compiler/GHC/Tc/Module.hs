@@ -2047,11 +2047,11 @@ get two defns for 'main' in the interface file!
 *********************************************************
 -}
 
-runTcInteractive :: HscEnv -> TcRn a -> IO (Messages TcRnMessage, Maybe a)
+runTcInteractive :: HscEnv -> InteractiveContext -> TcRn a -> IO (Messages TcRnMessage, Maybe a)
 -- Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
-runTcInteractive hsc_env thing_inside
-  = initTcInteractive hsc_env $ withTcPlugins hsc_env $
+runTcInteractive hsc_env icxt thing_inside
+  = initTcInteractive hsc_env icxt $ withTcPlugins hsc_env $
     withDefaultingPlugins hsc_env $ withHoleFitPlugins hsc_env $
     do { traceTc "setInteractiveContext" $
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
@@ -2099,7 +2099,6 @@ runTcInteractive hsc_env thing_inside
   where
     (home_insts, home_fam_insts) = hptAllInstances hsc_env
 
-    icxt                     = hsc_IC hsc_env
     (ic_insts, ic_finsts)    = ic_instances icxt
     (lcl_ids, top_ty_things) = partitionWith is_closed (ic_tythings icxt)
 
@@ -2158,13 +2157,13 @@ We don't bother with the tcl_th_bndrs environment either.
 --
 -- The returned TypecheckedHsExpr is of type IO [ () ], a list of the bound
 -- values, coerced to ().
-tcRnStmt :: HscEnv -> GhciLStmt GhcPs
+tcRnStmt :: HscEnv -> InteractiveContext -> GhciLStmt GhcPs
          -> IO (Messages TcRnMessage, Maybe ([Id], LHsExpr GhcTc, FixityEnv))
-tcRnStmt hsc_env rdr_stmt
-  = runTcInteractive hsc_env $ do {
+tcRnStmt hsc_env ic rdr_stmt
+  = runTcInteractive hsc_env ic $ do {
 
     -- The real work is done here
-    ((bound_ids, tc_expr), fix_env) <- tcUserStmt rdr_stmt ;
+    ((bound_ids, tc_expr), fix_env) <- tcUserStmt ic rdr_stmt ;
     zonked_expr <- zonkTopLExpr tc_expr ;
     zonked_ids  <- zonkTopBndrs bound_ids ;
 
@@ -2235,19 +2234,19 @@ runPlans (p:ps) = tryTcDiscardingErrs (runPlans ps) p
 -- in GHCi] in GHC.Driver.Env for more details. We do this lifting by trying
 -- different ways ('plans') of lifting the code into the IO monad and
 -- type checking each plan until one succeeds.
-tcUserStmt :: GhciLStmt GhcPs -> TcM (PlanResult, FixityEnv)
+tcUserStmt :: InteractiveContext -> GhciLStmt GhcPs -> TcM (PlanResult, FixityEnv)
 
 -- An expression typed at the prompt is treated very specially
-tcUserStmt (L loc (BodyStmt _ expr _ _))
+tcUserStmt ic (L loc (BodyStmt _ expr _ _))
   = do  { (rn_expr, fvs) <- checkNoErrs (rnLExpr expr)
 
         ; dumpOptTcRn Opt_D_dump_rn_ast "Renamer" FormatHaskell
             (showAstData NoBlankSrcSpan NoBlankEpAnnotations rn_expr)
                -- Don't try to typecheck if the renamer fails!
-        ; ghciStep <- getGhciStepIO
+        ; ghciStep <- getGhciStepIO ic 
         ; uniq <- newUnique
         ; let loc' = noAnnSrcSpan $ locA loc
-        ; interPrintName <- getInteractivePrintName
+        ; let interPrintName = ic_int_print ic
         ; let fresh_it  = itName uniq (locA loc)
               matches   = [mkMatch (mkPrefixFunRhs (L loc' fresh_it)) [] rn_expr
                                    emptyLocalBinds]
@@ -2393,7 +2392,7 @@ But for naked expressions, you will have
           In an equation for ‘x’: x = putStrLn True
 -}
 
-tcUserStmt rdr_stmt@(L loc _)
+tcUserStmt ic rdr_stmt@(L loc _)
   = do { (([rn_stmt], fix_env), fvs) <- checkNoErrs $
            rnStmts (HsDoStmt GhciStmtCtxt) rnExpr [rdr_stmt] $ \_ -> do
              fix_env <- getFixityEnv
@@ -2402,7 +2401,7 @@ tcUserStmt rdr_stmt@(L loc _)
        ; traceRn "tcRnStmt" (vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs])
        ; rnDump rn_stmt ;
 
-       ; ghciStep <- getGhciStepIO
+       ; ghciStep <- getGhciStepIO ic
        ; let gi_stmt
                | (L loc (BindStmt x pat expr)) <- rn_stmt
                      = L loc $ BindStmt x pat (nlHsApp ghciStep expr)
@@ -2511,9 +2510,9 @@ tcGhciStmts stmts
     }
 
 -- | Generate a typed ghciStepIO expression (ghciStep :: Ty a -> IO a)
-getGhciStepIO :: TcM (LHsExpr GhcRn)
-getGhciStepIO = do
-    ghciTy <- getGHCiMonad
+getGhciStepIO :: InteractiveContext -> TcM (LHsExpr GhcRn)
+getGhciStepIO ic = do
+    let ghciTy = ic_monad ic
     a_tv <- newName (mkTyVarOccFS (fsLit "a"))
     let ghciM   = nlHsAppTy (nlHsTyVar NotPromoted ghciTy) (nlHsTyVar NotPromoted a_tv)
         ioM     = nlHsAppTy (nlHsTyVar NotPromoted ioTyConName) (nlHsTyVar NotPromoted a_tv)
@@ -2529,9 +2528,9 @@ getGhciStepIO = do
 
     return (noLocA $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
 
-isGHCiMonad :: HscEnv -> String -> IO (Messages TcRnMessage, Maybe Name)
-isGHCiMonad hsc_env ty
-  = runTcInteractive hsc_env $ do
+isGHCiMonad :: HscEnv -> InteractiveContext -> String -> IO (Messages TcRnMessage, Maybe Name)
+isGHCiMonad hsc_env ic ty
+  = runTcInteractive hsc_env ic $ do
         rdrEnv <- getGlobalRdrEnv
         let occIO = lookupOccEnv rdrEnv (mkOccName tcName ty)
         case occIO of
@@ -2554,11 +2553,12 @@ data TcRnExprMode = TM_Inst     -- ^ Instantiate inferred quantifiers only (:typ
 -- | tcRnExpr just finds the type of an expression
 --   for :type
 tcRnExpr :: HscEnv
+         -> InteractiveContext
          -> TcRnExprMode
          -> LHsExpr GhcPs
          -> IO (Messages TcRnMessage, Maybe Type)
-tcRnExpr hsc_env mode rdr_expr
-  = runTcInteractive hsc_env $
+tcRnExpr hsc_env ic mode rdr_expr
+  = runTcInteractive hsc_env ic $
     do {
 
     (rn_expr, _fvs) <- rnLExpr rdr_expr ;
@@ -2647,12 +2647,13 @@ anything here is ad-hoc, and it's a user-sought improvement.
 
 --------------------------
 tcRnImportDecls :: HscEnv
+                -> InteractiveContext
                 -> [LImportDecl GhcPs]
                 -> IO (Messages TcRnMessage, Maybe GlobalRdrEnv)
 -- Find the new chunk of GlobalRdrEnv created by this list of import
 -- decls.  In contract tcRnImports *extends* the TcGblEnv.
-tcRnImportDecls hsc_env import_decls
- =  runTcInteractive hsc_env $
+tcRnImportDecls hsc_env ic import_decls
+ =  runTcInteractive hsc_env ic $
     do { gbl_env <- updGblEnv zap_rdr_env $
                     tcRnImports hsc_env $ map (,text "is directly imported") import_decls
        ; return (tcg_rdr_env gbl_env) }
@@ -2661,12 +2662,13 @@ tcRnImportDecls hsc_env import_decls
 
 -- tcRnType just finds the kind of a type
 tcRnType :: HscEnv
+         -> InteractiveContext
          -> ZonkFlexi
          -> Bool        -- Normalise the returned type
          -> LHsType GhcPs
          -> IO (Messages TcRnMessage, Maybe (Type, Kind))
-tcRnType hsc_env flexi normalise rdr_type
-  = runTcInteractive hsc_env $
+tcRnType hsc_env ic flexi normalise rdr_type
+  = runTcInteractive hsc_env ic $
     setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
     do { (HsWC { hswc_ext = wcs, hswc_body = rn_type }, _fvs)
                <- rnHsWcType GHCiCtx (mkHsWildCardBndrs rdr_type)
@@ -2797,10 +2799,11 @@ tcRnDeclsi exists to allow class, data, and other declarations in GHCi.
 -}
 
 tcRnDeclsi :: HscEnv
+           -> InteractiveContext
            -> [LHsDecl GhcPs]
            -> IO (Messages TcRnMessage, Maybe TcGblEnv)
-tcRnDeclsi hsc_env local_decls
-  = runTcInteractive hsc_env $
+tcRnDeclsi hsc_env ic local_decls
+  = runTcInteractive hsc_env ic $
     tcRnSrcDecls False Nothing local_decls
 
 externaliseAndTidyId :: Module -> Id -> TcM Id
@@ -2823,16 +2826,16 @@ externaliseAndTidyId this_mod id
 -- a package module with an interface on disk.  If neither of these is
 -- true, then the result will be an error indicating the interface
 -- could not be found.
-getModuleInterface :: HscEnv -> Module -> IO (Messages TcRnMessage, Maybe ModIface)
-getModuleInterface hsc_env mod
-  = runTcInteractive hsc_env $
+getModuleInterface :: HscEnv -> InteractiveContext -> Module -> IO (Messages TcRnMessage, Maybe ModIface)
+getModuleInterface hsc_env ic mod
+  = runTcInteractive hsc_env ic $
     loadModuleInterface (text "getModuleInterface") mod
 
-tcRnLookupRdrName :: HscEnv -> LocatedN RdrName
+tcRnLookupRdrName :: HscEnv -> InteractiveContext -> LocatedN RdrName
                   -> IO (Messages TcRnMessage, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
-tcRnLookupRdrName hsc_env (L loc rdr_name)
-  = runTcInteractive hsc_env $
+tcRnLookupRdrName hsc_env ic (L loc rdr_name)
+  = runTcInteractive hsc_env ic $
     setSrcSpanA loc          $
     do {   -- If the identifier is a constructor (begins with an
            -- upper-case letter), then we need to consider both
@@ -2844,9 +2847,9 @@ tcRnLookupRdrName hsc_env (L loc rdr_name)
            (text "Not in scope:" <+> quotes (ppr rdr_name)))
        ; return names }
 
-tcRnLookupName :: HscEnv -> Name -> IO (Messages TcRnMessage, Maybe TyThing)
-tcRnLookupName hsc_env name
-  = runTcInteractive hsc_env $
+tcRnLookupName :: HscEnv -> InteractiveContext -> Name -> IO (Messages TcRnMessage, Maybe TyThing)
+tcRnLookupName hsc_env ic name
+  = runTcInteractive hsc_env ic $
     tcRnLookupName' name
 
 -- To look up a name we have to look in the local environment (tcl_lcl)
@@ -2862,6 +2865,7 @@ tcRnLookupName' name = do
      _ -> panic "tcRnLookupName'"
 
 tcRnGetInfo :: HscEnv
+            -> InteractiveContext
             -> Name
             -> IO ( Messages TcRnMessage
                   , Maybe (TyThing, Fixity, [ClsInst], [FamInst], SDoc))
@@ -2873,9 +2877,9 @@ tcRnGetInfo :: HscEnv
 -- but we want to treat it as *both* a data constructor
 --  *and* as a type or class constructor;
 -- hence the call to dataTcOccs, and we return up to two results
-tcRnGetInfo hsc_env name
-  = runTcInteractive hsc_env $
-    do { loadUnqualIfaces hsc_env (hsc_IC hsc_env)
+tcRnGetInfo hsc_env ic name
+  = runTcInteractive hsc_env ic $
+    do { loadUnqualIfaces hsc_env ic
            -- Load the interface for all unqualified types and classes
            -- That way we will find all the instance declarations
            -- (Packages have not orphan modules, and we assume that

@@ -446,6 +446,7 @@ Library
         GHC.Driver.Make
         GHC.Driver.MakeFile
         GHC.Driver.Monad
+        GHC.Driver.Monad.Interactive
         GHC.Driver.Phases
         GHC.Driver.Pipeline
         GHC.Driver.Pipeline.Execute

@@ -108,16 +108,15 @@ getHscEnv :: Hsc HscEnv
 getHscEnv = Hsc $ \e w -> return (e, w)
 
 -- | Switches in the DynFlags and Plugins from the InteractiveContext
-mkInteractiveHscEnv :: HscEnv -> HscEnv
-mkInteractiveHscEnv hsc_env =
-    let ic = hsc_IC hsc_env
-    in hscSetFlags (ic_dflags ic) $
+mkInteractiveHscEnv :: HscEnv -> InteractiveContext -> HscEnv
+mkInteractiveHscEnv hsc_env ic =
+    hscSetFlags (ic_dflags ic) $
        hsc_env { hsc_plugins = ic_plugins ic }
 
 -- | A variant of runHsc that switches in the DynFlags and Plugins from the
 -- InteractiveContext before running the Hsc computation.
-runInteractiveHsc :: HscEnv -> Hsc a -> IO a
-runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
+runInteractiveHsc :: HscEnv -> InteractiveContext -> Hsc a -> IO a
+runInteractiveHsc hsc_env ic = runHsc (mkInteractiveHscEnv hsc_env ic)
 
 hsc_home_unit :: HscEnv -> HomeUnit
 hsc_home_unit = unsafeGetHomeUnit . hsc_unit_env
@@ -433,19 +432,18 @@ hscActiveUnitId e = ue_currentUnit (hsc_unit_env e)
 -- | Discard the contents of the InteractiveContext, but keep the DynFlags and
 -- the loaded plugins.  It will also keep ic_int_print and ic_monad if their
 -- names are from external packages.
-discardIC :: HscEnv -> HscEnv
-discardIC hsc_env
-  = hsc_env { hsc_IC = empty_ic { ic_int_print = new_ic_int_print
-                                , ic_monad     = new_ic_monad
-                                , ic_plugins   = old_plugins
-                                } }
+discardIC :: HscEnv -> InteractiveContext -> InteractiveContext
+discardIC hsc_env old_ic
+  = empty_ic { ic_int_print = new_ic_int_print
+             , ic_monad     = new_ic_monad
+             , ic_plugins   = old_plugins
+             }
   where
   -- Force the new values for ic_int_print and ic_monad to avoid leaking old_ic
   !new_ic_int_print = keep_external_name ic_int_print
   !new_ic_monad = keep_external_name ic_monad
   !old_plugins = ic_plugins old_ic
   dflags = ic_dflags old_ic
-  old_ic = hsc_IC hsc_env
   empty_ic = emptyInteractiveContext dflags
   keep_external_name ic_name
     | nameIsFromExternalPackage home_unit old_name = old_name
