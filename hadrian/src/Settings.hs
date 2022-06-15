@@ -240,7 +240,8 @@ builderPredicate = builderSetting <&> (\(wstg, wpkg, builderMode) ->
        BM_Ghc ghcMode -> wildcard (builder Ghc) (builder . Ghc) ghcMode
        BM_Cc  ccMode  -> wildcard (builder Cc) (builder . Cc) ccMode
        BM_CabalConfigure -> builder (Cabal Setup)
-       BM_RunTest     -> builder Testsuite
+       BM_Hsc2HsRun      -> builder Hsc2Hs
+       BM_RunTest        -> builder Testsuite
     )
   )
 
@@ -250,6 +251,7 @@ builderPredicate = builderSetting <&> (\(wstg, wpkg, builderMode) ->
 data BuilderMode = BM_Ghc (Wildcard GhcMode)
                  | BM_Cc  (Wildcard CcMode)
                  | BM_CabalConfigure
+                 | BM_Hsc2HsRun
                  | BM_RunTest
 
 -- | Interpretation-agnostic description of the builder settings
@@ -289,6 +291,7 @@ builderSetting =
              [ str "ghc" *> fmap BM_Ghc (wild ghcBuilder) <* str "opts"
              , str "cc" *> fmap BM_Cc (wild ccBuilder) <* str "opts"
              , BM_CabalConfigure <$ str "cabal" <* str "configure" <* str "opts"
+             , BM_Hsc2HsRun <$ str "hsc2hs" <* str "run" <* str "opts"
              ]
     , (Wildcard, Wildcard, BM_RunTest)
       <$ str "runtest" <* str "opts"

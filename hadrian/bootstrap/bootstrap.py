@@ -94,6 +94,9 @@ class Compiler:
         self.ghc_pkg_path = (self.ghc_path.parent / 'ghc-pkg').resolve()
         if not self.ghc_pkg_path.is_file():
             raise TypeError(f'ghc-pkg {self.ghc_pkg_path} is not a file')
+        self.hsc2hs_path = (self.ghc_path.parent / 'hsc2hs').resolve()
+        if not self.hsc2hs_path.is_file():
+            raise TypeError(f'hsc2hs {self.hsc2hs_path} is not a file')
 
     def _get_ghc_info(self) -> Dict[str,str]:
         from ast import literal_eval
@@ -198,6 +201,7 @@ def install_sdist(dist_dir: Path, sdist_dir: Path, ghc: Compiler, flags: List[st
         f'--bindir={BINDIR.resolve()}',
         f'--with-compiler={ghc.ghc_path}',
         f'--with-hc-pkg={ghc.ghc_pkg_path}',
+        f'--with-hsc2hs={ghc.hsc2hs_path}',
         f'--flags={flags_option}',
     ]
 
@@ -384,7 +388,7 @@ def main() -> None:
         ghc = find_ghc(args.with_compiler)
         args.deps = Path(sys.path[0]) / f"plan-bootstrap-{ghc.version.replace('.','_')}.json"
         print(f"defaulting bootstrap plan to {args.deps}")
-      # We have a tarball with all the required information, unpack it and use for further 
+      # We have a tarball with all the required information, unpack it and use for further
       elif args.bootstrap_sources is not None and args.command != 'list-sources':
         print(f'Unpacking {args.bootstrap_sources} to {TARBALLS}')
         shutil.unpack_archive(args.bootstrap_sources.resolve(), TARBALLS, 'gztar')
@@ -415,16 +419,16 @@ def main() -> None:
         # In temporary directory, create a directory which we will archive
         tmpdir = TMPDIR.resolve()
         tmpdir.mkdir(parents=True, exist_ok=True)
- 
+
         rootdir = Path(tempfile.mkdtemp(dir=tmpdir))
- 
+
         fetch_from_plan(plan, rootdir)
 
         shutil.copyfile(args.deps, rootdir / 'plan-bootstrap.json')
 
         fmt = 'gztar'
         if platform.system() == 'Windows': fmt = 'zip'
- 
+
         archivename = shutil.make_archive(args.output, fmt, root_dir=rootdir)
 
         print(f'Bootstrap sources saved to {archivename}')
