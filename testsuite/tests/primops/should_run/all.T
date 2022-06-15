@@ -36,3 +36,5 @@ test('ShrinkSmallMutableArrayA', normal, compile_and_run, [''])
 test('ShrinkSmallMutableArrayB', normal, compile_and_run, [''])
 test('T14664', normal, compile_and_run, [''])
 test('CStringLength', normal, compile_and_run, ['-O2'])
+
+test('T21624', normal, compile_and_run, [''])
