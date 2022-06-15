@@ -891,7 +891,7 @@ getRegister' config plat expr
 
         -- Signed multiply/divide
         MO_Mul w          -> intOp True w (\d x y -> unitOL $ MUL d x y)
-        MO_S_MulMayOflo w -> intOp True w (\d x y -> toOL [ MUL d x y, CSET d VS ])
+        MO_S_MulMayOflo w -> do_mul_may_oflo w x y
         MO_S_Quot w       -> intOp True w (\d x y -> unitOL $ SDIV d x y)
 
         -- No native rem instruction. So we'll compute the following
@@ -976,6 +976,46 @@ getRegister' config plat expr
                                     ,0b0111_1111, 0b1111_1110
                                     ,0b1111_1111]
 
+    -- N.B. MUL does not set the overflow flag.
+    do_mul_may_oflo :: Width -> CmmExpr -> CmmExpr -> NatM Register
+    do_mul_may_oflo w@W64 x y = do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        lo <- getNewRegNat II64
+        hi <- getNewRegNat II64
+        return $ Any (intFormat w) (\dst ->
+            code_x `appOL`
+            code_y `snocOL`
+            MUL (OpReg w lo) (OpReg w reg_x) (OpReg w reg_y) `snocOL`
+            SMULH (OpReg w hi) (OpReg w reg_x) (OpReg w reg_y) `snocOL`
+            CMP (OpReg w hi) (OpRegShift w lo SASR 63) `snocOL`
+            CSET (OpReg w dst) NE)
+    do_mul_may_oflo w x y = do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        let tmp_w = case w of
+                      W32 -> W64
+                      W16 -> W32
+                      W8  -> W32
+                      _   -> panic "do_mul_may_oflo: impossible"
+        -- This will hold the product
+        tmp <- getNewRegNat (intFormat tmp_w)
+        let ext_mode = case w of
+                         W32 -> ESXTW
+                         W16 -> ESXTH
+                         W8  -> ESXTB
+                         _   -> panic "do_mul_may_oflo: impossible"
+            mul = case w of
+                    W32 -> SMULL
+                    W16 -> MUL
+                    W8  -> MUL
+                    _   -> panic "do_mul_may_oflo: impossible"
+        return $ Any (intFormat w) (\dst ->
+            code_x `appOL`
+            code_y `snocOL`
+            mul (OpReg tmp_w tmp) (OpReg w reg_x) (OpReg w reg_y) `snocOL`
+            CMP (OpReg tmp_w tmp) (OpRegExt tmp_w tmp ext_mode 0) `snocOL`
+            CSET (OpReg w dst) NE)
 
 -- | Instructions to sign-extend the value in the given register from width @w@
 -- up to width @w'@.
