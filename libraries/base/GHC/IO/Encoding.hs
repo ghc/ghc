@@ -180,7 +180,11 @@ initLocaleEncoding, initFileSystemEncoding, initForeignEncoding :: TextEncoding
 -- N.B. initLocaleEncoding is exported for use in System.IO.localeEncoding.
 -- NOINLINE ensures that this result is shared.
 
-#if !defined(mingw32_HOST_OS)
+#if defined(js_HOST_ARCH)
+initLocaleEncoding     = utf8
+initFileSystemEncoding = utf8
+initForeignEncoding    = utf8
+#elif !defined(mingw32_HOST_OS)
 -- It is rather important that we don't just call Iconv.mkIconvEncoding here
 -- because some iconvs (in particular GNU iconv) will brokenly UTF-8 encode
 -- lone surrogates without complaint.
