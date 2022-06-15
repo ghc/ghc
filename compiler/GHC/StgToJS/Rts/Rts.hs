@@ -382,11 +382,13 @@ rtsDecls = jsSaturate (Just "h$RTSD") $
           , declRegs
           , declRets]
 
-rtsText :: StgToJSConfig -> T.ShortText
-rtsText = T.pack . show . pretty . rts
+-- FIXME (Sylvain 2022-06): don't use String
+rtsText :: StgToJSConfig -> String
+rtsText = show . pretty . rts
 
-rtsDeclsText :: T.ShortText
-rtsDeclsText = T.pack . show . pretty $ rtsDecls
+-- FIXME (Sylvain 2022-06): don't use String
+rtsDeclsText :: String
+rtsDeclsText = show . pretty $ rtsDecls
 
 rts :: StgToJSConfig -> JStat
 rts = jsSaturate (Just "h$RTS") . rts'
