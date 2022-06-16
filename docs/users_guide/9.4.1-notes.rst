@@ -441,6 +441,8 @@ Runtime system
 
 - Removed `lookupOrigIO` in favor of `lookupNameCache`
 
+- Added a new `thNameToGhcNameIO` function that plugins can use outside the `CoreM` monad.
+
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~
 

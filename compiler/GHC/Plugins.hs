@@ -63,6 +63,7 @@ module GHC.Plugins
    , module GHC.Hs
    , -- * Getting 'Name's
      thNameToGhcName
+   , thNameToGhcNameIO
    )
 where
 
@@ -140,6 +141,7 @@ import GHC.Prelude
 import GHC.Utils.Monad  ( mapMaybeM )
 import GHC.ThToHs       ( thRdrNameGuesses )
 import GHC.Tc.Utils.Env ( lookupGlobal )
+import GHC.Types.Name.Cache ( NameCache )
 
 import GHC.Tc.Errors.Hole.FitTypes
 
@@ -171,7 +173,29 @@ instance MonadThings CoreM where
 -- to names in the module being compiled, if possible. Exact TH names
 -- will be bound to the name they represent, exactly.
 thNameToGhcName :: TH.Name -> CoreM (Maybe Name)
-thNameToGhcName th_name
+thNameToGhcName th_name = do
+  hsc_env <- getHscEnv
+  liftIO $ thNameToGhcNameIO (hsc_NC hsc_env) th_name
+
+-- | Attempt to convert a Template Haskell name to one that GHC can
+-- understand. Original TH names such as those you get when you use
+-- the @'foo@ syntax will be translated to their equivalent GHC name
+-- exactly. Qualified or unqualified TH names will be dynamically bound
+-- to names in the module being compiled, if possible. Exact TH names
+-- will be bound to the name they represent, exactly.
+--
+-- One must be careful to consistently use the same 'NameCache' to
+-- create identifier that might be compared. (C.f. how the
+-- 'Control.Monad.ST.ST' Monad enforces that variables from separate
+-- 'Control.Monad.ST.runST' invocations are never intermingled; it would
+-- be valid to use the same tricks for 'Name's and 'NameCache's.)
+--
+-- For now, the easiest and recommended way to ensure a consistent
+-- 'NameCache' is used it to retrieve the preexisting one from an active
+-- 'HscEnv'. A single 'HscEnv' is created per GHC "session", and this
+-- ensures everything in that sesssion will getthe same name cache.
+thNameToGhcNameIO :: NameCache -> TH.Name -> IO (Maybe Name)
+thNameToGhcNameIO cache th_name
   =  do { names <- mapMaybeM lookup (thRdrNameGuesses th_name)
           -- Pick the first that works
           -- E.g. reify (mkName "A") will pick the class A in preference
@@ -182,6 +206,5 @@ thNameToGhcName th_name
       | Just n <- isExact_maybe rdr_name   -- This happens in derived code
       = return $ if isExternalName n then Just n else Nothing
       | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
-      = do { hsc_env <- hsc_NC <$> getHscEnv
-           ; Just <$> liftIO (lookupNameCache hsc_env rdr_mod rdr_occ) }
+      = Just <$> lookupNameCache cache rdr_mod rdr_occ
       | otherwise = return Nothing
