@@ -52,7 +52,7 @@ executable ucd2haskell
   main-is: UCD2Haskell.hs
   other-modules: Parser.Text
   build-depends:
-      base             >= 4.7   && < 4.17
+      base             >= 4.7   && < 4.18
     , streamly         >= 0.8   && < 0.9
     , split            >= 0.2.3 && < 0.3
     , getopt-generics  >= 0.13  && < 0.14
