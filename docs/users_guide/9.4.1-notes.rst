@@ -439,6 +439,8 @@ Runtime system
   datatype, to track the presence of a promotion tick. Plugins which manipulate
   the Haskell AST will need to take this change into account.
 
+- Removed `lookupOrigIO` in favor of `lookupNameCache`
+
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~
 
