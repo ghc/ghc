@@ -3469,7 +3469,7 @@ fFlagsDeps = [
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
   flagSpec "version-macros"                   Opt_VersionMacros,
   flagSpec "worker-wrapper"                   Opt_WorkerWrapper,
-  flagSpec "worker-wrapper-cbv"               Opt_WorkerWrapperUnlift,
+  flagSpec "worker-wrapper-cbv"               Opt_WorkerWrapperUnlift, -- See Note [Worker/wrapper for strict arguments]
   flagSpec "solve-constant-dicts"             Opt_SolveConstantDicts,
   flagSpec "catch-nonexhaustive-cases"        Opt_CatchNonexhaustiveCases,
   flagSpec "alignment-sanitisation"           Opt_AlignmentSanitisation,
