@@ -64,6 +64,7 @@ import GHC.Platform.Host (hostPlatformArchOS)
 import           GHC.StgToJS.Linker.Types
 import           GHC.StgToJS.Linker.Utils
 import           GHC.StgToJS.Linker.Compactor
+import           GHC.StgToJS.Linker.Shims
 
 import           GHC.StgToJS.Rts.Rts
 
@@ -217,17 +218,17 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
           static_rts_files <- find_env_shims "JS_RTS_PATH"
           let all_rts_js = linkLibRTS link_res ++ static_rts_files
 
-          rts_js_bss <- mapM (tryReadShimFile logger tmpfs dflags unit_env) all_rts_js
+          rts_js_bss <- streamShims <$> readShimFiles logger tmpfs dflags unit_env all_rts_js
           BL.writeFile (out </> "rts.js") (BLC.pack rtsDeclsText
                                            <> BL.fromChunks rts_js_bss
                                            <> BLC.pack (rtsText cfg))
 
         static_base_files <- find_env_shims "JS_BASE_PATH"
         let all_lib_js = linkLibA link_res ++ static_base_files
-        lla'    <- mapM (tryReadShimFile logger tmpfs dflags unit_env) all_lib_js
+        lla'    <- streamShims <$> readShimFiles logger tmpfs dflags unit_env all_lib_js
         -- llarch' <- mapM (readShimsArchive dflags) (linkLibArch link_res)
         -- let lib_js = BL.fromChunks $ llarch' ++ lla'
-        let lib_js = BL.fromChunks lla'
+        let lib_js = BL.fromChunks $! lla'
         BL.writeFile (out </> "lib" <.> jsExt) lib_js
 
         if genBase

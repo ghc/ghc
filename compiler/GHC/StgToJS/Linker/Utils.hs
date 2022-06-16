@@ -1,5 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
-
+{-# LANGUAGE OverloadedStrings  #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.StgToJS.Linker.Utils
@@ -28,23 +27,17 @@ import           Data.ByteString (ByteString)
 import           System.IO (withBinaryFile, IOMode(WriteMode))
 
 import          GHC.Driver.Session
-import          GHC.Driver.Pipeline.Execute (doCpp)
 import          GHC.Settings.Config (cProjectVersion)
 
 import          GHC.Data.ShortText
 import          GHC.Unit.State
-import          GHC.Unit.Env
 import          GHC.Unit.Types
-import          GHC.Utils.Panic
-import          GHC.Utils.TmpFs
-import          GHC.Utils.Logger
 
 import          GHC.StgToJS.Types
 
 import           Prelude
 import GHC.Platform
 import Data.List (isPrefixOf)
-
 
 {-
       macOS has trouble writing more than 2GiB at once to a file
@@ -69,27 +62,6 @@ getInstalledPackageLibDirs us = fmap unpack . maybe mempty unitLibraryDirs . loo
 
 getInstalledPackageHsLibs :: UnitState -> UnitId -> [String]
 getInstalledPackageHsLibs us = fmap unpack . maybe mempty unitLibraries . lookupUnitId us
-
-tryReadShimFile :: Logger -> TmpFs -> DynFlags -> UnitEnv -> FilePath -> IO B.ByteString
-tryReadShimFile logger tmpfs dflags unit_env file = do
-  if needsCpp file
-  then do
-    infile <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "jsppx"
-    -- FIXME (Sylvain 2022-06): we should get profiling from the codegen options
-    -- (was GHCJS_PROF CPP define)
-    let profiling = False
-    -- append common CPP definitions to the .pp file.
-    B.writeFile infile (commonCppDefs profiling)
-    B.readFile file >>= B.appendFile infile
-    outfile <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "jspp"
-    let use_cpp_and_not_cc_dash_E = False
-    let extra_opts = []
-    doCpp logger tmpfs dflags unit_env use_cpp_and_not_cc_dash_E extra_opts infile outfile
-    B.readFile outfile
-  else B.readFile file
-
-readShimsArchive :: DynFlags -> FilePath -> IO B.ByteString
-readShimsArchive = panic "readShimsArchive: Shims not yet implemented!"
 
 getCompilerVersion :: String
 getCompilerVersion = cProjectVersion
@@ -311,15 +283,6 @@ genCommonCppDefs profiling = mconcat
   , "#define CALL_UBX_TUP9(r1,r2,r3,r4,r5,r6,r7,r8,r9,c) { (r1) = (c); (r2) = h$ret1; (r3) = h$ret2; (r4) = h$ret3; (r5) = h$ret4; (r6) = h$ret5; (r7) = h$ret6; (r8) = h$ret7; (r9) = h$ret8; }\n"
   , "#define CALL_UBX_TUP10(r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,c) { (r1) = (c); (r2) = h$ret1; (r3) = h$ret2; (r4) = h$ret3; (r5) = h$ret4; (r6) = h$ret5; (r7) = h$ret6; (r8) = h$ret7; (r9) = h$ret8; (r10) = h$ret9; }\n"
   ]
-
--- | Test if file has ".pp" extension
---
--- running the C preprocessor on JS files is a bit fragile
--- and breaks in some situations. Therefore we only preprocess
--- files with .pp extension, for example lib.js.pp
-needsCpp :: FilePath -> Bool
-needsCpp file = "pp" `isExtensionOf` file
-
 
 -- FIXME: Jeff (2022,04): remove this function since it is a duplicate of
 -- GHC.Linker.Static.Utils.exeFileName

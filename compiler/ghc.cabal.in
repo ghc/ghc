@@ -666,6 +666,7 @@ Library
         GHC.StgToJS.Linker.Types
         GHC.StgToJS.Linker.Utils
         GHC.StgToJS.Linker.Archive
+        GHC.StgToJS.Linker.Shims
         GHC.Stg.Unarise
         GHC.SysTools
         GHC.SysTools.Ar
