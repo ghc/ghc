@@ -700,6 +700,8 @@ nightly-hackage-perf:
   variables:
     # Generate logs for nightly builds which include timing information.
     EXTRA_HC_OPTS: "-ddump-timings"
+    # Ask head.hackage to generate eventlogs
+    EVENTLOGGING: 1
 
 ############################################################
 # Nofib testing
