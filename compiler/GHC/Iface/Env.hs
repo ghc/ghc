@@ -6,7 +6,7 @@ module GHC.Iface.Env (
         newGlobalBinder, newInteractiveBinder,
         externaliseName,
         lookupIfaceTop,
-        lookupOrig, lookupOrigIO, lookupOrigNameCache,
+        lookupOrig, lookupNameCache, lookupOrigNameCache,
         newIfaceName, newIfaceNames,
         extendIfaceIdEnv, extendIfaceTyVarEnv,
         tcIfaceLclId, tcIfaceTyVar, lookupIfaceVar,
@@ -145,10 +145,6 @@ lookupOrig mod occ = do
   hsc_env <- getTopEnv
   traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
   liftIO $ lookupNameCache (hsc_NC hsc_env) mod occ
-
-lookupOrigIO :: HscEnv -> Module -> OccName -> IO Name
-lookupOrigIO hsc_env mod occ
-  = lookupNameCache (hsc_NC hsc_env) mod occ
 
 lookupNameCache :: NameCache -> Module -> OccName -> IO Name
 -- Lookup up the (Module,OccName) in the NameCache

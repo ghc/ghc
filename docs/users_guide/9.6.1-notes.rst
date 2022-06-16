@@ -81,6 +81,8 @@ Compiler
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
+- Removed `lookupOrigIO` in favor of `lookupNameCache`
+
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~
 
