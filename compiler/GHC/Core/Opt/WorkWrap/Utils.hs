@@ -784,6 +784,53 @@ before calling the partially applied function. But this would be neither a small
 stick with A) and a flag for B) for now.
 
 See also Note [Tag Inference] and Note [CBV Function Ids]
+
+Note [Worker/wrapper for strict arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    f x = case x of
+             []     -> blah
+             (y:ys) -> f ys
+
+Clearly `f` is strict, but its argument is not a product type, so by default
+we don't worker/wrapper it.  But it is arguably valuable to do so.  We could
+do this:
+
+   f x = case x of xx { DEFAULT -> $wf xx }
+   $wf xx = case xx of
+              []     -> blah
+              (y:ys) -> f ys
+
+Now the worker `$wf` knows that its argument `xx` will be evaluated
+and properly tagged, so the code for the `case xx` does not need to do
+an "eval" (see `GHC.StgToCmm.Expr.cgCase`).  A call (f (a:as)) will
+have the wrapper inlined, and will drop the `case x`, so no eval
+happens at all.
+
+The worker `$wf` is a CBV function (see `Note [CBV Function Ids]`
+in GHC.Types.Id.Info) and the code generator guarantees that every
+call to `$wf` has a properly tagged argument (see `GHC.Stg.InferTags.Rewrite`).
+
+Is this a win?  Not always:
+* It can cause slight codesize increases. This is since we push evals to every
+  call sites which there might be many. And the evals will only disappear at
+  call sites where we already known that the argument is evaluated.
+
+* It will also cause many more functions to get a worker/wrapper split
+  which can play badly with rules (see Ticket #20364).  In particular
+  if you depend on rules firing on functions marked as NOINLINE
+  without marking use sites of these functions as INLINE or INLINEABLE
+  then things will break.
+  But if you want a function to match in a RULE, it is /in any case/ good practice to
+  have a `INLINE[1]` or `NOINLNE[1]` pragma, to ensure that it doesn't inline until
+  the rule has had a chance to fire.
+
+So there is a flag, `-fworker-wrapper-cbv`, to control whether we do
+w/w on strict arguments (internally `Opt_WorkerWrapperUnlift`).  The
+flag is off by default.  The choice is made in
+GHC.Core.Opt.WorkWrape.Utils.wwForUnlifting
+
+See also `Note [WW for calling convention]` in GHC.Core.Opt.WorkWrap.Utils
 -}
 
 {-
