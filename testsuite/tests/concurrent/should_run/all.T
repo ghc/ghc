@@ -257,7 +257,6 @@ test('T21651',
        when(opsys('mingw32'),skip), # uses POSIX pipes
        when(opsys('darwin'),extra_run_opts('8 12 2000 100')),
        unless(opsys('darwin'),extra_run_opts('8 12 2000 200')), # darwin runners complain of too many open files
-       expect_broken('21651'),
        req_smp ],
      compile_and_run, [''])
 
