@@ -1,6 +1,6 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DeriveFunctor      #-}
-{-# LANGUAGE DerivingVia        #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TupleSections      #-}
 
 -----------------------------------------------------------------------------
@@ -58,7 +58,7 @@ import           Prelude
 type Shim = Shim' B.ByteString
 
 newtype Shim' a = Shim' { unShim :: (ShimLbl, a) }
-    deriving Functor via (,) ShimLbl
+    deriving newtype Functor
 
 -- | projections from Shims; project the shim label tag
 -- shimLabel :: Shim -> ShimLbl
