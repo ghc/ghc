@@ -218,9 +218,16 @@ test('conc067', ignore_stdout, compile_and_run, [''])
 test('conc068', [ omit_ways(concurrent_ways), exit_code(1) ], compile_and_run, [''])
 
 test('setnumcapabilities001',
-     [ only_ways(['threaded1','threaded2', 'nonmoving_thr']),
+     [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        extra_run_opts('8 12 2000'),
        when(have_thread_sanitizer(), expect_broken(18808)),
+       req_smp ],
+     compile_and_run, [''])
+
+test('T21651',
+     [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
+       when(opsys('mingw32'),skip), # uses POSIX pipes
+       extra_run_opts('8 12 2000 50'),
        req_smp ],
      compile_and_run, [''])
 
