@@ -495,36 +495,17 @@ gcCostCentreStacks (CostCentreStack *ccs)
     }
 }
 
-static bool objectContains (ObjectCode *oc, const void *addr)
-{
-    int i;
-
-     if (oc != NULL) {
-        for (i = 0; i < oc->n_sections; i++) {
-            if (oc->sections[i].kind != SECTIONKIND_OTHER) {
-                if ((W_)addr >= (W_)oc->sections[i].start &&
-                    (W_)addr <  (W_)oc->sections[i].start
-                                + oc->sections[i].size) {
-                    return true;
-                }
-            }
-        }
-    }
-
-     return false;
-}
-
-//
-// Remove all CostCentres which are statically allocated in the given object
-// from the global CC_LIST.
-//
-static void gcCostCentres(ObjectCode *oc)
+// Remove from the global CC_LIST all CostCentres which are statically
+// allocated in an unloaded object that we are about to free in this GC cycle.
+static void gcCostCentres(OCSectionIndices *s_indices)
 {
     CostCentre *cc, *prev, *next;
+    ObjectCode *oc;
     prev = NULL;
     for (cc = CC_LIST; cc != NULL; cc = next) {
         next = cc->link;
-        if (objectContains(oc, cc)) {
+        oc = findOC(s_indices, cc);
+        if (oc != NULL && oc->mark == 0) {
             if (prev == NULL) {
                 CC_LIST = cc->link;
             } else {
@@ -556,17 +537,19 @@ void checkUnload()
         markObjectLive(NULL, (W_)oc, NULL);
     }
 
+#if defined(PROFILING)
+    // At this point, we know what object should be unloaded based on the
+    // referenced field in its metadata ObjetCode* struct. Thus, we can
+    // traverse CC_LIST to prune CCs that belong to one of the unloaded
+    // objects.
+    gcCostCentres(s_indices);
+#endif
+
     // Free unmarked objects
     ObjectCode *next = NULL;
     for (ObjectCode *oc = old_objects; oc != NULL; oc = next) {
         next = oc->next;
         ASSERT(oc->status == OBJECT_UNLOADED);
-
-#if defined(PROFILING)
-        // The CCS tree isn't keeping this object alive, and it is unloaded,
-        // so we can prune the global CC_LIST of any CCs from this object.
-        gcCostCentres(oc);
-#endif
 
         removeOCSectionIndices(s_indices, oc);
 
