@@ -724,8 +724,11 @@ ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_inline = spec }))
         NoUserInlinePrag -> "{-# " ++ extractSpecPragName (inl_src inl)
         _                -> "{-# " ++ extractSpecPragName (inl_src inl)  ++ "_INLINE"
 ppr_sig (InlineSig _ var inl)
-  = pragSrcBrackets (inlinePragmaSource inl) "{-# INLINE"  (pprInline inl
-                                   <+> pprPrefixOcc (unLoc var))
+  = ppr_pfx <+> pprInline inl <+> pprPrefixOcc (unLoc var) <+> text "#-}"
+    where
+      ppr_pfx = case inlinePragmaSource inl of
+        SourceText src -> text src
+        NoSourceText   -> text "{-#" <+> inlinePragmaName (inl_inline inl)
 ppr_sig (SpecInstSig _ src ty)
   = pragSrcBrackets src "{-# pragma" (text "instance" <+> ppr ty)
 ppr_sig (MinimalSig _ src bf)

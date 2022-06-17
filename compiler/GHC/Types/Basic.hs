@@ -1769,9 +1769,11 @@ inlinePragmaName (NoInline          _)  = text "NOINLINE"
 inlinePragmaName (Opaque            _)  = text "OPAQUE"
 inlinePragmaName NoUserInlinePrag       = empty
 
+-- | Pretty-print without displaying the user-specified 'InlineSpec'.
 pprInline :: InlinePragma -> SDoc
 pprInline = pprInline' True
 
+-- | Pretty-print including the user-specified 'InlineSpec'.
 pprInlineDebug :: InlinePragma -> SDoc
 pprInlineDebug = pprInline' False
 
