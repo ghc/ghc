@@ -1,5 +1,19 @@
 cabal-version: 3.0
 name: rts
+-- Note [Bumping the rts version number]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- When bumping the version of the `rts` package one must update
+-- the following places:
+--
+--  * the version field of rts.cabal.in (this file)
+--  * compiler/GHC/Unit/Info.hs:unitHsLibs
+--  * hadrian/src/Rules/Rts.hs:prefix
+--  * rts/ghc.mk:rts_VERSION
+--  * rts/package.conf.in:version
+--
+-- Failing to update any one of these may result in quite surprising
+-- errors.
+--
 version: 1.0.3
 license: BSD-3-Clause
 maintainer: glasgow-haskell-users@haskell.org
