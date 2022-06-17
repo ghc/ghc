@@ -270,6 +270,7 @@ Library
         GHC.Records
         GHC.ResponseFile
         GHC.RTS.Flags
+        GHC.RWLock
         GHC.ST
         GHC.Stack.CloneStack
         GHC.StaticPtr
