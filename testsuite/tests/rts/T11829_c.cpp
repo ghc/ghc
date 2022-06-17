@@ -1,5 +1,5 @@
 #include <iostream>
-#include <exception>
+#include <stdexcept>
 extern "C" {
 
 int func() {
