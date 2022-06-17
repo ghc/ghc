@@ -377,6 +377,9 @@ Library
           cbits/CastFloatWord.cmm
           cbits/StackCloningDecoding.cmm
 
+    js-sources:
+        jsbits/base.js.pp
+
     include-dirs: include
     includes:
         HsBase.h
