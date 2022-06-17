@@ -28,7 +28,8 @@ import GHC.List (zipWith, zipWith3)
 import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
                       labelThread, modifyMVar_, withMVar, newTVar, sharedCAF,
                       getNumCapabilities, threadCapability, myThreadId, forkOn,
-                      threadStatus, writeTVar, newTVarIO, readTVar, retry,throwSTM,STM)
+                      threadStatus, writeTVar, newTVarIO, readTVar, retry,throwSTM,STM,
+                      numCapabilitiesLock)
 import GHC.IO (mask_, uninterruptibleMask_, onException)
 import GHC.IO.Exception (ioError)
 import GHC.IOArray (IOArray, newIOArray, readIOArray, writeIOArray,
@@ -46,6 +47,7 @@ import GHC.Real (fromIntegral)
 import GHC.Show (showSignedInt)
 import System.IO.Unsafe (unsafePerformIO)
 import System.Posix.Types (Fd)
+import GHC.RWLock
 
 -- | Suspends the current thread for a given number of microseconds
 -- (GHC only).
@@ -105,7 +107,7 @@ threadWaitWrite = threadWait evtWrite
 closeFdWith :: (Fd -> IO ())        -- ^ Action that performs the close.
             -> Fd                   -- ^ File descriptor to close.
             -> IO ()
-closeFdWith close fd = do
+closeFdWith close fd = withReader numCapabilitiesLock $ \() -> do
   -- 'takeMVar', and 'M.closeFd_' might block, although for a very short time.
   -- To make 'closeFdWith' safe in presence of asynchronous exceptions we have
   -- to use uninterruptible mask.

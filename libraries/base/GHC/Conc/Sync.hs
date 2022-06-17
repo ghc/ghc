@@ -58,6 +58,7 @@ module GHC.Conc.Sync
         , numCapabilities
         , getNumCapabilities
         , setNumCapabilities
+        , numCapabilitiesLock
         , getNumProcessors
 
         -- * Sparks
@@ -112,6 +113,7 @@ import GHC.Show         ( Show(..), showParen, showString )
 import GHC.Stable       ( StablePtr(..) )
 import GHC.Weak
 import GHC.Conc.TVar
+import GHC.RWLock
 
 import Unsafe.Coerce    ( unsafeCoerce# )
 
@@ -369,10 +371,16 @@ to avoid contention with other processes in the machine.
 setNumCapabilities :: Int -> IO ()
 setNumCapabilities i
   | i <= 0    = failIO $ "setNumCapabilities: Capability count ("++show i++") must be positive"
-  | otherwise = c_setNumCapabilities (fromIntegral i)
+  | otherwise = withWriter numCapabilitiesLock $ \() -> do
+      c_setNumCapabilities (fromIntegral i)
+      return ((), ())
 
 foreign import ccall safe "setNumCapabilities"
   c_setNumCapabilities :: CUInt -> IO ()
+
+numCapabilitiesLock :: RWLock ()
+numCapabilitiesLock = unsafePerformIO $ newRWLock ()
+{-# NOINLINE numCapabilitiesLock #-}
 
 -- | Returns the number of CPUs that the machine has
 --
