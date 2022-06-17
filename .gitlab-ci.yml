@@ -470,6 +470,8 @@ hackage-doc-tarball:
   variables:
     # Don't clone the git repo..
     GIT_STRATEGY: none
+    # Don't attempt to boot a source tarball
+    NO_BOOT: "1"
   artifacts:
     paths:
       - hackage_docs
