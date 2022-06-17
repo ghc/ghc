@@ -197,6 +197,7 @@ Library
         GHC.Clock
         GHC.Conc
         GHC.Conc.IO
+        GHC.Conc.TVar
         GHC.Conc.Signal
         GHC.Conc.Sync
         GHC.ConsoleHandler

@@ -17,7 +17,6 @@
 
 module GHC.Conc.Sync
         ( forkIO,
-          TVar(..),
           ThreadId(..),
           myThreadId,
           showThreadId,
@@ -33,7 +32,6 @@ import GHC.Ptr
 forkIO :: IO () -> IO ThreadId
 
 data ThreadId = ThreadId ThreadId#
-data TVar a = TVar (TVar# RealWorld a)
 
 data BlockReason
         = BlockedOnMVar
