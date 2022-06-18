@@ -44,6 +44,8 @@ garbage collection (ordinary references may be relocated during garbage
 collection).  Consequently, stable pointers can be passed to foreign code,
 which can treat it as an opaque reference to a Haskell value.
 
+The @StablePtr@ 0 is reserved for representing NULL in foreign code.
+
 A value of type @StablePtr a@ is a stable pointer to a Haskell
 expression of type @a@.
 -}

@@ -28,6 +28,10 @@ StgTSO *getTopHandlerThread(void) {
     ACQUIRE_LOCK(&m);
     StgWeak *weak = (StgWeak*)deRefStablePtr(topHandlerPtr);
     RELEASE_LOCK(&m);
+    if (weak == NULL) {
+        // topHandlerPtr was never initialised
+        return NULL;
+    }
     const StgInfoTable *info = weak->header.info;
     load_load_barrier();
     if (info == &stg_WEAK_info) {

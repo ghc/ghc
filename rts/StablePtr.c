@@ -88,6 +88,16 @@
   https://gitlab.haskell.org/ghc/ghc/issues/7670 for details.
 */
 
+/*
+ * Note [NULL StgStablePtr]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * StablePtr index 0 is reserved to represent NULL. Consequently, we must
+ * subtract 1 to get the index into the array and add 1 to the index to get the
+ * StablePtr.
+ */
+
+
 spEntry *stable_ptr_table = NULL;
 static spEntry *stable_ptr_free = NULL;
 static unsigned int SPT_size = 0;
@@ -255,8 +265,13 @@ freeSpEntry(spEntry *sp)
 void
 freeStablePtrUnsafe(StgStablePtr sp)
 {
-    ASSERT((StgWord)sp < SPT_size);
-    freeSpEntry(&stable_ptr_table[(StgWord)sp]);
+    // see Note [NULL StgStablePtr]
+    if (sp == NULL) {
+        return;
+    }
+    StgWord spw = (StgWord)sp - 1;
+    ASSERT(spw < SPT_size);
+    freeSpEntry(&stable_ptr_table[spw]);
 }
 
 void
@@ -282,6 +297,8 @@ getStablePtr(StgPtr p)
   stable_ptr_free  = (spEntry*)(stable_ptr_free->addr);
   RELAXED_STORE(&stable_ptr_table[sp].addr, p);
   stablePtrUnlock();
+  // see Note [NULL StgStablePtr]
+  sp = sp + 1;
   return (StgStablePtr)(sp);
 }
 

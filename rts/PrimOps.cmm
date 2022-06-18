@@ -2307,7 +2307,7 @@ stg_newIOPortzh ()
 }
 
 /* -----------------------------------------------------------------------------
-   Stable pointer primitives
+   Stable name primitives
    -------------------------------------------------------------------------  */
 
 stg_makeStableNamezh ( P_ obj )
@@ -2347,6 +2347,10 @@ stg_makeStableNamezh ( P_ obj )
     return (sn_obj);
 }
 
+/* -----------------------------------------------------------------------------
+   Stable pointer primitives
+   -------------------------------------------------------------------------  */
+
 stg_makeStablePtrzh ( P_ obj )
 {
     W_ sp;
@@ -2358,7 +2362,9 @@ stg_makeStablePtrzh ( P_ obj )
 stg_deRefStablePtrzh ( P_ sp )
 {
     W_ r;
-    r = spEntry_addr(W_[stable_ptr_table] + sp*SIZEOF_spEntry);
+    // see Note [NULL StgStablePtr] in StablePtr.c
+    // here we assume that sp is a valid StablePtr#
+    r = spEntry_addr(W_[stable_ptr_table] + (sp-1)*SIZEOF_spEntry);
     return (r);
 }
 
