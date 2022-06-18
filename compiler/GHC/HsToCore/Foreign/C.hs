@@ -281,11 +281,10 @@ dsFCall fn_id co fcall mDeclHeader = do
                       cRet
                        | isVoidRes =                   cCall
                        | otherwise = text "return" <+> cCall
-                      cCall = if isFun
-                              then ppr cName <> parens argVals
-                              else if null arg_tys
-                                    then ppr cName
-                                    else panic "dsFCall: Unexpected arguments to FFI value import"
+                      cCall
+                        | isFun = ppr cName <> parens argVals
+                        | null arg_tys = ppr cName
+                        | otherwise = panic "dsFCall: Unexpected arguments to FFI value import"
                       raw_res_ty = case tcSplitIOType_maybe io_res_ty of
                                    Just (_ioTyCon, res_ty) -> res_ty
                                    Nothing                 -> io_res_ty
@@ -358,12 +357,12 @@ toCType = f False
            -- through one layer of type synonym etc.
            | Just t' <- coreView t
               = f voidOK t'
-           -- This may be an 'UnliftedFFITypes'-style ByteArray# argument
-           -- (which is marshalled like a Ptr)
-           | Just byteArrayPrimTyCon        == tyConAppTyConPicky_maybe t
-              = (Nothing, text "const void*")
-           | Just mutableByteArrayPrimTyCon == tyConAppTyConPicky_maybe t
-              = (Nothing, text "void*")
+          -- Handle 'UnliftedFFITypes' argument
+           | Just tyCon <- tyConAppTyConPicky_maybe t
+           , isPrimTyCon tyCon
+           , Just cType <- ppPrimTyConStgType tyCon
+           = (Nothing, text cType)
+
            -- Otherwise we don't know the C type. If we are allowing
            -- void then return that; otherwise something has gone wrong.
            | voidOK = (Nothing, text "void")
@@ -624,4 +623,3 @@ fun_type_arg_stdcall_info platform StdCallConv ty
     in Just $ sum (map (widthInBytes . typeWidth . typeCmmType platform . getPrimTyOf) fe_arg_tys)
 fun_type_arg_stdcall_info _ _other_conv _
   = Nothing
-

@@ -1,7 +1,10 @@
+{-# LANGUAGE MultiWayIf #-}
+
 module GHC.HsToCore.Foreign.Utils
   ( Binding
   , getPrimTyOf
   , primTyDescChar
+  , ppPrimTyConStgType
   )
 where
 
@@ -74,3 +77,29 @@ primTyDescChar !platform ty
     (signed_word, unsigned_word) = case platformWordSize platform of
       PW4 -> ('W','w')
       PW8 -> ('L','l')
+
+-- | Printed C Type to be used with CAPI calling convention
+ppPrimTyConStgType :: TyCon -> Maybe String
+ppPrimTyConStgType tc =
+  if | tc == charPrimTyCon -> Just "StgChar"
+     | tc == intPrimTyCon -> Just "StgInt"
+     | tc == int8PrimTyCon -> Just "StgInt8"
+     | tc == int16PrimTyCon -> Just "StgInt16"
+     | tc == int32PrimTyCon -> Just "StgInt32"
+     | tc == int64PrimTyCon -> Just "StgInt64"
+     | tc == wordPrimTyCon -> Just "StgWord"
+     | tc == word8PrimTyCon -> Just "StgWord8"
+     | tc == word16PrimTyCon -> Just "StgWord16"
+     | tc == word32PrimTyCon -> Just "StgWord32"
+     | tc == word64PrimTyCon -> Just "StgWord64"
+     | tc == floatPrimTyCon -> Just "StgFloat"
+     | tc == doublePrimTyCon -> Just "StgDouble"
+     | tc == addrPrimTyCon -> Just "StgAddr"
+     | tc == stablePtrPrimTyCon -> Just "StgStablePtr"
+     | tc == arrayPrimTyCon -> Just "const StgAddr"
+     | tc == mutableArrayPrimTyCon -> Just "StgAddr"
+     | tc == byteArrayPrimTyCon -> Just "const StgAddr"
+     | tc == mutableByteArrayPrimTyCon -> Just "StgAddr"
+     | tc == smallArrayPrimTyCon -> Just "const StgAddr"
+     | tc == smallMutableArrayPrimTyCon -> Just "StgAddr"
+     | otherwise -> Nothing
