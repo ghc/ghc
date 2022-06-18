@@ -118,7 +118,6 @@ TARGETS=(
     #########################
 
     "x86_64-unknown-openbsd"
-    "i386-unknown-openbsd"
 
     #########################
     # Other

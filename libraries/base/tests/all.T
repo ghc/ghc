@@ -27,11 +27,11 @@ test('assert', exit_code(1), compile_and_run, ['-fno-ignore-asserts'])
 test('CPUTime001', fragile(16224), compile_and_run, [''])
 test('readLitChar',   normal, compile_and_run, [''])
 test('unicode001',
-     when(platform('i386-unknown-openbsd'), expect_fail),
+     normal,
      compile_and_run,
      [''])
 test('unicode002',
-     when(platform('i386-unknown-openbsd'), expect_fail),
+     normal,
      compile_and_run,
      [''])
 test('unicode003', normal, compile_and_run, [''])
