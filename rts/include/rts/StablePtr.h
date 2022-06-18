@@ -31,9 +31,14 @@ extern DLL_IMPORT_RTS spEntry *stable_ptr_table;
 ATTR_ALWAYS_INLINE EXTERN_INLINE
 StgPtr deRefStablePtr(StgStablePtr sp)
 {
+    // see Note [NULL StgStablePtr]
+    if (sp == 0) {
+        return NULL;
+    }
+    StgWord spw = (StgWord)sp - 1;
     // acquire load to ensure that we see the new SPT if it has been recently
     // enlarged.
     const spEntry *spt = ACQUIRE_LOAD(&stable_ptr_table);
     // acquire load to ensure that the referenced object is visible.
-    return ACQUIRE_LOAD(&spt[(StgWord)sp].addr);
+    return ACQUIRE_LOAD(&spt[spw].addr);
 }
