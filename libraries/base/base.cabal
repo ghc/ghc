@@ -115,6 +115,7 @@ Library
         Control.Monad.Zip
         Data.Array.Byte
         Data.Bifoldable
+        Data.Bifoldable1
         Data.Bifunctor
         Data.Bitraversable
         Data.Bits
@@ -128,6 +129,7 @@ Library
         Data.Eq
         Data.Fixed
         Data.Foldable
+        Data.Foldable1
         Data.Function
         Data.Functor
         Data.Functor.Classes

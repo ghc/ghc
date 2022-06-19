@@ -6,7 +6,8 @@
     exception handler.
   * Add `GHC.Weak.Finalize.{get,set}FinalizerExceptionHandler` which the user to
     override the above-mentioned handler.
-  * `Numeric.Natural` re-exports `GHC.Natural.minusNaturalMaybe`. 
+  * `Numeric.Natural` re-exports `GHC.Natural.minusNaturalMaybe`.
+  * Add `Data.Foldable1` and `Data.Bifoldable1`.
 
 ## 4.17.0.0 *TBA*
 
