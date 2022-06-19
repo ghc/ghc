@@ -135,6 +135,13 @@ denominator (_ :% y)    =  y
 -- Standard numeric classes
 --------------------------------------------------------------
 
+-- | Real numbers.
+--
+-- The Haskell report defines no laws for 'Real', however 'Real' instances
+-- are customarily expected to adhere to the following law:
+--
+-- [__Coherence with 'fromRational'__]: if the type also implements 'Fractional',
+-- then 'fromRational' is a left inverse for 'toRational', i.e. @fromRational (toRational i) = i@
 class  (Num a, Ord a) => Real a  where
     -- | the rational equivalent of its real argument with full precision
     toRational          ::  a -> Rational
@@ -153,6 +160,9 @@ class  (Num a, Ord a) => Real a  where
 --
 -- An example of a suitable Euclidean function, for 'Integer'\'s instance, is
 -- 'abs'.
+--
+-- In addition, 'toInteger` should be total, and 'fromInteger' should be a left
+-- inverse for it, i.e. @fromInteger (toInteger i) = i@.
 class  (Real a, Enum a) => Integral a  where
     -- | integer division truncated toward zero
     --
@@ -211,6 +221,9 @@ class  (Real a, Enum a) => Integral a  where
 --
 -- [__'recip' gives the multiplicative inverse__]:
 -- @x * recip x@ = @recip x * x@ = @fromInteger 1@
+-- [__Totality of 'toRational'__]: 'toRational' is total
+-- [__Coherence with 'toRational'__]: if the type also implements 'Real',
+-- then 'fromRational' is a left inverse for 'toRational', i.e. @fromRational (toRational i) = i@
 --
 -- Note that it /isn't/ customarily expected that a type instance of
 -- 'Fractional' implement a field. However, all instances in @base@ do.

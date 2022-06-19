@@ -56,6 +56,8 @@ default ()              -- Double isn't available yet,
 -- @x * fromInteger 1@ = @x@ and @fromInteger 1 * x@ = @x@
 -- [__Distributivity of @('*')@ with respect to @('+')@__]:
 -- @a * (b + c)@ = @(a * b) + (a * c)@ and @(b + c) * a@ = @(b * a) + (c * a)@
+-- [__Coherence with 'toInteger'__]: if the type also implements 'GHC.Real.Integral', then
+-- 'fromInteger' is a left inverse for 'GHC.Real.toInteger', i.e. @fromInteger (toInteger i) == i@
 --
 -- Note that it /isn't/ customarily expected that a type instance of both 'Num'
 -- and 'Ord' implement an ordered ring. Indeed, in @base@ only 'Integer' and

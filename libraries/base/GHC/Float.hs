@@ -335,6 +335,9 @@ instance  Real Float  where
 --
 -- >>> 0/0 * (recip 0/0 :: Float)
 -- NaN
+--
+-- Additionally, because of @NaN@ this instance does not obey the left-inverse
+-- law for 'toRational'/'fromRational'.
 instance  Fractional Float  where
     (/) x y             =  divideFloat x y
     {-# INLINE fromRational #-}
@@ -564,6 +567,9 @@ instance  Real Double  where
 --
 -- >>> 0/0 * (recip 0/0 :: Double)
 -- NaN
+--
+-- Additionally, because of @NaN@ this instance does not obey the left-inverse
+-- law for 'toRational'/'fromRational'.
 instance  Fractional Double  where
     (/) x y             =  divideDouble x y
     {-# INLINE fromRational #-}
