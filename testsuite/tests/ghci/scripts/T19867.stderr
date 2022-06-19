@@ -1,0 +1,6 @@
+
+T19867.hs:3:5: error:
+    Variable not in scope: guard
+    Suggested fix:
+      Perhaps you want to add ‘guard’ to the import list in the import of
+      ‘Control.Monad’ (T19867.hs:1:1-31).
