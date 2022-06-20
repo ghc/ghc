@@ -694,6 +694,9 @@ data WorkerLimit
 -- produced by calling 'depanal'.
 load' :: GhcMonad m => Maybe ModIfaceCache -> LoadHowMuch -> Maybe Messager -> ModuleGraph -> m SuccessFlag
 load' mhmi_cache how_much mHscMessage mod_graph = do
+    -- In normal usage plugins are initialised already by ghc/Main.hs this is protective
+    -- for any client who might interact with GHC via load'.
+    initializeSessionPlugins
     modifySession $ \hsc_env -> hsc_env { hsc_mod_graph = mod_graph }
     guessOutputFile
     hsc_env <- getSession
@@ -2852,13 +2855,11 @@ label_self thread_name = do
 runPipelines :: WorkerLimit -> HscEnv -> Maybe Messager -> [MakeAction] -> IO ()
 -- Don't even initialise plugins if there are no pipelines
 runPipelines _ _ _ [] = return ()
-runPipelines n_job orig_hsc_env mHscMessager all_pipelines = do
+runPipelines n_job hsc_env mHscMessager all_pipelines = do
   liftIO $ label_self "main --make thread"
-
-  plugins_hsc_env <- initializePlugins orig_hsc_env
   case n_job of
-    NumProcessorsLimit n | n <= 1 -> runSeqPipelines plugins_hsc_env mHscMessager all_pipelines
-    _n -> runParPipelines n_job plugins_hsc_env mHscMessager all_pipelines
+    NumProcessorsLimit n | n <= 1 -> runSeqPipelines hsc_env mHscMessager all_pipelines
+    _n -> runParPipelines n_job hsc_env mHscMessager all_pipelines
 
 runSeqPipelines :: HscEnv -> Maybe Messager -> [MakeAction] -> IO ()
 runSeqPipelines plugin_hsc_env mHscMessager all_pipelines =

@@ -62,7 +62,6 @@ import GHC.Parser.Header
 import GHC.Data.StringBuffer
 import GHC.Types.SourceError
 import GHC.Unit.Finder
-import GHC.Runtime.Loader
 import Data.IORef
 import GHC.Types.Name.Env
 import GHC.Platform.Ways
@@ -82,6 +81,7 @@ import GHC.StgToJS.Linker.Linker (embedJsFile)
 
 import Language.Haskell.Syntax.Module.Name
 import GHC.Unit.Home.ModInfo
+import GHC.Runtime.Loader (initializePlugins)
 
 newtype HookedUse a = HookedUse { runHookedUse :: (Hooks, PhaseHook) -> IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch) via (ReaderT (Hooks, PhaseHook) IO)
@@ -724,9 +724,11 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
       new_includes = addImplicitQuoteInclude paths [current_dir]
       paths = includePaths dflags0
       dflags = dflags0 { includePaths = new_includes }
-      hsc_env = hscSetFlags dflags hsc_env0
+      hsc_env1 = hscSetFlags dflags hsc_env0
 
-
+  -- Initialise plugins as the flags passed into runHscPhase might have local plugins just
+  -- specific to this module.
+  hsc_env <- initializePlugins hsc_env1
 
   -- gather the imports and module name
   (hspp_buf,mod_name,imps,src_imps, ghc_prim_imp) <- do
@@ -786,18 +788,17 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   -- run the compiler!
   let msg :: Messager
       msg hsc_env _ what _ = oneShotMsg (hsc_logger hsc_env) what
-  plugin_hsc_env' <- initializePlugins hsc_env
 
   -- Need to set the knot-tying mutable variable for interface
   -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
   -- See also Note [hsc_type_env_var hack]
   type_env_var <- newIORef emptyNameEnv
-  let plugin_hsc_env = plugin_hsc_env' { hsc_type_env_vars = knotVarsFromModuleEnv (mkModuleEnv [(mod, type_env_var)]) }
+  let hsc_env' = hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv (mkModuleEnv [(mod, type_env_var)]) }
 
-  status <- hscRecompStatus (Just msg) plugin_hsc_env mod_summary
+  status <- hscRecompStatus (Just msg) hsc_env' mod_summary
                         Nothing emptyHomeModInfoLinkable (1, 1)
 
-  return (plugin_hsc_env, mod_summary, status)
+  return (hsc_env', mod_summary, status)
 
 -- | Calculate the ModLocation from the provided DynFlags. This function is only used
 -- in one-shot mode and therefore takes into account the effect of -o/-ohi flags

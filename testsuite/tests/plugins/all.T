@@ -317,3 +317,17 @@ test('plugins-external',
       pre_cmd('$MAKE -s --no-print-directory -C shared-plugin package.plugins01 TOP={top}'),
       when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, [])
+
+test('test-phase-hooks-plugin',
+     [extra_files(['hooks-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C hooks-plugin package.test-phase-hooks-plugin TOP={top}'),
+
+      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+     compile,
+     ['-package-db hooks-plugin/pkg.test-phase-hooks-plugin/local.package.conf -fplugin Hooks.PhasePlugin -package hooks-plugin ' + config.plugin_way_flags])
+
+test('test-log-hooks-plugin',
+     [extra_files(['hooks-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C hooks-plugin package.test-log-hooks-plugin TOP={top}')],
+     compile_fail,
+     ['-package-db hooks-plugin/pkg.test-log-hooks-plugin/local.package.conf -fplugin Hooks.LogPlugin -package hooks-plugin ' + config.plugin_way_flags])
