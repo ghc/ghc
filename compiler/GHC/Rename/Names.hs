@@ -1888,22 +1888,11 @@ The ImportMap is a short-lived intermediate data structure records, for
 each import declaration, what stuff brought into scope by that
 declaration is actually used in the module.
 
-The SrcLoc is the location of the END of a particular 'import'
-declaration.  Why *END*?  Because we don't want to get confused
-by the implicit Prelude import. Consider (#7476) the module
-    import Foo( foo )
-    main = print foo
-There is an implicit 'import Prelude(print)', and it gets a SrcSpan
-of line 1:1 (just the point, not a span). If we use the *START* of
-the SrcSpan to identify the import decl, we'll confuse the implicit
-import Prelude with the explicit 'import Foo'.  So we use the END.
-It's just a cheap hack; we could equally well use the Span too.
-
 The [GlobalRdrElt] are the things imported from that decl.
 -}
 
 data ImportMap = ImportMap
-  { im_imports :: Map RealSrcLoc [GlobalRdrElt]
+  { im_imports :: Map RealSrcSpan [GlobalRdrElt]
     -- ^ See [The ImportMap]
     -- If loc :-> gres, then
     --   'loc' = the end loc of the bestImport of each GRE in 'gres'
@@ -1920,8 +1909,8 @@ insertImportMap :: GlobalRdrElt -> ImportMap -> ImportMap
 insertImportMap gre@(GRE { gre_imp = imp_specs }) importMap
   | is_implicit best_imp_spec =
       importMap{im_implicitImports = insertElem (moduleName $ is_mod best_imp_spec) gre $ im_implicitImports importMap}
-  | Just decl_loc <- toImportMapSrcLoc (is_dloc best_imp_spec) =
-      importMap{im_imports = insertElem decl_loc gre $ im_imports importMap}
+  | RealSrcSpan importSpan _ <- is_dloc best_imp_spec =
+      importMap{im_imports = insertElem importSpan gre $ im_imports importMap}
   | otherwise = importMap
   where
     best_imp_spec =
@@ -1941,15 +1930,8 @@ lookupImportMap (L srcSpan ImportDecl{ideclName = L _ modName}) importMap =
     -- should match logic in insertImportMap
     case locA srcSpan of
       _ | Just gres <- modName `Map.lookup` im_implicitImports importMap -> Just gres
-      _ | Just loc <- toImportMapSrcLoc (locA srcSpan) -> loc `Map.lookup` im_imports importMap
+      RealSrcSpan realSrcSpan _ -> realSrcSpan `Map.lookup` im_imports importMap
       _ -> Nothing
-
-toImportMapSrcLoc :: SrcSpan -> Maybe RealSrcLoc
-toImportMapSrcLoc srcSpan =
-  -- see Note [The ImportMap] for why we're using srcSpanEnd
-  case srcSpanEnd srcSpan of
-    RealSrcLoc loc _ -> Just loc
-    UnhelpfulLoc _ -> Nothing
 
 warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
 warnUnusedImport rdr_env (L loc decl, used, unused)
