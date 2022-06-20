@@ -1902,26 +1902,32 @@ It's just a cheap hack; we could equally well use the Span too.
 The [GlobalRdrElt] are the things imported from that decl.
 -}
 
-type ImportMap = Map RealSrcLoc [GlobalRdrElt]  -- See [The ImportMap]
-     -- If loc :-> gres, then
-     --   'loc' = the end loc of the bestImport of each GRE in 'gres'
+data ImportMap = ImportMap
+  { im_imports :: Map RealSrcLoc [GlobalRdrElt]
+    -- ^ See [The ImportMap]
+    -- If loc :-> gres, then
+    --   'loc' = the end loc of the bestImport of each GRE in 'gres'
+  , im_implicitImports :: Map ModuleName [GlobalRdrElt]
+  }
 
 mkImportMap :: [GlobalRdrElt] -> ImportMap
 -- For each of a list of used GREs, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
-mkImportMap = foldr insertImportMap Map.empty
+mkImportMap = foldr insertImportMap $ ImportMap Map.empty Map.empty
 
 insertImportMap :: GlobalRdrElt -> ImportMap -> ImportMap
-insertImportMap gre@(GRE { gre_imp = imp_specs }) importMap =
-  case toImportMapSrcLoc (is_dloc (is_decl best_imp_spec)) of
-    Just decl_loc -> insertElem decl_loc gre importMap
-    Nothing -> importMap
+insertImportMap gre@(GRE { gre_imp = imp_specs }) importMap
+  | is_implicit best_imp_spec =
+      importMap{im_implicitImports = insertElem (moduleName $ is_mod best_imp_spec) gre $ im_implicitImports importMap}
+  | Just decl_loc <- toImportMapSrcLoc (is_dloc best_imp_spec) =
+      importMap{im_imports = insertElem decl_loc gre $ im_imports importMap}
+  | otherwise = importMap
   where
     best_imp_spec =
       case bagToList imp_specs of
         []     -> pprPanic "mkImportMap: GRE with no ImportSpecs" (ppr gre)
-        is:iss -> bestImport (is NE.:| iss)
+        is:iss -> is_decl $ bestImport (is NE.:| iss)
 
     -- https://github.com/haskell/containers/issues/784
     insertElem :: Ord k => k -> v -> Map k [v] -> Map k [v]
@@ -1930,9 +1936,13 @@ insertImportMap gre@(GRE { gre_imp = imp_specs }) importMap =
       Nothing -> Just [v]
 
 lookupImportMap :: LImportDecl GhcRn -> ImportMap -> [GlobalRdrElt]
-lookupImportMap (L srcSpan _) importMap =
+lookupImportMap (L srcSpan ImportDecl{ideclName = L _ modName}) importMap =
   fromMaybe [] $
-    toImportMapSrcLoc (locA srcSpan) >>= (`Map.lookup` importMap)
+    -- should match logic in insertImportMap
+    case locA srcSpan of
+      _ | Just gres <- modName `Map.lookup` im_implicitImports importMap -> Just gres
+      _ | Just loc <- toImportMapSrcLoc (locA srcSpan) -> loc `Map.lookup` im_imports importMap
+      _ -> Nothing
 
 toImportMapSrcLoc :: SrcSpan -> Maybe RealSrcLoc
 toImportMapSrcLoc srcSpan =
