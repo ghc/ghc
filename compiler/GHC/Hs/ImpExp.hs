@@ -80,13 +80,19 @@ type instance XCImportDecl  GhcTc = DataConCantHappen
 data XImportDeclPass = XImportDeclPass
     { ideclAnn        :: EpAnn EpAnnImportDecl
     , ideclSourceText :: SourceText -- Note [Pragma source text] in "GHC.Types.SourceText"
-    , ideclImplicit   :: Bool
-        -- ^ GHC generates an `ImportDecl` to represent the invisible `import Prelude`
-        -- that appears in any file that omits `import Prelude`, setting
-        -- this field to indicate that the import doesn't appear in the
-        -- original source. True => implicit import (of Prelude)
+    , ideclGenerated   :: Bool -- ^ See Note [Generated imports]
     }
     deriving (Data)
+
+{- Note [Generated imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC generates an `ImportDecl` to represent the invisible `import Prelude`
+that appears in any file that omits `import Prelude`, setting
+this field to indicate that the import doesn't appear in the
+original source.
+
+Plugins may also introduce generated imports.
+-}
 
 type instance XXImportDecl  (GhcPass _) = DataConCantHappen
 
@@ -152,19 +158,19 @@ instance (OutputableBndrId p
                     , ideclLevelSpec = level
                     , ideclQualified = qual
                     , ideclAs = as, ideclImportList = spec })
-      = hang (hsep [text "import", ppr_imp impExt from, pp_implicit impExt,
+      = hang (hsep [text "import", ppr_imp impExt from, pp_generated impExt,
                     pp_level level False, pp_safe safe, pp_qual qual False,
                     ppr pkg, ppr mod',
                     pp_level level True, pp_qual qual True,
                     pp_as as])
              4 (pp_spec spec)
       where
-        pp_implicit ext =
-            let implicit = case ghcPass @p of
-                            GhcPs | XImportDeclPass { ideclImplicit = implicit } <- ext -> implicit
-                            GhcRn | XImportDeclPass { ideclImplicit = implicit } <- ext -> implicit
+        pp_generated ext =
+            let generated = case ghcPass @p of
+                            GhcPs | XImportDeclPass { ideclGenerated = generated } <- ext -> generated
+                            GhcRn | XImportDeclPass { ideclGenerated = generated } <- ext -> generated
                             GhcTc -> dataConCantHappen ext
-            in if implicit then text "(implicit)"
+            in if generated then text "(generated)"
                            else empty
 
         pp_qual QualifiedPre False = text "qualified" -- Prepositive qualifier/prepositive position.

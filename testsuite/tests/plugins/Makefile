@@ -234,3 +234,7 @@ test-late-plugin:
 	ContainsLateBinding=$$(echo $$SHOW_IFACE | grep -o 222222) ; \
 	echo "$$ContainsLateBinding" ; \
 	[ "$$ContainsEarlyBinding" = "111111" ] && [ "$$ContainLateBinding" = "" ]
+
+.PHONY: T21730
+T21730:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T21730.hs -package-db T21730-plugin/pkg.T21730-plugin/local.package.conf

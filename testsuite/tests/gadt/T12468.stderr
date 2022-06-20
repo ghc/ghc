@@ -7,9 +7,10 @@ T12468.hs:9:7: error: [GHC-88464]
       Valid hole fits include
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
-          (imported from ‘Prelude’ at T12468.hs:3:8-13
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @Int
-          (imported from ‘Prelude’ at T12468.hs:3:8-13
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Enum’))
+

@@ -317,7 +317,7 @@ rnImportDecl this_mod
                                      , ideclSafe = mod_safe
                                      , ideclLevelSpec = import_level
                                      , ideclQualified = qual_style
-                                     , ideclExt = XImportDeclPass { ideclImplicit = implicit }
+                                     , ideclExt = XImportDeclPass { ideclGenerated = generated }
                                      , ideclAs = as_mod, ideclImportList = imp_details }), import_reason)
   = setSrcSpanA loc $ do
 
@@ -364,7 +364,7 @@ rnImportDecl this_mod
     -- checks for T(..) items but that is done in checkDodgyImport below)
     case imp_details of
         Just (Exactly, _) -> return () -- Explicit import list
-        _  | implicit   -> return () -- Do not bleat for implicit imports
+        _  | generated   -> return () -- Do not bleat for generated imports
            | qual_only  -> return ()
            | otherwise  -> addDiagnostic (TcRnNoExplicitImportList imp_mod_name)
 
@@ -408,8 +408,8 @@ rnImportDecl this_mod
 
         -- should the import be safe?
         mod_safe' = mod_safe
-                    || (not implicit && safeDirectImpsReq dflags)
-                    || (implicit && safeImplicitImpsReq dflags)
+                    || (not generated && safeDirectImpsReq dflags)
+                    || (generated && safeImplicitImpsReq dflags)
 
     hsc_env <- getTopEnv
     let home_unit = hsc_home_unit hsc_env
@@ -1922,25 +1922,27 @@ type ImportDeclUsage
 warnUnusedImportDecls :: TcGblEnv -> HscSource -> RnM ()
 warnUnusedImportDecls gbl_env hsc_src
   = do { uses <- readMutVar (tcg_used_gres gbl_env)
-       ; let user_imports = filterOut
-                              (ideclImplicit . ideclExt . unLoc)
-                              (tcg_rn_imports gbl_env)
-                -- This whole function deals only with *user* imports
-                -- both for warning about unnecessary ones, and for
-                -- deciding the minimal ones
+       ; let imports = tcg_rn_imports gbl_env
              rdr_env = tcg_rdr_env gbl_env
 
-       ; let usage :: [ImportDeclUsage]
-             usage = findImportUsage user_imports uses
+        -- We should only warn for unnecessary *user* imports, but deciding
+        -- minimal imports should take generated imports into account
+       ; let usageUserImports = findImportUsage (excludeGenerated imports) uses
+             usageAllImports = findImportUsage imports uses
 
        ; traceRn "warnUnusedImportDecls" $
                        (vcat [ text "Uses:" <+> ppr uses
-                             , text "Import usage" <+> ppr usage])
+                             , text "Usage all user imports: " <+> ppr usageUserImports
+                             , text "Usage all imports: " <+> ppr usageAllImports])
 
-       ; mapM_ (warnUnusedImport rdr_env) usage
+       ; mapM_ (warnUnusedImport rdr_env) usageUserImports
 
        ; whenGOptM Opt_D_dump_minimal_imports $
-         printMinimalImports hsc_src usage }
+         printMinimalImports hsc_src usageAllImports }
+
+-- | Exclude generated imports
+excludeGenerated :: [LImportDecl GhcRn] -> [LImportDecl GhcRn]
+excludeGenerated = filterOut (ideclGenerated . ideclExt . unLoc)
 
 findImportUsage :: [LImportDecl GhcRn]
                 -> [GlobalRdrElt]
@@ -1953,12 +1955,10 @@ findImportUsage imports used_gres
     import_usage = mkImportMap used_gres
 
     unused_decl :: LImportDecl GhcRn -> (LImportDecl GhcRn, [GlobalRdrElt], [Name])
-    unused_decl decl@(L loc (ImportDecl { ideclImportList = imps }))
+    unused_decl decl@(L _ (ImportDecl { ideclImportList = imps }))
       = (decl, used_gres, nameSetElemsStable unused_imps)
       where
-        used_gres = lookupSrcLoc (srcSpanEnd $ locA loc) import_usage
-                               -- srcSpanEnd: see Note [The ImportMap]
-                    `orElse` []
+        used_gres = lookupImportMap decl import_usage
 
         used_gre_env = mkGlobalRdrEnv used_gres
         used_parents = mkNameSet (mapMaybe greParent_maybe used_gres)
@@ -2099,42 +2099,50 @@ The ImportMap is a short-lived intermediate data structure records, for
 each import declaration, what stuff brought into scope by that
 declaration is actually used in the module.
 
-The SrcLoc is the location of the END of a particular 'import'
-declaration.  Why *END*?  Because we don't want to get confused
-by the implicit Prelude import. Consider (#7476) the module
-    import Foo( foo )
-    main = print foo
-There is an implicit 'import Prelude(print)', and it gets a SrcSpan
-of line 1:1 (just the point, not a span). If we use the *START* of
-the SrcSpan to identify the import decl, we'll confuse the implicit
-import Prelude with the explicit 'import Foo'.  So we use the END.
-It's just a cheap hack; we could equally well use the Span too.
-
 The [GlobalRdrElt] are the things imported from that decl.
 -}
 
-type ImportMap = Map RealSrcLoc [GlobalRdrElt]  -- See [The ImportMap]
-     -- If loc :-> gres, then
-     --   'loc' = the end loc of the bestImport of each GRE in 'gres'
+data ImportMap = ImportMap
+  { im_imports :: Map RealSrcSpan [GlobalRdrElt]
+    -- ^ See [The ImportMap]
+    -- If loc :-> gres, then
+    --   'loc' = the end loc of the bestImport of each GRE in 'gres'
+  , im_generatedImports :: Map ModuleName [GlobalRdrElt]
+  }
 
 mkImportMap :: [GlobalRdrElt] -> ImportMap
 -- For each of a list of used GREs, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
-mkImportMap gres
-  = foldr add_one Map.empty gres
+mkImportMap = foldr insertImportMap $ ImportMap Map.empty Map.empty
+
+insertImportMap :: GlobalRdrElt -> ImportMap -> ImportMap
+insertImportMap gre@(GRE { gre_imp = imp_specs }) importMap
+  | RealSrcSpan importSpan _ <- is_dloc best_imp_spec =
+      importMap{im_imports = insertElem importSpan gre $ im_imports importMap}
+  | UnhelpfulSpan UnhelpfulGenerated <- is_dloc best_imp_spec =
+      importMap{im_generatedImports = insertElem (moduleName $ is_mod best_imp_spec) gre $ im_generatedImports importMap}
+  | otherwise = importMap
   where
-    add_one gre@(GRE { gre_imp = imp_specs }) imp_map =
-      case srcSpanEnd (is_dloc (is_decl best_imp_spec)) of
-                              -- For srcSpanEnd see Note [The ImportMap]
-       RealSrcLoc decl_loc _ -> Map.insertWith add decl_loc [gre] imp_map
-       UnhelpfulLoc _ -> imp_map
-       where
-          best_imp_spec =
-            case bagToList imp_specs of
-              []     -> pprPanic "mkImportMap: GRE with no ImportSpecs" (ppr gre)
-              is:iss -> bestImport (is NE.:| iss)
-          add _ gres = gre : gres
+    best_imp_spec =
+      case bagToList imp_specs of
+        []     -> pprPanic "mkImportMap: GRE with no ImportSpecs" (ppr gre)
+        is:iss -> is_decl $ bestImport (is NE.:| iss)
+
+    -- https://github.com/haskell/containers/issues/784
+    insertElem :: Ord k => k -> v -> Map k [v] -> Map k [v]
+    insertElem k v = flip Map.alter k $ \case
+      Just vs -> Just (v : vs)
+      Nothing -> Just [v]
+
+lookupImportMap :: LImportDecl GhcRn -> ImportMap -> [GlobalRdrElt]
+lookupImportMap (L srcSpan ImportDecl{ideclName = L _ modName}) importMap =
+  fromMaybe [] $
+    -- should match logic in insertImportMap
+    case locA srcSpan of
+      RealSrcSpan realSrcSpan _ -> realSrcSpan `Map.lookup` im_imports importMap
+      UnhelpfulSpan UnhelpfulGenerated -> modName `Map.lookup` im_generatedImports importMap
+      _ -> Nothing
 
 warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
 warnUnusedImport rdr_env (L loc decl, used, unused)
@@ -2202,8 +2210,10 @@ x,y to avoid name-shadowing warnings.  Example (#9061)
 
 Note [Printing minimal imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-To print the minimal imports we walk over the user-supplied import
-decls, and simply trim their import lists.  NB that
+To print the minimal imports we walk over all import decls (both user-supplied
+and generated), trim their import lists, then filter out generated decls.
+
+NB that
 
   * We do *not* change the 'qualified' or 'as' parts!
 
@@ -2295,7 +2305,7 @@ classifyGREs = partition (not . isRecFldGRE)
 printMinimalImports :: HscSource -> [ImportDeclUsage] -> RnM ()
 -- See Note [Printing minimal imports]
 printMinimalImports hsc_src imports_w_usage
-  = do { imports' <- getMinimalImports imports_w_usage
+  = do { imports' <- excludeGenerated <$> getMinimalImports imports_w_usage
        ; this_mod <- getModule
        ; dflags   <- getDynFlags
        ; liftIO $ withFile (mkFilename dflags this_mod) WriteMode $ \h ->

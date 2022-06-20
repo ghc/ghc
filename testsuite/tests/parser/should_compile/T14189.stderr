@@ -247,7 +247,7 @@
    [])
   [(L
     (EpAnn
-     (EpaSpan { T14189.hs:1:8-13 })
+     (EpaSpan { <generated> })
      (AnnListItem
       [])
      (EpaComments
@@ -270,7 +270,7 @@
       (True))
      (L
       (EpAnn
-       (EpaSpan { T14189.hs:1:8-13 })
+       (EpaSpan { <generated> })
        (AnnListItem
         [])
        (EpaComments

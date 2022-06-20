@@ -100,19 +100,17 @@ getImports popts implicit_prelude buf filename source_filename = do
                 mod = mb_mod `orElse` L (noAnnSrcSpan main_loc) mAIN_NAME
                 (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
-                implicit_imports = mkPrelImports (unLoc mod) main_loc
-                                                 implicit_prelude imps
+                generated_imports = mkPrelImports (unLoc mod) implicit_prelude imps
                 convImport (L _ (i :: ImportDecl GhcPs)) = (convImportLevel (ideclLevelSpec i), ideclPkgQual i, reLoc $ ideclName i)
                 convImport_src (L _ (i :: ImportDecl GhcPs)) = (reLoc $ ideclName i)
               in
               return (map convImport_src src_idecls
-                     , map convImport (implicit_imports ++ ord_idecls)
+                     , map convImport (generated_imports ++ ord_idecls)
                      , reLoc mod)
 
 
 
 mkPrelImports :: ModuleName
-              -> SrcSpan    -- Attribute the "import Prelude" to this location
               -> Bool -> [LImportDecl GhcPs]
               -> [LImportDecl GhcPs]
 -- Construct the implicit declaration "import Prelude" (or not)
@@ -120,7 +118,7 @@ mkPrelImports :: ModuleName
 -- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
 -- because the former doesn't even look at Prelude.hi for instance
 -- declarations, whereas the latter does.
-mkPrelImports this_mod loc implicit_prelude import_decls
+mkPrelImports this_mod implicit_prelude import_decls
   | this_mod == pRELUDE_NAME
    || explicit_prelude_import
    || not implicit_prelude
@@ -142,15 +140,15 @@ mkPrelImports this_mod loc implicit_prelude import_decls
               _ -> False
 
 
-      loc' = noAnnSrcSpan loc
+      loc = noAnnSrcSpan generatedSrcSpan
       preludeImportDecl :: LImportDecl GhcPs
       preludeImportDecl
-        = L loc' $ ImportDecl { ideclExt       = XImportDeclPass
+        = L loc $ ImportDecl { ideclExt       = XImportDeclPass
                                                     { ideclAnn = noAnn
                                                     , ideclSourceText = NoSourceText
-                                                    , ideclImplicit  = True   -- Implicit!
+                                                    , ideclGenerated  = True   -- Generated!
                                                     },
-                                ideclName      = L loc' pRELUDE_NAME,
+                                ideclName      = L loc pRELUDE_NAME,
                                 ideclPkgQual   = NoRawPkgQual,
                                 ideclSource    = NotBoot,
                                 ideclSafe      = False,  -- Not a safe import

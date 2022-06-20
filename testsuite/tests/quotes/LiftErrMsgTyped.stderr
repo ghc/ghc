@@ -3,7 +3,7 @@ LiftErrMsgTyped.hs:14:12: error: [GHC-28914]
     • Could not be resolved by implicit lifting due to the following error:
         No instance for: ‘Lift (a -> a)’
     • Available from the imports:
-      • imported from ‘Prelude’ at LiftErrMsgTyped.hs:3:8-17
+      • imported from ‘Prelude’
     • In the typed Template Haskell splice: id
       In the Template Haskell typed quotation: [|| id ||]
       In the expression: [|| id ||]
@@ -13,7 +13,7 @@ LiftErrMsgTyped.hs:17:14: error: [GHC-28914]
     • Could not be resolved by implicit lifting due to the following error:
         No instance for: ‘Lift (a -> a)’
     • Available from the imports:
-      • imported from ‘Prelude’ at LiftErrMsgTyped.hs:3:8-17
+      • imported from ‘Prelude’
     • In the typed Template Haskell splice: id
       In the expression: id
       In the Template Haskell typed quotation: [|| (id, id) ||]
