@@ -1510,7 +1510,7 @@ instance HiePass p => ToHie (LocatedA (HsCmd (GhcPass p))) where
         [ toHie a
         , toHie b
         ]
-      HsCmdArrForm _ a _ _ cmdtops ->
+      HsCmdArrForm _ a _ cmdtops ->
         [ toHie a
         , toHie cmdtops
         ]

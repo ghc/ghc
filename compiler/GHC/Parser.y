@@ -3081,7 +3081,7 @@ aexp2   :: { ECP }
         | '(|' aexp cmdargs '|)'  {% runPV (unECP $2) >>= \ $2 ->
                                       fmap ecpFromCmd $
                                       amsA' (sLL $1 $> $ HsCmdArrForm (AnnList (glRM $1) (Just $ mu AnnOpenB $1) (Just $ mu AnnCloseB $4) [] []) $2 Prefix
-                                                           Nothing (reverse $3)) }
+                                                           (reverse $3)) }
 
 projection :: { Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs))) }
 projection

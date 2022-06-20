@@ -3470,7 +3470,7 @@ instance ExactPrint (HsCmd GhcPs) where
         arr' <- markAnnotated arr
         return (HsCmdArrApp an0 arr' arg' o isRightToLeft)
 
-  exact (HsCmdArrForm an e fixity mf cs) = do
+  exact (HsCmdArrForm an e fixity cs) = do
     an0 <- markLensMAA' an lal_open
     (e',cs') <- case (fixity, cs) of
       (Infix, (arg1:argrest)) -> do
@@ -3484,7 +3484,7 @@ instance ExactPrint (HsCmd GhcPs) where
         return (e', cs')
       (Infix, []) -> error "Not possible"
     an1 <- markLensMAA' an0 lal_close
-    return (HsCmdArrForm an1 e' fixity mf cs')
+    return (HsCmdArrForm an1 e' fixity cs')
 
   exact (HsCmdApp an e1 e2) = do
     e1' <- markAnnotated e1

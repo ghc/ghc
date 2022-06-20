@@ -1152,10 +1152,10 @@ zonkCmd (HsCmdArrApp ty e1 e2 ho rl)
        new_ty <- zonkTcTypeToTypeX ty
        return (HsCmdArrApp new_ty new_e1 new_e2 ho rl)
 
-zonkCmd (HsCmdArrForm x op f fixity args)
+zonkCmd (HsCmdArrForm x op fixity args)
   = do new_op <- zonkLExpr op
        new_args <- mapM zonkCmdTop args
-       return (HsCmdArrForm x new_op f fixity new_args)
+       return (HsCmdArrForm x new_op fixity new_args)
 
 zonkCmd (HsCmdApp x c e)
   = do new_c <- zonkLCmd c
