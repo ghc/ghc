@@ -114,3 +114,25 @@ data SrcUnpackedness = SrcUnpack -- ^ {-# UNPACK #-} specified
                      | SrcNoUnpack -- ^ {-# NOUNPACK #-} specified
                      | NoSrcUnpack -- ^ no unpack pragma
      deriving (Eq, Data)
+
+{-
+************************************************************************
+*                                                                      *
+Fixity
+*                                                                      *
+************************************************************************
+-}
+
+-- | Captures the fixity of declarations as they are parsed. This is not
+-- necessarily the same as the fixity declaration, as the normal fixity may be
+-- overridden using parens or backticks.
+data LexicalFixity = Prefix | Infix deriving (Eq, Data)
+
+data FixityDirection
+   = InfixL
+   | InfixR
+   | InfixN
+   deriving (Eq, Data)
+
+data Fixity = Fixity Int FixityDirection
+  deriving (Eq, Data)

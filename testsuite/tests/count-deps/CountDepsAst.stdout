@@ -91,6 +91,7 @@ GHC.Driver.Phases
 GHC.Driver.Pipeline.Monad
 GHC.Driver.Plugins.External
 GHC.Hs
+GHC.Hs.Basic
 GHC.Hs.Binds
 GHC.Hs.Decls
 GHC.Hs.Doc

@@ -43,4 +43,3 @@ mkIfaceFixCache pairs
 
 emptyIfaceFixCache :: OccName -> Maybe Fixity
 emptyIfaceFixCache _ = Nothing
-

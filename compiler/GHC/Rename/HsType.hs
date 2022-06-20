@@ -25,7 +25,7 @@ module GHC.Rename.HsType (
 
         -- Precence related stuff
         NegationHandling(..),
-        mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
+        mkOpAppRn, mkNegAppRn, mkConOpPatRn,
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
@@ -1454,35 +1454,6 @@ mkNegAppRn neg_arg neg_name
 not_op_app :: HsExpr id -> Bool
 not_op_app (OpApp {}) = False
 not_op_app _          = True
-
----------------------------
-mkOpFormRn :: LHsCmdTop GhcRn            -- Left operand; already rearranged
-          -> LHsExpr GhcRn -> Fixity     -- Operator and fixity
-          -> LHsCmdTop GhcRn             -- Right operand (not an infix)
-          -> RnM (HsCmd GhcRn)
-
--- (e1a `op1` e1b) `op2` e2
-mkOpFormRn e1@(L loc
-                    (HsCmdTop _
-                     (L _ (HsCmdArrForm x op1 f (Just fix1)
-                        [e1a,e1b]))))
-        op2 fix2 e2
-  | nofix_error
-  = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
-       return (HsCmdArrForm x op2 f (Just fix2) [e1, e2])
-
-  | associate_right
-  = do new_c <- mkOpFormRn e1a op2 fix2 e2
-       return (HsCmdArrForm noExtField op1 f (Just fix1)
-               [e1b, L loc (HsCmdTop [] (L (l2l loc) new_c))])
-        -- TODO: locs are wrong
-  where
-    (nofix_error, associate_right) = compareFixity fix1 fix2
-
---      Default case
-mkOpFormRn arg1 op fix arg2                     -- Default case, no rearrangement
-  = return (HsCmdArrForm noExtField op Infix (Just fix) [arg1, arg2])
-
 
 --------------------------------------
 mkConOpPatRn :: LocatedN Name -> Fixity -> LPat GhcRn -> LPat GhcRn
