@@ -1,4 +1,4 @@
-{-# OPTIONS -fplugin=Hooks.Plugin #-}
+{-# OPTIONS -fplugin=Hooks.MetaPlugin #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Main where
 

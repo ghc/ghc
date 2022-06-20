@@ -2,7 +2,7 @@
 
 -- | Dynamically lookup up values from modules and loading them.
 module GHC.Runtime.Loader (
-        initializePlugins,
+        initializePlugins, initializeSessionPlugins,
         -- * Loading plugins
         loadFrontendPlugin,
 
@@ -74,7 +74,11 @@ import Unsafe.Coerce     ( unsafeCoerce )
 import GHC.Linker.Types
 import Data.List (unzip4)
 import GHC.Iface.Errors.Ppr
+import GHC.Driver.Monad
 
+-- | Initialise plugins specified by the current DynFlags and update the session.
+initializeSessionPlugins :: GhcMonad m => m ()
+initializeSessionPlugins = getSession >>= liftIO . initializePlugins >>= setSession
 
 -- | Loads the plugins specified in the pluginModNames field of the dynamic
 -- flags. Should be called after command line arguments are parsed, but before

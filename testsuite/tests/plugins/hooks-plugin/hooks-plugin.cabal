@@ -4,6 +4,6 @@ version:             0.1
 build-type:          Simple
 
 library
-  exposed-modules:     Hooks.Plugin
+  exposed-modules:     Hooks.MetaPlugin, Hooks.PhasePlugin, Hooks.LogPlugin
   build-depends:       base, ghc
   default-language:    Haskell2010
