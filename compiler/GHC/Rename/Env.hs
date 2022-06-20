@@ -1982,6 +1982,7 @@ lookupQualifiedNameGHCi fos rdr_name
                              , is_as = moduleName mod
                              , is_pkg_qual = NoPkgQual
                              , is_qual = True
+                             , is_implicit = False
                              , is_isboot = NotBoot
                              , is_dloc = noSrcSpan
                              , is_level = NormalLevel }

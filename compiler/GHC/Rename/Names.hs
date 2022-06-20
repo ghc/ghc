@@ -391,7 +391,7 @@ rnImportDecl this_mod
 
     let imp_mod = mi_module iface
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
-        imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only,
+        imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only, is_implicit = implicit,
                                   is_dloc = locA loc, is_as = qual_mod_name,
                                   is_pkg_qual = pkg_qual, is_isboot = want_boot,
                                   is_level = convImportLevel import_level }

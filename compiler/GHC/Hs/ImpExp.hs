@@ -80,13 +80,18 @@ type instance XCImportDecl  GhcTc = DataConCantHappen
 data XImportDeclPass = XImportDeclPass
     { ideclAnn        :: EpAnn EpAnnImportDecl
     , ideclSourceText :: SourceText -- Note [Pragma source text] in "GHC.Types.SourceText"
-    , ideclImplicit   :: Bool
-        -- ^ GHC generates an `ImportDecl` to represent the invisible `import Prelude`
-        -- that appears in any file that omits `import Prelude`, setting
-        -- this field to indicate that the import doesn't appear in the
-        -- original source. True => implicit import (of Prelude)
+    , ideclImplicit   :: Bool -- ^ See Note [Implicit imports]
     }
     deriving (Data)
+
+{- Note [Implicit imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+GHC generates an `ImportDecl` to represent the invisible `import Prelude`
+that appears in any file that omits `import Prelude`, setting
+this field to indicate that the import doesn't appear in the
+original source. True => implicit import (of Prelude)
+-}
 
 type instance XXImportDecl  (GhcPass _) = DataConCantHappen
 
