@@ -86,10 +86,8 @@ module Data.Typeable.Internal (
     trLiftedRep
   ) where
 
-import GHC.Prim ( FUN )
 import GHC.Base
 import qualified GHC.Arr as A
-import GHC.Types ( TYPE, Multiplicity (Many) )
 import Data.Type.Equality
 import GHC.List ( splitAt, foldl', elem )
 import GHC.Word

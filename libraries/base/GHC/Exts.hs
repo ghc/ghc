@@ -25,10 +25,6 @@
 
 module GHC.Exts
        (
-        -- * Primitive types
-
-        FUN, TYPE, -- See https://gitlab.haskell.org/ghc/ghc/issues/18302
-
         -- ** Pointer types
         Ptr(..), FunPtr(..),
 
