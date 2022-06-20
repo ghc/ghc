@@ -16,24 +16,18 @@ module GHC.Event.Thread
     ) where
 -- TODO: Use new Windows I/O manager
 import Control.Exception (finally, SomeException, toException)
-import Data.Foldable (forM_, mapM_, sequence_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Maybe (fromMaybe)
-import Data.Tuple (snd)
 import Foreign.C.Error (eBADF, errnoToIOError)
 import Foreign.C.Types (CInt(..), CUInt(..))
 import Foreign.Ptr (Ptr)
 import GHC.Base
-import GHC.List (zipWith, zipWith3)
 import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
-                      labelThread, modifyMVar_, withMVar, newTVar, sharedCAF,
-                      getNumCapabilities, threadCapability, myThreadId, forkOn,
+                      labelThread, modifyMVar_, newTVar, sharedCAF, forkOn,
                       threadStatus, writeTVar, newTVarIO, readTVar, retry,throwSTM,STM,
                       numCapabilitiesLock)
 import GHC.IO (mask_, uninterruptibleMask_, onException)
 import GHC.IO.Exception (ioError)
-import GHC.IOArray (IOArray, newIOArray, readIOArray, writeIOArray,
-                    boundsIOArray)
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
 import GHC.Event.Control (controlWriteFd)
 import GHC.Event.Internal (eventIs, evtClose)
@@ -42,7 +36,6 @@ import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
 import qualified GHC.Event.Manager as M
 import qualified GHC.Event.TimerManager as TM
 import GHC.PerCapability
-import GHC.Num ((-), (+))
 import GHC.Real (fromIntegral)
 import GHC.Show (showSignedInt)
 import System.IO.Unsafe (unsafePerformIO)
@@ -213,17 +206,10 @@ eventManager = unsafePerformIO $ do
                   loop mgr
           labelThread t ("IOManager on cap " ++ show_int i)
           return (t, mgr)
-        free_cap (t, mgr) = M.cleanup mgr
+        free_cap (_t, mgr) = M.cleanup mgr
     pc <- newPerCapability new_cap free_cap
     sharedCAF pc getOrSetSystemEventThreadEventManagerStore
 {-# NOINLINE eventManager #-}
-
-numEnabledEventManagers :: IORef Int
-numEnabledEventManagers = unsafePerformIO $ newIORef 0
-{-# NOINLINE numEnabledEventManagers #-}
-
-foreign import ccall unsafe "getOrSetSystemEventThreadIOManagerThreadStore"
-    getOrSetSystemEventThreadIOManagerThreadStore :: Ptr a -> IO (Ptr a)
 
 getSystemTimerManager :: IO TM.TimerManager
 getSystemTimerManager =
