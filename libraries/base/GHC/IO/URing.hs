@@ -11,7 +11,11 @@ import GHC.Conc
 import GHC.MVar
 import GHC.Num ((-), (+))
 import GHC.PerCapability
+import GHC.Show
+import System.Posix.Internals (puts)
 import GHC.Real
+import GHC.IO (catch)
+import GHC.IO.Exception
 import GHC.IO.Unsafe (unsafePerformIO)
 import Data.Int
 
@@ -25,7 +29,19 @@ import qualified System.Linux.IO.URing.Ring as URing.Ring
 import System.Linux.IO.URing.Cqe (Cqe(..))
 
 supportsIOURing :: Bool
-supportsIOURing = False -- TODO: Feature test
+supportsIOURing = unsafePerformIO checkIOURing
+{-# NOINLINE supportsIOURing #-}
+
+checkIOURing :: IO Bool
+checkIOURing = do
+    catch (URing.Ring.newURing 16 >> return True) uhOh
+  where
+    uhOh :: IOError -> IO Bool
+    uhOh ioe
+      | UnsupportedOperation <- ioe_type ioe = return False
+      | otherwise = do
+        puts $ "Unexpected error while checking io-uring support: " ++ show ioe
+        return False
 
 type Completion = Int32 -> IO ()
 
