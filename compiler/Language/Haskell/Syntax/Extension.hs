@@ -721,6 +721,12 @@ type family XXIEWrappedName p
 
 
 -- =====================================================================
+-- Type families for the type families in L.H.S.Basic
+
+type family XFixity x
+type family XXFixity x
+
+-- =====================================================================
 -- Misc
 
 -- | See Note [NoGhcTc] in GHC.Hs.Extension. It has to be in this

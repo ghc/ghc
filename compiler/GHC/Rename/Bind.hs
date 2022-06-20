@@ -53,6 +53,7 @@ import GHC.Driver.Session
 import GHC.Unit.Module
 import GHC.Types.Error
 import GHC.Types.FieldLabel
+import GHC.Types.Fixity
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -71,6 +72,7 @@ import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import qualified Language.Haskell.Syntax.Basic as H
 
 import Control.Monad
 import Data.Foldable      ( toList )
@@ -647,7 +649,7 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
  where
    add_one_sig :: MiniFixityEnv -> LFixitySig GhcPs -> RnM MiniFixityEnv
    add_one_sig env (L loc (FixitySig _ names fixity)) =
-     foldlM add_one env [ (locA loc,locA name_loc,name,fixity)
+     foldlM add_one env [ (locA loc, locA name_loc, name, fixityFromSyntax fixity)
                         | L name_loc name <- names ]
 
    add_one env (loc, name_loc, name,fixity) = do
@@ -1340,9 +1342,9 @@ rnSrcFixityDecl sig_ctxt = rn_decl
         -- for con-like things; hence returning a list
         -- If neither are in scope, report an error; otherwise
         -- return a fixity sig for each (slightly odd)
-    rn_decl (FixitySig _ fnames fixity)
+    rn_decl (FixitySig _ fnames (H.Fixity x a b))
       = do names <- concatMapM lookup_one fnames
-           return (FixitySig noExtField names fixity)
+           return (FixitySig noExtField names $ H.Fixity x a b)
 
     lookup_one :: LocatedN RdrName -> RnM [LocatedN Name]
     lookup_one (L name_loc rdr_name)

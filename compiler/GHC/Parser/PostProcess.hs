@@ -1655,7 +1655,7 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsOpAppPV l c1 op c2 = do
     let cmdArg c = L (l2l $ getLoc c) $ HsCmdTop noExtField c
     cs <- getCommentsFor l
-    return $ L (noAnnSrcSpan l) $ HsCmdArrForm (EpAnn (spanAsAnchor l) (AnnList Nothing Nothing Nothing [] []) cs) (reLocL op) Infix Nothing [cmdArg c1, cmdArg c2]
+    return $ L (noAnnSrcSpan l) $ HsCmdArrForm (EpAnn (spanAsAnchor l) (AnnList Nothing Nothing Nothing [] []) cs) (reLocL op) Infix [cmdArg c1, cmdArg c2]
   mkHsCasePV l c (L lm m) anns = do
     cs <- getCommentsFor l
     let mg = mkMatchGroup FromSource (L lm m)

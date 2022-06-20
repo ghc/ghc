@@ -96,11 +96,10 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Basic (Role)
+import Language.Haskell.Syntax.Basic (Role, LexicalFixity)
 
 import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName, Activation)
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
-import GHC.Types.Fixity (LexicalFixity)
 
 import GHC.Core.Type (Specificity)
 import GHC.Unit.Module.Warnings (WarningTxt)

@@ -26,7 +26,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Fixity
-import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable
@@ -126,7 +125,7 @@ lookupFixityRn_help' :: Name
                      -> RnM (Bool, Fixity)
 lookupFixityRn_help' name occ
   | isUnboundName name
-  = return (False, Fixity NoSourceText minPrecedence InfixL)
+  = return (False, Fixity minPrecedence InfixL)
     -- Minimise errors from ubound names; eg
     --    a>0 `foo` b>0
     -- where 'foo' is not in scope, should not give an error (#7937)

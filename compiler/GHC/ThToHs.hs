@@ -67,6 +67,8 @@ import Foreign.ForeignPtr
 import Foreign.Ptr
 import System.IO.Unsafe
 
+import qualified Language.Haskell.Syntax.Basic as HSyn (Fixity(..))
+
 -------------------------------------------------------------------
 --              The external interface
 
@@ -1914,8 +1916,8 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
 cvtPatSynSigTy ty         = cvtSigType ty
 
 -----------------------------------------------------------
-cvtFixity :: TH.Fixity -> Hs.Fixity
-cvtFixity (TH.Fixity prec dir) = Hs.Fixity NoSourceText prec (cvt_dir dir)
+cvtFixity :: TH.Fixity -> HSyn.Fixity (GhcPass p)
+cvtFixity (TH.Fixity prec dir) = HSyn.Fixity NoSourceText prec (cvt_dir dir)
    where
      cvt_dir TH.InfixL = Hs.InfixL
      cvt_dir TH.InfixR = Hs.InfixR

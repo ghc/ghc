@@ -33,6 +33,7 @@ import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
+import Language.Haskell.Syntax.Basic (Fixity(..))
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -549,6 +550,12 @@ deriving instance Data (IE GhcTc)
 deriving instance Eq (IE GhcPs)
 deriving instance Eq (IE GhcRn)
 deriving instance Eq (IE GhcTc)
+
+-- ---------------------------------------------------------------------
+
+deriving instance Data (Fixity GhcPs)
+deriving instance Data (Fixity GhcRn)
+deriving instance Data (Fixity GhcTc)
 
 -- ---------------------------------------------------------------------
 

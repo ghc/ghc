@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 module Language.Haskell.Syntax.Basic where
 
+import Language.Haskell.Syntax.Extension
+
 import Data.Data
 import Data.Eq
 import Data.Ord
@@ -94,3 +96,26 @@ data SrcUnpackedness = SrcUnpack -- ^ {-# UNPACK #-} specified
                      | SrcNoUnpack -- ^ {-# NOUNPACK #-} specified
                      | NoSrcUnpack -- ^ no unpack pragma
      deriving (Eq, Data)
+
+{-
+************************************************************************
+*                                                                      *
+Fixity
+*                                                                      *
+************************************************************************
+-}
+
+data Fixity pass = Fixity (XFixity pass) Int FixityDirection
+                 | XFixity !(XXFixity pass)
+
+data FixityDirection
+   = InfixL
+   | InfixR
+   | InfixN
+   deriving (Eq, Data)
+
+-- | Captures the fixity of declarations as they are parsed. This is not
+-- necessarily the same as the fixity declaration, as the normal fixity may be
+-- overridden using parens or backticks.
+data LexicalFixity = Prefix | Infix deriving (Eq, Data)
+

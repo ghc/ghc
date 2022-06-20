@@ -1470,16 +1470,16 @@ mkOpFormRn :: LHsCmdTop GhcRn            -- Left operand; already rearranged
 -- (e1a `op1` e1b) `op2` e2
 mkOpFormRn e1@(L loc
                     (HsCmdTop _
-                     (L _ (HsCmdArrForm x op1 f (Just fix1)
+                     (L _ (HsCmdArrForm (Just fix1) op1 f
                         [e1a,e1b]))))
         op2 fix2 e2
   | nofix_error
-  = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
-       return (HsCmdArrForm x op2 f (Just fix2) [e1, e2])
+  = do precParseErr (get_op op1, fix1) (get_op op2,fix2)
+       return (HsCmdArrForm (Just fix2) op2 f [e1, e2])
 
   | associate_right
   = do new_c <- mkOpFormRn e1a op2 fix2 e2
-       return (HsCmdArrForm noExtField op1 f (Just fix1)
+       return (HsCmdArrForm (Just fix1) op1 f
                [e1b, L loc (HsCmdTop [] (L (l2l loc) new_c))])
         -- TODO: locs are wrong
   where
@@ -1487,7 +1487,7 @@ mkOpFormRn e1@(L loc
 
 --      Default case
 mkOpFormRn arg1 op fix arg2                     -- Default case, no rearrangment
-  = return (HsCmdArrForm noExtField op Infix (Just fix) [arg1, arg2])
+  = return (HsCmdArrForm (Just fix) op Infix [arg1, arg2])
 
 
 --------------------------------------
@@ -1563,8 +1563,8 @@ checkPrecMatch op (MG { mg_alts = (L _ ms) })
 
 checkPrec :: Name -> Pat GhcRn -> Bool -> IOEnv (Env TcGblEnv TcLclEnv) ()
 checkPrec op (ConPat NoExtField op1 (InfixCon _ _)) right = do
-    op_fix@(Fixity _ op_prec  op_dir) <- lookupFixityRn op
-    op1_fix@(Fixity _ op1_prec op1_dir) <- lookupFixityRn (unLoc op1)
+    op_fix@(Fixity op_prec  op_dir) <- lookupFixityRn op
+    op1_fix@(Fixity op1_prec op1_dir) <- lookupFixityRn (unLoc op1)
     let
         inf_ok = op1_prec > op_prec ||
                  (op1_prec == op_prec &&
@@ -1592,8 +1592,8 @@ checkSectionPrec direction section op arg
         _                 -> return ()
   where
     op_name = get_op op
-    go_for_it arg_op arg_fix@(Fixity _ arg_prec assoc) = do
-          op_fix@(Fixity _ op_prec _) <- lookupFixityOp op_name
+    go_for_it arg_op arg_fix@(Fixity arg_prec assoc) = do
+          op_fix@(Fixity op_prec _) <- lookupFixityOp op_name
           unless (op_prec < arg_prec
                   || (op_prec == arg_prec && direction == assoc))
                  (sectionPrecErr (get_op op, op_fix)

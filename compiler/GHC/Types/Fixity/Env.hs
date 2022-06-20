@@ -1,3 +1,5 @@
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances #-}
 module GHC.Types.Fixity.Env
    ( FixityEnv
    , FixItem (..)
@@ -31,7 +33,7 @@ emptyFixityEnv = emptyNameEnv
 
 lookupFixity :: FixityEnv -> Name -> Fixity
 lookupFixity env n = case lookupNameEnv env n of
-                        Just (FixItem _ fix) -> fix
+                        Just (FixItem _ (Fixity a b)) -> Fixity a b
                         Nothing         -> defaultFixity
 
 -- | Creates cached lookup for the 'mi_fix_fn' field of 'ModIface'

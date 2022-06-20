@@ -90,6 +90,7 @@ import Data.Kind (Constraint)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import qualified Language.Haskell.Syntax.Basic as H
 
 import Data.ByteString ( unpack )
 import Control.Monad
@@ -782,7 +783,7 @@ repLFixD :: LFixitySig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
 repLFixD (L loc fix_sig) = rep_fix_d (locA loc) fix_sig
 
 rep_fix_d :: SrcSpan -> FixitySig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
-rep_fix_d loc (FixitySig _ names (Fixity _ prec dir))
+rep_fix_d loc (FixitySig _ names (H.Fixity _ prec dir))
   = do { MkC prec' <- coreIntLit prec
        ; let rep_fn = case dir of
                         InfixL -> infixLDName

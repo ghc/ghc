@@ -69,16 +69,16 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc
-import Control.Monad
 import GHC.Builtin.Types ( nilDataConName )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
+import Control.Arrow (first)
+import Control.Monad
 import Data.List (unzip4, minimumBy)
 import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Maybe (isJust, isNothing)
-import Control.Arrow (first)
 import Data.Ord
 import Data.Array
 import qualified Data.List.NonEmpty as NE
@@ -336,7 +336,7 @@ rnExpr (OpApp _ e1 op e2)
         ; fixity <- case op' of
               L _ (HsVar _ (L _ n)) -> lookupFixityRn n
               L _ (HsRecSel _ f)    -> lookupFieldFixityRn f
-              _ -> return (Fixity NoSourceText minPrecedence InfixL)
+              _ -> return (Fixity minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
 
         ; lexical_negation <- xoptM LangExt.LexicalNegation
@@ -823,7 +823,7 @@ rnCmd (HsCmdArrApp _ arrow arg ho rtl)
         -- inside 'arrow'.  In the higher-order case (-<<), they are.
 
 -- infix form
-rnCmd (HsCmdArrForm _ op _ (Just _) [arg1, arg2])
+rnCmd (HsCmdArrForm _ op _ [arg1, arg2])
   = do { (op',fv_op) <- escapeArrowScope (rnLExpr op)
        ; let L _ (HsVar _ (L _ op_name)) = op'
        ; (arg1',fv_arg1) <- rnCmdTop arg1
@@ -833,10 +833,10 @@ rnCmd (HsCmdArrForm _ op _ (Just _) [arg1, arg2])
        ; final_e <- mkOpFormRn arg1' op' fixity arg2'
        ; return (final_e, fv_arg1 `plusFV` fv_op `plusFV` fv_arg2) }
 
-rnCmd (HsCmdArrForm _ op f fixity cmds)
+rnCmd (HsCmdArrForm _ op f cmds)
   = do { (op',fvOp) <- escapeArrowScope (rnLExpr op)
        ; (cmds',fvCmds) <- rnCmdArgs cmds
-       ; return ( HsCmdArrForm noExtField op' f fixity cmds'
+       ; return ( HsCmdArrForm Nothing op' f cmds'
                 , fvOp `plusFV` fvCmds) }
 
 rnCmd (HsCmdApp x fun arg)

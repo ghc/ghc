@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-orphans #-} -- Outputable, Binary, Eq
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 -- | Fixity
@@ -11,64 +14,48 @@ module GHC.Types.Fixity
    , negateFixity
    , funTyFixity
    , compareFixity
+   , fixityFromSyntax
+   , fixityToSyntax
    )
 where
 
 import GHC.Prelude
 
+import GHC.Hs.Extension
+import qualified GHC.Hs.Basic as H
 import GHC.Types.SourceText
 
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
 
-import Data.Data hiding (Fixity, Prefix, Infix)
+import Data.Data hiding (Fixity(..))
 
-data Fixity = Fixity SourceText Int FixityDirection
-  -- Note [Pragma source text]
-  deriving Data
+import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Basic (FixityDirection(..), LexicalFixity(..))
+
+type instance XFixity (GhcPass _) = SourceText -- Note [Pragma source text]
+type instance XXFixity (GhcPass _) = DataConCantHappen
+
+-- | Fixity used internally in GHC, so that we don't have to take `GhcPass p`
+-- everywhere.
+--
+-- The Fixity defined in the AST is converted to this Fixity
+--
+-- See `fixityFromSyntax`
+data Fixity = Fixity Int FixityDirection
+    deriving (Eq, Data)
 
 instance Outputable Fixity where
-    ppr (Fixity _ prec dir) = hcat [ppr dir, space, int prec]
-
-instance Eq Fixity where -- Used to determine if two fixities conflict
-  (Fixity _ p1 dir1) == (Fixity _ p2 dir2) = p1==p2 && dir1 == dir2
+    ppr (Fixity prec dir) = hcat [ppr dir, space, int prec]
 
 instance Binary Fixity where
-    put_ bh (Fixity src aa ab) = do
-            put_ bh src
+    put_ bh (Fixity aa ab) = do
             put_ bh aa
             put_ bh ab
     get bh = do
-          src <- get bh
           aa <- get bh
           ab <- get bh
-          return (Fixity src aa ab)
-
-------------------------
-data FixityDirection
-   = InfixL
-   | InfixR
-   | InfixN
-   deriving (Eq, Data)
-
-instance Outputable FixityDirection where
-    ppr InfixL = text "infixl"
-    ppr InfixR = text "infixr"
-    ppr InfixN = text "infix"
-
-instance Binary FixityDirection where
-    put_ bh InfixL =
-            putByte bh 0
-    put_ bh InfixR =
-            putByte bh 1
-    put_ bh InfixN =
-            putByte bh 2
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> return InfixL
-              1 -> return InfixR
-              _ -> return InfixN
+          return (Fixity aa ab)
 
 ------------------------
 maxPrecedence, minPrecedence :: Int
@@ -76,12 +63,12 @@ maxPrecedence = 9
 minPrecedence = 0
 
 defaultFixity :: Fixity
-defaultFixity = Fixity NoSourceText maxPrecedence InfixL
+defaultFixity = Fixity maxPrecedence InfixL
 
 negateFixity, funTyFixity :: Fixity
 -- Wired-in fixities
-negateFixity = Fixity NoSourceText 6 InfixL  -- Fixity of unary negate
-funTyFixity  = Fixity NoSourceText (-1) InfixR  -- Fixity of '->', see #15235
+negateFixity = Fixity 6 InfixL  -- Fixity of unary negate
+funTyFixity  = Fixity (-1) InfixR  -- Fixity of '->', see #15235
 
 {-
 Consider
@@ -96,7 +83,7 @@ whether there's an error.
 compareFixity :: Fixity -> Fixity
               -> (Bool,         -- Error please
                   Bool)         -- Associate to the right: a op1 (b op2 c)
-compareFixity (Fixity _ prec1 dir1) (Fixity _ prec2 dir2)
+compareFixity (Fixity prec1 dir1) (Fixity prec2 dir2)
   = case prec1 `compare` prec2 of
         GT -> left
         LT -> right
@@ -109,11 +96,8 @@ compareFixity (Fixity _ prec1 dir1) (Fixity _ prec2 dir2)
     left         = (False, False)
     error_please = (True,  False)
 
--- |Captures the fixity of declarations as they are parsed. This is not
--- necessarily the same as the fixity declaration, as the normal fixity may be
--- overridden using parens or backticks.
-data LexicalFixity = Prefix | Infix deriving (Data,Eq)
+fixityFromSyntax :: H.Fixity (GhcPass p) -> Fixity
+fixityFromSyntax (H.Fixity _ i d) = Fixity i d
 
-instance Outputable LexicalFixity where
-  ppr Prefix = text "Prefix"
-  ppr Infix  = text "Infix"
+fixityToSyntax :: Fixity -> H.Fixity (GhcPass p)
+fixityToSyntax (Fixity i d) = H.Fixity NoSourceText i d

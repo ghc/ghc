@@ -29,9 +29,9 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Pat
   ( LPat )
 
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Basic (Fixity)
 import Language.Haskell.Syntax.Type
 
-import GHC.Types.Fixity (Fixity)
 import GHC.Data.Bag (Bag)
 import GHC.Types.Basic (InlinePragma)
 
@@ -460,7 +460,7 @@ data Sig pass
 type LFixitySig pass = XRec pass (FixitySig pass)
 
 -- | Fixity Signature
-data FixitySig pass = FixitySig (XFixitySig pass) [LIdP pass] Fixity
+data FixitySig pass = FixitySig (XFixitySig pass) [LIdP pass] (Fixity pass)
                     | XFixitySig !(XXFixitySig pass)
 
 isFixityLSig :: forall p. UnXRec p => LSig p -> Bool

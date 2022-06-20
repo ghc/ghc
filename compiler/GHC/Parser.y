@@ -70,7 +70,7 @@ import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occName
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error ( GhcHint(..) )
-import GHC.Types.Fixity
+import GHC.Types.Fixity hiding (Fixity(..))
 import GHC.Types.ForeignCall
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
@@ -96,6 +96,8 @@ import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.Semigroup as Semi
+
+import Language.Haskell.Syntax.Basic (Fixity(..))
 }
 
 %expect 0 -- shift/reduce conflicts
@@ -2963,7 +2965,7 @@ aexp2   :: { ECP }
         | '(|' aexp cmdargs '|)'  {% runPV (unECP $2) >>= \ $2 ->
                                       fmap ecpFromCmd $
                                       acsA (\cs -> sLL $1 $> $ HsCmdArrForm (EpAnn (glR $1) (AnnList (Just $ glR $1) (Just $ mu AnnOpenB $1) (Just $ mu AnnCloseB $4) [] []) cs) $2 Prefix
-                                                           Nothing (reverse $3)) }
+                                                           (reverse $3)) }
 
 projection :: { Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs))) }
 projection
