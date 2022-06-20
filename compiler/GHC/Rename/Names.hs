@@ -1917,14 +1917,19 @@ mkImportMap gres
     add_one gre@(GRE { gre_imp = imp_specs }) imp_map =
       case srcSpanEnd (is_dloc (is_decl best_imp_spec)) of
                               -- For srcSpanEnd see Note [The ImportMap]
-       RealSrcLoc decl_loc _ -> Map.insertWith add decl_loc [gre] imp_map
+       RealSrcLoc decl_loc _ -> insertElem decl_loc gre imp_map
        UnhelpfulLoc _ -> imp_map
        where
           best_imp_spec =
             case bagToList imp_specs of
               []     -> pprPanic "mkImportMap: GRE with no ImportSpecs" (ppr gre)
               is:iss -> bestImport (is NE.:| iss)
-          add _ gres = gre : gres
+
+    -- https://github.com/haskell/containers/issues/784
+    insertElem :: Ord k => k -> v -> Map k [v] -> Map k [v]
+    insertElem k v = flip Map.alter k $ \case
+      Just vs -> Just (v : vs)
+      Nothing -> Just [v]
 
 warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
 warnUnusedImport rdr_env (L loc decl, used, unused)
