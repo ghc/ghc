@@ -41,7 +41,7 @@ import GHC.Platform.Host
 import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
-import GHC.Runtime.Loader   ( loadFrontendPlugin )
+import GHC.Runtime.Loader   ( loadFrontendPlugin, initializeSessionPlugins )
 
 import GHC.Unit.Env
 import GHC.Unit (UnitId, homeUnitDepends)
@@ -256,8 +256,16 @@ main' postLoadMode units dflags0 args flagWarnings = do
   -- we've finished manipulating the DynFlags, update the session
   _ <- GHC.setSessionDynFlags dflags5
   dflags6 <- GHC.getSessionDynFlags
-  hsc_env <- GHC.getSession
+
+  -- Must do this before loading plugins
+  liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
+
+  -- Initialise plugins here because the plugin author might already expect this
+  -- subsequent call to `getLogger` to be affected by a plugin.
+  initializeSessionPlugins
+  hsc_env <- getSession
   logger <- getLogger
+
 
         ---------------- Display configuration -----------
   case verbosity dflags6 of
@@ -265,7 +273,6 @@ main' postLoadMode units dflags0 args flagWarnings = do
       | v >= 5 -> liftIO $ dumpUnits       hsc_env
       | otherwise -> return ()
 
-  liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
         ---------------- Final sanity checking -----------
   liftIO $ checkOptions postLoadMode dflags6 srcs objs units
 

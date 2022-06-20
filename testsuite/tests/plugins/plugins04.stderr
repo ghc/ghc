@@ -1,2 +1,1 @@
-Module graph contains a cycle:
-  module ‘HomePackagePlugin’ (./HomePackagePlugin.hs) imports itself
+attempting to use module ‘main:HomePackagePlugin’ (./HomePackagePlugin.hs) which is not loaded

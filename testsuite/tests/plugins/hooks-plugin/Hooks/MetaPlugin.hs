@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-module Hooks.Plugin (plugin) where
+module Hooks.MetaPlugin (plugin) where
 
 import GHC.Types.SourceText
 import GHC.Plugins

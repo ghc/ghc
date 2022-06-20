@@ -47,6 +47,7 @@ test('T15369',     just_ghci, ghci_script, ['T15369.script'])
 test('T15633a',
      [extra_files(['tc-plugin-ghci/']),
       when(opsys('mingw32'), [multi_cpu_race, fragile(16813)]),
+      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706)),
       only_ways(['ghci']),
       pre_cmd('$MAKE -s --no-print-directory -C tc-plugin-ghci package.plugins01 TOP={top}'),
       extra_hc_opts("-package-db tc-plugin-ghci/pkg.plugins01/local.package.conf -fplugin TcPluginGHCi")

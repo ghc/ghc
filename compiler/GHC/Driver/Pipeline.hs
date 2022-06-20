@@ -244,6 +244,7 @@ compileOne' mHscMessage
              addFilesToClean tmpfs TFL_GhcSession $
                  [ml_obj_file $ ms_location summary]
 
+   -- Initialise plugins here for any plugins enabled locally for a module.
    plugin_hsc_env <- initializePlugins hsc_env
    let pipe_env = mkPipeEnv NoStop input_fn Nothing pipelineOutput
    status <- hscRecompStatus mHscMessage plugin_hsc_env upd_summary
@@ -526,7 +527,11 @@ findHSLib platform ws dirs lib = do
 -- Compile files in one-shot mode.
 
 oneShot :: HscEnv -> StopPhase -> [(String, Maybe Phase)] -> IO ()
-oneShot hsc_env stop_phase srcs = do
+oneShot orig_hsc_env stop_phase srcs = do
+  -- In oneshot mode, initialise plugins specified on command line
+  -- we also initialise in ghc/Main but this might be used as an entry point by API clients who
+  -- should initialise their own plugins but may not.
+  hsc_env <- initializePlugins orig_hsc_env
   o_files <- mapMaybeM (compileFile hsc_env stop_phase) srcs
   case stop_phase of
     StopPreprocess -> return ()
