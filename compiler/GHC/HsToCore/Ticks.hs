@@ -882,11 +882,10 @@ addTickHsCmd (HsCmdArrApp  arr_ty e1 e2 ty1 lr) =
                (addTickLHsExpr e2)
                (return ty1)
                (return lr)
-addTickHsCmd (HsCmdArrForm x e f fix cmdtop) =
-        liftM4 (HsCmdArrForm x)
+addTickHsCmd (HsCmdArrForm x e f cmdtop) =
+        liftM3 (HsCmdArrForm x)
                (addTickLHsExpr e)
                (return f)
-               (return fix)
                (mapM (traverse (addTickHsCmdTop)) cmdtop)
 
 addTickHsCmd (XCmd (HsWrap w cmd)) =

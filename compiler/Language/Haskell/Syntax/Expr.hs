@@ -31,7 +31,6 @@ import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
 
 -- others:
-import GHC.Types.Fixity (LexicalFixity(Infix), Fixity)
 import GHC.Types.SourceText (StringLiteral)
 
 import GHC.Data.FastString (FastString)
@@ -831,8 +830,6 @@ data HsCmd id
                          -- applied to the type of the local environment tuple
         LexicalFixity    -- Whether the operator appeared prefix or infix when
                          -- parsed.
-        (Maybe Fixity)   -- fixity (filled in by the renamer), for forms that
-                         -- were converted from OpApp's by the renamer
         [LHsCmdTop id]   -- argument commands
 
   | HsCmdApp    (XCmdApp id)

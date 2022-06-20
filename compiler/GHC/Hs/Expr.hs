@@ -32,6 +32,7 @@ import Language.Haskell.Syntax.Expr
 -- friends:
 import GHC.Prelude
 
+import GHC.Hs.Basic() -- import instances
 import GHC.Hs.Decls() -- import instances
 import GHC.Hs.Pat
 import GHC.Hs.Lit
@@ -1250,8 +1251,10 @@ type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
 type instance XCmdArrForm GhcPs = AnnList
-type instance XCmdArrForm GhcRn = NoExtField
-type instance XCmdArrForm GhcTc = NoExtField
+-- | fixity (filled in by the renamer), for forms that were converted from
+-- OpApp's by the renamer
+type instance XCmdArrForm GhcRn = Maybe Fixity
+type instance XCmdArrForm GhcTc = Maybe Fixity
 
 type instance XCmdApp     (GhcPass _) = NoExtField
 type instance XCmdLam     (GhcPass _) = NoExtField
@@ -1412,7 +1415,7 @@ ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp True)
 ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp False)
   = hsep [ppr_lexpr arg, arrowtt, ppr_lexpr arrow]
 
-ppr_cmd (HsCmdArrForm _ (L _ op) ps_fix rn_fix args)
+ppr_cmd (HsCmdArrForm rn_fix (L _ op) ps_fix args)
   | HsVar _ (L _ v) <- op
   = ppr_cmd_infix v
   | GhcTc <- ghcPass @p
@@ -1427,7 +1430,10 @@ ppr_cmd (HsCmdArrForm _ (L _ op) ps_fix rn_fix args)
     ppr_cmd_infix :: OutputableBndr v => v -> SDoc
     ppr_cmd_infix v
       | [arg1, arg2] <- args
-      , isJust rn_fix || ps_fix == Infix
+      , case ghcPass @p of
+          GhcPs -> ps_fix == Infix
+          GhcRn -> isJust rn_fix || ps_fix == Infix
+          GhcTc -> isJust rn_fix || ps_fix == Infix
       = hang (pprCmdArg (unLoc arg1))
            4 (sep [ pprInfixOcc v, pprCmdArg (unLoc arg2)])
       | otherwise

@@ -905,21 +905,10 @@ rnCmd (HsCmdArrApp _ arrow arg ho rtl)
         -- Local bindings, inside the enclosing proc, are not in scope
         -- inside 'arrow'.  In the higher-order case (-<<), they are.
 
--- infix form
-rnCmd (HsCmdArrForm _ op _ (Just _) [arg1, arg2])
-  = do { (op',fv_op) <- escapeArrowScope (rnLExpr op)
-       ; let L _ (HsVar _ (L _ op_name)) = op'
-       ; (arg1',fv_arg1) <- rnCmdTop arg1
-       ; (arg2',fv_arg2) <- rnCmdTop arg2
-        -- Deal with fixity
-       ; fixity <- lookupFixityRn op_name
-       ; final_e <- mkOpFormRn arg1' op' fixity arg2'
-       ; return (final_e, fv_arg1 `plusFV` fv_op `plusFV` fv_arg2) }
-
-rnCmd (HsCmdArrForm _ op f fixity cmds)
+rnCmd (HsCmdArrForm _ op f cmds)
   = do { (op',fvOp) <- escapeArrowScope (rnLExpr op)
        ; (cmds',fvCmds) <- rnCmdArgs cmds
-       ; return ( HsCmdArrForm noExtField op' f fixity cmds'
+       ; return ( HsCmdArrForm Nothing op' f cmds'
                 , fvOp `plusFV` fvCmds) }
 
 rnCmd (HsCmdApp x fun arg)
