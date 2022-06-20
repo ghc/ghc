@@ -527,14 +527,8 @@ multiplicityTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Multipli
                           multiplicityTyConKey multiplicityTyCon
 
 oneDataConName, manyDataConName :: Name
-oneDataConName = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "One") oneDataConKey oneDataCon
-manyDataConName = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "Many") manyDataConKey manyDataCon
- -- It feels wrong to have One and Many be BuiltInSyntax. But otherwise,
- -- `Many`, in particular, is considered out of scope unless an appropriate
- -- file is open. The problem with this is that `Many` appears implicitly in
- -- types every time there is an `(->)`, hence out-of-scope errors get
- -- reported. Making them built-in make it so that they are always considered in
- -- scope.
+oneDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "One") oneDataConKey oneDataCon
+manyDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Many") manyDataConKey manyDataCon
 
 runtimeRepTyConName, vecRepDataConName, tupleRepDataConName, sumRepDataConName, boxedRepDataConName :: Name
 runtimeRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "RuntimeRep") runtimeRepTyConKey runtimeRepTyCon

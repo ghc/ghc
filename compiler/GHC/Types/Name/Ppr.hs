@@ -21,6 +21,7 @@ import GHC.Builtin.Types
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Builtin.Types.Prim (tYPETyConName, funTyConName)
 
 
 {-
@@ -109,7 +110,11 @@ mkPrintUnqualified unit_env env
             , constraintKindTyConName
             , heqTyConName
             , coercibleTyConName
-            , eqTyConName ]
+            , eqTyConName
+            , tYPETyConName
+            , funTyConName
+            , oneDataConName
+            , manyDataConName ]
 
         right_name gre = greDefinitionModule gre == Just mod
 
