@@ -7,15 +7,15 @@ T25180.hs:12:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         () :: () (bound at <wired into compiler>)
         mempty :: forall a. Monoid a => a
           with mempty @()
-          (imported from ‘Prelude’ at T25180.hs:3:8-13
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
         maxBound :: forall a. Bounded a => a
           with maxBound @()
-          (imported from ‘Prelude’ at T25180.hs:3:8-13
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Enum’))
         minBound :: forall a. Bounded a => a
           with minBound @()
-          (imported from ‘Prelude’ at T25180.hs:3:8-13
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Enum’))
 
 T25180.hs:19:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
@@ -35,11 +35,11 @@ T25180.hs:19:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
            (and originally defined in ‘GHC.Internal.Tuple’))
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @Solo @a
-          (imported from ‘Prelude’ at T25180.hs:3:8-13
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
         pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @Solo @a
-          (imported from ‘Prelude’ at T25180.hs:3:8-13
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
 
 T25180.hs:26:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]

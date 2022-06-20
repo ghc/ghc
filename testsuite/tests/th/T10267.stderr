@@ -15,7 +15,7 @@ T10267.hs:8:1: error: [GHC-88464]
           (bound at T10267.hs:8:1)
         id :: forall a. a -> a
           with id @a
-          (imported from ‘Prelude’ at T10267.hs:3:8-13
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
 
 T10267.hs:8:1: error: [GHC-88464]

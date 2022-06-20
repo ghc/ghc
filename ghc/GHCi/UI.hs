@@ -527,7 +527,7 @@ interactiveUI config srcs maybe_exprs = do
    let prelude_import =
          case simpleImportDecl preludeModuleName of
            -- Set to True because Prelude is implicitly imported.
-           impDecl@ImportDecl{ideclExt=ext} -> impDecl{ideclExt = ext{ideclImplicit=True}}
+           impDecl@ImportDecl{ideclExt=ext} -> impDecl{ideclExt = ext{ideclGenerated=True}}
    empty_cache <- liftIO newIfaceCache
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname           = default_progname,

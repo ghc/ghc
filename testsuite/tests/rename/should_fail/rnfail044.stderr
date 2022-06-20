@@ -3,6 +3,6 @@ rnfail044.hs:5:12: error: [GHC-87543]
     Ambiguous occurrence ‘splitAt’.
     It could refer to
        either ‘Prelude.splitAt’,
-              imported from ‘Prelude’ at rnfail044.hs:5:8
+              imported from ‘Prelude’
               (and originally defined in ‘GHC.Internal.List’),
            or ‘A.splitAt’, defined at rnfail044.hs:8:3.

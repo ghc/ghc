@@ -5,7 +5,7 @@ LiftErrMsgDefer.hs:14:12: warning: [GHC-28914] [-Wdeferred-type-errors (in -Wdef
     • Could not be resolved by implicit lifting due to the following error:
         No instance for: ‘Lift (a2 -> a2)’
     • Available from the imports:
-      • imported from ‘Prelude’ at LiftErrMsgDefer.hs:3:8-11
+      • imported from ‘Prelude’
     • In the expression: [| id |]
       In an equation for ‘test1’: test1 = [| id |]
 (deferred type error)

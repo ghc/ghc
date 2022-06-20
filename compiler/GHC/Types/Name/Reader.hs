@@ -2048,10 +2048,13 @@ bestImport iss = NE.head $ NE.sortBy best iss
     -- Less means better
     -- Unqualified always wins over qualified; then
     -- import-all wins over import-some; then
+    -- generated wins over user-specified; then
     -- earlier declaration wins over later
     best (ImpSpec { is_item = item1, is_decl = d1 })
          (ImpSpec { is_item = item2, is_decl = d2 })
-      = (is_qual d1 `compare` is_qual d2) S.<> best_item item1 item2 S.<>
+      = (is_qual d1 `compare` is_qual d2) S.<>
+        best_item item1 item2 S.<>
+        compareGenerated (is_dloc d1) (is_dloc d2) S.<>
         SrcLoc.leftmost_smallest (is_dloc d1) (is_dloc d2)
 
     best_item :: ImpItemSpec -> ImpItemSpec -> Ordering
@@ -2061,6 +2064,11 @@ bestImport iss = NE.head $ NE.sortBy best iss
     best_item (ImpSome { is_explicit = e1 })
               (ImpSome { is_explicit = e2 }) = e1 `compare` e2
      -- False < True, so if e1 is explicit and e2 is not, we get GT
+
+    compareGenerated UnhelpfulSpan{} UnhelpfulSpan{} = EQ
+    compareGenerated UnhelpfulSpan{} RealSrcSpan{} = LT
+    compareGenerated RealSrcSpan{} UnhelpfulSpan{} = GT
+    compareGenerated RealSrcSpan{} RealSrcSpan{} = EQ
 
 {- Note [Choosing the best import declaration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2095,12 +2103,19 @@ unnecessary.  Here is the dominance relationship we choose:
 
     b) import Foo dominates import Foo(x).
 
-    c) Otherwise choose the textually first one.
+    c) Generated imports dominate user-written imports.
+
+    d) For user-written imports, textually earlier imports dominate later imports.
 
 Rationale for (a).  Consider
    import qualified M  -- Import #1
    import M( x )       -- Import #2
    foo = M.x + x
+
+Rationale for (c): the most common form of a generated import is the implicit
+Prelude import. We would like this to take precedence over user-written
+imports, as one shouldn't need to explicitly import basic declarations from the
+Prelude (e.g. map, id, Maybe etc).
 
 The unqualified 'x' can only come from import #2.  The qualified 'M.x'
 could come from either, but bestImport picks import #2, because it is
