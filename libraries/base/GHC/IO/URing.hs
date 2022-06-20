@@ -129,7 +129,10 @@ startCompletionThread
     -> IT.IntTable PendingReq
     -> FreeSqEvent
     -> IO ()
-startCompletionThread ring requests free_sq = go
+startCompletionThread ring requests free_sq = do
+    tid <- myThreadId
+    labelThread tid "uring completion thread"
+    go
   where
     go = once >> go
 
