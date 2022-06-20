@@ -57,6 +57,7 @@ _*
 */ghc-stage1
 .shake.*
 .hadrian_ghci
+.hie-bios
 
 # -----------------------------------------------------------------------------
 # Ignore any overlapped darcs repos and back up files
