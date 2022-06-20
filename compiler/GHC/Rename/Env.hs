@@ -2001,7 +2001,15 @@ lookupQualifiedNameGHCi fos rdr_name
           , gre_info = info }
         where
           info = lookupGREInfo hsc_env nm
-          spec = ImpDeclSpec { is_mod = mod, is_as = moduleName mod, is_pkg_qual = NoPkgQual, is_qual = True, is_isboot = NotBoot, is_dloc = noSrcSpan }
+          spec = ImpDeclSpec
+            { is_mod = mod
+            , is_as = moduleName mod
+            , is_pkg_qual = NoPkgQual
+            , is_qual = True
+            , is_isboot = NotBoot
+            , is_dloc = noSrcSpan
+            , is_implicit = False
+            }
           is = ImpSpec { is_decl = spec, is_item = ImpAll }
 
 -- | Look up the 'GREInfo' associated with the given 'Name'

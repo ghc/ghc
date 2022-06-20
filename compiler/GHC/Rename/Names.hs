@@ -391,7 +391,8 @@ rnImportDecl this_mod
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
         imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only,
                                   is_dloc = locA loc, is_as = qual_mod_name,
-                                  is_pkg_qual = pkg_qual, is_isboot = want_boot }
+                                  is_pkg_qual = pkg_qual, is_isboot = want_boot,
+                                  is_implicit = implicit }
 
     -- filter the imports according to the import declaration
     (new_imp_details, imp_user_list, gbl_env) <- filterImports hsc_env iface imp_spec imp_details

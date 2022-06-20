@@ -1779,7 +1779,8 @@ shadowNames drop_only_qualified env new_gres = minusOccEnv_C_Ns do_shadowing env
                                    , is_pkg_qual = NoPkgQual
                                    , is_qual = True
                                    , is_isboot = NotBoot
-                                   , is_dloc = greDefinitionSrcSpan old_gre }
+                                   , is_dloc = greDefinitionSrcSpan old_gre
+                                   , is_implicit = False }
 
     set_qual :: ImportSpec -> ImportSpec
     set_qual is = is { is_decl = (is_decl is) { is_qual = True } }
@@ -1939,6 +1940,7 @@ data ImpDeclSpec
         is_as       :: !ModuleName, -- ^ Import alias, e.g. from @as M@ (or @Muggle@ if there is no @as@ clause)
         is_pkg_qual :: !PkgQual,    -- ^ Was this a package import?
         is_qual     :: !Bool,       -- ^ Was this import qualified?
+        is_implicit :: Bool,       -- ^ Was this import implicit?
         is_dloc     :: !SrcSpan,    -- ^ The location of the entire import declaration
         is_isboot   :: !IsBootInterface -- ^ Was this a SOURCE import?
     } deriving (Eq, Data)

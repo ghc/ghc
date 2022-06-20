@@ -632,7 +632,8 @@ mergeSignatures
                                             is_pkg_qual = NoPkgQual,
                                             is_qual     = False,
                                             is_isboot   = NotBoot,
-                                            is_dloc     = locA loc
+                                            is_dloc     = locA loc,
+                                            is_implicit = False
                                           } ImpAll
                                 rdr_env = mkGlobalRdrEnv $ gresFromAvails hsc_env (Just ispec) as1
                             setGblEnv tcg_env {
