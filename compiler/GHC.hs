@@ -1503,7 +1503,8 @@ availsToGlobalRdrEnv hsc_env mod avails
       -- all the specified modules into the global interactive module
     imp_spec = ImpSpec { is_decl = decl, is_item = ImpAll}
     decl = ImpDeclSpec { is_mod = mod, is_as = moduleName mod,
-                         is_qual = False, is_isboot = NotBoot, is_pkg_qual = NoPkgQual,
+                         is_qual = False, is_implicit = False,
+                         is_isboot = NotBoot, is_pkg_qual = NoPkgQual,
                          is_dloc = srcLocSpan interactiveSrcLoc,
                          is_level = NormalLevel }
 

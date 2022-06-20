@@ -1821,6 +1821,7 @@ shadowNames drop_only_qualified env new_gres = minusOccEnv_C_Ns do_shadowing env
                                    , is_as = old_mod_name
                                    , is_pkg_qual = NoPkgQual
                                    , is_qual = True
+                                   , is_implicit = False
                                    , is_level = NormalLevel -- MP: Not 100% sure this is correct
                                    , is_isboot = NotBoot
                                    , is_dloc = greDefinitionSrcSpan old_gre }
@@ -1983,6 +1984,7 @@ data ImpDeclSpec
         is_as       :: !ModuleName, -- ^ Import alias, e.g. from @as M@ (or @Muggle@ if there is no @as@ clause)
         is_pkg_qual :: !PkgQual,    -- ^ Was this a package import?
         is_qual     :: !Bool,       -- ^ Was this import qualified?
+        is_implicit :: !Bool,       -- ^ Was this import implicit? See Note [Implicit imports]
         is_dloc     :: !SrcSpan,    -- ^ The location of the entire import declaration
         is_isboot   :: !IsBootInterface, -- ^ Was this a SOURCE import?
         is_level    :: !ImportLevel -- ^ Was this import level modified? splice/quote +-1
@@ -1995,11 +1997,12 @@ instance NFData ImpDeclSpec where
 
 
 instance Binary ImpDeclSpec where
-  put_ bh (ImpDeclSpec mod as pkg_qual qual _dloc isboot isstage) = do
+  put_ bh (ImpDeclSpec mod as pkg_qual qual implicit _dloc isboot isstage) = do
     put_ bh mod
     put_ bh as
     put_ bh pkg_qual
     put_ bh qual
+    put_ bh implicit
     put_ bh isboot
     put_ bh (fromEnum isstage)
 
@@ -2008,9 +2011,10 @@ instance Binary ImpDeclSpec where
     as <- get bh
     pkg_qual <- get bh
     qual <- get bh
+    implicit <- get bh
     isboot <- get bh
     isstage <- toEnum <$> get bh
-    return (ImpDeclSpec mod as pkg_qual qual noSrcSpan isboot isstage)
+    return (ImpDeclSpec mod as pkg_qual qual implicit noSrcSpan isboot isstage)
 
 -- | Import Item Specification
 --

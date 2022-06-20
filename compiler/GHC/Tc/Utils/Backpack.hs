@@ -633,6 +633,7 @@ mergeSignatures
                                             is_as       = mod_name,
                                             is_pkg_qual = NoPkgQual,
                                             is_qual     = False,
+                                            is_implicit = False,
                                             is_isboot   = NotBoot,
                                             is_dloc     = locA loc,
                                             is_level    = NormalLevel
