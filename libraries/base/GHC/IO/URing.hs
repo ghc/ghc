@@ -85,19 +85,20 @@ newURingMgr cap = do
     usrc <- newSource
     reqs <- IT.new mAX_REQS
     free_sq <- newEmptyMVar
-    _ <- forkOn cap (startCompletionThread ring reqs free_sq)
-    return URingMgr { uring = ring
-                    , uniqueSource = usrc
-                    , requests = reqs
-                    , freeSqSlot = free_sq
-                    }
+    let mgr = URingMgr { uring = ring
+                       , uniqueSource = usrc
+                       , requests = reqs
+                       , freeSqSlot = free_sq
+                       }
+    _ <- forkOn cap (startCompletionThread mgr)
+    return mgr
 
 submit' :: URingMgr
         -> (UserData -> SqeBuilder a)
             -- ^ User data to SqeBuilder
         -> Completion
             -- ^ Action to run on completion
-        -> IO a
+        -> IO (Int, a)
 submit' mgr mkSqe compl = do
     Unique u <- newUnique (uniqueSource mgr)
     go u
@@ -114,8 +115,8 @@ submit' mgr mkSqe compl = do
             pushRes <- URing.Ring.pushSqe (uring mgr) sqeIdx
             if pushRes
               then do
-                  _ <- URing.submit (uring mgr) 1
-                  return r
+                  completed <- URing.submit (uring mgr) 1
+                  return (completed, r)
               else URing.freeSqe (uring mgr) sqeIdx >> no_sqs u
           Nothing -> no_sqs u
 
@@ -126,13 +127,19 @@ submit :: (UserData -> SqeBuilder a)
        -> Completion
        -> IO a
 submit mkSqe compl = withURingMgr $ \mgr -> do
-    submit' mgr mkSqe compl
+    withURingMgr $ \mgr -> do
+        (completed, r) <- submit' mgr mkSqe compl
+        -- TODO: data race here
+        when (completed > 0) $
+            handleCompletions mgr
+        return r
 
 submitAndBlock :: (UserData -> SqeBuilder a) -> IO Int32
 submitAndBlock mkSqe = do
     mvar <- newEmptyMVar
     submit mkSqe (putMVar mvar)
-    takeMVar mvar
+    r <- takeMVar mvar
+    return r
 
 withURingMgr :: (URingMgr -> IO a) -> IO a
 withURingMgr f = do
@@ -141,32 +148,34 @@ withURingMgr f = do
     f mgr
 
 startCompletionThread
-    :: URing.URing
-    -> IT.IntTable PendingReq
-    -> FreeSqEvent
+    :: URingMgr
     -> IO ()
-startCompletionThread ring requests free_sq = do
+startCompletionThread mgr = do
     tid <- myThreadId
     labelThread tid "uring completion thread"
     go
   where
-    go = once >> go
+    go = do
+        handleCompletions mgr
+        _ <- URing.submitAndWait (uring mgr) 0 1
+        go
 
-    once :: IO ()
-    once = do
-        mb_cqe <- URing.popCq ring
+handleCompletions :: URingMgr -> IO ()
+handleCompletions mgr = loop
+  where
+    loop = do
+        mb_cqe <- URing.popCq (uring mgr)
         case mb_cqe of
-          Nothing -> do
-              _ <- URing.submitAndWait ring 0 1
-              return ()
+          Nothing -> return ()
           Just cqe -> do
               let reqId :: Int
                   reqId = fromIntegral $ cqeUserData cqe
-              mb_req <- IT.delete reqId requests
+              mb_req <- IT.delete reqId (requests mgr)
               case mb_req of
                 Nothing -> error "No request"
                 Just (PendingReq sqe_idx compl) -> do
-                    URing.freeSqe ring sqe_idx
-                    tryPutMVar free_sq () -- TODO: How inefficient is this?
+                    URing.freeSqe (uring mgr) sqe_idx
+                    tryPutMVar (freeSqSlot mgr) () -- TODO: How inefficient is this?
                     compl (cqeRes cqe)
+              loop
 
