@@ -293,3 +293,5 @@ test('T13622', normal, compile, [''])
 test('T13704a', normal, compile, ['-main-is Main.program'])
 test('T13704b', [], multimod_compile, ['T13704b1.hs T13704b2.hs', '-main-is T13704b2.program -v0'])
 test('T20562', normal, compile, [''])
+
+test('T21752', [extra_files(['T21752A.hs', 'T21752.hs'])], multimod_compile, ['T21752', '-v0'])
