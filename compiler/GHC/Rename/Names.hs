@@ -1870,12 +1870,10 @@ findImportUsage imports used_gres
     import_usage = mkImportMap used_gres
 
     unused_decl :: LImportDecl GhcRn -> (LImportDecl GhcRn, [GlobalRdrElt], [Name])
-    unused_decl decl@(L loc (ImportDecl { ideclImportList = imps }))
+    unused_decl decl@(L _ (ImportDecl { ideclImportList = imps }))
       = (decl, used_gres, nameSetElemsStable unused_imps)
       where
-        used_gres = lookupSrcLoc (srcSpanEnd $ locA loc) import_usage
-                               -- srcSpanEnd: see Note [The ImportMap]
-                    `orElse` []
+        used_gres = lookupImportMap decl import_usage
 
         used_gre_env = mkGlobalRdrEnv used_gres
         used_parents = mkNameSet (mapMaybe greParent_maybe used_gres)
@@ -2038,25 +2036,36 @@ mkImportMap :: [GlobalRdrElt] -> ImportMap
 -- For each of a list of used GREs, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
-mkImportMap gres
-  = foldr add_one Map.empty gres
+mkImportMap = foldr insertImportMap Map.empty
+
+insertImportMap :: GlobalRdrElt -> ImportMap -> ImportMap
+insertImportMap gre@(GRE { gre_imp = imp_specs }) importMap =
+  case toImportMapSrcLoc (is_dloc (is_decl best_imp_spec)) of
+    Just decl_loc -> insertElem decl_loc gre importMap
+    Nothing -> importMap
   where
-    add_one gre@(GRE { gre_imp = imp_specs }) imp_map =
-      case srcSpanEnd (is_dloc (is_decl best_imp_spec)) of
-                              -- For srcSpanEnd see Note [The ImportMap]
-       RealSrcLoc decl_loc _ -> insertElem decl_loc gre imp_map
-       UnhelpfulLoc _ -> imp_map
-       where
-          best_imp_spec =
-            case bagToList imp_specs of
-              []     -> pprPanic "mkImportMap: GRE with no ImportSpecs" (ppr gre)
-              is:iss -> bestImport (is NE.:| iss)
+    best_imp_spec =
+      case bagToList imp_specs of
+        []     -> pprPanic "mkImportMap: GRE with no ImportSpecs" (ppr gre)
+        is:iss -> bestImport (is NE.:| iss)
 
     -- https://github.com/haskell/containers/issues/784
     insertElem :: Ord k => k -> v -> Map k [v] -> Map k [v]
     insertElem k v = flip Map.alter k $ \case
       Just vs -> Just (v : vs)
       Nothing -> Just [v]
+
+lookupImportMap :: LImportDecl GhcRn -> ImportMap -> [GlobalRdrElt]
+lookupImportMap (L srcSpan _) importMap =
+  fromMaybe [] $
+    toImportMapSrcLoc (locA srcSpan) >>= (`Map.lookup` importMap)
+
+toImportMapSrcLoc :: SrcSpan -> Maybe RealSrcLoc
+toImportMapSrcLoc srcSpan =
+  -- see Note [The ImportMap] for why we're using srcSpanEnd
+  case srcSpanEnd srcSpan of
+    RealSrcLoc loc _ -> Just loc
+    UnhelpfulLoc _ -> Nothing
 
 warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
 warnUnusedImport rdr_env (L loc decl, used, unused)
