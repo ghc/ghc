@@ -2,7 +2,10 @@
 {-# LANGUAGE BlockArguments #-}
 
 -- | JavaScript code generator
-module GHC.StgToJS.CodeGen where
+module GHC.StgToJS.CodeGen
+  ( stgToJS
+  )
+where
 
 import GHC.Prelude
 
