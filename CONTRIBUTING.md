@@ -36,15 +36,12 @@ cd haddock
 
 ### Git Branches
 
-For improvements to the documentation generator,
-please base your pull request on the latest GHC version branch
-(`ghc-9.2` for instance). 
+Pull requests are to be opened against the `main` branch, from which are forked
+GHC-specific branches (like `ghc-9.2`, `ghc-9.4`, etc).
 
 ### Building the packages
 
 #### Using `cabal`
-
-Requires cabal `>= 3.4` and GHC `== 9.2`:
 
 First update the package list:
 
@@ -60,7 +57,7 @@ cabal v2-build all --enable-tests
 cabal v2-test all
 ```
 
-### Updating golden testsuite outputs
+### Updating golden test suite outputs
 
 If you've changed Haddock's output, you will probably need to accept the new
 output of Haddock's golden test suites (`html-test`, `latex-test`,
@@ -71,7 +68,6 @@ argument to these test suites. With a new enough version of `cabal-install`:
 cabal v2-test html-test latex-test hoogle-test hypsrc-test \
   --test-option='--accept'
 ```
-
 
 [SSCCE]: http://sscce.org/
 [CoC]: ./CODE_OF_CONDUCT.md
