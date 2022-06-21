@@ -222,6 +222,9 @@ Runtime system
   eliminating the need to pass the :ghc-flag:`-eventlog` flag to use the eventlog.
   This flag has been deprecated (:ghc-ticket:`18948`).
 
+- Summary statistics, i.e. the output of :rts-flag:`-s [⟨file⟩]`, now correctly
+  accounts for bytes copied during sequential collections.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

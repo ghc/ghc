@@ -170,6 +170,9 @@ is requested it takes 1, when a SYNC_GC_PAR is requested it takes n_capabilities
 
 Clearly this is in need of some tidying up, but for now we tread carefully. We
 call is_par_gc() to see whether we are in a parallel or sequential collection.
+If we are in a parallel collection we iterate over gc_threads, being careful to
+account for idle caps. If we are in a sequential collection we deal only with
+the thread local gct.
 Of course this is valid only inside GarbageCollect ().
 
 Omitting this check has led to issues such as #19147.
@@ -647,7 +650,11 @@ GarbageCollect (uint32_t collect_gen,
           par_balanced_copied =
               (par_balanced_copied_acc - copied + other_active_threads / 2) /
               other_active_threads;
+      } else {
           copied += gct->copied;
+          any_work += gct->any_work;
+          scav_find_work += gct->scav_find_work;
+          max_n_todo_overflow += gct->max_n_todo_overflow;
       }
   }
 
