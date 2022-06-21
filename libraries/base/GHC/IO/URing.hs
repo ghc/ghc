@@ -33,7 +33,9 @@ supportsIOURing = unsafePerformIO checkIOURing
 {-# NOINLINE supportsIOURing #-}
 
 checkIOURing :: IO Bool
-checkIOURing = do
+checkIOURing
+  | c_rtsIsThreaded == 0 = return False
+  | otherwise = do
     catch (URing.Ring.newURing 16 >> return True) uhOh
   where
     uhOh :: IOError -> IO Bool
@@ -42,6 +44,8 @@ checkIOURing = do
       | otherwise = do
         puts $ "Unexpected error while checking io-uring support: " ++ show ioe
         return False
+
+foreign import ccall unsafe "rts_isThreaded" c_rtsIsThreaded :: Int
 
 type Completion = Int32 -> IO ()
 
