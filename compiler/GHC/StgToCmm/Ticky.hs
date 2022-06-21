@@ -207,8 +207,8 @@ instance ToJson TickyClosureType where
               ,("args", json args)
               ]
 
-tickyEntryDesc :: (SDocContext -> TickyClosureType -> String)
-tickyEntryDesc ctxt = renderWithContext ctxt . renderJSON . json
+tickyEntryDescJson :: (SDocContext -> TickyClosureType -> String)
+tickyEntryDescJson ctxt = renderWithContext ctxt . renderJSON . json
 
 data TickyClosureType
     = TickyFun
@@ -279,6 +279,34 @@ withNewTickyCounter cloType name m = do
   lbl <- emitTickyCounter cloType name
   setTickyCtrLabel lbl m
 
+emitTickyData :: Platform
+              -> CLabel -- ^ lbl for the counter
+              -> Arity -- ^ arity
+              -> CmmLit -- ^ fun desc
+              -> CmmLit -- ^ arg desc
+              -> CmmLit -- ^ json desc
+              -> CmmLit -- ^ info table lbl
+              -> FCode ()
+emitTickyData platform ctr_lbl arity fun_desc arg_desc json_desc info_tbl =
+  emitDataLits ctr_lbl
+    -- Must match layout of rts/include/rts/Ticky.h's StgEntCounter
+    --
+    -- krc: note that all the fields are I32 now; some were I16
+    -- before, but the code generator wasn't handling that
+    -- properly and it led to chaos, panic and disorder.
+        [ zeroCLit platform,               -- registered?
+          mkIntCLit platform arity,   -- Arity
+          zeroCLit platform,               -- Heap allocated for this thing
+          fun_desc,
+          arg_desc,
+          json_desc,
+          info_tbl,
+          zeroCLit platform,          -- Entries into this thing
+          zeroCLit platform,          -- Heap allocated by this thing
+          zeroCLit platform           -- Link to next StgEntCounter
+        ]
+
+
 emitTickyCounter :: TickyClosureType -> Id -> FCode CLabel
 emitTickyCounter cloType tickee
   = let name = idName tickee in
@@ -342,23 +370,9 @@ emitTickyCounter cloType tickee
 
         ; let ctx = defaultSDocContext {sdocPprDebug = True}
         ; fun_descr_lit <- newStringCLit $ renderWithContext ctx ppr_for_ticky_name
-        ; arg_descr_lit <- newStringCLit $ tickyEntryDesc ctx cloType
-        ; emitDataLits ctr_lbl
-        -- Must match layout of rts/include/rts/Ticky.h's StgEntCounter
-        --
-        -- krc: note that all the fields are I32 now; some were I16
-        -- before, but the code generator wasn't handling that
-        -- properly and it led to chaos, panic and disorder.
-            [ mkIntCLit platform 0,               -- registered?
-              mkIntCLit platform (tickyArgArity cloType),   -- Arity
-              mkIntCLit platform 0,               -- Heap allocated for this thing
-              fun_descr_lit,
-              arg_descr_lit,
-              info_lbl,
-              zeroCLit platform,          -- Entries into this thing
-              zeroCLit platform,          -- Heap allocated by this thing
-              zeroCLit platform           -- Link to next StgEntCounter
-            ]
+        ; arg_descr_lit <- newStringCLit $ tickyArgDesc cloType
+        ; json_descr_lit <- newStringCLit $ tickyEntryDescJson ctx cloType
+        ; emitTickyData platform ctr_lbl (tickyArgArity cloType) fun_descr_lit arg_descr_lit json_descr_lit info_lbl
         }
 
 {- Note [TagSkip ticky counters]
@@ -432,21 +446,8 @@ emitTickyCounterTag unique (NonVoid id) =
         ; sdoc_context <- stgToCmmContext <$> getStgToCmmConfig
         ; fun_descr_lit <- newStringCLit $ renderWithContext sdoc_context ppr_for_ticky_name
         ; arg_descr_lit <- newStringCLit $ "infer"
-        ; emitDataLits ctr_lbl
-        -- Must match layout of includes/rts/Ticky.h's StgEntCounter
-        --
-        -- krc: note that all the fields are I32 now; some were I16
-        -- before, but the code generator wasn't handling that
-        -- properly and it led to chaos, panic and disorder.
-            [ mkIntCLit platform 0,               -- registered?
-              mkIntCLit platform 0,   -- Arity
-              mkIntCLit platform 0,               -- Heap allocated for this thing
-              fun_descr_lit,
-              arg_descr_lit,
-              zeroCLit platform,          -- Entries into this thing
-              zeroCLit platform,          -- Heap allocated by this thing
-              zeroCLit platform           -- Link to next StgEntCounter
-            ]
+        ; json_descr_lit <- newStringCLit $ "infer"
+        ; emitTickyData platform ctr_lbl 0 fun_descr_lit arg_descr_lit json_descr_lit (zeroCLit platform)
         }
 -- -----------------------------------------------------------------------------
 -- Ticky stack frames
