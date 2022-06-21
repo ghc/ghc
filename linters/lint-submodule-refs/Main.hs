@@ -67,7 +67,7 @@ main = do
                   when (not $ null wip) $ do
                     T.putStrLn     "     Found the following non-mirrored WIP branches:"
                     forM_ wip $ \branch -> do
-                      commit <- gitNormCid smAbsPath branch
+                      commit <- gitNormCid smAbsPath ("origin/" <> branch)
                       T.putStrLn $ "      - " <> branch <> " -> " <> commit
                     T.putStrLn ""
               pure bad
