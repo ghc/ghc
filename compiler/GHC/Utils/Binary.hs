@@ -115,8 +115,6 @@ import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import           Data.Map (Map)
-import qualified Data.Map as M
 #if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 #endif
@@ -671,10 +669,6 @@ instance Binary a => Binary [a] where
 instance (Binary a, Ord a) => Binary (Set a) where
   put_ bh s = put_ bh (Set.toList s)
   get bh = Set.fromList <$> get bh
-
-instance (Ord k, Binary k, Binary v) => Binary (Map k v) where
-  put_ bh = put_ bh . M.toList
-  get bh = M.fromList <$> get bh
 
 instance Binary a => Binary (NonEmpty a) where
     put_ bh = put_ bh . NonEmpty.toList
