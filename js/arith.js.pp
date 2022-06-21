@@ -15,30 +15,6 @@ function h$hs_neWord64(a1,a2,b1,b2) {
   return (a1 !== b1 || a2 !== b2) ? 1 : 0;
 }
 
-function h$hs_word64ToWord(a1,a2) {
-  return a2;
-}
-
-function h$hs_wordToWord64(w) {
-  RETURN_UBX_TUP2(0, w);
-}
-
-function h$hs_intToInt64(a) {
-  RETURN_UBX_TUP2((a < 0) ? -1 : 0, a);
-}
-
-function h$hs_int64ToWord64(a1,a2) {
-  RETURN_UBX_TUP2(a1, a2);
-}
-
-function h$hs_word64ToInt64(a1,a2) {
-  RETURN_UBX_TUP2(a1, a2);
-}
-
-function h$hs_int64ToInt(a1,a2) {
-  return a2;
-}
-
 function h$hs_negateInt64(a1,a2) {
   var c = goog.math.Long.fromBits(a2,a1).negate();
   RETURN_UBX_TUP2(c.getHighBits(), c.getLowBits());

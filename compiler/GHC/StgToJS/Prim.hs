@@ -50,6 +50,30 @@ genPrim _ _ Int16ToWord16Op   [r] [x]   = PrimInline $ r |= x
 genPrim _ _ Word16ToInt16Op   [r] [x]   = PrimInline $ r |= x
 genPrim _ _ Int32ToWord32Op   [r] [x]   = PrimInline $ r |= x
 genPrim _ _ Word32ToInt32Op   [r] [x]   = PrimInline $ r |= x
+genPrim _ _ Int64ToWord64Op   [r1,r2] [x1,x2] =
+   PrimInline $ mconcat
+    [ r1 |= x1
+    , r2 |= x2
+    ]
+genPrim _ _ Word64ToInt64Op   [r1,r2] [x1,x2] =
+   PrimInline $ mconcat
+    [ r1 |= x1
+    , r2 |= x2
+    ]
+
+genPrim _ _ Word64ToWordOp    [r] [_x1,x2] = PrimInline $ r |= x2
+genPrim _ _ Int64ToIntOp      [r] [_x1,x2] = PrimInline $ r |= x2
+
+genPrim _ _ WordToWord64Op    [r1,r2] [x] =
+   PrimInline $ mconcat
+    [ r1 |= 0
+    , r2 |= x
+    ]
+genPrim _ _ IntToInt64Op      [r1,r2] [x] =
+   PrimInline $ mconcat
+    [ r1 |= if_ (x .<. 0) (-1) 0 -- sign-extension
+    , r2 |= x
+    ]
 
 genPrim _ _ IntAddOp          [r] [x,y] = PrimInline $ r |= trunc (Add x y)
 genPrim _ _ IntSubOp          [r] [x,y] = PrimInline $ r |= trunc (Sub x y)
