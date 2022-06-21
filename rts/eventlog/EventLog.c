@@ -1355,7 +1355,7 @@ void postProfBegin(void)
 #if defined(TICKY_TICKY)
 static void postTickyCounterDef(EventsBuf *eb, StgEntCounter *p)
 {
-    StgWord len = 8 + 2 + strlen(p->arg_kinds)+1 + strlen(p->str)+1 + 8;
+    StgWord len = 8 + 2 + strlen(p->arg_kinds)+1 + strlen(p->ticky_json)+1 + strlen(p->str)+1 + 8;
     ensureRoomForVariableEvent(eb, len);
     postEventHeader(eb, EVENT_TICKY_COUNTER_DEF);
     postPayloadSize(eb, len);
@@ -1363,6 +1363,7 @@ static void postTickyCounterDef(EventsBuf *eb, StgEntCounter *p)
     postWord64(eb, (uint64_t)((uintptr_t) p));
     postWord16(eb, (uint16_t) p->arity);
     postString(eb, p->arg_kinds);
+    postString(eb, p->ticky_json);
     postString(eb, p->str);
     postWord64(eb, (W_) (INFO_PTR_TO_STRUCT(p->info)));
 }
