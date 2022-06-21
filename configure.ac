@@ -357,20 +357,17 @@ FP_FIND_ROOT
 if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
     FP_SETUP_WINDOWS_TOOLCHAIN
 else
-    # Ideally should use AC_CHECK_TARGET_TOOL but our triples
-    # are screwed up. Configure doesn't think they're ever equal and
-    # so never tried without the prefix.
-    AC_PATH_PROG([CC],[gcc], [clang])
-    AC_PATH_PROG([CXX],[g++], [clang++])
-    AC_PATH_PROG([NM],[nm])
+    AC_PATH_TOOL([CC],[gcc], [clang])
+    AC_PATH_TOOL([CXX],[g++], [clang++])
+    AC_PATH_TOOL([NM],[nm])
     # N.B. we don't probe for LD here but instead
     # do so in FIND_LD to avoid #21778.
-    AC_PATH_PROG([AR],[ar])
-    AC_PATH_PROG([RANLIB],[ranlib])
-    AC_PATH_PROG([OBJDUMP],[objdump])
-    AC_PATH_PROG([DllWrap],[dllwrap])
-    AC_PATH_PROG([Windres],[windres])
-    AC_PATH_PROG([Genlib],[genlib])
+    AC_PATH_TOOL([AR],[ar])
+    AC_PATH_TOOL([RANLIB],[ranlib])
+    AC_PATH_TOOL([OBJDUMP],[objdump])
+    AC_PATH_TOOL([DllWrap],[dllwrap])
+    AC_PATH_TOOL([Windres],[windres])
+    AC_PATH_TOOL([Genlib],[genlib])
 
     HAVE_GENLIB=False
     if test "$HostOS" = "mingw32"; then
