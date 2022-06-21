@@ -450,7 +450,7 @@ foreign import javascript interruptible "h$base_dup2($1,$2,$c);"
     c_dup2 :: CInt -> CInt -> IO CInt
 foreign import javascript interruptible "h$base_fstat($1,$2_1,$2_2,$c);" -- fixme wrong type
     c_fstat :: CInt -> Ptr CStat -> IO CInt
-foreign import javascript unsafe "h$base_isatty($1);"
+foreign import javascript unsafe "(function(){ return h$base_isatty;})"
     c_isatty :: CInt -> IO CInt
 foreign import javascript interruptible "h$base_lseek($1,$2_1,$2_2,$3,$c);"
    c_lseek :: CInt -> COff -> CInt -> IO COff
