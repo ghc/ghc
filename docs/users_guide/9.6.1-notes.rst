@@ -66,6 +66,12 @@ Compiler
 - The :extension:`TypeInType` is now marked as deprecated. Its meaning has been included 
   in :extension:`PolyKinds` and :extension:`DataKinds`.
 
+Runtime System
+~~~~~~~~~~~~~~
+
+- Summary statistics, i.e. the output of :rts-flag:`-s [⟨file⟩]`, now correctly
+  accounts for bytes copied during sequential collections.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
