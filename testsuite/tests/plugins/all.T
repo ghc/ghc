@@ -376,3 +376,9 @@ test('test-late-plugin',
      [extra_files(['late-plugin/LatePlugin.hs']), ignore_stdout],
      makefile_test,
      [])
+
+test('T21730',
+     [extra_files(['T21730-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C T21730-plugin package.T21730-plugin TOP={top}')
+      ],
+     makefile_test, [])
