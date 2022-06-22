@@ -132,14 +132,6 @@ $1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen/cabal_macros.h
 # for our build system, and registers the package for use in-place in
 # the build tree.
 $$($1_$2_PKGDATA) : $$$$(ghc-cabal_INPLACE) $$($1_$2_GHC_PKG_DEP) $1/$$($1_PACKAGE).cabal $$(wildcard $1/configure) $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_CONFIG_DEP)
-# Checking packages built with the bootstrapping compiler would
-# generally be a waste of time. Either we will rebuild them with
-# stage1/stage2, or we don't really care about them.
-ifneq "$3" "0"
-ifneq "$$($1_NO_CHECK)" "YES"
-	"$$(ghc-cabal_INPLACE)" check $1
-endif
-endif
 	"$$(ghc-cabal_INPLACE)" configure $1 $2 --with-ghc="$$($1_$2_HC_CONFIG)" --with-ghc-pkg="$$($1_$2_GHC_PKG)" $$($1_CONFIGURE_OPTS) $$($1_$2_CONFIGURE_OPTS)
 ifeq "$$($1_$2_PROG)" ""
 	$$(call cmd,$1_$2_GHC_PKG) update -v0 --force $$($1_$2_GHC_PKG_OPTS) $1/$2/inplace-pkg-config
