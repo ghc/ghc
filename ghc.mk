@@ -478,6 +478,10 @@ libraries/haskeline_CONFIGURE_OPTS += --flags=-examples
 # described in #20724.
 libraries/text_CONFIGURE_OPTS += --flags=-simdutf
 
+# Filepath is vendored for template-haskell to avoid making it non-resinstallable.
+# see #21738
+libraries/template-haskell_CONFIGURE_OPTS += --flags=+vendor-filepath
+
 libraries/ghc-bignum_CONFIGURE_OPTS += -f $(BIGNUM_BACKEND)
 
 ifeq "$(BIGNUM_BACKEND)" "gmp"
