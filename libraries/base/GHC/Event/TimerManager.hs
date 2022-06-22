@@ -7,6 +7,9 @@
 
 -- TODO: use the new Windows IO manager
 module GHC.Event.TimerManager
+#ifdef js_HOST_ARCH
+    () where
+#else
     ( -- * Types
       TimerManager
 
@@ -261,3 +264,5 @@ editTimeouts mgr g = do
                       -- minimum element didn't change.
                       t0 /= t1
                     _ -> True
+
+#endif

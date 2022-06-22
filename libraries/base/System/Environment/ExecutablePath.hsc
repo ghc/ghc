@@ -18,8 +18,17 @@
 
 module System.Environment.ExecutablePath
   ( getExecutablePath
+##if !defined(js_HOST_ARCH)
   , executablePath
+##endif
   ) where
+
+##if defined(js_HOST_ARCH)
+
+getExecutablePath :: IO FilePath
+getExecutablePath = return "a.jsexe"
+
+##else
 
 -- The imports are purposely kept completely disjoint to prevent edits
 -- to one OS implementation from breaking another.
@@ -372,3 +381,5 @@ executablePath = Nothing
 --------------------------------------------------------------------------------
 
 #endif
+
+##endif

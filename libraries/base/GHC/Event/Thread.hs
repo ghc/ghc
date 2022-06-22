@@ -1,7 +1,11 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns, NoImplicitPrelude #-}
+{-# LANGUAGE CPP #-}
 
 module GHC.Event.Thread
+#ifdef js_HOST_ARCH
+    ( ) where
+#else
     ( getSystemEventManager
     , getSystemTimerManager
     , ensureIOManagerIsRunning
@@ -427,3 +431,5 @@ foreign import ccall unsafe "setIOManagerControlFd"
 
 foreign import ccall unsafe "setTimerManagerControlFd"
    c_setTimerManagerControlFd :: CInt -> IO ()
+
+#endif

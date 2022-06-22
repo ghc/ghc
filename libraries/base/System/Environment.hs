@@ -19,7 +19,9 @@ module System.Environment
     (
       getArgs,
       getProgName,
+#if !defined(js_HOST_ARCH)
       executablePath,
+#endif
       getExecutablePath,
       getEnv,
       lookupEnv,
