@@ -3311,7 +3311,7 @@ primtype BCO
    { Primitive bytecode type. }
 
 primop   AddrToAnyOp "addrToAny#" GenPrimOp
-   Addr# -> (# a #)
+   Addr# -> (# v #)
    { Convert an 'Addr#' to a followable Any type. }
    with
    code_size = 0
