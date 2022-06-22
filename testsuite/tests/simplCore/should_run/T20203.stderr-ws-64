@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 290, types: 141, coercions: 0, joins: 0/0}
+  = {terms: 340, types: 140, coercions: 0, joins: 0/0}
 
 bitOrTwoVarInt
   = \ x y ->
@@ -24,33 +24,50 @@ bitOrTwoVarInt8
       case x of { I8# x# ->
       case y of { I8# x#1 ->
       I8#
-        (word8ToInt8#
-           (orWord8# 17##8 (orWord8# (int8ToWord8# x#) (int8ToWord8# x#1))))
+        (intToInt8#
+           (orI#
+              (int8ToInt# (intToInt8# (orI# (int8ToInt# x#) 1#)))
+              (int8ToInt# (intToInt8# (orI# (int8ToInt# x#1) 16#)))))
       }
       }
-
-bitAndInt1 = I8# 0#8
 
 bitAndTwoVarInt8
   = \ x y ->
-      case x of { I8# x# -> case y of { I8# x#1 -> bitAndInt1 } }
+      case x of { I8# x# ->
+      case y of { I8# x#1 ->
+      I8#
+        (intToInt8#
+           (andI#
+              (int8ToInt# (intToInt8# (andI# (int8ToInt# x#) 1#)))
+              (int8ToInt# (intToInt8# (andI# (int8ToInt# x#1) 16#)))))
+      }
+      }
 
 bitOrInt8
   = \ x ->
       case x of { I8# x# ->
-      I8# (word8ToInt8# (orWord8# 17##8 (int8ToWord8# x#)))
+      I8#
+        (intToInt8#
+           (orI# (int8ToInt# (intToInt8# (orI# (int8ToInt# x#) 1#))) 16#))
       }
 
-bitAndInt8 = \ x -> case x of { I8# x# -> bitAndInt1 }
+bitAndInt8
+  = \ x ->
+      case x of { I8# x# ->
+      I8#
+        (intToInt8#
+           (andI# (int8ToInt# (intToInt8# (andI# (int8ToInt# x#) 1#))) 16#))
+      }
 
 bitOrTwoVarInt16
   = \ x y ->
       case x of { I16# x# ->
       case y of { I16# x#1 ->
       I16#
-        (word16ToInt16#
-           (orWord16#
-              255##16 (orWord16# (int16ToWord16# x#) (int16ToWord16# x#1))))
+        (intToInt16#
+           (orI#
+              (int16ToInt# (intToInt16# (orI# (int16ToInt# x#) 250#)))
+              (int16ToInt# (intToInt16# (orI# (int16ToInt# x#1) 175#)))))
       }
       }
 
@@ -59,22 +76,29 @@ bitAndTwoVarInt16
       case x of { I16# x# ->
       case y of { I16# x#1 ->
       I16#
-        (word16ToInt16#
-           (andWord16#
-              170##16 (andWord16# (int16ToWord16# x#) (int16ToWord16# x#1))))
+        (intToInt16#
+           (andI#
+              (int16ToInt# (intToInt16# (andI# (int16ToInt# x#) 250#)))
+              (int16ToInt# (intToInt16# (andI# (int16ToInt# x#1) 175#)))))
       }
       }
 
 bitOrInt16
   = \ x ->
       case x of { I16# x# ->
-      I16# (word16ToInt16# (orWord16# 255##16 (int16ToWord16# x#)))
+      I16#
+        (intToInt16#
+           (orI#
+              (int16ToInt# (intToInt16# (orI# (int16ToInt# x#) 250#))) 175#))
       }
 
 bitAndInt16
   = \ x ->
       case x of { I16# x# ->
-      I16# (word16ToInt16# (andWord16# 170##16 (int16ToWord16# x#)))
+      I16#
+        (intToInt16#
+           (andI#
+              (int16ToInt# (intToInt16# (andI# (int16ToInt# x#) 250#))) 175#))
       }
 
 bitOrTwoVarInt32
