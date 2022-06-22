@@ -13,6 +13,7 @@ packageArgs :: Args
 packageArgs = do
     stage        <- getStage
     path         <- getBuildPath
+    root         <- getBuildRoot
     compilerPath <- expr $ buildPath (vanillaContext stage compiler)
 
     let -- Do not bind the result to a Boolean: this forces the configure rule
@@ -211,6 +212,12 @@ packageArgs = do
         --------------------------------- hpcBin ----------------------------------
         , package hpcBin
           ? builder (Cabal Flags) ? arg "-build-tool-depends"
+
+        --------------------------------- template-haskell ----------------------------------
+
+        , package templateHaskell
+            ? mconcat [ builder (Cabal Flags) ? notStage0 ? arg "+vendor-filepath"
+                      , builder Ghc ? notStage0 ? arg ("-i" <> (root </> pkgPath filepath)) ]
         ]
 
 ghcBignumArgs :: Args

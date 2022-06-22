@@ -23,11 +23,6 @@ ghc_stage2_CONFIGURE_OPTS += --flags=internal-interpreter
 ghc_stage3_CONFIGURE_OPTS += --flags=internal-interpreter
 endif
 
-# This package doesn't pass the Cabal checks because data-dir
-# points outside the source directory. This isn't a real problem, so
-# we just skip the check.
-ghc_NO_CHECK = YES
-
 ghc_stage1_MORE_HC_OPTS = $(GhcStage1HcOpts)
 ghc_stage2_MORE_HC_OPTS = $(GhcStage2HcOpts)
 ghc_stage3_MORE_HC_OPTS = $(GhcStage3HcOpts)
