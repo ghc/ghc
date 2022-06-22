@@ -671,14 +671,16 @@ But regardless, SpecConstr can and should!  It's easy:
   well as constructor applications.
 
 Wrinkles:
+
 * This should all work perfectly fine for newtype classes.  Mind you,
   currently newtype classes are inlined fairly agressively, but we
   may change that. And it would take extra code to exclude them, as
   well as being unnecessary.
 
-* We (mis-) use LambdaVal for this purpose, because ConVal
-  requires us to list the data constructor and fields, and that
-  is (a) inconvenient and (b) unnecessary for class methods.
+* In isValue, we (mis-) use LambdaVal for this ($fblah d1 .. dn)
+  because ConVal requires us to list the data constructor and
+  fields, and that is (a) inconvenient and (b) unnecessary for
+  class methods.
 
 -----------------------------------------------------
                 Stuff not yet handled
@@ -1227,7 +1229,20 @@ data ArgOcc = NoOcc     -- Doesn't occur at all; or a type argument
             | UnkOcc    -- Used in some unknown way
 
             | ScrutOcc  -- See Note [ScrutOcc]
-                 (DataConEnv [ArgOcc])   -- How the sub-components are used
+                 (DataConEnv [ArgOcc])
+                     -- [ArgOcc]: how the sub-components are used
+
+deadArgOcc :: ArgOcc -> Bool
+deadArgOcc (ScrutOcc {}) = False
+deadArgOcc UnkOcc        = False
+deadArgOcc NoOcc         = True
+
+specialisableArgOcc :: ArgOcc -> Bool
+-- | Does this occurence represent one worth specializing for.
+specialisableArgOcc UnkOcc        = False
+specialisableArgOcc NoOcc         = False
+specialisableArgOcc (ScrutOcc {}) = True
+
 
 {- Note [ScrutOcc]
 ~~~~~~~~~~~~~~~~~~
@@ -1253,6 +1268,9 @@ instance Outputable ArgOcc where
   ppr NoOcc         = text "no-occ"
 
 evalScrutOcc :: ArgOcc
+-- We use evalScrutOcc for
+--   - mkVarUsage: applied functions
+--   - scApp: dicts that are the arugment of a classop
 evalScrutOcc = ScrutOcc emptyUFM
 
 -- Experimentally, this version of combineOcc makes ScrutOcc "win", so
@@ -1333,17 +1351,18 @@ scExpr' env (Case scrut b ty alts)
      = do { let (alt_env,b') = extendBndrWith RecArg env b
                         -- Record RecArg for the components
 
-          ; (alt_usgs, alt_occs, alts')
-                <- mapAndUnzip3M (sc_alt alt_env scrut' b') alts
+          ; (alt_usgs, alt_occs, alts') <- mapAndUnzip3M (sc_alt alt_env scrut' b') alts
 
           ; let scrut_occ  = foldr combineOcc NoOcc alt_occs
                 scrut_usg' = setScrutOcc env scrut_usg scrut' scrut_occ
                 -- The combined usage of the scrutinee is given
-                -- by scrut_occ, which is passed to scScrut, which
+                -- by scrut_occ, which is passed to setScrutOcc, which
                 -- in turn treats a bare-variable scrutinee specially
 
           ; return (foldr combineUsage scrut_usg' alt_usgs,
                     Case scrut' b' (scSubstTy env ty) alts') }
+
+    single_alt = isSingleton alts
 
     sc_alt env scrut' b' (Alt con bs rhs)
      = do { let (env1, bs1) = extendBndrsWith RecArg env bs
@@ -1351,8 +1370,10 @@ scExpr' env (Case scrut b ty alts)
           ; (usg, rhs') <- scExpr env2 rhs
           ; let (usg', b_occ:arg_occs) = lookupOccs usg (b':bs2)
                 scrut_occ = case con of
-                               DataAlt dc -> ScrutOcc (unitUFM dc arg_occs)
-                               _          -> evalScrutOcc
+                               DataAlt dc -- See Note [Do not specialise evals]
+                                  | not (single_alt && all deadArgOcc arg_occs)
+                                  -> ScrutOcc (unitUFM dc arg_occs)
+                               _  -> UnkOcc
           ; return (usg', b_occ `combineOcc` scrut_occ, Alt con bs2 rhs') }
 
 scExpr' env (Let (NonRec bndr rhs) body)
@@ -1429,6 +1450,46 @@ recursive function, but that's not essential and might even be
 harmful.  I'm not sure.
 -}
 
+{- Note [Do not specialise evals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f x y = case x of I# _ ->
+           if y>1 then f x (y-1) else x
+
+Here `x` is scrutinised by a case, but only in an eval-like way; the
+/component/ of the I# is unused.  We don't want to specialise this
+function, even if we find a call (f (I# z)), because nothing is gained
+  * No case branches are discarded
+  * No allocation in removed
+The specialised version would take an unboxed Int#, pass it along,
+and rebox it at the end.
+
+In fact this can cause significant regression.  In #21763 we had:
+like
+  f = ... case x of x' { I# n ->
+          join j y = rhs
+          in ...jump j x'...
+
+Now if we specialise `j` for the argument `I# n`, we'll end up reboxing
+it in `j`, without even removing an allocation from the call site.
+
+Reboxing is always a worry.  But here we can ameliorate the problem as
+follows.
+
+* In scExpr (Case ...), for a /single-alternative/ case expression, in
+  which the pattern binders are all unused, we build a UnkOcc for
+  the scrutinee, not one that maps the data constructor; we don't treat
+  this occurrence as a reason for specialisation.
+
+* Conveniently, SpecConstr is doing its own occurrence analysis, so
+  the "unused" bit is just looking for NoOcc
+
+* Note that if we have
+    f x = case x of { True -> e1; False -> e2 }
+  then even though the pattern binders are unused (there are none), it is
+  still worth specialising on x. Hence the /single-alternative/ guard.
+-}
+
 scApp :: ScEnv -> (InExpr, [InExpr]) -> UniqSM (ScUsage, CoreExpr)
 
 scApp env (Var fn, args)        -- Function is a variable
@@ -1478,7 +1539,6 @@ mkVarUsage env fn args
                            , scu_occs  = unitVarEnv fn arg_occ }
         Nothing     -> nullUsage
   where
-    -- I rather think we could use UnkOcc all the time
     arg_occ | null args = UnkOcc
             | otherwise = evalScrutOcc
 
@@ -2558,10 +2618,8 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
   --    (b) we know what its value is
   -- In that case it counts as "interesting"
 argToPat1 env in_scope val_env (Var v) arg_occ arg_str
-  | sc_force env || case arg_occ of { ScrutOcc {} -> True
-                                    ; UnkOcc      -> False
-                                    ; NoOcc       -> False } -- (a)
-  , is_value                                                 -- (b)
+  | sc_force env || specialisableArgOcc arg_occ  -- (a)
+  , is_value                                     -- (b)
        -- Ignoring sc_keen here to avoid gratuitously incurring Note [Reboxing]
        -- So sc_keen focused just on f (I# x), where we have freshly-allocated
        -- box that we can eliminate in the caller

@@ -2257,7 +2257,7 @@ prepareAlts tries these things:
         case e of x { (a,b) -> rhs }
     where the type is a single constructor type.  This gives better code
     when rhs also scrutinises x or e.
-    See CoreUtils Note [Refine DEFAULT case alternatives]
+    See GHC.Core.Utils Note [Refine DEFAULT case alternatives]
 
 3. combineIdenticalAlts: combine identical alternatives into a DEFAULT.
    See CoreUtils Note [Combine identical alternatives], which also
