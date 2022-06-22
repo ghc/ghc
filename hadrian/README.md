@@ -1,22 +1,17 @@
 Hadrian
 =======
 
-Hadrian is a new build system for the [Glasgow Haskell Compiler][ghc]. It is
-based on the [Shake][shake] library and we hope that it will replace the current
-[Make-based build system][make] starting from GHC 8.8. If you are curious about
+Hadrian is the build system for the [Glasgow Haskell Compiler][ghc]. It is
+based on the [Shake][shake] library. If you are curious about
 the rationale behind the
 project and the architecture of the build system you can find more details in
 this [Haskell Symposium 2016 paper](https://dl.acm.org/authorize?N41275) and this
 [Haskell eXchange 2016 talk][talk].
 
-The new build system can work side-by-side with the existing build system, since it
-places all build artefacts in a dedicated directory (called `_build` by default).
-
 Your first build
 ----------------
 
-Hadrian has not entirely caught up with the Make build system. Not afraid?
-Then put on the helmet and run the following commands from the root of the GHC
+Put on the helmet and run the following commands from the root of the GHC
 tree:
 
 ```
@@ -34,12 +29,6 @@ hadrian/build.bat -j
 Here flag `-j` enables parallelism and is optional. We will further refer to the
 build script simply as `build`.
 
-Notes:
-
-* If the default build script doesn't work, you might want to try another one,
-e.g. based on Cabal sandboxes (`build-cabal.*`), Stack (`build-stack.*`) or Nix
-(`build-stack-nix.*`).
-
 * On Windows, if you do not want to install MSYS, you can use the Stack-based
 build script (Stack provides a managed MSYS environment), as described in
 [these instructions][windows-build]. If you don't mind installing MSYS yourself
@@ -51,17 +40,42 @@ or already have it, you can use the Cabal-based build script.
 * If you have never built GHC before, start with the
 [preparation guide][ghc-preparation].
 
-Cheatsheet for Make users
--------------------------
+* By default Hadrian will fetch dependencies from the internet. If this is a problem
+  for your build system then see the [bootstrap](bootstrap/README.md) directory for
+  instructions about how to build hadrian without an internet connection.
 
-You can find a cheatsheet-style document that shows the Hadrian equivalents of
-commands that GHC users are used to run with the Make build system
-[here](doc/make.md).
 
 Using the build system
 ----------------------
 Once your first build is successful, simply run `build` to rebuild after some
 changes. Build results are placed into `_build` by default.
+
+#### Choosing a build flavour
+
+There are many different ways to build a compiler, each way is called a flavour.
+
+* `--flavour=FLAVOUR`: choose a build flavour. The following settings are
+currently supported: `default`, `quick`, `quickest`, `perf`, `prof`, `devel1`
+and `devel2`. As an example, the `quickest` flavour adds `-O0` flag to all GHC
+invocations and builds libraries only in the `vanilla` way, which speeds up
+builds by 3-4x.
+
+In addition to the overall build flavour there are also "flavour transformers"
+which can slightly modify the build settings for a flavour. Some common flavour
+transformers are:
+
+* `no_profiled_libs`: Don't build profiled libraries
+* `lint`: Build with core lint enabled.
+* etc
+
+A flavour transformer is appended to a normal flavour name using `+`
+
+```
+--flavour=default+lint
+```
+
+Build flavours and flavour transformers are documented
+[here](https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/flavours.md).
 
 #### Command line flags
 
@@ -70,18 +84,11 @@ currently supports several others:
 
 * `--build-root=PATH` or `-oPATH`: specify the directory in which you want to
 store all build products. By default Hadrian builds everything in the `_build/`
-subdirectory of the GHC source tree. Unlike the Make build system, Hadrian
-doesn't have any "inplace" logic left any more. This option is therefore useful
+subdirectory of the GHC source tree. This option is useful
 for GHC developers who want to build GHC in different ways or at different
 commits, from the same source directory, and have the build products sit in
 different, isolated folders.
 
-* `--flavour=FLAVOUR`: choose a build flavour. The following settings are
-currently supported: `default`, `quick`, `quickest`, `perf`, `prof`, `devel1`
-and `devel2`. As an example, the `quickest` flavour adds `-O0` flag to all GHC
-invocations and builds libraries only in the `vanilla` way, which speeds up
-builds by 3-4x. Build flavours are documented
-[here](https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/flavours.md).
 
 * `--freeze1`: freeze Stage1 GHC, i.e. do not rebuild it even if some of its
 source files are out-of-date. This allows to significantly reduce the rebuild
@@ -330,14 +337,6 @@ The `./hadrian/ghci` script is implemented using this target.
 Troubleshooting
 ---------------
 
-Here are a few simple suggestions that might help you fix the build:
-
-* The call to `build test` sometimes fails with
-  `libCffi_p.a: copyFile: does not exist` (as noticed
-  [here](https://gitlab.haskell.org/ghc/ghc/issues/15877#note_166739)).
-  The workaround is to `rm _build/stage1/libffi/build/inst/lib/libffi.a` and
-  start over.
-
 If you need help in debugging Hadrian, read the
 [wiki](https://github.com/snowleopard/hadrian/wiki)
 and Shake's [debugging tutorial](https://shakebuild.com/debugging).
@@ -348,15 +347,12 @@ Current limitations
 The new build system still lacks many important features:
 * Dynamic linking on Windows is not supported [#343][dynamic-windows-issue].
 
-How to contribute
------------------
+Cheatsheet for Make users
+-------------------------
 
-The best way to contribute is to try Hadrian, report the issues you found, and
-attempt to fix them. Documentation patches are particularly welcome. Please
-note: the codebase is still unstable and we expect some further refactoring. In
-particular, we would like to separate the general-purpose "Hadrian library" for
-building Haskell projects using Shake (`src/Hadrian/*`) from GHC specifics; see
-[this issue](https://github.com/snowleopard/hadrian/issues/347).
+You can find a cheatsheet-style document that shows the Hadrian equivalents of
+commands that GHC users are used to run with the Make build system
+[here](doc/make.md).
 
 Acknowledgements
 ----------------
