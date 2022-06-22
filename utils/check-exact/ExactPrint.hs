@@ -1037,9 +1037,9 @@ instance ExactPrint (RuleDecls GhcPs) where
 
 instance ExactPrint (RuleDecl GhcPs) where
   getAnnotationEntry (HsRule {rd_ext = (an,_)}) = fromAnn an
-  exact (HsRule (an,_) ln act mtybndrs termbndrs lhs rhs) = do
+  exact (HsRule (an,nsrc) (L ln n) act mtybndrs termbndrs lhs rhs) = do
     debugM "HsRule entered"
-    markAnnotated ln
+    markAnnotated (L ln (nsrc, n))
     debugM "HsRule after ln"
     markActivation an ra_rest act
     debugM "HsRule after act"

@@ -1122,8 +1122,6 @@ data HsRuleRn = HsRuleRn NameSet NameSet -- Free-vars from the LHS and RHS
 
 type instance XXRuleDecl    (GhcPass _) = DataConCantHappen
 
-type instance Anno (SourceText, RuleName) = SrcAnn NoEpAnns
-
 data HsRuleAnn
   = HsRuleAnn
        { ra_tyanns :: Maybe (AddEpAnn, AddEpAnn)
