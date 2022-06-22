@@ -25,6 +25,10 @@
   * Change default `Ord` implementation of `(>=)`, `(>)`, and `(<)` to use
     `(<=)` instead of `compare` per
     [Core Libraries proposal](https://github.com/haskell/core-libraries-committee/issues/24).
+  * Export `liftA2` from `Prelude`. This means that the entirety of `Applicative`
+    is now exported from `Prelude`. See [CLC #50](https://github.com/haskell/core-libraries-committee/issues/50)
+    for the related discussion,
+    as well as [the migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/export-lifta2-prelude.md)
 
 ## 4.17.0.0 *August 2022*
 
