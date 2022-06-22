@@ -19,6 +19,9 @@
 
 -- #not-home
 module GHC.Conc.Windows
+#ifdef js_HOST_ARCH
+       () where
+#else
        ( ensureIOManagerIsRunning
        , interruptIOManager
 
@@ -117,4 +120,4 @@ ensureIOManagerIsRunning =  POSIX.ensureIOManagerIsRunning
 interruptIOManager :: IO ()
 interruptIOManager = POSIX.interruptIOManager <!> WINIO.interruptIOManager
 
-
+#endif

@@ -93,7 +93,9 @@ runMainIO main =
       topHandler
 
 install_interrupt_handler :: IO () -> IO ()
-#if defined(mingw32_HOST_OS)
+#if defined(js_HOST_ARCH)
+install_interrupt_handler _ = return ()
+#elif defined(mingw32_HOST_OS)
 install_interrupt_handler handler = do
   _ <- GHC.ConsoleHandler.installHandler $
      Catch $ \event ->
@@ -263,7 +265,7 @@ unreachable :: IO a
 unreachable = failIO "If you can read this, shutdownHaskellAndExit did not exit."
 
 exitHelper :: CInt -> Int -> IO a
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) || defined(js_HOST_ARCH)
 exitHelper exitKind r =
   shutdownHaskellAndExit (fromIntegral r) exitKind >> unreachable
 #else
@@ -285,7 +287,7 @@ foreign import ccall "shutdownHaskellAndSignal"
 
 exitInterrupted :: IO a
 exitInterrupted =
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) || defined(js_HOST_ARCH)
   safeExit 252
 #else
   -- we must exit via the default action for SIGINT, so that the

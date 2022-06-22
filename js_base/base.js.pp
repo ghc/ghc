@@ -277,9 +277,22 @@ function h$base_umask(mode) {
     return 0;
 }
 
-function h$base_write(fd, buf, buf_off, n, c) {
+function h$base_write(fd, fdo, buf, buf_off, n, c) {
+// fd: a number describing StdOut, StdErr etc
+// fdo: is the
+// buf:
+// buf_off:
+// n:
+// c: a callback function
     TRACE_IO("base_write: " + fd);
-    var fdo = h$base_fds[fd];
+
+    /* FIXME: Jeff-06-2022: sometimes h$base_write is always called with 6
+     *  arguments through FFI but the original ghcjs version only defined 5
+     *  parameters thereby leaving off the callback function, c. Why do we have the
+     *  discrepency? I've commented out the line under this comment in response.
+    */
+    // var fdo = h$base_fds[fd];
+
     if(fdo && fdo.write) {
         fdo.write(fd, fdo, buf, buf_off, n, c);
     } else {

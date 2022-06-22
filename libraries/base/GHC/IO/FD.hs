@@ -570,6 +570,10 @@ indicates that there's no data, we call threadWaitRead.
 
 readRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
 readRawBufferPtr loc !fd !buf !off !len
+#ifdef js_HOST_ARCH
+  = fmap fromIntegral . uninterruptibleMask_ $
+    throwErrnoIfMinus1 loc (c_read (fdFD fd) (buf `plusPtr` off) len)
+#else
   | isNonBlocking fd = unsafe_read -- unsafe is ok, it can't block
   | otherwise    = do r <- throwErrnoIfMinus1 loc
                                 (unsafe_fdReady (fdFD fd) 0 0 0)
@@ -583,10 +587,19 @@ readRawBufferPtr loc !fd !buf !off !len
     read        = if threaded then safe_read else unsafe_read
     unsafe_read = do_read (c_read (fdFD fd) (buf `plusPtr` off) len)
     safe_read   = do_read (c_safe_read (fdFD fd) (buf `plusPtr` off) len)
+#endif
 
 -- return: -1 indicates EOF, >=0 is bytes read
 readRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
 readRawBufferPtrNoBlock loc !fd !buf !off !len
+#ifdef js_HOST_ARCH
+  = uninterruptibleMask_ $ do
+      r <- throwErrnoIfMinus1 loc (c_read (fdFD fd) (buf `plusPtr` off) len)
+      case r of
+       (-1) -> return 0
+       0    -> return (-1)
+       n    -> return (fromIntegral n)
+#else
   | isNonBlocking fd  = unsafe_read -- unsafe is ok, it can't block
   | otherwise    = do r <- unsafe_fdReady (fdFD fd) 0 0 0
                       if r /= 0 then safe_read
@@ -600,9 +613,14 @@ readRawBufferPtrNoBlock loc !fd !buf !off !len
                        n    -> return (fromIntegral n)
    unsafe_read  = do_read (c_read (fdFD fd) (buf `plusPtr` off) len)
    safe_read    = do_read (c_safe_read (fdFD fd) (buf `plusPtr` off) len)
+#endif
 
 writeRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtr loc !fd !buf !off !len
+#ifdef js_HOST_ARCH
+  = fmap fromIntegral . uninterruptibleMask_ $
+    throwErrnoIfMinus1 loc (c_write (fdFD fd) (buf `plusPtr` off) len)
+#else
   | isNonBlocking fd = unsafe_write -- unsafe is ok, it can't block
   | otherwise   = do r <- unsafe_fdReady (fdFD fd) 1 0 0
                      if r /= 0
@@ -615,9 +633,17 @@ writeRawBufferPtr loc !fd !buf !off !len
     write         = if threaded then safe_write else unsafe_write
     unsafe_write  = do_write (c_write (fdFD fd) (buf `plusPtr` off) len)
     safe_write    = do_write (c_safe_write (fdFD fd) (buf `plusPtr` off) len)
+#endif
 
 writeRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtrNoBlock loc !fd !buf !off !len
+#ifdef js_HOST_ARCH
+  = uninterruptibleMask_ $ do
+      r <- throwErrnoIfMinus1 loc (c_write (fdFD fd) (buf `plusPtr` off) len)
+      case r of
+        (-1) -> return 0
+        n    -> return (fromIntegral n)
+#else
   | isNonBlocking fd = unsafe_write -- unsafe is ok, it can't block
   | otherwise   = do r <- unsafe_fdReady (fdFD fd) 1 0 0
                      if r /= 0 then write
@@ -630,9 +656,14 @@ writeRawBufferPtrNoBlock loc !fd !buf !off !len
     write         = if threaded then safe_write else unsafe_write
     unsafe_write  = do_write (c_write (fdFD fd) (buf `plusPtr` off) len)
     safe_write    = do_write (c_safe_write (fdFD fd) (buf `plusPtr` off) len)
+#endif
 
 isNonBlocking :: FD -> Bool
+#ifdef js_HOST_ARCH
+isNonBlocking _  = True
+#else
 isNonBlocking fd = fdIsNonBlocking fd /= 0
+#endif
 
 foreign import ccall unsafe "fdReady"
   unsafe_fdReady :: CInt -> CBool -> Int64 -> CBool -> IO CInt
@@ -730,7 +761,7 @@ foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 -- -----------------------------------------------------------------------------
 -- utils
 
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && !defined(js_HOST_ARCH)
 throwErrnoIfMinus1RetryOnBlock  :: String -> IO CSsize -> IO CSsize -> IO CSsize
 throwErrnoIfMinus1RetryOnBlock loc f on_block  =
   do
