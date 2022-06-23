@@ -2469,7 +2469,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "ddump-asm-stats"
         (setDumpFlag Opt_D_dump_asm_stats)
   , make_ord_flag defGhcFlag "ddump-llvm"
-        (NoArg $ setObjBackend llvmBackend >> setDumpFlag' Opt_D_dump_llvm)
+        (NoArg $ setDumpFlag' Opt_D_dump_llvm)
   , make_ord_flag defGhcFlag "ddump-c-backend"
         (NoArg $ setDumpFlag' Opt_D_dump_c_backend)
   , make_ord_flag defGhcFlag "ddump-deriv"
