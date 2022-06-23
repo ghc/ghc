@@ -1580,9 +1580,21 @@ genCCall target dest_regs arg_regs bid = do
     -- size we want to pack. Failure to get this right can result in pretty
     -- subtle bugs, e.g. #20137.
 
-    passArguments pack (gpReg:gpRegs) fpRegs ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
+    passArguments pack (gpReg:gpRegs) fpRegs ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
+      platform <- getPlatform
       let w = formatToWidth format
-          mov = MOV (OpReg w gpReg) (OpReg w r)
+          mov
+            -- Specifically, Darwin/AArch64's ABI requires that the caller
+            -- sign-extend arguments which are smaller than 32-bits.
+            | w < W32
+            , platformCConvNeedsExtension platform
+            , SignedHint <- hint
+            = case w of
+                W8  -> SXTB (OpReg W64 gpReg) (OpReg w r)
+                W16 -> SXTH (OpReg W64 gpReg) (OpReg w r)
+                _   -> panic "impossible"
+            | otherwise
+            = MOV (OpReg w gpReg) (OpReg w r)
           accumCode' = accumCode `appOL`
                        code_r `snocOL`
                        ann (text "Pass gp argument: " <> ppr r) mov
