@@ -55,7 +55,8 @@ test('T15155',
   [ unless(have_ncg(), skip)
   ], makefile_test, [])
 
-test('T15155l', [ when(unregisterised(), skip), unless(have_llvm(), skip)],
+test('T15155l',
+     [when(unregisterised(), skip), unless(have_llvm(), skip), only_ways(llvm_ways)],
      makefile_test, [])
 
 test('T16449_1', normal, compile, [''])
