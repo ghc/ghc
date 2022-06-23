@@ -2788,6 +2788,7 @@ rebuildCase env scrut case_bndr alts cont
             Nothing             -> missingAlt env case_bndr alts cont
             Just (Alt _ bs rhs) -> simple_rhs env [] scrut bs rhs }
 
+    -- Case-of-known-constructor: scrutinee is a constructor application
   | Just (in_scope', wfloats, con, ty_args, other_args)
       <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
         -- Works when the scrutinee is a variable with a known unfolding
@@ -2803,8 +2804,16 @@ rebuildCase env scrut case_bndr alts cont
         ; case findAlt (DataAlt con) alts of
             Nothing                   -> missingAlt env0 case_bndr alts cont
             Just (Alt DEFAULT bs rhs) -> simple_rhs env0 scaled_wfloats case_bndr_rhs bs rhs
-            Just (Alt _       bs rhs) -> knownCon env0 scrut scaled_wfloats con ty_args
-                                                  other_args case_bndr bs rhs cont
+            Just (Alt _       bs rhs)
+                -- See Note [Avoiding register pressure due to
+                -- case-of-known-constructor].
+              | Var v <- scrut 
+              , isLocalId v
+              , filter (not . isDeadBinder) bs `lengthAtLeast` 10
+                -> reallyRebuildCase env scrut case_bndr alts cont
+              | otherwise 
+                -> knownCon env0 scrut scaled_wfloats con ty_args
+                            other_args case_bndr bs rhs cont
         }
   where
     simple_rhs env wfloats case_bndr_rhs bs rhs =
@@ -3321,6 +3330,20 @@ and then
         f (h v)
 
 All this should happen in one sweep.
+
+
+Note [Avoiding register pressure due to case-of-known-constructor]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In #17615 we noticed that case-of-known-constructor can produce quite extreme
+register pressure with little benefit. For instance, consider the following
+program scrutinizing a wide product constructor K:
+
+    case x of { K _ _ x3 ... _ _ ->
+       <lots of stuff happens here, binding new_x3>
+         case x of { K x1 x2 x3 ... x99 x100 ->
+           K x1 x2 new_x3 ... x99 x100 } }
+
+The problem here is that the inner case on `x` can be eliminated.
 -}
 
 knownCon :: SimplEnv
