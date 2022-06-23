@@ -101,15 +101,15 @@ commonCabalArgs stage = do
             , arg "--prefix"
             , arg prefix
 
-            -- NB: this is valid only because Hadrian puts the @docs@ and
+            -- NB: this is valid only because Hadrian puts the @doc@ and
             -- @libraries@ folders in the same relative position:
             --
             --   * libraries in @_build/stageN/libraries@
-            --   * docs in @_build/docs/html/libraries@
+            --   * docs in @_build/doc/html/libraries@
             --
-            -- This doesn't hold if we move the @docs@ folder anywhere else.
+            -- This doesn't hold if we move the @doc@ folder anywhere else.
             , arg "--htmldir"
-            , arg $ "${pkgroot}/../../docs/html/libraries/" ++ package_id
+            , arg $ "${pkgroot}/../../doc/html/libraries/" ++ package_id
 
             , withStaged $ Ghc CompileHs
             , withBuilderArgs (Ghc CompileHs stage)

@@ -71,7 +71,7 @@ define patchpackageconf
 # to the doc files.
 	cat '$2' | sed 's|haddock-interfaces.*|haddock-interfaces: "$${pkgroot}/$4/html/libraries/$5/$1.haddock"|' \
 	         | sed 's|haddock-html.*|haddock-html: "$${pkgroot}/$4/html/libraries/$5"|' \
-		 | sed 's|    $${pkgroot}/../../docs/html/.*||' \
+		 | sed 's|    $${pkgroot}/../../doc/html/.*||' \
 	       > '$2.copy'
 # The rts package doesn't actually supply haddocks, so we stop advertising them
 # altogether.
@@ -189,7 +189,7 @@ install_lib: lib/settings
 		cp -R $$i "$(DESTDIR)$(ActualLibsDir)/"; \
 	done
 
-DOCS = $(wildcard ./docs/*)
+DOCS = $(wildcard ./doc/*)
 install_docs:
 	@echo "Copying docs to $(DESTDIR)$(docdir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"

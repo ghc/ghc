@@ -226,8 +226,8 @@ bindistRules = do
         -- version should not be used for directories the build system can
         -- create. Using the Action version caused documentation to not be
         -- included in the bindist in the past (part of the problem in #18669).
-        whenM (liftIO (IO.doesDirectoryExist (root -/- "docs"))) $ do
-          copyDirectory (root -/- "docs") bindistFilesDir
+        whenM (liftIO (IO.doesDirectoryExist (root -/- "doc"))) $ do
+          copyDirectory (root -/- "doc") bindistFilesDir
           copyFile ("libraries" -/- "prologue.txt") (bindistFilesDir -/- "docs-utils" -/- "prologue.txt")
           copyFile ("libraries" -/- "gen_contents_index") (bindistFilesDir -/- "docs-utils" -/- "gen_contents_index" )
 
