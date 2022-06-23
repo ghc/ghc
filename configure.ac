@@ -357,7 +357,8 @@ else
     AC_PATH_PROG([CC],[gcc], [clang])
     AC_PATH_PROG([CXX],[g++], [clang++])
     AC_PATH_PROG([NM],[nm])
-    AC_PATH_PROG([LD],[ld])
+    # N.B. we don't probe for LD here but instead
+    # do so in FIND_LD to avoid #21778.
     AC_PATH_PROG([AR],[ar])
     AC_PATH_PROG([RANLIB],[ranlib])
     AC_PATH_PROG([OBJDUMP],[objdump])
