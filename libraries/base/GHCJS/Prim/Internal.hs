@@ -39,18 +39,18 @@ setCurrentThreadResultValue :: IO JSVal -> IO ()
 setCurrentThreadResultValue x = js_setCurrentThreadResultValue =<< x
 
 foreign import javascript unsafe
-  "h$setCurrentThreadResultWouldBlock();"
+  "(() => { return h$setCurrentThreadResultWouldBlock; })"
   js_setCurrentThreadResultWouldBlock :: IO ()
 
 foreign import javascript unsafe
-  "h$setCurrentThreadResultJSException($1);"
+  "(($1) => { return h$setCurrentThreadResultJSException($1); })"
   js_setCurrentThreadResultJSException :: JSVal -> IO ()
 
 foreign import javascript unsafe
-  "h$setCurrentThreadResultHaskellException($1);"
+  "(($1) => { return h$setCurrentThreadResultHaskellException($1); })"
   js_setCurrentThreadResultHaskellException :: JSVal -> IO ()
 
 foreign import javascript unsafe
-  "h$setCurrentThreadResultValue($1);"
+  "(($1) => { return h$setCurrentThreadResultValue($1); })"
   js_setCurrentThreadResultValue :: JSVal -> IO ()
 
