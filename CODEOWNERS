@@ -59,7 +59,6 @@
 /libraries/libiserv/              @angerman @simonmar
 /utils/iserv-proxy/               @angerman @simonmar
 /utils/iserv/                     @angerman @simonmar
-/utils/gen-dll/                   @Phyx
 /utils/fs/                        @Phyx
 
 [WinIO related code]
