@@ -162,25 +162,25 @@ tryReadShimFile :: Logger -> TmpFs -> DynFlags -> UnitEnv -> FilePath -> IO Shim
 tryReadShimFile logger tmpfs dflags unit_env file = do
   if needsCpp file
   then do
-    infile <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "jsppx"
     -- FIXME (Sylvain 2022-06): we should get profiling from the codegen options
     -- (was GHCJS_PROF CPP define)
     let profiling = False
         use_cpp_and_not_cc_dash_E = False
         extra_opts = []
-    -- append common CPP definitions to the .pp file.
-    B.writeFile infile (commonCppDefs profiling)
-    shim <- parseShim file
+
+    -- load the shim into memory
+    shim   <- parseShim file
+    -- make a temp file for doCpp
+    infile <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "jsppx"
 
     withShim shim $ \payload ->
-        do B.appendFile infile payload
+        do -- preparation: append common CPP definitions to the .pp file.
+           B.writeFile infile $ (commonCppDefs profiling) <> payload
            outfile <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "jspp"
+           -- do the business
            doCpp logger tmpfs dflags unit_env use_cpp_and_not_cc_dash_E extra_opts infile outfile
            B.readFile outfile
   else parseShim file
-
--- readShimsArchive :: DynFlags -> FilePath -> IO B.ByteString
--- readShimsArchive = panic "readShimsArchive: Shims not yet implemented!"
 
 -- | Test if file has ".pp" extension
 --

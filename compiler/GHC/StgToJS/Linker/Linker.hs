@@ -802,13 +802,10 @@ readSystemDeps' file
                                   , d baseUnitId "GHC.Ptr" ["Ptr"]
                                   , d primUnitId "GHC.Types" [":", "[]"]
                                   , d primUnitId "GHC.Tuple" ["(,)", "(,,)", "(,,,)", "(,,,,)", "(,,,,,)","(,,,,,,)", "(,,,,,,,)", "(,,,,,,,,)", "(,,,,,,,,,)"]
-                                  -- FIXME Sylvain (2022,05): no longer valid
-                                  -- integer constructors, and GHCJS prim stuff
-                                  -- that doesn't exist yet
-                                  -- , d bignumUnitId "GHC.Integer.Type" ["S#", "Jp#", "Jn#"]
-                                  -- , d primUnitId "GHC.Types" [ "JSVal" ]
-                                  -- , d baseUnitId "GHCJS.Prim" ["JSException", "$fShowJSException", "$fExceptionJSException", "resolve", "resolveIO", "toIO"]
-                                  -- , d baseUnitId "GHCJS.Prim.Internal" ["wouldBlock", "blockedIndefinitelyOnMVar", "blockedIndefinitelyOnSTM", "ignoreException", "setCurrentThreadResultException", "setCurrentThreadResultValue"]
+                                  , d bignumUnitId "GHC.Integer.Type" ["S#", "Jp#", "Jn#"]
+                                  , d primUnitId "GHC.Types" [ "JSVal" ]
+                                  , d baseUnitId "GHCJS.Prim" ["JSException", "$fShowJSException", "$fExceptionJSException", "resolve", "resolveIO", "toIO"]
+                                  , d baseUnitId "GHCJS.Prim.Internal" ["wouldBlock", "blockedIndefinitelyOnMVar", "blockedIndefinitelyOnSTM", "ignoreException", "setCurrentThreadResultException", "setCurrentThreadResultValue"]
                                   ]
                                   )
   | otherwise = pure (mempty, mempty)
