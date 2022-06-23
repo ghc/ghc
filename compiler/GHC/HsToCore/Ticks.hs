@@ -15,6 +15,7 @@ module GHC.HsToCore.Ticks
   , TickishType (..)
   , addTicksToBinds
   , isGoodSrcSpan'
+  , stripTicksTopHsExpr
   ) where
 
 import GHC.Prelude as Prelude
@@ -205,6 +206,14 @@ shouldTickPatBind density top_lev
       TickExportedFunctions -> False
       TickForCoverage       -> False
       TickCallSites         -> False
+
+-- Strip ticks HsExpr
+
+-- | Strip CoreTicks from an HsExpr
+stripTicksTopHsExpr :: HsExpr GhcTc -> ([CoreTickish], HsExpr GhcTc)
+stripTicksTopHsExpr (XExpr (HsTick t e)) = let (ts, body) = stripTicksTopHsExpr (unLoc e)
+                                            in (t:ts, body)
+stripTicksTopHsExpr e = ([], e)
 
 -- -----------------------------------------------------------------------------
 -- Adding ticks to bindings
