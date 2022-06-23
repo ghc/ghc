@@ -353,7 +353,8 @@ data DataDeclRn = DataDeclRn
              , tcdFVs      :: NameSet }
   deriving Data
 
-type instance XClassDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey, LayoutInfo)  -- See Note [Class LayoutInfo]
+type instance XClassDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey)
+
   -- TODO:AZ:tidy up AnnSortKey above
 type instance XClassDecl    GhcRn = NameSet -- FVs
 type instance XClassDecl    GhcTc = NameSet -- FVs

@@ -3417,17 +3417,17 @@ exactTransStmt an by using GroupForm = do
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (TyClDecl GhcPs) where
-  getAnnotationEntry (FamDecl   { })                      = NoEntryVal
-  getAnnotationEntry (SynDecl   { tcdSExt = an })         = fromAnn an
-  getAnnotationEntry (DataDecl  { tcdDExt = an })         = fromAnn an
-  getAnnotationEntry (ClassDecl { tcdCExt = (an, _, _) }) = fromAnn an
+  getAnnotationEntry (FamDecl   { })                   = NoEntryVal
+  getAnnotationEntry (SynDecl   { tcdSExt = an })      = fromAnn an
+  getAnnotationEntry (DataDecl  { tcdDExt = an })      = fromAnn an
+  getAnnotationEntry (ClassDecl { tcdCExt = (an, _) }) = fromAnn an
 
   setAnnotationAnchor a@FamDecl{}     _ _s = a
   setAnnotationAnchor x@SynDecl{}   anc cs = x { tcdSExt = setAnchorEpa (tcdSExt x) anc cs }
   setAnnotationAnchor x@DataDecl{}  anc cs = x { tcdDExt = setAnchorEpa (tcdDExt x) anc cs }
-  setAnnotationAnchor x@ClassDecl{} anc cs = x { tcdCExt = (setAnchorEpa an anc cs, a, b) }
+  setAnnotationAnchor x@ClassDecl{} anc cs = x { tcdCExt = (setAnchorEpa an anc cs, a) }
     where
-      (an,a,b) = tcdCExt x
+      (an,a) = tcdCExt x
 
   exact (FamDecl a decl) = do
     decl' <- markAnnotated decl
@@ -3459,7 +3459,8 @@ instance ExactPrint (TyClDecl GhcPs) where
 
   -- -----------------------------------
 
-  exact (ClassDecl {tcdCExt = (an, sortKey, lo),
+  exact (ClassDecl {tcdCExt = (an, sortKey),
+                    tcdLayout = lo,
                     tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
@@ -3472,7 +3473,8 @@ instance ExactPrint (TyClDecl GhcPs) where
           (an0, fds', lclas', tyvars',context') <- top_matter
           an1 <- markEpAnnL an0 lidl AnnOpenC
           an2 <- markEpAnnL an1 lidl AnnCloseC
-          return (ClassDecl {tcdCExt = (an2, sortKey, lo),
+          return (ClassDecl {tcdCExt = (an2, sortKey),
+                             tcdLayout = lo,
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
@@ -3498,7 +3500,8 @@ instance ExactPrint (TyClDecl GhcPs) where
             methods' = listToBag $ undynamic ds
             ats'     = undynamic ds
             at_defs' = undynamic ds
-          return (ClassDecl {tcdCExt = (an3, sortKey, lo),
+          return (ClassDecl {tcdCExt = (an3, sortKey),
+                             tcdLayout = lo,
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',

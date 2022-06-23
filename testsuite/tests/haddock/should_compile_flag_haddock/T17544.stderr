@@ -49,7 +49,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (Anchor
          { T17544.hs:(5,1)-(6,16) }
@@ -58,9 +58,9 @@
         ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:5:12-16 }))]
         (EpaComments
          []))
-       (NoAnnSortKey)
-       (VirtualBraces
-        (3)))
+       (NoAnnSortKey))
+      (VirtualBraces
+       (3))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:5:7-8 })
@@ -186,7 +186,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (Anchor
          { T17544.hs:(9,1)-(10,16) }
@@ -195,9 +195,9 @@
         ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:9:12-16 }))]
         (EpaComments
          []))
-       (NoAnnSortKey)
-       (VirtualBraces
-        (3)))
+       (NoAnnSortKey))
+      (VirtualBraces
+       (3))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:9:7-8 })
@@ -321,7 +321,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (Anchor
          { T17544.hs:(13,1)-(14,16) }
@@ -330,9 +330,9 @@
         ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:13:12-16 }))]
         (EpaComments
          []))
-       (NoAnnSortKey)
-       (VirtualBraces
-        (3)))
+       (NoAnnSortKey))
+      (VirtualBraces
+       (3))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:13:7-8 })
@@ -459,7 +459,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (Anchor
          { T17544.hs:(17,1)-(20,16) }
@@ -468,9 +468,9 @@
         ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:17:12-16 }))]
         (EpaComments
          []))
-       (NoAnnSortKey)
-       (VirtualBraces
-        (3)))
+       (NoAnnSortKey))
+      (VirtualBraces
+       (3))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:17:7-8 })
@@ -648,7 +648,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (Anchor
          { T17544.hs:22:1-30 }
@@ -659,8 +659,16 @@
         ,(AddEpAnn AnnCloseC (EpaSpan { T17544.hs:22:30 }))]
         (EpaComments
          []))
-       (NoAnnSortKey)
-       (ExplicitBraces))
+       (NoAnnSortKey))
+      (ExplicitBraces
+       (L
+        (TokenLoc
+         (EpaSpan { T17544.hs:22:18 }))
+        (HsTok))
+       (L
+        (TokenLoc
+         (EpaSpan { T17544.hs:22:30 }))
+        (HsTok)))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:22:7-8 })
@@ -917,7 +925,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (Anchor
          { T17544.hs:28:1-30 }
@@ -928,8 +936,16 @@
         ,(AddEpAnn AnnCloseC (EpaSpan { T17544.hs:28:30 }))]
         (EpaComments
          []))
-       (NoAnnSortKey)
-       (ExplicitBraces))
+       (NoAnnSortKey))
+      (ExplicitBraces
+       (L
+        (TokenLoc
+         (EpaSpan { T17544.hs:28:18 }))
+        (HsTok))
+       (L
+        (TokenLoc
+         (EpaSpan { T17544.hs:28:30 }))
+        (HsTok)))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:28:7-8 })
@@ -1186,7 +1202,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (Anchor
          { T17544.hs:34:1-30 }
@@ -1197,8 +1213,16 @@
         ,(AddEpAnn AnnCloseC (EpaSpan { T17544.hs:34:30 }))]
         (EpaComments
          []))
-       (NoAnnSortKey)
-       (ExplicitBraces))
+       (NoAnnSortKey))
+      (ExplicitBraces
+       (L
+        (TokenLoc
+         (EpaSpan { T17544.hs:34:18 }))
+        (HsTok))
+       (L
+        (TokenLoc
+         (EpaSpan { T17544.hs:34:30 }))
+        (HsTok)))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:34:7-8 })
@@ -1455,7 +1479,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (Anchor
          { T17544.hs:40:1-30 }
@@ -1466,8 +1490,16 @@
         ,(AddEpAnn AnnCloseC (EpaSpan { T17544.hs:40:30 }))]
         (EpaComments
          []))
-       (NoAnnSortKey)
-       (ExplicitBraces))
+       (NoAnnSortKey))
+      (ExplicitBraces
+       (L
+        (TokenLoc
+         (EpaSpan { T17544.hs:40:18 }))
+        (HsTok))
+       (L
+        (TokenLoc
+         (EpaSpan { T17544.hs:40:30 }))
+        (HsTok)))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:40:7-8 })
@@ -1724,7 +1756,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (Anchor
          { T17544.hs:46:1-30 }
@@ -1735,8 +1767,16 @@
         ,(AddEpAnn AnnCloseC (EpaSpan { T17544.hs:46:30 }))]
         (EpaComments
          []))
-       (NoAnnSortKey)
-       (ExplicitBraces))
+       (NoAnnSortKey))
+      (ExplicitBraces
+       (L
+        (TokenLoc
+         (EpaSpan { T17544.hs:46:18 }))
+        (HsTok))
+       (L
+        (TokenLoc
+         (EpaSpan { T17544.hs:46:30 }))
+        (HsTok)))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:46:7-8 })
@@ -1993,7 +2033,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (Anchor
          { T17544.hs:52:1-32 }
@@ -2004,8 +2044,16 @@
         ,(AddEpAnn AnnCloseC (EpaSpan { T17544.hs:52:32 }))]
         (EpaComments
          []))
-       (NoAnnSortKey)
-       (ExplicitBraces))
+       (NoAnnSortKey))
+      (ExplicitBraces
+       (L
+        (TokenLoc
+         (EpaSpan { T17544.hs:52:19 }))
+        (HsTok))
+       (L
+        (TokenLoc
+         (EpaSpan { T17544.hs:52:32 }))
+        (HsTok)))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:52:7-9 })

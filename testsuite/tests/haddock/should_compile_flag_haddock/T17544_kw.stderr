@@ -269,7 +269,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (Anchor
          { T17544_kw.hs:(21,1)-(24,18) }
@@ -278,9 +278,9 @@
         ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:23:3-7 }))]
         (EpaComments
          []))
-       (NoAnnSortKey)
-       (VirtualBraces
-        (5)))
+       (NoAnnSortKey))
+      (VirtualBraces
+       (5))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:21:7-9 })

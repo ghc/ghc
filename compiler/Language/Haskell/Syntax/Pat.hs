@@ -36,6 +36,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr (SyntaxExpr, LHsExpr, HsUntyp
 -- friends:
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Lit
+import Language.Haskell.Syntax.Concrete
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 

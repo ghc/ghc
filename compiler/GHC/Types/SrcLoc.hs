@@ -16,6 +16,7 @@ module GHC.Types.SrcLoc (
 
         -- ** Constructing SrcLoc
         mkSrcLoc, mkRealSrcLoc, mkGeneralSrcLoc,
+        leftmostColumn,
 
         noSrcLoc,               -- "I'm sorry, I haven't a clue"
         generatedSrcLoc,        -- Code generated within the compiler
@@ -104,11 +105,6 @@ module GHC.Types.SrcLoc (
         mkSrcSpanPs,
         combineRealSrcSpans,
         psLocatedToLocated,
-
-        -- * Layout information
-        LayoutInfo(..),
-        leftmostColumn
-
     ) where
 
 import GHC.Prelude
@@ -240,6 +236,10 @@ mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col) Strict.Nothing
 
 mkRealSrcLoc :: FastString -> Int -> Int -> RealSrcLoc
 mkRealSrcLoc x line col = SrcLoc (LexicalFastString x) line col
+
+-- | Indentation level is 1-indexed, so the leftmost column is 1.
+leftmostColumn :: Int
+leftmostColumn = 1
 
 getBufPos :: SrcLoc -> Strict.Maybe BufPos
 getBufPos (RealSrcLoc _ mbpos) = mbpos
@@ -886,33 +886,3 @@ psSpanEnd (PsSpan r b) = PsLoc (realSrcSpanEnd r) (bufSpanEnd b)
 
 mkSrcSpanPs :: PsSpan -> SrcSpan
 mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Strict.Just b)
-
--- | Layout information for declarations.
-data LayoutInfo =
-
-    -- | Explicit braces written by the user.
-    --
-    -- @
-    -- class C a where { foo :: a; bar :: a }
-    -- @
-    ExplicitBraces
-  |
-    -- | Virtual braces inserted by the layout algorithm.
-    --
-    -- @
-    -- class C a where
-    --   foo :: a
-    --   bar :: a
-    -- @
-    VirtualBraces
-      !Int -- ^ Layout column (indentation level, begins at 1)
-  |
-    -- | Empty or compiler-generated blocks do not have layout information
-    -- associated with them.
-    NoLayoutInfo
-
-  deriving (Eq, Ord, Show, Data)
-
--- | Indentation level is 1-indexed, so the leftmost column is 1.
-leftmostColumn :: Int
-leftmostColumn = 1

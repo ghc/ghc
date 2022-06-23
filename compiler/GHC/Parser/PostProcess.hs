@@ -193,7 +193,7 @@ mkClassDecl :: SrcSpan
             -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
             -> Located (a,[LHsFunDep GhcPs])
             -> OrdList (LHsDecl GhcPs)
-            -> LayoutInfo
+            -> LayoutInfo GhcPs
             -> [AddEpAnn]
             -> P (LTyClDecl GhcPs)
 
@@ -204,7 +204,8 @@ mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layoutInfo annsIn
        ; tyvars <- checkTyVars (text "class") whereDots cls tparams
        ; cs <- getCommentsFor (locA loc) -- Get any remaining comments
        ; let anns' = addAnns (EpAnn (spanAsAnchor $ locA loc) annsIn emptyComments) ann cs
-       ; return (L loc (ClassDecl { tcdCExt = (anns', NoAnnSortKey, layoutInfo)
+       ; return (L loc (ClassDecl { tcdCExt = (anns', NoAnnSortKey)
+                                  , tcdLayout = layoutInfo
                                   , tcdCtxt = mcxt
                                   , tcdLName = cls, tcdTyVars = tyvars
                                   , tcdFixity = fixity

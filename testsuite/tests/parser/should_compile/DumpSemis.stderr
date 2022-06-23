@@ -1048,7 +1048,7 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,,)
+      ((,)
        (EpAnn
         (Anchor
          { DumpSemis.hs:(28,1)-(29,23) }
@@ -1057,9 +1057,9 @@
         ,(AddEpAnn AnnWhere (EpaSpan { DumpSemis.hs:28:40-44 }))]
         (EpaComments
          []))
-       (NoAnnSortKey)
-       (VirtualBraces
-        (3)))
+       (NoAnnSortKey))
+      (VirtualBraces
+       (3))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:28:7-19 })
@@ -2112,3 +2112,5 @@
                         (NoExtField)))))]))))))]
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
+
+

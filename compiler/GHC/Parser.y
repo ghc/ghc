@@ -925,17 +925,17 @@ maybemodwarning :: { Maybe (LocatedP (WarningTxt GhcPs)) }
 
 body    :: { (AnnList
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])
-             ,LayoutInfo) }
+             ,LayoutInfo GhcPs) }
         :  '{'            top '}'      { (AnnList Nothing (Just $ moc $1) (Just $ mcc $3) [] (fst $2)
-                                         , snd $2, ExplicitBraces) }
+                                         , snd $2, explicitBraces $1 $3) }
         |      vocurly    top close    { (AnnList Nothing Nothing Nothing [] (fst $2)
                                          , snd $2, VirtualBraces (getVOCURLY $1)) }
 
 body2   :: { (AnnList
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])
-             ,LayoutInfo) }
+             ,LayoutInfo GhcPs) }
         :  '{' top '}'                          { (AnnList Nothing (Just $ moc $1) (Just $ mcc $3) [] (fst $2)
-                                                  , snd $2, ExplicitBraces) }
+                                                  , snd $2, explicitBraces $1 $3) }
         |  missing_module_keyword top close     { (AnnList Nothing Nothing Nothing [] [], snd $2, VirtualBraces leftmostColumn) }
 
 
@@ -1712,9 +1712,9 @@ decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
 decllist_cls
         :: { Located ([AddEpAnn]
                      , OrdList (LHsDecl GhcPs)
-                     , LayoutInfo) }      -- Reversed
+                     , LayoutInfo GhcPs) }      -- Reversed
         : '{'         decls_cls '}'     { sLL $1 $> (moc $1:mcc $3:(fst $ unLoc $2)
-                                             ,snd $ unLoc $2, ExplicitBraces) }
+                                             ,snd $ unLoc $2, explicitBraces $1 $3) }
         |     vocurly decls_cls close   { let { L l (anns, decls) = $2 }
                                            in L l (anns, decls, VirtualBraces (getVOCURLY $1)) }
 
@@ -1722,7 +1722,7 @@ decllist_cls
 --
 where_cls :: { Located ([AddEpAnn]
                        ,(OrdList (LHsDecl GhcPs))    -- Reversed
-                       ,LayoutInfo) }
+                       ,LayoutInfo GhcPs) }
                                 -- No implicit parameters
                                 -- May have type declarations
         : 'where' decllist_cls          { sLL $1 $> (mj AnnWhere $1:(fstOf3 $ unLoc $2)
@@ -4408,6 +4408,9 @@ hsUniTok :: Located Token -> LHsUniToken tok utok GhcPs
 hsUniTok t@(L l _) =
   L (mkTokenLocation l)
     (if isUnicode t then HsUnicodeTok else HsNormalTok)
+
+explicitBraces :: Located Token -> Located Token -> LayoutInfo GhcPs
+explicitBraces t1 t2 = ExplicitBraces (hsTok t1) (hsTok t2)
 
 -- -------------------------------------
 

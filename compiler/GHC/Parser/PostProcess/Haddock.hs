@@ -340,7 +340,7 @@ In this case, we should produce four HsDecl items (pseudo-code):
 
 The inputs to addHaddockInterleaveItems are:
 
-  * layout_info :: LayoutInfo
+  * layout_info :: LayoutInfo GhcPs
 
     In the example above, note that the indentation level inside the module is
     2 spaces. It would be represented as layout_info = VirtualBraces 2.
@@ -372,7 +372,7 @@ The inputs to addHaddockInterleaveItems are:
 addHaddockInterleaveItems
   :: forall a.
      HasHaddock a
-  => LayoutInfo
+  => LayoutInfo GhcPs
   -> (PsLocated HdkComment -> Maybe a) -- Get a documentation item
   -> [a]           -- Unprocessed (non-documentation) items
   -> HdkA [a]      -- Documentation items & processed non-documentation items
@@ -389,7 +389,7 @@ addHaddockInterleaveItems layout_info get_doc_item = go
     with_layout_info :: HdkA a -> HdkA a
     with_layout_info = case layout_info of
       NoLayoutInfo -> id
-      ExplicitBraces -> id
+      ExplicitBraces{} -> id
       VirtualBraces n ->
         let loc_range = mempty { loc_range_col = ColumnFrom (n+1) }
         in hoistHdkA (inLocRange loc_range)
@@ -498,7 +498,7 @@ instance HasHaddock (HsDecl GhcPs) where
   --      -- ^ Comment on the second method
   --
   addHaddock (TyClD _ decl)
-    | ClassDecl { tcdCExt = (x, NoAnnSortKey, tcdLayout),
+    | ClassDecl { tcdCExt = (x, NoAnnSortKey), tcdLayout,
                   tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs,
                   tcdSigs, tcdMeths, tcdATs, tcdATDefs } <- decl
     = do
@@ -509,7 +509,7 @@ instance HasHaddock (HsDecl GhcPs) where
           flattenBindsAndSigs (tcdMeths, tcdSigs, tcdATs, tcdATDefs, [], [])
         pure $
           let (tcdMeths', tcdSigs', tcdATs', tcdATDefs', _, tcdDocs) = partitionBindsAndSigs where_cls'
-              decl' = ClassDecl { tcdCExt = (x, NoAnnSortKey, tcdLayout)
+              decl' = ClassDecl { tcdCExt = (x, NoAnnSortKey), tcdLayout
                                 , tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs
                                 , tcdSigs = tcdSigs'
                                 , tcdMeths = tcdMeths'
@@ -1309,10 +1309,10 @@ reportExtraDocs =
 *                                                                      *
 ********************************************************************* -}
 
-mkDocHsDecl :: LayoutInfo -> PsLocated HdkComment -> Maybe (LHsDecl GhcPs)
+mkDocHsDecl :: LayoutInfo GhcPs -> PsLocated HdkComment -> Maybe (LHsDecl GhcPs)
 mkDocHsDecl layout_info a = fmap (DocD noExtField) <$> mkDocDecl layout_info a
 
-mkDocDecl :: LayoutInfo -> PsLocated HdkComment -> Maybe (LDocDecl GhcPs)
+mkDocDecl :: LayoutInfo GhcPs -> PsLocated HdkComment -> Maybe (LDocDecl GhcPs)
 mkDocDecl layout_info (L l_comment hdk_comment)
   | indent_mismatch = Nothing
   | otherwise =
@@ -1346,7 +1346,7 @@ mkDocDecl layout_info (L l_comment hdk_comment)
     --         -- ^ indent mismatch
     indent_mismatch = case layout_info of
       NoLayoutInfo -> False
-      ExplicitBraces -> False
+      ExplicitBraces{} -> False
       VirtualBraces n -> n /= srcSpanStartCol (psRealSpan l_comment)
 
 mkDocIE :: PsLocated HdkComment -> Maybe (LIE GhcPs)

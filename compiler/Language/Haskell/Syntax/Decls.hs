@@ -97,8 +97,9 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
         -- Because Expr imports Decls via HsBracket
 
 import Language.Haskell.Syntax.Binds
-import Language.Haskell.Syntax.Type
+import Language.Haskell.Syntax.Concrete
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Basic (Role)
 
 import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName, Activation)
@@ -457,6 +458,8 @@ data TyClDecl pass
     --                          'GHC.Parser.Annotation.AnnRarrow'
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
+                tcdLayout  :: !(LayoutInfo pass),      -- ^ Explicit or virtual braces
+                              -- See Note [Class LayoutInfo]
                 tcdCtxt    :: Maybe (LHsContext pass), -- ^ Context...
                 tcdLName   :: LIdP pass,               -- ^ Name of the class
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables

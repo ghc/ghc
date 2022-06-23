@@ -5,7 +5,6 @@
 {-# LANGUAGE DeriveDataTypeable      #-}
 {-# LANGUAGE EmptyCase               #-}
 {-# LANGUAGE EmptyDataDeriving       #-}
-{-# LANGUAGE StandaloneDeriving      #-}
 {-# LANGUAGE FlexibleContexts        #-}
 {-# LANGUAGE FlexibleInstances       #-}
 {-# LANGUAGE GADTs                   #-}
@@ -21,8 +20,6 @@ module Language.Haskell.Syntax.Extension where
 
 -- This module captures the type families to precisely identify the extension
 -- points for GHC.Hs syntax
-
-import GHC.TypeLits (Symbol, KnownSymbol)
 
 #if MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
 import Data.Type.Equality (type (~))
@@ -731,27 +728,3 @@ type family NoGhcTc (p :: Type)
 -- =====================================================================
 -- End of Type family definitions
 -- =====================================================================
-
-
-
--- =====================================================================
--- Token information
-
-type LHsToken tok p = XRec p (HsToken tok)
-
-data HsToken (tok :: Symbol) = HsTok
-
-deriving instance KnownSymbol tok => Data (HsToken tok)
-
-type LHsUniToken tok utok p = XRec p (HsUniToken tok utok)
-
--- With UnicodeSyntax, there might be multiple ways to write the same token.
--- For example an arrow could be either "->" or "→". This choice must be
--- recorded in order to exactprint such tokens,
--- so instead of HsToken "->" we introduce HsUniToken "->" "→".
---
--- See also IsUnicodeSyntax in GHC.Parser.Annotation; we do not use here to
--- avoid a dependency.
-data HsUniToken (tok :: Symbol) (utok :: Symbol) = HsNormalTok | HsUnicodeTok
-
-deriving instance (KnownSymbol tok, KnownSymbol utok) => Data (HsUniToken tok utok)

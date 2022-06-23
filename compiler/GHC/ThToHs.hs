@@ -328,7 +328,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
                      <+> text "are not allowed:")
                    $$ (Outputable.ppr adts'))
         ; returnJustLA $ TyClD noExtField $
-          ClassDecl { tcdCExt = (noAnn, NoAnnSortKey, NoLayoutInfo)
+          ClassDecl { tcdCExt = (noAnn, NoAnnSortKey), tcdLayout = NoLayoutInfo
                     , tcdCtxt = mkHsContextMaybe cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFixity = Prefix
                     , tcdFDs = fds', tcdSigs = Hs.mkClassOpSigs sigs'

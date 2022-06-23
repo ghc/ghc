@@ -1050,6 +1050,8 @@
        (ClassDecl
         {NameSet:
          []}
+        (VirtualBraces
+         (3))
         (Nothing)
         (L
          (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:27:7 })

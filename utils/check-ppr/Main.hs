@@ -110,7 +110,7 @@ eraseLayoutInfo = everywhere go
   where
     go :: forall a. Typeable a => a -> a
     go x =
-      case eqT @a @LayoutInfo of
+      case eqT @a @(LayoutInfo GhcPs) of
         Nothing -> x
         Just Refl -> NoLayoutInfo
 

@@ -57,6 +57,7 @@ module Language.Haskell.Syntax.Type (
 
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 
+import Language.Haskell.Syntax.Concrete
 import Language.Haskell.Syntax.Extension
 
 import GHC.Types.Name.Reader ( RdrName )

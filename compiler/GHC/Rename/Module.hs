@@ -1839,7 +1839,8 @@ rnTyClDecl (DataDecl
                           , tcdDataDefn = defn'
                           , tcdDExt     = rn_info }, fvs) } }
 
-rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
+rnTyClDecl (ClassDecl { tcdLayout = layout,
+                        tcdCtxt = context, tcdLName = lcls,
                         tcdTyVars = tyvars, tcdFixity = fixity,
                         tcdFDs = fds, tcdSigs = sigs,
                         tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
@@ -1893,7 +1894,8 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
 
         ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
         ; docs' <- traverse rnLDocDecl docs
-        ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
+        ; return (ClassDecl { tcdLayout = rnLayoutInfo layout,
+                              tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds', tcdSigs = sigs',
                               tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
@@ -1901,6 +1903,11 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                   all_fvs ) }
   where
     cls_doc  = ClassDeclCtx lcls
+
+rnLayoutInfo :: LayoutInfo GhcPs -> LayoutInfo GhcRn
+rnLayoutInfo (ExplicitBraces ob cb) = ExplicitBraces ob cb
+rnLayoutInfo (VirtualBraces n) = VirtualBraces n
+rnLayoutInfo NoLayoutInfo = NoLayoutInfo
 
 -- Does the data type declaration include a CUSK?
 data_decl_has_cusk :: LHsQTyVars (GhcPass p) -> NewOrData -> Bool -> Maybe (LHsKind (GhcPass p')) -> RnM Bool

@@ -26,6 +26,7 @@ import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Lit
+import Language.Haskell.Syntax.Concrete
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
