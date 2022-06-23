@@ -26,13 +26,13 @@ import qualified Data.Set    as Set
 import qualified Text.Parsec as Parsec
 
 docRoot :: FilePath
-docRoot = "docs"
+docRoot = "doc"
 
 htmlRoot :: FilePath
 htmlRoot = docRoot -/- "html"
 
 pdfRoot :: FilePath
-pdfRoot = docRoot -/- "pdfs"
+pdfRoot = docRoot
 
 infoRoot :: FilePath
 infoRoot = docRoot -/- "info"

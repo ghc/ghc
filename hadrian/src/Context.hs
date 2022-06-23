@@ -89,7 +89,7 @@ pkgHaddockFile :: Context -> Action FilePath
 pkgHaddockFile Context {..} = do
     root <- buildRoot
     version <- pkgIdentifier package
-    return $ root -/- "docs/html/libraries" -/- version -/- pkgName package <.> "haddock"
+    return $ root -/- "doc/html/libraries" -/- version -/- pkgName package <.> "haddock"
 
 -- | Path to the registered ghc-pkg library file of a given 'Context', e.g.:
 -- @_build/stage1/lib/x86_64-linux-ghc-8.9.0/libHSarray-0.5.1.0-ghc8.9.0.so@
