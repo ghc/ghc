@@ -52,7 +52,7 @@ T15155:
 # Same as above, but in LLVM. Check that the static indirection b is compiled to
 # an alias.
 T15155l:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -ddump-llvm T15155l.hs 2>/dev/null | \
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -fllvm -ddump-llvm T15155l.hs 2>/dev/null | \
 		grep -F "@T15155_b_closure = alias i8, i8* @T15155_a_closure"
 
 # Without -fcatch-bottoms `f` is non-CAFFY. With -fcatch-bottoms it becomes
