@@ -1,5 +1,6 @@
 
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -66,6 +67,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Core.PatSyn
 import Control.Monad
+import GHC.HsToCore.Ticks (stripTicksTopHsExpr)
 
 {-
 ************************************************************************
@@ -280,14 +282,18 @@ dsExpr e@(XExpr ext_expr_tc)
             mkBinaryTickBox ixT ixF e2
           }
 
+-- Strip ticks due to #21701, need to be invariant about warnings we produce whether
+-- this is enabled or not.
 dsExpr (NegApp _ (L loc
-                    (HsOverLit _ lit@(OverLit { ol_val = HsIntegral i})))
-                neg_expr)
+                    (stripTicksTopHsExpr -> (ts, (HsOverLit _ lit@(OverLit { ol_val = HsIntegral i})))))
+              neg_expr)
   = do { expr' <- putSrcSpanDsA loc $ do
           { warnAboutOverflowedOverLit
+                -- See Note [Checking "negative literals"]
               (lit { ol_val = HsIntegral (negateIntegralLit i) })
           ; dsOverLit lit }
-       ; dsSyntaxExpr neg_expr [expr'] }
+       ;
+       ; dsSyntaxExpr neg_expr [mkTicks ts expr'] }
 
 dsExpr (NegApp _ expr neg_expr)
   = do { expr' <- dsLExpr expr
@@ -307,6 +313,27 @@ dsExpr e@(HsApp _ fun arg)
 dsExpr e@(HsAppType {}) = dsHsWrapped e
 
 {-
+Note [Checking "negative literals"]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As observed in #13257 it's desirable to warn about overflowing negative literals
+in some situations where the user thinks they are writing a negative literal (ie -1)
+but without `-XNegativeLiterals` enabled.
+
+This catches cases such as (-1 :: Word8) which overflow, because (negate 1 == 255) but
+which we desugar to `negate (fromIntegral 1)`.
+
+Notice it's crucial we still desugar to the correct (negate (fromIntegral ...)) despite
+performing the negation in order to check whether the application of negate will overflow.
+For a user written Integer instance we can't predict the interation of negate and fromIntegral.
+
+Also note that this works for detecting the right result for `-128 :: Int8`.. which is
+in-range for Int8 but the correct result is achieved via two overflows.
+
+negate (fromIntegral 128 :: Int8)
+= negate (-128 :: Int8)
+= -128 :: Int8
+
 Note [Desugaring vars]
 ~~~~~~~~~~~~~~~~~~~~~~
 In one situation we can get a *coercion* variable in a HsVar, namely
