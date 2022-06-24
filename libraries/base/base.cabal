@@ -461,7 +461,7 @@ Library
     if os(freebsd)
         cc-options: -DLIBICONV_PLUG
 
-    if os(ghcjs)
+    if arch(js)
         exposed-modules:
             -- FIXME: Luite (2022,05): remove GHCJS name
             GHCJS.Prim
