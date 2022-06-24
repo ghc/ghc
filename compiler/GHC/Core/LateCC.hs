@@ -21,22 +21,17 @@ import GHC.Types.Var
 import GHC.Unit.Types
 import GHC.Data.FastString
 import GHC.Core
-import GHC.Plugins.Monad
 import GHC.Types.Id
 import GHC.Core.Utils (mkTick)
 
-addLateCostCentres :: ModGuts -> CoreM ModGuts
-addLateCostCentres guts = do
-  dflags <- getDynFlags
-  let env :: Env
-      env = Env
-        { thisModule = mg_module guts
-        , ccState = newCostCentreState
-        , dflags = dflags
-        }
-  let guts' = guts { mg_binds = doCoreProgram env (mg_binds guts)
-                   }
-  return guts'
+addLateCostCentres :: DynFlags -> ModGuts -> ModGuts
+addLateCostCentres dflags guts = let
+  env = Env
+    { thisModule = mg_module guts
+    , ccState = newCostCentreState
+    , dflags = dflags
+    }
+  in guts { mg_binds = doCoreProgram env (mg_binds guts) }
 
 doCoreProgram :: Env -> CoreProgram -> CoreProgram
 doCoreProgram env binds = flip evalState newCostCentreState $ do
