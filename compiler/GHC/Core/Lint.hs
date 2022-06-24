@@ -12,6 +12,7 @@ See Note [Core Lint guarantee].
 -}
 
 module GHC.Core.Lint (
+    LintAnnotationsConfig (..),
     LintPassResultConfig (..),
     LintFlags (..),
     StaticPtrCheck (..),
@@ -55,8 +56,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.Unify
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Opt.Arity    ( typeArity )
-
-import GHC.Plugins.Monad
+import GHC.Core.Opt.Stats ( SimplCount )
 
 import GHC.Types.Literal
 import GHC.Types.Var as Var
@@ -3426,44 +3426,48 @@ dupExtVars vars
 ************************************************************************
 -}
 
+data LintAnnotationsConfig = LintAnnotationsConfig
+  { la_doAnnotationLinting :: !Bool
+  , la_passName :: !SDoc
+  , la_sourceLoc :: !SrcSpan
+  , la_debugLevel :: !Int
+  , la_printUnqual :: !PrintUnqualified
+  }
+
 -- | This checks whether a pass correctly looks through debug
 -- annotations (@SourceNote@). This works a bit different from other
 -- consistency checks: We check this by running the given task twice,
 -- noting all differences between the results.
-lintAnnots :: SDoc -> (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
-lintAnnots pname pass guts = {-# SCC "lintAnnots" #-} do
+lintAnnots :: Logger -> LintAnnotationsConfig -> (Int -> ModGuts -> IO (ModGuts, SimplCount)) -> ModGuts -> IO (ModGuts, SimplCount)
+lintAnnots logger cfg pass guts = {-# SCC "lintAnnots" #-} do
   -- Run the pass as we normally would
-  dflags <- getDynFlags
-  logger <- getLogger
-  when (gopt Opt_DoAnnotationLinting dflags) $
-    liftIO $ Err.showPass logger "Annotation linting - first run"
-  nguts <- pass guts
+  when (la_doAnnotationLinting cfg) $
+    Err.showPass logger "Annotation linting - first run"
+  res@(nguts, _) <- pass (la_debugLevel cfg) guts
   -- If appropriate re-run it without debug annotations to make sure
   -- that they made no difference.
-  when (gopt Opt_DoAnnotationLinting dflags) $ do
-    liftIO $ Err.showPass logger "Annotation linting - second run"
+  when (la_doAnnotationLinting cfg) $ do
+    Err.showPass logger "Annotation linting - second run"
     nguts' <- withoutAnnots pass guts
     -- Finally compare the resulting bindings
-    liftIO $ Err.showPass logger "Annotation linting - comparison"
+    Err.showPass logger "Annotation linting - comparison"
     let binds = flattenBinds $ mg_binds nguts
         binds' = flattenBinds $ mg_binds nguts'
         (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'
-    when (not (null diffs)) $ GHC.Plugins.Monad.putMsg $ vcat
-      [ lint_banner "warning" pname
+        sty = mkUserStyle (la_printUnqual cfg) AllTheWay
+    when (not (null diffs)) $ logMsg logger MCInfo (la_sourceLoc cfg) $ withPprStyle sty $ vcat
+      [ lint_banner "warning" (la_passName cfg)
       , text "Core changes with annotations:"
       , withPprStyle defaultDumpStyle $ nest 2 $ vcat diffs
       ]
-  -- Return actual new guts
-  return nguts
+  -- Return actual new guts along with the of the ticks counted
+  return res
 
 -- | Run the given pass without annotations. This means that we both
 -- set the debugLevel setting to 0 in the environment as well as all
 -- annotations from incoming modules.
-withoutAnnots :: (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
+withoutAnnots :: (Int -> ModGuts -> IO (ModGuts, SimplCount)) -> ModGuts -> IO ModGuts
 withoutAnnots pass guts = do
-  -- Remove debug flag from environment.
-  -- TODO: supply tag here as well ?
-  let withoutFlag = mapDynFlagsCoreM $ \(!dflags) -> dflags { debugLevel = 0 }
   -- Nuke existing ticks in module.
   -- TODO: Ticks in unfoldings. Maybe change unfolding so it removes
   -- them in absence of debugLevel > 0.
@@ -3474,6 +3478,6 @@ withoutAnnots pass guts = do
         NonRec b e -> NonRec b $ nukeTicks e
       nukeAnnotsMod mg@ModGuts{mg_binds=binds}
         = mg{mg_binds = map nukeAnnotsBind binds}
-  -- Perform pass with all changes applied. Drop the simple count so it doesn't
-  -- effect the total also
-  dropSimplCount $ withoutFlag $ pass (nukeAnnotsMod guts)
+  -- Perform pass with all changes applied and without debugging.
+  -- TODO: supply tag here as well ?
+  fst <$> pass 0 (nukeAnnotsMod guts)
