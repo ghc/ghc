@@ -1,8 +1,8 @@
 module GHC.Driver.Config.Core.Lint
   ( endPass
-  , endPassHscEnvIO
   , lintCoreBindings
   , initEndPassConfig
+  , initLintAnnotationsConfig
   , initLintPassResultConfig
   , initLintConfig
   ) where
@@ -34,17 +34,8 @@ be, and it makes a convenient place for them.  They print out stuff
 before and after core passes, and do Core Lint when necessary.
 -}
 
-endPass :: CoreToDo -> CoreProgram -> [CoreRule] -> CoreM ()
-endPass pass binds rules
-  = do { hsc_env <- getHscEnv
-       ; print_unqual <- getPrintUnqualified
-       ; liftIO $ endPassHscEnvIO hsc_env
-           print_unqual pass binds rules
-       }
-
-endPassHscEnvIO :: HscEnv -> PrintUnqualified
-          -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
-endPassHscEnvIO hsc_env print_unqual pass binds rules
+endPass :: HscEnv -> PrintUnqualified -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
+endPass hsc_env print_unqual pass binds rules
   = do { let dflags  = hsc_dflags hsc_env
        ; endPassIO
            (hsc_logger hsc_env)
@@ -73,6 +64,20 @@ initEndPassConfig dflags extra_vars print_unqual pass = EndPassConfig
   , ep_prettyPass = ppr pass
   , ep_passDetails = pprPassDetails pass
   }
+
+initLintAnnotationsConfig :: CoreToDo -> CoreM LintAnnotationsConfig
+initLintAnnotationsConfig pass = do
+  dflags <- getDynFlags
+  loc <- getSrcSpanM
+  let debug_lvl = debugLevel dflags
+  print_unqual <- getPrintUnqualified
+  return LintAnnotationsConfig
+    { la_doAnnotationLinting = gopt Opt_DoAnnotationLinting dflags
+    , la_passName = ppr pass
+    , la_sourceLoc = loc
+    , la_debugLevel = debug_lvl
+    , la_printUnqual = print_unqual
+    }
 
 coreDumpFlag :: CoreToDo -> Maybe DumpFlag
 coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_verbose_core2core

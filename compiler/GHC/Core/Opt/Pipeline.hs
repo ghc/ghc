@@ -13,7 +13,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
-import GHC.Driver.Config.Core.Lint ( endPass )
+import GHC.Driver.Config.Core.Lint ( endPass, initLintAnnotationsConfig )
 import GHC.Driver.Config.Core.Opt.CallerCC ( initCallerCCOpts )
 import GHC.Driver.Config.Core.Opt.SpecConstr ( initSpecConstrOpts )
 import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )
@@ -28,7 +28,7 @@ import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( mkRuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
-import GHC.Core.Lint    ( LintAnnotationsConfig(..), lintAnnots )
+import GHC.Core.Lint    ( lintAnnots )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Opt.Simplify ( simplifyExpr, simplifyPgm )
 import GHC.Core.Opt.Simplify.Monad
@@ -453,46 +453,38 @@ runCorePasses passes guts
     do_pass guts CoreDoNothing = return guts
     do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
     do_pass guts pass = do
+      hsc_env <- getHscEnv
       logger <- getLogger
+      print_unqual <- getPrintUnqualified
       cfg <- initLintAnnotationsConfig pass
-      withTiming logger (ppr pass <+> brackets (ppr mod))
-                   (const ()) $ do
-            (guts', sc) <- unliftCoreM $ \runInIO -> do
-              let passIO :: Int -> ModGuts -> IO (ModGuts, SimplCount)
-                  passIO debug_lvl nguts = runInIO
-                    $ mapDynFlagsCoreM (\(!dflags) -> dflags { debugLevel = debug_lvl })
-                    $ doCorePass pass nguts
-              lintAnnots logger cfg passIO guts
-            addSimplCount sc
-            endPass pass (mg_binds guts') (mg_rules guts')
-            return guts'
+      withTiming logger (ppr pass <+> brackets (ppr mod)) (const ()) $ do
+        (guts', sc) <- unliftCoreM $ \runInIO -> do
+          let passIO debug_lvl nguts = runInIO
+                $ mapDynFlagsCoreM (\(!dflags) -> dflags { debugLevel = debug_lvl })
+                $ doCorePass pass nguts
+          res@(guts', _) <- lintAnnots logger cfg passIO guts
+          endPass hsc_env print_unqual pass (mg_binds guts') (mg_rules guts')
+          return res
+        addSimplCount sc
+        return guts'
 
     mod = mg_module guts
-
-initLintAnnotationsConfig :: CoreToDo -> CoreM LintAnnotationsConfig
-initLintAnnotationsConfig pass = do
-  dflags <- getDynFlags
-  loc <- getSrcSpanM
-  let debug_lvl = debugLevel dflags
-  print_unqual <- getPrintUnqualified
-  return LintAnnotationsConfig
-    { la_doAnnotationLinting = gopt Opt_DoAnnotationLinting dflags
-    , la_passName = ppr pass
-    , la_sourceLoc = loc
-    , la_debugLevel = debug_lvl
-    , la_printUnqual = print_unqual
-    }
 
 doCorePass :: CoreToDo -> ModGuts -> CoreM ModGuts
 doCorePass pass guts = do
   logger    <- getLogger
   hsc_env   <- getHscEnv
   dflags    <- getDynFlags
+  this_mod  <- getModule
+  rb        <- getRuleBase
   us        <- getUniqueSupplyM
   p_fam_env <- getPackageFamInstEnv
+  vis_orphs <- getVisibleOrphanMods
+  (_, annos) <- liftIO $ getFirstAnnotationsFromHscEnv hsc_env deserializeWithData guts
   let platform = targetPlatform dflags
   let fam_envs = (p_fam_env, mg_fam_inst_env guts)
   let prof_count_entries = gopt Opt_ProfCountEntries dflags
+
   let updateBinds  f = return $ guts { mg_binds = f (mg_binds guts) }
   let updateBindsM f = f (mg_binds guts) >>= \b' -> return $ guts { mg_binds = b' }
 
@@ -503,8 +495,9 @@ doCorePass pass guts = do
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
                                  updateBinds cseProgram
 
-    CoreLiberateCase          -> {-# SCC "LiberateCase" #-}
-                                 updateBinds (liberateCase (initLiberateCaseOpts dflags))
+    CoreLiberateCase          -> {-# SCC "LiberateCase" #-} do
+                                 let opts = initLiberateCaseOpts dflags
+                                 updateBinds (liberateCase opts)
 
     CoreDoFloatInwards        -> {-# SCC "FloatInwards" #-}
                                  updateBinds (floatInwards platform)
@@ -527,26 +520,21 @@ doCorePass pass guts = do
     CoreDoCpr                 -> {-# SCC "CprAnal" #-}
                                  updateBindsM (liftIO . cprAnalProgram logger fam_envs)
 
-    CoreDoWorkerWrapper       -> {-# SCC "WorkWrap" #-}
-                                 updateBinds (wwTopBinds
-                                               (initWorkWrapOpts (mg_module guts) dflags fam_envs)
-                                               us)
+    CoreDoWorkerWrapper       -> {-# SCC "WorkWrap" #-} do
+                                 let opts = initWorkWrapOpts (mg_module guts) dflags fam_envs
+                                 updateBinds (wwTopBinds opts us)
 
     CoreDoSpecialising        -> {-# SCC "Specialise" #-} do
-                                   specialise_opts <- initSpecialiseOpts
-                                   liftIO $ specProgram logger specialise_opts guts
+                                 specialise_opts <- initSpecialiseOpts
+                                 liftIO $ specProgram logger specialise_opts guts
 
     CoreDoSpecConstr          -> {-# SCC "SpecConstr" #-} do
-      this_mod <- getModule
-      hsc_env <- getHscEnv
-      (_, annos) <- liftIO $ getFirstAnnotationsFromHscEnv hsc_env deserializeWithData guts
-      return $ specConstrProgram
-        annos us
-        (initSpecConstrOpts dflags this_mod)
-        guts
+                                 let opts = initSpecConstrOpts dflags this_mod
+                                 return (specConstrProgram annos us opts guts)
 
-    CoreAddCallerCcs          -> {-# SCC "AddCallerCcs" #-}
-                                 return (addCallerCostCentres (initCallerCCOpts dflags) guts)
+    CoreAddCallerCcs          -> {-# SCC "AddCallerCcs" #-} do
+                                 let opts = initCallerCCOpts dflags
+                                 return (addCallerCostCentres opts guts)
 
     CoreAddLateCcs            -> {-# SCC "AddLateCcs" #-}
                                  return (addLateCostCentres prof_count_entries guts)
@@ -555,7 +543,7 @@ doCorePass pass guts = do
                                  liftIO $ printCore logger (mg_binds guts) >> return guts
 
     CoreDoRuleCheck phase pat -> {-# SCC "RuleCheck" #-}
-                                 ruleCheckPass phase pat guts
+                                 liftIO $ ruleCheckPass logger dflags rb vis_orphs phase pat guts
     CoreDoNothing             -> return guts
     CoreDoPasses passes       -> runCorePasses passes guts
 
@@ -578,20 +566,22 @@ printCore :: Logger -> CoreProgram -> IO ()
 printCore logger binds
     = Logger.logDumpMsg logger "Print Core" (pprCoreBindings binds)
 
-ruleCheckPass :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
-ruleCheckPass current_phase pat guts = do
-    dflags <- getDynFlags
-    logger <- getLogger
+ruleCheckPass :: Logger
+              -> DynFlags
+              -> RuleBase
+              -> ModuleSet
+              -> CompilerPhase
+              -> String
+              -> ModGuts
+              -> IO ModGuts
+ruleCheckPass logger dflags rb vis_orphs current_phase pat guts =
     withTiming logger (text "RuleCheck"<+>brackets (ppr $ mg_module guts))
                 (const ()) $ do
-        rb <- getRuleBase
-        vis_orphs <- getVisibleOrphanMods
         let rule_fn fn = getRules (RuleEnv [rb] vis_orphs) fn
                           ++ (mg_rules guts)
         let ropts = initRuleOpts dflags
-        liftIO $ logDumpMsg logger "Rule check"
-                     (ruleCheckProgram ropts current_phase pat
-                        rule_fn (mg_binds guts))
+        logDumpMsg logger "Rule check" $
+            ruleCheckProgram ropts current_phase pat rule_fn (mg_binds guts)
         return guts
 
 dmdAnal :: Logger -> DynFlags -> FamInstEnvs -> [CoreRule] -> CoreProgram -> IO CoreProgram
