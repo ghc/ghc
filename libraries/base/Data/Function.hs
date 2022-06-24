@@ -25,9 +25,11 @@ module Data.Function
   , (&)
   , fix
   , on
+  , applyWhen
   ) where
 
 import GHC.Base ( ($), (.), id, const, flip )
+import Data.Bool ( Bool(..) )
 
 infixl 0 `on`
 infixl 1 &
@@ -120,6 +122,33 @@ on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
 -- @since 4.8.0.0
 (&) :: a -> (a -> b) -> b
 x & f = f x
+
+-- | 'applyWhen' applies a function to a value if a condition is true,
+-- otherwise, it returns the value unchanged.
+--
+-- It is equivalent to @'flip' ('Data.Bool.bool' 'id')@.
+--
+-- Algebraic properties:
+--
+-- * @applyWhen 'True' = 'id'@
+--
+-- * @applyWhen 'False' f = 'id'@
+--
+-- @since 4.18.0.0
+applyWhen :: Bool -> (a -> a) -> a -> a
+applyWhen True  f x = f x
+applyWhen False _ x = x
+-- Proofs:
+--
+-- flip bool id = \q f -> bool id f q
+-- = \f q -> case q of
+--     True -> f = \x -> f x
+--     False -> id = \x -> x ∎
+--
+-- applyWhen True = \f x -> f x
+-- = \f -> \x -> f x = \f -> f = id ∎
+--
+-- applyWhen False f = \x -> x = id ∎
 
 -- $setup
 -- >>> import Prelude

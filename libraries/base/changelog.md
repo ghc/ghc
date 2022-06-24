@@ -8,6 +8,7 @@
     override the above-mentioned handler.
   * `Numeric.Natural` re-exports `GHC.Natural.minusNaturalMaybe`.
   * Add `Data.Foldable1` and `Data.Bifoldable1`.
+  * Add `applyWhen` to `Data.Function`.
 
 ## 4.17.0.0 *TBA*
 
