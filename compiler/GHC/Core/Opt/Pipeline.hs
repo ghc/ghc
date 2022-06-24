@@ -30,7 +30,7 @@ import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop, dumpIdInfoOfProgram )
-import GHC.Core.Lint    ( dumpPassResult, lintAnnots )
+import GHC.Core.Lint    ( LintAnnotationsConfig(..), dumpPassResult, lintAnnots )
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..), CoreDoSimplifyOpts(..) )
 import GHC.Core.Opt.Simplify       ( simplTopBinds, simplExpr, simplImpRules )
 import GHC.Core.Opt.Simplify.Utils ( simplEnvForGHCi, activeRule, activeUnfolding )
@@ -488,13 +488,34 @@ runCorePasses passes guts
     do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
     do_pass guts pass = do
       logger <- getLogger
+      cfg <- initLintAnnotationsConfig pass
       withTiming logger (ppr pass <+> brackets (ppr mod))
                    (const ()) $ do
-            guts' <- lintAnnots (ppr pass) (doCorePass pass) guts
+            (guts', sc) <- unliftCoreM $ \runInIO -> do
+              let passIO :: Int -> ModGuts -> IO (ModGuts, SimplCount)
+                  passIO debug_lvl nguts = runInIO
+                    $ mapDynFlagsCoreM (\(!dflags) -> dflags { debugLevel = debug_lvl })
+                    $ doCorePass pass nguts
+              lintAnnots logger cfg passIO guts
+            addSimplCount sc
             endPass pass (mg_binds guts') (mg_rules guts')
             return guts'
 
     mod = mg_module guts
+
+initLintAnnotationsConfig :: CoreToDo -> CoreM LintAnnotationsConfig
+initLintAnnotationsConfig pass = do
+  dflags <- getDynFlags
+  loc <- getSrcSpanM
+  let debug_lvl = debugLevel dflags
+  print_unqual <- getPrintUnqualified
+  return LintAnnotationsConfig
+    { la_doAnnotationLinting = gopt Opt_DoAnnotationLinting dflags
+    , la_passName = ppr pass
+    , la_sourceLoc = loc
+    , la_debugLevel = debug_lvl
+    , la_printUnqual = print_unqual
+    }
 
 doCorePass :: CoreToDo -> ModGuts -> CoreM ModGuts
 doCorePass pass guts = do
