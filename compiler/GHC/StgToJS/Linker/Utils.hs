@@ -126,8 +126,8 @@ genCommonCppDefs profiling = mconcat
 
   -- GHCJS.Prim.JSVal
   , if profiling
-      then "#define MK_JSVAL(x) (h$c1(h$ghczmprimZCGHCziTypesziJSVal_con_e, (x), h$CCS_SYSTEM))\n"
-      else "#define MK_JSVAL(x) (h$c1(h$ghczmprimZCGHCziTypesziJSVal_con_e, (x)))\n"
+      then "#define MK_JSVAL(x) (h$baseZCGHCJSziPrimziJSVal_con_e, (x), h$CCS_SYSTEM))\n"
+      else "#define MK_JSVAL(x) (h$baseZCGHCJSziPrimziJSVal_con_e, (x)))\n"
   ,  "#define JSVAL_VAL(x) ((x).d1)\n"
 
   -- GHCJS.Prim.JSException

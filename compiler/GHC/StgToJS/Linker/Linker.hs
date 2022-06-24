@@ -317,7 +317,6 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
       all_deps <- getDeps (fmap fst dep_map) excluded_units dep_fun_roots dep_unit_roots
 
       logInfo logger $ hang (text "Units to link:") 2 (vcat (fmap ppr dep_units))
-      -- logInfo logger $ hang (text "Dependency map:") 2 (ppr dep_map)
       -- logInfo logger $ hang (text "All deps:") 2 (vcat (fmap ppr (S.toList all_deps)))
 
       -- retrieve code for dependencies
@@ -803,8 +802,7 @@ readSystemDeps' file
                                   , d primUnitId "GHC.Types" [":", "[]"]
                                   , d primUnitId "GHC.Tuple" ["(,)", "(,,)", "(,,,)", "(,,,,)", "(,,,,,)","(,,,,,,)", "(,,,,,,,)", "(,,,,,,,,)", "(,,,,,,,,,)"]
                                   , d bignumUnitId "GHC.Integer.Type" ["S#", "Jp#", "Jn#"]
-                                  , d primUnitId "GHC.Types" [ "JSVal" ]
-                                  , d baseUnitId "GHCJS.Prim" ["JSException", "$fShowJSException", "$fExceptionJSException", "resolve", "resolveIO", "toIO"]
+                                  , d baseUnitId "GHCJS.Prim" ["JSVal", "JSException", "$fShowJSException", "$fExceptionJSException", "resolve", "resolveIO", "toIO"]
                                   , d baseUnitId "GHCJS.Prim.Internal" ["wouldBlock", "blockedIndefinitelyOnMVar", "blockedIndefinitelyOnSTM", "ignoreException", "setCurrentThreadResultException", "setCurrentThreadResultValue"]
                                   ]
                                   )
