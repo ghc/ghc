@@ -174,7 +174,7 @@ closureConstructors s = BlockStat
     checkC :: JStat
     checkC | csAssertRts s =
       jVar $ \msg ->
-      jwhenS (var "arguments" .! 0 .!==. jString "h$ghcjszmprimZCGHCJSziPrimziJSVal_con_e")
+      jwhenS (var "arguments" .! 0 .!==. jString "h$baseZCGHCJSziPrimziJSVal_con_e")
                                   (loop 1 (.<. var "arguments" .^ "length")
                                           (\i ->
                                              mconcat [msg |= jString "warning: undefined or null in argument: "
