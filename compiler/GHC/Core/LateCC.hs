@@ -23,10 +23,9 @@ import GHC.Types.Var
 import GHC.Unit.Types
 import GHC.Data.FastString
 import GHC.Core
-import GHC.Plugins.Monad
 import GHC.Core.Utils (mkTick)
 import GHC.Types.Id
-import GHC.Driver.Session
+import GHC.Driver.Flags
 
 import GHC.Utils.Logger
 import GHC.Utils.Outputable
@@ -65,33 +64,30 @@ profile so we improve efficiency by omitting those.
 
 -}
 
-addLateCostCentresMG :: ModGuts -> CoreM ModGuts
-addLateCostCentresMG guts = do
-  dflags <- getDynFlags
-  let env :: Env
-      env = Env
-        { thisModule = mg_module guts
-        , ccState = newCostCentreState
-        , countEntries = gopt Opt_ProfCountEntries dflags
-        , collectCCs = False -- See Note [Collecting late cost centres]
-        }
-  let guts' = guts { mg_binds = fst (addLateCostCentres env (mg_binds guts))
-                   }
-  return guts'
+addLateCostCentresMG :: Bool -> ModGuts -> ModGuts
+addLateCostCentresMG prof_count_entries guts = let
+  env = Env
+    { thisModule = mg_module guts
+    , ccState = newCostCentreState
+    , countEntries = prof_count_entries
+    , collectCCs = False -- See Note [Collecting late cost centres]
+    }
+  in guts { mg_binds = fst (addLateCostCentres env (mg_binds guts))
+          }
 
-addLateCostCentresPgm :: DynFlags -> Logger -> Module -> CoreProgram -> IO (CoreProgram, S.Set CostCentre)
-addLateCostCentresPgm dflags logger mod binds =
+addLateCostCentresPgm :: Bool -> Logger -> Module -> CoreProgram -> IO (CoreProgram, S.Set CostCentre)
+addLateCostCentresPgm prof_count_entries logger mod binds =
   withTiming logger
                (text "LateCC"<+>brackets (ppr mod))
                (\(a,b) -> a `seqList` (b `seq` ())) $ do
   let env = Env
         { thisModule = mod
         , ccState = newCostCentreState
-        , countEntries = gopt Opt_ProfCountEntries dflags
+        , countEntries = prof_count_entries
         , collectCCs = True -- See Note [Collecting late cost centres]
         }
       (binds', ccs) = addLateCostCentres env binds
-  when (dopt Opt_D_dump_late_cc dflags || dopt Opt_D_verbose_core2core dflags) $
+  when (logHasDumpFlag logger Opt_D_dump_late_cc || logHasDumpFlag logger Opt_D_verbose_core2core) $
     putDumpFileMaybe logger Opt_D_dump_late_cc "LateCC" FormatCore (vcat (map ppr binds'))
   return (binds', ccs)
 

@@ -114,7 +114,7 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyExprOpts )
-import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
+import GHC.Driver.Config.Core.Lint ( endPass )
 import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
 import GHC.Driver.Config.CoreToStg.Prep
 import GHC.Driver.Config.Logger   (initLogFlags)
@@ -1700,7 +1700,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         (late_cc_binds, late_local_ccs) <-
               if gopt Opt_ProfLateCcs dflags && not (gopt Opt_ProfLateInlineCcs dflags)
                   then  {-# SCC lateCC #-} do
-                    (binds,late_ccs) <- addLateCostCentresPgm dflags logger this_mod core_binds
+                    (binds,late_ccs) <- addLateCostCentresPgm (gopt Opt_ProfCountEntries dflags) logger this_mod core_binds
                     return ( binds, (S.toList late_ccs `mappend` local_ccs ))
                   else
                     return (core_binds, local_ccs)
@@ -2319,7 +2319,7 @@ hscTidy hsc_env guts = do
   let all_tidy_binds = cg_binds cgguts
   let print_unqual   = mkPrintUnqualified (hsc_unit_env hsc_env) (mg_rdr_env guts)
 
-  endPassHscEnvIO hsc_env print_unqual CoreTidy all_tidy_binds tidy_rules
+  endPass hsc_env print_unqual CoreTidy all_tidy_binds tidy_rules
 
   -- If the endPass didn't print the rules, but ddump-rules is
   -- on, print now
