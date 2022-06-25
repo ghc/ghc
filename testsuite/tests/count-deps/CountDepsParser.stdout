@@ -38,6 +38,7 @@ GHC.Core.Multiplicity
 GHC.Core.Opt.Arity
 GHC.Core.Opt.CallerCC.Filter
 GHC.Core.Opt.ConstantFold
+GHC.Core.Opt.Counting
 GHC.Core.Opt.OccurAnal
 GHC.Core.Opt.Pipeline.Types
 GHC.Core.Opt.Utils

@@ -22,7 +22,6 @@ import GHC.Core
 import GHC.Core.Ppr
 import GHC.Core.Opt.Pipeline.Types
 import GHC.Core.Opt.Utils ( SimplMode(..) )
-import GHC.Plugins.Monad
 import GHC.Core.Coercion
 
 import GHC.Core.Lint
@@ -32,6 +31,7 @@ import GHC.Runtime.Context
 import GHC.Data.Bag
 
 import GHC.Types.Basic ( CompilerPhase(..) )
+import GHC.Types.SrcLoc ( SrcSpan )
 
 import GHC.Utils.Outputable as Outputable
 
@@ -97,19 +97,14 @@ initEndPassConfig ic dflags print_unqual pass = EndPassConfig
   , ep_passDetails = pprPassDetails pass
   }
 
-initLintAnnotationsConfig :: CoreToDo -> CoreM LintAnnotationsConfig
-initLintAnnotationsConfig pass = do
-  dflags <- getDynFlags
-  loc <- getSrcSpanM
-  let debug_lvl = debugLevel dflags
-  print_unqual <- getPrintUnqualified
-  return LintAnnotationsConfig
-    { la_doAnnotationLinting = gopt Opt_DoAnnotationLinting dflags
-    , la_passName = ppr pass
-    , la_sourceLoc = loc
-    , la_debugLevel = debug_lvl
-    , la_printUnqual = print_unqual
-    }
+initLintAnnotationsConfig :: DynFlags -> SrcSpan -> PrintUnqualified -> CoreToDo -> LintAnnotationsConfig
+initLintAnnotationsConfig dflags loc print_unqual pass = LintAnnotationsConfig
+  { la_doAnnotationLinting = gopt Opt_DoAnnotationLinting dflags
+  , la_passName = ppr pass
+  , la_sourceLoc = loc
+  , la_debugLevel = debugLevel dflags
+  , la_printUnqual = print_unqual
+  }
 
 coreDumpFlag :: CoreToDo -> Maybe DumpFlag
 coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_verbose_core2core

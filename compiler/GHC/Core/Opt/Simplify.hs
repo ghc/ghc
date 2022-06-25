@@ -33,7 +33,8 @@ import GHC.Core.DataCon
    ( DataCon, dataConWorkId, dataConRepStrictness
    , dataConRepArgTys, isUnboxedTupleDataCon
    , StrictnessMark (..) )
-import GHC.Core.Opt.Utils ( Tick(..), SimplMode(..) )
+import GHC.Core.Opt.Counting ( Tick(..) )
+import GHC.Core.Opt.Utils ( SimplMode(..) )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make

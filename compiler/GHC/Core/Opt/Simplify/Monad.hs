@@ -35,7 +35,7 @@ import GHC.Core.Coercion.Opt
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import GHC.Driver.Config
-import GHC.Core.Opt.Utils
+import GHC.Core.Opt.Counting
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Monad

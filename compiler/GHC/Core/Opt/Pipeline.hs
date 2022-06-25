@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TupleSections #-}
 
 module GHC.Core.Opt.Pipeline ( core2core, simplifyExpr ) where
 
@@ -16,6 +17,7 @@ import GHC.Driver.Env
 import GHC.Driver.Config.Core.Lint ( endPass, initLintAnnotationsConfig, lintPassResult )
 import GHC.Driver.Config.Core.Opt.CallerCC ( initCallerCCOpts )
 import GHC.Driver.Config.Core.Opt.SpecConstr ( initSpecConstrOpts )
+import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )
 import GHC.Driver.Config.Core.Opt.LiberateCase ( initLiberateCaseOpts )
 import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
@@ -36,13 +38,15 @@ import GHC.Core.Opt.Simplify       ( simplTopBinds, simplExpr, simplImpRules )
 import GHC.Core.Opt.Simplify.Utils ( simplEnvForGHCi, activeRule, activeUnfolding )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Opt.Utils        ( FloatOutSwitches(..), SimplMode(..), floatEnable
-                                 , simplCountN, getFirstAnnotationsFromHscEnv )
+import GHC.Core.Opt.Counting     ( SimplCountM, runSimplCountM, simplCountN
+                                 , tellSimplCountIO )
+import GHC.Core.Opt.Utils        ( FloatOutSwitches(..), SimplMode(..)
+                                 , floatEnable, getFirstAnnotationsFromHscEnv )
 import GHC.Core.Opt.FloatIn      ( floatInwards )
 import GHC.Core.Opt.FloatOut     ( floatOutwards )
 import GHC.Core.Opt.LiberateCase ( liberateCase )
 import GHC.Core.Opt.StaticArgs   ( doStaticArgs )
-import GHC.Core.Opt.Specialise   ( SpecialiseOpts(..), specProgram )
+import GHC.Core.Opt.Specialise   ( specProgram )
 import GHC.Core.Opt.SpecConstr   ( specConstrProgram )
 import GHC.Core.Opt.DmdAnal
 import GHC.Core.Opt.CprAnal      ( cprAnalProgram )
@@ -78,13 +82,16 @@ import GHC.Types.Basic
 import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.SrcLoc ( SrcSpan )
 import GHC.Types.Tickish
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 import GHC.Types.Name.Ppr
 
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.Module
+
 {-
 ************************************************************************
 *                                                                      *
@@ -101,14 +108,13 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
   = do { let builtin_passes = getCoreToDo logger dflags
              orph_mods = mkModuleSet (mod : dep_orphs deps)
              uniq_mask = 's'
-       ;
-       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_mask mod
-                                    orph_mods print_unqual loc $
-                           do { hsc_env' <- getHscEnv
-                              ; all_passes <- withPlugins (hsc_plugins hsc_env')
-                                                installCoreToDos
-                                                builtin_passes
-                              ; runCorePasses all_passes guts }
+
+       ; (guts2, stats) <- runSimplCountM dflags $ do
+           all_passes <- tellSimplCountIO
+             $ runCoreM hsc_env hpt_rule_base uniq_mask mod orph_mods print_unqual loc
+             $ withPlugins (hsc_plugins hsc_env) installCoreToDos builtin_passes
+           runCorePasses logger hsc_env hpt_rule_base uniq_mask loc
+                         print_unqual orph_mods all_passes guts
 
        ; Logger.putDumpFileMaybe logger Opt_D_dump_simpl_stats
              "Grand total simplifier statistics"
@@ -480,50 +486,67 @@ This extra run of the simplifier has a cost, but this is only with -O2.
 ************************************************************************
 -}
 
-runCorePasses :: [CoreToDo] -> ModGuts -> CoreM ModGuts
-runCorePasses passes guts
+runCorePasses :: Logger
+              -> HscEnv
+              -> RuleBase
+              -> Char -- ^ Mask for unique supply
+              -> SrcSpan
+              -> PrintUnqualified
+              -> ModuleSet
+              -> [CoreToDo]
+              -> ModGuts
+              -> SimplCountM ModGuts
+runCorePasses logger hsc_env rule_base mask loc print_unqual vis_orphs
+              passes guts
   = foldM do_pass guts passes
   where
-    do_pass guts CoreDoNothing = return guts
-    do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
+    do_pass :: ModGuts -> CoreToDo -> SimplCountM ModGuts
+    do_pass res CoreDoNothing = return res
+    do_pass guts (CoreDoPasses ps) = runCorePasses logger hsc_env rule_base mask loc print_unqual vis_orphs ps guts
     do_pass guts pass = do
-      hsc_env <- getHscEnv
-      logger <- getLogger
-      print_unqual <- getPrintUnqualified
-      cfg <- initLintAnnotationsConfig pass
-      withTiming logger (ppr pass <+> brackets (ppr mod)) (const ()) $ do
-        (guts', sc) <- unliftCoreM $ \runInIO -> do
-          let passIO debug_lvl nguts = runInIO
-                $ mapDynFlagsCoreM (\(!dflags) -> dflags { debugLevel = debug_lvl })
-                $ doCorePass pass nguts
-          res@(guts', _) <- lintAnnots logger cfg passIO guts
-          endPass hsc_env print_unqual pass (mg_binds guts') (mg_rules guts')
-          return res
-        addSimplCount sc
+      let cfg = initLintAnnotationsConfig dflags loc print_unqual pass
+      let doCorePassWithDebug debug_lvl nguts = do
+            let dflags' = (hsc_dflags hsc_env) { debugLevel = debug_lvl }
+                hsc_env' = hsc_env { hsc_dflags = dflags' }
+            doCorePass
+              logger hsc_env' this_mod rule_base mask loc print_unqual vis_orphs
+              pass nguts
+
+      withTiming logger (ppr pass <+> brackets (ppr this_mod)) (const ()) $ do
+        guts' <- lintAnnots logger cfg doCorePassWithDebug guts
+        liftIO $ endPass hsc_env print_unqual pass (mg_binds guts') (mg_rules guts')
         return guts'
 
-    mod = mg_module guts
+    dflags = hsc_dflags hsc_env
+    this_mod = mg_module guts
 
-doCorePass :: CoreToDo -> ModGuts -> CoreM ModGuts
-doCorePass pass guts = do
-  logger    <- getLogger
-  hsc_env   <- getHscEnv
-  dflags    <- getDynFlags
-  this_mod  <- getModule
-  rb        <- getRuleBase
-  us        <- getUniqueSupplyM
-  p_fam_env <- getPackageFamInstEnv
-  vis_orphs <- getVisibleOrphanMods
+doCorePass :: Logger
+           -> HscEnv
+           -> Module
+           -> RuleBase
+           -> Char -- ^ Mask for unique supply
+           -> SrcSpan
+           -> PrintUnqualified
+           -> ModuleSet
+           -> CoreToDo
+           -> ModGuts
+           -> SimplCountM ModGuts
+doCorePass logger hsc_env this_mod rule_base mask loc print_unqual vis_orphs pass guts = do
+  p_fam_env <- eps_fam_inst_env <$> liftIO (hscEPS hsc_env)
   (_, annos) <- liftIO $ getFirstAnnotationsFromHscEnv hsc_env deserializeWithData guts
+  us <- liftIO $ mkSplitUniqSupply mask
+  let dflags   = hsc_dflags hsc_env
   let platform = targetPlatform dflags
   let fam_envs = (p_fam_env, mg_fam_inst_env guts)
 
-  let updateBinds  f = return $ guts { mg_binds = f (mg_binds guts) }
-  let updateBindsM f = f (mg_binds guts) >>= \b' -> return $ guts { mg_binds = b' }
+  let noCounts     x = return (x ,zeroSimplCount dflags)
+  let noCountsM    f = (,zeroSimplCount dflags) <$> f
+  let updateBinds  f = noCounts $ guts { mg_binds = f (mg_binds guts) }
+  let updateBindsM f = f (mg_binds guts) >>= \b' -> noCounts $ guts { mg_binds = b' }
 
-  case pass of
+  tellSimplCountIO $ case pass of
     CoreDoSimplify cfg        -> {-# SCC "Simplify" #-}
-                                 simplifyPgm cfg guts
+                                 simplifyPgmIO cfg hsc_env rule_base guts
 
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
                                  updateBinds cseProgram
@@ -536,7 +559,7 @@ doCorePass pass guts = do
                                  updateBinds (floatInwards platform)
 
     CoreDoFloatOutwards f     -> {-# SCC "FloatOutwards" #-}
-                                 updateBindsM (liftIO . floatOutwards logger f us)
+                                 updateBindsM (floatOutwards logger f us)
 
     CoreDoStaticArgs          -> {-# SCC "StaticArgs" #-}
                                  updateBinds (doStaticArgs us)
@@ -548,75 +571,49 @@ doCorePass pass guts = do
                                  updateBinds exitifyProgram
 
     CoreDoDemand              -> {-# SCC "DmdAnal" #-}
-                                 updateBindsM (liftIO . dmdAnal logger dflags fam_envs (mg_rules guts))
+                                 updateBindsM (dmdAnal logger dflags fam_envs (mg_rules guts))
 
     CoreDoCpr                 -> {-# SCC "CprAnal" #-}
-                                 updateBindsM (liftIO . cprAnalProgram logger fam_envs)
+                                 updateBindsM (cprAnalProgram logger fam_envs)
 
     CoreDoWorkerWrapper       -> {-# SCC "WorkWrap" #-} do
                                  let opts = initWorkWrapOpts (mg_module guts) dflags fam_envs
                                  updateBinds (wwTopBinds opts us)
 
     CoreDoSpecialising        -> {-# SCC "Specialise" #-} do
-                                 specialise_opts <- initSpecialiseOpts
-                                 liftIO $ specProgram logger specialise_opts guts
+                                 specialise_opts <- initSpecialiseOpts hsc_env loc rule_base mask print_unqual vis_orphs
+                                 noCountsM $ specProgram logger specialise_opts guts
 
     CoreDoSpecConstr          -> {-# SCC "SpecConstr" #-} do
                                  let opts = initSpecConstrOpts dflags this_mod
-                                 liftIO $ specConstrProgram annos us opts guts
+                                 noCountsM $ specConstrProgram annos us opts guts
 
     CoreAddCallerCcs          -> {-# SCC "AddCallerCcs" #-} do
                                  let opts = initCallerCCOpts dflags
-                                 return (addCallerCostCentres opts guts)
+                                 noCounts (addCallerCostCentres opts guts)
 
     CoreAddLateCcs            -> {-# SCC "AddLateCcs" #-}
-                                 return (addLateCostCentres dflags guts)
+                                 noCounts (addLateCostCentres dflags guts)
 
-    CoreDoPrintCore           -> {-# SCC "PrintCore" #-}
-                                 liftIO $ printCore logger (mg_binds guts) >> return guts
+    CoreDoPrintCore           -> {-# SCC "PrintCore" #-} do
+                                 printCore logger (mg_binds guts)
+                                 noCounts guts
 
     CoreDoRuleCheck phase pat -> {-# SCC "RuleCheck" #-}
-                                 liftIO $ ruleCheckPass logger dflags rb vis_orphs phase pat guts
-    CoreDoNothing             -> return guts
-    CoreDoPasses passes       -> runCorePasses passes guts
+                                 noCountsM $ ruleCheckPass logger dflags rule_base vis_orphs phase pat guts
+    CoreDoNothing             -> noCounts guts
+    CoreDoPasses passes       -> runSimplCountM dflags $ runCorePasses logger hsc_env rule_base mask loc print_unqual vis_orphs passes guts
 
-    CoreDoPluginPass _ p      -> {-# SCC "Plugin" #-} p guts
+    CoreDoPluginPass _ p      -> {-# SCC "Plugin" #-} do
+                                 runSimplCountM dflags $ liftCoreM $ p guts
 
-    CoreDesugar               -> pprPanic "doCorePass" (ppr pass)
-    CoreDesugarOpt            -> pprPanic "doCorePass" (ppr pass)
-    CoreTidy                  -> pprPanic "doCorePass" (ppr pass)
-    CorePrep                  -> pprPanic "doCorePass" (ppr pass)
-
-{-
-************************************************************************
-*                                                                      *
-        Initialize options for the optimization passes
-*                                                                      *
-************************************************************************
-
-These initialization functions will be moved to the 'GHC.Driver.Config.Core.Opt'
-namespace as part of the refactoring which is tracked in T17957.
--}
-
-initSpecialiseOpts :: CoreM SpecialiseOpts
-initSpecialiseOpts = do
-  dflags <- getDynFlags
-  hsc_env <- getHscEnv
-  eps <- liftIO $ hscEPS hsc_env
-  loc <- getSrcSpanM
-  rule_base <- getRuleBase
-  mask <- getUniqMask
-  unqual <- getPrintUnqualified
-  vis_orphans <- getVisibleOrphanMods
-  return SpecialiseOpts
-    { so_dflags = dflags
-    , so_external_rule_base = eps_rule_base eps
-    , so_loc = loc
-    , so_rule_base = rule_base
-    , so_uniq_mask = mask
-    , so_unqual = unqual
-    , so_visible_orphan_mods = vis_orphans
-    }
+    CoreDesugar               -> noCounts $ pprPanic "doCorePass" (ppr pass)
+    CoreDesugarOpt            -> noCounts $ pprPanic "doCorePass" (ppr pass)
+    CoreTidy                  -> noCounts $ pprPanic "doCorePass" (ppr pass)
+    CorePrep                  -> noCounts $ pprPanic "doCorePass" (ppr pass)
+  where
+    liftCoreM = tellSimplCountIO . runCoreM
+      hsc_env rule_base mask this_mod vis_orphs print_unqual loc
 
 {-
 ************************************************************************
@@ -717,18 +714,11 @@ simplExprGently env expr = do
 ************************************************************************
 -}
 
-simplifyPgm :: CoreDoSimplifyOpts -> ModGuts -> CoreM ModGuts
-simplifyPgm cfg guts
-  = do { hsc_env <- getHscEnv
-       ; rb <- getRuleBase
-       ; liftIOWithCount $
-         simplifyPgmIO cfg hsc_env rb guts }
-
 simplifyPgmIO :: CoreDoSimplifyOpts
               -> HscEnv
               -> RuleBase
               -> ModGuts
-              -> IO (SimplCount, ModGuts)  -- New bindings
+              -> IO (ModGuts, SimplCount)  -- New bindings
 
 simplifyPgmIO cfg@(CoreDoSimplifyOpts max_iterations mode)
               hsc_env hpt_rule_base
@@ -749,7 +739,7 @@ simplifyPgmIO cfg@(CoreDoSimplifyOpts max_iterations mode)
                          blankLine,
                          pprSimplCount counts_out])
 
-        ; return (counts_out, guts')
+        ; return (guts', counts_out)
     }
   where
     dflags       = hsc_dflags hsc_env

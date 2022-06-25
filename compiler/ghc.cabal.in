@@ -310,6 +310,7 @@ Library
         GHC.Core.Opt.CallerCC
         GHC.Core.Opt.CallerCC.Filter
         GHC.Core.Opt.ConstantFold
+        GHC.Core.Opt.Counting
         GHC.Core.Opt.CprAnal
         GHC.Core.Opt.CSE
         GHC.Core.Opt.DmdAnal
@@ -404,6 +405,7 @@ Library
         GHC.Driver.Config.Core.Opt.CallerCC
         GHC.Driver.Config.Core.Opt.LiberateCase
         GHC.Driver.Config.Core.Opt.SpecConstr
+        GHC.Driver.Config.Core.Opt.Specialise
         GHC.Driver.Config.Core.Opt.WorkWrap
         GHC.Driver.Config.Core.Rules
         GHC.Driver.Config.CoreToStg.Prep

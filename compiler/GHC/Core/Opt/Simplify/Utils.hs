@@ -48,7 +48,8 @@ import GHC.Driver.Session
 import GHC.Core
 import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
-import GHC.Core.Opt.Utils        ( SimplMode(..), Tick(..), floatEnable )
+import GHC.Core.Opt.Counting     ( Tick(..) )
+import GHC.Core.Opt.Utils        ( SimplMode(..), floatEnable )
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
