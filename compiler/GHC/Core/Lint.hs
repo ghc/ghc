@@ -56,7 +56,6 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.Unify
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Opt.Arity    ( typeArity )
-import GHC.Core.Opt.Stats ( SimplCount )
 
 import GHC.Types.Literal
 import GHC.Types.Var as Var
@@ -3438,35 +3437,45 @@ data LintAnnotationsConfig = LintAnnotationsConfig
 -- annotations (@SourceNote@). This works a bit different from other
 -- consistency checks: We check this by running the given task twice,
 -- noting all differences between the results.
-lintAnnots :: Logger -> LintAnnotationsConfig -> (Int -> ModGuts -> IO (ModGuts, SimplCount)) -> ModGuts -> IO (ModGuts, SimplCount)
+lintAnnots
+  :: MonadIO m
+  => Logger
+  -> LintAnnotationsConfig
+  -> (Int -> ModGuts -> m ModGuts)
+  -> ModGuts -> m ModGuts
 lintAnnots logger cfg pass guts = {-# SCC "lintAnnots" #-} do
   -- Run the pass as we normally would
   when (la_doAnnotationLinting cfg) $
-    Err.showPass logger "Annotation linting - first run"
-  res@(nguts, _) <- pass (la_debugLevel cfg) guts
+    liftIO $ Err.showPass logger "Annotation linting - first run"
+  nguts <- pass (la_debugLevel cfg) guts
   -- If appropriate re-run it without debug annotations to make sure
   -- that they made no difference.
   when (la_doAnnotationLinting cfg) $ do
-    Err.showPass logger "Annotation linting - second run"
+    liftIO $ Err.showPass logger "Annotation linting - second run"
     nguts' <- withoutAnnots pass guts
     -- Finally compare the resulting bindings
-    Err.showPass logger "Annotation linting - comparison"
+    liftIO $ Err.showPass logger "Annotation linting - comparison"
     let binds = flattenBinds $ mg_binds nguts
         binds' = flattenBinds $ mg_binds nguts'
         (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'
         sty = mkUserStyle (la_printUnqual cfg) AllTheWay
-    when (not (null diffs)) $ logMsg logger MCInfo (la_sourceLoc cfg) $ withPprStyle sty $ vcat
-      [ lint_banner "warning" (la_passName cfg)
-      , text "Core changes with annotations:"
-      , withPprStyle defaultDumpStyle $ nest 2 $ vcat diffs
-      ]
+    liftIO $ when (not (null diffs)) $
+      logMsg logger MCInfo (la_sourceLoc cfg) $ withPprStyle sty $ vcat
+        [ lint_banner "warning" (la_passName cfg)
+        , text "Core changes with annotations:"
+        , withPprStyle defaultDumpStyle $ nest 2 $ vcat diffs
+        ]
   -- Return actual new guts along with the of the ticks counted
-  return res
+  return nguts
 
 -- | Run the given pass without annotations. This means that we both
 -- set the debugLevel setting to 0 in the environment as well as all
 -- annotations from incoming modules.
-withoutAnnots :: (Int -> ModGuts -> IO (ModGuts, SimplCount)) -> ModGuts -> IO ModGuts
+withoutAnnots
+  :: MonadIO m
+  => (Int -> ModGuts -> m ModGuts)
+  -> ModGuts
+  -> m ModGuts
 withoutAnnots pass guts = do
   -- Nuke existing ticks in module.
   -- TODO: Ticks in unfoldings. Maybe change unfolding so it removes
@@ -3480,4 +3489,4 @@ withoutAnnots pass guts = do
         = mg{mg_binds = map nukeAnnotsBind binds}
   -- Perform pass with all changes applied and without debugging.
   -- TODO: supply tag here as well ?
-  fst <$> pass 0 (nukeAnnotsMod guts)
+  pass 0 (nukeAnnotsMod guts)

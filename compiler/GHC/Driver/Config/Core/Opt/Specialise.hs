@@ -1,32 +1,30 @@
-module GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts ) where
+module GHC.Driver.Config.Core.Opt.Specialise
+  ( initSpecialiseOpts
+  ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
-import GHC.Driver.Env
+import GHC.Core ( RuleBase )
+import GHC.Core.Opt.Specialise ( SpecialiseOpts (..) )
 
-import GHC.Core.Opt.Specialise ( SpecialiseOpts(..) )
+import GHC.Driver.Env ( HscEnv, hsc_dflags, hscEPS )
 
-import GHC.Plugins.Monad
+import GHC.Unit.External ( eps_rule_base )
+import GHC.Unit.Module ( ModuleSet )
 
-import GHC.Unit.External
+import GHC.Types.SrcLoc ( SrcSpan )
 
-initSpecialiseOpts :: CoreM SpecialiseOpts
-initSpecialiseOpts = do
-  dflags <- getDynFlags
-  hsc_env <- getHscEnv
-  eps <- liftIO $ hscEPS hsc_env
-  loc <- getSrcSpanM
-  rule_base <- getRuleBase
-  mask <- getUniqMask
-  unqual <- getPrintUnqualified
-  vis_orphans <- getVisibleOrphanMods
+import GHC.Utils.Outputable ( PrintUnqualified )
+
+initSpecialiseOpts :: HscEnv -> SrcSpan -> RuleBase -> Char -> PrintUnqualified -> ModuleSet -> IO SpecialiseOpts
+initSpecialiseOpts hsc_env loc rule_base mask print_unqual vis_orphs = do
+  eps <- hscEPS hsc_env
   return SpecialiseOpts
-    { so_dflags = dflags
+    { so_dflags = hsc_dflags hsc_env
     , so_external_rule_base = eps_rule_base eps
     , so_loc = loc
     , so_rule_base = rule_base
     , so_uniq_mask = mask
-    , so_unqual = unqual
-    , so_visible_orphan_mods = vis_orphans
+    , so_unqual = print_unqual
+    , so_visible_orphan_mods = vis_orphs
     }
