@@ -1003,7 +1003,7 @@ INSTALL_DISTDIR_compiler = stage2
 
 # Now we can do the installation
 install_packages: install_libexecs
-install_packages: rts/dist-install/package.conf.install mk/system-cxx-std-lib-1.0.conf.install
+install_packages: rts/dist-install/package.conf.install mk/system-cxx-std-lib-1.0.conf
 	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
 	$(call removeTrees,"$(INSTALLED_PACKAGE_CONF)")
 	$(INSTALL_DIR) "$(INSTALLED_PACKAGE_CONF)"
