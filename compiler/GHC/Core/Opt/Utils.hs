@@ -46,6 +46,7 @@ data FloatOutSwitches = FloatOutSwitches {
                              -- in GHC.Core.Opt.SetLevels
   floatToTopLevelOnly :: Bool      -- ^ Allow floating to the top level only.
   }
+
 instance Outputable FloatOutSwitches where
     ppr = pprFloatOutSwitches
 

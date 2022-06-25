@@ -144,7 +144,7 @@ simplifyPgm :: Logger
             -> UnitEnv
             -> SimplifyOpts
             -> ModGuts
-            -> IO (SimplCount, ModGuts)  -- New bindings
+            -> IO (ModGuts, SimplCount)  -- New bindings
 
 simplifyPgm logger unit_env opts
             guts@(ModGuts { mg_module = this_mod
@@ -164,7 +164,7 @@ simplifyPgm logger unit_env opts
                          blankLine,
                          pprSimplCount counts_out])
 
-        ; return (counts_out, guts')
+        ; return (guts', counts_out)
     }
   where
     dump_core_sizes = so_dump_core_sizes opts

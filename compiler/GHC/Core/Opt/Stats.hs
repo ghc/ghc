@@ -10,7 +10,9 @@
 module GHC.Core.Opt.Stats (
     SimplCount, doSimplTick, doFreeSimplTick, simplCountN,
     pprSimplCount, plusSimplCount, zeroSimplCount,
-    isZeroSimplCount, hasDetailedCounts, Tick(..)
+    isZeroSimplCount, hasDetailedCounts, Tick(..),
+
+    SimplCountM, runSimplCountM, tellSimplCountIO
   ) where
 
 import GHC.Prelude
@@ -22,6 +24,8 @@ import GHC.Utils.Outputable as Outputable
 
 import GHC.Data.FastString
 
+import Control.Monad.IO.Class ( MonadIO, liftIO )
+import Control.Monad.Trans.State ( StateT, modify, runStateT )
 import Data.List (groupBy, sortBy)
 import Data.Ord
 import Data.Map (Map)
@@ -32,7 +36,7 @@ import GHC.Utils.Panic (throwGhcException, GhcException(..), panic)
 getVerboseSimplStats :: (Bool -> SDoc) -> SDoc
 getVerboseSimplStats = getPprDebug          -- For now, anyway
 
-zeroSimplCount     :: Bool -- ^ -ddump-simpl-stats
+zeroSimplCount     :: Bool -- ^ Dump simpl stats
                    -> SimplCount
 isZeroSimplCount   :: SimplCount -> Bool
 hasDetailedCounts  :: SimplCount -> Bool
@@ -127,6 +131,21 @@ pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
                       nest 4 (vcat (map ppr l1) $$ vcat (map ppr l2))]
           else Outputable.empty
     ]
+
+newtype SimplCountM a = SimplCountM { unSimplCountM :: StateT SimplCount IO a }
+  deriving (Functor, Applicative, Monad, MonadIO) via (StateT SimplCount IO)
+
+runSimplCountM
+  :: Bool -- ^ Dump simpl stats
+  -> SimplCountM a
+  -> IO (a, SimplCount)
+runSimplCountM dump_simpl_stats m = runStateT (unSimplCountM m) (zeroSimplCount dump_simpl_stats)
+
+tellSimplCountIO :: IO (a, SimplCount) -> SimplCountM a
+tellSimplCountIO m = SimplCountM $ do
+  (res, counts) <- liftIO m
+  modify (`plusSimplCount` counts)
+  return res
 
 {- Note [Which transformations are innocuous]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

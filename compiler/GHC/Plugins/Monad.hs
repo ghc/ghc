@@ -10,7 +10,7 @@ module GHC.Plugins.Monad (
     bindsOnlyPass,
 
     -- * The monad
-    CoreM, runCoreM, unliftCoreM,
+    CoreM, runCoreM,
 
     mapDynFlagsCoreM,
 
@@ -178,14 +178,6 @@ runCoreM hsc_env rule_base mask mod orph_imps print_unqual loc m
             cr_uniq_mask = mask
         }
 
-    extract :: (a, CoreWriter) -> (a, SimplCount)
-    extract (value, writer) = (value, cw_simpl_count writer)
-
-unliftCoreM :: ((CoreM a -> IO (a, SimplCount)) -> IO r) -> CoreM r
-unliftCoreM f = do
-  reader <- read id
-  liftIO $ f (liftM extract . runIOEnv reader . unCoreM)
-  where
     extract :: (a, CoreWriter) -> (a, SimplCount)
     extract (value, writer) = (value, cw_simpl_count writer)
 
