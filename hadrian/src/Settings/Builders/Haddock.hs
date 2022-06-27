@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Settings.Builders.Haddock (haddockBuilderArgs) where
 
 import Hadrian.Haskell.Cabal
@@ -8,6 +9,10 @@ import Packages
 import Rules.Documentation
 import Settings.Builders.Common
 import Settings.Builders.Ghc
+import Utilities
+import Context.Type as C
+import CommandLine
+import qualified Data.Text as T
 
 -- | Given a version string such as "2.16.2" produce an integer equivalent.
 versionToInt :: String -> Int
@@ -38,10 +43,13 @@ haddockBuilderArgs = mconcat
         context  <- getContext
         version  <- expr $ pkgVersion  pkg
         synopsis <- expr $ pkgSynopsis pkg
-        deps     <- getContextData depNames
+        trans_deps <- expr $ contextDependencies context
+        pkgs <- expr $ mapM (pkgIdentifier . C.package) $ trans_deps
         haddocks <- expr $ haddockDependencies context
         hVersion <- expr $ pkgVersion haddock
         statsDir <- expr $ haddockStatsFilesDir
+        baseUrlTemplate <- expr (docsBaseUrl <$> userSetting defaultDocArgs)
+        let baseUrl p = substituteTemplate baseUrlTemplate p
         ghcOpts  <- haddockGhcArgs
         mconcat
             [ arg "--verbosity=0"
@@ -59,12 +67,15 @@ haddockBuilderArgs = mconcat
             , arg $ "--optghc=-D__HADDOCK_VERSION__="
                     ++ show (versionToInt hVersion)
             , map ("--hide=" ++) <$> getContextData otherModules
-            , pure [ "--read-interface=../" ++ dep
-                     ++ ",../" ++ dep ++ "/src/%{MODULE}.html#%{NAME},"
-                     ++ haddock | (dep, haddock) <- zip deps haddocks ]
+            , pure [ "--read-interface=../" ++ p
+                     ++ "," ++ baseUrl p ++ "/src/%{MODULE}.html#%{NAME},"
+                     ++ haddock | (p, haddock) <- zip pkgs haddocks ]
             , pure [ "--optghc=" ++ opt | opt <- ghcOpts, not ("--package-db" `isInfixOf` opt) ]
             , getInputs
             , arg "+RTS"
             , arg $ "-t" ++ (statsDir -/- pkgName pkg ++ ".t")
             , arg "--machine-readable"
             , arg "-RTS" ] ]
+
+substituteTemplate :: String -> String -> String
+substituteTemplate baseTemplate pkgId = T.unpack . T.replace "%pkg%" (T.pack pkgId) . T.pack $ baseTemplate
