@@ -297,10 +297,7 @@ schemeTopBind (id, rhs)
         -- by just re-using the single top-level definition.  So
         -- for the worker itself, we must allocate it directly.
     -- ioToBc (putStrLn $ "top level BCO")
-    let enter = if isUnliftedTypeKind (tyConResKind (dataConTyCon data_con))
-                then RETURN_UNLIFTED P
-                else ENTER
-    emitBc (mkProtoBCO platform (getName id) (toOL [PACK data_con 0, enter])
+    emitBc (mkProtoBCO platform (getName id) (toOL [PACK data_con 0, RETURN])
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
 
   | otherwise
@@ -506,7 +503,7 @@ schemeE
     :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
 schemeE d s p (StgLit lit) = returnUnliftedAtom d s p (StgLitArg lit)
 schemeE d s p (StgApp x [])
-   | isUnliftedType (idType x) = returnUnliftedAtom d s p (StgVarArg x)
+   | not (usePlainReturn (idType x)) = returnUnliftedAtom d s p (StgVarArg x)
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(StgApp {}) = schemeT d s p e
 schemeE d s p e@(StgConApp {}) = schemeT d s p e
@@ -671,10 +668,7 @@ schemeT d s p (StgConApp con _cn args _tys)
    = do alloc_con <- mkConAppCode d s p con args
         platform <- profilePlatform <$> getProfile
         return (alloc_con         `appOL`
-                mkSlideW 1 (bytesToWords platform $ d - s) `snocOL`
-                if isUnliftedTypeKind (tyConResKind (dataConTyCon con))
-                then RETURN_UNLIFTED P
-                else ENTER)
+                mkSlideW 1 (bytesToWords platform $ d - s) `snocOL` RETURN)
 
    -- Case 4: Tail call of function
 schemeT d s p (StgApp fn args)
@@ -742,10 +736,7 @@ doTailCall init_d s p fn args = do
         platform <- profilePlatform <$> getProfile
         assert (sz == wordSize platform) return ()
         let slide = mkSlideB platform (d - init_d + wordSize platform) (init_d - s)
-            enter = if isUnliftedType (idType fn)
-                    then RETURN_UNLIFTED P
-                    else ENTER
-        return (push_fn `appOL` (slide `appOL` unitOL enter))
+        return (push_fn `appOL` (slide `appOL` unitOL ENTER))
   do_pushes !d args reps = do
       let (push_apply, n, rest_of_reps) = findPushSeq reps
           (these_args, rest_of_args) = splitAt n args
@@ -821,7 +812,7 @@ doCase d s p scrut bndr alts
           (isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty) &&
           length non_void_arg_reps > 1
 
-        unlifted_alg_ty = isUnliftedType bndr_ty && isAlgCase
+        ubx_frame = not ubx_tuple_frame && not (usePlainReturn bndr_ty)
 
         non_void_arg_reps = non_void (typeArgReps platform bndr_ty)
 
@@ -846,11 +837,9 @@ doCase d s p scrut bndr alts
 
         -- The size of the return frame info table pointer if one exists
         unlifted_itbl_size_b :: StackDepth
-        unlifted_itbl_size_b | ubx_tuple_frame              = wordSize platform
-                             | not (isUnliftedType bndr_ty)
-                             -- See Note [Popping return frame for unlifted things]
-                             || unlifted_alg_ty             = 0
-                             | otherwise                    = wordSize platform
+        unlifted_itbl_size_b | ubx_tuple_frame = wordSize platform
+                             | ubx_frame       = wordSize platform
+                             | otherwise       = 0
 
         (bndr_size, tuple_info, args_offsets)
            | ubx_tuple_frame =
@@ -1008,21 +997,9 @@ doCase d s p scrut bndr alts
 
      alt_stuff <- mapM codeAlt alts
      alt_final0 <- mkMultiBranch maybe_ncons alt_stuff
-     -- Note [Popping return frame for unlifted things]
-     -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-     -- When an unlifted value is returned, a special stg_ret_XXX_info frame will
-     -- be sitting on top of the stack. This mechanism is used to aid in switching
-     -- execution contexts between object code and interpreter. However, mkMultiBranch,
-     -- which produces the bytecode to discriminate the case alternatives, does not
-     -- account for that frame header and does branching based on the top of the stack.
-     -- Therefore, we must compensate for this by popping the frame header (2 words
-     -- for tuples and 1 word for other unlifted things) before passing control to
-     -- the case discrimination continuation. This ensures we are looking at the
-     -- right word and it also saves some stack space. Failing to account for this
-     -- was the cause of #20194.
+
      let alt_final
            | ubx_tuple_frame    = mkSlideW 0 2 `mappend` alt_final0
-           | unlifted_alg_ty    = mkSlideW 0 1 `mappend` alt_final0
            | otherwise          = alt_final0
 
      let
@@ -1042,7 +1019,7 @@ doCase d s p scrut bndr alts
               return (PUSH_ALTS_TUPLE alt_bco' tuple_info tuple_bco
                       `consOL` scrut_code)
        else let push_alts
-                  | not (isUnliftedType bndr_ty)
+                  | not ubx_frame
                   = PUSH_ALTS alt_bco'
                   | otherwise
                   = let unlifted_rep =
@@ -1119,6 +1096,19 @@ layoutTuple profile start_off arg_ty reps =
               map (\(x, o) -> (x, o + start_off))
                   (orig_stk_params ++ map get_byte_off new_stk_params)
      )
+
+{-
+  We use the plain return convention (ENTER/PUSH_ALTS) for
+  lifted types and unlifted algebraic types.
+
+  Other types use PUSH_ALTS_UNLIFTED/PUSH_ALTS_TUPLE which expect
+  additional data on the stack.
+ -}
+usePlainReturn :: Type -> Bool
+usePlainReturn t
+  | isUnboxedTupleType t || isUnboxedSumType t = False
+  | otherwise = typePrimRep t == [LiftedRep] ||
+                (typePrimRep t == [UnliftedRep] && isAlgType t)
 
 {- Note [unboxed tuple bytecodes and tuple_BCO]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
