@@ -64,7 +64,8 @@ module GHC.Types.Demand (
     -- * Demand signatures
     DmdSig(..), mkDmdSigForArity, mkClosedDmdSig, mkVanillaDmdSig,
     splitDmdSig, dmdSigDmdEnv, hasDemandEnvSig,
-    nopSig, botSig, isNopSig, isDeadEndSig, isDeadEndAppSig, trimBoxityDmdSig,
+    nopSig, botSig, isNopSig, isBottomingSig, isDeadEndSig, isDeadEndAppSig,
+    trimBoxityDmdSig, transferArgBoxityDmdSig,
 
     -- ** Handling arity adjustments
     prependArgsDmdSig, etaConvertDmdSig,
@@ -2147,6 +2148,13 @@ isNopSig (DmdSig ty) = isNopDmdType ty
 isDeadEndSig :: DmdSig -> Bool
 isDeadEndSig (DmdSig (DmdType _ _ res)) = isDeadEndDiv res
 
+-- | True if the signature diverges or throws an imprecise exception in a saturated call.
+-- NB: In constrast to 'isDeadEndSig' this returns False for 'exnDiv'.
+-- See Note [Dead ends]
+-- and Note [Precise vs imprecise exceptions].
+isBottomingSig :: DmdSig -> Bool
+isBottomingSig (DmdSig (DmdType _ _ res)) = res == botDiv
+
 -- | True when the signature indicates all arguments are boxed
 onlyBoxedArguments :: DmdSig -> Bool
 onlyBoxedArguments (DmdSig (DmdType _ dmds _)) = all demandIsBoxed dmds
@@ -2178,6 +2186,38 @@ trimBoxityDmdType (DmdType fvs ds res) =
 
 trimBoxityDmdSig :: DmdSig -> DmdSig
 trimBoxityDmdSig = coerce trimBoxityDmdType
+
+-- | Transfers the boxity of the left arg to the demand structure of the right
+-- arg. This only makes sense if applied to new and old demands of the same
+-- value.
+transferBoxity :: Demand -> Demand -> Demand
+transferBoxity from to = go_dmd from to
+  where
+    go_dmd (from_n :* from_sd) to_dmd@(to_n :* to_sd)
+      | isAbs from_n || isAbs to_n = to_dmd
+      | otherwise = case (from_sd, to_sd) of
+          (Poly from_b _, Poly _ to_c) ->
+            to_n :* Poly from_b to_c
+          (_, Prod _ to_ds)
+            | Just (from_b, from_ds) <- viewProd (length to_ds) from_sd
+            -> to_n :* mkProd from_b (strictZipWith go_dmd from_ds to_ds)
+          (Prod from_b from_ds, _)
+            | Just (_, to_ds) <- viewProd (length from_ds) to_sd
+            -> to_n :* mkProd from_b (strictZipWith go_dmd from_ds to_ds)
+          _ -> trimBoxity to_dmd
+
+transferArgBoxityDmdType :: DmdType -> DmdType -> DmdType
+transferArgBoxityDmdType _from@(DmdType _ from_ds _) to@(DmdType to_fvs to_ds to_res)
+  | equalLength from_ds to_ds
+  = -- pprTraceWith "transfer" (\r -> ppr _from $$ ppr to $$ ppr r) $
+    DmdType to_fvs -- Only arg boxity! See Note [Don't change boxity without worker/wrapper]
+            (zipWith transferBoxity from_ds to_ds)
+            to_res
+  | otherwise
+  = trimBoxityDmdType to
+
+transferArgBoxityDmdSig :: DmdSig -> DmdSig -> DmdSig
+transferArgBoxityDmdSig = coerce transferArgBoxityDmdType
 
 prependArgsDmdSig :: Int -> DmdSig -> DmdSig
 -- ^ Add extra ('topDmd') arguments to a strictness signature.

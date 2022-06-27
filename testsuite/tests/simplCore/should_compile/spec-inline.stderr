@@ -143,7 +143,7 @@ Roman.foo1 = GHC.Maybe.Just @Int Roman.foo2
 foo :: Int -> Int
 [GblId,
  Arity=1,
- Str=<1!P(L)>,
+ Str=<1L>,
  Cpr=1,
  Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,

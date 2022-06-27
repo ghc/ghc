@@ -45,7 +45,8 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoStaticArgs
   | CoreDoCallArity
   | CoreDoExitify
-  | CoreDoDemand
+  | CoreDoDemand Bool  -- Bool: Do worker/wrapper afterwards?
+                       -- See Note [Don't change boxity without worker/wrapper]
   | CoreDoCpr
   | CoreDoWorkerWrapper
   | CoreDoSpecialising
@@ -74,7 +75,8 @@ instance Outputable CoreToDo where
   ppr CoreDoStaticArgs         = text "Static argument"
   ppr CoreDoCallArity          = text "Called arity analysis"
   ppr CoreDoExitify            = text "Exitification transformation"
-  ppr CoreDoDemand             = text "Demand analysis"
+  ppr (CoreDoDemand True)      = text "Demand analysis (including Boxity)"
+  ppr (CoreDoDemand False)     = text "Demand analysis"
   ppr CoreDoCpr                = text "Constructed Product Result analysis"
   ppr CoreDoWorkerWrapper      = text "Worker Wrapper binds"
   ppr CoreDoSpecialising       = text "Specialise"

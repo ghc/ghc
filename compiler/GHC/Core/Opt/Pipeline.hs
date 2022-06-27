@@ -150,7 +150,7 @@ getCoreToDo dflags rule_base extra_vars
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
     maybe_strictness_before (Phase phase)
-      | phase `elem` strictnessBefore dflags = CoreDoDemand
+      | phase `elem` strictnessBefore dflags = CoreDoDemand False
     maybe_strictness_before _
       = CoreDoNothing
 
@@ -171,8 +171,8 @@ getCoreToDo dflags rule_base extra_vars
     simpl_gently = CoreDoSimplify $ initSimplifyOpts dflags extra_vars max_iter
                                     (initGentleSimplMode dflags) rule_base
 
-    dmd_cpr_ww = if ww_on then [CoreDoDemand,CoreDoCpr,CoreDoWorkerWrapper]
-                          else [CoreDoDemand,CoreDoCpr]
+    dmd_cpr_ww = if ww_on then [CoreDoDemand True,CoreDoCpr,CoreDoWorkerWrapper]
+                          else [CoreDoDemand False] -- NB: No CPR! See Note [Don't change boxity without worker/wrapper]
 
 
     demand_analyser = (CoreDoPasses (
@@ -340,7 +340,7 @@ getCoreToDo dflags rule_base extra_vars
         -- has run at all. See Note [Final Demand Analyser run] in GHC.Core.Opt.DmdAnal
         -- It is EXTREMELY IMPORTANT to run this pass, otherwise execution
         -- can become /exponentially/ more expensive. See #11731, #12996.
-        runWhen (strictness || late_dmd_anal) CoreDoDemand,
+        runWhen (strictness || late_dmd_anal) (CoreDoDemand False),
 
         maybe_rule_check FinalPhase,
 
@@ -491,8 +491,8 @@ doCorePass pass guts = do
     CoreDoExitify             -> {-# SCC "Exitify" #-}
                                  updateBinds exitifyProgram
 
-    CoreDoDemand              -> {-# SCC "DmdAnal" #-}
-                                 updateBindsM (liftIO . dmdAnal logger dflags fam_envs (mg_rules guts))
+    CoreDoDemand before_ww    -> {-# SCC "DmdAnal" #-}
+                                 updateBindsM (liftIO . dmdAnal logger before_ww dflags fam_envs (mg_rules guts))
 
     CoreDoCpr                 -> {-# SCC "CprAnal" #-}
                                  updateBindsM (liftIO . cprAnalProgram logger fam_envs)
@@ -557,10 +557,11 @@ ruleCheckPass current_phase pat guts = do
                         rule_fn (mg_binds guts))
         return guts
 
-dmdAnal :: Logger -> DynFlags -> FamInstEnvs -> [CoreRule] -> CoreProgram -> IO CoreProgram
-dmdAnal logger dflags fam_envs rules binds = do
+dmdAnal :: Logger -> Bool -> DynFlags -> FamInstEnvs -> [CoreRule] -> CoreProgram -> IO CoreProgram
+dmdAnal logger before_ww dflags fam_envs rules binds = do
   let !opts = DmdAnalOpts
                { dmd_strict_dicts    = gopt Opt_DictsStrict dflags
+               , dmd_do_boxity       = before_ww -- only run Boxity Analysis immediately preceding WW
                , dmd_unbox_width     = dmdUnboxWidth dflags
                , dmd_max_worker_args = maxWorkerArgs dflags
                }

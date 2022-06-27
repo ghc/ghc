@@ -59,9 +59,18 @@ _ = pprTrace -- Tired of commenting out the import all the time
 
 -- | Options for the demand analysis
 data DmdAnalOpts = DmdAnalOpts
-   { dmd_strict_dicts    :: !Bool -- ^ Use strict dictionaries
-   , dmd_unbox_width     :: !Int  -- ^ Use strict dictionaries
+   { dmd_strict_dicts    :: !Bool
+   -- ^ Value of `-fdicts-strict` (on by default).
+   -- When set, all functons are implicitly strict in dictionary args.
+   , dmd_do_boxity       :: !Bool
+   -- ^ Governs whether the analysis should update boxity signatures.
+   -- See Note [Don't change boxity without worker/wrapper].
+   , dmd_unbox_width     :: !Int
+   -- ^ Value of `-fdmd-unbox-width`.
+   -- See Note [Unboxed demand on function bodies returning small products]
    , dmd_max_worker_args :: !Int
+   -- ^ Value of `-fmax-worker-args`.
+   -- Don't unbox anything if we end up with more than this many args.
    }
 
 -- This is a strict alternative to (,)
@@ -145,6 +154,40 @@ generation would hold on to an extra copy of the Core program, via
 unforced thunks in demand or strictness information; and it is the
 most memory-intensive part of the compilation process, so this added
 seqBinds makes a big difference in peak memory usage.
+
+Note [Don't change boxity without worker/wrapper]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (T21754)
+  f n = n+1
+  {-# NOINLINE f #-}
+With `-fno-worker-wrapper`, we should not give `f` a boxity signature that says
+that it unboxes its argument! Client modules would never be able to cancel away
+the box for n. Likewise we shouldn't give `f` the CPR property.
+
+Similarly, in the last run of DmdAnal before codegen (which does not have a
+worker/wrapper phase) we should not change boxity in any way. Remember: an
+earlier result of the demand analyser, complete with worker/wrapper, has aleady
+given a demand signature (with boxity info) to the function.
+(The "last run" is mainly there to attach demanded-once info to let-bindings.)
+
+In general, we should not run Note [Boxity analysis] unless worker/wrapper
+follows to exploit the boxity and make sure that calling modules can observe the
+reported boxity.
+
+Hence DmdAnal is configured by a flag `dmd_do_boxity` that is True only
+if worker/wrapper follows after DmdAnal. If it is not set, and the signature
+is not subject to Note [Boxity for bottoming functions], DmdAnal tries
+to transfer over the previous boxity to the new demand signature, in
+`setIdDmdAndBoxSig`.
+
+Why isn't CprAnal configured with a similar flag? Because if we aren't going to
+do worker/wrapper we don't run CPR analysis at all. (see GHC.Core.Opt.Pipeline)
+
+It might be surprising that we only try to preserve *arg* boxity, not boxity on
+FVs. But FV demands won't make it into interface files anyway, so it's a waste
+of energy.
+Besides, W/W zaps the `DmdEnv` portion of a signature, so we don't know the old
+boxity to begin with; see Note [Zapping DmdEnv after Demand Analyzer].
 
 Note [Analysing top-level bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -256,6 +299,16 @@ setBindIdDemandInfo :: TopLevelFlag -> Id -> Demand -> Id
 setBindIdDemandInfo top_lvl id dmd = setIdDemandInfo id $ case top_lvl of
   TopLevel | not (isInterestingTopLevelFn id) -> topDmd
   _                                           -> dmd
+
+-- | Update the demand signature, but be careful not to change boxity info if
+-- `dmd_do_boxity` is True or if the signature is bottom.
+-- See Note [Don't change boxity without worker/wrapper]
+-- and Note [Boxity for bottoming functions].
+setIdDmdAndBoxSig :: DmdAnalOpts -> Id -> DmdSig -> Id
+setIdDmdAndBoxSig opts id sig = setIdDmdSig id $
+  if dmd_do_boxity opts || isBottomingSig sig
+    then sig
+    else transferArgBoxityDmdSig (idDmdSig id) sig
 
 -- | Let bindings can be processed in two ways:
 -- Down (RHS before body) or Up (body before RHS).
@@ -1018,7 +1071,8 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
 
     sig = mkDmdSigForArity threshold_arity (DmdType sig_fv final_rhs_dmds rhs_div)
 
-    final_id   = id `setIdDmdSig` sig
+    opts       = ae_opts env
+    final_id   = setIdDmdAndBoxSig opts id sig
     !final_env = extendAnalEnv top_lvl env final_id sig
 
     -- See Note [Aggregated demand for cardinality]
@@ -1858,8 +1912,9 @@ dmdFix :: TopLevelFlag
 dmdFix top_lvl env let_dmd orig_pairs
   = loop 1 initial_pairs
   where
+    opts = ae_opts env
     -- See Note [Initialising strictness]
-    initial_pairs | ae_virgin env = [(setIdDmdSig id botSig, rhs) | (id, rhs) <- orig_pairs ]
+    initial_pairs | ae_virgin env = [(setIdDmdAndBoxSig opts id botSig, rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
 
     -- If fixed-point iteration does not yield a result we use this instead
