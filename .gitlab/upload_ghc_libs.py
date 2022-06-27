@@ -196,9 +196,10 @@ def main() -> None:
     for pkg_name in pkgs:
         assert pkg_name in PACKAGES
 
+    if pkgs == []:
+        pkgs = PACKAGES.keys()
+
     if args.command == "prepare":
-        if pkgs == []:
-            pkgs = PACKAGES.keys()
 
         manifest = {}
         for pkg_name in pkgs:
@@ -215,7 +216,7 @@ def main() -> None:
         with open(manifest_path / 'manifest.pickle', 'rb') as fin:
             manifest = pickle.load(fin)
         for pkg, item in manifest.items():
-            if pkgs != [] and pkg.name in pkgs:
+            if pkg.name in pkgs:
                 print(pkg, item)
                 upload_pkg(pkg, manifest_path, item, publish=args.publish)
 
