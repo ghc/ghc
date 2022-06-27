@@ -82,6 +82,7 @@ commonCabalArgs :: Stage -> Args
 commonCabalArgs stage = do
   verbosity <- expr getVerbosity
   pkg       <- getPackage
+  package_id <- expr $ pkgIdentifier pkg
   let prefix = "${pkgroot}" ++ (if windowsHost then "" else "/..")
   mconcat [ -- Don't strip libraries when cross compiling.
             -- TODO: We need to set @--with-strip=(stripCmdPath :: Action FilePath)@,
@@ -109,7 +110,7 @@ commonCabalArgs stage = do
             --
             -- This doesn't hold if we move the @docs@ folder anywhere else.
             , arg "--htmldir"
-            , arg $ "${pkgroot}/../../docs/html/libraries/" ++ pkgName pkg
+            , arg $ "${pkgroot}/../../docs/html/libraries/" ++ package_id
 
             , withStaged $ Ghc CompileHs
             , withBuilderArgs (Ghc CompileHs stage)
