@@ -78,6 +78,10 @@ Compiler
 - New :ghc-flag:`-fprof-late` that adds automatic CCS annotations to all
   top level functions *after* core optimisation have been run.
 
+- New :ghc-flag:`-fprof-manual` which allows surpression of profiling cost centre
+  annotations. It can be disabled as well which can be useful to surpress cost centres
+  originating in library code.
+
 - Typechecking plugins now support type-family rewriting. The ``TcPlugin``
   datatype now contains an extra field, ``tcPluginRewrite``, which allows
   typechecking plugin authors to specify which type families should be
