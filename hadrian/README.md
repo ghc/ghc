@@ -256,6 +256,9 @@ To build all GHC documentation, run `build docs`. This includes
 
 In order to only build haddock document there is the `build docs-haddock` target.
 
+In order to build the haddock documentation for just one package use the `docs:<pkg>` command,
+for example `docs:base` will just build the documentation for `base`.
+
 Alternatively,
 you can use the `--docs` CLI flag to selectively disable some or
 all of the documentation targets:

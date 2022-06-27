@@ -39,6 +39,11 @@ simpleTarget (stage, target) = do
     if target == Packages.ghc
       then need [ root -/- ("ghc-" <> stagestr) ]
       else pure ()
+  when (stage == Stage1 && isLibrary target && target /= rts) $ do
+    let doc_tgt = intercalate ":" ["docs", pkgname]
+    doc_tgt ~> do
+      need . (:[]) =<< (pkgHaddockFile $ vanillaContext Stage1 target)
+
 
   where typ = if isLibrary target then "lib" else "exe"
         stagestr = stageString stage
