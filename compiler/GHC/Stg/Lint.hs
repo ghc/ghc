@@ -235,10 +235,13 @@ lintStgRhs (StgRhsClosure _ _ _ binders expr)
         lintStgExpr expr
 
 lintStgRhs rhs@(StgRhsCon _ con _ _ args) = do
+    opts <- getStgPprOpts
     when (isUnboxedTupleDataCon con || isUnboxedSumDataCon con) $ do
-      opts <- getStgPprOpts
       addErrL (text "StgRhsCon is an unboxed tuple or sum application" $$
                pprStgRhs opts rhs)
+
+    lintConApp con args (pprStgRhs opts rhs)
+
     mapM_ lintStgArg args
     mapM_ checkPostUnariseConArg args
 
@@ -249,16 +252,20 @@ lintStgExpr (StgLit _) = return ()
 lintStgExpr e@(StgApp fun args) = do
   lintStgVar fun
   mapM_ lintStgArg args
+
   lintAppCbvMarks e
   lintStgAppReps fun args
 
 lintStgExpr app@(StgConApp con _n args _arg_tys) = do
     -- unboxed sums should vanish during unarise
     lf <- getLintFlags
+    opts <- getStgPprOpts
     when (lf_unarised lf && isUnboxedSumDataCon con) $ do
-      opts <- getStgPprOpts
       addErrL (text "Unboxed sum after unarise:" $$
                pprStgExpr opts app)
+
+    lintConApp con args (pprStgExpr opts app)
+
     mapM_ lintStgArg args
     mapM_ checkPostUnariseConArg args
 
@@ -305,6 +312,83 @@ lintAlt GenStgAlt{ alt_con   = DataAlt _
   do
     mapM_ checkPostUnariseBndr bndrs
     addInScopeVars bndrs (lintStgExpr rhs)
+
+-- Post unarise check we apply constructors to the right number of args.
+-- This can be violated by invalid use of unsafeCoerce as showcased by test
+-- T9208
+lintConApp :: Foldable t => DataCon -> t a -> SDoc -> LintM ()
+lintConApp con args app = do
+    unarised <- lf_unarised <$> getLintFlags
+    when (unarised &&
+          not (isUnboxedTupleDataCon con) &&
+          length (dataConRuntimeRepStrictness con) /= length args) $ do
+      addErrL (text "Constructor applied to incorrect number of arguments:" $$
+               text "Application:" <> app)
+
+-- See Note [Linting StgApp]
+-- See Note [Typing the STG language]
+lintStgAppReps :: Id -> [StgArg] -> LintM ()
+lintStgAppReps _fun [] = return ()
+lintStgAppReps fun args = do
+  lf <- getLintFlags
+  let platform = lf_platform lf
+      (fun_arg_tys, _res) = splitFunTys (idType fun)
+      fun_arg_tys' = map (scaledThing ) fun_arg_tys :: [Type]
+      fun_arg_tys_reps, actual_arg_reps :: [Maybe [PrimRep]]
+      fun_arg_tys_reps = map typePrimRep_maybe fun_arg_tys'
+      actual_arg_reps = map (typePrimRep_maybe . stgArgType) args
+
+      match_args :: [Maybe [PrimRep]] -> [Maybe [PrimRep]] -> LintM ()
+      -- Might be wrongly typed as polymorphic. See #21399
+      match_args (Nothing:_) _   = return ()
+      match_args (_) (Nothing:_) = return ()
+      match_args (Just actual_rep:actual_reps_left) (Just expected_rep:expected_reps_left)
+        -- Common case, reps are exactly the same
+        | actual_rep == expected_rep
+        = match_args actual_reps_left expected_reps_left
+
+        -- Check for void rep which can be either an empty list *or* [VoidRep]
+        | isVoidRep actual_rep && isVoidRep expected_rep
+        = match_args actual_reps_left expected_reps_left
+
+        -- Some reps are compatible *even* if they are not the same. E.g. IntRep and WordRep.
+        -- We check for that here with primRepCompatible
+        | and $ zipWith (primRepCompatible platform) actual_rep expected_rep
+        = match_args actual_reps_left expected_reps_left
+
+        | otherwise = addErrL $ hang (text "Function type reps and function argument reps missmatched") 2 $
+            (text "In application " <> ppr fun <+> ppr args $$
+              text "argument rep:" <> ppr actual_rep $$
+              text "expected rep:" <> ppr expected_rep $$
+              -- text "expected reps:" <> ppr arg_ty_reps $$
+              text "unarised?:" <> ppr (lf_unarised lf))
+        where
+          isVoidRep [] = True
+          isVoidRep [VoidRep] = True
+          isVoidRep _ = False
+
+          -- n_arg_ty_reps = length arg_ty_reps
+
+      match_args _ _ = return () -- Functions are allowed to be over/under applied.
+
+  match_args actual_arg_reps fun_arg_tys_reps
+
+lintAppCbvMarks :: OutputablePass pass
+                => GenStgExpr pass -> LintM ()
+lintAppCbvMarks e@(StgApp fun args) = do
+  lf <- getLintFlags
+  when (lf_unarised lf) $ do
+    -- A function which expects a unlifted argument as n'th argument
+    -- always needs to be applied to n arguments.
+    -- See Note [CBV Function Ids].
+    let marks = fromMaybe [] $ idCbvMarks_maybe fun
+    when (length (dropWhileEndLE (not . isMarkedCbv) marks) > length args) $ do
+      addErrL $ hang (text "Undersatured cbv marked ID in App" <+> ppr e ) 2 $
+        (text "marks" <> ppr marks $$
+        text "args" <> ppr args $$
+        text "arity" <> ppr (idArity fun) $$
+        text "join_arity" <> ppr (isJoinId_maybe fun))
+lintAppCbvMarks _ = panic "impossible - lintAppCbvMarks"
 
 {-
 ************************************************************************

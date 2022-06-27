@@ -10,12 +10,9 @@ stuff = \ (i :: Int) -> case i of i1 { GHC.Types.I# ipv -> GHC.Types.: @Int i1 (
 Rec {
 -- RHS size: {terms: 23, types: 11, coercions: 0, joins: 0/0}
 T18793.$wgo1 [InlPrag=[2], Occ=LoopBreaker] :: [Int] -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId[StrictWorker([!, ~])], Arity=2, Str=<1L><L>, Unf=OtherCon []]
+[GblId[StrictWorker([!])], Arity=2, Str=<1L><L>, Unf=OtherCon []]
 T18793.$wgo1
-  = \ (ds
-         :: [Int]
-         Unf=OtherCon [])
-      (ww :: GHC.Prim.Int#) ->
+  = \ (ds :: [Int]) (ww :: GHC.Prim.Int#) ->
       case ds of {
         [] -> ww;
         : y ys ->
@@ -35,8 +32,8 @@ T18793.f_go1 [InlPrag=[2]] :: [Int] -> Int -> Int
  Str=<1L><1!P(L)>,
  Cpr=1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (ds [Occ=Once1] :: [Int]) (eta [Occ=Once1!] :: Int) -> case eta of { GHC.Types.I# ww [Occ=Once1] -> case T18793.$wgo1 ds ww of ww1 [Occ=Once1] { __DEFAULT -> GHC.Types.I# ww1 } }}]
-T18793.f_go1 = \ (ds :: [Int]) (eta :: Int) -> case eta of { GHC.Types.I# ww -> case T18793.$wgo1 ds ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 } }
+         Tmpl= \ (ds [Occ=Once1] :: [Int]) (eta [Occ=Once1!, OS=OneShot] :: Int) -> case eta of { GHC.Types.I# ww [Occ=Once1] -> case T18793.$wgo1 ds ww of ww1 [Occ=Once1] { __DEFAULT -> GHC.Types.I# ww1 } }}]
+T18793.f_go1 = \ (ds :: [Int]) (eta [OS=OneShot] :: Int) -> case eta of { GHC.Types.I# ww -> case T18793.$wgo1 ds ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 } }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T18793.f2 :: Int

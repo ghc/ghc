@@ -57,7 +57,7 @@ module GHC.Core.Utils (
         isJoinBind,
 
         -- * Tag inference
-        computeCbvInfo,
+        mkStrictFieldSeqs, shouldStrictifyIdForCbv, shouldUseCbvForId,
 
         -- * unsafeEqualityProof
         isUnsafeEqualityProof,
@@ -95,9 +95,9 @@ import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Basic( Arity, Levity(..)
+                       )
 import GHC.Types.Unique
-import GHC.Types.Basic     ( Arity, CbvMark(..), Levity(..)
-                           , isMarkedCbv )
 import GHC.Types.Unique.Set
 
 import GHC.Data.FastString
@@ -118,6 +118,8 @@ import Data.Function       ( on )
 import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
 import Data.Ord            ( comparing )
 import qualified Data.Set as Set
+import GHC.Types.RepType (isZeroBitTy)
+import GHC.Types.Demand (isStrictDmd, isAbsDmd)
 
 {-
 ************************************************************************
@@ -2517,7 +2519,7 @@ canEtaReduceToArity fun dest_join_arity dest_arity =
 
     || ( dest_arity < idCbvMarkArity fun )
        -- Don't undersaturate StrictWorkerIds.
-       -- See Note [Strict Worker Ids] in GHC.CoreToStg.Prep.
+       -- See Note [CBV Function Ids]  in GHC.CoreToStg.Prep.
 
     ||  isLinearType (idType fun)
        -- Don't perform eta reduction on linear types.
@@ -2644,75 +2646,238 @@ dumpIdInfoOfProgram dump_locals ppr_id_info binds = vcat (map printId ids)
 ************************************************************************
 -}
 
--- | For a binding we:
--- * Look at the args
--- * Mark any with Unf=OtherCon[] as call-by-value, unless it's an unlifted type already.
--- * Potentially combine it with existing call-by-value marks (from ww)
--- * Update the id
--- See Note [Attaching CBV Marks to ids].
-computeCbvInfo :: HasCallStack
-               => Id            -- The function
-               -> CoreExpr      -- It's RHS
-               -> Id
-computeCbvInfo id rhs =
-  -- pprTrace "computeCbv" (hang (ppr id) 2 (ppr dmd $$ ppr dmds)) $
-  -- TODO: For perf reasons we could skip looking at non VanillaId/StrictWorkerId/JoinId bindings
-  cbv_bndr
+{- Note [Call-by-value for worker args]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we unbox a constructor with strict fields we want to
+preserve the information that some of the arguments came
+out of strict fields and therefore should be already properly
+tagged, however we can't express this directly in core.
+
+Instead what we do is generate a worker like this:
+
+  data T = MkT A !B
+
+  foo = case T of MkT a b -> $wfoo a b
+
+  $wfoo a b = case b of b' -> rhs[b/b']
+
+This makes the worker strict in b causing us to use a more efficient
+calling convention for `b` where the caller needs to ensure `b` is
+properly tagged and evaluated before it's passed to $wfoo. See Note [CBV Function Ids].
+
+Usually the argument will be known to be properly tagged at the call site so there is
+no additional work for the caller and the worker can be more efficient since it can
+assume the presence of a tag.
+
+This is especially true for recursive functions like this:
+    -- myPred expect it's argument properly tagged
+    myPred !x = ...
+
+    loop :: MyPair -> Int
+    loop (MyPair !x !y) =
+        case x of
+            A -> 1
+            B -> 2
+            _ -> loop (MyPair (myPred x) (myPred y))
+
+Here we would ordinarily not be strict in y after unboxing.
+However if we pass it as a regular argument then this means on
+every iteration of loop we will incur an extra seq on y before
+we can pass it to `myPred` which isn't great! That is in STG after
+tag inference we get:
+
+    Rec {
+    Find.$wloop [InlPrag=[2], Occ=LoopBreaker]
+      :: Find.MyEnum -> Find.MyEnum -> GHC.Prim.Int#
+    [GblId[StrictWorker([!, ~])],
+    Arity=2,
+    Str=<1L><ML>,
+    Unf=OtherCon []] =
+        {} \r [x y]
+            case x<TagProper> of x' [Occ=Once1] {
+              __DEFAULT ->
+                  case y of y' [Occ=Once1] {
+                  __DEFAULT ->
+                  case Find.$wmyPred y' of pred_y [Occ=Once1] {
+                  __DEFAULT ->
+                  case Find.$wmyPred x' of pred_x [Occ=Once1] {
+                  __DEFAULT -> Find.$wloop pred_x pred_y;
+                  };
+                  };
+              Find.A -> 1#;
+              Find.B -> 2#;
+            };
+    end Rec }
+
+Here comes the tricky part: If we make $wloop strict in both x/y and we get:
+
+    Rec {
+    Find.$wloop [InlPrag=[2], Occ=LoopBreaker]
+      :: Find.MyEnum -> Find.MyEnum -> GHC.Prim.Int#
+    [GblId[StrictWorker([!, !])],
+    Arity=2,
+    Str=<1L><!L>,
+    Unf=OtherCon []] =
+        {} \r [x y]
+            case y<TagProper> of y' [Occ=Once1] { __DEFAULT ->
+            case x<TagProper> of x' [Occ=Once1] {
+              __DEFAULT ->
+                  case Find.$wmyPred y' of pred_y [Occ=Once1] {
+                  __DEFAULT ->
+                  case Find.$wmyPred x' of pred_x [Occ=Once1] {
+                  __DEFAULT -> Find.$wloop pred_x pred_y;
+                  };
+                  };
+              Find.A -> 1#;
+              Find.B -> 2#;
+            };
+    end Rec }
+
+Here both x and y are known to be tagged in the function body since we pass strict worker args using unlifted cbv.
+This means the seqs on x and y both become no-ops and compared to the first version the seq on `y` disappears at runtime.
+
+The downside is that the caller of $wfoo potentially has to evaluate `y` once if we can't prove it isn't already evaluated.
+But y coming out of a strict field is in WHNF so safe to evaluated. And most of the time it will be properly tagged+evaluated
+already at the call site because of the Strict Field Invariant! See Note [Strict Field Invariant] for more in this.
+This makes GHC itself around 1% faster despite doing slightly more work! So this is generally quite good.
+
+We only apply this when we think there is a benefit in doing so however. There are a number of cases in which
+it would be useless to insert an extra seq. ShouldStrictifyIdForCbv tries to identify these to avoid churn in the
+simplifier. See Note [Which Ids should be strictified] for details on this.
+-}
+mkStrictFieldSeqs :: [(Id,StrictnessMark)] -> CoreExpr -> (CoreExpr)
+mkStrictFieldSeqs args rhs =
+  foldr addEval rhs args
+    where
+      case_ty = exprType rhs
+      addEval :: (Id,StrictnessMark) -> (CoreExpr) -> (CoreExpr)
+      addEval (arg_id,arg_cbv) (rhs)
+        -- Argument representing strict field.
+        | isMarkedStrict arg_cbv
+        , shouldStrictifyIdForCbv arg_id
+        -- Make sure to remove unfoldings here to avoid the simplifier dropping those for OtherCon[] unfoldings.
+        = Case (Var $! zapIdUnfolding arg_id) arg_id case_ty ([Alt DEFAULT [] rhs])
+        -- Normal argument
+        | otherwise = do
+          rhs
+
+{- Note [Which Ids should be strictified]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For some arguments we would like to convince GHC to pass them call by value.
+One way to achieve this is described in see Note [Call-by-value for worker args].
+
+We separate the concerns of "should we pass this argument using cbv" and
+"should we do so by making the rhs strict in this argument".
+This note deals with the second part.
+
+There are multiple reasons why we might not want to insert a seq in the rhs to
+strictify a functions argument:
+
+1) The argument doesn't exist at runtime.
+
+For zero width types (like Types) there is no benefit as we don't operate on them
+at runtime at all. This includes things like void#, coercions and state tokens.
+
+2) The argument is a unlifted type.
+
+If the argument is a unlifted type the calling convention already is explicitly
+cbv. This means inserting a seq on this argument wouldn't do anything as the seq
+would be a no-op *and* it wouldn't affect the calling convention.
+
+3) The argument is absent.
+
+If the argument is absent in the body there is no advantage to it being passed as
+cbv to the function. The function won't ever look at it so we don't safe any work.
+
+This mostly happens for join point. For example we might have:
+
+    data T = MkT ![Int] [Char]
+    f t = case t of MkT xs{strict} ys-> snd (xs,ys)
+
+and abstract the case alternative to:
+
+    f t = join j1 = \xs ys -> snd (xs,ys)
+          in case t of MkT xs{strict} ys-> j1 xs xy
+
+While we "use" xs inside `j1` it's not used inside the function `snd` we pass it to.
+In short a absent demand means neither our RHS, nor any function we pass the argument
+to will inspect it. So there is no work to be saved by forcing `xs` early.
+
+NB: There is an edge case where if we rebox we *can* end up seqing an absent value.
+Note [Absent fillers] has an example of this. However this is so rare it's not worth
+caring about here.
+
+4) The argument is already strict.
+
+Consider this code:
+
+    data T = MkT ![Int]
+    f t = case t of MkT xs{strict} -> reverse xs
+
+The `xs{strict}` indicates that `xs` is used strictly by the `reverse xs`.
+If we do a w/w split, and add the extra eval on `xs`, we'll get
+
+    $wf xs =
+        case xs of xs1 ->
+            let t = MkT xs1 in
+            case t of MkT xs2 -> reverse xs2
+
+That's not wrong; but the w/w body will simplify to
+
+    $wf xs = case xs of xs1 -> reverse xs1
+
+and now we'll drop the `case xs` because `xs1` is used strictly in its scope.
+Adding that eval was a waste of time.  So don't add it for strictly-demanded Ids.
+
+5) Functions
+
+Functions are tricky (see Note [TagInfo of functions] in InferTags).
+But the gist of it even if we make a higher order function argument strict
+we can't avoid the tag check when it's used later in the body.
+So there is no benefit.
+
+-}
+-- | Do we expect there to be any benefit if we make this var strict
+-- in order for it to get treated as as cbv argument?
+-- See Note [Which Ids should be strictified]
+-- See Note [CBV Function Ids] for more background.
+shouldStrictifyIdForCbv :: Var -> Bool
+shouldStrictifyIdForCbv = wantCbvForId False
+
+-- Like shouldStrictifyIdForCbv but also wants to use cbv for strict args.
+shouldUseCbvForId :: Var -> Bool
+shouldUseCbvForId = wantCbvForId True
+
+-- When we strictify we want to skip strict args otherwise the logic is the same
+-- as for shouldUseCbvForId so we common up the logic here.
+-- Basically returns true if it would be benefitial for runtime to pass this argument
+-- as CBV independent of weither or not it's correct. E.g. it might return true for lazy args
+-- we are not allowed to force.
+wantCbvForId :: Bool -> Var -> Bool
+wantCbvForId cbv_for_strict v
+  -- Must be a runtime var.
+  -- See Note [Which Ids should be strictified] point 1)
+  | isId v
+  , not $ isZeroBitTy ty
+  -- Unlifted things don't need special measures to be treated as cbv
+  -- See Note [Which Ids should be strictified] point 2)
+  , mightBeLiftedType ty
+  -- Functions sometimes get a zero tag so we can't eliminate the tag check.
+  -- See Note [TagInfo of functions] in InferTags.
+  -- See Note [Which Ids should be strictified] point 5)
+  , not $ isFunTy ty
+  -- If the var is strict already a seq is redundant.
+  -- See Note [Which Ids should be strictified] point 4)
+  , not (isStrictDmd dmd) || cbv_for_strict
+  -- If the var is absent a seq is almost always useless.
+  -- See Note [Which Ids should be strictified] point 3)
+  , not (isAbsDmd dmd)
+  = True
+  | otherwise
+  = False
   where
-    (_,val_args,_body) = collectTyAndValBinders rhs
-    new_marks = mkCbvMarks val_args
-    cbv_marks = assertPpr (checkMarks id new_marks)
-        (ppr id <+> ppr (idType id) $$ text "old:" <> ppr (idCbvMarks_maybe id) $$ text "new:" <> ppr new_marks $$ text "rhs:" <> ppr rhs)
-        new_marks
-    cbv_bndr
-        | valid_unlifted_worker val_args
-        -- Avoid retaining the original rhs
-        = cbv_marks `seqList` setIdCbvMarks id cbv_marks
-        | otherwise =
-          -- pprTraceDebug "tidyCbvInfo: Worker seems to take unboxed tuple/sum types!" (ppr id <+> ppr rhs)
-          id
-    -- We don't set CBV marks on workers which take unboxed tuples or sums as arguments.
-    -- Doing so would require us to compute the result of unarise here in order to properly determine
-    -- argument positions at runtime.
-    -- In practice this doesn't matter much. Most "interesting" functions will get a W/W split which will eliminate
-    -- unboxed tuple arguments, and unboxed sums are rarely used.
-    valid_unlifted_worker args =
-      -- pprTrace "valid_unlifted" (ppr id $$ ppr args) $
-      not $ (any (\arg -> isMultiValArg arg) args)
-    isMultiValArg id =
-      let ty = idType id
-      in not (isStateType ty) && (isUnboxedTupleType ty || isUnboxedSumType ty)
-    -- Only keep relevant marks. We *don't* have to cover all arguments. Only these
-    -- that we might want to pass call-by-value.
-    trimMarks :: [CbvMark] -> [Id] -> [CbvMark]
-    trimMarks marks val_args =
-        map fst .
-          -- Starting at the end, drop all non-cbv marks, and marks applied to unlifted types
-          dropWhileEndLE (\(m,v) -> not (isMarkedCbv m) || isUnliftedType (idType v)) $
-            -- NB: function arguments must have a fixed RuntimeRep, so isUnliftedType can't crash.
-          zip marks val_args
-
-    mkCbvMarks :: ([Id]) -> [CbvMark]
-    mkCbvMarks = map mkMark
-      where
-        cbv_arg arg = isEvaldUnfolding (idUnfolding arg)
-        mkMark arg
-          | cbv_arg arg
-          , not $ isUnliftedType (idType arg)
-            -- NB: isUnliftedType can't crash here as function arguments have a fixed RuntimeRep
-          = MarkedCbv
-          | otherwise
-          = NotMarkedCbv
-    -- If we determined earlier one an argument should be passed cbv it should
-    -- still be so here.
-    checkMarks id new_marks
-      | Just old_marks <- idCbvMarks_maybe id
-      = length (trimMarks old_marks val_args) <= length new_marks &&
-        and (zipWith checkNewMark old_marks new_marks)
-      | otherwise = True
-    checkNewMark old new =
-      isMarkedCbv new || (not $ isMarkedCbv old)
-
+    ty = idType v
+    dmd = idDemandInfo v
 
 {- *********************************************************************
 *                                                                      *

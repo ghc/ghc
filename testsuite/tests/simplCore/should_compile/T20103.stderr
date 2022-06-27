@@ -113,15 +113,9 @@ Rec {
 -- RHS size: {terms: 44, types: 41, coercions: 21, joins: 0/0}
 T20103.$wfoo [InlPrag=[2], Occ=LoopBreaker]
   :: HasCallStack => GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId[StrictWorker([!, ~])],
- Arity=2,
- Str=<SL><1L>,
- Unf=OtherCon []]
+[GblId[StrictWorker([!])], Arity=2, Str=<SL><1L>, Unf=OtherCon []]
 T20103.$wfoo
-  = \ ($dIP
-         :: HasCallStack
-         Unf=OtherCon [])
-      (ww :: GHC.Prim.Int#) ->
+  = \ ($dIP :: HasCallStack) (ww :: GHC.Prim.Int#) ->
       case ww of ds {
         __DEFAULT ->
           case $dIP

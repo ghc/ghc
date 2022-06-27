@@ -626,41 +626,12 @@ regardless of size; and then we needed a way to turn that *off*.  Now
 that we have ForceSpecConstr, this NoSpecConstr is probably redundant.
 (Used only for PArray, TODO: remove?)
 
-Note [SpecConstr and evaluated unfoldings]
+Note [SpecConstr and strict fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-SpecConstr will attach evaldUnfolding unfoldings to function
-arguments representing things that should be fully evaluated
-by the time we execute the RHS.
-
-This primarily concerns strict fields. To give an example in the
-containers package we have a merge function with this specialization:
-
-  "SC:$wmerge01" [2]
-      forall (sc_s5lX :: ghc-prim:GHC.Prim.Int#)
-              (sc_s5lY :: ghc-prim:GHC.Prim.Int#)
-              (sc_s5lZ
-                :: IntMap a_s4UX
-                Unf=OtherCon [])
-              (sc_s5m0
-                :: IntMap a_s4UX
-                Unf=OtherCon [])
-              (sc_s5lW :: ghc-prim:GHC.Prim.Int#)
-              (sc_s5lU :: ghc-prim:GHC.Prim.Int#)
-              (sc_s5lV :: a_s4UX).
-        $wmerge0_s4UK (Data.IntMap.Internal.Tip @a_s4UX sc_s5lU sc_s5lV)
-                      (ghc-prim:GHC.Types.I# sc_s5lW)
-                      (Data.IntMap.Internal.Bin
-                          @a_s4UX sc_s5lX sc_s5lY sc_s5lZ sc_s5m0)
-        = $s$wmerge0_s5m2
-            sc_s5lX sc_s5lY sc_s5lZ sc_s5m0 sc_s5lW sc_s5lU sc_s5lV]
-
-We give sc_s5lZ and sc_s5m0 a evaluated unfolding since they come out of
-strict field fields in the Bin constructor.
-This is especially important since tag inference can then use this
-information to adjust the calling convention of
-`$wmerge0_s4UK` to enforce arguments being passed fully evaluated+tagged.
-See Note [Tag Inference], Note [Strict Worker Ids] for more information on
-how we can take advantage of this.
+We treat strict fields in SpecConstr the same way we do in W/W.
+That is we make the specialized function strict in arguments
+representing strict fields. See Note [Call-by-value for worker args]
+for why we do this.
 
 -----------------------------------------------------
                 Stuff not yet handled
@@ -751,6 +722,7 @@ specConstrProgram guts
       us     <- getUniqueSupplyM
       (_, annos) <- getFirstAnnotations deserializeWithData guts
       this_mod <- getModule
+      -- pprTraceM "specConstrInput" (ppr $ mg_binds guts)
       let binds' = reverse $ fst $ initUs us $ do
                     -- Note [Top-level recursive groups]
                     (env, binds) <- goEnv (initScEnv dflags this_mod annos)
@@ -1738,7 +1710,7 @@ spec_one :: ScEnv
 -}
 
 spec_one env fn arg_bndrs body (call_pat, rule_number)
-  | CP { cp_qvars = qvars, cp_args = pats } <- call_pat
+  | CP { cp_qvars = qvars, cp_args = pats, cp_strict_args = cbv_args } <- call_pat
   = do  { spec_uniq <- getUniqueM
         ; let env1 = extendScSubstList (extendScInScope env qvars)
                                        (arg_bndrs `zip` pats)
@@ -1788,17 +1760,14 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                   , (spec_lam_args, spec_call_args, _) <- addVoidWorkerArg spec_lam_args1 []
                       -- needsVoidWorkerArg: usual w/w hack to avoid generating
                       -- a spec_rhs of unlifted type and no args.
-                      -- Unlike W/W we don't turn functions into strict workers
-                      -- immediately here instead letting tidy handle this.
-                      -- For this reason we can ignore the cbv marks.
-                      -- See Note [Strict Worker Ids]. See Note [Tag Inference].
                   , !spec_arity      <- spec_arity1 + 1
                   , !spec_join_arity <- fmap (+ 1) spec_join_arity1
                   = (spec_lam_args,  spec_call_args, spec_arity,  spec_join_arity)
                   | otherwise
                   = (spec_lam_args1, spec_lam_args1, spec_arity1, spec_join_arity1)
 
-              spec_id    = mkLocalId spec_name Many
+              spec_id    = asWorkerLikeId $
+                           mkLocalId spec_name Many
                                      (mkLamTypes spec_lam_args spec_body_ty)
                              -- See Note [Transfer strictness]
                              `setIdDmdSig`    spec_sig
@@ -1807,7 +1776,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                              `asJoinId_maybe` spec_join_arity
 
                 -- Conditionally use result of new worker-wrapper transform
-              spec_rhs   = mkLams spec_lam_args spec_body
+              spec_rhs   = mkLams spec_lam_args (mkSeqs cbv_args spec_body_ty spec_body)
               rule_rhs   = mkVarApps (Var spec_id) $
                            dropTail (length extra_bndrs) spec_call_args
               inline_act = idInlineActivation fn
@@ -1819,6 +1788,47 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                                , os_id = spec_id
                                , os_rhs = spec_rhs }) }
 
+-- See Note [SpecConstr and strict fields]
+mkSeqs :: [Var] -> Type -> CoreExpr -> CoreExpr
+mkSeqs seqees res_ty rhs =
+  foldr addEval rhs seqees
+    where
+      addEval :: Var -> CoreExpr -> CoreExpr
+      addEval arg_id rhs
+        -- Argument representing strict field and it's worth passing via cbv
+        | shouldStrictifyIdForCbv arg_id
+        = Case (Var arg_id) arg_id res_ty ([Alt DEFAULT [] rhs])
+        | otherwise
+        = rhs
+
+
+{- Note [SpecConst needs to add void args first]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a function
+    f start @t = e
+We want to specialize for a partially applied call `f True`.
+See also Note [SpecConstr call patterns], second Wrinkle.
+Naively we would expect to get
+    $sf @t = $se
+    RULE: f True = $sf
+The specialized function only takes a single type argument
+so we add a void argument to prevent it from turning into
+a thunk. See Note [Protecting the last value argument] for details
+why. Normally we would add the void argument after the
+type argument giving us:
+    $sf :: forall t. Void# -> bla
+    $sf @t void = $se
+    RULE: f True = $sf void# (wrong)
+But if you look closely this wouldn't typecheck!
+If we substitute `f True` with `$sf void#` we expect the type argument to be applied first
+but we apply void# first.
+The easist fix seems to be just to add the void argument to the front of the arguments.
+Now we get:
+    $sf :: Void# -> forall t. bla
+    $sf void @t = $se
+    RULE: f True = $sf void#
+And now we can substitute `f True` with `$sf void#` with everything working out nicely!
+-}
 
 calcSpecInfo :: Id                     -- The original function
              -> CallPat                -- Call pattern
@@ -2081,13 +2091,15 @@ only in kind-casts, but I'm doing the simple thing for now.
 -}
 
 data CallPat = CP { cp_qvars :: [Var]           -- Quantified variables
-                  , cp_args  :: [CoreExpr] }    -- Arguments
+                  , cp_args  :: [CoreExpr]      -- Arguments
+                  , cp_strict_args :: [Var] }   -- Arguments we want to pass unlifted even if they are boxed
      -- See Note [SpecConstr call patterns]
 
 instance Outputable CallPat where
-  ppr (CP { cp_qvars = qvars, cp_args = args })
+  ppr (CP { cp_qvars = qvars, cp_args = args, cp_strict_args =  strict })
     = text "CP" <> braces (sep [ text "cp_qvars =" <+> ppr qvars <> comma
-                               , text "cp_args =" <+> ppr args ])
+                               , text "cp_args =" <+> ppr args
+                               , text "cp_strict_args = " <> ppr strict ])
 
 callsToNewPats :: ScEnv -> Id
                -> SpecInfo
@@ -2200,16 +2212,16 @@ callToPats :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
 callToPats env bndr_occs call@(Call fn args con_env)
   = do  { let in_scope = substInScope (sc_subst env)
 
-        ; pairs <- zipWith3M (argToPat env in_scope con_env) args bndr_occs (map (const NotMarkedStrict) args)
+        ; arg_tripples <- zipWith3M (argToPat env in_scope con_env) args bndr_occs (map (const NotMarkedStrict) args)
                    -- This zip trims the args to be no longer than
                    -- the lambdas in the function definition (bndr_occs)
 
           -- Drop boring patterns from the end
           -- See Note [SpecConstr call patterns]
-        ; let pairs' | isJoinId fn = pairs
-                     | otherwise   = dropWhileEnd is_boring pairs
-              is_boring (interesting, _) = not interesting
-              (interesting_s, pats) = unzip pairs'
+        ; let arg_tripples' | isJoinId fn = arg_tripples
+                            | otherwise   = dropWhileEnd is_boring arg_tripples
+              is_boring (interesting, _,_) = not interesting
+              (interesting_s, pats, cbv_ids) = unzip3 arg_tripples'
               interesting           = or interesting_s
 
         ; let pat_fvs = exprsFreeVarsList pats
@@ -2254,7 +2266,7 @@ callToPats env bndr_occs call@(Call fn args con_env)
               -- pprTraceM "callToPatsOut" (
               --   text "fun" <> ppr fn $$
               --   ppr (CP { cp_qvars = qvars', cp_args = pats })) >>
-                return (Just (CP { cp_qvars = qvars', cp_args = pats }))
+              return (Just (CP { cp_qvars = qvars', cp_args = pats, cp_strict_args = concat cbv_ids }))
           else return Nothing }
 
     -- argToPat takes an actual argument, and returns an abstracted
@@ -2269,8 +2281,8 @@ argToPat :: ScEnv
          -> CoreArg                     -- A call arg (or component thereof)
          -> ArgOcc
          -> StrictnessMark              -- Tells us if this argument is a strict field of a data constructor
-                                        -- See Note [SpecConstr and evaluated unfoldings]
-         -> UniqSM (Bool, CoreArg)
+                                        -- See Note [SpecConstr and strict fields]
+         -> UniqSM (Bool, CoreArg, [Id])
 
 -- Returns (interesting, pat),
 -- where pat is the pattern derived from the argument
@@ -2295,12 +2307,12 @@ argToPat1 :: ScEnv
   -> Expr CoreBndr
   -> ArgOcc
   -> StrictnessMark
-  -> UniqSM (Bool, Expr CoreBndr)
+  -> UniqSM (Bool, Expr CoreBndr, [Id])
 argToPat1 _env _in_scope _val_env arg@(Type {}) _arg_occ _arg_str
-  = return (False, arg)
+  = return (False, arg, [])
 
-argToPat1 env in_scope val_env (Tick _ arg) arg_occ _arg_str
-  = argToPat env in_scope val_env arg arg_occ _arg_str
+argToPat1 env in_scope val_env (Tick _ arg) arg_occ arg_str
+  = argToPat env in_scope val_env arg arg_occ arg_str
         -- Note [Tick annotations in call patterns]
         -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         -- Ignore Notes.  In particular, we want to ignore any InlineMe notes
@@ -2324,7 +2336,7 @@ argToPat env in_scope val_env (Case scrut _ _ [(_, _, rhs)]) arg_occ
 
 argToPat1 env in_scope val_env (Cast arg co) arg_occ arg_str
   | not (ignoreType env ty2)
-  = do  { (interesting, arg') <- argToPat env in_scope val_env arg arg_occ arg_str
+  = do  { (interesting, arg', strict_args) <- argToPat env in_scope val_env arg arg_occ arg_str
         ; if not interesting then
                 wildCardPat ty2 arg_str
           else do
@@ -2332,7 +2344,7 @@ argToPat1 env in_scope val_env (Cast arg co) arg_occ arg_str
           uniq <- getUniqueM
         ; let co_name = mkSysTvName uniq (fsLit "sg")
               co_var  = mkCoVar co_name (mkCoercionType Representational ty1 ty2)
-        ; return (interesting, Cast arg' (mkCoVarCo co_var)) } }
+        ; return (interesting, Cast arg' (mkCoVarCo co_var), strict_args) } }
   where
     Pair ty1 ty2 = coercionKind co
 
@@ -2368,17 +2380,12 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
       --       ppr rest_args $$
       --       ppr (map isTypeArg rest_args))
        ; prs <- zipWith3M (argToPat env in_scope val_env) rest_args arg_occs matched_str
-       ; let args' = map snd prs :: [CoreArg]
+       ; let args' = map sndOf3 prs :: [CoreArg]
        ; assertPpr (length con_str == length (filter isRuntimeArg rest_args))
             ( ppr con_str $$ ppr rest_args $$
               ppr (length con_str) $$ ppr (length rest_args)
             ) $ return ()
-      --  ; assert (length con_str == length rest_args) $
-      --    pprTraceM "argToPat"
-      --       ( parens (int $ length con_str) <> ppr con_str  $$
-      --         ppr rest_args $$
-      --         ppr prs)
-       ; return (True, mkConApp dc (ty_args ++ args')) }
+       ; return (True, mkConApp dc (ty_args ++ args'), concat (map thdOf3 prs)) }
   where
     mb_scrut dc = case arg_occ of
                 ScrutOcc bs | Just occs <- lookupUFM bs dc
@@ -2406,7 +2413,7 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
   --         business of absence analysis, not SpecConstr.)
   --    (b) we know what its value is
   -- In that case it counts as "interesting"
-argToPat1 env in_scope val_env (Var v) arg_occ _arg_str
+argToPat1 env in_scope val_env (Var v) arg_occ arg_str
   | sc_force env || case arg_occ of { ScrutOcc {} -> True
                                     ; UnkOcc      -> False
                                     ; NoOcc       -> False } -- (a)
@@ -2415,7 +2422,8 @@ argToPat1 env in_scope val_env (Var v) arg_occ _arg_str
        -- So sc_keen focused just on f (I# x), where we have freshly-allocated
        -- box that we can eliminate in the caller
   , not (ignoreType env (varType v))
-  = return (True, Var (setStrUnfolding v MarkedStrict))
+  -- See Note [SpecConstr and strict fields]
+  = return (True, Var v, if isMarkedStrict arg_str then [v] else mempty)
   where
     is_value
         | isLocalId v = v `elemInScopeSet` in_scope
@@ -2447,40 +2455,12 @@ argToPat1 env in_scope val_env (Var v) arg_occ _arg_str
 argToPat1 _env _in_scope _val_env arg _arg_occ arg_str
   = wildCardPat (exprType arg) arg_str
 
--- We want the given id to be passed call-by-value if it's MarkedCbv.
--- For some, but not all ids this can be achieved by giving them an OtherCon unfolding.
--- Doesn't touch existing value unfoldings.
--- See Note [SpecConstr and evaluated unfoldings]
-setStrUnfolding :: Id -> StrictnessMark  -> Id
--- setStrUnfolding id str = id
-setStrUnfolding id str
-  -- pprTrace "setStrUnfolding"
-  --   (ppr id <+> ppr (isMarkedCbv str) $$
-  --    ppr (idType id) $$
-  --    text "boxed:" <> ppr (isBoxedType (idType id)) $$
-  --    text "unlifted:" <> ppr (isUnliftedType (idType id))
-  --    )
-  --   False
-  -- = undefined
-  | not (isId id) || isEvaldUnfolding (idUnfolding id)
-  = id
-  | isMarkedStrict str
-  , not $ isUnliftedType (idType id) -- Pointless to stick an evald unfolding on unlifted types
-  = -- trace "setStrUnfolding2" $
-    assert (isId id) $
-    assert (not $ hasCoreUnfolding $ idUnfolding id) $
-    id `setIdUnfolding` evaldUnfolding
-  | otherwise
-  = -- trace "setStrUnfolding3"
-    id
-
-wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg)
+-- | wildCardPats are always boring
+wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg, [Id])
 wildCardPat ty str
-  = do { uniq <- getUniqueM
-       ; let id = mkSysLocalOrCoVar (fsLit "sc") uniq Many ty `setStrUnfolding` str
-       -- See Note [SpecConstr and evaluated unfoldings]
-       -- ; pprTraceM "wildCardPat" (ppr id <+> ppr (idUnfolding id))
-       ; return (False, varToCoreExpr id) }
+  = do { id <- mkSysLocalOrCoVarM (fsLit "sc") Many ty
+       -- ; pprTraceM "wildCardPat" (ppr id' <+> ppr (idUnfolding id'))
+       ; return (False, varToCoreExpr id, if isMarkedStrict str then [id] else []) }
 
 isValue :: ValueEnv -> CoreExpr -> Maybe Value
 isValue _env (Lit lit)
@@ -2536,6 +2516,7 @@ samePat (CP { cp_qvars = vs1, cp_args = as1 })
         (CP { cp_qvars = vs2, cp_args = as2 })
   = all2 same as1 as2
   where
+    -- If the args are the same, their strictness marks will be too so we don't compare those.
     same (Var v1) (Var v2)
         | v1 `elem` vs1 = v2 `elem` vs2
         | v2 `elem` vs2 = False

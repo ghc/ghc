@@ -1246,6 +1246,17 @@ setRuleIdName nm ru = ru { ru_fn = nm }
 ************************************************************************
 
 The @Unfolding@ type is declared here to avoid numerous loops
+
+Note [Never put `OtherCon` unfoldings on lambda binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Based on #21496 we never attach unfoldings of any kind to lambda binders.
+It's just too easy for the call site to change and invalidate the unfolding.
+E.g. the caller of the lambda drops a seq (e.g. because the lambda is strict in it's binder)
+which in turn makes the OtherCon[] unfolding a lie.
+So unfoldings on lambda binders can never really be trusted when on lambda binders if there
+is the chance of the call site to change. So it's easiest to just never attach any
+to lambda binders to begin with, as well as stripping them off if we e.g. float out
+and expression while abstracting over some arguments.
 -}
 
 -- | Records the /unfolding/ of an identifier, which is approximately the form the
