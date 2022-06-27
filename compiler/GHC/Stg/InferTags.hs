@@ -82,7 +82,7 @@ and will be tagged with `001` or `010` respectively.
 It will never point to a thunk, nor will it be tagged `000` (meaning "might be a thunk").
 NB: Note that the proper tag for some objects is indeed `000`. Currently this is the case for PAPs.
 
-This works analogous to how `StrictWorkerId`s work. See also Note [Strict Worker Ids].
+This works analogous to how `WorkerLikeId`s work. See also Note [CBV Function Ids].
 
 Why do we care? Because if we have code like:
 
@@ -121,7 +121,7 @@ evaluated will allocate the constructor.
 So we do our best to establish that `x` is already tagged (which it almost always is)
 to avoid this cost. In my benchmarks I haven't seen any cases where this causes regressions.
 
-Note that there are similar constraints around Note [Strict Worker Ids].
+Note that there are similar constraints around Note [CBV Function Ids].
 
 Note [How untagged pointers can end up in strict fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -186,7 +186,8 @@ As it makes little difference for runtime performance I've treated functions as 
 it made the code simpler. But besides implementation complexity there isn't any reason
 why we couldn't be more rigourous in dealing with functions.
 
-NB: It turned out because of #21193 option two wouldn't really have been an option anyway.
+NB: It turned in #21193 that PAPs get tag zero, so the tag check can't be omitted for functions.
+So option two isn't really an option without reworking this anyway.
 
 Note [Tag inference debugging]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

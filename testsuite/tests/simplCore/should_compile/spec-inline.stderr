@@ -80,11 +80,7 @@ Roman.$wgo [InlPrag=[2]] :: Maybe Int -> Maybe Int -> GHC.Prim.Int#
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [61 30] 249 0}]
 Roman.$wgo
-  = \ (u :: Maybe Int
-         Unf=OtherCon [])
-      (ds
-         :: Maybe Int
-         Unf=OtherCon []) ->
+  = \ (u :: Maybe Int) (ds :: Maybe Int) ->
       case ds of {
         Nothing -> case Roman.foo3 of wild1 { };
         Just x ->
@@ -113,7 +109,7 @@ Roman.$wgo
 
 -- RHS size: {terms: 9, types: 5, coercions: 0, joins: 0/0}
 Roman.foo_go [InlPrag=[2]] :: Maybe Int -> Maybe Int -> Int
-[GblId,
+[GblId[StrictWorker([!, !])],
  Arity=2,
  Str=<1L><1L>,
  Cpr=1,

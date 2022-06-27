@@ -30,9 +30,10 @@ test('T8743', [], multimod_compile, ['T8743', '-v0'])
 test('T10482',  [ grep_errmsg(r'wfoo.*Int#') ], compile, ['-dppr-cols=200 -ddump-simpl'])
 test('T10482a', [ grep_errmsg(r'wf.*Int#') ],   compile, ['-dppr-cols=200 -ddump-simpl'])
 
-test('T9208', when(compiler_debugged(), expect_broken(9208)), compile, [''])
+test('T9208', normal, compile_fail, ['-dno-typeable-binds -dstg-lint'])
 # T9208 fails (and should do so) if you have assertion checking on in the compiler
 # Hence the above expect_broken.  See comments in the ticket
+# AK 06/2022: StgLint now also catches this
 
 test('T10694', [ grep_errmsg(r'(Str|Cpr)=') ],   compile, ['-dppr-cols=200 -ddump-simpl -dsuppress-uniques'])
 test('T11770', [ check_errmsg('OneShot') ], compile, ['-ddump-simpl'])

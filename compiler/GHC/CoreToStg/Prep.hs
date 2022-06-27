@@ -139,7 +139,7 @@ The goal of this pass is to prepare for code generation.
 
 12. Collect cost centres (including cost centres in unfoldings) if we're in
     profiling mode. We have to do this here beucase we won't have unfoldings
-    after this pass (see `zapUnfolding` and Note [Drop unfoldings and rules].
+    after this pass (see `trimUnfolding` and Note [Drop unfoldings and rules].
 
 13. Eliminate case clutter in favour of unsafe coercions.
     See Note [Unsafe coercions]
@@ -989,6 +989,7 @@ cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- May return a CpeRhs because of saturating primops
 cpeApp top_env expr
   = do { let (terminal, args) = collect_args expr
+      --  ; pprTraceM "cpeApp" $ (ppr expr)
        ; cpe_app top_env terminal args
        }
 
@@ -1106,6 +1107,7 @@ cpeApp top_env expr
                  min_arity = case hd of
                    Just v_hd -> if hasNoBinding v_hd then Just $! (idArity v_hd) else Nothing
                    Nothing -> Nothing
+          --  ; pprTraceM "cpe_app:stricts:" (ppr v <+> ppr args $$ ppr stricts $$ ppr (idCbvMarks_maybe v))
            ; (app, floats, unsat_ticks) <- rebuild_app env args e2 emptyFloats stricts min_arity
            ; mb_saturate hd app floats unsat_ticks depth }
         where
@@ -1136,7 +1138,7 @@ cpeApp top_env expr
            ; (app, floats,unsat_ticks) <- rebuild_app env args fun' fun_floats [] Nothing
            ; mb_saturate Nothing app floats unsat_ticks (val_args args) }
 
-    -- Count the number of value arguments.
+    -- Count the number of value arguments *and* coercions (since we don't eliminate the later in STG)
     val_args :: [ArgInfo] -> Int
     val_args args = go args 0
       where
@@ -1152,7 +1154,7 @@ cpeApp top_env expr
             CpeApp e                                  -> go infos n'
               where
                 !n'
-                  | isTyCoArg e = n
+                  | isTypeArg e = n
                   | otherwise   = n+1
 
     -- Saturate if necessary
@@ -1192,7 +1194,7 @@ cpeApp top_env expr
         -> Int -- Number of arguments required to satisfy minimal tick scopes.
         -> UniqSM (CpeApp, Floats, [CoreTickish])
     rebuild_app' _ [] app floats ss rt_ticks !_req_depth
-      = assert (null ss) -- make sure we used all the strictness info
+      = assertPpr (null ss) (ppr ss)-- make sure we used all the strictness info
         return (app, floats, rt_ticks)
 
     rebuild_app' env (a : as) fun' floats ss rt_ticks req_depth = case a of
@@ -1210,9 +1212,12 @@ cpeApp top_env expr
           arg_ty' = cpSubstTy env arg_ty
 
       CpeApp (Coercion co)
-        -> rebuild_app' env as (App fun' (Coercion co')) floats ss rt_ticks req_depth
+        -> rebuild_app' env as (App fun' (Coercion co')) floats ss' rt_ticks req_depth
         where
             co' = cpSubstCo env co
+            ss'
+              | null ss = []
+              | otherwise = tail ss
 
       CpeApp arg -> do
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
@@ -1535,14 +1540,23 @@ maybeSaturate fn expr n_args unsat_ticks
   | hasNoBinding fn        -- There's no binding
   = return $ wrapLamBody (\body -> foldr mkTick body unsat_ticks) sat_expr
 
-  | mark_arity > 0 -- A strict worker. See Note [Strict Worker Ids]
+  | mark_arity > 0 -- A call-by-value function. See Note [CBV Function Ids]
   , not applied_marks
   = assertPpr
       ( not (isJoinId fn)) -- See Note [Do not eta-expand join points]
       ( ppr fn $$ text "expr:" <+> ppr expr $$ text "n_args:" <+> ppr n_args $$
           text "marks:" <+> ppr (idCbvMarks_maybe fn) $$
-          text "join_arity" <+> ppr (idJoinArity fn)
+          text "join_arity" <+> ppr (isJoinId_maybe fn) $$
+          text "fn_arity" <+> ppr fn_arity
        ) $
+    -- pprTrace "maybeSat"
+    --   ( ppr fn $$ text "expr:" <+> ppr expr $$ text "n_args:" <+> ppr n_args $$
+    --       text "marks:" <+> ppr (idCbvMarks_maybe fn) $$
+    --       text "join_arity" <+> ppr (isJoinId_maybe fn) $$
+    --       text "fn_arity" <+> ppr fn_arity $$
+    --       text "excess_arity" <+> ppr excess_arity $$
+    --       text "mark_arity" <+> ppr mark_arity
+    --    ) $
     return sat_expr
 
   | otherwise
@@ -2123,7 +2137,7 @@ cpCloneBndr env bndr
        -- Drop (now-useless) rules/unfoldings
        -- See Note [Drop unfoldings and rules]
        -- and Note [Preserve evaluatedness] in GHC.Core.Tidy
-       ; let unfolding' = zapUnfolding (realIdUnfolding bndr)
+       ; let unfolding' = trimUnfolding (realIdUnfolding bndr)
                           -- Simplifier will set the Id's unfolding
 
              bndr'' = bndr' `setIdUnfolding`      unfolding'
