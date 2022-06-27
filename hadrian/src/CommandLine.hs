@@ -2,7 +2,7 @@ module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2, lookupSkipDepends,
     cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdCompleteSetting,
     cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
-    cmdPrefix
+    cmdPrefix, DocArgs(..), defaultDocArgs
     ) where
 
 import Data.Either
@@ -17,6 +17,7 @@ import System.Environment
 import qualified System.Directory as Directory
 
 import qualified Data.Set as Set
+import Data.Maybe
 
 data TestSpeed = TestSlow | TestNormal | TestFast deriving (Show, Eq)
 
@@ -32,6 +33,7 @@ data CommandLineArgs = CommandLineArgs
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs
+    , docsArgs       :: DocArgs
     , docTargets     :: DocTargets
     , prefix         :: Maybe FilePath
     , completeStg    :: Maybe String }
@@ -50,6 +52,7 @@ defaultCommandLineArgs = CommandLineArgs
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs
+    , docsArgs       = defaultDocArgs
     , docTargets     = Set.fromList [minBound..maxBound]
     , prefix         = Nothing
     , completeStg    = Nothing }
@@ -103,6 +106,13 @@ defaultTestArgs = TestArgs
     , testAccept     = False
     , testHasInTreeFiles = False
     }
+
+data DocArgs = DocArgs
+  { docsBaseUrl :: String
+  } deriving (Eq, Show)
+
+defaultDocArgs :: DocArgs
+defaultDocArgs = DocArgs { docsBaseUrl = "../%pkg%" }
 
 readConfigure :: Either String (CommandLineArgs -> CommandLineArgs)
 readConfigure = Left "hadrian --configure has been deprecated (see #20167). Please run ./boot; ./configure manually"
@@ -190,6 +200,13 @@ readTestOnlyPerf = Right $ \flags -> flags { testArgs = (testArgs flags) { testO
 
 readTestSkipPerf :: Either String (CommandLineArgs -> CommandLineArgs)
 readTestSkipPerf = Right $ \flags -> flags { testArgs = (testArgs flags) { testSkipPerf = True } }
+
+readHaddockBaseUrl :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readHaddockBaseUrl base_url = Right $ \flags ->
+  flags { docsArgs = (docsArgs flags) { docsBaseUrl = base_url' } }
+
+  where base_url' = fromMaybe "https://hackage.haskell.org/package/%pkg%/docs" base_url
+
 
 readTestRootDirs :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestRootDirs rootdirs = Right $ \flags ->
@@ -316,6 +333,8 @@ optDescrs =
         "Destination path for the bindist 'install' rule"
     , Option [] ["complete-setting"] (OptArg readCompleteStg "SETTING")
         "Setting key to autocomplete, for the 'autocomplete' target."
+    , Option [] ["haddock-base-url"] (OptArg readHaddockBaseUrl "BASE_URL")
+        "Generate documentation suitable for upload to hackage or for another base URL (for example a local hackage server)."
     ]
 
 -- | A type-indexed map containing Hadrian command line arguments to be passed
@@ -353,6 +372,7 @@ cmdLineArgsMap = do
     return $ insertExtra (progressInfo   args) -- Accessed by Hadrian.Utilities
            $ insertExtra (buildRoot      args) -- Accessed by Hadrian.Utilities
            $ insertExtra (testArgs       args) -- Accessed by Settings.Builders.RunTest
+           $ insertExtra (docsArgs       args) -- Accessed by Rules.Documentation
            $ insertExtra allSettings           -- Accessed by Settings
            $ insertExtra args Map.empty
 

@@ -285,6 +285,10 @@ all of the documentation targets:
 You can pass several `--docs=...` flags, Hadrian will combine
 their effects.
 
+To build haddock documentation for upload to hackage you need to pass the `--haddock-base-url` flag,
+by default this will choose a url suitable for uploading to hackage but you might also want to pass something like
+`http://127.0.0.1:8080/package/%pkg%/docs` for testing upload locally on a local hackage server.
+
 #### Source distribution
 
 To build a GHC source distribution tarball, run `build source-dist`.

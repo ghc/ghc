@@ -35,7 +35,7 @@ cd inst/share/doc/ghc*/html/libraries
 
 # try extracting the make bindist docs and then the hadrian bindist docs
 mv ../../../../../../windows/doc/html/libraries/Win32-* . || \
-    mv ../../../../../../windows/docs/html/libraries/Win32 . || \
+    mv ../../../../../../windows/docs/html/libraries/Win32-* . || \
     die "failed to find the Win32 package documentation"
 
 sh gen_contents_index

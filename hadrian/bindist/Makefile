@@ -65,11 +65,12 @@ define patchpackageconf
 # $2 = path to .conf file
 # $3 = Docs Directory
 # $4 = (relative) path from $${pkgroot} to docs directory ($3)
+# $5 = package name and version (ex: bytestring-0.13)
 #
 # We fix the paths to haddock files by using the relative path from the pkgroot
 # to the doc files.
-	cat '$2' | sed 's|haddock-interfaces.*|haddock-interfaces: "$${pkgroot}/$4/html/libraries/$1/$1.haddock"|' \
-	         | sed 's|haddock-html.*|haddock-html: "$${pkgroot}/$4/html/libraries/$1"|' \
+	cat '$2' | sed 's|haddock-interfaces.*|haddock-interfaces: "$${pkgroot}/$4/html/libraries/$5/$1.haddock"|' \
+	         | sed 's|haddock-html.*|haddock-html: "$${pkgroot}/$4/html/libraries/$5"|' \
 		 | sed 's|    $${pkgroot}/../../docs/html/.*||' \
 	       > '$2.copy'
 # The rts package doesn't actually supply haddocks, so we stop advertising them
@@ -212,7 +213,7 @@ update_package_db: install_bin install_lib
 	cp mk/system-cxx-std-lib-1.0.conf "$(DESTDIR)$(ActualLibsDir)/"
 	@echo "Updating the package DB"
 	$(foreach p, $(PKG_CONFS),\
-		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-\([0-9]*[0-9]\.\)*conf//g'),$(shell echo "$p" | sed 's:\0xxx\0:   :g'),$(docdir),$(shell mk/relpath.sh "$(ActualLibsDir)" "$(docdir)")))
+		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-\([0-9]*[0-9]\.\)*conf//g'),$(shell echo "$p" | sed 's:\0xxx\0:   :g'),$(docdir),$(shell mk/relpath.sh "$(ActualLibsDir)" "$(docdir)"),$(shell echo $(notdir $p) | sed 's/.conf//g')))
 	'$(DESTDIR)$(ActualBinsDir)/$(CrossCompilePrefix)ghc-pkg' --global-package-db "$(DESTDIR)$(ActualLibsDir)/package.conf.d" recache
 
 install_mingw:

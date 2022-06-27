@@ -135,9 +135,9 @@ def prepare_docs(bindist: Path, pkg: Package):
     is the path to an extract binary distribution produced by
     hadrian.
     """
-    docdir = bindist / 'docs' / 'html' / 'libraries' / pkg.name
     cabal_file = pkg.path / f'{pkg.name}.cabal'
     version = get_version(cabal_file)
+    docdir = bindist / 'docs' / 'html' / 'libraries' / (pkg.name + "-" + version)
     assert version is not None
 
     # Build the documentation tarball from the bindist documentation
