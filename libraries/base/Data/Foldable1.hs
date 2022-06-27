@@ -302,8 +302,6 @@ foldlMapM1 g f t = g x >>= \y -> foldlM f y xs
 
 -- | The largest element of a non-empty structure with respect to the
 -- given comparison function.
-
--- See Note [maximumBy/minimumBy space usage]
 maximumBy :: Foldable1 t => (a -> a -> Ordering) -> t a -> a
 maximumBy cmp = foldl1' max'
   where max' x y = case cmp x y of
@@ -312,8 +310,6 @@ maximumBy cmp = foldl1' max'
 
 -- | The least element of a non-empty structure with respect to the
 -- given comparison function.
-
--- See Note [maximumBy/minimumBy space usage]
 minimumBy :: Foldable1 t => (a -> a -> Ordering) -> t a -> a
 minimumBy cmp = foldl1' min'
   where min' x y = case cmp x y of
