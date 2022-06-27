@@ -121,7 +121,7 @@ def upload_pkg_sdist(sdist : Path, pkg : Package, publish : bool):
     if stamp.is_file():
         return
     print(f'Uploading package {pkg.name}...')
-    cabal_upload(sdist)
+    cabal_upload(sdist, publish)
     stamp.write_text('')
 
 def get_version(cabal_file: Path) -> Optional[str]:
