@@ -884,7 +884,8 @@ lintCoreExpr (Lit lit)
   = return (literalType lit, zeroUE)
 
 lintCoreExpr (Cast expr co)
-  = do (expr_ty, ue) <- markAllJoinsBad   $ lintCoreExpr expr
+  = do (expr_ty, ue) <- markAllJoinsBad (lintCoreExpr expr)
+            -- markAllJoinsBad: see Note [Join points and casts]
        to_ty <- lintCastExpr expr expr_ty co
        return (to_ty, ue)
 
@@ -1214,7 +1215,40 @@ checkLinearity body_ue lam_var =
     err_msg mult = text "Linearity failure in lambda:" <+> ppr lam_var
                 $$ ppr lhs <+> text "⊈" <+> ppr mult
 
-{-
+{- Note [Join points and casts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You might think that this should be OK:
+   join j x = rhs
+   in (case e of
+          A   -> alt1
+          B x -> (jump j x) |> co)
+
+You might think that, since the cast is ultimately erased, the jump to
+`j` should still be OK as a join point.  But no!  See #21716. Suppose
+
+  newtype Age = MkAge Int   -- axAge :: Age ~ Int
+  f :: Int -> ...           -- f strict in it's first argument
+
+and consider the expression
+
+  f (join j :: Bool -> Age
+          j x = (rhs1 :: Age)
+     in case v of
+         Just x  -> (j x |> axAge :: Int)
+         Nothing -> rhs2)
+
+Then, if the Simplifier pushes the strict call into the join points
+and alternatives we'll get
+
+   join j' x = f (rhs1 :: Age)
+   in case v of
+      Just x  -> j' x |> axAge
+      Nothing -> f rhs2
+
+Utterly bogus.  `f` expects an `Int` and we are giving it an `Age`.
+No no no.  Casts destroy the tail-call property.  Henc markAllJoinsBad
+in the (Cast expr co) case of lintCoreExpr.
+
 Note [No alternatives lint check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Case expressions with no alternatives are odd beasts, and it would seem

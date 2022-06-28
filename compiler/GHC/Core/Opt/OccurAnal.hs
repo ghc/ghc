@@ -1856,7 +1856,8 @@ occAnalLam env (Cast expr co)
          -- usage3: you might think this was not necessary, because of
          -- the markAllNonTail in adjustRhsUsage; but not so!  For a
          -- join point, adjustRhsUsage doesn't do this; yet if there is
-         -- a cast, we must!
+         -- a cast, we must!  Also: why markAllNonTail?  See
+         -- GHC.Core.Lint: Note Note [Join points and casts]
          usage3 = markAllNonTail usage2
 
     in WithUsageDetails usage3 (Cast expr' co)
