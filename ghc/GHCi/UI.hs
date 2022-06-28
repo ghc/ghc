@@ -236,7 +236,7 @@ ghciCommands = map mkCmd [
   ("reload!",   keepGoingMulti' reloadModuleDefer,   noCompletion),
   ("run",       keepGoing runRun,               completeFilename),
   ("script",    keepGoing' scriptCmd,           completeFilename),
-  ("set",       keepGoing setCmd,               completeSetOptions),
+  ("set",       keepGoingMulti setCmd,          completeSetOptions),
   ("seti",      keepGoingMulti setiCmd,         completeSeti),
   ("show",      keepGoingMulti' showCmd,        completeShowOptions),
   ("showi",     keepGoing showiCmd,             completeShowiOptions),
@@ -2958,7 +2958,7 @@ setCmd str
         setLocalConfigBehaviour $ dropWhile isSpace rest
     _ -> case toArgsNoLoc str of
          Left err -> liftIO (hPutStrLn stderr err)
-         Right wds -> setOptions wds
+         Right wds -> () <$ keepGoing' setOptions wds
 
 setiCmd :: GhciMonad m => String -> m ()
 setiCmd ""   = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags False
