@@ -405,7 +405,7 @@ lookupRule :: RuleOpts -> InScopeEnv
 -- See Note [Extra args in the target]
 -- See comments on matchRule
 lookupRule opts rule_env@(in_scope,_) is_active fn args rules
-  = -- pprTrace "matchRules" (ppr fn <+> ppr args $$ ppr rules ) $
+  = -- pprTrace "lookupRule" (ppr fn <+> ppr args $$ ppr rules $$ ppr in_scope) $
     case go [] rules of
         []     -> Nothing
         (m:ms) -> Just (findBest in_scope (fn,args') m ms)
