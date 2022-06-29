@@ -3,6 +3,7 @@ module GHC.Driver.Config.Core.Lint
   ( defaultLintFlags
   , desugarBeforeFlags
   , desugarAfterFlags
+  , tidyFlags
   , lintPassResult
   , lintCoreBindings
   , initLintAnnotationsConfig
@@ -105,7 +106,6 @@ perPassFlags dflags pass
   where
     -- See Note [Checking for global Ids]
     check_globals = case pass of
-                      CoreTidy -> False
                       CorePrep -> False
                       _        -> True
 
@@ -113,7 +113,6 @@ perPassFlags dflags pass
     check_static_ptrs | not (xopt LangExt.StaticPointers dflags) = AllowAnywhere
                       | otherwise = case pass of
                           CoreDoFloatOutwards _ -> AllowAtTopLevel
-                          CoreTidy              -> RejectEverywhere
                           CorePrep              -> AllowAtTopLevel
                           _                     -> AllowAnywhere
 
@@ -155,6 +154,24 @@ desugarAfterFlags dflags
                , lf_check_linearity = gopt Opt_DoLinearCoreLinting dflags
                , lf_check_fixed_rep = True
                }
+
+tidyFlags :: DynFlags -> LintFlags
+tidyFlags dflags
+  = (defaultLintFlags dflags)
+               {
+               -- See Note [Checking for global Ids]
+                 lf_check_global_ids = False
+               , lf_check_inline_loop_breakers = True
+               , lf_check_static_ptrs = check_static_ptrs
+               -- See Note [Linting linearity]
+               , lf_check_linearity = gopt Opt_DoLinearCoreLinting dflags
+               , lf_check_fixed_rep = True
+               }
+  where
+    -- See Note [Checking StaticPtrs]
+    check_static_ptrs | not (xopt LangExt.StaticPointers dflags) = AllowAnywhere
+                      | otherwise = RejectEverywhere
+
 
 initLintConfig :: DynFlags -> [Var] -> LintConfig
 initLintConfig dflags vars = LintConfig

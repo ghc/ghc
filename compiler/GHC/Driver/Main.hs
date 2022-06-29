@@ -112,7 +112,7 @@ import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
-import GHC.Driver.Config.Core.EndPass ( endPass )
+import GHC.Driver.Config.Core.EndPass ( endPassTidy )
 import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
 import GHC.Driver.Config.CoreToStg.Prep
 import GHC.Driver.Config.Logger   (initLogFlags)
@@ -163,7 +163,6 @@ import GHC.Core.Multiplicity
 import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
 import GHC.Core.Opt.Pipeline
-import GHC.Core.Opt.Pipeline.Types ( CoreToDo (..))
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
@@ -2298,13 +2297,13 @@ hscTidy hsc_env guts = do
   let all_tidy_binds = cg_binds cgguts
   let print_unqual   = mkPrintUnqualified (hsc_unit_env hsc_env) (mg_rdr_env guts)
 
-  endPass hsc_env print_unqual CoreTidy all_tidy_binds tidy_rules
+  endPassTidy hsc_env print_unqual all_tidy_binds tidy_rules
 
   -- If the endPass didn't print the rules, but ddump-rules is
   -- on, print now
   unless (logHasDumpFlag logger Opt_D_dump_simpl) $
     putDumpFileMaybe logger Opt_D_dump_rules
-      (renderWithContext defaultSDocContext (ppr CoreTidy <+> text "rules"))
+      (renderWithContext defaultSDocContext (text "Tidy Core rules"))
       FormatText
       (pprRulesForUser tidy_rules)
 

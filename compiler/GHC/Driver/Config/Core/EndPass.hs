@@ -2,6 +2,7 @@ module GHC.Driver.Config.Core.EndPass
   ( endPass
   , endPassDesugarBefore
   , endPassDesugarAfter
+  , endPassTidy
   , endPassLintFlags
   , defaultLintFlags
   , lintPassResult
@@ -57,6 +58,14 @@ endPassDesugarAfter hsc_env print_unqual binds rules = do
     (desugarAfterConfig dflags (interactiveInScope $ hsc_IC hsc_env) print_unqual)
     binds rules
 
+endPassTidy :: HscEnv -> PrintUnqualified -> CoreProgram -> [CoreRule] -> IO ()
+endPassTidy hsc_env print_unqual binds rules = do
+  let dflags  = hsc_dflags hsc_env
+  endPassIO
+    (hsc_logger hsc_env)
+    (tidyConfig dflags (interactiveInScope $ hsc_IC hsc_env) print_unqual)
+    binds rules
+
 endPassLintFlags :: HscEnv -> PrintUnqualified -> Maybe DumpFlag -> LintFlags -> SDoc -> SDoc -> Bool -> CoreProgram -> [CoreRule] -> IO ()
 endPassLintFlags hsc_env print_unqual dump_flag lint_flags pretty_pass pass_details show_lint_warnings binds rules = do
   let dflags  = hsc_dflags hsc_env
@@ -92,6 +101,15 @@ desugarAfterConfig dflags extra_vars print_unqual =
         (Outputable.empty)
         True
 
+tidyConfig :: DynFlags -> [Var] -> PrintUnqualified -> EndPassConfig
+tidyConfig dflags extra_vars print_unqual =
+  initEndPassConfig' dflags extra_vars print_unqual
+        (Just Opt_D_dump_simpl)
+        (tidyFlags dflags)
+        (text "Tidy Core")
+        (Outputable.empty)
+        True
+
 initEndPassConfig'
   :: DynFlags -> [Var] -> PrintUnqualified -> Maybe DumpFlag -> LintFlags
   -> SDoc -> SDoc -> Bool -> EndPassConfig
@@ -124,7 +142,6 @@ coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
 coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
 coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
 coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse
-coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
 coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
 
 coreDumpFlag CoreAddCallerCcs         = Nothing
