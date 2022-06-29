@@ -609,7 +609,6 @@ doCorePass logger hsc_env this_mod rule_base mask loc print_unqual vis_orphs pas
     CoreDoPluginPass _ p      -> {-# SCC "Plugin" #-} do
                                  runSimplCountM dflags $ liftCoreM $ p guts
 
-    CoreDesugar               -> noCounts $ pprPanic "doCorePass" (ppr pass)
     CoreDesugarOpt            -> noCounts $ pprPanic "doCorePass" (ppr pass)
     CoreTidy                  -> noCounts $ pprPanic "doCorePass" (ppr pass)
     CorePrep                  -> noCounts $ pprPanic "doCorePass" (ppr pass)

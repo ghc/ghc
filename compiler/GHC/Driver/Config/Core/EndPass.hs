@@ -1,5 +1,6 @@
 module GHC.Driver.Config.Core.EndPass
   ( endPass
+  , endPassDesugarBefore
   , endPassLintFlags
   , defaultLintFlags
   , lintPassResult
@@ -39,6 +40,14 @@ endPass hsc_env print_unqual pass binds rules = do
     (initEndPassConfig dflags (interactiveInScope $ hsc_IC hsc_env) print_unqual pass)
     binds rules
 
+endPassDesugarBefore :: HscEnv -> PrintUnqualified -> CoreProgram -> [CoreRule] -> IO ()
+endPassDesugarBefore hsc_env print_unqual binds rules = do
+  let dflags  = hsc_dflags hsc_env
+  endPassIO
+    (hsc_logger hsc_env)
+    (desugarBeforeConfig dflags (interactiveInScope $ hsc_IC hsc_env) print_unqual)
+    binds rules
+
 endPassLintFlags :: HscEnv -> PrintUnqualified -> Maybe DumpFlag -> LintFlags -> SDoc -> SDoc -> Bool -> CoreProgram -> [CoreRule] -> IO ()
 endPassLintFlags hsc_env print_unqual dump_flag lint_flags pretty_pass pass_details show_lint_warnings binds rules = do
   let dflags  = hsc_dflags hsc_env
@@ -55,6 +64,15 @@ initEndPassConfig dflags extra_vars print_unqual pass =
         (ppr pass)
         (pprPassDetails pass)
         (showLintWarnings pass)
+
+desugarBeforeConfig :: DynFlags -> [Var] -> PrintUnqualified -> EndPassConfig
+desugarBeforeConfig dflags extra_vars print_unqual =
+  initEndPassConfig' dflags extra_vars print_unqual
+        (Just Opt_D_dump_ds_preopt)
+        (desugarBeforeFlags dflags)
+        (text "Desugar (before optimization)")
+        (Outputable.empty)
+        True
 
 initEndPassConfig'
   :: DynFlags -> [Var] -> PrintUnqualified -> Maybe DumpFlag -> LintFlags
@@ -88,7 +106,6 @@ coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
 coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
 coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
 coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse
-coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds_preopt
 coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds
 coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
 coreDumpFlag CorePrep                 = Just Opt_D_dump_prep

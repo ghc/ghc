@@ -55,7 +55,6 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoNothing                -- Useful when building up
   | CoreDoPasses [CoreToDo]      -- lists of these things
 
-  | CoreDesugar    -- Right after desugaring, no simple optimisation yet!
   | CoreDesugarOpt -- CoreDesugarXXX: Not strictly a core-to-core pass, but produces
                    --                 Core output, and hence useful to pass to endPass
 
@@ -79,7 +78,6 @@ instance Outputable CoreToDo where
   ppr CoreDoSpecialising       = text "Specialise"
   ppr CoreDoSpecConstr         = text "SpecConstr"
   ppr CoreCSE                  = text "Common sub-expression"
-  ppr CoreDesugar              = text "Desugar (before optimization)"
   ppr CoreDesugarOpt           = text "Desugar (after optimization)"
   ppr CoreTidy                 = text "Tidy Core"
   ppr CoreAddCallerCcs         = text "Add caller cost-centres"

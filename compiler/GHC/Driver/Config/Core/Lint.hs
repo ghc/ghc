@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 module GHC.Driver.Config.Core.Lint
   ( defaultLintFlags
+  , desugarBeforeFlags
   , lintPassResult
   , lintCoreBindings
   , initLintAnnotationsConfig
@@ -98,19 +99,9 @@ perPassFlags dflags pass
                , lf_check_inline_loop_breakers = check_lbs
                , lf_check_static_ptrs = check_static_ptrs
                , lf_check_linearity = check_linearity
-               , lf_check_fixed_rep = check_fixed_rep
+               , lf_check_fixed_rep = True
                }
   where
-    -- In the output of the desugarer, before optimisation,
-    -- we have eta-expanded data constructors with representation-polymorphic
-    -- bindings; so we switch off the representation-polymorphism checks.
-    -- The very simple optimiser will beta-reduce them away.
-    -- See Note [Checking for representation-polymorphic built-ins]
-    -- in GHC.HsToCore.Expr.
-    check_fixed_rep = case pass of
-                        CoreDesugar -> False
-                        _           -> True
-
     -- See Note [Checking for global Ids]
     check_globals = case pass of
                       CoreTidy -> False
@@ -119,7 +110,6 @@ perPassFlags dflags pass
 
     -- See Note [Checking for INLINE loop breakers]
     check_lbs = case pass of
-                      CoreDesugar    -> False
                       CoreDesugarOpt -> False
                       _              -> True
 
@@ -132,10 +122,28 @@ perPassFlags dflags pass
                           _                     -> AllowAnywhere
 
     -- See Note [Linting linearity]
-    check_linearity = gopt Opt_DoLinearCoreLinting dflags || (
-                        case pass of
-                          CoreDesugar -> True
-                          _ -> False)
+    check_linearity = gopt Opt_DoLinearCoreLinting dflags
+
+desugarBeforeFlags :: DynFlags -> LintFlags
+desugarBeforeFlags dflags
+  = (defaultLintFlags dflags)
+               {
+               -- See Note [Checking for global Ids]
+                 lf_check_global_ids = True
+               -- See Note [Checking for INLINE loop breakers]
+               , lf_check_inline_loop_breakers = False
+               -- See Note [Checking StaticPtrs]
+               , lf_check_static_ptrs = AllowAnywhere
+               -- See Note [Linting linearity]
+               , lf_check_linearity = True
+               -- In the output of the desugarer, before optimisation,
+               -- we have eta-expanded data constructors with representation-polymorphic
+               -- bindings; so we switch off the representation-polymorphism checks.
+               -- The very simple optimiser will beta-reduce them away.
+               -- See Note [Checking for representation-polymorphic built-ins]
+               -- in GHC.HsToCore.Expr.
+               , lf_check_fixed_rep = False
+               }
 
 initLintConfig :: DynFlags -> [Var] -> LintConfig
 initLintConfig dflags vars = LintConfig

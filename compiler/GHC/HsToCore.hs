@@ -20,7 +20,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Config
-import GHC.Driver.Config.Core.EndPass ( endPass )
+import GHC.Driver.Config.Core.EndPass ( endPass, endPassDesugarBefore )
 import GHC.Driver.Config.HsToCore.Ticks
 import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
@@ -211,7 +211,7 @@ deSugar hsc_env
         -- You might think it doesn't matter, but the simplifier brings all top-level
         -- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
-        ; endPass hsc_env print_unqual CoreDesugar final_pgm rules_for_imps
+        ; endPassDesugarBefore hsc_env print_unqual final_pgm rules_for_imps
         ; let simpl_opts = initSimpleOpts dflags
         ; let (ds_binds, ds_rules_for_imps, occ_anald_binds)
                 = simpleOptPgm simpl_opts mod final_pgm rules_for_imps
