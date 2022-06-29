@@ -8,6 +8,7 @@ module GHC.Driver.Config.Core.EndPass
   , lintPassResult
   , lintCoreBindings
   , initEndPassConfig
+  , corePrepConfig
   , initLintAnnotationsConfig
   , initLintPassResultConfig
   , initLintConfig
@@ -83,6 +84,15 @@ initEndPassConfig dflags extra_vars print_unqual pass =
         (pprPassDetails pass)
         (showLintWarnings pass)
 
+corePrepConfig :: DynFlags -> [Var] -> PrintUnqualified -> EndPassConfig
+corePrepConfig dflags extra_vars print_unqual =
+  initEndPassConfig' dflags extra_vars print_unqual
+        (Just Opt_D_dump_prep)
+        (corePrepFlags dflags)
+        (text "CorePrep")
+        (Outputable.empty)
+        True
+
 desugarBeforeConfig :: DynFlags -> [Var] -> PrintUnqualified -> EndPassConfig
 desugarBeforeConfig dflags extra_vars print_unqual =
   initEndPassConfig' dflags extra_vars print_unqual
@@ -142,7 +152,6 @@ coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
 coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
 coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
 coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse
-coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
 
 coreDumpFlag CoreAddCallerCcs         = Nothing
 coreDumpFlag CoreAddLateCcs           = Nothing

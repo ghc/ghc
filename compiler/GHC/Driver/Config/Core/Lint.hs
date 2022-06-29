@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 module GHC.Driver.Config.Core.Lint
   ( defaultLintFlags
+  , corePrepFlags
   , desugarBeforeFlags
   , desugarAfterFlags
   , tidyFlags
@@ -97,27 +98,39 @@ showLintWarnings = \case
 perPassFlags :: DynFlags -> CoreToDo -> LintFlags
 perPassFlags dflags pass
   = (defaultLintFlags dflags)
-               { lf_check_global_ids = check_globals
+               { lf_check_global_ids = True
                , lf_check_inline_loop_breakers = True
                , lf_check_static_ptrs = check_static_ptrs
                , lf_check_linearity = check_linearity
                , lf_check_fixed_rep = True
                }
   where
-    -- See Note [Checking for global Ids]
-    check_globals = case pass of
-                      CorePrep -> False
-                      _        -> True
-
     -- See Note [Checking StaticPtrs]
     check_static_ptrs | not (xopt LangExt.StaticPointers dflags) = AllowAnywhere
                       | otherwise = case pass of
                           CoreDoFloatOutwards _ -> AllowAtTopLevel
-                          CorePrep              -> AllowAtTopLevel
                           _                     -> AllowAnywhere
 
     -- See Note [Linting linearity]
     check_linearity = gopt Opt_DoLinearCoreLinting dflags
+
+corePrepFlags :: DynFlags -> LintFlags
+corePrepFlags dflags
+  = (defaultLintFlags dflags)
+               {
+               -- See Note [Checking for global Ids]
+                 lf_check_global_ids = False
+               -- See Note [Checking for INLINE loop breakers]
+               , lf_check_inline_loop_breakers = True
+               , lf_check_static_ptrs = check_static_ptrs
+               -- See Note [Linting linearity]
+               , lf_check_linearity = gopt Opt_DoLinearCoreLinting dflags
+               , lf_check_fixed_rep = True
+               }
+  where
+    -- See Note [Checking StaticPtrs]
+    check_static_ptrs | not (xopt LangExt.StaticPointers dflags) = AllowAnywhere
+                      | otherwise = AllowAtTopLevel
 
 desugarBeforeFlags :: DynFlags -> LintFlags
 desugarBeforeFlags dflags

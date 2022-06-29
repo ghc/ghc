@@ -55,7 +55,6 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoNothing                -- Useful when building up
   | CoreDoPasses [CoreToDo]      -- lists of these things
 
-  | CorePrep
   | CoreAddCallerCcs
   | CoreAddLateCcs
 
@@ -76,7 +75,6 @@ instance Outputable CoreToDo where
   ppr CoreCSE                  = text "Common sub-expression"
   ppr CoreAddCallerCcs         = text "Add caller cost-centres"
   ppr CoreAddLateCcs           = text "Add late core cost-centres"
-  ppr CorePrep                 = text "CorePrep"
   ppr CoreDoPrintCore          = text "Print core"
   ppr (CoreDoRuleCheck {})     = text "Rule check"
   ppr CoreDoNothing            = text "CoreDoNothing"
