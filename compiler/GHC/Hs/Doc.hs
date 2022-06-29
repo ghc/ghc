@@ -36,7 +36,6 @@ import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Data.EnumSet (EnumSet)
 import GHC.Types.Avail
 import GHC.Types.Name.Set
-import GHC.Unit.Module.Name
 import GHC.Driver.Flags
 
 import Control.Applicative (liftA2)
@@ -48,12 +47,14 @@ import qualified Data.Map as Map
 import Data.List.NonEmpty (NonEmpty(..))
 import GHC.LanguageExtensions.Type
 import qualified GHC.Utils.Outputable as O
-import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
 import GHC.Types.Unique.Map
 import Data.List (sortBy)
 
 import GHC.Hs.DocString
+
+import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Module.Name
 
 -- | A docstring with the (probable) identifiers found in it.
 type HsDoc = WithHsDocIdentifiers HsDocString

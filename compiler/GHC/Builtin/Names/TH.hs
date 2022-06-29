@@ -10,13 +10,14 @@ import GHC.Prelude ()
 
 import GHC.Builtin.Names( mk_known_key_name )
 import GHC.Unit.Types
-import GHC.Unit.Module.Name
 import GHC.Types.Name( Name )
 import GHC.Types.Name.Occurrence( tcName, clsName, dataName, varName )
 import GHC.Types.Name.Reader( RdrName, nameRdrName )
 import GHC.Types.Unique
 import GHC.Builtin.Uniques
 import GHC.Data.FastString
+
+import Language.Haskell.Syntax.Module.Name
 
 -- To add a name, do three things
 --

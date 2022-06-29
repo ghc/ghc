@@ -3,7 +3,7 @@
 module Main where
 
 import GHC.Core.Opt.CallerCC
-import GHC.Unit.Module.Name
+import Language.Haskell.Syntax.Module.Name
 
 deriving instance Eq CallerCcFilter
 deriving instance Show CallerCcFilter

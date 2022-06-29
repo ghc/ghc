@@ -77,6 +77,8 @@ module GHC.Utils.Binary
 
 import GHC.Prelude
 
+import Language.Haskell.Syntax.Module.Name (ModuleName(..))
+
 import {-# SOURCE #-} GHC.Types.Name (Name)
 import GHC.Data.FastString
 import GHC.Utils.Panic.Plain
@@ -1102,6 +1104,10 @@ deriving instance Binary LexicalFastString
 instance Binary Fingerprint where
   put_ h (Fingerprint w1 w2) = do put_ h w1; put_ h w2
   get  h = do w1 <- get h; w2 <- get h; return (Fingerprint w1 w2)
+
+instance Binary ModuleName where
+  put_ bh (ModuleName fs) = put_ bh fs
+  get bh = do fs <- get bh; return (ModuleName fs)
 
 -- instance Binary FunctionOrData where
 --     put_ bh IsFunction = putByte bh 0

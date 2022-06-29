@@ -3,6 +3,7 @@
 module Language.Haskell.Syntax.ImpExp where
 
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Module.Name
 
 import Data.Eq (Eq)
 import Data.Ord (Ord)
@@ -14,7 +15,6 @@ import Data.String (String)
 import Data.Int (Int)
 
 import GHC.Hs.Doc -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
-import GHC.Data.FastString
 
 {-
 ************************************************************************
@@ -25,9 +25,6 @@ Import and export declaration lists
 
 One per import declaration in a module.
 -}
-
--- | A ModuleName is essentially a simple string, e.g. @Data.List@.
-newtype ModuleName = ModuleName FastString deriving Show
 
 -- | Located Import Declaration
 type LImportDecl pass = XRec pass (ImportDecl pass)

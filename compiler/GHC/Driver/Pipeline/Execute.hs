@@ -22,7 +22,6 @@ import GHC.Driver.Pipeline.Phases
 import GHC.Driver.Env hiding (Hsc)
 import GHC.Unit.Module.Location
 import GHC.Driver.Phases
-import GHC.Unit.Module.Name ( ModuleName )
 import GHC.Unit.Types
 import GHC.Types.SourceFile
 import GHC.Unit.Module.Status
@@ -82,6 +81,8 @@ import GHC.Unit.Module.Env
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.Config.Finder
 import GHC.Rename.Names
+
+import Language.Haskell.Syntax.Module.Name
 
 newtype HookedUse a = HookedUse { runHookedUse :: (Hooks, PhaseHook) -> IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch) via (ReaderT (Hooks, PhaseHook) IO)
