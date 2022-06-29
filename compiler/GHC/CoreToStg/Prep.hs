@@ -35,7 +35,7 @@ import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
-import GHC.Core.Lint    ( EndPassConfig(..), endPassIO )
+import GHC.Core.EndPass    ( EndPassConfig(..), endPassIO )
 import GHC.Core
 import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type

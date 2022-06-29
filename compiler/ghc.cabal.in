@@ -296,6 +296,7 @@ Library
         GHC.Core.Coercion.Opt
         GHC.Core.ConLike
         GHC.Core.DataCon
+        GHC.Core.EndPass
         GHC.Core.FamInstEnv
         GHC.Core.FVs
         GHC.Core.InstEnv
@@ -401,6 +402,7 @@ Library
         GHC.Driver.Config.Cmm.Parser
         GHC.Driver.Config.CmmToAsm
         GHC.Driver.Config.CmmToLlvm
+        GHC.Driver.Config.Core.EndPass
         GHC.Driver.Config.Core.Lint
         GHC.Driver.Config.Core.Lint.Interactive
         GHC.Driver.Config.Core.Opt.Arity

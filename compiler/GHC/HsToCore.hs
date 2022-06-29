@@ -20,7 +20,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Config
-import GHC.Driver.Config.Core.Lint ( endPass )
+import GHC.Driver.Config.Core.EndPass ( endPass )
 import GHC.Driver.Config.HsToCore.Ticks
 import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env

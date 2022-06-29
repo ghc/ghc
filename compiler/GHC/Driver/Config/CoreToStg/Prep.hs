@@ -8,7 +8,7 @@ import GHC.Prelude
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Driver.Env
 import GHC.Driver.Session
-import GHC.Driver.Config.Core.Lint
+import GHC.Driver.Config.Core.EndPass
 import GHC.Tc.Utils.Env
 import GHC.Types.Var
 import GHC.Utils.Outputable ( alwaysQualify )
