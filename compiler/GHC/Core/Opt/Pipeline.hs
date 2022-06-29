@@ -552,7 +552,6 @@ doCorePass pass guts = do
     CoreDesugarOpt            -> pprPanic "doCorePass" (ppr pass)
     CoreTidy                  -> pprPanic "doCorePass" (ppr pass)
     CorePrep                  -> pprPanic "doCorePass" (ppr pass)
-    CoreOccurAnal             -> pprPanic "doCorePass" (ppr pass)
 
 {-
 ************************************************************************

@@ -357,7 +357,6 @@ coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds_preopt
 coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds
 coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
 coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
-coreDumpFlag CoreOccurAnal            = Just Opt_D_dump_occur_anal
 
 coreDumpFlag CoreAddCallerCcs         = Nothing
 coreDumpFlag CoreAddLateCcs           = Nothing
