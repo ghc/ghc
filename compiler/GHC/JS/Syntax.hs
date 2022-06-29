@@ -71,6 +71,8 @@ module GHC.JS.Syntax
   , pattern BAnd
   , pattern BXor
   , pattern BNot
+  , pattern LOr
+  , pattern LAnd
   , pattern Int
   , pattern String
   , pattern PreInc
@@ -328,6 +330,15 @@ pattern BXor x y = InfixExpr BXorOp x y
 -- | pattern synonym for Bitwise Not @~@
 pattern BNot :: JExpr -> JExpr
 pattern BNot x = UOpExpr BNotOp x
+
+-- | pattern synonym for logical Or @||@
+pattern LOr :: JExpr -> JExpr -> JExpr
+pattern LOr x y = InfixExpr LOrOp x y
+
+-- | pattern synonym for logical And @&&@
+pattern LAnd :: JExpr -> JExpr -> JExpr
+pattern LAnd x y = InfixExpr LAndOp x y
+
 
 -- | pattern synonym to create integer values
 pattern Int :: Integer -> JExpr

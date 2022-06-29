@@ -262,12 +262,14 @@ genPrim _ _ IntToInt64Op      [r1,r2] [x] =
     , r2 |= x
     ]
 
-genPrim _ _ Int64EqOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= app "h$hs_eqInt64" [high0,low0,high1,low1]
+genPrim _ _ Int64EqOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if_ (LAnd (low0 .===. low1) (high0 .===. high1)) 1 0
+genPrim _ _ Int64NeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if_ (LOr (low0 .!==. low1) (high0 .!==. high1)) 1 0
+
+
 genPrim _ _ Int64GeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= app "h$hs_geInt64" [high0,low0,high1,low1]
 genPrim _ _ Int64GtOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= app "h$hs_gtInt64" [high0,low0,high1,low1]
 genPrim _ _ Int64LeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= app "h$hs_leInt64" [high0,low0,high1,low1]
 genPrim _ _ Int64LtOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= app "h$hs_ltInt64" [high0,low0,high1,low1]
-genPrim _ _ Int64NeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= app "h$hs_neInt64" [high0,low0,high1,low1]
 
 ------------------------------ Word64 -------------------------------------------
 
@@ -285,6 +287,9 @@ genPrim _ _ Word64ToInt64Op   [r1,r2] [x1,x2] =
     , r2 |= x2
     ]
 
+genPrim _ _ Word64EqOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if_ (LAnd (low0 .===. low1) (high0 .===. high1)) 1 0
+genPrim _ _ Word64NeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if_ (LOr (low0 .!==. low1) (high0 .!==. high1)) 1 0
+
 genPrim _ _ Word64AddOp        [r_high,r_low] [high0, low0, high1, low1] =
   PrimInline $ appT [r_high, r_low] "h$hs_plusInt64" [high0, low0, high1, low1]
 
@@ -292,6 +297,30 @@ genPrim _ _ Word64SllOp [r_high,r_low] [high, low, n] =
   PrimInline $ appT [r_high, r_low] "h$hs_uncheckedIShiftL64" [high, low, n]
 genPrim _ _ Word64SrlOp [r_high,r_low] [high, low, n] =
   PrimInline $ appT [r_high, r_low] "h$hs_uncheckedShiftRL64" [high, low, n] -- FIXME: Jeff 06-20222: Is this one right? No h$hs_uncheckedIShiftRL64?
+
+genPrim _ _ Word64OrOp        [r_high,r_low] [high0, low0, high1, low1] =
+  PrimInline $ mconcat
+    [ r_high |= BOr high0 high1
+    , r_low  |= BOr low0  low1
+    ]
+
+genPrim _ _ Word64AndOp        [r_high,r_low] [high0, low0, high1, low1] =
+  PrimInline $ mconcat
+    [ r_high |= BAnd high0 high1
+    , r_low  |= BAnd low0  low1
+    ]
+
+genPrim _ _ Word64XorOp        [r_high,r_low] [high0, low0, high1, low1] =
+  PrimInline $ mconcat
+    [ r_high |= BXor high0 high1
+    , r_low  |= BXor low0  low1
+    ]
+
+genPrim _ _ Word64NotOp        [r_high,r_low] [high, low] =
+  PrimInline $ mconcat
+    [ r_high |= BNot high
+    , r_low  |= BNot low
+    ]
 
 ------------------------------ Word ---------------------------------------------
 
