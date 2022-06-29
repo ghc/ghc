@@ -14,7 +14,8 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
-import GHC.Driver.Config.Core.Lint ( endPass, initLintAnnotationsConfig )
+import GHC.Driver.Config.Core.EndPass ( endPass )
+import GHC.Driver.Config.Core.Lint ( initLintAnnotationsConfig )
 import GHC.Driver.Config.Core.Opt.CallerCC ( initCallerCCOpts )
 import GHC.Driver.Config.Core.Opt.SpecConstr ( initSpecConstrOpts )
 import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )

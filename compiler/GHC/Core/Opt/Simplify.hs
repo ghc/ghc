@@ -10,12 +10,13 @@ import GHC.Prelude
 import GHC.Driver.Flags
 
 import GHC.Core
+import GHC.Core.EndPass ( dumpPassResult )
 import GHC.Core.Rules   ( extendRuleBaseList, extendRuleEnv, addRuleInfo )
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop )
-import GHC.Core.Lint    ( LintPassResultConfig, dumpPassResult, lintPassResult )
+import GHC.Core.Lint    ( LintPassResultConfig, lintPassResult )
 import GHC.Core.Opt.Simplify.Iteration ( simplTopBinds, simplExpr, simplImpRules )
 import GHC.Core.Opt.Simplify.Utils ( activeRule, activeUnfolding )
 import GHC.Core.Opt.Simplify.Env
