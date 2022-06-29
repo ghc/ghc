@@ -14,7 +14,7 @@ import GHC.Core.Opt.Simplify.Env ( FloatEnable(..), SimplMode(..) )
 import GHC.Core.Opt.Simplify.Monad ( TopEnvConfig(..) )
 
 import GHC.Driver.Config ( initOptCoercionOpts )
-import GHC.Driver.Config.Core.Lint ( initLintPassResultConfig )
+import GHC.Driver.Config.Core.Lint ( initLintPassResultConfig, perPassFlags )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Driver.Config.Core.Opt.Arity ( initArityOpts )
 import GHC.Driver.Session ( DynFlags(..), GeneralFlag(..), gopt )
@@ -23,6 +23,8 @@ import GHC.Runtime.Context ( InteractiveContext(..) )
 
 import GHC.Types.Basic ( CompilerPhase(..) )
 import GHC.Types.Var ( Var )
+
+import GHC.Utils.Outputable
 
 initSimplifyExprOpts :: DynFlags -> InteractiveContext -> SimplifyExprOpts
 initSimplifyExprOpts dflags ic = SimplifyExprOpts
@@ -47,7 +49,12 @@ initSimplifyOpts dflags extra_vars iterations mode rule_base = let
     , so_iterations = iterations
     , so_mode = mode
     , so_pass_result_cfg = if gopt Opt_DoCoreLinting dflags
-      then Just $ initLintPassResultConfig dflags extra_vars (CoreDoSimplify opts)
+      then Just $ initLintPassResultConfig dflags extra_vars
+        (perPassFlags dflags $ CoreDoSimplify opts)
+        (ppr $ CoreDoSimplify opts)
+        -- Disable Lint warnings on the first simplifier pass, because
+        -- there may be some INLINE knots still tied, which is tiresomely noisy
+        (sm_phase mode /= InitialPhase)
       else Nothing
     , so_rule_base = rule_base
     , so_top_env_cfg = TopEnvConfig
