@@ -7,41 +7,9 @@ function h$logArith() { h$log.apply(h$log,arguments); }
 #define TRACE_ARITH(args...)
 #endif
 
-function h$hs_eqWord64(a1,a2,b1,b2) {
-  return (a1===b1 && a2===b2) ? 1 : 0;
-}
-
-function h$hs_neWord64(a1,a2,b1,b2) {
-  return (a1 !== b1 || a2 !== b2) ? 1 : 0;
-}
-
 function h$hs_negateInt64(a1,a2) {
   var c = goog.math.Long.fromBits(a2,a1).negate();
   RETURN_UBX_TUP2(c.getHighBits(), c.getLowBits());
-}
-
-function h$hs_not64(a1,a2) {
-  RETURN_UBX_TUP2(~a1, ~a2);
-}
-
-function h$hs_xor64(a1,a2,b1,b2) {
-  RETURN_UBX_TUP2(a1 ^ b1, a2 ^ b2);
-}
-
-function h$hs_and64(a1,a2,b1,b2) {
-  RETURN_UBX_TUP2(a1 & b1, a2 & b2);
-}
-
-function h$hs_or64(a1,a2,b1,b2) {
-  RETURN_UBX_TUP2(a1 | b1, a2 | b2);
-}
-
-function h$hs_eqInt64(a1,a2,b1,b2) {
-  return (a1 === b1 && a2 === b2) ? 1 : 0;
-}
-
-function h$hs_neInt64(a1,a2,b1,b2) {
-  return (a1 !== b1 || a2 !== b2) ? 1 : 0;
 }
 
 function h$hs_leInt64(a1,a2,b1,b2) {
@@ -178,17 +146,30 @@ function h$hs_remWord64(a1,a2,b1,b2) {
   // RETURN_UBX_TUP2(c.shiftRight(32).intValue(), c.intValue());
 }
 
-function h$hs_uncheckedIShiftL64(a1,a2,n) {
-  TRACE_ARITH("hs_uncheckedIShiftL64 " + a1 + " " + a2 + " " + n);
-  var num = new goog.math.Long(a2,a1).shiftLeft(n);
-  TRACE_ARITH("hs_uncheckedIShiftL64 result " + num.getHighBits() + " " + num.getLowBits());
-  RETURN_UBX_TUP2(num.getHighBits(), num.getLowBits());
+function h$hs_uncheckedIShiftL64(high,low,n) {
+  n &= 63;
+  if (n == 0) {
+    RETURN_UBX_TUP2(high,low);
+  } else {
+    if (n < 32) {
+      RETURN_UBX_TUP2((high << n) | (low >>> (32 - n)), low << n);
+    } else {
+      RETURN_UBX_TUP2(low << (n - 32), 0);
+    }
+  }
 }
 
-function h$hs_uncheckedIShiftRA64(a1,a2,n) {
-  TRACE_ARITH("hs_uncheckedShiftRA64 " + a1 + " " + a2 + " " + n);
-  var num = new goog.math.Long(a2,a1).shiftRight(n);
-  RETURN_UBX_TUP2(num.getHighBits(), num.getLowBits());
+function h$hs_uncheckedIShiftRA64(high,low,n) {
+  n &= 63;
+  if (n == 0) {
+    RETURN_UBX_TUP2(high,low);
+  } else {
+    if (n < 32) {
+      RETURN_UBX_TUP2(high >> n, (low >>> n) | (high << (32 - n)));
+    } else {
+      RETURN_UBX_TUP2(high >= 0 ? 0 : -1, high >> (n - 32));
+    }
+  }
 }
 
 // always nonnegative n?
