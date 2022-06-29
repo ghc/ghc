@@ -31,7 +31,6 @@ import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Tickish
-import GHC.Unit.Module.Name
 import GHC.Unit.Module.ModGuts
 import GHC.Types.SrcLoc
 import GHC.Types.Var
@@ -42,6 +41,8 @@ import GHC.Core.Opt.Monad
 import GHC.Utils.Panic
 import qualified GHC.Utils.Binary as B
 import Data.Char
+
+import Language.Haskell.Syntax.Module.Name
 
 addCallerCostCentres :: ModGuts -> CoreM ModGuts
 addCallerCostCentres guts = do

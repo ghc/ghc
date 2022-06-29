@@ -59,6 +59,8 @@ import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
 
 import Data.Char        ( chr, ord )
 
+import Language.Haskell.Syntax.Module.Name
+
 {-
 ************************************************************************
 *                                                                      *
@@ -186,6 +188,10 @@ instance Uniquable FastString where
 
 instance Uniquable Int where
  getUnique i = mkUniqueGrimily i
+
+instance Uniquable ModuleName where
+  getUnique (ModuleName nm) = getUnique nm
+
 
 {-
 ************************************************************************

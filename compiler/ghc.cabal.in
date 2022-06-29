@@ -765,7 +765,6 @@ Library
         GHC.Unit.Module.ModGuts
         GHC.Unit.Module.ModIface
         GHC.Unit.Module.ModSummary
-        GHC.Unit.Module.Name
         GHC.Unit.Module.Status
         GHC.Unit.Module.Warnings
         GHC.Unit.Parser
@@ -806,6 +805,7 @@ Library
         Language.Haskell.Syntax.Extension
         Language.Haskell.Syntax.ImpExp
         Language.Haskell.Syntax.Lit
+        Language.Haskell.Syntax.Module.Name
         Language.Haskell.Syntax.Pat
         Language.Haskell.Syntax.Type
 

@@ -86,7 +86,6 @@ import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Unit.Types
-import GHC.Unit.Module.Name
 import GHC.Utils.Binary
 import GHC.Types.Unique.FM ( UniqFM )
 import GHC.Types.Unique.Set
@@ -104,6 +103,8 @@ import qualified Data.ByteString.Lazy    as LBS
 import qualified Data.Data as Data
 import Data.Char
 import Data.List( find )
+
+import Language.Haskell.Syntax.Module.Name
 
 {-
 Data constructor representation

@@ -29,8 +29,6 @@ import GHC.Types.FieldLabel   ( FieldLabel )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc
-import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.ImpExp
 import GHC.Parser.Annotation
 import GHC.Hs.Extension
 import GHC.Types.Name
@@ -38,6 +36,10 @@ import GHC.Types.PkgQual
 
 import Data.Data
 import Data.Maybe
+
+import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Module.Name
+import Language.Haskell.Syntax.ImpExp
 
 {-
 ************************************************************************

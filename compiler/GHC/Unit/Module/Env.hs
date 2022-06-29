@@ -37,7 +37,6 @@ where
 
 import GHC.Prelude
 
-import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
@@ -53,6 +52,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified GHC.Data.FiniteMap as Map
 import GHC.Utils.Outputable
+
+import Language.Haskell.Syntax.Module.Name
 
 -- | A map keyed off of 'Module's
 newtype ModuleEnv elt = ModuleEnv (Map NDModule elt)

@@ -22,6 +22,7 @@ module Language.Haskell.Syntax (
         module Language.Haskell.Syntax.Expr,
         module Language.Haskell.Syntax.ImpExp,
         module Language.Haskell.Syntax.Lit,
+        module Language.Haskell.Syntax.Module.Name,
         module Language.Haskell.Syntax.Pat,
         module Language.Haskell.Syntax.Type,
         module Language.Haskell.Syntax.Extension,
@@ -32,6 +33,7 @@ import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Expr
 import Language.Haskell.Syntax.ImpExp
+import Language.Haskell.Syntax.Module.Name
 import Language.Haskell.Syntax.Lit
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Pat

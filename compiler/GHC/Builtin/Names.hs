@@ -136,7 +136,6 @@ where
 import GHC.Prelude
 
 import GHC.Unit.Types
-import GHC.Unit.Module.Name
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
 import GHC.Types.Unique
@@ -144,6 +143,8 @@ import GHC.Builtin.Uniques
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Data.FastString
+
+import Language.Haskell.Syntax.Module.Name
 
 {-
 ************************************************************************

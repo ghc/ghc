@@ -16,10 +16,11 @@ import GHC.Types.Error
 import GHC.Driver.Errors.Types
 import GHC.Fingerprint.Type
 import GHC.Unit.Module.Location ( ModLocation )
-import GHC.Unit.Module.Name ( ModuleName )
 import GHC.Unit.Module.ModIface
 import GHC.Linker.Types
 import GHC.Driver.Phases
+
+import Language.Haskell.Syntax.Module.Name ( ModuleName )
 
 -- Typed Pipeline Phases
 -- MP: TODO: We need to refine the arguments to each of these phases so recompilation

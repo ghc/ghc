@@ -1,7 +1,5 @@
 module Language.Haskell.Syntax.ImpExp where
 
-import GHC.Data.FastString
-
 import Data.Eq
 import Data.Ord
 import Text.Show
@@ -16,7 +14,3 @@ instance Eq IsBootInterface
 instance Ord IsBootInterface
 instance Show IsBootInterface
 instance Data IsBootInterface
-
-newtype ModuleName = ModuleName FastString
-
-instance Show ModuleName

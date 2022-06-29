@@ -78,6 +78,8 @@ module GHC.Utils.Outputable (
 
         pprFastFilePath, pprFilePathString,
 
+        pprModuleName,
+
         -- * Controlling the style in which output is printed
         BindingSite(..),
 
@@ -104,7 +106,7 @@ module GHC.Utils.Outputable (
 
     ) where
 
-import {-# SOURCE #-} Language.Haskell.Syntax.ImpExp ( ModuleName )
+import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
 
 import GHC.Prelude
 
@@ -1038,6 +1040,16 @@ instance Outputable Serialized where
 
 instance Outputable Extension where
     ppr = text . show
+
+instance Outputable ModuleName where
+  ppr = pprModuleName
+
+pprModuleName :: ModuleName -> SDoc
+pprModuleName (ModuleName nm) =
+    getPprStyle $ \ sty ->
+    if codeStyle sty
+        then ztext (zEncodeFS nm)
+        else ftext nm
 
 -----------------------------------------------------------------------
 -- The @OutputableP@ class

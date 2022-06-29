@@ -91,7 +91,6 @@ where
 import GHC.Prelude
 import GHC.Types.Unique
 import GHC.Types.Unique.DSet
-import GHC.Unit.Module.Name
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -107,6 +106,7 @@ import Data.Bifunctor
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 
+import Language.Haskell.Syntax.Module.Name
 import {-# SOURCE #-} Language.Haskell.Syntax.ImpExp (IsBootInterface(..))
 
 ---------------------------------------------------------------------

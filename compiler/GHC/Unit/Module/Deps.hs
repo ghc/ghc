@@ -24,7 +24,6 @@ import GHC.Prelude
 import GHC.Types.SafeHaskell
 import GHC.Types.Name
 
-import GHC.Unit.Module.Name
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module
 import GHC.Unit.Home
