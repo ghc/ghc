@@ -20,7 +20,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Config
-import GHC.Driver.Config.Core.EndPass ( endPass, endPassDesugarBefore )
+import GHC.Driver.Config.Core.EndPass ( endPassDesugarAfter, endPassDesugarBefore )
 import GHC.Driver.Config.HsToCore.Ticks
 import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
@@ -55,7 +55,6 @@ import GHC.Core.Coercion
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
 import GHC.Core.Rules
-import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Ppr
 
 import GHC.Builtin.Names
@@ -220,7 +219,7 @@ deSugar hsc_env
         ; putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
             FormatCore (pprCoreBindings occ_anald_binds $$ pprRules ds_rules_for_imps )
 
-        ; endPass hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
+        ; endPassDesugarAfter hsc_env print_unqual ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
               pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))

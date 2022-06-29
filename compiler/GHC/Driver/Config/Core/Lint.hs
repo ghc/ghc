@@ -2,6 +2,7 @@
 module GHC.Driver.Config.Core.Lint
   ( defaultLintFlags
   , desugarBeforeFlags
+  , desugarAfterFlags
   , lintPassResult
   , lintCoreBindings
   , initLintAnnotationsConfig
@@ -96,7 +97,7 @@ perPassFlags :: DynFlags -> CoreToDo -> LintFlags
 perPassFlags dflags pass
   = (defaultLintFlags dflags)
                { lf_check_global_ids = check_globals
-               , lf_check_inline_loop_breakers = check_lbs
+               , lf_check_inline_loop_breakers = True
                , lf_check_static_ptrs = check_static_ptrs
                , lf_check_linearity = check_linearity
                , lf_check_fixed_rep = True
@@ -107,11 +108,6 @@ perPassFlags dflags pass
                       CoreTidy -> False
                       CorePrep -> False
                       _        -> True
-
-    -- See Note [Checking for INLINE loop breakers]
-    check_lbs = case pass of
-                      CoreDesugarOpt -> False
-                      _              -> True
 
     -- See Note [Checking StaticPtrs]
     check_static_ptrs | not (xopt LangExt.StaticPointers dflags) = AllowAnywhere
@@ -143,6 +139,21 @@ desugarBeforeFlags dflags
                -- See Note [Checking for representation-polymorphic built-ins]
                -- in GHC.HsToCore.Expr.
                , lf_check_fixed_rep = False
+               }
+
+desugarAfterFlags :: DynFlags -> LintFlags
+desugarAfterFlags dflags
+  = (defaultLintFlags dflags)
+               {
+               -- See Note [Checking for global Ids]
+                 lf_check_global_ids = True
+               -- See Note [Checking for INLINE loop breakers]
+               , lf_check_inline_loop_breakers = False
+               -- See Note [Checking StaticPtrs]
+               , lf_check_static_ptrs = AllowAnywhere
+               -- See Note [Linting linearity]
+               , lf_check_linearity = gopt Opt_DoLinearCoreLinting dflags
+               , lf_check_fixed_rep = True
                }
 
 initLintConfig :: DynFlags -> [Var] -> LintConfig

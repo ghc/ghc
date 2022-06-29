@@ -1,6 +1,7 @@
 module GHC.Driver.Config.Core.EndPass
   ( endPass
   , endPassDesugarBefore
+  , endPassDesugarAfter
   , endPassLintFlags
   , defaultLintFlags
   , lintPassResult
@@ -48,6 +49,14 @@ endPassDesugarBefore hsc_env print_unqual binds rules = do
     (desugarBeforeConfig dflags (interactiveInScope $ hsc_IC hsc_env) print_unqual)
     binds rules
 
+endPassDesugarAfter :: HscEnv -> PrintUnqualified -> CoreProgram -> [CoreRule] -> IO ()
+endPassDesugarAfter hsc_env print_unqual binds rules = do
+  let dflags  = hsc_dflags hsc_env
+  endPassIO
+    (hsc_logger hsc_env)
+    (desugarAfterConfig dflags (interactiveInScope $ hsc_IC hsc_env) print_unqual)
+    binds rules
+
 endPassLintFlags :: HscEnv -> PrintUnqualified -> Maybe DumpFlag -> LintFlags -> SDoc -> SDoc -> Bool -> CoreProgram -> [CoreRule] -> IO ()
 endPassLintFlags hsc_env print_unqual dump_flag lint_flags pretty_pass pass_details show_lint_warnings binds rules = do
   let dflags  = hsc_dflags hsc_env
@@ -71,6 +80,15 @@ desugarBeforeConfig dflags extra_vars print_unqual =
         (Just Opt_D_dump_ds_preopt)
         (desugarBeforeFlags dflags)
         (text "Desugar (before optimization)")
+        (Outputable.empty)
+        True
+
+desugarAfterConfig :: DynFlags -> [Var] -> PrintUnqualified -> EndPassConfig
+desugarAfterConfig dflags extra_vars print_unqual =
+  initEndPassConfig' dflags extra_vars print_unqual
+        (Just Opt_D_dump_ds)
+        (desugarAfterFlags dflags)
+        (text "Desugar (after optimization)")
         (Outputable.empty)
         True
 
@@ -106,7 +124,6 @@ coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
 coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
 coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
 coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse
-coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds
 coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
 coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
 
