@@ -258,62 +258,62 @@ seqList xs = go xs `seq` xs
   where go (y:ys) = y `seq` go ys
         go []     = ()
 
-foreign import javascript unsafe "h$toHsString($1)"
+foreign import javascript unsafe "(($1) => { return h$toHsString($1); })"
   js_fromJSString :: JSVal -> Exts.Any
 
-foreign import javascript unsafe "h$fromHsString($1)"
+foreign import javascript unsafe "(($1) => { return h$fromHsString($1); })"
   js_toJSString :: Exts.Any -> JSVal
 
-foreign import javascript unsafe "h$toHsListJSVal($1)"
+foreign import javascript unsafe "(($1) => { return h$toHsListJSVal($1); })"
   js_fromJSArray :: JSVal -> IO Exts.Any
 
-foreign import javascript unsafe "h$fromHsListJSVal($1)"
+foreign import javascript unsafe "(($1) => { return h$fromHsListJSVal($1); })"
   js_toJSArray :: Exts.Any -> IO JSVal
 
-foreign import javascript unsafe "$1 === null"
+foreign import javascript unsafe "(($1) => { return ($1 === null); })"
   js_isNull :: JSVal -> Bool
 
-foreign import javascript unsafe "$1 === undefined"
+foreign import javascript unsafe "(($1) => { return ($1 === undefined); })"
   js_isUndefined :: JSVal -> Bool
 
-foreign import javascript unsafe "$r = typeof($1) === 'number' ? ($1|0) : 0;"
+foreign import javascript unsafe "(($1) => { return ($r = typeof($1) === 'number' ? ($1|0) : 0;); })"
   js_fromJSInt :: JSVal -> Int
 
-foreign import javascript unsafe "$r = $1;"
+foreign import javascript unsafe "(($1) => { return ($r = $1;); })"
   js_toJSInt :: Int -> JSVal
 
 foreign import javascript unsafe "$r = null;"
   js_null :: JSVal
 
-foreign import javascript unsafe "$1[h$fromHsString($2)]"
+foreign import javascript unsafe "(($1,$2) => { return $1[h$fromHsString($2)]; })"
   js_getProp :: JSVal -> Exts.Any -> IO JSVal
 
-foreign import javascript unsafe "$1[h$fromHsString($2)]"
+foreign import javascript unsafe "(($1,$2) => { return $1[h$fromHsString($2)]; })"
   js_unsafeGetProp :: JSVal -> Exts.Any -> JSVal
 
-foreign import javascript unsafe "$1[$2]"
+foreign import javascript unsafe "(($1,$2) => { return $1[$2]; })"
   js_getProp' :: JSVal -> JSVal -> IO JSVal
 
-foreign import javascript unsafe "$1[$2]"
+foreign import javascript unsafe "(($1,$2) => { return $1[$2]; })"
   js_unsafeGetProp' :: JSVal -> JSVal -> JSVal
 
-foreign import javascript unsafe "$1[h$decodeUtf8z($2_1, $2_2)]"
+foreign import javascript unsafe "(($1,$2_1,$2_2) => { return $1[h$decodeUtf8z($2_1, $2_2)]; })"
   js_getPropUtf8## :: JSVal# -> Addr# -> State# s -> (# State# s, JSVal# #)
 
-foreign import javascript unsafe "$1[h$decodeUtf8z($2_1, $2_2)]"
+foreign import javascript unsafe "(($1,$2_1,$2_2) => { return $1[h$decodeUtf8z($2_1, $2_2)]; })"
   js_unsafeGetPropUtf8## :: JSVal# -> Addr# -> JSVal#
 
-foreign import javascript unsafe "h$decodeUtf8z($1_1, $1_2)"
+foreign import javascript unsafe "(($1_1,$1_2) => { return h$decodeUtf8z($1_1, $1_2); })"
   js_unpackJSStringUtf8## :: Addr# -> State# s -> (# State# s, JSVal# #)
 
 
-foreign import javascript unsafe "h$decodeUtf8z($1_1, $1_2)"
+foreign import javascript unsafe "(($1_1, $1_2) => { return h$decodeUtf8z($1_1,$1_2); })"
   js_unsafeUnpackJSStringUtf8## :: Addr# -> JSVal#
 
-foreign import javascript unsafe "$1($2)"
+foreign import javascript unsafe "(($1, $2) => { return $1($2); })"
   js_callback_any :: JSVal# -> Exts.Any -> IO ()
 
-foreign import javascript unsafe "$1($2)"
+foreign import javascript unsafe "(($1, $2) => { return $1($2); })"
   js_callback_jsval :: JSVal# -> JSVal -> IO ()
 
 #endif
