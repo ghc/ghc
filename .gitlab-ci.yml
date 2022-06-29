@@ -514,11 +514,11 @@ doc-tarball:
 hackage-doc-tarball:
   stage: packaging
   needs:
-    - job: x86_64-linux-fedora33-release
+    - job: x86_64-linux-fedora33-release-hackage
       optional: true
-    - job: nightly-x86_64-linux-fedora33-release
+    - job: nightly-x86_64-linux-fedora33-release-hackage
       optional: true
-    - job: release-x86_64-linux-fedora33-release
+    - job: release-x86_64-linux-fedora33-release-hackage
       optional: true
     - job: source-tarball
   tags:

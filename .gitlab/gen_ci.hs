@@ -712,6 +712,10 @@ data JobGroup a = StandardTriple { v :: (String, a)
                 | ValidateOnly   { v :: (String, a)
                                  , n :: (String, a) } deriving Functor
 
+rename :: (String -> String) -> JobGroup a -> JobGroup a
+rename f (StandardTriple (nv, v) (nn, n) (nr, r)) = StandardTriple (f nv, v) (f nn, n) (f nr, r)
+rename f (ValidateOnly (nv, v) (nn, n)) = ValidateOnly (f nv, v) (f nn, n)
+
 -- | Construct a 'JobGroup' which consists of a validate, nightly and release build with
 -- a specific config.
 standardBuildsWithConfig :: Arch -> Opsys -> BuildConfig -> JobGroup Job
@@ -756,6 +760,8 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      -- Fedora33 job is always built with perf so there's one job in the normal
      -- validate pipeline which is built with perf.
      , (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig)
+     -- This job is only for generating head.hackage docs
+     , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
      , fastCI (standardBuilds Amd64 Windows)
      , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
@@ -770,6 +776,8 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      ]
 
   where
+    hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-base-url")
+
     tsan_jobs =
       modifyJobs
         ( addVariable "TSAN_OPTIONS" "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
