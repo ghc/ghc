@@ -2781,7 +2781,7 @@ section "Synchronized I/O Ports"
 ------------------------------------------------------------------------
 
 primtype IOPort# s a
-        { A shared I/O port is almost the same as a 'MVar#'!).
+        { A shared I/O port is almost the same as an 'MVar#'.
         The main difference is that IOPort has no deadlock detection or
         deadlock breaking code that forcibly releases the lock. }
 
