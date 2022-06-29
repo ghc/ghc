@@ -132,6 +132,7 @@ pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
           else Outputable.empty
     ]
 
+-- | A writer monad accumulating 'SimplCount'.
 newtype SimplCountM a = SimplCountM { unSimplCountM :: StateT SimplCount IO a }
   deriving (Functor, Applicative, Monad, MonadIO) via (StateT SimplCount IO)
 

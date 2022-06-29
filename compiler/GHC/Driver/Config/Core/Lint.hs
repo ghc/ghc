@@ -1,7 +1,8 @@
 module GHC.Driver.Config.Core.Lint
-  ( lintCoreBindings
+  ( defaultLintFlags
   , initLintAnnotationsConfig
   , initLintPassResultConfig
+  , maybeInitLintPassResultConfig
   , initLintConfig
   , showLintWarnings
   , perPassFlags
@@ -14,7 +15,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Driver.Session
 import GHC.Driver.Config.Diagnostic
 
-import GHC.Core
 import GHC.Core.Lint
 import GHC.Core.Opt.Pipeline.Types
 import GHC.Core.Opt.Simplify ( SimplifyOpts(..) )
@@ -25,22 +25,6 @@ import GHC.Types.Basic ( CompilerPhase(..) )
 import GHC.Types.SrcLoc ( SrcSpan )
 
 import GHC.Utils.Outputable as Outputable
-
-{-
-These functions are not CoreM monad stuff, but they probably ought to
-be, and it makes a convenient place for them.  They print out stuff
-before and after core passes, and do Core Lint when necessary.
--}
-
--- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
-lintCoreBindings :: DynFlags -> CoreToDo -> [Var] -> CoreProgram -> WarnsAndErrs
-lintCoreBindings dflags coreToDo vars -- binds
-  = lintCoreBindings' $ LintConfig
-      { l_diagOpts = initDiagOpts dflags
-      , l_platform = targetPlatform dflags
-      , l_flags    = perPassFlags dflags coreToDo
-      , l_vars     = vars
-      }
 
 initLintAnnotationsConfig :: DynFlags -> SrcSpan -> PrintUnqualified -> CoreToDo -> LintAnnotationsConfig
 initLintAnnotationsConfig dflags loc print_unqual pass = LintAnnotationsConfig
@@ -55,11 +39,16 @@ initLintPassResultConfig :: DynFlags -> [Var] -> LintFlags -> SDoc -> Bool -> Li
 initLintPassResultConfig dflags extra_vars lint_flags pass_ppr show_lint_warnings = LintPassResultConfig
   { lpr_diagOpts      = initDiagOpts dflags
   , lpr_platform      = targetPlatform dflags
-  , lpr_makeLintFlags = lint_flags --perPassFlags dflags pass
-  , lpr_showLintWarnings = show_lint_warnings -- showLintWarnings pass
+  , lpr_makeLintFlags = lint_flags
+  , lpr_showLintWarnings = show_lint_warnings
   , lpr_passPpr = pass_ppr
   , lpr_localsInScope = extra_vars
   }
+
+maybeInitLintPassResultConfig :: DynFlags -> [Var] -> LintFlags -> SDoc -> Bool -> Maybe LintPassResultConfig
+maybeInitLintPassResultConfig dflags extra_vars lint_flags pass_ppr show_lint_warnings
+  | gopt Opt_DoCoreLinting dflags = Just $ initLintPassResultConfig dflags extra_vars lint_flags pass_ppr show_lint_warnings
+  | otherwise = Nothing
 
 showLintWarnings :: CoreToDo -> Bool
 -- Disable Lint warnings on the first simplifier pass, because
@@ -70,50 +59,15 @@ showLintWarnings (CoreDoSimplify cfg) = case sm_phase (so_mode cfg) of
 showLintWarnings _ = True
 
 perPassFlags :: DynFlags -> CoreToDo -> LintFlags
-perPassFlags dflags pass
-  = (defaultLintFlags dflags)
-               { lf_check_global_ids = check_globals
-               , lf_check_inline_loop_breakers = check_lbs
-               , lf_check_static_ptrs = check_static_ptrs
-               , lf_check_linearity = check_linearity
-               , lf_check_fixed_rep = check_fixed_rep
-               }
+perPassFlags dflags pass = (defaultLintFlags dflags)
+  { lf_check_static_ptrs = check_static_ptrs
+  }
   where
-    -- In the output of the desugarer, before optimisation,
-    -- we have eta-expanded data constructors with representation-polymorphic
-    -- bindings; so we switch off the representation-polymorphism checks.
-    -- The very simple optimiser will beta-reduce them away.
-    -- See Note [Checking for representation-polymorphic built-ins]
-    -- in GHC.HsToCore.Expr.
-    check_fixed_rep = case pass of
-                        CoreDesugar -> False
-                        _           -> True
-
-    -- See Note [Checking for global Ids]
-    check_globals = case pass of
-                      CoreTidy -> False
-                      CorePrep -> False
-                      _        -> True
-
-    -- See Note [Checking for INLINE loop breakers]
-    check_lbs = case pass of
-                      CoreDesugar    -> False
-                      CoreDesugarOpt -> False
-                      _              -> True
-
     -- See Note [Checking StaticPtrs]
     check_static_ptrs | not (xopt LangExt.StaticPointers dflags) = AllowAnywhere
                       | otherwise = case pass of
                           CoreDoFloatOutwards _ -> AllowAtTopLevel
-                          CoreTidy              -> RejectEverywhere
-                          CorePrep              -> AllowAtTopLevel
                           _                     -> AllowAnywhere
-
-    -- See Note [Linting linearity]
-    check_linearity = gopt Opt_DoLinearCoreLinting dflags || (
-                        case pass of
-                          CoreDesugar -> True
-                          _ -> False)
 
 initLintConfig :: DynFlags -> [Var] -> LintConfig
 initLintConfig dflags vars = LintConfig
@@ -124,10 +78,11 @@ initLintConfig dflags vars = LintConfig
   }
 
 defaultLintFlags :: DynFlags -> LintFlags
-defaultLintFlags dflags = LF { lf_check_global_ids = True
-                             , lf_check_inline_loop_breakers = True
-                             , lf_check_static_ptrs = AllowAnywhere
-                             , lf_check_linearity = gopt Opt_DoLinearCoreLinting dflags
-                             , lf_report_unsat_syns = True
-                             , lf_check_fixed_rep = True
-                             }
+defaultLintFlags dflags = LF
+  { lf_check_global_ids = True
+  , lf_check_inline_loop_breakers = True
+  , lf_check_static_ptrs = AllowAnywhere
+  , lf_check_linearity = gopt Opt_DoLinearCoreLinting dflags
+  , lf_report_unsat_syns = True
+  , lf_check_fixed_rep = True
+  }
