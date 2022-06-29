@@ -1025,9 +1025,9 @@ to eta-expand to
    in ...(f a b c)...
 
 But now f's strictness signature has too short an arity; see
-GHC.Core.Lint Note [Check arity on bottoming functions].
-Fortuitously, the same strictness-signature-fixup code gives the
-function a new strictness signature with the right number of
+GHC.Core.Opt.DmdAnal Note [idArity varies independently of dmdTypeDepth].
+Fortuitously, the same strictness-signature-fixup code
+gives the function a new strictness signature with the right number of
 arguments.  Example in stranal/should_compile/EtaExpansion.
 
 Note [Setting the demand info]

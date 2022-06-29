@@ -353,8 +353,9 @@ data IdInfo
         occInfo         :: OccInfo,
         -- ^ How the 'Id' occurs in the program
         dmdSigInfo      :: DmdSig,
-        -- ^ A strictness signature. Digests how a function uses its arguments
-        -- if applied to at least 'arityInfo' arguments.
+        -- ^ A strictness signature. Describes how a function uses its arguments
+        --   See Note [idArity varies independently of dmdTypeDepth]
+        --       in GHC.Core.Opt.DmdAnal
         cprSigInfo      :: CprSig,
         -- ^ Information on whether the function will ultimately return a
         -- freshly allocated constructor.

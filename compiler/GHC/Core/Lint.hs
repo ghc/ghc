@@ -640,7 +640,8 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
            ppr (typeArity (idType binder)) <> colon <+>
            ppr binder)
 
-       -- See Note [Check arity on bottoming functions]
+       -- See Note [idArity varies independently of dmdTypeDepth]
+       --     in GHC.Core.Opt.DmdAnal
        ; case splitDmdSig (idDmdSig binder) of
            (demands, result_info) | isDeadEndDiv result_info ->
              checkL (demands `lengthAtLeast` idArity binder)
@@ -648,6 +649,7 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
                text "exceeds arity imposed by the strictness signature" <+>
                ppr (idDmdSig binder) <> colon <+>
                ppr binder)
+
            _ -> return ()
 
        ; addLoc (RuleOf binder) $ mapM_ (lintCoreRule binder binder_ty) (idCoreRules binder)
@@ -724,15 +726,8 @@ lintIdUnfolding  _ _ _
   = return ()       -- Do not Lint unstable unfoldings, because that leads
                     -- to exponential behaviour; c.f. GHC.Core.FVs.idUnfoldingVars
 
-{-
-Note [Check arity on bottoming functions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If a function has a strictness signature like [S]b, it claims to
-return bottom when applied to one argument.  So its arity should not
-be greater than 1!  We check this claim in Lint.
-
-Note [Checking for INLINE loop breakers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Checking for INLINE loop breakers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's very suspicious if a strong loop breaker is marked INLINE.
 
 However, the desugarer generates instance methods with INLINE pragmas

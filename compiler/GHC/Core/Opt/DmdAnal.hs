@@ -1177,18 +1177,27 @@ complexity.
 
 Note [idArity varies independently of dmdTypeDepth]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general, an Id `f` has two independently varying attributes:
+
+* f's idArity, and
+* the dmdTypeDepth of f's demand signature
+
+For example, if f's demand signature is <L><L>, f's arity could be
+greater than, or less than 2. Why?  Because both are conservative
+approximations:
+
+* Arity n means "does no work until applied to at least n args"
+  (e.g. (f x1..xm) is cheap to bring to HNF for m<n)
+
+* Dmd sig with n args means "here is how to transform the incoming demand
+  when applied to n args".  This is /semantic/ property, unrelated to
+  arity. See GHC.Types.Demand Note [Understanding DmdType and DmdSig]
+
 We used to check in GHC.Core.Lint that dmdTypeDepth <= idArity for a let-bound
 identifier. But that means we would have to zap demand signatures every time we
-reset or decrease arity. That's an unnecessary dependency, because
+reset or decrease arity.
 
-  * The demand signature captures a semantic property that is independent of
-    what the binding's current arity is
-  * idArity is analysis information itself, thus volatile
-  * We already *have* dmdTypeDepth, wo why not just use it to encode the
-    threshold for when to unleash the signature
-    (cf. Note [Understanding DmdType and DmdSig] in GHC.Types.Demand)
-
-Consider the following expression, for example:
+For example, consider the following expression, for example:
 
     (let go x y = `x` seq ... in go) |> co
 
@@ -1200,6 +1209,11 @@ coercion into the binding, leading to an arity decrease:
 
 With the CoreLint check, we would have to zap `go`'s perfectly viable strictness
 signature.
+
+However, in the case of a /bottoming/ signature, f : <L><L>b, we /can/
+say that f's arity is no greater than 2, because it'd be false to say
+that f does no work when applied to 3 args.  Lint checks this constraint,
+in `GHC.Core.Lint.lintLetBind`.
 
 Note [Demand analysis for trivial right-hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
