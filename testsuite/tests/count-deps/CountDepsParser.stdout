@@ -16,6 +16,7 @@ GHC.Cmm.Dataflow.Label
 GHC.Cmm.Expr
 GHC.Cmm.MachOp
 GHC.Cmm.Node
+GHC.Cmm.Reg
 GHC.Cmm.Switch
 GHC.Cmm.Type
 GHC.CmmToAsm.CFG.Weight

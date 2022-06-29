@@ -43,7 +43,6 @@ import GHC.Data.FastString ( nilFS, mkFastString )
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Cmm.Ppr.Expr ( pprExpr )
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Utils.Misc      ( seqList )
@@ -559,6 +558,6 @@ toUnwindExpr platform e@(CmmMachOp op [e1, e2])   =
     (MO_Sub{}, u1,        u2       ) -> UwMinus u1 u2
     (MO_Mul{}, u1,        u2       ) -> UwTimes u1 u2
     _otherwise -> pprPanic "Unsupported operator in unwind expression!"
-                           (pprExpr platform e)
+                           (pdoc platform e)
 toUnwindExpr platform e
   = pprPanic "Unsupported unwind expression!" (pdoc platform e)

@@ -24,7 +24,6 @@ import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Liveness
 import GHC.Cmm.Switch (switchTargetsToList)
-import GHC.Cmm.Ppr () -- For Outputable instances
 import GHC.Utils.Outputable
 
 import Control.Monad (ap, unless)

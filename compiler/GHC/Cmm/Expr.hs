@@ -10,6 +10,7 @@ module GHC.Cmm.Expr
     , CmmReg(..), cmmRegType, cmmRegWidth
     , CmmLit(..), cmmLitType
     , AlignmentSpec(..)
+      -- TODO: Remove:
     , LocalReg(..), localRegType
     , GlobalReg(..), isArgReg, globalRegType
     , spReg, hpReg, spLimReg, hpLimReg, nodeReg
@@ -26,6 +27,11 @@ module GHC.Cmm.Expr
     , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
     , regSetToList
 
+    , isTrivialCmmExpr
+    , hasNoGlobalRegs
+    , isLit
+    , isComparisonExpr
+
     , Area(..)
     , module GHC.Cmm.MachOp
     , module GHC.Cmm.Type
@@ -39,12 +45,16 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm.MachOp
 import GHC.Cmm.Type
+import GHC.Cmm.Reg
+import GHC.Utils.Trace (pprTrace)
 import GHC.Utils.Panic (panic)
 import GHC.Utils.Outputable
 import GHC.Types.Unique
 
+import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Numeric ( fromRat )
 
 import GHC.Types.Basic (Alignment, mkAlignment, alignmentOf)
 
@@ -78,13 +88,11 @@ instance Eq CmmExpr where       -- Equality ignores the types
   CmmStackSlot a1 i1 == CmmStackSlot a2 i2 = a1==a2 && i1==i2
   _e1                == _e2                = False
 
+instance OutputableP Platform CmmExpr where
+    pdoc = pprExpr
+
 data AlignmentSpec = NaturallyAligned | Unaligned
   deriving (Eq, Ord, Show)
-
-data CmmReg
-  = CmmLocal  {-# UNPACK #-} !LocalReg
-  | CmmGlobal GlobalReg
-  deriving( Eq, Ord, Show )
 
 -- | A stack area is either the stack slot where a variable is spilled
 -- or the stack space where function arguments and results are passed.
@@ -93,6 +101,14 @@ data Area
   | Young {-# UNPACK #-} !BlockId  -- Invariant: must be a continuation BlockId
                    -- See Note [Continuation BlockIds] in GHC.Cmm.Node.
   deriving (Eq, Ord, Show)
+
+instance Outputable Area where
+    ppr e = pprArea e
+
+pprArea :: Area -> SDoc
+pprArea Old        = text "old"
+pprArea (Young id) = hcat [ text "young<", ppr id, text ">" ]
+
 
 {- Note [Old Area]
 ~~~~~~~~~~~~~~~~~~
@@ -217,6 +233,9 @@ data CmmLit
                      -- of bytes used
   deriving (Eq, Show)
 
+instance OutputableP Platform CmmLit where
+    pdoc = pprLit
+
 instance Outputable CmmLit where
   ppr (CmmInt n w) = text "CmmInt" <+> ppr n <+> ppr w
   ppr (CmmFloat n w) = text "CmmFloat" <+> text (show n) <+> ppr w
@@ -276,38 +295,34 @@ maybeInvertCmmExpr (CmmMachOp op args) = do op' <- maybeInvertComparison op
                                             return (CmmMachOp op' args)
 maybeInvertCmmExpr _ = Nothing
 
------------------------------------------------------------------------------
---              Local registers
------------------------------------------------------------------------------
+---------------------------------------------------
+--         CmmExpr predicates
+---------------------------------------------------
 
-data LocalReg
-  = LocalReg {-# UNPACK #-} !Unique !CmmType
-    -- ^ Parameters:
-    --   1. Identifier
-    --   2. Type
-  deriving Show
+isTrivialCmmExpr :: CmmExpr -> Bool
+isTrivialCmmExpr (CmmLoad _ _ _)    = False
+isTrivialCmmExpr (CmmMachOp _ _)    = False
+isTrivialCmmExpr (CmmLit _)         = True
+isTrivialCmmExpr (CmmReg _)         = True
+isTrivialCmmExpr (CmmRegOff _ _)    = True
+isTrivialCmmExpr (CmmStackSlot _ _) = panic "isTrivialCmmExpr CmmStackSlot"
 
-instance Eq LocalReg where
-  (LocalReg u1 _) == (LocalReg u2 _) = u1 == u2
+hasNoGlobalRegs :: CmmExpr -> Bool
+hasNoGlobalRegs (CmmLoad e _ _)            = hasNoGlobalRegs e
+hasNoGlobalRegs (CmmMachOp _ es)           = all hasNoGlobalRegs es
+hasNoGlobalRegs (CmmLit _)                 = True
+hasNoGlobalRegs (CmmReg (CmmLocal _))      = True
+hasNoGlobalRegs (CmmRegOff (CmmLocal _) _) = True
+hasNoGlobalRegs _                          = False
 
--- This is non-deterministic but we do not currently support deterministic
--- code-generation. See Note [Unique Determinism and code generation]
--- See Note [No Ord for Unique]
-instance Ord LocalReg where
-  compare (LocalReg u1 _) (LocalReg u2 _) = nonDetCmpUnique u1 u2
+isLit :: CmmExpr -> Bool
+isLit (CmmLit _) = True
+isLit _          = False
 
-instance Uniquable LocalReg where
-  getUnique (LocalReg uniq _) = uniq
+isComparisonExpr :: CmmExpr -> Bool
+isComparisonExpr (CmmMachOp op _) = isComparisonMachOp op
+isComparisonExpr _                = False
 
-cmmRegType :: Platform -> CmmReg -> CmmType
-cmmRegType _        (CmmLocal  reg) = localRegType reg
-cmmRegType platform (CmmGlobal reg) = globalRegType platform reg
-
-cmmRegWidth :: Platform -> CmmReg -> Width
-cmmRegWidth platform = typeWidth . cmmRegType platform
-
-localRegType :: LocalReg -> CmmType
-localRegType (LocalReg _ rep) = rep
 
 -----------------------------------------------------------------------------
 --    Register-use information for expressions and other types
@@ -404,241 +419,159 @@ instance DefinerOfRegs r a => DefinerOfRegs r [a] where
   foldRegsDefd platform f set as = foldl' (foldRegsDefd platform f) set as
   {-# INLINABLE foldRegsDefd #-}
 
------------------------------------------------------------------------------
---              Global STG registers
------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------
+-- Pretty-printing expressions
+-- --------------------------------------------------------------------------
 
-data VGcPtr = VGcPtr | VNonGcPtr deriving( Eq, Show )
+pprExpr :: Platform -> CmmExpr -> SDoc
+pprExpr platform e
+    = case e of
+        CmmRegOff reg i ->
+                pprExpr platform (CmmMachOp (MO_Add rep)
+                           [CmmReg reg, CmmLit (CmmInt (fromIntegral i) rep)])
+                where rep = typeWidth (cmmRegType platform reg)
+        CmmLit lit -> pprLit platform lit
+        _other     -> pprExpr1 platform e
 
------------------------------------------------------------------------------
---              Global STG registers
------------------------------------------------------------------------------
-{-
-Note [Overlapping global registers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The backend might not faithfully implement the abstraction of the STG
-machine with independent registers for different values of type
-GlobalReg. Specifically, certain pairs of registers (r1, r2) may
-overlap in the sense that a store to r1 invalidates the value in r2,
-and vice versa.
+-- Here's the precedence table from GHC.Cmm.Parser:
+-- %nonassoc '>=' '>' '<=' '<' '!=' '=='
+-- %left '|'
+-- %left '^'
+-- %left '&'
+-- %left '>>' '<<'
+-- %left '-' '+'
+-- %left '/' '*' '%'
+-- %right '~'
 
-Currently this occurs only on the x86_64 architecture where FloatReg n
-and DoubleReg n are assigned the same microarchitectural register, in
-order to allow functions to receive more Float# or Double# arguments
-in registers (as opposed to on the stack).
+-- We just cope with the common operators for now, the rest will get
+-- a default conservative behaviour.
 
-There are no specific rules about which registers might overlap with
-which other registers, but presumably it's safe to assume that nothing
-will overlap with special registers like Sp or BaseReg.
+-- %nonassoc '>=' '>' '<=' '<' '!=' '=='
+pprExpr1, pprExpr7, pprExpr8 :: Platform -> CmmExpr -> SDoc
+pprExpr1 platform (CmmMachOp op [x,y])
+   | Just doc <- infixMachOp1 op
+   = pprExpr7 platform x <+> doc <+> pprExpr7 platform y
+pprExpr1 platform e = pprExpr7 platform e
 
-Use GHC.Cmm.Utils.regsOverlap to determine whether two GlobalRegs overlap
-on a particular platform. The instance Eq GlobalReg is syntactic
-equality of STG registers and does not take overlap into
-account. However it is still used in UserOfRegs/DefinerOfRegs and
-there are likely still bugs there, beware!
--}
+infixMachOp1, infixMachOp7, infixMachOp8 :: MachOp -> Maybe SDoc
 
-data GlobalReg
-  -- Argument and return registers
-  = VanillaReg                  -- pointers, unboxed ints and chars
-        {-# UNPACK #-} !Int     -- its number
-        VGcPtr
+infixMachOp1 (MO_Eq     _) = Just (text "==")
+infixMachOp1 (MO_Ne     _) = Just (text "!=")
+infixMachOp1 (MO_Shl    _) = Just (text "<<")
+infixMachOp1 (MO_U_Shr  _) = Just (text ">>")
+infixMachOp1 (MO_U_Ge   _) = Just (text ">=")
+infixMachOp1 (MO_U_Le   _) = Just (text "<=")
+infixMachOp1 (MO_U_Gt   _) = Just (char '>')
+infixMachOp1 (MO_U_Lt   _) = Just (char '<')
+infixMachOp1 _             = Nothing
 
-  | FloatReg            -- single-precision floating-point registers
-        {-# UNPACK #-} !Int     -- its number
+-- %left '-' '+'
+pprExpr7 platform (CmmMachOp (MO_Add rep1) [x, CmmLit (CmmInt i rep2)]) | i < 0
+   = pprExpr7 platform (CmmMachOp (MO_Sub rep1) [x, CmmLit (CmmInt (negate i) rep2)])
+pprExpr7 platform (CmmMachOp op [x,y])
+   | Just doc <- infixMachOp7 op
+   = pprExpr7 platform x <+> doc <+> pprExpr8 platform y
+pprExpr7 platform e = pprExpr8 platform e
 
-  | DoubleReg           -- double-precision floating-point registers
-        {-# UNPACK #-} !Int     -- its number
+infixMachOp7 (MO_Add _)  = Just (char '+')
+infixMachOp7 (MO_Sub _)  = Just (char '-')
+infixMachOp7 _           = Nothing
 
-  | LongReg             -- long int registers (64-bit, really)
-        {-# UNPACK #-} !Int     -- its number
+-- %left '/' '*' '%'
+pprExpr8 platform (CmmMachOp op [x,y])
+   | Just doc <- infixMachOp8 op
+   = pprExpr8 platform x <+> doc <+> pprExpr9 platform y
+pprExpr8 platform e = pprExpr9 platform e
 
-  | XmmReg                      -- 128-bit SIMD vector register
-        {-# UNPACK #-} !Int     -- its number
+infixMachOp8 (MO_U_Quot _) = Just (char '/')
+infixMachOp8 (MO_Mul _)    = Just (char '*')
+infixMachOp8 (MO_U_Rem _)  = Just (char '%')
+infixMachOp8 _             = Nothing
 
-  | YmmReg                      -- 256-bit SIMD vector register
-        {-# UNPACK #-} !Int     -- its number
+pprExpr9 :: Platform -> CmmExpr -> SDoc
+pprExpr9 platform e =
+   case e of
+        CmmLit    lit       -> pprLit1 platform lit
+        CmmLoad   expr rep align
+                            -> let align_mark =
+                                       case align of
+                                         NaturallyAligned -> empty
+                                         Unaligned        -> text "^"
+                                in ppr rep <> align_mark <> brackets (pdoc platform expr)
+        CmmReg    reg       -> ppr reg
+        CmmRegOff  reg off  -> parens (ppr reg <+> char '+' <+> int off)
+        CmmStackSlot a off  -> parens (ppr a   <+> char '+' <+> int off)
+        CmmMachOp mop args  -> genMachOp platform mop args
 
-  | ZmmReg                      -- 512-bit SIMD vector register
-        {-# UNPACK #-} !Int     -- its number
+genMachOp :: Platform -> MachOp -> [CmmExpr] -> SDoc
+genMachOp platform mop args
+   | Just doc <- infixMachOp mop = case args of
+        -- dyadic
+        [x,y] -> pprExpr9 platform x <+> doc <+> pprExpr9 platform y
 
-  -- STG registers
-  | Sp                  -- Stack ptr; points to last occupied stack location.
-  | SpLim               -- Stack limit
-  | Hp                  -- Heap ptr; points to last occupied heap location.
-  | HpLim               -- Heap limit register
-  | CCCS                -- Current cost-centre stack
-  | CurrentTSO          -- pointer to current thread's TSO
-  | CurrentNursery      -- pointer to allocation area
-  | HpAlloc             -- allocation count for heap check failure
+        -- unary
+        [x]   -> doc <> pprExpr9 platform x
 
-                -- We keep the address of some commonly-called
-                -- functions in the register table, to keep code
-                -- size down:
-  | EagerBlackholeInfo  -- stg_EAGER_BLACKHOLE_info
-  | GCEnter1            -- stg_gc_enter_1
-  | GCFun               -- stg_gc_fun
+        _     -> pprTrace "GHC.Cmm.Expr.genMachOp: machop with strange number of args"
+                          (pprMachOp mop <+>
+                            parens (hcat $ punctuate comma (map (pprExpr platform) args)))
+                          empty
 
-  -- Base offset for the register table, used for accessing registers
-  -- which do not have real registers assigned to them.  This register
-  -- will only appear after we have expanded GlobalReg into memory accesses
-  -- (where necessary) in the native code generator.
-  | BaseReg
+   | isJust (infixMachOp1 mop)
+   || isJust (infixMachOp7 mop)
+   || isJust (infixMachOp8 mop)  = parens (pprExpr platform (CmmMachOp mop args))
 
-  -- The register used by the platform for the C stack pointer. This is
-  -- a break in the STG abstraction used exclusively to setup stack unwinding
-  -- information.
-  | MachSp
+   | otherwise = char '%' <> ppr_op <> parens (commafy (map (pprExpr platform) args))
+        where ppr_op = text (map (\c -> if c == ' ' then '_' else c)
+                                 (show mop))
+                -- replace spaces in (show mop) with underscores,
 
-  -- The is a dummy register used to indicate to the stack unwinder where
-  -- a routine would return to.
-  | UnwindReturnReg
+--
+-- Unsigned ops on the word size of the machine get nice symbols.
+-- All else get dumped in their ugly format.
+--
+infixMachOp :: MachOp -> Maybe SDoc
+infixMachOp mop
+        = case mop of
+            MO_And    _ -> Just $ char '&'
+            MO_Or     _ -> Just $ char '|'
+            MO_Xor    _ -> Just $ char '^'
+            MO_Not    _ -> Just $ char '~'
+            MO_S_Neg  _ -> Just $ char '-' -- there is no unsigned neg :)
+            _ -> Nothing
 
-  -- Base Register for PIC (position-independent code) calculations
-  -- Only used inside the native code generator. It's exact meaning differs
-  -- from platform to platform (see module PositionIndependentCode).
-  | PicBaseReg
+-- --------------------------------------------------------------------------
+-- Pretty-printing literals
+--
+--  To minimise line noise we adopt the convention that if the literal
+--  has the natural machine word size, we do not append the type
+-- --------------------------------------------------------------------------
 
-  deriving( Show )
+pprLit :: Platform -> CmmLit -> SDoc
+pprLit platform lit = case lit of
+    CmmInt i rep ->
+        hcat [ (if i < 0 then parens else id)(integer i)
+             , ppUnless (rep == wordWidth platform) $
+               space <> dcolon <+> ppr rep ]
 
-instance Eq GlobalReg where
-   VanillaReg i _ == VanillaReg j _ = i==j -- Ignore type when seeking clashes
-   FloatReg i == FloatReg j = i==j
-   DoubleReg i == DoubleReg j = i==j
-   LongReg i == LongReg j = i==j
-   -- NOTE: XMM, YMM, ZMM registers actually are the same registers
-   -- at least with respect to store at YMM i and then read from XMM i
-   -- and similarly for ZMM etc.
-   XmmReg i == XmmReg j = i==j
-   YmmReg i == YmmReg j = i==j
-   ZmmReg i == ZmmReg j = i==j
-   Sp == Sp = True
-   SpLim == SpLim = True
-   Hp == Hp = True
-   HpLim == HpLim = True
-   CCCS == CCCS = True
-   CurrentTSO == CurrentTSO = True
-   CurrentNursery == CurrentNursery = True
-   HpAlloc == HpAlloc = True
-   EagerBlackholeInfo == EagerBlackholeInfo = True
-   GCEnter1 == GCEnter1 = True
-   GCFun == GCFun = True
-   BaseReg == BaseReg = True
-   MachSp == MachSp = True
-   UnwindReturnReg == UnwindReturnReg = True
-   PicBaseReg == PicBaseReg = True
-   _r1 == _r2 = False
+    CmmFloat f rep     -> hsep [ double (fromRat f), dcolon, ppr rep ]
+    CmmVec lits        -> char '<' <> commafy (map (pprLit platform) lits) <> char '>'
+    CmmLabel clbl      -> pdoc platform clbl
+    CmmLabelOff clbl i -> pdoc platform clbl <> ppr_offset i
+    CmmLabelDiffOff clbl1 clbl2 i _ -> pdoc platform clbl1 <> char '-'
+                                       <> pdoc platform clbl2 <> ppr_offset i
+    CmmBlock id        -> ppr id
+    CmmHighStackMark -> text "<highSp>"
 
--- NOTE: this Ord instance affects the tuple layout in GHCi, see
---       Note [GHCi tuple layout]
-instance Ord GlobalReg where
-   compare (VanillaReg i _) (VanillaReg j _) = compare i j
-     -- Ignore type when seeking clashes
-   compare (FloatReg i)  (FloatReg  j) = compare i j
-   compare (DoubleReg i) (DoubleReg j) = compare i j
-   compare (LongReg i)   (LongReg   j) = compare i j
-   compare (XmmReg i)    (XmmReg    j) = compare i j
-   compare (YmmReg i)    (YmmReg    j) = compare i j
-   compare (ZmmReg i)    (ZmmReg    j) = compare i j
-   compare Sp Sp = EQ
-   compare SpLim SpLim = EQ
-   compare Hp Hp = EQ
-   compare HpLim HpLim = EQ
-   compare CCCS CCCS = EQ
-   compare CurrentTSO CurrentTSO = EQ
-   compare CurrentNursery CurrentNursery = EQ
-   compare HpAlloc HpAlloc = EQ
-   compare EagerBlackholeInfo EagerBlackholeInfo = EQ
-   compare GCEnter1 GCEnter1 = EQ
-   compare GCFun GCFun = EQ
-   compare BaseReg BaseReg = EQ
-   compare MachSp MachSp = EQ
-   compare UnwindReturnReg UnwindReturnReg = EQ
-   compare PicBaseReg PicBaseReg = EQ
-   compare (VanillaReg _ _) _ = LT
-   compare _ (VanillaReg _ _) = GT
-   compare (FloatReg _) _     = LT
-   compare _ (FloatReg _)     = GT
-   compare (DoubleReg _) _    = LT
-   compare _ (DoubleReg _)    = GT
-   compare (LongReg _) _      = LT
-   compare _ (LongReg _)      = GT
-   compare (XmmReg _) _       = LT
-   compare _ (XmmReg _)       = GT
-   compare (YmmReg _) _       = LT
-   compare _ (YmmReg _)       = GT
-   compare (ZmmReg _) _       = LT
-   compare _ (ZmmReg _)       = GT
-   compare Sp _ = LT
-   compare _ Sp = GT
-   compare SpLim _ = LT
-   compare _ SpLim = GT
-   compare Hp _ = LT
-   compare _ Hp = GT
-   compare HpLim _ = LT
-   compare _ HpLim = GT
-   compare CCCS _ = LT
-   compare _ CCCS = GT
-   compare CurrentTSO _ = LT
-   compare _ CurrentTSO = GT
-   compare CurrentNursery _ = LT
-   compare _ CurrentNursery = GT
-   compare HpAlloc _ = LT
-   compare _ HpAlloc = GT
-   compare GCEnter1 _ = LT
-   compare _ GCEnter1 = GT
-   compare GCFun _ = LT
-   compare _ GCFun = GT
-   compare BaseReg _ = LT
-   compare _ BaseReg = GT
-   compare MachSp _ = LT
-   compare _ MachSp = GT
-   compare UnwindReturnReg _ = LT
-   compare _ UnwindReturnReg = GT
-   compare EagerBlackholeInfo _ = LT
-   compare _ EagerBlackholeInfo = GT
+pprLit1 :: Platform -> CmmLit -> SDoc
+pprLit1 platform lit@(CmmLabelOff {}) = parens (pprLit platform lit)
+pprLit1 platform lit                  = pprLit platform lit
 
--- convenient aliases
-baseReg, spReg, hpReg, spLimReg, hpLimReg, nodeReg,
-  currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg  :: CmmReg
-baseReg = CmmGlobal BaseReg
-spReg = CmmGlobal Sp
-hpReg = CmmGlobal Hp
-hpLimReg = CmmGlobal HpLim
-spLimReg = CmmGlobal SpLim
-nodeReg = CmmGlobal node
-currentTSOReg = CmmGlobal CurrentTSO
-currentNurseryReg = CmmGlobal CurrentNursery
-hpAllocReg = CmmGlobal HpAlloc
-cccsReg = CmmGlobal CCCS
+ppr_offset :: Int -> SDoc
+ppr_offset i
+    | i==0      = empty
+    | i>=0      = char '+' <> int i
+    | otherwise = char '-' <> int (-i)
 
-node :: GlobalReg
-node = VanillaReg 1 VGcPtr
-
-globalRegType :: Platform -> GlobalReg -> CmmType
-globalRegType platform = \case
-   (VanillaReg _ VGcPtr)    -> gcWord platform
-   (VanillaReg _ VNonGcPtr) -> bWord platform
-   (FloatReg _)             -> cmmFloat W32
-   (DoubleReg _)            -> cmmFloat W64
-   (LongReg _)              -> cmmBits W64
-   -- TODO: improve the internal model of SIMD/vectorized registers
-   -- the right design SHOULd improve handling of float and double code too.
-   -- see remarks in "NOTE [SIMD Design for the future]"" in GHC.StgToCmm.Prim
-   (XmmReg _) -> cmmVec 4 (cmmBits W32)
-   (YmmReg _) -> cmmVec 8 (cmmBits W32)
-   (ZmmReg _) -> cmmVec 16 (cmmBits W32)
-
-   Hp         -> gcWord platform -- The initialiser for all
-                                 -- dynamically allocated closures
-   _          -> bWord platform
-
-isArgReg :: GlobalReg -> Bool
-isArgReg (VanillaReg {}) = True
-isArgReg (FloatReg {})   = True
-isArgReg (DoubleReg {})  = True
-isArgReg (LongReg {})    = True
-isArgReg (XmmReg {})     = True
-isArgReg (YmmReg {})     = True
-isArgReg (ZmmReg {})     = True
-isArgReg _               = False
+commafy :: [SDoc] -> SDoc
+commafy xs = fsep $ punctuate comma xs

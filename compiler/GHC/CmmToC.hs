@@ -33,8 +33,7 @@ import GHC.CmmToAsm.CPrim
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
-import GHC.Cmm hiding (pprBBlock)
-import GHC.Cmm.Ppr () -- For Outputable instances
+import GHC.Cmm hiding (pprBBlock, pprStatic)
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph

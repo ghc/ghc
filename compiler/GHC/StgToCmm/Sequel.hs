@@ -17,7 +17,6 @@ module GHC.StgToCmm.Sequel
 
 import GHC.Cmm.BlockId
 import GHC.Cmm
-import GHC.Cmm.Ppr()
 
 import GHC.Types.Id
 import GHC.Utils.Outputable
