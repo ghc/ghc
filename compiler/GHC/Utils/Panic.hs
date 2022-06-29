@@ -12,30 +12,36 @@
 -- It's hard to put these functions anywhere else without causing
 -- some unnecessary loops in the module dependency graph.
 module GHC.Utils.Panic
-   ( GhcException(..)
+   ( -- * GHC exception type
+     GhcException(..)
    , showGhcException
    , showGhcExceptionUnsafe
    , throwGhcException
    , throwGhcExceptionIO
    , handleGhcException
 
+     -- * Command error throwing patterns
    , pgmError
    , panic
    , pprPanic
-   , assertPanic
-   , assertPprPanic
-   , assertPpr
-   , assertPprM
-   , massertPpr
    , sorry
    , panicDoc
    , sorryDoc
    , pgmErrorDoc
    , cmdLineError
    , cmdLineErrorIO
+     -- ** Assertions
+   , assertPanic
+   , assertPprPanic
+   , assertPpr
+   , assertPprM
+   , massertPpr
+
+     -- * Call stacks
    , callStackDoc
    , prettyCallStackDoc
 
+     -- * Exception utilities
    , Exception.Exception(..)
    , showException
    , safeShowException
