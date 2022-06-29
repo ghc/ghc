@@ -151,7 +151,7 @@ optParens r x = case x of
 defRenderJsE :: RenderJs -> JExpr -> Doc
 defRenderJsE r = \case
   ValExpr x         -> jsToDocR r x
-  SelExpr x y       -> cat [jsToDocR r x <> char '.', jsToDocR r y]
+  SelExpr x y       -> jsToDocR r x <> char '.' <> jsToDocR r y
   IdxExpr x y       -> jsToDocR r x <> brackets (jsToDocR r y)
   IfExpr x y z      -> parens (jsToDocR r x <+> char '?' <+> jsToDocR r y <+> char ':' <+> jsToDocR r z)
   InfixExpr op x y  -> parens $ hsep [jsToDocR r x, stext (opText op), jsToDocR r y]
