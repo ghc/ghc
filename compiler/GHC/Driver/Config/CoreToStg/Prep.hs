@@ -5,15 +5,20 @@ module GHC.Driver.Config.CoreToStg.Prep
 
 import GHC.Prelude
 
-import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Driver.Env
 import GHC.Driver.Session
-import GHC.Driver.Config.Core.EndPass
+import GHC.Driver.Config.Core.EndPass ()
+import GHC.Driver.Config.Core.Lint ( defaultLintFlags, maybeInitLintPassResultConfig )
 import GHC.Tc.Utils.Env
 import GHC.Types.Var
-import GHC.Utils.Outputable ( alwaysQualify )
+import GHC.Utils.Outputable
+
+import GHC.Core.EndPass ( EndPassConfig(..) )
+import GHC.Core.Lint ( LintFlags(..), StaticPtrCheck(..) )
 
 import GHC.CoreToStg.Prep
+
+import qualified GHC.LanguageExtensions as LangExt
 
 initCorePrepConfig :: HscEnv -> IO CorePrepConfig
 initCorePrepConfig hsc_env = do
@@ -29,6 +34,26 @@ initCorePrepConfig hsc_env = do
 
 initCorePrepPgmConfig :: DynFlags -> [Var] -> CorePrepPgmConfig
 initCorePrepPgmConfig dflags extra_vars = CorePrepPgmConfig
-  { cpPgm_endPassConfig     = initEndPassConfig dflags extra_vars alwaysQualify CorePrep
+  { cpPgm_endPassConfig = EndPassConfig
+      { ep_dumpCoreSizes = not (gopt Opt_SuppressCoreSizes dflags)
+      , ep_lintPassResult = maybeInitLintPassResultConfig dflags extra_vars
+          lint_flags
+          pass_ppr
+          True
+      , ep_printUnqual = alwaysQualify
+      , ep_dumpFlag = Just Opt_D_dump_prep
+      , ep_prettyPass = pass_ppr
+      , ep_passDetails = empty
+      }
   , cpPgm_generateDebugInfo = needSourceNotes dflags
   }
+  where
+    pass_ppr = text "CorePrep"
+    lint_flags = (defaultLintFlags dflags)
+      { -- See Note [Checking for global Ids]
+        lf_check_global_ids = False
+        -- See Note [Checking StaticPtrs]
+      , lf_check_static_ptrs = if xopt LangExt.StaticPointers dflags
+          then AllowAtTopLevel
+          else AllowAnywhere
+      }

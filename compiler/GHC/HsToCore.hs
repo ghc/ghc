@@ -20,7 +20,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Config
-import GHC.Driver.Config.Core.EndPass ( endPass )
+import GHC.Driver.Config.Core.Lint ( defaultLintFlags, maybeInitLintPassResultConfig )
 import GHC.Driver.Config.HsToCore.Ticks
 import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
@@ -48,6 +48,9 @@ import GHC.Core.Type
 import GHC.Core.TyCon     ( tyConDataCons )
 import GHC.Core
 import GHC.Core.FVs       ( exprsSomeFreeVarsList )
+import GHC.Core.EndPass   ( EndPassConfig(..), endPassIO )
+import GHC.Core.Lint      ( LintFlags(..) )
+import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
@@ -55,7 +58,6 @@ import GHC.Core.Coercion
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
 import GHC.Core.Rules
-import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Ppr
 
 import GHC.Builtin.Names
@@ -210,8 +212,36 @@ deSugar hsc_env
         -- we want F# to be in scope in the foreign marshalling code!
         -- You might think it doesn't matter, but the simplifier brings all top-level
         -- things into the in-scope set before simplifying; so we get no unfolding for F#!
+              extra_vars = interactiveInScope $ hsc_IC hsc_env
 
-        ; endPass hsc_env print_unqual CoreDesugar final_pgm rules_for_imps
+        ; let desugar_before_ppr = text "Desugar (before optimization)"
+        ; let desugar_before_flags = (defaultLintFlags dflags)
+                { -- See Note [Checking for INLINE loop breakers]
+                  lf_check_inline_loop_breakers = False
+                  -- See Note [Linting linearity]
+                , lf_check_linearity = True
+                  -- In the output of the desugarer, before optimisation,
+                  -- we have eta-expanded data constructors with representation-polymorphic
+                  -- bindings; so we switch off the representation-polymorphism checks.
+                  -- The very simple optimiser will beta-reduce them away.
+                  -- See Note [Checking for representation-polymorphic built-ins]
+                  -- in GHC.HsToCore.Expr.
+                , lf_check_fixed_rep = False
+                }
+        ; let desugar_before_cfg = EndPassConfig
+                { ep_dumpCoreSizes = not (gopt Opt_SuppressCoreSizes dflags)
+                , ep_lintPassResult = maybeInitLintPassResultConfig dflags
+                    extra_vars
+                    desugar_before_flags
+                    desugar_before_ppr
+                    True
+                , ep_printUnqual = print_unqual
+                , ep_dumpFlag = Just Opt_D_dump_ds_preopt
+                , ep_prettyPass = desugar_before_ppr
+                , ep_passDetails = empty
+                }
+        ; endPassIO (hsc_logger hsc_env) desugar_before_cfg final_pgm rules_for_imps
+
         ; let simpl_opts = initSimpleOpts dflags
         ; let (ds_binds, ds_rules_for_imps, occ_anald_binds)
                 = simpleOptPgm simpl_opts mod final_pgm rules_for_imps
@@ -220,7 +250,24 @@ deSugar hsc_env
         ; putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
             FormatCore (pprCoreBindings occ_anald_binds $$ pprRules ds_rules_for_imps )
 
-        ; endPass hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
+        ; let desugar_after_ppr = text "Desugar (after optimization)"
+        ; let desugar_after_flags = (defaultLintFlags dflags)
+                { -- See Note [Checking for INLINE loop breakers]
+                  lf_check_inline_loop_breakers = False
+                }
+        ; let desugar_after_cfg = EndPassConfig
+                { ep_dumpCoreSizes = not (gopt Opt_SuppressCoreSizes dflags)
+                , ep_lintPassResult = maybeInitLintPassResultConfig dflags
+                    extra_vars
+                    desugar_after_flags
+                    desugar_after_ppr
+                    True
+                , ep_printUnqual = print_unqual
+                , ep_dumpFlag = Just Opt_D_dump_ds
+                , ep_prettyPass = desugar_after_ppr
+                , ep_passDetails = empty
+                }
+        ; endPassIO (hsc_logger hsc_env) desugar_after_cfg ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
               pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))

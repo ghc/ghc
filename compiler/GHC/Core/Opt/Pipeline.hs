@@ -14,8 +14,8 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
-import GHC.Driver.Config.Core.EndPass ( endPass )
 import GHC.Driver.Config.Core.Lint ( initLintAnnotationsConfig )
+import GHC.Driver.Config.Core.EndPass ( initEndPassConfig )
 import GHC.Driver.Config.Core.Opt.CallerCC ( initCallerCCOpts )
 import GHC.Driver.Config.Core.Opt.SpecConstr ( initSpecConstrOpts )
 import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )
@@ -26,13 +26,14 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core
+import GHC.Core.EndPass  ( endPassIO )
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( mkRuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( lintAnnots )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
-import GHC.Core.Opt.Pipeline.Types
+import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Opt.Simplify ( simplifyExpr, simplifyPgm )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Stats        ( SimplCountM, runSimplCountM, tellSimplCountIO )
@@ -61,7 +62,6 @@ import GHC.Serialized   ( deserializeWithData )
 import GHC.Utils.Error  ( withTiming )
 import GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 
 import GHC.Unit.External ( ExternalPackageState(..) )
 import GHC.Unit.Module.Env
@@ -470,7 +470,9 @@ runCorePasses logger hsc_env rule_base mask loc print_unqual vis_orphs
     do_pass res CoreDoNothing = return res
     do_pass guts (CoreDoPasses ps) = runCorePasses logger hsc_env rule_base mask loc print_unqual vis_orphs ps guts
     do_pass guts pass = do
-      let cfg = initLintAnnotationsConfig dflags loc print_unqual pass
+      let extra_vars = interactiveInScope $ hsc_IC hsc_env
+      let end_pass_cfg = initEndPassConfig dflags extra_vars print_unqual pass
+      let lint_anno_cfg = initLintAnnotationsConfig dflags loc print_unqual pass
       let doCorePassWithDebug debug_lvl nguts = do
             let dflags' = (hsc_dflags hsc_env) { debugLevel = debug_lvl }
                 hsc_env' = hsc_env { hsc_dflags = dflags' }
@@ -479,8 +481,8 @@ runCorePasses logger hsc_env rule_base mask loc print_unqual vis_orphs
               pass nguts
 
       withTiming logger (ppr pass <+> brackets (ppr this_mod)) (const ()) $ do
-        guts' <- lintAnnots logger cfg doCorePassWithDebug guts
-        liftIO $ endPass hsc_env print_unqual pass (mg_binds guts') (mg_rules guts')
+        guts' <- lintAnnots logger lint_anno_cfg doCorePassWithDebug guts
+        liftIO $ endPassIO logger end_pass_cfg (mg_binds guts') (mg_rules guts')
         return guts'
 
     dflags = hsc_dflags hsc_env
@@ -578,10 +580,6 @@ doCorePass logger hsc_env this_mod rule_base mask loc print_unqual vis_orphs pas
     CoreDoPluginPass _ p      -> {-# SCC "Plugin" #-}
                                  runSimplCountM dump_simpl_stats $ liftCoreM $ p guts
 
-    CoreDesugar               -> noCounts $ pprPanic "doCorePass" (ppr pass)
-    CoreDesugarOpt            -> noCounts $ pprPanic "doCorePass" (ppr pass)
-    CoreTidy                  -> noCounts $ pprPanic "doCorePass" (ppr pass)
-    CorePrep                  -> noCounts $ pprPanic "doCorePass" (ppr pass)
   where
     liftCoreM = tellSimplCountIO . runCoreM
       hsc_env rule_base mask this_mod vis_orphs print_unqual loc

@@ -113,7 +113,7 @@ import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
-import GHC.Driver.Config.Core.EndPass ( endPass )
+import GHC.Driver.Config.Core.Lint ( defaultLintFlags, maybeInitLintPassResultConfig )
 import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyExprOpts )
 import GHC.Driver.Config.CoreToStg.Prep
@@ -158,6 +158,8 @@ import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result)
 import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
 import GHC.Core
+import GHC.Core.EndPass ( EndPassConfig(..), endPassIO )
+import GHC.Core.Lint ( LintFlags(..), StaticPtrCheck(..) )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
@@ -165,7 +167,6 @@ import GHC.Core.Multiplicity
 import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
 import GHC.Core.Opt.Pipeline
-import GHC.Core.Opt.Pipeline.Types ( CoreToDo (..) )
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
@@ -199,6 +200,8 @@ import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 import GHC.Cmm.Parser
+
+import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -2289,6 +2292,7 @@ hscParseThingWithLocation source linenumber parser str = do
 
 hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 hscTidy hsc_env guts = do
+  let dflags   = hsc_dflags hsc_env
   let logger   = hsc_logger hsc_env
   let this_mod = mg_module guts
 
@@ -2303,13 +2307,34 @@ hscTidy hsc_env guts = do
   let all_tidy_binds = cg_binds cgguts
   let print_unqual   = mkPrintUnqualified (hsc_unit_env hsc_env) (mg_rdr_env guts)
 
-  endPass hsc_env print_unqual CoreTidy all_tidy_binds tidy_rules
+  let tidy_ppr = text "Tidy Core"
+  let extra_vars = interactiveInScope $ hsc_IC hsc_env
+  let tidy_flags = (defaultLintFlags dflags)
+        { -- See Note [Checking for global Ids]
+          lf_check_global_ids = False
+          -- See Note [Checking StaticPtrs]
+        , lf_check_static_ptrs = if xopt LangExt.StaticPointers dflags
+            then RejectEverywhere
+            else AllowAnywhere
+        }
+  let tidy_cfg = EndPassConfig
+        { ep_dumpCoreSizes = not (gopt Opt_SuppressCoreSizes dflags)
+        , ep_lintPassResult = maybeInitLintPassResultConfig dflags extra_vars
+            tidy_flags
+            tidy_ppr
+            True
+        , ep_printUnqual = print_unqual
+        , ep_dumpFlag = Just Opt_D_dump_simpl
+        , ep_prettyPass = tidy_ppr
+        , ep_passDetails = empty
+        }
+  endPassIO logger tidy_cfg all_tidy_binds tidy_rules
 
   -- If the endPass didn't print the rules, but ddump-rules is
   -- on, print now
   unless (logHasDumpFlag logger Opt_D_dump_simpl) $
     putDumpFileMaybe logger Opt_D_dump_rules
-      (renderWithContext defaultSDocContext (ppr CoreTidy <+> text "rules"))
+      (renderWithContext defaultSDocContext (text "Tidy Core rules"))
       FormatText
       (pprRulesForUser tidy_rules)
 
