@@ -38,7 +38,6 @@ import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
 import GHC.Cmm.Utils ( zeroExpr, cmmTagMask, mkWordCLit, mAX_PTR_TAG )
-import GHC.Cmm.Ppr
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Types.ForeignCall
@@ -1021,7 +1020,7 @@ cgIdApp fun_id args = do
               assertTag = whenCheckTags $ do
                   mod <- getModuleName
                   emitTagAssertion (showPprUnsafe
-                      (text "TagCheck failed on entry in" <+> ppr mod <+> text "- value:" <> ppr fun_id <+> pprExpr platform fun))
+                      (text "TagCheck failed on entry in" <+> ppr mod <+> text "- value:" <> ppr fun_id <+> pdoc platform fun))
                       fun
 
         EnterIt -> assert (null args) $  -- Discarding arguments

@@ -48,7 +48,6 @@ import GHC.Platform
 
 -- Our intermediate code:
 import GHC.Cmm.BlockId
-import GHC.Cmm.Ppr           ( pprExpr )
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
@@ -395,7 +394,7 @@ iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
 iselExpr64 expr
    = do
      platform <- getPlatform
-     pprPanic "iselExpr64(powerpc)" (pprExpr platform expr)
+     pprPanic "iselExpr64(powerpc)" (pdoc platform expr)
 
 
 
@@ -689,7 +688,7 @@ getRegister' config platform (CmmLit lit)
             `consOL` (addr_code `snocOL` LD format dst addr)
        return (Any format code)
 
-getRegister' _ platform other = pprPanic "getRegister(ppc)" (pprExpr platform other)
+getRegister' _ platform other = pprPanic "getRegister(ppc)" (pdoc platform other)
 
     -- extend?Rep: wrap integer expression of type `from`
     -- in a conversion to `to`

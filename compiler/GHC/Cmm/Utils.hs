@@ -42,8 +42,6 @@ module GHC.Cmm.Utils(
 
         cmmMkAssign,
 
-        isTrivialCmmExpr, hasNoGlobalRegs, isLit, isComparisonExpr,
-
         baseExpr, spExpr, hpExpr, spLimExpr, hpLimExpr,
         currentTSOExpr, currentNurseryExpr, cccsExpr,
 
@@ -61,9 +59,9 @@ module GHC.Cmm.Utils(
         modifyGraph,
 
         ofBlockMap, toBlockMap,
-        ofBlockList, toBlockList, bodyToBlockList,
+        ofBlockList, toBlockList,
         toBlockListEntryFirst, toBlockListEntryFirstFalseFallthrough,
-        foldlGraphBlocks, mapGraphNodes, revPostorder, mapGraphNodes1,
+        foldlGraphBlocks, mapGraphNodes, mapGraphNodes1,
 
         -- * Ticks
         blockTicks
@@ -400,36 +398,6 @@ cmmMkAssign platform expr uq =
 
 ---------------------------------------------------
 --
---      CmmExpr predicates
---
----------------------------------------------------
-
-isTrivialCmmExpr :: CmmExpr -> Bool
-isTrivialCmmExpr (CmmLoad _ _ _)    = False
-isTrivialCmmExpr (CmmMachOp _ _)    = False
-isTrivialCmmExpr (CmmLit _)         = True
-isTrivialCmmExpr (CmmReg _)         = True
-isTrivialCmmExpr (CmmRegOff _ _)    = True
-isTrivialCmmExpr (CmmStackSlot _ _) = panic "isTrivialCmmExpr CmmStackSlot"
-
-hasNoGlobalRegs :: CmmExpr -> Bool
-hasNoGlobalRegs (CmmLoad e _ _)            = hasNoGlobalRegs e
-hasNoGlobalRegs (CmmMachOp _ es)           = all hasNoGlobalRegs es
-hasNoGlobalRegs (CmmLit _)                 = True
-hasNoGlobalRegs (CmmReg (CmmLocal _))      = True
-hasNoGlobalRegs (CmmRegOff (CmmLocal _) _) = True
-hasNoGlobalRegs _ = False
-
-isLit :: CmmExpr -> Bool
-isLit (CmmLit _) = True
-isLit _          = False
-
-isComparisonExpr :: CmmExpr -> Bool
-isComparisonExpr (CmmMachOp op _) = isComparisonMachOp op
-isComparisonExpr _                  = False
-
----------------------------------------------------
---
 --      Tagging
 --
 ---------------------------------------------------
@@ -525,9 +493,6 @@ mkLiveness platform (reg:regs)
 modifyGraph :: (Graph n C C -> Graph n' C C) -> GenCmmGraph n -> GenCmmGraph n'
 modifyGraph f g = CmmGraph {g_entry=g_entry g, g_graph=f (g_graph g)}
 
-toBlockMap :: CmmGraph -> LabelMap CmmBlock
-toBlockMap (CmmGraph {g_graph=GMany NothingO body NothingO}) = body
-
 ofBlockMap :: BlockId -> LabelMap CmmBlock -> CmmGraph
 ofBlockMap entry bodyMap = CmmGraph {g_entry=entry, g_graph=GMany NothingO bodyMap NothingO}
 
@@ -578,9 +543,6 @@ ofBlockList entry blocks = CmmGraph { g_entry = entry
                                     , g_graph = GMany NothingO body NothingO }
   where body = foldr addBlock emptyBody blocks
 
-bodyToBlockList :: Body CmmNode -> [CmmBlock]
-bodyToBlockList body = mapElems body
-
 mapGraphNodes :: ( CmmNode C O -> CmmNode C O
                  , CmmNode O O -> CmmNode O O
                  , CmmNode O C -> CmmNode O C)
@@ -595,10 +557,6 @@ mapGraphNodes1 f = modifyGraph (mapGraph f)
 
 foldlGraphBlocks :: (a -> CmmBlock -> a) -> a -> CmmGraph -> a
 foldlGraphBlocks k z g = mapFoldl k z $ toBlockMap g
-
-revPostorder :: CmmGraph -> [CmmBlock]
-revPostorder g = {-# SCC "revPostorder" #-}
-    revPostorderFrom (toBlockMap g) (g_entry g)
 
 -------------------------------------------------
 -- Tick utilities

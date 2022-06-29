@@ -17,7 +17,6 @@ import GHC.Prelude hiding (last, unzip, succ, zip)
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm
-import GHC.Cmm.Ppr () -- For Outputable instances
 import GHC.Cmm.Utils
 import GHC.Cmm.Info
 import GHC.Cmm.Liveness

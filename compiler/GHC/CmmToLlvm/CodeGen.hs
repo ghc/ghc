@@ -19,7 +19,6 @@ import GHC.CmmToLlvm.Regs
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm
-import GHC.Cmm.Ppr as PprCmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Cmm.Dataflow.Block
@@ -1204,7 +1203,7 @@ genStore_slow addr val alignment meta = do
 
         other ->
             pprPanic "genStore: ptr not right type!"
-                    (PprCmm.pprExpr platform addr <+> text (
+                    (pdoc platform addr <+> text (
                         "Size of Ptr: "   ++ show (llvmPtrBits platform) ++
                         ", Size of var: " ++ show (llvmWidthInBits platform other) ++
                         ", Var: "         ++ renderWithContext (llvmCgContext cfg) (ppVar cfg vaddr)))
@@ -1725,7 +1724,7 @@ genMachOp_slow opt op [x, y] = case op of
                -> do
                     -- Error. Continue anyway so we can debug the generated ll file.
                     let render   = renderWithContext (llvmCgContext cfg)
-                        cmmToStr = (lines . render . PprCmm.pprExpr platform)
+                        cmmToStr = (lines . render . pdoc platform)
                     statement $ Comment $ map fsLit $ cmmToStr x
                     statement $ Comment $ map fsLit $ cmmToStr y
                     doExprW (ty vx) $ binOp vx vy
@@ -1882,7 +1881,7 @@ genLoad_slow atomic e ty align meta = do
                     doExprW (cmmToLlvmType ty) (MExpr meta $ mkLoad atomic ptr align)
 
         other -> pprPanic "exprToVar: CmmLoad expression is not right type!"
-                     (PprCmm.pprExpr platform e <+> text (
+                     (pdoc platform e <+> text (
                          "Size of Ptr: "   ++ show (llvmPtrBits platform) ++
                          ", Size of var: " ++ show (llvmWidthInBits platform other) ++
                          ", Var: " ++ renderWithContext (llvmCgContext cfg) (ppVar cfg iptr)))

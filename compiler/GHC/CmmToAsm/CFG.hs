@@ -78,7 +78,6 @@ import GHC.Utils.Panic.Plain
 --import GHC.Cmm.DebugBlock
 --import GHC.Data.OrdList
 --import GHC.Cmm.DebugBlock.Trace
-import GHC.Cmm.Ppr () -- For Outputable instances
 
 import Data.List (sort, nub, partition)
 import Data.STRef.Strict

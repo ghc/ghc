@@ -364,6 +364,14 @@ data ForeignHint
         -- Used to give extra per-argument or per-result
         -- information needed by foreign calling conventions
 
+instance Outputable ForeignHint where
+  ppr NoHint     = empty
+  ppr SignedHint = quotes(text "signed")
+--  ppr AddrHint   = quotes(text "address")
+-- Temp Jan08
+  ppr AddrHint   = (text "PtrHint")
+
+
 -------------------------------------------------------------------------
 
 -- These don't really belong here, but I don't know where is best to

@@ -12,6 +12,7 @@ module GHC.Cmm.Dataflow.Graph
     , NonLocal(..)
     , addBlock
     , bodyList
+    , bodyToBlockList
     , emptyBody
     , labelsDefined
     , mapGraph
@@ -55,6 +56,9 @@ emptyBody = mapEmpty
 
 bodyList :: Body' block n -> [(Label,block n C C)]
 bodyList body = mapToList body
+
+bodyToBlockList :: Body n -> [Block n C C]
+bodyToBlockList body = mapElems body
 
 addBlock
     :: (NonLocal block, HasDebugCallStack)

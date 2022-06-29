@@ -20,7 +20,6 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Cmm.BlockId
 import GHC.Cmm
-import GHC.Cmm.Ppr.Expr () -- For Outputable instances
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow

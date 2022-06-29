@@ -208,10 +208,8 @@ Library
         GHC.Cmm.Parser.Config
         GHC.Cmm.Parser.Monad
         GHC.Cmm.Pipeline
-        GHC.Cmm.Ppr
-        GHC.Cmm.Ppr.Decl
-        GHC.Cmm.Ppr.Expr
         GHC.Cmm.ProcPoint
+        GHC.Cmm.Reg
         GHC.Cmm.Sink
         GHC.Cmm.Switch
         GHC.Cmm.Switch.Implement

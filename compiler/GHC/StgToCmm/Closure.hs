@@ -76,7 +76,6 @@ import GHC.Stg.Syntax
 import GHC.Runtime.Heap.Layout
 import GHC.Cmm
 import GHC.Cmm.Utils
-import GHC.Cmm.Ppr.Expr() -- For Outputable instances
 import GHC.StgToCmm.Types
 import GHC.StgToCmm.Sequel
 

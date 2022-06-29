@@ -42,7 +42,6 @@ import GHC.CmmToLlvm.Regs
 import GHC.CmmToLlvm.Config
 
 import GHC.Cmm.CLabel
-import GHC.Cmm.Ppr.Expr ()
 import GHC.Platform.Regs ( activeStgRegs, globalRegMaybe )
 import GHC.Driver.Session
 import GHC.Data.FastString

@@ -116,7 +116,6 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Opt           ( cmmMachOpFold )
-import GHC.Cmm.Ppr
 import GHC.Cmm.CLabel
 
 import GHC.Types.Unique.FM

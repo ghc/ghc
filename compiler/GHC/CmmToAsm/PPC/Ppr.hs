@@ -34,7 +34,6 @@ import GHC.Cmm.Dataflow.Label
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
-import GHC.Cmm.Ppr.Expr () -- For Outputable instances
 
 import GHC.Types.Unique ( pprUniqueAlways, getUnique )
 import GHC.Platform

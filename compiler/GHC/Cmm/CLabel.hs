@@ -827,6 +827,9 @@ data InfoProvEnt = InfoProvEnt
                                -- Position and information about the info table
                                deriving (Eq, Ord)
 
+instance OutputableP Platform InfoProvEnt where
+  pdoc platform (InfoProvEnt clabel _ _ _ _) = pdoc platform clabel
+
 -- Constructing Cost Center Labels
 mkCCLabel  :: CostCentre      -> CLabel
 mkCCSLabel :: CostCentreStack -> CLabel
