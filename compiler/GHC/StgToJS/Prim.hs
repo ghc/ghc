@@ -262,8 +262,8 @@ genPrim _ _ IntToInt64Op      [r1,r2] [x] =
     , r2 |= x
     ]
 
-genPrim _ _ Int64EqOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if_ (LAnd (low0 .===. low1) (high0 .===. high1)) 1 0
-genPrim _ _ Int64NeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if_ (LOr (low0 .!==. low1) (high0 .!==. high1)) 1 0
+genPrim _ _ Int64EqOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if10 (LAnd (low0 .===. low1) (high0 .===. high1))
+genPrim _ _ Int64NeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if10 (LOr (low0 .!==. low1) (high0 .!==. high1))
 
 
 genPrim _ _ Int64GeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= app "h$hs_geInt64" [high0,low0,high1,low1]
@@ -287,8 +287,8 @@ genPrim _ _ Word64ToInt64Op   [r1,r2] [x1,x2] =
     , r2 |= x2
     ]
 
-genPrim _ _ Word64EqOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if_ (LAnd (low0 .===. low1) (high0 .===. high1)) 1 0
-genPrim _ _ Word64NeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if_ (LOr (low0 .!==. low1) (high0 .!==. high1)) 1 0
+genPrim _ _ Word64EqOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if10 (LAnd (low0 .===. low1) (high0 .===. high1))
+genPrim _ _ Word64NeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if10 (LOr (low0 .!==. low1) (high0 .!==. high1))
 
 genPrim _ _ Word64AddOp        [r_high,r_low] [high0, low0, high1, low1] =
   PrimInline $ appT [r_high, r_low] "h$hs_plusInt64" [high0, low0, high1, low1]
