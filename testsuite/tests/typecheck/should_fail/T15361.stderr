@@ -1,6 +1,6 @@
 
 T15361.hs:13:13: error:
-    • Could not deduce (a ~ c)
+    • Could not deduce ‘a ~ c’
       from the context: b ~ a
         bound by a pattern with constructor:
                    HRefl :: forall {k1} (a :: k1). a :~~: a,
@@ -22,7 +22,7 @@ T15361.hs:13:13: error:
         foo :: (a :~~: b) -> a :~~: c (bound at T15361.hs:13:1)
 
 T15361.hs:20:27: error:
-    • Could not deduce (Show a) arising from a use of ‘show’
+    • Could not deduce ‘Show a’ arising from a use of ‘show’
       from the context: Ord a
         bound by a pattern with constructor:
                    IGetKnockedDown :: forall a. (Eq a, Ord a) => a -> Chumbawamba a,

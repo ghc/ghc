@@ -1,6 +1,6 @@
 
 T14273.hs:7:27: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Could not deduce (Show a1) arising from a use of ‘show’
+    • Could not deduce ‘Show a1’ arising from a use of ‘show’
       from the context: Show a
         bound by the type signature for:
                    pleaseShow :: forall a. Show a => Bool -> a -> Maybe String
@@ -11,7 +11,7 @@ T14273.hs:7:27: warning: [-Wdeferred-type-errors (in -Wdefault)]
           -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
         ...plus 26 others
-        ...plus 71 instances involving out-of-scope types
+        ...plus 28 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘Just’, namely ‘(show _a)’
       In the expression: Just (show _a)

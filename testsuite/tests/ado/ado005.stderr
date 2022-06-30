@@ -1,6 +1,6 @@
 
 ado005.hs:8:3: error:
-    • Could not deduce (Monad f) arising from a do statement
+    • Could not deduce ‘Monad f’ arising from a do statement
       from the context: Applicative f
         bound by the type signature for:
                    test :: forall (f :: * -> *).

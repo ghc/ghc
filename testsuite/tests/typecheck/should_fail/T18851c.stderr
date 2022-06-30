@@ -1,6 +1,6 @@
 
 T18851c.hs:25:27: error:
-    • Could not deduce (n2 ~ n1)
+    • Could not deduce ‘n2 ~ n1’
         arising from reasoning about an injective type family using constraints:
           ‘Plus1 n2 ~ n’
             arising from a type equality

@@ -1,14 +1,14 @@
 
 T3323.hs:18:7: error:
-    • Could not deduce (GHC.IO.Device.RawIO dev0)
+    • Could not deduce ‘GHC.IO.Device.RawIO dev0’
       from the context: (GHC.IO.Device.RawIO dev,
                          GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev,
-                         base-4.16.0.0:Data.Typeable.Internal.Typeable dev)
+                         base-4.17.0.0:Data.Typeable.Internal.Typeable dev)
         bound by a pattern with constructor:
                    Handle__ :: forall dev enc_state dec_state.
                                (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev,
                                 GHC.IO.BufferedIO.BufferedIO dev,
-                                base-4.16.0.0:Data.Typeable.Internal.Typeable dev) =>
+                                base-4.17.0.0:Data.Typeable.Internal.Typeable dev) =>
                                dev
                                -> HandleType
                                -> GHC.IORef.IORef (GHC.IO.Buffer.Buffer GHC.Word.Word8)

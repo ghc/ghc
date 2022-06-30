@@ -1,6 +1,6 @@
 
 T19752.hs:12:10: error:
-    • Could not deduce (F b0 ~ a)
+    • Could not deduce ‘F b0 ~ a’
       from the context: F b ~ a
         bound by the type signature for:
                    f :: forall b. (F b ~ a) => a

@@ -1,6 +1,6 @@
 
 MonadFailErrors.hs:14:5: error:
-    • Could not deduce (MonadFail m)
+    • Could not deduce ‘MonadFail m’
         arising from a do statement
         with the failable pattern ‘Just x’
       from the context: Monad m
@@ -21,7 +21,7 @@ MonadFailErrors.hs:14:5: error:
                  undefined
 
 MonadFailErrors.hs:28:5: error:
-    • No instance for (MonadFail Identity)
+    • No instance for ‘MonadFail Identity’
         arising from a do statement
         with the failable pattern ‘Just x’
     • In a stmt of a 'do' block: Just x <- undefined
@@ -34,7 +34,7 @@ MonadFailErrors.hs:28:5: error:
                  undefined
 
 MonadFailErrors.hs:42:5: error:
-    • No instance for (MonadFail ((->) r))
+    • No instance for ‘MonadFail ((->) r)’
         arising from a do statement
         with the failable pattern ‘Just x’
     • In a stmt of a 'do' block: Just x <- undefined

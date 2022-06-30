@@ -1,6 +1,6 @@
 
 T7279.hs:6:10: error:
-    • Could not deduce (Show b0)
+    • Could not deduce ‘Show b0’
       from the context: (Eq a, Show b)
         bound by an instance declaration:
                    forall a b. (Eq a, Show b) => Eq (T a)

@@ -19,7 +19,7 @@ tcfail133.hs:68:7: error:
           foo = show $ add (One :@ Zero) (One :@ One)
 
 tcfail133.hs:68:14: error:
-    • No instance for (AddDigit (Zero :@ (One :@ One)) One a0)
+    • No instance for ‘AddDigit (Zero :@ (One :@ One)) One a0’
         arising from a use of ‘add’
     • In the second argument of ‘($)’, namely
         ‘add (One :@ Zero) (One :@ One)’

@@ -16,7 +16,7 @@ RecordDotSyntaxFail8.hs:37:3: error:
            print $ ....quux
 
 RecordDotSyntaxFail8.hs:37:11: error:
-    • No instance for (HasField "quux" Quux a0)
+    • No instance for ‘HasField "quux" Quux a0’
         arising from selecting the field ‘quux’
     • In the second argument of ‘($)’, namely ‘....baz.quux’
       In a stmt of a 'do' block: print $ ....baz.quux

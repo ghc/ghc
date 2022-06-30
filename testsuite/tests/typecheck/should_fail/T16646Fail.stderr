@@ -1,6 +1,7 @@
 
 T16646Fail.hs:16:5: error:
-    • No instance for (WithDict cls meth) arising from a use of ‘withDict’
+    • No instance for ‘WithDict cls meth’
+        arising from a use of ‘withDict’
       Possible fix:
         add (WithDict cls meth) to the context of
           the type signature for:
@@ -9,7 +10,7 @@ T16646Fail.hs:16:5: error:
       In an equation for ‘f’: f = withDict @cls @meth
 
 T16646Fail.hs:22:5: error:
-    • No instance for (WithDict (C a) (Maybe a))
+    • No instance for ‘WithDict (C a) (Maybe a)’
         arising from a use of ‘withDict’
     • In the expression: withDict @(C a) @(Maybe a)
       In an equation for ‘g’: g = withDict @(C a) @(Maybe a)

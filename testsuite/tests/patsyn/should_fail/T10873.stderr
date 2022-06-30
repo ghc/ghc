@@ -1,6 +1,6 @@
 
 T10873.hs:6:24: error:
-    • No instance for (Show a)
+    • No instance for ‘Show a’
         arising from the "provided" constraints claimed by
           the signature of ‘Pat1’
       In other words, a successful match on the pattern
@@ -9,7 +9,7 @@ T10873.hs:6:24: error:
     • In the declaration for pattern synonym ‘Pat1’
 
 T10873.hs:10:23: error:
-    • Could not deduce (Show a)
+    • Could not deduce ‘Show a’
         arising from the "provided" constraints claimed by
           the signature of ‘Pat2’
       from the context: Ord a

@@ -1,6 +1,6 @@
 
 T9109.hs:8:13: error:
-    • Could not deduce (p ~ Bool)
+    • Could not deduce ‘p ~ Bool’
       from the context: a ~ Bool
         bound by a pattern with constructor: GBool :: G Bool,
                  in an equation for ‘foo’

@@ -1,6 +1,6 @@
 
 T3731_simple.hs:19:13: error:
-    • Could not deduce (Default a)
+    • Could not deduce ‘Default a’
         arising from a superclass required to satisfy ‘Data a’,
         arising from a use of ‘dataTypeOf’
       from the context: Data a

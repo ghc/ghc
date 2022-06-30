@@ -1,6 +1,6 @@
 
 T13324_fail2.hs:7:1: error:
-    • No instance for (Eq (f (f a)))
+    • No instance for ‘Eq (f (f a))’
         arising from a 'deriving' declaration
       Possible fix: fill in the wildcard constraint yourself
     • When deriving the instance for (Eq (Foo f a))

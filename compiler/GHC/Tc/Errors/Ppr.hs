@@ -2322,7 +2322,7 @@ pprTcSolverReportMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extr
 
     missing =
       case wanteds of
-        [wanted] -> pprParendType wanted
+        [wanted] -> quotes (ppr wanted)
         _        -> pprTheta wanteds
 
 pprTcSolverReportMsg ctxt (AmbiguityPreventsSolvingCt item ambigs) =

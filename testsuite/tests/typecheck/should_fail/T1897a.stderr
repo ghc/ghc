@@ -1,6 +1,6 @@
 
 T1897a.hs:9:1: error:
-    • Could not deduce (Wob a0 b)
+    • Could not deduce ‘Wob a0 b’
       from the context: Wob a b
         bound by the inferred type for ‘foo’:
                    forall {a} {b}. Wob a b => b -> [b]

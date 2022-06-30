@@ -1,6 +1,6 @@
 
 EtaExpandStupid2.hs:16:8: error:
-    • No instance for (Num c) arising from a use of ‘MkD4’
+    • No instance for ‘Num c’ arising from a use of ‘MkD4’
       Possible fix:
         add (Num c) to the context of
           the type signature for:

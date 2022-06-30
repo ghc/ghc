@@ -1,18 +1,18 @@
 
 overloadedlabelsfail01.hs:6:5: error:
-    • No instance for (IsLabel "x" a0)
+    • No instance for ‘IsLabel "x" a0’
         arising from the overloaded label ‘#x’
     • In the expression: #x
       In an equation for ‘a’: a = #x
 
 overloadedlabelsfail01.hs:10:5: error:
-    • No instance for (IsLabel "x" Int)
+    • No instance for ‘IsLabel "x" Int’
         arising from the overloaded label ‘#x’
     • In the expression: #x
       In an equation for ‘b’: b = #x
 
 overloadedlabelsfail01.hs:14:5: error:
-    • Could not deduce (IsLabel "y" t)
+    • Could not deduce ‘IsLabel "y" t’
         arising from the overloaded label ‘#y’
       from the context: IsLabel "x" t
         bound by the type signature for:

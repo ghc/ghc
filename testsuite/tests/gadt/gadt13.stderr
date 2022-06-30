@@ -1,6 +1,6 @@
 
 gadt13.hs:15:13: error:
-    • Could not deduce (p ~ (String -> [Char]))
+    • Could not deduce ‘p ~ (String -> [Char])’
       from the context: a ~ Int
         bound by a pattern with constructor: I :: Int -> Term Int,
                  in an equation for ‘shw’

@@ -3,7 +3,7 @@
 [3 of 4] Compiling Main             ( TcPlugin_RewritePerf.hs, TcPlugin_RewritePerf.o )
 
 TcPlugin_RewritePerf.hs:25:8: error:
-    • No instance for (Show
+    • No instance for ‘Show
                          (Proxy
                             '[ '[ 'Cube 'G 'B 'W 'R 'B 'G, 'Cube 'W 'G 'B 'W 'R 'R,
                                   'Cube 'R 'W 'R 'B 'G 'R, 'Cube 'B 'R 'G 'G 'W 'W],
@@ -20,7 +20,7 @@ TcPlugin_RewritePerf.hs:25:8: error:
                                '[ 'Cube 'G 'B 'B 'W 'R 'G, 'Cube 'W 'R 'G 'B 'W 'R,
                                   'Cube 'R 'G 'W 'R 'B 'R, 'Cube 'B 'W 'R 'G 'G 'W],
                                '[ 'Cube 'G 'B 'B 'R 'W 'G, 'Cube 'R 'G 'R 'W 'B 'W,
-                                  'Cube 'R 'W 'G 'B 'R 'R, 'Cube 'W 'R 'W 'G 'G 'B]]))
+                                  'Cube 'R 'W 'G 'B 'R 'R, 'Cube 'W 'R 'W 'G 'G 'B]])’
         arising from a use of ‘print’
     • In the expression: print (Proxy :: Proxy (Solutions Cubes))
       In an equation for ‘main’:

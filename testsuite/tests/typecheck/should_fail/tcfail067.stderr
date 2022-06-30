@@ -3,7 +3,7 @@ tcfail067.hs:1:14: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 tcfail067.hs:12:16: error:
-    • No instance for (Ord a) arising from a use of ‘SubRange’
+    • No instance for ‘Ord a’ arising from a use of ‘SubRange’
       Possible fix:
         add (Ord a) to the context of
           the type signature for:
@@ -13,7 +13,7 @@ tcfail067.hs:12:16: error:
           subRangeValue (SubRange (lower, upper) value) = value
 
 tcfail067.hs:15:11: error:
-    • No instance for (Ord a) arising from a use of ‘SubRange’
+    • No instance for ‘Ord a’ arising from a use of ‘SubRange’
       Possible fix:
         add (Ord a) to the context of
           the type signature for:
@@ -22,7 +22,7 @@ tcfail067.hs:15:11: error:
       In an equation for ‘subRange’: subRange (SubRange r value) = r
 
 tcfail067.hs:46:12: error:
-    • Could not deduce (Ord a) arising from a use of ‘SubRange’
+    • Could not deduce ‘Ord a’ arising from a use of ‘SubRange’
       from the context: Show a
         bound by the type signature for:
                    showRange :: forall a. Show a => SubRange a -> String
@@ -37,7 +37,7 @@ tcfail067.hs:46:12: error:
             = show value ++ " :" ++ show lower ++ ".." ++ show upper
 
 tcfail067.hs:61:12: error:
-    • Could not deduce (Ord a)
+    • Could not deduce ‘Ord a’
         arising from a use of ‘numSubRangeNegate’
       from the context: Num a
         bound by the instance declaration at tcfail067.hs:60:10-34
@@ -48,7 +48,7 @@ tcfail067.hs:61:12: error:
       In the instance declaration for ‘Num (SubRange a)’
 
 tcfail067.hs:65:19: error:
-    • Could not deduce (Ord a) arising from a use of ‘SubRange’
+    • Could not deduce ‘Ord a’ arising from a use of ‘SubRange’
       from the context: Num a
         bound by the instance declaration at tcfail067.hs:60:10-34
       Possible fix:
@@ -61,7 +61,7 @@ tcfail067.hs:65:19: error:
       In the instance declaration for ‘Num (SubRange a)’
 
 tcfail067.hs:74:5: error:
-    • Could not deduce (Ord a) arising from a use of ‘SubRange’
+    • Could not deduce ‘Ord a’ arising from a use of ‘SubRange’
       from the context: Num a
         bound by the type signature for:
                    numSubRangeBinOp :: forall a.

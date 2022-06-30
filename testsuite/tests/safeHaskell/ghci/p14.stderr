@@ -3,7 +3,7 @@ when making flags consistent: warning:
     Optimization flags are incompatible with the byte-code interpreter; optimization flags ignored.
 
 <interactive>:10:25: error:
-    • No instance for (Num a) arising from a use of ‘f’
+    • No instance for ‘Num a’ arising from a use of ‘f’
       Possible fix: add (Num a) to the context of the RULE "id/Int"
     • In the expression: f
       When checking the rewrite rule "id/Int"

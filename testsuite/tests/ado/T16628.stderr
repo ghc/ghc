@@ -1,9 +1,9 @@
 
-T16628.hs:10:5:
-   No instance for (MonadFail Identity)
+T16628.hs:10:5: error:
+    • No instance for ‘MonadFail Identity’
         arising from a do statement
         with the failable pattern ‘[x]’
-     In a stmt of a 'do' block: [x] <- i1
+    • In a stmt of a 'do' block: [x] <- i1
       In the expression:
         do _ <- i0
            [x] <- i1

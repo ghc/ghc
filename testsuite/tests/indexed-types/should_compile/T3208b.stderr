@@ -1,6 +1,6 @@
 
 T3208b.hs:15:10: error:
-    • Could not deduce (OTerm o0 ~ STerm a) arising from a use of ‘fce’
+    • Could not deduce ‘OTerm o0 ~ STerm a’ arising from a use of ‘fce’
       from the context: (OTerm a ~ STerm a, OBJECT a, SUBST a)
         bound by the type signature for:
                    fce' :: forall a c.
@@ -15,7 +15,7 @@ T3208b.hs:15:10: error:
         fce' :: a -> c (bound at T3208b.hs:15:1)
 
 T3208b.hs:15:15: error:
-    • Could not deduce (STerm o0 ~ STerm a)
+    • Could not deduce ‘STerm o0 ~ STerm a’
         arising from a use of ‘apply’
       from the context: (OTerm a ~ STerm a, OBJECT a, SUBST a)
         bound by the type signature for:

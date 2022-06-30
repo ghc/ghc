@@ -1,6 +1,6 @@
 
 gadt7.hs:16:38: error:
-    • Could not deduce (p1 ~ p2)
+    • Could not deduce ‘p1 ~ p2’
       from the context: a ~ Int
         bound by a pattern with constructor: K :: T Int,
                  in a case alternative

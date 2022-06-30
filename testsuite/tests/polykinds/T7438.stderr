@@ -1,6 +1,6 @@
 
 T7438.hs:6:14: error:
-    • Could not deduce (p1 ~ p2)
+    • Could not deduce ‘p1 ~ p2’
       from the context: b ~ a
         bound by a pattern with constructor:
                    Nil :: forall {k} (a :: k). Thrist a a,

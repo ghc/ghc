@@ -1,6 +1,6 @@
 
 T9872b_defer.hs:19:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • No instance for (Show
+    • No instance for ‘Show
                          (Proxy
                             '[ '[ 'Cube 'G 'B 'W 'R 'B 'G, 'Cube 'W 'G 'B 'W 'R 'R,
                                   'Cube 'R 'W 'R 'B 'G 'R, 'Cube 'B 'R 'G 'G 'W 'W],
@@ -17,7 +17,7 @@ T9872b_defer.hs:19:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
                                '[ 'Cube 'G 'B 'B 'W 'R 'G, 'Cube 'W 'R 'G 'B 'W 'R,
                                   'Cube 'R 'G 'W 'R 'B 'R, 'Cube 'B 'W 'R 'G 'G 'W],
                                '[ 'Cube 'G 'B 'B 'R 'W 'G, 'Cube 'R 'G 'R 'W 'B 'W,
-                                  'Cube 'R 'W 'G 'B 'R 'R, 'Cube 'W 'R 'W 'G 'G 'B]]))
+                                  'Cube 'R 'W 'G 'B 'R 'R, 'Cube 'W 'R 'W 'G 'G 'B]])’
         arising from a use of ‘print’
     • In the expression: print (Proxy :: Proxy (Solutions Cubes))
       In an equation for ‘main’:

@@ -1,6 +1,6 @@
 
 T15322a.hs:12:7: error:
-    • Could not deduce (KnownNat (n + 1))
+    • Could not deduce ‘KnownNat (n + 1)’
         arising from a use of ‘typeRep’
       from the context: KnownNat n
         bound by the type signature for:

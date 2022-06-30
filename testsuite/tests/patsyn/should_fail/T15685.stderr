@@ -1,6 +1,6 @@
 
 T15685.hs:13:24: error:
-    • Could not deduce (k ~ [k0])
+    • Could not deduce ‘k ~ [k0]’
       from the context: as ~ (a : as1)
         bound by a pattern with constructor:
                    Here :: forall {k} (f :: k -> *) (a :: k) (as :: [k]).

@@ -1,6 +1,6 @@
 
 T7594.hs:37:12: error:
-    • Could not deduce (b ~ IO ())
+    • Could not deduce ‘b ~ IO ()’
       from the context: (:&:) c0 Real a
         bound by a type expected by the context:
                    forall a. (:&:) c0 Real a => a -> b
