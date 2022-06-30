@@ -3307,6 +3307,7 @@ primop KeepAliveOp "keepAlive#" GenPrimOp
      polymorphic type might suggest; see the section \"RuntimeRep polymorphism
      in continuation-style primops\" for details. }
    with
+   out_of_line = True
    strictness = { \ _arity -> mkClosedDmdSig [topDmd, topDmd, strictOnceApply1Dmd] topDiv }
 
 

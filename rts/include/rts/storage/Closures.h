@@ -256,6 +256,12 @@ typedef struct _StgUpdateFrame {
 } StgUpdateFrame;
 
 
+// Closure types: RET_SMALL
+typedef struct {
+    StgHeader  header;
+    StgClosure *c;
+} StgKeepAliveFrame;
+
 // Stack frame, when we call catch one of these will be put on the stack so we
 // know to handle exceptions with the supplied handler
 //
