@@ -4,10 +4,13 @@
 -}
 
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.Core.Opt.Counting (
+    SimplCountOpts,
+
     SimplCount, doSimplTick, doFreeSimplTick, simplCountN,
     pprSimplCount, plusSimplCount, zeroSimplCount,
     isZeroSimplCount, hasDetailedCounts, Tick(..),
@@ -16,8 +19,6 @@ module GHC.Core.Opt.Counting (
   ) where
 
 import GHC.Prelude
-
-import GHC.Driver.Session
 
 import GHC.Types.Var
 import GHC.Types.Error
@@ -38,13 +39,23 @@ import GHC.Utils.Panic (throwGhcException, GhcException(..), panic)
 getVerboseSimplStats :: (Bool -> SDoc) -> SDoc
 getVerboseSimplStats = getPprDebug          -- For now, anyway
 
-zeroSimplCount     :: DynFlags -> SimplCount
+zeroSimplCount     :: SimplCountOpts -> SimplCount
 isZeroSimplCount   :: SimplCount -> Bool
 hasDetailedCounts  :: SimplCount -> Bool
 pprSimplCount      :: SimplCount -> SDoc
-doSimplTick        :: DynFlags -> Tick -> SimplCount -> SimplCount
-doFreeSimplTick    ::             Tick -> SimplCount -> SimplCount
+doSimplTick        :: SimplCountOpts
+                   -> Tick -> SimplCount -> SimplCount
+doFreeSimplTick    :: Tick -> SimplCount -> SimplCount
 plusSimplCount     :: SimplCount -> SimplCount -> SimplCount
+
+data SimplCountOpts
+  = VerySimplCountOpts
+    {
+    }
+  | SimplCountOpts
+    { sc_historySize :: !Int
+      -- ^ Simplification history size
+    }
 
 data SimplCount
    = VerySimplCount !Int        -- Used when don't want detailed stats
@@ -67,14 +78,16 @@ simplCountN :: SimplCount -> Int
 simplCountN (VerySimplCount n)         = n
 simplCountN (SimplCount { ticks = n }) = n
 
-zeroSimplCount dflags
-                -- This is where we decide whether to do
-                -- the VerySimpl version or the full-stats version
-  | dopt Opt_D_dump_simpl_stats dflags
-  = SimplCount {ticks = 0, details = Map.empty,
+--  | dopt Opt_D_dump_simpl_stats dflags
+
+-- This is where we decide whether to do
+-- the VerySimpl version or the full-stats version
+zeroSimplCount = \case
+  SimplCountOpts {} ->
+    SimplCount {ticks = 0, details = Map.empty,
                 n_log = 0, log1 = [], log2 = []}
-  | otherwise
-  = VerySimplCount 0
+  VerySimplCountOpts {} ->
+    VerySimplCount 0
 
 isZeroSimplCount (VerySimplCount n)         = n==0
 isZeroSimplCount (SimplCount { ticks = n }) = n==0
@@ -86,12 +99,15 @@ doFreeSimplTick tick sc@SimplCount { details = dts }
   = sc { details = dts `addTick` tick }
 doFreeSimplTick _ sc = sc
 
-doSimplTick dflags tick
+doSimplTick cfg tick
     sc@(SimplCount { ticks = tks, details = dts, n_log = nl, log1 = l1 })
-  | nl >= historySize dflags = sc1 { n_log = 1, log1 = [tick], log2 = l1 }
-  | otherwise                = sc1 { n_log = nl+1, log1 = tick : l1 }
+  | SimplCountOpts { sc_historySize = sc } <- cfg
+  , nl >= sc
+  = sc1 { n_log = 1, log1 = [tick], log2 = l1 }
+  | otherwise               
+  = sc1 { n_log = nl + 1, log1 = tick : l1 }
   where
-    sc1 = sc { ticks = tks+1, details = dts `addTick` tick }
+    sc1 = sc { ticks = tks + 1, details = dts `addTick` tick }
 
 doSimplTick _ _ (VerySimplCount n) = VerySimplCount (n+1)
 
@@ -136,8 +152,8 @@ pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
 newtype SimplCountM a = SimplCountM { unSimplCountM :: StateT SimplCount IO a }
   deriving (Functor, Applicative, Monad, MonadIO) via (StateT SimplCount IO)
 
-runSimplCountM :: DynFlags -> SimplCountM a -> IO (a, SimplCount)
-runSimplCountM dflags m = runStateT (unSimplCountM m) (zeroSimplCount dflags)
+runSimplCountM :: SimplCountOpts -> SimplCountM a -> IO (a, SimplCount)
+runSimplCountM cfg m = runStateT (unSimplCountM m) (zeroSimplCount cfg)
 
 tellSimplCountIO :: IO (a, SimplCount) -> SimplCountM a
 tellSimplCountIO m = SimplCountM $ do
