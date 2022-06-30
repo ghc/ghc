@@ -61,6 +61,7 @@ RTS_RET(stg_unmaskAsyncExceptionszh_ret);
 RTS_RET(stg_maskUninterruptiblezh_ret);
 RTS_RET(stg_maskAsyncExceptionszh_ret);
 RTS_RET(stg_stack_underflow_frame);
+RTS_RET(stg_keepAlive_frame);
 RTS_RET(stg_restore_cccs);
 RTS_RET(stg_restore_cccs_eval);
 
@@ -498,6 +499,7 @@ RTS_FUN_DECL(stg_raiseUnderflowzh);
 RTS_FUN_DECL(stg_raiseOverflowzh);
 RTS_FUN_DECL(stg_raiseIOzh);
 RTS_FUN_DECL(stg_paniczh);
+RTS_FUN_DECL(stg_keepAlivezh);
 RTS_FUN_DECL(stg_absentErrorzh);
 
 RTS_FUN_DECL(stg_makeStableNamezh);
