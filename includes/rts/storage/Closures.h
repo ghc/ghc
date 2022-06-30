@@ -186,6 +186,11 @@ typedef struct _StgUpdateFrame {
 
 typedef struct {
     StgHeader  header;
+    StgClosure *c;
+} StgKeepAliveFrame;
+
+typedef struct {
+    StgHeader  header;
     StgWord    exceptions_blocked;
     StgClosure *handler;
 } StgCatchFrame;

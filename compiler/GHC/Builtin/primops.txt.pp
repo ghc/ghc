@@ -3257,6 +3257,7 @@ primop KeepAliveOp "keepAlive#" GenPrimOp
    { \tt{keepAlive# x s k} keeps the value \tt{x} alive during the execution
      of the computation \tt{k}. }
    with
+   out_of_line = True
    strictness = { \ _arity -> mkClosedStrictSig [topDmd, topDmd, strictOnceApply1Dmd] topDiv }
 
 
