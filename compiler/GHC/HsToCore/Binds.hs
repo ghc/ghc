@@ -718,8 +718,9 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              spec_id    = mkLocalId spec_name Many spec_ty -- Specialised binding is toplevel, hence Many.
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
+             sdoc_context = initSDocContext dflags defaultUserStyle
 
-             rule = mkSpecRule dflags this_mod False rule_act (text "USPEC")
+             rule = mkSpecRule sdoc_context this_mod False rule_act (text "USPEC")
                                poly_id rule_bndrs rule_lhs_args
                                (mkVarApps (Var spec_id) spec_bndrs)
              spec_rhs = mkLams spec_bndrs (core_app poly_rhs)

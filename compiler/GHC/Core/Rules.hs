@@ -35,9 +35,6 @@ import GHC.Prelude
 import GHC.Unit.Module   ( Module )
 import GHC.Unit.Module.Env
 
-import GHC.Driver.Session( DynFlags )
-import GHC.Driver.Ppr( showSDoc )
-
 import GHC.Core         -- All of it
 import GHC.Core.Subst
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
@@ -203,10 +200,10 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
     orph = chooseOrphanAnchor local_lhs_names
 
 --------------
-mkSpecRule :: DynFlags -> Module -> Bool -> Activation -> SDoc
+mkSpecRule :: SDocContext -> Module -> Bool -> Activation -> SDoc
            -> Id -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- Make a specialisation rule, for Specialise or SpecConstr
-mkSpecRule dflags this_mod is_auto inl_act herald fn bndrs args rhs
+mkSpecRule sdoc_context this_mod is_auto inl_act herald fn bndrs args rhs
   = case isJoinId_maybe fn of
       Just join_arity -> etaExpandToJoinPointRule join_arity rule
       Nothing         -> rule
@@ -218,11 +215,11 @@ mkSpecRule dflags this_mod is_auto inl_act herald fn bndrs args rhs
                   bndrs args rhs
 
     is_local = isLocalId fn
-    rule_name = mkSpecRuleName dflags herald fn args
+    rule_name = mkSpecRuleName sdoc_context herald fn args
 
-mkSpecRuleName :: DynFlags -> SDoc -> Id -> [CoreExpr] -> FastString
-mkSpecRuleName dflags herald fn args
-  = mkFastString $ showSDoc dflags $
+mkSpecRuleName :: SDocContext -> SDoc -> Id -> [CoreExpr] -> FastString
+mkSpecRuleName sdoc_context herald fn args
+  = mkFastString $ renderWithContext sdoc_context $
     herald <+> ftext (occNameFS (getOccName fn))
                      -- This name ends up in interface files, so use occNameFS.
                      -- Otherwise uniques end up there, making builds
