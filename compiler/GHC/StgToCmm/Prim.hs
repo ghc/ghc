@@ -1640,9 +1640,7 @@ emitPrimOp cfg primop =
   TraceEventBinaryOp -> alwaysExternal
   TraceMarkerOp -> alwaysExternal
   SetThreadAllocationCounter -> alwaysExternal
-
-  -- See Note [keepAlive# magic] in GHC.CoreToStg.Prep.
-  KeepAliveOp -> panic "keepAlive# should have been eliminated in CorePrep"
+  KeepAliveOp -> alwaysExternal
 
  where
   profile  = stgToCmmProfile  cfg
