@@ -12,7 +12,8 @@ module GHC.Cmm (
      -- * Cmm top-level datatypes
      CmmProgram, CmmGroup, CmmGroupSRTs, RawCmmGroup, GenCmmGroup,
      CmmDecl, CmmDeclSRTs, GenCmmDecl(..),
-     CmmGraph, GenCmmGraph(..), toBlockMap, revPostorder,
+     CmmGraph, GenCmmGraph(..),
+     toBlockMap, revPostorder, toBlockList,
      CmmBlock, RawCmmDecl,
      Section(..), SectionType(..),
      GenCmmStatics(..), type CmmStatics, type RawCmmStatics, CmmStatic(..),
@@ -149,6 +150,9 @@ pprCmmGraph platform g
 revPostorder :: CmmGraph -> [CmmBlock]
 revPostorder g = {-# SCC "revPostorder" #-}
     revPostorderFrom (toBlockMap g) (g_entry g)
+
+toBlockList :: CmmGraph -> [CmmBlock]
+toBlockList g = mapElems $ toBlockMap g
 
 -----------------------------------------------------------------------------
 --     Info Tables
