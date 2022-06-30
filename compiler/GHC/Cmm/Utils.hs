@@ -496,9 +496,6 @@ modifyGraph f g = CmmGraph {g_entry=g_entry g, g_graph=f (g_graph g)}
 ofBlockMap :: BlockId -> LabelMap CmmBlock -> CmmGraph
 ofBlockMap entry bodyMap = CmmGraph {g_entry=entry, g_graph=GMany NothingO bodyMap NothingO}
 
-toBlockList :: CmmGraph -> [CmmBlock]
-toBlockList g = mapElems $ toBlockMap g
-
 -- | like 'toBlockList', but the entry block always comes first
 toBlockListEntryFirst :: CmmGraph -> [CmmBlock]
 toBlockListEntryFirst g

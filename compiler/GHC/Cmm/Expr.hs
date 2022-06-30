@@ -49,7 +49,6 @@ import GHC.Cmm.Reg
 import GHC.Utils.Trace (pprTrace)
 import GHC.Utils.Panic (panic)
 import GHC.Utils.Outputable
-import GHC.Types.Unique
 
 import Data.Maybe
 import Data.Set (Set)

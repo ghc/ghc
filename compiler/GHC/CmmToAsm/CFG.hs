@@ -47,7 +47,6 @@ import GHC.Platform
 import GHC.Cmm.BlockId
 import GHC.Cmm as Cmm
 
-import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label

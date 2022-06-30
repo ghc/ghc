@@ -12,7 +12,6 @@ import GHC.Cmm.Dataflow.Collections (mapToList)
 import GHC.Cmm.Dataflow.Label (Label)
 import GHC.Cmm.Info.Build (emptySRT)
 import GHC.Cmm.Pipeline (cmmPipeline)
-import GHC.Cmm.Utils (toBlockList)
 import GHC.Data.Maybe (firstJusts)
 import GHC.Data.Stream (Stream, liftIO)
 import qualified GHC.Data.Stream as Stream
