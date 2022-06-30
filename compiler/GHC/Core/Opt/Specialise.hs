@@ -14,12 +14,6 @@ module GHC.Core.Opt.Specialise
 
 import GHC.Prelude
 
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Driver.Config
-import GHC.Driver.Config.Diagnostic
-import GHC.Driver.Config.Core.Rules ( initRuleOpts )
-
 import GHC.Tc.Utils.TcType hiding( substTy )
 
 import GHC.Core.Type  hiding( substTy, extendTvSubstList )
@@ -30,6 +24,7 @@ import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
 import GHC.Core.Rules
+import GHC.Core.SimpleOpt ( SimpleOpts )
 import GHC.Core.Utils     ( exprIsTrivial, getIdFromTrivialExpr_maybe
                           , mkCast, exprType
                           , stripTicksTop )
@@ -59,7 +54,6 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Error
 
-import GHC.Utils.Error ( mkMCDiagnostic )
 import GHC.Utils.Logger
 import GHC.Utils.Monad    ( foldlM )
 import GHC.Utils.Misc
@@ -609,17 +603,11 @@ specProgram logger opts guts@(ModGuts { mg_module = this_mod
               -- accidentally re-use a unique that's already in use
               -- Easiest thing is to do it all at once, as if all the top-level
               -- decls were mutually recursive
-       { let top_env = SE { se_subst = Core.mkEmptySubst $ mkInScopeSet $ mkVarSet $
+       { let top_env = SE { se_opts = opts
+                          , se_subst = Core.mkEmptySubst $ mkInScopeSet $ mkVarSet $
                                        bindersOfBinds binds
                           , se_interesting = emptyVarSet
                           , se_module = this_mod
-                          , se_dflags = so_dflags opts
-                          , se_external_rule_base = so_external_rule_base opts
-                          , se_rule_base = so_rule_base opts
-                          , se_uniq_mask = so_uniq_mask opts
-                          , se_unqual = so_unqual opts
-                          , se_loc = so_loc opts
-                          , se_visible_orphan_mods = so_visible_orphan_mods opts
                           }
 
              go []           = return ([], emptyUDs)
@@ -670,12 +658,12 @@ specImports :: Logger
             -> IO ([CoreRule], [CoreBind])
 specImports logger top_env local_rules
             (MkUD { ud_binds = dict_binds, ud_calls = calls })
-  | not $ gopt Opt_CrossModuleSpecialise (se_dflags top_env)
+  | not $ so_cross_module_specialise (se_opts top_env)
     -- See Note [Disabling cross-module specialisation]
   = return ([], wrapDictBinds dict_binds [])
 
   | otherwise
-  = do { let hpt_rules = se_rule_base top_env
+  = do { let hpt_rules = so_rule_base (se_opts top_env)
        ; let rule_base = extendRuleBaseList hpt_rules local_rules
 
        ; (spec_rules, spec_binds) <- spec_imports logger top_env [] rule_base
@@ -745,13 +733,14 @@ spec_import logger top_env callers rb dict_binds cis@(CIS fn _)
   | null good_calls
   = return ([], [])
 
-  | Just rhs <- canSpecImport dflags fn
+  | Just rhs <- canSpecImport (so_specialise_aggressively (se_opts top_env)) fn
   = do {     -- Get rules from the external package state
              -- We keep doing this in case we "page-fault in"
              -- more rules as we go along
-       ; let external_rule_base = se_external_rule_base top_env
-       ; let mask = se_uniq_mask top_env
-       ; let vis_orphs = se_visible_orphan_mods top_env
+       ; let opts = se_opts top_env
+       ; let external_rule_base = so_external_rule_base opts
+       ; let mask = so_uniq_mask opts
+       ; let vis_orphs = so_visible_orphan_mods opts
        ; let rules_for_fn = getRules (RuleEnv [rb, external_rule_base] vis_orphs) fn
 
        ; -- debugTraceMsg (text "specImport1" <+> vcat [ppr fn, ppr good_calls, ppr rhs])
@@ -783,14 +772,13 @@ spec_import logger top_env callers rb dict_binds cis@(CIS fn _)
        ; return ([], [])}
 
   where
-    dflags = se_dflags top_env
     good_calls = filterCalls cis dict_binds
        -- SUPER IMPORTANT!  Drop calls that (directly or indirectly) refer to fn
        -- See Note [Avoiding loops in specImports]
 
-canSpecImport :: DynFlags -> Id -> Maybe CoreExpr
+canSpecImport :: Bool -> Id -> Maybe CoreExpr
 -- See Note [Specialise imported INLINABLE things]
-canSpecImport dflags fn
+canSpecImport specialise_aggressively fn
   | CoreUnfolding { uf_src = src, uf_tmpl = rhs } <- unf
   , isStableSource src
   = Just rhs   -- By default, specialise only imported things that have a stable
@@ -803,7 +791,7 @@ canSpecImport dflags fn
     -- We only specialise DFunUnfoldings with -fspecialise-aggressively
     -- See Note [Do not specialise imported DFuns]
 
-  | gopt Opt_SpecialiseAggressively dflags
+  | specialise_aggressively
   = maybeUnfoldingTemplate unf  -- With -fspecialise-aggressively, specialise anything
                                 -- with an unfolding, stable or not, DFun or not
 
@@ -821,19 +809,19 @@ tryWarnMissingSpecs :: Logger -> SpecEnv -> [Id] -> Id -> [CallInfo] -> IO ()
 -- See Note [Warning about missed specialisations]
 tryWarnMissingSpecs logger top_env callers fn calls_for_fn
   | isClassOpId fn = return () -- See Note [Missed specialization for ClassOps]
-  | wopt Opt_WarnMissedSpecs dflags
-    && not (null callers)
-    && allCallersInlined                  = doWarn $ WarningWithFlag Opt_WarnMissedSpecs
-  | wopt Opt_WarnAllMissedSpecs dflags    = doWarn $ WarningWithFlag Opt_WarnAllMissedSpecs
-  | otherwise                             = return ()
+  | Just msg_class <- so_warn_missed_specs (se_opts top_env)
+    , not (null callers)
+    , allCallersInlined
+      = doWarn msg_class
+  | Just msg_class <- so_warn_all_missed_specs (se_opts top_env)
+      = doWarn msg_class
+  | otherwise = return ()
   where
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
-    dflags = se_dflags top_env
-    diag_opts = initDiagOpts dflags
-    doWarn reason = let
-      msg_class = mkMCDiagnostic diag_opts reason
-      loc = se_loc top_env
-      sty = mkErrStyle (se_unqual top_env)
+    doWarn msg_class = let
+      opts = se_opts top_env
+      loc = so_loc opts
+      sty = mkErrStyle (so_unqual opts)
       doc = vcat
           [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
                   2 (vcat [ text "when specialising" <+> quotes (ppr caller)
@@ -1092,17 +1080,25 @@ the specialisations for imported bindings recursive.
 -}
 
 data SpecialiseOpts = SpecialiseOpts
-  { so_dflags :: !DynFlags
-  , so_loc :: !SrcSpan
+  { so_loc :: !SrcSpan
   , so_rule_base :: !RuleBase
   , so_external_rule_base :: !RuleBase
   , so_uniq_mask :: !Char
   , so_unqual :: !PrintUnqualified
   , so_visible_orphan_mods :: !ModuleSet
+  , so_cross_module_specialise :: !Bool
+  , so_specialise_aggressively :: !Bool
+  , so_warn_missed_specs :: !(Maybe MessageClass)
+  , so_warn_all_missed_specs :: !(Maybe MessageClass)
+  , so_sdoc_context :: !SDocContext
+  , so_simpl_opts :: !SimpleOpts
+  , so_rule_opts :: !RuleOpts
   }
 
 data SpecEnv
-  = SE { se_subst :: Core.Subst
+  = SE { se_opts :: SpecialiseOpts
+
+       , se_subst :: Core.Subst
              -- We carry a substitution down:
              -- a) we must clone any binding that might float outwards,
              --    to avoid name clashes
@@ -1116,13 +1112,6 @@ data SpecEnv
              -- See Note [Interesting dictionary arguments]
 
        , se_module :: Module
-       , se_dflags :: DynFlags
-       , se_external_rule_base  :: RuleBase
-       , se_loc    :: SrcSpan
-       , se_rule_base :: RuleBase
-       , se_uniq_mask :: Char
-       , se_unqual :: PrintUnqualified
-       , se_visible_orphan_mods :: ModuleSet
      }
 
 instance Outputable SpecEnv where
@@ -1516,7 +1505,6 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
     inl_act   = inlinePragmaActivation inl_prag
     is_local  = isLocalId fn
     is_dfun   = isDFunId fn
-    dflags    = se_dflags env
     this_mod  = se_module env
         -- Figure out whether the function has an INLINE pragma
         -- See Note [Inline specialisations]
@@ -1593,6 +1581,10 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
 
            ; spec_fn <- newSpecIdSM fn spec_fn_ty spec_join_arity
            ; let
+                opts = se_opts env
+                sdoc_context = so_sdoc_context opts
+                simpl_opts = so_simpl_opts opts
+
                 -- The rule to put in the function's specialisation is:
                 --      forall x @b d1' d2'.
                 --          f x @T1 @b @T2 d1' d2' = f1 x @b
@@ -1602,7 +1594,7 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
                        | otherwise = -- Specialising local fn
                                      text "SPEC"
 
-                rule_name = mkFastString $ showSDoc dflags $
+                rule_name = mkFastString $ renderWithContext sdoc_context $
                             herald <+> ftext (occNameFS (getOccName fn))
                                    <+> hsep (mapMaybe ppr_call_key_ty call_args)
                             -- This name ends up in interface files, so use occNameString.
@@ -1628,8 +1620,6 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
                 -- Add the { d1' = dx1; d2' = dx2 } usage stuff
                 -- See Note [Specialising Calls]
                 spec_uds = foldr consDictBind rhs_uds dx_binds
-
-                simpl_opts = initSimpleOpts dflags
 
                 --------------------------------------
                 -- Add a suitable unfolding if the spec_inl_prag says so
@@ -1672,11 +1662,10 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
 -- Convenience function for invoking lookupRule from Specialise
 specLookupRule :: SpecEnv -> Id -> [CoreExpr] -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 specLookupRule env fn args rules
-  = lookupRule ropts (in_scope, realIdUnfolding) (const True) fn args rules
+  = lookupRule rule_opts (in_scope, realIdUnfolding) (const True) fn args rules
   where
-    dflags   = se_dflags env
     in_scope = Core.substInScope (se_subst env)
-    ropts    = initRuleOpts dflags
+    rule_opts = so_rule_opts (se_opts env)
 
 
 {- Note [Specialising DFuns]
