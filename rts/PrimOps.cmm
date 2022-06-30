@@ -2924,3 +2924,22 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);
     return ();
 }
+
+
+#define KEEP_ALIVE_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,c)   \
+  w_ info_ptr,                                                          \
+  PROF_HDR_FIELDS(w_,p1,p2)                                             \
+  p_ c
+
+stg_keepAlivezh ( P_ c,      /* :: v */
+                  P_ io      /* :: IO p */ )
+{
+    jump stg_ap_v_fast
+        (KEEP_ALIVE_FRAME_FIELDS(,,stg_keepAlive_frame_info, CCCS, 0, c))(io);
+}
+
+INFO_TABLE_RET(stg_keepAlive_frame, RET_SMALL, KEEP_ALIVE_FRAME_FIELDS(W_,P_, info_ptr, p1, p2, c))
+    return (P_ ret)
+{
+    return (ret);
+}
