@@ -70,6 +70,8 @@ import GHC.Data.Maybe          ( orElse )
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Control.Monad
 import Data.Foldable      ( toList )
 import Data.List          ( partition, sortBy )
@@ -710,7 +712,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                RecCon vars ->
                    do { checkDupRdrNames (map (foLabel . recordPatSynField) vars)
                       ; fls <- lookupConstructorFields name
-                      ; let fld_env = mkFsEnv [ (flLabel fl, fl) | fl <- fls ]
+                      ; let fld_env = mkFsEnv [ (field_label $ flLabel fl, fl) | fl <- fls ]
                       ; let rnRecordPatSynField
                               (RecordPatSynField { recordPatSynField  = visible
                                                  , recordPatSynPatVar = hidden })

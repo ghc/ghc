@@ -78,6 +78,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        seqList, zipWithEqual )
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Control.Monad
 import System.IO.Unsafe
 import Control.DeepSeq
@@ -1262,7 +1264,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
       | otherwise      = Nothing
       where
         sel = flSelector lbl
-        occ = mkVarOccFS (flLabel lbl)
+        occ = mkVarOccFS (field_label $ flLabel lbl)
 
     mk_user_con_res_ty :: IfaceEqSpec -> SDoc
     -- See Note [Result type of a data family GADT]

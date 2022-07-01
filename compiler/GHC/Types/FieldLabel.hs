@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-orphans #-} -- Outputable FieldLabelString
 
 {-
 %
@@ -71,8 +72,7 @@ Of course, datatypes with no constructors cannot have any fields.
 -}
 
 module GHC.Types.FieldLabel
-   ( FieldLabelString
-   , FieldLabelEnv
+   ( FieldLabelEnv
    , FieldLabel(..)
    , fieldSelectorOccName
    , fieldLabelPrintableName
@@ -89,10 +89,11 @@ import {-# SOURCE #-} GHC.Types.Name
 
 import GHC.Data.FastString
 import GHC.Data.FastString.Env
+import GHC.Types.Unique (Uniquable(..))
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
 
-import Language.Haskell.Syntax.Basic (FieldLabelString)
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.Bool
 import Data.Data
@@ -115,12 +116,19 @@ data FieldLabel = FieldLabel {
   deriving (Data, Eq)
 
 instance HasOccName FieldLabel where
-  occName = mkVarOccFS . flLabel
+  occName = mkVarOccFS . field_label . flLabel
 
 instance Outputable FieldLabel where
     ppr fl = ppr (flLabel fl) <> whenPprDebug (braces (ppr (flSelector fl))
                                                 <> ppr (flHasDuplicateRecordFields fl)
                                                 <> ppr (flHasFieldSelector fl))
+
+instance Outputable FieldLabelString where
+  ppr (FieldLabelString l) = ppr l
+
+instance Uniquable FieldLabelString where
+  getUnique (FieldLabelString fs) = getUnique fs
+
 
 -- | Flag to indicate whether the DuplicateRecordFields extension is enabled.
 data DuplicateRecordFields
@@ -158,7 +166,7 @@ instance Outputable FieldSelectors where
 -- because "GHC.Utils.Binary" itself depends on "GHC.Types.Name".
 instance Binary Name => Binary FieldLabel where
     put_ bh (FieldLabel aa ab ac ad) = do
-        put_ bh aa
+        put_ bh (field_label aa)
         put_ bh ab
         put_ bh ac
         put_ bh ad
@@ -167,7 +175,7 @@ instance Binary Name => Binary FieldLabel where
         ab <- get bh
         ac <- get bh
         ad <- get bh
-        return (FieldLabel aa ab ac ad)
+        return (FieldLabel (FieldLabelString aa) ab ac ad)
 
 
 -- | Record selector OccNames are built from the underlying field name
@@ -177,9 +185,10 @@ instance Binary Name => Binary FieldLabel where
 fieldSelectorOccName :: FieldLabelString -> OccName -> DuplicateRecordFields -> FieldSelectors -> OccName
 fieldSelectorOccName lbl dc dup_fields_ok has_sel
   | shouldMangleSelectorNames dup_fields_ok has_sel = mkRecFldSelOcc str
-  | otherwise     = mkVarOccFS lbl
+  | otherwise     = mkVarOccFS fl
   where
-    str     = ":" ++ unpackFS lbl ++ ":" ++ occNameString dc
+    fl      = field_label lbl
+    str     = ":" ++ unpackFS fl ++ ":" ++ occNameString dc
 
 -- | Undo the name mangling described in Note [FieldLabel] to produce a Name
 -- that has the user-visible OccName (but the selector's unique).  This should
@@ -187,7 +196,7 @@ fieldSelectorOccName lbl dc dup_fields_ok has_sel
 -- need to qualify it with a module prefix.
 fieldLabelPrintableName :: FieldLabel -> Name
 fieldLabelPrintableName fl
-  | flIsOverloaded fl = tidyNameOcc (flSelector fl) (mkVarOccFS (flLabel fl))
+  | flIsOverloaded fl = tidyNameOcc (flSelector fl) (mkVarOccFS (field_label $ flLabel fl))
   | otherwise         = flSelector fl
 
 -- | Selector name mangling should be used if either DuplicateRecordFields or

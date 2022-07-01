@@ -37,7 +37,7 @@ import GHC.Hs.Decls() -- import instances
 import GHC.Hs.Pat
 import GHC.Hs.Lit
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Basic (FieldLabelString)
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import GHC.Hs.Extension
 import GHC.Hs.Type
 import GHC.Hs.Binds
@@ -46,6 +46,7 @@ import GHC.Parser.Annotation
 -- others:
 import GHC.Tc.Types.Evidence
 import GHC.Types.Name
+import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Basic
 import GHC.Types.Fixity
@@ -2121,8 +2122,11 @@ pprFieldLabelStrings :: forall p. (UnXRec p, Outputable (XRec p FieldLabelString
 pprFieldLabelStrings (FieldLabelStrings flds) =
     hcat (punctuate dot (map (ppr . unXRec @p) flds))
 
-instance Outputable(XRec p FieldLabelString) => Outputable (DotFieldOcc p) where
-  ppr (DotFieldOcc _ s) = ppr s
+pprPrefixFastString :: FastString -> SDoc
+pprPrefixFastString fs = pprPrefixOcc (mkVarUnqual fs)
+
+instance UnXRec p => Outputable (DotFieldOcc p) where
+  ppr (DotFieldOcc _ s) = (pprPrefixFastString . field_label . unXRec @p) s
   ppr XDotFieldOcc{} = text "XDotFieldOcc"
 
 {-
@@ -2157,8 +2161,10 @@ type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr))))] = SrcSpanAnnL
 
 type instance Anno (FieldLabelStrings (GhcPass p)) = SrcAnn NoEpAnns
+type instance Anno FieldLabelString                = SrcSpanAnnN
+
 type instance Anno FastString                      = SrcAnn NoEpAnns
-              -- NB: type FieldLabelString = FastString
+  -- Used in HsQuasiQuote and perhaps elsewhere
 
 type instance Anno (DotFieldOcc (GhcPass p))       = SrcAnn NoEpAnns
 

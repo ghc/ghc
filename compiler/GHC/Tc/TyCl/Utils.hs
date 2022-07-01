@@ -81,6 +81,8 @@ import GHC.Types.Unique.Set
 import GHC.Types.TyThing
 import qualified GHC.LanguageExtensions as LangExt
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Control.Monad
 
 {-
@@ -935,7 +937,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                         { hfbAnn = noAnn
                         , hfbLHS
                            = L locc (FieldOcc sel_name
-                                      (L locn $ mkVarUnqual lbl))
+                                      (L locn $ mkVarUnqual (field_label lbl)))
                         , hfbRHS
                            = L loc' (VarPat noExtField (L locn field_var))
                         , hfbPun = False })
@@ -982,7 +984,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     inst_tys = substTyVars eq_subst univ_tvs
 
     unit_rhs = mkLHsTupleExpr [] noExtField
-    msg_lit = HsStringPrim NoSourceText (bytesFS lbl)
+    msg_lit = HsStringPrim NoSourceText (bytesFS (field_label lbl))
 
 {-
 Note [Polymorphic selectors]

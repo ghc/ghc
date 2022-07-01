@@ -58,6 +58,8 @@ import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Utils.Misc
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Control.Monad (mplus)
 import Data.List (zip4, partition)
 import Data.Maybe (isJust)
@@ -639,7 +641,7 @@ tc_mkRepTy gk get_fixity dit@(DerivInstTys{ dit_rep_tc = tycon
                               then promotedTrueDataCon
                               else promotedFalseDataCon
 
-        selName = mkStrLitTy . flLabel
+        selName = mkStrLitTy . field_label . flLabel
 
         mbSel Nothing  = mkTyConApp promotedNothingDataCon [typeSymbolKind]
         mbSel (Just s) = mkTyConApp promotedJustDataCon

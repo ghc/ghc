@@ -86,6 +86,8 @@ import GHC.Data.Maybe
 import GHC.Data.FastString
 import GHC.Data.FastString.Env
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Control.Monad
 import Data.Either      ( partitionEithers )
 import Data.Map         ( Map )
@@ -993,7 +995,7 @@ getLocalNonValBinders fixity_env
         find_con_decl_fld  (L _ (FieldOcc _ (L _ rdr)))
           = expectJust "getLocalNonValBinders/find_con_decl_fld" $
               find (\ fl -> flLabel fl == lbl) flds
-          where lbl = occNameFS (rdrNameOcc rdr)
+          where lbl = FieldLabelString $ occNameFS (rdrNameOcc rdr)
 
     new_assoc :: DuplicateRecordFields -> FieldSelectors -> LInstDecl GhcPs
               -> RnM ([AvailInfo], [(Name, [FieldLabel])])
@@ -1055,7 +1057,7 @@ newRecordSelector dup_fields_ok has_sel (dc:_) (L loc (FieldOcc _ (L _ fld)))
                              , flHasFieldSelector = has_sel
                              , flSelector = selName } }
   where
-    fieldLabelString = occNameFS $ rdrNameOcc fld
+    fieldLabelString = FieldLabelString $ occNameFS $ rdrNameOcc fld
     selOccName = fieldSelectorOccName fieldLabelString (nameOccName dc) dup_fields_ok has_sel
     field | isExact fld = fld
               -- use an Exact RdrName as is to preserve the bindings

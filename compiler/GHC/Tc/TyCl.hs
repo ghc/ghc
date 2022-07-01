@@ -98,6 +98,8 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Control.Monad
 import Data.Functor.Identity
 import Data.List ( partition)
@@ -4270,7 +4272,7 @@ checkValidTyCon tc
     -- The order of these equivalence classes might conceivably (non-deterministically)
     -- depend on the result of this comparison, but that just affects the order in which
     -- fields are checked for compatibility. It will not affect the compiled binary.
-    cmp_fld (f1,_) (f2,_) = flLabel f1 `uniqCompareFS` flLabel f2
+    cmp_fld (f1,_) (f2,_) = field_label (flLabel f1) `uniqCompareFS` field_label (flLabel f2)
     get_fields con = dataConFieldLabels con `zip` repeat con
         -- dataConFieldLabels may return the empty list, which is fine
 

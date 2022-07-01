@@ -46,6 +46,7 @@ import GHC.Prelude
 
 import GHC.Tc.Utils.Monad
 import GHC.Hs
+import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
 import GHC.Types.Basic
 import GHC.Types.Fixity
@@ -83,6 +84,8 @@ import GHC.Utils.Lexeme
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Data.Bag
+
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.List  ( find, partition, intersperse )
 import GHC.Data.Maybe ( expectJust )
@@ -1110,7 +1113,7 @@ gen_Read_binds get_fixity loc dit@(DerivInstTys{dit_rep_tc = tycon})
         field_stmts  = zipWithEqual "lbl_stmts" read_field labels as_needed
 
         con_arity    = dataConSourceArity data_con
-        labels       = map flLabel $ dataConFieldLabels data_con
+        labels       = map (field_label . flLabel) $ dataConFieldLabels data_con
         dc_nm        = getName data_con
         is_infix     = dataConIsInfix data_con
         is_record    = labels `lengthExceeds` 0
@@ -1234,7 +1237,7 @@ gen_Show_binds get_fixity loc dit@(DerivInstTys{ dit_rep_tc = tycon
              arg_tys       = derivDataConInstArgTys data_con dit -- Correspond 1-1 with bs_needed
              con_pat       = nlConVarPat data_con_RDR bs_needed
              nullary_con   = con_arity == 0
-             labels        = map flLabel $ dataConFieldLabels data_con
+             labels        = map (field_label . flLabel) $ dataConFieldLabels data_con
              lab_fields    = length labels
              record_syntax = lab_fields > 0
 
@@ -2200,7 +2203,7 @@ genAuxBindSpecOriginal dflags loc spec
              , nlList  labels                               -- Field labels
              , nlHsVar fixity ]                             -- Fixity
 
-        labels   = map (nlHsLit . mkHsString . unpackFS . flLabel)
+        labels   = map (nlHsLit . mkHsString . unpackFS . field_label . flLabel)
                        (dataConFieldLabels dc)
         dc_occ   = getOccName dc
         is_infix = isDataSymOcc dc_occ

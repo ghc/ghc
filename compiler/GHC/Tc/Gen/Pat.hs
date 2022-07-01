@@ -37,6 +37,7 @@ import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
 import GHC.Types.Error
+import GHC.Types.FieldLabel
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Name
@@ -70,8 +71,10 @@ import GHC.Utils.Panic.Plain
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
 import Control.Monad
+import GHC.Data.FastString
 import qualified Data.List.NonEmpty as NE
 import GHC.Data.List.SetOps ( getNth )
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 {-
 ************************************************************************
@@ -1296,7 +1299,7 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
                                                                         pun), res) }
 
 
-      find_field_ty :: Name -> FieldLabelString -> TcM (Scaled TcType)
+      find_field_ty :: Name -> FastString -> TcM (Scaled TcType)
       find_field_ty sel lbl
         = case [ty | (fl, ty) <- field_tys, flSelector fl == sel ] of
 
@@ -1306,7 +1309,7 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
                 --      f (R { foo = (a,b) }) = a+b
                 -- If foo isn't one of R's fields, we don't want to crash when
                 -- typechecking the "a+b".
-           [] -> failWith (badFieldConErr (getName con_like) lbl)
+           [] -> failWith (badFieldConErr (getName con_like) (FieldLabelString lbl))
 
                 -- The normal case, when the field comes from the right constructor
            (pat_ty : extras) -> do

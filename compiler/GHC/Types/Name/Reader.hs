@@ -93,6 +93,8 @@ import GHC.Utils.Misc as Utils
 import GHC.Utils.Panic
 import GHC.Types.Name.Env
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Data.Data
 import Data.List( sortBy )
 import GHC.Data.Bag
@@ -867,7 +869,7 @@ lookupGRE_FieldLabel :: GlobalRdrEnv -> FieldLabel -> Maybe GlobalRdrElt
 -- selector name and field label may be different: the GlobalRdrEnv is keyed on
 -- the label.  See Note [GreNames] for why this happens.
 lookupGRE_FieldLabel env fl
-  = lookupGRE_Name_OccName env (flSelector fl) (mkVarOccFS (flLabel fl))
+  = lookupGRE_Name_OccName env (flSelector fl) (mkVarOccFS (field_label $ flLabel fl))
 
 lookupGRE_Name_OccName :: GlobalRdrEnv -> Name -> OccName -> Maybe GlobalRdrElt
 -- ^ Look for precisely this 'Name' in the environment, but with an 'OccName'

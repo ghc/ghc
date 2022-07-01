@@ -78,6 +78,8 @@ import GHC.Utils.Panic.Plain
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Data.List (sortBy, nubBy, partition)
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
@@ -1282,7 +1284,7 @@ rnConDeclFields ctxt fls fields
    = mapFvRn (rnField fl_env env) fields
   where
     env    = mkTyKiEnv ctxt TypeLevel RnTypeBody
-    fl_env = mkFsEnv [ (flLabel fl, fl) | fl <- fls ]
+    fl_env = mkFsEnv [ (field_label $ flLabel fl, fl) | fl <- fls ]
 
 rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LConDeclField GhcPs
         -> RnM (LConDeclField GhcRn, FreeVars)

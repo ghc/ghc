@@ -73,6 +73,8 @@ import Control.Monad
 import GHC.Builtin.Types ( nilDataConName )
 import qualified GHC.LanguageExtensions as LangExt
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Data.List (unzip4, minimumBy)
 import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Maybe (isJust, isNothing)
@@ -2730,11 +2732,11 @@ mkGetField get_field arg field = unLoc (head $ mkGet get_field [arg] field)
 -- mkSetField a field b calculates a set_field @field expression.
 -- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' on a to b").
 mkSetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> LHsExpr GhcRn -> HsExpr GhcRn
-mkSetField set_field a (L _ field) b =
+mkSetField set_field a (L _ (FieldLabelString field)) b =
   genHsApp (genHsApp (genHsVar set_field `genAppType` genHsTyLit field)  a) b
 
 mkGet :: Name -> [LHsExpr GhcRn] -> LocatedAn NoEpAnns FieldLabelString -> [LHsExpr GhcRn]
-mkGet get_field l@(r : _) (L _ field) =
+mkGet get_field l@(r : _) (L _ (FieldLabelString field)) =
   wrapGenSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit field) r) : l
 mkGet _ [] _ = panic "mkGet : The impossible has happened!"
 
@@ -2751,7 +2753,7 @@ mkProjection getFieldName circName (field :| fields) = foldl' f (proj field) fie
     f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
 
     proj :: LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
-    proj (L _ f) = genHsVar getFieldName `genAppType` genHsTyLit f
+    proj (L _ (FieldLabelString f)) = genHsVar getFieldName `genAppType` genHsTyLit f
 
 -- mkProjUpdateSetField calculates functions representing dot notation record updates.
 -- e.g. Suppose an update like foo.bar = 1.

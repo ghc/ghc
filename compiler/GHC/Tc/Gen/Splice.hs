@@ -132,6 +132,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe( MaybeErr(..) )
 import qualified GHC.Data.EnumSet as EnumSet
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
 import qualified Language.Haskell.TH.Syntax as TH
@@ -2762,7 +2763,7 @@ reifyFieldLabel fl
     mod     = assert (isExternalName name) $ nameModule name
     pkg_str = unitString (moduleUnit mod)
     mod_str = moduleNameString (moduleName mod)
-    occ_str = unpackFS (flLabel fl)
+    occ_str = unpackFS (field_label $ flLabel fl)
 
 reifySelector :: Id -> TyCon -> TH.Name
 reifySelector id tc

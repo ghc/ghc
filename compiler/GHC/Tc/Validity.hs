@@ -72,6 +72,8 @@ import GHC.Utils.Panic
 import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Control.Monad
 import Data.Foldable
 import Data.Function
@@ -1581,7 +1583,7 @@ checkHasFieldInst cls tys@[_k_ty, x_ty, r_ty, _a_ty] =
                   -> whoops (text "Record data type may not be a data family")
       | otherwise -> case isStrLitTy x_ty of
        Just lbl
-         | isJust (lookupTyConFieldLabel lbl tc)
+         | isJust (lookupTyConFieldLabel (FieldLabelString lbl) tc)
                      -> whoops (ppr tc <+> text "already has a field"
                                        <+> quotes (ppr lbl))
          | otherwise -> return ()

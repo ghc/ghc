@@ -28,6 +28,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
 
+import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader( lookupGRE_FieldLabel, greMangledName )
 import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name, pprDefinedAt )
@@ -50,6 +51,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( splitAtList, fstOf3 )
 import GHC.Data.FastString
+
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.Maybe
 
@@ -917,7 +920,7 @@ matchHasField dflags short_cut clas tys
                -- use representation tycon (if data family); it has the fields
              , let r_tc = fstOf3 (tcLookupDataFamInst fam_inst_envs tc args)
                -- x should be a field of r
-             , Just fl <- lookupTyConFieldLabel x r_tc
+             , Just fl <- lookupTyConFieldLabel (FieldLabelString x) r_tc
                -- the field selector should be in scope
              , Just gre <- lookupGRE_FieldLabel rdr_env fl
 

@@ -55,6 +55,8 @@ import GHC.Data.FastString
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
 import Control.Applicative( (<|>) )
@@ -1106,8 +1108,10 @@ cvtl e = wrapLA (cvt e)
     cvt (LabelE s)       = return $ HsOverLabel noComments (fsLit s)
     cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noComments n' }
     cvt (GetFieldE exp f) = do { e' <- cvtl exp
-                               ; return $ HsGetField noComments e' (L noSrcSpanA (DotFieldOcc noAnn (L noSrcSpanA (fsLit f)))) }
-    cvt (ProjectionE xs) = return $ HsProjection noAnn $ fmap (L noSrcSpanA . DotFieldOcc noAnn . L noSrcSpanA . fsLit) xs
+                               ; return $ HsGetField noComments e'
+                                         (L noSrcSpanA (DotFieldOcc noAnn (L noSrcSpanA (FieldLabelString (fsLit f))))) }
+    cvt (ProjectionE xs) = return $ HsProjection noAnn $ fmap
+                                         (L noSrcSpanA . DotFieldOcc noAnn . L noSrcSpanA . FieldLabelString  . fsLit) xs
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.
 Consider this example:

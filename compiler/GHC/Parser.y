@@ -93,6 +93,8 @@ import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            unboxedUnitTyCon, unboxedUnitDataCon,
                            listTyCon_RDR, consDataCon_RDR)
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import qualified Data.Semigroup as Semi
 }
 
@@ -2881,8 +2883,8 @@ aexp1   :: { ECP }
         | aexp1 TIGHT_INFIX_PROJ field
             {% runPV (unECP $1) >>= \ $1 ->
                fmap ecpFromExp $ acsa (\cs ->
-                 let fl = sLLa $2 $> (DotFieldOcc ((EpAnn (glR $2) (AnnFieldLabel (Just $ glAA $2)) emptyComments)) (reLocA $3)) in
-                 mkRdrGetField (noAnnSrcSpan $ comb2 (reLoc $1) $>) $1 fl (EpAnn (glAR $1) NoEpAnns cs))  }
+                 let fl = sLLa $2 (reLoc $>) (DotFieldOcc ((EpAnn (glR $2) (AnnFieldLabel (Just $ glAA $2)) emptyComments)) $3) in
+                 mkRdrGetField (noAnnSrcSpan $ comb2 (reLoc $1) (reLoc $>)) $1 fl (EpAnn (glAR $1) NoEpAnns cs))  }
 
 
         | aexp2                { $1 }
@@ -2967,8 +2969,8 @@ projection :: { Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs))) }
 projection
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parsing.Lexer
         : projection TIGHT_INFIX_PROJ field
-                             {% acs (\cs -> sLL $1 $> ((sLLa $2 $> $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $2)) cs) (reLocA $3)) `NE.cons` unLoc $1)) }
-        | PREFIX_PROJ field  {% acs (\cs -> sLL $1 $> ((sLLa $1 $> $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) (reLocA $2)) :| [])) }
+                             {% acs (\cs -> sLL $1 (reLoc $>) ((sLLa $2 (reLoc $>) $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $2)) cs) $3) `NE.cons` unLoc $1)) }
+        | PREFIX_PROJ field  {% acs (\cs -> sLL $1 (reLoc $>) ((sLLa $1 (reLoc $>) $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) $2) :| [])) }
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { mapLoc (HsUntypedSplice noAnn) (reLocA $1) }
@@ -3416,15 +3418,15 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         -- AZ: need to pull out the let block into a helper
         | field TIGHT_INFIX_PROJ fieldToUpdate '=' texp
                         { do
-                            let top = sL1a $1 $ DotFieldOcc noAnn (reLocA $1)
+                            let top = sL1 (la2la $1) $ DotFieldOcc noAnn $1
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
                                 lf' = comb2 $2 (reLoc $ L lf ())
                                 fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (EpAnn (spanAsAnchor lf') (AnnFieldLabel (Just $ glAA $2)) emptyComments) f) : t
                                 final = last fields
-                                l = comb2 $1 $3
+                                l = comb2 (reLoc $1) $3
                                 isPun = False
                             $5 <- unECP $5
-                            fmap Right $ mkHsProjUpdatePV (comb2 $1 (reLoc $5)) (L l fields) $5 isPun
+                            fmap Right $ mkHsProjUpdatePV (comb2 (reLoc $1) (reLoc $5)) (L l fields) $5 isPun
                                             [mj AnnEqual $4]
                         }
 
@@ -3432,24 +3434,24 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         -- AZ: need to pull out the let block into a helper
         | field TIGHT_INFIX_PROJ fieldToUpdate
                         { do
-                            let top =  sL1a $1 $ DotFieldOcc noAnn (reLocA $1)
+                            let top =  sL1 (la2la $1) $ DotFieldOcc noAnn $1
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
                                 lf' = comb2 $2 (reLoc $ L lf ())
                                 fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (EpAnn (spanAsAnchor lf') (AnnFieldLabel (Just $ glAA $2)) emptyComments) f) : t
                                 final = last fields
-                                l = comb2 $1 $3
+                                l = comb2 (reLoc $1) $3
                                 isPun = True
-                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLocA final) (mkRdrUnqual . mkVarOcc . unpackFS . unLoc . dfoLabel . unLoc $ final))
+                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLocA final) (mkRdrUnqual . mkVarOcc . unpackFS . field_label . unLoc . dfoLabel . unLoc $ final))
                             fmap Right $ mkHsProjUpdatePV l (L l fields) var isPun []
                         }
 
 fieldToUpdate :: { Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)] }
 fieldToUpdate
         -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
-        : fieldToUpdate TIGHT_INFIX_PROJ field   {% getCommentsFor (getLoc $3) >>= \cs ->
-                                                     return (sLL $1 $> ((sLLa $2 $> (DotFieldOcc (EpAnn (glR $2) (AnnFieldLabel $ Just $ glAA $2) cs) (reLocA $3))) : unLoc $1)) }
-        | field       {% getCommentsFor (getLoc $1) >>= \cs ->
-                        return (sL1 $1 [sL1a $1 (DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel Nothing) cs) (reLocA $1))]) }
+        : fieldToUpdate TIGHT_INFIX_PROJ field   {% getCommentsFor (getLocA $3) >>= \cs ->
+                                                     return (sLL $1 (reLoc $>) ((sLLa $2 (reLoc $>) (DotFieldOcc (EpAnn (glR $2) (AnnFieldLabel $ Just $ glAA $2) cs) $3)) : unLoc $1)) }
+        | field       {% getCommentsFor (getLocA $1) >>= \cs ->
+                        return (sL1 (reLoc $1) [sL1a (reLoc $1) (DotFieldOcc (EpAnn (glNR $1) (AnnFieldLabel Nothing) cs) $1)]) }
 
 -----------------------------------------------------------------------------
 -- Implicit Parameter Bindings
@@ -3751,8 +3753,8 @@ qvar    :: { LocatedN RdrName }
 -- whether it's a qvar or a var can be postponed until
 -- *after* we see the close paren.
 
-field :: { Located FastString  }
-      : varid { reLocN $ fmap (occNameFS . rdrNameOcc) $1 }
+field :: { LocatedN FieldLabelString  }
+      : varid { fmap (FieldLabelString . occNameFS . rdrNameOcc) $1 }
 
 qvarid :: { LocatedN RdrName }
         : varid               { $1 }
