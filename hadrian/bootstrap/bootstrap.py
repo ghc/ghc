@@ -120,10 +120,10 @@ class BadTarball(Exception):
         ])
 
 def package_url(package: PackageName, version: Version) -> str:
-    return f'http://hackage.haskell.org/package/{package}-{version}/{package}-{version}.tar.gz'
+    return f'https://hackage.haskell.org/package/{package}-{version}/{package}-{version}.tar.gz'
 
 def package_cabal_url(package: PackageName, version: Version, revision: int) -> str:
-    return f'http://hackage.haskell.org/package/{package}-{version}/revision/{revision}.cabal'
+    return f'https://hackage.haskell.org/package/{package}-{version}/revision/{revision}.cabal'
 
 def verify_sha256(expected_hash: SHA256Hash, f: Path):
     print(f"Verifying {f}...")
