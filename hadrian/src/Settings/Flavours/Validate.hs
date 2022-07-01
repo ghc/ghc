@@ -39,9 +39,8 @@ validateArgs = sourceArgs SourceArgs
     , hsGhc      = pure ["-O"] }
 
 slowValidateFlavour :: Flavour
-slowValidateFlavour = werror $ validateFlavour
+slowValidateFlavour = validateFlavour
     { name = "slow-validate"
-    , args = defaultBuilderArgs <> validateArgs <> defaultPackageArgs
     , ghcDebugAssertions = True
     }
 
