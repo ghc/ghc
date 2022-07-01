@@ -235,6 +235,7 @@ ghcWrapper stage  = do
     return $ unwords $ map show $ [ ghcPath ]
                                ++ (if stage == Stage1
                                      then ["-no-global-package-db"
+                                          , "-package-env=-"
                                           , "-package-db " ++ dbPath
                                           ]
                                      else [])
