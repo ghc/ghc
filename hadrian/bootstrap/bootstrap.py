@@ -474,7 +474,7 @@ Alternatively, you could use `bootstrap.py -d {args.deps} fetch -o $TARBALL` to 
 
                 {hadrian_path}
 
-            It have been archived for distribution in
+            It has been archived for distribution in
 
                 {archive}
 
