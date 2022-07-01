@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor       #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -435,8 +436,13 @@ lint_banner string pass = text "*** Core Lint"      <+> text string
 showLintWarnings :: CoreToDo -> Bool
 -- Disable Lint warnings on the first simplifier pass, because
 -- there may be some INLINE knots still tied, which is tiresomely noisy
-showLintWarnings (CoreDoSimplify _ (SimplMode { sm_phase = InitialPhase })) = False
-showLintWarnings _ = True
+showLintWarnings = \case
+  (CoreDoSimplify
+    (CoreDoSimplifyOpts
+      _
+      (SimplMode { sm_phase = InitialPhase })))
+    -> False
+  _ -> True
 
 interactiveInScope :: InteractiveContext -> [Var]
 -- In GHCi we may lint expressions, or bindings arising from 'deriving'

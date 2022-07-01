@@ -11,7 +11,7 @@
 module GHC.Core.Opt.Monad (
     -- * Configuration of the core-to-core passes
     CoreToDo(..), runWhen, runMaybe,
-    SimplMode(..),
+    CoreDoSimplifyOpts(..), SimplMode(..),
     FloatOutSwitches(..),
     FloatEnable(..),
     floatEnable,
@@ -105,13 +105,16 @@ import GHC.Utils.Panic (throwGhcException, GhcException(..), panic)
 ************************************************************************
 -}
 
+data CoreDoSimplifyOpts = CoreDoSimplifyOpts
+        Int                    -- Max iterations
+        SimplMode
+
 data CoreToDo           -- These are diff core-to-core passes,
                         -- which may be invoked in any order,
                         -- as many times as you like.
 
-  = CoreDoSimplify      -- The core-to-core simplifier.
-        Int                    -- Max iterations
-        SimplMode
+  = CoreDoSimplify !CoreDoSimplifyOpts
+  -- ^ The core-to-core simplifier.
   | CoreDoPluginPass String CorePluginPass
   | CoreDoFloatInwards
   | CoreDoFloatOutwards FloatOutSwitches
@@ -141,7 +144,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreAddLateCcs
 
 instance Outputable CoreToDo where
-  ppr (CoreDoSimplify _ _)     = text "Simplifier"
+  ppr (CoreDoSimplify _)       = text "Simplifier"
   ppr (CoreDoPluginPass s _)   = text "Core plugin: " <+> text s
   ppr CoreDoFloatInwards       = text "Float inwards"
   ppr (CoreDoFloatOutwards f)  = text "Float out" <> parens (ppr f)
@@ -167,8 +170,9 @@ instance Outputable CoreToDo where
   ppr (CoreDoPasses passes)    = text "CoreDoPasses" <+> ppr passes
 
 pprPassDetails :: CoreToDo -> SDoc
-pprPassDetails (CoreDoSimplify n md) = vcat [ text "Max iterations =" <+> int n
-                                            , ppr md ]
+pprPassDetails (CoreDoSimplify cfg) = vcat [ text "Max iterations =" <+> int n
+                                           , ppr md ]
+  where CoreDoSimplifyOpts n md = cfg
 pprPassDetails _ = Outputable.empty
 
 
