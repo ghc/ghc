@@ -38,6 +38,8 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import qualified Data.Data as Data
 import Data.Function
 import Data.List (find)

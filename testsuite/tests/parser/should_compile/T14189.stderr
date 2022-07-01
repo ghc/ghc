@@ -188,7 +188,8 @@
        [(L
          { T14189.hs:3:11 }
          (FieldLabel
-          {FastString: "f"}
+          (FieldLabelString
+           {FastString: "f"})
           (NoDuplicateRecordFields)
           (FieldSelectors)
           {Name: T14189.f}))]
@@ -215,7 +216,8 @@
          {Name: T14189.NT})
        ,(FieldGreName
          (FieldLabel
-          {FastString: "f"}
+          (FieldLabelString
+           {FastString: "f"})
           (NoDuplicateRecordFields)
           (FieldSelectors)
           {Name: T14189.f}))])])])

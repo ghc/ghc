@@ -53,8 +53,8 @@ Field Labels
 
 -- | Field labels are just represented as strings;
 -- they are not necessarily unique (even within a module)
-type FieldLabelString = FastString
-
+newtype FieldLabelString = FieldLabelString { field_label:: FastString }
+  deriving (Data, Eq)
 
 {-
 ************************************************************************

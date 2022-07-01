@@ -174,6 +174,8 @@ import GHC.Utils.Misc
 import GHC.Types.Unique.Set
 import GHC.Unit.Module
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import qualified Data.Data as Data
 
 {-
@@ -1803,12 +1805,12 @@ tyConFieldLabelEnv tc
 
 -- | Look up a field label belonging to this 'TyCon'
 lookupTyConFieldLabel :: FieldLabelString -> TyCon -> Maybe FieldLabel
-lookupTyConFieldLabel lbl tc = lookupDFsEnv (tyConFieldLabelEnv tc) lbl
+lookupTyConFieldLabel lbl tc = lookupDFsEnv (tyConFieldLabelEnv tc) (field_label lbl)
 
 -- | Make a map from strings to FieldLabels from all the data
 -- constructors of this algebraic tycon
 fieldsOfAlgTcRhs :: AlgTyConRhs -> FieldLabelEnv
-fieldsOfAlgTcRhs rhs = mkDFsEnv [ (flLabel fl, fl)
+fieldsOfAlgTcRhs rhs = mkDFsEnv [ (field_label $ flLabel fl, fl)
                                 | fl <- dataConsFields (visibleDataCons rhs) ]
   where
     -- Duplicates in this list will be removed by 'mkFsEnv'

@@ -30,14 +30,17 @@ import GHC.Data.FastString
 import GHC.Types.Basic hiding (EP)
 import GHC.Types.Fixity
 import GHC.Types.ForeignCall
-import GHC.Types.SourceText
+import GHC.Types.Name.Reader
 import GHC.Types.PkgQual
+import GHC.Types.SourceText
 import GHC.Types.Var
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Unit.Module.Warnings
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.TypeLits
+
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad.Identity
 import Control.Monad.RWS
@@ -47,7 +50,6 @@ import Data.Typeable
 import Data.List ( partition, sortBy)
 import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe ( isJust )
-
 import Data.Void
 
 import Lookup
@@ -2270,9 +2272,11 @@ instance ExactPrint (FieldLabelStrings GhcPs) where
 instance ExactPrint (DotFieldOcc GhcPs) where
   getAnnotationEntry (DotFieldOcc an _) = fromAnn an
 
-  exact (DotFieldOcc an fs) = do
+  exact (DotFieldOcc an (L loc (FieldLabelString fs))) = do
     markAnnKwM an afDot  AnnDot
-    markAnnotated fs
+    -- The field name has a SrcSpanAnnN, print it as a
+    -- LocatedN RdrName
+    markAnnotated (L loc (mkVarUnqual fs))
 
 -- ---------------------------------------------------------------------
 

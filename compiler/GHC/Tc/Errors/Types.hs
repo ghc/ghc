@@ -81,7 +81,6 @@ import GHC.Tc.Types.Rank (Rank)
 import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType)
 import GHC.Types.Error
 import GHC.Types.Hint (UntickedPromotedThing(..))
-import GHC.Types.FieldLabel (FieldLabelString)
 import GHC.Types.ForeignCall (CLabelString)
 import GHC.Types.Name (Name, OccName, getSrcLoc, getSrcSpan)
 import GHC.Types.Name.Reader
@@ -108,6 +107,8 @@ import GHC.Types.Basic
 import GHC.Utils.Misc (capitalise, filterOut)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.FastString (FastString)
+
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable hiding (TyCon)

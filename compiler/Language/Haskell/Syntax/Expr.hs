@@ -1638,4 +1638,3 @@ isMonadDoCompContext ListComp     = False
 isMonadDoCompContext GhciStmtCtxt = False
 isMonadDoCompContext (DoExpr _)   = False
 isMonadDoCompContext (MDoExpr _)  = False
-

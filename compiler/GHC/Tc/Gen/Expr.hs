@@ -37,6 +37,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
 import GHC.Types.Error
+import GHC.Types.FieldLabel
 import GHC.Types.Unique.Map ( UniqMap, listToUniqMap, lookupUniqMap )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
@@ -83,6 +84,8 @@ import GHC.Utils.Panic.Plain
 import Control.Monad
 import GHC.Core.Class(classTyCon)
 import GHC.Types.Unique.Set ( UniqSet, mkUniqSet, elementOfUniqSet, nonDetEltsUniqSet )
+
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.Function
 import Data.List (partition, sortBy, groupBy, intersect)
@@ -1208,7 +1211,7 @@ desugarRecordUpd record_expr rbnds res_ty
        -- After this we know that rbinds is unambiguous
        ; rbinds <- disambiguateRecordBinds record_expr record_rho rbnds res_ty
        ; let upd_flds = map (unLoc . hfbLHS . unLoc) rbinds
-             upd_fld_occs = map (occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc) upd_flds
+             upd_fld_occs = map (FieldLabelString . occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc) upd_flds
              sel_ids      = map selectorAmbiguousFieldOcc upd_flds
              upd_fld_names = map idName sel_ids
 
@@ -1355,7 +1358,7 @@ desugarRecordUpd record_expr rbnds res_ty
                  Just (upd_id, _) -> (genWildPat, genLHsVar (idName upd_id))
                  -- Field is not being updated: LHS = variable pattern, RHS = that same variable.
                  _  -> let fld_nm = mkInternalName (mkBuiltinUnique i)
-                                      (mkVarOccFS (flLabel fld_lbl))
+                                      (mkVarOccFS (field_label $ flLabel fld_lbl))
                                       generatedSrcSpan
                        in (genVarPat fld_nm, genLHsVar fld_nm)
 
@@ -1599,7 +1602,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
       = do { addErrTc (badFieldConErr (getName con_like) field_lbl)
            ; return Nothing }
   where
-        field_lbl = occNameFS $ rdrNameOcc (unLoc lbl)
+        field_lbl = FieldLabelString $ occNameFS $ rdrNameOcc (unLoc lbl)
 
 
 checkMissingFields ::  ConLike -> HsRecordBinds GhcRn -> [Scaled TcType] -> TcM ()
@@ -1705,7 +1708,7 @@ badFieldsUpd rbinds data_cons
     membership :: [(FieldLabelString, [Bool])]
     membership = sortMembership $
         map (\fld -> (fld, map (fld `elementOfUniqSet`) fieldLabelSets)) $
-          map (occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc . unLoc . hfbLHS . unLoc) rbinds
+          map (FieldLabelString . occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc . unLoc . hfbLHS . unLoc) rbinds
 
     fieldLabelSets :: [UniqSet FieldLabelString]
     fieldLabelSets = map (mkUniqSet . map flLabel . conLikeFieldLabels) data_cons

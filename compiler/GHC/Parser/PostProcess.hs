@@ -157,6 +157,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import qualified GHC.Data.Strict as Strict
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
@@ -2561,7 +2563,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
     recFieldToProjUpdate (L l (HsFieldBind anns (L _ (FieldOcc _ (L loc rdr))) arg pun)) =
         -- The idea here is to convert the label to a singleton [FastString].
         let f = occNameFS . rdrNameOcc $ rdr
-            fl = DotFieldOcc noAnn (L (l2l loc) f) -- AZ: what about the ann?
+            fl = DotFieldOcc noAnn (L loc (FieldLabelString f))
             lf = locA loc
         in mkRdrProjUpdate l (L lf [L (l2l loc) fl]) (punnedVar f) pun anns
         where

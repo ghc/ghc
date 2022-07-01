@@ -68,6 +68,8 @@ import GHC.Utils.Monad
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 {- *********************************************************************
 *                                                                      *
           UserTypeCtxt
@@ -673,7 +675,7 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ name)) = OccurrenceOf name
-exprCtOrigin (HsGetField _ _ (L _ f)) = HasFieldOrigin (unLoc $ dfoLabel f)
+exprCtOrigin (HsGetField _ _ (L _ f)) = HasFieldOrigin (field_label $ unLoc $ dfoLabel f)
 exprCtOrigin (HsUnboundVar {})    = Shouldn'tHappenOrigin "unbound variable"
 exprCtOrigin (HsRecSel _ f)       = OccurrenceOfRecSel (unLoc $ foLabel f)
 exprCtOrigin (HsOverLabel _ l)    = OverLabelOrigin l

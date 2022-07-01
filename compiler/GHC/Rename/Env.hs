@@ -104,6 +104,7 @@ import Control.Arrow    ( first )
 import GHC.Types.FieldLabel
 import GHC.Data.Bag
 import GHC.Types.PkgQual
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 {-
 *********************************************************
@@ -498,7 +499,7 @@ lookupRecFieldOcc mb_con rdr_name
   = lookupExactOrOrig rdr_name id $  -- See Note [Record field names and Template Haskell]
     do { flds <- lookupConstructorFields con
        ; env <- getGlobalRdrEnv
-       ; let lbl      = occNameFS (rdrNameOcc rdr_name)
+       ; let lbl      = FieldLabelString $ occNameFS (rdrNameOcc rdr_name)
              mb_field = do fl <- find ((== lbl) . flLabel) flds
                            -- We have the label, now check it is in scope.  If
                            -- there is a qualifier, use pickGREs to check that

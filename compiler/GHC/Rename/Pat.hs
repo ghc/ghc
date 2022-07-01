@@ -82,6 +82,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Ratio
 import GHC.Types.FieldLabel (DuplicateRecordFields(..))
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 {-
 *********************************************************
@@ -822,7 +823,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                  (dot_dot_fields, dot_dot_gres)
                         = unzip [ (fl, gre)
                                 | fl <- con_fields
-                                , let lbl = mkVarOccFS (flLabel fl)
+                                , let lbl = mkVarOccFS (field_label $ flLabel fl)
                                 , not (lbl `elemOccSet` present_flds)
                                 , Just gre <- [lookupGRE_FieldLabel rdr_env fl]
                                               -- Check selector is in scope
@@ -840,7 +841,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                         , hfbPun      = False })
                     | fl <- dot_dot_fields
                     , let sel     = flSelector fl
-                    , let arg_rdr = mkVarUnqual (flLabel fl) ] }
+                    , let arg_rdr = mkVarUnqual (field_label $ flLabel fl) ] }
 
     rn_dotdot _dotdot _mb_con _flds
       = return []

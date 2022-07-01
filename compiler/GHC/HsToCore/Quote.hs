@@ -89,6 +89,8 @@ import Data.Kind (Constraint)
 
 import qualified GHC.LanguageExtensions as LangExt
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Data.ByteString ( unpack )
 import Control.Monad
 import Data.List (sort, sortBy)
@@ -1635,10 +1637,10 @@ repE (HsUnboundVar _ uv)   = do
                                occ   <- occNameLit uv
                                sname <- repNameS occ
                                repUnboundVar sname
-repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ f)))) = do
+repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ (FieldLabelString f))))) = do
   e1 <- repLE e
   repGetField e1 f
-repE (HsProjection _ xs) = repProjection (fmap (unLoc . dfoLabel . unLoc) xs)
+repE (HsProjection _ xs) = repProjection (fmap (field_label . unLoc . dfoLabel . unLoc) xs)
 repE (XExpr (HsExpanded orig_expr ds_expr))
   = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
        ; if rebindable_on  -- See Note [Quotation and rebindable syntax]
