@@ -37,6 +37,7 @@ import GHC.Core.DataCon (FieldLabelString)
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Types.Fixity
+import GHC.Types.Name.Reader
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Unit.Module (ModuleName)
@@ -159,8 +160,20 @@ pprFieldLabelStrings :: forall p. (UnXRec p, Outputable (XRec p FieldLabelString
 pprFieldLabelStrings (FieldLabelStrings flds) =
     hcat (punctuate dot (map (ppr . unXRec @p) flds))
 
-instance Outputable(XRec p FieldLabelString) => Outputable (DotFieldOcc p) where
-  ppr (DotFieldOcc _ s) = ppr s
+pprPrefixFieldLabelStrings :: forall p. (UnXRec p, Outputable (XRec p FieldLabelString))
+                           => FieldLabelStrings p -> SDoc
+pprPrefixFieldLabelStrings (FieldLabelStrings flds) =
+    hcat (punctuate dot (map (pprPrefixFieldLabelString . unXRec @p) flds))
+
+pprPrefixFieldLabelString :: forall p. UnXRec p => DotFieldOcc p -> SDoc
+pprPrefixFieldLabelString (DotFieldOcc _ s) = (pprPrefixFastString . unXRec @p) s
+pprPrefixFieldLabelString XDotFieldOcc{} = text "XDotFieldOcc"
+
+pprPrefixFastString :: FastString -> SDoc
+pprPrefixFastString fs = pprPrefixOcc (mkVarUnqual fs)
+
+instance UnXRec p => Outputable (DotFieldOcc p) where
+  ppr (DotFieldOcc _ s) = (pprPrefixFastString . unXRec @p) s
   ppr XDotFieldOcc{} = text "XDotFieldOcc"
 
 -- Field projection updates (e.g. @foo.bar.baz = 1@). See Note

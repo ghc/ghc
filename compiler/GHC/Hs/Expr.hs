@@ -2063,7 +2063,7 @@ type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr))))] = SrcSpanAnnL
 
 type instance Anno (FieldLabelStrings (GhcPass p)) = SrcAnn NoEpAnns
-type instance Anno (FieldLabelString) = SrcAnn NoEpAnns
+type instance Anno (FieldLabelString) = SrcSpanAnnN
 type instance Anno (DotFieldOcc (GhcPass p)) = SrcAnn NoEpAnns
 
 instance (Anno a ~ SrcSpanAnn' (EpAnn an))

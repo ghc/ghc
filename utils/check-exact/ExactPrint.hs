@@ -30,8 +30,9 @@ import GHC.Data.FastString
 import GHC.Types.Basic hiding (EP)
 import GHC.Types.Fixity
 import GHC.Types.ForeignCall
-import GHC.Types.SourceText
+import GHC.Types.Name.Reader
 import GHC.Types.PkgQual
+import GHC.Types.SourceText
 import GHC.Types.Var
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Unit.Module.Warnings
@@ -2291,9 +2292,11 @@ instance ExactPrint (FieldLabelStrings GhcPs) where
 instance ExactPrint (DotFieldOcc GhcPs) where
   getAnnotationEntry (DotFieldOcc an _) = fromAnn an
 
-  exact (DotFieldOcc an fs) = do
+  exact (DotFieldOcc an (L loc fs)) = do
     markAnnKwM an afDot  AnnDot
-    markAnnotated fs
+    -- The field name has a SrcSpanAnnN, print it as a
+    -- LocatedN RdrName
+    markAnnotated (L loc (mkVarUnqual fs))
 
 -- ---------------------------------------------------------------------
 
