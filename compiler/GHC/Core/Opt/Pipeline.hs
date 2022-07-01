@@ -184,7 +184,7 @@ getCoreToDo logger dflags
     simpl_phase phase name iter
       = CoreDoPasses
       $   [ maybe_strictness_before phase
-          , CoreDoSimplify iter
+          , CoreDoSimplify $ CoreDoSimplifyOpts iter
                 (base_mode { sm_phase = phase
                            , sm_names = [name] })
 
@@ -195,7 +195,7 @@ getCoreToDo logger dflags
     simplify name = simpl_phase FinalPhase name max_iter
 
     -- initial simplify: mk specialiser happy: minimum effort please
-    simpl_gently = CoreDoSimplify max_iter
+    simpl_gently = CoreDoSimplify $ CoreDoSimplifyOpts max_iter
                        (base_mode { sm_phase = InitialPhase
                                   , sm_names = ["Gentle"]
                                   , sm_rules = rules_on   -- Note [RULEs enabled in InitialPhase]
@@ -491,8 +491,8 @@ doCorePass pass guts = do
   let updateBindsM f = f (mg_binds guts) >>= \b' -> return $ guts { mg_binds = b' }
 
   case pass of
-    CoreDoSimplify {}         -> {-# SCC "Simplify" #-}
-                                 simplifyPgm pass guts
+    CoreDoSimplify cfg        -> {-# SCC "Simplify" #-}
+                                 simplifyPgm cfg guts
 
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
                                  updateBinds cseProgram
@@ -650,20 +650,20 @@ simplExprGently env expr = do
 ************************************************************************
 -}
 
-simplifyPgm :: CoreToDo -> ModGuts -> CoreM ModGuts
-simplifyPgm pass guts
+simplifyPgm :: CoreDoSimplifyOpts -> ModGuts -> CoreM ModGuts
+simplifyPgm cfg guts
   = do { hsc_env <- getHscEnv
        ; rb <- getRuleBase
        ; liftIOWithCount $
-         simplifyPgmIO pass hsc_env rb guts }
+         simplifyPgmIO cfg hsc_env rb guts }
 
-simplifyPgmIO :: CoreToDo
+simplifyPgmIO :: CoreDoSimplifyOpts
               -> HscEnv
               -> RuleBase
               -> ModGuts
               -> IO (SimplCount, ModGuts)  -- New bindings
 
-simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
+simplifyPgmIO cfg@(CoreDoSimplifyOpts max_iterations mode)
               hsc_env hpt_rule_base
               guts@(ModGuts { mg_module = this_mod
                             , mg_rdr_env = rdr_env
@@ -779,7 +779,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                 -- Dump the result of this iteration
            let { dump_core_sizes = not (gopt Opt_SuppressCoreSizes dflags) } ;
            dump_end_iteration logger dump_core_sizes print_unqual iteration_no counts1 binds2 rules1 ;
-           lintPassResult hsc_env pass binds2 ;
+           lintPassResult hsc_env (CoreDoSimplify cfg) binds2 ;
 
                 -- Loop
            do_iteration (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
@@ -792,8 +792,6 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
         totalise :: [SimplCount] -> SimplCount
         totalise = foldr (\c acc -> acc `plusSimplCount` c)
                          (zeroSimplCount dflags)
-
-simplifyPgmIO _ _ _ _ = panic "simplifyPgmIO"
 
 -------------------
 dump_end_iteration :: Logger -> Bool -> PrintUnqualified -> Int

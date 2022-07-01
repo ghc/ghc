@@ -435,7 +435,9 @@ lint_banner string pass = text "*** Core Lint"      <+> text string
 showLintWarnings :: CoreToDo -> Bool
 -- Disable Lint warnings on the first simplifier pass, because
 -- there may be some INLINE knots still tied, which is tiresomely noisy
-showLintWarnings (CoreDoSimplify _ (SimplMode { sm_phase = InitialPhase })) = False
+showLintWarnings (CoreDoSimplify cfg) = case sm_phase (cds_mode cfg) of
+  InitialPhase -> False
+  _ -> True
 showLintWarnings _ = True
 
 interactiveInScope :: InteractiveContext -> [Var]
