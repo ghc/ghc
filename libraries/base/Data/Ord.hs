@@ -132,6 +132,12 @@ instance (Show a) => Show (Down a) where
 -- | @since 4.6.0.0
 instance Ord a => Ord (Down a) where
     compare (Down x) (Down y) = y `compare` x
+    Down x < Down y = y < x
+    Down x > Down y = y > x
+    Down x <= Down y = y <= x
+    Down x >= Down y = y >= x
+    min (Down x) (Down y) = Down (max y x)
+    max (Down x) (Down y) = Down (min y x)
 
 -- | Swaps @'minBound'@ and @'maxBound'@ of the underlying type.
 --
