@@ -20,8 +20,8 @@ module GHC.Core.Lint (
     LintConfig (..),
     WarnsAndErrs,
 
-    lintCoreBindings', lintUnfolding,
-    lintPassResult', lintExpr,
+    lintCoreBindings, lintUnfolding,
+    lintPassResult, lintExpr,
     lintAnnots, lintAxioms,
 
     -- ** Debug output
@@ -276,10 +276,10 @@ data LintPassResultConfig = LintPassResultConfig
   , lpr_localsInScope    :: ![Var]
   }
 
-lintPassResult' :: Logger -> LintPassResultConfig
+lintPassResult :: Logger -> LintPassResultConfig
                 -> CoreProgram -> IO ()
-lintPassResult' logger cfg binds
-  = do { let warns_and_errs = lintCoreBindings'
+lintPassResult logger cfg binds
+  = do { let warns_and_errs = lintCoreBindings
                (LintConfig
                 { l_diagOpts = lpr_diagOpts cfg
                 , l_platform = lpr_platform cfg
@@ -329,11 +329,11 @@ lint_banner string pass = text "*** Core Lint"      <+> text string
                           <+> text "***"
 
 -- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
-lintCoreBindings' :: LintConfig -> CoreProgram -> WarnsAndErrs
+lintCoreBindings :: LintConfig -> CoreProgram -> WarnsAndErrs
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreBindings' cfg binds
+lintCoreBindings cfg binds
   = initL cfg $
     addLoc TopLevelBindings           $
     do { checkL (null dups) (dupVars dups)

@@ -15,7 +15,9 @@ import GHC.Driver.Session
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
 import GHC.Driver.Config.Core.EndPass ( endPass )
-import GHC.Driver.Config.Core.Lint ( initLintAnnotationsConfig, lintPassResult )
+import GHC.Driver.Config.Core.Lint ( initLintAnnotationsConfig
+                                   , initLintPassResultConfig, perPassFlags
+                                   , showLintWarnings )
 import GHC.Driver.Config.Core.Opt.CallerCC ( initCallerCCOpts )
 import GHC.Driver.Config.Core.Opt.SpecConstr ( initSpecConstrOpts )
 import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )
@@ -34,7 +36,8 @@ import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop, dumpIdInfoOfProgram )
 import GHC.Core.EndPass ( dumpPassResult )
-import GHC.Core.Lint    ( lintAnnots )
+import GHC.Core.Lint    ( lintAnnots, lintPassResult )
+import GHC.Core.Lint.Interactive   ( interactiveInScope )
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..), CoreDoSimplifyOpts(..) )
 import GHC.Core.Opt.Simplify       ( simplTopBinds, simplExpr, simplImpRules )
 import GHC.Core.Opt.Simplify.Utils ( simplEnvForGHCi, activeRule, activeUnfolding )
@@ -833,7 +836,15 @@ simplifyPgmIO cfg@(CoreDoSimplifyOpts max_iterations mode)
                 -- Dump the result of this iteration
            let { dump_core_sizes = not (gopt Opt_SuppressCoreSizes dflags) } ;
            dump_end_iteration logger dump_core_sizes print_unqual iteration_no counts1 binds2 rules1 ;
-           lintPassResult hsc_env (CoreDoSimplify cfg) binds2 ;
+
+           unless (gopt Opt_DoCoreLinting dflags) $ let
+             pass = CoreDoSimplify cfg
+             pass_result_cfg = initLintPassResultConfig dflags
+               (interactiveInScope $ hsc_IC hsc_env)
+               (perPassFlags dflags pass)
+               (ppr pass)
+               (showLintWarnings pass)
+             in lintPassResult logger pass_result_cfg binds2 ;
 
                 -- Loop
            do_iteration (iteration_no + 1) (counts1:counts_so_far) binds2 rules1

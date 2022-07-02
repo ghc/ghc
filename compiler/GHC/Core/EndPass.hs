@@ -69,7 +69,7 @@ endPassIO logger cfg binds rules
                         (renderWithContext defaultSDocContext (ep_prettyPass cfg))
                         (ep_passDetails cfg) binds rules
        ; for_ (ep_lintPassResult cfg) $ \lp_cfg ->
-           lintPassResult' logger lp_cfg binds
+           lintPassResult logger lp_cfg binds
        }
   where
     mb_flag = case ep_dumpFlag cfg of

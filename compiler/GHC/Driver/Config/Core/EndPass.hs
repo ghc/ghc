@@ -4,14 +4,8 @@ module GHC.Driver.Config.Core.EndPass
   , endPassDesugarAfter
   , endPassTidy
   , endPassLintFlags
-  , defaultLintFlags
-  , lintPassResult
-  , lintCoreBindings
   , initEndPassConfig
   , corePrepConfig
-  , initLintAnnotationsConfig
-  , initLintPassResultConfig
-  , initLintConfig
   ) where
 
 import GHC.Prelude
