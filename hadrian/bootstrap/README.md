@@ -18,16 +18,17 @@ The result of the bootstrap script will be a hadrian binary in
 
 Alternatively, you can provide a tarball with the source of any dependencies.
 
-    bootstrap.py -d plan-bootstrap-8_10_5.json -w /path/to-ghc -s sources-tarball.tar.gz
+    bootstrap.py -w /path/to-ghc -s sources-tarball.tar.gz
 
 Which dependencies you need can be queried using the `list-sources` option.
 
     bootstrap.py -d plan-bootstrap-8_10_5.json list-sources
 
 This produces `fetch_plan.json` which tells you where to get each source from.
+
 You can instruct the script to create the tarball using the `fetch` option.
 
-    bootstrap.py -d plan-bootstrap-8_10_5.json fetch -o sources-tarball.tar.gz
+    bootstrap.py -d plan-bootstrap-8_10_5.json fetch -o sources-tarball
 
 ## Generating the bootstrap plans
 
