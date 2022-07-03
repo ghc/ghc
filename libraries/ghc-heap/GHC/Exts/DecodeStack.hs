@@ -27,6 +27,7 @@ import GHC.Exts
 import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 import Numeric
 import qualified GHC.Exts.Heap.Closures as CL
+import GHC.Exts.Heap.StackFFI as StackFFI
 
 data BitmapPayload = Closure CL.Closure | Primitive Word
 
@@ -67,7 +68,7 @@ data StackFrame =
   UnderflowFrame |
   StopFrame |
   RetSmall SpecialRetSmall [BitmapPayload] |
-  RetBig |
+  RetBig [BitmapPayload] |
   RetFun |
   RetBCO
   deriving (Show)
@@ -132,15 +133,17 @@ toStackFrame sp = do
        let special = ((toEnum . fromInteger . toInteger) (getSpecialRetSmall sp))
            -- TODO: Use word size here, not just 8
            payloadAddr# = plusAddr# sp (toInt# 8)
-           bitmapSize = getBitmapSize itblPtr
-           bitmapWord = getBitmapWord itblPtr
+           bSize = getBitmapSize itblPtr
+           bWord = getBitmapWord itblPtr
        in
          do
-            traceM $ "toStackFrame - RET_SMALL - bitmapSize " ++ show bitmapSize
-            traceM $ "toStackFrame - RET_SMALL - bitmapWord " ++ show bitmapWord
-            payloads <- peekBitmapPayloadArray bitmapSize bitmapWord (Ptr payloadAddr#)
+            payloads <- peekBitmapPayloadArray bSize bWord (Ptr payloadAddr#)
             pure $ RetSmall special payloads
-     RET_BIG -> pure RetBig
+     RET_BIG -> do
+       pPtr <- payloadPtr (Ptr sp)
+       largeBitmap <- peekStgLargeBitmap itblPtr
+       payloads <- peekLargeBitmap (StackFFI.size largeBitmap) (StackFFI.bitmap largeBitmap) pPtr
+       pure $ RetBig payloads
      RET_FUN -> pure RetFun
      UPDATE_FRAME -> pure UpdateFrame
      CATCH_FRAME -> pure CatchFrame
@@ -151,14 +154,35 @@ toStackFrame sp = do
      CATCH_STM_FRAME -> pure CatchStmFrame
      _ -> error $ "Unexpected closure type on stack: " ++ show (tipe itbl)
 
--- TODO: Use Ptr instead of Addr# (in all possible places)?
-peekBitmapPayloadArray ::  Word -> Word -> Ptr Word -> IO [BitmapPayload]
-peekBitmapPayloadArray bitmapSize bitmapWord ptr = go 0 []
+peekLargeBitmap :: Word -> [Word] -> Ptr Word -> IO [BitmapPayload]
+peekLargeBitmap 0 _ _ = pure []
+peekLargeBitmap _ [] _ = pure []
+peekLargeBitmap bSize (w:ws) pPtr = do
+    payloads <- peekPayloadsFromLargeBitmapWord bSize w pPtr
+    -- TODO: Not tail-recursive, breaks lazyness
+    rest <- peekLargeBitmap remainingBitmapSize ws pPtr
+    pure $ payloads ++ rest
+  where
+    remainingBitmapSize = max 0 (bSize - bitsInWord)
+
+peekPayloadsFromLargeBitmapWord :: Word -> Word -> Ptr Word -> IO [BitmapPayload]
+peekPayloadsFromLargeBitmapWord bSize bWord ptr = go 0 []
   where
     go :: Word -> [BitmapPayload] -> IO [BitmapPayload]
-    go index acc | index >= bitmapSize = pure acc
+    go index acc | index >= bitsUsed = pure acc
     go index acc = do
-                  e <- peekBitmapPayload ptr index bitmapWord
+                  e <- peekBitmapPayload ptr index bWord
+                  go (index + 1) (e:acc)
+    bitsUsed = min bitsInWord bSize
+
+-- TODO: Use Ptr instead of Addr# (in all possible places)?
+peekBitmapPayloadArray ::  Word -> Word -> Ptr Word -> IO [BitmapPayload]
+peekBitmapPayloadArray bSize bWord ptr = go 0 []
+  where
+    go :: Word -> [BitmapPayload] -> IO [BitmapPayload]
+    go index acc | index >= bSize = pure acc
+    go index acc = do
+                  e <- peekBitmapPayload ptr index bWord
                   go (index + 1) (e:acc)
 
 -- | Fetch a single closure payload
