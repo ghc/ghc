@@ -193,6 +193,15 @@ build in parallel.
 ./hadrian/ghci -j8
 ```
 
+##### Multi-Repl Session
+
+You can also use the experimental multi-repl if you are booting with GHC-9.4 or
+later.
+
+```
+./hadrian/ghci-multi
+```
+
 #### Testing
 
 To run GHC testsuite, use `build test`. See

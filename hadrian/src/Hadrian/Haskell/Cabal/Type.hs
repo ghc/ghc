@@ -43,6 +43,7 @@ data ContextData = ContextData
     , mainIs             :: Maybe (String, FilePath)  -- ("Main", filepath)
     , modules            :: [String]
     , otherModules       :: [String]
+    , reexportModules    :: [String]
     , srcDirs            :: [String]
     , depIds             :: [String]
     , depNames           :: [String]

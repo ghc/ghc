@@ -45,6 +45,9 @@ import qualified Distribution.Utils.ShortText                  as C
 #if !MIN_VERSION_Cabal(3,4,0)
 import qualified Distribution.Types.CondTree                   as C
 #endif
+#if !MIN_VERSION_Cabal(3,5,0)
+import qualified Distribution.Types.ModuleReexport             as C
+#endif
 import qualified Distribution.Verbosity                        as C
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
@@ -92,13 +95,13 @@ parsePackageData pkg = do
 parseCabalPkgId :: FilePath -> IO String
 parseCabalPkgId file = C.display . C.package . C.packageDescription <$> C.readGenericPackageDescription C.silent file
 
-biModules :: C.PackageDescription -> (C.BuildInfo, [C.ModuleName], Maybe (C.ModuleName, String))
-biModules pd = go [ comp | comp@(bi,_,_) <-
+biModules :: C.PackageDescription -> (C.BuildInfo, [C.ModuleName], Maybe [C.ModuleName], Maybe (C.ModuleName, String))
+biModules pd = go [ comp | comp@(bi,_,_,_) <-
                              (map libBiModules . maybeToList $ C.library pd) ++
                              (map exeBiModules               $ C.executables pd)
                          , C.buildable bi ]
   where
-    libBiModules lib = (C.libBuildInfo lib, C.explicitLibModules lib, Nothing)
+    libBiModules lib = (C.libBuildInfo lib, C.explicitLibModules lib, Just (map C.moduleReexportName (C.reexportedModules lib)),  Nothing)
     exeBiModules exe = (C.buildInfo exe,
                        -- If "main-is: ..." is not a .hs or .lhs file, do not
                        -- inject "Main" into the modules.  This does not respect
@@ -107,7 +110,7 @@ biModules pd = go [ comp | comp@(bi,_,_) <-
                        if takeExtension (C.modulePath exe) `elem` [".hs", ".lhs"]
                            then C.main : C.exeModules exe
                                 -- The module `Main` still need to be kept in `modules` of PD.
-                           else C.exeModules exe,
+                           else C.exeModules exe, Nothing,
                        Just (C.main, C.modulePath exe))
     go []  = error "No buildable component found."
     go [x] = x
@@ -244,7 +247,7 @@ resolveContextData context@Context {..} = do
             -- @library-dirs@ here.
             _ -> error "No (or multiple) GHC rts package is registered!"
 
-        (buildInfo, modules, mainIs) = biModules (C.localPkgDescr lbi')
+        (buildInfo, modules, rexport_modules, mainIs) = biModules (C.localPkgDescr lbi')
 
         classifyMain :: FilePath -> MainSourceType
         classifyMain fp
@@ -259,6 +262,7 @@ resolveContextData context@Context {..} = do
           , mainIs          = main_src
           , modules         = map C.display modules
           , otherModules    = map C.display $ C.otherModules buildInfo
+          , reexportModules = map C.display (concat rexport_modules)
           , srcDirs         =
 #if MIN_VERSION_Cabal(3,5,0)
                               map C.getSymbolicPath
