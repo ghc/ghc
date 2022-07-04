@@ -55,3 +55,5 @@ test('multipleHomeUnitsPackageImports',
     ], multiunit_compile, [['unitB', 'unitB2', 'unitPI'], '-fhide-source-paths'])
 
 test('MHU_OptionsGHC', normal, compile_fail, [''])
+
+test('multipleHomeUnits_loop', [extra_files([ 'a/', 'unitA', 'loop', 'unitLoop'])], multiunit_compile, [['unitA', 'unitLoop'], '-fhide-source-paths'])

@@ -28,6 +28,7 @@ module GHC.Unit.Module.Graph
    , summaryNodeSummary
 
    , NodeKey(..)
+   , nodeKeyUnitId
    , ModNodeKey
    , mkNodeKey
    , msKey
@@ -120,6 +121,11 @@ pprNodeKey :: NodeKey -> SDoc
 pprNodeKey (NodeKey_Unit iu) = ppr iu
 pprNodeKey (NodeKey_Module mk) = ppr mk
 pprNodeKey (NodeKey_Link uid)  = ppr uid
+
+nodeKeyUnitId :: NodeKey -> UnitId
+nodeKeyUnitId (NodeKey_Unit iu)   = instUnitInstanceOf iu
+nodeKeyUnitId (NodeKey_Module mk) = mnkUnitId mk
+nodeKeyUnitId (NodeKey_Link uid)  = uid
 
 data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: ModuleNameWithIsBoot
                                            , mnkUnitId     :: UnitId } deriving (Eq, Ord)

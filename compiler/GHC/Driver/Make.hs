@@ -591,11 +591,18 @@ createBuildPlan mod_graph maybe_top_mod =
 
         (mg, lookup_node) = moduleGraphNodes False (mgModSummaries' mod_graph)
         trans_deps_map = allReachable mg (mkNodeKey . node_payload)
+        -- Compute the intermediate modules between a file and its hs-boot file.
+        -- See Step 2a in Note [Upsweep]
         boot_path mn uid =
           map (summaryNodeSummary . expectJust "toNode" . lookup_node) $ Set.toList $
+          -- Don't include the boot module itself
           Set.delete (NodeKey_Module (key IsBoot))  $
-          expectJust "boot_path" (M.lookup (NodeKey_Module (key NotBoot)) trans_deps_map)
-            `Set.difference` (expectJust "boot_path" (M.lookup (NodeKey_Module (key IsBoot)) trans_deps_map))
+          -- Keep intermediate dependencies: as per Step 2a in Note [Upsweep], these are
+          -- the transitive dependencies of the non-boot file which transitively depend
+          -- on the boot file.
+          Set.filter (\nk -> nodeKeyUnitId nk == uid  -- Cheap test
+                              && (NodeKey_Module (key IsBoot)) `Set.member` expectJust "dep_on_boot" (M.lookup nk trans_deps_map)) $
+          expectJust "not_boot_dep" (M.lookup (NodeKey_Module (key NotBoot)) trans_deps_map)
           where
             key ib = ModNodeKeyWithUid (GWIB mn ib) uid
 
@@ -894,8 +901,13 @@ Step 1:  Topologically sort the module graph without hs-boot files. This returns
 Step 2:  For each cycle, topologically sort the modules in the cycle *with* the relevant hs-boot files. This should
          result in an acyclic build plan if the hs-boot files are sufficient to resolve the cycle.
 Step 2a: For each module in the cycle, if the module has a boot file then compute the
-         modules on the path between it and the hs-boot file. This information is
-         stored in ModuleGraphNodeWithBoot.
+         modules on the path between it and the hs-boot file.
+         These are the intermediate modules which:
+            (1) are (transitive) dependencies of the non-boot module, and
+            (2) have the boot module as a (transitive) dependency.
+         In particular, all such intermediate modules must appear in the same unit as
+         the module under consideration, as module cycles cannot cross unit boundaries.
+         This information is stored in ModuleGraphNodeWithBoot.
 
 The `[BuildPlan]` is then interpreted by the `interpretBuildPlan` function.
 
