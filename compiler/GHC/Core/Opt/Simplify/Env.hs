@@ -8,10 +8,15 @@
 
 module GHC.Core.Opt.Simplify.Env (
         -- * The simplifier mode
-        setMode, getMode, updMode, seDynFlags, seUnfoldingOpts, seLogger,
+        SimplMode(..), updMode,
+        smPedanticBottoms, smPlatform,
 
         -- * Environments
         SimplEnv(..), pprSimplEnv,   -- Temp not abstract
+        seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seCastSwizzle,
+        seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
+        seOptCoercionOpts, sePedanticBottoms, sePhase, sePlatform, sePreInline,
+        seRuleOpts, seRules, seUnfoldingOpts,
         mkSimplEnv, extendIdSubst,
         extendTvSubst, extendCvSubst,
         zapSubstEnv, setSubstEnv, bumpCaseDepth,
@@ -46,8 +51,11 @@ module GHC.Core.Opt.Simplify.Env (
 
 import GHC.Prelude
 
+import GHC.Core.Coercion.Opt ( OptCoercionOpts )
+import GHC.Core.FamInstEnv ( FamInstEnv )
+import GHC.Core.Opt.Arity ( ArityOpts(..) )
 import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Opt.Monad        ( SimplMode(..), FloatEnable (..) )
+import GHC.Core.Rules.Config ( RuleOpts(..) )
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Multiplicity     ( scaleScaled )
@@ -59,23 +67,22 @@ import GHC.Data.OrdList
 import GHC.Data.Graph.UnVar
 import GHC.Types.Id as Id
 import GHC.Core.Make            ( mkWildValBinder, mkCoreLet )
-import GHC.Driver.Session       ( DynFlags )
 import GHC.Builtin.Types
 import GHC.Core.TyCo.Rep        ( TyCoBinder(..) )
 import qualified GHC.Core.Type as Type
 import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, extendTvSubst, extendCvSubst )
 import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
+import GHC.Platform ( Platform )
 import GHC.Types.Basic
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
-import GHC.Utils.Logger
 import GHC.Types.Unique.FM      ( pprUniqFM )
 
-import Data.List (mapAccumL)
+import Data.List ( intersperse, mapAccumL )
 
 {-
 ************************************************************************
@@ -85,13 +92,75 @@ import Data.List (mapAccumL)
 ************************************************************************
 -}
 
+{-
+Note [The environments of the Simplify pass]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The functions of the Simplify pass draw their contextual data from two
+environments: `SimplEnv`, which is passed to the functions as an argument, and
+`SimplTopEnv`, which is part of the `SimplM` monad. For both environments exist
+corresponding configuration records `SimplMode` and `TopEnvConfig` respectively.
+A configuration record denotes a unary datatype bundeling the various options
+and switches we provide to control the behaviour of the respective part of the
+Simplify pass. The value is provided by the driver using the functions found in
+the GHC.Driver.Config.Core.Opt.Simplify module.
+
+These configuration records are part in the environment to avoid needless
+copying of their values. This raises the question which data value goes in which
+of the four datatypes. For each value needed by the pass we ask the following
+two questions:
+
+ * Does the value only make sense in a monadic environment?
+
+ * Is it part of the configuration of the pass and provided by the user or is it
+   it an internal value?
+
+Examples of values that make only sense in conjunction with `SimplM` are the
+logger and the values related to counting. As it does not make sense to use them
+in a pure function (the logger needs IO and counting needs access to the
+accumulated counts in the monad) we want these to live in `SimplTopEnv`.
+Other values, like the switches controlling the behaviour of the pass (e.g.
+whether to do case merging or not) are perfectly usable in a non-monadic setting.
+Indeed many of those are used in guard expressions and it would be cumbersome to
+query them from the monadic environment and feed them to the pure functions as
+an argument. Hence we conveniently store them in the `SpecEnv` environment which
+can be passed to pure functions as a whole.
+
+Now that we know in which of the two environments a particular value lives we
+turn to the second question to determine if the value is part of the
+configuration record embedded in the environment or if it is stored in an own
+field in the environment type. Some values like the tick factor must be provided
+from outside as we can neither derive it from other values provided to us nor
+does a constant value make sense. Other values like the maximal number of ticks
+are computed on environment initialization and we wish not to expose the field
+to the "user" or the pass -- it is an internal value. Therefore the distinction
+here is between "freely set by the caller" and "internally managed by the pass".
+
+Note that it doesn't matter for the decision procedure wheter a value is altered
+throughout an iteration of the Simplify pass: The fields sm_phase, sm_inline,
+sm_rules, sm_cast_swizzle and sm_eta_expand are updated locally (See the
+definitions of `updModeForStableUnfoldings` and `updModeForRules` in
+GHC.Core.Opt.Simplify.Utils) but they are still part of `SimplMode` as the
+caller of the Simplify pass needs to provide the initial values for those fields.
+
+The decision which value goes into which datatype can be summarized by the
+following table:
+                                 |          Usable in a           |
+                                 | pure setting | monadic setting |
+    |----------------------------|--------------|-----------------|
+    | Set by user                | SimplMode    | TopEnvConfig    |
+    | Computed on initialization | SimplEnv     | SimplTopEnv     |
+
+-}
+
 data SimplEnv
   = SimplEnv {
      ----------- Static part of the environment -----------
      -- Static in the sense of lexically scoped,
      -- wrt the original expression
 
+        -- See Note [The environments of the Simplify pass]
         seMode      :: !SimplMode
+      , seFamEnvs   :: !(FamInstEnv, FamInstEnv)
 
         -- The current substitution
       , seTvSubst   :: TvSubstEnv      -- InTyVar |--> OutType
@@ -112,6 +181,137 @@ data SimplEnv
 
       , seCaseDepth :: !Int  -- Depth of multi-branch case alternatives
     }
+
+seArityOpts :: SimplEnv -> ArityOpts
+seArityOpts env = sm_arity_opts (seMode env)
+
+seCaseCase :: SimplEnv -> Bool
+seCaseCase env = sm_case_case (seMode env)
+
+seCaseFolding :: SimplEnv -> Bool
+seCaseFolding env = sm_case_folding (seMode env)
+
+seCaseMerge :: SimplEnv -> Bool
+seCaseMerge env = sm_case_merge (seMode env)
+
+seCastSwizzle :: SimplEnv -> Bool
+seCastSwizzle env = sm_cast_swizzle (seMode env)
+
+seDoEtaReduction :: SimplEnv -> Bool
+seDoEtaReduction env = sm_do_eta_reduction (seMode env)
+
+seEtaExpand :: SimplEnv -> Bool
+seEtaExpand env = sm_eta_expand (seMode env)
+
+seFloatEnable :: SimplEnv -> FloatEnable
+seFloatEnable env = sm_float_enable (seMode env)
+
+seInline :: SimplEnv -> Bool
+seInline env = sm_inline (seMode env)
+
+seNames :: SimplEnv -> [String]
+seNames env = sm_names (seMode env)
+
+seOptCoercionOpts :: SimplEnv -> OptCoercionOpts
+seOptCoercionOpts env = sm_co_opt_opts (seMode env)
+
+sePedanticBottoms :: SimplEnv -> Bool
+sePedanticBottoms env = smPedanticBottoms (seMode env)
+
+sePhase :: SimplEnv -> CompilerPhase
+sePhase env = sm_phase (seMode env)
+
+sePlatform :: SimplEnv -> Platform
+sePlatform env = smPlatform (seMode env)
+
+sePreInline :: SimplEnv -> Bool
+sePreInline env = sm_pre_inline (seMode env)
+
+seRuleOpts :: SimplEnv -> RuleOpts
+seRuleOpts env = sm_rule_opts (seMode env)
+
+seRules :: SimplEnv -> Bool
+seRules env = sm_rules (seMode env)
+
+seUnfoldingOpts :: SimplEnv -> UnfoldingOpts
+seUnfoldingOpts env = sm_uf_opts (seMode env)
+
+-- See Note [The environments of the Simplify pass]
+data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad
+  { sm_phase        :: !CompilerPhase
+  , sm_names        :: ![String]      -- ^ Name(s) of the phase
+  , sm_rules        :: !Bool          -- ^ Whether RULES are enabled
+  , sm_inline       :: !Bool          -- ^ Whether inlining is enabled
+  , sm_eta_expand   :: !Bool          -- ^ Whether eta-expansion is enabled
+  , sm_cast_swizzle :: !Bool          -- ^ Do we swizzle casts past lambdas?
+  , sm_uf_opts      :: !UnfoldingOpts -- ^ Unfolding options
+  , sm_case_case    :: !Bool          -- ^ Whether case-of-case is enabled
+  , sm_pre_inline   :: !Bool          -- ^ Whether pre-inlining is enabled
+  , sm_float_enable :: !FloatEnable   -- ^ Whether to enable floating out
+  , sm_do_eta_reduction :: !Bool
+  , sm_arity_opts :: !ArityOpts
+  , sm_rule_opts :: !RuleOpts
+  , sm_case_folding :: !Bool
+  , sm_case_merge :: !Bool
+  , sm_co_opt_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
+  }
+
+instance Outputable SimplMode where
+    ppr (SimplMode { sm_phase = p , sm_names = ss
+                   , sm_rules = r, sm_inline = i
+                   , sm_cast_swizzle = cs
+                   , sm_eta_expand = eta, sm_case_case = cc })
+       = text "SimplMode" <+> braces (
+         sep [ text "Phase =" <+> ppr p <+>
+               brackets (text (concat $ intersperse "," ss)) <> comma
+             , pp_flag i   (text "inline") <> comma
+             , pp_flag r   (text "rules") <> comma
+             , pp_flag eta (text "eta-expand") <> comma
+             , pp_flag cs (text "cast-swizzle") <> comma
+             , pp_flag cc  (text "case-of-case") ])
+         where
+           pp_flag f s = ppUnless f (text "no") <+> s
+
+smPedanticBottoms :: SimplMode -> Bool
+smPedanticBottoms opts = ao_ped_bot (sm_arity_opts opts)
+
+smPlatform :: SimplMode -> Platform
+smPlatform opts = roPlatform (sm_rule_opts opts)
+
+data FloatEnable  -- Controls local let-floating
+  = FloatDisabled      -- Do no local let-floating
+  | FloatNestedOnly    -- Local let-floating for nested (NotTopLevel) bindings only
+  | FloatEnabled       -- Do local let-floating on all bindings
+
+{-
+Note [Local floating]
+~~~~~~~~~~~~~~~~~~~~~
+The Simplifier can perform local let-floating: it floats let-bindings
+out of the RHS of let-bindings.  See
+  Let-floating: moving bindings to give faster programs (ICFP'96)
+  https://www.microsoft.com/en-us/research/publication/let-floating-moving-bindings-to-give-faster-programs/
+
+Here's an example
+   x = let y = v+1 in (y,true)
+
+The RHS of x is a thunk.  Much better to float that y-binding out to give
+   y = v+1
+   x = (y,true)
+
+Not only have we avoided building a thunk, but any (case x of (p,q) -> ...) in
+the scope of the x-binding can now be simplified.
+
+This local let-floating is done in GHC.Core.Opt.Simplify.prepareBinding,
+controlled by the predicate GHC.Core.Opt.Simplify.Env.doFloatFromRhs.
+
+The `FloatEnable` data type controls where local let-floating takes place;
+it allows you to specify that it should be done only for nested bindings;
+or for top-level bindings as well; or not at all.
+
+Note that all of this is quite separate from the global FloatOut pass;
+see GHC.Core.Opt.FloatOut.
+
+-}
 
 data SimplFloats
   = SimplFloats
@@ -285,9 +485,10 @@ need to know at the occurrence site that the variable is a join point
 so that we know to drop the context. Thus we remember which join
 points we're substituting. -}
 
-mkSimplEnv :: SimplMode -> SimplEnv
-mkSimplEnv mode
+mkSimplEnv :: SimplMode -> (FamInstEnv, FamInstEnv) -> SimplEnv
+mkSimplEnv mode fam_envs
   = SimplEnv { seMode      = mode
+             , seFamEnvs   = fam_envs
              , seInScope   = init_in_scope
              , seTvSubst   = emptyVarEnv
              , seCvSubst   = emptyVarEnv
@@ -319,23 +520,6 @@ wild-ids before doing much else.
 
 It's a very dark corner of GHC.  Maybe it should be cleaned up.
 -}
-
-getMode :: SimplEnv -> SimplMode
-getMode env = seMode env
-
-seDynFlags :: SimplEnv -> DynFlags
-seDynFlags env = sm_dflags (seMode env)
-
-seLogger :: SimplEnv -> Logger
-seLogger env = sm_logger (seMode env)
-
-
-seUnfoldingOpts :: SimplEnv -> UnfoldingOpts
-seUnfoldingOpts env = sm_uf_opts (seMode env)
-
-
-setMode :: SimplMode -> SimplEnv -> SimplEnv
-setMode mode env = env { seMode = mode }
 
 updMode :: (SimplMode -> SimplMode) -> SimplEnv -> SimplEnv
 updMode upd env

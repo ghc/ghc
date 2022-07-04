@@ -92,7 +92,6 @@ import GHC.Prelude
 import GHC.Stg.Syntax
 import GHC.Stg.Utils
 
-import GHC.Core.Lint        ( interactiveInScope )
 import GHC.Core.DataCon
 import GHC.Core             ( AltCon(..) )
 import GHC.Core.Type
@@ -112,7 +111,6 @@ import GHC.Utils.Error      ( mkLocMessage, DiagOpts )
 import qualified GHC.Utils.Error as Err
 
 import GHC.Unit.Module            ( Module )
-import GHC.Runtime.Context        ( InteractiveContext )
 
 import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 
@@ -129,14 +127,14 @@ lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
                    -> Logger
                    -> DiagOpts
                    -> StgPprOpts
-                   -> InteractiveContext
+                   -> [Var]  -- ^ extra vars in scope from GHCi
                    -> Module -- ^ module being compiled
                    -> Bool   -- ^ have we run Unarise yet?
                    -> String -- ^ who produced the STG?
                    -> [GenStgTopBinding a]
                    -> IO ()
 
-lintStgTopBindings platform logger diag_opts opts ictxt this_mod unarised whodunnit binds
+lintStgTopBindings platform logger diag_opts opts extra_vars this_mod unarised whodunnit binds
   = {-# SCC "StgLint" #-}
     case initL platform diag_opts this_mod unarised opts top_level_binds (lint_binds binds) of
       Nothing  ->
@@ -155,7 +153,7 @@ lintStgTopBindings platform logger diag_opts opts ictxt this_mod unarised whodun
     -- Bring all top-level binds into scope because CoreToStg does not generate
     -- bindings in dependency order (so we may see a use before its definition).
     top_level_binds = extendVarSetList (mkVarSet (bindersOfTopBinds binds))
-                                       (interactiveInScope ictxt)
+                                       extra_vars
 
     lint_binds :: [GenStgTopBinding a] -> LintM ()
 

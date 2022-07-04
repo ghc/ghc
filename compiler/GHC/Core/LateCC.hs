@@ -11,7 +11,6 @@ import GHC.Utils.Monad.State.Strict
 import Control.Monad
 
 import GHC.Prelude
-import GHC.Driver.Session
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.Name hiding (varName)
@@ -21,22 +20,17 @@ import GHC.Types.Var
 import GHC.Unit.Types
 import GHC.Data.FastString
 import GHC.Core
-import GHC.Core.Opt.Monad
 import GHC.Types.Id
 import GHC.Core.Utils (mkTick)
 
-addLateCostCentres :: ModGuts -> CoreM ModGuts
-addLateCostCentres guts = do
-  dflags <- getDynFlags
-  let env :: Env
-      env = Env
-        { thisModule = mg_module guts
-        , ccState = newCostCentreState
-        , dflags = dflags
-        }
-  let guts' = guts { mg_binds = doCoreProgram env (mg_binds guts)
-                   }
-  return guts'
+addLateCostCentres :: Bool -> ModGuts -> ModGuts
+addLateCostCentres prof_count_entries guts = let
+  env = Env
+    { thisModule = mg_module guts
+    , ccState = newCostCentreState
+    , countEntries = prof_count_entries
+    }
+  in guts { mg_binds = doCoreProgram env (mg_binds guts) }
 
 doCoreProgram :: Env -> CoreProgram -> CoreProgram
 doCoreProgram env binds = flip evalState newCostCentreState $ do
@@ -54,7 +48,7 @@ doBndr env bndr rhs = do
     let name = idName bndr
         name_loc = nameSrcSpan name
         cc_name = getOccFS name
-        count = gopt Opt_ProfCountEntries (dflags env)
+        count = countEntries env
     cc_flavour <- getCCExprFlavour cc_name
     let cc_mod = thisModule env
         bndrCC = NormalCC cc_flavour cc_name cc_mod name_loc
@@ -70,8 +64,8 @@ getCCIndex' :: FastString -> M CostCentreIndex
 getCCIndex' name = state (getCCIndex name)
 
 data Env = Env
-  { thisModule  :: Module
-  , dflags      :: DynFlags
-  , ccState     :: CostCentreState
+  { thisModule   :: Module
+  , countEntries :: Bool
+  , ccState      :: CostCentreState
   }
 

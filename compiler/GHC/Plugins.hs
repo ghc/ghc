@@ -17,6 +17,8 @@ module GHC.Plugins
    , module GHC.Types.Id.Info
    , module GHC.Types.PkgQual
    , module GHC.Core.Opt.Monad
+   , module GHC.Core.Opt.Pipeline.Types
+   , module GHC.Core.Opt.Stats
    , module GHC.Core
    , module GHC.Types.Literal
    , module GHC.Core.DataCon
@@ -83,6 +85,8 @@ import GHC.Types.Id.Info
 
 -- Core
 import GHC.Core.Opt.Monad
+import GHC.Core.Opt.Pipeline.Types
+import GHC.Core.Opt.Stats
 import GHC.Core
 import GHC.Types.Literal
 import GHC.Core.DataCon

@@ -298,6 +298,7 @@ Library
         GHC.Core.FVs
         GHC.Core.InstEnv
         GHC.Core.Lint
+        GHC.Core.Lint.Interactive
         GHC.Core.LateCC
         GHC.Core.Make
         GHC.Core.Map.Expr
@@ -317,14 +318,17 @@ Library
         GHC.Core.Opt.Monad
         GHC.Core.Opt.OccurAnal
         GHC.Core.Opt.Pipeline
+        GHC.Core.Opt.Pipeline.Types
         GHC.Core.Opt.SetLevels
         GHC.Core.Opt.Simplify
         GHC.Core.Opt.Simplify.Env
+        GHC.Core.Opt.Simplify.Iteration
         GHC.Core.Opt.Simplify.Monad
         GHC.Core.Opt.Simplify.Utils
         GHC.Core.Opt.SpecConstr
         GHC.Core.Opt.Specialise
         GHC.Core.Opt.StaticArgs
+        GHC.Core.Opt.Stats
         GHC.Core.Opt.WorkWrap
         GHC.Core.Opt.WorkWrap.Utils
         GHC.Core.PatSyn
@@ -396,8 +400,10 @@ Library
         GHC.Driver.Config.CmmToAsm
         GHC.Driver.Config.CmmToLlvm
         GHC.Driver.Config.Core.Lint
+        GHC.Driver.Config.Core.Lint.Interactive
         GHC.Driver.Config.Core.Opt.Arity
         GHC.Driver.Config.Core.Opt.LiberateCase
+        GHC.Driver.Config.Core.Opt.Simplify
         GHC.Driver.Config.Core.Opt.WorkWrap
         GHC.Driver.Config.Core.Rules
         GHC.Driver.Config.CoreToStg.Prep

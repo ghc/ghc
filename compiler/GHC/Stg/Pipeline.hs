@@ -29,9 +29,9 @@ import GHC.Stg.BcPrep   ( bcPrep )
 import GHC.Stg.CSE      ( stgCse )
 import GHC.Stg.Lift     ( StgLiftConfig, stgLiftLams )
 import GHC.Unit.Module ( Module )
-import GHC.Runtime.Context ( InteractiveContext )
 
 import GHC.Utils.Error
+import GHC.Types.Var
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
@@ -62,12 +62,12 @@ runStgM :: Char -> StgM a -> IO a
 runStgM mask (StgM m) = runReaderT m mask
 
 stg2stg :: Logger
-        -> InteractiveContext
+        -> [Var]                     -- ^ extra vars in scope from GHCi
         -> StgPipelineOpts
-        -> Module                    -- module being compiled
-        -> [StgTopBinding]           -- input program
+        -> Module                    -- ^ module being compiled
+        -> [StgTopBinding]           -- ^ input program
         -> IO [CgStgTopBinding]        -- output program
-stg2stg logger ictxt opts this_mod binds
+stg2stg logger extra_vars opts this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
         ; showPass logger "Stg2Stg"
         -- Do the main business!
@@ -94,7 +94,7 @@ stg2stg logger ictxt opts this_mod binds
       = lintStgTopBindings
           (stgPlatform opts) logger
           diag_opts ppr_opts
-          ictxt this_mod unarised
+          extra_vars this_mod unarised
       | otherwise
       = \ _whodunnit _binds -> return ()
 
