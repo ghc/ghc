@@ -1,6 +1,7 @@
 module GHC.Unit.External
    ( ExternalUnitCache (..)
    , initExternalUnitCache
+   , eucEPS
    , ExternalPackageState (..)
    , initExternalPackageState
    , EpsStats(..)
@@ -58,6 +59,9 @@ newtype ExternalUnitCache = ExternalUnitCache
 
 initExternalUnitCache :: IO ExternalUnitCache
 initExternalUnitCache = ExternalUnitCache <$> newIORef initExternalPackageState
+
+eucEPS :: ExternalUnitCache -> IO ExternalPackageState
+eucEPS = readIORef . euc_eps
 
 initExternalPackageState :: ExternalPackageState
 initExternalPackageState = EPS

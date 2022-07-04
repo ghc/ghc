@@ -15,7 +15,7 @@ module GHC.Core.Opt.Simplify.Utils (
         preInlineUnconditionally, postInlineUnconditionally,
         activeUnfolding, activeRule,
         getUnfoldingInRuleMatch,
-        simplEnvForGHCi, updModeForStableUnfoldings, updModeForRules,
+        updModeForStableUnfoldings, updModeForRules,
 
         -- The BindContext type
         BindContext(..), bindContextLevel,
@@ -43,12 +43,10 @@ module GHC.Core.Opt.Simplify.Utils (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
-
 import GHC.Core
 import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
-import GHC.Core.Opt.Monad        ( SimplMode(..), Tick(..), floatEnable )
+import GHC.Core.Opt.Stats ( Tick(..) )
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
@@ -64,8 +62,6 @@ import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
 import GHC.Core.Multiplicity
 import GHC.Core.Opt.ConstantFold
 
-import GHC.Driver.Config.Core.Opt.Arity
-
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -80,7 +76,6 @@ import GHC.Data.FastString ( fsLit )
 import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
-import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Trace
@@ -611,7 +606,7 @@ mkArgInfo env fun rules n_val_args call_cont
     vanilla_dmds  = repeat topDmd
 
     arg_dmds
-      | not (sm_inline (seMode env))
+      | not (seInline env)
       = vanilla_dmds -- See Note [Do not expose strictness if sm_inline=False]
       | otherwise
       = -- add_type_str fun_ty $
@@ -780,8 +775,8 @@ interestingCallContext env cont
   = interesting cont
   where
     interesting (Select {})
-       | sm_case_case (getMode env) = CaseCtxt
-       | otherwise                  = BoringCtxt
+       | seCaseCase env = CaseCtxt
+       | otherwise      = BoringCtxt
        -- See Note [No case of case is boring]
 
     interesting (ApplyToVal {}) = ValAppCtxt
@@ -926,41 +921,10 @@ interestingArg env e = go env 0 e
                   SimplMode
 *                                                                      *
 ************************************************************************
-
-The SimplMode controls several switches; see its definition in
-GHC.Core.Opt.Monad
-        sm_rules      :: Bool     -- Whether RULES are enabled
-        sm_inline     :: Bool     -- Whether inlining is enabled
-        sm_case_case  :: Bool     -- Whether case-of-case is enabled
-        sm_eta_expand :: Bool     -- Whether eta-expansion is enabled
 -}
 
-simplEnvForGHCi :: Logger -> DynFlags -> SimplEnv
-simplEnvForGHCi logger dflags
-  = mkSimplEnv $ SimplMode { sm_names  = ["GHCi"]
-                           , sm_phase  = InitialPhase
-                           , sm_logger = logger
-                           , sm_dflags = dflags
-                           , sm_uf_opts = uf_opts
-                           , sm_rules  = rules_on
-                           , sm_inline = False
-                              -- Do not do any inlining, in case we expose some
-                              -- unboxed tuple stuff that confuses the bytecode
-                              -- interpreter
-                           , sm_eta_expand = eta_expand_on
-                           , sm_cast_swizzle = True
-                           , sm_case_case  = True
-                           , sm_pre_inline = pre_inline_on
-                           , sm_float_enable = float_enable
-                           }
-  where
-    rules_on      = gopt Opt_EnableRewriteRules   dflags
-    eta_expand_on = gopt Opt_DoLambdaEtaExpansion dflags
-    pre_inline_on = gopt Opt_SimplPreInlining     dflags
-    uf_opts       = unfoldingOpts                 dflags
-    float_enable  = floatEnable                   dflags
-
 updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
+-- See Note [The environments of the Simplify pass]
 updModeForStableUnfoldings unf_act current_mode
   = current_mode { sm_phase      = phaseFromActivation unf_act
                  , sm_inline     = True }
@@ -973,6 +937,7 @@ updModeForStableUnfoldings unf_act current_mode
 
 updModeForRules :: SimplMode -> SimplMode
 -- See Note [Simplifying rules]
+-- See Note [The environments of the Simplify pass]
 updModeForRules current_mode
   = current_mode { sm_phase        = InitialPhase
                  , sm_inline       = False
@@ -1189,10 +1154,9 @@ getUnfoldingInRuleMatch env
   = (in_scope, id_unf)
   where
     in_scope = seInScope env
-    mode = getMode env
     id_unf id | unf_is_active id = idUnfolding id
               | otherwise        = NoUnfolding
-    unf_is_active id = isActive (sm_phase mode) (idInlineActivation id)
+    unf_is_active id = isActive (sePhase env) (idInlineActivation id)
        -- When sm_rules was off we used to test for a /stable/ unfolding,
        -- but that seems wrong (#20941)
 
@@ -1367,9 +1331,8 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
                   , occ_int_cxt = IsInteresting } = canInlineInLam rhs
     one_occ _                                     = False
 
-    pre_inline_unconditionally = sm_pre_inline mode
-    mode   = getMode env
-    active = isActive (sm_phase mode) (inlinePragmaActivation inline_prag)
+    pre_inline_unconditionally = sePreInline env
+    active = isActive (sePhase env) (inlinePragmaActivation inline_prag)
              -- See Note [pre/postInlineUnconditionally in gentle mode]
     inline_prag = idInlinePragma bndr
 
@@ -1401,7 +1364,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
       -- not ticks.  Counting ticks cannot be duplicated, and non-counting
       -- ticks around a Lam will disappear anyway.
 
-    early_phase = sm_phase mode /= FinalPhase
+    early_phase = sePhase env /= FinalPhase
     -- If we don't have this early_phase test, consider
     --      x = length [1,2,3]
     -- The full laziness pass carefully floats all the cons cells to
@@ -1531,7 +1494,7 @@ postInlineUnconditionally env bind_cxt bndr occ_info rhs
   where
     unfolding = idUnfolding bndr
     uf_opts   = seUnfoldingOpts env
-    phase     = sm_phase (getMode env)
+    phase     = sePhase env
     active    = isActive phase (idInlineActivation bndr)
         -- See Note [pre/postInlineUnconditionally in gentle mode]
 
@@ -1659,72 +1622,67 @@ rebuildLam _env [] body _cont
   = return body
 
 rebuildLam env bndrs body cont
-  = {-# SCC "rebuildLam" #-}
-    do { dflags <- getDynFlags
-       ; try_eta dflags bndrs body }
+  = {-# SCC "rebuildLam" #-} try_eta bndrs body
   where
-    mode     = getMode env
     rec_ids  = seRecIds env
     in_scope = getInScope env  -- Includes 'bndrs'
     mb_rhs   = contIsRhs cont
 
     -- See Note [Eta reduction based on evaluation context]
-    eval_sd dflags
-      | gopt Opt_PedanticBottoms dflags = topSubDmd
+    eval_sd
+      | sePedanticBottoms env = topSubDmd
           -- See Note [Eta reduction soundness], criterion (S)
           -- the bit about -fpedantic-bottoms
       | otherwise = contEvalContext cont
         -- NB: cont is never ApplyToVal, because beta-reduction would
         -- have happened.  So contEvalContext can panic on ApplyToVal.
 
-    try_eta :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
-    try_eta dflags bndrs body
+    try_eta :: [OutBndr] -> OutExpr -> SimplM OutExpr
+    try_eta bndrs body
       | -- Try eta reduction
-        gopt Opt_DoEtaReduction dflags
-      , Just etad_lam <- tryEtaReduce rec_ids bndrs body (eval_sd dflags)
+        seDoEtaReduction env
+      , Just etad_lam <- tryEtaReduce rec_ids bndrs body eval_sd
       = do { tick (EtaReduction (head bndrs))
            ; return etad_lam }
 
       | -- Try eta expansion
         Nothing <- mb_rhs  -- See Note [Eta expanding lambdas]
-      , sm_eta_expand mode
+      , seEtaExpand env
       , any isRuntimeVar bndrs  -- Only when there is at least one value lambda already
-      , Just body_arity <- exprEtaExpandArity (initArityOpts dflags) body
+      , Just body_arity <- exprEtaExpandArity (seArityOpts env) body
       = do { tick (EtaExpansion (head bndrs))
            ; let body' = etaExpandAT in_scope body_arity body
            ; traceSmpl "eta expand" (vcat [text "before" <+> ppr body
                                           , text "after" <+> ppr body'])
            -- NB: body' might have an outer Cast, but if so
            --     mk_lams will pull it further out, past 'bndrs' to the top
-           ; mk_lams dflags bndrs body' }
+           ; return (mk_lams bndrs body') }
 
       | otherwise
-      = mk_lams dflags bndrs body
+      = return (mk_lams bndrs body)
 
-    mk_lams :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
+    mk_lams :: [OutBndr] -> OutExpr -> OutExpr
     -- mk_lams pulls casts and ticks to the top
-    mk_lams dflags bndrs body@(Lam {})
-      = mk_lams dflags (bndrs ++ bndrs1) body1
+    mk_lams bndrs body@(Lam {})
+      = mk_lams (bndrs ++ bndrs1) body1
       where
         (bndrs1, body1) = collectBinders body
 
-    mk_lams dflags bndrs (Tick t expr)
+    mk_lams bndrs (Tick t expr)
       | tickishFloatable t
-      = do { expr' <- mk_lams dflags bndrs expr
-           ; return (mkTick t expr') }
+      = mkTick t (mk_lams bndrs expr)
 
-    mk_lams dflags bndrs (Cast body co)
+    mk_lams bndrs (Cast body co)
       | -- Note [Casts and lambdas]
-        sm_cast_swizzle mode
+        seCastSwizzle env
       , not (any bad bndrs)
-      = do { lam <- mk_lams dflags bndrs body
-           ; return (mkCast lam (mkPiCos Representational bndrs co)) }
+      = mkCast (mk_lams bndrs body) (mkPiCos Representational bndrs co)
       where
         co_vars  = tyCoVarsOfCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
 
-    mk_lams _ bndrs body
-      = return (mkLams bndrs body)
+    mk_lams bndrs body
+      = mkLams bndrs body
 
 {-
 Note [Eta expanding lambdas]
@@ -1744,9 +1702,6 @@ However, when the lambda is let-bound, as the RHS of a let, we have a
 better eta-expander (in the form of tryEtaExpandRhs), so we don't
 bother to try expansion in mkLam in that case; hence the contIsRhs
 guard.
-
-NB: We check the SimplEnv (sm_eta_expand), not DynFlags.
-    See Historical-note [Eta-expansion in stable unfoldings]
 
 Note [Casts and lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1834,7 +1789,7 @@ tryEtaExpandRhs _env (BC_Join {}) bndr rhs
   = pprPanic "tryEtaExpandRhs" (ppr bndr)
 
 tryEtaExpandRhs env (BC_Let _ is_rec) bndr rhs
-  | sm_eta_expand mode      -- Provided eta-expansion is on
+  | seEtaExpand env         -- Provided eta-expansion is on
   , new_arity > old_arity   -- And the current manifest arity isn't enough
   , wantEtaExpansion rhs
   = do { tick (EtaExpansion bndr)
@@ -1843,10 +1798,8 @@ tryEtaExpandRhs env (BC_Let _ is_rec) bndr rhs
   | otherwise
   = return (arity_type, rhs)
   where
-    mode       = getMode env
     in_scope   = getInScope env
-    dflags     = sm_dflags mode
-    arity_opts = initArityOpts dflags
+    arity_opts = seArityOpts env
     old_arity  = exprArity rhs
     arity_type = findRhsArity arity_opts is_rec bndr rhs old_arity
     new_arity  = arityTypeArity arity_type
@@ -2399,7 +2352,7 @@ There are some wrinkles
 -}
 
 mkCase, mkCase1, mkCase2, mkCase3
-   :: DynFlags
+   :: SimplMode
    -> OutExpr -> OutId
    -> OutType -> [OutAlt]               -- Alternatives in standard (increasing) order
    -> SimplM OutExpr
@@ -2408,8 +2361,8 @@ mkCase, mkCase1, mkCase2, mkCase3
 --      1. Merge Nested Cases
 --------------------------------------------------
 
-mkCase dflags scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
-  | gopt Opt_CaseMerge dflags
+mkCase mode scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
+  | sm_case_merge mode
   , (ticks, Case (Var inner_scrut_var) inner_bndr _ inner_alts)
        <- stripTicksTop tickishFloatable deflt_rhs
   , inner_scrut_var == outer_bndr
@@ -2436,7 +2389,7 @@ mkCase dflags scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
                 -- precedence over e2 as the value for A!
 
         ; fmap (mkTicks ticks) $
-          mkCase1 dflags scrut outer_bndr alts_ty merged_alts
+          mkCase1 mode scrut outer_bndr alts_ty merged_alts
         }
         -- Warning: don't call mkCase recursively!
         -- Firstly, there's no point, because inner alts have already had
@@ -2444,13 +2397,13 @@ mkCase dflags scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
         -- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
         -- in munge_rhs may put a case into the DEFAULT branch!
 
-mkCase dflags scrut bndr alts_ty alts = mkCase1 dflags scrut bndr alts_ty alts
+mkCase mode scrut bndr alts_ty alts = mkCase1 mode scrut bndr alts_ty alts
 
 --------------------------------------------------
 --      2. Eliminate Identity Case
 --------------------------------------------------
 
-mkCase1 _dflags scrut case_bndr _ alts@(Alt _ _ rhs1 : _)      -- Identity case
+mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : _)      -- Identity case
   | all identity_alt alts
   = do { tick (CaseIdentity case_bndr)
        ; return (mkTicks ticks $ re_cast scrut rhs1) }
@@ -2489,19 +2442,19 @@ mkCase1 _dflags scrut case_bndr _ alts@(Alt _ _ rhs1 : _)      -- Identity case
     re_cast scrut (Cast rhs co) = Cast (re_cast scrut rhs) co
     re_cast scrut _             = scrut
 
-mkCase1 dflags scrut bndr alts_ty alts = mkCase2 dflags scrut bndr alts_ty alts
+mkCase1 mode scrut bndr alts_ty alts = mkCase2 mode scrut bndr alts_ty alts
 
 --------------------------------------------------
 --      2. Scrutinee Constant Folding
 --------------------------------------------------
 
-mkCase2 dflags scrut bndr alts_ty alts
+mkCase2 mode scrut bndr alts_ty alts
   | -- See Note [Scrutinee Constant Folding]
     case alts of  -- Not if there is just a DEFAULT alternative
       [Alt DEFAULT _ _] -> False
       _                 -> True
-  , gopt Opt_CaseFolding dflags
-  , Just (scrut', tx_con, mk_orig) <- caseRules (targetPlatform dflags) scrut
+  , sm_case_folding mode
+  , Just (scrut', tx_con, mk_orig) <- caseRules (smPlatform mode) scrut
   = do { bndr' <- newId (fsLit "lwild") Many (exprType scrut')
 
        ; alts' <- mapMaybeM (tx_alt tx_con mk_orig bndr') alts
@@ -2509,12 +2462,12 @@ mkCase2 dflags scrut bndr alts_ty alts
                   -- See Note [Unreachable caseRules alternatives]
                   -- in GHC.Core.Opt.ConstantFold
 
-       ; mkCase3 dflags scrut' bndr' alts_ty $
+       ; mkCase3 mode scrut' bndr' alts_ty $
          add_default (re_sort alts')
        }
 
   | otherwise
-  = mkCase3 dflags scrut bndr alts_ty alts
+  = mkCase3 mode scrut bndr alts_ty alts
   where
     -- We need to keep the correct association between the scrutinee and its
     -- binder if the latter isn't dead. Hence we wrap rhs of alternatives with
@@ -2595,7 +2548,7 @@ in GHC.Core.Opt.ConstantFold)
 --------------------------------------------------
 --      Catch-all
 --------------------------------------------------
-mkCase3 _dflags scrut bndr alts_ty alts
+mkCase3 _mode scrut bndr alts_ty alts
   = return (Case scrut bndr alts_ty alts)
 
 -- See Note [Exitification] and Note [Do not inline exit join points] in

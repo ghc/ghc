@@ -7,9 +7,9 @@
 
 module GHC.Core.Opt.Simplify.Monad (
         -- The monad
-        SimplM,
+        TopEnvConfig(..), SimplM,
         initSmpl, traceSmpl,
-        getSimplRules, getFamEnvs, getOptCoercionOpts,
+        getSimplRules,
 
         -- Unique supply
         MonadUnique(..), newId, newJoinId,
@@ -27,15 +27,11 @@ import GHC.Types.Name      ( mkSystemVarName )
 import GHC.Types.Id        ( Id, mkSysLocalOrCoVarM )
 import GHC.Types.Id.Info   ( IdDetails(..), vanillaIdInfo, setArityInfo )
 import GHC.Core.Type       ( Type, Mult )
-import GHC.Core.FamInstEnv ( FamInstEnv )
-import GHC.Core            ( RuleEnv(..), RuleBase)
-import GHC.Core.Rules
+import GHC.Core            ( RuleEnv(..) )
+import GHC.Core.Opt.Stats
 import GHC.Core.Utils      ( mkLamTypes )
-import GHC.Core.Coercion.Opt
 import GHC.Types.Unique.Supply
-import GHC.Driver.Session
-import GHC.Driver.Config
-import GHC.Core.Opt.Monad
+import GHC.Driver.Flags
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Monad
@@ -53,13 +49,10 @@ import GHC.Exts( oneShot )
 \subsection{Monad plumbing}
 *                                                                      *
 ************************************************************************
-
-For the simplifier monad, we want to {\em thread} a unique supply and a counter.
-(Command-line switches move around through the explicitly-passed SimplEnv.)
 -}
 
 newtype SimplM result
-  =  SM'  { unSM :: SimplTopEnv  -- Envt that does not change much
+  =  SM'  { unSM :: SimplTopEnv
                  -> SimplCount
                  -> IO (result, SimplCount)}
     -- We only need IO here for dump output, but since we already have it
@@ -76,54 +69,53 @@ pattern SM m <- SM' m
   where
     SM m = SM' (oneShot $ \env -> oneShot $ \ct -> m env ct)
 
-data SimplTopEnv
-  = STE { st_flags     :: DynFlags
-        , st_logger    :: !Logger
-        , st_max_ticks :: IntWithInf  -- ^ Max #ticks in this simplifier run
-        , st_query_rulebase :: IO RuleBase
-          -- ^ The action to retrieve an up-to-date EPS RuleBase
-          -- See Note [Overall plumbing for rules]
-        , st_mod_rules :: RuleEnv
-        , st_fams      :: (FamInstEnv, FamInstEnv)
+-- See Note [The environments of the Simplify pass]
+data TopEnvConfig = TopEnvConfig
+  { te_history_size :: !Int
+  , te_tick_factor :: !Int
+  }
 
-        , st_co_opt_opts :: !OptCoercionOpts
-            -- ^ Coercion optimiser options
+data SimplTopEnv
+  = STE { -- See Note [The environments of the Simplify pass]
+          st_config :: !TopEnvConfig
+        , st_logger    :: !Logger
+        , st_max_ticks :: !IntWithInf  -- ^ Max #ticks in this simplifier run
+        , st_read_ruleenv :: !(IO RuleEnv)
+          -- ^ The action to retrieve an up-to-date EPS RuleEnv
+          -- See Note [Overall plumbing for rules]
         }
 
-initSmpl :: Logger -> DynFlags -> IO RuleBase -> RuleEnv -> (FamInstEnv, FamInstEnv)
-         -> Int                 -- Size of the bindings, used to limit
-                                -- the number of ticks we allow
+initSmpl :: Logger
+         -> IO RuleEnv
+         -> TopEnvConfig
+         -> Int -- ^ Size of the bindings, used to limit the number of ticks we allow
          -> SimplM a
          -> IO (a, SimplCount)
 
-initSmpl logger dflags qrb rules fam_envs size m
+initSmpl logger read_ruleenv cfg size m
   = do -- No init count; set to 0
-       let simplCount = zeroSimplCount dflags
-       (result, count) <- unSM m env simplCount
-       return (result, count)
+       let simplCount = zeroSimplCount $ logHasDumpFlag logger Opt_D_dump_simpl_stats
+       unSM m env simplCount
   where
-    env = STE { st_flags = dflags
+    env = STE { st_config = cfg
               , st_logger = logger
-              , st_query_rulebase = qrb
-              , st_mod_rules = rules
-              , st_max_ticks = computeMaxTicks dflags size
-              , st_fams = fam_envs
-              , st_co_opt_opts = initOptCoercionOpts dflags
+              , st_max_ticks = computeMaxTicks cfg size
+              , st_read_ruleenv = read_ruleenv
               }
 
-computeMaxTicks :: DynFlags -> Int -> IntWithInf
+computeMaxTicks :: TopEnvConfig -> Int -> IntWithInf
 -- Compute the max simplifier ticks as
 --     (base-size + pgm-size) * magic-multiplier * tick-factor/100
 -- where
 --    magic-multiplier is a constant that gives reasonable results
 --    base-size is a constant to deal with size-zero programs
-computeMaxTicks dflags size
+computeMaxTicks cfg size
   = treatZeroAsInf $
     fromInteger ((toInteger (size + base_size)
                   * toInteger (tick_factor * magic_multiplier))
           `div` 100)
   where
-    tick_factor      = simplTickFactor dflags
+    tick_factor      = te_tick_factor cfg
     base_size        = 100
     magic_multiplier = 40
         -- MAGIC NUMBER, multiplies the simplTickFactor
@@ -196,27 +188,22 @@ instance MonadUnique SimplM where
     getUniqueSupplyM = liftIO $ mkSplitUniqSupply simplMask
     getUniqueM = liftIO $ uniqFromMask simplMask
 
-instance HasDynFlags SimplM where
-    getDynFlags = SM (\st_env sc -> return (st_flags st_env, sc))
-
 instance HasLogger SimplM where
-    getLogger = SM (\st_env sc -> return (st_logger st_env, sc))
+    getLogger = gets st_logger
 
 instance MonadIO SimplM where
-    liftIO m = SM $ \_ sc -> do
-      x <- m
-      return (x, sc)
+    liftIO = liftIOWithEnv . const
 
 getSimplRules :: SimplM RuleEnv
-getSimplRules = SM (\st_env sc -> do
-    eps_rules <- st_query_rulebase st_env
-    return (extendRuleEnv (st_mod_rules st_env) eps_rules, sc))
+getSimplRules = liftIOWithEnv st_read_ruleenv
 
-getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)
-getFamEnvs = SM (\st_env sc -> return (st_fams st_env, sc))
+liftIOWithEnv :: (SimplTopEnv -> IO a) -> SimplM a
+liftIOWithEnv m = SM (\st_env sc -> do
+    x <- m st_env
+    return (x, sc))
 
-getOptCoercionOpts :: SimplM OptCoercionOpts
-getOptCoercionOpts = SM (\st_env sc -> return (st_co_opt_opts st_env, sc))
+gets :: (SimplTopEnv -> a) -> SimplM a
+gets f = liftIOWithEnv (return . f)
 
 newId :: FastString -> Mult -> Type -> SimplM Id
 newId fs w ty = mkSysLocalOrCoVarM fs w ty
@@ -248,8 +235,10 @@ getSimplCount :: SimplM SimplCount
 getSimplCount = SM (\_st_env sc -> return (sc, sc))
 
 tick :: Tick -> SimplM ()
-tick t = SM (\st_env sc -> let sc' = doSimplTick (st_flags st_env) t sc
-                              in sc' `seq` return ((), sc'))
+tick t = SM (\st_env sc -> let
+  history_size = te_history_size (st_config st_env)
+  sc' = doSimplTick history_size t sc
+  in sc' `seq` return ((), sc'))
 
 checkedTick :: Tick -> SimplM ()
 -- Try to take a tick, but fail if too many
@@ -258,8 +247,10 @@ checkedTick t
            if st_max_ticks st_env <= mkIntWithInf (simplCountN sc)
            then throwGhcExceptionIO $
                   PprProgramError "Simplifier ticks exhausted" (msg sc)
-           else let sc' = doSimplTick (st_flags st_env) t sc
-                in sc' `seq` return ((), sc'))
+           else let
+             history_size = te_history_size (st_config st_env)
+             sc' = doSimplTick history_size t sc
+             in sc' `seq` return ((), sc'))
   where
     msg sc = vcat
       [ text "When trying" <+> ppr t

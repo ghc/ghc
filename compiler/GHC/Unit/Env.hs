@@ -3,6 +3,7 @@
 module GHC.Unit.Env
     ( UnitEnv (..)
     , initUnitEnv
+    , ueEPS
     , unsafeGetHomeUnit
     , updateHug
     , updateHpt
@@ -97,6 +98,9 @@ data UnitEnv = UnitEnv
     , ue_namever   :: !GhcNameVersion
         -- ^ GHC name/version (used for dynamic library suffix)
     }
+
+ueEPS :: UnitEnv -> IO ExternalPackageState
+ueEPS = eucEPS . ue_eps
 
 initUnitEnv :: UnitId -> HomeUnitGraph -> GhcNameVersion -> Platform -> IO UnitEnv
 initUnitEnv cur_unit hug namever platform = do
