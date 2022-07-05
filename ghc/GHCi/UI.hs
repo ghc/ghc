@@ -1718,7 +1718,7 @@ editFile str =
 -- of those.
 chooseEditFile :: GHC.GhcMonad m => m String
 chooseEditFile =
-  do let hasFailed (GHC.ModuleNode _deps x) = fmap not $ GHC.isLoaded $ GHC.ms_mod_name x
+  do let hasFailed (GHC.ModuleNode _deps x) = fmap not $ isLoadedModSummary x
          hasFailed _ = return False
 
      graph <- GHC.getModuleGraph
@@ -2122,7 +2122,10 @@ doLoadAndCollectInfo retain_context howmuch = do
   doLoad retain_context howmuch >>= \case
     Succeeded | doCollectInfo -> do
       mod_summaries <- GHC.mgModSummaries <$> getModuleGraph
-      loaded <- filterM GHC.isLoaded $ map GHC.ms_mod_name mod_summaries
+      -- MP: :set +c code path only works in single package mode atm, hence
+      -- this call to isLoaded is ok. collectInfo needs to be modified further to
+      -- work with :set +c so I have punted on that for now.
+      loaded <- filterM GHC.isLoaded (map ms_mod_name mod_summaries)
       v <- mod_infos <$> getGHCiState
       !newInfos <- collectInfo v loaded
       modifyGHCiState (\st -> st { mod_infos = newInfos })
@@ -2180,7 +2183,7 @@ setContextAfterLoad keep_ctxt (Just graph) = do
         (m:_) ->
           load_this m
  where
-   is_loaded (GHC.ModuleNode _ ms) = GHC.isLoaded (ms_mod_name ms)
+   is_loaded (GHC.ModuleNode _ ms) = isLoadedModSummary ms
    is_loaded _ = return False
 
    findTarget mds t
@@ -3334,7 +3337,7 @@ showModules = do
 getLoadedModules :: GHC.GhcMonad m => m [GHC.ModSummary]
 getLoadedModules = do
   graph <- GHC.getModuleGraph
-  filterM (GHC.isLoaded . GHC.ms_mod_name) (GHC.mgModSummaries graph)
+  filterM isLoadedModSummary (GHC.mgModSummaries graph)
 
 showBindings :: GHC.GhcMonad m => m ()
 showBindings = do
@@ -3361,6 +3364,9 @@ showBindings = do
 
 printTyThing :: GHC.GhcMonad m => TyThing -> m ()
 printTyThing tyth = printForUser (pprTyThing showToHeader tyth)
+
+isLoadedModSummary :: GHC.GhcMonad m => ModSummary -> m Bool
+isLoadedModSummary ms = GHC.isLoadedModule (ms_unitid ms) (ms_mod_name ms)
 
 {-
 Note [Filter bindings]
