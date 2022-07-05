@@ -2373,6 +2373,10 @@ static void read_trace_flags(const char *arg)
             RtsFlags.TraceFlags.sparks_sampled = enabled;
             RtsFlags.TraceFlags.sparks_full    = enabled;
             RtsFlags.TraceFlags.user           = enabled;
+            RtsFlags.TraceFlags.nonmoving_gc   = enabled;
+#if defined(TICKY_TICKY)
+            RtsFlags.TraceFlags.ticky          = enabled;
+#endif
             enabled = true;
             break;
 
