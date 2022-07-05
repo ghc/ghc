@@ -54,7 +54,6 @@ import GHC.Driver.Session
 import GHC.Types.SourceFile ( hscSourceString )
 
 import GHC.Unit.Module.ModSummary
-import GHC.Unit.Module.Env
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 
@@ -149,8 +148,6 @@ data ModuleGraph = ModuleGraph
   , mg_trans_deps :: Map.Map NodeKey (Set.Set NodeKey)
     -- A cached transitive dependency calculation so that a lot of work is not
     -- repeated whenever the transitive dependencies need to be calculated (for example, hptInstances)
-  , mg_non_boot :: ModuleEnv ModSummary
-    -- a map of all non-boot ModSummaries keyed by Modules
   }
 
 -- | Map a function 'f' over all the 'ModSummaries'.
@@ -161,7 +158,6 @@ mapMG f mg@ModuleGraph{..} = mg
       InstantiationNode uid iuid -> InstantiationNode uid iuid
       LinkNode uid nks -> LinkNode uid nks
       ModuleNode deps ms  -> ModuleNode deps (f ms)
-  , mg_non_boot = mapModuleEnv f mg_non_boot
   }
 
 unionMG :: ModuleGraph -> ModuleGraph -> ModuleGraph
@@ -170,7 +166,6 @@ unionMG a b =
   in ModuleGraph {
         mg_mss = new_mss
       , mg_trans_deps = mkTransDeps new_mss
-      , mg_non_boot = mg_non_boot a `plusModuleEnv` mg_non_boot b
       }
 
 
@@ -184,11 +179,19 @@ mgModSummaries' :: ModuleGraph -> [ModuleGraphNode]
 mgModSummaries' = mg_mss
 
 -- | Look up a ModSummary in the ModuleGraph
+-- Looks up the non-boot ModSummary
+-- Linear in the size of the module graph
 mgLookupModule :: ModuleGraph -> Module -> Maybe ModSummary
-mgLookupModule ModuleGraph{..} m = lookupModuleEnv mg_non_boot m
+mgLookupModule ModuleGraph{..} m = listToMaybe $ mapMaybe go mg_mss
+  where
+    go (ModuleNode _ ms)
+      | NotBoot <- isBootSummary ms
+      , ms_mod ms == m
+      = Just ms
+    go _ = Nothing
 
 emptyMG :: ModuleGraph
-emptyMG = ModuleGraph [] Map.empty emptyModuleEnv
+emptyMG = ModuleGraph [] Map.empty
 
 isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
 isTemplateHaskellOrQQNonBoot ms =
@@ -202,9 +205,6 @@ extendMG :: ModuleGraph -> [NodeKey] -> ModSummary -> ModuleGraph
 extendMG ModuleGraph{..} deps ms = ModuleGraph
   { mg_mss = ModuleNode deps ms : mg_mss
   , mg_trans_deps = mkTransDeps (ModuleNode deps ms : mg_mss)
-  , mg_non_boot = case isBootSummary ms of
-      IsBoot -> mg_non_boot
-      NotBoot -> extendModuleEnv mg_non_boot (ms_mod ms) ms
   }
 
 mkTransDeps :: [ModuleGraphNode] -> Map.Map NodeKey (Set.Set NodeKey)
