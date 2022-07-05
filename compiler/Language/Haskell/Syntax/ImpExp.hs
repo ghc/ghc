@@ -39,7 +39,7 @@ data ImportDeclQualifiedStyle
   = QualifiedPre  -- ^ 'qualified' appears in prepositive position.
   | QualifiedPost -- ^ 'qualified' appears in postpositive position.
   | NotQualified  -- ^ Not qualified.
-  deriving Data
+  deriving (Eq, Data)
 
 -- | Indicates whether a module name is referring to a boot interface (hs-boot
 -- file) or regular module (hs file). We need to treat boot modules specially
