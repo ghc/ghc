@@ -779,7 +779,7 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
             HsRecFld{}          -> False
             HsOverLabel{}       -> False
             HsIPVar{}           -> False
-            XExpr (WrapExpr {}) -> False
+            XExpr (ExpansionExpr {}) -> False
             _                   -> True
 
 data HiePassEv p where
