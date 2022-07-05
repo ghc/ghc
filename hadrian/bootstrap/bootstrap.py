@@ -15,7 +15,6 @@ please rather run `cabal build hadrian .`. or `./hadrian/build`
 
 from enum import Enum
 import hashlib
-import logging
 import json
 from pathlib import Path
 import platform
@@ -24,8 +23,8 @@ import subprocess
 import tempfile
 import sys
 from textwrap import dedent
-from typing import Set, Optional, Dict, List, Tuple, \
-                   NewType, BinaryIO, NamedTuple, TypeVar
+from typing import Optional, Dict, List, Tuple, \
+                   NewType, BinaryIO, NamedTuple
 
 #logging.basicConfig(level=logging.INFO)
 
@@ -296,7 +295,7 @@ def archive_name(version):
 
 def make_archive(hadrian_path):
 
-    print(f'Creating distribution tarball')
+    print('Creating distribution tarball')
 
     # Get bootstrapped hadrian version
     # This also acts as smoke test
