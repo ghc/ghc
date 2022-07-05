@@ -212,7 +212,7 @@ ghciCommands = map mkCmd [
   ("delete",    keepGoing deleteCmd,            noCompletion),
   ("disable",   keepGoing disableCmd,           noCompletion),
   ("doc",       keepGoing' docCmd,              completeIdentifier),
-  ("edit",      keepGoing' editFile,            completeFilename),
+  ("edit",      keepGoingMulti' editFile,            completeFilename),
   ("enable",    keepGoing enableCmd,            noCompletion),
   ("etags",     keepGoing createETagsFileCmd,   completeFilename),
   ("force",     keepGoing forceCmd,             completeExpression),
