@@ -36,7 +36,7 @@ import GHC.StgToJS.Monad
 
 import GHC.Types.CostCentre
 
-import qualified GHC.Data.ShortText as ST
+import GHC.Data.FastString
 import GHC.Unit.Module
 import GHC.Utils.Encoding
 import GHC.Utils.Outputable
@@ -141,7 +141,7 @@ costCentreLbl' cc = do
     moduleNameColons (moduleName curModl) ++ "_" ++ if isCafCC cc then "CAF_ccs" else lbl
 
 costCentreLbl :: CostCentre -> G Ident
-costCentreLbl cc = TxtI . ST.pack <$> costCentreLbl' cc
+costCentreLbl cc = TxtI . mkFastString <$> costCentreLbl' cc
 
 costCentreStackLbl' :: CostCentreStack -> G (Maybe String)
 costCentreStackLbl' ccs = do
@@ -155,7 +155,7 @@ costCentreStackLbl' ccs = do
             Nothing -> pure Nothing
 
 costCentreStackLbl :: CostCentreStack -> G (Maybe Ident)
-costCentreStackLbl ccs = fmap (TxtI . ST.pack) <$> costCentreStackLbl' ccs
+costCentreStackLbl ccs = fmap (TxtI . mkFastString) <$> costCentreStackLbl' ccs
 
 singletonCCSLbl' :: CostCentre -> G String
 singletonCCSLbl' cc = do
@@ -169,7 +169,7 @@ singletonCCSLbl' cc = do
               ]
 
 singletonCCSLbl :: CostCentre -> G Ident
-singletonCCSLbl cc = TxtI . ST.pack <$> singletonCCSLbl' cc
+singletonCCSLbl cc = TxtI . mkFastString <$> singletonCCSLbl' cc
 
 ccsVarJ :: CostCentreStack -> G (Maybe JExpr)
 ccsVarJ ccs = do

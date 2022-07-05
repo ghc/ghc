@@ -45,8 +45,7 @@ import GHC.Types.Id
 import GHC.Types.Unique
 import GHC.Types.TyThing
 
-import qualified GHC.Data.ShortText as ST
-import GHC.Data.ShortText (ShortText)
+import GHC.Data.FastString
 import GHC.Utils.Encoding
 import GHC.Utils.Logger
 import GHC.Utils.Panic
@@ -169,7 +168,7 @@ genUnits m ss spt_entries foreign_stubs
                                               []
                                               []
                                               mempty
-                                              (ST.pack $ renderWithContext defaultSDocContext f_c)
+                                              (mkFastString $ renderWithContext defaultSDocContext f_c)
                                               []
                                               []
         return ( st'
@@ -234,10 +233,10 @@ serializeLinkableUnit :: HasDebugCallStack
                       -> [ClosureInfo]
                       -> [StaticInfo]
                       -> JStat               -- generated code for the unit
-                      -> ShortText
+                      -> FastString
                       -> [Object.ExpFun]
                       -> [ForeignJSRef]
-                      -> G (Object.SymbolTable, [ShortText], BS.ByteString)
+                      -> G (Object.SymbolTable, [FastString], BS.ByteString)
 serializeLinkableUnit _m st i ci si stat rawStat fe fi = do
   !i' <- mapM idStr i
   !(!st', !o) <- lift $ Object.serializeStat st ci si stat rawStat fe fi
@@ -246,10 +245,10 @@ serializeLinkableUnit _m st i ci si stat rawStat fe fi = do
       idStr i = itxt <$> jsIdI i
 
 -- | variable prefix for the nth block in module
-modulePrefix :: Module -> Int -> ShortText
+modulePrefix :: Module -> Int -> FastString
 modulePrefix m n =
   let encMod = zEncodeString . moduleNameString . moduleName $ m
-  in  ST.pack $ "h$" ++ encMod ++ "_id_" ++ show n
+  in  mkFastString $ "h$" ++ encMod ++ "_id_" ++ show n
 
 genToplevel :: CgStgBinding -> G JStat
 genToplevel (StgNonRec bndr rhs) = genToplevelDecl bndr rhs
@@ -279,7 +278,7 @@ genSetConInfo i d l {- srt -} = do
   sr <- genStaticRefs l
   emitClosureInfo $ ClosureInfo eii
                                 (CIRegs 0 [PtrV])
-                                (ST.pack $ renderWithContext defaultSDocContext (ppr d))
+                                (mkFastString $ renderWithContext defaultSDocContext (ppr d))
                                 (fixedLayout $ map uTypeVt fields)
                                 (CICon $ dataConTag d)
                                 sr

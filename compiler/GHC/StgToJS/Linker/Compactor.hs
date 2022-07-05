@@ -42,7 +42,9 @@ module GHC.StgToJS.Linker.Compactor
 
 import           GHC.Utils.Panic
 import           GHC.Utils.Misc
-
+import           GHC.Types.Unique.Map
+import           GHC.Types.Unique.Set
+import           GHC.Types.Unique.DSet
 
 import           Control.Applicative
 import           GHC.Utils.Monad.State.Strict
@@ -64,9 +66,7 @@ import qualified Data.List as List
 import           Data.Maybe
 import qualified Data.Set as S
 import           Data.Set (Set)
-import           GHC.Data.ShortText (ShortText)
-import qualified GHC.Data.ShortText as T
-
+import           GHC.Data.FastString
 
 import           GHC.JS.Syntax
 import           GHC.JS.Make
@@ -288,7 +288,7 @@ renameInternals :: HasDebugCallStack
                 => JSLinkConfig
                 -> StgToJSConfig
                 -> CompactorState
-                -> [ShortText]
+                -> [FastString]
                 -> [LinkedUnit]
                 -> (CompactorState, [JStat], JStat)
 renameInternals ln_cfg cfg cs0 rtsDeps stats0a = (cs, stats, meta)
@@ -389,8 +389,8 @@ staticInitStat :: Bool         -- ^ profiling enabled
                -> JStat
 staticInitStat _prof (StaticInfo i sv cc) =
   case sv of
-    StaticData con args  -> appS "h$sti" ([var i, var con, toJExpr args] ++ ccArg)
-    StaticFun f args     -> appS "h$sti" ([var i, var f, toJExpr args] ++ ccArg)
+    StaticData con args -> appS "h$sti" ([var i, var con, toJExpr args] ++ ccArg)
+    StaticFun  f   args -> appS "h$sti" ([var i, var f, toJExpr args] ++ ccArg)
     StaticList args mt   ->
       appS "h$stl" ([var i, toJExpr args, toJExpr $ maybe null_ (toJExpr . TxtI) mt] ++ ccArg)
     StaticThunk (Just (f,args)) ->
@@ -415,7 +415,7 @@ staticDeclStat (StaticInfo si sv _) =
   in  maybe (appS "h$di" [toJExpr si']) (\v -> DeclStat si' `mappend` (toJExpr si' |= v)) (ssv sv)
 
 initStr :: BS.ByteString -> JExpr
-initStr str = app "h$str" [ValExpr (JStr . T.pack . BSC.unpack $! str)]
+initStr str = app "h$str" [ValExpr (JStr . mkFastString . BSC.unpack $! str)]
       --TODO: Jeff (2022,03): This function used to call @decodeModifiedUTF8 in
       --Gen2.Utils. I've removed the call site and opted to keep the Just case.
       --We'll need to double check to see if we indeed do need to decoded the
@@ -427,11 +427,11 @@ initStr str = app "h$str" [ValExpr (JStr . T.pack . BSC.unpack $! str)]
 
 -- | rename a heap object, which means adding it to the
 --  static init table in addition to the renamer
-renameObj :: ShortText
-          -> State CompactorState ShortText
+renameObj :: FastString
+          -> State CompactorState FastString
 renameObj xs = do
-  (TxtI xs') <- renameVar (TxtI xs) -- added to the renamer
-  modify (addStaticEntry xs')       -- and now the table
+  (TxtI xs') <- renameVar (TxtI xs)               -- added to the renamer
+  modify (addStaticEntry xs') -- and now the table
   return xs'
 
 renameEntry :: Ident
@@ -444,7 +444,7 @@ renameEntry i = do
 collectLabels :: StaticInfo -> State CompactorState ()
 collectLabels si = mapM_ go (labelsV . siVal $ si)
   where
-    go :: ShortText -> State CompactorState ()
+    go :: FastString -> State CompactorState ()
     go = modify . addLabel
     labelsV (StaticData _ args) = concatMap labelsA args
     labelsV (StaticList args _) = concatMap labelsA args
@@ -456,18 +456,18 @@ collectLabels si = mapM_ go (labelsV . siVal $ si)
 
 lookupRenamed :: CompactorState -> Ident -> Ident
 lookupRenamed cs i@(TxtI t) =
-  fromMaybe i (M.lookup t (csNameMap cs))
+  fromMaybe i (lookupUniqMap (csNameMap cs) t)
 
 renameVar :: Ident                      -- ^ text identifier to rename
           -> State CompactorState Ident -- ^ the updated renamer state and the new ident
 renameVar i@(TxtI t)
-  | "h$$" `List.isPrefixOf` T.unpack t = do
+  | "h$$" `List.isPrefixOf` unpackFS t = do
       m <- gets csNameMap
-      case M.lookup t m of
+      case lookupUniqMap m t of
         Just r  -> return r
         Nothing -> do
           y <- newIdent
-          let add_var cs' = cs' {csNameMap = M.insert t y (csNameMap cs')}
+          let add_var cs' = cs' {csNameMap = addToUniqMap (csNameMap cs') t y}
           modify add_var
           return y
   | otherwise = return i
@@ -488,7 +488,7 @@ renameClosureInfo :: CompactorState
 renameClosureInfo cs (ClosureInfo v rs n l t s)  =
   ClosureInfo (renameV v) rs n l t (f s)
     where
-      renameV t = maybe t (\(TxtI t') -> t') (M.lookup t m)
+      renameV t = maybe t itxt (lookupUniqMap m t)
       m                   = csNameMap cs
       f (CIStaticRefs rs) = CIStaticRefs (map renameV rs)
 
@@ -498,25 +498,25 @@ renameStaticInfo :: CompactorState
                  -> StaticInfo
 renameStaticInfo cs = staticIdents renameIdent
   where
-    renameIdent t = maybe t (\(TxtI t') -> t') (M.lookup t $ csNameMap cs)
+    renameIdent t = maybe t itxt (lookupUniqMap (csNameMap cs) t)
 
-staticIdents :: (ShortText -> ShortText)
+staticIdents :: (FastString -> FastString)
              -> StaticInfo
              -> StaticInfo
 staticIdents f (StaticInfo i v cc) = StaticInfo (f i) (staticIdentsV f v) cc
 
-staticIdentsV ::(ShortText -> ShortText) -> StaticVal -> StaticVal
-staticIdentsV f (StaticFun i args)             = StaticFun (f i) (staticIdentsA f <$> args)
+staticIdentsV ::(FastString -> FastString) -> StaticVal -> StaticVal
+staticIdentsV f (StaticFun i args) = StaticFun (f i) (staticIdentsA f <$> args)
 staticIdentsV f (StaticThunk (Just (i, args))) = StaticThunk . Just $
                                                  (f i, staticIdentsA f <$> args)
-staticIdentsV f (StaticData con args)          = StaticData (f con) (staticIdentsA f <$> args)
+staticIdentsV f (StaticData con args) = StaticData (f con) (staticIdentsA f <$> args)
 staticIdentsV f (StaticList xs t)              = StaticList (staticIdentsA f <$> xs) (f <$> t)
 staticIdentsV _ x                              = x
 
 -- staticIdentsA :: Traversal' StaticArg ShortText
-staticIdentsA :: (ShortText -> ShortText) -> StaticArg -> StaticArg
+staticIdentsA :: (FastString -> FastString) -> StaticArg -> StaticArg
 staticIdentsA f (StaticObjArg t) = StaticObjArg $! f t
-staticIdentsA _ x                = x
+staticIdentsA _ x = x
 
 
 {-
@@ -548,40 +548,40 @@ encodeStr = concatMap encodeChr
 entryIdx :: HasDebugCallStack
          => String
          -> CompactorState
-         -> ShortText
+         -> FastString
          -> Int
-entryIdx msg cs i = fromMaybe lookupParent (M.lookup i' (csEntries cs))
+entryIdx msg cs i = fromMaybe lookupParent (lookupUniqMap (csEntries cs) i')
   where
     (TxtI i')    = lookupRenamed cs (TxtI i)
     lookupParent = maybe err
                          (+ csNumEntries cs)
-                         (M.lookup i' (csParentEntries cs))
-    err = panic (msg ++ ": invalid entry: " ++ T.unpack i')
+                         (lookupUniqMap (csParentEntries cs) i')
+    err = panic (msg ++ ": invalid entry: " ++ unpackFS i')
 
 objectIdx :: HasDebugCallStack
           => String
           -> CompactorState
-          -> ShortText
+          -> FastString
           -> Int
-objectIdx msg cs i = fromMaybe lookupParent (M.lookup i' (csStatics cs))
+objectIdx msg cs i = fromMaybe lookupParent (lookupUniqMap (csStatics cs) i')
   where
     (TxtI i')    = lookupRenamed cs (TxtI i)
     lookupParent = maybe err
                          (+ csNumStatics cs)
-                         (M.lookup i' (csParentStatics cs))
-    err          = panic (msg ++ ": invalid static: " ++ T.unpack i')
+                         (lookupUniqMap (csParentStatics cs) i')
+    err          = panic (msg ++ ": invalid static: " ++ unpackFS i')
 
 labelIdx :: HasDebugCallStack
          => String
          -> CompactorState
-         -> ShortText
+         -> FastString
          -> Int
-labelIdx msg cs l = fromMaybe lookupParent (M.lookup l (csLabels cs))
+labelIdx msg cs l = fromMaybe lookupParent (lookupUniqMap (csLabels cs) l)
   where
     lookupParent = maybe err
                          (+ csNumLabels cs)
-                         (M.lookup l (csParentLabels cs))
-    err          = panic (msg ++ ": invalid label: " ++ T.unpack l)
+                         (lookupUniqMap (csParentLabels cs) l)
+    err          = panic (msg ++ ": invalid label: " ++ unpackFS l)
 
 encodeInfo :: HasDebugCallStack
            => CompactorState
@@ -590,7 +590,7 @@ encodeInfo :: HasDebugCallStack
 encodeInfo cs (ClosureInfo _var regs name layout typ static)
   | CIThunk              <- typ = 0 : ls
   | (CIFun _arity regs0) <- typ, regs0 /= argSize regs
-     = panic ("encodeInfo: inconsistent register metadata for " ++ T.unpack name)
+     = panic ("encodeInfo: inconsistent register metadata for " ++ unpackFS name)
   | (CIFun arity _regs0) <- typ = [1, arity, encodeRegs regs] ++ ls
   | (CICon tag)          <- typ = [2, tag] ++ ls
   | CIStackFrame         <- typ = [3, encodeRegs regs] ++ ls
@@ -638,7 +638,7 @@ encodeStatic0 cs (StaticInfo _to sv _)
     | StaticUnboxed (StaticUnboxedDouble _d) <- sv =
       [6] -- ++ encodeDouble d
     | (StaticUnboxed _) <- sv = [] -- unboxed strings have their own table
---    | StaticString t <- sv         = [7, T.length t] ++ map encodeChar (T.unpack t)
+--    | StaticString t <- sv         = [7, T.length t] ++ map encodeChar (unpackFS t)
 --    | StaticBin bs <- sv           = [8, BS.length bs] ++ map fromIntegral (BS.unpack bs)
     | StaticList [] Nothing <- sv =
       [8]
@@ -684,8 +684,8 @@ encodeStatic0 cs (StaticInfo _to sv _)
 
 -- FIXME: Jeff (2022,03): Use FastString or ShortByteString and remove this
 -- serialization/deserialization
-encodeString :: ShortText -> [Int]
-encodeString = encodeBinary . BSC.pack . T.unpack
+encodeString :: FastString -> [Int]
+encodeString = encodeBinary . BSC.pack . unpackFS
 
 -- ByteString is prefixed with length, then blocks of 4 numbers encoding 3 bytes
 encodeBinary :: BS.ByteString -> [Int]
@@ -775,7 +775,7 @@ staticValArgs _ x = pure x
 compact :: JSLinkConfig
         -> StgToJSConfig
         -> CompactorState
-        -> [ShortText]
+        -> [FastString]
         -> [LinkedUnit]
         -> (CompactorState, [JStat], JStat)
 compact ln_cfg cfg cs0 rtsDeps0 input0
@@ -791,7 +791,7 @@ compact ln_cfg cfg cs0 rtsDeps0 input0
 
 -- hash compactification
 
-dedupeBodies :: [ShortText]
+dedupeBodies :: [FastString]
              -> [LinkedUnit]
              -> (JStat, [LinkedUnit])
 dedupeBodies rtsDeps input = (renderBuildFunctions bfN bfCB, input')
@@ -799,37 +799,38 @@ dedupeBodies rtsDeps input = (renderBuildFunctions bfN bfCB, input')
     (bfN, bfCB, input') = rewriteBodies globals hdefsR hdefs input
     hdefs   = M.fromListWith (\(s,ks1) (_,ks2) -> (s, ks1++ks2))
                              (map (\(k, s, bs) -> (bs, (s, [k]))) hdefs0)
-    hdefsR  = M.fromList $ map (\(k, _, bs) -> (k, bs)) hdefs0
-    hdefs0 :: [(ShortText, Int, BS.ByteString)]
+    hdefsR  = listToUniqMap $ map (\(k, _, bs) -> (k, bs)) hdefs0
+    hdefs0 :: [(FastString, Int, BS.ByteString)]
     hdefs0  = concatMap ((map (\(k,h) ->
                             let (s,fh, _deps) = finalizeHash' h
                             in (k, s, fh))
                         . hashDefinitions globals) . lu_js_code)
                         input
-    globals = List.foldl' (flip S.delete) (findAllGlobals input) rtsDeps
+    globals = List.foldl' delOneFromUniqSet (findAllGlobals input) rtsDeps
 
 renderBuildFunctions :: [BuildFunction] -> [BuildFunction] -> JStat
 renderBuildFunctions normalBfs cycleBreakerBfs =
   cycleBr1 <> mconcat (map renderBuildFunction normalBfs) <> cycleBr2
   where
     renderCbr f = mconcat (zipWith f cycleBreakerBfs [1..])
-    cbName :: Int -> ShortText
-    cbName = T.pack . ("h$$$cb"++) . show
+    cbName :: Int -> FastString
+    cbName = mkFastString . ("h$$$cb"++) . show
     cycleBr1 = renderCbr $ \bf n ->
-      let args = map (TxtI . T.pack . ('a':) . show) [1..bfArgs bf]
+      let args = map (TxtI . mkFastString . ('a':) . show) [1..bfArgs bf]
           body = ReturnStat $ ApplExpr (ValExpr (JVar (TxtI $ cbName n)))
                                        (map (ValExpr . JVar) args)
-      in  DeclStat (TxtI (bfName bf)) <>
-          AssignStat (ValExpr (JVar (TxtI (bfName bf))))
+          bfn = bfName bf
+      in  DeclStat (TxtI bfn) <>
+          AssignStat (ValExpr (JVar (TxtI bfn)))
                      (ValExpr (JFunc args body))
     cycleBr2 = renderCbr $ \bf n -> renderBuildFunction (bf { bfName = cbName n })
 
 data BuildFunction = BuildFunction
-  { bfName    :: !ShortText
+  { bfName    :: !FastString
   , bfBuilder :: !Ident
-  , bfDeps    :: [ShortText]
+  , bfDeps    :: [FastString]
   , bfArgs    :: !Int
-  } deriving (Eq, Ord, Show)
+  } deriving (Eq, Show)
 
 {-
   Stack frame initialization order is important when code is reused:
@@ -842,33 +843,33 @@ sortBuildFunctions :: [BuildFunction] -> ([BuildFunction], [BuildFunction])
 sortBuildFunctions bfs = (map snd normBFs, map snd cbBFs)
   where
     (normBFs, cbBFs) = List.partition (not.fst) . concatMap fromSCC $ sccs bfs
-    bfm :: Map ShortText BuildFunction
-    bfm = M.fromList (map (\x -> (bfName x, x)) bfs)
-    fromSCC :: G.SCC ShortText -> [(Bool, BuildFunction)]
-    fromSCC (G.AcyclicSCC x) = [(False, bfm M.! x)]
-    fromSCC (G.CyclicSCC xs) = breakCycles xs
-    sccs :: [BuildFunction] -> [G.SCC ShortText]
+    bfm :: UniqMap FastString BuildFunction
+    bfm = listToUniqMap (map (\x -> (bfName x, x)) bfs)
+    fromSCC :: G.SCC LexicalFastString -> [(Bool, BuildFunction)]
+    fromSCC (G.AcyclicSCC (LexicalFastString x)) = [(False, fromJust $ lookupUniqMap bfm x)]
+    fromSCC (G.CyclicSCC xs) = breakCycles $ map (\(LexicalFastString f) -> f) xs
+    sccs :: [BuildFunction] -> [G.SCC LexicalFastString]
     sccs b = G.stronglyConnComp $
-      map (\bf -> let n = bfName bf in (n, n, bfDeps bf)) b
+      map (\bf -> let n = bfName bf in (LexicalFastString n, LexicalFastString n, map LexicalFastString $ bfDeps bf)) b
     {-
        finding the maximum acyclic subgraph is the Minimum Feedback Arc Set problem,
        which is NP-complete. We use an approximation here.
      -}
-    breakCycles :: [ShortText] -> [(Bool, BuildFunction)]
+    breakCycles :: [FastString] -> [(Bool, BuildFunction)]
     breakCycles nodes =
-      (True, bfm M.! selected)
-      : concatMap fromSCC (sccs (map (bfm M.!) $ filter (/=selected) nodes))
+      (True, fromJust $ lookupUniqMap bfm selected)
+      : concatMap fromSCC (sccs (map (fromJust . lookupUniqMap bfm) $ filter (/=selected) nodes))
       where
-        outDeg, inDeg :: Map ShortText Int
-        outDeg = M.fromList $ map (\n -> (n, length (bfDeps (bfm M.! n)))) nodes
-        inDeg  = M.fromListWith (+) (map (,1) . concatMap (bfDeps . (bfm M.!)) $ nodes)
+        outDeg, inDeg :: UniqMap FastString Int
+        outDeg = listToUniqMap $ map (\n -> (n, length (bfDeps (fromJust $ lookupUniqMap bfm n)))) nodes
+        inDeg  = listToUniqMap_C (+) (map (,1) . concatMap (bfDeps . (fromJust . lookupUniqMap bfm)) $ nodes)
         -- ELS heuristic (Eades et. al.)
-        selected :: ShortText
-        selected = List.maximumBy (compare `on` (\x -> outDeg M.! x - inDeg M.! x)) nodes
+        selected :: FastString
+        selected = List.maximumBy (compare `on` (\x -> fromJust (lookupUniqMap outDeg x) - fromJust (lookupUniqMap inDeg x))) nodes
 
-rewriteBodies :: Set ShortText
-              -> Map ShortText BS.ByteString
-              -> Map BS.ByteString (Int, [ShortText])
+rewriteBodies :: UniqSet FastString
+              -> UniqMap FastString BS.ByteString
+              -> Map BS.ByteString (Int, [FastString])
               -> [LinkedUnit]
               -> ([BuildFunction], [BuildFunction], [LinkedUnit])
 rewriteBodies globals idx1 idx2 input = (bfsNormal, bfsCycleBreaker, input')
@@ -877,20 +878,20 @@ rewriteBodies globals idx1 idx2 input = (bfsNormal, bfsCycleBreaker, input')
     (bfsNormal, bfsCycleBreaker) = sortBuildFunctions (concat bfs1)
 
     -- this index only contains the entries we actually want to dedupe
-    idx2' :: Map BS.ByteString (Int, [ShortText])
+    idx2' :: Map BS.ByteString (Int, [FastString])
     idx2' = M.filter (\(s, xs) -> dedupeBody (length xs) s) idx2
 
     rewriteBlock :: LinkedUnit -> ([BuildFunction], LinkedUnit)
     rewriteBlock (LinkedUnit st cis sis) =
       let (bfs, st') = rewriteFunctions st
       -- remove the declarations for things that we just deduped
-          st''       = removeDecls (S.fromList $ map bfName bfs) st'
+          st''       = removeDecls (mkUniqSet $ map bfName bfs) st'
       in  (bfs, LinkedUnit st'' cis sis)
 
-    removeDecls :: Set ShortText -> JStat -> JStat
+    removeDecls :: UniqSet FastString -> JStat -> JStat
     removeDecls t (BlockStat ss) = BlockStat (map (removeDecls t) ss)
     removeDecls t (DeclStat (TxtI i))
-      | i `S.member` t = mempty
+      | elementOfUniqSet i t = mempty
     removeDecls _ s = s
 
     rewriteFunctions :: JStat -> ([BuildFunction], JStat)
@@ -899,14 +900,14 @@ rewriteBodies globals idx1 idx2 input = (bfsNormal, bfsCycleBreaker, input')
       in  (concat bfs, BlockStat ss')
     rewriteFunctions (AssignStat (ValExpr (JVar (TxtI i)))
                                  (ValExpr (JFunc args st)))
-      | Just h         <- M.lookup i idx1
+      | Just h         <- lookupUniqMap idx1  i
       , Just (_s, his) <- M.lookup h idx2' =
           let (bf, st') = rewriteFunction i h his args st in ([bf], st')
     rewriteFunctions x = ([], x)
 
-    rewriteFunction :: ShortText
+    rewriteFunction :: FastString
                     -> BS.ByteString
-                    -> [ShortText]
+                    -> [FastString]
                     -> [Ident]
                     -> JStat
                     -> (BuildFunction, JStat)
@@ -916,14 +917,14 @@ rewriteBodies globals idx1 idx2 input = (bfsNormal, bfsCycleBreaker, input')
        where
           bf :: BuildFunction
           bf       = BuildFunction i (buildFunId idx) g (length args)
-          g :: [ShortText]
+          g :: [FastString]
           g        = findGlobals globals body
           iFirst   = head his
           Just idx = M.lookupIndex h idx2'
 
-    createFunction :: ShortText
+    createFunction :: FastString
                    -> Int
-                   -> [ShortText]
+                   -> [FastString]
                    -> [Ident]
                    -> JStat
                    -> JStat
@@ -935,13 +936,13 @@ rewriteBodies globals idx1 idx2 input = (bfsNormal, bfsCycleBreaker, input')
         ng    = length g
         bi    = buildFunId idx
         bargs :: [Ident]
-        bargs = map (TxtI . T.pack . ("h$$$g"++) . show) [1..ng]
-        bgm :: Map ShortText Ident
-        bgm   = M.fromList (zip g bargs)
+        bargs = map (TxtI . mkFastString . ("h$$$g"++) . show) [1..ng]
+        bgm :: UniqMap FastString Ident
+        bgm   = listToUniqMap (zip g bargs)
         bbody :: JStat
         bbody = ReturnStat (ValExpr $ JFunc args ibody)
         ibody :: JStat
-        ibody = identsS' (\ti@(TxtI i) -> fromMaybe ti (M.lookup i bgm)) body
+        ibody = identsS' (\ti@(TxtI i) -> fromMaybe ti (lookupUniqMap bgm i)) body
 
 renderBuildFunction :: BuildFunction -> JStat
 renderBuildFunction (BuildFunction i bfid deps _nargs) =
@@ -957,17 +958,16 @@ dedupeBody n size
   | otherwise      = False
 
 buildFunId :: Int -> Ident
-buildFunId i = TxtI (T.pack $ "h$$$f" ++ show i)
+buildFunId i = TxtI (mkFastString $ "h$$$f" ++ show i)
 
 -- result is ordered, does not contain duplicates
-findGlobals :: Set ShortText -> JStat -> [ShortText]
-findGlobals globals stat = nub'
-  (filter isGlobal . map (\(TxtI i) -> i) $ identsS stat )
+findGlobals :: UniqSet FastString -> JStat -> [FastString]
+findGlobals globals stat = filter isGlobal . map itxt . S.toList $ identsS stat
   where
-    locals     = S.fromList (findLocals stat)
-    isGlobal i = i `S.member` globals && i `S.notMember` locals
+    locals     = mkUniqSet (findLocals stat)
+    isGlobal i = elementOfUniqSet i globals && not (elementOfUniqSet i locals)
 
-findLocals :: JStat -> [ShortText]
+findLocals :: JStat -> [FastString]
 findLocals (BlockStat ss)      = concatMap findLocals ss
 findLocals (DeclStat (TxtI i)) = [i]
 findLocals _                   = []
@@ -980,9 +980,9 @@ nub' = go S.empty
       | x `S.member` s = go s xs
       | otherwise      = x : go (S.insert x s) xs
 
-data HashIdx = HashIdx (Map ShortText Hash) (Map Hash ShortText)
+data HashIdx = HashIdx (UniqMap FastString Hash) (Map Hash FastString)
 
-dedupe :: [ShortText]
+dedupe :: [FastString]
        -> [LinkedUnit]
        -> [LinkedUnit]
 dedupe rtsDeps input
@@ -992,12 +992,19 @@ dedupe rtsDeps input
   where
     idx    = HashIdx hashes hr
     hashes0 = buildHashes rtsDeps input
-    hashes  = List.foldl' (flip M.delete) hashes0 rtsDeps
-    hr     = fmap pickShortest
-             (M.fromListWith (++) $
-             map (\(i, h) -> (h, [i])) (M.toList hashes))
-    pickShortest :: [ShortText] -> ShortText
-    pickShortest = List.minimumBy (compare `on` T.codepointLength)
+    hashes  = List.foldl' delFromUniqMap hashes0 rtsDeps
+    -- Adding to a map, and selecting a deterministic element on overlapping keys
+    -- using pickShortest avoids the non-determinism introduced by nonDetEltsUniqMap.
+    hr     = M.fromListWith pickShortest $
+             map (\(i, h) -> (h, i)) (nonDetEltsUniqMap hashes)
+    pickShortest :: FastString -> FastString -> FastString
+    pickShortest x y
+      | x == y                                    = x
+      | lengthFS x < lengthFS y                   = x
+      | lengthFS x > lengthFS y                   = y
+      | LexicalFastString x < LexicalFastString y = x -- these are the same length, so pick the
+      | otherwise                                 = y -- lexically first one for determinism
+
 
 dedupeBlock :: HashIdx
             -> LinkedUnit
@@ -1014,10 +1021,10 @@ dedupeStat hi = go
     go (BlockStat ss) = BlockStat (map go ss)
     go s@(DeclStat (TxtI i))
       | not (isCanon hi i) = mempty
-      | otherwise          = s
+      | otherwise                              = s
     go (AssignStat v@(ValExpr (JVar (TxtI i))) e)
       | not (isCanon hi i) = mempty
-      | otherwise          = AssignStat v (identsE' (toCanonI hi) e)
+      | otherwise                              = AssignStat v (identsE' (toCanonI hi) e)
     -- rewrite identifiers in e
     go s = identsS' (toCanonI hi) s
 
@@ -1053,26 +1060,26 @@ dedupeStaticArg hi (StaticConArg c args)
                  (map (dedupeStaticArg hi) args)
 dedupeStaticArg _hi a@StaticLitArg{}    = a
 
-isCanon :: HashIdx -> ShortText -> Bool
+isCanon :: HashIdx -> FastString -> Bool
 isCanon (HashIdx a b) t
   | Nothing <- la = True
   | Just h  <- la
   , Just t' <- M.lookup h b = t == t'
   | otherwise = False
-  where la = M.lookup t a
+  where la = lookupUniqMap a t
 
-toCanon :: HashIdx -> ShortText -> ShortText
+toCanon :: HashIdx -> FastString -> FastString
 toCanon (HashIdx a b) t
-  | Just h  <- M.lookup t a
+  | Just h  <- lookupUniqMap a t
   , Just t' <- M.lookup h b = t'
   | otherwise = t
 
 toCanonI :: HashIdx -> Ident -> Ident
-toCanonI hi (TxtI x) = TxtI (toCanon hi x)
+toCanonI hi (TxtI x) = TxtI $ toCanon hi x
 
-type Hash = (BS.ByteString, [ShortText])
+type Hash = (BS.ByteString, [LexicalFastString])
 
-data HashBuilder = HashBuilder !BB.Builder ![ShortText]
+data HashBuilder = HashBuilder !BB.Builder ![FastString]
 
 instance Monoid HashBuilder where
   mempty = HashBuilder mempty mempty
@@ -1106,38 +1113,40 @@ dumpHashes' input =
         BL.writeFile "hashes.json" (Aeson.encode $ dumpHashes hashes)
   in unsafePerformIO writeHashes `seq` True
 -}
-buildHashes :: [ShortText] -> [LinkedUnit] -> Map ShortText Hash
+buildHashes :: [FastString] -> [LinkedUnit] -> UniqMap FastString Hash
 buildHashes rtsDeps xss
   -- - | dumpHashes0 hashes0
-  = fixHashes (fmap finalizeHash hashes0)
+  = fixHashes (mapUniqMap finalizeHash hashes0)
   where
-    globals = List.foldl' (flip S.delete) (findAllGlobals xss) rtsDeps
-    hashes0 = M.unions (map buildHashesBlock xss)
+    globals = List.foldl' delOneFromUniqSet (findAllGlobals xss) rtsDeps
+    hashes0 = foldl plusUniqMap emptyUniqMap (map buildHashesBlock xss)
     buildHashesBlock (LinkedUnit st cis sis) =
       let hdefs = hashDefinitions globals st
           hcis  = map hashClosureInfo cis
           hsis  = map hashStaticInfo (filter (not . ignoreStatic) sis)
-      in  M.fromList (combineHashes hdefs hcis ++ hsis)
+      in  listToUniqMap (combineHashes hdefs hcis ++ hsis)
 
-findAllGlobals :: [LinkedUnit] -> Set ShortText
-findAllGlobals xss = S.fromList $ concatMap f xss
+findAllGlobals :: [LinkedUnit] -> UniqSet FastString
+findAllGlobals xss = mkUniqSet $ concatMap f xss
   where
     f (LinkedUnit _js_code closures statics) =
       map (\(ClosureInfo i _ _ _ _ _) -> i) closures ++
       map (\(StaticInfo i _ _) -> i) statics
 
-fixHashes :: Map ShortText Hash -> Map ShortText Hash
+fixHashes :: UniqMap FastString Hash -> UniqMap FastString Hash
 fixHashes hashes = fmap (second (map replaceHash)) hashes
   where
-    replaceHash :: ShortText -> ShortText
-    replaceHash h = maybe h T.pack (M.lookup h finalHashes)
+    replaceHash :: LexicalFastString -> LexicalFastString
+    replaceHash h'@(LexicalFastString h) = maybe h' (LexicalFastString . mkFastString) (lookupUniqMap finalHashes h)
     hashText  bs = "h$$$" <> utf8DecodeByteString bs
-    sccs :: [[ShortText]]
+    sccs :: [[FastString]]
     sccs         = map fromSCC $
-                   G.stronglyConnComp (map (\(k, (_bs, deps)) -> (k, k, deps)) (M.toList hashes))
-    ks           = M.keys hashes
-    invDeps      = M.fromListWith (++) (concatMap mkInvDeps $ M.toList hashes)
-    mkInvDeps (k, (_, ds)) = map (,[k]) ds
+                   G.stronglyConnComp (map (\(k, (_bs, deps)) -> (k, LexicalFastString k, deps)) kvs)
+    kvs          = List.sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap hashes -- sort lexically to avoid non-determinism
+    -- FIXME: Can we make this more efficient by avoiding lists and staying in GHC Unique collections?
+    ks           = fst $ unzip kvs
+    invDeps      = listToUniqMap_C (++) (concatMap mkInvDeps kvs)
+    mkInvDeps (k, (_, ds)) = map (\(LexicalFastString d) -> (d,[k])) ds
     finalHashes  = fmap hashText (fixHashesIter 500 invDeps ks ks sccs hashes mempty)
 
 fromSCC :: G.SCC a -> [a]
@@ -1145,71 +1154,72 @@ fromSCC (G.AcyclicSCC x) = [x]
 fromSCC (G.CyclicSCC xs) = xs
 
 fixHashesIter :: Int
-              -> Map ShortText [ShortText]
-              -> [ShortText]
-              -> [ShortText]
-              -> [[ShortText]]
-              -> Map ShortText Hash
-              -> Map ShortText BS.ByteString
-              -> Map ShortText BS.ByteString
+              -> UniqMap FastString [FastString]
+              -> [FastString]
+              -> [FastString]
+              -> [[FastString]]
+              -> UniqMap FastString Hash
+              -> UniqMap FastString BS.ByteString
+              -> UniqMap FastString BS.ByteString
 fixHashesIter n invDeps allKeys checkKeys sccs hashes finalHashes
   -- - | unsafePerformIO (putStrLn ("fixHashesIter: " ++ show n)) `seq` False = undefined
   | n < 0                = finalHashes
   | not (null newHashes) = fixHashesIter (n-1) invDeps allKeys checkKeys' sccs hashes
-      (M.union finalHashes $ M.fromList newHashes)
+      (addListToUniqMap finalHashes newHashes)
   -- - | unsafePerformIO (putStrLn ("fixHashesIter killing cycles:\n" ++ show rootSCCs)) `seq` False = undefined
   | not (null rootSCCs)  = fixHashesIter n {- -1 -} invDeps allKeys allKeys sccs hashes
-      (M.union finalHashes (M.fromList $ concatMap hashRootSCC rootSCCs))
+      (addListToUniqMap finalHashes (concatMap hashRootSCC rootSCCs))
   | otherwise            = finalHashes
   where
-    checkKeys' | length newHashes > M.size hashes `div` 10 = allKeys
-               | otherwise = S.toList . S.fromList $ concatMap newHashDeps newHashes
-    newHashDeps (k, _) = fromMaybe [] (M.lookup k invDeps)
-    mkNewHash k | M.notMember k finalHashes
-                , Just (hb, htxt) <- M.lookup k hashes
-                , Just bs <- mapM (`M.lookup` finalHashes) htxt =
+    checkKeys' | length newHashes > sizeUniqMap hashes `div` 10 = allKeys
+               | otherwise = uniqDSetToList . mkUniqDSet $ concatMap (newHashDeps) newHashes
+    newHashDeps :: (FastString, BSC.ByteString) -> [FastString]
+    newHashDeps (k, _) = fromMaybe [] (lookupUniqMap invDeps k)
+    mkNewHash k | not $ elemUniqMap k finalHashes
+                , Just (hb, htxt) <- lookupUniqMap hashes k
+                , Just bs <- mapM (\(LexicalFastString ht) -> lookupUniqMap finalHashes ht) htxt =
                   Just (k, makeFinalHash hb bs)
                 | otherwise = Nothing
-    newHashes :: [(ShortText, BS.ByteString)]
+    newHashes :: [(FastString, BS.ByteString)]
     newHashes = mapMaybe mkNewHash checkKeys
-    rootSCCs :: [[ShortText]]
+    rootSCCs :: [[FastString]]
     rootSCCs = filter isRootSCC sccs
-    isRootSCC :: [ShortText] -> Bool
-    isRootSCC scc = not (all (`M.member` finalHashes) scc) && all check scc
+    isRootSCC :: [FastString] -> Bool
+    isRootSCC scc = not (all (`elemUniqMap` finalHashes) scc) && all check scc
       where
-        check n = let Just (_bs, out) = M.lookup n hashes
+        check n = let Just (_bs, out) = lookupUniqMap hashes n
                   in  all checkEdge out
-        checkEdge e = e `S.member` s || e `M.member` finalHashes
-        s = S.fromList scc
-    hashRootSCC :: [ShortText] -> [(ShortText,BS.ByteString)]
+        checkEdge (LexicalFastString e) = e `elementOfUniqSet` s || e `elemUniqMap` finalHashes
+        s = mkUniqSet scc
+    hashRootSCC :: [FastString] -> [(FastString,BS.ByteString)]
     hashRootSCC scc
-      | any (`M.member` finalHashes) scc = panic "Gen2.Compactor.hashRootSCC: has finalized nodes"
+      | any (`elemUniqMap` finalHashes) scc = panic "Gen2.Compactor.hashRootSCC: has finalized nodes"
       | otherwise = map makeHash toHash
       where
-        makeHash k = let Just (bs,deps) = M.lookup k hashes
+        makeHash k = let Just (bs,deps) = lookupUniqMap hashes k
                          luds           = map lookupDep deps
                      in (k, makeFinalHash bs luds)
-        lookupDep :: ShortText -> BS.ByteString
-        lookupDep d
-          | Just b <- M.lookup d finalHashes = b
-          | Just i <- M.lookup d toHashIdx
+        lookupDep :: LexicalFastString -> BS.ByteString
+        lookupDep (LexicalFastString d)
+          | Just b <- lookupUniqMap finalHashes d = b
+          | Just i <- lookupUniqMap toHashIdx d
               = grpHash <> (utf8EncodeString . show $ i)
           | otherwise
               = panic $ "Gen2.Compactor.hashRootSCC: unknown key: " ++
-                              T.unpack d
-        toHashIdx :: M.Map ShortText Integer
-        toHashIdx = M.fromList $ zip toHash [1..]
+                              unpackFS d
+        toHashIdx :: UniqMap FastString Integer
+        toHashIdx = listToUniqMap $ zip toHash [1..]
         grpHash :: BS.ByteString
         grpHash = BL.toStrict
                 . BB.toLazyByteString
-                $ mconcat (map (mkGrpHash . (hashes M.!)) toHash)
+                $ mconcat (map (mkGrpHash . fromJust . lookupUniqMap hashes) toHash)
         mkGrpHash (h, deps) =
-          let deps' = mapMaybe (`M.lookup` finalHashes) deps
+          let deps' = mapMaybe (\(LexicalFastString d) -> lookupUniqMap finalHashes d) deps
           in  BB.byteString h <>
               BB.int64LE (fromIntegral $ length deps') <>
               mconcat (map BB.byteString deps')
-        toHash :: [ShortText]
-        toHash = List.sortBy (compare `on` fst . (hashes M.!)) scc
+        toHash :: [FastString]
+        toHash = List.sortBy (compare `on` fst . (fromJust . lookupUniqMap hashes)) scc
 
 makeFinalHash :: BS.ByteString -> [BS.ByteString] -> BS.ByteString
 makeFinalHash b bs = mconcat (b:bs)
@@ -1222,12 +1232,16 @@ ignoreStatic (StaticInfo _ StaticThunk {} _) = True
 ignoreStatic _                               = False
 
 -- combine hashes from x and y, leaving only those which have an entry in both
-combineHashes :: [(ShortText, HashBuilder)]
-              -> [(ShortText, HashBuilder)]
-              -> [(ShortText, HashBuilder)]
-combineHashes x y = M.toList $ M.intersectionWith (<>)
-                                                  (M.fromList x)
-                                                  (M.fromList y)
+-- FIXME: Make users of this function consume a UniqMap
+combineHashes :: [(FastString, HashBuilder)]
+              -> [(FastString, HashBuilder)]
+              -> [(FastString, HashBuilder)]
+combineHashes x y = map unlexical . M.toList $ M.intersectionWith (<>)
+                                                  (M.fromList $ map lexical x)
+                                                  (M.fromList $ map lexical y)
+  where
+    lexical (f, x) = (LexicalFastString f, x)
+    unlexical (LexicalFastString f, x) = (f, x)
 
 {-
 dumpHashes0 :: Map ShortText HashBuilder -> Bool
@@ -1237,7 +1251,7 @@ dumpHashes0 hashes = unsafePerformIO writeHashes `seq` True
       n <> " ->\n    " <>
       escapeBS (BB.toLazyByteString bb) <> "\n    [" <> T.intercalate " " txt <> "]\n"
     escapeBS :: BL.ByteString -> T.Text
-    escapeBS = T.pack . concatMap escapeCH . BL.unpack
+    escapeBS = mkFastString . concatMap escapeCH . BL.unpack
     escapeCH c | c < 32 || c > 127 = '\\' : show c
                | c == 92           = "\\\\"
                | otherwise         = [chr (fromIntegral c)]
@@ -1270,18 +1284,18 @@ hi' x | x' > toInteger (maxBound :: Int64) || x' < toInteger (minBound :: Int64)
 hd :: Double -> HashBuilder
 hd d = HashBuilder (BB.doubleLE d) []
 
-htxt :: ShortText -> HashBuilder
+htxt :: FastString -> HashBuilder
 htxt x = HashBuilder (BB.int64LE (fromIntegral $ BS.length bs) <> BB.byteString bs) []
   where
-    bs = utf8EncodeString $ T.unpack x
+    bs = utf8EncodeString $ unpackFS x
 
-hobj :: ShortText -> HashBuilder
+hobj :: FastString -> HashBuilder
 hobj x = HashBuilder (BB.int8 127) [x]
 
 hb :: BS.ByteString -> HashBuilder
 hb x = HashBuilder (BB.int64LE (fromIntegral $ BS.length x) <> BB.byteString x) []
 
-hashDefinitions :: Set ShortText -> JStat -> [(ShortText, HashBuilder)]
+hashDefinitions :: UniqSet FastString -> JStat -> [(FastString, HashBuilder)]
 hashDefinitions globals st =
   let defs = findDefinitions st
   in  map (uncurry (hashSingleDefinition globals)) defs
@@ -1291,14 +1305,14 @@ findDefinitions (BlockStat ss)                    = concatMap findDefinitions ss
 findDefinitions (AssignStat (ValExpr (JVar i)) e) = [(i,e)]
 findDefinitions _                                 = []
 
-hashSingleDefinition :: Set ShortText -> Ident -> JExpr -> (ShortText, HashBuilder)
+hashSingleDefinition :: UniqSet FastString -> Ident -> JExpr -> (FastString, HashBuilder)
 hashSingleDefinition globals (TxtI i) expr = (i, ht 0 <> render st <> mconcat (map hobj globalRefs))
   where
-    globalRefs = List.nub $ filter (`S.member` globals) (map (\(TxtI i) -> i) (identsE expr))
-    globalMap  = M.fromList $ zip globalRefs (map (T.pack . ("h$$$global_"++) . show) [(1::Int)..])
-    expr'      = identsE' (\i@(TxtI t) ->  maybe i TxtI (M.lookup t globalMap)) expr
+    globalRefs = filter (`elementOfUniqSet` globals) . map itxt $ S.toList (identsE expr)
+    globalMap  = listToUniqMap $ zip globalRefs (map (mkFastString . ("h$$$global_"++) . show) [(1::Int)..])
+    expr'      = identsE' (\i@(TxtI t) ->  maybe i TxtI (lookupUniqMap globalMap t)) expr
     st         = AssignStat (ValExpr (JVar (TxtI "dummy"))) expr'
-    render     = htxt . T.pack. show . pretty
+    render     = htxt . mkFastString. show . pretty
 
 
 -- FIXME: Jeff (2022,03): reduce the redundancy between these idents functions
@@ -1347,11 +1361,11 @@ identsS' f (LabelStat l s)      = LabelStat l $! identsS' f s
 identsS' _ b@BreakStat{}        = b
 identsS' _ c@ContinueStat{}     = c
 
-hashClosureInfo :: ClosureInfo -> (ShortText, HashBuilder)
+hashClosureInfo :: ClosureInfo -> (FastString, HashBuilder)
 hashClosureInfo (ClosureInfo civ cir _cin cil cit cis) =
   (civ, ht 1 <> hashCIRegs cir <> hashCILayout cil <> hashCIType cit <> hashCIStatic cis)
 
-hashStaticInfo :: StaticInfo -> (ShortText, HashBuilder)
+hashStaticInfo :: StaticInfo -> (FastString, HashBuilder)
 hashStaticInfo (StaticInfo sivr sivl _sicc) =
   (sivr, ht 2 <> hashStaticVal sivl)
 
@@ -1383,8 +1397,8 @@ hashVT :: VarType -> HashBuilder
 hashVT = hi . fromEnum
 
 hashStaticVal :: StaticVal -> HashBuilder
-hashStaticVal (StaticFun t args)      = ht 1 <> hobj t <> hashList hashStaticArg args
-hashStaticVal (StaticThunk mtn)       = ht 2 <> hashMaybe htobj mtn
+hashStaticVal (StaticFun t args)       = ht 1 <> hobj t <> hashList hashStaticArg args
+hashStaticVal (StaticThunk mtn)        = ht 2 <> hashMaybe htobj mtn
   where
     htobj (o, args) = hobj o <> hashList hashStaticArg args
 hashStaticVal (StaticUnboxed su)      = ht 3 <> hashStaticUnboxed su
@@ -1413,9 +1427,9 @@ hashStaticLit (BoolLit b)       = ht 1 <> hi (fromEnum b)
 hashStaticLit (IntLit iv)       = ht 2 <> hi (fromIntegral iv)
 hashStaticLit  NullLit          = ht 3
 hashStaticLit (DoubleLit d)     = ht 4 <> hashSaneDouble d
-hashStaticLit (StringLit tt)    = ht 5 <> htxt tt
+hashStaticLit (StringLit tt) = ht 5 <> htxt tt
 hashStaticLit (BinLit bs)       = ht 6 <> hb bs
-hashStaticLit (LabelLit bb ln)  = ht 7 <> hi (fromEnum bb) <> htxt ln
+hashStaticLit (LabelLit bb ln) = ht 7 <> hi (fromEnum bb) <> htxt ln
 
 hashSaneDouble :: SaneDouble -> HashBuilder
 hashSaneDouble (SaneDouble sd) = hd sd
@@ -1425,9 +1439,9 @@ finalizeHash (HashBuilder hb tt) =
 -- FIXME: Jeff (2022,03): I've removed the SHA256.hash function which would be
 -- producing h. Do we need it? If so how to replace it?
   let h = (BL.toStrict $ BB.toLazyByteString hb)
-  in  h `seq` (h, tt)
+  in  h `seq` (h, map LexicalFastString tt)
 
-finalizeHash' :: HashBuilder -> (Int, BS.ByteString, [ShortText])
+finalizeHash' :: HashBuilder -> (Int, BS.ByteString, [FastString])
 finalizeHash' (HashBuilder hb tt) =
   let b  = BL.toStrict (BB.toLazyByteString hb)
       bl = BS.length b

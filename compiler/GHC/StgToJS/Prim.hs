@@ -29,8 +29,7 @@ import GHC.Builtin.PrimOps
 import GHC.Tc.Utils.TcType (isBoolTy)
 import GHC.Utils.Encoding (zEncodeString)
 
-import GHC.Data.ShortText (ShortText)
-import qualified GHC.Data.ShortText as ST
+import GHC.Data.FastString
 import GHC.Utils.Outputable (renderWithContext, defaultSDocContext, ppr)
 import Data.Maybe
 
@@ -1013,7 +1012,7 @@ genPrim prof ty = \case
         , " "
         , show (length rs, length as)
         ]]
-    , appS (ST.pack $ "h$primop_" ++ zEncodeString (renderWithContext defaultSDocContext (ppr op))) as
+    , appS (mkFastString $ "h$primop_" ++ zEncodeString (renderWithContext defaultSDocContext (ppr op))) as
       -- copyRes
     , mconcat $ zipWith (\r reg -> r |= toJExpr reg) rs (enumFrom Ret1)
     ]
@@ -1077,7 +1076,7 @@ GetSparkOp
 
 
 -- tuple returns
-appT :: [JExpr] -> ShortText -> [JExpr] -> JStat
+appT :: [JExpr] -> FastString -> [JExpr] -> JStat
 appT []     f xs = appS f xs
 appT (r:rs) f xs = mconcat
   [ r |= app f xs

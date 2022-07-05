@@ -15,7 +15,7 @@ module GHC.StgToJS.Closure
 where
 
 import GHC.Prelude
-import GHC.Data.ShortText
+import GHC.Data.FastString
 
 import GHC.StgToJS.Heap
 import GHC.StgToJS.Types
@@ -49,11 +49,11 @@ closureInfoStat debug (ClosureInfo obj rs name layout ctype srefs)
 
 
 setObjInfoL :: Bool        -- ^ debug: output symbol names
-            -> ShortText   -- ^ the object name
+            -> FastString  -- ^ the object name
             -> CIRegs      -- ^ things in registers
             -> CILayout    -- ^ layout of the object
             -> ClosureType -- ^ closure type
-            -> ShortText   -- ^ object name, for printing
+            -> FastString  -- ^ object name, for printing
             -> Int         -- ^ `a' argument, depends on type (arity, conid)
             -> CIStatic    -- ^ static refs
             -> JStat
@@ -70,9 +70,9 @@ setObjInfoL debug obj rs layout t n a
           CILayoutFixed _ fs   -> toTypeList fs
 
 setObjInfo :: Bool        -- ^ debug: output all symbol names
-           -> ShortText   -- ^ the thing to modify
+           -> FastString  -- ^ the thing to modify
            -> ClosureType -- ^ closure type
-           -> ShortText   -- ^ object name, for printing
+           -> FastString  -- ^ object name, for printing
            -> [Int]       -- ^ list of item types in the object, if known (free variables, datacon fields)
            -> Int         -- ^ extra 'a' parameter, for constructor tag or arity
            -> Int         -- ^ object size, -1 (number of vars) for unknown
@@ -105,9 +105,9 @@ setObjInfo debug obj t name fields a size regs static
 closure :: ClosureInfo -- ^ object being info'd see @ciVar@ in @ClosureInfo@
         -> JStat       -- ^ rhs
         -> JStat
-closure ci body = (TxtI (ciVar ci)||= jLam body) `mappend` closureInfoStat False ci
+closure ci body = (TxtI (ciVar ci) ||= jLam body) `mappend` closureInfoStat False ci
 
-conClosure :: ShortText -> ShortText -> CILayout -> Int -> JStat
+conClosure :: FastString -> FastString -> CILayout -> Int -> JStat
 conClosure symbol name layout constr =
   closure (ClosureInfo symbol (CIRegs 0 [PtrV]) name layout (CICon constr) mempty)
           (returnS (stack .! sp))

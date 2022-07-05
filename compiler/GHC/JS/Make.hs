@@ -143,9 +143,11 @@ import qualified Data.List as List
 import GHC.Utils.Outputable (Outputable (..))
 import qualified GHC.Data.ShortText as ST
 import GHC.Data.ShortText (ShortText)
+import GHC.Data.FastString
 import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Types.Unique.Map
 
 --------------------------------------------------------------------------------
 --                        Type Classes
@@ -180,11 +182,11 @@ instance ToJExpr Bool where
 instance ToJExpr JVal where
     toJExpr = ValExpr
 
-instance ToJExpr a => ToJExpr (M.Map ShortText a) where
-    toJExpr = ValExpr . JHash . M.map toJExpr
+instance ToJExpr a => ToJExpr (UniqMap FastString a) where
+    toJExpr = ValExpr . JHash . mapUniqMap toJExpr
 
 instance ToJExpr a => ToJExpr (M.Map String a) where
-    toJExpr = ValExpr . JHash . M.fromList . map (ST.pack *** toJExpr) . M.toList
+    toJExpr = ValExpr . JHash . listToUniqMap . map (mkFastString *** toJExpr) . M.toList
 
 instance ToJExpr Double where
     toJExpr = ValExpr . JDouble . SaneDouble
@@ -196,14 +198,14 @@ instance ToJExpr Integer where
     toJExpr = ValExpr . JInt
 
 instance ToJExpr Char where
-    toJExpr = ValExpr . JStr . ST.pack . (:[])
-    toJExprFromList = ValExpr . JStr . ST.pack
+    toJExpr = ValExpr . JStr . mkFastString . (:[])
+    toJExprFromList = ValExpr . JStr . mkFastString
 --        where escQuotes = tailDef "" . initDef "" . show
 
 instance ToJExpr Ident where
     toJExpr = ValExpr . JVar
 
-instance ToJExpr ShortText where
+instance ToJExpr FastString where
     toJExpr = ValExpr . JStr
 
 instance (ToJExpr a, ToJExpr b) => ToJExpr (a,b) where
@@ -296,11 +298,11 @@ jTryCatchFinally s f s2 = UnsatBlock . IS $ do
                      return $ TryStat s i block s2
 
 -- | construct a JS variable reference
-var :: ShortText -> JExpr
+var :: FastString -> JExpr
 var = ValExpr . JVar . TxtI
 
 -- | Convert a ShortText to a Javascript String
-jString :: ShortText -> JExpr
+jString :: FastString -> JExpr
 jString = toJExpr
 
 -- | Create a 'for' statement
@@ -328,8 +330,8 @@ jhAdd  k v m = M.insert k (toJExpr v) m
 
 -- FIXME: Jeff (2022,05): remove list for foldable and specialize
 -- | Construct a JS HashMap from a list of key-value pairs
-jhFromList :: [(ShortText, JExpr)] -> JVal
-jhFromList = JHash . M.fromList
+jhFromList :: [(FastString, JExpr)] -> JVal
+jhFromList = JHash . listToUniqMap
 
 -- | The empty JS statement
 nullStat :: JStat
@@ -421,11 +423,11 @@ if01 e = IfExpr e zero_ one_
 -- | an expression application, see related 'appS'
 --
 -- > app f xs ==> f(xs)
-app :: ShortText -> [JExpr] -> JExpr
+app :: FastString -> [JExpr] -> JExpr
 app f xs = ApplExpr (var f) xs
 
 -- | A statement application, see the expression form 'app'
-appS :: ShortText -> [JExpr] -> JStat
+appS :: FastString -> [JExpr] -> JStat
 appS f xs = ApplStat (var f) xs
 
 -- | Return a 'JExpr'
@@ -489,7 +491,7 @@ mask16 x = BAnd x (Int 0xFFFF)
 -- | Select a property 'prop', from and object 'obj'
 --
 -- > obj .^ prop ==> obj.prop
-(.^) :: JExpr -> ShortText -> JExpr
+(.^) :: JExpr -> FastString -> JExpr
 obj .^ prop = SelExpr obj (TxtI prop)
 infixl 8 .^
 
@@ -578,7 +580,7 @@ returnStack = ReturnStat (ApplExpr (var "h$rs") [])
 math :: JExpr
 math = var "Math"
 
-math_ :: ShortText -> [JExpr] -> JExpr
+math_ :: FastString -> [JExpr] -> JExpr
 math_ op args = ApplExpr (math .^ op) args
 
 math_log, math_sin, math_cos, math_tan, math_exp, math_acos, math_asin, math_atan,
@@ -623,37 +625,31 @@ instance Fractional JExpr where
 -- FIXME: Jeff (2022,05): Consider moving these
 
 -- | Cache "dXXX" field names
---
--- TODO: use FastString instead
-dataFieldCache :: Array Int ShortText
-dataFieldCache = listArray (0,nFieldCache) (map (ST.pack . ('d':) . show) [(0::Int)..nFieldCache])
+dataFieldCache :: Array Int FastString
+dataFieldCache = listArray (0,nFieldCache) (map (mkFastString . ('d':) . show) [(0::Int)..nFieldCache])
 
 nFieldCache :: Int
 nFieldCache  = 16384
 
-dataFieldName :: Int -> ShortText
+dataFieldName :: Int -> FastString
 dataFieldName i
   | i < 1 || i > nFieldCache = panic "dataFieldName" (ppr i)
   | otherwise                = dataFieldCache ! i
 
-dataFieldNames :: [ShortText]
+dataFieldNames :: [FastString]
 dataFieldNames = fmap dataFieldName [1..nFieldCache]
 
 
 -- | Cache "h$dXXX" names
---
--- TODO: use FastString instead
-dataCache :: Array Int ShortText
-dataCache = listArray (0,1024) (map (ST.pack . ("h$d"++) . show) [(0::Int)..1024])
+dataCache :: Array Int FastString
+dataCache = listArray (0,1024) (map (mkFastString . ("h$d"++) . show) [(0::Int)..1024])
 
 allocData :: Int -> JExpr
 allocData i = toJExpr (TxtI (dataCache ! i))
 
 -- | Cache "h$cXXX" names
---
--- TODO: use FastString instead
-clsCache :: Array Int ShortText
-clsCache = listArray (0,1024) (map (ST.pack . ("h$c"++) . show) [(0::Int)..1024])
+clsCache :: Array Int FastString
+clsCache = listArray (0,1024) (map (mkFastString . ("h$c"++) . show) [(0::Int)..1024])
 
 allocClsA :: Int -> JExpr
 allocClsA i = toJExpr (TxtI (clsCache ! i))

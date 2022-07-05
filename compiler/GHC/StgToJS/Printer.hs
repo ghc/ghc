@@ -28,8 +28,11 @@ import GHC.JS.Ppr
 
 import qualified GHC.Data.ShortText as T
 import           GHC.Utils.Ppr      as PP
+import           GHC.Data.FastString
+import           GHC.Types.Unique.Map
 
 import qualified Data.Map           as M
+import           Data.List
 
 import Data.Char (isAlpha,isDigit)
 
@@ -51,17 +54,20 @@ ghcjsRenderJsS r s              = renderJsS defaultRenderJs r s
 -- don't quote keys in our object literals, so closure compiler works
 ghcjsRenderJsV :: RenderJs -> JVal -> Doc
 ghcjsRenderJsV r (JHash m)
-  | M.null m  = text "{}"
-  | otherwise = braceNest . PP.fsep . punctuate comma .
-                          map (\(x,y) -> quoteIfRequired x <> PP.colon <+> jsToDocR r y) $ M.toList m
+  | isNullUniqMap m = text "{}"
+  | otherwise       = braceNest . PP.fsep . punctuate comma .
+                          map (\(x,y) -> quoteIfRequired x <> PP.colon <+> jsToDocR r y)
+                          -- nonDetEltsUniqMap doesn't introduce non-determinism here because
+                          -- we sort the elements lexically
+                          . sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap m
   where
-    quoteIfRequired :: T.ShortText -> Doc
+    quoteIfRequired :: FastString -> Doc
     quoteIfRequired x
       | isUnquotedKey x' = text x'
       | otherwise        = PP.squotes (text x')
     -- FIXME: Jeff (2022,03): remove the deserialization to String. We are only
     -- converting from ShortText to String here to call @all@ and @tail@.
-      where x' = T.unpack x
+      where x' = unpackFS x
 
     isUnquotedKey :: String -> Bool
     isUnquotedKey x | null x        = False

@@ -90,7 +90,6 @@ import GHC.StgToJS.Regs
 import GHC.StgToJS.CoreUtils
 import GHC.StgToJS.UnitUtils
 
-import GHC.Data.ShortText as ST
 import GHC.Unit.Module
 import GHC.Core.DataCon
 import GHC.Stg.Syntax
@@ -155,7 +154,7 @@ emitToplevel s = modifyGroup mod_group
     mod_group g = g { ggsToplevelStats = s : ggsToplevelStats g}
 
 -- | emit static data for the binding group
-emitStatic :: ShortText -> StaticVal -> Maybe Ident -> G ()
+emitStatic :: FastString -> StaticVal -> Maybe Ident -> G ()
 emitStatic ident val cc = modifyGroup mod_group
   where
     mod_group  g = g { ggsStatic = mod_static (ggsStatic g) }
@@ -168,18 +167,19 @@ emitClosureInfo ci = modifyGroup mod_group
     mod_group g = g { ggsClosureInfo = ci : ggsClosureInfo g}
 
 emitForeign :: Maybe RealSrcSpan
-            -> ShortText
+            -> FastString
             -> Safety
             -> CCallConv
-            -> [ShortText]
-            -> ShortText
+            -> [FastString]
+            -> FastString
             -> G ()
 emitForeign mbSpan pat safety cconv arg_tys res_ty = modifyGroup mod_group
   where
     mod_group g = g { ggsForeignRefs = new_ref : ggsForeignRefs g }
     new_ref = ForeignJSRef spanTxt pat safety cconv arg_tys res_ty
     spanTxt = case mbSpan of
-                Just sp -> ST.pack $
+                -- TODO: Is there a better way to concatenate FastStrings?
+                Just sp -> mkFastString $
                   unpackFS (srcSpanFile sp) ++
                   " " ++
                   show (srcSpanStartLine sp, srcSpanStartCol sp) ++
@@ -195,7 +195,8 @@ makeIdent :: G Ident
 makeIdent = do
   i <- freshUnique
   mod <- State.gets gsModule
-  let !name = ST.pack $ mconcat
+  -- TODO: Is there a better way to concatenate FastStrings?
+  let !name = mkFastString $ mconcat
                 [ "h$$"
                 , zEncodeString (unitModuleString mod)
                 , "_"
@@ -226,7 +227,7 @@ jsIdN i n = ValExpr . JVar <$> jsIdIdent i (Just n) IdPlain
 jsIdIdent' :: Id -> Maybe Int -> IdType -> G Ident
 jsIdIdent' i mn suffix0 = do
   (prefix, u) <- mkPrefixU
-  let i' = (\x -> ST.pack $ "h$"++prefix++x++mns++suffix++u) . zEncodeString $ name
+  let i' = (\x -> mkFastString $ "h$"++prefix++x++mns++suffix++u) . zEncodeString $ name
   i' `seq` return (TxtI i')
     where
       suffix = idTypeSuffix suffix0
@@ -327,14 +328,14 @@ jsIdIdent i mi suffix = do
             Just _  -> pure ()
           pure ji
 
-getStaticRef :: Id -> G (Maybe ShortText)
+getStaticRef :: Id -> G (Maybe FastString)
 getStaticRef = fmap (fmap itxt . listToMaybe) . genIdsI
 
 -- uncached
 makeIdIdent :: Id -> Maybe Int -> IdType -> Module -> Ident
 makeIdIdent i mn suffix0 mod = TxtI txt
   where
-    !txt = ST.pack full_name
+    !txt = mkFastString full_name
 
     full_name = mconcat
       ["h$"
@@ -484,13 +485,13 @@ adjSpN n = do
   return (adjSpN' n)
 
 pushN :: Array Int Ident
-pushN = listArray (1,32) $ map (TxtI . ST.pack . ("h$p"++) . show) [(1::Int)..32]
+pushN = listArray (1,32) $ map (TxtI . mkFastString . ("h$p"++) . show) [(1::Int)..32]
 
 pushN' :: Array Int JExpr
 pushN' = fmap (ValExpr . JVar) pushN
 
 pushNN :: Array Integer Ident
-pushNN = listArray (1,255) $ map (TxtI . ST.pack . ("h$pp"++) . show) [(1::Int)..255]
+pushNN = listArray (1,255) $ map (TxtI . mkFastString . ("h$pp"++) . show) [(1::Int)..255]
 
 pushNN' :: Array Integer JExpr
 pushNN' = fmap (ValExpr . JVar) pushNN
@@ -651,9 +652,9 @@ freshUnique = do
 liftToGlobal :: JStat -> G [(Ident, Id)]
 liftToGlobal jst = do
   GlobalIdCache gidc <- getGlobalIdCache
-  let sids  = filter (`M.member` gidc) (identsS jst)
-      cnt   = M.fromListWith (+) (map (,(1::Integer)) sids)
-      sids' = L.sortBy (compare `on` (cnt M.!)) (nub' sids)
+  let sids  = S.filter (`M.member` gidc) (identsS jst)
+      cnt   = M.fromListWith (+) (map (,(1::Integer)) $ S.toList sids)
+      sids' = L.sortBy (compare `on` (cnt M.!)) (nub' $ S.toList sids)
   pure $ map (\s -> (s, snd $ gidc M.! s)) sids'
 
 nub' :: (Ord a, Eq a) => [a] -> [a]

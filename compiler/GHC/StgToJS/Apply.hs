@@ -62,8 +62,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Outputable (vcat, ppr)
-import qualified GHC.Data.ShortText as ST
-import GHC.Data.ShortText (ShortText)
+import GHC.Data.FastString
 
 import qualified Data.Bits as Bits
 import Data.Monoid
@@ -271,9 +270,9 @@ applySpec = [ (regs,arity)  | arity <- [1..4], regs <- [max 0 (arity-1)..(arity*
 
 specApply :: Bool -> Int -> Int -> Maybe JExpr
 specApply fast n r
-  | (r,n) == (0,0)         = Just (var . ST.pack $ ("h$ap_0_0" ++ fastSuff))
-  | (r,n) == (0,1)         = Just (var . ST.pack $ ("h$ap_1_0" ++ fastSuff))
-  | (r,n) `elem` applySpec = Just (var . ST.pack $ ("h$ap_" ++ show n ++ "_" ++ show r ++ fastSuff))
+  | (r,n) == (0,0)         = Just (var . mkFastString $ ("h$ap_0_0" ++ fastSuff))
+  | (r,n) == (0,1)         = Just (var . mkFastString $ ("h$ap_1_0" ++ fastSuff))
+  | (r,n) `elem` applySpec = Just (var . mkFastString $ ("h$ap_" ++ show n ++ "_" ++ show r ++ fastSuff))
   | otherwise              = Nothing
    where
       fastSuff | fast      = "_fast"
@@ -312,11 +311,11 @@ mkApplyArr = mconcat
     assignSpec :: (Int, Int) -> JStat
     assignSpec (r,n) =
       var "h$apply" .! (toJExpr $ Bits.shiftL r 8 Bits..|. n) |=
-           (var (ST.pack ("h$ap_" ++ show n ++ "_" ++ show r)))
+           (var (mkFastString ("h$ap_" ++ show n ++ "_" ++ show r)))
 
     assignPap :: Int -> JStat
     assignPap p = var "h$paps" .! toJExpr p |=
-                      (var (ST.pack $ ("h$pap_" ++ show p)))
+                      (var (mkFastString $ ("h$pap_" ++ show p)))
 
 pushCont :: HasDebugCallStack
          => [StgArg]
@@ -532,7 +531,7 @@ stackApply s r n =
   where
     layout    = CILayoutUnknown r
 
-    funcName = ST.pack ("h$ap_" ++ show n ++ "_" ++ show r)
+    funcName = mkFastString ("h$ap_" ++ show n ++ "_" ++ show r)
 
     body = jVar \c ->
              [ c |= closureEntry r1
@@ -630,7 +629,7 @@ stackApply s r n =
 fastApply :: StgToJSConfig -> Int -> Int -> JStat
 fastApply s r n = func ||= toJExpr (JFunc myFunArgs body)
     where
-      funName = ST.pack ("h$ap_" ++ show n ++ "_" ++ show r ++ "_fast")
+      funName = mkFastString ("h$ap_" ++ show n ++ "_" ++ show r ++ "_fast")
       func    = TxtI funName
 
       myFunArgs = []
@@ -638,7 +637,7 @@ fastApply s r n = func ||= toJExpr (JFunc myFunArgs body)
       regArgs = take r (enumFrom R2)
 
       mkAp :: Int -> Int -> [JExpr]
-      mkAp n' r' = [ var . ST.pack $ "h$ap_" ++ show n' ++ "_" ++ show r' ]
+      mkAp n' r' = [ var . mkFastString $ "h$ap_" ++ show n' ++ "_" ++ show r' ]
 
       body =
         jVar \c farity arity ->
@@ -794,12 +793,12 @@ selectors s =
   <> mconcat (map mkSelN [3..16])
    where
     mkSelN :: Int -> JStat
-    mkSelN x = mkSel (ST.pack $ show x)
+    mkSelN x = mkSel (mkFastString $ show x)
                      (\e -> SelExpr (closureField2 (toJExpr e))
-                            (TxtI $ ST.pack ("d" ++ show (x-1))))
+                            (TxtI $ mkFastString ("d" ++ show (x-1))))
 
 
-    mkSel :: ShortText -> (JExpr -> JExpr) -> JStat
+    mkSel :: FastString -> (JExpr -> JExpr) -> JStat
     mkSel name sel = mconcat
       [TxtI createName ||= jLam \r -> mconcat
           [ traceRts s (toJExpr ("selector create: " <> name <> " for ") + (r .^ "alloc"))
@@ -870,14 +869,14 @@ specPap = [0..numSpecPap]
 
 -- | Cache of specialized PAP idents
 specPapIdents :: Array Int Ident
-specPapIdents = listArray (0,numSpecPap) $ map (TxtI . ST.pack . ("h$pap_"++) . show) specPap
+specPapIdents = listArray (0,numSpecPap) $ map (TxtI . mkFastString . ("h$pap_"++) . show) specPap
 
 pap :: StgToJSConfig
     -> Int
     -> JStat
 pap s r = closure (ClosureInfo funcName CIRegsUnknown funcName (CILayoutUnknown (r+2)) CIPap mempty) body
   where
-    funcName = ST.pack ("h$pap_" ++ show r)
+    funcName = mkFastString ("h$pap_" ++ show r)
 
     body = jVar \c d f extra ->
              [ c |= closureField1 r1
@@ -897,7 +896,7 @@ pap s r = closure (ClosureInfo funcName CIRegsUnknown funcName (CILayoutUnknown 
     moveCase m = (toJExpr m, toJExpr (intToJSReg (m+r+1)) |= toJExpr (intToJSReg (m+1)))
     loadOwnArgs d = mconcat $ map (\r ->
         toJExpr (intToJSReg (r+1)) |= dField d (r+2)) [1..r]
-    dField d n = SelExpr d (TxtI . ST.pack $ ('d':show (n-1)))
+    dField d n = SelExpr d (TxtI . mkFastString $ ('d':show (n-1)))
 
 -- Construct a generic PAP
 papGen :: StgToJSConfig -> JStat
@@ -925,7 +924,7 @@ papGen cfg =
   where
     funcName = "h$pap_gen"
     loadOwnArgs d r =
-      let prop n = d .^ ("d" <> ST.pack (show $ n+1))
+      let prop n = d .^ ("d" <> mkFastString (show $ n+1))
           loadOwnArg n = (toJExpr n, toJExpr (intToJSReg (n+1)) |= prop n)
       in  SwitchStat r (map loadOwnArg [127,126..1]) mempty
 

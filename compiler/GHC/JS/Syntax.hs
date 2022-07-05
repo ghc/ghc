@@ -102,12 +102,12 @@ import qualified Data.Semigroup as Semigroup
 
 import GHC.Generics
 
-import Data.Binary
 import GHC.Utils.Outputable (Outputable (..))
 import qualified GHC.Utils.Outputable as O
-import qualified GHC.Data.ShortText as ST
-import GHC.Data.ShortText (ShortText())
+import GHC.Data.FastString
 import GHC.Utils.Monad.State.Strict
+import GHC.Types.Unique.Map
+import GHC.Utils.Binary
 
 -- FIXME: Jeff (2022,03): This state monad is strict, but uses a lazy list as
 -- the state, since the strict state monad evaluates to WHNF, this state monad
@@ -151,9 +151,9 @@ inIdentSupply f x = IS $ f (runIdentSupply x)
 instance Functor IdentSupply where
     fmap f x = inIdentSupply (fmap f) x
 
-newIdentSupply :: Maybe ShortText -> [Ident]
+newIdentSupply :: Maybe FastString -> [Ident]
 newIdentSupply Nothing    = newIdentSupply (Just "jmId")
-newIdentSupply (Just pfx) = [ TxtI (mconcat [pfx,"_",ST.pack (show x)])
+newIdentSupply (Just pfx) = [ TxtI (mconcat [pfx,"_",mkFastString (show x)])
                             | x <- [(0::Word64)..]
                             ]
 
@@ -206,13 +206,11 @@ data JStat
   | LabelStat JsLabel JStat                  -- ^ Statement Labels, makes me nostalgic for qbasic
   | BreakStat (Maybe JsLabel)                -- ^ Break
   | ContinueStat (Maybe JsLabel)             -- ^ Continue
-  deriving (Eq, Ord, Show, Typeable, Generic)
-
-instance NFData JStat
+  deriving (Eq, Typeable, Generic)
 
 -- | A Label used for 'JStat', specifically 'BreakStat', 'ContinueStat' and of
 -- course 'LabelStat'
-type JsLabel = ShortText
+type JsLabel = LexicalFastString
 
 instance Semigroup JStat where
   (<>) = appendJStat
@@ -255,12 +253,10 @@ data JExpr
   | ApplExpr   JExpr [JExpr]        -- ^ Application
   | UnsatExpr  (IdentSupply JExpr)  -- ^ An /Unsaturated/ expression.
                                     --   See 'pseudoSaturate'
-  deriving (Eq, Ord, Show, Typeable, Generic)
+  deriving (Eq, Typeable, Generic)
 
 instance Outputable JExpr where
-  ppr x = O.text (show x)
-
-instance NFData JExpr
+  ppr x = undefined -- O.text (show x)
 
 -- * Useful pattern synonyms to ease programming with the deeply embedded JS
 --   AST. Each pattern wraps @JUOp@ and @JOp@ into a @JExpr@s to save typing and
@@ -345,7 +341,7 @@ pattern Int :: Integer -> JExpr
 pattern Int x = ValExpr (JInt x)
 
 -- | pattern synonym to create string values
-pattern String :: ShortText -> JExpr
+pattern String :: FastString -> JExpr
 pattern String x = ValExpr (JStr x)
 
 
@@ -354,22 +350,20 @@ pattern String x = ValExpr (JStr x)
 --------------------------------------------------------------------------------
 -- | JavaScript values
 data JVal
-  = JVar     Ident                           -- ^ A variable reference
-  | JList    [JExpr]                         -- ^ A JavaScript list, or what JS
-                                             --   calls an Array
-  | JDouble  SaneDouble                      -- ^ A Double
-  | JInt     Integer                         -- ^ A BigInt
-  | JStr     ShortText                       -- ^ A String
-  | JRegEx   ShortText                       -- ^ A Regex
-  | JHash    (M.Map ShortText JExpr)         -- ^ A JS HashMap: @{"foo": 0}@
-  | JFunc    [Ident] JStat                   -- ^ A function
-  | UnsatVal (IdentSupply JVal)              -- ^ An /Unsaturated/ value, see 'pseudoSaturate'
-  deriving (Eq, Ord, Show, Typeable, Generic)
+  = JVar     Ident                      -- ^ A variable reference
+  | JList    [JExpr]                    -- ^ A JavaScript list, or what JS
+                                        --   calls an Array
+  | JDouble  SaneDouble                 -- ^ A Double
+  | JInt     Integer                    -- ^ A BigInt
+  | JStr     FastString                 -- ^ A String
+  | JRegEx   FastString                 -- ^ A Regex
+  | JHash    (UniqMap FastString JExpr) -- ^ A JS HashMap: @{"foo": 0}@
+  | JFunc    [Ident] JStat              -- ^ A function
+  | UnsatVal (IdentSupply JVal)         -- ^ An /Unsaturated/ value, see 'pseudoSaturate'
+  deriving (Eq, Typeable, Generic)
 
 instance Outputable JVal where
-  ppr x = O.text (show x)
-
-instance NFData JVal
+  ppr x = undefined -- O.text (show x)
 
 
 --------------------------------------------------------------------------------
@@ -447,15 +441,14 @@ instance Show SaneDouble where
 --------------------------------------------------------------------------------
 --                            Identifiers
 --------------------------------------------------------------------------------
--- We use ShortText for identifiers in JS backend
+-- We use FastString for identifiers in JS backend
 
--- | A newtype wrapper around 'ShortText' for JS identifiers.
-newtype Ident = TxtI { itxt:: ShortText}
- deriving stock (Show, Typeable, Ord, Eq, Generic)
- deriving newtype (Binary, NFData) -- FIXME: Jeff (2022,03): ShortText uses Data.Binary
-                                   -- rather than GHC.Utils.Binary. What is the
-                                   -- difference? See related FIXME in StgToJS.Object
+-- | A newtype wrapper around 'FastString' for JS identifiers.
+newtype Ident = TxtI { itxt :: FastString }
+ deriving stock (Show, Typeable, Eq, Generic)
 
+instance Ord Ident where
+  compare (TxtI fs1) (TxtI fs2) = lexicalCompareFS fs1 fs2
 
 --------------------------------------------------------------------------------
 --                            JS Keywords

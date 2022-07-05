@@ -15,8 +15,6 @@ import GHC.JS.Make
 import GHC.StgToJS.Types
 import GHC.StgToJS.Monad
 
-import qualified GHC.Data.ShortText as ST
-import GHC.Data.ShortText (ShortText(..))
 import GHC.Data.FastString
 import GHC.Types.Literal
 import GHC.Types.Basic
@@ -61,10 +59,10 @@ genLit = \case
   LitDouble r              -> return [ toJExpr (r2d r) ]
   LitLabel name _size fod
     | fod == IsFunction      -> return [ ApplExpr (var "h$mkFunctionPtr")
-                                                  [var (ST.pack $ "h$" ++ unpackFS name)]
+                                                  [var (mkFastString $ "h$" ++ unpackFS name)]
                                        , ValExpr (JInt 0)
                                        ]
-    | otherwise              -> return [ toJExpr (TxtI . ST.pack $ "h$" ++ unpackFS name)
+    | otherwise              -> return [ toJExpr (TxtI . mkFastString $ "h$" ++ unpackFS name)
                                        , ValExpr (JInt 0)
                                        ]
   LitRubbish _rep -> return [ null_ ]
@@ -74,7 +72,7 @@ genStaticLit :: Literal -> G [StaticLit]
 genStaticLit = \case
   LitChar c                -> return [ IntLit (fromIntegral $ ord c) ]
   LitString str
-    | True                 -> return [ StringLit (ShortText (Short.toShort str)), IntLit 0]
+    | True                 -> return [ StringLit (mkFastStringByteString str), IntLit 0]
     -- FIXME: documentation for LitString says it's always UTF8 encoded but it's
     -- not true (e.g. for embedded files).
     --  1) We should add a decoding function that detects errors in
@@ -95,7 +93,7 @@ genStaticLit = \case
   LitNumber LitNumWord64 w -> return [ IntLit (toSigned (w `Bits.shiftR` 32)), IntLit (toSigned w) ]
   LitFloat r               -> return [ DoubleLit . SaneDouble . r2f $ r ]
   LitDouble r              -> return [ DoubleLit . SaneDouble . r2d $ r ]
-  LitLabel name _size fod  -> return [ LabelLit (fod == IsFunction) (ST.pack $ "h$" ++ unpackFS name)
+  LitLabel name _size fod  -> return [ LabelLit (fod == IsFunction) (mkFastString $ "h$" ++ unpackFS name)
                                      , IntLit 0 ]
   -- FIXME: handle other LitNumbers, LitRubbish, etc.
   l -> pprPanic "genStaticLit" (ppr l)

@@ -44,7 +44,8 @@ import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
 import GHC.StgToJS.Types
 
-import qualified GHC.Data.ShortText as T
+import GHC.Data.FastString
+import GHC.Types.Unique.Map
 
 import Data.Array
 import Data.Monoid
@@ -205,19 +206,19 @@ closureConstructors s = BlockStat
     mkClosureCon :: Int -> JStat
     mkClosureCon n = funName ||= toJExpr fun
       where
-        funName = TxtI $ T.pack ("h$c" ++ show n) -- FIXME (Sylvain 2022-03): cache this
+        funName = TxtI $ mkFastString ("h$c" ++ show n) -- FIXME (Sylvain 2022-03): cache this
         -- args are: f x1 x2 .. xn [cc]
-        args   = TxtI "f" : addCCArg' (map (TxtI . T.pack . ('x':) . show) [(1::Int)..n])
+        args   = TxtI "f" : addCCArg' (map (TxtI . mkFastString . ('x':) . show) [(1::Int)..n])
         fun    = JFunc args funBod
         -- x1 goes into closureField1. All the other args are bundled into an
         -- object in closureField2: { d1 = x2, d2 = x3, ... }
         --
         -- FIXME (Sylvain 2022-03): share code and comment with mkDataFill
-        extra_args = ValExpr . JHash . M.fromList $ zip
+        extra_args = ValExpr . JHash . listToUniqMap $ zip
                    -- FIXME (Sylvain 2002-03): use dataFieldCache and another
                    -- cache for "xN" names
-                   (map (T.pack . ('d':) . show) [(1::Int)..])
-                   (map (toJExpr . TxtI . T.pack . ('x':) . show) [2..n])
+                   (map (mkFastString . ('d':) . show) [(1::Int)..])
+                   (map (toJExpr . TxtI . mkFastString . ('x':) . show) [2..n])
 
         funBod = jVar $ \x ->
             [ checkC
@@ -237,9 +238,9 @@ closureConstructors s = BlockStat
     mkDataFill n = funName ||= toJExpr fun
       where
         -- FIXME (Sylvain 2002-03): use dataFieldCache and dataCache
-        funName    = TxtI $ T.pack ("h$d" ++ show n)
-        ds         = map (T.pack . ('d':) . show) [(1::Int)..n]
-        extra_args = ValExpr . JHash . M.fromList . zip ds $ map (toJExpr . TxtI) ds
+        funName    = TxtI $ mkFastString ("h$d" ++ show n)
+        ds         = map (mkFastString . ('d':) . show) [(1::Int)..n]
+        extra_args = ValExpr . JHash . listToUniqMap . zip ds $ map (toJExpr . TxtI) ds
         fun        = JFunc (map TxtI ds) (checkD <> returnS extra_args)
 
 stackManip :: JStat
@@ -247,8 +248,8 @@ stackManip = mconcat (map mkPush [1..32]) <>
              mconcat (map mkPpush [1..255])
   where
     mkPush :: Int -> JStat
-    mkPush n = let funName = TxtI $ T.pack ("h$p" ++ show n)
-                   as      = map (TxtI . T.pack . ('x':) . show) [1..n]
+    mkPush n = let funName = TxtI $ mkFastString ("h$p" ++ show n)
+                   as      = map (TxtI . mkFastString . ('x':) . show) [1..n]
                    fun     = JFunc as ((sp |= sp + toJExpr n)
                                        <> mconcat (zipWith (\i a -> stack .! (sp - toJExpr (n-i)) |= toJExpr a)
                                                    [1..] as))
@@ -257,11 +258,11 @@ stackManip = mconcat (map mkPush [1..32]) <>
     -- partial pushes, based on bitmap, increases Sp by highest bit
     mkPpush :: Integer -> JStat
     mkPpush sig | sig Bits..&. (sig+1) == 0 = mempty -- already handled by h$p
-    mkPpush sig = let funName = TxtI $ T.pack ("h$pp" ++ show sig)
+    mkPpush sig = let funName = TxtI $ mkFastString ("h$pp" ++ show sig)
                       bits    = bitsIdx sig
                       n       = length bits
                       h       = last bits
-                      args    = map (TxtI . T.pack . ('x':) . show) [1..n]
+                      args    = map (TxtI . mkFastString . ('x':) . show) [1..n]
                       fun     = JFunc args $
                         mconcat [ sp |= sp + toJExpr (h+1)
                                 , mconcat (zipWith (\b a -> stack .! (sp - toJExpr (h-b)) |= toJExpr a) bits args)
@@ -302,7 +303,7 @@ declRegs =
           , loadRegs
           ]
     where
-      declReg r = (decl . TxtI . T.pack . ("h$"++) . map toLower . show) r
+      declReg r = (decl . TxtI . mkFastString . ("h$"++) . map toLower . show) r
                   <> BlockStat [AssignStat (toJExpr r) (ValExpr (JInt 0))] -- [j| `r` = 0; |]
 
 regGettersSetters :: JStat
@@ -320,7 +321,7 @@ loadRegs :: JStat
 loadRegs = mconcat $ map mkLoad [1..32]
   where
     mkLoad :: Int -> JStat
-    mkLoad n = let args   = map (TxtI . T.pack . ("x"++) . show) [1..n]
+    mkLoad n = let args   = map (TxtI . mkFastString . ("x"++) . show) [1..n]
                    assign = zipWith (\a r -> toJExpr r |= toJExpr a)
                                 -- FIXME: Jeff (2022,03) the use of reverse,
                                 -- take, and enumFrom here heavily implies
@@ -330,7 +331,7 @@ loadRegs = mconcat $ map mkLoad [1..32]
                                 -- Either way we can avoid allocating this
                                 -- intermediate `enumFrom R1` list
                               args (reverse $ take n (enumFrom R1))
-                   fname  = TxtI $ T.pack ("h$l" ++ show n)
+                   fname  = TxtI $ mkFastString ("h$l" ++ show n)
                    fun    = JFunc args (mconcat assign)
                in fname ||= toJExpr fun
 
@@ -347,10 +348,10 @@ assignRegs s xs
     l = length xs
 
 assignRegs' :: Array Int Ident
-assignRegs' = listArray (1,32) (map (TxtI . T.pack . ("h$l"++) . show) [(1::Int)..32])
+assignRegs' = listArray (1,32) (map (TxtI . mkFastString . ("h$l"++) . show) [(1::Int)..32])
 
 declRets :: JStat
-declRets = mconcat $ map (decl . TxtI . T.pack . ("h$"++) . map toLower . show) (enumFrom Ret1)
+declRets = mconcat $ map (decl . TxtI . mkFastString . ("h$"++) . map toLower . show) (enumFrom Ret1)
 
 trace :: ToJExpr a => a -> JStat
 trace ex = appS "h$log" [toJExpr ex]
@@ -359,7 +360,7 @@ closureTypes :: JStat
 closureTypes = mconcat (map mkClosureType (enumFromTo minBound maxBound)) <> closureTypeName
   where
     mkClosureType :: ClosureType -> JStat
-    mkClosureType c = let s = TxtI . T.pack $ "h$" ++ map toUpper (show c) ++ "_CLOSURE"
+    mkClosureType c = let s = TxtI . mkFastString $ "h$" ++ map toUpper (show c) ++ "_CLOSURE"
                       in  s ||= toJExpr c
     closureTypeName :: JStat
     closureTypeName =

@@ -58,7 +58,7 @@ import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Outputable (ppr, renderWithContext, defaultSDocContext)
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified GHC.Data.ShortText as ST
+import GHC.Data.FastString
 import qualified GHC.Data.List.SetOps as ListSetOps
 
 import Data.Ord
@@ -147,7 +147,7 @@ genBind ctx bndr =
            the_fvjs <- genIds the_fv
            case (tgts, the_fvjs) of
              ([tgt], [the_fvj]) -> return $ Just
-               (tgt ||= ApplExpr (var ("h$c_sel_" <> ST.pack sel_tag)) [the_fvj])
+               (tgt ||= ApplExpr (var ("h$c_sel_" <> mkFastString sel_tag)) [the_fvj])
              _ -> panic "genBind.assign: invalid size"
      assign b (StgRhsClosure _ext _ccs _upd [] expr)
        | snd (isInlineExpr (ctxEvaluatedIds ctx) expr) = do
@@ -226,7 +226,7 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body) =
   emitClosureInfo $
     ClosureInfo eii
                 (CIRegs 0 $ concatMap idVt args)
-                (eii <> ", " <> ST.pack (renderWithContext defaultSDocContext (ppr i)))
+                (eii <> ", " <> mkFastString (renderWithContext defaultSDocContext (ppr i)))
                 (fixedLayout . reverse $
                     map (stackSlotType . fst) (ctxLneFrameVars ctx))
                 CIStackFrame
@@ -261,7 +261,7 @@ genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body) = res
   sr <- genStaticRefsRhs rhs
   emitClosureInfo $ ClosureInfo eii
                                 (CIRegs 0 $ PtrV : concatMap idVt args)
-                                (eii <> ", " <> ST.pack (renderWithContext defaultSDocContext (ppr i)))
+                                (eii <> ", " <> mkFastString (renderWithContext defaultSDocContext (ppr i)))
                                 (fixedLayout $ map (uTypeVt . idType) live)
                                 et
                                 sr
@@ -689,7 +689,7 @@ verifyMatchRep x alt = do
     else case alt of
       AlgAlt tc -> do
         ix <- genIds x
-        pure $ ApplStat (var "h$verify_match_alg") (ValExpr(JStr(ST.pack (renderWithContext defaultSDocContext (ppr tc)))):ix)
+        pure $ ApplStat (var "h$verify_match_alg") (ValExpr(JStr(mkFastString (renderWithContext defaultSDocContext (ppr tc)))):ix)
       _ -> pure mempty
 
 data Branch a = Branch
@@ -697,7 +697,7 @@ data Branch a = Branch
   , branch_stat   :: JStat
   , branch_result :: ExprResult
   }
-  deriving (Eq,Ord,Functor)
+  deriving (Eq,Functor)
 
 -- if one branch ends in a continuation but another is inline,
 -- we need to adjust the inline branch to use the continuation convention
@@ -751,9 +751,11 @@ mkSwitch e cases
     addBreak _                     = panic "mkSwitch: addBreak"
     (n,d) = L.partition (isJust . branch_expr) cases
 
--- if/else for pattern matching on things that js cannot switch on
+-- | if/else for pattern matching on things that js cannot switch on
+-- the list of branches is expected to have the default alternative
+-- first, if it exists
 mkIfElse :: [JExpr] -> [Branch (Maybe [JExpr])] -> JStat
-mkIfElse e s = go (L.sortOn Down s)
+mkIfElse e s = go (L.reverse s)
     where
       go = \case
         [Branch _ s _]              -> s -- only one 'nothing' allowed

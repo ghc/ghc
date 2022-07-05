@@ -26,6 +26,7 @@ import GHC.StgToJS.CoreUtils
 
 import GHC.Types.RepType
 import GHC.Types.ForeignCall
+import GHC.Types.Unique.Map
 
 import GHC.Stg.Syntax
 
@@ -38,8 +39,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable (renderWithContext, defaultSDocContext, ppr, vcat, text)
 import GHC.Data.FastString
-import qualified GHC.Data.ShortText as ST
-import GHC.Data.ShortText (ShortText)
 
 import Data.Char
 import Data.Monoid
@@ -186,7 +185,7 @@ parseFFIPattern' callback javascriptCc pat t ret args
          (stats, as) <- unzip <$> mapM (genFFIArg javascriptCc) args
          cs <- getSettings
          return $ traceCall cs as <> mconcat stats <> ApplStat f' (concat as)
-        where f' = toJExpr (TxtI $ ST.pack f)
+        where f' = toJExpr (TxtI $ mkFastString f)
     copyResult rs = mconcat $ zipWith (\t r -> toJExpr r |= toJExpr t) (enumFrom Ret1) rs
     p e = error ("Parse error in FFI pattern: " ++ pat ++ "\n" ++ e)
     replaceIdent :: M.Map Ident JExpr -> Ident -> JExpr
@@ -196,14 +195,14 @@ parseFFIPattern' callback javascriptCc pat t ret args
         where
           (TxtI i') = i
           err = pprPanic "parseFFIPattern': invalid placeholder, check function type"
-                  (vcat [ppr pat, text (ST.unpack i'), ppr args, ppr t])
+                  (vcat [ppr pat, text (unpackFS i'), ppr args, ppr t])
     traceCall cs as
         | csTraceForeign cs = ApplStat (var "h$traceForeign") [toJExpr pat, toJExpr as]
         | otherwise         = mempty
 
 -- ident is $N, $N_R, $rN, $rN_R or $r or $c
 isFFIPlaceholder :: Ident -> Bool
-isFFIPlaceholder (TxtI x) = not (null (P.readP_to_S parser (ST.unpack x)))
+isFFIPlaceholder (TxtI x) = not (null (P.readP_to_S parser (unpackFS x)))
   where
     digit = P.satisfy (`elem` ("0123456789" :: String))
     parser = void (P.string "$r" >> P.eof) <|>
@@ -244,9 +243,9 @@ mkPlaceholder :: Bool -> String -> [JExpr] -> [(Ident, JExpr)]
 mkPlaceholder undersc prefix aids =
       case aids of
              []       -> []
-             [x]      -> [(TxtI . ST.pack $ prefix, x)]
-             xs@(x:_) -> (TxtI . ST.pack $ prefix, x) :
-                zipWith (\x m -> (TxtI . ST.pack $ prefix ++ u ++ show m,x)) xs [(1::Int)..]
+             [x]      -> [(TxtI . mkFastString $ prefix, x)]
+             xs@(x:_) -> (TxtI . mkFastString $ prefix, x) :
+                zipWith (\x m -> (TxtI . mkFastString $ prefix ++ u ++ show m,x)) xs [(1::Int)..]
    where u = if undersc then "_" else ""
 
 -- $r for single, $r1,$r2 for dual
@@ -265,12 +264,12 @@ resultPlaceholders False t rs =
           phs   = zipWith (\size n -> f n size) sizes [(1::Int)..]
       in case sizes of
            [n] -> mkUnary n
-           _   -> concat $ zipWith (\phs' r -> map (\i -> (TxtI (ST.pack i), r)) phs') (concat phs) rs
+           _   -> concat $ zipWith (\phs' r -> map (\i -> (TxtI (mkFastString i), r)) phs') (concat phs) rs
   where
     mkUnary 0 = []
     mkUnary 1 = [(TxtI "$r",head rs)] -- single
     mkUnary n = [(TxtI "$r",head rs),(TxtI "$r1", head rs)] ++
-       zipWith (\n r -> (TxtI . ST.pack $ "$r" ++ show n, toJExpr r)) [2..n] (tail rs)
+       zipWith (\n r -> (TxtI . mkFastString $ "$r" ++ show n, toJExpr r)) [2..n] (tail rs)
 
 callbackPlaceholders :: Maybe JExpr -> [(Ident,JExpr)]
 callbackPlaceholders Nothing  = []
@@ -287,7 +286,7 @@ parseFfiJM _xs _u = Left "parseFfiJM not yet implemented"
   -- decide which syntax we support
 
 saturateFFI :: JMacro a => Int -> a -> a
-saturateFFI u = jsSaturate (Just . ST.pack $ "ghcjs_ffi_sat_" ++ show u)
+saturateFFI u = jsSaturate (Just . mkFastString $ "ghcjs_ffi_sat_" ++ show u)
 
 genForeignCall :: HasDebugCallStack
                => ExprCtx
@@ -306,12 +305,12 @@ genForeignCall _ctx
   | tgt == fsLit "h$buildObject"
   , Just pairs <- getObjectKeyValuePairs args = do
       pairs' <- mapM (\(k,v) -> genArg v >>= \vs -> return (k, head vs)) pairs
-      return ( (|=) obj (ValExpr (JHash $ M.fromList pairs'))
+      return ( (|=) obj (ValExpr (JHash $ listToUniqMap pairs'))
              , ExprInline Nothing
              )
 
 genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) t tgt args = do
-  emitForeign (ctxSrcSpan ctx) (ST.pack lbl) safety cconv (map showArgType args) (showType t)
+  emitForeign (ctxSrcSpan ctx) (mkFastString lbl) safety cconv (map showArgType args) (showType t)
   (,exprResult) <$> parseFFIPattern catchExcep async isJsCc lbl t tgt' args
   where
     isJsCc = cconv == JavaScriptCallConv
@@ -338,22 +337,22 @@ genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) t tgt args = do
 
     wrapperPrefix = "ghczuwrapperZC"
 
-getObjectKeyValuePairs :: [StgArg] -> Maybe [(ShortText, StgArg)]
+getObjectKeyValuePairs :: [StgArg] -> Maybe [(FastString, StgArg)]
 getObjectKeyValuePairs [] = Just []
 getObjectKeyValuePairs (k:v:xs)
   | Just t <- argJSStringLitUnfolding k =
       fmap ((t,v):) (getObjectKeyValuePairs xs)
 getObjectKeyValuePairs _ = Nothing
 
-argJSStringLitUnfolding :: StgArg -> Maybe ShortText
+argJSStringLitUnfolding :: StgArg -> Maybe FastString
 argJSStringLitUnfolding (StgVarArg _v) = Nothing -- fixme
 argJSStringLitUnfolding _              = Nothing
 
-showArgType :: StgArg -> ShortText
+showArgType :: StgArg -> FastString
 showArgType a = showType (stgArgType a)
 
-showType :: Type -> ShortText
+showType :: Type -> FastString
 showType t
   | Just tc <- tyConAppTyCon_maybe (unwrapType t) =
-      ST.pack (renderWithContext defaultSDocContext (ppr tc))
+      mkFastString (renderWithContext defaultSDocContext (ppr tc))
   | otherwise = "<unknown>"

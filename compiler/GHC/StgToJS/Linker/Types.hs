@@ -50,10 +50,10 @@ import           GHC.StgToJS.Types (ClosureInfo, StaticInfo)
 import           GHC.Unit.Types
 import           GHC.Utils.Panic
 import           GHC.Utils.Outputable hiding ((<>))
-import           GHC.Data.ShortText   (ShortText)
-import qualified GHC.Data.ShortText   as T
+import           GHC.Data.FastString
 import           GHC.Driver.Env.Types (HscEnv)
 import           GHC.Types.Error      (Messages)
+import           GHC.Types.Unique.Map
 
 import           Control.Monad
 
@@ -65,6 +65,7 @@ import           Data.ByteString      (ByteString)
 import qualified Data.ByteString.Lazy as BL
 import           Data.Map.Strict      (Map)
 import qualified Data.Map.Strict      as M
+import           Data.List            (sortOn)
 import           Data.Set             (Set)
 import qualified Data.Set             as S
 import qualified Data.IntMap          as I
@@ -79,7 +80,7 @@ import           Prelude
 
 newLocals :: [Ident]
 newLocals = filter (not . isJsKeyword) $
-            map (TxtI . T.pack) $
+            map (TxtI . mkFastString) $
             map (:[]) chars0 ++ concatMap mkIdents [1..]
   where
     mkIdents n = [c0:cs | c0 <- chars0, cs <- replicateM n chars]
@@ -97,45 +98,50 @@ renamedVars = map (\(TxtI xs) -> TxtI ("h$$"<>xs)) newLocals
 -- them and thus accidently construct hard to understand bugs. When we newtype
 -- we should use deriving via to avoid boilerplate
 data CompactorState = CompactorState
-  { csIdentSupply   :: [Ident]                  -- ^ ident supply for new names
-  , csNameMap       :: !(M.Map ShortText Ident) -- ^ renaming mapping for internal names
-  , csEntries       :: !(M.Map ShortText Int)   -- ^ entry functions (these get listed in the metadata init
-                                                -- array)
+  { csIdentSupply   :: [Ident]                     -- ^ ident supply for new names
+  , csNameMap       :: !(UniqMap FastString Ident) -- ^ renaming mapping for internal names
+  , csEntries       :: !(UniqMap FastString Int)   -- ^ entry functions (these get listed in the metadata init
+                                                   -- array)
   , csNumEntries    :: !Int
-  , csStatics       :: !(M.Map ShortText Int)   -- ^ mapping of global closure -> index in current block,
-                                                -- for static initialisation
-  , csNumStatics    :: !Int                     -- ^ number of static entries
-  , csLabels        :: !(M.Map ShortText Int)   -- ^ non-Haskell JS labels
-  , csNumLabels     :: !Int                     -- ^ number of labels
-  , csParentEntries :: !(M.Map ShortText Int)   -- ^ entry functions we're not linking, offset where parent
-                                                -- gets [0..n], grandparent [n+1..k] etc
-  , csParentStatics :: !(M.Map ShortText Int)   -- ^ objects we're not linking in base bundle
-  , csParentLabels  :: !(M.Map ShortText Int)   -- ^ non-Haskell JS labels in parent
+  , csStatics       :: !(UniqMap FastString Int)   -- ^ mapping of global closure -> index in current block,
+                                                   -- for static initialisation
+  , csNumStatics    :: !Int                        -- ^ number of static entries
+  , csLabels        :: !(UniqMap FastString Int)   -- ^ non-Haskell JS labels
+  , csNumLabels     :: !Int                        -- ^ number of labels
+  , csParentEntries :: !(UniqMap FastString Int)   -- ^ entry functions we're not linking, offset where parent
+                                                   -- gets [0..n], grandparent [n+1..k] etc
+  , csParentStatics :: !(UniqMap FastString Int)   -- ^ objects we're not linking in base bundle
+  , csParentLabels  :: !(UniqMap FastString Int)   -- ^ non-Haskell JS labels in parent
   , csStringTable   :: !StringTable
-  } deriving (Show)
+  }
 
 data StringTable = StringTable
-  { stTableIdents :: !(Array Int ShortText)
-  , stOffsets     :: !(M.Map ByteString (Int, Int))        -- ^ content of the table
-  , stIdents      :: !(M.Map ShortText  (Either Int Int))  -- ^ identifiers in the table
-  } deriving (Show)
+  { stTableIdents :: !(Array Int FastString)
+  , stOffsets     :: !(M.Map ByteString (Int, Int))         -- ^ content of the table
+  , stIdents      :: !(UniqMap FastString (Either Int Int)) -- ^ identifiers in the table
+  }
+
+instance DB.Binary Ident where
+  put (TxtI s) = DB.put $ unpackFS s
+  get = TxtI . mkFastString <$> DB.get
 
 instance DB.Binary StringTable where
   put (StringTable tids offs idents) = do
     DB.put tids
     DB.put (M.toList offs)
-    DB.put (M.toList idents)
+    -- The lexical sorting allows us to use nonDetEltsUniqMap without introducing non-determinism
+    DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap idents)
   get = StringTable <$> DB.get
                     <*> fmap M.fromList DB.get
-                    <*> fmap M.fromList DB.get
+                    <*> fmap listToUniqMap DB.get
 
 emptyStringTable :: StringTable
-emptyStringTable = StringTable (listArray (0,-1) []) M.empty M.empty
+emptyStringTable = StringTable (listArray (0,-1) []) M.empty emptyUniqMap
 
 -- FIXME: Jeff: (2022,03): Each of these helper functions carry a Functor f
 -- constraint. We should specialize these once we know how they are used
 entries :: Functor f
-        => (M.Map ShortText Int -> f (M.Map ShortText Int))
+        => (UniqMap FastString Int -> f (UniqMap FastString Int))
         -> CompactorState
         -> f CompactorState
 entries f cs = fmap (\x -> cs { csEntries = x }) (f $ csEntries cs)
@@ -149,14 +155,14 @@ identSupply f cs = fmap (\x -> cs { csIdentSupply = x }) (f $ csIdentSupply cs)
 {-# INLINE identSupply #-}
 
 labels :: Functor f
-       => (M.Map ShortText Int -> f (M.Map ShortText Int))
+       => (UniqMap FastString Int -> f (UniqMap FastString Int))
        -> CompactorState
        -> f CompactorState
 labels f cs = fmap (\x -> cs { csLabels = x }) (f $ csLabels cs)
 {-# INLINE labels #-}
 
 nameMap :: Functor f
-        => (M.Map ShortText Ident -> f (M.Map ShortText Ident))
+        => (UniqMap FastString Ident -> f (UniqMap FastString Ident))
         -> CompactorState
         -> f CompactorState
 nameMap f cs = fmap (\x -> cs { csNameMap = x }) (f $ csNameMap cs)
@@ -184,28 +190,28 @@ numStatics f cs = fmap (\x -> cs { csNumStatics = x }) (f $ csNumStatics cs)
 {-# INLINE numStatics #-}
 
 parentEntries :: Functor f
-              => (M.Map ShortText Int -> f (M.Map ShortText Int))
+              => (UniqMap FastString Int -> f (UniqMap FastString Int))
               -> CompactorState
               -> f CompactorState
 parentEntries f cs = fmap (\x -> cs { csParentEntries = x }) (f $ csParentEntries cs)
 {-# INLINE parentEntries #-}
 
 parentLabels :: Functor f
-             => (M.Map ShortText Int -> f (M.Map ShortText Int))
+             => (UniqMap FastString Int -> f (UniqMap FastString Int))
              -> CompactorState
              -> f CompactorState
 parentLabels f cs = fmap (\x -> cs { csParentLabels = x }) (f $ csParentLabels cs)
 {-# INLINE parentLabels #-}
 
 parentStatics :: Functor f
-              => (M.Map ShortText Int -> f (M.Map ShortText Int))
+              => (UniqMap FastString Int -> f (UniqMap FastString Int))
               -> CompactorState
               -> f CompactorState
 parentStatics f cs = fmap (\x -> cs { csParentStatics = x }) (f $ csParentStatics cs)
 {-# INLINE parentStatics #-}
 
 statics :: Functor f
-        => (M.Map ShortText Int -> f (M.Map ShortText Int))
+        => (UniqMap FastString Int -> f (UniqMap FastString Int))
         -> CompactorState
         -> f CompactorState
 statics f cs = fmap (\x -> cs { csStatics = x }) (f $ csStatics cs)
@@ -238,54 +244,54 @@ makeCompactorParent :: CompactorState -> CompactorState
 makeCompactorParent (CompactorState is nm es nes ss nss ls nls pes pss pls sts)
   = CompactorState is
                    nm
-                   M.empty 0
-                   M.empty 0
-                   M.empty 0
-                   (M.union (fmap (+nes) pes) es)
-                   (M.union (fmap (+nss) pss) ss)
-                   (M.union (fmap (+nls) pls) ls)
+                   emptyUniqMap 0
+                   emptyUniqMap 0
+                   emptyUniqMap 0
+                   (plusUniqMap (fmap (+nes) pes) es)
+                   (plusUniqMap (fmap (+nss) pss) ss)
+                   (plusUniqMap (fmap (+nls) pls) ls)
                    sts
 
 -- Helper functions used in Linker.Compactor. We live with some redundant code
 -- to avoid the lens mayhem in Gen2 GHCJS. TODO: refactor to avoid redundant
 -- code
-addStaticEntry :: ShortText      -- ^ The static entry to add
-               -> CompactorState -- ^ the old state
-               -> CompactorState -- ^ the new state
+addStaticEntry :: FastString        -- ^ The static entry to add
+               -> CompactorState    -- ^ the old state
+               -> CompactorState    -- ^ the new state
 addStaticEntry new cs =
   -- check if we have seen new before
   let cur_statics = csStatics cs
-      go          = M.lookup new cur_statics >> M.lookup new (csParentStatics cs)
+      go          = lookupUniqMap cur_statics new >> lookupUniqMap (csParentStatics cs) new
   in case go of
     Just _  -> cs                      -- we have so return
     Nothing -> let cnt = csNumStatics cs -- we haven't so do the business
-                   newStatics = M.insert new cnt cur_statics
+                   newStatics = addToUniqMap cur_statics new cnt
                    newCnt = cnt + 1
                in cs {csStatics = newStatics, csNumStatics = newCnt}
 
-addEntry :: ShortText      -- ^ The entry function to add
-         -> CompactorState -- ^ the old state
-         -> CompactorState -- ^ the new state
+addEntry :: FastString        -- ^ The entry function to add
+         -> CompactorState    -- ^ the old state
+         -> CompactorState    -- ^ the new state
 addEntry new cs =
   let cur_entries = csEntries cs
-      go          = M.lookup new cur_entries >> M.lookup new (csParentEntries cs)
+      go          = lookupUniqMap cur_entries new >> lookupUniqMap (csParentEntries cs) new
   in case go of
     Just _  -> cs
     Nothing -> let cnt = csNumEntries cs
-                   newEntries = M.insert new cnt cur_entries
+                   newEntries = addToUniqMap cur_entries new cnt
                    newCnt = cnt + 1
                in cs {csEntries = newEntries, csNumEntries = newCnt}
 
-addLabel :: ShortText      -- ^ The label to add
-         -> CompactorState -- ^ the old state
-         -> CompactorState -- ^ the new state
+addLabel :: FastString        -- ^ The label to add
+         -> CompactorState    -- ^ the old state
+         -> CompactorState    -- ^ the new state
 addLabel new cs =
   let cur_lbls = csLabels cs
-      go          = M.lookup new cur_lbls >> M.lookup new (csParentLabels cs)
+      go       = lookupUniqMap cur_lbls new >> lookupUniqMap (csParentLabels cs) new
   in case go of
     Just _  -> cs
     Nothing -> let cnt = csNumLabels cs
-                   newLabels = M.insert new cnt cur_lbls
+                   newLabels = addToUniqMap cur_lbls new cnt
                    newCnt = cnt + 1
                in cs {csEntries = newLabels, csNumLabels = newCnt}
 --------------------------------------------------------------------------------
@@ -313,7 +319,7 @@ showBase b = unlines
                                                         -- config or find a better way than showSDocUnsafe
   , "  number of units: " ++ show (S.size $ baseUnits b)
   , "  renaming table size: " ++
-    show (M.size . csNameMap . baseCompactorState $ b)
+    show (sizeUniqMap . csNameMap . baseCompactorState $ b)
   ]
 
 emptyBase :: Base
@@ -343,13 +349,14 @@ putBase (Base cs packages funs) = do
       panic "putBase: putCs exhausted renamer symbol names"
     putCs (CompactorState (ns:_) nm es _ ss _ ls _ pes pss pls sts) = do
       DB.put ns
-      DB.put (M.toList nm)
-      DB.put (M.toList es)
-      DB.put (M.toList ss)
-      DB.put (M.toList ls)
-      DB.put (M.toList pes)
-      DB.put (M.toList pss)
-      DB.put (M.toList pls)
+      -- We can use nonDetEltsUniqMap without introducing non-determinism by sorting lexically
+      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap nm)
+      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap es)
+      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap ss)
+      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap ls)
+      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap pes)
+      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap pss)
+      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap pls)
       DB.put sts
     -- putPkg mod = DB.put mod
     -- fixme group things first
@@ -369,21 +376,21 @@ getBase file = getBase'
     -- getPkg = DB.get
     getCs = do
       n   <- DB.get
-      nm  <- M.fromList <$> DB.get
-      es  <- M.fromList <$> DB.get
-      ss  <- M.fromList <$> DB.get
-      ls  <- M.fromList <$> DB.get
-      pes <- M.fromList <$> DB.get
-      pss <- M.fromList <$> DB.get
-      pls <- M.fromList <$> DB.get
+      nm  <- listToUniqMap <$> DB.get
+      es  <- listToUniqMap <$> DB.get
+      ss  <- listToUniqMap <$> DB.get
+      ls  <- listToUniqMap <$> DB.get
+      pes <- listToUniqMap <$> DB.get
+      pss <- listToUniqMap <$> DB.get
+      pls <- listToUniqMap <$> DB.get
       CompactorState (dropWhile (/=n) renamedVars)
                              nm
                              es
-                             (M.size es)
+                             (sizeUniqMap es)
                              ss
-                             (M.size ss)
+                             (sizeUniqMap ss)
                              ls
-                             (M.size ls)
+                             (sizeUniqMap ls)
                              pes
                              pss
                              pls <$> DB.get

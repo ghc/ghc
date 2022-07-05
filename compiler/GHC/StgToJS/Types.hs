@@ -21,7 +21,7 @@ import GHC.Types.ForeignCall
 import Control.Monad.Trans.State.Strict
 import GHC.Utils.Outputable (Outputable (..), text, SDocContext, (<+>), ($$))
 
-import GHC.Data.ShortText
+import GHC.Data.FastString
 
 import GHC.Unit.Module
 
@@ -75,16 +75,14 @@ data StgToJSConfig = StgToJSConfig
   }
 
 data ClosureInfo = ClosureInfo
-  { ciVar     :: ShortText -- ^ object being infod
+  { ciVar     :: FastString -- ^ object being infod
   , ciRegs    :: CIRegs    -- ^ things in registers when this is the next closure to enter
-  , ciName    :: ShortText -- ^ friendly name for printing
+  , ciName    :: FastString -- ^ friendly name for printing
   , ciLayout  :: CILayout  -- ^ heap/stack layout of the object
   , ciType    :: CIType    -- ^ type of the object, with extra info where required
   , ciStatic  :: CIStatic  -- ^ static references of this object
   }
-  deriving stock (Eq, Ord, Show, Generic)
-
-instance NFData ClosureInfo
+  deriving stock (Eq, Show, Generic)
 
 data CIRegs
   = CIRegsUnknown
@@ -122,11 +120,9 @@ data CIType
 instance NFData CIType
 
 -- | Static references that must be kept alive
-newtype CIStatic = CIStaticRefs { staticRefs :: [ShortText] }
-  deriving stock   (Eq, Ord, Generic)
+newtype CIStatic = CIStaticRefs { staticRefs :: [FastString] }
+  deriving stock   (Eq, Generic)
   deriving newtype (Semigroup, Monoid, Show)
-
-instance NFData CIStatic
 
 -- | static refs: array = references, null = nothing to report
 --   note: only works after all top-level objects have been created
@@ -164,12 +160,12 @@ data IdKey
   deriving (Eq, Ord)
 
 data OtherSymb
-  = OtherSymb !Module !ShortText
+  = OtherSymb !Module !FastString
   deriving Eq
 
 instance Ord OtherSymb where
   compare (OtherSymb m1 t1) (OtherSymb m2 t2)
-    = stableModuleCmp m1 m2 <> compare t1 t2
+    = stableModuleCmp m1 m2 <> lexicalCompareFS t1 t2
 
 newtype IdCache = IdCache (M.Map IdKey Ident)
 newtype GlobalIdCache = GlobalIdCache (M.Map Ident (IdKey, Id))
@@ -181,28 +177,24 @@ data StackSlot
 
 
 data StaticInfo = StaticInfo
-  { siVar    :: !ShortText     -- ^ global object
+  { siVar    :: !FastString -- ^ global object
   , siVal    :: !StaticVal     -- ^ static initialization
   , siCC     :: !(Maybe Ident) -- ^ optional CCS name
-  } deriving stock (Eq, Ord, Show, Typeable, Generic)
-
-instance NFData StaticInfo
+  } deriving stock (Eq, Show, Typeable, Generic)
 
 data StaticVal
-  = StaticFun     !ShortText   [StaticArg]
+  = StaticFun     !FastString [StaticArg]
     -- ^ heap object for function
-  | StaticThunk   !(Maybe (ShortText,[StaticArg]))
+  | StaticThunk   !(Maybe (FastString,[StaticArg]))
     -- ^ heap object for CAF (field is Nothing when thunk is initialized in an
     -- alternative way, like string thunks through h$str)
   | StaticUnboxed !StaticUnboxed
     -- ^ unboxed constructor (Bool, Int, Double etc)
-  | StaticData    !ShortText [StaticArg]
+  | StaticData    !FastString [StaticArg]
     -- ^ regular datacon app
-  | StaticList    [StaticArg] (Maybe ShortText)
+  | StaticList    [StaticArg] (Maybe FastString)
     -- ^ list initializer (with optional tail)
-  deriving stock (Eq, Ord, Show, Generic)
-
-instance NFData StaticVal
+  deriving stock (Eq, Show, Generic)
 
 data StaticUnboxed
   = StaticUnboxedBool         !Bool
@@ -215,12 +207,10 @@ data StaticUnboxed
 instance NFData StaticUnboxed
 
 data StaticArg
-  = StaticObjArg !ShortText             -- ^ reference to a heap object
+  = StaticObjArg !FastString     -- ^ reference to a heap object
   | StaticLitArg !StaticLit             -- ^ literal
-  | StaticConArg !ShortText [StaticArg] -- ^ unfloated constructor
-  deriving stock (Eq, Ord, Show, Generic)
-
-instance NFData StaticArg
+  | StaticConArg !FastString [StaticArg] -- ^ unfloated constructor
+  deriving stock (Eq, Show, Generic)
 
 instance Outputable StaticArg where
   ppr x = text (show x)
@@ -230,12 +220,10 @@ data StaticLit
   | IntLit    !Integer
   | NullLit
   | DoubleLit !SaneDouble -- should we actually use double here?
-  | StringLit !ShortText
+  | StringLit !FastString
   | BinLit    !BS.ByteString
-  | LabelLit  !Bool !ShortText -- ^ is function pointer, label (also used for string / binary init)
-  deriving (Eq, Ord, Show, Generic)
-
-instance NFData StaticLit
+  | LabelLit  !Bool !FastString -- ^ is function pointer, label (also used for string / binary init)
+  deriving (Eq, Show, Generic)
 
 instance Outputable StaticLit where
   ppr x = text (show x)
@@ -246,24 +234,24 @@ instance ToJExpr StaticLit where
   toJExpr (IntLit i)            = toJExpr i
   toJExpr NullLit               = null_
   toJExpr (DoubleLit d)         = toJExpr (unSaneDouble d)
-  toJExpr (StringLit t)         = app (pack "h$str") [toJExpr t]
-  toJExpr (BinLit b)            = app (pack "h$rstr") [toJExpr (map toInteger (BS.unpack b))]
+  toJExpr (StringLit t)         = app (mkFastString "h$str") [toJExpr t]
+  toJExpr (BinLit b)            = app (mkFastString "h$rstr") [toJExpr (map toInteger (BS.unpack b))]
   toJExpr (LabelLit _isFun lbl) = var lbl
 
 data ForeignJSRef = ForeignJSRef
-  { foreignRefSrcSpan  :: !ShortText
-  , foreignRefPattern  :: !ShortText
+  { foreignRefSrcSpan  :: !FastString
+  , foreignRefPattern  :: !FastString
   , foreignRefSafety   :: !Safety
   , foreignRefCConv    :: !CCallConv
-  , foreignRefArgs     :: ![ShortText]
-  , foreignRefResult   :: !ShortText
+  , foreignRefArgs     :: ![FastString]
+  , foreignRefResult   :: !FastString
   } deriving stock (Generic)
 
 -- | data used to generate one ObjUnit in our object file
 data LinkableUnit = LinkableUnit
   { luStat         :: BS.ByteString -- ^ serialized JS AST
   , luIdExports    :: [Id]          -- ^ exported names from haskell identifiers
-  , luOtherExports :: [ShortText]   -- ^ other exports
+  , luOtherExports :: [FastString]  -- ^ other exports
   , luIdDeps       :: [Id]          -- ^ identifiers this unit depends on
   , luPseudoIdDeps :: [Unique]      -- ^ pseudo-id identifiers this unit depends on (fixme)
   , luOtherDeps    :: [OtherSymb]   -- ^ symbols not from a haskell id that this unit depends on
@@ -275,7 +263,7 @@ data LinkableUnit = LinkableUnit
 data TypedExpr = TypedExpr
   { typex_typ  :: !PrimRep
   , typex_expr :: [JExpr]
-  } deriving stock Show
+  }
 
 instance Outputable TypedExpr where
   ppr x = text "TypedExpr: " <+> ppr (typex_expr x)
@@ -289,10 +277,10 @@ data PrimRes
 data ExprResult
   = ExprCont
   | ExprInline (Maybe [JExpr])
-  deriving (Eq, Ord, Show)
+  deriving (Eq)
 
 newtype ExprValData = ExprValData [JExpr]
-  deriving newtype (Eq, Ord, Show)
+  deriving newtype (Eq)
 
 -- closure types
 data ClosureType

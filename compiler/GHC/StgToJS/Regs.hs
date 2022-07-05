@@ -20,6 +20,7 @@ import GHC.JS.Syntax
 import GHC.JS.Make
 
 import qualified GHC.Data.ShortText as ST
+import GHC.Data.FastString
 
 import Data.Array
 import Data.Char
@@ -120,7 +121,7 @@ registers :: Array StgReg JExpr
 registers = listArray (minBound, maxBound) (map regN (enumFrom R1))
   where
     regN r
-      | fromEnum r < 32 = var . ST.pack . ("h$"++) . map toLower . show $ r
+      | fromEnum r < 32 = var . mkFastString . ("h$"++) . map toLower . show $ r
       | otherwise       = IdxExpr (var "h$regs")
                             (toJExpr ((fromEnum r) - 32))
 
@@ -128,4 +129,4 @@ registers = listArray (minBound, maxBound) (map regN (enumFrom R1))
 rets :: Array StgRet JExpr
 rets = listArray (minBound, maxBound) (map retN (enumFrom Ret1))
   where
-    retN = var . ST.pack . ("h$"++) . map toLower . show
+    retN = var . mkFastString . ("h$"++) . map toLower . show
