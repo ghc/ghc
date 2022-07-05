@@ -79,6 +79,7 @@ module GHC (
         getModSummary,
         getModuleGraph,
         isLoaded,
+        isLoadedModule,
         topSortModuleGraph,
 
         -- * Inspecting modules
@@ -1327,6 +1328,10 @@ getModuleGraph = liftM hsc_mod_graph getSession
 isLoaded :: GhcMonad m => ModuleName -> m Bool
 isLoaded m = withSession $ \hsc_env ->
   return $! isJust (lookupHpt (hsc_HPT hsc_env) m)
+
+isLoadedModule :: GhcMonad m => UnitId -> ModuleName -> m Bool
+isLoadedModule uid m = withSession $ \hsc_env ->
+  return $! isJust (lookupHug (hsc_HUG hsc_env) uid m)
 
 -- | Return the bindings for the current interactive session.
 getBindings :: GhcMonad m => m [TyThing]
