@@ -72,9 +72,9 @@ instance Outputable ModuleGraphNode where
 -- 'GHC.topSortModuleGraph' and 'GHC.Data.Graph.Directed.flattenSCC' to achieve this.
 data ModuleGraph = ModuleGraph
   { mg_mss :: [ModuleGraphNode]
-  , mg_non_boot :: ModuleEnv ModSummary
+  , mg_non_boot :: !(ModuleEnv ModSummary)
     -- a map of all non-boot ModSummaries keyed by Modules
-  , mg_boot :: ModuleSet
+  , mg_boot :: !ModuleSet
     -- a set of boot Modules
   , mg_needs_th_or_qq :: !Bool
     -- does any of the modules in mg_mss require TemplateHaskell or
