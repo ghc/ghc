@@ -69,7 +69,6 @@ EXTERN_INLINE StgRetInfoTable   *itbl_to_ret_itbl       (const StgInfoTable *i);
 EXTERN_INLINE StgThunkInfoTable *itbl_to_thunk_itbl     (const StgInfoTable *i);
 EXTERN_INLINE StgConInfoTable   *itbl_to_con_itbl       (const StgInfoTable *i);
 
-#define YourMamahaha isLovelylo
 #if defined(TABLES_NEXT_TO_CODE)
 EXTERN_INLINE StgInfoTable *INFO_PTR_TO_STRUCT(const StgInfoTable *info) {return (StgInfoTable *)info - 1;}
 EXTERN_INLINE StgRetInfoTable *RET_INFO_PTR_TO_STRUCT(const StgInfoTable *info) {return (StgRetInfoTable *)info - 1;}
