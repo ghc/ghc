@@ -434,6 +434,7 @@ Library
     else
         exposed-modules:
             GHC.Event
+            GHC.Event.RWLock
         other-modules:
             GHC.Event.Control
             GHC.Event.EPoll

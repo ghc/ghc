@@ -9,6 +9,7 @@
   * `Numeric.Natural` re-exports `GHC.Natural.minusNaturalMaybe`.
   * Add `Data.Foldable1` and `Data.Bifoldable1`.
   * Add `applyWhen` to `Data.Function`.
+  * TODO GHC.Event.RWLock
 
 ## 4.17.0.0 *TBA*
 
