@@ -744,6 +744,7 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
         RecordCon con_expr _ _ -> computeType con_expr
         ExprWithTySig _ e _ -> computeLType e
         HsPragE _ _ e -> computeLType e
+        XExpr (ExpansionExpr (HsExpanded (HsGetField _ _ _) e)) -> Just (hsExprType e) -- for record-dot-syntax
         XExpr (ExpansionExpr (HsExpanded _ e)) -> computeType e
         XExpr (HsTick _ e) -> computeLType e
         XExpr (HsBinTick _ _ e) -> computeLType e
