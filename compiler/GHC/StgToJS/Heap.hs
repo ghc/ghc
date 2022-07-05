@@ -41,45 +41,45 @@ import GHC.Prelude
 import GHC.JS.Syntax
 import GHC.JS.Make
 import GHC.StgToJS.Types
-import GHC.Data.ShortText (ShortText)
+import GHC.Data.FastString
 
 -- FIXME: Jeff (2022,03): These helpers are a classic case of using a newtype
 -- over a type synonym to leverage GHC's type checker. Basically we never want
 -- to mix these up, and so we should have:
 --------------------------------------
--- newtype ClosureEntry  = ClosureEntry  { unClosureEntry  :: ShortText }
--- newtype ClosureExtra1 = ClosureExtra1 { unClosureExtra1 :: ShortText }
--- newtype ClosureExtra2 = ClosureExtra2 { unClosureExtra2 :: ShortText }
--- newtype ClosureMeta   = ClosureMeta   { unClosureMeta   :: ShortText }
+-- newtype ClosureEntry  = ClosureEntry  { unClosureEntry  :: FastString }
+-- newtype ClosureExtra1 = ClosureExtra1 { unClosureExtra1 :: FastString }
+-- newtype ClosureExtra2 = ClosureExtra2 { unClosureExtra2 :: FastString }
+-- newtype ClosureMeta   = ClosureMeta   { unClosureMeta   :: FastString }
 --------------------------------------
 -- especially since any bugs which result from confusing these will be catastrophic and hard to debug
 -- also NOTE: if ClosureExtra<N> is truly unbounded then we should have:
--- newtype ClosureExtras = ClosureExtras { unClosureExtras :: [ShortText] }
+-- newtype ClosureExtras = ClosureExtras { unClosureExtras :: [FastString] }
 -- or use an Array and amortize increasing the arrays size when needed; depending
 -- on its use case in the RTS of course
 
-closureEntry_ :: ShortText
+closureEntry_ :: FastString
 closureEntry_ = "f"
 
-closureField1_ :: ShortText
+closureField1_ :: FastString
 closureField1_ = "d1"
 
-closureField2_ :: ShortText
+closureField2_ :: FastString
 closureField2_ = "d2"
 
-closureMeta_ :: ShortText
+closureMeta_ :: FastString
 closureMeta_ = "m"
 
-closureCC_ :: ShortText
+closureCC_ :: FastString
 closureCC_ = "cc"
 
-entryClosureType_ :: ShortText
+entryClosureType_ :: FastString
 entryClosureType_ = "t"
 
-entryConTag_ :: ShortText
+entryConTag_ :: FastString
 entryConTag_ = "a"
 
-entryFunArity_ :: ShortText
+entryFunArity_ :: FastString
 entryFunArity_ = "a"
 
 jTyObject :: JExpr

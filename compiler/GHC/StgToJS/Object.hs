@@ -94,7 +94,7 @@ import           Data.Int
 import           Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
 import           Data.IORef
-import           Data.List (sortBy)
+import           Data.List (sortBy, sortOn)
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe (catMaybes)
@@ -115,6 +115,7 @@ import GHC.Unit.Module
 import GHC.Data.FastString
 import GHC.Data.ShortText as ST
 
+import GHC.Types.Unique.Map
 import GHC.Float (castDoubleToWord64, castWord64ToDouble)
 import GHC.Utils.Binary hiding (SymbolTable)
 import GHC.Utils.Misc
@@ -195,7 +196,7 @@ data JSFFIType
 
 data ExportedFun = ExportedFun
   { funModule  :: !Module
-  , funSymbol  :: !ShortText
+  , funSymbol  :: !LexicalFastString
   } deriving (Eq, Ord)
 
 instance Outputable ExportedFun where
@@ -206,17 +207,16 @@ instance Outputable ExportedFun where
 
 -- we need to store the size separately, since getting a HashMap's size is O(n)
 data SymbolTable
-  = SymbolTable !Int !(Map ShortText Int)
-  deriving (Show)
+  = SymbolTable !Int !(UniqMap FastString Int)
 
 emptySymbolTable :: SymbolTable
-emptySymbolTable = SymbolTable 0 M.empty
+emptySymbolTable = SymbolTable 0 emptyUniqMap
 
-insertSymbol :: ShortText -> SymbolTable -> (SymbolTable, Int)
+insertSymbol :: FastString -> SymbolTable -> (SymbolTable, Int)
 insertSymbol s st@(SymbolTable n t) =
-  case M.lookup s t of
+  case lookupUniqMap t s of
     Just k  -> (st, k)
-    Nothing -> (SymbolTable (n+1) (M.insert s n t), n)
+    Nothing -> (SymbolTable (n+1) (addToUniqMap t s n), n)
 
 data ObjEnv = ObjEnv
   { oeSymbols :: SymbolTableR
@@ -224,7 +224,7 @@ data ObjEnv = ObjEnv
   }
 
 data SymbolTableR = SymbolTableR
-  { strText   :: Array Int ShortText
+  { strText   :: Array Int FastString
   , _strString :: Array Int String
   }
 
@@ -246,7 +246,7 @@ runPutS st ps = do
 insertTable :: IORef SymbolTable -> BinHandle -> FastString -> IO ()
 insertTable t_r bh s = do
   t <- readIORef t_r
-  let (t', n) = insertSymbol (ST.pack $ unpackFS s) t
+  let (t', n) = insertSymbol s t
   writeIORef t_r t'
   put_ bh n
   return ()
@@ -254,7 +254,7 @@ insertTable t_r bh s = do
 readTable :: ObjEnv -> BinHandle -> IO FastString
 readTable e bh = do
   n :: Int <- get bh
-  return . mkFastString . ST.unpack $ strText (oeSymbols e) ! fromIntegral n
+  return $ strText (oeSymbols e) ! fromIntegral n
 
 -- unexpected :: String -> GetS a
 -- unexpected err = ask >>= \e ->
@@ -262,11 +262,11 @@ readTable e bh = do
 
 -- one toplevel block in the object file
 data ObjUnit = ObjUnit
-  { oiSymbols  :: [ShortText]    -- toplevel symbols (stored in index)
+  { oiSymbols  :: [FastString]   -- toplevel symbols (stored in index)
   , oiClInfo   :: [ClosureInfo]  -- closure information of all closures in block
   , oiStatic   :: [StaticInfo]   -- static closure data
   , oiStat     :: JStat          -- the code
-  , oiRaw      :: ShortText      -- raw JS code
+  , oiRaw      :: FastString     -- raw JS code
   , oiFExports :: [ExpFun]
   , oiFImports :: [ForeignJSRef]
   }
@@ -290,7 +290,7 @@ serializeStat :: SymbolTable
               -> [ClosureInfo]
               -> [StaticInfo]
               -> JStat
-              -> ShortText
+              -> FastString
               -> [ExpFun]
               -> [ForeignJSRef]
               -> IO (SymbolTable, BS.ByteString)
@@ -316,10 +316,10 @@ moduleNameTag (ModuleName fs) = case compare len moduleNameLength of
     !len = n_chars fs
 
 object'
-  :: ModuleName                 -- ^ module
-  -> SymbolTable                -- ^ final symbol table
-  -> Deps                       -- ^ dependencies
-  -> [([ShortText],ByteString)] -- ^ serialized units and their exported symbols, the first unit is module-global
+  :: ModuleName                  -- ^ module
+  -> SymbolTable                 -- ^ final symbol table
+  -> Deps                        -- ^ dependencies
+  -> [([FastString],ByteString)] -- ^ serialized units and their exported symbols, the first unit is module-global
   -> IO ByteString
 object' mod_name st0 deps0 os = do
   (sti, idx) <- putIndex st0 os
@@ -330,13 +330,13 @@ object' mod_name st0 deps0 os = do
   where
     bl = fromIntegral . B.length
 
-putIndex :: SymbolTable -> [([ShortText], ByteString)] -> IO (SymbolTable, ByteString)
+putIndex :: SymbolTable -> [([FastString], ByteString)] -> IO (SymbolTable, ByteString)
 putIndex st xs = runPutS st (\bh -> put_ bh $ zip symbols offsets)
   where
     (symbols, values) = unzip xs
     offsets = scanl (+) 0 (map B.length values)
 
-getIndex :: HasDebugCallStack => String -> SymbolTableR -> ByteString -> IO [([ShortText], Int64)]
+getIndex :: HasDebugCallStack => String -> SymbolTableR -> ByteString -> IO [([FastString], Int64)]
 getIndex name st bs = runGetS name st get bs
 
 putDeps :: SymbolTable -> Deps -> IO (SymbolTable, ByteString)
@@ -435,7 +435,7 @@ readDepsMaybe name bs = either (const Nothing) Just <$> readDepsEither name bs
 readObjectFile :: FilePath -> IO [ObjUnit]
 readObjectFile = readObjectFileKeys (\_ _ -> True)
 
-readObjectFileKeys :: (Int -> [ShortText] -> Bool) -> FilePath -> IO [ObjUnit]
+readObjectFileKeys :: (Int -> [FastString] -> Bool) -> FilePath -> IO [ObjUnit]
 readObjectFileKeys p file = bracket (openBinaryFile file ReadMode) hClose $ \h -> do
   mhdr <- getHeader <$> B.hGet h headerLength
   case mhdr of
@@ -449,7 +449,7 @@ readObjectFileKeys p file = bracket (openBinaryFile file ReadMode) hClose $ \h -
 readObject :: String -> ByteString -> IO [ObjUnit]
 readObject name = readObjectKeys name (\_ _ -> True)
 
-readObjectKeys :: HasDebugCallStack => String -> (Int -> [ShortText] -> Bool) -> ByteString -> IO [ObjUnit]
+readObjectKeys :: HasDebugCallStack => String -> (Int -> [FastString] -> Bool) -> ByteString -> IO [ObjUnit]
 readObjectKeys name p bs =
   case getHeader bs of
     Left err -> error ("readObjectKeys: not a valid GHCJS object: " ++ name ++ "\n    " ++ err)
@@ -461,7 +461,7 @@ readObjectKeys name p bs =
 
 readObjectKeys' :: HasDebugCallStack
                 => String
-                -> (Int -> [ShortText] -> Bool)
+                -> (Int -> [FastString] -> Bool)
                 -> SymbolTableR
                 -> ByteString
                 -> ByteString
@@ -478,10 +478,10 @@ readObjectKeys' name p st bsidx bsobjs = do
     getOU bh = (,,,,,) <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
 
 getSymbolTable :: HasDebugCallStack => ByteString -> SymbolTableR
-getSymbolTable bs = SymbolTableR (listArray (0,n-1) xs) (listArray (0,n-1) (map ST.unpack xs))
+getSymbolTable bs = SymbolTableR (listArray (0,n-1) xs) (listArray (0,n-1) (map unpackFS xs))
   where
     (n,xs) = DB.runGet getter bs
-    getter :: DB.Get (Int, [ShortText])
+    getter :: DB.Get (Int, [FastString])
     getter = do
       l <- DB.getWord32le
       let l' = fromIntegral l
@@ -496,8 +496,9 @@ putSymbolTable (SymbolTable _ hm) = st
               -- fixme: this is a workaround for some weird issue sometimes causing zero-length
               --        strings when using the Data.Text instance directly
               -- mapM_ (DB.put . TE.encodeUtf8) xs
-      xs :: [ShortText]
-      xs = map fst . sortBy (compare `on` snd) . M.toList $ hm
+      xs :: [FastString]
+      xs = map fst . sortBy (compare `on` snd) . nonDetEltsUniqMap $ hm
+      -- We can use `nonDetEltsUniqMap` because the paired `Int`s introduce ordering.
 
 headerLength :: Int
 headerLength = 32 + versionTagLength + moduleNameLength
@@ -543,9 +544,9 @@ tag = put_
 getTag :: BinHandle -> IO Word8
 getTag = get
 
-instance Binary ShortText where
-  put_ bh t = put_ bh (mkFastString $ ST.unpack t)
-  get bh = ST.pack . unpackFS <$> get bh
+-- instance Binary ShortText where
+--   put_ bh t = put_ bh (mkFastString $ ST.unpack t)
+--   get bh = ST.pack . unpackFS <$> get bh
   -- put_ bh t = do
     -- symbols <- St.get
     -- let (symbols', n) = insertSymbol t symbols
@@ -615,7 +616,7 @@ instance Binary JVal where
   put_ bh (JInt i)      = tag bh 4 >> put_ bh i
   put_ bh (JStr xs)     = tag bh 5 >> put_ bh xs
   put_ bh (JRegEx xs)   = tag bh 6 >> put_ bh xs
-  put_ bh (JHash m)     = tag bh 7 >> put_ bh (M.toList m)
+  put_ bh (JHash m)     = tag bh 7 >> put_ bh (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap m)
   put_ bh (JFunc is s)  = tag bh 8 >> put_ bh is >> put_ bh s
   put_ _  (UnsatVal {}) = error "put_ bh JVal: UnsatVal"
   get bh = getTag bh >>= \case
@@ -625,7 +626,7 @@ instance Binary JVal where
     4 -> JInt    <$> get bh
     5 -> JStr    <$> get bh
     6 -> JRegEx  <$> get bh
-    7 -> JHash . M.fromList <$> get bh
+    7 -> JHash . listToUniqMap <$> get bh
     8 -> JFunc   <$> get bh <*> get bh
     n -> error ("Binary get bh JVal: invalid tag: " ++ show n)
 

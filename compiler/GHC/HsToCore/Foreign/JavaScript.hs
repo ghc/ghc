@@ -62,7 +62,6 @@ import GHC.Builtin.PrimOps.Ids
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Data.Maybe
-import qualified GHC.Data.ShortText as ST
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -187,7 +186,7 @@ mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
                         ) <> semi
           _ -> empty
 
-  strlit xs = docToSDoc (pprStringLit (ST.pack xs))
+  strlit xs = docToSDoc (pprStringLit (mkFastString xs))
 
   -- the target which will form the root of what we ask rts_evalIO to run
   the_cfun

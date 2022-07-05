@@ -85,9 +85,7 @@ import           GHC.Unit.Home
 import           GHC.Unit.Types
 import           GHC.Utils.Error
 import           GHC.Driver.Env.Types
-import           GHC.Data.ShortText       (ShortText)
-import qualified GHC.Data.ShortText       as T
-import           GHC.Data.FastString (unpackFS)
+import           GHC.Data.FastString
 
 import           Control.Concurrent.MVar
 import           Control.Monad
@@ -355,7 +353,7 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
 data ModuleCode = ModuleCode
   { mc_module   :: !Module
   , mc_js_code  :: !JStat
-  , mc_exports  :: !ShortText        -- ^ rendered exports
+  , mc_exports  :: !FastString        -- ^ rendered exports
   , mc_closures :: ![ClosureInfo]
   , mc_statics  :: ![StaticInfo]
   , mc_frefs    :: ![ForeignJSRef]
@@ -383,7 +381,7 @@ renderLinker settings cfg renamer_state rtsDeps code =
       }
     -- call the compactor
     (renamer_state', compacted, meta) = compact settings cfg renamer_state
-                                          (map funSymbol $ S.toList rtsDeps)
+                                          (map ((\(LexicalFastString f) -> f) . funSymbol) $ S.toList rtsDeps)
                                           (map code_to_linked_unit code)
     -- render result into JS code
     rendered_all     = mconcat [mconcat rendered_mods, rendered_meta, rendered_exports]
@@ -392,9 +390,7 @@ renderLinker settings cfg renamer_state rtsDeps code =
     render_js        = BC.pack . (<>"\n") . show . pretty
                          -- FIXME (Sylvain 2022-06): this must be utterly slow.
                          -- Replace with something faster.
-    rendered_exports = BC.pack . concatMap T.unpack . filter (not . T.null) $ map mc_exports code
-                         -- FIXME (Sylvain 2022-06): this must also be utterly slow.
-                         -- Replace with something faster.
+    rendered_exports = BC.concat . map bytesFS . filter (not . nullFS) $ map mc_exports code
     meta_length      = fromIntegral (BC.length rendered_meta)
     -- make LinkerStats entry for the given ModuleCode.
     -- For now, only associate generated code size in bytes to each module
@@ -534,8 +530,8 @@ writeRunner _settings out =
   --   copyFile (topDir dflags </> "bin" </> "wrapper" <.> "exe")
   --            runner
   --   writeFile (runner <.> "options") $ unlines
-  --               [ T.pack nodePgm -- T.pack (nodeProgram nodeSettings)
-  --               , T.pack ("{{EXEPATH}}" </> out </> "all" <.> "js")
+  --               [ mkFastString nodePgm -- mkFastString (nodeProgram nodeSettings)
+  --               , mkFastString ("{{EXEPATH}}" </> out </> "all" <.> "js")
   --               ]
   -- else do
   ---------------------------------------------
@@ -554,16 +550,16 @@ writeWebAppManifest top out = do
   where
     manifestFile = out </> "manifest.webapp"
 
-rtsExterns :: ShortText
+rtsExterns :: FastString
 rtsExterns =
   "// GHCJS RTS externs for closure compiler ADVANCED_OPTIMIZATIONS\n\n" <>
-  mconcat (map (\x -> "/** @type {*} */\nObject.d" <> T.pack (show x) <> ";\n")
+  mconcat (map (\x -> "/** @type {*} */\nObject.d" <> mkFastString (show x) <> ";\n")
                [(7::Int)..16384])
 
 writeExterns :: FilePath -> IO ()
 writeExterns out = writeFile (out </> "all.js.externs")
-  $ T.unpack rtsExterns -- FIXME: Jeff (2022,03): Why write rtsExterns as
-                        -- ShortText just to unpack?
+  $ unpackFS rtsExterns -- FIXME: Jeff (2022,03): Why write rtsExterns as
+                        -- FastString just to unpack?
 
 -- | get all functions in a module
 modFuns :: Deps -> [ExportedFun]
@@ -661,8 +657,8 @@ extractDeps ar_state units deps loc =
         ArchiveFile a -> (collectCode
                         <=< readObjectKeys (a ++ ':':moduleNameString (moduleName mod)) selector)
                         =<< readArObject ar_state mod a
-                            --  error ("Ar.readObject: " ++ a ++ ':' : T.unpack mod))
-                            -- Ar.readObject (mkModuleName $ T.unpack mod) a)
+                            --  error ("Ar.readObject: " ++ a ++ ':' : unpackFS mod))
+                            -- Ar.readObject (mkModuleName $ unpackFS mod) a)
         InMemory n b  -> collectCode =<< readObjectKeys n selector b
       -- evaluate (rnf x) -- See FIXME Re: NFData instance on Safety and
                           -- ForeignJSRefs below
@@ -670,7 +666,7 @@ extractDeps ar_state units deps loc =
   where
     mod           = depsModule deps
     -- FIXME: Jeff (2022,03): remove this hacky reimplementation of unlines
-    newline       = T.pack "\n"
+    newline       = mkFastString "\n"
     unlines'      = intersperse newline . map oiRaw
     collectCode l = let x = ModuleCode
                               { mc_module   = mod
@@ -719,7 +715,7 @@ readArObject ar_state mod ar_file = do
      refers to directly
  -}
 newtype StaticDeps =
-  StaticDeps { unStaticDeps :: [(ShortText, ShortText)] -- module/symbol
+  StaticDeps { unStaticDeps :: [(FastString, FastString)] -- module/symbol
              }
 
 noStaticDeps :: StaticDeps
@@ -814,13 +810,14 @@ readSystemDeps' file
     d :: UnitId -> String -> [String] -> [ExportedFun]
     d uid mod symbols = map (let pkg_module = mkJsModule uid mod
                               in ExportedFun pkg_module
-                                 . mkHaskellSym pkg_module (T.pack mod)
-                                 . T.pack)
+                                 . LexicalFastString
+                                 . mkHaskellSym pkg_module (mkFastString mod)
+                                 . mkFastString)
                         symbols
-    zenc  = T.pack . zEncodeString . T.unpack
+    zenc  = mkFastString . zEncodeString . unpackFS
 
-    mkHaskellSym :: Module -> ShortText -> ShortText -> ShortText
-    mkHaskellSym mod _m s = "h$" <> zenc (T.pack (unitModuleString mod)
+    mkHaskellSym :: Module -> FastString -> FastString -> FastString
+    mkHaskellSym mod _m s = "h$" <> zenc (mkFastString (unitModuleString mod)
                                        <> "."
                                        <> s)
     mkJsModule :: UnitId -> String -> GenModule Unit
@@ -836,7 +833,7 @@ readSystemDeps' file
       let (StaticDeps unresolved, pkgs, funs) = staticDeps wi sdeps
       in  case unresolved of
             ((p,_,_):_) ->
-                  panic $ "Package `" ++ T.unpack p ++ "' is required for " ++
+                  panic $ "Package `" ++ unpackFS p ++ "' is required for " ++
                           requiredFor ++ ", but was not found"
             _ ->
               -- putStrLn "system dependencies:"
@@ -845,7 +842,7 @@ readSystemDeps' file
 
 -}
 
-readSystemWiredIn :: HscEnv -> IO [(ShortText, UnitId)]
+readSystemWiredIn :: HscEnv -> IO [(FastString, UnitId)]
 readSystemWiredIn _ = pure [] -- XXX
 {-
 readSystemWiredIn dflags = do
@@ -858,7 +855,7 @@ readSystemWiredIn dflags = do
   where
     filename = getLibDir dflags </> "wiredinkeys" <.> "yaml"
     ghcWiredIn :: Map Text UnitId
-    ghcWiredIn = M.fromList $ map (\k -> (T.pack (installedUnitIdString k), k))
+    ghcWiredIn = M.fromList $ map (\k -> (mkFastString (installedUnitIdString k), k))
                                   (map toUnitId wiredInUnitIds)
                                   -}
 {- | read a static dependencies specification and give the roots
@@ -868,17 +865,17 @@ readSystemWiredIn dflags = do
      will all come from the same version, but it's undefined which one.
  -}
 
-type SDep = (ShortText, ShortText) -- ^ module/symbol
+type SDep = (FastString, FastString) -- ^ module/symbol
 
 staticDeps :: UnitEnv
-           -> [(ShortText, Module)]   -- ^ wired-in package names / keys
+           -> [(FastString, Module)]   -- ^ wired-in package names / keys
            -> StaticDeps              -- ^ deps from yaml file
            -> (StaticDeps, Set UnitId, Set ExportedFun)
                                       -- ^ the StaticDeps contains the symbols
                                       --   for which no package could be found
 staticDeps unit_env wiredin sdeps = mkDeps sdeps
   where
-    zenc  = T.pack . zEncodeString . T.unpack
+    zenc  = mkFastString . zEncodeString . unpackFS
     u_st  = ue_units unit_env
     mkDeps (StaticDeps ds) =
       -- FIXME: Jeff (2022,03): this foldl' will leak memory due to the tuple
@@ -902,7 +899,7 @@ staticDeps unit_env wiredin sdeps = mkDeps sdeps
                  -- couldn't find the uid for this wired in package so explode
                  Nothing -> pprPanic ("Package key for wired-in dependency could not be found.`"
                                      ++ "I looked for: "
-                                     ++ T.unpack mod_name
+                                     ++ unpackFS mod_name
                                      ++ " received " ++ moduleNameString (moduleName mod)
                                      ++ " but could not find: " ++ unitString mod_uid
                                      ++ " in the UnitState."
@@ -914,16 +911,16 @@ staticDeps unit_env wiredin sdeps = mkDeps sdeps
                  Just _ -> ( unresolved
                            , S.insert mod_uid pkgs
                            , S.insert (ExportedFun mod
-                                       $ mkSymb mod mod_name s) resolved
+                                       . LexicalFastString $ mkSymb mod mod_name s) resolved
                            )
     -- confusingly with the new ghc api we now use Module where we formerly had
     -- Package, so this becomes Module -> Module -> Symbol where the first
     -- Module is GHC's module type and the second is the SDep Moudle read as a
-    -- ShortText
+    -- FastString
     -- FIXME: Jeff (2022,03): should mkSymb be in the UnitUtils?
-    mkSymb :: Module -> ShortText -> ShortText -> ShortText
+    mkSymb :: Module -> FastString -> FastString -> FastString
     mkSymb p _m s  =
-      "h$" <> zenc (T.pack (unitModuleString p) <> "." <> s)
+      "h$" <> zenc (mkFastString (unitModuleString p) <> "." <> s)
 
 closePackageDeps :: UnitState -> Set UnitId -> Set UnitId
 closePackageDeps u_st pkgs

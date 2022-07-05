@@ -28,6 +28,7 @@ import GHC.StgToJS.Profiling
 import GHC.Builtin.Types
 import GHC.Stg.Syntax
 import GHC.Core.DataCon
+import GHC.Data.FastString
 
 import GHC.Types.CostCentre
 import GHC.Types.Unique.FM

@@ -26,10 +26,11 @@ import GHC.StgToJS.Utils
 import GHC.Core.DataCon
 
 import GHC.Types.CostCentre
+import GHC.Types.Unique.Map
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import qualified GHC.Data.ShortText as ST
+import GHC.Data.FastString
 
 import qualified Data.Map as M
 import Data.Maybe
@@ -92,8 +93,8 @@ allocDynamicE  inline_alloc entry free cc
                 []  -> (null_, null_)
                 [x] -> (x,null_)
                 [x,y] -> (x,y)
-                (x:xs) -> (x,toJExpr (JHash $ M.fromList (zip dataFields xs)))
-    dataFields = map (ST.pack . ('d':) . show) [(1::Int)..]
+                (x:xs) -> (x,toJExpr (JHash $ listToUniqMap (zip dataFields xs)))
+    dataFields = map (mkFastString . ('d':) . show) [(1::Int)..]
 
 allocDynamic :: StgToJSConfig -> Bool -> Ident -> JExpr -> [JExpr] -> Maybe JExpr -> JStat
 allocDynamic s haveDecl to entry free cc =

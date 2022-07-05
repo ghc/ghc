@@ -34,12 +34,16 @@ import GHC.JS.Transform
 import Data.Function
 import Data.Char (isControl, ord)
 import qualified Data.Map as M
+import Data.List
+import Data.Ord
 
 import Numeric(showHex)
 
 import GHC.Utils.Ppr as PP
 import qualified GHC.Data.ShortText as ST
 import GHC.Data.ShortText (ShortText)
+import GHC.Data.FastString
+import GHC.Types.Unique.Map
 
 ($$$) :: Doc -> Doc -> Doc
 --x $$$ y = align (nest 2 $ x $+$ y) -- FIXME (Sylvain, 2022/02)
@@ -70,10 +74,10 @@ jsToDoc = jsToDocR defaultRenderJs
 -- | Render a syntax tree as a pretty-printable document, using a given prefix
 -- to all generated names. Use this with distinct prefixes to ensure distinct
 -- generated names between independent calls to render(Prefix)Js.
-renderPrefixJs :: (JsToDoc a, JMacro a) => ShortText -> a -> Doc
+renderPrefixJs :: (JsToDoc a, JMacro a) => FastString -> a -> Doc
 renderPrefixJs pfx = renderPrefixJs' defaultRenderJs pfx
 
-renderPrefixJs' :: (JsToDoc a, JMacro a) => RenderJs -> ShortText -> a -> Doc
+renderPrefixJs' :: (JsToDoc a, JMacro a) => RenderJs -> FastString -> a -> Doc
 renderPrefixJs' r pfx = jsToDocR r . jsSaturate (Just $ "jmId_" `mappend` pfx)
 
 braceNest :: Doc -> Doc
@@ -107,9 +111,9 @@ defRenderJsS r = \case
   WhileStat False p b -> text "while" <> parens (jsToDocR r p) $$ braceNest' (jsToDocR r b)
   WhileStat True  p b -> (text "do" $$ braceNest' (jsToDocR r b)) $+$ text "while" <+> parens (jsToDocR r p)
   UnsatBlock e        -> jsToDocR r $ pseudoSaturate e
-  BreakStat l         -> maybe (text "break") (((<+>) `on` stext) "break") l
-  ContinueStat l      -> maybe (text "continue") (((<+>) `on` stext) "continue") l
-  LabelStat l s       -> stext l <> char ':' $$ printBS s
+  BreakStat l         -> maybe (text "break")    (\(LexicalFastString s) -> (text "break"    <+> ftext s)) l
+  ContinueStat l      -> maybe (text "continue") (\(LexicalFastString s) -> (text "continue" <+> ftext s)) l
+  LabelStat (LexicalFastString l) s -> ftext l <> char ':' $$ printBS s
         where
           printBS (BlockStat ss) = vcat $ interSemi $ flattenBlocks ss
           printBS x = jsToDocR r x
@@ -132,9 +136,9 @@ defRenderJsS r = \case
                         | otherwise = text "finally" $$ braceNest' (jsToDocR r s2)
   AssignStat i x    -> jsToDocR r i <+> char '=' <+> jsToDocR r x
   UOpStat op x
-    | isPre op && isAlphaOp op -> stext (uOpText op) <+> optParens r x
-    | isPre op                 -> stext (uOpText op) <> optParens r x
-    | otherwise                -> optParens r x <> stext (uOpText op)
+    | isPre op && isAlphaOp op -> ftext (uOpText op) <+> optParens r x
+    | isPre op                 -> ftext (uOpText op) <> optParens r x
+    | otherwise                -> optParens r x <> ftext (uOpText op)
   BlockStat xs -> jsToDocR r (flattenBlocks xs)
 
 flattenBlocks :: [JStat] -> [JStat]
@@ -154,11 +158,11 @@ defRenderJsE r = \case
   SelExpr x y       -> jsToDocR r x <> char '.' <> jsToDocR r y
   IdxExpr x y       -> jsToDocR r x <> brackets (jsToDocR r y)
   IfExpr x y z      -> parens (jsToDocR r x <+> char '?' <+> jsToDocR r y <+> char ':' <+> jsToDocR r z)
-  InfixExpr op x y  -> parens $ hsep [jsToDocR r x, stext (opText op), jsToDocR r y]
+  InfixExpr op x y  -> parens $ hsep [jsToDocR r x, ftext (opText op), jsToDocR r y]
   UOpExpr op x
-    | isPre op && isAlphaOp op -> stext (uOpText op) <+> optParens r x
-    | isPre op                 -> stext (uOpText op) <> optParens r x
-    | otherwise                -> optParens r x <> stext (uOpText op)
+    | isPre op && isAlphaOp op -> ftext (uOpText op) <+> optParens r x
+    | isPre op                 -> ftext (uOpText op) <> optParens r x
+    | otherwise                -> optParens r x <> ftext (uOpText op)
   ApplExpr je xs -> jsToDocR r je <> (parens . hsep . punctuate comma $ map (jsToDocR r) xs)
   UnsatExpr e    -> jsToDocR r $ pseudoSaturate e
 
@@ -172,24 +176,27 @@ defRenderJsV r = \case
   JInt i
     | i < 0     -> parens (integer i)
     | otherwise -> integer i
-  JStr s    -> pprStringLit s
-  JRegEx s  -> hcat [char '/',stext s, char '/']
+  JStr   s -> pprStringLit s
+  JRegEx s -> hcat [char '/',ftext s, char '/']
   JHash m
-    | M.null m  -> text "{}"
+    | isNullUniqMap m  -> text "{}"
     | otherwise -> braceNest . hsep . punctuate comma .
-                          map (\(x,y) -> squotes (stext x) <> colon <+> jsToDocR r y) $ M.toList m
+                          map (\(x,y) -> squotes (ftext x) <> colon <+> jsToDocR r y)
+                          -- nonDetEltsUniqMap doesn't introduce non-determinism here
+                          -- because we sort the elements lexically
+                          $ sortOn (LexicalFastString . fst) (nonDetEltsUniqMap m)
   JFunc is b -> parens $ text "function" <> parens (hsep . punctuate comma . map (jsToDocR r) $ is) $$ braceNest' (jsToDocR r b)
   UnsatVal f -> jsToDocR r $ pseudoSaturate f
 
 defRenderJsI :: RenderJs -> Ident -> Doc
-defRenderJsI _ (TxtI t) = stext t
+defRenderJsI _ (TxtI t) = ftext t
 
 
-pprStringLit :: ShortText -> Doc
+pprStringLit :: FastString -> Doc
 pprStringLit s = hcat [char '\"',encodeJson s, char '\"']
 
-encodeJson :: ShortText -> Doc
-encodeJson xs = hcat (map encodeJsonChar (ST.unpack xs))
+encodeJson :: FastString -> Doc
+encodeJson xs = hcat (map encodeJsonChar (unpackFS xs))
 
 encodeJsonChar :: Char -> Doc
 encodeJsonChar = \case
@@ -212,7 +219,7 @@ encodeJsonChar = \case
             let h = showHex cp ""
             in  text (prefix ++ replicate (pad - length h) '0' ++ h)
 
-uOpText :: JUOp -> ShortText
+uOpText :: JUOp -> FastString
 uOpText = \case
   NotOp     -> "!"
   BNotOp    -> "~"
@@ -228,7 +235,7 @@ uOpText = \case
   PreDecOp  -> "--"
   PostDecOp -> "--"
 
-opText :: JOp -> ShortText
+opText :: JOp -> FastString
 opText = \case
   EqOp          -> "=="
   StrictEqOp    -> "==="

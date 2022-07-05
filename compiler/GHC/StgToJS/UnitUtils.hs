@@ -8,7 +8,7 @@ module GHC.StgToJS.UnitUtils
 
 import GHC.Prelude
 
-import GHC.Data.ShortText as ST
+import GHC.Data.FastString
 import GHC.Unit.Module
 import GHC.Utils.Encoding
 
@@ -21,16 +21,16 @@ unitModuleString mod = mconcat
 
 -- | the global linkable unit of a module exports this symbol, depend on it to
 --   include that unit (used for cost centres)
-moduleGlobalSymbol :: Module -> ShortText
-moduleGlobalSymbol m = mconcat
+moduleGlobalSymbol :: Module -> FastString
+moduleGlobalSymbol m = mconcat -- TODO: Is there a better way to concatenate FastStrings?
   [ "h$"
-  , ST.pack (zEncodeString $ unitModuleString m)
+  , mkFastString (zEncodeString $ unitModuleString m)
   , "_<global>"
   ]
 
-moduleExportsSymbol :: Module -> ShortText
-moduleExportsSymbol m = mconcat
+moduleExportsSymbol :: Module -> FastString
+moduleExportsSymbol m = mconcat -- TODO: Is there a better way to concatenate FastStrings?
   [ "h$"
-  , ST.pack (zEncodeString $ unitModuleString m)
+  , mkFastString (zEncodeString $ unitModuleString m)
   , "_<exports>"
   ]

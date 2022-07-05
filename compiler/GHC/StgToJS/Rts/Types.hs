@@ -28,8 +28,8 @@ import GHC.StgToJS.Regs
 import GHC.StgToJS.Types
 
 import GHC.Utils.Monad.State.Strict
-import qualified GHC.Data.ShortText as T
 
+import GHC.Data.FastString
 
 
 traceRts :: StgToJSConfig -> JExpr -> JStat
@@ -103,4 +103,4 @@ withRegsRE start end max fallthrough f =
       mkCase r = (toJExpr (fromEnum r), mconcat [f r , brk])
 
 jsVar :: String -> JExpr
-jsVar = ValExpr . JVar . TxtI . T.pack
+jsVar = ValExpr . JVar . TxtI . mkFastString

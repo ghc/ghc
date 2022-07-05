@@ -24,7 +24,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import GHC.Data.ShortText as ST
+import GHC.Data.FastString
 
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -138,7 +138,7 @@ genDependencyData mod units = do
       lookupOtherFun od@(OtherSymb m idTxt) =
         case M.lookup od unitOtherExports of
           Just n  -> return (Right n)
-          Nothing | m == mod -> panic ("genDependencyData.lookupOtherFun: unknown local other id: " ++ ST.unpack idTxt)
+          Nothing | m == mod -> panic ("genDependencyData.lookupOtherFun: unknown local other id: " ++ unpackFS idTxt)
           Nothing ->  Left <$> (maybe (lookupExternalFun Nothing od) return =<<
                         gets (M.lookup od . ddcOther))
 
@@ -147,7 +147,7 @@ genDependencyData mod units = do
         (TxtI idTxt) <- lift (jsIdI i)
         lookupExternalFun (Just . getKey . getUnique $ i) (OtherSymb mod idTxt)
 
-      lookupExportedOther :: ShortText -> StateT DependencyDataCache G Object.ExportedFun
+      lookupExportedOther :: FastString -> StateT DependencyDataCache G Object.ExportedFun
       lookupExportedOther = lookupExternalFun Nothing . OtherSymb mod
 
       -- lookup a dependency to another module, add to the id cache if there's
@@ -157,7 +157,7 @@ genDependencyData mod units = do
       lookupExternalFun mbIdKey od@(OtherSymb m idTxt) = do
         let mk        = getKey . getUnique $ m
             mpk       = moduleUnit m
-            exp_fun   = Object.ExportedFun m idTxt
+            exp_fun   = Object.ExportedFun m (LexicalFastString idTxt)
             addCache  = do
               ms <- gets ddcModule
               let !cache' = IM.insert mk mpk ms
