@@ -45,7 +45,6 @@ import GHC.Core.Class
 
 import GHC.Core ( Expr(Var, App, Cast, Let), Bind (NonRec) )
 import GHC.Types.Basic
-import GHC.Types.SourceText
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -459,7 +458,9 @@ matchWithDict [cls, mty]
                                mkVisFunTysMany [mty, mkInvisFunTyMany cls openAlphaTy] openAlphaTy
 
        ; wd_id <- mkSysLocalM (fsLit "withDict_wd") Many evWithDict_type
-       ; let wd_id' = wd_id `setInlinePragma` inlineAfterSpecialiser
+       ; let wd_id' = wd_id `setInlinePragma` neverInlinePragma
+               -- Inlining withDict can cause the specialiser to incorrectly common up
+               -- distinct evidence terms. See (WD6) in Note [withDict].
 
        -- Given co2 : mty ~N# inst_meth_ty, construct the method of
        -- the WithDict dictionary:
@@ -485,12 +486,6 @@ matchWithDict [cls, mty]
 
 matchWithDict _
   = return NoInstance
-
-inlineAfterSpecialiser :: InlinePragma
--- Do not inline before the specialiser; but do so afterwards
--- See (WD6) in Note [withDict]
-inlineAfterSpecialiser = alwaysInlinePragma `setInlinePragmaActivation`
-                         ActiveAfter NoSourceText 2
 
 {-
 Note [withDict]
@@ -587,12 +582,14 @@ Some further observations about `withDict`:
       See #19915.
 
 (WD6) In fact we desugar `withDict @(C t_1 ... t_n) @mty @{rr} @r` to
+
          let wd = \sv k -> k (sv |> co)
-             {-# INLINE [2] #-}
+             {-# NOINLINE wd #-}
          in wd
-      The local `let` and INLINE pragma delays inlining `wd` until after the
-      type-class Specialiser has run.  This is super important. Suppose we
-      have calls
+
+      The local `let` and NOINLINE pragma ensure that the type-class specialiser
+      doesn't wrongly common up distinct evidence terms. This is super important!
+      Suppose we have calls
           withDict A k
           withDict B k
       where k1, k2 :: C T -> blah.  If we inline those withDict calls we'll get
@@ -602,8 +599,14 @@ Some further observations about `withDict`:
       the same, will specialise `k` for that type, and will call the same,
       specialised function from both call sites.  #21575 is a concrete case in point.
 
-      Solution: delay inlining `withDict` until after the specialiser; that is,
-      until Phase 2.  This is not a Final Solution -- seee #21575 "Alas..".
+      Solution: never inline `withDict`. Note that it is not sufficient to delay
+      inlining until after the specialiser (that is, until Phase 2), because if
+      we inline withDict in module A but import it in module B, the specialiser
+      will try to common up the two distinct evidence terms.
+      See test case T21575b.
+
+      This solution is unsatisfactory, as it imposes a performance overhead
+      on uses of withDict.
 
 -}
 

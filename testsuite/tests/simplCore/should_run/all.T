@@ -101,3 +101,4 @@ test('T19569', [only_ways(['optasm']),extra_run_opts('True 1000000')], compile_a
 test('T20203', normal, compile, ['-O -dsuppress-all -dsuppress-uniques -dno-typeable-binds -ddump-simpl'])
 test('T19313', expect_broken(19131), compile_and_run, [''])
 test('T21575', normal, compile_and_run, ['-O'])
+test('T21575b', [], multimod_compile_and_run, ['T21575b', '-O'])
