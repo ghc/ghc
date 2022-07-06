@@ -52,6 +52,8 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Haddock.Types
 import Haddock.Interface.Specialize
 import Haddock.GhcUtils                      ( orderedFVs, defaultRuntimeRepVars, mkEmptySigType )
@@ -387,7 +389,7 @@ synifyDataCon use_gadt_syntax dc =
 
   field_tys = zipWith con_decl_field (dataConFieldLabels dc) linear_tys
   con_decl_field fl synTy = noLocA $
-    ConDeclField noAnn [noLocA $ FieldOcc (flSelector fl) (noLocA $ mkVarUnqual $ flLabel fl)] synTy
+    ConDeclField noAnn [noLocA $ FieldOcc (flSelector fl) (noLocA $ mkVarUnqual $ field_label $ flLabel fl)] synTy
                  Nothing
 
   mk_h98_arg_tys :: Either ErrMsg (HsConDeclH98Details GhcRn)
