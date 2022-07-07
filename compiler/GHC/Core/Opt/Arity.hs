@@ -17,7 +17,7 @@ module GHC.Core.Opt.Arity
    , exprBotStrictness_maybe
 
    -- ** ArityType
-   , ArityType(..), mkBotArityType, mkTopArityType, expandableArityType
+   , ArityType(..), mkBotArityType, mkManifestArityType, expandableArityType
    , arityTypeArity, maxWithArity, idArityType
 
    -- ** Join points
@@ -53,7 +53,6 @@ import GHC.Types.Demand
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Id
-import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Tickish
 
@@ -594,7 +593,8 @@ same fix.
 -- where the @at@ fields of @ALam@ are inductively subject to the same order.
 -- That is, @ALam os at1 < ALam os at2@ iff @at1 < at2@.
 --
--- Why the strange Top element? See Note [Combining case branches].
+-- Why the strange Top element?
+--   See Note [Combining case branches: optimistic one-shot-ness]
 --
 -- We rely on this lattice structure for fixed-point iteration in
 -- 'findRhsArity'. For the semantics of 'ArityType', see Note [ArityType].
@@ -641,11 +641,16 @@ mkBotArityType oss = AT oss botDiv
 botArityType :: ArityType
 botArityType = mkBotArityType []
 
-mkTopArityType :: [OneShotInfo] -> ArityType
-mkTopArityType oss = AT oss topDiv
+mkManifestArityType :: [Var] -> CoreExpr -> ArityType
+mkManifestArityType bndrs body
+  = AT oss div
+  where
+    oss = [idOneShotInfo bndr | bndr <- bndrs, isId bndr]
+    div | exprIsDeadEnd body = botDiv
+        | otherwise          = topDiv
 
 topArityType :: ArityType
-topArityType = mkTopArityType []
+topArityType = AT [] topDiv
 
 -- | The number of value args for the arity type
 arityTypeArity :: ArityType -> Arity
@@ -685,7 +690,7 @@ takeWhileOneShot (AT oss div)
 exprEtaExpandArity :: DynFlags -> CoreExpr -> ArityType
 -- exprEtaExpandArity is used when eta expanding
 --      e  ==>  \xy -> e x y
-exprEtaExpandArity dflags e = arityType (etaExpandArityEnv dflags) e
+exprEtaExpandArity dflags e = arityType (findRhsArityEnv dflags) e
 
 getBotArity :: ArityType -> Maybe Arity
 -- Arity of a divergent function
@@ -825,6 +830,7 @@ floatIn cheap at
   | otherwise                      = takeWhileOneShot at
 
 arityApp :: ArityType -> Bool -> ArityType
+
 -- Processing (fun arg) where at is the ArityType of fun,
 -- Knock off an argument and behave like 'let'
 arityApp (AT (_:oss) div) cheap = floatIn cheap (AT oss div)
@@ -834,16 +840,30 @@ arityApp at               _     = at
 -- See the haddocks on 'ArityType' for the lattice.
 --
 -- Used for branches of a @case@.
-andArityType :: ArityType -> ArityType -> ArityType
-andArityType (AT (os1:oss1) div1) (AT (os2:oss2) div2)
-  | AT oss' div' <- andArityType (AT oss1 div1) (AT oss2 div2)
-  = AT ((os1 `bestOneShot` os2) : oss') div' -- See Note [Combining case branches]
-andArityType at1@(AT []         div1) at2
-  | isDeadEndDiv div1 = at2                  -- Note [ABot branches: max arity wins]
-  | otherwise         = at1                  -- See Note [Combining case branches]
-andArityType at1                  at2@(AT []         div2)
-  | isDeadEndDiv div2 = at1                  -- Note [ABot branches: max arity wins]
-  | otherwise         = at2                  -- See Note [Combining case branches]
+andArityType :: ArityEnv -> ArityType -> ArityType -> ArityType
+andArityType env (AT (lam1:lams1) div1) (AT (lam2:lams2) div2)
+  | AT lams' div' <- andArityType env (AT lams1 div1) (AT lams2 div2)
+  = AT ((lam1 `and_lam` lam2) : lams') div'
+  where
+    (os1) `and_lam` (os2)
+      = ( os1 `bestOneShot` os2)
+        -- bestOneShot: see Note [Combining case branches: optimistic one-shot-ness]
+
+andArityType env (AT [] div1) at2 = andWithTail env div1 at2
+andArityType env at1 (AT [] div2) = andWithTail env div2 at1
+
+andWithTail :: ArityEnv -> Divergence -> ArityType -> ArityType
+andWithTail env div1 at2@(AT lams2 _)
+  | isDeadEndDiv div1     -- case x of { T -> error; F -> \y.e }
+  = at2        -- Note [ABot branches: max arity wins]
+
+  | pedanticBottoms env  -- Note [Combining case branches: andWithTail]
+  = AT [] topDiv
+
+  | otherwise  -- case x of { T -> plusInt <expensive>; F -> \y.e }
+  = AT lams2 topDiv    -- We know div1 = topDiv
+    -- See Note [Combining case branches: andWithTail]
+
 
 {- Note [ABot branches: max arity wins]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -854,8 +874,60 @@ Consider   case x of
 Remember: \o1..on.⊥ means "if you apply to n args, it'll definitely diverge".
 So we need \??.⊥ for the whole thing, the /max/ of both arities.
 
-Note [Combining case branches]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Combining case branches: optimistic one-shot-ness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When combining the ArityTypes for two case branches (with andArityType)
+and both ArityTypes have ATLamInfo, then we just combine their
+expensive-ness and one-shot info.  The tricky point is when we have
+     case x of True -> \x{one-shot). blah1
+               Fale -> \y.           blah2
+
+Since one-shot-ness is about the /consumer/ not the /producer/, we
+optimistically assume that if either branch is one-shot, we combine
+the best of the two branches, on the (slightly dodgy) basis that if we
+know one branch is one-shot, then they all must be.  Surprisingly,
+this means that the one-shot arity type is effectively the top element
+of the lattice.
+
+Hence the call to `bestOneShot` in `andArityType`.
+
+Note [Combining case branches: andWithTail]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When combining the ArityTypes for two case branches (with andArityType)
+and one side or the other has run out of ATLamInfo; then we get
+into `andWithTail`.
+
+* If one branch is guaranteed bottom (isDeadEndDiv), we just take
+  the other; see Note [ABot branches: max arity wins]
+
+* Otherwise, if pedantic-bottoms is on, we just have to return
+  AT [] topDiv.  E.g. if we have
+    f x z = case x of True  -> \y. blah
+                      False -> z
+  then we can't eta-expand, because that would change the behaviour
+  of (f False bottom().
+
+* But if pedantic-bottoms is not on, we allow ourselves to push
+  `z` under a lambda (much as we allow ourselves to put the `case x`
+  under a lambda).  However we know nothing about the expensiveness
+  or one-shot-ness of `z`, so we'd better assume it looks like
+  (Expensive, NoOneShotInfo) all the way. Remembering
+  Note [Combining case branches: optimistic one-shot-ness],
+  we just add work to ever ATLamInfo, keeping the one-shot-ness.
+
+Here's an example:
+  go = \x. let z = go e0
+               go2 = \x. case x of
+                           True  -> z
+                           False -> \s(one-shot). e1
+           in go2 x
+We *really* want to respect the one-shot annotation provided by the
+user and eta-expand go and go2.
+When combining the branches of the case we have
+     T `andAT` \1.T
+and we want to get \1.T.
+But if the inner lambda wasn't one-shot (\?.T) we don't want to do this.
+(We need a usage analysis to justify that.)
 
 Unless we can conclude that **all** branches are safe to eta-expand then we
 must pessimisticaly conclude that we can't eta-expand. See #21694 for where this
@@ -934,22 +1006,21 @@ data ArityEnv
   = AE
   { ae_mode   :: !AnalysisMode
   -- ^ The analysis mode. See 'AnalysisMode'.
-  , ae_joins  :: !IdSet
-  -- ^ In-scope join points. See Note [Eta-expansion and join points]
-  --   INVARIANT: Disjoint with the domain of 'am_sigs' (if present).
   }
 
 -- | The @ArityEnv@ used by 'exprBotStrictness_maybe'. Pedantic about bottoms
 -- and no application is ever considered cheap.
 botStrictnessArityEnv :: ArityEnv
-botStrictnessArityEnv = AE { ae_mode = BotStrictness, ae_joins = emptyVarSet }
+botStrictnessArityEnv = AE { ae_mode = BotStrictness }
 
+{-
 -- | The @ArityEnv@ used by 'exprEtaExpandArity'.
 etaExpandArityEnv :: DynFlags -> ArityEnv
 etaExpandArityEnv dflags
   = AE { ae_mode  = EtaExpandArity { am_ped_bot = gopt Opt_PedanticBottoms dflags
                                    , am_dicts_cheap = gopt Opt_DictsCheap dflags }
        , ae_joins = emptyVarSet }
+-}
 
 -- | The @ArityEnv@ used by 'findRhsArity'.
 findRhsArityEnv :: DynFlags -> ArityEnv
@@ -957,7 +1028,11 @@ findRhsArityEnv dflags
   = AE { ae_mode  = FindRhsArity { am_ped_bot = gopt Opt_PedanticBottoms dflags
                                  , am_dicts_cheap = gopt Opt_DictsCheap dflags
                                  , am_sigs = emptyVarEnv }
-       , ae_joins = emptyVarSet }
+       }
+
+isFindRhsArity :: ArityEnv -> Bool
+isFindRhsArity (AE { ae_mode = FindRhsArity {} }) = True
+isFindRhsArity _                                  = False
 
 -- First some internal functions in snake_case for deleting in certain VarEnvs
 -- of the ArityType. Don't call these; call delInScope* instead!
@@ -976,32 +1051,17 @@ del_sig_env_list :: [Id] -> ArityEnv -> ArityEnv -- internal!
 del_sig_env_list ids = modifySigEnv (\sigs -> delVarEnvList sigs ids)
 {-# INLINE del_sig_env_list #-}
 
-del_join_env :: JoinId -> ArityEnv -> ArityEnv -- internal!
-del_join_env id env@(AE { ae_joins = joins })
-  = env { ae_joins = delVarSet joins id }
-{-# INLINE del_join_env #-}
-
-del_join_env_list :: [JoinId] -> ArityEnv -> ArityEnv -- internal!
-del_join_env_list ids env@(AE { ae_joins = joins })
-  = env { ae_joins = delVarSetList joins ids }
-{-# INLINE del_join_env_list #-}
-
 -- end of internal deletion functions
-
-extendJoinEnv :: ArityEnv -> [JoinId] -> ArityEnv
-extendJoinEnv env@(AE { ae_joins = joins }) join_ids
-  = del_sig_env_list join_ids
-  $ env { ae_joins = joins `extendVarSetList` join_ids }
 
 extendSigEnv :: ArityEnv -> Id -> ArityType -> ArityEnv
 extendSigEnv env id ar_ty
-  = del_join_env id (modifySigEnv (\sigs -> extendVarEnv sigs id ar_ty) env)
+  = modifySigEnv (\sigs -> extendVarEnv sigs id ar_ty) env
 
 delInScope :: ArityEnv -> Id -> ArityEnv
-delInScope env id = del_join_env id $ del_sig_env id env
+delInScope env id = del_sig_env id env
 
 delInScopeList :: ArityEnv -> [Id] -> ArityEnv
-delInScopeList env ids = del_join_env_list ids $ del_sig_env_list ids env
+delInScopeList env ids = del_sig_env_list ids env
 
 lookupSigEnv :: ArityEnv -> Id -> Maybe ArityType
 lookupSigEnv AE{ ae_mode = mode } id = case mode of
@@ -1046,8 +1106,11 @@ myIsCheapApp :: IdEnv ArityType -> CheapAppFun
 myIsCheapApp sigs fn n_val_args = case lookupVarEnv sigs fn of
   -- Nothing means not a local function, fall back to regular
   -- 'GHC.Core.Utils.isCheapApp'
-  Nothing         -> isCheapApp fn n_val_args
-  -- @Just at@ means local function with @at@ as current ArityType.
+  Nothing -> isCheapApp fn n_val_args
+
+  -- `Just at` means local function with `at` as current SafeArityType.
+  -- NB the SafeArityType bit: that means we can ignore the cost flags
+  --    in 'lams', and just consider the length
   -- Roughly approximate what 'isCheapApp' is doing.
   Just (AT oss div)
     | isDeadEndDiv div -> True -- See Note [isCheapApp: bottoming functions] in GHC.Core.Utils
@@ -1055,7 +1118,10 @@ myIsCheapApp sigs fn n_val_args = case lookupVarEnv sigs fn of
     | otherwise -> False
 
 ----------------
-arityType :: ArityEnv -> CoreExpr -> ArityType
+arityType :: HasDebugCallStack => ArityEnv -> CoreExpr -> ArityType
+-- Precondition: all the free join points of the expression
+--               are bound by the ArityEnv
+-- See Note [No free join points in arityType]
 
 arityType env (Cast e co)
   = minWithArity (arityType env e) co_arity -- See Note [Arity trimming]
@@ -1067,12 +1133,13 @@ arityType env (Cast e co)
     -- #5441 is a nice demo
 
 arityType env (Var v)
-  | v `elemVarSet` ae_joins env
-  = botArityType  -- See Note [Eta-expansion and join points]
   | Just at <- lookupSigEnv env v -- Local binding
   = at
   | otherwise
-  = idArityType v
+  = assertPpr  (not (isFindRhsArity env && isJoinId v)) (ppr v) $
+    -- All join-point should be in the ae_sigs
+    -- See Note [No free join points in arityType]
+    idArityType v
 
         -- Lambdas; increase arity
 arityType env (Lam x e)
@@ -1109,32 +1176,11 @@ arityType env (Case scrut bndr _ alts)
   where
     env' = delInScope env bndr
     arity_type_alt (Alt _con bndrs rhs) = arityType (delInScopeList env' bndrs) rhs
-    alts_type = foldr1 andArityType (map arity_type_alt alts)
-
-arityType env (Let (NonRec j rhs) body)
-  | Just join_arity <- isJoinId_maybe j
-  , (_, rhs_body)   <- collectNBinders join_arity rhs
-  = -- See Note [Eta-expansion and join points]
-    andArityType (arityType env rhs_body)
-                 (arityType env' body)
-  where
-     env' = extendJoinEnv env [j]
-
-arityType env (Let (Rec pairs) body)
-  | ((j,_):_) <- pairs
-  , isJoinId j
-  = -- See Note [Eta-expansion and join points]
-    foldr (andArityType . do_one) (arityType env' body) pairs
-  where
-    env' = extendJoinEnv env (map fst pairs)
-    do_one (j,rhs)
-      | Just arity <- isJoinId_maybe j
-      = arityType env' $ snd $ collectNBinders arity rhs
-      | otherwise
-      = pprPanic "arityType:joinrec" (ppr pairs)
+    alts_type = foldr1 (andArityType env) (map arity_type_alt alts)
 
 arityType env (Let (NonRec b r) e)
-  = floatIn cheap_rhs (arityType env' e)
+  = -- See Note [arityType for let-bindings]
+    floatIn cheap_rhs (arityType env' e)
   where
     cheap_rhs = myExprIsCheap env r (Just (idType b))
     env'      = extendSigEnv env b (arityType env r)
@@ -1142,17 +1188,76 @@ arityType env (Let (NonRec b r) e)
 arityType env (Let (Rec prs) e)
   = floatIn (all is_cheap prs) (arityType env' e)
   where
-    env'           = delInScopeList env (map fst prs)
     is_cheap (b,e) = myExprIsCheap env' e (Just (idType b))
+    env'            = foldl extend_rec env prs
+    extend_rec :: ArityEnv -> (Id,CoreExpr) -> ArityEnv
+    extend_rec env (b,e) = extendSigEnv env b  $
+                           mkManifestArityType bndrs body
+                         where
+                           (bndrs, body) = collectBinders e
+      -- We can't call arityType on the RHS, because it might mention
+      -- join points bound in this very letrec, and we don't want to
+      -- do a fixpoint calculation here.  So we make do with the
+      -- manifest arity
 
 arityType env (Tick t e)
   | not (tickishIsCode t)     = arityType env e
 
 arityType _ _ = topArityType
 
-{- Note [Eta-expansion and join points]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (#18328)
+
+{- Note [No free join points in arityType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we call arityType on this expression (EX1)
+   \x . case x of True  -> \y. e
+                  False -> $j 3
+where $j is a join point.  It really makes no sense to talk of the arity
+of this expression, because it has a free join point.  In particular, we
+can't eta-expand the expression because we'd have do the same thing to the
+binding of $j, and we can't see that binding.
+
+If we had (EX2)
+   \x. join $j y = blah
+       case x of True  -> \y. e
+                 False -> $j 3
+then it would make perfect sense: we can determine $j's ArityType, and
+propagate it to the usage site as usual.
+
+But how can we get (EX1)?  It doesn't make much sense, because $j can't
+be a join point under the \x anyway.  So we make it a precondition of
+arityType that the argument has no free join-point Ids.  (This is checked
+with an assesrt in the Var case of arityType.)
+
+BUT the invariant risks being invalidated by one very narrow special case: runRW#
+   join $j y = blah
+   runRW# (\s. case x of True  -> \y. e
+                         False -> $j x)
+
+We have special magic in OccurAnal, and Simplify to allow continuations to
+move into the body of a runRW# call.
+
+So we are careful never to attempt to eta-expand the (\s.blah) in the
+argument to runRW#, at least not when there is a literal lambda there,
+so that OccurAnal has seen it and allowed join points bound outside.
+See Note [No eta-expansion in runRW#] in GHC.Core.Opt.Simplify.Iteration.
+
+Note [arityType for let-bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For non-recursive let-bindings, we just get the arityType of the RHS,
+and extend the environment.  That works nicely for things like this
+(#18793):
+  go = \ ds. case ds_a2CF of {
+               []     -> id
+               : y ys -> case y of { GHC.Types.I# x ->
+                         let acc = go ys in
+                         case x ># 42# of {
+                            __DEFAULT -> acc
+                            1# -> \x1. acc (negate x2)
+
+Here we want to get a good arity for `acc`, based on the ArityType
+of `go`.
+
+All this is particularly important for join points. Consider this (#18328)
 
   f x = join j y = case y of
                       True -> \a. blah
@@ -1165,42 +1270,64 @@ Consider this (#18328)
 and suppose the join point is too big to inline.  Now, what is the
 arity of f?  If we inlined the join point, we'd definitely say "arity
 2" because we are prepared to push case-scrutinisation inside a
-lambda.  But currently the join point totally messes all that up,
-because (thought of as a vanilla let-binding) the arity pinned on 'j'
-is just 1.
+lambda. It's important that we extend the envt with j's ArityType,
+so that we can use that information in the A/C branch of the case.
 
-Why don't we eta-expand j?  Because of
-Note [Do not eta-expand join points] in GHC.Core.Opt.Simplify.Utils
+For /recursive/ bindings it's more difficult, to call arityType,
+because we don't have an ArityType to put in the envt for the
+recursively bound Ids.  So for non-join-point bindings we satisfy
+ourselves with mkManifestArityType.  Typically we'll have eta-expanded
+the binding (based on an earlier fixpoint calculation in
+findRhsArity), so the manifest arity is good.
 
-Even if we don't eta-expand j, why is its arity only 1?
-See invariant 2b in Note [Invariants on join points] in GHC.Core.
+But for /recursive join points/ things are not so good.
+See Note [Arity type for recursive join bindings]
 
-So we do this:
+See Note [Arity type for recursive join bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f x = joinrec j 0 = \ a b c -> (a,x,b)
+                j n = j (n-1)
+        in j 20
 
-* Treat the RHS of a join-point binding, /after/ stripping off
-  join-arity lambda-binders, as very like the body of the let.
-  More precisely, do andArityType with the arityType from the
-  body of the let.
+Obviously `f` should get arity 4.  But the manifest arity of `j`
+is 1.  Remember, we don't eta-expand join points; see
+GHC.Core.Opt.Simplify.Utils Note [Do not eta-expand join points].
+And the ArityInfo on `j` will be just 1 too; see GHC.Core
+Note [Invariants on join points], item (2b).  So using
+Note [ArityType for let-bindings] won't work well.
 
-* Dually, when we come to a /call/ of a join point, just no-op
-  by returning ABot, the bottom element of ArityType,
-  which so that: bot `andArityType` x = x
+We could do a fixpoint iteration, but that's a heavy hammer
+to use in arityType.  So we take advantage of it being a join
+point:
 
-* This works if the join point is bound in the expression we are
-  taking the arityType of.  But if it's bound further out, it makes
-  no sense to say that (say) the arityType of (j False) is ABot.
-  Bad things happen.  So we keep track of the in-scope join-point Ids
-  in ae_join.
+* Extend the ArityEnv to bind each of the recursive binders
+  (all join points) to `botArityType`.  This means that any
+  jump to the join point will return botArityType, which is
+  unit for `andArityType`:
+      botAritType `andArityType` at = at
+  So it's almost as if those "jump" branches didn't exist.
 
-This will make f, above, have arity 2. Then, we'll eta-expand it thus:
+* In this extended env, find the ArityType of each of the RHS, after
+  stripping off the join-point binders.
 
-  f x eta = (join j y = ... in case x of ...) eta
+* Use andArityType to combine all these RHS ArityTypes.
 
-and the Simplify will automatically push that application of eta into
-the join points.
+* Find the ArityType of the body, also in this strange extended
+  environment
 
-An alternative (roughly equivalent) idea would be to carry an
-environment mapping let-bound Ids to their ArityType.
+* And combine that into the result with andArityType.
+
+In our example, the jump (j 20) will yield Bot, as will the jump
+(j (n-1)). We'll 'and' those the ArityType of (\abc. blah).  Good!
+
+In effect we are treating the RHSs as alternative bodies (like
+in a case), and ignoring all jumps.  In this way we don't need
+to take a fixpoint.  Tricky!
+
+NB: we treat /non-recursive/ join points in the same way, but
+actually it works fine to treat them uniformly with normal
+let-bindings, and that takes less code.
 -}
 
 idArityType :: Id -> ArityType
