@@ -1186,7 +1186,7 @@ For example, if f's demand signature is <L><L>, f's arity could be
 greater than, or less than 2. Why?  Because both are conservative
 approximations:
 
-* Arity n means "does no work until applied to at least n args"
+* Arity n means "does no expensive work until applied to at least n args"
   (e.g. (f x1..xm) is cheap to bring to HNF for m<n)
 
 * Dmd sig with n args means "here is how to transform the incoming demand
@@ -1197,7 +1197,7 @@ We used to check in GHC.Core.Lint that dmdTypeDepth <= idArity for a let-bound
 identifier. But that means we would have to zap demand signatures every time we
 reset or decrease arity.
 
-For example, consider the following expression, for example:
+For example, consider the following expression:
 
     (let go x y = `x` seq ... in go) |> co
 

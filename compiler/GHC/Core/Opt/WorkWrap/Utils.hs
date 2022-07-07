@@ -1110,7 +1110,7 @@ Needless to say, there are some wrinkles:
      NB from Andreas: But I think using an error thunk there would be dodgy no matter what
      for example if we decide to pass the argument to the bottoming function cbv.
      As we might do if the function in question is a worker.
-     See Note [CBV Function Ids] in GHC.CoreToStg.Prep. So I just left the strictness check
+     See Note [CBV Function Ids] in GHC.Types.Id.Info. So I just left the strictness check
      in place on top of threading through the marks from the constructor. It's a *really* cheap
      and easy check to make anyway.
 
