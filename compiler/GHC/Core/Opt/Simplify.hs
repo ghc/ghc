@@ -2064,19 +2064,32 @@ rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
                         , sc_cont = cont, sc_hole_ty = fun_ty })
   | fun_id `hasKey` runRWKey
-  , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
   , [ TyArg {}, TyArg {} ] <- rev_args
-  = do { s <- newId (fsLit "s") Many realWorldStatePrimTy
-       ; let (m,_,_) = splitFunTy fun_ty
-             env'  = (arg_se `setInScopeFromE` env) `addNewInScopeIds` [s]
+  -- Do this even if (contIsStop cont)
+  -- See Note [No eta-expansion in runRW#]
+  = do { let arg_env = arg_se `setInScopeFromE` env
              ty'   = contResultType cont
-             cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s
-                                , sc_env = env', sc_cont = cont
-                                , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy ty' }
-                     -- cont' applies to s, then K
-       ; body' <- simplExprC env' arg cont'
-       ; let arg'  = Lam s body'
-             rr'   = getRuntimeRep ty'
+
+       -- If the argument is a literal lambda already, take a short cut
+       -- This isn't just efficiency; if we don't do this we get a beta-redex
+       -- every time, so the simplifier keeps doing more iterations.
+       ; arg' <- case arg of
+           Lam s body -> do { (env', s') <- simplBinder arg_env s
+                            ; body' <- simplExprC env' body cont
+                            ; return (Lam s' body') }
+                            -- Important: do not try to eta-expand this lambda
+                            -- See Note [No eta-expansion in runRW#]
+           _ -> do { s' <- newId (fsLit "s") Many realWorldStatePrimTy
+                   ; let (m,_,_) = splitFunTy fun_ty
+                         env'  = arg_env `addNewInScopeIds` [s']
+                         cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s'
+                                            , sc_env = env', sc_cont = cont
+                                            , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy ty' }
+                                -- cont' applies to s', then K
+                   ; body' <- simplExprC env' arg cont'
+                   ; return (Lam s' body') }
+
+       ; let rr'   = getRuntimeRep ty'
              call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg ty', arg']
        ; return (emptyFloats env, call') }
 
@@ -2183,6 +2196,19 @@ to get the effect that finding (error "foo") in a strict arg position will
 discard the entire application and replace it with (error "foo").  Getting
 all this at once is TOO HARD!
 
+Note [No eta-expansion in runRW#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we see `runRW# (\s. blah)` we must not attempt to eta-expand that
+lambda.  Why not?  Because
+* `blah` can mention join points bound outside the runRW#
+* eta-expansion uses arityType, and
+* `arityType` cannot cope with free join Ids:
+
+So the simplifier spots the literal lambda, and simplifies inside it.
+It's a very special lambda, because it is the one the OccAnal spots and
+allows join points bound /outside/ to be called /inside/.
+
+See Note [No free join points in arityType] in GHC.Core.Opt.Arity
 
 ************************************************************************
 *                                                                      *
