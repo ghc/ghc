@@ -895,8 +895,8 @@ lintCoreExpr e@(App _ _)
     -- N.B. we may have an over-saturated application of the form:
     --   runRW (\s -> \x -> ...) y
   , ty_arg1 : ty_arg2 : arg3 : rest <- args
-  = do { fun_pair1 <- lintCoreArg (idType fun, zeroUE) ty_arg1
-       ; (fun_ty2, ue2) <- lintCoreArg fun_pair1       ty_arg2
+  = do { fun_pair1      <- lintCoreArg (idType fun, zeroUE) ty_arg1
+       ; (fun_ty2, ue2) <- lintCoreArg fun_pair1            ty_arg2
          -- See Note [Linting of runRW#]
        ; let lintRunRWCont :: CoreArg -> LintM (LintedType, UsageEnv)
              lintRunRWCont expr@(Lam _ _) =
