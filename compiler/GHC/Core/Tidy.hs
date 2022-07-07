@@ -117,8 +117,7 @@ tidyCbvInfoTop boot_exports id rhs
 
 -- See Note [CBV Function Ids]
 tidyCbvInfoLocal :: HasDebugCallStack => Id -> CoreExpr -> Id
-tidyCbvInfoLocal id rhs
-  | otherwise = computeCbvInfo id rhs
+tidyCbvInfoLocal id rhs = computeCbvInfo id rhs
 
 -- | For a binding we:
 -- * Look at the args
@@ -135,9 +134,9 @@ computeCbvInfo :: HasCallStack
                -> Id
 -- computeCbvInfo fun_id rhs = fun_id
 computeCbvInfo fun_id rhs
-  | (isWorkerLike || isJoinId fun_id) &&  (valid_unlifted_worker val_args)
-  =
-    -- pprTrace "computeCbvInfo"
+  | is_wkr_like || isJust mb_join_id
+  , valid_unlifted_worker val_args
+  = -- pprTrace "computeCbvInfo"
     --   (text "fun" <+> ppr fun_id $$
     --     text "arg_tys" <+> ppr (map idType val_args) $$
 
@@ -146,31 +145,48 @@ computeCbvInfo fun_id rhs
     --     text "cbv_marks" <+> ppr cbv_marks $$
     --     text "out_id" <+> ppr cbv_bndr $$
     --     ppr rhs)
-      cbv_bndr
+    cbv_bndr
+
   | otherwise = fun_id
   where
-    val_args = filter isId . fst $ collectBinders rhs
-    cbv_marks =
-      -- CBV marks are only set during tidy so none should be present already.
-      assertPpr (maybe True null $ idCbvMarks_maybe fun_id) (ppr fun_id <+> (ppr $ idCbvMarks_maybe fun_id) $$ ppr rhs) $
-      map mkMark val_args
-    cbv_bndr
-        | valid_unlifted_worker val_args
-        , any isMarkedCbv cbv_marks
-        -- seqList to avoid retaining the original rhs
-        = cbv_marks `seqList` setIdCbvMarks fun_id cbv_marks
-        | otherwise =
-          -- pprTraceDebug "tidyCbvInfo: Worker seems to take unboxed tuple/sum types!" (ppr fun_id <+> ppr rhs)
-          asNonWorkerLikeId fun_id
-    -- We don't set CBV marks on functions which take unboxed tuples or sums as arguments.
-    -- Doing so would require us to compute the result of unarise here in order to properly determine
-    -- argument positions at runtime.
-    -- In practice this doesn't matter much. Most "interesting" functions will get a W/W split which will eliminate
-    -- unboxed tuple arguments, and unboxed sums are rarely used. But we could change this in the future and support
+    mb_join_id  = isJoinId_maybe fun_id
+    is_wkr_like = isWorkerLikeId fun_id
+
+    val_args = filter isId lam_bndrs
+    -- When computing CbvMarks, we limit the arity of join points to
+    -- the JoinArity, because that's the arity we are going to use
+    -- when calling it. There may be more lambdas than that on the RHS.
+    lam_bndrs | Just join_arity <- mb_join_id
+              = fst $ collectNBinders join_arity rhs
+              | otherwise
+              = fst $ collectBinders rhs
+
+    cbv_marks = -- assert: CBV marks are only set during tidy so none should be present already.
+                assertPpr (maybe True null $ idCbvMarks_maybe fun_id)
+                          (ppr fun_id <+> (ppr $ idCbvMarks_maybe fun_id) $$ ppr rhs) $
+                map mkMark val_args
+
+    cbv_bndr | any isMarkedCbv cbv_marks
+             = cbv_marks `seqList` setIdCbvMarks fun_id cbv_marks
+               -- seqList: avoid retaining the original rhs
+
+             | otherwise
+             = -- pprTraceDebug "tidyCbvInfo: Worker seems to take unboxed tuple/sum types!"
+               --    (ppr fun_id <+> ppr rhs)
+               asNonWorkerLikeId fun_id
+
+    -- We don't set CBV marks on functions which take unboxed tuples or sums as
+    -- arguments.  Doing so would require us to compute the result of unarise
+    -- here in order to properly determine argument positions at runtime.
+    --
+    -- In practice this doesn't matter much. Most "interesting" functions will
+    -- get a W/W split which will eliminate unboxed tuple arguments, and unboxed
+    -- sums are rarely used. But we could change this in the future and support
     -- unboxed sums/tuples as well.
     valid_unlifted_worker args =
       -- pprTrace "valid_unlifted" (ppr fun_id $$ ppr args) $
       all isSingleUnarisedArg args
+
     isSingleUnarisedArg v
       | isUnboxedSumType ty = False
       | isUnboxedTupleType ty = isSimplePrimRep (typePrimRep ty)
@@ -188,7 +204,6 @@ computeCbvInfo fun_id rhs
       , not (isDeadEndId fun_id) = MarkedCbv
       | otherwise = NotMarkedCbv
 
-    isWorkerLike = isWorkerLikeId fun_id
 
 ------------  Expressions  --------------
 tidyExpr :: TidyEnv -> CoreExpr -> CoreExpr
@@ -339,7 +354,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
         new_info = vanillaIdInfo
                     `setOccInfo`        occInfo old_info
                     `setArityInfo`      arityInfo old_info
-                    `setDmdSigInfo` zapDmdEnvSig (dmdSigInfo old_info)
+                    `setDmdSigInfo`     zapDmdEnvSig (dmdSigInfo old_info)
                     `setDemandInfo`     demandInfo old_info
                     `setInlinePragInfo` inlinePragInfo old_info
                     `setUnfoldingInfo`  new_unf

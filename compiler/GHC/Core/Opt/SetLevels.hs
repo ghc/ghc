@@ -104,7 +104,7 @@ import GHC.Types.Unique.DSet  ( getUniqDSet )
 import GHC.Types.Var.Env
 import GHC.Types.Literal      ( litIsTrivial )
 import GHC.Types.Demand       ( DmdSig, prependArgsDmdSig )
-import GHC.Types.Cpr          ( mkCprSig, botCpr )
+import GHC.Types.Cpr          ( CprSig, prependArgsCprSig )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
 import GHC.Types.Unique       ( hasKey )
@@ -659,9 +659,7 @@ lvlMFE env strict_ctxt ann_expr
          -- No wrapping needed if the type is lifted, or is a literal string
          -- or if we are wrapping it in one or more value lambdas
   = do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive
-                              (isJust mb_bot_str)
-                              join_arity_maybe
-                              ann_expr
+                              is_bot_lam join_arity_maybe ann_expr
                   -- Treat the expr just like a right-hand side
        ; var <- newLvlVar expr1 join_arity_maybe is_mk_static
        ; let var2 = annotateBotStr var float_n_lams mb_bot_str
@@ -702,6 +700,7 @@ lvlMFE env strict_ctxt ann_expr
     fvs          = freeVarsOf ann_expr
     fvs_ty       = tyCoVarsOfType expr_ty
     is_bot       = isBottomThunk mb_bot_str
+    is_bot_lam   = isJust mb_bot_str
     is_function  = isFunction ann_expr
     mb_bot_str   = exprBotStrictness_maybe expr
                            -- See Note [Bottoming floats]
@@ -750,10 +749,10 @@ hasFreeJoin :: LevelEnv -> DVarSet -> Bool
 hasFreeJoin env fvs
   = not (maxFvLevel isJoinId env fvs == tOP_LEVEL)
 
-isBottomThunk :: Maybe (Arity, s) -> Bool
+isBottomThunk :: Maybe (Arity, DmdSig, CprSig) -> Bool
 -- See Note [Bottoming floats] (2)
-isBottomThunk (Just (0, _)) = True   -- Zero arity
-isBottomThunk _             = False
+isBottomThunk (Just (0, _, _)) = True   -- Zero arity
+isBottomThunk _                = False
 
 {- Note [Floating to the top]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -977,16 +976,6 @@ Id, *immediately*, for three reasons:
     thing is based on the cheap-and-cheerful exprIsDeadEnd, I'm not sure
     that it'll nail all such cases.
 
-Note [Bottoming floats: eta expansion] c.f Note [Bottoming floats]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Tiresomely, though, the simplifier has an invariant that the manifest
-arity of the RHS should be the same as the arity; but we can't call
-etaExpand during GHC.Core.Opt.SetLevels because it works over a decorated form of
-CoreExpr.  So we do the eta expansion later, in GHC.Core.Opt.FloatOut.
-But we should only eta-expand if the RHS doesn't already have the right
-exprArity, otherwise we get unnecessary top-level bindings if the RHS was
-trivial after the next run of the Simplifier.
-
 Note [Case MFEs]
 ~~~~~~~~~~~~~~~~
 We don't float a case expression as an MFE from a strict context.  Why not?
@@ -1008,17 +997,18 @@ answer.
 
 -}
 
-annotateBotStr :: Id -> Arity -> Maybe (Arity, DmdSig) -> Id
+annotateBotStr :: Id -> Arity -> Maybe (Arity, DmdSig, CprSig) -> Id
 -- See Note [Bottoming floats] for why we want to add
 -- bottoming information right now
 --
 -- n_extra are the number of extra value arguments added during floating
-annotateBotStr id n_extra mb_str
-  = case mb_str of
-      Nothing           -> id
-      Just (arity, sig) -> id `setIdArity`  (arity + n_extra)
-                              `setIdDmdSig` prependArgsDmdSig n_extra sig
-                              `setIdCprSig` mkCprSig (arity + n_extra) botCpr
+annotateBotStr id n_extra mb_bot_str
+  | Just (arity, str_sig, cpr_sig) <- mb_bot_str
+  = id `setIdArity`  (arity + n_extra)
+       `setIdDmdSig` prependArgsDmdSig n_extra str_sig
+       `setIdCprSig` prependArgsCprSig n_extra cpr_sig
+  | otherwise
+  = id
 
 notWorthFloating :: CoreExpr -> [Var] -> Bool
 -- Returns True if the expression would be replaced by
@@ -1127,7 +1117,7 @@ lvlBind env (AnnNonRec bndr rhs)
           -- bit brutal, but unlifted bindings aren't expensive either
 
   = -- No float
-    do { rhs' <- lvlRhs env NonRecursive is_bot mb_join_arity rhs
+    do { rhs' <- lvlRhs env NonRecursive is_bot_lam mb_join_arity rhs
        ; let  bind_lvl        = incMinorLvl (le_ctxt_lvl env)
               (env', [bndr']) = substAndLvlBndrs NonRecursive env bind_lvl [bndr]
        ; return (NonRec bndr' rhs', env') }
@@ -1136,7 +1126,7 @@ lvlBind env (AnnNonRec bndr rhs)
   | null abs_vars
   = do {  -- No type abstraction; clone existing binder
          rhs' <- lvlFloatRhs [] dest_lvl env NonRecursive
-                             is_bot mb_join_arity rhs
+                             is_bot_lam mb_join_arity rhs
        ; (env', [bndr']) <- cloneLetVars NonRecursive env dest_lvl [bndr]
        ; let bndr2 = annotateBotStr bndr' 0 mb_bot_str
        ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
@@ -1144,7 +1134,7 @@ lvlBind env (AnnNonRec bndr rhs)
   | otherwise
   = do {  -- Yes, type abstraction; create a new binder, extend substitution, etc
          rhs' <- lvlFloatRhs abs_vars dest_lvl env NonRecursive
-                             is_bot mb_join_arity rhs
+                             is_bot_lam mb_join_arity rhs
        ; (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars [bndr]
        ; let bndr2 = annotateBotStr bndr' n_extra mb_bot_str
        ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
@@ -1155,11 +1145,12 @@ lvlBind env (AnnNonRec bndr rhs)
     rhs_fvs    = freeVarsOf rhs
     bind_fvs   = rhs_fvs `unionDVarSet` dIdFreeVars bndr
     abs_vars   = abstractVars dest_lvl env bind_fvs
-    dest_lvl   = destLevel env bind_fvs ty_fvs (isFunction rhs) is_bot is_join
+    dest_lvl   = destLevel env bind_fvs ty_fvs (isFunction rhs) is_bot_lam is_join
 
     deann_rhs  = deAnnotate rhs
     mb_bot_str = exprBotStrictness_maybe deann_rhs
-    is_bot     = isJust mb_bot_str
+    is_bot_lam = isJust mb_bot_str
+        -- is_bot_lam: looks like (\xy. bot), maybe zero lams
         -- NB: not isBottomThunk!  See Note [Bottoming floats] point (3)
 
     n_extra    = count isId abs_vars

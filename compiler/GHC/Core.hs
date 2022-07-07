@@ -43,7 +43,7 @@ module GHC.Core (
         -- ** Simple 'Expr' access functions and predicates
         bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
         collectBinders, collectTyBinders, collectTyAndValBinders,
-        collectNBinders,
+        collectNBinders, collectNValBinders_maybe,
         collectArgs, stripNArgs, collectArgsTicks, flattenBinds,
         collectFunSimple,
 
@@ -746,17 +746,18 @@ Join points must follow these invariants:
          the binder.  Reason: if we want to push a continuation into
          the RHS we must push it into the unfolding as well.
 
-     2b. The Arity (in the IdInfo) of a join point is the number of value
-         binders in the top n lambdas, where n is the join arity.
+     2b. The Arity (in the IdInfo) of a join point varies independently of the
+         join-arity. For example, we could have
+             j x = case x of { T -> \y.y; F -> \y.3 }
+         Its join-arity is 1, but its idArity is 2; and we do not eta-expand
+         join points: see Note [Do not eta-expand join points] in
+                          GHC.Core.Opt.Simplify.Utils.
 
-         So arity <= join arity; the former counts only value binders
-         while the latter counts all binders.
-         e.g. Suppose $j has join arity 1
-               let j = \x y. e in case x of { A -> j 1; B -> j 2 }
-         Then its ordinary arity is also 1, not 2.
+         Allowing the idArity to be bigger than the join-arity is
+         important in arityType; see GHC.Core.Opt.Arity
+         Note [Arity for recursive join bindings]
 
-         The arity of a join point isn't very important; but short of setting
-         it to zero, it is helpful to have an invariant.  E.g. #17294.
+         Historical note: see #17294.
 
   3. If the binding is recursive, then all other bindings in the recursive group
      must also be join points.
@@ -1973,9 +1974,11 @@ collectBinders         :: Expr b   -> ([b],     Expr b)
 collectTyBinders       :: CoreExpr -> ([TyVar], CoreExpr)
 collectValBinders      :: CoreExpr -> ([Id],    CoreExpr)
 collectTyAndValBinders :: CoreExpr -> ([TyVar], [Id], CoreExpr)
--- | Strip off exactly N leading lambdas (type or value). Good for use with
--- join points.
-collectNBinders        :: Int -> Expr b -> ([b], Expr b)
+
+-- | Strip off exactly N leading lambdas (type or value).
+-- Good for use with join points.
+-- Panic if there aren't enough
+collectNBinders :: JoinArity -> Expr b -> ([b], Expr b)
 
 collectBinders expr
   = go [] expr
@@ -2007,6 +2010,18 @@ collectNBinders orig_n orig_expr
     go 0 bs expr      = (reverse bs, expr)
     go n bs (Lam b e) = go (n-1) (b:bs) e
     go _ _  _         = pprPanic "collectNBinders" $ int orig_n
+
+-- | Strip off exactly N leading value lambdas
+-- returning all the binders found up to that point
+-- Return Nothing if there aren't enough
+collectNValBinders_maybe :: Arity -> CoreExpr -> Maybe ([Var], CoreExpr)
+collectNValBinders_maybe orig_n orig_expr
+  = go orig_n [] orig_expr
+  where
+    go 0 bs expr      = Just (reverse bs, expr)
+    go n bs (Lam b e) | isId b    = go (n-1) (b:bs) e
+                      | otherwise = go n     (b:bs) e
+    go _ _  _         = Nothing
 
 -- | Takes a nested application expression and returns the function
 -- being applied and the arguments to which it is applied

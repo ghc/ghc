@@ -53,7 +53,6 @@ import GHC.Types.Id
 import GHC.Types.Id.Make ( mkDictSelRhs )
 import GHC.Types.Id.Info
 import GHC.Types.Demand  ( isDeadEndAppSig, isNopSig, nopSig, isDeadEndSig )
-import GHC.Types.Cpr     ( mkCprSig, botCpr )
 import GHC.Types.Basic
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Name.Set
@@ -1275,21 +1274,22 @@ tidyTopIdInfo uf_opts rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unf
 
               -- No demand signature, so try a
               -- cheap-and-cheerful bottom analyser
-              | Just (_, nsig) <- mb_bot_str
-              = nsig
+              | Just (_, bot_str_sig, _) <- mb_bot_str
+              = bot_str_sig
 
               -- No stricness info
               | otherwise = nopSig
 
     cpr = cprSigInfo idinfo
-    final_cpr | Just _ <- mb_bot_str
-              = mkCprSig arity botCpr
+    final_cpr | Just (_, _, bot_cpr_sig) <- mb_bot_str
+              = bot_cpr_sig
               | otherwise
               = cpr
 
-    _bottom_hidden id_sig = case mb_bot_str of
-                                  Nothing         -> False
-                                  Just (arity, _) -> not (isDeadEndAppSig id_sig arity)
+    _bottom_hidden id_sig
+      = case mb_bot_str of
+          Nothing            -> False
+          Just (arity, _, _) -> not (isDeadEndAppSig id_sig arity)
 
     --------- Unfolding ------------
     unf_info = realUnfoldingInfo idinfo

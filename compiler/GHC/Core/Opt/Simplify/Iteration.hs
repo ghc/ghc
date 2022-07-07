@@ -38,8 +38,8 @@ import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
-import GHC.Core.Opt.Arity ( ArityType, exprArity, getBotArity
-                          , pushCoTyArg, pushCoValArg
+import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
+                          , pushCoTyArg, pushCoValArg, exprIsDeadEnd
                           , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo )
@@ -53,7 +53,6 @@ import GHC.Types.Id.Make   ( seqId )
 import GHC.Types.Id.Info
 import GHC.Types.Name   ( mkSystemVarName, isExternalName, getOccFS )
 import GHC.Types.Demand
-import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
@@ -301,8 +300,8 @@ simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
 
   | otherwise
   = case bind_cxt of
-      BC_Join cont  -> simplTrace "SimplBind:join" (ppr old_bndr) $
-                       simplJoinBind env cont old_bndr new_bndr rhs env
+      BC_Join is_rec cont -> simplTrace "SimplBind:join" (ppr old_bndr) $
+                             simplJoinBind env is_rec cont old_bndr new_bndr rhs env
 
       BC_Let top_lvl is_rec -> simplTrace "SimplBind:normal" (ppr old_bndr) $
                                simplLazyBind env top_lvl is_rec old_bndr new_bndr rhs env
@@ -385,16 +384,17 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 
 --------------------------
 simplJoinBind :: SimplEnv
+              -> RecFlag
               -> SimplCont
               -> InId -> OutId          -- Binder, both pre-and post simpl
                                         -- The OutId has IdInfo, except arity,
                                         --   unfolding
               -> InExpr -> SimplEnv     -- The right hand side and its env
               -> SimplM (SimplFloats, SimplEnv)
-simplJoinBind env cont old_bndr new_bndr rhs rhs_se
+simplJoinBind env is_rec cont old_bndr new_bndr rhs rhs_se
   = do  { let rhs_env = rhs_se `setInScopeFromE` env
         ; rhs' <- simplJoinRhs rhs_env old_bndr rhs cont
-        ; completeBind env (BC_Join cont) old_bndr new_bndr rhs' }
+        ; completeBind env (BC_Join is_rec cont) old_bndr new_bndr rhs' }
 
 --------------------------
 simplNonRecX :: SimplEnv
@@ -982,11 +982,11 @@ addLetBndrInfo new_bndr new_arity_type new_unf
           = info2
 
     -- Bottoming bindings: see Note [Bottoming bindings]
-    info4 = case getBotArity new_arity_type of
+    info4 = case arityTypeBotSigs_maybe new_arity_type of
         Nothing -> info3
-        Just ar -> assert (ar == new_arity) $
-                   info3 `setDmdSigInfo` mkVanillaDmdSig new_arity botDiv
-                         `setCprSigInfo` mkCprSig new_arity botCpr
+        Just (ar, str_sig, cpr_sig) -> assert (ar == new_arity) $
+                                       info3 `setDmdSigInfo` str_sig
+                                             `setCprSigInfo` cpr_sig
 
      -- Zap call arity info. We have used it by now (via
      -- `tryEtaExpandRhs`), and the simplifier can invalidate this
@@ -1872,8 +1872,8 @@ simplNonRecJoinPoint env bndr rhs body cont
         ; let mult   = contHoleScaling cont
               res_ty = contResultType cont
         ; (env1, bndr1)    <- simplNonRecJoinBndr env bndr mult res_ty
-        ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (BC_Join cont)
-        ; (floats1, env3)  <- simplJoinBind env2 cont bndr bndr2 rhs env
+        ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (BC_Join NonRecursive cont)
+        ; (floats1, env3)  <- simplJoinBind env2 NonRecursive cont bndr bndr2 rhs env
         ; (floats2, body') <- simplExprF env3 body cont
         ; return (floats1 `addFloats` floats2, body') }
 
@@ -1890,7 +1890,7 @@ simplRecJoinPoint env pairs body cont
        ; env1 <- simplRecJoinBndrs env bndrs mult res_ty
                -- NB: bndrs' don't have unfoldings or rules
                -- We add them as we go down
-       ; (floats1, env2)  <- simplRecBind env1 (BC_Join cont) pairs
+       ; (floats1, env2)  <- simplRecBind env1 (BC_Join Recursive cont) pairs
        ; (floats2, body') <- simplExprF env2 body cont
        ; return (floats1 `addFloats` floats2, body') }
 
@@ -2173,19 +2173,32 @@ rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
                         , sc_cont = cont, sc_hole_ty = fun_ty })
   | fun_id `hasKey` runRWKey
-  , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
   , [ TyArg {}, TyArg {} ] <- rev_args
-  = do { s <- newId (fsLit "s") Many realWorldStatePrimTy
-       ; let (m,_,_) = splitFunTy fun_ty
-             env'  = (arg_se `setInScopeFromE` env) `addNewInScopeIds` [s]
+  -- Do this even if (contIsStop cont)
+  -- See Note [No eta-expansion in runRW#]
+  = do { let arg_env = arg_se `setInScopeFromE` env
              ty'   = contResultType cont
-             cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s
-                                , sc_env = env', sc_cont = cont
-                                , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy ty' }
-                     -- cont' applies to s, then K
-       ; body' <- simplExprC env' arg cont'
-       ; let arg'  = Lam s body'
-             rr'   = getRuntimeRep ty'
+
+       -- If the argument is a literal lambda already, take a short cut
+       -- This isn't just efficiency; if we don't do this we get a beta-redex
+       -- every time, so the simplifier keeps doing more iterations.
+       ; arg' <- case arg of
+           Lam s body -> do { (env', s') <- simplBinder arg_env s
+                            ; body' <- simplExprC env' body cont
+                            ; return (Lam s' body') }
+                            -- Important: do not try to eta-expand this lambda
+                            -- See Note [No eta-expansion in runRW#]
+           _ -> do { s' <- newId (fsLit "s") Many realWorldStatePrimTy
+                   ; let (m,_,_) = splitFunTy fun_ty
+                         env'  = arg_env `addNewInScopeIds` [s']
+                         cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s'
+                                            , sc_env = env', sc_cont = cont
+                                            , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy ty' }
+                                -- cont' applies to s', then K
+                   ; body' <- simplExprC env' arg cont'
+                   ; return (Lam s' body') }
+
+       ; let rr'   = getRuntimeRep ty'
              call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg ty', arg']
        ; return (emptyFloats env, call') }
 
@@ -2292,6 +2305,19 @@ to get the effect that finding (error "foo") in a strict arg position will
 discard the entire application and replace it with (error "foo").  Getting
 all this at once is TOO HARD!
 
+Note [No eta-expansion in runRW#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we see `runRW# (\s. blah)` we must not attempt to eta-expand that
+lambda.  Why not?  Because
+* `blah` can mention join points bound outside the runRW#
+* eta-expansion uses arityType, and
+* `arityType` cannot cope with free join Ids:
+
+So the simplifier spots the literal lambda, and simplifies inside it.
+It's a very special lambda, because it is the one the OccAnal spots and
+allows join points bound /outside/ to be called /inside/.
+
+See Note [No free join points in arityType] in GHC.Core.Opt.Arity
 
 ************************************************************************
 *                                                                      *
@@ -4126,9 +4152,9 @@ simplStableUnfolding env bind_cxt id rhs_ty id_arity unf
       CoreUnfolding { uf_tmpl = expr, uf_src = src, uf_guidance = guide }
         | isStableSource src
         -> do { expr' <- case bind_cxt of
-                  BC_Join cont    -> -- Binder is a join point
-                                     -- See Note [Rules and unfolding for join points]
-                                     simplJoinRhs unf_env id expr cont
+                  BC_Join _ cont    -> -- Binder is a join point
+                                       -- See Note [Rules and unfolding for join points]
+                                       simplJoinRhs unf_env id expr cont
                   BC_Let _ is_rec -> -- Binder is not a join point
                                      do { let cont = mkRhsStop rhs_ty is_rec topDmd
                                            -- mkRhsStop: switch off eta-expansion at the top level
@@ -4181,6 +4207,7 @@ simplStableUnfolding env bind_cxt id rhs_ty id_arity unf
 
     -- See Note [Eta-expand stable unfoldings]
     -- Use the arity from the main Id (in id_arity), rather than computing it from rhs
+    -- Not used for join points
     eta_expand expr | seEtaExpand env
                     , exprArity expr < arityTypeArity id_arity
                     , wantEtaExpansion expr
@@ -4219,7 +4246,7 @@ Wrinkles
 
 * Don't eta-expand join points; see Note [Do not eta-expand join points]
   in GHC.Core.Opt.Simplify.Utils.  We uphold this because the join-point
-  case (bind_cxt = BC_Join _) doesn't use eta_expand.
+  case (bind_cxt = BC_Join {}) doesn't use eta_expand.
 
 Note [Force bottoming field]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4292,8 +4319,8 @@ simplRules env mb_new_id rules bind_cxt
       = do { (env', bndrs') <- simplBinders env bndrs
            ; let rhs_ty = substTy env' (exprType rhs)
                  rhs_cont = case bind_cxt of  -- See Note [Rules and unfolding for join points]
-                                BC_Let {}    -> mkBoringStop rhs_ty
-                                BC_Join cont -> assertPpr join_ok bad_join_msg cont
+                                BC_Let {}      -> mkBoringStop rhs_ty
+                                BC_Join _ cont -> assertPpr join_ok bad_join_msg cont
                  lhs_env = updMode updModeForRules env'
                  rhs_env = updMode (updModeForStableUnfoldings act) env'
                            -- See Note [Simplifying the RHS of a RULE]

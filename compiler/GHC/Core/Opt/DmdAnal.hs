@@ -956,16 +956,15 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
   = -- pprTrace "dmdAnalRhsSig" (ppr id $$ ppr let_dmd $$ ppr rhs_dmds $$ ppr sig $$ ppr lazy_fv) $
     (final_env, lazy_fv, final_id, final_rhs)
   where
-    rhs_arity = idArity id
-    -- See Note [Demand signatures are computed for a threshold demand based on idArity]
+    threshold_arity = thresholdArity id rhs
 
-    rhs_dmd = mkCalledOnceDmds rhs_arity body_dmd
+    rhs_dmd = mkCalledOnceDmds threshold_arity body_dmd
 
     body_dmd
       | isJoinId id
       -- See Note [Demand analysis for join points]
       -- See Note [Invariants on join points] invariant 2b, in GHC.Core
-      --     rhs_arity matches the join arity of the join point
+      --     threshold_arity matches the join arity of the join point
       -- See Note [Unboxed demand on function bodies returning small products]
       = unboxedWhenSmall env rec_flag (resultType_maybe id) let_dmd
       | otherwise
@@ -975,10 +974,10 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
     WithDmdType rhs_dmd_ty rhs' = dmdAnal env rhs_dmd rhs
     DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
     -- See Note [Boxity for bottoming functions]
-    (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id rhs_arity rhs' rhs_div
+    (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id threshold_arity rhs' rhs_div
                                   `orElse` (rhs_dmds, rhs')
 
-    sig = mkDmdSigForArity rhs_arity (DmdType sig_fv final_rhs_dmds rhs_div)
+    sig = mkDmdSigForArity threshold_arity (DmdType sig_fv final_rhs_dmds rhs_div)
 
     final_id   = id `setIdDmdSig` sig
     !final_env = extendAnalEnv top_lvl env final_id sig
@@ -1004,6 +1003,13 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
 
     -- See Note [Lazy and unleashable free variables]
     !(!lazy_fv, !sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
+
+thresholdArity :: Id -> CoreExpr -> Arity
+-- See Note [Demand signatures are computed for a threshold arity based on idArity]
+thresholdArity fn rhs
+  = case isJoinId_maybe fn of
+      Just join_arity -> count isId $ fst $ collectNBinders join_arity rhs
+      Nothing         -> idArity fn
 
 -- | The result type after applying 'idArity' many arguments. Returns 'Nothing'
 -- when the type doesn't have exactly 'idArity' many arrows.
@@ -1137,28 +1143,40 @@ meaning one absent argument, returns bottom.  That seems odd because
 there's a \y inside.  But it's right because when consumed in a C1(L)
 context the RHS of the join point is indeed bottom.
 
-Note [Demand signatures are computed for a threshold demand based on idArity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We compute demand signatures assuming idArity incoming arguments to approximate
-behavior for when we have a call site with at least that many arguments. idArity
-is /at least/ the number of manifest lambdas, but might be higher for PAPs and
-trivial RHS (see Note [Demand analysis for trivial right-hand sides]).
+Note [Demand signatures are computed for a threshold arity based on idArity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given a binding { f = rhs }, we compute a "theshold arity", and do demand
+analysis based on a call with that many value arguments.
 
-Because idArity of a function varies independently of its cardinality
-properties (cf. Note [idArity varies independently of dmdTypeDepth]), we
+The threshold we use is
+
+* Ordinary bindings: idArity f.
+  Why idArity arguments? Because that's a conservative estimate of how many
+  arguments we must feed a function before it does anything interesting with
+  them.  Also it elegantly subsumes the trivial RHS and PAP case.
+
+  idArity is /at least/ the number of manifest lambdas, but might be higher for
+  PAPs and trivial RHS (see Note [Demand analysis for trivial right-hand sides]).
+
+* Join points: the value-binder subset of the JoinArity.  This can
+  be less than the number of visible lambdas; e.g.
+     join j x = \y. blah
+     in ...(jump j 2)....(jump j 3)....
+  We know that j will never be applied to more than 1 arg (its join
+  arity, and we don't eta-expand join points, so here a threshold
+  of 1 is the best we can do.
+
+Note that the idArity of a function varies independently of its cardinality
+properties (cf. Note [idArity varies independently of dmdTypeDepth]), so we
 implicitly encode the arity for when a demand signature is sound to unleash
-in its 'dmdTypeDepth' (cf. Note [Understanding DmdType and DmdSig] in
-GHC.Types.Demand). It is unsound to unleash a demand signature when the
-incoming number of arguments is less than that.
-See Note [What are demand signatures?] in GHC.Types.Demand for more details
-on soundness.
+in its 'dmdTypeDepth', not in its idArity (cf. Note [Understanding DmdType
+and DmdSig] in GHC.Types.Demand). It is unsound to unleash a demand
+signature when the incoming number of arguments is less than that. See
+GHC.Types.Demand Note [What are demand signatures?]  for more details on
+soundness.
 
-Why idArity arguments? Because that's a conservative estimate of how many
-arguments we must feed a function before it does anything interesting with them.
-Also it elegantly subsumes the trivial RHS and PAP case.
-
-There might be functions for which we might want to analyse for more incoming
-arguments than idArity. Example:
+Note that there might, in principle, be functions for which we might want to
+analyse for more incoming arguments than idArity. Example:
 
   f x =
     if expensive
@@ -1175,6 +1193,7 @@ strictness info for `y` (and more precise info on `x`) and possibly CPR
 information, but
 
   * We would no longer be able to unleash the signature at unary call sites
+
   * Performing the worker/wrapper split based on this information would be
     implicitly eta-expanding `f`, playing fast and loose with divergence and
     even being unsound in the presence of newtypes, so we refrain from doing so.

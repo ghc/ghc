@@ -13,7 +13,7 @@
 module GHC.Core.Opt.Arity
    ( -- Finding arity
      manifestArity, joinRhsArity, exprArity
-   , findRhsArity, exprBotStrictness_maybe
+   , findRhsArity, cheapArityType
    , ArityOpts(..)
 
    -- ** Eta expansion
@@ -23,8 +23,11 @@ module GHC.Core.Opt.Arity
    , tryEtaReduce
 
    -- ** ArityType
-   , ArityType, mkBotArityType, mkManifestArityType
-   , arityTypeArity, idArityType, getBotArity
+   , ArityType, mkBotArityType
+   , arityTypeArity, idArityType
+
+   -- ** Bottoming things
+   , exprIsDeadEnd, exprBotStrictness_maybe, arityTypeBotSigs_maybe
 
    -- ** typeArity and the state hack
    , typeArity, typeOneShots, typeOneShot
@@ -63,6 +66,7 @@ import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
 
 import GHC.Types.Demand
+import GHC.Types.Cpr( CprSig, mkCprSig, botCpr )
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -134,36 +138,22 @@ joinRhsArity _         = 0
 
 
 ---------------
-exprArity :: CoreExpr -> Arity
--- ^ An approximate, fast, version of 'exprEtaExpandArity'
--- We do /not/ guarantee that exprArity e <= typeArity e
--- You may need to do arity trimming after calling exprArity
--- See Note [Arity trimming]
--- Reason: if we do arity trimming here we have take exprType
---         and that can be expensive if there is a large cast
-exprArity e = go e
-  where
-    go (Var v)                     = idArity v
-    go (Lam x e) | isId x          = go e + 1
-                 | otherwise       = go e
-    go (Tick t e) | not (tickishIsCode t) = go e
-    go (Cast e _)                  = go e
-    go (App e (Type _))            = go e
-    go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
-        -- See Note [exprArity for applications]
-        -- NB: coercions count as a value argument
-
-    go _                           = 0
-
----------------
-exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, DmdSig)
+exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, DmdSig, CprSig)
 -- A cheap and cheerful function that identifies bottoming functions
--- and gives them a suitable strictness signatures.  It's used during
--- float-out
-exprBotStrictness_maybe e
-  = case getBotArity (arityType botStrictnessArityEnv e) of
-        Nothing -> Nothing
-        Just ar -> Just (ar, mkVanillaDmdSig ar botDiv)
+-- and gives them a suitable strictness and CPR signatures.
+-- It's used during float-out
+exprBotStrictness_maybe e = arityTypeBotSigs_maybe (cheapArityType e)
+
+arityTypeBotSigs_maybe :: ArityType ->  Maybe (Arity, DmdSig, CprSig)
+-- Arity of a divergent function
+arityTypeBotSigs_maybe (AT lams div)
+  | isDeadEndDiv div = Just ( arity
+                            , mkVanillaDmdSig arity botDiv
+                            , mkCprSig arity botCpr)
+  | otherwise        = Nothing
+  where
+    arity = length lams
+
 
 {- Note [exprArity for applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -467,7 +457,14 @@ We want this to have arity 1 if the \y-abstraction is a 1-shot lambda.
 
 Note [Dealing with bottom]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-A Big Deal with computing arities is expressions like
+GHC does some transformations that are technically unsound wrt
+bottom, because doing so improves arities... a lot!  We describe
+them in this Note.
+
+The flag -fpedantic-bottoms (off by default) restore technically
+correct behaviour at the cots of efficiency.
+
+It's mostly to do with eta-expansion.  Consider
 
    f = \x -> case x of
                True  -> \s -> e1
@@ -487,7 +484,7 @@ would lose an important transformation for many programs. (See
 
 Consider also
         f = \x -> error "foo"
-Here, arity 1 is fine.  But if it is
+Here, arity 1 is fine.  But if it looks like this (see #22068)
         f = \x -> case x of
                         True  -> error "foo"
                         False -> \y -> x+y
@@ -752,7 +749,8 @@ SafeArityType to indicate where we believe the ArityType is safe.
 -- where the @at@ fields of @ALam@ are inductively subject to the same order.
 -- That is, @ALam os at1 < ALam os at2@ iff @at1 < at2@.
 --
--- Why the strange Top element? See Note [Combining case branches].
+-- Why the strange Top element?
+--   See Note [Combining case branches: optimistic one-shot-ness]
 --
 -- We rely on this lattice structure for fixed-point iteration in
 -- 'findRhsArity'. For the semantics of 'ArityType', see Note [ArityType].
@@ -812,9 +810,6 @@ mkBotArityType oss = AT [(IsCheap,os) | os <- oss] botDiv
 botArityType :: ArityType
 botArityType = mkBotArityType []
 
-mkManifestArityType :: [OneShotInfo] -> ArityType
-mkManifestArityType oss = AT [(IsCheap,os) | os <- oss] topDiv
-
 topArityType :: ArityType
 topArityType = AT [] topDiv
 
@@ -850,7 +845,7 @@ trimArityType :: Arity -> ArityType -> ArityType
 -- they end in 'ABot'.  See Note [Arity trimming]
 trimArityType max_arity at@(AT lams _)
   | lams `lengthAtMost` max_arity = at
-  | otherwise                    = AT (take max_arity lams) topDiv
+  | otherwise                     = AT (take max_arity lams) topDiv
 
 data ArityOpts = ArityOpts
   { ao_ped_bot :: !Bool -- See Note [Dealing with bottom]
@@ -869,13 +864,7 @@ exprEtaExpandArity opts e
   | otherwise
   = Just arity_type
   where
-    arity_type = safeArityType (arityType (etaExpandArityEnv opts) e)
-
-getBotArity :: ArityType -> Maybe Arity
--- Arity of a divergent function
-getBotArity (AT oss div)
-  | isDeadEndDiv div = Just $ length oss
-  | otherwise        = Nothing
+    arity_type = safeArityType (arityType (findRhsArityEnv opts False) e)
 
 
 {- *********************************************************************
@@ -900,7 +889,7 @@ findRhsArity opts is_rec bndr rhs old_arity
       NonRecursive -> step init_env
   where
     init_env :: ArityEnv
-    init_env = findRhsArityEnv opts
+    init_env = findRhsArityEnv opts (isJoinId bndr)
 
     ty_arity     = typeArity (idType bndr)
     id_one_shots = idDemandOneShots bndr
@@ -925,13 +914,13 @@ findRhsArity opts is_rec bndr rhs old_arity
     go !n cur_at@(AT lams div)
       | not (isDeadEndDiv div)           -- the "stop right away" case
       , length lams <= old_arity = cur_at -- from above
-      | next_at == cur_at       = cur_at
-      | otherwise               =
+      | next_at == cur_at        = cur_at
+      | otherwise
          -- Warn if more than 2 iterations. Why 2? See Note [Exciting arity]
-         warnPprTrace (debugIsOn && n > 2)
+      = warnPprTrace (debugIsOn && n > 2)
             "Exciting arity"
             (nest 2 (ppr bndr <+> ppr cur_at <+> ppr next_at $$ ppr rhs)) $
-            go (n+1) next_at
+        go (n+1) next_at
       where
         next_at = step (extendSigEnv init_env bndr cur_at)
 
@@ -945,8 +934,9 @@ combineWithDemandOneShots at@(AT lams div) oss
   where
     zip_lams :: [ATLamInfo] -> [OneShotInfo] -> [ATLamInfo]
     zip_lams lams []  = lams
-    zip_lams []   oss = [ (IsExpensive,OneShotLam)
-                        | _ <- takeWhile isOneShotInfo oss]
+    zip_lams []   oss | isDeadEndDiv div = []
+                      | otherwise        = [ (IsExpensive,OneShotLam)
+                                           | _ <- takeWhile isOneShotInfo oss]
     zip_lams ((ch,os1):lams) (os2:oss)
       = (ch, os1 `bestOneShot` os2) : zip_lams lams oss
 
@@ -1112,13 +1102,14 @@ floatIn IsCheap     at = at
 floatIn IsExpensive at = addWork at
 
 addWork :: ArityType -> ArityType
+-- Add work to the outermost level of the arity type
 addWork at@(AT lams div)
   = case lams of
       []      -> at
       lam:lams' -> AT (add_work lam : lams') div
-  where
-    add_work :: ATLamInfo -> ATLamInfo
-    add_work (_,os) = (IsExpensive,os)
+
+add_work :: ATLamInfo -> ATLamInfo
+add_work (_,os) = (IsExpensive,os)
 
 arityApp :: ArityType -> Cost -> ArityType
 -- Processing (fun arg) where at is the ArityType of fun,
@@ -1130,55 +1121,96 @@ arityApp at                     _   = at
 -- See the haddocks on 'ArityType' for the lattice.
 --
 -- Used for branches of a @case@.
-andArityType :: ArityType -> ArityType -> ArityType
-andArityType (AT (lam1:lams1) div1) (AT (lam2:lams2) div2)
-  | AT lams' div' <- andArityType (AT lams1 div1) (AT lams2 div2)
-  = AT ((lam1 `and_lam` lam2) : lams') div' -- See Note [Combining case branches]
+andArityType :: ArityEnv -> ArityType -> ArityType -> ArityType
+andArityType env (AT (lam1:lams1) div1) (AT (lam2:lams2) div2)
+  | AT lams' div' <- andArityType env (AT lams1 div1) (AT lams2 div2)
+  = AT ((lam1 `and_lam` lam2) : lams') div'
   where
     (ch1,os1) `and_lam` (ch2,os2)
       = ( ch1 `addCost` ch2, os1 `bestOneShot` os2)
+        -- bestOneShot: see Note [Combining case branches: optimistic one-shot-ness]
 
-andArityType (AT [] div1) at2 = andWithTail div1 at2
-andArityType at1 (AT [] div2) = andWithTail div2 at1
+andArityType env (AT [] div1) at2 = andWithTail env div1 at2
+andArityType env at1 (AT [] div2) = andWithTail env div2 at1
 
-andWithTail :: Divergence -> ArityType -> ArityType
-andWithTail div1 at2@(AT oss2 _)
-  | isDeadEndDiv div1     -- case x of { T -> error; F -> \y.e }
-  = at2
+andWithTail :: ArityEnv -> Divergence -> ArityType -> ArityType
+andWithTail env div1 at2@(AT lams2 _)
+  | isDeadEndDiv div1    -- case x of { T -> error; F -> \y.e }
+  = at2                  -- See Note
+  | pedanticBottoms env  --    [Combining case branches: andWithTail]
+  = AT [] topDiv
+
   | otherwise  -- case x of { T -> plusInt <expensive>; F -> \y.e }
-  = addWork (AT oss2 topDiv)   -- We know div1 = topDiv
-        -- Note [ABot branches: max arity wins]
-        -- See Note [Combining case branches]
+  = AT (map add_work lams2) topDiv    -- We know div1 = topDiv
+    -- See Note [Combining case branches: andWithTail]
 
-{- Note [ABot branches: max arity wins]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider   case x of
-             True  -> \x.  error "urk"
-             False -> \xy. error "urk2"
+{- Note [Combining case branches: optimistic one-shot-ness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When combining the ArityTypes for two case branches (with
+andArityType) and both ArityTypes have ATLamInfo, then we just combine
+their expensive-ness and one-shot info.  The tricky point is when we
+have
 
-Remember: \o1..on.⊥ means "if you apply to n args, it'll definitely diverge".
-So we need \??.⊥ for the whole thing, the /max/ of both arities.
+     case x of True -> \x{one-shot). blah1
+               Fale -> \y.           blah2
 
-Note [Combining case branches]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
+Since one-shot-ness is about the /consumer/ not the /producer/, we
+optimistically assume that if either branch is one-shot, we combine
+the best of the two branches, on the (slightly dodgy) basis that if we
+know one branch is one-shot, then they all must be.  Surprisingly,
+this means that the one-shot arity type is effectively the top element
+of the lattice.
+
+Hence the call to `bestOneShot` in `andArityType`.
+
+Here's an example:
   go = \x. let z = go e0
                go2 = \x. case x of
                            True  -> z
                            False -> \s(one-shot). e1
            in go2 x
-We *really* want to respect the one-shot annotation provided by the
-user and eta-expand go and go2.
-When combining the branches of the case we have
-     T `andAT` \1.T
-and we want to get \1.T.
-But if the inner lambda wasn't one-shot (\?.T) we don't want to do this.
-(We need a usage analysis to justify that.)
 
-So we combine the best of the two branches, on the (slightly dodgy)
-basis that if we know one branch is one-shot, then they all must be.
-Surprisingly, this means that the one-shot arity type is effectively the top
-element of the lattice.
+We *really* want to respect the one-shot annotation provided by the
+user and eta-expand go and go2.  In the first fixpoint iteration of
+'go' we'll bind 'go' to botArityType (written \.⊥, see Note
+[ArityType]).  So 'z' will get arityType \.⊥; so we end up combining
+the True and False branches:
+
+      \.⊥ `andArityType` \1.T
+
+That gives \1.T (see Note [Combining case branches: andWithTail],
+first bullet).  So 'go2' gets an arityType of \(C?)(C1).T, which is
+what we want.
+
+Note [Combining case branches: andWithTail]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When combining the ArityTypes for two case branches (with andArityType)
+and one side or the other has run out of ATLamInfo; then we get
+into `andWithTail`.
+
+* If one branch is guaranteed bottom (isDeadEndDiv), we just take
+  the other. Consider   case x of
+             True  -> \x.  error "urk"
+             False -> \xy. error "urk2"
+
+  Remember: \o1..on.⊥ means "if you apply to n args, it'll definitely
+  diverge".  So we need \??.⊥ for the whole thing, the /max/ of both
+  arities.
+
+* Otherwise, if pedantic-bottoms is on, we just have to return
+  AT [] topDiv.  E.g. if we have
+    f x z = case x of True  -> \y. blah
+                      False -> z
+  then we can't eta-expand, because that would change the behaviour
+  of (f False bottom().
+
+* But if pedantic-bottoms is not on, we allow ourselves to push
+  `z` under a lambda (much as we allow ourselves to put the `case x`
+  under a lambda).  However we know nothing about the expensiveness
+  or one-shot-ness of `z`, so we'd better assume it looks like
+  (Expensive, NoOneShotInfo) all the way. Remembering
+  Note [Combining case branches: optimistic one-shot-ness],
+  we just add work to ever ATLamInfo, keeping the one-shot-ness.
 
 Note [Eta expanding through CallStacks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1213,71 +1245,37 @@ dictionary-typed expression, but that's more work.
 
 ---------------------------
 
--- | Each of the entry-points of the analyser ('arityType') has different
--- requirements. The entry-points are
---
---   1. 'exprBotStrictness_maybe'
---   2. 'exprEtaExpandArity'
---   3. 'findRhsArity'
---
--- For each of the entry-points, there is a separate mode that governs
---
---   1. How pedantic we are wrt. ⊥, in 'pedanticBottoms'.
---   2. Whether we store arity signatures for non-recursive let-bindings,
---      accessed in 'extendSigEnv'/'lookupSigEnv'.
---      See Note [Arity analysis] why that's important.
---   3. Which expressions we consider cheap to float inside a lambda,
---      in 'myExprIsCheap'.
-data AnalysisMode
-  = BotStrictness
-  -- ^ Used during 'exprBotStrictness_maybe'.
-
-  | EtaExpandArity { am_opts :: !ArityOpts }
-  -- ^ Used for finding an expression's eta-expanding arity quickly,
-  -- without fixed-point iteration ('exprEtaExpandArity').
-
-  | FindRhsArity { am_opts        :: !ArityOpts
-                 , am_sigs        :: !(IdEnv SafeArityType) }
-  -- ^ Used for regular, fixed-point arity analysis ('findRhsArity').
-  --   See Note [Arity analysis] for details about fixed-point iteration.
-  -- am_dicts_cheap: see Note [Eta expanding through dictionaries]
-  -- am_sigs: note `SafeArityType` so we can use this in myIsCheapApp
-  -- INVARIANT: am_sigs is disjoint with 'ae_joins'.
-
 data ArityEnv
-  = AE
-  { ae_mode   :: !AnalysisMode
-  -- ^ The analysis mode. See 'AnalysisMode'.
-  , ae_joins  :: !IdSet
-  -- ^ In-scope join points. See Note [Eta-expansion and join points]
-  --   INVARIANT: Disjoint with the domain of 'am_sigs' (if present).
-  }
+  = AE { am_opts :: !ArityOpts
 
--- | The @ArityEnv@ used by 'exprBotStrictness_maybe'. Pedantic about bottoms
--- and no application is ever considered cheap.
-botStrictnessArityEnv :: ArityEnv
-botStrictnessArityEnv = AE { ae_mode = BotStrictness, ae_joins = emptyVarSet }
+       , am_sigs :: !(IdEnv SafeArityType)
+         -- NB `SafeArityType` so we can use this in myIsCheapApp
+         -- See Note [Arity analysis] for details about fixed-point iteration.
 
--- | The @ArityEnv@ used by 'exprEtaExpandArity'.
-etaExpandArityEnv :: ArityOpts -> ArityEnv
-etaExpandArityEnv opts
-  = AE { ae_mode  = EtaExpandArity { am_opts = opts }
-       , ae_joins = emptyVarSet }
+       , am_free_joins :: !Bool  -- True <=> free join points allowed
+         -- Used /only/ to support assertion checks
+       }
+
+instance Outputable ArityEnv where
+  ppr (AE { am_sigs = sigs, am_free_joins = free_joins })
+    = text "AE" <+> braces (sep [ text "free joins:" <+> ppr free_joins
+                                , text "sigs:" <+> ppr sigs ])
 
 -- | The @ArityEnv@ used by 'findRhsArity'.
-findRhsArityEnv :: ArityOpts -> ArityEnv
-findRhsArityEnv opts
-  = AE { ae_mode  = FindRhsArity { am_opts = opts
-                                 , am_sigs = emptyVarEnv }
-       , ae_joins = emptyVarSet }
+findRhsArityEnv :: ArityOpts -> Bool -> ArityEnv
+findRhsArityEnv opts free_joins
+  = AE { am_opts       = opts
+       , am_free_joins = free_joins
+       , am_sigs       = emptyVarEnv }
+
+freeJoinsOK :: ArityEnv -> Bool
+freeJoinsOK (AE { am_free_joins = free_joins }) = free_joins
 
 -- First some internal functions in snake_case for deleting in certain VarEnvs
 -- of the ArityType. Don't call these; call delInScope* instead!
 
 modifySigEnv :: (IdEnv ArityType -> IdEnv ArityType) -> ArityEnv -> ArityEnv
-modifySigEnv f env@AE { ae_mode = am@FindRhsArity{am_sigs = sigs} } =
-  env { ae_mode = am { am_sigs = f sigs } }
-modifySigEnv _ env = env
+modifySigEnv f env@(AE { am_sigs = sigs }) = env { am_sigs = f sigs }
 {-# INLINE modifySigEnv #-}
 
 del_sig_env :: Id -> ArityEnv -> ArityEnv -- internal!
@@ -1288,48 +1286,26 @@ del_sig_env_list :: [Id] -> ArityEnv -> ArityEnv -- internal!
 del_sig_env_list ids = modifySigEnv (\sigs -> delVarEnvList sigs ids)
 {-# INLINE del_sig_env_list #-}
 
-del_join_env :: JoinId -> ArityEnv -> ArityEnv -- internal!
-del_join_env id env@(AE { ae_joins = joins })
-  = env { ae_joins = delVarSet joins id }
-{-# INLINE del_join_env #-}
-
-del_join_env_list :: [JoinId] -> ArityEnv -> ArityEnv -- internal!
-del_join_env_list ids env@(AE { ae_joins = joins })
-  = env { ae_joins = delVarSetList joins ids }
-{-# INLINE del_join_env_list #-}
-
 -- end of internal deletion functions
-
-extendJoinEnv :: ArityEnv -> [JoinId] -> ArityEnv
-extendJoinEnv env@(AE { ae_joins = joins }) join_ids
-  = del_sig_env_list join_ids
-  $ env { ae_joins = joins `extendVarSetList` join_ids }
 
 extendSigEnv :: ArityEnv -> Id -> SafeArityType -> ArityEnv
 extendSigEnv env id ar_ty
-  = del_join_env id                                    $
-    modifySigEnv (\sigs -> extendVarEnv sigs id ar_ty) $
+  = modifySigEnv (\sigs -> extendVarEnv sigs id ar_ty) $
     env
 
 delInScope :: ArityEnv -> Id -> ArityEnv
-delInScope env id = del_join_env id $ del_sig_env id env
+delInScope env id = del_sig_env id env
 
 delInScopeList :: ArityEnv -> [Id] -> ArityEnv
-delInScopeList env ids = del_join_env_list ids $ del_sig_env_list ids env
+delInScopeList env ids = del_sig_env_list ids env
 
 lookupSigEnv :: ArityEnv -> Id -> Maybe SafeArityType
-lookupSigEnv AE{ ae_mode = mode } id = case mode of
-  BotStrictness                  -> Nothing
-  EtaExpandArity{}               -> Nothing
-  FindRhsArity{ am_sigs = sigs } -> lookupVarEnv sigs id
+lookupSigEnv (AE { am_sigs = sigs }) id = lookupVarEnv sigs id
 
 -- | Whether the analysis should be pedantic about bottoms.
 -- 'exprBotStrictness_maybe' always is.
 pedanticBottoms :: ArityEnv -> Bool
-pedanticBottoms AE{ ae_mode = mode } = case mode of
-  BotStrictness                          -> True
-  EtaExpandArity{ am_opts = ArityOpts{ ao_ped_bot = ped_bot } } -> ped_bot
-  FindRhsArity{ am_opts = ArityOpts{ ao_ped_bot = ped_bot } }   -> ped_bot
+pedanticBottoms (AE { am_opts = ArityOpts{ ao_ped_bot = ped_bot }}) = ped_bot
 
 exprCost :: ArityEnv -> CoreExpr -> Maybe Type -> Cost
 exprCost env e mb_ty
@@ -1340,23 +1316,17 @@ exprCost env e mb_ty
 -- and optionally the expression's type.
 -- Under 'exprBotStrictness_maybe', no expressions are cheap.
 myExprIsCheap :: ArityEnv -> CoreExpr -> Maybe Type -> Bool
-myExprIsCheap AE{ae_mode = mode} e mb_ty = case mode of
-  BotStrictness -> False
-  _             -> cheap_dict || cheap_fun e
-    where
-      cheap_dict = case mb_ty of
+myExprIsCheap (AE { am_opts = opts, am_sigs = sigs }) e mb_ty
+  = cheap_dict || cheap_fun e
+  where
+    cheap_dict = case mb_ty of
                      Nothing -> False
-                     Just ty -> (ao_dicts_cheap (am_opts mode) && isDictTy ty)
+                     Just ty -> (ao_dicts_cheap opts && isDictTy ty)
                                 || isCallStackPredTy ty
         -- See Note [Eta expanding through dictionaries]
         -- See Note [Eta expanding through CallStacks]
 
-      cheap_fun e = case mode of
-#if __GLASGOW_HASKELL__ <= 900
-        BotStrictness                -> panic "impossible"
-#endif
-        EtaExpandArity{}             -> exprIsCheap e
-        FindRhsArity{am_sigs = sigs} -> exprIsCheapX (myIsCheapApp sigs) e
+    cheap_fun e = exprIsCheapX (myIsCheapApp sigs) e
 
 -- | A version of 'isCheapApp' that considers results from arity analysis.
 -- See Note [Arity analysis] for what's in the signature environment and why
@@ -1369,6 +1339,8 @@ myIsCheapApp sigs fn n_val_args = case lookupVarEnv sigs fn of
   Nothing -> isCheapApp fn n_val_args
 
   -- `Just at` means local function with `at` as current SafeArityType.
+  -- NB the SafeArityType bit: that means we can ignore the cost flags
+  --    in 'lams', and just consider the length
   -- Roughly approximate what 'isCheapApp' is doing.
   Just (AT lams div)
     | isDeadEndDiv div -> True -- See Note [isCheapApp: bottoming functions] in GHC.Core.Utils
@@ -1377,15 +1349,21 @@ myIsCheapApp sigs fn n_val_args = case lookupVarEnv sigs fn of
     | otherwise                -> False
 
 ----------------
-arityType :: ArityEnv -> CoreExpr -> ArityType
-
+arityType :: HasDebugCallStack => ArityEnv -> CoreExpr -> ArityType
+-- Precondition: all the free join points of the expression
+--               are bound by the ArityEnv
+-- See Note [No free join points in arityType]
+--
+-- Returns ArityType, not SafeArityType.  The caller must do
+-- trimArityType if necessary.
 arityType env (Var v)
-  | v `elemVarSet` ae_joins env
-  = botArityType  -- See Note [Eta-expansion and join points]
   | Just at <- lookupSigEnv env v -- Local binding
   = at
   | otherwise
-  = idArityType v
+  = assertPpr (freeJoinsOK env || not (isJoinId v)) (ppr v) $
+    -- All join-point should be in the ae_sigs
+    -- See Note [No free join points in arityType]
+    idArityType v
 
 arityType env (Cast e _)
   = arityType env e
@@ -1430,50 +1408,237 @@ arityType env (Case scrut bndr _ alts)
   where
     env' = delInScope env bndr
     arity_type_alt (Alt _con bndrs rhs) = arityType (delInScopeList env' bndrs) rhs
-    alts_type = foldr1 andArityType (map arity_type_alt alts)
-
-arityType env (Let (NonRec j rhs) body)
-  | Just join_arity <- isJoinId_maybe j
-  , (_, rhs_body)   <- collectNBinders join_arity rhs
-  = -- See Note [Eta-expansion and join points]
-    andArityType (arityType env rhs_body)
-                 (arityType env' body)
-  where
-     env' = extendJoinEnv env [j]
-
-arityType env (Let (Rec pairs) body)
-  | ((j,_):_) <- pairs
-  , isJoinId j
-  = -- See Note [Eta-expansion and join points]
-    foldr (andArityType . do_one) (arityType env' body) pairs
-  where
-    env' = extendJoinEnv env (map fst pairs)
-    do_one (j,rhs)
-      | Just arity <- isJoinId_maybe j
-      = arityType env' $ snd $ collectNBinders arity rhs
-      | otherwise
-      = pprPanic "arityType:joinrec" (ppr pairs)
+    alts_type = foldr1 (andArityType env) (map arity_type_alt alts)
 
 arityType env (Let (NonRec b rhs) e)
-  = floatIn rhs_cost (arityType env' e)
+  = -- See Note [arityType for non-recursive let-bindings]
+    floatIn rhs_cost (arityType env' e)
   where
     rhs_cost = exprCost env rhs (Just (idType b))
     env'     = extendSigEnv env b (safeArityType (arityType env rhs))
 
 arityType env (Let (Rec prs) e)
-  = floatIn (allCosts bind_cost prs) (arityType env' e)
+  = -- See Note [arityType for recursive let-bindings]
+    floatIn (allCosts bind_cost prs) (arityType env' e)
   where
-    env'            = delInScopeList env (map fst prs)
     bind_cost (b,e) = exprCost env' e (Just (idType b))
+    env'            = foldl extend_rec env prs
+    extend_rec :: ArityEnv -> (Id,CoreExpr) -> ArityEnv
+    extend_rec env (b,_) = extendSigEnv env b  $
+                           idArityType b
+      -- See Note [arityType for recursive let-bindings]
 
 arityType env (Tick t e)
   | not (tickishIsCode t)     = arityType env e
 
 arityType _ _ = topArityType
 
-{- Note [Eta-expansion and join points]
+--------------------
+idArityType :: Id -> ArityType
+idArityType v
+  | strict_sig <- idDmdSig v
+  , (ds, div) <- splitDmdSig strict_sig
+  , isDeadEndDiv div
+  = AT (takeList ds one_shots) div
+
+  | isEmptyTy id_ty
+  = botArityType
+
+  | otherwise
+  = AT (take (idArity v) one_shots) topDiv
+  where
+    id_ty = idType v
+
+    one_shots :: [(Cost,OneShotInfo)]  -- One-shot-ness derived from the type
+    one_shots = repeat IsCheap `zip` typeOneShots id_ty
+
+--------------------
+cheapArityType :: HasDebugCallStack => CoreExpr -> ArityType
+-- A fast and cheap version of arityType.
+-- Returns an ArityType with IsCheap everywhere
+-- c.f. GHC.Core.Utils.exprIsDeadEnd
+--
+-- /Can/ encounter a free join-point Id; e.g. via the call
+--   in exprBotStrictness_maybe, which is called in lots
+--   of places
+--
+-- Returns ArityType, not SafeArityType.  The caller must do
+-- trimArityType if necessary.
+cheapArityType e = go e
+  where
+    go (Var v)                  = idArityType v
+    go (Cast e _)               = go e
+    go (Lam x e)  | isId x      = arityLam x (go e)
+                  | otherwise   = go e
+    go (App e a)  | isTypeArg a = go e
+                  | otherwise   = arity_app a (go e)
+
+    go (Tick t e) | not (tickishIsCode t) = go e
+
+    -- Null alts: see Note [Empty case alternatives] in GHC.Core
+    go (Case _ _ _ alts) | null alts = botArityType
+
+    -- Give up on let, case.  In particular, unlike arityType,
+    -- we make no attempt to look inside let's.
+    go _ = topArityType
+
+    -- Specialised version of arityApp; all costs in ArityType are IsCheap
+    -- See Note [exprArity for applications]
+    -- NB: (1) coercions count as a value argument
+    --     (2) we use the super-cheap exprIsTrivial rather than the
+    --         more complicated and expensive exprIsCheap
+    arity_app _ at@(AT [] _) = at
+    arity_app arg at@(AT ((cost,_):lams) div)
+       | assertPpr (cost == IsCheap) (ppr at $$ ppr arg) $
+         isDeadEndDiv div  = AT lams div
+       | exprIsTrivial arg = AT lams topDiv
+       | otherwise         = topArityType
+
+---------------
+exprArity :: CoreExpr -> Arity
+-- ^ An approximate, even faster, version of 'cheapArityType'
+-- Roughly   exprArity e = arityTypeArity (cheapArityType e)
+-- But it's a bit less clever about bottoms
+--
+-- We do /not/ guarantee that exprArity e <= typeArity e
+-- You may need to do arity trimming after calling exprArity
+-- See Note [Arity trimming]
+-- Reason: if we do arity trimming here we have take exprType
+--         and that can be expensive if there is a large cast
+exprArity e = go e
+  where
+    go (Var v)                     = idArity v
+    go (Lam x e) | isId x          = go e + 1
+                 | otherwise       = go e
+    go (Tick t e) | not (tickishIsCode t) = go e
+    go (Cast e _)                  = go e
+    go (App e (Type _))            = go e
+    go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
+        -- See Note [exprArity for applications]
+        -- NB: coercions count as a value argument
+
+    go _                           = 0
+
+---------------
+exprIsDeadEnd :: CoreExpr -> Bool
+-- See Note [Bottoming expressions]
+-- This function is, in effect, just a specialised (and hence cheap)
+--    version of cheapArityType:
+--    exprIsDeadEnd e = case cheapArityType e of
+--                         AT lams div -> null lams && isDeadEndDiv div
+-- See also exprBotStrictness_maybe, which uses cheapArityType
+exprIsDeadEnd e
+  = go 0 e
+  where
+    go :: Arity -> CoreExpr -> Bool
+    -- (go n e) = True <=> expr applied to n value args is bottom
+    go _ (Lit {})                = False
+    go _ (Type {})               = False
+    go _ (Coercion {})           = False
+    go n (App e a) | isTypeArg a = go n e
+                   | otherwise   = go (n+1) e
+    go n (Tick _ e)              = go n e
+    go n (Cast e _)              = go n e
+    go n (Let _ e)               = go n e
+    go n (Lam v e) | isTyVar v   = go n e
+                   | otherwise   = False
+
+    go _ (Case _ _ _ alts)       = null alts
+       -- See Note [Empty case alternatives] in GHC.Core
+
+    go n (Var v) | isDeadEndAppSig (idDmdSig v) n = True
+                 | isEmptyTy (idType v)           = True
+                 | otherwise                      = False
+
+{- Note [Bottoming expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A bottoming expression is guaranteed to diverge, or raise an
+exception.  We can test for it in two different ways, and exprIsDeadEnd
+checks for both of these situations:
+
+* Visibly-bottom computations.  For example
+      (error Int "Hello")
+  is visibly bottom.  The strictness analyser also finds out if
+  a function diverges or raises an exception, and puts that info
+  in its strictness signature.
+
+* Empty types.  If a type is empty, its only inhabitant is bottom.
+  For example:
+      data T
+      f :: T -> Bool
+      f = \(x:t). case x of Bool {}
+  Since T has no data constructors, the case alternatives are of course
+  empty.  However note that 'x' is not bound to a visibly-bottom value;
+  it's the *type* that tells us it's going to diverge.
+
+A GADT may also be empty even though it has constructors:
+        data T a where
+          T1 :: a -> T Bool
+          T2 :: T Int
+        ...(case (x::T Char) of {})...
+Here (T Char) is uninhabited.  A more realistic case is (Int ~ Bool),
+which is likewise uninhabited.
+
+Note [No free join points in arityType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (#18328)
+Suppose we call arityType on this expression (EX1)
+   \x . case x of True  -> \y. e
+                  False -> $j 3
+where $j is a join point.  It really makes no sense to talk of the arity
+of this expression, because it has a free join point.  In particular, we
+can't eta-expand the expression because we'd have do the same thing to the
+binding of $j, and we can't see that binding.
+
+If we had (EX2)
+   \x. join $j y = blah
+       case x of True  -> \y. e
+                 False -> $j 3
+then it would make perfect sense: we can determine $j's ArityType, and
+propagate it to the usage site as usual.
+
+But how can we get (EX1)?  It doesn't make much sense, because $j can't
+be a join point under the \x anyway.  So we make it a precondition of
+arityType that the argument has no free join-point Ids.  (This is checked
+with an assert in the Var case of arityType.)
+
+Wrinkles
+
+* We /do/ allow free join point when doing findRhsArity for join-point
+  right-hand sides. See Note [Arity for recursive join bindings]
+  point (5) in GHC.Core.Opt.Simplify.Utils.
+
+* The invariant (no free join point in arityType) risks being
+  invalidated by one very narrow special case: runRW#
+
+   join $j y = blah
+   runRW# (\s. case x of True  -> \y. e
+                         False -> $j x)
+
+  We have special magic in OccurAnal, and Simplify to allow continuations to
+  move into the body of a runRW# call.
+
+  So we are careful never to attempt to eta-expand the (\s.blah) in the
+  argument to runRW#, at least not when there is a literal lambda there,
+  so that OccurAnal has seen it and allowed join points bound outside.
+  See Note [No eta-expansion in runRW#] in GHC.Core.Opt.Simplify.Iteration.
+
+Note [arityType for non-recursive let-bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For non-recursive let-bindings, we just get the arityType of the RHS,
+and extend the environment.  That works nicely for things like this
+(#18793):
+  go = \ ds. case ds_a2CF of {
+               []     -> id
+               : y ys -> case y of { GHC.Types.I# x ->
+                         let acc = go ys in
+                         case x ># 42# of {
+                            __DEFAULT -> acc
+                            1# -> \x1. acc (negate x2)
+
+Here we want to get a good arity for `acc`, based on the ArityType
+of `go`.
+
+All this is particularly important for join points. Consider this (#18328)
 
   f x = join j y = case y of
                       True -> \a. blah
@@ -1486,57 +1651,31 @@ Consider this (#18328)
 and suppose the join point is too big to inline.  Now, what is the
 arity of f?  If we inlined the join point, we'd definitely say "arity
 2" because we are prepared to push case-scrutinisation inside a
-lambda.  But currently the join point totally messes all that up,
-because (thought of as a vanilla let-binding) the arity pinned on 'j'
-is just 1.
+lambda. It's important that we extend the envt with j's ArityType, so
+that we can use that information in the A/C branch of the case.
 
-Why don't we eta-expand j?  Because of
-Note [Do not eta-expand join points] in GHC.Core.Opt.Simplify.Utils
+Note [arityType for recursive let-bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For /recursive/ bindings it's more difficult, to call arityType
+(as we do in Note [arityType for non-recursive let-bindings])
+because we don't have an ArityType to put in the envt for the
+recursively bound Ids.  So for we satisfy ourselves with whizzing up
+up an ArityType from the idArity of the function, via idArityType.
 
-Even if we don't eta-expand j, why is its arity only 1?
-See invariant 2b in Note [Invariants on join points] in GHC.Core.
+That is nearly equivalent to deleting the binder from the envt, at
+which point we'll call idArityType at the occurrences.  But doing it
+here means
 
-So we do this:
+  (a) we only call idArityType once, no matter how many
+      occurrences, and
 
-* Treat the RHS of a join-point binding, /after/ stripping off
-  join-arity lambda-binders, as very like the body of the let.
-  More precisely, do andArityType with the arityType from the
-  body of the let.
+  (b) we can check (in the arityType (Var v) case) that
+      we don't mention free join-point Ids. See
+      Note [No free join points in arityType].
 
-* Dually, when we come to a /call/ of a join point, just no-op
-  by returning ABot, the bottom element of ArityType,
-  which so that: bot `andArityType` x = x
-
-* This works if the join point is bound in the expression we are
-  taking the arityType of.  But if it's bound further out, it makes
-  no sense to say that (say) the arityType of (j False) is ABot.
-  Bad things happen.  So we keep track of the in-scope join-point Ids
-  in ae_join.
-
-This will make f, above, have arity 2. Then, we'll eta-expand it thus:
-
-  f x eta = (join j y = ... in case x of ...) eta
-
-and the Simplify will automatically push that application of eta into
-the join points.
-
-An alternative (roughly equivalent) idea would be to carry an
-environment mapping let-bound Ids to their ArityType.
+But see Note [Arity for recursive join bindings] in
+GHC.Core.Opt.Simplify.Utils for dark corners.
 -}
-
-idArityType :: Id -> ArityType
-idArityType v
-  | strict_sig <- idDmdSig v
-  , not $ isNopSig strict_sig
-  , (ds, div) <- splitDmdSig strict_sig
-  , let arity = length ds
-  -- Every strictness signature admits an arity signature!
-  = AT (take arity one_shots) div
-  | otherwise
-  = AT (take (idArity v) one_shots) topDiv
-  where
-    one_shots :: [(Cost,OneShotInfo)]  -- One-shot-ness derived from the type
-    one_shots = repeat IsCheap `zip` typeOneShots (idType v)
 
 {-
 %************************************************************************
@@ -1782,7 +1921,7 @@ nested newtypes. This is expressed by the EtaInfo type:
 
 Note [Check for reflexive casts in eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It turns out that the casts created by teh above mechanism are often Refl.
+It turns out that the casts created by the above mechanism are often Refl.
 When casts are very deeply nested (as happens in #18223), the repetition
 of types can make the overall term very large.  So there is a big
 payoff in cancelling out casts aggressively wherever possible.

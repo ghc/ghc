@@ -745,11 +745,7 @@ by LitRubbish (see Note [Drop absent bindings]) so there is no great harm.
 ---------------------
 splitFun :: WwOpts -> Id -> CoreExpr -> UniqSM [(Id, CoreExpr)]
 splitFun ww_opts fn_id rhs
-  | not (wrap_dmds `lengthIs` count isId arg_vars)
-    -- See Note [Don't eta expand in w/w]
-  = return [(fn_id, rhs)]
-
-  | otherwise
+  | Just (arg_vars, body) <- collectNValBinders_maybe (length wrap_dmds) rhs
   = warnPprTrace (not (wrap_dmds `lengthIs` (arityInfo fn_info)))
                  "splitFun"
                  (ppr fn_id <+> (ppr wrap_dmds $$ ppr cpr)) $
@@ -772,10 +768,13 @@ splitFun ww_opts fn_id rhs
               -> do { work_uniq <- getUniqueM
                     ; return (mkWWBindPair ww_opts fn_id fn_info arg_vars body
                                            work_uniq div stuff) } }
+
+  | otherwise    -- See Note [Don't eta expand in w/w]
+  = return [(fn_id, rhs)]
+
   where
     uf_opts = so_uf_opts (wo_simple_opts ww_opts)
     fn_info = idInfo fn_id
-    (arg_vars, body) = collectBinders rhs
 
     (wrap_dmds, div) = splitDmdSig (dmdSigInfo fn_info)
 
