@@ -1070,9 +1070,9 @@ lookupLocalOccRn rdr_name
 
 -- lookupTypeOccRn looks up an optionally promoted RdrName.
 -- Used for looking up type variables.
-lookupTypeOccRn :: RdrName -> RnM Name
+lookupTypeOccRn :: [GhcHint] -> RdrName -> RnM Name
 -- see Note [Demotion]
-lookupTypeOccRn rdr_name
+lookupTypeOccRn hints rdr_name
   | (isVarOcc <||> isFieldOcc) (rdrNameOcc rdr_name)  -- See Note [Promoted variables in types]
   = badVarInType rdr_name
   | otherwise
@@ -1082,7 +1082,7 @@ lookupTypeOccRn rdr_name
              Nothing   ->
                if occName rdr_name == occName eqTyCon_RDR -- See Note [eqTyCon (~) compatibility fallback]
                then eqTyConName <$ addDiagnostic TcRnTypeEqualityOutOfScope
-               else lookup_demoted rdr_name }
+               else lookup_demoted hints rdr_name }
 
 {- Note [eqTyCon (~) compatibility fallback]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1098,8 +1098,8 @@ To ease migration and minimize breakage, we continue to support those usages
 but emit appropriate warnings.
 -}
 
-lookup_demoted :: RdrName -> RnM Name
-lookup_demoted rdr_name
+lookup_demoted :: [GhcHint] -> RdrName -> RnM Name
+lookup_demoted hints rdr_name
   | Just demoted_rdr <- demoteRdrName rdr_name
     -- Maybe it's the name of a *data* constructor
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -1128,8 +1128,7 @@ lookup_demoted rdr_name
   = report_qualified_term_in_types rdr_name demoted_rdr_name
 
   | otherwise
-  = reportUnboundName' (lf_which looking_for) rdr_name
-
+  = unboundNameX looking_for rdr_name hints
   where
     looking_for = LF WL_Constructor WL_Anywhere
 

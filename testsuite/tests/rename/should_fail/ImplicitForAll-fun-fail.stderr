@@ -1,0 +1,25 @@
+ImplicitForAll-fun-fail.hs:5:6:
+    Not in scope: type variable ‘a’
+    Suggested fix:
+      Perhaps you intended to use ImplicitForAll
+      The extension has been turned off manually, which requires type variables to be bound by  ‘forall’
+
+ImplicitForAll-fun-fail.hs:5:11:
+    Not in scope: type variable ‘b’
+    Suggested fix:
+      Perhaps you intended to use ImplicitForAll
+      The extension has been turned off manually, which requires type variables to be bound by  ‘forall’
+
+ImplicitForAll-fun-fail.hs:5:16:
+    Not in scope: type variable ‘b’
+    Suggested fix:
+      Perhaps you intended to use ImplicitForAll
+      The extension has been turned off manually, which requires type variables to be bound by  ‘forall’
+
+ImplicitForAll-fun-fail.hs:9:17: Not in scope: type variable ‘a’
+
+ImplicitForAll-fun-fail.hs:17:16:
+    Not in scope: type variable ‘b’
+    Suggested fix:
+      Perhaps you intended to use ImplicitForAll
+      The extension has been turned off manually, which requires type variables to be bound by ‘forall’

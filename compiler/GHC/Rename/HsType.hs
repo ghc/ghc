@@ -32,7 +32,7 @@ module GHC.Rename.HsType (
         bindHsOuterTyVarBndrs, bindHsForAllTelescope,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
         rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars,
-        FreeKiTyVars, filterInScopeM,
+        FreeKiTyVars, filterOutInScopeM,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVars, extractRdrKindSigVars,
         extractConDeclGADTDetailsTyVars, extractDataDefnKindVars,
@@ -45,12 +45,13 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType )
 
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
+import GHC.Driver.Flags (WarningFlag (Opt_WarnPatternSignatureBinds))
 import GHC.Hs
 import GHC.Rename.Env
 import GHC.Rename.Doc
 import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV
                          , typeAppErr, newLocalBndrRn, checkDupRdrNames
-                         , checkShadowedRdrNames, warnForallIdentifier )
+                         , checkShadowedRdrNames, warnForallIdentifier, newLocalBndrsRn )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
 import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
@@ -130,19 +131,19 @@ data HsPatSigTypeScoping
     -- "GHC.Hs.Type".
 
 rnHsSigWcType :: HsDocContext
+              -> [GhcHint]
               -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeVars)
-rnHsSigWcType doc (HsWC { hswc_body =
-    sig_ty@(L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
-  = do { free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
-       ; (nwc_rdrs', imp_tv_nms) <- partition_nwcs free_vars
-       ; let nwc_rdrs = nubL nwc_rdrs'
-       ; bindHsOuterTyVarBndrs doc Nothing imp_tv_nms outer_bndrs $ \outer_bndrs' ->
-    do { (wcs, body_ty', fvs) <- rnWcBody doc nwc_rdrs body_ty
+rnHsSigWcType ctx hints (HsWC { hswc_body =
+    (L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
+  = bindHsOuterTyVarBndrs ctx Nothing fvs outer_bndrs $ \outer_bndrs' ->
+    do { (wcs, body_ty', fvs') <- rnWcBody ctx hints fvs body_ty
        ; pure ( HsWC  { hswc_ext = wcs, hswc_body = L loc $
                 HsSig { sig_ext = noExtField
                       , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
-              , fvs) } }
+              , fvs') }
+  where
+    fvs = extractHsTyRdrTyVars body_ty
 
 rnHsPatSigType :: HsPatSigTypeScoping
                -> HsDocContext
@@ -159,29 +160,56 @@ rnHsPatSigType :: HsPatSigTypeScoping
 rnHsPatSigType scoping ctx sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
        ; checkErr ty_sig_okay (unexpectedPatSigTypeErr sig_ty)
-       ; free_vars <- filterInScopeM (extractHsTyRdrTyVars pat_sig_ty)
-       ; (nwc_rdrs', tv_rdrs) <- partition_nwcs free_vars
-       ; let nwc_rdrs = nubN nwc_rdrs'
-             implicit_bndrs = case scoping of
-               AlwaysBind -> tv_rdrs
-               NeverBind  -> []
-       ; rnImplicitTvOccs Nothing implicit_bndrs $ \ imp_tvs ->
-    do { (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx nwc_rdrs pat_sig_ty
+       ; let handle_implicit k = case scoping of
+               AlwaysBind -> do
+                 implicit_bndrs <- get_fresh_non_wildcards ctx tyvars
+                 warn_pattern_signature_binds implicit_bndrs
+                 rnImplicitTvOccs Nothing implicit_bndrs k
+               NeverBind  -> k []
+       ; handle_implicit $ \ imp_tvs ->
+    do { (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx noHints tyvars pat_sig_ty
        ; let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
              sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = pat_sig_ty' }
        ; (res, fvs2) <- thing_inside sig_ty'
        ; return (res, fvs1 `plusFV` fvs2) } }
   where
     pat_sig_ty = hsPatSigType sig_ty
+    tyvars = extractHsTyRdrTyVars pat_sig_ty
 
 rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeVars)
 rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
-  = do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
-       ; (nwc_rdrs', _) <- partition_nwcs free_vars
-       ; let nwc_rdrs = nubL nwc_rdrs'
-       ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
+  = do { (wcs, hs_ty', fvs) <- rnWcBody ctxt noHints (extractHsTyRdrTyVars hs_ty) hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
+
+is_wildcard :: LocatedN RdrName -> Bool
+is_wildcard rdr = startsWithUnderscore (rdrNameOcc (unLoc rdr))
+
+-- | Return the type variables from @candidate_vars@ that do not correspond to
+-- named wild cards, i.e. that don't start with an underscore.
+--
+-- If named wild cards aren't permitted, all variables are returned (see 'make_is_nwcs').
+-- @fresh@ indicates that the variables aren't renamed.
+--
+-- The returned variables may still contain duplicates.
+get_fresh_non_wildcards :: HsDocContext -> FreeKiTyVars -> RnM FreeKiTyVars
+get_fresh_non_wildcards ctxt candidate_vars = do
+  f <- make_is_nwcs ctxt
+  free_vars <- filterOutInScopeM candidate_vars
+  pure $ filter (not . f) free_vars
+
+-- | Return the type variables from @candidate_vars@ that correspond to named
+-- wild cards, i.e. that start with an underscore.
+--
+-- If named wild cards aren't permitted, no variables are returned (see 'make_is_nwcs').
+-- @fresh@ indicates that the variables aren't renamed.
+--
+-- The returned variables do not contain duplicates.
+get_fresh_wildcards :: HsDocContext -> FreeKiTyVars -> RnM FreeKiTyVars
+get_fresh_wildcards ctxt tyvars = do
+  f <- make_is_nwcs ctxt
+  free_vars <- filterOutInScopeM tyvars
+  pure $ nubL $ filter f free_vars
 
 -- Similar to rnHsWcType, but rather than requiring free variables in the type to
 -- already be in scope, we are going to require them not to be in scope,
@@ -214,9 +242,11 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
     -- so we currently reject.
     when (not (null varsInScope)) $
       addErr $ TcRnBindVarAlreadyInScope varsInScope
-    (wcVars, ibVars) <- partition_nwcs varsNotInScope
+    (wcVars, ibVars) <- do
+      f <- make_is_nwcs ctxt
+      pure $ partition f varsNotInScope
     rnImplicitTvBndrs ctxt Nothing ibVars $ \ ibVars' -> do
-      (wcVars', hs_ty', fvs) <- rnWcBody ctxt wcVars hs_ty
+      (wcVars', hs_ty', fvs) <- rnWcBody ctxt noHints wcVars hs_ty
       let sig_ty = HsPS
             { hsps_body = hs_ty'
             , hsps_ext = HsPSRn
@@ -227,14 +257,15 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
       (res, fvs') <- thing_inside sig_ty
       return (res, fvs `plusFV` fvs')
 
-rnWcBody :: HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
+rnWcBody :: HsDocContext -> [GhcHint] -> [LocatedN RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
-rnWcBody ctxt nwc_rdrs hs_ty
-  = do { nwcs <- mapM newLocalBndrRn nwc_rdrs
+rnWcBody ctxt hints tyvars hs_ty
+  = do { nwcs <- newLocalBndrsRn =<< get_fresh_wildcards ctxt tyvars
        ; let env = RTKE { rtke_level = TypeLevel
                         , rtke_what  = RnTypeBody
                         , rtke_nwcs  = mkNameSet nwcs
-                        , rtke_ctxt  = ctxt }
+                        , rtke_ctxt  = ctxt
+                        , rtke_hints = hints }
        ; (hs_ty', fvs) <- bindLocalNamesFV nwcs $
                           rn_lty env hs_ty
        ; return (nwcs, hs_ty', fvs) }
@@ -316,21 +347,28 @@ extraConstraintWildCardsAllowed env
       StandaloneKindSigCtx {} -> False  -- See Note [Wildcards in standalone kind signatures] in "GHC.Hs.Decls"
       _                   -> False
 
--- | When the NamedWildCards extension is enabled, partition_nwcs
--- removes type variables that start with an underscore from the
--- FreeKiTyVars in the argument and returns them in a separate list.
--- When the extension is disabled, the function returns the argument
--- and empty list.  See Note [Renaming named wild cards]
-partition_nwcs :: FreeKiTyVars -> RnM ([LocatedN RdrName], FreeKiTyVars)
-partition_nwcs free_vars
+-- | Decide whether the current type context allows named wild cards.
+nwcs_allowed :: HsDocContext -> Bool
+nwcs_allowed = \case
+  PatCtx {} -> True
+  TypeSigCtx {} -> True
+  DerivDeclCtx {} -> True
+  ExprWithTySigCtx {} -> True
+  _ -> False
+
+-- | When the NamedWildCards extension is enabled, `make_is_nwcs`
+-- creates a function that returns true for a type variable that starts
+-- with an underscore from the FreeKiTyVars in the argument. When the
+-- extension is disabled or the current type context doesn't permit them,
+-- the created function returns False.
+--
+-- See Note [Renaming named wild cards]
+make_is_nwcs :: HsDocContext -> RnM (FreeKiTyVar -> Bool)
+make_is_nwcs ctx
   = do { wildcards_enabled <- xoptM LangExt.NamedWildCards
-       ; return $
-           if wildcards_enabled
-           then partition is_wildcard free_vars
-           else ([], free_vars) }
-  where
-     is_wildcard :: LocatedN RdrName -> Bool
-     is_wildcard rdr = startsWithUnderscore (rdrNameOcc (unLoc rdr))
+       ; return $ \free_var ->
+           nwcs_allowed ctx && wildcards_enabled && is_wildcard free_var
+       }
 
 {- Note [Renaming named wild cards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -364,8 +402,7 @@ rnHsSigType ctx level
        ; case outer_bndrs of
            HsOuterExplicit{} -> checkPolyKinds env (HsSigType sig_ty)
            HsOuterImplicit{} -> pure ()
-       ; imp_vars <- filterInScopeM $ extractHsTyRdrTyVars body
-       ; bindHsOuterTyVarBndrs ctx Nothing imp_vars outer_bndrs $ \outer_bndrs' ->
+       ; bindHsOuterTyVarBndrs ctx Nothing (extractHsTyRdrTyVars body) outer_bndrs $ \outer_bndrs' ->
     do { (body', fvs) <- rnLHsTyKi env body
 
        ; return ( L loc $ HsSig { sig_ext = noExtField
@@ -462,6 +499,7 @@ want a gratuitous knot.
 
 data RnTyKiEnv
   = RTKE { rtke_ctxt  :: HsDocContext
+         , rtke_hints :: [GhcHint]   -- Additional error information for out-of-scope variables
          , rtke_level :: TypeOrKind  -- Am I renaming a type or a kind?
          , rtke_what  :: RnTyKiWhat  -- And within that what am I renaming?
          , rtke_nwcs  :: NameSet     -- These are the in-scope named wildcards
@@ -486,7 +524,7 @@ instance Outputable RnTyKiWhat where
 mkTyKiEnv :: HsDocContext -> TypeOrKind -> RnTyKiWhat -> RnTyKiEnv
 mkTyKiEnv cxt level what
  = RTKE { rtke_level = level, rtke_nwcs = emptyNameSet
-        , rtke_what = what, rtke_ctxt = cxt }
+        , rtke_what = what, rtke_ctxt = cxt, rtke_hints = noHints }
 
 isRnKindLevel :: RnTyKiEnv -> Bool
 isRnKindLevel (RTKE { rtke_level = KindLevel }) = True
@@ -791,14 +829,14 @@ throw an error accordingly.
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name
 rnTyVar env rdr_name
-  = do { name <- lookupTypeOccRn rdr_name
+  = do { name <- lookupTypeOccRn (rtke_hints env) rdr_name
        ; checkNamedWildCard env name
        ; return name }
 
 rnLTyVar :: LocatedN RdrName -> RnM (LocatedN Name)
 -- Called externally; does not deal with wildcards
 rnLTyVar (L loc rdr_name)
-  = do { tyvar <- lookupTypeOccRn rdr_name
+  = do { tyvar <- lookupTypeOccRn noHints rdr_name
        ; return (L loc tyvar) }
 
 --------------
@@ -935,23 +973,29 @@ bindHsQTyVars :: forall a b.
 bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
   = do { let bndr_kv_occs = extractHsTyVarBndrsKVs hs_tv_bndrs
 
+       ; ifaOk <- xoptM LangExt.ImplicitForAll
        ; let -- See Note [bindHsQTyVars examples] for what
              -- all these various things are doing
-             bndrs, implicit_kvs :: [LocatedN RdrName]
+             bndrs, implicit_kvs_bndr, implicit_kvs_body :: [LocatedN RdrName]
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
-             implicit_kvs = filterFreeVarsToBind bndrs $
-               bndr_kv_occs ++ body_kv_occs
+             implicit_kvs_bndr = filterFreeVarsToBind bndrs bndr_kv_occs
+             implicit_kvs_body = filterFreeVarsToBind (bndrs ++ implicit_kvs_bndr) body_kv_occs
+             implicit_kvs = implicit_kvs_bndr ++ (if ifaOk then implicit_kvs_body else [])
              body_remaining = filterFreeVarsToBind bndr_kv_occs $
               filterFreeVarsToBind bndrs body_kv_occs
              all_bound_on_lhs = null body_remaining
 
        ; traceRn "checkMixedVars3" $
-           vcat [ text "bndrs"   <+> ppr hs_tv_bndrs
-                , text "bndr_kv_occs"   <+> ppr bndr_kv_occs
-                , text "body_kv_occs"   <+> ppr body_kv_occs
-                , text "implicit_kvs"   <+> ppr implicit_kvs
-                , text "body_remaining" <+> ppr body_remaining
+           vcat [ text "bndrs"             <+> ppr hs_tv_bndrs
+                , text "bndr_kv_occs"      <+> ppr bndr_kv_occs
+                , text "body_kv_occs"      <+> ppr body_kv_occs
+                , text "implicit_kvs_bndr" <+> ppr implicit_kvs_bndr
+                , text "implicit_kvs_body" <+> ppr implicit_kvs_body
+                , text "body_remaining"    <+> ppr body_remaining
                 ]
+
+      -- TODO Might be decided later that this warning should also trigger for tycon param kind sigs
+       -- ; warn_pattern_signature_binds implicit_kvs_bndr
 
        ; rnImplicitTvOccs mb_assoc implicit_kvs $ \ implicit_kv_nms' ->
          bindLHsTyVarBndrs doc NoWarnUnusedForalls mb_assoc hs_tv_bndrs $ \ rn_bndrs ->
@@ -1113,27 +1157,82 @@ an LHsQTyVars can be semantically significant. As a result, we suppress
 -Wunused-foralls warnings in exactly one place: in bindHsQTyVars.
 -}
 
+-- | Create new renamed type variables corresponding to source-level ones.
+-- This is the handler for the case of a signature without explicit forall,
+-- quantifying all free variables implicitly.
+--
+-- Before renaming, some variables are filtered out:
+--
+-- - Those that are in scope, for example from an enclosing function decl
+--
+-- - Those that are named wildcards, but only if the extension NamedWildCards
+-- is enabled and the current type context allows it (decided by looking at the
+-- 'HsDocContext')
+bind_tyvars_implicit :: OutputableBndrFlag flag 'Renamed
+                     => HsDocContext
+                     -> Maybe assoc
+                        -- ^ @'Just' _@ => an associated type decl
+                     -> [LocatedN RdrName]
+                        -- ^ free vars of body type; some might be in scope
+                     -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
+                     -> RnM (a, FreeVars)
+bind_tyvars_implicit ctx mb_cls tyvars thing_inside = do
+  imp_tv_nms <- get_fresh_non_wildcards ctx tyvars
+  rnImplicitTvOccs mb_cls imp_tv_nms $ \implicit_vars' ->
+    thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
+
+
+bind_tyvars_explicit :: OutputableBndrFlag flag 'Renamed
+                     => HsDocContext
+                     -> [LHsTyVarBndr flag GhcPs]
+                     -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
+                     -> RnM (a, FreeVars)
+bind_tyvars_explicit doc exp_bndrs thing_inside =
+  -- Note: If we pass mb_cls instead of Nothing below, bindLHsTyVarBndrs
+  -- will use class variables for any names the user meant to bring in
+  -- scope here. This is an explicit forall, so we want fresh names, not
+  -- class variables. Thus: always pass Nothing.
+  bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' ->
+    thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
+                                   , hso_bndrs     = exp_bndrs' }
+
+-- | Create new renamed type variables corresponding to source-level ones,
+-- given a type signature or family RHS with optional outer binders
+-- ('HsOuterTyVarBndrs') and free variables ('FreeKiTyVars', @tyvars@).
+--
+-- Depending on whether the signature has an outer forall ('HsOuterExplicit'),
+-- this behaves differently.
+--
+-- - If a forall is present, only the explicitly quantified variables are
+-- brought into scope, resulting in errors for any not-in-scope free variables
+-- triggered somewhere within 'rnHsTyKi' (see
+-- Note [forall-or-nothing rule] in GHC.Hs.Type).
+--
+-- - If no forall is present, variables (@tyvars@) may be renamed by implicit
+-- quantification, depending on whether the extension 'ImplicitForAll' is
+-- enabled (which is the default).
+-- If implicit quantification is permitted, all free variables are brought into
+-- scope, otherwise the same logic as for explicit forall is used, but without
+-- any binders.
 bindHsOuterTyVarBndrs :: OutputableBndrFlag flag 'Renamed
                       => HsDocContext
                       -> Maybe assoc
-                         -- ^ @'Just' _@ => an associated type decl
+                        -- ^ @'Just' _@ => an associated type decl
                       -> FreeKiTyVars
                       -> HsOuterTyVarBndrs flag GhcPs
                       -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
                       -> RnM (a, FreeVars)
-bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
+bindHsOuterTyVarBndrs doc mb_cls tyvars outer_bndrs thing_inside =
   case outer_bndrs of
-    HsOuterImplicit{} ->
-      rnImplicitTvOccs mb_cls implicit_vars $ \implicit_vars' ->
-        thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
+    HsOuterImplicit{} -> do
+      implicitOk <- xoptM LangExt.ImplicitForAll
+      if implicitOk
+      then bind_tyvars_implicit doc mb_cls free_vars thing_inside
+      else bind_tyvars_explicit doc [] thing_inside
     HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-      -- Note: If we pass mb_cls instead of Nothing below, bindLHsTyVarBndrs
-      -- will use class variables for any names the user meant to bring in
-      -- scope here. This is an explicit forall, so we want fresh names, not
-      -- class variables. Thus: always pass Nothing.
-      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' ->
-        thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
-                                       , hso_bndrs     = exp_bndrs' }
+      bind_tyvars_explicit doc exp_bndrs thing_inside
+  where
+    free_vars = extractHsOuterTvBndrs outer_bndrs tyvars
 
 warn_term_var_capture :: LocatedN RdrName -> RnM ()
 warn_term_var_capture lVar = do
@@ -1623,6 +1722,11 @@ warnCapturedTerm (L loc tv) shadowed_term_names
   = let msg = TcRnCapturedTermName tv shadowed_term_names
     in addDiagnosticAt (locA loc) msg
 
+warn_pattern_signature_binds :: [LocatedN RdrName] -> TcM ()
+warn_pattern_signature_binds bndrs =
+  whenWOptM Opt_WarnPatternSignatureBinds $
+  forM_ bndrs $ \ b -> addTcRnDiagnostic (TcRnPatternSignatureBinds b)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1779,21 +1883,22 @@ type checking. While viable, this would mean we'd end up accepting this:
 -- These lists are guaranteed to preserve left-to-right ordering of
 -- the types the variables were extracted from. See also
 -- Note [Ordering of implicit variables].
-type FreeKiTyVars = [LocatedN RdrName]
+type FreeKiTyVar  = LocatedN RdrName
+type FreeKiTyVars = [FreeKiTyVar]
 
 -- | Filter out any type and kind variables that are already in scope in the
 -- the supplied LocalRdrEnv. Note that this includes named wildcards, which
 -- look like perfectly ordinary type variables at this point.
-filterInScope :: LocalRdrEnv -> FreeKiTyVars -> FreeKiTyVars
-filterInScope rdr_env = filterOut (inScope rdr_env . unLoc)
+filter_out_in_scope :: LocalRdrEnv -> FreeKiTyVars -> FreeKiTyVars
+filter_out_in_scope rdr_env = filterOut (inScope rdr_env . unLoc)
 
 -- | Filter out any type and kind variables that are already in scope in the
 -- the environment's LocalRdrEnv. Note that this includes named wildcards,
 -- which look like perfectly ordinary type variables at this point.
-filterInScopeM :: FreeKiTyVars -> RnM FreeKiTyVars
-filterInScopeM vars
+filterOutInScopeM :: FreeKiTyVars -> RnM FreeKiTyVars
+filterOutInScopeM vars
   = do { rdr_env <- getLocalRdrEnv
-       ; return (filterInScope rdr_env vars) }
+       ; return (filter_out_in_scope rdr_env vars) }
 
 inScope :: LocalRdrEnv -> RdrName -> Bool
 inScope rdr_env rdr = rdr `elemLocalRdrEnv` rdr_env
@@ -1928,10 +2033,6 @@ extract_lty (L _ ty) acc
       XHsType {}                  -> acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
-
-extract_lhs_sig_ty :: LHsSigType GhcPs -> FreeKiTyVars
-extract_lhs_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
-  extractHsOuterTvBndrs outer_bndrs $ extract_lty body []
 
 extract_hs_arrow :: HsArrow GhcPs -> FreeKiTyVars ->
                    FreeKiTyVars

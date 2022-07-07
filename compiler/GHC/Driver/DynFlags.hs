@@ -1351,7 +1351,8 @@ languageExtensions (Just Haskell98)
            -- turning it off breaks code, so we're keeping it on for
            -- backwards compatibility.  Cabal uses -XHaskell98 by
            -- default unless you specify another language.
-       LangExt.DeepSubsumption
+       LangExt.DeepSubsumption,
+       LangExt.ImplicitForAll
        -- Non-standard but enabled for backwards compatability (see GHC proposal #511)
       ]
 
@@ -1369,7 +1370,8 @@ languageExtensions (Just Haskell2010)
        LangExt.DoAndIfThenElse,
        LangExt.FieldSelectors,
        LangExt.RelaxedPolyRec,
-       LangExt.DeepSubsumption ]
+       LangExt.DeepSubsumption,
+       LangExt.ImplicitForAll ]
 
 languageExtensions (Just GHC2021)
     = [LangExt.ImplicitPrelude,
@@ -1420,7 +1422,8 @@ languageExtensions (Just GHC2021)
        LangExt.TupleSections,
        LangExt.TypeApplications,
        LangExt.TypeOperators,
-       LangExt.TypeSynonymInstances]
+       LangExt.TypeSynonymInstances,
+       LangExt.ImplicitForAll]
 
 
 ways :: DynFlags -> Ways

@@ -230,6 +230,9 @@ case, *the signature brings that type variable into scope*. For example: ::
 
 The pattern type signature makes the type variable available on the right-hand side of the equation.
 
+GHC will print a warning about variables brought into scope by signatures
+in this fashion if the flag :ghc-flag:`-Wpattern-signature-binds` is set.
+
 Bringing type variables into scope is particularly important
 for existential data constructors. For example: ::
 

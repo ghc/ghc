@@ -1,0 +1,5 @@
+PatternSignatureBinds.hs:6:4: warning: [-Wpattern-signature-binds]
+    The pattern signature variable ‘a’ is not in scope.
+
+PatternSignatureBinds.hs:17:4: warning: [-Wpattern-signature-binds]
+    The pattern signature variable ‘b’ is not in scope.

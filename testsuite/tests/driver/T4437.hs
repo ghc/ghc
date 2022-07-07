@@ -39,6 +39,7 @@ expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions =
     [ "TypeAbstractions",
       "ExtendedLiterals"
+    , "ImplicitForAll"
     ]
 
 expectedCabalOnlyExtensions :: [String]

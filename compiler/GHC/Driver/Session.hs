@@ -2250,7 +2250,8 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnTypeEqualityOutOfScope,
   warnSpec    Opt_WarnTypeEqualityRequiresOperators,
   warnSpec    Opt_WarnTermVariableCapture,
-  warnSpec    Opt_WarnMissingRoleAnnotations
+  warnSpec    Opt_WarnMissingRoleAnnotations,
+  warnSpec    Opt_WarnPatternSignatureBinds
  ]
 
 warningGroupsDeps :: [(Deprecation, FlagSpec WarningGroup)]
@@ -2619,6 +2620,7 @@ xFlagsDeps = [
                                               setGenDeriving,
   flagSpec' "GeneralisedNewtypeDeriving"      LangExt.GeneralizedNewtypeDeriving
                                               setGenDeriving,
+  flagSpec "ImplicitForAll"                   LangExt.ImplicitForAll,
   flagSpec "ImplicitParams"                   LangExt.ImplicitParams,
   flagSpec "ImplicitPrelude"                  LangExt.ImplicitPrelude,
   flagSpec "ImportQualifiedPost"              LangExt.ImportQualifiedPost,

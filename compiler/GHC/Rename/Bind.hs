@@ -1030,13 +1030,30 @@ renameSigs ctxt sigs
 -- We'll just rename the INLINE prag to refer to whatever other 'op'
 -- is in scope.  (I'm assuming that Baz.op isn't in scope unqualified.)
 -- Doesn't seem worth much trouble to sort this.
+--
+-- When ImplicitForAll has been disabled, we attach a hint about it if no forall
+-- is present, since the error messages about undeclared tyvars might be confusing
+-- otherwise to an observer who's not aware of the extension.
 
 renameSig :: HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeVars)
 renameSig ctxt sig@(TypeSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRnN ctxt sig) vs
         ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
-        ; (new_ty, fvs) <- rnHsSigWcType doc ty
+        ; ifaOk <- xoptM LangExt.ImplicitForAll
+        ; (new_ty, fvs) <- rnHsSigWcType doc (out_of_scope_hint ifaOk (hswc_body ty)) ty
         ; return (TypeSig noAnn new_vs new_ty, fvs) }
+  where
+    -- Since this information is lost from here on, the existence of an outer forall in
+    -- conjunction with a manually disabled 'ImplicitForAll' is observed as a
+    -- 'GhcHint' here, so an error message about a missing type variable may alert
+    -- the user of this fact.
+    out_of_scope_hint :: Bool -> LHsSigType GhcPs -> [GhcHint]
+    out_of_scope_hint False (L _ (HsSig {sig_bndrs = HsOuterImplicit {}})) =
+      [suggestExtensionWithInfo implicit_msg LangExt.ImplicitForAll]
+    out_of_scope_hint _ _ = noHints
+    implicit_msg =
+      text "The extension has been turned off manually, which requires type variables to be bound by" <+>
+      quotes (text "forall")
 
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures

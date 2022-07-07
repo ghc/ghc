@@ -22,5 +22,6 @@ docs:
          StarIsType
          CUSKs
          FieldSelectors
+         ImplicitForAll
 extensible fields:
 

@@ -1,0 +1,27 @@
+ImplicitForAll-tycl-fail.hs:7:16: Not in scope: type variable ‘b’
+
+ImplicitForAll-tycl-fail.hs:9:32: Not in scope: type variable ‘c’
+
+ImplicitForAll-tycl-fail.hs:11:20: Not in scope: type variable ‘b’
+
+ImplicitForAll-tycl-fail.hs:15:25: Not in scope: type variable ‘a’
+
+ImplicitForAll-tycl-fail.hs:15:37: Not in scope: type variable ‘a’
+
+ImplicitForAll-tycl-fail.hs:18:8: Not in scope: type variable ‘a’
+
+ImplicitForAll-tycl-fail.hs:18:14: Not in scope: type variable ‘a’
+
+ImplicitForAll-tycl-fail.hs:21:20: Not in scope: type variable ‘k’
+
+ImplicitForAll-tycl-fail.hs:26:20: Not in scope: type variable ‘k’
+
+ImplicitForAll-tycl-fail.hs:28:23: Not in scope: type variable ‘k’
+
+ImplicitForAll-tycl-fail.hs:29:26: Not in scope: type variable ‘f’
+
+ImplicitForAll-tycl-fail.hs:29:38: Not in scope: type variable ‘f’
+
+ImplicitForAll-tycl-fail.hs:33:13: Not in scope: type variable ‘a’
+
+ImplicitForAll-tycl-fail.hs:33:28: Not in scope: type variable ‘a’

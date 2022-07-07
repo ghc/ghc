@@ -131,6 +131,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wtype-defaults`
         * :ghc-flag:`-Wunused-do-bind`
         * :ghc-flag:`-Wunused-record-wildcards`
+        * :ghc-flag:`-Wpattern-signature-binds`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
@@ -2392,6 +2393,16 @@ of ``-W(no-)*``.
 
     When :ghc-flag:`-Wterm-variable-capture` is enabled, GHC warns against implicit quantification
     that would stop working under ``RequiredTypeArguments``.
+.. ghc-flag:: -Wpattern-signature-binds
+    :shortdesc: warn when a pattern signature binds a type variable
+    :type: dynamic
+    :reverse: -Wno-pattern-signature-binds
+
+    :since: 9.6
+
+    :extension:`ScopedTypeVariables` allows patterns to be annotated with type signatures.
+    If a signature mentions a type variable that isn't in scope, GHC will implicitly bind it.
+    This warning reports such an implicitly bound variable.
 
 .. ghc-flag:: -Wmissing-role-annotations
     :shortdesc: warn when type declarations don't have role annotations

@@ -69,5 +69,6 @@ docs:
          StandaloneKindSignatures
          FieldSelectors
          TypeAbstractions
+         ImplicitForAll
 extensible fields:
 

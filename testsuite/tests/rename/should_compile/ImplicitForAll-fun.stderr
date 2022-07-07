@@ -1,0 +1,6 @@
+ImplicitForAll-fun.hs:9:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
+     Found type wildcard ‘_b’ standing for ‘w’
+      Where: ‘w’ is a rigid type variable bound by
+               the inferred type of f :: a -> w -> a
+               at ImplicitForAll-fun.hs:(10,1)-(11,11)
+     In the type signature: f :: forall a. a -> _b -> a

@@ -1077,6 +1077,10 @@ instance Diagnostic TcRnMessage where
             impMsg  = text "imported from" <+> ppr pragma_warning_import_mod <> extra
             extra | pragma_warning_import_mod == pragma_warning_defined_mod = empty
                   | otherwise = text ", but defined in" <+> ppr pragma_warning_defined_mod
+    TcRnPatternSignatureBinds rdr_name
+      -> mkSimpleDecorated $
+            sep [ text "The pattern signature variable" <+> quotes (ppr rdr_name),
+                  text "is not in scope." ]
     TcRnIllegalHsigDefaultMethods name meths
       -> mkSimpleDecorated $
         text "Illegal default method" <> plural (NE.toList meths) <+> text "in class definition of" <+> ppr name <+> text "in hsig file"
@@ -2233,6 +2237,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithoutFlag
     TcRnPragmaWarning{pragma_warning_msg}
       -> WarningWithCategory (warningTxtCategory pragma_warning_msg)
+    TcRnPatternSignatureBinds{}
+      -> WarningWithFlag Opt_WarnPatternSignatureBinds
     TcRnIllegalHsigDefaultMethods{}
       -> ErrorWithoutFlag
     TcRnHsigFixityMismatch{}
@@ -2889,6 +2895,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnSpecialiseNotVisible name
       -> [SuggestSpecialiseVisibilityHints name]
+    TcRnPatternSignatureBinds{}
+      -> noHints
     TcRnPragmaWarning{}
       -> noHints
     TcRnIllegalHsigDefaultMethods{}

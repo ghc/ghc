@@ -2608,7 +2608,7 @@ tcRnType hsc_env flexi normalise rdr_type
                  -- of free type variables :
                  -- ghci> :k [a]
                  -- [a] :: *
-               <- rnHsSigWcType GHCiCtx (mkHsWildCardBndrs $ noLocA (mkHsImplicitSigType rdr_type))
+               <- rnHsSigWcType GHCiCtx [] (mkHsWildCardBndrs $ noLocA (mkHsImplicitSigType rdr_type))
                   -- The type can have wild cards, but no implicit
                   -- generalisation; e.g.   :kind (T _)
        ; failIfErrsM

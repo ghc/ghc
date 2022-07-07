@@ -481,6 +481,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalKindSignature"                      = 91382
   GhcDiagnosticCode "TcRnDataKindsError"                            = 68567
 
+  GhcDiagnosticCode "TcRnPatternSignatureBinds"                     = 10101
   GhcDiagnosticCode "TcRnIllegalHsigDefaultMethods"                 = 93006
   GhcDiagnosticCode "TcRnHsigFixityMismatch"                        = 93007
   GhcDiagnosticCode "TcRnHsigNoIface"                               = 93010

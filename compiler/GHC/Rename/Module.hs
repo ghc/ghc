@@ -689,10 +689,8 @@ rnFamEqn doc atfi extra_kvars
          -- @
          --
          -- For associated type family instances, exclude the type variables
-         -- bound by the instance head with filterInScopeM (#19649).
-       ; all_imp_vars <- filterInScopeM $ pat_kity_vars ++ extra_kvars
-
-       ; bindHsOuterTyVarBndrs doc mb_cls all_imp_vars outer_bndrs $ \rn_outer_bndrs ->
+         -- bound by the instance head with filterOutInScopeM (#19649).
+       ; bindHsOuterTyVarBndrs doc mb_cls (pat_kity_vars ++ extra_kvars) outer_bndrs $ \rn_outer_bndrs ->
     do { (pats', pat_fvs) <- rnLHsTypeArgs (FamPatCtx tycon) pats
        ; (payload', rhs_fvs) <- rn_payload doc payload
 
@@ -1130,7 +1128,7 @@ rnSrcDerivDecl (DerivDecl _ ty mds overlap)
   = do { standalone_deriv_ok <- xoptM LangExt.StandaloneDeriving
        ; unless standalone_deriv_ok (addErr TcRnUnexpectedStandaloneDerivingDecl)
        ; checkInferredVars ctxt nowc_ty
-       ; (mds', ty', fvs) <- rnLDerivStrategy ctxt mds $ rnHsSigWcType ctxt ty
+       ; (mds', ty', fvs) <- rnLDerivStrategy ctxt mds $ rnHsSigWcType ctxt [] ty
          -- Check if there are any nested `forall`s or contexts, which are
          -- illegal in the type of an instance declaration (see
          -- Note [No nested foralls or contexts in instance types] in
@@ -1323,7 +1321,7 @@ reasons:
 
 * Improve kind error messages. Consider
 
-     data T f a = MkT f a
+     data T f a = MkT (f a)
      data S f a = MkS f (T f a)
 
   This has a kind error, but the error message is better if you
@@ -2433,7 +2431,6 @@ rnConDecl (ConDeclGADT { con_names   = names
               -- variable, and hence the order needed for visible type application
               -- See #14808.
               implicit_bndrs =
-                extractHsOuterTvBndrs outer_bndrs           $
                 extractHsTysRdrTyVars (hsConDeclTheta mcxt) $
                 extractConDeclGADTDetailsTyVars args        $
                 extractHsTysRdrTyVars [res_ty] []

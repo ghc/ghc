@@ -2470,6 +2470,13 @@ data TcRnMessage where
     pragma_warning_defined_mod :: ModuleName
   } -> TcRnMessage
 
+  {-| TcRnPatternSignatureBinds is a warning (controlled with -Wpattern-signature-binds)
+      that occurs if a pattern signature mentions an out-of-scope variable.
+
+     Test cases:
+       warnings/should_compile/PatternSignatureBinds
+  -}
+  TcRnPatternSignatureBinds :: !(LocatedN RdrName) -> TcRnMessage
 
   {-| TcRnIllegalHsigDefaultMethods is an error that occurs when a binding for
      a class default method is provided in a Backpack signature file.

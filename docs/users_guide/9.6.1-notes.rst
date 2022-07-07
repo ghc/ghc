@@ -113,6 +113,9 @@ Language
   - Numeric characters: `#1728` equivalent to `getLabel @"1728"`
   - Arbitrary strings: `#"Hello, World!"` equivalent to `getLabel @"Hello, World!"`
 
+- A new extension, :extension:`ImplicitForAll`, has been added that makes explicit
+  ``forall`` on declarations with type variables mandatory when disabled.
+
 Compiler
 ~~~~~~~~
 
@@ -182,6 +185,9 @@ Runtime system
 - Fixed a bug that sometimes caused live sparks to be GC'ed too early either during
   minor GC or major GC with workstealing disabled. See #22528.
 
+- A new warning, :ghc-flag:`-Wpattern-signature-binds`, has been added that
+  alerts the user when a pattern signature binds a type variable that isn't
+  in scope.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
