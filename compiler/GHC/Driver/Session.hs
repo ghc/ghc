@@ -1339,12 +1339,14 @@ languageExtensions (Just Haskell98)
        LangExt.DatatypeContexts,
        LangExt.TraditionalRecordSyntax,
        LangExt.FieldSelectors,
-       LangExt.NondecreasingIndentation
+       LangExt.NondecreasingIndentation,
            -- strictly speaking non-standard, but we always had this
            -- on implicitly before the option was added in 7.1, and
            -- turning it off breaks code, so we're keeping it on for
            -- backwards compatibility.  Cabal uses -XHaskell98 by
            -- default unless you specify another language.
+       LangExt.ImplicitForAll,
+       LangExt.PatternSignatureBinds
       ]
 
 languageExtensions (Just Haskell2010)
@@ -1360,7 +1362,9 @@ languageExtensions (Just Haskell2010)
        LangExt.PatternGuards,
        LangExt.DoAndIfThenElse,
        LangExt.FieldSelectors,
-       LangExt.RelaxedPolyRec]
+       LangExt.RelaxedPolyRec,
+       LangExt.ImplicitForAll,
+       LangExt.PatternSignatureBinds]
 
 languageExtensions (Just GHC2021)
     = [LangExt.ImplicitPrelude,
@@ -1410,7 +1414,9 @@ languageExtensions (Just GHC2021)
        LangExt.TupleSections,
        LangExt.TypeApplications,
        LangExt.TypeOperators,
-       LangExt.TypeSynonymInstances]
+       LangExt.TypeSynonymInstances,
+       LangExt.ImplicitForAll,
+       LangExt.PatternSignatureBinds]
 
 hasPprDebug :: DynFlags -> Bool
 hasPprDebug = dopt Opt_D_ppr_debug
@@ -3687,6 +3693,7 @@ xFlagsDeps = [
                                               setGenDeriving,
   flagSpec' "GeneralisedNewtypeDeriving"      LangExt.GeneralizedNewtypeDeriving
                                               setGenDeriving,
+  flagSpec "ImplicitForAll"                   LangExt.ImplicitForAll,
   flagSpec "ImplicitParams"                   LangExt.ImplicitParams,
   flagSpec "ImplicitPrelude"                  LangExt.ImplicitPrelude,
   flagSpec "ImportQualifiedPost"              LangExt.ImportQualifiedPost,
@@ -3732,6 +3739,7 @@ xFlagsDeps = [
   flagSpec "PatternGuards"                    LangExt.PatternGuards,
   depFlagSpec' "PatternSignatures"            LangExt.ScopedTypeVariables
     (deprecatedForExtension "ScopedTypeVariables"),
+  flagSpec "PatternSignatureBinds"                   LangExt.PatternSignatureBinds,
   flagSpec "PatternSynonyms"                  LangExt.PatternSynonyms,
   flagSpec "PolyKinds"                        LangExt.PolyKinds,
   flagSpec "PolymorphicComponents"            LangExt.RankNTypes,

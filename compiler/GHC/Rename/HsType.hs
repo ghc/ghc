@@ -165,7 +165,7 @@ rnHsPatSigType scoping ctx sig_ty thing_inside
              implicit_bndrs = case scoping of
                AlwaysBind -> tv_rdrs
                NeverBind  -> []
-       ; rnImplicitTvOccs Nothing implicit_bndrs $ \ imp_tvs ->
+       ; rnImplicitTvOccsIfXopt LangExt.PatternSignatureBinds Nothing implicit_bndrs $ \ imp_tvs ->
     do { (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx nwc_rdrs pat_sig_ty
        ; let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
              sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = pat_sig_ty' }
@@ -405,6 +405,17 @@ rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
+
+rnImplicitTvOccsIfXopt :: LangExt.Extension
+                       -> Maybe assoc
+                       -> FreeKiTyVars
+                       -> ([Name] -> RnM (a, FreeVars))
+                       -> RnM (a, FreeVars)
+rnImplicitTvOccsIfXopt ext mb_assoc implicit_vs_with_dups thing_inside = do
+  ok <- xoptM ext
+  if ok
+  then rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
+  else thing_inside []
 
 {-
 Note [Source locations for implicitly bound type variables]
@@ -972,23 +983,27 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
 
        ; let -- See Note [bindHsQTyVars examples] for what
              -- all these various things are doing
-             bndrs, implicit_kvs :: [LocatedN RdrName]
+             bndrs, implicit_kvs_bndr, implicit_kvs_body :: [LocatedN RdrName]
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
-             implicit_kvs = filterFreeVarsToBind bndrs $
-               bndr_kv_occs ++ body_kv_occs
+             implicit_kvs_bndr = filterFreeVarsToBind bndrs $
+               bndr_kv_occs
+             implicit_kvs_body = filterFreeVarsToBind bndrs $
+               body_kv_occs
              body_remaining = filterFreeVarsToBind bndr_kv_occs $
               filterFreeVarsToBind bndrs body_kv_occs
              all_bound_on_lhs = null body_remaining
 
        ; traceRn "checkMixedVars3" $
-           vcat [ text "bndrs"   <+> ppr hs_tv_bndrs
-                , text "bndr_kv_occs"   <+> ppr bndr_kv_occs
-                , text "body_kv_occs"   <+> ppr body_kv_occs
-                , text "implicit_kvs"   <+> ppr implicit_kvs
-                , text "body_remaining" <+> ppr body_remaining
+           vcat [ text "bndrs"             <+> ppr hs_tv_bndrs
+                , text "bndr_kv_occs"      <+> ppr bndr_kv_occs
+                , text "body_kv_occs"      <+> ppr body_kv_occs
+                , text "implicit_kvs_bndr" <+> ppr implicit_kvs_bndr
+                , text "implicit_kvs_body" <+> ppr implicit_kvs_body
+                , text "body_remaining"    <+> ppr body_remaining
                 ]
 
-       ; rnImplicitTvOccs mb_assoc implicit_kvs $ \ implicit_kv_nms' ->
+       ; rnImplicitTvOccsIfXopt LangExt.ImplicitForAll mb_assoc implicit_kvs_body $ \ implicit_kv_nms_body' ->
+         rnImplicitTvOccsIfXopt LangExt.PatternSignatureBinds mb_assoc implicit_kvs_bndr $ \ implicit_kv_nms_bndr' ->
          bindLHsTyVarBndrs doc NoWarnUnusedForalls mb_assoc hs_tv_bndrs $ \ rn_bndrs ->
            -- This is the only call site for bindLHsTyVarBndrs where we pass
            -- NoWarnUnusedForalls, which suppresses -Wunused-foralls warnings.
@@ -999,7 +1014,7 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
              -- be a little more precise than that by pointing to the location
              -- of the LHsQTyVars instead, which is what bndrs_loc
              -- corresponds to.
-             implicit_kv_nms = map (`setNameLoc` bndrs_loc) implicit_kv_nms'
+             implicit_kv_nms = map (`setNameLoc` bndrs_loc) (implicit_kv_nms_body' ++ implicit_kv_nms_bndr')
 
        ; traceRn "bindHsQTyVars" (ppr hsq_bndrs $$ ppr implicit_kv_nms $$ ppr rn_bndrs)
        ; thing_inside (HsQTvs { hsq_ext = implicit_kv_nms
@@ -1158,9 +1173,12 @@ bindHsOuterTyVarBndrs :: OutputableBndrFlag flag 'Renamed
                       -> RnM (a, FreeVars)
 bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
   case outer_bndrs of
-    HsOuterImplicit{} ->
-      rnImplicitTvOccs mb_cls implicit_vars $ \implicit_vars' ->
+    HsOuterImplicit{} -> do
+      implicit_forall <- xoptM LangExt.ImplicitForAll
+      if implicit_forall
+      then rnImplicitTvOccs mb_cls implicit_vars $ \implicit_vars' -> do
         thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
+      else thing_inside $ HsOuterImplicit { hso_ximplicit = [] }
     HsOuterExplicit{hso_bndrs = exp_bndrs} ->
       -- Note: If we pass mb_cls instead of Nothing below, bindLHsTyVarBndrs
       -- will use class variables for any names the user meant to bring in
