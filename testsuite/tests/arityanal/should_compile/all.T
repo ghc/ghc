@@ -21,3 +21,4 @@ test('Arity16', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dn
 test('T18793', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
 test('T18870', [ only_ways(['optasm']) ], compile, ['-ddebug-output'])
 test('T18937', [ only_ways(['optasm']) ], compile, ['-ddebug-output'])
+test('T21755',  [ grep_errmsg(r'Arity=') ], compile, ['-O -dno-typeable-binds -fno-worker-wrapper'])

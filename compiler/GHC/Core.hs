@@ -695,6 +695,7 @@ Join points must follow these invariants:
 
          The arity of a join point isn't very important; but short of setting
          it to zero, it is helpful to have an invariant.  E.g. #17294.
+         See also Note [Do not eta-expand join points] in GHC.Core.Opt.Simplify.Utils.
 
   3. If the binding is recursive, then all other bindings in the recursive group
      must also be join points.

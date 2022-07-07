@@ -1697,9 +1697,7 @@ tryEtaExpandRhs :: SimplMode -> OutId -> OutExpr
 tryEtaExpandRhs mode bndr rhs
   | Just join_arity <- isJoinId_maybe bndr
   = do { let (join_bndrs, join_body) = collectNBinders join_arity rhs
-             oss   = [idOneShotInfo id | id <- join_bndrs, isId id]
-             arity_type | exprIsDeadEnd join_body = mkBotArityType oss
-                        | otherwise               = mkTopArityType oss
+             arity_type = mkManifestArityType join_bndrs join_body
        ; return (arity_type, rhs) }
          -- Note [Do not eta-expand join points]
          -- But do return the correct arity and bottom-ness, because
