@@ -1099,9 +1099,9 @@ addFunResCtxt fun args fun_res_ty env_ty thing_inside
            ; let -- See Note [Splitting nested sigma types in mismatched
                  --           function types]
                  (_, _, fun_tau) = tcSplitNestedSigmaTys fun_res'
-                 -- No need to call tcSplitNestedSigmaTys here, since env_ty is
-                 -- an ExpRhoTy, i.e., it's already instantiated.
-                 (_, _, env_tau) = tcSplitSigmaTy env'
+                 (_, _, env_tau) = tcSplitNestedSigmaTys env'
+                     -- env_ty is an ExpRhoTy, but with simple subsumption it
+                     -- is not deeply skolemised, so still use tcSplitNestedSigmaTys
                  (args_fun, res_fun) = tcSplitFunTys fun_tau
                  (args_env, res_env) = tcSplitFunTys env_tau
                  n_fun = length args_fun
@@ -1148,7 +1148,7 @@ Previously, GHC computed the number of argument types through tcSplitSigmaTy.
 This is incorrect in the face of nested foralls, however!
 This caused Ticket #13311, for instance:
 
-  f :: forall a. (Monoid a) => forall b. (Monoid b) => Maybe a -> Maybe b
+  f :: forall a. (Monoid a) => Int -> forall b. (Monoid b) => Maybe a -> Maybe b
 
 If one uses `f` like so:
 
@@ -1159,7 +1159,7 @@ Then tcSplitSigmaTy will decompose the type of `f` into:
   Tyvars: [a]
   Context: (Monoid a)
   Argument types: []
-  Return type: forall b. Monoid b => Maybe a -> Maybe b
+  Return type: Int -> forall b. Monoid b => Maybe a -> Maybe b
 
 That is, it will conclude that there are *no* argument types, and since `f`
 was given no arguments, it won't print a helpful error message. On the other
@@ -1167,11 +1167,15 @@ hand, tcSplitNestedSigmaTys correctly decomposes `f`'s type down to:
 
   Tyvars: [a, b]
   Context: (Monoid a, Monoid b)
-  Argument types: [Maybe a]
+  Argument types: [Int, Maybe a]
   Return type: Maybe b
 
 So now GHC recognizes that `f` has one more argument type than it was actually
 provided.
+
+Notice that tcSplitNestedSigmaTys looks through function arrows too, regardless
+of simple/deep subsumption.  Here we are concerned only whether there is a
+mis-match in the number of value arguments.
 -}
 
 
