@@ -224,10 +224,13 @@ genPrim p t Word32NeOp         rs  xs    = genPrim p t WordNeOp rs xs
 
 ------------------------------ Int64 --------------------------------------------
 
-genPrim _ _ Int64ToIntOp      [r] [_x1,x2] = PrimInline $ r |= x2
+genPrim _ _ Int64ToIntOp      [r] [_h,l] = PrimInline $ r |= l
 
-genPrim _ _ Int64NegOp        [r_high,r_low] [high, low] =
-  PrimInline $ appT [r_high, r_low] "h$hs_negateInt64" [high, low]
+genPrim _ _ Int64NegOp        [r_h,r_l] [h,l] =
+  PrimInline $ mconcat
+    [ r_l |= ((BNot l + 1)       `BOr` zero_)
+    , r_h |= ((BNot h + Not r_l) `BOr` zero_)
+    ]
 
 genPrim _ _ Int64AddOp        [r_high,r_low] [high0, low0, high1, low1] =
   PrimInline $ appT [r_high, r_low] "h$hs_plusInt64" [high0, low0, high1, low1]
