@@ -538,7 +538,10 @@ isMarkedCbv NotMarkedCbv = False
 -- | What sort of 'StgOpArg' an 'StgOp' expects.
 data OpArgForm
     = OpArgValue -- ^ a normal value argument (i.e. 'StgOpArg').
-    | OpArgCont  -- ^ a continuation argument (i.e. 'StgContArg').
+    | OpArgCont  -- ^ continuation arguments (i.e. 'StgContArg').
+                 -- are allowed in addition to value arguments (i.e.
+                 -- 'StgOpArg').
+                 --
                  -- See Note [Continuation-accepting primops].
 
 instance Outputable OpArgForm where

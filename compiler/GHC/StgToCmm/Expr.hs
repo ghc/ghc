@@ -639,7 +639,7 @@ isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) _
                                      = return $! not (playSafe safe)
 -- dataToTag# evaluates its argument, see Note [dataToTag# magic] in GHC.Core.Opt.ConstantFold
 isSimpleOp (StgPrimOp DataToTagOp) _ = return False
-isSimpleOp (StgPrimOp op) stg_args   = do
+isSimpleOp (StgPrimOp _op) _stg_args   = do
     return False
     --TODO
     --arg_exprs <- getNonVoidArgAmodes stg_args

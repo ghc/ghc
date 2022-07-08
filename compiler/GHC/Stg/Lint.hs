@@ -176,7 +176,7 @@ lintStgArg (StgVarArg v) = lintStgVar v
 lintStgOpArg
     :: (OutputablePass a, BinderP a ~ Id)
     => OpArgForm -> GenStgOpArg a -> LintM ()
-lintStgOpArg OpArgValue (StgValueArg arg) =
+lintStgOpArg _          (StgValueArg arg) =
     lintStgArg arg
 lintStgOpArg OpArgCont  (StgContArg bndr body) =
     addInScopeVars [bndr] $ lintStgExpr body

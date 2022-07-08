@@ -965,7 +965,6 @@ instance Outputable ArgInfo where
 
 
 {-
--- TODO: make this configurable in primops.pp.txt
 idOpArgForms :: Id -> [OpArgForm]
 idOpArgForms f
   | Just op <- isPrimOpId_maybe f
