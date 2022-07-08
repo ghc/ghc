@@ -34,7 +34,7 @@ import GHC.Core         -- All of it
 import GHC.Core.Subst
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
 import GHC.Core.FVs       ( exprFreeVars, exprsFreeVars, bindFreeVars
-                          , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
+                          , rulesFreeVarsDSet, exprsOrphNames )
 import GHC.Core.Utils     ( exprType, mkTick, mkTicks
                           , stripTicksTopT, stripTicksTopE
                           , isJoinBind, mkCastMCo )
@@ -1223,7 +1223,9 @@ match_tmpl_var :: RuleMatchEnv
 match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
                subst@(RS { rs_id_subst = id_subst, rs_bndrs = let_bndrs })
                v1' e2
-  | any (inRnEnvR rn_env) (exprFreeVarsList e2)
+  -- anyInRnEnvR is lazy in the 2nd arg which allows us to avoid computing fvs
+  -- if the right side of the env is empty.
+  | anyInRnEnvR rn_env (exprFreeVars e2)
   = Nothing     -- Skolem-escape failure
                 -- e.g. match forall a. (\x-> a x) against (\y. y y)
 
