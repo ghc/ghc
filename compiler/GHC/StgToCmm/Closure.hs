@@ -209,7 +209,7 @@ argPrimRep arg = typePrimRep1 (stgArgType arg)
 mkLFArgument :: Id -> LambdaFormInfo
 mkLFArgument id
   | isUnliftedType ty      = LFUnlifted
-  | might_be_a_function ty = LFUnknown True
+  | mightBeFunTy ty = LFUnknown True
   | otherwise              = LFUnknown False
   where
     ty = idType id
@@ -237,19 +237,7 @@ mkLFThunk thunk_ty top fvs upd_flag
     LFThunk top (null fvs)
             (isUpdatable upd_flag)
             NonStandardThunk
-            (might_be_a_function thunk_ty)
-
---------------
-might_be_a_function :: Type -> Bool
--- Return False only if we are *sure* it's a data type
--- Look through newtypes etc as much as poss
-might_be_a_function ty
-  | [LiftedRep] <- typePrimRep ty
-  , Just tc <- tyConAppTyCon_maybe (unwrapType ty)
-  , isDataTyCon tc
-  = False
-  | otherwise
-  = True
+            (mightBeFunTy thunk_ty)
 
 -------------
 mkConLFInfo :: DataCon -> LambdaFormInfo
@@ -259,13 +247,13 @@ mkConLFInfo con = LFCon con
 mkSelectorLFInfo :: Id -> Int -> Bool -> LambdaFormInfo
 mkSelectorLFInfo id offset updatable
   = LFThunk NotTopLevel False updatable (SelectorThunk offset)
-        (might_be_a_function (idType id))
+        (mightBeFunTy (idType id))
 
 -------------
 mkApLFInfo :: Id -> UpdateFlag -> Arity -> LambdaFormInfo
 mkApLFInfo id upd_flag arity
   = LFThunk NotTopLevel (arity == 0) (isUpdatable upd_flag) (ApThunk arity)
-        (might_be_a_function (idType id))
+        (mightBeFunTy (idType id))
 
 -------------
 mkLFImported :: Id -> LambdaFormInfo
@@ -598,8 +586,8 @@ getCallMethod cfg name id (LFUnknown might_be_a_function) n_args _v_args _cg_loc
   | n_args == 0
   , Just sig <- idTagSig_maybe id
   , isTaggedSig sig -- Infered to be already evaluated by Tag Inference
-  -- When profiling we enter functions to update the SCC so we
-  -- can't use the infered enterInfo here.
+  -- When profiling we must enter all potential functions to make sure we update the SCC
+  -- even if the function itself is already evaluated.
   -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
   , not (profileIsProfiling (stgToCmmProfile cfg) && might_be_a_function)
   = InferedReturnIt -- See Note [Tag Inference]
