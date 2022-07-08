@@ -390,15 +390,21 @@ then
     dnl dealing with the rest of the build system that assumes that a linker is
     dnl available.
     echo "#!/usr/bin/env bash"                       > "$ghcjsbin/js-unknown-ghcjs-ld"
-    echo "exec \"$EMSDK_LLVM/bin/llvm-ld\" \"\$@\""  >> "$ghcjsbin/js-unknown-ghcjs-ld"
+    echo "exec \"$EMSDK_LLVM/bin/llvm-link\" \"\$@\""  >> "$ghcjsbin/js-unknown-ghcjs-ld"
     chmod 755 "$ghcjsbin/js-unknown-ghcjs-ld"
 
     export PATH=$ghcjsbin:$PATH
-fi
 
-# Extract and configure the Windows toolchain
-if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
-    FP_SETUP_WINDOWS_TOOLCHAIN
+    dnl We need to use AC_CHECK_TARGET_TOOL instead of AC_PATH_PROG below that
+    dnl doesn't take into account the target triple...
+    dnl Why are we inflicting all this to ourselves?
+    AC_CHECK_TARGET_TOOL([CC],[gcc])
+    AC_CHECK_TARGET_TOOL([CXX],[g++])
+    AC_CHECK_TARGET_TOOL([NM],[nm])
+    AC_CHECK_TARGET_TOOL([AR],[ar])
+    AC_CHECK_TARGET_TOOL([RANLIB],[ranlib])
+    AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
+
 else
     AC_PATH_TOOL([CC],[gcc], [clang])
     AC_PATH_TOOL([CXX],[g++], [clang++])
@@ -412,17 +418,37 @@ else
     AC_PATH_TOOL([Windres],[windres])
     AC_PATH_TOOL([Genlib],[genlib])
 
-    HAVE_GENLIB=False
-    if test "$HostOS" = "mingw32"; then
-        AC_CHECK_TARGET_TOOL([Windres],[windres])
-        AC_CHECK_TARGET_TOOL([DllWrap],[dllwrap])
-        AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
+  # Extract and configure the Windows toolchain
+  if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
+      FP_SETUP_WINDOWS_TOOLCHAIN
+  else
+      # Ideally should use AC_CHECK_TARGET_TOOL but our triples
+      # are screwed up. Configure doesn't think they're ever equal and
+      # so never tried without the prefix.
+      AC_PATH_PROG([CC],[gcc], [clang])
+      AC_PATH_PROG([CXX],[g++], [clang++])
+      AC_PATH_PROG([NM],[nm])
+      # N.B. we don't probe for LD here but instead
+      # do so in FIND_LD to avoid #21778.
+      AC_PATH_PROG([AR],[ar])
+      AC_PATH_PROG([RANLIB],[ranlib])
+      AC_PATH_PROG([OBJDUMP],[objdump])
+      AC_PATH_PROG([DllWrap],[dllwrap])
+      AC_PATH_PROG([Windres],[windres])
+      AC_PATH_PROG([Genlib],[genlib])
 
-        if test "$Genlib" != ""; then
-            GenlibCmd="$(cygpath -m $Genlib)"
-            HAVE_GENLIB=True
-        fi
-    fi
+      HAVE_GENLIB=False
+      if test "$HostOS" = "mingw32"; then
+          AC_CHECK_TARGET_TOOL([Windres],[windres])
+          AC_CHECK_TARGET_TOOL([DllWrap],[dllwrap])
+          AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
+
+          if test "$Genlib" != ""; then
+              GenlibCmd="$(cygpath -m $Genlib)"
+              HAVE_GENLIB=True
+          fi
+      fi
+  fi
 fi
 
 if test "$HostOS" = "mingw32"; then
