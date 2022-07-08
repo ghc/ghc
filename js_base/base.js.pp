@@ -277,22 +277,20 @@ function h$base_umask(mode) {
     return 0;
 }
 
-function h$base_write(fd, buf, buf_off, n_h, n_l, c) {
+function h$base_write(fd, buf, buf_off, n, c) {
 // fd: file descriptor number
 // buf: buffer to write
 // buf_off: offset in the buffer
-// n: number of bytes to write (64-bits, hence n_h, n_l)
+// n: number of bytes to write
 // c: continuation
     TRACE_IO("base_write: " + fd);
-
-    if (n_h > 0) { throw "h$base_write: too many bytes to write (> 32-bits)" }
 
     var fdo = h$base_fds[fd];
 
     if(fdo && fdo.write) {
-        fdo.write(fd, fdo, buf, buf_off, n_l, c);
+        fdo.write(fd, fdo, buf, buf_off, n, c);
     } else {
-        h$fs.write(fd, buf.u8, buf_off, n_l, function(err, bytesWritten, buf0) {
+        h$fs.write(fd, buf.u8, buf_off, n, function(err, bytesWritten, buf0) {
             h$handleErrnoC(err, -1, bytesWritten, c);
         });
     }
