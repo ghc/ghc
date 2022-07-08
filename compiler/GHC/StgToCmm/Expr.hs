@@ -45,7 +45,7 @@ import GHC.Types.Id
 import GHC.Builtin.PrimOps
 import GHC.Core.TyCon
 import GHC.Core.Type        ( isUnliftedType )
-import GHC.Types.RepType    ( isZeroBitTy, countConRepArgs )
+import GHC.Types.RepType    ( isZeroBitTy, countConRepArgs, mightBeFunTy )
 import GHC.Types.CostCentre ( CostCentreStack, currentCCS )
 import GHC.Types.Tickish
 import GHC.Data.Maybe
@@ -59,6 +59,7 @@ import Control.Monad ( unless, void )
 import Control.Arrow ( first )
 import Data.List     ( partition )
 import GHC.Stg.InferTags.TagSig (isTaggedSig)
+import GHC.Platform.Profile (profileIsProfiling)
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -551,7 +552,6 @@ cgCase scrut bndr alt_type alts
                     | not simple_scrut = True
                     | isSingleton alts = False
                     | up_hp_usg > 0    = False
-                    | evaluatedScrut   = False
                     | otherwise        = True
                -- cf Note [Compiling case expressions]
              gc_plan = if do_gc then GcInAlts alt_regs else NoGcInAlts
@@ -567,12 +567,6 @@ cgCase scrut bndr alt_type alts
   where
     is_cmp_op (StgOpApp (StgPrimOp op) _ _) = isComparisonPrimOp op
     is_cmp_op _                             = False
-    evaluatedScrut
-      | (StgApp v []) <- scrut
-      , Just sig <- idTagSig_maybe v
-      , isTaggedSig sig = True
-      | otherwise = False
-
 
 
 {- Note [GC for conditionals]
@@ -628,7 +622,11 @@ isSimpleScrut (StgLit _)           _         = return True       -- case 1# of {
 isSimpleScrut (StgApp _ [])    (PrimAlt _)   = return True       -- case x# of { 0# -> ..; ... }
 isSimpleScrut (StgApp f [])   _
   | Just sig <- idTagSig_maybe f
-  = return $! isTaggedSig sig       -- case !x of { ... }
+  , isTaggedSig sig  -- case !x of { ... }
+  = if mightBeFunTy (idType f)
+      -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
+      then not . profileIsProfiling <$> getProfile
+      else pure True
 isSimpleScrut _                    _         = return False
 
 isSimpleOp :: StgOp -> [StgArg] -> FCode Bool
