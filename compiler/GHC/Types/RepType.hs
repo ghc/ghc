@@ -22,6 +22,9 @@ module GHC.Types.RepType
     ubxSumRepType, layoutUbxSum, typeSlotTy, SlotTy (..),
     slotPrimRep, primRepSlot,
 
+    -- * Is this type known to be data?
+    mightBeFunTy
+
     ) where
 
 import GHC.Prelude
@@ -677,3 +680,19 @@ primRepToRuntimeRep rep = case rep of
 -- See also Note [RuntimeRep and PrimRep]
 primRepToType :: PrimRep -> Type
 primRepToType = anyTypeOfKind . mkTYPEapp . primRepToRuntimeRep
+
+--------------
+mightBeFunTy :: Type -> Bool
+-- Return False only if we are *sure* it's a data type
+-- Look through newtypes etc as much as possible. Used to
+-- decide if we need to enter a closure via a slow call.
+--
+-- AK: It would be nice to figure out and document the difference
+-- between this and isFunTy at some point.
+mightBeFunTy ty
+  | [LiftedRep] <- typePrimRep ty
+  , Just tc <- tyConAppTyCon_maybe (unwrapType ty)
+  , isDataTyCon tc
+  = False
+  | otherwise
+  = True
