@@ -415,6 +415,9 @@ def main() -> None:
         else:
           plan = gen_fetch_plan(info)
 
+        if ghc is None:
+          ghc = find_ghc(args.with_compiler)
+
         # In temporary directory, create a directory which we will archive
         tmpdir = TMPDIR.resolve()
         tmpdir.mkdir(parents=True, exist_ok=True)
@@ -430,10 +433,14 @@ def main() -> None:
 
         archivename = shutil.make_archive(args.output, fmt, root_dir=rootdir)
 
-        print(f'Bootstrap sources saved to {archivename}')
-        print(f'Use `bootstrap.py -d {args.deps} -s {archivename}` to continue')
+        print(f"""
+Bootstrap sources saved to {archivename}
+
+Use `bootstrap.py -w {ghc.ghc_path} -s {archivename}` to continue
+""")
 
     elif(args.command == 'list-sources'):
+        ghc = find_ghc(args.with_compiler)
         plan = gen_fetch_plan(info)
         with open(args.output, 'w') as out:
           json.dump({path : val._asdict() for path,val in plan.items()}, out)
@@ -447,8 +454,9 @@ The contents of $TARBALL should look like:
 ./plan-bootstrap.json
 ./{tarfmt.join(path for path in plan)}
 
-Then use `bootstrap.py -s $TARBALL` to continue
-Alternatively, you could use `bootstrap.py -d {args.deps} fetch -o $TARBALL` to download and generate the tarball, skipping this step
+Then use `bootstrap.py -w {ghc.ghc_path} -s $TARBALL` to continue
+
+Alternatively, you could use `bootstrap.py -w {ghc.ghc_path} -d {args.deps} fetch -o $TARBALL` to download and generate the tarball, skipping this step
 """)
 
     elif(args.command == None):
