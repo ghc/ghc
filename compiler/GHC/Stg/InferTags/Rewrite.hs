@@ -355,7 +355,7 @@ rewriteExpr _ e@(StgConApp {})        = rewriteConApp e
 
 rewriteExpr isScrut e@(StgApp {})     = rewriteApp isScrut e
 rewriteExpr _ (StgLit lit)           = return $! (StgLit lit)
-rewriteExpr _ (StgOpApp op args res_ty) = return $! (StgOpApp op args res_ty)
+rewriteExpr _ (StgOpApp op args res_ty) = StgOpApp op <$!> mapM rewriteOpArg args <*> pure res_ty
 
 rewriteCase :: InferStgExpr -> RM TgStgExpr
 rewriteCase (StgCase scrut bndr alt_type alts) =
@@ -441,6 +441,11 @@ rewriteApp _ (StgApp f args)
 
 rewriteApp _ (StgApp f args) = return $ StgApp f args
 rewriteApp _ _ = panic "Impossible"
+
+rewriteOpArg :: InferStgOpArg -> RM TgStgOpArg
+rewriteOpArg (StgValueArg arg) = return (StgValueArg arg)
+rewriteOpArg (StgContArg bndr body) = do
+    StgContArg (fst bndr) <$!> rewriteExpr False body
 
 -- `mkSeq` x x' e generates `case x of x' -> e`
 -- We could also substitute x' for x in e but that's so rarely beneficial

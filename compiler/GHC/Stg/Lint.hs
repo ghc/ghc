@@ -92,12 +92,13 @@ import GHC.Prelude
 import GHC.Stg.Syntax
 import GHC.Stg.Utils
 
+import GHC.Builtin.PrimOps  ( primOpArgForms )
 import GHC.Core.Lint        ( interactiveInScope )
 import GHC.Core.DataCon
 import GHC.Core             ( AltCon(..) )
 import GHC.Core.Type
 
-import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel, isMarkedCbv )
+import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel, OpArgForm(..), isMarkedCbv )
 import GHC.Types.CostCentre ( isCurrentCCS )
 import GHC.Types.Error      ( DiagnosticReason(WarningWithoutFlag) )
 import GHC.Types.Id
@@ -171,6 +172,19 @@ lintStgTopBindings platform logger diag_opts opts ictxt this_mod unarised whodun
 lintStgArg :: StgArg -> LintM ()
 lintStgArg (StgLitArg _) = return ()
 lintStgArg (StgVarArg v) = lintStgVar v
+
+lintStgOpArg
+    :: (OutputablePass a, BinderP a ~ Id)
+    => OpArgForm -> GenStgOpArg a -> LintM ()
+lintStgOpArg OpArgValue (StgValueArg arg) =
+    lintStgArg arg
+lintStgOpArg OpArgCont  (StgContArg bndr body) =
+    addInScopeVars [bndr] $ lintStgExpr body
+lintStgOpArg form arg = addErrL doc
+  where
+    doc = text "mismatched op argument form:"
+       $$ text "expected:" <+> ppr form
+       $$ text "found:" <+> ppr arg
 
 lintStgVar :: Id -> LintM ()
 lintStgVar id = checkInScope id
@@ -271,8 +285,13 @@ lintStgExpr app@(StgConApp con _n args _arg_tys) = do
     mapM_ lintStgArg args
     mapM_ checkPostUnariseConArg args
 
-lintStgExpr (StgOpApp _ args _) =
-    mapM_ lintStgArg args
+lintStgExpr (StgOpApp op args _) =
+    mapM_ (uncurry lintStgOpArg)
+      $ zipEqual "lintStgExpr(StgOpApp)" arg_forms args
+  where
+    arg_forms
+      | StgPrimOp primop <- op = primOpArgForms primop
+      | otherwise = repeat OpArgValue
 
 lintStgExpr (StgLet _ binds body) = do
     binders <- lintStgBinds NotTopLevel binds

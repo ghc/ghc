@@ -9,6 +9,7 @@
 module GHC.Builtin.PrimOps (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,
         primOpType, primOpSig, primOpResultType,
+        primOpArgForms,
         primOpTag, maxPrimOpTag, primOpOcc,
         primOpWrapperId,
 
@@ -636,6 +637,13 @@ primOpOcc :: PrimOp -> OccName
 primOpOcc op = case primOpInfo op of
                Compare   occ _     -> occ
                GenPrimOp occ _ _ _ -> occ
+
+-- TODO: make this configurable in primops.pp.txt
+primOpArgForms :: PrimOp -> [OpArgForm]
+primOpArgForms CatchOp =
+    [ OpArgValue, OpArgValue, OpArgCont, OpArgValue, OpArgValue]
+primOpArgForms _ =
+    repeat OpArgValue
 
 {- Note [Primop wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

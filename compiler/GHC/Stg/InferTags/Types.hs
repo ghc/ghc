@@ -37,6 +37,7 @@ type instance XRhsClosure  'InferTaggedBinders = XRhsClosure  'CodeGen
 
 type InferStgTopBinding = GenStgTopBinding 'InferTaggedBinders
 type InferStgBinding    = GenStgBinding    'InferTaggedBinders
+type InferStgOpArg      = GenStgOpArg      'InferTaggedBinders
 type InferStgExpr       = GenStgExpr       'InferTaggedBinders
 type InferStgRhs        = GenStgRhs        'InferTaggedBinders
 type InferStgAlt        = GenStgAlt        'InferTaggedBinders

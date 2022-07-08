@@ -219,6 +219,13 @@ liftArgs (StgVarArg occ) = do
   assertPprM (not <$> isLifted occ) (text "StgArgs should never be lifted" $$ ppr occ)
   StgVarArg <$> substOcc occ
 
+liftOpArgs :: LlStgOpArg -> LiftM OutStgOpArg
+liftOpArgs (StgValueArg arg) = StgValueArg <$> liftArgs arg
+liftOpArgs (StgContArg bndr body) = do
+  withSubstBndr (binderInfoBndr bndr) $ \bndr' -> do
+    body' <- liftExpr body
+    pure (StgContArg bndr' body')
+
 liftExpr :: LlStgExpr -> LiftM OutStgExpr
 liftExpr (StgLit lit) = pure (StgLit lit)
 liftExpr (StgTick t e) = StgTick t <$> liftExpr e
@@ -229,7 +236,7 @@ liftExpr (StgApp f args) = do
   let top_lvl_args = map StgVarArg fvs' ++ args'
   pure (StgApp f' top_lvl_args)
 liftExpr (StgConApp con mn args tys) = StgConApp con mn <$> traverse liftArgs args <*> pure tys
-liftExpr (StgOpApp op args ty) = StgOpApp op <$> traverse liftArgs args <*> pure ty
+liftExpr (StgOpApp op args ty) = StgOpApp op <$> traverse liftOpArgs args <*> pure ty
 liftExpr (StgCase scrut info ty alts) = do
   scrut' <- liftExpr scrut
   withSubstBndr (binderInfoBndr info) $ \bndr' -> do

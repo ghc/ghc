@@ -21,7 +21,7 @@ generation.
 
 module GHC.Stg.Syntax (
         -- * STG Syntax
-        StgArg(..),
+        StgArg(..), GenStgOpArg(..), expectValueOpArg,
 
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt(..), AltType(..),
@@ -83,6 +83,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Literal     ( Literal, literalType )
 import GHC.Unit.Module       ( Module )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Core.Ppr( {- instances -} )
 import GHC.Builtin.PrimOps ( PrimOp, PrimCall )
@@ -121,9 +122,24 @@ StgArg
 ************************************************************************
 -}
 
+-- | An application argument.
 data StgArg
-  = StgVarArg  Id
-  | StgLitArg  Literal
+  = StgVarArg Id
+  | StgLitArg Literal
+
+-- | An argument to a primop application.
+data GenStgOpArg pass
+  = StgContArg (BinderP pass) (GenStgExpr pass)
+    -- ^ an argument of the form @\(s :: State# _) -> expr@. This
+    -- is only allowed as the continuation argument of a
+    -- continuation-accepting primop (see Note [Continuation-accepting
+    -- primops].
+  | StgValueArg StgArg
+    -- ^ a \"normal\" argument.
+
+expectValueOpArg :: (OutputablePass pass) => GenStgOpArg pass -> StgArg
+expectValueOpArg (StgValueArg arg) = arg
+expectValueOpArg arg@(StgContArg _ _) = pprPanic "Expected continuation argument" $ ppr arg
 
 -- | Does this constructor application refer to anything in a different
 -- *Windows* DLL?
@@ -237,14 +253,14 @@ literals.
         -- which can't be let-bound
   | StgConApp   DataCon
                 ConstructorNumber
-                [StgArg] -- Saturated
-                [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
+                [StgArg]           -- Saturated
+                [Type]             -- See Note [Types in StgConApp] in GHC.Stg.Unarise
 
-  | StgOpApp    StgOp    -- Primitive op or foreign call
-                [StgArg] -- Saturated.
-                Type     -- Result type
-                         -- We need to know this so that we can
-                         -- assign result registers
+  | StgOpApp    StgOp              -- Primitive op or foreign call
+                [GenStgOpArg pass] -- Saturated.
+                Type               -- Result type
+                                   -- We need to know this so that we can
+                                   -- assign result registers
 
 {-
 ************************************************************************
@@ -508,24 +524,28 @@ The Plain STG parameterisation
 
 type StgTopBinding = GenStgTopBinding 'Vanilla
 type StgBinding    = GenStgBinding    'Vanilla
+type StgOpArg      = GenStgOpArg      'Vanilla
 type StgExpr       = GenStgExpr       'Vanilla
 type StgRhs        = GenStgRhs        'Vanilla
 type StgAlt        = GenStgAlt        'Vanilla
 
 type LlStgTopBinding = GenStgTopBinding 'LiftLams
 type LlStgBinding    = GenStgBinding    'LiftLams
+type LlStgOpArg      = GenStgOpArg      'LiftLams
 type LlStgExpr       = GenStgExpr       'LiftLams
 type LlStgRhs        = GenStgRhs        'LiftLams
 type LlStgAlt        = GenStgAlt        'LiftLams
 
 type CgStgTopBinding = GenStgTopBinding 'CodeGen
 type CgStgBinding    = GenStgBinding    'CodeGen
+type CgStgOpArg      = GenStgOpArg      'CodeGen
 type CgStgExpr       = GenStgExpr       'CodeGen
 type CgStgRhs        = GenStgRhs        'CodeGen
 type CgStgAlt        = GenStgAlt        'CodeGen
 
 type TgStgTopBinding = GenStgTopBinding 'CodeGen
 type TgStgBinding    = GenStgBinding    'CodeGen
+type TgStgOpArg      = GenStgOpArg      'CodeGen
 type TgStgExpr       = GenStgExpr       'CodeGen
 type TgStgRhs        = GenStgRhs        'CodeGen
 type TgStgAlt        = GenStgAlt        'CodeGen
@@ -538,12 +558,14 @@ type TgStgAlt        = GenStgAlt        'CodeGen
 type InStgTopBinding  = StgTopBinding
 type InStgBinding     = StgBinding
 type InStgArg         = StgArg
+type InStgOpArg       = StgOpArg
 type InStgExpr        = StgExpr
 type InStgRhs         = StgRhs
 type InStgAlt         = StgAlt
 type OutStgTopBinding = StgTopBinding
 type OutStgBinding    = StgBinding
 type OutStgArg        = StgArg
+type OutStgOpArg      = StgOpArg
 type OutStgExpr       = StgExpr
 type OutStgRhs        = StgRhs
 type OutStgAlt        = StgAlt
@@ -747,6 +769,14 @@ instance Outputable StgArg where
 pprStgArg :: StgArg -> SDoc
 pprStgArg (StgVarArg var) = ppr var
 pprStgArg (StgLitArg con) = ppr con
+
+instance OutputablePass pass => Outputable (GenStgOpArg pass) where
+  ppr = pprStgOpArg
+
+pprStgOpArg :: OutputablePass pass => GenStgOpArg pass -> SDoc
+pprStgOpArg (StgContArg bndr body) =
+  char '\\' <> ppr bndr <+> text "->" <+> ppr body
+pprStgOpArg (StgValueArg arg) = ppr arg
 
 instance OutputablePass pass => Outputable  (GenStgExpr pass) where
   ppr = pprStgExpr panicStgPprOpts

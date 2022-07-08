@@ -71,12 +71,12 @@ cgExpr (StgApp fun args)     = cgIdApp fun args
 
 -- seq# a s ==> a
 -- See Note [seq# magic] in GHC.Core.Opt.ConstantFold
-cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
+cgExpr (StgOpApp (StgPrimOp SeqOp) [StgValueArg (StgVarArg a), _] _res_ty) =
   cgIdApp a []
 
 -- dataToTag# :: a -> Int#
 -- See Note [dataToTag# magic] in GHC.Core.Opt.ConstantFold
-cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
+cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgValueArg (StgVarArg a)] _res_ty) = do
   platform <- getPlatform
   emitComment (mkFastString "dataToTag#")
   info <- getCgIdInfo a
@@ -534,7 +534,8 @@ The special case for seq# in cgCase does this:
 is the same as the return convention for just 'a')
 -}
 
-cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
+cgCase (StgOpApp (StgPrimOp SeqOp) args _) bndr alt_type alts
+  | [StgValueArg (StgVarArg a), _] <- args
   = -- Note [Handle seq#]
     -- And see Note [seq# magic] in GHC.Core.Opt.ConstantFold
     -- Use the same return convention as vanilla 'a'.
@@ -632,17 +633,20 @@ isSimpleScrut (StgApp f [])   _
   = return $! isTaggedSig sig       -- case !x of { ... }
 isSimpleScrut _                    _         = return False
 
-isSimpleOp :: StgOp -> [StgArg] -> FCode Bool
+isSimpleOp :: StgOp -> [CgStgOpArg] -> FCode Bool
 -- True iff the op cannot block or allocate
-isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) _ = return $! not (playSafe safe)
+isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) _
+                                     = return $! not (playSafe safe)
 -- dataToTag# evaluates its argument, see Note [dataToTag# magic] in GHC.Core.Opt.ConstantFold
 isSimpleOp (StgPrimOp DataToTagOp) _ = return False
-isSimpleOp (StgPrimOp op) stg_args                  = do
-    arg_exprs <- getNonVoidArgAmodes stg_args
-    cfg       <- getStgToCmmConfig
+isSimpleOp (StgPrimOp op) stg_args   = do
+    return False
+    --TODO
+    --arg_exprs <- getNonVoidArgAmodes stg_args
+    --cfg       <- getStgToCmmConfig
     -- See Note [Inlining out-of-line primops and heap checks]
-    return $! shouldInlinePrimOp cfg op arg_exprs
-isSimpleOp (StgPrimCallOp _) _                           = return False
+    --return $! shouldInlinePrimOp cfg op arg_exprs
+isSimpleOp (StgPrimCallOp _) _       = return False
 
 -----------------
 chooseReturnBndrs :: Id -> AltType -> [CgStgAlt] -> [NonVoid Id]

@@ -398,7 +398,7 @@ unariseExpr rho (StgConApp dc n args ty_args)
   = return (StgConApp dc n args' (map stgArgType args'))
 
 unariseExpr rho (StgOpApp op args ty)
-  = return (StgOpApp op (unariseFunArgs rho args) ty)
+  = StgOpApp op <$> unariseOpArgs rho args <*> pure ty
 
 unariseExpr rho (StgCase scrut bndr alt_ty alts)
   -- tuple/sum binders in the scrutinee can always be eliminated
@@ -803,6 +803,16 @@ unariseFunArgBinders rho xs = second concat <$> mapAccumLM unariseFunArgBinder r
 -- Result list of binders is never empty
 unariseFunArgBinder :: UnariseEnv -> Id -> UniqSM (UnariseEnv, [Id])
 unariseFunArgBinder = unariseArgBinder False
+
+unariseOpArgs :: UnariseEnv -> [StgOpArg] -> UniqSM [StgOpArg]
+unariseOpArgs rho args = concat <$> mapM (unariseOpArg rho) args
+
+unariseOpArg :: UnariseEnv -> StgOpArg -> UniqSM [StgOpArg]
+unariseOpArg rho (StgValueArg arg) =
+  return $ map StgValueArg $ unariseFunArg rho arg
+unariseOpArg rho (StgContArg bndr body) = do
+  body' <- unariseExpr rho body
+  return [StgContArg bndr body']
 
 --------------------------------------------------------------------------------
 

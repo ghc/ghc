@@ -47,6 +47,8 @@ module GHC.Types.Basic (
 
         Boxity(..), isBoxed,
 
+        OpArgForm(..),
+
         CbvMark(..), isMarkedCbv,
 
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec, starPrec, appPrec,
@@ -525,6 +527,23 @@ isMarkedCbv :: CbvMark -> Bool
 isMarkedCbv MarkedCbv = True
 isMarkedCbv NotMarkedCbv = False
 
+{-
+************************************************************************
+*                                                                      *
+                StgOp argument forms
+*                                                                      *
+************************************************************************
+-}
+
+-- | What sort of 'StgOpArg' an 'StgOp' expects.
+data OpArgForm
+    = OpArgValue -- ^ a normal value argument (i.e. 'StgOpArg').
+    | OpArgCont  -- ^ a continuation argument (i.e. 'StgContArg').
+                 -- See Note [Continuation-accepting primops].
+
+instance Outputable OpArgForm where
+    ppr OpArgValue = text "OpArgValue"
+    ppr OpArgCont  = text "OpArgCont"
 
 {-
 ************************************************************************

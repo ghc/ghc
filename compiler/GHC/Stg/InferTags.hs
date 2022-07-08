@@ -321,10 +321,10 @@ inferTagExpr env (StgTick tick body)
   where
     (info, body') = inferTagExpr env body
 
-inferTagExpr _ (StgOpApp op args ty)
+inferTagExpr env (StgOpApp op args ty)
   = -- Do any primops guarantee to return a properly tagged value?
     -- I think not.  Ditto foreign calls.
-    (TagDunno, StgOpApp op args ty)
+    (TagDunno, StgOpApp op (map (inferTagOpArg env) args) ty)
 
 inferTagExpr env (StgLet ext bind body)
   = (info, StgLet ext bind' body')
@@ -536,6 +536,22 @@ inferTagRhs _ env _rhs@(StgRhsCon cc con cn ticks args)
 -- become thunks. We encode this by giving changing RhsCon nodes the info TagDunno
   = --pprTrace "inferTagRhsCon" (ppr grp_ids) $
     (TagSig (inferConTag env con args), StgRhsCon cc con cn ticks args)
+
+inferTagOpArg ::
+       (OutputableInferPass p, InferExtEq p)
+    => TagEnv p
+    -> GenStgOpArg p
+    -> GenStgOpArg 'InferTaggedBinders
+inferTagOpArg _env (StgValueArg arg) = StgValueArg arg
+inferTagOpArg env0 (StgContArg bndr body) = StgContArg (getBinderId env0 bndr, sig) body'
+  where
+    id   = getBinderId env0 bndr
+    -- The continuation's lambda-binder is of type State# which has a void
+    -- representation and therefore needs no tag. However, we need to give it
+    -- some sort of signature therefore we claim TagDunno for simplicity.
+    sig = TagSig TagDunno
+    env1 = extendSigEnv env0 [(id, sig)]
+    (_info, body') = inferTagExpr env1 body
 
 {- Note [Constructor TagSigs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -963,6 +963,16 @@ instance Outputable ArgInfo where
   ppr (CpeCast co) = text "cast" <+> ppr co
   ppr (CpeTick tick) = text "tick" <+> ppr tick
 
+
+{-
+-- TODO: make this configurable in primops.pp.txt
+idOpArgForms :: Id -> [OpArgForm]
+idOpArgForms f
+  | Just op <- isPrimOpId_maybe f
+  = primopOpArgForms op
+idOpArgForms _ = repeat OpArgValue
+-}
+
 {- Note [Ticks and mandatory eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Something like

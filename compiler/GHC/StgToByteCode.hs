@@ -661,11 +661,13 @@ schemeT d s p app
    -- Case 1
 schemeT d s p (StgOpApp (StgFCallOp (CCall ccall_spec) _ty) args result_ty)
    = if isSupportedCConv ccall_spec
-      then generateCCall d s p ccall_spec result_ty (reverse args)
+      then generateCCall d s p ccall_spec result_ty (reverse args')
       else unsupportedCConvException
+   where args' = expectNoStgContArgs args
 
 schemeT d s p (StgOpApp (StgPrimOp op) args _ty)
-   = doTailCall d s p (primOpId op) (reverse args)
+   = doTailCall d s p (primOpId op) (reverse args')
+   where args' = expectNoStgContArgs args
 
 schemeT _d _s _p (StgOpApp StgPrimCallOp{} _args _ty)
    = unsupportedCConvException
@@ -1536,7 +1538,8 @@ maybe_getCCallReturnRep fn_ty
 
 maybe_is_tagToEnum_call :: CgStgExpr -> Maybe (Id, [Name])
 -- Detect and extract relevant info for the tagToEnum kludge.
-maybe_is_tagToEnum_call (StgOpApp (StgPrimOp TagToEnumOp) [StgVarArg v] t)
+maybe_is_tagToEnum_call (StgOpApp (StgPrimOp TagToEnumOp) args t)
+  | [StgValueArg (StgVarArg v)] <- args
   = Just (v, extract_constr_Names t)
   where
     extract_constr_Names ty
@@ -2113,3 +2116,10 @@ getTopStrings = BcM $ \st -> return (st, topStrings st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
+
+-- | We should have eliminated all 'StgContArg's during @BcPrep@.
+expectNoStgContArgs :: [CgStgOpArg] -> [StgArg]
+expectNoStgContArgs args = map toStgArg args
+  where
+    toStgArg (StgValueArg arg) = arg
+    toStgArg (StgContArg _ _) = pprPanic "unexpected continuation argument to C call" $ ppr args

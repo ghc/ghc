@@ -236,8 +236,8 @@ exprFVs env = go
       = (StgConApp dc n as tys, fvs)
 
     go (StgOpApp op as ty)
-      | fvs <- argsFVs env as
-      = (StgOpApp op as ty, fvs)
+      | (as', fvs) <- opArgsFVs env as
+      = (StgOpApp op as' ty, fvs)
 
     go (StgCase scrut bndr ty alts)
       | (scrut', StgFVs scrut_top_fvs scrut_lcl_fvs) <- exprFVs env scrut
@@ -277,10 +277,25 @@ rhsFVs env (StgRhsCon ccs dc mu ts bs)
   = (StgRhsCon ccs dc mu ts bs, fvs)
 
 argsFVs :: Env -> [StgArg] -> StgFVs
-argsFVs env = foldl' f emptyStgFVs
+argsFVs env = foldl' (flip (argFVs env)) emptyStgFVs
+
+opArgsFVs :: Env -> [StgOpArg] -> ([CgStgOpArg], StgFVs)
+opArgsFVs env args =
+    let (args', fvs) = foldl' f ([], emptyStgFVs) args
+    in (reverse args', fvs)
   where
-    f fvs StgLitArg{}   = fvs
-    f fvs (StgVarArg v) = varFVs env v fvs
+    f :: ([CgStgOpArg], StgFVs) -> StgOpArg -> ([CgStgOpArg], StgFVs)
+    f (args', fvs) (StgValueArg arg) =
+        (StgValueArg arg : args', argFVs env arg fvs)
+    f (args', fvs) (StgContArg bndr body) =
+        let arg' = StgContArg bndr body'
+            env' = addLocals [bndr] env
+            (body', body_fvs) = exprFVs env' body
+        in (arg' : args', unionStgFVs [fvs, body_fvs])
+
+argFVs :: Env -> StgArg -> StgFVs -> StgFVs
+argFVs _env StgLitArg{}   fvs = fvs
+argFVs env  (StgVarArg v) fvs = varFVs env v fvs
 
 altFVs :: Env -> StgAlt -> (CgStgAlt, StgFVs)
 altFVs env GenStgAlt{alt_con=con, alt_bndrs=bndrs, alt_rhs=e}

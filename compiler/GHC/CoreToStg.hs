@@ -61,7 +61,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Trace
 
 import Control.Monad (ap)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, catMaybes)
 import Data.Tuple (swap)
 
 -- Note [Live vs free]
@@ -522,13 +522,20 @@ coreToStgApp :: Id            -- Function
              -> [CoreArg]     -- Arguments
              -> [CoreTickish] -- Debug ticks
              -> CtsM StgExpr
-coreToStgApp f args ticks = do
-    (args', ticks') <- coreToStgArgs args
+coreToStgApp f args ticks
+  | Just op <- is_stg_op = do
+    (args', ticks') <- coreToStgOpArgs args
+    let app = StgOpApp op args' res_ty
+        tapp = add_ticks ticks' app
+
+    -- Forcing these fixes a leak in the code generator, noticed while
+    -- profiling for trac #4367
+    app `seq` return tapp
+
+  | otherwise       = do
     how_bound <- lookupVarCts f
-
-    let
-        n_val_args       = valArgCount args
-
+    (args', ticks') <- coreToStgArgs args
+    let n_val_args       = valArgCount args
         -- Mostly, the arity info of a function is in the fn's IdInfo
         -- But new bindings introduced by CoreSat may not have no
         -- arity info; it would do us no good anyway.  For example:
@@ -539,37 +546,43 @@ coreToStgApp f args ticks = do
         f_arity   = stgArity f how_bound
         saturated = f_arity <= n_val_args
 
-        res_ty = exprType (mkApps (Var f) args)
-        app = case idDetails f of
-                DataConWorkId dc
-                  | saturated    -> StgConApp dc NoNumber args'
-                                      (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
+        app
+          | Just dc <- isDataConWorkId_maybe f
+          , saturated
+          = StgConApp dc NoNumber args'
+                      (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
+          | otherwise
+          = StgApp f args'
 
-                -- Some primitive operator that might be implemented as a library call.
-                -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
-                -- we require that primop applications be saturated.
-                PrimOpId op _    -> -- assertPpr saturated (ppr f <+> ppr args) $
-                                    StgOpApp (StgPrimOp op) args' res_ty
-
-                -- A call to some primitive Cmm function.
-                FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
-                                          PrimCallConv _))
-                                 -> assert saturated $
-                                    StgOpApp (StgPrimCallOp (PrimCall lbl pkgId)) args' res_ty
-
-                -- A regular foreign call.
-                FCallId call     -> assert saturated $
-                                    StgOpApp (StgFCallOp call (idType f)) args' res_ty
-
-                TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
-                _other           -> StgApp f args'
-
-        add_tick !t !e = StgTick t e
-        tapp = foldr add_tick app (map (coreToStgTick res_ty) ticks ++ ticks')
+        tapp = add_ticks ticks' app
 
     -- Forcing these fixes a leak in the code generator, noticed while
     -- profiling for trac #4367
     app `seq` return tapp
+  where
+    is_stg_op =
+        case idDetails f of
+          -- Some primitive operator that might be implemented as a
+          -- library call. As noted by Note [Eta expanding primops] in
+          -- GHC.Builtin.PrimOps we require that primop applications be
+          -- saturated.
+          PrimOpId op _ -> Just $ StgPrimOp op
+          -- A call to some primitive Cmm function.
+          FCallId (CCall (CCallSpec tgt PrimCallConv _))
+            | StaticTarget _ lbl (Just pkgId) True <- tgt
+            -> Just $ StgPrimCallOp (PrimCall lbl pkgId)
+          -- A regular foreign call.
+          FCallId call -> Just $ StgFCallOp call (idType f)
+          TickBoxOpId {} -> pprPanic "coreToStg TickBox" $ ppr (f, args)
+          _ -> Nothing
+
+
+    add_tick !t !e = StgTick t e
+    add_ticks :: [StgTickish] -> StgExpr -> StgExpr
+    add_ticks ticks' e =
+        foldr add_tick e (map (coreToStgTick res_ty) ticks ++ ticks')
+    res_ty = exprType (mkApps (Var f) args)
+
 
 -- ---------------------------------------------------------------------------
 -- Argument lists
@@ -577,35 +590,50 @@ coreToStgApp f args ticks = do
 -- ---------------------------------------------------------------------------
 
 coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [StgTickish])
-coreToStgArgs []
-  = return ([], [])
+coreToStgArgs args = do
+    (args, ticks) <- unzip <$> mapM coreToStgArg args
+    return (catMaybes args, concat ticks)
 
-coreToStgArgs (Type _ : args) = do     -- Type argument
-    (args', ts) <- coreToStgArgs args
-    return (args', ts)
+coreToStgOpArgs :: [CoreArg] -> CtsM ([StgOpArg], [StgTickish])
+coreToStgOpArgs args = do
+    (args, ticks) <- unzip <$> mapM to_stg_op_arg args
+    return (catMaybes args, concat ticks)
+  where
+    -- See Note [Continuation-accepting primops].
+    to_stg_op_arg (Lam bndr body) = do
+        -- TODO: Deal with enclosing ticks
+        body' <- coreToStgExpr body
+        return (Just $ StgContArg bndr body', [])
+    to_stg_op_arg e = do
+        (arg, ticks) <- coreToStgArg e
+        return (fmap StgValueArg arg, ticks)
 
-coreToStgArgs (Coercion _ : args) -- Coercion argument; See Note [Coercion tokens]
-  = do { (args', ts) <- coreToStgArgs args
-       ; return (StgVarArg coercionTokenId : args', ts) }
+stgExprToStgArg :: StgExpr -> StgArg
+stgExprToStgArg (StgApp v [])                  = StgVarArg v
+stgExprToStgArg (StgConApp con _ [] _)         = StgVarArg (dataConWorkId con)
+stgExprToStgArg (StgOpApp (StgPrimOp op) [] _) = StgVarArg (primOpWrapperId op)
+stgExprToStgArg (StgLit lit)                   = StgLitArg lit
+stgExprToStgArg  arg                           =
+    pprPanic "coreToStgArgs" (ppr arg)
 
-coreToStgArgs (Tick t e : args)
-  = assert (not (tickishIsCode t)) $
-    do { (args', ts) <- coreToStgArgs (e : args)
-       ; let !t' = coreToStgTick (exprType e) t
-       ; return (args', t':ts) }
+coreToStgArg :: CoreArg -> CtsM (Maybe StgArg, [StgTickish])
+coreToStgArg (Type _) =          -- Type argument
+    return (Nothing, [])
 
-coreToStgArgs (arg : args) = do         -- Non-type argument
-    (stg_args, ticks) <- coreToStgArgs args
+coreToStgArg (Coercion _) = do   -- Coercion argument; See Note [Coercion tokens]
+    return (Just $ StgVarArg coercionTokenId, [])
+
+coreToStgArg (Tick t e)
+  | tickishIsCode t = pprPanic "unexpected code tick" (ppr t)
+  | otherwise = do
+     (arg, ts) <- coreToStgArg e
+     let !t' = coreToStgTick (exprType e) t
+     return (arg, t':ts)
+
+coreToStgArg arg = do            -- Non-type argument
     arg' <- coreToStgExpr arg
-    let
-        (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
-        stg_arg = case arg'' of
-           StgApp v []                  -> StgVarArg v
-           StgConApp con _ [] _         -> StgVarArg (dataConWorkId con)
-           StgOpApp (StgPrimOp op) [] _ -> StgVarArg (primOpWrapperId op)
-           StgLit lit                   -> StgLitArg lit
-           _ -> pprPanic "coreToStgArgs" (ppr arg $$ pprStgExpr panicStgPprOpts arg' $$ pprStgExpr panicStgPprOpts arg'')
-
+    let (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
+        stg_arg = stgExprToStgArg arg''
         -- WARNING: what if we have an argument like (v `cast` co)
         --          where 'co' changes the representation type?
         --          (This really only happens if co is unsafe.)
@@ -623,7 +651,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         bad_args = not (primRepsCompatible platform arg_rep stg_arg_rep)
 
     warnPprTrace bad_args "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" (ppr arg) $
-     return (stg_arg : stg_args, ticks ++ aticks)
+      return (Just stg_arg, aticks)
 
 coreToStgTick :: Type -- type of the ticked expression
               -> CoreTickish

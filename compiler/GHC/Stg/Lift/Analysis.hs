@@ -184,11 +184,26 @@ instance OutputableBndr BinderInfo where
   pprInfixOcc = pprInfixOcc . binderInfoBndr
   bndrIsJoin_maybe = bndrIsJoin_maybe . binderInfoBndr
 
-mkArgOccs :: [StgArg] -> IdSet
-mkArgOccs = mkVarSet . mapMaybe stg_arg_var
+mkArgsOccs :: [StgArg] -> IdSet
+mkArgsOccs = foldMap mkArgOccs
+
+mkArgOccs :: StgArg -> IdSet
+mkArgOccs (StgVarArg occ) = unitVarSet occ
+mkArgOccs _               = emptyVarSet
+
+tagSkeletonOpArg :: CgStgOpArg -> (IdSet, LlStgOpArg)
+tagSkeletonOpArg (StgValueArg arg) =
+    (mkArgOccs arg, StgValueArg arg)
+tagSkeletonOpArg (StgContArg bndr body) =
+    let (_sk, occs, body') = tagSkeletonExpr body
+    in (occs `delVarSet` bndr, StgContArg (BoringBinder bndr) body')
+
+tagSkeletonOpArgs :: [CgStgOpArg] -> (IdSet, [LlStgOpArg])
+tagSkeletonOpArgs = foldr f (emptyVarSet, [])
   where
-    stg_arg_var (StgVarArg occ) = Just occ
-    stg_arg_var _               = Nothing
+    f arg (occs', args') = (occs' `unionVarSet` arg_occs, arg' : args')
+      where
+        (arg_occs, arg') = tagSkeletonOpArg arg
 
 -- | Tags every binder with its 'BinderInfo' and let bindings with their
 -- 'Skeleton's.
@@ -208,9 +223,10 @@ tagSkeletonExpr :: CgStgExpr -> (Skeleton, IdSet, LlStgExpr)
 tagSkeletonExpr (StgLit lit)
   = (NilSk, emptyVarSet, StgLit lit)
 tagSkeletonExpr (StgConApp con mn args tys)
-  = (NilSk, mkArgOccs args, StgConApp con mn args tys)
+  = (NilSk, mkArgsOccs args, StgConApp con mn args tys)
 tagSkeletonExpr (StgOpApp op args ty)
-  = (NilSk, mkArgOccs args, StgOpApp op args ty)
+  = let (occs, args') = tagSkeletonOpArgs args
+    in (NilSk, occs, StgOpApp op args' ty)
 tagSkeletonExpr (StgApp f args)
   = (NilSk, arg_occs, StgApp f args)
   where
@@ -218,7 +234,7 @@ tagSkeletonExpr (StgApp f args)
       -- This checks for nullary applications, which we treat the same as
       -- argument occurrences, see "GHC.Stg.Lift.Analysis#arg_occs".
       | null args = unitVarSet f
-      | otherwise = mkArgOccs args
+      | otherwise = mkArgsOccs args
 tagSkeletonExpr (StgCase scrut bndr ty alts)
   = (skel, arg_occs, StgCase scrut' bndr' ty alts')
   where
@@ -312,7 +328,7 @@ tagSkeletonBinding is_lne body_skel body_arg_occs (StgRec pairs)
 
 tagSkeletonRhs :: Id -> CgStgRhs -> (Skeleton, IdSet, LlStgRhs)
 tagSkeletonRhs _ (StgRhsCon ccs dc mn ts args)
-  = (NilSk, mkArgOccs args, StgRhsCon ccs dc mn ts args)
+  = (NilSk, mkArgsOccs args, StgRhsCon ccs dc mn ts args)
 tagSkeletonRhs bndr (StgRhsClosure fvs ccs upd bndrs body)
   = (rhs_skel, body_arg_occs, StgRhsClosure fvs ccs upd bndrs' body')
   where

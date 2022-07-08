@@ -66,23 +66,28 @@ right to wrap it in a singleton unboxed tuple, because the result
 might be a Haskell closure pointer, we don't want to evaluate it. -}
 
 ----------------------------------
-cgOpApp :: StgOp        -- The op
-        -> [StgArg]     -- Arguments
-        -> Type         -- Result type (always an unboxed tuple)
+cgOpApp :: StgOp        -- ^ The op
+        -> [CgStgOpArg] -- ^ Arguments
+        -> Type         -- ^ Result type (always an unboxed tuple)
         -> FCode ReturnKind
 
 -- Foreign calls
-cgOpApp (StgFCallOp fcall ty) stg_args res_ty
-  = cgForeignCall fcall ty stg_args res_ty
+cgOpApp (StgFCallOp fcall ty) stg_op_args res_ty
+  = let stg_args = map expectValueOpArg stg_op_args
+    in cgForeignCall fcall ty stg_args res_ty
       -- See Note [Foreign call results]
+
+cgOpApp (StgPrimOp primop) args res_ty
+  | Just k <- cgContPrimOpApp primop args res_ty
+  = k
 
 cgOpApp (StgPrimOp primop) args res_ty = do
     cfg <- getStgToCmmConfig
-    cmm_args <- getNonVoidArgAmodes args
+    cmm_args <- getNonVoidArgAmodes $ map expectValueOpArg args
     cmmPrimOpApp cfg primop cmm_args (Just res_ty)
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
-  = do  { cmm_args <- getNonVoidArgAmodes args
+  = do  { cmm_args <- getNonVoidArgAmodes $ map expectValueOpArg args
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
 
@@ -98,6 +103,14 @@ cmmPrimOpApp cfg primop cmm_args mres_ty =
     PrimopCmmEmit_External -> do
       let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
       emitCall (NativeNodeCall, NativeReturn) fun cmm_args
+
+
+cgContPrimOpApp
+    :: PrimOp       -- ^ The 'PrimOp'
+    -> [CgStgOpArg] -- ^ Arguments
+    -> Type         -- ^ Result type (always an unboxed tuple)
+    -> Maybe (FCode ReturnKind)
+cgContPrimOpApp _ _ _ = Nothing
 
 
 -- | Interpret the argument as an unsigned value, assuming the value

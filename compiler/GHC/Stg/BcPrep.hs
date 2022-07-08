@@ -8,6 +8,7 @@
    - Protect Not-necessarily lifted join points, see
         Note [Not-necessarily-lifted join points]
 
+   - Convert StgContArg arguments into let-bindings
  -}
 
 module GHC.Stg.BcPrep ( bcPrep ) where
@@ -27,6 +28,7 @@ import GHC.Types.Unique.Supply
 import qualified GHC.Types.CostCentre as CC
 import GHC.Stg.Syntax
 import GHC.Utils.Monad.State.Strict
+import Data.Maybe (catMaybes)
 
 data BcPrepM_State
    = BcPrepM_State
@@ -93,7 +95,10 @@ bcPrepExpr (StgApp x [])
       StgApp (protectNNLJoinPointId x) [StgVarArg voidPrimId]
 bcPrepExpr app@StgApp{} = pure app
 bcPrepExpr app@StgConApp{} = pure app
-bcPrepExpr app@StgOpApp{} = pure app
+bcPrepExpr (StgOpApp op args ty) = do
+    (args', binds) <- flattenOpArgs ty args
+    let app' = StgOpApp op (map StgValueArg args') ty
+    return $ foldr (StgLet noExtFieldSilent) app' binds
 
 bcPrepAlt :: StgAlt -> BcPrepM StgAlt
 bcPrepAlt (GenStgAlt con bndrs rhs) = GenStgAlt con bndrs <$> bcPrepExpr rhs
@@ -212,3 +217,18 @@ Right Fix is to take advantage of join points as goto-labels.
 
 -}
 
+-- | Let bind all 'StgContArg' arguments and turn them into 'StgValueArg's.
+flattenOpArgs :: Type -> [StgOpArg] -> BcPrepM ([StgArg], [StgBinding])
+flattenOpArgs res_ty args = do
+    (args', bindss) <- unzip <$> mapM (bindOpArg res_ty) args
+    return (args', catMaybes bindss)
+
+bindOpArg :: Type -> StgOpArg -> BcPrepM (StgArg, Maybe StgBinding)
+bindOpArg _res_ty (StgValueArg arg) = return (arg, Nothing)
+bindOpArg res_ty  (StgContArg bndr body) = do
+    -- In the case of a continuation argument we simply let-bind the
+    -- continuation.
+    -- TODO: Should this be a linear arrow?
+    id <- newId $ mkStatePrimTy realWorldTy `mkVisFunTyMany` res_ty
+    let bind = StgNonRec id $ StgRhsClosure noExtFieldSilent CC.dontCareCCS ReEntrant [bndr] body
+    return (StgVarArg id, Just bind)

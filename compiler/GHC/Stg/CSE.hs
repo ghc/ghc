@@ -332,7 +332,7 @@ stgCseExpr _ (StgLit lit)
     = StgLit lit
 stgCseExpr env (StgOpApp op args tys)
     = StgOpApp op args' tys
-  where args' = substArgs env args
+  where args' = map (stgCseOpArg env) args
 stgCseExpr env (StgTick tick body)
     = let body' = stgCseExpr env body
       in StgTick tick body'
@@ -370,6 +370,13 @@ stgCseExpr env (StgLetNoEscape ext binds body)
     = let (binds', env') = stgCseBind env binds
           body' = stgCseExpr env' body
       in mkStgLet (StgLetNoEscape ext) binds' body'
+
+-- Primop arguments
+stgCseOpArg :: CseEnv -> InStgOpArg -> OutStgOpArg
+stgCseOpArg env (StgValueArg arg) = StgValueArg (substArg env arg)
+stgCseOpArg env (StgContArg bndr body) = StgContArg bndr' (stgCseExpr env' body)
+  where
+    (env', bndr') = substBndr env bndr
 
 -- Case alternatives
 -- Extend the CSE environment
