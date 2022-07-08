@@ -1316,34 +1316,50 @@ tcSplitSigmaTy ty = case tcSplitForAllInvisTyVars ty of
                         (tvs, rho) -> case tcSplitPhiTy rho of
                                         (theta, tau) -> (tvs, theta, tau)
 
--- | Split a sigma type into its parts, going underneath as many @ForAllTy@s
--- as possible. For example, given this type synonym:
---
--- @
--- type Traversal s t a b = forall f. Applicative f => (a -> f b) -> s -> f t
--- @
---
--- if you called @tcSplitSigmaTy@ on this type:
---
--- @
--- forall s t a b. Each s t a b => Traversal s t a b
--- @
---
--- then it would return @([s,t,a,b], [Each s t a b], Traversal s t a b)@. But
--- if you instead called @tcSplitNestedSigmaTys@ on the type, it would return
--- @([s,t,a,b,f], [Each s t a b, Applicative f], (a -> f b) -> s -> f t)@.
+-- | Split a sigma type into its parts, going underneath as many arrows
+-- and foralls as possible. See Note [tcSplitNestedSigmaTys]
 tcSplitNestedSigmaTys :: Type -> ([TyVar], ThetaType, Type)
--- NB: This is basically a pure version of topInstantiate (from Inst) that
--- doesn't compute an HsWrapper.
+-- See Note [tcSplitNestedSigmaTys]
+-- NB: This is basically a pure version of deeplyInstantiate (from Unify) that
+--     doesn't compute an HsWrapper.
 tcSplitNestedSigmaTys ty
     -- If there's a forall, split it apart and try splitting the rho type
     -- underneath it.
-  | (tvs1, theta1, rho1) <- tcSplitSigmaTy ty
+  | (arg_tys, body_ty)   <- tcSplitFunTys ty
+  , (tvs1, theta1, rho1) <- tcSplitSigmaTy body_ty
   , not (null tvs1 && null theta1)
   = let (tvs2, theta2, rho2) = tcSplitNestedSigmaTys rho1
-    in (tvs1 ++ tvs2, theta1 ++ theta2, rho2)
+    in (tvs1 ++ tvs2, theta1 ++ theta2, mkVisFunTys arg_tys rho2)
+
     -- If there's no forall, we're done.
   | otherwise = ([], [], ty)
+
+{- Note [tcSplitNestedSigmaTys]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tcSplitNestedSigmaTys splits out all the /nested/ foralls and constraints,
+including under function arrows.  E.g. given this type synonym:
+  type Traversal s t a b = forall f. Applicative f => (a -> f b) -> s -> f t
+
+then
+  tcSplitNestedSigmaTys (forall s t a b. C s t a b => Int -> Traversal s t a b)
+
+will return
+  ( [s,t,a,b,f]
+  , [C s t a b, Applicative f]
+  , Int -> (a -> f b) -> s -> f t)@.
+
+This function is used in these places:
+* Improving error messages in GHC.Tc.Gen.Head.addFunResCtxt
+* Validity checking for default methods: GHC.Tc.TyCl.checkValidClass
+* A couple of calls in the GHCi debugger: GHC.Runtime.Heap.Inspect
+
+In other words, just in validity checking and error messages; hence
+no wrappers or evidence generation.
+
+Notice that tcSplitNestedSigmaTys even looks under function arrows;
+doing so is the Right Thing even with simple subsumption, not just
+with deep subsumption.
+-}
 
 -----------------------
 tcTyConAppTyCon :: Type -> TyCon
