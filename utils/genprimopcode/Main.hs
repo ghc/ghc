@@ -786,13 +786,11 @@ ppType (TyApp (TyCon "MutVar#") [x,y])          = "mkMutVarPrimTy " ++ ppType x
                                                    ++ " " ++ ppType y
 ppType (TyApp (TyCon "MutableArray#") [x,y])    = "mkMutableArrayPrimTy " ++ ppType x
                                                    ++ " " ++ ppType y
-ppType (TyApp (TyCon "MutableArrayArray#") [x]) = "mkMutableArrayArrayPrimTy " ++ ppType x
 ppType (TyApp (TyCon "SmallMutableArray#") [x,y]) = "mkSmallMutableArrayPrimTy " ++ ppType x
                                                     ++ " " ++ ppType y
 ppType (TyApp (TyCon "MutableByteArray#") [x])  = "mkMutableByteArrayPrimTy "
                                                    ++ ppType x
 ppType (TyApp (TyCon "Array#") [x])             = "mkArrayPrimTy " ++ ppType x
-ppType (TyApp (TyCon "ArrayArray#") [])         = "mkArrayArrayPrimTy"
 ppType (TyApp (TyCon "SmallArray#") [x])        = "mkSmallArrayPrimTy " ++ ppType x
 
 
