@@ -277,26 +277,22 @@ function h$base_umask(mode) {
     return 0;
 }
 
-function h$base_write(fd, fdo, buf, buf_off, n, c) {
-// fd: a number describing StdOut, StdErr etc
-// fdo: is the
-// buf:
-// buf_off:
-// n:
-// c: a callback function
+function h$base_write(fd, buf, buf_off, n_h, n_l, c) {
+// fd: file descriptor number
+// buf: buffer to write
+// buf_off: offset in the buffer
+// n: number of bytes to write (64-bits, hence n_h, n_l)
+// c: continuation
     TRACE_IO("base_write: " + fd);
 
-    /* FIXME: Jeff-06-2022: sometimes h$base_write is always called with 6
-     *  arguments through FFI but the original ghcjs version only defined 5
-     *  parameters thereby leaving off the callback function, c. Why do we have the
-     *  discrepency? I've commented out the line under this comment in response.
-    */
-    // var fdo = h$base_fds[fd];
+    if (n_h > 0) { throw "h$base_write: too many bytes to write (> 32-bits)" }
+
+    var fdo = h$base_fds[fd];
 
     if(fdo && fdo.write) {
-        fdo.write(fd, fdo, buf, buf_off, n, c);
+        fdo.write(fd, fdo, buf, buf_off, n_l, c);
     } else {
-        h$fs.write(fd, buf.u8, buf_off, n, function(err, bytesWritten, buf0) {
+        h$fs.write(fd, buf.u8, buf_off, n_l, function(err, bytesWritten, buf0) {
             h$handleErrnoC(err, -1, bytesWritten, c);
         });
     }
