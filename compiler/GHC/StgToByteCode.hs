@@ -527,6 +527,30 @@ schemeE d s p (StgLet _xlet
 -- General case for let.  Generates correct, if inefficient, code in
 -- all situations.
 schemeE d s p (StgLet _ext binds body) = do
+     (d', p', binds_code) <- generateBinds d p binds
+     body_code <- schemeE d' s p' body
+     return (binds_code `appOL` body_code)
+
+schemeE _d _s _p (StgTick (Breakpoint _ bp_id _) _rhs)
+   = panic ("schemeE: Breakpoint without let binding: " ++
+            show bp_id ++
+            " forgot to run bcPrep?")
+
+-- ignore other kinds of tick
+schemeE d s p (StgTick _ rhs) = schemeE d s p rhs
+
+-- no alts: scrut is guaranteed to diverge
+schemeE d s p (StgCase scrut _ _ []) = schemeE d s p scrut
+
+schemeE d s p (StgCase scrut bndr _ alts)
+   = doCase d s p scrut bndr alts
+
+-- | Generate code for the given binding(s) and insert them into the 'BCEnv'.
+generateBinds :: StackDepth
+              -> BCEnv
+              -> CgStgBinding
+              -> BcM (StackDepth, BCEnv, BCInstrList)
+generateBinds d p binds = do
      platform <- targetPlatform <$> getDynFlags
      let (xs,rhss) = case binds of StgNonRec x rhs  -> ([x],[rhs])
                                    StgRec xs_n_rhss -> unzip xs_n_rhss
@@ -589,24 +613,9 @@ schemeE d s p (StgLet _ext binds body) = do
             | (fvs, x, rhs, size, arity, n) <-
                 zip6 fvss xs rhss sizes arities [n_binds, n_binds-1 .. 1]
             ]
-     body_code <- schemeE d' s p' body
+
      thunk_codes <- sequence compile_binds
-     return (alloc_code `appOL` concatOL thunk_codes `appOL` body_code)
-
-schemeE _d _s _p (StgTick (Breakpoint _ bp_id _) _rhs)
-   = panic ("schemeE: Breakpoint without let binding: " ++
-            show bp_id ++
-            " forgot to run bcPrep?")
-
--- ignore other kinds of tick
-schemeE d s p (StgTick _ rhs) = schemeE d s p rhs
-
--- no alts: scrut is guaranteed to diverge
-schemeE d s p (StgCase scrut _ _ []) = schemeE d s p scrut
-
-schemeE d s p (StgCase scrut bndr _ alts)
-   = doCase d s p scrut bndr alts
-
+     return (d', p', alloc_code `appOL` concatOL thunk_codes)
 
 {-
    Ticked Expressions
