@@ -72,7 +72,7 @@ module GHC.Types.Var.Env (
 
         -- * TidyEnv and its operation
         TidyEnv,
-        emptyTidyEnv, mkEmptyTidyEnv, delTidyEnvList
+        emptyTidyEnv, mkEmptyTidyEnv, delTidyEnvList, anyInRnEnvR
     ) where
 
 import GHC.Prelude
@@ -400,6 +400,14 @@ inRnEnvL, inRnEnvR :: RnEnv2 -> Var -> Bool
 inRnEnvL (RV2 { envL = env }) v = v `elemVarEnv` env
 inRnEnvR (RV2 { envR = env }) v = v `elemVarEnv` env
 
+-- | `anyInRnEnvR env set` == `any (inRnEnvR rn_env) (toList set)`
+-- but lazy in the second argument if the right side of the env is empty.
+anyInRnEnvR :: RnEnv2 -> VarSet -> Bool
+anyInRnEnvR (RV2 { envR = env }) vs
+  -- Avoid allocating the predicate if we deal with an empty env.
+  | isEmptyVarEnv env = False
+  | otherwise = anyVarEnv (`elemVarSet` vs) env
+
 lookupRnInScope :: RnEnv2 -> Var -> Var
 lookupRnInScope env v = lookupInScope (in_scope env) v `orElse` v
 
@@ -495,6 +503,7 @@ plusVarEnvList    :: [VarEnv a] -> VarEnv a
 extendVarEnvList  :: VarEnv a -> [(Var, a)] -> VarEnv a
 
 partitionVarEnv   :: (a -> Bool) -> VarEnv a -> (VarEnv a, VarEnv a)
+-- | Only keep variables contained in the VarSet
 restrictVarEnv    :: VarEnv a -> VarSet -> VarEnv a
 delVarEnvList     :: VarEnv a -> [Var] -> VarEnv a
 delVarEnv         :: VarEnv a -> Var -> VarEnv a
@@ -509,6 +518,7 @@ isEmptyVarEnv     :: VarEnv a -> Bool
 lookupVarEnv      :: VarEnv a -> Var -> Maybe a
 lookupVarEnv_Directly :: VarEnv a -> Unique -> Maybe a
 filterVarEnv      :: (a -> Bool) -> VarEnv a -> VarEnv a
+anyVarEnv         :: (elt -> Bool) -> UniqFM key elt -> Bool
 lookupVarEnv_NF   :: VarEnv a -> Var -> a
 lookupWithDefaultVarEnv :: VarEnv a -> a -> Var -> a
 elemVarEnv        :: Var -> VarEnv a -> Bool
@@ -539,6 +549,7 @@ plusVarEnvList   = plusUFMList
 lookupVarEnv     = lookupUFM
 lookupVarEnv_Directly = lookupUFM_Directly
 filterVarEnv     = filterUFM
+anyVarEnv        = anyUFM
 lookupWithDefaultVarEnv = lookupWithDefaultUFM
 mapVarEnv        = mapUFM
 mkVarEnv         = listToUFM
@@ -556,6 +567,7 @@ zipVarEnv tyvars tys   = mkVarEnv (zipEqual "zipVarEnv" tyvars tys)
 lookupVarEnv_NF env id = case lookupVarEnv env id of
                          Just xx -> xx
                          Nothing -> panic "lookupVarEnv_NF: Nothing"
+
 
 {-
 @modifyVarEnv@: Look up a thing in the VarEnv,
