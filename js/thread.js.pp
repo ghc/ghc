@@ -785,6 +785,9 @@ function h$reportMainLoopException(e, isMainThread) {
   var main = isMainThread ? " main" : "";
   h$log("uncaught exception in Haskell" + main + " thread: " + e.toString());
   if(e.stack) h$log(e.stack);
+  if (h$isNode) {
+    process.exit(1);
+  }
 }
 
 
