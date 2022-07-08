@@ -1,5 +1,4 @@
 #include "HsBaseConfig.h"
-#include <ghcjs/rts.h>
 
 // #define GHCJS_TRACE_IO 1
 
@@ -279,8 +278,15 @@ function h$base_umask(mode) {
 }
 
 function h$base_write(fd, buf, buf_off, n, c) {
+// fd: file descriptor number
+// buf: buffer to write
+// buf_off: offset in the buffer
+// n: number of bytes to write
+// c: continuation
     TRACE_IO("base_write: " + fd);
+
     var fdo = h$base_fds[fd];
+
     if(fdo && fdo.write) {
         fdo.write(fd, fdo, buf, buf_off, n, c);
     } else {
