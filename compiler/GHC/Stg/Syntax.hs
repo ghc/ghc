@@ -20,45 +20,46 @@ generation.
 -}
 
 module GHC.Stg.Syntax (
+        -- * STG Syntax
         StgArg(..),
 
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt(..), AltType(..),
 
-        StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
-        NoExtFieldSilent, noExtFieldSilent,
-        OutputablePass,
+        StgOp(..),
 
         UpdateFlag(..), isUpdatable,
 
         ConstructorNumber(..),
 
-        -- a set of synonyms for the vanilla parameterisation
-        StgTopBinding, StgBinding, StgExpr, StgRhs, StgAlt,
+        -- * Trees-that-grow
+        StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
+        NoExtFieldSilent, noExtFieldSilent,
+        OutputablePass,
 
-        -- a set of synonyms for the code gen parameterisation
-        CgStgTopBinding, CgStgBinding, CgStgExpr, CgStgRhs, CgStgAlt,
+        -- * Synonyms for the vanilla parameterisation
+        StgTopBinding, StgBinding, StgExpr, StgRhs, StgAlt, StgOpArg,
 
-        -- Same for taggedness
-        TgStgTopBinding, TgStgBinding, TgStgExpr, TgStgRhs, TgStgAlt,
+        -- * Synonyms for the code gen parameterisation
+        CgStgTopBinding, CgStgBinding, CgStgExpr, CgStgRhs, CgStgAlt, CgStgOpArg,
 
-        -- a set of synonyms for the lambda lifting parameterisation
-        LlStgTopBinding, LlStgBinding, LlStgExpr, LlStgRhs, LlStgAlt,
+        -- * Synonyms for the taggedness parameterisation
+        TgStgTopBinding, TgStgBinding, TgStgExpr, TgStgRhs, TgStgAlt, TgStgOpArg,
 
-        -- a set of synonyms to distinguish in- and out variants
-        InStgArg,  InStgTopBinding,  InStgBinding,  InStgExpr,  InStgRhs,  InStgAlt,
-        OutStgArg, OutStgTopBinding, OutStgBinding, OutStgExpr, OutStgRhs, OutStgAlt,
+        -- * Synonyms for the lambda lifting parameterisation
+        LlStgTopBinding, LlStgBinding, LlStgExpr, LlStgRhs, LlStgAlt, LlStgOpArg,
 
-        -- StgOp
-        StgOp(..),
+        -- * Synonyms to distinguish in- and out variants
+        InStgArg,  InStgTopBinding,  InStgBinding,  InStgExpr,  InStgRhs,  InStgAlt, InStgOpArg,
+        OutStgArg, OutStgTopBinding, OutStgBinding, OutStgExpr, OutStgRhs, OutStgAlt, OutStgOpArg,
 
-        -- utils
+        -- * Utilities
         stgRhsArity, freeVarsOfRhs,
         isDllConApp,
         stgArgType,
         stgCaseBndrInScope,
 
-        -- ppr
+        -- * Pretty-printing
         StgPprOpts(..),
         panicStgPprOpts, shortStgPprOpts,
         pprStgArg, pprStgExpr, pprStgRhs, pprStgBinding,
