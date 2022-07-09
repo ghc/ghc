@@ -60,7 +60,7 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
 
 
-import GHC.Cmm.Dataflow.Collections
+import GHC.Types.Collections
 import GHC.Cmm
 import GHC.Cmm.CLabel
 import GHC.Cmm.Utils (cmmLoadBWord)

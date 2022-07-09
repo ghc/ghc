@@ -39,7 +39,7 @@ import qualified GHC.Types.Unique as U
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Collections
+import GHC.Types.Collections
 import GHC.Cmm.Dataflow.Label
 import Data.Maybe
 import Data.List (tails,sortBy)

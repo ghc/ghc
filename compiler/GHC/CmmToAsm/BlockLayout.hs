@@ -25,7 +25,7 @@ import GHC.CmmToAsm.Config
 
 import GHC.Cmm
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Collections
+import GHC.Types.Collections
 import GHC.Cmm.Dataflow.Label
 
 import GHC.Types.Unique.FM

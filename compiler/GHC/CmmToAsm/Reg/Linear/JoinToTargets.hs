@@ -23,7 +23,7 @@ import GHC.CmmToAsm.Types
 import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Collections
+import GHC.Types.Collections
 import GHC.Data.Graph.Directed
 import GHC.Utils.Panic
 import GHC.Utils.Monad (concatMapM)

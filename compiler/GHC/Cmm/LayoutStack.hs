@@ -22,7 +22,7 @@ import GHC.Cmm.Liveness
 import GHC.Cmm.ProcPoint
 import GHC.Runtime.Heap.Layout
 import GHC.Cmm.Dataflow.Block
-import GHC.Cmm.Dataflow.Collections
+import GHC.Types.Collections
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label

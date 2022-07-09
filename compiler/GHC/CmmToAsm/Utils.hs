@@ -7,7 +7,7 @@ where
 import GHC.Prelude
 
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Collections
+import GHC.Types.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm hiding (topInfoTable)
 

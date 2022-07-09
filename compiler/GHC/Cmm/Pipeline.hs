@@ -12,7 +12,7 @@ import GHC.Cmm
 import GHC.Cmm.Config
 import GHC.Cmm.ContFlowOpt
 import GHC.Cmm.CommonBlockElim
-import GHC.Cmm.Dataflow.Collections
+import GHC.Types.Collections
 import GHC.Cmm.Info.Build
 import GHC.Cmm.Lint
 import GHC.Cmm.LayoutStack

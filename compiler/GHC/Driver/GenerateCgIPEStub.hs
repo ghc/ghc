@@ -8,7 +8,7 @@ import GHC.Cmm
 import GHC.Cmm.CLabel (CLabel)
 import GHC.Cmm.Dataflow (Block, C, O)
 import GHC.Cmm.Dataflow.Block (blockSplit, blockToList)
-import GHC.Cmm.Dataflow.Collections (mapToList)
+import GHC.Types.Collections (mapToList)
 import GHC.Cmm.Dataflow.Label (Label)
 import GHC.Cmm.Info.Build (emptySRT)
 import GHC.Cmm.Pipeline (cmmPipeline)

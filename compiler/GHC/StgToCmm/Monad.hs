@@ -71,7 +71,7 @@ import GHC.Cmm
 import GHC.StgToCmm.Config
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Sequel
-import GHC.Cmm.Dataflow.Collections
+import GHC.Types.Collections
 import GHC.Cmm.Graph as CmmGraph
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel

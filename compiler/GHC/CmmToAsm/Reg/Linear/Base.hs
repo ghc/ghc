@@ -34,7 +34,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Collections
+import GHC.Types.Collections
 import GHC.CmmToAsm.Reg.Utils
 
 data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)

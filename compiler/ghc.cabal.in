@@ -188,7 +188,6 @@ Library
         GHC.Cmm.ContFlowOpt
         GHC.Cmm.Dataflow
         GHC.Cmm.Dataflow.Block
-        GHC.Cmm.Dataflow.Collections
         GHC.Cmm.Dataflow.Graph
         GHC.Cmm.Dataflow.Label
         GHC.Cmm.DebugBlock
@@ -695,6 +694,7 @@ Library
         GHC.Types.Avail
         GHC.Types.Basic
         GHC.Types.BreakInfo
+        GHC.Types.Collections
         GHC.Types.CompleteMatch
         GHC.Types.CostCentre
         GHC.Types.CostCentre.State

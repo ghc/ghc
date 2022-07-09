@@ -10,6 +10,7 @@ Basically, the things need to be in class @Uniquable@.
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module GHC.Types.Unique.Set (
         -- * Unique set type
@@ -44,17 +45,31 @@ module GHC.Types.Unique.Set (
         nonDetEltsUniqSet,
         nonDetKeysUniqSet,
         nonDetStrictFoldUniqSet,
+
+        UniqOnlySet,
     ) where
 
 import GHC.Prelude
 
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
+import qualified Data.IntSet as S
+import GHC.Types.Collections (IsSet(..))
 import GHC.Types.Unique
 import Data.Coerce
 import GHC.Utils.Outputable
 import Data.Data
 import qualified Data.Semigroup as Semi
+import Unsafe.Coerce -- See Note [UniqOnlySet and unsafeCoerce]
+
+-- Note [UniqOnlySet and unsafeCoerce]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- UniqOnlySet's traversal functions expect functions over uniques
+-- but in the end the methods that actually implement the traversal
+-- work over ints. While we could pass a impedance matching lambda to
+-- convert between the two Uniques are already Int's under the hood and
+-- we would just add a layer of indirection. So instead we unsafeCoerce
+-- these functions.
 
 -- Note [UniqSet invariant]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -62,6 +77,10 @@ import qualified Data.Semigroup as Semi
 --   The keys in the map are the uniques of the values
 -- It means that to implement mapUniqSet you have to update
 -- both the keys and the values.
+-- We could use a safe coerce if the MkUnique constructor would
+-- be expost. But then people might use the constructor directly.
+-- Not sure what's better but I kept the constructor hidden and
+-- used unsafeCoerce for now.
 
 newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a a}
                   deriving (Data, Semi.Semigroup, Monoid)
@@ -196,3 +215,49 @@ pprUniqSet :: (a -> SDoc) -> UniqSet a -> SDoc
 -- It's OK to use nonDetUFMToList here because we only use it for
 -- pretty-printing.
 pprUniqSet f = braces . pprWithCommas f . nonDetEltsUniqSet
+
+-- | Similar to UniqueSet but does not store the values, only the uniques!
+-- This allows for higher efficiency where applicable.
+newtype UniqOnlySet a = US S.IntSet deriving (Eq, Ord, Show, Semigroup, Monoid)
+
+-- We inline all instance methods to ensure the underlying container methods are exposed at the call sites.
+instance Uniquable a => IsSet (UniqOnlySet a) where
+  type ElemOf (UniqOnlySet a) = Unique
+
+  {-# INLINE setNull #-}
+  setNull (US s) = S.null s
+
+  {-# INLINE setSize #-}
+  setSize (US s) = S.size s
+  {-# INLINE setMember #-}
+  setMember k (US s) = S.member (getKey k) s
+
+  {-# INLINE setEmpty #-}
+  setEmpty = US S.empty
+  {-# INLINE setSingleton #-}
+  setSingleton k = US (S.singleton (getKey k))
+  {-# INLINE setInsert #-}
+  setInsert k (US s) = US (S.insert (getKey k) s)
+  {-# INLINE setDelete #-}
+  setDelete k (US s) = US (S.delete (getKey k) s)
+
+  {-# INLINE setUnion #-}
+  setUnion (US x) (US y) = US (S.union x y)
+  {-# INLINE setDifference #-}
+  setDifference (US x) (US y) = US (S.difference x y)
+  {-# INLINE setIntersection #-}
+  setIntersection (US x) (US y) = US (S.intersection x y)
+  {-# INLINE setIsSubsetOf #-}
+  setIsSubsetOf (US x) (US y) = S.isSubsetOf x y
+  {-# INLINE setFilter #-}
+  setFilter f (US s) = US (S.filter (unsafeCoerce f) s) -- See Note [UniqOnlySet and unsafeCoerce]
+
+  {-# INLINE setFoldl #-}
+  setFoldl k z (US s) = S.foldl' (unsafeCoerce k) z s -- See Note [UniqOnlySet and unsafeCoerce]
+  {-# INLINE setFoldr #-}
+  setFoldr k z (US s) = S.foldr (unsafeCoerce k) z s -- See Note [UniqOnlySet and unsafeCoerce]
+
+  {-# INLINE setElems #-}
+  setElems (US s) = unsafeCoerce $ S.elems s
+  {-# INLINE setFromList #-}
+  setFromList ks = US (S.fromList $ unsafeCoerce ks) -- See Note [UniqOnlySet and unsafeCoerce]

@@ -17,7 +17,7 @@ import GHC.Cmm.ContFlowOpt
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
-import GHC.Cmm.Dataflow.Collections
+import GHC.Types.Collections
 import Data.Maybe (mapMaybe)
 import qualified Data.List as List
 import Data.Word

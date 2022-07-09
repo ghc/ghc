@@ -89,7 +89,7 @@ import qualified Data.ByteString as BS
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Block
-import GHC.Cmm.Dataflow.Collections
+import GHC.Types.Collections
 
 ---------------------------------------------------
 --

@@ -2,7 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module GHC.Cmm.Dataflow.Collections
+module GHC.Types.Collections
     ( IsSet(..)
     , setInsertList, setDeleteList, setUnions
     , IsMap(..)

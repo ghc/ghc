@@ -49,7 +49,7 @@ import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
-import GHC.Cmm.Dataflow.Collections
+import GHC.Types.Collections
 
 import Data.List (nub, foldl1', find)
 import Data.Maybe
