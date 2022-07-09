@@ -33,7 +33,7 @@ BUILDDIR    = Path('_build')
 BINDIR      = BUILDDIR / 'bin'            # binaries go there (--bindir)
 DISTDIR     = BUILDDIR / 'dists'          # --builddir
 UNPACKED    = BUILDDIR / 'unpacked'       # where we unpack final package tarballs
-TARBALLS    = BUILDDIR / 'tarballs'       # where we download tarballks
+TARBALLS    = BUILDDIR / 'tarballs'       # where we download tarballs
 PSEUDOSTORE = BUILDDIR / 'pseudostore'    # where we install packages
 ARTIFACTS   = BUILDDIR / 'artifacts'      # Where we put the archive
 TMPDIR      = BUILDDIR / 'tmp'            #
@@ -447,16 +447,19 @@ Use `bootstrap.py -w {ghc.ghc_path} -s {archivename}` to continue
         print(f"Required hackage sources saved to {args.output}")
         tarfmt= "\n./"
         print(f"""
-Download the files listed in {args.output} and save them to a tarball ($TARBALL), along with {args.deps}
+Download the files listed in {args.output}, copying {args.deps} to plan-bootstrap.json, and save them to a tarball ($TARBALL)
+
 The contents of $TARBALL should look like:
 
 ./
 ./plan-bootstrap.json
 ./{tarfmt.join(path for path in plan)}
 
+To generate $TARBALL, e.g. files in sources-tarball, `TARBALL=sources-tarball.tar.gz; pushd sources-tarball; tar -zcf ../$TARBALL .; popd`
+
 Then use `bootstrap.py -w {ghc.ghc_path} -s $TARBALL` to continue
 
-Alternatively, you could use `bootstrap.py -w {ghc.ghc_path} -d {args.deps} fetch -o $TARBALL` to download and generate the tarball, skipping this step
+Alternatively, you could use `bootstrap.py -w {ghc.ghc_path} -d {args.deps} fetch -o sources-tarball` to download and generate the tarball, skipping this step
 """)
 
     elif(args.command == None):
