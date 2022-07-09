@@ -560,13 +560,13 @@ tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
 -- See Note [FV eta expansion] in "GHC.Utils.FV" for explanation.
 tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
-tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
-  | not (f v) = (acc_list, acc_set)
-  | v `elemVarSet` bound_vars = (acc_list, acc_set)
-  | v `elemVarSet` acc_set = (acc_list, acc_set)
+tyCoFVsOfType (TyVarTy v)        f bound_vars acc
+  | not (f v) = acc
+  | v `elemVarSet` bound_vars = acc
+  | v `elemAcc` acc = acc
   | otherwise = tyCoFVsOfType (tyVarKind v) f
                                emptyVarSet   -- See Note [Closing over free variable kinds]
-                               (v:acc_list, extendVarSet acc_set v)
+                               (extendVarAcc v acc)
 tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_vars acc
 tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
 tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc

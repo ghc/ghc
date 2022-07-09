@@ -67,6 +67,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
 import Data.List (mapAccumL)
+import GHC.Utils.FV
 
 
 
@@ -693,9 +694,9 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
 ------------------
 substDVarSet :: HasDebugCallStack => Subst -> DVarSet -> DVarSet
 substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
-  = mkDVarSet $ fst $ foldr subst_fv ([], emptyVarSet) $ dVarSetElems fvs
+  = mkDVarSet $ acc_list $ foldr subst_fv (VarAcc [] emptyVarSet) $ dVarSetElems fvs
   where
-  subst_fv :: Var -> ([Var], VarSet) -> ([Var], VarSet)
+  subst_fv :: Var -> VarAcc -> VarAcc
   subst_fv fv acc
      | isTyVar fv
      , let fv_ty = lookupVarEnv tv_env fv `orElse` mkTyVarTy fv

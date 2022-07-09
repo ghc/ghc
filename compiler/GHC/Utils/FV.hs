@@ -8,10 +8,10 @@
 -- | Utilities for efficiently and deterministically computing free variables.
 module GHC.Utils.FV (
         -- * Deterministic free vars computations
-        FV, InterestingVarFun,
+        FV, VarAcc(..), InterestingVarFun,
 
         -- * Running the computations
-        fvVarList, fvVarSet, fvDVarSet,
+        fvVarList, fvVarSet, fvDVarSet, extendVarAcc,
 
         -- ** Manipulating those computations
         unitFV,
@@ -22,13 +22,14 @@ module GHC.Utils.FV (
         delFV,
         delFVs,
         filterFV,
-        mapUnionFV,
+        mapUnionFV, elemAcc,
     ) where
 
 import GHC.Prelude
 
 import GHC.Types.Var
 import GHC.Types.Var.Set
+import GHC.Utils.Panic.Plain (panic)
 
 -- | Predicate on possible free variables: returns @True@ iff the variable is
 -- interesting
@@ -50,11 +51,29 @@ type FV = InterestingVarFun -- Used for filtering sets as we build them
         -> VarAcc           -- Accumulator
         -> VarAcc
 
-type VarAcc = ([Var], VarSet)  -- List to preserve ordering and set to check for membership,
+data VarAcc = VarAcc
+            { acc_list :: [Var]
+            , acc_vset :: !VarSet
+            }
+            | SetAcc
+            { acc_set :: !VarSet }
+                               -- List to preserve ordering and set to check for membership,
                                -- so that the list doesn't have duplicates
                                -- For explanation of why using `VarSet` is not deterministic see
                                -- Note [Deterministic UniqFM] in GHC.Types.Unique.DFM.
 
+{-# INLINE extendVarAcc #-}
+extendVarAcc :: Var -> VarAcc -> VarAcc
+extendVarAcc !v !acc =
+  case acc of
+    VarAcc l s -> VarAcc (v:l) (extendVarSet s v)
+    SetAcc s -> SetAcc (extendVarSet s v)
+
+elemAcc :: Var -> VarAcc -> Bool
+elemAcc v acc =
+  case acc of
+    VarAcc _ s -> elemVarSet v s
+    SetAcc s -> elemVarSet v s
 -- Note [FV naming conventions]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- To get the performance and determinism that FV provides, FV computations
@@ -82,13 +101,13 @@ type VarAcc = ([Var], VarSet)  -- List to preserve ordering and set to check for
 -- | Run a free variable computation, returning a list of distinct free
 -- variables in deterministic order and a non-deterministic set containing
 -- those variables.
-fvVarAcc :: FV ->  ([Var], VarSet)
-fvVarAcc fv = fv (const True) emptyVarSet ([], emptyVarSet)
+fvVarAcc :: FV ->  VarAcc
+fvVarAcc fv = fv (const True) emptyVarSet (VarAcc [] emptyVarSet)
 
 -- | Run a free variable computation, returning a list of distinct free
 -- variables in deterministic order.
 fvVarList :: FV -> [Var]
-fvVarList = fst . fvVarAcc
+fvVarList = acc_list . fvVarAcc
 
 -- | Run a free variable computation, returning a deterministic set of free
 -- variables. Note that this is just a wrapper around the version that
@@ -101,7 +120,9 @@ fvDVarSet = mkDVarSet . fvVarList
 -- free variables. Don't use if the set will be later converted to a list
 -- and the order of that list will impact the generated code.
 fvVarSet :: FV -> VarSet
-fvVarSet = snd . fvVarAcc
+fvVarSet = \fv -> case fv (const True) emptyVarSet (SetAcc emptyVarSet) of
+    SetAcc s -> s
+    _ -> panic "Invalid fvs accum"
 
 -- Note [FV eta expansion]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -143,10 +164,10 @@ fvVarSet = snd . fvVarAcc
 -- | Add a variable - when free, to the returned free variables.
 -- Ignores duplicates and respects the filtering function.
 unitFV :: Id -> FV
-unitFV var fv_cand in_scope acc@(have, haveSet)
+unitFV !var fv_cand !in_scope !acc
   | var `elemVarSet` in_scope = acc
-  | var `elemVarSet` haveSet = acc
-  | fv_cand var = (var:have, extendVarSet haveSet var)
+  | var `elemAcc` acc = acc
+  | fv_cand var = extendVarAcc var acc
   | otherwise = acc
 {-# INLINE unitFV #-}
 
