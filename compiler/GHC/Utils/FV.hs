@@ -116,7 +116,7 @@ elemAcc v acc =
 -- | Run a free variable computation, returning a list of distinct free
 -- variables in deterministic order.
 fvVarList :: FV -> [Var]
-fvVarList = \fv -> acc_list $ fv (const True) setEmpty emptyListAcc
+fvVarList fv = acc_list $ fv (const True) setEmpty emptyListAcc
 
 -- | Run a free variable computation, returning a deterministic set of free
 -- variables. Note that this is just a wrapper around the version that
@@ -129,7 +129,7 @@ fvDVarSet = mkDVarSet . fvVarList
 -- free variables. Don't use if the set will be later converted to a list
 -- and the order of that list will impact the generated code.
 fvVarSet :: FV -> VarSet
-fvVarSet = \fv -> case fv (const True) setEmpty emptySetAcc of
+fvVarSet fv = case fv (const True) setEmpty emptySetAcc of
     SetAcc s -> s
     _ -> panic "Invalid fvs accum"
 
@@ -194,7 +194,8 @@ unionFV fv1 fv2 fv_cand in_scope acc =
 -- | Mark the variable as not free by putting it in scope.
 delFV :: Var -> FV -> FV
 delFV var fv fv_cand !in_scope acc =
-  fv fv_cand (setInsert (getUnique var) in_scope) acc
+  let !scope = (setInsert (getUnique var) in_scope)
+  in fv fv_cand scope acc
 {-# INLINE delFV #-}
 
 -- | Mark many free variables as not free.
