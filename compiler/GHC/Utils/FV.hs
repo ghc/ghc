@@ -12,6 +12,7 @@ module GHC.Utils.FV (
 
         -- * Running the computations
         fvVarList, fvVarSet, fvDVarSet, extendVarAcc,
+        emptyListAcc,
 
         -- ** Manipulating those computations
         unitFV,
@@ -30,6 +31,9 @@ import GHC.Prelude
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Utils.Panic.Plain (panic)
+import GHC.Types.Unique.Set (UniqOnlySet, nonDetStrictFoldUniqSet_Directly)
+import GHC.Types.Collections (IsSet(..))
+import GHC.Types.Unique (Uniquable (getUnique))
 
 -- | Predicate on possible free variables: returns @True@ iff the variable is
 -- interesting
@@ -47,13 +51,13 @@ type InterestingVarFun = Var -> Bool
 -- factor. It's cheaper to incrementally add to a list and use a set to check
 -- for duplicates.
 type FV = InterestingVarFun -- Used for filtering sets as we build them
-        -> VarSet           -- Locally bound variables
+        -> UniqOnlySet Var           -- Locally bound variables
         -> VarAcc           -- Accumulator
         -> VarAcc
 
 data VarAcc = VarAcc
             { acc_list :: [Var]
-            , acc_vset :: !VarSet
+            , acc_vset :: !(UniqOnlySet Var)
             }
             | SetAcc
             { acc_set :: !VarSet }
@@ -62,18 +66,23 @@ data VarAcc = VarAcc
                                -- For explanation of why using `VarSet` is not deterministic see
                                -- Note [Deterministic UniqFM] in GHC.Types.Unique.DFM.
 
+emptyListAcc, emptySetAcc :: VarAcc
+emptyListAcc = VarAcc [] mempty
+emptySetAcc = SetAcc emptyVarSet
+
 {-# INLINE extendVarAcc #-}
 extendVarAcc :: Var -> VarAcc -> VarAcc
 extendVarAcc !v !acc =
   case acc of
-    VarAcc l s -> VarAcc (v:l) (extendVarSet s v)
+    VarAcc l s -> VarAcc (v:l) (setInsert (getUnique v) s)
     SetAcc s -> SetAcc (extendVarSet s v)
 
 elemAcc :: Var -> VarAcc -> Bool
 elemAcc v acc =
   case acc of
-    VarAcc _ s -> elemVarSet v s
+    VarAcc _ s -> setMember (getUnique v) s
     SetAcc s -> elemVarSet v s
+
 -- Note [FV naming conventions]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- To get the performance and determinism that FV provides, FV computations
@@ -101,13 +110,13 @@ elemAcc v acc =
 -- | Run a free variable computation, returning a list of distinct free
 -- variables in deterministic order and a non-deterministic set containing
 -- those variables.
-fvVarAcc :: FV ->  VarAcc
-fvVarAcc fv = fv (const True) emptyVarSet (VarAcc [] emptyVarSet)
+-- fvVarAcc :: FV ->  VarAcc
+-- fvVarAcc fv = fv (const True) emptyVarSet (VarAcc [] emptyVarSet)
 
 -- | Run a free variable computation, returning a list of distinct free
 -- variables in deterministic order.
 fvVarList :: FV -> [Var]
-fvVarList = acc_list . fvVarAcc
+fvVarList = \fv -> acc_list $ fv (const True) setEmpty emptyListAcc
 
 -- | Run a free variable computation, returning a deterministic set of free
 -- variables. Note that this is just a wrapper around the version that
@@ -120,7 +129,7 @@ fvDVarSet = mkDVarSet . fvVarList
 -- free variables. Don't use if the set will be later converted to a list
 -- and the order of that list will impact the generated code.
 fvVarSet :: FV -> VarSet
-fvVarSet = \fv -> case fv (const True) emptyVarSet (SetAcc emptyVarSet) of
+fvVarSet = \fv -> case fv (const True) setEmpty emptySetAcc of
     SetAcc s -> s
     _ -> panic "Invalid fvs accum"
 
@@ -165,7 +174,7 @@ fvVarSet = \fv -> case fv (const True) emptyVarSet (SetAcc emptyVarSet) of
 -- Ignores duplicates and respects the filtering function.
 unitFV :: Id -> FV
 unitFV !var fv_cand !in_scope !acc
-  | var `elemVarSet` in_scope = acc
+  | (getUnique var) `setMember` in_scope = acc
   | var `elemAcc` acc = acc
   | fv_cand var = extendVarAcc var acc
   | otherwise = acc
@@ -185,13 +194,14 @@ unionFV fv1 fv2 fv_cand in_scope acc =
 -- | Mark the variable as not free by putting it in scope.
 delFV :: Var -> FV -> FV
 delFV var fv fv_cand !in_scope acc =
-  fv fv_cand (extendVarSet in_scope var) acc
+  fv fv_cand (setInsert (getUnique var) in_scope) acc
 {-# INLINE delFV #-}
 
 -- | Mark many free variables as not free.
 delFVs :: VarSet -> FV -> FV
-delFVs vars fv fv_cand !in_scope acc =
-  fv fv_cand (in_scope `unionVarSet` vars) acc
+delFVs !vars fv fv_cand !in_scope acc =
+  let !in_scope' = nonDetStrictFoldUniqSet_Directly (\u _ s -> setInsert u s) in_scope $ vars
+  in fv fv_cand in_scope' acc
 {-# INLINE delFVs #-}
 
 -- | Filter a free variable computation.

@@ -68,6 +68,7 @@ import GHC.Utils.Panic.Plain
 
 import Data.List (mapAccumL)
 import GHC.Utils.FV
+import GHC.Types.Collections (IsSet(..))
 
 
 
@@ -694,19 +695,19 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
 ------------------
 substDVarSet :: HasDebugCallStack => Subst -> DVarSet -> DVarSet
 substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
-  = mkDVarSet $ acc_list $ foldr subst_fv (VarAcc [] emptyVarSet) $ dVarSetElems fvs
+  = mkDVarSet $ acc_list $ foldr subst_fv emptyListAcc $ dVarSetElems fvs
   where
   subst_fv :: Var -> VarAcc -> VarAcc
   subst_fv fv acc
      | isTyVar fv
      , let fv_ty = lookupVarEnv tv_env fv `orElse` mkTyVarTy fv
-     = tyCoFVsOfType fv_ty (const True) emptyVarSet $! acc
+     = tyCoFVsOfType fv_ty (const True) setEmpty $! acc
      | isCoVar fv
      , let fv_co = lookupVarEnv cv_env fv `orElse` mkCoVarCo fv
-     = tyCoFVsOfCo fv_co (const True) emptyVarSet $! acc
+     = tyCoFVsOfCo fv_co (const True) setEmpty $! acc
      | otherwise
      , let fv_expr = lookupIdSubst subst fv
-     = expr_fvs fv_expr isLocalVar emptyVarSet $! acc
+     = expr_fvs fv_expr isLocalVar setEmpty $! acc
 
 ------------------
 substTickish :: Subst -> CoreTickish -> CoreTickish

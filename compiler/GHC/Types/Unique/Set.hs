@@ -45,6 +45,7 @@ module GHC.Types.Unique.Set (
         nonDetEltsUniqSet,
         nonDetKeysUniqSet,
         nonDetStrictFoldUniqSet,
+        nonDetStrictFoldUniqSet_Directly,
 
         UniqOnlySet,
     ) where
@@ -189,6 +190,9 @@ nonDetKeysUniqSet = nonDetKeysUFM . getUniqSet'
 -- nondeterminism.
 nonDetStrictFoldUniqSet :: (elt -> a -> a) -> a -> UniqSet elt -> a
 nonDetStrictFoldUniqSet c n (UniqSet s) = nonDetStrictFoldUFM c n s
+
+nonDetStrictFoldUniqSet_Directly :: (Unique -> elt -> a -> a) -> a -> UniqSet elt -> a
+nonDetStrictFoldUniqSet_Directly f z (UniqSet s) = nonDetStrictFoldUFM_Directly f z s
 
 -- See Note [UniqSet invariant]
 mapUniqSet :: Uniquable b => (a -> b) -> UniqSet a -> UniqSet b

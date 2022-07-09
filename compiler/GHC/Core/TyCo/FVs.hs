@@ -57,6 +57,8 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Types.Collections (IsSet(..))
+import GHC.Types.Unique (getUnique)
 
 {-
 %************************************************************************
@@ -562,10 +564,10 @@ tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfType (TyVarTy v)        f bound_vars acc
   | not (f v) = acc
-  | v `elemVarSet` bound_vars = acc
+  | (getUnique v) `setMember` bound_vars = acc
   | v `elemAcc` acc = acc
   | otherwise = tyCoFVsOfType (tyVarKind v) f
-                               emptyVarSet   -- See Note [Closing over free variable kinds]
+                               setEmpty   -- See Note [Closing over free variable kinds]
                                (extendVarAcc v acc)
 tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_vars acc
 tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
