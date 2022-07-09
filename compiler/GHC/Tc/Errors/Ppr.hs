@@ -82,6 +82,8 @@ import GHC.Utils.Panic
 
 import qualified GHC.LanguageExtensions as LangExt
 
+import GHC.Data.BooleanFormula (pprBooleanFormulaNice)
+
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Function (on)
@@ -961,6 +963,36 @@ instance Diagnostic TcRnMessage where
             impMsg  = text "imported from" <+> ppr pragma_warning_import_mod <> extra
             extra | pragma_warning_import_mod == pragma_warning_defined_mod = empty
                   | otherwise = text ", but defined in" <+> ppr pragma_warning_defined_mod
+    TcRnIllegalHsigDefaultMethods name meths
+      -> mkSimpleDecorated $
+        text "Illegal default method" <> plural (NE.toList meths) <+> text "in class definition of" <+> ppr name <+> text "in hsig file"
+    TcRnBadGenericMethod clas op
+      -> mkSimpleDecorated $
+        hsep [text "Class", quotes (ppr clas),
+          text "has a generic-default signature without a binding", quotes (ppr op)]
+    TcRnWarningMinimalDefIncomplete mindef
+      -> mkSimpleDecorated $
+        vcat [ text "The MINIMAL pragma does not require:"
+          , nest 2 (pprBooleanFormulaNice mindef)
+          , text "but there is no default implementation." ]
+    TcRnDefaultMethodForPragmaLacksBinding sel_id prag
+      -> mkSimpleDecorated $
+        text "The" <+> hsSigDoc prag <+> text "for default method"
+          <+> quotes (ppr sel_id)
+          <+> text "lacks an accompanying binding"
+    TcRnIgnoreSpecialisePragmaOnDefMethod sel_name
+      -> mkSimpleDecorated $
+        text "Ignoring SPECIALISE pragmas on default method"
+          <+> quotes (ppr sel_name)
+    TcRnBadMethodErr{badMethodErrClassName, badMethodErrMethodName}
+      -> mkSimpleDecorated $
+        hsep [text "Class", quotes (ppr badMethodErrClassName),
+          text "does not have a method", quotes (ppr badMethodErrMethodName)]
+    TcRnNoExplicitAssocTypeOrDefaultDeclaration name
+      -> mkSimpleDecorated $
+        text "No explicit" <+> text "associated type"
+          <+> text "or default declaration for"
+          <+> quotes (ppr name)
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -1276,6 +1308,20 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnPragmaWarning{}
       -> WarningWithFlag Opt_WarnWarningsDeprecations
+    TcRnIllegalHsigDefaultMethods{}
+      -> ErrorWithoutFlag
+    TcRnBadGenericMethod{}
+      -> ErrorWithoutFlag
+    TcRnWarningMinimalDefIncomplete{}
+      -> WarningWithoutFlag
+    TcRnDefaultMethodForPragmaLacksBinding{}
+      -> ErrorWithoutFlag
+    TcRnIgnoreSpecialisePragmaOnDefMethod{}
+      -> WarningWithoutFlag
+    TcRnBadMethodErr{}
+      -> ErrorWithoutFlag
+    TcRnNoExplicitAssocTypeOrDefaultDeclaration{}
+      -> WarningWithFlag (Opt_WarnMissingMethods)
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -1591,7 +1637,13 @@ instance Diagnostic TcRnMessage where
     TcRnNameByTemplateHaskellQuote{} -> noHints
     TcRnIllegalBindingOfBuiltIn{} -> noHints
     TcRnPragmaWarning{} -> noHints
-
+    TcRnIllegalHsigDefaultMethods{} -> noHints
+    TcRnBadGenericMethod{} -> noHints
+    TcRnWarningMinimalDefIncomplete{} -> noHints
+    TcRnDefaultMethodForPragmaLacksBinding{} -> noHints
+    TcRnIgnoreSpecialisePragmaOnDefMethod{} -> noHints
+    TcRnBadMethodErr{} -> noHints
+    TcRnNoExplicitAssocTypeOrDefaultDeclaration{} -> noHints
 
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",
 -- and so on.  The `and` stands for any `conjunction`, which is passed in.

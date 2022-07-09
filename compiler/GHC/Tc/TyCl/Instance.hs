@@ -27,8 +27,8 @@ import GHC.Tc.Gen.Bind
 import GHC.Tc.TyCl
 import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
 import GHC.Tc.TyCl.Class ( tcClassDecl2, tcATDefault,
-                           HsSigFun, mkHsSigFun, badMethodErr,
-                           findMethodBind, instantiateMethod )
+                           HsSigFun, mkHsSigFun, findMethodBind,
+                           instantiateMethod )
 import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Monad
@@ -1800,7 +1800,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     -- Check if any method bindings do not correspond to the class.
     -- See Note [Mismatched class methods and associated type families].
     checkMethBindMembership
-      = mapM_ (addErrTc . badMethodErr clas) mismatched_meths
+      = mapM_ (addErrTc . TcRnBadMethodErr (className clas)) mismatched_meths
       where
         bind_nms         = map unLoc $ collectMethodBinders binds
         cls_meth_nms     = map (idName . fst) op_items

@@ -2,5 +2,5 @@
   [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
 
 bkpfail40.bkp:3:9: error:
-    • Illegal default method(s) in class definition of C in hsig file
+    • Illegal default method in class definition of C in hsig file
     • In the class declaration for ‘C’

@@ -91,7 +91,7 @@ import GHC.Types.Var.Env (TidyEnv)
 import GHC.Types.Var.Set (TyVarSet, VarSet)
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
-import GHC.Core.Class (Class)
+import GHC.Core.Class (Class, ClassMinimalDef)
 import GHC.Core.Coercion.Axiom (CoAxBranch)
 import GHC.Core.ConLike (ConLike)
 import GHC.Core.DataCon (DataCon)
@@ -2187,9 +2187,93 @@ data TcRnMessage where
     pragma_warning_defined_mod :: ModuleName
   } -> TcRnMessage
 
+
+  {-| TcRnIllegalHsigDefaultMethods is an error that occurs when a binding for
+     a class default method is provided in a Backpack signature file.
+
+    Test case:
+      bkpfail40
+  -}
+
+  TcRnIllegalHsigDefaultMethods :: !Name -- ^ 'Name' of the class
+                                -> NE.NonEmpty (LHsBind GhcRn) -- ^ default methods
+                                -> TcRnMessage
+  {-| TcRnBadGenericMethod
+     This test ensures that if you provide a "more specific" type signatures
+     for the default method, you must also provide a binding.
+
+     Example:
+     {-# LANGUAGE DefaultSignatures #-}
+
+     class C a where
+       meth :: a
+       default meth :: Num a => a
+       meth = 0
+
+    Test case:
+      testsuite/tests/typecheck/should_fail/MissingDefaultMethodBinding.hs
+  -}
+  TcRnBadGenericMethod :: !Name   -- ^ 'Name' of the class
+                       -> !Name   -- ^ Problematic method
+                       -> TcRnMessage
+
+  {-| TcRnWarningMinimalDefIncomplete is a warning that one must
+      specify which methods must be implemented by all instances.
+
+     Example:
+       class Cheater a where  -- WARNING LINE
+       cheater :: a
+       {-# MINIMAL #-} -- warning!
+
+     Test case:
+       testsuite/tests/warnings/minimal/WarnMinimal.hs:
+  -}
+  TcRnWarningMinimalDefIncomplete :: ClassMinimalDef -> TcRnMessage
+
+  {-| TcRnDefaultMethodForPragmaLacksBinding is an error that occurs when
+      a default method pragma is missing an accompanying binding.
+
+    Test cases:
+      testsuite/tests/typecheck/should_fail/T5084.hs
+      testsuite/tests/typecheck/should_fail/T2354.hs
+  -}
+  TcRnDefaultMethodForPragmaLacksBinding
+            :: Id             -- ^ method
+            -> Sig GhcRn      -- ^ the pragma
+            -> TcRnMessage
+  {-| TcRnIgnoreSpecialisePragmaOnDefMethod is a warning that occurs when
+      a specialise pragma is put on a default method.
+
+    Test cases: none
+  -}
+  TcRnIgnoreSpecialisePragmaOnDefMethod
+            :: !Name
+            -> TcRnMessage
+  {-| TcRnBadMethodErr is an error that happens when one attempts to provide a method
+     in a class instance, when the class doesn't have a method by that name.
+
+     Test case:
+       testsuite/tests/th/T12387
+  -}
+  TcRnBadMethodErr
+    :: { badMethodErrClassName  :: !Name
+       , badMethodErrMethodName :: !Name
+       } -> TcRnMessage
+  {-| TcRnNoExplicitAssocTypeOrDefaultDeclaration is an error that occurs
+      when a class instance does not provide an expected associated type
+      or default declaration.
+
+    Test cases:
+      testsuite/tests/deriving/should_compile/T14094
+      testsuite/tests/indexed-types/should_compile/Simple2
+      testsuite/tests/typecheck/should_compile/tc254
+  -}
+  TcRnNoExplicitAssocTypeOrDefaultDeclaration
+            :: Name
+            -> TcRnMessage
+
 -- | Specifies which back ends can handle a requested foreign import or export
 type ExpectedBackends = [Backend]
-
 -- | Specifies which calling convention is unsupported on the current platform
 data UnsupportedCallConvention
   = StdCallConvUnsupported
