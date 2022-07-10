@@ -167,20 +167,6 @@ new_adjustor_pool(
     return pool;
 }
 
-/* Return the index of the first unset bit of the given bitmap or
- * length_in_bits. */
-static size_t
-bitmap_first_unset(uint8_t *bitmap, size_t length_in_bits, size_t start_idx)
-{
-    for (size_t i = start_idx; i < length_in_bits; i += 8) {
-        uint8_t x = bitmap[i / 8];
-        if (x != 0xff) {
-            return i + __builtin_clz(~x);
-        }
-    }
-    return length_in_bits;
-}
-
 static void
 bitmap_set(uint8_t *bitmap, size_t idx, bool value)
 {
@@ -200,6 +186,19 @@ bitmap_get(uint8_t *bitmap, size_t idx)
     size_t word_n = idx / 8;
     uint8_t bit = 1 << (idx % 8);
     return bitmap[word_n] & bit;
+}
+
+/* Return the index of the first unset bit of the given bitmap or
+ * length_in_bits if all bits are set. */
+static size_t
+bitmap_first_unset(uint8_t *bitmap, size_t length_in_bits, size_t start_idx)
+{
+    for (size_t i = start_idx; i < length_in_bits; i ++) {
+        if (bitmap_get(bitmap, i) == 0) {
+            return i;
+        }
+    }
+    return length_in_bits;
 }
 
 static void *
@@ -224,6 +223,7 @@ alloc_adjustor(struct AdjustorPool *pool, void *context)
     chunk = pool->free_list;
     slot_idx = chunk->first_free;
     ASSERT(slot_idx < pool->chunk_slots);
+    ASSERT(bitmap_get(chunk->slot_bitmap, slot_idx) == 0);
     bitmap_set(chunk->slot_bitmap, slot_idx, 1);
 
     // advance first_free
