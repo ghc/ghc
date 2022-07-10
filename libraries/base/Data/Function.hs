@@ -141,7 +141,7 @@ applyWhen False _ x = x
 -- Proofs:
 --
 -- flip bool id = \q f -> bool id f q
--- = \f q -> case q of
+-- = \q f -> case q of
 --     True -> f = \x -> f x
 --     False -> id = \x -> x ∎
 --
