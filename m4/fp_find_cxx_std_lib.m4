@@ -19,7 +19,7 @@ unknown
 EOF
         AC_MSG_CHECKING([C++ standard library flavour])
         if "$CXX" -E actest.cpp -o actest.out; then
-            if grep "libc++" actest.out; then
+            if grep "libc++" actest.out >/dev/null; then
                 CXX_STD_LIB_LIBS="c++ c++abi"
                 p="`"$CXX" --print-file-name libc++.so`"
                 d="`dirname "$p"`"
@@ -32,7 +32,7 @@ EOF
                 CXX_STD_LIB_LIB_DIRS="$d"
                 CXX_STD_LIB_DYN_LIB_DIRS="$d"
                 AC_MSG_RESULT([libc++])
-            elif grep "libstdc++" actest.out; then
+            elif grep "libstdc++" actest.out >/dev/null; then
                 CXX_STD_LIB_LIBS="stdc++"
                 p="`"$CXX" --print-file-name libstdc++.so`"
                 d="`dirname "$p"`"
