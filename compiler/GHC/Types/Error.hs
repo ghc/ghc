@@ -68,21 +68,19 @@ module GHC.Types.Error
    , errorsFound
    , errorsOrFatalWarningsFound
 
-   -- * Diagnostic codes
+   -- * Diagnostic code re-exports
    , DiagnosticCode
-   , mkDiagnosticCode
    , GhcDiagnosticCode
-   , prefixGhcDiagnosticCode
    , fromGhcDiagnosticCode
-   , numDigitsInGhcDiagnosticCode
-   , ghcDiagnosticCodeNumber
    )
 where
 
 import GHC.Prelude
 
 import GHC.Driver.Flags
+-- import {-# SOURCE #-} GHC.Driver.Errors.Ppr ( allUsedDiagnosticCodes )
 
+import GHC.Types.Error.Codes
 import GHC.Data.Bag
 import GHC.IO (catchException)
 import GHC.Utils.Outputable as Outputable
@@ -91,12 +89,11 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 import GHC.Utils.Json
-import GHC.Utils.Panic.Plain
+import GHC.Utils.Panic
 
 import Data.Bifunctor
 import Data.Foldable    ( fold )
 import GHC.Types.Hint
-import Text.Printf      ( printf )
 import qualified Data.List.NonEmpty as NE
 import Data.List ( intercalate )
 
@@ -245,6 +242,27 @@ class Diagnostic a where
   -- Instances of 'Diagnostic' within GHC may wish to use 'fromGhcDiagnosticCode'
   -- to make defining this easier.
   diagnosticCode    :: a -> Maybe DiagnosticCode
+
+-- | Make defining 'diagnosticCode' easier within GHC. Example usage:
+--
+-- @
+--   instance Diagnostic MyMessage where
+--     diagnosticCode = fromGhcDiagnosticCode $ \case
+--       ...
+-- @
+--
+-- In a DEBUG compiler, this function also checks whether the code
+-- is listed in allUsedDiagnosticCodes, to make sure that list isn't
+-- missing anything.
+fromGhcDiagnosticCode :: (a -> Maybe GhcDiagnosticCode) -> a -> Maybe DiagnosticCode
+fromGhcDiagnosticCode mk_ghc_dc =
+  fmap (prefixGhcDiagnosticCode . check_code) . mk_ghc_dc
+  where
+    check_code :: GhcDiagnosticCode -> GhcDiagnosticCode
+    check_code ghc_code =
+{-      assertPpr (ghc_code `elem` allUsedDiagnosticCodes)
+                (text "Unknown diagnostic code:" <+> ppr ghc_code) $ -}
+      ghc_code
 
 -- | A class identifying diagnostic message types within GHC.
 -- This class does /not/ include plugin diagnostics, but every type
@@ -663,87 +681,3 @@ getErrorMessages (Messages xs) = fst $ partitionBag isIntrinsicErrorMessage xs
 -- warnings, and the second the errors.
 partitionMessages :: Diagnostic e => Messages e -> (Messages e, Messages e)
 partitionMessages (Messages xs) = bimap Messages Messages (partitionBag isWarningMessage xs)
-
-----------------------------------------------------------------
---                                                            --
--- Diagnostic Codes                                           --
---                                                            --
-----------------------------------------------------------------
-
-{- Note [Diagnostic codes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-"RAE": Write note.
-Talk about difference between DiagnosticCode and GhcDiagnosticCode.
-Talk about aspirations to remove Maybe.
--}
-
--- | A diagnostic code (called an "error code" in its specification
--- at "RAE": TODO) has a prefix and a suffix. Briefly, the prefix is
--- an alphanumeric string assigned by the Haskell Foundation (in order
--- to keep codes from different tools distinct). The suffix is a string
--- of digits uniquely identifying a diagnostic.
---
--- To make a 'DiagnosticCode' from a 'GhcDiagnosticCode', see 'prefixGhcDiagnosticCode'.
---
--- See also Note [Diagnostic codes]
-data DiagnosticCode = MkDiagnosticCode SDoc SDoc
-
-mkDiagnosticCode :: SDoc   -- ^ prefix of diagnostic code; must be assiged by Haskell Foundation
-                 -> SDoc   -- ^ suffix of diagnostic code; must be a string of digits
-                 -> DiagnosticCode
-mkDiagnosticCode = MkDiagnosticCode
-
-instance Outputable DiagnosticCode where
-  ppr (MkDiagnosticCode prefix suffix) = brackets $ prefix <> char '-' <> suffix
-
--- | Convert the GHC-specific 'GhcDiagnosticCode' to a tool-agnostic
--- 'DiagnosticCode' by adding the @GHC-@ prefix.
-prefixGhcDiagnosticCode :: GhcDiagnosticCode -> DiagnosticCode
-prefixGhcDiagnosticCode (MkGhcDiagnosticCode n)
-  = MkDiagnosticCode (text ghcDiagnosticCodePrefix) (text ppr_n)
-  where
-    ppr_n = printf format_string n
-    format_string = "%0" ++ show numDigitsInGhcDiagnosticCode ++ "d"
-
--- | Make defining 'diagnosticCode' easier within GHC. Example usage:
---
--- @
---   instance Diagnostic MyMessage where
---     diagnosticCode = fromGhcDiagnosticCode $ \case
---       ...
--- @
-fromGhcDiagnosticCode :: (a -> Maybe GhcDiagnosticCode) -> a -> Maybe DiagnosticCode
-fromGhcDiagnosticCode mk_ghc_dc = fmap prefixGhcDiagnosticCode . mk_ghc_dc
-
--- | The code used within GHC to label a diagnostic. See Note [Diagnostic codes].
-newtype GhcDiagnosticCode = MkGhcDiagnosticCode Int
-  deriving (Eq, Ord)
-
--- | Make it easy to write code without using the constructor
-instance Num GhcDiagnosticCode where
-  fromInteger = MkGhcDiagnosticCode . fromInteger
-
-  (+) = panic "adding GhcDiagnosticCodes"
-  (-) = panic "subtracting GhcDiagnosticCodes"
-  (*) = panic "multiplying GhcDiagnosticCodes"
-  abs = panic "abs GhcDiagnosticCode"
-  negate = panic "negate GhcDiagnosticCode"
-  signum = panic "signum GhcDiagnosticCode"
-
--- | Extract the diagnostic code number from a 'GhcDiagnosticCode'
-ghcDiagnosticCodeNumber :: GhcDiagnosticCode -> Int
-ghcDiagnosticCodeNumber (MkGhcDiagnosticCode n) = n
-
--- | The Haskell-Foundation-assigned prefix for GHC's diagnostic codes.
-ghcDiagnosticCodePrefix :: String
-ghcDiagnosticCodePrefix = "GHC"
-
--- | The minimum number of digits of a diagnostic code. Codes are prefixed
--- with 0s to print this many digits.
-numDigitsInGhcDiagnosticCode :: Int
-numDigitsInGhcDiagnosticCode = 5
-
--- This instance outputs the full diagnostic code, including its "GHC-"
--- prefix, and wraps it in brackets for visual distinction.
-instance Outputable GhcDiagnosticCode where
-  ppr = ppr . prefixGhcDiagnosticCode

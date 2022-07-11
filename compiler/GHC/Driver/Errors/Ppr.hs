@@ -3,7 +3,13 @@
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic {DriverMessage, GhcMessage}
 
-module GHC.Driver.Errors.Ppr where
+module GHC.Driver.Errors.Ppr (
+  -- The most important exports from this module are instances,
+  -- but the following functions are useful.
+
+  allUsedDiagnosticCodes,
+  allRetiredDiagnosticCodes
+  ) where
 
 import GHC.Prelude
 
@@ -98,6 +104,15 @@ instance GhcDiagnostic GhcMessage where
                                   , retiredDiagnosticCodes @DriverMessage
                                   ]
 
+-- | A list of all used diagnostic codes; used for testing
+-- whether or not a given code is registered in this list.
+allUsedDiagnosticCodes :: [GhcDiagnosticCode]
+allUsedDiagnosticCodes = usedDiagnosticCodes @GhcMessage
+
+-- | A list of all retired diagnostic codes; used for testing
+-- whether the set of codes is pairwise distinct.
+allRetiredDiagnosticCodes :: [GhcDiagnosticCode]
+allRetiredDiagnosticCodes = retiredDiagnosticCodes @GhcMessage
 
 instance Diagnostic DriverMessage where
   diagnosticMessage = \case
