@@ -44,8 +44,8 @@ function h$compactAllocateBlock(size, suggesta, suggesto) {
 function h$compactFixupPointers(blocka, blocko, roota, rooto) {
   TRACE_COMPACT("compactFixupPointers");
   throw new Error("not implemented");
-  // returns new root address
-  RETURN_UBX_TUP2(null, 0);
+  // returns new root address and new Compact#
+  RETURN_UBX_TUP3(null, 0);
 }
 
 
