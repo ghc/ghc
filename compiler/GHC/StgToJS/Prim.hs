@@ -837,7 +837,7 @@ genPrim prof ty = \case
 ------------------------------- STM-accessible Mutable Variables  --------------
 
   AtomicallyOp -> \[_r] [a]   -> PRPrimCall $ returnS (app "h$atomically" [a])
-  RetryOp      -> \[_r] []    -> PRPrimCall $ returnS (app "h$stmRetry" [])
+  RetryOp      -> \_r   []    -> PRPrimCall $ returnS (app "h$stmRetry" [])
   CatchRetryOp -> \[_r] [a,b] -> PRPrimCall $ returnS (app "h$stmCatchRetry" [a,b])
   CatchSTMOp   -> \[_r] [a,h] -> PRPrimCall $ returnS (app "h$catchStm" [a,h])
   NewTVarOp    -> \[tv] [v]   -> PrimInline $ tv |= app "h$newTVar" [v]
