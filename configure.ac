@@ -399,12 +399,12 @@ then
     dnl We need to use AC_CHECK_TARGET_TOOL instead of AC_PATH_PROG below that
     dnl doesn't take into account the target triple...
     dnl Why are we inflicting all this to ourselves?
-    AC_CHECK_TARGET_TOOL([CC],[gcc])
-    AC_CHECK_TARGET_TOOL([CXX],[g++])
-    AC_CHECK_TARGET_TOOL([NM],[nm])
-    AC_CHECK_TARGET_TOOL([AR],[ar])
-    AC_CHECK_TARGET_TOOL([RANLIB],[ranlib])
-    AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
+    AC_PATH_TARGET_TOOL([CC],[gcc])
+    AC_PATH_TARGET_TOOL([CXX],[g++])
+    AC_PATH_TARGET_TOOL([NM],[nm])
+    AC_PATH_TARGET_TOOL([AR],[ar])
+    AC_PATH_TARGET_TOOL([RANLIB],[ranlib])
+    AC_PATH_TARGET_TOOL([OBJDUMP],[objdump])
 
 else
     AC_PATH_TOOL([CC],[gcc], [clang])
