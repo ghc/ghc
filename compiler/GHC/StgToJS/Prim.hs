@@ -902,7 +902,7 @@ genPrim prof ty = \case
 ------------------------------ Compact normal form -----------------------------
 
   CompactNewOp           -> \[c] [s]   -> PrimInline $ c |= app "h$compactNew" [s]
-  CompactResizeOp        -> \[]  [s]   -> PrimInline $ appS "h$compactResize" [s]
+  CompactResizeOp        -> \[]  [c,s] -> PrimInline $ appS "h$compactResize" [c,s]
   CompactContainsOp      -> \[r] [c,v] -> PrimInline $ r |= app "h$compactContains" [c,v]
   CompactContainsAnyOp   -> \[r] [v]   -> PrimInline $ r |= app "h$compactContainsAny" [v]
   CompactGetFirstBlockOp -> \[ra,ro,s] [c] ->
@@ -911,8 +911,8 @@ genPrim prof ty = \case
     PrimInline $ appT [ra,ro,s] "h$compactGetNextBlock" [c,a,o]
   CompactAllocateBlockOp -> \[ra,ro] [size,sa,so] ->
     PrimInline $ appT [ra,ro] "h$compactAllocateBlock" [size,sa,so]
-  CompactFixupPointersOp -> \[newroota, newrooto] [blocka,blocko,roota,rooto] ->
-    PrimInline $ appT [newroota,newrooto] "h$compactFixupPointers" [blocka,blocko,roota,rooto]
+  CompactFixupPointersOp -> \[c,newroota, newrooto] [blocka,blocko,roota,rooto] ->
+    PrimInline $ appT [c,newroota,newrooto] "h$compactFixupPointers" [blocka,blocko,roota,rooto]
   CompactAdd -> \[_r] [c,o] ->
     PRPrimCall $ returnS (app "h$compactAdd" [c,o])
   CompactAddWithSharing -> \[_r] [c,o] ->
