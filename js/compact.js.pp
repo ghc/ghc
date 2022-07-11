@@ -45,7 +45,7 @@ function h$compactFixupPointers(blocka, blocko, roota, rooto) {
   TRACE_COMPACT("compactFixupPointers");
   throw new Error("not implemented");
   // returns new root address and new Compact#
-  RETURN_UBX_TUP3(null, 0);
+  RETURN_UBX_TUP3(null, null, 0);
 }
 
 
