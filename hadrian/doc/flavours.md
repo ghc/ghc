@@ -101,7 +101,6 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>release (same as perf with -haddock)</td>
-    <td> Yes (on supported platforms) </td>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
     <td></td>

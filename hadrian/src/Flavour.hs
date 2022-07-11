@@ -145,7 +145,7 @@ enableLinting =
       [ arg "-dlint"
       ]
 
--- | Enable Core, STG, and C-- linting in all compilations with the stage1 compiler.
+-- | Enable Haddock documentation.
 enableHaddock :: Flavour -> Flavour
 enableHaddock =
     addArgs $ stage1 ? mconcat
@@ -469,6 +469,7 @@ data BuilderMode = BM_Ghc (Wildcard GhcMode)
 --   > (<stage> or *).(<package name> or *).ghc.(<ghc mode> or *).opts
 --   > (<stage> or *).(<package name> or *).cc.(<cc mode> or *).opts
 --   > (<stage> or *).(<package name> or *).cabal.configure.opts
+--   > (<stage> or *).(<package name> or *).hsc2hs.run.opts
 --   > runtest.opts
 --
 --   where:

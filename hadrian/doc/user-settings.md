@@ -2,16 +2,18 @@
 
 You can customise Hadrian in two ways:
 
-- by copying the file `hadrian/src/UserSettings.hs` to `hadrian/UserSettings.hs`
-  and overriding the default build settings (if you don't
-  copy the file your changes will be tracked by `git` and you can accidentally commit
-  them). Here we document currently supported settings.
+- By selecting a flavour, flavour transformers and using
+  key-value settings, either in the command line
+  or by modifying the `hadrian.settings` file in the build directory.
 
-## The `UserSettings` module
+- By overriding the default build settings in the source code,
+  by copying the file `hadrian/src/UserSettings.hs` to `hadrian/UserSettings.hs`
+  and making modifications (if you don't copy the file, your changes will be tracked by `git`
+  and you can accidentally commit them).
 
-### Build flavour
+## Build flavours
 
-Build _flavour_ is a collection of build settings that fully define a GHC build
+A build _flavour_ is a collection of build settings that fully define a GHC build
 (see `src/Flavour.hs`):
 ```haskell
 data Flavour = Flavour {
@@ -47,8 +49,111 @@ data Flavour = Flavour {
 ```
 Hadrian provides several built-in flavours (`default`, `quick`, and a few
 others; see `hadrian/doc/flavours.md`), which can be activated from the command line,
-e.g. by passing `--flavour=quick`. Users can define new build flavours by adding them
-to `userFlavours` list:
+e.g. by passing `--flavour=quick`.
+
+## Flavour transformers
+
+Flavours can be customised using [flavour transformers](flavours.md#flavour-transformers).
+
+For example, it is useful to enable `-Werror` when building GHC as this setting is
+used in the CI to ensure a warning-free build. The `+werror` flavour transformer
+can be used to easily modify a flavour to turn this setting on:
+
+```
+hadrian/build --flavour=validate+werror
+```
+
+## `key = value` and `key += value` style settings
+
+One can supply settings from the command line or a
+`<build root>/hadrian.settings` file. Hadrian currently supports
+the following "families" of settings:
+
+- `{stage0, ..., stage3, *}.(<package name> or *).ghc.{c, hs, link, deps, toolargs, *}.opts`
+- `{stage0, ..., stage3, *}.(<package name> or *).cc.{c, deps, *}.opts`
+- `{stage0, ..., stage3, *}.(<package name> or *).cabal.configure.opts`
+- `{stage0, ..., stage3, *}.(<package name> or *).hsc2hs.run.opts`
+
+For example, putting the following in a file at `_build/hadrian.settings`:
+
+``` make
+stage1.ghc-bin.ghc.link.opts += -debug
+*.base.ghc.*.opts += -v3
+```
+
+and running hadrian with the default build root (`_build`), would respectively
+link the stage 2 GHC executable (using the stage 1 GHC) with the `-debug`
+flag and use `-v3` on all GHC commands used to build anything related to
+`base`, whatever the stage.
+
+We could equivalently specify those settings on the command-line:
+
+``` sh
+$ hadrian/build "stage1.ghc-bin.ghc.link.opts += -eventlog" \
+                   "*.base.ghc.*.opts += -v3"
+```
+
+or specify some in `hadrian.settings` and some on the command-line.
+
+Here is an overview of the supported settings and how you can figure out
+the right names for them:
+
+- the stage slot, which comes first, can be filled with any of `stage0`,
+  `stage1`, `stage2`, `stage3` or `*`; any value but `*` will restrict the
+  setting update to targets built during the given stage, while `*` is taken
+  to mean "for any stage". For instance, the above example will affect
+  the linking of the `_build/stage1/bin/ghc` executable.
+- the package slot, which comes second, can be filled with any package name
+  that Hadrian knows about (all packages that are part of a GHC checkout),
+  or `*`, to respectively mean that the builder options are going to be updated
+  only when building the given package, or that the said options should be used
+  when building all known packages, if the Hadrian command ever gets them to be
+  built;
+- the remaining slots specify the builder and how it was invoked,
+
+  * `ghc` refers to GHC commands; the final slot refers to how GHC is invoked:
+
+    * `c.opts` for commands that build C files with GHC
+	  * `hs.opts` for commands that compile Haskell modules with GHC
+	  * `link.opts` for GHC linking command
+	  * `deps.opts` for commands that figure out dependencies between Haskell modules
+	    (with `ghc -M`)
+	  * `toolargs.opts` for GHC commands that are used to generate the right ghci
+	    argument for `hadrian/ghci` to work
+
+  * `cc` refers to C compiler commands
+  * `cxx` refers to C++ compiler commands
+
+    * `c.opts` for commands that call the C compiler on some C files
+	  * `deps.opts` for commands that call the C compiler for figuring out
+	    dependencies between C files
+
+  * `cabal.configure.opts` refers to Cabal configure command line. Note that
+    package flags can be given by adding `--flags=...` arguments.
+
+  * `hsc2hs.run.opts` allows passing options to `Hsc2Hs` invocations.
+
+  * `runtest.opts` defines extra arguments passed to `runtest.py` when
+    invoked via the `hadrian test` target.
+
+- using a wildcard (`*`) ranges over all possible values for a given "slot";
+- `=` entirely overrides the arguments for a given builder in a given context,
+  with the value specified on the right hand side of `=`, while `+=` merely
+  extends the arguments that are to be emitted in the said context, with
+  the values supplied on the right hand side of `+=`.
+
+See `Note [Hadrian settings]` in `hadrian/src/Settings.hs` for explanations
+about the implementation and how the set of supported settings can be
+extended.
+
+## Directly modifying Hadrian configuration
+
+If the existing configuration options aren't enough for your needs,
+you can directly add new configurations to Hadrian.
+
+### Defining new flavours
+
+Users can define new build flavours by adding them to the `userFlavours` list:
 ```haskell
 -- | User-defined build flavours. See 'userFlavour' as an example.
 userFlavours :: [Flavour]
@@ -82,7 +187,7 @@ more detail. Note: `defaultFlavour`, as well as its individual fields such
 as `defaultArgs`, `defaultPackages`, etc. that we use below, are defined in module
 `Settings.Default`.
 
-## Command line arguments
+### Passing command line arguments to builders
 
 One of the key features of Hadrian is that users can easily modify any build command.
 The build system will detect the change and will rerun all affected build rules during
@@ -112,17 +217,6 @@ and `output` predicates when specifying custom command line arguments. File
 patterns such as `"**/Prelude.*"` can be used when matching input and output files,
 where `**` matches an arbitrary number of path components, but not absolute path
 prefixes, and `*` matches an entire path component, excluding any separators.
-
-#### Enabling -Werror
-
-It is useful to enable `-Werror` when building GHC as this setting is
-used in the CI to ensure a warning-free build. The `+werror`
-[flavour transformer](flavours.md#flavour-transformers)
-can be used to easily modify a flavour to turn this setting on:
-
-```
-hadrian/build --flavour=validate+werror
-```
 
 #### Linking GHC against the debugged RTS
 
@@ -311,85 +405,6 @@ Dull Blue
 Vivid Cyan
 Extended "203"
 ```
-
-## `key = value` and `key += value` style settings
-
-One can alternatively supply settings from the command line or a
-`<build root>/hadrian.settings` file. Hadrian currently supports two
-"families" of settings:
-
-- `{stage0, ..., stage3, *}.(<package name> or *).ghc.{c, hs, link, deps, toolargs, *}.opts`
-- `{stage0, ..., stage3, *}.(<package name> or *).cc.{c, deps, *}.opts`
-
-For example, putting the following in a file at `_build/hadrian.settings`:
-
-``` make
-stage1.ghc-bin.ghc.link.opts += -debug
-*.base.ghc.*.opts += -v3
-```
-
-and running hadrian with the default build root (`_build`), would respectively
-link the stage 2 GHC executable (using the stage 1 GHC) with the `-debug`
-flag and use `-v3` on all GHC commands used to build anything related to
-`base`, whatever the stage.
-
-We could equivalently specify those settings on the command-line:
-
-``` sh
-$ hadrian/build "stage1.ghc-bin.ghc.link.opts += -eventlog" \
-                   "*.base.ghc.*.opts += -v3"
-```
-
-or specify some in `hadrian.settings` and some on the command-line.
-
-Here is an overview of the supported settings and how you can figure out
-the right names for them:
-
-- the stage slot, which comes first, can be filled with any of `stage0`,
-  `stage1`, `stage2`, `stage3` or `*`; any value but `*` will restrict the
-  setting update to targets built during the given stage, while `*` is taken
-  to mean "for any stage". For instance, the above example will affect
-  the linking of the `_build/stage1/bin/ghc` executable.
-- the package slot, which comes second, can be filled with any package name
-  that Hadrian knows about (all packages that are part of a GHC checkout),
-  or `*`, to respectively mean that the builder options are going to be updated
-  only when building the given package, or that the said options should be used
-  when building all known packages, if the Hadrian command ever gets them to be
-  built;
-- the remaining slots specify the builder and how it was invoked,
-
-  * `ghc` refers to GHC commands; the final slot refers to how GHC is invoked:
-
-    * `c.opts` for commands that build C files with GHC
-	  * `hs.opts` for commands that compile Haskell modules with GHC
-	  * `link.opts` for GHC linking command
-	  * `deps.opts` for commands that figure out dependencies between Haskell modules
-	    (with `ghc -M`)
-	  * `toolargs.opts` for GHC commands that are used to generate the right ghci
-	    argument for `hadrian/ghci` to work
-
-  * `cc` refers to C compiler commands
-  * `cxx` refers to C++ compiler commands
-
-    * `c.opts` for commands that call the C compiler on some C files
-	  * `deps.opts` for commands that call the C compiler for figuring out
-	    dependencies between C files
-
-  * `cabal.configure.opts` refers to Cabal configure command line. Note that
-    package flags can be given by adding `--flags=...` arguments.
-
-  * `runtest.opts` defines extra arguments passed to `runtest.py` when
-    invoked via the `hadrian test` target.
-
-- using a wildcard (`*`) ranges over all possible values for a given "slot";
-- `=` entirely overrides the arguments for a given builder in a given context,
-  with the value specified on the right hand side of `=`, while `+=` merely
-  extends the arguments that are to be emitted in the said context, with
-  the values supplied on the right hand side of `+=`.
-
-See `Note [Hadrian settings]` in `hadrian/src/Settings.hs` for explanations
-about the implementation and how the set of supported settings can be
-extended.
 
 ### Tab completion
 
