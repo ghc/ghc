@@ -823,12 +823,14 @@ genPrim prof ty = \case
 ------------------------------- Exceptions --------------------------------------
 
   CatchOp -> \[_r] [a,handler] -> PRPrimCall $ returnS (app "h$catch" [a, handler])
-  RaiseOp         -> \[_r] [a] -> PRPrimCall $ returnS (app "h$throw" [a, false_])
-  RaiseIOOp       -> \[_r] [a] -> PRPrimCall $ returnS (app "h$throw" [a, false_])
 
-  MaskAsyncExceptionsOp   -> \[_r] [a] -> PRPrimCall $ returnS (app "h$maskAsync" [a])
-  MaskUninterruptibleOp   -> \[_r] [a] -> PRPrimCall $ returnS (app "h$maskUnintAsync" [a])
-  UnmaskAsyncExceptionsOp -> \[_r] [a] -> PRPrimCall $ returnS (app "h$unmaskAsync" [a])
+                             -- fully ignore the result arity as it can use 1 or 2
+                             -- slots, depending on the return type.
+  RaiseOp                 -> \_r [a] -> PRPrimCall $ returnS (app "h$throw" [a, false_])
+  RaiseIOOp               -> \_r [a] -> PRPrimCall $ returnS (app "h$throw" [a, false_])
+  MaskAsyncExceptionsOp   -> \_r [a] -> PRPrimCall $ returnS (app "h$maskAsync" [a])
+  MaskUninterruptibleOp   -> \_r [a] -> PRPrimCall $ returnS (app "h$maskUnintAsync" [a])
+  UnmaskAsyncExceptionsOp -> \_r [a] -> PRPrimCall $ returnS (app "h$unmaskAsync" [a])
 
   MaskStatus -> \[r] [] -> PrimInline $ r |= app "h$maskStatus" []
 
