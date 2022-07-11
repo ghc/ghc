@@ -2,6 +2,11 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE MultiWayIf #-}
+
+-- disable this warning because of all the lambdas matching on primops'
+-- arguments.
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.StgToJS.Prim
   ( genPrim
@@ -36,520 +41,497 @@ genPrim :: Bool     -- ^ Profiling (cost-centres) enabled
         -> [JExpr]  -- ^ where to store the result
         -> [JExpr]  -- ^ arguments
         -> PrimRes
-genPrim _ _ CharGtOp          [r] [x,y] = PrimInline $ r |= if10 (x .>. y)
-genPrim _ _ CharGeOp          [r] [x,y] = PrimInline $ r |= if10 (x .>=. y)
-genPrim _ _ CharEqOp          [r] [x,y] = PrimInline $ r |= if10 (x .===. y)
-genPrim _ _ CharNeOp          [r] [x,y] = PrimInline $ r |= if10 (x .!==. y)
-genPrim _ _ CharLtOp          [r] [x,y] = PrimInline $ r |= if10 (x .<. y)
-genPrim _ _ CharLeOp          [r] [x,y] = PrimInline $ r |= if10 (x .<=. y)
-genPrim _ _ OrdOp             [r] [x]   = PrimInline $ r |= x
+genPrim prof ty = \case
+  CharGtOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>. y)
+  CharGeOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>=. y)
+  CharEqOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
+  CharNeOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
+  CharLtOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<. y)
+  CharLeOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<=. y)
+  OrdOp           -> \[r] [x]   -> PrimInline $ r |= x
 
-genPrim _ _ Int8ToWord8Op     [r] [x]   = PrimInline $ r |= x
-genPrim _ _ Word8ToInt8Op     [r] [x]   = PrimInline $ r |= x
-genPrim _ _ Int16ToWord16Op   [r] [x]   = PrimInline $ r |= x
-genPrim _ _ Word16ToInt16Op   [r] [x]   = PrimInline $ r |= x
-genPrim _ _ Int32ToWord32Op   [r] [x]   = PrimInline $ r |= x
-genPrim _ _ Word32ToInt32Op   [r] [x]   = PrimInline $ r |= x
+  Int8ToWord8Op   -> \[r] [x]   -> PrimInline $ r |= x
+  Word8ToInt8Op   -> \[r] [x]   -> PrimInline $ r |= x
+  Int16ToWord16Op -> \[r] [x]   -> PrimInline $ r |= x
+  Word16ToInt16Op -> \[r] [x]   -> PrimInline $ r |= x
+  Int32ToWord32Op -> \[r] [x]   -> PrimInline $ r |= x
+  Word32ToInt32Op -> \[r] [x]   -> PrimInline $ r |= x
 
 ------------------------------ Int ----------------------------------------------
 
-genPrim _ _ IntAddOp          [r] [x,y] = PrimInline $ r |= trunc (Add x y)
-genPrim _ _ IntSubOp          [r] [x,y] = PrimInline $ r |= trunc (Sub x y)
-genPrim _ _ IntMulOp          [r] [x,y] = PrimInline $ r |= app "h$mulInt32" [x, y]
+  IntAddOp        -> \[r] [x,y] -> PrimInline $ r |= trunc (Add x y)
+  IntSubOp        -> \[r] [x,y] -> PrimInline $ r |= trunc (Sub x y)
+  IntMulOp        -> \[r] [x,y] -> PrimInline $ r |= app "h$mulInt32" [x, y]
 -- fixme may will give the wrong result in case of overflow
-genPrim _ _ IntMulMayOfloOp   [r] [x,y] = PrimInline $ jVar \tmp -> mconcat
+  IntMulMayOfloOp -> \[r] [x,y] -> PrimInline $ jVar \tmp -> mconcat
                                             [ tmp |= Mul x y
                                             , r   |= if01 (tmp .===. trunc tmp)
                                             ]
-genPrim _ _ IntQuotOp         [r] [x,y] = PrimInline $ r |= trunc (Div x y)
-genPrim _ _ IntRemOp          [r] [x,y] = PrimInline $ r |= Mod x y
-genPrim _ _ IntQuotRemOp    [q,r] [x,y] = PrimInline $ mconcat
+  IntQuotOp       -> \[r]   [x,y] -> PrimInline $ r |= trunc (Div x y)
+  IntRemOp        -> \[r]   [x,y] -> PrimInline $ r |= Mod x y
+  IntQuotRemOp    -> \[q,r] [x,y] -> PrimInline $ mconcat
                                             [ q |= trunc (Div x y)
                                             , r |= x `Sub` (Mul y q)
                                             ]
-genPrim _ _ IntAndOp [r] [x,y]          = PrimInline $ r |= BAnd x y
-genPrim _ _ IntOrOp  [r] [x,y]          = PrimInline $ r |= BOr  x y
-genPrim _ _ IntXorOp [r] [x,y]          = PrimInline $ r |= BXor x y
-genPrim _ _ IntNotOp [r] [x]            = PrimInline $ r |= BNot x
+  IntAndOp        -> \[r] [x,y]   -> PrimInline $ r |= BAnd x y
+  IntOrOp         -> \[r] [x,y]   -> PrimInline $ r |= BOr  x y
+  IntXorOp        -> \[r] [x,y]   -> PrimInline $ r |= BXor x y
+  IntNotOp        -> \[r] [x]     -> PrimInline $ r |= BNot x
 
-genPrim _ _ IntNegOp          [r] [x]   = PrimInline $ r |= trunc (Negate x)
+  IntNegOp        -> \[r] [x]   -> PrimInline $ r |= trunc (Negate x)
 -- add with carry: overflow == 0 iff no overflow
-genPrim _ _ IntAddCOp         [r,overf] [x,y] =
-  PrimInline $ jVar \rt -> mconcat
-    [ rt    |= Add x y
-    , r     |= trunc rt
-    , overf |= if10 (r .!=. rt)
-    ]
-genPrim _ _ IntSubCOp         [r,overf] [x,y] =
-  PrimInline $ jVar \rt -> mconcat
-    [ rt    |= Sub x y
-    , r     |= trunc rt
-    , overf |= if10 (r .!=. rt)
-    ]
-genPrim _ _ IntGtOp           [r] [x,y] = PrimInline $ r |= if10 (x .>. y)
-genPrim _ _ IntGeOp           [r] [x,y] = PrimInline $ r |= if10 (x .>=. y)
-genPrim _ _ IntEqOp           [r] [x,y] = PrimInline $ r |= if10 (x .===. y)
-genPrim _ _ IntNeOp           [r] [x,y] = PrimInline $ r |= if10(x .!==. y)
-genPrim _ _ IntLtOp           [r] [x,y] = PrimInline $ r |= if10 (x .<. y)
-genPrim _ _ IntLeOp           [r] [x,y] = PrimInline $ r |= if10 (x .<=. y)
-genPrim _ _ ChrOp             [r] [x]   = PrimInline $ r |= x
-genPrim _ _ IntToWordOp       [r] [x]   = PrimInline $ r |= x
-genPrim _ _ IntToFloatOp      [r] [x]   = PrimInline $ r |= x
-genPrim _ _ IntToDoubleOp     [r] [x]   = PrimInline $ r |= x
-genPrim _ _ IntSllOp          [r] [x,y] = PrimInline $ r |= x .<<. y
-genPrim _ _ IntSraOp          [r] [x,y] = PrimInline $ r |= x .>>. y
-genPrim _ _ IntSrlOp          [r] [x,y] = PrimInline $ r |= trunc (x .>>>. y)
+  IntAddCOp       -> \[r,overf] [x,y] ->
+      PrimInline $ jVar \rt -> mconcat
+        [ rt    |= Add x y
+        , r     |= trunc rt
+        , overf |= if10 (r .!=. rt)
+        ]
+  IntSubCOp       -> \[r,overf] [x,y] ->
+      PrimInline $ jVar \rt -> mconcat
+        [ rt    |= Sub x y
+        , r     |= trunc rt
+        , overf |= if10 (r .!=. rt)
+        ]
+  IntGtOp           -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>. y)
+  IntGeOp           -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>=. y)
+  IntEqOp           -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
+  IntNeOp           -> \[r] [x,y] -> PrimInline $ r |= if10(x .!==. y)
+  IntLtOp           -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<. y)
+  IntLeOp           -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<=. y)
+  ChrOp             -> \[r] [x]   -> PrimInline $ r |= x
+  IntToWordOp       -> \[r] [x]   -> PrimInline $ r |= x
+  IntToFloatOp      -> \[r] [x]   -> PrimInline $ r |= x
+  IntToDoubleOp     -> \[r] [x]   -> PrimInline $ r |= x
+  IntSllOp          -> \[r] [x,y] -> PrimInline $ r |= x .<<. y
+  IntSraOp          -> \[r] [x,y] -> PrimInline $ r |= x .>>. y
+  IntSrlOp          -> \[r] [x,y] -> PrimInline $ r |= trunc (x .>>>. y)
 
 ------------------------------ Int8 ---------------------------------------------
 
-genPrim _ _ Int8ToIntOp       [r] [x]   = PrimInline $ r |= mask8 x
-genPrim _ _ IntToInt8Op       [r] [x]   = PrimInline $ r |= mask8 x -- fixme
-genPrim _ _ Int8NegOp         [r] [x]   = PrimInline $ r |= mask8 (Sub (Int 0x100) x)
-genPrim _ _ Int8AddOp         [r] [x,y] = PrimInline $ r |= mask8 (Add x y)
-genPrim _ _ Int8SubOp         [r] [x,y] = PrimInline $ r |= mask8 (Sub x y)
-genPrim _ _ Int8MulOp         [r] [x,y] = PrimInline $ r |= mask8 (Mul x y)
-genPrim _ _ Int8QuotOp        [r] [x,y] = PrimInline $ r |= quotShortInt 8 x y
-genPrim _ _ Int8RemOp         [r] [x,y] = PrimInline $ r |= remShortInt 8 x y
-genPrim _ _ Int8QuotRemOp     [r1,r2] [x,y] = PrimInline $ mconcat
+  Int8ToIntOp       -> \[r] [x]       -> PrimInline $ r |= mask8 x
+  IntToInt8Op       -> \[r] [x]       -> PrimInline $ r |= mask8 x -- fixme
+  Int8NegOp         -> \[r] [x]       -> PrimInline $ r |= mask8 (Sub (Int 0x100) x)
+  Int8AddOp         -> \[r] [x,y]     -> PrimInline $ r |= mask8 (Add x y)
+  Int8SubOp         -> \[r] [x,y]     -> PrimInline $ r |= mask8 (Sub x y)
+  Int8MulOp         -> \[r] [x,y]     -> PrimInline $ r |= mask8 (Mul x y)
+  Int8QuotOp        -> \[r] [x,y]     -> PrimInline $ r |= quotShortInt 8 x y
+  Int8RemOp         -> \[r] [x,y]     -> PrimInline $ r |= remShortInt 8 x y
+  Int8QuotRemOp     -> \[r1,r2] [x,y] -> PrimInline $ mconcat
                                                 [ r1 |= quotShortInt 8 x y
                                                 , r2 |= remShortInt 8 x y
                                                 ]
-genPrim _ _ Int8EqOp          [r] [x,y] = PrimInline $ r |= if10 (x .===. y)
-genPrim _ _ Int8GeOp          [r] [x,y] = PrimInline $ r |= if10 ((x .<<. (Int 24)) .>=. (y .<<. (Int 24)))
-genPrim _ _ Int8GtOp          [r] [x,y] = PrimInline $ r |= if10 ((x .<<. (Int 24)) .>.  (y .<<. (Int 24)))
-genPrim _ _ Int8LeOp          [r] [x,y] = PrimInline $ r |= if10 ((x .<<. (Int 24)) .<=. (y .<<. (Int 24)))
-genPrim _ _ Int8LtOp          [r] [x,y] = PrimInline $ r |= if10 ((x .<<. (Int 24)) .<.  (y .<<. (Int 24)))
-genPrim _ _ Int8NeOp          [r] [x,y] = PrimInline $ r |= if10 (x .!==. y)
+  Int8EqOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
+  Int8GeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .<<. (Int 24)) .>=. (y .<<. (Int 24)))
+  Int8GtOp          -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .<<. (Int 24)) .>.  (y .<<. (Int 24)))
+  Int8LeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .<<. (Int 24)) .<=. (y .<<. (Int 24)))
+  Int8LtOp          -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .<<. (Int 24)) .<.  (y .<<. (Int 24)))
+  Int8NeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
 
 ------------------------------ Word8 --------------------------------------------
 
-genPrim _ _ Word8ToWordOp      [r] [x]   = PrimInline $ r |= mask8 x
-genPrim _ _ WordToWord8Op      [r] [x]   = PrimInline $ r |= mask8 x
-genPrim _ _ Word8NotOp         [r] [x]   = PrimInline $ r |= BXor x (Int 0xff)
-genPrim _ _ Word8AddOp         [r] [x,y] = PrimInline $ r |= mask8 (Add x y)
-genPrim _ _ Word8SubOp         [r] [x,y] = PrimInline $ r |= mask8 (Sub x y)
-genPrim _ _ Word8MulOp         [r] [x,y] = PrimInline $ r |= mask8 (Mul x y)
-genPrim _ _ Word8QuotOp        [r] [x,y] = PrimInline $ r |= trunc (Div x y)
-genPrim _ _ Word8RemOp         [r] [x,y] = PrimInline $ r |= Mod x y
-genPrim _ _ Word8QuotRemOp     [r1,r2] [x,y] = PrimInline $ mconcat
+  Word8ToWordOp      -> \[r] [x]       -> PrimInline $ r |= mask8 x
+  WordToWord8Op      -> \[r] [x]       -> PrimInline $ r |= mask8 x
+  Word8NotOp         -> \[r] [x]       -> PrimInline $ r |= BXor x (Int 0xff)
+  Word8AddOp         -> \[r] [x,y]     -> PrimInline $ r |= mask8 (Add x y)
+  Word8SubOp         -> \[r] [x,y]     -> PrimInline $ r |= mask8 (Sub x y)
+  Word8MulOp         -> \[r] [x,y]     -> PrimInline $ r |= mask8 (Mul x y)
+  Word8QuotOp        -> \[r] [x,y]     -> PrimInline $ r |= trunc (Div x y)
+  Word8RemOp         -> \[r] [x,y]     -> PrimInline $ r |= Mod x y
+  Word8QuotRemOp     -> \[r1,r2] [x,y] -> PrimInline $ mconcat
                                                   [ r1 |= trunc (Div x y)
                                                   , r2 |= Mod x y
                                                   ]
-genPrim _ _ Word8EqOp          [r] [x,y] = PrimInline $ r |= if10 (x .===. y)
-genPrim _ _ Word8GeOp          [r] [x,y] = PrimInline $ r |= if10 (x .>=. y)
-genPrim _ _ Word8GtOp          [r] [x,y] = PrimInline $ r |= if10 (x .>. y)
-genPrim _ _ Word8LeOp          [r] [x,y] = PrimInline $ r |= if10 (x .<=. y)
-genPrim _ _ Word8LtOp          [r] [x,y] = PrimInline $ r |= if10 (x .<. y)
-genPrim _ _ Word8NeOp          [r] [x,y] = PrimInline $ r |= if10 (x .!==. y)
+  Word8EqOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
+  Word8GeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>=. y)
+  Word8GtOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>. y)
+  Word8LeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<=. y)
+  Word8LtOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<. y)
+  Word8NeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
 
 ------------------------------ Int16 -------------------------------------------
 
-genPrim _ _ Int16ToIntOp       [r] [x]   = PrimInline $ r |= mask16 x
-genPrim _ _ IntToInt16Op       [r] [x]   = PrimInline $ r |= mask16 x -- fixme ?
-genPrim _ _ Int16NegOp         [r] [x]   = PrimInline $ r |= mask16 (Sub (Int 0x10000) x)
-genPrim _ _ Int16AddOp         [r] [x,y] = PrimInline $ r |= mask16 (Add x y)
-genPrim _ _ Int16SubOp         [r] [x,y] = PrimInline $ r |= mask16 (Sub x y)
-genPrim _ _ Int16MulOp         [r] [x,y] = PrimInline $ r |= mask16 (Mul x y)
-genPrim _ _ Int16QuotOp        [r] [x,y] = PrimInline $ r |= quotShortInt 16 x y
-genPrim _ _ Int16RemOp         [r] [x,y] = PrimInline $ r |= remShortInt 16 x y
-genPrim _ _ Int16QuotRemOp     [r1,r2] [x,y] = PrimInline $ mconcat
+  Int16ToIntOp       -> \[r] [x]       -> PrimInline $ r |= mask16 x
+  IntToInt16Op       -> \[r] [x]       -> PrimInline $ r |= mask16 x -- fixme ?
+  Int16NegOp         -> \[r] [x]       -> PrimInline $ r |= mask16 (Sub (Int 0x10000) x)
+  Int16AddOp         -> \[r] [x,y]     -> PrimInline $ r |= mask16 (Add x y)
+  Int16SubOp         -> \[r] [x,y]     -> PrimInline $ r |= mask16 (Sub x y)
+  Int16MulOp         -> \[r] [x,y]     -> PrimInline $ r |= mask16 (Mul x y)
+  Int16QuotOp        -> \[r] [x,y]     -> PrimInline $ r |= quotShortInt 16 x y
+  Int16RemOp         -> \[r] [x,y]     -> PrimInline $ r |= remShortInt 16 x y
+  Int16QuotRemOp     -> \[r1,r2] [x,y] -> PrimInline $ mconcat
                                                 [ r1 |= quotShortInt 16 x y
                                                 , r2 |= remShortInt 16 x y
                                                 ]
-genPrim _ _ Int16EqOp          [r] [x,y] = PrimInline $ r |= if10 (x .===. y)
-genPrim _ _ Int16GeOp          [r] [x,y] = PrimInline $ r |= if10 ((x .<<. (Int 16)) .>=. (y .<<. (Int 16)))
-genPrim _ _ Int16GtOp          [r] [x,y] = PrimInline $ r |= if10 ((x .<<. (Int 16)) .>.  (y .<<. (Int 16)))
-genPrim _ _ Int16LeOp          [r] [x,y] = PrimInline $ r |= if10 ((x .<<. (Int 16)) .<=. (y .<<. (Int 16)))
-genPrim _ _ Int16LtOp          [r] [x,y] = PrimInline $ r |= if10 ((x .<<. (Int 16)) .<.  (y .<<. (Int 16)))
-genPrim _ _ Int16NeOp          [r] [x,y] = PrimInline $ r |= if10 (x .!==. y)
+  Int16EqOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
+  Int16GeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .<<. (Int 16)) .>=. (y .<<. (Int 16)))
+  Int16GtOp          -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .<<. (Int 16)) .>.  (y .<<. (Int 16)))
+  Int16LeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .<<. (Int 16)) .<=. (y .<<. (Int 16)))
+  Int16LtOp          -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .<<. (Int 16)) .<.  (y .<<. (Int 16)))
+  Int16NeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
 
 ------------------------------ Word16 ------------------------------------------
 
-genPrim _ _ Word16ToWordOp     [r] [x]   = PrimInline $ r |= mask16 x
-genPrim _ _ WordToWord16Op     [r] [x]   = PrimInline $ r |= mask16 x
-genPrim _ _ Word16NotOp        [r] [x]   = PrimInline $ r |= BXor x (Int 0xffff)
-genPrim _ _ Word16AddOp        [r] [x,y] = PrimInline $ r |= mask16 (Add x y)
-genPrim _ _ Word16SubOp        [r] [x,y] = PrimInline $ r |= mask16 (Sub x y)
-genPrim _ _ Word16MulOp        [r] [x,y] = PrimInline $ r |= mask16 (Mul x y)
-genPrim _ _ Word16QuotOp       [r] [x,y] = PrimInline $ r |= trunc (Div x y)
-genPrim _ _ Word16RemOp        [r] [x,y] = PrimInline $ r |= Mod x y
-genPrim _ _ Word16QuotRemOp    [r1,r2] [x,y] = PrimInline $ mconcat
+  Word16ToWordOp     -> \[r] [x]   -> PrimInline $ r |= mask16 x
+  WordToWord16Op     -> \[r] [x]   -> PrimInline $ r |= mask16 x
+  Word16NotOp        -> \[r] [x]   -> PrimInline $ r |= BXor x (Int 0xffff)
+  Word16AddOp        -> \[r] [x,y] -> PrimInline $ r |= mask16 (Add x y)
+  Word16SubOp        -> \[r] [x,y] -> PrimInline $ r |= mask16 (Sub x y)
+  Word16MulOp        -> \[r] [x,y] -> PrimInline $ r |= mask16 (Mul x y)
+  Word16QuotOp       -> \[r] [x,y] -> PrimInline $ r |= trunc (Div x y)
+  Word16RemOp        -> \[r] [x,y] -> PrimInline $ r |= Mod x y
+  Word16QuotRemOp    -> \[r1,r2] [x,y] -> PrimInline $ mconcat
                                                 [ r1 |= trunc (Div x y)
                                                 , r2 |= Mod x y
                                                 ]
-genPrim _ _ Word16EqOp         [r] [x,y] = PrimInline $ r |= if10 (x .===. y)
-genPrim _ _ Word16GeOp         [r] [x,y] = PrimInline $ r |= if10 (x .>=. y)
-genPrim _ _ Word16GtOp         [r] [x,y] = PrimInline $ r |= if10 (x .>. y)
-genPrim _ _ Word16LeOp         [r] [x,y] = PrimInline $ r |= if10 (x .<=. y)
-genPrim _ _ Word16LtOp         [r] [x,y] = PrimInline $ r |= if10 (x .<. y)
-genPrim _ _ Word16NeOp         [r] [x,y] = PrimInline $ r |= if10 (x .!==. y)
+  Word16EqOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
+  Word16GeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>=. y)
+  Word16GtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>. y)
+  Word16LeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<=. y)
+  Word16LtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<. y)
+  Word16NeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
 
 ------------------------------ Int32 --------------------------------------------
 
-genPrim _ _ Int32ToIntOp       [r] [x]   = PrimInline $ r |= x
-genPrim _ _ IntToInt32Op       [r] [x]   = PrimInline $ r |= x
-genPrim p t Int32NegOp         rs  xs    = genPrim p t IntNegOp rs xs
-genPrim p t Int32AddOp         rs  xs    = genPrim p t IntAddOp rs xs
-genPrim p t Int32SubOp         rs  xs    = genPrim p t IntSubOp rs xs
-genPrim p t Int32MulOp         rs  xs    = genPrim p t IntMulOp rs xs
-genPrim p t Int32QuotOp        rs  xs    = genPrim p t IntQuotOp rs xs
-genPrim p t Int32RemOp         rs  xs    = genPrim p t IntRemOp rs xs
-genPrim p t Int32QuotRemOp     rs  xs    = genPrim p t IntQuotRemOp rs xs
+  Int32ToIntOp       -> \[r] [x]   -> PrimInline $ r |= x
+  IntToInt32Op       -> \[r] [x]   -> PrimInline $ r |= x
+  Int32NegOp         -> \rs  xs    -> genPrim prof ty IntNegOp rs xs
+  Int32AddOp         -> \rs  xs    -> genPrim prof ty IntAddOp rs xs
+  Int32SubOp         -> \rs  xs    -> genPrim prof ty IntSubOp rs xs
+  Int32MulOp         -> \rs  xs    -> genPrim prof ty IntMulOp rs xs
+  Int32QuotOp        -> \rs  xs    -> genPrim prof ty IntQuotOp rs xs
+  Int32RemOp         -> \rs  xs    -> genPrim prof ty IntRemOp rs xs
+  Int32QuotRemOp     -> \rs  xs    -> genPrim prof ty IntQuotRemOp rs xs
 
-genPrim p t Int32EqOp          rs  xs    = genPrim p t IntEqOp rs xs
-genPrim p t Int32GeOp          rs  xs    = genPrim p t IntGeOp rs xs
-genPrim p t Int32GtOp          rs  xs    = genPrim p t IntGtOp rs xs
-genPrim p t Int32LeOp          rs  xs    = genPrim p t IntLeOp rs xs
-genPrim p t Int32LtOp          rs  xs    = genPrim p t IntLtOp rs xs
-genPrim p t Int32NeOp          rs  xs    = genPrim p t IntNeOp rs xs
+  Int32EqOp          -> \rs  xs    -> genPrim prof ty IntEqOp rs xs
+  Int32GeOp          -> \rs  xs    -> genPrim prof ty IntGeOp rs xs
+  Int32GtOp          -> \rs  xs    -> genPrim prof ty IntGtOp rs xs
+  Int32LeOp          -> \rs  xs    -> genPrim prof ty IntLeOp rs xs
+  Int32LtOp          -> \rs  xs    -> genPrim prof ty IntLtOp rs xs
+  Int32NeOp          -> \rs  xs    -> genPrim prof ty IntNeOp rs xs
 
 ------------------------------ Word32 -------------------------------------------
 
-genPrim _ _ Word32ToWordOp     [r] [x]   = PrimInline $ r |= x
-genPrim _ _ WordToWord32Op     [r] [x]   = PrimInline $ r |= x
-genPrim p t Word32NotOp        rs  xs    = genPrim p t WordNotOp rs xs
-genPrim p t Word32AddOp        rs  xs    = genPrim p t WordAddOp rs xs
-genPrim p t Word32SubOp        rs  xs    = genPrim p t WordSubOp rs xs
-genPrim p t Word32MulOp        rs  xs    = genPrim p t WordMulOp rs xs
-genPrim p t Word32QuotOp       rs  xs    = genPrim p t WordQuotOp rs xs
-genPrim p t Word32RemOp        rs  xs    = genPrim p t WordRemOp rs xs
-genPrim p t Word32QuotRemOp    rs  xs    = genPrim p t WordQuotRemOp rs xs
+  Word32ToWordOp     -> \[r] [x]   -> PrimInline $ r |= x
+  WordToWord32Op     -> \[r] [x]   -> PrimInline $ r |= x
+  Word32NotOp        -> \rs  xs    -> genPrim prof ty WordNotOp rs xs
+  Word32AddOp        -> \rs  xs    -> genPrim prof ty WordAddOp rs xs
+  Word32SubOp        -> \rs  xs    -> genPrim prof ty WordSubOp rs xs
+  Word32MulOp        -> \rs  xs    -> genPrim prof ty WordMulOp rs xs
+  Word32QuotOp       -> \rs  xs    -> genPrim prof ty WordQuotOp rs xs
+  Word32RemOp        -> \rs  xs    -> genPrim prof ty WordRemOp rs xs
+  Word32QuotRemOp    -> \rs  xs    -> genPrim prof ty WordQuotRemOp rs xs
 
-genPrim p t Word32EqOp         rs  xs    = genPrim p t WordEqOp rs xs
-genPrim p t Word32GeOp         rs  xs    = genPrim p t WordGeOp rs xs
-genPrim p t Word32GtOp         rs  xs    = genPrim p t WordGtOp rs xs
-genPrim p t Word32LeOp         rs  xs    = genPrim p t WordLeOp rs xs
-genPrim p t Word32LtOp         rs  xs    = genPrim p t WordLtOp rs xs
-genPrim p t Word32NeOp         rs  xs    = genPrim p t WordNeOp rs xs
+  Word32EqOp         -> \rs  xs    -> genPrim prof ty WordEqOp rs xs
+  Word32GeOp         -> \rs  xs    -> genPrim prof ty WordGeOp rs xs
+  Word32GtOp         -> \rs  xs    -> genPrim prof ty WordGtOp rs xs
+  Word32LeOp         -> \rs  xs    -> genPrim prof ty WordLeOp rs xs
+  Word32LtOp         -> \rs  xs    -> genPrim prof ty WordLtOp rs xs
+  Word32NeOp         -> \rs  xs    -> genPrim prof ty WordNeOp rs xs
 
 ------------------------------ Int64 --------------------------------------------
 
-genPrim _ _ Int64ToIntOp      [r] [_h,l] = PrimInline $ r |= l
+  Int64ToIntOp      -> \[r] [_h,l] -> PrimInline $ r |= l
 
-genPrim _ _ Int64NegOp        [r_h,r_l] [h,l] =
-  PrimInline $ mconcat
-    [ r_l |= ((BNot l + 1)       `BOr` zero_)
-    , r_h |= ((BNot h + Not r_l) `BOr` zero_)
-    ]
+  Int64NegOp        -> \[r_h,r_l] [h,l] ->
+      PrimInline $ mconcat
+        [ r_l |= ((BNot l + 1)       `BOr` zero_)
+        , r_h |= ((BNot h + Not r_l) `BOr` zero_)
+        ]
 
-genPrim _ _ Int64AddOp        [r_high,r_low] [high0, low0, high1, low1] =
-  PrimInline $ appT [r_high, r_low] "h$hs_plusInt64" [high0, low0, high1, low1]
+  Int64AddOp  -> \[hr,lr] [h0,l0,h1,l1] -> PrimInline $ appT [hr,lr] "h$hs_plusInt64"  [h0,l0,h1,l1]
+  Int64SubOp  -> \[hr,lr] [h0,l0,h1,l1] -> PrimInline $ appT [hr,lr] "h$hs_minusInt64" [h0,l0,h1,l1]
+  Int64MulOp  -> \[hr,lr] [h0,l0,h1,l1] -> PrimInline $ appT [hr,lr] "h$hs_timesInt64" [h0,l0,h1,l1]
+  Int64QuotOp -> \[hr,lr] [h0,l0,h1,l1] -> PrimInline $ appT [hr,lr] "h$hs_quotInt64"  [h0,l0,h1,l1]
+  Int64RemOp  -> \[hr,lr] [h0,l0,h1,l1] -> PrimInline $ appT [hr,lr] "h$hs_remInt64"   [h0,l0,h1,l1]
 
-genPrim _ _ Int64SubOp        [r_high,r_low] [high0, low0, high1, low1] =
-  PrimInline $ appT [r_high, r_low] "h$hs_minusInt64" [high0, low0, high1, low1]
+  Int64SllOp  -> \[hr,lr] [h,l,n] -> PrimInline $ appT [hr,lr] "h$hs_uncheckedIShiftL64"  [h,l,n]
+  Int64SraOp  -> \[hr,lr] [h,l,n] -> PrimInline $ appT [hr,lr] "h$hs_uncheckedIShiftRA64" [h,l,n]
+  Int64SrlOp  -> \[hr,lr] [h,l,n] -> PrimInline $ appT [hr,lr] "h$hs_uncheckedShiftRL64"  [h,l,n]
+      -- FIXME: Jeff 06-20222: Is this one right? No h$hs_uncheckedIShiftRL64?
 
-genPrim _ _ Int64MulOp        [r_high,r_low] [high0, low0, high1, low1] =
-  PrimInline $ appT [r_high, r_low] "h$hs_timesInt64" [high0, low0, high1, low1]
+  Int64ToWord64Op   -> \[r1,r2] [x1,x2] ->
+      PrimInline $ mconcat
+       [ r1 |= x1
+       , r2 |= x2
+       ]
+  IntToInt64Op      -> \[r1,r2] [x] ->
+      PrimInline $ mconcat
+       [ r1 |= if_ (x .<. 0) (-1) 0 -- sign-extension
+       , r2 |= x
+       ]
 
-genPrim _ _ Int64QuotOp        [r_high,r_low] [high0, low0, high1, low1] =
-  PrimInline $ appT [r_high, r_low] "h$hs_quotInt64" [high0, low0, high1, low1]
-
-genPrim _ _ Int64RemOp        [r_high,r_low] [high0, low0, high1, low1] =
-  PrimInline $ appT [r_high, r_low] "h$hs_remInt64" [high0, low0, high1, low1]
-
-genPrim _ _ Int64SllOp [r_high,r_low] [high, low, n] =
-  PrimInline $ appT [r_high, r_low] "h$hs_uncheckedIShiftL64" [high, low, n]
-genPrim _ _ Int64SraOp [r_high,r_low] [high, low, n] =
-  PrimInline $ appT [r_high, r_low] "h$hs_uncheckedIShiftRA64" [high, low, n]
-genPrim _ _ Int64SrlOp [r_high,r_low] [high, low, n] =
-  PrimInline $ appT [r_high, r_low] "h$hs_uncheckedShiftRL64" [high, low, n] -- FIXME: Jeff 06-20222: Is this one right? No h$hs_uncheckedIShiftRL64?
-
-genPrim _ _ Int64ToWord64Op   [r1,r2] [x1,x2] =
-   PrimInline $ mconcat
-    [ r1 |= x1
-    , r2 |= x2
-    ]
-genPrim _ _ IntToInt64Op      [r1,r2] [x] =
-   PrimInline $ mconcat
-    [ r1 |= if_ (x .<. 0) (-1) 0 -- sign-extension
-    , r2 |= x
-    ]
-
-genPrim _ _ Int64EqOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if10 (LAnd (low0 .===. low1) (high0 .===. high1))
-genPrim _ _ Int64NeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if10 (LOr (low0 .!==. low1) (high0 .!==. high1))
-
-
-genPrim _ _ Int64GeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= app "h$hs_geInt64" [high0,low0,high1,low1]
-genPrim _ _ Int64GtOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= app "h$hs_gtInt64" [high0,low0,high1,low1]
-genPrim _ _ Int64LeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= app "h$hs_leInt64" [high0,low0,high1,low1]
-genPrim _ _ Int64LtOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= app "h$hs_ltInt64" [high0,low0,high1,low1]
+  Int64EqOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LAnd (l0 .===. l1) (h0 .===. h1))
+  Int64NeOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LOr (l0 .!==. l1) (h0 .!==. h1))
+  Int64GeOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= app "h$hs_geInt64" [h0,l0,h1,l1]
+  Int64GtOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= app "h$hs_gtInt64" [h0,l0,h1,l1]
+  Int64LeOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= app "h$hs_leInt64" [h0,l0,h1,l1]
+  Int64LtOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= app "h$hs_ltInt64" [h0,l0,h1,l1]
 
 ------------------------------ Word64 -------------------------------------------
 
-genPrim _ _ Word64ToWordOp    [r] [_x1,x2] = PrimInline $ r |= x2
+  Word64ToWordOp    -> \[r] [_x1,x2] -> PrimInline $ r |= x2
 
-genPrim _ _ WordToWord64Op    [r1,r2] [x] =
-   PrimInline $ mconcat
-    [ r1 |= 0
-    , r2 |= x
-    ]
+  WordToWord64Op    -> \[r1,r2] [x] ->
+    PrimInline $ mconcat
+     [ r1 |= 0
+     , r2 |= x
+     ]
 
-genPrim _ _ Word64ToInt64Op   [r1,r2] [x1,x2] =
-   PrimInline $ mconcat
-    [ r1 |= x1
-    , r2 |= x2
-    ]
+  Word64ToInt64Op   -> \[r1,r2] [x1,x2] ->
+    PrimInline $ mconcat
+     [ r1 |= x1
+     , r2 |= x2
+     ]
 
-genPrim _ _ Word64EqOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if10 (LAnd (low0 .===. low1) (high0 .===. high1))
-genPrim _ _ Word64NeOp         [r] [high0,low0,high1,low1] = PrimInline $ r |= if10 (LOr (low0 .!==. low1) (high0 .!==. high1))
+  Word64EqOp  -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LAnd (l0 .===. l1) (h0 .===. h1))
+  Word64NeOp  -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LOr (l0 .!==. l1) (h0 .!==. h1))
 
-genPrim _ _ Word64AddOp        [r_high,r_low] [high0, low0, high1, low1] =
-  PrimInline $ appT [r_high, r_low] "h$hs_plusInt64" [high0, low0, high1, low1]
+  Word64AddOp -> \[hr,hl] [h0, l0, h1, l1] -> PrimInline $ appT [hr, hl] "h$hs_plusInt64" [h0, l0, h1, l1]
 
-genPrim _ _ Word64SllOp [r_high,r_low] [high, low, n] =
-  PrimInline $ appT [r_high, r_low] "h$hs_uncheckedIShiftL64" [high, low, n]
-genPrim _ _ Word64SrlOp [r_high,r_low] [high, low, n] =
-  PrimInline $ appT [r_high, r_low] "h$hs_uncheckedShiftRL64" [high, low, n] -- FIXME: Jeff 06-20222: Is this one right? No h$hs_uncheckedIShiftRL64?
+  Word64SllOp -> \[hr,hl] [h, l, n] -> PrimInline $ appT [hr, hl] "h$hs_uncheckedIShiftL64" [h, l, n]
+  Word64SrlOp -> \[hr,hl] [h, l, n] -> PrimInline $ appT [hr, hl] "h$hs_uncheckedShiftRL64" [h, l, n]
+      -- FIXME: Jeff 06-20222: Is this one right? No h$hs_uncheckedIShiftRL64?
 
-genPrim _ _ Word64OrOp        [r_high,r_low] [high0, low0, high1, low1] =
-  PrimInline $ mconcat
-    [ r_high |= BOr high0 high1
-    , r_low  |= BOr low0  low1
-    ]
+  Word64OrOp  -> \[hr,hl] [h0, l0, h1, l1] ->
+      PrimInline $ mconcat
+        [ hr |= BOr h0 h1
+        , hl |= BOr l0 l1
+        ]
 
-genPrim _ _ Word64AndOp        [r_high,r_low] [high0, low0, high1, low1] =
-  PrimInline $ mconcat
-    [ r_high |= BAnd high0 high1
-    , r_low  |= BAnd low0  low1
-    ]
+  Word64AndOp -> \[hr,hl] [h0, l0, h1, l1] ->
+      PrimInline $ mconcat
+        [ hr |= BAnd h0 h1
+        , hl |= BAnd l0 l1
+        ]
 
-genPrim _ _ Word64XorOp        [r_high,r_low] [high0, low0, high1, low1] =
-  PrimInline $ mconcat
-    [ r_high |= BXor high0 high1
-    , r_low  |= BXor low0  low1
-    ]
+  Word64XorOp -> \[hr,hl] [h0, l0, h1, l1] ->
+      PrimInline $ mconcat
+        [ hr |= BXor h0 h1
+        , hl |= BXor l0 l1
+        ]
 
-genPrim _ _ Word64NotOp        [r_high,r_low] [high, low] =
-  PrimInline $ mconcat
-    [ r_high |= BNot high
-    , r_low  |= BNot low
-    ]
+  Word64NotOp -> \[hr,hl] [h, l] ->
+      PrimInline $ mconcat
+        [ hr |= BNot h
+        , hl |= BNot l
+        ]
 
 ------------------------------ Word ---------------------------------------------
 
-genPrim _ _ WordAddOp         [r] [x,y] = PrimInline $ r |= trunc (x `Add` y)
-genPrim _ _ WordAddCOp      [r,c] [x,y] = PrimInline $
-  jVar \t -> mconcat
-    [ t |= (x .>>>. zero_) `Add` (y .>>>. zero_)
-    , r |= trunc t
-    , c |= if10 (t .>. Int 4294967295)
-    ]
-genPrim _ _ WordSubCOp        [r,c] [x,y] =
-  PrimInline $ mconcat
-    [ r |= trunc (Sub x y)
-    , c |= if10 ((y .>>>. zero_) .>. (x .>>>. zero_))
-    ]
-genPrim _ _ WordAdd2Op      [h,l] [x,y] = PrimInline $ appT [h,l] "h$wordAdd2" [x,y]
-genPrim _ _ WordSubOp         [r] [x,y] = PrimInline $ r |= trunc (Sub x y)
-genPrim _ _ WordMulOp         [r] [x,y] = PrimInline $ r |= app "h$mulWord32" [x, y]
-genPrim _ _ WordMul2Op      [h,l] [x,y] = PrimInline $ appT [h,l] "h$mul2Word32" [x,y]
-genPrim _ _ WordQuotOp        [q] [x,y] = PrimInline $ q |= app "h$quotWord32" [x,y]
-genPrim _ _ WordRemOp         [r] [x,y] = PrimInline $ r |= app "h$remWord32" [x,y]
-genPrim _ _ WordQuotRemOp   [q,r] [x,y] = PrimInline $ mconcat
+  WordAddOp  -> \[r]   [x,y] -> PrimInline $ r |= trunc (x `Add` y)
+  WordAddCOp -> \[r,c] [x,y] -> PrimInline $
+      jVar \t -> mconcat
+        [ t |= (x .>>>. zero_) `Add` (y .>>>. zero_)
+        , r |= trunc t
+        , c |= if10 (t .>. Int 4294967295)
+        ]
+  WordSubCOp  -> \[r,c] [x,y] ->
+      PrimInline $ mconcat
+        [ r |= trunc (Sub x y)
+        , c |= if10 ((y .>>>. zero_) .>. (x .>>>. zero_))
+        ]
+  WordAdd2Op    -> \[h,l] [x,y] -> PrimInline $ appT [h,l] "h$wordAdd2" [x,y]
+  WordSubOp     -> \  [r] [x,y] -> PrimInline $ r |= trunc (Sub x y)
+  WordMulOp     -> \  [r] [x,y] -> PrimInline $ r |= app "h$mulWord32" [x, y]
+  WordMul2Op    -> \[h,l] [x,y] -> PrimInline $ appT [h,l] "h$mul2Word32" [x,y]
+  WordQuotOp    -> \  [q] [x,y] -> PrimInline $ q |= app "h$quotWord32" [x,y]
+  WordRemOp     -> \  [r] [x,y] -> PrimInline $ r |= app "h$remWord32" [x,y]
+  WordQuotRemOp -> \[q,r] [x,y] -> PrimInline $ mconcat
                                             [ q |= app "h$quotWord32" [x,y]
                                             , r |= app "h$remWord32" [x,y]
                                             ]
-genPrim _ _ WordQuotRem2Op   [q,r] [xh,xl,y] = PrimInline $ appT [q,r] "h$quotRem2Word32" [xh,xl,y]
-genPrim _ _ WordAndOp         [r] [x,y] = PrimInline $ r |= BAnd x y
-genPrim _ _ WordOrOp          [r] [x,y] = PrimInline $ r |= BOr  x y
-genPrim _ _ WordXorOp         [r] [x,y] = PrimInline $ r |= BXor x y
-genPrim _ _ WordNotOp         [r] [x]   = PrimInline $ r |= BNot x
-genPrim _ _ WordSllOp         [r] [x,y] = PrimInline $ r |= x .<<. y
-genPrim _ _ WordSrlOp         [r] [x,y] = PrimInline $ r |= trunc (x .>>>. y)
-genPrim _ _ WordToIntOp       [r] [x]   = PrimInline $ r |= x
-genPrim _ _ WordGtOp          [r] [x,y] =
-  PrimInline $ r |= if10 ((x .>>>. zero_) .>. (y .>>>. zero_))
-genPrim _ _ WordGeOp          [r] [x,y] =
-  PrimInline $ r |= if10 ((x .>>>. zero_) .>=. (y .>>>. zero_))
-genPrim _ _ WordEqOp          [r] [x,y] = PrimInline $ r |= if10 (x .===. y)
-genPrim _ _ WordNeOp          [r] [x,y] = PrimInline $ r |= if10 (x .!==. y)
-genPrim _ _ WordLtOp          [r] [x,y] =
-  PrimInline $ r |= if10 ((x .>>>. zero_) .<. (y .>>>. zero_))
-genPrim _ _ WordLeOp          [r] [x,y] =
-  PrimInline $ r |= if10 ((x .>>>. zero_) .<=. (y .>>>. zero_))
-genPrim _ _ WordToDoubleOp    [r] [x] = PrimInline $ r |= (Add (BAnd x (Int 0x7FFFFFFF)) (x .>>>. (Int 31))) `Mul` Int 2147483648
-genPrim _ _ WordToFloatOp     [r] [x] = PrimInline $ r |= (Add (BAnd x (Int 0x7FFFFFFF)) (x .>>>. (Int 31))) `Mul` Int 2147483648
-genPrim _ _ PopCnt8Op         [r] [x] = PrimInline $ r |= var "h$popCntTab" .! (mask8 x)
-genPrim _ _ PopCnt16Op        [r] [x] =
-  PrimInline $ r |= Add (var "h$popCntTab" .! (mask8 x))
-                        (var "h$popCntTab" .! (mask8 (x .>>>. Int 8)))
+  WordQuotRem2Op   -> \[q,r] [xh,xl,y] -> PrimInline $ appT [q,r] "h$quotRem2Word32" [xh,xl,y]
+  WordAndOp        -> \[r] [x,y] -> PrimInline $ r |= BAnd x y
+  WordOrOp         -> \[r] [x,y] -> PrimInline $ r |= BOr  x y
+  WordXorOp        -> \[r] [x,y] -> PrimInline $ r |= BXor x y
+  WordNotOp        -> \[r] [x]   -> PrimInline $ r |= BNot x
+  WordSllOp        -> \[r] [x,y] -> PrimInline $ r |= x .<<. y
+  WordSrlOp        -> \[r] [x,y] -> PrimInline $ r |= trunc (x .>>>. y)
+  WordToIntOp      -> \[r] [x]   -> PrimInline $ r |= x
+  WordGtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .>>>. zero_) .>. (y .>>>. zero_))
+  WordGeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .>>>. zero_) .>=. (y .>>>. zero_))
+  WordEqOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
+  WordNeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
+  WordLtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .>>>. zero_) .<. (y .>>>. zero_))
+  WordLeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .>>>. zero_) .<=. (y .>>>. zero_))
+  WordToDoubleOp   -> \[r] [x]   -> PrimInline $ r |= (Add (BAnd x (Int 0x7FFFFFFF)) (x .>>>. (Int 31))) `Mul` Int 2147483648
+  WordToFloatOp    -> \[r] [x]   -> PrimInline $ r |= (Add (BAnd x (Int 0x7FFFFFFF)) (x .>>>. (Int 31))) `Mul` Int 2147483648
+  PopCnt8Op        -> \[r] [x]   -> PrimInline $ r |= var "h$popCntTab" .! (mask8 x)
+  PopCnt16Op       -> \[r] [x]   -> PrimInline $ r |= Add (var "h$popCntTab" .! (mask8 x))
+                                                      (var "h$popCntTab" .! (mask8 (x .>>>. Int 8)))
 
-genPrim _ _ PopCnt32Op        [r] [x]   = PrimInline $ r |= app "h$popCnt32" [x]
-genPrim _ _ PopCnt64Op        [r] [x1,x2] = PrimInline $ r |= app "h$popCnt64" [x1,x2]
-genPrim d t PopCntOp          [r] [x]   = genPrim d t PopCnt32Op [r] [x]
-genPrim _ _ Pdep8Op           [r] [s,m] = PrimInline $ r |= app "h$pdep8"  [s,m]
-genPrim _ _ Pdep16Op          [r] [s,m] = PrimInline $ r |= app "h$pdep16" [s,m]
-genPrim _ _ Pdep32Op          [r] [s,m] = PrimInline $ r |= app "h$pdep32" [s,m]
-genPrim _ _ Pdep64Op          [ra,rb] [sa,sb,ma,mb] = PrimInline $ appT [ra,rb] "h$pdep64" [sa,sb,ma,mb]
-genPrim d t PdepOp            rs xs = genPrim d t Pdep32Op rs xs
-genPrim _ _ Pext8Op           [r] [s,m] = PrimInline $ r |= app "h$pext8" [s,m]
-genPrim _ _ Pext16Op          [r] [s,m] = PrimInline $ r |= app "h$pext16" [s,m]
-genPrim _ _ Pext32Op          [r] [s,m] = PrimInline $ r |= app "h$pext32" [s,m]
-genPrim _ _ Pext64Op          [ra,rb] [sa,sb,ma,mb] = PrimInline $
-  appT [ra,rb] "h$pext64" [sa,sb,ma,mb]
-genPrim d t PextOp            rs xs     = genPrim d t Pext32Op rs xs
+  PopCnt32Op  -> \[r] [x]     -> PrimInline $ r |= app "h$popCnt32" [x]
+  PopCnt64Op  -> \[r] [x1,x2] -> PrimInline $ r |= app "h$popCnt64" [x1,x2]
+  PopCntOp    -> \[r] [x]     -> genPrim prof ty PopCnt32Op [r] [x]
+  Pdep8Op     -> \[r] [s,m]   -> PrimInline $ r |= app "h$pdep8"  [s,m]
+  Pdep16Op    -> \[r] [s,m]   -> PrimInline $ r |= app "h$pdep16" [s,m]
+  Pdep32Op    -> \[r] [s,m]   -> PrimInline $ r |= app "h$pdep32" [s,m]
+  Pdep64Op    -> \[ra,rb] [sa,sb,ma,mb] -> PrimInline $ appT [ra,rb] "h$pdep64" [sa,sb,ma,mb]
+  PdepOp      -> \rs xs                 -> genPrim prof ty Pdep32Op rs xs
+  Pext8Op     -> \[r] [s,m] -> PrimInline $ r |= app "h$pext8" [s,m]
+  Pext16Op    -> \[r] [s,m] -> PrimInline $ r |= app "h$pext16" [s,m]
+  Pext32Op    -> \[r] [s,m] -> PrimInline $ r |= app "h$pext32" [s,m]
+  Pext64Op    -> \[ra,rb] [sa,sb,ma,mb] -> PrimInline $ appT [ra,rb] "h$pext64" [sa,sb,ma,mb]
+  PextOp      -> \rs xs     -> genPrim prof ty Pext32Op rs xs
 
-genPrim _ _ ClzOp                      [r]   [x]           = PrimInline $ r |= app "h$clz32" [x]
-genPrim _ _ Clz8Op                     [r]   [x]           = PrimInline $ r |= app "h$clz8"  [x]
-genPrim _ _ Clz16Op                    [r]   [x]           = PrimInline $ r |= app "h$clz16" [x]
-genPrim _ _ Clz32Op                    [r]   [x]           = PrimInline $ r |= app "h$clz32" [x]
-genPrim _ _ Clz64Op                    [r]   [x1,x2]       = PrimInline $ r |= app "h$clz64" [x1,x2]
+  ClzOp       -> \[r]   [x]     -> PrimInline $ r |= app "h$clz32" [x]
+  Clz8Op      -> \[r]   [x]     -> PrimInline $ r |= app "h$clz8"  [x]
+  Clz16Op     -> \[r]   [x]     -> PrimInline $ r |= app "h$clz16" [x]
+  Clz32Op     -> \[r]   [x]     -> PrimInline $ r |= app "h$clz32" [x]
+  Clz64Op     -> \[r]   [x1,x2] -> PrimInline $ r |= app "h$clz64" [x1,x2]
+  CtzOp       -> \[r]   [x]     -> PrimInline $ r |= app "h$ctz32" [x]
+  Ctz8Op      -> \[r]   [x]     -> PrimInline $ r |= app "h$ctz8"  [x]
+  Ctz16Op     -> \[r]   [x]     -> PrimInline $ r |= app "h$ctz16" [x]
+  Ctz32Op     -> \[r]   [x]     -> PrimInline $ r |= app "h$ctz32" [x]
+  Ctz64Op     -> \[r]   [x1,x2] -> PrimInline $ r |= app "h$ctz64" [x1,x2]
 
-genPrim _ _ CtzOp                      [r]   [x]           = PrimInline $ r |= app "h$ctz32" [x]
-genPrim _ _ Ctz8Op                     [r]   [x]           = PrimInline $ r |= app "h$ctz8"  [x]
-genPrim _ _ Ctz16Op                    [r]   [x]           = PrimInline $ r |= app "h$ctz16" [x]
-genPrim _ _ Ctz32Op                    [r]   [x]           = PrimInline $ r |= app "h$ctz32" [x]
-genPrim _ _ Ctz64Op                    [r]   [x1,x2]       = PrimInline $ r |= app "h$ctz64" [x1,x2]
-
-genPrim _ _ BSwap16Op         [r] [x]   = PrimInline $
-  r |= BOr ((mask8 x) .<<. (Int 8))
-           (mask8 (x .>>>. (Int 8)))
-genPrim _ _ BSwap32Op         [r] [x]   = PrimInline $
-  r |= (x .<<. (Int 24))
-        `BOr` ((BAnd x (Int 0xFF00)) .<<. (Int 8))
-        `BOr` ((BAnd x (Int 0xFF0000)) .>>. (Int 8))
-        `BOr` (x .>>>. (Int 24))
-genPrim _ _ BSwap64Op     [r1,r2] [x,y] = PrimInline $
-  appT [r1,r2] "h$bswap64" [x,y]
-genPrim d t BSwapOp           [r] [x]   = genPrim d t BSwap32Op [r] [x]
+  BSwap16Op   -> \[r] [x]   -> PrimInline $
+      r |= BOr ((mask8 x) .<<. (Int 8))
+               (mask8 (x .>>>. (Int 8)))
+  BSwap32Op   -> \[r] [x]   -> PrimInline $
+      r |= (x .<<. (Int 24))
+            `BOr` ((BAnd x (Int 0xFF00)) .<<. (Int 8))
+            `BOr` ((BAnd x (Int 0xFF0000)) .>>. (Int 8))
+            `BOr` (x .>>>. (Int 24))
+  BSwap64Op   -> \[r1,r2] [x,y] -> PrimInline $ appT [r1,r2] "h$bswap64" [x,y]
+  BSwapOp     -> \[r] [x]       -> genPrim prof ty BSwap32Op [r] [x]
 
 ------------------------------ Narrow -------------------------------------------
 
-genPrim _ _ Narrow8IntOp      [r] [x]   = PrimInline $ r |= (BAnd x (Int 0x7F)) `Sub` (BAnd x (Int 0x80))
-genPrim _ _ Narrow16IntOp     [r] [x]   = PrimInline $ r |= (BAnd x (Int 0x7FFF)) `Sub` (BAnd x (Int 0x8000))
-genPrim _ _ Narrow32IntOp     [r] [x]   = PrimInline $ r |= trunc x
-genPrim _ _ Narrow8WordOp     [r] [x]   = PrimInline $ r |= mask8 x
-genPrim _ _ Narrow16WordOp    [r] [x]   = PrimInline $ r |= mask16 x
-genPrim _ _ Narrow32WordOp    [r] [x]   = PrimInline $ r |= trunc x
+  Narrow8IntOp    -> \[r] [x] -> PrimInline $ r |= (BAnd x (Int 0x7F)) `Sub` (BAnd x (Int 0x80))
+  Narrow16IntOp   -> \[r] [x] -> PrimInline $ r |= (BAnd x (Int 0x7FFF)) `Sub` (BAnd x (Int 0x8000))
+  Narrow32IntOp   -> \[r] [x] -> PrimInline $ r |= trunc x
+  Narrow8WordOp   -> \[r] [x] -> PrimInline $ r |= mask8 x
+  Narrow16WordOp  -> \[r] [x] -> PrimInline $ r |= mask16 x
+  Narrow32WordOp  -> \[r] [x] -> PrimInline $ r |= trunc x
 
 ------------------------------ Double -------------------------------------------
 
-genPrim _ _ DoubleGtOp        [r] [x,y] = PrimInline $ r |= if10 (x .>. y)
-genPrim _ _ DoubleGeOp        [r] [x,y] = PrimInline $ r |= if10 (x .>=. y)
-genPrim _ _ DoubleEqOp        [r] [x,y] = PrimInline $ r |= if10 (x .===. y)
-genPrim _ _ DoubleNeOp        [r] [x,y] = PrimInline $ r |= if10 (x .!==. y)
-genPrim _ _ DoubleLtOp        [r] [x,y] = PrimInline $ r |= if10 (x .<. y)
-genPrim _ _ DoubleLeOp        [r] [x,y] = PrimInline $ r |= if10 (x .<=. y)
-genPrim _ _ DoubleAddOp       [r] [x,y] = PrimInline $ r |= Add x y
-genPrim _ _ DoubleSubOp       [r] [x,y] = PrimInline $ r |= Sub x y
-genPrim _ _ DoubleMulOp       [r] [x,y] = PrimInline $ r |= Mul x y
-genPrim _ _ DoubleDivOp       [r] [x,y] = PrimInline $ r |= Div x y
-genPrim _ _ DoubleNegOp       [r] [x]   = PrimInline $ r |= Negate x
-genPrim _ _ DoubleFabsOp      [r] [x]   = PrimInline $ r |= math_abs [x]
-genPrim _ _ DoubleToIntOp     [r] [x]   = PrimInline $ r |= trunc x
-genPrim _ _ DoubleToFloatOp   [r] [x]   = PrimInline $ r |= app "h$fround" [x]
-genPrim _ _ DoubleExpOp       [r] [x]   = PrimInline $ r |= math_exp [x]
-genPrim _ _ DoubleLogOp       [r] [x]   = PrimInline $ r |= math_log [x]
-genPrim _ _ DoubleSqrtOp      [r] [x]   = PrimInline $ r |= math_sqrt [x]
-genPrim _ _ DoubleSinOp       [r] [x]   = PrimInline $ r |= math_sin [x]
-genPrim _ _ DoubleCosOp       [r] [x]   = PrimInline $ r |= math_cos [x]
-genPrim _ _ DoubleTanOp       [r] [x]   = PrimInline $ r |= math_tan [x]
-genPrim _ _ DoubleAsinOp      [r] [x]   = PrimInline $ r |= math_asin [x]
-genPrim _ _ DoubleAcosOp      [r] [x]   = PrimInline $ r |= math_acos [x]
-genPrim _ _ DoubleAtanOp      [r] [x]   = PrimInline $ r |= math_atan [x]
-genPrim _ _ DoubleSinhOp      [r] [x]   = PrimInline $ r |= (math_exp [x] `Sub` math_exp [Negate x]) `Div` two_
-genPrim _ _ DoubleCoshOp      [r] [x]   = PrimInline $ r |= (math_exp [x] `Add` math_exp [Negate x]) `Div` two_
-genPrim _ _ DoubleTanhOp      [r] [x]   = PrimInline $ r |= (math_exp [Mul two_ x] `Sub` one_) `Div` (math_exp [Mul two_ x] `Add` one_)
-genPrim _ _ DoubleAsinhOp     [r] [x]   = PrimInline $ r |= math_asinh [x]
-genPrim _ _ DoubleAcoshOp     [r] [x]   = PrimInline $ r |= math_acosh [x]
-genPrim _ _ DoubleAtanhOp     [r] [x]   = PrimInline $ r |= math_atanh [x]
-genPrim _ _ DoublePowerOp     [r] [x,y] = PrimInline $ r |= math_pow [x,y]
-genPrim _ _ DoubleDecode_2IntOp [s,h,l,e] [x] = PrimInline $ appT [s,h,l,e] "h$decodeDouble2Int" [x]
-genPrim _ _ DoubleDecode_Int64Op [s1,s2,e] [d] =
-  PrimInline $ appT [e,s1,s2] "h$decodeDoubleInt64" [d]
+  DoubleGtOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>. y)
+  DoubleGeOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>=. y)
+  DoubleEqOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
+  DoubleNeOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
+  DoubleLtOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<. y)
+  DoubleLeOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<=. y)
+  DoubleAddOp       -> \[r] [x,y] -> PrimInline $ r |= Add x y
+  DoubleSubOp       -> \[r] [x,y] -> PrimInline $ r |= Sub x y
+  DoubleMulOp       -> \[r] [x,y] -> PrimInline $ r |= Mul x y
+  DoubleDivOp       -> \[r] [x,y] -> PrimInline $ r |= Div x y
+  DoubleNegOp       -> \[r] [x]   -> PrimInline $ r |= Negate x
+  DoubleFabsOp      -> \[r] [x]   -> PrimInline $ r |= math_abs [x]
+  DoubleToIntOp     -> \[r] [x]   -> PrimInline $ r |= trunc x
+  DoubleToFloatOp   -> \[r] [x]   -> PrimInline $ r |= app "h$fround" [x]
+  DoubleExpOp       -> \[r] [x]   -> PrimInline $ r |= math_exp [x]
+  DoubleLogOp       -> \[r] [x]   -> PrimInline $ r |= math_log [x]
+  DoubleSqrtOp      -> \[r] [x]   -> PrimInline $ r |= math_sqrt [x]
+  DoubleSinOp       -> \[r] [x]   -> PrimInline $ r |= math_sin [x]
+  DoubleCosOp       -> \[r] [x]   -> PrimInline $ r |= math_cos [x]
+  DoubleTanOp       -> \[r] [x]   -> PrimInline $ r |= math_tan [x]
+  DoubleAsinOp      -> \[r] [x]   -> PrimInline $ r |= math_asin [x]
+  DoubleAcosOp      -> \[r] [x]   -> PrimInline $ r |= math_acos [x]
+  DoubleAtanOp      -> \[r] [x]   -> PrimInline $ r |= math_atan [x]
+  DoubleSinhOp      -> \[r] [x]   -> PrimInline $ r |= (math_exp [x] `Sub` math_exp [Negate x]) `Div` two_
+  DoubleCoshOp      -> \[r] [x]   -> PrimInline $ r |= (math_exp [x] `Add` math_exp [Negate x]) `Div` two_
+  DoubleTanhOp      -> \[r] [x]   -> PrimInline $ r |= (math_exp [Mul two_ x] `Sub` one_) `Div` (math_exp [Mul two_ x] `Add` one_)
+  DoubleAsinhOp     -> \[r] [x]   -> PrimInline $ r |= math_asinh [x]
+  DoubleAcoshOp     -> \[r] [x]   -> PrimInline $ r |= math_acosh [x]
+  DoubleAtanhOp     -> \[r] [x]   -> PrimInline $ r |= math_atanh [x]
+  DoublePowerOp     -> \[r] [x,y] -> PrimInline $ r |= math_pow [x,y]
+  DoubleDecode_2IntOp  -> \[s,h,l,e] [x] -> PrimInline $ appT [s,h,l,e] "h$decodeDouble2Int" [x]
+  DoubleDecode_Int64Op -> \[s1,s2,e] [d] -> PrimInline $ appT [e,s1,s2] "h$decodeDoubleInt64" [d]
 
 ------------------------------ Float --------------------------------------------
 
-genPrim _ _ FloatGtOp         [r] [x,y] = PrimInline $ r |= if10 (x .>. y)
-genPrim _ _ FloatGeOp         [r] [x,y] = PrimInline $ r |= if10 (x .>=. y)
-genPrim _ _ FloatEqOp         [r] [x,y] = PrimInline $ r |= if10 (x .===. y)
-genPrim _ _ FloatNeOp         [r] [x,y] = PrimInline $ r |= if10 (x .!==. y)
-genPrim _ _ FloatLtOp         [r] [x,y] = PrimInline $ r |= if10 (x .<. y)
-genPrim _ _ FloatLeOp         [r] [x,y] = PrimInline $ r |= if10 (x .<=. y)
-genPrim _ _ FloatAddOp        [r] [x,y] = PrimInline $ r |= Add x y
-genPrim _ _ FloatSubOp        [r] [x,y] = PrimInline $ r |= Sub x y
-genPrim _ _ FloatMulOp        [r] [x,y] = PrimInline $ r |= Mul x y
-genPrim _ _ FloatDivOp        [r] [x,y] = PrimInline $ r |= Div x y
-genPrim _ _ FloatNegOp        [r] [x]   = PrimInline $ r |= Negate x
-genPrim _ _ FloatFabsOp       [r] [x]   = PrimInline $ r |= math_abs [x]
-genPrim _ _ FloatToIntOp      [r] [x]   = PrimInline $ r |= trunc x
-genPrim _ _ FloatExpOp        [r] [x]   = PrimInline $ r |= math_exp [x]
-genPrim _ _ FloatLogOp        [r] [x]   = PrimInline $ r |= math_log [x]
-genPrim _ _ FloatSqrtOp       [r] [x]   = PrimInline $ r |= math_sqrt [x]
-genPrim _ _ FloatSinOp        [r] [x]   = PrimInline $ r |= math_sin [x]
-genPrim _ _ FloatCosOp        [r] [x]   = PrimInline $ r |= math_cos [x]
-genPrim _ _ FloatTanOp        [r] [x]   = PrimInline $ r |= math_tan [x]
-genPrim _ _ FloatAsinOp       [r] [x]   = PrimInline $ r |= math_asin [x]
-genPrim _ _ FloatAcosOp       [r] [x]   = PrimInline $ r |= math_acos [x]
-genPrim _ _ FloatAtanOp       [r] [x]   = PrimInline $ r |= math_atan [x]
-genPrim _ _ FloatSinhOp       [r] [x]   = PrimInline $ r |= (math_exp [x] `Sub` math_exp [Negate x]) `Div` two_
-genPrim _ _ FloatCoshOp       [r] [x]   = PrimInline $ r |= (math_exp [x] `Add` math_exp [Negate x]) `Div` two_
-genPrim _ _ FloatTanhOp       [r] [x]   = PrimInline $ r |= (math_exp [Mul two_ x] `Sub` one_) `Div` (math_exp [Mul two_ x] `Add` one_)
-genPrim _ _ FloatAsinhOp      [r] [x]   = PrimInline $ r |= math_asinh [x]
-genPrim _ _ FloatAcoshOp      [r] [x]   = PrimInline $ r |= math_acosh [x]
-genPrim _ _ FloatAtanhOp      [r] [x]   = PrimInline $ r |= math_atanh [x]
-genPrim _ _ FloatPowerOp      [r] [x,y] = PrimInline $ r |= math_pow [x,y]
-genPrim _ _ FloatToDoubleOp   [r] [x]   = PrimInline $ r |= x
-genPrim _ _ FloatDecode_IntOp [s,e] [x] = PrimInline $ appT [s,e] "h$decodeFloatInt" [x]
+  FloatGtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>. y)
+  FloatGeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>=. y)
+  FloatEqOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
+  FloatNeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
+  FloatLtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<. y)
+  FloatLeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<=. y)
+  FloatAddOp        -> \[r] [x,y] -> PrimInline $ r |= Add x y
+  FloatSubOp        -> \[r] [x,y] -> PrimInline $ r |= Sub x y
+  FloatMulOp        -> \[r] [x,y] -> PrimInline $ r |= Mul x y
+  FloatDivOp        -> \[r] [x,y] -> PrimInline $ r |= Div x y
+  FloatNegOp        -> \[r] [x]   -> PrimInline $ r |= Negate x
+  FloatFabsOp       -> \[r] [x]   -> PrimInline $ r |= math_abs [x]
+  FloatToIntOp      -> \[r] [x]   -> PrimInline $ r |= trunc x
+  FloatExpOp        -> \[r] [x]   -> PrimInline $ r |= math_exp [x]
+  FloatLogOp        -> \[r] [x]   -> PrimInline $ r |= math_log [x]
+  FloatSqrtOp       -> \[r] [x]   -> PrimInline $ r |= math_sqrt [x]
+  FloatSinOp        -> \[r] [x]   -> PrimInline $ r |= math_sin [x]
+  FloatCosOp        -> \[r] [x]   -> PrimInline $ r |= math_cos [x]
+  FloatTanOp        -> \[r] [x]   -> PrimInline $ r |= math_tan [x]
+  FloatAsinOp       -> \[r] [x]   -> PrimInline $ r |= math_asin [x]
+  FloatAcosOp       -> \[r] [x]   -> PrimInline $ r |= math_acos [x]
+  FloatAtanOp       -> \[r] [x]   -> PrimInline $ r |= math_atan [x]
+  FloatSinhOp       -> \[r] [x]   -> PrimInline $ r |= (math_exp [x] `Sub` math_exp [Negate x]) `Div` two_
+  FloatCoshOp       -> \[r] [x]   -> PrimInline $ r |= (math_exp [x] `Add` math_exp [Negate x]) `Div` two_
+  FloatTanhOp       -> \[r] [x]   -> PrimInline $ r |= (math_exp [Mul two_ x] `Sub` one_) `Div` (math_exp [Mul two_ x] `Add` one_)
+  FloatAsinhOp      -> \[r] [x]   -> PrimInline $ r |= math_asinh [x]
+  FloatAcoshOp      -> \[r] [x]   -> PrimInline $ r |= math_acosh [x]
+  FloatAtanhOp      -> \[r] [x]   -> PrimInline $ r |= math_atanh [x]
+  FloatPowerOp      -> \[r] [x,y] -> PrimInline $ r |= math_pow [x,y]
+  FloatToDoubleOp   -> \[r] [x]   -> PrimInline $ r |= x
+  FloatDecode_IntOp -> \[s,e] [x] -> PrimInline $ appT [s,e] "h$decodeFloatInt" [x]
 
 ------------------------------ Arrays -------------------------------------------
 
-genPrim _ _ NewArrayOp          [r] [l,e]   = PrimInline (newArray r l e)
-genPrim _ _ ReadArrayOp         [r] [a,i]   = PrimInline $ r |= a .! i
-genPrim _ _ WriteArrayOp        []  [a,i,v] = PrimInline $ a .! i |= v
-genPrim _ _ SizeofArrayOp       [r] [a]     = PrimInline $ r |= a .^ "length"
-genPrim _ _ SizeofMutableArrayOp [r] [a]    = PrimInline $ r |= a .^ "length"
-genPrim _ _ IndexArrayOp        [r] [a,i]   = PrimInline $ r |= a .! i
-genPrim _ _ UnsafeFreezeArrayOp [r] [a]     = PrimInline $ r |= a
-genPrim _ _ UnsafeThawArrayOp   [r] [a]     = PrimInline $ r |= a
-genPrim _ _ CopyArrayOp         [] [a,o1,ma,o2,n] =
-  PrimInline $ loopBlockS (Int 0) (.<. n) \i ->
-    [ ma .! (Add i o2) |= a .! (Add i o1)
-    , preIncrS i
-    ]
-genPrim d t CopyMutableArrayOp  []  [a1,o1,a2,o2,n] = genPrim d t CopyArrayOp [] [a1,o1,a2,o2,n]
-genPrim _ _ CloneArrayOp        [r] [a,start,n]     = PrimInline $ r |= app "h$sliceArray" [a,start,n]
-genPrim d t CloneMutableArrayOp [r] [a,start,n]     = genPrim d t CloneArrayOp [r] [a,start,n]
-genPrim _ _ FreezeArrayOp       [r] [a,start,n]     = PrimInline $ r |= app "h$sliceArray" [a,start,n]
-genPrim _ _ ThawArrayOp         [r] [a,start,n]     = PrimInline $ r |= app "h$sliceArray" [a,start,n]
-genPrim _ _ CasArrayOp        [s,o] [a,i,old,new]   = PrimInline $
-  jVar \x -> mconcat
-    [ x |= a .! i
-    , ifBlockS (x .===. old)
-               [ o |= new
-               , a .! i |= new
-               , s |= zero_
-               ]
-               [ s |= one_
-               , o |= x
-               ]
-    ]
+  NewArrayOp           -> \[r] [l,e]   -> PrimInline (newArray r l e)
+  ReadArrayOp          -> \[r] [a,i]   -> PrimInline $ r |= a .! i
+  WriteArrayOp         -> \[]  [a,i,v] -> PrimInline $ a .! i |= v
+  SizeofArrayOp        -> \[r] [a]     -> PrimInline $ r |= a .^ "length"
+  SizeofMutableArrayOp -> \[r] [a]     -> PrimInline $ r |= a .^ "length"
+  IndexArrayOp         -> \[r] [a,i]   -> PrimInline $ r |= a .! i
+  UnsafeFreezeArrayOp  -> \[r] [a]     -> PrimInline $ r |= a
+  UnsafeThawArrayOp    -> \[r] [a]     -> PrimInline $ r |= a
+  CopyArrayOp          -> \[] [a,o1,ma,o2,n] ->
+      PrimInline $ loopBlockS (Int 0) (.<. n) \i ->
+        [ ma .! (Add i o2) |= a .! (Add i o1)
+        , preIncrS i
+        ]
+  CopyMutableArrayOp  -> \[]  [a1,o1,a2,o2,n] -> genPrim prof ty CopyArrayOp [] [a1,o1,a2,o2,n]
+  CloneArrayOp        -> \[r] [a,start,n]     -> PrimInline $ r |= app "h$sliceArray" [a,start,n]
+  CloneMutableArrayOp -> \[r] [a,start,n]     -> genPrim prof ty CloneArrayOp [r] [a,start,n]
+  FreezeArrayOp       -> \[r] [a,start,n]     -> PrimInline $ r |= app "h$sliceArray" [a,start,n]
+  ThawArrayOp         -> \[r] [a,start,n]     -> PrimInline $ r |= app "h$sliceArray" [a,start,n]
+  CasArrayOp          -> \[s,o] [a,i,old,new] -> PrimInline $
+      jVar \x -> mconcat
+        [ x |= a .! i
+        , ifBlockS (x .===. old)
+                   [ o |= new
+                   , a .! i |= new
+                   , s |= zero_
+                   ]
+                   [ s |= one_
+                   , o |= x
+                   ]
+        ]
 
 ------------------------------ Small Arrays -------------------------------------
 
-genPrim _ _ NewSmallArrayOp            [a]   [n,e]         = PrimInline $ a |= app "h$newArray" [n,e]
-genPrim _ _ ReadSmallArrayOp           [r]   [a,i]         = PrimInline $ r |= a .! i
-genPrim _ _ WriteSmallArrayOp          []    [a,i,e]       = PrimInline $ a .! i |= e
-genPrim _ _ SizeofSmallArrayOp         [r]   [a]           = PrimInline $ r |= a .^ "length"
-genPrim _ _ SizeofSmallMutableArrayOp  [r]   [a]           = PrimInline $ r |= a .^ "length"
-genPrim _ _ IndexSmallArrayOp          [r]   [a,i]         = PrimInline $ r |= a .! i
-genPrim _ _ UnsafeFreezeSmallArrayOp   [r]   [a]           = PrimInline $ r |= a
-genPrim _ _ UnsafeThawSmallArrayOp     [r]   [a]           = PrimInline $ r |= a
-genPrim _ _ CopySmallArrayOp           []    [s,si,d,di,n] = PrimInline $
-  loopBlockS (Sub n one_) (.>=. zero_) \i ->
-    [ d .! (Add di i) |= s .! (Add si i)
-    , postDecrS i
-    ]
-genPrim _ _ CopySmallMutableArrayOp    []    [s,si,d,di,n] = PrimInline $
-  loopBlockS (Sub n one_) (.>=. zero_) \i ->
-    [ d .! (Add di i) |= s .! (Add si i)
-    , postDecrS i
-    ]
-genPrim _ _ CloneSmallArrayOp          [r]   [a,o,n]       = PrimInline $ cloneArray r a (Just o) n
-genPrim _ _ CloneSmallMutableArrayOp   [r]   [a,o,n]       = PrimInline $ cloneArray r a (Just o) n
-genPrim _ _ FreezeSmallArrayOp         [r]   [a,o,n]       = PrimInline $ cloneArray r a (Just o) n
-genPrim _ _ ThawSmallArrayOp           [r]   [a,o,n]       = PrimInline $ cloneArray r a (Just o) n
-genPrim _ _ CasSmallArrayOp            [s,o] [a,i,old,new] = PrimInline $ jVar \x -> mconcat
+  NewSmallArrayOp            -> \[a]   [n,e]         -> PrimInline $ a |= app "h$newArray" [n,e]
+  ReadSmallArrayOp           -> \[r]   [a,i]         -> PrimInline $ r |= a .! i
+  WriteSmallArrayOp          -> \[]    [a,i,e]       -> PrimInline $ a .! i |= e
+  SizeofSmallArrayOp         -> \[r]   [a]           -> PrimInline $ r |= a .^ "length"
+  SizeofSmallMutableArrayOp  -> \[r]   [a]           -> PrimInline $ r |= a .^ "length"
+  IndexSmallArrayOp          -> \[r]   [a,i]         -> PrimInline $ r |= a .! i
+  UnsafeFreezeSmallArrayOp   -> \[r]   [a]           -> PrimInline $ r |= a
+  UnsafeThawSmallArrayOp     -> \[r]   [a]           -> PrimInline $ r |= a
+  CopySmallArrayOp           -> \[]    [s,si,d,di,n] -> PrimInline $
+      loopBlockS (Sub n one_) (.>=. zero_) \i ->
+        [ d .! (Add di i) |= s .! (Add si i)
+        , postDecrS i
+        ]
+  CopySmallMutableArrayOp    -> \[]    [s,si,d,di,n] -> PrimInline $
+      loopBlockS (Sub n one_) (.>=. zero_) \i ->
+        [ d .! (Add di i) |= s .! (Add si i)
+        , postDecrS i
+        ]
+  CloneSmallArrayOp          -> \[r]   [a,o,n]       -> PrimInline $ cloneArray r a (Just o) n
+  CloneSmallMutableArrayOp   -> \[r]   [a,o,n]       -> PrimInline $ cloneArray r a (Just o) n
+  FreezeSmallArrayOp         -> \[r]   [a,o,n]       -> PrimInline $ cloneArray r a (Just o) n
+  ThawSmallArrayOp           -> \[r]   [a,o,n]       -> PrimInline $ cloneArray r a (Just o) n
+  CasSmallArrayOp            -> \[s,o] [a,i,old,new] -> PrimInline $ jVar \x -> mconcat
                                                                 [ x |= a .! i
                                                                 , ifBlockS (x .===. old)
                                                                     [ o |= new
@@ -564,57 +546,450 @@ genPrim _ _ CasSmallArrayOp            [s,o] [a,i,old,new] = PrimInline $ jVar \
 
 ------------------------------- Byte Arrays -------------------------------------
 
-genPrim _ _ NewByteArrayOp_Char               [r] [l]         = PrimInline (newByteArray r l)
-genPrim _ _ NewPinnedByteArrayOp_Char         [r] [l]         = PrimInline (newByteArray r l)
-genPrim _ _ NewAlignedPinnedByteArrayOp_Char  [r] [l,_align]  = PrimInline (newByteArray r l)
-genPrim _ _ MutableByteArrayIsPinnedOp        [r] [_]         = PrimInline $ r |= one_
-genPrim _ _ ByteArrayIsPinnedOp               [r] [_]         = PrimInline $ r |= one_
-genPrim _ _ ByteArrayContents_Char            [a,o] [b]       = PrimInline $ mconcat [a |= b, o |= zero_]
-genPrim _ _ MutableByteArrayContents_Char     [a,o] [b]       = PrimInline $ mconcat [a |= b, o |= zero_]
-genPrim _ _ ShrinkMutableByteArrayOp_Char     [] [a,n]        = PrimInline $ appS "h$shrinkMutableByteArray" [a,n]
-genPrim _ _ ResizeMutableByteArrayOp_Char     [r] [a,n]       = PrimInline $ r |= app "h$resizeMutableByteArray" [a,n]
-genPrim _ _ UnsafeFreezeByteArrayOp           [a] [b]         = PrimInline $ a |= b
-genPrim _ _ SizeofByteArrayOp                 [r] [a]         = PrimInline $ r |= a .^ "len"
-genPrim _ _ SizeofMutableByteArrayOp          [r] [a]         = PrimInline $ r |= a .^ "len"
-genPrim _ _ GetSizeofMutableByteArrayOp       [r] [a]         = PrimInline $ r |= a .^ "len"
-genPrim _ _ IndexByteArrayOp_Char             [r] [a,i]       = PrimInline $ r |= u8_ a i
-genPrim _ _ IndexByteArrayOp_WideChar         [r] [a,i]       = PrimInline $ r |= i3_ a i
-genPrim _ _ IndexByteArrayOp_Int              [r] [a,i]       = PrimInline $ r |= i3_ a i
-genPrim _ _ IndexByteArrayOp_Word             [r] [a,i]       = PrimInline $ r |= i3_ a i
-genPrim _ _ IndexByteArrayOp_Addr             [r1,r2] [a,i]   = PrimInline $ jVar \t -> mconcat
-                                                                [ t |= a .^ "arr"
-                                                                , ifBlockS (t .&&. t .! (i .<<. two_))
-                                                                    [ r1 |= t .! (i .<<. two_) .! zero_
-                                                                    , r2 |= t .! (i .<<. two_) .! one_
-                                                                    ]
-                                                                    [ r1 |= null_
-                                                                    , r2 |= zero_
-                                                                    ]
-                                                                ]
+  NewByteArrayOp_Char               -> \[r] [l]         -> PrimInline (newByteArray r l)
+  NewPinnedByteArrayOp_Char         -> \[r] [l]         -> PrimInline (newByteArray r l)
+  NewAlignedPinnedByteArrayOp_Char  -> \[r] [l,_align]  -> PrimInline (newByteArray r l)
+  MutableByteArrayIsPinnedOp        -> \[r] [_]         -> PrimInline $ r |= one_
+  ByteArrayIsPinnedOp               -> \[r] [_]         -> PrimInline $ r |= one_
+  ByteArrayContents_Char            -> \[a,o] [b]       -> PrimInline $ mconcat [a |= b, o |= zero_]
+  MutableByteArrayContents_Char     -> \[a,o] [b]       -> PrimInline $ mconcat [a |= b, o |= zero_]
+  ShrinkMutableByteArrayOp_Char     -> \[] [a,n]        -> PrimInline $ appS "h$shrinkMutableByteArray" [a,n]
+  ResizeMutableByteArrayOp_Char     -> \[r] [a,n]       -> PrimInline $ r |= app "h$resizeMutableByteArray" [a,n]
+  UnsafeFreezeByteArrayOp           -> \[a] [b]         -> PrimInline $ a |= b
+  SizeofByteArrayOp                 -> \[r] [a]         -> PrimInline $ r |= a .^ "len"
+  SizeofMutableByteArrayOp          -> \[r] [a]         -> PrimInline $ r |= a .^ "len"
+  GetSizeofMutableByteArrayOp       -> \[r] [a]         -> PrimInline $ r |= a .^ "len"
+  IndexByteArrayOp_Char             -> \[r] [a,i]       -> PrimInline $ r |= u8_ a i
+  IndexByteArrayOp_WideChar         -> \[r] [a,i]       -> PrimInline $ r |= i3_ a i
+  IndexByteArrayOp_Int              -> \[r] [a,i]       -> PrimInline $ r |= i3_ a i
+  IndexByteArrayOp_Word             -> \[r] [a,i]       -> PrimInline $ r |= i3_ a i
+  IndexByteArrayOp_Addr             -> \[r1,r2] [a,i]   ->
+    PrimInline $ jVar \t -> mconcat
+      [ t |= a .^ "arr"
+      , ifBlockS (t .&&. t .! (i .<<. two_))
+          [ r1 |= t .! (i .<<. two_) .! zero_
+          , r2 |= t .! (i .<<. two_) .! one_
+          ]
+          [ r1 |= null_
+          , r2 |= zero_
+          ]
+      ]
 
-genPrim _ _ IndexByteArrayOp_Float [r] [a,i] =
-  PrimInline $ r |= f3_ a i
-genPrim _ _ IndexByteArrayOp_Double [r] [a,i] =
-  PrimInline $ r |= f6_ a i
-genPrim _ _ IndexByteArrayOp_StablePtr [r1,r2] [a,i] =
-  PrimInline $ mconcat
-    [ r1 |= var "h$stablePtrBuf"
-    , r2 |= i3_ a i
-    ]
-genPrim _ _ IndexByteArrayOp_Int8  [r] [a,i]      = PrimInline $ r |= dv_i8 a i
-genPrim _ _ IndexByteArrayOp_Int16 [r] [a,i]      = PrimInline $ r |= dv_i16 a (i .<<. one_)
-genPrim _ _ IndexByteArrayOp_Int32 [r] [a,i]      = PrimInline $ r |= i3_ a i
-genPrim _ _ IndexByteArrayOp_Int64 [r1,r2] [a,i]  = PrimInline $ mconcat
+  IndexByteArrayOp_Float     -> \[r]     [a,i] -> PrimInline $ r |= f3_ a i
+  IndexByteArrayOp_Double    -> \[r]     [a,i] -> PrimInline $ r |= f6_ a i
+  IndexByteArrayOp_StablePtr -> \[r1,r2] [a,i] ->
+    PrimInline $ mconcat
+      [ r1 |= var "h$stablePtrBuf"
+      , r2 |= i3_ a i
+      ]
+  IndexByteArrayOp_Int8  -> \[r] [a,i]      -> PrimInline $ r |= dv_i8 a i
+  IndexByteArrayOp_Int16 -> \[r] [a,i]      -> PrimInline $ r |= dv_i16 a (i .<<. one_)
+  IndexByteArrayOp_Int32 -> \[r] [a,i]      -> PrimInline $ r |= i3_ a i
+  IndexByteArrayOp_Int64 -> \[r1,r2] [a,i]  -> PrimInline $ mconcat
                                                      [ r1 |= i3_ a (Add (i .<<. one_) one_)
                                                      , r2 |= i3_ a (i .<<. one_)
                                                      ]
-genPrim _ _ IndexByteArrayOp_Word8 [r] [a,i]      = PrimInline $ r |= u8_ a i
-genPrim _ _ IndexByteArrayOp_Word16 [r] [a,i]     = PrimInline $ r |= dv_u16 a (i .<<. one_)
-genPrim _ _ IndexByteArrayOp_Word32 [r] [a,i]     = PrimInline $ r |= i3_ a i
-genPrim _ _ IndexByteArrayOp_Word64 [r1,r2] [a,i] = PrimInline $ mconcat
+  IndexByteArrayOp_Word8  -> \[r] [a,i]     -> PrimInline $ r |= u8_ a i
+  IndexByteArrayOp_Word16 -> \[r] [a,i]     -> PrimInline $ r |= dv_u16 a (i .<<. one_)
+  IndexByteArrayOp_Word32 -> \[r] [a,i]     -> PrimInline $ r |= i3_ a i
+  IndexByteArrayOp_Word64 -> \[r1,r2] [a,i] -> PrimInline $ mconcat
                                                       [ r1 |= i3_ a (Add (i .<<. one_) one_)
                                                       , r2 |= i3_ a (i .<<. one_)
                                                       ]
+  ReadByteArrayOp_Char     -> \[r]     [a,i] -> PrimInline $ r |= u8_ a i
+  ReadByteArrayOp_WideChar -> \[r]     [a,i] -> PrimInline $ r |= i3_ a i
+  ReadByteArrayOp_Int      -> \[r]     [a,i] -> PrimInline $ r |= i3_ a i
+  ReadByteArrayOp_Word     -> \[r]     [a,i] -> PrimInline $ r |= i3_ a i
+  ReadByteArrayOp_Addr     -> \[r1,r2] [a,i] ->
+      PrimInline $ jVar \x -> mconcat
+        [ x |= i .<<. two_
+        , ifS (a .^ "arr" .&&. a .^ "arr" .! x)
+               (mconcat [ r1 |= a .^ "arr" .! x .! zero_
+                        , r2 |= a .^ "arr" .! x .! one_
+                        ])
+               (mconcat [r1 |= null_, r2 |= one_])
+        ]
+  ReadByteArrayOp_Float     -> \[r]     [a,i] -> PrimInline $ r |= f3_ a i
+  ReadByteArrayOp_Double    -> \[r]     [a,i] -> PrimInline $ r |= f6_ a i
+  ReadByteArrayOp_StablePtr -> \[r1,r2] [a,i] ->
+      PrimInline $ mconcat
+       [ r1 |= var "h$stablePtrBuf"
+       , r2 |= i3_ a i
+       ]
+  ReadByteArrayOp_Int8  -> \[r]     [a,i] -> PrimInline $ r |= dv_i8 a i
+  ReadByteArrayOp_Int16 -> \[r]     [a,i] -> PrimInline $ r |= dv_i16 a (i .<<. one_)
+  ReadByteArrayOp_Int32 -> \[r]     [a,i] -> PrimInline $ r |= i3_ a i
+  ReadByteArrayOp_Int64 -> \[r1,r2] [a,i] ->
+      PrimInline $ mconcat
+        [ r1 |= i3_ a (Add (i .<<. one_) one_)
+        , r2 |= i3_ a (i .<<. one_)
+        ]
+  ReadByteArrayOp_Word8  -> \[r]     [a,i] -> PrimInline $ r |= u8_ a i
+  ReadByteArrayOp_Word16 -> \[r]     [a,i] -> PrimInline $ r |= u1_ a i
+  ReadByteArrayOp_Word32 -> \[r]     [a,i] -> PrimInline $ r |= i3_ a i
+  ReadByteArrayOp_Word64 -> \[r1,r2] [a,i] ->
+      PrimInline $ mconcat
+        [ r1 |= i3_ a (Add (i .<<. one_) one_)
+        , r2 |= i3_ a (i .<<. one_)
+        ]
+  WriteByteArrayOp_Char     -> \[] [a,i,e]     -> PrimInline $ u8_ a i |= e
+  WriteByteArrayOp_WideChar -> \[] [a,i,e]     -> PrimInline $ i3_ a i |= e
+  WriteByteArrayOp_Int      -> \[] [a,i,e]     -> PrimInline $ i3_ a i |= e
+  WriteByteArrayOp_Word     -> \[] [a,i,e]     -> PrimInline $ i3_ a i |= e
+  WriteByteArrayOp_Addr     -> \[] [a,i,e1,e2] ->
+    PrimInline $ mconcat
+      [ ifS (Not (a .^ "arr")) (a .^ "arr" |= ValExpr (JList [])) mempty
+      , a .^ "arr" .! (i .<<. two_) |= ValExpr (JList [e1, e2])
+      ]
+  WriteByteArrayOp_Float     -> \[] [a,i,e]      -> PrimInline $ f3_ a i |= e
+  WriteByteArrayOp_Double    -> \[] [a,i,e]      -> PrimInline $ f6_ a i |= e
+  WriteByteArrayOp_StablePtr -> \[] [a,i,_e1,e2] -> PrimInline $ i3_ a i |= e2
+
+  WriteByteArrayOp_Int8  -> \[] [a,i,e]     -> PrimInline $ dv_s_i8 a i e
+  WriteByteArrayOp_Int16 -> \[] [a,i,e]     -> PrimInline $ dv_s_i16 a (i .<<. one_) e
+  WriteByteArrayOp_Int32 -> \[] [a,i,e]     -> PrimInline $ i3_ a i |= e
+  WriteByteArrayOp_Int64 -> \[] [a,i,e1,e2] ->
+      PrimInline $ mconcat
+        [ i3_ a (Add (i .<<. one_) one_) |= e1
+        , i3_ a (i .<<. one_) |= e2
+        ]
+  WriteByteArrayOp_Word8  -> \[] [a,i,e]     -> PrimInline $ u8_ a i |= e
+  WriteByteArrayOp_Word16 -> \[] [a,i,e]     -> PrimInline $ u1_ a i |= e
+  WriteByteArrayOp_Word32 -> \[] [a,i,e]     -> PrimInline $ i3_ a i |= e
+  WriteByteArrayOp_Word64 -> \[] [a,i,e1,e2] ->
+      PrimInline $ mconcat
+        [ i3_ a (Add (i .<<. one_) one_) |= e1
+        , i3_ a (i .<<. one_) |= e2
+        ]
+  CompareByteArraysOp -> \[r] [a1,o1,a2,o2,n] ->
+      PrimInline $ r |= app "h$compareByteArrays" [a1,o1,a2,o2,n]
+
+  CopyByteArrayOp -> \[] [a1,o1,a2,o2,n] ->
+      -- FIXME: we can do faster by copying 32 bit ints or doubles
+      PrimInline $ loopBlockS (Sub n one_) (.>=. zero_) \i ->
+        [ u8_ a2 (Add i o2) |= u8_ a1 (Add i o1)
+        , postDecrS i
+        ]
+  CopyMutableByteArrayOp       -> \[] xs@[_a1,_o1,_a2,_o2,_n] -> genPrim prof ty CopyByteArrayOp [] xs
+  CopyByteArrayToAddrOp        -> \[] xs@[_a1,_o1,_a2,_o2,_n] -> genPrim prof ty CopyByteArrayOp [] xs
+  CopyMutableByteArrayToAddrOp -> \[] xs@[_a1,_o1,_a2,_o2,_n] -> genPrim prof ty CopyByteArrayOp [] xs
+  CopyAddrToByteArrayOp        -> \[] xs@[_ba,_bo,_aa,_ao,_n] -> genPrim prof ty CopyByteArrayOp [] xs
+
+  SetByteArrayOp -> \[] [a,o,n,v] ->
+      PrimInline $ loopBlockS zero_ (.<. n) \i ->
+        [ u8_ a (Add o i) |= v
+        , postIncrS i
+        ]
+
+  AtomicReadByteArrayOp_Int  -> \[r]   [a,i]         -> PrimInline $ r |= i3_ a i
+  AtomicWriteByteArrayOp_Int -> \[]    [a,i,v]       -> PrimInline $ i3_ a i |= v
+  CasByteArrayOp_Int         -> \[r]   [a,i,old,new] -> PrimInline $
+      jVar \t -> mconcat
+        [ t |= i3_ a i
+        , r |= t
+        , ifS (t .===. old) (i3_ a i |= new) mempty
+        ]
+  FetchAddByteArrayOp_Int    -> \[r]   [a,i,v] -> PrimInline $ fetchOpByteArray Add  r a i v
+  FetchSubByteArrayOp_Int    -> \[r]   [a,i,v] -> PrimInline $ fetchOpByteArray Sub  r a i v
+  FetchAndByteArrayOp_Int    -> \[r]   [a,i,v] -> PrimInline $ fetchOpByteArray BAnd r a i v
+  FetchOrByteArrayOp_Int     -> \[r]   [a,i,v] -> PrimInline $ fetchOpByteArray BOr  r a i v
+  FetchNandByteArrayOp_Int   -> \[r]   [a,i,v] -> PrimInline $ fetchOpByteArray (\x y -> BNot (BAnd x y)) r a i v
+  FetchXorByteArrayOp_Int    -> \[r]   [a,i,v] -> PrimInline $ fetchOpByteArray BXor r a i v
+
+------------------------------- Addr# ------------------------------------------
+
+  AddrAddOp   -> \[a',o'] [a,o,i]         -> PrimInline $ mconcat [a' |= a, o' |= Add o i]
+  AddrSubOp   -> \[i]     [_a1,o1,_a2,o2] -> PrimInline $ i |= Sub o1 o2
+  AddrRemOp   -> \[r]     [_a,o,i]        -> PrimInline $ r |= Mod o i
+  AddrToIntOp -> \[i]     [_a,o]          -> PrimInline $ i |= o -- only usable for comparisons within one range
+  IntToAddrOp -> \[a,o]   [i]             -> PrimInline $ mconcat [a |= null_, o |= i] -- FIXME: unsupported
+  AddrGtOp -> \[r] [a1,o1,a2,o2] -> PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .>. zero_)
+  AddrGeOp -> \[r] [a1,o1,a2,o2] -> PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .>=. zero_)
+  AddrEqOp -> \[r] [a1,o1,a2,o2] -> PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .===. zero_)
+  AddrNeOp -> \[r] [a1,o1,a2,o2] -> PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .!==. zero_)
+  AddrLtOp -> \[r] [a1,o1,a2,o2] -> PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .<. zero_)
+  AddrLeOp -> \[r] [a1,o1,a2,o2] -> PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .<=. zero_)
+
+------------------------------- Addr Indexing: Unboxed Arrays -------------------
+
+  IndexOffAddrOp_Char     -> \[c] [a,o,i] -> PrimInline $ c |= u8_ a    (off8  o i)
+  IndexOffAddrOp_WideChar -> \[c] [a,o,i] -> PrimInline $ c |= dv_u32 a (off32 o i)
+  IndexOffAddrOp_Int      -> \[c] [a,o,i] -> PrimInline $ c |= dv_i32 a (off32 o i)
+  IndexOffAddrOp_Word     -> \[c] [a,o,i] -> PrimInline $ c |= dv_i32 a (off32 o i)
+  IndexOffAddrOp_Addr     -> \[ca,co] [a,o,i] ->
+      PrimInline $ ifBlockS (a .^ "arr " .&&. a .^ "arr" .! (i .<<. two_))
+                       [ ca |= a .^ "arr" .! (off32 o i) .! zero_
+                       ,  co |= a .^ "arr" .! (off32 o i) .! one_
+                       ]
+                       [ ca |= null_
+                       , co |= zero_
+                       ]
+  IndexOffAddrOp_Float     -> \[c]     [a,o,i] -> PrimInline $ c |= dv_f32 a (off32 o i)
+  IndexOffAddrOp_Double    -> \[c]     [a,o,i] -> PrimInline $ c |= dv_f64 a (off64 o i)
+  IndexOffAddrOp_StablePtr -> \[c1,c2] [a,o,i] -> PrimInline $ mconcat
+                                                          [ c1 |= var "h$stablePtrBuf"
+                                                          , c2 |= dv_i32 a (off32 o i)
+                                                          ]
+  IndexOffAddrOp_Int8  -> \[c]     [a,o,i] -> PrimInline $ c |= u8_    a (off8  o i)
+  IndexOffAddrOp_Int16 -> \[c]     [a,o,i] -> PrimInline $ c |= dv_i16 a (off16 o i)
+  IndexOffAddrOp_Int32 -> \[c]     [a,o,i] -> PrimInline $ c |= dv_i32 a (off32 o i)
+  IndexOffAddrOp_Int64 -> \[c1,c2] [a,o,i] ->
+      PrimInline $ mconcat
+       [ c1 |= dv_i32 a (Add (off64 o i) (Int 4))
+       , c2 |= dv_i32 a (off64 o i)
+       ]
+  IndexOffAddrOp_Word8  -> \[c]     [a,o,i] -> PrimInline $ c |= u8_    a (off8  o i)
+  IndexOffAddrOp_Word16 -> \[c]     [a,o,i] -> PrimInline $ c |= dv_u16 a (off16 o i)
+  IndexOffAddrOp_Word32 -> \[c]     [a,o,i] -> PrimInline $ c |= dv_i32 a (off32 o i)
+  IndexOffAddrOp_Word64 -> \[c1,c2] [a,o,i] ->
+      PrimInline $ mconcat
+       [ c1 |= dv_i32 a (Add (off64 o i) (Int 4))
+       , c2 |= dv_i32 a (off64 o i)
+       ]
+  ReadOffAddrOp_Char     -> \[c] [a,o,i] -> PrimInline $ c |= u8_    a (off8  o i)
+  ReadOffAddrOp_WideChar -> \[c] [a,o,i] -> PrimInline $ c |= dv_u32 a (off32 o i)
+  ReadOffAddrOp_Int      -> \[c] [a,o,i] -> PrimInline $ c |= dv_i32 a (off32 o i)
+  ReadOffAddrOp_Word     -> \[c] [a,o,i] -> PrimInline $ c |= dv_i32 a (off32 o i)
+  ReadOffAddrOp_Addr     -> \[c1,c2] [a,o,i] ->
+      PrimInline $ jVar \x -> mconcat
+        [ x |= i .<<. two_
+        , ifBlockS  (a .^ "arr" .&&. a .^ "arr" .! (Add o x))
+              [ c1 |= a .^ "arr" .! (Add o x) .! zero_
+              , c2 |= a .^ "arr" .! (Add o x) .! one_
+              ]
+              [ c1 |= null_
+              , c2 |= zero_
+              ]
+        ]
+  ReadOffAddrOp_Float     -> \[c]     [a,o,i] -> PrimInline $ c |= dv_f32 a (off32 o i)
+  ReadOffAddrOp_Double    -> \[c]     [a,o,i] -> PrimInline $ c |= dv_f64 a (off64 o i)
+  ReadOffAddrOp_StablePtr -> \[c1,c2] [a,o,i] -> PrimInline $ mconcat
+                                                        [ c1 |= var "h$stablePtrBuf"
+                                                        , c2 |= dv_u32 a (off32 o i)
+                                                        ]
+  ReadOffAddrOp_Int8   -> \[c]     [a,o,i] -> PrimInline $ AssignStat c $ dv_i8  a (off8  o i)
+  ReadOffAddrOp_Int16  -> \[c]     [a,o,i] -> PrimInline $ AssignStat c $ dv_i16 a (off16 o i)
+  ReadOffAddrOp_Int32  -> \[c]     [a,o,i] -> PrimInline $ AssignStat c $ dv_i32 a (off32 o i)
+  ReadOffAddrOp_Int64  -> \[c1,c2] [a,o,i] ->
+      PrimInline $ mconcat
+        [ c1 |= dv_i32 a (Add (off64 o i) (Int 4))
+        , c2 |= dv_i32 a (off64 o i)
+        ]
+  ReadOffAddrOp_Word8  -> \[c]     [a,o,i] -> PrimInline $ AssignStat c $ u8_    a (off8  o i)
+  ReadOffAddrOp_Word16 -> \[c]     [a,o,i] -> PrimInline $ AssignStat c $ dv_u16 a (off16 o i)
+  ReadOffAddrOp_Word32 -> \[c]     [a,o,i] -> PrimInline $ AssignStat c $ dv_i32 a (off32 o i)
+  ReadOffAddrOp_Word64 -> \[c1,c2] [a,o,i] ->
+      PrimInline $ mconcat
+       [ c1 |= dv_i32 a (Add (off64 o i) (Int 4))
+       , c2 |= dv_i32 a (off64 o i)
+       ]
+  WriteOffAddrOp_Char     -> \[] [a,o,i,v]     -> PrimInline $ u8_      a (off8  o i) |= v
+  WriteOffAddrOp_WideChar -> \[] [a,o,i,v]     -> PrimInline $ dv_s_u32 a (off32 o i) v
+  WriteOffAddrOp_Int      -> \[] [a,o,i,v]     -> PrimInline $ dv_s_i32 a (off32 o i) v
+  WriteOffAddrOp_Word     -> \[] [a,o,i,v]     -> PrimInline $ dv_s_i32 a (off32 o i) v
+  WriteOffAddrOp_Addr     -> \[] [a,o,i,va,vo] ->
+      PrimInline $ mconcat
+        [ ifS (Not (a .^ "arr")) (a .^ "arr" |= ValExpr (JList [])) mempty
+        , AssignStat (a .^ "arr" .! (off32 o i)) $ ValExpr (JList [va, vo])
+        ]
+  WriteOffAddrOp_Float     -> \[] [a,o,i,v]      -> PrimInline $ dv_s_f32 a (off32 o i) v
+  WriteOffAddrOp_Double    -> \[] [a,o,i,v]      -> PrimInline $ dv_s_f64 a (off64 o i) v
+  WriteOffAddrOp_StablePtr -> \[] [a,o,i,_v1,v2] -> PrimInline $ dv_s_u32 a (off32 o i) v2
+  WriteOffAddrOp_Int8      -> \[] [a,o,i,v]      -> PrimInline $ dv_s_i8  a (off8  o i) v
+  WriteOffAddrOp_Int16     -> \[] [a,o,i,v]      -> PrimInline $ dv_s_i16 a (off16 o i) v
+  WriteOffAddrOp_Int32     -> \[] [a,o,i,v]      -> PrimInline $ dv_s_i32 a (off32 o i) v
+  WriteOffAddrOp_Int64     -> \[] [a,o,i,v1,v2]  -> PrimInline $ mconcat
+                                                          [ dv_s_i32 a (Add (off64 o i) (Int 4)) v1
+                                                          , dv_s_i32 a (off64 o i) v2
+                                                          ]
+  WriteOffAddrOp_Word8     -> \[] [a,o,i,v]      -> PrimInline $ u8_      a (off8  o i) |= v
+  WriteOffAddrOp_Word16    -> \[] [a,o,i,v]      -> PrimInline $ dv_s_u16 a (off16 o i) v
+  WriteOffAddrOp_Word32    -> \[] [a,o,i,v]      -> PrimInline $ dv_s_i32 a (off32 o i) v
+  WriteOffAddrOp_Word64    -> \[] [a,o,i,v1,v2]  -> PrimInline $ mconcat
+                                                          [ dv_s_i32 a (Add (off64 o i) (Int 4)) v1
+                                                          , dv_s_i32 a (off64 o i) v2
+                                                          ]
+-- Mutable variables
+  NewMutVarOp           -> \[r] [x]       -> PrimInline $ r |= New (app "h$MutVar" [x])
+  ReadMutVarOp          -> \[r] [m]       -> PrimInline $ r |= m .^ "val"
+  WriteMutVarOp         -> \[] [m,x]      -> PrimInline $ m .^ "val" |= x
+  AtomicModifyMutVar2Op -> \[r1,r2] [m,f] -> PrimInline $ appT [r1,r2] "h$atomicModifyMutVar2" [m,f]
+  AtomicModifyMutVar_Op -> \[r1,r2] [m,f] -> PrimInline $ appT [r1,r2] "h$atomicModifyMutVar" [m,f]
+
+  CasMutVarOp -> \[status,r] [mv,o,n] -> PrimInline $ ifS (mv .^ "val" .===. o)
+                   (mconcat [status |= zero_, r |= n, mv .^ "val" |= n])
+                   (mconcat [status |= one_ , r |= mv .^ "val"])
+
+------------------------------- Exceptions --------------------------------------
+
+  CatchOp -> \[_r] [a,handler] -> PRPrimCall $ returnS (app "h$catch" [a, handler])
+  RaiseOp         -> \[_r] [a] -> PRPrimCall $ returnS (app "h$throw" [a, false_])
+  RaiseIOOp       -> \[_r] [a] -> PRPrimCall $ returnS (app "h$throw" [a, false_])
+
+  MaskAsyncExceptionsOp   -> \[_r] [a] -> PRPrimCall $ returnS (app "h$maskAsync" [a])
+  MaskUninterruptibleOp   -> \[_r] [a] -> PRPrimCall $ returnS (app "h$maskUnintAsync" [a])
+  UnmaskAsyncExceptionsOp -> \[_r] [a] -> PRPrimCall $ returnS (app "h$unmaskAsync" [a])
+
+  MaskStatus -> \[r] [] -> PrimInline $ r |= app "h$maskStatus" []
+
+------------------------------- STM-accessible Mutable Variables  --------------
+
+  AtomicallyOp -> \[_r] [a]   -> PRPrimCall $ returnS (app "h$atomically" [a])
+  RetryOp      -> \[_r] []    -> PRPrimCall $ returnS (app "h$stmRetry" [])
+  CatchRetryOp -> \[_r] [a,b] -> PRPrimCall $ returnS (app "h$stmCatchRetry" [a,b])
+  CatchSTMOp   -> \[_r] [a,h] -> PRPrimCall $ returnS (app "h$catchStm" [a,h])
+  NewTVarOp    -> \[tv] [v]   -> PrimInline $ tv |= app "h$newTVar" [v]
+  ReadTVarOp   -> \[r] [tv]   -> PrimInline $ r |= app "h$readTVar" [tv]
+  ReadTVarIOOp -> \[r] [tv]   -> PrimInline $ r |= app "h$readTVarIO" [tv]
+  WriteTVarOp  -> \[] [tv,v]  -> PrimInline $ appS "h$writeTVar" [tv,v]
+
+------------------------------- Synchronized Mutable Variables ------------------
+
+  NewMVarOp     -> \[r]   []    -> PrimInline $ r |= New (app "h$MVar" [])
+  TakeMVarOp    -> \[_r]  [m]   -> PRPrimCall $ returnS (app "h$takeMVar" [m])
+  TryTakeMVarOp -> \[r,v] [m]   -> PrimInline $ appT [r,v] "h$tryTakeMVar" [m]
+  PutMVarOp     -> \[]    [m,v] -> PRPrimCall $ returnS (app "h$putMVar" [m,v])
+  TryPutMVarOp  -> \[r]   [m,v] -> PrimInline $ r |= app "h$tryPutMVar" [m,v]
+  ReadMVarOp    -> \[_r]  [m]   -> PRPrimCall $ returnS (app "h$readMVar" [m])
+  TryReadMVarOp -> \[r,v] [m]   -> PrimInline $ mconcat
+                                                    [ v |= m .^ "val"
+                                                    , r |= if01 (v .===. null_)
+                                                    ]
+  IsEmptyMVarOp -> \[r]   [m]   -> PrimInline $ r |= if10 (m .^ "val" .===. null_)
+
+------------------------------- Delay/Wait Ops ---------------------------------
+
+  DelayOp     -> \[] [t]  -> PRPrimCall $ returnS (app "h$delayThread" [t])
+  WaitReadOp  -> \[] [fd] -> PRPrimCall $ returnS (app "h$waidRead" [fd])
+  WaitWriteOp -> \[] [fd] -> PRPrimCall $ returnS (app "h$waitWrite" [fd])
+
+------------------------------- Concurrency Primitives -------------------------
+
+  ForkOp   -> \[_tid] [x]    -> PRPrimCall $ returnS (app "h$fork" [x, true_])
+  ForkOnOp -> \[_tid] [_p,x] -> PRPrimCall $ returnS (app "h$fork" [x, true_]) -- ignore processor argument
+  KillThreadOp  -> \[] [tid,ex]  -> PRPrimCall $ returnS (app "h$killThread" [tid,ex])
+  YieldOp       -> \[] []        -> PRPrimCall $ returnS (app "h$yield" [])
+  MyThreadIdOp  -> \[r] []       -> PrimInline $ r |= var "h$currentThread"
+  LabelThreadOp -> \[] [t,la,lo] -> PrimInline $ t .^ "label" |= ValExpr (JList [la, lo])
+  IsCurrentThreadBoundOp -> \[r] [] -> PrimInline $ r |= one_
+  NoDuplicateOp -> \[] [] -> PrimInline mempty -- don't need to do anything as long as we have eager blackholing
+  ThreadStatusOp -> \[stat,cap,locked] [tid] -> PrimInline $ appT [stat, cap, locked] "h$threadStatus" [tid]
+
+------------------------------- Weak Pointers -----------------------------------
+
+  MkWeakOp              -> \[r] [o,b,c] -> PrimInline $ r |= app "h$makeWeak" [o,b,c]
+  MkWeakNoFinalizerOp   -> \[r] [o,b]   -> PrimInline $ r |= app "h$makeWeakNoFinalizer" [o,b]
+  AddCFinalizerToWeakOp -> \[r] [_a1,_a1o,_a2,_a2o,_i,_a3,_a3o,_w] -> PrimInline $ r |= one_ -- fixme
+  DeRefWeakOp           -> \[f,v] [w] -> PrimInline $ mconcat
+                                                        [ v |= w .^ "val"
+                                                        , f |= if01 (v .===. null_)
+                                                        ]
+  FinalizeWeakOp     -> \[fl,fin] [w] -> PrimInline $ appT [fin, fl] "h$finalizeWeak" [w]
+  TouchOp            -> \[] [_e]      -> PrimInline mempty -- fixme what to do?
+
+------------------------------ Stable pointers and names ------------------------
+
+  MakeStablePtrOp -> \[s1,s2] [a] -> PrimInline $ mconcat
+      [ s1 |= var "h$stablePtrBuf"
+      , s2 |= app "h$makeStablePtr" [a]
+      ]
+  DeRefStablePtrOp -> \[r] [_s1,s2]            -> PrimInline $ r |= app "h$deRefStablePtr" [s2]
+  EqStablePtrOp    -> \[r] [_sa1,sa2,_sb1,sb2] -> PrimInline $ r |= if10 (sa2 .===. sb2)
+
+  MakeStableNameOp  -> \[r] [a] -> PrimInline $ r |= app "h$makeStableName" [a]
+  StableNameToIntOp -> \[r] [s] -> PrimInline $ r |= app "h$stableNameInt" [s]
+
+------------------------------ Compact normal form -----------------------------
+
+  CompactNewOp           -> \[c] [s]   -> PrimInline $ c |= app "h$compactNew" [s]
+  CompactResizeOp        -> \[]  [s]   -> PrimInline $ appS "h$compactResize" [s]
+  CompactContainsOp      -> \[r] [c,v] -> PrimInline $ r |= app "h$compactContains" [c,v]
+  CompactContainsAnyOp   -> \[r] [v]   -> PrimInline $ r |= app "h$compactContainsAny" [v]
+  CompactGetFirstBlockOp -> \[ra,ro,s] [c] ->
+    PrimInline $ appT [ra,ro,s] "h$compactGetFirstBlock" [c]
+  CompactGetNextBlockOp -> \[ra,ro,s] [c,a,o] ->
+    PrimInline $ appT [ra,ro,s] "h$compactGetNextBlock" [c,a,o]
+  CompactAllocateBlockOp -> \[ra,ro] [size,sa,so] ->
+    PrimInline $ appT [ra,ro] "h$compactAllocateBlock" [size,sa,so]
+  CompactFixupPointersOp -> \[newroota, newrooto] [blocka,blocko,roota,rooto] ->
+    PrimInline $ appT [newroota,newrooto] "h$compactFixupPointers" [blocka,blocko,roota,rooto]
+  CompactAdd -> \[_r] [c,o] ->
+    PRPrimCall $ returnS (app "h$compactAdd" [c,o])
+  CompactAddWithSharing -> \[_r] [c,o] ->
+    PRPrimCall $ returnS (app "h$compactAddWithSharing" [c,o])
+  CompactSize -> \[s] [c] ->
+    PrimInline $ s |= app "h$compactSize" [c]
+
+------------------------------ Unsafe pointer equality --------------------------
+
+  ReallyUnsafePtrEqualityOp -> \[r] [p1,p2] -> PrimInline $ r |= if10 (p1 .===. p2)
+
+------------------------------ Parallelism --------------------------------------
+
+  ParOp     -> \[r] [_a] -> PrimInline $ r |= zero_
+  SparkOp   -> \[r] [a]  -> PrimInline $ r |= a
+  SeqOp     -> \[_r] [e] -> PRPrimCall $ returnS (app "h$e" [e])
+  NumSparks -> \[r] []   -> PrimInline $ r |= zero_
+
+------------------------------ Tag to enum stuff --------------------------------
+
+  DataToTagOp -> \[_r] [d] -> PRPrimCall $ mconcat
+      [ stack .! PreInc sp |= var "h$dataToTag_e"
+      , returnS (app "h$e" [d])
+      ]
+  TagToEnumOp -> \[r] [tag] -> if
+    | isBoolTy ty -> PrimInline $ r |= IfExpr tag true_ false_
+    | otherwise   -> PrimInline $ r |= app "h$tagToEnum" [tag]
+
+------------------------------ Bytecode operations ------------------------------
+
+  AddrToAnyOp -> \[r] [d,_o] -> PrimInline $ r |= d
+
+------------------------------ Profiling (CCS)  ------------------------------
+
+  GetCCSOfOp -> \[a, o] [obj] -> if
+    | prof -> PrimInline $ mconcat
+        [ a |= if_ (isObject obj)
+                    (app "h$buildCCSPtr" [obj .^ "cc"])
+                    null_
+        , o |= zero_
+        ]
+    | otherwise -> PrimInline $ mconcat
+                    [ a |= null_
+                    , o |= zero_
+                    ]
+
+  GetCurrentCCSOp -> \[a, o] [_dummy_arg] ->
+    let ptr = if prof then app "h$buildCCSPtr" [jCurrentCCS]
+                      else null_
+    in PrimInline $ mconcat
+        [ a |= ptr
+        , o |= zero_
+        ]
+
+  ClearCCSOp -> \[_r] [x] -> PRPrimCall $ ReturnStat (app "h$clearCCS" [x])
+
+------------------------------ Eventlog -------------------
+
+  TraceEventOp       -> \[] [ed,eo]     -> PrimInline $ appS "h$traceEvent" [ed,eo]
+  TraceEventBinaryOp -> \[] [ed,eo,len] -> PrimInline $ appS "h$traceEventBinary" [ed,eo,len]
+  TraceMarkerOp      -> \[] [ed,eo]     -> PrimInline $ appS "h$traceMarker" [ed,eo]
+
+-- FIXME: Sylvain (2022-06) We want to support every primop, or disable them
+-- explicitly. So we should remove this catch-all case ultimately, or make it
+-- crash at compilation time.
+  op -> \rs as -> PrimInline $ mconcat
+    [ appS "h$log" [toJExpr $ mconcat
+        [ "warning, unhandled primop: "
+        , renderWithContext defaultSDocContext (ppr op)
+        , " "
+        , show (length rs, length as)
+        ]]
+    , appS (ST.pack $ "h$primop_" ++ zEncodeString (renderWithContext defaultSDocContext (ppr op))) as
+      -- copyRes
+    , mconcat $ zipWith (\r reg -> r |= toJExpr reg) rs (enumFrom Ret1)
+    ]
+
 {- new ops in 8.6
    , IndexByteArrayOp_Word8AsChar
    , IndexByteArrayOp_Word8AsWideChar
@@ -630,53 +1005,7 @@ genPrim _ _ IndexByteArrayOp_Word64 [r1,r2] [a,i] = PrimInline $ mconcat
    , IndexByteArrayOp_Word8AsWord32
    , IndexByteArrayOp_Word8AsWord64
    , IndexByteArrayOp_Word8AsWord
- -}
-genPrim _ _ ReadByteArrayOp_Char [r] [a,i] =
-  PrimInline $ r |= u8_ a i
-genPrim _ _ ReadByteArrayOp_WideChar [r] [a,i] =
-  PrimInline $ r |= i3_ a i
-genPrim _ _ ReadByteArrayOp_Int [r] [a,i] =
-  PrimInline $ r |= i3_ a i
-genPrim _ _ ReadByteArrayOp_Word [r] [a,i] =
-  PrimInline $ r |= i3_ a i
-genPrim _ _ ReadByteArrayOp_Addr [r1,r2] [a,i] =
-  PrimInline $ jVar \x -> mconcat
-    [ x |= i .<<. two_
-    , ifS (a .^ "arr" .&&. a .^ "arr" .! x)
-           (mconcat [ r1 |= a .^ "arr" .! x .! zero_
-                    , r2 |= a .^ "arr" .! x .! one_
-                    ])
-           (mconcat [r1 |= null_, r2 |= one_])
-    ]
-genPrim _ _ ReadByteArrayOp_Float [r] [a,i] =
-  PrimInline $ r |= f3_ a i
-genPrim _ _ ReadByteArrayOp_Double [r] [a,i] =
-  PrimInline $ r |= f6_ a i
-genPrim _ _ ReadByteArrayOp_StablePtr [r1,r2] [a,i] =
-   PrimInline $ mconcat
-    [ r1 |= var "h$stablePtrBuf"
-    , r2 |= i3_ a i
-    ]
-genPrim _ _ ReadByteArrayOp_Int8 [r] [a,i] =
-  PrimInline $ r |= dv_i8 a i
-genPrim _ _ ReadByteArrayOp_Int16 [r] [a,i] =
-  PrimInline $ r |= dv_i16 a (i .<<. one_)
-genPrim _ _ ReadByteArrayOp_Int32 [r] [a,i] =
-  PrimInline $ r |= i3_ a i
-genPrim _ _ ReadByteArrayOp_Int64 [r1,r2] [a,i] =
-  PrimInline $ mconcat
-    [ r1 |= i3_ a (Add (i .<<. one_) one_)
-    , r2 |= i3_ a (i .<<. one_)
-    ]
-genPrim _ _ ReadByteArrayOp_Word8 [r] [a,i] = PrimInline $ r |= u8_ a i
-genPrim _ _ ReadByteArrayOp_Word16 [r] [a,i] = PrimInline $ r |= u1_ a i
-genPrim _ _ ReadByteArrayOp_Word32 [r] [a,i] = PrimInline $ r |= i3_ a i
-genPrim _ _ ReadByteArrayOp_Word64 [r1,r2] [a,i] =
-  PrimInline $ mconcat
-    [ r1 |= i3_ a (Add (i .<<. one_) one_)
-    , r2 |= i3_ a (i .<<. one_)
-    ]
-{- new ops in 8.6
+
    , ReadByteArrayOp_Word8AsChar
    , ReadByteArrayOp_Word8AsWideChar
    , ReadByteArrayOp_Word8AsAddr
@@ -691,354 +1020,21 @@ genPrim _ _ ReadByteArrayOp_Word64 [r1,r2] [a,i] =
    , ReadByteArrayOp_Word8AsWord32
    , ReadByteArrayOp_Word8AsWord64
    , ReadByteArrayOp_Word8AsWord
+   , WriteByteArrayOp_Word8AsChar
+   , WriteByteArrayOp_Word8AsWideChar
+   , WriteByteArrayOp_Word8AsAddr
+   , WriteByteArrayOp_Word8AsFloat
+   , WriteByteArrayOp_Word8AsDouble
+   , WriteByteArrayOp_Word8AsStablePtr
+   , WriteByteArrayOp_Word8AsInt16
+   , WriteByteArrayOp_Word8AsInt32
+   , WriteByteArrayOp_Word8AsInt64
+   , WriteByteArrayOp_Word8AsInt
+   , WriteByteArrayOp_Word8AsWord16
+   , WriteByteArrayOp_Word8AsWord32
+   , WriteByteArrayOp_Word8AsWord64
+   , WriteByteArrayOp_Word8AsWord
  -}
-genPrim _ _ WriteByteArrayOp_Char [] [a,i,e] = PrimInline $ u8_ a i |= e
-genPrim _ _ WriteByteArrayOp_WideChar [] [a,i,e] = PrimInline $ i3_ a i |= e
-genPrim _ _ WriteByteArrayOp_Int [] [a,i,e] = PrimInline $ i3_ a i |= e
-genPrim _ _ WriteByteArrayOp_Word [] [a,i,e] = PrimInline $ i3_ a i |= e
-genPrim _ _ WriteByteArrayOp_Addr [] [a,i,e1,e2] = PrimInline $ mconcat
-                                                      [ ifS (Not (a .^ "arr")) (a .^ "arr" |= ValExpr (JList [])) mempty
-                                                      , a .^ "arr" .! (i .<<. two_) |= ValExpr (JList [e1, e2])
-                                                      ]
-genPrim _ _ WriteByteArrayOp_Float     [] [a,i,e]      = PrimInline $ f3_ a i |= e
-genPrim _ _ WriteByteArrayOp_Double    [] [a,i,e]      = PrimInline $ f6_ a i |= e
-genPrim _ _ WriteByteArrayOp_StablePtr [] [a,i,_e1,e2] = PrimInline $ i3_ a i |= e2
-
-genPrim _ _ WriteByteArrayOp_Int8  [] [a,i,e]     = PrimInline $ dv_s_i8 a i e
-genPrim _ _ WriteByteArrayOp_Int16 [] [a,i,e]     = PrimInline $ dv_s_i16 a (i .<<. one_) e
-genPrim _ _ WriteByteArrayOp_Int32 [] [a,i,e]     = PrimInline $ i3_ a i |= e
-genPrim _ _ WriteByteArrayOp_Int64 [] [a,i,e1,e2] =
-  PrimInline $ mconcat
-    [ i3_ a (Add (i .<<. one_) one_) |= e1
-    , i3_ a (i .<<. one_) |= e2
-    ]
-genPrim _ _ WriteByteArrayOp_Word8  [] [a,i,e]     = PrimInline $ u8_ a i |= e
-genPrim _ _ WriteByteArrayOp_Word16 [] [a,i,e]     = PrimInline $ u1_ a i |= e
-genPrim _ _ WriteByteArrayOp_Word32 [] [a,i,e]     = PrimInline $ i3_ a i |= e
-genPrim _ _ WriteByteArrayOp_Word64 [] [a,i,e1,e2] =
-  PrimInline $ mconcat
-    [ i3_ a (Add (i .<<. one_) one_) |= e1
-    , i3_ a (i .<<. one_) |= e2
-    ]
-{- implement new ops in 8.6
-                  , WriteByteArrayOp_Word8AsChar
-                  , WriteByteArrayOp_Word8AsWideChar
-                  , WriteByteArrayOp_Word8AsAddr
-                  , WriteByteArrayOp_Word8AsFloat
-                  , WriteByteArrayOp_Word8AsDouble
-                  , WriteByteArrayOp_Word8AsStablePtr
-                  , WriteByteArrayOp_Word8AsInt16
-                  , WriteByteArrayOp_Word8AsInt32
-                  , WriteByteArrayOp_Word8AsInt64
-                  , WriteByteArrayOp_Word8AsInt
-                  , WriteByteArrayOp_Word8AsWord16
-                  , WriteByteArrayOp_Word8AsWord32
-                  , WriteByteArrayOp_Word8AsWord64
-                  , WriteByteArrayOp_Word8AsWord
- -}
-
-genPrim _ _ CompareByteArraysOp [r] [a1,o1,a2,o2,n] =
-  PrimInline $ r |= app "h$compareByteArrays" [a1,o1,a2,o2,n]
--- fixme we can do faster by copying 32 bit ints or doubles
-genPrim _ _ CopyByteArrayOp [] [a1,o1,a2,o2,n] =
-  PrimInline $ loopBlockS (Sub n one_) (.>=. zero_) \i ->
-    [ u8_ a2 (Add i o2) |= u8_ a1 (Add i o1)
-    , postDecrS i
-    ]
-genPrim d t CopyMutableByteArrayOp [] xs@[_a1,_o1,_a2,_o2,_n] = genPrim d t CopyByteArrayOp [] xs
-genPrim d t CopyByteArrayToAddrOp [] xs@[_a1,_o1,_a2,_o2,_n] = genPrim d t CopyByteArrayOp [] xs
-genPrim d t CopyMutableByteArrayToAddrOp [] xs@[_a1,_o1,_a2,_o2,_n] = genPrim d t CopyByteArrayOp [] xs
-genPrim d t CopyAddrToByteArrayOp [] xs@[_ba,_bo,_aa,_ao,_n] = genPrim d t CopyByteArrayOp [] xs
-
-genPrim _ _ SetByteArrayOp [] [a,o,n,v] =
-  PrimInline $ loopBlockS zero_ (.<. n) \i ->
-    [ u8_ a (Add o i) |= v
-    , postIncrS i
-    ]
-
-genPrim _ _ AtomicReadByteArrayOp_Int  [r]   [a,i]         = PrimInline $ r |= i3_ a i
-genPrim _ _ AtomicWriteByteArrayOp_Int []    [a,i,v]       = PrimInline $ i3_ a i |= v
-genPrim _ _ CasByteArrayOp_Int         [r]   [a,i,old,new] = PrimInline $
-  jVar \t -> mconcat
-    [ t |= i3_ a i
-    , r |= t
-    , ifS (t .===. old) (i3_ a i |= new) mempty
-    ]
-genPrim _ _ FetchAddByteArrayOp_Int    [r]   [a,i,v]       = PrimInline $ fetchOpByteArray Add  r a i v
-genPrim _ _ FetchSubByteArrayOp_Int    [r]   [a,i,v]       = PrimInline $ fetchOpByteArray Sub  r a i v
-genPrim _ _ FetchAndByteArrayOp_Int    [r]   [a,i,v]       = PrimInline $ fetchOpByteArray BAnd r a i v
-genPrim _ _ FetchOrByteArrayOp_Int     [r]   [a,i,v]       = PrimInline $ fetchOpByteArray BOr  r a i v
-genPrim _ _ FetchNandByteArrayOp_Int   [r]   [a,i,v]       = PrimInline $ fetchOpByteArray (\x y -> BNot (BAnd x y)) r a i v
-genPrim _ _ FetchXorByteArrayOp_Int    [r]   [a,i,v]       = PrimInline $ fetchOpByteArray BXor r a i v
-
-------------------------------- Addr# ------------------------------------------
-
-genPrim _ _ AddrAddOp  [a',o'] [a,o,i]     = PrimInline $ mconcat [a' |= a, o' |= Add o i]
-genPrim _ _ AddrSubOp  [i] [_a1,o1,_a2,o2] = PrimInline $ i |= Sub o1 o2
-genPrim _ _ AddrRemOp  [r] [_a,o,i]        = PrimInline $ r |= Mod o i
-genPrim _ _ AddrToIntOp [i]     [_a,o]     = PrimInline $ i |= o -- only usable for comparisons within one range
-genPrim _ _ IntToAddrOp [a,o]   [i]        = PrimInline $ mconcat [a |= null_, o |= i] -- FIXME: unsupported
-genPrim _ _ AddrGtOp   [r] [a1,o1,a2,o2] =
-  PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .>. zero_)
-genPrim _ _ AddrGeOp   [r] [a1,o1,a2,o2] =
-  PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .>=. zero_)
-genPrim _ _ AddrEqOp   [r] [a1,o1,a2,o2]   =
-  PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .===. zero_)
-genPrim _ _ AddrNeOp   [r] [a1,o1,a2,o2]   =
-  PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .!==. zero_)
-genPrim _ _ AddrLtOp   [r] [a1,o1,a2,o2] =
-  PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .<. zero_)
-genPrim _ _ AddrLeOp   [r] [a1,o1,a2,o2] =
-  PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .<=. zero_)
-
-------------------------------- Addr Indexing: Unboxed Arrays -------------------
-
-genPrim _ _ IndexOffAddrOp_Char     [c] [a,o,i] = PrimInline $ c |= u8_ a    (off8  o i)
-genPrim _ _ IndexOffAddrOp_WideChar [c] [a,o,i] = PrimInline $ c |= dv_u32 a (off32 o i)
-genPrim _ _ IndexOffAddrOp_Int      [c] [a,o,i] = PrimInline $ c |= dv_i32 a (off32 o i)
-genPrim _ _ IndexOffAddrOp_Word     [c] [a,o,i] = PrimInline $ c |= dv_i32 a (off32 o i)
-genPrim _ _ IndexOffAddrOp_Addr [ca,co] [a,o,i] =
-  PrimInline $ ifBlockS (a .^ "arr " .&&. a .^ "arr" .! (i .<<. two_))
-                   [ ca |= a .^ "arr" .! (off32 o i) .! zero_
-                   ,  co |= a .^ "arr" .! (off32 o i) .! one_
-                   ]
-                   [ ca |= null_
-                   , co |= zero_
-                   ]
-genPrim _ _ IndexOffAddrOp_Float [c] [a,o,i] = PrimInline $ c |= dv_f32 a (off32 o i)
-genPrim _ _ IndexOffAddrOp_Double [c] [a,o,i] = PrimInline $ c |= dv_f64 a (off64 o i)
-genPrim _ _ IndexOffAddrOp_StablePtr [c1,c2] [a,o,i] = PrimInline $ mconcat
-                                                          [ c1 |= var "h$stablePtrBuf"
-                                                          , c2 |= dv_i32 a (off32 o i)
-                                                          ]
-genPrim _ _ IndexOffAddrOp_Int8  [c] [a,o,i] = PrimInline $ c |= u8_    a (off8  o i)
-genPrim _ _ IndexOffAddrOp_Int16 [c] [a,o,i] = PrimInline $ c |= dv_i16 a (off16 o i)
-genPrim _ _ IndexOffAddrOp_Int32 [c] [a,o,i] = PrimInline $ c |= dv_i32 a (off32 o i)
-genPrim _ _ IndexOffAddrOp_Int64 [c1,c2] [a,o,i] =
-   PrimInline $ mconcat
-    [ c1 |= dv_i32 a (Add (off64 o i) (Int 4))
-    , c2 |= dv_i32 a (off64 o i)
-    ]
-genPrim _ _ IndexOffAddrOp_Word8  [c] [a,o,i] = PrimInline $ c |= u8_    a (off8  o i)
-genPrim _ _ IndexOffAddrOp_Word16 [c] [a,o,i] = PrimInline $ c |= dv_u16 a (off16 o i)
-genPrim _ _ IndexOffAddrOp_Word32 [c] [a,o,i] = PrimInline $ c |= dv_i32 a (off32 o i)
-genPrim _ _ IndexOffAddrOp_Word64 [c1,c2] [a,o,i] =
-   PrimInline $ mconcat
-    [ c1 |= dv_i32 a (Add (off64 o i) (Int 4))
-    , c2 |= dv_i32 a (off64 o i)
-    ]
-genPrim _ _ ReadOffAddrOp_Char     [c] [a,o,i] = PrimInline $ c |= u8_    a (off8  o i)
-genPrim _ _ ReadOffAddrOp_WideChar [c] [a,o,i] = PrimInline $ c |= dv_u32 a (off32 o i)
-genPrim _ _ ReadOffAddrOp_Int      [c] [a,o,i] = PrimInline $ c |= dv_i32 a (off32 o i)
-genPrim _ _ ReadOffAddrOp_Word     [c] [a,o,i] = PrimInline $ c |= dv_i32 a (off32 o i)
-genPrim _ _ ReadOffAddrOp_Addr [c1,c2] [a,o,i] =
-  PrimInline $ jVar \x -> mconcat
-    [ x |= i .<<. two_
-    , ifBlockS  (a .^ "arr" .&&. a .^ "arr" .! (Add o x))
-          [ c1 |= a .^ "arr" .! (Add o x) .! zero_
-          , c2 |= a .^ "arr" .! (Add o x) .! one_
-          ]
-          [ c1 |= null_
-          , c2 |= zero_
-          ]
-    ]
-genPrim _ _ ReadOffAddrOp_Float  [c] [a,o,i] = PrimInline $ c |= dv_f32 a (off32 o i)
-genPrim _ _ ReadOffAddrOp_Double [c] [a,o,i] = PrimInline $ c |= dv_f64 a (off64 o i)
-genPrim _ _ ReadOffAddrOp_StablePtr [c1,c2] [a,o,i] = PrimInline $ mconcat
-                                                        [ c1 |= var "h$stablePtrBuf"
-                                                        , c2 |= dv_u32 a (off32 o i)
-                                                        ]
-genPrim _ _ ReadOffAddrOp_Int8   [c] [a,o,i] = PrimInline $ AssignStat c $ dv_i8  a (off8  o i)
-genPrim _ _ ReadOffAddrOp_Int16  [c] [a,o,i] = PrimInline $ AssignStat c $ dv_i16 a (off16 o i)
-genPrim _ _ ReadOffAddrOp_Int32  [c] [a,o,i] = PrimInline $ AssignStat c $ dv_i32 a (off32 o i)
-genPrim _ _ ReadOffAddrOp_Int64  [c1,c2] [a,o,i] =
-  PrimInline $ mconcat
-    [ c1 |= dv_i32 a (Add (off64 o i) (Int 4))
-    , c2 |= dv_i32 a (off64 o i)
-    ]
-genPrim _ _ ReadOffAddrOp_Word8  [c] [a,o,i] = PrimInline $ AssignStat c $ u8_    a (off8  o i)
-genPrim _ _ ReadOffAddrOp_Word16 [c] [a,o,i] = PrimInline $ AssignStat c $ dv_u16 a (off16 o i)
-genPrim _ _ ReadOffAddrOp_Word32 [c] [a,o,i] = PrimInline $ AssignStat c $ dv_i32 a (off32 o i)
-genPrim _ _ ReadOffAddrOp_Word64 [c1,c2] [a,o,i] =
-   PrimInline $ mconcat
-    [ c1 |= dv_i32 a (Add (off64 o i) (Int 4))
-    , c2 |= dv_i32 a (off64 o i)
-    ]
-genPrim _ _ WriteOffAddrOp_Char     [] [a,o,i,v]     = PrimInline $ u8_      a (off8  o i) |= v
-genPrim _ _ WriteOffAddrOp_WideChar [] [a,o,i,v]     = PrimInline $ dv_s_u32 a (off32 o i) v
-genPrim _ _ WriteOffAddrOp_Int      [] [a,o,i,v]     = PrimInline $ dv_s_i32 a (off32 o i) v
-genPrim _ _ WriteOffAddrOp_Word     [] [a,o,i,v]     = PrimInline $ dv_s_i32 a (off32 o i) v
-genPrim _ _ WriteOffAddrOp_Addr     [] [a,o,i,va,vo] =
-  PrimInline $ mconcat
-    [ ifS (Not (a .^ "arr")) (a .^ "arr" |= ValExpr (JList [])) mempty
-    , AssignStat (a .^ "arr" .! (off32 o i)) $ ValExpr (JList [va, vo])
-    ]
-genPrim _ _ WriteOffAddrOp_Float     [] [a,o,i,v]      = PrimInline $ dv_s_f32 a (off32 o i) v
-genPrim _ _ WriteOffAddrOp_Double    [] [a,o,i,v]      = PrimInline $ dv_s_f64 a (off64 o i) v
-genPrim _ _ WriteOffAddrOp_StablePtr [] [a,o,i,_v1,v2] = PrimInline $ dv_s_u32 a (off32 o i) v2
-genPrim _ _ WriteOffAddrOp_Int8      [] [a,o,i,v]      = PrimInline $ dv_s_i8  a (off8  o i) v
-genPrim _ _ WriteOffAddrOp_Int16     [] [a,o,i,v]      = PrimInline $ dv_s_i16 a (off16 o i) v
-genPrim _ _ WriteOffAddrOp_Int32     [] [a,o,i,v]      = PrimInline $ dv_s_i32 a (off32 o i) v
-genPrim _ _ WriteOffAddrOp_Int64     [] [a,o,i,v1,v2]  = PrimInline $ mconcat
-                                                          [ dv_s_i32 a (Add (off64 o i) (Int 4)) v1
-                                                          , dv_s_i32 a (off64 o i) v2
-                                                          ]
-genPrim _ _ WriteOffAddrOp_Word8     [] [a,o,i,v]      = PrimInline $ u8_      a (off8  o i) |= v
-genPrim _ _ WriteOffAddrOp_Word16    [] [a,o,i,v]      = PrimInline $ dv_s_u16 a (off16 o i) v
-genPrim _ _ WriteOffAddrOp_Word32    [] [a,o,i,v]      = PrimInline $ dv_s_i32 a (off32 o i) v
-genPrim _ _ WriteOffAddrOp_Word64    [] [a,o,i,v1,v2]  = PrimInline $ mconcat
-                                                          [ dv_s_i32 a (Add (off64 o i) (Int 4)) v1
-                                                          , dv_s_i32 a (off64 o i) v2
-                                                          ]
--- Mutable variables
-genPrim _ _ NewMutVarOp       [r] [x]   = PrimInline $ r |= New (app "h$MutVar" [x])
-genPrim _ _ ReadMutVarOp      [r] [m]   = PrimInline $ r |= m .^ "val"
-genPrim _ _ WriteMutVarOp     [] [m,x]  = PrimInline $ m .^ "val" |= x
-genPrim _ _ AtomicModifyMutVar2Op [r1,r2] [m,f] = PrimInline $ appT [r1,r2] "h$atomicModifyMutVar2" [m,f]
-genPrim _ _ AtomicModifyMutVar_Op [r1,r2] [m,f] = PrimInline $ appT [r1,r2] "h$atomicModifyMutVar" [m,f]
-
-genPrim _ _ CasMutVarOp [status,r] [mv,o,n] = PrimInline $ ifS (mv .^ "val" .===. o)
-                   (mconcat [status |= zero_, r |= n, mv .^ "val" |= n])
-                   (mconcat [status |= one_ , r |= mv .^ "val"])
-
-------------------------------- Exceptions --------------------------------------
-
-genPrim _ _ CatchOp [_r] [a,handler] = PRPrimCall $
-  returnS (app "h$catch" [a, handler])
-genPrim _ _ RaiseOp         [_r] [a] = PRPrimCall $ returnS (app "h$throw" [a, false_])
-genPrim _ _ RaiseIOOp       [_r] [a] = PRPrimCall $ returnS (app "h$throw" [a, false_])
-
-genPrim _ _ MaskAsyncExceptionsOp [_r] [a] =
-  PRPrimCall $ returnS (app "h$maskAsync" [a])
-genPrim _ _ MaskUninterruptibleOp [_r] [a] =
-  PRPrimCall $ returnS (app "h$maskUnintAsync" [a])
-genPrim _ _ UnmaskAsyncExceptionsOp [_r] [a] =
-  PRPrimCall $ returnS (app "h$unmaskAsync" [a])
-
-genPrim _ _ MaskStatus [r] [] = PrimInline $ r |= app "h$maskStatus" []
-
-------------------------------- STM-accessible Mutable Variables  --------------
-
-genPrim _ _ AtomicallyOp [_r] [a] = PRPrimCall $ returnS (app "h$atomically" [a])
-genPrim _ _ RetryOp [_r] [] = PRPrimCall $ returnS (app "h$stmRetry" [])
-genPrim _ _ CatchRetryOp [_r] [a,b] = PRPrimCall $ returnS (app "h$stmCatchRetry" [a,b])
-genPrim _ _ CatchSTMOp [_r] [a,h] = PRPrimCall $ returnS (app "h$catchStm" [a,h])
-genPrim _ _ NewTVarOp [tv] [v] = PrimInline $ tv |= app "h$newTVar" [v]
-genPrim _ _ ReadTVarOp [r] [tv] = PrimInline $ r |= app "h$readTVar" [tv]
-genPrim _ _ ReadTVarIOOp [r] [tv] = PrimInline $ r |= app "h$readTVarIO" [tv]
-genPrim _ _ WriteTVarOp [] [tv,v] = PrimInline $ appS "h$writeTVar" [tv,v]
-
-------------------------------- Synchronized Mutable Variables ------------------
-
-genPrim _ _ NewMVarOp     [r]   []    = PrimInline $ r |= New (app "h$MVar" [])
-genPrim _ _ TakeMVarOp    [_r]  [m]   = PRPrimCall $ returnS (app "h$takeMVar" [m])
-genPrim _ _ TryTakeMVarOp [r,v] [m]   = PrimInline $ appT [r,v] "h$tryTakeMVar" [m]
-genPrim _ _ PutMVarOp     []    [m,v] = PRPrimCall $ returnS (app "h$putMVar" [m,v])
-genPrim _ _ TryPutMVarOp  [r]   [m,v] = PrimInline $ r |= app "h$tryPutMVar" [m,v]
-genPrim _ _ ReadMVarOp    [_r]  [m]   = PRPrimCall $ returnS (app "h$readMVar" [m])
-genPrim _ _ TryReadMVarOp [r,v] [m]   = PrimInline $ mconcat
-                                                    [ v |= m .^ "val"
-                                                    , r |= if01 (v .===. null_)
-                                                    ]
-genPrim _ _ IsEmptyMVarOp [r]   [m]   = PrimInline $ r |= if10 (m .^ "val" .===. null_)
-
-------------------------------- Delay/Wait Ops ---------------------------------
-
-genPrim _ _ DelayOp [] [t] = PRPrimCall $ returnS (app "h$delayThread" [t])
-genPrim _ _ WaitReadOp [] [fd] = PRPrimCall $ returnS (app "h$waidRead" [fd])
-genPrim _ _ WaitWriteOp [] [fd] = PRPrimCall $ returnS (app "h$waitWrite" [fd])
-
-------------------------------- Concurrency Primitives -------------------------
-
-genPrim _ _ ForkOp [_tid] [x] = PRPrimCall $ returnS (app "h$fork" [x, true_])
-genPrim _ _ ForkOnOp [_tid] [_p,x] = PRPrimCall $ returnS (app "h$fork" [x, true_]) -- ignore processor argument
-genPrim _ _ KillThreadOp [] [tid,ex] =
-  PRPrimCall $ returnS (app "h$killThread" [tid,ex])
-genPrim _ _ YieldOp [] [] = PRPrimCall $ returnS (app "h$yield" [])
-genPrim _ _ MyThreadIdOp [r] [] = PrimInline $ r |= var "h$currentThread"
-genPrim _ _ LabelThreadOp [] [t,la,lo] = PrimInline $ t .^ "label" |= ValExpr (JList [la, lo])
-genPrim _ _ IsCurrentThreadBoundOp [r] [] = PrimInline $ r |= one_
-genPrim _ _ NoDuplicateOp [] [] = PrimInline mempty -- don't need to do anything as long as we have eager blackholing
-genPrim _ _ ThreadStatusOp [stat,cap,locked] [tid] = PrimInline $
-  appT [stat, cap, locked] "h$threadStatus" [tid]
-
-------------------------------- Weak Pointers -----------------------------------
-
-genPrim _ _ MkWeakOp [r] [o,b,c] = PrimInline $ r |= app "h$makeWeak" [o,b,c]
-genPrim _ _ MkWeakNoFinalizerOp [r] [o,b] = PrimInline $ r |= app "h$makeWeakNoFinalizer" [o,b]
-genPrim _ _ AddCFinalizerToWeakOp [r] [_a1,_a1o,_a2,_a2o,_i,_a3,_a3o,_w] =
-  PrimInline $ r |= one_ -- fixme?
-genPrim _ _ DeRefWeakOp        [f,v] [w] = PrimInline $ mconcat
-                                                        [ v |= w .^ "val"
-                                                        , f |= if01 (v .===. null_)
-                                                        ]
-genPrim _ _ FinalizeWeakOp     [fl,fin] [w] =
-  PrimInline $ appT [fin, fl] "h$finalizeWeak" [w]
-genPrim _ _ TouchOp [] [_e] = PrimInline mempty -- fixme what to do?
-
------------------------------- Stable pointers and names ------------------------
-
-genPrim _ _ MakeStablePtrOp [s1,s2] [a] = PrimInline $ mconcat
-  [ s1 |= var "h$stablePtrBuf"
-  , s2 |= app "h$makeStablePtr" [a]
-  ]
-genPrim _ _ DeRefStablePtrOp [r] [_s1,s2] = PrimInline $
-  r |= app "h$deRefStablePtr" [s2]
-genPrim _ _ EqStablePtrOp [r] [_sa1,sa2,_sb1,sb2] = PrimInline $
-  r |= if10 (sa2 .===. sb2)
-
-genPrim _ _ MakeStableNameOp [r] [a] = PrimInline $ r |= app "h$makeStableName" [a]
-genPrim _ _ StableNameToIntOp [r] [s] = PrimInline $ r |= app "h$stableNameInt" [s]
-
------------------------------- Compact normal form -----------------------------
-
-genPrim _ _ CompactNewOp [c] [s] = PrimInline $ c |= app "h$compactNew" [s]
-genPrim _ _ CompactResizeOp [] [s] = PrimInline $ appS "h$compactResize" [s]
-genPrim _ _ CompactContainsOp [r] [c,v] = PrimInline $ r |= app "h$compactContains" [c,v]
-genPrim _ _ CompactContainsAnyOp [r] [v] = PrimInline $ r |= app "h$compactContainsAny" [v]
-genPrim _ _ CompactGetFirstBlockOp [ra,ro,s] [c] =
-  PrimInline $ appT [ra,ro,s] "h$compactGetFirstBlock" [c]
-genPrim _ _ CompactGetNextBlockOp [ra,ro,s] [c,a,o] =
-  PrimInline $ appT [ra,ro,s] "h$compactGetNextBlock" [c,a,o]
-genPrim _ _ CompactAllocateBlockOp [ra,ro] [size,sa,so] =
-  PrimInline $ appT [ra,ro] "h$compactAllocateBlock" [size,sa,so]
-genPrim _ _ CompactFixupPointersOp [newroota, newrooto] [blocka,blocko,roota,rooto] =
-  PrimInline $ appT [newroota,newrooto] "h$compactFixupPointers" [blocka,blocko,roota,rooto]
-genPrim _ _ CompactAdd [_r] [c,o] =
-  PRPrimCall $ returnS (app "h$compactAdd" [c,o])
-genPrim _ _ CompactAddWithSharing [_r] [c,o] =
-  PRPrimCall $ returnS (app "h$compactAddWithSharing" [c,o])
-genPrim _ _ CompactSize [s] [c] =
-  PrimInline $ s |= app "h$compactSize" [c]
-
------------------------------- Unsafe pointer equality --------------------------
-
-genPrim _ _ ReallyUnsafePtrEqualityOp [r] [p1,p2] = PrimInline $ r |= if10 (p1 .===. p2)
-
------------------------------- Parallelism --------------------------------------
-
-genPrim _ _ ParOp   [r] [_a] = PrimInline $ r |= zero_
-genPrim _ _ SparkOp [r] [a]  = PrimInline $ r |= a
-genPrim _ _ SeqOp   [_r] [e] = PRPrimCall $ returnS (app "h$e" [e])
-{-
-GetSparkOp
--}
-genPrim _ _ NumSparks [r] [] = PrimInline $ r |= zero_
-
------------------------------- Tag to enum stuff --------------------------------
-
-genPrim _ _t DataToTagOp [_r] [d] = PRPrimCall $ mconcat
-  [ stack .! PreInc sp |= var "h$dataToTag_e"
-  , returnS (app "h$e" [d])
-  ]
-genPrim _ t TagToEnumOp [r] [tag]
-  | isBoolTy t = PrimInline $ r |= IfExpr tag true_ false_
-  | otherwise  = PrimInline $ r |= app "h$tagToEnum" [tag]
-
------------------------------- Bytecode operations ------------------------------
-
-genPrim _ _ AddrToAnyOp [r] [d,_o] = PrimInline $ r |= d
-
 {-
 AnyToAddrOp
 MkApUpd0_Op
@@ -1047,54 +1043,10 @@ UnpackClosureOp
 GetApStackValOp
 -}
 
--- Misc
+{-
+GetSparkOp
+-}
 
-genPrim prof _ GetCCSOfOp [a, o] [obj]
-  | prof = PrimInline $ mconcat
-      [ a |= if_ (isObject obj)
-                  (app "h$buildCCSPtr" [obj .^ "cc"])
-                  null_
-      , o |= zero_
-      ]
-  | otherwise = PrimInline $ mconcat
-                  [ a |= null_
-                  , o |= zero_
-                  ]
-
-genPrim prof _ GetCurrentCCSOp [a, o] [_dummy_arg] =
-  let ptr = if prof then app "h$buildCCSPtr" [jCurrentCCS]
-                    else null_
-  in PrimInline $ mconcat
-      [ a |= ptr
-      , o |= zero_
-      ]
-
-genPrim _ _ ClearCCSOp [_r] [x] = PRPrimCall $ ReturnStat (app "h$clearCCS" [x])
-
------------------------------- Etc (Miscellaneous built-ins) -------------------
-
-genPrim _ _ TraceEventOp       [] [ed,eo]     = PrimInline $ appS "h$traceEvent" [ed,eo]
-genPrim _ _ TraceEventBinaryOp [] [ed,eo,len] = PrimInline $ appS "h$traceEventBinary" [ed,eo,len]
-genPrim _ _ TraceMarkerOp      [] [ed,eo]     = PrimInline $ appS "h$traceMarker" [ed,eo]
-
--- FIXME: Sylvain (2022-06) We want to support every primop, or disable them
--- explicitly. So we should remove this catch-all case ultimately, or make it
--- crash at compilation time.
--- Sadly, we can't check for a complete match on primops with the code as it is
--- written, because we match on args and results at the same time which are
--- lists and there is no type-level information linking the primop and the number
--- of args/results.
-genPrim _ _ op rs as = PrimInline $ mconcat
-  [ appS "h$log" [toJExpr $ mconcat
-      [ "warning, unhandled primop: "
-      , renderWithContext defaultSDocContext (ppr op)
-      , " "
-      , show (length rs, length as)
-      ]]
-  , appS (ST.pack $ "h$primop_" ++ zEncodeString (renderWithContext defaultSDocContext (ppr op))) as
-    -- copyRes
-  , mconcat $ zipWith (\r reg -> r |= toJExpr reg) rs (enumFrom Ret1)
-  ]
 
 -- tuple returns
 appT :: [JExpr] -> ShortText -> [JExpr] -> JStat
