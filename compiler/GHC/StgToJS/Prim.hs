@@ -131,7 +131,7 @@ genPrim prof ty = \case
 
   Word8ToWordOp      -> \[r] [x]       -> PrimInline $ r |= mask8 x
   WordToWord8Op      -> \[r] [x]       -> PrimInline $ r |= mask8 x
-  Word8NotOp         -> \[r] [x]       -> PrimInline $ r |= BXor x (Int 0xff)
+
   Word8AddOp         -> \[r] [x,y]     -> PrimInline $ r |= mask8 (Add x y)
   Word8SubOp         -> \[r] [x,y]     -> PrimInline $ r |= mask8 (Sub x y)
   Word8MulOp         -> \[r] [x,y]     -> PrimInline $ r |= mask8 (Mul x y)
@@ -148,10 +148,19 @@ genPrim prof ty = \case
   Word8LtOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<. y)
   Word8NeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
 
+  Word8AndOp         -> \[r] [x,y]   -> PrimInline $ r |= BAnd x y
+  Word8OrOp          -> \[r] [x,y]   -> PrimInline $ r |= BOr  x y
+  Word8XorOp         -> \[r] [x,y]   -> PrimInline $ r |= BXor x y
+  Word8NotOp         -> \[r] [x]     -> PrimInline $ r |= BXor x (Int 0xff)
+
+  Word8SllOp         -> \[r] [x,i]   -> PrimInline $ r |= mask8 (x .<<. i)
+  Word8SrlOp         -> \[r] [x,i]   -> PrimInline $ r |= x .>>. i
+
 ------------------------------ Int16 -------------------------------------------
 
   Int16ToIntOp       -> \[r] [x]       -> PrimInline $ r |= mask16 x
   IntToInt16Op       -> \[r] [x]       -> PrimInline $ r |= mask16 x -- fixme ?
+
   Int16NegOp         -> \[r] [x]       -> PrimInline $ r |= mask16 (Sub (Int 0x10000) x)
   Int16AddOp         -> \[r] [x,y]     -> PrimInline $ r |= mask16 (Add x y)
   Int16SubOp         -> \[r] [x,y]     -> PrimInline $ r |= mask16 (Sub x y)
@@ -173,7 +182,7 @@ genPrim prof ty = \case
 
   Word16ToWordOp     -> \[r] [x]   -> PrimInline $ r |= mask16 x
   WordToWord16Op     -> \[r] [x]   -> PrimInline $ r |= mask16 x
-  Word16NotOp        -> \[r] [x]   -> PrimInline $ r |= BXor x (Int 0xffff)
+
   Word16AddOp        -> \[r] [x,y] -> PrimInline $ r |= mask16 (Add x y)
   Word16SubOp        -> \[r] [x,y] -> PrimInline $ r |= mask16 (Sub x y)
   Word16MulOp        -> \[r] [x,y] -> PrimInline $ r |= mask16 (Mul x y)
@@ -190,10 +199,19 @@ genPrim prof ty = \case
   Word16LtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<. y)
   Word16NeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
 
+  Word16AndOp        -> \[r] [x,y]   -> PrimInline $ r |= BAnd x y
+  Word16OrOp         -> \[r] [x,y]   -> PrimInline $ r |= BOr  x y
+  Word16XorOp        -> \[r] [x,y]   -> PrimInline $ r |= BXor x y
+  Word16NotOp        -> \[r] [x]     -> PrimInline $ r |= BXor x (Int 0xffff)
+
+  Word16SllOp        -> \[r] [x,i]   -> PrimInline $ r |= mask16 (x .<<. i)
+  Word16SrlOp        -> \[r] [x,i]   -> PrimInline $ r |= x .>>. i
+
 ------------------------------ Int32 --------------------------------------------
 
   Int32ToIntOp       -> \[r] [x]   -> PrimInline $ r |= x
   IntToInt32Op       -> \[r] [x]   -> PrimInline $ r |= x
+
   Int32NegOp         -> \rs  xs    -> genPrim prof ty IntNegOp rs xs
   Int32AddOp         -> \rs  xs    -> genPrim prof ty IntAddOp rs xs
   Int32SubOp         -> \rs  xs    -> genPrim prof ty IntSubOp rs xs
@@ -213,7 +231,7 @@ genPrim prof ty = \case
 
   Word32ToWordOp     -> \[r] [x]   -> PrimInline $ r |= x
   WordToWord32Op     -> \[r] [x]   -> PrimInline $ r |= x
-  Word32NotOp        -> \rs  xs    -> genPrim prof ty WordNotOp rs xs
+
   Word32AddOp        -> \rs  xs    -> genPrim prof ty WordAddOp rs xs
   Word32SubOp        -> \rs  xs    -> genPrim prof ty WordSubOp rs xs
   Word32MulOp        -> \rs  xs    -> genPrim prof ty WordMulOp rs xs
@@ -227,6 +245,14 @@ genPrim prof ty = \case
   Word32LeOp         -> \rs  xs    -> genPrim prof ty WordLeOp rs xs
   Word32LtOp         -> \rs  xs    -> genPrim prof ty WordLtOp rs xs
   Word32NeOp         -> \rs  xs    -> genPrim prof ty WordNeOp rs xs
+
+  Word32AndOp        -> \rs xs     -> genPrim prof ty WordAndOp rs xs
+  Word32OrOp         -> \rs xs     -> genPrim prof ty WordOrOp rs xs
+  Word32XorOp        -> \rs xs     -> genPrim prof ty WordXorOp rs xs
+  Word32NotOp        -> \rs xs     -> genPrim prof ty WordNotOp rs xs
+
+  Word32SllOp        -> \rs xs     -> genPrim prof ty WordSllOp rs xs
+  Word32SrlOp        -> \rs xs     -> genPrim prof ty WordSrlOp rs xs
 
 ------------------------------ Int64 --------------------------------------------
 
