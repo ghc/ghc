@@ -1143,6 +1143,8 @@ void freeObjectCode (ObjectCode *oc)
         // happens when we resolve the object.
 #if defined(OBJFORMAT_ELF)
         ocRunFini_ELF(oc);
+#elif defined(OBJFORMAT_PEi386)
+        ocRunFini_PEi386(oc);
 #endif
     }
 
