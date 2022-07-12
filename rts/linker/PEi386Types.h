@@ -16,9 +16,17 @@ struct SectionFormatInfo {
     uint64_t virtualSize;
     uint64_t virtualAddr;
  };
+
+// A linked-list of Sections; used to represent the set of initializer/finalizer
+// list sections.
+struct SectionList {
+    Section *section;
+    struct SectionList *next;
+};
+
 struct ObjectCodeFormatInfo {
-    Section* init;
-    Section* fini;
+    struct SectionList* init;  // Freed by ocRunInit_PEi386
+    struct SectionList* fini;  // Freed by ocRunFini_PEi386
     Section* pdata;
     Section* xdata;
     COFF_HEADER_INFO* ch_info; // Freed by ocResolve_PEi386
