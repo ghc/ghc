@@ -365,7 +365,10 @@ void shutdownCapabilities(Task *task, bool wait_foreign);
 
 // cause all capabilities to context switch as soon as possible.
 void contextSwitchAllCapabilities(void);
-INLINE_HEADER void contextSwitchCapability(Capability *cap);
+
+// if immediately is set then the capability will context-switch at the next
+// heap-check.  Otherwise it will context switch at the next failing heap-check.
+INLINE_HEADER void contextSwitchCapability(Capability *cap, bool immediately);
 
 // cause all capabilities to stop running Haskell code and return to
 // the scheduler as soon as possible.
@@ -478,9 +481,11 @@ interruptCapability (Capability *cap)
 }
 
 INLINE_HEADER void
-contextSwitchCapability (Capability *cap)
+contextSwitchCapability (Capability *cap, bool immediately)
 {
-    stopCapability(cap);
+    if(immediately) {
+        stopCapability(cap);
+    }
     SEQ_CST_STORE(&cap->context_switch, true);
 }
 
