@@ -1017,9 +1017,9 @@ annotateBotStr :: Id -> Arity -> Maybe (Arity, DmdSig) -> Id
 annotateBotStr id n_extra mb_str
   = case mb_str of
       Nothing           -> id
-      Just (arity, sig) -> id `setIdArity`      (arity + n_extra)
-                              `setIdDmdSig` (prependArgsDmdSig n_extra sig)
-                              `setIdCprSig`    mkCprSig (arity + n_extra) botCpr
+      Just (arity, sig) -> id `setIdArity`  (arity + n_extra)
+                              `setIdDmdSig` prependArgsDmdSig n_extra sig
+                              `setIdCprSig` mkCprSig (arity + n_extra) botCpr
 
 notWorthFloating :: CoreExpr -> [Var] -> Bool
 -- Returns True if the expression would be replaced by
@@ -1262,7 +1262,7 @@ lvlBind env (AnnRec pairs)
 profitableFloat :: LevelEnv -> Level -> Bool
 profitableFloat env dest_lvl
   =  (dest_lvl `ltMajLvl` le_ctxt_lvl env)  -- Escapes a value lambda
-  || isTopLvl dest_lvl                      -- Going all the way to top level
+  || (isTopLvl dest_lvl && floatConsts env) -- Going all the way to top level
 
 
 ----------------------------------------------------
