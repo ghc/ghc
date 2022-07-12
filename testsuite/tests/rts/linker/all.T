@@ -118,11 +118,8 @@ test('T7072',
 		req_rts_linker], 
 	makefile_test, ['T7072'])
 
-test('T20494',
-     [req_rts_linker,
-      # The PEi386 linker doesn't yet support finalizers
-      when(opsys('mingw32'), expect_broken(20494))],
-    makefile_test, ['T20494'])
+test('T20494', [req_rts_linker],
+     makefile_test, ['T20494'])
 
 test('T20918',
      [extra_files(['T20918_v.cc']),

@@ -2111,6 +2111,28 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
 */
 
+/*
+ * Note [Initializers and finalizers (PEi386)]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * COFF/PE allows an object to define initializers and finalizers to be run
+ * at load/unload time, respectively. These are listed in the `.ctors` and
+ * `.dtors` sections. Moreover, these section names may be sufficed with an
+ * integer priority (e.g. `.ctors.1234`). Sections are run in order of
+ * increasing priority. Sections without a priority (e.g. `.ctors`) are run
+ * last.
+ *
+ * A `.ctors`/`.dtors` section contains an array of pointers to
+ * `init_t`/`fini_t` functions, respectively. Note that `.ctors` must be run in
+ * reverse order.
+ *
+ * For more about how the code generator emits initializers and finalizers see
+ * Note [Initializers and finalizers in Cmm] in GHC.Cmm.InitFini.
+ */
+
+
+// Run the constructors/initializers of an ObjectCode.
+// Returns 1 on success.
+// See Note [Initializers and finalizers (PEi386)].
 bool
 ocRunInit_PEi386 ( ObjectCode *oc )
 {
@@ -2131,12 +2153,35 @@ ocRunInit_PEi386 ( ObjectCode *oc )
   init_t *init_start   = (init_t*)init_startC;
   init_t *init_end     = (init_t*)(init_startC + section.size);
 
-  // ctors are run *backwards*!
+  // ctors are run in reverse order.
   for (init_t *init = init_end - 1; init >= init_start; init--)
       (*init)(argc, argv, envv);
 
   freeProgEnvv(envc, envv);
   return true;
+}
+
+// Run the finalizers of an ObjectCode.
+// Returns 1 on success.
+// See Note [Initializers and finalizers (PEi386)].
+bool ocRunFini_PEi386( ObjectCode *oc )
+{
+  if (!oc || !oc->info || !oc->info->fini) {
+    return true;
+  }
+
+  Section section = *oc->info->fini;
+  CHECK(SECTIONKIND_FINIT_ARRAY == section.kind);
+
+  uint8_t *fini_startC = section.start;
+  fini_t *fini_start   = (fini_t*)fini_startC;
+  fini_t *fini_end     = (fini_t*)(fini_startC + section.size);
+
+  // dtors are run in forward order.
+  for (fini_t *fini = fini_end - 1; fini >= fini_start; fini--)
+      (*fini)();
+
+   return true;
 }
 
 SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType *type)
