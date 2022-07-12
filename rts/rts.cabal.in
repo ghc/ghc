@@ -110,9 +110,6 @@ library
        -- that it is ordered correctly with libpthread, since ghc-prim.cabal
        -- also explicitly lists libc. See #19029.
        extra-libraries: c
-    if flag(libm)
-       -- for ldexp()
-       extra-libraries: m
     if flag(librt)
        extra-libraries: rt
     if flag(libdl)
