@@ -100,7 +100,7 @@ typedef
           /* Static initializer section. e.g. .ctors.  */
           SECTIONKIND_INIT_ARRAY,
           /* Static finalizer section. e.g. .dtors.  */
-          SECTIONKIND_FINIT_ARRAY,
+          SECTIONKIND_FINI_ARRAY,
           /* We don't know what the section is and don't care.  */
           SECTIONKIND_OTHER,
           /* Section contains debug information. e.g. .debug$.  */
