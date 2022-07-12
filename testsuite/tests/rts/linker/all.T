@@ -128,3 +128,6 @@ test('T20918',
       req_rts_linker],
      makefile_test, ['T20918'])
 
+test('T21618',
+     [unless(opsys('mingw32'), skip), req_rts_linker],
+     makefile_test, ['T21618'])

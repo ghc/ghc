@@ -130,3 +130,8 @@ T20494:
 T20918:
 	"$(TEST_HC)" -c T20918_v.cc -o T20918_v.o
 	echo hello | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) T20918_v.o T20918.hs
+
+.PHONY: T21618
+T21618:
+	"$(TEST_HC)" -c T21618_c.c -o T21618_c.o
+	echo main | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) T21618_c.o T21618.hs
