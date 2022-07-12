@@ -10,7 +10,8 @@ module GHC.Types.Cpr (
     CprType (..), topCprType, botCprType, flatConCprType,
     lubCprType, applyCprTy, abstractCprTy, trimCprTy,
     UnpackConFieldsResult (..), unpackConFieldsCpr,
-    CprSig (..), topCprSig, isTopCprSig, mkCprSigForArity, mkCprSig, seqCprSig
+    CprSig (..), topCprSig, isTopCprSig, mkCprSigForArity, mkCprSig,
+    seqCprSig, prependArgsCprSig
   ) where
 
 import GHC.Prelude
@@ -186,6 +187,13 @@ mkCprSig arty cpr = CprSig (CprType arty cpr)
 
 seqCprSig :: CprSig -> ()
 seqCprSig (CprSig ty) = seqCprTy ty
+
+prependArgsCprSig :: Arity -> CprSig -> CprSig
+-- ^ Add extra value args to CprSig
+prependArgsCprSig n_extra cpr_sig@(CprSig (CprType arity cpr))
+  | n_extra == 0 = cpr_sig
+  | otherwise    = assertPpr (n_extra > 0) (ppr n_extra) $
+                   CprSig (CprType (arity + n_extra) cpr)
 
 -- | BNF:
 --
