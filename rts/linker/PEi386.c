@@ -1197,7 +1197,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    oc->info       = stgCallocBytes (sizeof(struct ObjectCodeFormatInfo), 1,
                                     "ocVerifyImage_PEi386(info)");
    oc->info->init          = NULL;
-   oc->info->finit         = NULL;
+   oc->info->fini          = NULL;
    oc->info->ch_info       = info;
 
    /* Copy the tables over from object-file. Copying these allows us to
@@ -1474,8 +1474,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       }
 
       if (0==strncmp(".dtors", section->info->name, 6)) {
-          kind = SECTIONKIND_FINIT_ARRAY;
-          oc->info->finit = &oc->sections[i];
+          kind = SECTIONKIND_FINI_ARRAY;
+          oc->info->fini = &oc->sections[i];
       }
 
       if (   0 == strncmp(".stab"     , section->info->name, 5 )
