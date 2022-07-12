@@ -509,13 +509,14 @@ void freePreloadObjectFile_PEi386(ObjectCode *oc)
     }
 }
 
+// Free oc->info and oc->sections[i]->info.
 static void releaseOcInfo(ObjectCode* oc) {
     if (!oc) return;
 
     if (oc->info) {
         stgFree (oc->info->ch_info);
-        stgFree (oc->info->str_tab);
         stgFree (oc->info->symbols);
+        stgFree (oc->info->str_tab);
         stgFree (oc->info);
         oc->info = NULL;
     }
@@ -2014,6 +2015,12 @@ ocResolve_PEi386 ( ObjectCode* oc )
       }
    }
 
+   // We now have no more need of info->ch_info and info->symbols.
+   stgFree(oc->info->ch_info);
+   oc->info->ch_info = NULL;
+   stgFree(oc->info->symbols);
+   oc->info->symbols = NULL;
+
    IF_DEBUG(linker, debugBelch("completed %" PATH_FMT "\n", oc->fileName));
    return true;
 }
@@ -2129,7 +2136,6 @@ ocRunInit_PEi386 ( ObjectCode *oc )
       (*init)(argc, argv, envv);
 
   freeProgEnvv(envc, envv);
-  releaseOcInfo (oc);
   return true;
 }
 
