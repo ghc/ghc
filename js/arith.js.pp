@@ -267,8 +267,20 @@ function h$quotRem2Word32(h1,l1,b) {
 }
 
 function h$wordAdd2(a,b) {
-  var c = goog.math.Long.fromBits(a,0).add(goog.math.Long.fromBits(b,0));
-  RETURN_UBX_TUP2(c.getHighBits(), c.getLowBits());
+  const a16 = a >>> 16;
+  const a00 = a & 0xFFFF;
+
+  const b16 = b >>> 16;
+  const b00 = b & 0xFFFF;
+
+  var c32 = 0, c16 = 0, c00 = 0;
+  c00 += a00 + b00;
+  c16 += c00 >>> 16;
+  c00 &= 0xFFFF;
+  c16 += a16 + b16;
+  c32 += c16 >>> 16;
+  c16 &= 0xFFFF;
+  RETURN_UBX_TUP2(c32, (c16 << 16) | c00);
 }
 
 // this does an unsigned shift, is that ok?
