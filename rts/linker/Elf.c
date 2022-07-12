@@ -1977,6 +1977,7 @@ int ocRunInit_ELF( ObjectCode *oc )
          init_end = (init_t*)(init_startC + shdr[i].sh_size);
          // ctors run in reverse
          for (init = init_end - 1; init >= init_start; init--) {
+            CHECK(0x0 != *init);
             (*init)(argc, argv, envv);
          }
       }
