@@ -18,7 +18,7 @@ struct SectionFormatInfo {
  };
 struct ObjectCodeFormatInfo {
     Section* init;
-    Section* finit;
+    Section* fini;
     Section* pdata;
     Section* xdata;
     COFF_HEADER_INFO* ch_info;
