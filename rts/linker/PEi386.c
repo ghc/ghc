@@ -386,6 +386,15 @@ const int default_alignment = 8;
    the pointer as a redirect.  Essentially it's a DATA DLL reference.  */
 const void* __rts_iob_func = (void*)&__acrt_iob_func;
 
+static void freeSectionList(struct SectionList *slist)
+{
+    while (slist != NULL) {
+        struct SectionList *next = slist->next;
+        stgFree(slist);
+        slist = next;
+    }
+}
+
 void initLinker_PEi386()
 {
     if (!ghciInsertSymbolTable(WSTR("(GHCi/Ld special symbols)"),
@@ -514,6 +523,8 @@ static void releaseOcInfo(ObjectCode* oc) {
     if (!oc) return;
 
     if (oc->info) {
+        freeSectionList(oc->info->init);
+        freeSectionList(oc->info->fini);
         stgFree (oc->info->ch_info);
         stgFree (oc->info->symbols);
         stgFree (oc->info->str_tab);
@@ -1470,13 +1481,21 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       }
 
       if (0==strncmp(".ctors", section->info->name, 6)) {
+          /* N.B. a compilation unit may have more than one .ctor section; we
+           * must run them all. See #21618 for a case where this happened */
+          struct SectionList *slist = stgMallocBytes(sizeof(struct SectionList), "ocGetNames_PEi386");
+          slist->section = &oc->sections[i];
+          slist->next = oc->info->init;
+          oc->info->init = slist;
           kind = SECTIONKIND_INIT_ARRAY;
-          oc->info->init = &oc->sections[i];
       }
 
       if (0==strncmp(".dtors", section->info->name, 6)) {
+          struct SectionList *slist = stgMallocBytes(sizeof(struct SectionList), "ocGetNames_PEi386");
+          slist->section = &oc->sections[i];
+          slist->next = oc->info->fini;
+          oc->info->fini = slist;
           kind = SECTIONKIND_FINI_ARRAY;
-          oc->info->fini = &oc->sections[i];
       }
 
       if (   0 == strncmp(".stab"     , section->info->name, 5 )
@@ -2146,16 +2165,23 @@ ocRunInit_PEi386 ( ObjectCode *oc )
   getProgArgv(&argc, &argv);
   getProgEnvv(&envc, &envv);
 
-  Section section = *oc->info->init;
-  CHECK(SECTIONKIND_INIT_ARRAY == section.kind);
+  for (struct SectionList *slist = oc->info->init;
+       slist != NULL;
+       slist = slist->next) {
+    Section *section = slist->section;
+    CHECK(SECTIONKIND_INIT_ARRAY == section->kind);
+    uint8_t *init_startC = section->start;
+    init_t *init_start   = (init_t*)init_startC;
+    init_t *init_end     = (init_t*)(init_startC + section->size);
 
-  uint8_t *init_startC = section.start;
-  init_t *init_start   = (init_t*)init_startC;
-  init_t *init_end     = (init_t*)(init_startC + section.size);
+    // ctors are run *backwards*!
+    for (init_t *init = init_end - 1; init >= init_start; init--) {
+        (*init)(argc, argv, envv);
+    }
+  }
 
-  // ctors are run in reverse order.
-  for (init_t *init = init_end - 1; init >= init_start; init--)
-      (*init)(argc, argv, envv);
+  freeSectionList(oc->info->init);
+  oc->info->init = NULL;
 
   freeProgEnvv(envc, envv);
   return true;
@@ -2170,18 +2196,26 @@ bool ocRunFini_PEi386( ObjectCode *oc )
     return true;
   }
 
-  Section section = *oc->info->fini;
-  CHECK(SECTIONKIND_FINIT_ARRAY == section.kind);
+  for (struct SectionList *slist = oc->info->fini;
+       slist != NULL;
+       slist = slist->next) {
+    Section section = *slist->section;
+    CHECK(SECTIONKIND_FINI_ARRAY == section.kind);
 
-  uint8_t *fini_startC = section.start;
-  fini_t *fini_start   = (fini_t*)fini_startC;
-  fini_t *fini_end     = (fini_t*)(fini_startC + section.size);
+    uint8_t *fini_startC = section.start;
+    fini_t *fini_start   = (fini_t*)fini_startC;
+    fini_t *fini_end     = (fini_t*)(fini_startC + section.size);
 
-  // dtors are run in forward order.
-  for (fini_t *fini = fini_end - 1; fini >= fini_start; fini--)
+    // dtors are run in forward order.
+    for (fini_t *fini = fini_end - 1; fini >= fini_start; fini--) {
       (*fini)();
+    }
+  }
 
-   return true;
+  freeSectionList(oc->info->fini);
+  oc->info->fini = NULL;
+
+  return true;
 }
 
 SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType *type)
