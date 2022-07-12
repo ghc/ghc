@@ -21,9 +21,9 @@ struct ObjectCodeFormatInfo {
     Section* fini;
     Section* pdata;
     Section* xdata;
-    COFF_HEADER_INFO* ch_info;
+    COFF_HEADER_INFO* ch_info; // Freed by ocResolve_PEi386
+    COFF_symbol* symbols;      // Freed by ocResolve_PEi386
     char* str_tab;
-    COFF_symbol* symbols;
  };
 
 #endif /* OBJFORMAT_PEi386.  */
