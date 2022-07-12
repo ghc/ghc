@@ -366,6 +366,17 @@ deriving instance Data (ParStmtBlock GhcPs GhcRn)
 deriving instance Data (ParStmtBlock GhcRn GhcRn)
 deriving instance Data (ParStmtBlock GhcTc GhcTc)
 
+-- ROMES:TODO: Can we get rid of one of the parameters? What is applicativestmt?
+deriving instance Data (ApplicativeStmt GhcPs GhcPs)
+deriving instance Data (ApplicativeStmt GhcPs GhcRn)
+deriving instance Data (ApplicativeStmt GhcPs GhcTc)
+deriving instance Data (ApplicativeStmt GhcRn GhcPs)
+deriving instance Data (ApplicativeStmt GhcRn GhcRn)
+deriving instance Data (ApplicativeStmt GhcRn GhcTc)
+deriving instance Data (ApplicativeStmt GhcTc GhcPs)
+deriving instance Data (ApplicativeStmt GhcTc GhcRn)
+deriving instance Data (ApplicativeStmt GhcTc GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (ApplicativeArg p)
 deriving instance Data (ApplicativeArg GhcPs)
 deriving instance Data (ApplicativeArg GhcRn)

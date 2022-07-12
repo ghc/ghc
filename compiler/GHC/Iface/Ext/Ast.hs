@@ -1255,9 +1255,6 @@ instance ( ToHie (LocatedA (body (GhcPass p)))
         [ toHie $ PS (getRealSpan $ getLocA body) scope NoScope pat
         , toHie body
         ]
-      ApplicativeStmt _ stmts _ ->
-        [ concatMapM (toHie . RS scope . snd) stmts
-        ]
       BodyStmt _ body _ _ ->
         [ toHie body
         ]
@@ -1277,10 +1274,15 @@ instance ( ToHie (LocatedA (body (GhcPass p)))
       RecStmt {recS_stmts = L _ stmts} ->
         [ toHie $ map (RS $ combineScopes scope (mkScope (locA span))) stmts
         ]
+      XStmtLR x -> ext x
+          where
     where
       node = case hiePass @p of
         HieTc -> makeNodeA stmt span
         HieRn -> makeNodeA stmt span
+      ext x = case hiePass @p of
+        HieRn | ApplicativeStmt _ stmts _ <- x -> [ concatMapM (toHie . RS scope . snd) stmts ]
+        HieTc | ApplicativeStmt _ stmts _ <- x -> [ concatMapM (toHie . RS scope . snd) stmts ]
 
 instance HiePass p => ToHie (RScoped (HsLocalBinds (GhcPass p))) where
   toHie (RS scope binds) = concatM $ makeNode binds (spanHsLocaLBinds binds) : case binds of

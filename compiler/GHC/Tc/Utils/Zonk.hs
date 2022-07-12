@@ -1220,12 +1220,12 @@ zonkStmt env zBody (BindStmt xbs pat body)
 
 -- Scopes: join > ops (in reverse order) > pats (in forward order)
 --              > rest of stmts
-zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
+zonkStmt env _zBody (XStmtLR (ApplicativeStmt body_ty args mb_join))
   = do  { (env1, new_mb_join)   <- zonk_join env mb_join
         ; (env2, new_args)      <- zonk_args env1 args
         ; new_body_ty           <- zonkTcTypeToTypeX env2 body_ty
         ; return ( env2
-                 , ApplicativeStmt new_body_ty new_args new_mb_join) }
+                 , XStmtLR $ ApplicativeStmt new_body_ty new_args new_mb_join) }
   where
     zonk_join env Nothing  = return (env, Nothing)
     zonk_join env (Just j) = second Just <$> zonkSyntaxExpr env j
