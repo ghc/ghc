@@ -21,6 +21,7 @@ struct SectionFormatInfo {
 // list sections.
 struct SectionList {
     Section *section;
+    int priority;
     struct SectionList *next;
 };
 
