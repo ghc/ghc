@@ -386,6 +386,36 @@ const int default_alignment = 8;
    the pointer as a redirect.  Essentially it's a DATA DLL reference.  */
 const void* __rts_iob_func = (void*)&__acrt_iob_func;
 
+enum SortOrder { INCREASING, DECREASING };
+
+// Sort a SectionList by priority.
+static void sortSectionList(struct SectionList **slist, enum SortOrder order)
+{
+    // Bubble sort
+    bool done = false;
+    while (!done) {
+        struct SectionList **last = slist;
+        done = true;
+        while (*last != NULL && (*last)->next != NULL) {
+            struct SectionList *s0 = *last;
+            struct SectionList *s1 = s0->next;
+            bool flip;
+            switch (order) {
+                case INCREASING: flip = s0->priority > s1->priority; break;
+                case DECREASING: flip = s0->priority < s1->priority; break;
+            }
+            if (flip) {
+                s0->next = s1->next;
+                s1->next = s0;
+                *last = s1;
+                done = false;
+            } else {
+                last = &s0->next;
+            }
+        }
+    }
+}
+
 static void freeSectionList(struct SectionList *slist)
 {
     while (slist != NULL) {
@@ -1486,6 +1516,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           struct SectionList *slist = stgMallocBytes(sizeof(struct SectionList), "ocGetNames_PEi386");
           slist->section = &oc->sections[i];
           slist->next = oc->info->init;
+          if (sscanf(section->info->name, ".ctors.%d", &slist->priority) != 1) {
+              // Sections without an explicit priority must be run last
+              slist->priority = 0;
+          }
           oc->info->init = slist;
           kind = SECTIONKIND_INIT_ARRAY;
       }
@@ -1494,6 +1528,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           struct SectionList *slist = stgMallocBytes(sizeof(struct SectionList), "ocGetNames_PEi386");
           slist->section = &oc->sections[i];
           slist->next = oc->info->fini;
+          if (sscanf(section->info->name, ".dtors.%d", &slist->priority) != 1) {
+              // Sections without an explicit priority must be run last
+              slist->priority = INT_MAX;
+          }
           oc->info->fini = slist;
           kind = SECTIONKIND_FINI_ARRAY;
       }
@@ -1593,6 +1631,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       addSection(section, kind, SECTION_NOMEM, start, sz, 0, 0, 0);
       addProddableBlock(oc, oc->sections[i].start, sz);
    }
+
+   /* Sort the constructors and finalizers by priority */
+   sortSectionList(&oc->info->init, DECREASING);
+   sortSectionList(&oc->info->fini, INCREASING);
 
    /* Copy exported symbols into the ObjectCode. */
 
@@ -2135,9 +2177,9 @@ ocResolve_PEi386 ( ObjectCode* oc )
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * COFF/PE allows an object to define initializers and finalizers to be run
  * at load/unload time, respectively. These are listed in the `.ctors` and
- * `.dtors` sections. Moreover, these section names may be sufficed with an
+ * `.dtors` sections. Moreover, these section names may be suffixed with an
  * integer priority (e.g. `.ctors.1234`). Sections are run in order of
- * increasing priority. Sections without a priority (e.g. `.ctors`) are run
+ * high-to-low priority. Sections without a priority (e.g.  `.ctors`) are run
  * last.
  *
  * A `.ctors`/`.dtors` section contains an array of pointers to
