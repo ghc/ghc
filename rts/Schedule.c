@@ -2586,6 +2586,9 @@ scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
 {
     tso->flags |= TSO_LOCKED; // we requested explicit affinity; don't
                               // move this thread from now on.
+
+    // We will context switch soon, but not immediately: we don't want every
+    // fork to force a context-switch.
 #if defined(THREADED_RTS)
     cpu %= enabled_capabilities;
     if (cpu == cap->no) {
@@ -2593,8 +2596,10 @@ scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
     } else {
         migrateThread(cap, tso, capabilities[cpu]);
     }
+    contextSwitchCapability(capabilities[cpu], false);
 #else
     appendToRunQueue(cap,tso);
+    contextSwitchCapability(cap, false);
 #endif
 }
 
