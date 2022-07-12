@@ -741,7 +741,7 @@ This is all done in 'extendSigEnvForArg'.
 
 Note that
 
-  * Whether or not something unboxes is decided by 'wantToUnboxArg', else we may
+  * Whether or not something unboxes is decided by 'canUnboxArg', else we may
     get over-optimistic CPR results (e.g., from \(x :: a) -> x!).
 
   * If the demand unboxes deeply, we can give the binder a /nested/ CPR

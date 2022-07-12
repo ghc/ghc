@@ -2224,11 +2224,10 @@ prependArgsDmdSig :: Int -> DmdSig -> DmdSig
 prependArgsDmdSig new_args sig@(DmdSig dmd_ty@(DmdType env dmds res))
   | new_args == 0       = sig
   | isNopDmdType dmd_ty = sig
-  | new_args < 0        = pprPanic "prependArgsDmdSig: negative new_args"
-                                   (ppr new_args $$ ppr sig)
   | otherwise           = DmdSig (DmdType env dmds' res)
   where
-    dmds' = replicate new_args topDmd ++ dmds
+    dmds' = assertPpr (new_args > 0) (ppr new_args) $
+            replicate new_args topDmd ++ dmds
 
 etaConvertDmdSig :: Arity -> DmdSig -> DmdSig
 -- ^ We are expanding (\x y. e) to (\x y z. e z) or reducing from the latter to
