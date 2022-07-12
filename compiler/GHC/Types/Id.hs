@@ -1045,6 +1045,7 @@ transferPolyIdInfo old_id abstract_wrt new_id
     old_strictness  = dmdSigInfo old_info
     new_strictness  = prependArgsDmdSig arity_increase old_strictness
     old_cpr         = cprSigInfo old_info
+    new_cpr         = prependArgsCprSig arity_increase old_cpr
 
     old_cbv_marks   = fromMaybe (replicate old_arity NotMarkedCbv) (idCbvMarks_maybe old_id)
     abstr_cbv_marks = mapMaybe getMark abstract_wrt
@@ -1058,8 +1059,8 @@ transferPolyIdInfo old_id abstract_wrt new_id
       , mightBeLiftedType (idType v)
       = Just MarkedCbv
       | otherwise = Just NotMarkedCbv
-    transfer new_info = new_info `setArityInfo` new_arity
+    transfer new_info = new_info `setArityInfo`      new_arity
                                  `setInlinePragInfo` old_inline_prag
-                                 `setOccInfo` new_occ_info
-                                 `setDmdSigInfo` new_strictness
-                                 `setCprSigInfo` old_cpr
+                                 `setOccInfo`        new_occ_info
+                                 `setDmdSigInfo`     new_strictness
+                                 `setCprSigInfo`     new_cpr
