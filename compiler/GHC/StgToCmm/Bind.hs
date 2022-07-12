@@ -64,6 +64,7 @@ import GHC.Data.FastString
 import GHC.Data.List.SetOps
 
 import Control.Monad
+import GHC.Utils.Trace (pprTraceM)
 
 ------------------------------------------------------------------------
 --              Top-level bindings
@@ -79,13 +80,13 @@ cgTopRhsClosure :: Platform
                 -> UpdateFlag
                 -> [Id]                 -- Args
                 -> CgStgExpr
-                -> (CgIdInfo, FCode ())
+                -> (FCode CgIdInfo, FCode ())
 
-cgTopRhsClosure platform rec id ccs upd_flag args body =
+cgTopRhsClosure platform rec id ccs upd_flag args body = do
   let closure_label = mkClosureLabel (idName id) (idCafInfo id)
-      cg_id_info    = litIdInfo platform id lf_info (CmmLabel closure_label)
       lf_info       = mkClosureLFInfo platform id TopLevel [] upd_flag args
-  in (cg_id_info, gen_code lf_info closure_label)
+      cg_id_info    = litIdInfo platform id lf_info (CmmLabel closure_label)
+  gen_code cg_id_info closure_label
   where
   -- special case for a indirection (f = g).  We create an IND_STATIC
   -- closure pointing directly to the indirectee.  This is exactly
@@ -102,12 +103,15 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
   --
   gen_code _ closure_label
     | StgApp f [] <- body, null args, isNonRec rec
-    = do
-         cg_info <- getCgIdInfo f
-         emitDataCon closure_label indStaticInfoTable ccs [unLit (idInfoToAmode cg_info)]
+    = ( do
+          cg_info <- getCgIdInfo f
+          return cg_info { cg_id = id }
+      , do
+          cg_info <- getCgIdInfo f
+          emitDataCon closure_label indStaticInfoTable ccs [unLit (idInfoToAmode cg_info)])
 
-  gen_code lf_info _closure_label
-   = do { profile <- getProfile
+  gen_code cg_info@CgIdInfo { cg_lf = lf_info } _closure_label
+   = (pure cg_info, do { profile <- getProfile
         ; let name = idName id
         ; mod_name <- getModuleName
         ; let descr         = closureDescription mod_name name
@@ -125,7 +129,7 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
         ; forkClosureBody (closureCodeBody True id closure_info ccs
                                 args body fv_details)
 
-        ; return () }
+        ; return () })
 
   unLit (CmmLit l) = l
   unLit _ = panic "unLit"

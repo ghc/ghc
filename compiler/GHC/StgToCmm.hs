@@ -166,14 +166,15 @@ cgTopBinding logger tmpfs cfg = \case
     StgTopLifted (StgNonRec id rhs) -> do
         let (info, fcode) = cgTopRhs cfg NonRecursive id rhs
         fcode
-        addBindC info
+        info >>= addBindC
 
     StgTopLifted (StgRec pairs) -> do
         let (bndrs, rhss) = unzip pairs
         let pairs' = zip bndrs rhss
             r = unzipWith (cgTopRhs cfg Recursive) pairs'
             (infos, fcodes) = unzip r
-        addBindsC infos
+        infos' <- sequence infos
+        addBindsC infos'
         sequence_ fcodes
 
     StgTopStringLit id str -> do
@@ -196,7 +197,7 @@ cgTopBinding logger tmpfs cfg = \case
         addBindC (litIdInfo (stgToCmmPlatform cfg) id mkLFStringLit lit)
 
 
-cgTopRhs :: StgToCmmConfig -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
+cgTopRhs :: StgToCmmConfig -> RecFlag -> Id -> CgStgRhs -> (FCode CgIdInfo, FCode ())
         -- The Id is passed along for setting up a binding...
 
 cgTopRhs cfg _rec bndr (StgRhsCon _cc con mn _ts args)

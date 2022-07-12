@@ -64,7 +64,7 @@ cgTopRhsCon :: StgToCmmConfig
             -> DataCon          -- Id
             -> ConstructorNumber
             -> [NonVoid StgArg] -- Args
-            -> (CgIdInfo, FCode ())
+            -> (FCode CgIdInfo, FCode ())
 cgTopRhsCon cfg id con mn args
   | Just static_info <- precomputedStaticConInfo_maybe cfg id con args
   , let static_code | isInternalName name = pure ()
@@ -75,11 +75,11 @@ cgTopRhsCon cfg id con mn args
     -- since importing modules will refer to it by name;
     -- but for Internal ones we can drop it altogether
     -- See Note [About the NameSorts] in "GHC.Types.Name" for Internal/External
-    (static_info, static_code)
+    (pure static_info, static_code)
 
   -- Otherwise generate a closure for the constructor.
   | otherwise
-  = (id_Info, gen_code)
+  = (pure id_Info, gen_code)
 
   where
    platform      = stgToCmmPlatform cfg
