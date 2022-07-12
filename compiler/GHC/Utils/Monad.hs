@@ -147,6 +147,11 @@ mapAccumLM :: Monad m
             -> acc                      -- ^ initial state
             -> [x]                      -- ^ inputs
             -> m (acc, [y])             -- ^ final state, outputs
+{-# INLINE mapAccumLM #-}
+-- INLINE pragma.  mapAccumLM is called in inner loops.  Like 'map',
+-- we inline it so that we can take advantage of knowing 'f'.
+-- This makes a few percent difference (in compiler allocations)
+-- when compiling perf/compiler/T9675
 mapAccumLM f s xs =
   go s xs
   where
