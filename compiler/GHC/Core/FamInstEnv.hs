@@ -1323,11 +1323,45 @@ topNormaliseType_maybe env ty
           _ -> NS_Done
 
 ---------------
+-- | Try to simplify a type-family application, by *one* step
+-- If topReduceTyFamApp_maybe env r F tys = Just (HetReduction (Reduction co rhs) res_co)
+-- then    co     :: F tys ~R# rhs
+--         res_co :: typeKind(F tys) ~ typeKind(rhs)
+-- Type families and data families; always Representational role
+topReduceTyFamApp_maybe :: FamInstEnvs -> TyCon -> [Type]
+                        -> Maybe HetReduction
+topReduceTyFamApp_maybe envs fam_tc arg_tys
+  | isFamilyTyCon fam_tc   -- type families and data families
+  , Just redn <- reduceTyFamApp_maybe envs role fam_tc ntys
+  = Just $
+      mkHetReduction
+        (mkTyConAppCo role fam_tc args_cos `mkTransRedn` redn)
+        res_co
+  | otherwise
+  = Nothing
+  where
+    role = Representational
+    ArgsReductions (Reductions args_cos ntys) res_co
+      = initNormM envs role (tyCoVarsOfTypes arg_tys)
+      $ normalise_tc_args fam_tc arg_tys
+
+---------------
+normaliseType :: FamInstEnvs
+              -> Role  -- desired role of coercion
+              -> Type -> Reduction
+normaliseType env role ty
+  = initNormM env role (tyCoVarsOfType ty) $ normalise_type ty
+
+---------------
 normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> Reduction
 -- See comments on normaliseType for the arguments of this function
 normaliseTcApp env role tc tys
   = initNormM env role (tyCoVarsOfTypes tys) $
     normalise_tc_app tc tys
+
+-------------------------------------------------------
+--        Functions that work in the NormM monad
+-------------------------------------------------------
 
 -- See Note [Normalising types] about the LiftingContext
 normalise_tc_app :: TyCon -> [Type] -> NormM Reduction
@@ -1371,40 +1405,10 @@ normalise_tc_app tc tys
     assemble_result r redn kind_co
       = mkCoherenceRightMRedn r redn (mkSymMCo kind_co)
 
----------------
--- | Try to simplify a type-family application, by *one* step
--- If topReduceTyFamApp_maybe env r F tys = Just (HetReduction (Reduction co rhs) res_co)
--- then    co     :: F tys ~R# rhs
---         res_co :: typeKind(F tys) ~ typeKind(rhs)
--- Type families and data families; always Representational role
-topReduceTyFamApp_maybe :: FamInstEnvs -> TyCon -> [Type]
-                        -> Maybe HetReduction
-topReduceTyFamApp_maybe envs fam_tc arg_tys
-  | isFamilyTyCon fam_tc   -- type families and data families
-  , Just redn <- reduceTyFamApp_maybe envs role fam_tc ntys
-  = Just $
-      mkHetReduction
-        (mkTyConAppCo role fam_tc args_cos `mkTransRedn` redn)
-        res_co
-  | otherwise
-  = Nothing
-  where
-    role = Representational
-    ArgsReductions (Reductions args_cos ntys) res_co
-      = initNormM envs role (tyCoVarsOfTypes arg_tys)
-      $ normalise_tc_args fam_tc arg_tys
-
 normalise_tc_args :: TyCon -> [Type] -> NormM ArgsReductions
 normalise_tc_args tc tys
   = do { role <- getRole
        ; normalise_args (tyConKind tc) (tyConRolesX role tc) tys }
-
----------------
-normaliseType :: FamInstEnvs
-              -> Role  -- desired role of coercion
-              -> Type -> Reduction
-normaliseType env role ty
-  = initNormM env role (tyCoVarsOfType ty) $ normalise_type ty
 
 normalise_type :: Type -> NormM Reduction
 -- Normalise the input type, by eliminating *all* type-function redexes
