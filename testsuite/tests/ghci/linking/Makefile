@@ -32,13 +32,13 @@ ghcilink002 :
 	"$(TEST_HC)" -no-auto-link-packages -shared -v0 -o dir002/$(call DLL,foo) dir002/foo.o
 	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -Ldir002 -lfoo TestLink.hs
 
-# Test 3: ghci -lstdc++
-#    where libstdc++.so is normally found in a directory private to gcc,
-#    so only gcc can find it (see #5289)
+# Test 3: ghci -package system-cxx-std-lib
+#    where the C++ standard library is normally found in a directory private to
+#    gcc, so only gcc can find it (see #5289)
 
 .PHONY: ghcilink003
 ghcilink003 :
-	echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -l$(LIBCXX)
+	echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -package system-cxx-std-lib
 
 # Test 4:
 #   package P
@@ -98,7 +98,7 @@ ghcilink005 :
 
 # Test 6:
 #   package P
-#      extra-libraries: stdc++
+#      build-depends: system-cxx-std-lib
 
 LOCAL_PKGCONF006=dir006/ghcilink006.package.conf
 PKG006=dir006/pkg.conf
@@ -112,7 +112,7 @@ ghcilink006 :
 	echo "version: 1.0" >>$(PKG006)
 	echo "id: test-XXX" >>$(PKG006)
 	echo "key: test-XXX" >>$(PKG006)
-	echo "extra-libraries: $(LIBCXX)" >>$(PKG006)
+	echo "build-depends: system-cxx-std-lib" >>$(PKG006)
 	'$(GHC_PKG)' init $(LOCAL_PKGCONF006)
 	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF006) register $(PKG006) -v0
 	#
