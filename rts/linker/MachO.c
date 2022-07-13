@@ -1394,7 +1394,6 @@ ocGetNames_MachO(ObjectCode* oc)
                     {
                             IF_DEBUG(linker_verbose, debugBelch("ocGetNames_MachO: inserting %s\n", nm));
                             SymbolAddr* addr = oc->info->macho_symbols[i].addr;
-                            MachOSection *sect = &oc->info->macho_sections[oc->info->macho_symbols[i].nlist->n_sect-1];
                             // TODO: Make figure out how to determine this from the object file
                             SymType sym_type = SYM_TYPE_CODE;
                             ghciInsertSymbolTable( oc->fileName
