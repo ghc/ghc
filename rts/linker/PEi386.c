@@ -532,8 +532,8 @@ void freePreloadObjectFile_PEi386(ObjectCode *oc)
     if (oc->info) {
         /* Release the unwinder information.
            See Note [Exception Unwinding].  */
-        if (oc->info->xdata) {
-            if (!RtlDeleteFunctionTable (oc->info->xdata->start))
+        if (oc->info->pdata) {
+            if (!RtlDeleteFunctionTable (oc->info->pdata->start))
               debugBelch ("Unable to remove Exception handlers for %" PATH_FMT "\n",
                           oc->fileName);
             oc->info->xdata = NULL;
@@ -2105,15 +2105,16 @@ ocResolve_PEi386 ( ObjectCode* oc )
   Note [Exception Unwinding]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  Exception Unwinding on Windows is handle using two named sections.
+  Exception Unwinding on Windows is handled using two named sections.
 
   .pdata: Exception registration tables.
 
-  The .pdata section contains an array of function table entries that are used
-  for exception handling.  The entries must be sorted according to the
-  function addresses (the first field in each structure) before being emitted
-  into the final image.  It is pointed to by the exception table entry in the
-  image data directory. For x64 each entry contains:
+  The .pdata section contains an array of function table entries (of type
+  RUNTIME_FUNCTION) that are used for exception handling.  The entries must be
+  sorted according to the function addresses (the first field in each
+  structure) before being emitted into the final image.  It is pointed to by
+  the exception table entry in the image data directory. For x64 each entry
+  contains:
 
   Offset    Size    Field              Description
   0         4       Begin Address      The RVA of the corresponding function.
