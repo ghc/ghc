@@ -1597,6 +1597,35 @@ ocRunInit_MachO ( ObjectCode *oc )
     return 1;
 }
 
+int
+ocRunFini_MachO ( ObjectCode *oc )
+{
+    if (NULL == oc->info->segCmd) {
+        barf("ocRunInit_MachO: no segment load command");
+    }
+
+    for (int i = 0; i < oc->n_sections; i++) {
+        IF_DEBUG(linker, debugBelch("ocRunFini_MachO: checking section %d\n", i));
+
+        if (oc->sections[i].kind == SECTIONKIND_FINI_ARRAY) {
+            IF_DEBUG(linker, debugBelch("ocRunFini_MachO:     running mod fini functions\n"));
+
+            void *fini_startC = oc->sections[i].start;
+            fini_t *fini = (fini_t*)fini_startC;
+            fini_t *fini_end = (fini_t*)((uint8_t*)fini_startC
+                             + oc->sections[i].info->macho_section->size);
+
+            for (int pn = 0; fini < fini_end; fini++, pn++) {
+                IF_DEBUG(linker, debugBelch("ocRunFini_MachO:     function pointer %d at %p to %p\n",
+                                            pn, (void *) fini, (void *) *fini));
+                (*fini)();
+            }
+        }
+    }
+
+    return 1;
+}
+
 /*
  * Figure out by how much to shift the entire Mach-O file in memory
  * when loading so that its single segment ends up 16-byte-aligned
