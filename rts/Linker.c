@@ -1145,6 +1145,8 @@ void freeObjectCode (ObjectCode *oc)
         ocRunFini_ELF(oc);
 #elif defined(OBJFORMAT_PEi386)
         ocRunFini_PEi386(oc);
+#elif defined(OBJFORMAT_MACHO)
+        ocRunFini_MachO(oc);
 #endif
     }
 
