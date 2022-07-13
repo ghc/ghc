@@ -992,8 +992,8 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
              -- all these various things are doing
              bndrs, implicit_kvs_bndr, implicit_kvs_body :: [LocatedN RdrName]
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
-             implicit_kvs_bndr = filterFreeVarsToBind bndrs bndr_kv_occs
              implicit_kvs_body = filterFreeVarsToBind bndrs body_kv_occs
+             implicit_kvs_bndr = filterFreeVarsToBind (bndrs ++ implicit_kvs_body) bndr_kv_occs
              body_remaining = filterFreeVarsToBind bndr_kv_occs $
               filterFreeVarsToBind bndrs body_kv_occs
              all_bound_on_lhs = null body_remaining
