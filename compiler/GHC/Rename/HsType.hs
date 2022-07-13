@@ -985,10 +985,8 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
              -- all these various things are doing
              bndrs, implicit_kvs_bndr, implicit_kvs_body :: [LocatedN RdrName]
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
-             implicit_kvs_bndr = filterFreeVarsToBind bndrs $
-               bndr_kv_occs
-             implicit_kvs_body = filterFreeVarsToBind bndrs $
-               body_kv_occs
+             implicit_kvs_bndr = filterFreeVarsToBind bndrs bndr_kv_occs
+             implicit_kvs_body = filterFreeVarsToBind bndrs body_kv_occs
              body_remaining = filterFreeVarsToBind bndr_kv_occs $
               filterFreeVarsToBind bndrs body_kv_occs
              all_bound_on_lhs = null body_remaining
@@ -1008,7 +1006,7 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
            -- This is the only call site for bindLHsTyVarBndrs where we pass
            -- NoWarnUnusedForalls, which suppresses -Wunused-foralls warnings.
            -- See Note [Suppress -Wunused-foralls when binding LHsQTyVars].
-    do { let -- The SrcSpan that rnImplicitTvOccs will attach to each Name will
+    do { let -- The SrcSpan that rnImplicitTvOccsIfXopt will attach to each Name will
              -- span the entire declaration to which the LHsQTyVars belongs,
              -- which will be reflected in warning and error messages. We can
              -- be a little more precise than that by pointing to the location
