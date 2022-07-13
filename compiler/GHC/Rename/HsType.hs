@@ -406,6 +406,13 @@ rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
        ; bindLocalNamesFV vars $
          thing_inside vars }
 
+-- | This is a wrapper for 'rnImplicitTvOccs' that conditionally introduces new
+-- renamed type variables, in particular for the case of implicitly bound variables
+-- in type or kind signatures as well as pattern signature binders.
+-- If the language extension passed in as the first argument is enabled, renaming will
+-- be performed, otherwise an empty list is passed to the continuation.
+-- The function was introduced for the extensions @ImplicitForAll@ and
+-- @PatternSignatureBinds@, so it is expected to be used with those two in practice.
 rnImplicitTvOccsIfXopt :: LangExt.Extension
                        -> Maybe assoc
                        -> FreeKiTyVars
@@ -1172,11 +1179,8 @@ bindHsOuterTyVarBndrs :: OutputableBndrFlag flag 'Renamed
 bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
   case outer_bndrs of
     HsOuterImplicit{} -> do
-      implicit_forall <- xoptM LangExt.ImplicitForAll
-      if implicit_forall
-      then rnImplicitTvOccs mb_cls implicit_vars $ \implicit_vars' -> do
+      rnImplicitTvOccsIfXopt LangExt.ImplicitForAll mb_cls implicit_vars $ \implicit_vars' ->
         thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
-      else thing_inside $ HsOuterImplicit { hso_ximplicit = [] }
     HsOuterExplicit{hso_bndrs = exp_bndrs} ->
       -- Note: If we pass mb_cls instead of Nothing below, bindLHsTyVarBndrs
       -- will use class variables for any names the user meant to bring in

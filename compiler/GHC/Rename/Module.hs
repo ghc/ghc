@@ -1826,8 +1826,7 @@ rnTyClDecl (DataDecl
              doc = TyDataCtx tycon
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' no_rhs_kvs ->
-    do {
-       ; (defn', fvs) <- rnDataDefn doc defn
+    do { (defn', fvs) <- rnDataDefn doc defn
        ; cusk <- data_decl_has_cusk tyvars' new_or_data no_rhs_kvs kind_sig
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
                                   , tcdFVs      = fvs }
