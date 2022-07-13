@@ -971,22 +971,18 @@ relocateSection(ObjectCode* oc, int curSection)
 SectionKind
 getSectionKind_MachO(MachOSection *section)
 {
-    SectionKind kind;
-
-    /* todo: Use section flags instead */
-    if (0==strcmp(section->sectname,"__text")) {
-        kind = SECTIONKIND_CODE_OR_RODATA;
-    } else if (0==strcmp(section->sectname,"__const") ||
-               0==strcmp(section->sectname,"__data") ||
-               0==strcmp(section->sectname,"__bss") ||
-               0==strcmp(section->sectname,"__common") ||
-               0==strcmp(section->sectname,"__mod_init_func")) {
-        kind = SECTIONKIND_RWDATA;
+    uint8_t s_type = section->flags & SECTION_TYPE;
+    if (s_type == S_MOD_INIT_FUNC_POINTERS) {
+        return SECTIONKIND_INIT_ARRAY;
+    } else if (s_type == S_MOD_TERM_FUNC_POINTERS) {
+        return SECTIONKIND_FINI_ARRAY;
+    } else if (0==strcmp(section->segname,"__TEXT")) {
+        return SECTIONKIND_CODE_OR_RODATA;
+    } else if (0==strcmp(section->segname,"__DATA")) {
+        return SECTIONKIND_RWDATA;
     } else {
-        kind = SECTIONKIND_OTHER;
+        return SECTIONKIND_OTHER;
     }
-
-    return kind;
 }
 
 /* Calculate the # of active segments and their sizes based on section
@@ -1581,12 +1577,7 @@ ocRunInit_MachO ( ObjectCode *oc )
     for (int i = 0; i < oc->n_sections; i++) {
         IF_DEBUG(linker, debugBelch("ocRunInit_MachO: checking section %d\n", i));
 
-        // ToDo: replace this with a proper check for the S_MOD_INIT_FUNC_POINTERS
-        // flag.  We should do this elsewhere in the Mach-O linker code
-        // too.  Note that the system linker will *refuse* to honor
-        // sections which don't have this flag, so this could cause
-        // weird behavior divergence (albeit reproducible).
-        if (0 == strcmp(oc->info->macho_sections[i].sectname, "__mod_init_func")) {
+        if (oc->sections[i].kind == SECTIONKIND_INIT_ARRAY) {
             IF_DEBUG(linker, debugBelch("ocRunInit_MachO:     running mod init functions\n"));
 
             void *init_startC = oc->sections[i].start;
