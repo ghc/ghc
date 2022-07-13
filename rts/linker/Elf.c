@@ -1955,6 +1955,15 @@ ocResolve_ELF ( ObjectCode* oc )
  *
  * See also: the "Initialization and Termination Functions" section of the
  * System V ABI.
+ *
+ * Note [GCC 6 init/fini section workaround]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The System V ABI specifies that .init_array and .fini_array sections should
+ * be marked with the SHT_INIT_ARRAY/SHT_FINI_ARRAY section types. However, it
+ * seems that GCC 6 (at least on i386) produces sections *named*
+ * .init_array/.fini_array but marks them as SHT_PROGBITS. Consequently we need
+ * to augment the usual section type check (which in an ideal world would be
+ * sufficient) with a check looking at the section name to catch this case.
  */
 
 // Run the constructors/initializers of an ObjectCode.
@@ -1979,15 +1988,19 @@ int ocRunInit_ELF( ObjectCode *oc )
    // it here, please file a bug report if it affects you.
    for (i = 0; i < elf_shnum(ehdr); i++) {
       init_t *init_start, *init_end, *init;
+      char *sh_name = sh_strtab + shdr[i].sh_name;
       int is_bss = false;
       SectionKind kind = getSectionKind_ELF(&shdr[i], &is_bss);
+
       if (kind == SECTIONKIND_CODE_OR_RODATA
-       && 0 == memcmp(".init", sh_strtab + shdr[i].sh_name, 5)) {
+       && 0 == memcmp(".init", sh_name, 5)) {
           init_t init_f = (init_t)(oc->sections[i].start);
           init_f(argc, argv, envv);
       }
 
-      if (kind == SECTIONKIND_INIT_ARRAY) {
+      // Note [GCC 6 init/fini section workaround]
+      if (kind == SECTIONKIND_INIT_ARRAY
+          || 0 == memcmp(".init_array", sh_name, 11)) {
          char *init_startC = oc->sections[i].start;
          init_start = (init_t*)init_startC;
          init_end = (init_t*)(init_startC + shdr[i].sh_size);
@@ -2027,6 +2040,7 @@ int ocRunFini_ELF( ObjectCode *oc )
    char* sh_strtab = ehdrC + shdr[elf_shstrndx(ehdr)].sh_offset;
 
    for (Elf_Word i = 0; i < elf_shnum(ehdr); i++) {
+      char *sh_name = sh_strtab + shdr[i].sh_name;
       int is_bss = false;
       SectionKind kind = getSectionKind_ELF(&shdr[i], &is_bss);
 
@@ -2035,7 +2049,9 @@ int ocRunFini_ELF( ObjectCode *oc )
          fini_f();
       }
 
-      if (kind == SECTIONKIND_FINI_ARRAY) {
+      // Note [GCC 6 init/fini section workaround]
+      if (kind == SECTIONKIND_FINI_ARRAY
+          || 0 == memcmp(".fini_array", sh_name, 11)) {
          fini_t *fini_start, *fini_end, *fini;
          char *fini_startC = oc->sections[i].start;
          fini_start = (fini_t*)fini_startC;
