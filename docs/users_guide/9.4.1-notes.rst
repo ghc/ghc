@@ -243,15 +243,18 @@ Runtime system
 
 - There's a new special function ``withDict`` in ``GHC.Exts``: ::
 
-        withDict :: forall {rr :: RuntimeRep} st dt (r :: TYPE rr). st -> (dt => r) -> r
+        withDict :: forall {rr :: RuntimeRep} cls meth (r :: TYPE rr). WithDict cls meth => meth -> (cls => r) -> r
 
-  where ``dt`` must be a class containing exactly one method, whose type
-  must be ``st``. This function converts ``st`` to a type class dictionary.
+  where ``cls`` must be a class containing exactly one method, whose type
+  must be ``meth``. This requirement is enforced by the constraint
+  ``WithDict cls meth``.
+
+  This function converts ``meth`` to a type class dictionary.
   It removes the need for ``unsafeCoerce`` in implementation of reflection
   libraries. It should be used with care, because it can introduce
   incoherent instances.
 
-- See the the ``base`` library's ``changelog.md`` for a full accounting.
+- See the ``base`` library's ``changelog.md`` for a full accounting.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
@@ -372,7 +375,7 @@ Runtime system
     - ``maskAsyncExceptions#``, ``maskUninterruptible#``, ``unmaskAsyncExceptions#``.
 
   Note in particular that ``raise#`` is now both representation-polymorphic
-  (with an inferred `RuntimeRep` argument) and levity-polymorphic, with type: ::
+  (with an inferred ``RuntimeRep`` argument) and levity-polymorphic, with type: ::
 
       raise# :: forall {l :: Levity} {r :: RuntimeRep}
                        (a :: TYPE (BoxedRep l))
@@ -442,12 +445,12 @@ Runtime system
   datatype, to track the presence of a promotion tick. Plugins which manipulate
   the Haskell AST will need to take this change into account.
 
-- Removed `lookupOrigIO` in favor of `lookupNameCache`
+- Removed ``lookupOrigIO`` in favor of ``lookupNameCache``.
 
-- Added a new `thNameToGhcNameIO` function that plugins can use outside the `CoreM` monad.
+- Added a new ``thNameToGhcNameIO`` function that plugins can use outside the ``CoreM`` monad.
 
 ``ghc-heap`` library
-~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 - The ``link`` field of ``GHC.Exts.Heap.WeakClosure`` has been replaced with a
   ``weakLink`` field which is ``Nothing`` if and only if ``link`` would have
