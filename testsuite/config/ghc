@@ -54,7 +54,6 @@ if ghc_with_dynamic_rts:
 
 if windows:
     config.supports_dynamic_hs = False
-    config.stdcxx_impl = 'c++'
 
 # WinIO I/O manager for Windows
 if windows:

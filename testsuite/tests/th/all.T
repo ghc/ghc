@@ -403,7 +403,7 @@ test('T13366Cxx',
       when(opsys('darwin'), expect_broken(16083))
      ],
      compile_and_run,
-     ['-l{} -v0'.format(config.stdcxx_impl)])
+     ['-package system-cxx-std-lib -v0'])
 test('T13473', normal, multimod_compile_and_run,
      ['T13473.hs', '-v0 ' + config.ghc_th_way_flags])
 test('T13587', expect_broken(13587), compile_and_run, ['-v0'])

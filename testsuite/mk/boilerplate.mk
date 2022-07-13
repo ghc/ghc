@@ -303,16 +303,7 @@ DARWIN = YES
 else
 DARWIN = NO
 endif
-# The platform is known to use libc++ as its main C++ library.
-ifeq "$(HostOS)" "freebsd"
-LIBCXX_PLATFORM = YES
-else ifeq "$(HostOS)" "openbsd"
-LIBCXX_PLATFORM = YES
-else ifeq "$(HostOS)" "mingw32"
-LIBCXX_PLATFORM = YES
-else
-LIBCXX_PLATFORM = NO
-endif
+
 ifeq "$(HostOS)" "openbsd"
 # None required, dlopen and the like are in libc.
 LIBDL_NAME =
