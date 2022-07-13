@@ -1,0 +1,2 @@
+patternsignaturebinds1.hs:6:9:
+    Not in scope: type variable ‘a’

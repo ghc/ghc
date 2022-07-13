@@ -1,0 +1,5 @@
+no-psb-no-ifa-data-fail.hs:8:17:
+    Not in scope: type variable ‘c’
+
+no-psb-no-ifa-data-fail.hs:8:39:
+    Not in scope: type variable ‘c’

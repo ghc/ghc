@@ -1,0 +1,7 @@
+test('psb-data', normal, compile, [''])
+test('psb-fun', normal, compile, [''])
+test('no-psb-fun', normal, compile, [''])
+test('no-psb-fun-fail', normal, compile_fail, [''])
+test('no-psb-data', normal, compile, [''])
+test('no-psb-data-fail', normal, compile_fail, [''])
+test('no-psb-no-ifa-data-fail', normal, compile_fail, [''])
