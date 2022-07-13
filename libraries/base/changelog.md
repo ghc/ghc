@@ -50,24 +50,24 @@
 
   * There's a new special function ``withDict`` in ``GHC.Exts``: ::
 
-        withDict :: forall {rr :: RuntimeRep} st dt (r :: TYPE rr). st -> (dt => r) -> r
+        withDict :: forall {rr :: RuntimeRep} cls meth (r :: TYPE rr). WithDict cls meth => meth -> (cls => r) -> r
 
-    where ``dt`` must be a class containing exactly one method, whose type
-    must be ``st``.
+    where ``cls`` must be a class containing exactly one method, whose type
+    must be ``meth``.
 
-    This function converts ``st`` to a type class dictionary.
+    This function converts ``meth`` to a type class dictionary.
     It removes the need for ``unsafeCoerce`` in implementation of reflection
     libraries. It should be used with care, because it can introduce
     incoherent instances.
 
     For example, the ``withTypeable`` function from the
-    ``Data.Typeable`` module can now be defined as: ::
+    ``Type.Reflection`` module can now be defined as: ::
 
           withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
                        => TypeRep a -> (Typeable a => r) -> r
-          withTypeable rep k = withDict @(TypeRep a) @(Typeable a) rep k
+          withTypeable rep k = withDict @(Typeable a) rep k
 
-    Note that the explicit type applications are required, as the call to
+    Note that the explicit type application is required, as the call to
     ``withDict`` would be ambiguous otherwise.
 
     This replaces the old ``GHC.Exts.magicDict``, which required
