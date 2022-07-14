@@ -855,6 +855,12 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent, SymTy
             return &lookupDependentSymbol;
         }
     }
+    if (strcmp(lbl, MAYBE_LEADING_UNDERSCORE_STR("__cxa_atexit")) == 0 && dependent) {
+        dependent->cxa_finalize = (cxa_finalize_fn) lookupDependentSymbol(
+                MAYBE_LEADING_UNDERSCORE_STR("__cxa_finalize"),
+                dependent,
+                NULL);
+    }
 
     if (!ghciLookupSymbolInfo(symhash, lbl, &pinfo)) {
         IF_DEBUG(linker_verbose, debugBelch("lookupSymbol: symbol '%s' not found, trying dlsym\n", lbl));
@@ -937,7 +943,13 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent, SymTy
  * relocations of bounded displacement and therefore __dso_handle must not be
  * too far from the loaded object's code (hence using its start address).
  *
+ * Finally, when we see a reference to __cxa_atexit in an object we take care
+ * to lookup and record the address of __cxa_finalize (largely to ensure that
+ * the symbol dependency is recorded) and call it with the appropriate handle
+ * when the object is unloaded.
+ *
  * See #20493.
+ * See section 3.3.5 of the Itanium C++ ABI, version 1.83.
  */
 
 /*
@@ -1150,6 +1162,11 @@ void freeObjectCode (ObjectCode *oc)
 #endif
     }
 
+    // See Note [Resolving __dso_handle]
+    if (oc->cxa_finalize) {
+        oc->cxa_finalize(oc->image);
+    }
+
     if (oc->type == DYNAMIC_OBJECT) {
 #if defined(OBJFORMAT_ELF)
         ACQUIRE_LOCK(&dl_mutex);
@@ -1300,6 +1317,7 @@ mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
    oc->imageMapped       = mapped;
 
    oc->misalignment      = misalignment;
+   oc->cxa_finalize      = NULL;
    oc->extraInfos        = NULL;
 
    /* chain it onto the list of objects */
