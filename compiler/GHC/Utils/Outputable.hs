@@ -381,6 +381,7 @@ data SDocContext = SDC
   , sdocSuppressTypeApplications    :: !Bool
   , sdocSuppressIdInfo              :: !Bool
   , sdocSuppressCoercions           :: !Bool
+  , sdocSuppressCoercionTypes       :: !Bool
   , sdocSuppressUnfoldings          :: !Bool
   , sdocSuppressVarKinds            :: !Bool
   , sdocSuppressUniques             :: !Bool
@@ -441,6 +442,7 @@ defaultSDocContext = SDC
   , sdocSuppressTypeApplications    = False
   , sdocSuppressIdInfo              = False
   , sdocSuppressCoercions           = False
+  , sdocSuppressCoercionTypes       = False
   , sdocSuppressUnfoldings          = False
   , sdocSuppressVarKinds            = False
   , sdocSuppressUniques             = False
