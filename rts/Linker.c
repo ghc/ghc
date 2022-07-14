@@ -846,7 +846,7 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent, SymTy
     RtsSymbolInfo *pinfo;
 
     /* See Note [Resolving __dso_handle] */
-    if (strcmp(lbl, "__dso_handle") == 0) {
+    if (strcmp(lbl, MAYBE_LEADING_UNDERSCORE_STR("__dso_handle")) == 0) {
         if (dependent) {
             return dependent->image;
         } else {
