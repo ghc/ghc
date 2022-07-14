@@ -353,8 +353,10 @@ data GeneralFlag
    | Opt_ShowLoadedModules
    | Opt_HexWordLiterals -- See Note [Print Hexadecimal Literals]
 
-   -- Suppress all coercions, them replacing with '...'
+   -- Suppress a coercions inner structure, replacing it with '...'
    | Opt_SuppressCoercions
+   -- Suppress the type of a coercion as well
+   | Opt_SuppressCoercionTypes
    | Opt_SuppressVarKinds
    -- Suppress module id prefixes on variables.
    | Opt_SuppressModulePrefixes

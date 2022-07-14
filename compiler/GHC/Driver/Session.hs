@@ -2427,6 +2427,7 @@ dynamic_flags_deps = [
   -- have otherwise identical names.
   , make_ord_flag defGhcFlag "dsuppress-all"
       (NoArg $ do setGeneralFlag Opt_SuppressCoercions
+                  setGeneralFlag Opt_SuppressCoercionTypes
                   setGeneralFlag Opt_SuppressVarKinds
                   setGeneralFlag Opt_SuppressModulePrefixes
                   setGeneralFlag Opt_SuppressTypeApplications
@@ -3372,6 +3373,7 @@ dFlagsDeps = [
      (useInstead "-d" "suppress-stg-exts"),
   flagSpec "suppress-stg-exts"          Opt_SuppressStgExts,
   flagSpec "suppress-coercions"         Opt_SuppressCoercions,
+  flagSpec "suppress-coercion-types"    Opt_SuppressCoercionTypes,
   flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
   flagSpec "suppress-unfoldings"        Opt_SuppressUnfoldings,
   flagSpec "suppress-module-prefixes"   Opt_SuppressModulePrefixes,
@@ -5023,6 +5025,7 @@ initSDocContext dflags style = SDC
   , sdocSuppressTypeApplications    = gopt Opt_SuppressTypeApplications dflags
   , sdocSuppressIdInfo              = gopt Opt_SuppressIdInfo dflags
   , sdocSuppressCoercions           = gopt Opt_SuppressCoercions dflags
+  , sdocSuppressCoercionTypes       = gopt Opt_SuppressCoercionTypes dflags
   , sdocSuppressUnfoldings          = gopt Opt_SuppressUnfoldings dflags
   , sdocSuppressVarKinds            = gopt Opt_SuppressVarKinds dflags
   , sdocSuppressUniques             = gopt Opt_SuppressUniques dflags

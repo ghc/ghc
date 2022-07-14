@@ -172,8 +172,12 @@ noParens pp = pp
 pprOptCo :: Coercion -> SDoc
 -- Print a coercion optionally; i.e. honouring -dsuppress-coercions
 pprOptCo co = sdocOption sdocSuppressCoercions $ \case
-              True  -> angleBrackets (text "Co:" <> int (coercionSize co)) <+> dcolon <+> ppr (coercionType co)
-              False -> parens $ sep [ppr co, dcolon <+> ppr (coercionType co)]
+              True  -> angleBrackets (text "Co:" <> int (coercionSize co)) <+> dcolon <+> co_type
+              False -> parens $ sep [ppr co, dcolon <+> co_type]
+    where
+      co_type = sdocOption sdocSuppressCoercionTypes $ \case
+          True -> text "..."
+          False -> ppr (coercionType co)
 
 ppr_id_occ :: (SDoc -> SDoc) -> Id -> SDoc
 ppr_id_occ add_par id

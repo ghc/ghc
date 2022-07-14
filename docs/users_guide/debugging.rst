@@ -910,6 +910,11 @@ parts that you are not interested in.
 
     Suppress the printing of type coercions.
 
+.. ghc-flag:: -dsuppress-coercion-types
+    :shortdesc: Suppress the printing of coercion types in Core dumps to make them
+        shorter
+    :type: dynamic
+
 .. ghc-flag:: -dsuppress-var-kinds
     :shortdesc: Suppress the printing of variable kinds
     :type: dynamic
