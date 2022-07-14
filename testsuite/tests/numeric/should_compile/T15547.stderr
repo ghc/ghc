@@ -5,31 +5,25 @@ Result size of Tidy Core
 
 nat2Word#
   = \ @n $dKnownNat _ ->
-      naturalToWord# ($dKnownNat `cast` <Co:5> :: KnownNat n ~R# Natural)
+      naturalToWord# ($dKnownNat `cast` <Co:5> :: ...)
 
 foo = \ _ -> 18##
 
 fd
   = \ @n $dKnownNat _ ->
-      naturalToWord#
-        ($dKnownNat
-         `cast` <Co:13> :: KnownNat (Div (n + 63) 64) ~R# Natural)
+      naturalToWord# ($dKnownNat `cast` <Co:13> :: ...)
 
 d = \ _ -> 3##
 
 fm
   = \ @n $dKnownNat _ ->
-      naturalToWord#
-        ($dKnownNat
-         `cast` <Co:17> :: KnownNat (Mod (n - 1) 64 + 1) ~R# Natural)
+      naturalToWord# ($dKnownNat `cast` <Co:17> :: ...)
 
 m = \ _ -> 9##
 
 fp
   = \ @n $dKnownNat _ ->
-      naturalToWord#
-        ($dKnownNat
-         `cast` <Co:21> :: KnownNat (2 ^ (Mod (n + 63) 64 + 1)) ~R# Natural)
+      naturalToWord# ($dKnownNat `cast` <Co:21> :: ...)
 
 p = \ _ -> 512##
 
