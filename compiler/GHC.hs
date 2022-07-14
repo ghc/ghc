@@ -597,7 +597,7 @@ setSessionDynFlags dflags0 = do
   case S.toList all_uids of
     [uid] -> do
       setUnitDynFlagsNoCheck uid dflags
-      modifySession (hscSetActiveUnitId (homeUnitId_ dflags))
+      modifySession (hscUpdateLoggerFlags . hscSetActiveUnitId (homeUnitId_ dflags))
       dflags' <- getDynFlags
       setTopSessionDynFlags dflags'
     [] -> panic "nohue"

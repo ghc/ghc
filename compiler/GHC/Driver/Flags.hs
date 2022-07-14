@@ -1,5 +1,7 @@
 module GHC.Driver.Flags
    ( DumpFlag(..)
+   , getDumpFlagFrom
+   , enabledIfVerbose
    , GeneralFlag(..)
    , Language(..)
    , optimisationFlags
@@ -141,6 +143,46 @@ data DumpFlag
    | Opt_D_dump_faststrings
    | Opt_D_faststring_stats
    deriving (Eq, Show, Enum)
+
+-- | Helper function to query whether a given `DumpFlag` is enabled or not.
+getDumpFlagFrom
+  :: (a -> Int) -- ^ Getter for verbosity setting
+  -> (a -> EnumSet DumpFlag) -- ^ Getter for the set of enabled dump flags
+  -> DumpFlag -> a -> Bool
+getDumpFlagFrom getVerbosity getFlags f x
+  =  (f `EnumSet.member` getFlags x)
+  || (getVerbosity x >= 4 && enabledIfVerbose f)
+
+-- | Is the flag implicitly enabled when the verbosity is high enough?
+enabledIfVerbose :: DumpFlag -> Bool
+enabledIfVerbose Opt_D_dump_tc_trace               = False
+enabledIfVerbose Opt_D_dump_rn_trace               = False
+enabledIfVerbose Opt_D_dump_cs_trace               = False
+enabledIfVerbose Opt_D_dump_if_trace               = False
+enabledIfVerbose Opt_D_dump_tc                     = False
+enabledIfVerbose Opt_D_dump_rn                     = False
+enabledIfVerbose Opt_D_dump_rn_stats               = False
+enabledIfVerbose Opt_D_dump_hi_diffs               = False
+enabledIfVerbose Opt_D_verbose_core2core           = False
+enabledIfVerbose Opt_D_verbose_stg2stg             = False
+enabledIfVerbose Opt_D_dump_splices                = False
+enabledIfVerbose Opt_D_th_dec_file                 = False
+enabledIfVerbose Opt_D_dump_rule_firings           = False
+enabledIfVerbose Opt_D_dump_rule_rewrites          = False
+enabledIfVerbose Opt_D_dump_simpl_trace            = False
+enabledIfVerbose Opt_D_dump_rtti                   = False
+enabledIfVerbose Opt_D_dump_inlinings              = False
+enabledIfVerbose Opt_D_dump_verbose_inlinings      = False
+enabledIfVerbose Opt_D_dump_core_stats             = False
+enabledIfVerbose Opt_D_dump_asm_stats              = False
+enabledIfVerbose Opt_D_dump_types                  = False
+enabledIfVerbose Opt_D_dump_simpl_iterations       = False
+enabledIfVerbose Opt_D_dump_ticked                 = False
+enabledIfVerbose Opt_D_dump_view_pattern_commoning = False
+enabledIfVerbose Opt_D_dump_mod_cycles             = False
+enabledIfVerbose Opt_D_dump_mod_map                = False
+enabledIfVerbose Opt_D_dump_ec_trace               = False
+enabledIfVerbose _                                 = True
 
 -- | Enumerates the simple on-or-off dynamic flags
 data GeneralFlag

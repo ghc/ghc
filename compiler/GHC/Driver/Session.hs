@@ -1427,36 +1427,7 @@ hasNoOptCoercion = gopt Opt_G_NoOptCoercion
 
 -- | Test whether a 'DumpFlag' is set
 dopt :: DumpFlag -> DynFlags -> Bool
-dopt f dflags = (f `EnumSet.member` dumpFlags dflags)
-             || (verbosity dflags >= 4 && enableIfVerbose f)
-    where enableIfVerbose Opt_D_dump_tc_trace               = False
-          enableIfVerbose Opt_D_dump_rn_trace               = False
-          enableIfVerbose Opt_D_dump_cs_trace               = False
-          enableIfVerbose Opt_D_dump_if_trace               = False
-          enableIfVerbose Opt_D_dump_tc                     = False
-          enableIfVerbose Opt_D_dump_rn                     = False
-          enableIfVerbose Opt_D_dump_rn_stats               = False
-          enableIfVerbose Opt_D_dump_hi_diffs               = False
-          enableIfVerbose Opt_D_verbose_core2core           = False
-          enableIfVerbose Opt_D_verbose_stg2stg             = False
-          enableIfVerbose Opt_D_dump_splices                = False
-          enableIfVerbose Opt_D_th_dec_file                 = False
-          enableIfVerbose Opt_D_dump_rule_firings           = False
-          enableIfVerbose Opt_D_dump_rule_rewrites          = False
-          enableIfVerbose Opt_D_dump_simpl_trace            = False
-          enableIfVerbose Opt_D_dump_rtti                   = False
-          enableIfVerbose Opt_D_dump_inlinings              = False
-          enableIfVerbose Opt_D_dump_verbose_inlinings      = False
-          enableIfVerbose Opt_D_dump_core_stats             = False
-          enableIfVerbose Opt_D_dump_asm_stats              = False
-          enableIfVerbose Opt_D_dump_types                  = False
-          enableIfVerbose Opt_D_dump_simpl_iterations       = False
-          enableIfVerbose Opt_D_dump_ticked                 = False
-          enableIfVerbose Opt_D_dump_view_pattern_commoning = False
-          enableIfVerbose Opt_D_dump_mod_cycles             = False
-          enableIfVerbose Opt_D_dump_mod_map                = False
-          enableIfVerbose Opt_D_dump_ec_trace               = False
-          enableIfVerbose _                                 = True
+dopt = getDumpFlagFrom verbosity dumpFlags
 
 -- | Set a 'DumpFlag'
 dopt_set :: DynFlags -> DumpFlag -> DynFlags

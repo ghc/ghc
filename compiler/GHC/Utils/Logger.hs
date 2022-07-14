@@ -146,7 +146,7 @@ defaultLogFlags = LogFlags
 
 -- | Test if a DumpFlag is enabled
 log_dopt :: DumpFlag -> LogFlags -> Bool
-log_dopt f logflags = f `EnumSet.member` log_dump_flags logflags
+log_dopt = getDumpFlagFrom log_verbosity log_dump_flags
 
 -- | Enable a DumpFlag
 log_set_dopt :: DumpFlag -> LogFlags -> LogFlags
