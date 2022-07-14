@@ -399,9 +399,7 @@ test('T13366C',
      compile_and_run,
      ['-v0'])
 test('T13366Cxx',
-     [expect_broken_for(13366, ['ghci']),
-      when(opsys('darwin'), expect_broken(16083))
-     ],
+     [expect_broken_for(13366, ['ghci'])],
      compile_and_run,
      ['-package system-cxx-std-lib -v0'])
 test('T13473', normal, multimod_compile_and_run,
