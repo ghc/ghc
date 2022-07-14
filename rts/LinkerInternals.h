@@ -239,6 +239,8 @@ typedef enum {
     DYNAMIC_OBJECT,
 } ObjectType;
 
+typedef void (*cxa_finalize_fn)(void *);
+
 /* Top-level structure for an object module.  One of these is allocated
  * for each object file in use.
  */
@@ -275,6 +277,11 @@ struct _ObjectCode {
     /* record by how much image has been deliberately misaligned
        after allocation, so that we can use realloc */
     int        misalignment;
+
+    /* The address of __cxa_finalize; set when at least one finalizer was
+     * register and therefore we must call __cxa_finalize before unloading.
+     * See Note [Resolving __dso_handle]. */
+    cxa_finalize_fn cxa_finalize;
 
     /* The section-kind entries for this object module. An array. */
     int n_sections;
