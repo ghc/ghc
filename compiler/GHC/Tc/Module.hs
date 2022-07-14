@@ -2668,8 +2668,15 @@ tcRnType :: HscEnv
 tcRnType hsc_env flexi normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
-    do { (HsWC { hswc_ext = wcs, hswc_body = rn_type }, _fvs)
-               <- rnHsWcType GHCiCtx (mkHsWildCardBndrs rdr_type)
+    do { (HsWC { hswc_ext = wcs, hswc_body = rn_sig_type@(L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body })) }, _fvs)
+                 -- we are using 'rnHsSigWcType' to bind the unbound type variables
+                 -- and in combination with 'tcOuterTKBndrs' we are able to
+                 -- implicitly quantify them as if the user wrote 'forall' by
+                 -- hand (see #19217). This allows kind check to work in presence
+                 -- of free type variables :
+                 -- ghci> :k [a]
+                 -- [a] :: *
+               <- rnHsSigWcType GHCiCtx (mkHsWildCardBndrs $ noLocA (mkHsImplicitSigType rdr_type))
                   -- The type can have wild cards, but no implicit
                   -- generalisation; e.g.   :kind (T _)
        ; failIfErrsM
@@ -2679,14 +2686,14 @@ tcRnType hsc_env flexi normalise rdr_type
         -- Now kind-check the type
         -- It can have any rank or kind
         -- First bring into scope any wildcards
-       ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
-       ; ((ty, kind), wanted)
+       ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_sig_type])
+       ; si <- mkSkolemInfo $ SigTypeSkol (GhciCtxt True)
+       ; ((_, (ty, kind)), wanted)
                <- captureTopConstraints $
                   pushTcLevelM_         $
                   bindNamedWildCardBinders wcs $ \ wcs' ->
                   do { mapM_ emitNamedTypeHole wcs'
-                     ; tcInferLHsTypeUnsaturated rn_type }
-
+                     ; tcOuterTKBndrs si outer_bndrs $ tcInferLHsTypeUnsaturated body }
        -- Since all the wanteds are equalities, the returned bindings will be empty
        ; empty_binds <- simplifyTop wanted
        ; massertPpr (isEmptyBag empty_binds) (ppr empty_binds)

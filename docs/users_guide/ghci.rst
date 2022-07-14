@@ -2615,6 +2615,14 @@ commonly used commands.
         ghci> :k T Int
         T Int :: * -> *
 
+    Free type variables are also implicitly quantified, same as if you wrote
+    ``:k forall a. [a]`` so this also works:
+
+    .. code-block:: none
+
+        ghci> :k [a]
+        [a] :: *
+
     If you specify the optional "``!``", GHC will in addition normalise
     the type by expanding out type synonyms and evaluating type-function
     applications, and display the normalised result.
