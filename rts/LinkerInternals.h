@@ -103,6 +103,11 @@ typedef
           SECTIONKIND_FINI_ARRAY,
           /* We don't know what the section is and don't care.  */
           SECTIONKIND_OTHER,
+
+          /*
+           * Windows-specific section kinds
+           */
+
           /* Section contains debug information. e.g. .debug$.  */
           SECTIONKIND_DEBUG,
           /* Section contains exception table. e.g. .pdata.  */
@@ -115,8 +120,6 @@ typedef
           SECTIONKIND_BFD_IMPORT_LIBRARY_HEAD,
           /* Section defines an import library entry, e.g. idata$7.  */
           SECTIONKIND_BFD_IMPORT_LIBRARY,
-          /* Unknown section */
-          SECTIONKIND_NOINFOAVAIL
         }
    SectionKind;
 
