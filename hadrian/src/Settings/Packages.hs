@@ -51,7 +51,7 @@ packageArgs = do
         , package compiler ? mconcat
           [ builder Alex ? arg "--latin1"
 
-          , builder (Ghc CompileHs) ? mconcat
+          , builder (Ghc . CompileHs) ? mconcat
             [ debugAssertions ? notStage0 ? arg "-DDEBUG"
 
             , inputs ["**/GHC.hs", "**/GHC/Driver/Make.hs"] ? arg "-fprof-auto"

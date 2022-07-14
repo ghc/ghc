@@ -207,7 +207,15 @@ compileHsObjectAndHi rs objpath = do
     <- parsePath (parseBuildObject root) "<object file path parser>" objpath
   let ctx = objectContext b
       way = C.way ctx
+  lib_ways <- interpretInContext ctx getLibraryWays
   ctxPath <- contextPath ctx
+  -- Need the stamp file, which triggers a rebuild via make
+  stamp <- pkgStampFile ctx
+  if way == dynamic && vanilla `elem` lib_ways
+    then return ()
+    else need [stamp]
+
+  {-
   (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
   need (src:deps)
 
@@ -221,6 +229,7 @@ compileHsObjectAndHi rs objpath = do
              ]
 
   buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
+  -}
 
 compileNonHsObject :: [(Resource, Int)] -> SourceLang -> FilePath -> Action ()
 compileNonHsObject rs lang path = do
@@ -232,7 +241,7 @@ compileNonHsObject rs lang path = do
     builder = case lang of
       C -> Ghc CompileCWithGhc
       Cxx-> Ghc CompileCppWithGhc
-      _ -> Ghc CompileHs
+      _ -> Ghc (CompileHs GhcOneShot)
   src <- case lang of
       Asm -> obj2src "S"   (const False)      ctx path
       C   -> obj2src "c"   (const False)      ctx path

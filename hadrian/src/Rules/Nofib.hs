@@ -28,7 +28,7 @@ nofibRules = do
 
         makePath <- builderPath (Make "nofib")
         top      <- topDirectory
-        ghcPath  <- builderPath (Ghc CompileHs Stage2)
+        ghcPath  <- builderPath (Ghc (CompileHs GhcMake) Stage2)
 
         -- some makefiles in nofib rely on a $MAKE
         -- env var being defined
@@ -53,4 +53,4 @@ needNofibDeps = do
     unlitPath <- programPath (vanillaContext Stage1 unlit)
     mtlPath   <- pkgConfFile (vanillaContext Stage1 mtl  )
     need [ unlitPath, mtlPath ]
-    needBuilder (Ghc CompileHs Stage2)
+    needBuilder (Ghc (CompileHs GhcMake) Stage2)

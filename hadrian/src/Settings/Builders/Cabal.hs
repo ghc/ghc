@@ -112,8 +112,8 @@ commonCabalArgs stage = do
             , arg "--htmldir"
             , arg $ "${pkgroot}/../../docs/html/libraries/" ++ package_id
 
-            , withStaged $ Ghc CompileHs
-            , withBuilderArgs (Ghc CompileHs stage)
+            , withStaged $ Ghc (CompileHs GhcMake)
+            , withBuilderArgs (Ghc (CompileHs GhcMake) stage)
             , withStaged (GhcPkg Update)
             , withBuilderArgs (GhcPkg Update stage)
             , bootPackageDatabaseArgs

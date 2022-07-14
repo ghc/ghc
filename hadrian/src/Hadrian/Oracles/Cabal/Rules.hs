@@ -58,7 +58,7 @@ cabalOracle = do
         putVerbose $ "| PackageConfiguration oracle: configuring "
                ++ quote (pkgName pkg) ++ " (" ++ show stage ++ ")..."
         -- Configure the package with the GHC corresponding to the given stage
-        hcPath <- builderPath (Ghc CompileHs stage)
+        hcPath <- builderPath (Ghc (CompileHs GhcMake) stage)
         hcPkgPath <- builderPath (GhcPkg undefined stage)
         -- N.B. the hcPath parameter of `configure` is broken when given an
         -- empty ProgramDb. To work around this we manually construct an

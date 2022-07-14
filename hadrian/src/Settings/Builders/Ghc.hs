@@ -28,7 +28,7 @@ ghcBuilderArgs = mconcat
       let nextStageRtsBuildIncludeDir = nextStageRtsBuildDir </> "include"
       builder Ghc ? arg ("-I" ++ nextStageRtsBuildIncludeDir)
   , compileAndLinkHs, compileC, compileCxx, findHsDependencies
-  , toolArgs]
+  , toolArgs ]
 
 toolArgs :: Args
 toolArgs = do
@@ -40,28 +40,35 @@ toolArgs = do
               , map ("-optP" ++) <$> getContextData cppOpts
               ]
 
+
 compileAndLinkHs :: Args
-compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
+compileAndLinkHs = (builder (Ghc . CompileHs) ||^ builder (Ghc LinkHs)) ? do
     ways <- getLibraryWays
     useColor <- shakeColor <$> expr getShakeOptions
     let hasVanilla = elem vanilla ways
         hasDynamic = elem dynamic ways
     mconcat [ arg "-Wall"
             , arg "-Wcompat"
-            , not useColor ? builder (Ghc CompileHs) ?
+            , not useColor ? builder (Ghc . CompileHs) ?
               -- N.B. Target.trackArgument ignores this argument from the
               -- input hash to avoid superfluous recompilation, avoiding
               -- #18672.
               arg "-fdiagnostics-color=never"
-            , (hasVanilla && hasDynamic) ? builder (Ghc CompileHs) ?
+            , (hasVanilla && hasDynamic) ? builder (Ghc . CompileHs) ?
               platformSupportsSharedLibs ? way vanilla ?
               arg "-dynamic-too"
             , commonGhcArgs
             , ghcLinkArgs
             , defaultGhcWarningsArgs
-            , builder (Ghc CompileHs) ? arg "-c"
+            , builder (Ghc (CompileHs GhcOneShot)) ? mconcat [
+                arg "-c" ]
+            , builder (Ghc (CompileHs GhcMake)) ? mconcat
+                [ arg "--make"
+                , arg "-no-link" ]
             , getInputs
-            , arg "-o", arg =<< getOutput ]
+            , notM (builder (Ghc (CompileHs GhcMake))) ? mconcat
+                [arg "-o", arg =<< getOutput]
+            ]
 
 compileC :: Args
 compileC = builder (Ghc CompileCWithGhc) ? do

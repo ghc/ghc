@@ -111,7 +111,7 @@ werror = addArgs (builder Ghc ? notStage0 ? arg "-Werror")
 -- | Build C and Haskell objects with debugging information.
 enableDebugInfo :: Flavour -> Flavour
 enableDebugInfo = addArgs $ notStage0 ? mconcat
-    [ builder (Ghc CompileHs) ? arg "-g3"
+    [ builder (Ghc . CompileHs) ? arg "-g3"
     , builder (Cc CompileC) ? arg "-g3"
     , builder (Cabal Setup) ? arg "--disable-library-stripping"
     , builder (Cabal Setup) ? arg "--disable-executable-stripping"
@@ -121,7 +121,7 @@ enableDebugInfo = addArgs $ notStage0 ? mconcat
 enableTickyGhc :: Flavour -> Flavour
 enableTickyGhc =
     addArgs $ stage1 ? mconcat
-      [ builder (Ghc CompileHs) ? ticky
+      [ builder (Ghc . CompileHs) ? ticky
       , builder (Ghc LinkHs) ? ticky
       ]
   where
@@ -138,7 +138,7 @@ enableTickyGhc =
 enableLinting :: Flavour -> Flavour
 enableLinting =
     addArgs $ stage1 ? mconcat
-      [ builder (Ghc CompileHs) ? lint
+      [ builder (Ghc . CompileHs) ? lint
       ]
   where
     lint = mconcat
@@ -149,7 +149,7 @@ enableLinting =
 enableHaddock :: Flavour -> Flavour
 enableHaddock =
     addArgs $ stage1 ? mconcat
-      [ builder (Ghc CompileHs) ? haddock
+      [ builder (Ghc . CompileHs) ? haddock
       ]
   where
     haddock = mconcat
@@ -170,7 +170,7 @@ splitSectionsIf pkgPredicate = addArgs $ do
     osx <- expr isOsxTarget
     not osx ? -- osx doesn't support split sections
       pkgPredicate pkg ? -- Only apply to these packages
-        builder (Ghc CompileHs) ? arg "-split-sections"
+        builder (Ghc . CompileHs) ? arg "-split-sections"
 
 -- | Like 'splitSectionsIf', but with a fixed predicate: use
 --   split sections for all packages but the GHC library.
@@ -181,7 +181,7 @@ splitSections = splitSectionsIf (/=ghc)
 
 enableThreadSanitizer :: Flavour -> Flavour
 enableThreadSanitizer = addArgs $ mconcat
-    [ builder (Ghc CompileHs) ? arg "-optc-fsanitize=thread"
+    [ builder (Ghc . CompileHs) ? arg "-optc-fsanitize=thread"
     , builder (Ghc CompileCWithGhc) ? (arg "-optc-fsanitize=thread" <> arg "-DTSAN_ENABLED")
     , builder (Ghc LinkHs) ? arg "-optl-fsanitize=thread"
     , builder (Cc  CompileC) ? (arg "-fsanitize=thread" <> arg "-DTSAN_ENABLED")
@@ -224,19 +224,19 @@ disableProfiledLibs flavour =
 -- recompilation.
 omitPragmas :: Flavour -> Flavour
 omitPragmas = addArgs
-    $ notStage0 ? builder (Ghc CompileHs) ? package compiler
+    $ notStage0 ? builder (Ghc . CompileHs) ? package compiler
     ? arg "-fomit-interface-pragmas"
 
 -- | Build stage2 dependencies with options to enable IPE debugging
 -- information.
 enableIPE :: Flavour -> Flavour
 enableIPE = addArgs
-    $ notStage0 ? builder (Ghc CompileHs)
+    $ notStage0 ? builder (Ghc . CompileHs)
     ? pure ["-finfo-table-map", "-fdistinct-constructor-tables"]
 
 enableLateCCS :: Flavour -> Flavour
 enableLateCCS = addArgs
-  $ notStage0 ? builder (Ghc CompileHs)
+  $ notStage0 ? builder (Ghc . CompileHs)
   ? arg "-fprof-late"
 
 -- | Enable assertions for the stage2 compiler
@@ -281,7 +281,7 @@ fullyStatic flavour =
          - an executable (where their position is not at the beginning of
          - the file).
          -}
-        , builder (Ghc CompileHs) ? pure [ "-fPIC", "-static" ]
+        , builder (Ghc . CompileHs) ? pure [ "-fPIC", "-static" ]
         , builder (Ghc CompileCWithGhc) ? pure [ "-fPIC", "-optc", "-static"]
         , builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
         ]
@@ -297,7 +297,7 @@ collectTimings =
   -- that has been causing the allocation. So we want -v.
   -- On the other hand, -v doesn't work with -ddump-to-file, so we need
   -- -ddump-timings.
-  addArgs $ notStage0 ? builder (Ghc CompileHs) ?
+  addArgs $ notStage0 ? builder (Ghc . CompileHs) ?
     pure ["-ddump-to-file", "-ddump-timings", "-v"]
 
 -- | Build ghc with debug rts (i.e. -debug) in and after this stage
@@ -508,7 +508,7 @@ builderSetting =
           [ ("c", CompileCWithGhc)
           , ("cpp", CompileCppWithGhc)
           , ("deps", FindHsDependencies)
-          , ("hs", CompileHs)
+          , ("hs", CompileHs GhcMake)
           , ("link", LinkHs)
           , ("toolargs", ToolArgs)
           ]

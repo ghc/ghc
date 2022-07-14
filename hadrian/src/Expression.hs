@@ -79,6 +79,13 @@ instance BuilderPredicate a => BuilderPredicate (GhcMode -> a) where
             Ghc c _ -> builder (f c)
             _       -> return False
 
+instance BuilderPredicate a => BuilderPredicate (MakeOrOneShot -> a) where
+    builder f = do
+        b <- getBuilder
+        case b of
+            Ghc (CompileHs mode)  _ -> builder (f mode)
+            _       -> return False
+
 instance BuilderPredicate a => BuilderPredicate (FilePath -> a) where
     builder f = do
         b <- getBuilder

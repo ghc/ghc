@@ -3,7 +3,7 @@ module Builder (
     -- * Data types
     ArMode (..), CcMode (..), ConfigurationInfo (..), DependencyType (..),
     GhcMode (..), GhcPkgMode (..), HaddockMode (..), TestMode(..), SphinxMode (..),
-    TarMode (..), GitMode (..), Builder (..), Win32TarballsMode(..),
+    TarMode (..), GitMode (..), Builder (..), Win32TarballsMode(..), MakeOrOneShot(..),
 
     -- * Builder properties
     builderProvenance, systemBuilderPath, builderPath, isSpecified, needBuilder,
@@ -61,7 +61,8 @@ instance NFData   DependencyType
 -- * Compile a C source file.
 -- * Extract source dependencies by passing @-M@ command line argument.
 -- * Link object files & static libraries into an executable.
-data GhcMode = CompileHs
+
+data GhcMode = CompileHs MakeOrOneShot
              | CompileCWithGhc
              | CompileCppWithGhc
              | FindHsDependencies
@@ -69,9 +70,15 @@ data GhcMode = CompileHs
              | ToolArgs
     deriving (Eq, Generic, Show)
 
+data MakeOrOneShot = GhcMake | GhcOneShot deriving (Eq, Generic, Show)
+
 instance Binary   GhcMode
 instance Hashable GhcMode
 instance NFData   GhcMode
+
+instance Binary   MakeOrOneShot
+instance Hashable MakeOrOneShot
+instance NFData   MakeOrOneShot
 
 -- | To configure a package we need two pieces of information, which we choose
 -- to record separately for convenience.
@@ -382,6 +389,11 @@ instance H.Builder Builder where
                   Exit code <- cmd [path] buildArgs
                   when (code /= ExitSuccess) $ do
                     fail "tests failed"
+
+                Ghc (CompileHs GhcMake) _ -> do
+                  Exit code <- cmd [path] buildArgs
+                  when (code /= ExitSuccess) $ do
+                    fail "build failed"
 
                 _  -> cmd' [path] buildArgs
 
