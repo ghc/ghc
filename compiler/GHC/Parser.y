@@ -12,6 +12,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-ignore-interface-pragmas -fcmm-sink #-}
 
 -- | This module provides the generated Happy parser for Haskell. It exports
 -- a number of parsers which may be used in any library that uses the GHC API.

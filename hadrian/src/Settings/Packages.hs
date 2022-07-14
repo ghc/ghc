@@ -54,17 +54,17 @@ packageArgs = do
           , builder (Ghc . CompileHs) ? mconcat
             [ debugAssertions ? notStage0 ? arg "-DDEBUG"
 
-            , inputs ["**/GHC.hs", "**/GHC/Driver/Make.hs"] ? arg "-fprof-auto"
-            , input "**/Parser.hs" ?
-              pure ["-fno-ignore-interface-pragmas", "-fcmm-sink"]
+       --     , inputs ["**/GHC.hs", "**/GHC/Driver/Make.hs"] ? arg "-fprof-auto"
+       --     , input "**/Parser.hs" ?
+       --       pure ["-fno-ignore-interface-pragmas", "-fcmm-sink"]
             -- Enable -haddock and -Winvalid-haddock for the compiler
             , arg "-haddock"
-            , notStage0 ? arg "-Winvalid-haddock"
+            , notStage0 ? arg "-Winvalid-haddock" ]
             -- These files take a very long time to compile with -O1,
             -- so we use -O0 for them just in Stage0 to speed up the
             -- build but not affect Stage1+ executables
-            , inputs ["**/GHC/Hs/Instances.hs", "**/GHC/Driver/Session.hs"] ? stage0 ?
-              pure ["-O0"] ]
+    --        , inputs ["**/GHC/Hs/Instances.hs", "**/GHC/Driver/Session.hs"] ? stage0 ?
+    --          pure ["-O0"] ]
 
           , builder (Cabal Setup) ? mconcat
             [ arg "--disable-library-for-ghci"
