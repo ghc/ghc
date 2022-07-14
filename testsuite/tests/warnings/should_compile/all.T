@@ -53,3 +53,5 @@ test('DerivingTypeable', normal, compile, ['-Wderiving-typeable'])
 test('T18862a', normal, compile, [''])
 test('T18862b', normal, compile, [''])
 test('T20312', normal, compile,['-Wall'])
+
+test ('PatternSignatureBinds', normal, compile, ['-Wpattern-signature-binds'])

@@ -2176,6 +2176,13 @@ data TcRnMessage where
     pragma_warning_defined_mod :: ModuleName
   } -> TcRnMessage
 
+  {-| TcRnPatternSignatureBinds is a warning (controlled with -pattern-signature-binds)
+      that occurs if a pattern signature mentions an out-of-scope variable.
+
+     Test cases: ???
+  -}
+  TcRnPatternSignatureBinds :: !(LocatedN RdrName) -> Bool -> TcRnMessage
+
 -- | Specifies which back ends can handle a requested foreign import or export
 type ExpectedBackends = [Backend]
 

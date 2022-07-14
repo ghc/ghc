@@ -567,6 +567,7 @@ data WarningFlag =
    | Opt_WarnGADTMonoLocalBinds                      -- Since 9.4
    | Opt_WarnTypeEqualityOutOfScope                  -- Since 9.4
    | Opt_WarnTypeEqualityRequiresOperators           -- Since 9.4
+   | Opt_WarnPatternSignatureBinds                   -- Since 9.6
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -672,6 +673,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnGADTMonoLocalBinds                      -> "gadt-mono-local-binds" :| []
   Opt_WarnTypeEqualityOutOfScope                  -> "type-equality-out-of-scope" :| []
   Opt_WarnTypeEqualityRequiresOperators           -> "type-equality-requires-operators" :| []
+  Opt_WarnPatternSignatureBinds                   -> "pattern-signature-binds" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options

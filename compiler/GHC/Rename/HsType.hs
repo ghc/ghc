@@ -165,7 +165,8 @@ rnHsPatSigType scoping ctx sig_ty thing_inside
              implicit_bndrs = case scoping of
                AlwaysBind -> tv_rdrs
                NeverBind  -> []
-       ; rnImplicitTvOccsIfXopt LangExt.PatternSignatureBinds Nothing implicit_bndrs $ \ imp_tvs ->
+       ; warnPatternSignatureBinds implicit_bndrs False
+       ; rnImplicitTvOccs Nothing implicit_bndrs $ \ imp_tvs ->
     do { (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx nwc_rdrs pat_sig_ty
        ; let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
              sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = pat_sig_ty' }
@@ -992,8 +993,8 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
              -- all these various things are doing
              bndrs, implicit_kvs_bndr, implicit_kvs_body :: [LocatedN RdrName]
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
+             implicit_kvs_bndr = filterFreeVarsToBind bndrs bndr_kv_occs
              implicit_kvs_body = filterFreeVarsToBind bndrs body_kv_occs
-             implicit_kvs_bndr = filterFreeVarsToBind (bndrs ++ implicit_kvs_body) bndr_kv_occs
              body_remaining = filterFreeVarsToBind bndr_kv_occs $
               filterFreeVarsToBind bndrs body_kv_occs
              all_bound_on_lhs = null body_remaining
@@ -1007,8 +1008,9 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
                 , text "body_remaining"    <+> ppr body_remaining
                 ]
 
-       ; rnImplicitTvOccsIfXopt LangExt.ImplicitForAll mb_assoc implicit_kvs_body $ \ implicit_kv_nms_body' ->
-         rnImplicitTvOccsIfXopt LangExt.PatternSignatureBinds mb_assoc implicit_kvs_bndr $ \ implicit_kv_nms_bndr' ->
+       ; warnPatternSignatureBinds implicit_kvs_bndr True
+
+       ; rnImplicitTvOccsIfXopt LangExt.ImplicitForAll mb_assoc implicit_kvs_body $ \ implicit_kv_nms' ->
          bindLHsTyVarBndrs doc NoWarnUnusedForalls mb_assoc hs_tv_bndrs $ \ rn_bndrs ->
            -- This is the only call site for bindLHsTyVarBndrs where we pass
            -- NoWarnUnusedForalls, which suppresses -Wunused-foralls warnings.
@@ -1019,7 +1021,7 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
              -- be a little more precise than that by pointing to the location
              -- of the LHsQTyVars instead, which is what bndrs_loc
              -- corresponds to.
-             implicit_kv_nms = map (`setNameLoc` bndrs_loc) (implicit_kv_nms_body' ++ implicit_kv_nms_bndr')
+             implicit_kv_nms = map (`setNameLoc` bndrs_loc) implicit_kv_nms'
 
        ; traceRn "bindHsQTyVars" (ppr hsq_bndrs $$ ppr implicit_kv_nms $$ ppr rn_bndrs)
        ; thing_inside (HsQTvs { hsq_ext = implicit_kv_nms
@@ -1691,6 +1693,11 @@ warnUnusedForAll doc (L loc tv) used_names
               vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
                    , inHsDocContext doc ]
       addDiagnosticAt (locA loc) msg
+
+warnPatternSignatureBinds :: [LocatedN RdrName] -> Bool -> TcM ()
+warnPatternSignatureBinds bndrs isKind =
+  whenWOptM Opt_WarnPatternSignatureBinds $
+  forM_ bndrs $ \ b -> addTcRnDiagnostic (TcRnPatternSignatureBinds b isKind)
 
 {-
 ************************************************************************

@@ -957,6 +957,11 @@ instance Diagnostic TcRnMessage where
             impMsg  = text "imported from" <+> ppr pragma_warning_import_mod <> extra
             extra | pragma_warning_import_mod == pragma_warning_defined_mod = empty
                   | otherwise = text ", but defined in" <+> ppr pragma_warning_defined_mod
+    TcRnPatternSignatureBinds rdr_name isKind
+      -> mkSimpleDecorated $
+            sep [ text "The pattern signature variable" <+> quotes (ppr rdr_name),
+                  text "was not declared by the" <+>
+                  text (if isKind then "kind signature." else "function's type signature.") ]
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -1270,6 +1275,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnPragmaWarning{}
       -> WarningWithFlag Opt_WarnWarningsDeprecations
+    TcRnPatternSignatureBinds{}
+      -> WarningWithFlag Opt_WarnPatternSignatureBinds
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -1583,6 +1590,8 @@ instance Diagnostic TcRnMessage where
     TcRnNameByTemplateHaskellQuote{} -> noHints
     TcRnIllegalBindingOfBuiltIn{} -> noHints
     TcRnPragmaWarning{} -> noHints
+    TcRnPatternSignatureBinds{}
+      -> noHints
 
 
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",

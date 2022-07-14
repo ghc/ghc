@@ -1345,8 +1345,7 @@ languageExtensions (Just Haskell98)
            -- turning it off breaks code, so we're keeping it on for
            -- backwards compatibility.  Cabal uses -XHaskell98 by
            -- default unless you specify another language.
-       LangExt.ImplicitForAll,
-       LangExt.PatternSignatureBinds
+       LangExt.ImplicitForAll
       ]
 
 languageExtensions (Just Haskell2010)
@@ -1363,8 +1362,7 @@ languageExtensions (Just Haskell2010)
        LangExt.DoAndIfThenElse,
        LangExt.FieldSelectors,
        LangExt.RelaxedPolyRec,
-       LangExt.ImplicitForAll,
-       LangExt.PatternSignatureBinds]
+       LangExt.ImplicitForAll]
 
 languageExtensions (Just GHC2021)
     = [LangExt.ImplicitPrelude,
@@ -1415,8 +1413,7 @@ languageExtensions (Just GHC2021)
        LangExt.TypeApplications,
        LangExt.TypeOperators,
        LangExt.TypeSynonymInstances,
-       LangExt.ImplicitForAll,
-       LangExt.PatternSignatureBinds]
+       LangExt.ImplicitForAll]
 
 hasPprDebug :: DynFlags -> Bool
 hasPprDebug = dopt Opt_D_ppr_debug
@@ -3340,7 +3337,8 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnUnicodeBidirectionalFormatCharacters,
   warnSpec    Opt_WarnGADTMonoLocalBinds,
   warnSpec    Opt_WarnTypeEqualityOutOfScope,
-  warnSpec    Opt_WarnTypeEqualityRequiresOperators
+  warnSpec    Opt_WarnTypeEqualityRequiresOperators,
+  warnSpec    Opt_WarnPatternSignatureBinds
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
@@ -3739,7 +3737,6 @@ xFlagsDeps = [
   flagSpec "PatternGuards"                    LangExt.PatternGuards,
   depFlagSpec' "PatternSignatures"            LangExt.ScopedTypeVariables
     (deprecatedForExtension "ScopedTypeVariables"),
-  flagSpec "PatternSignatureBinds"                   LangExt.PatternSignatureBinds,
   flagSpec "PatternSynonyms"                  LangExt.PatternSynonyms,
   flagSpec "PolyKinds"                        LangExt.PolyKinds,
   flagSpec "PolymorphicComponents"            LangExt.RankNTypes,
