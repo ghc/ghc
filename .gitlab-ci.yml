@@ -707,6 +707,7 @@ nightly-hackage-perf:
 
 ############################################################
 # Nofib testing
+# (Disabled: See #21859)
 ############################################################
 
 perf-nofib:
@@ -724,9 +725,11 @@ perf-nofib:
       optional: true
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
   rules:
+    - when: never
     - if: $CI_MERGE_REQUEST_ID
     - if: '$CI_COMMIT_BRANCH == "master"'
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
   tags:
     - x86_64-linux
   before_script:
@@ -752,8 +755,6 @@ perf-nofib:
     when: always
     paths:
       - nofib/nofib.log
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 ############################################################
 # Ad-hoc performance testing
