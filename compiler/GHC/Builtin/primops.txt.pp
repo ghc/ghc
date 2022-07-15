@@ -2542,6 +2542,12 @@ primop  CatchOp "catch#" GenPrimOp
        -> (w -> State# RealWorld -> (# State# RealWorld, o #) )
        -> State# RealWorld
        -> (# State# RealWorld, o #)
+   { @'catch#' k handler s@ evaluates @k s@, invoking @handler@ on any exceptions
+     thrown.
+
+     Note that the result type here isn't quite as unrestricted as the
+     polymorphic type might suggest; see the section \"RuntimeRep polymorphism
+     in continuation-style primops\" for details. }
    with
    strictness  = { \ _arity -> mkClosedDmdSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
@@ -2579,6 +2585,12 @@ primop  RaiseIOOp "raiseIO#" GenPrimOp
 primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, o #))
      -> (State# RealWorld -> (# State# RealWorld, o #))
+   { @'maskAsyncExceptions#' k s@ evaluates @k s@ such that asynchronous
+     exceptions are deferred until after evaluation has finished.
+
+     Note that the result type here isn't quite as unrestricted as the
+     polymorphic type might suggest; see the section \"RuntimeRep polymorphism
+     in continuation-style primops\" for details. }
    with
    strictness  = { \ _arity -> mkClosedDmdSig [strictOnceApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
@@ -2588,6 +2600,12 @@ primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
 primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, o #))
      -> (State# RealWorld -> (# State# RealWorld, o #))
+   { @'maskUninterruptible#' k s@ evaluates @k s@ such that asynchronous
+     exceptions are deferred until after evaluation has finished.
+
+     Note that the result type here isn't quite as unrestricted as the
+     polymorphic type might suggest; see the section \"RuntimeRep polymorphism
+     in continuation-style primops\" for details. }
    with
    strictness  = { \ _arity -> mkClosedDmdSig [strictOnceApply1Dmd,topDmd] topDiv }
    out_of_line = True
@@ -2596,6 +2614,12 @@ primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
 primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, o #))
      -> (State# RealWorld -> (# State# RealWorld, o #))
+   { @'unmaskAsyncUninterruptible#' k s@ evaluates @k s@ such that asynchronous
+     exceptions are unmasked.
+
+     Note that the result type here isn't quite as unrestricted as the
+     polymorphic type might suggest; see the section \"RuntimeRep polymorphism
+     in continuation-style primops\" for details. }
    with
    strictness  = { \ _arity -> mkClosedDmdSig [strictOnceApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
@@ -3264,6 +3288,7 @@ primop NumSparks "numSparks#" GenPrimOp
    out_of_line = True
 
 
+
 ------------------------------------------------------------------------
 section "Controlling object lifetime"
         {Ensuring that objects don't die a premature death.}
@@ -3276,7 +3301,11 @@ section "Controlling object lifetime"
 primop KeepAliveOp "keepAlive#" GenPrimOp
    v -> State# RealWorld -> (State# RealWorld -> p) -> p
    { @'keepAlive#' x s k@ keeps the value @x@ alive during the execution
-     of the computation @k@. }
+     of the computation @k@.
+
+     Note that the result type here isn't quite as unrestricted as the
+     polymorphic type might suggest; see the section \"RuntimeRep polymorphism
+     in continuation-style primops\" for details. }
    with
    strictness = { \ _arity -> mkClosedDmdSig [topDmd, topDmd, strictOnceApply1Dmd] topDiv }
 
@@ -3901,6 +3930,35 @@ primop PrefetchAddrOp0 "prefetchAddr0#" GenPrimOp
 primop PrefetchValueOp0 "prefetchValue0#" GenPrimOp
    a -> State# s -> State# s
    with has_side_effects =  True
+
+
+-- Note [RuntimeRep polymorphism in continuation-style primops]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--  See below.
+
+section "RuntimeRep polymorphism in continuation-style primops"
+  {
+  Several primops provided by GHC accept continuation arguments with highly polymorphic
+  arguments. For instance, consider the type of `catch#`:
+
+    catch# :: forall (r_rep :: RuntimeRep) (r :: TYPE r_rep) w.
+              (State# RealWorld -> (# State# RealWorld, r #) )
+           -> (w -> State# RealWorld -> (# State# RealWorld, r #) )
+           -> State# RealWorld
+           -> (# State# RealWorld, r #)
+
+  This type suggests that we could instantiate `catch#` continuation argument
+  (namely, the first argument) with something like,
+
+    f :: State# RealWorld -> (# State# RealWorld, (# Int, String, Int8# #) #)
+
+  However, sadly the type does not capture an important limitation of the
+  primop. Specifically, due to the operational behavior of `catch#` the result
+  type must be representable with a single machine word. In a future GHC
+  release we may improve the precision of this type to capture this limitation.
+
+  See #21868.
+  }
 
 ------------------------------------------------------------------------
 ---                                                                  ---
