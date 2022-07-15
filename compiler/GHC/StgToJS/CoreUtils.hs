@@ -207,7 +207,7 @@ primTypeVt t = case tyConAppTyCon_maybe (unwrapType t) of
     | tc == eqPrimTyCon                -> VoidV -- coercion token?
     | tc == eqReprPrimTyCon            -> VoidV -- role
     | tc == unboxedUnitTyCon           -> VoidV -- Void#
-    | otherwise                        -> pprPanic "primTypeVt: unrecognized primitive type" (ppr tc)
+    | otherwise                        -> PtrV  -- anything else must be some boxed thing
 
 argVt :: StgArg -> VarType
 argVt a = uTypeVt . stgArgType $ a
