@@ -87,7 +87,7 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
     CONF_CC_OPTS_STAGE1="$cflags"
     CONF_CC_OPTS_STAGE2="$cflags"
 
-    cxxflags="--rtlib=compiler-rt --unwindlib=libunwind --stdlib=libc++"
+    cxxflags=""
     CXXFLAGS="$cxxflags"
     CONF_CXX_OPTS_STAGE1="$cxxflags"
     CONF_CXX_OPTS_STAGE2="$cxxflags"
