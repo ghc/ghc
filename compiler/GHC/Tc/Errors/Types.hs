@@ -2179,7 +2179,8 @@ data TcRnMessage where
   {-| TcRnPatternSignatureBinds is a warning (controlled with -pattern-signature-binds)
       that occurs if a pattern signature mentions an out-of-scope variable.
 
-     Test cases: ???
+     Test cases:
+       warnings/should_compile/PatternSignatureBinds
   -}
   TcRnPatternSignatureBinds :: !(LocatedN RdrName) -> Bool -> TcRnMessage
 
