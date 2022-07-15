@@ -3281,7 +3281,10 @@ section "Controlling object lifetime"
 primop KeepAliveOp "keepAlive#" GenPrimOp
    v -> State# RealWorld -> (State# RealWorld -> p) -> p
    { \tt{keepAlive# x s k} keeps the value \tt{x} alive during the execution
-     of the computation \tt{k}. }
+     of the computation \tt{k}.
+
+     Note that the result type here isn't quite as unrestricted as the
+     polymorphic type might suggest; ticket \#21868 for details. }
    with
    out_of_line = True
    strictness = { \ _arity -> mkClosedDmdSig [topDmd, topDmd, strictOnceApply1Dmd] topDiv }
