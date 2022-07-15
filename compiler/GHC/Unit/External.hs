@@ -21,11 +21,10 @@ import GHC.Prelude
 import GHC.Unit
 import GHC.Unit.Module.ModIface
 
-import GHC.Core         ( RuleBase )
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv ( InstEnv, emptyInstEnv )
 import GHC.Core.Opt.ConstantFold
-import GHC.Core.Rules (mkRuleBase)
+import GHC.Core.Rules ( RuleBase, mkRuleBase)
 
 import GHC.Types.Annotations ( AnnEnv, emptyAnnEnv )
 import GHC.Types.CompleteMatch

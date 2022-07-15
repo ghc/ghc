@@ -442,3 +442,7 @@ test('T22357',  normal, compile, ['-O'])
 #    Rule fired: SPEC/T17366 f @(Tagged tag) @_ (T17366)
 test('T17366',  normal, multimod_compile, ['T17366', '-O -v0 -ddump-rule-firings'])
 test('T17366_AR',  [grep_errmsg(r'SPEC')], multimod_compile, ['T17366_AR', '-O -v0 -ddump-rule-firings'])
+
+# One module, T21851_2.hs, has OPTIONS_GHC -ddump-simpl
+# Expecting to see $s$wwombat
+test('T21851_2', [grep_errmsg(r'wwombat') ], multimod_compile, ['T21851_2', '-O -dno-typeable-binds -dsuppress-uniques'])

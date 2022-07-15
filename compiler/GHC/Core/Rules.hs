@@ -12,8 +12,10 @@ module GHC.Core.Rules (
         lookupRule,
 
         -- ** RuleBase, RuleEnv
+        RuleBase, RuleEnv(..), mkRuleEnv, emptyRuleEnv,
+        updExternalPackageRules, addLocalRules, updLocalRules,
         emptyRuleBase, mkRuleBase, extendRuleBaseList,
-        pprRuleBase, extendRuleEnv,
+        pprRuleBase,
 
         -- ** Checking rule applications
         ruleCheckProgram,
@@ -21,6 +23,8 @@ module GHC.Core.Rules (
         -- ** Manipulating 'RuleInfo' rules
         extendRuleInfo, addRuleInfo,
         addIdSpecialisations,
+
+        -- ** RuleBase and RuleEnv
 
         -- * Misc. CoreRule helpers
         rulesOfBinds, getRules, pprRulesForUser,
@@ -34,6 +38,8 @@ import GHC.Prelude
 
 import GHC.Unit.Module   ( Module )
 import GHC.Unit.Module.Env
+import GHC.Unit.Module.ModGuts( ModGuts(..) )
+import GHC.Unit.Module.Deps( Dependencies(..) )
 
 import GHC.Driver.Session( DynFlags )
 import GHC.Driver.Ppr( showSDoc )
@@ -135,7 +141,7 @@ Note [Overall plumbing for rules]
 * At the moment (c) is carried in a reader-monad way by the GHC.Core.Opt.Monad.
   The HomePackageTable doesn't have a single RuleBase because technically
   we should only be able to "see" rules "below" this module; so we
-  generate a RuleBase for (c) by combing rules from all the modules
+  generate a RuleBase for (c) by combining rules from all the modules
   "below" us.  That's why we can't just select the home-package RuleBase
   from HscEnv.
 
@@ -339,12 +345,106 @@ addIdSpecialisations id rules
 rulesOfBinds :: [CoreBind] -> [CoreRule]
 rulesOfBinds binds = concatMap (concatMap idCoreRules . bindersOf) binds
 
-getRules :: RuleEnv -> Id -> [CoreRule]
--- See Note [Where rules are found]
-getRules (RuleEnv { re_base = rule_base, re_visible_orphs = orphs }) fn
-  = idCoreRules fn ++ concatMap imp_rules rule_base
+
+{-
+************************************************************************
+*                                                                      *
+                RuleBase
+*                                                                      *
+************************************************************************
+-}
+
+-- | Gathers a collection of 'CoreRule's. Maps (the name of) an 'Id' to its rules
+type RuleBase = NameEnv [CoreRule]
+        -- The rules are unordered;
+        -- we sort out any overlaps on lookup
+
+emptyRuleBase :: RuleBase
+emptyRuleBase = emptyNameEnv
+
+mkRuleBase :: [CoreRule] -> RuleBase
+mkRuleBase rules = extendRuleBaseList emptyRuleBase rules
+
+extendRuleBaseList :: RuleBase -> [CoreRule] -> RuleBase
+extendRuleBaseList rule_base new_guys
+  = foldl' extendRuleBase rule_base new_guys
+
+extendRuleBase :: RuleBase -> CoreRule -> RuleBase
+extendRuleBase rule_base rule
+  = extendNameEnv_Acc (:) Utils.singleton rule_base (ruleIdName rule) rule
+
+pprRuleBase :: RuleBase -> SDoc
+pprRuleBase rules = pprUFM rules $ \rss ->
+  vcat [ pprRules (tidyRules emptyTidyEnv rs)
+       | rs <- rss ]
+
+-- | A full rule environment which we can apply rules from.  Like a 'RuleBase',
+-- but it also includes the set of visible orphans we use to filter out orphan
+-- rules which are not visible (even though we can see them...)
+-- See Note [Orphans] in GHC.Core
+data RuleEnv
+    = RuleEnv { re_local_rules   :: !RuleBase -- Rules from this module
+              , re_home_rules    :: !RuleBase -- Rule from the home package
+                                              --   (excl this module)
+              , re_eps_rules     :: !RuleBase -- Rules from other packages
+                                              --   see Note [External package rules]
+              , re_visible_orphs :: !ModuleSet
+              }
+
+mkRuleEnv :: ModGuts -> RuleBase -> RuleBase -> RuleEnv
+mkRuleEnv (ModGuts { mg_module = this_mod
+                   , mg_deps   = deps
+                   , mg_rules  = local_rules })
+          eps_rules hpt_rules
+  = RuleEnv { re_local_rules   = mkRuleBase local_rules
+            , re_home_rules    = hpt_rules
+            , re_eps_rules     = eps_rules
+            , re_visible_orphs = mkModuleSet vis_orphs }
   where
-    imp_rules rb = filter (ruleIsVisible orphs) (lookupNameEnv rb (idName fn) `orElse` [])
+    vis_orphs = this_mod : dep_orphs deps
+
+updExternalPackageRules :: RuleEnv -> RuleBase -> RuleEnv
+-- Completely over-ride the external rules in RuleEnv
+updExternalPackageRules rule_env eps_rules
+  = rule_env { re_eps_rules = eps_rules }
+
+updLocalRules :: RuleEnv -> [CoreRule] -> RuleEnv
+-- Completely over-ride the local rules in RuleEnv
+updLocalRules rule_env local_rules
+  = rule_env { re_local_rules = mkRuleBase local_rules }
+
+addLocalRules :: RuleEnv -> [CoreRule] -> RuleEnv
+-- Add new local rules
+addLocalRules rule_env rules
+  = rule_env { re_local_rules = extendRuleBaseList (re_local_rules rule_env) rules }
+
+emptyRuleEnv :: RuleEnv
+emptyRuleEnv = RuleEnv { re_local_rules   = emptyNameEnv
+                       , re_home_rules    = emptyNameEnv
+                       , re_eps_rules     = emptyNameEnv
+                       , re_visible_orphs = emptyModuleSet }
+
+getRules :: RuleEnv -> Id -> [CoreRule]
+-- Given a RuleEnv and an Id, find the visible rules for that Id
+-- See Note [Where rules are found]
+getRules (RuleEnv { re_local_rules   = local_rules
+                  , re_home_rules    = home_rules
+                  , re_eps_rules     = eps_rules
+                  , re_visible_orphs = orphs }) fn
+
+  | Just {} <- isDataConId_maybe fn   -- Short cut for data constructor workers
+  = []                                -- and wrappers, which never have any rules
+
+  | otherwise
+  = idCoreRules fn          ++
+    get local_rules         ++
+    find_visible home_rules ++
+    find_visible eps_rules
+
+  where
+    fn_name = idName fn
+    find_visible rb = filter (ruleIsVisible orphs) (get rb)
+    get rb = lookupNameEnv rb fn_name `orElse` []
 
 ruleIsVisible :: ModuleSet -> CoreRule -> Bool
 ruleIsVisible _ BuiltinRule{} = True
@@ -370,37 +470,28 @@ but that isn't quite right:
        in the module defining the Id (when it's a LocalId), but
        the rules are kept in the global RuleBase
 
+ Note [External package rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Note [Overall plumbing for rules], it is explained that the final
+RuleBase which we must consider is combined from 4 different sources.
 
-************************************************************************
-*                                                                      *
-                RuleBase
-*                                                                      *
-************************************************************************
+During simplifier runs, the fourth source of rules is constantly being updated
+as new interfaces are loaded into the EPS. Therefore just before we check to see
+if any rules match we get the EPS RuleBase and combine it with the existing RuleBase
+and then perform exactly 1 lookup into the new map.
+
+It is more efficient to avoid combining the environments and store the uncombined
+environments as we can instead perform 1 lookup into each environment and then combine
+the results.
+
+Essentially we use the identity:
+
+> lookupNameEnv n (plusNameEnv_C (++) rb1 rb2)
+>   = lookupNameEnv n rb1 ++ lookupNameEnv n rb2
+
+The latter being more efficient as we don't construct an intermediate
+map.
 -}
-
--- RuleBase itself is defined in GHC.Core, along with CoreRule
-
-emptyRuleBase :: RuleBase
-emptyRuleBase = emptyNameEnv
-
-mkRuleBase :: [CoreRule] -> RuleBase
-mkRuleBase rules = extendRuleBaseList emptyRuleBase rules
-
-extendRuleBaseList :: RuleBase -> [CoreRule] -> RuleBase
-extendRuleBaseList rule_base new_guys
-  = foldl' extendRuleBase rule_base new_guys
-
-extendRuleBase :: RuleBase -> CoreRule -> RuleBase
-extendRuleBase rule_base rule
-  = extendNameEnv_Acc (:) Utils.singleton rule_base (ruleIdName rule) rule
-
-extendRuleEnv :: RuleEnv -> RuleBase -> RuleEnv
-extendRuleEnv (RuleEnv rules orphs) rb = (RuleEnv (rb:rules) orphs)
-
-pprRuleBase :: RuleBase -> SDoc
-pprRuleBase rules = pprUFM rules $ \rss ->
-  vcat [ pprRules (tidyRules emptyTidyEnv rs)
-       | rs <- rss ]
 
 {-
 ************************************************************************
@@ -1575,7 +1666,7 @@ ruleCheckFun env fn args
   | otherwise             = unitBag (ruleAppCheck_help env fn args name_match_rules)
   where
     name_match_rules = filter match (rc_rules env fn)
-    match rule = (rc_pattern env) `isPrefixOf` unpackFS (ruleName rule)
+    match rule = rc_pattern env `isPrefixOf` unpackFS (ruleName rule)
 
 ruleAppCheck_help :: RuleCheckEnv -> Id -> [CoreExpr] -> [CoreRule] -> SDoc
 ruleAppCheck_help env fn args rules

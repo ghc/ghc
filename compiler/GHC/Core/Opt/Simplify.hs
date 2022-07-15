@@ -10,7 +10,7 @@ import GHC.Prelude
 import GHC.Driver.Flags
 
 import GHC.Core
-import GHC.Core.Rules   ( extendRuleBaseList, extendRuleEnv, addRuleInfo )
+import GHC.Core.Rules
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
@@ -31,7 +31,6 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Unit.Env ( UnitEnv, ueEPS )
 import GHC.Unit.External
 import GHC.Unit.Module.ModGuts
-import GHC.Unit.Module.Deps
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -81,7 +80,7 @@ simplifyExpr logger euc opts expr
               simpl_env = mkSimplEnv (se_mode opts) fam_envs
               top_env_cfg = se_top_env_cfg opts
               read_eps_rules = eps_rule_base <$> eucEPS euc
-              read_ruleenv = extendRuleEnv emptyRuleEnv <$> read_eps_rules
+              read_ruleenv = updExternalPackageRules emptyRuleEnv <$> read_eps_rules
 
         ; let sz = exprSize expr
 
@@ -132,11 +131,11 @@ simplExprGently env expr = do
 -- The values of this datatype are /only/ driven by the demands of that function.
 data SimplifyOpts = SimplifyOpts
   { so_dump_core_sizes :: !Bool
-  , so_iterations :: !Int
-  , so_mode :: !SimplMode
+  , so_iterations      :: !Int
+  , so_mode            :: !SimplMode
   , so_pass_result_cfg :: !(Maybe LintPassResultConfig)
-  , so_rule_base :: !RuleBase
-  , so_top_env_cfg :: !TopEnvConfig
+  , so_hpt_rules       :: !RuleBase
+  , so_top_env_cfg     :: !TopEnvConfig
   }
 
 simplifyPgm :: Logger
@@ -148,11 +147,10 @@ simplifyPgm :: Logger
 simplifyPgm logger unit_env opts
             guts@(ModGuts { mg_module = this_mod
                           , mg_rdr_env = rdr_env
-                          , mg_deps = deps
-                          , mg_binds = binds, mg_rules = rules
+                          , mg_binds = binds, mg_rules = local_rules
                           , mg_fam_inst_env = fam_inst_env })
   = do { (termination_msg, it_count, counts_out, guts')
-            <- do_iteration 1 [] binds rules
+            <- do_iteration 1 [] binds local_rules
 
         ; when (logHasDumpFlag logger Opt_D_verbose_core2core
                 && logHasDumpFlag logger Opt_D_dump_simpl_stats) $
@@ -169,7 +167,6 @@ simplifyPgm logger unit_env opts
     dump_core_sizes = so_dump_core_sizes opts
     mode            = so_mode opts
     max_iterations  = so_iterations opts
-    hpt_rule_base   = so_rule_base opts
     top_env_cfg     = so_top_env_cfg opts
     print_unqual    = mkPrintUnqualified unit_env rdr_env
     active_rule     = activeRule mode
@@ -178,13 +175,18 @@ simplifyPgm logger unit_env opts
     -- the old bindings are retained until the end of all simplifier iterations
     !guts_no_binds = guts { mg_binds = [], mg_rules = [] }
 
+    hpt_rule_env :: RuleEnv
+    hpt_rule_env = mkRuleEnv guts emptyRuleBase (so_hpt_rules opts)
+                   -- emptyRuleBase: no EPS rules yet; we will update
+                   -- them on each iteration to pick up the most up to date set
+
     do_iteration :: Int -- Counts iterations
                  -> [SimplCount] -- Counts from earlier iterations, reversed
-                 -> CoreProgram  -- Bindings in
-                 -> [CoreRule]   -- and orphan rules
+                 -> CoreProgram  -- Bindings
+                 -> [CoreRule]   -- Local rules for imported Ids
                  -> IO (String, Int, SimplCount, ModGuts)
 
-    do_iteration iteration_no counts_so_far binds rules
+    do_iteration iteration_no counts_so_far binds local_rules
         -- iteration_no is the number of the iteration we are
         -- about to begin, with '1' for the first
       | iteration_no > max_iterations   -- Stop if we've run out of iterations
@@ -200,7 +202,7 @@ simplifyPgm logger unit_env opts
                 -- number of iterations we actually completed
         return ( "Simplifier baled out", iteration_no - 1
                , totalise counts_so_far
-               , guts_no_binds { mg_binds = binds, mg_rules = rules } )
+               , guts_no_binds { mg_binds = binds, mg_rules = local_rules } )
 
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
@@ -209,8 +211,8 @@ simplifyPgm logger unit_env opts
       = do {
                 -- Occurrence analysis
            let { tagged_binds = {-# SCC "OccAnal" #-}
-                     occurAnalysePgm this_mod active_unf active_rule rules
-                                     binds
+                     occurAnalysePgm this_mod active_unf active_rule
+                                     local_rules binds
                } ;
            Logger.putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
                      FormatCore
@@ -221,24 +223,29 @@ simplifyPgm logger unit_env opts
                 -- poke on IdInfo thunks, which in turn brings in new rules
                 -- behind the scenes.  Otherwise there's a danger we'll simply
                 -- miss the rules for Ids hidden inside imported inlinings
-                -- Hence just before attempting to match rules we read on the EPS
-                -- value and then combine it when the existing rule base.
+                -- Hence just before attempting to match a rule we read the EPS
+                -- value (via read_rule_env) and then combine it with the existing rule base.
                 -- See `GHC.Core.Opt.Simplify.Monad.getSimplRules`.
-           eps <- ueEPS unit_env ;
-           let  { -- Forcing this value to avoid unnessecary allocations.
+          eps <- ueEPS unit_env ;
+           let  { -- base_rule_env contains
+                  --    (a) home package rules, fixed across all iterations
+                  --    (b) local rules (substituted) from `local_rules` arg to do_iteration
+                  -- Forcing base_rule_env to avoid unnecessary allocations.
                   -- Not doing so results in +25.6% allocations of LargeRecord.
-                ; !rule_base = extendRuleBaseList hpt_rule_base rules
-                ; vis_orphs = this_mod : dep_orphs deps
-                ; base_ruleenv = mkRuleEnv rule_base vis_orphs
+                ; !base_rule_env = updLocalRules hpt_rule_env local_rules
+
+                ; read_eps_rules :: IO PackageRuleBase
                 ; read_eps_rules = eps_rule_base <$> ueEPS unit_env
-                ; read_ruleenv = extendRuleEnv base_ruleenv <$> read_eps_rules
+
+                ; read_rule_env :: IO RuleEnv
+                ; read_rule_env = updExternalPackageRules base_rule_env <$> read_eps_rules
 
                 ; fam_envs = (eps_fam_inst_env eps, fam_inst_env)
                 ; simpl_env = mkSimplEnv mode fam_envs } ;
 
                 -- Simplify the program
            ((binds1, rules1), counts1) <-
-             initSmpl logger read_ruleenv top_env_cfg sz $
+             initSmpl logger read_rule_env top_env_cfg sz $
                do { (floats, env1) <- {-# SCC "SimplTopBinds" #-}
                                       simplTopBinds simpl_env tagged_binds
 
@@ -246,7 +253,7 @@ simplifyPgm logger unit_env opts
                       -- for imported Ids.  Eg  RULE map my_f = blah
                       -- If we have a substitution my_f :-> other_f, we'd better
                       -- apply it to the rule to, or it'll never match
-                  ; rules1 <- simplImpRules env1 rules
+                  ; rules1 <- simplImpRules env1 local_rules
 
                   ; return (getTopFloatBinds floats, rules1) } ;
 

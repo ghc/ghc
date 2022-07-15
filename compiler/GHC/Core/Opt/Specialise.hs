@@ -17,6 +17,7 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 
 import GHC.Core.Type  hiding( substTy, substCo, extendTvSubst, zapSubst )
 import GHC.Core.Multiplicity
+import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith )
 import GHC.Core.Predicate
 import GHC.Core.Coercion( Coercion )
 import GHC.Core.Opt.Monad
@@ -636,9 +637,11 @@ Hence, the invariant is this:
 -- | Specialise calls to type-class overloaded functions occurring in a program.
 specProgram :: ModGuts -> CoreM ModGuts
 specProgram guts@(ModGuts { mg_module = this_mod
-                          , mg_rules = local_rules
-                          , mg_binds = binds })
-  = do { dflags <- getDynFlags
+                          , mg_rules  = local_rules
+                          , mg_binds  = binds })
+  = do { dflags   <- getDynFlags
+       ; rule_env <- initRuleEnv guts
+                     -- See Note [Fire rules in the specialiser]
 
               -- We need to start with a Subst that knows all the things
               -- that are in scope, so that the substitution engine doesn't
@@ -650,6 +653,7 @@ specProgram guts@(ModGuts { mg_module = this_mod
                                       --    mkInScopeSetList $
                                       --  bindersOfBinds binds
                           , se_module = this_mod
+                          , se_rules  = rule_env
                           , se_dflags = dflags }
 
              go []           = return ([], emptyUDs)
@@ -660,7 +664,7 @@ specProgram guts@(ModGuts { mg_module = this_mod
              -- Specialise the bindings of this module
        ; (binds', uds) <- runSpecM (go binds)
 
-       ; (spec_rules, spec_binds) <- specImports top_env local_rules uds
+       ; (spec_rules, spec_binds) <- specImports top_env uds
 
        ; return (guts { mg_binds = spec_binds ++ binds'
                       , mg_rules = spec_rules ++ local_rules }) }
@@ -725,21 +729,15 @@ specialisation (see canSpecImport):
 -}
 
 specImports :: SpecEnv
-            -> [CoreRule]
             -> UsageDetails
             -> CoreM ([CoreRule], [CoreBind])
-specImports top_env local_rules
-            (MkUD { ud_binds = dict_binds, ud_calls = calls })
+specImports top_env (MkUD { ud_binds = dict_binds, ud_calls = calls })
   | not $ gopt Opt_CrossModuleSpecialise (se_dflags top_env)
     -- See Note [Disabling cross-module specialisation]
   = return ([], wrapDictBinds dict_binds [])
 
   | otherwise
-  = do { hpt_rules <- getRuleBase
-       ; let rule_base = extendRuleBaseList hpt_rules local_rules
-
-       ; (spec_rules, spec_binds) <- spec_imports top_env [] rule_base
-                                                  dict_binds calls
+  = do { (_env, spec_rules, spec_binds) <- spec_imports top_env [] dict_binds calls
 
              -- Don't forget to wrap the specialized bindings with
              -- bindings for the needed dictionaries.
@@ -757,89 +755,91 @@ specImports top_env local_rules
 spec_imports :: SpecEnv          -- Passed in so that all top-level Ids are in scope
              -> [Id]             -- Stack of imported functions being specialised
                                  -- See Note [specImport call stack]
-             -> RuleBase         -- Rules from this module and the home package
-                                 -- (but not external packages, which can change)
              -> FloatedDictBinds -- Dict bindings, used /only/ for filterCalls
                                  -- See Note [Avoiding loops in specImports]
              -> CallDetails      -- Calls for imported things
-             -> CoreM ( [CoreRule]   -- New rules
+             -> CoreM ( SpecEnv      -- Env contains the new rules
+                      , [CoreRule]   -- New rules
                       , [CoreBind] ) -- Specialised bindings
-spec_imports top_env callers rule_base dict_binds calls
+spec_imports env callers dict_binds calls
   = do { let import_calls = dVarEnvElts calls
 --       ; debugTraceMsg (text "specImports {" <+>
 --                         vcat [ text "calls:" <+> ppr import_calls
 --                              , text "dict_binds:" <+> ppr dict_binds ])
-       ; (rules, spec_binds) <- go rule_base import_calls
+       ; (env, rules, spec_binds) <- go env import_calls
 --       ; debugTraceMsg (text "End specImports }" <+> ppr import_calls)
 
-       ; return (rules, spec_binds) }
+       ; return (env, rules, spec_binds) }
   where
-    go :: RuleBase -> [CallInfoSet] -> CoreM ([CoreRule], [CoreBind])
-    go _ [] = return ([], [])
-    go rb (cis : other_calls)
+    go :: SpecEnv -> [CallInfoSet] -> CoreM (SpecEnv, [CoreRule], [CoreBind])
+    go env [] = return (env, [], [])
+    go env (cis : other_calls)
       = do { -- debugTraceMsg (text "specImport {" <+> ppr cis)
-           ; (rules1, spec_binds1) <- spec_import top_env callers rb dict_binds cis
+           ; (env, rules1, spec_binds1) <- spec_import env callers dict_binds cis
            ; -- debugTraceMsg (text "specImport }" <+> ppr cis)
 
-           ; (rules2, spec_binds2) <- go (extendRuleBaseList rb rules1) other_calls
-           ; return (rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
+           ; (env, rules2, spec_binds2) <- go env other_calls
+           ; return (env, rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
 
 spec_import :: SpecEnv               -- Passed in so that all top-level Ids are in scope
             -> [Id]                  -- Stack of imported functions being specialised
                                      -- See Note [specImport call stack]
-            -> RuleBase              -- Rules from this module
             -> FloatedDictBinds      -- Dict bindings, used /only/ for filterCalls
                                      -- See Note [Avoiding loops in specImports]
             -> CallInfoSet           -- Imported function and calls for it
-            -> CoreM ( [CoreRule]    -- New rules
+            -> CoreM ( SpecEnv
+                     , [CoreRule]    -- New rules
                      , [CoreBind] )  -- Specialised bindings
-spec_import top_env callers rb dict_binds cis@(CIS fn _)
+spec_import env callers dict_binds cis@(CIS fn _)
   | isIn "specImport" fn callers
-  = return ([], [])     -- No warning.  This actually happens all the time
-                        -- when specialising a recursive function, because
-                        -- the RHS of the specialised function contains a recursive
-                        -- call to the original function
+  = return (env, [], [])  -- No warning.  This actually happens all the time
+                          -- when specialising a recursive function, because
+                          -- the RHS of the specialised function contains a recursive
+                          -- call to the original function
 
   | null good_calls
-  = return ([], [])
+  = return (env, [], [])
 
   | Just rhs <- canSpecImport dflags fn
   = do {     -- Get rules from the external package state
              -- We keep doing this in case we "page-fault in"
              -- more rules as we go along
-       ; external_rule_base <- getExternalRuleBase
-       ; vis_orphs <- getVisibleOrphanMods
-       ; let rules_for_fn = getRules (RuleEnv [rb, external_rule_base] vis_orphs) fn
+       ; eps_rules <- getExternalRuleBase
+       ; let rule_env = se_rules env `updExternalPackageRules` eps_rules
 
-       ; -- debugTraceMsg (text "specImport1" <+> vcat [ppr fn, ppr good_calls, ppr rhs])
+--       ; debugTraceMsg (text "specImport1" <+> vcat [ppr fn, ppr good_calls
+--                                                    , ppr (getRules rule_env fn), ppr rhs])
        ; (rules1, spec_pairs, MkUD { ud_binds = dict_binds1, ud_calls = new_calls })
-            <- runSpecM $ specCalls True top_env dict_binds
-                             rules_for_fn good_calls fn rhs
+            <- runSpecM $ specCalls True env dict_binds
+                                    (getRules rule_env fn) good_calls fn rhs
 
        ; let spec_binds1 = [NonRec b r | (b,r) <- spec_pairs]
              -- After the rules kick in we may get recursion, but
              -- we rely on a global GlomBinds to sort that out later
              -- See Note [Glom the bindings if imported functions are specialised]
 
+             new_subst = se_subst env `Core.extendSubstInScopeList` map fst spec_pairs
+             new_env   = env { se_rules = rule_env `addLocalRules` rules1
+                             , se_subst = new_subst }
+
               -- Now specialise any cascaded calls
-       ; -- debugTraceMsg (text "specImport 2" <+> (ppr fn $$ ppr rules1 $$ ppr spec_binds1))
-       ; (rules2, spec_binds2) <- spec_imports top_env
-                                               (fn:callers)
-                                               (extendRuleBaseList rb rules1)
-                                               (dict_binds `thenFDBs` dict_binds1)
-                                               new_calls
+--       ; debugTraceMsg (text "specImport 2" <+> (ppr fn $$ ppr rules1 $$ ppr spec_binds1))
+       ; (env, rules2, spec_binds2)
+            <- spec_imports new_env (fn:callers)
+                                    (dict_binds `thenFDBs` dict_binds1)
+                                    new_calls
 
        ; let final_binds = wrapDictBinds dict_binds1 $
                            spec_binds2 ++ spec_binds1
 
-       ; return (rules2 ++ rules1, final_binds) }
+       ; return (env, rules2 ++ rules1, final_binds) }
 
   | otherwise
   = do { tryWarnMissingSpecs dflags callers fn good_calls
-       ; return ([], [])}
+       ; return (env, [], [])}
 
   where
-    dflags = se_dflags top_env
+    dflags = se_dflags env
     good_calls = filterCalls cis dict_binds
        -- SUPER IMPORTANT!  Drop calls that (directly or indirectly) refer to fn
        -- See Note [Avoiding loops in specImports]
@@ -1134,6 +1134,7 @@ data SpecEnv
              --    the RHS of specialised bindings (no type-let!)
 
        , se_module :: Module
+       , se_rules  :: RuleEnv  -- From the home package and this module
        , se_dflags :: DynFlags
      }
 
@@ -1172,8 +1173,8 @@ specExpr env expr@(App {})
        ; (args_out, uds_args) <- mapAndCombineSM (specExpr env) args_in
        ; let env_args = env `bringFloatedDictsIntoScope` ud_binds uds_args
                 -- Some dicts may have floated out of args_in;
-                -- they should be in scope for rewriteClassOps (#21689)
-             (fun_in', args_out') = rewriteClassOps env_args fun_in args_out
+                -- they should be in scope for fireRewriteRules (#21689)
+             (fun_in', args_out') = fireRewriteRules env_args fun_in args_out
        ; (fun_out', uds_fun) <- specExpr env fun_in'
        ; let uds_call = mkCallUDs env fun_out' args_out'
        ; return (fun_out' `mkApps` args_out', uds_fun `thenUDs` uds_call `thenUDs` uds_args) }
@@ -1208,17 +1209,19 @@ specExpr env (Let bind body)
        ; return (foldr Let body' binds', uds) }
 
 -- See Note [Specialisation modulo dictionary selectors]
--- and Note [ClassOp/DFun selection]
-rewriteClassOps :: SpecEnv -> InExpr -> [OutExpr] -> (InExpr, [OutExpr])
-rewriteClassOps env (Var f) args
-  | isClassOpId f -- If we see `op_sel $fCInt`, we rewrite to `$copInt`
-  , Just (rule, expr) <- -- pprTrace "rewriteClassOps" (ppr f $$ ppr args $$ ppr (se_subst env)) $
-                         specLookupRule env f args (idCoreRules f)
-  , let rest_args = drop (ruleArity rule) args -- See Note [Extra args in the target]
---  , pprTrace "class op rewritten" (ppr f <+> ppr args $$ ppr expr <+> ppr rest_args) True
-  , (fun, args) <- collectArgs expr
-  = rewriteClassOps env fun (args++rest_args)
-rewriteClassOps _ fun args = (fun, args)
+--     Note [ClassOp/DFun selection]
+--     Note [Fire rules in the specialiser]
+fireRewriteRules :: SpecEnv -> InExpr -> [OutExpr] -> (InExpr, [OutExpr])
+fireRewriteRules env (Var f) args
+  | Just (rule, expr) <- specLookupRule env f args InitialPhase (getRules (se_rules env) f)
+  , let rest_args    = drop (ruleArity rule) args -- See Note [Extra args in the target]
+        zapped_subst = Core.zapSubst (se_subst env)
+        expr'        = simpleOptExprWith defaultSimpleOpts zapped_subst expr
+                       -- simplOptExpr needed because lookupRule returns
+                       --   (\x y. rhs) arg1 arg2
+  , (fun, args) <- collectArgs expr'
+  = fireRewriteRules env fun (args++rest_args)
+fireRewriteRules _ fun args = (fun, args)
 
 --------------
 specLam :: SpecEnv -> [OutBndr] -> InExpr -> SpecM (OutExpr, UsageDetails)
@@ -1324,7 +1327,67 @@ specCase env scrut case_bndr alts
         where
           (env_rhs, args') = substBndrs env_alt args
 
-{-
+{- Note [Fire rules in the specialiser]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this (#21851)
+
+    module A where
+      f :: Num b => b -> (b, b)
+      f x = (x + 1, snd (f x))
+      {-# SPECIALIZE f :: Int -> (Int, Int) #-}
+
+    module B (g') where
+      import A
+
+      g :: Num a => a -> a
+      g x = fst (f x)
+      {-# NOINLINE[99] g #-}
+
+      h :: Int -> Int
+      h = g
+
+Note that `f` has the CPR property, and so will worker/wrapper.
+
+The call to `g` in `h` will make us specialise `g @Int`. And the specialised
+version of `g` will contain the call `f @Int`; but in the subsequent run of
+the Simplifier, there will be a competition between:
+* The user-supplied SPECIALISE rule for `f`
+* The inlining of the wrapper for `f`
+In fact, the latter wins -- see Note [Rewrite rules and inlining] in
+GHC.Core.Opt.Simplify.Iteration.  However, it a bit fragile.
+
+Moreover consider (test T21851_2):
+
+    module A
+      f :: (Ord a, Show b) => a -> b -> blah
+      {-# RULE forall b. f @Int @b = wombat #-}
+
+      wombat :: Show b => Int -> b -> blah
+      wombat = blah
+
+    module B
+      import A
+      g :: forall a. Ord a => blah
+      g @a = ...g...f @a @Char....
+
+      h = ....g @Int....
+
+Now, in module B, GHC will specialise `g @Int`, which will lead to a
+call `f @Int @Char`.  If we immediately (in the specialiser) rewrite
+that to `womabat @Char`, we have a chance to specialise `wombat`.
+
+Conclusion: it's treat if the Specialiser fires RULEs itself.
+It's not hard to achieve: see `fireRewriteRules`. The only tricky bit is
+making sure that we have a reasonably up to date EPS rule base. Currently
+we load it up just once, in `initRuleEnv`, called at the beginning of
+`specProgram`.
+
+NB: you might wonder if running rules in the specialiser (this Note)
+renders Note [Rewrite rules and inlining] in the Simplifier redundant.
+That is, if we run rules in the specialiser, does it matter if we make
+rules "win" over inlining in the Simplifier?  Yes, it does!  See the
+discussion in #21851.
+
 Note [Floating dictionaries out of cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -1415,13 +1478,12 @@ specBind top_lvl env (NonRec fn rhs) do_body
 
              final_binds :: [DictBind]
              -- See Note [From non-recursive to recursive]
-             final_binds
-               | not (isNilOL dump_dbs)
-               , not (null spec_defns)
-               = [recWithDumpedDicts pairs dump_dbs]
-               | otherwise
-               = [mkDB $ NonRec b r | (b,r) <- pairs]
-                 ++ fromOL dump_dbs
+             final_binds | not (isNilOL dump_dbs)
+                         , not (null spec_defns)
+                         = [recWithDumpedDicts pairs dump_dbs]
+                         | otherwise
+                         = [mkDB $ NonRec b r | (b,r) <- pairs]
+                           ++ fromOL dump_dbs
 
        ; if float_all then
              -- Rather than discard the calls mentioning the bound variables
@@ -1553,8 +1615,10 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
     foldlM spec_call ([], [], emptyUDs) calls_for_me
 
   | otherwise   -- No calls or RHS doesn't fit our preconceptions
-  = warnPprTrace (not (exprIsTrivial rhs) && notNull calls_for_me)
+  = warnPprTrace (not (exprIsTrivial rhs) && notNull calls_for_me && not (isClassOpId fn))
           "Missed specialisation opportunity for" (ppr fn $$ trace_doc) $
+          -- isClassOpId: class-op Ids never inline; we specialise them
+          -- through fireRewriteRules. So don't complain about missed opportunities
           -- Note [Specialisation shape]
     -- pprTrace "specCalls: none" (ppr fn <+> ppr calls_for_me) $
     return ([], [], emptyUDs)
@@ -1581,9 +1645,13 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
 
     already_covered :: SpecEnv -> [CoreRule] -> [CoreExpr] -> Bool
     already_covered env new_rules args      -- Note [Specialisations already covered]
-       = isJust (specLookupRule env fn args (new_rules ++ existing_rules))
-         -- NB: we look both in the new_rules (generated by this invocation
-         --     of specCalls), and in existing_rules (passed in to specCalls)
+       = isJust (specLookupRule env fn args (beginPhase inl_act)
+                                (new_rules ++ existing_rules))
+         -- Rules: we look both in the new_rules (generated by this invocation
+         --   of specCalls), and in existing_rules (passed in to specCalls)
+         -- inl_act: is the activation we are going to put in the new SPEC
+         --   rule; so we want to see if it is covered by another rule with
+         --   that same activation.
 
     ----------------------------------------------------------
         -- Specialise to one particular call pattern
@@ -1708,13 +1776,16 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
 
 -- Convenience function for invoking lookupRule from Specialise
 -- The SpecEnv's InScopeSet should include all the Vars in the [CoreExpr]
-specLookupRule :: SpecEnv -> Id -> [CoreExpr] -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
-specLookupRule env fn args rules
-  = lookupRule ropts (in_scope, realIdUnfolding) (const True) fn args rules
+specLookupRule :: SpecEnv -> Id -> [CoreExpr]
+               -> CompilerPhase  -- Look up rules as if we were in this phase
+               -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
+specLookupRule env fn args phase rules
+  = lookupRule ropts (in_scope, realIdUnfolding) is_active fn args rules
   where
-    dflags   = se_dflags env
-    in_scope = getSubstInScope (se_subst env)
-    ropts    = initRuleOpts dflags
+    dflags    = se_dflags env
+    in_scope  = getSubstInScope (se_subst env)
+    ropts     = initRuleOpts dflags
+    is_active = isActive phase
 
 {- Note [Specialising DFuns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1913,10 +1984,10 @@ We want to specialise this! How? By doing the method-selection rewrite in
 the Specialiser. Hence
 
 1. In the App case of 'specExpr', try to apply the ClassOp/DFun rule on the
-   head of the application, repeatedly, via 'rewriteClassOps'.
+   head of the application, repeatedly, via 'fireRewriteRules'.
 2. Attach an unfolding to freshly-bound dictionary ids such as `$dC` and
    `$dShow` in `bindAuxiliaryDict`, so that we can exploit the unfolding
-   in 'rewriteClassOps' to do the ClassOp/DFun rewrite.
+   in 'fireRewriteRules' to do the ClassOp/DFun rewrite.
 
 NB: Without (2), (1) would be pointless, because 'lookupRule' wouldn't be able
 to look into the RHS of `$dC` to see the DFun.

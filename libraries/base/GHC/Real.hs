@@ -701,10 +701,13 @@ half of y - 1 can be computed as y `quot` 2, optimising subtraction away.
 
 Note [Inlining (^)
 ~~~~~~~~~~~~~~~~~~
-The INLINABLE pragma allows (^) to be specialised at its call sites.
+The INLINABLE [1] pragma allows (^) to be specialised at its call sites.
 If it is called repeatedly at the same type, that can make a huge
 difference, because of those constants which can be repeatedly
 calculated.
+
+We don't inline until phase 1, to give a chance for the RULES
+"^2/Int" etc to fire first.
 
 Currently the fromInteger calls are not floated because we get
           \d1 d2 x y -> blah

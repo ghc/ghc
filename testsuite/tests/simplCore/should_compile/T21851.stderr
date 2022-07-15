@@ -15,5 +15,3 @@ g' :: Int -> Int
 g'
   = \ (x :: Int) -> case T21851a.$w$sf x of { (# ww, ww1 #) -> ww }
 
-
-

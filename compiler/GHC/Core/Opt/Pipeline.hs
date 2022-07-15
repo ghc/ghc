@@ -22,7 +22,7 @@ import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core
 import GHC.Core.Opt.CSE  ( cseProgram )
-import GHC.Core.Rules   ( mkRuleBase, ruleCheckProgram, getRules )
+import GHC.Core.Rules   ( RuleBase, mkRuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( lintAnnots )
@@ -53,9 +53,7 @@ import GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import GHC.Unit.Module.Env
 import GHC.Unit.Module.ModGuts
-import GHC.Unit.Module.Deps
 
 import GHC.Types.Id.Info
 import GHC.Types.Basic
@@ -78,14 +76,12 @@ import GHC.Unit.Module
 core2core :: HscEnv -> ModGuts -> IO ModGuts
 core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_loc     = loc
-                                , mg_deps    = deps
                                 , mg_rdr_env = rdr_env })
   = do { let builtin_passes = getCoreToDo dflags hpt_rule_base extra_vars
-             orph_mods = mkModuleSet (mod : dep_orphs deps)
              uniq_mask = 's'
-       ;
+
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_mask mod
-                                    orph_mods print_unqual loc $
+                                    print_unqual loc $
                            do { hsc_env' <- getHscEnv
                               ; all_passes <- withPlugins (hsc_plugins hsc_env')
                                                 installCoreToDos
@@ -121,7 +117,8 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
 -}
 
 getCoreToDo :: DynFlags -> RuleBase -> [Var] -> [CoreToDo]
-getCoreToDo dflags rule_base extra_vars
+-- This function builds the pipeline of optimisations
+getCoreToDo dflags hpt_rule_base extra_vars
   = flatten_todos core_todo
   where
     phases        = simplPhases        dflags
@@ -176,7 +173,7 @@ getCoreToDo dflags rule_base extra_vars
 
     ----------------------------
     run_simplifier mode iter
-      = CoreDoSimplify $ initSimplifyOpts dflags extra_vars iter mode rule_base
+      = CoreDoSimplify $ initSimplifyOpts dflags extra_vars iter mode hpt_rule_base
 
     simpl_phase phase name iter = CoreDoPasses $
                                   [ maybe_strictness_before phase
@@ -573,11 +570,9 @@ ruleCheckPass current_phase pat guts = do
     logger <- getLogger
     withTiming logger (text "RuleCheck"<+>brackets (ppr $ mg_module guts))
                 (const ()) $ do
-        rb <- getRuleBase
-        vis_orphs <- getVisibleOrphanMods
-        let rule_fn fn = getRules (RuleEnv [rb] vis_orphs) fn
-                          ++ (mg_rules guts)
-        let ropts = initRuleOpts dflags
+        rule_env <- initRuleEnv guts
+        let rule_fn fn = getRules rule_env fn
+            ropts = initRuleOpts dflags
         liftIO $ logDumpMsg logger "Rule check"
                      (ruleCheckProgram ropts current_phase pat
                         rule_fn (mg_binds guts))

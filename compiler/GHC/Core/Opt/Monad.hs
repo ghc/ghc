@@ -19,10 +19,10 @@ module GHC.Core.Opt.Monad (
 
     -- ** Reading from the monad
     getHscEnv, getModule,
-    getRuleBase, getExternalRuleBase,
+    initRuleEnv, getExternalRuleBase,
     getDynFlags, getPackageFamInstEnv,
     getInteractiveContext,
-    getVisibleOrphanMods, getUniqMask,
+    getUniqMask,
     getPrintUnqualified, getSrcSpanM,
 
     -- ** Writing to the monad
@@ -45,7 +45,7 @@ import GHC.Prelude hiding ( read )
 import GHC.Driver.Session
 import GHC.Driver.Env
 
-import GHC.Core
+import GHC.Core.Rules     ( RuleBase, RuleEnv, mkRuleEnv )
 import GHC.Core.Opt.Stats ( SimplCount, zeroSimplCount, plusSimplCount )
 
 import GHC.Types.Annotations
@@ -114,12 +114,11 @@ pprFloatOutSwitches sw
 
 data CoreReader = CoreReader {
         cr_hsc_env             :: HscEnv,
-        cr_rule_base           :: RuleBase,
+        cr_rule_base           :: RuleBase,  -- Home package table rules
         cr_module              :: Module,
         cr_print_unqual        :: PrintUnqualified,
         cr_loc                 :: SrcSpan,   -- Use this for log/error messages so they
                                              -- are at least tagged with the right source file
-        cr_visible_orphan_mods :: !ModuleSet,
         cr_uniq_mask           :: !Char      -- Mask for creating unique values
 }
 
@@ -181,19 +180,17 @@ runCoreM :: HscEnv
          -> RuleBase
          -> Char -- ^ Mask
          -> Module
-         -> ModuleSet
          -> PrintUnqualified
          -> SrcSpan
          -> CoreM a
          -> IO (a, SimplCount)
-runCoreM hsc_env rule_base mask mod orph_imps print_unqual loc m
+runCoreM hsc_env rule_base mask mod print_unqual loc m
   = liftM extract $ runIOEnv reader $ unCoreM m
   where
     reader = CoreReader {
             cr_hsc_env = hsc_env,
             cr_rule_base = rule_base,
             cr_module = mod,
-            cr_visible_orphan_mods = orph_imps,
             cr_print_unqual = print_unqual,
             cr_loc = loc,
             cr_uniq_mask = mask
@@ -245,14 +242,17 @@ liftIOWithCount what = liftIO what >>= (\(count, x) -> addSimplCount count >> re
 getHscEnv :: CoreM HscEnv
 getHscEnv = read cr_hsc_env
 
-getRuleBase :: CoreM RuleBase
-getRuleBase = read cr_rule_base
+getHomeRuleBase :: CoreM RuleBase
+getHomeRuleBase = read cr_rule_base
+
+initRuleEnv :: ModGuts -> CoreM RuleEnv
+initRuleEnv guts
+  = do { hpt_rules <- getHomeRuleBase
+       ; eps_rules <- getExternalRuleBase
+       ; return (mkRuleEnv guts eps_rules hpt_rules) }
 
 getExternalRuleBase :: CoreM RuleBase
 getExternalRuleBase = eps_rule_base <$> get_eps
-
-getVisibleOrphanMods :: CoreM ModuleSet
-getVisibleOrphanMods = read cr_visible_orphan_mods
 
 getPrintUnqualified :: CoreM PrintUnqualified
 getPrintUnqualified = read cr_print_unqual

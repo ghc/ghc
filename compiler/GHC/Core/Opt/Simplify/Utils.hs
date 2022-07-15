@@ -53,7 +53,7 @@ import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
 import GHC.Core.FVs
 import GHC.Core.Utils
-import GHC.Core.Rules( getRules )
+import GHC.Core.Rules( RuleEnv, getRules )
 import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make

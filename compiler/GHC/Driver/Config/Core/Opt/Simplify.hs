@@ -6,7 +6,7 @@ module GHC.Driver.Config.Core.Opt.Simplify
 
 import GHC.Prelude
 
-import GHC.Core ( RuleBase )
+import GHC.Core.Rules ( RuleBase )
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Opt.Simplify ( SimplifyExprOpts(..), SimplifyOpts(..) )
 import GHC.Core.Opt.Simplify.Env ( FloatEnable(..), SimplMode(..) )
@@ -40,20 +40,19 @@ initSimplifyExprOpts dflags ic = SimplifyExprOpts
   }
 
 initSimplifyOpts :: DynFlags -> [Var] -> Int -> SimplMode -> RuleBase -> SimplifyOpts
-initSimplifyOpts dflags extra_vars iterations mode rule_base = let
+initSimplifyOpts dflags extra_vars iterations mode hpt_rule_base = let
   -- This is a particularly ugly construction, but we will get rid of it in !8341.
   opts = SimplifyOpts
     { so_dump_core_sizes = not $ gopt Opt_SuppressCoreSizes dflags
-    , so_iterations = iterations
-    , so_mode = mode
+    , so_iterations      = iterations
+    , so_mode            = mode
     , so_pass_result_cfg = if gopt Opt_DoCoreLinting dflags
-      then Just $ initLintPassResultConfig dflags extra_vars (CoreDoSimplify opts)
-      else Nothing
-    , so_rule_base = rule_base
-    , so_top_env_cfg = TopEnvConfig
-        { te_history_size = historySize dflags
-        , te_tick_factor = simplTickFactor dflags
-        }
+                           then Just $ initLintPassResultConfig dflags extra_vars
+                                                            (CoreDoSimplify opts)
+                           else Nothing
+    , so_hpt_rules       = hpt_rule_base
+    , so_top_env_cfg     = TopEnvConfig { te_history_size = historySize dflags
+                                        , te_tick_factor = simplTickFactor dflags }
     }
   in opts
 

@@ -85,9 +85,8 @@ module GHC.Core (
         IsOrphan(..), isOrphan, notOrphan, chooseOrphanAnchor,
 
         -- * Core rule data types
-        CoreRule(..), RuleBase,
-        RuleName, RuleFun, IdUnfoldingFun, InScopeEnv,
-        RuleEnv(..), RuleOpts, mkRuleEnv, emptyRuleEnv,
+        CoreRule(..),
+        RuleName, RuleFun, IdUnfoldingFun, InScopeEnv, RuleOpts,
 
         -- ** Operations on 'CoreRule's
         ruleArity, ruleName, ruleIdName, ruleActivation,
@@ -105,7 +104,6 @@ import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Name.Env( NameEnv )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Core.DataCon
@@ -1062,6 +1060,12 @@ has two major consequences
    M.  But it's painful, because it means we need to keep track of all
    the orphan modules below us.
 
+ * The "visible orphan modules" are all the orphan module in the transitive
+   closure of the imports of this module.
+
+ * During instance lookup, we filter orphan instances depending on
+   whether or not the instance is in a visible orphan module.
+
  * A non-orphan is not finger-printed separately.  Instead, for
    fingerprinting purposes it is treated as part of the entity it
    mentions on the LHS.  For example
@@ -1076,12 +1080,20 @@ has two major consequences
 
 Orphan-hood is computed
   * For class instances:
-      when we make a ClsInst
-    (because it is needed during instance lookup)
+    when we make a ClsInst in GHC.Core.InstEnv.mkLocalInstance
+      (because it is needed during instance lookup)
+    See Note [When exactly is an instance decl an orphan?]
+        in GHC.Core.InstEnv
 
-  * For rules and family instances:
-       when we generate an IfaceRule (GHC.Iface.Make.coreRuleToIfaceRule)
-                     or IfaceFamInst (GHC.Iface.Make.instanceToIfaceInst)
+  * For rules
+    when we generate a CoreRule (GHC.Core.Rules.mkRule)
+
+  * For family instances:
+    when we generate an IfaceFamInst (GHC.Iface.Make.instanceToIfaceInst)
+
+Orphan-hood is persisted into interface files, in ClsInst, FamInst,
+and CoreRules.
+
 -}
 
 {-
@@ -1096,49 +1108,6 @@ GHC.Core.FVs, GHC.Core.Subst, GHC.Core.Ppr, GHC.Core.Tidy also inspect the
 representation.
 -}
 
--- | Gathers a collection of 'CoreRule's. Maps (the name of) an 'Id' to its rules
-type RuleBase = NameEnv [CoreRule]
-        -- The rules are unordered;
-        -- we sort out any overlaps on lookup
-
--- | A full rule environment which we can apply rules from.  Like a 'RuleBase',
--- but it also includes the set of visible orphans we use to filter out orphan
--- rules which are not visible (even though we can see them...)
-data RuleEnv
-    = RuleEnv { re_base          :: [RuleBase] -- See Note [Why re_base is a list]
-              , re_visible_orphs :: ModuleSet
-              }
-
-mkRuleEnv :: RuleBase -> [Module] -> RuleEnv
-mkRuleEnv rules vis_orphs = RuleEnv [rules] (mkModuleSet vis_orphs)
-
-emptyRuleEnv :: RuleEnv
-emptyRuleEnv = RuleEnv [] emptyModuleSet
-
-{-
-Note [Why re_base is a list]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In Note [Overall plumbing for rules], it is explained that the final
-RuleBase which we must consider is combined from 4 different sources.
-
-During simplifier runs, the fourth source of rules is constantly being updated
-as new interfaces are loaded into the EPS. Therefore just before we check to see
-if any rules match we get the EPS RuleBase and combine it with the existing RuleBase
-and then perform exactly 1 lookup into the new map.
-
-It is more efficient to avoid combining the environments and store the uncombined
-environments as we can instead perform 1 lookup into each environment and then combine
-the results.
-
-Essentially we use the identity:
-
-> lookupNameEnv n (plusNameEnv_C (++) rb1 rb2)
->   = lookupNameEnv n rb1 ++ lookupNameEnv n rb2
-
-The latter being more efficient as we don't construct an intermediate
-map.
--}
 
 -- | A 'CoreRule' is:
 --
