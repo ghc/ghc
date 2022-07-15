@@ -1138,6 +1138,7 @@ alpine_x86 =
   -- Dynamically linked build, suitable for building your own static executables on alpine
   , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken vanilla))
   , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine320) (splitSectionsBroken vanilla))
+  , allowFailureGroup (standardBuildsWithConfig I386 (Linux Alpine320) (splitSectionsBroken vanilla))
   ]
   where
     -- ghcilink002 broken due to #17869
