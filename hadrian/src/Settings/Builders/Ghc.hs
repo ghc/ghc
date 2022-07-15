@@ -13,6 +13,7 @@ import qualified Context as Context
 import Rules.Libffi (libffiName)
 import qualified Data.Set as Set
 import System.Directory
+import Hadrian.Semaphore
 
 ghcBuilderArgs :: Args
 ghcBuilderArgs = mconcat
@@ -62,13 +63,18 @@ compileAndLinkHs = (builder (Ghc . CompileHs) ||^ builder (Ghc LinkHs)) ? do
             , defaultGhcWarningsArgs
             , builder (Ghc (CompileHs GhcOneShot)) ? mconcat [
                 arg "-c" ]
-            , builder (Ghc (CompileHs GhcMake)) ? mconcat
-                [ arg "--make"
-                , arg "-no-link" ]
+            , builder (Ghc (CompileHs GhcMake)) ? do
+                jsem <- expr getJsemSemaphore
+                mconcat
+                  ([ arg "--make"
+                  , arg "-no-link"
+                  ] )
+                --  ++ semaphore [] (\name _ -> [ arg "-jsem", arg name]) jsem)
             , getInputs
             , notM (builder (Ghc (CompileHs GhcMake))) ? mconcat
                 [arg "-o", arg =<< getOutput]
             ]
+
 
 compileC :: Args
 compileC = builder (Ghc CompileCWithGhc) ? do

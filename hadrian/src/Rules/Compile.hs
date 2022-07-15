@@ -206,30 +206,39 @@ compileHsObjectAndHi rs objpath = do
   b@(BuildPath _root stage _path _o)
     <- parsePath (parseBuildObject root) "<object file path parser>" objpath
   let ctx = objectContext b
-      way = C.way ctx
-  lib_ways <- interpretInContext ctx getLibraryWays
-  ctxPath <- contextPath ctx
-  -- Need the stamp file, which triggers a rebuild via make
-  stamp <- pkgStampFile ctx
-  if way == dynamic && vanilla `elem` lib_ways
-    then return ()
-    else need [stamp]
+  -- Ideally we want to use --make to build with stage0 but we need to use -jsem
+  -- to recover build-time performance so we only do it for stage1 at the moment.
+  if isStage0 stage
+    then compileWithOneShot ctx
+    else compileWithMake ctx
 
-  {-
-  (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
-  need (src:deps)
+  where
+    compileWithMake ctx = do
+      -- Need the stamp file, which triggers a rebuild via make
+      stamp <- pkgStampFile ctx
+      let way = C.way ctx
+      lib_ways <- interpretInContext ctx getLibraryWays
+      -- In this situation -dynamic-too will produce both ways
+      unless (way == dynamic && vanilla `elem` lib_ways) $
+        need [stamp]
 
-  -- The .dependencies file lists indicating inputs. ghc will
-  -- generally read more *.hi and *.hi-boot files (direct inputs).
-  -- Allow such reads (see https://gitlab.haskell.org/ghc/ghc/wikis/Developing-Hadrian#haskell-object-files-and-hi-inputs)
-  -- Note that this may allow too many *.hi and *.hi-boot files, but
-  -- calculating the exact set of direct inputs is not feasible.
-  trackAllow [ "**/*." ++ hisuf     way
-             , "**/*." ++ hibootsuf way
-             ]
+    compileWithOneShot ctx = do
+      let way = C.way ctx
+          stage = C.stage ctx
+      ctxPath <- contextPath ctx
+      (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
+      need (src:deps)
 
-  buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
-  -}
+      -- The .dependencies file lists indicating inputs. ghc will
+      -- generally read more *.hi and *.hi-boot files (direct inputs).
+      -- Allow such reads (see https://gitlab.haskell.org/ghc/ghc/wikis/Developing-Hadrian#haskell-object-files-and-hi-inputs)
+      -- Note that this may allow too many *.hi and *.hi-boot files, but
+      -- calculating the exact set of direct inputs is not feasible.
+      trackAllow [ "**/*." ++ hisuf     way
+                 , "**/*." ++ hibootsuf way
+                 ]
+
+      buildWithResources rs $ target ctx (Ghc (CompileHs GhcOneShot) stage) [src] [objpath]
 
 compileNonHsObject :: [(Resource, Int)] -> SourceLang -> FilePath -> Action ()
 compileNonHsObject rs lang path = do

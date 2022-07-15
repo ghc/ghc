@@ -18,7 +18,6 @@ import Utilities
 import Data.Time.Clock
 import Rules.Generate (generatedDependencies)
 import Hadrian.Oracles.Cabal (readPackageData)
-import Flavour
 import Oracles.Flag
 
 -- * Library 'Rules'
@@ -69,7 +68,8 @@ buildPackage root fp = do
                    | pkg <- depPkgs, pkg `elem` stagePkgs ]
   need deps
   need (srcs ++ gens)
-  unless (null srcs) (build $ target ctx (Ghc (CompileHs GhcMake) stage) srcs [])
+  unless (null srcs) $ do
+    build $ target ctx (Ghc (CompileHs GhcMake) stage) srcs []
   time <- liftIO $ getCurrentTime
   liftIO $ writeFile fp (show time)
   ways <- interpretInContext ctx getLibraryWays

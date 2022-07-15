@@ -59,6 +59,7 @@ executable hadrian
                        , Hadrian.Package
                        , Hadrian.Target
                        , Hadrian.Utilities
+                       , Hadrian.Semaphore
                        , Oracles.Flag
                        , Oracles.Flavour
                        , Oracles.Setting
@@ -155,6 +156,7 @@ executable hadrian
                        , unordered-containers >= 0.2.1   && < 0.3
                        , text                 >= 1.2     && < 3
                        , time
+                       , unix
     ghc-options:       -Wall
                        -Wincomplete-record-updates
                        -Wredundant-constraints

@@ -51,6 +51,12 @@ packageArgs = do
         , package compiler ? mconcat
           [ builder Alex ? arg "--latin1"
 
+            -- These files take a very long time to compile with -O1,
+            -- so we use -O0 for them just in Stage0 to speed up the
+            -- build but not affect Stage1+ executables
+          , builder (Ghc (CompileHs GhcOneShot)) ? inputs ["**/GHC/Hs/Instances.hs", "**/GHC/Driver/Session.hs"] ? stage0 ?
+              pure ["-O0"]
+
           , builder (Ghc . CompileHs) ? mconcat
             [ debugAssertions ? notStage0 ? arg "-DDEBUG"
 
@@ -60,11 +66,6 @@ packageArgs = do
             -- Enable -haddock and -Winvalid-haddock for the compiler
             , arg "-haddock"
             , notStage0 ? arg "-Winvalid-haddock" ]
-            -- These files take a very long time to compile with -O1,
-            -- so we use -O0 for them just in Stage0 to speed up the
-            -- build but not affect Stage1+ executables
-    --        , inputs ["**/GHC/Hs/Instances.hs", "**/GHC/Driver/Session.hs"] ? stage0 ?
-    --          pure ["-O0"] ]
 
           , builder (Cabal Setup) ? mconcat
             [ arg "--disable-library-for-ghci"

@@ -41,6 +41,7 @@ import Packages
 import GHC.IO.Encoding (getFileSystemEncoding)
 import qualified Data.ByteString as BS
 import qualified GHC.Foreign as GHC
+import Hadrian.Semaphore
 
 -- | C compiler can be used in two different modes:
 -- * Compile or preprocess a source file.
@@ -391,7 +392,8 @@ instance H.Builder Builder where
                     fail "tests failed"
 
                 Ghc (CompileHs GhcMake) _ -> do
-                  Exit code <- cmd [path] buildArgs
+                  sem <- getJsemSemaphore
+                  Exit code <- withSemaphore sem $ cmd [path] buildArgs
                   when (code /= ExitSuccess) $ do
                     fail "build failed"
 
