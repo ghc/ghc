@@ -319,7 +319,9 @@ resultSize [] t
   -- Note that RuntimeRep from Builtins.Types hits this case. A singleton of
   -- (LiftedRep, 1) is exactly what's returned by the otherwise case for
   -- RuntimeRep.
-  | Nothing <- typeLevity_maybe t' = [(LiftedRep, 1)]
+  -- FIXME: Luite (2022,07): typeLevity_maybe can panic, doesn't the next case
+  -- give us the right answer?
+  -- | Nothing <- typeLevity_maybe t' = [(LiftedRep, 1)]
   | otherwise = fmap (\p -> (p, slotCount (primRepSize p))) (typePrimReps t)
   where
     t' = unwrapType t
