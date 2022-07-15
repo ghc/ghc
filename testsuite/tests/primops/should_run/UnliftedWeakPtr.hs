@@ -23,7 +23,7 @@ main = do
         case newMutVar# False s1 of
           (# s2, val_var #) ->
             case keepAlive# val_var s2 (inner mvar val_var) of
-              (# s3, wk, strs #) ->
+              (# s3, Res wk strs #) ->
                 case unIO performGC s3 of
                   (# s4, _ #) ->
                     case deRefWeak# wk s4 of
@@ -33,15 +33,19 @@ main = do
                             (# s6, strs ++ [ show (I# j), r ] #)
   print res
 
+data Res = Res (Weak# (MutableByteArray# RealWorld)) [String]
+
 inner :: MVar# RealWorld String
       -> MutVar# RealWorld Bool
       -> State# RealWorld
-      -> (# State# RealWorld, Weak# U, [String] #)
+      -> (# State# RealWorld, Res #)
 inner mvar u s0 =
-  case mkWeak# u (U 42#) (finalise mvar) s0 of
-    (# s1, wk #) ->
-      case deRefWeak# wk s1 of
-        (# s2, i, U u #) -> (# s2, wk, [ show (I# i), show (I# u) ] #)
+  case newByteArray# 42# s0 of
+    (# s1, ba# #) ->
+      case mkWeak# u ba# (finalise mvar) s1 of
+        (# s2, wk #) ->
+          case deRefWeak# wk s2 of
+            (# s3, i, ba'# #) -> (# s3, Res wk [ show (I# i), show (I# (sizeofMutableByteArray# ba'#)) ] #)
 
 finalise :: MVar# RealWorld String -> State# RealWorld -> (# State# RealWorld, () #)
 finalise mvar s0 =
