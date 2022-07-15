@@ -260,8 +260,8 @@ fromGhcDiagnosticCode mk_ghc_dc =
   where
     check_code :: GhcDiagnosticCode -> GhcDiagnosticCode
     check_code ghc_code =
-{-      assertPpr (ghc_code `elem` allUsedDiagnosticCodes)
-                (text "Unknown diagnostic code:" <+> ppr ghc_code) $ -}
+      assertPpr (ghc_code `elem` allUsedDiagnosticCodes)
+                (text "Unknown diagnostic code:" <+> ppr ghc_code) $
       ghc_code
 
 -- | A class identifying diagnostic message types within GHC.
