@@ -124,6 +124,7 @@ extern memcount nonmoving_segment_live_words;
 
 #if defined(THREADED_RTS)
 extern bool concurrent_coll_running;
+extern Mutex nonmoving_collection_mutex;
 #endif
 
 void nonmovingInit(void);

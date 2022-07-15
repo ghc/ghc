@@ -1206,11 +1206,12 @@ memInventory (bool show)
   bool leak;
 
 #if defined(THREADED_RTS)
-  // Can't easily do a memory inventory: We might race with the nonmoving
-  // collector. In principle we could try to take nonmoving_collection_mutex
-  // and do an inventory if we have it but we don't currently implement this.
-  if (RtsFlags.GcFlags.useNonmoving)
-    return;
+  // We need to be careful not to race with the nonmoving collector.
+  // If a nonmoving collection is on-going we simply abort the inventory.
+  if (RtsFlags.GcFlags.useNonmoving){
+    if(TRY_ACQUIRE_LOCK(&nonmoving_collection_mutex))
+      return;
+  }
 #endif
 
   // count the blocks we current have
@@ -1314,6 +1315,13 @@ memInventory (bool show)
   }
   ASSERT(n_alloc_blocks == live_blocks);
   ASSERT(!leak);
+
+#if defined(THREADED_RTS)
+  if (RtsFlags.GcFlags.useNonmoving){
+    RELEASE_LOCK(&nonmoving_collection_mutex);
+  }
+#endif
+
 }
 
 
