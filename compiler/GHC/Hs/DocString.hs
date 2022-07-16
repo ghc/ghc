@@ -137,7 +137,7 @@ instance Outputable HsDocStringChunk where
 
 
 mkHsDocStringChunk :: String -> HsDocStringChunk
-mkHsDocStringChunk s = HsDocStringChunk (utf8EncodeString s)
+mkHsDocStringChunk s = HsDocStringChunk (utf8EncodeByteString s)
 
 -- | Create a 'HsDocString' from a UTF8-encoded 'ByteString'.
 mkHsDocStringChunkUtf8ByteString :: ByteString -> HsDocStringChunk

@@ -531,13 +531,13 @@ mkFastString :: String -> FastString
 {-# NOINLINE[1] mkFastString #-}
 mkFastString str =
   inlinePerformIO $ do
-    sbs <- utf8EncodeShortByteString str
+    let !sbs = utf8EncodeShortByteString str
     mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
 
 -- The following rule is used to avoid polluting the non-reclaimable FastString
 -- table with transient strings when we only want their encoding.
 {-# RULES
-"bytesFS/mkFastString" forall x. bytesFS (mkFastString x) = utf8EncodeString x #-}
+"bytesFS/mkFastString" forall x. bytesFS (mkFastString x) = utf8EncodeByteString x #-}
 
 -- | Creates a 'FastString' from a UTF-8 encoded @[Word8]@
 mkFastStringByteList :: [Word8] -> FastString
@@ -554,7 +554,7 @@ mkNewFastStringShortByteString :: ShortByteString -> Int
                                -> FastMutInt -> IO FastString
 mkNewFastStringShortByteString sbs uid n_zencs = do
   let zstr = mkZFastString n_zencs sbs
-  chars <- countUTF8Chars sbs
+      chars = utf8CountCharsShortByteString sbs
   return (FastString uid chars sbs zstr)
 
 hashStr  :: ShortByteString -> Int

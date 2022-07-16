@@ -578,7 +578,7 @@ mkLitChar = LitChar
 mkLitString :: String -> Literal
 -- stored UTF-8 encoded
 mkLitString [] = LitString mempty
-mkLitString s  = LitString (utf8EncodeString s)
+mkLitString s  = LitString (utf8EncodeByteString s)
 
 mkLitBigNat :: Integer -> Literal
 mkLitBigNat x = assertPpr (x >= 0) (integer x)

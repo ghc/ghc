@@ -45,6 +45,7 @@ Library
             GHC.Data.ShortText
             GHC.Data.SizedSeq
             GHC.Utils.Encoding
+            GHC.Utils.Encoding.UTF8
             GHC.LanguageExtensions
             GHC.Unit.Database
             GHC.Serialized

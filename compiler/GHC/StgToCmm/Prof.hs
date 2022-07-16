@@ -230,7 +230,7 @@ emitCostCentreDecl cc = do
   ; modl  <- newByteStringCLit (bytesFS $ moduleNameFS
                                         $ moduleName
                                         $ cc_mod cc)
-  ; loc <- newByteStringCLit $ utf8EncodeString $
+  ; loc <- newByteStringCLit $ utf8EncodeByteString $
                    renderWithContext ctx (ppr $! costCentreSrcSpan cc)
   ; let
      lits = [ zero platform,  -- StgInt ccID,
@@ -297,7 +297,7 @@ emitInfoTableProv ip = do
         ctx      = stgToCmmContext  cfg
         platform = stgToCmmPlatform cfg
   ; let (src, label) = maybe ("", "") (first (renderWithContext ctx . ppr)) (infoTableProv ip)
-        mk_string    = newByteStringCLit . utf8EncodeString
+        mk_string    = newByteStringCLit . utf8EncodeByteString
   ; label <- mk_string label
   ; modl  <- newByteStringCLit (bytesFS $ moduleNameFS
                                         $ moduleName mod)
