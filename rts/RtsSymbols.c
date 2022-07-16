@@ -722,6 +722,7 @@ extern char **environ;
       SymI_HasDataProto(stg_isEmptyMVarzh)                                  \
       SymI_HasDataProto(stg_killThreadzh)                                   \
       SymI_HasDataProto(stg_listThreadszh)                                  \
+      SymI_HasDataProto(stg_threadLabelzh)                                  \
       SymI_HasProto(loadArchive)                                        \
       SymI_HasProto(loadObj)                                            \
       SymI_HasProto(purgeObj)                                           \

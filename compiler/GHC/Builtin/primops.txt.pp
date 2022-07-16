@@ -2938,6 +2938,16 @@ primop  NoDuplicateOp "noDuplicate#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+primop GetThreadLabelOp "threadLabel#" GenPrimOp
+   ThreadId# -> State# RealWorld -> (# State# RealWorld, Int#, ByteArray# #)
+   {Get the label of the given thread.
+    Morally of type @ThreadId# -> IO (Maybe ByteArray#)@, with a @1#@ tag
+    denoting @Just@.
+
+    @since 0.10}
+   with
+   out_of_line      = True
+
 primop  ThreadStatusOp "threadStatus#" GenPrimOp
    ThreadId# -> State# RealWorld -> (# State# RealWorld, Int#, Int#, Int# #)
    {Get the status of the given thread. Result is

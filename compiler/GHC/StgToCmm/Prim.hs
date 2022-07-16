@@ -1597,6 +1597,7 @@ emitPrimOp cfg primop =
   LabelThreadOp -> alwaysExternal
   IsCurrentThreadBoundOp -> alwaysExternal
   NoDuplicateOp -> alwaysExternal
+  GetThreadLabelOp -> alwaysExternal
   ThreadStatusOp -> alwaysExternal
   MkWeakOp -> alwaysExternal
   MkWeakNoFinalizerOp -> alwaysExternal

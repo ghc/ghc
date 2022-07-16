@@ -18,6 +18,9 @@
   ```
   Where the `ByteArray#` must contain a UTF-8-encoded string.
 
+- The `threadLabel#` primop was added, allowing the user to query the label of
+  a given `ThreadId#`.
+
 ## 0.9.0
 
 - Shipped with GHC 9.4.1

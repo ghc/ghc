@@ -19,6 +19,8 @@
     a thread label by way of a `ByteArray#` containing a UTF-8-encoded string.
     The old `GHC.Conc.Sync.labelThread` is now implemented in terms of this
     function.
+  * `GHC.Conc.Sync.threadLabel` was added, allowing the user to query the label
+    of a given `ThreadId`.
 
 ## 4.17.0.0 *TBA*
 
