@@ -20,10 +20,10 @@
 - ignore: {name: "Redundant return"} # 1 hint
 - ignore: {name: "Replace case with fromMaybe"} # 2 hints
 - ignore: {name: "Replace case with maybe"} # 4 hints
-- ignore: {name: "Unused LANGUAGE pragma"} # 10 hints
+- ignore: {name: "Unused LANGUAGE pragma"} # 11 hints
 - ignore: {name: "Use $>"} # 4 hints
 - ignore: {name: "Use ++"} # 3 hints
-- ignore: {name: "Use :"} # 3 hints
+- ignore: {name: "Use :"} # 4 hints
 - ignore: {name: "Use <$>"} # 12 hints
 - ignore: {name: "Use <&>"} # 1 hint
 - ignore: {name: "Use <|>"} # 1 hint
@@ -34,12 +34,11 @@
 - ignore: {name: "Use concatMap"} # 1 hint
 - ignore: {name: "Use const"} # 4 hints
 - ignore: {name: "Use fewer LANGUAGE pragmas"} # 1 hint
-- ignore: {name: "Use fewer imports"} # 1 hint
 - ignore: {name: "Use find"} # 1 hint
 - ignore: {name: "Use fmap"} # 12 hints
 - ignore: {name: "Use foldr"} # 1 hint
 - ignore: {name: "Use fromMaybe"} # 2 hints
-- ignore: {name: "Use infix"} # 2 hints
+- ignore: {name: "Use infix"} # 3 hints
 - ignore: {name: "Use intercalate"} # 1 hint
 - ignore: {name: "Use isAsciiLower"} # 1 hint
 - ignore: {name: "Use isAsciiUpper"} # 1 hint
@@ -54,11 +53,11 @@
 - ignore: {name: "Use notElem"} # 2 hints
 - ignore: {name: "Use print"} # 3 hints
 - ignore: {name: "Use record patterns"} # 5 hints
+- ignore: {name: "Use second"} # 3 hints
 - ignore: {name: "Use sortOn"} # 3 hints
-- ignore: {name: "Use tuple-section"} # 2 hints
+- ignore: {name: "Use tuple-section"} # 3 hints
 - ignore: {name: "Use unless"} # 1 hint
 - ignore: {name: "Use void"} # 1 hint
-- ignore: {name: "Use second"} # 3 hints
 # Module names (not all unique) where CPP can be used
 - extensions:
   - name: CPP
