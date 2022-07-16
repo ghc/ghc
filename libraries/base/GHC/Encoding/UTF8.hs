@@ -1,111 +1,38 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, MultiWayIf #-}
+{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, NoImplicitPrelude #-}
 {-# OPTIONS_GHC -O2 -fno-warn-name-shadowing #-}
--- We always optimise this, otherwise performance of a non-optimised
--- compiler is severely affected. This module used to live in the `ghc`
--- package but has been moved to `ghc-boot` because the definition
--- of the package database (needed in both ghc and in ghc-pkg) lives in
--- `ghc-boot` and uses ShortText, which in turn depends on this module.
 
--- | Simple, non-streaming UTF-8 codecs.
-module GHC.Utils.Encoding.UTF8
+-- | Simple UTF-8 codecs supporting non-streaming encoding/decoding.
+-- For encoding where codepoints may be broken across buffers,
+-- see "GHC.IO.Encoding.UTF8".
+module GHC.Encoding.UTF8
     ( -- * Decoding single characters
       utf8DecodeCharAddr#
     , utf8DecodeCharPtr
     , utf8DecodeCharByteArray#
-    , utf8PrevChar
-    , utf8CharStart
-    , utf8UnconsByteString
       -- * Decoding strings
-    , utf8DecodeByteString
-    , utf8DecodeShortByteString
-    , utf8DecodeForeignPtr
     , utf8DecodeByteArray#
+    , utf8DecodeForeignPtr
       -- * Counting characters
-    , utf8CountCharsShortByteString
     , utf8CountCharsByteArray#
       -- * Comparison
     , utf8CompareByteArray#
-    , utf8CompareShortByteString
       -- * Encoding strings
-    , utf8EncodeByteArray#
     , utf8EncodePtr
-    , utf8EncodeByteString
-    , utf8EncodeShortByteString
+    , utf8EncodeByteArray#
     , utf8EncodedLength
     ) where
 
-
-import Prelude
-
-import Foreign
-import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
-import Data.Char
+import GHC.Types
+import GHC.Base
 import GHC.IO
 import GHC.ST
-
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Internal as BS
-import Data.ByteString.Short.Internal (ShortByteString(..))
-
-import GHC.Exts
-
--- | Find the start of the codepoint preceding the codepoint at the given
--- 'Ptr'. This is undefined if there is no previous valid codepoint.
-utf8PrevChar :: Ptr Word8 -> IO (Ptr Word8)
-utf8PrevChar p = utf8CharStart (p `plusPtr` (-1))
-
--- | Find the start of the codepoint at the given 'Ptr'. This is undefined if
--- there is no previous valid codepoint.
-utf8CharStart :: Ptr Word8 -> IO (Ptr Word8)
-utf8CharStart p = go p
- where go p = do w <- peek p
-                 if w >= 0x80 && w < 0xC0
-                        then go (p `plusPtr` (-1))
-                        else return p
-
-utf8CountCharsShortByteString :: ShortByteString -> Int
-utf8CountCharsShortByteString (SBS ba) = utf8CountCharsByteArray# ba
-
-utf8DecodeShortByteString :: ShortByteString -> [Char]
-utf8DecodeShortByteString (SBS ba#) = utf8DecodeByteArray# ba#
-
--- | Decode a 'ByteString' containing a UTF-8 string.
-utf8DecodeByteString :: ByteString -> [Char]
-utf8DecodeByteString (BS.PS fptr offset len)
-  = utf8DecodeForeignPtr fptr offset len
-
-utf8EncodeShortByteString :: String -> ShortByteString
-utf8EncodeShortByteString str = SBS (utf8EncodeByteArray# str)
-
--- | Encode a 'String' into a 'ByteString'.
-utf8EncodeByteString :: String -> ByteString
-utf8EncodeByteString s =
-  unsafePerformIO $ do
-    let len = utf8EncodedLength s
-    buf <- mallocForeignPtrBytes len
-    withForeignPtr buf $ \ptr -> do
-      utf8EncodePtr ptr s
-      pure (BS.fromForeignPtr buf 0 len)
-
-utf8UnconsByteString :: ByteString -> Maybe (Char, ByteString)
-utf8UnconsByteString (BS.PS _ _ 0) = Nothing
-utf8UnconsByteString (BS.PS fptr offset len)
-  = unsafeDupablePerformIO $
-      withForeignPtr fptr $ \ptr -> do
-        let (c,n) = utf8DecodeCharPtr (ptr `plusPtr` offset)
-        return $ Just (c, BS.PS fptr (offset + n) (len - n))
-
-utf8CompareShortByteString :: ShortByteString -> ShortByteString -> Ordering
-utf8CompareShortByteString (SBS a1) (SBS a2) = utf8CompareByteArray# a1 a2
-
----------------------------------------------------------
--- Everything below was moved into base in GHC 9.6
---
--- These can be dropped in GHC 9.6 + 2 major releases.
----------------------------------------------------------
-
-#if !MIN_VERSION_base(4,18,0)
+import GHC.Word
+import GHC.ForeignPtr
+import GHC.Num
+import GHC.Bits
+import GHC.Real
+import GHC.Ptr
 
 -- We can't write the decoder as efficiently as we'd like without
 -- resorting to unboxed extensions, unfortunately.  I tried to write
@@ -349,5 +276,3 @@ utf8EncodedLength str = go 0 str
           | ord c <= 0x07ff = go (n+2) cs
           | ord c <= 0xffff = go (n+3) cs
           | otherwise       = go (n+4) cs
-
-#endif /* MIN_VERSION_base(4,18,0) */
