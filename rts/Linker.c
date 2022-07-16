@@ -907,6 +907,13 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent, SymTy
                 NULL);
     }
 
+#if defined(OBJFORMAT_ELF)
+    // Resolve references to the GOT if we know the origin object
+    if (dependent && strncmp(lbl, "_GLOBAL_OFFSET_TABLE_", 21) == 0) {
+        return dependent->info->got_start;
+    }
+#endif
+
     if (!ghciLookupSymbolInfo(symhash, lbl, &pinfo)) {
         IF_DEBUG(linker_verbose, debugBelch("lookupSymbol: symbol '%s' not found, trying dlsym\n", lbl));
 
