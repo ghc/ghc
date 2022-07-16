@@ -18,8 +18,16 @@ module GHC.Weak.Finalize
 import GHC.Base
 import GHC.Exception
 import GHC.IORef
-import {-# SOURCE #-} GHC.Conc (labelThread, myThreadId)
+import {-# SOURCE #-} GHC.Conc.Sync (labelThreadByteArray#, myThreadId)
 import GHC.IO (catchException, unsafePerformIO)
+import GHC.Encoding.UTF8 (utf8EncodeByteArray#)
+
+data ByteArray = ByteArray ByteArray#
+
+-- | The label we use for finalization threads. We manually float this to the
+-- top-level to ensure that the ByteArray# can be shared.
+label :: ByteArray
+label = ByteArray (utf8EncodeByteArray# "weak finalizer thread")
 
 -- | Run a batch of finalizers from the garbage collector.  We're given
 -- an array of finalizers and the length of the array, and we just
@@ -29,7 +37,7 @@ runFinalizerBatch :: Int
                   -> IO ()
 runFinalizerBatch (I# n) arr = do
     tid <- myThreadId
-    labelThread tid "weak finalizer thread"
+    case label of ByteArray ba# -> labelThreadByteArray# tid ba#
     go n
   where
     getFinalizer :: Int# -> IO ()

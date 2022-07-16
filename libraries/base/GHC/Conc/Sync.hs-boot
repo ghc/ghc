@@ -24,7 +24,7 @@ module GHC.Conc.Sync
           ThreadStatus(..),
           threadStatus,
           sharedCAF,
-          labelThread
+          labelThreadByteArray#
         ) where
 
 import GHC.Base
@@ -69,4 +69,4 @@ myThreadId :: IO ThreadId
 showThreadId :: ThreadId -> String
 threadStatus :: ThreadId -> IO ThreadStatus
 sharedCAF :: a -> (Ptr a -> IO (Ptr a)) -> IO a
-labelThread :: ThreadId -> String -> IO ()
+labelThreadByteArray# :: ThreadId -> ByteArray# -> IO ()
