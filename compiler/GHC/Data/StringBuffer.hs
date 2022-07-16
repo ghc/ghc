@@ -199,7 +199,7 @@ stringToStringBuffer str =
   let size = utf8EncodedLength str
   buf <- mallocForeignPtrArray (size+3)
   unsafeWithForeignPtr buf $ \ptr -> do
-    utf8EncodeStringPtr ptr str
+    utf8EncodePtr ptr str
     pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
     -- sentinels for UTF-8 decoding
   return (StringBuffer buf size 0)
@@ -297,7 +297,7 @@ prevChar (StringBuffer buf _   cur) _     =
   inlinePerformIO $
     unsafeWithForeignPtr buf $ \p -> do
       p' <- utf8PrevChar (p `plusPtr` cur)
-      return (fst (utf8DecodeChar p'))
+      return (fst (utf8DecodeCharPtr p'))
 
 -- -----------------------------------------------------------------------------
 -- Moving
@@ -383,7 +383,7 @@ lexemeToString :: StringBuffer
                -> String
 lexemeToString _ 0 = ""
 lexemeToString (StringBuffer buf _ cur) bytes =
-  utf8DecodeStringLazy buf cur bytes
+  utf8DecodeForeignPtr buf cur bytes
 
 lexemeToFastString :: StringBuffer
                    -> Int               -- ^ @n@, the number of bytes
@@ -405,7 +405,7 @@ decodePrevNChars n (StringBuffer buf _ cur) =
     go buf0 n acc p | n == 0 || buf0 >= p = return acc
     go buf0 n acc p = do
         p' <- utf8PrevChar p
-        let (c,_) = utf8DecodeChar p'
+        let (c,_) = utf8DecodeCharPtr p'
         go buf0 (n - 1) (c:acc) p'
 
 -- -----------------------------------------------------------------------------
@@ -414,7 +414,7 @@ parseUnsignedInteger :: StringBuffer -> Int -> Integer -> (Char->Int) -> Integer
 parseUnsignedInteger (StringBuffer buf _ cur) len radix char_to_int
   = inlinePerformIO $ withForeignPtr buf $ \ptr -> return $! let
     go i x | i == len  = x
-           | otherwise = case fst (utf8DecodeChar (ptr `plusPtr` (cur + i))) of
+           | otherwise = case fst (utf8DecodeCharPtr (ptr `plusPtr` (cur + i))) of
                '_'  -> go (i + 1) x    -- skip "_" (#14473)
                char -> go (i + 1) (x * radix + toInteger (char_to_int char))
   in go 0 0

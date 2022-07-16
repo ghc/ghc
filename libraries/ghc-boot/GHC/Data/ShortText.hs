@@ -67,14 +67,15 @@ instance IsString ShortText where
 
 -- | /O(n)/ Returns the length of the 'ShortText' in characters.
 codepointLength :: ShortText -> Int
-codepointLength st = unsafeDupablePerformIO $ countUTF8Chars (contents st)
+codepointLength st = utf8CountCharsShortByteString (contents st)
+
 -- | /O(1)/ Returns the length of the 'ShortText' in bytes.
 byteLength :: ShortText -> Int
 byteLength st = SBS.length $ contents st
 
 -- | /O(n)/ Convert a 'String' into a 'ShortText'.
 pack :: String -> ShortText
-pack s = unsafeDupablePerformIO $ ShortText <$> utf8EncodeShortByteString s
+pack s = ShortText $ utf8EncodeShortByteString s
 
 -- | /O(n)/ Convert a 'ShortText' into a 'String'.
 unpack :: ShortText -> String

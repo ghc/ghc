@@ -599,7 +599,7 @@ pprString str
   = pprString' $ hcat $ map escapeChar $
     if str `lengthIs` utf8EncodedLength str
     then str
-    else map (chr . fromIntegral) $ BS.unpack $ utf8EncodeString str
+    else map (chr . fromIntegral) $ BS.unpack $ utf8EncodeByteString str
 
 -- | Escape a single non-unicode character
 escapeChar :: Char -> SDoc
