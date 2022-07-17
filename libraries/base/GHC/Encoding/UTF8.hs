@@ -5,6 +5,11 @@
 -- | Simple UTF-8 codecs supporting non-streaming encoding/decoding.
 -- For encoding where codepoints may be broken across buffers,
 -- see "GHC.IO.Encoding.UTF8".
+--
+-- This is one of several UTF-8 implementations provided by GHC; see Note
+-- [GHC's many UTF-8 implementations] in "GHC.Encoding.UTF8" for an
+-- overview.
+--
 module GHC.Encoding.UTF8
     ( -- * Decoding single characters
       utf8DecodeCharAddr#
@@ -33,6 +38,41 @@ import GHC.Num
 import GHC.Bits
 import GHC.Real
 import GHC.Ptr
+
+{-
+Note [GHC's many UTF-8 implementations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Currently GHC ships with at least five UTF-8 implementations:
+
+a. the implementation used by GHC in `ghc-boot:GHC.Utils.Encoding`; this can be
+   used at a number of types including `Addr#`, `ByteArray#`, `ForeignPtr`,
+   `Ptr`, `ShortByteString`, and `ByteString`. Most of this can be removed in
+   GHC 9.6+2, when the copies in `base` will become available to `ghc-boot`.
+
+b. the copy of the `ghc-boot` definition now exported by `base:GHC.Encoding.UTF8`.
+   This can be used at `Addr#`, `Ptr`, `ByteArray#`, and `ForeignPtr`.
+
+c. the decoder used by `unpackCStringUtf8#` in `ghc-prim:GHC.CString`; this is
+   specialised at `Addr#`.
+
+d. the codec used by the IO subsystem in `base:GHC.IO.Encoding.UTF8`; this is
+   specialised at `Addr#` but, unlike the above, supports recovery in the presence
+   of partial codepoints (since in IO contexts codepoints may be broken across
+   buffers)
+
+e. the implementation provided by the `text` library
+
+On its face, this seems a tad silly. On the other hand, these implementations do
+materially differ from one another (e.g. in the types they support, the
+detail in errors they can report, and the ability to recover from partial
+codepoints). Consequently, it's quite unclear that further consolidation
+would be worthwhile.
+
+The most obvious opportunity is to move (b) into `ghc-prim` and use it to
+implement (c) (namely `unpackCStringUtf8#` and friends). However, it's not
+clear that this would be worthwhile as several of the types supported by (b)
+are defined in `base`.
+-}
 
 -- We can't write the decoder as efficiently as we'd like without
 -- resorting to unboxed extensions, unfortunately.  I tried to write
