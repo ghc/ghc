@@ -720,7 +720,7 @@ maximum []              =  errorEmptyList "maximum"
 maximum xs              =  foldl1' max xs
 
 -- We want this to be specialized so that with a strict max function, GHC
--- produces good code. Note that to see if this is happending, one has to
+-- produces good code. Note that to see if this is happening, one has to
 -- look at -ddump-prep, not -ddump-core!
 {-# SPECIALIZE  maximum :: [Int] -> Int #-}
 {-# SPECIALIZE  maximum :: [Integer] -> Integer #-}

@@ -7,7 +7,7 @@
 {-|
 This module exports the Type Literal kinds as well as the comparison type
 families for those kinds.  It is needed to prevent module cycles while still
-allowing these identifiers to be improted in 'Data.Type.Ord'.
+allowing these identifiers to be imported in 'Data.Type.Ord'.
 
 @since 4.16.0.0
 -}

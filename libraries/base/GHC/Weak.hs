@@ -59,7 +59,7 @@ addition to finalizers.
 
 References from the finalizer to the key are treated in the same way
 as references from the value to the key: they do not keep the key
-alive.  A finalizer may therefore ressurrect the key, perhaps by
+alive.  A finalizer may therefore resurrect the key, perhaps by
 storing it in the same data structure.
 
 The finalizer, and the relationship between the key and the value,

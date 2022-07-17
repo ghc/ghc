@@ -1270,7 +1270,7 @@ augment g xs = g (:) xs
         -- when we disable the rule that expands (++) into foldr
 
 -- The foldr/cons rule looks nice, but it can give disastrously
--- bloated code when commpiling
+-- bloated code when compiling
 --      array (a,b) [(1,2), (2,2), (3,2), ...very long list... ]
 -- i.e. when there are very very long literal lists
 -- So I've disabled it for now. We could have special cases

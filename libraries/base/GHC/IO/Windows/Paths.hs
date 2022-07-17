@@ -35,7 +35,7 @@ foreign import ccall safe "__hs_create_device_name"
 
 -- | This function converts Windows paths between namespaces. More specifically
 -- It converts an explorer style path into a NT or Win32 namespace.
--- This has several caveats but they are caviats that are native to Windows and
+-- This has several caveats but they are caveats that are native to Windows and
 -- not POSIX. See
 -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247.aspx.
 -- Anything else such as raw device paths we leave untouched.  The main benefit

@@ -92,7 +92,7 @@ unescapeArgs = filter (not . null) . unescape
 --
 -- While 'unescapeArgs' allows using quoting (i.e., convenient
 -- escaping of many characters) by having matching sets of single- or
--- double-quotes,'escapeArgs' does not use the quoting mechasnism,
+-- double-quotes,'escapeArgs' does not use the quoting mechanism,
 -- and thus will always escape any whitespace, quotes, and
 -- backslashes.
 --

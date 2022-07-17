@@ -119,7 +119,7 @@ AC_DEFUN([FPTOOLS_HTYPE_INCLUDES],
 
 
 dnl ** Map an arithmetic C type to a Haskell type.
-dnl    Based on autconf's AC_CHECK_SIZEOF.
+dnl    Based on autoconf's AC_CHECK_SIZEOF.
 
 dnl FPTOOLS_CHECK_HTYPE_ELSE(TYPE, WHAT_TO_DO_IF_TYPE_DOES_NOT_EXIST)
 AC_DEFUN([FPTOOLS_CHECK_HTYPE_ELSE],[

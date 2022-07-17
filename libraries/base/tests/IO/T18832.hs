@@ -12,8 +12,8 @@ import Control.Concurrent
 
 -- How many `openHandle` calls in the test
 -- On a laptop:
--- * when set to 1k, it ocasionally reproduces the failure
--- * when set to 10k, it ocasionally fails to reproduce
+-- * when set to 1k, it occasionally reproduces the failure
+-- * when set to 10k, it occasionally fails to reproduce
 n :: Int
 n = 10000
 

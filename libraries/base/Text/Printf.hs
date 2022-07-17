@@ -63,7 +63,7 @@ module Text.Printf(
 -- ** Standard Formatters
 --
 -- | These formatters for standard types are provided for
--- convenience in writting new type-specific formatters:
+-- convenience in writing new type-specific formatters:
 -- a common pattern is to throw to 'formatString' or
 -- 'formatInteger' to do most of the format handling for
 -- a new type.

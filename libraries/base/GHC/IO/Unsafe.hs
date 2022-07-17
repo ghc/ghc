@@ -47,7 +47,7 @@ Now `r` doesn't look strict, because it's wrapped in a `return`.
 But if we were to define unsafePerformIO like this
   unsafePerformIO (IO m) = case runRW# m of (# _, r #) -> r
 
-then we'll push that `case` inside the arugment to runRW#, givign
+then we'll push that `case` inside the argument to runRW#, giving
   runRW# (\s -> case lockMemoTable s of s1 ->
                 let r = f x in
                 case updateMemoTable s1 of s2 ->

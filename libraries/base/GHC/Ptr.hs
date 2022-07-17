@@ -39,7 +39,7 @@ import Numeric          ( showHex )
 -- Data pointers.
 
 -- The role of Ptr's parameter is phantom, as there is no relation between
--- the Haskell representation and whathever the user puts at the end of the
+-- the Haskell representation and whatever the user puts at the end of the
 -- pointer. And phantom is useful to implement castPtr (see #9163)
 
 -- redundant role annotation checks that this doesn't change

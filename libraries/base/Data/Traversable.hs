@@ -1426,7 +1426,7 @@ foldMapDefault = coerce (traverse @t @(Const m) @a @())
 --
 -- Since in fact __@'traverse' id@__ is just 'sequenceA' the above boils down
 -- to a rather concise definition of /transpose/, with [coercion](#coercion)
--- used to implicily wrap and unwrap the @ZipList@ @newtype@ as neeed, giving
+-- used to implicitly wrap and unwrap the @ZipList@ @newtype@ as needed, giving
 -- a function that operates on a list of lists:
 --
 -- >>> {-# LANGUAGE ScopedTypeVariables #-}

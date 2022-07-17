@@ -301,7 +301,7 @@ fail, the call to the continuation never fails and so the caller should respond
 first to the size check failing and *then* call the continuation. Making this evident
 to the compiler avoids historic space leaks.
 
-In a previous interation of this code we had a pattern that, somewhat simplified,
+In a previous iteration of this code we had a pattern that, somewhat simplified,
 looked like this:
 
 go :: State -> (State -> IO a) -> IO a
@@ -323,6 +323,6 @@ unreachable *after* action returns. This means we keep alive the function closur
 for `action` until `action` returns. Which in turn keeps alive the *whole* lazy list
 via `action` until the action has fully run.
 This went wrong in #20107, where the continuation kept an entire lazy bytestring alive
-rather than allowing it to be incrementaly consumed and collected.
+rather than allowing it to be incrementally consumed and collected.
 -}
 

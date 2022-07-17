@@ -51,7 +51,7 @@ comparing p x y = compare (p x) (p y)
 -- |
 -- > clamp (low, high) a = min high (max a low)
 --
--- Function for ensursing the value @a@ is within the inclusive bounds given by
+-- Function for ensuring the value @a@ is within the inclusive bounds given by
 -- @low@ and @high@. If it is, @a@ is returned unchanged. The result
 -- is otherwise @low@ if @a <= low@, or @high@ if @high <= a@.
 --

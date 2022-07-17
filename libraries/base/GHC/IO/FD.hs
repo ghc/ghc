@@ -177,7 +177,7 @@ writeBuf' fd buf = do
 -- file. If an exception occurs in @act1@, then the file will be closed.
 -- @act1@ /must not/ close the file itself. If it does so and then receives an
 -- exception, then the exception handler will attempt to close it again, which
--- is impermissable.
+-- is impermissible.
 --
 -- @act2@ is performed with asynchronous exceptions masked. It is passed a
 -- function to restore the masking state and the result of @act1@.  It /must

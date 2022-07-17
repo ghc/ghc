@@ -12,7 +12,7 @@
 -- Stability   :  internal
 -- Portability :  non-portable
 --
--- This model abtracts away the platform specific handles that can be toggled
+-- This model abstracts away the platform specific handles that can be toggled
 -- through the RTS.
 --
 -----------------------------------------------------------------------------

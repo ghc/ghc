@@ -561,7 +561,7 @@ touchForeignPtr :: ForeignPtr a -> IO ()
 -- ^This function ensures that the foreign object in
 -- question is alive at the given place in the sequence of IO
 -- actions. However, this comes with a significant caveat: the contract above
--- does not hold if GHC can demonstrate that the code preceeding
+-- does not hold if GHC can demonstrate that the code preceding
 -- @touchForeignPtr@ diverges (e.g. by looping infinitely or throwing an
 -- exception). For this reason, you are strongly advised to use instead
 -- 'withForeignPtr' where possible.

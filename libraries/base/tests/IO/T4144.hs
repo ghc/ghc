@@ -23,7 +23,7 @@ import GHC.IO.Handle
 
 import System.IO
 
--- | Create a seakable read-handle from a bytestring
+-- | Create a seekable read-handle from a bytestring
 bsHandle :: ByteString -> FilePath -> IO Handle
 bsHandle bs fp
     = newBsDevice bs >>= \dev ->

@@ -140,7 +140,7 @@ data GCDetails = GCDetails {
   , gcdetails_threads :: Word32
     -- | Number of bytes allocated since the previous GC
   , gcdetails_allocated_bytes :: Word64
-    -- | Total amount of live data in the heap (incliudes large + compact data).
+    -- | Total amount of live data in the heap (includes large + compact data).
     -- Updated after every GC. Data in uncollected generations (in minor GCs)
     -- are considered live.
   , gcdetails_live_bytes :: Word64

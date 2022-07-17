@@ -98,7 +98,7 @@ main = do
   -- notElem
   print [notElem 5 [1..10], notElem 0 [1..10], notElem 1 []]
 
-  -- lookkup
+  -- lookup
   print (lookup 4 (zip [1..10] (reverse [1..10])))
 
   -- sum

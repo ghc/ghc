@@ -67,7 +67,7 @@ stimesMonoid n x0 = case compare n 0 of
         | y == 1 = x `mappend` z
         | otherwise = g (x `mappend` x) (y `quot` 2) (x `mappend` z) -- See Note [Half of y - 1]
 
--- this is used by the class definitionin GHC.Base;
+-- this is used by the class definition in GHC.Base;
 -- it lives here to avoid cycles
 stimesDefault :: (Integral b, Semigroup a) => b -> a -> a
 stimesDefault y0 x0

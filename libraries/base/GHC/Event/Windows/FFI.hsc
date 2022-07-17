@@ -263,7 +263,7 @@ instance Storable CompletionData where
 -- | Tag type for @LPOVERLAPPED@.
 data OVERLAPPED
 
--- | Tag type for the extended version of @OVERLAPPED@ containg some book
+-- | Tag type for the extended version of @OVERLAPPED@ containing some book
 --   keeping information.
 data HASKELL_OVERLAPPED
 
@@ -305,7 +305,7 @@ instance Storable OVERLAPPED_ENTRY where
 -- | Allocate a new
 -- <http://msdn.microsoft.com/en-us/library/windows/desktop/ms684342%28v=vs.85%29.aspx
 -- OVERLAPPED> structure on the unmanaged heap. This also zeros the memory to
--- prevent the values inside the struct to be incorrectlt interpreted as data
+-- prevent the values inside the struct to be incorrectly interpreted as data
 -- payload.
 --
 -- We extend the overlapped structure with some extra book keeping information
@@ -361,7 +361,7 @@ pokeEventOverlapped lpol event = do
 -- [2] https://docs.microsoft.com/en-us/windows/win32/sync/synchronization-and-overlapped-input-and-output
 --
 -- As such we need to annotate all NativeHandles with a Boolean to indicate
--- wether it's an asynchronous handle or not.
+-- whether it's an asynchronous handle or not.
 -- This allows us to manually wait for the completion instead of relying
 -- on the I/O system to do the right thing.  As we have been using the
 -- buffers in async mode we may not have moved the file pointer on the kernel
