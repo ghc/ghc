@@ -143,6 +143,7 @@ function setup_locale() {
 }
 
 function mingw_init() {
+  toolchain="$(cygpath -w $toolchain)"
   case "$MSYSTEM" in
     MINGW32)
       target_triple="i386-unknown-mingw32"

@@ -451,18 +451,7 @@ systemBuilderPath builder = case builder of
             unless (isOptional builder) . error $ "Non optional builder "
                 ++ quote key ++ " is not specified" ++ inCfg
             return "" -- TODO: Use a safe interface.
-        else do
-            -- angerman: I find this lookupInPath rather questionable.
-            -- if we specify CC, LD, ... *without* a path, that is intentional
-            -- lookupInPath should be done by the person invoking the configure
-            -- script iif they want to have that full path, if they just want
-            -- some generic tool name (on purpose!) the build system should not
-            -- go behind their backs to add a path they likely never wanted.
-            fullPath <- lookupInPath path
-            case (windowsHost, hasExtension fullPath) of
-                (False, _    ) -> return path
-                (True , True ) -> fixAbsolutePathOnWindows fullPath
-                (True , False) -> fixAbsolutePathOnWindows fullPath <&> (<.> exe)
+        else return path
 
     -- Without this function, on Windows we can observe a bad builder path
     -- for 'autoreconf'. If the relevant system.config field is set to
