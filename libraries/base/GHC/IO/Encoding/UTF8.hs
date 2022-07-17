@@ -18,6 +18,10 @@
 --
 -- UTF-8 Codec for the IO library
 --
+-- This is one of several UTF-8 implementations provided by GHC; see Note
+-- [GHC's many UTF-8 implementations] in "GHC.Encoding.UTF8" for an
+-- overview.
+--
 -- Portions Copyright   : (c) Tom Harper 2008-2009,
 --                        (c) Bryan O'Sullivan 2009,
 --                        (c) Duncan Coutts 2009

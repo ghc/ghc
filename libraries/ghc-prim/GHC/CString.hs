@@ -225,7 +225,6 @@ unpackCStringUtf8# addr
         -- See Note [unpackCString# iterating over addr]
         !ch = indexCharOffAddr# addr 0#
 
-
 unpackAppendCStringUtf8# :: Addr# -> [Char] -> [Char]
 {-# NOINLINE unpackAppendCStringUtf8# #-}
      -- See the NOINLINE note on unpackCString#
@@ -288,8 +287,12 @@ cstringLength# = c_strlen
 
 
 ------------------------------
---- UTF8 decoding utilities
+--- UTF-8 decoding utilities
 ------------------------------
+--
+-- This is one of several UTF-8 implementations provided by GHC; see Note
+-- [GHC's many UTF-8 implementations] in "GHC.Encoding.UTF8" for an
+-- overview.
 --
 -- These functions make explicit the logic that was originally
 -- part of unpackCStringUtf8. Since we want the same support for ascii
