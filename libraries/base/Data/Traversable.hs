@@ -28,8 +28,10 @@ module Data.Traversable (
     -- * Utility functions
     for,
     forM,
+    forAccumM,
     mapAccumL,
     mapAccumR,
+    mapAccumM,
     -- * General definitions for superclass methods
     fmapDefault,
     foldMapDefault,
@@ -99,7 +101,7 @@ import Data.Either ( Either(..) )
 import Data.Foldable
 import Data.Functor
 import Data.Functor.Identity ( Identity(..) )
-import Data.Functor.Utils ( StateL(..), StateR(..) )
+import Data.Functor.Utils ( StateL(..), StateR(..), StateT(..), (#.) )
 import Data.Monoid ( Dual(..), Sum(..), Product(..),
                      First(..), Last(..), Alt(..), Ap(..) )
 import Data.Ord ( Down(..) )
@@ -482,6 +484,45 @@ mapAccumR :: forall t s a b. Traversable t
 -- See Note [Function coercion] in Data.Functor.Utils.
 mapAccumR f s t = coerce (traverse @t @(StateR s) @a @b) (flip f) t s
 
+-- | The `mapAccumM` function behaves like a combination of `mapM` and
+-- `mapAccumL` that traverses the structure while evaluating the actions
+-- and passing an accumulating parameter from left to right.
+-- It returns a final value of this accumulator together with the new structure.
+-- The accummulator is often used for caching the intermediate results of a computation.
+--
+--  @since 4.18.0.0
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> let expensiveDouble a = putStrLn ("Doubling " <> show a) >> pure (2 * a)
+-- >>> :{
+-- mapAccumM (\cache a -> case lookup a cache of
+--     Nothing -> expensiveDouble a >>= \double -> pure ((a, double):cache, double)
+--     Just double -> pure (cache, double)
+--     ) [] [1, 2, 3, 1, 2, 3]
+-- :}
+-- Doubling 1
+-- Doubling 2
+-- Doubling 3
+-- ([(3,6),(2,4),(1,2)],[2,4,6,2,4,6])
+--
+mapAccumM
+  :: forall m t s a b. (Monad m, Traversable t)
+  => (s -> a -> m (s, b))
+  -> s -> t a -> m (s, t b)
+mapAccumM f s t = coerce (mapM @t @(StateT s m) @a @b) (StateT #. flip f) t s
+
+-- | 'forAccumM' is 'mapAccumM' with the arguments rearranged.
+--
+-- @since 4.18.0.0
+forAccumM
+  :: (Monad m, Traversable t)
+  => s -> t a -> (s -> a -> m (s, b)) -> m (s, t b)
+{-# INLINE forAccumM #-}
+forAccumM s t f = mapAccumM f s t
+
 -- | This function may be used as a value for `fmap` in a `Functor`
 --   instance, provided that 'traverse' is defined. (Using
 --   `fmapDefault` with a `Traversable` instance defined only by
@@ -573,8 +614,9 @@ foldMapDefault = coerce (traverse @t @(Const m) @a @())
 --
 -- When the traversable term is a simple variable or expression, and the
 -- monadic action to run is a non-trivial do block, it can be more natural to
--- write the action last.  This idiom is supported by 'for' and 'forM', which
--- are the flipped versions of 'traverse' and 'mapM', respectively.
+-- write the action last.  This idiom is supported by 'for', 'forM', and
+-- 'forAccumM' which are the flipped versions of 'traverse', 'mapM', and
+-- 'mapAccumM' respectively.
 
 ------------------
 

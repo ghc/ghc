@@ -9,6 +9,8 @@
   * `Numeric.Natural` re-exports `GHC.Natural.minusNaturalMaybe`.
   * Add `Data.Foldable1` and `Data.Bifoldable1`.
   * Add `applyWhen` to `Data.Function`.
+  * Add functions `mapAccumM` and `forAccumM` to `Data.Traversable`, per the
+    [Core Libraries proposal](https://github.com/haskell/core-libraries-committee/issues/65).
 
 ## 4.17.0.0 *TBA*
 
