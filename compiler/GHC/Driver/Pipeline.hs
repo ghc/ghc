@@ -580,7 +580,7 @@ compileForeign hsc_env lang stub_c = do
               LangCxx    -> viaCPipeline Ccxx
               LangObjc   -> viaCPipeline Cobjc
               LangObjcxx -> viaCPipeline Cobjcxx
-              LangAsm    -> \pe hsc_env ml fp -> Just <$> asPipeline True pe hsc_env ml fp
+              LangAsm    -> \pe hsc_env ml fp -> asPipeline True pe hsc_env ml fp
 #if __GLASGOW_HASKELL__ < 811
               RawObject  -> panic "compileForeign: should be unreachable"
 #endif
@@ -588,6 +588,7 @@ compileForeign hsc_env lang stub_c = do
         res <- runPipeline (hsc_hooks hsc_env) (pipeline pipe_env hsc_env Nothing stub_c)
         case res of
           -- This should never happen as viaCPipeline should only return `Nothing` when the stop phase is `StopC`.
+          -- and the same should never happen for asPipeline
           -- Future refactoring to not check StopC for this case
           Nothing -> pprPanic "compileForeign" (ppr stub_c)
           Just fp -> return fp
@@ -766,28 +767,30 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
         return (Just linkable)
   return (miface, final_linkable)
 
-asPipeline :: P m => Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m ObjFile
-asPipeline use_cpp pipe_env hsc_env location input_fn = do
-  use (T_As use_cpp pipe_env hsc_env location input_fn)
+asPipeline :: P m => Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe ObjFile)
+asPipeline use_cpp pipe_env hsc_env location input_fn =
+  case stop_phase pipe_env of
+    StopAs -> return Nothing
+    _ -> Just <$> use (T_As use_cpp pipe_env hsc_env location input_fn)
 
 viaCPipeline :: P m => Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 viaCPipeline c_phase pipe_env hsc_env location input_fn = do
   out_fn <- use (T_Cc c_phase pipe_env hsc_env input_fn)
   case stop_phase pipe_env of
     StopC -> return Nothing
-    _ -> Just <$> asPipeline False pipe_env hsc_env location out_fn
+    _ -> asPipeline False pipe_env hsc_env location out_fn
 
-llvmPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
+llvmPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 llvmPipeline pipe_env hsc_env location fp = do
   opt_fn <- use (T_LlvmOpt pipe_env hsc_env fp)
   llvmLlcPipeline pipe_env hsc_env location opt_fn
 
-llvmLlcPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
+llvmLlcPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 llvmLlcPipeline pipe_env hsc_env location opt_fn = do
   llc_fn <- use (T_LlvmLlc pipe_env hsc_env opt_fn)
   llvmManglePipeline pipe_env hsc_env location llc_fn
 
-llvmManglePipeline :: P m  => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
+llvmManglePipeline :: P m  => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 llvmManglePipeline pipe_env hsc_env location llc_fn = do
   mangled_fn <-
     if gopt Opt_NoLlvmMangler (hsc_dflags hsc_env)
@@ -814,8 +817,8 @@ hscPostBackendPipeline _ _ HsigFile _ _ _     = return Nothing
 hscPostBackendPipeline pipe_env hsc_env _ bcknd ml input_fn =
   case bcknd of
         ViaC        -> viaCPipeline HCc pipe_env hsc_env ml input_fn
-        NCG         -> Just <$> asPipeline False pipe_env hsc_env ml input_fn
-        LLVM        -> Just <$> llvmPipeline pipe_env hsc_env ml input_fn
+        NCG         -> asPipeline False pipe_env hsc_env ml input_fn
+        LLVM        -> llvmPipeline pipe_env hsc_env ml input_fn
         NoBackend   -> return Nothing
         Interpreter -> return Nothing
 
@@ -848,7 +851,7 @@ pipelineStart pipe_env hsc_env input_fn =
    c :: P m => Phase -> m (Maybe FilePath)
    c phase = viaCPipeline phase pipe_env hsc_env Nothing input_fn
    as :: P m => Bool -> m (Maybe FilePath)
-   as use_cpp = Just <$> asPipeline use_cpp pipe_env hsc_env Nothing input_fn
+   as use_cpp = asPipeline use_cpp pipe_env hsc_env Nothing input_fn
 
    objFromLinkable (_, Just (LM _ _ [DotO lnk])) = Just lnk
    objFromLinkable _ = Nothing
@@ -874,9 +877,9 @@ pipelineStart pipe_env hsc_env input_fn =
    fromSuffix "cxx"      = c Ccxx
    fromSuffix "s"        = as False
    fromSuffix "S"        = as True
-   fromSuffix "ll"       = Just <$> llvmPipeline pipe_env hsc_env Nothing input_fn
-   fromSuffix "bc"       = Just <$> llvmLlcPipeline pipe_env hsc_env Nothing input_fn
-   fromSuffix "lm_s"     = Just <$> llvmManglePipeline pipe_env hsc_env Nothing input_fn
+   fromSuffix "ll"       = llvmPipeline pipe_env hsc_env Nothing input_fn
+   fromSuffix "bc"       = llvmLlcPipeline pipe_env hsc_env Nothing input_fn
+   fromSuffix "lm_s"     = llvmManglePipeline pipe_env hsc_env Nothing input_fn
    fromSuffix "o"        = return (Just input_fn)
    fromSuffix "cmm"      = Just <$> cmmCppPipeline pipe_env hsc_env input_fn
    fromSuffix "cmmcpp"   = Just <$> cmmPipeline pipe_env hsc_env input_fn

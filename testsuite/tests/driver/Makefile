@@ -744,3 +744,9 @@ T20316:
 T20569:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c T20569/A.hs -i -iT20569 -hidir=interface
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c T20569/B.hs -i -iT20569 -hidir=interface
+
+.PHONY: T21869
+T21869:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T21869.hs -S
+	[ -f T21869.s ] || (echo "assembly file does not exist" && exit 2)
+	[ ! -f T21869.o ] || (echo "object file exists" && exit 2)
