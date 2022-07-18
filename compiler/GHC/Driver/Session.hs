@@ -1339,12 +1339,14 @@ languageExtensions (Just Haskell98)
        LangExt.DatatypeContexts,
        LangExt.TraditionalRecordSyntax,
        LangExt.FieldSelectors,
-       LangExt.NondecreasingIndentation
+       LangExt.NondecreasingIndentation,
            -- strictly speaking non-standard, but we always had this
            -- on implicitly before the option was added in 7.1, and
            -- turning it off breaks code, so we're keeping it on for
            -- backwards compatibility.  Cabal uses -XHaskell98 by
            -- default unless you specify another language.
+       LangExt.DeepSubsumption
+       -- Non-standard but enabled for backwards compatability (see GHC proposal #511)
       ]
 
 languageExtensions (Just Haskell2010)
