@@ -143,5 +143,6 @@ docs:
          ImportQualifiedPost
          StandaloneKindSignatures
          FieldSelectors
+         ImplicitForAll
 extensible fields:
 
