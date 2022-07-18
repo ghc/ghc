@@ -299,7 +299,7 @@ linkNodes summaries uid hue =
   in if | ghcLink dflags == LinkBinary && isJust ofile && not do_linking ->
             Just (Left $ singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan (DriverRedirectedNoMain $ mainModuleNameIs dflags))
         -- This should be an error, not a warning (#10895).
-        | do_linking -> Just (Right (LinkNode unit_nodes uid))
+        | ghcLink dflags /= NoLink, do_linking -> Just (Right (LinkNode unit_nodes uid))
         | otherwise  -> Nothing
 
 -- Note [Missing home modules]
