@@ -29,7 +29,7 @@ import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
 import GHC.Core.Rules
-import GHC.Core.Utils     ( exprIsTrivial, getIdFromTrivialExpr_maybe
+import GHC.Core.Utils     ( exprIsTrivial
                           , mkCast, exprType
                           , stripTicksTop )
 import GHC.Core.FVs
@@ -608,13 +608,12 @@ specProgram guts@(ModGuts { mg_module = this_mod
               -- decls were mutually recursive
        ; let top_env = SE { se_subst = Core.mkEmptySubst $ mkInScopeSet $ mkVarSet $
                                        bindersOfBinds binds
-                          , se_interesting = emptyVarSet
                           , se_module = this_mod
                           , se_dflags = dflags }
 
              go []           = return ([], emptyUDs)
-             go (bind:binds) = do (binds', uds) <- go binds
-                                  (bind', uds') <- specBind top_env bind uds
+             go (bind:binds) = do (bind', binds', uds') <- specBind TopLevel top_env bind $ \_ ->
+                                                           go binds
                                   return (bind' ++ binds', uds')
 
              -- Specialise the bindings of this module
@@ -1078,32 +1077,32 @@ data SpecEnv
              -- b) we carry a type substitution to use when analysing
              --    the RHS of specialised bindings (no type-let!)
 
-
-       , se_interesting :: VarSet
-             -- Dict Ids that we know something about
-             -- and hence may be worth specialising against
-             -- See Note [Interesting dictionary arguments]
-
        , se_module :: Module
        , se_dflags :: DynFlags
      }
 
 instance Outputable SpecEnv where
-  ppr (SE { se_subst = subst, se_interesting = interesting })
-    = text "SE" <+> braces (sep $ punctuate comma
-        [ text "subst =" <+> ppr subst
-        , text "interesting =" <+> ppr interesting ])
+  ppr (SE { se_subst = subst })
+    = text "SE" <+> braces (text "subst =" <+> ppr subst)
 
-specVar :: SpecEnv -> Id -> CoreExpr
-specVar env v = Core.lookupIdSubst (se_subst env) v
+specVar :: SpecEnv -> InId -> SpecM (OutExpr, UsageDetails)
+specVar env@(SE { se_subst = Core.Subst in_scope ids _ _ }) v
+  | not (isLocalId v)                   = return (Var v, emptyUDs)
+  | Just e  <- lookupVarEnv ids       v = specExpr (zapSubst env) e  -- Note (1)
+  | Just v' <- lookupInScope in_scope v = return (Var v', emptyUDs)
+  | otherwise = pprPanic "specVar" (ppr v $$ ppr in_scope)
+  -- c.f. GHC.Core.Subst.lookupIdSubst
+  -- Note (1): we recurse so we do the lookupInScope thing on any Vars in e
+  --           probably has little effect, but it's the right thing.
+  --           We need zapSubst because `e` is an OutExpr
 
 specExpr :: SpecEnv -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
 
 ---------------- First the easy cases --------------------
+specExpr env (Var v)       = specVar env v
 specExpr env (Type ty)     = return (Type     (substTy env ty), emptyUDs)
 specExpr env (Coercion co) = return (Coercion (substCo env co), emptyUDs)
-specExpr env (Var v)       = return (specVar env v, emptyUDs)
-specExpr _   (Lit lit)     = return (Lit lit,       emptyUDs)
+specExpr _   (Lit lit)     = return (Lit lit,                   emptyUDs)
 specExpr env (Cast e co)
   = do { (e', uds) <- specExpr env e
        ; return ((mkCast e' (substCo env co)), uds) }
@@ -1136,20 +1135,19 @@ specExpr env (Case scrut case_bndr ty alts)
   = do { (scrut', scrut_uds) <- specExpr env scrut
        ; (scrut'', case_bndr', alts', alts_uds)
              <- specCase env scrut' case_bndr alts
+--       ; pprTrace "specExpr:case" (vcat
+--            [ text "scrut" <+> ppr scrut, text "scrut'" <+> ppr scrut'
+--            , text "case_bndr'" <+> ppr case_bndr'
+--            , text "alts_uds" <+> ppr alts_uds
+--            ])
        ; return (Case scrut'' case_bndr' (substTy env ty) alts'
                 , scrut_uds `thenUDs` alts_uds) }
 
 ---------------- Finally, let is the interesting case --------------------
 specExpr env (Let bind body)
-  = do { -- Clone binders
-         (rhs_env, body_env, bind') <- cloneBindSM env bind
-
-         -- Deal with the body
-       ; (body', body_uds) <- specExpr body_env body
-
-        -- Deal with the bindings
-       ; (binds', uds) <- specBind rhs_env bind' body_uds
-
+  = do { (binds', body', uds) <- specBind NotTopLevel env bind $ \body_env ->
+                                 -- pprTrace "specExpr:let" (ppr (se_subst body_env) $$ ppr body) $
+                                 specExpr body_env body
          -- All done
        ; return (foldr Let body' binds', uds) }
 
@@ -1179,52 +1177,58 @@ specLam env bndrs body
 
 --------------
 specTickish :: SpecEnv -> CoreTickish -> CoreTickish
-specTickish env (Breakpoint ext ix ids)
-  = Breakpoint ext ix [ id' | id <- ids, Var id' <- [specVar env id]]
+specTickish (SE { se_subst = subst }) (Breakpoint ext ix ids)
+  = Breakpoint ext ix [ id' | id <- ids, Var id' <- [Core.lookupIdSubst subst id]]
   -- drop vars from the list if they have a non-variable substitution.
   -- should never happen, but it's harmless to drop them anyway.
 specTickish _ other_tickish = other_tickish
 
 --------------
 specCase :: SpecEnv
-         -> CoreExpr            -- Scrutinee, already done
-         -> Id -> [CoreAlt]
-         -> SpecM ( CoreExpr    -- New scrutinee
-                  , Id
-                  , [CoreAlt]
+         -> OutExpr             -- Scrutinee, already done
+         -> InId -> [InAlt]
+         -> SpecM ( OutExpr     -- New scrutinee
+                  , OutId
+                  , [OutAlt]
                   , UsageDetails)
 specCase env scrut' case_bndr [Alt con args rhs]
-  | isDictId case_bndr           -- See Note [Floating dictionaries out of cases]
-  , interestingDict env scrut'
+  | -- See Note [Floating dictionaries out of cases]
+    interestingDict scrut' (idType case_bndr)
   , not (isDeadBinder case_bndr && null sc_args')
   = do { (case_bndr_flt : sc_args_flt) <- mapM clone_me (case_bndr' : sc_args')
 
-       ; let sc_rhss = [ Case (Var case_bndr_flt) case_bndr' (idType sc_arg')
-                              [Alt con args' (Var sc_arg')]
-                       | sc_arg' <- sc_args' ]
+       ; let case_bndr_flt' = case_bndr_flt `addDictUnfolding` scrut'
+             scrut_bind     = mkDB (NonRec case_bndr_flt scrut')
+
+             sc_args_flt' = zipWith addDictUnfolding sc_args_flt sc_rhss
+             sc_rhss      = [ Case (Var case_bndr_flt') case_bndr' (idType sc_arg')
+                                   [Alt con args' (Var sc_arg')]
+                            | sc_arg' <- sc_args' ]
+             cb_set       = unitVarSet case_bndr_flt'
+             sc_binds     = [ DB { db_bind = NonRec sc_arg_flt sc_rhs, db_fvs  = cb_set }
+                            | (sc_arg_flt, sc_rhs) <- sc_args_flt' `zip` sc_rhss ]
+
+             flt_binds    = scrut_bind : sc_binds
 
              -- Extend the substitution for RHS to map the *original* binders
              -- to their floated versions.
              mb_sc_flts :: [Maybe DictId]
              mb_sc_flts = map (lookupVarEnv clone_env) args'
-             clone_env  = zipVarEnv sc_args' sc_args_flt
+             clone_env  = zipVarEnv sc_args' sc_args_flt'
+
              subst_prs  = (case_bndr, Var case_bndr_flt)
                         : [ (arg, Var sc_flt)
                           | (arg, Just sc_flt) <- args `zip` mb_sc_flts ]
-             env_rhs' = env_rhs { se_subst = Core.extendIdSubstList (se_subst env_rhs) subst_prs
-                                , se_interesting = se_interesting env_rhs `extendVarSetList`
-                                                   (case_bndr_flt : sc_args_flt) }
+             subst'   = se_subst env_rhs
+                        `Core.extendSubstInScopeList` (case_bndr_flt' : sc_args_flt')
+                        `Core.extendIdSubstList`      subst_prs
+             env_rhs' = env_rhs { se_subst = subst' }
 
        ; (rhs', rhs_uds)   <- specExpr env_rhs' rhs
-       ; let scrut_bind    = mkDB (NonRec case_bndr_flt scrut')
-             case_bndr_set = unitVarSet case_bndr_flt
-             sc_binds      = [ DB { db_bind = NonRec sc_arg_flt sc_rhs
-                                  , db_fvs  = case_bndr_set }
-                             | (sc_arg_flt, sc_rhs) <- sc_args_flt `zip` sc_rhss ]
-             flt_binds     = scrut_bind : sc_binds
-             (free_uds, dumped_dbs) = dumpUDs (case_bndr':args') rhs_uds
+       ; let (free_uds, dumped_dbs) = dumpUDs (case_bndr':args') rhs_uds
              all_uds = flt_binds `consDictBinds` free_uds
              alt'    = Alt con args' (wrapDictBindsE dumped_dbs rhs')
+--       ; pprTrace "specCase" (ppr case_bndr $$ ppr scrut_bind) $
        ; return (Var case_bndr_flt, case_bndr', [alt'], all_uds) }
   where
     (env_rhs, (case_bndr':args')) = substBndrs env (case_bndr:args)
@@ -1253,10 +1257,14 @@ specCase env scrut case_bndr alts
        ; return (scrut, case_bndr', alts', uds_alts) }
   where
     (env_alt, case_bndr') = substBndr env case_bndr
-    spec_alt (Alt con args rhs) = do
-          (rhs', uds) <- specExpr env_rhs rhs
-          let (free_uds, dumped_dbs) = dumpUDs (case_bndr' : args') uds
-          return (Alt con args' (wrapDictBindsE dumped_dbs rhs'), free_uds)
+    spec_alt (Alt con args rhs)
+      = do { (rhs', uds) <- specExpr env_rhs rhs
+           ; let (free_uds, dumped_dbs) = dumpUDs (case_bndr' : args') uds
+--           ; unless (isNilOL dumped_dbs) $
+--             pprTrace "specAlt" (vcat
+--                 [text "case_bndr', args" <+> (ppr case_bndr' $$ ppr args)
+--                 ,text "dumped" <+> ppr dumped_dbs ]) return ()
+           ; return (Alt con args' (wrapDictBindsE dumped_dbs rhs'), free_uds) }
         where
           (env_rhs, args') = substBndrs env_alt args
 
@@ -1306,32 +1314,48 @@ bringFloatedDictsIntoScope env (FDB { fdb_bndrs = dx_bndrs })
   where
    subst' = se_subst env `Core.extendSubstInScopeSet` dx_bndrs
 
-specBind :: SpecEnv                     -- Use this for RHSs
-         -> CoreBind                    -- Binders are already cloned by cloneBindSM,
-                                        -- but RHSs are un-processed
-         -> UsageDetails                -- Info on how the scope of the binding
-         -> SpecM ([CoreBind],          -- New bindings
-                   UsageDetails)        -- And info to pass upstream
+specBind :: TopLevelFlag
+         -> SpecEnv    -- At top-level only, this env already has the
+                       -- top level binders in scope
+         -> InBind
+         -> (SpecEnv -> SpecM (body, UsageDetails))    -- Process the body
+         -> SpecM ( [OutBind]           -- New bindings
+                  , body                -- Body
+                  , UsageDetails)       -- And info to pass upstream
 
 -- Returned UsageDetails:
 --    No calls for binders of this bind
-specBind rhs_env (NonRec fn rhs) body_uds
-  = do { (rhs', rhs_uds) <- specExpr rhs_env rhs
+specBind top_lvl env (NonRec fn rhs) do_body
+  = do { (rhs', rhs_uds) <- specExpr env rhs
 
-       ; let zapped_fn = zapIdDemandInfo fn
-              -- We zap the demand info because the binding may float,
-              -- which would invaidate the demand info (see #17810 for example).
-              -- Destroying demand info is not terrible; specialisation is
-              -- always followed soon by demand analysis.
-       ; (fn', spec_defns, body_uds1) <- specDefn rhs_env body_uds zapped_fn rhs
+       ; (body_env1, fn1) <- case top_lvl of
+                               TopLevel    -> return (env, fn)
+                               NotTopLevel -> cloneBndrSM env fn
 
-       ; let pairs = spec_defns ++ [(fn', rhs')]
-                        -- fn' mentions the spec_defns in its rules,
+       ; let fn2 | isStableUnfolding (idUnfolding fn1) = fn1
+                 | otherwise = fn1 `setIdUnfolding` mkSimpleUnfolding defaultUnfoldingOpts rhs'
+             -- Update the unfolding with the perhaps-simpler or more specialised rhs'
+             -- This is important: see Note [Update unfolding after specialisation]
+             -- And in any case cloneBndrSM discards non-Stable unfoldings
+
+             fn3 = zapIdDemandInfo fn2
+             -- We zap the demand info because the binding may float,
+             -- which would invaidate the demand info (see #17810 for example).
+             -- Destroying demand info is not terrible; specialisation is
+             -- always followed soon by demand analysis.
+
+             body_env2 = body_env1 `extendInScope` fn3
+
+       ; (body', body_uds) <- do_body body_env2
+
+       ; (fn4, spec_defns, body_uds1) <- specDefn env body_uds fn3 rhs
+
+       ; let (free_uds, dump_dbs, float_all) = dumpBindUDs [fn4] body_uds1
+             all_free_uds                    = free_uds `thenUDs` rhs_uds
+
+             pairs = spec_defns ++ [(fn4, rhs')]
+                        -- fn4 mentions the spec_defns in its rules,
                         -- so put the latter first
-
-             combined_uds = body_uds1 `thenUDs` rhs_uds
-
-             (free_uds, dump_dbs, float_all) = dumpBindUDs [fn] combined_uds
 
              final_binds :: [DictBind]
              -- See Note [From non-recursive to recursive]
@@ -1346,38 +1370,46 @@ specBind rhs_env (NonRec fn rhs) body_uds
        ; if float_all then
              -- Rather than discard the calls mentioning the bound variables
              -- we float this (dictionary) binding along with the others
-              return ([], free_uds `snocDictBinds` final_binds)
+              return ([], body', all_free_uds `snocDictBinds` final_binds)
          else
              -- No call in final_uds mentions bound variables,
              -- so we can just leave the binding here
-              return (map db_bind final_binds, free_uds) }
+              return (map db_bind final_binds, body', all_free_uds) }
 
 
-specBind rhs_env (Rec pairs) body_uds
+specBind top_lvl env (Rec pairs) do_body
        -- Note [Specialising a recursive group]
   = do { let (bndrs,rhss) = unzip pairs
-       ; (rhss', rhs_uds) <- mapAndCombineSM (specExpr rhs_env) rhss
+
+       ; (rec_env, bndrs1) <- case top_lvl of
+                                 TopLevel    -> return (env, bndrs)
+                                 NotTopLevel -> cloneRecBndrsSM env bndrs
+
+       ; (rhss', rhs_uds)  <- mapAndCombineSM (specExpr rec_env) rhss
+       ; (body', body_uds) <- do_body rec_env
+
        ; let scope_uds = body_uds `thenUDs` rhs_uds
                        -- Includes binds and calls arising from rhss
 
-       ; (bndrs1, spec_defns1, uds1) <- specDefns rhs_env scope_uds pairs
+       ; (bndrs2, spec_defns2, uds2) <- specDefns rec_env scope_uds (bndrs1 `zip` rhss)
+         -- bndrs2 is like bndrs1, but with RULES added
 
        ; (bndrs3, spec_defns3, uds3)
-             <- if null spec_defns1  -- Common case: no specialisation
-                then return (bndrs1, [], uds1)
+             <- if null spec_defns2  -- Common case: no specialisation
+                then return (bndrs2, [], uds2)
                 else do {            -- Specialisation occurred; do it again
-                          (bndrs2, spec_defns2, uds2)
-                              <- specDefns rhs_env uds1 (bndrs1 `zip` rhss)
-                        ; return (bndrs2, spec_defns2 ++ spec_defns1, uds2) }
+                          (bndrs3, spec_defns3, uds3)
+                              <- specDefns rec_env uds2 (bndrs2 `zip` rhss)
+                        ; return (bndrs3, spec_defns3 ++ spec_defns2, uds3) }
 
-       ; let (final_uds, dumped_dbs, float_all) = dumpBindUDs bndrs uds3
+       ; let (final_uds, dumped_dbs, float_all) = dumpBindUDs bndrs1 uds3
              final_bind = recWithDumpedDicts (spec_defns3 ++ zip bndrs3 rhss')
                                              dumped_dbs
 
        ; if float_all then
-              return ([], final_uds `snocDictBind` final_bind)
+              return ([], body', final_uds `snocDictBind` final_bind)
          else
-              return ([db_bind final_bind], final_uds) }
+              return ([db_bind final_bind], body', final_uds) }
 
 
 ---------------------------
@@ -2104,7 +2136,7 @@ Consider:
    {-# RULE f g = 0 #-}
 
 Suppose that auto-specialisation makes a specialised version of
-g::Int->Int That version won't appear in the LHS of the RULE for f.
+g::Int->Int. That version won't appear in the LHS of the RULE for f.
 So if the specialisation rule fires too early, the rule for f may
 never fire.
 
@@ -2441,30 +2473,31 @@ bindAuxiliaryDict
   -> ( SpecEnv        -- Substitutes for orig_dict_id
      , Maybe DictBind -- Auxiliary dict binding, if any
      , OutExpr)       -- Witnessing expression (always trivial)
-bindAuxiliaryDict env@(SE { se_subst = subst, se_interesting = interesting })
+bindAuxiliaryDict env@(SE { se_subst = subst })
                   orig_dict_id fresh_dict_id dict_expr
 
   -- If the dictionary argument is trivial,
   -- don’t bother creating a new dict binding; just substitute
-  | Just dict_id <- getIdFromTrivialExpr_maybe dict_expr
-  = let env' = env { se_subst = Core.extendSubst subst orig_dict_id dict_expr
-                          -- See Note [Keep the old dictionaries interesting]
-                   , se_interesting = interesting `extendVarSet` dict_id }
+  | exprIsTrivial dict_expr
+  = let env' = env { se_subst = Core.extendSubst subst orig_dict_id dict_expr }
     in -- pprTrace "bindAuxiliaryDict:trivial" (ppr orig_dict_id <+> ppr dict_id) $
        (env', Nothing, dict_expr)
 
   | otherwise  -- Non-trivial dictionary arg; make an auxiliary binding
-  = let dict_unf       = mkSimpleUnfolding defaultUnfoldingOpts dict_expr
-        fresh_dict_id' = fresh_dict_id `setIdUnfolding` dict_unf
-          -- See Note [Specialisation modulo dictionary selectors] for the unfolding
+  = let fresh_dict_id' = fresh_dict_id `addDictUnfolding` dict_expr
+
         dict_bind = mkDB (NonRec fresh_dict_id' dict_expr)
         env' = env { se_subst = Core.extendSubst subst orig_dict_id (Var fresh_dict_id')
-                                `Core.extendSubstInScope` fresh_dict_id'
+                                `Core.extendSubstInScope` fresh_dict_id' }
                                 -- Ensure the new unfolding is in the in-scope set
-                      -- See Note [Make the new dictionaries interesting]
-                   , se_interesting = interesting `extendVarSet` fresh_dict_id' }
-    in -- pprTrace "bindAuxiliaryDict:non-trivial" (ppr orig_dict_id <+> ppr fresh_dict_id' $$ ppr dict_expr $$ ppr (exprFreeVarsList dict_expr)) $
+    in -- pprTrace "bindAuxiliaryDict:non-trivial" (ppr orig_dict_id <+> ppr fresh_dict_id') $
        (env', Just dict_bind, Var fresh_dict_id')
+
+addDictUnfolding :: Id -> CoreExpr -> Id
+-- Add unfolding for freshly-bound Ids: see Note [Make the new dictionaries interesting]
+-- and Note [Specialisation modulo dictionary selectors]
+addDictUnfolding id rhs
+  = id `setIdUnfolding` mkSimpleUnfolding defaultUnfoldingOpts rhs
 
 {-
 Note [Make the new dictionaries interesting]
@@ -2476,46 +2509,8 @@ consequential calls. E.g.
 If we specialise f for a call (f (dfun dNumInt)), we'll get
 a consequent call (g d') with an auxiliary definition
     d' = df dNumInt
-We want that consequent call to look interesting
-
-Note [Keep the old dictionaries interesting]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In bindAuxiliaryDict, we don’t bother creating a new dict binding if
-the dict expression is trivial. For example, if we have
-
-    f = \ @m1 (d1 :: Monad m1) -> ...
-
-and we specialize it at the pattern
-
-    [SpecType IO, SpecArg $dMonadIO]
-
-it would be silly to create a new binding for $dMonadIO; it’s already
-a binding! So we just extend the substitution directly:
-
-    m1 :-> IO
-    d1 :-> $dMonadIO
-
-But this creates a new subtlety: the dict expression might be a dict
-binding we floated out while specializing another function. For
-example, we might have
-
-    d2 = $p1Monad $dMonadIO -- floated out by bindAuxiliaryDict
-    $sg = h @IO d2
-    h = \ @m2 (d2 :: Applicative m2) -> ...
-
-and end up specializing h at the following pattern:
-
-    [SpecType IO, SpecArg d2]
-
-When we created the d2 binding in the first place, we locally marked
-it as interesting while specializing g as described above by
-Note [Make the new dictionaries interesting]. But when we go to
-specialize h, it isn’t in the SpecEnv anymore, so we’ve lost the
-knowledge that we should specialize on it.
-
-To fix this, we have to explicitly add d2 *back* to the interesting
-set. That way, it will still be considered interesting while
-specializing the body of h. See !2913.
+We want that consequent call to look interesting; so we add an unfolding
+in the dictionary Id.
 -}
 
 
@@ -2544,7 +2539,9 @@ data FloatedDictBinds  -- See Note [Floated dictionary bindings]
                -- for later addition to an InScopeSet
 
 -- | A 'DictBind' is a binding along with a cached set containing its free
--- variables (both type variables and dictionaries)
+-- variables (both type variables and dictionaries). We need this set
+-- in splitDictBinds, when filtering bindings to decide which are
+-- captured by a binder
 data DictBind = DB { db_bind :: CoreBind, db_fvs :: VarSet }
 
 bindersOfDictBind :: DictBind -> [Id]
@@ -2727,9 +2724,7 @@ mkCallUDs' env f args
     -- we decide on a case by case basis if we want to specialise
     -- on this argument; if so, SpecDict, if not UnspecArg
     mk_spec_arg arg (Anon InvisArg pred)
-      | typeDeterminesValue (scaledThing pred)
-              -- See Note [Type determines value]
-      , interestingDict env arg
+      | interestingDict arg (scaledThing pred)
               -- See Note [Interesting dictionary arguments]
       = SpecDict arg
 
@@ -2793,45 +2788,87 @@ because the code for the specialised f is not improved at all, because
 d is lambda-bound.  We simply get junk specialisations.
 
 What is "interesting"?  Just that it has *some* structure.  But what about
-variables?
+variables?  We look in the variable's /unfolding/.  And that means
+that we must be careful to ensure that dictionaries have unfoldings,
 
- * A variable might be imported, in which case its unfolding
-   will tell us whether it has useful structure
-
- * Local variables are cloned on the way down (to avoid clashes when
-   we float dictionaries), and cloning drops the unfolding
-   (cloneIdBndr).  Moreover, we make up some new bindings, and it's a
-   nuisance to give them unfoldings.  So we keep track of the
-   "interesting" dictionaries as a VarSet in SpecEnv.
-   We have to take care to put any new interesting dictionary
-   bindings in the set.
+* cloneBndrSM discards non-Stable unfoldings
+* specBind updates the unfolding after specialisation
+  See Note [Update unfolding after specialisation]
+* bindAuxiliaryDict adds an unfolding for an aux dict
+  see Note [Specialisation modulo dictionary selectors]
+* specCase adds unfoldings for the new bindings it creates
 
 We accidentally lost accurate tracking of local variables for a long
-time, because cloned variables don't have unfoldings. But makes a
+time, because cloned variables didn't have unfoldings. But makes a
 massive difference in a few cases, eg #5113. For nofib as a
 whole it's only a small win: 2.2% improvement in allocation for ansi,
 1.2% for bspt, but mostly 0.0!  Average 0.1% increase in binary size.
+
+Note [Update unfolding after specialisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#21848)
+
+  wombat :: Show b => Int -> b -> String
+  wombat a b | a>0       = wombat (a-1) b
+             | otherwise = show a ++ wombat a b
+
+  class C a where
+    meth :: Show b => a -> b -> String
+    dummy :: a -> () -- Force a datatype dictionary representation
+
+  instance C Int where
+    meth = wombat
+    dummy _ = ()
+
+  class C a => D a   -- D has C as a superclass
+  instance D Int
+
+  f :: (D a, Show b) => a -> b -> String
+  {-# INLINABLE[0] f #-}
+  f a b = meth a b ++ "!" ++ meth a b
+
+Now `f` turns into:
+
+  f @a @b (dd :: D a) (ds :: Show b) a b
+     = let dc :: D a = %p1 dd  -- Superclass selection
+       in meth @a dc ....
+          meth @a dc ....
+
+When we specialise `f`, at a=Int say, that superclass selection can
+nfire (via rewiteClassOps), but that info (that 'dc' is now a
+particular dictionary `C`, of type `C Int`) must be available to
+the call `meth @a dc`, so that we can fire the `meth` class-op, and
+thence specialise `wombat`.
+
+We deliver on this idea by updating the unfolding for the binder
+in the NonRec case of specBind.  (This is too exotic to trouble with
+the Rec case.)
 -}
 
 typeDeterminesValue :: Type -> Bool
 -- See Note [Type determines value]
 typeDeterminesValue ty = isDictTy ty && not (isIPLikePred ty)
 
-interestingDict :: SpecEnv -> CoreExpr -> Bool
+interestingDict :: CoreExpr -> Type -> Bool
 -- A dictionary argument is interesting if it has *some* structure,
 -- see Note [Interesting dictionary arguments]
 -- NB: "dictionary" arguments include constraints of all sorts,
 --     including equality constraints; hence the Coercion case
-interestingDict env (Var v) =  hasSomeUnfolding (idUnfolding v)
-                            || isDataConWorkId v
-                            || v `elemVarSet` se_interesting env
-interestingDict _ (Type _)                = False
-interestingDict _ (Coercion _)            = False
-interestingDict env (App fn (Type _))     = interestingDict env fn
-interestingDict env (App fn (Coercion _)) = interestingDict env fn
-interestingDict env (Tick _ a)            = interestingDict env a
-interestingDict env (Cast e _)            = interestingDict env e
-interestingDict _ _                       = True
+-- To make this work, we need to ensure that dictionaries have
+-- unfoldings in them.
+interestingDict arg arg_ty
+  | not (typeDeterminesValue arg_ty) = False   -- See Note [Type determines value]
+  | otherwise                        = go arg
+  where
+    go (Var v)               =  hasSomeUnfolding (idUnfolding v)
+                             || isDataConWorkId v
+    go (Type _)              = False
+    go (Coercion _)          = False
+    go (App fn (Type _))     = go fn
+    go (App fn (Coercion _)) = go fn
+    go (Tick _ a)            = go a
+    go (Cast e _)            = go e
+    go _                     = True
 
 thenUDs :: UsageDetails -> UsageDetails -> UsageDetails
 thenUDs (MkUD {ud_binds = db1, ud_calls = calls1})
@@ -2951,7 +2988,7 @@ dumpBindUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, OrdList DictBind, Bo
 -- float the binding itself;
 -- See Note [Floated dictionary bindings]
 dumpBindUDs bndrs (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
-  = -- pprTrace "dumpBindUDs" (ppr bndrs $$ ppr free_uds $$ ppr dump_dbs) $
+  = -- pprTrace "dumpBindUDs" (ppr bndrs $$ ppr free_uds $$ ppr dump_dbs $$ ppr float_all) $
     (free_uds, dump_dbs, float_all)
   where
     free_uds = MkUD { ud_binds = free_dbs, ud_calls = free_calls }
@@ -3065,6 +3102,14 @@ extendTvSubstList :: SpecEnv -> [(TyVar,Type)] -> SpecEnv
 extendTvSubstList env tv_binds
   = env { se_subst = Core.extendTvSubstList (se_subst env) tv_binds }
 
+extendInScope :: SpecEnv -> OutId -> SpecEnv
+extendInScope env@(SE { se_subst = subst }) bndr
+  = env { se_subst = subst `Core.extendSubstInScope` bndr }
+
+zapSubst :: SpecEnv -> SpecEnv
+zapSubst env@(SE { se_subst = subst })
+  = env { se_subst = Core.zapSubstEnv subst }
+
 substTy :: SpecEnv -> Type -> Type
 substTy env ty = Core.substTy (se_subst env) ty
 
@@ -3079,27 +3124,21 @@ substBndrs :: SpecEnv -> [CoreBndr] -> (SpecEnv, [CoreBndr])
 substBndrs env bs = case Core.substBndrs (se_subst env) bs of
                       (subst', bs') -> (env { se_subst = subst' }, bs')
 
-cloneBindSM :: SpecEnv -> CoreBind -> SpecM (SpecEnv, SpecEnv, CoreBind)
+cloneBndrSM :: SpecEnv -> Id -> SpecM (SpecEnv, Id)
 -- Clone the binders of the bind; return new bind with the cloned binders
 -- Return the substitution to use for RHSs, and the one to use for the body
-cloneBindSM env@(SE { se_subst = subst, se_interesting = interesting }) (NonRec bndr rhs)
+-- Discards non-Stable unfoldings
+cloneBndrSM env@(SE { se_subst = subst }) bndr
   = do { us <- getUniqueSupplyM
        ; let (subst', bndr') = Core.cloneIdBndr subst us bndr
-             interesting' | typeDeterminesValue (idType bndr)
-                          , interestingDict env rhs
-                          = interesting `extendVarSet` bndr'
-                          | otherwise = interesting
---       ; pprTrace "cloneBindSM" (ppr bndr <+> text ":->" <+> ppr bndr') return ()
-       ; return (env, env { se_subst = subst', se_interesting = interesting' }
-                , NonRec bndr' rhs) }
+       ; return (env { se_subst = subst' }, bndr') }
 
-cloneBindSM env@(SE { se_subst = subst, se_interesting = interesting }) (Rec pairs)
+cloneRecBndrsSM :: SpecEnv -> [Id] -> SpecM (SpecEnv, [Id])
+cloneRecBndrsSM env@(SE { se_subst = subst }) bndrs
   = do { us <- getUniqueSupplyM
-       ; let (subst', bndrs') = Core.cloneRecIdBndrs subst us (map fst pairs)
-             env' = env { se_subst = subst'
-                        , se_interesting = interesting `extendVarSetList`
-                                           [ v | (v,r) <- pairs, typeDeterminesValue (idType v), interestingDict env r ] }
-       ; return (env', env', Rec (bndrs' `zip` map snd pairs)) }
+       ; let (subst', bndrs') = Core.cloneRecIdBndrs subst us bndrs
+             env' = env { se_subst = subst' }
+       ; return (env', bndrs') }
 
 newDictBndr :: SpecEnv -> CoreBndr -> SpecM (SpecEnv, CoreBndr)
 -- Make up completely fresh binders for the dictionaries

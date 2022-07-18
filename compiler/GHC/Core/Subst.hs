@@ -494,12 +494,14 @@ It also unconditionally zaps the OccInfo.
 
 -- | Very similar to 'substBndr', but it always allocates a new 'Unique' for
 -- each variable in its output.  It substitutes the IdInfo though.
+-- Discards non-Stable unfoldings
 cloneIdBndr :: Subst -> UniqSupply -> Id -> (Subst, Id)
 cloneIdBndr subst us old_id
   = clone_id subst subst (old_id, uniqFromSupply us)
 
 -- | Applies 'cloneIdBndr' to a number of 'Id's, accumulating a final
 -- substitution from left to right
+-- Discards non-Stable unfoldings
 cloneIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
 cloneIdBndrs subst us ids
   = mapAccumL (clone_id subst) subst (ids `zip` uniqsFromSupply us)
@@ -525,6 +527,7 @@ cloneRecIdBndrs subst us ids
 
 -- Just like substIdBndr, except that it always makes a new unique
 -- It is given the unique to use
+-- Discards non-Stable unfoldings
 clone_id    :: Subst                    -- Substitution for the IdInfo
             -> Subst -> (Id, Unique)    -- Substitution and Id to transform
             -> (Subst, Id)              -- Transformed pair
@@ -602,6 +605,7 @@ substIdType subst@(Subst _ _ tv_env cv_env) id
 
 ------------------
 -- | Substitute into some 'IdInfo' with regard to the supplied new 'Id'.
+-- Discards unfoldings, unless they are Stable
 substIdInfo :: Subst -> Id -> IdInfo -> Maybe IdInfo
 substIdInfo subst new_id info
   | nothing_to_do = Nothing
@@ -632,7 +636,7 @@ substUnfolding subst df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
     args'           = map (substExpr subst') args
 
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
-        -- Retain an InlineRule!
+  -- Retain stable unfoldings
   | not (isStableSource src)  -- Zap an unstable unfolding, to save substitution work
   = NoUnfolding
   | otherwise                 -- But keep a stable one!
