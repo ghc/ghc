@@ -13,7 +13,6 @@ module GHC.Core.Opt.Specialise ( specProgram, specUnfolding ) where
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Driver.Ppr
 import GHC.Driver.Config
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
@@ -34,15 +33,13 @@ import GHC.Core.Utils     ( exprIsTrivial
                           , stripTicksTop )
 import GHC.Core.FVs
 import GHC.Core.TyCo.Rep (TyCoBinder (..))
-import GHC.Core.Opt.Arity     ( collectBindersPushingCo
-                              , etaExpandToJoinPointRule )
+import GHC.Core.Opt.Arity( collectBindersPushingCo )
 
 import GHC.Builtin.Types  ( unboxedUnitTy )
 
-import GHC.Data.Maybe     ( mapMaybe, maybeToList, isJust )
+import GHC.Data.Maybe     ( maybeToList, isJust )
 import GHC.Data.Bag
 import GHC.Data.OrdList
-import GHC.Data.FastString
 import GHC.Data.List.SetOps
 
 import GHC.Types.Basic
@@ -1577,7 +1574,7 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
                  add_void_arg = isUnliftedType spec_fn_ty1 && not (isJoinId fn)
                  (spec_bndrs, spec_rhs, spec_fn_ty)
                    | add_void_arg = ( voidPrimId : spec_bndrs1
-                                    , Lam        voidArgId  spec_rhs1
+                                    , Lam voidArgId spec_rhs1
                                     , mkVisFunTyMany unboxedUnitTy spec_fn_ty1)
                    | otherwise   = (spec_bndrs1, spec_rhs1, spec_fn_ty1)
 
@@ -1598,28 +1595,9 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
                        | otherwise = -- Specialising local fn
                                      text "SPEC"
 
-                rule_name = mkFastString $ showSDoc dflags $
-                            herald <+> ftext (occNameFS (getOccName fn))
-                                   <+> hsep (mapMaybe ppr_call_key_ty call_args)
-                            -- This name ends up in interface files, so use occNameString.
-                            -- Otherwise uniques end up there, making builds
-                            -- less deterministic (See #4012 comment:61 ff)
-
-                rule_wout_eta = mkRule
-                                  this_mod
-                                  True {- Auto generated -}
-                                  is_local
-                                  rule_name
-                                  inl_act       -- Note [Auto-specialisation and RULES]
-                                  (idName fn)
-                                  rule_bndrs
-                                  rule_lhs_args
-                                  (mkVarApps (Var spec_fn) spec_bndrs)
-
-                spec_rule
-                  = case isJoinId_maybe fn of
-                      Just join_arity -> etaExpandToJoinPointRule join_arity rule_wout_eta
-                      Nothing -> rule_wout_eta
+                spec_rule = mkSpecRule dflags this_mod True inl_act
+                                    herald fn rule_bndrs rule_lhs_args
+                                    (mkVarApps (Var spec_fn) spec_bndrs)
 
                 -- Add the { d1' = dx1; d2' = dx2 } usage stuff
                 -- See Note [Specialising Calls]
@@ -1674,7 +1652,6 @@ specLookupRule env fn args rules
     dflags   = se_dflags env
     in_scope = Core.substInScope (se_subst env)
     ropts    = initRuleOpts dflags
-
 
 {- Note [Specialising DFuns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2630,12 +2607,6 @@ pprCallInfo :: Id -> CallInfo -> SDoc
 pprCallInfo fn (CI { ci_key = key })
   = ppr fn <+> ppr key
 
-ppr_call_key_ty :: SpecArg -> Maybe SDoc
-ppr_call_key_ty (SpecType ty) = Just $ char '@' <> pprParendType ty
-ppr_call_key_ty UnspecType    = Just $ char '_'
-ppr_call_key_ty (SpecDict _)  = Nothing
-ppr_call_key_ty UnspecArg     = Nothing
-
 instance Outputable CallInfo where
   ppr (CI { ci_key = key, ci_fvs = _fvs })
     = text "CI" <> braces (sep (map ppr key))
@@ -2767,20 +2738,8 @@ wantCallsFor _env _f = True
  -- all in one place.  So we simply collect usage info for imported
  -- overloaded functions.
 
-{- Note [Type determines value]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Only specialise on non-impicit-parameter predicates, because these
-are the ones whose *type* determines their *value*.  In particular,
-with implicit params, the type args *don't* say what the value of the
-implicit param is!  See #7101.
-
-So we treat implicit params just like ordinary arguments for the
-purposes of specialisation.  Note that we still want to specialise
-functions with implicit params if they have *other* dicts which are
-class params; see #17930.
-
-Note [Interesting dictionary arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Interesting dictionary arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this
          \a.\d:Eq a.  let f = ... in ...(f d)...
 There really is not much point in specialising f wrt the dictionary d,
@@ -2844,10 +2803,6 @@ We deliver on this idea by updating the unfolding for the binder
 in the NonRec case of specBind.  (This is too exotic to trouble with
 the Rec case.)
 -}
-
-typeDeterminesValue :: Type -> Bool
--- See Note [Type determines value]
-typeDeterminesValue ty = isDictTy ty && not (isIPLikePred ty)
 
 interestingDict :: CoreExpr -> Type -> Bool
 -- A dictionary argument is interesting if it has *some* structure,

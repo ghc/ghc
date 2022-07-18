@@ -18,14 +18,14 @@ lower levels it is preserved with @let@/@letrec@s).
 
 module GHC.HsToCore.Binds
    ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec
-   , dsHsWrapper, dsEvTerm, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds, dsMkUserRule
+   , dsHsWrapper, dsEvTerm, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds
+   , dsWarnOrphanRule
    )
 where
 
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Driver.Ppr
 import GHC.Driver.Config
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.Module
@@ -73,7 +73,6 @@ import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Data.Graph.Directed
 import GHC.Data.Bag
-import GHC.Data.FastString
 
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
@@ -720,18 +719,12 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
 
-       ; rule <- dsMkUserRule this_mod is_local_id
-                        (mkFastString ("SPEC " ++ showPpr dflags poly_name))
-                        rule_act poly_name
-                        rule_bndrs rule_lhs_args
-                        (mkVarApps (Var spec_id) spec_bndrs)
+             rule = mkSpecRule dflags this_mod False rule_act (text "USPEC")
+                               poly_id rule_bndrs rule_lhs_args
+                               (mkVarApps (Var spec_id) spec_bndrs)
+             spec_rhs = mkLams spec_bndrs (core_app poly_rhs)
 
-       ; let spec_rhs = mkLams spec_bndrs (core_app poly_rhs)
-
--- Commented out: see Note [SPECIALISE on INLINE functions]
---       ; when (isInlinePragma id_inl)
---              (diagnosticDs $ text "SPECIALISE pragma on INLINE function probably won't fire:"
---                        <+> quotes (ppr poly_name))
+       ; dsWarnOrphanRule rule
 
        ; return (Just (unitOL (spec_id, spec_rhs), rule))
             -- NB: do *not* use makeCorePair on (spec_id,spec_rhs), because
@@ -774,13 +767,10 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              | otherwise   = spec_prag_act                   -- Specified by user
 
 
-dsMkUserRule :: Module -> Bool -> RuleName -> Activation
-       -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> DsM CoreRule
-dsMkUserRule this_mod is_local name act fn bndrs args rhs = do
-    let rule = mkRule this_mod False is_local name act fn bndrs args rhs
-    when (isOrphan (ru_orphan rule)) $
-        diagnosticDs (DsOrphanRule rule)
-    return rule
+dsWarnOrphanRule :: CoreRule -> DsM ()
+dsWarnOrphanRule rule
+  = when (isOrphan (ru_orphan rule)) $
+    diagnosticDs (DsOrphanRule rule)
 
 {- Note [SPECIALISE on INLINE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

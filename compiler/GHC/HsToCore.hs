@@ -475,26 +475,27 @@ dsRule (L loc (HsRule { rd_name = name
               simpl_opts = initSimpleOpts dflags
               final_rhs = simpleOptExpr simpl_opts rhs''    -- De-crap it
               rule_name = unLoc name
-              final_bndrs_set = mkVarSet final_bndrs
-              arg_ids = filterOut (`elemVarSet` final_bndrs_set) $
-                        exprsSomeFreeVarsList isId args
-
-        ; rule <- dsMkUserRule this_mod is_local
-                         rule_name rule_act fn_name final_bndrs args
-                         final_rhs
-        ; warnRuleShadowing rule_name rule_act fn_id arg_ids
+              rule = mkRule this_mod False is_local rule_name rule_act
+                            fn_name final_bndrs args final_rhs
+        ; dsWarnOrphanRule rule
+        ; dsWarnRuleShadowing fn_id rule
 
         ; return (Just rule)
         } } }
 
-warnRuleShadowing :: RuleName -> Activation -> Id -> [Id] -> DsM ()
+dsWarnRuleShadowing :: Id -> CoreRule -> DsM ()
 -- See Note [Rules and inlining/other rules]
-warnRuleShadowing rule_name rule_act fn_id arg_ids
+dsWarnRuleShadowing fn_id
+    (Rule { ru_name = rule_name, ru_act = rule_act, ru_bndrs = bndrs, ru_args = args})
   = do { check False fn_id    -- We often have multiple rules for the same Id in a
                               -- module. Maybe we should check that they don't overlap
                               -- but currently we don't
        ; mapM_ (check True) arg_ids }
   where
+    bndrs_set = mkVarSet bndrs
+    arg_ids = filterOut (`elemVarSet` bndrs_set) $
+              exprsSomeFreeVarsList isId args
+
     check check_rules_too lhs_id
       | isLocalId lhs_id || canUnfold (idUnfolding lhs_id)
                        -- If imported with no unfolding, no worries
@@ -509,6 +510,8 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
     get_bad_rules lhs_id
       = [ rule | rule <- idCoreRules lhs_id
                , ruleActivation rule `competesWith` rule_act ]
+
+dsWarnRuleShadowing _ _ = return () -- Not expecting built-in rules here
 
 -- See Note [Desugaring coerce as cast]
 unfold_coerce :: [Id] -> CoreExpr -> CoreExpr -> DsM ([Var], CoreExpr, CoreExpr)

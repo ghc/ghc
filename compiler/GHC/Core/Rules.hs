@@ -8,7 +8,10 @@
 -- | Functions for collecting together and applying rewrite rules to a module.
 -- The 'CoreRule' datatype itself is declared elsewhere.
 module GHC.Core.Rules (
-        -- ** Constructing
+        -- ** Looking up rules
+        lookupRule,
+
+        -- ** RuleBase, RuleEnv
         emptyRuleBase, mkRuleBase, extendRuleBaseList,
         pprRuleBase, extendRuleEnv,
 
@@ -22,13 +25,18 @@ module GHC.Core.Rules (
         -- * Misc. CoreRule helpers
         rulesOfBinds, getRules, pprRulesForUser,
 
-        lookupRule, mkRule, roughTopNames
+        -- * Making rules
+        mkRule, mkSpecRule, roughTopNames
+
     ) where
 
 import GHC.Prelude
 
 import GHC.Unit.Module   ( Module )
 import GHC.Unit.Module.Env
+
+import GHC.Driver.Session( DynFlags )
+import GHC.Driver.Ppr( showSDoc )
 
 import GHC.Core         -- All of it
 import GHC.Core.Subst
@@ -43,9 +51,11 @@ import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Core.Type as Type
    ( Type, TCvSubst, extendTvSubst, extendCvSubst
    , mkEmptyTCvSubst, substTy, getTyVar_maybe )
+import GHC.Core.TyCo.Ppr( pprParendType )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )
 import GHC.Core.Map.Expr ( eqCoreExpr )
+import GHC.Core.Opt.Arity( etaExpandToJoinPointRule )
 
 import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
 import GHC.Builtin.Types    ( anyTypeOfKind )
@@ -58,6 +68,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Name    ( Name, NamedThing(..), nameIsLocalOrFrom )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
+import GHC.Types.Name.Occurrence( occNameFS )
 import GHC.Types.Unique.FM
 import GHC.Types.Tickish
 import GHC.Types.Basic
@@ -152,33 +163,18 @@ Note [Overall plumbing for rules]
 *                                                                      *
 ************************************************************************
 
-A @CoreRule@ holds details of one rule for an @Id@, which
+A CoreRule holds details of one rule for an Id, which
 includes its specialisations.
 
-For example, if a rule for @f@ contains the mapping:
-\begin{verbatim}
-        forall a b d. [Type (List a), Type b, Var d]  ===>  f' a b
-\end{verbatim}
+For example, if a rule for f is
+   RULE "f" forall @a @b d. f @(List a) @b d = f' a b
+
 then when we find an application of f to matching types, we simply replace
 it by the matching RHS:
-\begin{verbatim}
         f (List Int) Bool dict ===>  f' Int Bool
-\end{verbatim}
 All the stuff about how many dictionaries to discard, and what types
 to apply the specialised function to, are handled by the fact that the
 Rule contains a template for the result of the specialisation.
-
-There is one more exciting case, which is dealt with in exactly the same
-way.  If the specialised value is unboxed then it is lifted at its
-definition site and unlifted at its uses.  For example:
-
-        pi :: forall a. Num a => a
-
-might have a specialisation
-
-        [Int#] ===>  (case pi' of Lift pi# -> pi#)
-
-where pi' :: Lift Int# is the specialised version of pi.
 -}
 
 mkRule :: Module -> Bool -> Bool -> RuleName -> Activation
@@ -205,6 +201,40 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
         -- as opposed to uniq value.
     local_lhs_names = filterNameSet (nameIsLocalOrFrom this_mod) lhs_names
     orph = chooseOrphanAnchor local_lhs_names
+
+--------------
+mkSpecRule :: DynFlags -> Module -> Bool -> Activation -> SDoc
+           -> Id -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
+-- Make a specialisation rule, for Specialise or SpecConstr
+mkSpecRule dflags this_mod is_auto inl_act herald fn bndrs args rhs
+  = case isJoinId_maybe fn of
+      Just join_arity -> etaExpandToJoinPointRule join_arity rule
+      Nothing         -> rule
+  where
+    rule = mkRule this_mod is_auto is_local
+                  rule_name
+                  inl_act       -- Note [Auto-specialisation and RULES]
+                  (idName fn)
+                  bndrs args rhs
+
+    is_local = isLocalId fn
+    rule_name = mkSpecRuleName dflags herald fn args
+
+mkSpecRuleName :: DynFlags -> SDoc -> Id -> [CoreExpr] -> FastString
+mkSpecRuleName dflags herald fn args
+  = mkFastString $ showSDoc dflags $
+    herald <+> ftext (occNameFS (getOccName fn))
+                     -- This name ends up in interface files, so use occNameFS.
+                     -- Otherwise uniques end up there, making builds
+                     -- less deterministic (See #4012 comment:61 ff)
+           <+> hsep (mapMaybe ppr_call_key_ty args)
+  where
+    ppr_call_key_ty :: CoreExpr -> Maybe SDoc
+    ppr_call_key_ty (Type ty) = case getTyVar_maybe ty of
+                                  Just {} -> Just (text "@_")
+                                  Nothing -> Just $ char '@' <> pprParendType ty
+    ppr_call_key_ty _ = Nothing
+
 
 --------------
 roughTopNames :: [CoreExpr] -> [Maybe Name]
@@ -446,16 +476,9 @@ findBest in_scope target (rule1,ans1) ((rule2,ans2):prs)
     (fn,args) = target
 
 isMoreSpecific :: InScopeSet -> CoreRule -> CoreRule -> Bool
--- This tests if one rule is more specific than another
--- We take the view that a BuiltinRule is less specific than
--- anything else, because we want user-define rules to "win"
--- In particular, class ops have a built-in rule, but we
--- any user-specific rules to win
---   eg (#4397)
---      truncate :: (RealFrac a, Integral b) => a -> b
---      {-# RULES "truncate/Double->Int" truncate = double2Int #-}
---      double2Int :: Double -> Int
---   We want the specific RULE to beat the built-in class-op rule
+-- The call (rule1 `isMoreSpecific` rule2)
+-- sees if rule2 can be instantiated to look like rule1
+-- See Note [isMoreSpecific]
 isMoreSpecific _        (BuiltinRule {}) _                = False
 isMoreSpecific _        (Rule {})        (BuiltinRule {}) = True
 isMoreSpecific in_scope (Rule { ru_bndrs = bndrs1, ru_args = args1 })
@@ -470,7 +493,24 @@ isMoreSpecific in_scope (Rule { ru_bndrs = bndrs1, ru_args = args1 })
 noBlackList :: Activation -> Bool
 noBlackList _ = False           -- Nothing is black listed
 
-{- Note [Extra args in the target]
+{- Note [isMoreSpecific]
+~~~~~~~~~~~~~~~~~~~~~~~~
+The call (rule1 `isMoreSpecific` rule2)
+sees if rule2 can be instantiated to look like rule1.
+
+Wrinkle:
+
+* We take the view that a BuiltinRule is less specific than
+  anything else, because we want user-defined rules to "win"
+  In particular, class ops have a built-in rule, but we
+  prefer any user-specific rules to win:
+    eg (#4397)
+       truncate :: (RealFrac a, Integral b) => a -> b
+       {-# RULES "truncate/Double->Int" truncate = double2Int #-}
+       double2Int :: Double -> Int
+  We want the specific RULE to beat the built-in class-op rule
+
+Note [Extra args in the target]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we find a matching rule, we return (Just (rule, rhs)),
 /but/ the rule firing has only consumed as many of the input args
@@ -610,6 +650,27 @@ matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es rhs
               , text "LHS args:" <+> ppr tmpl_es
               , text "Actual args:" <+> ppr target_es ]
 
+----------------------
+match_exprs :: RuleMatchEnv -> RuleSubst
+            -> [CoreExpr]       -- Templates
+            -> [CoreExpr]       -- Targets
+            -> Maybe RuleSubst
+-- If the targets are longer than templates, succeed, simply ignoring
+-- the leftover targets. This matters in the call in matchN.
+--
+-- Precondition: corresponding elements of es1 and es2 have the same
+--               type, assuming earlier elements match.
+-- Example:  f :: forall v. v -> blah
+--   match_exprs [Type a, y::a] [Type Int, 3]
+-- Then, after matching Type a against Type Int,
+-- the type of (y::a) matches that of (3::Int)
+match_exprs _ subst [] _
+  = Just subst
+match_exprs renv subst (e1:es1) (e2:es2)
+  = do { subst' <- match renv subst e1 e2 MRefl
+       ; match_exprs renv subst' es1 es2 }
+match_exprs _ _ _ _ = Nothing
+
 
 {- Note [Unbound RULE binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -742,27 +803,6 @@ type BindWrapper = CoreExpr -> CoreExpr
 emptyRuleSubst :: RuleSubst
 emptyRuleSubst = RS { rs_tv_subst = emptyVarEnv, rs_id_subst = emptyVarEnv
                     , rs_binds = \e -> e, rs_bndrs = [] }
-
-----------------------
-match_exprs :: RuleMatchEnv -> RuleSubst
-            -> [CoreExpr]       -- Templates
-            -> [CoreExpr]       -- Targets
-            -> Maybe RuleSubst
--- If the targets are longer than templates, succeed, simply ignoring
--- the leftover targets. This matters in the call in matchN.
---
--- Precondition: corresponding elements of es1 and es2 have the same
---               type, assumuing earlier elements match
--- Example:  f :: forall v. v -> blah
---   match_exprs [Type a, y::a] [Type Int, 3]
--- Then, after matching Type a against Type Int,
--- the type of (y::a) matches that of (3::Int)
-match_exprs _ subst [] _
-  = Just subst
-match_exprs renv subst (e1:es1) (e2:es2)
-  = do { subst' <- match renv subst e1 e2 MRefl
-       ; match_exprs renv subst' es1 es2 }
-match_exprs _ _ _ _ = Nothing
 
 
 {- Note [Casts in the target]
