@@ -1,6 +1,6 @@
 
 InstanceGivenOverlap2.hs:40:1: error:
-    • Could not deduce (P a)
+    • Could not deduce (P a) arising from GHC Bug #20076
       from the context: Q (F (Tagged t a))
         bound by the inferred type for ‘g’:
                    forall (t :: Bool) a. Q (F (Tagged t a)) => Proxy t -> [a] -> Int

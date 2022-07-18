@@ -1,6 +1,8 @@
 
 tc168.hs:17:1: error:
     • Could not deduce (C a (a1, b0))
+        arising from a type ambiguity check for
+        the inferred type for ‘g’
       from the context: C a (a1, b)
         bound by the inferred type for ‘g’:
                    forall {a} {a1} {b}. C a (a1, b) => a -> a1

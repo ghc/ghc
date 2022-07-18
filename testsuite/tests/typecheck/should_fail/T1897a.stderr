@@ -1,6 +1,8 @@
 
 T1897a.hs:9:1: error:
     • Could not deduce (Wob a0 b)
+        arising from a type ambiguity check for
+        the inferred type for ‘foo’
       from the context: Wob a b
         bound by the inferred type for ‘foo’:
                    forall {a} {b}. Wob a b => b -> [b]

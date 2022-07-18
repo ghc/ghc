@@ -1,6 +1,8 @@
 
 tcfail116.hs:7:5: error:
     • Could not deduce (Foo a0)
+        arising from a type ambiguity check for
+        the type signature for ‘bug’
       from the context: Foo a
         bound by the type signature for:
                    bug :: forall a. Foo a => ()
