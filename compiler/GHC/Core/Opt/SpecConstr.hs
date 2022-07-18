@@ -28,13 +28,14 @@ import GHC.Core
 import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.Unfold
-import GHC.Core.FVs     ( exprsFreeVarsList )
+import GHC.Core.FVs     ( exprsFreeVarsList, exprFreeVars )
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Core.DataCon
 import GHC.Core.Class( classTyVars )
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.Rules
+import GHC.Core.Predicate ( typeDeterminesValue )
 import GHC.Core.Type     hiding ( substTy )
 import GHC.Core.TyCon   (TyCon, tyConUnique, tyConName )
 import GHC.Core.Multiplicity
@@ -1811,6 +1812,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
 --        return ()
 
                 -- And build the results
+        ; (qvars', pats') <- generaliseDictPats qvars pats
         ; let spec_body_ty   = exprType spec_body
               (spec_lam_args1, spec_sig, spec_arity1, spec_join_arity1)
                   = calcSpecInfo fn call_pat extra_bndrs
@@ -1848,7 +1850,8 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
               inline_act = idInlineActivation fn
               this_mod   = sc_module $ sc_opts env
               rule       = mkRule this_mod True {- Auto -} True {- Local -}
-                                  rule_name inline_act fn_name qvars pats rule_rhs
+                                  rule_name inline_act
+                                  fn_name qvars' pats' rule_rhs
                            -- See Note [Transfer activation]
 
         -- ; pprTraceM "spec_one {" (vcat [ text "function:" <+> ppr fn <+> braces (ppr (idUnique fn))
@@ -1869,6 +1872,27 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
         ; return (spec_usg, OS { os_pat = call_pat, os_rule = rule
                                , os_id = spec_id
                                , os_rhs = spec_rhs }) }
+
+generaliseDictPats :: [Var] -> [CoreExpr]  -- Quantified vars and pats
+                   -> UniqSM ([Var], [CoreExpr]) -- New quantified vars and pats
+-- See Note [generaliseDictPats]
+generaliseDictPats qvars pats
+  = do { (extra_qvars, pats') <- mapAccumLM go [] pats
+       ; case extra_qvars of
+             [] -> return (qvars,                pats)
+             _  -> return (qvars ++ extra_qvars, pats') }
+  where
+    qvar_set = mkVarSet qvars
+    go :: [Id] -> CoreExpr -> UniqSM ([Id], CoreExpr)
+    go extra_qvs pat
+       | not (isTyCoArg pat)
+       , let pat_ty = exprType pat
+       , typeDeterminesValue pat_ty
+       , exprFreeVars pat `disjointVarSet` qvar_set
+       = do { id <- mkSysLocalOrCoVarM (fsLit "dict") Many pat_ty
+            ; return (id:extra_qvs, Var id) }
+       | otherwise
+       = return (extra_qvs, pat)
 
 -- See Note [SpecConstr and strict fields]
 mkSeqs :: [Var] -> Type -> CoreExpr -> CoreExpr
@@ -1910,6 +1934,33 @@ Now we get:
     $sf void @t = $se
     RULE: f True = $sf void#
 And now we can substitute `f True` with `$sf void#` with everything working out nicely!
+
+Note [generaliseDictPats]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider these two rules (#21831, item 2):
+  RULE "SPEC:foo"  forall d1 d2. foo @Int @Integer d1 d2 = $sfoo1
+  RULE "SC:foo"    forall a. foo @Int @a $fNumInteger = $sfoo2 @a
+The former comes from the type class specialiser, the latter from SpecConstr.
+Note that $fNumInteger is a top-level binding for Num Integer.
+
+The trouble is that neither is more general than the other.  In a call
+   (foo @Int @Integer $fNumInteger d)
+it isn't clear which rule to fire.
+
+The trouble is that the SpecConstr rule fires on a /specific/ dict, $fNumInteger,
+but actually /could/ fire regardless.  That is, it could be
+  RULE "SC:foo"    forall a d. foo @Int @a d = $sfoo2 @a
+
+Now, it is clear that SPEC:foo is more specific.  But GHC can't tell
+that, because SpecConstr doesn't know that dictionary arguments are
+singleton types!  So generaliseDictPats teaches it this fact.  It
+spots such patterns (using typeDeterminesValue), and quantifies over
+the dictionary.  Now we get
+
+  RULE "SC:foo"    forall a d. foo @Int @a d = $sfoo2 @a
+
+And /now/ "SPEC:foo" is clearly more specific: we can instantiate the new
+"SC:foo" to match the (prefix of) "SPEC:foo".
 -}
 
 calcSpecInfo :: Id                     -- The original function
