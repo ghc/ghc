@@ -773,3 +773,9 @@ T21349:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 Main -working-dir T21349
 	[ ! -f T21349/B.o ] || (echo "object file exists" && exit 2)
 	[ ! -f T21349/B.hi ] || (echo "interface file exists" && exit 2)
+
+.PHONY: T21869
+T21869:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T21869.hs -S
+	[ -f T21869.s ] || (echo "assembly file does not exist" && exit 2)
+	[ ! -f T21869.o ] || (echo "object file exists" && exit 2)
