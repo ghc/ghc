@@ -129,6 +129,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wimplicit-lift`
         * :ghc-flag:`-Wmissing-kind-signatures`
         * :ghc-flag:`-Wunticked-promoted-constructors`
+        * :ghc-flag:`-pattern-signature-binds`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
@@ -2354,6 +2355,19 @@ of ``-W(no-)*``.
     be used even when :extension:`TypeOperators` is disabled. The warning is
     triggered whenever this happens, and can be addressed by enabling the
     extension.
+
+.. ghc-flag:: -Wpattern-signature-binds
+    :shortdesc: warn when a pattern signature binds a type variable
+    :type: dynamic
+    :reverse: -Wno-pattern-signature-binds
+
+    :since: 9.6
+
+    :extension:`ScopedTypeVariables` allows patterns to be annotated with type signatures.
+    If a signature mentions a type variable that hasn't been explicitly quantified in a
+    ``forall``, GHC will implicitly bind it.
+    This warning reports such an implicitly bound variable.
+
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
