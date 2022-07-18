@@ -1504,6 +1504,7 @@ otherCons _               = []
 isValueUnfolding :: Unfolding -> Bool
         -- Returns False for OtherCon
 isValueUnfolding (CoreUnfolding { uf_is_value = is_evald }) = is_evald
+isValueUnfolding (DFunUnfolding {})                         = True
 isValueUnfolding _                                          = False
 
 -- | Determines if it possibly the case that the unfolding will
@@ -1512,6 +1513,7 @@ isValueUnfolding _                                          = False
 isEvaldUnfolding :: Unfolding -> Bool
         -- Returns True for OtherCon
 isEvaldUnfolding (OtherCon _)                               = True
+isEvaldUnfolding (DFunUnfolding {})                         = True
 isEvaldUnfolding (CoreUnfolding { uf_is_value = is_evald }) = is_evald
 isEvaldUnfolding _                                          = False
 
