@@ -1,6 +1,8 @@
 
 tcfail098.hs:13:10: error:
     • Could not deduce (Bar a0)
+        arising from a type ambiguity check for
+        an instance declaration
       from the context: Bar a
         bound by an instance declaration:
                    forall a. Bar a => Bar Bool

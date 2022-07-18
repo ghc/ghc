@@ -9,6 +9,8 @@ T7437.hs:14:13: error:
 
 T7437.hs:14:13: error:
     • Could not deduce (Put a0)
+        arising from a type ambiguity check for
+        the type signature for ‘put’
       from the context: (Put a, Generic t, GPut (Rep t))
         bound by the type signature for:
                    put :: forall a t. (Put a, Generic t, GPut (Rep t)) => t -> [()]

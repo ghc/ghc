@@ -1,11 +1,20 @@
 
 NamedWildcardsNotInMonotype.hs:5:1: error:
     • Could not deduce (Eq w0)
+        arising from a type ambiguity check for
+        the inferred type for ‘foo’
       from the context: (Show a, Eq w, Eq a)
         bound by the inferred type for ‘foo’:
                    forall {a} {w}. (Show a, Eq w, Eq a) => a -> a -> String
         at NamedWildcardsNotInMonotype.hs:5:1-33
       The type variable ‘w0’ is ambiguous
+      These potential instances exist:
+        instance Eq Ordering -- Defined in ‘GHC.Classes’
+        instance Eq a => Eq (Maybe a) -- Defined in ‘GHC.Maybe’
+        instance Eq Integer -- Defined in ‘GHC.Num.Integer’
+        ...plus 23 others
+        ...plus six instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
     • In the ambiguity check for the inferred type for ‘foo’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type

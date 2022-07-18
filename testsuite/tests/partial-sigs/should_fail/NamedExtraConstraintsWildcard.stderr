@@ -1,6 +1,8 @@
 
 NamedExtraConstraintsWildcard.hs:5:1: error:
     • Could not deduce: w0
+        arising from a type ambiguity check for
+        the inferred type for ‘foo’
       from the context: (Eq a, w)
         bound by the inferred type for ‘foo’:
                    forall a {w :: Constraint}. (Eq a, w) => a -> a

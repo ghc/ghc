@@ -1,6 +1,8 @@
 
 T5300.hs:12:7: error:
     • Could not deduce (C1 a b c0)
+        arising from a type ambiguity check for
+        the type signature for ‘f1’
       from the context: (Monad m, C1 a b c)
         bound by the type signature for:
                    f1 :: forall (m :: * -> *) a b c.
@@ -15,6 +17,8 @@ T5300.hs:12:7: error:
 
 T5300.hs:15:7: error:
     • Could not deduce (C1 a1 b1 c10)
+        arising from a type ambiguity check for
+        the type signature for ‘f2’
       from the context: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2)
         bound by the type signature for:
                    f2 :: forall (m :: * -> *) a1 b1 c1 a2 b2 c2.

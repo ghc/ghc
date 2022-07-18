@@ -1,6 +1,8 @@
 
 ClassOperator.hs:14:3: error:
     • Could not deduce (a ><> b0)
+        arising from a type ambiguity check for
+        the type signature for ‘**>’
       from the context: a ><> b
         bound by the type signature for:
                    (**>) :: forall a b. (a ><> b) => a -> a -> ()
@@ -14,6 +16,8 @@ ClassOperator.hs:14:3: error:
 
 ClassOperator.hs:14:3: error:
     • Could not deduce (a ><> b0)
+        arising from a type ambiguity check for
+        the type signature for ‘**<’
       from the context: a ><> b
         bound by the type signature for:
                    (**<) :: forall a b. (a ><> b) => a -> a -> ()
@@ -27,6 +31,8 @@ ClassOperator.hs:14:3: error:
 
 ClassOperator.hs:14:3: error:
     • Could not deduce (a ><> b0)
+        arising from a type ambiguity check for
+        the type signature for ‘>**’
       from the context: a ><> b
         bound by the type signature for:
                    (>**) :: forall a b. (a ><> b) => a -> a -> ()
@@ -40,6 +46,8 @@ ClassOperator.hs:14:3: error:
 
 ClassOperator.hs:14:3: error:
     • Could not deduce (a ><> b0)
+        arising from a type ambiguity check for
+        the type signature for ‘<**’
       from the context: a ><> b
         bound by the type signature for:
                    (<**) :: forall a b. (a ><> b) => a -> a -> ()
