@@ -457,7 +457,11 @@ function fetch_perf_notes() {
 }
 
 function push_perf_notes() {
-  if [ -n "${CROSS_TARGET:-}" ]; then
+  if [[ -z "${TEST_ENV:-}" ]]; then
+    return
+  fi
+
+  if [[ -n "${CROSS_TARGET:-}" ]]; then
     info "Can't test cross-compiled build."
     return
   fi
