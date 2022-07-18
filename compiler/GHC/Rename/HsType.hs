@@ -991,10 +991,10 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
 
        ; let -- See Note [bindHsQTyVars examples] for what
              -- all these various things are doing
-             bndrs, implicit_kvs_bndr, implicit_kvs_body :: [LocatedN RdrName]
+             bndrs, implicit_kvs_bndr, implicit_kvs :: [LocatedN RdrName]
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
              implicit_kvs_bndr = filterFreeVarsToBind bndrs bndr_kv_occs
-             implicit_kvs_body = filterFreeVarsToBind bndrs body_kv_occs
+             implicit_kvs = filterFreeVarsToBind bndrs (body_kv_occs ++ bndr_kv_occs)
              body_remaining = filterFreeVarsToBind bndr_kv_occs $
               filterFreeVarsToBind bndrs body_kv_occs
              all_bound_on_lhs = null body_remaining
@@ -1004,13 +1004,13 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
                 , text "bndr_kv_occs"      <+> ppr bndr_kv_occs
                 , text "body_kv_occs"      <+> ppr body_kv_occs
                 , text "implicit_kvs_bndr" <+> ppr implicit_kvs_bndr
-                , text "implicit_kvs_body" <+> ppr implicit_kvs_body
+                , text "implicit_kvs"      <+> ppr implicit_kvs
                 , text "body_remaining"    <+> ppr body_remaining
                 ]
 
        ; warnPatternSignatureBinds implicit_kvs_bndr True
 
-       ; rnImplicitTvOccsIfXopt LangExt.ImplicitForAll mb_assoc implicit_kvs_body $ \ implicit_kv_nms' ->
+       ; rnImplicitTvOccsIfXopt LangExt.ImplicitForAll mb_assoc implicit_kvs $ \ implicit_kv_nms' ->
          bindLHsTyVarBndrs doc NoWarnUnusedForalls mb_assoc hs_tv_bndrs $ \ rn_bndrs ->
            -- This is the only call site for bindLHsTyVarBndrs where we pass
            -- NoWarnUnusedForalls, which suppresses -Wunused-foralls warnings.
