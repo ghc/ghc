@@ -927,8 +927,9 @@ updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
 -- See Note [The environments of the Simplify pass]
 updModeForStableUnfoldings unf_act current_mode
   = current_mode { sm_phase      = phaseFromActivation unf_act
+                 , sm_eta_expand = False
                  , sm_inline     = True }
-       -- sm_eta_expand: see Historical-note [No eta expansion in stable unfoldings]
+       -- sm_eta_expand: see Note [Eta expansion in stable unfoldings and rules]
        -- sm_rules: just inherit; sm_rules might be "off"
        --           because of -fno-enable-rewrite-rules
   where
@@ -993,11 +994,14 @@ we don't want to swizzle this to
       (\x. blah) |> (Refl xty `FunCo` CoVar cv)
 So we switch off cast swizzling in updModeForRules.
 
-Historical-note [No eta expansion in stable unfoldings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This Note is no longer relevant because the specialiser has improved.
-See Note [Account for casts in binding] in GHC.Core.Opt.Specialise.
-So we do not override sm_eta_expand in updModeForStableUnfoldings.
+Note [Eta expansion in stable unfoldings and rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+SPJ Jul 22: whether or not eta-expansion is switched on in a stable
+unfolding, or the RHS of a RULE, seems to be a bit moot. But switching
+it on adds clutter, so I'm experimenting with switching off
+eta-expansion in such places.
+
+In the olden days, we really /wanted/ to switch it off.
 
     Old note: If we have a stable unfolding
       f :: Ord a => a -> IO ()
@@ -1007,11 +1011,13 @@ So we do not override sm_eta_expand in updModeForStableUnfoldings.
       f :: Ord a => a -> IO ()
       -- Unfolding template
       --    = (/\a \(d:Ord a) (x:a) (eta:State#). bla eta) |> co
-    because not specialisation of the overloading doesn't work properly
+    because now specialisation of the overloading doesn't work properly
     (see Note [Specialisation shape] in GHC.Core.Opt.Specialise), #9509.
     So we disable eta-expansion in stable unfoldings.
 
-    End of Historical Note
+But this old note is no longer relevant because the specialiser has
+improved: see Note [Account for casts in binding] in
+GHC.Core.Opt.Specialise.  So we seem to have a free choice.
 
 Note [Inlining in gentle mode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
