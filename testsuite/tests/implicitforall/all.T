@@ -1,5 +1,7 @@
 test('ifa-fun', normal, compile, [''])
 test('ifa-fun-fail', normal, compile_fail, [''])
 test('ifa-data', normal, compile, [''])
+test('no-ifa-fun', normal, compile, [''])
 test('no-ifa-fun-fail', normal, compile_fail, [''])
+test('no-ifa-data', normal, compile, [''])
 test('no-ifa-data-fail', normal, compile_fail, [''])

@@ -1,3 +1,9 @@
 no-ifa-data-fail.hs:7:16: Not in scope: type variable ‘b’
 
 no-ifa-data-fail.hs:9:32: Not in scope: type variable ‘c’
+
+no-ifa-data-fail.hs:11:20: Not in scope: type variable ‘b’
+
+no-ifa-data-fail.hs:15:25: Not in scope: type variable ‘a’
+
+no-ifa-data-fail.hs:15:37: Not in scope: type variable ‘a’
