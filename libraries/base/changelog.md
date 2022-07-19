@@ -1,6 +1,6 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.17.0.0 *TBA*
+## 4.17.0.0 *August 2022*
 
   * Add explicitly bidirectional `pattern TypeRep` to `Type.Reflection`.
 
