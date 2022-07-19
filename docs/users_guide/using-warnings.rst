@@ -129,7 +129,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wimplicit-lift`
         * :ghc-flag:`-Wmissing-kind-signatures`
         * :ghc-flag:`-Wunticked-promoted-constructors`
-        * :ghc-flag:`-pattern-signature-binds`
+        * :ghc-flag:`-Wpattern-signature-binds`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
