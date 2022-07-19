@@ -377,6 +377,7 @@ nextEra( void )
             n_censuses *= 2;
             censuses = stgReallocBytes(censuses, sizeof(Census) * n_censuses,
                                        "nextEra");
+            memset(&censuses[era], 0, sizeof(Census) * n_censuses / 2);
         }
     }
 #endif /* PROFILING */
