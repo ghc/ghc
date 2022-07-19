@@ -1,5 +1,13 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.16.3.0 *May 2022*
+
+  * Shipped with GHC 9.2.4
+
+  * winio: make consoleReadNonBlocking not wait for any events at all.
+
+  * winio: Add support to console handles to handleToHANDLE
+
 ## 4.16.2.0 *May 2022*
 
   * Shipped with GHC 9.2.2
