@@ -133,3 +133,38 @@ Notes:
   ``b`` would be implicitly quantified. In effect, it would be as if one had
   written ``MkT :: forall b. (forall a. a -> b -> T)``, which contains nested
   ``forall``\ s. See :ref:`formal-gadt-syntax`.
+
+.. _implicit-forall:
+
+Requiring explicit quantification
+---------------------------------
+
+.. extension:: NoImplicitForAll
+    :shortdesc: Disable implicit universal quantification.
+
+    :since: 9.6
+
+    Require use of the ``forall`` keyword in some places where universal
+    quantification is implicit.
+
+Activating this language extension makes explicit quantification mandatory
+for any top-level type or kind signature on functions, data types,
+:ref:`data-instance-declarations` or :ref:`closed-type-families` that uses
+type variables.
+
+Implicit quantification will not be performed anymore, so this function
+signature will not be accepted:
+
+    g :: b -> b
+
+Local variables will still be allowed to use implicitly quantified variables:
+
+  f :: forall a. [a] -> Maybe a
+  f = let g :: b -> [a] -> Maybe a
+          g _ _ = Nothing
+      in g False
+
+Kind variables bound by pattern signatures in data or type declarations will
+still be implicitly quantified:
+
+  data T (a :: k)

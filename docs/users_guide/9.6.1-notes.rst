@@ -60,10 +60,13 @@ Language
   add an injectivity annotation to the type family in the case that
   the type family is in fact injective.
 
+- A new extension, ``NoImplicitForAll``, has been added that makes explicit
+  ``forall`` on top-level declarations with type variables mandatory.
+
 Compiler
 ~~~~~~~~
 
-- The :extension:`TypeInType` is now marked as deprecated. Its meaning has been included 
+- The :extension:`TypeInType` is now marked as deprecated. Its meaning has been included
   in :extension:`PolyKinds` and :extension:`DataKinds`.
 
 ``base`` library
