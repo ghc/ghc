@@ -1,4 +1,4 @@
-## 0.9.0
+## 0.9.0 *August 2022*
 
 - Shipped with GHC 9.4.1
 

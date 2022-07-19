@@ -14,7 +14,7 @@
   * Add default implementation of `(<>)` in terms of `sconcat` and `mempty` in
     terms of `mconcat`.
 
-## 4.17.0.0 *TBA*
+## 4.17.0.0 *August 2022*
 
   * Add explicitly bidirectional `pattern TypeRep` to `Type.Reflection`.
 
