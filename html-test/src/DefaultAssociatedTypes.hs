@@ -1,5 +1,5 @@
 {-# LANGUAGE Haskell2010 #-}
-{-# LANGUAGE DefaultSignatures, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module DefaultAssociatedTypes where
 
