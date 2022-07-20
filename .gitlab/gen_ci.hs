@@ -116,6 +116,7 @@ data BuildConfig
                 , llvmBootstrap  :: Bool
                 , withAssertions :: Bool
                 , withNuma       :: Bool
+                , crossTarget    :: Maybe String
                 , fullyStatic    :: Bool
                 , tablesNextToCode :: Bool
                 , threadSanitiser :: Bool
@@ -126,6 +127,7 @@ configureArgsStr :: BuildConfig -> String
 configureArgsStr bc = intercalate " " $
   ["--enable-unregisterised"| unregisterised bc ]
   ++ ["--disable-tables-next-to-code" | not (tablesNextToCode bc) ]
+  ++ ["--with-intree-gmp" | Just _ <- pure (crossTarget bc) ]
 
 -- Compute the hadrian flavour from the BuildConfig
 mkJobFlavour :: BuildConfig -> Flavour
@@ -156,6 +158,7 @@ vanilla = BuildConfig
   , llvmBootstrap  = False
   , withAssertions = False
   , withNuma = False
+  , crossTarget = Nothing
   , fullyStatic = False
   , tablesNextToCode = True
   , threadSanitiser = False
@@ -185,6 +188,9 @@ static = vanilla { fullyStatic = True }
 
 staticNativeInt :: BuildConfig
 staticNativeInt = static { bignumBackend = Native }
+
+crossConfig :: String -> BuildConfig
+crossConfig triple = vanilla { crossTarget = Just triple }
 
 llvm :: BuildConfig
 llvm = vanilla { llvmBootstrap = True }
@@ -252,6 +258,7 @@ testEnv arch opsys bc = intercalate "-" $
                         ++ ["unreg" | unregisterised bc ]
                         ++ ["numa"  | withNuma bc ]
                         ++ ["no_tntc"  | not (tablesNextToCode bc) ]
+                        ++ ["cross_"++triple  | Just triple <- pure $ crossTarget bc ]
                         ++ [flavourString (mkJobFlavour bc)]
 
 -- | The hadrian flavour string we are going to use for this build
@@ -597,7 +604,7 @@ job arch opsys buildConfig = (jobName, Job {..})
       , "BUILD_FLAVOUR" =: flavourString jobFlavour
       , "BIGNUM_BACKEND" =: bignumString (bignumBackend buildConfig)
       , "CONFIGURE_ARGS" =: configureArgsStr buildConfig
-
+      , maybe M.empty ("CROSS_TARGET" =:) (crossTarget buildConfig)
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else M.empty
       ]
 
@@ -774,6 +781,7 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      , standardBuilds I386 (Linux Debian9)
      , allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) static)
      , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
+     , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu")
      ]
 
   where
