@@ -56,5 +56,6 @@ expectedCabalOnlyExtensions = ["Generics",
                                "Unsafe",
                                "Trustworthy",
                                "MonadFailDesugaring",
-                               "MonoPatBinds"
+                               "MonoPatBinds",
+                               "ImplicitForAll"
                               ]
