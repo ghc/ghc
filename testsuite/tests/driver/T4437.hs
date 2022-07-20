@@ -41,6 +41,7 @@ expectedGhcOnlyExtensions =
     , "AlternativeLayoutRule"
     , "AlternativeLayoutRuleTransitional"
     , "OverloadedRecordUpdate"
+    , "ImplicitForAll"
     ]
 
 expectedCabalOnlyExtensions :: [String]
@@ -56,6 +57,5 @@ expectedCabalOnlyExtensions = ["Generics",
                                "Unsafe",
                                "Trustworthy",
                                "MonadFailDesugaring",
-                               "MonoPatBinds",
-                               "ImplicitForAll"
+                               "MonoPatBinds"
                               ]
