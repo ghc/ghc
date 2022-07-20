@@ -975,9 +975,13 @@ renameSig _ (IdSig _ x)
 
 renameSig ctxt sig@(TypeSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRnN ctxt sig) vs
-        ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
+        ; let doc = TypeSigCtx (hsSigTypeExplicit (hswc_body ty)) (ppr_sig_bndrs vs)
         ; (new_ty, fvs) <- rnHsSigWcType doc ty
         ; return (TypeSig noAnn new_vs new_ty, fvs) }
+  where
+    hsSigTypeExplicit :: LHsSigType GhcPs -> Bool
+    hsSigTypeExplicit (L _ (HsSig {sig_bndrs = HsOuterExplicit {}})) = True
+    hsSigTypeExplicit _ = False
 
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures

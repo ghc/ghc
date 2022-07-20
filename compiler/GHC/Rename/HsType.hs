@@ -841,14 +841,14 @@ throw an error accordingly.
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name
 rnTyVar env rdr_name
-  = do { name <- lookupTypeOccRn rdr_name
+  = do { name <- lookupTypeOccRn (rtke_ctxt env) rdr_name
        ; checkNamedWildCard env name
        ; return name }
 
 rnLTyVar :: LocatedN RdrName -> RnM (LocatedN Name)
 -- Called externally; does not deal with wildcards
 rnLTyVar (L loc rdr_name)
-  = do { tyvar <- lookupTypeOccRn rdr_name
+  = do { tyvar <- lookupTypeOccRn (GenericCtx (text "rnLTyVar")) rdr_name
        ; return (L loc tyvar) }
 
 --------------

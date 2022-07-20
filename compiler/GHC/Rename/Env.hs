@@ -1038,9 +1038,9 @@ lookupLocalOccRn rdr_name
 
 -- lookupTypeOccRn looks up an optionally promoted RdrName.
 -- Used for looking up type variables.
-lookupTypeOccRn :: RdrName -> RnM Name
+lookupTypeOccRn :: HsDocContext -> RdrName -> RnM Name
 -- see Note [Demotion]
-lookupTypeOccRn rdr_name
+lookupTypeOccRn ctx rdr_name
   | isVarOcc (rdrNameOcc rdr_name)  -- See Note [Promoted variables in types]
   = badVarInType rdr_name
   | otherwise
@@ -1050,7 +1050,7 @@ lookupTypeOccRn rdr_name
              Nothing   ->
                if occName rdr_name == occName eqTyCon_RDR -- See Note [eqTyCon (~) compatibility fallback]
                then eqTyConName <$ addDiagnostic TcRnTypeEqualityOutOfScope
-               else lookup_demoted rdr_name }
+               else lookup_demoted ctx rdr_name }
 
 {- Note [eqTyCon (~) compatibility fallback]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1066,8 +1066,8 @@ To ease migration and minimize breakage, we continue to support those usages
 but emit appropriate warnings.
 -}
 
-lookup_demoted :: RdrName -> RnM Name
-lookup_demoted rdr_name
+lookup_demoted :: HsDocContext -> RdrName -> RnM Name
+lookup_demoted ctx rdr_name
   | Just demoted_rdr <- demoteRdrName rdr_name
     -- Maybe it's the name of a *data* constructor
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -1093,10 +1093,18 @@ lookup_demoted rdr_name
                     ; unboundNameX looking_for rdr_name suggestion } }
 
   | otherwise
-  = reportUnboundName' (lf_which looking_for) rdr_name
+  = do
+    hints <- implicitHint ctx <$> xoptM LangExt.ImplicitForAll
+    unboundNameX looking_for rdr_name hints
 
   where
     looking_for = LF WL_Constructor WL_Anywhere
+    implicitHint (TypeSigCtx False _) False =
+      [suggestExtensionWithInfo implicitMsg LangExt.ImplicitForAll]
+    implicitHint _ _ = []
+    implicitMsg =
+      text "The extension has been turned off manually, which requires type variables to be bound by " <+>
+      quotes (text "forall")
 
 -- If the given RdrName can be promoted to the type level and its promoted variant is in scope,
 -- lookup_promoted returns the corresponding type-level Name.
