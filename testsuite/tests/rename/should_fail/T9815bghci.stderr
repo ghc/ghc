@@ -1,5 +1,5 @@
+<interactive>:5:7: error: [GHC-47217]
+    Invalid record construction ‘Arg{..}’.
+    The data constructor ‘Arg’ does not have named record fields.
+    Suggested fix: Apply ‘Arg’ to its two arguments
 
-<interactive>:5:7: [GHC-47217]
-    Illegal `{..}' notation for constructor ‘Arg’
-      Record wildcards may not be used for constructors with unlabelled fields.
-      Possible fix: Remove the `{..}' and add a match for each field of the constructor.

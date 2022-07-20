@@ -423,7 +423,12 @@ lookupConstructorInfo qcon@(WithUserRdr _ con_name)
   = do { info <- lookupGREInfo_GRE con_name
        ; case info of
             IAmConLike con_info -> return con_info
-            UnboundGRE          -> return $ ConInfo (ConIsData []) ConHasPositionalArgs
+            UnboundGRE          -> return $ ConInfo (ConIsData []) (ConHasPositionalArgs 0)
+              -- NB: it's OK to use the dummy value of '0' for the constructor arity:
+              -- we only use this information for 'TcRnIllegalWildcardsInConstructor',
+              -- which is an error we don't emit when the constructor is unbound.
+              -- See GHC.Rename.Pat.rnHsRecFields.rn_dotdot.
+
             IAmTyCon {}         -> failIllegalTyCon WL_ConLike qcon
             _ -> pprPanic "lookupConstructorInfo: not a ConLike" $
                       vcat [ text "name:" <+> ppr con_name ]

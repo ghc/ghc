@@ -244,14 +244,14 @@ instance NFData ConLikeInfo where
 -- See Note [Local constructor info in the renamer]
 data ConFieldInfo
   = ConHasRecordFields (NonEmpty FieldLabel)
-  | ConHasPositionalArgs
+  | ConHasPositionalArgs !VisArity
   | ConIsNullary
   deriving stock Eq
   deriving Data
 
 instance NFData ConFieldInfo where
   rnf ConIsNullary = ()
-  rnf ConHasPositionalArgs = ()
+  rnf (ConHasPositionalArgs arity) = rnf arity
   rnf (ConHasRecordFields flds) = rnf flds
 
 mkConInfo :: ConLikeInfo -> VisArity -> [FieldLabel] -> ConInfo
@@ -259,9 +259,9 @@ mkConInfo con_ty n flds =
   ConInfo { conLikeInfo  = con_ty
           , conFieldInfo = mkConFieldInfo n flds }
 
-mkConFieldInfo :: Arity -> [FieldLabel] -> ConFieldInfo
+mkConFieldInfo :: VisArity -> [FieldLabel] -> ConFieldInfo
 mkConFieldInfo 0 _ = ConIsNullary
-mkConFieldInfo _ fields = maybe ConHasPositionalArgs ConHasRecordFields
+mkConFieldInfo arity fields = maybe (ConHasPositionalArgs arity) ConHasRecordFields
                    $ NonEmpty.nonEmpty fields
 
 conInfoFields :: ConInfo -> [FieldLabel]
@@ -269,7 +269,7 @@ conInfoFields = conFieldInfoFields . conFieldInfo
 
 conFieldInfoFields :: ConFieldInfo -> [FieldLabel]
 conFieldInfoFields (ConHasRecordFields fields) = NonEmpty.toList fields
-conFieldInfoFields ConHasPositionalArgs = []
+conFieldInfoFields (ConHasPositionalArgs _) = []
 conFieldInfoFields ConIsNullary = []
 
 instance Outputable ConInfo where
@@ -284,7 +284,7 @@ instance Outputable ConLikeInfo where
 
 instance Outputable ConFieldInfo where
   ppr ConIsNullary = text "ConIsNullary"
-  ppr ConHasPositionalArgs = text "ConHasPositionalArgs"
+  ppr (ConHasPositionalArgs arity) = text "ConHasPositionalArgs" <+> braces (ppr arity)
   ppr (ConHasRecordFields fieldLabels) =
     text "ConHasRecordFields" <+> braces (ppr fieldLabels)
 

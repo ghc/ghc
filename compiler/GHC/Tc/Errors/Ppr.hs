@@ -357,11 +357,11 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $ vcat [text "Illegal view pattern: " <+> ppr pat]
     TcRnCharLiteralOutOfRange c
       -> mkSimpleDecorated $ text "character literal out of range: '\\" <> char c  <> char '\''
-    TcRnIllegalWildcardsInConstructor con
+    TcRnIllegalWildcardsInConstructor ctx con _
       -> mkSimpleDecorated $
-           vcat [ text "Illegal `{..}' notation for constructor" <+> quotes (ppr con)
-                , nest 2 (text "Record wildcards may not be used for constructors with unlabelled fields.")
-                , nest 2 (text "Possible fix: Remove the `{..}' and add a match for each field of the constructor.")
+           vcat [ text "Invalid record" <+> pprRecordFieldPart ctx <+> quotes (ppr con <> text "{..}") <> dot
+                , text "The data constructor" <+> quotes (ppr con)
+                  <+> text "does not have named record fields."
                 ]
     TcRnIgnoringAnnotations anns
       -> mkSimpleDecorated $
@@ -2791,8 +2791,12 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.ViewPatterns]
     TcRnCharLiteralOutOfRange{}
       -> noHints
-    TcRnIllegalWildcardsInConstructor{}
-      -> noHints
+    TcRnIllegalWildcardsInConstructor ctx con arity
+      -> case ctx of
+           RecordFieldPattern{} -> [ SuggestEmptyRecordBraces con
+                                   , SuggestExplicitConstructorArguments con arity
+                                   ]
+           _                    -> [SuggestExplicitConstructorArguments con arity]
     TcRnIgnoringAnnotations{}
       -> noHints
     TcRnAnnotationInSafeHaskell

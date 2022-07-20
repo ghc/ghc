@@ -345,6 +345,12 @@ instance Outputable GhcHint where
                  text "The jobserver uses a newer semaphore protocol than this GHC."
               $$ (text "Upgrade GHC to a version that supports semaphore protocol v"
                   <> int required <> text " to resolve this.")
+    SuggestEmptyRecordBraces con
+      -> text "Use" <+> quotes (ppr con <> text "{}") <+> text "instead,"
+         <+> text "which matches" <+> quotes (ppr con) <+> text "regardless of its fields"
+    SuggestExplicitConstructorArguments con nbArgs
+      -> text "Apply" <+> quotes (ppr con) <+> text "to its"
+         <+> speakNOf nbArgs (text "argument")
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

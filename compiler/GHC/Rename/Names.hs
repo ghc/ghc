@@ -71,7 +71,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.Hint
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.Basic  ( TyConFlavour (..), convImportLevel )
+import GHC.Types.Basic  (TyConFlavour (..), convImportLevel, VisArity)
 import GHC.Types.Id
 import GHC.Types.PkgQual
 import GHC.Types.GREInfo (ConInfo(..), ConFieldInfo (..), ConLikeInfo (ConIsData))
@@ -875,15 +875,16 @@ getLocalNonValBinders fixity_env
     --
     -- The information we needed was all set up for us:
     -- see Note [Collecting record fields in data declarations] in GHC.Hs.Utils.
-    mk_fld_env :: [(Name, Maybe [Located Int])] -> IntMap FieldLabel
+    mk_fld_env :: [(Name, Either VisArity [Located Int])] -> IntMap FieldLabel
                -> [(ConLikeName, ConInfo)]
     mk_fld_env names flds =
       [ (DataConName con, ConInfo (ConIsData (map fst names)) fld_info)
-      | (con, mb_fl_indxs) <- names
-      , let fld_info = case fmap (map ((flds IntMap.!) . unLoc)) mb_fl_indxs of
-              Nothing         -> ConHasPositionalArgs
-              Just []         -> ConIsNullary
-              Just (fld:flds) -> ConHasRecordFields $ fld NE.:| flds ]
+      | (con, con_fl_indxs) <- names
+      , let fld_info = case fmap (map ((flds IntMap.!) . unLoc)) con_fl_indxs of
+              Left 0           -> ConIsNullary
+              Left arity       -> ConHasPositionalArgs arity
+              Right []         -> ConIsNullary
+              Right (fld:flds) -> ConHasRecordFields $ fld NE.:| flds ]
 
     new_assoc :: DuplicateRecordFields -> FieldSelectors -> LInstDecl GhcPs
               -> RnM [GlobalRdrElt]
@@ -939,10 +940,10 @@ getLocalNonValBinders fixity_env
 
     -- Add errors if a constructor has a duplicate record field.
     add_dup_fld_errs :: IntMap FieldLabel
-                     -> (Name, Maybe [Located Int])
+                     -> (Name, Either VisArity [Located Int])
                      -> IOEnv (Env TcGblEnv TcLclEnv) ()
-    add_dup_fld_errs all_flds (con, mb_con_flds)
-      | Just con_flds <- mb_con_flds
+    add_dup_fld_errs all_flds (con, con_flds_or_arity)
+      | Right con_flds <- con_flds_or_arity
       , let (_, dups) = removeDups (comparing unLoc) con_flds
       = for_ dups $ \ dup_flds ->
           -- Report the error at the location of the second occurrence

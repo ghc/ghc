@@ -818,17 +818,35 @@ data TcRnMessage where
   TcRnNegativeNumTypeLiteral :: IntegralLit GhcRn -> TcRnMessage
 
   {-| TcRnIllegalWildcardsInConstructor is an error that occurs whenever
-      the record wildcards '..' are used inside a constructor without labeled fields.
+      the record wildcards '..' are used with a constructor whose fields are
+      positional (unlabelled). The 'RecordFieldPart' field records whether
+      the wildcards occurred in a record construction (an expression) or in
+      a record pattern, so that the message and its suggested fixes can be
+      worded accordingly. Constructors with no fields at all do not trigger
+      this error: since GHC proposal 496 ("Nullary record wildcards"),
+      @C {..}@ is legal for nullary constructors.
+      Example(s):
 
-      Examples(s): None
+        data D = D Int Bool
+
+        f :: D -> ()
+        f D{..} = ()      -- record pattern
+
+        g :: D
+        g = D{..}         -- record construction
 
      Test cases:
        rename/should_fail/T9815.hs
        rename/should_fail/T9815b.hs
        rename/should_fail/T9815ghci.hs
        rename/should_fail/T9815bghci.hs
+       rename/should_fail/T21101.hs
   -}
-  TcRnIllegalWildcardsInConstructor :: !Name -> TcRnMessage
+  TcRnIllegalWildcardsInConstructor
+    :: !RecordFieldPart -- ^ context in which the constructor application occurs
+    -> !Name     -- ^ name of the constructor
+    -> !VisArity -- ^ arity of the constructor
+    -> TcRnMessage
 
   {-| TcRnIgnoringAnnotations is a warning that occurs when the source code
       contains annotation pragmas but the platform in use does not support an

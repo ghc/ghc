@@ -1613,8 +1613,8 @@ hsConDeclsBinders in the following format:
     with its record fields, in the form of a list of Int indices into...
   - IntMap FieldOcc, an IntMap of record fields.
 
-(In actual fact, we use [(ConRdrName, Maybe [Located Int])], with Nothing indicating
-that the constructor has unlabelled fields: see Note [Local constructor info in the renamer]
+(In actual fact, we use [(ConRdrName, Either VisArity [Located Int])], with Left n indicating
+that the constructor has n unlabelled arguments: see Note [Local constructor info in the renamer]
 in GHC.Types.GREInfo.)
 
 This allows us to do the following (see GHC.Rename.Names.getLocalNonValBinders.new_tc):
@@ -1635,7 +1635,7 @@ Other relevant test cases: rnfail015.
 -- See Note [Collecting record fields in data declarations].
 data LConsWithFields p =
   LConsWithFields
-    { consWithFieldIndices :: [(LocatedA (IdP (GhcPass p)), Maybe [Located Int])]
+    { consWithFieldIndices :: [(LocatedA (IdP (GhcPass p)), Either VisArity [Located Int])]
     , consFields :: IntMap (LFieldOcc (GhcPass p))
     }
 
@@ -1675,16 +1675,15 @@ hsConDeclsBinders cons = go emptyFieldIndices cons
                 LConsWithFields ns fs = go seen' rs
 
     get_flds_h98 :: FieldIndices p -> HsConDeclH98Details (GhcPass p)
-                 -> (Maybe [Located Int], FieldIndices p)
-    get_flds_h98 seen (RecCon _ flds) = first Just $ get_flds seen flds
-    get_flds_h98 seen (PrefixCon _ []) = (Just [], seen)
-    get_flds_h98 seen _ = (Nothing, seen)
+                 -> (Either VisArity [Located Int], FieldIndices p)
+    get_flds_h98 seen (RecCon _ flds) = first Right $ get_flds seen flds
+    get_flds_h98 seen (PrefixCon _ args) = (Left (length args), seen)
+    get_flds_h98 seen (InfixCon {}) = (Left 2, seen)
 
     get_flds_gadt :: FieldIndices p -> HsConDeclGADTDetails (GhcPass p)
-                  -> (Maybe [Located Int], FieldIndices p)
-    get_flds_gadt seen (RecConGADT _ flds) = first Just $ get_flds seen flds
-    get_flds_gadt seen (PrefixConGADT _ []) = (Just [], seen)
-    get_flds_gadt seen _ = (Nothing, seen)
+                  -> (Either VisArity [Located Int], FieldIndices p)
+    get_flds_gadt seen (RecConGADT _ flds) = first Right $ get_flds seen flds
+    get_flds_gadt seen (PrefixConGADT _ args) = (Left (length args), seen)
 
     get_flds :: FieldIndices p -> LocatedA [LHsConDeclRecField (GhcPass p)]
              -> ([Located Int], FieldIndices p)

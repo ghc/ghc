@@ -45,7 +45,7 @@ import GHC.Types.InlinePragma (ActivationGhc)
 import GHC.Types.Name (Name, NameSpace, OccName (occNameFS), isSymOcc, nameOccName)
 import GHC.Types.Name.Reader (RdrName (Unqual), ImpDeclSpec, GlobalRdrElt)
 import GHC.Types.SrcLoc (SrcSpan)
-import GHC.Types.Basic (RuleName)
+import GHC.Types.Basic (RuleName, VisArity)
 import GHC.Parser.Errors.Basic
 import GHC.Utils.Outputable
 import GHC.Data.FastString (fsLit)
@@ -547,6 +547,23 @@ data GhcHint
   -}
   | SuggestUpgradeForSemaphoreVersionMismatch !SemaphoreUpgradeTarget !Int
     -- ^ The 'Int' is the required protocol version.
+
+  {-| Suggest replacing a record wildcard pattern @C {..}@ with @C {}@,
+      which matches a constructor without binding its fields.
+
+      Triggered by 'GHC.Tc.Errors.Types.TcRnIllegalWildcardsInConstructor'
+      in a record pattern.
+  -}
+  | SuggestEmptyRecordBraces !Name
+
+  {-| Suggest applying a constructor directly to its arguments instead
+      of record syntax, for constructors without labelled fields.
+
+      Triggered by 'GHC.Tc.Errors.Types.TcRnIllegalWildcardsInConstructor'
+      in a record construction and record patterns.
+      The 'VisArity' is the number of positional arguments of the constructor.
+  -}
+  | SuggestExplicitConstructorArguments !Name !VisArity
 
 -- | What the user should upgrade to resolve an @-jsem@ semaphore
 --   protocol version mismatch.

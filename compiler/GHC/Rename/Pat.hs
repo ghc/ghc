@@ -874,7 +874,10 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; checkErr dd_flag (needFlagDotDot ctxt)
            ; (rdr_env, lcl_env) <- getRdrEnvs
            ; conInfo <- lookupConstructorInfo qcon
-           ; when (conFieldInfo conInfo == ConHasPositionalArgs) (addErr (TcRnIllegalWildcardsInConstructor con))
+           ; case conFieldInfo conInfo of
+               ConHasPositionalArgs nbArgs ->
+                 addErr $ TcRnIllegalWildcardsInConstructor (toRecordFieldPart ctxt) con nbArgs
+               _ -> return ()
            ; let present_flds = mkOccSet $ map rdrNameOcc (getFieldRdrs flds)
 
                    -- For constructor uses (but not patterns)

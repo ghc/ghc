@@ -1,0 +1,8 @@
+section: compiler
+synopsis: Improve error messages and hints for invalid record wildcards
+description:
+  Record wildcard hints are now shown in more contexts and include
+  constructor arity; matching with ``..`` on a fieldless constructor
+  now produces a dedicated error message.
+mrs: !8673
+issues: #21101

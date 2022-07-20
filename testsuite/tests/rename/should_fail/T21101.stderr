@@ -1,0 +1,7 @@
+T21101.hs:7:3: error: [GHC-47217]
+    Invalid record pattern ‘D{..}’.
+    The data constructor ‘D’ does not have named record fields.
+    Suggested fixes:
+      • Use ‘D{}’ instead, which matches ‘D’ regardless of its fields
+      • Apply ‘D’ to its two arguments
+
