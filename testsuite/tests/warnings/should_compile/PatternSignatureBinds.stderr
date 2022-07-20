@@ -2,10 +2,6 @@ PatternSignatureBinds.hs:6:4: warning: [-Wpattern-signature-binds]
     The pattern signature variable ‘a’
     was not declared by the function's type signature.
 
-PatternSignatureBinds.hs:13:1: warning: [-Wpattern-signature-binds]
-    The pattern signature variable ‘c’
-    was not declared by the kind signature.
-
-PatternSignatureBinds.hs:16:4: warning: [-Wpattern-signature-binds]
+PatternSignatureBinds.hs:17:4: warning: [-Wpattern-signature-binds]
     The pattern signature variable ‘b’
     was not declared by the function's type signature.
