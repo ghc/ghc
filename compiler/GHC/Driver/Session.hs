@@ -1946,7 +1946,8 @@ safeFlagCheck cmdl dflags =
                     " must be specified with a Safe Haskell flag"]
 
     -- Have we inferred Unsafe? See Note [Safe Haskell Inference] in GHC.Driver.Main
-    safeFlags = all (\(_,_,t,_) -> not $ t dflags) unsafeFlagsForInfer
+    -- Force this to avoid retaining reference to old DynFlags value
+    !safeFlags = all (\(_,_,t,_) -> not $ t dflags) unsafeFlagsForInfer
 
 
 {- **********************************************************************
