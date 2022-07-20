@@ -137,7 +137,7 @@ def prepare_docs(bindist: Path, pkg: Package):
     """
     cabal_file = pkg.path / f'{pkg.name}.cabal'
     version = get_version(cabal_file)
-    docdir = bindist / 'docs' / 'html' / 'libraries' / (pkg.name + "-" + version)
+    docdir = bindist / 'doc' / 'html' / 'libraries' / (pkg.name + "-" + version)
     assert version is not None
 
     # Build the documentation tarball from the bindist documentation
