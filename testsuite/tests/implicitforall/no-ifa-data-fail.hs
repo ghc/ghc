@@ -13,3 +13,17 @@ type family F a :: b
 data family DF a :: a
 
 data instance DF (Maybe a) :: Maybe a
+
+data E where
+  E :: a -> (a -> Int) -> E
+
+class C a where
+  type AssocC a :: k -> Type
+
+class D a where
+  type AssocD a :: Type -> Type
+
+data family DF2 :: k -> Type
+
+data instance DF2 :: (k -> Type) -> Type where
+  DF2 :: (forall x. x -> f x) -> DF2 f

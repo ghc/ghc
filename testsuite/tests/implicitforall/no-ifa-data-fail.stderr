@@ -7,3 +7,17 @@ no-ifa-data-fail.hs:11:20: Not in scope: type variable ‘b’
 no-ifa-data-fail.hs:15:25: Not in scope: type variable ‘a’
 
 no-ifa-data-fail.hs:15:37: Not in scope: type variable ‘a’
+
+no-ifa-data-fail.hs:18:8: Not in scope: type variable ‘a’
+
+no-ifa-data-fail.hs:18:14: Not in scope: type variable ‘a’
+
+no-ifa-data-fail.hs:21:20: Not in scope: type variable ‘k’
+
+no-ifa-data-fail.hs:26:20: Not in scope: type variable ‘k’
+
+no-ifa-data-fail.hs:28:23: Not in scope: type variable ‘k’
+
+no-ifa-data-fail.hs:29:26: Not in scope: type variable ‘f’
+
+no-ifa-data-fail.hs:29:38: Not in scope: type variable ‘f’
