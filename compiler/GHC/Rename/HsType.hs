@@ -1008,7 +1008,8 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
                 , text "body_remaining"    <+> ppr body_remaining
                 ]
 
-       ; warnPatternSignatureBinds implicit_kvs_bndr True
+      -- Might be decided later that this warning should also trigger for tycon param kind sigs
+       -- ; warnPatternSignatureBinds implicit_kvs_bndr True
 
        ; rnImplicitTvOccs mb_assoc implicit_kvs_bndr $ \ implicit_kv_bndr_nms' ->
          rnImplicitTvOccsIfXopt LangExt.ImplicitForAll mb_assoc implicit_kvs_body $ \ implicit_kv_body_nms' ->
@@ -1181,7 +1182,7 @@ bindHsOuterTyVarBndrs :: OutputableBndrFlag flag 'Renamed
                       -> RnM (a, FreeVars)
 bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
   case outer_bndrs of
-    HsOuterImplicit{} -> do
+    HsOuterImplicit{} ->
       rnImplicitTvOccsIfXopt LangExt.ImplicitForAll mb_cls implicit_vars $ \implicit_vars' ->
         thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
     HsOuterExplicit{hso_bndrs = exp_bndrs} ->
