@@ -139,18 +139,20 @@ Notes:
 Requiring explicit quantification
 ---------------------------------
 
-.. extension:: NoImplicitForAll
-    :shortdesc: Disable implicit universal quantification.
+.. extension:: ImplicitForAll
+    :shortdesc: Enable implicit universal quantification.
 
     :since: 9.6
 
-    Require use of the ``forall`` keyword in some places where universal
-    quantification is implicit.
+    Controls whether implicit quantification of type variables is performed,
+    enabled by default.
+    Turning off this extension requires use of the ``forall`` keyword in some
+    places where universal quantification would be implicit.
 
-Activating this language extension makes explicit quantification mandatory
-for any top-level type or kind signature on functions, data types,
-:ref:`data-instance-declarations` or :ref:`closed-type-families` that uses
-type variables.
+Deactivating this language extension with ``NoImplicitForAll`` makes explicit
+quantification mandatory for any top-level type or kind signature on functions,
+data types, :ref:`data-instance-declarations`, :ref:`closed-type-families`,
+:ref:`assoc-inst`, or :ref:`rewrite-rules` that uses type variables.
 
 Implicit quantification will not be performed anymore, so this function
 signature will not be accepted:
