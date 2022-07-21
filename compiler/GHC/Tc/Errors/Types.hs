@@ -2176,7 +2176,7 @@ data TcRnMessage where
     pragma_warning_defined_mod :: ModuleName
   } -> TcRnMessage
 
-  {-| TcRnPatternSignatureBinds is a warning (controlled with -pattern-signature-binds)
+  {-| TcRnPatternSignatureBinds is a warning (controlled with -Wpattern-signature-binds)
       that occurs if a pattern signature mentions an out-of-scope variable.
 
      Test cases:
