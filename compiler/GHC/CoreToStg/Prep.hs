@@ -123,26 +123,24 @@ The goal of this pass is to prepare for code generation.
     We want curried definitions for all of these in case they
     aren't inlined by some caller.
 
-9.  Replace (lazy e) by e.  See Note [lazyId magic] in GHC.Types.Id.Make
-    Also replace (noinline e) by e.
+ 9. Convert bignum literals into their core representation.
 
-10. Convert bignum literals into their core representation.
-
-11. Uphold tick consistency while doing this: We move ticks out of
+10. Uphold tick consistency while doing this: We move ticks out of
     (non-type) applications where we can, and make sure that we
     annotate according to scoping rules when floating.
 
-12. Collect cost centres (including cost centres in unfoldings) if we're in
+11. Collect cost centres (including cost centres in unfoldings) if we're in
     profiling mode. We have to do this here beucase we won't have unfoldings
     after this pass (see `trimUnfolding` and Note [Drop unfoldings and rules].
 
-13. Eliminate case clutter in favour of unsafe coercions.
+12. Eliminate case clutter in favour of unsafe coercions.
     See Note [Unsafe coercions]
 
-14. Eliminate some magic Ids, specifically
+13. Eliminate some magic Ids, specifically
      runRW# (\s. e)  ==>  e[readWorldId/s]
-             lazy e  ==>  e
+             lazy e  ==>  e (see Note [lazyId magic] in GHC.Types.Id.Make)
          noinline e  ==>  e
+           nospec e  ==>  e
      ToDo:  keepAlive# ...
     This is done in cpeApp
 
@@ -1052,6 +1050,8 @@ cpeApp top_env expr
             -- See Note [lazyId magic] in GHC.Types.Id.Make
        || f `hasKey` noinlineIdKey      -- Replace (noinline a) with a
             -- See Note [noinlineId magic] in GHC.Types.Id.Make
+       || f `hasKey` nospecIdKey        -- Replace (nospec a) with a
+            -- See Note [nospecId magic] in GHC.Types.Id.Make
 
         -- Consider the code:
         --

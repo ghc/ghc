@@ -33,6 +33,7 @@ import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name, pprDefinedAt )
 import GHC.Types.Var.Env ( VarEnv )
 import GHC.Types.Id
+import GHC.Types.Id.Make ( nospecId )
 import GHC.Types.Var
 
 import GHC.Core.Predicate
@@ -43,9 +44,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
 
-import GHC.Core ( Expr(Var, App, Cast, Let), Bind (NonRec) )
-import GHC.Types.Basic
-import GHC.Types.SourceText
+import GHC.Core ( Expr(Var, App, Cast, Type) )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -455,20 +454,26 @@ matchWithDict [cls, mty]
   = do { sv <- mkSysLocalM (fsLit "withDict_s") Many mty
        ; k  <- mkSysLocalM (fsLit "withDict_k") Many (mkInvisFunTyMany cls openAlphaTy)
 
-       ; let evWithDict_type = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar] $
-                               mkVisFunTysMany [mty, mkInvisFunTyMany cls openAlphaTy] openAlphaTy
-
-       ; wd_id <- mkSysLocalM (fsLit "withDict_wd") Many evWithDict_type
-       ; let wd_id' = wd_id `setInlinePragma` inlineAfterSpecialiser
-
        -- Given co2 : mty ~N# inst_meth_ty, construct the method of
        -- the WithDict dictionary:
-       -- \@(r : RuntimeRep) @(a :: TYPE r) (sv : mty) (k :: cls => a) -> k (sv |> (sub co; sym co2))
+       --
+       --   \@(r :: RuntimeRep) @(a :: TYPE r) (sv :: mty) (k :: cls => a) ->
+       --     nospec @(cls => a) k (sv |> (sub co ; sym co2))
+       --
+       -- where  nospec :: forall a. a -> a  ensures that the typeclass specialiser
+       -- doesn't attempt to common up this evidence term with other evidence terms
+       -- of the same type.
+       --
+       -- See (WD6) in Note [withDict], and Note [nospecId magic] in GHC.Types.Id.Make.
        ; let evWithDict co2 =
-               let wd_rhs = mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
-                            Var k `App` Cast (Var sv) (mkTcTransCo (mkTcSubCo co2) (mkTcSymCo co))
-               in Let (NonRec wd_id' wd_rhs) (Var wd_id')
-         -- Why a Let?  See (WD6) in Note [withDict]
+               mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
+                 Var nospecId
+                   `App`
+                 (Type $ mkInvisFunTyMany cls openAlphaTy)
+                   `App`
+                 Var k
+                   `App`
+                 (Var sv `Cast` mkTcTransCo (mkTcSubCo co2) (mkTcSymCo co))
 
        ; tc <- tcLookupTyCon withDictClassName
        ; let Just withdict_data_con
@@ -485,12 +490,6 @@ matchWithDict [cls, mty]
 
 matchWithDict _
   = return NoInstance
-
-inlineAfterSpecialiser :: InlinePragma
--- Do not inline before the specialiser; but do so afterwards
--- See (WD6) in Note [withDict]
-inlineAfterSpecialiser = alwaysInlinePragma `setInlinePragmaActivation`
-                         ActiveAfter NoSourceText 2
 
 {-
 Note [withDict]
@@ -536,7 +535,7 @@ as if the following instance declaration existed:
 
 instance (mty ~# inst_meth_ty) => WithDict (C t1..tn) mty where
   withDict = \@{rr} @(r :: TYPE rr) (sv :: mty) (k :: C t1..tn => r) ->
-    k (sv |> (sub co2; sym co))
+    k (sv |> (sub co2 ; sym co))
 
 That is, it matches on the first (constraint) argument of C; if C is
 a single-method class, the instance "fires" and emits an equality
@@ -582,28 +581,55 @@ Some further observations about `withDict`:
 
 (WD5) In earlier implementations, `withDict` was implemented as an identifier
       with special handling during either constant-folding or desugaring.
-      The current approach is more robust, previously the type of `withDict`
+      The current approach is more robust: previously, the type of `withDict`
       did not have a type-class constraint and was overly polymorphic.
       See #19915.
 
-(WD6) In fact we desugar `withDict @(C t_1 ... t_n) @mty @{rr} @r` to
-         let wd = \sv k -> k (sv |> co)
-             {-# INLINE [2] #-}
-         in wd
-      The local `let` and INLINE pragma delays inlining `wd` until after the
-      type-class Specialiser has run.  This is super important. Suppose we
-      have calls
+(WD6) In fact, we desugar `withDict @cls @mty @{rr} @r` to
+
+         \@(r :: RuntimeRep) @(a :: TYPE r) (sv :: mty) (k :: cls => a) ->
+           nospec @(cls => a) k (sv |> (sub co2 ; sym co)))
+
+      That is, we cast the method using a coercion, and apply k to it.
+      However, we use the 'nospec' magicId (see Note [nospecId magic] in GHC.Types.Id.Make)
+      to ensure that the typeclass specialiser doesn't incorrectly common-up distinct
+      evidence terms. This is super important! Suppose we have calls
+
           withDict A k
           withDict B k
-      where k1, k2 :: C T -> blah.  If we inline those withDict calls we'll get
+
+      where k1, k2 :: C T -> blah.  If we desugared withDict naively, we'd get
+
           k (A |> co1)
           k (B |> co2)
-      and the Specialiser will assume that those arguments (of type `C T`) are
-      the same, will specialise `k` for that type, and will call the same,
+
+      and the Specialiser would assume that those arguments (of type `C T`) are
+      the same. It would then specialise `k` for that type, and then call the same,
       specialised function from both call sites.  #21575 is a concrete case in point.
 
-      Solution: delay inlining `withDict` until after the specialiser; that is,
-      until Phase 2.  This is not a Final Solution -- seee #21575 "Alas..".
+      To avoid this, we need to stop the typeclass specialiser from seeing this
+      structure, by using nospec. This function is inlined only in CorePrep; crucially
+      this means that it still appears in interface files, so that the desugaring of
+      withDict remains opaque to the typeclass specialiser across modules.
+      This means the specialiser will always see instead:
+
+          nospec @(cls => a) k (A |> co1)
+          nospec @(cls => a) k (B |> co2)
+
+      Why does this work? Recall that nospec is not an overloaded function;
+      it has the type
+
+        nospec :: forall a. a -> a
+
+      This means that there is nothing for the specialiser to do with function calls
+      such as
+
+        nospec @(cls => a) k (A |> co)
+
+      as the specialiser only looks at calls of the form `f dict` for an
+      overloaded function `f` (e.g. with a type such as `f :: Eq a => ...`).
+
+      See test-case T21575b.
 
 -}
 

@@ -105,4 +105,5 @@ test('T19313', normal, compile_and_run, [''])
 test('UnliftedArgRule', normal, compile_and_run, [''])
 test('T21229', normal, compile_and_run, ['-O'])
 test('T21575', normal, compile_and_run, ['-O'])
+test('T21575b', [], multimod_compile_and_run, ['T21575b', '-O'])
 test('T20836', normal, compile_and_run, ['-O0']) # Should not time out; See #20836

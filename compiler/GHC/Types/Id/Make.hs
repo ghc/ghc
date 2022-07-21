@@ -32,7 +32,7 @@ module GHC.Types.Id.Make (
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, coerceId,
-        proxyHashId, noinlineId, noinlineIdName,
+        proxyHashId, noinlineId, noinlineIdName, nospecId, nospecIdName,
         coerceName, leftSectionName, rightSectionName,
     ) where
 
@@ -159,7 +159,7 @@ wiredInIds
   ++ errorIds           -- Defined in GHC.Core.Make
 
 magicIds :: [Id]    -- See Note [magicIds]
-magicIds = [lazyId, oneShotId, noinlineId]
+magicIds = [lazyId, oneShotId, noinlineId, nospecId]
 
 ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
@@ -1401,10 +1401,11 @@ leftSectionName   = mkWiredInIdName gHC_PRIM  (fsLit "leftSection")    leftSecti
 rightSectionName  = mkWiredInIdName gHC_PRIM  (fsLit "rightSection")   rightSectionKey    rightSectionId
 
 -- Names listed in magicIds; see Note [magicIds]
-lazyIdName, oneShotName, noinlineIdName :: Name
+lazyIdName, oneShotName, noinlineIdName, nospecIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
 noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
+nospecIdName      = mkWiredInIdName gHC_MAGIC (fsLit "nospec")         nospecIdKey        nospecId
 
 ------------------------------------------------
 proxyHashId :: Id
@@ -1468,6 +1469,12 @@ lazyId = pcMiscPrelId lazyIdName ty info
 
 noinlineId :: Id -- See Note [noinlineId magic]
 noinlineId = pcMiscPrelId noinlineIdName ty info
+  where
+    info = noCafIdInfo
+    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
+
+nospecId :: Id -- See Note [nospecId magic]
+nospecId = pcMiscPrelId nospecIdName ty info
   where
     info = noCafIdInfo
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
@@ -1726,6 +1733,19 @@ specifies that it is strict in its argument. We considered fixing this this by a
 special case to the demand analyser to address #16588. However, the special
 case seemed like a large and expensive hammer to address a rare case and
 consequently we rather opted to use a more minimal solution.
+
+Note [nospecId magic]
+~~~~~~~~~~~~~~~~~~~~~
+The 'nospec' magic Id is used to ensure to make a value opaque to the typeclass
+specialiser. In CorePrep, we inline 'nospec', turning (nospec e) into e.
+Note that this happens *after* unfoldings are exposed in the interface file.
+This is crucial: otherwise, we could import an unfolding in which
+'nospec' has been inlined (= erased), and we would lose the benefit.
+
+'nospec' is used in the implementation of 'withDict': we insert 'nospec'
+so that the typeclass specialiser doesn't assume any two evidence terms
+of the same type are equal. See Note [withDict] in GHC.Tc.Instance.Class,
+and see test case T21575b for an example.
 
 Note [The oneShot function]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

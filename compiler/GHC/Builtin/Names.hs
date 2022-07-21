@@ -2332,6 +2332,9 @@ runRWKey                      = mkPreludeMiscIdUnique 107
 traceKey :: Unique
 traceKey                      = mkPreludeMiscIdUnique 108
 
+nospecIdKey :: Unique
+nospecIdKey                   = mkPreludeMiscIdUnique 109
+
 inlineIdKey, noinlineIdKey :: Unique
 inlineIdKey                   = mkPreludeMiscIdUnique 120
 -- see below
