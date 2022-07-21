@@ -472,7 +472,7 @@ Standalone kind signatures and declaration headers
 --------------------------------------------------
 
 GHC requires that in the presence of a standalone kind signature, data
-declarations must bind all their inputs. For example: ::
+declarations must bind all their parameters For example: ::
 
     type Prox1 :: k -> Type
     data Prox1 a = MkProx1
@@ -485,7 +485,7 @@ declarations must bind all their inputs. For example: ::
       --   • In the data type declaration for ‘Prox2’
 
 
-GADT-style data declarations may either bind their inputs or use an inline
+GADT-style data declarations may either bind their parameters or use an inline
 signature in addition to the standalone kind signature: ::
 
     type GProx1 :: k -> Type
@@ -502,9 +502,19 @@ signature in addition to the standalone kind signature: ::
     data GProx3 :: k -> Type where MkGProx3 :: GProx3 a
       -- OK.
 
-    type GProx4 :: k -> Type
-    data GProx4 :: w where MkGProx4 :: GProx4 a
-      -- OK, w ~ (k -> Type)
+    type GProx4 :: k1 -> Type
+    data GProx4 :: k2 -> Type where MkGProx4 :: GProx4 a
+      -- OK.
+
+Note that variables in a kind signature must stand for variables, not
+arbitrary types. For example, the following is rejected: ::
+
+    type GProx5 :: k -> Type
+    data GProx5 :: w where MkGProx5 :: GProx5 a
+      -- Error:
+      --   • Couldn't match expected kind ‘w’ with actual kind ‘k -> Type’
+      --   • In the data type declaration for ‘GProx5’
+
 
 Classes are subject to the same rules: ::
 
@@ -519,10 +529,29 @@ Classes are subject to the same rules: ::
       --                 with actual kind ‘Type -> Constraint’
       --   • In the class declaration for ‘C2’
 
-On the other hand, type families are exempt from this rule: ::
+For type families, the number of parameters in the kind signature takes on
+additional meaning: it specifies the arity of the type family, i.e. how many
+arguments the type family requires before reducing.
+Any type family instances must then provide the same number of arguments.
+For example: ::
 
-    type F :: Type -> Type
-    type family F
+    type F1 :: Type -> Type
+    type family F1 where
+      F1 = Maybe
+      -- OK.
+
+    type F2 :: Type -> Type
+    type family F2 where
+      F2 () = Bool
+      F2 a  = Maybe a
+      -- Error:
+      --   • Number of parameters must match family declaration; expected 0
+      --   • In the type family declaration for `F2'
+
+    type F3 :: Type -> Type
+    type family F3 a where
+      F3 () = Bool
+      F3 a  = Maybe a
       -- OK.
 
 Data families are tricky territory. Their headers are exempt from this rule,
