@@ -197,6 +197,10 @@ Mutex concurrent_coll_finished_lock;
  *  - Note [Concurrent non-moving collection] (NonMoving.c) describes
  *    concurrency control of the nonmoving collector
  *
+ *  - Note [Scavenging the non-moving heap] (NonMovingScav.c) describes
+ *    how data is scavenged after having been promoted into the non-moving
+ *    heap.
+ *
  *  - Note [Live data accounting in nonmoving collector] (NonMoving.c)
  *    describes how we track the quantity of live data in the nonmoving
  *    generation.
