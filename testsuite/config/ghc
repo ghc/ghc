@@ -29,6 +29,7 @@ config.other_ways         = ['prof', 'normal_h',
                              'ext-interp',
                              'nonmoving',
                              'nonmoving_thr',
+                             'nonmoving_thr_sanity',
                              'nonmoving_thr_ghc',
                              'compacting_gc',
                              ]
@@ -51,6 +52,7 @@ if ghc_with_threaded_rts:
         config.run_ways.append('threaded2')
         if config.speed == 0:
             config.run_ways.append('nonmoving_thr')
+            config.run_ways.append('nonmoving_thr_sanity')
 
 if ghc_with_dynamic_rts:
     config.supports_dynamic_libs = True
@@ -108,6 +110,7 @@ config.way_flags = {
     'ext-interp'   : ['-fexternal-interpreter'],
     'nonmoving'    : [],
     'nonmoving_thr': ['-threaded'],
+    'nonmoving_thr_sanity': ['-threaded', '-debug'],
     'nonmoving_thr_ghc': ['+RTS', '-xn', '-N2', '-RTS', '-threaded'],
     'compacting_gc': [],
     'winio': [],
@@ -152,6 +155,7 @@ config.way_rts_flags = {
     'ext-interp'       : [],
     'nonmoving'        : ['-xn'],
     'nonmoving_thr'    : ['-xn', '-N2'],
+    'nonmoving_thr_sanity'    : ['-xn', '-N2', '-DS'],
     'nonmoving_thr_ghc': ['-xn', '-N2'],
     'compacting_gc': ['-c'],
     'winio': ['--io-manager=native'],
