@@ -44,10 +44,6 @@
     A [migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/no-monadfail-st-inst.md)
     is available.
 
-  * Add functions `traceWith`, `traceShowWith`, `traceEventWith` to
-    `Debug.Trace`, per
-    [CLC #36](https://github.com/haskell/core-libraries-committee/issues/36).
-
   * Re-export `augment` and `build` function from `GHC.List`
 
   * Re-export the `IsList` typeclass from the new `GHC.IsList` module.
