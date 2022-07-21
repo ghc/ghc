@@ -89,6 +89,7 @@ test('T19384', expect_broken(19384), compile, [overlapping_incomplete])
 test('T19622', normal, compile, [overlapping_incomplete])
 test('T20631', normal, compile, [overlapping_incomplete])
 test('T20642', normal, compile, [overlapping_incomplete])
+test('T21360', normal, compile, [overlapping_incomplete])
 
 # Other tests
 test('pmc001', [], compile, [overlapping_incomplete])
