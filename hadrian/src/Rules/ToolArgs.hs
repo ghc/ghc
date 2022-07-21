@@ -154,32 +154,32 @@ allDeps = do
 -- which takes a while to compile.
 toolTargets :: [Package]
 toolTargets = [ binary
-             , bytestring
-             , cabalSyntax
-             , cabal
-             , compiler
-             , directory
-             , process
-             , exceptions
---             , ghc # depends on ghc library
---             , runGhc # depends on ghc library
-             , ghcBoot
-             , ghcBootTh
-             , ghcHeap
-             , ghci
---             , ghcPkg  # executable
---             , haddock # depends on ghc library
---             , hsc2hs  # executable
-             , hpc
---             , hpcBin  # executable
-             , mtl
-             , parsec
-             , time
-             , templateHaskell
-             , text
-             , transformers
---             , unlit  # executable
-             , unix ]
+              , bytestring
+              , cabalSyntax
+              , cabal
+              , compiler
+              , directory
+              , process
+              , exceptions
+--            , ghc     # depends on ghc library
+--            , runGhc  # depends on ghc library
+              , ghcBoot
+              , ghcBootTh
+              , ghcHeap
+              , ghci
+--            , ghcPkg  # executable
+--            , haddock # depends on ghc library
+--            , hsc2hs  # executable
+              , hpc
+--            , hpcBin  # executable
+              , mtl
+              , parsec
+              , time
+              , templateHaskell
+              , text
+              , transformers
+--            , unlit  # executable
+              ] ++ if windowsHost then [ win32 ] else [ unix ]
 
 -- | Create a mapping from files to which component it belongs to.
 dirMap :: Action [(FilePath, (Package, [String]))]
