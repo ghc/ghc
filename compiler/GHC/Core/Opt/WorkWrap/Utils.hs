@@ -224,7 +224,8 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
               init_str_marks = map (const NotMarkedStrict) cloned_arg_vars
 
         ; (useful1, work_args_str, wrap_fn_str, fn_args)
-             <- mkWWstr opts cloned_arg_vars init_str_marks
+             <- -- pprTrace "mkWWbodies" (ppr fun_id $$ ppr (arg_vars `zip` cloned_arg_vars) $$ ppr demands) $
+                mkWWstr opts cloned_arg_vars init_str_marks
 
         ; let (work_args, work_marks) = unzip work_args_str
 
@@ -567,13 +568,10 @@ data DataConPatContext s
 -- | Describes the outer shape of an argument to be unboxed or left as-is
 -- Depending on how @s@ is instantiated (e.g., 'Demand' or 'Cpr').
 data UnboxingDecision unboxing_info
-  = StopUnboxing
-  -- ^ We ran out of strictness info. Leave untouched.
-  | DropAbsent
-  -- ^ The argument/field was absent. Drop it.
-  | Unbox !unboxing_info
-  -- ^ The argument is used strictly or the returned product
-  -- was constructed, so unbox it.
+  = DontUnbox               -- ^ We ran out of strictness info. Leave untouched.
+  | DoUnbox !unboxing_info  -- ^ The argument is used strictly or the
+                            -- returned product was constructed, so unbox it.
+  | DropAbsent              -- ^ The argument/field was absent. Drop it.
 
 -- Do we want to create workers just for unlifting?
 wwForUnlifting :: WwOpts -> Bool
@@ -612,11 +610,11 @@ canUnboxArg fam_envs ty (n :* sd)
   , let arity = dataConRepArity dc
   , Just (Unboxed, dmds) <- viewProd arity sd -- See Note [Boxity analysis]
   , dmds `lengthIs` dataConRepArity dc
-  = Unbox (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
-                             , dcpc_co = co, dcpc_args = dmds })
+  = DoUnbox (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
+                               , dcpc_co = co, dcpc_args = dmds })
 
   | otherwise
-  = StopUnboxing
+  = DontUnbox
 
 
 -- | Unboxing strategy for constructed results.
@@ -638,11 +636,11 @@ canUnboxResult fam_envs ty cpr
   -- Deactivates CPR worker/wrapper splits on constructors with non-linear
   -- arguments, for the moment, because they require unboxed tuple with variable
   -- multiplicity fields.
-  = Unbox (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
-                             , dcpc_co = co, dcpc_args = arg_cprs })
+  = DoUnbox (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
+                               , dcpc_co = co, dcpc_args = arg_cprs })
 
   | otherwise
-  = StopUnboxing
+  = DontUnbox
 
   where
     -- See Note [non-algebraic or open body type warning]
@@ -809,7 +807,8 @@ mkWWstr :: WwOpts
                                          -- original RHS. Corresponds one-to-one
                                          -- with the wrapper arg vars
 mkWWstr opts args str_marks
-  = go args str_marks
+  = -- pprTrace "mkWWstr" (ppr args) $
+    go args str_marks
   where
     go [] _ = return (badWorker, [], nop_fn, [])
     go (arg : args) (str:strs)
@@ -833,29 +832,32 @@ mkWWstr_one :: WwOpts
             -> StrictnessMark
             -> UniqSM (Bool, [(Var,StrictnessMark)], CoreExpr -> CoreExpr, CoreExpr)
 mkWWstr_one opts arg str_mark =
+  -- pprTrace "mkWWstr_one" (ppr arg <+> (if isId arg then ppr arg_ty  $$ ppr arg_dmd else text "type arg")) $
   case canUnboxArg fam_envs arg_ty arg_dmd of
     _ | isTyVar arg -> do_nothing
 
     DropAbsent
       | Just absent_filler <- mkAbsentFiller opts arg str_mark
-         -- Absent case.  Dropt the argument from the worker.
+         -- Absent case.  Drop the argument from the worker.
          -- We can't always handle absence for arbitrary
          -- unlifted types, so we need to choose just the cases we can
          -- (that's what mkAbsentFiller does)
       -> return (goodWorker, [], nop_fn, absent_filler)
+      | otherwise -> do_nothing
 
-    Unbox dcpc -> unbox_one_arg opts arg dcpc
+    DoUnbox dcpc -> -- pprTrace "mkWWstr_one:1" (ppr (dcpc_dc dcpc) <+> ppr (dcpc_tc_args dcpc) $$ ppr (dcpc_args dcpc)) $
+                    unbox_one_arg opts arg dcpc
 
-    _ | isStrictDmd arg_dmd || isMarkedStrict str_mark
-      , wwForUnlifting opts
+    DontUnbox
+      | isStrictDmd arg_dmd || isMarkedStrict str_mark
+      , wwForUnlifting opts  -- See Note [CBV Function Ids]
       , not (isFunTy arg_ty)
       , not (isUnliftedType arg_ty) -- Already unlifted!
         -- NB: function arguments have a fixed RuntimeRep,
         -- so it's OK to call isUnliftedType here
-      -> -- See Note [CBV Function Ids]
-         return  (goodWorker, [(arg, MarkedStrict)], nop_fn, varToCoreExpr arg )
+      -> return  (goodWorker, [(arg, MarkedStrict)], nop_fn, varToCoreExpr arg )
 
-    _ -> do_nothing -- Other cases, like StopUnboxing
+      | otherwise -> do_nothing
 
   where
     fam_envs   = wo_fam_envs opts
@@ -954,7 +956,7 @@ function is worthy for splitting:
 
 2. If the argument is evaluated strictly (or known to be eval'd),
    we can take a view into the product demand ('viewProd'). In accordance
-   with Note [Boxity analysis], 'canUnboxArg' will say 'Unbox'.
+   with Note [Boxity analysis], 'canUnboxArg' will say 'DoUnbox'.
    'mkWWstr_one' then follows suit it and recurses into the fields of the
    product demand. For example
 
@@ -976,7 +978,7 @@ function is worthy for splitting:
      $gw c a b = if c then a else b
 
 2a But do /not/ unbox if Boxity Analysis said "Boxed".
-   In this case, 'canUnboxArg' returns 'StopUnboxing'.
+   In this case, 'canUnboxArg' returns 'DontUnbox'.
    Otherwise we risk decomposing and reboxing a massive
    tuple which is barely used. Example:
 
@@ -997,7 +999,7 @@ function is worthy for splitting:
 3. In all other cases (e.g., lazy, used demand and not eval'd),
    'finaliseArgBoxities' will have cleared the Boxity flag to 'Boxed'
    (see Note [Finalising boxity for demand signatures] in GHC.Core.Opt.DmdAnal)
-   and 'canUnboxArg' returns 'StopUnboxing' so that 'mkWWstr_one'
+   and 'canUnboxArg' returns 'DontUnbox' so that 'mkWWstr_one'
    stops unboxing.
 
 Note [Worker/wrapper for bottoming functions]
@@ -1391,7 +1393,7 @@ mkWWcpr_one :: WwOpts -> Id -> Cpr -> UniqSM CprWwResultOne
 -- ^ See if we want to unbox the result and hand off to 'unbox_one_result'.
 mkWWcpr_one opts res_bndr cpr
   | assert (not (isTyVar res_bndr) ) True
-  , Unbox dcpc <- canUnboxResult (wo_fam_envs opts) (idType res_bndr) cpr
+  , DoUnbox dcpc <- canUnboxResult (wo_fam_envs opts) (idType res_bndr) cpr
   = unbox_one_result opts res_bndr dcpc
   | otherwise
   = return (badWorker, unitOL res_bndr, varToCoreExpr res_bndr, nop_fn)
