@@ -1,7 +1,7 @@
 
 ==================== Strictness signatures ====================
 BottomFromInnerLambda.expensive: <1!P(SL)>
-BottomFromInnerLambda.f: <1!S><1!S>b
+BottomFromInnerLambda.f: <1!P(S)><1!P(S)>b
 
 
 
@@ -13,6 +13,6 @@ BottomFromInnerLambda.f: b
 
 ==================== Strictness signatures ====================
 BottomFromInnerLambda.expensive: <1!P(1L)>
-BottomFromInnerLambda.f: <1!P(1!S)><1!S>b
+BottomFromInnerLambda.f: <1!P(1S)><1!P(S)>b
 
 

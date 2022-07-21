@@ -830,11 +830,13 @@ unboxDeeplySubDmd (Prod _ ds) = mkProd Unboxed (strictMap unboxDeeplyDmd ds)
 unboxDeeplySubDmd call@Call{} = call
 
 -- | Sets 'Boxity' to 'Unboxed' for the 'Demand', recursing into 'Prod's.
+-- Don't recurse into lazy arguments; see GHC.Core.Opt.DmdAnal
+--    Note [No lazy, Unboxed demands in demand signature]
 unboxDeeplyDmd :: Demand -> Demand
 unboxDeeplyDmd AbsDmd   = AbsDmd
 unboxDeeplyDmd BotDmd   = BotDmd
-unboxDeeplyDmd (D n sd) = D n (unboxDeeplySubDmd sd)
-
+unboxDeeplyDmd dmd@(D n sd) | isStrict n = D n (unboxDeeplySubDmd sd)
+                            | otherwise  = dmd
 
 multSubDmd :: Card -> SubDemand -> SubDemand
 multSubDmd C_11 sd           = sd -- An optimisation, for when sd is a deep Prod
@@ -2619,7 +2621,7 @@ instance Outputable Demand where
 
 -- | See Note [Demand notation]
 instance Outputable SubDemand where
-  ppr (Poly b sd) = pp_boxity b <> ppr sd
+  ppr (Poly b n)  = pp_boxity b <> ppr n
   ppr (Call n sd) = char 'C' <> ppr n <> parens (ppr sd)
   ppr (Prod b ds) = pp_boxity b <> char 'P' <> parens (fields ds)
     where

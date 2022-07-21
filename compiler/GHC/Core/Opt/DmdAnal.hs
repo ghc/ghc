@@ -432,35 +432,38 @@ dmdAnal' env dmd (Lam var body)
     in
     WithDmdType new_dmd_type (Lam var' body')
 
-dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
+dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt_con bndrs rhs])
   -- Only one alternative.
   -- If it's a DataAlt, it should be the only constructor of the type and we
   -- can consider its field demands when analysing the scrutinee.
-  | want_precise_field_dmds alt
+  | want_precise_field_dmds alt_con
   = let
         WithDmdType rhs_ty rhs'           = dmdAnal env dmd rhs
         WithDmdType alt_ty1 fld_dmds      = findBndrsDmds env rhs_ty bndrs
         WithDmdType alt_ty2 case_bndr_dmd = findBndrDmd env alt_ty1 case_bndr
         !case_bndr'                       = setIdDemandInfo case_bndr case_bndr_dmd
+
         -- Evaluation cardinality on the case binder is irrelevant and a no-op.
         -- What matters is its nested sub-demand!
         -- NB: If case_bndr_dmd is absDmd, boxity will say Unboxed, which is
         -- what we want, because then `seq` will put a `seqDmd` on its scrut.
         (_ :* case_bndr_sd) = strictifyDmd case_bndr_dmd
+
         -- Compute demand on the scrutinee
         -- FORCE the result, otherwise thunks will end up retaining the
         -- whole DmdEnv
         !(!bndrs', !scrut_sd)
-          | DataAlt _ <- alt
+          | DataAlt _ <- alt_con
           -- See Note [Demand on the scrutinee of a product case]
           -- See Note [Demand on case-alternative binders]
           , (!scrut_sd, fld_dmds') <- addCaseBndrDmd case_bndr_sd fld_dmds
           , let !bndrs' = setBndrsDemandInfo bndrs fld_dmds'
           = (bndrs', scrut_sd)
           | otherwise
-          -- __DEFAULT and literal alts. Simply add demands and discard the
-          -- evaluation cardinality, as we evaluate the scrutinee exactly once.
+          -- DEFAULT alts. Simply add demands and discard the evaluation
+          -- cardinality, as we evaluate the scrutinee exactly once.
           = assert (null bndrs) (bndrs, case_bndr_sd)
+
         alt_ty3
           -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
           | exprMayThrowPreciseException (ae_fam_envs env) scrut
@@ -478,35 +481,27 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_ty" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
-    WithDmdType res_ty (Case scrut' case_bndr' ty [Alt alt bndrs' rhs'])
+    WithDmdType res_ty (Case scrut' case_bndr' ty [Alt alt_con bndrs' rhs'])
     where
-      want_precise_field_dmds alt = case alt of
-        (DataAlt dc)
-          | Nothing <- tyConSingleAlgDataCon_maybe $ dataConTyCon dc -> False
-          | DefinitelyRecursive <- ae_rec_dc env dc                  -> False
-              -- See Note [Demand analysis for recursive data constructors]
-        _                                                            -> True
-
-
-
+      want_precise_field_dmds (DataAlt dc)
+        | Nothing <- tyConSingleAlgDataCon_maybe $ dataConTyCon dc
+        = False    -- Not a product type, even though this is the
+                   -- only remaining possible data constructor
+        | DefinitelyRecursive <- ae_rec_dc env dc
+        = False     -- See Note [Demand analysis for recursive data constructors]
+        | otherwise
+        = True
+      want_precise_field_dmds (LitAlt {}) = False  -- Like the non-product datacon above
+      want_precise_field_dmds DEFAULT     = True
 
 dmdAnal' env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
-        WithDmdType alt_ty alts'     = combineAltDmds alts
-
-        combineAltDmds [] = WithDmdType botDmdType []
-        combineAltDmds (a:as) =
-          let
-            WithDmdType cur_ty a' = dmdAnalSumAlt env dmd case_bndr a
-            WithDmdType rest_ty as' = combineAltDmds as
-          in WithDmdType (lubDmdType cur_ty rest_ty) (a':as')
+        WithDmdType scrut_ty scrut' = dmdAnal env topSubDmd scrut
 
         WithDmdType alt_ty1 case_bndr_dmd = findBndrDmd env alt_ty case_bndr
         !case_bndr'                       = setIdDemandInfo case_bndr case_bndr_dmd
-        WithDmdType scrut_ty scrut'       = dmdAnal env topSubDmd scrut
-                               -- NB: Base case is botDmdType, for empty case alternatives
-                               --     This is a unit for lubDmdType, and the right result
-                               --     when there really are no alternatives
+        WithDmdType alt_ty alts'          = dmdAnalSumAlts env dmd case_bndr alts
+
         fam_envs             = ae_fam_envs env
         alt_ty2
           -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
@@ -564,7 +559,20 @@ forcesRealWorld fam_envs ty
   | otherwise
   = False
 
-dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> Alt Var -> WithDmdType (Alt Var)
+dmdAnalSumAlts :: AnalEnv -> SubDemand -> Id -> [CoreAlt] -> WithDmdType [CoreAlt]
+
+dmdAnalSumAlts _ _ _ [] = WithDmdType botDmdType []
+  -- Base case is botDmdType, for empty case alternatives
+  -- This is a unit for lubDmdType, and the right result
+  -- when there really are no alternatives
+dmdAnalSumAlts env dmd case_bndr (alt:alts)
+  = let
+      WithDmdType cur_ty  alt'  = dmdAnalSumAlt env dmd case_bndr alt
+      WithDmdType rest_ty alts' = dmdAnalSumAlts env dmd case_bndr alts
+    in WithDmdType (lubDmdType cur_ty rest_ty) (alt':alts')
+
+
+dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> CoreAlt -> WithDmdType CoreAlt
 dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
   | WithDmdType rhs_ty rhs' <- dmdAnal env dmd rhs
   , WithDmdType alt_ty dmds <- findBndrsDmds env rhs_ty bndrs
@@ -752,10 +760,13 @@ T11545 features a single-product, recursive data type
 Naturally, `(==)` is deeply strict in `A` and in fact will never terminate. That
 leads to very large (exponential in the depth) demand signatures and fruitless
 churn in boxity analysis, demand analysis and worker/wrapper.
-So we detect `A` as a recursive data constructor
-(see Note [Detecting recursive data constructors]) analysing `case x of A ...`
+
+So we detect `A` as a recursive data constructor (see
+Note [Detecting recursive data constructors]) analysing `case x of A ...`
 and simply assume L for the demand on field binders, which is the same code
-path as we take for sum types.
+path as we take for sum types. This code happens in want_precise_field_dmds
+in the Case equation for dmdAnal.
+
 Combined with the B demand on the case binder, we get the very small demand
 signature <1S><1S>b on `(==)`. This improves ghc/alloc performance on T11545
 tenfold! See also Note [CPR for recursive data constructors] which describes the
@@ -1267,38 +1278,67 @@ this, that actually happened in practice.
 
 Note [Boxity for bottoming functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-```hs
-indexError :: Show a => (a, a) -> a -> String -> b
--- Str=<..><1!P(S,S)><1S><S>b
-indexError rng i s = error (show rng ++ show i ++ show s)
+Consider (A)
+    indexError :: Show a => (a, a) -> a -> String -> b
+    -- Str=<..><1!P(S,S)><1S><S>b
+    indexError rng i s = error (show rng ++ show i ++ show s)
 
-get :: (Int, Int) -> Int -> [a] -> a
-get p@(l,u) i xs
-  | l <= i, i < u = xs !! (i-u)
-  | otherwise     = indexError p i "get"
-```
-The hot path of `get` certainly wants to unbox `p` as well as `l` and `u`, but
-the unimportant, diverging error path needs `l` and `u` boxed (although the
-wrapper for `indexError` *will* unbox `p`). This pattern often occurs in
-performance sensitive code that does bounds-checking.
+    get :: (Int, Int) -> Int -> [a] -> a
+    get p@(l,u) i xs
+      | l <= i, i < u = xs !! (i-u)
+      | otherwise     = indexError p i "get"
 
-It would be a shame to let `Boxed` win for the fields! So here's what we do:
-While summarising `indexError`'s boxity signature in `finaliseArgBoxities`,
-we `unboxDeeplyDmd` all its argument demands and are careful not to discard
-excess boxity in the `StopUnboxing` case, to get the signature
-`<1!P(!S,!S)><1!S><S!S>b`.
+The hot path of `get` certainly wants to unbox `p` as well as `l` and
+`u`, but the unimportant, diverging error path needs `l::a` and `u::a`
+boxed, since `indexError` can't unbox them because they are polymorphic.
+This pattern often occurs in performance sensitive code that does
+bounds-checking.
 
-Then worker/wrapper will not only unbox the pair passed to `indexError` (as it
-would do anyway), demand analysis will also pretend that `indexError` needs `l`
-and `u` unboxed (and the two other args). Which is a lie, because `indexError`'s
-type abstracts over their types and could never unbox them.
+So we want to give `indexError` a signature like `<1!P(!S,!S)><1!S><S!S>b`
+where the !S (meaning Poly Unboxed C1N) says that the polymorphic arguments
+are unboxed (recursively).  The wrapper for `indexError` won't /acutally/
+unbox them (because their polymorphic type doesn't allow that) but when
+demand-analysing /callers/, we'll behave as if that call needs the args
+unboxed.
 
-The important change is at the *call sites* of `$windexError`: Boxity analysis
-will conclude to unbox `l` and `u`, which *will* incur reboxing of crud that
-should better float to the call site of `$windexError`. There we don't care
-much, because it's in the slow, diverging code path! And that floating often
-happens, but not always. See Note [Reboxed crud for bottoming calls].
+Then at call sites of `indexError`, we will end up doing some
+reboxing, because `$windexError` still takes boxed arguments. This
+reboxing should usually float into the slow, diverging code path; but
+sometimes (sadly) it doesn't: see Note [Reboxed crud for bottoming calls].
+
+Here is another important case (B):
+    f x = Just x  -- Suppose f is not inlined for some reason
+                  -- Main point: f takes its argument boxed
+
+    wombat x = error (show (f x))
+
+    g :: Bool -> Int -> a
+    g True  x = x+1
+    g False x = wombat x
+
+Again we want `wombat` to pretend to take its Int-typed argument unboxed,
+even though it has to pass it boxed to `f`, so that `g` can take its
+arugment unboxed (and rebox it before calling `wombat`).
+
+So here's what we do: while summarising `indexError`'s boxity signature in
+`finaliseArgBoxities`:
+
+* To address (B), for bottoming functions, we start by using `unboxDeeplyDmd`
+  to make all its argument demands unboxed, right to the leaves; regardless
+  of what the analysis said.
+
+* To address (A), for bottoming functions, in the DontUnbox case when the
+  argument is a type variable, we /refrain/ from using trimBoxity.
+  (Remember the previous bullet: we have already doen `unboxDeeplyDmd`.)
+
+Wrinkle:
+
+* Remember Note [No lazy, Unboxed demands in demand signature]. So
+  unboxDeeplyDmd doesn't recurse into lazy demands.  It's extremely unusual
+  to have lazy demands in the arguments of a bottoming function anyway.
+  But it can happen, when the demand analyser gives up because it
+  encounters a recursive data type; see Note [Demand analysis for recursive
+  data constructors].
 
 Note [Reboxed crud for bottoming calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1617,7 +1657,11 @@ finaliseArgBoxities env fn arity rhs div
              -- simply want to give f the same demand signature as g
 
   | otherwise
-  = Just (arg_dmds', add_demands arg_dmds' rhs)
+  = -- pprTrace "finaliseArgBoxities" (
+    --   vcat [text "function:" <+> ppr fn
+    --        , text "dmds before:" <+> ppr (map idDemandInfo (filter isId bndrs))
+    --        , text "dmds after: " <+>  ppr arg_dmds' ]) $
+    Just (arg_dmds', add_demands arg_dmds' rhs)
     -- add_demands: we must attach the final boxities to the lambda-binders
     -- of the function, both because that's kosher, and because CPR analysis
     -- uses the info on the binders directly.
@@ -1649,7 +1693,7 @@ finaliseArgBoxities env fn arity rhs div
         -- NB: even for bottoming functions, don't unbox dictionaries
 
       | is_bot_fn = unboxDeeplyDmd dmd
-        -- See Note [Boxity for bottoming functions]
+        -- See Note [Boxity for bottoming functions], case (B)
 
       | is_opaque = trimBoxity dmd
         -- See Note [OPAQUE pragma]
@@ -1669,19 +1713,15 @@ finaliseArgBoxities env fn arity rhs div
     go_arg :: Budgets -> (Type,StrictnessMark,Demand) -> (Budgets, Demand)
     go_arg bg@(MkB bg_top bg_inner) (ty, str_mark, dmd@(n :* _))
       = case wantToUnboxArg env ty str_mark dmd of
-          FD_Absent -> (bg, dmd)
+          DropAbsent -> (bg, dmd)
 
-          FD_Box | is_bot_fn -> (decremented_bg, dmd)
-                 | otherwise -> (decremented_bg, trimBoxity dmd)
+          DontUnbox | is_bot_fn, isTyVarTy ty -> (decremented_bg, dmd)
+                    | otherwise               -> (decremented_bg, trimBoxity dmd)
             -- If bot: Keep deep boxity even though WW won't unbox
-            -- See Note [Boxity for bottoming functions]
+            -- See Note [Boxity for bottoming functions] case (A)
             -- trimBoxity: see Note [No lazy, Unboxed demands in demand signature]
 
-          FD_RecBox -> (decremented_bg, trimBoxity dmd)
-            -- Important: must do trimBoxity for FD_RecBox, even for bottoming fns,
-            -- else we unbox infinitely (simpl019, T11545, T18304, T4903)
-
-          FD_Unbox triples -> (MkB (bg_top-1) final_bg_inner, final_dmd)
+          DoUnbox triples -> (MkB (bg_top-1) final_bg_inner, final_dmd)
             where
               (bg_inner', dmds') = go_args (incTopBudget bg_inner) triples
                      -- incTopBudget: give one back for the arg we are unboxing
@@ -1715,57 +1755,34 @@ finaliseLetBoxity env ty dmd
     go :: (Type,StrictnessMark,Demand) -> Demand
     go (ty, str, dmd@(n :* _)) =
       case wantToUnboxArg env ty str dmd of
-        FD_Absent        -> dmd
-        FD_Box           -> trimBoxity dmd
-        FD_RecBox        -> trimBoxity dmd
-        FD_Unbox triples -> n :* (mkProd Unboxed $! map go triples)
+        DropAbsent      -> dmd
+        DontUnbox       -> trimBoxity dmd
+        DoUnbox triples -> n :* (mkProd Unboxed $! map go triples)
 
--- The data type `FinalDecision` is entirely local to this one module,
--- and is used only to express the result of `wantToUnboxArg`.
---
--- `FinalDecision` is a bit like WorkWrap.Utils.UnboxingDecision, but
--- not quite the same, notably because of the need for FD_RecBox.  But
--- I decided make `FinalDecision` do just what was needed, rather than
--- to attempt to generalise `UnboxingDecision`, or make it GADT-ish or
--- something.
-data FinalDecision
-  = FD_Absent
-  | FD_Box        -- Keep this argument boxed
-  | FD_RecBox     -- Special case of a strict recursive product!  Take care!
-  | FD_Unbox [(Type, StrictnessMark, Demand)]
-
-wantToUnboxArg :: AnalEnv -> Type -> StrictnessMark -> Demand -> FinalDecision
+wantToUnboxArg :: AnalEnv -> Type -> StrictnessMark -> Demand
+               -> UnboxingDecision [(Type, StrictnessMark, Demand)]
 wantToUnboxArg env ty str_mark dmd@(n :* _)
-  | isAbs n
-  = FD_Absent
-
-  | not (isStrict n || isMarkedStrict str_mark)
-  = FD_Box -- Don't unbox a lazy field
-    -- isMarkedStrict: see Note [Unboxing evaluated arguments] in DmdAnal
-
-  | otherwise
   = case canUnboxArg (ae_fam_envs env) ty dmd of
-      DropAbsent -> FD_Absent
-        -- The earlier isAbs guard means this case won't happen, in fact;
-        -- but it does no harm.  We can't drop the isAbs guard or we'd
-        -- wrongly return StopUnboxing for absent args.
+      DropAbsent -> DropAbsent
+      DontUnbox  -> DontUnbox
 
-      StopUnboxing -> FD_Box
-
-      Unbox (DataConPatContext{ dcpc_dc      = dc
-                              , dcpc_tc_args = tc_args
-                              , dcpc_args    = dmds })
+      DoUnbox (DataConPatContext{ dcpc_dc      = dc
+                                , dcpc_tc_args = tc_args
+                                , dcpc_args    = dmds })
        -- OK, so we /can/ unbox it; but do we /want/ to?
+       | not (isStrict n || isMarkedStrict str_mark)   -- Don't unbox a lazy field
+         -- isMarkedStrict: see Note [Unboxing evaluated arguments] in DmdAnal
+       -> DontUnbox
+
        | DefinitelyRecursive <- ae_rec_dc env dc
          -- See Note [Which types are unboxed?]
          -- and Note [Demand analysis for recursive data constructors]
-       -> FD_RecBox
+       -> DontUnbox
 
-       | otherwise
-       -> FD_Unbox (zip3 (dubiousDataConInstArgTys dc tc_args)
-                         (dataConRepStrictness dc)
-                         dmds)
-
+       | otherwise  -- Bad cases dealt with: we want to unbox!
+       -> DoUnbox (zip3 (dubiousDataConInstArgTys dc tc_args)
+                        (dataConRepStrictness dc)
+                        dmds)
 
 {- *********************************************************************
 *                                                                      *

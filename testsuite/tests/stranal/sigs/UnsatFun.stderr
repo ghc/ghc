@@ -1,7 +1,7 @@
 
 ==================== Strictness signatures ====================
-UnsatFun.f: <1!S><B>b
-UnsatFun.g: <1!S>b
+UnsatFun.f: <1!P(S)><B>b
+UnsatFun.g: <1!P(S)>b
 UnsatFun.g': <MS>
 UnsatFun.g3: <A>
 UnsatFun.h: <1C1(L)>
@@ -22,8 +22,8 @@ UnsatFun.h3: 1
 
 
 ==================== Strictness signatures ====================
-UnsatFun.f: <1!S><B>b
-UnsatFun.g: <1!S>b
+UnsatFun.f: <1!P(S)><B>b
+UnsatFun.g: <1!P(S)>b
 UnsatFun.g': <MS>
 UnsatFun.g3: <A>
 UnsatFun.h: <1C1(L)>
