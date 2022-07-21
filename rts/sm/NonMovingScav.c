@@ -10,6 +10,79 @@
 #include "Printer.h"
 #include "MarkWeak.h" // scavengeLiveWeak
 
+/*
+ * Note [Scavenging the non-moving heap]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The moving GC promotes objects from the moving heap into the non-moving heap
+ * via evacuation and subsequent scavenging. This of course raises the question
+ * of how to keep track of which objects still require scavenging. The story
+ * here is as follows:
+ *
+ *  - each GC thread maintains a list, `todo_seg`, of "todo" segments which
+ *    still have outstanding scavenging work
+ *  - similar to the moving collector, we use the scan pointer of a segment's
+ *    block descriptor to track the first yet-to-be-scavenged object.
+ *  - the first time we evacuate into an segment during a GC, we push the
+ *    segment onto the `todo_seg` list
+ *  - scavenge_find_work checks `todo_seg` as a source of scavenging work
+ *
+ * The scan pointer requires very careful treatment here. Specifically, we must
+ * only scavenge objects which we evacuated in the current GC to avoid issues
+ * like #21885. objects evacuated to the non-moving generation. In particular,
+ * objects can be allocated into the non-moving generation by two ways:
+ *
+ *  a. evacuation out of from-space by the garbage collector
+ *  b. direct allocation by the mutator
+ *
+ * Like all evacuation, objects moved by (a) must be scavenged, since they
+ * may contain references to other objects located in from-space..
+ * However, we must not neglect to consider objects allocated by path (b).
+ * In short, the problem is that objects directly allocated by the mutator
+ * may become unreachable (but not swept, since the containing segment is
+ * not yet full), at which point they may contain references to swept objects.
+ * Specifically, we observed this in #21885 in the following way:
+ *
+ * 1. the mutator (specifically in #21885, a `lockCAF`) allocates an object
+ *    (specifically a blackhole, which here we will call `blkh`; see Note
+ *    [Static objects under the nonmoving collector] for the reason why) on
+ *    the non-moving heap. The bitmap of the allocated block remains 0
+ *    (since allocation doesn't affect the bitmap) and the containing
+ *    segment's (which we will call `blkh_seg`) `next_free` is advanced.
+ * 2. We enter the blackhole, evaluating the blackhole to produce a result
+ *    (specificaly a cons cell) in the nursery
+ * 3. The blackhole gets updated into an indirection pointing to the cons
+ *    cell; it is pushed to the generational remembered set
+ * 4. we perform a GC, the cons cell is evacuated into the nonmoving heap
+ *    (into segment `cons_seg`)
+ * 5. the cons cell is marked
+ * 6. the GC concludes
+ * 7. the CAF and blackhole become unreachable
+ * 8. `cons_seg` is filled
+ * 9. we start another GC; the cons cell is swept
+ * 10. we start a new GC
+ * 11. something is evacuated into `blkh_seg`, adding it to the "todo" list
+ * 12. we attempt to scavenge `blkh_seg` (namely, all unmarked blocks
+ *     between `scan` and `next_free`, which includes `blkh`). We attempt to
+ *     evacuate `blkh`'s indirectee, which is the previously-swept cons cell.
+ *     This is unsafe, since the indirectee is no longer a valid heap
+ *     object.
+ *
+ * The problem here was that the scavenging logic previously assumed that (a)
+ * was the only source of allocations into the non-moving heap and therefore
+ * *all* unmarked blocks between `scan` and `next_free` were evacuated.
+ * However, due to (b) this is not true, since the scan pointer was only
+ * updated (1) when the segment was initialized (to point to block 0),
+ * and (2) when an object is scavenged (by advancing it to the next block).
+ * Consequently, at the beginning of a GC `scan` may point a block which was
+ * allocated by the mutator since the last GC.
+ *
+ * The solution is to ensure that that the scanned region only encompasses
+ * the region of objects allocated for evacuation during the present GC. We do
+ * this by updating `scan` as we push the segment to the todo-segment list to
+ * point to the block which was evacuated into.
+ *
+ */
+
 void
 nonmovingScavengeOne (StgClosure *q)
 {
@@ -383,13 +456,21 @@ scavengeNonmovingSegment (struct NonmovingSegment *seg)
     ASSERT(seg_block->u.scan >= (P_)nonmovingSegmentGetBlock(seg, 0));
     ASSERT(seg_block->u.scan <= (P_)nonmovingSegmentGetBlock(seg, seg->next_free));
 
+    StgPtr scan = seg_block->u.scan;
     StgPtr scan_end = (P_)nonmovingSegmentGetBlock(seg, seg->next_free);
-    if (seg_block->u.scan == scan_end)
+    if (scan == scan_end)
         return;
 
-    nonmoving_block_idx p_idx = nonmovingGetBlockIdx(seg_block->u.scan);
-    while (seg_block->u.scan < scan_end) {
-        StgClosure *p = (StgClosure*)seg_block->u.scan;
+    // At this point the segment is not on the todo_seg list. Consequently, we
+    // may need to re-add it during scavenging (as we may evacuate a new object
+    // to this segment); this has the effect of updating the scan pointer.
+    // We must therefore take care to move the scan pointer to the end of the
+    // scanned region *before* doing any scavenging.
+    seg_block->u.scan = scan_end;
+
+    nonmoving_block_idx p_idx = nonmovingGetBlockIdx(scan);
+    while (scan < scan_end) {
+        StgClosure *p = (StgClosure*)scan;
 
         // bit set = was allocated in a previous GC, no need to scavenge
         // bit not set = new allocation, so scavenge
@@ -397,7 +478,7 @@ scavengeNonmovingSegment (struct NonmovingSegment *seg)
             nonmovingScavengeOne(p);
         }
 
+        scan = (StgPtr) ((uint8_t*) scan + blk_size);
         p_idx++;
-        seg_block->u.scan = (P_)(((uint8_t*)seg_block->u.scan) + blk_size);
     }
 }

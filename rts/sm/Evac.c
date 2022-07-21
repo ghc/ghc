@@ -70,6 +70,7 @@ alloc_in_nonmoving_heap (uint32_t size)
     gct->copied += size;
     StgPtr to = nonmovingAllocate(gct->cap, size);
 
+    // See Note [Scavenging the non-moving heap] in NonMovingScav.c.
     // Add segment to the todo list unless it's already there
     // current->todo_link == NULL means not in todo list
     struct NonmovingSegment *seg = nonmovingGetSegment(to);
@@ -77,6 +78,8 @@ alloc_in_nonmoving_heap (uint32_t size)
         gen_workspace *ws = &gct->gens[oldest_gen->no];
         seg->todo_link = ws->todo_seg;
         ws->todo_seg = seg;
+        bdescr *seg_bd = Bdescr((StgPtr) seg);
+        seg_bd->u.scan = to;
     }
 
     // The object which refers to this closure may have been aged (i.e.
