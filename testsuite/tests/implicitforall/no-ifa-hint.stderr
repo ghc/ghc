@@ -1,7 +1,0 @@
-no-ifa-hint.hs:5:6:
-    Not in scope: type variable ‘a’
-    Suggested fix:
-      Perhaps you intended to use ImplicitForAll
-      The extension has been turned off manually, which requires type variables to be bound by  ‘forall’
-
-no-ifa-hint.hs:9:22: Not in scope: type variable ‘b’
