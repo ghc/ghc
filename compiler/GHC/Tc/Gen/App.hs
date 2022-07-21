@@ -289,6 +289,7 @@ particular Ids:
   the renamer (Note [Handling overloaded and rebindable constructs] in
   GHC.Rename.Expr), and we want them to be instantiated impredicatively
   so that (f `op`), say, will work OK even if `f` is higher rank.
+  See Note [Left and right sections] in GHC.Rename.Expr.
 
 Note [Unify with expected type before typechecking arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -349,12 +350,26 @@ tcApp rn_expr exp_res_ty
                  = addFunResCtxt rn_fun rn_args app_res_rho exp_res_ty $
                    thing_inside
 
+       -- Match up app_res_rho: the result type of rn_expr
+       --     with exp_res_ty:  the expected result type
+       ; do_ds <- xoptM LangExt.DeepSubsumption
        ; res_wrap <- perhaps_add_res_ty_ctxt $
-                     tcSubTypeNC (exprCtOrigin rn_expr) GenSigCtxt (Just $ ppr rn_expr)
-                                 app_res_rho exp_res_ty
-                     -- Need tcSubType because of the possiblity of deep subsumption.
-                     -- app_res_rho and exp_res_ty are both rho-types, so without
-                     -- deep subsumption unifyExpectedType would be sufficient
+            if not do_ds
+            then -- No deep subsumption
+                 -- app_res_rho and exp_res_ty are both rho-types,
+                 -- so with simple subsumption we can just unify them
+                 -- No need to zonk; the unifier does that
+                 do { co <- unifyExpectedType rn_expr app_res_rho exp_res_ty
+                    ; return (mkWpCastN co) }
+
+            else -- Deep subsumption
+                 -- Even though both app_res_rho and exp_res_ty are rho-types,
+                 -- they may have nested polymorphism, so if deep subsumption
+                 -- is on we must call tcSubType.
+                 -- Zonk app_res_rho first, becuase QL may have instantiated some
+                 -- delta variables to polytypes, and tcSubType doesn't expect that
+                 do { app_res_rho <- zonkQuickLook do_ql app_res_rho
+                    ; tcSubTypeDS rn_expr app_res_rho exp_res_ty }
 
        ; whenDOptM Opt_D_dump_tc_trace $
          do { inst_args <- mapM zonkArg inst_args  -- Only when tracing
@@ -380,7 +395,6 @@ tcApp rn_expr exp_res_ty
 
 --------------------
 wantQuickLook :: HsExpr GhcRn -> TcM Bool
--- GHC switches on impredicativity all the time for ($)
 wantQuickLook (HsVar _ (L _ f))
   | getUnique f `elem` quickLookKeys = return True
 wantQuickLook _                      = xoptM LangExt.ImpredicativeTypes

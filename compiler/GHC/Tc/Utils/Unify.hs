@@ -17,7 +17,7 @@ module GHC.Tc.Utils.Unify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcWrapResultMono,
   tcTopSkolemise, tcSkolemiseScoped, tcSkolemiseExpType,
-  tcSubType, tcSubTypeNC, tcSubTypeSigma, tcSubTypePat,
+  tcSubType, tcSubTypeSigma, tcSubTypePat, tcSubTypeDS,
   tcSubTypeAmbiguity, tcSubMult,
   checkConstraints, checkTvConstraints,
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
@@ -611,6 +611,27 @@ tcSubType orig ctxt ty_actual ty_expected
     do { traceTc "tcSubType" (vcat [pprUserTypeCtxt ctxt, ppr ty_actual, ppr ty_expected])
        ; tcSubTypeNC orig ctxt Nothing ty_actual ty_expected }
 
+---------------
+tcSubTypeDS :: HsExpr GhcRn
+            -> TcRhoType   -- Actual -- a rho-type not a sigma-type
+            -> ExpRhoType  -- Expected
+            -> TcM HsWrapper
+-- Similar signature to unifyExpectedType; does deep subsumption
+-- Only one call site, in GHC.Tc.Gen.App.tcApp
+tcSubTypeDS rn_expr act_rho res_ty
+  = case res_ty of
+      Check exp_rho -> do { dflags <- getDynFlags
+                          ; tc_sub_type_deep dflags (unifyType m_thing) orig
+                                        GenSigCtxt act_rho exp_rho
+                          }
+
+      Infer inf_res -> do { co <- fillInferResult act_rho inf_res
+                          ; return (mkWpCastN co) }
+  where
+    orig    = exprCtOrigin rn_expr
+    m_thing = Just (ppr rn_expr)
+
+---------------
 tcSubTypeNC :: CtOrigin          -- ^ Used when instantiating
             -> UserTypeCtxt      -- ^ Used when skolemising
             -> Maybe SDoc        -- ^ The expression that has type 'actual' (if known)
@@ -914,7 +935,7 @@ The effects are in these main places:
    signatures (e.g. f :: ty; f = e), we must deeply skolemise the type;
    see the call to tcDeeplySkolemise in tcSkolemiseScoped.
 
-4. In GHC.Tc.Gen.App.tcApp we call tcSubTypeNC to match the result
+4. In GHC.Tc.Gen.App.tcApp we call tcSubTypeDS to match the result
    type. Without deep subsumption, unifyExpectedType would be sufficent.
 
 In all these cases note that the deep skolemisation must be done /first/.
