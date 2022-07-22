@@ -1,5 +1,7 @@
 
-T7276.hs:6:8: error:
+T7276.hs:6:5: error:
+    • Exception when trying to run compile-time code:
+        T7276.hs:6:8: error:
     • Couldn't match type ‘[Language.Haskell.TH.Syntax.Dec]’
                      with ‘Language.Haskell.TH.Syntax.Exp’
       Expected: Language.Haskell.TH.Lib.Internal.ExpQ
@@ -7,3 +9,6 @@ T7276.hs:6:8: error:
                   Language.Haskell.TH.Lib.Internal.Decs
     • In the expression: [d| y = 3 |]
       In the untyped splice: $([d| y = 3 |])
+(deferred type error)
+      Code: ([d| y = 3 |])
+    • In the untyped splice: $([d| y = 3 |])
