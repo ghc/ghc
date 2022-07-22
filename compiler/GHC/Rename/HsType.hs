@@ -29,7 +29,7 @@ module GHC.Rename.HsType (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
-        bindHsOuterTyVarBndrs, bindHsForAllTelescope,
+        bindHsOuterTyVarBndrs, bindHsOuterTyVarBndrsNotInScope, bindHsForAllTelescope,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
         rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars,
         FreeKiTyVars, filterInScopeM,
@@ -134,15 +134,12 @@ rnHsSigWcType :: HsDocContext
               -> RnM (LHsSigWcType GhcRn, FreeVars)
 rnHsSigWcType doc (HsWC { hswc_body =
     sig_ty@(L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
-  = do { free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
-       ; (nwc_rdrs', imp_tv_nms) <- partition_nwcs free_vars
-       ; let nwc_rdrs = nubL nwc_rdrs'
-       ; bindHsOuterTyVarBndrs doc Nothing imp_tv_nms outer_bndrs $ \outer_bndrs' ->
+  = bindHsOuterTyVarBndrsNotInScopeWc True doc Nothing (extract_lhs_sig_ty sig_ty) outer_bndrs $ \nwc_rdrs outer_bndrs' ->
     do { (wcs, body_ty', fvs) <- rnWcBody doc nwc_rdrs body_ty
        ; pure ( HsWC  { hswc_ext = wcs, hswc_body = L loc $
                 HsSig { sig_ext = noExtField
                       , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
-              , fvs) } }
+              , fvs) }
 
 rnHsPatSigType :: HsPatSigTypeScoping
                -> HsDocContext
@@ -372,8 +369,7 @@ rnHsSigType ctx level
        ; case outer_bndrs of
            HsOuterExplicit{} -> checkPolyKinds env sig_ty
            HsOuterImplicit{} -> pure ()
-       ; imp_vars <- filterInScopeM $ extractHsTyRdrTyVars body
-       ; bindHsOuterTyVarBndrs ctx Nothing imp_vars outer_bndrs $ \outer_bndrs' ->
+       ; bindHsOuterTyVarBndrsNotInScope ctx Nothing (extractHsTyRdrTyVars body) outer_bndrs $ \outer_bndrs' ->
     do { (body', fvs) <- rnLHsTyKi env body
 
        ; return ( L loc $ HsSig { sig_ext = noExtField
@@ -1193,6 +1189,31 @@ bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
       bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' ->
         thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
                                        , hso_bndrs     = exp_bndrs' }
+
+bindHsOuterTyVarBndrsNotInScopeWc :: OutputableBndrFlag flag 'Renamed
+                                  => Bool
+                                  -> HsDocContext
+                                  -> Maybe assoc
+                                    -- ^ @'Just' _@ => an associated type decl
+                                  -> FreeKiTyVars
+                                  -> HsOuterTyVarBndrs flag GhcPs
+                                  -> (FreeKiTyVars -> HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
+                                  -> RnM (a, FreeVars)
+bindHsOuterTyVarBndrsNotInScopeWc extractWc doc mb_cls tyvars outer_bndrs thing_inside = do
+  free_vars <- filterInScopeM tyvars
+  (nwc_rdrs', imp_tv_nms) <- if extractWc then partition_nwcs free_vars else pure ([], free_vars)
+  bindHsOuterTyVarBndrs doc mb_cls imp_tv_nms outer_bndrs (thing_inside (nubL nwc_rdrs'))
+
+bindHsOuterTyVarBndrsNotInScope :: OutputableBndrFlag flag 'Renamed
+                                => HsDocContext
+                                -> Maybe assoc
+                                  -- ^ @'Just' _@ => an associated type decl
+                                -> FreeKiTyVars
+                                -> HsOuterTyVarBndrs flag GhcPs
+                                -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
+                                -> RnM (a, FreeVars)
+bindHsOuterTyVarBndrsNotInScope doc mb_cls tyvars outer_bndrs thing_inside =
+  bindHsOuterTyVarBndrsNotInScopeWc False doc mb_cls tyvars outer_bndrs (const thing_inside)
 
 bindHsForAllTelescope :: HsDocContext
                       -> HsForAllTelescope GhcPs
