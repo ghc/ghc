@@ -25,7 +25,9 @@ test('staticcallstack002',
      ['-O0 -g3 -fdistinct-constructor-tables -finfo-table-map'])
 
 test('T21455',
-     [extra_run_opts('+RTS -hT -postem')],
+     [extra_run_opts('+RTS -hT -postem'),
+      # Nonmoving collector doesn't support -hT
+      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
      compile_and_run,
      [''])
 
