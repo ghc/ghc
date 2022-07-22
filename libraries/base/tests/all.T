@@ -258,7 +258,11 @@ test('T16943b', normal, compile_and_run, [''])
 test('T17499', [collect_stats('bytes allocated',5)], compile_and_run, ['-O -w'])
 test('T16643', normal, compile_and_run, [''])
 test('clamp', normal, compile_and_run, [''])
-test('T18642', extra_run_opts('+RTS -T -RTS'), compile_and_run, ['-O2'])
+test('T18642',
+     [extra_run_opts('+RTS -T -RTS'),
+      # The nonmoving GC's residency behavior is very conservative
+      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
+     compile_and_run, ['-O2'])
 test('T19288', exit_code(1), compile_and_run, [''])
 test('T19719', normal, compile_and_run, [''])
 test('T20107', extra_run_opts('+RTS -M50M'), compile_and_run, ['-package bytestring'])
