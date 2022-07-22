@@ -1058,7 +1058,7 @@ tc_infer_hs_type _ (XHsType ty)
            subst_prs = [ (getUnique nm, tv)
                        | ATyVar nm tv <- nonDetNameEnvElts (tcl_env env) ]
            subst = mkTvSubst
-                     (mkInScopeSet $ mkVarSet $ map snd subst_prs)
+                     (mkInScopeSetList $ map snd subst_prs)
                      (listToUFM_Directly $ map (liftSnd mkTyVarTy) subst_prs)
            ty' = substTy subst ty
        return (ty', tcTypeKind ty')
@@ -3663,7 +3663,7 @@ etaExpandAlgTyCon flav skol_info tcbs res_kind
   = return ([], res_kind)
   where
     tyvars     = binderVars tcbs
-    in_scope   = mkInScopeSet (mkVarSet tyvars)
+    in_scope   = mkInScopeSetList tyvars
     avoid_occs = map getOccName tyvars
 
 needsEtaExpansion :: TyConFlavour -> Bool

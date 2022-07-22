@@ -556,30 +556,34 @@ data InjectivityCheckResult
 injectiveBranches :: [Bool] -> CoAxBranch -> CoAxBranch
                   -> InjectivityCheckResult
 injectiveBranches injectivity
-                  ax1@(CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
-                  ax2@(CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
+                  ax1@(CoAxBranch { cab_tvs = tvs1, cab_lhs = lhs1, cab_rhs = rhs1 })
+                  ax2@(CoAxBranch { cab_tvs = tvs2, cab_lhs = lhs2, cab_rhs = rhs2 })
   -- See Note [Verifying injectivity annotation], case 1.
   = let getInjArgs  = filterByList injectivity
-    in case tcUnifyTyWithTFs True rhs1 rhs2 of -- True = two-way pre-unification
+        in_scope    = mkInScopeSetList (tvs1 ++ tvs2)
+    in case tcUnifyTyWithTFs True in_scope rhs1 rhs2 of -- True = two-way pre-unification
        Nothing -> InjectivityAccepted
          -- RHS are different, so equations are injective.
          -- This is case 1A from Note [Verifying injectivity annotation]
-       Just subst -> -- RHS unify under a substitution
-        let lhs1Subst = Type.substTys subst (getInjArgs lhs1)
-            lhs2Subst = Type.substTys subst (getInjArgs lhs2)
-        -- If LHSs are equal under the substitution used for RHSs then this pair
-        -- of equations does not violate injectivity annotation. If LHSs are not
-        -- equal under that substitution then this pair of equations violates
-        -- injectivity annotation, but for closed type families it still might
-        -- be the case that one LHS after substitution is unreachable.
-        in if eqTypes lhs1Subst lhs2Subst  -- check case 1B1 from Note.
-           then InjectivityAccepted
-           else InjectivityUnified ( ax1 { cab_lhs = Type.substTys subst lhs1
-                                         , cab_rhs = Type.substTy  subst rhs1 })
-                                   ( ax2 { cab_lhs = Type.substTys subst lhs2
-                                         , cab_rhs = Type.substTy  subst rhs2 })
-                -- payload of InjectivityUnified used only for check 1B2, only
-                -- for closed type families
+
+       Just subst -- RHS unify under a substitution
+          -- If LHSs are equal under the substitution used for RHSs then this pair
+          -- of equations does not violate injectivity annotation. If LHSs are not
+          -- equal under that substitution then this pair of equations violates
+          -- injectivity annotation, but for closed type families it still might
+          -- be the case that one LHS after substitution is unreachable.
+          | eqTypes lhs1Subst lhs2Subst  -- check case 1B1 from Note.
+          -> InjectivityAccepted
+          | otherwise
+          -> InjectivityUnified ( ax1 { cab_lhs = Type.substTys subst lhs1
+                                      , cab_rhs = Type.substTy  subst rhs1 })
+                                ( ax2 { cab_lhs = Type.substTys subst lhs2
+                                      , cab_rhs = Type.substTy  subst rhs2 })
+                  -- Payload of InjectivityUnified used only for check 1B2, only
+                  -- for closed type families
+        where
+          lhs1Subst = Type.substTys subst (getInjArgs lhs1)
+          lhs2Subst = Type.substTys subst (getInjArgs lhs2)
 
 -- takes a CoAxiom with unknown branch incompatibilities and computes
 -- the compatibilities

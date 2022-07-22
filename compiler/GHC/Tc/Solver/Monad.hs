@@ -89,7 +89,7 @@ module GHC.Tc.Solver.Monad (
     instDFunType,                              -- Instantiation
 
     -- MetaTyVars
-    newFlexiTcSTy, instFlexi, instFlexiX,
+    newFlexiTcSTy, instFlexiX,
     cloneMetaTyVar,
     tcInstSkolTyVarsX,
 
@@ -1614,22 +1614,21 @@ newFlexiTcSTy knd = wrapTcS (TcM.newFlexiTyVarTy knd)
 cloneMetaTyVar :: TcTyVar -> TcS TcTyVar
 cloneMetaTyVar tv = wrapTcS (TcM.cloneMetaTyVar tv)
 
-instFlexi :: [TKVar] -> TcS TCvSubst
-instFlexi = instFlexiX emptyTCvSubst
-
 instFlexiX :: TCvSubst -> [TKVar] -> TcS TCvSubst
 instFlexiX subst tvs
   = wrapTcS (foldlM instFlexiHelper subst tvs)
 
 instFlexiHelper :: TCvSubst -> TKVar -> TcM TCvSubst
+-- Makes fresh tyvar, extends the substitution, and the in-scope set
 instFlexiHelper subst tv
   = do { uniq <- TcM.newUnique
        ; details <- TcM.newMetaDetails TauTv
-       ; let name = setNameUnique (tyVarName tv) uniq
-             kind = substTyUnchecked subst (tyVarKind tv)
-             ty'  = mkTyVarTy (mkTcTyVar name kind details)
-       ; TcM.traceTc "instFlexi" (ppr ty')
-       ; return (extendTvSubst subst tv ty') }
+       ; let name   = setNameUnique (tyVarName tv) uniq
+             kind   = substTyUnchecked subst (tyVarKind tv)
+             tv'    = mkTcTyVar name kind details
+             subst' = extendTvSubstWithClone subst tv tv'
+       ; TcM.traceTc "instFlexi" (ppr tv')
+       ; return (extendTvSubst subst' tv (mkTyVarTy tv')) }
 
 matchGlobalInst :: DynFlags
                 -> Bool      -- True <=> caller is the short-cut solver

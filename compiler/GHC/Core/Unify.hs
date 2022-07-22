@@ -41,7 +41,7 @@ import GHC.Core.TyCo.FVs   ( tyCoVarsOfCoList, tyCoFVsOfTypes )
 import GHC.Core.TyCo.Subst ( mkTvSubst )
 import GHC.Core.RoughMap
 import GHC.Core.Map.Type
-import GHC.Utils.FV( FV, fvVarSet, fvVarList )
+import GHC.Utils.FV( FV, fvVarList )
 import GHC.Utils.Misc
 import GHC.Data.Pair
 import GHC.Utils.Outputable
@@ -474,25 +474,26 @@ tcUnifyTyKi t1 t2 = tcUnifyTyKis alwaysBindFun [t1] [t2]
 tcUnifyTyWithTFs :: Bool  -- ^ True <=> do two-way unification;
                           --   False <=> do one-way matching.
                           --   See end of sec 5.2 from the paper
-                 -> Type -> Type -> Maybe TCvSubst
+                 -> InScopeSet     -- Should include the free tyvars of both Type args
+                 -> Type -> Type   -- Types to unify
+                 -> Maybe TCvSubst
 -- This algorithm is an implementation of the "Algorithm U" presented in
 -- the paper "Injective type families for Haskell", Figures 2 and 3.
 -- The code is incorporated with the standard unifier for convenience, but
 -- its operation should match the specification in the paper.
-tcUnifyTyWithTFs twoWay t1 t2
+tcUnifyTyWithTFs twoWay in_scope t1 t2
   = case tc_unify_tys alwaysBindFun twoWay True False
                        rn_env emptyTvSubstEnv emptyCvSubstEnv
                        [t1] [t2] of
-      Unifiable          (subst, _) -> Just $ maybe_fix subst
-      MaybeApart _reason (subst, _) -> Just $ maybe_fix subst
+      Unifiable          (tv_subst, _cv_subst) -> Just $ maybe_fix tv_subst
+      MaybeApart _reason (tv_subst, _cv_subst) -> Just $ maybe_fix tv_subst
       -- we want to *succeed* in questionable cases. This is a
       -- pre-unification algorithm.
       SurelyApart      -> Nothing
   where
-    in_scope = mkInScopeSet $ tyCoVarsOfTypes [t1, t2]
     rn_env   = mkRnEnv2 in_scope
 
-    maybe_fix | twoWay    = niFixTCvSubst
+    maybe_fix | twoWay    = niFixTCvSubst in_scope
               | otherwise = mkTvSubst in_scope -- when matching, don't confuse
                                                -- domain with range
 
@@ -587,13 +588,13 @@ tc_unify_tys_fg :: Bool
                 -> [Type] -> [Type]
                 -> UnifyResult
 tc_unify_tys_fg match_kis bind_fn tys1 tys2
-  = do { (env, _) <- tc_unify_tys bind_fn True False match_kis env
+  = do { (env, _) <- tc_unify_tys bind_fn True False match_kis rn_env
                                   emptyTvSubstEnv emptyCvSubstEnv
                                   tys1 tys2
-       ; return $ niFixTCvSubst env }
+       ; return $ niFixTCvSubst in_scope env }
   where
-    vars = tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2
-    env  = mkRnEnv2 $ mkInScopeSet vars
+    in_scope = mkInScopeSet $ tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2
+    rn_env   = mkRnEnv2 in_scope
 
 -- | This function is actually the one to call the unifier -- a little
 -- too general for outside clients, though.
@@ -726,13 +727,13 @@ variables in the in-scope set; it is used only to ensure no
 shadowing.
 -}
 
-niFixTCvSubst :: TvSubstEnv -> TCvSubst
+niFixTCvSubst :: InScopeSet -> TvSubstEnv -> TCvSubst
 -- Find the idempotent fixed point of the non-idempotent substitution
 -- This is surprisingly tricky:
 --   see Note [Finding the substitution fixpoint]
 -- ToDo: use laziness instead of iteration?
-niFixTCvSubst tenv
-  | not_fixpoint = niFixTCvSubst (mapVarEnv (substTy subst) tenv)
+niFixTCvSubst in_scope tenv
+  | not_fixpoint = niFixTCvSubst in_scope (mapVarEnv (substTy subst) tenv)
   | otherwise    = subst
   where
     range_fvs :: FV
@@ -749,9 +750,8 @@ niFixTCvSubst tenv
     free_tvs = scopedSort (filterOut in_domain range_tvs)
 
     -- See Note [Finding the substitution fixpoint], Step 6
-    init_in_scope = mkInScopeSet (fvVarSet range_fvs)
     subst = foldl' add_free_tv
-                  (mkTvSubst init_in_scope tenv)
+                  (mkTvSubst in_scope tenv)
                   free_tvs
 
     add_free_tv :: TCvSubst -> TyVar -> TCvSubst
