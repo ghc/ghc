@@ -66,6 +66,36 @@
 
   * Re-export the `IsList` typeclass from the new `GHC.IsList` module.
 
+  * There's a new special function ``withDict`` in ``GHC.Exts``: ::
+
+        withDict :: forall {rr :: RuntimeRep} st dt (r :: TYPE rr). st -> (dt => r) -> r
+
+    where ``dt`` must be a class containing exactly one method, whose type
+    must be ``st``.
+
+    This function converts ``st`` to a type class dictionary.
+    It removes the need for ``unsafeCoerce`` in implementation of reflection
+    libraries. It should be used with care, because it can introduce
+    incoherent instances.
+
+    For example, the ``withTypeable`` function from the
+    ``Data.Typeable`` module can now be defined as: ::
+
+          withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
+                       => TypeRep a -> (Typeable a => r) -> r
+          withTypeable rep k = withDict @(TypeRep a) @(Typeable a) rep k
+
+    Note that the explicit type applications are required, as the call to
+    ``withDict`` would be ambiguous otherwise.
+
+    This replaces the old ``GHC.Exts.magicDict``, which required
+    an intermediate data type and was less reliable.
+
+  * `Data.Word.Word64` and `Data.Int.Int64` are now already represented by
+    `Word64#` and `Int64#`, respectively. Previously on 32-bit platforms these
+    were rather represented by `Word#` and `Int#`. See GHC #11953.
+
+
 ## 4.16.1.0 *Feb 2022*
 
   * Shipped with GHC 9.2.2
