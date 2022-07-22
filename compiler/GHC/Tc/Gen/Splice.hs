@@ -877,12 +877,6 @@ tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr GhcTc) -> TcM (LHsExpr GhcTc)
 tcTopSpliceExpr isTypedSplice tc_action
   = checkNoErrs $  -- checkNoErrs: must not try to run the thing
                    -- if the type checker fails!
-    unsetGOptM Opt_DeferTypeErrors $
-                   -- Don't defer type errors.  Not only are we
-                   -- going to run this code, but we do an unsafe
-                   -- coerce, so we get a seg-fault if, say we
-                   -- splice a type into a place where an expression
-                   -- is expected (#7276)
     setStage (Splice isTypedSplice) $
     do {    -- Typecheck the expression
          (mb_expr', wanted) <- tryCaptureConstraints tc_action
