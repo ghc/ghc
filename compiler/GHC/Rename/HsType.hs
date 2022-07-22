@@ -234,11 +234,19 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
       (res, fvs') <- thing_inside sig_ty
       return (res, fvs `plusFV` fvs')
 
+unboundWildcards :: FreeKiTyVars -> RnM [Name]
+unboundWildcards tyvars = do
+  new <- filterInScopeM tyvars
+  mapM newLocalBndrRn (nubL (wcs new))
+  where
+    wcs =
+      filter (startsWithUnderscore . rdrNameOcc . unLoc)
+
 rnWcBody :: HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
 rnWcBody ctxt tyvars hs_ty
   = do { wildcards_enabled <- xoptM LangExt.NamedWildCards
-       ; nwcs <- if wildcards_enabled then mapM newLocalBndrRn (nubL (wcs tyvars)) else pure []
+       ; nwcs <- if wildcards_enabled then unboundWildcards tyvars else pure []
        ; let env = RTKE { rtke_level = TypeLevel
                         , rtke_what  = RnTypeBody
                         , rtke_nwcs  = mkNameSet nwcs
@@ -247,8 +255,6 @@ rnWcBody ctxt tyvars hs_ty
                           rn_lty env hs_ty
        ; return (nwcs, hs_ty', fvs) }
   where
-    wcs =
-      filter (startsWithUnderscore . rdrNameOcc . unLoc)
     rn_lty env (L loc hs_ty)
       = setSrcSpanA loc $
         do { (hs_ty', fvs) <- rn_ty env hs_ty
