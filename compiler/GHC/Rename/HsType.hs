@@ -1190,6 +1190,11 @@ bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
         thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
                                        , hso_bndrs     = exp_bndrs' }
 
+-- This pulls 'filterInScopeM' into 'bindHsOuterTyVarBndrs' since they were used at all sites together.
+-- Since there was one site ('rnHsSigWcType') that also separated the wildcard type variables, which has to be done
+-- between filtering and renaming, that too has been pulled in.
+--
+-- TODO find a way to handle wildcards locally
 bindHsOuterTyVarBndrsNotInScopeWc :: OutputableBndrFlag flag 'Renamed
                                   => Bool
                                   -> HsDocContext
