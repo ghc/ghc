@@ -117,6 +117,8 @@ data LinuxDistro
 
 data Arch = Amd64 | AArch64 | I386
 
+data TestSpeed = TestSpeedSlow | TestSpeedNormal | TestSpeedFast
+
 data BignumBackend = Native | Gmp deriving Eq
 
 bignumString :: BignumBackend -> String
@@ -145,6 +147,7 @@ data BuildConfig
                 , fullyStatic    :: Bool
                 , tablesNextToCode :: Bool
                 , threadSanitiser :: Bool
+                , testSpeed      :: TestSpeed
                 , noSplitSections :: Bool
                 , validateNonmovingGc :: Bool
                 }
@@ -202,6 +205,7 @@ vanilla = BuildConfig
   , fullyStatic = False
   , tablesNextToCode = True
   , threadSanitiser = False
+  , testSpeed = TestSpeedNormal
   , noSplitSections = False
   , validateNonmovingGc = False
   }
@@ -300,6 +304,11 @@ archName :: Arch -> String
 archName Amd64 = "x86_64"
 archName AArch64 = "aarch64"
 archName I386  = "i386"
+
+testSpeedName :: TestSpeed -> String
+testSpeedName TestSpeedFast   = "fast"
+testSpeedName TestSpeedNormal = "normal"
+testSpeedName TestSpeedSlow   = "slow"
 
 binDistName :: Arch -> Opsys -> BuildConfig -> String
 binDistName arch opsys bc = "ghc-" ++ testEnv arch opsys bc
@@ -695,6 +704,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
             Just _  -> "CROSS_EMULATOR" =: "NOT_SET" -- we need an emulator but it isn't set. Won't run the testsuite
           Emulator s       -> "CROSS_EMULATOR" =: s
           NoEmulatorNeeded -> mempty
+      , "TEST_SPEED"     =: testSpeedName (testSpeed buildConfig)
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else mempty
       , if validateNonmovingGc buildConfig
            then "RUNTEST_ARGS" =: "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity"

@@ -90,6 +90,7 @@ Environment variables determining build configuration of Hadrian system:
   REINSTALL_GHC     Build and test a reinstalled "stage3" ghc built using cabal-install
                     This tests the "reinstall" configuration
   CROSS_EMULATOR    The emulator to use for testing of cross-compilers.
+  TEST_SPEED        What "speed" of the testsuite to run (normal, slow, fast)
 
 Environment variables determining bootstrap toolchain (Linux):
 
@@ -673,6 +674,7 @@ function test_hadrian() {
       --summary-junit=./junit.xml \
       --test-have-intree-files \
       --test-compiler="${test_compiler}" \
+      --test-speed="${TEST_SPEED:-normal}" \
       "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian main testsuite"
 
     info "STAGE2_TEST=$?"
