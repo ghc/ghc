@@ -35,19 +35,27 @@ The following things have kind ``Constraint``:
 
 -  Anything whose form is not yet known, but the user has declared to
    have kind ``Constraint`` (for which they need to import it from
-   ``Data.Kind``). So for example
+   ``Data.Kind``). For example
    ``type Foo (f :: Type -> Constraint) = forall b. f b => b -> b``
-   is allowed, as well as examples involving type families: ::
+   is allowed.
 
-       type family Typ a b :: Constraint
-       type instance Typ Int  b = Show b
-       type instance Typ Bool b = Num b
+Note, however, that the :extension:`TypeFamilies` and :extension:`GADTs` extensions
+also allow the manipulation of things with kind ``Constraint``, without necessarily
+requiring the :extension:`ConstraintKinds` extension: ::
 
-       func :: Typ a b => a -> b -> b
-       func = ...
+    -- With -XTypeFamilies -XNoConstraintKinds
+    type T :: Type -> (Type -> Constraint)
+    type family T a where
+      T Int    = Num
+      T Double = Floating
 
-Note that because constraints are just handled as types of a particular
-kind, this extension allows type constraint synonyms: ::
+    -- With -XGADTs -XNoConstraintKinds
+    type Dict :: Constraint -> Type
+    data Dict c where
+      MkDict :: c => Dict c
+
+With the :extension:`ConstraintKinds`  extension, constraints are just handled as
+types of a particular kind. This allows type constraint synonyms: ::
 
     type Stringy a = (Read a, Show a)
     foo :: Stringy a => a -> (String, String -> a)
@@ -77,5 +85,3 @@ You may write programs that use exotic sorts of constraints in instance
 contexts and superclasses, but to do so you must use
 :extension:`UndecidableInstances` to signal that you don't mind if the type
 checker fails to terminate.
-
-
