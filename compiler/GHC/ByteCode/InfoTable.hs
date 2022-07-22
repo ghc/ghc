@@ -37,7 +37,7 @@ import GHC.Utils.Panic
 -- Make info tables for the data decls in this module
 mkITbls :: Interp -> Profile -> [TyCon] -> IO ItblEnv
 mkITbls interp profile tcs =
-  foldr plusNameEnv emptyNameEnv <$>
+  foldr plusNameEnv emptyNameEnv <$> --
     mapM mkITbl (filter isDataTyCon tcs)
  where
   mkITbl :: TyCon -> IO ItblEnv

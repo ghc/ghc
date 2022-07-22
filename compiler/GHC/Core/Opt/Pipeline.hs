@@ -790,7 +790,7 @@ simplifyPgmIO cfg@(CoreDoSimplifyOpts max_iterations mode)
       where
         -- Remember the counts_so_far are reversed
         totalise :: [SimplCount] -> SimplCount
-        totalise = foldr (\c acc -> acc `plusSimplCount` c)
+        totalise = foldr (\c acc -> acc `plusSimplCount` c) --
                          (zeroSimplCount dflags)
 
 -------------------

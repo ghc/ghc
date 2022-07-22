@@ -511,7 +511,7 @@ cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap cmm count
           then do
                 -- the regs usable for allocation
                 let (alloc_regs :: UniqFM RegClass (UniqSet RealReg))
-                        = foldr (\r -> plusUFM_C unionUniqSets
+                        = foldr (\r -> plusUFM_C unionUniqSets --
                                         $ unitUFM (targetClassOfRealReg platform r) (unitUniqSet r))
                                 emptyUFM
                         $ allocatableRegs ncgImpl

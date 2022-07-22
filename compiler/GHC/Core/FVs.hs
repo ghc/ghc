@@ -329,7 +329,7 @@ exprOrphNames e
 
 -- | Finds the free /external/ names of several expressions: see 'exprOrphNames' for details
 exprsOrphNames :: [CoreExpr] -> NameSet
-exprsOrphNames es = foldr (unionNameSet . exprOrphNames) emptyNameSet es
+exprsOrphNames es = foldr (unionNameSet . exprOrphNames) emptyNameSet es --
 
 
 {- **********************************************************************
@@ -367,7 +367,7 @@ orphNamesOfType (CastTy ty co)       = orphNamesOfType ty `unionNameSet` orphNam
 orphNamesOfType (CoercionTy co)      = orphNamesOfCo co
 
 orphNamesOfThings :: (a -> NameSet) -> [a] -> NameSet
-orphNamesOfThings f = foldr (unionNameSet . f) emptyNameSet
+orphNamesOfThings f = foldr (unionNameSet . f) emptyNameSet --
 
 orphNamesOfTypes :: [Type] -> NameSet
 orphNamesOfTypes = orphNamesOfThings orphNamesOfType
@@ -417,7 +417,7 @@ orphNamesOfAxiom axiom
 
 orphNamesOfCoAxBranches :: Branches br -> NameSet
 orphNamesOfCoAxBranches
-  = foldr (unionNameSet . orphNamesOfCoAxBranch) emptyNameSet . fromBranches
+  = foldr (unionNameSet . orphNamesOfCoAxBranch) emptyNameSet . fromBranches --
 
 orphNamesOfCoAxBranch :: CoAxBranch -> NameSet
 orphNamesOfCoAxBranch (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
@@ -578,7 +578,7 @@ unionFVss :: [DVarSet] -> DVarSet
 unionFVss = unionDVarSets
 
 delBindersFV :: [Var] -> DVarSet -> DVarSet
-delBindersFV bs fvs = foldr delBinderFV fvs bs
+delBindersFV bs fvs = foldr delBinderFV fvs bs --
 
 delBinderFV :: Var -> DVarSet -> DVarSet
 -- This way round, so we can do it multiple times using foldr
@@ -705,7 +705,7 @@ freeVarsBind (Rec binds) body_fvs
   where
     (binders, rhss) = unzip binds
     rhss2        = map freeVars rhss
-    rhs_body_fvs = foldr (unionFVs . freeVarsOf) body_fvs rhss2
+    rhs_body_fvs = foldr (unionFVs . freeVarsOf) body_fvs rhss2 --
     binders_fvs  = fvDVarSet $ mapUnionFV bndrRuleAndUnfoldingFVs binders
                    -- See Note [The FVAnn invariant]
     all_fvs      = rhs_body_fvs `unionFVs` binders_fvs

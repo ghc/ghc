@@ -565,7 +565,7 @@ coreToStgApp f args ticks = do
                 _other           -> StgApp f args'
 
         add_tick !t !e = StgTick t e
-        tapp = foldr add_tick app (map (coreToStgTick res_ty) ticks ++ ticks')
+        tapp = foldr add_tick app (map (coreToStgTick res_ty) ticks ++ ticks') --
 
     -- Forcing these fixes a leak in the code generator, noticed while
     -- profiling for trac #4367

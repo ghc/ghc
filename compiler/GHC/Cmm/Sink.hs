@@ -846,7 +846,7 @@ memConflicts _         _         = True
 
 exprMem :: Platform -> CmmExpr -> AbsMem
 exprMem platform (CmmLoad addr w _)  = bothMems (loadAddr platform addr (typeWidth w)) (exprMem platform addr)
-exprMem platform (CmmMachOp _ es)    = foldr bothMems NoMem (map (exprMem platform) es)
+exprMem platform (CmmMachOp _ es)    = foldr bothMems NoMem (map (exprMem platform) es) --
 exprMem _        _                   = NoMem
 
 loadAddr :: Platform -> CmmExpr -> Width -> AbsMem

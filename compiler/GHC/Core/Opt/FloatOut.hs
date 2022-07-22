@@ -446,7 +446,7 @@ floatExpr (Let bind body)
       FloatMe dest_lvl
         -> case (floatBind bind) of { (fsb, bind_floats, binds') ->
            case (floatExpr body) of { (fse, body_floats, body') ->
-           let new_bind_floats = foldr plusFloats emptyFloats
+           let new_bind_floats = foldr plusFloats emptyFloats --
                                    (map (unitLetFloat dest_lvl) binds') in
            ( add_stats fsb fse
            , bind_floats `plusFloats` new_bind_floats
@@ -639,10 +639,10 @@ addTopFloatPairs float_bag prs
     add (Rec prs1)   prs2 = prs1 ++ prs2
 
 flattenMajor :: MajorEnv -> Bag FloatBind
-flattenMajor = M.foldr (unionBags . flattenMinor) emptyBag
+flattenMajor = M.foldr (unionBags . flattenMinor) emptyBag --
 
 flattenMinor :: MinorEnv -> Bag FloatBind
-flattenMinor = M.foldr unionBags emptyBag
+flattenMinor = M.foldr unionBags emptyBag --
 
 emptyFloats :: FloatBinds
 emptyFloats = FB emptyBag emptyBag M.empty

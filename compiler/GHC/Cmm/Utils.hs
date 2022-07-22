@@ -576,7 +576,7 @@ toBlockListEntryFirstFalseFallthrough g
 ofBlockList :: BlockId -> [CmmBlock] -> CmmGraph
 ofBlockList entry blocks = CmmGraph { g_entry = entry
                                     , g_graph = GMany NothingO body NothingO }
-  where body = foldr addBlock emptyBody blocks
+  where body = foldr addBlock emptyBody blocks --
 
 bodyToBlockList :: Body CmmNode -> [CmmBlock]
 bodyToBlockList body = mapElems body

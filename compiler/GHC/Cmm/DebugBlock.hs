@@ -209,7 +209,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
 -- control flow order (so ticks have a chance to be sorted in the
 -- right order).
 blockContexts :: RawCmmGroup -> Map.Map CmmTickScope [BlockContext]
-blockContexts decls = Map.map reverse $ foldr walkProc Map.empty decls
+blockContexts decls = Map.map reverse $ foldr walkProc Map.empty decls --
   where walkProc :: RawCmmDecl
                  -> Map.Map CmmTickScope [BlockContext]
                  -> Map.Map CmmTickScope [BlockContext]

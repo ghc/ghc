@@ -255,7 +255,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
              , shortcut_map
              , if oldSuccs == newSuccs
                then backEdges
-               else foldr incPreds (foldr decPreds backEdges oldSuccs) newSuccs )
+               else foldr incPreds (foldr decPreds backEdges oldSuccs) newSuccs ) --
 
         -- Otherwise don't do anything
         | otherwise
@@ -417,9 +417,9 @@ mkCmmCondBranch p t f l =
 
 -- Build a map from a block to its set of predecessors.
 predMap :: [CmmBlock] -> LabelMap Int
-predMap blocks = foldr add_preds mapEmpty blocks
+predMap blocks = foldr add_preds mapEmpty blocks --
   where
-    add_preds block env = foldr add env (successors block)
+    add_preds block env = foldr add env (successors block) --
       where add lbl env = mapInsertWith (+) lbl 1 env
 
 -- Removing unreachable blocks

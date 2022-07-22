@@ -1255,7 +1255,7 @@ lvlBind env (AnnRec pairs)
                `delDVarSetList`
                 bndrs
 
-    ty_fvs   = foldr (unionVarSet . tyCoVarsOfType . idType) emptyVarSet bndrs
+    ty_fvs   = foldr (unionVarSet . tyCoVarsOfType . idType) emptyVarSet bndrs --
     dest_lvl = destLevel env bind_fvs ty_fvs is_fun is_bot is_join
     abs_vars = abstractVars dest_lvl env bind_fvs
 

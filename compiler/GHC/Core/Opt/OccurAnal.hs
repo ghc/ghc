@@ -117,7 +117,7 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
     -- We treat such RULES as extra rules for 'f'
     -- See Note [Preventing loops due to imported functions rules]
     imp_rule_edges :: ImpRuleEdges
-    imp_rule_edges = foldr (plusVarEnv_C (++)) emptyVarEnv
+    imp_rule_edges = foldr (plusVarEnv_C (++)) emptyVarEnv --
                            [ mapVarEnv (const [(act,rhs_fvs)]) $ getUniqSet $
                              exprsFreeIds args `delVarSetList` bndrs
                            | Rule { ru_act = act, ru_bndrs = bndrs
@@ -160,14 +160,14 @@ impRulesScopeUsage :: [(Activation,VarSet)] -> UsageDetails
 -- Variable mentioned in RHS of an IMP-RULE for the bndr,
 -- whether active or not
 impRulesScopeUsage imp_rules_info
-  = foldr add emptyDetails imp_rules_info
+  = foldr add emptyDetails imp_rules_info --
   where
     add (_,vs) usage = addManyOccs usage vs
 
 impRulesActiveFvs :: (Activation -> Bool) -> VarSet
                   -> [(Activation,VarSet)] -> VarSet
 impRulesActiveFvs is_active bndr_set vs
-  = foldr add emptyVarSet vs `intersectVarSet` bndr_set
+  = foldr add emptyVarSet vs `intersectVarSet` bndr_set --
   where
     add (act,vs) acc | is_active act = vs `unionVarSet` acc
                      | otherwise     = acc
@@ -792,7 +792,7 @@ occAnalNonRecBind !env lvl imp_rule_edges bndr rhs body_usage
          -- that g is (since the RULE might turn g into h), so
          -- we make g mention h.
 
-    rule_uds = foldr add_rule_uds imp_rule_uds rules_w_uds
+    rule_uds = foldr add_rule_uds imp_rule_uds rules_w_uds --
     add_rule_uds (_, l, r) uds = l `andUDs` r `andUDs` uds
 
     ----------

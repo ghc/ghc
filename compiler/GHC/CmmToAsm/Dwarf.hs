@@ -130,7 +130,7 @@ compileUnitFooter platform unitU =
 -- Note [Splitting DebugBlocks] for details.
 debugSplitProcs :: [DebugBlock] -> [DebugBlock]
 debugSplitProcs b = concat $ H.mapElems $ mergeMaps $ map (split Nothing) b
-  where mergeMaps = foldr (H.mapUnionWithKey (const (++))) H.mapEmpty
+  where mergeMaps = foldr (H.mapUnionWithKey (const (++))) H.mapEmpty --
         split :: Maybe DebugBlock -> DebugBlock -> H.LabelMap [DebugBlock]
         split parent blk = H.mapInsert prc [blk'] nested
           where prc = dblProcedure blk
