@@ -29,7 +29,7 @@ module GHC.Rename.HsType (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
-        bindHsOuterTyVarBndrs, bindHsOuterTyVarBndrsNotInScope, bindHsForAllTelescope,
+        bindHsOuterTyVarBndrs, bindHsForAllTelescope,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
         rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars,
         FreeKiTyVars, filterInScopeM,
@@ -134,12 +134,14 @@ rnHsSigWcType :: HsDocContext
               -> RnM (LHsSigWcType GhcRn, FreeVars)
 rnHsSigWcType doc (HsWC { hswc_body =
     sig_ty@(L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
-  = bindHsOuterTyVarBndrsNotInScopeWc True doc Nothing (extract_lhs_sig_ty sig_ty) outer_bndrs $ \nwc_rdrs outer_bndrs' ->
-    do { (wcs, body_ty', fvs) <- rnWcBody doc nwc_rdrs body_ty
+  = bindHsOuterTyVarBndrs doc Nothing fvs outer_bndrs $ \outer_bndrs' ->
+    do { (wcs, body_ty', fvs') <- rnWcBody doc fvs body_ty
        ; pure ( HsWC  { hswc_ext = wcs, hswc_body = L loc $
                 HsSig { sig_ext = noExtField
                       , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
-              , fvs) }
+              , fvs') }
+  where
+    fvs = extract_lhs_sig_ty sig_ty
 
 rnHsPatSigType :: HsPatSigTypeScoping
                -> HsDocContext
@@ -234,8 +236,9 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
 
 rnWcBody :: HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
-rnWcBody ctxt nwc_rdrs hs_ty
-  = do { nwcs <- mapM newLocalBndrRn nwc_rdrs
+rnWcBody ctxt tyvars hs_ty
+  = do { wildcards_enabled <- xoptM LangExt.NamedWildCards
+       ; nwcs <- if wildcards_enabled then mapM newLocalBndrRn (nubL (wcs tyvars)) else pure []
        ; let env = RTKE { rtke_level = TypeLevel
                         , rtke_what  = RnTypeBody
                         , rtke_nwcs  = mkNameSet nwcs
@@ -244,6 +247,8 @@ rnWcBody ctxt nwc_rdrs hs_ty
                           rn_lty env hs_ty
        ; return (nwcs, hs_ty', fvs) }
   where
+    wcs =
+      filter (startsWithUnderscore . rdrNameOcc . unLoc)
     rn_lty env (L loc hs_ty)
       = setSrcSpanA loc $
         do { (hs_ty', fvs) <- rn_ty env hs_ty
@@ -369,7 +374,7 @@ rnHsSigType ctx level
        ; case outer_bndrs of
            HsOuterExplicit{} -> checkPolyKinds env sig_ty
            HsOuterImplicit{} -> pure ()
-       ; bindHsOuterTyVarBndrsNotInScope ctx Nothing (extractHsTyRdrTyVars body) outer_bndrs $ \outer_bndrs' ->
+       ; bindHsOuterTyVarBndrs ctx Nothing (extractHsTyRdrTyVars body) outer_bndrs $ \outer_bndrs' ->
     do { (body', fvs) <- rnLHsTyKi env body
 
        ; return ( L loc $ HsSig { sig_ext = noExtField
@@ -1168,57 +1173,49 @@ an LHsQTyVars can be semantically significant. As a result, we suppress
 -Wunused-foralls warnings in exactly one place: in bindHsQTyVars.
 -}
 
-bindHsOuterTyVarBndrs :: OutputableBndrFlag flag 'Renamed
+bindHsOuterTyVarBndrsImplicit :: OutputableBndrFlag flag 'Renamed
+                              => Maybe assoc
+                                 -- ^ @'Just' _@ => an associated type decl
+                              -> FreeKiTyVars
+                              -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
+                              -> RnM (a, FreeVars)
+bindHsOuterTyVarBndrsImplicit mb_cls tyvars thing_inside = do
+  (_, imp_tv_nms) <- partition_nwcs =<< filterInScopeM tyvars
+  rnImplicitTvOccs mb_cls imp_tv_nms $ \implicit_vars' ->
+    thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
+
+
+bindHsOuterTyVarBndrsExplicit :: OutputableBndrFlag flag 'Renamed
                       => HsDocContext
-                      -> Maybe assoc
-                         -- ^ @'Just' _@ => an associated type decl
-                      -> FreeKiTyVars
-                      -> HsOuterTyVarBndrs flag GhcPs
+                      -> [LHsTyVarBndr flag GhcPs]
                       -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
                       -> RnM (a, FreeVars)
-bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
-  case outer_bndrs of
-    HsOuterImplicit{} ->
-      rnImplicitTvOccsIfXopt LangExt.ImplicitForAll mb_cls implicit_vars $ \implicit_vars' ->
-        thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
-    HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-      -- Note: If we pass mb_cls instead of Nothing below, bindLHsTyVarBndrs
-      -- will use class variables for any names the user meant to bring in
-      -- scope here. This is an explicit forall, so we want fresh names, not
-      -- class variables. Thus: always pass Nothing.
-      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' ->
-        thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
-                                       , hso_bndrs     = exp_bndrs' }
+bindHsOuterTyVarBndrsExplicit doc exp_bndrs thing_inside =
+  -- Note: If we pass mb_cls instead of Nothing below, bindLHsTyVarBndrs
+  -- will use class variables for any names the user meant to bring in
+  -- scope here. This is an explicit forall, so we want fresh names, not
+  -- class variables. Thus: always pass Nothing.
+  bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' ->
+    thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
+                                   , hso_bndrs     = exp_bndrs' }
 
--- This pulls 'filterInScopeM' into 'bindHsOuterTyVarBndrs' since they were used at all sites together.
--- Since there was one site ('rnHsSigWcType') that also separated the wildcard type variables, which has to be done
--- between filtering and renaming, that too has been pulled in.
---
--- TODO find a way to handle wildcards locally
-bindHsOuterTyVarBndrsNotInScopeWc :: OutputableBndrFlag flag 'Renamed
-                                  => Bool
-                                  -> HsDocContext
+bindHsOuterTyVarBndrs :: OutputableBndrFlag flag 'Renamed
+                                  => HsDocContext
                                   -> Maybe assoc
                                     -- ^ @'Just' _@ => an associated type decl
                                   -> FreeKiTyVars
                                   -> HsOuterTyVarBndrs flag GhcPs
-                                  -> (FreeKiTyVars -> HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
+                                  -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
                                   -> RnM (a, FreeVars)
-bindHsOuterTyVarBndrsNotInScopeWc extractWc doc mb_cls tyvars outer_bndrs thing_inside = do
-  free_vars <- filterInScopeM tyvars
-  (nwc_rdrs', imp_tv_nms) <- if extractWc then partition_nwcs free_vars else pure ([], free_vars)
-  bindHsOuterTyVarBndrs doc mb_cls imp_tv_nms outer_bndrs (thing_inside (nubL nwc_rdrs'))
-
-bindHsOuterTyVarBndrsNotInScope :: OutputableBndrFlag flag 'Renamed
-                                => HsDocContext
-                                -> Maybe assoc
-                                  -- ^ @'Just' _@ => an associated type decl
-                                -> FreeKiTyVars
-                                -> HsOuterTyVarBndrs flag GhcPs
-                                -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
-                                -> RnM (a, FreeVars)
-bindHsOuterTyVarBndrsNotInScope doc mb_cls tyvars outer_bndrs thing_inside =
-  bindHsOuterTyVarBndrsNotInScopeWc False doc mb_cls tyvars outer_bndrs (const thing_inside)
+bindHsOuterTyVarBndrs doc mb_cls tyvars outer_bndrs thing_inside =
+  case outer_bndrs of
+    HsOuterImplicit{} -> do
+      implicitOk <- xoptM LangExt.ImplicitForAll
+      if implicitOk
+      then bindHsOuterTyVarBndrsImplicit mb_cls tyvars thing_inside
+      else bindHsOuterTyVarBndrsExplicit doc [] thing_inside
+    HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+      bindHsOuterTyVarBndrsExplicit doc exp_bndrs thing_inside
 
 bindHsForAllTelescope :: HsDocContext
                       -> HsForAllTelescope GhcPs

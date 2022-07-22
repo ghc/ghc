@@ -740,7 +740,7 @@ rnFamEqn doc atfi extra_kvars
          --
          -- For associated type family instances, exclude the type variables
          -- bound by the instance head with filterInScopeM (#19649).
-       ; bindHsOuterTyVarBndrsNotInScope doc mb_cls (pat_kity_vars ++ extra_kvars) outer_bndrs $ \rn_outer_bndrs ->
+       ; bindHsOuterTyVarBndrs doc mb_cls (pat_kity_vars ++ extra_kvars) outer_bndrs $ \rn_outer_bndrs ->
     do { (pats', pat_fvs) <- rnLHsTypeArgs (FamPatCtx tycon) pats
        ; (payload', rhs_fvs) <- rn_payload doc payload
 
@@ -2370,7 +2370,7 @@ rnConDecl (ConDeclGADT { con_names   = names
 
         ; let ctxt = ConDeclCtx new_names
 
-        ; bindHsOuterTyVarBndrsNotInScope ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->
+        ; bindHsOuterTyVarBndrs ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclGADTDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
