@@ -1093,12 +1093,12 @@ tidyTopName mod name_cache maybe_ref occ_env id
 
   | otherwise = panic "tidyTopName"
   where
-    name        = idName id
+    !name       = idName id
     external    = isJust maybe_ref
     global      = isExternalName name
     local       = not global
     internal    = not external
-    loc         = nameSrcSpan name
+    !loc        = nameSrcSpan name
 
     old_occ     = nameOccName name
     new_occ | Just ref <- maybe_ref
