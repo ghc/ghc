@@ -911,7 +911,7 @@ initModDetails hsc_env mod_summary iface =
   fixIO $ \details' -> do
     let act hpt  = addToHpt hpt (ms_mod_name mod_summary)
                                 (HomeModInfo iface details' Nothing)
-    let hsc_env' = hscUpdateHPT act hsc_env
+    let !hsc_env' = hscUpdateHPT act hsc_env
     -- NB: This result is actually not that useful
     -- in one-shot mode, since we're not going to do
     -- any further typechecking.  It's much more useful

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Generates the following module graph:
+#   - A module cycle H_d - ... - H_1 - H_0 - H_d-boot.
+#   - A w-wide collection of modules W_1 ... W_w all importing a common module W.
+#   - A module J importing H_d and all of W_1, ..., W_w.
+# This module graph makes it so that GHC has to compile one of the W_i modules at the same time
+# as it is compiling the loop of H modules.
+DEPTH=8
+WIDTH=40
+echo "module JSpaceTest where" > JSpaceTest.hs
+echo "module W where" > W.hs
+  for j in $(seq -w 1 300); do
+    echo "w$j = 123" >> W.hs;
+  done
+for i in $(seq -w 1 $WIDTH); do
+  echo "module W$i where" > W$i.hs;
+  echo "import W" >> W$i.hs;
+  echo "import W$i" >> JSpaceTest.hs;
+  for j in $(seq -w 1 1000); do
+    echo "w$j = 123" >> W$i.hs;
+  done
+done
+echo "module H0 where" > H0.hs;
+echo "import {-# SOURCE #-} H$DEPTH" >> H0.hs;
+echo "import H$DEPTH" >> JSpaceTest.hs;
+for i in $(seq -w 1 $DEPTH); do
+  echo "module H$i where" > H$i.hs;
+  echo "import H$((i-1))" >> H$i.hs;
+  for j in $(seq -w 1 100); do
+    echo "h$j = 123" >> H$i.hs;
+  done
+done
+echo "module H$DEPTH where" > H$DEPTH.hs-boot;

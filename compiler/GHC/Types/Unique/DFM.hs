@@ -58,6 +58,7 @@ module GHC.Types.Unique.DFM (
         udfmMinusUFM, ufmMinusUDFM,
         partitionUDFM,
         udfmRestrictKeys,
+        udfmRestrictKeysSet,
         anyUDFM, allUDFM,
         pprUniqDFM, pprUDFM,
 
@@ -81,6 +82,7 @@ import Data.List (sortBy)
 import Data.Function (on)
 import GHC.Types.Unique.FM (UniqFM, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
 import Unsafe.Coerce
+import qualified Data.IntSet as I
 
 -- Note [Deterministic UniqFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -313,6 +315,11 @@ filterUDFM_Directly p (UDFM m i) = UDFM (M.filterWithKey p' m) i
 
 udfmRestrictKeys :: UniqDFM key elt -> UniqDFM key elt2 -> UniqDFM key elt
 udfmRestrictKeys (UDFM a i) (UDFM b _) = UDFM (M.restrictKeys a (M.keysSet b)) i
+
+udfmRestrictKeysSet :: UniqDFM key elt -> I.IntSet -> UniqDFM key elt
+udfmRestrictKeysSet (UDFM val_set i) set =
+  let key_set = set
+  in UDFM (M.restrictKeys val_set key_set) i
 
 -- | Converts `UniqDFM` to a list, with elements in deterministic order.
 -- It's O(n log n) while the corresponding function on `UniqFM` is O(n).
