@@ -6,6 +6,7 @@ module GHC.Unit.Env
     , ueEPS
     , unsafeGetHomeUnit
     , updateHug
+    , updateHpt_lazy
     , updateHpt
     -- * Unit Env helper functions
     , ue_units
@@ -49,6 +50,7 @@ module GHC.Unit.Env
     , unitEnv_elts
     , unitEnv_hpts
     , unitEnv_foldWithKey
+    , unitEnv_union
     , unitEnv_mapWithKey
     -- * Invariants
     , assertUnitEnvInvariant
@@ -118,6 +120,9 @@ initUnitEnv cur_unit hug namever platform = do
 -- Unsafe because the home-unit may not be set
 unsafeGetHomeUnit :: UnitEnv -> HomeUnit
 unsafeGetHomeUnit ue = ue_unsafeHomeUnit ue
+
+updateHpt_lazy :: (HomePackageTable -> HomePackageTable) -> UnitEnv -> UnitEnv
+updateHpt_lazy = ue_updateHPT_lazy
 
 updateHpt :: (HomePackageTable -> HomePackageTable) -> UnitEnv -> UnitEnv
 updateHpt = ue_updateHPT
@@ -266,7 +271,9 @@ addHomeModInfoToHug hmi hug = unitEnv_alter go hmi_unit hug
     go (Just hue) = Just (updateHueHpt (addHomeModInfoToHpt hmi) hue)
 
 updateHueHpt :: (HomePackageTable -> HomePackageTable) -> HomeUnitEnv -> HomeUnitEnv
-updateHueHpt f hue = hue { homeUnitEnv_hpt = f (homeUnitEnv_hpt hue)}
+updateHueHpt f hue =
+  let !hpt =  f (homeUnitEnv_hpt hue)
+  in hue { homeUnitEnv_hpt = hpt }
 
 
 lookupHug :: HomeUnitGraph -> UnitId -> ModuleName -> Maybe HomeModInfo
@@ -342,6 +349,9 @@ unitEnv_hpts env = map homeUnitEnv_hpt (Map.elems (unitEnv_graph env))
 unitEnv_foldWithKey :: (b -> UnitEnvGraphKey -> a -> b) -> b -> UnitEnvGraph a -> b
 unitEnv_foldWithKey f z (UnitEnvGraph g)= Map.foldlWithKey' f z g
 
+unitEnv_union :: (a -> a -> a) -> UnitEnvGraph a -> UnitEnvGraph a -> UnitEnvGraph a
+unitEnv_union f (UnitEnvGraph env1) (UnitEnvGraph env2) = UnitEnvGraph (Map.unionWith f env1 env2)
+
 -- -------------------------------------------------------
 -- Query and modify UnitState in HomeUnitEnv
 -- -------------------------------------------------------
@@ -369,16 +379,26 @@ ue_setUnitDbs unit_dbs ue = ue_updateHomeUnitEnv f (ue_currentUnit ue) ue
 ue_hpt :: HasDebugCallStack => UnitEnv -> HomePackageTable
 ue_hpt = homeUnitEnv_hpt . ue_currentHomeUnitEnv
 
+ue_updateHPT_lazy :: HasDebugCallStack => (HomePackageTable -> HomePackageTable) -> UnitEnv -> UnitEnv
+ue_updateHPT_lazy f e = ue_updateUnitHPT_lazy f (ue_currentUnit e) e
+
 ue_updateHPT :: HasDebugCallStack => (HomePackageTable -> HomePackageTable) -> UnitEnv -> UnitEnv
 ue_updateHPT f e = ue_updateUnitHPT f (ue_currentUnit e) e
 
 ue_updateHUG :: HasDebugCallStack => (HomeUnitGraph -> HomeUnitGraph) -> UnitEnv -> UnitEnv
 ue_updateHUG f e = ue_updateUnitHUG f e
 
+ue_updateUnitHPT_lazy :: HasDebugCallStack => (HomePackageTable -> HomePackageTable) -> UnitId -> UnitEnv -> UnitEnv
+ue_updateUnitHPT_lazy f uid ue_env = ue_updateHomeUnitEnv update uid ue_env
+  where
+    update unitEnv = unitEnv { homeUnitEnv_hpt = f $ homeUnitEnv_hpt unitEnv }
+
 ue_updateUnitHPT :: HasDebugCallStack => (HomePackageTable -> HomePackageTable) -> UnitId -> UnitEnv -> UnitEnv
 ue_updateUnitHPT f uid ue_env = ue_updateHomeUnitEnv update uid ue_env
   where
-    update unitEnv = unitEnv { homeUnitEnv_hpt = f $ homeUnitEnv_hpt unitEnv }
+    update unitEnv =
+      let !res = f $ homeUnitEnv_hpt unitEnv
+      in unitEnv { homeUnitEnv_hpt = res }
 
 ue_updateUnitHUG :: HasDebugCallStack => (HomeUnitGraph -> HomeUnitGraph) -> UnitEnv -> UnitEnv
 ue_updateUnitHUG f ue_env = ue_env { ue_home_unit_graph = f (ue_home_unit_graph ue_env)}
