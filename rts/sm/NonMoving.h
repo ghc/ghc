@@ -33,11 +33,31 @@ _Static_assert(NONMOVING_SEGMENT_SIZE % BLOCK_SIZE == 0,
 // The index of a block within a segment
 typedef uint16_t nonmoving_block_idx;
 
+#if defined(DEBUG)
+#define TRACK_SEGMENT_STATE
+#endif
+
+#if defined(TRACK_SEGMENT_STATE)
+// The collector itself doesn't require each segment to know its state (this is
+// implied by what segment list it is on) however it can be very useful while
+// debugging to know this.
+enum NonmovingSegmentState {
+    FREE, CURRENT, ACTIVE, FILLED, FILLED_SWEEPING
+};
+
+#define SET_SEGMENT_STATE(seg, st) (seg)->state = (st)
+#else
+#define SET_SEGMENT_STATE(_seg,_st)
+#endif
+
 // A non-moving heap segment
 struct NonmovingSegment {
-    struct NonmovingSegment *link;     // for linking together segments into lists
+    struct NonmovingSegment *link;      // for linking together segments into lists
     struct NonmovingSegment *todo_link; // NULL when not in todo list
     nonmoving_block_idx next_free;      // index of the next unallocated block
+#if defined(TRACK_SEGMENT_STATE)
+    enum NonmovingSegmentState state;
+#endif
     uint8_t bitmap[];                   // liveness bitmap
     // After the liveness bitmap comes the data blocks. Note that we need to
     // ensure that the size of this struct (including the bitmap) is a multiple
@@ -148,6 +168,7 @@ INLINE_HEADER void nonmovingPushActiveSegment(struct NonmovingSegment *seg)
 {
     struct NonmovingAllocator *alloc =
         nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
+    SET_SEGMENT_STATE(seg, ACTIVE);
     while (true) {
         struct NonmovingSegment *current_active = (struct NonmovingSegment*)VOLATILE_LOAD(&alloc->active);
         seg->link = current_active;
@@ -162,6 +183,7 @@ INLINE_HEADER void nonmovingPushFilledSegment(struct NonmovingSegment *seg)
 {
     struct NonmovingAllocator *alloc =
         nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
+    SET_SEGMENT_STATE(seg, FILLED);
     while (true) {
         struct NonmovingSegment *current_filled = (struct NonmovingSegment*)VOLATILE_LOAD(&alloc->filled);
         seg->link = current_filled;
