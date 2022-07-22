@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
     }
 
     binDir = getExecutablePath();
-    exePath = mkString("%s/ghc.exe", binDir);
+    exePath = mkString("%s/%s.exe", binDir, EXE_PATH);
     preArgv[0] = "--interactive";
 
     /* If ghc.exe can't be found, we assume that we're building ghc from
