@@ -504,6 +504,7 @@ static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t log_block
     seg->link = NULL;
     seg->todo_link = NULL;
     seg->next_free = 0;
+    SET_SEGMENT_STATE(seg, FREE);
     bd->nonmoving_segment.log_block_size = log_block_size;
     bd->nonmoving_segment.next_free_snap = 0;
     bd->u.scan = nonmovingSegmentGetBlock(seg, 0);
@@ -526,6 +527,7 @@ void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
         return;
     }
 
+    SET_SEGMENT_STATE(seg, FREE);
     while (true) {
         struct NonmovingSegment *old = nonmovingHeap.free;
         seg->link = old;
@@ -694,6 +696,7 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
 
         // make it current
         new_current->link = NULL;
+        SET_SEGMENT_STATE(new_current, CURRENT);
         alloca->current[cap->no] = new_current;
     }
 
@@ -790,6 +793,7 @@ void nonmovingAddCapabilities(uint32_t new_n_caps)
         for (unsigned int j = old_n_caps; j < new_n_caps; j++) {
             allocs[i]->current[j] = nonmovingAllocSegment(capabilities[j]->node);
             nonmovingInitSegment(allocs[i]->current[j], NONMOVING_ALLOCA0 + i);
+            SET_SEGMENT_STATE(allocs[i]->current[j], CURRENT);
             allocs[i]->current[j]->link = NULL;
         }
     }
@@ -1067,6 +1071,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
                     break;
             }
             // add filled segments to sweep_list
+            SET_SEGMENT_STATE(seg, FILLED_SWEEPING);
             seg->link = nonmovingHeap.sweep_list;
             nonmovingHeap.sweep_list = filled;
         }
