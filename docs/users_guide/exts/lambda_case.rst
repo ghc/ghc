@@ -24,11 +24,11 @@ of the form ::
 
       \cases { p11 ... pM1 -> e1; ...; p1N ... pMN -> eN }
 
-which is equivalent to a function defined as
+which is equivalent to a function defined as ::
 
-      f p11 ... pM1 -> e1
+      f p11 ... pM1 = e1
       ...
-      f p1N ... pMN -> eN
+      f p1N ... pMN = eN
 
 
 Note that both ``\case`` and ``\cases`` start a layout, so you can write ::
