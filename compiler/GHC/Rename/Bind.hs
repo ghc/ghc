@@ -975,13 +975,18 @@ renameSig _ (IdSig _ x)
 
 renameSig ctxt sig@(TypeSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRnN ctxt sig) vs
-        ; let doc = TypeSigCtx (hsSigTypeExplicit (hswc_body ty)) (ppr_sig_bndrs vs)
-        ; (new_ty, fvs) <- rnHsSigWcType doc ty
+        ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
+        ; ifaOk <- xoptM LangExt.ImplicitForAll
+        ; (new_ty, fvs) <- rnHsSigWcType doc (outOfScopeHint ifaOk (hswc_body ty)) ty
         ; return (TypeSig noAnn new_vs new_ty, fvs) }
   where
-    hsSigTypeExplicit :: LHsSigType GhcPs -> Bool
-    hsSigTypeExplicit (L _ (HsSig {sig_bndrs = HsOuterExplicit {}})) = True
-    hsSigTypeExplicit _ = False
+    -- Since this information is lost from here on, the existence of an outer forall in
+    -- conjunction with a manually disabled 'ImplicitForAll' is is observed as an
+    -- 'OutOfScopeHint' here, so an error message about a missing type variable may alert
+    -- the user of this fact.
+    outOfScopeHint :: Bool -> LHsSigType GhcPs -> OutOfScopeHint
+    outOfScopeHint False (L _ (HsSig {sig_bndrs = HsOuterImplicit {}})) = OutOfScopeNoImplicit
+    outOfScopeHint _ _ = OutOfScopeNoHint
 
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures

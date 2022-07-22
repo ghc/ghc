@@ -130,12 +130,13 @@ data HsPatSigTypeScoping
     -- "GHC.Hs.Type".
 
 rnHsSigWcType :: HsDocContext
+              -> OutOfScopeHint
               -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeVars)
-rnHsSigWcType doc (HsWC { hswc_body =
+rnHsSigWcType ctx hint (HsWC { hswc_body =
     sig_ty@(L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
-  = bindHsOuterTyVarBndrs doc Nothing fvs outer_bndrs $ \outer_bndrs' ->
-    do { (wcs, body_ty', fvs') <- rnWcBody doc fvs body_ty
+  = bindHsOuterTyVarBndrs ctx Nothing fvs outer_bndrs $ \outer_bndrs' ->
+    do { (wcs, body_ty', fvs') <- rnWcBody ctx hint fvs body_ty
        ; pure ( HsWC  { hswc_ext = wcs, hswc_body = L loc $
                 HsSig { sig_ext = noExtField
                       , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
@@ -166,7 +167,7 @@ rnHsPatSigType scoping ctx sig_ty thing_inside
                NeverBind  -> []
        ; warnPatternSignatureBinds implicit_bndrs False
        ; rnImplicitTvOccs Nothing implicit_bndrs $ \ imp_tvs ->
-    do { (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx nwc_rdrs pat_sig_ty
+    do { (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx OutOfScopeNoHint nwc_rdrs pat_sig_ty
        ; let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
              sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = pat_sig_ty' }
        ; (res, fvs2) <- thing_inside sig_ty'
@@ -179,7 +180,7 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
   = do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
        ; (nwc_rdrs', _) <- partition_nwcs ctxt free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
-       ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
+       ; (wcs, hs_ty', fvs) <- rnWcBody ctxt OutOfScopeNoHint nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
 
@@ -223,7 +224,7 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
           ]
     (wcVars, ibVars) <- partition_nwcs ctxt varsNotInScope
     rnImplicitTvBndrs ctxt Nothing ibVars $ \ ibVars' -> do
-      (wcVars', hs_ty', fvs) <- rnWcBody ctxt wcVars hs_ty
+      (wcVars', hs_ty', fvs) <- rnWcBody ctxt OutOfScopeNoHint wcVars hs_ty
       let sig_ty = HsPS
             { hsps_body = hs_ty'
             , hsps_ext = HsPSRn
@@ -242,15 +243,16 @@ unboundWildcards tyvars = do
     wcs =
       filter (startsWithUnderscore . rdrNameOcc . unLoc)
 
-rnWcBody :: HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
+rnWcBody :: HsDocContext -> OutOfScopeHint -> [LocatedN RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
-rnWcBody ctxt tyvars hs_ty
+rnWcBody ctxt hint tyvars hs_ty
   = do { wildcards_enabled <- xoptM LangExt.NamedWildCards
        ; nwcs <- if wildcards_enabled then unboundWildcards tyvars else pure []
        ; let env = RTKE { rtke_level = TypeLevel
                         , rtke_what  = RnTypeBody
                         , rtke_nwcs  = mkNameSet nwcs
-                        , rtke_ctxt  = ctxt }
+                        , rtke_ctxt  = ctxt
+                        , rtke_hint = hint }
        ; (hs_ty', fvs) <- bindLocalNamesFV nwcs $
                           rn_lty env hs_ty
        ; return (nwcs, hs_ty', fvs) }
@@ -533,6 +535,7 @@ uninhabited. See Note [Constraints in kinds] in GHC.Core.TyCo.Rep.
 
 data RnTyKiEnv
   = RTKE { rtke_ctxt  :: HsDocContext
+         , rtke_hint  :: OutOfScopeHint
          , rtke_level :: TypeOrKind  -- Am I renaming a type or a kind?
          , rtke_what  :: RnTyKiWhat  -- And within that what am I renaming?
          , rtke_nwcs  :: NameSet     -- These are the in-scope named wildcards
@@ -557,7 +560,7 @@ instance Outputable RnTyKiWhat where
 mkTyKiEnv :: HsDocContext -> TypeOrKind -> RnTyKiWhat -> RnTyKiEnv
 mkTyKiEnv cxt level what
  = RTKE { rtke_level = level, rtke_nwcs = emptyNameSet
-        , rtke_what = what, rtke_ctxt = cxt }
+        , rtke_what = what, rtke_ctxt = cxt, rtke_hint = OutOfScopeNoHint }
 
 isRnKindLevel :: RnTyKiEnv -> Bool
 isRnKindLevel (RTKE { rtke_level = KindLevel }) = True
@@ -856,14 +859,14 @@ throw an error accordingly.
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name
 rnTyVar env rdr_name
-  = do { name <- lookupTypeOccRn (rtke_ctxt env) rdr_name
+  = do { name <- lookupTypeOccRn (rtke_hint env) rdr_name
        ; checkNamedWildCard env name
        ; return name }
 
 rnLTyVar :: LocatedN RdrName -> RnM (LocatedN Name)
 -- Called externally; does not deal with wildcards
 rnLTyVar (L loc rdr_name)
-  = do { tyvar <- lookupTypeOccRn (GenericCtx (text "rnLTyVar")) rdr_name
+  = do { tyvar <- lookupTypeOccRn OutOfScopeNoHint rdr_name
        ; return (L loc tyvar) }
 
 --------------

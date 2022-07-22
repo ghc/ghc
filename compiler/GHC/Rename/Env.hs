@@ -21,6 +21,7 @@ module GHC.Rename.Env (
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
         lookupTypeOccRn,
+        OutOfScopeHint (..),
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
 
         AmbiguousResult(..),
@@ -1036,9 +1037,14 @@ lookupLocalOccRn rdr_name
            Just name -> return name
            Nothing   -> unboundName (LF WL_Anything WL_LocalOnly) rdr_name }
 
+data OutOfScopeHint =
+  OutOfScopeNoHint
+  |
+  OutOfScopeNoImplicit
+
 -- lookupTypeOccRn looks up an optionally promoted RdrName.
 -- Used for looking up type variables.
-lookupTypeOccRn :: HsDocContext -> RdrName -> RnM Name
+lookupTypeOccRn :: OutOfScopeHint -> RdrName -> RnM Name
 -- see Note [Demotion]
 lookupTypeOccRn ctx rdr_name
   | isVarOcc (rdrNameOcc rdr_name)  -- See Note [Promoted variables in types]
@@ -1066,8 +1072,8 @@ To ease migration and minimize breakage, we continue to support those usages
 but emit appropriate warnings.
 -}
 
-lookup_demoted :: HsDocContext -> RdrName -> RnM Name
-lookup_demoted ctx rdr_name
+lookup_demoted :: OutOfScopeHint -> RdrName -> RnM Name
+lookup_demoted hint rdr_name
   | Just demoted_rdr <- demoteRdrName rdr_name
     -- Maybe it's the name of a *data* constructor
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -1094,14 +1100,13 @@ lookup_demoted ctx rdr_name
 
   | otherwise
   = do
-    hints <- implicitHint ctx <$> xoptM LangExt.ImplicitForAll
-    unboundNameX looking_for rdr_name hints
+    unboundNameX looking_for rdr_name (implicitHint hint)
 
   where
     looking_for = LF WL_Constructor WL_Anywhere
-    implicitHint (TypeSigCtx False _) False =
+    implicitHint OutOfScopeNoImplicit =
       [suggestExtensionWithInfo implicitMsg LangExt.ImplicitForAll]
-    implicitHint _ _ = []
+    implicitHint OutOfScopeNoHint = []
     implicitMsg =
       text "The extension has been turned off manually, which requires type variables to be bound by " <+>
       quotes (text "forall")

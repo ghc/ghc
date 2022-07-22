@@ -3412,7 +3412,7 @@ inHsDocContext ctxt = text "In" <+> pprHsDocContext ctxt
 
 pprHsDocContext :: HsDocContext -> SDoc
 pprHsDocContext (GenericCtx doc)      = doc
-pprHsDocContext (TypeSigCtx _ doc)    = text "the type signature for" <+> doc
+pprHsDocContext (TypeSigCtx doc)      = text "the type signature for" <+> doc
 pprHsDocContext (StandaloneKindSigCtx doc) = text "the standalone kind signature for" <+> doc
 pprHsDocContext PatCtx                = text "a pattern type-signature"
 pprHsDocContext SpecInstSigCtx        = text "a SPECIALISE instance pragma"

@@ -3207,7 +3207,7 @@ data FixedRuntimeRepErrorInfo
 -- AZ:TODO: Change these all to be Name instead of RdrName.
 --          Merge TcType.UserTypeContext in to it.
 data HsDocContext
-  = TypeSigCtx Bool SDoc -- Whether the sig is explicitly quantified
+  = TypeSigCtx SDoc
   | StandaloneKindSigCtx SDoc
   | PatCtx
   | SpecInstSigCtx
