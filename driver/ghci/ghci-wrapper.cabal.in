@@ -26,3 +26,7 @@ Executable ghci
     C-Sources:
        -- the following get copied from ../utils by hadrian
        getLocation.c isMinTTY.c cwrapper.c
+    -- We need to call the versioned ghc executable because the unversioned
+    -- GHC executable is a wrapper that doesn't call FreeConsole and so
+    -- breaks an interactive process like GHCi. See #21889, #14150 and #13411
+    CPP-Options: -DEXE_PATH="ghc-@ProjectVersion@"

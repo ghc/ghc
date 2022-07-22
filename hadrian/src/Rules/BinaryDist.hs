@@ -163,7 +163,7 @@ bindistRules = do
             -- 2. Either make a symlink for the unversioned version or
             -- a wrapper script on platforms (windows) which don't support symlinks.
             if windowsHost
-              then createVersionWrapper version_prog unversioned_install_path
+              then createVersionWrapper pkg version_prog unversioned_install_path
               else liftIO $ do
                 -- Use the IO versions rather than createFileLink because
                 -- we need to create a relative symlink.
@@ -180,8 +180,8 @@ bindistRules = do
                     bindistFilesDir -/- "bin" -/- "runhaskell" ++ "-" ++ version ++ ext
               if windowsHost
                 then do
-                  createVersionWrapper version_prog unversioned_runhaskell_path
-                  createVersionWrapper version_prog versioned_runhaskell_path
+                  createVersionWrapper pkg version_prog unversioned_runhaskell_path
+                  createVersionWrapper pkg version_prog versioned_runhaskell_path
                 else liftIO $ do
                   -- Unversioned
                   IO.removeFile unversioned_runhaskell_path <|> return ()
@@ -453,15 +453,22 @@ iservBins = do
 -- See Note [Two Types of Wrappers]
 
 -- | Create a wrapper script calls the executable given as first argument
-createVersionWrapper :: String -> FilePath -> Action ()
-createVersionWrapper versioned_exe install_path = do
+createVersionWrapper :: Package -> String -> FilePath -> Action ()
+createVersionWrapper pkg versioned_exe install_path = do
   ghcPath <- builderPath (Ghc CompileCWithGhc Stage2)
   top <- topDirectory
   let version_wrapper_dir = top -/- "hadrian" -/- "bindist" -/- "cwrappers"
       wrapper_files = [ version_wrapper_dir -/- file | file <- ["version-wrapper.c", "getLocation.c", "cwrapper.c"]]
+      -- If the wrapper is for an interactive process like GHCi then we need to call
+      -- FreeConsole to pass event processing to the child process
+      -- See #21889 and #14150 and #13411
+      interactive
+        | pkg == ghciWrapper = (1 :: Int)
+        | otherwise = 0
 
   cmd ghcPath (["-no-hs-main", "-o", install_path, "-I"++version_wrapper_dir
               , "-DEXE_PATH=\"" ++ versioned_exe ++ "\""
+              , "-DINTERACTIVE_PROCESS=" ++ show interactive
               ] ++ wrapper_files)
 
 {-
