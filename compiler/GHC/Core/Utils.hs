@@ -275,7 +275,7 @@ mkPiMCo v (MCo co) = MCo (mkPiCo Representational v co)
 
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
-mkCast :: CoreExpr -> CoercionR -> CoreExpr
+mkCast :: HasDebugCallStack => CoreExpr -> CoercionR -> CoreExpr
 mkCast e co
   | assertPpr (coercionRole co == Representational)
               (text "coercion" <+> ppr co <+> text "passed to mkCast"

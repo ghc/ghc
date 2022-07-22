@@ -2353,7 +2353,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
     -- for why we have an accumulating coercion
     --
     -- Invariant: (go bs body co) returns an expression
-    --            equivalent to (\(reverse bs). body |> co)
+    --            equivalent to (\(reverse bs). (body |> co))
 
     -- See Note [Eta reduction with casted function]
     go bs (Cast e co1) co2
@@ -2380,14 +2380,16 @@ tryEtaReduce rec_ids bndrs body eval_sd
       , remaining_bndrs `ltLength` bndrs
             -- Only reply Just if /something/ has happened
       , ok_fun fun
-      , let etad_expr = mkLams (reverse remaining_bndrs) (mkCast fun co)
-            used_vars = exprFreeVars etad_expr
+      , let used_vars     = exprFreeVars fun `unionVarSet` tyCoVarsOfCo co
             reduced_bndrs = mkVarSet (dropList remaining_bndrs bndrs)
+            -- reduced_bndrs are the ones we are eta-reducing away
       , used_vars `disjointVarSet` reduced_bndrs
-          -- Check for any of the binders free in the result,
-          -- including the accumulated coercion
+          -- Check for any of the reduced_bndrs (about to be dropped)
+          -- free in the result, including the accumulated coercion.
           -- See Note [Eta reduction makes sense], intro and point (1)
-      = Just etad_expr
+          -- NB: don't compute used_vars from exprFreeVars (mkCast fun co)
+          --     because the latter may be ill formed if the guard fails (#21801)
+      = Just (mkLams (reverse remaining_bndrs) (mkCast fun co))
 
     go _remaining_bndrs _fun  _  = -- pprTrace "tER fail" (ppr _fun $$ ppr _remaining_bndrs) $
                                    Nothing
