@@ -350,13 +350,13 @@ extendTvSubstBinderAndInScope subst (Anon {}) _
   = subst
 
 extendTvSubstWithClone :: TCvSubst -> TyVar -> TyVar -> TCvSubst
--- Adds a new tv -> tv mapping, /and/ extends the in-scope set
+-- Adds a new tv -> tv mapping, /and/ extends the in-scope set with the clone
+-- Does not look in the kind of the new variable;
+--   those variables should be in scope already
 extendTvSubstWithClone (TCvSubst in_scope tenv cenv) tv tv'
-  = TCvSubst (extendInScopeSetSet in_scope new_in_scope)
+  = TCvSubst (extendInScopeSet in_scope tv')
              (extendVarEnv tenv tv (mkTyVarTy tv'))
              cenv
-  where
-    new_in_scope = tyCoVarsOfType (tyVarKind tv') `extendVarSet` tv'
 
 extendCvSubst :: TCvSubst -> CoVar -> Coercion -> TCvSubst
 extendCvSubst (TCvSubst in_scope tenv cenv) v co

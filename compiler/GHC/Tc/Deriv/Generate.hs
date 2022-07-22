@@ -73,7 +73,6 @@ import GHC.Builtin.Types
 import GHC.Core.Type
 import GHC.Core.Class
 import GHC.Types.Unique.FM ( lookupUFM, listToUFM )
-import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Utils.Misc
 import GHC.Types.Var
@@ -2079,7 +2078,7 @@ gen_Newtype_fam_insts loc' cls inst_tvs inst_tys rhs_ty
     ats       = classATs cls
     locn      = noAnnSrcSpan loc'
     cls_tvs   = classTyVars cls
-    in_scope  = mkInScopeSet $ mkVarSet inst_tvs
+    in_scope  = mkInScopeSetList inst_tvs
     lhs_env   = zipTyEnv cls_tvs inst_tys
     lhs_subst = mkTvSubst in_scope lhs_env
     rhs_env   = zipTyEnv cls_tvs underlying_inst_tys
@@ -2129,7 +2128,7 @@ mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty id
          (substTy lhs_subst user_meth_ty)
   where
     cls_tvs = classTyVars cls
-    in_scope = mkInScopeSet $ mkVarSet inst_tvs
+    in_scope = mkInScopeSetList inst_tvs
     lhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs inst_tys)
     rhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs (changeLast inst_tys rhs_ty))
     (_class_tvs, _class_constraint, user_meth_ty)

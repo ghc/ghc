@@ -50,7 +50,7 @@ module GHC.Types.Var.Env (
         InScopeSet,
 
         -- ** Operations on InScopeSets
-        emptyInScopeSet, mkInScopeSet, delInScopeSet,
+        emptyInScopeSet, mkInScopeSet, mkInScopeSetList, delInScopeSet,
         extendInScopeSet, extendInScopeSetList, extendInScopeSetSet,
         getInScopeVars, lookupInScope, lookupInScope_Directly,
         unionInScope, elemInScopeSet, uniqAway,
@@ -147,6 +147,9 @@ getInScopeVars (InScope vs) = vs
 
 mkInScopeSet :: VarSet -> InScopeSet
 mkInScopeSet in_scope = InScope in_scope
+
+mkInScopeSetList :: [Var] -> InScopeSet
+mkInScopeSetList vs = InScope (mkVarSet vs)
 
 extendInScopeSet :: InScopeSet -> Var -> InScopeSet
 extendInScopeSet (InScope in_scope) v

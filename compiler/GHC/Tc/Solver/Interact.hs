@@ -1845,7 +1845,7 @@ doTopFundepImprovement work_item@(CDictCan { cc_ev = ev, cc_class = cls
 doTopFundepImprovement work_item = pprPanic "doTopFundepImprovement" (ppr work_item)
 
 emitFunDepWanteds :: RewriterSet  -- from the work item
-                   -> [FunDepEqn (CtLoc, RewriterSet)] -> TcS ()
+                  -> [FunDepEqn (CtLoc, RewriterSet)] -> TcS ()
 -- See Note [FunDep and implicit parameter reactions]
 emitFunDepWanteds work_rewriters fd_eqns
   = mapM_ do_one_FDEqn fd_eqns
@@ -1859,15 +1859,24 @@ emitFunDepWanteds work_rewriters fd_eqns
 
      | otherwise
      = do { traceTcS "emitFunDepWanteds 2" (ppr (ctl_depth loc) $$ ppr tvs $$ ppr eqs)
-          ; subst <- instFlexi tvs  -- Takes account of kind substitution
+          ; subst <- instFlexiX emptyTCvSubst tvs  -- Takes account of kind substitution
           ; mapM_ (do_one_eq loc all_rewriters subst) (reverse eqs) }
                -- See Note [Reverse order of fundep equations]
      where
        all_rewriters = work_rewriters S.<> rewriters
 
     do_one_eq loc rewriters subst (Pair ty1 ty2)
-       = unifyWanted rewriters loc Nominal
-                     (Type.substTyUnchecked subst ty1) (Type.substTyUnchecked subst ty2)
+       = unifyWanted rewriters loc Nominal (Type.substTy subst' ty1) ty2
+         -- ty2 does not mention fd_qtvs, so no need to subst it.
+         -- See GHC.Tc.Instance.Fundeps Note [Improving against instances]
+         --     Wrinkle (1)
+      where
+         subst' = extendTCvInScopeSet subst (tyCoVarsOfType ty1)
+         -- The free vars of ty1 aren't just fd_qtvs: ty1 is the result
+         -- of matching with the [W] constraint. So we add its free
+         -- vars to InScopeSet, to satisfy substTy's invariants, even
+         -- though ty1 will never (currently) be a poytype, so this
+         -- InScopeSet will never be looked at.
 
 {-
 **********************************************************************
@@ -2065,6 +2074,8 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
   = return []
 
   where
+      in_scope = mkInScopeSet (tyCoVarsOfType rhs_ty)
+
       buildImprovementData
           :: [a]                     -- axioms for a TF (FamInst or CoAxBranch)
           -> (a -> [TyVar])          -- get bound tyvars of an axiom
@@ -2083,7 +2094,8 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
           , let ax_args = axiomLHS axiom
                 ax_rhs  = axiomRHS axiom
                 ax_tvs  = axiomTVs axiom
-          , Just subst <- [tcUnifyTyWithTFs False ax_rhs rhs_ty]
+                in_scope1 = in_scope `extendInScopeSetList` ax_tvs
+          , Just subst <- [tcUnifyTyWithTFs False in_scope1 ax_rhs rhs_ty]
           , let notInSubst tv = not (tv `elemVarEnv` getTvSubstEnv subst)
                 unsubstTvs    = filter (notInSubst <&&> isTyVar) ax_tvs ]
                    -- The order of unsubstTvs is important; it must be
@@ -2099,7 +2111,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
                   -- be sure to apply the current substitution to a's kind.
                   -- Hence instFlexiX.   #13135 was an example.
 
-             ; return [ Pair (substTyUnchecked subst ax_arg) arg
+             ; return [ Pair (substTy subst ax_arg) arg
                         -- NB: the ax_arg part is on the left
                         -- see Note [Improvement orientation]
                       | case cabr of

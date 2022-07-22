@@ -57,7 +57,6 @@ import Data.Foldable    ( fold )
 *                                                                      *
 ************************************************************************
 
-
 Each functional dependency with one variable in the RHS is responsible
 for generating a single equality. For instance:
      class C a b | a -> b
@@ -83,31 +82,56 @@ Will generate:
 INVARIANT: Corresponding types aren't already equal
 That is, there exists at least one non-identity equality in FDEqs.
 
+Note [Improving against instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Assume:
-       class C a b c | a -> b c
-       instance C Int x x
-And:   [Wanted] C Int Bool alpha
-We will /match/ the LHS of fundep equations, producing a matching substitution
-and create equations for the RHS sides. In our last example we'd have generated:
-      ({x}, [fd1,fd2])
-where
-       fd1 = FDEq 1 Bool x
-       fd2 = FDEq 2 alpha x
-To ``execute'' the equation, make fresh type variable for each tyvar in the set,
-instantiate the two types with these fresh variables, and then unify or generate
-a new constraint. In the above example we would generate a new unification
-variable 'beta' for x and produce the following constraints:
-     [Wanted] (Bool ~ beta)
-     [Wanted] (alpha ~ beta)
+   class C a b | a -> b
+   instance C Int Bool
+   [W] C Int ty
 
-Notice the subtle difference between the above class declaration and:
-       class C a b c | a -> b, a -> c
-where we would generate:
-      ({x},[fd1]),({x},[fd2])
-This means that the template variable would be instantiated to different
-unification variables when producing the FD constraints.
+Then `improveFromInstEnv` should return a FDEqn with
+   FDEqn { fd_qtvs = [], fd_eqs = [Pair Bool ty] }
 
-Finally, the position parameters will help us rewrite the wanted constraint ``on the spot''
+describing an equality (Int ~ ty).  To do this we /match/ the instance head
+against the [W], using just the LHS of the fundep; if we match, we return
+an equality for the RHS.
+
+Wrinkles:
+
+(1) meta_tvs: sometimes the instance mentions variables in the RHS that
+    are not bound in the LHS.  For example
+
+     class C a b | a -> b
+     instance C Int (Maybe x)
+     [W] C Int ty
+
+    Note that although the `Int` parts match, that does not fix what `x` is.
+    So we just make up a fresh unification variable (a meta_tv), to give the
+    "shape" of the RHS.  So we emit the FDEqun
+       FDEqn { fd_qtvs = [x], fd_eqs = [Pair (Maybe x) ty] }
+
+    Note that the fd_qtvs can be free in the /first/ component of the Pair,
+
+    but not in the seconde (which comes from the [W] constraint.
+
+(2) Multi-range fundeps. When these meta_tvs are involved, there is a subtle
+    difference between the fundep (a -> b c) and the two fundeps (a->b, a->c).
+    Consider
+       class D a b c | a -> b c
+       instance D Int x (Maybe x)
+       [W] D Int Bool ty
+
+    Then we'll generate
+       FDEqn { fd_qtvs = [x], fd_eqs = [Pair x Bool, Pair (Maybe x) ty] }
+
+    But if the fundeps had been (a->b, a->c) we'd generate two FDEqns
+       FDEqn { fd_qtvs = [x], fd_eqs = [Pair x Bool] }
+       FDEqn { fd_qtvs = [x], fd_eqs = [Pair (Maybe x) ty] }
+    with two FDEqns, generating two separate unification variables.
+
+(3) improveFromInstEnv doesn't return any equations that already hold.
+    Reason: then we know if any actual improvement has happened, in
+    which case we need to iterate the solver
 -}
 
 data FunDepEqn loc
@@ -116,10 +140,23 @@ data FunDepEqn loc
                                  -- Non-empty only for FunDepEqns arising from instance decls
 
           , fd_eqs   :: [TypeEqn]  -- Make these pairs of types equal
+                                   -- Invariant: In each (Pair ty1 ty2), the fd_qtvs may be
+                                   -- free in ty1 but not in ty2.  See Wrinkle (1) of
+                                   -- Note [Improving against instances]
+
           , fd_pred1 :: PredType   -- The FunDepEqn arose from
           , fd_pred2 :: PredType   --  combining these two constraints
           , fd_loc   :: loc  }
     deriving Functor
+
+instance Outputable (FunDepEqn a) where
+  ppr = pprEquation
+
+pprEquation :: FunDepEqn a -> SDoc
+pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
+  = vcat [text "forall" <+> braces (pprWithCommas ppr qtvs),
+          nest 2 (vcat [ ppr t1 <+> text "~" <+> ppr t2
+                       | Pair t1 t2 <- pairs])]
 
 {-
 Given a bunch of predicates that must hold, such as
@@ -195,20 +232,12 @@ improveFromAnother _ _ _ = []
 -- Improve a class constraint from instance declarations
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-instance Outputable (FunDepEqn a) where
-  ppr = pprEquation
-
-pprEquation :: FunDepEqn a -> SDoc
-pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
-  = vcat [text "forall" <+> braces (pprWithCommas ppr qtvs),
-          nest 2 (vcat [ ppr t1 <+> text "~" <+> ppr t2
-                       | Pair t1 t2 <- pairs])]
-
 improveFromInstEnv :: InstEnvs
                    -> (PredType -> SrcSpan -> loc)
                    -> Class -> [Type]
                    -> [FunDepEqn loc] -- Needs to be a FunDepEqn because
                                       -- of quantified variables
+-- See Note [Improving against instances]
 -- Post: Equations oriented from the template (matching instance) to the workitem!
 improveFromInstEnv inst_env mk_loc cls tys
   = [ FDEqn { fd_qtvs = meta_tvs, fd_eqs = eqs
@@ -232,36 +261,15 @@ improveFromInstEnv inst_env mk_loc cls tys
     rough_tcs          = RM_KnownTc (className cls) : roughMatchTcs tys
     pred               = mkClassPred cls tys
 
-
-
-
 improveClsFD :: [TyVar] -> FunDep TyVar    -- One functional dependency from the class
              -> ClsInst                    -- An instance template
              -> [Type] -> [RoughMatchTc]   -- Arguments of this (C tys) predicate
              -> [([TyCoVar], [TypeEqn])]   -- Empty or singleton
+-- See Note [Improving against instances]
 
 improveClsFD clas_tvs fd
              (ClsInst { is_tvs = qtvs, is_tys = tys_inst, is_tcs = rough_tcs_inst })
              tys_actual rough_tcs_actual
-
--- Compare instance      {a,b}    C sx sp sy sq
---         with wanted     [W] C tx tp ty tq
---         for fundep (x,y -> p,q)  from class  (C x p y q)
--- If (sx,sy) unifies with (tx,ty), take the subst S
-
--- 'qtvs' are the quantified type variables, the ones which can be instantiated
--- to make the types match.  For example, given
---      class C a b | a->b where ...
---      instance C (Maybe x) (Tree x) where ..
---
--- and a wanted constraint of form (C (Maybe t1) t2),
--- then we will call checkClsFD with
---
---      is_qtvs = {x}, is_tys = [Maybe x,  Tree x]
---                     tys_actual = [Maybe t1, t2]
---
--- We can instantiate x to t1, and then we want to force
---      (Tree x) [t1/x]  ~   t2
 
   | instanceCantMatch rough_tcs_inst rough_tcs_actual
   = []          -- Filter out ones that can't possibly match,
@@ -271,12 +279,11 @@ improveClsFD clas_tvs fd
                equalLength tys_inst clas_tvs)
               (ppr tys_inst <+> ppr tys_actual) $
 
-    case tcMatchTyKis ltys1 ltys2 of
+    case tcMatchTyKisX init_subst ltys1 ltys2 of
         Nothing  -> []
         Just subst | isJust (tcMatchTyKisX subst rtys1 rtys2)
                         -- Don't include any equations that already hold.
-                        -- Reason: then we know if any actual improvement has happened,
-                        --         in which case we need to iterate the solver
+                        -- See Note [Improving against instances] wrinkle (3)
                         -- In making this check we must taking account of the fact that any
                         -- qtvs that aren't already instantiated can be instantiated to anything
                         -- at all
@@ -307,7 +314,7 @@ improveClsFD clas_tvs fd
                         -- executed.  What we're doing instead is recording the partial
                         -- work of the ls1/ls2 unification leaving a smaller unification problem
                   where
-                    rtys1' = map (substTyUnchecked subst) rtys1
+                    rtys1' = map (substTy subst) rtys1
 
                     fdeqs = zipAndComputeFDEqs (\_ _ -> False) rtys1' rtys2
                         -- Don't discard anything!
@@ -315,8 +322,10 @@ improveClsFD clas_tvs fd
                         -- eqType again, since we know for sure that /at least one/
                         -- equation in there is useful)
 
-                    meta_tvs = [ setVarType tv (substTyUnchecked subst (varType tv))
-                               | tv <- qtvs, tv `notElemTCvSubst` subst ]
+                    meta_tvs = [ setVarType tv (substTy subst (varType tv))
+                               | tv <- qtvs
+                               , tv `notElemTCvSubst` subst
+                               , tv `elemVarSet` rtys1_tvs ]
                         -- meta_tvs are the quantified type variables
                         -- that have not been substituted out
                         --
@@ -331,11 +340,14 @@ improveClsFD clas_tvs fd
                         --              type variables' kinds
                         --          (b) we must apply 'subst' to the kinds, in case we have
                         --              matched out a kind variable, but not a type variable
-                        --              whose kind mentions that kind variable!
-                        --          #6015, #6068
+                        --              whose kind mentions that kind variable! #6015, #6068
+                        --          (c) no need to include tyvars not in rtys1
   where
+    init_subst     = mkEmptyTCvSubst $ mkInScopeSet $
+                     mkVarSet qtvs `unionVarSet` tyCoVarsOfTypes ltys2
     (ltys1, rtys1) = instFD fd clas_tvs tys_inst
     (ltys2, rtys2) = instFD fd clas_tvs tys_actual
+    rtys1_tvs      = tyCoVarsOfTypes rtys1
 
 {-
 %************************************************************************

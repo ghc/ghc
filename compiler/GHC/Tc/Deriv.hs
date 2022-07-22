@@ -1920,7 +1920,7 @@ genFamInsts spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
       -- See Note [DeriveAnyClass and default family instances]
       DerivSpecAnyClass -> do
         let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
-            mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
+            mini_subst = mkTvSubst (mkInScopeSetList tyvars) mini_env
         dflags <- getDynFlags
         tyfam_insts <-
           -- canDeriveAnyClass should ensure that this code can't be reached

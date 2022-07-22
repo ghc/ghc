@@ -606,7 +606,7 @@ specProgram guts@(ModGuts { mg_module = this_mod
               -- accidentally re-use a unique that's already in use
               -- Easiest thing is to do it all at once, as if all the top-level
               -- decls were mutually recursive
-       ; let top_env = SE { se_subst = Core.mkEmptySubst $ mkInScopeSet $ mkVarSet $
+       ; let top_env = SE { se_subst = Core.mkEmptySubst $ mkInScopeSetList $
                                        bindersOfBinds binds
                           , se_module = this_mod
                           , se_dflags = dflags }

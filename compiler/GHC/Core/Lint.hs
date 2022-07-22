@@ -2600,7 +2600,7 @@ compatible_branches (CoAxBranch { cab_tvs = tvs1
                                 , cab_rhs = rhs2 })
   = -- we need to freshen ax2 w.r.t. ax1
     -- do this by pretending tvs1 are in scope when processing tvs2
-    let in_scope       = mkInScopeSet (mkVarSet tvs1)
+    let in_scope       = mkInScopeSetList tvs1
         subst0         = mkEmptyTCvSubst in_scope
         (subst, _)     = substTyVarBndrs subst0 tvs2
         lhs2'          = substTys subst lhs2
@@ -2858,7 +2858,7 @@ initL cfg m
   where
     (tcvs, ids) = partition isTyCoVar $ l_vars cfg
     env = LE { le_flags = l_flags cfg
-             , le_subst = mkEmptyTCvSubst (mkInScopeSet (mkVarSet tcvs))
+             , le_subst = mkEmptyTCvSubst (mkInScopeSetList tcvs)
              , le_ids   = mkVarEnv [(id, (id,idType id)) | id <- ids]
              , le_joins = emptyVarSet
              , le_loc = []

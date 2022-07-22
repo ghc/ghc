@@ -42,7 +42,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.Var
-import GHC.Types.Var.Env( emptyTidyEnv, mkInScopeSet )
+import GHC.Types.Var.Env( emptyTidyEnv, mkInScopeSetList )
 import GHC.Types.Id
 import GHC.Types.Id.Info( RecSelParent(..) )
 import GHC.Tc.Gen.Bind
@@ -456,7 +456,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
            pushLevelAndCaptureConstraints   $
            tcExtendNameTyVarEnv univ_tv_prs $
            tcCheckPat PatSyn lpat (unrestricted skol_pat_ty)   $
-           do { let in_scope    = mkInScopeSet (mkVarSet skol_univ_tvs)
+           do { let in_scope    = mkInScopeSetList skol_univ_tvs
                     empty_subst = mkEmptyTCvSubst in_scope
               ; (inst_subst, ex_tvs') <- mapAccumLM newMetaTyVarX empty_subst skol_ex_tvs
                     -- newMetaTyVarX: see the "Existential type variables"
