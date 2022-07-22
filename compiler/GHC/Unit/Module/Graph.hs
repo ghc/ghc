@@ -29,6 +29,7 @@ module GHC.Unit.Module.Graph
 
    , NodeKey(..)
    , nodeKeyUnitId
+   , nodeKeyModName
    , ModNodeKey
    , mkNodeKey
    , msKey
@@ -125,6 +126,10 @@ nodeKeyUnitId :: NodeKey -> UnitId
 nodeKeyUnitId (NodeKey_Unit iu)   = instUnitInstanceOf iu
 nodeKeyUnitId (NodeKey_Module mk) = mnkUnitId mk
 nodeKeyUnitId (NodeKey_Link uid)  = uid
+
+nodeKeyModName :: NodeKey -> Maybe ModuleName
+nodeKeyModName (NodeKey_Module mk) = Just (gwib_mod $ mnkModuleName mk)
+nodeKeyModName _ = Nothing
 
 data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: ModuleNameWithIsBoot
                                            , mnkUnitId     :: UnitId } deriving (Eq, Ord)

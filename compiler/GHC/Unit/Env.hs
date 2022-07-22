@@ -49,6 +49,7 @@ module GHC.Unit.Env
     , unitEnv_elts
     , unitEnv_hpts
     , unitEnv_foldWithKey
+    , unitEnv_union
     , unitEnv_mapWithKey
     -- * Invariants
     , assertUnitEnvInvariant
@@ -341,6 +342,9 @@ unitEnv_hpts env = map homeUnitEnv_hpt (Map.elems (unitEnv_graph env))
 
 unitEnv_foldWithKey :: (b -> UnitEnvGraphKey -> a -> b) -> b -> UnitEnvGraph a -> b
 unitEnv_foldWithKey f z (UnitEnvGraph g)= Map.foldlWithKey' f z g
+
+unitEnv_union :: (a -> a -> a) -> UnitEnvGraph a -> UnitEnvGraph a -> UnitEnvGraph a
+unitEnv_union f (UnitEnvGraph env1) (UnitEnvGraph env2) = UnitEnvGraph (Map.unionWith f env1 env2)
 
 -- -------------------------------------------------------
 -- Query and modify UnitState in HomeUnitEnv

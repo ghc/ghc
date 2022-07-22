@@ -134,7 +134,9 @@ hsc_all_home_unit_ids :: HscEnv -> Set.Set UnitId
 hsc_all_home_unit_ids = unitEnv_keys . hsc_HUG
 
 hscUpdateHPT :: (HomePackageTable -> HomePackageTable) -> HscEnv -> HscEnv
-hscUpdateHPT f hsc_env = hsc_env { hsc_unit_env = updateHpt f (hsc_unit_env hsc_env) }
+hscUpdateHPT f hsc_env =
+  let res = updateHpt f (hsc_unit_env hsc_env)
+  in res `seq` hsc_env { hsc_unit_env = res }
 
 hscUpdateHUG :: (HomeUnitGraph -> HomeUnitGraph) -> HscEnv -> HscEnv
 hscUpdateHUG f hsc_env = hsc_env { hsc_unit_env = updateHug f (hsc_unit_env hsc_env) }
