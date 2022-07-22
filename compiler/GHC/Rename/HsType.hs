@@ -159,7 +159,7 @@ rnHsPatSigType scoping ctx sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
        ; checkErr ty_sig_okay (unexpectedPatSigTypeErr sig_ty)
        ; free_vars <- filterInScopeM (extractHsTyRdrTyVars pat_sig_ty)
-       ; (nwc_rdrs', tv_rdrs) <- partition_nwcs free_vars
+       ; (nwc_rdrs', tv_rdrs) <- partition_nwcs ctx free_vars
        ; let nwc_rdrs = nubN nwc_rdrs'
              implicit_bndrs = case scoping of
                AlwaysBind -> tv_rdrs
@@ -177,7 +177,7 @@ rnHsPatSigType scoping ctx sig_ty thing_inside
 rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeVars)
 rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
   = do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
-       ; (nwc_rdrs', _) <- partition_nwcs free_vars
+       ; (nwc_rdrs', _) <- partition_nwcs ctxt free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
        ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
@@ -221,7 +221,7 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
             <+> text "already in scope."
           , text "Type applications in patterns must bind fresh variables, without shadowing."
           ]
-    (wcVars, ibVars) <- partition_nwcs varsNotInScope
+    (wcVars, ibVars) <- partition_nwcs ctxt varsNotInScope
     rnImplicitTvBndrs ctxt Nothing ibVars $ \ ibVars' -> do
       (wcVars', hs_ty', fvs) <- rnWcBody ctxt wcVars hs_ty
       let sig_ty = HsPS
@@ -326,16 +326,24 @@ extraConstraintWildCardsAllowed env
       StandaloneKindSigCtx {} -> False  -- See Note [Wildcards in standalone kind signatures] in "GHC.Hs.Decls"
       _                   -> False
 
+namedWildCardsAllowed :: HsDocContext -> Bool
+namedWildCardsAllowed = \case
+  PatCtx {} -> True
+  TypeSigCtx {} -> True
+  DerivDeclCtx {} -> True
+  ExprWithTySigCtx {} -> True
+  _ -> False
+
 -- | When the NamedWildCards extension is enabled, partition_nwcs
 -- removes type variables that start with an underscore from the
 -- FreeKiTyVars in the argument and returns them in a separate list.
 -- When the extension is disabled, the function returns the argument
 -- and empty list.  See Note [Renaming named wild cards]
-partition_nwcs :: FreeKiTyVars -> RnM ([LocatedN RdrName], FreeKiTyVars)
-partition_nwcs free_vars
+partition_nwcs :: HsDocContext -> FreeKiTyVars -> RnM ([LocatedN RdrName], FreeKiTyVars)
+partition_nwcs ctx free_vars
   = do { wildcards_enabled <- xoptM LangExt.NamedWildCards
        ; return $
-           if wildcards_enabled
+           if namedWildCardsAllowed ctx && wildcards_enabled
            then partition is_wildcard free_vars
            else ([], free_vars) }
   where
@@ -1174,13 +1182,14 @@ an LHsQTyVars can be semantically significant. As a result, we suppress
 -}
 
 bindHsOuterTyVarBndrsImplicit :: OutputableBndrFlag flag 'Renamed
-                              => Maybe assoc
+                              => HsDocContext
+                              -> Maybe assoc
                                  -- ^ @'Just' _@ => an associated type decl
                               -> FreeKiTyVars
                               -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
                               -> RnM (a, FreeVars)
-bindHsOuterTyVarBndrsImplicit mb_cls tyvars thing_inside = do
-  (_, imp_tv_nms) <- partition_nwcs =<< filterInScopeM tyvars
+bindHsOuterTyVarBndrsImplicit ctx mb_cls tyvars thing_inside = do
+  (_, imp_tv_nms) <- partition_nwcs ctx =<< filterInScopeM tyvars
   rnImplicitTvOccs mb_cls imp_tv_nms $ \implicit_vars' ->
     thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
 
@@ -1212,7 +1221,7 @@ bindHsOuterTyVarBndrs doc mb_cls tyvars outer_bndrs thing_inside =
     HsOuterImplicit{} -> do
       implicitOk <- xoptM LangExt.ImplicitForAll
       if implicitOk
-      then bindHsOuterTyVarBndrsImplicit mb_cls tyvars thing_inside
+      then bindHsOuterTyVarBndrsImplicit doc mb_cls tyvars thing_inside
       else bindHsOuterTyVarBndrsExplicit doc [] thing_inside
     HsOuterExplicit{hso_bndrs = exp_bndrs} ->
       bindHsOuterTyVarBndrsExplicit doc exp_bndrs thing_inside
