@@ -12,6 +12,13 @@ The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
 Language
 ~~~~~~~~
 
+- GHC Proposal `#511
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0511-deep-subsumption.rst>`_
+  has been implemented, introducing a new language extension,
+  :lang-ext:`DeepSubsumption`. This extension allows the user
+  to opt-in to the deep type subsumption-checking behavior implemented by GHC
+  8.10 and earlier.
+
 - A small change has been made to the way GHC infers types for definitions
   with no type signature: GHC will no longer generalize a function over
   a type variable determined by a functional dependency. For example::
