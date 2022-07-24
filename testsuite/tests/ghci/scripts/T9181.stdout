@@ -68,6 +68,7 @@ type (Data.Type.Ord.<=) :: forall {t}. t -> t -> Constraint
 type (Data.Type.Ord.<=) x y =
   GHC.TypeError.Assert
     (x Data.Type.Ord.<=? y) (Data.Type.Ord.LeErrMsg x y)
+  ~ (() :: Constraint)
   :: Constraint
 type (Data.Type.Ord.<=?) :: forall k. k -> k -> Bool
 type (Data.Type.Ord.<=?) m n =

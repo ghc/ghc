@@ -38,7 +38,7 @@ import GHC.Show(Show(..))
 import GHC.TypeError
 import GHC.TypeLits.Internal
 import GHC.TypeNats.Internal
-import GHC.Types (type (~))
+import GHC.Types (type (~), Constraint)
 import Data.Bool
 import Data.Char(Char)
 import Data.Eq
@@ -71,25 +71,25 @@ infix 4 <=?, <=, >=?, >=, <?, <, >?, >
 -- | Comparison (<=) of comparable types, as a constraint.
 --
 -- @since 4.16.0.0
-type x <= y = Assert (x <=? y) (LeErrMsg x y)
+type x <= y = Assert (x <=? y) (LeErrMsg x y) ~ (() :: Constraint)
 type LeErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " <= " ':<>: 'ShowType y)
 
 -- | Comparison (>=) of comparable types, as a constraint.
 --
 -- @since 4.16.0.0
-type x >= y = Assert (x >=? y) (GeErrMsg x y)
+type x >= y = Assert (x >=? y) (GeErrMsg x y) ~ (() :: Constraint)
 type GeErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " >= " ':<>: 'ShowType y)
 
 -- | Comparison (<) of comparable types, as a constraint.
 --
 -- @since 4.16.0.0
-type x < y = Assert (x <? y) (LtErrMsg x y)
+type x < y = Assert (x <? y) (LtErrMsg x y) ~ (() :: Constraint)
 type LtErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " < " ':<>: 'ShowType y)
 
 -- | Comparison (>) of comparable types, as a constraint.
 --
 -- @since 4.16.0.0
-type x > y = Assert (x >? y) (GtErrMsg x y)
+type x > y = Assert (x >? y) (GtErrMsg x y) ~ (() :: Constraint)
 type GtErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " > " ':<>: 'ShowType y)
 
 -- | Comparison (<=) of comparable types, as a function.
