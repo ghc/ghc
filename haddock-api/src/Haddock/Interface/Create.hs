@@ -331,7 +331,7 @@ mkAliasMap state impDecls =
   M.fromList $
   mapMaybe (\(SrcLoc.L _ impDecl) -> do
     SrcLoc.L _ alias <- ideclAs impDecl
-    return $
+    return
       (lookupModuleDyn state
          -- TODO: This is supremely dodgy, because in general the
          -- UnitId isn't going to look anything like the package

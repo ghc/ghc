@@ -725,7 +725,7 @@ ppInstanceSigs links splice unicode qual sigs = do
         L _ rtyp = dropWildCards typ
     -- Instance methods signatures are synified and thus don't have a useful
     -- SrcSpan value. Use the methods name location instead.
-    return $ ppSimpleSig links splice unicode qual HideEmptyContexts (getLocA $ head $ lnames) names rtyp
+    return $ ppSimpleSig links splice unicode qual HideEmptyContexts (getLocA $ head lnames) names rtyp
 
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2

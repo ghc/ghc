@@ -142,7 +142,7 @@ richToken srcs details Token{..}
     contexts = concatMap (Set.elems . identInfo) . Map.elems . nodeIdentifiers $ details
 
     -- pick an arbitrary non-evidence identifier to hyperlink with
-    identDet = Map.lookupMin $ Map.filter notEvidence $ nodeIdentifiers $ details
+    identDet = Map.lookupMin $ Map.filter notEvidence $ nodeIdentifiers details
     notEvidence = not . any isEvidenceContext . identInfo
 
     -- If we have name information, we can make links

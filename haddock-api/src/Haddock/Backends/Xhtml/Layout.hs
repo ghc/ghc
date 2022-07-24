@@ -220,7 +220,7 @@ subOrphanInstances pkg qual lnks splice  = maybe noHtml wrap . instTable
   where
     wrap = ((h1 << "Orphan instances") +++)
     instTable = fmap (thediv ! [ identifier ("section." ++ id_) ] <<) . subTableSrc pkg qual lnks splice
-    id_ = makeAnchorId $ "orphans"
+    id_ = makeAnchorId "orphans"
 
 
 subInstHead :: String -- ^ Instance unique id (for anchor generation)

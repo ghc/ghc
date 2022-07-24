@@ -474,7 +474,7 @@ instance Parent (ConDecl GhcRn) where
 instance Parent (TyClDecl GhcRn) where
   children d
     | isDataDecl  d = map unLoc $ concatMap (getConNames . unLoc)
-                              $ (dd_cons . tcdDataDefn) $ d
+                                $ (dd_cons . tcdDataDefn) d
     | isClassDecl d =
         map (unLoc . fdLName . unLoc) (tcdATs d) ++
         [ unLoc n | L _ (TypeSig _ ns _) <- tcdSigs d, n <- ns ]

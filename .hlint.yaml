@@ -10,7 +10,6 @@
 - ignore: {name: "Move brackets to avoid $"} # 7 hints
 - ignore: {name: "Move guards forward"} # 1 hint
 - ignore: {name: "Move map inside list comprehension"} # 2 hints
-- ignore: {name: "Redundant $"} # 11 hints
 - ignore: {name: "Redundant <$>"} # 3 hints
 - ignore: {name: "Redundant bracket"} # 44 hints
 - ignore: {name: "Redundant id"} # 1 hint
