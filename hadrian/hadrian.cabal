@@ -24,6 +24,14 @@ flag threaded
                          which don't support the threaded runtime should
                          disable this flag.
 
+-- See also #21913
+flag selftest
+     manual:             True
+     default:            True
+     description:        Enables the hadrian selftest rules which require
+                         QuickCheck. Disabling it thus saves on a few dependencies
+                         which can be problematic when bootstrapping.
+
 executable hadrian
     main-is:             Main.hs
     hs-source-dirs:      .
@@ -82,7 +90,6 @@ executable hadrian
                        , Rules.Program
                        , Rules.Register
                        , Rules.Rts
-                       , Rules.Selftest
                        , Rules.SimpleTargets
                        , Rules.SourceDist
                        , Rules.Test
@@ -141,7 +148,6 @@ executable hadrian
     other-extensions:    MultiParamTypeClasses
                        , TypeFamilies
     build-depends:       Cabal                >= 3.2     && < 3.7
-                       , QuickCheck           >= 2.6     && < 2.15
                        , base                 >= 4.8     && < 5
                        , bytestring           >= 0.10    && < 0.12
                        , containers           >= 0.5     && < 0.7
@@ -169,3 +175,8 @@ executable hadrian
                        --        time tends to eat any benefit.
                        "-with-rtsopts=-I0 -qg"
                        -threaded
+
+    if flag(selftest)
+      other-modules:   Rules.Selftest
+      cpp-options:     -DHADRIAN_ENABLE_SELFTEST
+      build-depends:   QuickCheck           >= 2.6     && < 2.15

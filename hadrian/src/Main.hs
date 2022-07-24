@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Main (main) where
 
 import Development.Shake
@@ -19,7 +20,9 @@ import qualified Rules.Docspec
 import qualified Rules.Documentation
 import qualified Rules.Lint
 import qualified Rules.Nofib
+#if HADRIAN_ENABLE_SELFTEST
 import qualified Rules.Selftest
+#endif
 import qualified Rules.SourceDist
 import qualified Rules.Test
 import qualified UserSettings
@@ -99,7 +102,9 @@ main = do
             Rules.Lint.lintRules
             Rules.Nofib.nofibRules
             Rules.oracleRules
+#if HADRIAN_ENABLE_SELFTEST
             Rules.Selftest.selftestRules
+#endif
             Rules.SourceDist.sourceDistRules
             Rules.Test.testRules
             Rules.topLevelTargets
@@ -150,4 +155,3 @@ escNormal = "\ESC[0m"
 
 escape :: String -> String -> String
 escape code x = escForeground code ++ x ++ escNormal
-
