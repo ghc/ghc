@@ -211,6 +211,12 @@ infixr 6 <>
 --
 -- [Associativity] @x '<>' (y '<>' z) = (x '<>' y) '<>' z@
 --
+-- You can alternatively define `sconcat` instead of (`<>`), in which case the
+-- laws are:
+--
+-- [Unit]: @'sconcat' ('pure' x) = x@
+-- [Multiplication]: @'sconcat' ('join' xss) = 'sconcat' ('fmap' 'sconcat' xss)@
+--
 -- @since 4.9.0.0
 class Semigroup a where
         -- | An associative operation.
@@ -218,6 +224,7 @@ class Semigroup a where
         -- >>> [1,2,3] <> [4,5,6]
         -- [1,2,3,4,5,6]
         (<>) :: a -> a -> a
+        a <> b = sconcat (a :| [ b ])
 
         -- | Reduce a non-empty list with '<>'
         --
@@ -248,6 +255,8 @@ class Semigroup a where
         stimes :: Integral b => b -> a -> a
         stimes = stimesDefault
 
+        {-# MINIMAL (<>) | sconcat #-}
+
 
 -- | The class of monoids (types with an associative binary operation that
 -- has an identity).  Instances should satisfy the following:
@@ -256,6 +265,13 @@ class Semigroup a where
 -- [Left identity]  @'mempty' '<>' x = x@
 -- [Associativity]  @x '<>' (y '<>' z) = (x '<>' y) '<>' z@ ('Semigroup' law)
 -- [Concatenation]  @'mconcat' = 'foldr' ('<>') 'mempty'@
+--
+-- You can alternatively define `mconcat` instead of `mempty`, in which case the
+-- laws are:
+--
+-- [Unit]: @'mconcat' ('pure' x) = x@
+-- [Multiplication]: @'mconcat' ('join' xss) = 'mconcat' ('fmap' 'mconcat' xss)@
+-- [Subclass]: @'mconcat' ('toList' xs) = 'sconcat' xs@
 --
 -- The method names refer to the monoid of lists under concatenation,
 -- but there are many other instances.
@@ -271,7 +287,9 @@ class Semigroup a => Monoid a where
         --
         -- >>> "Hello world" <> mempty
         -- "Hello world"
-        mempty  :: a
+        mempty :: a
+        mempty = mconcat []
+        {-# INLINE mempty #-}
 
         -- | An associative operation
         --
@@ -296,6 +314,8 @@ class Semigroup a => Monoid a where
         mconcat = foldr mappend mempty
         {-# INLINE mconcat #-}
         -- INLINE in the hope of fusion with mconcat's argument (see !4890)
+
+        {-# MINIMAL mempty | mconcat #-}
 
 -- | @since 4.9.0.0
 instance Semigroup [a] where

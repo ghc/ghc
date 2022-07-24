@@ -11,6 +11,8 @@
   * Add `applyWhen` to `Data.Function`.
   * Add functions `mapAccumM` and `forAccumM` to `Data.Traversable`, per the
     [Core Libraries proposal](https://github.com/haskell/core-libraries-committee/issues/65).
+  * Add default implementation of `(<>)` in terms of `sconcat` and `mempty` in
+    terms of `mconcat`.
 
 ## 4.17.0.0 *TBA*
 
