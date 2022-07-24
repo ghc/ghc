@@ -1875,7 +1875,7 @@ run_BCO:
             int flags                 = BCO_NEXT;
             bool interruptible        = flags & 0x1;
             bool unsafe_call          = flags & 0x2;
-            void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
+            void(*marshal_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
 
             /* the stack looks like this:
 
@@ -1902,7 +1902,7 @@ run_BCO:
 
 #define ROUND_UP_WDS(p)  ((((StgWord)(p)) + sizeof(W_)-1)/sizeof(W_))
 
-            ffi_cif *cif = (ffi_cif *)marshall_fn;
+            ffi_cif *cif = (ffi_cif *)marshal_fn;
             uint32_t nargs = cif->nargs;
             uint32_t ret_size;
             uint32_t i;
