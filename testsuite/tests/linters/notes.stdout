@@ -1,6 +1,5 @@
 ref    compiler/GHC/Core/Coercion/Axiom.hs:458:2:     Note [RoughMap and rm_empty]
 ref    compiler/GHC/Core/Opt/OccurAnal.hs:857:15:     Note [Loop breaking]
-ref    compiler/GHC/Core/Opt/Pipeline.hs:820:24:     Note [Which transformations are innocuous]
 ref    compiler/GHC/Core/Opt/SetLevels.hs:1598:30:     Note [Top level scope]
 ref    compiler/GHC/Core/Opt/Simplify/Iteration.hs:2666:13:     Note [Case binder next]
 ref    compiler/GHC/Core/Opt/Simplify/Iteration.hs:3288:0:     Note [Suppressing binder-swaps on linear case]
