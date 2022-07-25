@@ -280,6 +280,7 @@ Library
         GHC.CmmToLlvm.Ppr
         GHC.CmmToLlvm.Regs
         GHC.CmmToWasm
+        GHC.CmmToWasm.Config
         GHC.Cmm.Dominators
         GHC.Cmm.Reducibility
         GHC.Cmm.Type
