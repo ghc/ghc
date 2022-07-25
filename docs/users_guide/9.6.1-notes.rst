@@ -77,17 +77,8 @@ Compiler
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
-
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
-- Removed `lookupOrigIO` in favor of `lookupNameCache`
-
-- Added a new `thNameToGhcNameIO` function that plugins can use outside the `CoreM` monad.
-
 ``ghc-heap`` library
-~~~~~~~~~~~~~~~
-
-- The ``link`` field of ``GHC.Exts.Heap.WeakClosure`` has been replaced with a
-  ``weakLink`` field which is ``Nothing`` if and only if ``link`` would have
-  been NULL.
+~~~~~~~~~~~~~~~~~~~~
