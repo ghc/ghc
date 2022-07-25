@@ -159,17 +159,17 @@ rnHsPatSigType :: HsPatSigTypeScoping
 rnHsPatSigType scoping ctx sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
        ; checkErr ty_sig_okay (unexpectedPatSigTypeErr sig_ty)
-       ; free_vars <- filterInScopeM (extractHsTyRdrTyVars pat_sig_ty)
-       ; (nwc_rdrs', tv_rdrs) <- do
-         f <- make_is_nwcs ctx
-         pure $ partition f free_vars
-       ; let nwc_rdrs = nubN nwc_rdrs'
-             implicit_bndrs = case scoping of
-               AlwaysBind -> tv_rdrs
-               NeverBind  -> []
-       ; warnPatternSignatureBinds implicit_bndrs False
-       ; rnImplicitTvOccs Nothing implicit_bndrs $ \ imp_tvs ->
-    do { (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx OutOfScopeNoHint nwc_rdrs pat_sig_ty
+       ; let handle_implicit k = case scoping of
+               AlwaysBind -> do
+                 free_vars <- filterInScopeM (extractHsTyRdrTyVars pat_sig_ty)
+                 f <- make_is_nwcs ctx
+                 let implicit_bndrs = filter (not . f) free_vars
+                 warnPatternSignatureBinds implicit_bndrs False
+                 rnImplicitTvOccs Nothing implicit_bndrs k
+               NeverBind  -> k []
+       ; handle_implicit $ \ imp_tvs ->
+    do { nwc_rdrs <- get_fresh_wildcards ctx pat_sig_ty
+       ; (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx OutOfScopeNoHint nwc_rdrs pat_sig_ty
        ; let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
              sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = pat_sig_ty' }
        ; (res, fvs2) <- thing_inside sig_ty'
@@ -179,14 +179,16 @@ rnHsPatSigType scoping ctx sig_ty thing_inside
 
 rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeVars)
 rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
-  = do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
-       ; nwc_rdrs' <- do
-         f <- make_is_nwcs ctxt
-         pure $ filter f free_vars
-       ; let nwc_rdrs = nubL nwc_rdrs'
+  = do { nwc_rdrs <- get_fresh_wildcards ctxt hs_ty
        ; (wcs, hs_ty', fvs) <- rnWcBody ctxt OutOfScopeNoHint nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
+
+get_fresh_wildcards :: HsDocContext -> LHsType GhcPs -> RnM [LocatedN RdrName]
+get_fresh_wildcards ctxt hs_ty = do
+  f <- make_is_nwcs ctxt
+  free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
+  pure $ nubL $ filter f free_vars
 
 -- Similar to rnHsWcType, but rather than requiring free variables in the type to
 -- already be in scope, we are going to require them not to be in scope,
