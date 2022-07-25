@@ -160,7 +160,9 @@ rnHsPatSigType scoping ctx sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
        ; checkErr ty_sig_okay (unexpectedPatSigTypeErr sig_ty)
        ; free_vars <- filterInScopeM (extractHsTyRdrTyVars pat_sig_ty)
-       ; (nwc_rdrs', tv_rdrs) <- partition_nwcs ctx free_vars
+       ; (nwc_rdrs', tv_rdrs) <- do
+         f <- make_is_nwcs ctx
+         pure $ partition f free_vars
        ; let nwc_rdrs = nubN nwc_rdrs'
              implicit_bndrs = case scoping of
                AlwaysBind -> tv_rdrs
@@ -178,7 +180,9 @@ rnHsPatSigType scoping ctx sig_ty thing_inside
 rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeVars)
 rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
   = do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
-       ; (nwc_rdrs', _) <- partition_nwcs ctxt free_vars
+       ; nwc_rdrs' <- do
+         f <- make_is_nwcs ctxt
+         pure $ filter f free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
        ; (wcs, hs_ty', fvs) <- rnWcBody ctxt OutOfScopeNoHint nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
@@ -222,7 +226,9 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
             <+> text "already in scope."
           , text "Type applications in patterns must bind fresh variables, without shadowing."
           ]
-    (wcVars, ibVars) <- partition_nwcs ctxt varsNotInScope
+    (wcVars, ibVars) <- do
+      f <- make_is_nwcs ctxt
+      pure $ partition f varsNotInScope
     rnImplicitTvBndrs ctxt Nothing ibVars $ \ ibVars' -> do
       (wcVars', hs_ty', fvs) <- rnWcBody ctxt OutOfScopeNoHint wcVars hs_ty
       let sig_ty = HsPS
@@ -345,18 +351,18 @@ namedWildCardsAllowed = \case
   ExprWithTySigCtx {} -> True
   _ -> False
 
--- | When the NamedWildCards extension is enabled, partition_nwcs
--- removes type variables that start with an underscore from the
--- FreeKiTyVars in the argument and returns them in a separate list.
--- When the extension is disabled, the function returns the argument
--- and empty list.  See Note [Renaming named wild cards]
-partition_nwcs :: HsDocContext -> FreeKiTyVars -> RnM ([LocatedN RdrName], FreeKiTyVars)
-partition_nwcs ctx free_vars
+-- | When the NamedWildCards extension is enabled, `make_is_nwcs`
+-- creates a function that returns true for a type variable that start
+-- with an underscore from the FreeKiTyVars in the argument. When the
+-- extension is disabled, the created function returns False.
+--
+-- See Note [Renaming named wild cards]
+make_is_nwcs :: HsDocContext -> RnM (FreeKiTyVar -> Bool)
+make_is_nwcs ctx
   = do { wildcards_enabled <- xoptM LangExt.NamedWildCards
-       ; return $
-           if namedWildCardsAllowed ctx && wildcards_enabled
-           then partition is_wildcard free_vars
-           else ([], free_vars) }
+       ; return $ \free_var ->
+           namedWildCardsAllowed ctx && wildcards_enabled && is_wildcard free_var
+       }
 
 {- Note [Renaming named wild cards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1181,7 +1187,10 @@ bindHsOuterTyVarBndrsImplicit :: OutputableBndrFlag flag 'Renamed
                               -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
                               -> RnM (a, FreeVars)
 bindHsOuterTyVarBndrsImplicit ctx mb_cls tyvars thing_inside = do
-  (_, imp_tv_nms) <- partition_nwcs ctx =<< filterInScopeM tyvars
+  imp_tv_nms <- do
+    fvs <- filterInScopeM tyvars
+    f <- make_is_nwcs ctx
+    pure $ filter (not . f) fvs
   rnImplicitTvOccs mb_cls imp_tv_nms $ \implicit_vars' ->
     thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
 
@@ -1883,7 +1892,8 @@ type checking. While viable, this would mean we'd end up accepting this:
 -- These lists are guaranteed to preserve left-to-right ordering of
 -- the types the variables were extracted from. See also
 -- Note [Ordering of implicit variables].
-type FreeKiTyVars = [LocatedN RdrName]
+type FreeKiTyVar  = LocatedN RdrName
+type FreeKiTyVars = [FreeKiTyVar]
 
 -- | Filter out any type and kind variables that are already in scope in the
 -- the supplied LocalRdrEnv. Note that this includes named wildcards, which
