@@ -161,9 +161,8 @@ rnHsPatSigType scoping ctx sig_ty thing_inside
        ; checkErr ty_sig_okay (unexpectedPatSigTypeErr sig_ty)
        ; let handle_implicit k = case scoping of
                AlwaysBind -> do
-                 free_vars <- filterInScopeM (extractHsTyRdrTyVars pat_sig_ty)
-                 f <- make_is_nwcs ctx
-                 let implicit_bndrs = filter (not . f) free_vars
+                 implicit_bndrs <- get_fresh_non_wildcards ctx $
+                   extractHsTyRdrTyVars pat_sig_ty
                  warnPatternSignatureBinds implicit_bndrs False
                  rnImplicitTvOccs Nothing implicit_bndrs k
                NeverBind  -> k []
@@ -183,6 +182,12 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
        ; (wcs, hs_ty', fvs) <- rnWcBody ctxt OutOfScopeNoHint nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
+
+get_fresh_non_wildcards :: HsDocContext -> [LocatedN RdrName] -> RnM FreeKiTyVars
+get_fresh_non_wildcards ctxt candidate_vars = do
+  f <- make_is_nwcs ctxt
+  free_vars <- filterInScopeM candidate_vars
+  pure $ filter (not . f) free_vars
 
 get_fresh_wildcards :: HsDocContext -> LHsType GhcPs -> RnM [LocatedN RdrName]
 get_fresh_wildcards ctxt hs_ty = do
@@ -1185,14 +1190,13 @@ bindHsOuterTyVarBndrsImplicit :: OutputableBndrFlag flag 'Renamed
                               => HsDocContext
                               -> Maybe assoc
                                  -- ^ @'Just' _@ => an associated type decl
-                              -> FreeKiTyVars
+                              -> [LocatedN RdrName]
+                                 -- ^ possibly free vars, we bind implicitly the
+                                 -- ones that are
                               -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
                               -> RnM (a, FreeVars)
 bindHsOuterTyVarBndrsImplicit ctx mb_cls tyvars thing_inside = do
-  imp_tv_nms <- do
-    fvs <- filterInScopeM tyvars
-    f <- make_is_nwcs ctx
-    pure $ filter (not . f) fvs
+  imp_tv_nms <- get_fresh_non_wildcards ctx tyvars
   rnImplicitTvOccs mb_cls imp_tv_nms $ \implicit_vars' ->
     thing_inside $ HsOuterImplicit { hso_ximplicit = implicit_vars' }
 
