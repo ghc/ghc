@@ -8,13 +8,12 @@ module GHC.Driver.Config.Core.Opt.Simplify
 import GHC.Prelude
 
 import GHC.Core ( RuleBase )
-import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Opt.Simplify ( SimplifyExprOpts(..), SimplifyOpts(..) )
 import GHC.Core.Opt.Simplify.Env ( FloatEnable(..), SimplMode(..) )
 import GHC.Core.Opt.Simplify.Monad ( TopEnvConfig(..) )
 
 import GHC.Driver.Config ( initOptCoercionOpts )
-import GHC.Driver.Config.Core.Lint ( initLintPassResultConfig, perPassFlags )
+import GHC.Driver.Config.Core.Lint ( defaultLintFlags, initLintPassResultConfig )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Driver.Config.Core.Opt.Arity ( initArityOpts )
 import GHC.Driver.Session ( DynFlags(..), GeneralFlag(..), gopt )
@@ -42,27 +41,24 @@ initSimplifyExprOpts dflags ic = SimplifyExprOpts
   }
 
 initSimplifyOpts :: DynFlags -> [Var] -> Int -> SimplMode -> RuleBase -> SimplifyOpts
-initSimplifyOpts dflags extra_vars iterations mode rule_base = let
-  -- This is a particularly ugly construction, but we will get rid of it in !8341.
-  opts = SimplifyOpts
-    { so_dump_core_sizes = not $ gopt Opt_SuppressCoreSizes dflags
-    , so_iterations = iterations
-    , so_mode = mode
-    , so_pass_result_cfg = if gopt Opt_DoCoreLinting dflags
-      then Just $ initLintPassResultConfig dflags extra_vars
-        (perPassFlags dflags $ CoreDoSimplify opts)
-        (ppr $ CoreDoSimplify opts)
-        -- Disable Lint warnings on the first simplifier pass, because
-        -- there may be some INLINE knots still tied, which is tiresomely noisy
-        (sm_phase mode /= InitialPhase)
-      else Nothing
-    , so_rule_base = rule_base
-    , so_top_env_cfg = TopEnvConfig
-        { te_history_size = historySize dflags
-        , te_tick_factor = simplTickFactor dflags
-        }
-    }
-  in opts
+initSimplifyOpts dflags extra_vars iterations mode rule_base = SimplifyOpts
+  { so_dump_core_sizes = not $ gopt Opt_SuppressCoreSizes dflags
+  , so_iterations = iterations
+  , so_mode = mode
+  , so_pass_result_cfg = if gopt Opt_DoCoreLinting dflags
+    then Just $ initLintPassResultConfig dflags extra_vars
+      (defaultLintFlags dflags)
+      (text "Simplifier")
+      -- Disable Lint warnings on the first simplifier pass, because
+      -- there may be some INLINE knots still tied, which is tiresomely noisy
+      (sm_phase mode /= InitialPhase)
+    else Nothing
+  , so_rule_base = rule_base
+  , so_top_env_cfg = TopEnvConfig
+      { te_history_size = historySize dflags
+      , te_tick_factor = simplTickFactor dflags
+      }
+  }
 
 initSimplMode :: DynFlags -> CompilerPhase -> String -> SimplMode
 initSimplMode dflags phase name = SimplMode
