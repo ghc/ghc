@@ -28,6 +28,7 @@ GHC.Core.Coercion.Axiom
 GHC.Core.Coercion.Opt
 GHC.Core.ConLike
 GHC.Core.DataCon
+GHC.Core.EndPass
 GHC.Core.FVs
 GHC.Core.FamInstEnv
 GHC.Core.InstEnv
@@ -39,7 +40,6 @@ GHC.Core.Multiplicity
 GHC.Core.Opt.Arity
 GHC.Core.Opt.CallerCC.Filter
 GHC.Core.Opt.ConstantFold
-GHC.Core.Opt.Counting
 GHC.Core.Opt.OccurAnal
 GHC.Core.Opt.Pipeline.Types
 GHC.Core.Opt.Simplify
