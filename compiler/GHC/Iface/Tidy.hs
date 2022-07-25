@@ -1021,7 +1021,7 @@ findExternalRules opts binds imp_id_rules unfold_env
        = ([], emptyVarSet, imp_user_rule_fvs, imp_rules)
 
     trim_binds (bind:binds)
-       | any needed bndrs    -- Keep binding
+       | any needed bndrs    -- Keep this binding
        = ( bind : binds', bndr_set', needed_fvs', local_rules ++ rules )
        | otherwise           -- Discard binding altogether
        = stuff
