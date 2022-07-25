@@ -51,7 +51,7 @@ import GHC.Rename.Env
 import GHC.Rename.Doc
 import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV
                          , typeAppErr, newLocalBndrRn, checkDupRdrNamesN
-                         , checkShadowedRdrNames, warnForallIdentifier )
+                         , checkShadowedRdrNames, warnForallIdentifier, newLocalBndrsRn )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
 import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
@@ -235,19 +235,22 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
       (res, fvs') <- thing_inside sig_ty
       return (res, fvs `plusFV` fvs')
 
-unboundWildcards :: FreeKiTyVars -> RnM [Name]
-unboundWildcards tyvars = do
-  new <- filterInScopeM tyvars
-  mapM newLocalBndrRn (nubL (wcs new))
-  where
-    wcs =
-      filter (startsWithUnderscore . rdrNameOcc . unLoc)
+is_wildcard :: LocatedN RdrName -> Bool
+is_wildcard rdr = startsWithUnderscore (rdrNameOcc (unLoc rdr))
+
+rnNamedWildCards :: FreeKiTyVars -> RnM [Name]
+rnNamedWildCards tyvars =
+  xoptM LangExt.NamedWildCards >>= \case
+    True -> do
+      new <- filterInScopeM tyvars
+      newLocalBndrsRn (nubL (filter is_wildcard new))
+    False ->
+      pure []
 
 rnWcBody :: HsDocContext -> OutOfScopeHint -> [LocatedN RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
 rnWcBody ctxt hint tyvars hs_ty
-  = do { wildcards_enabled <- xoptM LangExt.NamedWildCards
-       ; nwcs <- if wildcards_enabled then unboundWildcards tyvars else pure []
+  = do { nwcs <- rnNamedWildCards tyvars
        ; let env = RTKE { rtke_level = TypeLevel
                         , rtke_what  = RnTypeBody
                         , rtke_nwcs  = mkNameSet nwcs
@@ -354,9 +357,6 @@ partition_nwcs ctx free_vars
            if namedWildCardsAllowed ctx && wildcards_enabled
            then partition is_wildcard free_vars
            else ([], free_vars) }
-  where
-     is_wildcard :: LocatedN RdrName -> Bool
-     is_wildcard rdr = startsWithUnderscore (rdrNameOcc (unLoc rdr))
 
 {- Note [Renaming named wild cards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

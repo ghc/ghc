@@ -968,6 +968,10 @@ renameSigs ctxt sigs
 -- We'll just rename the INLINE prag to refer to whatever other 'op'
 -- is in scope.  (I'm assuming that Baz.op isn't in scope unqualified.)
 -- Doesn't seem worth much trouble to sort this.
+--
+-- When ImplicitForAll has been disabled, we attach a hint about it if no forall
+-- is present, since the error messages about undeclared tyvars might be confusing
+-- otherwise to an observer who's not aware of the extension.
 
 renameSig :: HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeVars)
 renameSig _ (IdSig _ x)
@@ -981,7 +985,7 @@ renameSig ctxt sig@(TypeSig _ vs ty)
         ; return (TypeSig noAnn new_vs new_ty, fvs) }
   where
     -- Since this information is lost from here on, the existence of an outer forall in
-    -- conjunction with a manually disabled 'ImplicitForAll' is is observed as an
+    -- conjunction with a manually disabled 'ImplicitForAll' is observed as an
     -- 'OutOfScopeHint' here, so an error message about a missing type variable may alert
     -- the user of this fact.
     outOfScopeHint :: Bool -> LHsSigType GhcPs -> OutOfScopeHint
