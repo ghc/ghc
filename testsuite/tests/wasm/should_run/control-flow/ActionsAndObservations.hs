@@ -47,3 +47,9 @@ instance Show Stmt where
 
 instance Show Expr where
   show = showSDocUnsafe . ppr . e_label
+
+instance OutputableP Platform Stmt where
+  pdoc _ s = text "Stmt" <+> ppr (s_label s)
+
+instance OutputableP Platform Expr where
+  pdoc _ e = text "Expr" <+> ppr (e_label e)

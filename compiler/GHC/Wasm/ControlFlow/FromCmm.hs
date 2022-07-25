@@ -19,7 +19,7 @@ where
 import GHC.Prelude hiding (succ)
 
 import Data.Function
-import Data.List
+import Data.List (sortBy)
 import Data.Semigroup
 import qualified Data.Tree as Tree
 
@@ -132,7 +132,7 @@ withFallthrough :: Context -> Label -> Context
 inside frame c = c { enclosing = frame : enclosing c }
 withFallthrough c l = c { fallthrough = Just l }
 
-type CmmStmts = Block CmmNode O O
+type CmmActions = Block CmmNode O O
 type CfgNode = CmmBlock
 
 
@@ -144,7 +144,7 @@ type CfgNode = CmmBlock
 structuredControl :: forall expr stmt .
                      Platform  -- ^ needed for offset calculation
                   -> (Label -> CmmExpr -> expr) -- ^ translator for expressions
-                  -> (Label -> CmmStmts -> stmt) -- ^ translator for straight-line code
+                  -> (Label -> CmmActions -> stmt) -- ^ translator for straight-line code
                   -> CmmGraph -- ^ CFG to be translated
                   -> WasmControl stmt expr
 structuredControl platform txExpr txBlock g =
@@ -159,18 +159,19 @@ structuredControl platform txExpr txBlock g =
                                     -> Context -> WasmControl stmt expr
    doBranch   :: Label -> Label     -> Context -> WasmControl stmt expr
 
-   doTree (Tree.Node x immediateDominatees) context =
-       let codeForX = nodeWithin x dominatees Nothing
-       in  if isHeader x then
+   doTree (Tree.Node x children) context =
+       let codeForX = nodeWithin x selectedChildren Nothing
+       in  if isLoopHeader x then
              WasmLoop (codeForX loopContext)
            else
              codeForX context
-     where dominatees = case lastNode x of
-                          CmmSwitch {} -> immediateDominatees
-                                 -- N.B. Unlike `if`, translation of Switch uses only labels.
-                          _ -> filter isMergeTree $ immediateDominatees
+     where selectedChildren = case lastNode x of
+                                CmmSwitch {} -> children
+                                   -- N.B. Unlike `if`, translation of Switch uses only labels.
+                                _ -> filter hasMergeRoot $ children
            loopContext = LoopHeadedBy (entryLabel x) `inside`
                            (context `withFallthrough` (entryLabel x))
+           hasMergeRoot = isMergeNode . Tree.rootLabel
 
    nodeWithin x (y_n:ys) (Just zlabel) context =
        WasmBlock $ nodeWithin x (y_n:ys) Nothing context'
@@ -188,7 +189,7 @@ structuredControl platform txExpr txBlock g =
 
            translationOfX :: Context -> WasmControl stmt expr
            translationOfX context =
-             WasmAction (txBlock xlabel $ nodeBody x) <>
+             WasmActions (txBlock xlabel $ nodeBody x) <>
              case flowLeaving platform x of
                Unconditional l -> doBranch xlabel l context
                Conditional e t f ->
@@ -228,10 +229,9 @@ structuredControl platform txExpr txBlock g =
    subtreeAt :: Label -> Tree.Tree CfgNode
    blockLabeled :: Label -> CfgNode
    rpnum :: Label -> RPNum -- ^ reverse postorder number of the labeled block
-   isMergeTree :: Tree.Tree CfgNode -> Bool
    isMergeLabel :: Label -> Bool
    isMergeNode :: CfgNode -> Bool
-   isHeader :: CfgNode -> Bool -- ^ identify loop headers
+   isLoopHeader :: CfgNode -> Bool -- ^ identify loop headers
      -- ^ all nodes whose immediate dominator is the given block.
      -- They are produced with the largest RP number first,
      -- so the largest RP number is pushed on the context first.
@@ -253,7 +253,6 @@ structuredControl platform txExpr txBlock g =
 
    isMergeLabel l = setMember l mergeBlockLabels
    isMergeNode = isMergeLabel . entryLabel
-   isMergeTree = isMergeNode . Tree.rootLabel
 
    isBackward from to = rpnum to <= rpnum from -- self-edge counts as a backward edge
 
@@ -283,7 +282,7 @@ structuredControl platform txExpr txBlock g =
                         | isBackward from to = pm
                         | otherwise = addToList (from :) to pm
 
-   isHeader = isHeaderLabel . entryLabel
+   isLoopHeader = isHeaderLabel . entryLabel
    isHeaderLabel = \l -> setMember l headers  -- loop headers
       where headers :: LabelSet
             headers = foldMap headersPointedTo blockmap
@@ -303,7 +302,7 @@ structuredControl platform txExpr txBlock g =
 
 
 
-nodeBody :: CfgNode -> CmmStmts
+nodeBody :: CfgNode -> CmmActions
 nodeBody (BlockCC _first middle _last) = middle
 
 

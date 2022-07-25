@@ -52,9 +52,9 @@ data WasmControl s e where
               -> WasmControl s e
               -- invariant: the table interval is contained
               -- within [0 .. pred (length targets)]
-  WasmReturn :: WasmControl s e
+  WasmReturn  :: WasmControl s e
 
-  WasmAction :: s -> WasmControl s e   -- basic block: one entry, one exit
+  WasmActions :: s -> WasmControl s e   -- basic block: one entry, one exit
   WasmSeq :: WasmControl s e -> WasmControl s e -> WasmControl s e
 
   WasmUnreachable :: WasmControl s e
