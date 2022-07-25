@@ -64,9 +64,9 @@ test('driver052', [extra_files(['d052_1/', 'd052_2/'])], makefile_test, ['test05
 
 test('driver053', [extra_files(['d053_1/', 'd053_2/'])], makefile_test, ['test053'])
 
-test('driver061a', [extra_files(['A061a.hs'])], makefile_test, ['test061a'])
+test('driver061a', [extra_files(['A061a.hs']), when(unregisterised(), skip)], makefile_test, ['test061a'])
 
-test('driver061b', [extra_files(['A061b.hs'])], makefile_test, ['test061b'])
+test('driver061b', [extra_files(['A061b.hs']), when(unregisterised(), skip)], makefile_test, ['test061b'])
 
 
 test('driver062a', [], makefile_test, ['test062a'])
@@ -85,9 +85,9 @@ test('driver066', [extra_files(['A066.hs'])], makefile_test, ['test066'])
 
 test('driver067', [extra_files(['A067.hs'])], makefile_test, ['test067'])
 
-test('driver070', [extra_files(['A070.hs'])], makefile_test, ['test070'])
+test('driver070', [extra_files(['A070.hs']), when(unregisterised(), skip)], makefile_test, ['test070'])
 
-test('driver071', [extra_files(['A071.hs'])], makefile_test, ['test071'])
+test('driver071', [extra_files(['A071.hs']), when(unregisterised(), skip)], makefile_test, ['test071'])
 
 test('driver081a', [], makefile_test, ['test081a'])
 
@@ -309,4 +309,4 @@ test('T16476a', normal, makefile_test, [])
 test('T16476b', normal, makefile_test, [])
 test('T20569', extra_files(["T20569/"]), makefile_test, [])
 test('T21349', extra_files(['T21349']), makefile_test, [])
-test('T21869', normal, makefile_test, [])
+test('T21869', [normal, when(unregisterised(), skip)], makefile_test, [])
