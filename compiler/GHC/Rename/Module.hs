@@ -2363,7 +2363,6 @@ rnConDecl (ConDeclGADT { con_names   = names
               -- variable, and hence the order needed for visible type application
               -- See #14808.
               implicit_bndrs =
-                extractHsOuterTvBndrs outer_bndrs           $
                 extractHsTysRdrTyVars (hsConDeclTheta mcxt) $
                 extractConDeclGADTDetailsTyVars args        $
                 extractHsTysRdrTyVars [res_ty] []

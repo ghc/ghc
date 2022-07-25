@@ -134,7 +134,7 @@ rnHsSigWcType :: HsDocContext
               -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeVars)
 rnHsSigWcType ctx hint (HsWC { hswc_body =
-    sig_ty@(L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
+    (L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
   = bindHsOuterTyVarBndrs ctx Nothing fvs outer_bndrs $ \outer_bndrs' ->
     do { (wcs, body_ty', fvs') <- rnWcBody ctx hint fvs body_ty
        ; pure ( HsWC  { hswc_ext = wcs, hswc_body = L loc $
@@ -142,7 +142,7 @@ rnHsSigWcType ctx hint (HsWC { hswc_body =
                       , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
               , fvs') }
   where
-    fvs = extract_lhs_sig_ty sig_ty
+    fvs = extract_lty body_ty []
 
 rnHsPatSigType :: HsPatSigTypeScoping
                -> HsDocContext
@@ -1230,10 +1230,12 @@ bindHsOuterTyVarBndrs doc mb_cls tyvars outer_bndrs thing_inside =
     HsOuterImplicit{} -> do
       implicitOk <- xoptM LangExt.ImplicitForAll
       if implicitOk
-      then bindHsOuterTyVarBndrsImplicit doc mb_cls tyvars thing_inside
+      then bindHsOuterTyVarBndrsImplicit doc mb_cls free_vars thing_inside
       else bindHsOuterTyVarBndrsExplicit doc [] thing_inside
     HsOuterExplicit{hso_bndrs = exp_bndrs} ->
       bindHsOuterTyVarBndrsExplicit doc exp_bndrs thing_inside
+  where
+    free_vars = extractHsOuterTvBndrs outer_bndrs tyvars
 
 bindHsForAllTelescope :: HsDocContext
                       -> HsForAllTelescope GhcPs
@@ -2047,10 +2049,6 @@ extract_lty (L _ ty) acc
       XHsType {}                  -> acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
-
-extract_lhs_sig_ty :: LHsSigType GhcPs -> FreeKiTyVars
-extract_lhs_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
-  extractHsOuterTvBndrs outer_bndrs $ extract_lty body []
 
 extract_hs_arrow :: HsArrow GhcPs -> FreeKiTyVars ->
                    FreeKiTyVars
