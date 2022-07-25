@@ -424,24 +424,6 @@ rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
        ; bindLocalNamesFV vars $
          thing_inside vars }
 
--- | This is a wrapper for 'rnImplicitTvOccs' that conditionally introduces new
--- renamed type variables, in particular for the case of implicitly bound variables
--- in type or kind signatures as well as pattern signature binders.
--- If the language extension passed in as the first argument is enabled, renaming will
--- be performed, otherwise an empty list is passed to the continuation.
--- The function was introduced for the extensions @ImplicitForAll@ and
--- @PatternSignatureBinds@, so it is expected to be used with those two in practice.
-rnImplicitTvOccsIfXopt :: LangExt.Extension
-                       -> Maybe assoc
-                       -> FreeKiTyVars
-                       -> ([Name] -> RnM (a, FreeVars))
-                       -> RnM (a, FreeVars)
-rnImplicitTvOccsIfXopt ext mb_assoc implicit_vs_with_dups thing_inside = do
-  ok <- xoptM ext
-  if ok
-  then rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
-  else thing_inside []
-
 {-
 Note [Source locations for implicitly bound type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1007,12 +989,14 @@ bindHsQTyVars :: forall a b.
 bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
   = do { let bndr_kv_occs = extractHsTyVarBndrsKVs hs_tv_bndrs
 
+       ; ifaOk <- xoptM LangExt.ImplicitForAll
        ; let -- See Note [bindHsQTyVars examples] for what
              -- all these various things are doing
              bndrs, implicit_kvs_bndr, implicit_kvs_body :: [LocatedN RdrName]
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
              implicit_kvs_bndr = filterFreeVarsToBind bndrs bndr_kv_occs
              implicit_kvs_body = filterFreeVarsToBind (bndrs ++ implicit_kvs_bndr) body_kv_occs
+             implicit_kvs = implicit_kvs_bndr ++ (if ifaOk then implicit_kvs_body else [])
              body_remaining = filterFreeVarsToBind bndr_kv_occs $
               filterFreeVarsToBind bndrs body_kv_occs
              all_bound_on_lhs = null body_remaining
@@ -1029,19 +1013,18 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
       -- Might be decided later that this warning should also trigger for tycon param kind sigs
        -- ; warnPatternSignatureBinds implicit_kvs_bndr True
 
-       ; rnImplicitTvOccs mb_assoc implicit_kvs_bndr $ \ implicit_kv_bndr_nms' ->
-         rnImplicitTvOccsIfXopt LangExt.ImplicitForAll mb_assoc implicit_kvs_body $ \ implicit_kv_body_nms' ->
+       ; rnImplicitTvOccs mb_assoc implicit_kvs $ \ implicit_kv_nms' ->
          bindLHsTyVarBndrs doc NoWarnUnusedForalls mb_assoc hs_tv_bndrs $ \ rn_bndrs ->
            -- This is the only call site for bindLHsTyVarBndrs where we pass
            -- NoWarnUnusedForalls, which suppresses -Wunused-foralls warnings.
            -- See Note [Suppress -Wunused-foralls when binding LHsQTyVars].
-    do { let -- The SrcSpan that rnImplicitTvOccsIfXopt will attach to each Name will
+    do { let -- The SrcSpan that rnImplicitTvOccs will attach to each Name will
              -- span the entire declaration to which the LHsQTyVars belongs,
              -- which will be reflected in warning and error messages. We can
              -- be a little more precise than that by pointing to the location
              -- of the LHsQTyVars instead, which is what bndrs_loc
              -- corresponds to.
-             implicit_kv_nms = map (`setNameLoc` bndrs_loc) (implicit_kv_bndr_nms' ++ implicit_kv_body_nms')
+             implicit_kv_nms = map (`setNameLoc` bndrs_loc) implicit_kv_nms'
 
        ; traceRn "bindHsQTyVars" (ppr hsq_bndrs $$ ppr implicit_kv_nms $$ ppr rn_bndrs)
        ; thing_inside (HsQTvs { hsq_ext = implicit_kv_nms
