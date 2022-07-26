@@ -29,9 +29,9 @@ initEndPassConfig dflags extra_vars print_unqual pass = EndPassConfig
 coreDumpFlag :: CoreToDo -> Maybe DumpFlag
 coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_verbose_core2core
 coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_verbose_core2core
-coreDumpFlag CoreDoFloatInwards       = Just Opt_D_verbose_core2core
+coreDumpFlag (CoreDoFloatInwards {})  = Just Opt_D_verbose_core2core
 coreDumpFlag (CoreDoFloatOutwards {}) = Just Opt_D_verbose_core2core
-coreDumpFlag CoreLiberateCase         = Just Opt_D_verbose_core2core
+coreDumpFlag (CoreLiberateCase {})    = Just Opt_D_verbose_core2core
 coreDumpFlag CoreDoStaticArgs         = Just Opt_D_verbose_core2core
 coreDumpFlag CoreDoCallArity          = Just Opt_D_dump_call_arity
 coreDumpFlag CoreDoExitify            = Just Opt_D_dump_exitify
@@ -39,11 +39,11 @@ coreDumpFlag CoreDoDemand             = Just Opt_D_dump_stranal
 coreDumpFlag CoreDoCpr                = Just Opt_D_dump_cpranal
 coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
 coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
-coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
+coreDumpFlag (CoreDoSpecConstr {})    = Just Opt_D_dump_spec
 coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse
 
-coreDumpFlag CoreAddCallerCcs         = Nothing
-coreDumpFlag CoreAddLateCcs           = Nothing
+coreDumpFlag (CoreAddCallerCcs {})    = Nothing
+coreDumpFlag (CoreAddLateCcs {})      = Nothing
 coreDumpFlag CoreDoPrintCore          = Nothing
 coreDumpFlag (CoreDoRuleCheck {})     = Nothing
 coreDumpFlag CoreDoNothing            = Nothing

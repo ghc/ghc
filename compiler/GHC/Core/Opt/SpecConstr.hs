@@ -761,9 +761,10 @@ specConstrProgram
   :: NameEnv SpecConstrAnnotation
   -> UniqSupply
   -> SpecConstrOpts
+  -> Module
   -> ModGuts -> ModGuts
-specConstrProgram annos us opts guts = let
-  env0 = initScEnv opts annos (mg_binds guts)
+specConstrProgram annos us opts mod guts = let
+  env0 = initScEnv opts mod annos (mg_binds guts)
   (_usg, binds') = initUs_ us $
                    scTopBinds env0 (mg_binds guts)
 
@@ -870,9 +871,6 @@ data SpecConstrOpts = SpecConstrOpts
   , sc_uf_opts   :: !UnfoldingOpts
   -- ^ Unfolding options
 
-  , sc_module    :: !Module
-  -- ^ The name of the module being processed
-
   , sc_size      :: !(Maybe Int)
   -- ^ Size threshold: Nothing => no limit
 
@@ -890,6 +888,9 @@ data SpecConstrOpts = SpecConstrOpts
   }
 
 data ScEnv = SCE { sc_opts      :: !SpecConstrOpts,
+
+                   sc_module    :: Module,      -- ^ The name of the module being processed
+
                    sc_force     :: Bool,        -- Force specialisation?
                                                 -- See Note [Forcing specialisation]
 
@@ -925,9 +926,10 @@ instance Outputable Value where
    ppr LambdaVal         = text "<Lambda>"
 
 ---------------------
-initScEnv :: SpecConstrOpts -> UniqFM Name SpecConstrAnnotation -> [Bind Var] -> ScEnv
-initScEnv opts anns binds
+initScEnv :: SpecConstrOpts -> Module -> UniqFM Name SpecConstrAnnotation -> [Bind Var] -> ScEnv
+initScEnv opts mod anns binds
   = SCE { sc_opts        = opts,
+          sc_module      = mod,
           sc_force       = False,
           sc_subst       = init_subst,
           sc_how_bound   = emptyVarEnv,
@@ -1916,7 +1918,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                               -- since `length(qvars) + void + length(extra_bndrs) = length spec_call_args`
                               dropTail (length extra_bndrs) spec_call_args
               inline_act = idInlineActivation fn
-              this_mod   = sc_module $ sc_opts env
+              this_mod   = sc_module env
               rule       = mkRule this_mod True {- Auto -} True {- Local -}
                                   rule_name inline_act
                                   fn_name qvars' pats' rule_rhs

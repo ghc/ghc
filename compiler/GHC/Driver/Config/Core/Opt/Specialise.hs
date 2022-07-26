@@ -11,15 +11,12 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Driver.Config.Diagnostic ( initDiagOpts )
 import GHC.Driver.Session ( DynFlags, DiagnosticReason(..), GeneralFlag(..), WarningFlag(..), gopt, initSDocContext, wopt )
 
-import GHC.Types.SrcLoc ( SrcSpan )
-
 import GHC.Utils.Error ( mkMCDiagnostic )
 import GHC.Utils.Outputable ( PrintUnqualified, defaultUserStyle )
 
-initSpecialiseOpts :: DynFlags -> SrcSpan -> Char -> PrintUnqualified -> SpecialiseOpts
-initSpecialiseOpts dflags loc mask print_unqual = SpecialiseOpts
-  { so_loc = loc
-  , so_uniq_mask = mask
+initSpecialiseOpts :: DynFlags -> Char -> PrintUnqualified -> SpecialiseOpts
+initSpecialiseOpts dflags mask print_unqual = SpecialiseOpts
+  { so_uniq_mask = mask
   , so_unqual = print_unqual
   , so_cross_module_specialise = gopt Opt_CrossModuleSpecialise dflags
   , so_specialise_aggressively = gopt Opt_SpecialiseAggressively dflags

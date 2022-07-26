@@ -7,7 +7,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TupleSections #-}
 
-module GHC.Core.Opt.Pipeline ( core2core, simplifyExpr ) where
+module GHC.Core.Opt.Pipeline ( core2core ) where
 
 import GHC.Prelude
 
@@ -34,7 +34,7 @@ import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( lintAnnots )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
-import GHC.Core.Opt.Simplify ( simplifyExpr, simplifyPgm )
+import GHC.Core.Opt.Simplify ( simplifyPgm )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Stats        ( SimplCountM, addCounts, runSimplCountM )
 import GHC.Core.Opt.Utils        ( FloatOutSwitches(..)
@@ -138,6 +138,7 @@ getCoreToDo dflags extra_vars
   where
     phases        = simplPhases        dflags
     max_iter      = maxSimplIterations dflags
+    platform      = targetPlatform     dflags
     rule_check    = ruleCheck          dflags
     const_fold    = gopt Opt_CoreConstantFolding          dflags
     call_arity    = gopt Opt_CallArity                    dflags
@@ -184,8 +185,9 @@ getCoreToDo dflags extra_vars
     simpl_gently = CoreDoSimplify $ initSimplifyOpts dflags extra_vars max_iter
                                     (initGentleSimplMode dflags)
 
-    dmd_cpr_ww = if ww_on then [CoreDoDemand,CoreDoCpr,CoreDoWorkerWrapper]
-                          else [CoreDoDemand,CoreDoCpr]
+    dmd_cpr_ww = [CoreDoDemand, CoreDoCpr] ++
+      if ww_on then [CoreDoWorkerWrapper]
+               else []
 
 
     demand_analyser = (CoreDoPasses (
@@ -208,10 +210,12 @@ getCoreToDo dflags extra_vars
         ]
 
     add_caller_ccs =
-        runWhen (profiling && not (null $ callerCcFilters dflags)) CoreAddCallerCcs
+        runWhen (profiling && not (null $ callerCcFilters dflags)) $
+          CoreAddCallerCcs (initCallerCCOpts dflags)
 
     add_late_ccs =
-        runWhen (profiling && gopt Opt_ProfLateInlineCcs dflags) $ CoreAddLateCcs
+        runWhen (profiling && gopt Opt_ProfLateInlineCcs dflags) $
+          CoreAddLateCcs (gopt Opt_ProfCountEntries dflags)
 
     core_todo =
      [
@@ -273,7 +277,7 @@ getCoreToDo dflags extra_vars
                 -- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
                 -- Don't stop now!
 
-        runWhen do_float_in CoreDoFloatInwards,
+        runWhen do_float_in (CoreDoFloatInwards platform),
             -- Run float-inwards immediately before the strictness analyser
             -- Doing so pushes bindings nearer their use site and hence makes
             -- them more likely to be strict. These bindings might only show
@@ -309,7 +313,7 @@ getCoreToDo dflags extra_vars
                 -- succeed in commoning up things floated out by full laziness.
                 -- CSE used to rely on the no-shadowing invariant, but it doesn't any more
 
-        runWhen do_float_in CoreDoFloatInwards,
+        runWhen do_float_in (CoreDoFloatInwards platform),
 
         simplify "final",  -- Final tidy-up
 
@@ -321,13 +325,15 @@ getCoreToDo dflags extra_vars
                 -- Case-liberation for -O2.  This should be after
                 -- strictness analysis and the simplification which follows it.
         runWhen liberate_case $ CoreDoPasses
-           [ CoreLiberateCase, simplify "post-liberate-case" ],
+           [ CoreLiberateCase (initLiberateCaseOpts dflags)
+           , simplify "post-liberate-case" ],
            -- Run the simplifier after LiberateCase to vastly
            -- reduce the possibility of shadowing
            -- Reason: see Note [Shadowing] in GHC.Core.Opt.SpecConstr
 
         runWhen spec_constr $ CoreDoPasses
-           [ CoreDoSpecConstr, simplify "post-spec-constr"],
+           [ CoreDoSpecConstr (initSpecConstrOpts dflags)
+           , simplify "post-spec-constr"],
            -- See Note [Simplify after SpecConstr]
 
         maybe_rule_check FinalPhase,
@@ -501,33 +507,30 @@ doCorePass logger hsc_env this_mod rule_base loc print_unqual vis_orphs pass gut
   (_, annos) <- liftIO $ getFirstAnnotationsFromHscEnv hsc_env deserializeWithData guts
   us <- liftIO $ mkSplitUniqSupply simplMask
 
-  -- let this_mod = mg_module guts
   let dflags = hsc_dflags hsc_env
   let external_rule_base = eps_rule_base eps
   let p_fam_env = eps_fam_inst_env eps
-  let platform = targetPlatform dflags
   let fam_envs = (p_fam_env, mg_fam_inst_env guts)
-  let prof_count_entries = gopt Opt_ProfCountEntries dflags
   let !read_ruleenv = readRuleEnv hsc_env guts
+  let unit_env = hsc_unit_env hsc_env
 
   case pass of
     CoreDoSimplify opts       -> {-# SCC "Simplify" #-} do
-                                 (guts', sc) <- liftIO $ simplifyPgm logger read_ruleenv (hsc_unit_env hsc_env) opts guts
+                                 (guts', sc) <- liftIO $ simplifyPgm logger read_ruleenv unit_env opts guts
                                  addCounts sc
                                  return guts'
 
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
                                  updateBinds cseProgram
 
-    CoreLiberateCase          -> {-# SCC "LiberateCase" #-} do
-                                 let opts = initLiberateCaseOpts dflags
+    CoreLiberateCase opts     -> {-# SCC "LiberateCase" #-} do
                                  updateBinds (liberateCase opts)
 
-    CoreDoFloatInwards        -> {-# SCC "FloatInwards" #-}
-                                 updateBinds (floatInwards platform)
+    CoreDoFloatInwards opts   -> {-# SCC "FloatInwards" #-}
+                                 updateBinds (floatInwards opts)
 
-    CoreDoFloatOutwards f     -> {-# SCC "FloatOutwards" #-}
-                                 updateBindsM (floatOutwards logger f us)
+    CoreDoFloatOutwards opts  -> {-# SCC "FloatOutwards" #-}
+                                 updateBindsM (floatOutwards logger opts us)
 
     CoreDoStaticArgs          -> {-# SCC "StaticArgs" #-}
                                  updateBinds (doStaticArgs us)
@@ -539,36 +542,34 @@ doCorePass logger hsc_env this_mod rule_base loc print_unqual vis_orphs pass gut
                                  updateBinds exitifyProgram
 
     CoreDoDemand              -> {-# SCC "DmdAnal" #-}
-                                 updateBindsM (dmdAnal logger dflags fam_envs (mg_rules guts))
+                                 updateBindsM (dmdAnal logger dflags fam_envs (mg_rules guts))  -- TODO: dmdAnal takes DynFlags
 
     CoreDoCpr                 -> {-# SCC "CprAnal" #-}
                                  updateBindsM (cprAnalProgram logger fam_envs)
 
     CoreDoWorkerWrapper       -> {-# SCC "WorkWrap" #-} do
-                                 let opts = initWorkWrapOpts (mg_module guts) dflags fam_envs
+                                 let opts = initWorkWrapOpts (mg_module guts) dflags fam_envs  -- TODO: How to get rid of the module part ?
                                  updateBinds (wwTopBinds opts us)
 
     CoreDoSpecialising        -> {-# SCC "Specialise" #-} do
-                                 let opts = initSpecialiseOpts dflags loc simplMask print_unqual
-                                 liftIO $ specProgram logger opts vis_orphs external_rule_base rule_base guts
+                                 let opts = initSpecialiseOpts dflags simplMask print_unqual
+                                 liftIO $ specProgram logger opts loc vis_orphs external_rule_base rule_base guts
 
-    CoreDoSpecConstr          -> {-# SCC "SpecConstr" #-} do
-                                 let opts = initSpecConstrOpts dflags this_mod
-                                 return (specConstrProgram annos us opts guts)
+    CoreDoSpecConstr opts     -> {-# SCC "SpecConstr" #-}
+                                 return (specConstrProgram annos us opts this_mod guts)
 
-    CoreAddCallerCcs          -> {-# SCC "AddCallerCcs" #-} do
-                                 let opts = initCallerCCOpts dflags
+    CoreAddCallerCcs opts     -> {-# SCC "AddCallerCcs" #-}
                                  return (addCallerCostCentres opts guts)
 
-    CoreAddLateCcs            -> {-# SCC "AddLateCcs" #-}
-                                 return (addLateCostCentresMG prof_count_entries guts)
+    CoreAddLateCcs opts       -> {-# SCC "AddLateCcs" #-}
+                                 return (addLateCostCentresMG opts guts)
 
     CoreDoPrintCore           -> {-# SCC "PrintCore" #-} do
                                  liftIO $ printCore logger (mg_binds guts)
                                  return guts
 
     CoreDoRuleCheck phase pat -> {-# SCC "RuleCheck" #-}
-                                 liftIO $ ruleCheckPass logger dflags rule_base
+                                 liftIO $ ruleCheckPass logger (initRuleOpts dflags) rule_base  -- TODO: Own config record
                                                         vis_orphs phase pat guts
 
     CoreDoNothing             -> return guts
@@ -582,6 +583,7 @@ doCorePass logger hsc_env this_mod rule_base loc print_unqual vis_orphs pass gut
                                  return guts'
   where
     updateBinds f = return $ guts { mg_binds = f (mg_binds guts) }
+
     updateBindsM f = do
       b' <- liftIO $ f (mg_binds guts)
       return $ guts { mg_binds = b' }
@@ -628,19 +630,18 @@ printCore logger binds
     = Logger.logDumpMsg logger "Print Core" (pprCoreBindings binds)
 
 ruleCheckPass :: Logger
-              -> DynFlags
+              -> RuleOpts
               -> RuleBase
               -> ModuleSet
               -> CompilerPhase
               -> String
               -> ModGuts
               -> IO ModGuts
-ruleCheckPass logger dflags rb vis_orphs current_phase pat guts =
+ruleCheckPass logger ropts rb vis_orphs current_phase pat guts =
     withTiming logger (text "RuleCheck"<+>brackets (ppr $ mg_module guts))
                 (const ()) $ do
         let rule_fn fn = getRules (RuleEnv [rb] vis_orphs) fn
                           ++ (mg_rules guts)
-        let ropts = initRuleOpts dflags
         logDumpMsg logger "Rule check" $
             ruleCheckProgram ropts current_phase pat rule_fn (mg_binds guts)
         return guts

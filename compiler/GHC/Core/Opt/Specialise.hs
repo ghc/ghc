@@ -591,11 +591,12 @@ Hence, the invariant is this:
 specProgram
   :: Logger
   -> SpecialiseOpts
+  -> SrcSpan
   -> ModuleSet
   -> RuleBase -- ^ external rule base
   -> RuleBase -- ^ home rule base
   -> ModGuts -> IO ModGuts
-specProgram logger opts vis_orphs eps_rule_base hpt_rule_base
+specProgram logger opts loc vis_orphs eps_rule_base hpt_rule_base
             guts@(ModGuts { mg_module = this_mod
                           , mg_rules = local_rules
                           , mg_binds = binds })
@@ -610,6 +611,7 @@ specProgram logger opts vis_orphs eps_rule_base hpt_rule_base
                           , se_subst = Core.mkEmptySubst $ mkInScopeSetList $
                                        bindersOfBinds binds
                           , se_module = this_mod
+                          , se_loc = loc
                           , se_visible_orphan_mods = vis_orphs
                           , se_eps_rule_base = eps_rule_base
                           , se_hpt_rule_base = hpt_rule_base
@@ -825,7 +827,7 @@ tryWarnMissingSpecs logger top_env callers fn calls_for_fn
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
     doWarn msg_class = let
       opts = se_opts top_env
-      loc = so_loc opts
+      loc = se_loc top_env
       sty = mkErrStyle (so_unqual opts)
       doc = vcat
           [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
@@ -1085,8 +1087,7 @@ the specialisations for imported bindings recursive.
 -}
 
 data SpecialiseOpts = SpecialiseOpts
-  { so_loc :: !SrcSpan
-  , so_uniq_mask :: !Char
+  { so_uniq_mask :: !Char
   , so_unqual :: !PrintUnqualified
   , so_cross_module_specialise :: !Bool
   , so_specialise_aggressively :: !Bool
@@ -1108,6 +1109,7 @@ data SpecEnv
              --    the RHS of specialised bindings (no type-let!)
 
        , se_module :: Module
+       , se_loc :: SrcSpan
 
        , se_visible_orphan_mods :: ModuleSet
 
