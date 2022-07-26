@@ -419,6 +419,10 @@ Runtime system
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
+- The ``load`` function no longer automatically caches interface files in memory between calls. If
+  you want to use a cache then you can supply one explicitly using the ``loadWithCache``
+  function, with your own implementation or a simple cache created by ``newIfaceCache``.
+
 - A new ``GHC.Hs.Syn.Type`` module has been introduced which defines functions
   for computing the ``Type`` of an ``HsExpr GhcTc`` in a pure fashion.
   The ``hsLitType`` and ``hsPatType`` functions that previously lived in

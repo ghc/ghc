@@ -27,7 +27,7 @@
 -- -----------------------------------------------------------------------------
 module GHC.Driver.Make (
         depanal, depanalE, depanalPartial, checkHomeUnitsClosed,
-        load, loadWithCache, load', LoadHowMuch(..), HomeModInfoCache(..), noHomeCache, newHomeModInfoCache,
+        load, loadWithCache, load', LoadHowMuch(..), ModIfaceCache(..), noIfaceCache, newIfaceCache,
         instantiationNodes,
 
         downsweep,
@@ -121,7 +121,7 @@ import Data.Either ( rights, partitionEithers, lefts )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Control.Concurrent ( newQSem, waitQSem, signalQSem, ThreadId, killThread, forkIOWithUnmask , forkIO )
+import Control.Concurrent ( newQSem, waitQSem, signalQSem, ThreadId, killThread, forkIOWithUnmask )
 import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
 import Control.Monad
@@ -420,48 +420,41 @@ were not recorded in the cache. In the less old days, the cache was returned at 
 end of load, and supplied at the start of load, however, this was not sufficient
 because it didn't account for the possibility of exceptions such as SIGINT (#20780).
 
-So now, in the current day, we have this HomeModInfoCache abstraction which
-can incrementally be updated during the process of upsweep. This alllows us
+So now, in the current day, we have this ModIfaceCache abstraction which
+can incrementally be updated during the process of upsweep. This allows us
 to store interface files for boot modules in an exception-safe way.
 
 When the final version of an interface file is completed then it is placed into
-the cache. The contents of the cache is retrieved, and the cache cleared, by hmi_clearCache.
+the cache. The contents of the cache is retrieved, and the cache cleared, by iface_clearCache.
 
-If a module is in a loop then the final version is the retypechecked version of
-the inteface file which is created after the loop has concluded. For modules not
-in a loop, the final interface file is just the normal one we create at the end
-of compiling the module.
-
-One slightly tricky part is keeping the cache up-to-date when performing parallel
-upsweep. In order to do this we spawn a thread for each module which blocks on
-the result variable and once unblocked adds the interface to the cache. This also
-has the effect of writing the maximal number of modules into the cache as modules are not
-inserted in the linearised order. In addition
-to this we are careful to block the program continuing whilst there are still threads
-waiting to write to the cache, lest we end up in situations where load is called
-again before all threads have finished writing and old information will be placed into
-the cache.
-
-
+Note that because we only store the ModIface and Linkable in the ModIfaceCache,
+hydration and rehydration is totally irrelevant, and we just store the CachedIface as
+soon as it is completed.
 
 -}
 
 
 -- Abstract interface to a cache of HomeModInfo
 -- See Note [Caching HomeModInfo]
-data HomeModInfoCache = HomeModInfoCache { hmi_clearCache :: IO [HomeModInfo]
-                                         , hmi_addToCache :: HomeModInfo -> IO () }
+data ModIfaceCache = ModIfaceCache { iface_clearCache :: IO [CachedIface]
+                                   , iface_addToCache :: CachedIface -> IO () }
 
-noHomeCache :: Maybe HomeModInfoCache
-noHomeCache = Nothing
+addHmiToCache :: ModIfaceCache -> HomeModInfo -> IO ()
+addHmiToCache c (HomeModInfo i _ l) = iface_addToCache c (CachedIface i l)
 
-newHomeModInfoCache :: IO HomeModInfoCache
-newHomeModInfoCache = do
+data CachedIface = CachedIface { cached_modiface :: !ModIface
+                               , cached_linkable :: !(Maybe Linkable) }
+
+noIfaceCache :: Maybe ModIfaceCache
+noIfaceCache = Nothing
+
+newIfaceCache :: IO ModIfaceCache
+newIfaceCache = do
   ioref <- newIORef []
   return $
-    HomeModInfoCache
-      { hmi_clearCache = atomicModifyIORef' ioref (\c -> ([], c))
-      , hmi_addToCache = \hmi -> atomicModifyIORef' ioref (\c -> (hmi:c, ()))
+    ModIfaceCache
+      { iface_clearCache = atomicModifyIORef' ioref (\c -> ([], c))
+      , iface_addToCache = \hmi -> atomicModifyIORef' ioref (\c -> (hmi:c, ()))
       }
 
 
@@ -483,7 +476,7 @@ newHomeModInfoCache = do
 -- All other errors are reported using the 'defaultWarnErrLogger'.
 
 load :: GhcMonad f => LoadHowMuch -> f SuccessFlag
-load how_much = loadWithCache noHomeCache how_much
+load how_much = loadWithCache noIfaceCache how_much
 
 mkBatchMsg :: HscEnv -> Messager
 mkBatchMsg hsc_env =
@@ -493,7 +486,7 @@ mkBatchMsg hsc_env =
     else batchMsg
 
 
-loadWithCache :: GhcMonad m => Maybe HomeModInfoCache -> LoadHowMuch -> m SuccessFlag
+loadWithCache :: GhcMonad m => Maybe ModIfaceCache -> LoadHowMuch -> m SuccessFlag
 loadWithCache cache how_much = do
     (errs, mod_graph) <- depanalE [] False                        -- #17459
     msg <- mkBatchMsg <$> getSession
@@ -652,7 +645,7 @@ createBuildPlan mod_graph maybe_top_mod =
 -- | Generalized version of 'load' which also supports a custom
 -- 'Messager' (for reporting progress) and 'ModuleGraph' (generally
 -- produced by calling 'depanal'.
-load' :: GhcMonad m => Maybe HomeModInfoCache -> LoadHowMuch -> Maybe Messager -> ModuleGraph -> m SuccessFlag
+load' :: GhcMonad m => Maybe ModIfaceCache -> LoadHowMuch -> Maybe Messager -> ModuleGraph -> m SuccessFlag
 load' mhmi_cache how_much mHscMessage mod_graph = do
     modifySession $ \hsc_env -> hsc_env { hsc_mod_graph = mod_graph }
     guessOutputFile
@@ -708,7 +701,7 @@ load' mhmi_cache how_much mHscMessage mod_graph = do
         build_plan = createBuildPlan mod_graph maybe_top_mod
 
 
-    cache <- liftIO $ maybe (return []) hmi_clearCache mhmi_cache
+    cache <- liftIO $ maybe (return []) iface_clearCache mhmi_cache
     let
         -- prune the HPT so everything is not retained when doing an
         -- upsweep.
@@ -813,19 +806,22 @@ guessOutputFile = modifySession $ \env ->
 -- old HPT holds on to the entire type environment from the previous
 -- compilation.
 -- Note [GHC Heap Invariants]
-pruneCache :: [HomeModInfo]
+pruneCache :: [CachedIface]
                       -> [ModSummary]
                       -> [HomeModInfo]
 pruneCache hpt summ
   = strictMap prune hpt
-  where prune hmi = hmi'{ hm_details = emptyModDetails }
+  where prune (CachedIface { cached_modiface = iface
+                           , cached_linkable = linkable
+                           }) = HomeModInfo iface emptyModDetails linkable'
           where
-           modl = moduleName (mi_module (hm_iface hmi))
-           hmi' | Just ms <- lookupUFM ms_map modl
-                , mi_src_hash (hm_iface hmi) /= ms_hs_hash ms
-                = hmi{ hm_linkable = Nothing }
+           modl = moduleName (mi_module iface)
+           linkable'
+                | Just ms <- lookupUFM ms_map modl
+                , mi_src_hash iface /= ms_hs_hash ms
+                = Nothing
                 | otherwise
-                = hmi
+                = linkable
 
         ms_map = listToUFM [(ms_mod_name ms, ms) | ms <- summ]
 
@@ -1022,7 +1018,7 @@ type RunMakeM a = ReaderT MakeEnv (MaybeT IO) a
 -- if the module participates in a loop. This step also labels each node with a number for the output.
 -- See Note [Upsweep] for a high-level description.
 interpretBuildPlan :: HomeUnitGraph
-                   -> Maybe HomeModInfoCache
+                   -> Maybe ModIfaceCache
                    -> M.Map ModNodeKeyWithUid HomeModInfo
                    -> [BuildPlan]
                    -> IO ( Maybe [ModuleGraphNode] -- Is there an unresolved cycle
@@ -1031,37 +1027,14 @@ interpretBuildPlan :: HomeUnitGraph
 interpretBuildPlan hug mhmi_cache old_hpt plan = do
   hug_var <- newMVar hug
   ((mcycle, plans), build_map) <- runStateT (buildLoop plan) (BuildLoopState M.empty 1 hug_var)
-  wait <- collect_results (buildDep build_map)
+  let wait = collect_results (buildDep build_map)
   return (mcycle, plans, wait)
 
   where
-    collect_results build_map = do
-      -- 1. On success, write the result to the cache, fork threads waiting for each result
-      -- so that the cache can be updated out of order, before we wait at the end for everything to
-      -- finish. We do this here rather than when we update the hug_var because we only ever
-      -- want to add things to the cache which are externally visible
-      -- (something which is hard to work out in the main loop).
-      waits <- mapM (\(_doc, res_var) -> collect_result res_var) (M.elems build_map)
-      -- 2. Block waiting for all to finish
-      return (sequence waits)
-
-    -- See Note [Caching HomeModInfo]
-    collect_result res_var = case mhmi_cache of
-      -- Avoid forking a new thread when there's no cache
-      Nothing -> return (runMaybeT (waitResult res_var))
-      Just hmi_cache -> do
-        -- Barrier used to ensure that we write to the cache before execution
-        -- continues.
-        barrier <- newEmptyMVar
-        forkIO (do
-           r <- runMaybeT (waitResult res_var)
-           case r of
-             Just (Just hmi) -> do
-               hmi_addToCache hmi_cache hmi
-             _ -> do
-               return ()
-           putMVar barrier r)
-        return (takeMVar barrier)
+    collect_results build_map =
+      sequence (map (\(_doc, res_var) -> collect_result res_var) (M.elems build_map))
+      where
+        collect_result res_var = runMaybeT (waitResult res_var)
 
     n_mods = sum (map countMods plan)
 
@@ -1109,6 +1082,10 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
                   let !old_hmi = M.lookup (msKey ms) old_hpt
                       rehydrate_mods = mapMaybe moduleGraphNodeModule <$> rehydrate_nodes
                   hmi <- executeCompileNode mod_idx n_mods old_hmi (wait_deps_hug hug_var build_deps) rehydrate_mods ms
+
+                  -- Write the HMI to an external cache (if one exists)
+                  -- See Note [Caching HomeModInfo]
+                  liftIO $ forM mhmi_cache $ \hmi_cache -> addHmiToCache hmi_cache hmi
                   -- This global MVar is incrementally modified in order to avoid having to
                   -- recreate the HPT before compiling each module which leads to a quadratic amount of work.
                   hsc_env <- asks hsc_env
@@ -1157,7 +1134,7 @@ withCurrentUnit uid = do
 upsweep
     :: Int -- ^ The number of workers we wish to run in parallel
     -> HscEnv -- ^ The base HscEnv, which is augmented for each module
-    -> Maybe HomeModInfoCache -- ^ A cache to incrementally write final interface files to
+    -> Maybe ModIfaceCache -- ^ A cache to incrementally write final interface files to
     -> Maybe Messager
     -> M.Map ModNodeKeyWithUid HomeModInfo
     -> [BuildPlan]
