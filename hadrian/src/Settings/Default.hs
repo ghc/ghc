@@ -77,6 +77,7 @@ stage0Packages = do
              , cabalSyntax
              , cabal
              , compiler
+             , containers
              , directory
              , process
              , exceptions
