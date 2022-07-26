@@ -44,7 +44,6 @@ ref    compiler/GHC/Tc/Types.hs:702:33:     Note [Extra dependencies from .hs-bo
 ref    compiler/GHC/Tc/Types.hs:1433:47:     Note [Care with plugin imports]
 ref    compiler/GHC/Tc/Types/Constraint.hs:253:34:     Note [NonCanonical Semantics]
 ref    compiler/GHC/Types/Demand.hs:308:25:     Note [Preserving Boxity of results is rarely a win]
-ref    compiler/GHC/Types/Name/Occurrence.hs:301:4:     Note [Unique OccNames from Template Haskell]
 ref    compiler/GHC/Unit/Module/Deps.hs:82:13:     Note [Structure of dep_boot_mods]
 ref    compiler/GHC/Utils/Monad.hs:391:34:     Note [multiShotIO]
 ref    compiler/Language/Haskell/Syntax/Binds.hs:204:31:     Note [fun_id in Match]
