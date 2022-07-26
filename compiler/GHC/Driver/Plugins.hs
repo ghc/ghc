@@ -71,7 +71,7 @@ import qualified GHC.Tc.Types
 import GHC.Tc.Types ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR )
 
-import GHC.Core.Opt.Pipeline.Types ( CoreToDo )
+import GHC.Core.Opt.Config ( CoreToDo )
 import GHC.Plugins.Monad ( CoreM )
 import GHC.Hs
 import GHC.Types.Error (Messages)

@@ -309,6 +309,7 @@ Library
         GHC.Core.Opt.CallArity
         GHC.Core.Opt.CallerCC
         GHC.Core.Opt.CallerCC.Filter
+        GHC.Core.Opt.Config
         GHC.Core.Opt.ConstantFold
         GHC.Core.Opt.CprAnal
         GHC.Core.Opt.CSE
@@ -318,8 +319,6 @@ Library
         GHC.Core.Opt.FloatOut
         GHC.Core.Opt.LiberateCase
         GHC.Core.Opt.OccurAnal
-        GHC.Core.Opt.Pipeline
-        GHC.Core.Opt.Pipeline.Types
         GHC.Core.Opt.SetLevels
         GHC.Core.Opt.Simplify
         GHC.Core.Opt.Simplify.Env
@@ -404,6 +403,7 @@ Library
         GHC.Driver.Config.Core.EndPass
         GHC.Driver.Config.Core.Lint
         GHC.Driver.Config.Core.Lint.Interactive
+        GHC.Driver.Config.Core.Opt
         GHC.Driver.Config.Core.Opt.Arity
         GHC.Driver.Config.Core.Opt.CallerCC
         GHC.Driver.Config.Core.Opt.LiberateCase
@@ -426,6 +426,7 @@ Library
         GHC.Driver.Config.Stg.Ppr
         GHC.Driver.Config.StgToCmm
         GHC.Driver.Config.Tidy
+        GHC.Driver.Core.Opt
         GHC.Driver.Env
         GHC.Driver.Env.KnotVars
         GHC.Driver.Env.Types

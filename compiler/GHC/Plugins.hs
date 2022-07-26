@@ -16,7 +16,7 @@ module GHC.Plugins
    , module GHC.Types.Id
    , module GHC.Types.Id.Info
    , module GHC.Types.PkgQual
-   , module GHC.Core.Opt.Pipeline.Types
+   , module GHC.Core.Opt.Config
    , module GHC.Core.Opt.Stats
    , module GHC.Core.Opt.Utils
    , module GHC.Plugins.Monad
@@ -85,7 +85,7 @@ import GHC.Types.Id       hiding  ( lazySetIdInfo, setIdExported, setIdNotExport
 import GHC.Types.Id.Info
 
 -- Core
-import GHC.Core.Opt.Pipeline.Types
+import GHC.Core.Opt.Config
 import GHC.Core.Opt.Stats
 import GHC.Core.Opt.Utils
 import GHC.Core
