@@ -51,7 +51,7 @@ import GHC.Driver.Session as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
 import GHC.Driver.Monad ( modifySession )
-import GHC.Driver.Make ( newHomeModInfoCache, HomeModInfoCache(..) )
+import GHC.Driver.Make ( newIfaceCache, ModIfaceCache(..) )
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Config.Diagnostic
 import qualified GHC
@@ -542,7 +542,7 @@ interactiveUI config srcs maybe_exprs = do
    let prelude_import = simpleImportDecl preludeModuleName
    hsc_env <- GHC.getSession
    let in_multi = length (hsc_all_home_unit_ids hsc_env) > 1
-   empty_cache <- liftIO newHomeModInfoCache
+   empty_cache <- liftIO newIfaceCache
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname           = default_progname,
                    args               = default_args,
@@ -577,7 +577,7 @@ interactiveUI config srcs maybe_exprs = do
                    mod_infos          = M.empty,
                    flushStdHandles    = flush,
                    noBuffering        = nobuffering,
-                   hmiCache = empty_cache
+                   ifaceCache = empty_cache
                  }
 
    return ()
@@ -2147,7 +2147,7 @@ doLoad retain_context howmuch = do
              (\_ ->
               liftIO $ do hSetBuffering stdout NoBuffering
                           hSetBuffering stderr NoBuffering) $ \_ -> do
-      hmis <- hmiCache <$> getGHCiState
+      hmis <- ifaceCache <$> getGHCiState
       ok <- trySuccess $ GHC.loadWithCache (Just hmis) howmuch
       afterLoad ok retain_context
       return ok
@@ -4445,7 +4445,7 @@ discardActiveBreakPoints = do
 
 discardInterfaceCache :: GhciMonad m => m ()
 discardInterfaceCache =
-   void (liftIO . hmi_clearCache . hmiCache =<< getGHCiState)
+   void (liftIO . iface_clearCache . ifaceCache =<< getGHCiState)
 
 clearHPTs :: GhciMonad m => m ()
 clearHPTs = do

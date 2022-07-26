@@ -47,7 +47,7 @@ import GHC.Data.FastString
 import GHC.Driver.Env
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
-import GHC.Driver.Make (HomeModInfoCache(..))
+import GHC.Driver.Make (ModIfaceCache(..))
 import GHC.Unit
 import GHC.Types.Name.Reader as RdrName (mkOrig)
 import GHC.Builtin.Names (gHC_GHCI_HELPERS)
@@ -164,7 +164,7 @@ data GHCiState = GHCiState
             -- ^ @hFlush stdout; hFlush stderr@ in the interpreter
         noBuffering :: ForeignHValue,
             -- ^ @hSetBuffering NoBuffering@ for stdin/stdout/stderr
-        hmiCache :: HomeModInfoCache
+        ifaceCache :: ModIfaceCache
      }
 
 type TickArray = Array Int [(GHC.BreakIndex,RealSrcSpan)]
