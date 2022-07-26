@@ -590,10 +590,17 @@ Hence, the invariant is this:
 -}
 
 -- | Specialise calls to type-class overloaded functions occurring in a program.
-specProgram :: Logger -> SpecialiseOpts -> ModGuts -> IO ModGuts
-specProgram logger opts guts@(ModGuts { mg_module = this_mod
-                                      , mg_rules = local_rules
-                                      , mg_binds = binds })
+specProgram
+  :: Logger
+  -> SpecialiseOpts
+  -> ModuleSet
+  -> RuleBase -- ^ external rule base
+  -> RuleBase -- ^ home rule base
+  -> ModGuts -> IO ModGuts
+specProgram logger opts vis_orphs eps_rule_base hpt_rule_base
+            guts@(ModGuts { mg_module = this_mod
+                          , mg_rules = local_rules
+                          , mg_binds = binds })
   = do
 
               -- We need to start with a Subst that knows all the things
@@ -605,6 +612,9 @@ specProgram logger opts guts@(ModGuts { mg_module = this_mod
                           , se_subst = Core.mkEmptySubst $ mkInScopeSetList $
                                        bindersOfBinds binds
                           , se_module = this_mod
+                          , se_visible_orphan_mods = vis_orphs
+                          , se_eps_rule_base = eps_rule_base
+                          , se_hpt_rule_base = hpt_rule_base
                           }
 
              go []           = return ([], emptyUDs)
@@ -660,7 +670,7 @@ specImports logger top_env local_rules
   = return ([], wrapDictBinds dict_binds [])
 
   | otherwise
-  = do { let hpt_rules = so_rule_base (se_opts top_env)
+  = do { let hpt_rules = se_hpt_rule_base top_env
        ; let rule_base = extendRuleBaseList hpt_rules local_rules
 
        ; (spec_rules, spec_binds) <- spec_imports logger top_env [] rule_base
@@ -735,9 +745,9 @@ spec_import logger top_env callers rb dict_binds cis@(CIS fn _)
              -- We keep doing this in case we "page-fault in"
              -- more rules as we go along
        ; let opts = se_opts top_env
-       ; let external_rule_base = so_external_rule_base opts
+       ; let external_rule_base = se_eps_rule_base top_env
        ; let mask = so_uniq_mask opts
-       ; let vis_orphs = so_visible_orphan_mods opts
+       ; let vis_orphs = se_visible_orphan_mods top_env
        ; let rules_for_fn = getRules (RuleEnv [rb, external_rule_base] vis_orphs) fn
 
        ; -- debugTraceMsg (text "specImport1" <+> vcat [ppr fn, ppr good_calls, ppr rhs])
@@ -1078,11 +1088,8 @@ the specialisations for imported bindings recursive.
 
 data SpecialiseOpts = SpecialiseOpts
   { so_loc :: !SrcSpan
-  , so_rule_base :: !RuleBase
-  , so_external_rule_base :: !RuleBase
   , so_uniq_mask :: !Char
   , so_unqual :: !PrintUnqualified
-  , so_visible_orphan_mods :: !ModuleSet
   , so_cross_module_specialise :: !Bool
   , so_specialise_aggressively :: !Bool
   , so_warn_missed_specs :: !(Maybe MessageClass)
@@ -1103,6 +1110,11 @@ data SpecEnv
              --    the RHS of specialised bindings (no type-let!)
 
        , se_module :: Module
+
+       , se_visible_orphan_mods :: ModuleSet
+
+       , se_eps_rule_base :: RuleBase
+       , se_hpt_rule_base :: RuleBase
      }
 
 instance Outputable SpecEnv where
