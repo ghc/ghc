@@ -172,6 +172,7 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Rules
 import GHC.Core.Stats
+import GHC.Core.Opt.Simplify ( simplifyExpr )
 
 import GHC.CoreToStg.Prep
 import GHC.CoreToStg    ( coreToStg )
