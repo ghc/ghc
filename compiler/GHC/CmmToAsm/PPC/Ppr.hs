@@ -240,7 +240,7 @@ pprImm platform = \case
    ImmInteger i   -> integer i
    ImmCLbl l      -> pdoc platform l
    ImmIndex l i   -> pdoc platform l <> char '+' <> int i
-   ImmLit s       -> s
+   ImmLit s       -> text s
    ImmFloat f     -> float $ fromRational f
    ImmDouble d    -> double $ fromRational d
    ImmConstantSum a b   -> pprImm platform a <> char '+' <> pprImm platform b

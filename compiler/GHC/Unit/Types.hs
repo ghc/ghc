@@ -207,7 +207,7 @@ pprModule mod@(Module p n)  = getPprStyle doc
     | qualModule sty mod =
         case p of
           HoleUnit -> angleBrackets (pprModuleName n)
-          _        -> ppr (moduleUnit mod) <> char ':' <> pprModuleName n
+          _        -> ppr p <> char ':' <> pprModuleName n
     | otherwise =
         pprModuleName n
 

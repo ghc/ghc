@@ -33,7 +33,7 @@ module GHC.Cmm (
      module GHC.Cmm.Expr,
 
      -- * Pretty-printing
-     pprCmms, pprCmmGroup, pprSection, pprStatic
+     pprCmmGroup, pprSection, pprStatic
   ) where
 
 import GHC.Prelude
@@ -378,12 +378,6 @@ pprBBlock (BasicBlock ident stmts) =
 --      C-style, rather than as their internal MachRep name.
 --
 -- These conventions produce much more readable Cmm output.
-
-pprCmms :: (OutputableP Platform info, OutputableP Platform g)
-        => Platform -> [GenCmmGroup RawCmmStatics info g] -> SDoc
-pprCmms platform cmms = pprCode CStyle (vcat (intersperse separator $ map (pdoc platform) cmms))
-        where
-          separator = space $$ text "-------------------" $$ space
 
 pprCmmGroup :: (OutputableP Platform d, OutputableP Platform info, OutputableP Platform g)
             => Platform -> GenCmmGroup d info g -> SDoc

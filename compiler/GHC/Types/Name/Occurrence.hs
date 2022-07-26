@@ -6,7 +6,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- |
 -- #name_types#
@@ -282,24 +281,9 @@ pprOccName (OccName sp occ)
   = getPprStyle $ \ sty ->
     if codeStyle sty
     then ztext (zEncodeFS occ)
-    else pp_occ <> whenPprDebug (braces (pprNameSpaceBrief sp))
-  where
-    pp_occ = sdocOption sdocSuppressUniques $ \case
-               True  -> text (strip_th_unique (unpackFS occ))
-               False -> ftext occ
-
-        -- See Note [Suppressing uniques in OccNames]
-    strip_th_unique ('[' : c : _) | isAlphaNum c = []
-    strip_th_unique (c : cs) = c : strip_th_unique cs
-    strip_th_unique []       = []
+    else ftext occ <> whenPprDebug (braces (pprNameSpaceBrief sp))
 
 {-
-Note [Suppressing uniques in OccNames]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This is a hack to de-wobblify the OccNames that contain uniques from
-Template Haskell that have been turned into a string in the OccName.
-See Note [Unique OccNames from Template Haskell] in "GHC.ThToHs"
-
 ************************************************************************
 *                                                                      *
 \subsection{Construction}

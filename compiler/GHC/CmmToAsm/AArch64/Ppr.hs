@@ -50,14 +50,14 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock config top_info) blocks) $$
         (if ncgDwarfEnabled config
-         then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
+         then pdoc platform (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
         pprSizeDecl platform lbl
 
     Just (CmmStaticsRaw info_lbl _) ->
       pprSectionAlign config (Section Text info_lbl) $$
       -- pprProcAlignment config $$
       (if platformHasSubsectionsViaSymbols platform
-          then ppr (mkDeadStripPreventer info_lbl) <> char ':'
+          then pdoc platform (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock config top_info) blocks) $$
       -- above: Even the first block gets a label, because with branch-chain
@@ -65,9 +65,9 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
       (if platformHasSubsectionsViaSymbols platform
        then -- See Note [Subsections Via Symbols]
                 text "\t.long "
-            <+> ppr info_lbl
+            <+> pdoc platform info_lbl
             <+> char '-'
-            <+> ppr (mkDeadStripPreventer info_lbl)
+            <+> pdoc platform (mkDeadStripPreventer info_lbl)
        else empty) $$
       pprSizeDecl platform info_lbl
 
@@ -86,9 +86,6 @@ pprAlignForSection :: Platform -> SectionType -> SDoc
 pprAlignForSection _platform _seg
     -- .balign is stable, whereas .align is platform dependent.
     = text "\t.balign 8" --  always 8
-
-instance Outputable Instr where
-    ppr = pprInstr genericPlatform
 
 -- | Print section header and appropriate alignment for that section.
 --
@@ -118,7 +115,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
     pprLabel platform asmLbl $$
     vcat (map (pprInstr platform) (id {-detectTrivialDeadlock-} optInstrs)) $$
     (if  ncgDwarfEnabled config
-      then ppr (mkAsmTempEndLabel asmLbl) <> char ':'
+      then pdoc platform (mkAsmTempEndLabel asmLbl) <> char ':'
       else empty
     )
   where
@@ -138,7 +135,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
            pprLabel platform info_lbl $$
            c $$
            (if ncgDwarfEnabled config
-             then ppr (mkAsmTempEndLabel info_lbl) <> char ':'
+             then pdoc platform (mkAsmTempEndLabel info_lbl) <> char ':'
              else empty)
     -- Make sure the info table has the right .loc for the block
     -- coming right after it. See Note [Info Offset]
@@ -235,7 +232,7 @@ pprImm _ (ImmInt i)     = int i
 pprImm _ (ImmInteger i) = integer i
 pprImm p (ImmCLbl l)    = pdoc p l
 pprImm p (ImmIndex l i) = pdoc p l <> char '+' <> int i
-pprImm _ (ImmLit s)     = s
+pprImm _ (ImmLit s)     = text s
 
 -- TODO: See pprIm below for why this is a bad idea!
 pprImm _ (ImmFloat f)
