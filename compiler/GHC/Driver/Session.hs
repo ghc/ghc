@@ -4015,7 +4015,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnSpaceAfterBang,
         Opt_WarnNonCanonicalMonadInstances,
         Opt_WarnNonCanonicalMonoidInstances,
-        Opt_WarnOperatorWhitespaceExtConflict
+        Opt_WarnOperatorWhitespaceExtConflict,
+        Opt_WarnUnicodeBidirectionalFormatCharacters
       ]
 
 -- | Things you get with -W
