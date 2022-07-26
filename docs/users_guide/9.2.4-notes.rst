@@ -1,0 +1,141 @@
+.. _release-9-2-4:
+
+Version 9.2.4
+==============
+
+The significant changes to the various parts of the compiler are listed in the
+following sections.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+9, 10, 11, or 12.
+
+Compiler
+--------
+
+- Add the :extension:`DeepSubsumption` language extension which reverses the
+  effects of the `Simplified Subsumption Proposal`_ introduced in GHC 9.0. This
+  is an attempt to make GHC 9.2.4 more backwards compatible with GHC 8.10 and
+  eases migration for users who depended on this feature.
+
+  This extension is enabled by default with the :extension:`Haskell2010`
+  and :extension:`Haskell98` languages but disabled with the :extension:`GHC2021`
+  language originally introduced in GHC 9.2.1.
+
+  See the `Deep Subsumption Proposal`_ for more details.
+
+.. _Simplified Subsumption Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0511-deep-subsumption.rst
+.. _Deep Subsumption Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0511-deep-subsumption.rst
+
+- The flag ``-ddump-llvm`` doesn't imply ``-fllvm`` any more (:ghc-ticket:`21776`).
+
+- Fix a compiler panic due to a bug in the simplifier (:ghc-ticket:`21694`).
+
+- Fix a bug where the flag ``Werror=unrecognised-warning-flags`` did not behave as expected (:ghc-ticket:`21682`).
+
+- Fix miscompilations on AArch64 (:ghc-ticket:`21624`, :ghc-ticket:`21773`, :ghc-ticket:`20735`).
+
+- Fix a miscompilation bug that manifests due to improper handling of name shadowing during
+  common subexpression elimination (:ghc-ticket:`21685`).
+
+- Fix a space leak that may manifest using the ``extendMG`` function (:ghc-ticket:`21818`).
+
+- Ensure types from record dot syntax are stored in the HIE file AST (:ghc-ticket:`21797`).
+
+- Fix a compiler panic when importing "wrapper" with ``-XCApiFFI`` (:ghc-ticket:`20272`).
+
+- Enable ``-Wunicode-bidirectional-format-characters`` by default. This was meant to be enabled previously
+  but was not due to a botched backport (:ghc-ticket:`21865`).
+
+Runtime system
+--------------
+
+- Fix segfaults that may arise due to a bug in the implementation of the
+  ``keepAlive#`` primop. This may regress performance for certain programs which
+  use this primop or functions which use the primop, such as ``withForeignPtr``.
+  These regressions are mostly small, but can be larger in certain edge cases.
+  Judicious use of ``unsafeWithForeignPtr`` when its argument is known
+  not to statically diverge can mitigate these in many cases. It is our
+  judgement that the critical correctness issues justify the regression in
+  performance and that it is important to get a release out with the fix while we
+  work on a better approach which will improve performance for future releases
+  (:ghc-ticket:`21708`).
+
+- Fix a segfault that may arise using LDV profiling (:ghc-ticket:`21880`).
+
+- Fix a bug in the nonmoving GC which resulted in segfaults due to early GC (:ghc-ticket:`21885`).
+
+- Fix accounting for copied bytes during sequential garbage collections (:ghc-ticket:`21745`).
+
+- Allow passing``-po`` flag to set output during non-profiled builds (:ghc-ticket:`21445`).
+
+- Respect the ``-po`` flag to set output while heap profiling (:ghc-ticket:`21446`).
+
+GHCi
+----
+
+- Allow CApi FFI calls in GHCi (:ghc-ticket:`7388`).
+
+- Fix behaviour of Ctrl-C on Windows in GHCi (:ghc-ticket:`21889`). 
+
+Core libraries
+--------------
+
+- Bump ``base`` to 4.16.3.0.
+
+- Ensure ``hGetBufNonBlocking`` doesn't block on Windows (:ghc-ticket:`21665`).
+
+Build system and packaging
+--------------------------
+
+- Don't override linker on Darwin during ``configure`` (:ghc-ticket:`21712`).
+
+- Fix a hadrian bug to do with building profiled executables without corresponding libraries (:ghc-ticket:`19624`).
+
+- Fix a panic on FreeBSD when building with hadrian due to incorrect arch triple (:ghc-ticket:`15718`).
+
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal:     Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+
+
