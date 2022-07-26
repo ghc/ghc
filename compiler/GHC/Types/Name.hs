@@ -58,6 +58,7 @@ module GHC.Types.Name (
 
         nameSrcLoc, nameSrcSpan, pprNameDefnLoc, pprDefinedAt,
         pprFullName, pprTickyName,
+        pprCodeName,
 
         -- ** Predicates on 'Name's
         isSystemName, isInternalName, isExternalName,
@@ -639,6 +640,15 @@ pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
     handlePuns :: Bool -> Maybe FastString -> SDoc -> SDoc
     handlePuns True (Just pun) _ = ftext pun
     handlePuns _    _          r = r
+
+pprCodeName :: Name -> SDoc
+pprCodeName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ}) =
+  -- TODO: might have to treat puns (namePun_maybe).
+  case sort of
+    WiredIn mod _ builtin -> pprCodeModule mod <> char '_' <> ppr_z_occ_name occ
+    External mod          -> pprCodeModule mod <> char '_' <> ppr_z_occ_name occ
+    System                -> pprUniqueAlways uniq
+    Internal              -> pprUniqueAlways uniq
 
 -- | Print fully qualified name (with unit-id, module and unique)
 pprFullName :: Module -> Name -> SDoc

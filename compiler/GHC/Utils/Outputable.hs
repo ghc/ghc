@@ -79,6 +79,7 @@ module GHC.Utils.Outputable (
         pprFastFilePath, pprFilePathString,
 
         pprModuleName,
+        pprCodeModuleName,
 
         -- * Controlling the style in which output is printed
         BindingSite(..),
@@ -1051,6 +1052,8 @@ pprModuleName (ModuleName nm) =
         then ztext (zEncodeFS nm)
         else ftext nm
 
+pprCodeModuleName :: ModuleName -> SDoc
+pprCodeModuleName (ModuleName nm) = ztext (zEncodeFS nm)
 -----------------------------------------------------------------------
 -- The @OutputableP@ class
 -----------------------------------------------------------------------

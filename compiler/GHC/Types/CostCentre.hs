@@ -8,11 +8,13 @@ module GHC.Types.CostCentre (
         currentCCS, dontCareCCS,
         isCurrentCCS,
         maybeSingletonCCS,
+        pprCodeCostCentreStack,
 
         mkUserCC, mkAutoCC, mkAllCafsCC,
         mkSingletonCCS,
         isCafCCS, isCafCC, isSccCountCC, sccAbleCC, ccFromThisModule,
 
+        pprCodeCostCentre,
         pprCostCentreCore,
         costCentreUserName, costCentreUserNameFS,
         costCentreSrcSpan,
@@ -233,10 +235,12 @@ mkSingletonCCS cc = SingletonCCS cc
 -- expression.
 
 instance Outputable CostCentreStack where
-  ppr CurrentCCS        = text "CCCS"
-  ppr DontCareCCS       = text "CCS_DONT_CARE"
-  ppr (SingletonCCS cc) = ppr cc <> text "_ccs"
+  ppr = pprCodeCostCentreStack
 
+pprCodeCostCentreStack :: CostCentreStack -> SDoc
+pprCodeCostCentreStack CurrentCCS        = text "CCCS"
+pprCodeCostCentreStack DontCareCCS       = text "CCS_DONT_CARE"
+pprCodeCostCentreStack (SingletonCCS cc) = pprCodeCostCentre cc <> text "_ccs"
 
 -----------------------------------------------------------------------------
 -- Printing Cost Centres
@@ -257,6 +261,9 @@ instance Outputable CostCentre where
            if codeStyle sty
            then ppCostCentreLbl cc
            else text (costCentreUserName cc)
+
+pprCodeCostCentre :: CostCentre -> SDoc
+pprCodeCostCentre = ppCostCentreLbl
 
 -- Printing in Core
 pprCostCentreCore :: CostCentre -> SDoc
@@ -282,9 +289,9 @@ pprIdxCore idx = whenPprDebug $ ppr idx
 
 -- Printing as a C label
 ppCostCentreLbl :: CostCentre -> SDoc
-ppCostCentreLbl (AllCafsCC  {cc_mod = m}) = ppr m <> text "_CAFs_cc"
+ppCostCentreLbl (AllCafsCC  {cc_mod = m}) = pprCodeModule m <> text "_CAFs_cc"
 ppCostCentreLbl (NormalCC {cc_flavour = f, cc_name = n, cc_mod = m})
-  = ppr m <> char '_' <> ztext (zEncodeFS n) <> char '_' <>
+  = pprCodeModule m <> char '_' <> ztext (zEncodeFS n) <> char '_' <>
         ppFlavourLblComponent f <> text "_cc"
 
 -- ^ Print the flavour component of a C label

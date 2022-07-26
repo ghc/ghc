@@ -21,6 +21,7 @@ module GHC.Unit.Types
    , mkModule
    , moduleUnitId
    , pprModule
+   , pprCodeModule
    , pprInstantiatedModule
    , moduleFreeHoles
 
@@ -203,7 +204,7 @@ pprModule mod@(Module p n)  = getPprStyle doc
         (if p == mainUnit
                 then empty -- never qualify the main package in code
                 else ztext (zEncodeFS (unitFS p)) <> char '_')
-            <> pprModuleName n
+            <> pprCodeModuleName n
     | qualModule sty mod =
         case p of
           HoleUnit -> angleBrackets (pprModuleName n)
@@ -211,6 +212,12 @@ pprModule mod@(Module p n)  = getPprStyle doc
     | otherwise =
         pprModuleName n
 
+pprCodeModule :: Module -> SDoc
+pprCodeModule mod@(Module p n) =
+    (if p == mainUnit
+            then empty -- never qualify the main package in code
+            else ztext (zEncodeFS (unitFS p)) <> char '_')
+        <> pprCodeModuleName n
 
 pprInstantiatedModule :: InstantiatedModule -> SDoc
 pprInstantiatedModule (Module uid m) =

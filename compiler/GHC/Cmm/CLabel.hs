@@ -1468,7 +1468,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
                          if isRandomGenerated
                             then asmTempLabelPrefix platform
                             else empty
-      CStyle   -> ppr name <> ppIdFlavor flavor
+      CStyle   -> pprCodeName name <> ppIdFlavor flavor
 
    SRTLabel u
       -> maybe_underscore $ tempLabelPrefixOrUnderscore <> pprUniqueAlways u <> pp_cSEP <> text "srt"
@@ -1520,8 +1520,8 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
    HpcTicksLabel mod
       -> maybe_underscore $ text "_hpc_tickboxes_"  <> ppr mod <> text "_hpc"
 
-   CC_Label cc   -> maybe_underscore $ ppr cc
-   CCS_Label ccs -> maybe_underscore $ ppr ccs
+   CC_Label cc   -> maybe_underscore $ pprCodeCostCentre cc
+   CCS_Label ccs -> maybe_underscore $ pprCodeCostCentreStack ccs
    IPE_Label (InfoProvEnt l _ _ m _) -> maybe_underscore $ (pprCLabel platform CStyle l <> text "_" <> ppr m <> text "_ipe")
    ModuleLabel mod kind        -> maybe_underscore $ ppr mod <> text "_" <> ppr kind
 
