@@ -500,10 +500,12 @@ doCorePass :: Logger
            -> ModGuts
            -> SimplCountM ModGuts
 doCorePass logger hsc_env this_mod rule_base mask loc print_unqual vis_orphs pass guts = do
-  p_fam_env <- eps_fam_inst_env <$> liftIO (hscEPS hsc_env)
+  eps <- liftIO $ hscEPS hsc_env
   (_, annos) <- liftIO $ getFirstAnnotationsFromHscEnv hsc_env deserializeWithData guts
   us <- liftIO $ mkSplitUniqSupply mask
   let dflags   = hsc_dflags hsc_env
+  let external_rule_base = eps_rule_base eps
+  let p_fam_env = eps_fam_inst_env eps
   let platform = targetPlatform dflags
   let fam_envs = (p_fam_env, mg_fam_inst_env guts)
   let dump_simpl_stats = logHasDumpFlag logger Opt_D_dump_simpl_stats
@@ -552,8 +554,8 @@ doCorePass logger hsc_env this_mod rule_base mask loc print_unqual vis_orphs pas
                                  updateBinds (wwTopBinds opts us)
 
     CoreDoSpecialising        -> {-# SCC "Specialise" #-} do
-                                 specialise_opts <- initSpecialiseOpts hsc_env loc rule_base mask print_unqual vis_orphs
-                                 noCountsM $ specProgram logger specialise_opts guts
+                                 let opts = initSpecialiseOpts dflags loc mask print_unqual
+                                 noCountsM $ specProgram logger opts vis_orphs external_rule_base rule_base guts
 
     CoreDoSpecConstr          -> {-# SCC "SpecConstr" #-} do
                                  let opts = initSpecConstrOpts dflags this_mod
