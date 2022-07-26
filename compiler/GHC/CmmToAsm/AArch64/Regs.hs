@@ -59,7 +59,7 @@ data Imm
   = ImmInt      Int
   | ImmInteger  Integer     -- Sigh.
   | ImmCLbl     CLabel      -- AbstractC Label (with baggage)
-  | ImmLit      SDoc        -- Simple string
+  | ImmLit      String
   | ImmIndex    CLabel Int
   | ImmFloat    Rational
   | ImmDouble   Rational
@@ -67,14 +67,8 @@ data Imm
   | ImmConstantDiff Imm Imm
   deriving (Eq, Show)
 
-instance Show SDoc where
-  show = showPprUnsafe . ppr
-
-instance Eq SDoc where
-  lhs == rhs = show lhs == show rhs
-
 strImmLit :: String -> Imm
-strImmLit s = ImmLit (text s)
+strImmLit s = ImmLit s
 
 
 litToImm :: CmmLit -> Imm

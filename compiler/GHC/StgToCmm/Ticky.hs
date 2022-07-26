@@ -363,7 +363,7 @@ emitTickyCounter cloType tickee
                                       Just (CgIdInfo { cg_lf = cg_lf })
                                           | isLFThunk cg_lf
                                           -> return $! CmmLabel $ mkClosureInfoTableLabel (profilePlatform profile) tickee cg_lf
-                                      _   -> pprTraceDebug "tickyThunkUnknown" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
+                                      _   -> pprTraceDebug "tickyThunkUnknown" (text t <> colon <> ppr name <+> pdoc (profilePlatform profile) (mkInfoTableLabel name NoCafRefs))
                                             return $! zeroCLit platform
 
                             TickyLNE {} -> return $! zeroCLit platform

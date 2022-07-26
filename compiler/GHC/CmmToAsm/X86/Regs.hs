@@ -55,7 +55,6 @@ import GHC.Platform.Reg.Class
 
 import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )
-import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 
@@ -111,7 +110,7 @@ data Imm
   = ImmInt      Int
   | ImmInteger  Integer     -- Sigh.
   | ImmCLbl     CLabel      -- AbstractC Label (with baggage)
-  | ImmLit      SDoc        -- Simple string
+  | ImmLit      String
   | ImmIndex    CLabel Int
   | ImmFloat    Rational
   | ImmDouble   Rational
@@ -119,7 +118,7 @@ data Imm
   | ImmConstantDiff Imm Imm
 
 strImmLit :: String -> Imm
-strImmLit s = ImmLit (text s)
+strImmLit s = ImmLit s
 
 
 litToImm :: CmmLit -> Imm

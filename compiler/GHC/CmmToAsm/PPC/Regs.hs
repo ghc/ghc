@@ -133,7 +133,7 @@ data Imm
         = ImmInt        Int
         | ImmInteger    Integer     -- Sigh.
         | ImmCLbl       CLabel      -- AbstractC Label (with baggage)
-        | ImmLit        SDoc        -- Simple string
+        | ImmLit        String
         | ImmIndex    CLabel Int
         | ImmFloat      Rational
         | ImmDouble     Rational
@@ -147,7 +147,7 @@ data Imm
 
 
 strImmLit :: String -> Imm
-strImmLit s = ImmLit (text s)
+strImmLit s = ImmLit s
 
 
 litToImm :: CmmLit -> Imm
