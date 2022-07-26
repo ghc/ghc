@@ -28,7 +28,7 @@ import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 import GHC.Core
 import GHC.Core.EndPass  ( endPassIO )
 import GHC.Core.Opt.CSE  ( cseProgram )
-import GHC.Core.Rules   ( mkRuleBase, ruleCheckProgram, getRules )
+import GHC.Core.Rules   ( extendRuleBaseList, extendRuleEnv, mkRuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( lintAnnots )
@@ -93,7 +93,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_loc     = loc
                                 , mg_deps    = deps
                                 , mg_rdr_env = rdr_env })
-  = do { let builtin_passes = getCoreToDo dflags hpt_rule_base extra_vars
+  = do { let builtin_passes = getCoreToDo dflags extra_vars
              orph_mods = mkModuleSet (mod : dep_orphs deps)
              uniq_mask = 's'
 
@@ -133,8 +133,8 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
 ************************************************************************
 -}
 
-getCoreToDo :: DynFlags -> RuleBase -> [Var] -> [CoreToDo]
-getCoreToDo dflags rule_base extra_vars
+getCoreToDo :: DynFlags -> [Var] -> [CoreToDo]
+getCoreToDo dflags extra_vars
   = flatten_todos core_todo
   where
     phases        = simplPhases        dflags
@@ -172,7 +172,7 @@ getCoreToDo dflags rule_base extra_vars
       = CoreDoPasses
       $   [ maybe_strictness_before phase
           , CoreDoSimplify $ initSimplifyOpts dflags extra_vars iter
-                             (initSimplMode dflags phase name) rule_base
+                             (initSimplMode dflags phase name)
           , maybe_rule_check phase ]
 
     -- Run GHC's internal simplification phase, after all rules have run.
@@ -183,7 +183,7 @@ getCoreToDo dflags rule_base extra_vars
     -- See Note [Inline in InitialPhase]
     -- See Note [RULEs enabled in InitialPhase]
     simpl_gently = CoreDoSimplify $ initSimplifyOpts dflags extra_vars max_iter
-                                    (initGentleSimplMode dflags) rule_base
+                                    (initGentleSimplMode dflags)
 
     dmd_cpr_ww = if ww_on then [CoreDoDemand,CoreDoCpr,CoreDoWorkerWrapper]
                           else [CoreDoDemand,CoreDoCpr]
@@ -508,6 +508,7 @@ doCorePass logger hsc_env this_mod rule_base mask loc print_unqual vis_orphs pas
   let fam_envs = (p_fam_env, mg_fam_inst_env guts)
   let dump_simpl_stats = logHasDumpFlag logger Opt_D_dump_simpl_stats
   let prof_count_entries = gopt Opt_ProfCountEntries dflags
+  let !read_ruleenv = readRuleEnv hsc_env guts
 
   let noCounts     x = return (x ,zeroSimplCount dump_simpl_stats)
   let noCountsM    f = (,zeroSimplCount dump_simpl_stats) <$> f
@@ -516,7 +517,7 @@ doCorePass logger hsc_env this_mod rule_base mask loc print_unqual vis_orphs pas
 
   tellSimplCountIO $ case pass of
     CoreDoSimplify opts       -> {-# SCC "Simplify" #-}
-                                 simplifyPgm logger (hsc_unit_env hsc_env) opts guts
+                                 simplifyPgm logger read_ruleenv (hsc_unit_env hsc_env) opts guts
 
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
                                  updateBinds cseProgram
@@ -583,6 +584,19 @@ doCorePass logger hsc_env this_mod rule_base mask loc print_unqual vis_orphs pas
   where
     liftCoreM = tellSimplCountIO . runCoreM
       hsc_env rule_base mask this_mod vis_orphs print_unqual loc
+
+readRuleEnv :: HscEnv -> ModGuts -> IO RuleEnv
+readRuleEnv hsc_env guts = extendRuleEnv base_ruleenv <$> read_eps_rules
+  where
+    this_mod = mg_module guts
+    gwib = GWIB { gwib_mod = moduleName this_mod, gwib_isBoot = NotBoot }
+    hpt_rule_base  = mkRuleBase (hptRules hsc_env (moduleUnitId this_mod) gwib)
+    -- Forcing this value to avoid unnessecary allocations.
+    -- Not doing so results in +25.6% allocations of LargeRecord.
+    !rule_base = extendRuleBaseList hpt_rule_base (mg_rules guts)
+    vis_orphs = this_mod : dep_orphs (mg_deps guts)
+    base_ruleenv = mkRuleEnv rule_base vis_orphs
+    read_eps_rules = eps_rule_base <$> hscEPS hsc_env
 
 {-
 ************************************************************************

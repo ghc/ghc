@@ -11,7 +11,7 @@ import GHC.Driver.Flags
 
 import GHC.Core
 import GHC.Core.EndPass ( dumpPassResult )
-import GHC.Core.Rules   ( extendRuleBaseList, extendRuleEnv, addRuleInfo )
+import GHC.Core.Rules   ( extendRuleEnv, addRuleInfo )
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
@@ -33,7 +33,6 @@ import GHC.Utils.Trace
 import GHC.Unit.Env ( UnitEnv, ueEPS )
 import GHC.Unit.External
 import GHC.Unit.Module.ModGuts
-import GHC.Unit.Module.Deps
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -137,20 +136,19 @@ data SimplifyOpts = SimplifyOpts
   , so_iterations :: !Int
   , so_mode :: !SimplMode
   , so_pass_result_cfg :: !(Maybe LintPassResultConfig)
-  , so_rule_base :: !RuleBase
   , so_top_env_cfg :: !TopEnvConfig
   }
 
 simplifyPgm :: Logger
+            -> IO RuleEnv -- ^ Action to get the current RuleEnv
             -> UnitEnv
             -> SimplifyOpts
             -> ModGuts
             -> IO (ModGuts, SimplCount)  -- New bindings
 
-simplifyPgm logger unit_env opts
+simplifyPgm logger read_ruleenv unit_env opts
             guts@(ModGuts { mg_module = this_mod
                           , mg_rdr_env = rdr_env
-                          , mg_deps = deps
                           , mg_binds = binds, mg_rules = rules
                           , mg_fam_inst_env = fam_inst_env })
   = do { (termination_msg, it_count, counts_out, guts')
@@ -171,7 +169,6 @@ simplifyPgm logger unit_env opts
     dump_core_sizes = so_dump_core_sizes opts
     mode            = so_mode opts
     max_iterations  = so_iterations opts
-    hpt_rule_base   = so_rule_base opts
     top_env_cfg     = so_top_env_cfg opts
     print_unqual    = mkPrintUnqualified unit_env rdr_env
     active_rule     = activeRule mode
@@ -227,15 +224,7 @@ simplifyPgm logger unit_env opts
                 -- value and then combine it when the existing rule base.
                 -- See `GHC.Core.Opt.Simplify.Monad.getSimplRules`.
            eps <- ueEPS unit_env ;
-           let  { -- Forcing this value to avoid unnessecary allocations.
-                  -- Not doing so results in +25.6% allocations of LargeRecord.
-                ; !rule_base = extendRuleBaseList hpt_rule_base rules
-                ; vis_orphs = this_mod : dep_orphs deps
-                ; base_ruleenv = mkRuleEnv rule_base vis_orphs
-                ; read_eps_rules = eps_rule_base <$> ueEPS unit_env
-                ; read_ruleenv = extendRuleEnv base_ruleenv <$> read_eps_rules
-
-                ; fam_envs = (eps_fam_inst_env eps, fam_inst_env)
+           let  { fam_envs = (eps_fam_inst_env eps, fam_inst_env)
                 ; simpl_env = mkSimplEnv mode fam_envs } ;
 
                 -- Simplify the program

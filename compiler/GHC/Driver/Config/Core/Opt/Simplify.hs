@@ -40,8 +40,8 @@ initSimplifyExprOpts dflags ic = SimplifyExprOpts
     }
   }
 
-initSimplifyOpts :: DynFlags -> [Var] -> Int -> SimplMode -> RuleBase -> SimplifyOpts
-initSimplifyOpts dflags extra_vars iterations mode rule_base = SimplifyOpts
+initSimplifyOpts :: DynFlags -> [Var] -> Int -> SimplMode -> SimplifyOpts
+initSimplifyOpts dflags extra_vars iterations mode = SimplifyOpts
   { so_dump_core_sizes = not $ gopt Opt_SuppressCoreSizes dflags
   , so_iterations = iterations
   , so_mode = mode
@@ -53,7 +53,6 @@ initSimplifyOpts dflags extra_vars iterations mode rule_base = SimplifyOpts
       -- there may be some INLINE knots still tied, which is tiresomely noisy
       (sm_phase mode /= InitialPhase)
     else Nothing
-  , so_rule_base = rule_base
   , so_top_env_cfg = TopEnvConfig
       { te_history_size = historySize dflags
       , te_tick_factor = simplTickFactor dflags
