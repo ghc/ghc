@@ -40,7 +40,7 @@
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module GHC.Cmm.Ppr.Decl
-    ( pprCmms, pprCmmGroup, pprSection, pprStatic
+    ( pprCmmGroup, pprSection, pprStatic
     )
 where
 
@@ -55,13 +55,6 @@ import GHC.Utils.Outputable
 import Data.List (intersperse)
 
 import qualified Data.ByteString as BS
-
-
-pprCmms :: (OutputableP Platform info, OutputableP Platform g)
-        => Platform -> [GenCmmGroup RawCmmStatics info g] -> SDoc
-pprCmms platform cmms = pprCode CStyle (vcat (intersperse separator $ map (pdoc platform) cmms))
-        where
-          separator = space $$ text "-------------------" $$ space
 
 -----------------------------------------------------------------------------
 

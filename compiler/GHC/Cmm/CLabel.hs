@@ -1522,7 +1522,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
 
    CC_Label cc   -> maybe_underscore $ ppr cc
    CCS_Label ccs -> maybe_underscore $ ppr ccs
-   IPE_Label (InfoProvEnt l _ _ m _) -> maybe_underscore $ (pprCode CStyle (pdoc platform l) <> text "_" <> ppr m <> text "_ipe")
+   IPE_Label (InfoProvEnt l _ _ m _) -> maybe_underscore $ (pprCLabel platform CStyle l <> text "_" <> ppr m <> text "_ipe")
    ModuleLabel mod kind        -> maybe_underscore $ ppr mod <> text "_" <> ppr kind
 
    CmmLabel _ _ fs CmmCode     -> maybe_underscore $ ftext fs

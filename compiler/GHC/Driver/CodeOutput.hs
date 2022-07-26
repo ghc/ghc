@@ -253,19 +253,17 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
 
      ForeignStubs (CHeader h_code) (CStub c_code _ _) -> do
         let
-            stub_c_output_d = pprCode CStyle c_code
-            stub_c_output_w = showSDoc dflags stub_c_output_d
+            stub_c_output_w = showSDoc dflags $ pprCode CStyle c_code
 
             -- Header file protos for "foreign export"ed functions.
-            stub_h_output_d = pprCode CStyle h_code
-            stub_h_output_w = showSDoc dflags stub_h_output_d
+            stub_h_output_w = showSDoc dflags $ pprCode CStyle h_code
 
         createDirectoryIfMissing True (takeDirectory stub_h)
 
         putDumpFileMaybe logger Opt_D_dump_foreign
                       "Foreign export header file"
                       FormatC
-                      stub_h_output_d
+                      h_code
 
         -- we need the #includes from the rts package for the stub files
         let rts_includes =
@@ -288,7 +286,7 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
                 ("#include <HsFFI.h>\n" ++ cplusplus_hdr) cplusplus_ftr
 
         putDumpFileMaybe logger Opt_D_dump_foreign
-                      "Foreign export stubs" FormatC stub_c_output_d
+                      "Foreign export stubs" FormatC c_code
 
         stub_c_file_exists
            <- outputForeignStubs_help stub_c stub_c_output_w
