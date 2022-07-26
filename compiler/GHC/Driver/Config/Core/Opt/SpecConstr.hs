@@ -5,8 +5,6 @@ import GHC.Driver.Session ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
 
 import GHC.Core.Opt.SpecConstr ( SpecConstrOpts (..) )
 
-import GHC.Unit.Module
-
 initSpecConstrOpts :: DynFlags -> SpecConstrOpts
 initSpecConstrOpts dflags = SpecConstrOpts
   { sc_max_args    = maxWorkerArgs dflags

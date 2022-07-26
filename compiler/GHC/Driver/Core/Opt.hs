@@ -17,14 +17,9 @@ import GHC.Driver.Env
 import GHC.Driver.Config.Core.Lint ( initLintAnnotationsConfig )
 import GHC.Driver.Config.Core.EndPass ( initEndPassConfig )
 import GHC.Driver.Config.Core.Opt ( getCoreToDo )
-import GHC.Driver.Config.Core.Opt.CallerCC ( initCallerCCOpts )
-import GHC.Driver.Config.Core.Opt.SpecConstr ( initSpecConstrOpts )
 import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )
-import GHC.Driver.Config.Core.Opt.LiberateCase ( initLiberateCaseOpts )
-import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyOpts, initSimplMode, initGentleSimplMode )
 import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
-import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core
 import GHC.Core.EndPass  ( endPassIO )
@@ -38,8 +33,7 @@ import GHC.Core.Opt.Config ( CoreToDo(..) )
 import GHC.Core.Opt.Simplify ( simplifyPgm )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Stats        ( SimplCountM, addCounts, runSimplCountM )
-import GHC.Core.Opt.Utils        ( FloatOutSwitches(..)
-                                 , getFirstAnnotationsFromHscEnv )
+import GHC.Core.Opt.Utils        ( getFirstAnnotationsFromHscEnv )
 import GHC.Core.Opt.FloatIn      ( floatInwards )
 import GHC.Core.Opt.FloatOut     ( floatOutwards )
 import GHC.Core.Opt.LiberateCase ( liberateCase )
@@ -75,10 +69,8 @@ import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.SrcLoc ( SrcSpan )
 import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 import GHC.Types.Name.Ppr
-import GHC.Types.Var ( Var )
 
 import Control.Monad
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.Module
 
 {-
