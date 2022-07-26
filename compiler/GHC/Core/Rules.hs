@@ -130,7 +130,7 @@ Note [Overall plumbing for rules]
     (d) Rules in the ExternalPackageTable. These can grow in response
         to lazy demand-loading of interfaces.
 
-* At the moment (c) is carried in a reader-monad way by the GHC.Core.Opt.Utils.
+* At the moment (c) is passed around as an explicit function argument.
   The HomePackageTable doesn't have a single RuleBase because technically
   we should only be able to "see" rules "below" this module; so we
   generate a RuleBase for (c) by combing rules from all the modules
@@ -140,10 +140,10 @@ Note [Overall plumbing for rules]
   [NB: we are inconsistent here.  We should do the same for external
   packages, but we don't.  Same for type-class instances.]
 
-* So in the outer simplifier loop (simplifyPgmIO), we combine (b & c) into a single
+* So in the outer simplifier loop (simplifyPgm), we combine (b & c) into a single
   RuleBase, reading
-     (b) from the ModGuts,
-     (c) from the GHC.Core.Opt.Utils, and
+     (b) from the ModGuts, and receiving
+     (c) as an argument, and
   just before doing rule matching we read
      (d) from its mutable variable
   and combine it with the results from (b & c).
