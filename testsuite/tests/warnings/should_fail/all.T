@@ -16,3 +16,4 @@ test('CaretDiagnostics1',
      ['-fdiagnostics-show-caret -ferror-spans'])
 test('CaretDiagnostics2', normal, compile_fail, ['-fdiagnostics-show-caret'])
 test('T20263', normal, compile_fail, ['-Wunicode-bidirectional-format-characters -Werror'])
+test('T21865', normal, compile_fail, ['-Werror'])
