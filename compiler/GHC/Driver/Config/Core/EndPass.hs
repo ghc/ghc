@@ -8,8 +8,8 @@ import GHC.Driver.Session
 import GHC.Driver.Config.Core.Lint
 
 import GHC.Core.EndPass
-import GHC.Core.Opt.Pipeline.Types
 import GHC.Core.Coercion
+import GHC.Core.Opt.Config
 
 import GHC.Utils.Outputable as Outputable
 

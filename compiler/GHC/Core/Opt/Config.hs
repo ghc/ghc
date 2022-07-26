@@ -1,4 +1,4 @@
-module GHC.Core.Opt.Pipeline.Types (
+module GHC.Core.Opt.Config (
     -- * Configuration of the core-to-core passes
     CorePluginPass, CoreToDo(..),
     pprPassDetails,

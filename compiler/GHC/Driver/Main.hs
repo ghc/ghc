@@ -123,11 +123,12 @@ import GHC.Driver.Config.Stg.Ppr  (initStgPprOpts)
 import GHC.Driver.Config.Stg.Pipeline (initStgPipelineOpts)
 import GHC.Driver.Config.StgToCmm  (initStgToCmmConfig)
 import GHC.Driver.Config.Cmm       (initCmmConfig)
-import GHC.Driver.LlvmConfigCache  (initLlvmConfigCache)
+import GHC.Driver.Core.Opt         ( core2core )
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Tidy
 import GHC.Driver.Hooks
 import GHC.Driver.GenerateCgIPEStub (generateCgIPEStub)
+import GHC.Driver.LlvmConfigCache  (initLlvmConfigCache)
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter ( addSptEntry )
@@ -166,7 +167,6 @@ import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Multiplicity
 import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
-import GHC.Core.Opt.Pipeline
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
