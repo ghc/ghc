@@ -12,7 +12,7 @@ module GHC.Core.Opt.Stats (
     pprSimplCount, plusSimplCount, zeroSimplCount,
     isZeroSimplCount, hasDetailedCounts, Tick(..),
 
-    SimplCountM, runSimplCountM, tellSimplCountIO
+    SimplCountM, runSimplCountM, addCounts
   ) where
 
 import GHC.Prelude
@@ -24,7 +24,7 @@ import GHC.Utils.Outputable as Outputable
 
 import GHC.Data.FastString
 
-import Control.Monad.IO.Class ( MonadIO, liftIO )
+import Control.Monad.IO.Class ( MonadIO )
 import Control.Monad.Trans.State ( StateT, modify, runStateT )
 import Data.List (groupBy, sortBy)
 import Data.Ord
@@ -142,11 +142,8 @@ runSimplCountM
   -> IO (a, SimplCount)
 runSimplCountM dump_simpl_stats m = runStateT (unSimplCountM m) (zeroSimplCount dump_simpl_stats)
 
-tellSimplCountIO :: IO (a, SimplCount) -> SimplCountM a
-tellSimplCountIO m = SimplCountM $ do
-  (res, counts) <- liftIO m
-  modify (`plusSimplCount` counts)
-  return res
+addCounts :: SimplCount -> SimplCountM ()
+addCounts counts = SimplCountM $ modify (`plusSimplCount` counts)
 
 {- Note [Which transformations are innocuous]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
