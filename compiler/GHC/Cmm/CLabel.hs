@@ -1409,19 +1409,19 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
       AsmStyle | use_leading_underscores -> pp_cSEP <> doc
       _                                  -> doc
 
-    tempLabelPrefixOrUnderscore :: Platform -> SDoc
-    tempLabelPrefixOrUnderscore platform = case sty of
+    tempLabelPrefixOrUnderscore :: SDoc
+    tempLabelPrefixOrUnderscore = case sty of
       AsmStyle -> asmTempLabelPrefix platform
       CStyle   -> char '_'
 
 
   in case lbl of
    LocalBlockLabel u -> case sty of
-      AsmStyle -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
-      CStyle   -> tempLabelPrefixOrUnderscore platform <> text "blk_" <> pprUniqueAlways u
+      AsmStyle -> tempLabelPrefixOrUnderscore <> pprUniqueAlways u
+      CStyle   -> tempLabelPrefixOrUnderscore <> text "blk_" <> pprUniqueAlways u
 
    AsmTempLabel u
-      -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
+      -> tempLabelPrefixOrUnderscore <> pprUniqueAlways u
 
    AsmTempDerivedLabel l suf
       -> asmTempLabelPrefix platform
@@ -1471,7 +1471,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
       CStyle   -> ppr name <> ppIdFlavor flavor
 
    SRTLabel u
-      -> maybe_underscore $ tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u <> pp_cSEP <> text "srt"
+      -> maybe_underscore $ tempLabelPrefixOrUnderscore <> pprUniqueAlways u <> pp_cSEP <> text "srt"
 
    RtsLabel (RtsApFast (NonDetFastString str))
       -> maybe_underscore $ ftext str <> text "_fast"
@@ -1511,7 +1511,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
       -> maybe_underscore $ text "SLOW_CALL_fast_" <> text pat <> text "_ctr"
 
    LargeBitmapLabel u
-      -> maybe_underscore $ tempLabelPrefixOrUnderscore platform
+      -> maybe_underscore $ tempLabelPrefixOrUnderscore
                             <> char 'b' <> pprUniqueAlways u <> pp_cSEP <> text "btm"
                             -- Some bitmaps for tuple constructors have a numeric tag (e.g. '7')
                             -- until that gets resolved we'll just force them to start
