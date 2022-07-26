@@ -125,6 +125,12 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
 ************************************************************************
 -}
 
+-- | Run a core pipeline, as specified with a list of 'CoreToDo'.
+--
+-- In typical ussage, the "plannning" of what passes to run (i.e.
+-- creation of the '[CoreToDo]') happens in
+-- 'GHC.Driver.Config.Core.Opt'. Then this function "executes" that
+-- plan.
 runCorePasses :: Logger
               -> HscEnv
               -> RuleBase
@@ -160,6 +166,7 @@ runCorePasses logger hsc_env rule_base loc print_unqual vis_orphs
     dflags = hsc_dflags hsc_env
     this_mod = mg_module guts
 
+-- | Run a single core pass, as specified with a single 'CoreToDo'.
 doCorePass :: Logger
            -> HscEnv
            -> Module
