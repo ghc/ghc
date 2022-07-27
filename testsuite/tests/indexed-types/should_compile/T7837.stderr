@@ -1,7 +1,3 @@
 Rule fired: Class op signum (BUILTIN)
 Rule fired: Class op abs (BUILTIN)
 Rule fired: normalize/Double (T7837)
-Rule fired: Class op eq_sel (BUILTIN)
-Rule fired: Class op $p1Norm (BUILTIN)
-Rule fired: Class op / (BUILTIN)
-Rule fired: Class op norm (BUILTIN)

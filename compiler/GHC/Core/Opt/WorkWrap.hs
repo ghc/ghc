@@ -195,19 +195,47 @@ will not be specialised at call sites in other modules.
 
 This comes up in practice (#6056).
 
-Solution: do the w/w for strictness analysis, but transfer the Stable
-unfolding to the *worker*.  So we will get something like this:
+Solution:
 
-  {-# INLINE[2] f #-}
+* Do the w/w for strictness analysis, even for INLINABLE functions
+
+* Transfer the Stable unfolding to the *worker*.  How do we "transfer
+  the unfolding"? Easy: by using the old one, wrapped in work_fn! See
+  GHC.Core.Unfold.Make.mkWorkerUnfolding.
+
+* We use the /original, user-specified/ function's InlineSpec pragma
+  for both the wrapper and the worker (see `mkStrWrapperInlinePrag`).
+  So if f is INLINEABLE, both worker and wrapper will get an InlineSpec
+  of (Inlinable "blah").
+
+  It's important that both get this, because the specialiser uses
+  the existence of a /user-specified/ INLINE/INLINABLE pragma to
+  drive specialiation of imported functions.  See  GHC.Core.Opt.Specialise
+  Note [Specialising imported functions]
+
+* Remember, the subsequent inlining behaviour of the wrapper is expressed by
+  (a) the stable unfolding
+  (b) the unfolding guidance of UnfWhen
+  (c) the inl_act activation (see Note [Wrapper activation]
+
+For our {-# INLINEABLE f #-} example above, we will get something a
+bit like like this:
+
+  {-# Has stable unfolding, active in phase 2;
+      plus InlineSpec = INLINEABLE #-}
   f :: Ord a => [a] -> Int -> a
   f d x y = case y of I# y' -> fw d x y'
 
-  {-# INLINABLE[2] fw #-}
+  {-# Has stable unfolding, plus InlineSpec = INLINEABLE #-}
   fw :: Ord a => [a] -> Int# -> a
   fw d x y' = let y = I# y' in ...f...
 
-How do we "transfer the unfolding"? Easy: by using the old one, wrapped
-in work_fn! See GHC.Core.Unfold.Make.mkWorkerUnfolding.
+
+(Historical note: we used to always give the wrapper an INLINE pragma,
+but CSE will not happen if there is a user-specified pragma, but
+should happen for w/w’ed things (#14186).  But now we simply propagate
+any user-defined pragma info, so we'll defeat CSE (rightly) only when
+there is a user-supplied INLINE/INLINEABLE pragma.)
 
 Note [No worker/wrapper for record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -495,19 +523,6 @@ specialisation for foo's worker, which we will do too.  That seems
 fine.  (To work reliably, `foo` would need an INLINABLE pragma,
 in which case we don't unpack dictionaries for the worker; see
 see Note [Do not unbox class dictionaries].)
-
-Note [Wrapper NoUserInlinePrag]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We use NoUserInlinePrag on the wrapper, to say that there is no
-user-specified inline pragma. (The worker inherits that; see Note
-[Worker/wrapper for INLINABLE functions].)  The wrapper has no pragma
-given by the user.
-
-(Historical note: we used to give the wrapper an INLINE pragma, but
-CSE will not happen if there is a user-specified pragma, but should
-happen for w/w’ed things (#14186).  We don't need a pragma, because
-everything we needs is expressed by (a) the stable unfolding and (b)
-the inl_act activation.)
 
 Note [Drop absent bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -872,17 +887,19 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
     fn_rules        = ruleInfoRules (ruleInfo fn_info)
 
 mkStrWrapperInlinePrag :: InlinePragma -> [CoreRule] -> InlinePragma
--- See Note [Wrapper activation]
-mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info }) rules
+mkStrWrapperInlinePrag (InlinePragma { inl_inline = fn_inl
+                                     , inl_act    = fn_act
+                                     , inl_rule   = rule_info }) rules
   = InlinePragma { inl_src    = SourceText "{-# INLINE"
-                 , inl_inline = NoUserInlinePrag -- See Note [Wrapper NoUserInlinePrag]
                  , inl_sat    = Nothing
+                 , inl_inline = fn_inl -- See Note [Worker/wrapper for INLINABLE functions]
                  , inl_act    = activeAfter wrapper_phase
+                                -- See Note [Wrapper activation]
                  , inl_rule   = rule_info }  -- RuleMatchInfo is (and must be) unaffected
   where
     -- See Note [Wrapper activation]
     wrapper_phase = foldr (laterPhase . get_rule_phase) earliest_inline_phase rules
-    earliest_inline_phase = beginPhase act `laterPhase` nextPhase InitialPhase
+    earliest_inline_phase = beginPhase fn_act `laterPhase` nextPhase InitialPhase
           -- laterPhase (nextPhase InitialPhase) is a temporary hack
           -- to inline no earlier than phase 2.  I got regressions in
           -- 'mate', due to changes in full laziness due to Note [Case

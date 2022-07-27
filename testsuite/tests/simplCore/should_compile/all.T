@@ -428,3 +428,5 @@ test('T21763', only_ways(['optasm']), compile, ['-O2 -ddump-rules'])
 test('T21763a', only_ways(['optasm']), compile, ['-O2 -ddump-rules'])
 test('T22028', normal, compile, ['-O -ddump-rule-firings'])
 test('T22114', normal, compile, ['-O'])
+test('T21286',  normal, multimod_compile, ['T21286', '-O -ddump-rule-firings'])
+

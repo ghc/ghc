@@ -1636,30 +1636,32 @@ the case on `x` up through the case on `burble`.
 
 Note [Do not unbox class dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have
-   f :: Ord a => [a] -> Int -> a
-   {-# INLINABLE f #-}
-and we worker/wrapper f, we'll get a worker with an INLINABLE pragma
-(see Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap),
-which can still be specialised by the type-class specialiser, something like
-   fw :: Ord a => [a] -> Int# -> a
+We never unbox class dictionaries in worker/wrapper.
 
-BUT if f is strict in the Ord dictionary, we might unpack it, to get
-   fw :: (a->a->Bool) -> [a] -> Int# -> a
-and the type-class specialiser can't specialise that. An example is #6056.
+1. INLINABLE functions
+   If we have
+      f :: Ord a => [a] -> Int -> a
+      {-# INLINABLE f #-}
+   and we worker/wrapper f, we'll get a worker with an INLINABLE pragma
+   (see Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap),
+   which can still be specialised by the type-class specialiser, something like
+      fw :: Ord a => [a] -> Int# -> a
 
-But in any other situation, a dictionary is just an ordinary value,
-and can be unpacked.  So we track the INLINABLE pragma, and discard the boxity
-flag in finaliseArgBoxities (see the isClassPred test).
+   BUT if f is strict in the Ord dictionary, we might unpack it, to get
+      fw :: (a->a->Bool) -> [a] -> Int# -> a
+   and the type-class specialiser can't specialise that. An example is #6056.
 
-Historical note: #14955 describes how I got this fix wrong the first time.
+   Historical note: #14955 describes how I got this fix wrong the first time.
+   I got aware of the issue in T5075 by the change in boxity of loop between
+   demand analysis runs.
 
-Note that the simplicity of this fix implies that INLINE functions (such as
-wrapper functions after the WW run) will never say that they unbox class
-dictionaries. That's not ideal, but not worth losing sleep over, as INLINE
-functions will have been inlined by the time we run demand analysis so we'll
-see the unboxing around the worker in client modules. I got aware of the issue
-in T5075 by the change in boxity of loop between demand analysis runs.
+2. -fspecialise-aggressively.  As #21286 shows, the same phenomenon can occur
+   occur without INLINABLE, when we use -fexpose-all-unfoldings and
+   -fspecialise-aggressively to do vigorous cross-module specialisation.
+
+TL;DR we /never/ unbox class dictionaries. Unboxing the dictionary, and passing
+a raft of higher-order functions isn't a huge win anyway -- you really want to
+specialise the function.
 
 Note [Worker argument budget]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1725,7 +1727,6 @@ finaliseArgBoxities env fn arity rhs div
     -- uses the info on the binders directly.
   where
     opts            = ae_opts env
-    is_inlinable_fn = isStableUnfolding (realIdUnfolding fn)
     (bndrs, _body)  = collectBinders rhs
     max_wkr_args    = dmd_max_worker_args opts `max` arity
                       -- See Note [Worker argument budget]
@@ -1743,8 +1744,7 @@ finaliseArgBoxities env fn arity rhs div
 
     get_dmd :: Id -> Type -> Demand
     get_dmd bndr bndr_ty
-      | isClassPred bndr_ty
-      , is_inlinable_fn = trimBoxity dmd
+      | isClassPred bndr_ty = trimBoxity dmd
         -- See Note [Do not unbox class dictionaries]
         -- NB: 'ty' has not been normalised, so this will (rightly)
         --     catch newtype dictionaries too.

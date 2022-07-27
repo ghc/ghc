@@ -193,25 +193,40 @@ specUnfolding to specialise its unfolding.  Some important points:
   must do so too!  Otherwise we lose the magic rules that make it
   interact with ClassOps
 
-* There is a bit of hack for INLINABLE functions:
-     f :: Ord a => ....
-     f = <big-rhs>
-     {- INLINABLE f #-}
-  Now if we specialise f, should the specialised version still have
-  an INLINABLE pragma?  If it does, we'll capture a specialised copy
-  of <big-rhs> as its unfolding, and that probably won't inline.  But
-  if we don't, the specialised version of <big-rhs> might be small
-  enough to inline at a call site. This happens with Control.Monad.liftM3,
-  and can cause a lot more allocation as a result (nofib n-body shows this).
+* For a /stable/ CoreUnfolding, we specialise the unfolding, no matter
+  how big, iff it has UnfWhen guidance.  This happens for INLINE
+  functions, and for wrappers.  For these, it would be very odd if a
+  function marked INLINE was specialised (because of some local use),
+  and then forever after (including importing modules) the specialised
+  version wasn't INLINEd!  After all, the programmer said INLINE.
 
-  Moreover, keeping the INLINABLE thing isn't much help, because
+* However, for a stable CoreUnfolding with guidance UnfoldIfGoodArgs,
+  which arises from INLINABLE functions, we drop the unfolding.
+  See #4874 for persuasive examples.  Suppose we have
+    {-# INLINABLE f #-}
+    f :: Ord a => [a] -> Int f xs = letrec f' = ...f'... in f'
+
+  Then, when f is specialised and optimised we might get
+    wgo :: [Int] -> Int#
+    wgo = ...wgo...
+    f_spec :: [Int] -> Int
+    f_spec xs = case wgo xs of { r -> I# r }
+
+  and we clearly want to inline f_spec at call sites.  But if we still
+  have the big, un-optimised of f (albeit specialised) captured in the
+  stable unfolding for f_spec, we won't get that optimisation.
+
+  This happens with Control.Monad.liftM3, and can cause a lot more
+  allocation as a result (nofib n-body shows this).
+
+  Moreover, keeping the stable unfoldign isn't much help, because
   the specialised function (probably) isn't overloaded any more.
 
-  Conclusion: drop the INLINEABLE pragma.  In practice what this means is:
-     if a stable unfolding has UnfoldingGuidance of UnfWhen,
-        we keep it (so the specialised thing too will always inline)
-     if a stable unfolding has UnfoldingGuidance of UnfIfGoodArgs
-        (which arises from INLINABLE), we discard it
+  TL;DR: we simply drop the stable unfolding when specialising. It's
+  not really a complete solution; ignoring specialisation for now,
+  INLINABLE functions don't get properly strictness analysed, for
+  example. But it works well for examples involving specialisation,
+  which is the dominant use of INLINABLE.
 
 Note [Honour INLINE on 0-ary bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
