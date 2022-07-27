@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Generate a module cycle of size $DEPTH, and a bunch of other modules of size $WIDTH.
+# The goal is to get GHC to compile one of the W* modules, whilst it is compiling the loop.
+# Therefore the W module contains 300 definitions whlst each module in the loop contains 100, so
+# at first the only thing GHC can do is compile W and the H modules. Once we are done compiling
+# W then all the W* modules can start which should be at the same time as the H loop is being compiled.
+DEPTH=8
+WIDTH=40
+echo "module JSpace where" > JSpace.hs
+echo "module W where" > W.hs
+  for j in $(seq -w 1 300); do
+    echo "w$j = 123" >> W.hs;
+  done
+for i in $(seq -w 1 $WIDTH); do
+  echo "module W$i where" > W$i.hs;
+  echo "import W" >> W$i.hs;
+  echo "import W$i" >> JSpace.hs;
+  for j in $(seq -w 1 1000); do
+    echo "w$j = 123" >> W$i.hs;
+  done
+done
+echo "module H0 where" > H0.hs;
+echo "import {-# SOURCE #-} H$DEPTH" >> H0.hs;
+echo "import H$DEPTH" >> JSpace.hs;
+for i in $(seq -w 1 $DEPTH); do
+  echo "module H$i where" > H$i.hs;
+  echo "import H$((i-1))" >> H$i.hs;
+  for j in $(seq -w 1 100); do
+    echo "h$j = 123" >> H$i.hs;
+  done
+done
+echo "module H$DEPTH where" > H$DEPTH.hs-boot;
