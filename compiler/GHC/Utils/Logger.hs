@@ -201,6 +201,7 @@ data DumpFormat
    | FormatByteCode  -- ^ ByteCode
    | FormatCMM       -- ^ Cmm
    | FormatASM       -- ^ Assembly code
+   | FormatWASM      -- ^ WebAssembly code (textual form)
    | FormatC         -- ^ C code/header
    | FormatLLVM      -- ^ LLVM bytecode
    | FormatText      -- ^ Unstructured dump
@@ -611,4 +612,3 @@ class HasLogger m where
 
 class ContainsLogger t where
     extractLogger :: t -> Logger
-
