@@ -97,7 +97,6 @@ inTreeCompilerArgs stg = do
     leadingUnderscore   <- flag LeadingUnderscore
     -- MP: This setting seems to only dictate whether we turn on optasm as a compiler
     -- way, but a lot of tests which use only_ways(optasm) seem to not test the NCG?
-    withNativeCodeGen   <- return True
     withInterpreter     <- ghcWithInterpreter
     unregisterised      <- flag GhcUnregisterised
     withSMP             <- targetSupportsSMP
@@ -106,6 +105,11 @@ inTreeCompilerArgs stg = do
 
     os          <- setting HostOs
     arch        <- setting TargetArch
+    let codegen_arches = ["x86_64", "i386", "powerpc", "powerpc64", "powerpc64le", "aarch64"]
+    let withNativeCodeGen
+          | unregisterised = False
+          | arch `elem` codegen_arches = True
+          | otherwise = False
     platform    <- setting TargetPlatform
     wordsize    <- (show @Int . (*8) . read) <$> setting TargetWordSize
 
