@@ -13,6 +13,7 @@ module GHC.Core.Opt.Simplify.Monad (
 
         -- Unique supply
         MonadUnique(..), newId, newJoinId,
+        simplMask,
 
         -- Counting
         SimplCount, tick, freeTick, checkedTick,

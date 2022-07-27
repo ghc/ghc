@@ -7,16 +7,14 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TupleSections #-}
 
-module GHC.Driver.Core.Opt ( core2core ) where
+module GHC.Driver.Core.Opt ( runCorePasses ) where
 
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
 import GHC.Driver.Config.Core.Lint ( initLintAnnotationsConfig )
 import GHC.Driver.Config.Core.EndPass ( initEndPassConfig )
-import GHC.Driver.Config.Core.Opt ( getCoreToDo )
 import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )
 import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
@@ -32,7 +30,7 @@ import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Opt.Config ( CoreToDo(..) )
 import GHC.Core.Opt.Simplify ( simplifyPgm )
 import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Opt.Stats        ( SimplCountM, addCounts, runSimplCountM )
+import GHC.Core.Opt.Stats        ( SimplCountM, addCounts )
 import GHC.Core.Opt.Utils        ( getFirstAnnotationsFromHscEnv )
 import GHC.Core.Opt.FloatIn      ( floatInwards )
 import GHC.Core.Opt.FloatOut     ( floatOutwards )
@@ -68,54 +66,9 @@ import GHC.Types.Basic
 import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.SrcLoc ( SrcSpan )
 import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
-import GHC.Types.Name.Ppr
 
 import Control.Monad
 import GHC.Unit.Module
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{The driver for the simplifier}
-*                                                                      *
-************************************************************************
--}
-
-core2core :: HscEnv -> ModGuts -> IO ModGuts
-core2core hsc_env guts@(ModGuts { mg_module  = mod
-                                , mg_loc     = loc
-                                , mg_deps    = deps
-                                , mg_rdr_env = rdr_env })
-  = do { let builtin_passes = getCoreToDo dflags extra_vars
-             orph_mods = mkModuleSet (mod : dep_orphs deps)
-
-       ; (guts2, stats) <- runSimplCountM dump_simpl_stats $ do
-           (all_passes, sc) <- liftIO $ runPlugin hsc_env guts $
-             withPlugins (hsc_plugins hsc_env) installCoreToDos builtin_passes
-           addCounts sc
-           runCorePasses logger hsc_env hpt_rule_base loc
-                         print_unqual orph_mods all_passes guts
-
-       ; Logger.putDumpFileMaybe logger Opt_D_dump_simpl_stats
-             "Grand total simplifier statistics"
-             FormatText
-             (pprSimplCount stats)
-
-       ; return guts2 }
-  where
-    dflags           = hsc_dflags hsc_env
-    logger           = hsc_logger hsc_env
-    dump_simpl_stats = logHasDumpFlag logger Opt_D_dump_simpl_stats
-    extra_vars       = interactiveInScope (hsc_IC hsc_env)
-    home_pkg_rules   = hptRules hsc_env (moduleUnitId mod) (GWIB { gwib_mod = moduleName mod
-                                                                 , gwib_isBoot = NotBoot })
-    hpt_rule_base  = mkRuleBase home_pkg_rules
-    print_unqual   = mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env
-    -- mod: get the module out of the current HscEnv so we can retrieve it from the monad.
-    -- This is very convienent for the users of the monad (e.g. plugins do not have to
-    -- consume the ModGuts to find the module) but somewhat ugly because mg_module may
-    -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
-    -- would mean our cached value would go out of date.
 
 {-
 ************************************************************************
@@ -253,9 +206,7 @@ doCorePass logger hsc_env this_mod rule_base loc print_unqual vis_orphs pass gut
                                                print_unqual vis_orphs passes guts
 
     CoreDoPluginPass _ p      -> {-# SCC "Plugin" #-} do
-                                 (guts', sc) <- liftIO $ runPlugin hsc_env guts $ p guts
-                                 addCounts sc
-                                 return guts'
+                                 liftCoreMToSimplCountM hsc_env guts $ p guts
   where
     updateBinds f = return $ guts { mg_binds = f (mg_binds guts) }
 
@@ -275,22 +226,6 @@ readRuleEnv hsc_env guts = extendRuleEnv base_ruleenv <$> read_eps_rules
     vis_orphs = this_mod : dep_orphs (mg_deps guts)
     base_ruleenv = mkRuleEnv rule_base vis_orphs
     read_eps_rules = eps_rule_base <$> hscEPS hsc_env
-
-runPlugin :: HscEnv -> ModGuts -> CoreM a -> IO (a, SimplCount)
-runPlugin hsc_env guts m
-  = runCoreM hsc_env hpt_rule_base simplMask mod orph_mods print_unqual loc m
-  where
-    mod = mg_module guts
-    loc = mg_loc guts
-    orph_mods = mkModuleSet (mod : dep_orphs (mg_deps guts))
-    gwib = GWIB { gwib_mod = moduleName mod, gwib_isBoot = NotBoot }
-    hpt_rule_base = mkRuleBase (hptRules hsc_env (moduleUnitId mod) gwib)
-    print_unqual = mkPrintUnqualified (hsc_unit_env hsc_env) (mg_rdr_env guts)
-
--- TODO: This is the same as in GHC.Core.Opt.Simplify.Monad
--- TODO: Link to note
-simplMask :: Char
-simplMask = 's'
 
 {-
 ************************************************************************

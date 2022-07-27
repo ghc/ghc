@@ -27,6 +27,7 @@ module GHC.Plugins.Monad (
 
     -- ** Lifting into the monad
     liftIO, liftIOWithCount,
+    liftCoreMToSimplCountM,
 
     -- ** Dealing with annotations
     getAnnotations, getFirstAnnotations,
@@ -43,7 +44,12 @@ import GHC.Driver.Session
 import GHC.Driver.Env
 
 import GHC.Core
-import GHC.Core.Opt.Stats ( SimplCount, zeroSimplCount, plusSimplCount )
+import GHC.Core.Rules ( mkRuleBase )
+import GHC.Core.Opt.Simplify.Monad ( simplMask )
+import GHC.Core.Opt.Stats
+  ( SimplCountM, addCounts
+  , SimplCount, zeroSimplCount, plusSimplCount
+  )
 import GHC.Core.Opt.Utils
 
 import GHC.Runtime.Context ( InteractiveContext )
@@ -52,6 +58,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Error
+import GHC.Types.Name.Ppr ( mkPrintUnqualified )
 
 import GHC.Utils.Error ( errorDiagnostic )
 import GHC.Utils.Outputable as Outputable
@@ -62,6 +69,7 @@ import GHC.Data.IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified GHC.Data.IOEnv  as IOEnv
 
 import GHC.Unit.Module
+import GHC.Unit.Module.Deps
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.External
 
@@ -180,6 +188,20 @@ runCoreM hsc_env rule_base mask mod orph_imps print_unqual loc m
 
     extract :: (a, CoreWriter) -> (a, SimplCount)
     extract (value, writer) = (value, cw_simpl_count writer)
+
+
+liftCoreMToSimplCountM :: HscEnv -> ModGuts -> CoreM a -> SimplCountM a
+liftCoreMToSimplCountM hsc_env guts m = do
+    (a, sc) <- liftIO $ runCoreM hsc_env hpt_rule_base simplMask mod orph_mods print_unqual loc m
+    addCounts sc
+    pure a
+  where
+    mod = mg_module guts
+    loc = mg_loc guts
+    orph_mods = mkModuleSet (mod : dep_orphs (mg_deps guts))
+    gwib = GWIB { gwib_mod = moduleName mod, gwib_isBoot = NotBoot }
+    hpt_rule_base = mkRuleBase (hptRules hsc_env (moduleUnitId mod) gwib)
+    print_unqual = mkPrintUnqualified (hsc_unit_env hsc_env) (mg_rdr_env guts)
 
 {-
 ************************************************************************
