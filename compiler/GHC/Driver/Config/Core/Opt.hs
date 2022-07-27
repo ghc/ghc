@@ -23,7 +23,7 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core.Opt.Config ( CoreToDo(..) )
-import GHC.Core.Opt.Utils ( FloatOutSwitches(..) )
+import GHC.Core.Opt.FloatOutSwitches ( FloatOutSwitches(..) )
 
 import GHC.Types.Basic
 import GHC.Types.Var ( Var )

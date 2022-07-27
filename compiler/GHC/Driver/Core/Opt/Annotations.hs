@@ -3,11 +3,8 @@
 
 -}
 
-module GHC.Core.Opt.Utils (
-    -- * Configuration of the core-to-core passes
-    FloatOutSwitches(..),
-
-    -- ** Dealing with annotations
+-- | Dealing with annotations
+module GHC.Driver.Core.Opt.Annotations (
     getAnnotationsFromHscEnv, getFirstAnnotationsFromHscEnv,
   ) where
 
@@ -17,9 +14,6 @@ import GHC.Driver.Env ( HscEnv, prepareAnnotations )
 
 import GHC.Types.Annotations
 import GHC.Types.Name.Env
-import GHC.Types.Error
-
-import GHC.Utils.Outputable
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
@@ -27,44 +21,6 @@ import GHC.Unit.Module.ModGuts
 import Data.Bifunctor ( bimap )
 import Data.Typeable ( Typeable )
 import Data.Word ( Word8 )
-
-data FloatOutSwitches = FloatOutSwitches {
-  floatOutLambdas   :: Maybe Int,  -- ^ Just n <=> float lambdas to top level, if
-                                   -- doing so will abstract over n or fewer
-                                   -- value variables
-                                   -- Nothing <=> float all lambdas to top level,
-                                   --             regardless of how many free variables
-                                   -- Just 0 is the vanilla case: float a lambda
-                                   --    iff it has no free vars
-
-  floatOutConstants :: Bool,       -- ^ True <=> float constants to top level,
-                                   --            even if they do not escape a lambda
-  floatOutOverSatApps :: Bool,
-                             -- ^ True <=> float out over-saturated applications
-                             --            based on arity information.
-                             -- See Note [Floating over-saturated applications]
-                             -- in GHC.Core.Opt.SetLevels
-  floatToTopLevelOnly :: Bool      -- ^ Allow floating to the top level only.
-  }
-
-instance Outputable FloatOutSwitches where
-    ppr = pprFloatOutSwitches
-
-pprFloatOutSwitches :: FloatOutSwitches -> SDoc
-pprFloatOutSwitches sw
-  = text "FOS" <+> (braces $
-     sep $ punctuate comma $
-     [ text "Lam ="    <+> ppr (floatOutLambdas sw)
-     , text "Consts =" <+> ppr (floatOutConstants sw)
-     , text "OverSatApps ="   <+> ppr (floatOutOverSatApps sw) ])
-
-{-
-************************************************************************
-*                                                                      *
-             Dealing with annotations
-*                                                                      *
-************************************************************************
--}
 
 -- | Get all annotations of a given type. This happens lazily, that is
 -- no deserialization will take place until the [a] is actually demanded and

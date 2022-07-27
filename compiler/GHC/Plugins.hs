@@ -18,7 +18,7 @@ module GHC.Plugins
    , module GHC.Types.PkgQual
    , module GHC.Core.Opt.Config
    , module GHC.Core.Opt.Stats
-   , module GHC.Core.Opt.Utils
+   , module GHC.Core.Opt.FloatOutSwitches
    , module GHC.Plugins.Monad
    , module GHC.Core
    , module GHC.Types.Literal
@@ -87,7 +87,7 @@ import GHC.Types.Id.Info
 -- Core
 import GHC.Core.Opt.Config
 import GHC.Core.Opt.Stats
-import GHC.Core.Opt.Utils
+import GHC.Core.Opt.FloatOutSwitches
 import GHC.Core
 import GHC.Types.Literal
 import GHC.Core.DataCon

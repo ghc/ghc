@@ -51,7 +51,7 @@ GHC.Core.Opt.Simplify.Monad
 GHC.Core.Opt.Simplify.Utils
 GHC.Core.Opt.SpecConstr
 GHC.Core.Opt.Stats
-GHC.Core.Opt.Utils
+GHC.Core.Opt.FloatOutSwitches
 GHC.Core.Opt.WorkWrap.Utils
 GHC.Core.PatSyn
 GHC.Core.Ppr

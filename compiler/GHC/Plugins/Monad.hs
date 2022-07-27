@@ -40,13 +40,13 @@ module GHC.Plugins.Monad (
 import GHC.Prelude hiding ( read )
 
 import GHC.Driver.Session
+import GHC.Driver.Core.Opt.Annotations
 import GHC.Driver.Env hiding ( getHscEnv )
 
 import GHC.Core
 import GHC.Core.Opt.Stats
   ( SimplCount, zeroSimplCount, plusSimplCount
   )
-import GHC.Core.Opt.Utils
 
 import GHC.Runtime.Context ( InteractiveContext )
 
