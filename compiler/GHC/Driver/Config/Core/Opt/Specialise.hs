@@ -4,7 +4,7 @@ module GHC.Driver.Config.Core.Opt.Specialise
 
 import GHC.Prelude
 
-import GHC.Core.Opt.Specialise ( SpecialiseOpts (..) )
+import GHC.Core.Opt.Specialise.Config ( SpecialiseOpts (..) )
 
 import GHC.Driver.Config ( initSimpleOpts )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )

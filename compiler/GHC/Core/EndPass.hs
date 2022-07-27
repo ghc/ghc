@@ -16,7 +16,7 @@ module GHC.Core.EndPass (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.Flags ( DumpFlag (..) )
 
 import GHC.Core
 import GHC.Core.Lint

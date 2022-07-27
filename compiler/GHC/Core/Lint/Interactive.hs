@@ -33,7 +33,7 @@ interactiveInScope :: InteractiveContext -> [Var]
 --
 -- We do this by find local-named things that may appear free in interactive
 -- context.  This function is pretty revolting and quite possibly not quite right.
--- When we are not in GHCi, the interactive context (hsc_IC hsc_env) is empty
+-- When we are not in GHCi, the interactive context is empty
 -- so this is a (cheap) no-op.
 --
 -- See #8215 for an example

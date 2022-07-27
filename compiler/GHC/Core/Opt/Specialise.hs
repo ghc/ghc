@@ -9,7 +9,7 @@
 -}
 
 module GHC.Core.Opt.Specialise
-  ( SpecialiseOpts(..), specProgram, specUnfolding
+  ( specProgram, specUnfolding
   ) where
 
 import GHC.Prelude
@@ -24,13 +24,13 @@ import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
 import GHC.Core.Rules
-import GHC.Core.SimpleOpt ( SimpleOpts )
 import GHC.Core.Utils     ( exprIsTrivial
                           , mkCast, exprType
                           , stripTicksTop )
 import GHC.Core.FVs
 import GHC.Core.TyCo.Rep (TyCoBinder (..))
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
+import GHC.Core.Opt.Specialise.Config
 
 import GHC.Builtin.Types  ( unboxedUnitTy )
 
@@ -1087,18 +1087,6 @@ the specialisations for imported bindings recursive.
 *                                                                      *
 ************************************************************************
 -}
-
-data SpecialiseOpts = SpecialiseOpts
-  { so_uniq_mask :: !Char
-  , so_unqual :: !PrintUnqualified
-  , so_cross_module_specialise :: !Bool
-  , so_specialise_aggressively :: !Bool
-  , so_warn_missed_specs :: !(Maybe MessageClass)
-  , so_warn_all_missed_specs :: !(Maybe MessageClass)
-  , so_sdoc_context :: !SDocContext
-  , so_simpl_opts :: !SimpleOpts
-  , so_rule_opts :: !RuleOpts
-  }
 
 data SpecEnv
   = SE { se_opts :: SpecialiseOpts
