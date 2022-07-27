@@ -16,7 +16,7 @@ import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
 import GHC.Core.Opt.Arity ( exprArity, etaExpand )
-import GHC.Core.Opt.Utils ( FloatOutSwitches(..) )
+import GHC.Core.Opt.FloatOutSwitches ( FloatOutSwitches(..) )
 
 import GHC.Driver.Flags  ( DumpFlag (..) )
 import GHC.Utils.Logger

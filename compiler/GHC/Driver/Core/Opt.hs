@@ -6,6 +6,7 @@ import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Driver.Env
 import GHC.Driver.Core.Rules ( readRuleEnv )
+import GHC.Driver.Core.Opt.Annotations ( getFirstAnnotationsFromHscEnv )
 import GHC.Driver.Config.Core.Lint ( initLintAnnotationsConfig )
 import GHC.Driver.Config.Core.EndPass ( initEndPassConfig )
 import GHC.Driver.Config.Core.Opt ( getCoreToDo )
@@ -20,7 +21,6 @@ import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Rules ( mkRuleBase )
 import GHC.Core.Opt ( CoreOptEnv (..), runCorePasses )
 import GHC.Core.Opt.Stats    ( SimplCountM, runSimplCountM, pprSimplCount )
-import GHC.Core.Opt.Utils    ( getFirstAnnotationsFromHscEnv )
 
 import GHC.Unit
 import GHC.Unit.Module.ModGuts

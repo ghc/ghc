@@ -318,6 +318,7 @@ Library
         GHC.Core.Opt.Exitify
         GHC.Core.Opt.FloatIn
         GHC.Core.Opt.FloatOut
+        GHC.Core.Opt.FloatOutSwitches
         GHC.Core.Opt.LiberateCase
         GHC.Core.Opt.OccurAnal
         GHC.Core.Opt.SetLevels
@@ -331,7 +332,6 @@ Library
         GHC.Core.Opt.Specialise.Config
         GHC.Core.Opt.StaticArgs
         GHC.Core.Opt.Stats
-        GHC.Core.Opt.Utils
         GHC.Core.Opt.WorkWrap
         GHC.Core.Opt.WorkWrap.Utils
         GHC.Core.PatSyn
@@ -430,6 +430,7 @@ Library
         GHC.Driver.Config.StgToCmm
         GHC.Driver.Config.Tidy
         GHC.Driver.Core.Opt
+        GHC.Driver.Core.Opt.Annotations
         GHC.Driver.Core.Rules
         GHC.Driver.Env
         GHC.Driver.Env.KnotVars

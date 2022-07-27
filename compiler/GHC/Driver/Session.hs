@@ -495,7 +495,7 @@ data DynFlags = DynFlags {
                                         --   this feature. See 'GHC.StgToCmm.Config'.
   liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
-                                        --   See 'GHC.Core.Opt.Utils.FloatOutSwitches'
+                                        --   See 'GHC.Core.Opt.FloatOutSwitches.FloatOutSwitches'
 
   liftLamsRecArgs       :: Maybe Int,   -- ^ Maximum number of arguments after lambda lifting a
                                         --   recursive function.

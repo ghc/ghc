@@ -16,7 +16,7 @@ import GHC.Core.Opt.Specialise.Config ( SpecialiseOpts(..) )
 import GHC.Core.Opt.SpecConstr ( SpecConstrOpts )
 import GHC.Core.Opt.WorkWrap ( WwOpts )
 
-import GHC.Core.Opt.Utils ( FloatOutSwitches )
+import GHC.Core.Opt.FloatOutSwitches ( FloatOutSwitches )
 
 import GHC.Platform ( Platform )
 import GHC.Plugins.Monad ( CoreM )
