@@ -115,7 +115,6 @@ import GHC.Driver.CodeOutput
 import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
 import GHC.Driver.Config.Core.Lint ( defaultLintFlags, maybeInitLintPassResultConfig )
 import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
-import GHC.Driver.Config.Core.Opt ( getCoreToDo )
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyExprOpts )
 import GHC.Driver.Config.CoreToStg.Prep
 import GHC.Driver.Config.Logger   (initLogFlags)
@@ -124,7 +123,7 @@ import GHC.Driver.Config.Stg.Ppr  (initStgPprOpts)
 import GHC.Driver.Config.Stg.Pipeline (initStgPipelineOpts)
 import GHC.Driver.Config.StgToCmm  (initStgToCmmConfig)
 import GHC.Driver.Config.Cmm       (initCmmConfig)
-import GHC.Driver.Core.Opt         ( runCorePasses )
+import GHC.Driver.Core.Opt         ( hscSimplify, hscSimplify' )
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Tidy
 import GHC.Driver.Hooks
@@ -133,11 +132,8 @@ import GHC.Driver.LlvmConfigCache  (initLlvmConfigCache)
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter ( addSptEntry )
-import GHC.Runtime.Loader      ( initializePlugins )
 import GHCi.RemoteTypes        ( ForeignHValue )
 import GHC.ByteCode.Types
-
-import GHC.Plugins.Monad ( liftCoreMToSimplCountM )
 
 import GHC.Linker.Loader
 import GHC.Linker.Types
@@ -177,7 +173,6 @@ import GHC.Core.Rules
 import GHC.Core.Stats
 import GHC.Core.LateCC (addLateCostCentresPgm)
 import GHC.Core.Opt.Simplify ( simplifyExpr )
-import GHC.Core.Opt.Stats    ( runSimplCountM, pprSimplCount )
 
 import GHC.CoreToStg.Prep
 import GHC.CoreToStg    ( coreToStg )
@@ -367,9 +362,6 @@ clearDiagnostics = Hsc $ \_ _ -> return ((), emptyMessages)
 
 logDiagnostics :: Messages GhcMessage -> Hsc ()
 logDiagnostics w = Hsc $ \_ w0 -> return ((), w0 `unionMessages` w)
-
-getHscEnv :: Hsc HscEnv
-getHscEnv = Hsc $ \e w -> return (e, w)
 
 handleWarnings :: Hsc ()
 handleWarnings = do
@@ -1617,64 +1609,6 @@ hscGetSafeMode :: TcGblEnv -> Hsc SafeHaskellMode
 hscGetSafeMode tcg_env = do
     dflags  <- getDynFlags
     liftIO $ finalSafeMode dflags tcg_env
-
---------------------------------------------------------------
--- Simplifiers
---------------------------------------------------------------
-
--- | Run Core2Core simplifier. The list of String is a list of (Core) plugin
--- module names added via TH (cf 'addCorePlugin').
-hscSimplify :: HscEnv -> [String] -> ModGuts -> IO ModGuts
-hscSimplify hsc_env plugins modguts =
-    runHsc hsc_env $ hscSimplify' plugins modguts
-
--- | Run Core2Core simplifier. The list of String is a list of (Core) plugin
--- module names added via TH (cf 'addCorePlugin').
-hscSimplify' :: [String] -> ModGuts -> Hsc ModGuts
-hscSimplify' plugins ds_result = do
-    hsc_env <- getHscEnv
-    hsc_env_with_plugins <- if null plugins -- fast path
-        then return hsc_env
-        else liftIO $ initializePlugins
-                    $ hscUpdateFlags (\dflags -> foldr addPluginModuleName dflags plugins)
-                      hsc_env
-    {-# SCC "Core2Core" #-}
-      liftIO $ core2core hsc_env_with_plugins ds_result
-
-core2core :: HscEnv -> ModGuts -> IO ModGuts
-core2core hsc_env guts@(ModGuts { mg_module  = mod
-                                , mg_loc     = loc
-                                , mg_deps    = deps
-                                , mg_rdr_env = rdr_env })
-  = do { let builtin_passes = getCoreToDo dflags extra_vars
-             orph_mods = mkModuleSet (mod : dep_orphs deps)
-
-       ; (guts2, stats) <- runSimplCountM dump_simpl_stats $ do
-           all_passes <- liftCoreMToSimplCountM hsc_env guts $
-             withPlugins (hsc_plugins hsc_env) installCoreToDos builtin_passes
-           runCorePasses logger hsc_env hpt_rule_base loc
-                         print_unqual orph_mods all_passes guts
-
-       ; Logger.putDumpFileMaybe logger Opt_D_dump_simpl_stats
-             "Grand total simplifier statistics"
-             FormatText
-             (pprSimplCount stats)
-
-       ; return guts2 }
-  where
-    dflags           = hsc_dflags hsc_env
-    logger           = hsc_logger hsc_env
-    dump_simpl_stats = logHasDumpFlag logger Opt_D_dump_simpl_stats
-    extra_vars       = interactiveInScope (hsc_IC hsc_env)
-    home_pkg_rules   = hptRules hsc_env (moduleUnitId mod) (GWIB { gwib_mod = moduleName mod
-                                                                 , gwib_isBoot = NotBoot })
-    hpt_rule_base  = mkRuleBase home_pkg_rules
-    print_unqual   = mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env
-    -- mod: get the module out of the current HscEnv so we can retrieve it from the monad.
-    -- This is very convienent for the users of the monad (e.g. plugins do not have to
-    -- consume the ModGuts to find the module) but somewhat ugly because mg_module may
-    -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
-    -- would mean our cached value would go out of date.
 
 --------------------------------------------------------------
 -- Interface generators

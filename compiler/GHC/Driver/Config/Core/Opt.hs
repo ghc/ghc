@@ -13,9 +13,13 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Config.Core.Opt.CallerCC ( initCallerCCOpts )
+import GHC.Driver.Config.Core.Opt.DmdAnal ( initDmdAnalOpts )
 import GHC.Driver.Config.Core.Opt.SpecConstr ( initSpecConstrOpts )
+import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )
 import GHC.Driver.Config.Core.Opt.LiberateCase ( initLiberateCaseOpts )
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyOpts, initSimplMode, initGentleSimplMode )
+import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
+import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core.Opt.Config ( CoreToDo(..) )
@@ -63,10 +67,10 @@ getCoreToDo dflags extra_vars
     do_presimplify = do_specialise -- TODO: any other optimizations benefit from pre-simplification?
     do_simpl3      = const_fold || rules_on -- TODO: any other optimizations benefit from three-phase simplification?
 
-    maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
+    maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck (initRuleOpts dflags) phase)
 
     maybe_strictness_before (Phase phase)
-      | phase `elem` strictnessBefore dflags = CoreDoDemand
+      | phase `elem` strictnessBefore dflags = coreDoDemand dflags
     maybe_strictness_before _
       = CoreDoNothing
 
@@ -87,8 +91,8 @@ getCoreToDo dflags extra_vars
     simpl_gently = CoreDoSimplify $ initSimplifyOpts dflags extra_vars max_iter
                                     (initGentleSimplMode dflags)
 
-    dmd_cpr_ww = [CoreDoDemand, CoreDoCpr] ++
-      if ww_on then [CoreDoWorkerWrapper]
+    dmd_cpr_ww = [coreDoDemand dflags, CoreDoCpr] ++
+      if ww_on then [CoreDoWorkerWrapper $ \mod fam_env -> initWorkWrapOpts mod dflags fam_env]
                else []
 
 
@@ -132,7 +136,7 @@ getCoreToDo dflags extra_vars
 
         -- Specialisation is best done before full laziness
         -- so that overloaded functions have all their dictionary lambdas manifest
-        runWhen do_specialise CoreDoSpecialising,
+        runWhen do_specialise $ coreDoSpecialising dflags,
 
         if full_laziness then
            CoreDoFloatOutwards FloatOutSwitches {
@@ -241,7 +245,7 @@ getCoreToDo dflags extra_vars
         maybe_rule_check FinalPhase,
 
         runWhen late_specialise $ CoreDoPasses
-           [ CoreDoSpecialising, simplify "post-late-spec"],
+           [ coreDoSpecialising dflags, simplify "post-late-spec"],
 
         -- LiberateCase can yield new CSE opportunities because it peels
         -- off one layer of a recursive function (concretely, I saw this
@@ -261,7 +265,7 @@ getCoreToDo dflags extra_vars
         -- has run at all. See Note [Final Demand Analyser run] in GHC.Core.Opt.DmdAnal
         -- It is EXTREMELY IMPORTANT to run this pass, otherwise execution
         -- can become /exponentially/ more expensive. See #11731, #12996.
-        runWhen (strictness || late_dmd_anal) CoreDoDemand,
+        runWhen (strictness || late_dmd_anal) $ coreDoDemand dflags,
 
         maybe_rule_check FinalPhase,
 
@@ -284,6 +288,17 @@ runWhen False _       = CoreDoNothing
 runMaybe :: Maybe a -> (a -> CoreToDo) -> CoreToDo
 runMaybe (Just x) f = f x
 runMaybe Nothing  _ = CoreDoNothing
+
+coreDoDemand :: DynFlags -> CoreToDo
+coreDoDemand dflags = CoreDoDemand $ initDmdAnalOpts dflags
+
+coreDoSpecialising :: DynFlags -> CoreToDo
+coreDoSpecialising dflags = CoreDoSpecialising $
+  \ print_unqual -> initSpecialiseOpts dflags simplMask print_unqual
+
+-- TODO DEDUp!!!!
+simplMask :: Char
+simplMask = 's'
 
 {- Note [Inline in InitialPhase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

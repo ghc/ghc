@@ -1,12 +1,3 @@
-{-
-(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-
-\section[SimplCore]{Driver for simplifying @Core@ programs}
--}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE TupleSections #-}
-
 module GHC.Driver.Core.Rules ( readRuleEnv ) where
 
 import GHC.Prelude
@@ -28,6 +19,10 @@ import GHC.Unit.Module
 --
 -- I would do right away, but that changes the 'extendRuleBaseList'
 -- order and I am not sure what the ramifications of that are.
+
+
+-- FIXME(Ericson2314): Might be good to just fold into GHC.Driver.Core.Opt
+
 
 -- | Get all the rules
 --

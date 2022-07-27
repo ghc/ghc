@@ -115,7 +115,7 @@ import GHC.Core.Coercion hiding {- conflict with GHC.Core.Subst -}
                 ( substCo )
 import GHC.Core.TyCon
 import GHC.Builtin.Types
-import GHC.Driver.Env
+import GHC.Driver.Env hiding ( getHscEnv )
 import GHC.Types.Basic
 
 import GHC.Plugins.Monad

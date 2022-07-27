@@ -1,8 +1,14 @@
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.Driver.Env
-   ( Hsc(..)
-   , HscEnv (..)
+   ( -- * The 'Hsc' Monad
+     Hsc(..)
+   , runHsc
+   , runHsc'
+   , getHscEnv
+
+   , -- * The 'HscEnv' environment
+     HscEnv (..)
    , hscUpdateFlags
    , hscSetFlags
    , hsc_home_unit
@@ -19,8 +25,6 @@ module GHC.Driver.Env
    , hscSetActiveHomeUnit
    , hscSetActiveUnitId
    , hscActiveUnitId
-   , runHsc
-   , runHsc'
    , mkInteractiveHscEnv
    , runInteractiveHsc
    , hscEPS
@@ -100,6 +104,9 @@ runHsc hsc_env (Hsc hsc) = do
 
 runHsc' :: HscEnv -> Hsc a -> IO (a, Messages GhcMessage)
 runHsc' hsc_env (Hsc hsc) = hsc hsc_env emptyMessages
+
+getHscEnv :: Hsc HscEnv
+getHscEnv = Hsc $ \e w -> return (e, w)
 
 -- | Switches in the DynFlags and Plugins from the InteractiveContext
 mkInteractiveHscEnv :: HscEnv -> HscEnv

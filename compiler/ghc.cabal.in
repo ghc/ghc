@@ -305,6 +305,7 @@ Library
         GHC.Core.Map.Expr
         GHC.Core.Map.Type
         GHC.Core.Multiplicity
+        GHC.Core.Opt
         GHC.Core.Opt.Arity
         GHC.Core.Opt.CallArity
         GHC.Core.Opt.CallerCC
@@ -327,6 +328,7 @@ Library
         GHC.Core.Opt.Simplify.Utils
         GHC.Core.Opt.SpecConstr
         GHC.Core.Opt.Specialise
+        GHC.Core.Opt.Specialise.Config
         GHC.Core.Opt.StaticArgs
         GHC.Core.Opt.Stats
         GHC.Core.Opt.Utils
@@ -406,6 +408,7 @@ Library
         GHC.Driver.Config.Core.Opt
         GHC.Driver.Config.Core.Opt.Arity
         GHC.Driver.Config.Core.Opt.CallerCC
+        GHC.Driver.Config.Core.Opt.DmdAnal
         GHC.Driver.Config.Core.Opt.LiberateCase
         GHC.Driver.Config.Core.Opt.Simplify
         GHC.Driver.Config.Core.Opt.SpecConstr

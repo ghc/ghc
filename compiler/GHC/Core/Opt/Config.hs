@@ -6,10 +6,15 @@ module GHC.Core.Opt.Config (
 
 import GHC.Prelude
 
+import GHC.Core.FamInstEnv ( FamInstEnv )
+import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Core.Opt.CallerCC ( CallerCCOpts )
+import GHC.Core.Opt.DmdAnal ( DmdAnalOpts )
 import GHC.Core.Opt.LiberateCase ( LibCaseOpts )
 import GHC.Core.Opt.Simplify ( SimplifyOpts(..) )
+import GHC.Core.Opt.Specialise.Config ( SpecialiseOpts(..) )
 import GHC.Core.Opt.SpecConstr ( SpecConstrOpts )
+import GHC.Core.Opt.WorkWrap ( WwOpts )
 
 import GHC.Core.Opt.Utils ( FloatOutSwitches )
 
@@ -17,6 +22,7 @@ import GHC.Platform ( Platform )
 import GHC.Plugins.Monad ( CoreM )
 import GHC.Types.Basic  ( CompilerPhase(..) )
 import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module ( Module )
 import GHC.Utils.Outputable as Outputable
 
 {-
@@ -35,8 +41,8 @@ data CoreToDo           -- These are diff core-to-core passes,
                         -- which may be invoked in any order,
                         -- as many times as you like.
 
-  = CoreDoSimplify !SimplifyOpts
-  -- ^ The core-to-core simplifier.
+  = -- | The core-to-core simplifier.
+    CoreDoSimplify !SimplifyOpts
   | CoreDoPluginPass String CorePluginPass
   | CoreDoFloatInwards !Platform
   | CoreDoFloatOutwards FloatOutSwitches
@@ -45,19 +51,22 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoStaticArgs
   | CoreDoCallArity
   | CoreDoExitify
-  | CoreDoDemand
+  | CoreDoDemand DmdAnalOpts
   | CoreDoCpr
-  | CoreDoWorkerWrapper
-  | CoreDoSpecialising
+  | CoreDoWorkerWrapper (Module -> (FamInstEnv, FamInstEnv) -> WwOpts)
+  | CoreDoSpecialising (PrintUnqualified -> SpecialiseOpts)
   | CoreDoSpecConstr !SpecConstrOpts
   | CoreCSE
-  | CoreDoRuleCheck CompilerPhase String   -- Check for non-application of rules
-                                           -- matching this string
-  | CoreDoNothing                -- Useful when building up
-  | CoreDoPasses [CoreToDo]      -- lists of these things
+  | -- | Check for non-application of rulesmatching this string
+    CoreDoRuleCheck RuleOpts CompilerPhase String
+  | -- | Useful when building up
+    CoreDoNothing
+  | -- | lists of these things
+    CoreDoPasses [CoreToDo]
 
   | CoreAddCallerCcs !CallerCCOpts
-  | CoreAddLateCcs !Bool  -- -fprof-count-entries
+  | CoreAddLateCcs
+      !Bool -- ^ '-fprof-count-entries'
 
 instance Outputable CoreToDo where
   ppr (CoreDoSimplify _)       = text "Simplifier"
@@ -68,10 +77,10 @@ instance Outputable CoreToDo where
   ppr CoreDoStaticArgs         = text "Static argument"
   ppr CoreDoCallArity          = text "Called arity analysis"
   ppr CoreDoExitify            = text "Exitification transformation"
-  ppr CoreDoDemand             = text "Demand analysis"
+  ppr (CoreDoDemand {})        = text "Demand analysis"
   ppr CoreDoCpr                = text "Constructed Product Result analysis"
-  ppr CoreDoWorkerWrapper      = text "Worker Wrapper binds"
-  ppr CoreDoSpecialising       = text "Specialise"
+  ppr (CoreDoWorkerWrapper _)  = text "Worker Wrapper binds"
+  ppr (CoreDoSpecialising _)   = text "Specialise"
   ppr (CoreDoSpecConstr _)     = text "SpecConstr"
   ppr CoreCSE                  = text "Common sub-expression"
   ppr (CoreAddCallerCcs _)     = text "Add caller cost-centres"
