@@ -668,9 +668,9 @@ tryCastWorkerWrapper env _ _ _ bndr rhs  -- All other bindings
 
 mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
 -- See Note [Cast worker/wrapper]
-mkCastWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
+mkCastWrapperInlinePrag (InlinePragma { inl_inline = fn_inl, inl_act = fn_act, inl_rule = rule_info })
   = InlinePragma { inl_src    = SourceText "{-# INLINE"
-                 , inl_inline = NoUserInlinePrag -- See Note [Wrapper NoUserInlinePrag]
+                 , inl_inline = fn_inl       -- See Note [Worker/wrapper for INLINABLE functions]
                  , inl_sat    = Nothing      --     in GHC.Core.Opt.WorkWrap
                  , inl_act    = wrap_act     -- See Note [Wrapper activation]
                  , inl_rule   = rule_info }  --     in GHC.Core.Opt.WorkWrap
@@ -678,8 +678,8 @@ mkCastWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
   where
     -- See Note [Wrapper activation] in GHC.Core.Opt.WorkWrap
     -- But simpler, because we don't need to disable during InitialPhase
-    wrap_act | isNeverActive act = activateDuringFinal
-             | otherwise         = act
+    wrap_act | isNeverActive fn_act = activateDuringFinal
+             | otherwise            = fn_act
 
 
 {- *********************************************************************
@@ -4161,23 +4161,14 @@ simplStableUnfolding env bind_cxt id rhs_ty id_arity unf
                                         ; expr' <- simplExprC unf_env expr cont
                                         ; return (eta_expand expr') }
               ; case guide of
-                  UnfWhen { ug_arity = arity
-                          , ug_unsat_ok = sat_ok
-                          , ug_boring_ok = boring_ok
-                          }
-                          -- Happens for INLINE things
-                        -- Really important to force new_boring_ok as otherwise
-                        -- `ug_boring_ok` is a thunk chain of
-                        -- inlineBoringExprOk expr0
-                        --  || inlineBoringExprOk expr1 || ...
-                        --  See #20134
+                  UnfWhen { ug_boring_ok = boring_ok }
+                     -- Happens for INLINE things
+                     -- Really important to force new_boring_ok since otherwise
+                     --   `ug_boring_ok` is a thunk chain of
+                     --   inlineBoringExprOk expr0 || inlineBoringExprOk expr1 || ...
+                     -- See #20134
                      -> let !new_boring_ok = boring_ok || inlineBoringOk expr'
-                            guide' =
-                              UnfWhen { ug_arity = arity
-                                      , ug_unsat_ok = sat_ok
-                                      , ug_boring_ok = new_boring_ok
-
-                                      }
+                            guide' = guide { ug_boring_ok = new_boring_ok }
                         -- Refresh the boring-ok flag, in case expr'
                         -- has got small. This happens, notably in the inlinings
                         -- for dfuns for single-method classes; see

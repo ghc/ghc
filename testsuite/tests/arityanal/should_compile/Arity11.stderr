@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 149, types: 104, coercions: 0, joins: 2/7}
+Result size of Tidy Core = {terms: 136, types: 75, coercions: 0, joins: 2/7}
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 F11.fib3 :: Integer
@@ -51,11 +51,11 @@ F11.fib1 :: Integer
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 F11.fib1 = GHC.Num.Integer.IS 0#
 
--- RHS size: {terms: 52, types: 26, coercions: 0, joins: 0/5}
-F11.$wfib [InlPrag=[2]] :: forall {t} {a}. (t -> t -> Bool) -> (Num t, Num a) => t -> a
-[GblId, Arity=4, Str=<SCS(C1(L))><LP(A,LCL(C1(L)),A,A,A,A,L)><LP(LCS(C1(L)),A,A,A,A,A,MC1(L))><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 150 60 0] 460 0}]
-F11.$wfib
-  = \ (@t) (@a) (ww :: t -> t -> Bool) ($dNum :: Num t) ($dNum1 :: Num a) (eta :: t) ->
+-- RHS size: {terms: 54, types: 27, coercions: 0, joins: 0/5}
+fib :: forall {t} {a}. (Eq t, Num t, Num a) => t -> a
+[GblId, Arity=4, Str=<SP(SCS(C1(L)),A)><LP(A,LCL(C1(L)),A,A,A,A,L)><LP(LCS(C1(L)),A,A,A,A,A,MC1(L))><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 150 60 0] 480 0}]
+fib
+  = \ (@t) (@a) ($dEq :: Eq t) ($dNum :: Num t) ($dNum1 :: Num a) (eta :: t) ->
       let {
         lvl :: t
         [LclId]
@@ -77,24 +77,15 @@ F11.$wfib
         [LclId, Arity=1, Str=<L>, Unf=OtherCon []]
         fib4
           = \ (ds :: t) ->
-              case ww ds lvl3 of {
+              case == @t $dEq ds lvl3 of {
                 False ->
-                  case ww ds lvl of {
+                  case == @t $dEq ds lvl of {
                     False -> + @a $dNum1 (fib4 (- @t $dNum ds lvl)) (fib4 (- @t $dNum ds lvl1));
                     True -> lvl2
                   };
                 True -> lvl2
               }; } in
       fib4 eta
-
--- RHS size: {terms: 14, types: 19, coercions: 0, joins: 0/0}
-fib [InlPrag=[2]] :: forall {t} {a}. (Eq t, Num t, Num a) => t -> a
-[GblId,
- Arity=4,
- Str=<1P(SCS(C1(L)),A)><LP(A,LCL(C1(L)),A,A,A,A,L)><LP(LCS(C1(L)),A,A,A,A,A,LCS(L))><L>,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@t) (@a) ($dEq [Occ=Once1!] :: Eq t) ($dNum [Occ=Once1] :: Num t) ($dNum1 [Occ=Once1] :: Num a) (eta [Occ=Once1] :: t) -> case $dEq of { GHC.Classes.C:Eq ww [Occ=Once1] _ [Occ=Dead] -> F11.$wfib @t @a ww $dNum $dNum1 eta }}]
-fib = \ (@t) (@a) ($dEq :: Eq t) ($dNum :: Num t) ($dNum1 :: Num a) (eta :: t) -> case $dEq of { GHC.Classes.C:Eq ww ww1 -> F11.$wfib @t @a ww $dNum $dNum1 eta }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 F11.f3 :: Integer

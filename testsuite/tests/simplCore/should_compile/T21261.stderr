@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 182, types: 191, coercions: 0, joins: 0/0}
+  = {terms: 139, types: 130, coercions: 0, joins: 0/0}
 
 lvl = I# 3#
 
@@ -35,8 +35,7 @@ $wf7 = \ c -> (# case c lvl2 of { __DEFAULT -> c lvl lvl1 } #)
 
 f7 = \ c -> case $wf7 c of { (# ww #) -> Just ww }
 
-no_tricky_lazy
-  = \ c -> case $wf7 (\ x y -> c x y) of { (# ww #) -> Just ww }
+no_tricky_lazy = \ c -> f7 (\ x y -> c x y)
 
 $wf5
   = \ c ->

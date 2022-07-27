@@ -1,6 +1,20 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE Strict #-}
 
+{- Notes on T18223
+~~~~~~~~~~~~~~~~~~
+If we inline
+      modify' :: MonadState s m => (s -> s) -> m ()
+early, before the specialiser, the casts all collapse immediately.
+It turns out that fixing #21286 causes this to happen, because
+we no longer w/w modify'.
+
+If we don't inline it before the specialiser we generate
+a specialised version of it.  Then it gets inlined and all
+the casts collapse, but we end up keeping the code for the
+specialised version right through the pipeline.
+-}
+
 import Control.Monad.State
 
 tester :: MonadState a m => m ()

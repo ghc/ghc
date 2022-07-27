@@ -647,6 +647,37 @@ See #10491
 *                                                                      *
 ********************************************************************* -}
 
+{- Note [Specialising imported functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+specImports specialises imported functions, based on calls in this module.
+
+When -fspecialise-aggressively is on, we specialise any imported
+function for which we have an unfolding.  The
+-fspecialise-aggressively flag is usually off, because we risk lots of
+orphan modules from over-vigorous specialisation.  (See Note [Orphans]
+in GHC.Core.) However it's not a big deal: anything non-recursive with
+an unfolding-template will probably have been inlined already.
+
+When -fspecialise-aggressively is off, we are more selective about
+specialisation (see canSpecImport):
+
+(1) Without -fspecialise-aggressively, do not specialise
+    DFunUnfoldings. Note [Do not specialise imported DFuns].
+
+(2) Without -fspecialise-aggressively, specialise only imported things
+    that have a /user-supplied/ INLINE or INLINABLE pragma (hence
+    isAnyInlinePragma rather than isStableSource).
+
+    In particular, we don't want to specialise workers created by
+    worker/wrapper (for functions with no pragma) because they won't
+    specialise usefully, and they generate quite a bit of useless code
+    bloat.
+
+    Specialise even INLINE things; it hasn't inlined yet, so perhaps
+    it never will.  Moreover it may have calls inside it that we want
+    to specialise
+-}
+
 specImports :: SpecEnv
             -> [CoreRule]
             -> UsageDetails
@@ -768,23 +799,17 @@ spec_import top_env callers rb dict_binds cis@(CIS fn _)
        -- See Note [Avoiding loops in specImports]
 
 canSpecImport :: DynFlags -> Id -> Maybe CoreExpr
--- See Note [Specialise imported INLINABLE things]
 canSpecImport dflags fn
-  | CoreUnfolding { uf_src = src, uf_tmpl = rhs } <- unf
-  , isStableSource src
-  = Just rhs   -- By default, specialise only imported things that have a stable
-               -- unfolding; that is, have an INLINE or INLINABLE pragma
-               -- Specialise even INLINE things; it hasn't inlined yet,
-               -- so perhaps it never will.  Moreover it may have calls
-               -- inside it that we want to specialise
-
-    -- CoreUnfolding case does /not/ include DFunUnfoldings;
-    -- We only specialise DFunUnfoldings with -fspecialise-aggressively
-    -- See Note [Do not specialise imported DFuns]
+  | CoreUnfolding { uf_tmpl = rhs } <- unf
+    -- See Note [Specialising imported functions] point (1).
+  , isAnyInlinePragma (idInlinePragma fn)
+    -- See Note [Specialising imported functions] point (2).
+  = Just rhs
 
   | gopt Opt_SpecialiseAggressively dflags
-  = maybeUnfoldingTemplate unf  -- With -fspecialise-aggressively, specialise anything
-                                -- with an unfolding, stable or not, DFun or not
+  = maybeUnfoldingTemplate unf
+    -- With -fspecialise-aggressively, specialise anything
+    -- with an unfolding, stable or not, DFun or not
 
   | otherwise = Nothing
   where
@@ -1020,20 +1045,6 @@ recursive yet-more-specialised call, so we'd diverge in that case.
 And if the call is to the same type, one specialisation is enough.
 Avoiding this recursive specialisation loop is one reason for the
 'callers' stack passed to specImports and specImport.
-
-Note [Specialise imported INLINABLE things]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-What imported functions do we specialise?  The basic set is
- * DFuns and things with INLINABLE pragmas.
-but with -fspecialise-aggressively we add
- * Anything with an unfolding template
-
-#8874 has a good example of why we want to auto-specialise DFuns.
-
-We have the -fspecialise-aggressively flag (usually off), because we
-risk lots of orphan modules from over-vigorous specialisation.
-However it's not a big deal: anything non-recursive with an
-unfolding-template will probably have been inlined already.
 
 Note [Glom the bindings if imported functions are specialised]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1604,19 +1615,16 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
                 simpl_opts = initSimpleOpts dflags
 
                 --------------------------------------
-                -- Add a suitable unfolding if the spec_inl_prag says so
-                -- See Note [Inline specialisations]
-                (spec_inl_prag, spec_unf)
-                  | not is_local && isStrongLoopBreaker (idOccInfo fn)
-                  = (neverInlinePragma, noUnfolding)
-                        -- See Note [Specialising imported functions] in "GHC.Core.Opt.OccurAnal"
+                -- Add a suitable unfolding; see Note [Inline specialisations]
+                spec_unf = specUnfolding simpl_opts spec_bndrs (`mkApps` spec_args)
+                                         rule_lhs_args fn_unf
 
-                  | isInlinablePragma inl_prag
-                  = (inl_prag { inl_inline = NoUserInlinePrag }, noUnfolding)
-
+                spec_inl_prag
+                  | not is_local     -- See Note [Specialising imported functions]
+                  , isStrongLoopBreaker (idOccInfo fn) -- in GHC.Core.Opt.OccurAnal
+                  = neverInlinePragma
                   | otherwise
-                  = (inl_prag, specUnfolding simpl_opts spec_bndrs (`mkApps` spec_args)
-                                             rule_lhs_args fn_unf)
+                  = inl_prag
 
                 --------------------------------------
                 -- Adding arity information just propagates it a bit faster
@@ -2172,24 +2180,17 @@ So we suppress the WARN if the rhs is trivial.
 Note [Inline specialisations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here is what we do with the InlinePragma of the original function
-  * Activation/RuleMatchInfo: both transferred to the
-                              specialised function
-  * InlineSpec:
-       (a) An INLINE pragma is transferred
-       (b) An INLINABLE pragma is *not* transferred
 
-Why (a): transfer INLINE pragmas? The point of INLINE was precisely to
-specialise the function at its call site, and arguably that's not so
-important for the specialised copies.  BUT *pragma-directed*
-specialisation now takes place in the typechecker/desugarer, with
-manually specified INLINEs.  The specialisation here is automatic.
-It'd be very odd if a function marked INLINE was specialised (because
-of some local use), and then forever after (including importing
-modules) the specialised version wasn't INLINEd.  After all, the
-programmer said INLINE!
+  * Activation/RuleMatchInfo: both inherited from the original function
 
-You might wonder why we specialise INLINE functions at all.  After
-all they should be inlined, right?  Two reasons:
+  * InlineSpec: inherit from original function
+
+  * Unfolding: transfer a StableUnfolding iff it is UnfWhen
+               See GHC.Core.Unfold.Make.specUnfolding
+               and its Note [Specialising unfoldings]
+
+InlineSpec: you might wonder why we specialise INLINE functions at all.
+After all they should be inlined, right?  Two reasons:
 
  * Even INLINE functions are sometimes not inlined, when they aren't
    applied to interesting arguments.  But perhaps the type arguments
@@ -2215,26 +2216,6 @@ all they should be inlined, right?  Two reasons:
    (replicateM_ dMonadIO).  We certainly want to specialise $wreplicateM_!
    This particular example had a huge effect on the call to replicateM_
    in nofib/shootout/n-body.
-
-Why (b): discard INLINABLE pragmas? See #4874 for persuasive examples.
-Suppose we have
-    {-# INLINABLE f #-}
-    f :: Ord a => [a] -> Int
-    f xs = letrec f' = ...f'... in f'
-Then, when f is specialised and optimised we might get
-    wgo :: [Int] -> Int#
-    wgo = ...wgo...
-    f_spec :: [Int] -> Int
-    f_spec xs = case wgo xs of { r -> I# r }
-and we clearly want to inline f_spec at call sites.  But if we still
-have the big, un-optimised of f (albeit specialised) captured in an
-INLINABLE pragma for f_spec, we won't get that optimisation.
-
-So we simply drop INLINABLE pragmas when specialising. It's not really
-a complete solution; ignoring specialisation for now, INLINABLE functions
-don't get properly strictness analysed, for example. But it works well
-for examples involving specialisation, which is the dominant use of
-INLINABLE.  See #4874.
 -}
 
 {- *********************************************************************

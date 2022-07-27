@@ -9,6 +9,49 @@
 
 {-# OPTIONS_GHC -freduction-depth=0 #-}
 
+{- Notes on LargeRecord
+~~~~~~~~~~~~~~~~~~~~~~~
+I noticed that in GHC of July 2022, when compiling this
+module I got lots of "SPEC" rules
+
+      SuperRecord.$fRecCopy:ltsrts_$crecCopyInto @"f2"
+                                                 @'["f1" := Int, "f2" := Int, "f3" := Int,
+                                                    "f4" := Int]
+                                                 @Int
+                                                 @'["f2" := Int, "f3" := Int, "f4" := Int]
+                                                 @'["f3" := Int, "f4" := Int]
+                                                 $d(%,,%)_X1 $d(%,,%)1_X2 $dRecCopy_X3
+      SuperRecord.$fRecCopy:ltsrts_$crecCopyInto @"f3"
+                                                 @'["f1" := Int, "f2" := Int, "f3" := Int,
+                                                    "f4" := Int]
+                                                 @Int
+                                                 @'["f2" := Int, "f3" := Int, "f4" := Int]
+                                                 @'["f4" := Int]
+                                                 $d(%,,%)_X1 $d(%,,%)1_s6yK $dRecCopy_X2
+
+      SuperRecord.$fRecCopy:ltsrts_$crecCopyInto @"f3"
+                                                 @'["f2" := Int, "f3" := Int, "f4" := Int]
+                                                 @Int
+                                                 @'["f3" := Int, "f4" := Int]
+                                                 @'["f4" := Int]
+                                                 $d(%,,%)_s6yr $d(%,,%)1_X1 $dRecCopy_X2
+      SuperRecord.$fRecCopy:ltsrts_$crecCopyInto @"f4"
+                                                 @(SortInsert'
+                                                     (GHC.TypeLits.Internal.CmpSymbol "f3" "f4")
+                                                     ("f3" := Int)
+                                                     ("f4" := Int)
+                                                     '[])
+                                                 @Int
+                                                 @'["f4" := Int]
+                                                 @'[]
+                                                 $d(%,,%)_X1 $d(%,,%)1_X2 $dRecCopy_s6yb
+
+(This was with BigFieldList having only four elements.)
+
+The relevant function SuperRecord.$fRecCopy:ltsrts_$crecCopyInto is
+only a wrapper that we were specialising -- little or no benefit.  We
+don't want to specialise wrappers!  -}
+
 module DCo_Record where
 
 import SuperRecord
