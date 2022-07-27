@@ -230,6 +230,11 @@ MinBootGhcVersion="9.0"
 FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[$MinBootGhcVersion],
     [AC_MSG_ERROR([GHC version $MinBootGhcVersion or later is required to compile GHC.])])
 
+# See Note [Support for building ghc 9.4 with the make build system]
+MaxBootWithMakeGhcVersion="9.1"
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[$MaxBootWithMakeGhcVersion],
+    [AC_SUBST(CanBootWithMake,"YES")])
+
 if test `expr $GhcMinVersion % 2` = "1"
 then
     if test "$EnableBootstrapWithDevelSnaphost" = "NO"
@@ -1277,6 +1282,7 @@ echo "\
    Bootstrapping using   : $WithGhc
       which is version   : $GhcVersion
       with threaded RTS? : $GhcThreadedRts
+     can boot with make? : $CanBootWithMake
 "
 
 if test "x$CcLlvmBackend" = "xYES"; then

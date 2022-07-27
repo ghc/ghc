@@ -882,3 +882,7 @@ endif
 # on core-i7 for 'compiler/GHC/Hs/Expr.hs') and sometimes not compile
 # at all: powerpc64 overflows TOC section on 'compiler/GHC/Hs/Expr.hs'
 #         ia64 overflows short data section on 'compiler/GHC/Driver/Session.hs'
+
+
+# See Note [Support for building ghc 9.4 with the make build system]
+CanBootWithMake = @CanBootWithMake@
