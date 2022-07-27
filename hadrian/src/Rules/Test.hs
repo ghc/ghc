@@ -120,7 +120,7 @@ testRules = do
           writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
           makeExecutable path
       else if prog == "ghc-pkg" then do
-        let flags = ["-no-global-package-db", "--no-user-package-db", "--global-package-db", pkgDb]
+        let flags = ["--no-user-package-db", "--global-package-db", pkgDb]
         writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
         makeExecutable path
       else createFileLink abs_prog_path path
