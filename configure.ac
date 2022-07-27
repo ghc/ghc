@@ -230,6 +230,10 @@ MinBootGhcVersion="9.0"
 FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[$MinBootGhcVersion],
     [AC_MSG_ERROR([GHC version $MinBootGhcVersion or later is required to compile GHC.])])
 
+# See Note [Support for building ghc 9.4 with the make build system]
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[9.1],
+    [AC_SUBST([CanBootWithMake],"YES")])
+
 if test `expr $GhcMinVersion % 2` = "1"
 then
     if test "$EnableBootstrapWithDevelSnaphost" = "NO"

@@ -100,6 +100,24 @@ else
 $(error Make has restarted itself $(MAKE_RESTARTS) times; is there a makefile bug? See https://gitlab.haskell.org/ghc/ghc/wikis/building/troubleshooting#make-has-restarted-itself-3-times-is-there-a-makefile-bug for details)
 endif
 
+##################################################
+# {- Note [Support for building ghc 9.4 with the make build system]  -}
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# For ghc-9.6 and forward we will be removing the make build system in favour of
+# the in-tree hadrian build system. However for ghc-9.4 we do still support
+# make.  This support is fragile, and we do recommend that you build with
+# hadrian if you are able to do so. The blog post
+# https://www.haskell.org/ghc/blog/20220805-make-to-hadrian.html gives advice to
+# packagers adapting to hadrian.
+#
+# There are several hacks in place to allow ghc-9.4 to build with make:
+# * We require a boot compiler < ghc-9.2. See issue #21914
+# * We carefully build stage0 Cabal with the boot compiler's process library,
+#   which does not satisfy Cabal's bounds. See issue #21953
+ifneq "$(CanBootWithMake)" "YES"
+$(error The make build system requires a boot compiler older than ghc-9.2. Your boot compiler is too new and cannot be used to build ghc-9.4 with make. Either boot with ghc 9.0.2 or build with hadrian. See https://www.haskell.org/ghc/blog/20220805-make-to-hadrian.html for advice on transitioning to hadrian.)
+endif
+
 # -----------------------------------------------------------------------------
 # Misc GNU make utils
 
@@ -484,6 +502,9 @@ libraries/template-haskell_CONFIGURE_OPTS += --flags=+vendor-filepath
 
 libraries/ghc-bignum_CONFIGURE_OPTS += -f $(BIGNUM_BACKEND)
 
+# See Note [Support for building ghc 9.4 with the make build system]
+# Here we carefully configure stage0 Cabal to build with the boot compiler's
+# process, which does not satisfy Cabal's bounds.
 CABAL_DEPS = text transformers mtl parsec Cabal/Cabal-syntax
 CABAL_BOOT_DEPS = process array filepath base bytestring containers deepseq time unix pretty directory
 
