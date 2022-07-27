@@ -100,12 +100,12 @@ stage0Packages = do
              , text
              , transformers
              , unlit
+             , hp2ps
              , if winTarget then win32 else unix
              ]
           ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                ]
           ++ [ touchy   | windowsHost                ]
-          ++ [ hp2ps    | cross                      ]
 
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
 stage1Packages :: Action [Package]
