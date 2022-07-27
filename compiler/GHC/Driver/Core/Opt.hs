@@ -13,6 +13,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Env
+import GHC.Driver.Core.Rules ( readRuleEnv )
 import GHC.Driver.Config.Core.Lint ( initLintAnnotationsConfig )
 import GHC.Driver.Config.Core.EndPass ( initEndPassConfig )
 import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )
@@ -22,7 +23,7 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Core
 import GHC.Core.EndPass  ( endPassIO )
 import GHC.Core.Opt.CSE  ( cseProgram )
-import GHC.Core.Rules   ( extendRuleBaseList, extendRuleEnv, mkRuleBase, ruleCheckProgram, getRules )
+import GHC.Core.Rules   ( ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( lintAnnots )
@@ -59,7 +60,6 @@ import GHC.Utils.Outputable
 import GHC.Unit.External ( ExternalPackageState(..) )
 import GHC.Unit.Module.Env
 import GHC.Unit.Module.ModGuts
-import GHC.Unit.Module.Deps
 
 import GHC.Types.Id.Info
 import GHC.Types.Basic
@@ -213,19 +213,6 @@ doCorePass logger hsc_env this_mod rule_base loc print_unqual vis_orphs pass gut
     updateBindsM f = do
       b' <- liftIO $ f (mg_binds guts)
       return $ guts { mg_binds = b' }
-
-readRuleEnv :: HscEnv -> ModGuts -> IO RuleEnv
-readRuleEnv hsc_env guts = extendRuleEnv base_ruleenv <$> read_eps_rules
-  where
-    this_mod = mg_module guts
-    gwib = GWIB { gwib_mod = moduleName this_mod, gwib_isBoot = NotBoot }
-    hpt_rule_base = mkRuleBase (hptRules hsc_env (moduleUnitId this_mod) gwib)
-    -- Forcing this value to avoid unnessecary allocations.
-    -- Not doing so results in +25.6% allocations of LargeRecord.
-    !rule_base = extendRuleBaseList hpt_rule_base (mg_rules guts)
-    vis_orphs = this_mod : dep_orphs (mg_deps guts)
-    base_ruleenv = mkRuleEnv rule_base vis_orphs
-    read_eps_rules = eps_rule_base <$> hscEPS hsc_env
 
 {-
 ************************************************************************
