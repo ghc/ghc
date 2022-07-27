@@ -2801,21 +2801,6 @@ stg_getApStackValzh ( P_ ap_stack, W_ offset )
    }
 }
 
-// Write the cost center stack of the first argument on stderr; return
-// the second.  Possibly only makes sense for already evaluated
-// things?
-stg_traceCcszh ( P_ obj, P_ ret )
-{
-    W_ ccs;
-
-#if defined(PROFILING)
-    ccs = StgHeader_ccs(UNTAG(obj));
-    ccall fprintCCS_stderr(ccs "ptr");
-#endif
-
-    jump stg_ap_0_fast(ret);
-}
-
 stg_getSparkzh ()
 {
     W_ spark;

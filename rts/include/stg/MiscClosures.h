@@ -566,7 +566,6 @@ RTS_FUN_DECL(stg_numSparkszh);
 
 RTS_FUN_DECL(stg_noDuplicatezh);
 
-RTS_FUN_DECL(stg_traceCcszh);
 RTS_FUN_DECL(stg_clearCCSzh);
 RTS_FUN_DECL(stg_traceEventzh);
 RTS_FUN_DECL(stg_traceBinaryEventzh);

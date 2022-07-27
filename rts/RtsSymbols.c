@@ -1015,7 +1015,6 @@ extern char **environ;
       SymI_HasProto(stopTimer)                                          \
       SymI_HasProto(n_capabilities)                                     \
       SymI_HasProto(enabled_capabilities)                               \
-      SymI_HasDataProto(stg_traceCcszh)                                     \
       SymI_HasDataProto(stg_traceEventzh)                                   \
       SymI_HasDataProto(stg_traceMarkerzh)                                  \
       SymI_HasDataProto(stg_traceBinaryEventzh)                             \
