@@ -61,7 +61,7 @@ f [InlPrag=[2]] :: Int -> (Int, Int) -> Bool
  Arity=2,
  Str=<1!P(1L)><MP(A,1P(1L))>,
  Cpr=2,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (ds [Occ=Once1!] :: Int) (x [Occ=Once1!] :: (Int, Int)) ->

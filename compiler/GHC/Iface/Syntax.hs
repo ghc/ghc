@@ -13,7 +13,7 @@ module GHC.Iface.Syntax (
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
         IfaceExpr(..), IfaceAlt(..), IfaceLetBndr(..), IfaceJoinInfo(..),
         IfaceBinding(..), IfaceConAlt(..),
-        IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..),
+        IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..), IfGuidance(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
         IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
         IfaceClassBody(..),
@@ -360,21 +360,12 @@ data IfaceInfoItem
 -- only later attached to the Id.  Partial reason: some are orphans.
 
 data IfaceUnfolding
-  = IfCoreUnfold Bool IfaceExpr -- True <=> INLINABLE, False <=> regular unfolding
-                                -- Possibly could eliminate the Bool here, the information
-                                -- is also in the InlinePragma.
-
-  | IfCompulsory IfaceExpr      -- default methods and unsafeCoerce#
-                                -- for more about unsafeCoerce#, see
-                                -- Note [Wiring in unsafeCoerce#] in "GHC.HsToCore"
-
-  | IfInlineRule Arity          -- INLINE pragmas
-                 Bool           -- OK to inline even if *un*-saturated
-                 Bool           -- OK to inline even if context is boring
-                 IfaceExpr
-
+  = IfCoreUnfold UnfoldingSource IfGuidance IfaceExpr
   | IfDFunUnfold [IfaceBndr] [IfaceExpr]
 
+data IfGuidance
+  = IfNoGuidance            -- Compute it from the IfaceExpr
+  | IfWhen Arity Bool Bool  -- Just like UnfWhen in Core.UnfoldingGuidance
 
 -- We only serialise the IdDetails of top-level Ids, and even then
 -- we only need a very limited selection.  Notably, none of the
@@ -1488,16 +1479,14 @@ instance Outputable IfaceJoinInfo where
   ppr (IfaceJoinPoint ar) = angleBrackets (text "join" <+> ppr ar)
 
 instance Outputable IfaceUnfolding where
-  ppr (IfCompulsory e)     = text "<compulsory>" <+> parens (ppr e)
-  ppr (IfCoreUnfold s e)   = (if s
-                                then text "<stable>"
-                                else Outputable.empty)
-                              <+> parens (ppr e)
-  ppr (IfInlineRule a uok bok e) = sep [text "InlineRule"
-                                            <+> ppr (a,uok,bok),
-                                        pprParendIfaceExpr e]
+  ppr (IfCoreUnfold src guide e)
+    = sep [ text "Core:" <+> ppr src <+> ppr guide, ppr e ]
   ppr (IfDFunUnfold bs es) = hang (text "DFun:" <+> sep (map ppr bs) <> dot)
                                 2 (sep (map pprParendIfaceExpr es))
+
+instance Outputable IfGuidance where
+  ppr IfNoGuidance   = empty
+  ppr (IfWhen a u b) = angleBrackets (ppr a <> comma <> ppr u <> ppr b)
 
 {-
 ************************************************************************
@@ -1742,9 +1731,7 @@ freeNamesItem (HsLFInfo (IfLFCon n)) = unitNameSet n
 freeNamesItem _                      = emptyNameSet
 
 freeNamesIfUnfold :: IfaceUnfolding -> NameSet
-freeNamesIfUnfold (IfCoreUnfold _ e)     = freeNamesIfExpr e
-freeNamesIfUnfold (IfCompulsory e)       = freeNamesIfExpr e
-freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
+freeNamesIfUnfold (IfCoreUnfold _ _ e)   = freeNamesIfExpr e
 freeNamesIfUnfold (IfDFunUnfold bs es)   = freeNamesIfBndrs bs &&& fnList freeNamesIfExpr es
 
 freeNamesIfExpr :: IfaceExpr -> NameSet
@@ -2264,39 +2251,41 @@ instance Binary IfaceInfoItem where
             _ -> HsTagSig <$> get bh
 
 instance Binary IfaceUnfolding where
-    put_ bh (IfCoreUnfold s e) = do
+    put_ bh (IfCoreUnfold s g e) = do
         putByte bh 0
         put_ bh s
+        put_ bh g
         put_ bh e
-    put_ bh (IfInlineRule a b c d) = do
-        putByte bh 1
-        put_ bh a
-        put_ bh b
-        put_ bh c
-        put_ bh d
     put_ bh (IfDFunUnfold as bs) = do
-        putByte bh 2
+        putByte bh 1
         put_ bh as
         put_ bh bs
-    put_ bh (IfCompulsory e) = do
-        putByte bh 3
-        put_ bh e
     get bh = do
         h <- getByte bh
         case h of
             0 -> do s <- get bh
+                    g <- get bh
                     e <- get bh
-                    return (IfCoreUnfold s e)
-            1 -> do a <- get bh
-                    b <- get bh
-                    c <- get bh
-                    d <- get bh
-                    return (IfInlineRule a b c d)
-            2 -> do as <- get bh
+                    return (IfCoreUnfold s g e)
+            _ -> do as <- get bh
                     bs <- get bh
                     return (IfDFunUnfold as bs)
-            _ -> do e <- get bh
-                    return (IfCompulsory e)
+
+instance Binary IfGuidance where
+    put_ bh IfNoGuidance = putByte bh 0
+    put_ bh (IfWhen a b c ) = do
+        putByte bh 1
+        put_ bh a
+        put_ bh b
+        put_ bh c
+    get bh = do
+        h <- getByte bh
+        case h of
+            0 -> return IfNoGuidance
+            _ -> do a <- get bh
+                    b <- get bh
+                    c <- get bh
+                    return (IfWhen a b c)
 
 instance Binary IfaceAlt where
     put_ bh (IfaceAlt a b c) = do
@@ -2610,16 +2599,15 @@ instance NFData IfaceInfoItem where
     HsLFInfo lf_info -> lf_info `seq` () -- TODO: seq further?
     HsTagSig sig -> sig `seq` ()
 
+instance NFData IfGuidance where
+  rnf = \case
+    IfNoGuidance -> ()
+    IfWhen a b c -> a `seq` b `seq` c `seq` ()
+
 instance NFData IfaceUnfolding where
   rnf = \case
-    IfCoreUnfold inlinable expr ->
-      rnf inlinable `seq` rnf expr
-    IfCompulsory expr ->
-      rnf expr
-    IfInlineRule arity b1 b2 e ->
-      rnf arity `seq` rnf b1 `seq` rnf b2 `seq` rnf e
-    IfDFunUnfold bndrs exprs ->
-      rnf bndrs `seq` rnf exprs
+    IfCoreUnfold src guidance expr -> src `seq` rnf guidance `seq` rnf expr
+    IfDFunUnfold bndrs exprs       -> rnf bndrs `seq` rnf exprs
 
 instance NFData IfaceExpr where
   rnf = \case

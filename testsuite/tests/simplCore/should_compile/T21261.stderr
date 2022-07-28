@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 139, types: 130, coercions: 0, joins: 0/0}
+  = {terms: 127, types: 120, coercions: 0, joins: 0/0}
 
 lvl = I# 3#
 
@@ -13,57 +13,48 @@ f2 = \ c -> case c lvl2 of { __DEFAULT -> c lvl lvl1 }
 
 yes1or2 = f2
 
-lvl3 = I# 2#
+lvl3 = I# 42#
 
-$wf4
+lvl4 = I# 2#
+
+f4
   = \ c ->
-      case c lvl2 lvl3 of { __DEFAULT ->
-      case c lvl lvl1 of { __DEFAULT -> 42# }
+      case c lvl2 lvl4 of { __DEFAULT ->
+      case c lvl lvl1 of { __DEFAULT -> lvl3 }
       }
 
-f4 = \ c -> case $wf4 c of ww { __DEFAULT -> I# ww }
+no3 = \ c -> f4 (\ x y z -> c x y z)
 
-no3
-  = \ c ->
-      case $wf4 (\ x y z -> c x y z) of ww { __DEFAULT -> I# ww }
-
-f6 = \ c -> case c lvl2 of { __DEFAULT -> c lvl3 lvl }
+f6 = \ c -> case c lvl2 of { __DEFAULT -> c lvl4 lvl }
 
 no_tricky = \ c -> f6 (\ x y -> c x y)
 
-$wf7 = \ c -> (# case c lvl2 of { __DEFAULT -> c lvl lvl1 } #)
-
-f7 = \ c -> case $wf7 c of { (# ww #) -> Just ww }
+f7 = \ c -> Just (case c lvl2 of { __DEFAULT -> c lvl lvl1 })
 
 no_tricky_lazy = \ c -> f7 (\ x y -> c x y)
 
-$wf5
+f5
   = \ c ->
-      (# case c lvl2 lvl3 of { I# x ->
+      Just
+        (case c lvl2 lvl4 of { I# x ->
          case c lvl lvl1 of { I# y -> I# (+# x y) }
-         } #)
-
-f5 = \ c -> case $wf5 c of { (# ww #) -> Just ww }
+         })
 
 yes2_lazy = f5
 
-$wf3
+f3
   = \ c ->
-      case c lvl2 lvl3 of { I# x ->
-      case c lvl lvl1 of { I# y -> +# x y }
+      case c lvl2 lvl4 of { I# x ->
+      case c lvl lvl1 of { I# y -> I# (+# x y) }
       }
-
-f3 = \ c -> case $wf3 c of ww { __DEFAULT -> I# ww }
 
 yes2 = f3
 
-$wf1
+f1
   = \ c ->
-      case c lvl2 lvl3 of { I# x ->
-      case c lvl lvl1 of { I# y -> +# x y }
+      case c lvl2 lvl4 of { I# x ->
+      case c lvl lvl1 of { I# y -> I# (+# x y) }
       }
-
-f1 = \ c -> case $wf1 c of ww { __DEFAULT -> I# ww }
 
 yes1 = f1
 

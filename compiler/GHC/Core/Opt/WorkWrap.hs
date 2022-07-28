@@ -210,7 +210,7 @@ Solution:
 
   It's important that both get this, because the specialiser uses
   the existence of a /user-specified/ INLINE/INLINABLE pragma to
-  drive specialiation of imported functions.  See  GHC.Core.Opt.Specialise
+  drive specialisation of imported functions.  See  GHC.Core.Opt.Specialise
   Note [Specialising imported functions]
 
 * Remember, the subsequent inlining behaviour of the wrapper is expressed by
@@ -892,9 +892,13 @@ mkStrWrapperInlinePrag (InlinePragma { inl_inline = fn_inl
                                      , inl_rule   = rule_info }) rules
   = InlinePragma { inl_src    = SourceText "{-# INLINE"
                  , inl_sat    = Nothing
-                 , inl_inline = fn_inl -- See Note [Worker/wrapper for INLINABLE functions]
+
+                 , inl_inline = fn_inl
+                      -- See Note [Worker/wrapper for INLINABLE functions]
+
                  , inl_act    = activeAfter wrapper_phase
-                                -- See Note [Wrapper activation]
+                      -- See Note [Wrapper activation]
+
                  , inl_rule   = rule_info }  -- RuleMatchInfo is (and must be) unaffected
   where
     -- See Note [Wrapper activation]

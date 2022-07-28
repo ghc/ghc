@@ -756,7 +756,7 @@ add_info env old_bndr top_level new_rhs new_bndr
                  | otherwise
                  = unfolding_from_rhs
 
-   unfolding_from_rhs = mkUnfolding uf_opts InlineRhs
+   unfolding_from_rhs = mkUnfolding uf_opts VanillaSrc
                                     (isTopLevel top_level)
                                     False -- may be bottom or not
                                     new_rhs

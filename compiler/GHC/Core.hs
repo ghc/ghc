@@ -65,7 +65,8 @@ module GHC.Core (
         maybeUnfoldingTemplate, otherCons,
         isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
-        isStableUnfolding, isInlineUnfolding, isBootUnfolding,
+        isStableUnfolding, isStableUserUnfolding, isStableSystemUnfolding,
+        isInlineUnfolding, isBootUnfolding,
         hasCoreUnfolding, hasSomeUnfolding,
         canUnfold, neverUnfoldGuidance, isStableSource,
 
@@ -1338,36 +1339,6 @@ data Unfolding
 
 
 ------------------------------------------------
-data UnfoldingSource
-  = -- See also Note [Historical note: unfoldings for wrappers]
-
-    InlineRhs          -- The current rhs of the function
-                       -- Replace uf_tmpl each time around
-
-  | InlineStable       -- From an INLINE or INLINABLE pragma
-                       --   INLINE     if guidance is UnfWhen
-                       --   INLINABLE  if guidance is UnfIfGoodArgs/UnfoldNever
-                       -- (well, technically an INLINABLE might be made
-                       -- UnfWhen if it was small enough, and then
-                       -- it will behave like INLINE outside the current
-                       -- module, but that is the way automatic unfoldings
-                       -- work so it is consistent with the intended
-                       -- meaning of INLINABLE).
-                       --
-                       -- uf_tmpl may change, but only as a result of
-                       -- gentle simplification, it doesn't get updated
-                       -- to the current RHS during compilation as with
-                       -- InlineRhs.
-                       --
-                       -- See Note [InlineStable]
-
-  | InlineCompulsory   -- Something that *has* no binding, so you *must* inline it
-                       -- Only a few primop-like things have this property
-                       -- (see "GHC.Types.Id.Make", calls to mkCompulsoryUnfolding).
-                       -- Inline absolutely always, however boring the context.
-
-
-
 -- | 'UnfoldingGuidance' says when unfolding should take place
 data UnfoldingGuidance
   = UnfWhen {   -- Inline without thinking about the *size* of the uf_tmpl
@@ -1472,12 +1443,6 @@ bootUnfolding = BootUnfolding
 mkOtherCon :: [AltCon] -> Unfolding
 mkOtherCon = OtherCon
 
-isStableSource :: UnfoldingSource -> Bool
--- Keep the unfolding template
-isStableSource InlineCompulsory   = True
-isStableSource InlineStable       = True
-isStableSource InlineRhs          = False
-
 -- | Retrieves the template of an unfolding: panics if none is known
 unfoldingTemplate :: Unfolding -> CoreExpr
 unfoldingTemplate = uf_tmpl
@@ -1542,8 +1507,8 @@ expandUnfolding_maybe (CoreUnfolding { uf_expandable = True, uf_tmpl = rhs }) = 
 expandUnfolding_maybe _                                                       = Nothing
 
 isCompulsoryUnfolding :: Unfolding -> Bool
-isCompulsoryUnfolding (CoreUnfolding { uf_src = InlineCompulsory }) = True
-isCompulsoryUnfolding _                                             = False
+isCompulsoryUnfolding (CoreUnfolding { uf_src = src }) = isCompulsorySource src
+isCompulsoryUnfolding _                                = False
 
 isStableUnfolding :: Unfolding -> Bool
 -- True of unfoldings that should not be overwritten
@@ -1551,6 +1516,16 @@ isStableUnfolding :: Unfolding -> Bool
 isStableUnfolding (CoreUnfolding { uf_src = src }) = isStableSource src
 isStableUnfolding (DFunUnfolding {})               = True
 isStableUnfolding _                                = False
+
+isStableUserUnfolding :: Unfolding -> Bool
+-- True of unfoldings that arise from an INLINE or INLINEABLE pragma
+isStableUserUnfolding (CoreUnfolding { uf_src = src }) = isStableUserSource src
+isStableUserUnfolding _                                = False
+
+isStableSystemUnfolding :: Unfolding -> Bool
+-- True of unfoldings that arise from an INLINE or INLINEABLE pragma
+isStableSystemUnfolding (CoreUnfolding { uf_src = src }) = isStableSystemSource src
+isStableSystemUnfolding _                                = False
 
 isInlineUnfolding :: Unfolding -> Bool
 -- ^ True of a /stable/ unfolding that is
@@ -1608,8 +1583,8 @@ ones are
 
 We consider even a StableUnfolding as fragile, because it needs substitution.
 
-Note [InlineStable]
-~~~~~~~~~~~~~~~~~
+Note [Stable unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~
 When you say
       {-# INLINE f #-}
       f x = <rhs>
@@ -1619,10 +1594,11 @@ with it.  Meanwhile, we can optimise <rhs> to our heart's content,
 leaving the original unfolding intact in Unfolding of 'f'. For example
         all xs = foldr (&&) True xs
         any p = all . map p  {-# INLINE any #-}
-We optimise any's RHS fully, but leave the InlineRule saying "all . map p",
-which deforests well at the call site.
+We optimise any's RHS fully, but leave the stable unfolding for `any`
+saying "all . map p", which deforests well at the call site.
 
-So INLINE pragma gives rise to an InlineRule, which captures the original RHS.
+So INLINE pragma gives rise to a stable unfolding, which captures the
+original RHS.
 
 Moreover, it's only used when 'f' is applied to the
 specified number of arguments; that is, the number of argument on
@@ -1635,9 +1611,6 @@ on the left, thus
    (.) f g x = f (g x)
 it'd only inline when applied to three arguments.  This slightly-experimental
 change was requested by Roman, but it seems to make sense.
-
-See also Note [Inlining an InlineRule] in GHC.Core.Unfold.
-
 
 Note [OccInfo in unfoldings and rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

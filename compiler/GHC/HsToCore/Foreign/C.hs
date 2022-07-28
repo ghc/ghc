@@ -324,9 +324,8 @@ dsFCall fn_id co fcall mDeclHeader = do
         wrap_rhs     = mkLams (tvs ++ args) wrapper_body
         wrap_rhs'    = Cast wrap_rhs co
         simpl_opts   = initSimpleOpts dflags
-        fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfoldingWithArity
-                                                (length args)
-                                                simpl_opts
+        fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfoldingWithArity simpl_opts
+                                                StableSystemSrc (length args)
                                                 wrap_rhs'
 
     return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], mempty, CStub cDoc [] [])

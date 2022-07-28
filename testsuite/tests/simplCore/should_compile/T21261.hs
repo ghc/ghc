@@ -1,3 +1,9 @@
+{-# OPTIONS_GHC -fno-worker-wrapper #-}
+
+-- The -fno-worker-wrapper stops f1, f2 etc from worker/wrappering
+-- via CPR analysis, after which they inline ane confuse the
+-- detection of eta-expansion or otherwise
+
 module T21261 where
 
 -- README: The convention here is that bindings starting with 'yes' should be

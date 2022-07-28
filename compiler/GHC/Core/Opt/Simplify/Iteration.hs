@@ -628,7 +628,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
                            , extendIdSubst (setInScopeFromF env floats) old_bndr $
                              DoneEx triv_rhs Nothing ) }
 
-          else do { wrap_unf <- mkLetUnfolding uf_opts top_lvl InlineRhs bndr triv_rhs
+          else do { wrap_unf <- mkLetUnfolding uf_opts top_lvl VanillaSrc bndr triv_rhs
                   ; let bndr' = bndr `setInlinePragma` mkCastWrapperInlinePrag (idInlinePragma bndr)
                                 `setIdUnfolding`  wrap_unf
                         floats' = floats `extendFloats` NonRec bndr' triv_rhs
@@ -659,7 +659,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
       = case realUnfoldingInfo info of -- NB: the real one, even for loop-breakers
            unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
              | isStableSource src -> return (unf { uf_tmpl = mkCast unf_rhs (mkSymCo co) })
-           _ -> mkLetUnfolding uf_opts top_lvl InlineRhs work_id work_rhs
+           _ -> mkLetUnfolding uf_opts top_lvl VanillaSrc work_id work_rhs
 
 tryCastWorkerWrapper env _ _ _ bndr rhs  -- All other bindings
   = do { traceSmpl "tcww:no" (vcat [ text "bndr:" <+> ppr bndr
@@ -841,7 +841,7 @@ makeTrivial env top_lvl dmd occ_fs expr
           -- the 'floats' from prepareRHS; but they are all fresh, so there is
           -- no danger of introducing name shadowig in eta expansion
 
-        ; unf <- mkLetUnfolding uf_opts top_lvl InlineRhs var expr2
+        ; unf <- mkLetUnfolding uf_opts top_lvl VanillaSrc var expr2
 
         ; let final_id = addLetBndrInfo var arity_type unf
               bind     = NonRec final_id expr2
@@ -4110,7 +4110,7 @@ simplLetUnfolding env bind_cxt id new_rhs rhs_ty arity unf
   | otherwise
   = -- Otherwise, we end up retaining all the SimpleEnv
     let !opts = seUnfoldingOpts env
-    in mkLetUnfolding opts (bindContextLevel bind_cxt) InlineRhs id new_rhs
+    in mkLetUnfolding opts (bindContextLevel bind_cxt) VanillaSrc id new_rhs
 
 -------------------
 mkLetUnfolding :: UnfoldingOpts -> TopLevelFlag -> UnfoldingSource

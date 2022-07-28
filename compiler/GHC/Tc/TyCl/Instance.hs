@@ -175,7 +175,7 @@ Note [Instances and loop breakers]
   inline df_i in it, and that in turn means that (since it'll be a
   loop-breaker because df_i isn't), op1_i will ironically never be
   inlined.  But this is OK: the recursion breaking happens by way of
-  a RULE (the magic ClassOp rule above), and RULES work inside InlineRule
+  a RULE (the magic ClassOp rule above), and RULES work inside stable
   unfoldings. See Note [RULEs enabled in InitialPhase] in GHC.Core.Opt.Simplify.Utils
 
 Note [ClassOp/DFun selection]
@@ -1349,7 +1349,7 @@ addDFunPrags :: DFunId -> [Id] -> DFunId
 -- is messing with.
 addDFunPrags dfun_id sc_meth_ids
  | is_newtype
-  = dfun_id `setIdUnfolding`  mkInlineUnfoldingWithArity 0 defaultSimpleOpts con_app
+  = dfun_id `setIdUnfolding`  mkInlineUnfoldingWithArity defaultSimpleOpts StableSystemSrc 0 con_app
             `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
  | otherwise
  = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_bndrs dict_con dict_args

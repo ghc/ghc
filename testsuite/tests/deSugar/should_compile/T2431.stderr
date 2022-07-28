@@ -7,7 +7,7 @@ Result size of Tidy Core
 T2431.$WRefl [InlPrag=INLINE[final] CONLIKE] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@a) -> T2431.Refl @a @a @~(<a>_N :: a GHC.Prim.~# a)}]
@@ -64,8 +64,8 @@ T2431.$tc:~: :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 T2431.$tc:~:
   = GHC.Types.TyCon
-      4608886815921030019##
-      6030312177285011233##
+      4608886815921030019##64
+      6030312177285011233##64
       T2431.$trModule
       $tc:~:2
       0#
@@ -103,8 +103,8 @@ T2431.$tc'Refl :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 T2431.$tc'Refl
   = GHC.Types.TyCon
-      2478588351447975921##
-      2684375695874497811##
+      2478588351447975921##64
+      2684375695874497811##64
       T2431.$trModule
       $tc'Refl2
       1#

@@ -57,6 +57,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core
 import GHC.Core.Unify( RoughMatchTc(..) )
 import GHC.Core.Utils
+import GHC.Core.Unfold( calcUnfoldingGuidance )
 import GHC.Core.Unfold.Make
 import GHC.Core.Lint
 import GHC.Core.Make
@@ -97,6 +98,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet ( mkUniqDSet )
 import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Types.Unique.Supply
+import GHC.Types.Demand( isDeadEndSig )
 import GHC.Types.Literal
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
@@ -1655,8 +1657,8 @@ tcIdInfo ignore_prags toplvl name ty info = do
     need_prag :: IfaceInfoItem -> Bool
       -- Always read in compulsory unfoldings
       -- See Note [Always expose compulsory unfoldings] in GHC.Iface.Tidy
-    need_prag (HsUnfold _ (IfCompulsory {})) = True
-    need_prag _                              = False
+    need_prag (HsUnfold _ (IfCoreUnfold src _ _)) = isCompulsorySource src
+    need_prag _ = False
 
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
     tcPrag info HsNoCafRefs        = return (info `setCafInfo`   NoCafRefs)
@@ -1716,25 +1718,16 @@ tcLFInfo lfi = case lfi of
 
 tcUnfolding :: TopLevelFlag -> Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
 -- See Note [Lazily checking Unfoldings]
-tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
+tcUnfolding toplvl name _ info (IfCoreUnfold src if_guidance if_expr)
   = do  { uf_opts <- unfoldingOpts <$> getDynFlags
-        ; expr <- tcUnfoldingRhs False toplvl name if_expr
-        ; let unf_src | stable    = InlineStable
-                      | otherwise = InlineRhs
-        ; return $ mkFinalUnfolding uf_opts unf_src strict_sig expr }
+        ; expr <- tcUnfoldingRhs (isCompulsorySource src) toplvl name if_expr
+        ; let guidance = case if_guidance of
+                 IfWhen arity unsat_ok boring_ok -> UnfWhen arity unsat_ok boring_ok
+                 IfNoGuidance -> calcUnfoldingGuidance uf_opts is_top_bottoming expr
+        ; return $ mkCoreUnfolding src True expr guidance }
   where
     -- Strictness should occur before unfolding!
-    strict_sig = dmdSigInfo info
-
-tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
-  = do  { expr <- tcUnfoldingRhs True toplvl name if_expr
-        ; return $ mkCompulsoryUnfolding' expr }
-
-tcUnfolding toplvl name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
-  = do  { expr <- tcUnfoldingRhs False toplvl name if_expr
-        ; return $ mkCoreUnfolding InlineStable True expr guidance }
-  where
-    guidance = UnfWhen { ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
+    is_top_bottoming = isTopLevel toplvl && isDeadEndSig (dmdSigInfo info)
 
 tcUnfolding _toplvl name dfun_ty _ (IfDFunUnfold bs ops)
   = bindIfaceBndrs bs $ \ bs' ->
@@ -1765,7 +1758,7 @@ in the middle of checking (so looking at it would cause a loop).
 
 Conclusion: `tcUnfolding` must return an `Unfolding` whose `uf_src` field is readable without
 forcing the `uf_tmpl` field. In particular, all the functions used at the end of
-`tcUnfolding` (such as `mkFinalUnfolding`, `mkCompulsoryUnfolding'`, `mkCoreUnfolding`) must be
+`tcUnfolding` (such as `mkFinalUnfolding`, `mkCoreUnfolding`) must be
 lazy in `expr`.
 
 Ticket #21139

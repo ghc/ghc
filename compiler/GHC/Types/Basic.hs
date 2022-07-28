@@ -98,6 +98,9 @@ module GHC.Types.Basic (
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
         pprInline, pprInlineDebug,
 
+        UnfoldingSource(..), isStableSource, isStableUserSource,
+        isStableSystemSource, isCompulsorySource,
+
         SuccessFlag(..), succeeded, failed, successIf,
 
         IntWithInf, infinity, treatZeroAsInf, subWithInf, mkIntWithInf, intGtLimit,
@@ -1433,7 +1436,7 @@ If you write nothing at all, you get defaultInlinePragma:
 It's not possible to get that combination by *writing* something, so
 if an Id has defaultInlinePragma it means the user didn't specify anything.
 
-If inl_inline = Inline or Inlineable, then the Id should have an InlineRule unfolding.
+If inl_inline = Inline or Inlineable, then the Id should have a stable unfolding.
 
 If you want to know where InlinePragmas take effect: Look in GHC.HsToCore.Binds.makeCorePair
 
@@ -1778,6 +1781,62 @@ pprInline' emptyInline (InlinePragma
               | otherwise      = ppr info
 
 
+{- *********************************************************************
+*                                                                      *
+                 UnfoldingSource
+*                                                                      *
+********************************************************************* -}
+
+data UnfoldingSource
+  = -- See also Note [Historical note: unfoldings for wrappers]
+    VanillaSrc         -- The current rhs of the function
+                       -- Replace uf_tmpl each time around
+
+  -- See Note [Stable unfoldings] in GHC.Core
+  | StableUserSrc   -- From a user-specified INLINE or INLINABLE pragma
+  | StableSystemSrc -- From a wrapper, or system-generated unfolding
+
+  | CompulsorySrc   -- Something that *has* no binding, so you *must* inline it
+                    -- Only a few primop-like things have this property
+                    -- (see "GHC.Types.Id.Make", calls to mkCompulsoryUnfolding).
+                    -- Inline absolutely always, however boring the context.
+
+isStableUserSource :: UnfoldingSource -> Bool
+isStableUserSource StableUserSrc = True
+isStableUserSource _             = False
+
+isStableSystemSource :: UnfoldingSource -> Bool
+isStableSystemSource StableSystemSrc = True
+isStableSystemSource _               = False
+
+isCompulsorySource :: UnfoldingSource -> Bool
+isCompulsorySource CompulsorySrc = True
+isCompulsorySource _             = False
+
+isStableSource :: UnfoldingSource -> Bool
+isStableSource CompulsorySrc   = True
+isStableSource StableSystemSrc = True
+isStableSource StableUserSrc   = True
+isStableSource VanillaSrc      = False
+
+instance Binary UnfoldingSource where
+    put_ bh CompulsorySrc   = putByte bh 0
+    put_ bh StableUserSrc   = putByte bh 1
+    put_ bh StableSystemSrc = putByte bh 2
+    put_ bh VanillaSrc      = putByte bh 3
+    get bh = do
+        h <- getByte bh
+        case h of
+            0 -> return CompulsorySrc
+            1 -> return StableUserSrc
+            2 -> return StableSystemSrc
+            _ -> return VanillaSrc
+
+instance Outputable UnfoldingSource where
+  ppr CompulsorySrc     = text "Compulsory"
+  ppr StableUserSrc     = text "StableUser"
+  ppr StableSystemSrc   = text "StableSystem"
+  ppr VanillaSrc        = text "<vanilla>"
 
 {-
 ************************************************************************

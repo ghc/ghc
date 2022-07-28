@@ -618,11 +618,6 @@ instance Outputable UnfoldingGuidance where
                int size,
                int discount ]
 
-instance Outputable UnfoldingSource where
-  ppr InlineCompulsory  = text "Compulsory"
-  ppr InlineStable      = text "InlineStable"
-  ppr InlineRhs         = text "<vanilla>"
-
 instance Outputable Unfolding where
   ppr NoUnfolding                = text "No unfolding"
   ppr BootUnfolding              = text "No unfolding (from boot)"

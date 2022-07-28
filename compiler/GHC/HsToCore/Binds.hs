@@ -390,7 +390,7 @@ makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr
 makeCorePair dflags gbl_id is_default_method dict_arity rhs
   | is_default_method    -- Default methods are *always* inlined
                          -- See Note [INLINE and default methods] in GHC.Tc.TyCl.Instance
-  = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding simpl_opts rhs, rhs)
+  = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding' simpl_opts rhs, rhs)
 
   | otherwise
   = case inlinePragmaSpec inline_prag of
@@ -402,19 +402,20 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
   where
     simpl_opts    = initSimpleOpts dflags
     inline_prag   = idInlinePragma gbl_id
-    inlinable_unf = mkInlinableUnfolding simpl_opts rhs
+    inlinable_unf = mkInlinableUnfolding simpl_opts StableUserSrc rhs
     inline_pair
        | Just arity <- inlinePragmaSat inline_prag
         -- Add an Unfolding for an INLINE (but not for NOINLINE)
         -- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
        , let real_arity = dict_arity + arity
-        -- NB: The arity in the InlineRule takes account of the dictionaries
-       = ( gbl_id `setIdUnfolding` mkInlineUnfoldingWithArity real_arity simpl_opts rhs
+        -- NB: The arity passed to mkInlineUnfoldingWithArity
+        --     must take account of the dictionaries
+       = ( gbl_id `setIdUnfolding` mkInlineUnfoldingWithArity simpl_opts StableUserSrc real_arity rhs
          , etaExpand real_arity rhs)
 
        | otherwise
        = pprTrace "makeCorePair: arity missing" (ppr gbl_id) $
-         (gbl_id `setIdUnfolding` mkInlineUnfolding simpl_opts rhs, rhs)
+         (gbl_id `setIdUnfolding` mkInlineUnfoldingNoArity simpl_opts StableUserSrc rhs, rhs)
 
 dictArity :: [Var] -> Arity
 -- Don't count coercion variables in arity
@@ -542,7 +543,7 @@ this:
         fromT :: T Bool -> Bool
         { fromT_1 ((TBool b)) = not b } } }
 
-Note the nested AbsBind.  The arity for the InlineRule on $cfromT should be
+Note the nested AbsBind.  The arity for the unfolding on $cfromT should be
 gotten from the binding for fromT_1.
 
 It might be better to have just one level of AbsBinds, but that requires more
@@ -976,7 +977,7 @@ And from that we want the rule
 
 But be careful!  That dInt might be GHC.Base.$fOrdInt, which is an External
 Name, and you can't bind them in a lambda or forall without getting things
-confused.   Likewise it might have an InlineRule or something, which would be
+confused.   Likewise it might have a stable unfolding or something, which would be
 utterly bogus. So we really make a fresh Id, with the same unique and type
 as the old one, but with an Internal name and no IdInfo.
 
