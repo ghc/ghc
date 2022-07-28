@@ -483,8 +483,8 @@ mkDictSelId name clas
 
     info | new_tycon
          = base_info `setInlinePragInfo` alwaysInlinePragma
-                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity 1
-                                           defaultSimpleOpts
+                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity defaultSimpleOpts
+                                           StableSystemSrc 1
                                            (mkDictSelRhs clas val_index)
                    -- See Note [Single-method classes] in GHC.Tc.TyCl.Instance
                    -- for why alwaysInlinePragma
@@ -492,8 +492,8 @@ mkDictSelId name clas
          | otherwise
          = base_info `setRuleInfo` mkRuleInfo [rule]
                      `setInlinePragInfo` neverInlinePragma
-                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity 1
-                                           defaultSimpleOpts
+                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity defaultSimpleOpts
+                                           StableSystemSrc 1
                                            (mkDictSelRhs clas val_index)
                    -- Add a magic BuiltinRule, but no unfolding
                    -- so that the rule is always available to fire.
@@ -600,7 +600,7 @@ mkDataConWorkId wkr_name data_con
     newtype_unf  = assertPpr (isVanillaDataCon data_con && isSingleton arg_tys)
                              (ppr data_con) $
                               -- Note [Newtype datacons]
-                   mkCompulsoryUnfolding defaultSimpleOpts $
+                   mkCompulsoryUnfolding $
                    mkLams univ_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
 
@@ -719,9 +719,9 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
              -- See Note [Inline partially-applied constructor wrappers]
              -- Passing Nothing here allows the wrapper to inline when
              -- unsaturated.
-             wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding defaultSimpleOpts wrap_rhs
+             wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding wrap_rhs
                         -- See Note [Compulsory newtype unfolding]
-                      | otherwise        = mkInlineUnfolding defaultSimpleOpts wrap_rhs
+                      | otherwise        = mkDataConUnfolding wrap_rhs
              wrap_rhs = mkLams wrap_tvs $
                         mkLams wrap_args $
                         wrapFamInstBody tycon res_ty_args $
@@ -1431,14 +1431,14 @@ nullAddrId :: Id
 nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts (Lit nullAddrLit)
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding (Lit nullAddrLit)
 
 ------------------------------------------------
 seqId :: Id     -- See Note [seqId magic]
 seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` inline_prag
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
                        `setArityInfo`      arity
 
     inline_prag
@@ -1484,7 +1484,7 @@ oneShotId :: Id -- See Note [The oneShot function]
 oneShotId = pcMiscPrelId oneShotName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
                        `setArityInfo`      arity
     ty  = mkInfForAllTys  [ runtimeRep1TyVar, runtimeRep2TyVar ] $
           mkSpecForAllTys [ openAlphaTyVar, openBetaTyVar ]      $
@@ -1525,7 +1525,7 @@ leftSectionId :: Id
 leftSectionId = pcMiscPrelId leftSectionName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
                        `setArityInfo`      arity
     ty  = mkInfForAllTys  [runtimeRep1TyVar,runtimeRep2TyVar, multiplicityTyVar1] $
           mkSpecForAllTys [openAlphaTyVar,  openBetaTyVar]    $
@@ -1550,7 +1550,7 @@ rightSectionId :: Id
 rightSectionId = pcMiscPrelId rightSectionName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
                        `setArityInfo`      arity
     ty  = mkInfForAllTys  [runtimeRep1TyVar,runtimeRep2TyVar,runtimeRep3TyVar
                           , multiplicityTyVar1, multiplicityTyVar2 ] $
@@ -1576,7 +1576,7 @@ coerceId :: Id
 coerceId = pcMiscPrelId coerceName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
                        `setArityInfo`      2
     eqRTy     = mkTyConApp coercibleTyCon  [ tYPE_r,         a, b ]
     eqRPrimTy = mkTyConApp eqReprPrimTyCon [ tYPE_r, tYPE_r, a, b ]
@@ -1813,7 +1813,7 @@ voidPrimId :: Id     -- Global constant :: Void#
                      -- We cannot define it in normal Haskell, since it's
                      -- a top-level unlifted value.
 voidPrimId  = pcMiscPrelId voidPrimIdName unboxedUnitTy
-                (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding defaultSimpleOpts unboxedUnitExpr)
+                (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding unboxedUnitExpr)
 
 unboxedUnitExpr :: CoreExpr
 unboxedUnitExpr = Var (dataConWorkId unboxedUnitDataCon)

@@ -875,9 +875,9 @@ dffvBind(x,r)
 dffvLetBndr :: Bool -> Id -> DFFV ()
 -- Gather the free vars of the RULES and unfolding of a binder
 -- We always get the free vars of a *stable* unfolding, but
--- for a *vanilla* one (InlineRhs), the flag controls what happens:
+-- for a *vanilla* one (VanillaSrc), the flag controls what happens:
 --   True <=> get fvs of even a *vanilla* unfolding
---   False <=> ignore an InlineRhs
+--   False <=> ignore a VanillaSrc
 -- For nested bindings (call from dffvBind) we always say "False" because
 --       we are taking the fvs of the RHS anyway
 -- For top-level bindings (call from addExternal, via bndrFvsInOrder)
@@ -889,10 +889,9 @@ dffvLetBndr vanilla_unfold id
     idinfo = idInfo id
 
     go_unf (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
-       = case src of
-           InlineRhs | vanilla_unfold -> dffvExpr rhs
-                     | otherwise      -> return ()
-           _                          -> dffvExpr rhs
+       | isStableSource src = dffvExpr rhs
+       | vanilla_unfold     = dffvExpr rhs
+       | otherwise          = return ()
 
     go_unf (DFunUnfolding { df_bndrs = bndrs, df_args = args })
              = extendScopeList bndrs $ mapM_ dffvExpr args
@@ -1292,7 +1291,6 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
                  = tidyTopUnfolding rhs_tidy_env tidy_rhs unf_info
                  | otherwise
                  = minimal_unfold_info
---    unf_from_rhs = mkFinalUnfolding uf_opts InlineRhs final_sig orig_rhs
      -- NB: use `orig_rhs` not `tidy_rhs` in this call to mkFinalUnfolding
      -- else you get a black hole (#22122). Reason: mkFinalUnfolding
      -- looks at IdInfo, and that is knot-tied in tidyTopBind (the Rec case)

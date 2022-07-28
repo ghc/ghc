@@ -1,25 +1,16 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 32, types: 23, coercions: 0, joins: 0/0}
+  = {terms: 32, types: 21, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 17, types: 10, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 17, types: 9, coercions: 0, joins: 0/0}
 f :: forall {a}. Num a => a -> Bool -> a -> a
 [GblId,
  Arity=4,
- Str=<S,1*U(1*C1(C1(U)),1*C1(C1(U)),A,A,A,A,A)><L,U><S,1*U><L,U>,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+ Str=<1P(MC1(C1(L)),MC1(C1(L)),A,A,A,A,A)><L><1L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@a)
-                 ($dNum [Occ=Once2] :: Num a)
-                 (x [Occ=Once2] :: a)
-                 (b [Occ=Once1!] :: Bool)
-                 (eta [Occ=Once2, OS=OneShot] :: a) ->
-                 case b of {
-                   False -> - @a $dNum x eta;
-                   True -> + @a $dNum x eta
-                 }}]
+         Guidance=IF_ARGS [60 0 70 0] 100 0}]
 f = \ (@a)
       ($dNum :: Num a)
       (x :: a)

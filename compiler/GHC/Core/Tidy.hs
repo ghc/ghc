@@ -400,7 +400,7 @@ two reasons:
 
   (a) To make printing tidy core nicer
 
-  (b) Because we tidy RULES and InlineRules, which may then propagate
+  (b) Because we tidy RULES and unfoldings, which may then propagate
       via --make into the compilation of the next module, and we want
       the benefit of that occurrence analysis when we use the rule or
       or inline the function.  In particular, it's vital not to lose

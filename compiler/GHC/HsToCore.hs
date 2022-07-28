@@ -787,7 +787,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
 
 
              info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                                `setUnfoldingInfo` mkCompulsoryUnfolding' rhs
+                                `setUnfoldingInfo` mkCompulsoryUnfolding rhs
                                 `setArityInfo`     arity
 
              ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar

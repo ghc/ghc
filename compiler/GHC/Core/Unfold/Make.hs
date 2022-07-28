@@ -8,13 +8,12 @@ module GHC.Core.Unfold.Make
    , mkFinalUnfolding
    , mkSimpleUnfolding
    , mkWorkerUnfolding
-   , mkInlineUnfolding
-   , mkInlineUnfoldingWithArity
+   , mkInlineUnfoldingWithArity, mkInlineUnfoldingNoArity
    , mkInlinableUnfolding
    , mkWrapperUnfolding
-   , mkCompulsoryUnfolding
-   , mkCompulsoryUnfolding'
+   , mkCompulsoryUnfolding, mkCompulsoryUnfolding'
    , mkDFunUnfolding
+   , mkDataConUnfolding
    , specUnfolding
    , certainlyWillInline
    )
@@ -50,15 +49,14 @@ mkFinalUnfolding opts src strict_sig expr
                 (isDeadEndSig strict_sig)
                 expr
 
--- | Used for things that absolutely must be unfolded
-mkCompulsoryUnfolding :: SimpleOpts -> CoreExpr -> Unfolding
-mkCompulsoryUnfolding opts expr = mkCompulsoryUnfolding' (simpleOptExpr opts expr)
+-- | Same as 'mkCompulsoryUnfolding' but simplifies the unfolding first
+mkCompulsoryUnfolding' :: SimpleOpts -> CoreExpr -> Unfolding
+mkCompulsoryUnfolding' opts expr = mkCompulsoryUnfolding (simpleOptExpr opts expr)
 
--- | Same as 'mkCompulsoryUnfolding' but no simple optimiser pass is performed
--- on the unfolding.
-mkCompulsoryUnfolding' :: CoreExpr -> Unfolding
-mkCompulsoryUnfolding' expr
-  = mkCoreUnfolding InlineCompulsory True
+-- | Used for things that absolutely must be unfolded
+mkCompulsoryUnfolding :: CoreExpr -> Unfolding
+mkCompulsoryUnfolding expr
+  = mkCoreUnfolding CompulsorySrc True
                     expr
                     (UnfWhen { ug_arity = 0    -- Arity of unfolding doesn't matter
                              , ug_unsat_ok = unSaturatedOk, ug_boring_ok = boringCxtOk })
@@ -71,7 +69,7 @@ mkCompulsoryUnfolding' expr
 
 mkSimpleUnfolding :: UnfoldingOpts -> CoreExpr -> Unfolding
 mkSimpleUnfolding !opts rhs
-  = mkUnfolding opts InlineRhs False False rhs
+  = mkUnfolding opts VanillaSrc False False rhs
 
 mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops
@@ -80,11 +78,21 @@ mkDFunUnfolding bndrs con ops
                   , df_args = map occurAnalyseExpr ops }
                   -- See Note [Occurrence analysis of unfoldings]
 
+mkDataConUnfolding :: CoreExpr -> Unfolding
+-- Used for non-newtype data constructors with non-trivial wrappers
+mkDataConUnfolding expr
+  = mkCoreUnfolding StableSystemSrc True expr guide
+    -- No need to simplify the expression
+  where
+    guide = UnfWhen { ug_arity     = manifestArity expr
+                    , ug_unsat_ok  = unSaturatedOk
+                    , ug_boring_ok = False }
+
 mkWrapperUnfolding :: SimpleOpts -> CoreExpr -> Arity -> Unfolding
 -- Make the unfolding for the wrapper in a worker/wrapper split
 -- after demand/CPR analysis
 mkWrapperUnfolding opts expr arity
-  = mkCoreUnfolding InlineStable True
+  = mkCoreUnfolding StableSystemSrc True
                     (simpleOptExpr opts expr)
                     (UnfWhen { ug_arity     = arity
                              , ug_unsat_ok  = unSaturatedOk
@@ -103,13 +111,13 @@ mkWorkerUnfolding opts work_fn
 
 mkWorkerUnfolding _ _ _ = noUnfolding
 
--- | Make an unfolding that may be used unsaturated
+-- | Make an INLINE unfolding that may be used unsaturated
 -- (ug_unsat_ok = unSaturatedOk) and that is reported as having its
 -- manifest arity (the number of outer lambdas applications will
 -- resolve before doing any work).
-mkInlineUnfolding :: SimpleOpts -> CoreExpr -> Unfolding
-mkInlineUnfolding opts expr
-  = mkCoreUnfolding InlineStable
+mkInlineUnfoldingNoArity :: SimpleOpts -> UnfoldingSource -> CoreExpr -> Unfolding
+mkInlineUnfoldingNoArity opts src expr
+  = mkCoreUnfolding src
                     True         -- Note [Top-level flag on inline rules]
                     expr' guide
   where
@@ -119,11 +127,11 @@ mkInlineUnfolding opts expr
                     , ug_boring_ok = boring_ok }
     boring_ok = inlineBoringOk expr'
 
--- | Make an unfolding that will be used once the RHS has been saturated
+-- | Make an INLINE unfolding that will be used once the RHS has been saturated
 -- to the given arity.
-mkInlineUnfoldingWithArity :: Arity -> SimpleOpts -> CoreExpr -> Unfolding
-mkInlineUnfoldingWithArity arity opts expr
-  = mkCoreUnfolding InlineStable
+mkInlineUnfoldingWithArity :: SimpleOpts -> UnfoldingSource -> Arity -> CoreExpr -> Unfolding
+mkInlineUnfoldingWithArity opts src arity expr
+  = mkCoreUnfolding src
                     True         -- Note [Top-level flag on inline rules]
                     expr' guide
   where
@@ -136,9 +144,9 @@ mkInlineUnfoldingWithArity arity opts expr
     boring_ok | arity == 0 = True
               | otherwise  = inlineBoringOk expr'
 
-mkInlinableUnfolding :: SimpleOpts -> CoreExpr -> Unfolding
-mkInlinableUnfolding opts expr
-  = mkUnfolding (so_uf_opts opts) InlineStable False False expr'
+mkInlinableUnfolding :: SimpleOpts -> UnfoldingSource -> CoreExpr -> Unfolding
+mkInlinableUnfolding opts src expr
+  = mkUnfolding (so_uf_opts opts) src False False expr'
   where
     expr' = simpleOptExpr opts expr
 
@@ -316,29 +324,29 @@ mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
                 -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
 mkCoreUnfolding src top_lvl expr guidance
-  =
+  = CoreUnfolding { uf_tmpl = is_value `seq`
+                              is_conlike `seq`
+                              is_work_free `seq`
+                              is_expandable `seq`
+                              occurAnalyseExpr expr
+      -- occAnalyseExpr: see Note [Occurrence analysis of unfoldings]
+      -- See #20905 for what a discussion of these 'seq's
+      -- We are careful to make sure we only
+      -- have one copy of an unfolding around at once.
+      -- Note [Thoughtful forcing in mkCoreUnfolding]
 
-  let is_value = exprIsHNF expr
-      is_conlike = exprIsConLike expr
-      is_work_free = exprIsWorkFree expr
-      is_expandable = exprIsExpandable expr
-  in
-  -- See #20905 for what is going on here. We are careful to make sure we only
-  -- have one copy of an unfolding around at once.
-  -- Note [Thoughtful forcing in mkCoreUnfolding]
-  CoreUnfolding { uf_tmpl         = is_value `seq`
-                                    is_conlike `seq`
-                                    is_work_free `seq`
-                                    is_expandable `seq`
-                                      occurAnalyseExpr expr,
-                      -- See Note [Occurrence analysis of unfoldings]
-                    uf_src          = src,
-                    uf_is_top       = top_lvl,
-                    uf_is_value     = is_value,
-                    uf_is_conlike   = is_conlike,
-                    uf_is_work_free = is_work_free,
-                    uf_expandable   = is_expandable,
-                    uf_guidance     = guidance }
+                  , uf_src          = src
+                  , uf_is_top       = top_lvl
+                  , uf_is_value     = is_value
+                  , uf_is_conlike   = is_conlike
+                  , uf_is_work_free = is_work_free
+                  , uf_expandable   = is_expandable
+                  , uf_guidance     = guidance }
+  where
+    is_value      = exprIsHNF expr
+    is_conlike    = exprIsConLike expr
+    is_work_free  = exprIsWorkFree expr
+    is_expandable = exprIsExpandable expr
 
 ----------------
 certainlyWillInline :: UnfoldingOpts -> IdInfo -> CoreExpr -> Maybe Unfolding
@@ -358,14 +366,12 @@ certainlyWillInline opts fn_info rhs'
              UnfIfGoodArgs { ug_size = size, ug_args = args }
                         -> do_cunf size args src' tmpl'
         where
-          src' = -- Do not change InlineCompulsory!
-                 case src of
-                   InlineCompulsory -> InlineCompulsory
-                   _                -> InlineStable
-          tmpl' = -- Do not overwrite stable unfoldings!
-                  case src of
-                    InlineRhs -> occurAnalyseExpr rhs'
-                    _         -> uf_tmpl fn_unf
+          src' | isCompulsorySource src = src  -- Do not change InlineCompulsory!
+               | otherwise              = StableSystemSrc
+
+          tmpl' | isStableSource src = uf_tmpl fn_unf
+                | otherwise          = occurAnalyseExpr rhs'
+                -- Do not overwrite stable unfoldings!
 
       DFunUnfolding {} -> Just fn_unf  -- Don't w/w DFuns; it never makes sense
                                        -- to do so, and even if it is currently a

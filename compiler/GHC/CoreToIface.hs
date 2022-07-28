@@ -501,20 +501,11 @@ toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs
                                 , uf_src = src
                                 , uf_guidance = guidance })
   = Just $ HsUnfold lb $
-    case src of
-        InlineStable
-          -> case guidance of
-               UnfWhen {ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok =  boring_ok }
-                      -> IfInlineRule arity unsat_ok boring_ok if_rhs
-               _other -> IfCoreUnfold True if_rhs
-        InlineCompulsory -> IfCompulsory if_rhs
-        InlineRhs        -> IfCoreUnfold False if_rhs
+    IfCoreUnfold src (toIfGuidance src guidance) (toIfaceExpr rhs)
         -- Yes, even if guidance is UnfNever, expose the unfolding
         -- If we didn't want to expose the unfolding, GHC.Iface.Tidy would
         -- have stuck in NoUnfolding.  For supercompilation we want
         -- to see that unfolding!
-  where
-    if_rhs = toIfaceExpr rhs
 
 toIfUnfolding lb (DFunUnfolding { df_bndrs = bndrs, df_args = args })
   = Just (HsUnfold lb (IfDFunUnfold (map toIfaceBndr bndrs) (map toIfaceExpr args)))
@@ -530,6 +521,12 @@ toIfUnfolding _ BootUnfolding = Nothing
   -- Can't happen; we only have BootUnfolding for imported binders
 
 toIfUnfolding _ NoUnfolding = Nothing
+
+toIfGuidance :: UnfoldingSource -> UnfoldingGuidance -> IfGuidance
+toIfGuidance src guidance
+  | UnfWhen arity unsat_ok boring_ok <- guidance
+  , isStableSource src = IfWhen arity unsat_ok boring_ok
+  | otherwise          = IfNoGuidance
 
 {-
 ************************************************************************

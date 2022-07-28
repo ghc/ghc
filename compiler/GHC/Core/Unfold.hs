@@ -1307,20 +1307,6 @@ Note [Things to watch]
     Make sure that x does not inline unconditionally!
     Lest we get extra allocation.
 
-Note [Inlining an InlineRule]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An InlineRules is used for
-  (a) programmer INLINE pragmas
-  (b) inlinings from worker/wrapper
-
-For (a) the RHS may be large, and our contract is that we *only* inline
-when the function is applied to all the arguments on the LHS of the
-source-code defn.  (The uf_arity in the rule.)
-
-However for worker/wrapper it may be worth inlining even if the
-arity is not satisfied (as we do in the CoreUnfolding case) so we don't
-require saturation.
-
 Note [Nested functions]
 ~~~~~~~~~~~~~~~~~~~~~~~
 At one time we treated a call of a non-top-level function as
@@ -1399,8 +1385,8 @@ RULE) so there's no gain.
 However, watch out:
 
  * Consider this:
-        foo = _inline_ (\n. [n])
-        bar = _inline_ (foo 20)
+        foo = \n. [n])  {-# INLINE foo #-}
+        bar = foo 20    {-# INLINE bar #-}
         baz = \n. case bar of { (m:_) -> m + n }
    Here we really want to inline 'bar' so that we can inline 'foo'
    and the whole thing unravels as it should obviously do.  This is
@@ -1408,9 +1394,9 @@ However, watch out:
    structure rather than a list.
 
    So the non-inlining of lone_variables should only apply if the
-   unfolding is regarded as cheap; because that is when exprIsConApp_maybe
-   looks through the unfolding.  Hence the "&& is_wf" in the
-   InlineRule branch.
+   unfolding is regarded as expandable; because that is when
+   exprIsConApp_maybe looks through the unfolding.  Hence the "&&
+   is_exp" in the CaseCtxt branch of interesting_call
 
  * Even a type application or coercion isn't a lone variable.
    Consider
