@@ -59,8 +59,56 @@ function h$hs_quotWord64(h1,l1,h2,l2) {
 }
 
 function h$hs_timesInt64(h1,l1,h2,l2) {
-  var c = goog.math.Long.fromBits(l1,h1).multiply(goog.math.Long.fromBits(l2,h2));
-  RETURN_UBX_TUP2(c.getHighBits(), c.getLowBits());
+  // check for 0 and 1 operands
+  if (h1 === 0) {
+    if (l1 === 0) {
+      RETURN_UBX_TUP2(0,0);
+    }
+    if (l1 === 1) {
+      RETURN_UBX_TUP2(h2,l2);
+    }
+  }
+  if (h2 === 0) {
+    if (l2 === 0) {
+      RETURN_UBX_TUP2(0,0);
+    }
+    if (l2 === 1) {
+      RETURN_UBX_TUP2(h1,l1);
+    }
+  }
+
+  var a48 = h1 >>> 16;
+  var a32 = h1 & 0xFFFF;
+  var a16 = l1 >>> 16;
+  var a00 = l1 & 0xFFFF;
+
+  var b48 = h2 >>> 16;
+  var b32 = h2 & 0xFFFF;
+  var b16 = l2 >>> 16;
+  var b00 = l2 & 0xFFFF;
+
+  var c48 = 0, c32 = 0, c16 = 0, c00 = 0;
+  c00 += a00 * b00;
+  c16 += c00 >>> 16;
+  c00 &= 0xFFFF;
+  c16 += a16 * b00;
+  c32 += c16 >>> 16;
+  c16 &= 0xFFFF;
+  c16 += a00 * b16;
+  c32 += c16 >>> 16;
+  c16 &= 0xFFFF;
+  c32 += a32 * b00;
+  c48 += c32 >>> 16;
+  c32 &= 0xFFFF;
+  c32 += a16 * b16;
+  c48 += c32 >>> 16;
+  c32 &= 0xFFFF;
+  c32 += a00 * b32;
+  c48 += c32 >>> 16;
+  c32 &= 0xFFFF;
+  c48 += a48 * b00 + a32 * b16 + a16 * b32 + a00 * b48;
+  c48 &= 0xFFFF;
+  RETURN_UBX_TUP2((c48 << 16) | c32, (c16 << 16) | c00);
 }
 
 function h$hs_quotInt64(h1,l1,h2,l2) {
@@ -237,13 +285,121 @@ var h$mulInt32 = Math.imul ? Math.imul : h$imul_shim;
 // }
 // var hs_mulInt32 = h$mulInt32;
 
-function h$mulWord32(a,b) {
-  return goog.math.Long.fromBits(a,0).multiply(goog.math.Long.fromBits(b,0)).getLowBits();
+
+// Compute product of two Ints. Returns (nh,ch,cl)
+// where (ch,cl) are the two parts of the 64-bit result
+// and nh is 0 if ch can be safely dropped (i.e. it's a sign-extension of cl).
+function h$hs_timesInt2(l1,l2) {
+  // check for 0 and 1 operands
+  if (l1 === 0) {
+    RETURN_UBX_TUP3(0,0,0);
+  }
+  if (l2 === 0) {
+    RETURN_UBX_TUP3(0,0,0);
+  }
+  if (l1 === 1) {
+    RETURN_UBX_TUP3(0,0,l2);
+  }
+  if (l2 === 1) {
+    RETURN_UBX_TUP3(0,0,l1);
+  }
+
+  var a16 = l1 >>> 16;
+  var a00 = l1 & 0xFFFF;
+
+  var b16 = l2 >>> 16;
+  var b00 = l2 & 0xFFFF;
+
+  var c48 = 0, c32 = 0, c16 = 0, c00 = 0;
+  c00 += a00 * b00;
+  c16 += c00 >>> 16;
+  c00 &= 0xFFFF;
+  c16 += a16 * b00;
+  c32 += c16 >>> 16;
+  c16 &= 0xFFFF;
+  c16 += a00 * b16;
+  c32 += c16 >>> 16;
+  c16 &= 0xFFFF;
+  c32 &= 0xFFFF;
+  c32 += a16 * b16;
+  c48 += c32 >>> 16;
+  c32 &= 0xFFFF;
+  c48 &= 0xFFFF;
+  var ch = (c48 << 16) | c32
+  var cl = (c16 << 16) | c00
+  var nh = (ch === 0 || (ch === -1 && cl < 0)) ? 0 : 1
+  RETURN_UBX_TUP3(nh, ch, cl);
 }
 
-function h$mul2Word32(a,b) {
-  var c = goog.math.Long.fromBits(a,0).multiply(goog.math.Long.fromBits(b,0));
-  RETURN_UBX_TUP2(c.getHighBits(), c.getLowBits());
+
+function h$mulWord32(l1,l2) {
+  // check for 0 and 1 operands
+  if (l1 === 0) {
+    return 0;
+  }
+  if (l1 === 1) {
+    return l2;
+  }
+  if (l2 === 0) {
+    return 0;
+  }
+  if (l2 === 1) {
+    return l1;
+  }
+
+  var a16 = l1 >>> 16;
+  var a00 = l1 & 0xFFFF;
+
+  var b16 = l2 >>> 16;
+  var b00 = l2 & 0xFFFF;
+
+  var c16 = 0, c00 = 0;
+  c00 += a00 * b00;
+  c16 += c00 >>> 16;
+  c00 &= 0xFFFF;
+  c16 += a16 * b00;
+  c16 &= 0xFFFF;
+  c16 += a00 * b16;
+  c16 &= 0xFFFF;
+  return ((c16 << 16) | c00);
+}
+
+function h$mul2Word32(l1,l2) {
+  // check for 0 and 1 operands
+  if (l1 === 0) {
+    RETURN_UBX_TUP2(0,0);
+  }
+  if (l1 === 1) {
+    RETURN_UBX_TUP2(0,l2);
+  }
+  if (l2 === 0) {
+    RETURN_UBX_TUP2(0,0);
+  }
+  if (l2 === 1) {
+    RETURN_UBX_TUP2(0,l1);
+  }
+
+  var a16 = l1 >>> 16;
+  var a00 = l1 & 0xFFFF;
+
+  var b16 = l2 >>> 16;
+  var b00 = l2 & 0xFFFF;
+
+  var c48 = 0, c32 = 0, c16 = 0, c00 = 0;
+  c00 += a00 * b00;
+  c16 += c00 >>> 16;
+  c00 &= 0xFFFF;
+  c16 += a16 * b00;
+  c32 += c16 >>> 16;
+  c16 &= 0xFFFF;
+  c16 += a00 * b16;
+  c32 += c16 >>> 16;
+  c16 &= 0xFFFF;
+  c32 += a16 * b16;
+  c48 += c32 >>> 16;
+  c32 &= 0xFFFF;
+  c48 &= 0xFFFF;
+  RETURN_UBX_TUP2((c48 << 16) | c32, (c16 << 16) | c00);
 }
 
 function h$quotWord32(a,b) {
@@ -567,4 +723,41 @@ if(typeof Math.fround === 'function') {
     h$truncateFloat_buf[0] = f;
     return h$truncateFloat_buf[0];
   }
+}
+
+function h$decodeDoubleInt64(d) {
+  if(isNaN(d)) {
+    RETURN_UBX_TUP3(972, -1572864, 0);
+  }
+  h$convertDouble[0] = d;
+  var i0 = h$convertInt[0], i1 = h$convertInt[1];
+  var exp = (i1&2146435072)>>>20;
+  var ret1, ret2 = i0, ret3;
+  if(exp === 0) { // denormal or zero
+    if((i1&2147483647) === 0 && ret2 === 0) {
+      ret1 = 0;
+      ret3 = 0;
+    } else {
+      h$convertDouble[0] = d*9007199254740992;
+      i1 = h$convertInt[1];
+      ret1 = (i1&1048575)|1048576;
+      ret2 = h$convertInt[0];
+      ret3 = ((i1&2146435072)>>>20)-1128;
+    }
+  } else {
+    ret3 = exp-1075;
+    ret1 = (i1&1048575)|1048576;
+  }
+  // negate mantissa for negative input
+  if(d < 0) {
+    if(ret2 === 0) {
+      ret1 = ((~ret1) + 1) | 0;
+      // ret2 = 0;
+    } else {
+      ret1 = ~ret1;
+      ret2 = ((~ret2) + 1) | 0;
+    }
+  }
+  // prim ubx tup returns don't return the first value!
+  RETURN_UBX_TUP3(ret3,ret1,ret2);
 }

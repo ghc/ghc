@@ -61,6 +61,7 @@ genPrim prof ty = \case
   IntAddOp        -> \[r] [x,y] -> PrimInline $ r |= trunc (Add x y)
   IntSubOp        -> \[r] [x,y] -> PrimInline $ r |= trunc (Sub x y)
   IntMulOp        -> \[r] [x,y] -> PrimInline $ r |= app "h$mulInt32" [x, y]
+  IntMul2Op       -> \[c,hr,lr] [x,y] -> PrimInline $ appT [c,hr,lr] "h$hs_timesInt2" [x, y]
 -- fixme may will give the wrong result in case of overflow
   IntMulMayOfloOp -> \[r] [x,y] -> PrimInline $ jVar \tmp -> mconcat
                                             [ tmp |= Mul x y
