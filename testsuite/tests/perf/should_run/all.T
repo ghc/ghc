@@ -395,3 +395,11 @@ test('T19347',
     compile_and_run,
     ['-O'])
 
+# Track perf of generics based binary instances
+test('T21839r',
+    [   collect_stats('bytes allocated', 10),
+        collect_runtime_residency(10),
+        collect_compiler_stats('bytes allocated', 1),
+        only_ways(['normal'])],
+    compile_and_run,
+    ['-O'])
