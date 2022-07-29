@@ -9,6 +9,8 @@
 {-# LANGUAGE UnboxedTuples #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Eta reduce" #-}
 module GHC.CmmToWasm
    ( wasmCodeGen
    )
@@ -16,31 +18,12 @@ where
 
 import GHC.Prelude
 
-import qualified GHC.CmmToAsm.X86   as X86
-import qualified GHC.CmmToAsm.PPC   as PPC
-import qualified GHC.CmmToAsm.AArch64 as AArch64
 
 import GHC.CmmToAsm.Reg.Liveness
-import qualified GHC.CmmToAsm.Reg.Linear                as Linear
 
-import qualified GHC.Data.Graph.Color                   as Color
-import qualified GHC.CmmToAsm.Reg.Graph                 as Color
-import qualified GHC.CmmToAsm.Reg.Graph.Stats           as Color
-import qualified GHC.CmmToAsm.Reg.Graph.TrivColorable   as Color
 
-import GHC.Utils.Asm
-import GHC.CmmToAsm.Reg.Target
-import GHC.Platform
-import GHC.CmmToAsm.BlockLayout as BlockLayout
-import GHC.Settings.Config
-import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
-import GHC.Platform.Reg
-import GHC.Platform.Reg.Class (RegClass)
 import GHC.CmmToAsm.Monad
-import GHC.CmmToAsm.CFG
-import GHC.CmmToAsm.Dwarf
-import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
 import GHC.Cmm.DebugBlock
 
@@ -68,26 +51,19 @@ import GHC.Utils.Logger
 import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.BufHandle
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Exception (evaluate)
-import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Wasm.ControlFlow
 
 import GHC.Data.FastString
-import GHC.Types.Unique.Set
 import GHC.Unit
 import GHC.Data.Stream (Stream)
 import qualified GHC.Data.Stream as Stream
 
-import Data.List (sortBy, groupBy)
-import Data.Maybe
-import Data.Ord         ( comparing )
 import Control.Monad
 import System.IO
 
-import Data.ByteString.Builder
 
 --------------------
 
@@ -97,8 +73,8 @@ data WasmGenImpl a c = WasmGenImpl a c WasmGenConfig
 wcgConfig :: WasmGenImpl a c -> WasmGenConfig
 wcgConfig (WasmGenImpl _ _ cfg) = cfg
 
-type WasmExpr = CmmExpr
-data WasmActions = NoActions
+type WasmExpr = CmmExpr -- XXX placeholders
+type WasmActions = ()
 
 
 
@@ -115,6 +91,28 @@ wasmCodeGen logger config modLoc h us cmms
 
 type Wasm = WasmControl WasmActions WasmExpr
 type WasmCmmDecl statics = GenCmmDecl statics (LabelMap RawCmmStatics) Wasm
+
+wasmCodeGen' ::
+                  Logger
+               -> WasmGenConfig
+               -> ModLocation
+               -> WasmGenImpl statics jumpDest
+               -> Handle
+               -> UniqSupply
+               -> Stream IO RawCmmGroup a
+               -> IO a
+wasmCodeGen' logger config modLoc wcgImpl h us cmms
+ = do
+        -- BufHandle is a performance hack.  We could hide it inside
+        -- Pretty if it weren't for the fact that we do lots of little
+        -- printDocs here (in order to do codegen in constant space).
+        bufh <- newBufHandle h
+        let wgs0 = WGS [] [] [] [] emptyUFM mapEmpty
+        (wgs, us', a) <- wasmCodeGenStream logger config modLoc wcgImpl bufh us
+                                           cmms wgs0
+        _ <- finishWasmGen logger config modLoc bufh us' wgs
+        return a
+
 
 -- | Data accumulated during code generation. Mostly about statistics,
 -- but also collects debug data for DWARF generation.
@@ -159,17 +157,17 @@ See also Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
 
 -- XXX TODO replace prettyprinter with Data.ByteString.Builder
 
-wasmCodeGen' :: forall statics jumpDest a
+wasmCodeGenStream :: forall statics jumpDest a
               . Logger
              -> WasmGenConfig
              -> ModLocation
              -> WasmGenImpl statics jumpDest
-             -> Handle
+             -> BufHandle
              -> UniqSupply
              -> Stream IO RawCmmGroup a
              -> WasmGenAcc statics
              -> IO (WasmGenAcc statics, UniqSupply, a)
-wasmCodeGen' logger config modLoc wcgImpl h us cmms wgs
+wasmCodeGenStream logger config modLoc wcgImpl h us cmms wgs
  = loop us (Stream.runStream cmms) wgs
   where
     wcglabel = text "WasmCodeGen"
@@ -196,11 +194,7 @@ wasmCodeGen' logger config modLoc wcgImpl h us cmms wgs
                   dbgMap = debugToMap ndbgs
 
               -- Generate native code
-                         -- BufHandle is a performance hack.  We could hide it inside
-                         -- Pretty if it weren't for the fact that we do lots of little
-                         -- printDocs here (in order to do codegen in constant space).
-              bufh <- newBufHandle h
-              (wgs',us') <- cmmWasmGens logger config modLoc wcgImpl bufh
+              (wgs',us') <- cmmWasmGens logger config modLoc wcgImpl h
                                         dbgMap us cmms wgs 0
 
               -- Link native code information into debug blocks
@@ -233,7 +227,7 @@ finishWasmGen :: Logger
                 -> UniqSupply
                 -> WasmGenAcc statics
                 -> IO UniqSupply
-finishWasmGen logger config modLoc bufh@(BufHandle _ _ h) us wgs
+finishWasmGen logger config _modLoc bufh@(BufHandle _ _ h) us wgs
  = withTimingSilent logger (text "WCG") (`seq` ()) $ do
         -- Write debug data and finish
         bFlush bufh
@@ -242,13 +236,12 @@ finishWasmGen logger config modLoc bufh@(BufHandle _ _ h) us wgs
         let ctx = wcgAsmContext config
         printSDocLn ctx Pretty.LeftMode h
                 $ makeImportsDoc config (concat (wgs_imports wgs))
-        return us
-  where
-    dump_stats = logDumpFile logger (mkDumpStyle alwaysQualify)
-                   Opt_D_dump_asm_stats "WCG stats"
-                   FormatText
 
-cmmWasmGens :: forall statics jumpDest a .
+        -- stats could be dumped here
+        return us
+
+
+cmmWasmGens :: forall statics jumpDest .
                  Logger
               -> WasmGenConfig
               -> ModLocation
@@ -279,17 +272,11 @@ cmmWasmGens logger config modLoc wcgImpl h dbgMap = go
                           cmm count
 
         -- Generate .file directives for every new file that has been
-        -- used. Note that it is important that we generate these in
-        -- ascending order, as Clang's 3.6 assembler complains.
-        let newFileIds = sortBy (comparing snd) $
-                         nonDetEltsUFM $ fileIds' `minusUFM` fileIds
-            -- See Note [Unique Determinism and code generation]
-            pprDecl (f,n) = text "\t.file " <> ppr n <+>
-                            pprFilePathString (unpackFS f)
+        -- used. (XXX not yet in wasm)
+        let _newFileIds = nonDetEltsUFM $ fileIds' `minusUFM` fileIds
 
              -- XXX TODO will want config to say text vs binary
         emitWasmText logger config h $ vcat $
-          -- map pprDecl newFileIds ++
           map (pprWasmCmmDecl wcgImpl) wasm
 
         -- force evaluation all this stuff to avoid space leaks
@@ -301,7 +288,6 @@ cmmWasmGens logger config modLoc wcgImpl h dbgMap = go
             !wasms'  = if logHasDumpFlag logger Opt_D_dump_asm_stats
                         then wasm : wgs_wasms wgs else []
 
-            mCon = maybe id (:)
             wgs' = wgs{ wgs_imports     = imports : wgs_imports wgs
                       , wgs_wasms       = wasms'
                       , wgs_labels      = wgs_labels wgs ++ labels'
@@ -351,12 +337,12 @@ cmmWasmGen
             , LabelMap [UnwindPoint]                    -- unwinding information for blocks
             )
 
-cmmWasmGen logger modLoc wcgImpl us fileIds dbgMap cmm count
- = do
+cmmWasmGen logger modLoc wcgImpl us fileIds dbgMap cmm _count
+ = do -- _count used in NCG to identify dumped stats
         let config   = wcgConfig wcgImpl
         let platform = wcgPlatform config
 
-        let proc_name = case cmm of
+        let _proc_name = case cmm of
                 (CmmProc _ entry_label _ _) -> pdoc platform entry_label
                 _                           -> text "DataChunk"
 
@@ -404,7 +390,7 @@ cmmWasmGen logger modLoc wcgImpl us fileIds dbgMap cmm count
 -- | Build a doc for all the imports.
 --
 makeImportsDoc :: WasmGenConfig -> [CLabel] -> SDoc
-makeImportsDoc config imports = unimp "way to specify imports for a Wasm module"
+makeImportsDoc _config _imports = unimp "way to specify imports for a Wasm module"
 
 pprWasmCmmDecl :: WasmGenImpl statics jumpDest -> WasmCmmDecl statics -> SDoc
 pprWasmCmmDecl _ = unimp "emit Wasm code (and change SDoc to Builder)"
@@ -430,7 +416,7 @@ genWasmCode
                 , DwarfFiles
                 )
 
-genWasmCode config modLoc cmmTopCodeGen fileIds dbgMap cmm_top
+genWasmCode _config _modLoc _cmmTopCodeGen _fileIds _dbgMap _cmm_top
   = unimp "code generation with last-minute imports and dwarf files"
 
 wasmTopCodeGen :: RawCmmDecl -> CGMonad [WasmCmmDecl statics]
@@ -568,7 +554,6 @@ cmmExprNative :: ReferenceKind -> CmmExpr -> CmmOptM CmmExpr
 cmmExprNative referenceKind expr = do
      config <- getCmmOptConfig
      let platform = wcgPlatform config
-         arch = platformArch platform
          directJump = True -- see usage below
      case expr of
         CmmLoad addr rep align
@@ -592,7 +577,7 @@ cmmExprNative referenceKind expr = do
                 -- need to optimize here, since it's late
                 return $ cmmMachOpFold platform (MO_Add (wordWidth platform)) [
                     dynRef,
-                    (CmmLit $ CmmInt (fromIntegral off) (wordWidth platform))
+                    CmmLit $ CmmInt (fromIntegral off) (wordWidth platform)
                   ]
 
         -- XXX keeping these around until we see if something similar applies on wasm
@@ -624,5 +609,5 @@ wasmMakeDynamicReference
   -> CLabel            -- the label
   -> m CmmExpr
 
-wasmMakeDynamicReference config referenceKind lbl =
+wasmMakeDynamicReference _config _referenceKind _lbl =
     unimp "convert CLabel to something Wasm can understand"
