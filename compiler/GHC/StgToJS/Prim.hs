@@ -99,7 +99,7 @@ genPrim prof ty = \case
   IntLtOp           -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<. y)
   IntLeOp           -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<=. y)
   ChrOp             -> \[r] [x]   -> PrimInline $ r |= x
-  IntToWordOp       -> \[r] [x]   -> PrimInline $ r |= x
+  IntToWordOp       -> \[r] [x]   -> PrimInline $ r |= x .>>>. 0
   IntToFloatOp      -> \[r] [x]   -> PrimInline $ r |= x
   IntToDoubleOp     -> \[r] [x]   -> PrimInline $ r |= x
   IntSllOp          -> \[r] [x,y] -> PrimInline $ r |= x .<<. y
@@ -126,6 +126,8 @@ genPrim prof ty = \case
   Int8LeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .<<. (Int 24)) .<=. (y .<<. (Int 24)))
   Int8LtOp          -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .<<. (Int 24)) .<.  (y .<<. (Int 24)))
   Int8NeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
+
+  Int8SraOp         -> \[r] [x,i]   -> PrimInline $ r |= x .>>. i
 
 ------------------------------ Word8 --------------------------------------------
 
@@ -154,7 +156,7 @@ genPrim prof ty = \case
   Word8NotOp         -> \[r] [x]     -> PrimInline $ r |= BXor x (Int 0xff)
 
   Word8SllOp         -> \[r] [x,i]   -> PrimInline $ r |= mask8 (x .<<. i)
-  Word8SrlOp         -> \[r] [x,i]   -> PrimInline $ r |= x .>>. i
+  Word8SrlOp         -> \[r] [x,i]   -> PrimInline $ r |= x .>>>. i
 
 ------------------------------ Int16 -------------------------------------------
 
@@ -205,7 +207,7 @@ genPrim prof ty = \case
   Word16NotOp        -> \[r] [x]     -> PrimInline $ r |= BXor x (Int 0xffff)
 
   Word16SllOp        -> \[r] [x,i]   -> PrimInline $ r |= mask16 (x .<<. i)
-  Word16SrlOp        -> \[r] [x,i]   -> PrimInline $ r |= x .>>. i
+  Word16SrlOp        -> \[r] [x,i]   -> PrimInline $ r |= x .>>>. i
 
 ------------------------------ Int32 --------------------------------------------
 
