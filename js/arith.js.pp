@@ -327,7 +327,7 @@ function h$hs_timesInt2(l1,l2) {
   c48 &= 0xFFFF;
   var ch = (c48 << 16) | c32
   var cl = (c16 << 16) | c00
-  var nh = (ch === 0 || (ch === -1 && cl < 0)) ? 0 : 1
+  var nh = ((ch === 0 && cl >= 0) || (ch === -1 && cl < 0)) ? 0 : 1
   RETURN_UBX_TUP3(nh, ch, cl);
 }
 
@@ -431,16 +431,61 @@ function h$quotRemWord32(n,d) {
   RETURN_UBX_TUP2((q + (c ? 1 : 0)) >>> 0, (r - (c ? q : 0)) >>> 0);
 }
 
-function h$quotRem2Word32(h1,l1,b) {
-/*  var a = h$bigFromWord64(h1,l1);
-  var b = h$bigFromWord(b);
- var d = a.divide(b); */
-  /* var a = h$ghcjsbn_mkBigNat_ww(h1,l1);
-  var b = h$ghcjsbn_mkBigNat_w(b); */
-  var q = [], r = [];
-  h$ghcjsbn_quotRem_bb(q,r,h$ghcjsbn_mkBigNat_ww(h1,l1),h$ghcjsbn_mkBigNat_w(b));
-  RETURN_UBX_TUP2(h$ghcjsbn_toWord_b(q), h$ghcjsbn_toWord_b(r));
-  // RETURN_UBX_TUP2(d.intValue(), a.subtract(b.multiply(d)).intValue());
+#define UN(x) ((x)>>>0)
+
+function h$quotRem2Word32(nh,nl,d) {
+  // from Hacker's Delight book (p196)
+
+  nh = UN(nh);
+  nl = UN(nl);
+  d  = UN(d);
+
+  if (nh >= d) {
+    // WordQuotRem2Op requires that high word < divisor
+    throw "h$quotRem2Word32: unexpected high word > divisor: high word=" + nh + ", divisor=" + d;
+  }
+
+  if (d === 0) {
+    // FIXME: raise Haskell exception
+    throw "h$quotRem2Word32: division by zero";
+  }
+
+  var s = Math.clz32(d); // 0 <= s <= 31
+  d = d << s;            // normalize divisor
+  var dh = d >>> 16;     // break divisor up into two 16-bit digits
+  var dl = d & 0xFFFF;
+
+  // shift dividend left too
+  var un32 = UN((nh << s) | ((nl >>> (32-s)) & (-s >> 31)));
+  var un10 = UN(nl << s);
+
+  var un1 = un10 >>> 16;    // break lower part of the divisor into two 16-bit digits
+  var un0 = un10 & 0xFFFF;
+
+  var q1 = UN(un32 / dh);       // compute first quotient digit q1
+  var rhat = UN(un32 - UN(q1*dh));
+
+  while (q1 >= 0xFFFF || UN(q1*dl) > UN(UN(rhat << 16) + un1)) {
+    q1   = UN(q1 - 1);
+    rhat = UN(rhat + dh);
+    if (rhat >= 0xFFFF) break;
+  }
+
+  var un21 = UN(UN(UN(un32 << 16) + un1) - UN(q1*d));
+
+  var q0 = UN(un21 / dh);     // compute second quotient digit q0
+  rhat = UN(un21 - UN(q0*dh));
+
+  while (q0 >= 0xFFFF || UN(q0*dh) > UN(UN(rhat << 16) + un0)) {
+    q0   = UN(q0 - 1);
+    rhat = UN(rhat + dh);
+    if (rhat >= 0xFFFF) break;
+  }
+
+  var rq = UN(q1 << 16 + q0);
+  var rr = (UN(un21 << 16) + un0 - UN(q0*d)) >>> s;
+
+  RETURN_UBX_TUP2(rq,rr);
 }
 
 function h$wordAdd2(a,b) {
