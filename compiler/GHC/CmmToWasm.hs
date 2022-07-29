@@ -364,7 +364,7 @@ cmmWasmGen logger modLoc wcgImpl us fileIds dbgMap cmm _count
                 (pprCmmGroup platform [opt_cmm])
 
         -- allocate a local variable for each Cmm variable
-        varmap <- unimp "allocate local variable for each Cmm variable"
+        let varmap = localVarLocationsFrom cmm (length (wcgPinnedRegs config))
            -- consider putDumpFileMaybe
 
         -- generate wasm code from cmm
@@ -395,12 +395,28 @@ makeImportsDoc _config _imports = unimp "way to specify imports for a Wasm modul
 pprWasmCmmDecl :: WasmGenImpl statics jumpDest -> WasmCmmDecl statics -> SDoc
 pprWasmCmmDecl _ = unimp "emit Wasm code (and change SDoc to Builder)"
 
+newtype WasmLocal = WasmLocal Int
+
+-- Local-register info.
+-- A Cmm local register may be used either with integer type or with
+-- floating-point type.  Each use must map onto a *different*
+-- WebAssembly local variable.
+
+data LRInfo = LRInt !WasmLocal
+            | LRFloat !WasmLocal
+            | LRBoth { lr_int :: !WasmLocal
+                     , lr_float :: !WasmLocal
+                     }
+
+type LRMap = UniqueMap LRInfo
+
+localVarLocationsFrom :: RawCmmDecl -> Int -> LRMap
+localVarLocationsFrom _cmm _first = unimp "Cmm crawl for locals"
+
 -- -----------------------------------------------------------------------------
 -- Instruction selection
 
 type CGMonad a = UniqSM a
-
-type WasmLocalIndex = Int
 
 genWasmCode
         :: WasmGenConfig
@@ -409,7 +425,7 @@ genWasmCode
         -> DwarfFiles
         -> LabelMap DebugBlock
         -> RawCmmDecl
-        -> (LocalReg -> WasmLocalIndex)
+        -> LRMap
         -> UniqSM
                 ( [WasmCmmDecl statics]
                 , [CLabel]

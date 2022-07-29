@@ -16,7 +16,7 @@ data WasmGenConfig = WasmGenConfig
    { wcgPlatform              :: !Platform        -- ^ Target platform
    , wcgAsmContext            :: !SDocContext     -- ^ Context for ASM code generation
    , wcgThisModule            :: !Module          -- ^ The name of the module we are currently compiling
-   , wcgParameterResultRegs   :: ![GlobalReg]     -- ^ GHC global registers to be passed as
+   , wcgPinnedRegs            :: ![GlobalReg]     -- ^ GHC global registers to be passed as
                                                    -- parameters and returned as results
 
    , wcgDoConstantFolding     :: !Bool            -- ^ rewrite Cmm
