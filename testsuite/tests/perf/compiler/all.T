@@ -643,3 +643,10 @@ test ('T20261',
       [collect_compiler_stats('all')],
       compile,
       [''])
+
+# Track perf of generics based binary instances
+test('T21839c',
+    [   collect_compiler_stats('all', 1),
+        only_ways(['normal'])],
+    compile,
+    ['-O'])
