@@ -402,12 +402,33 @@ function h$mul2Word32(l1,l2) {
   RETURN_UBX_TUP2((c48 << 16) | c32, (c16 << 16) | c00);
 }
 
-function h$quotWord32(a,b) {
-  return goog.math.Long.fromBits(a,0).div(goog.math.Long.fromBits(b,0)).getLowBits();
+function h$quotWord32(n,d) {
+  // from Hacker's Delight book (p 192)
+  // adapted for JavaScript
+  var t = d >> 31;
+  var n2 = n & ~t;
+  var q = ((n2 >>> 1) / d) << 1;
+  var r = (n - q * d) >>> 0;
+  var c = (r >>> 0) >= (d >>> 0);
+  return (q + (c ? 1 : 0)) >>> 0;
 }
 
-function h$remWord32(a,b) {
-  return goog.math.Long.fromBits(a,0).modulo(goog.math.Long.fromBits(b,0)).getLowBits();
+function h$remWord32(n,d) {
+  var t = d >> 31;
+  var n2 = n & ~t;
+  var q = ((n2 >>> 1) / d) << 1;
+  var r = (n - q * d) >>> 0;
+  var c = (r >>> 0) >= (d >>> 0);
+  return (r - (c ? q : 0)) >>> 0;
+}
+
+function h$quotRemWord32(n,d) {
+  var t = d >> 31;
+  var n2 = n & ~t;
+  var q = ((n2 >>> 1) / d) << 1;
+  var r = (n - q * d) >>> 0;
+  var c = (r >>> 0) >= (d >>> 0);
+  RETURN_UBX_TUP2((q + (c ? 1 : 0)) >>> 0, (r - (c ? q : 0)) >>> 0);
 }
 
 function h$quotRem2Word32(h1,l1,b) {

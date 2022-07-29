@@ -362,10 +362,7 @@ genPrim prof ty = \case
   WordMul2Op    -> \[h,l] [x,y] -> PrimInline $ appT [h,l] "h$mul2Word32" [x,y]
   WordQuotOp    -> \  [q] [x,y] -> PrimInline $ q |= app "h$quotWord32" [x,y]
   WordRemOp     -> \  [r] [x,y] -> PrimInline $ r |= app "h$remWord32" [x,y]
-  WordQuotRemOp -> \[q,r] [x,y] -> PrimInline $ mconcat
-                                            [ q |= app "h$quotWord32" [x,y]
-                                            , r |= app "h$remWord32" [x,y]
-                                            ]
+  WordQuotRemOp -> \[q,r] [x,y] -> PrimInline $ appT [q,r] "h$quotRemWord32" [x,y]
   WordQuotRem2Op   -> \[q,r] [xh,xl,y] -> PrimInline $ appT [q,r] "h$quotRem2Word32" [xh,xl,y]
   WordAndOp        -> \[r] [x,y] -> PrimInline $ r |= BAnd x y
   WordOrOp         -> \[r] [x,y] -> PrimInline $ r |= BOr  x y
