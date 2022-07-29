@@ -132,11 +132,48 @@ function h$base_isatty(fd) {
     return 0;
 }
 
-function h$base_lseek(fd, pos_1, pos_2, whence, c) {
+
+#define TWO_PWR_32_DBL_ 0x100000000
+#define TWO_PWR_63_DBL_ 0x8000000000000000
+#define CLOSEST_FLOAT_NUMBER(h,l) (((h)*TWO_PWR_32_DBL_) + ((l)>>>0))
+
+/**
+ * Returns a 64-bit represention of the given number.
+ * NaN will be returned as zero.
+ * Infinity is converted to max value and
+ * -Infinity to min value.
+ * @param {f} value The number in question.
+ * @param {c} the continuation taking high and low bits
+ */
+function h$long_from_number(f,c) {
+  if (value > 0) {
+      if (value >= TWO_PWR_63_DBL_) {
+        // return max value
+        return c(0x7FFFFFFF,0xFFFFFFFF);
+      }
+      return c(value / TWO_PWR_32_DBL_, value);
+    } else if (value < 0) {
+      if (value <= -TWO_PWR_63_DBL_) {
+        // return min value
+        return c(0x80000000,0);
+      }
+      var h = -value / TWO_PWR_32_DBL_;
+      var l = -value;
+      // negate h l
+      var nl = (~l + 1) | 0;
+      var nh = (~h + !nl) | 0;
+      return c(nh,nl);
+    } else {
+      // NaN or 0.
+      return c(0,0);
+    }
+}
+
+function h$base_lseek(fd, pos_h, pos_l, whence, c) {
     TRACE_IO("base_lseek");
 #ifndef GHCJS_BROWSER
     if(h$isNode) {
-        var p = goog.math.Long.fromBits(pos_2, pos_1), p1;
+        var p = CLOSEST_FLOAT_NUMBER(pos_h,pos_l);
         var o = h$base_fds[fd];
         if(!o) {
             h$errno = CONST_BADF;
@@ -144,13 +181,12 @@ function h$base_lseek(fd, pos_1, pos_2, whence, c) {
         } else {
             switch(whence) {
             case 0: /* SET */
-                o.pos = p.toNumber();
-                c(p.getHighBits(), p.getLowBits());
+                o.pos = p;
+                c(pos_h, pos_l);
                 break;
             case 1: /* CUR */
-                o.pos += p.toNumber();
-                p1 = goog.math.Long.fromNumber(o.pos);
-                c(p1.getHighBits(), p1.getLowBits());
+                o.pos += p;
+                h$long_from_number(o.pos,c);
                 break;
             case 2: /* END */
                 h$fs.fstat(fd, function(err, fs) {
@@ -158,9 +194,8 @@ function h$base_lseek(fd, pos_1, pos_2, whence, c) {
                         h$setErrno(err);
                         c(-1,-1);
                     } else {
-                        o.pos = fs.size + p.toNumber();
-                        p1 = goog.math.Long.fromNumber(o.pos);
-                        c(p1.getHighBits(), p1.getLowBits());
+                        o.pos = fs.size + p;
+                        h$long_from_number(o.pos,c);
                     }
                 });
                 break;
@@ -296,11 +331,11 @@ function h$base_write(fd, buf, buf_off, n, c) {
     }
 }
 
-function h$base_ftruncate(fd, pos_1, pos_2, c) {
+function h$base_ftruncate(fd, pos_h, pos_l, c) {
     TRACE_IO("base_ftruncate");
 #ifndef GHCJS_BROWSER
     if(h$isNode) {
-        h$fs.ftruncate(fd, goog.math.Long.fromBits(pos_2, pos_1).toNumber(), function(err) {
+        h$fs.ftruncate(fd, CLOSEST_FLOAT_NUMBER(pos_h,pos_l), function(err) {
             h$handleErrnoC(err, -1, 0, c);
         });
     } else
@@ -365,15 +400,18 @@ function h$base_utime(file, file_off, timbuf, timbuf_off, c) {
             if(err) {
                 h$handleErrnoC(err, 0, -1, c); // fixme
             } else {
-                var atime = goog.math.Long.fromNumber(fs.atime.getTime());
-                var mtime = goog.math.Long.fromNumber(fs.mtime.getTime());
-                var ctime = goog.math.Long.fromNumber(fs.ctime.getTime());
-                timbuf.i3[0] = atime.getHighBits();
-                timbuf.i3[1] = atime.getLowBits();
-                timbuf.i3[2] = mtime.getHighBits();
-                timbuf.i3[3] = mtime.getLowBits();
-                timbuf.i3[4] = ctime.getHighBits();
-                timbuf.i3[5] = ctime.getLowBits();
+                h$long_from_number(fs.atime.getTime(), (h,l) => {
+                    timbuf.i3[0] = h;
+                    timbuf.i3[1] = l;
+                  });
+                h$long_from_number(fs.mtime.getTime(), (h,l) => {
+                    timbuf.i3[2] = h;
+                    timbuf.i3[3] = l;
+                  });
+                h$long_from_number(fs.ctime.getTime(), (h,l) => {
+                    timbuf.i3[4] = h;
+                    timbuf.i3[5] = l;
+                  });
                 c(0);
             }
         });
@@ -417,15 +455,18 @@ function h$base_fillStat(fs, b, off) {
     if(off%4) throw "h$base_fillStat: not aligned";
     var o = off>>2;
     b.i3[o+0] = fs.mode;
-    var s = goog.math.Long.fromNumber(fs.size);
-    b.i3[o+1] = s.getHighBits();
-    b.i3[o+2] = s.getLowBits();
+    h$long_from_number(fs.size, (h,l) => {
+      b.i3[o+1] = h;
+      b.i3[o+2] = l;
+    });
+
     b.i3[o+3] = 0; // fixme
     b.i3[o+4] = 0; // fixme
     b.i3[o+5] = fs.dev;
-    var i = goog.math.Long.fromNumber(fs.ino);
-    b.i3[o+6] = i.getHighBits();
-    b.i3[o+7] = i.getLowBits();
+    h$long_from_number(fs.ino, (h,l) => {
+      b.i3[o+6] = h;
+      b.i3[o+7] = l;
+    });
     b.i3[o+8] = fs.uid;
     b.i3[o+9] = fs.gid;
 }
