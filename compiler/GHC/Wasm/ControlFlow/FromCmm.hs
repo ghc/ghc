@@ -2,10 +2,19 @@
 Module      : GHC.Wasm.ControlFlow.FromCmm
 Description : Translation of (reducible) Cmm control flow to WebAssembly
 
-Code in this module can translate any _reducible_ Cmm control-flow
-graph to the structured control flow that is required by WebAssembly.
-The algorithm is subtle and is described in detail in a draft paper
-to be found at https://www.cs.tufts.edu/~nr/pubs/relooper.pdf.
+Code in this module can translate any Cmm control-flow graph that
+has the following properties:
+
+  - The control-flow graph is reducible.
+  - All calls are tail calls (`cml_cont` is always `Nothing`).
+
+The translator produces the structured control flow that is required
+by WebAssembly.  The algorithm is subtle and is described in detail in
+a paper to be found at https://www.cs.tufts.edu/~nr/pubs/relooper.pdf.
+
+(To ensure that all calls are tail calls, it suffices to enable
+"no tables next to code," which is necessary on the WebAssembly
+platform for other reasons.)
 -}
 
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -78,9 +87,14 @@ flowLeaving platform b =
               range = inclusiveInterval (lo+toInteger offset) (hi+toInteger offset)
           in  Switch scrutinee range (atMost brTableLimit target_labels) default_label
 
-      CmmCall { cml_cont = Just l } -> Unconditional l
-      CmmCall { cml_cont = Nothing } -> TerminalFlow
       CmmForeignCall { succ = l } -> Unconditional l
+      CmmCall { cml_cont = Nothing } -> TerminalFlow
+      CmmCall { cml_cont = Just _ } ->
+          panic "I tried to translate a non-tail call to WebAssembly"
+          -- The main reason we panic here is that WebAssembly cannot
+          -- support "tables next to code," which leaves us with no
+          -- way to generate this case (except by hand-written Cmm),
+          -- and therefore no real way to test it.
 
   where atMost :: Int -> [a] -> [a]
         atMost k xs = if xs `hasAtLeast` k then
