@@ -49,7 +49,7 @@ run (Run s : stack) = step s
 
         step (WasmReturn) = return ()
 
-        step (WasmAction s) = takeAction @s @e s >> run stack
+        step (WasmActions s) = takeAction @s @e s >> run stack
         step (WasmSeq s s') = run (Run s : Run s' : stack)
 
         br 0 (EndLoop s : stack) = run (EndLoop s : stack)
