@@ -16,6 +16,8 @@ coercibleTyCon, heqTyCon :: TyCon
 
 unitTy :: Type
 
+typeOrConstraintTy :: Type
+mkTYPEapp, mkCONSTRAINTapp :: RuntimeRepType -> Type
 
 liftedTypeKindTyConName :: Name
 

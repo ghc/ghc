@@ -40,7 +40,8 @@ module GHC.Types (
         type (~), type (~~), Coercible,
 
         -- * Representation polymorphism
-        TYPE, Levity(..), RuntimeRep(..),
+        TYPE, CONSTRAINT, TypeOrConstraint,
+        Levity(..), RuntimeRep(..),
         LiftedRep, UnliftedRep,
         Type, UnliftedType, Constraint,
           -- The historical type * should ideally be written as
@@ -92,8 +93,7 @@ type (->) = FUN 'Many
 *                                                                      *
 ********************************************************************* -}
 
--- | The kind of constraints, like @Show a@
-data Constraint
+
 
 -- | The runtime representation of lifted types.
 type LiftedRep = 'BoxedRep 'Lifted
@@ -106,6 +106,15 @@ type UnliftedRep = 'BoxedRep 'Unlifted
 type ZeroBitRep = 'TupleRep '[]
 
 -------------------------
+-- | The kind of types
+type TYPE       = SORT TypeLike
+
+-- | The kind of constraints
+type CONSTRAINT = SORT ConstraintLike
+
+-- | The kind of lifted constraints
+type Constraint = CONSTRAINT LiftedRep
+
 -- | The kind of types with lifted values. For example @Int :: Type@.
 type Type = TYPE LiftedRep
 
@@ -115,6 +124,9 @@ type UnliftedType = TYPE UnliftedRep
 
 -- | The kind of the empty unboxed tuple type (# #)
 type ZeroBitType = TYPE ZeroBitRep
+
+-------------------------
+data TypeOrConstraint = TypeLike | ConstraintLike
 
 -------------------------
 data Multiplicity = Many | One

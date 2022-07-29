@@ -780,7 +780,7 @@ mkTyConAppCo r tc cos
     -- co1  :: a   ~  c         co2  :: b   ~  d
     mkFunCo r w co1 co2
 
-               -- Expand type synonyms
+  -- Expand type synonyms
   | Just (tv_co_prs, rhs_ty, leftover_cos) <- expandSynTyCon_maybe tc cos
   = mkAppCos (liftCoSubst r (mkLiftingContext tv_co_prs) rhs_ty) leftover_cos
 

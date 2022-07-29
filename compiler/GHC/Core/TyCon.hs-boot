@@ -14,7 +14,6 @@ type TyConRepName = Name
 
 isTupleTyCon        :: TyCon -> Bool
 isUnboxedTupleTyCon :: TyCon -> Bool
-isFunTyCon          :: TyCon -> Bool
 
 tyConRepName_maybe  :: TyCon -> Maybe TyConRepName
 mkPrelTyConRepName  :: Name -> TyConRepName

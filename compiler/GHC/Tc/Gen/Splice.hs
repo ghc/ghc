@@ -2143,7 +2143,7 @@ reifyTyCon tc
   | Just cls <- tyConClass_maybe tc
   = reifyClass cls
 
-  | isFunTyCon tc
+  | tc `hasKey` funTyConKey
   = return (TH.PrimTyConI (reifyName tc) 2                False)
 
   | isPrimTyCon tc

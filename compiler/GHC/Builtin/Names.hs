@@ -1840,6 +1840,9 @@ stablePtrTyConKey                       = mkPreludeTyConUnique 39
 eqTyConKey                              = mkPreludeTyConUnique 40
 heqTyConKey                             = mkPreludeTyConUnique 41
 
+fatArrowTyConKey                        = mkPreludeTyConUnique 42
+fatArrow2TyConKey                       = mkPreludeTyConUnique 43
+
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,
     wordPrimTyConKey, wordTyConKey, word8PrimTyConKey, word8TyConKey,
@@ -1893,11 +1896,15 @@ liftedTypeKindTyConKey, unliftedTypeKindTyConKey,
   tYPETyConKey, liftedRepTyConKey, unliftedRepTyConKey,
   constraintKindTyConKey, levityTyConKey, runtimeRepTyConKey,
   vecCountTyConKey, vecElemTyConKey,
-  zeroBitRepTyConKey, zeroBitTypeTyConKey :: Unique
+  zeroBitRepTyConKey, zeroBitTypeTyConKey,
+  typeOrConstraintTyConKey, sORTTyConKey, cONSTRAINTTyConKey :: Unique
+typeOrConstraintTyConKey                = mkPreludeTyConUnique 87
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 88
 unliftedTypeKindTyConKey                = mkPreludeTyConUnique 89
-tYPETyConKey                            = mkPreludeTyConUnique 90
-constraintKindTyConKey                  = mkPreludeTyConUnique 92
+sORTTyConKey                            = mkPreludeTyConUnique 90
+tYPETyConKey                            = mkPreludeTyConUnique 91
+cONSTRAINTTyConKey                      = mkPreludeTyConUnique 92
+constraintKindTyConKey                  = mkPreludeTyConUnique 93
 levityTyConKey                          = mkPreludeTyConUnique 94
 runtimeRepTyConKey                      = mkPreludeTyConUnique 95
 vecCountTyConKey                        = mkPreludeTyConUnique 96
@@ -1918,7 +1925,6 @@ trModuleTyConKey                        = mkPreludeTyConUnique 105
 trNameTyConKey                          = mkPreludeTyConUnique 106
 kindRepTyConKey                         = mkPreludeTyConUnique 107
 typeLitSortTyConKey                     = mkPreludeTyConUnique 108
-
 
 -- Generics (Unique keys)
 v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,

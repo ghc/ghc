@@ -164,10 +164,10 @@ data Type
 
   | FunTy      -- ^ FUN m t1 t2   Very common, so an important special case
                 -- See Note [Function types]
-     { ft_af  :: AnonArgFlag    -- Is this (->) or (=>)?
-     , ft_mult :: Mult          -- Multiplicity
-     , ft_arg :: Type           -- Argument type
-     , ft_res :: Type }         -- Result type
+     { ft_af   :: Arrow          -- Is this (->) or (=>) or (==>)?
+     , ft_mult :: Mult           -- Multiplicity
+     , ft_arg  :: Type           -- Argument type
+     , ft_res  :: Type }         -- Result type
 
   | LitTy TyLit     -- ^ Type literals are similar to type constructors.
 
@@ -186,6 +186,10 @@ data Type
                     -- GADT data constructor
 
   deriving Data.Data
+
+data Arrow = FatArrow   -- (=>)
+           | FatArrow2  -- (==>)
+           | ThinArrow  -- (->)
 
 instance Outputable Type where
   ppr = pprType

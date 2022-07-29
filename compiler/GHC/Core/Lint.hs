@@ -1739,8 +1739,8 @@ lintType ty@(TyConApp tc tys)
   = do { report_unsat <- lf_report_unsat_syns <$> getLintFlags
        ; lintTySynFamApp report_unsat ty tc tys }
 
-  | isFunTyCon tc
-  , tys `lengthIs` 5
+  | isFunLikeTyCon tc
+  , tys `lengthIs` tyConArity tc
     -- We should never see a saturated application of funTyCon; such
     -- applications should be represented with the FunTy constructor.
     -- See Note [Linting function types] and

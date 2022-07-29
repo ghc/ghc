@@ -41,13 +41,13 @@ module GHC.Builtin.Types.Prim(
         multiplicityTyVar1, multiplicityTyVar2,
 
         -- Kind constructors...
-        tYPETyCon, tYPETyConName,
+        sORTTyCon, sORTTyConName,
 
-        -- Kinds
-        mkTYPEapp,
+        -- Arrows
+        fUNTyCon,       fUNTyConName,
+        fatArrowTyCon,  fatArrowTyConName,
+        fatArrow2TyCon, fatArrow2TyConName,
 
-        functionWithMultiplicity,
-        funTyCon, funTyConName,
         unexposedPrimTyCons, exposedPrimTyCons, primTyCons,
 
         charPrimTyCon,          charPrimTy, charPrimTyConName,
@@ -106,6 +106,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind, unliftedTypeKind
+  , typeOrConstraintTy
   , boxedRepDataConTyCon, vecRepDataConTyCon
   , liftedRepTy, unliftedRepTy, zeroBitRepTy
   , intRepDataConTy
@@ -120,7 +121,8 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , multiplicityTy )
+  , multiplicityTy
+  , mkTYPEapp, mkCONSTRAINTapp )
 
 import GHC.Types.Var    ( TyVarBinder, TyVar
                         , mkTyVar, mkTyVarBinder, mkTyVarBinders )
@@ -135,17 +137,79 @@ import GHC.Data.FastString
 import GHC.Utils.Misc ( changeLast )
 import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
                          -- import loops which show up if you import Type instead
-import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, mkTyConApp, mkTYPEapp, getLevity )
+import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, mkTyConApp, getLevity )
 
 import Data.Char
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection{Primitive type constructors}
+             Building blocks
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
+
+mkPrimTc :: FastString -> Unique -> TyCon -> Name
+mkPrimTc = mkGenPrimTc UserSyntax
+
+mkBuiltInPrimTc :: FastString -> Unique -> TyCon -> Name
+mkBuiltInPrimTc = mkGenPrimTc BuiltInSyntax
+
+mkGenPrimTc :: BuiltInSyntax -> FastString -> Unique -> TyCon -> Name
+mkGenPrimTc built_in_syntax occ key tycon
+  = mkWiredInName gHC_PRIM (mkTcOccFS occ)
+                  key
+                  (mkATyCon tycon)
+                  built_in_syntax
+
+-- | Create a primitive 'TyCon' with the given 'Name',
+-- arguments of kind 'Type` with the given 'Role's,
+-- and the given result kind representation.
+--
+-- Only use this in "GHC.Builtin.Types.Prim".
+pcPrimTyCon :: Name
+            -> [Role] -> RuntimeRepType -> TyCon
+pcPrimTyCon name roles res_rep
+  = mkPrimTyCon name binders result_kind roles
+  where
+    bndr_kis    = liftedTypeKind <$ roles
+    binders     = mkTemplateAnonTyConBinders bndr_kis
+    result_kind = mkTYPEapp res_rep
+
+-- | Create a primitive nullary 'TyCon' with the given 'Name'
+-- and result kind representation.
+--
+-- Only use this in "GHC.Builtin.Types.Prim".
+pcPrimTyCon0 :: Name -> RuntimeRepType -> TyCon
+pcPrimTyCon0 name res_rep
+  = pcPrimTyCon name [] res_rep
+
+-- | Create a primitive 'TyCon' like 'pcPrimTyCon', except the last
+-- argument is levity-polymorphic.
+--
+-- Only use this in "GHC.Builtin.Types.Prim".
+pcPrimTyCon_LevPolyLastArg :: Name
+                           -> [Role] -- ^ roles of the arguments (must be non-empty),
+                                     -- not including the implicit argument of kind 'Levity',
+                                     -- which always has 'Nominal' role
+                           -> RuntimeRepType  -- ^ representation of the fully-applied type
+                           -> TyCon
+pcPrimTyCon_LevPolyLastArg name roles res_rep
+  = mkPrimTyCon name binders result_kind (Nominal : roles)
+    where
+      result_kind = mkTYPEapp res_rep
+      lev_bndr = mkNamedTyConBinder Inferred levity1TyVar
+      binders  = lev_bndr : mkTemplateAnonTyConBinders anon_bndr_kis
+      lev_tv   = mkTyVarTy (binderVar lev_bndr)
+
+      -- [ Type, ..., Type, TYPE (BoxedRep l) ]
+      anon_bndr_kis = changeLast (liftedTypeKind <$ roles)
+                        (mkTYPEapp $ mkTyConApp boxedRepDataConTyCon [lev_tv])
+
+
+{- *********************************************************************
+*                                                                      *
+           Primitive type constructors
+*                                                                      *
+********************************************************************* -}
 
 primTyCons :: [TyCon]
 primTyCons = unexposedPrimTyCons ++ exposedPrimTyCons
@@ -199,26 +263,11 @@ exposedPrimTyCons
     , word64PrimTyCon
     , stackSnapshotPrimTyCon
 
-    , tYPETyCon
-    , funTyCon
+    , fUNTyCon
+    , sORTTyCon
 
 #include "primop-vector-tycons.hs-incl"
     ]
-
-mkPrimTc :: FastString -> Unique -> TyCon -> Name
-mkPrimTc fs unique tycon
-  = mkWiredInName gHC_PRIM (mkTcOccFS fs)
-                  unique
-                  (mkATyCon tycon)        -- Relevant TyCon
-                  UserSyntax
-
-mkBuiltInPrimTc :: FastString -> Unique -> TyCon -> Name
-mkBuiltInPrimTc fs unique tycon
-  = mkWiredInName gHC_PRIM (mkTcOccFS fs)
-                  unique
-                  (mkATyCon tycon)        -- Relevant TyCon
-                  BuiltInSyntax
-
 
 charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName,
   wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName,
@@ -270,13 +319,13 @@ bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTy
 weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection{Support code}
+                Type variables
 *                                                                      *
-************************************************************************
+********************************************************************* -}
 
+{-
 alphaTyVars is a list of type variables for use in templates:
         ["a", "b", ..., "z", "t1", "t2", ... ]
 -}
@@ -468,8 +517,10 @@ multiplicityTyVar1, multiplicityTyVar2  :: TyVar
 ************************************************************************
 -}
 
-funTyConName :: Name
-funTyConName = mkPrimTcName UserSyntax (fsLit "FUN") funTyConKey funTyCon
+fUNTyConName, fatArrowTyConName, fatArrow2TyConName :: Name
+fUNTyConName       = mkPrimTc        (fsLit "FUN") funTyConKey       fUNTyCon
+fatArrowTyConName  = mkBuiltInPrimTc (fsLit "=>")  fatArrowTyConKey  fatArrowTyCon
+fatArrow2TyConName = mkBuiltInPrimTc (fsLit "==>") fatArrow2TyConKey fatArrow2TyCon
 
 -- | The @FUN@ type constructor.
 --
@@ -483,26 +534,41 @@ funTyConName = mkPrimTcName UserSyntax (fsLit "FUN") funTyConKey funTyCon
 -- means they cannot be specified with @-XTypeApplications@.
 --
 -- This is a deliberate choice to allow future extensions to the
--- function arrow. To allow visible application a type synonym can be
--- defined:
---
--- @
--- type Arr :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
---             TYPE rep1 -> TYPE rep2 -> Type
--- type Arr = FUN 'Many
--- @
---
-funTyCon :: TyCon
-funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
+-- function arrow.
+fUNTyCon :: TyCon
+fUNTyCon = mkPrimTyCon fUNTyConName tc_bndrs liftedTypeKind tc_roles
   where
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Required multiplicityTyVar1
                , mkNamedTyConBinder Inferred runtimeRep1TyVar
                , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
                ++ mkTemplateAnonTyConBinders [ mkTYPEapp runtimeRep1Ty
-                                             , mkTYPEapp runtimeRep2Ty
-                                             ]
-    tc_rep_nm = mkPrelTyConRepName funTyConName
+                                             , mkTYPEapp runtimeRep2Ty ]
+    tc_roles = [Nominal, Nominal, Nominal, Representational, Representational]
+
+-- (=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+--         CONSTRAINT rep1 -> TYPE rep2 -> *
+fatArrowTyCon :: TyCon
+fatArrowTyCon = mkPrimTyCon fatArrowTyConName tc_bndrs liftedTypeKind tc_roles
+  where
+    -- See also unrestrictedFunTyCon
+    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
+               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
+               ++ mkTemplateAnonTyConBinders [ mkCONSTRAINTapp runtimeRep1Ty
+                                             , mkTYPEapp       runtimeRep2Ty ]
+    tc_roles = [Nominal, Nominal, Representational, Representational]
+
+-- (==>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+--          CONSTRAINT rep1 -> TYPE rep2 -> *
+fatArrow2TyCon :: TyCon
+fatArrow2TyCon = mkPrimTyCon fatArrow2TyConName tc_bndrs liftedTypeKind tc_roles
+  where
+    -- See also unrestrictedFunTyCon
+    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
+               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
+               ++ mkTemplateAnonTyConBinders [ mkCONSTRAINTapp runtimeRep1Ty
+                                             , mkCONSTRAINTapp runtimeRep2Ty ]
+    tc_roles = [Nominal, Nominal, Representational, Representational]
 
 {-
 ************************************************************************
@@ -569,82 +635,22 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
 
 -}
 
-tYPETyCon :: TyCon
-tYPETyConName :: Name
+sORTTyCon :: TyCon
+sORTTyConName :: Name
 
-tYPETyCon = mkPrimTyCon tYPETyConName
-                        (mkTemplateAnonTyConBinders [runtimeRepTy])
+-- SORT :: TypeOrConstraint -> RuntimeRep -> Type
+sORTTyCon = mkPrimTyCon sORTTyConName
+                        (mkTemplateAnonTyConBinders [typeOrConstraintTy, runtimeRepTy])
                         liftedTypeKind
                         [Nominal]
+sORTTyConName = mkPrimTc (fsLit "SORT") sORTTyConKey sORTTyCon
 
---------------------------
--- ... and now their names
 
--- If you edit these, you may need to update the GHC formalism
--- See Note [GHC Formalism] in GHC.Core.Lint
-tYPETyConName             = mkPrimTcName UserSyntax (fsLit "TYPE") tYPETyConKey tYPETyCon
-
-mkPrimTcName :: BuiltInSyntax -> FastString -> Unique -> TyCon -> Name
-mkPrimTcName built_in_syntax occ key tycon
-  = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (mkATyCon tycon) built_in_syntax
-
------------------------------
-
--- Given a Multiplicity, applies FUN to it.
-functionWithMultiplicity :: Type -> Type
-functionWithMultiplicity mul = TyConApp funTyCon [mul]
-
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-   Basic primitive types (@Char#@, @Int#@, etc.)
+       Basic primitive types (Char#, Int#, etc.)
 *                                                                      *
-************************************************************************
--}
-
--- | Create a primitive 'TyCon' with the given 'Name',
--- arguments of kind 'Type` with the given 'Role's,
--- and the given result kind representation.
---
--- Only use this in "GHC.Builtin.Types.Prim".
-pcPrimTyCon :: Name
-            -> [Role] -> RuntimeRepType -> TyCon
-pcPrimTyCon name roles res_rep
-  = mkPrimTyCon name binders result_kind roles
-  where
-    bndr_kis    = liftedTypeKind <$ roles
-    binders     = mkTemplateAnonTyConBinders bndr_kis
-    result_kind = mkTYPEapp res_rep
-
--- | Create a primitive nullary 'TyCon' with the given 'Name'
--- and result kind representation.
---
--- Only use this in "GHC.Builtin.Types.Prim".
-pcPrimTyCon0 :: Name -> RuntimeRepType -> TyCon
-pcPrimTyCon0 name res_rep
-  = pcPrimTyCon name [] res_rep
-
--- | Create a primitive 'TyCon' like 'pcPrimTyCon', except the last
--- argument is levity-polymorphic.
---
--- Only use this in "GHC.Builtin.Types.Prim".
-pcPrimTyCon_LevPolyLastArg :: Name
-                           -> [Role] -- ^ roles of the arguments (must be non-empty),
-                                     -- not including the implicit argument of kind 'Levity',
-                                     -- which always has 'Nominal' role
-                           -> RuntimeRepType  -- ^ representation of the fully-applied type
-                           -> TyCon
-pcPrimTyCon_LevPolyLastArg name roles res_rep
-  = mkPrimTyCon name binders result_kind (Nominal : roles)
-    where
-      result_kind = mkTYPEapp res_rep
-      lev_bndr = mkNamedTyConBinder Inferred levity1TyVar
-      binders  = lev_bndr : mkTemplateAnonTyConBinders anon_bndr_kis
-      lev_tv   = mkTyVarTy (binderVar lev_bndr)
-
-      -- [ Type, ..., Type, TYPE (BoxedRep l) ]
-      anon_bndr_kis = changeLast (liftedTypeKind <$ roles)
-                        (mkTYPEapp $ mkTyConApp boxedRepDataConTyCon [lev_tv])
+********************************************************************* -}
 
 charPrimTy :: Type
 charPrimTy      = mkTyConTy charPrimTyCon
