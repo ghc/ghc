@@ -14,6 +14,7 @@ where
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.FamInstEnv ( FamInstEnvs )
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.Type
@@ -29,6 +30,8 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.SourceText
 import GHC.Types.Unique
+
+import GHC.Unit.Types ( Module )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -66,12 +69,18 @@ info for exported values).
 \end{enumerate}
 -}
 
-wwTopBinds :: WwOpts -> UniqSupply -> CoreProgram -> CoreProgram
+wwTopBinds :: WwOpts -> UniqSupply -> FamInstEnvs -> Module -> CoreProgram -> CoreProgram
 
-wwTopBinds ww_opts us top_binds
+wwTopBinds opts us fam_envs mod top_binds
   = initUs_ us $ do
-    top_binds' <- mapM (wwBind ww_opts) top_binds
+    top_binds' <- mapM (wwBind env) top_binds
     return (concat top_binds')
+  where
+    env = MkWwEnv
+      { ww_opts = opts
+      , ww_fam_envs = fam_envs
+      , ww_module = mod
+      }
 
 {-
 ************************************************************************
@@ -84,24 +93,24 @@ wwTopBinds ww_opts us top_binds
 turn.  Non-recursive case first, then recursive...
 -}
 
-wwBind  :: WwOpts
+wwBind  :: WwEnv
         -> CoreBind
         -> UniqSM [CoreBind]    -- returns a WwBinding intermediate form;
                                 -- the caller will convert to Expr/Binding,
                                 -- as appropriate.
 
-wwBind ww_opts (NonRec binder rhs) = do
-    new_rhs   <- wwExpr ww_opts rhs
-    new_pairs <- tryWW ww_opts NonRecursive binder new_rhs
+wwBind env (NonRec binder rhs) = do
+    new_rhs   <- wwExpr env rhs
+    new_pairs <- tryWW env NonRecursive binder new_rhs
     return [NonRec b e | (b,e) <- new_pairs]
       -- Generated bindings must be non-recursive
       -- because the original binding was.
 
-wwBind ww_opts (Rec pairs)
+wwBind env (Rec pairs)
   = return . Rec <$> concatMapM do_one pairs
   where
-    do_one (binder, rhs) = do new_rhs <- wwExpr ww_opts rhs
-                              tryWW ww_opts Recursive binder new_rhs
+    do_one (binder, rhs) = do new_rhs <- wwExpr env rhs
+                              tryWW env Recursive binder new_rhs
 
 {-
 @wwExpr@ basically just walks the tree, looking for appropriate
@@ -110,41 +119,41 @@ matching by looking for strict arguments of the correct type.
 @wwExpr@ is a version that just returns the ``Plain'' Tree.
 -}
 
-wwExpr :: WwOpts -> CoreExpr -> UniqSM CoreExpr
+wwExpr :: WwEnv -> CoreExpr -> UniqSM CoreExpr
 
 wwExpr _ e@(Type {}) = return e
 wwExpr _ e@(Coercion {}) = return e
 wwExpr _ e@(Lit  {}) = return e
 wwExpr _ e@(Var  {}) = return e
 
-wwExpr ww_opts (Lam binder expr)
-  = Lam new_binder <$> wwExpr ww_opts expr
+wwExpr env (Lam binder expr)
+  = Lam new_binder <$> wwExpr env expr
   where new_binder | isId binder = zapIdUsedOnceInfo binder
                    | otherwise   = binder
   -- See Note [Zapping Used Once info in WorkWrap]
 
-wwExpr ww_opts (App f a)
-  = App <$> wwExpr ww_opts f <*> wwExpr ww_opts a
+wwExpr env (App f a)
+  = App <$> wwExpr env f <*> wwExpr env a
 
-wwExpr ww_opts (Tick note expr)
-  = Tick note <$> wwExpr ww_opts expr
+wwExpr env (Tick note expr)
+  = Tick note <$> wwExpr env expr
 
-wwExpr ww_opts (Cast expr co) = do
-    new_expr <- wwExpr ww_opts expr
+wwExpr env (Cast expr co) = do
+    new_expr <- wwExpr env expr
     return (Cast new_expr co)
 
-wwExpr ww_opts (Let bind expr)
-  = mkLets <$> wwBind ww_opts bind <*> wwExpr ww_opts expr
+wwExpr env (Let bind expr)
+  = mkLets <$> wwBind env bind <*> wwExpr env expr
 
-wwExpr ww_opts (Case expr binder ty alts) = do
-    new_expr <- wwExpr ww_opts expr
+wwExpr env (Case expr binder ty alts) = do
+    new_expr <- wwExpr env expr
     new_alts <- mapM ww_alt alts
     let new_binder = zapIdUsedOnceInfo binder
       -- See Note [Zapping Used Once info in WorkWrap]
     return (Case new_expr new_binder ty new_alts)
   where
     ww_alt (Alt con binders rhs) = do
-        new_rhs <- wwExpr ww_opts rhs
+        new_rhs <- wwExpr env rhs
         let new_binders = [ if isId b then zapIdUsedOnceInfo b else b
                           | b <- binders ]
            -- See Note [Zapping Used Once info in WorkWrap]
@@ -522,7 +531,7 @@ So we pre-empt the problem by replacing t's RHS with an absent filler.
 Simple and effective.
 -}
 
-tryWW   :: WwOpts
+tryWW   :: WwEnv
         -> RecFlag
         -> Id                           -- The fn binder
         -> CoreExpr                     -- The bound rhs; its innards
@@ -532,11 +541,11 @@ tryWW   :: WwOpts
                                         -- the orig "wrapper" lives on);
                                         -- if two, then a worker and a
                                         -- wrapper.
-tryWW ww_opts is_rec fn_id rhs
+tryWW env is_rec fn_id rhs
   -- See Note [Drop absent bindings]
   | isAbsDmd (demandInfo fn_info)
   , not (isJoinId fn_id)
-  , Just filler <- mkAbsentFiller ww_opts fn_id NotMarkedStrict
+  , Just filler <- mkAbsentFiller env fn_id NotMarkedStrict
   = return [(new_fn_id, filler)]
 
   -- See Note [Don't w/w INLINE things]
@@ -577,11 +586,11 @@ tryWW ww_opts is_rec fn_id rhs
   -- Do this even if there is a NOINLINE pragma
   -- See Note [Worker/wrapper for NOINLINE functions]
   | is_fun
-  = splitFun ww_opts new_fn_id rhs
+  = splitFun env new_fn_id rhs
 
   -- See Note [Thunk splitting]
   | isNonRec is_rec, is_thunk
-  = splitThunk ww_opts is_rec new_fn_id rhs
+  = splitThunk env is_rec new_fn_id rhs
 
   | otherwise
   = return [ (new_fn_id, rhs) ]
@@ -743,19 +752,19 @@ by LitRubbish (see Note [Drop absent bindings]) so there is no great harm.
 
 
 ---------------------
-splitFun :: WwOpts -> Id -> CoreExpr -> UniqSM [(Id, CoreExpr)]
-splitFun ww_opts fn_id rhs
+splitFun :: WwEnv -> Id -> CoreExpr -> UniqSM [(Id, CoreExpr)]
+splitFun env fn_id rhs
   | Just (arg_vars, body) <- collectNValBinders_maybe (length wrap_dmds) rhs
   = warnPprTrace (not (wrap_dmds `lengthIs` (arityInfo fn_info)))
                  "splitFun"
                  (ppr fn_id <+> (ppr wrap_dmds $$ ppr cpr)) $
-    do { mb_stuff <- mkWwBodies ww_opts fn_id arg_vars (exprType body) wrap_dmds cpr
+    do { mb_stuff <- mkWwBodies env fn_id arg_vars (exprType body) wrap_dmds cpr
        ; case mb_stuff of
             Nothing -> -- No useful wrapper; leave the binding alone
                        return [(fn_id, rhs)]
 
             Just stuff
-              | let opt_wwd_rhs = simpleOptExpr (wo_simple_opts ww_opts) rhs
+              | let opt_wwd_rhs = simpleOptExpr (wo_simple_opts (ww_opts env)) rhs
                   -- We need to stabilise the WW'd (and optimised) RHS below
               , Just stable_unf <- certainlyWillInline uf_opts fn_info opt_wwd_rhs
                 -- We could make a w/w split, but in fact the RHS is small
@@ -766,14 +775,14 @@ splitFun ww_opts fn_id rhs
 
               | otherwise
               -> do { work_uniq <- getUniqueM
-                    ; return (mkWWBindPair ww_opts fn_id fn_info arg_vars body
+                    ; return (mkWWBindPair env fn_id fn_info arg_vars body
                                            work_uniq div stuff) } }
 
   | otherwise    -- See Note [Don't eta expand in w/w]
   = return [(fn_id, rhs)]
 
   where
-    uf_opts = so_uf_opts (wo_simple_opts ww_opts)
+    uf_opts = so_uf_opts (wo_simple_opts (ww_opts env))
     fn_info = idInfo fn_id
 
     (wrap_dmds, div) = splitDmdSig (dmdSigInfo fn_info)
@@ -786,11 +795,11 @@ splitFun ww_opts fn_id rhs
                       <+> text "arityInfo:" <+> ppr (arityInfo fn_info)) $
           ct_cpr cpr_ty
 
-mkWWBindPair :: WwOpts -> Id -> IdInfo
+mkWWBindPair :: WwEnv -> Id -> IdInfo
              -> [Var] -> CoreExpr -> Unique -> Divergence
              -> ([Demand],JoinArity, Id -> CoreExpr, Expr CoreBndr -> CoreExpr)
              -> [(Id, CoreExpr)]
-mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
+mkWWBindPair env fn_id fn_info fn_args fn_body work_uniq div
              (work_demands, join_arity, wrap_fn, work_fn)
   = -- pprTrace "mkWWBindPair" (ppr fn_id <+> ppr wrap_id <+> ppr work_id $$ ppr wrap_rhs) $
     [(work_id, work_rhs), (wrap_id, wrap_rhs)]
@@ -800,7 +809,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
             -- The arity is set by the simplifier using exprEtaExpandArity
             -- So it may be more than the number of top-level-visible lambdas
 
-    simpl_opts = wo_simple_opts ww_opts
+    simpl_opts = wo_simple_opts (ww_opts env)
 
     work_rhs = work_fn (mkLams fn_args fn_body)
     work_act = case fn_inline_spec of  -- See Note [Worker activation]
@@ -1026,12 +1035,12 @@ get around by localising the Id for the auxiliary bindings in 'splitThunk'.
 --
 -- How can we do thunk-splitting on a top-level binder?  See
 -- Note [Thunk splitting for top-level binders].
-splitThunk :: WwOpts -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
-splitThunk ww_opts is_rec x rhs
+splitThunk :: WwEnv -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
+splitThunk env is_rec x rhs
   = assert (not (isJoinId x)) $
     do { let x' = localiseId x -- See comment above
        ; (useful,_args, wrap_fn, fn_arg)
-           <- mkWWstr_one ww_opts x' NotMarkedStrict
+           <- mkWWstr_one env x' NotMarkedStrict
        ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn fn_arg)) ]
        ; if useful then assertPpr (isNonRec is_rec) (ppr x) -- The thunk must be non-recursive
                    return res

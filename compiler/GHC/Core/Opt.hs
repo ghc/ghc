@@ -160,9 +160,8 @@ doCorePass env pass guts = do
     CoreDoCpr                 -> {-# SCC "CprAnal" #-}
                                  updateBindsM (cprAnalProgram (co_logger env) fam_envs)
 
-    CoreDoWorkerWrapper f     -> {-# SCC "WorkWrap" #-} do
-                                 let opts = f (mg_module guts) fam_envs
-                                 updateBinds (wwTopBinds opts us)
+    CoreDoWorkerWrapper opts  -> {-# SCC "WorkWrap" #-} do
+                                 updateBinds (wwTopBinds opts us fam_envs this_mod)
 
     CoreDoSpecialising f      -> {-# SCC "Specialise" #-} do
                                  let opts = f (co_printUnqual env)

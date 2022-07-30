@@ -92,7 +92,7 @@ getCoreToDo dflags extra_vars
                                     (initGentleSimplMode dflags)
 
     dmd_cpr_ww = [coreDoDemand dflags, CoreDoCpr] ++
-      if ww_on then [CoreDoWorkerWrapper $ \mod fam_env -> initWorkWrapOpts mod dflags fam_env]
+      if ww_on then [CoreDoWorkerWrapper (initWorkWrapOpts dflags)]
                else []
 
 

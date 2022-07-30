@@ -8,7 +8,7 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 {-# LANGUAGE ViewPatterns #-}
 
 module GHC.Core.Opt.WorkWrap.Utils
-   ( WwOpts(..), mkWwBodies, mkWWstr, mkWWstr_one
+   ( WwOpts(..), WwEnv(..), mkWwBodies, mkWWstr, mkWWstr_one
    , needsVoidWorkerArg, addVoidWorkerArg
    , DataConPatContext(..)
    , UnboxingDecision(..), canUnboxArg
@@ -136,18 +136,24 @@ the unusable strictness-info into the interfaces.
 
 data WwOpts
   = MkWwOpts
-  { -- | Environment of type/data family instances
-    wo_fam_envs          :: !FamInstEnvs
-  , -- | Options for the "Simple optimiser"
+  { -- | Options for the "Simple optimiser"
     wo_simple_opts       :: !SimpleOpts
   , -- | Whether to enable "Constructed Product Result" analysis.
     -- (Originally from DOI: 10.1017/S0956796803004751)
     wo_cpr_anal          :: !Bool
-  , -- | Used for absent argument error message
-    wo_module            :: !Module
   , -- | Generate workers even if the only effect is some args get passed
     -- unlifted. See Note [WW for calling convention]
     wo_unlift_strict     :: !Bool }
+
+data WwEnv
+  = MkWwEnv
+  { -- | WorkWrap options
+    ww_opts :: !WwOpts
+  , -- | Environment of type/data family instances
+    ww_fam_envs :: !FamInstEnvs
+  , -- | Used for absent argument error message
+    ww_module :: !Module
+  }
 
 type WwResult
   = ([Demand],              -- Demands for worker (value) args
@@ -159,7 +165,7 @@ nop_fn :: CoreExpr -> CoreExpr
 nop_fn body = body
 
 
-mkWwBodies :: WwOpts
+mkWwBodies :: WwEnv
            -> Id             -- ^ The original function
            -> [Var]          -- ^ Manifest args of original function
            -> Type           -- ^ Result type of the original function,
@@ -207,7 +213,7 @@ mkWwBodies :: WwOpts
 -- and beta-redexes]), which allows us to apply the same split to function body
 -- and its unfolding(s) alike.
 --
-mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
+mkWwBodies env fun_id arg_vars res_ty demands res_cpr
   = do  { massertPpr (filter isId arg_vars `equalLength` demands)
                      (text "wrong wrapper arity" $$ ppr fun_id $$ ppr arg_vars $$ ppr res_ty $$ ppr demands)
 
@@ -224,13 +230,13 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
 
         ; (useful1, work_args_str, wrap_fn_str, fn_args)
              <- -- pprTrace "mkWWbodies" (ppr fun_id $$ ppr (arg_vars `zip` cloned_arg_vars) $$ ppr demands) $
-                mkWWstr opts cloned_arg_vars init_str_marks
+                mkWWstr env cloned_arg_vars init_str_marks
 
         ; let (work_args, work_marks) = unzip work_args_str
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
         ; (useful2, wrap_fn_cpr, work_fn_cpr)
-              <- mkWWcpr_entry opts res_ty' res_cpr
+              <- mkWWcpr_entry env res_ty' res_cpr
 
         ; let (work_lam_args, work_call_args, work_call_str)
                 | needsVoidWorkerArg fun_id arg_vars work_args
@@ -573,10 +579,10 @@ data UnboxingDecision unboxing_info
   | DropAbsent              -- ^ The argument/field was absent. Drop it.
 
 -- Do we want to create workers just for unlifting?
-wwForUnlifting :: WwOpts -> Bool
-wwForUnlifting !opts
+wwForUnlifting :: WwEnv -> Bool
+wwForUnlifting !env
     -- Always unlift if possible
-    | wo_unlift_strict opts = goodWorker
+    | wo_unlift_strict (ww_opts env) = goodWorker
     -- Don't unlift  it would cause additional W/W splits.
     | otherwise = badWorker
 
@@ -840,7 +846,7 @@ See also `Note [WW for calling convention]` in GHC.Core.Opt.WorkWrap.Utils
 ************************************************************************
 -}
 
-mkWWstr :: WwOpts
+mkWWstr :: WwEnv
         -> [Var]                         -- Wrapper args; have their demand info on them
                                          --  *Includes type variables*
         -> [StrictnessMark]              -- Strictness-mark info for arguments
@@ -852,13 +858,13 @@ mkWWstr :: WwOpts
                    [CoreExpr])           -- Reboxed args for the call to the
                                          -- original RHS. Corresponds one-to-one
                                          -- with the wrapper arg vars
-mkWWstr opts args str_marks
+mkWWstr env args str_marks
   = -- pprTrace "mkWWstr" (ppr args) $
     go args str_marks
   where
     go [] _ = return (badWorker, [], nop_fn, [])
     go (arg : args) (str:strs)
-      = do { (useful1, args1, wrap_fn1, wrap_arg)  <- mkWWstr_one opts arg str
+      = do { (useful1, args1, wrap_fn1, wrap_arg)  <- mkWWstr_one env arg str
            ; (useful2, args2, wrap_fn2, wrap_args) <- go args strs
            ; return ( useful1 || useful2
                     , args1 ++ args2
@@ -873,17 +879,17 @@ mkWWstr opts args str_marks
 --   * wrap_arg assumes work_args are in scope, and builds a ConApp that
 --        reconstructs the RHS of wrap_var that we pass to the original RHS
 -- See Note [Worker/wrapper for Strictness and Absence]
-mkWWstr_one :: WwOpts
+mkWWstr_one :: WwEnv
             -> Var
             -> StrictnessMark
             -> UniqSM (Bool, [(Var,StrictnessMark)], CoreExpr -> CoreExpr, CoreExpr)
-mkWWstr_one opts arg str_mark =
+mkWWstr_one env arg str_mark =
   -- pprTrace "mkWWstr_one" (ppr arg <+> (if isId arg then ppr arg_ty  $$ ppr arg_dmd else text "type arg")) $
   case canUnboxArg fam_envs arg_ty arg_dmd of
     _ | isTyVar arg -> do_nothing
 
     DropAbsent
-      | Just absent_filler <- mkAbsentFiller opts arg str_mark
+      | Just absent_filler <- mkAbsentFiller env arg str_mark
          -- Absent case.  Drop the argument from the worker.
          -- We can't always handle absence for arbitrary
          -- unlifted types, so we need to choose just the cases we can
@@ -892,11 +898,11 @@ mkWWstr_one opts arg str_mark =
       | otherwise -> do_nothing
 
     DoUnbox dcpc -> -- pprTrace "mkWWstr_one:1" (ppr (dcpc_dc dcpc) <+> ppr (dcpc_tc_args dcpc) $$ ppr (dcpc_args dcpc)) $
-                    unbox_one_arg opts arg dcpc
+                    unbox_one_arg env arg dcpc
 
     DontUnbox
       | isStrictDmd arg_dmd || isMarkedStrict str_mark
-      , wwForUnlifting opts  -- See Note [CBV Function Ids]
+      , wwForUnlifting env  -- See Note [CBV Function Ids]
       , not (isFunTy arg_ty)
       , not (isUnliftedType arg_ty) -- Already unlifted!
         -- NB: function arguments have a fixed RuntimeRep,
@@ -906,17 +912,17 @@ mkWWstr_one opts arg str_mark =
       | otherwise -> do_nothing
 
   where
-    fam_envs   = wo_fam_envs opts
+    fam_envs   = ww_fam_envs env
     arg_ty     = idType arg
     arg_dmd    = idDemandInfo arg
     arg_str    | isTyVar arg = NotMarkedStrict -- Type args don't get stricness marks
                | otherwise   = str_mark
     do_nothing = return (badWorker, [(arg,arg_str)], nop_fn, varToCoreExpr arg)
 
-unbox_one_arg :: WwOpts
+unbox_one_arg :: WwEnv
               -> Var-> DataConPatContext Demand
               -> UniqSM (Bool, [(Var,StrictnessMark)], CoreExpr -> CoreExpr, CoreExpr)
-unbox_one_arg opts arg_var
+unbox_one_arg env arg_var
               DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                                 , dcpc_co = co, dcpc_args = ds }
   = do { pat_bndrs_uniqs <- getUniquesM
@@ -941,7 +947,7 @@ unbox_one_arg opts arg_var
              all_str_marks = (map (const NotMarkedStrict) ex_tvs') ++ con_str_marks
 
        ; (_sub_args_quality, worker_args, wrap_fn, wrap_args)
-             <- mkWWstr opts (ex_tvs' ++ arg_ids') all_str_marks
+             <- mkWWstr env (ex_tvs' ++ arg_ids') all_str_marks
 
        ; let wrap_arg = mkConApp dc (map Type tc_args ++ wrap_args) `mkCast` mkSymCo co
 
@@ -953,8 +959,8 @@ unbox_one_arg opts arg_var
 --
 -- If @mkAbsentFiller _ id == Just e@, then @e@ is an absent filler with the
 -- same type as @id@. Otherwise, no suitable filler could be found.
-mkAbsentFiller :: WwOpts -> Id -> StrictnessMark -> Maybe CoreExpr
-mkAbsentFiller opts arg str
+mkAbsentFiller :: WwEnv -> Id -> StrictnessMark -> Maybe CoreExpr
+mkAbsentFiller env arg str
   -- The lifted case: Bind 'absentError' for a nice panic message if we are
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
   | mightBeLiftedType arg_ty
@@ -983,7 +989,7 @@ mkAbsentFiller opts arg str
               -- will have different lengths and hence different costs for
               -- the inliner leading to different inlining.
               -- See also Note [Unique Determinism] in GHC.Types.Unique
-    file_msg = text "In module" <+> quotes (ppr $ wo_module opts)
+    file_msg = text "In module" <+> quotes (ppr $ ww_module env)
 
 {- Note [Worker/wrapper for Strictness and Absence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1374,15 +1380,15 @@ See Note [Worker/wrapper for CPR] for an overview.
 -}
 
 mkWWcpr_entry
-  :: WwOpts
+  :: WwEnv
   -> Type                              -- function body
   -> Cpr                               -- CPR analysis results
   -> UniqSM (Bool,            -- Is w/w'ing useful?
              CoreExpr -> CoreExpr,     -- New wrapper. 'nop_fn' if not useful
              CoreExpr -> CoreExpr)     -- New worker.  'nop_fn' if not useful
 -- ^ Entrypoint to CPR W/W. See Note [Worker/wrapper for CPR] for an overview.
-mkWWcpr_entry opts body_ty body_cpr
-  | not (wo_cpr_anal opts) = return (badWorker, nop_fn, nop_fn)
+mkWWcpr_entry env body_ty body_cpr
+  | not (wo_cpr_anal (ww_opts env)) = return (badWorker, nop_fn, nop_fn)
   | otherwise = do
     -- Part (1)
     res_bndr <- mk_res_bndr body_ty
@@ -1390,7 +1396,7 @@ mkWWcpr_entry opts body_ty body_cpr
 
     -- Part (2)
     (useful, fromOL -> transit_vars, rebuilt_result, work_unpack_res) <-
-      mkWWcpr_one opts res_bndr body_cpr
+      mkWWcpr_one env res_bndr body_cpr
 
     -- Part (3)
     let (unbox_transit_tup, transit_tup) = move_transit_vars transit_vars
@@ -1419,35 +1425,35 @@ mk_res_bndr body_ty = do
 type CprWwResultOne  = (Bool, OrdList Var,  CoreExpr , CoreExpr -> CoreExpr)
 type CprWwResultMany = (Bool, OrdList Var, [CoreExpr], CoreExpr -> CoreExpr)
 
-mkWWcpr :: WwOpts -> [Id] -> [Cpr] -> UniqSM CprWwResultMany
-mkWWcpr _opts vars []   =
+mkWWcpr :: WwEnv -> [Id] -> [Cpr] -> UniqSM CprWwResultMany
+mkWWcpr _env vars []   =
   -- special case: No CPRs means all top (for example from FlatConCpr),
   -- hence stop WW.
   return (badWorker, toOL vars, map varToCoreExpr vars, nop_fn)
-mkWWcpr opts  vars cprs = do
+mkWWcpr env  vars cprs = do
   -- No existentials in 'vars'. 'canUnboxResult' should have checked that.
   massertPpr (not (any isTyVar vars)) (ppr vars $$ ppr cprs)
   massertPpr (equalLength vars cprs) (ppr vars $$ ppr cprs)
   (usefuls, varss, rebuilt_results, work_unpack_ress) <-
-    unzip4 <$> zipWithM (mkWWcpr_one opts) vars cprs
+    unzip4 <$> zipWithM (mkWWcpr_one env) vars cprs
   return ( or usefuls
          , concatOL varss
          , rebuilt_results
          , foldl' (.) nop_fn work_unpack_ress )
 
-mkWWcpr_one :: WwOpts -> Id -> Cpr -> UniqSM CprWwResultOne
+mkWWcpr_one :: WwEnv -> Id -> Cpr -> UniqSM CprWwResultOne
 -- ^ See if we want to unbox the result and hand off to 'unbox_one_result'.
-mkWWcpr_one opts res_bndr cpr
+mkWWcpr_one env res_bndr cpr
   | assert (not (isTyVar res_bndr) ) True
-  , DoUnbox dcpc <- canUnboxResult (wo_fam_envs opts) (idType res_bndr) cpr
-  = unbox_one_result opts res_bndr dcpc
+  , DoUnbox dcpc <- canUnboxResult (ww_fam_envs env) (idType res_bndr) cpr
+  = unbox_one_result env res_bndr dcpc
   | otherwise
   = return (badWorker, unitOL res_bndr, varToCoreExpr res_bndr, nop_fn)
 
 unbox_one_result
-  :: WwOpts -> Id -> DataConPatContext Cpr -> UniqSM CprWwResultOne
+  :: WwEnv -> Id -> DataConPatContext Cpr -> UniqSM CprWwResultOne
 -- ^ Implements the main bits of part (2) of Note [Worker/wrapper for CPR]
-unbox_one_result opts res_bndr
+unbox_one_result env res_bndr
                  DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                                    , dcpc_co = co, dcpc_args = arg_cprs } = do
   -- unboxer (free in `res_bndr`):       |   builder (where <i> builds what was
@@ -1461,7 +1467,7 @@ unbox_one_result opts res_bndr
   massert (null _exs) -- Should have been caught by canUnboxResult
 
   (nested_useful, transit_vars, con_args, work_unbox_res) <-
-    mkWWcpr opts arg_ids arg_cprs
+    mkWWcpr env arg_ids arg_cprs
 
   let -- rebuilt_result = (C a b |> sym co)
       rebuilt_result = mkConApp dc (map Type tc_args ++ con_args) `mkCast` mkSymCo co

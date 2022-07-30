@@ -6,7 +6,6 @@ module GHC.Core.Opt.Config (
 
 import GHC.Prelude
 
-import GHC.Core.FamInstEnv ( FamInstEnv )
 import GHC.Core.Opt.CallerCC ( CallerCCOpts )
 import GHC.Core.Opt.DmdAnal ( DmdAnalOpts )
 import GHC.Core.Opt.LiberateCase ( LibCaseOpts )
@@ -21,7 +20,6 @@ import GHC.Core.Opt.FloatOutSwitches ( FloatOutSwitches )
 import GHC.Platform ( Platform )
 import GHC.Plugins.Monad ( CoreM )
 import GHC.Unit.Module.ModGuts
-import GHC.Unit.Module ( Module )
 import GHC.Utils.Outputable as Outputable
 
 {-
@@ -44,15 +42,15 @@ data CoreToDo           -- These are diff core-to-core passes,
     CoreDoSimplify !SimplifyOpts
   | CoreDoPluginPass String CorePluginPass
   | CoreDoFloatInwards !Platform
-  | CoreDoFloatOutwards FloatOutSwitches
+  | CoreDoFloatOutwards !FloatOutSwitches
   | CoreLiberateCase !LibCaseOpts
   | CoreDoPrintCore
   | CoreDoStaticArgs
   | CoreDoCallArity
   | CoreDoExitify
-  | CoreDoDemand DmdAnalOpts
+  | CoreDoDemand !DmdAnalOpts
   | CoreDoCpr
-  | CoreDoWorkerWrapper (Module -> (FamInstEnv, FamInstEnv) -> WwOpts)
+  | CoreDoWorkerWrapper !WwOpts
   | CoreDoSpecialising (PrintUnqualified -> SpecialiseOpts)
   | CoreDoSpecConstr !SpecConstrOpts
   | CoreCSE
@@ -63,8 +61,7 @@ data CoreToDo           -- These are diff core-to-core passes,
     CoreDoPasses [CoreToDo]
 
   | CoreAddCallerCcs !CallerCCOpts
-  | CoreAddLateCcs
-      !Bool -- ^ '-fprof-count-entries'
+  | CoreAddLateCcs !Bool -- ^ '-fprof-count-entries'
 
 instance Outputable CoreToDo where
   ppr (CoreDoSimplify _)       = text "Simplifier"
