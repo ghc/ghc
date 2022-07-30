@@ -10,13 +10,10 @@ module GHC.Core.Opt ( CoreOptEnv (..), runCorePasses ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Flags ( DumpFlag ( Opt_D_dump_str_signatures ) )
-
 import GHC.Core
 import GHC.Core.EndPass  ( EndPassConfig, endPassIO )
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Ppr     ( pprCoreBindings )
-import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( LintAnnotationsConfig, DebugSetting(..), lintAnnots )
 import GHC.Core.Opt.Config       ( CoreToDo(..) )
 import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
@@ -36,8 +33,6 @@ import GHC.Core.Opt.StaticArgs   ( doStaticArgs )
 import GHC.Core.Opt.Stats        ( SimplCountM, addCounts )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Core.LateCC           ( addLateCostCentresMG )
-import GHC.Core.Seq (seqBinds)
-import GHC.Core.FamInstEnv
 
 import GHC.Exts ( SpecConstrAnnotation )
 
@@ -52,8 +47,6 @@ import GHC.Unit.Env
 import GHC.Unit.Module.Env
 import GHC.Unit.Module.ModGuts
 
-import GHC.Types.Id.Info
-import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 import GHC.Types.Var ( Var )
 import GHC.Types.Name.Env ( NameEnv )
@@ -81,7 +74,6 @@ data CoreOptEnv = CoreOptEnv
     -- Why can't it just use 'co_getAllRules' above?
   , co_printUnqual   :: PrintUnqualified
   , co_visOrphans    :: ModuleSet
-  , co_hasPprDebug   :: Bool
   , co_getEps        :: IO ExternalPackageState
   , co_extraVars     :: [Var]
   , co_specConstrAnn :: ModGuts -> IO (NameEnv SpecConstrAnnotation)
@@ -163,7 +155,7 @@ doCorePass env pass guts = do
                                  updateBinds exitifyProgram
 
     CoreDoDemand opts         -> {-# SCC "DmdAnal" #-}
-                                 updateBindsM (dmdAnal (co_logger env) (co_hasPprDebug env) opts fam_envs (mg_rules guts))
+                                 liftIO $ demandAnalysis (co_logger env) opts fam_envs guts
 
     CoreDoCpr                 -> {-# SCC "CprAnal" #-}
                                  updateBindsM (cprAnalProgram (co_logger env) fam_envs)
@@ -186,7 +178,8 @@ doCorePass env pass guts = do
                                  return (addLateCostCentresMG opts guts)
 
     CoreDoPrintCore           -> {-# SCC "PrintCore" #-} do
-                                 liftIO $ printCore (co_logger env) (mg_binds guts)
+                                 liftIO $ logDumpMsg (co_logger env) "Print Core" $
+                                   pprCoreBindings (mg_binds guts)
                                  return guts
 
     CoreDoRuleCheck opts      -> {-# SCC "RuleCheck" #-}
@@ -204,30 +197,3 @@ doCorePass env pass guts = do
     updateBindsM f = do
       b' <- liftIO $ f (mg_binds guts)
       return $ guts { mg_binds = b' }
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Core pass combinators}
-*                                                                      *
-************************************************************************
--}
-
-printCore :: Logger -> CoreProgram -> IO ()
-printCore logger binds
-    = Logger.logDumpMsg logger "Print Core" (pprCoreBindings binds)
-
-dmdAnal :: Logger
-        -> Bool
-        -> DmdAnalOpts
-        -> (FamInstEnv, FamInstEnv)
-        -> [CoreRule]
-        -> CoreProgram
-        -> IO CoreProgram
-dmdAnal logger has_ppr_debug opts fam_envs rules binds = do
-  let binds_plus_dmds = dmdAnalProgram opts fam_envs rules binds
-  -- TODO Ericson2314: Why are we gated on a specific dump flag and the master one??
-  Logger.putDumpFileMaybe logger Opt_D_dump_str_signatures "Strictness signatures" FormatText $
-    dumpIdInfoOfProgram has_ppr_debug (ppr . zapDmdEnvSig . dmdSigInfo) binds_plus_dmds
-  -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
-  seqBinds binds_plus_dmds `seq` return binds_plus_dmds

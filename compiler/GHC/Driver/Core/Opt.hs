@@ -99,7 +99,6 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
       , co_hptRuleBase   = hpt_rule_base
       , co_printUnqual   = print_unqual
       , co_visOrphans    = mkModuleSet (mod : dep_orphs deps)
-      , co_hasPprDebug   = hasPprDebug dflags
       , co_getEps        = hscEPS hsc_env
       , co_extraVars     = interactiveInScope $ hsc_IC hsc_env
       , co_specConstrAnn = fmap snd . getFirstAnnotationsFromHscEnv hsc_env deserializeWithData

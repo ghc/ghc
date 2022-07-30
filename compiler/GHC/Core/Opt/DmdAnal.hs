@@ -10,11 +10,13 @@
 
 module GHC.Core.Opt.DmdAnal
    ( DmdAnalOpts(..)
-   , dmdAnalProgram
+   , demandAnalysis
    )
 where
 
 import GHC.Prelude
+
+import GHC.Driver.Flags ( DumpFlag(Opt_D_dump_str_signatures) )
 
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Types.Demand   -- All of it
@@ -37,17 +39,20 @@ import GHC.Core.Coercion ( Coercion )
 import GHC.Core.TyCo.FVs ( coVarsOfCos )
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.Arity ( typeArity )
+import GHC.Unit.Module.ModGuts
+import GHC.Utils.Logger
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.Maybe
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
+import GHC.Types.Id.Info ( dmdSigInfo )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.MemoFun
+import GHC.Core.Seq ( seqBinds )
 
-import GHC.Utils.Trace
-_ = pprTrace -- Tired of commenting out the import all the time
+-- import GHC.Utils.Trace
 
 {-
 ************************************************************************
@@ -60,8 +65,9 @@ _ = pprTrace -- Tired of commenting out the import all the time
 -- | Options for the demand analysis
 data DmdAnalOpts = DmdAnalOpts
    { dmd_strict_dicts    :: !Bool -- ^ Use strict dictionaries
-   , dmd_unbox_width     :: !Int  -- ^ Use strict dictionaries
+   , dmd_unbox_width     :: !Int
    , dmd_max_worker_args :: !Int
+   , dmd_ppr_debug       :: !Bool
    }
 
 -- This is a strict alternative to (,)
@@ -72,6 +78,24 @@ getAnnotated :: WithDmdType a -> a
 getAnnotated (WithDmdType _ a) = a
 
 data DmdResult a b = R !a !b
+
+demandAnalysis
+  :: Logger
+  -> DmdAnalOpts
+  -> (FamInstEnv, FamInstEnv)
+  -> ModGuts
+  -> IO ModGuts
+demandAnalysis logger opts fam_envs guts = do
+  let binds_plus_dmds = dmdAnalProgram opts fam_envs rules binds
+  -- TODO Ericson2314: Why are we gated on a specific dump flag and the master one??
+  putDumpFileMaybe logger Opt_D_dump_str_signatures "Strictness signatures" FormatText $
+    dumpIdInfoOfProgram (dmd_ppr_debug opts) (ppr . zapDmdEnvSig . dmdSigInfo) binds_plus_dmds
+  -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
+  nbinds <- seqBinds binds_plus_dmds `seq` return binds_plus_dmds
+  return guts{ mg_binds = nbinds }
+  where
+    binds = mg_binds guts
+    rules = mg_rules guts
 
 -- | Outputs a new copy of the Core program in which binders have been annotated
 -- with demand and strictness information.

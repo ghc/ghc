@@ -9,4 +9,5 @@ initDmdAnalOpts dflags = DmdAnalOpts
   { dmd_strict_dicts    = gopt Opt_DictsStrict dflags
   , dmd_unbox_width     = dmdUnboxWidth dflags
   , dmd_max_worker_args = maxWorkerArgs dflags
+  , dmd_ppr_debug       = hasPprDebug dflags
   }
