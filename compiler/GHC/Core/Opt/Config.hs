@@ -11,7 +11,7 @@ import GHC.Core.Opt.DmdAnal ( DmdAnalOpts )
 import GHC.Core.Opt.LiberateCase ( LibCaseOpts )
 import GHC.Core.Opt.RuleCheck ( RuleCheckOpts )
 import GHC.Core.Opt.Simplify ( SimplifyOpts(..) )
-import GHC.Core.Opt.Specialise.Config ( SpecialiseOpts(..) )
+import GHC.Core.Opt.Specialise ( SpecialiseOpts(..) )
 import GHC.Core.Opt.SpecConstr ( SpecConstrOpts )
 import GHC.Core.Opt.WorkWrap ( WwOpts )
 
@@ -51,7 +51,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoDemand !DmdAnalOpts
   | CoreDoCpr
   | CoreDoWorkerWrapper !WwOpts
-  | CoreDoSpecialising (PrintUnqualified -> SpecialiseOpts)
+  | CoreDoSpecialising !SpecialiseOpts
   | CoreDoSpecConstr !SpecConstrOpts
   | CoreCSE
   | CoreDoRuleCheck !RuleCheckOpts

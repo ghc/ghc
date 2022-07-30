@@ -163,9 +163,8 @@ doCorePass env pass guts = do
     CoreDoWorkerWrapper opts  -> {-# SCC "WorkWrap" #-} do
                                  updateBinds (wwTopBinds opts us fam_envs this_mod)
 
-    CoreDoSpecialising f      -> {-# SCC "Specialise" #-} do
-                                 let opts = f (co_printUnqual env)
-                                 liftIO $ specProgram (co_logger env) opts (mg_loc guts) (co_visOrphans env) external_rule_base (co_hptRuleBase env) guts
+    CoreDoSpecialising opts   -> {-# SCC "Specialise" #-} do
+                                 liftIO $ specProgram (co_logger env) opts (co_printUnqual env) (mg_loc guts) (co_visOrphans env) external_rule_base (co_hptRuleBase env) guts
 
     CoreDoSpecConstr opts     -> {-# SCC "SpecConstr" #-}
                                  return (specConstrProgram annos us opts this_mod guts)

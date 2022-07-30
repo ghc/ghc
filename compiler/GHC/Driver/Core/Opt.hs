@@ -102,8 +102,8 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
       , co_getEps        = hscEPS hsc_env
       , co_extraVars     = interactiveInScope $ hsc_IC hsc_env
       , co_specConstrAnn = fmap snd . getFirstAnnotationsFromHscEnv hsc_env deserializeWithData
-      , co_endPassCfg    = \pass -> initEndPassConfig dflags extra_vars print_unqual pass
-      , co_lintAnnotationsCfg = \pass -> initLintAnnotationsConfig dflags loc print_unqual pass
+      , co_endPassCfg    = initEndPassConfig dflags extra_vars print_unqual
+      , co_lintAnnotationsCfg = initLintAnnotationsConfig dflags loc print_unqual
       }
 
 liftCoreMToSimplCountM :: HscEnv -> DebugSetting -> ModGuts -> CoreM a -> SimplCountM a

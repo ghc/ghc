@@ -53,7 +53,7 @@ GHC.Core.Opt.Simplify.Iteration
 GHC.Core.Opt.Simplify.Monad
 GHC.Core.Opt.Simplify.Utils
 GHC.Core.Opt.SpecConstr
-GHC.Core.Opt.Specialise.Config
+GHC.Core.Opt.Specialise
 GHC.Core.Opt.Stats
 GHC.Core.Opt.WorkWrap
 GHC.Core.Opt.WorkWrap.Utils

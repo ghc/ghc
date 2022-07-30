@@ -293,8 +293,7 @@ coreDoDemand :: DynFlags -> CoreToDo
 coreDoDemand dflags = CoreDoDemand $ initDmdAnalOpts dflags
 
 coreDoSpecialising :: DynFlags -> CoreToDo
-coreDoSpecialising dflags = CoreDoSpecialising $
-  \ print_unqual -> initSpecialiseOpts dflags simplMask print_unqual
+coreDoSpecialising dflags = CoreDoSpecialising (initSpecialiseOpts dflags simplMask)
 
 -- TODO DEDUp!!!!
 simplMask :: Char

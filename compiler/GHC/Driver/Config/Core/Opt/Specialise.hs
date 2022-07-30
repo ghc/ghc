@@ -4,7 +4,7 @@ module GHC.Driver.Config.Core.Opt.Specialise
 
 import GHC.Prelude
 
-import GHC.Core.Opt.Specialise.Config ( SpecialiseOpts (..) )
+import GHC.Core.Opt.Specialise ( SpecialiseOpts (..) )
 
 import GHC.Driver.Config ( initSimpleOpts )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
@@ -12,12 +12,11 @@ import GHC.Driver.Config.Diagnostic ( initDiagOpts )
 import GHC.Driver.Session ( DynFlags, DiagnosticReason(..), GeneralFlag(..), WarningFlag(..), gopt, initSDocContext, wopt )
 
 import GHC.Utils.Error ( mkMCDiagnostic )
-import GHC.Utils.Outputable ( PrintUnqualified, defaultUserStyle )
+import GHC.Utils.Outputable ( defaultUserStyle )
 
-initSpecialiseOpts :: DynFlags -> Char -> PrintUnqualified -> SpecialiseOpts
-initSpecialiseOpts dflags mask print_unqual = SpecialiseOpts
+initSpecialiseOpts :: DynFlags -> Char -> SpecialiseOpts
+initSpecialiseOpts dflags mask = SpecialiseOpts
   { so_uniq_mask = mask
-  , so_unqual = print_unqual
   , so_cross_module_specialise = gopt Opt_CrossModuleSpecialise dflags
   , so_specialise_aggressively = gopt Opt_SpecialiseAggressively dflags
   , so_warn_missed_specs = warn_missed_specs

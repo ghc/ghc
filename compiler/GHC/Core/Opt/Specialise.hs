@@ -7,7 +7,7 @@
 -}
 
 module GHC.Core.Opt.Specialise
-  ( specProgram, specUnfolding
+  ( SpecialiseOpts(..), specProgram, specUnfolding
   ) where
 
 import GHC.Prelude
@@ -22,13 +22,13 @@ import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
 import GHC.Core.Rules
+import GHC.Core.SimpleOpt ( SimpleOpts )
 import GHC.Core.Utils     ( exprIsTrivial
                           , mkCast, exprType
                           , stripTicksTop )
 import GHC.Core.FVs
 import GHC.Core.TyCo.Rep (TyCoBinder (..))
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
-import GHC.Core.Opt.Specialise.Config
 
 import GHC.Builtin.Types  ( unboxedUnitTy )
 
@@ -591,12 +591,13 @@ Hence, the invariant is this:
 specProgram
   :: Logger
   -> SpecialiseOpts
+  -> PrintUnqualified
   -> SrcSpan
   -> ModuleSet
   -> RuleBase -- ^ external rule base
   -> RuleBase -- ^ home rule base
   -> ModGuts -> IO ModGuts
-specProgram logger opts loc vis_orphs eps_rule_base hpt_rule_base
+specProgram logger opts print_unqual loc vis_orphs eps_rule_base hpt_rule_base
             guts@(ModGuts { mg_module = this_mod
                           , mg_rules = local_rules
                           , mg_binds = binds })
@@ -612,6 +613,7 @@ specProgram logger opts loc vis_orphs eps_rule_base hpt_rule_base
                                        bindersOfBinds binds
                           , se_module = this_mod
                           , se_loc = loc
+                          , se_print_unqual = print_unqual
                           , se_visible_orphan_mods = vis_orphs
                           , se_eps_rule_base = eps_rule_base
                           , se_hpt_rule_base = hpt_rule_base
@@ -826,9 +828,8 @@ tryWarnMissingSpecs logger top_env callers fn calls_for_fn
   where
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
     doWarn msg_class = let
-      opts = se_opts top_env
       loc = se_loc top_env
-      sty = mkErrStyle (so_unqual opts)
+      sty = mkErrStyle (se_print_unqual top_env)
       doc = vcat
           [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
                   2 (vcat [ text "when specialising" <+> quotes (ppr caller)
@@ -1086,6 +1087,17 @@ the specialisations for imported bindings recursive.
 ************************************************************************
 -}
 
+data SpecialiseOpts = SpecialiseOpts
+  { so_uniq_mask :: !Char
+  , so_cross_module_specialise :: !Bool
+  , so_specialise_aggressively :: !Bool
+  , so_warn_missed_specs :: !(Maybe MessageClass)
+  , so_warn_all_missed_specs :: !(Maybe MessageClass)
+  , so_sdoc_context :: !SDocContext
+  , so_simpl_opts :: !SimpleOpts
+  , so_rule_opts :: !RuleOpts
+  }
+
 data SpecEnv
   = SE { se_opts :: SpecialiseOpts
 
@@ -1098,6 +1110,7 @@ data SpecEnv
 
        , se_module :: Module
        , se_loc :: SrcSpan
+       , se_print_unqual :: PrintUnqualified
 
        , se_visible_orphan_mods :: ModuleSet
 
