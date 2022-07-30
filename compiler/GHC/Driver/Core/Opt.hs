@@ -20,7 +20,8 @@ import GHC.Plugins.Monad ( CoreM, runCoreM )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Rules ( mkRuleBase )
 import GHC.Core.Opt ( CoreOptEnv (..), runCorePasses )
-import GHC.Core.Opt.Stats    ( SimplCountM, runSimplCountM, pprSimplCount )
+import GHC.Core.Opt.Simplify.Monad ( simplMask )
+import GHC.Core.Opt.Stats ( SimplCountM, addCounts, runSimplCountM, pprSimplCount )
 
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
@@ -29,9 +30,6 @@ import GHC.Unit.Module.Deps
 import GHC.Types.Name.Ppr
 
 import GHC.Utils.Logger as Logger
-
-import GHC.Core.Opt.Stats ( addCounts )
-import GHC.Core.Opt.Simplify.Monad ( simplMask )
 
 import Control.Monad.IO.Class
 

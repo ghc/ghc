@@ -5,7 +5,6 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TupleSections #-}
 
 module GHC.Driver.Config.Core.Opt ( getCoreToDo ) where
 

@@ -5,7 +5,6 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TupleSections #-}
 
 module GHC.Core.Opt ( CoreOptEnv (..), runCorePasses ) where
 

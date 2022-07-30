@@ -42,6 +42,8 @@ GHC.Core.Opt.CallerCC
 GHC.Core.Opt.CallerCC.Filter
 GHC.Core.Opt.Config
 GHC.Core.Opt.ConstantFold
+GHC.Core.Opt.DmdAnal
+GHC.Core.Opt.FloatOutSwitches
 GHC.Core.Opt.LiberateCase
 GHC.Core.Opt.OccurAnal
 GHC.Core.Opt.Simplify
@@ -50,8 +52,9 @@ GHC.Core.Opt.Simplify.Iteration
 GHC.Core.Opt.Simplify.Monad
 GHC.Core.Opt.Simplify.Utils
 GHC.Core.Opt.SpecConstr
+GHC.Core.Opt.Specialise.Config
 GHC.Core.Opt.Stats
-GHC.Core.Opt.FloatOutSwitches
+GHC.Core.Opt.WorkWrap
 GHC.Core.Opt.WorkWrap.Utils
 GHC.Core.PatSyn
 GHC.Core.Ppr
@@ -107,6 +110,7 @@ GHC.Driver.CmdLine
 GHC.Driver.Config.Core.Lint
 GHC.Driver.Config.Diagnostic
 GHC.Driver.Config.Logger
+GHC.Driver.Core.Opt.Annotations
 GHC.Driver.Env
 GHC.Driver.Env.KnotVars
 GHC.Driver.Env.Types
@@ -242,6 +246,7 @@ GHC.Types.Unique.DFM
 GHC.Types.Unique.DSet
 GHC.Types.Unique.FM
 GHC.Types.Unique.Map
+GHC.Types.Unique.MemoFun
 GHC.Types.Unique.SDFM
 GHC.Types.Unique.Set
 GHC.Types.Unique.Supply
