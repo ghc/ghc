@@ -46,6 +46,7 @@ GHC.Core.Opt.DmdAnal
 GHC.Core.Opt.FloatOutSwitches
 GHC.Core.Opt.LiberateCase
 GHC.Core.Opt.OccurAnal
+GHC.Core.Opt.RuleCheck
 GHC.Core.Opt.Simplify
 GHC.Core.Opt.Simplify.Env
 GHC.Core.Opt.Simplify.Iteration
