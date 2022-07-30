@@ -31,9 +31,8 @@ import Data.Word ( Word8 )
 --
 -- See Note [Annotations]
 getAnnotationsFromHscEnv :: Typeable a => HscEnv -> ([Word8] -> a) -> ModGuts -> IO (ModuleEnv [a], NameEnv [a])
-getAnnotationsFromHscEnv hsc_env deserialize guts = do
-   ann_env <- prepareAnnotations hsc_env (Just guts)
-   return (deserializeAnns deserialize ann_env)
+getAnnotationsFromHscEnv hsc_env deserialize guts
+  = deserializeAnns deserialize <$> prepareAnnotations hsc_env (Just guts)
 
 -- | Get at most one annotation of a given type per annotatable item.
 getFirstAnnotationsFromHscEnv :: Typeable a => HscEnv -> ([Word8] -> a) -> ModGuts -> IO (ModuleEnv a, NameEnv a)

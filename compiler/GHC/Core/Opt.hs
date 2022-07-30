@@ -18,7 +18,7 @@ import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
-import GHC.Core.Lint    ( LintAnnotationsConfig, lintAnnots )
+import GHC.Core.Lint    ( LintAnnotationsConfig, DebugSetting(..), lintAnnots )
 import GHC.Core.Opt.Config ( CoreToDo(..) )
 import GHC.Core.Opt.Simplify ( simplifyPgm )
 import GHC.Core.Opt.Simplify.Monad
@@ -73,8 +73,9 @@ import Control.Monad
 -- that plan.
 data CoreOptEnv = CoreOptEnv
   { co_logger        :: Logger
+  , co_debugSetting  :: DebugSetting
   , co_unitEnv       :: UnitEnv
-  , co_liftCoreM     :: ModGuts -> CoreM ModGuts -> SimplCountM ModGuts
+  , co_liftCoreM     :: DebugSetting -> ModGuts -> CoreM ModGuts -> SimplCountM ModGuts
   , co_getAllRules   :: ModGuts -> IO RuleEnv
   , co_hptRuleBase   :: RuleBase
     -- ^ TODO(@mmhat, @ericson2314): Why does the simplifier need this?
@@ -108,34 +109,15 @@ runCorePasses env passes guts
     do_pass guts pass = do
       let end_pass_cfg = co_endPassCfg env  pass
       let lint_anno_cfg = co_lintAnnotationsCfg env pass
-      let doCorePassWithDebug _debug_lvl nguts = do
-            -- ERICSON2314 TO MMHAT:
-            --
-            -- This is rather intersting, this no longer works because
-            -- of the planning vs non-planning separation! This means
-            -- instead of doing
-            --
-            -- > | CoreToDoVariantBesidesDoPassses Config
-            --
-            -- We need to probably do
-            --
-            -- > | CoreToDoVariantBesidesDoPassses (DebugLevel -> Config)
-            --
-            -- so we can "defer" that one part of the planning for
-            -- 'lintAnnots' to try in multiple ways.
-            --
-            -- Does that makes sense?
-
-            -- let dflags' = (hsc_dflags hsc_env) { debugLevel = debug_lvl }
-            --     hsc_env' = hsc_env { hsc_dflags = dflags' }
-            doCorePass env pass nguts
+      let doCorePassWithoutDebug debug_setting = let
+            env' = env { co_debugSetting = debug_setting }
+            in doCorePass env' pass
 
       withTiming (co_logger env) (ppr pass <+> brackets (ppr this_mod)) (const ()) $ do
-        guts' <- lintAnnots (co_logger env) lint_anno_cfg doCorePassWithDebug guts
+        guts' <- lintAnnots (co_logger env) lint_anno_cfg doCorePassWithoutDebug guts
         liftIO $ endPassIO (co_logger env) end_pass_cfg (mg_binds guts') (mg_rules guts')
         return guts'
 
-    -- dflags = hsc_dflags hsc_env
     this_mod = mg_module guts
 
 -- | Run a single core pass, as specified with a single 'CoreToDo'.
@@ -217,8 +199,8 @@ doCorePass env pass guts = do
 
     CoreDoPasses passes       -> runCorePasses env passes guts
 
-    CoreDoPluginPass _ p      -> {-# SCC "Plugin" #-} do
-                                 co_liftCoreM env guts $ p guts
+    CoreDoPluginPass _ p      -> {-# SCC "Plugin" #-}
+                                 co_liftCoreM env (co_debugSetting env) guts $ p guts
   where
     updateBinds f = return $ guts { mg_binds = f (mg_binds guts) }
 

@@ -12,7 +12,7 @@ See Note [Core Lint guarantee].
 -}
 
 module GHC.Core.Lint (
-    LintAnnotationsConfig (..),
+    LintAnnotationsConfig (..), DebugSetting(..),
     LintPassResultConfig (..),
     LintFlags (..),
     StaticPtrCheck (..),
@@ -3348,9 +3348,14 @@ data LintAnnotationsConfig = LintAnnotationsConfig
   { la_doAnnotationLinting :: !Bool
   , la_passName :: !SDoc
   , la_sourceLoc :: !SrcSpan
-  , la_debugLevel :: !Int
   , la_printUnqual :: !PrintUnqualified
   }
+
+-- | Specifiy with which debug level the pass should be run.
+-- We use an own type here to avoid boolean blindness.
+data DebugSetting
+  = InheritDebugLevel
+  | NoDebugging
 
 -- | This checks whether a pass correctly looks through debug
 -- annotations (@SourceNote@). This works a bit different from other
@@ -3360,14 +3365,14 @@ lintAnnots
   :: MonadIO m
   => Logger
   -> LintAnnotationsConfig
-  -> (Int -> ModGuts -> m ModGuts)
+  -> (DebugSetting -> ModGuts -> m ModGuts)
   -> ModGuts -> m ModGuts
 lintAnnots logger cfg pass guts = {-# SCC "lintAnnots" #-}
   if la_doAnnotationLinting cfg
     then do
       liftIO $ Err.showPass logger "Annotation linting - first run"
       -- Run the pass as we normally would
-      nguts <- pass (la_debugLevel cfg) guts
+      nguts <- pass InheritDebugLevel guts
       liftIO $ Err.showPass logger "Annotation linting - second run"
       -- Re-run it without debug annotations to make sure that they made no
       -- difference.
@@ -3386,14 +3391,15 @@ lintAnnots logger cfg pass guts = {-# SCC "lintAnnots" #-}
           ]
       return nguts
     else
-      pass (la_debugLevel cfg) guts
+      pass InheritDebugLevel guts
 
 -- | Run the given pass without annotations. This means that we both
--- set the debugLevel setting to 0 in the environment as well as all
--- annotations from incoming modules.
+-- set the debugLevel setting to 0 (this is delegated to the pass callback by
+-- calling it with `NoDebugging`) in the environment as well as all annotations
+-- from incoming modules.
 withoutAnnots
   :: MonadIO m
-  => (Int -> ModGuts -> m ModGuts)
+  => (DebugSetting -> ModGuts -> m ModGuts)
   -> ModGuts
   -> m ModGuts
 withoutAnnots pass guts = do
@@ -3409,4 +3415,4 @@ withoutAnnots pass guts = do
         = mg{mg_binds = map nukeAnnotsBind binds}
   -- Perform pass with all changes applied and without debugging.
   -- TODO: supply tag here as well ?
-  pass 0 (nukeAnnotsMod guts)
+  pass NoDebugging (nukeAnnotsMod guts)

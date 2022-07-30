@@ -31,7 +31,6 @@ initLintAnnotationsConfig dflags loc print_unqual pass = LintAnnotationsConfig
   { la_doAnnotationLinting = gopt Opt_DoAnnotationLinting dflags
   , la_passName = ppr pass
   , la_sourceLoc = loc
-  , la_debugLevel = debugLevel dflags
   , la_printUnqual = print_unqual
   }
 
