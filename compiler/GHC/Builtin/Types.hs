@@ -530,12 +530,6 @@ tupleRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TupleRep
 sumRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "SumRep") sumRepDataConKey sumRepDataCon
 boxedRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "BoxedRep") boxedRepDataConKey boxedRepDataCon
 
-levityTyConName, liftedDataConName, unliftedDataConName :: Name
-levityTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Levity") levityTyConKey levityTyCon
-liftedDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Lifted") liftedDataConKey liftedDataCon
-unliftedDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Unlifted") unliftedDataConKey unliftedDataCon
-
-
 -- See Note [Wiring in RuntimeRep]
 runtimeRepSimpleDataConNames :: [Name]
 runtimeRepSimpleDataConNames
@@ -1553,152 +1547,20 @@ unliftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Unli
 unliftedTypeKind :: Type
 unliftedTypeKind = mkTyConTy unliftedTypeKindTyCon
 
------------------------
-mkTYPEapp :: RuntimeRepType -> Type
-mkTYPEapp rr
-  = case mkTYPEapp_maybe rr of
-       Just ty -> ty
-       Nothing -> TyConApp tYPETyCon [rr]
-
-mkTYPEapp_maybe :: RuntimeRepType -> Maybe Type
--- ^ Given a @RuntimeRep@, applies @TYPE@ to it.
--- On the fly it rewrites
---      TYPE LiftedRep      -->   liftedTypeKind    (a synonym)
---      TYPE UnliftedRep    -->   unliftedTypeKind  (ditto)
---      TYPE ZeroBitRep     -->   zeroBitTypeKind   (ditto)
--- NB: no need to check for TYPE (BoxedRep Lifted), TYPE (BoxedRep Unlifted)
---     because those inner types should already have been rewritten
---     to LiftedRep and UnliftedRep respectively, by mkTyConApp
---
--- see Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
--- See Note [Using synonyms to compress types] in GHC.Core.Type
-{-# NOINLINE mkTYPEapp_maybe #-}
-mkTYPEapp_maybe (TyConApp tc args)
-  | key == liftedRepTyConKey    = assert (null args) $ Just liftedTypeKind   -- TYPE LiftedRep
-  | key == unliftedRepTyConKey  = assert (null args) $ Just unliftedTypeKind -- TYPE UnliftedRep
-  | key == zeroBitRepTyConKey   = assert (null args) $ Just zeroBitTypeKind  -- TYPE ZeroBitRep
-  where
-    key = tyConUnique tc
-mkTYPEapp_maybe _ = Nothing
-
-------------------
-mkCONSTRAINTapp :: RuntimeRepType -> Type
--- ^ Just like mkTYPEapp
-mkCONSTRAINTapp rr
-  = case mkCONSTRAINTapp_maybe rr of
-       Just ty -> ty
-       Nothing -> TyConApp cONSTRAINTTyCon [rr]
-
-mkCONSTRAINTapp_maybe :: RuntimeRepType -> Maybe Type
--- ^ Just like mkTYPEapp_maybe
-{-# NOINLINE mkCONSTRAINTapp_maybe #-}
-mkCONSTRAINTapp_maybe (TyConApp tc args)
-  | key == liftedRepTyConKey = assert (null args) $ Just constraintKind   -- CONSTRAINT LiftedRep
-  where
-    key = tyConUnique tc
-mkCONSTRAINTapp_maybe _ = Nothing
-
-------------------
-mkBoxedRepApp_maybe :: Type -> Maybe Type
--- ^ Given a `Levity`, apply `BoxedRep` to it
--- On the fly, rewrite
---      BoxedRep Lifted     -->   liftedRepTy    (a synonym)
---      BoxedRep Unlifted   -->   unliftedRepTy  (ditto)
--- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
--- See Note [Using synonyms to compress types] in GHC.Core.Type
-{-# NOINLINE mkBoxedRepApp_maybe #-}
-mkBoxedRepApp_maybe (TyConApp tc args)
-  | key == liftedDataConKey   = assert (null args) $ Just liftedRepTy    -- BoxedRep Lifted
-  | key == unliftedDataConKey = assert (null args) $ Just unliftedRepTy  -- BoxedRep Unlifted
-  where
-    key = tyConUnique tc
-mkBoxedRepApp_maybe _ = Nothing
-
-mkTupleRepApp_maybe :: Type -> Maybe Type
--- ^ Given a `[RuntimeRep]`, apply `TupleRep` to it
--- On the fly, rewrite
---      TupleRep [] -> zeroBitRepTy   (a synonym)
--- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
--- See Note [Using synonyms to compress types] in GHC.Core.Type
-{-# NOINLINE mkTupleRepApp_maybe #-}
-mkTupleRepApp_maybe (TyConApp tc args)
-  | key == nilDataConKey = assert (isSingleton args) $ Just zeroBitRepTy  -- ZeroBitRep
-  where
-    key = tyConUnique tc
-mkTupleRepApp_maybe _ = Nothing
-
-{- Note [Using synonyms to compress types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Was: Prefer Type over TYPE (BoxedRep Lifted)]
-
-The Core of nearly any program will have numerous occurrences of the Types
-
-   TyConApp BoxedRep [TyConApp Lifted []]    -- Synonym LiftedRep
-   TyConApp BoxedRep [TyConApp Unlifted []]  -- Synonym UnliftedREp
-   TyConApp TYPE [TyConApp LiftedRep []]     -- Synonym Type
-   TyConApp TYPE [TyConApp UnliftedRep []]   -- Synonym UnliftedType
-
-While investigating #17292 we found that these constituted a majority
-of all TyConApp constructors on the heap:
-
-    (From a sample of 100000 TyConApp closures)
-    0x45f3523    - 28732 - `Type`
-    0x420b840702 - 9629  - generic type constructors
-    0x42055b7e46 - 9596
-    0x420559b582 - 9511
-    0x420bb15a1e - 9509
-    0x420b86c6ba - 9501
-    0x42055bac1e - 9496
-    0x45e68fd    - 538   - `TYPE ...`
-
-Consequently, we try hard to ensure that operations on such types are
-efficient. Specifically, we strive to
-
- a. Avoid heap allocation of such types; use a single static TyConApp
- b. Use a small (shallow in the tree-depth sense) representation
-    for such types
-
-Goal (b) is particularly useful as it makes traversals (e.g. free variable
-traversal, substitution, and comparison) more efficient.
-Comparison in particular takes special advantage of nullary type synonym
-applications (e.g. things like @TyConApp typeTyCon []@), Note [Comparing
-nullary type synonyms] in "GHC.Core.Type".
-
-To accomplish these we use a number of tricks, implemented by mkTyConApp.
-
- 1. Instead of (TyConApp BoxedRep [TyConApp Lifted []]),
-    we prefer a statically-allocated (TyConApp LiftedRep [])
-    where `LiftedRep` is a type synonym:
-       type LiftedRep = BoxedRep Lifted
-    Similarly for UnliftedRep
-
- 2. Instead of (TyConApp TYPE [TyConApp LiftedRep []])
-    we prefer the statically-allocated (TyConApp Type [])
-    where `Type` is a type synonym
-       type Type = TYPE LiftedRep
-    Similarly for UnliftedType
-
-These serve goal (b) since there are no applied type arguments to traverse,
-e.g., during comparison.
-
- 3. We have a single, statically allocated top-level binding to
-    represent `TyConApp GHC.Types.Type []` (namely
-    'GHC.Builtin.Types.Prim.liftedTypeKind'), ensuring that we don't
-    need to allocate such types (goal (a)).  See functions
-    mkTYPEapp and mkBoxedRepApp
-
- 4. We use the sharing mechanism described in Note [Sharing nullary TyConApps]
-    in GHC.Core.TyCon to ensure that we never need to allocate such
-    nullary applications (goal (a)).
-
-See #17958, #20541
--}
 
 {- *********************************************************************
 *                                                                      *
       data TypeOrConstraint = TypeLike | ConstraintLike
 *                                                                      *
 ********************************************************************* -}
+
+typeOrConstraintTyConName, typeLikeDataConName, typeLikeDataConName :: Name
+typeOrConstraintTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "TypeOrConstraint")
+                                               typeOrConstraintTyConKey typeOrConstraintTyConn
+typeLikeDataConName       = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TypeLike")
+                                                 typeLikeDataConKey typeLikeDataCon
+constraintLikeDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "ConstraintLike")
+                                                 constraintLikeDataConKey constraintLikeDataCon
 
 typeOrConstraintTyCon :: TyCon
 typeOrConstraintTyCon = pcTyCon typeOrConstraintTyConName Nothing []
@@ -1731,6 +1593,11 @@ constraintLikeDataConTy = mkTyConTy constraintLikeDataConTyCon
 *                                                                      *
 ********************************************************************* -}
 
+levityTyConName, liftedDataConName, unliftedDataConName :: Name
+levityTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Levity")   levityTyConKey     levityTyCon
+liftedDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Lifted")   liftedDataConKey   liftedDataCon
+unliftedDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Unlifted") unliftedDataConKey unliftedDataCon
+
 levityTyCon :: TyCon
 levityTyCon = pcTyCon levityTyConName Nothing [] [liftedDataCon,unliftedDataCon]
 
@@ -1742,6 +1609,7 @@ liftedDataCon = pcSpecialDataCon liftedDataConName
     [] levityTyCon LiftedInfo
 unliftedDataCon = pcSpecialDataCon unliftedDataConName
     [] levityTyCon UnliftedInfo
+
 
 liftedDataConTyCon :: TyCon
 liftedDataConTyCon = promoteDataCon liftedDataCon

@@ -65,6 +65,11 @@ module GHC.Core.TyCo.Rep (
         -- * Functions over coercions
         pickLR,
 
+        -- * Space-saving construction
+        mkTYPEapp, mkTYPEapp_maybe,
+        mkCONSTRAINTapp, mkCONSTRAINTapp_maybe,
+        mkBoxedRepApp_maybe, mkTupleRepApp_maybe,
+
         -- ** Analyzing types
         TyCoFolder(..), foldTyCo, noView,
 
@@ -88,13 +93,15 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import {-# SOURCE #-} GHC.Builtin.Types ( manyDataConTy )
+import {-# SOURCE #-} GHC.Builtin.Types
+import GHC.Builtin.Names
+
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
-import GHC.Types.Unique ( Uniquable(..) )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain( assert )
 
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
@@ -164,8 +171,12 @@ data Type
 
   | FunTy      -- ^ FUN m t1 t2   Very common, so an important special case
                 -- See Note [Function types]
-     { ft_af   :: Arrow          -- Is this (->) or (=>) or (==>)?
-     , ft_mult :: Mult           -- Multiplicity
+     { ft_af   :: AnonArgFlag    -- Is this (->/FUN) or (=>) or (==>)?
+                                 -- This info is fully specified by the kinds in
+                                 --      ft_arg and ft_res
+                                 -- Note [AnonArgFlag] in GHC.Types.Var
+
+     , ft_mult :: Mult           -- Multiplicity; always Many for (=>) and (==>)
      , ft_arg  :: Type           -- Argument type
      , ft_res  :: Type }         -- Result type
 
@@ -186,10 +197,6 @@ data Type
                     -- GADT data constructor
 
   deriving Data.Data
-
-data Arrow = FatArrow   -- (=>)
-           | FatArrow2  -- (==>)
-           | ThinArrow  -- (->)
 
 instance Outputable Type where
   ppr = pprType
@@ -770,8 +777,7 @@ delBinderVar vars (Bndr tv _) = vars `delVarSet` tv
 -- | Does this binder bind an invisible argument?
 isInvisibleBinder :: TyCoBinder -> Bool
 isInvisibleBinder (Named (Bndr _ vis)) = isInvisibleArgFlag vis
-isInvisibleBinder (Anon InvisArg _)    = True
-isInvisibleBinder (Anon VisArg   _)    = False
+isInvisibleBinder (Anon af _)          = isInvisibleAnonArg af
 
 -- | Does this binder bind a visible argument?
 isVisibleBinder :: TyCoBinder -> Bool
@@ -1058,8 +1064,8 @@ mkScaledFunTy :: AnonArgFlag -> Scaled Type -> Type -> Type
 mkScaledFunTy af (Scaled mult arg) res = mkFunTy af mult arg res
 
 mkVisFunTy, mkInvisFunTy :: Mult -> Type -> Type -> Type
-mkVisFunTy   = mkFunTy VisArg
-mkInvisFunTy = mkFunTy InvisArg
+mkVisFunTy   = mkFunTy VisArg      -- (->)
+mkInvisFunTy = mkFunTy InvisArg1   -- (=>)
 
 mkFunTyMany :: AnonArgFlag -> Type -> Type -> Type
 mkFunTyMany af = mkFunTy af manyDataConTy
@@ -1165,10 +1171,8 @@ data Coercion
   | FunCo Role CoercionN Coercion Coercion         -- lift FunTy
          -- FunCo :: "e" -> N -> e -> e -> e
          -- Note: why doesn't FunCo have a AnonArgFlag, like FunTy?
-         -- Because the AnonArgFlag has no impact on Core; it is only
-         -- there to guide implicit instantiation of Haskell source
-         -- types, and that is irrelevant for coercions, which are
-         -- Core-only.
+         -- It's just an engineering choice: we recover it from the
+         -- other arguments when we need it
 
   -- These are special
   | CoVarCo CoVar      -- :: _ -> (N or R)
@@ -2073,3 +2077,151 @@ So that Mult feels a bit more structured, we provide pattern synonyms and smart
 constructors for these.
 -}
 type Mult = Type
+
+
+{- *********************************************************************
+*                                                                      *
+                    Space-saving construction
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Using synonyms to compress types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Was: Prefer Type over TYPE (BoxedRep Lifted)]
+
+The Core of nearly any program will have numerous occurrences of the Types
+
+   TyConApp BoxedRep [TyConApp Lifted []]    -- Synonym LiftedRep
+   TyConApp BoxedRep [TyConApp Unlifted []]  -- Synonym UnliftedREp
+   TyConApp TYPE [TyConApp LiftedRep []]     -- Synonym Type
+   TyConApp TYPE [TyConApp UnliftedRep []]   -- Synonym UnliftedType
+
+While investigating #17292 we found that these constituted a majority
+of all TyConApp constructors on the heap:
+
+    (From a sample of 100000 TyConApp closures)
+    0x45f3523    - 28732 - `Type`
+    0x420b840702 - 9629  - generic type constructors
+    0x42055b7e46 - 9596
+    0x420559b582 - 9511
+    0x420bb15a1e - 9509
+    0x420b86c6ba - 9501
+    0x42055bac1e - 9496
+    0x45e68fd    - 538   - `TYPE ...`
+
+Consequently, we try hard to ensure that operations on such types are
+efficient. Specifically, we strive to
+
+ a. Avoid heap allocation of such types; use a single static TyConApp
+ b. Use a small (shallow in the tree-depth sense) representation
+    for such types
+
+Goal (b) is particularly useful as it makes traversals (e.g. free variable
+traversal, substitution, and comparison) more efficient.
+Comparison in particular takes special advantage of nullary type synonym
+applications (e.g. things like @TyConApp typeTyCon []@), Note [Comparing
+nullary type synonyms] in "GHC.Core.Type".
+
+To accomplish these we use a number of tricks, implemented by mkTyConApp.
+
+ 1. Instead of (TyConApp BoxedRep [TyConApp Lifted []]),
+    we prefer a statically-allocated (TyConApp LiftedRep [])
+    where `LiftedRep` is a type synonym:
+       type LiftedRep = BoxedRep Lifted
+    Similarly for UnliftedRep
+
+ 2. Instead of (TyConApp TYPE [TyConApp LiftedRep []])
+    we prefer the statically-allocated (TyConApp Type [])
+    where `Type` is a type synonym
+       type Type = TYPE LiftedRep
+    Similarly for UnliftedType
+
+These serve goal (b) since there are no applied type arguments to traverse,
+e.g., during comparison.
+
+ 3. We have a single, statically allocated top-level binding to
+    represent `TyConApp GHC.Types.Type []` (namely
+    'GHC.Builtin.Types.Prim.liftedTypeKind'), ensuring that we don't
+    need to allocate such types (goal (a)).  See functions
+    mkTYPEapp and mkBoxedRepApp
+
+ 4. We use the sharing mechanism described in Note [Sharing nullary TyConApps]
+    in GHC.Core.TyCon to ensure that we never need to allocate such
+    nullary applications (goal (a)).
+
+See #17958, #20541
+-}
+
+mkTYPEapp :: RuntimeRepType -> Type
+mkTYPEapp rr
+  = case mkTYPEapp_maybe rr of
+       Just ty -> ty
+       Nothing -> TyConApp tYPETyCon [rr]
+
+mkTYPEapp_maybe :: RuntimeRepType -> Maybe Type
+-- ^ Given a @RuntimeRep@, applies @TYPE@ to it.
+-- On the fly it rewrites
+--      TYPE LiftedRep      -->   liftedTypeKind    (a synonym)
+--      TYPE UnliftedRep    -->   unliftedTypeKind  (ditto)
+--      TYPE ZeroBitRep     -->   zeroBitTypeKind   (ditto)
+-- NB: no need to check for TYPE (BoxedRep Lifted), TYPE (BoxedRep Unlifted)
+--     because those inner types should already have been rewritten
+--     to LiftedRep and UnliftedRep respectively, by mkTyConApp
+--
+-- see Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
+-- See Note [Using synonyms to compress types] in GHC.Core.Type
+{-# NOINLINE mkTYPEapp_maybe #-}
+mkTYPEapp_maybe (TyConApp tc args)
+  | key == liftedRepTyConKey    = assert (null args) $ Just liftedTypeKind   -- TYPE LiftedRep
+  | key == unliftedRepTyConKey  = assert (null args) $ Just unliftedTypeKind -- TYPE UnliftedRep
+  | key == zeroBitRepTyConKey   = assert (null args) $ Just zeroBitTypeKind  -- TYPE ZeroBitRep
+  where
+    key = tyConUnique tc
+mkTYPEapp_maybe _ = Nothing
+
+------------------
+mkCONSTRAINTapp :: RuntimeRepType -> Type
+-- ^ Just like mkTYPEapp
+mkCONSTRAINTapp rr
+  = case mkCONSTRAINTapp_maybe rr of
+       Just ty -> ty
+       Nothing -> TyConApp cONSTRAINTTyCon [rr]
+
+mkCONSTRAINTapp_maybe :: RuntimeRepType -> Maybe Type
+-- ^ Just like mkTYPEapp_maybe
+{-# NOINLINE mkCONSTRAINTapp_maybe #-}
+mkCONSTRAINTapp_maybe (TyConApp tc args)
+  | key == liftedRepTyConKey = assert (null args) $ Just constraintKind   -- CONSTRAINT LiftedRep
+  where
+    key = tyConUnique tc
+mkCONSTRAINTapp_maybe _ = Nothing
+
+------------------
+mkBoxedRepApp_maybe :: Type -> Maybe Type
+-- ^ Given a `Levity`, apply `BoxedRep` to it
+-- On the fly, rewrite
+--      BoxedRep Lifted     -->   liftedRepTy    (a synonym)
+--      BoxedRep Unlifted   -->   unliftedRepTy  (ditto)
+-- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
+-- See Note [Using synonyms to compress types] in GHC.Core.Type
+{-# NOINLINE mkBoxedRepApp_maybe #-}
+mkBoxedRepApp_maybe (TyConApp tc args)
+  | key == liftedDataConKey   = assert (null args) $ Just liftedRepTy    -- BoxedRep Lifted
+  | key == unliftedDataConKey = assert (null args) $ Just unliftedRepTy  -- BoxedRep Unlifted
+  where
+    key = tyConUnique tc
+mkBoxedRepApp_maybe _ = Nothing
+
+mkTupleRepApp_maybe :: Type -> Maybe Type
+-- ^ Given a `[RuntimeRep]`, apply `TupleRep` to it
+-- On the fly, rewrite
+--      TupleRep [] -> zeroBitRepTy   (a synonym)
+-- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
+-- See Note [Using synonyms to compress types] in GHC.Core.Type
+{-# NOINLINE mkTupleRepApp_maybe #-}
+mkTupleRepApp_maybe (TyConApp tc args)
+  | key == nilDataConKey = assert (isSingleton args) $ Just zeroBitRepTy  -- ZeroBitRep
+  where
+    key = tyConUnique tc
+mkTupleRepApp_maybe _ = Nothing
+

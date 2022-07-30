@@ -68,7 +68,8 @@ module GHC.Types.Var (
 
         -- * ArgFlags
         ArgFlag(Invisible,Required,Specified,Inferred),
-        AnonArgFlag(..), Specificity(..),
+        AnonArgFlag(..), isVisibleAnonArg, isInvisibleAnonArg,
+        Specificity(..),
         isVisibleArgFlag, isInvisibleArgFlag, isInferredArgFlag,
         sameVis,
 
@@ -516,34 +517,48 @@ instance Binary ArgFlag where
 data AnonArgFlag
   = VisArg    -- ^ Used for @(->)@: an ordinary non-dependent arrow.
               --   The argument is visible in source code.
-  | InvisArg  -- ^ Used for @(=>)@: a non-dependent predicate arrow.
-              --   The argument is invisible in source code.
+  | InvisArg1 -- ^ Used for `(=>)`
+  | InvisArg2 -- ^ Used for `(==>)`
+              -- In both cases InvisArg cases the argument is invisible
+              -- in source code.
   deriving (Eq, Ord, Data)
 
 instance Outputable AnonArgFlag where
-  ppr VisArg   = text "[vis]"
-  ppr InvisArg = text "[invis]"
+  ppr VisArg    = text "[->]"
+  ppr InvisArg1 = text "[=>]"
+  ppr InvisArg2 = text "[==>]"
 
 instance Binary AnonArgFlag where
-  put_ bh VisArg   = putByte bh 0
-  put_ bh InvisArg = putByte bh 1
+  put_ bh VisArg    = putByte bh 0
+  put_ bh InvisArg1 = putByte bh 1
+  put_ bh InvisArg2 = putByte bh 2
 
   get bh = do
     h <- getByte bh
     case h of
       0 -> return VisArg
-      _ -> return InvisArg
+      1 -> return InvisArg1
+      _ -> return InvisArg2
+
+isInvisibleAnonArg :: AnonArgFlag -> Bool
+isInvisibleAnonArg af = not (isVisibleAnonArg af)
+
+isVisibleAnonArg :: AnonArgFlag -> Bool
+isVisibleAnonArg VisArg = True
+isVisibleAnonArg _      = False
 
 {- Note [AnonArgFlag]
 ~~~~~~~~~~~~~~~~~~~~~
 AnonArgFlag is used principally in the FunTy constructor of Type.
-  FunTy VisArg   t1 t2   means   t1 -> t2
-  FunTy InvisArg t1 t2   means   t1 => t2
+  FunTy VisArg    t1 t2   means   t1 -> t2
+  FunTy InvisArg1 t1 t2   means   t1 => t2
+  FunTy InvisArg2 t1 t2   means   t1 ==> t2
 
 However, the AnonArgFlag in a FunTy is just redundant, cached
 information.  In (FunTy { ft_af = af, ft_arg = t1, ft_res = t2 })
-  * if (isPredTy t1 = True)  then af = InvisArg
   * if (isPredTy t1 = False) then af = VisArg
+  * if (isPredTy t1 = True, isPredTy t2 = False) then af = InvisArg1
+  * if (isPredTy t1 = True, isPredTy t2 = True)  then af = InvisArg2
 where isPredTy is defined in GHC.Core.Type, and sees if t1's
 kind is Constraint.  See GHC.Core.TyCo.Rep
 Note [Types for coercions, predicates, and evidence]

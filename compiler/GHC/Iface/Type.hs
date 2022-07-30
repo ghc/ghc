@@ -478,7 +478,8 @@ splitIfaceSigmaTy ty
         = case split_foralls ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
     split_foralls rho = ([], rho)
 
-    split_rho (IfaceFunTy InvisArg _ ty1 ty2)
+    split_rho (IfaceFunTy af _ ty1 ty2)
+        | isInvisibleAnonArg af
         = case split_rho ty2 of { (ps, tau) -> (ty1:ps, tau) }
     split_rho tau = ([], tau)
 
@@ -775,8 +776,8 @@ pprIfacePrefixApp ctxt_prec pp_fun pp_tys
                   hang pp_fun 2 (sep pp_tys)
 
 isIfaceTauType :: IfaceType -> Bool
-isIfaceTauType (IfaceForAllTy _ _) = False
-isIfaceTauType (IfaceFunTy InvisArg _ _ _) = False
+isIfaceTauType (IfaceForAllTy _ _)   = False
+isIfaceTauType (IfaceFunTy af _ _ _) = isInvisibleAnonArg af
 isIfaceTauType _ = True
 
 -- ----------------------------- Printing binders ------------------------------------
@@ -858,8 +859,9 @@ pprIfaceTyConBinders suppress_sig = sep . map go
     go (Bndr (IfaceTvBndr bndr) vis) =
       -- See Note [Pretty-printing invisible arguments]
       case vis of
-        AnonTCB  VisArg    -> ppr_bndr (UseBndrParens True)
-        AnonTCB  InvisArg  -> char '@' <> braces (ppr_bndr (UseBndrParens False))
+        AnonTCB  af
+          | isVisibleAnonArg af -> ppr_bndr (UseBndrParens True)
+          | otherwise           -> char '@' <> braces (ppr_bndr (UseBndrParens False))
           -- The above case is rare. (See Note [AnonTCB InvisArg] in GHC.Core.TyCon.)
           -- Should we print these differently?
         NamedTCB Required  -> ppr_bndr (UseBndrParens True)
@@ -929,9 +931,9 @@ ppr_sigma ctxt_prec ty
   = maybeParen ctxt_prec funPrec (pprIfaceSigmaType ShowForAllMust ty)
 
 ppr_ty :: PprPrec -> IfaceType -> SDoc
-ppr_ty ctxt_prec ty@(IfaceForAllTy {})          = ppr_sigma ctxt_prec ty
-ppr_ty ctxt_prec ty@(IfaceFunTy InvisArg _ _ _) = ppr_sigma ctxt_prec ty
-
+ppr_ty ctxt_prec ty
+  | not (isIfaceTauType ty)             = ppr_sigma ctxt_prec ty
+ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIfaceTauType
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free tyvars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
@@ -1486,7 +1488,7 @@ pprTyTcApp ctxt_prec tc tys =
        , print_type_abbreviations  -- See Note [Printing type abbreviations]
        -> ppr_kind_type ctxt_prec
 
-       | tc `ifaceTyConHasKey` funTyConKey
+       | tc `ifaceTyConHasKey` fUNTyConKey
        , IA_Arg (IfaceTyConApp rep IA_Nil) Required args <- tys
        , rep `ifaceTyConHasKey` manyDataConKey
        , print_type_abbreviations  -- See Note [Printing type abbreviations]

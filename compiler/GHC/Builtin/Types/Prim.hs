@@ -45,7 +45,7 @@ module GHC.Builtin.Types.Prim(
 
         -- Arrows
         fUNTyCon,       fUNTyConName,
-        fatArrowTyCon,  fatArrowTyConName,
+        fatArrow1TyCon, fatArrow1TyConName,
         fatArrow2TyCon, fatArrow2TyConName,
 
         unexposedPrimTyCons, exposedPrimTyCons, primTyCons,
@@ -121,8 +121,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , multiplicityTy
-  , mkTYPEapp, mkCONSTRAINTapp )
+  , multiplicityTy )
 
 import GHC.Types.Var    ( TyVarBinder, TyVar
                         , mkTyVar, mkTyVarBinder, mkTyVarBinders )
@@ -517,9 +516,9 @@ multiplicityTyVar1, multiplicityTyVar2  :: TyVar
 ************************************************************************
 -}
 
-fUNTyConName, fatArrowTyConName, fatArrow2TyConName :: Name
-fUNTyConName       = mkPrimTc        (fsLit "FUN") funTyConKey       fUNTyCon
-fatArrowTyConName  = mkBuiltInPrimTc (fsLit "=>")  fatArrowTyConKey  fatArrowTyCon
+fUNTyConName, fatArrow1TyConName, fatArrow2TyConName :: Name
+fUNTyConName       = mkPrimTc        (fsLit "FUN") fUNTyConKey       fUNTyCon
+fatArrow1TyConName = mkBuiltInPrimTc (fsLit "=>")  fatArrow1TyConKey fatArrow1TyCon
 fatArrow2TyConName = mkBuiltInPrimTc (fsLit "==>") fatArrow2TyConKey fatArrow2TyCon
 
 -- | The @FUN@ type constructor.
@@ -548,8 +547,8 @@ fUNTyCon = mkPrimTyCon fUNTyConName tc_bndrs liftedTypeKind tc_roles
 
 -- (=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
 --         CONSTRAINT rep1 -> TYPE rep2 -> *
-fatArrowTyCon :: TyCon
-fatArrowTyCon = mkPrimTyCon fatArrowTyConName tc_bndrs liftedTypeKind tc_roles
+fatArrow1TyCon :: TyCon
+fatArrow1TyCon = mkPrimTyCon fatArrow1TyConName tc_bndrs liftedTypeKind tc_roles
   where
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar

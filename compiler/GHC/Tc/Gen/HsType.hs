@@ -1156,7 +1156,7 @@ tc_hs_type mode (HsFunTy _ mult ty1 ty2) exp_kind
   = tc_fun_type mode mult ty1 ty2 exp_kind
 
 tc_hs_type mode (HsOpTy _ _ ty1 (L _ op) ty2) exp_kind
-  | op `hasKey` funTyConKey
+  | op `hasKey` unrestrictedFunTyConKey
   = tc_fun_type mode (HsUnrestrictedArrow noHsUniTok) ty1 ty2 exp_kind
 
 --------- Foralls
@@ -1498,7 +1498,7 @@ splitHsAppTys hs_ty
     is_app :: HsType GhcRn -> Bool
     is_app (HsAppKindTy {})        = True
     is_app (HsAppTy {})            = True
-    is_app (HsOpTy _ _ _ (L _ op) _) = not (op `hasKey` funTyConKey)
+    is_app (HsOpTy _ _ _ (L _ op) _) = not (op `hasKey` unrestrictedFunTyConKey)
       -- I'm not sure why this funTyConKey test is necessary
       -- Can it even happen?  Perhaps for   t1 `(->)` t2
       -- but then maybe it's ok to treat that like a normal

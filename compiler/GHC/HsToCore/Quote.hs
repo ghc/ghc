@@ -1360,7 +1360,7 @@ repTy (HsTyVar _ _ (L _ n))
   | isLiftedTypeKindTyConName n        = repTStar
   | n `hasKey` constraintKindTyConKey  = repTConstraint
   | n `hasKey` unrestrictedFunTyConKey = repArrowTyCon
-  | n `hasKey` funTyConKey             = repMulArrowTyCon
+  | n `hasKey` fUNTyConKey             = repMulArrowTyCon
   | isTvOcc occ   = do tv1 <- lookupOcc n
                        repTvar tv1
   | isDataOcc occ = do tc1 <- lookupOcc n

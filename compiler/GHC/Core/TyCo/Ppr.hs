@@ -239,9 +239,12 @@ debug_ppr_ty prec ty@(FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res =
                           One -> lollipop
                           Many -> arrow
                           w -> mulArrow (const ppr) w
-            InvisArg -> case mult of
-                          Many -> darrow
-                          _ -> pprPanic "unexpected multiplicity" (ppr ty)
+            InvisArg1 -> case mult of
+                           Many -> text "=>"
+                           _ -> pprPanic "unexpected multiplicity" (ppr ty)
+            InvisArg2 -> case mult of
+                           Many -> text "==>"
+                           _ -> pprPanic "unexpected multiplicity" (ppr ty)
 
 debug_ppr_ty prec (TyConApp tc tys)
   | null tys  = ppr tc

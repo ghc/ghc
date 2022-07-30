@@ -2106,8 +2106,7 @@ lintCoercion (GRefl r ty (MCo co))
        ; return (GRefl r ty' (MCo co')) }
 
 lintCoercion co@(TyConAppCo r tc cos)
-  | tc `hasKey` funTyConKey
-  , [_w, _rep1,_rep2,_co1,_co2] <- cos
+  | isSaturatedFunTy tc cos
   = failWithL (text "Saturated TyConAppCo (->):" <+> ppr co)
     -- All saturated TyConAppCos should be FunCos
 

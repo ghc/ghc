@@ -452,8 +452,8 @@ data TyConBndrVis
   | AnonTCB  AnonArgFlag
 
 instance Outputable TyConBndrVis where
-  ppr (NamedTCB flag) = text "NamedTCB" <> ppr flag
-  ppr (AnonTCB af)    = text "AnonTCB"  <> ppr af
+  ppr (NamedTCB flag) = ppr flag
+  ppr (AnonTCB af)    = ppr af
 
 mkAnonTyConBinder :: AnonArgFlag -> TyVar -> TyConBinder
 mkAnonTyConBinder af tv = assert (isTyVar tv) $
@@ -485,8 +485,9 @@ tyConBinderArgFlag (Bndr _ vis) = tyConBndrVisArgFlag vis
 
 tyConBndrVisArgFlag :: TyConBndrVis -> ArgFlag
 tyConBndrVisArgFlag (NamedTCB vis)     = vis
-tyConBndrVisArgFlag (AnonTCB VisArg)   = Required
-tyConBndrVisArgFlag (AnonTCB InvisArg) = Inferred    -- See Note [AnonTCB InvisArg]
+tyConBndrVisArgFlag (AnonTCB af)    -- See Note [AnonTCB InvisArg]
+  | isVisibleAnonArg af = Required
+  | otherwise           = Inferred
 
 isNamedTyConBinder :: TyConBinder -> Bool
 -- Identifies kind variables
@@ -500,9 +501,8 @@ isVisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 isVisibleTyConBinder (Bndr _ tcb_vis) = isVisibleTcbVis tcb_vis
 
 isVisibleTcbVis :: TyConBndrVis -> Bool
-isVisibleTcbVis (NamedTCB vis)     = isVisibleArgFlag vis
-isVisibleTcbVis (AnonTCB VisArg)   = True
-isVisibleTcbVis (AnonTCB InvisArg) = False
+isVisibleTcbVis (NamedTCB vis) = isVisibleArgFlag vis
+isVisibleTcbVis (AnonTCB af)   = isVisibleAnonArg af
 
 isInvisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
@@ -526,10 +526,11 @@ tyConInvisTVBinders tc_bndrs
    mk_binder (Bndr tv tc_vis) = mkTyVarBinder vis tv
       where
         vis = case tc_vis of
-                AnonTCB VisArg           -> SpecifiedSpec
-                AnonTCB InvisArg         -> InferredSpec   -- See Note [AnonTCB InvisArg]
-                NamedTCB Required        -> SpecifiedSpec
-                NamedTCB (Invisible vis) -> vis
+                AnonTCB af    -- See Note [AnonTCB InvisArg]
+                  | isInvisibleAnonArg af -> InferredSpec
+                  | otherwise             -> SpecifiedSpec
+                NamedTCB Required         -> SpecifiedSpec
+                NamedTCB (Invisible vis)  -> vis
 
 -- Returns only tyvars, as covars are always inferred
 tyConVisibleTyVars :: TyCon -> [TyVar]
@@ -549,6 +550,7 @@ can arise in one of two ways:
 
   See Note [Constraints in kinds] in GHC.Core.TyCo.Rep, and
   Note [Promoted data constructors] in this module.
+
 * In a data type whose kind has an equality constraint, as in the
   following example from #12102:
 
@@ -717,13 +719,7 @@ Why do we have this invariant?
 -}
 
 instance OutputableBndr tv => Outputable (VarBndr tv TyConBndrVis) where
-  ppr (Bndr v bi) = ppr_bi bi <+> parens (pprBndr LetBind v)
-    where
-      ppr_bi (AnonTCB VisArg)     = text "anon-vis"
-      ppr_bi (AnonTCB InvisArg)   = text "anon-invis"
-      ppr_bi (NamedTCB Required)  = text "req"
-      ppr_bi (NamedTCB Specified) = text "spec"
-      ppr_bi (NamedTCB Inferred)  = text "inf"
+  ppr (Bndr v bi) = ppr bi <+> parens (pprBndr LetBind v)
 
 instance Binary TyConBndrVis where
   put_ bh (AnonTCB af)   = do { putByte bh 0; put_ bh af }

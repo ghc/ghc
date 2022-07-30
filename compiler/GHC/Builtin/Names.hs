@@ -1786,7 +1786,7 @@ hasFieldClassNameKey = mkPreludeClassUnique 50
 
 addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey,
     byteArrayPrimTyConKey, charPrimTyConKey, charTyConKey, doublePrimTyConKey,
-    doubleTyConKey, floatPrimTyConKey, floatTyConKey, funTyConKey,
+    doubleTyConKey, floatPrimTyConKey, floatTyConKey, fUNTyConKey,
     intPrimTyConKey, intTyConKey, int8TyConKey, int16TyConKey,
     int8PrimTyConKey, int16PrimTyConKey, int32PrimTyConKey, int32TyConKey,
     int64PrimTyConKey, int64TyConKey,
@@ -1797,7 +1797,8 @@ addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey,
     ratioTyConKey, rationalTyConKey, realWorldTyConKey, stablePtrPrimTyConKey,
     stablePtrTyConKey, eqTyConKey, heqTyConKey, ioPortPrimTyConKey,
     smallArrayPrimTyConKey, smallMutableArrayPrimTyConKey,
-    stringTyConKey :: Unique
+    stringTyConKey,
+    fatArrow1TyConKey, fatArrow2TyConKey :: Unique
 addrPrimTyConKey                        = mkPreludeTyConUnique  1
 arrayPrimTyConKey                       = mkPreludeTyConUnique  3
 boolTyConKey                            = mkPreludeTyConUnique  4
@@ -1809,7 +1810,7 @@ doublePrimTyConKey                      = mkPreludeTyConUnique  9
 doubleTyConKey                          = mkPreludeTyConUnique 10
 floatPrimTyConKey                       = mkPreludeTyConUnique 11
 floatTyConKey                           = mkPreludeTyConUnique 12
-funTyConKey                             = mkPreludeTyConUnique 13
+fUNTyConKey                             = mkPreludeTyConUnique 13
 intPrimTyConKey                         = mkPreludeTyConUnique 14
 intTyConKey                             = mkPreludeTyConUnique 15
 int8PrimTyConKey                        = mkPreludeTyConUnique 16
@@ -1840,7 +1841,7 @@ stablePtrTyConKey                       = mkPreludeTyConUnique 39
 eqTyConKey                              = mkPreludeTyConUnique 40
 heqTyConKey                             = mkPreludeTyConUnique 41
 
-fatArrowTyConKey                        = mkPreludeTyConUnique 42
+fatArrow1TyConKey                       = mkPreludeTyConUnique 42
 fatArrow2TyConKey                       = mkPreludeTyConUnique 43
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
@@ -2126,6 +2127,10 @@ fingerprintDataConKey                   = mkPreludeDataConUnique 35
 
 srcLocDataConKey :: Unique
 srcLocDataConKey                        = mkPreludeDataConUnique 37
+
+typeLikeDataConKey, constraintLikeDataConKey :: Unique
+typeLikeDataConKey                      = mkPreludeDataConUnique 38
+constraintLikeDataConKey                = mkPreludeDataConUnique 38
 
 trTyConDataConKey, trModuleDataConKey,
   trNameSDataConKey, trNameDDataConKey,
@@ -2791,9 +2796,10 @@ pretendNameIsInScope n
     [ liftedTypeKindTyConKey, unliftedTypeKindTyConKey
     , liftedDataConKey, unliftedDataConKey
     , tYPETyConKey
+    , cONSTRAINTTyConKey
     , runtimeRepTyConKey, boxedRepDataConKey
     , eqTyConKey
     , listTyConKey
     , oneDataConKey
     , manyDataConKey
-    , funTyConKey ]
+    , fUNTyConKey ]

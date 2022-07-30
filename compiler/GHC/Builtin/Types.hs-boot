@@ -12,12 +12,13 @@ typeSymbolKind :: Type
 charTy :: Type
 mkBoxedTupleTy :: [Type] -> Type
 
+tYPETyCon, cONSTRAINTTyCon :: TyCon
+
 coercibleTyCon, heqTyCon :: TyCon
 
 unitTy :: Type
 
 typeOrConstraintTy :: Type
-mkTYPEapp, mkCONSTRAINTapp :: RuntimeRepType -> Type
 
 liftedTypeKindTyConName :: Name
 
