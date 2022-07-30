@@ -13,12 +13,12 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Config.Core.Opt.CallerCC ( initCallerCCOpts )
 import GHC.Driver.Config.Core.Opt.DmdAnal ( initDmdAnalOpts )
-import GHC.Driver.Config.Core.Opt.SpecConstr ( initSpecConstrOpts )
-import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )
 import GHC.Driver.Config.Core.Opt.LiberateCase ( initLiberateCaseOpts )
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyOpts, initSimplMode, initGentleSimplMode )
+import GHC.Driver.Config.Core.Opt.SpecConstr ( initSpecConstrOpts )
+import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )
+import GHC.Driver.Config.Core.Opt.RuleCheck ( initRuleCheckOpts )
 import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
-import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core.Opt.Config ( CoreToDo(..) )
@@ -66,7 +66,8 @@ getCoreToDo dflags extra_vars
     do_presimplify = do_specialise -- TODO: any other optimizations benefit from pre-simplification?
     do_simpl3      = const_fold || rules_on -- TODO: any other optimizations benefit from three-phase simplification?
 
-    maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck (initRuleOpts dflags) phase)
+    maybe_rule_check phase = runMaybe rule_check $
+      CoreDoRuleCheck . initRuleCheckOpts dflags phase
 
     maybe_strictness_before (Phase phase)
       | phase `elem` strictnessBefore dflags = coreDoDemand dflags

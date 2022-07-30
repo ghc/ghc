@@ -7,10 +7,10 @@ module GHC.Core.Opt.Config (
 import GHC.Prelude
 
 import GHC.Core.FamInstEnv ( FamInstEnv )
-import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Core.Opt.CallerCC ( CallerCCOpts )
 import GHC.Core.Opt.DmdAnal ( DmdAnalOpts )
 import GHC.Core.Opt.LiberateCase ( LibCaseOpts )
+import GHC.Core.Opt.RuleCheck ( RuleCheckOpts )
 import GHC.Core.Opt.Simplify ( SimplifyOpts(..) )
 import GHC.Core.Opt.Specialise.Config ( SpecialiseOpts(..) )
 import GHC.Core.Opt.SpecConstr ( SpecConstrOpts )
@@ -20,7 +20,6 @@ import GHC.Core.Opt.FloatOutSwitches ( FloatOutSwitches )
 
 import GHC.Platform ( Platform )
 import GHC.Plugins.Monad ( CoreM )
-import GHC.Types.Basic  ( CompilerPhase(..) )
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module ( Module )
 import GHC.Utils.Outputable as Outputable
@@ -57,8 +56,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoSpecialising (PrintUnqualified -> SpecialiseOpts)
   | CoreDoSpecConstr !SpecConstrOpts
   | CoreCSE
-  | -- | Check for non-application of rulesmatching this string
-    CoreDoRuleCheck RuleOpts CompilerPhase String
+  | CoreDoRuleCheck !RuleCheckOpts
   | -- | Useful when building up
     CoreDoNothing
   | -- | lists of these things

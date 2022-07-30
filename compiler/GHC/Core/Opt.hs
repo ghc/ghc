@@ -15,26 +15,26 @@ import GHC.Driver.Flags ( DumpFlag ( Opt_D_dump_str_signatures ) )
 import GHC.Core
 import GHC.Core.EndPass  ( EndPassConfig, endPassIO )
 import GHC.Core.Opt.CSE  ( cseProgram )
-import GHC.Core.Rules   ( ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( LintAnnotationsConfig, DebugSetting(..), lintAnnots )
-import GHC.Core.Opt.Config ( CoreToDo(..) )
-import GHC.Core.Opt.Simplify ( simplifyPgm )
-import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Opt.Stats        ( SimplCountM, addCounts )
+import GHC.Core.Opt.Config       ( CoreToDo(..) )
+import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
+import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
+import GHC.Core.Opt.CprAnal      ( cprAnalProgram )
+import GHC.Core.Opt.DmdAnal
+import GHC.Core.Opt.Exitify      ( exitifyProgram )
 import GHC.Core.Opt.FloatIn      ( floatInwards )
 import GHC.Core.Opt.FloatOut     ( floatOutwards )
 import GHC.Core.Opt.LiberateCase ( liberateCase )
-import GHC.Core.Opt.StaticArgs   ( doStaticArgs )
-import GHC.Core.Opt.Specialise   ( specProgram )
+import GHC.Core.Opt.RuleCheck    ( ruleCheckPass )
+import GHC.Core.Opt.Simplify     ( simplifyPgm )
+import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.SpecConstr   ( specConstrProgram )
-import GHC.Core.Opt.DmdAnal
-import GHC.Core.Opt.CprAnal      ( cprAnalProgram )
-import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
-import GHC.Core.Opt.Exitify      ( exitifyProgram )
+import GHC.Core.Opt.Specialise   ( specProgram )
+import GHC.Core.Opt.StaticArgs   ( doStaticArgs )
+import GHC.Core.Opt.Stats        ( SimplCountM, addCounts )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
-import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
 import GHC.Core.LateCC           ( addLateCostCentresMG )
 import GHC.Core.Seq (seqBinds)
 import GHC.Core.FamInstEnv
@@ -53,7 +53,6 @@ import GHC.Unit.Module.Env
 import GHC.Unit.Module.ModGuts
 
 import GHC.Types.Id.Info
-import GHC.Types.Basic
 import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 import GHC.Types.Var ( Var )
@@ -190,10 +189,8 @@ doCorePass env pass guts = do
                                  liftIO $ printCore (co_logger env) (mg_binds guts)
                                  return guts
 
-    CoreDoRuleCheck opts phase pat
-                              -> {-# SCC "RuleCheck" #-}
-                                 liftIO $ ruleCheckPass (co_logger env) opts (co_hptRuleBase env)  -- TODO: Own config record
-                                                        (co_visOrphans env) phase pat guts
+    CoreDoRuleCheck opts      -> {-# SCC "RuleCheck" #-}
+                                 liftIO $ ruleCheckPass (co_logger env) opts (co_hptRuleBase env) (co_visOrphans env) guts
 
     CoreDoNothing             -> return guts
 
@@ -219,23 +216,6 @@ doCorePass env pass guts = do
 printCore :: Logger -> CoreProgram -> IO ()
 printCore logger binds
     = Logger.logDumpMsg logger "Print Core" (pprCoreBindings binds)
-
-ruleCheckPass :: Logger
-              -> RuleOpts
-              -> RuleBase
-              -> ModuleSet
-              -> CompilerPhase
-              -> String
-              -> ModGuts
-              -> IO ModGuts
-ruleCheckPass logger ropts rb vis_orphs current_phase pat guts =
-    withTiming logger (text "RuleCheck"<+>brackets (ppr $ mg_module guts))
-                (const ()) $ do
-        let rule_fn fn = getRules (RuleEnv [rb] vis_orphs) fn
-                          ++ (mg_rules guts)
-        logDumpMsg logger "Rule check" $
-            ruleCheckProgram ropts current_phase pat rule_fn (mg_binds guts)
-        return guts
 
 dmdAnal :: Logger
         -> Bool
