@@ -432,7 +432,6 @@ Library
         GHC.Driver.Config.Tidy
         GHC.Driver.Core.Opt
         GHC.Driver.Core.Opt.Annotations
-        GHC.Driver.Core.Rules
         GHC.Driver.Env
         GHC.Driver.Env.KnotVars
         GHC.Driver.Env.Types

@@ -33,6 +33,7 @@ import GHC.Core.Opt.StaticArgs   ( doStaticArgs )
 import GHC.Core.Opt.Stats        ( SimplCountM, addCounts )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Core.LateCC           ( addLateCostCentresMG )
+import GHC.Core.Rules            ( extendRuleBaseList, extendRuleEnv )
 
 import GHC.Exts ( SpecConstrAnnotation )
 
@@ -68,7 +69,6 @@ data CoreOptEnv = CoreOptEnv
   , co_debugSetting  :: DebugSetting
   , co_unitEnv       :: UnitEnv
   , co_liftCoreM     :: DebugSetting -> ModGuts -> CoreM ModGuts -> SimplCountM ModGuts
-  , co_getAllRules   :: ModGuts -> IO RuleEnv
   , co_hptRuleBase   :: RuleBase
     -- ^ TODO(@mmhat, @ericson2314): Why does the simplifier need this?
     -- Why can't it just use 'co_getAllRules' above?
@@ -125,7 +125,7 @@ doCorePass env pass guts = do
   let external_rule_base = eps_rule_base eps
   let p_fam_env = eps_fam_inst_env eps
   let fam_envs = (p_fam_env, mg_fam_inst_env guts)
-  let !read_ruleenv = co_getAllRules env guts
+  let !read_ruleenv = readRuleEnv env guts
 
   case pass of
     CoreDoSimplify opts       -> {-# SCC "Simplify" #-} do
@@ -195,3 +195,14 @@ doCorePass env pass guts = do
     updateBindsM f = do
       b' <- liftIO $ f (mg_binds guts)
       return $ guts { mg_binds = b' }
+
+readRuleEnv :: CoreOptEnv -> ModGuts -> IO RuleEnv
+readRuleEnv env guts = extendRuleEnv base_ruleenv <$> read_eps_rules
+  where
+    hpt_rule_base = co_hptRuleBase env
+    -- Forcing this value to avoid unnessecary allocations.
+    -- Not doing so results in +25.6% allocations of LargeRecord.
+    !rule_base = extendRuleBaseList hpt_rule_base (mg_rules guts)
+    vis_orphs = co_visOrphans env
+    base_ruleenv = RuleEnv [rule_base] vis_orphs
+    read_eps_rules = eps_rule_base <$> co_getEps env

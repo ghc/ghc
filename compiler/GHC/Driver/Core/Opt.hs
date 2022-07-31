@@ -5,7 +5,6 @@ import GHC.Prelude
 import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Driver.Env
-import GHC.Driver.Core.Rules ( readRuleEnv )
 import GHC.Driver.Core.Opt.Annotations ( getFirstAnnotationsFromHscEnv )
 import GHC.Driver.Config.Core.Lint ( initLintAnnotationsConfig )
 import GHC.Driver.Config.Core.EndPass ( initEndPassConfig )
@@ -95,7 +94,6 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
       , co_debugSetting  = InheritDebugLevel
       , co_unitEnv       = hsc_unit_env hsc_env
       , co_liftCoreM     = liftCoreMToSimplCountM hsc_env
-      , co_getAllRules   = readRuleEnv hsc_env
       , co_hptRuleBase   = hpt_rule_base
       , co_printUnqual   = print_unqual
       , co_visOrphans    = mkModuleSet (mod : dep_orphs deps)
