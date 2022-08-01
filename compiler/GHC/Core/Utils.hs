@@ -178,21 +178,6 @@ mkLamType v body_ty
    | otherwise
    = mkFunctionType (varMult v) (varType v) body_ty
 
-mkFunctionType :: Mult -> Type -> Type -> Type
--- This one works out the AnonArgFlag from the argument type
--- See GHC.Types.Var Note [AnonArgFlag]
-mkFunctionType mult arg_ty res_ty
- = FunTy { ft_af = af, ft_mult = mult, ft_arg = arg_ty, ft_res = res_ty }
- where
-   -- See GHC.Types.Var Note [AnonArgFlag]
-   af = case (isPredTy arg_ty, isPredTy res_ty) of
-         (False, res_pred) -> assert (not res_pred) (ppr arg_ty $$ ppr res_ty) $
-                              VisArg       -- (arg -> res)
-         (True, False)     -> assert (eqType mult Many) $
-                              InvisArg1    -- (arg => res)
-         (True, True)      -> assert (eqType mult Many) $
-                              InvisArg2    -- (arg ==> res)
-
 mkLamTypes vs ty = foldr mkLamType ty vs
 
 {-
@@ -1400,9 +1385,8 @@ isExpandableApp fn n_val_args
 
        | Just (bndr, ty) <- splitPiTy_maybe ty
        = case bndr of
-           Named {}        -> all_pred_args n_val_args ty
-           Anon InvisArg _ -> all_pred_args (n_val_args-1) ty
-           Anon VisArg _   -> False
+           Named {}  -> all_pred_args n_val_args ty
+           Anon af _ -> isInvisibleAnonArg af && all_pred_args (n_val_args-1) ty
 
        | otherwise
        = False

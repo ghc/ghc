@@ -35,7 +35,7 @@ mkUnarisedIds :: MonadUnique m => FastString -> [UnaryType] -> m [Id]
 mkUnarisedIds fs tys = mapM (mkUnarisedId fs) tys
 
 mkUnarisedId :: MonadUnique m => FastString -> UnaryType -> m Id
-mkUnarisedId s t = mkSysLocalM s Many t
+mkUnarisedId s t = mkSysLocalM s ManyTy t
 
 -- Checks if id is a top level error application.
 -- isErrorAp_maybe :: Id ->

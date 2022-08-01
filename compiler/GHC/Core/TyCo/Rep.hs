@@ -1168,11 +1168,8 @@ data Coercion
   | ForAllCo TyCoVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
-  | FunCo Role CoercionN Coercion Coercion         -- lift FunTy
+  | FunCo Role AnonArgFlag CoercionN Coercion Coercion     -- lift FunTy
          -- FunCo :: "e" -> N -> e -> e -> e
-         -- Note: why doesn't FunCo have a AnonArgFlag, like FunTy?
-         -- It's just an engineering choice: we recover it from the
-         -- other arguments when we need it
 
   -- These are special
   | CoVarCo CoVar      -- :: _ -> (N or R)
@@ -1934,7 +1931,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (GRefl _ ty (MCo co))   = go_ty env ty `mappend` go_co env co
     go_co env (TyConAppCo _ _ args)   = go_cos env args
     go_co env (AppCo c1 c2)           = go_co env c1 `mappend` go_co env c2
-    go_co env (FunCo _ cw c1 c2)      = go_co env cw `mappend`
+    go_co env (FunCo _ _ cw c1 c2)    = go_co env cw `mappend`
                                         go_co env c1 `mappend`
                                         go_co env c2
     go_co env (CoVarCo cv)            = covar env cv
@@ -2001,7 +1998,7 @@ coercionSize (GRefl _ ty (MCo co)) = 1 + typeSize ty + coercionSize co
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
 coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
-coercionSize (FunCo _ w co1 co2) = 1 + coercionSize co1 + coercionSize co2
+coercionSize (FunCo _ _ w c1 c2) = 1 + coercionSize c1 + coercionSize c2
                                                         + coercionSize w
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1

@@ -33,7 +33,7 @@ import {-# SOURCE #-} GHC.CoreToIface
 import {-# SOURCE #-} GHC.Core.DataCon
    ( dataConFullSig , dataConUserTyVarBinders, DataCon )
 
-import GHC.Core.Type ( pickyIsLiftedTypeKind, pattern One, pattern Many,
+import GHC.Core.Type ( pickyIsLiftedTypeKind, pattern OneTy, pattern ManyTy,
                        splitForAllReqTVBinders, splitForAllInvisTVBinders )
 
 import GHC.Core.TyCon
@@ -236,14 +236,14 @@ debug_ppr_ty prec ty@(FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res =
   where
     arr = case af of
             VisArg   -> case mult of
-                          One -> lollipop
-                          Many -> arrow
+                          OneTy -> lollipop
+                          ManyTy -> arrow
                           w -> mulArrow (const ppr) w
             InvisArg1 -> case mult of
-                           Many -> text "=>"
+                           ManyTy -> text "=>"
                            _ -> pprPanic "unexpected multiplicity" (ppr ty)
             InvisArg2 -> case mult of
-                           Many -> text "==>"
+                           ManyTy -> text "==>"
                            _ -> pprPanic "unexpected multiplicity" (ppr ty)
 
 debug_ppr_ty prec (TyConApp tc tys)

@@ -118,15 +118,22 @@ module GHC.Builtin.Types (
         coercibleTyCon, coercibleTyConName, coercibleDataCon, coercibleClass,
 
         -- * RuntimeRep and friends
-        runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon,
+        runtimeRepTyCon, vecCountTyCon, vecElemTyCon,
 
         boxedRepDataConTyCon,
-        runtimeRepTy, levityTy, liftedRepTy, unliftedRepTy, zeroBitRepTy,
+        runtimeRepTy, liftedRepTy, unliftedRepTy, zeroBitRepTy,
 
         vecRepDataConTyCon, tupleRepDataConTyCon, sumRepDataConTyCon,
 
+        -- * Levity
+        levityTyCon, levityTy,
         liftedDataConTyCon, unliftedDataConTyCon,
-        liftedDataConTy, unliftedDataConTy,
+        liftedDataConTy,    unliftedDataConTy,
+
+        -- * TypeOrConstraint
+        typeOrConstraintTyCon, typeOrConstraintTy,
+        typeLikeDataConTyCon, constraintLikeDataConTyCon,
+        typeLikeDataConTy,    constraintLikeDataConTy,
 
         intRepDataConTy,
         int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
@@ -1436,7 +1443,7 @@ multMulTyCon = mkFamilyTyCon multMulTyConName binders multiplicityTy Nothing
 unrestrictedFunTyCon :: TyCon
 unrestrictedFunTyCon
   = buildSynTyCon unrestrictedFunTyConName [] arrowKind []
-                  (TyConApp funTyCon [manyDataConTy])
+                  (TyCoRep.TyConApp fUNTyCon [manyDataConTy])
   where
     arrowKind = mkTyConKind binders liftedTypeKind
     -- See also funTyCon
@@ -1554,9 +1561,9 @@ unliftedTypeKind = mkTyConTy unliftedTypeKindTyCon
 *                                                                      *
 ********************************************************************* -}
 
-typeOrConstraintTyConName, typeLikeDataConName, typeLikeDataConName :: Name
+typeOrConstraintTyConName, typeLikeDataConName, constraintLikeDataConName :: Name
 typeOrConstraintTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "TypeOrConstraint")
-                                               typeOrConstraintTyConKey typeOrConstraintTyConn
+                                               typeOrConstraintTyConKey typeOrConstraintTyCon
 typeLikeDataConName       = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TypeLike")
                                                  typeLikeDataConKey typeLikeDataCon
 constraintLikeDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "ConstraintLike")
@@ -1567,13 +1574,13 @@ typeOrConstraintTyCon = pcTyCon typeOrConstraintTyConName Nothing []
                                 [typeLikeDataCon, constraintLikeDataCon]
 
 typeOrConstraintTy :: Type
-typeOrConstraintTy = mkTyConTy typeOrConstraintTy
+typeOrConstraintTy = mkTyConTy typeOrConstraintTyCon
 
 typeLikeDataCon, constraintLikeDataCon :: DataCon
 typeLikeDataCon = pcSpecialDataCon typeLikeDataConName
-    [] levityTyCon TypeLikeInfo
+    [] typeOrConstraintTyCon (TypeOrConstraint False)
 constraintLikeDataCon = pcSpecialDataCon constraintLikeDataConName
-    [] levityTyCon ConstraintLikeInfo
+    [] typeOrConstraintTyCon (TypeOrConstraint True)
 
 typeLikeDataConTyCon :: TyCon
 typeLikeDataConTyCon = promoteDataCon typeLikeDataCon
@@ -1606,10 +1613,9 @@ levityTy = mkTyConTy levityTyCon
 
 liftedDataCon, unliftedDataCon :: DataCon
 liftedDataCon = pcSpecialDataCon liftedDataConName
-    [] levityTyCon LiftedInfo
+    [] levityTyCon (Levity Lifted)
 unliftedDataCon = pcSpecialDataCon unliftedDataConName
-    [] levityTyCon UnliftedInfo
-
+    [] levityTyCon (Levity Unlifted)
 
 liftedDataConTyCon :: TyCon
 liftedDataConTyCon = promoteDataCon liftedDataCon
@@ -1662,8 +1668,8 @@ boxedRepDataCon = pcSpecialDataCon boxedRepDataConName
     -- See Note [Getting from RuntimeRep to PrimRep] in RepType
     prim_rep_fun [lev]
       = case tyConRuntimeRepInfo (tyConAppTyCon lev) of
-          LiftedInfo -> [LiftedRep]
-          UnliftedInfo -> [UnliftedRep]
+          Levity Lifted   -> [LiftedRep]
+          Levity Unlifted -> [UnliftedRep]
           _ -> pprPanic "boxedRepDataCon" (ppr lev)
     prim_rep_fun args
       = pprPanic "boxedRepDataCon" (ppr args)

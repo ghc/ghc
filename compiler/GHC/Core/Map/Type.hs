@@ -54,7 +54,6 @@ import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
 
 import Control.Monad ( (>=>) )
-import GHC.Data.Maybe
 
 -- NB: Be careful about RULES and type families (#5821).  So we should make sure
 -- to specify @Key TypeMapX@ (and not @DeBruijn Type@, the reduced form)
@@ -334,18 +333,16 @@ lkT (D env ty) m = go ty m
     go (AppTy t1 t2)               = tm_app    >.> lkG (D env t1)
                                                >=> lkG (D env t2)
     go (TyConApp tc [])            = tm_tycon  >.> lkDNamed tc
-    go ty@(TyConApp _ (_:_))       = pprPanic "lkT TyConApp" (ppr ty)
     go (LitTy l)                   = tm_tylit  >.> lkTyLit l
     go (ForAllTy (Bndr tv _) ty)   = tm_forall >.> lkG (D (extendCME env tv) ty)
                                                >=> lkBndr env tv
-    go (FunTy InvisArg _ arg res)
-      | Just res_rep <- getRuntimeRep_maybe res
-                                   = tm_funty >.> lkG (D env arg)
-                                              >=> lkG (D env res_rep)
-                                              >=> lkG (D env res)
-    go ty@(FunTy {})               = pprPanic "lkT FunTy" (ppr ty)
     go (CastTy t _)                = go t
     go (CoercionTy {})             = tm_coerce
+
+    -- trieMapView has eliminated non-nullary TyConApp
+    -- and FunTy into an AppTy chain
+    go ty@(TyConApp _ (_:_))       = pprPanic "lkT TyConApp" (ppr ty)
+    go ty@(FunTy {})               = pprPanic "lkT FunTy" (ppr ty)
 
 -----------------
 xtT :: DeBruijn Type -> XT a -> TypeMapX a -> TypeMapX a
@@ -355,16 +352,15 @@ xtT (D env (TyVarTy v))       f m = m { tm_var    = tm_var m |> xtVar env v f }
 xtT (D env (AppTy t1 t2))     f m = m { tm_app    = tm_app m |> xtG (D env t1)
                                                             |>> xtG (D env t2) f }
 xtT (D _   (TyConApp tc []))  f m = m { tm_tycon  = tm_tycon m |> xtDNamed tc f }
-xtT (D env (FunTy InvisArg _ t1 t2)) f m = m { tm_funty = tm_funty m |> xtG (D env t1)
-                                                                    |>> xtG (D env t2_rep)
-                                                                    |>> xtG (D env t2) f }
-  where t2_rep = expectJust "xtT FunTy InvisArg" (getRuntimeRep_maybe t2)
 xtT (D _   (LitTy l))         f m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
 xtT (D env (CastTy t _))      f m = xtT (D env t) f m
 xtT (D _   (CoercionTy {}))   f m = m { tm_coerce = tm_coerce m |> f }
 xtT (D env (ForAllTy (Bndr tv _) ty))  f m
   = m { tm_forall = tm_forall m |> xtG (D (extendCME env tv) ty)
                                 |>> xtBndr env tv f }
+
+-- trieMapView has eliminated non-nullary TyConApp
+-- and FunTy into an AppTy chain
 xtT (D _   ty@(TyConApp _ (_:_))) _ _ = pprPanic "xtT TyConApp" (ppr ty)
 xtT (D _   ty@(FunTy {}))         _ _ = pprPanic "xtT FunTy" (ppr ty)
 

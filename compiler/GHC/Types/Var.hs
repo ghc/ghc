@@ -566,11 +566,9 @@ Note [Types for coercions, predicates, and evidence]
 GHC.Core.Utils.mkFunctionType :: Mult -> Type -> Type -> Type
 uses isPredTy to decide the AnonArgFlag for the FunTy.
 
-The term (Lam b e), and coercion (FunCo co1 co2) don't carry
-AnonArgFlags; instead they use mkFunctionType when we want to
-get their types; see mkLamType and coercionLKind/RKind resp.
-This is just an engineering choice; we could cache here too
-if we wanted.
+The term (Lam b e) donesn't carry an AnonArgFlag; instead it uses
+mkFunctionType when we want to get its types; see mkLamType.  This is
+just an engineering choice; we could cache here too if we wanted.
 
 Why bother with all this? After all, we are in Core, where (=>) and
 (->) behave the same.  We maintain this distinction throughout Core so

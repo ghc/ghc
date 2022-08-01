@@ -171,9 +171,7 @@ mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
   = (App fun (Coercion co), funResultTy fun_ty)
 mkCoreAppTyped d (fun, fun_ty) arg
   = assertPpr (isFunTy fun_ty) (ppr fun $$ ppr arg $$ d)
-    (App fun arg, res_ty)
-  where
-    (_mult, _arg_ty, res_ty) = splitFunTy fun_ty
+    (App fun arg, funResultTy fun_ty)
 
 {- *********************************************************************
 *                                                                      *

@@ -2173,7 +2173,7 @@ lintCoercion co@(ForAllCo tcv kind_co body_co)
 
        ; return (ForAllCo tcv' kind_co' body_co') } }
 
-lintCoercion co@(FunCo r cow co1 co2)
+lintCoercion co@(FunCo r af cow co1 co2)
   = do { co1' <- lintCoercion co1
        ; co2' <- lintCoercion co2
        ; cow' <- lintCoercion cow
@@ -2190,7 +2190,7 @@ lintCoercion co@(FunCo r cow co1 co2)
                                     Phantom -> Phantom
                                     _ -> Nominal
        ; lintRole cow expected_mult_role (coercionRole cow)
-       ; return (FunCo r cow' co1' co2') }
+       ; return (FunCo r af cow' co1' co2') }
 
 -- See Note [Bad unsafe coercion]
 lintCoercion co@(UnivCo prov r ty1 ty2)

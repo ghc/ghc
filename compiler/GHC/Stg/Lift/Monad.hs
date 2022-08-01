@@ -282,7 +282,7 @@ withLiftedBndr abs_ids bndr inner = do
         -- See Note [transferPolyIdInfo] in GHC.Types.Id. We need to do this at least
         -- for arity information.
         = transferPolyIdInfo bndr (dVarSetElems abs_ids)
-        . mkSysLocal (mkFastString str) uniq Many
+        . mkSysLocal (mkFastString str) uniq ManyTy
         $ ty
   LiftM $ RWS.local
     (\e -> e

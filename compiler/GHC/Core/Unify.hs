@@ -1131,8 +1131,8 @@ unify_ty env ty1 ty2 _kco
   = maybeApart MARTypeFamily
 
   where
-    mb_tc_app1 = tcSplitTyConApp_maybe ty1
-    mb_tc_app2 = tcSplitTyConApp_maybe ty2
+    mb_tc_app1 = splitTyConApp_maybe ty1
+    mb_tc_app2 = splitTyConApp_maybe ty2
 
         -- Applications need a bit of care!
         -- They can match FunTy and TyConApp, so use splitAppTy_maybe
@@ -1145,16 +1145,6 @@ unify_ty env (AppTy ty1a ty1b) ty2 _kco
 unify_ty env ty1 (AppTy ty2a ty2b) _kco
   | Just (ty1a, ty1b) <- tcRepSplitAppTy_maybe ty1
   = unify_ty_app env ty1a [ty1b] ty2a [ty2b]
-
-  -- tcSplitTyConApp won't split a (=>), so we handle this separately.
-unify_ty env (FunTy InvisArg _w1 arg1 res1) (FunTy InvisArg _w2 arg2 res2) _kco
-   -- Look at result representations, but arg representations would be redundant
-   -- as anything that can appear to the left of => is lifted.
-   -- And anything that can appear to the left of => is unrestricted, so skip the
-   -- multiplicities.
-  | Just res_rep1 <- getRuntimeRep_maybe res1
-  , Just res_rep2 <- getRuntimeRep_maybe res2
-  = unify_tys env [res_rep1, arg1, res1] [res_rep2, arg2, res2]
 
 unify_ty _ (LitTy x) (LitTy y) _kco | x == y = return ()
 
@@ -1621,18 +1611,13 @@ ty_co_match menv subst ty1 (AppCo co2 arg2) _lkco _rkco
 
 ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
   = ty_co_match_tc menv subst tc1 tys tc2 cos
-ty_co_match menv subst (FunTy _ w ty1 ty2) co _lkco _rkco
-  | Just (tc, [co_mult,rrco1,rrco2,co1,co2]) <- splitTyConAppCo_maybe co
-  , tc == funTyCon
-  = let rr1 = getRuntimeRep ty1
-        rr2 = getRuntimeRep ty2
-        Pair lkcos rkcos = traverse (fmap (mkNomReflCo . typeKind) . coercionKind)
-                             [co_mult,rrco1, rrco2,co1,co2]
-    in  -- NB: we include the RuntimeRep arguments in the matching; not doing so caused #21205.
-        ty_co_match_args menv subst
-          [w, rr1, rr2, ty1, ty2]
-          [co_mult, rrco1, rrco2, co1, co2]
-          lkcos rkcos
+
+ty_co_match menv subst (FunTy af w ty1 ty2) co _lkco _rkco
+  | Just (tc2, cos) <- splitTyConAppCo_maybe co
+  , (tc1,tys)       <- funTyConAppTy af w ty1 ty2
+  = ty_co_match_tc menv subst tc1 tys tc2 cos
+    -- NB: we include the RuntimeRep arguments in the matching;
+    --     not doing so caused #21205.
 
 ty_co_match menv subst (ForAllTy (Bndr tv1 _) ty1)
                        (ForAllCo tv2 kind_co2 co2)
@@ -1687,7 +1672,6 @@ ty_co_match menv subst ty co1 lkco rkco
     in ty_co_match menv subst ty (mkReflCo r t) (lkco `mkTransCo` kco')
                                                 (rkco `mkTransCo` kco')
 
-
 ty_co_match menv subst ty co lkco rkco
   | Just co' <- pushRefl co = ty_co_match menv subst ty co' lkco rkco
   | otherwise               = Nothing
@@ -1736,11 +1720,8 @@ pushRefl co =
   case (isReflCo_maybe co) of
     Just (AppTy ty1 ty2, Nominal)
       -> Just (AppCo (mkReflCo Nominal ty1) (mkNomReflCo ty2))
-    Just (FunTy _ w ty1 ty2, r)
-      | Just rep1 <- getRuntimeRep_maybe ty1
-      , Just rep2 <- getRuntimeRep_maybe ty2
-      ->  Just (TyConAppCo r funTyCon [ multToCo w, mkReflCo r rep1, mkReflCo r rep2
-                                       , mkReflCo r ty1,  mkReflCo r ty2 ])
+    Just (FunTy af w ty1 ty2, r)
+      ->  Just (FunCo r af (mkReflCo r w) (mkReflCo r ty1) (mkReflCo r ty2))
     Just (TyConApp tc tys, r)
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRolesX r tc) tys))
     Just (ForAllTy (Bndr tv _) ty, r)

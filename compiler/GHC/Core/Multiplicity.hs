@@ -11,8 +11,8 @@ mkMultMul perform simplifications such as Many * x = Many on the fly.
 -}
 module GHC.Core.Multiplicity
   ( Mult
-  , pattern One
-  , pattern Many
+  , pattern OneTy
+  , pattern ManyTy
   , isMultMul
   , mkMultAdd
   , mkMultMul
@@ -295,13 +295,13 @@ that the summands and factors are ordered somehow, to have more equalities.
 -- With only two multiplicities One and Many, we can always replace
 -- p + q by Many. See Note [Overapproximating multiplicities].
 mkMultAdd :: Mult -> Mult -> Mult
-mkMultAdd _ _ = Many
+mkMultAdd _ _ = ManyTy
 
 mkMultMul :: Mult -> Mult -> Mult
-mkMultMul One p = p
-mkMultMul p One = p
-mkMultMul Many _ = Many
-mkMultMul _ Many = Many
+mkMultMul OneTy  p      = p
+mkMultMul p      OneTy  = p
+mkMultMul ManyTy _      = ManyTy
+mkMultMul _      ManyTy = ManyTy
 mkMultMul p q = mkTyConApp multMulTyCon [p, q]
 
 scaleScaled :: Mult -> Scaled a -> Scaled a
@@ -329,8 +329,8 @@ instance Outputable IsSubmult where
 -- value of multiplicity @w2@ is expected. This is a partial order.
 
 submult :: Mult -> Mult -> IsSubmult
-submult _     Many = Submult
-submult One   One  = Submult
+submult _     ManyTy = Submult
+submult OneTy OneTy  = Submult
 -- The 1 <= p rule
-submult One   _    = Submult
+submult OneTy _    = Submult
 submult _     _    = Unknown

@@ -1343,8 +1343,9 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                           ppr tv, equals, ppr ty_v]
          go ty_v r
 -- FunTy inductive case
-    | Just (w1,l1,l2) <- splitFunTy_maybe l
-    , Just (w2,r1,r2) <- splitFunTy_maybe r
+    | Just (af1,w1,l1,l2) <- splitFunTy_maybe l
+    , Just (af2,w2,r1,r2) <- splitFunTy_maybe r
+    , af1==af2
     , w1 `eqType` w2
     = do r2' <- go l2 r2
          r1' <- go l1 r1

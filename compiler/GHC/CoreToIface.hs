@@ -299,12 +299,12 @@ toIfaceCoercionX fr co
     go (UnivCo p r t1 t2)   = IfaceUnivCo (go_prov p) r
                                           (toIfaceTypeX fr t1)
                                           (toIfaceTypeX fr t2)
-    go (TyConAppCo r tc cos)
-      | tc `hasKey` funTyConKey
-      , [_,_,_,_, _] <- cos         = panic "toIfaceCoercion"
-      | otherwise                =
-        IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
-    go (FunCo r w co1 co2)   = IfaceFunCo r (go w) (go co1) (go co2)
+    go co@(TyConAppCo r tc cos)
+      =  assertPpr (not (isSaturatedFunTy tc cos)) (ppr co) $
+         IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
+
+    go (FunCo r af w co1 co2)
+      = IfaceFunCo r af (go w) (go co1) (go co2)
 
     go (ForAllCo tv k co) = IfaceForAllCo (toIfaceBndr tv)
                                           (toIfaceCoercionX fr' k)

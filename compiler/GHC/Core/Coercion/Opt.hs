@@ -269,11 +269,11 @@ opt_co4 env sym rep r (ForAllCo tv k_co co)
                             opt_co4_wrap env' sym rep r co
      -- Use the "mk" functions to check for nested Refls
 
-opt_co4 env sym rep r (FunCo _r cow co1 co2)
+opt_co4 env sym rep r (FunCo _r af cow co1 co2)
   = assert (r == _r) $
     if rep
-    then mkFunCo Representational cow' co1' co2'
-    else mkFunCo r cow' co1' co2'
+    then mkFunCo Representational af cow' co1' co2'
+    else mkFunCo r                af cow' co1' co2'
   where
     co1' = opt_co4_wrap env sym rep r co1
     co2' = opt_co4_wrap env sym rep r co2
@@ -350,9 +350,9 @@ opt_co4 env sym rep r (NthCo r1 n (TyConAppCo _ _ cos))
     opt_co4_wrap env sym rep r (cos `getNth` n)
 
 -- see the definition of GHC.Builtin.Types.Prim.funTyCon
-opt_co4 env sym rep r (NthCo r1 n (FunCo _r2 w co1 co2))
+opt_co4 env sym rep r (NthCo r1 n (FunCo _r2 af w co1 co2))
   = assert (r == r1 )
-    opt_co4_wrap env sym rep r (mkNthCoFunCo n w co1 co2)
+    opt_co4_wrap env sym rep r (mkNthCoFunCo n af w co1 co2)
 
 opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
       -- works for both tyvar and covar
@@ -362,10 +362,10 @@ opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
 
 opt_co4 env sym rep r (NthCo _r n co)
   | Just nth_co <- case co' of
-      TyConAppCo _ _ cos -> Just (cos `getNth` n)
-      FunCo _ w co1 co2  -> Just (mkNthCoFunCo n w co1 co2)
-      ForAllCo _ eta _   -> Just eta
-      _                  -> Nothing
+      TyConAppCo _ _ cos   -> Just (cos `getNth` n)
+      FunCo _ af w co1 co2 -> Just (mkNthCoFunCo n af w co1 co2)
+      ForAllCo _ eta _     -> Just eta
+      _                    -> Nothing
   = if rep && (r == Nominal)
       -- keep propagating the SubCo
     then opt_co4_wrap (zapLiftingContext env) False True Nominal nth_co
@@ -694,7 +694,8 @@ opt_trans_rule is in_co1@(TyConAppCo r1 tc1 cos1) in_co2@(TyConAppCo r2 tc2 cos2
     fireTransRule "PushTyConApp" in_co1 in_co2 $
     mkTyConAppCo r1 tc1 (opt_transList is cos1 cos2)
 
-opt_trans_rule is in_co1@(FunCo r1 w1 co1a co1b) in_co2@(FunCo r2 w2 co2a co2b)
+opt_trans_rule is in_co1@(FunCo r1 af1 w1 co1a co1b) in_co2@(FunCo r2 af2 w2 co2a co2b)
+  | af1 == af2
   = assert (r1 == r2) $   -- Just like the TyConAppCo/TyConAppCo case
     fireTransRule "PushFun" in_co1 in_co2 $
     mkFunCo r1 (opt_trans is w1 w2) (opt_trans is co1a co2a) (opt_trans is co1b co2b)

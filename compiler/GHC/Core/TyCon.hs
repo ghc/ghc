@@ -1216,20 +1216,26 @@ mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
 mkDataTyConRhs = mkLevPolyDataTyConRhs True
 
 -- | Some promoted datacons signify extra info relevant to GHC. For example,
--- the @IntRep@ constructor of @RuntimeRep@ corresponds to the 'IntRep'
+-- the `IntRep` constructor of `RuntimeRep` corresponds to the 'IntRep'
 -- constructor of 'PrimRep'. This data structure allows us to store this
 -- information right in the 'TyCon'. The other approach would be to look
--- up things like @RuntimeRep@'s @PrimRep@ by known-key every time.
+-- up things like `RuntimeRep`'s `PrimRep` by known-key every time.
 -- See also Note [Getting from RuntimeRep to PrimRep] in "GHC.Types.RepType"
 data RuntimeRepInfo
   = NoRRI       -- ^ an ordinary promoted data con
   | RuntimeRep ([Type] -> [PrimRep])
-      -- ^ A constructor of @RuntimeRep@. The argument to the function should
+      -- ^ A constructor of `RuntimeRep`. The argument to the function should
       -- be the list of arguments to the promoted datacon.
-  | VecCount Int         -- ^ A constructor of @VecCount@
-  | VecElem PrimElemRep  -- ^ A constructor of @VecElem@
-  | LiftedInfo           -- ^ A constructor of @Levity@
-  | UnliftedInfo         -- ^ A constructor of @Levity@
+
+  | VecCount Int         -- ^ A constructor of `VecCount`
+
+  | VecElem PrimElemRep  -- ^ A constructor of `VecElem`
+
+  | Levity Levity        -- ^ A constructor of `Levity`
+
+  | TypeOrConstraint Bool   -- ^ A constructor of `TypeOrConstraint`
+                            -- True  <=> ConstraintLike
+                            -- False <=> TypeLike
 
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in

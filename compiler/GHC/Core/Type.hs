@@ -35,7 +35,9 @@ module GHC.Core.Type (
         mkVisFunTysMany, mkInvisFunTysMany,
         splitFunTy, splitFunTy_maybe,
         splitFunTys, funResultTy, funArgTy,
-        funTyView, isSaturatedFunTy,
+        funTyConApp, funTyConAppTy, tyConAppFun_maybe,
+        funTyAnonArgFlag, anonArgTyCon,
+        mkFunctionType, chooseAnonArgFlag,
 
         mkTyConApp, mkTyConTy, mkTYPEapp,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
@@ -140,7 +142,7 @@ module GHC.Core.Type (
         isMultiplicityTy, isMultiplicityVar,
         unrestricted, linear, tymult,
         mkScaled, irrelevantMult, scaledSet,
-        pattern One, pattern Many,
+        pattern OneTy, pattern ManyTy,
         isOneDataConTy, isManyDataConTy,
         isLinearType,
 
@@ -447,35 +449,6 @@ coreView _ = Nothing
 {-# INLINE coreView #-}
 
 -----------------------------------------------
-funTyView :: AnonArgFlag -> Mult -> Type -> Type -> (TyCon, [Type])
--- Given the components of a FunTy,
--- figure out the corresponding TyConApp
-funTyView af mult ty1 ty2
-  = case af of
-      VisArg    -> (fUNTyCon,       [mult, rep1, rep2, ty1, ty2])
-      InvisArg1 -> (fatArrow1TyCon, [rep1, rep2, ty1, ty2])
-      InvisArg2 -> (fatArrow2TyCon, [rep1, rep2, ty1, ty2])
-  where
-    rep1 = getRuntimeRep ty1
-    rep2 = getRuntimeRep ty2
-
-anonArgTyCon :: AnonArgFlag -> TyCon
-anonArgTyCon VisArg    = fUNTyCon
-anonArgTyCon InvisArg1 = fatArrow1TyCon
-anonArgTyCon InvisArg2 = fatArrow2TyCon
-
-isSaturatedFunTy :: TyCon -> [a] -> Bool
--- True if this TyConApp/TyConAppCo should be represented as a FunTy/FunCo
-isSaturatedFunTy tc args
-  | tc `hasKey` fUNTyConKey
-  , (_w:_r1:_r2:_a1:_a2:_) <- args
-  = True
-  | tc `hasKey` fatArrow1TyConKey || tc `hasKey` fatArrow2TyConKey
-  , (_r1:_r2:_a1:_a2:_) <- args
-  = True
-  | otherwise = False
-
------------------------------------------------
 
 -- | @expandSynTyConApp_maybe tc tys@ expands the RHS of type synonym @tc@
 -- instantiated at arguments @tys@, or returns 'Nothing' if @tc@ is not a
@@ -531,8 +504,6 @@ expand_syn tvs rhs arg_tys
 
     go _ (_:_) [] = pprPanic "expand_syn" (ppr tvs $$ ppr rhs $$ ppr arg_tys)
                    -- Under-saturated, precondition failed
-
-
 
 coreFullView :: Type -> Type
 -- ^ Iterates 'coreView' until there is no more to synonym to expand.
@@ -622,8 +593,8 @@ expandTypeSynonyms ty
     go_co subst (ForAllCo tv kind_co co)
       = let (subst', tv', kind_co') = go_cobndr subst tv kind_co in
         mkForAllCo tv' kind_co' (go_co subst' co)
-    go_co subst (FunCo r w co1 co2)
-      = mkFunCo r (go_co subst w) (go_co subst co1) (go_co subst co2)
+    go_co subst (FunCo r af w co1 co2)
+      = mkFunCo r af (go_co subst w) (go_co subst co1) (go_co subst co2)
     go_co subst (CoVarCo cv)
       = substCoVar subst cv
     go_co subst (AxiomInstCo ax ind args)
@@ -659,6 +630,21 @@ expandTypeSynonyms ty
       -- handle coercion optimization (which sometimes swaps the
       -- order of a coercion)
     go_cobndr subst = substForAllCoBndrUsing False (go_co subst) subst
+
+{- Notes on type synonyms
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The various "split" functions (splitFunTy, splitRhoTy, splitForAllTy) try
+to return type synonyms wherever possible. Thus
+
+        type Foo a = a -> a
+
+we want
+        splitFunTys (a -> Foo a) = ([a], Foo a)
+not                                ([a], a -> a)
+
+The reason is that we then get better (shorter) type signatures in
+interfaces.  Notably this plays a role in tcTySigs in GHC.Tc.Gen.Bind.
+-}
 
 -- | An INLINE helper for function such as 'kindRep_maybe' below.
 --
@@ -974,7 +960,8 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_co env (Refl ty)           = Refl <$> go_ty env ty
     go_co env (GRefl r ty mco)    = mkGReflCo r <$> go_ty env ty <*> go_mco env mco
     go_co env (AppCo c1 c2)       = mkAppCo <$> go_co env c1 <*> go_co env c2
-    go_co env (FunCo r cw c1 c2)   = mkFunCo r <$> go_co env cw <*> go_co env c1 <*> go_co env c2
+    go_co env (FunCo r af cw c1 c2) = mkFunCo r af <$> go_co env cw
+                                      <*> go_co env c1 <*> go_co env c2
     go_co env (CoVarCo cv)        = covar env cv
     go_co env (HoleCo hole)       = cohole env hole
     go_co env (UnivCo p r t1 t2)  = mkUnivCo <$> go_prov env p <*> pure r
@@ -1014,14 +1001,9 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
 
 {- *********************************************************************
 *                                                                      *
-             Constructor-specific functions
+                      TyVarTy
 *                                                                      *
 ********************************************************************* -}
-
-
----------------------------------------------------------------------
---                                TyVarTy
---                                ~~~~~~~
 
 -- | Attempts to obtain the type variable underlying a 'Type', and panics with the
 -- given message if this is not a type variable type. See also 'getTyVar_maybe'
@@ -1051,11 +1033,14 @@ repGetTyVar_maybe :: Type -> Maybe TyVar
 repGetTyVar_maybe (TyVarTy tv) = Just tv
 repGetTyVar_maybe _            = Nothing
 
-{-
----------------------------------------------------------------------
-                                AppTy
-                                ~~~~~
-We need to be pretty careful with AppTy to make sure we obey the
+
+{- *********************************************************************
+*                                                                      *
+                      AppTy
+*                                                                      *
+********************************************************************* -}
+
+{- We need to be pretty careful with AppTy to make sure we obey the
 invariant that a TyConApp is always visibly so.  mkAppTy maintains the
 invariant: use it.
 
@@ -1129,7 +1114,7 @@ repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
 -- any Core view stuff is already done
 repSplitAppTy_maybe (FunTy af w ty1 ty2)
-  | (tc, tys)   <- funTyView af w ty1 ty2
+  | (tc, tys)        <- funTyConAppTy af w ty1 ty2
   , Just (tys', ty') <- snocView tys
   = Just (TyConApp tc tys', ty')
 
@@ -1196,7 +1181,7 @@ splitAppTys ty = split ty ty []
       = assert (null args )
         (TyConApp tc [], tys)
       where
-        (tc, tys) = funTyView af w ty1 ty2
+        (tc, tys) = funTyConAppTy af w ty1 ty2
 
     split orig_ty _                     args  = (orig_ty, args)
 
@@ -1215,14 +1200,16 @@ repSplitAppTys ty = split ty []
       = assert (null args )
         (TyConApp tc [], tys)
       where
-        (tc, tys) = funTyView af w ty1 ty2
+        (tc, tys) = funTyConAppTy af w ty1 ty2
 
     split ty args = (ty, args)
 
-{-
+
+{- *********************************************************************
+*                                                                      *
                       LitTy
-                      ~~~~~
--}
+*                                                                      *
+********************************************************************* -}
 
 mkNumLitTy :: Integer -> Type
 mkNumLitTy n = LitTy (NumTyLit n)
@@ -1297,16 +1284,14 @@ pprUserTypeErrorTy ty =
     _ -> ppr ty
 
 
+{- *********************************************************************
+*                                                                      *
+                      FunTy
+*                                                                      *
+********************************************************************* -}
 
-
-{-
----------------------------------------------------------------------
-                                FunTy
-                                ~~~~~
-
-Note [Representation of function types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Representation of function types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Functions (e.g. Int -> Char) can be thought of as being applications
 of funTyCon (known in Haskell surface syntax as (->)), (note that
 `RuntimeRep' quantifiers are left inferred)
@@ -1334,23 +1319,93 @@ In the compiler we maintain the invariant that all saturated applications of
 See #11714.
 -}
 
+-----------------------------------------------
+anonArgTyCon :: AnonArgFlag -> TyCon
+anonArgTyCon VisArg    = fUNTyCon
+anonArgTyCon InvisArg1 = fatArrow1TyCon
+anonArgTyCon InvisArg2 = fatArrow2TyCon
+
+funTyConApp :: (a->a)   -- How to extract a RuntimeRep
+            -> AnonArgFlag -> a -> a -> a
+            -> (TyCon, [a])
+-- Given the components of a FunTy/FuNCo,
+-- figure out the corresponding TyConApp/TyConAppCo
+-- The type 'a' is always Type or Coercion
+-- The (a->a) function extracts a RuntimeRep from arg/res
+funTyConApp get_rr af mult arg res
+  = case af of
+      VisArg    -> (fUNTyCon,       [mult, arg_rep, res_rep, arg, res])
+      InvisArg1 -> (fatArrow1TyCon, [arg_rep, res_rep, arg, res])
+      InvisArg2 -> (fatArrow2TyCon, [arg_rep, res_rep, arg, res])
+  where
+    arg_rep = get_rr arg
+    res_rep = get_rr res
+
+funTyConAppTy :: AnonArgFlag -> Mult -> Type -> Type -> (TyCon, [Type])
+funTyConAppTy = funTyConApp getRuntimeRep
+
+tyConAppFun_maybe :: (Type->a) -> TyCon -> [a]
+                   -> Maybe (AnonArgFlag, a, a, a)
+-- Return Just if this TyConApp/TyConAppCo should be represented as a FunTy/FunCo
+-- The type 'a' is always Type or Coercion
+-- The (Type->a) argument turns 'Many into type or coercion resp
+tyConAppFun_maybe mk tc args
+  | tc `hasKey` fUNTyConKey
+  , (w:_r1:_r2:a1:a2:rest) <- args
+  = assert (null rest) $ Just (VisArg, w, a1, a2)
+  | tc `hasKey` fatArrow1TyConKey
+  , (_r1:_r2:a1:a2:rest) <- args
+  = assert (null rest) $ Just (InvisArg1, mk manyDataConTy, a1,a2)
+  | tc `hasKey` fatArrow2TyConKey
+  , (_r1:_r2:a1:a2:rest) <- args
+  = assert (null rest) $ Just (InvisArg2, mk manyDataConTy, a1,a2)
+  | otherwise
+  = Nothing
+
+funTyAnonArgFlag :: Type -> AnonArgFlag
+funTyAnonArgFlag ty
+  | FunTy { ft_af = af } <- coreFullView ty
+  = af
+  | otherwise
+  = pprPanic "funTyAnonArgFlag" (ppr ty)
+
+mkFunctionType :: Mult -> Type -> Type -> Type
+-- This one works out the AnonArgFlag from the argument type
+-- See GHC.Types.Var Note [AnonArgFlag]
+mkFunctionType mult arg_ty res_ty
+ = FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty
+         , ft_mult = assertPpr mult_ok (ppr [mult, arg_ty, res_ty]) $
+                     mult }
+  where
+    af = chooseAnonArgFlag arg_ty res_ty
+    mult_ok = isVisibleAnonArg af || mult `eqType` manyDataConTy
+
+   -- See GHC.Types.Var Note [AnonArgFlag]
+chooseAnonArgFlag :: Type -> Type -> AnonArgFlag
+chooseAnonArgFlag arg_ty res_ty
+  = case (isPredTy arg_ty, isPredTy res_ty) of
+         (False, res_pred) -> assertPpr (not res_pred) (ppr arg_ty $$ ppr res_ty) $
+                              VisArg       -- (arg -> res)
+         (True, False)     -> InvisArg1    -- (arg => res)
+         (True, True)      -> InvisArg2    -- (arg ==> res)
+
 splitFunTy :: Type -> (Mult, Type, Type)
 -- ^ Attempts to extract the multiplicity, argument and result types from a type,
 -- and panics if that is not possible. See also 'splitFunTy_maybe'
 splitFunTy = expectJust "splitFunTy" . splitFunTy_maybe
 
 {-# INLINE splitFunTy_maybe #-}
-splitFunTy_maybe :: Type -> Maybe (Mult, Type, Type)
+splitFunTy_maybe :: Type -> Maybe (AnonArgFlag, Mult, Type, Type)
 -- ^ Attempts to extract the multiplicity, argument and result types from a type
 splitFunTy_maybe ty
-  | FunTy _ w arg res <- coreFullView ty = Just (w, arg, res)
-  | otherwise                            = Nothing
+  | FunTy af w arg res <- coreFullView ty = Just (af, w, arg, res)
+  | otherwise                             = Nothing
 
 splitFunTys :: Type -> ([Scaled Type], Type)
 splitFunTys ty = split [] ty ty
   where
       -- common case first
-    split args _       (FunTy _ w arg res) = split ((Scaled w arg):args) res res
+    split args _       (FunTy _ w arg res) = split (Scaled w arg : args) res res
     split args orig_ty ty | Just ty' <- coreView ty = split args orig_ty ty'
     split args orig_ty _                   = (reverse args, orig_ty)
 
@@ -1490,11 +1545,14 @@ We have
 So again we must instantiate.
 
 The same thing happens in GHC.CoreToIface.toIfaceAppArgsX.
-
----------------------------------------------------------------------
-                                TyConApp
-                                ~~~~~~~~
 -}
+
+
+{- *********************************************************************
+*                                                                      *
+                      TyConApp
+*                                                                      *
+********************************************************************* -}
 
 -- splitTyConApp "looks through" synonyms, because they don't
 -- mean a distinct type, but all other type-constructor applications
@@ -1576,7 +1634,7 @@ repSplitTyConApp_maybe (FunTy af w arg res)
   -- NB: we're in Core, so no check for VisArg
   = Just (fun_tc, tys)
   where
-    (fun_tc, tys) = funTyView af w arg res
+    (fun_tc, tys) = funTyConAppTy af w arg res
 repSplitTyConApp_maybe _ = Nothing
 
 tcRepSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
@@ -1616,12 +1674,12 @@ newTyConInstRhs tycon tys
   where
     (tvs, rhs) = newTyConEtadRhs tycon
 
-{-
----------------------------------------------------------------------
-                           CastTy
-                           ~~~~~~
-A casted type has its *kind* casted into something new.
--}
+
+{- *********************************************************************
+*                                                                      *
+                      CastTy
+*                                                                      *
+********************************************************************* -}
 
 splitCastTy_maybe :: Type -> Maybe (Type, Coercion)
 splitCastTy_maybe ty
@@ -1710,17 +1768,8 @@ mkTyConApp tycon []
     mkTyConTy tycon
 
 mkTyConApp tycon tys@(ty1:rest)
-  | key == fUNTyConKey
-  , [w, _rep1,_rep2,arg,res] <- tys
-  = FunTy { ft_af = VisArg, ft_mult = w, ft_arg = arg, ft_res = res }
-
-  | key == fatArrow1TyConKey
-  , [_rep1,_rep2,arg,res] <- tys
-  = FunTy { ft_af = InvisArg1, ft_mult = manyDataConTy, ft_arg = arg, ft_res = res }
-
-  | key == fatArrow2TyConKey
-  , [_rep1,_rep2,arg,res] <- tys
-  = FunTy { ft_af = InvisArg2, ft_mult = manyDataConTy, ft_arg = arg, ft_res = res }
+  | Just (af, mult, arg, res) <- tyConAppFun_maybe id tycon tys
+  = FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res }
 
   -- See Note [Using synonyms to compress types]
   | key == tYPETyConKey
@@ -1769,13 +1818,13 @@ coreView applied to (TyConApp LiftedRep [])
 
 
 
-{-
---------------------------------------------------------------------
-                            CoercionTy
-                            ~~~~~~~~~~
-CoercionTy allows us to inject coercions into types. A CoercionTy
-should appear only in the right-hand side of an application.
--}
+{- *********************************************************************
+*                                                                      *
+                     CoercionTy
+  CoercionTy allows us to inject coercions into types. A CoercionTy
+  should appear only in the right-hand side of an application.
+*                                                                      *
+********************************************************************* -}
 
 mkCoercionTy :: Coercion -> Type
 mkCoercionTy = CoercionTy
@@ -1792,30 +1841,12 @@ stripCoercionTy :: Type -> Coercion
 stripCoercionTy (CoercionTy co) = co
 stripCoercionTy ty              = pprPanic "stripCoercionTy" (ppr ty)
 
-{-
----------------------------------------------------------------------
-                                SynTy
-                                ~~~~~
 
-Notes on type synonyms
-~~~~~~~~~~~~~~~~~~~~~~
-The various "split" functions (splitFunTy, splitRhoTy, splitForAllTy) try
-to return type synonyms wherever possible. Thus
-
-        type Foo a = a -> a
-
-we want
-        splitFunTys (a -> Foo a) = ([a], Foo a)
-not                                ([a], a -> a)
-
-The reason is that we then get better (shorter) type signatures in
-interfaces.  Notably this plays a role in tcTySigs in GHC.Tc.Gen.Bind.
-
-
----------------------------------------------------------------------
-                                ForAllTy
-                                ~~~~~~~~
--}
+{- *********************************************************************
+*                                                                      *
+                      ForAllTy
+*                                                                      *
+********************************************************************* -}
 
 -- | Make a dependent forall over an 'Inferred' variable
 mkTyCoInvForAllTy :: TyCoVar -> Type -> Type
@@ -3292,10 +3323,10 @@ occCheckExpand vs_to_avoid ty
                  as'  = as `delVarSet` tv
            ; body' <- go_co (as', env') body_co
            ; return (ForAllCo tv' kind_co' body') }
-    go_co cxt (FunCo r w co1 co2)       = do { co1' <- go_co cxt co1
+    go_co cxt (FunCo r af w co1 co2)    = do { co1' <- go_co cxt co1
                                              ; co2' <- go_co cxt co2
                                              ; w' <- go_co cxt w
-                                             ; return (mkFunCo r w' co1' co2') }
+                                             ; return (mkFunCo r af w' co1' co2') }
     go_co (as,env) co@(CoVarCo c)
       | Just c' <- lookupVarEnv env c   = return (mkCoVarCo c')
       | bad_var_occ as c                = Nothing
@@ -3370,7 +3401,7 @@ tyConsOfType ty
      go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args
      go_co (AppCo co arg)          = go_co co `unionUniqSets` go_co arg
      go_co (ForAllCo _ kind_co co) = go_co kind_co `unionUniqSets` go_co co
-     go_co (FunCo _ co_mult co1 co2) = go_co co_mult `unionUniqSets` go_co co1 `unionUniqSets` go_co co2
+     go_co (FunCo _ _ m a r)       = go_co m `unionUniqSets` go_co a `unionUniqSets` go_co r
      go_co (AxiomInstCo ax _ args) = go_ax ax `unionUniqSets` go_cos args
      go_co (UnivCo p _ t1 t2)      = go_prov p `unionUniqSets` go t1 `unionUniqSets` go t2
      go_co (CoVarCo {})            = emptyUniqSet
@@ -3807,13 +3838,13 @@ their friends here with them.
 unrestricted, linear, tymult :: a -> Scaled a
 
 -- | Scale a payload by Many
-unrestricted = Scaled Many
+unrestricted = Scaled ManyTy
 
 -- | Scale a payload by One
-linear = Scaled One
+linear = Scaled OneTy
 
 -- | Scale a payload by Many; used for type arguments in core
-tymult = Scaled Many
+tymult = Scaled ManyTy
 
 irrelevantMult :: Scaled a -> a
 irrelevantMult = scaledThing
@@ -3824,13 +3855,13 @@ mkScaled = Scaled
 scaledSet :: Scaled a -> b -> Scaled b
 scaledSet (Scaled m _) b = Scaled m b
 
-pattern One :: Mult
-pattern One <- (isOneDataConTy -> True)
-  where One = oneDataConTy
+pattern OneTy :: Mult
+pattern OneTy <- (isOneDataConTy -> True)
+  where OneTy = oneDataConTy
 
-pattern Many :: Mult
-pattern Many <- (isManyDataConTy -> True)
-  where Many = manyDataConTy
+pattern ManyTy :: Mult
+pattern ManyTy <- (isManyDataConTy -> True)
+  where ManyTy = manyDataConTy
 
 isManyDataConTy :: Mult -> Bool
 isManyDataConTy ty
@@ -3850,7 +3881,7 @@ isLinearType :: Type -> Bool
 -- this function to check whether it is safe to eta reduce an Id in CorePrep. It
 -- is always safe to return 'True', because 'True' deactivates the optimisation.
 isLinearType ty = case ty of
-                      FunTy _ Many _ res -> isLinearType res
-                      FunTy _ _ _ _ -> True
-                      ForAllTy _ res -> isLinearType res
+                      FunTy _ ManyTy _ res -> isLinearType res
+                      FunTy _ _ _ _        -> True
+                      ForAllTy _ res       -> isLinearType res
                       _ -> False
