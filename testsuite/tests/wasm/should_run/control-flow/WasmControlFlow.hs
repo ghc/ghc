@@ -123,7 +123,7 @@ reducibilityTest platform (path, groups) = do
 
 splittingTest platform (path, groups) = do
   reductions <- catMaybes <$> runGrouped testNodeSplitting platform groups
-  mutilations <- runGrouped (return . testGraphMutilation) platform groups
+  mutilations <- runGrouped (return . testGraphMutilation path) platform groups
   codes <- liftM2 (++) (mapM (analyze "node splitting" path isIdentical) reductions)
                          (mapM (analyze "mutilation" path isDifferent) mutilations)
   return $ foldl combineExits exitZero codes
@@ -180,9 +180,9 @@ testNodeSplitting original_graph = do
       compareWithEntropy (runcfg original_graph) (runcfg reducible_graph) $
       cfgEntropy reducible_graph
 
-testGraphMutilation :: CmmGraph -> Outcome
-testGraphMutilation graph =
-  compareWithEntropy (runcfg graph) (runcfg $ mutilate graph) $ cfgEntropy graph
+testGraphMutilation :: FilePath -> CmmGraph -> Outcome
+testGraphMutilation path graph =
+  compareWithEntropy (runcfg graph) (runcfg $ mutilate path graph) $ cfgEntropy graph
 
 testTranslation :: Platform -> CmmGraph -> IO Outcome
 testTranslation platform big_switch_graph = do
@@ -209,11 +209,11 @@ type Entropy = [[Bool]]
 
 ----------------------------------------------------------------
 
-mutilate :: CmmGraph -> CmmGraph
-mutilate g =
+mutilate :: FilePath -> CmmGraph -> CmmGraph
+mutilate path g =
     case filter (/= entry_label) $ successors entry_block of
       (lbl:_) -> CmmGraph lbl (g_graph g)
-      [] -> error "cannot mutilate control-flow graph"
+      [] -> error $ "cannot mutilate control-flow graph in file " ++ path
  where entry_label = g_entry g
        entry_block = mapFindWithDefault (error "no entry block") entry_label $ graphMap g
 
