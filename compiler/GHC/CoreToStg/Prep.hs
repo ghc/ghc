@@ -2208,7 +2208,7 @@ fiddleCCall id
 
 newVar :: Type -> UniqSM Id
 newVar ty
- = seqType ty `seq` mkSysLocalOrCoVarM (fsLit "sat") Many ty
+ = seqType ty `seq` mkSysLocalOrCoVarM (fsLit "sat") ManyTy ty
 
 
 ------------------------------------------------------------------------------

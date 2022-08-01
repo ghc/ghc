@@ -378,7 +378,7 @@ duplicateLocalDs old_local
 
 newPredVarDs :: PredType -> DsM Var
 newPredVarDs
- = mkSysLocalOrCoVarM (fsLit "ds") Many  -- like newSysLocalDs, but we allow covars
+ = mkSysLocalOrCoVarM (fsLit "ds") ManyTy  -- like newSysLocalDs, but we allow covars
 
 newSysLocalDs, newFailLocalDs :: Mult -> Type -> DsM Id
 newSysLocalDs = mkSysLocalM (fsLit "ds")

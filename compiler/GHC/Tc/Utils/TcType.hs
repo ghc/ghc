@@ -1302,7 +1302,7 @@ getDFunTyKey (TyVarTy tv)            = getOccName tv
 getDFunTyKey (TyConApp tc _)         = getOccName tc
 getDFunTyKey (LitTy x)               = getDFunTyLitKey x
 getDFunTyKey (AppTy fun _)           = getDFunTyKey fun
-getDFunTyKey (FunTy {})              = getOccName funTyCon
+getDFunTyKey (FunTy { ft_af = af })  = getOccName (anonArgTyCon af)
 getDFunTyKey (ForAllTy _ t)          = getDFunTyKey t
 getDFunTyKey (CastTy ty _)           = getDFunTyKey ty
 getDFunTyKey t@(CoercionTy _)        = pprPanic "getDFunTyKey" (ppr t)
@@ -1419,8 +1419,8 @@ tcSplitPredFunTy_maybe :: Type -> Maybe (PredType, Type)
 -- Split off the first predicate argument from a type
 tcSplitPredFunTy_maybe ty
   | Just ty' <- tcView ty = tcSplitPredFunTy_maybe ty'
-tcSplitPredFunTy_maybe (FunTy { ft_af = InvisArg
-                              , ft_arg = arg, ft_res = res })
+tcSplitPredFunTy_maybe (FunTy { ft_af = af, ft_arg = arg, ft_res = res })
+  | isInvisibleAnonArg af
   = Just (arg, res)
 tcSplitPredFunTy_maybe _
   = Nothing
@@ -1500,9 +1500,8 @@ tcTyConAppTyCon_maybe ty
   | Just ty' <- tcView ty = tcTyConAppTyCon_maybe ty'
 tcTyConAppTyCon_maybe (TyConApp tc _)
   = Just tc
-tcTyConAppTyCon_maybe (FunTy { ft_af = VisArg })
-  = Just funTyCon  -- (=>) is /not/ a TyCon in its own right
-                   -- C.f. tcRepSplitAppTy_maybe
+tcTyConAppTyCon_maybe (FunTy { ft_af = af })
+  = Just (anonArgTyCon af)
 tcTyConAppTyCon_maybe _
   = Nothing
 
@@ -2076,15 +2075,15 @@ isSigmaTy :: TcType -> Bool
 -- *necessarily* have any foralls.  E.g
 --        f :: (?x::Int) => Int -> Int
 isSigmaTy ty | Just ty' <- tcView ty = isSigmaTy ty'
-isSigmaTy (ForAllTy {})                = True
-isSigmaTy (FunTy { ft_af = InvisArg }) = True
-isSigmaTy _                            = False
+isSigmaTy (ForAllTy {})          = True
+isSigmaTy (FunTy { ft_af = af }) = isInvisibleAnonArg af
+isSigmaTy _                      = False
 
 isRhoTy :: TcType -> Bool   -- True of TcRhoTypes; see Note [TcRhoType]
 isRhoTy ty | Just ty' <- tcView ty = isRhoTy ty'
-isRhoTy (ForAllTy {})                = False
-isRhoTy (FunTy { ft_af = InvisArg }) = False
-isRhoTy _                            = True
+isRhoTy (ForAllTy {})          = False
+isRhoTy (FunTy { ft_af = af }) = isVisibleAnonArg af
+isRhoTy _                      = True
 
 -- | Like 'isRhoTy', but also says 'True' for 'Infer' types
 isRhoExpTy :: ExpType -> Bool
@@ -2095,9 +2094,9 @@ isOverloadedTy :: Type -> Bool
 -- Yes for a type of a function that might require evidence-passing
 -- Used only by bindLocalMethods
 isOverloadedTy ty | Just ty' <- tcView ty = isOverloadedTy ty'
-isOverloadedTy (ForAllTy _  ty)             = isOverloadedTy ty
-isOverloadedTy (FunTy { ft_af = InvisArg }) = True
-isOverloadedTy _                            = False
+isOverloadedTy (ForAllTy _  ty)       = isOverloadedTy ty
+isOverloadedTy (FunTy { ft_af = af }) = isInvisibleAnonArg af
+isOverloadedTy _                      = False
 
 isFloatTy, isDoubleTy,
     isFloatPrimTy, isDoublePrimTy,

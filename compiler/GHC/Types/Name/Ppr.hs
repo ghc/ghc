@@ -16,12 +16,12 @@ import GHC.Unit.Env
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 
-import GHC.Builtin.Types
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Builtin.Types.Prim (tYPETyConName, funTyConName)
+import GHC.Builtin.Types.Prim ( fUNTyConName )
+import GHC.Builtin.Types
 
 
 {-
@@ -112,7 +112,7 @@ mkPrintUnqualified unit_env env
             , coercibleTyConName
             , eqTyConName
             , tYPETyConName
-            , funTyConName
+            , fUNTyConName, unrestrictedFunTyConName
             , oneDataConName
             , manyDataConName ]
 
@@ -127,6 +127,7 @@ mkPrintUnqualified unit_env env
 
 {- Note [pretendNameIsInScopeForPpr]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+c.f. Note [PretendNameIsInScope] in GHC.Builtin.Names
 Normally, a name is printed unqualified if it's in scope and unambiguous:
   ghci> :t not
   not :: Bool -> Bool

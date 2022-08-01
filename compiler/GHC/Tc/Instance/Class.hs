@@ -454,8 +454,8 @@ matchWithDict [cls, mty]
     -- and in that case let
     -- co :: C t1 ..tn ~R# inst_meth_ty
   , Just (inst_meth_ty, co) <- tcInstNewTyCon_maybe dict_tc dict_args
-  = do { sv <- mkSysLocalM (fsLit "withDict_s") Many mty
-       ; k  <- mkSysLocalM (fsLit "withDict_k") Many (mkInvisFunTyMany cls openAlphaTy)
+  = do { sv <- mkSysLocalM (fsLit "withDict_s") ManyTy mty
+       ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTyMany cls openAlphaTy)
 
        -- Given co2 : mty ~N# inst_meth_ty, construct the method of
        -- the WithDict dictionary:
@@ -655,7 +655,8 @@ matchTypeable clas [k,t]  -- clas = Typeable
   | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
   | k `eqType` charTy                      = doTyLit knownCharClassName        t
   | tcIsConstraintKind t                   = doTyConApp clas t constraintKindTyCon []
-  | Just (mult,arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t mult arg ret
+  | Just (af,mult,arg,ret) <- splitFunTy_maybe t
+   , isVisibleAnonArg af                   = doFunTy    clas t mult arg ret
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
   , onlyNamedBndrsApplied tc ks            = doTyConApp clas t tc ks
   | Just (f,kt)   <- splitAppTy_maybe t    = doTyApp    clas t f kt

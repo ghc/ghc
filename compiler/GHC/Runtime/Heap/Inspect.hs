@@ -745,10 +745,9 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                       -- we have unsound types. Replace constructor types in
                       -- subterms with tyvars
                       zterm' <- mapTermTypeM
-                                 (\ty -> case tcSplitTyConApp_maybe ty of
-                                           Just (tc, _:_) | tc /= funTyCon
-                                               -> newOpenVar
-                                           _   -> return ty)
+                                 (\ty -> if isFunTy ty
+                                         then return ty
+                                         else newOpenVar)
                                  term
                       zonkTerm zterm'
    traceTR (text "Term reconstruction completed." $$
@@ -1414,7 +1413,7 @@ isMonomorphicOnNonPhantomArgs ty
   , concrete_args <- [ arg | (tyv,arg) <- tyConTyVars tc `zip` all_args
                            , tyv `notElem` phantom_vars]
   = all isMonomorphicOnNonPhantomArgs concrete_args
-  | Just (_, ty1, ty2) <- splitFunTy_maybe ty
+  | Just (_, _, ty1, ty2) <- splitFunTy_maybe ty
   = all isMonomorphicOnNonPhantomArgs [ty1,ty2]
   | otherwise = isMonomorphic ty
 

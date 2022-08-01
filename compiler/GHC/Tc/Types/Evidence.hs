@@ -174,7 +174,7 @@ mkTcNomReflCo          = mkNomReflCo
 mkTcRepReflCo          = mkRepReflCo
 mkTcTyConAppCo         = mkTyConAppCo
 mkTcAppCo              = mkAppCo
-mkTcFunCo              = mkFunCo
+mkTcFunCo r            = mkFunCo r VisArg  -- mkTcFunCo is always for VisArg
 mkTcAxInstCo           = mkAxInstCo
 mkTcUnbranchedAxInstCo = mkUnbranchedAxInstCo Representational
 mkTcForAllCo           = mkForAllCo
@@ -242,6 +242,8 @@ data HsWrapper
        -- This isn't the same as for mkFunCo, but it has to be this way
        -- because we can't use 'sym' to flip around these HsWrappers
        -- The TcType is the "from" type of the first wrapper
+       --
+       -- NB: a WpFun is always for a VisArg, with (->) function arrow
        --
        -- Use 'mkWpFun' to construct such a wrapper.
 

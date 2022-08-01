@@ -50,6 +50,7 @@ import GHC.StgToCmm.Types
 import GHC.Core
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
+import GHC.Core.Coercion ( mkReflCo )
 import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
@@ -59,7 +60,6 @@ import GHC.Core.TyCo.Tidy ( tidyCo )
 
 import GHC.Builtin.Types.Prim ( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.Types ( heqTyCon )
-import GHC.Builtin.Names
 
 import GHC.Iface.Syntax
 import GHC.Data.FastString
@@ -82,7 +82,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Trace
 
-import Data.Maybe ( catMaybes )
+import Data.Maybe ( isNothing, catMaybes )
 
 {- Note [Avoiding space leaks in toIface*]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -300,7 +300,7 @@ toIfaceCoercionX fr co
                                           (toIfaceTypeX fr t1)
                                           (toIfaceTypeX fr t2)
     go co@(TyConAppCo r tc cos)
-      =  assertPpr (not (isSaturatedFunTy tc cos)) (ppr co) $
+      =  assertPpr (isNothing (tyConAppFun_maybe (mkReflCo r) tc cos)) (ppr co) $
          IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
 
     go (FunCo r af w co1 co2)
@@ -354,11 +354,10 @@ toIfaceAppArgsX fr kind ty_args
     go env (FunTy { ft_af = af, ft_res = res }) (t:ts)
       = IA_Arg (toIfaceTypeX fr t) argf (go env res ts)
       where
-        argf = case af of
-                 VisArg   -> Required
-                 InvisArg -> Inferred
-                   -- It's rare for a kind to have a constraint argument, but
-                   -- it can happen. See Note [AnonTCB InvisArg] in GHC.Core.TyCon.
+        argf | isVisibleAnonArg af = Required
+             | otherwise           = Inferred
+             -- It's rare for a kind to have a constraint argument, but
+             -- it can happen. See Note [AnonTCB InvisArg] in GHC.Core.TyCon.
 
     go env ty ts@(t1:ts1)
       | not (isEmptyTCvSubst env)

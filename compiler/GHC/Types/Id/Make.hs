@@ -1817,7 +1817,7 @@ voidPrimId  = pcMiscPrelId voidPrimIdName unboxedUnitTy
 
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
-voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Many unboxedUnitTy
+voidArgId = mkSysLocal (fsLit "void") voidArgIdKey ManyTy unboxedUnitTy
 
 coercionTokenId :: Id         -- :: () ~# ()
 coercionTokenId -- See Note [Coercion tokens] in "GHC.CoreToStg"

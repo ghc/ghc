@@ -21,7 +21,6 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.Core.Utils
 import GHC.Hs
 import GHC.Tc.Types.Evidence
 import GHC.Types.Id

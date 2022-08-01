@@ -40,7 +40,7 @@ import GHC.Data.Maybe
 import GHC.Exts (oneShot)
 import Control.Monad
 import Control.Applicative (liftA3)
-import GHC.Builtin.Types.Prim (tYPETyCon)
+import GHC.Builtin.Types (tYPETyCon)
 import Data.List ( find )
 
 {-

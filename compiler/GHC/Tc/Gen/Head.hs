@@ -58,6 +58,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Hs
 import GHC.Hs.Syn.Type
+import GHC.Types.Var( isInvisibleAnonArg )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.PatSyn( PatSyn )
@@ -617,9 +618,9 @@ tcRemainingValArgs applied_args app_res_rho fun = case fun of
         -- than the number of arguments apparent from the type.
         = pprPanic "tcRemainingValArgs" debug_msg
       tc_rem_args i_visval !i_val ((Scaled _ arg_ty, af) : tys)
-        = do { let (i_visval', arg_pos) =
-                     case af of { InvisArg -> ( i_visval    , ArgPosInvis )
-                                ; VisArg   -> ( i_visval + 1, ArgPosVis i_visval ) }
+        = do { let (i_visval', arg_pos)
+                     | isInvisibleAnonArg af = ( i_visval    , ArgPosInvis )
+                     | otherwise             = ( i_visval + 1, ArgPosVis i_visval )
                    frr_ctxt = FRRNoBindingResArg rep_poly_fun arg_pos
              ; hasFixedRuntimeRep_syntactic frr_ctxt arg_ty
                  -- Why is this a syntactic check? See Wrinkle [Syntactic check] in
@@ -1119,7 +1120,7 @@ tc_infer_id id_name
 check_local_id :: Id -> TcM ()
 check_local_id id
   = do { checkThLocalId id
-       ; tcEmitBindingUsage $ unitUE (idName id) One }
+       ; tcEmitBindingUsage $ unitUE (idName id) OneTy }
 
 check_naughty :: OccName -> TcId -> TcM ()
 check_naughty lbl id
@@ -1153,9 +1154,9 @@ tcInferDataCon con
     linear_to_poly :: Scaled Type -> TcM (Scaled Type)
     -- linear_to_poly implements point (3,4)
     -- of Note [Typechecking data constructors]
-    linear_to_poly (Scaled One ty) = do { mul_var <- newFlexiTyVarTy multiplicityTy
-                                        ; return (Scaled mul_var ty) }
-    linear_to_poly scaled_ty       = return scaled_ty
+    linear_to_poly (Scaled OneTy ty) = do { mul_var <- newFlexiTyVarTy multiplicityTy
+                                          ; return (Scaled mul_var ty) }
+    linear_to_poly scaled_ty         = return scaled_ty
 
 tcInferPatSyn :: Name -> PatSyn -> TcM (HsExpr GhcTc, TcSigmaType)
 tcInferPatSyn id_name ps

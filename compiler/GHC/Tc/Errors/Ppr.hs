@@ -22,8 +22,7 @@ module GHC.Tc.Errors.Ppr
 import GHC.Prelude
 
 import GHC.Builtin.Names
-import GHC.Builtin.Types (boxedRepDataConTyCon)
-import GHC.Builtin.Types.Prim (tYPETyCon)
+import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon )
 
 import GHC.Core.Coercion
 import GHC.Core.Unify     ( tcMatchTys )
@@ -3118,7 +3117,8 @@ tidySigSkol env cx ty tv_prs
       where
         (env', tv') = tidy_tv_bndr env tv
 
-    tidy_ty env ty@(FunTy InvisArg w arg res) -- Look under  c => t
+    tidy_ty env ty@(FunTy af w arg res) -- Look under  c => t
+      | isInvisibleAnonArg af
       = ty { ft_mult = tidy_ty env w,
              ft_arg = tidyType env arg,
              ft_res = tidy_ty env res }

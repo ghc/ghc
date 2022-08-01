@@ -523,7 +523,7 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
            -- into [m, a]
            unwrapTypeVars :: Type -> [TyCoVarBinder]
            unwrapTypeVars t = vars ++ case splitFunTy_maybe unforalled of
-                               Just (_, _, unfunned) -> unwrapTypeVars unfunned
+                               Just (_, _, _, unfunned) -> unwrapTypeVars unfunned
                                _ -> []
              where (vars, unforalled) = splitForAllTyCoVarBinders t
        holeVs = sep $ map (parens . (text "_" <+> dcolon <+>) . ppr) hfMatches

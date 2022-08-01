@@ -37,7 +37,7 @@ import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.Rules
 import GHC.Core.Predicate ( typeDeterminesValue )
 import GHC.Core.Type     hiding ( substTy )
-import GHC.Core.TyCon   (TyCon, tyConUnique, tyConName )
+import GHC.Core.TyCon   (TyCon, tyConName )
 import GHC.Core.Multiplicity
 import GHC.Core.Ppr     ( pprParendExpr )
 import GHC.Core.Make    ( mkImpossibleExpr )
@@ -57,6 +57,7 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.FM
+import GHC.Types.Unique( hasKey )
 
 import GHC.Data.Maybe     ( orElse, catMaybes, isJust, isNothing )
 import GHC.Data.Pair
@@ -1117,14 +1118,13 @@ forceSpecFunTy env = any (forceSpecArgTy env) . map scaledThing . fst . splitFun
 
 forceSpecArgTy :: ScEnv -> Type -> Bool
 forceSpecArgTy env ty
-  | Just ty' <- coreView ty = forceSpecArgTy env ty'
+  | isFunTy ty
+  = False
 
-forceSpecArgTy env ty
   | Just (tycon, tys) <- splitTyConApp_maybe ty
-  , tycon /= funTyCon
-      = tyConUnique tycon == specTyConKey
-        || lookupUFM (sc_annotations env) (tyConName tycon) == Just ForceSpecConstr
-        || any (forceSpecArgTy env) tys
+  = tycon `hasKey` specTyConKey
+    || lookupUFM (sc_annotations env) (tyConName tycon) == Just ForceSpecConstr
+    || any (forceSpecArgTy env) tys
 
 forceSpecArgTy _ _ = False
 
@@ -1839,7 +1839,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                   = (spec_lam_args1, spec_lam_args1, spec_arity1, spec_join_arity1)
 
               spec_id    = asWorkerLikeId $
-                           mkLocalId spec_name Many
+                           mkLocalId spec_name ManyTy
                                      (mkLamTypes spec_lam_args spec_body_ty)
                              -- See Note [Transfer strictness]
                              `setIdDmdSig`    spec_sig
@@ -1896,7 +1896,7 @@ generaliseDictPats qvars pats
        , let pat_ty = exprType pat
        , typeDeterminesValue pat_ty
        , exprFreeVars pat `disjointVarSet` qvar_set
-       = do { id <- mkSysLocalOrCoVarM (fsLit "dict") Many pat_ty
+       = do { id <- mkSysLocalOrCoVarM (fsLit "dict") ManyTy pat_ty
             ; return (id:extra_qvs, Var id) }
        | otherwise
        = return (extra_qvs, pat)
@@ -2602,7 +2602,7 @@ argToPat1 _env _in_scope _val_env arg _arg_occ arg_str
 -- | wildCardPats are always boring
 wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg, [Id])
 wildCardPat ty str
-  = do { id <- mkSysLocalOrCoVarM (fsLit "sc") Many ty
+  = do { id <- mkSysLocalOrCoVarM (fsLit "sc") ManyTy ty
        -- ; pprTraceM "wildCardPat" (ppr id' <+> ppr (idUnfolding id'))
        ; return (False, varToCoreExpr id, if isMarkedStrict str then [id] else []) }
 

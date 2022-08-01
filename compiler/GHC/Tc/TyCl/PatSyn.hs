@@ -23,7 +23,7 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Tc.Gen.Pat
 import GHC.Core.Multiplicity
-import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType, isManyDataConTy )
+import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType, isManyTy, mkTYPEapp )
 import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
@@ -423,7 +423,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
              ex_tvs     = binderVars ex_bndrs
 
          -- Pattern synonyms currently cannot be linear (#18806)
-       ; checkTc (all (isManyDataConTy . scaledMult) arg_tys) $
+       ; checkTc (all (isManyTy . scaledMult) arg_tys) $
            TcRnLinearPatSyn sig_body_ty
 
        ; skol_info <- mkSkolemInfo (SigSkol (PatSynCtxt name) pat_ty [])
@@ -804,9 +804,9 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              fail_ty  = mkVisFunTyMany unboxedUnitTy res_ty
 
        ; matcher_name <- newImplicitBinder ps_name mkMatcherOcc
-       ; scrutinee    <- newSysLocalId (fsLit "scrut") Many pat_ty
-       ; cont         <- newSysLocalId (fsLit "cont")  Many cont_ty
-       ; fail         <- newSysLocalId (fsLit "fail")  Many fail_ty
+       ; scrutinee    <- newSysLocalId (fsLit "scrut") ManyTy pat_ty
+       ; cont         <- newSysLocalId (fsLit "cont")  ManyTy cont_ty
+       ; fail         <- newSysLocalId (fsLit "fail")  ManyTy fail_ty
 
        ; dflags       <- getDynFlags
        ; let matcher_tau   = mkVisFunTysMany [pat_ty, cont_ty, fail_ty] res_ty

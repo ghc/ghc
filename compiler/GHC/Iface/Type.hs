@@ -56,8 +56,8 @@ module GHC.Iface.Type (
         splitIfaceSigmaTy, pprIfaceTypeApp, pprUserIfaceForAll,
         pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp,
         mulArrow,
-        ppr_fun_arrow,
-        isIfaceTauType,
+        ppr_FUN_arrow,
+        isIfaceRhoType,
 
         suppressIfaceInvisibles,
         stripIfaceInvisVars,
@@ -372,7 +372,7 @@ data IfaceMCoercion
 data IfaceCoercion
   = IfaceReflCo       IfaceType
   | IfaceGReflCo      Role IfaceType (IfaceMCoercion)
-  | IfaceFunCo        Role IfaceCoercion IfaceCoercion IfaceCoercion
+  | IfaceFunCo        Role AnonArgFlag IfaceCoercion IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
   | IfaceForAllCo     IfaceBndr IfaceCoercion IfaceCoercion
@@ -576,7 +576,7 @@ substIfaceType env ty
 
     go_co (IfaceReflCo ty)           = IfaceReflCo (go ty)
     go_co (IfaceGReflCo r ty mco)    = IfaceGReflCo r (go ty) (go_mco mco)
-    go_co (IfaceFunCo r w c1 c2)     = IfaceFunCo r (go_co w) (go_co c1) (go_co c2)
+    go_co (IfaceFunCo r af w c1 c2)  = IfaceFunCo r af (go_co w) (go_co c1) (go_co c2)
     go_co (IfaceTyConAppCo r tc cos) = IfaceTyConAppCo r tc (go_cos cos)
     go_co (IfaceAppCo c1 c2)         = IfaceAppCo (go_co c1) (go_co c2)
     go_co (IfaceForAllCo {})         = pprPanic "substIfaceCoercion" (ppr ty)
@@ -775,10 +775,10 @@ pprIfacePrefixApp ctxt_prec pp_fun pp_tys
   | otherwise   = maybeParen ctxt_prec appPrec $
                   hang pp_fun 2 (sep pp_tys)
 
-isIfaceTauType :: IfaceType -> Bool
-isIfaceTauType (IfaceForAllTy _ _)   = False
-isIfaceTauType (IfaceFunTy af _ _ _) = isInvisibleAnonArg af
-isIfaceTauType _ = True
+isIfaceRhoType :: IfaceType -> Bool
+isIfaceRhoType (IfaceForAllTy _ _)   = False
+isIfaceRhoType (IfaceFunTy af _ _ _) = isInvisibleAnonArg af
+isIfaceRhoType _ = True
 
 -- ----------------------------- Printing binders ------------------------------------
 
@@ -918,8 +918,9 @@ pprPrecIfaceType prec ty =
 mulArrow :: (PprPrec -> a -> SDoc) -> a -> SDoc
 mulArrow ppr_mult mult = text "%" <> ppr_mult appPrec mult <+> arrow
 
-ppr_fun_arrow :: IfaceMult -> SDoc
-ppr_fun_arrow w
+ppr_FUN_arrow :: IfaceMult -> SDoc
+-- Prints a thin arrow (->) with its multiplicity
+ppr_FUN_arrow w
   | (IfaceTyConApp tc _) <- w
   , tc `ifaceTyConHasKey` (getUnique manyDataConTyCon) = arrow
   | (IfaceTyConApp tc _) <- w
@@ -932,23 +933,24 @@ ppr_sigma ctxt_prec ty
 
 ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty ctxt_prec ty
-  | not (isIfaceTauType ty)             = ppr_sigma ctxt_prec ty
-ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIfaceTauType
+  | not (isIfaceRhoType ty)             = ppr_sigma ctxt_prec ty
+ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIfaceRhoType
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free tyvars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty ctxt_prec (IfaceTupleTy i p tys) = pprTuple ctxt_prec i p tys -- always fully saturated
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
         -- Function types
-ppr_ty ctxt_prec (IfaceFunTy _ w ty1 ty2)  -- Should be VisArg
-  = -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
+ppr_ty ctxt_prec ty@(IfaceFunTy af w ty1 ty2)  -- Should be VisArg
+  = assertPpr (isVisibleAnonArg af) (ppr ty) $  -- Ensured by isIfaceRhoType above
+    -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
     maybeParen ctxt_prec funPrec $
     sep [ppr_ty funPrec ty1, sep (ppr_fun_tail w ty2)]
   where
     ppr_fun_tail wthis (IfaceFunTy VisArg wnext ty1 ty2)
-      = (ppr_fun_arrow wthis <+> ppr_ty funPrec ty1) : ppr_fun_tail wnext ty2
+      = (ppr_FUN_arrow wthis <+> ppr_ty funPrec ty1) : ppr_fun_tail wnext ty2
     ppr_fun_tail wthis other_ty
-      = [ppr_fun_arrow wthis <+> pprIfaceType other_ty]
+      = [ppr_FUN_arrow wthis <+> pprIfaceType other_ty]
 
 ppr_ty ctxt_prec (IfaceAppTy t ts)
   = if_print_coercions
@@ -1719,15 +1721,22 @@ ppr_co _         (IfaceGReflCo r ty IfaceMRefl)
 ppr_co ctxt_prec (IfaceGReflCo r ty (IfaceMCo co))
   = ppr_special_co ctxt_prec
     (text "GRefl" <+> ppr r <+> pprParendIfaceType ty) [co]
-ppr_co ctxt_prec (IfaceFunCo r cow co1 co2)
+
+ppr_co ctxt_prec (IfaceFunCo r af co_mult co1 co2)
   = maybeParen ctxt_prec funPrec $
-    sep (ppr_co funPrec co1 : ppr_fun_tail cow co2)
+    sep (ppr_co funPrec co1 : ppr_fun_tail af co_mult co2)
   where
-    ppr_fun_tail cow' (IfaceFunCo r cow co1 co2)
-      = (coercionArrow cow' <> ppr_role r <+> ppr_co funPrec co1) : ppr_fun_tail cow co2
-    ppr_fun_tail cow' other_co
-      = [coercionArrow cow' <> ppr_role r <+> pprIfaceCoercion other_co]
-    coercionArrow w = mulArrow ppr_co w
+    ppr_fun_tail af1 co_mult1 (IfaceFunCo r af2 co_mult2 co1 co2)
+      = (ppr_arrow af1 co_mult1 <> ppr_role r <+> ppr_co funPrec co1)
+        : ppr_fun_tail af2 co_mult2 co2
+    ppr_fun_tail af1 co_mult1 other_co
+      = [ppr_arrow af1 co_mult1 <> ppr_role r <+> pprIfaceCoercion other_co]
+
+    ppr_arrow af co_mult
+      = case af of
+          VisArg    -> mulArrow ppr_co co_mult
+          InvisArg1 -> text "=>"
+          InvisArg2 -> text "==>"
 
 ppr_co _         (IfaceTyConAppCo r tc cos)
   = parens (pprIfaceCoTcApp topPrec tc cos) <> ppr_role r
@@ -2024,9 +2033,10 @@ instance Binary IfaceCoercion where
           put_ bh a
           put_ bh b
           put_ bh c
-  put_ bh (IfaceFunCo a w b c) = do
+  put_ bh (IfaceFunCo a af w b c) = do
           putByte bh 3
           put_ bh a
+          put_ bh af
           put_ bh w
           put_ bh b
           put_ bh c
@@ -2102,11 +2112,12 @@ instance Binary IfaceCoercion where
                    b <- get bh
                    c <- get bh
                    return $ IfaceGReflCo a b c
-           3 -> do a <- get bh
-                   w <- get bh
-                   b <- get bh
-                   c <- get bh
-                   return $ IfaceFunCo a w b c
+           3 -> do a  <- get bh
+                   af <- get bh
+                   w  <- get bh
+                   b  <- get bh
+                   c  <- get bh
+                   return $ IfaceFunCo a af w b c
            4 -> do a <- get bh
                    b <- get bh
                    c <- get bh
@@ -2212,7 +2223,7 @@ instance NFData IfaceCoercion where
   rnf = \case
     IfaceReflCo f1 -> rnf f1
     IfaceGReflCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
-    IfaceFunCo f1 f2 f3 f4 -> f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
+    IfaceFunCo f1 f2 f3 f4 f5 -> f1 `seq` f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5
     IfaceTyConAppCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
     IfaceAppCo f1 f2 -> rnf f1 `seq` rnf f2
     IfaceForAllCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3

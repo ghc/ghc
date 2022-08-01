@@ -247,7 +247,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
            -- Drop the foralls before inspecting the
            -- structure of the foreign type.
              (arg_tys, res_ty) = tcSplitFunTys (dropForAlls norm_sig_ty)
-             id                = mkLocalId nm Many sig_ty
+             id                = mkLocalId nm ManyTy sig_ty
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
                  -- (so GHC.Tc.Utils.Zonk.zonkForeignExports ignores it).
@@ -442,8 +442,8 @@ checkForeignArgs pred tys = mapM_ go tys
                           check (pred ty) (TcRnIllegalForeignType (Just Arg))
 
 checkNoLinearFFI :: Mult -> TcM ()  -- No linear types in FFI (#18472)
-checkNoLinearFFI Many = return ()
-checkNoLinearFFI _    = addErrTc $ TcRnIllegalForeignType (Just Arg)
+checkNoLinearFFI ManyTy = return ()
+checkNoLinearFFI _      = addErrTc $ TcRnIllegalForeignType (Just Arg)
                                    LinearTypesNotAllowed
 
 ------------ Checking result types for foreign calls ----------------------

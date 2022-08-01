@@ -2802,4 +2802,4 @@ pretendNameIsInScope n
     , listTyConKey
     , oneDataConKey
     , manyDataConKey
-    , fUNTyConKey ]
+    , fUNTyConKey, unrestrictedFunTyConKey ]

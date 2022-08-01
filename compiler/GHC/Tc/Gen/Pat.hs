@@ -355,7 +355,7 @@ tc_lpats tys penv pats
 --------------------
 -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 checkManyPattern :: Scaled a -> TcM HsWrapper
-checkManyPattern pat_ty = tcSubMult NonLinearPatternOrigin Many (scaledMult pat_ty)
+checkManyPattern pat_ty = tcSubMult NonLinearPatternOrigin ManyTy (scaledMult pat_ty)
 
 tc_pat  :: Scaled ExpSigmaTypeFRR
         -- ^ Fully refined result type

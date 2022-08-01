@@ -72,7 +72,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Builtin.Names
 import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim (tYPETyCon)
+import GHC.Builtin.Types.Prim (sORTTyCon)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst (elemSubst)
 import GHC.Core.Type
@@ -146,10 +146,10 @@ updRcm f (RCM vanilla pragmas)
 -- Ex.: @vanillaCompleteMatchTC 'Maybe' ==> Just ("Maybe", {'Just','Nothing'})@
 vanillaCompleteMatchTC :: TyCon -> Maybe CompleteMatch
 vanillaCompleteMatchTC tc =
-  let -- TYPE acts like an empty data type on the term-level (#14086), but
+  let -- SORT acts like an empty data type on the term-level (#14086), but
       -- it is a PrimTyCon, so tyConDataCons_maybe returns Nothing. Hence a
       -- special case.
-      mb_dcs | tc == tYPETyCon = Just []
+      mb_dcs | tc == sORTTyCon = Just []
              | otherwise       = tyConDataCons_maybe tc
   in vanillaCompleteMatch . mkUniqDSet . map RealDataCon <$> mb_dcs
 
@@ -641,7 +641,7 @@ nameTyCt pred_ty = do
   unique <- getUniqueM
   let occname = mkVarOccFS (fsLit ("pm_"++show unique))
       idname  = mkInternalName unique occname noSrcSpan
-  return (mkLocalIdOrCoVar idname Many pred_ty)
+  return (mkLocalIdOrCoVar idname ManyTy pred_ty)
 
 -----------------------------
 -- ** Adding term constraints

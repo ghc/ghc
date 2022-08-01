@@ -647,7 +647,7 @@ arithSeqEltType :: Maybe (SyntaxExpr GhcRn) -> ExpRhoType
 arithSeqEltType Nothing res_ty
   = do { res_ty <- expTypeToType res_ty
        ; (coi, elt_ty) <- matchExpectedListTy res_ty
-       ; return (mkWpCastN coi, One, elt_ty, Nothing) }
+       ; return (mkWpCastN coi, OneTy, elt_ty, Nothing) }
 arithSeqEltType (Just fl) res_ty
   = do { ((elt_mult, elt_ty), fl')
            <- tcSyntaxOp ListOrigin fl [SynList] res_ty $
@@ -1181,8 +1181,8 @@ desugarRecordUpd record_expr rbnds res_ty
           -- the record to disambiguate its fields, so we must infer the record
           -- type here before we can desugar. See Wrinkle [Disambiguating fields]
           -- in Note [Record Updates].
-       ; ((_, record_rho), _lie) <- captureConstraints $  -- see (1) below
-                                    tcScalingUsage Many $ -- see (2) below
+       ; ((_, record_rho), _lie) <- captureConstraints    $  -- see (1) below
+                                    tcScalingUsage ManyTy $ -- see (2) below
                                     tcInferRho record_expr
 
             -- (1)
@@ -1592,7 +1592,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
                 field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
-                                        Many field_ty (locA loc)
+                                        ManyTy field_ty (locA loc)
                 -- Yuk: the field_id has the *unique* of the selector Id
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS

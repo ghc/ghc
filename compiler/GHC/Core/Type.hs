@@ -35,7 +35,7 @@ module GHC.Core.Type (
         mkVisFunTysMany, mkInvisFunTysMany,
         splitFunTy, splitFunTy_maybe,
         splitFunTys, funResultTy, funArgTy,
-        funTyConApp, funTyConAppTy, tyConAppFun_maybe,
+        funTyConApp_maybe, funTyConAppTy_maybe, tyConAppFun_maybe,
         funTyAnonArgFlag, anonArgTyCon,
         mkFunctionType, chooseAnonArgFlag,
 
@@ -143,7 +143,7 @@ module GHC.Core.Type (
         unrestricted, linear, tymult,
         mkScaled, irrelevantMult, scaledSet,
         pattern OneTy, pattern ManyTy,
-        isOneDataConTy, isManyDataConTy,
+        isOneTy, isManyTy,
         isLinearType,
 
         -- * Main data types representing Kinds
@@ -293,7 +293,7 @@ import GHC.Data.Pair
 import GHC.Data.List.SetOps
 import GHC.Types.Unique ( nonDetCmpUnique )
 
-import GHC.Data.Maybe   ( orElse, expectJust, isJust )
+import GHC.Data.Maybe   ( orElse, isJust )
 import Control.Monad    ( guard )
 -- import GHC.Utils.Trace
 
@@ -1114,7 +1114,7 @@ repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
 -- any Core view stuff is already done
 repSplitAppTy_maybe (FunTy af w ty1 ty2)
-  | (tc, tys)        <- funTyConAppTy af w ty1 ty2
+  | Just (tc, tys)   <- funTyConAppTy_maybe af w ty1 ty2
   , Just (tys', ty') <- snocView tys
   = Just (TyConApp tc tys', ty')
 
@@ -1178,10 +1178,9 @@ splitAppTys ty = split ty ty []
         in
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split _   (FunTy af w ty1 ty2) args
+      | Just (tc,tys) <- funTyConAppTy_maybe af w ty1 ty2
       = assert (null args )
         (TyConApp tc [], tys)
-      where
-        (tc, tys) = funTyConAppTy af w ty1 ty2
 
     split orig_ty _                     args  = (orig_ty, args)
 
@@ -1197,10 +1196,10 @@ repSplitAppTys ty = split ty []
         in
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split (FunTy af w ty1 ty2) args
+      | Just (tc, tys) <- funTyConAppTy_maybe af w ty1 ty2
       = assert (null args )
         (TyConApp tc [], tys)
       where
-        (tc, tys) = funTyConAppTy af w ty1 ty2
 
     split ty args = (ty, args)
 
@@ -1325,24 +1324,25 @@ anonArgTyCon VisArg    = fUNTyCon
 anonArgTyCon InvisArg1 = fatArrow1TyCon
 anonArgTyCon InvisArg2 = fatArrow2TyCon
 
-funTyConApp :: (a->a)   -- How to extract a RuntimeRep
-            -> AnonArgFlag -> a -> a -> a
-            -> (TyCon, [a])
+funTyConApp_maybe :: (a -> Maybe a)   -- How to extract a RuntimeRep
+                  -> AnonArgFlag -> a -> a -> a
+                  -> Maybe (TyCon, [a])
 -- Given the components of a FunTy/FuNCo,
 -- figure out the corresponding TyConApp/TyConAppCo
 -- The type 'a' is always Type or Coercion
--- The (a->a) function extracts a RuntimeRep from arg/res
-funTyConApp get_rr af mult arg res
-  = case af of
+-- The (a -> Maybe a) function extracts a RuntimeRep from arg/res
+funTyConApp_maybe get_rr af mult arg res
+  | Just arg_rep <- get_rr arg
+  , Just res_rep <- get_rr res
+  = Just $ case af of
       VisArg    -> (fUNTyCon,       [mult, arg_rep, res_rep, arg, res])
       InvisArg1 -> (fatArrow1TyCon, [arg_rep, res_rep, arg, res])
       InvisArg2 -> (fatArrow2TyCon, [arg_rep, res_rep, arg, res])
-  where
-    arg_rep = get_rr arg
-    res_rep = get_rr res
+  | otherwise
+  = Nothing
 
-funTyConAppTy :: AnonArgFlag -> Mult -> Type -> Type -> (TyCon, [Type])
-funTyConAppTy = funTyConApp getRuntimeRep
+funTyConAppTy_maybe :: AnonArgFlag -> Mult -> Type -> Type -> Maybe (TyCon, [Type])
+funTyConAppTy_maybe = funTyConApp_maybe getRuntimeRep_maybe
 
 tyConAppFun_maybe :: (Type->a) -> TyCon -> [a]
                    -> Maybe (AnonArgFlag, a, a, a)
@@ -1378,7 +1378,7 @@ mkFunctionType mult arg_ty res_ty
                      mult }
   where
     af = chooseAnonArgFlag arg_ty res_ty
-    mult_ok = isVisibleAnonArg af || mult `eqType` manyDataConTy
+    mult_ok = isVisibleAnonArg af || isManyTy mult
 
    -- See GHC.Types.Var Note [AnonArgFlag]
 chooseAnonArgFlag :: Type -> Type -> AnonArgFlag
@@ -1392,7 +1392,9 @@ chooseAnonArgFlag arg_ty res_ty
 splitFunTy :: Type -> (Mult, Type, Type)
 -- ^ Attempts to extract the multiplicity, argument and result types from a type,
 -- and panics if that is not possible. See also 'splitFunTy_maybe'
-splitFunTy = expectJust "splitFunTy" . splitFunTy_maybe
+splitFunTy ty = case splitFunTy_maybe ty of
+                   Just (_af, mult, arg, res) -> (mult,arg,res)
+                   Nothing                    -> pprPanic "splitFunTy" (ppr ty)
 
 {-# INLINE splitFunTy_maybe #-}
 splitFunTy_maybe :: Type -> Maybe (AnonArgFlag, Mult, Type, Type)
@@ -1632,9 +1634,9 @@ repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy af w arg res)
   -- NB: we're in Core, so no check for VisArg
+  | Just (fun_tc, tys) <- funTyConAppTy_maybe af w arg res
   = Just (fun_tc, tys)
   where
-    (fun_tc, tys) = funTyConAppTy af w arg res
 repSplitTyConApp_maybe _ = Nothing
 
 tcRepSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
@@ -2572,7 +2574,7 @@ isValidJoinPointType arity ty
       = tvs `disjointVarSet` tyCoVarsOfType ty
       | Just (t, ty') <- splitForAllTyCoVar_maybe ty
       = valid_under (tvs `extendVarSet` t) (arity-1) ty'
-      | Just (_, _, res_ty) <- splitFunTy_maybe ty
+      | Just (_, _, _, res_ty) <- splitFunTy_maybe ty
       = valid_under tvs (arity-1) res_ty
       | otherwise
       = False
@@ -3856,24 +3858,24 @@ scaledSet :: Scaled a -> b -> Scaled b
 scaledSet (Scaled m _) b = Scaled m b
 
 pattern OneTy :: Mult
-pattern OneTy <- (isOneDataConTy -> True)
+pattern OneTy <- (isOneTy -> True)
   where OneTy = oneDataConTy
 
 pattern ManyTy :: Mult
-pattern ManyTy <- (isManyDataConTy -> True)
+pattern ManyTy <- (isManyTy -> True)
   where ManyTy = manyDataConTy
 
-isManyDataConTy :: Mult -> Bool
-isManyDataConTy ty
+isManyTy :: Mult -> Bool
+isManyTy ty
   | Just tc <- tyConAppTyCon_maybe ty
   = tc `hasKey` manyDataConKey
-isManyDataConTy _ = False
+isManyTy _ = False
 
-isOneDataConTy :: Mult -> Bool
-isOneDataConTy ty
+isOneTy :: Mult -> Bool
+isOneTy ty
   | Just tc <- tyConAppTyCon_maybe ty
   = tc `hasKey` oneDataConKey
-isOneDataConTy _ = False
+isOneTy _ = False
 
 isLinearType :: Type -> Bool
 -- ^ @isLinear t@ returns @True@ of a if @t@ is a type of (curried) function

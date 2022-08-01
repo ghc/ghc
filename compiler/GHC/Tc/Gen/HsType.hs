@@ -1604,8 +1604,8 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
         case ki_binder of
 
         -- FunTy with PredTy on LHS, or ForAllTy with Inferred
-        Named (Bndr _ Inferred) -> instantiate ki_binder inner_ki
-        Anon InvisArg _         -> instantiate ki_binder inner_ki
+        Named (Bndr _ Inferred)           -> instantiate ki_binder inner_ki
+        Anon af _ | isInvisibleAnonArg af -> instantiate ki_binder inner_ki
 
         Named (Bndr _ Specified) ->  -- Visible kind application
           do { traceTc "tcInferTyApps (vis kind app)"

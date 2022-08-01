@@ -189,7 +189,7 @@ dsCFExportDynamic id co0 cconv = do
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
-    stbl_value <- newSysLocalDs Many stable_ptr_ty
+    stbl_value <- newSysLocalDs ManyTy stable_ptr_ty
     (h_code, c_code, typestring, args_size) <- dsCFExport id (mkRepReflCo export_ty) fe_nm cconv True
     let
          {-
@@ -316,7 +316,7 @@ dsFCall fn_id co fcall mDeclHeader = do
         tvs           = map binderVar tv_bndrs
         the_ccall_app = mkFCall ccall_uniq fcall' val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
-        work_id       = mkSysLocal (fsLit "$wccall") work_uniq Many worker_ty
+        work_id       = mkSysLocal (fsLit "$wccall") work_uniq ManyTy worker_ty
 
         -- Build the wrapper
         work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args

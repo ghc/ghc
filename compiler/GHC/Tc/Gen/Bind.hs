@@ -540,7 +540,7 @@ recoveryCode binder_names sig_fn
       , Just poly_id <- completeSigPolyId_maybe sig
       = poly_id
       | otherwise
-      = mkLocalId name Many forall_a_a
+      = mkLocalId name ManyTy forall_a_a
 
 forall_a_a :: TcType
 -- At one point I had (forall r (a :: TYPE r). a), but of course
@@ -904,7 +904,7 @@ mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mo
          -- do this check; otherwise (#14000) we may report an ambiguity
          -- error for a rather bogus type.
 
-       ; return (mkLocalId poly_name Many inferred_poly_ty) }
+       ; return (mkLocalId poly_name ManyTy inferred_poly_ty) }
 
 
 chooseInferredQuantifiers :: WantedConstraints  -- residual constraints
@@ -1261,7 +1261,7 @@ tcMonoBinds is_rec sig_fn no_gen
   = setSrcSpanA b_loc    $
     do  { ((co_fn, matches'), mono_id, _) <- fixM $ \ ~(_, _, rhs_ty) ->
                                           -- See Note [fixM for rhs_ty in tcMonoBinds]
-            do  { mono_id <- newLetBndr no_gen name Many rhs_ty
+            do  { mono_id <- newLetBndr no_gen name ManyTy rhs_ty
                 ; (matches', rhs_ty')
                     <- tcInfer $ \ exp_ty ->
                        tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
@@ -1441,7 +1441,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
 
   | otherwise  -- No type signature
   = do { mono_ty <- newOpenFlexiTyVarTy
-       ; mono_id <- newLetBndr no_gen name Many mono_ty
+       ; mono_id <- newLetBndr no_gen name ManyTy mono_ty
           -- This ^ generates a binder with Many multiplicity because all
           -- let/where-binders are unrestricted. When we introduce linear let
           -- binders, we will need to retrieve the multiplicity information.
@@ -1512,7 +1512,7 @@ newSigLetBndr (LetGblBndr prags) name (TISI { sig_inst_sig = id_sig })
   | CompleteSig { sig_bndr = poly_id } <- id_sig
   = addInlinePrags poly_id (lookupPragEnv prags name)
 newSigLetBndr no_gen name (TISI { sig_inst_tau = tau })
-  = newLetBndr no_gen name Many tau
+  = newLetBndr no_gen name ManyTy tau
     -- Binders with a signature are currently always of multiplicity
     -- Many. Because they come either from toplevel, let, or where
     -- declarations. Which are all unrestricted currently.

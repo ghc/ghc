@@ -50,7 +50,7 @@ module GHC.Core.Coercion (
         mkHeteroPrimEqPred, mkHeteroReprPrimEqPred,
 
         -- ** Decomposition
-        instNewTyCon_maybe, funTyConAppCo,
+        instNewTyCon_maybe,
 
         NormaliseStepper, NormaliseStepResult(..), composeSteppers,
         mapStepResult, unwrapNewTypeStepper,
@@ -443,9 +443,6 @@ decomposeFunCo r co
     af     = funTyAnonArgFlag s1t1
     all_ok = isFunTy s1t1 && isFunTy s2t2
 
-funTyConAppCo :: AnonArgFlag -> Coercion -> Coercion -> Coercion -> (TyCon, [Coercion])
-funTyConAppCo = funTyConApp mkRuntimeRepCo
-
 
 {- Note [Pushing a coercion into a pi-type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -510,8 +507,9 @@ decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
         in
         go (arg_co : acc_arg_cos) (subst1', t1) res_co (subst2', t2) tys
 
-      | Just (_w1, _s1, t1) <- splitFunTy_maybe k1
-      , Just (_w1, _s2, t2) <- splitFunTy_maybe k2
+      | Just (af1, _w1, _s1, t1) <- splitFunTy_maybe k1
+      , Just (af2, _w1, _s2, t2) <- splitFunTy_maybe k2
+      , af1 == af2  -- Same sort of arrow
         -- know     co :: (s1 -> t1) ~ (s2 -> t2)
         --    function :: s1 -> t1
         --          ty :: s2

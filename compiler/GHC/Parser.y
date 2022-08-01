@@ -76,7 +76,7 @@ import GHC.Types.SourceFile
 import GHC.Types.SourceText
 import GHC.Types.PkgQual
 
-import GHC.Core.Type    ( unrestrictedFunTyCon, Specificity(..) )
+import GHC.Core.Type    ( Specificity(..) )
 import GHC.Core.Class   ( FunDep )
 import GHC.Core.DataCon ( DataCon, dataConName )
 
@@ -91,7 +91,8 @@ import GHC.Parser.Errors.Ppr ()
 import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            tupleTyCon, tupleDataCon, nilDataCon,
                            unboxedUnitTyCon, unboxedUnitDataCon,
-                           listTyCon_RDR, consDataCon_RDR)
+                           listTyCon_RDR, consDataCon_RDR,
+                           unrestrictedFunTyCon )
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 

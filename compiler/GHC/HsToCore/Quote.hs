@@ -51,8 +51,8 @@ import GHC.Tc.Types.Evidence
 import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import GHC.Core.Multiplicity ( pattern Many )
 import GHC.Core
+import GHC.Core.Type( pattern ManyTy )
 import GHC.Core.Make
 import GHC.Core.Utils
 
@@ -2134,7 +2134,8 @@ mkGenSyms :: [Name] -> MetaM [GenSymBind]
 --
 -- Nevertheless, it's monadic because we have to generate nameTy
 mkGenSyms ns = do { var_ty <- lookupType nameTyConName
-                  ; return [(nm, mkLocalId (localiseName nm) Many var_ty) | nm <- ns] }
+                  ; return [ (nm, mkLocalId (localiseName nm) ManyTy var_ty)
+                           | nm <- ns] }
 
 
 addBinds :: [GenSymBind] -> MetaM a -> MetaM a

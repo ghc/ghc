@@ -197,7 +197,7 @@ typeOneShots ty
       | Just (_, ty')  <- splitForAllTyCoVar_maybe ty
       = go rec_nts ty'
 
-      | Just (_,arg,res) <- splitFunTy_maybe ty
+      | Just (_,_,arg,res) <- splitFunTy_maybe ty
       = typeOneShot arg : go rec_nts res
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
@@ -2104,7 +2104,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        = (in_scope, EI (tcv' : bs) (mkHomoForAllMCo tcv' mco))
 
        ----------- Function types  (t1 -> t2)
-       | Just (mult, arg_ty, res_ty) <- splitFunTy_maybe ty
+       | Just (_af, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
        , typeHasFixedRuntimeRep arg_ty
           -- See Note [Representation polymorphism invariants] in GHC.Core
           -- See also test case typecheck/should_run/EtaExpandLevPoly
@@ -2584,15 +2584,15 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ok_arg bndr (Var v) co fun_ty
        | bndr == v
        , let mult = idMult bndr
-       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , Just (_af, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
        = Just (mkFunResCo Representational (idScaledType bndr) co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , Just (af, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , bndr == v
        , fun_mult `eqType` idMult bndr
-       = Just (mkFunCo Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
+       = Just (mkFunCo Representational af (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
     ok_arg bndr (Tick t arg) co fun_ty
@@ -2777,9 +2777,9 @@ pushCoercionIntoLambda
 pushCoercionIntoLambda in_scope x e co
     | assert (not (isTyVar x) && not (isCoVar x)) True
     , Pair s1s2 t1t2 <- coercionKind co
-    , Just (_, _s1,_s2) <- splitFunTy_maybe s1s2
-    , Just (w1, t1,_t2) <- splitFunTy_maybe t1t2
-    , (co_mult, co1, co2) <- decomposeFunCo Representational co
+    , Just {}              <- splitFunTy_maybe s1s2
+    , Just (_, w1, t1,_t2) <- splitFunTy_maybe t1t2
+    , (co_mult, co1, co2)  <- decomposeFunCo Representational co
     , isReflexiveCo co_mult
       -- We can't push the coercion in the case where co_mult isn't
       -- reflexivity. See pushCoValArg for more details.
@@ -2978,7 +2978,7 @@ etaBodyForJoinPoint need_args body
       | Just (tv, res_ty) <- splitForAllTyCoVar_maybe ty
       , let (subst', tv') = substVarBndr subst tv
       = go (n-1) res_ty subst' (tv' : rev_bs) (e `App` varToCoreExpr tv')
-      | Just (mult, arg_ty, res_ty) <- splitFunTy_maybe ty
+      | Just (_, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
       , let (subst', b) = freshEtaId n subst (Scaled mult arg_ty)
       = go (n-1) res_ty subst' (b : rev_bs) (e `App` Var b)
       | otherwise

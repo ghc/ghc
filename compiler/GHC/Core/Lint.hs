@@ -885,7 +885,7 @@ lintCoreExpr e@(Let (Rec pairs) body)
         ; ((body_type, body_ue), ues) <-
             lintRecBindings NotTopLevel pairs $ \ bndrs' ->
             lintLetBody bndrs' body
-        ; return (body_type, body_ue  `addUE` scaleUE Many (foldr1 addUE ues)) }
+        ; return (body_type, body_ue  `addUE` scaleUE ManyTy (foldr1 addUE ues)) }
   where
     bndrs = map fst pairs
 
@@ -1365,7 +1365,7 @@ lintTyApp fun_ty arg_ty
 -- application.
 lintValApp :: CoreExpr -> LintedType -> LintedType -> UsageEnv -> UsageEnv -> LintM (LintedType, UsageEnv)
 lintValApp arg fun_ty arg_ty fun_ue arg_ue
-  | Just (w, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
+  | Just (_, w, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
   = do { ensureEqTys arg_ty' arg_ty (mkAppMsg arg_ty' arg_ty arg)
        ; let app_ue =  addUE fun_ue (scaleUE w arg_ue)
        ; return (res_ty', app_ue) }
@@ -1527,7 +1527,7 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
         -- We've already check
       lintL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
     ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys
-          ; binderMult (Named _)   = Many
+          ; binderMult (Named _)   = ManyTy
           ; binderMult (Anon _ st) = scaledMult st
           -- See Note [Validating multiplicities in a case]
           ; multiplicities = map binderMult $ fst $ splitPiTys con_payload_ty }
@@ -1739,13 +1739,12 @@ lintType ty@(TyConApp tc tys)
   = do { report_unsat <- lf_report_unsat_syns <$> getLintFlags
        ; lintTySynFamApp report_unsat ty tc tys }
 
-  | isFunLikeTyCon tc
-  , tys `lengthIs` tyConArity tc
+  | Just {} <- tyConAppFun_maybe id tc tys
     -- We should never see a saturated application of funTyCon; such
     -- applications should be represented with the FunTy constructor.
     -- See Note [Linting function types] and
     -- Note [Representation of function types].
-  = failWithL (hang (text "Saturated application of (->)") 2 (ppr ty))
+  = failWithL (hang (text "Saturated application of" <+> quotes (ppr tc)) 2 (ppr ty))
 
   | otherwise  -- Data types, data families, primitive types
   = do { checkTyCon tc
@@ -2106,8 +2105,9 @@ lintCoercion (GRefl r ty (MCo co))
        ; return (GRefl r ty' (MCo co')) }
 
 lintCoercion co@(TyConAppCo r tc cos)
-  | isSaturatedFunTy tc cos
-  = failWithL (text "Saturated TyConAppCo (->):" <+> ppr co)
+  | Just {} <- tyConAppFun_maybe (mkReflCo r) tc cos
+  = failWithL (hang (text "Saturated application of" <+> quotes (ppr tc))
+                  2 (ppr co))
     -- All saturated TyConAppCos should be FunCos
 
   | Just {} <- synTyConDefn_maybe tc
@@ -3033,7 +3033,7 @@ varCallSiteUsage :: Id -> LintM UsageEnv
 varCallSiteUsage id =
   do m <- getUEAliases
      return $ case lookupNameEnv m (getName id) of
-         Nothing -> unitUE id One
+         Nothing    -> unitUE id OneTy
          Just id_ue -> id_ue
 
 ensureEqTys :: LintedType -> LintedType -> SDoc -> LintM ()
@@ -3044,7 +3044,7 @@ ensureEqTys ty1 ty2 msg = lintL (ty1 `eqType` ty2) msg
 
 ensureSubUsage :: Usage -> Mult -> SDoc -> LintM ()
 ensureSubUsage Bottom     _              _ = return ()
-ensureSubUsage Zero       described_mult err_msg = ensureSubMult Many described_mult err_msg
+ensureSubUsage Zero       described_mult err_msg = ensureSubMult ManyTy described_mult err_msg
 ensureSubUsage (MUsage m) described_mult err_msg = ensureSubMult m described_mult err_msg
 
 ensureSubMult :: Mult -> Mult -> SDoc -> LintM ()

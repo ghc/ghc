@@ -1037,12 +1037,13 @@ can_eq_nc' _rewritten _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
            (FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
            (FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
-  | af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
+  | 
+  af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
   , Just ty1a_rep <- getRuntimeRep_maybe ty1a  -- getRutimeRep_maybe:
   , Just ty1b_rep <- getRuntimeRep_maybe ty1b  -- see Note [Decomposing FunTy]
   , Just ty2a_rep <- getRuntimeRep_maybe ty2a
   , Just ty2b_rep <- getRuntimeRep_maybe ty2b
-  = canDecomposableTyConAppOK ev eq_rel funTyCon
+  = canDecomposableTyConAppOK ev eq_rel (anonArgTyCon af1)
                               [am1, ty1a_rep, ty1b_rep, ty1a, ty1b]
                               [am2, ty2a_rep, ty2b_rep, ty2a, ty2b]
 
@@ -3109,11 +3110,12 @@ unifyWanted rewriters loc role orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
-    go (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
+    go (FunTy af1 w1 s1 t1) (FunTy af2 w2 s2 t2)
+      | af1 == af2
       = do { co_s <- unifyWanted rewriters loc role s1 s2
            ; co_t <- unifyWanted rewriters loc role t1 t2
            ; co_w <- unifyWanted rewriters loc Nominal w1 w2
-           ; return (mkFunCo role co_w co_s co_t) }
+           ; return (mkFunCo role af1 co_w co_s co_t) }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality

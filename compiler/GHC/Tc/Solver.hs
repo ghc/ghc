@@ -58,7 +58,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Ppr
 import GHC.Core.TyCon    ( TyConBinder, isTypeFamilyTyCon )
-import GHC.Builtin.Types ( liftedRepTy, manyDataConTy, liftedDataConTy )
+import GHC.Builtin.Types ( liftedRepTy, liftedDataConTy )
 import GHC.Core.Unify    ( tcMatchTyKi )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -2895,7 +2895,7 @@ defaultTyVarTcS the_tv
        ; return True }
   | isMultiplicityVar the_tv
   = do { traceTcS "defaultTyVarTcS Multiplicity" (ppr the_tv)
-       ; unifyTyVar the_tv manyDataConTy
+       ; unifyTyVar the_tv ManyTy
        ; return True }
   | otherwise
   = return False  -- the common case

@@ -265,7 +265,7 @@ warnAboutIdentities :: DynFlags -> Id -> Type -> DsM ()
 warnAboutIdentities dflags conv_fn type_of_conv
   | wopt Opt_WarnIdentities dflags
   , idName conv_fn `elem` conversionNames
-  , Just (_, arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
+  , Just (_, _, arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
   , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
   = diagnosticDs (DsIdentitiesFound conv_fn type_of_conv)
 warnAboutIdentities _ _ _ = return ()

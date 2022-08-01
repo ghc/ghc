@@ -247,7 +247,7 @@ desugarPat x pat = case pat of
 -- | 'desugarPat', but also select and return a new match var.
 desugarPatV :: Pat GhcTc -> DsM (Id, [PmGrd])
 desugarPatV pat = do
-  x <- selectMatchVar Many pat
+  x <- selectMatchVar ManyTy pat
   grds <- desugarPat x pat
   pure (x, grds)
 

@@ -767,7 +767,7 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
 check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                           , ve_rank = rank })
            ty@(FunTy _ mult arg_ty res_ty)
-  = do  { failIfTcM (not (linearityAllowed ctxt) && not (isManyDataConTy mult))
+  = do  { failIfTcM (not (linearityAllowed ctxt) && not (isManyTy mult))
                      (env, TcRnLinearFuncInKind (tidyType env ty))
         ; check_type (ve{ve_rank = arg_rank}) arg_ty
         ; check_type (ve{ve_rank = res_rank}) res_ty }
@@ -1538,7 +1538,9 @@ tcInstHeadTyAppAllTyVars :: Type -> Bool
 tcInstHeadTyAppAllTyVars ty
   | Just (tc, tys) <- tcSplitTyConApp_maybe (dropCasts ty)
   = let tys' = filterOutInvisibleTypes tc tys  -- avoid kinds
-        tys'' | tc == funTyCon, tys_h:tys_t <- tys', tys_h `eqType` manyDataConTy = tys_t
+        tys'' | tc `hasKey` fUNTyConKey
+              , ManyTy : tys_t <- tys'
+              = tys_t
               | otherwise = tys'
     in ok tys''
   | LitTy _ <- ty = True  -- accept type literals (#13833)

@@ -396,7 +396,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
     go acc_arg_tys n ty
       | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
-    go acc_arg_tys n (FunTy { ft_mult = mult, ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+    go acc_arg_tys n (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg_ty, ft_res = res_ty })
       = assert (af == VisArg) $
         do { let arg_pos = 1 + length acc_arg_tys -- for error messages only
            ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
@@ -502,7 +502,8 @@ matchExpectedTyConApp :: TyCon                -- T :: forall kv1 ... kvm. k1 -> 
 -- Postcondition: (T k1 k2 k3 a b c) is well-kinded
 
 matchExpectedTyConApp tc orig_ty
-  = assert (not $ isFunLikeTyCon tc) $ go orig_ty
+  = assertPpr (isAlgTyCon tc) (ppr tc) $
+    go orig_ty
   where
     go ty
        | Just ty' <- tcView ty
@@ -1843,7 +1844,7 @@ uType t_or_k origin orig_ty1 orig_ty2
       = do { co_l <- uType t_or_k origin arg1 arg2
            ; co_r <- uType t_or_k origin res1 res2
            ; co_w <- uType t_or_k origin w1 w2
-           ; return $ mkFunCo Nominal co_w co_l co_r }
+           ; return $ mkFunCo Nominal VisArg co_w co_l co_r }
 
         -- Always defer if a type synonym family (type function)
         -- is involved.  (Data families behave rigidly.)
@@ -2532,7 +2533,8 @@ matchExpectedFunKind hs_ty n k = go n k
                 Indirect fun_kind -> go n fun_kind
                 Flexi ->             defer n k }
 
-    go n (FunTy { ft_mult = w, ft_arg = arg, ft_res = res })
+    go n (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
+      | isVisibleAnonArg af
       = do { co <- go (n-1) res
            ; return (mkTcFunCo Nominal (mkTcNomReflCo w) (mkTcNomReflCo arg) co) }
 
@@ -2658,7 +2660,7 @@ checkTypeEq lhs ty
     go (LitTy {})              = cteOK
     go (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
                                = go w S.<> go a S.<> go r S.<>
-                                 if not ghci_tv && af == InvisArg
+                                 if not ghci_tv && isInvisibleAnonArg af
                                    then impredicative
                                    else cteOK
     go (AppTy fun arg) = go fun S.<> go arg

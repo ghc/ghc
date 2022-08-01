@@ -46,7 +46,7 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Name
 import GHC.Types.Tickish
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
-import GHC.Types.Var      ( isLocalVar )
+import GHC.Types.Var      ( isLocalVar, isInvisibleAnonArg )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
@@ -2692,8 +2692,9 @@ mkCallUDs' env f args
     -- For "InvisArg", which are the type-class dictionaries,
     -- we decide on a case by case basis if we want to specialise
     -- on this argument; if so, SpecDict, if not UnspecArg
-    mk_spec_arg arg (Anon InvisArg pred)
-      | interestingDict arg (scaledThing pred)
+    mk_spec_arg arg (Anon af pred)
+      | isInvisibleAnonArg af
+      , interestingDict arg (scaledThing pred)
               -- See Note [Interesting dictionary arguments]
       = SpecDict arg
 
@@ -3100,7 +3101,7 @@ newDictBndr env@(SE { se_subst = subst }) b
   = do { uniq <- getUniqueM
        ; let n    = idName b
              ty'  = substTyUnchecked subst (idType b)
-             b'   = mkUserLocal (nameOccName n) uniq Many ty' (getSrcSpan n)
+             b'   = mkUserLocal (nameOccName n) uniq ManyTy ty' (getSrcSpan n)
              env' = env { se_subst = subst `Core.extendSubstInScope` b' }
        ; pure (env', b') }
 
@@ -3110,7 +3111,7 @@ newSpecIdSM old_id new_ty join_arity_maybe
   = do  { uniq <- getUniqueM
         ; let name    = idName old_id
               new_occ = mkSpecOcc (nameOccName name)
-              new_id  = mkUserLocal new_occ uniq Many new_ty (getSrcSpan name)
+              new_id  = mkUserLocal new_occ uniq ManyTy new_ty (getSrcSpan name)
                           `asJoinId_maybe` join_arity_maybe
         ; return new_id }
 

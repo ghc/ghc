@@ -4561,8 +4561,8 @@ checkNewDataCon con
     ok_bang (HsSrcBang _ _ SrcLazy)   = False
     ok_bang _                         = True
 
-    ok_mult One = True
-    ok_mult _   = False
+    ok_mult OneTy = True
+    ok_mult _     = False
 
 
 -- | Reject nullary data constructors where a type variables

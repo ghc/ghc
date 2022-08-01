@@ -871,7 +871,7 @@ matchSinglePat (Var var) ctx pat ty match_result
   = matchSinglePatVar var Nothing ctx pat ty match_result
 
 matchSinglePat scrut hs_ctx pat ty match_result
-  = do { var           <- selectSimpleMatchVarL Many pat
+  = do { var           <- selectSimpleMatchVarL ManyTy pat
                             -- matchSinglePat is only used in matchSimply, which
                             -- is used in list comprehension, arrow notation,
                             -- and to create field selectors. All of which only

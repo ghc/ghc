@@ -385,8 +385,8 @@ instance
 -- See #18846
 pprHsArrow :: (OutputableBndrId pass) => HsArrow (GhcPass pass) -> SDoc
 pprHsArrow (HsUnrestrictedArrow _) = arrow
-pprHsArrow (HsLinearArrow _) = lollipop
-pprHsArrow (HsExplicitMult _ p _) = mulArrow (const ppr) p
+pprHsArrow (HsLinearArrow _)       = lollipop
+pprHsArrow (HsExplicitMult _ p _)  = mulArrow (const ppr) p
 
 type instance XConDeclField  (GhcPass _) = EpAnn [AddEpAnn]
 type instance XXConDeclField (GhcPass _) = DataConCantHappen

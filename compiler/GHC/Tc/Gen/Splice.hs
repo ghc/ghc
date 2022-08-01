@@ -677,7 +677,7 @@ tcTypedBracket rn_expr expr res_ty
        --   (See Note [The life cycle of a TH quotation] in GHC.Hs.Expr)
        -- We'll typecheck it again when we splice it in somewhere
        ; (tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var wrapper)) $
-                                tcScalingUsage Many $
+                                tcScalingUsage ManyTy $
                                 -- Scale by Many, TH lifting is currently nonlinear (#18465)
                                 tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
@@ -780,7 +780,7 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
   = do { meta_ty <- tcMetaTy meta_ty_name
          -- Expected type of splice, e.g. m Exp
        ; let expected_type = mkAppTy m_var meta_ty
-       ; expr' <- tcScalingUsage Many $ tcCheckPolyExpr expr expected_type
+       ; expr' <- tcScalingUsage ManyTy $ tcCheckPolyExpr expr expected_type
                   -- Scale by Many, TH lifting is currently nonlinear (#18465)
        ; return (PendingTcSplice splice_name expr') }
   where
@@ -2143,8 +2143,8 @@ reifyTyCon tc
   | Just cls <- tyConClass_maybe tc
   = reifyClass cls
 
-  | tc `hasKey` funTyConKey
-  = return (TH.PrimTyConI (reifyName tc) 2                False)
+  | tc `hasKey` fUNTyConKey -- I'm not quite sure what is happening here
+  = return (TH.PrimTyConI (reifyName tc) 2 False)
 
   | isPrimTyCon tc
   = return (TH.PrimTyConI (reifyName tc) (length (tyConVisibleTyVars tc))
@@ -2602,14 +2602,14 @@ reifyType ty@(AppTy {})     = do
     filter_out_invisible_args ty_head ty_args =
       filterByList (map isVisibleArgFlag $ appTyArgFlags ty_head ty_args)
                    ty_args
-reifyType ty@(FunTy { ft_af = af, ft_mult = Many, ft_arg = t1, ft_res = t2 })
-  | InvisArg <- af = reify_for_all Inferred ty  -- Types like ((?x::Int) => Char -> Char)
-  | otherwise      = do { [r1,r2] <- reifyTypes [t1,t2]
-                        ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
+reifyType ty@(FunTy { ft_af = af, ft_mult = ManyTy, ft_arg = t1, ft_res = t2 })
+  | isInvisibleAnonArg af = reify_for_all Inferred ty  -- Types like ((?x::Int) => Char -> Char)
+  | otherwise             = do { [r1,r2] <- reifyTypes [t1,t2]
+                               ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
 reifyType ty@(FunTy { ft_af = af, ft_mult = tm, ft_arg = t1, ft_res = t2 })
-  | InvisArg <- af = noTH (text "linear invisible argument") (ppr ty)
-  | otherwise      = do { [rm,r1,r2] <- reifyTypes [tm,t1,t2]
-                        ; return (TH.MulArrowT `TH.AppT` rm `TH.AppT` r1 `TH.AppT` r2) }
+  | isInvisibleAnonArg af = noTH (text "linear invisible argument") (ppr ty)
+  | otherwise             = do { [rm,r1,r2] <- reifyTypes [tm,t1,t2]
+                               ; return (TH.MulArrowT `TH.AppT` rm `TH.AppT` r1 `TH.AppT` r2) }
 reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
 reifyType ty@(CoercionTy {})= noTH (text "coercions in types") (ppr ty)
 

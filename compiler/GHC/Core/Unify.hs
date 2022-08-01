@@ -1614,7 +1614,7 @@ ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
 
 ty_co_match menv subst (FunTy af w ty1 ty2) co _lkco _rkco
   | Just (tc2, cos) <- splitTyConAppCo_maybe co
-  , (tc1,tys)       <- funTyConAppTy af w ty1 ty2
+  , Just (tc1,tys)  <- funTyConAppTy_maybe af w ty1 ty2
   = ty_co_match_tc menv subst tc1 tys tc2 cos
     -- NB: we include the RuntimeRep arguments in the matching;
     --     not doing so caused #21205.

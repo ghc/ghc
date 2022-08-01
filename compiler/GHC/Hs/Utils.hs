@@ -123,7 +123,7 @@ import GHC.Parser.Annotation
 
 import GHC.Tc.Types.Evidence
 import GHC.Core.TyCo.Rep
-import GHC.Core.Multiplicity ( pattern Many )
+import GHC.Core.Multiplicity ( pattern ManyTy )
 import GHC.Builtin.Types ( unitTy )
 import GHC.Tc.Utils.TcType
 import GHC.Core.DataCon
@@ -410,7 +410,7 @@ mkTcBindStmt pat body = BindStmt (XBindStmtTc { xbstc_bindOp = noSyntaxExpr,
                                                 xbstc_boundResultType = unitTy,
                                                    -- unitTy is a dummy value
                                                    -- can't panic here: it's forced during zonking
-                                                xbstc_boundResultMult = Many,
+                                                xbstc_boundResultMult = ManyTy,
                                                 xbstc_failOp = Nothing }) pat body
 
 emptyRecStmt' :: forall idL idR body .
