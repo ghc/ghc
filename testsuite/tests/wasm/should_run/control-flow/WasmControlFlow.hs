@@ -189,7 +189,7 @@ testTranslation platform big_switch_graph = do
   real_graph <- runUniqSM $ cmmImplementSwitchPlans platform big_switch_graph
   reducible_graph <- fmap gwd_graph $ runUniqSM $
                      asReducible $ graphWithDominators real_graph
-  let wasm = structuredControl platform expr stmt reducible_graph
+  let wasm = structuredControlIncludingNonTail platform expr stmt reducible_graph
   return $ compareWithEntropy (runcfg real_graph) (runwasm wasm) $
            cfgEntropy reducible_graph
 

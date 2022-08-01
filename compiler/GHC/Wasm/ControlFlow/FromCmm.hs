@@ -22,6 +22,7 @@ platform for other reasons.)
 
 module GHC.Wasm.ControlFlow.FromCmm
   ( structuredControl
+  , structuredControlIncludingNonTail -- for testing only
   )
 where
 
@@ -64,6 +65,9 @@ import GHC.Wasm.ControlFlow
 --
 --   * Not at all.
 
+data CallsTranslated = TailCallsOnly
+                     | AllCalls
+  deriving (Eq)
 
 data ControlFlow e = Unconditional Label
                    | Conditional e Label Label
@@ -74,8 +78,9 @@ data ControlFlow e = Unconditional Label
                             }
                    | TerminalFlow
 
-flowLeaving :: Platform -> CmmBlock -> ControlFlow CmmExpr
-flowLeaving platform b =
+
+flowLeaving :: CallsTranslated -> Platform -> CmmBlock -> ControlFlow CmmExpr
+flowLeaving translated platform b =
     case lastNode b of
       CmmBranch l -> Unconditional l
       CmmCondBranch c t f _ -> Conditional c t f
@@ -88,13 +93,13 @@ flowLeaving platform b =
           in  Switch scrutinee range (atMost brTableLimit target_labels) default_label
 
       CmmForeignCall { succ = l } -> Unconditional l
-      CmmCall { cml_cont = Nothing } -> TerminalFlow
-      CmmCall { cml_cont = Just _ } ->
+      CmmCall { cml_cont = Just _ } | translated == TailCallsOnly ->
           panic "I tried to translate a non-tail call to WebAssembly"
           -- The main reason we panic here is that WebAssembly cannot
           -- support "tables next to code," which leaves us with no
           -- way to generate this case (except by hand-written Cmm),
           -- and therefore no real way to test it.
+      CmmCall { cml_cont = _ } -> TerminalFlow
 
   where atMost :: Int -> [a] -> [a]
         atMost k xs = if xs `hasAtLeast` k then
@@ -153,15 +158,27 @@ type CfgNode = CmmBlock
 
 ----------------------- Translation ------------------------------
 
+structuredControl, structuredControlIncludingNonTail ::
+                      Platform  -- ^ needed for offset calculation
+                   -> (Label -> CmmExpr -> expr) -- ^ translator for expressions
+                   -> (Label -> CmmActions -> stmt) -- ^ translator for straight-line code
+                   -> CmmGraph -- ^ CFG to be translated
+                   -> WasmControl stmt expr
+
+structuredControlIncludingNonTail = structuredControl' AllCalls
+structuredControl = structuredControl' TailCallsOnly
+
+
 -- | Convert a Cmm CFG to WebAssembly's structured control flow.
 
-structuredControl :: forall expr stmt .
-                     Platform  -- ^ needed for offset calculation
-                  -> (Label -> CmmExpr -> expr) -- ^ translator for expressions
-                  -> (Label -> CmmActions -> stmt) -- ^ translator for straight-line code
-                  -> CmmGraph -- ^ CFG to be translated
-                  -> WasmControl stmt expr
-structuredControl platform txExpr txBlock g =
+structuredControl' :: forall expr stmt .
+                      CallsTranslated
+                   -> Platform  -- ^ needed for offset calculation
+                   -> (Label -> CmmExpr -> expr) -- ^ translator for expressions
+                   -> (Label -> CmmActions -> stmt) -- ^ translator for straight-line code
+                   -> CmmGraph -- ^ CFG to be translated
+                   -> WasmControl stmt expr
+structuredControl' translated platform txExpr txBlock g =
    doTree dominatorTree emptyContext
  where
    dominatorTree :: Tree.Tree CfgNode -- ^ Dominator tree in which children are sorted
@@ -204,7 +221,7 @@ structuredControl platform txExpr txBlock g =
            translationOfX :: Context -> WasmControl stmt expr
            translationOfX context =
              WasmActions (txBlock xlabel $ nodeBody x) <>
-             case flowLeaving platform x of
+             case flowLeaving translated platform x of
                Unconditional l -> doBranch xlabel l context
                Conditional e t f ->
                  WasmIf (txExpr xlabel e)
@@ -227,8 +244,8 @@ structuredControl platform txExpr txBlock g =
       | otherwise = doTree (subtreeAt to) context -- inline the code here
      where i = index to (enclosing context)
 
-   generatesIf x = case flowLeaving platform x of Conditional {} -> True
-                                                  _ -> False
+   generatesIf x = case flowLeaving translated platform x of Conditional {} -> True
+                                                             _ -> False
 
    ---- everything else is utility functions
 
