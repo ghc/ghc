@@ -110,3 +110,11 @@
 [submodule "libraries/exceptions"]
 	path = libraries/exceptions
 	url = https://gitlab.haskell.org/ghc/packages/exceptions.git
+[submodule "libraries/primitive"]
+	path = libraries/primitive
+	url = https://github.com/haskell/primitive.git
+	ignore = untracked
+[submodule "libraries/haskell-transients"]
+	path = libraries/haskell-transients
+	url = https://github.com/PascEll/haskell-transients.git
+	ignore = untracked

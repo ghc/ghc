@@ -6,7 +6,7 @@ module Packages (
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
     exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
     ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline,
-    hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
+    haskellTransients, hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, libiserv, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, stm, templateHaskell, terminfo, text, time, timeout, touchy,
     transformers, unlit, unix, win32, xhtml,
@@ -37,9 +37,10 @@ ghcPackages =
     [ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh
-    , ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs
+    , ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline
+    , haskellTransients, hsc2hs
     , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
-    , parsec, pretty, process, rts, runGhc, stm, templateHaskell
+    , parsec, pretty, primitive, process, rts, runGhc, stm, templateHaskell
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
     , timeout
     , lintersCommon
@@ -53,7 +54,8 @@ isGhcPackage = (`elem` ghcPackages)
 array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps,
   compareSizes, compiler, containers, deepseq, deriveConstants, directory,
   exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
-  ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs,
+  ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline,
+  haskellTransients, hsc2hs,
   hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy, remoteIserv, libffi, libiserv, mtl,
   parsec, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
   terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml,
@@ -93,6 +95,7 @@ ghcPkg              = util "ghc-pkg"
 ghcPrim             = lib  "ghc-prim"
 haddock             = util "haddock"
 haskeline           = lib  "haskeline"
+haskellTransients   = lib "haskell-transients"
 hsc2hs              = util "hsc2hs"
 hp2ps               = util "hp2ps"
 hpc                 = lib  "hpc"

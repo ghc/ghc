@@ -67,4 +67,6 @@ libraries/xhtml              -           -                               https:/
 libraries/exceptions         -           -                               https://github.com/ekmett/exceptions.git
 nofib                        nofib       -                               -
 libraries/stm                -           -                               ssh://git@github.com/haskell/stm.git
+libraries/primitive          -           -                               https://github.com/haskell/primitive.git
+libraries/haskell-transients -           -                               -
 .                            -           ghc.git                         -

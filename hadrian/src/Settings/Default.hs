@@ -88,11 +88,13 @@ stage0Packages = do
              , ghci
              , ghcPkg
              , haddock
+             , haskellTransients
              , hsc2hs
              , hpc
              , hpcBin
              , mtl
              , parsec
+             , primitive
              , time
              , templateHaskell
              , text

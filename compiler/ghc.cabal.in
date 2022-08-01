@@ -93,7 +93,8 @@ Library
                    stm,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
-                   ghci == @ProjectVersionMunged@
+                   ghci == @ProjectVersionMunged@,
+                   haskell-transients
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.13
