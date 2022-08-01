@@ -627,3 +627,6 @@ wasmMakeDynamicReference
 
 wasmMakeDynamicReference _config _referenceKind _lbl =
     unimp "convert CLabel to something Wasm can understand"
+
+--- XXX need a note that the proc-point splitting rules out nodes of
+--- the form `CmmLit (CmmBlock id)`.
