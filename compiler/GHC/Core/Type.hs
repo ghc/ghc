@@ -1344,7 +1344,7 @@ funTyConApp_maybe get_rr af mult arg res
 funTyConAppTy_maybe :: AnonArgFlag -> Mult -> Type -> Type -> Maybe (TyCon, [Type])
 funTyConAppTy_maybe = funTyConApp_maybe getRuntimeRep_maybe
 
-tyConAppFun_maybe :: (Type->a) -> TyCon -> [a]
+tyConAppFun_maybe :: (HasDebugCallStack, Outputable a) => (Type->a) -> TyCon -> [a]
                    -> Maybe (AnonArgFlag, a, a, a)
 -- Return Just if this TyConApp/TyConAppCo should be represented as a FunTy/FunCo
 -- The type 'a' is always Type or Coercion
@@ -1352,13 +1352,16 @@ tyConAppFun_maybe :: (Type->a) -> TyCon -> [a]
 tyConAppFun_maybe mk tc args
   | tc `hasKey` fUNTyConKey
   , (w:_r1:_r2:a1:a2:rest) <- args
-  = assert (null rest) $ Just (VisArg, w, a1, a2)
+  = assertPpr (null rest) (ppr tc <+> ppr args) $
+    Just (VisArg, w, a1, a2)
   | tc `hasKey` fatArrow1TyConKey
   , (_r1:_r2:a1:a2:rest) <- args
-  = assert (null rest) $ Just (InvisArg1, mk manyDataConTy, a1,a2)
+  = assertPpr (null rest) (ppr tc <+> ppr args) $
+    Just (InvisArg1, mk manyDataConTy, a1,a2)
   | tc `hasKey` fatArrow2TyConKey
   , (_r1:_r2:a1:a2:rest) <- args
-  = assert (null rest) $ Just (InvisArg2, mk manyDataConTy, a1,a2)
+  = assertPpr (null rest) (ppr tc <+> ppr args) $
+    Just (InvisArg2, mk manyDataConTy, a1,a2)
   | otherwise
   = Nothing
 

@@ -1037,15 +1037,12 @@ can_eq_nc' _rewritten _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
            (FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
            (FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
-  | 
-  af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
-  , Just ty1a_rep <- getRuntimeRep_maybe ty1a  -- getRutimeRep_maybe:
-  , Just ty1b_rep <- getRuntimeRep_maybe ty1b  -- see Note [Decomposing FunTy]
-  , Just ty2a_rep <- getRuntimeRep_maybe ty2a
-  , Just ty2b_rep <- getRuntimeRep_maybe ty2b
-  = canDecomposableTyConAppOK ev eq_rel (anonArgTyCon af1)
-                              [am1, ty1a_rep, ty1b_rep, ty1a, ty1b]
-                              [am2, ty2a_rep, ty2b_rep, ty2a, ty2b]
+  | af1 == af2
+  , Just (tc1, args1) <- funTyConApp_maybe getRuntimeRep_maybe af1 am1 ty1a ty1b
+  , Just (tc2, args2) <- funTyConApp_maybe getRuntimeRep_maybe af2 am2 ty2a ty2b
+                         -- getRutimeRep_maybe: see Note [Decomposing FunTy]
+  = assert (tc1 == tc2) $  -- These will match if af1==af2
+    canDecomposableTyConAppOK ev eq_rel tc1 args1 args2
 
 -- Decompose type constructor applications
 -- NB: we have expanded type synonyms already

@@ -12,7 +12,7 @@ module GHC.Core.Unify (
 
         -- * Rough matching
         RoughMatchTc(..), roughMatchTcs, roughMatchTcsLookup, instanceCantMatch,
-        typesCantMatch, isRoughWildcard,
+        typesCantMatch, typesAreApart, isRoughWildcard,
 
         -- Side-effect free unification
         tcUnifyTy, tcUnifyTyKi, tcUnifyTys, tcUnifyTyKis,
@@ -351,13 +351,12 @@ suffices.
 -- apart, even after arbitrary type function evaluation and substitution?
 typesCantMatch :: [(Type,Type)] -> Bool
 -- See Note [Pruning dead case alternatives]
-typesCantMatch prs = any (uncurry cant_match) prs
-  where
-    cant_match :: Type -> Type -> Bool
-    cant_match t1 t2 = case tcUnifyTysFG alwaysBindFun [t1] [t2] of
-      SurelyApart -> True
-      _           -> False
+typesCantMatch prs = any (uncurry typesAreApart) prs
 
+typesAreApart :: Type -> Type -> Bool
+typesAreApart t1 t2 = case tcUnifyTysFG alwaysBindFun [t1] [t2] of
+                        SurelyApart -> True
+                        _           -> False
 {-
 ************************************************************************
 *                                                                      *

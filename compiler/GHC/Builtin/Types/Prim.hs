@@ -121,7 +121,8 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , multiplicityTy )
+  , multiplicityTy
+  , cONSTRAINTTyCon )
 
 import GHC.Types.Var    ( TyVarBinder, TyVar
                         , mkTyVar, mkTyVarBinder, mkTyVarBinders )
@@ -946,9 +947,9 @@ eqPrimTyCon :: TyCon  -- The representation type for equality predicates
                       -- See Note [The equality types story]
 eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
   where
-    -- Kind :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
+    -- Kind :: forall k1 k2. k1 -> k2 -> CONSTRAINT (TupleRep '[])
     binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
-    res_kind = unboxedTupleKind []
+    res_kind = TyConApp cONSTRAINTTyCon [zeroBitRepTy]
     roles    = [Nominal, Nominal, Nominal, Nominal]
 
 -- like eqPrimTyCon, but the type for *Representational* coercions
@@ -957,9 +958,9 @@ eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
 eqReprPrimTyCon :: TyCon   -- See Note [The equality types story]
 eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
   where
-    -- Kind :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
+    -- Kind :: forall k1 k2. k1 -> k2 -> CONSTRAINT (TupleRep '[])
     binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
-    res_kind = unboxedTupleKind []
+    res_kind = TyConApp cONSTRAINTTyCon [zeroBitRepTy]
     roles    = [Nominal, Nominal, Representational, Representational]
 
 -- like eqPrimTyCon, but the type for *Phantom* coercions.
@@ -968,9 +969,9 @@ eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
 eqPhantPrimTyCon :: TyCon
 eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName binders res_kind roles
   where
-    -- Kind :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
+    -- Kind :: forall k1 k2. k1 -> k2 -> CONSTRAINT (TupleRep '[])
     binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
-    res_kind = unboxedTupleKind []
+    res_kind = TyConApp cONSTRAINTTyCon [zeroBitRepTy]
     roles    = [Nominal, Nominal, Phantom, Phantom]
 
 -- | Given a Role, what TyCon is the type of equality predicates at that role?

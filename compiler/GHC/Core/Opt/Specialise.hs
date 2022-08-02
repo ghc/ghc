@@ -2700,9 +2700,6 @@ mkCallUDs' env f args
 
       | otherwise = UnspecArg
 
-    mk_spec_arg _ (Anon VisArg _)
-      = UnspecArg
-
 {-
 Note [Ticks on applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

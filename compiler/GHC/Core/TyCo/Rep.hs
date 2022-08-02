@@ -1055,10 +1055,10 @@ infixr 3 `mkFunTy`, `mkVisFunTy`, `mkInvisFunTy`, `mkVisFunTyMany`,
          `mkInvisFunTyMany`      -- Associates to the right
 
 mkFunTy :: AnonArgFlag -> Mult -> Type -> Type -> Type
-mkFunTy af mult arg res = FunTy { ft_af = af
+mkFunTy af mult arg res = FunTy { ft_af   = af
                                 , ft_mult = mult
-                                , ft_arg = arg
-                                , ft_res = res }
+                                , ft_arg  = arg
+                                , ft_res  = res }
 
 mkScaledFunTy :: AnonArgFlag -> Scaled Type -> Type -> Type
 mkScaledFunTy af (Scaled mult arg) res = mkFunTy af mult arg res

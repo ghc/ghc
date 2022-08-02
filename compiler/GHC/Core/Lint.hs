@@ -49,7 +49,7 @@ import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
-import GHC.Core.TyCo.Ppr ( pprTyVar, pprTyVars )
+import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCon as TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Unify
@@ -2527,10 +2527,14 @@ lint_branch ax_tc (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
        ; rhs' <- lintType rhs
        ; let lhs_kind = typeKind lhs'
              rhs_kind = typeKind rhs'
-       ; lintL (lhs_kind `eqType` rhs_kind) $
+       ; lintL (not (lhs_kind `typesAreApart` rhs_kind)) $
          hang (text "Inhomogeneous axiom")
             2 (text "lhs:" <+> ppr lhs <+> dcolon <+> ppr lhs_kind $$
                text "rhs:" <+> ppr rhs <+> dcolon <+> ppr rhs_kind) }
+         -- Type and Constraint are not Apart, so this test allows
+         -- the newtype axiom for a single-method class.  Indeed the
+         -- whole reason Type and Constraint are not Apart is to allow
+         -- such axioms!
 
 -- these checks do not apply to newtype axioms
 lint_family_branch :: TyCon -> CoAxBranch -> LintM ()

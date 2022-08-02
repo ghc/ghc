@@ -2130,7 +2130,7 @@ srcLocDataConKey                        = mkPreludeDataConUnique 37
 
 typeLikeDataConKey, constraintLikeDataConKey :: Unique
 typeLikeDataConKey                      = mkPreludeDataConUnique 38
-constraintLikeDataConKey                = mkPreludeDataConUnique 38
+constraintLikeDataConKey                = mkPreludeDataConUnique 39
 
 trTyConDataConKey, trModuleDataConKey,
   trNameSDataConKey, trNameDDataConKey,

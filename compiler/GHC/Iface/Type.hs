@@ -777,7 +777,7 @@ pprIfacePrefixApp ctxt_prec pp_fun pp_tys
 
 isIfaceRhoType :: IfaceType -> Bool
 isIfaceRhoType (IfaceForAllTy _ _)   = False
-isIfaceRhoType (IfaceFunTy af _ _ _) = isInvisibleAnonArg af
+isIfaceRhoType (IfaceFunTy af _ _ _) = isVisibleAnonArg af
 isIfaceRhoType _ = True
 
 -- ----------------------------- Printing binders ------------------------------------
@@ -927,19 +927,16 @@ ppr_FUN_arrow w
   , tc `ifaceTyConHasKey` (getUnique oneDataConTyCon) = lollipop
   | otherwise = mulArrow pprPrecIfaceType w
 
-ppr_sigma :: PprPrec -> IfaceType -> SDoc
-ppr_sigma ctxt_prec ty
-  = maybeParen ctxt_prec funPrec (pprIfaceSigmaType ShowForAllMust ty)
-
 ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty ctxt_prec ty
-  | not (isIfaceRhoType ty)             = ppr_sigma ctxt_prec ty
+  | not (isIfaceRhoType ty)             = ppr_sigma ShowForAllMust ctxt_prec ty
 ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIfaceRhoType
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free tyvars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty ctxt_prec (IfaceTupleTy i p tys) = pprTuple ctxt_prec i p tys -- always fully saturated
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
+
         -- Function types
 ppr_ty ctxt_prec ty@(IfaceFunTy af w ty1 ty2)  -- Should be VisArg
   = assertPpr (isVisibleAnonArg af) (ppr ty) $  -- Ensured by isIfaceRhoType above
@@ -1284,11 +1281,13 @@ data ShowForAllFlag = ShowForAllMust | ShowForAllWhen
 
 pprIfaceSigmaType :: ShowForAllFlag -> IfaceType -> SDoc
 pprIfaceSigmaType show_forall ty
-  = hideNonStandardTypes ppr_fn ty
-  where
-    ppr_fn iface_ty =
-      let (invis_tvs, theta, tau) = splitIfaceSigmaTy iface_ty
-          (req_tvs, tau') = splitIfaceReqForallTy tau
+  = hideNonStandardTypes (ppr_sigma show_forall topPrec) ty
+
+ppr_sigma :: ShowForAllFlag -> PprPrec -> IfaceType -> SDoc
+ppr_sigma show_forall ctxt_prec iface_ty
+  = maybeParen ctxt_prec funPrec $
+    let (invis_tvs, theta, tau) = splitIfaceSigmaTy iface_ty
+        (req_tvs, tau') = splitIfaceReqForallTy tau
           -- splitIfaceSigmaTy is recursive, so it will gather the binders after
           -- the theta, i.e.  forall a. theta => forall b. tau
           -- will give you    ([a,b], theta, tau).
@@ -1302,8 +1301,8 @@ pprIfaceSigmaType show_forall ty
           -- non-recursive (see #18458).
           -- Then it could handle both invisible and required binders, and
           -- splitIfaceReqForallTy wouldn't be necessary here.
-       in ppr_iface_forall_part show_forall invis_tvs theta $
-          sep [pprIfaceForAll req_tvs, ppr tau']
+    in ppr_iface_forall_part show_forall invis_tvs theta $
+       sep [pprIfaceForAll req_tvs, ppr tau']
 
 pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprUserIfaceForAll tvs

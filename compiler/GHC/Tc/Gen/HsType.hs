@@ -1335,12 +1335,20 @@ tc_fun_type :: TcTyMode -> HsArrow GhcRn -> LHsType GhcRn -> LHsType GhcRn -> Tc
             -> TcM TcType
 tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
   TypeLevel ->
-    do { arg_k <- newOpenTypeKind
+    do { traceTc "tc_fun_type" (ppr ty1 $$ ppr ty2)
+       ; arg_k <- newOpenTypeKind
        ; res_k <- newOpenTypeKind
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
        ; mult' <- tc_mult mode mult
-       ; checkExpectedKind (HsFunTy noAnn mult ty1 ty2) (mkVisFunTy mult' ty1' ty2')
+       ; traceTc "tc_fun_type1" (ppr ty1')
+       ; traceTc "tc_fun_type2" (ppr ty2' $$ ppr mult')
+       ; traceTc "tc_fun_type3" (ppr (typeKind ty1'))
+       ; traceTc "tc_fun_type4" (ppr (typeKind ty2'))
+       ; traceTc "tc_fun_type5" (debugPprType (mkVisFunTy mult' ty1' ty2'))
+       ; traceTc "tc_fun_type5" (ppr (mkVisFunTy mult' ty1' ty2'))
+       ; checkExpectedKind (HsFunTy noAnn mult ty1 ty2)
+                           (mkVisFunTy mult' ty1' ty2')
                            liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind

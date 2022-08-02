@@ -1461,15 +1461,15 @@ unrestrictedFunTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->
 *                                                                      *
       Type synonyms (all declared in ghc-prim:GHC.Types)
 
-         type CONSTRAINT   = SORT ConstraintLike  -- cONSTRAINTKind
-         type Constraint   = CONSTRAINT LiftedRep  -- constraintKind
+         type CONSTRAINT   = SORT ConstraintLike   :: RuntimeRep -> Type -- cONSTRAINTKind
+         type Constraint   = CONSTRAINT LiftedRep  :: Type               -- constraintKind
 
-         type TYPE         = SORT TypeLike        -- tYPEKind
-         type Type         = TYPE LiftedRep    -- liftedTypeKind
-         type UnliftedType = TYPE UnliftedRep  -- unliftedTypeKind
+         type TYPE         = SORT TypeLike    :: RuntimeRep -> Type  -- tYPEKind
+         type Type         = TYPE LiftedRep   :: Type                -- liftedTypeKind
+         type UnliftedType = TYPE UnliftedRep :: Type                -- unliftedTypeKind
 
-         type LiftedRep    = BoxedRep Lifted   -- liftedRepTy
-         type UnliftedRep  = BoxedRep Unlifted -- unliftedRepTy
+         type LiftedRep    = BoxedRep Lifted   :: RuntimeRep  -- liftedRepTy
+         type UnliftedRep  = BoxedRep Unlifted :: RuntimeRep  -- unliftedRepTy
 
 *                                                                      *
 ********************************************************************* -}
@@ -1481,9 +1481,10 @@ unrestrictedFunTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->
 ----------------------
 -- type TYPE = SORT TypeLike
 tYPETyCon :: TyCon
-tYPETyCon = buildSynTyCon tYPETyConName [] liftedTypeKind [] rhs
+tYPETyCon = buildSynTyCon tYPETyConName [] kind [] rhs
   where
-    rhs = TyCoRep.TyConApp sORTTyCon [typeLikeDataConTy]
+    kind = runtimeRepTy `mkVisFunTyMany` liftedTypeKind
+    rhs  = TyCoRep.TyConApp sORTTyCon [typeLikeDataConTy]
 
 tYPETyConName :: Name
 tYPETyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "TYPE")
@@ -1495,8 +1496,9 @@ tYPEKind = mkTyConTy tYPETyCon
 ----------------------
 -- type CONSTRAINT = SORT ConstraintLike
 cONSTRAINTTyCon :: TyCon
-cONSTRAINTTyCon = buildSynTyCon cONSTRAINTTyConName [] liftedTypeKind [] rhs
+cONSTRAINTTyCon = buildSynTyCon cONSTRAINTTyConName [] kind [] rhs
   where
+    kind = runtimeRepTy `mkVisFunTyMany` liftedTypeKind
     rhs = TyCoRep.TyConApp sORTTyCon [constraintLikeDataConTy]
 
 cONSTRAINTTyConName :: Name
