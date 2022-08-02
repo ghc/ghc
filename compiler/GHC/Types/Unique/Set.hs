@@ -21,6 +21,7 @@ module GHC.Types.Unique.Set (
         emptyUniqSet,
         unitUniqSet,
         mkUniqSet,
+        mkUniqSetFromAscList,
         addOneToUniqSet, addListToUniqSet,
         delOneFromUniqSet, delOneFromUniqSet_Directly, delListFromUniqSet,
         delListFromUniqSet_Directly,
@@ -74,6 +75,9 @@ unitUniqSet x = UniqSet $ unitUFM x x
 
 mkUniqSet :: Uniquable a => [a]  -> UniqSet a
 mkUniqSet = foldl' addOneToUniqSet emptyUniqSet
+
+mkUniqSetFromAscList :: Uniquable a => [a] -> UniqSet a
+mkUniqSetFromAscList l = UniqSet (ascListToUFM (map (\x -> (x, x)) l))
 
 addOneToUniqSet :: Uniquable a => UniqSet a -> a -> UniqSet a
 addOneToUniqSet (UniqSet set) x = UniqSet (addToUFM set x x)

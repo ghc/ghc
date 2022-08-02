@@ -91,6 +91,65 @@ import GHC.Utils.Panic
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
 
+import Control.Monad
+import Control.Monad.ST
+import Data.Word
+import WordMap
+
+newtype FastVarSet = FastVarSet (WordMap Var)
+
+varToKey :: Var -> Word64
+varToKey = fromIntegral . getKey . getUnique
+
+varSetToAscList :: VarSet -> [(Int, Var)]
+varSetToAscList = IntMap.toAscList . ufmToIntMap . getUniqSet
+
+emptyFastVarSet :: FastVarSet
+emptyFastVarSet = FastVarSet WordMap.empty
+
+extendFastVarSet :: FastVarSet -> Var -> FastVarSet
+extendFastVarSet (FastVarSet set) var = FastVarSet (insert (varToKey var) var set)
+
+extendFastVarSetList :: Foldable f => FastVarSet -> f Var -> FastVarSet
+extendFastVarSetList (FastVarSet set) vars = FastVarSet $ runST $ do
+  tmap <- foldM (\map var -> insertT (varToKey var) var map) (transient set) vars
+  persistent tmap
+
+extendFastVarSetSet :: FastVarSet -> VarSet -> FastVarSet
+extendFastVarSetSet (FastVarSet set1) set2
+  = FastVarSet (extendFromAscList (map intKeyToWordKey $ varSetToAscList set2) set1)
+  where
+    intKeyToWordKey (k, v) = (fromIntegral k, v)
+
+delFastVarSet :: FastVarSet -> Var -> FastVarSet
+delFastVarSet (FastVarSet set) var = FastVarSet (delete (varToKey var) set)
+
+elemFastVarSet :: Var -> FastVarSet -> Bool
+elemFastVarSet var (FastVarSet set) = isJust (WordMap.lookup (varToKey var) set)
+
+lookupFastVarSet :: FastVarSet -> Var -> Maybe Var
+lookupFastVarSet (FastVarSet set) var = WordMap.lookup (varToKey var) set
+
+lookupFastVarSet_Directly :: FastVarSet -> Unique -> Maybe Var
+lookupFastVarSet_Directly (FastVarSet set) uniq = WordMap.lookup (fromIntegral $ getKey uniq) set
+
+unionFastVarSet :: FastVarSet -> FastVarSet -> FastVarSet
+-- WordMap.union is left-biased, unionFastVarSet should be right-biased.
+unionFastVarSet (FastVarSet set1) (FastVarSet set2) = FastVarSet (union set2 set1)
+
+subFastVarSet :: VarSet -> FastVarSet -> Bool
+subFastVarSet set1 (FastVarSet set2)
+  = let keys1 = map (fromIntegral . fst) $ varSetToAscList set1
+        keys2 = map fst $ WordMap.toList set2
+     in go keys1 keys2
+  where
+    go [] _ = True
+    go _ [] = False
+    go (k1 : ks1) (k2 : ks2)
+      | k1 < k2 = False
+      | k1 == k2 = go ks1 ks2
+      | otherwise = go (k1 : ks1) ks2
+
 {-
 ************************************************************************
 *                                                                      *
@@ -106,7 +165,7 @@ import GHC.Utils.Outputable
 --
 -- "Secrets of the Glasgow Haskell Compiler inliner" Section 3.2 provides
 -- the motivation for this abstraction.
-newtype InScopeSet = InScope VarSet
+newtype InScopeSet = InScope FastVarSet
         -- Note [Lookups in in-scope set]
         -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         -- We store a VarSet here, but we use this for lookups rather than just
@@ -129,58 +188,56 @@ newtype InScopeSet = InScope VarSet
         -- See "Secrets of the Glasgow Haskell Compiler inliner" Section 3.2
         -- for more detailed motivation. #20419 has further discussion.
 
-
 instance Outputable InScopeSet where
-  ppr (InScope s) =
+  ppr (InScope (FastVarSet s)) =
     text "InScope" <+>
-    braces (fsep (map (ppr . Var.varName) (nonDetEltsUniqSet s)))
-                      -- It's OK to use nonDetEltsUniqSet here because it's
-                      -- only for pretty printing
-                      -- In-scope sets get big, and with -dppr-debug
-                      -- the output is overwhelming
+    braces (fsep (map (ppr . Var.varName . snd) (toList s)))
 
 emptyInScopeSet :: InScopeSet
-emptyInScopeSet = InScope emptyVarSet
+emptyInScopeSet = InScope emptyFastVarSet
 
-getInScopeVars ::  InScopeSet -> VarSet
-getInScopeVars (InScope vs) = vs
+getInScopeVars :: InScopeSet -> VarSet
+getInScopeVars (InScope (FastVarSet vs)) = mkUniqSetFromAscList (map snd $ WordMap.toList vs)
 
 mkInScopeSet :: VarSet -> InScopeSet
-mkInScopeSet in_scope = InScope in_scope
+mkInScopeSet in_scope
+  = InScope (FastVarSet (WordMap.fromAscList $ map intKeyToWordKey $ varSetToAscList in_scope))
+  where
+    intKeyToWordKey (k, v) = (fromIntegral k, v)
 
 extendInScopeSet :: InScopeSet -> Var -> InScopeSet
 extendInScopeSet (InScope in_scope) v
-   = InScope (extendVarSet in_scope v)
+  = InScope (extendFastVarSet in_scope v)
 
 extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
 extendInScopeSetList (InScope in_scope) vs
-   = InScope $ foldl' extendVarSet in_scope vs
+  = InScope (extendFastVarSetList in_scope vs)
 
 extendInScopeSetSet :: InScopeSet -> VarSet -> InScopeSet
 extendInScopeSetSet (InScope in_scope) vs
-   = InScope (in_scope `unionVarSet` vs)
+  = InScope (extendFastVarSetSet in_scope vs)
 
 delInScopeSet :: InScopeSet -> Var -> InScopeSet
-delInScopeSet (InScope in_scope) v = InScope (in_scope `delVarSet` v)
+delInScopeSet (InScope in_scope) v = InScope (in_scope `delFastVarSet` v)
 
 elemInScopeSet :: Var -> InScopeSet -> Bool
-elemInScopeSet v (InScope in_scope) = v `elemVarSet` in_scope
+elemInScopeSet v (InScope in_scope) = v `elemFastVarSet` in_scope
 
 -- | Look up a variable the 'InScopeSet'.  This lets you map from
 -- the variable's identity (unique) to its full value.
 lookupInScope :: InScopeSet -> Var -> Maybe Var
-lookupInScope (InScope in_scope) v  = lookupVarSet in_scope v
+lookupInScope (InScope in_scope) v = lookupFastVarSet in_scope v
 
 lookupInScope_Directly :: InScopeSet -> Unique -> Maybe Var
 lookupInScope_Directly (InScope in_scope) uniq
-  = lookupVarSet_Directly in_scope uniq
+  = lookupFastVarSet_Directly in_scope uniq
 
 unionInScope :: InScopeSet -> InScopeSet -> InScopeSet
 unionInScope (InScope s1) (InScope s2)
-  = InScope (s1 `unionVarSet` s2)
+  = InScope (s1 `unionFastVarSet` s2)
 
 varSetInScope :: VarSet -> InScopeSet -> Bool
-varSetInScope vars (InScope s1) = vars `subVarSet` s1
+varSetInScope vars (InScope s1) = vars `subFastVarSet` s1
 
 {-
 Note [Local uniques]
@@ -221,9 +278,9 @@ uniqAway' in_scope var
 -- given 'InScopeSet'. This must be used very carefully since one can very easily
 -- introduce non-unique 'Unique's this way. See Note [Local uniques].
 unsafeGetFreshLocalUnique :: InScopeSet -> Unique
-unsafeGetFreshLocalUnique (InScope set)
-  | Just (uniq,_) <- IntMap.lookupLT (getKey maxLocalUnique) (ufmToIntMap $ getUniqSet set)
-  , let uniq' = mkLocalUnique uniq
+unsafeGetFreshLocalUnique (InScope (FastVarSet set))
+  | Just (uniq,_) <- WordMap.lookupLT (fromIntegral $ getKey maxLocalUnique) set
+  , let uniq' = mkLocalUnique (fromIntegral uniq)
   , not $ uniq' `ltUnique` minLocalUnique
   = incrUnique uniq'
 

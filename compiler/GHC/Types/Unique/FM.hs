@@ -40,6 +40,7 @@ module GHC.Types.Unique.FM (
         listToUFM_Directly,
         listToUFM_C,
         listToIdentityUFM,
+        ascListToUFM,
         addToUFM,addToUFM_C,addToUFM_Acc,
         addListToUFM,addListToUFM_C,
         addToUFM_Directly,
@@ -150,6 +151,9 @@ listToUFM_C
   -> [(key, elt)]
   -> UniqFM key elt
 listToUFM_C f = foldl' (\m (k, v) -> addToUFM_C f m k v) emptyUFM
+
+ascListToUFM :: Uniquable key => [(key, elt)] -> UniqFM key elt
+ascListToUFM l = UFM (M.fromAscList (map (\(k, v) -> (getKey $ getUnique k, v)) l))
 
 addToUFM :: Uniquable key => UniqFM key elt -> key -> elt  -> UniqFM key elt
 addToUFM (UFM m) k v = UFM (M.insert (getKey $ getUnique k) v m)
