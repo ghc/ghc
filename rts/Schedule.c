@@ -1592,9 +1592,13 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
 
     heap_census = scheduleNeedHeapProfile(true);
 
+    // We force a major collection if the size of the heap exceeds maxHeapSize.
+    // We will either return memory until we are below maxHeapSize or trigger heapOverflow.
+    bool mblock_overflow = RtsFlags.GcFlags.maxHeapSize != 0 && mblocks_allocated > BLOCKS_TO_MBLOCKS(RtsFlags.GcFlags.maxHeapSize);
+
     // Figure out which generation we are collecting, so that we can
     // decide whether this is a parallel GC or not.
-    collect_gen = calcNeeded(force_major || heap_census, NULL);
+    collect_gen = calcNeeded(force_major || heap_census || mblock_overflow , NULL);
     major_gc = (collect_gen == RtsFlags.GcFlags.generations-1);
 
 #if defined(THREADED_RTS)
