@@ -761,7 +761,10 @@ updates s = BlockStat
                      (mconcat [ traceRts s (jString "$upd_frame: boxed: " + ((closureEntry r1) .^ "n"))
                               , copyClosure DontCopyCC updatee r1
                               ])
-                     (assignClosure updatee unbox_closure)
+                     -- the heap object is represented by another type of value
+                     -- (e.g. a JS number or string) so the unboxing closure
+                     -- will simply return it.
+                     (assignClosure updatee (unbox_closure { clField1 = r1 }))
                , profStat s (updateCC updatee)
                , adjSpN' 2
                , traceRts s (jString "h$upd_frame: updating: "
