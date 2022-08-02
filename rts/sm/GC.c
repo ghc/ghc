@@ -1061,6 +1061,13 @@ GarbageCollect (uint32_t collect_gen,
           returned = returnMemoryToOS(got - need);
       }
       traceEventMemReturn(cap, got, need, returned);
+
+      // Ensure that we've returned enough mblocks to place us under maxHeapSize.
+      // This may fail for instance due to block fragmentation.
+      W_ after = got - returned;
+      if (RtsFlags.GcFlags.maxHeapSize != 0 && after > BLOCKS_TO_MBLOCKS(RtsFlags.GcFlags.maxHeapSize)) {
+        heapOverflow();
+      }
   }
 
   // extra GC trace info
