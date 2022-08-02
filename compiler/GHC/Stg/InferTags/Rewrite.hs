@@ -336,7 +336,7 @@ rewriteRhs (_id, _tagSig) (StgRhsCon ccs con cn ticks args) = {-# SCC rewriteRhs
 rewriteRhs _binding (StgRhsClosure fvs ccs flag args body) = do
     withBinders NotTopLevel args $
         withClosureLcls fvs $
-            StgRhsClosure fvs ccs flag (map fst args) <$> rewriteExpr False body
+            StgRhsClosure fvs ccs flag (map fst args) <$> rewriteExpr body
         -- return (closure)
 
 fvArgs :: [StgArg] -> RM DVarSet
@@ -345,40 +345,36 @@ fvArgs args = do
     -- pprTraceM "fvArgs" (text "args:" <> ppr args $$ text "lcls:" <> pprVarSet (fv_lcls) (braces . fsep . map ppr) )
     return $ mkDVarSet [ v | StgVarArg v <- args, elemVarSet v fv_lcls]
 
-type IsScrut = Bool
-
 rewriteArgs :: [StgArg] -> RM [StgArg]
 rewriteArgs = mapM rewriteArg
 rewriteArg :: StgArg -> RM StgArg
 rewriteArg (StgVarArg v) = StgVarArg <$!> rewriteId v
 rewriteArg  (lit@StgLitArg{}) = return lit
 
--- Attach a tagSig if it's tagged
 rewriteId :: Id -> RM Id
 rewriteId v = do
     is_tagged <- isTagged v
     if is_tagged then return $! setIdTagSig v (TagSig TagProper)
                  else return v
 
-rewriteExpr :: IsScrut -> InferStgExpr -> RM TgStgExpr
-rewriteExpr _ (e@StgCase {})          = rewriteCase e
-rewriteExpr _ (e@StgLet {})           = rewriteLet e
-rewriteExpr _ (e@StgLetNoEscape {})   = rewriteLetNoEscape e
-rewriteExpr isScrut (StgTick t e)     = StgTick t <$!> rewriteExpr isScrut e
-rewriteExpr _ e@(StgConApp {})        = rewriteConApp e
-
-rewriteExpr isScrut e@(StgApp {})     = rewriteApp isScrut e
-rewriteExpr _ (StgLit lit)           = return $! (StgLit lit)
-rewriteExpr _ (StgOpApp op@(StgPrimOp DataToTagOp)  args res_ty) = do
+rewriteExpr :: InferStgExpr -> RM TgStgExpr
+rewriteExpr (e@StgCase {})          = rewriteCase e
+rewriteExpr (e@StgLet {})           = rewriteLet e
+rewriteExpr (e@StgLetNoEscape {})   = rewriteLetNoEscape e
+rewriteExpr (StgTick t e)     = StgTick t <$!> rewriteExpr e
+rewriteExpr e@(StgConApp {})        = rewriteConApp e
+rewriteExpr e@(StgApp {})     = rewriteApp e
+rewriteExpr (StgLit lit)           = return $! (StgLit lit)
+rewriteExpr (StgOpApp op@(StgPrimOp DataToTagOp) args res_ty) = do
         (StgOpApp op) <$!> rewriteArgs args <*> pure res_ty
-rewriteExpr _ (StgOpApp op args res_ty) = return $! (StgOpApp op args res_ty)
+rewriteExpr (StgOpApp op args res_ty) = return $! (StgOpApp op args res_ty)
 
 
 rewriteCase :: InferStgExpr -> RM TgStgExpr
 rewriteCase (StgCase scrut bndr alt_type alts) =
     withBinder NotTopLevel bndr $
         pure StgCase <*>
-            rewriteExpr True scrut <*>
+            rewriteExpr scrut <*>
             pure (fst bndr) <*>
             pure alt_type <*>
             mapM rewriteAlt alts
@@ -388,7 +384,7 @@ rewriteCase _ = panic "Impossible: nodeCase"
 rewriteAlt :: InferStgAlt -> RM TgStgAlt
 rewriteAlt alt@GenStgAlt{alt_con=_, alt_bndrs=bndrs, alt_rhs=rhs} =
     withBinders NotTopLevel bndrs $ do
-        !rhs' <- rewriteExpr False rhs
+        !rhs' <- rewriteExpr rhs
         return $! alt {alt_bndrs = map fst bndrs, alt_rhs = rhs'}
 
 rewriteLet :: InferStgExpr -> RM TgStgExpr
@@ -396,7 +392,7 @@ rewriteLet (StgLet xt bind expr) = do
     (!bind') <- rewriteBinds NotTopLevel bind
     withBind NotTopLevel bind $ do
         -- pprTraceM "withBindLet" (ppr $ bindersOfX bind)
-        !expr' <- rewriteExpr False expr
+        !expr' <- rewriteExpr expr
         return $! (StgLet xt bind' expr')
 rewriteLet _ = panic "Impossible"
 
@@ -404,7 +400,7 @@ rewriteLetNoEscape :: InferStgExpr -> RM TgStgExpr
 rewriteLetNoEscape (StgLetNoEscape xt bind expr) = do
     (!bind') <- rewriteBinds NotTopLevel bind
     withBind NotTopLevel bind $ do
-        !expr' <- rewriteExpr False expr
+        !expr' <- rewriteExpr expr
         return $! (StgLetNoEscape xt bind' expr')
 rewriteLetNoEscape _ = panic "Impossible"
 
@@ -424,19 +420,12 @@ rewriteConApp (StgConApp con cn args tys) = do
 
 rewriteConApp _ = panic "Impossible"
 
--- Special case: Expressions like `case x of { ... }`
-rewriteApp :: IsScrut -> InferStgExpr -> RM TgStgExpr
-rewriteApp True (StgApp f []) = do
-    -- pprTraceM "rewriteAppScrut" (ppr f)
-    f_tagged <- isTagged f
-    -- isTagged looks at more than the result of our analysis.
-    -- So always update here if useful.
-    let f' = if f_tagged
-                -- TODO: We might consisder using a subst env instead of setting the sig only for select places.
-                then setIdTagSig f (TagSig TagProper)
-                else f
+-- Special case: Atomic binders, usually in a case context like `case f of ...`.
+rewriteApp :: InferStgExpr -> RM TgStgExpr
+rewriteApp (StgApp f []) = do
+    f' <- rewriteId f
     return $! StgApp f' []
-rewriteApp _ (StgApp f args)
+rewriteApp (StgApp f args)
     -- pprTrace "rewriteAppOther" (ppr f <+> ppr args) False
     -- = undefined
     | Just marks <- idCbvMarks_maybe f
@@ -457,8 +446,8 @@ rewriteApp _ (StgApp f args)
             cbvArgIds = [x | StgVarArg x <- map fstOf3 cbvArgInfo] :: [Id]
         mkSeqs args cbvArgIds (\cbv_args -> StgApp f cbv_args)
 
-rewriteApp _ (StgApp f args) = return $ StgApp f args
-rewriteApp _ _ = panic "Impossible"
+rewriteApp (StgApp f args) = return $ StgApp f args
+rewriteApp _ = panic "Impossible"
 
 -- `mkSeq` x x' e generates `case x of x' -> e`
 -- We could also substitute x' for x in e but that's so rarely beneficial
