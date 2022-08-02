@@ -361,8 +361,14 @@ then
     if test "$EMSDK_LLVM" != "" ; then
         echo "Using emsdk LLVM: $EMSDK_LLVM"
     else
-        echo -e "Error: Could not find LLVM for Emscripten SDK.\nCheck the EMSDK_LLVM environment variable."
-        exit 1
+        echo "No emsdk LLVM set: defaulting to $EMSDK/upstream"
+        EMSDK_LLVM="$EMSDK/upstream"
+    fi
+
+    if test "$EMSDK_BIN" != "" ; then
+        echo "Using emsdk bin: $EMSDK_BIN"
+    else
+        echo "No emsdk bin set: defaulting to $EMSDK/upstream/emscripten"
     fi
 
     test -d inplace || mkdir inplace
@@ -371,7 +377,7 @@ then
     mkdir -p $ghcjsbin
 
     echo "#!/usr/bin/env bash"                         > "$ghcjsbin/js-unknown-ghcjs-cc"
-    echo "exec \"$EMSDK/emcc\" \"\$@\""                >> "$ghcjsbin/js-unknown-ghcjs-cc"
+    echo "exec \"$EMSDK_BIN/emcc\" \"\$@\"" >> "$ghcjsbin/js-unknown-ghcjs-cc"
     chmod 755 "$ghcjsbin/js-unknown-ghcjs-cc"
 
     echo "#!/usr/bin/env bash"                         > "$ghcjsbin/js-unknown-ghcjs-ar"
