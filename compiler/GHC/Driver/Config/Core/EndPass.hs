@@ -46,5 +46,3 @@ coreDumpFlag (CoreAddCallerCcs {})    = Nothing
 coreDumpFlag (CoreAddLateCcs {})      = Nothing
 coreDumpFlag CoreDoPrintCore          = Nothing
 coreDumpFlag (CoreDoRuleCheck {})     = Nothing
-coreDumpFlag CoreDoNothing            = Nothing
-coreDumpFlag (CoreDoPasses {})        = Nothing

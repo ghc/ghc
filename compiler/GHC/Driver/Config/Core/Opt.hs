@@ -29,6 +29,10 @@ import GHC.Types.Var ( Var )
 
 import qualified GHC.LanguageExtensions as LangExt
 
+import Control.Monad
+import Control.Monad.Trans.Writer.Strict ( Writer, execWriter, tell )
+import Data.Foldable
+
 {-
 ************************************************************************
 *                                                                      *
@@ -38,8 +42,184 @@ import qualified GHC.LanguageExtensions as LangExt
 -}
 
 getCoreToDo :: DynFlags -> [Var] -> [CoreToDo]
-getCoreToDo dflags extra_vars
-  = flatten_todos core_todo
+getCoreToDo dflags extra_vars = execWriter $ do
+  -- We want to do the static argument transform before full laziness as it
+  -- may expose extra opportunities to float things outwards. However, to fix
+  -- up the output of the transformation we need at do at least one simplify
+  -- after this before anything else
+  when static_args $ do
+    simpl_gently
+    enqueue CoreDoStaticArgs
+
+  -- initial simplify: make specialiser happy: minimum effort please
+  when do_presimplify $
+    simpl_gently
+
+  -- Specialisation is best done before full laziness
+  -- so that overloaded functions have all their dictionary lambdas manifest
+  when do_specialise $
+    enqueue $ coreDoSpecialising dflags
+
+  if full_laziness then
+    -- Was: gentleFloatOutSwitches
+    --
+    -- I have no idea why, but not floating constants to
+    -- top level is very bad in some cases.
+    --
+    -- Notably: p_ident in spectral/rewrite
+    --          Changing from "gentle" to "constantsOnly"
+    --          improved rewrite's allocation by 19%, and
+    --          made 0.0% difference to any other nofib
+    --          benchmark
+    --
+    -- Not doing floatOutOverSatApps yet, we'll do
+    -- that later on when we've had a chance to get more
+    -- accurate arity information.  In fact it makes no
+    -- difference at all to performance if we do it here,
+    -- but maybe we save some unnecessary to-and-fro in
+    -- the simplifier.
+    enqueue $ CoreDoFloatOutwards FloatOutSwitches
+      { floatOutLambdas   = Just 0
+      , floatOutConstants = True
+      , floatOutOverSatApps = False
+      , floatToTopLevelOnly = False
+      }
+
+  else
+    -- Even with full laziness turned off, we still need to float static
+    -- forms to the top level. See Note [Grand plan for static forms] in
+    -- GHC.Iface.Tidy.StaticPtrTable.
+    --
+    when static_ptrs $ do
+      -- Float Out can't handle type lets (sometimes created
+      -- by simpleOptPgm via mkParallelBindings)
+      simpl_gently
+      -- Static forms are moved to the top level with the FloatOut pass.
+      -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
+      enqueue $ CoreDoFloatOutwards FloatOutSwitches
+        { floatOutLambdas   = Just 0
+        , floatOutConstants = True
+        , floatOutOverSatApps = False
+        , floatToTopLevelOnly = True
+        }
+
+  -- Run the simplier phases 2,1,0 to allow rewrite rules to fire
+  when do_simpl3 $ do
+    for_ [phases, phases-1 .. 1] $ \phase ->
+      simpl_phase (Phase phase) "main" max_iter
+
+    -- Phase 0: allow all Ids to be inlined now
+    -- This gets foldr inlined before strictness analysis
+
+    -- At least 3 iterations because otherwise we land up with
+    -- huge dead expressions because of an infelicity in the
+    -- simplifier.
+    --      let k = BIG in foldr k z xs
+    -- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
+    -- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
+    -- Don't stop now!
+    simpl_phase (Phase 0) "main" (max max_iter 3)
+
+  -- Run float-inwards immediately before the strictness analyser
+  -- Doing so pushes bindings nearer their use site and hence makes
+  -- them more likely to be strict. These bindings might only show
+  -- up after the inlining from simplification.  Example in fulsom,
+  -- Csg.calc, where an arg of timesDouble thereby becomes strict.
+  when do_float_in $
+    enqueue $ CoreDoFloatInwards platform
+
+  when call_arity $ do
+    enqueue CoreDoCallArity
+    simplify "post-call-arity"
+
+  -- Strictness analysis
+  when strictness $ do
+    dmd_cpr_ww
+    simplify "post-worker-wrapper"
+
+  -- See Note [Placement of the exitification pass]
+  when exitification $
+    enqueue CoreDoExitify
+
+  when full_laziness $
+    enqueue $ CoreDoFloatOutwards FloatOutSwitches
+      { floatOutLambdas     = floatLamArgs dflags
+      , floatOutConstants   = True
+      , floatOutOverSatApps = True
+      , floatToTopLevelOnly = False
+      }
+      -- nofib/spectral/hartel/wang doubles in speed if you
+      -- do full laziness late in the day.  It only happens
+      -- after fusion and other stuff, so the early pass doesn't
+      -- catch it.  For the record, the redex is
+      --        f_el22 (f_el21 r_midblock)
+
+  -- We want CSE to follow the final full-laziness pass, because it may
+  -- succeed in commoning up things floated out by full laziness.
+  -- CSE used to rely on the no-shadowing invariant, but it doesn't any more
+  when cse $
+    enqueue CoreCSE
+
+  when do_float_in $
+    enqueue $ CoreDoFloatInwards platform
+
+  -- Final tidy-up
+  simplify "final"
+
+  maybe_rule_check FinalPhase
+
+  --------  After this we have -O2 passes -----------------
+  -- None of them run with -O
+
+  -- Case-liberation for -O2.  This should be after
+  -- strictness analysis and the simplification which follows it.
+  when liberate_case $ do
+    enqueue $ CoreLiberateCase (initLiberateCaseOpts dflags)
+    -- Run the simplifier after LiberateCase to vastly
+    -- reduce the possibility of shadowing
+    -- Reason: see Note [Shadowing] in GHC.Core.Opt.SpecConstr
+    simplify "post-liberate-case"
+
+  when spec_constr $ do
+    enqueue $ CoreDoSpecConstr (initSpecConstrOpts dflags)
+    -- See Note [Simplify after SpecConstr]
+    simplify "post-spec-constr"
+
+  maybe_rule_check FinalPhase
+
+  when late_specialise $ do
+    enqueue $ coreDoSpecialising dflags
+    simplify "post-late-spec"
+
+  -- LiberateCase can yield new CSE opportunities because it peels
+  -- off one layer of a recursive function (concretely, I saw this
+  -- in wheel-sieve1), and I'm guessing that SpecConstr can too
+  -- And CSE is a very cheap pass. So it seems worth doing here.
+  when ((liberate_case || spec_constr) && cse) $ do
+    enqueue CoreCSE
+    simplify "post-final-cse"
+
+  ---------  End of -O2 passes --------------
+
+  when late_dmd_anal $ do
+    dmd_cpr_ww
+    simplify "post-late-ww"
+
+  -- Final run of the demand_analyser, ensures that one-shot thunks are
+  -- really really one-shot thunks. Only needed if the demand analyser
+  -- has run at all. See Note [Final Demand Analyser run] in GHC.Core.Opt.DmdAnal
+  -- It is EXTREMELY IMPORTANT to run this pass, otherwise execution
+  -- can become /exponentially/ more expensive. See #11731, #12996.
+  when (strictness || late_dmd_anal) $
+    enqueue $ coreDoDemand dflags
+
+  maybe_rule_check FinalPhase
+
+  when profiling $ do
+    when (not (null $ callerCcFilters dflags)) $
+      enqueue $ CoreAddCallerCcs (initCallerCCOpts dflags)
+    when (gopt Opt_ProfLateInlineCcs dflags) $
+      enqueue $ CoreAddLateCcs (gopt Opt_ProfCountEntries dflags)
   where
     phases        = simplPhases        dflags
     max_iter      = maxSimplIterations dflags
@@ -66,228 +246,39 @@ getCoreToDo dflags extra_vars
     do_presimplify = do_specialise -- TODO: any other optimizations benefit from pre-simplification?
     do_simpl3      = const_fold || rules_on -- TODO: any other optimizations benefit from three-phase simplification?
 
-    maybe_rule_check phase = runMaybe rule_check $
-      CoreDoRuleCheck . initRuleCheckOpts dflags phase
+    maybe_rule_check phase = for_ rule_check $
+      enqueue . CoreDoRuleCheck . initRuleCheckOpts dflags phase
 
     maybe_strictness_before (Phase phase)
-      | phase `elem` strictnessBefore dflags = coreDoDemand dflags
-    maybe_strictness_before _
-      = CoreDoNothing
+      | phase `elem` strictnessBefore dflags = enqueue $ coreDoDemand dflags
+    maybe_strictness_before _ = return ()
 
-    simpl_phase phase name iter
-      = CoreDoPasses
-      $   [ maybe_strictness_before phase
-          , CoreDoSimplify $ initSimplifyOpts dflags extra_vars iter
-                             (initSimplMode dflags phase name)
-          , maybe_rule_check phase ]
+    simpl_phase phase name iter = do
+      maybe_strictness_before phase
+      enqueue $ CoreDoSimplify $ initSimplifyOpts dflags extra_vars iter
+                                 (initSimplMode dflags phase name)
+      maybe_rule_check phase
 
     -- Run GHC's internal simplification phase, after all rules have run.
     -- See Note [Compiler phases] in GHC.Types.Basic
     simplify name = simpl_phase FinalPhase name max_iter
 
-    -- initial simplify: mk specialiser happy: minimum effort please
+    -- initial simplify: make specialiser happy: minimum effort please
     -- See Note [Inline in InitialPhase]
     -- See Note [RULEs enabled in InitialPhase]
-    simpl_gently = CoreDoSimplify $ initSimplifyOpts dflags extra_vars max_iter
-                                    (initGentleSimplMode dflags)
+    simpl_gently = enqueue $ CoreDoSimplify $
+      initSimplifyOpts dflags extra_vars max_iter (initGentleSimplMode dflags)
 
-    dmd_cpr_ww = [coreDoDemand dflags, CoreDoCpr] ++
-      if ww_on then [CoreDoWorkerWrapper (initWorkWrapOpts dflags)]
-               else []
-
-
-    demand_analyser = (CoreDoPasses (
-                           dmd_cpr_ww ++
-                           [simplify "post-worker-wrapper"]
-                           ))
-
-    -- Static forms are moved to the top level with the FloatOut pass.
-    -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
-    static_ptrs_float_outwards =
-      runWhen static_ptrs $ CoreDoPasses
-        [ simpl_gently -- Float Out can't handle type lets (sometimes created
-                       -- by simpleOptPgm via mkParallelBindings)
-        , CoreDoFloatOutwards FloatOutSwitches
-          { floatOutLambdas   = Just 0
-          , floatOutConstants = True
-          , floatOutOverSatApps = False
-          , floatToTopLevelOnly = True
-          }
-        ]
-
-    add_caller_ccs =
-        runWhen (profiling && not (null $ callerCcFilters dflags)) $
-          CoreAddCallerCcs (initCallerCCOpts dflags)
-
-    add_late_ccs =
-        runWhen (profiling && gopt Opt_ProfLateInlineCcs dflags) $
-          CoreAddLateCcs (gopt Opt_ProfCountEntries dflags)
-
-    core_todo =
-     [
-    -- We want to do the static argument transform before full laziness as it
-    -- may expose extra opportunities to float things outwards. However, to fix
-    -- up the output of the transformation we need at do at least one simplify
-    -- after this before anything else
-        runWhen static_args (CoreDoPasses [ simpl_gently, CoreDoStaticArgs ]),
-
-        -- initial simplify: mk specialiser happy: minimum effort please
-        runWhen do_presimplify simpl_gently,
-
-        -- Specialisation is best done before full laziness
-        -- so that overloaded functions have all their dictionary lambdas manifest
-        runWhen do_specialise $ coreDoSpecialising dflags,
-
-        if full_laziness then
-           CoreDoFloatOutwards FloatOutSwitches {
-                                 floatOutLambdas   = Just 0,
-                                 floatOutConstants = True,
-                                 floatOutOverSatApps = False,
-                                 floatToTopLevelOnly = False }
-                -- Was: gentleFloatOutSwitches
-                --
-                -- I have no idea why, but not floating constants to
-                -- top level is very bad in some cases.
-                --
-                -- Notably: p_ident in spectral/rewrite
-                --          Changing from "gentle" to "constantsOnly"
-                --          improved rewrite's allocation by 19%, and
-                --          made 0.0% difference to any other nofib
-                --          benchmark
-                --
-                -- Not doing floatOutOverSatApps yet, we'll do
-                -- that later on when we've had a chance to get more
-                -- accurate arity information.  In fact it makes no
-                -- difference at all to performance if we do it here,
-                -- but maybe we save some unnecessary to-and-fro in
-                -- the simplifier.
-        else
-           -- Even with full laziness turned off, we still need to float static
-           -- forms to the top level. See Note [Grand plan for static forms] in
-           -- GHC.Iface.Tidy.StaticPtrTable.
-           static_ptrs_float_outwards,
-
-        -- Run the simplier phases 2,1,0 to allow rewrite rules to fire
-        runWhen do_simpl3
-            (CoreDoPasses $ [ simpl_phase (Phase phase) "main" max_iter
-                            | phase <- [phases, phases-1 .. 1] ] ++
-                            [ simpl_phase (Phase 0) "main" (max max_iter 3) ]),
-                -- Phase 0: allow all Ids to be inlined now
-                -- This gets foldr inlined before strictness analysis
-
-                -- At least 3 iterations because otherwise we land up with
-                -- huge dead expressions because of an infelicity in the
-                -- simplifier.
-                --      let k = BIG in foldr k z xs
-                -- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
-                -- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
-                -- Don't stop now!
-
-        runWhen do_float_in (CoreDoFloatInwards platform),
-            -- Run float-inwards immediately before the strictness analyser
-            -- Doing so pushes bindings nearer their use site and hence makes
-            -- them more likely to be strict. These bindings might only show
-            -- up after the inlining from simplification.  Example in fulsom,
-            -- Csg.calc, where an arg of timesDouble thereby becomes strict.
-
-        runWhen call_arity $ CoreDoPasses
-            [ CoreDoCallArity
-            , simplify "post-call-arity"
-            ],
-
-        -- Strictness analysis
-        runWhen strictness demand_analyser,
-
-        runWhen exitification CoreDoExitify,
-            -- See Note [Placement of the exitification pass]
-
-        runWhen full_laziness $
-           CoreDoFloatOutwards FloatOutSwitches {
-                                 floatOutLambdas     = floatLamArgs dflags,
-                                 floatOutConstants   = True,
-                                 floatOutOverSatApps = True,
-                                 floatToTopLevelOnly = False },
-                -- nofib/spectral/hartel/wang doubles in speed if you
-                -- do full laziness late in the day.  It only happens
-                -- after fusion and other stuff, so the early pass doesn't
-                -- catch it.  For the record, the redex is
-                --        f_el22 (f_el21 r_midblock)
+    dmd_cpr_ww = do
+      enqueue $ coreDoDemand dflags
+      enqueue CoreDoCpr
+      when ww_on $
+        enqueue $ CoreDoWorkerWrapper (initWorkWrapOpts dflags)
 
 
-        runWhen cse CoreCSE,
-                -- We want CSE to follow the final full-laziness pass, because it may
-                -- succeed in commoning up things floated out by full laziness.
-                -- CSE used to rely on the no-shadowing invariant, but it doesn't any more
 
-        runWhen do_float_in (CoreDoFloatInwards platform),
-
-        simplify "final",  -- Final tidy-up
-
-        maybe_rule_check FinalPhase,
-
-        --------  After this we have -O2 passes -----------------
-        -- None of them run with -O
-
-                -- Case-liberation for -O2.  This should be after
-                -- strictness analysis and the simplification which follows it.
-        runWhen liberate_case $ CoreDoPasses
-           [ CoreLiberateCase (initLiberateCaseOpts dflags)
-           , simplify "post-liberate-case" ],
-           -- Run the simplifier after LiberateCase to vastly
-           -- reduce the possibility of shadowing
-           -- Reason: see Note [Shadowing] in GHC.Core.Opt.SpecConstr
-
-        runWhen spec_constr $ CoreDoPasses
-           [ CoreDoSpecConstr (initSpecConstrOpts dflags)
-           , simplify "post-spec-constr"],
-           -- See Note [Simplify after SpecConstr]
-
-        maybe_rule_check FinalPhase,
-
-        runWhen late_specialise $ CoreDoPasses
-           [ coreDoSpecialising dflags, simplify "post-late-spec"],
-
-        -- LiberateCase can yield new CSE opportunities because it peels
-        -- off one layer of a recursive function (concretely, I saw this
-        -- in wheel-sieve1), and I'm guessing that SpecConstr can too
-        -- And CSE is a very cheap pass. So it seems worth doing here.
-        runWhen ((liberate_case || spec_constr) && cse) $ CoreDoPasses
-           [ CoreCSE, simplify "post-final-cse" ],
-
-        ---------  End of -O2 passes --------------
-
-        runWhen late_dmd_anal $ CoreDoPasses (
-            dmd_cpr_ww ++ [simplify "post-late-ww"]
-          ),
-
-        -- Final run of the demand_analyser, ensures that one-shot thunks are
-        -- really really one-shot thunks. Only needed if the demand analyser
-        -- has run at all. See Note [Final Demand Analyser run] in GHC.Core.Opt.DmdAnal
-        -- It is EXTREMELY IMPORTANT to run this pass, otherwise execution
-        -- can become /exponentially/ more expensive. See #11731, #12996.
-        runWhen (strictness || late_dmd_anal) $ coreDoDemand dflags,
-
-        maybe_rule_check FinalPhase,
-
-        add_caller_ccs,
-        add_late_ccs
-     ]
-
-    -- Remove 'CoreDoNothing' and flatten 'CoreDoPasses' for clarity.
-    flatten_todos [] = []
-    flatten_todos (CoreDoNothing : rest) = flatten_todos rest
-    flatten_todos (CoreDoPasses passes : rest) =
-      flatten_todos passes ++ flatten_todos rest
-    flatten_todos (todo : rest) = todo : flatten_todos rest
-
--- The core-to-core pass ordering is derived from the DynFlags:
-runWhen :: Bool -> CoreToDo -> CoreToDo
-runWhen True  do_this = do_this
-runWhen False _       = CoreDoNothing
-
-runMaybe :: Maybe a -> (a -> CoreToDo) -> CoreToDo
-runMaybe (Just x) f = f x
-runMaybe Nothing  _ = CoreDoNothing
+enqueue :: CoreToDo -> Writer [CoreToDo] ()
+enqueue pass = tell [pass]
 
 coreDoDemand :: DynFlags -> CoreToDo
 coreDoDemand dflags = CoreDoDemand $ initDmdAnalOpts dflags
@@ -295,7 +286,7 @@ coreDoDemand dflags = CoreDoDemand $ initDmdAnalOpts dflags
 coreDoSpecialising :: DynFlags -> CoreToDo
 coreDoSpecialising dflags = CoreDoSpecialising (initSpecialiseOpts dflags simplMask)
 
--- TODO DEDUp!!!!
+-- TODO: Deduplication
 simplMask :: Char
 simplMask = 's'
 

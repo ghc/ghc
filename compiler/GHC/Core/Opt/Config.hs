@@ -55,11 +55,6 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoSpecConstr !SpecConstrOpts
   | CoreCSE
   | CoreDoRuleCheck !RuleCheckOpts
-  | -- | Useful when building up
-    CoreDoNothing
-  | -- | lists of these things
-    CoreDoPasses [CoreToDo]
-
   | CoreAddCallerCcs !CallerCCOpts
   | CoreAddLateCcs !Bool -- ^ '-fprof-count-entries'
 
@@ -82,8 +77,6 @@ instance Outputable CoreToDo where
   ppr (CoreAddLateCcs _)       = text "Add late core cost-centres"
   ppr CoreDoPrintCore          = text "Print core"
   ppr (CoreDoRuleCheck {})     = text "Rule check"
-  ppr CoreDoNothing            = text "CoreDoNothing"
-  ppr (CoreDoPasses passes)    = text "CoreDoPasses" <+> ppr passes
 
 pprPassDetails :: CoreToDo -> SDoc
 pprPassDetails (CoreDoSimplify cfg) = vcat [ text "Max iterations =" <+> int n

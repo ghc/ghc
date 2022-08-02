@@ -95,8 +95,6 @@ runCorePasses env passes guts
   = foldM do_pass guts passes
   where
     do_pass :: ModGuts -> CoreToDo -> SimplCountM ModGuts
-    do_pass res CoreDoNothing = return res
-    do_pass guts (CoreDoPasses ps) = runCorePasses env ps guts
     do_pass guts pass = do
       let end_pass_cfg = co_endPassCfg env  pass
       let lint_anno_cfg = co_lintAnnotationsCfg env pass
@@ -182,10 +180,6 @@ doCorePass env pass guts = do
 
     CoreDoRuleCheck opts      -> {-# SCC "RuleCheck" #-}
                                  liftIO $ ruleCheckPass (co_logger env) opts (co_hptRuleBase env) (co_visOrphans env) guts
-
-    CoreDoNothing             -> return guts
-
-    CoreDoPasses passes       -> runCorePasses env passes guts
 
     CoreDoPluginPass _ p      -> {-# SCC "Plugin" #-}
                                  co_liftCoreM env (co_debugSetting env) guts $ p guts
