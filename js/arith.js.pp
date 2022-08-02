@@ -48,6 +48,7 @@ function h$hs_gtInt64(h1,l1,h2,l2) {
 }
 
 function h$hs_quotWord64(h1,l1,h2,l2) {
+  throw "hs_quotWord64 not implemented yet";
   // var a = h$ghcjsbn_mkBigNat_ww(h1,l1); // bigFromWord64(h1,l1);
   // var b = h$ghcjsbn_mkBigNat_ww(h2,l2); // bigFromWord64(h2,l2);
   var q = h$ghcjsbn_quot_bb(h$ghcjsbn_mkBigNat_ww(h1,l1),
@@ -112,11 +113,13 @@ function h$hs_timesInt64(h1,l1,h2,l2) {
 }
 
 function h$hs_quotInt64(h1,l1,h2,l2) {
-  var c = goog.math.Long.fromBits(l1,h1).div(goog.math.Long.fromBits(l2,h2));
-  RETURN_UBX_TUP2(c.getHighBits(), c.getLowBits());
+  throw "hs_quotInt64 not implemented yet";
+  //var c = goog.math.Long.fromBits(l1,h1).div(goog.math.Long.fromBits(l2,h2));
+  //RETURN_UBX_TUP2(c.getHighBits(), c.getLowBits());
 }
 
 function h$hs_remInt64(h1,l1,h2,l2) {
+  throw "hs_remInt64 not implemented yet";
   var c = goog.math.Long.fromBits(l1,h1).modulo(goog.math.Long.fromBits(l2,h2));
   RETURN_UBX_TUP2(c.getHighBits(), c.getLowBits());
 }
@@ -203,6 +206,7 @@ function h$hs_gtWord64(h1,l1,h2,l2) {
 }
 
 function h$hs_remWord64(h1,l1,h2,l2) {
+  throw "hs_remWord64 not implemented yet";
   /* var a = h$bigFromWord64(h1,l1);
      var b = h$bigFromWord64(h2,l2);
      var c = a.mod(b); */
@@ -428,7 +432,7 @@ function h$quotRemWord32(n,d) {
   var q = ((n2 >>> 1) / d) << 1;
   var r = (n - q * d) >>> 0;
   var c = (r >>> 0) >= (d >>> 0);
-  RETURN_UBX_TUP2((q + (c ? 1 : 0)) >>> 0, (r - (c ? q : 0)) >>> 0);
+  RETURN_UBX_TUP2((q + (c ? 1 : 0)) >>> 0, (r - (c ? d : 0)) >>> 0);
 }
 
 #define UN(x) ((x)>>>0)
