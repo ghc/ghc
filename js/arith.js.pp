@@ -423,7 +423,7 @@ function h$remWord32(n,d) {
   var q = ((n2 >>> 1) / d) << 1;
   var r = (n - q * d) >>> 0;
   var c = (r >>> 0) >= (d >>> 0);
-  return (r - (c ? q : 0)) >>> 0;
+  return (r - (c ? d : 0)) >>> 0;
 }
 
 function h$quotRemWord32(n,d) {
