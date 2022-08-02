@@ -105,6 +105,7 @@ module GHC.Types.Basic (
         TypeOrKind(..), isTypeLevel, isKindLevel,
 
         Levity(..), mightBeLifted, mightBeUnlifted,
+        MustBeLiftedReason(..),
 
         NonStandardDefaultingStrategy(..),
         DefaultingStrategy(..), defaultNonStandardTyVars,
@@ -1897,6 +1898,18 @@ mightBeLifted _               = True
 mightBeUnlifted :: Maybe Levity -> Bool
 mightBeUnlifted (Just Lifted) = False
 mightBeUnlifted _             = True
+
+data MustBeLiftedReason
+  = ParStmtMustBeLifted
+  | TransStmtMustBeLifted
+  | RecStmtMustBeLifted
+  | ArrowRecStmtMustBeLifted
+
+instance Outputable MustBeLiftedReason where
+  ppr ParStmtMustBeLifted      = text "parallel list comprehension"
+  ppr TransStmtMustBeLifted    = text "transform list comprehension"
+  ppr RecStmtMustBeLifted      = text "recursive statement"
+  ppr ArrowRecStmtMustBeLifted = text "arrow recursive statement"
 
 {- *********************************************************************
 *                                                                      *

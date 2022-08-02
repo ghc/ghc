@@ -32,6 +32,8 @@ module GHC.Tc.Gen.Match
    , tcDoStmt
    , tcGuardStmt
    , checkPatCounts
+
+   , lookupBigTupIds
    )
 where
 
@@ -50,7 +52,7 @@ import GHC.Tc.Gen.Head( tcCheckId )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Bind
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic, unifyTypeRuntimeRep_syntactic )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
@@ -494,7 +496,7 @@ tcLcStmt m_tc ctxt (ParStmt _ bndr_stmts_s _ _) elt_ty thing_inside
     loop (ParStmtBlock x stmts names _ : pairs)
       = do { (stmts', (ids, pairs', thing))
                 <- tcStmtsAndThen ctxt (tcLcStmt m_tc) stmts elt_ty $ \ _elt_ty' ->
-                   do { ids <- tcLookupLocalIds names
+                   do { ids <- lookupBigTupIds ParStmtMustBeLifted names
                       ; (pairs', thing) <- loop pairs
                       ; return (ids, pairs', thing) }
            ; return ( ParStmtBlock x stmts' ids noSyntaxExpr : pairs', thing ) }
@@ -509,7 +511,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
        ; (stmts', (bndr_ids, by'))
             <- tcStmtsAndThen (TransStmtCtxt ctxt) (tcLcStmt m_tc) stmts unused_ty $ \_ -> do
                { by' <- traverse tcInferRho by
-               ; bndr_ids <- tcLookupLocalIds bndr_names
+               ; bndr_ids <- lookupBigTupIds TransStmtMustBeLifted bndr_names
                ; return (bndr_ids, by') }
 
        ; let m_app ty = mkTyConApp m_tc [ty]
@@ -546,7 +548,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
-             -- See Note [TransStmt binder map] in GHC.Hs.Expr
+             -- See Note [TransStmt binder map] in Language.Haskell.Syntax.Expr
              n_bndr_ids  = zipWith mk_n_bndr n_bndr_names bndr_ids
              bindersMap' = bndr_ids `zip` n_bndr_ids
 
@@ -699,7 +701,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
                                          ; return (Just e') }
 
                 -- Find the Ids (and hence types) of all old binders
-                ; bndr_ids <- tcLookupLocalIds bndr_names
+                ; bndr_ids <- lookupBigTupIds TransStmtMustBeLifted bndr_names
 
                 -- 'return' is only used for the binders, so we know its type.
                 --   return :: (a,b,c,..) -> m (a,b,c,..)
@@ -739,7 +741,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
-             -- See Note [TransStmt binder map] in GHC.Hs.Expr
+             -- See Note [TransStmt binder map] in Language.Haskell.Syntax.Expr
              n_bndr_ids = zipWithEqual "tcMcStmt" mk_n_bndr n_bndr_names bndr_ids
              bindersMap' = bndr_ids `zip` n_bndr_ids
 
@@ -831,7 +833,7 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
            ; (stmts', (ids, return_op', pairs', thing))
                 <- tcStmtsAndThen ctxt tcMcStmt stmts (mkCheckExpType m_tup_ty) $
                    \m_tup_ty' ->
-                   do { ids <- tcLookupLocalIds names
+                   do { ids <- lookupBigTupIds ParStmtMustBeLifted names
                       ; let tup_ty = mkBigCoreVarTupTy ids
                       ; (_, return_op') <-
                           tcSyntaxOp MCompOrigin return_op
@@ -949,7 +951,7 @@ tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
                   ; return (thing, new_res_ty) }
 
         ; let rec_ids = takeList rec_names tup_ids
-        ; later_ids <- tcLookupLocalIds later_names
+        ; later_ids <- lookupBigTupIds RecStmtMustBeLifted later_names
         ; traceTc "tcdo" $ vcat [ppr rec_ids <+> ppr (map idType rec_ids),
                                  ppr later_ids <+> ppr (map idType later_ids)]
         ; return (RecStmt { recS_stmts = L l stmts', recS_later_ids = later_ids
@@ -1168,3 +1170,74 @@ check_match_pats matchContext (MG { mg_alts = L _ (match1:matches) })
 
     args_in_match :: (LocatedA (Match GhcRn body1) -> Int)
     args_in_match (L _ (Match { m_pats = pats })) = length pats
+
+{-**********************************************************************
+*                                                                      *
+\subsection{Ensuring liftedness}
+*                                                                      *
+************************************************************************
+
+Note [Ensuring liftedness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Parallel list comprehensions and transform list comprehensions are
+desugared by using tuples, for example:
+
+  [ x + y1 + y2 | x <- xs, y1 <- ys | y2 <- ys ]
+
+    ==>
+
+  [ x + y1 + y2 | ((x,y1),y2) <- zip [ (x,y1) | x <- xs, y1 <- ys ] ys ].
+
+Such a desugaring only works if we can indeed put x, y1, y2 into tuples;
+in particular, they must be lifted.
+
+This means that, when typechecking this parallel list comprehension, we need
+to ensure that the Ids 'x', 'y1' and 'y2' are lifted. (Failing to do so
+caused #20864 and #20855.)
+
+  (1)
+    The Ids are already known to have a syntactically fixed RuntimeRep,
+    in the sense of Note [Fixed RuntimeRep].
+    That is, we have already performed a representation-polymorphism
+    check elsewhere in the program. This check might well have been
+    a PHASE 2 check that produced a coercion. See
+    Note [The Concrete mechanism].
+
+  (2)
+    We thus need to check that the RuntimeRep of each Id is LiftedRep.
+    A syntactic check suffices, as we have already handled all rewriting
+    in (1). In particular, if we decided to perform unification
+
+      co <- unifyKind rep liftedRepTy
+
+    the resulting coercion, co, would be rather useless: it would always be
+    either reflexive or a deferred type error. We would then have to find
+    a good place to store this coercion in the AST, which would involve
+    changing a fair bit of the parallel/transform list comprehension code,
+    for no real benefit.
+
+As a result, it is best to do a simple syntactic check, which is achieved
+by the function unifyTypeRuntimeRep_syntactic in GHC.Tc.Utils.Concrete.
+-}
+
+-- | Given a list of binder names, this function:
+--
+--  - looks up the associated local 'Id's using 'tcLookupLocalIds'
+--  - ensures their types are all lifted, throwing an error in the 'TcM' monad
+--    if this is not the case.
+lookupBigTupIds :: MustBeLiftedReason -> [Name] -> TcM [TcId]
+lookupBigTupIds lifted_reason names
+  = do { ids <- tcLookupLocalIds names
+       ; bad_ids <- filterM not_lifted ids
+       ; case bad_ids of
+           []       -> return ids
+           bad:bads -> failWithTc (TcRnMustBeLifted lifted_reason (bad NE.:| bads)) }
+
+  where
+    not_lifted :: TcId -> TcM Bool
+    not_lifted v
+      = do { is_lifted <- unifyTypeRuntimeRep_syntactic ty liftedRepTy
+               -- See Note [Ensuring liftedness].
+           ; return $ not is_lifted }
+      where
+        ty = idType v

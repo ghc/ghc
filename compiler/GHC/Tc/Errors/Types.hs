@@ -41,6 +41,7 @@ module GHC.Tc.Errors.Types (
   , Exported(..)
   , HsDocContext(..)
   , FixedRuntimeRepErrorInfo(..)
+  , MustBeLiftedReason(..)
 
   , ErrorItem(..), errorItemOrigin, errorItemEqRel, errorItemPred, errorItemCtLoc
 
@@ -2175,6 +2176,15 @@ data TcRnMessage where
     pragma_warning_defined_mod :: ModuleName
   } -> TcRnMessage
 
+  {-| TcRnMustBeLifted is an error that occurs when an 'Id' has an unlifted type,
+      even though it appears in a context which requires it to be lifted, for example
+      because we want to put a variable with that 'Id' into a boxed tuple.
+
+      Test cases: T20864, T20855.
+  -}
+  TcRnMustBeLifted :: MustBeLiftedReason -> NE.NonEmpty Id -> TcRnMessage
+
+
 -- | Specifies which back ends can handle a requested foreign import or export
 type ExpectedBackends = [Backend]
 
@@ -2806,6 +2816,14 @@ data TcSolverReportMsg
    --
    -- See 'FixedRuntimeRepErrorInfo' and 'FixedRuntimeRepContext' for more information.
   | FixedRuntimeRepError [FixedRuntimeRepErrorInfo]
+
+  -- | The type of an 'Id' should have been lifted, but wasn't.
+  --
+  -- Used when we want to put 'Id's into a big tuple for desugaring parallel and transform
+  -- list comprehensions.
+  --
+  -- Test cases: T20864, T20855.
+  | NotLiftedError MustBeLiftedReason Id
 
   -- | A skolem type variable escapes its scope.
   --

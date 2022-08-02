@@ -1,0 +1,20 @@
+
+T20864_fail.hs:13:33: error:
+    • Expected lifted variables, but the following variables are unlifted:
+      • x :: F Int :: TYPE 'IntRep
+      • y :: F Int :: TYPE 'IntRep
+      NB: variables used in transform list comprehensions must be lifted.
+    • In a stmt of a list comprehension: then take 3
+      In the expression: [I# (x +# y) | Foo x y <- xs, then take 3]
+      In an equation for ‘glum2’:
+          glum2 xs = [I# (x +# y) | Foo x y <- xs, then take 3]
+
+T20864_fail.hs:16:22: error:
+    • Expected a lifted variable, but the following variable is unlifted:
+      • p :: Int# :: TYPE 'IntRep
+      NB: variables used in transform list comprehensions must be lifted.
+    • In a stmt of a list comprehension: then take 3
+      In the expression:
+        [I# p | I# x <- xs, let p = x +# 3#, then take 3]
+      In an equation for ‘glum’:
+          glum xs = [I# p | I# x <- xs, let p = x +# 3#, then take 3]

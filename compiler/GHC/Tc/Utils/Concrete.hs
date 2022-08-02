@@ -11,6 +11,9 @@ module GHC.Tc.Utils.Concrete
 
     -- * Making a type concrete
   , makeTypeConcrete
+
+    -- * Syntactic unification of concrete types
+  , unifyTypeRuntimeRep_syntactic, unifyConcrete_syntactic,
   )
  where
 
@@ -18,27 +21,33 @@ import GHC.Prelude
 
 import GHC.Builtin.Types       ( liftedTypeKindTyCon, unliftedTypeKindTyCon )
 
-import GHC.Core.Coercion       ( coToMCo, mkCastTyMCo )
+import GHC.Core.Coercion       ( coToMCo, mkCastTyMCo, isReflexiveCo )
 import GHC.Core.TyCo.Rep       ( Type(..), MCoercion(..) )
 import GHC.Core.TyCon          ( isConcreteTyCon )
 import GHC.Core.Type           ( isConcrete, typeKind, tyVarKind, tcView
-                               , mkTyVarTy, mkTyConApp, mkFunTy, mkAppTy )
-
+                               , mkTyVarTy, mkTyConApp, mkFunTy, mkAppTy
+                               , getRuntimeRep )
 import GHC.Tc.Types            ( TcM, ThStage(..), PendingStuff(..) )
-import GHC.Tc.Types.Constraint ( NotConcreteError(..), NotConcreteReason(..) )
+import GHC.Tc.Types.Constraint ( NotConcreteError(..), NotConcreteReason(..)
+                               , isEmptyWC )
 import GHC.Tc.Types.Evidence   ( Role(..), TcCoercionN, TcMCoercionN
                                , mkTcGReflRightMCo, mkTcNomReflCo )
-import GHC.Tc.Types.Origin     ( CtOrigin(..), FixedRuntimeRepContext, FixedRuntimeRepOrigin(..) )
-import GHC.Tc.Utils.Monad      ( emitNotConcreteError, setTcLevel, getCtLocM, getStage, traceTc )
+import GHC.Tc.Types.Origin     ( CtOrigin(..), FixedRuntimeRepContext, FixedRuntimeRepOrigin(..)
+                               , TypedThing(..) )
+import GHC.Tc.Utils.Monad      ( emitNotConcreteError, setTcLevel, getCtLocM, getStage, traceTc
+                               , captureConstraints )
 import GHC.Tc.Utils.TcType     ( TcType, TcKind, TcTypeFRR
                                , MetaInfo(..), ConcreteTvOrigin(..)
-                               , isMetaTyVar, metaTyVarInfo, tcTyVarLevel )
+                               , isMetaTyVar, metaTyVarInfo, tcTyVarLevel
+                               , tcEqType )
 import GHC.Tc.Utils.TcMType    ( newConcreteTyVar, isFilledMetaTyVar_maybe, writeMetaTyVar
                                , emitWantedEq )
+import {-# SOURCE #-} GHC.Tc.Utils.Unify ( unifyKind )
 
 import GHC.Types.Basic         ( TypeOrKind(..) )
 import GHC.Utils.Misc          ( HasDebugCallStack )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Control.Monad      ( void )
 import Data.Functor       ( ($>) )
@@ -682,3 +691,92 @@ makeTypeConcrete conc_orig ty =
 
     bale_out :: TcType -> NotConcreteReason -> WriterT [NotConcreteReason] TcM TcType
     bale_out ty reason = do { tell [reason]; return ty }
+
+
+{-
+%************************************************************************
+%*                                                                      *
+                       Syntactic unification
+%*                                                                      *
+%**********************************************************************-}
+
+
+-- | Given a type @ty :: TYPE rr@ and a desired 'RuntimeRep' @desired_rr@,
+-- this function attempts to syntactically unify @rr@ with @desired_rr@,
+-- returning whether it succeeded.
+--
+-- Preconditions:
+--   - The kind of @ty@ must be of the form @TYPE rr@.
+--   - Both @rr@ and @desired_rr@ are concrete 'RuntimeRep's,
+--     in the sense of Note [Concrete types].
+unifyTypeRuntimeRep_syntactic :: HasDebugCallStack
+                              => TcType -- ^ type to constrain (e.g. @ty :: TYPE rr@)
+                              -> TcType -- ^ desired 'RuntimeRep' (e.g. 'liftedRepTy')
+                              -> TcM Bool
+unifyTypeRuntimeRep_syntactic ty desired_rr
+  = do { res <- unifyConcrete_syntactic rr desired_rr
+          -- NB: unifyConcrete_syntactic asserts that both arguments are concrete,
+          -- so no need to assert that here.
+       ; traceTc "unifyTypeRuntimeRep_syntatic" $
+          vcat [ text "ty:" <+> ppr ty
+               , text "rr:" <+> ppr rr
+               , text "desired_rr:" <+> ppr desired_rr
+               , text "OK:" <+> ppr res ]
+       ; return res }
+  where
+    rr = getRuntimeRep ty
+
+-- | Syntactically unify two concrete types. Looks through filled metavariables,
+-- but does not do any rewriting, nor does it ever defer work to the
+-- constraint solver (this function never emits any constraints).
+--
+-- Preconditions:
+--    - The LHS and RHS types are both concrete, in the sense of
+--      Note [Concrete types] in GHC.Tc.Utils.Concrete.
+--    - The kinds of LHS and RHS are equal (according to 'tcEqType').
+unifyConcrete_syntactic :: HasDebugCallStack => TcType -> TcType -> TcM Bool
+unifyConcrete_syntactic ty desired_ty
+  = do { massertPpr (conc1 && conc2) $
+           vcat [ text "unifyConcrete_syntactic: non-concrete" <+> what_not_conc
+                , text "LHS:" <+> ppr ty
+                , text "RHS:" <+> ppr desired_ty ]
+       ; massertPpr (ki1 `tcEqType` ki2) $
+           vcat [ text "unifyConcrete_syntactic: kind mismatch"
+                , text "LHS:" <+> ppr ty <+> dcolon <+> ppr ki1
+                , text "RHS:" <+> ppr desired_ty <+> dcolon <+> ppr ki2 ]
+       ; (co, wc) <- captureConstraints $ unifyKind (Just $ TypeThing desired_ty) ty desired_ty
+       ; traceTc "unifyConcrete_syntactic" $
+            vcat [ text "ty:" <+> ppr ty
+                 , text "desired_ty:" <+> ppr desired_ty
+                 , text "co:" <+> ppr co
+                 , text "wc:" <+> ppr wc ]
+
+       ; if not $ isEmptyWC wc
+
+         -- There were unsolved constraints, perhaps something like `IntRep ~# LiftedRep`.
+         then return False
+
+         -- No unsolved constraints: we expect evidence for the equality to be Refl,
+         -- as both sides are concrete.
+         else
+    do { massertPpr (isReflexiveCo co) $
+           vcat [ text "unifyConcrete_syntactic: unification succeeded with non-reflexive coercion"
+                , text "ty:" <+> ppr ty
+                , text "desired_ty:" <+> ppr desired_ty
+                , text "co:" <+> ppr co ]
+       ; return True } }
+  where
+    ki1, ki2 :: TcKind
+    ki1 = typeKind ty
+    ki2 = typeKind desired_ty
+    conc1, conc2 :: Bool
+    conc1 = isConcrete ty
+    conc2 = isConcrete desired_ty
+    what_not_conc :: SDoc
+    what_not_conc
+      | not conc1 && not conc2
+      = text "LHS and RHS"
+      | not conc1
+      = text "LHS"
+      | otherwise
+      = text "RHS"

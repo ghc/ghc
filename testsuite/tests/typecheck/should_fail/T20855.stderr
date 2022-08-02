@@ -1,0 +1,10 @@
+
+T20855.hs:10:14: error:
+    • Expected a lifted variable, but the following variable is unlifted:
+      • x :: Int# :: TYPE 'IntRep
+      NB: variables used in parallel list comprehensions must be lifted.
+    • In a stmt of a list comprehension:
+        Just (I# x) <- xs |  I# y <- ys
+      In the expression: [I# (x +# y) | Just (I# x) <- xs |  I# y <- ys]
+      In an equation for ‘gore’:
+          gore xs ys = [I# (x +# y) | Just (I# x) <- xs |  I# y <- ys]

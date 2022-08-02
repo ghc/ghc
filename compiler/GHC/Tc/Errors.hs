@@ -1676,10 +1676,14 @@ mkTyVarEqErr' :: SolverReportErrCtxt -> ErrorItem
               -> (TcTyVar, TcCoercionN) -> TcType -> TcM (AccReportMsgs, [GhcHint])
 mkTyVarEqErr' ctxt item (tv1, co1) ty2
 
-  -- Is this a representation-polymorphism error, e.g.
-  -- alpha[conc] ~# rr[sk] ? If so, handle that first.
-  | Just frr_info <- mb_concrete_reason
-  = do
+  -- Is this an error involving a concrete metavariable being equal
+  -- to a non-concrete type, e.g. alpha[conc] ~# rr[sk]?
+  -- If so, handle that first.
+  | Just (conc_reason, conc_tv, not_conc) <- mb_concrete_reason
+  = case conc_reason of
+    ConcreteFRR frr_orig -> do
+      let frr_info = FRR_Info { frr_info_origin = frr_orig
+                              , frr_info_not_concrete = Just (conc_tv, not_conc) }
       (_, infos) <- zonkTidyFRRInfos (cec_tidy ctxt) [frr_info]
       return (FixedRuntimeRepError infos :| [], [])
 
@@ -1776,20 +1780,17 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
     -- we need to retrieve the ConcreteTvOrigin. Just knowing whether
     -- there is an error is not sufficient. See #21430.
     mb_concrete_reason
-      | Just frr_orig <- isConcreteTyVar_maybe tv1
+      | Just conc_orig <- isConcreteTyVar_maybe tv1
       , not (isConcrete ty2)
-      = Just $ frr_reason frr_orig tv1 ty2
-      | Just (tv2, frr_orig) <- isConcreteTyVarTy_maybe ty2
+      = Just (conc_orig, tv1, ty2)
+      | Just (tv2, conc_orig) <- isConcreteTyVarTy_maybe ty2
       , not (isConcreteTyVar tv1)
-      = Just $ frr_reason frr_orig tv2 ty1
+      = Just (conc_orig, tv2, ty1)
       -- NB: if it's an unsolved equality in which both sides are concrete
       -- (e.g. a concrete type variable on both sides), then it's not a
       -- representation-polymorphism problem.
       | otherwise
       = Nothing
-    frr_reason (ConcreteFRR frr_orig) conc_tv not_conc
-      = FRR_Info { frr_info_origin = frr_orig
-                 , frr_info_not_concrete = Just (conc_tv, not_conc) }
 
     ty1 = mkTyVarTy tv1
 

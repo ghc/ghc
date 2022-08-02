@@ -438,7 +438,7 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_n
                 --      (see Note [How RecStmt works] in Language.Haskell.Syntax.Expr)
 
         ; let rec_ids = takeList rec_names tup_ids
-        ; later_ids <- tcLookupLocalIds later_names
+        ; later_ids <- lookupBigTupIds ArrowRecStmtMustBeLifted later_names
 
         ; let rec_rets = takeList rec_names tup_rets
         ; let ret_table = zip tup_ids tup_rets

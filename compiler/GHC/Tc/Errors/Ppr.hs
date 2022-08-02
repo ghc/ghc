@@ -3,6 +3,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic TcRnMessage
 
@@ -723,7 +724,8 @@ instance Diagnostic TcRnMessage where
                      , text "in the following constraint" <> plural tidy_wanteds ])
              2
              (pprWithArising tidy_wanteds)
-
+    TcRnMustBeLifted ctxt bad_ids
+      -> mkSimpleDecorated $ pprMustBeLiftedError ctxt bad_ids
 
     TcRnForeignImportPrimExtNotSet _decl
       -> mkSimpleDecorated $
@@ -1271,6 +1273,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnPragmaWarning{}
       -> WarningWithFlag Opt_WarnWarningsDeprecations
+    TcRnMustBeLifted {}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -1581,10 +1585,14 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnSpecialiseNotVisible name
       -> [SuggestSpecialiseVisibilityHints name]
-    TcRnNameByTemplateHaskellQuote{} -> noHints
-    TcRnIllegalBindingOfBuiltIn{} -> noHints
-    TcRnPragmaWarning{} -> noHints
-
+    TcRnNameByTemplateHaskellQuote{}
+      -> noHints
+    TcRnIllegalBindingOfBuiltIn{}
+      -> noHints
+    TcRnPragmaWarning{}
+      -> noHints
+    TcRnMustBeLifted {}
+      -> noHints
 
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",
 -- and so on.  The `and` stands for any `conjunction`, which is passed in.
@@ -1596,6 +1604,7 @@ commafyWith conjunction xs = addConjunction $ punctuate comma xs
     where addConjunction [x, y] = [x, conjunction, y]
           addConjunction (x : xs) = x : addConjunction xs
           addConjunction _ = panic "commafyWith expected 2 or more elements"
+
 
 deriveInstanceErrReasonHints :: Class
                              -> UsingGeneralizedNewtypeDeriving
@@ -2228,7 +2237,8 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
           = quotes (text "Levity")
           | otherwise
           = text "type"
-
+pprTcSolverReportMsg _ (NotLiftedError reason id) =
+  pprMustBeLiftedError reason (id :| [])
 pprTcSolverReportMsg _ (SkolemEscape item implic esc_skols) =
   let
     esc_doc = sep [ text "because" <+> what <+> text "variable" <> plural esc_skols
@@ -2496,6 +2506,25 @@ pprTcSolverReportMsg _ (UnsafeOverlap item matches unsafe_overlapped) =
     ct_loc      = errorItemCtLoc item
     pred        = errorItemPred item
     (clas, tys) = getClassPredTys pred
+
+-- | Pretty-print an error when an 'Id' that is required to be lifted
+-- does not have a lifted type.
+pprMustBeLiftedError :: MustBeLiftedReason -> NonEmpty Id -> SDoc
+pprMustBeLiftedError ctxt (NE.toList -> bad_ids) =
+  vcat
+    ( hsep [ text "Expected" <+> what <> comma
+           , text "but the following variable" <> plural bad_ids <+> isOrAre bad_ids <+> text "unlifted:" ]
+    : map ppr_id bad_ids ++ [info] )
+  where
+    what :: SDoc
+    what = case bad_ids of { [_] -> text "a lifted variable"; _ -> text "lifted variables"}
+    ppr_id :: Id -> SDoc
+    ppr_id v = bullet <+> ppr v <+> dcolon <+> ppr ty <+> dcolon <+> ppr ki
+      where
+        ty = idType v
+        ki = typeKind ty
+    info :: SDoc
+    info = text "NB: variables used in" <+> ppr ctxt <> text "s" <+> text "must be lifted."
 
 {- *********************************************************************
 *                                                                      *
