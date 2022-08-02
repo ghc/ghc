@@ -137,7 +137,7 @@ string in the type-level list of fields: ::
     getField (Cons _ _ r) = getField @x r
 
   r :: Record '[ '("name", String) ]
-  r = Cons Proxy "R" Nil)
+  r = Cons Proxy "R" Nil
 
   x = getField @"name" r
 
