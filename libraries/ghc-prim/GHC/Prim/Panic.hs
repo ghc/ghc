@@ -4,12 +4,13 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- | Primitive panics.
 module GHC.Prim.Panic
    ( absentSumFieldError
    , panicError
-   , absentError
+   , absentError, absentConstraintError
    )
 where
 
@@ -95,6 +96,16 @@ absentSumFieldError = panicError "entered absent sum field!"#
 {-# NOINLINE absentError #-}
 absentError :: Addr# -> a
 absentError errmsg =
+  runRW# (\s ->
+    case stg_absentError# errmsg s of
+      (# _, _ #) -> -- This bottom is unreachable but we can't
+                    -- use an empty case lest the pattern match
+                    -- checker squawks.
+                    let x = x in x)
+
+{-# NOINLINE absentConstraintError #-}
+absentConstraintError :: forall (a :: Constraint). Addr# -> a
+absentConstraintError errmsg =
   runRW# (\s ->
     case stg_absentError# errmsg s of
       (# _, _ #) -> -- This bottom is unreachable but we can't

@@ -1177,7 +1177,7 @@ tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
   = tc_lhs_type mode rn_ty exp_kind
 
   -- See Note [Body kind of a HsQualTy]
-  | tcIsConstraintKind exp_kind
+  | isConstraintKind exp_kind
   = do { ctxt' <- tc_hs_context mode ctxt
        ; ty'   <- tc_lhs_type mode rn_ty constraintKind
        ; return (mkPhiTy ctxt' ty') }
@@ -1400,7 +1400,7 @@ tupKindSort_maybe :: TcKind -> Maybe TupleSort
 tupKindSort_maybe k
   | Just (k', _) <- splitCastTy_maybe k = tupKindSort_maybe k'
   | Just k'      <- tcView k            = tupKindSort_maybe k'
-  | tcIsConstraintKind k = Just ConstraintTuple
+  | isConstraintKind k = Just ConstraintTuple
   | tcIsLiftedTypeKind k   = Just BoxedTuple
   | otherwise            = Nothing
 
@@ -3840,7 +3840,7 @@ checkDataKindSig data_sort kind
 -- | Checks that the result kind of a class is exactly `Constraint`, rejecting
 -- type synonyms and type families that reduce to `Constraint`. See #16826.
 checkClassKindSig :: Kind -> TcM ()
-checkClassKindSig kind = checkTc (tcIsConstraintKind kind) err_msg
+checkClassKindSig kind = checkTc (isConstraintKind kind) err_msg
   where
     err_msg :: TcRnMessage
     err_msg = TcRnClassKindNotConstraint kind

@@ -2261,7 +2261,7 @@ naturalNBDataConKey       = mkPreludeDataConUnique 124
 ************************************************************************
 -}
 
-wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
+wildCardKey, absentErrorIdKey, absentConstraintErrorIdKey, augmentIdKey, appendIdKey,
     buildIdKey, foldrIdKey, recSelErrorIdKey,
     seqIdKey, eqStringIdKey,
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
@@ -2279,6 +2279,7 @@ absentErrorIdKey              = mkPreludeMiscIdUnique  1
 augmentIdKey                  = mkPreludeMiscIdUnique  2
 appendIdKey                   = mkPreludeMiscIdUnique  3
 buildIdKey                    = mkPreludeMiscIdUnique  4
+absentConstraintErrorIdKey    = mkPreludeMiscIdUnique  5
 foldrIdKey                    = mkPreludeMiscIdUnique  6
 recSelErrorIdKey              = mkPreludeMiscIdUnique  7
 seqIdKey                      = mkPreludeMiscIdUnique  8

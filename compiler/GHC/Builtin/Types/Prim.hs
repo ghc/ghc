@@ -30,6 +30,8 @@ module GHC.Builtin.Types.Prim(
         levity1TyVarInf, levity2TyVarInf,
         levity1Ty, levity2Ty,
 
+        alphaConstraintTyVar, betaConstraintTyVar,
+
         openAlphaTyVar, openBetaTyVar, openGammaTyVar,
         openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec,
         openAlphaTy, openBetaTy, openGammaTy,
@@ -122,7 +124,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
   , multiplicityTy
-  , cONSTRAINTTyCon )
+  , constraintKind, cONSTRAINTTyCon )
 
 import GHC.Types.Var    ( TyVarBinder, TyVar
                         , mkTyVar, mkTyVarBinder, mkTyVarBinders )
@@ -428,6 +430,12 @@ alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar :: TyVar
 
 alphaTyVarSpec, betaTyVarSpec, gammaTyVarSpec, deltaTyVarSpec :: TyVarBinder
 (alphaTyVarSpec:betaTyVarSpec:gammaTyVarSpec:deltaTyVarSpec:_) = mkTyVarBinders Specified alphaTyVars
+
+alphaConstraintTyVars :: [TyVar]
+alphaConstraintTyVars = mkTemplateTyVars $ repeat constraintKind
+
+alphaConstraintTyVar, betaConstraintTyVar :: TyVar
+(alphaConstraintTyVar:betaConstraintTyVar:_) = alphaConstraintTyVars
 
 alphaTys :: [Type]
 alphaTys = mkTyVarTys alphaTyVars

@@ -772,7 +772,7 @@ errorIds
       rAISE_DIVZERO_ID
       ]
 
-recSelErrorName, runtimeErrorName, absentErrorName :: Name
+recSelErrorName, runtimeErrorName :: Name
 recConErrorName, patErrorName :: Name
 nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
 typeErrorName :: Name
@@ -795,7 +795,7 @@ err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
 
 rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
-tYPE_ERROR_ID, aBSENT_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID :: Id
+tYPE_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID :: Id
 rAISE_OVERFLOW_ID, rAISE_UNDERFLOW_ID, rAISE_DIVZERO_ID :: Id
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
@@ -903,13 +903,6 @@ absentSumFieldErrorName
       (fsLit "absentSumFieldError")
       absentSumFieldErrorIdKey
       aBSENT_SUM_FIELD_ERROR_ID
-
-absentErrorName
-   = mkWiredInIdName
-      gHC_PRIM_PANIC
-      (fsLit "absentError")
-      absentErrorIdKey
-      aBSENT_ERROR_ID
 
 raiseOverflowName
    = mkWiredInIdName
@@ -1081,19 +1074,48 @@ but that should be okay; since there's no pattern match we can't really
 be relying on anything from it.
 -}
 
-aBSENT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
- = mkVanillaGlobalWithInfo absentErrorName absent_ty id_info
- where
-   absent_ty = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany addrPrimTy alphaTy)
-   -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
-   -- lifted-type things; see Note [Absent fillers] in GHC.Core.Opt.WorkWrap.Utils
-   id_info = divergingIdInfo [evalDmd] -- NB: CAFFY!
+-- We need two absentError Ids:
+--   absentError           :: forall (a :: Type).       Addr# -> a
+--   absentConstraintError :: forall (a :: Constraint). Addr# -> a
+-- We don't have polymorphism over TypeOrConstraint!
+-- mkAbsentErrorApp chooses which one to use, based on the kind
 
 mkAbsentErrorApp :: Type         -- The type to instantiate 'a'
                  -> String       -- The string to print
                  -> CoreExpr
 
 mkAbsentErrorApp res_ty err_msg
-  = mkApps (Var aBSENT_ERROR_ID) [ Type res_ty, err_string ]
+  = mkApps (Var err_id) [ Type res_ty, err_string ]
   where
+    err_id | isConstraintKind (typeKind res_ty) = aBSENT_CONSTRAINT_ERROR_ID
+           | otherwise                          = aBSENT_ERROR_ID
     err_string = Lit (mkLitString err_msg)
+
+absentErrorName, absentConstraintErrorName :: Name
+absentErrorName
+   = mkWiredInIdName gHC_PRIM_PANIC (fsLit "absentError")
+      absentErrorIdKey aBSENT_ERROR_ID
+
+absentConstraintErrorName
+   = mkWiredInIdName gHC_PRIM_PANIC (fsLit "absentConstraintError")
+      absentConstraintErrorIdKey aBSENT_CONSTRAINT_ERROR_ID
+
+aBSENT_ERROR_ID, aBSENT_CONSTRAINT_ERROR_ID :: Id
+
+aBSENT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
+ = mkVanillaGlobalWithInfo absentErrorName absent_ty id_info
+ where
+   -- absentError :: forall (a :: Type). Addr# -> a
+   absent_ty = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany addrPrimTy alphaTy)
+   -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
+   -- lifted-type things; see Note [Absent fillers] in GHC.Core.Opt.WorkWrap.Utils
+   id_info = divergingIdInfo [evalDmd] -- NB: CAFFY!
+
+aBSENT_CONSTRAINT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
+ = mkVanillaGlobalWithInfo absentConstraintErrorName absent_ty id_info
+ where
+   -- absentConstraintError :: forall (a :: Constraint). Addr# -> a
+   absent_ty = mkSpecForAllTys [alphaConstraintTyVar] (mkVisFunTyMany addrPrimTy alphaTy)
+   id_info = divergingIdInfo [evalDmd] -- NB: CAFFY!
+
+

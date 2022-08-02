@@ -151,7 +151,7 @@ module GHC.Core.Type (
 
         -- ** Finding the kind of a type
         typeKind, tcTypeKind, typeHasFixedRuntimeRep, argsHaveFixedRuntimeRep,
-        tcIsLiftedTypeKind, tcIsConstraintKind, tcReturnsConstraintKind,
+        tcIsLiftedTypeKind, isConstraintKind, tcReturnsConstraintKind,
         tcIsBoxedTypeKind, tcIsRuntimeTypeKind,
 
         -- ** Common Kind
@@ -264,7 +264,6 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  ( charTy, naturalTy, listTyCon
                                  , typeSymbolKind, liftedTypeKind, unliftedTypeKind
                                  , boxedRepDataConTyCon
-                                 , constraintKind
                                  , manyDataConTy, oneDataConTy )
 import GHC.Types.Name( Name )
 import GHC.Builtin.Names
@@ -3014,7 +3013,12 @@ typeKind ty@(ForAllTy {})
 -- which uses "tc" functions
 ---------------------------------------------
 
+
 tcTypeKind :: HasDebugCallStack => Type -> Kind
+tcTypeKind = typeKind
+
+
+{-
 -- No need to expand synonyms
 tcTypeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
 tcTypeKind (LitTy l)         = typeLiteralKind l
@@ -3038,7 +3042,7 @@ tcTypeKind (AppTy fun arg)
     go fun             args = piResultTys (tcTypeKind fun) args
 
 tcTypeKind ty@(ForAllTy {})
-  | tcIsConstraintKind body_kind
+  | isConstraintKind body_kind
   = constraintKind
 
   | otherwise
@@ -3052,11 +3056,11 @@ tcTypeKind ty@(ForAllTy {})
   where
     (tvs, body) = splitForAllTyVars ty
     body_kind = tcTypeKind body
-
+-}
 
 isPredTy :: HasDebugCallStack => Type -> Bool
 -- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
-isPredTy ty = tcIsConstraintKind (tcTypeKind ty)
+isPredTy ty = isConstraintKind (tcTypeKind ty)
 
 isSORTKind_maybe :: Kind -> Maybe (Type,Type)
 -- Sees if the argument is if form (SORT type_or_constraint runtime_rep)
@@ -3080,12 +3084,9 @@ isConstraintLike ty = case splitTyConApp_maybe ty of
                         Just (tc,_) -> tc `hasKey` constraintLikeDataConKey
                         Nothing     -> False
 
--- tcIsConstraintKind stuff only makes sense in the typechecker
--- After that Constraint = Type
--- See Note [coreView vs tcView]
--- Defined here because it is used in isPredTy and tcRepSplitAppTy_maybe (sigh)
-tcIsConstraintKind :: Kind -> Bool
-tcIsConstraintKind kind
+isConstraintKind :: Kind -> Bool
+-- True of (SORT ConstraintLike _)
+isConstraintKind kind
   | Just (t_or_c, _) <- isSORTKind_maybe kind
   = isConstraintLike t_or_c
   | otherwise

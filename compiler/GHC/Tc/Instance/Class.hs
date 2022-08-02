@@ -654,7 +654,7 @@ matchTypeable clas [k,t]  -- clas = Typeable
   | k `eqType` naturalTy                   = doTyLit knownNatClassName         t
   | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
   | k `eqType` charTy                      = doTyLit knownCharClassName        t
-  | tcIsConstraintKind t                   = doTyConApp clas t constraintKindTyCon []
+  | isConstraintKind t                     = doTyConApp clas t constraintKindTyCon []
   | Just (af,mult,arg,ret) <- splitFunTy_maybe t
    , isVisibleAnonArg af                   = doFunTy    clas t mult arg ret
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]

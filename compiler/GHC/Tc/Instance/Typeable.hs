@@ -560,7 +560,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
         -- We handle (TYPE LiftedRep) etc separately to make it
         -- clear to consumers (e.g. serializers) that there is
         -- a loop here (as TYPE :: RuntimeRep -> TYPE 'LiftedRep)
-      | not (tcIsConstraintKind k)
+      | not (isConstraintKind k)
               -- Typeable respects the Constraint/Type distinction
               -- so do not follow the special case here
       , Just arg <- kindRep_maybe k

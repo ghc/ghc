@@ -448,7 +448,7 @@ checkTySynRhs ctxt ty
   | tcReturnsConstraintKind actual_kind
   = do { ck <- xoptM LangExt.ConstraintKinds
        ; if ck
-         then  when (tcIsConstraintKind actual_kind)
+         then  when (isConstraintKind actual_kind)
                     (do { dflags <- getDynFlags
                         ; expand <- initialExpandMode
                         ; check_pred_ty emptyTidyEnv dflags ctxt expand ty })
