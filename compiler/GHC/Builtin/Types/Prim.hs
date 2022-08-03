@@ -690,7 +690,7 @@ We abbreviate '*' specially:
 Note [Type vs Constraint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC distinguishes Type from Constraint, via the TypeOrConstraint
-parameter of SORT.  See GHC Proposal #518.
+parameter of SORT. See GHC Proposal #518, and tickets #21623 and #11715.
 
 There are a number of wrinkles
 
@@ -710,7 +710,7 @@ Examples:
 Note [Type and Constraint are not apart]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Type and Constraint are not equal (eqType) but they are not /apart/
-either. Reason:
+either. Reason (c.f. #7451):
 
 * We want to allow newtype classes, where
     class C a where { op :: a -> a }
