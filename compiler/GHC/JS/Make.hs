@@ -98,6 +98,7 @@ module GHC.JS.Make
   , preDecrS, postDecrS
   , off8, off16, off32, off64
   , mask8, mask16
+  , signExtend8, signExtend16
   , typeof
   , returnStack, assignAllEqual, assignAll
   , declAssignAll
@@ -487,6 +488,14 @@ mask8 x = BAnd x (Int 0xFF)
 -- | a bit mask to retrieve the lower 16-bits
 mask16 :: JExpr -> JExpr
 mask16 x = BAnd x (Int 0xFFFF)
+
+-- | Sign-extend a 8-bit value
+signExtend8 :: JExpr -> JExpr
+signExtend8 x = (BAnd x (Int 0xFF) `BXor` 0x80) `Sub` 0x80
+
+-- | Sign-extend a 16-bit value
+signExtend16 :: JExpr -> JExpr
+signExtend16 x = (BAnd x (Int 0xFFFF) `BXor` 0x8000) `Sub` 0x8000
 
 -- | Select a property 'prop', from and object 'obj'
 --
