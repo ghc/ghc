@@ -38,10 +38,10 @@ $1/$2/build/%_hsc.c $1/$2/build/%_hsc.h $1/$2/build/%.hs : $1/$3/%.hsc $$$$(hsc2
 
 # Now the rules for hs-boot files.
 
-$1/$2/build/%.hs-boot : $1/$3/%.hs-boot
+$1/$2/build/%.hs-boot : $1/$3/%.hs-boot | $$$$(dir $$$$@)/.
 	"$$(CP)" $$< $$@
 
-$1/$2/build/%.lhs-boot : $1/$3/%.lhs-boot
+$1/$2/build/%.lhs-boot : $1/$3/%.lhs-boot | $$$$(dir $$$$@)/.
 	"$$(CP)" $$< $$@
 
 endif
