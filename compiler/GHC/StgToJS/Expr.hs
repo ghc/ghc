@@ -46,6 +46,7 @@ import GHC.Stg.Syntax
 import GHC.Stg.Utils
 
 import GHC.Builtin.PrimOps
+import GHC.Builtin.Types
 
 import GHC.Core
 import GHC.Core.TyCon
@@ -301,21 +302,40 @@ genBody ctx i startReg args e = do
 -- find the result type after applying the function to the arguments
 resultSize :: HasDebugCallStack => [Id] -> Type -> [(PrimRep, Int)]
 resultSize xxs@(_:xs) t
+  -- case: (# x, y, z #) -> r
+  --
+  -- we unarise the argument: x -> y -> z -> r
+  -- and we call resultSize again on this new type.
+  --
+  -- Note that in the case (# #) -> r
+  -- we have to drop one (void) argument
+  -- so there is nothing to unarise and this case is handled by the next
+  -- alternative.
   | t' <- unwrapType t
-  , Just (_mult, fa, fr) <- splitFunTy_maybe t' -- isFunTy t' =
+  , Just (_mult, fa, fr) <- splitFunTy_maybe t'
   , Just (tc, ys) <- splitTyConApp_maybe fa
-  , isUnboxedTupleTyCon tc =
-      resultSize xxs (mkVisFunTysMany (dropRuntimeRepArgs ys) fr)
+  , isUnboxedTupleTyCon tc
+  , tc /= unboxedUnitTyCon
+  = let -- unarised function type
+        t'' = mkVisFunTysMany (dropRuntimeRepArgs ys) fr
+    in resultSize xxs t''
+
+  -- case: x -> r
+  --
+  -- drop one argument and recurse on r
   | t' <- unwrapType t
-  , Just (_mult, _fa, fr) <- splitFunTy_maybe t' = -- isFunTy t' =
-      resultSize xs fr
+  , Just (_mult, _fa, fr) <- splitFunTy_maybe t'
+  = resultSize xs fr
+
   | otherwise = [(LiftedRep, 1)] -- possibly newtype family, must be boxed
+
 resultSize [] t
   -- FIXME: Jeff (2022,05): Is this check actually needed? If we have a runtime
   -- rep kinded type can't we just call typePrimReps to get the PrimReps and
   -- then primRep size just like in the catchall case? I don't see why this
   -- doesn't work.
   | isRuntimeRepKindedTy t' = pprPanic "resultSize: Type was RuntimeRepKinded don't know the size! " (ppr t')
+
   -- Note that RuntimeRep from Builtins.Types hits this case. A singleton of
   -- (LiftedRep, 1) is exactly what's returned by the otherwise case for
   -- RuntimeRep.
