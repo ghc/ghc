@@ -48,12 +48,12 @@ genLit = \case
     LitNumInt8    -> return [ toJExpr v ]
     LitNumInt16   -> return [ toJExpr v ]
     LitNumInt32   -> return [ toJExpr v ]
-    LitNumInt64   -> return [ toJExpr (Bits.shiftR v 32), toJExpr (toSigned v) ]
-    LitNumWord    -> return [ toJExpr (toSigned v) ]
-    LitNumWord8   -> return [ toJExpr (toSigned v) ]
-    LitNumWord16  -> return [ toJExpr (toSigned v) ]
-    LitNumWord32  -> return [ toJExpr (toSigned v) ]
-    LitNumWord64  -> return [ toJExpr (toSigned (Bits.shiftR v 32)), toJExpr (toSigned v) ]
+    LitNumInt64   -> return [ toJExpr (Bits.shiftR v 32), toU32Expr v ]
+    LitNumWord    -> return [ toU32Expr v ]
+    LitNumWord8   -> return [ toU32Expr v ]
+    LitNumWord16  -> return [ toU32Expr v ]
+    LitNumWord32  -> return [ toU32Expr v ]
+    LitNumWord64  -> return [ toU32Expr (Bits.shiftR v 32), toU32Expr v ]
     LitNumBigNat  -> panic "genLit: unexpected BigNat that should have been removed in CorePrep"
   LitFloat r               -> return [ toJExpr (r2f r) ]
   LitDouble r              -> return [ toJExpr (r2d r) ]
@@ -81,27 +81,32 @@ genStaticLit = \case
     --  benefit other backends?
     -- \|  invalid UTF8         -> return [ BinLit str, IntLit 0]
   LitNullAddr              -> return [ NullLit, IntLit 0 ]
-  LitNumber LitNumInt i    -> return [ IntLit (fromIntegral i) ]
-  LitNumber LitNumInt8 i   -> return [ IntLit (fromIntegral i) ]
-  LitNumber LitNumInt16 i  -> return [ IntLit (fromIntegral i) ]
-  LitNumber LitNumInt32 i  -> return [ IntLit (fromIntegral i) ]
-  LitNumber LitNumInt64 i  -> return [ IntLit (i `Bits.shiftR` 32), IntLit (toSigned i) ]
-  LitNumber LitNumWord w   -> return [ IntLit (toSigned w) ]
-  LitNumber LitNumWord8  w -> return [ IntLit (toSigned w) ]
-  LitNumber LitNumWord16 w -> return [ IntLit (toSigned w) ]
-  LitNumber LitNumWord32 w -> return [ IntLit (toSigned w) ]
-  LitNumber LitNumWord64 w -> return [ IntLit (toSigned (w `Bits.shiftR` 32)), IntLit (toSigned w) ]
+  LitNumber nt v           -> case nt of
+    LitNumInt     -> return [ IntLit v ]
+    LitNumInt8    -> return [ IntLit v ]
+    LitNumInt16   -> return [ IntLit v ]
+    LitNumInt32   -> return [ IntLit v ]
+    LitNumInt64   -> return [ IntLit (v `Bits.shiftR` 32), toU32Lit v ]
+    LitNumWord    -> return [ toU32Lit v ]
+    LitNumWord8   -> return [ toU32Lit v ]
+    LitNumWord16  -> return [ toU32Lit v ]
+    LitNumWord32  -> return [ toU32Lit v ]
+    LitNumWord64  -> return [ toU32Lit (v `Bits.shiftR` 32), toU32Lit v ]
+    LitNumBigNat  -> panic "genStaticLit: unexpected BigNat that should have been removed in CorePrep"
   LitFloat r               -> return [ DoubleLit . SaneDouble . r2f $ r ]
   LitDouble r              -> return [ DoubleLit . SaneDouble . r2d $ r ]
   LitLabel name _size fod  -> return [ LabelLit (fod == IsFunction) (mkFastString $ "h$" ++ unpackFS name)
                                      , IntLit 0 ]
-  -- FIXME: handle other LitNumbers, LitRubbish, etc.
+  -- FIXME: handle other LitRubbish, etc.
   l -> pprPanic "genStaticLit" (ppr l)
 
--- make a signed 32 bit int from this unsigned one, lower 32 bits
-toSigned :: Integer -> Integer
-toSigned i | Bits.testBit i 31 = Bits.complement (0x7FFFFFFF `Bits.xor` (i Bits..&. 0x7FFFFFFF))
-           | otherwise         = i Bits..&. 0xFFFFFFFF
+-- make an unsigned 32 bit number from this unsigned one, lower 32 bits
+toU32Expr :: Integer -> JExpr
+toU32Expr i = Int (i Bits..&. 0xFFFFFFFF) .>>>. 0
+
+-- make an unsigned 32 bit number from this unsigned one, lower 32 bits
+toU32Lit :: Integer -> StaticLit
+toU32Lit i = IntLit (i Bits..&. 0xFFFFFFFF)
 
 r2d :: Rational -> Double
 r2d = realToFrac
