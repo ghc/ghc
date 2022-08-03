@@ -484,6 +484,20 @@ libraries/template-haskell_CONFIGURE_OPTS += --flags=+vendor-filepath
 
 libraries/ghc-bignum_CONFIGURE_OPTS += -f $(BIGNUM_BACKEND)
 
+CABAL_DEPS = text transformers mtl parsec Cabal/Cabal-syntax
+CABAL_BOOT_DEPS = process array filepath base bytestring containers deepseq time unix pretty directory
+
+BOOT_PKG_DEPS := \
+    $(foreach p,$(CABAL_BOOT_DEPS),\
+        --dependency="$p=$p-$(shell $(GHC_PKG) --simple-output field $p version)")
+
+STAGE0_PKG_DEPS := \
+    $(foreach d,$(CABAL_DEPS),\
+        $(foreach p,$(basename $(notdir $(wildcard libraries/$d/*.cabal))),\
+            --dependency="$p=$p-$(shell grep -i "^Version:" libraries/$d/$p.cabal | sed "s/[^0-9.]//g")"))
+
+libraries/Cabal/Cabal_dist-boot_CONFIGURE_OPTS += --exact-configuration $(BOOT_PKG_DEPS) $(STAGE0_PKG_DEPS)
+
 ifeq "$(BIGNUM_BACKEND)" "gmp"
 GMP_ENABLED = YES
 libraries/ghc-bignum_CONFIGURE_OPTS += --configure-option="--with-gmp"
