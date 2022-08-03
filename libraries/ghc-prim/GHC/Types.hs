@@ -484,7 +484,7 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
 -- RuntimeRep is intimately tied to TyCon.RuntimeRep (in GHC proper). See
 -- Note [RuntimeRep and PrimRep] in RepType.
 -- See also Note [Wiring in RuntimeRep] in GHC.Builtin.Types
--- See also Note [TYPE and RuntimeRep] in GHC.Builtin.Type.Prim
+-- See also Note [SORT, TYPE, and CONSTRAINT] in GHC.Builtin.Type.Prim
 
 -- | Length of a SIMD vector type
 data VecCount = Vec2

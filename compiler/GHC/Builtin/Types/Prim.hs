@@ -643,8 +643,6 @@ tcArrowTyCon = mkPrimTyCon tcArrowTyConName tc_bndrs liftedTypeKind tc_roles
 *                                                                      *
 ************************************************************************
 
-***  ToDo: was Note [TYPE and RuntimeRep]  ***
-
 Note [SORT, TYPE, and CONSTRAINT]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 All types that classify values have a kind of the form (SORT t_or_c rr), where

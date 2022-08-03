@@ -1475,7 +1475,7 @@ unrestrictedFunTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->
 ********************************************************************* -}
 
 -- For these synonyms, see
--- Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim, and
+-- Note [SORT, TYPE, and CONSTRAINT] in GHC.Builtin.Types.Prim, and
 -- Note [Using synonyms to compress types] in GHC.Core.Type
 
 ----------------------

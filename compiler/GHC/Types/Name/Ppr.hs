@@ -127,7 +127,7 @@ mkPrintUnqualified unit_env env
 
 {- Note [pretendNameIsInScopeForPpr]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-c.f. Note [PretendNameIsInScope] in GHC.Builtin.Names
+c.f. Note [pretendNameIsInScope] in GHC.Builtin.Names
 Normally, a name is printed unqualified if it's in scope and unambiguous:
   ghci> :t not
   not :: Bool -> Bool

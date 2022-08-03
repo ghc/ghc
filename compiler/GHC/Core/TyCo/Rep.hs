@@ -2165,7 +2165,7 @@ mkTYPEapp_maybe :: RuntimeRepType -> Maybe Type
 --     because those inner types should already have been rewritten
 --     to LiftedRep and UnliftedRep respectively, by mkTyConApp
 --
--- see Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
+-- see Note [SORT, TYPE, and CONSTRAINT] in GHC.Builtin.Types.Prim.
 -- See Note [Using synonyms to compress types] in GHC.Core.Type
 {-# NOINLINE mkTYPEapp_maybe #-}
 mkTYPEapp_maybe (TyConApp tc args)
@@ -2199,7 +2199,7 @@ mkBoxedRepApp_maybe :: Type -> Maybe Type
 -- On the fly, rewrite
 --      BoxedRep Lifted     -->   liftedRepTy    (a synonym)
 --      BoxedRep Unlifted   -->   unliftedRepTy  (ditto)
--- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
+-- See Note [SORT, TYPE, and CONSTRAINT] in GHC.Builtin.Types.Prim.
 -- See Note [Using synonyms to compress types] in GHC.Core.Type
 {-# NOINLINE mkBoxedRepApp_maybe #-}
 mkBoxedRepApp_maybe (TyConApp tc args)
@@ -2213,7 +2213,7 @@ mkTupleRepApp_maybe :: Type -> Maybe Type
 -- ^ Given a `[RuntimeRep]`, apply `TupleRep` to it
 -- On the fly, rewrite
 --      TupleRep [] -> zeroBitRepTy   (a synonym)
--- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
+-- See Note [SORT, TYPE, and CONSTRAINT] in GHC.Builtin.Types.Prim.
 -- See Note [Using synonyms to compress types] in GHC.Core.Type
 {-# NOINLINE mkTupleRepApp_maybe #-}
 mkTupleRepApp_maybe (TyConApp tc args)
