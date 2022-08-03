@@ -504,6 +504,12 @@ STAGE0_PKG_DEPS := \
 
 libraries/Cabal/Cabal_dist-boot_CONFIGURE_OPTS += --exact-configuration $(BOOT_PKG_DEPS) $(STAGE0_PKG_DEPS)
 
+# See Note [Support for building ghc 9.4 with the make build system]
+libraries/containers/containers/dist-install/build/Data/IntMap/Internal.o: libraries/template-haskell/dist-install/build/Language/Haskell/TH/Lib/Internal.hi
+libraries/containers/containers/dist-install/build/Data/Graph.o: libraries/template-haskell/dist-install/build/Language/Haskell/TH/Lib/Internal.hi
+libraries/containers/containers/dist-install/build/Data/Set/Internal.o: libraries/template-haskell/dist-install/build/Language/Haskell/TH/Lib/Internal.hi
+libraries/containers/containers/dist-install/build/Data/IntSet/Internal.o: libraries/template-haskell/dist-install/build/Language/Haskell/TH/Lib/Internal.hi
+
 ifeq "$(BIGNUM_BACKEND)" "gmp"
 GMP_ENABLED = YES
 libraries/ghc-bignum_CONFIGURE_OPTS += --configure-option="--with-gmp"
@@ -1630,3 +1636,6 @@ phase_1_builds: $(PACKAGE_DATA_MKS)
 # * We require a boot compiler < ghc-9.2. See issue #21914
 # * We carefully build stage0 Cabal with the boot compiler's process library,
 #   which does not satisfy Cabal's bounds. See issue #21953
+# * We add an explicit dependencies from container modules containing splices to
+#   libraries/template-haskell/dist-install/build/Language/Haskell/TH/Lib/Internal.o
+#   becasue those splices induce an implicit dependency on the template-haskell module.
