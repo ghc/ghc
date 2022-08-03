@@ -53,7 +53,7 @@ module GHC.Core.Make (
         mkRuntimeErrorApp, mkImpossibleExpr, mkAbsentErrorApp, errorIds,
         rEC_CON_ERROR_ID, rUNTIME_ERROR_ID,
         nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
-        pAT_ERROR_ID, rEC_SEL_ERROR_ID, aBSENT_ERROR_ID,
+        pAT_ERROR_ID, rEC_SEL_ERROR_ID,
         tYPE_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID
     ) where
 
@@ -238,7 +238,7 @@ mkLitRubbish ty
   | otherwise
   = Just (Lit (LitRubbish torc rep) `mkTyApps` [ty])
   where
-    Just (torc, rep) = isSORTKind_maybe (typeKind ty)
+    Just (torc, rep) = sORTKind_maybe (typeKind ty)
 
 {-
 ************************************************************************
@@ -764,7 +764,7 @@ errorIds
       pAT_ERROR_ID,
       rEC_CON_ERROR_ID,
       rEC_SEL_ERROR_ID,
-      aBSENT_ERROR_ID,
+      aBSENT_ERROR_ID, aBSENT_CONSTRAINT_ERROR_ID,
       aBSENT_SUM_FIELD_ERROR_ID,
       tYPE_ERROR_ID,   -- Used with Opt_DeferTypeErrors, see #10284
       rAISE_OVERFLOW_ID,
@@ -1106,7 +1106,8 @@ aBSENT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
  = mkVanillaGlobalWithInfo absentErrorName absent_ty id_info
  where
    -- absentError :: forall (a :: Type). Addr# -> a
-   absent_ty = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany addrPrimTy alphaTy)
+   absent_ty = mkSpecForAllTys [alphaTyVar] $
+               mkVisFunTyMany addrPrimTy (mkTyVarTy alphaTyVar)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent fillers] in GHC.Core.Opt.WorkWrap.Utils
    id_info = divergingIdInfo [evalDmd] -- NB: CAFFY!
@@ -1115,7 +1116,8 @@ aBSENT_CONSTRAINT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
  = mkVanillaGlobalWithInfo absentConstraintErrorName absent_ty id_info
  where
    -- absentConstraintError :: forall (a :: Constraint). Addr# -> a
-   absent_ty = mkSpecForAllTys [alphaConstraintTyVar] (mkVisFunTyMany addrPrimTy alphaTy)
+   absent_ty = mkSpecForAllTys [alphaConstraintTyVar] $
+               mkVisFunTyMany addrPrimTy (mkTyVarTy alphaConstraintTyVar)
    id_info = divergingIdInfo [evalDmd] -- NB: CAFFY!
 
 

@@ -561,7 +561,13 @@ rather than by using a TyConApp.
 
 * The ft_mult :: Mult field gives the first argument for FUN
   For the other three cases ft_mult is redundant; it is always Many.
+  Note that of the four type constructors, only `FUN` takes a Multiplicity.
 
+* Functions in GHC.Core.Type help to build and decompose `FunTy`.
+  * `funTyConApp_maybe`
+  * `anonArgTyCon`
+  * `tyConAppFun_maybe`
+  Use them!
 -}
 
 fUNTyConName, ctArrowTyConName, ccArrowTyConName, tcArrowTyConName :: Name

@@ -119,7 +119,7 @@ module GHC.Core.Type (
         tyConAppNeedsKindSig,
 
         -- *** Levity and boxity
-        isSORTKind_maybe,
+        sORTKind_maybe,
         typeLevity_maybe,
         isLiftedTypeKind, isUnliftedTypeKind, pickyIsLiftedTypeKind,
         isLiftedRuntimeRep, isUnliftedRuntimeRep, runtimeRepLevity_maybe,
@@ -671,7 +671,7 @@ kindRep k = case kindRep_maybe k of
 -- Treats * and Constraint as the same
 kindRep_maybe :: HasDebugCallStack => Kind -> Maybe RuntimeRepType
 kindRep_maybe kind
-  | Just (_, rep) <- isSORTKind_maybe kind = Just rep
+  | Just (_, rep) <- sORTKind_maybe kind = Just rep
   | otherwise                              = Nothing
 
 -- | Returns True if the argument is a lifted SORT
@@ -3044,13 +3044,13 @@ isPredTy :: HasDebugCallStack => Type -> Bool
 -- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
 isPredTy ty = isConstraintKind (tcTypeKind ty)
 
-isSORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
+sORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
 -- Sees if the argument is if form (SORT type_or_constraint runtime_rep)
 -- and if so returns those components
 --
 -- We do not have type-or-constraint polymorphism, so the
 -- argument to SORT should always be TypeLike or ConstraintLike
-isSORTKind_maybe kind
+sORTKind_maybe kind
   = case splitTyConApp_maybe kind of
       Just (tc, tys) | tc `hasKey` sORTTyConKey
                      , [torc_ty, rep] <- tys
@@ -3063,7 +3063,7 @@ isSORTKind_maybe kind
 -- like *, TYPE Lifted, TYPE IntRep, TYPE v, Constraint.
 classifiesTypeWithValues :: Kind -> Bool
 -- ^ True of a kind `SORT _ _`
-classifiesTypeWithValues k = isJust (isSORTKind_maybe k)
+classifiesTypeWithValues k = isJust (sORTKind_maybe k)
 
 getTypeOrConstraint_maybe :: Type -> Maybe TypeOrConstraint
 getTypeOrConstraint_maybe ty
@@ -3076,7 +3076,7 @@ getTypeOrConstraint_maybe ty
 isConstraintKind :: Kind -> Bool
 -- True of (SORT ConstraintLike _)
 isConstraintKind kind
-  | Just (ConstraintLike, _) <- isSORTKind_maybe kind
+  | Just (ConstraintLike, _) <- sORTKind_maybe kind
   = True
   | otherwise
   = False
@@ -3087,7 +3087,7 @@ isConstraintKind kind
 -- treats them as the same type, see 'isLiftedTypeKind'.
 tcIsLiftedTypeKind :: Kind -> Bool
 tcIsLiftedTypeKind kind
-  | Just (TypeLike, rep) <- isSORTKind_maybe kind
+  | Just (TypeLike, rep) <- sORTKind_maybe kind
   = isLiftedRuntimeRep rep
   | otherwise
   = False
@@ -3098,7 +3098,7 @@ tcIsLiftedTypeKind kind
 -- treats them as the same type, see 'isLiftedTypeKind'.
 tcIsBoxedTypeKind :: Kind -> Bool
 tcIsBoxedTypeKind kind
-  | Just (TypeLike, rep) <- isSORTKind_maybe kind
+  | Just (TypeLike, rep) <- sORTKind_maybe kind
   = isBoxedRuntimeRep rep
   | otherwise
   = False
@@ -3108,7 +3108,7 @@ tcIsBoxedTypeKind kind
 -- This considers 'Constraint' to be distinct from @*@.
 tcIsRuntimeTypeKind :: Kind -> Bool
 tcIsRuntimeTypeKind kind
-  | Just (TypeLike, _) <- isSORTKind_maybe kind
+  | Just (TypeLike, _) <- sORTKind_maybe kind
   = True
   | otherwise
   = False
