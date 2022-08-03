@@ -1064,8 +1064,8 @@ mkScaledFunTy :: AnonArgFlag -> Scaled Type -> Type -> Type
 mkScaledFunTy af (Scaled mult arg) res = mkFunTy af mult arg res
 
 mkVisFunTy, mkInvisFunTy :: Mult -> Type -> Type -> Type
-mkVisFunTy   = mkFunTy VisArg      -- (->)
-mkInvisFunTy = mkFunTy InvisArg1   -- (=>)
+mkVisFunTy   = mkFunTy (visArg TypeLike)     -- (->)
+mkInvisFunTy = mkFunTy (invisArg TypeLike)   -- (=>)
 
 mkFunTyMany :: AnonArgFlag -> Type -> Type -> Type
 mkFunTyMany af = mkFunTy af manyDataConTy
@@ -1079,7 +1079,7 @@ mkInvisFunTyMany = mkInvisFunTy manyDataConTy
 
 -- | Make nested arrow types
 mkVisFunTys :: [Scaled Type] -> Type -> Type
-mkVisFunTys tys ty = foldr (mkScaledFunTy VisArg) ty tys
+mkVisFunTys tys ty = foldr (mkScaledFunTy (visArg TypeLike)) ty tys
 
 mkVisFunTysMany :: [Type] -> Type -> Type
 mkVisFunTysMany tys ty = foldr mkVisFunTyMany ty tys

@@ -1527,7 +1527,7 @@ tcSplitFunTy_maybe :: Type -> Maybe (Scaled Type, Type)
 tcSplitFunTy_maybe ty
   | Just ty' <- tcView ty = tcSplitFunTy_maybe ty'
 tcSplitFunTy_maybe (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
-  | VisArg <- af = Just (Scaled w arg, res)
+  | isVisibleAnonArg af = Just (Scaled w arg, res)
 tcSplitFunTy_maybe _ = Nothing
         -- Note the VisArg guard
         -- Consider     (?x::Int) => Bool

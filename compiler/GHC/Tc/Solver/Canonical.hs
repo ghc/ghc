@@ -1308,8 +1308,8 @@ zonk_eq_types = go
         split2 = tcSplitFunTy_maybe ty2
 
     go ty1 ty2
-      | Just (tc1, tys1) <- tcRepSplitTyConApp_maybe ty1
-      , Just (tc2, tys2) <- tcRepSplitTyConApp_maybe ty2
+      | Just (tc1, tys1) <- splitTyConAppNoSyn_maybe ty1
+      , Just (tc2, tys2) <- splitTyConAppNoSyn_maybe ty2
       = if tc1 == tc2 && tys1 `equalLength` tys2
           -- Crucial to check for equal-length args, because
           -- we cannot assume that the two args to 'go' have

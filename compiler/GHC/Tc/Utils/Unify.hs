@@ -135,7 +135,7 @@ matchActualFunTySigma herald mb_thing err_info fun_ty
     go ty | Just ty' <- tcView ty = go ty'
 
     go (FunTy { ft_af = af, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
-      = assert (af == VisArg) $
+      = assert (isVisibleAnonArg af) $
       do { hasFixedRuntimeRep_syntactic (FRRExpectedFunTy herald 1) arg_ty
          ; return (idHsWrapper, Scaled w arg_ty, res_ty) }
 
@@ -397,7 +397,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
       | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
     go acc_arg_tys n (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg_ty, ft_res = res_ty })
-      = assert (af == VisArg) $
+      = assert (isVisibleAnonArg af) $
         do { let arg_pos = 1 + length acc_arg_tys -- for error messages only
            ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
            ; (wrap_res, result) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
@@ -1292,13 +1292,13 @@ tc_sub_type_ds unify inst_orig ctxt ty_actual ty_expected
                     ; tc_sub_type_ds unify inst_orig ctxt ty_a' ty_e }
                Nothing -> just_unify ty_actual ty_expected }
 
-    go ty_a@(FunTy { ft_af = VisArg, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res })
-       ty_e@(FunTy { ft_af = VisArg, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
-      | isTauTy ty_a, isTauTy ty_e         -- Short cut common case to avoid
-      = just_unify ty_actual ty_expected   -- unnecessary eta expansion
-
-      | otherwise
-      = -- This is where we do the co/contra thing, and generate a WpFun, which in turn
+    go ty_a@(FunTy { ft_af = af1, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res })
+       ty_e@(FunTy { ft_af = af2, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
+      | isVisibleAnonArg af1, isVisibleAnonArg af2
+      = if (isTauTy ty_a && isTauTy ty_e)         -- Short cut common case to avoid
+        then just_unify ty_actual ty_expected   -- unnecessary eta expansion
+        else
+        -- This is where we do the co/contra thing, and generate a WpFun, which in turn
         -- causes eta-expansion, which we don't like; hence encouraging NoDeepSubsumption
         do { arg_wrap  <- tc_sub_type_deep unify given_orig GenSigCtxt exp_arg act_arg
                           -- GenSigCtxt: See Note [Setting the argument context]
@@ -1839,12 +1839,13 @@ uType t_or_k origin orig_ty1 orig_ty2
 
     -- Functions (t1 -> t2) just check the two parts
     -- Do not attempt (c => t); just defer
-    go (FunTy { ft_af = VisArg, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
-       (FunTy { ft_af = VisArg, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
+    go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
+       (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
+      | isVisibleAnonArg af1, af1 == af2
       = do { co_l <- uType t_or_k origin arg1 arg2
            ; co_r <- uType t_or_k origin res1 res2
            ; co_w <- uType t_or_k origin w1 w2
-           ; return $ mkFunCo Nominal VisArg co_w co_l co_r }
+           ; return $ mkFunCo Nominal af1 co_w co_l co_r }
 
         -- Always defer if a type synonym family (type function)
         -- is involved.  (Data families behave rigidly.)
@@ -2536,7 +2537,7 @@ matchExpectedFunKind hs_ty n k = go n k
     go n (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
       | isVisibleAnonArg af
       = do { co <- go (n-1) res
-           ; return (mkTcFunCo Nominal (mkTcNomReflCo w) (mkTcNomReflCo arg) co) }
+           ; return (mkTcFunCo Nominal af (mkTcNomReflCo w) (mkTcNomReflCo arg) co) }
 
     go n other
      = defer n other

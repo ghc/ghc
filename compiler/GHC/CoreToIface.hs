@@ -540,7 +540,7 @@ toIfUnfolding _ NoUnfolding = Nothing
 
 toIfaceExpr :: CoreExpr -> IfaceExpr
 toIfaceExpr (Var v)         = toIfaceVar v
-toIfaceExpr (Lit (LitRubbish r)) = IfaceLitRubbish (toIfaceType r)
+toIfaceExpr (Lit (LitRubbish tc r)) = IfaceLitRubbish tc (toIfaceType r)
 toIfaceExpr (Lit l)         = IfaceLit l
 toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
 toIfaceExpr (Coercion co)   = IfaceCo   (toIfaceCoercion co)

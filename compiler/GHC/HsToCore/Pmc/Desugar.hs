@@ -139,7 +139,8 @@ desugarPat x pat = case pat of
         ListPat {}
           | ViewPat arg_ty _lexpr pat <- expansion
           , not (xopt LangExt.RebindableSyntax dflags)
-          , Just _ <- splitListTyConApp_maybe arg_ty
+          , Just tc <- tyConAppTyCon_maybe arg_ty
+          , tc == listTyCon
           -> desugarLPat x pat
 
         _ -> desugarPat x expansion

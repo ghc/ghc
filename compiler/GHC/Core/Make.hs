@@ -236,9 +236,9 @@ mkLitRubbish ty
   | isCoVarType ty
   = Nothing   -- Satisfy INVARIANT 2
   | otherwise
-  = Just (Lit (LitRubbish rep) `mkTyApps` [ty])
+  = Just (Lit (LitRubbish torc rep) `mkTyApps` [ty])
   where
-    rep  = getRuntimeRep ty
+    Just (torc, rep) = isSORTKind_maybe (typeKind ty)
 
 {-
 ************************************************************************

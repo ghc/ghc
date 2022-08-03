@@ -1798,7 +1798,7 @@ addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey,
     stablePtrTyConKey, eqTyConKey, heqTyConKey, ioPortPrimTyConKey,
     smallArrayPrimTyConKey, smallMutableArrayPrimTyConKey,
     stringTyConKey,
-    fatArrow1TyConKey, fatArrow2TyConKey :: Unique
+    ccArrowTyConKey, ctArrowTyConKey, tcArrowTyConKey :: Unique
 addrPrimTyConKey                        = mkPreludeTyConUnique  1
 arrayPrimTyConKey                       = mkPreludeTyConUnique  3
 boolTyConKey                            = mkPreludeTyConUnique  4
@@ -1841,8 +1841,9 @@ stablePtrTyConKey                       = mkPreludeTyConUnique 39
 eqTyConKey                              = mkPreludeTyConUnique 40
 heqTyConKey                             = mkPreludeTyConUnique 41
 
-fatArrow1TyConKey                       = mkPreludeTyConUnique 42
-fatArrow2TyConKey                       = mkPreludeTyConUnique 43
+ctArrowTyConKey                       = mkPreludeTyConUnique 42
+ccArrowTyConKey                       = mkPreludeTyConUnique 43
+tcArrowTyConKey                       = mkPreludeTyConUnique 44
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,

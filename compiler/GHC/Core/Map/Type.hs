@@ -164,7 +164,7 @@ trieMapView :: Type -> Maybe Type
 trieMapView ty
   -- First check for TyConApps that need to be expanded to
   -- AppTy chains.
-  | Just (tc, tys@(_:_)) <- tcSplitTyConApp_maybe ty
+  | Just (tc, tys@(_:_)) <- splitTyConApp_maybe ty
   = Just $ foldl' AppTy (mkTyConTy tc) tys
 
   -- Then resolve any remaining nullary synonyms.

@@ -39,14 +39,12 @@ module GHC.Core.Type (
         funTyAnonArgFlag, anonArgTyCon,
         mkFunctionType, chooseAnonArgFlag,
 
-        mkTyConApp, mkTyConTy, mkTYPEapp,
+        mkTyConApp, mkTyConTy, mkTYPEapp, mkCONSTRAINTapp,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
-        splitTyConApp_maybe, splitTyConApp, tyConAppArgN,
+
+        splitTyConApp_maybe, splitTyConAppNoSyn_maybe, splitTyConApp, tyConAppArgN,
         tcSplitTyConApp_maybe,
-        splitListTyConApp_maybe,
-        repSplitTyConApp_maybe,
-        tcRepSplitTyConApp_maybe,
 
         mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoInvForAllTys,
         mkSpecForAllTy, mkSpecForAllTys,
@@ -121,6 +119,7 @@ module GHC.Core.Type (
         tyConAppNeedsKindSig,
 
         -- *** Levity and boxity
+        isSORTKind_maybe,
         typeLevity_maybe,
         isLiftedTypeKind, isUnliftedTypeKind, pickyIsLiftedTypeKind,
         isLiftedRuntimeRep, isUnliftedRuntimeRep, runtimeRepLevity_maybe,
@@ -261,7 +260,7 @@ import GHC.Types.Unique.Set
 import GHC.Core.TyCon
 import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types
-                                 ( charTy, naturalTy, listTyCon
+                                 ( charTy, naturalTy
                                  , typeSymbolKind, liftedTypeKind, unliftedTypeKind
                                  , boxedRepDataConTyCon
                                  , manyDataConTy, oneDataConTy )
@@ -1134,7 +1133,7 @@ tcRepSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'tcSplitAppTy_maybe', but assumes that
 -- any coreView stuff is already done. Refuses to look through (c => t)
 tcRepSplitAppTy_maybe (FunTy { ft_af = af, ft_mult = w, ft_arg = ty1, ft_res = ty2 })
-  | VisArg <- af   -- See Note [Decomposing fat arrow c=>t]
+  | isVisibleAnonArg af  -- See Note [Decomposing fat arrow c=>t]
 
   -- See Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType,
   -- Wrinkle around FunTy
@@ -1319,24 +1318,24 @@ See #11714.
 
 -----------------------------------------------
 anonArgTyCon :: AnonArgFlag -> TyCon
-anonArgTyCon VisArg    = fUNTyCon
-anonArgTyCon InvisArg1 = fatArrow1TyCon
-anonArgTyCon InvisArg2 = fatArrow2TyCon
+anonArgTyCon (VisArg   TypeLike)       = fUNTyCon
+anonArgTyCon (VisArg   ConstraintLike) = tcArrowTyCon
+anonArgTyCon (InvisArg TypeLike)       = ctArrowTyCon
+anonArgTyCon (InvisArg ConstraintLike) = ccArrowTyCon
 
 funTyConApp_maybe :: (a -> Maybe a)   -- How to extract a RuntimeRep
                   -> AnonArgFlag -> a -> a -> a
                   -> Maybe (TyCon, [a])
 -- Given the components of a FunTy/FuNCo,
 -- figure out the corresponding TyConApp/TyConAppCo
--- The type 'a' is always Type or Coercion
+-- The type 'a' always has kind Type or Coercion
 -- The (a -> Maybe a) function extracts a RuntimeRep from arg/res
 funTyConApp_maybe get_rr af mult arg res
   | Just arg_rep <- get_rr arg
   , Just res_rep <- get_rr res
-  = Just $ case af of
-      VisArg    -> (fUNTyCon,       [mult, arg_rep, res_rep, arg, res])
-      InvisArg1 -> (fatArrow1TyCon, [arg_rep, res_rep, arg, res])
-      InvisArg2 -> (fatArrow2TyCon, [arg_rep, res_rep, arg, res])
+  , let args | isFUNAnonArg af = [mult, arg_rep, res_rep, arg, res]
+             | otherwise       = [      arg_rep, res_rep, arg, res]
+  = Just $ (anonArgTyCon af, args)
   | otherwise
   = Nothing
 
@@ -1349,18 +1348,22 @@ tyConAppFun_maybe :: (HasDebugCallStack, Outputable a) => (Type->a) -> TyCon -> 
 -- The type 'a' is always Type or Coercion
 -- The (Type->a) argument turns 'Many into type or coercion resp
 tyConAppFun_maybe mk tc args
-  | tc `hasKey` fUNTyConKey
-  , (w:_r1:_r2:a1:a2:rest) <- args
+  | tc `hasKey` fUNTyConKey, (w:_r1:_r2:a1:a2:rest) <- args
   = assertPpr (null rest) (ppr tc <+> ppr args) $
-    Just (VisArg, w, a1, a2)
-  | tc `hasKey` fatArrow1TyConKey
-  , (_r1:_r2:a1:a2:rest) <- args
+    Just (VisArg TypeLike, w, a1, a2)
+
+  | tc `hasKey` tcArrowTyConKey, (_r1:_r2:a1:a2:rest) <- args
   = assertPpr (null rest) (ppr tc <+> ppr args) $
-    Just (InvisArg1, mk manyDataConTy, a1,a2)
-  | tc `hasKey` fatArrow2TyConKey
-  , (_r1:_r2:a1:a2:rest) <- args
+    Just (VisArg ConstraintLike, mk manyDataConTy, a1,a2)
+
+  | tc `hasKey` ctArrowTyConKey, (_r1:_r2:a1:a2:rest) <- args
   = assertPpr (null rest) (ppr tc <+> ppr args) $
-    Just (InvisArg2, mk manyDataConTy, a1,a2)
+    Just (InvisArg TypeLike, mk manyDataConTy, a1,a2)
+
+  | tc `hasKey` ccArrowTyConKey, (_r1:_r2:a1:a2:rest) <- args
+  = assertPpr (null rest) (ppr tc <+> ppr args) $
+    Just (InvisArg ConstraintLike, mk manyDataConTy, a1,a2)
+
   | otherwise
   = Nothing
 
@@ -1386,10 +1389,10 @@ mkFunctionType mult arg_ty res_ty
 chooseAnonArgFlag :: Type -> Type -> AnonArgFlag
 chooseAnonArgFlag arg_ty res_ty
   = case (isPredTy arg_ty, isPredTy res_ty) of
-         (False, res_pred) -> assertPpr (not res_pred) (ppr arg_ty $$ ppr res_ty) $
-                              VisArg       -- (arg -> res)
-         (True, False)     -> InvisArg1    -- (arg => res)
-         (True, True)      -> InvisArg2    -- (arg ==> res)
+         (False, False)    -> VisArg   TypeLike          -- (arg -> res)
+         (False, True)     -> VisArg   ConstraintLike    -- (arg -=> res)
+         (True, False)     -> InvisArg TypeLike          -- (arg => res)
+         (True, True)      -> InvisArg ConstraintLike    -- (arg ==> res)
 
 splitFunTy :: Type -> (Mult, Type, Type)
 -- ^ Attempts to extract the multiplicity, argument and result types from a type,
@@ -1571,6 +1574,7 @@ tyConAppTyConPicky_maybe _                      = Nothing
 
 
 -- | The same as @fst . splitTyConApp@
+-- We can short-cut the FunTy case
 {-# INLINE tyConAppTyCon_maybe #-}
 tyConAppTyCon_maybe :: Type -> Maybe TyCon
 tyConAppTyCon_maybe ty = case coreFullView ty of
@@ -1583,13 +1587,9 @@ tyConAppTyCon ty = tyConAppTyCon_maybe ty `orElse` pprPanic "tyConAppTyCon" (ppr
 
 -- | The same as @snd . splitTyConApp@
 tyConAppArgs_maybe :: Type -> Maybe [Type]
-tyConAppArgs_maybe ty = case coreFullView ty of
-  TyConApp _ tys -> Just tys
-  FunTy _ w arg res
-    | Just rep1 <- getRuntimeRep_maybe arg
-    , Just rep2 <- getRuntimeRep_maybe res
-    -> Just [w, rep1, rep2, arg, res]
-  _ -> Nothing
+tyConAppArgs_maybe ty = case splitTyConApp_maybe ty of
+                          Just (_, tys) -> Just tys
+                          Nothing       -> Nothing
 
 tyConAppArgs :: HasCallStack => Type -> [Type]
 tyConAppArgs ty = tyConAppArgs_maybe ty `orElse` pprPanic "tyConAppArgs" (ppr ty)
@@ -1605,14 +1605,21 @@ tyConAppArgN n ty
 -- of a number of arguments to that constructor. Panics if that is not possible.
 -- See also 'splitTyConApp_maybe'
 splitTyConApp :: Type -> (TyCon, [Type])
-splitTyConApp ty = case splitTyConApp_maybe ty of
-                   Just stuff -> stuff
-                   Nothing    -> pprPanic "splitTyConApp" (ppr ty)
+splitTyConApp ty = splitTyConApp_maybe ty `orElse` pprPanic "splitTyConApp" (ppr ty)
 
 -- | Attempts to tease a type apart into a type constructor and the application
 -- of a number of arguments to that constructor
 splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
-splitTyConApp_maybe = repSplitTyConApp_maybe . coreFullView
+splitTyConApp_maybe ty = splitTyConAppNoSyn_maybe (coreFullView ty)
+
+splitTyConAppNoSyn_maybe :: Type -> Maybe (TyCon, [Type])
+-- Same as splitTyConApp_maybe but without looking through synonyms
+splitTyConAppNoSyn_maybe ty
+  = case ty of
+      TyConApp tc tys -> Just (tc, tys)
+      FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res}
+                      -> funTyConAppTy_maybe af w arg res
+      _ -> Nothing
 
 -- | Split a type constructor application into its type constructor and
 -- applied types. Note that this may fail in the case of a 'FunTy' with an
@@ -1620,30 +1627,8 @@ splitTyConApp_maybe = repSplitTyConApp_maybe . coreFullView
 -- of @a@ isn't of the form @TYPE rep@). Consequently, you may need to zonk your
 -- type before using this function.
 --
--- This does *not* split types headed with (=>), as that's not a TyCon in the
--- type-checker.
---
--- If you only need the 'TyCon', consider using 'tcTyConAppTyCon_maybe'.
-tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
--- Defined here to avoid module loops between Unify and TcType.
-tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
-                         | otherwise             = tcRepSplitTyConApp_maybe ty
-
--------------------
-repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
--- ^ Like 'splitTyConApp_maybe', but doesn't look through synonyms. This
--- assumes the synonyms have already been dealt with.
-repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
-repSplitTyConApp_maybe (FunTy af w arg res)
-  -- NB: we're in Core, so no check for VisArg
-  | Just (fun_tc, tys) <- funTyConAppTy_maybe af w arg res
-  = Just (fun_tc, tys)
-  where
-repSplitTyConApp_maybe _ = Nothing
-
-tcRepSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
--- ^ Like 'tcSplitTyConApp_maybe', but doesn't look through synonyms. This
--- assumes the synonyms have already been dealt with.
+-- Differs from splitTyConApp_maybe in taht it does *not* split types
+-- headed with (=>), as that's not a TyCon in the type-checker.
 --
 -- Moreover, for a FunTy, it only succeeds if the argument types
 -- have enough info to extract the runtime-rep arguments that
@@ -1652,22 +1637,19 @@ tcRepSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 --     see Note [Decomposing FunTy] in GHC.Tc.Solver.Canonical
 --     and Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType,
 --         Wrinkle around FunTy
-tcRepSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
-tcRepSplitTyConApp_maybe (FunTy af w arg res)
-  | isVisibleAnonArg af  -- NB: Visible args only. See Note [Decomposing fat arrow c=>t]
-  , Just arg_rep <- getRuntimeRep_maybe arg
-  , Just res_rep <- getRuntimeRep_maybe res
-  = Just (fUNTyCon, [w, arg_rep, res_rep, arg, res])
-tcRepSplitTyConApp_maybe _ = Nothing
+--
+-- If you only need the 'TyCon', consider using 'tcTyConAppTyCon_maybe'.
+tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
+-- Defined here to avoid module loops between Unify and TcType.
+tcSplitTyConApp_maybe ty
+  = case coreFullView ty of
+      TyConApp tc tys -> Just (tc, tys)
+      FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res}
+        | isVisibleAnonArg af    -- Visible args only. See Note [Decomposing fat arrow c=>t]
+                      -> funTyConAppTy_maybe af w arg res
+      _ -> Nothing
 
 -------------------
--- | Attempts to tease a list type apart and gives the type of the elements if
--- successful (looks through type synonyms)
-splitListTyConApp_maybe :: Type -> Maybe Type
-splitListTyConApp_maybe ty = case splitTyConApp_maybe ty of
-  Just (tc,[e]) | tc == listTyCon -> Just e
-  _other                          -> Nothing
-
 newTyConInstRhs :: TyCon -> [Type] -> Type
 -- ^ Unwrap one 'layer' of newtype on a type constructor and its
 -- arguments, using an eta-reduced version of the @newtype@ if possible.
@@ -1912,7 +1894,7 @@ mkTyConBindersPreferAnon vars inner_tkvs = assert (all isTyVar vars)
               = ( Bndr v (NamedTCB Required) : binders
                 , fvs `delVarSet` v `unionVarSet` kind_vars )
               | otherwise
-              = ( Bndr v (AnonTCB VisArg) : binders
+              = ( Bndr v (AnonTCB (visArg TypeLike)) : binders
                 , fvs `unionVarSet` kind_vars )
       where
         (binders, fvs) = go vs
@@ -3062,33 +3044,40 @@ isPredTy :: HasDebugCallStack => Type -> Bool
 -- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
 isPredTy ty = isConstraintKind (tcTypeKind ty)
 
-isSORTKind_maybe :: Kind -> Maybe (Type,Type)
+isSORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
 -- Sees if the argument is if form (SORT type_or_constraint runtime_rep)
 -- and if so returns those components
+--
+-- We do not have type-or-constraint polymorphism, so the
+-- argument to SORT should always be TypeLike or ConstraintLike
 isSORTKind_maybe kind
   = case splitTyConApp_maybe kind of
       Just (tc, tys) | tc `hasKey` sORTTyConKey
-                     , [t_or_c, rep] <- tys
-                     -> Just (t_or_c, rep)
+                     , [torc_ty, rep] <- tys
+                     , Just torc <- getTypeOrConstraint_maybe torc_ty
+                     -> Just (torc, rep)
       _ -> Nothing
 
-isTypeLike :: Type -> Bool
--- True if the arg is TypeLike
-isTypeLike ty = case splitTyConApp_maybe ty of
-                  Just (tc,_) -> tc `hasKey` typeLikeDataConKey
-                  Nothing     -> False
+-----------------------------------------
+-- | Does this classify a type allowed to have values? Responds True to things
+-- like *, TYPE Lifted, TYPE IntRep, TYPE v, Constraint.
+classifiesTypeWithValues :: Kind -> Bool
+-- ^ True of a kind `SORT _ _`
+classifiesTypeWithValues k = isJust (isSORTKind_maybe k)
 
-isConstraintLike :: Type -> Bool
--- True if the arg is ConstraintLike
-isConstraintLike ty = case splitTyConApp_maybe ty of
-                        Just (tc,_) -> tc `hasKey` constraintLikeDataConKey
-                        Nothing     -> False
+getTypeOrConstraint_maybe :: Type -> Maybe TypeOrConstraint
+getTypeOrConstraint_maybe ty
+  | Just (tc,args)        <- splitTyConApp_maybe ty
+  , TypeOrConstraint torc <- tyConPromDataConInfo tc
+  = assert (null args) $ Just torc
+  | otherwise
+  = Nothing
 
 isConstraintKind :: Kind -> Bool
 -- True of (SORT ConstraintLike _)
 isConstraintKind kind
-  | Just (t_or_c, _) <- isSORTKind_maybe kind
-  = isConstraintLike t_or_c
+  | Just (ConstraintLike, _) <- isSORTKind_maybe kind
+  = True
   | otherwise
   = False
 
@@ -3098,8 +3087,8 @@ isConstraintKind kind
 -- treats them as the same type, see 'isLiftedTypeKind'.
 tcIsLiftedTypeKind :: Kind -> Bool
 tcIsLiftedTypeKind kind
-  | Just (t_or_c, rep) <- isSORTKind_maybe kind
-  = isTypeLike t_or_c && isLiftedRuntimeRep rep
+  | Just (TypeLike, rep) <- isSORTKind_maybe kind
+  = isLiftedRuntimeRep rep
   | otherwise
   = False
 
@@ -3109,8 +3098,8 @@ tcIsLiftedTypeKind kind
 -- treats them as the same type, see 'isLiftedTypeKind'.
 tcIsBoxedTypeKind :: Kind -> Bool
 tcIsBoxedTypeKind kind
-  | Just (t_or_c, rep) <- isSORTKind_maybe kind
-  = isTypeLike t_or_c && isBoxedRuntimeRep rep
+  | Just (TypeLike, rep) <- isSORTKind_maybe kind
+  = isBoxedRuntimeRep rep
   | otherwise
   = False
 
@@ -3119,8 +3108,8 @@ tcIsBoxedTypeKind kind
 -- This considers 'Constraint' to be distinct from @*@.
 tcIsRuntimeTypeKind :: Kind -> Bool
 tcIsRuntimeTypeKind kind
-  | Just (t_or_c, _) <- isSORTKind_maybe kind
-  = isTypeLike t_or_c
+  | Just (TypeLike, _) <- isSORTKind_maybe kind
+  = True
   | otherwise
   = False
 
@@ -3144,11 +3133,11 @@ typeLiteralKind (CharTyLit {}) = charTy
 -- | Returns True if a type has a syntactically fixed runtime rep,
 -- as per Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 --
--- This function is equivalent to @('isFixedRuntimeRepKind' . 'typeKind')@,
+-- This function is equivalent to `isFixedRuntimeRepKind . typeKind`
 -- but much faster.
 --
 -- __Precondition:__ The type has kind @('TYPE' blah)@
-typeHasFixedRuntimeRep :: Type -> Bool
+typeHasFixedRuntimeRep :: HasDebugCallStack => Type -> Bool
 typeHasFixedRuntimeRep = go
   where
     go (TyConApp tc _)
@@ -3512,14 +3501,12 @@ during type inference.
 -- | Checks that a kind of the form 'Type', 'Constraint'
 -- or @'TYPE r@ is concrete. See 'isConcrete'.
 --
--- __Precondition:__ The type has kind @('TYPE' blah)@.
+-- __Precondition:__ The type has kind `SORT blah`
 isFixedRuntimeRepKind :: HasDebugCallStack => Kind -> Bool
 isFixedRuntimeRepKind k
-  = assertPpr (isLiftedTypeKind k || _is_type) (ppr k) $
+  = assertPpr (classifiesTypeWithValues k) (ppr k) $
     -- the isLiftedTypeKind check is necessary b/c of Constraint
     isConcrete k
-  where
-    _is_type = classifiesTypeWithValues k
 
 -- | Tests whether the given type is concrete, i.e. it
 -- whether it consists only of concrete type constructors,
@@ -3543,12 +3530,6 @@ isConcrete = go
     go CastTy{}            = False
     go CoercionTy{}        = False
 
------------------------------------------
--- | Does this classify a type allowed to have values? Responds True to things
--- like *, TYPE Lifted, TYPE IntRep, TYPE v, Constraint.
-classifiesTypeWithValues :: Kind -> Bool
--- ^ True of any sub-kind of OpenTypeKind
-classifiesTypeWithValues k = isJust (kindRep_maybe k)
 
 {-
 %************************************************************************
@@ -3596,7 +3577,8 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
     injective_vars_of_binder :: TyConBinder -> FV
     injective_vars_of_binder (Bndr tv vis) =
       case vis of
-        AnonTCB VisArg -> injectiveVarsOfType False -- conservative choice
+        AnonTCB af     | isVisibleAnonArg af
+                       -> injectiveVarsOfType False -- conservative choice
                                               (varType tv)
         NamedTCB argf  | source_of_injectivity argf
                        -> unitFV tv `unionFV`

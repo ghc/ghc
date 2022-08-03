@@ -4,7 +4,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE EmptyCase #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes, KindSignatures #-}
 
 -- | Primitive panics.
 module GHC.Prim.Panic
@@ -16,6 +16,7 @@ where
 
 import GHC.Prim
 import GHC.Magic
+import GHC.Types( Type )
 
 default () -- Double and Integer aren't available yet
 
@@ -94,7 +95,7 @@ absentSumFieldError = panicError "entered absent sum field!"#
 
 -- | Displays "Oops!  Entered absent arg" ++ errormsg and exits the program.
 {-# NOINLINE absentError #-}
-absentError :: Addr# -> a
+absentError :: forall (a :: Type). Addr# -> a
 absentError errmsg =
   runRW# (\s ->
     case stg_absentError# errmsg s of
@@ -104,11 +105,13 @@ absentError errmsg =
                     let x = x in x)
 
 {-# NOINLINE absentConstraintError #-}
-absentConstraintError :: forall (a :: Constraint). Addr# -> a
-absentConstraintError errmsg =
-  runRW# (\s ->
-    case stg_absentError# errmsg s of
-      (# _, _ #) -> -- This bottom is unreachable but we can't
-                    -- use an empty case lest the pattern match
-                    -- checker squawks.
-                    let x = x in x)
+absentConstraintError :: forall (a :: Type). Addr# -> a
+-- We want to give this the type
+--    forall (a :: Constraint). Addr# -> a
+-- but Haskell source code doesn't allow functions that return Constraint
+-- Fortunately, absentConstraintError is a wired-in Id with the above
+-- desired type. So the only purpose of this definition is to give a
+-- function to call. And for that purpose, absentError will do fine.
+-- It's fine to lie about about the type; it is not looked at
+-- because absentConstraintError is wired-in.
+absentConstraintError errmsg = absentError errmsg

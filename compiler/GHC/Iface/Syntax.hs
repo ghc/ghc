@@ -63,7 +63,7 @@ import GHC.Types.Basic
 import GHC.Unit.Module
 import GHC.Types.SrcLoc
 import GHC.Data.BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
-import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders )
+import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArg )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
@@ -560,8 +560,8 @@ data IfaceExpr
   | IfaceLet    IfaceBinding  IfaceExpr
   | IfaceCast   IfaceExpr IfaceCoercion
   | IfaceLit    Literal
-  | IfaceLitRubbish IfaceType -- See GHC.Types.Literal
-                              --   Note [Rubbish literals] item (6)
+  | IfaceLitRubbish TypeOrConstraint IfaceType
+       -- See GHC.Types.Literal Note [Rubbish literals] item (6)
   | IfaceFCall  ForeignCall IfaceType
   | IfaceTick   IfaceTickish IfaceExpr    -- from Tick tickish E
 
@@ -1048,7 +1048,8 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               , ppWhen insert_empty_ctxt $ parens empty <+> darrow
                               , ex_msg
                               , pprIfaceContextArr prov_ctxt
-                              , pprIfaceType $ foldr (IfaceFunTy VisArg many_ty) pat_ty arg_tys ])
+                              , pprIfaceType $ foldr (IfaceFunTy (visArg TypeLike) many_ty)
+                                                     pat_ty arg_tys ])
         pat_body = braces $ sep $ punctuate comma $ map ppr pat_fldlbls
         univ_msg = pprUserIfaceForAll $ tyVarSpecToBinders univ_bndrs
         ex_msg   = pprUserIfaceForAll $ tyVarSpecToBinders ex_bndrs
@@ -1372,16 +1373,20 @@ pprParendIfaceExpr = pprIfaceExpr parens
 -- an atomic value (e.g. function args)
 pprIfaceExpr :: (SDoc -> SDoc) -> IfaceExpr -> SDoc
 
-pprIfaceExpr _       (IfaceLcl v)       = ppr v
-pprIfaceExpr _       (IfaceExt v)       = ppr v
-pprIfaceExpr _       (IfaceLit l)       = ppr l
-pprIfaceExpr _       (IfaceLitRubbish r) = text "RUBBISH" <> parens (ppr r)
-pprIfaceExpr _       (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
-pprIfaceExpr _       (IfaceType ty)     = char '@' <> pprParendIfaceType ty
-pprIfaceExpr _       (IfaceCo co)       = text "@~" <> pprParendIfaceCoercion co
+pprIfaceExpr _ (IfaceLcl v)       = ppr v
+pprIfaceExpr _ (IfaceExt v)       = ppr v
+pprIfaceExpr _ (IfaceLit l)       = ppr l
+pprIfaceExpr _ (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
+pprIfaceExpr _ (IfaceType ty)     = char '@' <> pprParendIfaceType ty
+pprIfaceExpr _ (IfaceCo co)       = text "@~" <> pprParendIfaceCoercion co
+pprIfaceExpr _ (IfaceTuple c as)  = tupleParens c (pprWithCommas ppr as)
+
+pprIfaceExpr _ (IfaceLitRubbish tc r)
+  = text "RUBBISH"
+    <> (case tc of { TypeLike -> empty; ConstraintLike -> text "[c]" })
+    <> parens (ppr r)
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
-pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (pprWithCommas ppr as)
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
   = add_par (sep [char '\\' <+> sep (map pprIfaceLamBndr bndrs) <+> arrow,
@@ -2363,8 +2368,11 @@ instance Binary IfaceExpr where
         putByte bh 13
         put_ bh a
         put_ bh b
-    put_ bh (IfaceLitRubbish r) = do
+    put_ bh (IfaceLitRubbish TypeLike r) = do
         putByte bh 14
+        put_ bh r
+    put_ bh (IfaceLitRubbish ConstraintLike r) = do
+        putByte bh 15
         put_ bh r
     get bh = do
         h <- getByte bh
@@ -2409,7 +2417,9 @@ instance Binary IfaceExpr where
                      b <- get bh
                      return (IfaceECase a b)
             14 -> do r <- get bh
-                     return (IfaceLitRubbish r)
+                     return (IfaceLitRubbish TypeLike r)
+            15 -> do r <- get bh
+                     return (IfaceLitRubbish ConstraintLike r)
             _ -> panic ("get IfaceExpr " ++ show h)
 
 instance Binary IfaceTickish where
@@ -2635,7 +2645,7 @@ instance NFData IfaceExpr where
     IfaceLet bind e -> rnf bind `seq` rnf e
     IfaceCast e co -> rnf e `seq` rnf co
     IfaceLit l -> l `seq` () -- FIXME
-    IfaceLitRubbish r -> rnf r `seq` ()
+    IfaceLitRubbish tc r -> tc `seq` rnf r `seq` ()
     IfaceFCall fc ty -> fc `seq` rnf ty
     IfaceTick tick e -> rnf tick `seq` rnf e
 

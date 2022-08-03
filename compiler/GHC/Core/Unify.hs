@@ -57,8 +57,6 @@ import Data.List ( mapAccumL )
 import Control.Monad
 import qualified Data.Semigroup as S
 
-import GHC.Builtin.Names (constraintKindTyConKey, liftedTypeKindTyConKey)
-
 {-
 
 Unification is much tricker than you might think.
@@ -1064,15 +1062,6 @@ unify_ty _env (TyConApp tc1 []) (TyConApp tc2 []) _kco
   | tc1 == tc2
   = return ()
 
-  -- See Note [coreView vs tcView] in GHC.Core.Type.
-  | tc1 `hasKey` constraintKindTyConKey
-  , tc2 `hasKey` liftedTypeKindTyConKey
-  = maybeApart MARTypeVsConstraint
-
-  | tc2 `hasKey` constraintKindTyConKey
-  , tc1 `hasKey` liftedTypeKindTyConKey
-  = maybeApart MARTypeVsConstraint
-
 unify_ty env ty1 ty2 kco
     -- Now handle the cases we can "look through": synonyms and casts.
   | Just ty1' <- tcView ty1   = unify_ty env ty1' ty2 kco
@@ -1092,8 +1081,14 @@ unify_ty env ty1 (TyVarTy tv2) kco
   = uVar (umSwapRn env) tv2 ty1 (mkSymCo kco)
 
 unify_ty env ty1 ty2 _kco
- -- NB: This keeps Constraint and Type distinct, as it should for use in the
- -- type-checker.
+  -- Type and Constraint are not Apart
+  -- See Note [Type vs Constraint] in GHC.Builtin.Types.Prim
+  | Just (tc1,_) <- mb_tc_app1
+  , TypeOrConstraint {} <- tyConPromDataConInfo tc1
+  , Just (tc2,_) <- mb_tc_app2
+  , TypeOrConstraint {} <- tyConPromDataConInfo tc2
+  = maybeApart MARTypeVsConstraint
+
   | Just (tc1, tys1) <- mb_tc_app1
   , Just (tc2, tys2) <- mb_tc_app2
   , tc1 == tc2

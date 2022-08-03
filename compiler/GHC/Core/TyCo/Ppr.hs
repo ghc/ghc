@@ -34,7 +34,8 @@ import {-# SOURCE #-} GHC.Core.DataCon
    ( dataConFullSig , dataConUserTyVarBinders, DataCon )
 
 import GHC.Core.Type ( pickyIsLiftedTypeKind, pattern OneTy, pattern ManyTy,
-                       splitForAllReqTVBinders, splitForAllInvisTVBinders )
+                       splitForAllReqTVBinders, splitForAllInvisTVBinders,
+                       isManyTy, anonArgTyCon )
 
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
@@ -234,17 +235,12 @@ debug_ppr_ty prec ty@(FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res =
   = maybeParen prec funPrec $
     sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]
   where
-    arr = case af of
-            VisArg   -> case mult of
-                          OneTy -> lollipop
-                          ManyTy -> arrow
-                          w -> mulArrow (const ppr) w
-            InvisArg1 -> case mult of
-                           ManyTy -> text "=>"
-                           _ -> pprPanic "unexpected multiplicity" (ppr ty)
-            InvisArg2 -> case mult of
-                           ManyTy -> text "==>"
-                           _ -> pprPanic "unexpected multiplicity" (ppr ty)
+    arr | isFUNAnonArg af = case mult of
+                              OneTy -> lollipop
+                              ManyTy -> arrow
+                              w -> mulArrow (const ppr) w
+        | otherwise = assertPpr (isManyTy mult) (ppr ty) $
+                      ppr (anonArgTyCon af)
 
 debug_ppr_ty prec (TyConApp tc tys)
   | null tys  = ppr tc

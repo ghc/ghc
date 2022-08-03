@@ -731,11 +731,12 @@ tcVTA fun_ty hs_ty
              insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
                          -- NB: tv and ty_arg have the same kind, so this
                          --     substitution is kind-respecting
-       ; traceTc "VTA" (vcat [ppr tv, debugPprType kind
-                             , debugPprType ty_arg
-                             , debugPprType (tcTypeKind ty_arg)
-                             , debugPprType inner_ty
-                             , debugPprType insted_ty ])
+       ; traceTc "VTA" (vcat [ text "fun_ty" <+> ppr fun_ty
+                             , text "tv" <+> ppr tv <+> dcolon <+> debugPprType kind
+                             , text "ty_arg" <+> debugPprType ty_arg <+> dcolon
+                                             <+> debugPprType (tcTypeKind ty_arg)
+                             , text "inner_ty" <+> debugPprType inner_ty
+                             , text "insted_ty" <+> debugPprType insted_ty ])
        ; return (ty_arg, insted_ty) }
 
   | otherwise
@@ -1001,14 +1002,14 @@ qlUnify delta ty1 ty2
 
     -- Decompose (arg1 -> res1) ~ (arg2 -> res2)
     -- and         (c1 => res1) ~   (c2 => res2)
-    -- But for the latter we only learn instantiation info from t1~t2
+    -- But for the latter we only learn instantiation info from res1~res2
     -- We look at the multiplicity too, although the chances of getting
     -- impredicative instantiation info from there seems...remote.
     go bvs (FunTy { ft_af = af1, ft_arg = arg1, ft_res = res1, ft_mult = mult1 })
            (FunTy { ft_af = af2, ft_arg = arg2, ft_res = res2, ft_mult = mult2 })
       | af1 == af2
-      = do { when (af1 == VisArg) $
-             do { go bvs arg1 arg2; go bvs mult1 mult2 }
+      = do { when (isVisibleAnonArg af1) (go bvs arg1 arg2)
+           ; when (isFUNAnonArg af1)     (go bvs mult1 mult2)
            ; go bvs res1 res2 }
 
     -- ToDo: c.f. Tc.Utils.unify.uType,

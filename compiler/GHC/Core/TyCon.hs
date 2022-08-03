@@ -17,13 +17,13 @@ module GHC.Core.TyCon(
         AlgTyConRhs(..), visibleDataCons,
         AlgTyConFlav(..), isNoParent,
         FamTyConFlav(..), Role(..), Injectivity(..),
-        RuntimeRepInfo(..), TyConFlavour(..),
+        PromDataConInfo(..), TyConFlavour(..),
 
         -- * TyConBinder
         TyConBinder, TyConBndrVis(..), TyConTyCoBinder,
         mkNamedTyConBinder, mkNamedTyConBinders,
         mkRequiredTyConBinder,
-        mkAnonTyConBinder, mkAnonTyConBinders,
+        mkAnonTyConBinder, mkAnonTyConBinders, mkInvisAnonTyConBinder,
         tyConBinderArgFlag, tyConBndrVisArgFlag, isNamedTyConBinder,
         isVisibleTyConBinder, isInvisibleTyConBinder, isVisibleTcbVis,
 
@@ -100,7 +100,7 @@ module GHC.Core.TyCon(
         unwrapNewTyCon_maybe, unwrapNewTyConEtad_maybe,
         newTyConDataCon_maybe,
         algTcFields,
-        tyConRuntimeRepInfo,
+        tyConPromDataConInfo,
         tyConBinders, tyConResKind, tyConInvisTVBinders,
         tcTyConScopedTyVars, tcTyConIsPoly,
         mkTyConTagMap,
@@ -455,12 +455,19 @@ instance Outputable TyConBndrVis where
   ppr (NamedTCB flag) = ppr flag
   ppr (AnonTCB af)    = ppr af
 
-mkAnonTyConBinder :: AnonArgFlag -> TyVar -> TyConBinder
-mkAnonTyConBinder af tv = assert (isTyVar tv) $
-                          Bndr tv (AnonTCB af)
+mkAnonTyConBinder :: TyVar -> TyConBinder
+-- Make a visible anonymous TyCon binder
+mkAnonTyConBinder tv = assert (isTyVar tv) $
+                       Bndr tv (AnonTCB (visArg TypeLike))
 
-mkAnonTyConBinders :: AnonArgFlag -> [TyVar] -> [TyConBinder]
-mkAnonTyConBinders af tvs = map (mkAnonTyConBinder af) tvs
+mkAnonTyConBinders :: [TyVar] -> [TyConBinder]
+mkAnonTyConBinders tvs = map mkAnonTyConBinder tvs
+
+mkInvisAnonTyConBinder :: TyVar -> TyConBinder
+-- Make an /invisible/ anonymous TyCon binder
+-- Not used much
+mkInvisAnonTyConBinder tv = assert (isTyVar tv) $
+                            Bndr tv (AnonTCB (invisArg TypeLike))
 
 mkNamedTyConBinder :: ArgFlag -> TyVar -> TyConBinder
 -- The odd argument order supports currying
@@ -478,7 +485,7 @@ mkRequiredTyConBinder :: TyCoVarSet  -- these are used dependently
                       -> TyConBinder
 mkRequiredTyConBinder dep_set tv
   | tv `elemVarSet` dep_set = mkNamedTyConBinder Required tv
-  | otherwise               = mkAnonTyConBinder  VisArg   tv
+  | otherwise               = mkAnonTyConBinder tv
 
 tyConBinderArgFlag :: TyConBinder -> ArgFlag
 tyConBinderArgFlag (Bndr _ vis) = tyConBndrVisArgFlag vis
@@ -948,7 +955,7 @@ data TyCon =
         tcRoles       :: [Role],    -- ^ Roles: N for kind vars, R for type vars
         dataCon       :: DataCon,   -- ^ Corresponding data constructor
         tcRepName     :: TyConRepName,
-        promDcRepInfo :: RuntimeRepInfo  -- ^ See comments with 'RuntimeRepInfo'
+        promDcInfo    :: PromDataConInfo  -- ^ See comments with 'PromDataConInfo'
     }
 
   -- | These exist only during type-checking. See Note [How TcTyCons work]
@@ -1221,8 +1228,8 @@ mkDataTyConRhs = mkLevPolyDataTyConRhs True
 -- information right in the 'TyCon'. The other approach would be to look
 -- up things like `RuntimeRep`'s `PrimRep` by known-key every time.
 -- See also Note [Getting from RuntimeRep to PrimRep] in "GHC.Types.RepType"
-data RuntimeRepInfo
-  = NoRRI       -- ^ an ordinary promoted data con
+data PromDataConInfo
+  = NoPromInfo       -- ^ an ordinary promoted data con
   | RuntimeRep ([Type] -> [PrimRep])
       -- ^ A constructor of `RuntimeRep`. The argument to the function should
       -- be the list of arguments to the promoted datacon.
@@ -1233,9 +1240,7 @@ data RuntimeRepInfo
 
   | Levity Levity        -- ^ A constructor of `Levity`
 
-  | TypeOrConstraint Bool   -- ^ A constructor of `TypeOrConstraint`
-                            -- True  <=> ConstraintLike
-                            -- False <=> TypeLike
+  | TypeOrConstraint TypeOrConstraint -- ^ A constructor of `TypeOrConstraint`
 
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in
@@ -2023,7 +2028,7 @@ mkFamilyTyCon name binders res_kind resVar flav parent inj
 -- the TyCon we add a quote; see the Outputable TyCon instance
 mkPromotedDataCon :: DataCon -> Name -> TyConRepName
                   -> [TyConTyCoBinder] -> Kind -> [Role]
-                  -> RuntimeRepInfo -> TyCon
+                  -> PromDataConInfo -> TyCon
 mkPromotedDataCon con name rep_name binders res_kind roles rep_info
   = let tc =
           PromotedDataCon {
@@ -2037,7 +2042,7 @@ mkPromotedDataCon con name rep_name binders res_kind roles rep_info
             tyConKind     = mkTyConKind binders res_kind,
             dataCon       = con,
             tcRepName     = rep_name,
-            promDcRepInfo = rep_info
+            promDcInfo    = rep_info
           }
     in tc
 
@@ -2725,9 +2730,9 @@ tyConFamilyCoercion_maybe (AlgTyCon {algTcFlavour = DataFamInstTyCon ax _ _ })
 tyConFamilyCoercion_maybe _ = Nothing
 
 -- | Extract any 'RuntimeRepInfo' from this TyCon
-tyConRuntimeRepInfo :: TyCon -> RuntimeRepInfo
-tyConRuntimeRepInfo (PromotedDataCon { promDcRepInfo = rri }) = rri
-tyConRuntimeRepInfo _                                         = NoRRI
+tyConPromDataConInfo :: TyCon -> PromDataConInfo
+tyConPromDataConInfo (PromotedDataCon { promDcInfo = rri }) = rri
+tyConPromDataConInfo _                                      = NoPromInfo
   -- could panic in that second case. But Douglas Adams told me not to.
 
 {-

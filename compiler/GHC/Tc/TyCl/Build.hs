@@ -175,7 +175,7 @@ buildDataCon fam_envs dc_bang_opts src_name declared_infix prom_info src_bangs
               data_con = mkDataCon src_name declared_infix prom_info
                                    src_bangs field_lbls
                                    univ_tvs ex_tvs user_tvbs eq_spec ctxt
-                                   arg_tys res_ty NoRRI rep_tycon tag
+                                   arg_tys res_ty NoPromInfo rep_tycon tag
                                    stupid_ctxt dc_wrk dc_rep
               dc_wrk = mkDataConWorkId work_name data_con
               dc_rep = initUs_ us (mkDataConRep dc_bang_opts fam_envs wrap_name data_con)

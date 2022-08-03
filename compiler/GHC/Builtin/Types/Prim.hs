@@ -47,8 +47,9 @@ module GHC.Builtin.Types.Prim(
 
         -- Arrows
         fUNTyCon,       fUNTyConName,
-        fatArrow1TyCon, fatArrow1TyConName,
-        fatArrow2TyCon, fatArrow2TyConName,
+        ctArrowTyCon, ctArrowTyConName,
+        ccArrowTyCon, ccArrowTyConName,
+        tcArrowTyCon, tcArrowTyConName,
 
         unexposedPrimTyCons, exposedPrimTyCons, primTyCons,
 
@@ -414,13 +415,16 @@ mkTemplateKiTyVar kind mk_arg_kinds
 
 mkTemplateKindTyConBinders :: [Kind] -> [TyConBinder]
 -- Makes named, Specified binders
-mkTemplateKindTyConBinders kinds = [mkNamedTyConBinder Specified tv | tv <- mkTemplateKindVars kinds]
+mkTemplateKindTyConBinders kinds
+  = [mkNamedTyConBinder Specified tv | tv <- mkTemplateKindVars kinds]
 
 mkTemplateAnonTyConBinders :: [Kind] -> [TyConBinder]
-mkTemplateAnonTyConBinders kinds = mkAnonTyConBinders VisArg (mkTemplateTyVars kinds)
+mkTemplateAnonTyConBinders kinds
+  = mkAnonTyConBinders (mkTemplateTyVars kinds)
 
 mkTemplateAnonTyConBindersFrom :: Int -> [Kind] -> [TyConBinder]
-mkTemplateAnonTyConBindersFrom n kinds = mkAnonTyConBinders VisArg (mkTemplateTyVarsFrom n kinds)
+mkTemplateAnonTyConBindersFrom n kinds
+  = mkAnonTyConBinders (mkTemplateTyVarsFrom n kinds)
 
 alphaTyVars :: [TyVar]
 alphaTyVars = mkTemplateTyVars $ repeat liftedTypeKind
@@ -525,10 +529,46 @@ multiplicityTyVar1, multiplicityTyVar2  :: TyVar
 ************************************************************************
 -}
 
-fUNTyConName, fatArrow1TyConName, fatArrow2TyConName :: Name
-fUNTyConName       = mkPrimTc        (fsLit "FUN") fUNTyConKey       fUNTyCon
-fatArrow1TyConName = mkBuiltInPrimTc (fsLit "=>")  fatArrow1TyConKey fatArrow1TyCon
-fatArrow2TyConName = mkBuiltInPrimTc (fsLit "==>") fatArrow2TyConKey fatArrow2TyCon
+{- Note [Function type constructors and FunTy]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have four distinct function type constructors, and a type synonym
+
+ FUN :: forall (m :: Multiplicity) ->
+        forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+        TYPE rep1 -> TYPE rep2 -> Type
+
+ (=>)  :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+          CONSTRAINT rep1 -> TYPE rep2 -> Type
+
+ (==>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+          CONSTRAINT rep1 -> CONSTRAINT rep2 -> Type
+
+ (-=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+          TYPE rep1 -> CONSTRAINT rep2 -> Type
+
+ type (->) = FUN Many
+
+For efficiency, all four are always represented by
+  FunTy { ft_af :: AnonArgFlag, ft_mult :: Mult
+        , ft_arg :: Type, ft_res :: Type }
+rather than by using a TyConApp.
+
+* The ft_af :: AnonArgFlag distinguishes the four cases.
+  See Note [AnonArgFlag] in GHC.Types.Var.
+
+* The ft_af field is redundant: it can always be gleaned from
+  the kinds of ft_arg and ft_res.  See Note [AnonArgFlag] in GHC.Types.Var.
+
+* The ft_mult :: Mult field gives the first argument for FUN
+  For the other three cases ft_mult is redundant; it is always Many.
+
+-}
+
+fUNTyConName, ctArrowTyConName, ccArrowTyConName, tcArrowTyConName :: Name
+fUNTyConName     = mkPrimTc        (fsLit "FUN") fUNTyConKey       fUNTyCon
+ctArrowTyConName = mkBuiltInPrimTc (fsLit "=>")  ctArrowTyConKey ctArrowTyCon
+ccArrowTyConName = mkBuiltInPrimTc (fsLit "==>") ccArrowTyConKey ccArrowTyCon
+tcArrowTyConName = mkBuiltInPrimTc (fsLit "-=>") tcArrowTyConKey tcArrowTyCon
 
 -- | The @FUN@ type constructor.
 --
@@ -556,8 +596,8 @@ fUNTyCon = mkPrimTyCon fUNTyConName tc_bndrs liftedTypeKind tc_roles
 
 -- (=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
 --         CONSTRAINT rep1 -> TYPE rep2 -> *
-fatArrow1TyCon :: TyCon
-fatArrow1TyCon = mkPrimTyCon fatArrow1TyConName tc_bndrs liftedTypeKind tc_roles
+ctArrowTyCon :: TyCon
+ctArrowTyCon = mkPrimTyCon ctArrowTyConName tc_bndrs liftedTypeKind tc_roles
   where
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
@@ -567,14 +607,26 @@ fatArrow1TyCon = mkPrimTyCon fatArrow1TyConName tc_bndrs liftedTypeKind tc_roles
     tc_roles = [Nominal, Nominal, Representational, Representational]
 
 -- (==>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
---          CONSTRAINT rep1 -> TYPE rep2 -> *
-fatArrow2TyCon :: TyCon
-fatArrow2TyCon = mkPrimTyCon fatArrow2TyConName tc_bndrs liftedTypeKind tc_roles
+--          CONSTRAINT rep1 -> CONSTRAINT rep2 -> *
+ccArrowTyCon :: TyCon
+ccArrowTyCon = mkPrimTyCon ccArrowTyConName tc_bndrs liftedTypeKind tc_roles
   where
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
                , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
                ++ mkTemplateAnonTyConBinders [ mkCONSTRAINTapp runtimeRep1Ty
+                                             , mkCONSTRAINTapp runtimeRep2Ty ]
+    tc_roles = [Nominal, Nominal, Representational, Representational]
+
+-- (-=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+--          TYPE rep1 -> CONSTRAINT rep2 -> *
+tcArrowTyCon :: TyCon
+tcArrowTyCon = mkPrimTyCon tcArrowTyConName tc_bndrs liftedTypeKind tc_roles
+  where
+    -- See also unrestrictedFunTyCon
+    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
+               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
+               ++ mkTemplateAnonTyConBinders [ mkTYPEapp       runtimeRep1Ty
                                              , mkCONSTRAINTapp runtimeRep2Ty ]
     tc_roles = [Nominal, Nominal, Representational, Representational]
 
@@ -585,37 +637,111 @@ fatArrow2TyCon = mkPrimTyCon fatArrow2TyConName tc_bndrs liftedTypeKind tc_roles
 *                                                                      *
 ************************************************************************
 
-Note [TYPE and RuntimeRep]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-All types that classify values have a kind of the form (TYPE rr), where
+***  ToDo: was Note [TYPE and RuntimeRep]  ***
 
-    data RuntimeRep     -- Defined in ghc-prim:GHC.Types
+Note [SORT, TYPE, and CONSTRAINT]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+All types that classify values have a kind of the form (SORT t_or_c rr), where
+
+  -- Primitive
+  type SORT :: TypeOrConstraint -> RuntimeRep -> Type
+
+* The `TypeOrConstraint` tells whether this value is
+  a regular type or a constraint; see Note [Type vs Constraint]
+
+* The `RuntimeRep` parameter tells us how the value is represented at runtime.
+
+There are a bunch of type synonyms and data types defined in
+in the library ghc-prim:GHC.Types.  All of them are also wired in to GHC,
+in GHC.Builtin.Types
+
+  type CONSTRAINT   = SORT ConstraintLike   :: RuntimeRep -> Type
+  type Constraint   = CONSTRAINT LiftedRep  :: Type
+
+  type TYPE         = SORT TypeLike    :: RuntimeRep -> Type
+  type Type         = TYPE LiftedRep   :: Type
+  type UnliftedType = TYPE UnliftedRep :: Type
+
+  type LiftedRep    = BoxedRep Lifted   :: RuntimeRep
+  type UnliftedRep  = BoxedRep Unlifted :: RuntimeRep
+
+
+  data RuntimeRep     -- Defined in ghc-prim:GHC.Types
       = BoxedRep Levity
       | IntRep
       | FloatRep
       .. etc ..
 
-    data Levity = Lifted | Unlifted
+  data Levity = Lifted | Unlifted
 
-    rr :: RuntimeRep
-
-    TYPE :: RuntimeRep -> TYPE 'LiftedRep  -- Built in
+  data TypeOrConstraint = TypeLike | ConstraintLike
 
 So for example:
-    Int        :: TYPE ('BoxedRep 'Lifted)
-    Array# Int :: TYPE ('BoxedRep 'Unlifted)
-    Int#       :: TYPE 'IntRep
-    Float#     :: TYPE 'FloatRep
-    Maybe      :: TYPE ('BoxedRep 'Lifted) -> TYPE ('BoxedRep 'Lifted)
+    Int        :: TYPE (BoxedRep Lifted)
+    Array# Int :: TYPE (BoxedRep Unlifted)
+    Int#       :: TYPE IntRep
+    Float#     :: TYPE FloatRep
+    Maybe      :: TYPE (BoxedRep Lifted) -> TYPE (BoxedRep Lifted)
     (# , #)    :: TYPE r1 -> TYPE r2 -> TYPE (TupleRep [r1, r2])
 
 We abbreviate '*' specially:
-    type LiftedRep = 'BoxedRep 'Lifted
-    type * = TYPE LiftedRep
+    type * = Type
 
-The 'rr' parameter tells us how the value is represented at runtime.
+Note [Type vs Constraint]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC distinguishes Type from Constraint, via the TypeOrConstraint
+parameter of SORT.  See GHC Proposal #518.
 
-Generally speaking, you can't be polymorphic in 'rr'.  E.g
+There are a number of wrinkles
+
+* Type and Constraint are considered distinct throughout GHC. But they
+  are not /apart/: see Note [Type and Constraint are not apart]
+
+* Constraints are mostly lifted, but unlifted ones are useful too.
+  Specifically  (a ~# b) :: CONSTRAINT (TupleRep [])
+
+Examples:
+
+  Eq Int       :: CONSTRAINT (BoxedRep Lifted)
+  IP "foo" Int :: CONSTRAINT (BoxedRep Lifted)
+  a ~ b        :: CONSTRAINT (BoxedRep Lifted)
+  a ~# b       :: CONSTRAINT (TupleRep [])
+
+Note [Type and Constraint are not apart]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Type and Constraint are not equal (eqType) but they are not /apart/
+either. Reason:
+
+* We want to allow newtype classes, where
+    class C a where { op :: a -> a }
+
+* The axiom for such a class will look like
+    axiom axC a :: C a ~# (a->a)
+
+* This axion connects a type of kind Type with one of kind Constraint
+  That is dangerous: kindCo (axC Int) :: Type ~ Constraint
+  In general, having a "contradictory proof" like (Int ~ Bool) would be very
+  bad; but it's fine provide they are not Apart.
+
+So we ensure that Type and Constraint are not apart; or, more
+precisely, that TypeLike and ConstraintLike are not apart.  This
+non-apart-ness check is implemented in GHC.Core.Unify.unify_ty: look for
+`maybeApart MARTypeVsConstraint`.
+
+Note taht  before, nothing prevents writing instances like:
+
+  instance C (Proxy @Type a) where ...
+
+In particular, SORT and TypeLike and ConstraintLike (and the synonyms
+TYPE, CONSTRAINT etc) are all allowed in instance heads. It's just
+that TypeLike is not apart from ConstraintLike so that instance would
+irretrievably overlap with:
+
+  instance C (Proxy @Constraint a) where ...
+
+Note [RuntimeRep polymorphism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally speaking, you can't be polymorphic in `RuntimeRep`.  E.g
    f :: forall (rr:RuntimeRep) (a:TYPE rr). a -> [a]
    f = /\(rr:RuntimeRep) (a:rr) \(a:rr). ...
 This is no good: we could not generate code for 'f', because the
@@ -640,7 +766,6 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
      (#,#) :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                      (a :: TYPE r1) (b :: TYPE r2).
                      a -> b -> TYPE ('TupleRep '[r1, r2])
-
 -}
 
 sORTTyCon :: TyCon

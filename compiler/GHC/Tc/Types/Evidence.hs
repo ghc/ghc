@@ -134,7 +134,7 @@ mkTcNomReflCo          :: TcType -> TcCoercionN
 mkTcRepReflCo          :: TcType -> TcCoercionR
 mkTcTyConAppCo         :: Role -> TyCon -> [TcCoercion] -> TcCoercion
 mkTcAppCo              :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion -> TcCoercion
+mkTcFunCo              :: Role -> AnonArgFlag -> TcCoercion -> TcCoercion -> TcCoercion -> TcCoercion
 mkTcAxInstCo           :: Role -> CoAxiom br -> BranchIndex
                        -> [TcType] -> [TcCoercion] -> TcCoercion
 mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
@@ -174,7 +174,7 @@ mkTcNomReflCo          = mkNomReflCo
 mkTcRepReflCo          = mkRepReflCo
 mkTcTyConAppCo         = mkTyConAppCo
 mkTcAppCo              = mkAppCo
-mkTcFunCo r            = mkFunCo r VisArg  -- mkTcFunCo is always for VisArg
+mkTcFunCo              = mkFunCo
 mkTcAxInstCo           = mkAxInstCo
 mkTcUnbranchedAxInstCo = mkUnbranchedAxInstCo Representational
 mkTcForAllCo           = mkForAllCo
@@ -306,10 +306,14 @@ mkWpFun :: HsWrapper -> HsWrapper
   -- because of [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep]
   -- in GHC.Tc.Utils.Concrete.
 mkWpFun WpHole       WpHole       _             _  = WpHole
-mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  = WpCast (mkTcFunCo Representational (multToCo w) (mkTcRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) (mkTcRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) co2)
+mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  = WpCast (mk_fun_co w (mkTcRepReflCo t1) co2)
+mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 = WpCast (mk_fun_co w (mkTcSymCo co1)    (mkTcRepReflCo t2))
+mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  = WpCast (mk_fun_co w (mkTcSymCo co1)    co2)
 mkWpFun co1          co2          t1            _  = WpFun co1 co2 t1
+
+mk_fun_co :: Mult -> TcCoercionR -> TcCoercionR -> TcCoercionR
+mk_fun_co mult arg_co res_co
+  = mkTcFunCo Representational (visArg TypeLike) (multToCo mult) arg_co res_co
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co

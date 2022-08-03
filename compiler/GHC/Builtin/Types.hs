@@ -183,7 +183,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Types.Id
 import GHC.Types.TyThing
 import GHC.Types.SourceText
-import GHC.Types.Var (VarBndr (Bndr))
+import GHC.Types.Var ( VarBndr (Bndr) )
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import GHC.Unit.Module        ( Module )
 import GHC.Core.Type
@@ -595,7 +595,7 @@ consDataCon_RDR = nameRdrName consDataConName
 pcTyCon :: Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
 pcTyCon name cType tyvars cons
   = mkAlgTyCon name
-                (mkAnonTyConBinders VisArg tyvars)
+                (mkAnonTyConBinders tyvars)
                 liftedTypeKind
                 (map (const Representational) tyvars)
                 cType
@@ -621,8 +621,8 @@ pcDataConWithFixity :: Bool      -- ^ declared infix?
                     -> [Scaled Type]    -- ^ args
                     -> TyCon
                     -> DataCon
-pcDataConWithFixity infx n = pcDataConWithFixity' infx n (dataConWorkerUnique (nameUnique n))
-                                                  NoRRI
+pcDataConWithFixity infx n = pcDataConWithFixity' infx n
+                                 (dataConWorkerUnique (nameUnique n)) NoPromInfo
 -- The Name's unique is the first of two free uniques;
 -- the first is used for the datacon itself,
 -- the second is used for the "worker name"
@@ -630,7 +630,7 @@ pcDataConWithFixity infx n = pcDataConWithFixity' infx n (dataConWorkerUnique (n
 -- To support this the mkPreludeDataConUnique function "allocates"
 -- one DataCon unique per pair of Ints.
 
-pcDataConWithFixity' :: Bool -> Name -> Unique -> RuntimeRepInfo
+pcDataConWithFixity' :: Bool -> Name -> Unique -> PromDataConInfo
                      -> [TyVar] -> [TyCoVar] -> [TyCoVar]
                      -> [Scaled Type] -> TyCon -> DataCon
 -- The Name should be in the DataName name space; it's the name
@@ -687,7 +687,7 @@ mkDataConWorkerName data_con wrk_key =
     wrk_occ = mkDataConWorkerOcc dc_occ
 
 -- used for RuntimeRep and friends
-pcSpecialDataCon :: Name -> [Type] -> TyCon -> RuntimeRepInfo -> DataCon
+pcSpecialDataCon :: Name -> [Type] -> TyCon -> PromDataConInfo -> DataCon
 pcSpecialDataCon dc_name arg_tys tycon rri
   = pcDataConWithFixity' False dc_name (dataConWorkerUnique (nameUnique dc_name)) rri
                          [] [] [] (map linear arg_tys) tycon
@@ -1580,9 +1580,9 @@ typeOrConstraintTy = mkTyConTy typeOrConstraintTyCon
 
 typeLikeDataCon, constraintLikeDataCon :: DataCon
 typeLikeDataCon = pcSpecialDataCon typeLikeDataConName
-    [] typeOrConstraintTyCon (TypeOrConstraint False)
+    [] typeOrConstraintTyCon (TypeOrConstraint TypeLike)
 constraintLikeDataCon = pcSpecialDataCon constraintLikeDataConName
-    [] typeOrConstraintTyCon (TypeOrConstraint True)
+    [] typeOrConstraintTyCon (TypeOrConstraint ConstraintLike)
 
 typeLikeDataConTyCon :: TyCon
 typeLikeDataConTyCon = promoteDataCon typeLikeDataCon
@@ -1669,7 +1669,7 @@ boxedRepDataCon = pcSpecialDataCon boxedRepDataConName
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in RepType
     prim_rep_fun [lev]
-      = case tyConRuntimeRepInfo (tyConAppTyCon lev) of
+      = case tyConPromDataConInfo (tyConAppTyCon lev) of
           Levity Lifted   -> [LiftedRep]
           Levity Unlifted -> [UnliftedRep]
           _ -> pprPanic "boxedRepDataCon" (ppr lev)
@@ -1721,8 +1721,8 @@ vecRepDataCon = pcSpecialDataCon vecRepDataConName [ mkTyConTy vecCountTyCon
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_rep_fun [count, elem]
-      | VecCount n <- tyConRuntimeRepInfo (tyConAppTyCon count)
-      , VecElem  e <- tyConRuntimeRepInfo (tyConAppTyCon elem)
+      | VecCount n <- tyConPromDataConInfo (tyConAppTyCon count)
+      , VecElem  e <- tyConPromDataConInfo (tyConAppTyCon elem)
       = [VecRep n e]
     prim_rep_fun args
       = pprPanic "vecRepDataCon" (ppr args)

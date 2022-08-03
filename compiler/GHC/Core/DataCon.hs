@@ -1046,7 +1046,7 @@ mkDataCon :: Name
           -> KnotTied ThetaType -- ^ Theta-type occurring before the arguments proper
           -> [KnotTied (Scaled Type)]    -- ^ Original argument types
           -> KnotTied Type      -- ^ Original result type
-          -> RuntimeRepInfo     -- ^ See comments on 'GHC.Core.TyCon.RuntimeRepInfo'
+          -> PromDataConInfo    -- ^ See comments on 'GHC.Core.TyCon.PromDataConInfo'
           -> KnotTied TyCon     -- ^ Representation type constructor
           -> ConTag             -- ^ Constructor tag
           -> ThetaType          -- ^ The "stupid theta", context of the data
@@ -1118,9 +1118,9 @@ mkDataCon name declared_infix prom_info
       -- fresh_names: make sure that the "anonymous" tyvars don't
       -- clash in name or unique with the universal/existential ones.
       -- Tiresome!  And unnecessary because these tyvars are never looked at
-    prom_theta_bndrs = [ mkAnonTyConBinder InvisArg1 (mkTyVar n t)
+    prom_theta_bndrs = [ mkInvisAnonTyConBinder (mkTyVar n t)
      {- Invisible -}   | (n,t) <- fresh_names `zip` theta ]
-    prom_arg_bndrs   = [ mkAnonTyConBinder VisArg (mkTyVar n t)
+    prom_arg_bndrs   = [ mkAnonTyConBinder (mkTyVar n t)
      {- Visible -}     | (n,t) <- dropList theta fresh_names `zip` map scaledThing orig_arg_tys ]
     prom_bndrs       = prom_tv_bndrs ++ prom_theta_bndrs ++ prom_arg_bndrs
     prom_res_kind    = orig_res_ty

@@ -131,15 +131,13 @@ data Literal
                                 -- that can be represented as a Literal. Create
                                 -- with 'nullAddrLit'
 
-  | LitRubbish Type             -- ^ A nonsense value of the given
-                                -- representation. See Note [Rubbish literals].
-                                --
-                                -- The Type argument, rr, is of kind RuntimeRep.
-                                -- The type of the literal is forall (a:TYPE rr). a
-                                --
-                                -- INVARIANT: the Type has no free variables
-                                --    and so substitution etc can ignore it
-                                --
+  | LitRubbish                  -- ^ A nonsense value; See Note [Rubbish literals].
+      TypeOrConstraint          -- t_or_c: whether this is a type or a constraint
+      Type                      -- rr: a type of kind RuntimeRep
+      -- The type of the literal is forall (a:SORT t_or_c rr). a
+      --
+      -- INVARIANT: the Type has no free variables
+      --    and so substitution etc can ignore it
 
   | LitFloat   Rational         -- ^ @Float#@. Create with 'mkLitFloat'
   | LitDouble  Rational         -- ^ @Double#@. Create with 'mkLitDouble'
@@ -267,7 +265,7 @@ instance Binary Literal where
         = do putByte bh 6
              put_ bh nt
              put_ bh i
-    put_ _ (LitRubbish b) = pprPanic "Binary LitRubbish" (ppr b)
+    put_ _ lit@(LitRubbish {}) = pprPanic "Binary LitRubbish" (ppr lit)
      -- We use IfaceLitRubbish; see Note [Rubbish literals], item (6)
 
     get bh = do
@@ -296,6 +294,7 @@ instance Binary Literal where
                     i  <- get bh
                     return (LitNumber nt i)
               _ -> pprPanic "Binary:Literal" (int (fromIntegral h))
+
 
 instance Outputable Literal where
     ppr = pprLiteral id
@@ -850,10 +849,13 @@ literalType (LitNumber lt _)  = case lt of
    LitNumWord64  -> word64PrimTy
 
 -- LitRubbish: see Note [Rubbish literals]
-literalType (LitRubbish rep)
+literalType (LitRubbish torc rep)
   = mkForAllTy a Inferred (mkTyVarTy a)
   where
-    a = mkTemplateKindVar (mkTYPEapp rep)
+    a = mkTemplateKindVar kind
+    kind = case torc of
+             TypeLike       -> mkTYPEapp       rep
+             ConstraintLike -> mkCONSTRAINTapp rep
 
 {-
         Comparison
@@ -869,7 +871,8 @@ cmpLit (LitDouble    a)     (LitDouble     b)     = a `compare` b
 cmpLit (LitLabel     a _ _) (LitLabel      b _ _) = a `lexicalCompareFS` b
 cmpLit (LitNumber nt1 a)    (LitNumber nt2  b)
   = (nt1 `compare` nt2) `mappend` (a `compare` b)
-cmpLit (LitRubbish b1)      (LitRubbish b2)       = b1 `nonDetCmpType` b2
+cmpLit (LitRubbish tc1 b1)  (LitRubbish tc2 b2)  = (tc1 `compare` tc2) `mappend`
+                                                   (b1 `nonDetCmpType` b2)
 cmpLit lit1 lit2
   | isTrue# (dataToTag# lit1 <# dataToTag# lit2) = LT
   | otherwise                                    = GT
@@ -904,8 +907,12 @@ pprLiteral add_par (LitLabel l mb fod) =
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
-pprLiteral _       (LitRubbish rep)
-  = text "RUBBISH" <> parens (ppr rep)
+pprLiteral _       (LitRubbish torc rep)
+  = text "RUBBISH" <> pp_tc <> parens (ppr rep)
+  where
+  pp_tc = case torc of
+           TypeLike       -> empty
+           ConstraintLike -> text "[c]"
 
 {-
 Note [Printing of literals in Core]
@@ -1004,7 +1011,7 @@ data type. Here are the moving parts:
    all boxed to the host GC anyway.
 
 6. IfaceSyn: `Literal` is part of `IfaceSyn`, but `Type` really isn't.  So in
-   the passage from Core to Iface I put LitRubbish into its owns IfaceExpr data
+   the passage from Core to Iface we put LitRubbish into its own IfaceExpr data
    constructor, IfaceLitRubbish. The remaining constructors of Literal are
    fine as IfaceSyn.
 

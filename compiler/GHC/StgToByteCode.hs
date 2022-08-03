@@ -1713,7 +1713,7 @@ pushLiteral padded lit =
         LitChar {}      -> code WordRep
         LitNullAddr     -> code AddrRep
         LitString {}    -> code AddrRep
-        LitRubbish rep  -> case runtimeRepPrimRep (text "pushLiteral") rep of
+        LitRubbish _ rep-> case runtimeRepPrimRep (text "pushLiteral") rep of
                              [pr] -> code pr
                              _    -> pprPanic "pushLiteral" (ppr lit)
         LitNumber nt _  -> case nt of

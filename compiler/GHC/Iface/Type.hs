@@ -75,7 +75,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  , tupleTyConName
                                  , manyDataConTyCon, oneDataConTyCon
                                  , liftedRepTyCon, liftedDataConTyCon )
-import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy )
+import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy, anonArgTyCon )
 
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
@@ -944,7 +944,8 @@ ppr_ty ctxt_prec ty@(IfaceFunTy af w ty1 ty2)  -- Should be VisArg
     maybeParen ctxt_prec funPrec $
     sep [ppr_ty funPrec ty1, sep (ppr_fun_tail w ty2)]
   where
-    ppr_fun_tail wthis (IfaceFunTy VisArg wnext ty1 ty2)
+    ppr_fun_tail wthis (IfaceFunTy af wnext ty1 ty2)
+      | isVisibleAnonArg af
       = (ppr_FUN_arrow wthis <+> ppr_ty funPrec ty1) : ppr_fun_tail wnext ty2
     ppr_fun_tail wthis other_ty
       = [ppr_FUN_arrow wthis <+> pprIfaceType other_ty]
@@ -1732,10 +1733,8 @@ ppr_co ctxt_prec (IfaceFunCo r af co_mult co1 co2)
       = [ppr_arrow af1 co_mult1 <> ppr_role r <+> pprIfaceCoercion other_co]
 
     ppr_arrow af co_mult
-      = case af of
-          VisArg    -> mulArrow ppr_co co_mult
-          InvisArg1 -> text "=>"
-          InvisArg2 -> text "==>"
+      | isFUNAnonArg af = mulArrow ppr_co co_mult
+      | otherwise       = ppr (anonArgTyCon af)
 
 ppr_co _         (IfaceTyConAppCo r tc cos)
   = parens (pprIfaceCoTcApp topPrec tc cos) <> ppr_role r

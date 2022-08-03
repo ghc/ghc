@@ -434,9 +434,9 @@ decomposeFunCo _ (FunCo _ _ w co1 co2) = (w, co1, co2)
 
 decomposeFunCo r co
   | assertPpr all_ok (ppr co) $
-    isVisibleAnonArg af   -- Args are [mult_co, arg_rep_co, res_rep_co, arg_co, res_co]
+    isFUNAnonArg af   -- Args are [mult_co, arg_rep_co, res_rep_co, arg_co, res_co]
   = (mkNthCo Nominal 0 co, mkNthCo r 3 co, mkNthCo r 4 co)
-  | otherwise             -- Args are [arg_rep_co, res_rep_co, arg_co, res_co]
+  | otherwise         -- Args are [arg_rep_co, res_rep_co, arg_co, res_co]
   = (mkReflCo r manyDataConTy, mkNthCo r 2 co, mkNthCo r 3 co)
   where
     Pair s1t1 s2t2 = coercionKind co
@@ -1203,19 +1203,19 @@ mkNthCoFunCo :: Int         -- ^ "n"
 --    resk_co :: sk2 ~ tk2  =  mkNthCo 0 (mkKindCo res_co)
 --                             i.e. mkRuntimeRepCo
 mkNthCoFunCo n af w co1 co2
-  | isVisibleAnonArg af = case n of
-                                0 -> w
-                                1 -> rep1
-                                2 -> rep2
-                                3 -> co1
-                                4 -> co2
-                                _ -> bad_n
-  | otherwise           = case n of
-                                0 -> rep1
-                                1 -> rep2
-                                2 -> co1
-                                3 -> co2
-                                _ -> bad_n
+  | isFUNAnonArg af = case n of
+                        0 -> w
+                        1 -> rep1
+                        2 -> rep2
+                        3 -> co1
+                        4 -> co2
+                        _ -> bad_n
+  | otherwise       = case n of
+                        0 -> rep1
+                        1 -> rep2
+                        2 -> co1
+                        3 -> co2
+                        _ -> bad_n
   where
     rep1 = mkRuntimeRepCo co1
     rep2 = mkRuntimeRepCo co2

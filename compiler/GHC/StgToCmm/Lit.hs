@@ -50,7 +50,7 @@ cgLit :: Literal -> FCode CmmExpr
 cgLit (LitString s) =
   CmmLit <$> newByteStringCLit s
  -- not unpackFS; we want the UTF-8 byte stream.
-cgLit (LitRubbish rep) =
+cgLit (LitRubbish _ rep) =
   case expectOnly "cgLit" prim_reps of -- Note [Post-unarisation invariants]
     VoidRep     -> panic "cgLit:VoidRep"   -- dito
     LiftedRep   -> idInfoToAmode <$> getCgIdInfo unitDataConId

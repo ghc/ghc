@@ -105,6 +105,7 @@ module GHC.Types.Basic (
         TypeOrKind(..), isTypeLevel, isKindLevel,
 
         Levity(..), mightBeLifted, mightBeUnlifted,
+        TypeOrConstraint(..),
 
         NonStandardDefaultingStrategy(..),
         DefaultingStrategy(..), defaultNonStandardTyVars,
@@ -1877,9 +1878,16 @@ isKindLevel KindLevel = True
 
 {- *********************************************************************
 *                                                                      *
-                     Levity information
+                 Levity and TypeOrConstraint
 *                                                                      *
 ********************************************************************* -}
+
+{- The types `Levity` and `TypeOrConstraint` are internal to GHC.
+   They are the same shape as the eponomyous types in the library
+      ghc-prim:GHC.Types
+   but they aren't the same types -- after all, they are defined in a
+   different module.
+-}
 
 data Levity
   = Lifted
@@ -1897,6 +1905,11 @@ mightBeLifted _               = True
 mightBeUnlifted :: Maybe Levity -> Bool
 mightBeUnlifted (Just Lifted) = False
 mightBeUnlifted _             = True
+
+data TypeOrConstraint
+  = TypeLike | ConstraintLike
+  deriving( Eq, Ord, Data )
+
 
 {- *********************************************************************
 *                                                                      *

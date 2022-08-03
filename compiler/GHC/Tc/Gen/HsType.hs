@@ -2472,7 +2472,7 @@ kcInferDeclHeader name flav
                -- recursive group.
                -- See Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
 
-             tc_binders = mkAnonTyConBinders VisArg tc_tvs
+             tc_binders = mkAnonTyConBinders tc_tvs
                -- Also, note that tc_binders has the tyvars from only the
                -- user-written tyvarbinders. See S1 in Note [How TcTyCons work]
                -- in GHC.Tc.TyCl

@@ -163,9 +163,10 @@ If we have done specialisation the we check that there are
 
 Note [Linting function types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As described in Note [Representation of function types], all saturated
-applications of funTyCon are represented with the FunTy constructor. We check
-this invariant in lintType.
+All saturated applications of funTyCon are represented with the FunTy constructor.
+See Note [Function type constructors and FunTy] in GHC.Builtin.Types.Prim
+
+ We check this invariant in lintType.
 
 Note [Linting type lets]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1742,8 +1743,7 @@ lintType ty@(TyConApp tc tys)
   | Just {} <- tyConAppFun_maybe id tc tys
     -- We should never see a saturated application of funTyCon; such
     -- applications should be represented with the FunTy constructor.
-    -- See Note [Linting function types] and
-    -- Note [Representation of function types].
+    -- See Note [Linting function types]
   = failWithL (hang (text "Saturated application of" <+> quotes (ppr tc)) 2 (ppr ty))
 
   | otherwise  -- Data types, data families, primitive types

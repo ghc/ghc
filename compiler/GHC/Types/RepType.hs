@@ -611,7 +611,7 @@ runtimeRepPrimRep doc rr_ty
   | Just rr_ty' <- coreView rr_ty
   = runtimeRepPrimRep doc rr_ty'
   | TyConApp rr_dc args <- rr_ty
-  , RuntimeRep fun <- tyConRuntimeRepInfo rr_dc
+  , RuntimeRep fun <- tyConPromDataConInfo rr_dc
   = fun args
   | otherwise
   = pprPanic "runtimeRepPrimRep" (doc $$ ppr rr_ty)
@@ -625,7 +625,7 @@ runtimeRepPrimRep_maybe rr_ty
   | Just rr_ty' <- coreView rr_ty
   = runtimeRepPrimRep_maybe rr_ty'
   | TyConApp rr_dc args <- rr_ty
-  , RuntimeRep fun <- tyConRuntimeRepInfo rr_dc
+  , RuntimeRep fun <- tyConPromDataConInfo rr_dc
   = Just $! fun args
   | otherwise
   = Nothing

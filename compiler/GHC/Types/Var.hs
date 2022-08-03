@@ -68,7 +68,9 @@ module GHC.Types.Var (
 
         -- * ArgFlags
         ArgFlag(Invisible,Required,Specified,Inferred),
-        AnonArgFlag(..), isVisibleAnonArg, isInvisibleAnonArg,
+        AnonArgFlag(..), isVisibleAnonArg, isInvisibleAnonArg, isFUNAnonArg,
+        visArg, invisArg,
+        TypeOrConstraint(..),  -- Re-export this: it's an argument of AnonArgFlag
         Specificity(..),
         isVisibleArgFlag, isInvisibleArgFlag, isInferredArgFlag,
         sameVis,
@@ -106,6 +108,7 @@ import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
                         , mkUniqueGrimily, nonDetCmpUnique )
+import GHC.Types.Basic( TypeOrConstraint(..) )
 import GHC.Utils.Misc
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
@@ -515,56 +518,70 @@ instance Binary ArgFlag where
 -- and ForallVisFlag, but also because it is used in IfaceType, rather
 -- early in the compilation chain
 data AnonArgFlag
-  = VisArg    -- ^ Used for @(->)@: an ordinary non-dependent arrow.
-              --   The argument is visible in source code.
-  | InvisArg1 -- ^ Used for `(=>)`
-  | InvisArg2 -- ^ Used for `(==>)`
-              -- In both cases InvisArg cases the argument is invisible
-              -- in source code.
+  = VisArg TypeOrConstraint   -- The argument is visible in source code.
+                              --     (->) and (-=>)
+  | InvisArg TypeOrConstraint -- The argument is invisible in source code.
+                              --     (=>) and (==>)
   deriving (Eq, Ord, Data)
 
 instance Outputable AnonArgFlag where
-  ppr VisArg    = text "[->]"
-  ppr InvisArg1 = text "[=>]"
-  ppr InvisArg2 = text "[==>]"
+  ppr (VisArg TypeLike)         = text "[->]"
+  ppr (VisArg ConstraintLike)   = text "[-=>]"
+  ppr (InvisArg TypeLike)       = text "[=>]"
+  ppr (InvisArg ConstraintLike) = text "[==>]"
 
 instance Binary AnonArgFlag where
-  put_ bh VisArg    = putByte bh 0
-  put_ bh InvisArg1 = putByte bh 1
-  put_ bh InvisArg2 = putByte bh 2
+  put_ bh (VisArg   TypeLike)       = putByte bh 0
+  put_ bh (VisArg   ConstraintLike) = putByte bh 1
+  put_ bh (InvisArg TypeLike)       = putByte bh 2
+  put_ bh (InvisArg ConstraintLike) = putByte bh 3
 
   get bh = do
     h <- getByte bh
     case h of
-      0 -> return VisArg
-      1 -> return InvisArg1
-      _ -> return InvisArg2
+      0 -> return (VisArg   TypeLike)
+      1 -> return (VisArg   ConstraintLike)
+      2 -> return (InvisArg TypeLike)
+      _ -> return (InvisArg ConstraintLike)
+
+visArg :: TypeOrConstraint -> AnonArgFlag
+visArg = VisArg
+
+invisArg :: TypeOrConstraint -> AnonArgFlag
+invisArg = InvisArg
 
 isInvisibleAnonArg :: AnonArgFlag -> Bool
 isInvisibleAnonArg af = not (isVisibleAnonArg af)
 
 isVisibleAnonArg :: AnonArgFlag -> Bool
-isVisibleAnonArg VisArg = True
-isVisibleAnonArg _      = False
+isVisibleAnonArg (VisArg {}) = True
+isVisibleAnonArg _           = False
+
+isFUNAnonArg :: AnonArgFlag -> Bool
+-- This one has an extra multiplicity argument
+isFUNAnonArg (VisArg TypeLike) = True
+isFUNAnonArg _                 = False
 
 {- Note [AnonArgFlag]
 ~~~~~~~~~~~~~~~~~~~~~
 AnonArgFlag is used principally in the FunTy constructor of Type.
-  FunTy VisArg    t1 t2   means   t1 -> t2
-  FunTy InvisArg1 t1 t2   means   t1 => t2
-  FunTy InvisArg2 t1 t2   means   t1 ==> t2
+  FunTy (VisArg TypeLike)         t1 t2   means   t1 -> t2
+  FunTy (InvisArg TypeLike)       t1 t2   means   t1 => t2
+  FunTy (VisArg ConstraintLike)   t1 t2   means   t1 -=> t2
+  FunTy (InvisArg ConstraintLike) t1 t2   means   t1 ==> t2
 
 However, the AnonArgFlag in a FunTy is just redundant, cached
 information.  In (FunTy { ft_af = af, ft_arg = t1, ft_res = t2 })
-  * if (isPredTy t1 = False) then af = VisArg
-  * if (isPredTy t1 = True, isPredTy t2 = False) then af = InvisArg1
-  * if (isPredTy t1 = True, isPredTy t2 = True)  then af = InvisArg2
+  ---------------------------------------------
+  (isPredTy t1)   (isPredTy ty)     AnonArgFlag
+  ---------------------------------------------
+     False           False         VisArg TypeLike
+     False           True          VisArg ConstraintLike
+     True            False         InvisArg TypeLike
+     True            True          InvisArg ConstraintLike
 where isPredTy is defined in GHC.Core.Type, and sees if t1's
-kind is Constraint.  See GHC.Core.TyCo.Rep
-Note [Types for coercions, predicates, and evidence]
-
-GHC.Core.Utils.mkFunctionType :: Mult -> Type -> Type -> Type
-uses isPredTy to decide the AnonArgFlag for the FunTy.
+kind is Constraint.  See GHC.Core.Type.chooseAnonArgFlag, and
+GHC.Core.TyCo.Rep Note [Types for coercions, predicates, and evidence]
 
 The term (Lam b e) donesn't carry an AnonArgFlag; instead it uses
 mkFunctionType when we want to get its types; see mkLamType.  This is
