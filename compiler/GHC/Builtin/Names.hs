@@ -2348,7 +2348,7 @@ traceKey                      = mkPreludeMiscIdUnique 108
 nospecIdKey :: Unique
 nospecIdKey                   = mkPreludeMiscIdUnique 109
 
-inlineIdKey, noinlineIdKey :: Unique
+inlineIdKey, noinlineIdKey, noinlineConstraintIdKey :: Unique
 inlineIdKey                   = mkPreludeMiscIdUnique 120
 -- see below
 
@@ -2356,8 +2356,9 @@ mapIdKey, dollarIdKey, coercionTokenIdKey, considerAccessibleIdKey :: Unique
 mapIdKey                = mkPreludeMiscIdUnique 121
 dollarIdKey             = mkPreludeMiscIdUnique 123
 coercionTokenIdKey      = mkPreludeMiscIdUnique 124
-noinlineIdKey           = mkPreludeMiscIdUnique 125
-considerAccessibleIdKey = mkPreludeMiscIdUnique 126
+considerAccessibleIdKey = mkPreludeMiscIdUnique 125
+noinlineIdKey           = mkPreludeMiscIdUnique 126
+noinlineConstraintIdKey = mkPreludeMiscIdUnique 127
 
 integerToFloatIdKey, integerToDoubleIdKey, naturalToFloatIdKey, naturalToDoubleIdKey :: Unique
 integerToFloatIdKey    = mkPreludeMiscIdUnique 128

@@ -32,7 +32,10 @@ module GHC.Types.Id.Make (
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, coerceId,
-        proxyHashId, noinlineId, noinlineIdName, nospecId, nospecIdName,
+        proxyHashId,
+        nospecId, nospecIdName,
+        noinlineId, noinlineIdName,
+        noinlineConstraintId, noinlineConstraintIdName,
         coerceName, leftSectionName, rightSectionName,
     ) where
 
@@ -159,7 +162,7 @@ wiredInIds
   ++ errorIds           -- Defined in GHC.Core.Make
 
 magicIds :: [Id]    -- See Note [magicIds]
-magicIds = [lazyId, oneShotId, noinlineId, nospecId]
+magicIds = [lazyId, oneShotId, noinlineId, noinlineConstraintId, nospecId]
 
 ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
@@ -1401,10 +1404,9 @@ leftSectionName   = mkWiredInIdName gHC_PRIM  (fsLit "leftSection")    leftSecti
 rightSectionName  = mkWiredInIdName gHC_PRIM  (fsLit "rightSection")   rightSectionKey    rightSectionId
 
 -- Names listed in magicIds; see Note [magicIds]
-lazyIdName, oneShotName, noinlineIdName, nospecIdName :: Name
+lazyIdName, oneShotName, nospecIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
-noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
 nospecIdName      = mkWiredInIdName gHC_MAGIC (fsLit "nospec")         nospecIdKey        nospecId
 
 ------------------------------------------------
@@ -1467,12 +1469,28 @@ lazyId = pcMiscPrelId lazyIdName ty info
     info = noCafIdInfo
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
 
+------------------------------------------------
+noinlineIdName, noinlineConstraintIdName :: Name
+noinlineIdName           = mkWiredInIdName gHC_MAGIC (fsLit "noinline")
+                                           noinlineIdKey noinlineId
+noinlineConstraintIdName = mkWiredInIdName gHC_MAGIC (fsLit "noinlineConstraint")
+                                           noinlineConstraintIdKey noinlineConstraintId
+
 noinlineId :: Id -- See Note [noinlineId magic]
 noinlineId = pcMiscPrelId noinlineIdName ty info
   where
     info = noCafIdInfo
-    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
+    ty  = mkSpecForAllTys [alphaTyVar] $
+          mkVisFunTyMany alphaTy alphaTy
 
+noinlineConstraintId :: Id -- See Note [noinlineId magic]
+noinlineConstraintId = pcMiscPrelId noinlineConstraintIdName ty info
+  where
+    info = noCafIdInfo
+    ty   = mkSpecForAllTys [alphaConstraintTyVar] $
+           mkVisFunTyMany alphaTy alphaConstraintTy
+
+------------------------------------------------
 nospecId :: Id -- See Note [nospecId magic]
 nospecId = pcMiscPrelId nospecIdName ty info
   where
@@ -1719,20 +1737,31 @@ But actually we give 'noinline' a wired-in name for three distinct reasons:
      noinline foo x xs
    where x::Int, will naturally desugar to
       noinline @Int (foo @Int dEqInt) x xs
-   But now it's entirely possible htat (foo @Int dEqInt) will inline foo,
+   But now it's entirely possible that (foo @Int dEqInt) will inline foo,
    since 'foo' is no longer a lone variable -- see #18995
 
    Solution: in the desugarer, rewrite
       noinline (f x y)  ==>  noinline f x y
    This is done in GHC.HsToCore.Utils.mkCoreAppDs.
+   This is only needed for noinlineId, not noInlineConstraintId (wrinkle
+   (a) below), because the latter never shows up in user code.
 
-Note that noinline as currently implemented can hide some simplifications since
-it hides strictness from the demand analyser. Specifically, the demand analyser
-will treat 'noinline f x' as lazy in 'x', even if the demand signature of 'f'
-specifies that it is strict in its argument. We considered fixing this this by adding a
-special case to the demand analyser to address #16588. However, the special
-case seemed like a large and expensive hammer to address a rare case and
-consequently we rather opted to use a more minimal solution.
+Wrinkles
+
+a) Sometimes case (2) above needs to apply `noinline` to a type of kind
+   Constraint; e.g.
+                    noinline @(Eq Int) $dfEqInt
+   We don't have type-or-kind polymorphism, so we simply have two `inline`
+   Ids, namely `noinlineId` and `noinlineConstraintId`.
+
+b) Note that noinline as currently implemented can hide some simplifications
+   since it hides strictness from the demand analyser. Specifically, the
+   demand analyser will treat 'noinline f x' as lazy in 'x', even if the
+   demand signature of 'f' specifies that it is strict in its argument. We
+   considered fixing this this by adding a special case to the demand
+   analyser to address #16588. However, the special case seemed like a large
+   and expensive hammer to address a rare case and consequently we rather
+   opted to use a more minimal solution.
 
 Note [nospecId magic]
 ~~~~~~~~~~~~~~~~~~~~~

@@ -30,7 +30,7 @@ module GHC.Builtin.Types.Prim(
         levity1TyVarInf, levity2TyVarInf,
         levity1Ty, levity2Ty,
 
-        alphaConstraintTyVar, betaConstraintTyVar,
+        alphaConstraintTyVar, alphaConstraintTy,
 
         openAlphaTyVar, openBetaTyVar, openGammaTyVar,
         openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec,
@@ -438,8 +438,11 @@ alphaTyVarSpec, betaTyVarSpec, gammaTyVarSpec, deltaTyVarSpec :: TyVarBinder
 alphaConstraintTyVars :: [TyVar]
 alphaConstraintTyVars = mkTemplateTyVars $ repeat constraintKind
 
-alphaConstraintTyVar, betaConstraintTyVar :: TyVar
-(alphaConstraintTyVar:betaConstraintTyVar:_) = alphaConstraintTyVars
+alphaConstraintTyVar :: TyVar
+(alphaConstraintTyVar:_) = alphaConstraintTyVars
+
+alphaConstraintTy :: Type
+alphaConstraintTy = mkTyVarTy alphaConstraintTyVar
 
 alphaTys :: [Type]
 alphaTys = mkTyVarTys alphaTyVars

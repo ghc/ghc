@@ -66,7 +66,7 @@ import GHC.Data.FastString
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make ( noinlineIdName )
+import GHC.Types.Id.Make ( noinlineIdName, noinlineConstraintIdName )
 import GHC.Types.Literal
 import GHC.Types.Name
 import GHC.Types.Basic
@@ -615,8 +615,8 @@ toIfaceVar :: Id -> IfaceExpr
 toIfaceVar v
     | isBootUnfolding (idUnfolding v)
     = -- See Note [Inlining and hs-boot files]
-      IfaceApp (IfaceApp (IfaceExt noinlineIdName)
-                         (IfaceType (toIfaceType (idType v))))
+      IfaceApp (IfaceApp (IfaceExt noinline_id)
+                         (IfaceType (toIfaceType ty)))
                (IfaceExt name) -- don't use mkIfaceApps, or infinite loop
 
     | Just fcall <- isFCallId_maybe v = IfaceFCall fcall (toIfaceType (idType v))
@@ -624,7 +624,12 @@ toIfaceVar v
 
     | isExternalName name             = IfaceExt name
     | otherwise                       = IfaceLcl (getOccFS name)
-  where name = idName v
+  where
+    name = idName v
+    ty   = idType v
+    noinline_id | isConstraintKind (typeKind ty) = noinlineConstraintIdName
+                | otherwise                      = noinlineIdName
+
 
 
 ---------------------
@@ -703,7 +708,8 @@ But how do we arrange for this to happen?  There are two ingredients:
     1. When we serialize out unfoldings to IfaceExprs (toIfaceVar),
     for every variable reference we see if we are referring to an
     'Id' that came from an hs-boot file.  If so, we add a `noinline`
-    to the reference.
+    to the reference.  See Note [noinlineId magic]
+    in GHC.Types.Id.Make
 
     2. But how do we know if a reference came from an hs-boot file
     or not?  We could record this directly in the 'IdInfo', but

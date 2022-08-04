@@ -82,7 +82,7 @@ import Data.Int
 import Data.Word
 import Data.Char
 import Data.Data ( Data )
-import GHC.Exts
+import GHC.Exts( isTrue#, dataToTag#, (<#) )
 import Numeric ( fromRat )
 
 {-
