@@ -20,6 +20,11 @@
     is used as operator, it will be bound to a promoted data constructor rather
     than a type constructor, if both are in scope.
 
+  * Add a `vendor-filepath` Cabal flag to the `template-haskell` package. If
+    this flag is set then `template-haskell` will not depend on the `filepath`
+    package and will instead use  some modules from `filepath` that have been
+    copied into the  `template-haskell` source tree.
+
 ## 2.18.0.0
   * The types of `ConP` and `conP` have been changed to allow for an additional list
     of type applications preceding the argument patterns.
