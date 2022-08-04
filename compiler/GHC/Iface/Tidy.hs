@@ -976,7 +976,8 @@ findExternalRules :: TidyOpts
 findExternalRules opts binds imp_id_rules unfold_env
   = (trimmed_binds, filter keep_rule all_rules)
   where
-    imp_rules         = filter expose_rule imp_id_rules
+    imp_rules | (opt_expose_rules opts) = filter expose_rule imp_id_rules
+              | otherwise               = []
     imp_user_rule_fvs = mapUnionVarSet user_rule_rhs_fvs imp_rules
 
     user_rule_rhs_fvs rule | isAutoRule rule = emptyVarSet
@@ -997,9 +998,7 @@ findExternalRules opts binds imp_id_rules unfold_env
         -- RHS: the auto rules that might mention a binder that has
         --      been discarded; see Note [Trimming auto-rules]
 
-    expose_rule rule
-        | not (opt_expose_rules opts) = False
-        | otherwise  = all is_external_id (ruleLhsFreeIdsList rule)
+    expose_rule rule = all is_external_id (ruleLhsFreeIdsList rule)
                 -- Don't expose a rule whose LHS mentions a locally-defined
                 -- Id that is completely internal (i.e. not visible to an
                 -- importing module).  NB: ruleLhsFreeIds only returns LocalIds.
