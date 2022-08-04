@@ -22,7 +22,8 @@ ifeq "$(Darwin_Host)" "YES"
 XATTR ?= /usr/bin/xattr
 endif
 
-define installscript
+# installscript
+#
 # $1 = package name
 # $2 = wrapper path
 # $3 = bindir
@@ -36,30 +37,32 @@ define installscript
 # to it. This implementation is a bit hacky and depends on consistency
 # of program names. For hadrian build this will work as programs have a
 # consistent naming procedure.
-	if [ -L 'wrappers/$1' ]; then echo "$1 is a symlink"; fi
-	@if [ -L 'wrappers/$1' ]; then \
-		cp -RP 'wrappers/$1' '$2'; \
-	else								 \
-		rm -f '$2' && 		 \
-		$(CREATE_SCRIPT) '$2' && \
-		echo "#!$(SHELL)" >>  '$2'  && \
-		echo "exedir=\"$4\"" >> '$2'  && \
-		echo "exeprog=\"$1\"" >> '$2'  && \
-		echo "executablename=\"$5\"" >> '$2'  && \
-		echo "bindir=\"$3\"" >> '$2'  && \
-		echo "libdir=\"$6\"" >> '$2'  && \
-		echo "docdir=\"$7\"" >> '$2'  && \
-		echo "includedir=\"$8\"" >> '$2'  && \
-		echo "" >> '$2'  && \
-		cat 'wrappers/$1' >> '$2'  && \
-		$(EXECUTABLE_FILE) '$2' ; \
+define installscript
+	echo "installscript $1 -> $2"
+	@if [ -L 'wrappers/$1' ]; then                \
+		$(CP) -P 'wrappers/$1' '$2' ;             \
+	else								          \
+		rm -f '$2' && 		                      \
+		$(CREATE_SCRIPT) '$2' &&                  \
+		echo "#!$(SHELL)" >>  '$2'  &&            \
+		echo "exedir=\"$4\"" >> '$2'  &&          \
+		echo "exeprog=\"$1\"" >> '$2'  &&         \
+		echo "executablename=\"$5\"" >> '$2'  &&  \
+		echo "bindir=\"$3\"" >> '$2'  &&          \
+		echo "libdir=\"$6\"" >> '$2'  &&          \
+		echo "docdir=\"$7\"" >> '$2'  &&          \
+		echo "includedir=\"$8\"" >> '$2'  &&      \
+		echo "" >> '$2'  &&                       \
+		cat 'wrappers/$1' >> '$2'  &&             \
+		$(EXECUTABLE_FILE) '$2' ;                 \
 	fi
 	@echo "$1 installed to $2"
 endef
 
+# patchpackageconf
+#
 # Hacky function to patch up the 'haddock-interfaces' and 'haddock-html'
 # fields in the package .conf files
-define patchpackageconf
 #
 # $1 = package name (ex: 'bytestring')
 # $2 = path to .conf file
@@ -67,16 +70,17 @@ define patchpackageconf
 # $4 = (relative) path from $${pkgroot} to docs directory ($3)
 # $5 = package name and version (ex: bytestring-0.13)
 #
-# We fix the paths to haddock files by using the relative path from the pkgroot
-# to the doc files.
+define patchpackageconf \
+	# We fix the paths to haddock files by using the relative path from the pkgroot
+	# to the doc files.
 	cat '$2' | sed 's|haddock-interfaces.*|haddock-interfaces: "$${pkgroot}/$4/html/libraries/$5/$1.haddock"|' \
 	         | sed 's|haddock-html.*|haddock-html: "$${pkgroot}/$4/html/libraries/$5"|' \
 		 | sed 's|    $${pkgroot}/../../doc/html/.*||' \
 	       > '$2.copy'
-# The rts package doesn't actually supply haddocks, so we stop advertising them
-# altogether.
+	# The rts package doesn't actually supply haddocks, so we stop advertising them
+	# altogether.
 	((echo "$1" | grep rts) && (cat '$2.copy' | sed 's|haddock-.*||' > '$2.copy.copy')) || (cat '$2.copy' > '$2.copy.copy')
-# We finally replace the original file.
+	# We finally replace the original file.
 	mv '$2.copy.copy' '$2'
 endef
 
@@ -170,7 +174,7 @@ install_bin_libdir:
 	@echo "Copying binaries to $(DESTDIR)$(ActualBinsDir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(ActualBinsDir)"
 	for i in $(BINARIES); do \
-		cp -R $$i "$(DESTDIR)$(ActualBinsDir)"; \
+		$(INSTALL_PROGRAM) $$i "$(DESTDIR)$(ActualBinsDir)"; \
 	done
 	# Work around #17418 on Darwin
 	if [ -e "${XATTR}" ]; then "${XATTR}" -c -r "$(DESTDIR)$(ActualBinsDir)"; fi
@@ -178,24 +182,43 @@ install_bin_libdir:
 install_bin_direct:
 	@echo "Copying binaries to $(DESTDIR)$(WrapperBinsDir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(WrapperBinsDir)"
-	cp ./bin/* "$(DESTDIR)$(WrapperBinsDir)/"
+	$(INSTALL_PROGRAM) ./bin/* "$(DESTDIR)$(WrapperBinsDir)/"
 
-LIBRARIES = $(wildcard ./lib/*)
 install_lib: lib/settings
 	@echo "Copying libraries to $(DESTDIR)$(ActualLibsDir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(ActualLibsDir)"
-	for i in $(LIBRARIES); do \
-		cp -R $$i "$(DESTDIR)$(ActualLibsDir)/"; \
-	done
+	
+	@dest="$(DESTDIR)$(ActualLibsDir)"; \
+	cd lib; \
+	for i in `$(FIND) . -type f`; do \
+		$(INSTALL_DIR) "$$dest/`dirname $$i`" ; \
+		case $$i in \
+		  *.a) \
+		    $(INSTALL_DATA) $$i "$$dest/`dirname $$i`" ; \
+		    $(RANLIB_CMD) "$$dest"/$$i ;; \
+		  *.dll) \
+		    $(INSTALL_PROGRAM) $$i "$$dest/`dirname $$i`" ; \
+		    $(STRIP_CMD) "$$dest"/$$i ;; \
+		  *.so) \
+		    $(INSTALL_SHLIB) $$i "$$dest/`dirname $$i`" ;; \
+		  *.dylib) \
+		    $(INSTALL_SHLIB) $$i "$$dest/`dirname $$i`" ;; \
+		  *) \
+		    $(INSTALL_DATA) $$i "$$dest/`dirname $$i`" ;; \
+		esac; \
+	done; \
+	chmod ugo+rx "$$dest"/bin/*
 
-DOCS = $(wildcard ./doc/*)
 install_docs:
 	@echo "Copying docs to $(DESTDIR)$(docdir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
-	for i in $(DOCS); do \
-		cp -R $$i "$(DESTDIR)$(docdir)/"; \
-	done
+	cd doc; $(FIND) . -type f -exec sh -c \
+			'$(INSTALL_DIR) "$(DESTDIR)$(docdir)/`dirname $$1`" && \
+			 $(INSTALL_DATA) "$$1" "$(DESTDIR)$(docdir)/`dirname $$1`" \
+		' sh '{}' \;
+	
 	if [ -d docs-utils ]; then \
+		$(INSTALL_DIR) "$(DESTDIR)$(docdir)/html/libraries/"; \
 		$(INSTALL_DATA) docs-utils/prologue.txt "$(DESTDIR)$(docdir)/html/libraries/"; \
 		$(INSTALL_SCRIPT) docs-utils/gen_contents_index "$(DESTDIR)$(docdir)/html/libraries/"; \
 	fi
@@ -210,7 +233,7 @@ install_wrappers: install_bin_libdir
 PKG_CONFS = $(shell find "$(DESTDIR)$(ActualLibsDir)/package.conf.d" -name '*.conf' | sed "s:   :\0xxx\0:g")
 update_package_db: install_bin install_lib
 	@echo "Installing C++ standard library virtual package"
-	cp mk/system-cxx-std-lib-1.0.conf "$(DESTDIR)$(ActualLibsDir)/"
+	$(INSTALL_DATA) mk/system-cxx-std-lib-1.0.conf "$(DESTDIR)$(ActualLibsDir)/"
 	@echo "Updating the package DB"
 	$(foreach p, $(PKG_CONFS),\
 		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-\([0-9]*[0-9]\.\)*conf//g'),$(shell echo "$p" | sed 's:\0xxx\0:   :g'),$(docdir),$(shell mk/relpath.sh "$(ActualLibsDir)" "$(docdir)"),$(shell echo $(notdir $p) | sed 's/.conf//g')))
@@ -219,6 +242,7 @@ update_package_db: install_bin install_lib
 install_mingw:
 	@echo "Installing MingGW"
 	$(INSTALL_DIR) "$(DESTDIR)$(prefix)/mingw"
-	cp -R ./mingw "$(DESTDIR)$(prefix)"
+	cp -Rp ./mingw "$(DESTDIR)$(prefix)"
+
 # END INSTALL
 # ----------------------------------------------------------------------
