@@ -256,6 +256,14 @@ Compiler
   type variables when given a polymorphic type. (It used to instantiate
   inferred type variables.)
 
+Packaging
+~~~~~~~~~~
+
+- GHC's package database now comes with a virtual
+  ``system-cxx-std-lib`` :ref:`package <system-cxx-std-lib>` which
+  captures the compiler configuration necessary to link aginst the
+  C++ standard library.
+
 Runtime system
 ~~~~~~~~~~~~~~~~
 

@@ -1449,3 +1449,23 @@ The allowed fields, with their types, are:
     HTML for this package.
 
 .. [1] it used to in GHC 6.4, but not since 6.6
+
+
+.. _system-cxx-std-lib:
+
+Linking against C++ libraries
+-----------------------------
+
+.. index::
+   single: system-cxx-std-lib
+   single: packages; system-cxx-std-lib
+   single: C++; linking
+
+Use of C++ libraries requires that the user link against the host
+system's C++ standard library. As the configuration necessary to
+achieve this is generally quite platform-dependent, GHC provides a
+built-in package, ``system-cxx-std-lib``. This package captures the
+configuration necessary for linking against the C++ standard library
+and can be used via the :ghc-flag:`-package ⟨pkg⟩` flag or the Cabal
+``build-depends`` field to link code against the C++ standard
+library.
