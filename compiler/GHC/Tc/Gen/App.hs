@@ -651,7 +651,7 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
            ; let delta'  = delta `extendVarSetList` (res_nu:arg_nus)
                  arg_tys = mkTyVarTys arg_nus
                  res_ty  = mkTyVarTy res_nu
-                 fun_ty' = mkVisFunTys (zipWithEqual "tcInstFun" mkScaled mults arg_tys) res_ty
+                 fun_ty' = mkScaledFunTys (zipWithEqual "tcInstFun" mkScaled mults arg_tys) res_ty
                  co_wrap = mkWpCastN (mkTcGReflLeftCo Nominal fun_ty' kind_co)
                  acc'    = addArgWrap co_wrap acc
                  -- Suppose kappa :: kk

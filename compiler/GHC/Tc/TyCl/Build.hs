@@ -320,7 +320,7 @@ buildClass tycon_name binders roles fds
               -- (We used to call them D_C, but now we can have two different
               --  superclasses both called C!)
 
-        ; let use_newtype = isSingleton arg_tys
+        ; let use_newtype = isSingleton (sc_theta ++ op_tys)
                 -- Use a newtype if the data constructor
                 --   (a) has exactly one value field
                 --       i.e. exactly one operation or superclass taken together
@@ -335,7 +335,6 @@ buildClass tycon_name binders roles fds
               args       = sc_sel_names ++ op_names
               op_tys     = [ty | (_,ty,_) <- sig_stuff]
               op_names   = [op | (op,_,_) <- sig_stuff]
-              arg_tys    = sc_theta ++ op_tys
               rec_tycon  = classTyCon rec_clas
               univ_bndrs = tyConInvisTVBinders binders
               univ_tvs   = binderVars univ_bndrs
@@ -353,8 +352,8 @@ buildClass tycon_name binders roles fds
                                    [{- no existentials -}]
                                    univ_bndrs
                                    [{- No GADT equalities -}]
-                                   [{- No theta -}]
-                                   (map unrestricted arg_tys) -- type classes are unrestricted
+                                   sc_theta
+                                   (map unrestricted op_tys) -- type classes are unrestricted
                                    (mkTyConApp rec_tycon (mkTyVarTys univ_tvs))
                                    rec_tycon
                                    (mkTyConTagMap rec_tycon)

@@ -458,7 +458,7 @@ instance Outputable TyConBndrVis where
 mkAnonTyConBinder :: TyVar -> TyConBinder
 -- Make a visible anonymous TyCon binder
 mkAnonTyConBinder tv = assert (isTyVar tv) $
-                       Bndr tv (AnonTCB (visArg TypeLike))
+                       Bndr tv (AnonTCB visArgTypeLike)
 
 mkAnonTyConBinders :: [TyVar] -> [TyConBinder]
 mkAnonTyConBinders tvs = map mkAnonTyConBinder tvs
@@ -467,7 +467,7 @@ mkInvisAnonTyConBinder :: TyVar -> TyConBinder
 -- Make an /invisible/ anonymous TyCon binder
 -- Not used much
 mkInvisAnonTyConBinder tv = assert (isTyVar tv) $
-                            Bndr tv (AnonTCB (invisArg TypeLike))
+                            Bndr tv (AnonTCB invisArgTypeLike)
 
 mkNamedTyConBinder :: ArgFlag -> TyVar -> TyConBinder
 -- The odd argument order supports currying

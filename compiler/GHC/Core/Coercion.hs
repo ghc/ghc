@@ -160,6 +160,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Trace
 
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )
@@ -817,7 +818,12 @@ mkFunCo r af w co1 co2
   , Just (ty2, _) <- isReflCo_maybe co2
   , Just (w, _)   <- isReflCo_maybe w
   = mkReflCo r (mkFunTy af w ty1 ty2)
-  | otherwise = FunCo r af w co1 co2
+
+  | otherwise
+  = assertPpr (af == chooseAnonArgFlag (coercionLKind co1) (coercionLKind co2))
+              (ppr af $$ ppr co1 <+> ppr dcolon <+> ppr (coercionLKind co1)
+                      $$ ppr co2 <+> ppr dcolon <+> ppr (coercionLKind co2)) $
+    FunCo r af w co1 co2
 
 -- | Apply a 'Coercion' to another 'Coercion'.
 -- The second coercion must be Nominal, unless the first is Phantom.
@@ -2380,14 +2386,16 @@ coercionKind co = Pair (coercionLKind co) (coercionRKind co)
 
 coercionLKind :: Coercion -> Type
 coercionLKind co
-  = go co
+  = pprTrace "coercionLKind" (ppr co) $
+    go co
   where
     go (Refl ty)                = ty
     go (GRefl _ ty _)           = ty
     go (TyConAppCo _ tc cos)    = mkTyConApp tc (map go cos)
     go (AppCo co1 co2)          = mkAppTy (go co1) (go co2)
     go (ForAllCo tv1 _ co1)     = mkTyCoInvForAllTy tv1 (go co1)
-    go (FunCo _ af w co1 co2)   = mkFunTy af (go w) (go co1) (go co2)
+    go (FunCo _ af w co1 co2)   = pprTrace "mkFunTy" (ppr af $$ ppr (go co2)) $
+                                  mkFunTy af (go w) (go co1) (go co2)
     go (CoVarCo cv)             = coVarLType cv
     go (HoleCo h)               = coVarLType (coHoleCoVar h)
     go (UnivCo _ _ ty1 _)       = ty1
@@ -2420,10 +2428,10 @@ coercionLKind co
     go_app (InstCo co arg) args = go_app co (go arg:args)
     go_app co              args = piResultTys (go co) args
 
-go_nth :: Int -> Type -> Type
+go_nth :: HasDebugCallStack => Int -> Type -> Type
 go_nth d ty
   | Just args <- tyConAppArgs_maybe ty
-  = assert (args `lengthExceeds` d) $
+  = assertPpr (args `lengthExceeds` d) (ppr d $$ ppr ty $$ ppr args $$ doc) $
     args `getNth` d
 
   | d == 0
@@ -2432,6 +2440,12 @@ go_nth d ty
 
   | otherwise
   = pprPanic "coercionLKind:nth" (ppr d <+> ppr ty)
+
+  where
+    doc = case ty of
+            FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res }
+              -> text "FunTy" <+> vcat [ppr af, ppr mult, ppr arg, ppr res, ppr (funTyConAppTy_maybe af mult arg res)]
+            _ -> text "not funty"
 
 coercionRKind :: Coercion -> Type
 coercionRKind co

@@ -52,7 +52,7 @@ import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core
-import GHC.Core.Type( pattern ManyTy )
+import GHC.Core.Type( pattern ManyTy, mkFunTyMany )
 import GHC.Core.Make
 import GHC.Core.Utils
 
@@ -128,8 +128,9 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
           -- the expected type
           tyvars = dataConUserTyVarBinders (classDataCon cls)
           expected_ty = mkInvisForAllTys tyvars $
-                          mkInvisFunTyMany (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
-                                           (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
+                        mkFunTyMany invisArgConstraintLike
+                                    (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
+                                    (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
 
       massertPpr (idType monad_sel `eqType` expected_ty) (ppr monad_sel $$ ppr expected_ty)
 

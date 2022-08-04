@@ -55,8 +55,6 @@ module GHC.Iface.Type (
         pprIfaceCoercion, pprParendIfaceCoercion,
         splitIfaceSigmaTy, pprIfaceTypeApp, pprUserIfaceForAll,
         pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp,
-        mulArrow,
-        ppr_FUN_arrow,
         isIfaceRhoType,
 
         suppressIfaceInvisibles,
@@ -65,7 +63,7 @@ module GHC.Iface.Type (
 
         mkIfaceTySubst, substIfaceTyVar, substIfaceAppArgs, inDomIfaceTySubst,
 
-        many_ty
+        many_ty, pprTypeArrow
     ) where
 
 import GHC.Prelude
@@ -73,7 +71,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Builtin.Types
                                  ( coercibleTyCon, heqTyCon
                                  , tupleTyConName
-                                 , manyDataConTyCon, oneDataConTyCon
+                                 , manyDataConTyCon
                                  , liftedRepTyCon, liftedDataConTyCon )
 import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy, anonArgTyCon )
 
@@ -912,20 +910,25 @@ pprPrecIfaceType :: PprPrec -> IfaceType -> SDoc
 pprPrecIfaceType prec ty =
   hideNonStandardTypes (ppr_ty prec) ty
 
--- mulArrow takes a pretty printer for the type it is being called on to
--- allow type applications to be printed with the correct precedence inside
--- the multiplicity e.g. a %(m n) -> b. See #20315.
-mulArrow :: (PprPrec -> a -> SDoc) -> a -> SDoc
-mulArrow ppr_mult mult = text "%" <> ppr_mult appPrec mult <+> arrow
+pprTypeArrow :: AnonArgFlag -> IfaceMult -> SDoc
+pprTypeArrow af mult
+  = pprArrow (mb_conc, pprPrecIfaceType) af mult
+  where
+    mb_conc (IfaceTyConApp tc _) = Just tc
+    mb_conc _                    = Nothing
 
-ppr_FUN_arrow :: IfaceMult -> SDoc
+pprArrow :: (a -> Maybe IfaceTyCon, PprPrec -> a -> SDoc)
+              -> AnonArgFlag -> a -> SDoc
 -- Prints a thin arrow (->) with its multiplicity
-ppr_FUN_arrow w
-  | (IfaceTyConApp tc _) <- w
-  , tc `ifaceTyConHasKey` (getUnique manyDataConTyCon) = arrow
-  | (IfaceTyConApp tc _) <- w
-  , tc `ifaceTyConHasKey` (getUnique oneDataConTyCon) = lollipop
-  | otherwise = mulArrow pprPrecIfaceType w
+-- Used for both FunTy and FunCo, hence higher order arguments
+pprArrow (mb_conc, ppr_mult) af mult
+  | isFUNAnonArg af
+  = case mb_conc mult of
+      Just tc | tc `ifaceTyConHasKey` manyDataConKey -> arrow
+              | tc `ifaceTyConHasKey` oneDataConKey  -> lollipop
+      _ -> text "%" <> ppr_mult appPrec mult <+> arrow
+  | otherwise
+  = ppr (anonArgTyCon af)
 
 ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty ctxt_prec ty
@@ -938,17 +941,20 @@ ppr_ty ctxt_prec (IfaceTupleTy i p tys) = pprTuple ctxt_prec i p tys -- always f
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
 
         -- Function types
-ppr_ty ctxt_prec ty@(IfaceFunTy af w ty1 ty2)  -- Should be VisArg
+ppr_ty ctxt_prec ty@(IfaceFunTy af w ty1 ty2)   -- Should be VisArg
   = assertPpr (isVisibleAnonArg af) (ppr ty) $  -- Ensured by isIfaceRhoType above
-    -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
+    -- We want to print a chain of arrows in a column
+    --     type1
+    --     -> type2
+    --     -> type3
     maybeParen ctxt_prec funPrec $
     sep [ppr_ty funPrec ty1, sep (ppr_fun_tail w ty2)]
   where
     ppr_fun_tail wthis (IfaceFunTy af wnext ty1 ty2)
       | isVisibleAnonArg af
-      = (ppr_FUN_arrow wthis <+> ppr_ty funPrec ty1) : ppr_fun_tail wnext ty2
+      = (pprTypeArrow af wthis <+> ppr_ty funPrec ty1) : ppr_fun_tail wnext ty2
     ppr_fun_tail wthis other_ty
-      = [ppr_FUN_arrow wthis <+> pprIfaceType other_ty]
+      = [pprTypeArrow af wthis <+> pprIfaceType other_ty]
 
 ppr_ty ctxt_prec (IfaceAppTy t ts)
   = if_print_coercions
@@ -1159,9 +1165,8 @@ lifted_ty =
 
 -- | The type 'Many :: Multiplicity'.
 many_ty :: IfaceType
-many_ty =
-    IfaceTyConApp (IfaceTyCon dc_name (mkIfaceTyConInfo IsPromoted IfaceNormalTyCon))
-                  IA_Nil
+many_ty = IfaceTyConApp (IfaceTyCon dc_name (mkIfaceTyConInfo IsPromoted IfaceNormalTyCon))
+                        IA_Nil
   where dc_name = getName manyDataConTyCon
 
 hideNonStandardTypes :: (IfaceType -> SDoc) -> IfaceType -> SDoc
@@ -1732,9 +1737,9 @@ ppr_co ctxt_prec (IfaceFunCo r af co_mult co1 co2)
     ppr_fun_tail af1 co_mult1 other_co
       = [ppr_arrow af1 co_mult1 <> ppr_role r <+> pprIfaceCoercion other_co]
 
-    ppr_arrow af co_mult
-      | isFUNAnonArg af = mulArrow ppr_co co_mult
-      | otherwise       = ppr (anonArgTyCon af)
+    ppr_arrow = pprArrow (mb_conc, ppr_co)
+    mb_conc (IfaceTyConAppCo _ tc _) = Just tc
+    mb_conc _                        = Nothing
 
 ppr_co _         (IfaceTyConAppCo r tc cos)
   = parens (pprIfaceCoTcApp topPrec tc cos) <> ppr_role r

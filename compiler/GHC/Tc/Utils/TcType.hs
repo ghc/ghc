@@ -55,7 +55,8 @@ module GHC.Tc.Utils.TcType (
 
   --------------------------------
   -- Builders
-  mkPhiTy, mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy,
+  mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy, mkPhiTy,
+  mkDFunTy, mkDFunPhiTy,
   mkTcAppTy, mkTcAppTys, mkTcCastTy,
 
   --------------------------------
@@ -144,8 +145,9 @@ module GHC.Tc.Utils.TcType (
   mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoInvForAllTys,
   mkSpecForAllTys, mkTyCoInvForAllTy,
   mkInfForAllTy, mkInfForAllTys,
-  mkVisFunTy, mkVisFunTys, mkInvisFunTy, mkInvisFunTyMany,
-  mkVisFunTyMany, mkVisFunTysMany, mkInvisFunTysMany,
+  mkVisFunTy, mkVisFunTyMany, mkVisFunTysMany,
+  mkScaledFunTys,
+  mkInvisFunTy, mkInvisFunTys,
   mkTyConApp, mkAppTy, mkAppTys,
   mkTyConTy, mkTyVarTy, mkTyVarTys,
   mkTyCoVarTy, mkTyCoVarTys,
@@ -1278,21 +1280,32 @@ ambigTkvsOfTy ty
 ************************************************************************
 -}
 
-mkSigmaTy :: [TyCoVarBinder] -> [PredType] -> Type -> Type
-mkSigmaTy bndrs theta tau = mkForAllTys bndrs (mkPhiTy theta tau)
-
 -- | Make a sigma ty where all type variables are 'Inferred'. That is,
 -- they cannot be used with visible type application.
-mkInfSigmaTy :: [TyCoVar] -> [PredType] -> Type -> Type
+mkInfSigmaTy :: HasDebugCallStack => [TyCoVar] -> [PredType] -> Type -> Type
 mkInfSigmaTy tyvars theta ty = mkSigmaTy (mkTyCoVarBinders Inferred tyvars) theta ty
 
 -- | Make a sigma ty where all type variables are "specified". That is,
 -- they can be used with visible type application
-mkSpecSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
+mkSpecSigmaTy :: HasDebugCallStack => [TyVar] -> [PredType] -> Type -> Type
 mkSpecSigmaTy tyvars preds ty = mkSigmaTy (mkTyCoVarBinders Specified tyvars) preds ty
 
-mkPhiTy :: [PredType] -> Type -> Type
-mkPhiTy = mkInvisFunTysMany
+mkSigmaTy :: HasDebugCallStack => [TyCoVarBinder] -> [PredType] -> Type -> Type
+-- Result is TypeLike
+mkSigmaTy bndrs theta tau = mkForAllTys bndrs (mkPhiTy theta tau)
+
+mkDFunTy :: [TyVar] -> ThetaType -> Type -> Type
+mkDFunTy tvs theta res_ty
+ = mkForAllTys (mkTyCoVarBinders Specified tvs) $
+   mkDFunPhiTy theta res_ty
+
+mkPhiTy :: HasDebugCallStack => [PredType] -> Type -> Type
+-- Result type is TypeLike
+mkPhiTy = mkInvisFunTys
+
+mkDFunPhiTy :: HasDebugCallStack => [PredType] -> Type -> Type
+-- Result type is ConstraintLike
+mkDFunPhiTy preds res = foldr (mkFunTyMany invisArgConstraintLike) res preds
 
 ---------------
 getDFunTyKey :: Type -> OccName -- Get some string from a type, to be used to
@@ -1455,7 +1468,7 @@ tcSplitNestedSigmaTys ty
   , (tvs1, theta1, rho1) <- tcSplitSigmaTy body_ty
   , not (null tvs1 && null theta1)
   = let (tvs2, theta2, rho2) = tcSplitNestedSigmaTys rho1
-    in (tvs1 ++ tvs2, theta1 ++ theta2, mkVisFunTys arg_tys rho2)
+    in (tvs1 ++ tvs2, theta1 ++ theta2, mkScaledFunTys arg_tys rho2)
 
     -- If there's no forall, we're done.
   | otherwise = ([], [], ty)

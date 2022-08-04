@@ -86,8 +86,6 @@ import GHC.Core
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
 
-import GHC.Iface.Type
-
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
@@ -313,7 +311,7 @@ mkWpFun co1          co2          t1            _  = WpFun co1 co2 t1
 
 mk_fun_co :: Mult -> TcCoercionR -> TcCoercionR -> TcCoercionR
 mk_fun_co mult arg_co res_co
-  = mkTcFunCo Representational (visArg TypeLike) (multToCo mult) arg_co res_co
+  = mkTcFunCo Representational visArgTypeLike (multToCo mult) arg_co res_co
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
@@ -1044,10 +1042,12 @@ instance Outputable EvCallStack where
     = ppr (orig,loc) <+> text ":" <+> ppr tm
 
 instance Outputable EvTypeable where
-  ppr (EvTypeableTyCon ts _)  = text "TyCon" <+> ppr ts
-  ppr (EvTypeableTyApp t1 t2) = parens (ppr t1 <+> ppr t2)
-  ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> mulArrow (const ppr) tm <+> ppr t2)
-  ppr (EvTypeableTyLit t1)    = text "TyLit" <> ppr t1
+  ppr (EvTypeableTyCon ts _)     = text "TyCon" <+> ppr ts
+  ppr (EvTypeableTyApp t1 t2)    = parens (ppr t1 <+> ppr t2)
+  ppr (EvTypeableTyLit t1)       = text "TyLit" <> ppr t1
+  ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> arr <+> ppr t2)
+    where
+      arr = pprArrowWithMultiplicity visArgTypeLike (Right (ppr tm))
 
 
 ----------------------------------------------------------------------

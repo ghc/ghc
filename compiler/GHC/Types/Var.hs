@@ -69,7 +69,9 @@ module GHC.Types.Var (
         -- * ArgFlags
         ArgFlag(Invisible,Required,Specified,Inferred),
         AnonArgFlag(..), isVisibleAnonArg, isInvisibleAnonArg, isFUNAnonArg,
-        visArg, invisArg,
+        anonArgTypeOrConstraint,
+        visArg, visArgTypeLike, visArgConstraintLike,
+        invisArg, invisArgTypeLike, invisArgConstraintLike,
         TypeOrConstraint(..),  -- Re-export this: it's an argument of AnonArgFlag
         Specificity(..),
         isVisibleArgFlag, isInvisibleArgFlag, isInferredArgFlag,
@@ -547,8 +549,20 @@ instance Binary AnonArgFlag where
 visArg :: TypeOrConstraint -> AnonArgFlag
 visArg = VisArg
 
+visArgTypeLike :: AnonArgFlag
+visArgTypeLike = VisArg TypeLike
+
+visArgConstraintLike :: AnonArgFlag
+visArgConstraintLike = VisArg ConstraintLike
+
 invisArg :: TypeOrConstraint -> AnonArgFlag
 invisArg = InvisArg
+
+invisArgTypeLike :: AnonArgFlag
+invisArgTypeLike = InvisArg TypeLike
+
+invisArgConstraintLike :: AnonArgFlag
+invisArgConstraintLike = InvisArg ConstraintLike
 
 isInvisibleAnonArg :: AnonArgFlag -> Bool
 isInvisibleAnonArg af = not (isVisibleAnonArg af)
@@ -561,6 +575,10 @@ isFUNAnonArg :: AnonArgFlag -> Bool
 -- This one has an extra multiplicity argument
 isFUNAnonArg (VisArg TypeLike) = True
 isFUNAnonArg _                 = False
+
+anonArgTypeOrConstraint :: AnonArgFlag -> TypeOrConstraint
+anonArgTypeOrConstraint (VisArg  torc) = torc
+anonArgTypeOrConstraint (InvisArg torc) = torc
 
 {- Note [AnonArgFlag]
 ~~~~~~~~~~~~~~~~~~~~~

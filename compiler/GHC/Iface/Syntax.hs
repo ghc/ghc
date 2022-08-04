@@ -63,7 +63,7 @@ import GHC.Types.Basic
 import GHC.Unit.Module
 import GHC.Types.SrcLoc
 import GHC.Data.BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
-import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArg )
+import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
@@ -1048,7 +1048,7 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               , ppWhen insert_empty_ctxt $ parens empty <+> darrow
                               , ex_msg
                               , pprIfaceContextArr prov_ctxt
-                              , pprIfaceType $ foldr (IfaceFunTy (visArg TypeLike) many_ty)
+                              , pprIfaceType $ foldr (IfaceFunTy visArgTypeLike many_ty)
                                                      pat_ty arg_tys ])
         pat_body = braces $ sep $ punctuate comma $ map ppr pat_fldlbls
         univ_msg = pprUserIfaceForAll $ tyVarSpecToBinders univ_bndrs
@@ -1197,7 +1197,9 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- Constructors are linear by default, but we don't want to show
     -- linear arrows when -XLinearTypes is disabled
     ppr_arr w = sdocOption sdocLinearTypes $ \linearTypes ->
-                if linearTypes then ppr_FUN_arrow w else arrow
+                if linearTypes
+                then pprTypeArrow visArgTypeLike w
+                else arrow
 
     ppr_bang IfNoBang = whenPprDebug $ char '_'
     ppr_bang IfStrict = char '!'

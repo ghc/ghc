@@ -29,14 +29,16 @@ module GHC.Core.Multiplicity
   , scaleScaled
   , IsSubmult(..)
   , submult
-  , mapScaledType) where
+  , mapScaledType
+  , pprArrowWithMultiplicity ) where
 
 import GHC.Prelude
 
 import GHC.Utils.Outputable
-import GHC.Core.TyCo.Rep
-import {-# SOURCE #-} GHC.Builtin.Types ( multMulTyCon )
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep
+import GHC.Types.Var( isFUNAnonArg )
+import {-# SOURCE #-} GHC.Builtin.Types ( multMulTyCon )
 import GHC.Builtin.Names (multMulTyConKey)
 import GHC.Types.Unique (hasKey)
 
@@ -334,3 +336,20 @@ submult OneTy OneTy  = Submult
 -- The 1 <= p rule
 submult OneTy _    = Submult
 submult _     _    = Unknown
+
+pprArrowWithMultiplicity :: AnonArgFlag -> Either Bool SDoc -> SDoc
+-- Pretty-print a multiplicity arrow.  The multiplicity itself
+-- is described by the (Either Bool SDoc)
+--    Left False   -- Many
+--    Left True    -- One
+--    Right doc    -- Something else
+-- In the Right case, the doc is in parens if not atomic
+pprArrowWithMultiplicity af pp_mult
+  | isFUNAnonArg af
+  = case pp_mult of
+      Left False -> arrow
+      Left True  -> lollipop
+      Right doc  -> text "%" <> doc <+> arrow
+  | otherwise
+  = ppr (anonArgTyCon af)
+

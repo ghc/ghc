@@ -330,7 +330,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
 
              -- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
              -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
-             act_res_ty = mkVisFunTys missing_tys (mkTupleTy1 boxity arg_tys)
+             act_res_ty = mkScaledFunTys missing_tys (mkTupleTy1 boxity arg_tys)
 
        ; traceTc "ExplicitTuple" (ppr act_res_ty $$ ppr res_ty)
 

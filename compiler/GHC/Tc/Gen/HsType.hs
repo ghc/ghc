@@ -1180,7 +1180,7 @@ tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
   | isConstraintKind exp_kind
   = do { ctxt' <- tc_hs_context mode ctxt
        ; ty'   <- tc_lhs_type mode rn_ty constraintKind
-       ; return (mkPhiTy ctxt' ty') }
+       ; return (mkDFunPhiTy ctxt' ty') }
 
   | otherwise
   = do { ctxt' <- tc_hs_context mode ctxt
@@ -1354,7 +1354,8 @@ tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
        ; mult' <- tc_mult mode mult
-       ; checkExpectedKind (HsFunTy noAnn mult ty1 ty2) (mkVisFunTy mult' ty1' ty2')
+       ; checkExpectedKind (HsFunTy noAnn mult ty1 ty2)
+                           (mkVisFunTy mult' ty1' ty2')
                            liftedTypeKind exp_kind }
 
 {- Note [Skolem escape and forall-types]

@@ -34,8 +34,7 @@ import {-# SOURCE #-} GHC.Core.DataCon
    ( dataConFullSig , dataConUserTyVarBinders, DataCon )
 
 import GHC.Core.Type ( pickyIsLiftedTypeKind, pattern OneTy, pattern ManyTy,
-                       splitForAllReqTVBinders, splitForAllInvisTVBinders,
-                       isManyTy, anonArgTyCon )
+                       splitForAllReqTVBinders, splitForAllInvisTVBinders )
 
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
@@ -43,7 +42,7 @@ import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.FVs
 import GHC.Core.Class
 import GHC.Types.Var
-
+import GHC.Core.Multiplicity( pprArrowWithMultiplicity )
 import GHC.Iface.Type
 
 import GHC.Types.Var.Set
@@ -231,16 +230,15 @@ debug_ppr_ty _ (LitTy l)
 debug_ppr_ty _ (TyVarTy tv)
   = ppr tv  -- With -dppr-debug we get (tv :: kind)
 
-debug_ppr_ty prec ty@(FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
+debug_ppr_ty prec (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
   = maybeParen prec funPrec $
     sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]
   where
-    arr | isFUNAnonArg af = case mult of
-                              OneTy -> lollipop
-                              ManyTy -> arrow
-                              w -> mulArrow (const ppr) w
-        | otherwise = assertPpr (isManyTy mult) (ppr ty) $
-                      ppr (anonArgTyCon af)
+    arr = pprArrowWithMultiplicity af $
+          case mult of
+            OneTy  -> Left True
+            ManyTy -> Left False
+            _      -> Right (debug_ppr_ty appPrec mult)
 
 debug_ppr_ty prec (TyConApp tc tys)
   | null tys  = ppr tc

@@ -6,6 +6,8 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Core.TyCon
 import {-# SOURCE #-} GHC.Core.TyCo.Rep( Type, Coercion )
 import GHC.Utils.Misc
+import GHC.Types.Var( AnonArgFlag )
+import GHC.Types.Basic( TypeOrConstraint )
 
 isPredTy     :: HasDebugCallStack => Type -> Bool
 isCoercionTy :: Type -> Bool
@@ -15,6 +17,9 @@ mkCastTy   :: Type -> Coercion -> Type
 mkTyConTy  :: TyCon -> Type
 mkTyConApp :: TyCon -> [Type] -> Type
 piResultTy :: HasDebugCallStack => Type -> Type -> Type
+
+typeKind :: HasDebugCallStack => Type -> Type
+typeTypeOrConstraint :: Type -> TypeOrConstraint
 
 coreView :: Type -> Maybe Type
 tcView :: Type -> Maybe Type
@@ -29,3 +34,5 @@ tyConAppTyCon_maybe :: Type -> Maybe TyCon
 getLevity :: HasDebugCallStack => Type -> Type
 
 partitionInvisibleTypes :: TyCon -> [Type] -> ([Type], [Type])
+
+chooseAnonArgFlag :: Type -> Type -> AnonArgFlag

@@ -29,10 +29,10 @@ module GHC.Core.Type (
         mkAppTy, mkAppTys, splitAppTy, splitAppTys, repSplitAppTys,
         splitAppTy_maybe, repSplitAppTy_maybe, tcRepSplitAppTy_maybe,
 
-        mkFunTy, mkVisFunTy, mkInvisFunTy,
-        mkVisFunTys,
-        mkVisFunTyMany, mkInvisFunTyMany,
-        mkVisFunTysMany, mkInvisFunTysMany,
+        mkFunTy, mkVisFunTy,
+        mkFunTyMany, mkVisFunTyMany, mkVisFunTysMany,
+        mkScaledFunTys,
+        mkInvisFunTy, mkInvisFunTys,
         splitFunTy, splitFunTy_maybe,
         splitFunTys, funResultTy, funArgTy,
         funTyConApp_maybe, funTyConAppTy_maybe, tyConAppFun_maybe,
@@ -119,7 +119,7 @@ module GHC.Core.Type (
         tyConAppNeedsKindSig,
 
         -- *** Levity and boxity
-        sORTKind_maybe,
+        sORTKind_maybe, typeTypeOrConstraint,
         typeLevity_maybe,
         isLiftedTypeKind, isUnliftedTypeKind, pickyIsLiftedTypeKind,
         isLiftedRuntimeRep, isUnliftedRuntimeRep, runtimeRepLevity_maybe,
@@ -1894,7 +1894,7 @@ mkTyConBindersPreferAnon vars inner_tkvs = assert (all isTyVar vars)
               = ( Bndr v (NamedTCB Required) : binders
                 , fvs `delVarSet` v `unionVarSet` kind_vars )
               | otherwise
-              = ( Bndr v (AnonTCB (visArg TypeLike)) : binders
+              = ( Bndr v (AnonTCB visArgTypeLike) : binders
                 , fvs `unionVarSet` kind_vars )
       where
         (binders, fvs) = go vs
@@ -2962,12 +2962,12 @@ See #14939.
 -----------------------------
 typeKind :: HasDebugCallStack => Type -> Kind
 -- No need to expand synonyms
-typeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
-typeKind (LitTy l)         = typeLiteralKind l
-typeKind (FunTy {})        = liftedTypeKind
-typeKind (TyVarTy tyvar)   = tyVarKind tyvar
-typeKind (CastTy _ty co)   = coercionRKind co
-typeKind (CoercionTy co)   = coercionType co
+typeKind (TyConApp tc tys)      = piResultTys (tyConKind tc) tys
+typeKind (LitTy l)              = typeLiteralKind l
+typeKind (FunTy { ft_af = af }) = tyConResKind (anonArgTyCon af)
+typeKind (TyVarTy tyvar)        = tyVarKind tyvar
+typeKind (CastTy _ty co)        = coercionRKind co
+typeKind (CoercionTy co)        = coercionType co
 
 typeKind (AppTy fun arg)
   = go fun [arg]
@@ -3057,6 +3057,18 @@ sORTKind_maybe kind
                      , Just torc <- getTypeOrConstraint_maybe torc_ty
                      -> Just (torc, rep)
       _ -> Nothing
+
+typeTypeOrConstraint :: Type -> TypeOrConstraint
+-- Expects a type that classifies values; returns
+-- whether it is TypeLike or ConstraintLike.
+-- Equivalent to calling sORTKind_maybe, but faster in the FunTy case
+typeTypeOrConstraint ty
+   = case coreFullView ty of
+       FunTy { ft_af = af } -> anonArgTypeOrConstraint af
+       ty | Just (torc, _) <- sORTKind_maybe (typeKind ty)
+          -> torc
+          | otherwise
+          -> pprPanic "typeOrConstraint" (ppr ty <+> dcolon <+> ppr (typeKind ty))
 
 -----------------------------------------
 -- | Does this classify a type allowed to have values? Responds True to things

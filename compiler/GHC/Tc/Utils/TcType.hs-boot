@@ -2,7 +2,7 @@ module GHC.Tc.Utils.TcType where
 import GHC.Utils.Outputable( SDoc )
 import GHC.Prelude ( Bool )
 import {-# SOURCE #-} GHC.Types.Var ( TcTyVar )
-import {-# SOURCE #-} GHC.Core.TyCo.Rep
+import {-# SOURCE #-} GHC.Core.TyCo.Rep( Type )
 import GHC.Utils.Misc ( HasDebugCallStack )
 import GHC.Stack
 

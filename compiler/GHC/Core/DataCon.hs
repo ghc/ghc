@@ -1107,7 +1107,7 @@ mkDataCon name declared_infix prom_info
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
         DCR{} -> mkInfForAllTys univ_tvs $ mkTyCoInvForAllTys ex_tvs $
-                 mkVisFunTys rep_arg_tys $
+                 mkScaledFunTys rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
       -- See Note [Promoted data constructors] in GHC.Core.TyCon
@@ -1466,8 +1466,8 @@ dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
                              dcOrigResTy = res_ty,
                              dcStupidTheta = stupid_theta })
   = mkInvisForAllTys user_tvbs $
-    mkInvisFunTysMany (stupid_theta ++ theta) $
-    mkVisFunTys arg_tys $
+    mkInvisFunTys (stupid_theta ++ theta) $
+    mkScaledFunTys  arg_tys $
     res_ty
 
 dataConNonlinearType :: DataCon -> Type
@@ -1476,8 +1476,8 @@ dataConNonlinearType (MkData { dcUserTyVarBinders = user_tvbs,
                                dcOrigResTy = res_ty })
   = let arg_tys' = map (\(Scaled w t) -> Scaled (case w of OneTy -> ManyTy; _ -> w) t) arg_tys
     in mkInvisForAllTys user_tvbs $
-       mkInvisFunTysMany theta $
-       mkVisFunTys arg_tys' $
+       mkInvisFunTys theta $
+       mkScaledFunTys arg_tys' $
        res_ty
 
 dataConDisplayType :: Bool -> DataCon -> Type

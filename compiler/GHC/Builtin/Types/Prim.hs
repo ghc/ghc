@@ -584,7 +584,7 @@ tcArrowTyConName = mkBuiltInPrimTc (fsLit "-=>") tcArrowTyConKey tcArrowTyCon
 -- @
 -- FUN :: forall (m :: Multiplicity) ->
 --        forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
---        TYPE rep1 -> TYPE rep2 -> *
+--        TYPE rep1 -> TYPE rep2 -> Type
 -- @
 --
 -- The runtime representations quantification is left inferred. This
@@ -604,7 +604,7 @@ fUNTyCon = mkPrimTyCon fUNTyConName tc_bndrs liftedTypeKind tc_roles
     tc_roles = [Nominal, Nominal, Nominal, Representational, Representational]
 
 -- (=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
---         CONSTRAINT rep1 -> TYPE rep2 -> *
+--         CONSTRAINT rep1 -> TYPE rep2 -> Type
 ctArrowTyCon :: TyCon
 ctArrowTyCon = mkPrimTyCon ctArrowTyConName tc_bndrs liftedTypeKind tc_roles
   where
@@ -616,9 +616,9 @@ ctArrowTyCon = mkPrimTyCon ctArrowTyConName tc_bndrs liftedTypeKind tc_roles
     tc_roles = [Nominal, Nominal, Representational, Representational]
 
 -- (==>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
---          CONSTRAINT rep1 -> CONSTRAINT rep2 -> *
+--          CONSTRAINT rep1 -> CONSTRAINT rep2 -> Constraint
 ccArrowTyCon :: TyCon
-ccArrowTyCon = mkPrimTyCon ccArrowTyConName tc_bndrs liftedTypeKind tc_roles
+ccArrowTyCon = mkPrimTyCon ccArrowTyConName tc_bndrs constraintKind tc_roles
   where
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
@@ -628,9 +628,9 @@ ccArrowTyCon = mkPrimTyCon ccArrowTyConName tc_bndrs liftedTypeKind tc_roles
     tc_roles = [Nominal, Nominal, Representational, Representational]
 
 -- (-=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
---          TYPE rep1 -> CONSTRAINT rep2 -> *
+--          TYPE rep1 -> CONSTRAINT rep2 -> Constraint
 tcArrowTyCon :: TyCon
-tcArrowTyCon = mkPrimTyCon tcArrowTyConName tc_bndrs liftedTypeKind tc_roles
+tcArrowTyCon = mkPrimTyCon tcArrowTyConName tc_bndrs constraintKind tc_roles
   where
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar

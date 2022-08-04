@@ -45,13 +45,12 @@ module GHC.Core.TyCo.Rep (
         -- * Functions over types
         mkNakedTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
-        mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys,
+        mkFunTy, mkVisFunTy, mkScaledFunTys,
+        mkInvisFunTy, mkInvisFunTys,
         mkForAllTy, mkForAllTys, mkInvisForAllTys,
         mkPiTy, mkPiTys,
         mkFunTyMany,
-        mkScaledFunTy,
         mkVisFunTyMany, mkVisFunTysMany,
-        mkInvisFunTyMany, mkInvisFunTysMany,
         nonDetCmpTyLit, cmpTyLit,
 
         -- * Functions over binders
@@ -83,6 +82,8 @@ module GHC.Core.TyCo.Rep (
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
+import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Core.Type( chooseAnonArgFlag, typeKind, typeTypeOrConstraint )
 
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
@@ -93,7 +94,6 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import {-# SOURCE #-} GHC.Builtin.Types
 import GHC.Builtin.Names
 
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
@@ -1051,42 +1051,57 @@ mkTyCoVarTy v
 mkTyCoVarTys :: [TyCoVar] -> [Type]
 mkTyCoVarTys = map mkTyCoVarTy
 
-infixr 3 `mkFunTy`, `mkVisFunTy`, `mkInvisFunTy`, `mkVisFunTyMany`,
-         `mkInvisFunTyMany`      -- Associates to the right
+infixr 3 `mkFunTy`, `mkInvisFunTy`, `mkVisFunTyMany`
 
-mkFunTy :: AnonArgFlag -> Mult -> Type -> Type -> Type
-mkFunTy af mult arg res = FunTy { ft_af   = af
-                                , ft_mult = mult
-                                , ft_arg  = arg
-                                , ft_res  = res }
+mkFunTy :: HasDebugCallStack => AnonArgFlag -> Mult -> Type -> Type -> Type
+mkFunTy af mult arg res
+  = assertPpr (af == chooseAnonArgFlag arg res) (vcat
+      [ text "af" <+> ppr af
+      , text "chooseAAF" <+> ppr (chooseAnonArgFlag arg res)
+      , text "arg" <+> ppr arg <+> dcolon <+> ppr (typeKind arg)
+      , text "res" <+> ppr res <+> dcolon <+> ppr (typeKind res) ]) $
+    FunTy { ft_af   = af
+          , ft_mult = mult
+          , ft_arg  = arg
+          , ft_res  = res }
 
-mkScaledFunTy :: AnonArgFlag -> Scaled Type -> Type -> Type
-mkScaledFunTy af (Scaled mult arg) res = mkFunTy af mult arg res
+mkInvisFunTy :: HasDebugCallStack => Type -> Type -> Type
+mkInvisFunTy arg res
+  = mkFunTy (invisArg (typeTypeOrConstraint res)) manyDataConTy arg res
 
-mkVisFunTy, mkInvisFunTy :: Mult -> Type -> Type -> Type
-mkVisFunTy   = mkFunTy (visArg TypeLike)     -- (->)
-mkInvisFunTy = mkFunTy (invisArg TypeLike)   -- (=>)
-
-mkFunTyMany :: AnonArgFlag -> Type -> Type -> Type
+mkFunTyMany :: HasDebugCallStack => AnonArgFlag -> Type -> Type -> Type
 mkFunTyMany af = mkFunTy af manyDataConTy
 
--- | Special, common, case: Arrow type with mult Many
-mkVisFunTyMany :: Type -> Type -> Type
-mkVisFunTyMany = mkVisFunTy manyDataConTy
+mkInvisFunTys :: HasDebugCallStack => [Type] -> Type -> Type
+mkInvisFunTys tys ty = foldr mkInvisFunTy ty tys
 
-mkInvisFunTyMany :: Type -> Type -> Type
-mkInvisFunTyMany = mkInvisFunTy manyDataConTy
+mkVisFunTy :: Mult -> Type -> Type -> Type
+-- Always TypeLike, user-specified multiplicity.
+-- Used by the typechecker to avoid looking at
+-- the result kind, which may not be zonked
+mkVisFunTy mult arg res
+  = mkFunTy visArgTypeLike mult arg res
 
 -- | Make nested arrow types
-mkVisFunTys :: [Scaled Type] -> Type -> Type
-mkVisFunTys tys ty = foldr (mkScaledFunTy (visArg TypeLike)) ty tys
+-- | Special, common, case: Arrow type with mult Many
+mkVisFunTyMany :: Type -> Type -> Type
+-- Always TypeLike, multiplicity Many
+mkVisFunTyMany = mkVisFunTy manyDataConTy
 
 mkVisFunTysMany :: [Type] -> Type -> Type
+-- Always TypeLike, multiplicity Many
 mkVisFunTysMany tys ty = foldr mkVisFunTyMany ty tys
 
-mkInvisFunTysMany :: [Type] -> Type -> Type
-mkInvisFunTysMany tys ty = foldr mkInvisFunTyMany ty tys
+---------------
+mkScaledFunTy :: HasDebugCallStack => AnonArgFlag -> Scaled Type -> Type -> Type
+mkScaledFunTy af (Scaled mult arg) res = mkFunTy af mult arg res
 
+mkScaledFunTys :: HasDebugCallStack => [Scaled Type] -> Type -> Type
+mkScaledFunTys tys ty = foldr (mkScaledFunTy af) ty tys
+  where
+    af = visArg (typeTypeOrConstraint ty)
+
+---------------
 -- | Like 'mkTyCoForAllTy', but does not check the occurrence of the binder
 -- See Note [Unused coercion variable in ForAllTy]
 mkForAllTy :: TyCoVar -> ArgFlag -> Type -> Type

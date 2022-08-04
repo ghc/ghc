@@ -455,7 +455,7 @@ matchWithDict [cls, mty]
     -- co :: C t1 ..tn ~R# inst_meth_ty
   , Just (inst_meth_ty, co) <- tcInstNewTyCon_maybe dict_tc dict_args
   = do { sv <- mkSysLocalM (fsLit "withDict_s") ManyTy mty
-       ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTyMany cls openAlphaTy)
+       ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTy cls openAlphaTy)
 
        -- Given co2 : mty ~N# inst_meth_ty, construct the method of
        -- the WithDict dictionary:
@@ -472,7 +472,7 @@ matchWithDict [cls, mty]
                mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
                  Var nospecId
                    `App`
-                 (Type $ mkInvisFunTyMany cls openAlphaTy)
+                 (Type $ mkInvisFunTy cls openAlphaTy)
                    `App`
                  Var k
                    `App`

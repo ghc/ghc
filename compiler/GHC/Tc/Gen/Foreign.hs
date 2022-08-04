@@ -271,7 +271,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) safety mh l@(CLabel
   = do checkCg (Right idecl) backendValidityOfCImport
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
-       check (isFFILabelTy (mkVisFunTys arg_tys res_ty))
+       check (isFFILabelTy (mkScaledFunTys arg_tys res_ty))
              (TcRnIllegalForeignType Nothing)
        cconv' <- checkCConv (Right idecl) cconv
        return (CImport src (L lc cconv') safety mh l)
@@ -304,7 +304,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) (L ls safety) mh
           addErrTc (TcRnIllegalForeignType Nothing AtLeastOneArgExpected)
         (Scaled arg1_mult arg1_ty:arg_tys) -> do
           dflags <- getDynFlags
-          let curried_res_ty = mkVisFunTys arg_tys res_ty
+          let curried_res_ty = mkScaledFunTys arg_tys res_ty
           checkNoLinearFFI arg1_mult
           check (isFFIDynTy curried_res_ty arg1_ty)
                 (TcRnIllegalForeignType (Just Arg))

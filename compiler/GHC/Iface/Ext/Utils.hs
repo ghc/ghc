@@ -160,8 +160,8 @@ hieTypeToIface = foldType go
     go (HLitTy l) = IfaceLitTy l
     go (HForAllTy ((n,k),af) t) = let b = (occNameFS $ getOccName n, k)
                                   in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
-    go (HFunTy w a b)   = IfaceFunTy (visArg TypeLike)   w       a    b
-    go (HQualTy pred b) = IfaceFunTy (invisArg TypeLike) many_ty pred b
+    go (HFunTy w a b)   = IfaceFunTy visArgTypeLike   w       a    b
+    go (HQualTy pred b) = IfaceFunTy invisArgTypeLike many_ty pred b
     go (HCastTy a) = a
     go HCoercionTy = IfaceTyVar "<coercion type>"
     go (HTyConApp a xs) = IfaceTyConApp a (hieToIfaceArgs xs)

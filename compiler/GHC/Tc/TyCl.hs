@@ -3416,7 +3416,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
              fake_ty  = mkSpecForAllTys  tc_tvs      $
                         mkInvisForAllTys exp_tvbndrs $
                         mkPhiTy ctxt $
-                        mkVisFunTys arg_tys $
+                        mkScaledFunTys arg_tys $
                         unitTy
              -- That type is a lie, of course. (It shouldn't end in ()!)
              -- And we could construct a proper result type from the info
@@ -3522,7 +3522,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; tkvs <- kindGeneralizeAll skol_info
                     (mkInvisForAllTys outer_tv_bndrs $
                      mkPhiTy ctxt                    $
-                     mkVisFunTys arg_tys             $
+                     mkScaledFunTys arg_tys             $
                      res_ty)
        ; traceTc "tcConDecl:GADT" (ppr names $$ ppr res_ty $$ ppr tkvs)
        ; reportUnsolvedEqualities skol_info tkvs tclvl wanted

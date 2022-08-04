@@ -1348,7 +1348,7 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
     , w1 `eqType` w2
     = do r2' <- go l2 r2
          r1' <- go l1 r1
-         return (mkVisFunTy w1 r1' r2')
+         return (mkFunTy af1 w1 r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
     | Just (tycon_l, _) <- tcSplitTyConApp_maybe lhs
     , Just (tycon_r, _) <- tcSplitTyConApp_maybe rhs

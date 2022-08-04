@@ -17,7 +17,7 @@ have a standard form, namely:
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Types.Id.Make (
-        mkDictFunId, mkDictFunTy, mkDictSelId, mkDictSelRhs,
+        mkDictFunId, mkDictSelId, mkDictSelRhs,
 
         mkFCallId,
 
@@ -474,7 +474,7 @@ mkDictSelId name clas
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
     sel_ty = mkInvisForAllTys tyvars $
-             mkInvisFunTyMany (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
+             mkFunctionType ManyTy (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
              scaledThing (getNth arg_tys val_index)
                -- See Note [Type classes and linear types]
 
@@ -1364,11 +1364,7 @@ mkDictFunId dfun_name tvs theta clas tys
                       dfun_ty
   where
     is_nt = isNewTyCon (classTyCon clas)
-    dfun_ty = mkDictFunTy tvs theta clas tys
-
-mkDictFunTy :: [TyVar] -> ThetaType -> Class -> [Type] -> Type
-mkDictFunTy tvs theta clas tys
- = mkSpecSigmaTy tvs theta (mkClassPred clas tys)
+    dfun_ty = TcType.mkDFunTy tvs theta (mkClassPred clas tys)
 
 {-
 ************************************************************************
@@ -1576,8 +1572,8 @@ rightSectionId = pcMiscPrelId rightSectionName ty info
     mult1 = mkTyVarTy multiplicityTyVar1
     mult2 = mkTyVarTy multiplicityTyVar2
 
-    [f,x,y] = mkTemplateLocals [ mkVisFunTys [ Scaled mult1 openAlphaTy
-                                             , Scaled mult2 openBetaTy ] openGammaTy
+    [f,x,y] = mkTemplateLocals [ mkScaledFunTys [ Scaled mult1 openAlphaTy
+                                                , Scaled mult2 openBetaTy ] openGammaTy
                                , openAlphaTy, openBetaTy ]
     xmult = setIdMult x mult1
     ymult = setIdMult y mult2
@@ -1600,7 +1596,7 @@ coerceId = pcMiscPrelId coerceName ty info
     ty        = mkInvisForAllTys [ Bndr rv InferredSpec
                                  , Bndr av SpecifiedSpec
                                  , Bndr bv SpecifiedSpec ] $
-                mkInvisFunTyMany eqRTy $
+                mkInvisFunTy eqRTy $
                 mkVisFunTyMany a b
 
     bndrs@[rv,av,bv] = mkTemplateKiTyVar runtimeRepTy

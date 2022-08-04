@@ -440,7 +440,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
            ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
            ; more_arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) more_arg_tys
            ; res_ty       <- readExpType res_ty
-           ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
+           ; let unif_fun_ty = mkScaledFunTys more_arg_tys res_ty
            ; wrap <- tcSubType AppOrigin ctx unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (wrap, result) }
@@ -465,7 +465,7 @@ mkFunTysMsg :: TidyEnv
             -> TcM (TidyEnv, SDoc)
 mkFunTysMsg env herald arg_tys res_ty n_val_args_in_call
   = do { (env', fun_rho) <- zonkTidyTcType env $
-                            mkVisFunTys arg_tys res_ty
+                            mkScaledFunTys arg_tys res_ty
 
        ; let (all_arg_tys, _) = splitFunTys fun_rho
              n_fun_args = length all_arg_tys
@@ -1388,7 +1388,7 @@ deeplySkolemise skol_info ty
                       <.> mkWpEvVarApps ids1
                     , tv_prs1  ++ tvs_prs2
                     , ev_vars1 ++ ev_vars2
-                    , mkVisFunTys arg_tys' rho ) }
+                    , mkScaledFunTys arg_tys' rho ) }
 
       | otherwise
       = return (idHsWrapper, [], [], substTy subst ty)
@@ -1412,7 +1412,7 @@ deeplyInstantiate orig ty
                         <.> wrap2
                         <.> wrap1
                         <.> mkWpEvVarApps ids1,
-                     mkVisFunTys arg_tys' rho2) }
+                     mkScaledFunTys arg_tys' rho2) }
 
       | otherwise
       = do { let ty' = substTy subst ty
