@@ -237,7 +237,6 @@ data SectionType
   | ReadOnlyData
   | RelocatableReadOnlyData
   | UninitialisedData
-  | ReadOnlyData16      -- .rodata.cst16 on x86_64, 16-byte aligned
     -- See Note [Initializers and finalizers in Cmm] in GHC.Cmm.InitFini
   | InitArray           -- .init_array on ELF, .ctor on Windows
   | FiniArray           -- .fini_array on ELF, .dtor on Windows
@@ -257,7 +256,6 @@ sectionProtection (Section t _) = case t of
     Text                    -> ReadOnlySection
     ReadOnlyData            -> ReadOnlySection
     RelocatableReadOnlyData -> WriteProtectedSection
-    ReadOnlyData16          -> ReadOnlySection
     InitArray               -> ReadOnlySection
     FiniArray               -> ReadOnlySection
     CString                 -> ReadOnlySection
@@ -465,7 +463,6 @@ pprSectionType s = doubleQuotes $ case s of
   Text                    -> text "text"
   Data                    -> text "data"
   ReadOnlyData            -> text "readonly"
-  ReadOnlyData16          -> text "readonly16"
   RelocatableReadOnlyData -> text "relreadonly"
   UninitialisedData       -> text "uninitialised"
   InitArray               -> text "initarray"

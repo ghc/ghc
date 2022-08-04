@@ -295,7 +295,6 @@ pprAlignForSection platform seg =
        UninitialisedData
         | ppc64          -> text ".align 3"
         | otherwise      -> text ".align 2"
-       ReadOnlyData16    -> text ".align 4"
        -- TODO: This is copied from the ReadOnlyData case, but it can likely be
        -- made more efficient.
        InitArray         -> text ".align 3"

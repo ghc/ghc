@@ -138,9 +138,6 @@ llvmSectionType p t = case t of
     RelocatableReadOnlyData -> case platformOS p of
                                  OSMinGW32 -> fsLit ".rdata$rel.ro"
                                  _         -> fsLit ".data.rel.ro"
-    ReadOnlyData16          -> case platformOS p of
-                                 OSMinGW32 -> fsLit ".rdata$cst16"
-                                 _         -> fsLit ".rodata.cst16"
     Data                    -> fsLit ".data"
     UninitialisedData       -> fsLit ".bss"
     CString                 -> case platformOS p of

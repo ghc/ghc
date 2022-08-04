@@ -487,12 +487,10 @@ pprAlignForSection platform seg =
       OSDarwin
        | target32Bit platform ->
           case seg of
-           ReadOnlyData16    -> int 4
            CString           -> int 1
            _                 -> int 2
        | otherwise ->
           case seg of
-           ReadOnlyData16    -> int 4
            CString           -> int 1
            _                 -> int 3
       -- Other: alignments are given as bytes.
@@ -500,12 +498,10 @@ pprAlignForSection platform seg =
        | target32Bit platform ->
           case seg of
            Text              -> text "4,0x90"
-           ReadOnlyData16    -> int 16
            CString           -> int 1
            _                 -> int 4
        | otherwise ->
           case seg of
-           ReadOnlyData16    -> int 16
            CString           -> int 1
            _                 -> int 8
 
