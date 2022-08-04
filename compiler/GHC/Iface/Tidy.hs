@@ -384,6 +384,7 @@ data TidyOpts = TidyOpts
       -- ^ Are rules exposed or not?
   , opt_static_ptr_opts :: !(Maybe StaticPtrOpts)
       -- ^ Options for generated static pointers, if enabled (/= Nothing).
+  , opt_keep_auto_rules :: !Bool
   }
 
 tidyProgram :: TidyOpts -> ModGuts -> IO (CgGuts, ModDetails)
@@ -417,6 +418,8 @@ tidyProgram opts (ModGuts { mg_module           = mod
   (spt_entries, mcstub, tidy_binds') <- case opt_static_ptr_opts opts of
     Nothing    -> pure ([], Nothing, tidy_binds)
     Just sopts -> sptCreateStaticBinds sopts mod tidy_binds
+
+  -- pprTraceM "trimmed_rules" (ppr trimmed_rules)
 
   let all_foreign_stubs = case mcstub of
         Nothing    -> foreign_stubs
@@ -989,12 +992,18 @@ called in the final code), we keep the rule too.
 
 This stuff is the only reason for the ru_auto field in a Rule.
 
-NB: In #18532 we looked at keeping auto-rules and it turned out to just make
-compiler performance worse while increasing code sizes at the same time. The impact
-varied. Compiling Cabal got ~3% slower, allocated ~3% more and wrote 15% more code to disk.
-Nofib only saw 0.7% more compiler allocations and executable file size growth. But given
-there was no difference in runtime for these benchmarks it turned out to be flat out worse.
-See the ticket for more details.
+We discard auto-rules by default, but keep them if -fkeep-auto-rules is on.
+
+* Discard by default: in #18532 we looked at keeping auto-rules and it turned out to just make
+  compiler performance worse while increasing code sizes at the same time. The
+  impact varied. Compiling Cabal got ~3% slower, allocated ~3% more and wrote 15%
+  more code to disk.  Nofib only saw 0.7% more compiler allocations and executable
+  file size growth. But given there was no difference in runtime for these
+  benchmarks it turned out to be flat out worse.  See the ticket for more details.
+
+* Keep with -fkeep-auto-rules: in #21917 we found cases where we get a lot code
+  duplication when we discard specialisations.  Agda is a case in point.  Having
+  a flag gives us control over the rule-trimming decision.
 -}
 
 findExternalRules :: TidyOpts
@@ -1006,11 +1015,12 @@ findExternalRules :: TidyOpts
 findExternalRules opts binds imp_id_rules unfold_env
   = (trimmed_binds, filter keep_rule all_rules)
   where
-    imp_rules | (opt_expose_rules opts) = filter expose_rule imp_id_rules
-              | otherwise               = []
+    imp_rules | opt_expose_rules opts = filter expose_rule imp_id_rules
+              | otherwise             = []
     imp_user_rule_fvs = mapUnionVarSet user_rule_rhs_fvs imp_rules
 
-    user_rule_rhs_fvs rule | isAutoRule rule = emptyVarSet
+    user_rule_rhs_fvs rule | isAutoRule rule && not (opt_keep_auto_rules opts)
+                                             = emptyVarSet
                            | otherwise       = ruleRhsFreeVars rule
 
     (trimmed_binds, local_bndrs, _, all_rules) = trim_binds binds
@@ -1071,7 +1081,7 @@ findExternalRules opts binds imp_id_rules unfold_env
             -- In needed_fvs', we don't bother to delete binders from the fv set
 
          local_rules  = [ rule
-                        | (opt_expose_rules opts)
+                        | opt_expose_rules opts
                         , id <- bndrs
                         , is_external_id id   -- Only collect rules for external Ids
                         , rule <- idCoreRules id

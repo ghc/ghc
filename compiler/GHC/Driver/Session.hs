@@ -2371,6 +2371,7 @@ fFlagsDeps = [
   flagSpec "error-spans"                      Opt_ErrorSpans,
   flagSpec "excess-precision"                 Opt_ExcessPrecision,
   flagSpec "expose-all-unfoldings"            Opt_ExposeAllUnfoldings,
+  flagSpec "keep-auto-rules"                  Opt_KeepAutoRules,
   flagSpec "expose-internal-symbols"          Opt_ExposeInternalSymbols,
   flagSpec "external-dynamic-refs"            Opt_ExternalDynamicRefs,
   flagSpec "external-interpreter"             Opt_ExternalInterpreter,

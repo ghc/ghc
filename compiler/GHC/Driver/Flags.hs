@@ -323,6 +323,7 @@ data GeneralFlag
    | Opt_IgnoreInterfacePragmas
    | Opt_OmitInterfacePragmas
    | Opt_ExposeAllUnfoldings
+   | Opt_KeepAutoRules -- ^Keep auto-generated rules even if they seem to have become useless
    | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
    | Opt_WriteHie -- generate .hie files
 
