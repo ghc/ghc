@@ -814,7 +814,8 @@ pages:
     - x86_64-linux
   script:
     - mkdir -p public/doc
-    - tar -xf haddock.html.tar.xz -C public/doc
+    # haddock docs are not in the hadrian produce doc tarballs at the moment
+    # - tar -xf haddock.html.tar.xz -C public/doc
     - tar -xf libraries.html.tar.xz -C public/doc
     - tar -xf users_guide.html.tar.xz -C public/doc
     - |
@@ -828,6 +829,8 @@ pages:
     # N.B. only run this on ghc/ghc since the deployed pages are quite large
     # and we only serve GitLab Pages for ghc/ghc.
     - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "ghc"'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*publish-docs.*/'
+
   artifacts:
     paths:
       - public
