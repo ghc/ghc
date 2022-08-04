@@ -73,7 +73,7 @@ Library
         System.FilePath
         System.FilePath.Posix
         System.FilePath.Windows
-      hs-source-dirs: ../filepath .
+      hs-source-dirs: ./vendored-filepath .
       default-extensions:
         ImplicitPrelude
     else
