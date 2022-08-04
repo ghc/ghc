@@ -580,10 +580,9 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     ------------
     -- Cost to allocate binding with given binder
     size_up_alloc bndr
-      |  isTyVar bndr                 -- Doesn't exist at runtime
-      || isJoinId bndr                -- Not allocated at all
-      || isUnliftedType (idType bndr) -- Doesn't live in heap
-           -- OK to call isUnliftedType: binders have a fixed RuntimeRep (search for FRRBinder)
+      |  isTyVar bndr                    -- Doesn't exist at runtime
+      || isJoinId bndr                   -- Not allocated at all
+      || not (isBoxedType (idType bndr)) -- Doesn't live in heap
       = 0
       | otherwise
       = 10
