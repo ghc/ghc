@@ -9,6 +9,48 @@ following sections.
 The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
 10, 11, 12, or 13.
 
+Breaking Changes
+~~~~~~~~~~~~~~~~
+
+In this section we list changes that may require changes in user programs while
+upgrading to GHC 9.4:
+
+- There were previously cases around functional dependencies and injective
+  type families where the result of type inference would depend on the order
+  of constraints, as written in a source file. These cases are fundamentally ambiguous.
+  While GHC previously made an arbitrary decision, it now notices the ambiguity
+  and rejects the program. This means that some previously accepted programs are
+  now rejected. The solution is to add a type annotation or type application to
+  resolve the ambiguity.
+
+  This is the fix for :ghc-ticket:`18851`.
+
+- Unboxed sums now require the :extension:`UnboxedSums` extension to be enabled.
+
+- ``ArrayArray#`` and its operations are no longer exported from ``GHC.Prim``
+  and are deprecated, having been superceded by the now levity-polymorphic
+  ``Array#`` type.
+
+- The type equality operator, ``(~)``, is not considered to be a type operator
+  (exported from ``Prelude``) and therefore requires the enabling of the
+  :extension:`TypeOperators` extension rather than :extension:`GADTs` or
+  :extension:`TypeFamilies` as was sufficient previously.
+
+- GHC is now a bit better at detecting redundant ``hs-boot`` files and may
+  report warnings where it previously did not. In such cases the correct
+  solution is generally to remove the ``hs-boot`` file in question.
+
+- Due to various changes in the typechecker's constraint solver, some programs
+  may need additional constraints to be explicitly provided. See the `Migration
+  guide
+  <https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.4#inference-for-simplifiable-constraints>`_
+  for details.
+
+- When :extension:`LambdaCase` is enabled, GHC will now parse the sequence
+  ``\ cases`` as the herald of a multi-pattern lambda-case expression.
+  Consequently, programs of the form ``\ cases -> ...`` will not parse;
+  the solution is likely to rename the ``cases`` binder.
+
 Language
 ~~~~~~~~
 
@@ -60,15 +102,26 @@ Language
   This means constructor patterns with arguments have to parenthesized here,
   just like in lambda expressions.
 
-- There were previously cases around functional dependencies and injective
-  type families where the result of type inference would depend on the order
-  of constraints, as written in a source file. These cases are fundamentally ambiguous.
-  While GHC previously made an arbitrary decision, it now notices the ambiguity
-  and rejects the program. This means that some previously accepted programs are
-  now rejected. The solution is to add a type annotation or type application to
-  resolve the ambiguity.
+- The parsing of implicit parameters is slightly more permissive, as GHC now allows ::
 
-  This is the fix for :ghc-ticket:`18851`.
+      foo :: (?ip :: forall a. a -> a)
+
+  without requiring parentheses around ``forall a. a -> a``. Note that implicit
+  parameters with such kinds are unlikely to be very useful, due to
+  :ghc-ticket:`18759`.
+
+- Changes to the treatment of :extension:`UnboxedSums`:
+
+  - GHC can now parse unboxed sum type constructors ``(# | #)``, ``(# | | #)``,
+    ``(# | | | #)``, etc. Partial applications need to be written in prefix form,
+    e.g. ``(# | #) Int#``.
+
+  - Unboxed sums now require the :extension:`UnboxedSums` extension to be enabled.
+
+  - The :extension:`UnboxedTuples` extension now implies
+    :extension:`UnboxedSums`. This means that code using unboxed sums that
+    enabled the :extension:`UnboxedTuples` extension but didn't explicitly
+    enable :extension:`UnboxedSums` will continue to work without changes.
 
 Compiler
 ~~~~~~~~
@@ -121,27 +174,6 @@ Compiler
   annotated with an :pragma:`OPAQUE` pragma remains a call of that named function,
   not some name-mangled variant. This implements GHC Proposal `#415
   <https://github.com/ghc-proposals/ghc-proposals/pull/415>`_.
-
-- The parsing of implicit parameters is slightly more permissive, as GHC now allows ::
-
-      foo :: (?ip :: forall a. a -> a)
-
-  without requiring parentheses around ``forall a. a -> a``. Note that implicit
-  parameters with such kinds are unlikely to be very useful, due to
-  :ghc-ticket:`18759`.
-
-- Changes to the treatment of :extension:`UnboxedSums`:
-
-  - GHC can now parse unboxed sum type constructors ``(# | #)``, ``(# | | #)``,
-    ``(# | | | #)``, etc. Partial applications need to be written in prefix form,
-    e.g. ``(# | #) Int#``.
-
-  - Unboxed sums now require the :extension:`UnboxedSums` extension to be enabled.
-
-  - The :extension:`UnboxedTuples` extension now implies
-    :extension:`UnboxedSums`. This means that code using unboxed sums that
-    enabled the :extension:`UnboxedTuples` extension but didn't explicitly
-    enable :extension:`UnboxedSums` will continue to work without changes.
 
 - Constructed Product Result analysis (c.f. :ghc-flag:`-fcpr-anal`) has been
   overhauled and will now unbox nestedly, if termination properties of the
@@ -265,10 +297,19 @@ Runtime system
 
   The following type constructors are now levity-polymorphic:
 
-    - ``Array#``, ``SmallArray#``, ``Weak#``, ``StablePtr#``, ``StableName#``,
+  .. hlist::
 
-    - ``MutableArray#``, ``SmallMutableArray#``, ``MutVar#``,
-      ``TVar#``, ``MVar#``, ``IOPort#``.
+    * ``Array#``
+    * ``SmallArray#``
+    * ``Weak#``
+    * ``StablePtr#``
+    * ``StableName#``
+    * ``MutableArray#``
+    * ``SmallMutableArray#``
+    * ``MutVar#``
+    * ``TVar#``
+    * ``MVar#``
+    * ``IOPort#``
 
   For example, ``Array#`` used to have kind: ::
 
