@@ -240,24 +240,6 @@ then
      or 'GHC=' to specify a different GHC to use.])
     fi
 fi
-
-# GHC is passed to Cabal, so we need a native path
-if test "${WithGhc}" != ""
-then
-    ghc_host_os=`"${WithGhc}" +RTS --info | grep 'Host OS' | sed -e 's/.*, "//' -e 's/")//'`
-
-    if test "$ghc_host_os" = "mingw32"
-    then
-        if test "${OSTYPE}" = "msys"
-        then
-            WithGhc=`echo "${WithGhc}" | sed "s#^/\([a-zA-Z]\)/#\1:/#"`
-        else
-            # Canonicalise to <drive>:/path/to/ghc
-            WithGhc=`cygpath -m "${WithGhc}"`
-        fi
-        echo "GHC path canonicalised to: ${WithGhc}"
-    fi
-fi
 AC_SUBST([WithGhc])
 
 dnl ** Without optimization some INLINE trickery fails for GHCi
@@ -368,6 +350,7 @@ else
         AC_CHECK_TARGET_TOOL([DllWrap],[dllwrap])
         AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
 
+        # N.B. genlib is used by utils/gen-dll/gen-dll.cabal.in
         if test "$Genlib" != ""; then
             GenlibCmd="$(cygpath -m $Genlib)"
             HAVE_GENLIB=True
@@ -783,14 +766,6 @@ fi
 AC_SUBST(HaveDtrace)
 
 AC_PATH_PROG(HSCOLOUR,HsColour)
-# HsColour is passed to Cabal, so we need a native path
-if test "$HostOS"      = "mingw32" && \
-   test "${OSTYPE}"   != "msys"    && \
-   test "${HSCOLOUR}" != ""
-then
-    # Canonicalise to <drive>:/path/to/gcc
-    HSCOLOUR=`cygpath -m ${HSCOLOUR}`
-fi
 
 dnl ** check for Sphinx toolchain
 AC_PATH_PROG(SPHINXBUILD,sphinx-build)
@@ -1201,6 +1176,9 @@ checkMake380() {
 
 checkMake380 make
 checkMake380 gmake
+
+dnl Normalize toolchain paths on Windows
+FP_NORMALISE_WINDOWS_PATHS
 
 dnl Things specific to the make build system
 AC_CONFIG_FILES(

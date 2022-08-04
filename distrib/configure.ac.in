@@ -254,6 +254,10 @@ AC_SUBST(UseLibdw)
 
 FP_SETTINGS
 
+
+dnl Normalize toolchain paths on Windows
+FP_NORMALISE_WINDOWS_PATHS
+
 #
 AC_CONFIG_FILES(mk/config.mk mk/install.mk)
 AC_OUTPUT
