@@ -46,8 +46,8 @@ initGhcM xs = do
       -- There is some unexplained behaviour where the result is infrequently 3264.. but
       -- this resisted investigation using ghc-debug so the test actually checks whether there
       -- are less than 51 live ModDetails which is still a big improvement over before.
-      when (n >= (51 * word_size * 8)) $ do
-        putStrLn "Space leak detetched by jspace test:"
+      when (n > (51 * word_size * 8)) $ do
+        putStrLn "Space leak detected by jspace test:"
         putStrLn $ (show (n `div` (word_size * 8))) ++ " live ModDetails when <= 51 are expected"
         exitFailure
     return ()
