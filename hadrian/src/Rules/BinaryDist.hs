@@ -254,6 +254,7 @@ bindistRules = do
           -- other machine.
           need $ map (bindistFilesDir -/-)
                     (["configure", "Makefile"] ++ bindistInstallFiles)
+          copyFile ("hadrian" -/- "bindist" -/- "config.mk.in") (bindistFilesDir -/- "config.mk.in")
           forM_ bin_targets $ \(pkg, _) -> do
             needed_wrappers <- pkgToWrappers pkg
             forM_ needed_wrappers $ \wrapper_name -> do
@@ -346,7 +347,9 @@ compressorExtension Bzip2 = "bz2"
 bindistInstallFiles :: [FilePath]
 bindistInstallFiles =
     [ "config.sub", "config.guess", "install-sh"
-    , "mk" -/- "config.mk.in", "mk" -/- "install.mk.in", "mk" -/- "project.mk"
+    , "mk" -/- "config.mk.in" -- TODO: Remove when make is gone
+    , "mk" -/- "install.mk.in" -- TODO: Remove when make is gone
+    , "mk" -/- "project.mk"
     , "mk" -/- "relpath.sh"
     , "mk" -/- "system-cxx-std-lib-1.0.conf.in"
     , "README", "INSTALL" ]

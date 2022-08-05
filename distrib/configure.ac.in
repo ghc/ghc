@@ -255,7 +255,7 @@ AC_SUBST(UseLibdw)
 FP_SETTINGS
 
 #
-AC_CONFIG_FILES(mk/config.mk mk/install.mk)
+AC_CONFIG_FILES(config.mk mk/config.mk mk/install.mk)
 AC_OUTPUT
 
 # We get caught by
