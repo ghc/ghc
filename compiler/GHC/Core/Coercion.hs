@@ -811,7 +811,7 @@ mkTyConAppCo r tc cos
 -- | Build a function 'Coercion' from two other 'Coercion's. That is,
 -- given @co1 :: a ~ b@ and @co2 :: x ~ y@ produce @co :: (a -> x) ~ (b -> y)@
 -- or @(a => x) ~ (b => y)@, depending on the kind of @a@/@b@.
-mkFunCo :: Role -> AnonArgFlag -> CoercionN -> Coercion -> Coercion -> Coercion
+mkFunCo :: HasDebugCallStack => Role -> AnonArgFlag -> CoercionN -> Coercion -> Coercion -> Coercion
 mkFunCo r af w co1 co2
     -- See Note [Refl invariant]
   | Just (ty1, _) <- isReflCo_maybe co1
@@ -820,10 +820,13 @@ mkFunCo r af w co1 co2
   = mkReflCo r (mkFunTy af w ty1 ty2)
 
   | otherwise
-  = assertPpr (af == chooseAnonArgFlag (coercionLKind co1) (coercionLKind co2))
-              (ppr af $$ ppr co1 <+> ppr dcolon <+> ppr (coercionLKind co1)
-                      $$ ppr co2 <+> ppr dcolon <+> ppr (coercionLKind co2)) $
+  = -- assertPpr (af == chooseAnonArgFlag (coercionLKind co1) (coercionLKind co2)) (doc "left")  $
+    -- assertPpr (af == chooseAnonArgFlag (coercionRKind co1) (coercionRKind co2)) (doc "right") $
     FunCo r af w co1 co2
+  where
+    doc txt = hang (text "mkFunCo" <> parens (text txt) <+> ppr af) 2 $
+               vcat [ text "co1:" <+> hang (ppr co1) 2 (ppr dcolon <+> ppr (coercionKind co1))
+                    , text "co2:" <+> hang (ppr co2) 2 (ppr dcolon <+> ppr (coercionKind co2)) ]
 
 -- | Apply a 'Coercion' to another 'Coercion'.
 -- The second coercion must be Nominal, unless the first is Phantom.
@@ -2394,8 +2397,9 @@ coercionLKind co
     go (TyConAppCo _ tc cos)    = mkTyConApp tc (map go cos)
     go (AppCo co1 co2)          = mkAppTy (go co1) (go co2)
     go (ForAllCo tv1 _ co1)     = mkTyCoInvForAllTy tv1 (go co1)
-    go (FunCo _ af w co1 co2)   = pprTrace "mkFunTy" (ppr af $$ ppr (go co2)) $
-                                  mkFunTy af (go w) (go co1) (go co2)
+    go (FunCo _ _af w co1 co2)  = mkFunTy _af (go w) (go co1) (go co2)
+                                  -- mkFunctionType (go w) (go co1) (go co2)
+                                  -- We'd need TWO afs
     go (CoVarCo cv)             = coVarLType cv
     go (HoleCo h)               = coVarLType (coHoleCoVar h)
     go (UnivCo _ _ ty1 _)       = ty1
@@ -2458,7 +2462,9 @@ coercionRKind co
     go (AppCo co1 co2)          = mkAppTy (go co1) (go co2)
     go (CoVarCo cv)             = coVarRType cv
     go (HoleCo h)               = coVarRType (coHoleCoVar h)
-    go (FunCo _ af w co1 co2)   = mkFunTy af (go w) (go co1) (go co2)
+    go (FunCo _ _af w co1 co2)  = mkFunTy _af (go w) (go co1) (go co2)
+                                  -- mkFunctionType (go w) (go co1) (go co2)
+                                  -- We'd need TWO afs
     go (UnivCo _ _ _ ty2)       = ty2
     go (SymCo co)               = coercionLKind co
     go (TransCo _ co2)          = go co2

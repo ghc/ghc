@@ -69,7 +69,7 @@ module GHC.Types.Var (
         -- * ArgFlags
         ArgFlag(Invisible,Required,Specified,Inferred),
         AnonArgFlag(..), isVisibleAnonArg, isInvisibleAnonArg, isFUNAnonArg,
-        anonArgTypeOrConstraint,
+        anonArgResultTypeOrConstraint,
         visArg, visArgTypeLike, visArgConstraintLike,
         invisArg, invisArgTypeLike, invisArgConstraintLike,
         TypeOrConstraint(..),  -- Re-export this: it's an argument of AnonArgFlag
@@ -576,9 +576,10 @@ isFUNAnonArg :: AnonArgFlag -> Bool
 isFUNAnonArg (VisArg TypeLike) = True
 isFUNAnonArg _                 = False
 
-anonArgTypeOrConstraint :: AnonArgFlag -> TypeOrConstraint
-anonArgTypeOrConstraint (VisArg  torc) = torc
-anonArgTypeOrConstraint (InvisArg torc) = torc
+anonArgResultTypeOrConstraint :: AnonArgFlag -> TypeOrConstraint
+-- Whether it /returns/ a type or a constraint
+anonArgResultTypeOrConstraint (VisArg   torc) = torc
+anonArgResultTypeOrConstraint (InvisArg torc) = torc
 
 {- Note [AnonArgFlag]
 ~~~~~~~~~~~~~~~~~~~~~

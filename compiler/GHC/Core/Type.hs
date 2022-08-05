@@ -262,7 +262,7 @@ import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types
                                  ( charTy, naturalTy
                                  , typeSymbolKind, liftedTypeKind, unliftedTypeKind
-                                 , boxedRepDataConTyCon
+                                 , boxedRepDataConTyCon, constraintKind
                                  , manyDataConTy, oneDataConTy )
 import GHC.Types.Name( Name )
 import GHC.Builtin.Names
@@ -285,6 +285,7 @@ import GHC.Utils.Misc
 import GHC.Utils.FV
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Trace
 import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Data.Pair
@@ -426,25 +427,19 @@ coreView :: Type -> Maybe Type
 -- ^ This function strips off the /top layer only/ of a type synonym
 -- application (if any) its underlying representation type.
 -- Returns 'Nothing' if there is nothing to look through.
--- This function considers 'Constraint' to be a synonym of @Type@.
 --
 -- This function does not look through type family applications.
 --
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
-coreView ty@(TyConApp tc tys)
-  | res@(Just _) <- expandSynTyConApp_maybe tc tys
-  = res
-
-  -- At the Core level, Constraint = Type
-  -- See Note [coreView vs tcView]
-  | isConstraintKindCon tc
-  = assertPpr (null tys) (ppr ty) $
-    Just liftedTypeKind
-
-coreView _ = Nothing
+coreView (TyConApp tc tys) = expandSynTyConApp_maybe tc tys
+coreView _                 = Nothing
 -- See Note [Inlining coreView].
 {-# INLINE coreView #-}
+
+--------------------------
+-- *** TODO: strange change in coreView ****
+--------------------------
 
 -----------------------------------------------
 
@@ -458,9 +453,14 @@ expandSynTyConApp_maybe :: TyCon -> [Type] -> Maybe Type
 -- Don't be tempted to make `expand_syn` (which is NOINLINE) return the
 -- Just/Nothing, else you'll increase allocation
 expandSynTyConApp_maybe tc arg_tys
-  | Just (tvs, rhs) <- synTyConDefn_maybe tc
-  , arg_tys `lengthAtLeast` (tyConArity tc)
-  = Just (expand_syn tvs rhs arg_tys)
+  | Just (tvs, rhs) <- pprTrace "expandSyn1" (ppr tc <+> ppr arg_tys) $
+                       synTyConDefn_maybe tc
+  , pprTrace "expandSyn2" (ppr tc <+> ppr rhs) $
+    pprTrace "expandSyn3" (ppr tc <+> ppr tvs) $
+    pprTrace "expandSyn4" (ppr tc <+> ppr (tyConArity tc)) $
+    arg_tys `lengthAtLeast` (tyConArity tc)
+  = pprTrace "expandSynTyConApp" (ppr tc <+> ppr arg_tys <+> ppr tvs <+> ppr rhs) $
+    Just (expand_syn tvs rhs arg_tys)
   | otherwise
   = Nothing
 
@@ -503,18 +503,21 @@ expand_syn tvs rhs arg_tys
     go _ (_:_) [] = pprPanic "expand_syn" (ppr tvs $$ ppr rhs $$ ppr arg_tys)
                    -- Under-saturated, precondition failed
 
-coreFullView :: Type -> Type
+coreFullView, core_full_view :: Type -> Type
 -- ^ Iterates 'coreView' until there is no more to synonym to expand.
+-- NB: coreFullView is non-recursive and can be inlined;
+--     core_full_view is the recursive one
 -- See Note [Inlining coreView].
 coreFullView ty@(TyConApp tc _)
-  | isTypeSynonymTyCon tc || isConstraintKindCon tc = go ty
-  where
-    go ty
-      | Just ty' <- coreView ty = go ty'
-      | otherwise = ty
-
+  | isTypeSynonymTyCon tc = pprTrace "core_full_view {" (ppr ty) $
+                            core_full_view ty
 coreFullView ty = ty
 {-# INLINE coreFullView #-}
+
+core_full_view ty
+  | Just ty' <- coreView ty = core_full_view ty'
+  | otherwise               = pprTrace "core_full_view }" (ppr ty) ty
+
 
 {- Note [Inlining coreView]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1388,11 +1391,20 @@ mkFunctionType mult arg_ty res_ty
    -- See GHC.Types.Var Note [AnonArgFlag]
 chooseAnonArgFlag :: Type -> Type -> AnonArgFlag
 chooseAnonArgFlag arg_ty res_ty
-  = case (isPredTy arg_ty, isPredTy res_ty) of
+  = case typeTypeOrConstraint arg_ty of
+       TypeLike       -> VisArg   res_torc   -- (arg -> res), (arg -=> res)
+       ConstraintLike -> InvisArg res_torc   -- (arg => res), (arg ==> res)
+  where
+    res_torc = typeTypeOrConstraint res_ty
+
+{-
+-- Or
+ = case (isPredTy arg_ty, isPredTy res_ty) of
          (False, False)    -> VisArg   TypeLike          -- (arg -> res)
          (False, True)     -> VisArg   ConstraintLike    -- (arg -=> res)
          (True, False)     -> InvisArg TypeLike          -- (arg => res)
          (True, True)      -> InvisArg ConstraintLike    -- (arg ==> res)
+-}
 
 splitFunTy :: Type -> (Mult, Type, Type)
 -- ^ Attempts to extract the multiplicity, argument and result types from a type,
@@ -2964,7 +2976,9 @@ typeKind :: HasDebugCallStack => Type -> Kind
 -- No need to expand synonyms
 typeKind (TyConApp tc tys)      = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)              = typeLiteralKind l
-typeKind (FunTy { ft_af = af }) = tyConResKind (anonArgTyCon af)
+typeKind (FunTy { ft_af = af }) = case anonArgResultTypeOrConstraint af of
+                                     TypeLike       -> liftedTypeKind
+                                     ConstraintLike -> constraintKind
 typeKind (TyVarTy tyvar)        = tyVarKind tyvar
 typeKind (CastTy _ty co)        = coercionRKind co
 typeKind (CoercionTy co)        = coercionType co
@@ -3059,14 +3073,19 @@ sORTKind_maybe kind
       _ -> Nothing
 
 typeTypeOrConstraint :: Type -> TypeOrConstraint
--- Expects a type that classifies values; returns
--- whether it is TypeLike or ConstraintLike.
+-- Precondition: expects a type that classifies values.
+-- Returns whether it is TypeLike or ConstraintLike.
 -- Equivalent to calling sORTKind_maybe, but faster in the FunTy case
 typeTypeOrConstraint ty
-   = case coreFullView ty of
-       FunTy { ft_af = af } -> anonArgTypeOrConstraint af
-       ty | Just (torc, _) <- sORTKind_maybe (typeKind ty)
-          -> torc
+   = pprTrace "typeTypeOrConstraint {" (ppr ty) $
+     pprTrace "typeTypeOrConstraint }" (case res of {TypeLike -> text "type"; ConstraintLike -> text "constraint" }) $
+     res
+  where
+   res =  case coreFullView ty of
+       FunTy { ft_af = af } -> anonArgResultTypeOrConstraint af
+       ty' | Just (torc, _) <- pprTrace "tc1 {" (ppr ty' <+> dcolon <+> ppr (typeKind ty')) $
+                               sORTKind_maybe (typeKind ty')
+          -> pprTrace "tc1 }" empty torc
           | otherwise
           -> pprPanic "typeOrConstraint" (ppr ty <+> dcolon <+> ppr (typeKind ty))
 
@@ -3078,6 +3097,7 @@ classifiesTypeWithValues :: Kind -> Bool
 classifiesTypeWithValues k = isJust (sORTKind_maybe k)
 
 getTypeOrConstraint_maybe :: Type -> Maybe TypeOrConstraint
+-- The argument is a type of kind TypeOrConstraint
 getTypeOrConstraint_maybe ty
   | Just (tc,args)        <- splitTyConApp_maybe ty
   , TypeOrConstraint torc <- tyConPromDataConInfo tc

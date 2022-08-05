@@ -544,10 +544,10 @@ We have four distinct function type constructors, and a type synonym
           CONSTRAINT rep1 -> TYPE rep2 -> Type
 
  (==>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
-          CONSTRAINT rep1 -> CONSTRAINT rep2 -> Type
+          CONSTRAINT rep1 -> CONSTRAINT rep2 -> Constraint
 
  (-=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
-          TYPE rep1 -> CONSTRAINT rep2 -> Type
+          TYPE rep1 -> CONSTRAINT rep2 -> Constraint
 
  type (->) = FUN Many
 
