@@ -1,0 +1,285 @@
+#-----------------------------------------------------------------------------
+#
+# Definition of installation directories, we don't use half of these, but since
+# the configure script has them on offer while passing through, we might as well
+# set them. Note that we have to be careful, because the GNU coding standards
+# have changed a bit over the course of time, and autoconf development reflects
+# this.
+#
+# A little bit of history regarding autoconf and GNU coding standards, use this
+# as a cheat-sheet for the stuff below:
+#
+# variable    | default < 2.60     | default >= 2.60
+# ------------+--------------------+--------------------------------------
+# exec_prefix | ${prefix}          | ${prefix}
+# libdir      | ${exec_prefix}/lib | ${exec_prefix}/lib
+# datarootdir | NONE!              | ${prefix}/share
+# datadir     | ${prefix}/share    | ${datarootdir}
+# infodir     | ${prefix}/info     | ${datarootdir}/info
+# mandir      | ${prefix}/man      | ${datarootdir}/man
+# docdir      | NONE!              | ${datarootdir}/doc/${PACKAGE_TARNAME}
+# htmldir     | NONE!              | ${docdir}
+# dvidir      | NONE!              | ${docdir}
+# pdfdir      | NONE!              | ${docdir}
+# psdir       | NONE!              | ${docdir}
+#
+# NOTE: The default e.g. ${docdir} above means that autoconf substitutes the
+# string "${docdir}", not the value of docdir! This is crucial for the GNU
+# coding standards. See #1924.
+
+define set_default
+# $1 = variable to set
+# $2 = default value to use, if configure didn't expand it
+# If $1 starts with an @ then configure didn't set it (because a version
+# of autoconf that is too old was used), so set it to a sensible value
+ifneq "$$(filter @%,$$($1))" ""
+$1 = $2
+endif
+endef
+
+prefix          = @prefix@
+
+datarootdir     = @datarootdir@
+$(eval $(call set_default,datarootdir,$${prefix}/share))
+
+exec_prefix     = @exec_prefix@
+bindir          = @bindir@
+datadir         = @datadir@
+libdir          = @libdir@
+includedir      = @includedir@
+mandir          = @mandir@
+
+# Note that `./configure --docdir=/foo/bar` should work.
+docdir = @docdir@
+PACKAGE_TARNAME = ghc-${ProjectVersion}
+$(eval $(call set_default,docdir,$${datarootdir}/doc/$${PACKAGE_TARNAME}))
+
+htmldir = @htmldir@
+dvidir  = @dvidir@
+pdfdir  = @pdfdir@
+psdir   = @psdir@
+$(eval $(call set_default,htmldir,$${docdir}))
+$(eval $(call set_default,dvidir,$${docdir}))
+$(eval $(call set_default,pdfdir,$${docdir}))
+$(eval $(call set_default,psdir,$${docdir}))
+
+ifeq "$(RelocatableBuild)" "YES"
+
+# Hack: our directory layouts tend to be different on Windows, so
+# hack around configure's bogus assumptions here.
+datarootdir = $(prefix)
+datadir     = $(prefix)/lib
+libdir      = $(prefix)/lib
+
+docdir    = $(prefix)/doc
+htmldir   = $(docdir)
+dvidir    = $(docdir)
+pdfdir    = $(docdir)
+psdir     = $(docdir)
+
+ghclibdir = $(libdir)
+
+else
+
+# Unix: override libdir and datadir to put ghc-specific stuff in
+# a subdirectory with the version number included.
+ghclibdir     = $(libdir)/$(CrossCompilePrefix)ghc-$(ProjectVersion)
+endif
+
+ghclibexecdir = $(ghclibdir)
+topdir        = $(ghclibdir)
+ghcheaderdir  = $(ghclibdir)/rts/include
+
+#-----------------------------------------------------------------------------
+# Utilities needed by the installation Makefile
+
+GENERATED_FILE  = chmod a-w
+EXECUTABLE_FILE = chmod +x
+CP              = cp
+FIND            = @FindCmd@
+INSTALL         = @INSTALL@
+INSTALL        := $(subst .././install-sh,$(TOP)/install-sh,$(INSTALL))
+LN_S            = @LN_S@
+MV              = mv
+SED             = @SedCmd@
+SHELL           = @SHELL@
+
+#
+# Invocations of `install' for different classes
+# of targets:
+#
+INSTALL_PROGRAM = $(INSTALL) -m 755
+INSTALL_SCRIPT  = $(INSTALL) -m 755
+INSTALL_SHLIB   = $(INSTALL) -m 755
+INSTALL_DATA    = $(INSTALL) -m 644
+INSTALL_HEADER  = $(INSTALL) -m 644
+INSTALL_MAN     = $(INSTALL) -m 644
+INSTALL_DOC     = $(INSTALL) -m 644
+INSTALL_DIR     = $(INSTALL) -m 755 -d
+
+CREATE_SCRIPT   = create () { touch "$$1" && chmod 755 "$$1" ; } && create
+CREATE_DATA     = create () { touch "$$1" && chmod 644 "$$1" ; } && create
+
+#-----------------------------------------------------------------------------
+# Build configuration
+
+CrossCompiling        = @CrossCompiling@
+CrossCompilePrefix    = @CrossCompilePrefix@
+GhcUnregisterised     = @Unregisterised@
+
+# ArchSupportsSMP should be set iff there is support for that arch in
+# rts/include/stg/SMP.h
+ifeq "$(TargetArch_CPP)" "arm"
+# We don't support load/store barriers pre-ARMv7. See #10433.
+ArchSupportsSMP=$(if $(filter $(ARM_ISA),ARMv5 ARMv6),NO,YES)
+else
+ArchSupportsSMP=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 sparc powerpc powerpc64 powerpc64le s390x aarch64 riscv64)))
+endif
+
+# The THREADED_RTS requires `BaseReg` to be in a register and the
+# `GhcUnregisterised` mode doesn't allow that.
+GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),YES,NO))
+
+# Whether to include GHCi in the compiler.  Depends on whether the RTS linker
+# has support for this OS/ARCH combination.
+OsSupportsGHCi=$(strip $(patsubst $(TargetOS_CPP), YES, $(findstring $(TargetOS_CPP), mingw32 linux solaris2 freebsd dragonfly netbsd openbsd darwin kfreebsdgnu)))
+ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc powerpc64 powerpc64le sparc sparc64 arm aarch64)))
+
+ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
+GhcWithInterpreter=YES
+else
+GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_GHC_PROGRAMS)),YES,NO)
+endif
+
+# On Windows we normally want to make a relocatable bindist, to we
+# ignore flags like libdir
+ifeq "$(Windows_Host)" "YES"
+RelocatableBuild = YES
+else
+RelocatableBuild = NO
+endif
+
+
+# runhaskell and hsc2hs are special, in that other compilers besides
+# GHC might provide them.  Systems with a package manager often come
+# with tools to manage this kind of clash, e.g. RPM's
+# update-alternatives.  When building a distribution for such a system,
+# we recommend setting both of the following to 'YES'.
+#
+# NO_INSTALL_RUNHASKELL = YES
+# NO_INSTALL_HSC2HS     = YES
+#
+# NB. we use negative tests here because for binary-distributions we cannot
+# test build-time variables at install-time, so they must default to on.
+
+ifneq "$(DESTDIR)" ""
+override DESTDIR := $(abspath $(DESTDIR))
+endif
+
+# We build the libraries at least the "vanilla" way (way "v")
+# Technically we don't need the v way if DYNAMIC_GHC_PROGRAMS is YES,
+# but with -dynamic-too it's cheap, and makes life easier.
+GhcLibWays = v
+
+# In addition to the normal sequential way, the default is to also build
+# profiled prelude libraries
+# $(if $(filter ...)) allows controlling this expression from build.mk.
+GhcLibWays += $(if $(filter $(BUILD_PROF_LIBS),NO),,p)
+
+# Backward compatibility: although it would be cleaner to test for
+# PlatformSupportsSharedLibs, or perhaps a new variable BUILD_SHARED_LIBS,
+# some users currently expect that DYNAMIC_GHC_PROGRAMS=NO in build.mk implies
+# that dyn is not added to GhcLibWays.
+GhcLibWays += $(if $(filter $(DYNAMIC_GHC_PROGRAMS),NO),,dyn)
+
+# Handy way to test whether we're building shared libs or not.
+BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))
+
+# In addition, the RTS is built in some further variations.  Ways that
+# make sense here:
+#
+#   thr           : threaded
+#   thr_p         : threaded + profiled
+#   debug         : debugging
+#   thr_debug     : debugging + threaded
+#   p             : profiled
+#
+# While the eventlog used to be enabled in only a subset of ways, we now always
+# enable it.
+
+# Usually want the debug version
+GhcRTSWays = debug
+
+# We always have the threaded versions, but note that SMP support may be disabled
+# (see GhcWithSMP).
+GhcRTSWays += thr thr_debug
+GhcRTSWays += $(if $(findstring p, $(GhcLibWays)),thr_p,)
+GhcRTSWays += $(if $(findstring dyn, $(GhcLibWays)),dyn debug_dyn thr_dyn thr_debug_dyn,)
+GhcRTSWays += $(if $(findstring p, $(GhcLibWays)),thr_debug_p debug_p,)
+
+# We can only build GHCi threaded if we have a threaded RTS:
+GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
+
+# Configuration for libffi
+UseSystemLibFFI=@UseSystemLibFFI@
+UseLibffiForAdjustors=@UseLibffiForAdjustors@
+
+# GHC needs arch-specific tweak at least in
+#     rts/Libdw.c:set_initial_registers()
+GhcRtsWithLibdw=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 s390x),@UseLibdw@,NO))
+
+#-----------------------------------------------------------------------------
+# Settings
+
+# We are in the process of moving the settings file from being entirely
+# generated by configure, to generated being by the build system. Many of these
+# might become redundant.
+# See Note [tooldir: How GHC finds mingw on Windows]
+
+GccExtraViaCOpts = @GccExtraViaCOpts@
+LdHasFilelist = @LdHasFilelist@
+LdHasBuildId = @LdHasBuildId@
+LdHasFilelist = @LdHasFilelist@
+LdIsGNULd = @LdIsGNULd@
+LdHasNoCompactUnwind = @LdHasNoCompactUnwind@
+ArArgs = @ArArgs@
+ArSupportsAtFile = @ArSupportsAtFile@
+ArSupportsDashL  = @ArSupportsDashL@
+HaskellHostOs = @HaskellHostOs@
+HaskellHostArch = @HaskellHostArch@
+HaskellTargetOs = @HaskellTargetOs@
+HaskellTargetArch = @HaskellTargetArch@
+TargetWordSize = @TargetWordSize@
+TargetWordBigEndian = @TargetWordBigEndian@
+TargetHasGnuNonexecStack = @TargetHasGnuNonexecStack@
+TargetHasIdentDirective = @TargetHasIdentDirective@
+TargetHasSubsectionsViaSymbols = @TargetHasSubsectionsViaSymbols@
+TargetHasRTSLinker = @TargetHasRTSLinker@
+TargetHasLibm = @TargetHasLibm@
+TablesNextToCode = @TablesNextToCode@
+
+SettingsCCompilerCommand = @SettingsCCompilerCommand@
+SettingsCxxCompilerCommand = @SettingsCxxCompilerCommand@
+SettingsHaskellCPPCommand = @SettingsHaskellCPPCommand@
+SettingsHaskellCPPFlags = @SettingsHaskellCPPFlags@
+SettingsCCompilerFlags = @SettingsCCompilerFlags@
+SettingsCxxCompilerFlags = @SettingsCxxCompilerFlags@
+SettingsCCompilerLinkFlags = @SettingsCCompilerLinkFlags@
+SettingsCCompilerSupportsNoPie = @SettingsCCompilerSupportsNoPie@
+SettingsLdCommand = @SettingsLdCommand@
+SettingsLdFlags = @SettingsLdFlags@
+SettingsMergeObjectsCommand = @SettingsMergeObjectsCommand@
+SettingsMergeObjectsFlags = @SettingsMergeObjectsFlags@
+SettingsArCommand = @SettingsArCommand@
+SettingsOtoolCommand = @SettingsOtoolCommand@
+SettingsInstallNameToolCommand = @SettingsInstallNameToolCommand@
+SettingsRanlibCommand = @SettingsRanlibCommand@
+SettingsDllWrapCommand = @SettingsDllWrapCommand@
+SettingsWindresCommand = @SettingsWindresCommand@
+SettingsLibtoolCommand = @SettingsLibtoolCommand@
+SettingsTouchCommand = @SettingsTouchCommand@
+SettingsClangCommand = @SettingsClangCommand@
+SettingsLlcCommand = @SettingsLlcCommand@
+SettingsOptCommand = @SettingsOptCommand@
+SettingsUseDistroMINGW = @SettingsUseDistroMINGW@
+
