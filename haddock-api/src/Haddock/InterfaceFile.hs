@@ -309,19 +309,6 @@ putInterfaceFile_ bh (InterfaceFile env info ifaces) = do
   put_ bh info
   put_ bh ifaces
 
-getInterfaceFile :: BinHandle -> Word16 -> IO InterfaceFile
-getInterfaceFile bh v | v <= 38 = do
-  env    <- get bh
-  let info = PackageInfo (PackageName mempty) (makeVersion [])
-  ifaces <- get bh
-  return (InterfaceFile env info ifaces)
-getInterfaceFile bh _ = do
-  env    <- get bh
-  info   <- get bh
-  ifaces <- get bh
-  return (InterfaceFile env info ifaces)
-
-
 instance Binary InstalledInterface where
   put_ bh (InstalledInterface modu is_sig info docMap argMap
            exps visExps opts fixMap) = do

@@ -54,7 +54,7 @@ import Data.Traversable (for)
 import GHC hiding (lookupName)
 import GHC.Core.Class (ClassMinimalDef, classMinimalDef)
 import GHC.Core.ConLike (ConLike (..))
-import GHC.Data.FastString (bytesFS, unpackFS)
+import GHC.Data.FastString (unpackFS)
 import GHC.Driver.Ppr (showSDoc)
 import GHC.HsToCore.Docs hiding (mkMaps, unionArgMaps)
 import GHC.IORef (readIORef)
@@ -1137,8 +1137,7 @@ extractDecl declMap name decl
               _ -> Left "internal: extractDecl (ClsInstD)"
       _ -> Left ("extractDecl: Unhandled decl for " ++ getOccString name)
 
-extractPatternSyn :: HasCallStack
-                  => Name -> Name
+extractPatternSyn :: Name -> Name
                   -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn]
                   -> Either ErrMsg (LSig GhcRn)
 extractPatternSyn nm t tvs cons =

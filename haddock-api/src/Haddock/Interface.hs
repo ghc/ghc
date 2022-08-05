@@ -46,7 +46,7 @@ import Haddock.Types (DocOption (..), Documentation (..), ExportItem (..), Iface
 import Haddock.Utils (Verbosity (..), normal, out, verbose)
 
 import Control.Monad (unless, when)
-import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.IO.Class (MonadIO)
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.List (foldl', isPrefixOf, nub)
 import Text.Printf (printf)
@@ -54,7 +54,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import GHC hiding (verbosity)
-import GHC.Data.FastString (unpackFS)
 import GHC.Data.Graph.Directed
 import GHC.Driver.Env
 import GHC.Driver.Monad (modifySession, withTimingM)
@@ -64,13 +63,7 @@ import GHC.Plugins
 import GHC.Tc.Types (TcGblEnv (..), TcM)
 import GHC.Tc.Utils.Env (tcLookupGlobal)
 import GHC.Tc.Utils.Monad (getTopEnv, setGblEnv)
-import GHC.Types.Name (nameIsFromExternalPackage, nameOccName)
-import GHC.Types.Name.Occurrence (isTcOcc)
-import GHC.Types.Name.Reader (globalRdrEnvElts, greMangledName, unQualOK)
-import GHC.Unit.Module.Env (ModuleSet, emptyModuleSet, mkModuleSet, unionModuleSet)
 import GHC.Unit.Module.Graph
-import GHC.Unit.Module.ModSummary (isBootSummary)
-import GHC.Unit.Types (IsBootInterface (..))
 import GHC.Utils.Error (withTiming)
 
 #if defined(mingw32_HOST_OS)
