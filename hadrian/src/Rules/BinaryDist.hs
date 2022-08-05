@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections, MultiWayIf #-}
 module Rules.BinaryDist where
 
 import Hadrian.Haskell.Cabal
@@ -376,15 +376,18 @@ useGhcPrefix pkg
 
 -- | Which wrappers point to a specific package
 pkgToWrappers :: Package -> Action [String]
-pkgToWrappers pkg
-  -- ghc also has the ghci script wrapper
-  | pkg == ghc = pure ["ghc", "ghci"]
-  | pkg == runGhc = pure ["runghc", "runhaskell"]
-  -- These are the packages which we want to expose to the user and hence
-  -- there are wrappers installed in the bindist.
-  | pkg `elem` [hpcBin, haddock, hp2ps, hsc2hs, ghc, ghcPkg]
-    = (:[]) <$> (programName =<< programContext Stage1 pkg)
-  | otherwise = pure []
+pkgToWrappers pkg = do
+    prefix <- crossPrefix
+    wrappers <-
+        if  -- ghc also has the ghci script wrapper
+          | pkg == ghc    -> pure ["ghc", "ghci"]
+          | pkg == runGhc -> pure ["runghc", "runhaskell"]
+            -- These are the packages which we want to expose to the user and hence
+            -- there are wrappers installed in the bindist.
+          | pkg `elem` [hpcBin, haddock, hp2ps, hsc2hs, ghc, ghcPkg]
+                          -> (:[]) <$> (programName =<< programContext Stage1 pkg)
+          | otherwise     -> pure []
+    return $ map (prefix++) wrappers
 
 
 wrapper :: FilePath -> Action String
