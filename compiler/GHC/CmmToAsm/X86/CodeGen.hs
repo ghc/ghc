@@ -2922,11 +2922,12 @@ genSwitch expr targets = do
           else do
             -- See Note [%rip-relative addressing on x86-64].
             tableReg <- getNewRegNat (intFormat (platformWordWidth platform))
+            targetReg <- getNewRegNat (intFormat (platformWordWidth platform))
             let op = OpAddr (AddrBaseIndex (EABaseReg tableReg) (EAIndex reg (platformWordSizeInBytes platform)) (ImmInt 0))
                 code = e_code `appOL` toOL
                     [ LEA (archWordFormat is32bit) (OpAddr (AddrBaseIndex EABaseRip EAIndexNone (ImmCLbl lbl))) (OpReg tableReg)
-                    , MOV (archWordFormat is32bit) op (OpReg reg)
-                    , JMP_TBL (OpReg reg) ids (Section ReadOnlyData lbl) lbl
+                    , MOV (archWordFormat is32bit) op (OpReg targetReg)
+                    , JMP_TBL (OpReg targetReg) ids (Section ReadOnlyData lbl) lbl
                     ]
             return code
   where
