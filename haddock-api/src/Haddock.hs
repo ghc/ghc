@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 {-# OPTIONS_GHC -Wwarn           #-}
 -----------------------------------------------------------------------------
 -- |
@@ -73,8 +74,11 @@ import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
 import GHC.Settings.Config
 import GHC.Driver.Session hiding (projectVersion, verbosity)
+import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Env
 import GHC.Utils.Error
+import GHC.Utils.Logger
+import GHC.Types.Name.Cache
 import GHC.Unit
 import GHC.Unit.State (lookupUnit)
 import GHC.Utils.Panic (handleGhcException)
@@ -193,9 +197,10 @@ haddockWithGhc ghc args = handleTopExceptions $ do
     unit_state <- hsc_units <$> getSession
 
     forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
-      mIfaceFile <- readInterfaceFiles freshNameCache [(("", Nothing), Visible, path)] noChecks
+      name_cache <- freshNameCache
+      mIfaceFile <- readInterfaceFiles name_cache [(("", Nothing), Visible, path)] noChecks
       forM_ mIfaceFile $ \(_,_,_, ifaceFile) -> do
-        putMsg logger dflags $ renderJson (jsonInterfaceFile ifaceFile)
+        putMsg logger $ renderJson (jsonInterfaceFile ifaceFile)
 
     if not (null files) then do
       (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
@@ -221,7 +226,8 @@ haddockWithGhc ghc args = handleTopExceptions $ do
         throwE "No input file(s)."
 
       -- Get packages supplied with --read-interface.
-      packages <- liftIO $ readInterfaceFiles freshNameCache (readIfaceArgs flags) noChecks
+      name_cache <- liftIO $ freshNameCache
+      packages <- liftIO $ readInterfaceFiles name_cache (readIfaceArgs flags) noChecks
 
       -- Render even though there are no input files (usually contents/index).
       liftIO $ renderStep logger dflags unit_state flags sinceQual qual packages []
@@ -264,7 +270,8 @@ readPackagesAndProcessModules :: [Flag] -> [String]
 readPackagesAndProcessModules flags files = do
     -- Get packages supplied with --read-interface.
     let noChecks = Flag_BypassInterfaceVersonCheck `elem` flags
-    packages <- readInterfaceFiles nameCacheFromGhc (readIfaceArgs flags) noChecks
+    name_cache <- hsc_NC <$> getSession
+    packages <- liftIO $ readInterfaceFiles name_cache (readIfaceArgs flags) noChecks
 
     -- Create the interfaces -- this is the core part of Haddock.
     let ifaceFiles = map (\(_, _, _, ifaceFile) -> ifaceFile) packages
@@ -303,7 +310,7 @@ renderStep logger dflags unit_state flags sinceQual nameQual pkgs interfaces = d
 -- | Render the interfaces with whatever backend is specified in the flags.
 render :: Logger -> DynFlags -> UnitState -> [Flag] -> SinceQual -> QualOption -> [Interface]
        -> [(FilePath, PackageInterfaces)] -> Map Module FilePath -> IO ()
-render logger dflags unit_state flags sinceQual qual ifaces packages extSrcMap = do
+render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = do
 
   let
     packageInfo = PackageInfo { piPackageName    = fromMaybe (PackageName mempty)
@@ -326,6 +333,7 @@ render logger dflags unit_state flags sinceQual qual ifaces packages extSrcMap =
     dflags'
       | unicode          = gopt_set dflags Opt_PrintUnicodeSyntax
       | otherwise        = dflags
+    logger               = setLogFlags log' (initLogFlags dflags')
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
@@ -430,7 +438,7 @@ render logger dflags unit_state flags sinceQual qual ifaces packages extSrcMap =
                   $ flags
 
   when (Flag_GenIndex `elem` flags) $ do
-    withTiming logger dflags' "ppHtmlIndex" (const ()) $ do
+    withTiming logger "ppHtmlIndex" (const ()) $ do
       _ <- {-# SCC ppHtmlIndex #-}
            ppHtmlIndex odir title pkgStr
                   themes opt_mathjax opt_contents_url sourceUrls' opt_wiki_urls
@@ -442,7 +450,7 @@ render logger dflags unit_state flags sinceQual qual ifaces packages extSrcMap =
       copyHtmlBits odir libDir themes withQuickjump
 
   when (Flag_GenContents `elem` flags) $ do
-    withTiming logger dflags' "ppHtmlContents" (const ()) $ do
+    withTiming logger "ppHtmlContents" (const ()) $ do
       _ <- {-# SCC ppHtmlContents #-}
            ppHtmlContents unit_state odir title pkgStr
                      themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
@@ -462,7 +470,7 @@ render logger dflags unit_state flags sinceQual qual ifaces packages extSrcMap =
                         $ packages)
 
   when (Flag_Html `elem` flags) $ do
-    withTiming logger dflags' "ppHtml" (const ()) $ do
+    withTiming logger "ppHtml" (const ()) $ do
       _ <- {-# SCC ppHtml #-}
            ppHtml unit_state title pkgStr visibleIfaces reexportedIfaces odir
                   prologue
@@ -498,14 +506,14 @@ render logger dflags unit_state flags sinceQual qual ifaces packages extSrcMap =
           ]
 
   when (Flag_LaTeX `elem` flags) $ do
-    withTiming logger dflags' "ppLatex" (const ()) $ do
+    withTiming logger "ppLatex" (const ()) $ do
       _ <- {-# SCC ppLatex #-}
            ppLaTeX title pkgStr visibleIfaces odir (fmap _doc prologue) opt_latex_style
                    libDir
       return ()
 
   when (Flag_HyperlinkedSource `elem` flags && not (null ifaces)) $ do
-    withTiming logger dflags' "ppHyperlinkedSource" (const ()) $ do
+    withTiming logger "ppHyperlinkedSource" (const ()) $ do
       _ <- {-# SCC ppHyperlinkedSource #-}
            ppHyperlinkedSource (verbosity flags) odir libDir opt_source_css pretty srcMap ifaces
       return ()
@@ -516,24 +524,22 @@ render logger dflags unit_state flags sinceQual qual ifaces packages extSrcMap =
 -------------------------------------------------------------------------------
 
 
-readInterfaceFiles :: MonadIO m
-                   => NameCacheAccessor m
+readInterfaceFiles :: NameCache
                    -> [(DocPaths, Visibility, FilePath)]
                    -> Bool
-                   -> m [(DocPaths, Visibility, FilePath, InterfaceFile)]
+                   -> IO [(DocPaths, Visibility, FilePath, InterfaceFile)]
 readInterfaceFiles name_cache_accessor pairs bypass_version_check = do
   catMaybes `liftM` mapM ({-# SCC readInterfaceFile #-} tryReadIface) pairs
   where
     -- try to read an interface, warn if we can't
-    tryReadIface (paths, showModules, file) =
+    tryReadIface (paths, vis, file) =
       readInterfaceFile name_cache_accessor file bypass_version_check >>= \case
-        Left err -> liftIO $ do
+        Left err -> do
           putStrLn ("Warning: Cannot read " ++ file ++ ":")
           putStrLn ("   " ++ err)
           putStrLn "Skipping this interface."
           return Nothing
-        Right f ->
-          return (Just (paths, showModules, file, f ))
+        Right f -> return (Just (paths, vis, file, f))
 
 
 -------------------------------------------------------------------------------
@@ -779,3 +785,4 @@ getPrologue dflags flags =
 rightOrThrowE :: Either String b -> IO b
 rightOrThrowE (Left msg) = throwE msg
 rightOrThrowE (Right x) = pure x
+

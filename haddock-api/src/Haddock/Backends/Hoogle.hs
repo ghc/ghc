@@ -87,7 +87,7 @@ dropHsDocTy = drop_sig_ty
         drop_ty (HsFunTy x w a b) = HsFunTy x w (drop_lty a) (drop_lty b)
         drop_ty (HsListTy x a) = HsListTy x (drop_lty a)
         drop_ty (HsTupleTy x a b) = HsTupleTy x a (map drop_lty b)
-        drop_ty (HsOpTy x a b c) = HsOpTy x (drop_lty a) b (drop_lty c)
+        drop_ty (HsOpTy x p a b c) = HsOpTy x p (drop_lty a) b (drop_lty c)
         drop_ty (HsParTy x a) = HsParTy x (drop_lty a)
         drop_ty (HsKindSig x a b) = HsKindSig x (drop_lty a) b
         drop_ty (HsDocTy _ a _) = drop_ty $ unL a
@@ -246,11 +246,11 @@ ppCtor dflags dat subdocs con@ConDeclH98 { con_args = con_args' }
         f (PrefixCon _ args) = [typeSig name $ (map hsScaledThing args) ++ [resType]]
         f (InfixCon a1 a2) = f $ PrefixCon [] [a1,a2]
         f (RecCon (L _ recs)) = f (PrefixCon [] $ map (hsLinear . cd_fld_type . unLoc) recs) ++ concat
-                          [(concatMap (lookupCon dflags subdocs . noLocA . extFieldOcc . unLoc) (cd_fld_names r)) ++
-                           [out dflags (map (extFieldOcc . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
+                          [(concatMap (lookupCon dflags subdocs . noLocA . foExt . unLoc) (cd_fld_names r)) ++
+                           [out dflags (map (foExt . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
                           | r <- map unLoc recs]
 
-        funs = foldr1 (\x y -> reL $ HsFunTy noAnn (HsUnrestrictedArrow NormalSyntax) x y)
+        funs = foldr1 (\x y -> reL $ HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) x y)
         apps = foldl1 (\x y -> reL $ HsAppTy noExtField x y)
 
         typeSig nm flds = operator nm ++ " :: " ++
@@ -279,12 +279,12 @@ ppCtor dflags _dat subdocs (ConDeclGADT { con_names = names
         name = out dflags $ map unL names
         con_sig_ty = HsSig noExtField outer_bndrs theta_ty where
           theta_ty = case mcxt of
-            Just theta -> noLocA (HsQualTy { hst_xqual = noExtField, hst_ctxt = Just theta, hst_body = tau_ty })
+            Just theta -> noLocA (HsQualTy { hst_xqual = noExtField, hst_ctxt = theta, hst_body = tau_ty })
             Nothing -> tau_ty
           tau_ty = foldr mkFunTy res_ty $
             case args of PrefixConGADT pos_args -> map hsScaledThing pos_args
-                         RecConGADT (L _ flds) -> map (cd_fld_type . unL) flds
-          mkFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow NormalSyntax) a b)
+                         RecConGADT (L _ flds) _ -> map (cd_fld_type . unL) flds
+          mkFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) a b)
 
 ppFixity :: DynFlags -> (Name, Fixity) -> [String]
 ppFixity dflags (name, fixity) = [out dflags ((FixitySig noExtField [noLocA name] fixity) :: FixitySig GhcRn)]

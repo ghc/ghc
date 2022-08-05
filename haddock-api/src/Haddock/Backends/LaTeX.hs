@@ -24,7 +24,7 @@ import Haddock.GhcUtils
 import GHC.Utils.Ppr hiding (Doc, quote)
 import qualified GHC.Utils.Ppr as Pretty
 
-import GHC.Types.Basic        ( PromotionFlag(..) )
+import GHC.Types.Basic        ( PromotionFlag(..), isPromoted )
 import GHC hiding (fromMaybeContext )
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name        ( nameOccName )
@@ -843,7 +843,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
     fieldPart = case con of
         ConDeclGADT{con_g_args = con_args'} -> case con_args' of
           -- GADT record declarations
-          RecConGADT _                    -> doConstrArgsWithDocs []
+          RecConGADT _ _                  -> doConstrArgsWithDocs []
           -- GADT prefix data constructors
           PrefixConGADT args | hasArgDocs -> doConstrArgsWithDocs (map hsScaledThing args)
           _                               -> empty
@@ -887,12 +887,12 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
 -- | Pretty-print a record field
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocNameI ->  LaTeX
 ppSideBySideField subdocs unicode (ConDeclField _ names ltype _) =
-  decltt (cat (punctuate comma (map (ppBinder . rdrNameOcc . unLoc . rdrNameFieldOcc . unLoc) names))
+  decltt (cat (punctuate comma (map (ppBinder . rdrNameOcc . unLoc . foLabel . unLoc) names))
     <+> dcolon unicode <+> ppLType unicode ltype) <-> rDoc mbDoc
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (extFieldOcc $ unLoc $ head names) subdocs >>= fmap _doc . combineDocumentation . fst
+    mbDoc = lookup (foExt $ unLoc $ head names) subdocs >>= fmap _doc . combineDocumentation . fst
 
 
 -- | Pretty-print a bundled pattern synonym
@@ -983,11 +983,12 @@ ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
 -------------------------------------------------------------------------------
 
 
-ppLContext, ppLContextNoArrow :: Maybe (LHsContext DocNameI) -> Bool -> LaTeX
-ppLContext        Nothing _ = empty
-ppLContext        (Just ctxt) unicode  = ppContext        (unLoc ctxt) unicode
-ppLContextNoArrow Nothing _ = empty
-ppLContextNoArrow (Just ctxt) unicode = ppContextNoArrow (unLoc ctxt) unicode
+ppLContext :: Maybe (LHsContext DocNameI) -> Bool -> LaTeX
+ppLContext Nothing _ = empty
+ppLContext (Just ctxt) unicode  = ppContext (unLoc ctxt) unicode
+
+ppLContextNoArrow :: LHsContext DocNameI -> Bool -> LaTeX
+ppLContextNoArrow ctxt unicode = ppContextNoArrow (unLoc ctxt) unicode
 
 ppContextNoLocsMaybe :: [HsType DocNameI] -> Bool -> Maybe LaTeX
 ppContextNoLocsMaybe [] _ = Nothing
@@ -1101,15 +1102,15 @@ ppr_mono_ty (HsForAllTy _ tele ty) unicode
   = sep [ ppHsForAllTelescope tele unicode
         , ppr_mono_lty ty unicode ]
 ppr_mono_ty (HsQualTy _ ctxt ty) unicode
-  = sep [ ppLContext ctxt unicode
+  = sep [ ppLContext (Just ctxt) unicode
         , ppr_mono_lty ty unicode ]
 ppr_mono_ty (HsFunTy _ mult ty1 ty2)   u
   = sep [ ppr_mono_lty ty1 u
         , arr <+> ppr_mono_lty ty2 u ]
    where arr = case mult of
-                 HsLinearArrow _ _ -> lollipop u
+                 HsLinearArrow _ -> lollipop u
                  HsUnrestrictedArrow _ -> arrow u
-                 HsExplicitMult _ _ m -> multAnnotation <> ppr_mono_lty m u <+> arrow u
+                 HsExplicitMult _ m _ -> multAnnotation <> ppr_mono_lty m u <+> arrow u
 
 ppr_mono_ty (HsBangTy _ b ty)     u = ppBang b <> ppLParendType u ty
 ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
@@ -1132,9 +1133,13 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode
 ppr_mono_ty (HsAppKindTy _ fun_ty arg_ki) unicode
   = hsep [ppr_mono_lty fun_ty unicode, atSign unicode <> ppr_mono_lty arg_ki unicode]
 
-ppr_mono_ty (HsOpTy _ ty1 op ty2) unicode
-  = ppr_mono_lty ty1 unicode <+> ppr_op <+> ppr_mono_lty ty2 unicode
+ppr_mono_ty (HsOpTy _ prom ty1 op ty2) unicode
+  = ppr_mono_lty ty1 unicode <+> ppr_op_prom <+> ppr_mono_lty ty2 unicode
   where
+    ppr_op_prom | isPromoted prom
+                = char '\'' <> ppr_op
+                | otherwise
+                = ppr_op
     ppr_op | isSymOcc (getOccName op) = ppLDocName op
            | otherwise = char '`' <> ppLDocName op <> char '`'
 

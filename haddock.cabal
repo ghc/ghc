@@ -35,7 +35,7 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==9.2.*
+tested-with:          GHC==9.4.*
 
 extra-source-files:
   CHANGES.md
@@ -68,7 +68,7 @@ executable haddock
 
   -- haddock typically only supports a single GHC major version
   build-depends:
-    base ^>= 4.13.0.0 || ^>= 4.14.0.0 || ^>= 4.15.0.0 || ^>= 4.16.0.0
+    base ^>= 4.13.0.0 || ^>= 4.14.0.0 || ^>= 4.15.0.0 || ^>= 4.16.0.0 || ^>= 4.17.0.0
 
   if flag(in-ghc-tree)
     hs-source-dirs: haddock-api/src,  haddock-library/src
@@ -83,7 +83,7 @@ executable haddock
       xhtml >= 3000.2 && < 3000.3,
       ghc-boot,
       ghc-boot-th,
-      ghc == 9.2.*,
+      ghc == 9.4.*,
       bytestring,
       parsec,
       text,

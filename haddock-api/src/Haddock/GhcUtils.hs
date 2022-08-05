@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns, FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -95,7 +96,7 @@ ifTrueJust True  = Just
 ifTrueJust False = const Nothing
 
 sigName :: LSig GhcRn -> [IdP GhcRn]
-sigName (L _ sig) = sigNameNoLoc sig
+sigName (L _ sig) = sigNameNoLoc emptyOccEnv sig
 
 -- | Was this signature given by the user?
 isUserLSig :: forall p. UnXRec p => LSig p -> Bool
@@ -114,7 +115,7 @@ pretty = showPpr
 -- instantiated at DocNameI instead of (GhcPass _).
 
 -- | Like 'hsTyVarName' from GHC API, but not instantiated at (GhcPass _)
-hsTyVarBndrName :: forall flag n. (XXTyVarBndr n ~ NoExtCon, UnXRec n)
+hsTyVarBndrName :: forall flag n. (XXTyVarBndr n ~ DataConCantHappen, UnXRec n)
                 => HsTyVarBndr flag n -> IdP n
 hsTyVarBndrName (UserTyVar _ _ name) = unXRec @n name
 hsTyVarBndrName (KindedTyVar _ _ name _) = unXRec @n name
@@ -171,17 +172,17 @@ getGADTConType (ConDeclGADT { con_bndrs = L _ outer_bndrs
                  , sig_body  = theta_ty })
  where
    theta_ty | Just theta <- mcxt
-            = noLocA (HsQualTy { hst_xqual = noAnn, hst_ctxt = Just theta, hst_body = tau_ty })
+            = noLocA (HsQualTy { hst_xqual = noAnn, hst_ctxt = theta, hst_body = tau_ty })
             | otherwise
             = tau_ty
 
 --  tau_ty :: LHsType DocNameI
    tau_ty = case args of
-              RecConGADT flds -> mkFunTy (noLocA (HsRecTy noAnn (unLoc flds))) res_ty
+              RecConGADT flds _ -> mkFunTy (noLocA (HsRecTy noAnn (unLoc flds))) res_ty
               PrefixConGADT pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
 
    mkFunTy :: LHsType DocNameI -> LHsType DocNameI -> LHsType DocNameI
-   mkFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow NormalSyntax) a b)
+   mkFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) a b)
 
 getGADTConType (ConDeclH98 {}) = panic "getGADTConType"
   -- Should only be called on ConDeclGADT
@@ -192,7 +193,7 @@ getMainDeclBinderI (ValD _ d) =
   case collectHsBindBinders CollNoDictBinders d of
     []       -> []
     (name:_) -> [name]
-getMainDeclBinderI (SigD _ d) = sigNameNoLoc d
+getMainDeclBinderI (SigD _ d) = sigNameNoLoc emptyOccEnv d
 getMainDeclBinderI (ForD _ (ForeignImport _ name _ _)) = [unLoc name]
 getMainDeclBinderI (ForD _ (ForeignExport _ _ _ _)) = []
 getMainDeclBinderI _ = []
@@ -226,12 +227,11 @@ addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype))
                          , hst_ctxt = add_ctxt ctxt, hst_body = ty })
     go_ty (L loc ty)
        = L loc (HsQualTy { hst_xqual = noExtField
-                         , hst_ctxt = add_ctxt Nothing, hst_body = L loc ty })
+                         , hst_ctxt = add_ctxt (noLocA []), hst_body = L loc ty })
 
-    extra_pred = nlHsTyConApp Prefix cls (lHsQTyVarsToTypes tvs0)
+    extra_pred = nlHsTyConApp NotPromoted Prefix cls (lHsQTyVarsToTypes tvs0)
 
-    add_ctxt Nothing              = Just $ noLocA [extra_pred]
-    add_ctxt (Just (L loc preds)) = Just $ L loc (extra_pred : preds)
+    add_ctxt (L loc preds) = L loc (extra_pred : preds)
 
 addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
 
@@ -284,14 +284,14 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
 
           ConDeclGADT { con_g_args = con_args' } -> case con_args' of
             PrefixConGADT {} -> Just d
-            RecConGADT fields
+            RecConGADT fields _
               | all field_avail (unLoc fields) -> Just d
               | otherwise -> Just (d { con_g_args = PrefixConGADT (field_types $ unLoc fields) })
               -- see above
       where
         field_avail :: LConDeclField GhcRn -> Bool
         field_avail (L _ (ConDeclField _ fs _ _))
-            = all (\f -> extFieldOcc (unLoc f) `elem` names) fs
+            = all (\f -> foExt (unLoc f) `elem` names) fs
 
         field_types flds = [ hsUnrestricted t | L _ (ConDeclField _ _ t _) <- flds ]
 
@@ -356,9 +356,7 @@ reparenTypePrec = go
   go p (HsQualTy x ctxt ty)
     = let p' [_] = PREC_CTX
           p' _   = PREC_TOP -- parens will get added anyways later...
-          ctxt' = case ctxt of
-            Nothing -> Nothing
-            Just c -> Just $ mapXRec @a (\xs -> map (goL (p' xs)) xs) c
+          ctxt' = mapXRec @a (\xs -> map (goL (p' xs)) xs) ctxt
       in paren p PREC_CTX $ HsQualTy x ctxt' (goL PREC_TOP ty)
     -- = paren p PREC_FUN $ HsQualTy x (fmap (mapXRec @a (map reparenLType)) ctxt) (reparenLType ty)
   go p (HsFunTy x w ty1 ty2)
@@ -367,8 +365,8 @@ reparenTypePrec = go
     = paren p PREC_CON $ HsAppTy x (goL PREC_FUN fun_ty) (goL PREC_CON arg_ty)
   go p (HsAppKindTy x fun_ty arg_ki)
     = paren p PREC_CON $ HsAppKindTy x (goL PREC_FUN fun_ty) (goL PREC_CON arg_ki)
-  go p (HsOpTy x ty1 op ty2)
-    = paren p PREC_FUN $ HsOpTy x (goL PREC_OP ty1) op (goL PREC_OP ty2)
+  go p (HsOpTy x prom ty1 op ty2)
+    = paren p PREC_FUN $ HsOpTy x prom (goL PREC_OP ty1) op (goL PREC_OP ty2)
   go p (HsParTy _ t) = unXRec @a $ goL p t -- pretend the paren doesn't exist - it will be added back if needed
   go _ t@HsTyVar{} = t
   go _ t@HsStarTy{} = t
@@ -469,7 +467,7 @@ instance Parent (ConDecl GhcRn) where
   children con =
     case getRecConArgs_maybe con of
       Nothing -> []
-      Just flds -> map (extFieldOcc . unLoc) $ concatMap (cd_fld_names . unLoc) (unLoc flds)
+      Just flds -> map (foExt . unLoc) $ concatMap (cd_fld_names . unLoc) (unLoc flds)
 
 instance Parent (TyClDecl GhcRn) where
   children d

@@ -191,8 +191,8 @@ renameDocumentation (Documentation mDoc mWarning) =
   Documentation <$> mapM renameDoc mDoc <*> mapM renameDoc mWarning
 
 
-renameLDocHsSyn :: LHsDocString -> RnM LHsDocString
-renameLDocHsSyn = return
+renameLDocHsSyn :: Located (WithHsDocIdentifiers HsDocString a) -> RnM (Located (WithHsDocIdentifiers HsDocString b))
+renameLDocHsSyn (L l doc) = return (L l (WithHsDocIdentifiers (hsDocString doc) []))
 
 
 renameDoc :: Traversable t => t (Wrap Name) -> RnM (t (Wrap DocName))
@@ -245,9 +245,10 @@ renameMaybeInjectivityAnn :: Maybe (LInjectivityAnn GhcRn)
 renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
 renameArrow :: HsArrow GhcRn -> RnM (HsArrow DocNameI)
-renameArrow (HsUnrestrictedArrow u) = return (HsUnrestrictedArrow u)
-renameArrow (HsLinearArrow u a) = return (HsLinearArrow u a)
-renameArrow (HsExplicitMult u a p) = HsExplicitMult u a <$> renameLType p
+renameArrow (HsUnrestrictedArrow arr) = return (HsUnrestrictedArrow arr)
+renameArrow (HsLinearArrow (HsPct1 pct1 arr)) = return (HsLinearArrow (HsPct1 pct1 arr))
+renameArrow (HsLinearArrow (HsLolly arr)) = return (HsLinearArrow (HsLolly arr))
+renameArrow (HsExplicitMult pct p arr) = (\p' -> HsExplicitMult pct p' arr) <$> renameLType p
 
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of
@@ -258,7 +259,7 @@ renameType t = case t of
                        , hst_tele = tele', hst_body = ltype' })
 
   HsQualTy { hst_ctxt = lcontext , hst_body = ltype } -> do
-    lcontext' <- traverse renameLContext lcontext
+    lcontext' <- renameLContext lcontext
     ltype'    <- renameLType ltype
     return (HsQualTy { hst_xqual = noAnn, hst_ctxt = lcontext', hst_body = ltype' })
 
@@ -289,11 +290,11 @@ renameType t = case t of
   HsTupleTy _ b ts -> return . HsTupleTy noAnn b =<< mapM renameLType ts
   HsSumTy _ ts -> HsSumTy noAnn <$> mapM renameLType ts
 
-  HsOpTy _ a (L loc op) b -> do
+  HsOpTy _ prom a (L loc op) b -> do
     op' <- rename op
     a'  <- renameLType a
     b'  <- renameLType b
-    return (HsOpTy noAnn a' (L loc op') b')
+    return (HsOpTy noAnn prom a' (L loc op') b')
 
   HsParTy _ ty -> return . (HsParTy noAnn) =<< renameLType ty
 
@@ -315,6 +316,7 @@ renameType t = case t of
   HsExplicitTupleTy _ b   -> HsExplicitTupleTy noAnn <$> mapM renameLType b
   HsSpliceTy _ s          -> renameHsSpliceTy s
   HsWildCardTy _          -> pure (HsWildCardTy noAnn)
+
 
 renameSigType :: HsSigType GhcRn -> RnM (HsSigType DocNameI)
 renameSigType (HsSig { sig_bndrs = bndrs, sig_body = body }) = do
@@ -505,15 +507,15 @@ renameCon :: ConDecl GhcRn -> RnM (ConDecl DocNameI)
 renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
                            , con_mb_cxt = lcontext, con_args = details
                            , con_doc = mbldoc
-                           , con_forall = forall }) = do
+                           , con_forall = forall_ }) = do
       lname'    <- renameL lname
       ltyvars'  <- mapM renameLTyVarBndr ltyvars
       lcontext' <- traverse renameLContext lcontext
       details'  <- renameH98Details details
-      mbldoc'   <- mapM renameLDocHsSyn mbldoc
+      mbldoc'   <- mapM (renameLDocHsSyn) mbldoc
       return (decl { con_ext = noExtField, con_name = lname', con_ex_tvs = ltyvars'
                    , con_mb_cxt = lcontext'
-                   , con_forall = forall -- Remove when #18311 is fixed
+                   , con_forall = forall_ -- Remove when #18311 is fixed
                    , con_args = details', con_doc = mbldoc' })
 
 renameCon ConDeclGADT { con_names = lnames, con_bndrs = bndrs
@@ -548,9 +550,9 @@ renameH98Details (InfixCon a b) = do
 
 renameGADTDetails :: HsConDeclGADTDetails GhcRn
                   -> RnM (HsConDeclGADTDetails DocNameI)
-renameGADTDetails (RecConGADT (L l fields)) = do
+renameGADTDetails (RecConGADT (L l fields) arr) = do
   fields' <- mapM renameConDeclFieldField fields
-  return (RecConGADT (L (locA l) fields'))
+  return (RecConGADT (L (locA l) fields') arr)
 renameGADTDetails (PrefixConGADT ps) = PrefixConGADT <$> mapM renameHsScaled ps
 
 renameConDeclFieldField :: LConDeclField GhcRn -> RnM (LConDeclField DocNameI)

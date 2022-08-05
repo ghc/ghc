@@ -15,6 +15,7 @@
 -----------------------------------------------------------------------------
 module Haddock.Interface.LexParseRn
   ( processDocString
+  , processDocStringFromString
   , processDocStringParas
   , processDocStrings
   , processModuleHeader
@@ -38,6 +39,7 @@ import GHC.Parser.PostProcess
 import GHC.Driver.Ppr ( showPpr, showSDoc )
 import GHC.Types.Name.Reader
 import GHC.Data.EnumSet as EnumSet
+import GHC.Utils.Trace
 
 processDocStrings :: DynFlags -> Maybe Package -> GlobalRdrEnv -> [HsDocString]
                   -> ErrMsgM (Maybe (MDoc Name))
@@ -52,11 +54,15 @@ processDocStrings dflags pkg gre strs = do
 
 processDocStringParas :: DynFlags -> Maybe Package -> GlobalRdrEnv -> HsDocString -> ErrMsgM (MDoc Name)
 processDocStringParas dflags pkg gre hds =
-  overDocF (rename dflags gre) $ parseParas dflags pkg (unpackHDS hds)
+  overDocF (rename dflags gre) $ parseParas dflags pkg (renderHsDocString hds)
 
 processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Doc Name)
 processDocString dflags gre hds =
-  rename dflags gre $ parseString dflags (unpackHDS hds)
+  processDocStringFromString dflags gre (renderHsDocString hds)
+
+processDocStringFromString :: DynFlags -> GlobalRdrEnv -> String -> ErrMsgM (Doc Name)
+processDocStringFromString dflags gre hds =
+  rename dflags gre $ parseString dflags hds
 
 processModuleHeader :: DynFlags -> Maybe Package -> GlobalRdrEnv -> SafeHaskellMode -> Maybe HsDocString
                     -> ErrMsgM (HaddockModInfo Name, Maybe (MDoc Name))
@@ -65,7 +71,7 @@ processModuleHeader dflags pkgName gre safety mayStr = do
     case mayStr of
       Nothing -> return failure
       Just hds -> do
-        let str = unpackHDS hds
+        let str = renderHsDocString hds
             (hmi, doc) = parseModuleHeader dflags pkgName str
         !descr <- case hmi_description hmi of
                     Just hmi_descr -> Just <$> rename dflags gre hmi_descr

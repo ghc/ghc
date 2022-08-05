@@ -4,7 +4,7 @@ module Documentation.Haddock.Parser.UtilSpec (main, spec) where
 
 import Documentation.Haddock.Parser.Monad
 import Documentation.Haddock.Parser.Util
-import Data.Either.Compat (isLeft)
+import Data.Either (isLeft)
 import Test.Hspec
 #if !(MIN_VERSION_base(4,8,0))
 import Control.Applicative

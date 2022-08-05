@@ -19,10 +19,6 @@ module Haddock.Convert (
   PrintRuntimeReps(..),
 ) where
 
-#ifndef __HLINT__
-#include "HsVersions.h"
-#endif
-
 import GHC.Data.Bag ( emptyBag )
 import GHC.Types.Basic ( TupleSort(..), PromotionFlag(..), DefMethSpec(..), TopLevelFlag(..) )
 import GHC.Types.SourceText (SourceText(..))
@@ -49,9 +45,9 @@ import GHC.Builtin.Types ( eqTyConName, listTyConName, liftedTypeKindTyConName
 import GHC.Builtin.Names ( hasKey, eqTyConKey, ipClassKey, tYPETyConKey
                  , liftedDataConKey, boxedRepDataConKey )
 import GHC.Types.Unique ( getUnique )
-import GHC.Utils.Misc ( chkAppend, debugIsOn, dropList, equalLength
+import GHC.Utils.Misc ( chkAppend, dropList, equalLength
                       , filterByList, filterOut )
-import GHC.Utils.Panic ( assertPanic )
+import GHC.Utils.Panic.Plain ( assert )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
@@ -128,7 +124,7 @@ tyThingToLHsDecl prr t = case t of
            vs = tyConVisibleTyVars (classTyCon cl)
 
        in withErrs (lefts atTyClDecls) . TyClD noExtField $ ClassDecl
-         { tcdCtxt = synifyCtx (classSCTheta cl)
+         { tcdCtxt = Just $ synifyCtx (classSCTheta cl)
          , tcdLName = synifyNameN cl
          , tcdTyVars = synifyTyVars vs
          , tcdFixity = synifyFixity cl
@@ -306,7 +302,7 @@ synifyTyCon _prr coax tc
   alg_deriv = []
   defn = HsDataDefn { dd_ext     = noExtField
                     , dd_ND      = alg_nd
-                    , dd_ctxt    = alg_ctx
+                    , dd_ctxt    = Just alg_ctx
                     , dd_cType   = Nothing
                     , dd_kindSig = kindSig
                     , dd_cons    = cons
@@ -345,14 +341,14 @@ synifyInjectivityAnn Nothing _ _            = Nothing
 synifyInjectivityAnn _       _ NotInjective = Nothing
 synifyInjectivityAnn (Just lhs) tvs (Injective inj) =
     let rhs = map (noLocA . tyVarName) (filterByList inj tvs)
-    in Just $ noLoc $ InjectivityAnn noAnn (noLocA lhs) rhs
+    in Just $ noLocA $ InjectivityAnn noAnn (noLocA lhs) rhs
 
 synifyFamilyResultSig :: Maybe Name -> Kind -> LFamilyResultSig GhcRn
 synifyFamilyResultSig  Nothing    kind
-   | isLiftedTypeKind kind = noLoc $ NoSig noExtField
-   | otherwise = noLoc $ KindSig  noExtField (synifyKindSig kind)
+   | isLiftedTypeKind kind = noLocA $ NoSig noExtField
+   | otherwise = noLocA $ KindSig  noExtField (synifyKindSig kind)
 synifyFamilyResultSig (Just name) kind =
-   noLoc $ TyVarSig noExtField (noLocA $ KindedTyVar noAnn () (noLocA name) (synifyKindSig kind))
+   noLocA $ TyVarSig noExtField (noLocA $ KindedTyVar noAnn () (noLocA name) (synifyKindSig kind))
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)
 -- for any constructor that would be misrepresented by omitting its
@@ -379,7 +375,7 @@ synifyDataCon use_gadt_syntax dc =
 
   -- skip any EqTheta, use 'orig'inal syntax
   ctx | null theta = Nothing
-      | otherwise = synifyCtx theta
+      | otherwise = Just $ synifyCtx theta
 
   linear_tys =
     zipWith (\ty bang ->
@@ -391,7 +387,7 @@ synifyDataCon use_gadt_syntax dc =
 
   field_tys = zipWith con_decl_field (dataConFieldLabels dc) linear_tys
   con_decl_field fl synTy = noLocA $
-    ConDeclField noAnn [noLoc $ FieldOcc (flSelector fl) (noLocA $ mkVarUnqual $ flLabel fl)] synTy
+    ConDeclField noAnn [noLocA $ FieldOcc (flSelector fl) (noLocA $ mkVarUnqual $ flLabel fl)] synTy
                  Nothing
 
   mk_h98_arg_tys :: Either ErrMsg (HsConDeclH98Details GhcRn)
@@ -405,7 +401,7 @@ synifyDataCon use_gadt_syntax dc =
 
   mk_gadt_arg_tys :: HsConDeclGADTDetails GhcRn
   mk_gadt_arg_tys
-    | use_named_field_syntax = RecConGADT (noLocA field_tys)
+    | use_named_field_syntax = RecConGADT (noLocA field_tys) noHsUniTok
     | otherwise              = PrefixConGADT (map hsUnrestricted linear_tys)
 
  -- finally we get synifyDataCon's result!
@@ -466,8 +462,8 @@ synifyTcIdSig vs (i, dm) =
     mainSig t = synifySigType DeleteTopLevelQuantification vs t
     defSig t = synifySigType ImplicitizeForAll vs t
 
-synifyCtx :: [PredType] -> Maybe (LHsContext GhcRn)
-synifyCtx ts = Just (noLocA ( map (synifyType WithinType []) ts))
+synifyCtx :: [PredType] -> LHsContext GhcRn
+synifyCtx ts = noLocA ( map (synifyType WithinType []) ts)
 
 
 synifyTyVars :: [TyVar] -> LHsQTyVars GhcRn
@@ -610,23 +606,25 @@ synifyType _ vs (TyConApp tc tys)
              tTy | L _ (HsExplicitListTy _ IsPromoted tTy') <- stripKindSig tTy
                  -> noLocA $ HsExplicitListTy noExtField IsPromoted (hTy : tTy')
                  | otherwise
-                 -> noLocA $ HsOpTy noExtField hTy (noLocA $ getName tc) tTy
+                 -> noLocA $ HsOpTy noAnn IsPromoted hTy (noLocA $ getName tc) tTy
       -- ditto for implicit parameter tycons
       | tc `hasKey` ipClassKey
       , [name, ty] <- tys
       , Just x <- isStrLitTy name
-      = noLocA $ HsIParamTy noAnn (noLoc $ HsIPName x) (synifyType WithinType vs ty)
+      = noLocA $ HsIParamTy noAnn (noLocA $ HsIPName x) (synifyType WithinType vs ty)
       -- and equalities
       | tc `hasKey` eqTyConKey
       , [ty1, ty2] <- tys
-      = noLocA $ HsOpTy noExtField
+      = noLocA $ HsOpTy noAnn
+                       NotPromoted
                        (synifyType WithinType vs ty1)
                        (noLocA eqTyConName)
                        (synifyType WithinType vs ty2)
       -- and infix type operators
       | isSymOcc (nameOccName (getName tc))
       , ty1:ty2:tys_rest <- vis_tys
-      = mk_app_tys (HsOpTy noExtField
+      = mk_app_tys (HsOpTy noAnn
+                           prom
                            (synifyType WithinType vs ty1)
                            (noLocA $ getName tc)
                            (synifyType WithinType vs ty2))
@@ -801,9 +799,9 @@ noKindTyVars _ _ = emptyVarSet
 
 synifyMult :: [TyVar] -> Mult -> HsArrow GhcRn
 synifyMult vs t = case t of
-                    One  -> HsLinearArrow NormalSyntax Nothing
-                    Many -> HsUnrestrictedArrow NormalSyntax
-                    ty -> HsExplicitMult NormalSyntax Nothing (synifyType WithinType vs ty)
+                    One  -> HsLinearArrow (HsPct1 noHsTok noHsUniTok)
+                    Many -> HsUnrestrictedArrow noHsUniTok
+                    ty -> HsExplicitMult noHsTok (synifyType WithinType vs ty) noHsUniTok
 
 
 
@@ -935,8 +933,8 @@ tcSplitForAllTysReqPreserveSynonyms :: Type -> ([ReqTVBinder], Type)
 tcSplitForAllTysReqPreserveSynonyms ty =
   let (all_bndrs, body) = tcSplitSomeForAllTysPreserveSynonyms isVisibleArgFlag ty
       req_bndrs         = mapMaybe mk_req_bndr_maybe all_bndrs in
-  ASSERT( req_bndrs `equalLength` all_bndrs )
-  (req_bndrs, body)
+  assert ( req_bndrs `equalLength` all_bndrs)
+    (req_bndrs, body)
   where
     mk_req_bndr_maybe :: TyCoVarBinder -> Maybe ReqTVBinder
     mk_req_bndr_maybe (Bndr tv argf) = case argf of
@@ -948,8 +946,8 @@ tcSplitForAllTysInvisPreserveSynonyms :: Type -> ([InvisTVBinder], Type)
 tcSplitForAllTysInvisPreserveSynonyms ty =
   let (all_bndrs, body) = tcSplitSomeForAllTysPreserveSynonyms isInvisibleArgFlag ty
       inv_bndrs         = mapMaybe mk_inv_bndr_maybe all_bndrs in
-  ASSERT( inv_bndrs `equalLength` all_bndrs )
-  (inv_bndrs, body)
+  assert ( inv_bndrs `equalLength` all_bndrs)
+    (inv_bndrs, body)
   where
     mk_inv_bndr_maybe :: TyCoVarBinder -> Maybe InvisTVBinder
     mk_inv_bndr_maybe (Bndr tv argf) = case argf of

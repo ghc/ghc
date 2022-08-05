@@ -36,28 +36,32 @@ cd haddock
 
 ### Git Branches
 
-Pull requests are to be opened against the `main` branch, from which are forked
-GHC-specific branches (like `ghc-9.2`, `ghc-9.4`, etc).
+If your patch consists of glue code and interface changes with GHC, please
+open a Pull Request targeting the `ghc-head` branch.
+
+Otherwise, for improvements to the documentation generator,
+please base your pull request on the current GHC version branch
+(`ghc-9.0` for instance). The PR will be forward-ported to `ghc-head`
+so that documentation built within GHC can benefit from it.
 
 ### Building the packages
 
 #### Using `cabal`
 
-First update the package list:
+Requires cabal `>= 3.4` and GHC `== 9.4`:
+
+You can install the latest build of GHC via ghcup using this command:
 
 ```bash
-cabal v2-update
+ghcup install ghc -u "https://gitlab.haskell.org/ghc/ghc/-/jobs/artifacts/master/raw/ghc-x86_64-deb9-linux-integer-simple.tar.xz?job=validate-x86_64-linux-deb9-integer-simple" head
 ```
-
-This is needed as haddock@ghc-9.2 uses the
-[ghc.head](https://ghc.gitlab.haskell.org/head.hackage/) package repository.
 
 ```bash
 cabal v2-build all --enable-tests
 cabal v2-test all
 ```
 
-### Updating golden test suite outputs
+### Updating golden testsuite outputs
 
 If you've changed Haddock's output, you will probably need to accept the new
 output of Haddock's golden test suites (`html-test`, `latex-test`,
@@ -68,6 +72,7 @@ argument to these test suites. With a new enough version of `cabal-install`:
 cabal v2-test html-test latex-test hoogle-test hypsrc-test \
   --test-option='--accept'
 ```
+
 
 [SSCCE]: http://sscce.org/
 [CoC]: ./CODE_OF_CONDUCT.md
