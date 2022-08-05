@@ -965,6 +965,13 @@ NB: if a binding is kept alive for some *other* reason (e.g. f_spec is
 called in the final code), we keep the rule too.
 
 This stuff is the only reason for the ru_auto field in a Rule.
+
+NB: In #18532 we looked at keeping auto-rules and it turned out to just make
+compiler performance worse while increasing code sizes at the same time. The impact
+varied. Compiling Cabal got ~3% slower, allocated ~3% more and wrote 15% more code to disk.
+Nofib only saw 0.7% more compiler allocations and executable file size growth. But given
+there was no difference in runtime for these benchmarks it turned out to be flat out worse.
+See the ticket for more details.
 -}
 
 findExternalRules :: TidyOpts
