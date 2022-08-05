@@ -92,7 +92,7 @@ names of jobs to update these other places.
 data Opsys
   = Linux LinuxDistro
   | Darwin
-  | FreeBSD
+  | FreeBSD13
   | Windows deriving (Eq)
 
 data LinuxDistro
@@ -223,7 +223,7 @@ runnerTag arch (Linux distro) =
 runnerTag AArch64 Darwin = "aarch64-darwin"
 runnerTag Amd64 Darwin = "x86_64-darwin-m1"
 runnerTag Amd64 Windows = "new-x86_64-windows"
-runnerTag Amd64 FreeBSD = "x86_64-freebsd"
+runnerTag Amd64 FreeBSD13 = "x86_64-freebsd13"
 
 tags :: Arch -> Opsys -> BuildConfig -> [String]
 tags arch opsys _bc = [runnerTag arch opsys] -- Tag for which runners we can use
@@ -242,7 +242,7 @@ distroName Alpine     = "alpine3_12"
 opsysName :: Opsys -> String
 opsysName (Linux distro) = "linux-" ++ distroName distro
 opsysName Darwin = "darwin"
-opsysName FreeBSD = "freebsd"
+opsysName FreeBSD13 = "freebsd13"
 opsysName Windows = "windows"
 
 archName :: Arch -> String
@@ -313,7 +313,7 @@ type Variables = M.MonoidalMap String [String]
 a =: b = M.singleton a [b]
 
 opsysVariables :: Arch -> Opsys -> Variables
-opsysVariables _ FreeBSD = mconcat
+opsysVariables _ FreeBSD13 = mconcat
   [ -- N.B. we use iconv from ports as I see linker errors when we attempt
     -- to use the "native" iconv embedded in libc as suggested by the
     -- porting guide [1].
@@ -321,7 +321,7 @@ opsysVariables _ FreeBSD = mconcat
     "CONFIGURE_ARGS" =:  "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
   , "HADRIAN_ARGS" =: "--docs=no-sphinx"
   , "GHC_VERSION" =: "9.2.2"
-  , "CABAL_INSTALL_VERSION" =: "3.2.0.0"
+  , "CABAL_INSTALL_VERSION" =: "3.6.2.0"
   ]
 opsysVariables ARMv7 (Linux distro) =
   distroVariables distro <>
@@ -489,12 +489,12 @@ instance ToJSON OnOffRules where
 
 -- | A Rule corresponds to some condition which must be satisifed in order to
 -- run the job.
-data Rule = FastCI -- ^ Run this job when the fast-ci label is set
-          | ReleaseOnly -- ^ Only run this job in a release pipeline
-          | Nightly     -- ^ Only run this job in the nightly pipeline
-          | LLVMBackend -- ^ Only run this job when the "LLVM backend" label is present
-          | FreeBSDTag  -- ^ Only run this job when the "FreeBSD" label is set.
-          | Disable     -- ^ Don't run this job.
+data Rule = FastCI       -- ^ Run this job when the fast-ci label is set
+          | ReleaseOnly  -- ^ Only run this job in a release pipeline
+          | Nightly      -- ^ Only run this job in the nightly pipeline
+          | LLVMBackend  -- ^ Only run this job when the "LLVM backend" label is present
+          | FreeBSDLabel -- ^ Only run this job when the "FreeBSD" label is set.
+          | Disable      -- ^ Don't run this job.
           deriving (Bounded, Enum, Ord, Eq)
 
 -- A constant evaluating to True because gitlab doesn't support "true" in the
@@ -512,8 +512,8 @@ ruleString On FastCI = true
 ruleString Off FastCI = "$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/"
 ruleString On LLVMBackend = "$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/"
 ruleString Off LLVMBackend = true
-ruleString On FreeBSDTag = "$CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/"
-ruleString Off FreeBSDTag = true
+ruleString On FreeBSDLabel = "$CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/"
+ruleString Off FreeBSDLabel = true
 ruleString On ReleaseOnly = "$RELEASE_JOB == \"yes\""
 ruleString Off ReleaseOnly = "$RELEASE_JOB != \"yes\""
 ruleString On Nightly = "$NIGHTLY"
@@ -781,7 +781,7 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      , fastCI (standardBuilds Amd64 Windows)
      , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
      , standardBuilds Amd64 Darwin
-     , allowFailureGroup (addValidateRule FreeBSDTag (standardBuilds Amd64 FreeBSD))
+     , allowFailureGroup (addValidateRule FreeBSDLabel (standardBuilds Amd64 FreeBSD13))
      , standardBuilds AArch64 Darwin
      , standardBuilds AArch64 (Linux Debian10)
      , disableValidate (standardBuilds AArch64 (Linux Debian11))

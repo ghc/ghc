@@ -207,6 +207,9 @@ function set_toolchain_paths() {
       CABAL="$toolchain/bin/cabal$exe"
       HAPPY="$toolchain/bin/happy$exe"
       ALEX="$toolchain/bin/alex$exe"
+      if [ "$(uname)" = "FreeBSD" ]; then
+        GHC=/usr/local/bin/ghc
+      fi
       ;;
     nix)
       if [[ ! -f toolchain.sh ]]; then
@@ -288,7 +291,7 @@ function fetch_ghc() {
           cp -r ghc-${GHC_VERSION}*/* "$toolchain"
           ;;
         *)
-          pushd "ghc-${GHC_VERSION}*"
+          pushd ghc-${GHC_VERSION}*
           ./configure --prefix="$toolchain"
           "$MAKE" install
           popd
@@ -326,9 +329,7 @@ function fetch_cabal() {
           local base_url="https://downloads.haskell.org/~cabal/cabal-install-$v/"
           case "$(uname)" in
             Darwin) cabal_url="$base_url/cabal-install-$v-x86_64-apple-darwin17.7.0.tar.xz" ;;
-            FreeBSD)
-              #cabal_url="$base_url/cabal-install-$v-x86_64-portbld-freebsd.tar.xz" ;;
-              cabal_url="http://home.smart-cactus.org/~ben/ghc/cabal-install-3.0.0.0-x86_64-portbld-freebsd.tar.xz" ;;
+            FreeBSD) cabal_url="$base_url/cabal-install-$v-x86_64-freebsd13.tar.xz" ;;
             *) fail "don't know where to fetch cabal-install for $(uname)"
           esac
           echo "Fetching cabal-install from $cabal_url"

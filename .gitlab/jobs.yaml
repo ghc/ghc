@@ -658,7 +658,7 @@
       "ac_cv_func_utimensat": "no"
     }
   },
-  "nightly-x86_64-freebsd-validate": {
+  "nightly-x86_64-freebsd13-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -668,7 +668,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-freebsd-validate.tar.xz",
+        "ghc-x86_64-freebsd13-validate.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -677,7 +677,7 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-freebsd-$CACHE_REV",
+      "key": "x86_64-freebsd13-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
@@ -705,17 +705,17 @@
     ],
     "stage": "full-build",
     "tags": [
-      "x86_64-freebsd"
+      "x86_64-freebsd13"
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-freebsd-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-freebsd13-validate",
       "BUILD_FLAVOUR": "validate",
-      "CABAL_INSTALL_VERSION": "3.2.0.0",
+      "CABAL_INSTALL_VERSION": "3.6.2.0",
       "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
       "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
-      "TEST_ENV": "x86_64-freebsd-validate",
+      "TEST_ENV": "x86_64-freebsd13-validate",
       "XZ_OPT": "-9"
     }
   },
@@ -2288,7 +2288,7 @@
       "ac_cv_func_utimensat": "no"
     }
   },
-  "release-x86_64-freebsd-release": {
+  "release-x86_64-freebsd13-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -2298,7 +2298,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-freebsd-release.tar.xz",
+        "ghc-x86_64-freebsd13-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -2307,7 +2307,7 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-freebsd-$CACHE_REV",
+      "key": "x86_64-freebsd13-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
@@ -2335,18 +2335,18 @@
     ],
     "stage": "full-build",
     "tags": [
-      "x86_64-freebsd"
+      "x86_64-freebsd13"
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-freebsd-release",
+      "BIN_DIST_NAME": "ghc-x86_64-freebsd13-release",
       "BUILD_FLAVOUR": "release",
-      "CABAL_INSTALL_VERSION": "3.2.0.0",
+      "CABAL_INSTALL_VERSION": "3.6.2.0",
       "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
       "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "x86_64-freebsd-release",
+      "TEST_ENV": "x86_64-freebsd13-release",
       "XZ_OPT": "-9"
     }
   },
@@ -3208,7 +3208,7 @@
       "ac_cv_func_utimensat": "no"
     }
   },
-  "x86_64-freebsd-validate": {
+  "x86_64-freebsd13-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -3218,7 +3218,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-freebsd-validate.tar.xz",
+        "ghc-x86_64-freebsd13-validate.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -3227,7 +3227,7 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-freebsd-$CACHE_REV",
+      "key": "x86_64-freebsd13-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
@@ -3255,17 +3255,17 @@
     ],
     "stage": "full-build",
     "tags": [
-      "x86_64-freebsd"
+      "x86_64-freebsd13"
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-freebsd-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-freebsd13-validate",
       "BUILD_FLAVOUR": "validate",
-      "CABAL_INSTALL_VERSION": "3.2.0.0",
+      "CABAL_INSTALL_VERSION": "3.6.2.0",
       "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
       "GHC_VERSION": "9.2.2",
       "HADRIAN_ARGS": "--docs=no-sphinx",
-      "TEST_ENV": "x86_64-freebsd-validate"
+      "TEST_ENV": "x86_64-freebsd13-validate"
     }
   },
   "x86_64-linux-alpine3_12-int_native-validate+fully_static": {
