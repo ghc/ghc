@@ -1590,6 +1590,7 @@ initSDocContext dflags style = SDC
   , sdocSuppressCoercions           = gopt Opt_SuppressCoercions dflags
   , sdocSuppressCoercionTypes       = gopt Opt_SuppressCoercionTypes dflags
   , sdocSuppressUnfoldings          = gopt Opt_SuppressUnfoldings dflags
+  , sdocSuppressUnfoldingGuidance   = gopt Opt_SuppressUnfoldingGuidance dflags
   , sdocSuppressVarKinds            = gopt Opt_SuppressVarKinds dflags
   , sdocSuppressUniques             = gopt Opt_SuppressUniques dflags
   , sdocSuppressModulePrefixes      = gopt Opt_SuppressModulePrefixes dflags

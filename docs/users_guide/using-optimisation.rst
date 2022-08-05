@@ -1903,6 +1903,37 @@ as such you shouldn't need to set any of them explicitly. A flag
     while still allowing GHC to compile modules containing such inlining loops.
 
 
+.. ghc-flag:: -funfolding-discount-depth=⟨n⟩
+    :shortdesc: *default: 20.* Don't look deeper than `n` levels into function argument use.
+    :type: dynamic
+    :category:
+
+    :default: 20
+
+    .. index::
+       single: inlining, controlling
+       single: unfolding, controlling
+
+    If we have a function application `f (Succ (Succ Zero))` with the function `f`::
+
+        f x =
+            case x of
+                Zero -> 0
+                Succ y -> case y of
+                    Zero -> 1
+                    Succ z -> case z of
+                        Zero -> 2
+                        _ -> error "Large"
+
+    Then GHC can consider the nested structure of the argument as well as how
+    deeply the function looks into the argument to make inlining decisions.
+
+    This allows us to properly estimate the result code size from applying arguments
+    with complex structure to functions taking these arguments appart.
+
+    However inspecting deeply nested arguments can be costly in terms of compile
+    time overhead. So we restrict these considerations to a certain depth.
+
 .. ghc-flag:: -fworker-wrapper
     :shortdesc: Enable the worker/wrapper transformation. Implied by :ghc-flag:`-O`
         and by :ghc-flag:`-fstrictness`.

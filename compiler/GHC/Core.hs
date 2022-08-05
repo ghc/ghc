@@ -55,6 +55,7 @@ module GHC.Core (
 
         -- * Unfolding data types
         Unfolding(..),  UnfoldingCache(..), UnfoldingGuidance(..), UnfoldingSource(..),
+        ArgDiscount(..), ConMap, ConDiscount(..),
 
         -- ** Constructing 'Unfolding's
         noUnfolding, bootUnfolding, evaldUnfolding, mkOtherCon,
@@ -62,13 +63,14 @@ module GHC.Core (
 
         -- ** Predicates and deconstruction on 'Unfolding'
         expandUnfolding_maybe, expandUnfolding_always,
-        maybeUnfoldingTemplate, otherCons,
+        maybeUnfoldingTemplate, maybeUnfoldingGuidance, otherCons,
         isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
         isStableUnfolding, isStableUserUnfolding, isStableSystemUnfolding,
         isInlineUnfolding, isBootUnfolding, isBetterUnfoldingThan,
         hasCoreUnfolding, hasSomeUnfolding,
-        canUnfold, neverUnfoldGuidance, isStableSource,
+        canUnfold, neverUnfoldGuidance, argGuidance, isStableSource,
+        discountDepth,
 
         -- * Annotated expression data types
         AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt(..),
@@ -127,6 +129,7 @@ import Data.Int
 import Data.List.NonEmpty (nonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Word
+import GHC.Types.Unique.FM
 
 import Control.DeepSeq
 
@@ -1793,6 +1796,47 @@ data UnfoldingCache
     }
   deriving (Eq)
 
+------------------------------------------------
+
+-- Argument use is modeled as a tree
+type ConMap a = UniqFM DataCon a
+
+data ConDiscount = ConDiscount { cd_con :: !DataCon
+                               , cd_discount :: !Int
+                               , cd_arg_discounts :: [ArgDiscount]
+                               }
+                  deriving (Eq)
+
+instance Outputable ConDiscount where
+  ppr (ConDiscount c d as) = ppr c <> text ":" <> ppr d <> (ppr as)
+
+data ArgDiscount
+            -- Argument is used, either sequed with a single alternative
+            -- used as argument to a interesting function or in other ways
+            -- which could make this argument worthwhile to inline.
+            = SomeArgUse { ad_seq_discount :: !Int }
+            -- Argument is used to discriminate between case alternatives.
+            -- We give specific constructors a discount based on the alternative
+            -- they will select, and provide a generic discount if we know the arg
+            -- is a value but not what value exactly.
+            -- Only of the the two discounts might be applied for the same argument.
+            | DiscSeq { ad_seq_discount :: !Int -- ^ Discount if no specific constructor discount matches
+                      , ad_con_discount :: !(ConMap ConDiscount) -- ^ Discounts for specific constructors
+                      }
+            -- A discount for the use of a function.
+            | FunDisc { ad_seq_discount :: !Int, ad_fun :: !Name}
+            | NoSeqUse
+            deriving Eq
+
+instance Outputable ArgDiscount where
+  ppr (SomeArgUse n)= text "seq:" <> ppr n
+  ppr (NoSeqUse)= text "lazy use"
+  ppr (FunDisc d f ) = text "fun-"<>ppr f<>text ":"<> ppr d
+  ppr (DiscSeq d_seq m)
+    | isNullUFM m = text "disc:"<> ppr d_seq
+    | otherwise = sep (punctuate comma ((text "some_con:"<> ppr d_seq) : map ppr (nonDetEltsUFM m)))
+      -- (text "some_con:"<> ppr d_seq) <> text "||" <> braces (pprUFM m ppr)
+
 -- | 'UnfoldingGuidance' says when unfolding should take place
 data UnfoldingGuidance
   = UnfWhen {   -- Inline without thinking about the *size* of the uf_tmpl
@@ -1809,13 +1853,13 @@ data UnfoldingGuidance
   | UnfIfGoodArgs {     -- Arose from a normal Id; the info here is the
                         -- result of a simple analysis of the RHS
 
-      ug_args ::  [Int],  -- Discount if the argument is evaluated.
+      ug_args ::  [ArgDiscount],  -- Discount if the argument is evaluated.
                           -- (i.e., a simplification will definitely
                           -- be possible).  One elt of the list per *value* arg.
 
-      ug_size :: Int,     -- The "size" of the unfolding.
+      ug_size :: !Int,     -- The "size" of the unfolding.
 
-      ug_res :: Int       -- Scrutinee discount: the discount to subtract if the thing is in
+      ug_res :: !Int       -- Scrutinee discount: the discount to subtract if the thing is in
     }                     -- a context (case (thing args) of ...),
                           -- (where there are the right number of arguments.)
 
@@ -1925,6 +1969,10 @@ maybeUnfoldingTemplate (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args 
 maybeUnfoldingTemplate _
   = Nothing
 
+maybeUnfoldingGuidance :: Unfolding -> Maybe UnfoldingGuidance
+maybeUnfoldingGuidance CoreUnfolding { uf_guidance = guidance } = Just guidance
+maybeUnfoldingGuidance _ = Nothing
+
 -- | The constructors that the unfolding could never be:
 -- returns @[]@ if no information is available
 otherCons :: Unfolding -> [AltCon]
@@ -2028,6 +2076,30 @@ isBootUnfolding _             = False
 neverUnfoldGuidance :: UnfoldingGuidance -> Bool
 neverUnfoldGuidance UnfNever = True
 neverUnfoldGuidance _        = False
+
+-- Returns a list of available argument discounts if any.
+argGuidance :: UnfoldingGuidance -> [ArgDiscount]
+argGuidance UnfIfGoodArgs { ug_args = arg_guides } = arg_guides
+argGuidance _ = []
+
+discountDepth :: ArgDiscount -> Int
+discountDepth dc = case dc of
+    NoSeqUse -> 0
+    FunDisc{} -> 1
+    SomeArgUse{} -> 1
+    DiscSeq { ad_con_discount = con_dc} ->
+      let max_con_depth =
+            nonDetStrictFoldUFM
+              (\(e :: ConDiscount) max_depth ->
+                max max_depth
+                    (foldl' max 1 (map discountDepth (cd_arg_discounts e))))
+              0
+              con_dc
+      in max 1 max_con_depth
+
+
+
+
 
 hasCoreUnfolding :: Unfolding -> Bool
 -- An unfolding "has Core" if it contains a Core expression, which

@@ -47,9 +47,8 @@ import GHC.Prelude hiding (head, init, last, tail)
 import qualified GHC.Prelude as Partial (head)
 
 import GHC.Core
-import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
-import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
+import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline, interestingArg )
 import GHC.Core.Opt.Stats ( Tick(..) )
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
@@ -366,10 +365,10 @@ data ArgInfo
         ai_dmds :: RemainingArgDmds,
           -- ^ Demands on remaining value arguments (beyond 'ai_args')
 
-        ai_discs :: Infinite Int
+        ai_discs :: Infinite ArgDiscount
           -- ^ Discounts for remaining value arguments (beyond 'ai_args')
           --
-          -- A non-zero value means: be keener to inline
+          -- A non-NoSeqUse value means: be keener to inline
     }
 
 -- | 'RemainingArgDmds' gives the demands on any remaining value arguments.
@@ -604,10 +603,15 @@ contArgs env cont
     lone _               = True
 
     go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
-                                        = go (interestingArg env se arg : args) k
+                                        = go (interestingArg (interesting_env se) arg : args) k
     go args (ApplyToTy { sc_cont = k }) = go args k
     go args (CastIt { sc_cont = k })    = go args k
     go args k                           = (False, reverse args, k)
+
+    -- interestingArg lives in GHC.Core.Opt.Simplify.Inline, which cannot
+    -- import StaticEnv (module loop), so resolve the environment here.
+    interesting_env (Simplified {})           = env
+    interesting_env (UnSimplified static_env) = static_env `setInScopeFromE` env
 
 contOutArgs :: SimplEnv -> SimplCont -> [OutExpr]
 -- Get the leading arguments from the `SimplCont`, as /OutExprs/
@@ -725,8 +729,8 @@ mkArgInfo env fun rules_for_fun cont
 
     fun_has_rules = not (null rules_for_fun)
 
-    vanilla_discounts, arg_discounts :: Infinite Int
-    vanilla_discounts = Inf.repeat 0
+    vanilla_discounts, arg_discounts :: Infinite ArgDiscount
+    vanilla_discounts = Inf.repeat NoSeqUse
     arg_discounts = case idUnfolding fun of
                         CoreUnfolding {uf_guidance = UnfIfGoodArgs {ug_args = discounts}}
                               -> discounts Inf.++ vanilla_discounts
@@ -965,16 +969,16 @@ the incentive to disappear when we inline `f`!
 lazyArgContext :: ArgInfo -> CallCtxt
 -- Use this for lazy arguments
 lazyArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
-  | encl_rules                    = RuleArgCtxt
-  | Inf disc _ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
-  | otherwise                     = BoringCtxt   -- Nothing interesting
+  | encl_rules                              = RuleArgCtxt
+  | Inf disc _ <- discs, disc /= NoSeqUse   = DiscArgCtxt  -- Be keener here
+  | otherwise                               = BoringCtxt   -- Nothing interesting
 
 strictArgContext :: ArgInfo -> CallCtxt
 strictArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
 -- Use this for strict arguments
-  | encl_rules                    = RuleArgCtxt
-  | Inf disc _ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
-  | otherwise                     = RhsCtxt NonRecursive
+  | encl_rules                              = RuleArgCtxt
+  | Inf disc _ <- discs, disc /= NoSeqUse   = DiscArgCtxt  -- Be keener here
+  | otherwise                               = RhsCtxt NonRecursive
       -- Why RhsCtxt?  if we see f (g x), and f is strict, we
       -- want to be a bit more eager to inline g, because it may
       -- expose an eval (on x perhaps) that can be eliminated or
@@ -1057,133 +1061,7 @@ contHasRules cont
     go (StrictBind {})                 = False      -- ??
     go (Stop _ _ _)                    = False
 
-{- Note [Interesting arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An argument is interesting if it deserves a discount for unfoldings
-with a discount in that argument position.  The idea is to avoid
-unfolding a function that is applied only to variables that have no
-unfolding (i.e. they are probably lambda bound): f x y z There is
-little point in inlining f here.
 
-Generally, *values* (like (C a b) and (\x.e)) deserve discounts.  But
-we must look through lets, eg (let x = e in C a b), because the let will
-float, exposing the value, if we inline.  That makes it different to
-exprIsHNF.
-
-Before 2009 we said it was interesting if the argument had *any* structure
-at all; i.e. (hasSomeUnfolding v).  But does too much inlining; see #3016.
-
-But we don't regard (f x y) as interesting, unless f is unsaturated.
-If it's saturated and f hasn't inlined, then it's probably not going
-to now!
-
-Wrinkles:
-
-(IA1) Conlike is interesting.
-   Consider
-           f d = ...((*) d x y)...
-           ... f (df d')...
-   where df is con-like. Then we'd really like to inline 'f' so that the
-   rule for (*) (df d) can fire.  To do this
-     a) we give a discount for being an argument of a class-op (eg (*) d)
-     b) we say that a con-like argument (eg (df d)) is interesting
-
-(IA2) OtherCon.
-   interestingArg returns
-      (a) NonTrivArg for an arg with an OtherCon [] unfolding
-      (b) ValueArg for an arg with an OtherCon [c1,c2..] unfolding.
-
-   Reason for (a): I found (in the GHC.Internal.Bignum.Integer module) that I was
-   inlining a pretty big function when all we knew was that its arguments
-   were evaluated, nothing more.  That in turn make the enclosing function
-   too big to inline elsewhere.
-
-   Reason for (b): we want to inline integerCompare here
-     integerLt# :: Integer -> Integer -> Bool#
-     integerLt# (IS x) (IS y)                  = x <# y
-     integerLt# x y | LT <- integerCompare x y = 1#
-     integerLt# _ _                            = 0#
-
-(IA3) Rubbish literals.
-   In a worker we might see
-     $wfoo x = let y = RUBBISH in
-               ...(g y True)...
-   where `g` has a wrapper that discards its first argment.  We really really
-   want to inline g's wrapper, to expose that it discards its RUBBISH arg.
-   That may not happen if RUBBISH looks like TrivArg, so we use NonTrivArg
-   instead.  See #26722.  (This reverses the plan in #20035, but the problem
-   reported there appears to have gone away.)
-
-(IA4) Consider a call `f (g x)`. If `f` has a an argument discount on its argument,
-   then f's body scrutinises its argument in a `case` expression, or perhaps applies
-   it.  We give the arg `(g x)` an ArgSummary of `NonTrivArg` so that `f` has a bit
-   of encouragment to inline in these cases.
-
-   Now consider `let y = g x in f y`.  Now we have to look through y's unfolding.
-   When should we do so?  Suppose we did inline `f` so we ended up with
-       let y = g x in ...(case y of alts)...
-   Then we'll call `exprIsConApp_maybe` on `y`; and that looks through "expandable"
-   unfoldings; indeed that's the whole purpose of `exprIsExpanadable`. See
-   Note [exprIsExpandable] in GHC.Core.Utils.
-
-   Conclusion: `interestingArg` should give some encouragement (NonTrivArg) to `f`
-   when the argument is expandable. Hence `uf_expandable` in the `Var` case.
-
--}
-
-interestingArg :: SimplEnv -> StaticEnv -> CoreExpr -> ArgSummary
--- See Note [Interesting arguments]
-interestingArg env se e
-  = case se of
-      Simplified {}           -> go env                                0 e
-      UnSimplified static_env -> go (static_env `setInScopeFromE` env) 0 e
-  where
-    -- n is # value args to which the expression is applied
-    go env n (Var v)
-       = case substId env v of
-           DoneId v'            -> go_var n v'
-           DoneEx e _           -> go (zapSubstEnv env)          n e
-           ContEx se e _mco     -> go (se `setInScopeFromE` env) n e
-
-    go _   _ (Lit l)
-       | isLitRubbish l        = NonTrivArg -- See (IA3) in Note [Interesting arguments]
-       | otherwise             = ValueArg
-    go _   _ (Type _)          = TrivArg
-    go _   _ (Coercion _)      = TrivArg
-    go env n (App fn (Type _)) = go env n fn
-    go env n (App fn _)        = go env (n+1) fn
-    go env n (Tick _ a)        = go env n a
-    go env n (Cast e _)        = go env n e
-    go env n (Lam v e)
-       | isTyVar v             = go env n e
-       | n>0                   = NonTrivArg     -- (\x.b) e   is NonTriv
-       | otherwise             = ValueArg
-    go _ _ (Case {})           = NonTrivArg
-    go env n (Let b e)         = case go env' n e of
-                                   ValueArg -> ValueArg
-                                   _        -> NonTrivArg
-                               where
-                                 env' = env `addNewInScopeIds` bindersOf b
-
-    go_var n v
-       | isConLikeId v = ValueArg   -- Experimenting with 'conlike' rather that
-                                    --    data constructors here
-                                    -- DFuns are con-like;
-                                    --    see (IA1) in Note [Interesting arguments]
-       | idArity v > n = ValueArg   -- Catches (eg) primops with arity but no unfolding
-       | n > 0         = NonTrivArg -- Saturated or unknown call
-       | otherwise  -- n==0, no value arguments; look for an interesting unfolding
-       = case idUnfolding v of
-           OtherCon [] -> NonTrivArg   -- It's evaluated, but that's all we know
-           OtherCon _  -> ValueArg     -- Evaluated and we know it isn't these constructors
-              -- See (IA2) in Note [Interesting arguments]
-           DFunUnfolding {} -> ValueArg   -- We konw that idArity=0
-           CoreUnfolding{ uf_cache = cache }
-             | uf_is_conlike cache -> ValueArg    -- Includes constructor applications
-             | uf_expandable cache -> NonTrivArg  -- See (IA4)
-             | otherwise           -> TrivArg
-           BootUnfolding           -> TrivArg
-           NoUnfolding             -> TrivArg
 
 
 {- *********************************************************************

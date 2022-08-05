@@ -14,6 +14,8 @@ It does not normalize the graphs. This means that g `unionUnVarGraph` g is
 equal to g, but twice as expensive and large.
 
 -}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module GHC.Data.Graph.UnVar
     ( UnVarSet
     , emptyUnVarSet, mkUnVarSet, unionUnVarSet, unionUnVarSets
@@ -46,8 +48,9 @@ import qualified GHC.Data.Word64Set as S
 
 -- Set of uniques, i.e. for adjacent nodes
 newtype UnVarSet = UnVarSet S.Word64Set
-    deriving Eq
+    deriving (Eq,Semigroup,Monoid)
 
+{-# INLINE k #-}
 k :: Var -> Word64
 k v = getKey (getUnique v)
 
@@ -68,7 +71,8 @@ delUnVarSet :: UnVarSet -> Var -> UnVarSet
 delUnVarSet (UnVarSet s) v = UnVarSet $ k v `S.delete` s
 
 delUnVarSetList :: UnVarSet -> [Var] -> UnVarSet
-delUnVarSetList s vs = s `minusUnVarSet` mkUnVarSet vs
+delUnVarSetList (UnVarSet s) vs =
+  UnVarSet $ foldl' (\s v -> S.delete (k v) s) s vs
 
 minusUnVarSet :: UnVarSet -> UnVarSet -> UnVarSet
 minusUnVarSet (UnVarSet s) (UnVarSet s') = UnVarSet $ s `S.difference` s'
@@ -77,13 +81,14 @@ sizeUnVarSet :: UnVarSet -> Int
 sizeUnVarSet (UnVarSet s) = S.size s
 
 mkUnVarSet :: [Var] -> UnVarSet
-mkUnVarSet vs = UnVarSet $ S.fromList $ map k vs
+mkUnVarSet vs = UnVarSet $ foldl' (\s v -> S.insert (k v) s) S.empty vs
 
 extendUnVarSet :: Var -> UnVarSet -> UnVarSet
 extendUnVarSet v (UnVarSet s) = UnVarSet $ S.insert (k v) s
 
 extendUnVarSetList :: [Var] -> UnVarSet -> UnVarSet
-extendUnVarSetList vs s = s `unionUnVarSet` mkUnVarSet vs
+extendUnVarSetList vs (UnVarSet s) =
+    UnVarSet $ foldl' (\s v -> S.insert (k v) s) s vs
 
 unionUnVarSet :: UnVarSet -> UnVarSet -> UnVarSet
 unionUnVarSet (UnVarSet set1) (UnVarSet set2) = UnVarSet (set1 `S.union` set2)

@@ -1879,6 +1879,8 @@ dynamic_flags_deps = [
       (intSuffix   (\n d -> d { unfoldingOpts = updateCaseThreshold n (unfoldingOpts d)}))
   , make_ord_flag defFlag "funfolding-case-scaling"
       (intSuffix   (\n d -> d { unfoldingOpts = updateCaseScaling n (unfoldingOpts d)}))
+  , make_ord_flag defFlag "funfolding-discount-depth"
+      (intSuffix   (\n d -> d { unfoldingOpts = updateMaxDiscountDepth n (unfoldingOpts d)}))
 
   , make_dep_flag defFlag "funfolding-keeness-factor"
       (floatSuffix (\_ d -> d))
@@ -2482,7 +2484,8 @@ dFlagsDeps = [
   flagSpec "suppress-type-signatures"   Opt_SuppressTypeSignatures,
   flagSpec "suppress-uniques"           Opt_SuppressUniques,
   flagSpec "suppress-var-kinds"         Opt_SuppressVarKinds,
-  flagSpec "suppress-core-sizes"        Opt_SuppressCoreSizes
+  flagSpec "suppress-core-sizes"        Opt_SuppressCoreSizes,
+  flagSpec "suppress-guidance"          Opt_SuppressUnfoldingGuidance
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
