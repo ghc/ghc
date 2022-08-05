@@ -14,7 +14,7 @@ module Packages (
     ghcPackages, isGhcPackage,
 
     -- * Package information
-    programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
+    crossPrefix, programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
     rtsContext, rtsBuildPath, libffiBuildPath,
     ensureConfigured
     ) where
@@ -154,15 +154,20 @@ linter name = program name ("linters" -/- name)
 setPath :: Package -> FilePath -> Package
 setPath pkg path = pkg { pkgPath = path }
 
+-- | Target prefix to prepend to executable names.
+crossPrefix :: Action String
+crossPrefix = do
+    cross <- flag CrossCompiling
+    targetPlatform <- setting TargetPlatformFull
+    return $ if cross then targetPlatform ++ "-" else ""
+
 -- | Given a 'Context', compute the name of the program that is built in it
 -- assuming that the corresponding package's type is 'Program'. For example, GHC
 -- built in 'Stage0' is called @ghc-stage1@. If the given package is a
 -- 'Library', the function simply returns its name.
 programName :: Context -> Action String
 programName Context {..} = do
-    cross <- flag CrossCompiling
-    targetPlatform <- setting TargetPlatformFull
-    let prefix = if cross then targetPlatform ++ "-" else ""
+    prefix <- crossPrefix
     -- TODO: Can we extract this information from Cabal files?
     -- Alp: We could, but then the iserv package would have to
     --      use Cabal conditionals + a 'profiling' flag
