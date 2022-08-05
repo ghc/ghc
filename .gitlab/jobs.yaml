@@ -1433,6 +1433,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp",
+      "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
       "CROSS_TARGET": "aarch64-linux-gnu",
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate",
       "XZ_OPT": "-9"
@@ -3972,6 +3973,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp",
+      "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
       "CROSS_TARGET": "aarch64-linux-gnu",
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
     }

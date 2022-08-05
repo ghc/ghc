@@ -117,6 +117,7 @@ data BuildConfig
                 , withAssertions :: Bool
                 , withNuma       :: Bool
                 , crossTarget    :: Maybe String
+                , crossEmulator  :: Maybe String
                 , fullyStatic    :: Bool
                 , tablesNextToCode :: Bool
                 , threadSanitiser :: Bool
@@ -159,6 +160,7 @@ vanilla = BuildConfig
   , withAssertions = False
   , withNuma = False
   , crossTarget = Nothing
+  , crossEmulator = Nothing
   , fullyStatic = False
   , tablesNextToCode = True
   , threadSanitiser = False
@@ -189,8 +191,13 @@ static = vanilla { fullyStatic = True }
 staticNativeInt :: BuildConfig
 staticNativeInt = static { bignumBackend = Native }
 
-crossConfig :: String -> BuildConfig
-crossConfig triple = vanilla { crossTarget = Just triple }
+crossConfig :: String       -- ^ target triple
+            -> Maybe String -- ^ emulator for testing
+            -> BuildConfig
+crossConfig triple emulator =
+    vanilla { crossTarget = Just triple
+            , crossEmulator = emulator
+            }
 
 llvm :: BuildConfig
 llvm = vanilla { llvmBootstrap = True }
@@ -605,6 +612,7 @@ job arch opsys buildConfig = (jobName, Job {..})
       , "BIGNUM_BACKEND" =: bignumString (bignumBackend buildConfig)
       , "CONFIGURE_ARGS" =: configureArgsStr buildConfig
       , maybe M.empty ("CROSS_TARGET" =:) (crossTarget buildConfig)
+      , maybe M.empty ("CROSS_EMULATOR" =:) (crossEmulator buildConfig)
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else M.empty
       ]
 
@@ -781,7 +789,7 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      , standardBuilds I386 (Linux Debian9)
      , allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) static)
      , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
-     , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu")
+     , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Just "qemu-aarch64 -L /usr/aarch64-linux-gnu"))
      ]
 
   where

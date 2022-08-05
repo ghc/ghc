@@ -93,6 +93,7 @@ Environment variables determining build configuration of Hadrian system:
   BUILD_FLAVOUR     Which flavour to build.
   REINSTALL_GHC     Build and test a reinstalled "stage3" ghc built using cabal-install
                     This tests the "reinstall" configuration
+  CROSS_EMULATOR    The emulator to use for testing of cross-compilers.
 
 Environment variables determining bootstrap toolchain (Linux):
 
@@ -564,15 +565,38 @@ function make_install_destdir() {
   fi
   info "merging file tree from $destdir to $instdir"
   cp -a "$destdir/$instdir"/* "$instdir"/
-  "$instdir"/bin/ghc-pkg recache
+  "$instdir"/bin/${cross_prefix}ghc-pkg recache
+}
+
+# install the binary distribution in directory $1 to $2.
+function install_bindist() {
+  local bindist="$1"
+  local instdir="$2"
+  pushd "$bindist"
+  case "$(uname)" in
+    MSYS_*|MINGW*)
+      mkdir -p "$instdir"
+      cp -a * "$instdir"
+      ;;
+    *)
+      read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
+
+      # FIXME: The bindist configure script shouldn't need to be reminded of
+      # the target platform. See #21970.
+      if [ -n "${CROSS_TARGET:-}" ]; then
+          args+=( "--target=$CROSS_TARGET" "--host=$CROSS_TARGET" )
+      fi
+
+      run ./configure \
+          --prefix="$instdir" \
+          "${args[@]+"${args[@]}"}"
+      make_install_destdir "$TOP"/destdir "$instdir"
+      ;;
+  esac
+  popd
 }
 
 function test_hadrian() {
-  if [ -n "${CROSS_TARGET:-}" ]; then
-    info "Can't test cross-compiled build."
-    return
-  fi
-
   check_msys2_deps _build/stage1/bin/ghc --version
   check_release_build
 
@@ -593,7 +617,21 @@ function test_hadrian() {
   fi
 
 
-  if [[ -n "${REINSTALL_GHC:-}" ]]; then
+  if [ -n "${CROSS_TARGET:-}" ]; then
+    if [ -n "${CROSS_EMULATOR:-}" ]; then
+      local instdir="$TOP/_build/install"
+      local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
+      install_bindist _build/bindist/ghc-*/ "$instdir"
+      echo 'main = putStrLn "hello world"' > hello.hs
+      echo "hello world" > expected
+      run "$test_compiler" hello.hs
+      $CROSS_EMULATOR ./hello > actual
+      run diff expected actual
+    else
+      info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
+      return
+    fi
+  elif [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian \
       test \
       --test-root-dirs=testsuite/tests/stage1 \
@@ -602,20 +640,9 @@ function test_hadrian() {
       --test-root-dirs=testsuite/tests/typecheck \
       "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian cabal-install test"
   else
-    cd _build/bindist/ghc-*/
-    case "$(uname)" in
-      MSYS_*|MINGW*)
-        mkdir -p "$TOP"/_build/install
-        cp -a * "$TOP"/_build/install
-        ;;
-      *)
-        read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
-        run ./configure --prefix="$TOP"/_build/install "${args[@]+"${args[@]}"}"
-        make_install_destdir "$TOP"/destdir "$TOP"/_build/install
-        ;;
-    esac
-    cd ../../../
-    test_compiler="$TOP/_build/install/bin/ghc$exe"
+    local instdir="$TOP/_build/install"
+    local test_compiler="$instdir/bin/ghc$exe"
+    install_bindist _build/bindist/ghc-*/ "$instdir"
 
     if [[ "${WINDOWS_HOST}" == "no" ]]; then
       run_hadrian \
@@ -779,6 +806,9 @@ esac
 if [ -n "${CROSS_TARGET:-}" ]; then
   info "Cross-compiling for $CROSS_TARGET..."
   target_triple="$CROSS_TARGET"
+  cross_prefix="$target_triple-"
+else
+  cross_prefix=""
 fi
 
 echo "Branch name ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}"
