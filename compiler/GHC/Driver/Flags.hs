@@ -416,6 +416,7 @@ data GeneralFlag
    -- Suppress separate type signatures in core, but leave types on
    -- lambda bound vars
    | Opt_SuppressUnfoldings
+   | Opt_SuppressUnfoldingGuidance
    -- Suppress the details of even stable unfoldings
    | Opt_SuppressTypeSignatures
    -- Suppress unique ids on variables.

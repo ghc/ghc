@@ -16,6 +16,7 @@ module GHC.Core.Opt.Simplify.Inline (
         smallEnoughToInline,
 
         -- * The smart inlining decisions are made by callSiteInline
+        interestingArg,
         callSiteInline, CallCtxt(..),
     ) where
 
@@ -26,7 +27,6 @@ import GHC.Driver.Flags
 import GHC.Core
 import GHC.Core.Unfold
 import GHC.Types.Id
-import GHC.Types.Basic  ( Arity, RecFlag(..) )
 import GHC.Utils.Logger
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -34,6 +34,17 @@ import GHC.Types.Name
 
 import Data.List (isPrefixOf)
 
+import GHC.Core.TyCon (isClassTyCon)
+
+import GHC.Types.Basic
+
+import GHC.Types.Unique.FM
+import GHC.Core.Opt.Simplify.Env
+import GHC.Types.Literal
+import GHC.Core.DataCon
+import GHC.Types.Var
+import GHC.Utils.Panic.Plain (assert)
+import GHC.Types.Tickish
 {-
 ************************************************************************
 *                                                                      *
@@ -138,40 +149,7 @@ them inlining is to give them a NOINLINE pragma, which we do in
 StrictAnal.addStrictnessInfoToTopId
 -}
 
-data ArgSummary = TrivArg       -- Nothing interesting
-                | NonTrivArg    -- Arg has structure
-                | ValueArg      -- Arg is a con-app or PAP
-                                -- ..or con-like. Note [Conlike is interesting]
 
-instance Outputable ArgSummary where
-  ppr TrivArg    = text "TrivArg"
-  ppr NonTrivArg = text "NonTrivArg"
-  ppr ValueArg   = text "ValueArg"
-
-nonTriv ::  ArgSummary -> Bool
-nonTriv TrivArg = False
-nonTriv _       = True
-
-data CallCtxt
-  = BoringCtxt
-  | RhsCtxt RecFlag     -- Rhs of a let-binding; see Note [RHS of lets]
-  | DiscArgCtxt         -- Argument of a function with non-zero arg discount
-  | RuleArgCtxt         -- We are somewhere in the argument of a function with rules
-
-  | ValAppCtxt          -- We're applied to at least one value arg
-                        -- This arises when we have ((f x |> co) y)
-                        -- Then the (f x) has argument 'x' but in a ValAppCtxt
-
-  | CaseCtxt            -- We're the scrutinee of a case
-                        -- that decomposes its scrutinee
-
-instance Outputable CallCtxt where
-  ppr CaseCtxt    = text "CaseCtxt"
-  ppr ValAppCtxt  = text "ValAppCtxt"
-  ppr BoringCtxt  = text "BoringCtxt"
-  ppr (RhsCtxt ir)= text "RhsCtxt" <> parens (ppr ir)
-  ppr DiscArgCtxt = text "DiscArgCtxt"
-  ppr RuleArgCtxt = text "RuleArgCtxt"
 
 callSiteInline :: Logger
                -> UnfoldingOpts
@@ -182,7 +160,7 @@ callSiteInline :: Logger
                -> [ArgSummary]          -- One for each value arg; True if it is interesting
                -> CallCtxt              -- True <=> continuation is interesting
                -> Maybe CoreExpr        -- Unfolding, if any
-callSiteInline logger opts !case_depth id active_unfolding lone_variable arg_infos cont_info
+callSiteInline logger !opts !case_depth id active_unfolding lone_variable arg_infos cont_info
   = case idUnfolding id of
       -- idUnfolding checks for loop-breakers, returning NoUnfolding
       -- Things with an INLINE pragma may have an unfolding *and*
@@ -201,7 +179,7 @@ callSiteInline logger opts !case_depth id active_unfolding lone_variable arg_inf
 
 -- | Report the inlining of an identifier's RHS to the user, if requested.
 traceInline :: Logger -> UnfoldingOpts -> Id -> String -> SDoc -> a -> a
-traceInline logger opts inline_id str doc result
+traceInline logger !opts inline_id str doc result
   -- We take care to ensure that doc is used in only one branch, ensuring that
   -- the simplifier can push its allocation into the branch. See Note [INLINE
   -- conditional tracing utilities].
@@ -340,7 +318,7 @@ tryUnfolding logger opts !case_depth id lone_variable
         | otherwise
         -> traceInline logger opts id str (mk_doc some_benefit extra_doc False) Nothing
         where
-          some_benefit = calc_some_benefit (length arg_discounts)
+          !some_benefit = calc_some_benefit (length arg_discounts)
           extra_doc = vcat [ text "case depth =" <+> int case_depth
                            , text "depth based penalty =" <+> int depth_penalty
                            , text "discounted size =" <+> int adjusted_size ]
@@ -349,8 +327,8 @@ tryUnfolding logger opts !case_depth id lone_variable
           depth_scaling = unfoldingCaseScaling opts
           depth_penalty | case_depth <= depth_treshold = 0
                         | otherwise       = (size * (case_depth - depth_treshold)) `div` depth_scaling
-          adjusted_size = size + depth_penalty - discount
-          small_enough = adjusted_size <= unfoldingUseThreshold opts
+          !adjusted_size = size + depth_penalty - discount
+          !small_enough = adjusted_size <= unfoldingUseThreshold opts
           discount = computeDiscount arg_discounts res_discount arg_infos cont_info
 
   where
@@ -383,7 +361,7 @@ tryUnfolding logger opts !case_depth id lone_variable
       where
         saturated      = n_val_args >= uf_arity
         over_saturated = n_val_args > uf_arity
-        interesting_args = any nonTriv arg_infos
+        interesting_args = any nonTrivArg arg_infos
                 -- NB: (any nonTriv arg_infos) looks at the
                 -- over-saturated args too which is "wrong";
                 -- but if over-saturated we inline anyway.
@@ -584,28 +562,72 @@ This kind of thing can occur if you have
 
 which Roman did.
 
-
+Note [Minimum value discount]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We always give *some* benefit to value arguments.
+A discount of 10 per arg because we replace the arguments
+and another of 10 if it's some non-trivial value.
+However when computing unfolding guidance we might have come to
+the conclusion that certain argument values deservere little or no
+discount. But we want to chance of inlining to only ever increase as
+more is known about the argument to keep things more predictable. So
+we always give at least 10 discount if the argument is a value. No matter
+what the actual value is.
 -}
 
-computeDiscount :: [Int] -> Int -> [ArgSummary] -> CallCtxt
+
+
+computeDiscount :: [ArgDiscount] -> Int -> [ArgSummary] -> CallCtxt
                 -> Int
-computeDiscount arg_discounts res_discount arg_infos cont_info
+computeDiscount arg_discounts !res_discount arg_infos cont_info
 
   = 10          -- Discount of 10 because the result replaces the call
                 -- so we count 10 for the function itself
 
-    + 10 * length actual_arg_discounts
+    + 10 * applied_arg_length
                -- Discount of 10 for each arg supplied,
                -- because the result replaces the call
 
     + total_arg_discount + res_discount'
   where
-    actual_arg_discounts = zipWith mk_arg_discount arg_discounts arg_infos
-    total_arg_discount   = sum actual_arg_discounts
+    (applied_arg_length,total_arg_discount) = zipWithSumLength arg_discounts arg_infos
+    -- actual_arg_discounts = zipWith mk_arg_discount (arg_discounts) arg_infos
+    -- total_arg_discount   = sum actual_arg_discounts
 
+    -- See Note [Minimum value discount]
+    mk_arg_discount :: ArgDiscount -> ArgSummary -> Int
     mk_arg_discount _        TrivArg    = 0
     mk_arg_discount _        NonTrivArg = 10
-    mk_arg_discount discount ValueArg   = discount
+    mk_arg_discount NoSeqUse    _       = 10
+    mk_arg_discount discount ValueArg   = max 10 (ad_seq_discount discount)
+    mk_arg_discount (DiscSeq seq_discount con_discounts) (ConArg con args)
+
+      -- There is a discount specific to this constructor, use that.
+      | Just (ConDiscount _ branch_dc arg_discounts) <- lookupUFM con_discounts con
+      = max 10 $ max seq_discount (branch_dc + (sum $ zipWith mk_arg_discount arg_discounts args))
+
+      -- Otherwise give it the generic seq discount
+      | otherwise = max 10 seq_discount
+    mk_arg_discount (SomeArgUse d) ConArg{} = max 10 d
+    mk_arg_discount (FunDisc d _) (ConArg{})
+      -- How can this arise? With dictionary constructors for example.
+      -- We see C:Show foo bar and give it a FunDisc for being applied
+      -- like a function.
+      -- But when constructing ArgSummaries we treat it as constructor
+      -- since well it is one. This is harmless, but a bit odd for sure.
+      -- We just treat it like any other boring ValueArg here.
+      = -- pprTrace "Function discount for con arg" (ppr arg_infos)
+        max 10 d
+
+    -- zipWithSumLength xs ys = (length $ zip xs ys, sum $ zipWith _ xs ys)
+    zipWithSumLength :: [ArgDiscount] -> [ArgSummary] -> (Int, Int)
+    zipWithSumLength dcs args = go 0 0 dcs args
+      where
+        go !length !discount (dc:dcs) (arg:args) =
+          let arg_discount = mk_arg_discount dc arg
+          in go (1+length) (discount + arg_discount) dcs args
+        go l d [] _ = (l,d)
+        go l d _ [] = (l,d)
 
     res_discount'
       | LT <- arg_discounts `compareLength` arg_infos
@@ -630,3 +652,122 @@ computeDiscount arg_discounts res_discount arg_infos cont_info
                 -- Otherwise we, rather arbitrarily, threshold it.  Yuk.
                 -- But we want to avoid inlining large functions that return
                 -- constructors into contexts that are simply "interesting"
+
+{- Note [Interesting arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An argument is interesting if it deserves a discount for unfoldings
+with a discount in that argument position.  The idea is to avoid
+unfolding a function that is applied only to variables that have no
+unfolding (i.e. they are probably lambda bound): f x y z There is
+little point in inlining f here.
+
+Generally, *values* (like (C a b) and (\x.e)) deserve discounts.  But
+we must look through lets, eg (let x = e in C a b), because the let will
+float, exposing the value, if we inline.  That makes it different to
+exprIsHNF.
+
+Before 2009 we said it was interesting if the argument had *any* structure
+at all; i.e. (hasSomeUnfolding v).  But does too much inlining; see #3016.
+
+But we don't regard (f x y) as interesting, unless f is unsaturated.
+If it's saturated and f hasn't inlined, then it's probably not going
+to now!
+
+Note [Conlike is interesting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+        f d = ...((*) d x y)...
+        ... f (df d')...
+where df is con-like. Then we'd really like to inline 'f' so that the
+rule for (*) (df d) can fire.  To do this
+  a) we give a discount for being an argument of a class-op (eg (*) d)
+  b) we say that a con-like argument (eg (df d)) is interesting
+-}
+
+interestingArg :: SimplEnv -> CoreExpr -> ArgSummary
+-- See Note [Interesting arguments]
+interestingArg env e =
+  go env depth_limit 0 e
+    where
+    depth_limit = unfoldingMaxAppDepth . sm_uf_opts . seMode $ env
+
+    -- n is # value args to which the expression is applied
+    go :: SimplEnv -> Int -> Int -> CoreExpr -> ArgSummary
+    go !_env max_depth _n !_
+      | max_depth <= 0 = TrivArg
+    go env depth n (Var v)
+       = case substId env v of
+           DoneId v'            -> go_var depth n v'
+           DoneEx e _           -> go (zapSubstEnv env) depth            n e
+           ContEx tvs cvs ids e -> go (setSubstEnv env tvs cvs ids) depth n e
+
+    go _ _depth  _ (Lit l)
+       | isLitRubbish l        = TrivArg -- Leads to unproductive inlining in WWRec, #20035
+       | otherwise             = ValueArg
+    go _ _depth   _ (Type _)          = TrivArg
+    go _ _depth   _ (Coercion _)      = TrivArg
+    go env depth n (App fn (Type _)) = go env depth n fn
+    go env depth n e@(App _fn _arg)
+      | (fn,arg_summaries,_ticks) <- mapArgsTicksVal (go env (depth-1) 0) e
+      = let fn_summary = go env depth (n + length arg_summaries) fn
+        in case fn_summary of
+          ConArg con fn_args
+            | isClassTyCon (dataConTyCon con) -> ValueArg
+            | otherwise ->
+              assert (null fn_args) $
+              ConArg con arg_summaries
+          _ -> fn_summary
+
+    go env depth n (Tick _ a)        = go env depth n a
+    go env depth n (Cast e _)        = go env depth n e
+    go env depth n (Lam v e)
+       | isTyVar v             = go env depth n e
+       | n>0                   = NonTrivArg     -- (\x.b) e   is NonTriv
+       | otherwise             = ValueArg
+    go _ _depth _ (Case {})           = NonTrivArg
+    go env depth n (Let b e)         = case go env' depth n e of
+                                   ValueArg -> ValueArg
+                                   c@ConArg{} -> c
+                                   _        -> NonTrivArg
+                               where
+                                 env' = env `addNewInScopeBndr` b
+
+    go_var depth n v
+      | Just rhs <- maybeUnfoldingTemplate (idUnfolding v)
+      , (f, arg_summaries, _ticks) <- mapArgsTicksVal (go env (depth-1) 0) rhs
+      , Var f' <- varView f
+      , Just con <- isDataConId_maybe f'
+      , not (isClassTyCon $ dataConTyCon con)
+      =
+        -- pprTrace "ConArg1" (ppr $ ConArg con $ map (go env 0) args) $
+        ConArg con arg_summaries
+
+      | Just con <- isDataConId_maybe v
+      = ConArg con []
+      | isConLikeId v     = ValueArg   -- Experimenting with 'conlike' rather that
+                                      --    data constructors here
+      | idArity v > n     = ValueArg   -- Catches (eg) primops with arity but no unfolding
+      | n > 0             = NonTrivArg -- Saturated or unknown call
+      | conlike_unfolding = ValueArg   -- n==0; look for an interesting unfolding
+                                      -- See Note [Conlike is interesting]
+      | otherwise         = TrivArg    -- n==0, no useful unfolding
+      where
+        conlike_unfolding = isConLikeUnfolding (idUnfolding v)
+
+        varView (Cast e _) = e
+        varView (Tick _ e) = e
+        varView e = e
+
+-- | Like @collectArgs@, but maps over the arguments at the same time.
+-- and also looks through casts.
+mapArgsTicksVal :: (Expr b -> c) -> Expr b
+                 -> (Expr b, [c], [CoreTickish])
+mapArgsTicksVal fm expr
+  = go expr [] []
+  where
+    go (App f a)  as ts
+      | isValArg a = go f (fm a:as) ts
+      | otherwise = go f as ts
+    go (Tick t e) as ts = go e as (t:ts)
+    go (Cast e _) as ts = go e as ts
+    go e          as ts = (e, as, reverse ts)

@@ -1651,6 +1651,58 @@ by saying ``-fno-wombat``.
     while still allowing GHC to compile modules containing such inlining loops.
 
 
+.. ghc-flag:: -funfolding-max-arg-depth=⟨n⟩
+    :shortdesc: *default: 20.* Don't look deepter than `n` levels into function arguments.
+    :type: dynamic
+    :category:
+
+    :default: 20
+
+    .. index::
+       single: inlining, controlling
+       single: unfolding, controlling
+
+    If we have a function application `f (Succ (Succ Zero))` with the function `f`::
+
+        f x =
+            case x of
+                Zero -> 0
+                Succ y -> case y of
+                    Zero -> 1
+                    Succ z -> case z of
+                        Zero -> 2
+                        _ -> error "Large"
+
+    Then GHC can consider the nested use of the argument when making inlining decisions.
+    However inspecting deeply nested arguments can be costly in terms of compile time overhead.
+    So we restrict inspection of the argument to a certain depth.
+
+.. ghc-flag:: -funfolding-max-guide-depth=⟨n⟩
+    :shortdesc: *default: 20.* Don't look deepter than `n` levels into a functions use of it's arguments.
+    :type: dynamic
+    :category:
+
+    :default: 20
+
+    .. index::
+       single: inlining, controlling
+       single: unfolding, controlling
+
+    If we have a function f::
+
+        f x =
+            case x of
+                Zero -> 0
+                Succ y -> case y of
+                    Zero -> 1
+                    Succ z -> case z of
+                        Zero -> 2
+                        _ -> error "Large"
+
+    GHC can consider the nested use of the argument when making inlining decisions.
+    However looking deeply into nested argument use can be costly in terms of compile time overhead.
+    So we restrict inspection of nested argument use to a certain level of nesting.
+
 .. ghc-flag:: -fworker-wrapper
     :shortdesc: Enable the worker/wrapper transformation.
     :type: dynamic

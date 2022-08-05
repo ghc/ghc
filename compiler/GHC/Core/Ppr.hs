@@ -614,7 +614,8 @@ instance Outputable UnfoldingGuidance where
                 text "boring_ok=" <> ppr boring_ok)
     ppr (UnfIfGoodArgs { ug_args = cs, ug_size = size, ug_res = discount })
       = hsep [ text "IF_ARGS",
-               brackets (hsep (map int cs)),
+               ppUnlessOption sdocSuppressUnfoldingGuidance
+               (brackets (hsep (map ppr cs))),
                int size,
                int discount ]
 

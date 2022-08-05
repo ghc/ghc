@@ -23,6 +23,8 @@ import GHC.Types.Var( varType, tyVarKind )
 import GHC.Core.Type( seqType, isTyVar )
 import GHC.Core.Coercion( seqCo )
 import GHC.Types.Id( idInfo )
+import GHC.Utils.Misc (seqList)
+import GHC.Types.Unique.FM (seqEltsUFM)
 
 -- | Evaluate all the fields of the 'IdInfo' that are generally demanded by the
 -- compiler
@@ -112,5 +114,15 @@ seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top,
 seqUnfolding _ = ()
 
 seqGuidance :: UnfoldingGuidance -> ()
-seqGuidance (UnfIfGoodArgs ns n b) = n `seq` sum ns `seq` b `seq` ()
+seqGuidance (UnfIfGoodArgs ns n b) = n `seq` (seqList (map seqArgDiscount ns) ()) `seq` b `seq` ()
 seqGuidance _                      = ()
+
+-- seqTopDiscount :: (a, ArgDiscount) -> ()
+-- seqTopDiscount (!_,dc) = seqArgDiscount dc
+
+seqArgDiscount :: ArgDiscount -> ()
+seqArgDiscount (DiscSeq !_ sub_args) = seqEltsUFM seqConDiscount sub_args
+seqArgDiscount !_ = ()
+
+seqConDiscount :: ConDiscount -> ()
+seqConDiscount (ConDiscount !_ !_ sub_args) = seqList (map seqArgDiscount sub_args) ()

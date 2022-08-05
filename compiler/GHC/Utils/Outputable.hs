@@ -382,7 +382,8 @@ data SDocContext = SDC
   , sdocSuppressIdInfo              :: !Bool
   , sdocSuppressCoercions           :: !Bool
   , sdocSuppressCoercionTypes       :: !Bool
-  , sdocSuppressUnfoldings          :: !Bool
+  , sdocSuppressUnfoldings          :: !Bool -- Maybe it should be a cutoff for the depth instead?
+  , sdocSuppressUnfoldingGuidance   :: !Bool
   , sdocSuppressVarKinds            :: !Bool
   , sdocSuppressUniques             :: !Bool
   , sdocSuppressModulePrefixes      :: !Bool
@@ -443,6 +444,7 @@ defaultSDocContext = SDC
   , sdocSuppressCoercions           = False
   , sdocSuppressCoercionTypes       = False
   , sdocSuppressUnfoldings          = False
+  , sdocSuppressUnfoldingGuidance   = False
   , sdocSuppressVarKinds            = False
   , sdocSuppressUniques             = False
   , sdocSuppressModulePrefixes      = False

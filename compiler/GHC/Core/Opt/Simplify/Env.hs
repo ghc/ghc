@@ -21,7 +21,7 @@ module GHC.Core.Opt.Simplify.Env (
         extendTvSubst, extendCvSubst,
         zapSubstEnv, setSubstEnv, bumpCaseDepth,
         getInScope, setInScopeFromE, setInScopeFromF,
-        setInScopeSet, modifyInScope, addNewInScopeIds,
+        setInScopeSet, modifyInScope, addNewInScopeIds, addNewInScopeId, addNewInScopeBndr,
         getSimplRules, enterRecGroupRHSs,
 
         -- * Substitution results
@@ -564,11 +564,40 @@ setInScopeFromE rhs_env here_env = rhs_env { seInScope = seInScope here_env }
 setInScopeFromF :: SimplEnv -> SimplFloats -> SimplEnv
 setInScopeFromF env floats = env { seInScope = sfInScope floats }
 
+addNewInScopeId :: SimplEnv -> CoreBndr -> SimplEnv
+addNewInScopeId env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) v
+-- See Note [Bangs in the Simplifier]
+  = let !in_scope1 = in_scope `extendInScopeSet` v
+        !id_subst1 = id_subst `delVarEnv` v
+    in
+    env { seInScope = in_scope1,
+          seIdSubst = id_subst1 }
+        -- Why delete?  Consider
+        --      let x = a*b in (x, \x -> x+3)
+        -- We add [x |-> a*b] to the substitution, but we must
+        -- _delete_ it from the substitution when going inside
+        -- the (\x -> ...)!
+
 addNewInScopeIds :: SimplEnv -> [CoreBndr] -> SimplEnv
         -- The new Ids are guaranteed to be freshly allocated
 addNewInScopeIds env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) vs
 -- See Note [Bangs in the Simplifier]
   = let !in_scope1 = in_scope `extendInScopeSetList` vs
+        !id_subst1 = id_subst `delVarEnvList` vs
+    in
+    env { seInScope = in_scope1,
+          seIdSubst = id_subst1 }
+        -- Why delete?  Consider
+        --      let x = a*b in (x, \x -> x+3)
+        -- We add [x |-> a*b] to the substitution, but we must
+        -- _delete_ it from the substitution when going inside
+        -- the (\x -> ...)!
+
+addNewInScopeBndr :: SimplEnv -> CoreBind -> SimplEnv
+addNewInScopeBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) b
+-- See Note [Bangs in the Simplifier]
+  = let vs = bindersOf b
+        !in_scope1 = in_scope `extendInScopeSetList` vs
         !id_subst1 = id_subst `delVarEnvList` vs
     in
     env { seInScope = in_scope1,

@@ -540,6 +540,7 @@ extendVarEnvList = addListToUFM
 plusVarEnv_C     = plusUFM_C
 plusVarEnv_CD    = plusUFM_CD
 plusMaybeVarEnv_C = plusMaybeUFM_C
+{-# INLINE delVarEnvList #-}
 delVarEnvList    = delListFromUFM
 delVarEnv        = delFromUFM
 minusVarEnv      = minusUFM

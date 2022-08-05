@@ -79,12 +79,12 @@ module GHC.Types.Unique.FM (
         ufmToSet_Directly,
         nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM,
         unsafeCastUFMKey,
-        pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
+        pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM,partitionWithKeyUFM
     ) where
 
 import GHC.Prelude
 
-import GHC.Types.Unique ( Uniquable(..), Unique, getKey )
+import GHC.Types.Unique ( Uniquable(..), Unique, getKey, mkUniqueGrimily )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
 import qualified Data.IntMap as M
@@ -359,6 +359,11 @@ filterUFM_Directly p (UFM m) = UFM (M.filterWithKey (p . getUnique) m)
 partitionUFM :: (elt -> Bool) -> UniqFM key elt -> (UniqFM key elt, UniqFM key elt)
 partitionUFM p (UFM m) =
   case M.partition p m of
+    (left, right) -> (UFM left, UFM right)
+
+partitionWithKeyUFM :: (Unique -> elt -> Bool) -> UniqFM key elt -> (UniqFM key elt, UniqFM key elt)
+partitionWithKeyUFM p (UFM m) =
+  case M.partitionWithKey (\k -> p (mkUniqueGrimily k)) m of
     (left, right) -> (UFM left, UFM right)
 
 sizeUFM :: UniqFM key elt -> Int

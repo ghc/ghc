@@ -24,8 +24,8 @@ module GHC.Core.Opt.Simplify.Utils (
         SimplCont(..), DupFlag(..), StaticEnv,
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
-        contIsTrivial, contArgs, contIsRhs,
-        countArgs,
+        contIsTrivial, contIsRhs,
+        countArgs, contArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
 
@@ -45,7 +45,6 @@ module GHC.Core.Opt.Simplify.Utils (
 import GHC.Prelude
 
 import GHC.Core
-import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.Opt.Stats ( Tick(..) )
@@ -327,8 +326,9 @@ data ArgInfo
                                 --   that the function diverges after being given
                                 --   that number of args
 
-        ai_discs :: [Int]       -- Discounts for remaining value arguments (beyond ai_args)
-                                --   non-zero => be keener to inline
+        ai_discs :: [ArgDiscount]
+                                -- Discounts for remaining value arguments (beyong ai_args)
+                                --   non-NoSeqUse => be keener to inline
                                 --   Always infinite
     }
 
@@ -621,8 +621,8 @@ mkArgInfo env rule_base fun cont
     fun_rules  = mkTryRules rules
     n_val_args = countValArgs cont
 
-    vanilla_discounts, arg_discounts :: [Int]
-    vanilla_discounts = repeat 0
+    vanilla_discounts, arg_discounts :: [ArgDiscount]
+    vanilla_discounts = repeat NoSeqUse
     arg_discounts = case idUnfolding fun of
                         CoreUnfolding {uf_guidance = UnfIfGoodArgs {ug_args = discounts}}
                               -> discounts ++ vanilla_discounts
@@ -776,14 +776,14 @@ lazyArgContext :: ArgInfo -> CallCtxt
 -- Use this for lazy arguments
 lazyArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
   | encl_rules                = RuleArgCtxt
-  | disc:_ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
+  | disc:_ <- discs, disc /= NoSeqUse = DiscArgCtxt  -- Be keener here
   | otherwise                 = BoringCtxt   -- Nothing interesting
 
 strictArgContext :: ArgInfo -> CallCtxt
 strictArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
 -- Use this for strict arguments
   | encl_rules                = RuleArgCtxt
-  | disc:_ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
+  | disc:_ <- discs, disc /= NoSeqUse = DiscArgCtxt  -- Be keener here
   | otherwise                 = RhsCtxt NonRecursive
       -- Why RhsCtxt?  if we see f (g x), and f is strict, we
       -- want to be a bit more eager to inline g, because it may
@@ -864,78 +864,7 @@ contHasRules cont
     go (StrictBind {})                 = False      -- ??
     go (Stop _ _ _)                    = False
 
-{- Note [Interesting arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An argument is interesting if it deserves a discount for unfoldings
-with a discount in that argument position.  The idea is to avoid
-unfolding a function that is applied only to variables that have no
-unfolding (i.e. they are probably lambda bound): f x y z There is
-little point in inlining f here.
 
-Generally, *values* (like (C a b) and (\x.e)) deserve discounts.  But
-we must look through lets, eg (let x = e in C a b), because the let will
-float, exposing the value, if we inline.  That makes it different to
-exprIsHNF.
-
-Before 2009 we said it was interesting if the argument had *any* structure
-at all; i.e. (hasSomeUnfolding v).  But does too much inlining; see #3016.
-
-But we don't regard (f x y) as interesting, unless f is unsaturated.
-If it's saturated and f hasn't inlined, then it's probably not going
-to now!
-
-Note [Conlike is interesting]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-        f d = ...((*) d x y)...
-        ... f (df d')...
-where df is con-like. Then we'd really like to inline 'f' so that the
-rule for (*) (df d) can fire.  To do this
-  a) we give a discount for being an argument of a class-op (eg (*) d)
-  b) we say that a con-like argument (eg (df d)) is interesting
--}
-
-interestingArg :: SimplEnv -> CoreExpr -> ArgSummary
--- See Note [Interesting arguments]
-interestingArg env e = go env 0 e
-  where
-    -- n is # value args to which the expression is applied
-    go env n (Var v)
-       = case substId env v of
-           DoneId v'            -> go_var n v'
-           DoneEx e _           -> go (zapSubstEnv env)             n e
-           ContEx tvs cvs ids e -> go (setSubstEnv env tvs cvs ids) n e
-
-    go _   _ (Lit l)
-       | isLitRubbish l        = TrivArg -- Leads to unproductive inlining in WWRec, #20035
-       | otherwise             = ValueArg
-    go _   _ (Type _)          = TrivArg
-    go _   _ (Coercion _)      = TrivArg
-    go env n (App fn (Type _)) = go env n fn
-    go env n (App fn _)        = go env (n+1) fn
-    go env n (Tick _ a)        = go env n a
-    go env n (Cast e _)        = go env n e
-    go env n (Lam v e)
-       | isTyVar v             = go env n e
-       | n>0                   = NonTrivArg     -- (\x.b) e   is NonTriv
-       | otherwise             = ValueArg
-    go _ _ (Case {})           = NonTrivArg
-    go env n (Let b e)         = case go env' n e of
-                                   ValueArg -> ValueArg
-                                   _        -> NonTrivArg
-                               where
-                                 env' = env `addNewInScopeIds` bindersOf b
-
-    go_var n v
-       | isConLikeId v     = ValueArg   -- Experimenting with 'conlike' rather that
-                                        --    data constructors here
-       | idArity v > n     = ValueArg   -- Catches (eg) primops with arity but no unfolding
-       | n > 0             = NonTrivArg -- Saturated or unknown call
-       | conlike_unfolding = ValueArg   -- n==0; look for an interesting unfolding
-                                        -- See Note [Conlike is interesting]
-       | otherwise         = TrivArg    -- n==0, no useful unfolding
-       where
-         conlike_unfolding = isConLikeUnfolding (idUnfolding v)
 
 {-
 ************************************************************************

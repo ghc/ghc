@@ -7,6 +7,7 @@
 
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
+-- {-# OPTIONS_GHC -ddump-simpl -ddump-to-file -ddump-stg-final -dsuppress-coercions -dsuppress-coercion-types #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.Simplify.Iteration ( simplTopBinds, simplExpr, simplImpRules ) where
@@ -3615,7 +3616,7 @@ mkDupableContWithDmds env _
     do { let rhs_ty       = contResultType cont
              (m,arg_ty,_) = splitFunTy fun_ty
        ; arg_bndr <- newId (fsLit "arg") m arg_ty
-       ; let env' = env `addNewInScopeIds` [arg_bndr]
+       ; let env' = env `addNewInScopeId` arg_bndr
        ; (floats, join_rhs) <- rebuildCall env' (addValArgTo fun (Var arg_bndr) fun_ty) cont
        ; mkDupableStrictBind env' arg_bndr (wrapFloats floats join_rhs) rhs_ty }
   where
@@ -3717,7 +3718,7 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
        ; let arg_info = ArgInfo { ai_fun   = join_bndr
                                 , ai_rewrite = TryNothing, ai_args  = []
                                 , ai_encl  = False, ai_dmds  = repeat topDmd
-                                , ai_discs = repeat 0 }
+                                , ai_discs = repeat NoSeqUse }
        ; return ( addJoinFloats (emptyFloats env) $
                   unitJoinFloat                   $
                   NonRec join_bndr                $

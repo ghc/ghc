@@ -28,8 +28,13 @@ module GHC.Core.Unfold (
         updateFunAppDiscount, updateDictDiscount,
         updateVeryAggressive, updateCaseScaling,
         updateCaseThreshold, updateReportPrefix,
+        updateMaxAppDepth, updateMaxGuideDepth,
 
-        inlineBoringOk, calcUnfoldingGuidance
+        inlineBoringOk,
+        ArgSummary(..), nonTrivArg,
+
+        CallCtxt(..),
+        calcUnfoldingGuidance
     ) where
 
 import GHC.Prelude
@@ -42,16 +47,23 @@ import GHC.Types.Literal
 import GHC.Builtin.PrimOps
 import GHC.Types.Id.Info
 import GHC.Types.RepType ( isZeroBitTy )
-import GHC.Types.Basic  ( Arity )
+import GHC.Types.Basic
 import GHC.Core.Type
 import GHC.Builtin.Names
-import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Types.ForeignCall
 import GHC.Types.Tickish
 
 import qualified Data.ByteString as BS
+import GHC.Types.Unique.FM
+import Data.Maybe
+import GHC.Types.Var.Env
+import GHC.Utils.Panic.Plain (assert)
+import GHC.Data.Graph.UnVar
+import GHC.Utils.Trace (pprTraceDebug)
+
+
 
 -- | Unfolding options
 data UnfoldingOpts = UnfoldingOpts
@@ -78,6 +90,15 @@ data UnfoldingOpts = UnfoldingOpts
 
    , unfoldingReportPrefix :: !(Maybe String)
       -- ^ Only report inlining decisions for names with this prefix
+
+   , unfoldingMaxAppDepth :: !Int
+      -- ^ When considering unfolding a definition look this deep
+      -- into the applied argument.
+
+   , unfoldingMaxGuideDepth :: !Int
+      -- ^ When creating unfolding guidance look this deep into
+      -- nested argument use.
+
    }
 
 defaultUnfoldingOpts :: UnfoldingOpts
@@ -112,6 +133,9 @@ defaultUnfoldingOpts = UnfoldingOpts
 
       -- Don't filter inlining decision reports
    , unfoldingReportPrefix = Nothing
+
+   , unfoldingMaxAppDepth = 20
+   , unfoldingMaxGuideDepth = 20
    }
 
 -- Helpers for "GHC.Driver.Session"
@@ -140,6 +164,12 @@ updateCaseScaling n opts = opts { unfoldingCaseScaling = n }
 
 updateReportPrefix :: Maybe String -> UnfoldingOpts -> UnfoldingOpts
 updateReportPrefix n opts = opts { unfoldingReportPrefix = n }
+
+updateMaxAppDepth :: Int -> UnfoldingOpts -> UnfoldingOpts
+updateMaxAppDepth n opts = opts { unfoldingMaxAppDepth = n }
+
+updateMaxGuideDepth :: Int -> UnfoldingOpts -> UnfoldingOpts
+updateMaxGuideDepth n opts = opts { unfoldingMaxGuideDepth = n }
 
 {-
 Note [Occurrence analysis of unfoldings]
@@ -248,17 +278,11 @@ calcUnfoldingGuidance opts is_top_bottoming expr
     val_bndrs   = filter isId bndrs
     n_val_bndrs = length val_bndrs
 
-    mk_discount :: Bag (Id,Int) -> Id -> Int
-    mk_discount cbs bndr = foldl' combine 0 cbs
-           where
-             combine acc (bndr', disc)
-               | bndr == bndr' = acc `plus_disc` disc
-               | otherwise     = acc
-
-             plus_disc :: Int -> Int -> Int
-             plus_disc | isFunTy (idType bndr) = max
-                       | otherwise             = (+)
-             -- See Note [Function and non-function discounts]
+    mk_discount :: VarEnv ArgDiscount -> Id -> (ArgDiscount)
+    mk_discount cbs bndr =
+        let !dc = lookupWithDefaultVarEnv cbs NoSeqUse bndr
+            -- !depth = discountDepth dc
+        in (dc)
 
 {- Note [Inline unsafeCoerce]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -392,6 +416,39 @@ the constructor would lead to a separate allocation instead of just
 sharing the wrapper closure.
 
 The solution: don’t ignore coercion arguments after all.
+
+Note [Nested discounts]
+~~~~~~~~~~~~~~~~~~~~~~~
+If we have code like:
+
+f :: Either Bool Int -> Int
+f x = case x of
+    Left l -> case l of
+        True -> 1
+        False -> sum [1..200] :: Int
+    Right r -> case r of
+        r -> r + succ r
+
+What should the discount be? I argue it should be a discount *tree* like this:
+    [some_con:62,
+      Left:43
+        [some_con:30, False:10[], True:49[]],
+      Right:70
+        [some_con:20, GHC.Types.I#:11[disc:30]]
+        ]
+
+How can we compute this? While we traverse the expression if we see a case on a interesting
+binder (e.g. x):
+* We look at all the alternatives(Left,Right), treating the constructor bound vars(l,r) as
+  additional interesting binders for their rhss.
+* We compute a default discount `some_con` which assumes we will statically choose the largest
+  alternative if we inline.
+* We compute specific discounts for each constructor alternative by attributing any
+  discount on alternative binders(l,r) to the constructor this alternative is matching on.
+* The discounts for the whole case are then represented by the combination of the flat default discount
+  as well as a list of constructor specific discounts, which carry inside them the discounts for their
+  arguments.
+
 -}
 
 uncondInline :: CoreExpr -> Arity -> Int -> Bool
@@ -402,6 +459,7 @@ uncondInline rhs arity size
   | arity > 0 = size <= 10 * (arity + 1) -- See Note [INLINE for small functions] (1)
   | otherwise = exprIsTrivial rhs        -- See Note [INLINE for small functions] (4)
 
+-- {-# NOINLINE sizeExpr #-}
 sizeExpr :: UnfoldingOpts
          -> Int             -- Bomb out if it gets bigger than this
          -> [Id]            -- Arguments; we're interested in which of these
@@ -413,81 +471,107 @@ sizeExpr :: UnfoldingOpts
 
 -- Forcing bOMB_OUT_SIZE early prevents repeated
 -- unboxing of the Int argument.
-sizeExpr opts !bOMB_OUT_SIZE top_args expr
-  = size_up expr
+sizeExpr opts !bOMB_OUT_SIZE top_args' expr
+  = size_up depth_limit (mkUnVarSet top_args') expr
   where
-    size_up (Cast e _) = size_up e
-    size_up (Tick _ e) = size_up e
-    size_up (Type _)   = sizeZero           -- Types cost nothing
-    size_up (Coercion _) = sizeZero
-    size_up (Lit lit)  = sizeN (litSize lit)
-    size_up (Var f) | isZeroBitId f = sizeZero
-                      -- Make sure we get constructor discounts even
-                      -- on nullary constructors
-                    | otherwise       = size_up_call f [] 0
+    depth_limit = unfoldingMaxGuideDepth opts
+    size_up :: Int -> UnVarSet -> Expr Var -> ExprSize
+    size_up !depth !arg_comps (Cast e _) = size_up depth arg_comps e
+    size_up !depth arg_comps (Tick _ e) = size_up depth arg_comps e
+    size_up !_depth _arg_comps (Type _)   = sizeZero           -- Types cost nothing
+    size_up !_depth _arg_comps (Coercion _) = sizeZero
+    size_up !_depth _arg_comps (Lit lit)  = sizeN (litSize lit)
+    size_up !_depth  arg_comps (Var f) | isZeroBitId f = sizeZero
+                                -- Make sure we get constructor discounts even
+                                -- on nullary constructors
+                              | otherwise       = size_up_call arg_comps f [] 0
 
-    size_up (App fun arg)
-      | isTyCoArg arg = size_up fun
-      | otherwise     = size_up arg  `addSizeNSD`
-                        size_up_app fun [arg] (if isZeroBitExpr arg then 1 else 0)
+    size_up !depth arg_comps (App fun arg)
+      | isTyCoArg arg = size_up depth arg_comps fun
+      | otherwise     = size_up depth arg_comps arg  `addSizeNSD`
+                        size_up_app depth arg_comps  fun [arg] (if isZeroBitExpr arg then 1 else 0)
 
-    size_up (Lam b e)
-      | isId b && not (isZeroBitId b) = lamScrutDiscount opts (size_up e `addSizeN` 10)
-      | otherwise = size_up e
+    size_up !depth arg_comps (Lam b e)
+      | isId b && not (isZeroBitId b) = lamScrutDiscount opts (size_up depth (delUnVarSet arg_comps b) e `addSizeN` 10)
+      | otherwise = size_up depth (delUnVarSet arg_comps b) e
 
-    size_up (Let (NonRec binder rhs) body)
-      = size_up_rhs (binder, rhs) `addSizeNSD`
-        size_up body              `addSizeN`
+    size_up !depth arg_comps (Let (NonRec binder rhs) body)
+      = let arg_comps' = delUnVarSet arg_comps binder
+        in
+        size_up_rhs depth  arg_comps' (binder, rhs) `addSizeNSD`
+        size_up depth arg_comps' body              `addSizeN`
         size_up_alloc binder
 
-    size_up (Let (Rec pairs) body)
-      = foldr (addSizeNSD . size_up_rhs)
-              (size_up body `addSizeN` sum (map (size_up_alloc . fst) pairs))
+    size_up !depth arg_comps (Let (Rec pairs) body)
+      = let lhs_bnds = map fst pairs
+            arg_comps' = delUnVarSetList arg_comps lhs_bnds
+        in
+        foldr (addSizeNSD . (size_up_rhs depth  arg_comps'))
+              (size_up depth arg_comps' body `addSizeN` sum (map (size_up_alloc . fst) pairs))
               pairs
 
-    size_up (Case e _ _ alts)
+    size_up !depth arg_comps (Case e _ _ alts)
         | null alts
-        = size_up e    -- case e of {} never returns, so take size of scrutinee
+        = size_up depth arg_comps e    -- case e of {} never returns, so take size of scrutinee
 
-    size_up (Case e _ _ alts)
+    size_up !depth arg_comps (Case e _ _ alts)
         -- Now alts is non-empty
-        | Just v <- is_top_arg e -- We are scrutinising an argument variable
+        -- We are scrutinising an argument variable or a subcomponent thereof.
+        | Just v <- is_top_arg e
         = let
-            alt_sizes = map size_up_alt alts
+            -- Compute size of alternatives
+            alt_sizes = map (size_up_alt depth (Just v) arg_comps) alts
 
-                  -- alts_size tries to compute a good discount for
-                  -- the case when we are scrutinising an argument variable
+            -- Apply a discount for a given constructor that brings the size down to just
+            -- the size of the alternative.
+            alt_size_discount tot_size (Alt (DataAlt con) alt_bndrs _rhs) (SizeIs alt_size _ _) =
+              let trim_discount = max 10 $ tot_size - alt_size
+              in Just (unitUFM con (ConDiscount con trim_discount (map (const NoSeqUse) alt_bndrs)))
+            alt_size_discount _tot_size _ _alt_size = Nothing
+
+            -- Add up discounts from the alternatives
+            added_alt_sizes = (foldr1 addAltSize alt_sizes)
+            -- Compute size of the largest rhs
+            largest_alt_size = (foldr (maxSize bOMB_OUT_SIZE) 0 alt_sizes)
+
+            -- alts_size tries to compute a good discount for
+            -- the case when we are scrutinising an argument variable or subcomponent thereof
             alts_size (SizeIs tot tot_disc tot_scrut)
-                          -- Size of all alternatives
-                      (SizeIs max _        _)
-                          -- Size of biggest alternative
-                  = SizeIs tot (unitBag (v, 20 + tot - max)
-                      `unionBags` tot_disc) tot_scrut
-                          -- If the variable is known, we produce a
-                          -- discount that will take us back to 'max',
-                          -- the size of the largest alternative The
-                          -- 1+ is a little discount for reduced
-                          -- allocation in the caller
+                      largest_alt_size
+
+                  = let default_alt_discount = 20 + tot - largest_alt_size
+                        alt_discounts = unitUFM v $ DiscSeq default_alt_discount $ plusUFMList $ catMaybes $ zipWith (alt_size_discount tot) alts alt_sizes
+                    in
+                    SizeIs tot
+                           (tot_disc
+                            `plusDiscountEnv` (alt_discounts))
+                            tot_scrut
+                          -- If the variable is known but we don't have a
+                          -- specific constructor discount for it, we produce a
+                          -- discount that will take us back to 'largest_alt_size',
+                          -- the size of the largest alternative.
                           --
                           -- Notice though, that we return tot_disc,
                           -- the total discount from all branches.  I
                           -- think that's right.
 
-            alts_size tot_size _ = tot_size
+            alts_size tot_size _max_alt_size = tot_size -- Too Big
           in
-          alts_size (foldr1 addAltSize alt_sizes)  -- alts is non-empty
-                    (foldr1 maxSize    alt_sizes)
+          -- Why foldr1? We might get TooBig already after the first few alternatives
+          -- in which case we don't have to look at the remaining ones.
+          alts_size added_alt_sizes  -- alts is non-empty
+                    largest_alt_size
                 -- Good to inline if an arg is scrutinised, because
                 -- that may eliminate allocation in the caller
                 -- And it eliminates the case itself
         where
-          is_top_arg (Var v) | v `elem` top_args = Just v
+          is_top_arg (Var v) | v `elemUnVarSet` arg_comps = Just v
           is_top_arg (Cast e _) = is_top_arg e
           is_top_arg _ = Nothing
 
 
-    size_up (Case e _ _ alts) = size_up e  `addSizeNSD`
-                                foldr (addAltSize . size_up_alt) case_size alts
+    size_up !depth arg_comps (Case e _ _ alts) = size_up depth arg_comps e  `addSizeNSD`
+                                foldr (addAltSize . (size_up_alt depth Nothing arg_comps) ) case_size alts
       where
           case_size
            | is_inline_scrut e, lengthAtMost alts 1 = sizeN (-10)
@@ -524,42 +608,54 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
               | otherwise
                 = False
 
-    size_up_rhs (bndr, rhs)
+    size_up_rhs !depth !arg_comps (bndr, rhs)
       | Just join_arity <- isJoinId_maybe bndr
         -- Skip arguments to join point
-      , (_bndrs, body) <- collectNBinders join_arity rhs
-      = size_up body
+      , (bndrs, body) <- collectNBinders join_arity rhs
+      = size_up depth (delUnVarSetList arg_comps bndrs) body
       | otherwise
-      = size_up rhs
+      = size_up depth arg_comps rhs
 
     ------------
     -- size_up_app is used when there's ONE OR MORE value args
-    size_up_app (App fun arg) args voids
-        | isTyCoArg arg                  = size_up_app fun args voids
-        | isZeroBitExpr arg              = size_up_app fun (arg:args) (voids + 1)
-        | otherwise                      = size_up arg  `addSizeNSD`
-                                           size_up_app fun (arg:args) voids
-    size_up_app (Var fun)     args voids = size_up_call fun args voids
-    size_up_app (Tick _ expr) args voids = size_up_app expr args voids
-    size_up_app (Cast expr _) args voids = size_up_app expr args voids
-    size_up_app other         args voids = size_up other `addSizeN`
+    size_up_app depth !arg_comps  (App fun arg) args voids
+        | isTyCoArg arg                  = size_up_app depth arg_comps  fun args voids
+        | isZeroBitExpr arg              = size_up_app depth arg_comps  fun (arg:args) (voids + 1)
+        | otherwise                      = size_up depth arg_comps arg  `addSizeNSD`
+                                           size_up_app depth arg_comps  fun (arg:args) voids
+    size_up_app _depth arg_comps (Var fun)     args voids = size_up_call arg_comps fun args voids
+    size_up_app depth arg_comps  (Tick _ expr) args voids = size_up_app depth arg_comps  expr args voids
+    size_up_app depth arg_comps  (Cast expr _) args voids = size_up_app depth arg_comps  expr args voids
+    size_up_app depth arg_comps  other         args voids = size_up depth arg_comps other `addSizeN`
                                            callSize (length args) voids
        -- if the lhs is not an App or a Var, or an invisible thing like a
        -- Tick or Cast, then we should charge for a complete call plus the
        -- size of the lhs itself.
 
     ------------
-    size_up_call :: Id -> [CoreExpr] -> Int -> ExprSize
-    size_up_call fun val_args voids
+    size_up_call :: UnVarSet -> Id -> [CoreExpr] -> Int -> ExprSize
+    size_up_call !arg_comps fun val_args voids
        = case idDetails fun of
            FCallId _        -> sizeN (callSize (length val_args) voids)
            DataConWorkId dc -> conSize    dc (length val_args)
            PrimOpId op _    -> primOpSize op (length val_args)
-           ClassOpId _      -> classOpSize opts top_args val_args
-           _                -> funSize opts top_args fun (length val_args) voids
+           ClassOpId _      -> classOpSize opts arg_comps val_args
+           _                -> funSize opts arg_comps fun (length val_args) voids
 
     ------------
-    size_up_alt (Alt _con _bndrs rhs) = size_up rhs `addSizeN` 10
+    -- Take into acount the binders of scrutinized argument binders
+    -- But not too deeply! Hence we check if we exhausted depth.
+    -- If so we simply ingore the case binders.
+    size_up_alt depth m_top_arg !arg_comps  (Alt alt_con bndrs rhs)
+      | Just top_arg <- m_top_arg
+      , depth > 0
+      , DataAlt con <- alt_con
+      =
+        let alt_size = size_up depth (extendUnVarSetList bndrs arg_comps) rhs `addSizeN` 10
+        -- let alt_size = size_up (arg_comps) rhs `addSizeN` 10
+
+        in asExprSize top_arg alt_size con bndrs
+    size_up_alt depth _ arg_comps  (Alt _con bndrs rhs) = size_up depth (delUnVarSetList arg_comps bndrs) rhs `addSizeN` 10
         -- Don't charge for args, so that wrappers look cheap
         -- (See comments about wrappers with Case)
         --
@@ -580,6 +676,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     ------------
         -- These addSize things have to be here because
         -- I don't want to give them bOMB_OUT_SIZE as an argument
+    addSizeN :: ExprSize -> Int -> ExprSize
     addSizeN TooBig          _  = TooBig
     addSizeN (SizeIs n xs d) m  = mkSizeIs bOMB_OUT_SIZE (n + m) xs d
 
@@ -588,7 +685,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     addAltSize _                 TooBig = TooBig
     addAltSize (SizeIs n1 xs d1) (SizeIs n2 ys d2)
         = mkSizeIs bOMB_OUT_SIZE (n1 + n2)
-                                 (xs `unionBags` ys)
+                                 (xs `plusDiscountEnv` ys)
                                  (d1 + d2) -- Note [addAltSize result discounts]
 
         -- This variant ignores the result discount from its LEFT argument
@@ -597,7 +694,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     addSizeNSD _                 TooBig = TooBig
     addSizeNSD (SizeIs n1 xs _) (SizeIs n2 ys d2)
         = mkSizeIs bOMB_OUT_SIZE (n1 + n2)
-                                 (xs `unionBags` ys)
+                                 (xs `plusDiscountEnv` ys)
                                  d2  -- Ignore d1
 
     -- don't count expressions such as State# RealWorld
@@ -621,21 +718,23 @@ litSize _other = 0    -- Must match size of nullary constructors
                       -- Key point: if  x |-> 4, then x must inline unconditionally
                       --            (eg via case binding)
 
-classOpSize :: UnfoldingOpts -> [Id] -> [CoreExpr] -> ExprSize
+classOpSize :: UnfoldingOpts -> UnVarSet -> [CoreExpr] -> ExprSize
 -- See Note [Conlike is interesting]
 classOpSize _ _ []
   = sizeZero
-classOpSize opts top_args (arg1 : other_args)
-  = SizeIs size arg_discount 0
+classOpSize opts !top_args (arg1 : other_args)
+  = SizeIs size (arg_discount arg1) 0
   where
     size = 20 + (10 * length other_args)
     -- If the class op is scrutinising a lambda bound dictionary then
     -- give it a discount, to encourage the inlining of this function
     -- The actual discount is rather arbitrarily chosen
-    arg_discount = case arg1 of
-                     Var dict | dict `elem` top_args
-                              -> unitBag (dict, unfoldingDictDiscount opts)
-                     _other   -> emptyBag
+    arg_discount dict_arg = case dict_arg of
+                      Var dict | dict `elemUnVarSet` top_args
+                                -> unitUFM dict (classOpArgDiscount $ unfoldingDictDiscount opts)
+                      Tick _ e -> arg_discount e
+                      Cast e _ -> arg_discount e
+                      _other   -> mempty
 
 -- | The size of a function call
 callSize
@@ -658,10 +757,10 @@ jumpSize n_val_args voids = 2 * (1 + n_val_args - voids)
   -- spectral/puzzle. TODO Perhaps adjusting the default threshold would be a
   -- better solution?
 
-funSize :: UnfoldingOpts -> [Id] -> Id -> Int -> Int -> ExprSize
+funSize :: UnfoldingOpts -> UnVarSet -> Id -> Int -> Int -> ExprSize
 -- Size for functions that are not constructors or primops
 -- Note [Function applications]
-funSize opts top_args fun n_val_args voids
+funSize opts !top_args fun n_val_args voids
   | fun `hasKey` buildIdKey   = buildSize
   | fun `hasKey` augmentIdKey = augmentSize
   | otherwise = SizeIs size arg_discount res_discount
@@ -675,9 +774,10 @@ funSize opts top_args fun n_val_args voids
 
         --                  DISCOUNTS
         --  See Note [Function and non-function discounts]
-    arg_discount | some_val_args && fun `elem` top_args
-                 = unitBag (fun, unfoldingFunAppDiscount opts)
-                 | otherwise = emptyBag
+    arg_discount | some_val_args && fun `elemUnVarSet` top_args
+                 = -- pprTrace "mkFunSize" (ppr fun) $
+                   unitUFM fun (FunDisc (unfoldingFunAppDiscount opts) (idName fun))
+                 | otherwise = mempty
         -- If the function is an argument and is applied
         -- to some values, give it an arg-discount
 
@@ -688,13 +788,13 @@ funSize opts top_args fun n_val_args voids
 
 conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args
-  | n_val_args == 0 = SizeIs 0 emptyBag 10    -- Like variables
+  | n_val_args == 0 = SizeIs 0 mempty 10    -- Like variables
 
 -- See Note [Unboxed tuple size and result discount]
-  | isUnboxedTupleDataCon dc = SizeIs 0 emptyBag 10
+  | isUnboxedTupleDataCon dc = SizeIs 0 mempty 10
 
 -- See Note [Constructor size and result discount]
-  | otherwise = SizeIs 10 emptyBag 10
+  | otherwise = SizeIs 10 mempty 10
 
 {- Note [Constructor size and result discount]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -798,7 +898,7 @@ primOpSize op n_val_args
 
 
 buildSize :: ExprSize
-buildSize = SizeIs 0 emptyBag 40
+buildSize = SizeIs 0 mempty 40
         -- We really want to inline applications of build
         -- build t (\cn -> e) should cost only the cost of e (because build will be inlined later)
         -- Indeed, we should add a result_discount because build is
@@ -807,7 +907,7 @@ buildSize = SizeIs 0 emptyBag 40
         -- The "4" is rather arbitrary.
 
 augmentSize :: ExprSize
-augmentSize = SizeIs 0 emptyBag 40
+augmentSize = SizeIs 0 mempty 40
         -- Ditto (augment t (\cn -> e) ys) should cost only the cost of
         -- e plus ys. The -2 accounts for the \cn
 
@@ -889,35 +989,150 @@ Code for manipulating sizes
 data ExprSize
     = TooBig
     | SizeIs { _es_size_is  :: {-# UNPACK #-} !Int -- ^ Size found
-             , _es_args     :: !(Bag (Id,Int))
+             , _es_args     :: !(VarEnv ArgDiscount)
                -- ^ Arguments cased herein, and discount for each such
              , _es_discount :: {-# UNPACK #-} !Int
                -- ^ Size to subtract if result is scrutinised by a case
                -- expression
              }
 
+plusDiscountEnv :: VarEnv ArgDiscount -> VarEnv ArgDiscount -> VarEnv ArgDiscount
+plusDiscountEnv el er = plusUFM_C combineArgDiscount el er
+
+-- TODO: Might be worth giving this a larger discount if the type class is known.
+-- So that `f @T $d x = opDoStuff @T $d x ` applied to `f @Bool $dC_$Bool` is likely
+-- to inline turning the unknown into a known call.
+classOpArgDiscount :: Int -> ArgDiscount
+classOpArgDiscount n = SomeArgUse n
+
+-- After computing the discounts for an alternatives rhs we transfer discounts from the
+-- alt binders to the constructor specific discount of the scrutinee for the given constructor.
+asExprSize :: Id -> ExprSize -> DataCon -> [Id] -> ExprSize
+asExprSize _ TooBig _ _ = TooBig
+asExprSize scrut (SizeIs n arg_discs s_d) con alt_bndrs =
+    let (alt_discount_bags, top_discounts) = partitionWithKeyUFM (\k _v -> k `elem` map getUnique alt_bndrs) arg_discs
+        alt_discount_map = alt_discount_bags
+        alt_bndr_uses = map (\bndr -> lookupWithDefaultVarEnv alt_discount_map NoSeqUse bndr ) alt_bndrs :: [ArgDiscount]
+
+    in SizeIs n (unitUFM scrut (mkConUse con alt_bndr_uses) `plusUFM` top_discounts) s_d
+
+
+mkConUse :: DataCon -> [ArgDiscount] -> ArgDiscount
+mkConUse con uses =
+  DiscSeq
+    0
+    -- We apply a penalty of 1 per case alternative, so here we apply a discount of 1 per *eliminated*
+    -- case alternative. And then one more because we get rid of a conditional branch which is always good.
+    (unitUFM con (ConDiscount con (length uses) uses))
+
+combineArgDiscount :: ArgDiscount -> ArgDiscount -> ArgDiscount
+combineArgDiscount NoSeqUse u2 = u2
+combineArgDiscount u1 NoSeqUse = u1
+combineArgDiscount (SomeArgUse d1) (SomeArgUse d2) = SomeArgUse $! d1 + d2
+combineArgDiscount (SomeArgUse d1) (DiscSeq d2 m2) = DiscSeq (d1 + d2) m2
+combineArgDiscount (DiscSeq d1 m1) (SomeArgUse d2) = DiscSeq (d1 + d2) m1
+combineArgDiscount (DiscSeq d1 m1) (DiscSeq d2 m2) = DiscSeq (d1 + d2) (plusUFM_C combineMapEntry m1 m2)
+-- See Note [Function and non-function discounts] why we need this
+combineArgDiscount f1@(FunDisc d1 _f1) f2@(FunDisc d2 _f2) = if d1 > d2 then f1 else f2
+-- This can happen either through shadowing or with things like unsafeCoerce. A good idea to warn for debug builds but we don't want to panic here.
+combineArgDiscount f1@(FunDisc _d _n) u2 = pprTraceDebug "Variable seemingly discounted as both function and constructor" (ppr f1 $$ ppr u2) f1
+combineArgDiscount u1 f2@(FunDisc _d _n) = pprTraceDebug "Variable seemingly discounted as both function and constructor" (ppr u1 $$ ppr f2) f2
+
+combineMapEntry :: ConDiscount -> ConDiscount -> ConDiscount
+combineMapEntry (ConDiscount c1 dc1 u1) (ConDiscount c2 dc2 u2) =
+    assert(c1 == c2) $ ConDiscount c1 (dc1+dc2) (combinArgDiscountLists u1 u2)
+
+combinArgDiscountLists :: [ArgDiscount] -> [ArgDiscount] -> [ArgDiscount]
+combinArgDiscountLists uses1 uses2 = zipWith combineArgDiscount uses1 uses2
+
 instance Outputable ExprSize where
   ppr TooBig         = text "TooBig"
-  ppr (SizeIs a _ c) = brackets (int a <+> int c)
+  -- ppr (SizeIs a _ c) = brackets (int a <+> int c)
+  ppr (SizeIs a d c) = brackets (int a <+> int c <+> ppr d)
 
 -- subtract the discount before deciding whether to bale out. eg. we
 -- want to inline a large constructor application into a selector:
 --      tup = (a_1, ..., a_99)
 --      x = case tup of ...
 --
-mkSizeIs :: Int -> Int -> Bag (Id, Int) -> Int -> ExprSize
+mkSizeIs :: Int -> Int -> VarEnv ArgDiscount -> Int -> ExprSize
 mkSizeIs max n xs d | (n - d) > max = TooBig
                     | otherwise     = SizeIs n xs d
 
-maxSize :: ExprSize -> ExprSize -> ExprSize
-maxSize TooBig         _                                  = TooBig
-maxSize _              TooBig                             = TooBig
-maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 > n2   = s1
-                                              | otherwise = s2
+maxSize :: Int -> ExprSize -> Int -> Int
+maxSize !max TooBig _n1 = max
+maxSize _max (SizeIs n1 _ _) n2 | n1 >= n2  = n1
+                                | otherwise = n2
 
 sizeZero :: ExprSize
 sizeN :: Int -> ExprSize
 
-sizeZero = SizeIs 0 emptyBag 0
-sizeN n  = SizeIs n emptyBag 0
+sizeZero = SizeIs 0 mempty 0
+sizeN n  = SizeIs n mempty 0
+
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{callSiteInline}
+*                                                                      *
+************************************************************************
+
+This is the key function.  It decides whether to inline a variable at a call site
+
+callSiteInline is used at call sites, so it is a bit more generous.
+It's a very important function that embodies lots of heuristics.
+A non-WHNF can be inlined if it doesn't occur inside a lambda,
+and occurs exactly once or
+    occurs once in each branch of a case and is small
+
+If the thing is in WHNF, there's no danger of duplicating work,
+so we can inline if it occurs once, or is small
+
+NOTE: we don't want to inline top-level functions that always diverge.
+It just makes the code bigger.  Tt turns out that the convenient way to prevent
+them inlining is to give them a NOINLINE pragma, which we do in
+StrictAnal.addStrictnessInfoToTopId
+-}
+
+data ArgSummary = TrivArg       -- Nothing interesting
+                | NonTrivArg    -- Arg has structure
+                | ValueArg      -- Arg is a con-app or PAP
+                                -- ..or con-like. Note [Conlike is interesting]
+                | ConArg !DataCon
+                         [ArgSummary] -- It's important that the sub-summaries are
+                                      -- computed lazily. This way they only get forced
+                                      -- if there is a interesting discount which matches
+                                      -- on them. Which improves performance quite a lot.
+
+instance Outputable ArgSummary where
+  ppr TrivArg    = text "TrivArg"
+  ppr NonTrivArg = text "NonTrivArg"
+  ppr ValueArg   = text "ValueArg"
+  ppr (ConArg con _args)  = text "ConArg:" <> ppr con -- <+> ppr args
+
+nonTrivArg ::  ArgSummary -> Bool
+nonTrivArg TrivArg = False
+nonTrivArg _       = True
+
+data CallCtxt
+  = BoringCtxt
+  | RhsCtxt RecFlag     -- Rhs of a let-binding; see Note [RHS of lets]
+  | DiscArgCtxt         -- Argument of a function with non-zero arg discount
+  | RuleArgCtxt         -- We are somewhere in the argument of a function with rules
+
+  | ValAppCtxt          -- We're applied to at least one value arg
+                        -- This arises when we have ((f x |> co) y)
+                        -- Then the (f x) has argument 'x' but in a ValAppCtxt
+
+  | CaseCtxt            -- We're the scrutinee of a case
+                        -- that decomposes its scrutinee
+
+instance Outputable CallCtxt where
+  ppr CaseCtxt    = text "CaseCtxt"
+  ppr ValAppCtxt  = text "ValAppCtxt"
+  ppr BoringCtxt  = text "BoringCtxt"
+  ppr (RhsCtxt ir)= text "RhsCtxt" <> parens (ppr ir)
+  ppr DiscArgCtxt = text "DiscArgCtxt"
+  ppr RuleArgCtxt = text "RuleArgCtxt"
 
