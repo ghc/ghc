@@ -115,6 +115,10 @@ Lexical syntax
      varid       →   small {idchar} ⟨reservedid⟩
      conid       →   large {idchar}
 
+- GHC allows redundant parantheses around the function name in the `funlhs` part of declarations.
+  That is GHC will succeed in parsing a declaration like `((f)) x = <rhs>` for any number
+  of parantheses around `f`.
+
 .. _infelicities-syntax:
 
 Context-free syntax
