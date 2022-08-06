@@ -448,7 +448,7 @@ bool queueIOThread()
       Capability *cap = &MainCapability;
       StgTSO * tso = createStrictIOThread (cap, RtsFlags.GcFlags.initialStkSize,
                                           processRemoteCompletion_closure);
-      labelThread(cap, tso, "ProcessIOThread");
+      setThreadLabel(cap, tso, "ProcessIOThread");
 
       ASSERT(tso);
       scheduleThreadNow (cap, tso);

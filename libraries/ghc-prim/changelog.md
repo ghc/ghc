@@ -8,6 +8,16 @@
   listThreads# :: State# RealWorld -> (# State# RealWorld, Array# ThreadId# #)
   ```
 
+- The type of the `labelThread#` primop was changed from:
+  ```haskell
+  labelThread# :: ThreadId# -> Addr# -> State# RealWorld -> State# RealWorld
+  ```
+  to
+  ```haskell
+  labelThread# :: ThreadId# -> ByteArray# -> State# RealWorld -> State# RealWorld
+  ```
+  Where the `ByteArray#` must contain a UTF-8-encoded string.
+
 ## 0.9.0
 
 - Shipped with GHC 9.4.1

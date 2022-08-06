@@ -117,7 +117,8 @@ void postSparkCountersEvent (Capability *cap,
  */
 void postThreadLabel(Capability    *cap,
                      EventThreadID  id,
-                     char          *label);
+                     char          *label,
+                     size_t         len);
 
 /*
  * Various GC and heap events

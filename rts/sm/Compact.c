@@ -470,6 +470,10 @@ thread_TSO (StgTSO *tso)
 
     thread_(&tso->trec);
 
+    if (tso->label != NULL) {
+        thread_((StgClosure **)&tso->label);
+    }
+
     thread_(&tso->stackobj);
     return (P_)tso + sizeofW(StgTSO);
 }

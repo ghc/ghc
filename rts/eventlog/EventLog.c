@@ -1076,9 +1076,10 @@ void postUserBinaryEvent(Capability   *cap,
 
 void postThreadLabel(Capability    *cap,
                      EventThreadID  id,
-                     char          *label)
+                     char          *label,
+                     size_t         len)
 {
-    const int strsize = strlen(label);
+    const int strsize = (int) len;
     const int size = strsize + sizeof(EventThreadID);
     if (size > EVENT_PAYLOAD_SIZE_MAX) {
         errorBelch("Event size exceeds EVENT_PAYLOAD_SIZE_MAX, bail out");

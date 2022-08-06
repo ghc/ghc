@@ -112,6 +112,7 @@ createThread(Capability *cap, W_ size)
     ASSIGN_Int64((W_*)&(tso->alloc_limit), 0);
 
     tso->trec = NO_TREC;
+    tso->label = NULL;
 
 #if defined(PROFILING)
     tso->prof.cccs = CCS_MAIN;
@@ -957,10 +958,9 @@ printThreadBlockage(StgTSO *tso)
 void
 printThreadStatus(StgTSO *t)
 {
-  debugBelch("\tthread %4lu @ %p ", (unsigned long)t->id, (void *)t);
-    {
-      void *label = lookupThreadLabel(t->id);
-      if (label) debugBelch("[\"%s\"] ",(char *)label);
+    debugBelch("\tthread %4lu @ %p ", (unsigned long)t->id, (void *)t);
+    if (t->label) {
+        debugBelch("[\"%.*s\"] ", (int)t->label->bytes, (char *)t->label->payload);
     }
     switch (t->what_next) {
     case ThreadKilled:

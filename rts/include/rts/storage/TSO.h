@@ -135,7 +135,8 @@ typedef struct StgTSO_ {
     struct InCall_*         bound;
     struct Capability_*     cap;
 
-    struct StgTRecHeader_ * trec;       /* STM transaction record */
+    struct StgTRecHeader_ * trec;           /* STM transaction record */
+    StgArrBytes*            label;          /* Thread label */
 
     /*
      * A list of threads blocked on this TSO waiting to throw exceptions.

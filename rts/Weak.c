@@ -176,7 +176,6 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
         );
 
     scheduleThread(cap,t);
-    labelThread(cap, t, "weak finalizer thread");
 }
 
 /* -----------------------------------------------------------------------------

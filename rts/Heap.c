@@ -223,6 +223,10 @@ StgWord collect_pointers(StgClosure *closure, StgClosure *ptrs[]) {
             ASSERT((StgClosure *)((StgTSO *)closure)->bq != NULL);
             ptrs[nptrs++] = (StgClosure *)((StgTSO *)closure)->bq;
 
+            if ((StgClosure *)((StgTSO *)closure)->label != NULL) {
+                ptrs[nptrs++] = (StgClosure *)((StgTSO *)closure)->label;
+            }
+
             break;
         case WEAK: {
             StgWeak *w = (StgWeak *)closure;

@@ -45,7 +45,7 @@ createSparkThread (Capability *cap)
 
     tso = createIOThread (cap, RtsFlags.GcFlags.initialStkSize,
                           (StgClosure *)runSparks_closure);
-    labelThread(cap, tso, "spark evaluator");
+    setThreadLabel(cap, tso, "spark evaluator");
     traceEventCreateSparkThread(cap, tso->id);
 
     appendToRunQueue(cap,tso);

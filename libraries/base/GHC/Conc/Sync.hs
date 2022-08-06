@@ -39,6 +39,7 @@ module GHC.Conc.Sync
         , throwTo
         , yield
         , labelThread
+        , labelThreadByteArray#
         , mkWeakThreadId
         , listThreads
         , ThreadStatus(..), BlockReason(..)
@@ -109,15 +110,13 @@ import Data.Maybe
 import GHC.Base
 import {-# SOURCE #-} GHC.IO.Handle ( hFlush )
 import {-# SOURCE #-} GHC.IO.StdHandles ( stdout )
+import GHC.Encoding.UTF8
 import GHC.Int
 import GHC.IO
-import GHC.IO.Encoding.UTF8
 import GHC.IO.Exception
 import GHC.Exception
-import qualified GHC.Foreign
 import GHC.IORef
 import GHC.MVar
-import GHC.Ptr
 import GHC.Real         ( fromIntegral )
 import GHC.Show         ( Show(..), showParen, showString )
 import GHC.Stable       ( StablePtr(..) )
@@ -497,17 +496,18 @@ yield = IO $ \s ->
 identifier will be used in the debugging output to make distinction of
 different threads easier (otherwise you only have the thread state object\'s
 address in the heap). It also emits an event to the RTS eventlog.
-
-Other applications like the graphical Concurrent Haskell Debugger
-(<http://www.informatik.uni-kiel.de/~fhu/chd/>) may choose to overload
-'labelThread' for their purposes as well.
 -}
-
 labelThread :: ThreadId -> String -> IO ()
-labelThread (ThreadId t) str =
-    GHC.Foreign.withCString utf8 str $ \(Ptr p) ->
-    IO $ \ s ->
-     case labelThread# t p s of s1 -> (# s1, () #)
+labelThread t str =
+    labelThreadByteArray# t (utf8EncodeByteArray# str)
+
+-- | 'labelThreadByteArray#' sets the label of a thread to the given UTF-8
+--  encoded string contained in a `ByteArray#`.
+--
+--  @since 4.18
+labelThreadByteArray# :: ThreadId -> ByteArray# -> IO ()
+labelThreadByteArray# (ThreadId t) str =
+    IO $ \s -> case labelThread# t str s of s1 -> (# s1, () #)
 
 --      Nota Bene: 'pseq' used to be 'seq'
 --                 but 'seq' is now defined in GHC.Prim

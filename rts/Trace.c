@@ -199,50 +199,52 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
     ACQUIRE_LOCK(&trace_utx);
 
     tracePreface();
-    char *threadLabel = (char *)lookupThreadLabel(tso->id);
-    if(!threadLabel)
-    {
-        threadLabel = "";
+    int threadLabelLen = 0;
+    char *threadLabel = "";
+    if (tso->label) {
+        threadLabelLen = (int) tso->label->bytes;
+        threadLabel = (char *) tso->label->payload;
     }
+
     switch (tag) {
     case EVENT_CREATE_THREAD:   // (cap, thread)
-        debugBelch("cap %d: created thread %" FMT_Word "[\"%s\"]" "\n",
-                   cap->no, (W_)tso->id, threadLabel);
+        debugBelch("cap %d: created thread %" FMT_Word "[\"%.*s\"]" "\n",
+                   cap->no, (W_)tso->id, threadLabelLen, threadLabel);
         break;
     case EVENT_RUN_THREAD:      //  (cap, thread)
-        debugBelch("cap %d: running thread %" FMT_Word "[\"%s\"]"" (%s)\n",
-                   cap->no, (W_)tso->id, threadLabel, what_next_strs[tso->what_next]);
+        debugBelch("cap %d: running thread %" FMT_Word "[\"%.*s\"]"" (%s)\n",
+                   cap->no, (W_)tso->id, threadLabelLen, threadLabel, what_next_strs[tso->what_next]);
         break;
     case EVENT_THREAD_RUNNABLE: // (cap, thread)
-        debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]"" appended to run queue\n",
-                   cap->no, (W_)tso->id, threadLabel);
+        debugBelch("cap %d: thread %" FMT_Word "[\"%.*s\"]"" appended to run queue\n",
+                   cap->no, (W_)tso->id, threadLabelLen, threadLabel);
         break;
     case EVENT_MIGRATE_THREAD:  // (cap, thread, new_cap)
-        debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]" " migrating to cap %d\n",
-                   cap->no, (W_)tso->id, threadLabel, (int)info1);
+        debugBelch("cap %d: thread %" FMT_Word "[\"%.*s\"]" " migrating to cap %d\n",
+                   cap->no, (W_)tso->id, threadLabelLen, threadLabel, (int)info1);
         break;
     case EVENT_THREAD_WAKEUP:   // (cap, thread, info1_cap)
-        debugBelch("cap %d: waking up thread %" FMT_Word "[\"%s\"]" " on cap %d\n",
-                   cap->no, (W_)tso->id, threadLabel, (int)info1);
+        debugBelch("cap %d: waking up thread %" FMT_Word "[\"%.*s\"]" " on cap %d\n",
+                   cap->no, (W_)tso->id, threadLabelLen, threadLabel, (int)info1);
         break;
 
     case EVENT_STOP_THREAD:     // (cap, thread, status)
         if (info1 == 6 + BlockedOnBlackHole) {
-            debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]" " stopped (blocked on black hole owned by thread %lu)\n",
-                       cap->no, (W_)tso->id, threadLabel, (long)info2);
+            debugBelch("cap %d: thread %" FMT_Word "[\"%.*s\"]" " stopped (blocked on black hole owned by thread %lu)\n",
+                       cap->no, (W_)tso->id, threadLabelLen, threadLabel, (long)info2);
         } else if (info1 == StackOverflow) {
-            debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]"
+            debugBelch("cap %d: thread %" FMT_Word "[\"%.*s\"]"
                        " stopped (stack overflow, size %lu)\n",
-                      cap->no, (W_)tso->id, threadLabel, (long)info2);
+                      cap->no, (W_)tso->id, threadLabelLen, threadLabel, (long)info2);
 
         } else {
-            debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]" " stopped (%s)\n",
-                       cap->no, (W_)tso->id, threadLabel, thread_stop_reasons[info1]);
+            debugBelch("cap %d: thread %" FMT_Word "[\"%.*s\"]" " stopped (%s)\n",
+                       cap->no, (W_)tso->id, threadLabelLen, threadLabel, thread_stop_reasons[info1]);
         }
         break;
     default:
-        debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]" ": event %d\n\n",
-                   cap->no, (W_)tso->id, threadLabel, tag);
+        debugBelch("cap %d: thread %" FMT_Word "[\"%.*s\"]" ": event %d\n\n",
+                   cap->no, (W_)tso->id, threadLabelLen, threadLabel, tag);
         break;
     }
 
@@ -855,19 +857,20 @@ void traceUserMarker(Capability *cap, char *markername)
 
 void traceThreadLabel_(Capability *cap,
                        StgTSO     *tso,
-                       char       *label)
+                       char       *label,
+                       size_t      len)
 {
 #if defined(DEBUG)
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
         ACQUIRE_LOCK(&trace_utx);
         tracePreface();
-        debugBelch("cap %d: thread %" FMT_Word " has label %s\n",
-                   cap->no, (W_)tso->id, label);
+        debugBelch("cap %d: thread %" FMT_Word " has label %.*s\n",
+                   cap->no, (W_)tso->id, (int) len, label);
         RELEASE_LOCK(&trace_utx);
     } else
 #endif
     {
-        postThreadLabel(cap, tso->id, label);
+        postThreadLabel(cap, tso->id, label, len);
     }
 }
 

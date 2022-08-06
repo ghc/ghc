@@ -740,6 +740,10 @@ checkTSO(StgTSO *tso)
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->global_link) &&
             (tso->global_link == END_TSO_QUEUE ||
              get_itbl((StgClosure*)tso->global_link)->type == TSO));
+
+    if (tso->label) {
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->label));
+    }
 }
 
 /*

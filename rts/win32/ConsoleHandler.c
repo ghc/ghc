@@ -192,7 +192,7 @@ void startSignalHandlers(Capability *cap)
                                      rts_mkInt(cap,
                                                stg_pending_buf[stg_pending_events])));
         scheduleThread(cap, t);
-        labelThread(cap, t, "signal handler thread");
+        setThreadLabel(cap, t, "signal handler thread");
     }
 
     RELEASE_LOCK(&sched_mutex);

@@ -15,6 +15,10 @@
     terms of `mconcat`.
   * `GHC.Conc.Sync.listThreads` was added, allowing the user to list the threads
     (both running and blocked) of the program.
+  * `GHC.Conc.Sync.labelThreadByteArray#` was added, allowing the user to specify
+    a thread label by way of a `ByteArray#` containing a UTF-8-encoded string.
+    The old `GHC.Conc.Sync.labelThread` is now implemented in terms of this
+    function.
 
 ## 4.17.0.0 *TBA*
 

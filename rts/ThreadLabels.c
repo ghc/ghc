@@ -18,91 +18,52 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(THREADED_RTS)
-static Mutex threadLabels_mutex;
-#endif /* THREADED_RTS */
+/*
+ * Note [Thread Labels]
+ * ~~~~~~~~~~~~~~~~~~~~
+ * The user may assign a textual label to a thread using the labelThread#
+ * primop to help identify the thread. This label is represented by StgTSO's
+ * label field which contains a pointer to a ByteArray# containing a
+ * UTF-8 string.
+ *
+ * Note that this string isn't necessary NULL terminated; rather, its length is
+ * determined by the ByteArray# length.
+ */
 
-static HashTable * threadLabels = NULL;
-
-void
-initThreadLabelTable(void)
+static StgArrBytes *
+allocateArrBytes(Capability *cap, size_t size_in_bytes)
 {
-#if defined(THREADED_RTS)
-  initMutex(&threadLabels_mutex);
-#endif /* THREADED_RTS */
+    /* round up to a whole number of words */
+    uint32_t data_size_in_words  = ROUNDUP_BYTES_TO_WDS(size_in_bytes);
+    uint32_t total_size_in_words = sizeofW(StgArrBytes) + data_size_in_words;
 
-  if (threadLabels == NULL) {
-    threadLabels = allocHashTable();
-  }
+    StgArrBytes *arr = (StgArrBytes *) allocate(cap, total_size_in_words);
+    SET_ARR_HDR(arr, &stg_ARR_WORDS_info, cap->r.rCCCS, size_in_bytes);
+    return arr;
 }
 
 void
-freeThreadLabelTable(void)
+setThreadLabel(Capability  *cap,
+               StgTSO      *tso,
+               char *label)
 {
-    ACQUIRE_LOCK(&threadLabels_mutex);
+    int len = strlen(label);
+    StgArrBytes *arr = allocateArrBytes(cap, len);
+    memcpy(&arr->payload, label, len);
+    labelThread(cap, tso, arr);
+}
 
-    if (threadLabels != NULL) {
-        freeHashTable(threadLabels, stgFree);
-        threadLabels = NULL;
+void
+labelThread(Capability  *cap,
+            StgTSO      *tso,
+            StgArrBytes *label)
+{
+    if (tso->label) {
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            updateRemembSetPushClosure(cap, (StgClosure *) tso->label);
+        }
     }
-
-    RELEASE_LOCK(&threadLabels_mutex);
-}
-
-static void
-updateThreadLabel(StgThreadID key, void *data)
-{
-  removeThreadLabel(key);
-
-  ACQUIRE_LOCK(&threadLabels_mutex);
-
-  insertHashTable(threadLabels,key,data);
-
-  RELEASE_LOCK(&threadLabels_mutex);
-}
-
-void *
-lookupThreadLabel(StgThreadID key)
-{
-  void * result;
-  ACQUIRE_LOCK(&threadLabels_mutex);
-
-  result = lookupHashTable(threadLabels,key);
-
-  RELEASE_LOCK(&threadLabels_mutex);
-
-  return result;
-}
-
-void
-removeThreadLabel(StgThreadID key)
-{
-  ACQUIRE_LOCK(&threadLabels_mutex);
-
-  void * old = NULL;
-  if ((old = lookupHashTable(threadLabels,key))) {
-    removeHashTable(threadLabels,key,old);
-    stgFree(old);
-  }
-
-  RELEASE_LOCK(&threadLabels_mutex);
-}
-
-void
-labelThread(Capability *cap   STG_UNUSED,
-            StgTSO     *tso   STG_UNUSED,
-            char       *label STG_UNUSED)
-{
-  int len;
-  void *buf;
-
-  /* Caveat: Once set, you can only set the thread name to "" */
-  len = strlen(label)+1;
-  buf = stgMallocBytes(len * sizeof(char), "ThreadLabels.c:labelThread()");
-  strncpy(buf,label,len);
-
-  /* Update will free the old memory for us */
-  updateThreadLabel(tso->id,buf);
-
-  traceThreadLabel(cap, tso, label);
+    recordClosureMutated(cap, (StgClosure*)tso);
+    tso->label = label;
+    traceThreadLabel(cap, tso, (char *) label->payload, label->bytes);
 }

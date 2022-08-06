@@ -489,7 +489,7 @@ startSignalHandlers(Capability *cap)
                                            rts_mkPtr(cap, info)),
                                  rts_mkInt(cap, info->si_signo)));
     scheduleThread(cap, t);
-    labelThread(cap, t, "signal handler thread");
+    setThreadLabel(cap, t, "signal handler thread");
   }
 
   unblockUserSignals();

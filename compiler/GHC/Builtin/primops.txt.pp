@@ -2919,7 +2919,9 @@ primop  MyThreadIdOp "myThreadId#" GenPrimOp
    has_side_effects = True
 
 primop LabelThreadOp "labelThread#" GenPrimOp
-   ThreadId# -> Addr# -> State# RealWorld -> State# RealWorld
+   ThreadId# -> ByteArray# -> State# RealWorld -> State# RealWorld
+   {Set the label of the given thread. The @ByteArray#@ should contain
+    a UTF-8-encoded string.}
    with
    has_side_effects = True
    out_of_line      = True

@@ -18,6 +18,7 @@ module GHC.Weak.Finalize
 import GHC.Base
 import GHC.Exception
 import GHC.IORef
+import {-# SOURCE #-} GHC.Conc (labelThread, myThreadId)
 import GHC.IO (catchException, unsafePerformIO)
 
 -- | Run a batch of finalizers from the garbage collector.  We're given
@@ -26,7 +27,9 @@ import GHC.IO (catchException, unsafePerformIO)
 runFinalizerBatch :: Int
                   -> Array# (State# RealWorld -> State# RealWorld)
                   -> IO ()
-runFinalizerBatch (I# n) arr =
+runFinalizerBatch (I# n) arr = do
+    tid <- myThreadId
+    labelThread tid "weak finalizer thread"
     go n
   where
     getFinalizer :: Int# -> IO ()
