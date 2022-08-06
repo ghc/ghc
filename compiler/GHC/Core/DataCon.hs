@@ -1107,8 +1107,11 @@ mkDataCon name declared_infix prom_info
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
         DCR{} -> mkInfForAllTys univ_tvs $ mkTyCoInvForAllTys ex_tvs $
-                 mkScaledFunTys rep_arg_tys $
+                 mkScaledFunctionTys rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
+                 -- res_arg_tys is a mixture of TypeLike and ConstraintLike,
+                 -- so we don't know which AnonArgFlag to use
+                 -- Hence using mkScaledFunctionTys.
 
       -- See Note [Promoted data constructors] in GHC.Core.TyCon
     prom_tv_bndrs = [ mkNamedTyConBinder (Invisible spec) tv
@@ -1467,7 +1470,7 @@ dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
                              dcStupidTheta = stupid_theta })
   = mkInvisForAllTys user_tvbs $
     mkInvisFunTys (stupid_theta ++ theta) $
-    mkScaledFunTys  arg_tys $
+    mkScaledFunTys arg_tys $
     res_ty
 
 dataConNonlinearType :: DataCon -> Type
@@ -1594,7 +1597,7 @@ dataConRepArgTys (MkData { dcRep = rep
                          , dcOtherTheta = theta
                          , dcOrigArgTys = orig_arg_tys })
   = case rep of
-      NoDataConRep -> assert (null eq_spec) $ (map unrestricted theta) ++ orig_arg_tys
+      NoDataConRep -> assert (null eq_spec) $ map unrestricted theta ++ orig_arg_tys
       DCR { dcr_arg_tys = arg_tys } -> arg_tys
 
 -- | The string @package:module.name@ identifying a constructor, which is attached

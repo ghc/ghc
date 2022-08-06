@@ -183,12 +183,12 @@ import GHC.Core.Coercion.Axiom
 import GHC.Types.Id
 import GHC.Types.TyThing
 import GHC.Types.SourceText
-import GHC.Types.Var ( VarBndr (Bndr) )
+import GHC.Types.Var ( VarBndr (Bndr), visArgTypeLike )
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import GHC.Unit.Module        ( Module )
 import GHC.Core.Type
 import qualified GHC.Core.TyCo.Rep as TyCoRep (Type(TyConApp))
-import GHC.Core.TyCo.Rep (RuntimeRepType)
+import GHC.Core.TyCo.Rep ( RuntimeRepType, mkNakedKindFunTy )
 import GHC.Types.RepType
 import GHC.Core.DataCon
 import GHC.Core.ConLike
@@ -605,19 +605,35 @@ pcTyCon name cType tyvars cons
                 False           -- Not in GADT syntax
 
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
-pcDataCon n univs tys = pcDataConW n univs (map linear tys)
-
-pcDataConW :: Name -> [TyVar] -> [Scaled Type] -> TyCon -> DataCon
-pcDataConW n univs tys = pcDataConWithFixity False n univs
+pcDataCon n univs tys
+  = pcDataConWithFixity False n univs
                       []    -- no ex_tvs
                       univs -- the univs are precisely the user-written tyvars
-                      tys
+                      []    -- No theta
+                      (map linear tys)
+
+pcDataConConstraint :: Name -> [TyVar] -> ThetaType -> TyCon -> DataCon
+-- Used for the data constructor of the Coercible (
+pcDataConConstraint n univs theta
+  = pcDataConWithFixity False n univs
+                      []    -- No ex_tvs
+                      univs -- The univs are precisely the user-written tyvars
+                      theta -- All constraint arguments
+                      []    -- No value arguments
+
+-- Used for RuntimeRep and friends; tings with PromDataConInfo
+pcSpecialDataCon :: Name -> [Type] -> TyCon -> PromDataConInfo -> DataCon
+pcSpecialDataCon dc_name arg_tys tycon rri
+  = pcDataConWithFixity' False dc_name
+                         (dataConWorkerUnique (nameUnique dc_name)) rri
+                         [] [] [] [] (map linear arg_tys) tycon
 
 pcDataConWithFixity :: Bool      -- ^ declared infix?
                     -> Name      -- ^ datacon name
                     -> [TyVar]   -- ^ univ tyvars
                     -> [TyCoVar] -- ^ ex tycovars
                     -> [TyCoVar] -- ^ user-written tycovars
+                    -> ThetaType
                     -> [Scaled Type]    -- ^ args
                     -> TyCon
                     -> DataCon
@@ -632,7 +648,7 @@ pcDataConWithFixity infx n = pcDataConWithFixity' infx n
 
 pcDataConWithFixity' :: Bool -> Name -> Unique -> PromDataConInfo
                      -> [TyVar] -> [TyCoVar] -> [TyCoVar]
-                     -> [Scaled Type] -> TyCon -> DataCon
+                     -> ThetaType -> [Scaled Type] -> TyCon -> DataCon
 -- The Name should be in the DataName name space; it's the name
 -- of the DataCon itself.
 --
@@ -644,7 +660,7 @@ pcDataConWithFixity' :: Bool -> Name -> Unique -> PromDataConInfo
 --    to regret doing so (we do).
 
 pcDataConWithFixity' declared_infix dc_name wrk_key rri
-                     tyvars ex_tyvars user_tyvars arg_tys tycon
+                     tyvars ex_tyvars user_tyvars theta arg_tys tycon
   = data_con
   where
     tag_map = mkTyConTagMap tycon
@@ -660,7 +676,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
                 tyvars ex_tyvars
                 (mkTyVarBinders SpecifiedSpec user_tyvars)
                 []      -- No equality spec
-                []      -- No theta
+                theta
                 arg_tys (mkTyConApp tycon (mkTyVarTys tyvars))
                 rri
                 tycon
@@ -686,11 +702,6 @@ mkDataConWorkerName data_con wrk_key =
     dc_occ  = nameOccName dc_name
     wrk_occ = mkDataConWorkerOcc dc_occ
 
--- used for RuntimeRep and friends
-pcSpecialDataCon :: Name -> [Type] -> TyCon -> PromDataConInfo -> DataCon
-pcSpecialDataCon dc_name arg_tys tycon rri
-  = pcDataConWithFixity' False dc_name (dataConWorkerUnique (nameUnique dc_name)) rri
-                         [] [] [] (map linear arg_tys) tycon
 
 {-
 ************************************************************************
@@ -1140,7 +1151,7 @@ mk_ctuple arity = (tycon, tuple_con, sc_sel_ids_arr)
                          (mkPrelTyConRepName tc_name)
 
     klass     = mk_ctuple_class tycon sc_theta sc_sel_ids
-    tuple_con = pcDataConW dc_name tvs (map unrestricted sc_theta) tycon
+    tuple_con = pcDataConConstraint dc_name tvs sc_theta tycon
 
     binders = mkTemplateAnonTyConBinders (replicate arity constraintKind)
     roles   = replicate arity Nominal
@@ -1327,7 +1338,7 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
                              rhs klass
                              (mkPrelTyConRepName eqTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
-    datacon   = pcDataConW eqDataConName tvs [unrestricted sc_pred] tycon
+    datacon   = pcDataConConstraint eqDataConName tvs [sc_pred] tycon
 
     -- Kind: forall k. k -> k -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k,k])
@@ -1345,7 +1356,7 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
                              rhs klass
                              (mkPrelTyConRepName heqTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
-    datacon   = pcDataConW heqDataConName tvs [unrestricted sc_pred] tycon
+    datacon   = pcDataConConstraint heqDataConName tvs [sc_pred] tycon
 
     -- Kind: forall k1 k2. k1 -> k2 -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
@@ -1363,7 +1374,7 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
                              rhs klass
                              (mkPrelTyConRepName coercibleTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
-    datacon   = pcDataConW coercibleDataConName tvs [unrestricted sc_pred] tycon
+    datacon   = pcDataConConstraint coercibleDataConName tvs [sc_pred] tycon
 
     -- Kind: forall k. k -> k -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k,k])
@@ -1478,13 +1489,26 @@ unrestrictedFunTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->
 -- Note [SORT, TYPE, and CONSTRAINT] in GHC.Builtin.Types.Prim, and
 -- Note [Using synonyms to compress types] in GHC.Core.Type
 
+{- Note [Naked FunTy]
+~~~~~~~~~~~~~~~~~~~~~
+GHC.Core.TyCo.Rep.mkFunTy has assertions about the consistency of the argument
+flag and arg/res types.  But when constructing the kinds of tYPETyCon and
+cONSTRAINTTyCon we don't want to make these checks because
+     TYPE :: RuntimeRep -> Type
+i.e. TYPE :: RuntimeRep- > TYPE LiftedRep
+
+so the check will loop infinitely.  Hence the use of a naked FunTy
+constructor in tTYPETyCon and cONSTRAINTTyCon.
+-}
+
 ----------------------
 -- type TYPE = SORT TypeLike
 tYPETyCon :: TyCon
 tYPETyCon = buildSynTyCon tYPETyConName [] kind [] rhs
   where
-    kind = runtimeRepTy `mkVisFunTyMany` liftedTypeKind
     rhs  = TyCoRep.TyConApp sORTTyCon [typeLikeDataConTy]
+    -- See Note [Naked FunTy]
+    kind = mkNakedKindFunTy visArgTypeLike runtimeRepTy liftedTypeKind
 
 tYPETyConName :: Name
 tYPETyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "TYPE")
@@ -1498,8 +1522,9 @@ tYPEKind = mkTyConTy tYPETyCon
 cONSTRAINTTyCon :: TyCon
 cONSTRAINTTyCon = buildSynTyCon cONSTRAINTTyConName [] kind [] rhs
   where
-    kind = runtimeRepTy `mkVisFunTyMany` liftedTypeKind
     rhs = TyCoRep.TyConApp sORTTyCon [constraintLikeDataConTy]
+    -- See Note [Naked FunTy]
+    kind = mkNakedKindFunTy visArgTypeLike runtimeRepTy liftedTypeKind
 
 cONSTRAINTTyConName :: Name
 cONSTRAINTTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "CONSTRAINT")
@@ -2085,8 +2110,10 @@ nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
 consDataCon :: DataCon
 consDataCon = pcDataConWithFixity True {- Declared infix -}
                consDataConName
-               alpha_tyvar [] alpha_tyvar
-               (map linear [alphaTy, mkTyConApp listTyCon alpha_ty]) listTyCon
+               alpha_tyvar [] alpha_tyvar []
+               (map linear [alphaTy, mkTyConApp listTyCon alpha_ty])
+               listTyCon
+
 -- Interesting: polymorphic recursion would help here.
 -- We can't use (mkListTy alphaTy) in the defn of consDataCon, else mkListTy
 -- gets the over-specific type (Type -> Type)
@@ -2098,7 +2125,7 @@ nonEmptyTyCon = pcTyCon nonEmptyTyConName Nothing [alphaTyVar] [nonEmptyDataCon]
 nonEmptyDataCon :: DataCon
 nonEmptyDataCon = pcDataConWithFixity True {- Declared infix -}
                     nonEmptyDataConName
-                    alpha_tyvar [] alpha_tyvar
+                    alpha_tyvar [] alpha_tyvar []
                     (map linear [alphaTy, mkTyConApp listTyCon alpha_ty])
                     nonEmptyTyCon
 

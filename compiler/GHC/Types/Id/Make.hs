@@ -73,7 +73,7 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )
-import GHC.Types.Var (VarBndr(Bndr))
+import GHC.Types.Var (VarBndr(Bndr), visArgConstraintLike)
 
 import GHC.Tc.Utils.TcType as TcType
 
@@ -1484,7 +1484,7 @@ noinlineConstraintId = pcMiscPrelId noinlineConstraintIdName ty info
   where
     info = noCafIdInfo
     ty   = mkSpecForAllTys [alphaConstraintTyVar] $
-           mkVisFunTyMany alphaTy alphaConstraintTy
+           mkFunTy visArgConstraintLike ManyTy alphaTy alphaConstraintTy
 
 ------------------------------------------------
 nospecId :: Id -- See Note [nospecId magic]

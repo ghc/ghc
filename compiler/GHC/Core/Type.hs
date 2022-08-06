@@ -30,14 +30,15 @@ module GHC.Core.Type (
         splitAppTy_maybe, repSplitAppTy_maybe, tcRepSplitAppTy_maybe,
 
         mkFunTy, mkVisFunTy,
-        mkFunTyMany, mkVisFunTyMany, mkVisFunTysMany,
+        mkVisFunTyMany, mkVisFunTysMany,
         mkScaledFunTys,
         mkInvisFunTy, mkInvisFunTys,
+        tcMkVisFunTy, tcMkScaledFunTys, tcMkInvisFunTy,
         splitFunTy, splitFunTy_maybe,
         splitFunTys, funResultTy, funArgTy,
         funTyConApp_maybe, funTyConAppTy_maybe, tyConAppFun_maybe,
         funTyAnonArgFlag, anonArgTyCon,
-        mkFunctionType, chooseAnonArgFlag,
+        mkFunctionType, mkScaledFunctionTys, chooseAnonArgFlag,
 
         mkTyConApp, mkTyConTy, mkTYPEapp, mkCONSTRAINTapp,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
@@ -285,7 +286,6 @@ import GHC.Utils.Misc
 import GHC.Utils.FV
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Trace
 import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Data.Pair
@@ -416,12 +416,8 @@ unification in GHC.Tc.Utils.TcMType.writeMetaTyVarRef.
 -- 'Type'. Returns 'Nothing' if no unwrapping happens.
 -- See also Note [coreView vs tcView]
 tcView :: Type -> Maybe Type
-tcView (TyConApp tc tys)
-  | res@(Just _) <- expandSynTyConApp_maybe tc tys
-  = res
-tcView _ = Nothing
--- See Note [Inlining coreView].
 {-# INLINE tcView #-}
+tcView ty = coreView ty
 
 coreView :: Type -> Maybe Type
 -- ^ This function strips off the /top layer only/ of a type synonym
@@ -453,14 +449,9 @@ expandSynTyConApp_maybe :: TyCon -> [Type] -> Maybe Type
 -- Don't be tempted to make `expand_syn` (which is NOINLINE) return the
 -- Just/Nothing, else you'll increase allocation
 expandSynTyConApp_maybe tc arg_tys
-  | Just (tvs, rhs) <- pprTrace "expandSyn1" (ppr tc <+> ppr arg_tys) $
-                       synTyConDefn_maybe tc
-  , pprTrace "expandSyn2" (ppr tc <+> ppr rhs) $
-    pprTrace "expandSyn3" (ppr tc <+> ppr tvs) $
-    pprTrace "expandSyn4" (ppr tc <+> ppr (tyConArity tc)) $
-    arg_tys `lengthAtLeast` (tyConArity tc)
-  = pprTrace "expandSynTyConApp" (ppr tc <+> ppr arg_tys <+> ppr tvs <+> ppr rhs) $
-    Just (expand_syn tvs rhs arg_tys)
+  | Just (tvs, rhs) <- synTyConDefn_maybe tc
+  , arg_tys `lengthAtLeast` (tyConArity tc)
+  = Just (expand_syn tvs rhs arg_tys)
   | otherwise
   = Nothing
 
@@ -509,14 +500,13 @@ coreFullView, core_full_view :: Type -> Type
 --     core_full_view is the recursive one
 -- See Note [Inlining coreView].
 coreFullView ty@(TyConApp tc _)
-  | isTypeSynonymTyCon tc = pprTrace "core_full_view {" (ppr ty) $
-                            core_full_view ty
+  | isTypeSynonymTyCon tc = core_full_view ty
 coreFullView ty = ty
 {-# INLINE coreFullView #-}
 
 core_full_view ty
   | Just ty' <- coreView ty = core_full_view ty'
-  | otherwise               = pprTrace "core_full_view }" (ppr ty) ty
+  | otherwise               = ty
 
 
 {- Note [Inlining coreView]
@@ -1388,23 +1378,26 @@ mkFunctionType mult arg_ty res_ty
     af = chooseAnonArgFlag arg_ty res_ty
     mult_ok = isVisibleAnonArg af || isManyTy mult
 
-   -- See GHC.Types.Var Note [AnonArgFlag]
-chooseAnonArgFlag :: Type -> Type -> AnonArgFlag
+mkScaledFunctionTys :: [Scaled Type] -> Type -> Type
+-- Like mkFunctionType, compute the AnonArgFlag from the arguments
+mkScaledFunctionTys arg_tys res_ty
+  = foldr mk res_ty arg_tys
+  where
+    res_torc = typeTypeOrConstraint res_ty
+    mk (Scaled mult arg_ty) res_ty
+      = mkFunTy (choose_anon_arg_flag_help arg_ty res_torc)
+                mult arg_ty res_ty
+
+chooseAnonArgFlag :: HasDebugCallStack => Type -> Type -> AnonArgFlag
+-- See GHC.Types.Var Note [AnonArgFlag]
 chooseAnonArgFlag arg_ty res_ty
+  = choose_anon_arg_flag_help arg_ty (typeTypeOrConstraint res_ty)
+
+choose_anon_arg_flag_help :: Type -> TypeOrConstraint -> AnonArgFlag
+choose_anon_arg_flag_help arg_ty res_torc
   = case typeTypeOrConstraint arg_ty of
        TypeLike       -> VisArg   res_torc   -- (arg -> res), (arg -=> res)
        ConstraintLike -> InvisArg res_torc   -- (arg => res), (arg ==> res)
-  where
-    res_torc = typeTypeOrConstraint res_ty
-
-{-
--- Or
- = case (isPredTy arg_ty, isPredTy res_ty) of
-         (False, False)    -> VisArg   TypeLike          -- (arg -> res)
-         (False, True)     -> VisArg   ConstraintLike    -- (arg -=> res)
-         (True, False)     -> InvisArg TypeLike          -- (arg => res)
-         (True, True)      -> InvisArg ConstraintLike    -- (arg ==> res)
--}
 
 splitFunTy :: Type -> (Mult, Type, Type)
 -- ^ Attempts to extract the multiplicity, argument and result types from a type,
@@ -3054,10 +3047,6 @@ tcTypeKind ty@(ForAllTy {})
     body_kind = tcTypeKind body
 -}
 
-isPredTy :: HasDebugCallStack => Type -> Bool
--- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
-isPredTy ty = isConstraintKind (tcTypeKind ty)
-
 sORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
 -- Sees if the argument is if form (SORT type_or_constraint runtime_rep)
 -- and if so returns those components
@@ -3072,22 +3061,24 @@ sORTKind_maybe kind
                      -> Just (torc, rep)
       _ -> Nothing
 
-typeTypeOrConstraint :: Type -> TypeOrConstraint
+typeTypeOrConstraint :: HasDebugCallStack => Type -> TypeOrConstraint
 -- Precondition: expects a type that classifies values.
 -- Returns whether it is TypeLike or ConstraintLike.
 -- Equivalent to calling sORTKind_maybe, but faster in the FunTy case
 typeTypeOrConstraint ty
-   = pprTrace "typeTypeOrConstraint {" (ppr ty) $
-     pprTrace "typeTypeOrConstraint }" (case res of {TypeLike -> text "type"; ConstraintLike -> text "constraint" }) $
-     res
-  where
-   res =  case coreFullView ty of
+   = case coreFullView ty of
        FunTy { ft_af = af } -> anonArgResultTypeOrConstraint af
-       ty' | Just (torc, _) <- pprTrace "tc1 {" (ppr ty' <+> dcolon <+> ppr (typeKind ty')) $
-                               sORTKind_maybe (typeKind ty')
-          -> pprTrace "tc1 }" empty torc
+       ty' | Just (torc, _) <- sORTKind_maybe (typeKind ty')
+          -> torc
           | otherwise
           -> pprPanic "typeOrConstraint" (ppr ty <+> dcolon <+> ppr (typeKind ty))
+
+isPredTy :: HasDebugCallStack => Type -> Bool
+-- Precondition: expects a type that classifies values
+-- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
+isPredTy ty = case typeTypeOrConstraint ty of
+                  TypeLike       -> False
+                  ConstraintLike -> True
 
 -----------------------------------------
 -- | Does this classify a type allowed to have values? Responds True to things

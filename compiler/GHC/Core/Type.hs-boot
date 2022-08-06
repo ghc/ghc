@@ -19,7 +19,7 @@ mkTyConApp :: TyCon -> [Type] -> Type
 piResultTy :: HasDebugCallStack => Type -> Type -> Type
 
 typeKind :: HasDebugCallStack => Type -> Type
-typeTypeOrConstraint :: Type -> TypeOrConstraint
+typeTypeOrConstraint :: HasDebugCallStack => Type -> TypeOrConstraint
 
 coreView :: Type -> Maybe Type
 tcView :: Type -> Maybe Type
@@ -35,4 +35,4 @@ getLevity :: HasDebugCallStack => Type -> Type
 
 partitionInvisibleTypes :: TyCon -> [Type] -> ([Type], [Type])
 
-chooseAnonArgFlag :: Type -> Type -> AnonArgFlag
+chooseAnonArgFlag :: HasDebugCallStack => Type -> Type -> AnonArgFlag

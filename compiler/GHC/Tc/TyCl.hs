@@ -3416,7 +3416,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
              fake_ty  = mkSpecForAllTys  tc_tvs      $
                         mkInvisForAllTys exp_tvbndrs $
                         mkPhiTy ctxt $
-                        mkScaledFunTys arg_tys $
+                        tcMkScaledFunTys arg_tys $
                         unitTy
              -- That type is a lie, of course. (It shouldn't end in ()!)
              -- And we could construct a proper result type from the info

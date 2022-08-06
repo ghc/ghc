@@ -3,7 +3,6 @@ module GHC.Core.TyCo.Rep where
 
 import GHC.Utils.Outputable ( Outputable )
 import Data.Data  ( Data )
-import GHC.Utils.Misc ( HasDebugCallStack )
 import {-# SOURCE #-} GHC.Types.Var( Var, ArgFlag, AnonArgFlag )
 import {-# SOURCE #-} GHC.Core.TyCon ( TyCon )
 
@@ -24,9 +23,9 @@ type ThetaType = [PredType]
 type CoercionN = Coercion
 type MCoercionN = MCoercion
 
-mkFunTyMany :: HasDebugCallStack => AnonArgFlag -> Type -> Type -> Type
-mkForAllTy :: Var -> ArgFlag -> Type -> Type
-mkNakedTyConTy :: TyCon -> Type
+mkForAllTy       :: Var -> ArgFlag -> Type -> Type
+mkNakedTyConTy   :: TyCon -> Type
+mkNakedKindFunTy :: AnonArgFlag -> Type -> Type -> Type
 
 instance Data Type  -- To support Data instances in GHC.Core.Coercion.Axiom
 instance Outputable Type

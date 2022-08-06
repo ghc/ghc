@@ -337,7 +337,10 @@ toIfaceAppArgsX :: VarSet -> Kind -> [Type] -> IfaceAppArgs
 -- Is 'blib' visible?  It depends on the visibility flag on j,
 -- so we have to substitute for k.  Annoying!
 toIfaceAppArgsX fr kind ty_args
-  = go (mkEmptySubst in_scope) kind ty_args
+  | null ty_args
+  = IA_Nil
+  | otherwise
+  = go (mkEmptyvSubst in_scope) kind ty_args
   where
     in_scope = mkInScopeSet (tyCoVarsOfTypes ty_args)
 

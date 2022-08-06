@@ -1759,6 +1759,12 @@ lintType ty@(FunTy af tw t1 t2)
        ; t2' <- lintType t2
        ; tw' <- lintType tw
        ; lintArrow (text "type or kind" <+> quotes (ppr ty)) t1' t2' tw'
+       ; let real_af = chooseAnonArgFlag t1 t2
+       ; unless (real_af == af) $ addErrL $
+         hang (text "Bad AnonArgFlag in FunTy")
+            2 (vcat [ ppr ty
+                    , text "AnonArgFlag =" <+> ppr af
+                    , text "Computed AnonArgFlag =" <+> ppr real_af ])
        ; return (FunTy af tw' t1' t2') }
 
 lintType ty@(ForAllTy (Bndr tcv vis) body_ty)
@@ -1859,17 +1865,16 @@ lintArrow :: SDoc -> LintedType -> LintedType -> LintedType -> LintM ()
 -- See Note [GHC Formalism]
 lintArrow what t1 t2 tw  -- Eg lintArrow "type or kind `blah'" k1 k2 kw
                          -- or lintArrow "coercion `blah'" k1 k2 kw
-  = do { unless (classifiesTypeWithValues k1) (addErrL (msg (text "argument") k1))
-       ; unless (classifiesTypeWithValues k2) (addErrL (msg (text "result")   k2))
-       ; unless (isMultiplicityTy kw) (addErrL (msg (text "multiplicity") kw)) }
+  = do { unless (classifiesTypeWithValues k1) (report (text "argument") k1)
+       ; unless (classifiesTypeWithValues k2) (report (text "result")   k2)
+       ; unless (isMultiplicityTy kw)         (report (text "multiplicity") kw) }
   where
     k1 = typeKind t1
     k2 = typeKind t2
     kw = typeKind tw
-    msg ar k
-      = vcat [ hang (text "Ill-kinded" <+> ar)
-                  2 (text "in" <+> what)
-             , what <+> text "kind:" <+> ppr k ]
+    report ar k = addErrL (vcat [ hang (text "Ill-kinded" <+> ar)
+                                     2 (text "in" <+> what)
+                                , what <+> text "kind:" <+> ppr k ])
 
 -----------------
 lint_ty_app :: Type -> LintedKind -> [LintedType] -> LintM ()

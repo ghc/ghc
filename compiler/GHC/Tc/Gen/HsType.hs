@@ -1188,7 +1188,7 @@ tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
        ; ek <- newOpenTypeKind  -- The body kind (result of the function) can
                                 -- be TYPE r, for any r, hence newOpenTypeKind
        ; ty' <- tc_lhs_type mode rn_ty ek
-       ; checkExpectedKind (unLoc rn_ty) (mkPhiTy ctxt' ty')
+       ; checkExpectedKind (unLoc rn_ty) (tcMkPhiTy ctxt' ty')
                            liftedTypeKind exp_kind }
 
 --------- Lists, arrays, and tuples
@@ -1338,24 +1338,18 @@ tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
     do { traceTc "tc_fun_type" (ppr ty1 $$ ppr ty2)
        ; arg_k <- newOpenTypeKind
        ; res_k <- newOpenTypeKind
-       ; ty1' <- tc_lhs_type mode ty1 arg_k
-       ; ty2' <- tc_lhs_type mode ty2 res_k
+       ; ty1'  <- tc_lhs_type mode ty1 arg_k
+       ; ty2'  <- tc_lhs_type mode ty2 res_k
        ; mult' <- tc_mult mode mult
-       ; traceTc "tc_fun_type1" (ppr ty1')
-       ; traceTc "tc_fun_type2" (ppr ty2' $$ ppr mult')
-       ; traceTc "tc_fun_type3" (ppr (typeKind ty1'))
-       ; traceTc "tc_fun_type4" (ppr (typeKind ty2'))
-       ; traceTc "tc_fun_type5" (debugPprType (mkVisFunTy mult' ty1' ty2'))
-       ; traceTc "tc_fun_type5" (ppr (mkVisFunTy mult' ty1' ty2'))
        ; checkExpectedKind (HsFunTy noAnn mult ty1 ty2)
-                           (mkVisFunTy mult' ty1' ty2')
+                           (tcMkVisFunTy mult' ty1' ty2')
                            liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
-    do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
-       ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
+    do { ty1'  <- tc_lhs_type mode ty1 liftedTypeKind
+       ; ty2'  <- tc_lhs_type mode ty2 liftedTypeKind
        ; mult' <- tc_mult mode mult
        ; checkExpectedKind (HsFunTy noAnn mult ty1 ty2)
-                           (mkVisFunTy mult' ty1' ty2')
+                           (tcMkVisFunTy mult' ty1' ty2')
                            liftedTypeKind exp_kind }
 
 {- Note [Skolem escape and forall-types]

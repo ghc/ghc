@@ -160,7 +160,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Trace
 
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )
@@ -820,8 +819,8 @@ mkFunCo r af w co1 co2
   = mkReflCo r (mkFunTy af w ty1 ty2)
 
   | otherwise
-  = -- assertPpr (af == chooseAnonArgFlag (coercionLKind co1) (coercionLKind co2)) (doc "left")  $
-    -- assertPpr (af == chooseAnonArgFlag (coercionRKind co1) (coercionRKind co2)) (doc "right") $
+  = assertPpr (af == chooseAnonArgFlag (coercionLKind co1) (coercionLKind co2)) (doc "left")  $
+    assertPpr (af == chooseAnonArgFlag (coercionRKind co1) (coercionRKind co2)) (doc "right") $
     FunCo r af w co1 co2
   where
     doc txt = hang (text "mkFunCo" <> parens (text txt) <+> ppr af) 2 $
@@ -2389,8 +2388,7 @@ coercionKind co = Pair (coercionLKind co) (coercionRKind co)
 
 coercionLKind :: Coercion -> Type
 coercionLKind co
-  = pprTrace "coercionLKind" (ppr co) $
-    go co
+  = go co
   where
     go (Refl ty)                = ty
     go (GRefl _ ty _)           = ty

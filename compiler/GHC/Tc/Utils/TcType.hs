@@ -55,7 +55,7 @@ module GHC.Tc.Utils.TcType (
 
   --------------------------------
   -- Builders
-  mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy, mkPhiTy,
+  mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy, mkPhiTy, tcMkPhiTy,
   mkDFunTy, mkDFunPhiTy,
   mkTcAppTy, mkTcAppTys, mkTcCastTy,
 
@@ -1303,9 +1303,15 @@ mkPhiTy :: HasDebugCallStack => [PredType] -> Type -> Type
 -- Result type is TypeLike
 mkPhiTy = mkInvisFunTys
 
+tcMkPhiTy :: HasDebugCallStack => [PredType] -> Type -> Type
+-- Like mkPhiTy, but with no assertion checks; it is called
+-- by the type checker and the result kind may not be zonked yet
+-- But the result kind is TypeLike
+tcMkPhiTy tys ty = foldr tcMkInvisFunTy ty tys
+
 mkDFunPhiTy :: HasDebugCallStack => [PredType] -> Type -> Type
 -- Result type is ConstraintLike
-mkDFunPhiTy preds res = foldr (mkFunTyMany invisArgConstraintLike) res preds
+mkDFunPhiTy preds res = foldr (mkFunTy invisArgConstraintLike ManyTy) res preds
 
 ---------------
 getDFunTyKey :: Type -> OccName -- Get some string from a type, to be used to

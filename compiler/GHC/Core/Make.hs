@@ -61,7 +61,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Types.Id
-import GHC.Types.Var  ( EvVar, setTyVarUnique )
+import GHC.Types.Var  ( EvVar, setTyVarUnique, visArgConstraintLike )
 import GHC.Types.TyThing
 import GHC.Types.Id.Info
 import GHC.Types.Cpr
@@ -1117,7 +1117,8 @@ aBSENT_CONSTRAINT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
  where
    -- absentConstraintError :: forall (a :: Constraint). Addr# -> a
    absent_ty = mkSpecForAllTys [alphaConstraintTyVar] $
-               mkVisFunTyMany addrPrimTy (mkTyVarTy alphaConstraintTyVar)
+               mkFunTy visArgConstraintLike ManyTy
+                       addrPrimTy (mkTyVarTy alphaConstraintTyVar)
    id_info = divergingIdInfo [evalDmd] -- NB: CAFFY!
 
 
