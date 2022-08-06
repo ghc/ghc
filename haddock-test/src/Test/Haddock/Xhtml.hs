@@ -23,8 +23,9 @@ import Data.Char ( isSpace )
 newtype Xml = Xml { unXml :: String }
 
 -- | Part of parsing involves dropping the @DOCTYPE@ line
+-- and windows newline endings
 parseXml :: String -> Maybe Xml
-parseXml = Just . Xml . dropDocTypeLine
+parseXml = Just . Xml . filter (/= '\r') . dropDocTypeLine
   where
   dropDocTypeLine bs
     | "<!DOCTYPE" `isPrefixOf` bs

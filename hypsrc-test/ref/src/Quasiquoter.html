@@ -80,8 +80,10 @@
 </span
       ><span id="line-7"
       ></span
+      ><span class="annot"
       ><span class="hs-comment"
-      >-- | Quoter for constructing multiline string literals</span
+	>-- | Quoter for constructing multiline string literals</span
+	></span
       ><span
       >
 </span
@@ -156,6 +158,7 @@
       ><span class="annot"
       ><span class="annottext"
 	>Exp -&gt; Q Exp
+forall a. a -&gt; Q a
 forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
 </span
 	><span class="hs-identifier hs-var"
@@ -398,6 +401,7 @@ forall a. String -&gt; Q a
       ><span class="annot"
       ><span class="annottext"
 	>String -&gt; Q a
+forall a. String -&gt; Q a
 forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
 </span
 	><span class="hs-identifier hs-var"

@@ -132,9 +132,9 @@ sugarTuples typ =
 
 
 sugarOperators :: HsType GhcRn -> HsType GhcRn
-sugarOperators (HsAppTy _ (L _ (HsAppTy _ (L _ (HsTyVar _ _ (L l name))) la)) lb)
-    | isSymOcc $ getOccName name' = mkHsOpTy la (L l name) lb
-    | unrestrictedFunTyConName == name' = HsFunTy noAnn (HsUnrestrictedArrow NormalSyntax) la lb
+sugarOperators (HsAppTy _ (L _ (HsAppTy _ (L _ (HsTyVar _ prom (L l name))) la)) lb)
+    | isSymOcc $ getOccName name' = mkHsOpTy prom la (L l name) lb
+    | unrestrictedFunTyConName == name' = HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) la lb
   where
     name' = getName name
 sugarOperators typ = typ
@@ -283,7 +283,7 @@ renameType (HsForAllTy x tele lt) =
         <*> renameLType lt
 renameType (HsQualTy x lctxt lt) =
     HsQualTy x
-        <$> renameMContext lctxt
+        <$> renameLContext lctxt
         <*> renameLType lt
 renameType (HsTyVar x ip name) = HsTyVar x ip <$> locatedN renameName name
 renameType t@(HsStarTy _ _) = pure t
@@ -293,8 +293,8 @@ renameType (HsFunTy x w la lr) = HsFunTy x <$> renameHsArrow w <*> renameLType l
 renameType (HsListTy x lt) = HsListTy x <$> renameLType lt
 renameType (HsTupleTy x srt lt) = HsTupleTy x srt <$> mapM renameLType lt
 renameType (HsSumTy x lt) = HsSumTy x <$> mapM renameLType lt
-renameType (HsOpTy x la lop lb) =
-    HsOpTy x <$> renameLType la <*> locatedN renameName lop <*> renameLType lb
+renameType (HsOpTy x prom la lop lb) =
+    HsOpTy x prom <$> renameLType la <*> locatedN renameName lop <*> renameLType lb
 renameType (HsParTy x lt) = HsParTy x <$> renameLType lt
 renameType (HsIParamTy x ip lt) = HsIParamTy x ip <$> renameLType lt
 renameType (HsKindSig x lt lk) = HsKindSig x <$> renameLType lt <*> pure lk
@@ -311,7 +311,7 @@ renameType t@(HsTyLit _ _) = pure t
 renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
 
 renameHsArrow :: HsArrow GhcRn -> Rename (IdP GhcRn) (HsArrow GhcRn)
-renameHsArrow (HsExplicitMult u a p) = HsExplicitMult u a <$> renameLType p
+renameHsArrow (HsExplicitMult pct p arr) = (\p' -> HsExplicitMult pct p' arr) <$> renameLType p
 renameHsArrow mult = pure mult
 
 
@@ -324,11 +324,10 @@ renameLKind = renameLType
 renameLTypes :: [LHsType GhcRn] -> Rename (IdP GhcRn) [LHsType GhcRn]
 renameLTypes = mapM renameLType
 
-renameMContext :: Maybe (LHsContext GhcRn) -> Rename (IdP GhcRn) (Maybe (LHsContext GhcRn))
-renameMContext Nothing = return Nothing
-renameMContext (Just (L l ctxt)) = do
+renameLContext :: LHsContext GhcRn -> Rename (IdP GhcRn) (LHsContext GhcRn)
+renameLContext (L l ctxt) = do
   ctxt' <- renameContext ctxt
-  return (Just (L l ctxt'))
+  return (L l ctxt')
 
 renameContext :: HsContext GhcRn -> Rename (IdP GhcRn) (HsContext GhcRn)
 renameContext = renameLTypes
