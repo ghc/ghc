@@ -1092,7 +1092,7 @@ def test_common_work(watcher: testutil.Watcher,
         do_ways = list(filter (ok_way,all_ways))
 
         # Only run all ways in slow mode.
-        # See Note [validate and testsuite speed] in toplevel Makefile.
+        # See Note [validate and testsuite speed] in `validate`
         if config.accept:
             # Only ever run one way
             do_ways = do_ways[:1]

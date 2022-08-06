@@ -300,7 +300,7 @@ else
 set_list_broken =
 endif
 
-# See Note [validate and testsuite speed] in toplevel Makefile.
+# See Note [validate and testsuite speed] in `validate`
 ifneq "$(SPEED)" ""
 setspeed = -e config.speed="$(SPEED)"
 else ifeq "$(fast)" "YES"
@@ -356,7 +356,7 @@ accept:
 	$(MAKE) accept=YES
 
 fast fasttest:
-	# See Note [validate and testsuite speed] in toplevel Makefile.
+	# See Note [validate and testsuite speed] in `validate`
 	$(MAKE) SPEED=2
 
 slow slowtest:
