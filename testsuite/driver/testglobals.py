@@ -89,7 +89,7 @@ class TestConfig:
         # Verbosity level
         self.verbose = 2
 
-        # See Note [validate and testsuite speed] in toplevel Makefile.
+        # See Note [validate and testsuite speed] in `validate`
         self.speed = 1
 
         self.list_broken = False

@@ -50,7 +50,6 @@ ref    compiler/Language/Haskell/Syntax/Binds.hs:204:31:     Note [fun_id in Mat
 ref    compiler/Language/Haskell/Syntax/Pat.hs:336:12:     Note [Disambiguating record fields]
 ref    configure.ac:212:10:     Note [Linking ghc-bin against threaded stage0 RTS]
 ref    docs/core-spec/core-spec.mng:177:6:     Note [TyBinders]
-ref    ghc/ghc.mk:62:6:     Note [Linking ghc-bin against threaded stage0 RTS]
 ref    hadrian/src/Expression.hs:130:30:     Note [Linking ghc-bin against threaded stage0 RTS]
 ref    libraries/base/GHC/ST.hs:134:7:     Note [Definition of runRW#]
 ref    linters/lint-notes/Notes.hs:32:29:     Note [" <> T.unpack x <> "]
@@ -75,5 +74,4 @@ ref    testsuite/tests/typecheck/should_compile/tc228.hs:9:7:     Note [Inferenc
 ref    testsuite/tests/typecheck/should_compile/tc231.hs:12:16:     Note [Important subtlety in oclose]
 ref    testsuite/tests/typecheck/should_fail/UnliftedNewtypesMultiFieldGadt.hs:11:28:     Note [Kind-checking the field type]
 ref    testsuite/tests/typecheck/should_fail/tcfail093.hs:13:7:     Note [Important subtlety in oclose]
-ref    validate:412:14:     Note [Why is there no stage1 setup function?]
 

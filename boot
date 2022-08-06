@@ -56,70 +56,6 @@ def check_boot_packages():
                     Maybe you haven't run 'git submodule update --init'?
                     """ % license_path)
 
-# Create libraries/*/{ghc.mk,GNUmakefile}
-def boot_pkgs():
-    library_dirs = []
-
-    for package in glob.glob("libraries/*/"):
-        packages_file = os.path.join(package, 'ghc-packages')
-        print(package)
-        if os.path.isfile(packages_file):
-            for subpkg in open(packages_file, 'r'):
-                library_dirs.append(os.path.join(package, subpkg.strip()))
-        elif package in EXCEPTIONS:
-            library_dirs.append(EXCEPTIONS[package])
-        else:
-            library_dirs.append(package)
-
-    for package in library_dirs:
-        if package[-1] == '/':
-            # drop trailing '/'
-            package = package[:-1]
-
-        dir_ = os.path.relpath(package, 'libraries')
-        cabals = glob.glob(os.path.join(package, '*.cabal.in'))
-        if len(cabals) == 0:
-            cabals = glob.glob(os.path.join(package, '*.cabal'))
-
-        if len(cabals) > 1:
-            die('Too many .cabal files in %s' % package)
-        elif len(cabals) == 1:
-            cabal = cabals[0]
-
-            if os.path.isfile(cabal):
-                # strip both .cabal and .in
-                pkg = os.path.splitext(os.path.splitext(os.path.basename(cabal))[0])[0]
-                top = os.path.join(*['..'] * len(os.path.normpath(package).split(os.path.sep)))
-
-                ghc_mk = os.path.join(package, 'ghc.mk')
-                if os.path.exists(ghc_mk):
-                    print('Skipping %s which already exists' % ghc_mk)
-                    continue
-                print('Creating %s' % ghc_mk)
-                with open(ghc_mk, 'w') as f:
-                    f.write(dedent(
-                        """\
-                        {package}_PACKAGE = {pkg}
-                        {package}_dist-install_GROUP = libraries
-                        $(if $(filter {dir},$(PACKAGES_STAGE0)),$(eval $(call build-package,{package},dist-boot,0)))
-                        $(if $(filter {dir},$(PACKAGES_STAGE1)),$(eval $(call build-package,{package},dist-install,1)))
-                        $(if $(filter {dir},$(PACKAGES_STAGE2)),$(eval $(call build-package,{package},dist-install,2)))
-                        """.format(package = package,
-                                pkg = pkg,
-                                dir = dir_)))
-
-                makefile = os.path.join(package, 'GNUmakefile')
-                with open(makefile, 'w') as f:
-                    f.write(dedent(
-                        """\
-                        dir = {package}
-                        TOP = {top}
-                        include $(TOP)/mk/sub-makefile.mk
-                        FAST_MAKE_OPTS += stage=0
-                        """.format(package = package, top = top)
-                    ))
-
-
 def autoreconf():
     # Run autoreconf on everything that needs it.
     processes = {}
@@ -154,24 +90,5 @@ def autoreconf():
     if fail:
         sys.exit(1)
 
-def check_build_mk():
-    if not args.validate and not os.path.isfile("mk/build.mk"):
-        print(dedent(
-            """
-            WARNING: You don't have a mk/build.mk file.
-
-            By default a standard GHC build will be done, which uses optimisation
-            and builds the profiling libraries. This will take a long time, so may
-            not be what you want if you are developing GHC or the libraries, rather
-            than simply building it to use it.
-
-            For information on creating a mk/build.mk file, please see:
-                https://gitlab.haskell.org/ghc/ghc/wikis/building/using#build-configuration
-            """))
-
 check_boot_packages()
-if not args.hadrian:
-    boot_pkgs()
 autoreconf()
-if not args.hadrian:
-    check_build_mk()
