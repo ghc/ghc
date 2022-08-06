@@ -40,6 +40,11 @@ upgrading to GHC 9.4:
   report warnings where it previously did not. In such cases the correct
   solution is generally to remove the ``hs-boot`` file in question.
 
+- The boxed ``Word64`` and ``Int64`` types are now internally represented by
+  the unboxed ``Word64#`` and ``Int64#`` primitive types, in contrast
+  previous releases where they were represented by ``Word#`` and ``Int#``
+  on 64-bit platforms.
+
 - Due to various changes in the typechecker's constraint solver, some programs
   may need additional constraints to be explicitly provided. See the `Migration
   guide

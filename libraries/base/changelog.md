@@ -73,7 +73,7 @@
     This replaces the old ``GHC.Exts.magicDict``, which required
     an intermediate data type and was less reliable.
 
-  * `Data.Word.Word64` and `Data.Int.Int64` are now already represented by
+  * `Data.Word.Word64` and `Data.Int.Int64` are now always represented by
     `Word64#` and `Int64#`, respectively. Previously on 32-bit platforms these
     were rather represented by `Word#` and `Int#`. See GHC #11953.
 
