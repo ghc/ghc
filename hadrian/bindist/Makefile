@@ -178,7 +178,9 @@ install_bin_libdir:
 		$(INSTALL_PROGRAM) $$i "$(DESTDIR)$(ActualBinsDir)"; \
 	done
 	# Work around #17418 on Darwin
-	if [ -e "${XATTR}" ]; then "${XATTR}" -c -r "$(DESTDIR)$(ActualBinsDir)"; fi
+	if [ -e "${XATTR}" ]; then \
+		"${XATTR}" -c -r "$(DESTDIR)$(ActualBinsDir)"; \
+	fi
 
 install_bin_direct:
 	@echo "Copying binaries to $(DESTDIR)$(WrapperBinsDir)"
@@ -209,6 +211,10 @@ install_lib: lib/settings
 		esac; \
 	done; \
 	chmod ugo+rx "$$dest"/bin/*
+	# Work around #17418 on Darwin
+	if [ -e "${XATTR}" ]; then \
+		"${XATTR}" -c -r "$(DESTDIR)$(ActualLibsDir)"; \
+	fi
 
 install_docs:
 	@echo "Copying docs to $(DESTDIR)$(docdir)"
