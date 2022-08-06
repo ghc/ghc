@@ -25,8 +25,6 @@ Flags:
                        2008-07-01: 14% slower than the default.
   --quiet              More pretty build log.
                        See Note [Default build system verbosity].
-  --legacy             Build the compiler and run the tests through the legacy
-                       make-based build system.
   --stack              Use Stack to build Hadrian and to provide the bootstrap
                        compiler.
   --ignore-perf-all    Use Hadrian's user settings to ask the "runtests" driver
@@ -38,9 +36,9 @@ Flags:
   --debug              Use inbuilt Hadrian flag to generate information for debugging
   --help               shows this usage help.
 
-  validate runs 'make -j\$THREADS', where by default THREADS is the number of
-  cpus your computer has +1. You can set the environment variable THREADS to
-  override this. For a sequential build you would for example use
+  validate runs 'hadrian/build -j\$THREADS', where by default THREADS is the
+  number of cpus your computer has +1. You can set the environment variable
+  THREADS to override this. For a sequential build you would for example use
 
     THREADS=1 ./validate
 
@@ -55,9 +53,9 @@ Flags:
   Note on BINDIST variable: The BINDIST variable value indicates whether a binary
   distribution of GHC built using Hadrian/Make is to be installed. When set
   to "YES", it indicates that a path, previously set with the --prefix flag in
-  the configuration step (./configure), can be used as the installation location
-  for both Hadrian and legacy Make systems. Otherwise the binary executables
-  built are placed in sub-directories within the "./_validatebuild" directory.
+  the configuration step (./configure), can be used as the installation location.
+  Otherwise the binary executables built are placed in sub-directories within
+  the "./_validatebuild" directory.
 
   Note on validate vs GitLab CI setup: This script is distinct from the
   collection of validation settings used by the GitLab Continuous Integration
@@ -77,7 +75,6 @@ be_quiet=0
 # heavy cost of xz, which is the typical default. The options are defined in
 # mk/config.mk.in
 tar_comp=gzip
-use_hadrian=YES
 use_stack=NO
 ignore_perf_all=NO
 ignore_perf_increases=NO
@@ -118,9 +115,6 @@ do
     --quiet)
         be_quiet=1
         ;;
-    --legacy)
-        use_hadrian=NO
-        ;;
     --stack)
         use_stack=YES
         ;;
@@ -149,11 +143,7 @@ done
 
 check_packages () {
     if [ "$bindistdir" = "" ]; then
-        if [ "$use_hadrian" = "YES" ]; then
-            ghc_pkg=$basedir/$hadrian_build_root/stage1/bin/ghc-pkg
-        else
-            ghc_pkg=inplace/bin/ghc-pkg
-        fi
+        ghc_pkg=$basedir/$hadrian_build_root/stage1/bin/ghc-pkg
     else
         ghc_pkg=$basedir/$bindistdir/bin/ghc-pkg
     fi
@@ -180,6 +170,7 @@ echo "using THREADS=${threads}" >&2
 
 configure_cmd="./configure"
 
+# Figure out name of `make`, needed to install binary distributions
 make="gmake"
 if type gmake > /dev/null 2> /dev/null ; then
     make="gmake"
@@ -192,32 +183,30 @@ if [ $be_quiet -eq 1 ]; then
 fi
 
 # Set up configuration, commands for building
-if [ "$use_hadrian" = "YES" ]; then
-    if [ "$use_stack" = "NO" ]; then
-        hadrian/build --help > /dev/null
-        echo "Entering ./hadrian directory..."
-        cd hadrian
-        hadrian_cmd=$(cabal new-exec -- which hadrian | grep 'hadrian$')
-    else
-        if [ $no_clean -eq 0 ]; then
-            rm -rf hadrian/.stack-work
-        fi
-        hadrian/build-stack --help > /dev/null
-        echo "Entering ./hadrian directory..."
-        cd hadrian
-        hadrian_cmd=$(stack exec -- which hadrian)
-        configure_cmd="stack --stack-yaml hadrian/stack.yaml exec -- ./configure"
+if [ "$use_stack" = "NO" ]; then
+    hadrian/build --help > /dev/null
+    echo "Entering ./hadrian directory..."
+    cd hadrian
+    hadrian_cmd=$(cabal new-exec -- which hadrian | grep 'hadrian$')
+else
+    if [ $no_clean -eq 0 ]; then
+        rm -rf hadrian/.stack-work
     fi
-    cd ..
-    echo "Back to $basedir"
-    echo "Hadrian configure command: $configure_cmd"
-    hadrian="$hadrian_cmd -j$threads --build-root=$hadrian_build_root"
-    if [ $be_quiet -eq 0 ]; then
-        hadrian="$hadrian -V"
-    fi
-
-    echo "Hadrian command: $hadrian"
+    hadrian/build-stack --help > /dev/null
+    echo "Entering ./hadrian directory..."
+    cd hadrian
+    hadrian_cmd=$(stack exec -- which hadrian)
+    configure_cmd="stack --stack-yaml hadrian/stack.yaml exec -- ./configure"
 fi
+cd ..
+echo "Back to $basedir"
+echo "Hadrian configure command: $configure_cmd"
+hadrian="$hadrian_cmd -j$threads --build-root=$hadrian_build_root"
+if [ $be_quiet -eq 0 ]; then
+    hadrian="$hadrian -V"
+fi
+
+echo "Hadrian command: $hadrian"
 
 # For details of the following flavours, refer to
 # ./hadrian/src/Settings/Flavours
@@ -234,48 +223,16 @@ if [ $build_only -eq 1 ] ||
     { [ $build_only -eq 0 ] && [ $testsuite_only -eq 0 ]; }; then
 
     if [ $no_clean -eq 0 ]; then
-        if [ "$use_hadrian" = "NO" ]; then
-            $make maintainer-clean
-        else
-            $hadrian clean && rm -rf $hadrian_build_root
-        fi
-
+        $hadrian clean && rm -rf $hadrian_build_root
         python3 ./boot --validate
         $configure_cmd --enable-tarballs-autodownload $CONFIG_ARGS
-
     fi
 
-    if [ "$use_hadrian" = "NO" ]; then
-        echo "Validating=YES"       >  mk/are-validating.mk
-        echo "ValidateSpeed=$speed" >> mk/are-validating.mk
-        echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
-
-        # Note [Default build system verbosity]
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # From https://gitlab.haskell.org/ghc/ghc/wikis/design/build-system:
-        #
-        #   "The build system should clearly report what it's doing (and sometimes
-        #   why), without being too verbose. It should emit actual command lines as
-        #   much as possible, so that they can be inspected and cut & pasted."
-        #
-        # That should be the default. Only suppress commands, by setting V=0 and using
-        # `make -s`, when user explicitly asks for it with `./validate --quiet`.
-        if [ $be_quiet -eq 1 ]; then
-            echo "V=0"                  >> mk/are-validating.mk # Less gunk
-        fi
-
-        if [ $debugging -eq 1 ]; then
-            make="$make --debug=b --debug=m"
-        fi
-
-        $make -j"$threads"
-    else
-        if [ $debugging -eq 1 ]; then
+    if [ $debugging -eq 1 ]; then
         hadrian="$hadrian --debug"
-        fi
-
-        $hadrian --flavour=$flavour
     fi
+
+    $hadrian --flavour=$flavour
 
     check_packages post-build
 
@@ -287,47 +244,38 @@ if [ $build_only -eq 1 ] ||
         bindistdir="bindisttest/install   dir"
         ghc="$basedir/$bindistdir/bin/ghc"
 
-        if [ "$use_hadrian" = "NO" ]; then
-            $make binary-dist-prep TAR_COMP=$tar_comp
-            $make test_bindist TEST_PREP=YES TAR_COMP=$tar_comp
-        else
-            $hadrian binary-dist --docs=no-sphinx
-            cfgdir="$(dirname "$(find $hadrian_build_root/bindist/ -name 'configure' | head -1)")"
-            cd "$cfgdir"
-            ./configure --prefix="$basedir/$bindistdir" && $make install
-            cd "$basedir"
-            "$ghc" -e 'Data.Text.IO.putStrLn (Data.Text.pack "bindist test: OK")'
-        fi
+        $hadrian binary-dist --docs=no-sphinx
+        cfgdir="$(dirname "$(find $hadrian_build_root/bindist/ -name 'configure' | head -1)")"
+        cd "$cfgdir"
+        ./configure --prefix="$basedir/$bindistdir" && make install
+        cd "$basedir"
+        "$ghc" -e 'Data.Text.IO.putStrLn (Data.Text.pack "bindist test: OK")'
 
         check_packages post-install
 
-        if [ "$use_hadrian" = "NO" ]; then
-            $make validate_build_xhtml BINDIST_PREFIX="$basedir/$bindistdir"
+        cd "$basedir/libraries/xhtml"
+        dynamicGhc=$("$ghc" --info | grep "GHC Dynamic" | cut -d',' -f3 | cut -d'"' -f2)
+        if [ "$dynamicGhc" = "NO" ]; then
+            libFlags="--disable-shared --enable-library-vanilla"
         else
-            cd "$basedir/libraries/xhtml"
-            dynamicGhc=$("$ghc" --info | grep "GHC Dynamic" | cut -d',' -f3 | cut -d'"' -f2)
-            if [ "$dynamicGhc" = "NO" ]; then
-                libFlags="--disable-shared --enable-library-vanilla"
-            else
-                libFlags="--enable-shared --disable-library-vanilla"
-            fi
-            libFlags="$libFlags --disable-library-prof"
-
-            "$ghc" --make Setup
-
-            # shellcheck disable=SC2086
-            ./Setup configure \
-                --with-ghc="$ghc" \
-                --with-haddock="$basedir/$bindistdir/bin/haddock" $libFlags \
-                --global --builddir=dist-bindist \
-                --prefix="$basedir/$bindistdir"
-            ./Setup build --builddir=dist-bindist
-            ./Setup haddock -v0 --ghc-options=-optP-P --builddir=dist-bindist
-            ./Setup install --builddir=dist-bindist
-            ./Setup clean --builddir=dist-bindist
-            rm -f Setup Setup.exe Setup.hi Setup.o
-            cd "$basedir"
+            libFlags="--enable-shared --disable-library-vanilla"
         fi
+        libFlags="$libFlags --disable-library-prof"
+
+        "$ghc" --make Setup
+
+        # shellcheck disable=SC2086
+        ./Setup configure \
+            --with-ghc="$ghc" \
+            --with-haddock="$basedir/$bindistdir/bin/haddock" $libFlags \
+            --global --builddir=dist-bindist \
+            --prefix="$basedir/$bindistdir"
+        ./Setup build --builddir=dist-bindist
+        ./Setup haddock -v0 --ghc-options=-optP-P --builddir=dist-bindist
+        ./Setup install --builddir=dist-bindist
+        ./Setup clean --builddir=dist-bindist
+        rm -f Setup Setup.exe Setup.hi Setup.o
+        cd "$basedir"
 
         check_packages post-xhtml
     fi
@@ -400,62 +348,37 @@ if [ $testsuite_only -eq 1 ] ||
     cd "$basedir"
     rm -f testsuite_summary.txt testsuite_summary_stage1.txt testsuite.xml
 
-    if [ "$use_hadrian" = "NO" ] ; then
-        # Use LOCAL=0, see Note [Running tests in /tmp].
-        $make -C "$basedir"/testsuite/tests $BINDIST "$PYTHON_ARG" \
-        $MAKE_TEST_TARGET stage=2 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
-        SUMMARY_FILE="$basedir"/testsuite_summary.txt \
-        JUNIT_FILE="$basedir"/testsuite.xml \
-        2>&1 | tee testlog
-
-        # Run a few tests using the stage1 compiler.
-        # See Note [Why is there no stage1 setup function?].
-        # Don't use BINDIST=YES, as stage1 is not available in a bindist.
-        $make -C testsuite/tests/stage1 "$PYTHON_ARG" \
-        $MAKE_TEST_TARGET stage=1 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
-        SUMMARY_FILE="$basedir"/testsuite_summary_stage1.txt \
-        JUNIT_FILE="$basedir"/testsuite_stage1.xml \
-        2>&1 | tee testlog-stage1
-
-        echo '==== STAGE 1 TESTS ==== '
-        cat "$basedir"/testsuite_summary_stage1.txt
-
-        echo '==== STAGE 2 TESTS ==== '
-        cat "$basedir"/testsuite_summary.txt
-    else
-        # If the --fast flag is used, make the test ghc an in-tree compiler
-        if  [ -d  "$basedir/bindisttest/install   dir"  ] && [ $BINDIST = "BINDIST=YES" ]; then
-            testghc="$basedir/bindisttest/install   dir/bin/ghc"
-        elif [ $BINDIST = "BINDIST=NO" ]; then
-            testghc="stage2"
-        fi
-
-        hadrian_test_with_args="test --test-speed=$HADRIAN_TEST_SPEED \
-            --test-compiler=\"$testghc\" \
-            --summary=$basedir/testsuite_summary.txt \
-            --summary-junit=$basedir/testsuite.xml"
-        sh -c "$hadrian $hadrian_test_with_args \"$test_perf_args\""
-
-        # Use stage1 compiler when BINDIST=NO
-        if [ "$BINDIST" = "NO" ] && [ ! -d "bindisttest/install   dir" ]; then
-            hadrian_test_with_args_stage1="test --test-speed=$HADRIAN_TEST_SPEED \
-                --test-root-dirs=\"$basedir/testsuite/tests/stage1\" \
-                --test-compiler=\"$testghc\" \
-                --summary=$basedir/testsuite_summary_stage1.txt \
-                --summary-junit=$basedir/testsuite_stage1.xml"
-            sh -c "$hadrian $hadrian_test_with_args_stage1 \"$test_perf_args\""
-
-            echo '==== STAGE 1 TESTS (using Hadrian) ==== '
-            cat testsuite_summary_stage1.txt
-        fi
-
-        echo '==== STAGE 2 TESTS (using Hadrian) ==== '
-        cat testsuite_summary.txt
+    # If the --fast flag is used, make the test ghc an in-tree compiler
+    if  [ -d  "$basedir/bindisttest/install   dir"  ] && [ $BINDIST = "BINDIST=YES" ]; then
+        testghc="$basedir/bindisttest/install   dir/bin/ghc"
+    elif [ $BINDIST = "BINDIST=NO" ]; then
+        testghc="stage2"
     fi
+
+    hadrian_test_with_args="test --test-speed=$HADRIAN_TEST_SPEED \
+        --test-compiler=\"$testghc\" \
+        --summary=$basedir/testsuite_summary.txt \
+        --summary-junit=$basedir/testsuite.xml"
+    sh -c "$hadrian $hadrian_test_with_args \"$test_perf_args\""
+
+    # Use stage1 compiler when BINDIST=NO
+    if [ "$BINDIST" = "NO" ] && [ ! -d "bindisttest/install   dir" ]; then
+        hadrian_test_with_args_stage1="test --test-speed=$HADRIAN_TEST_SPEED \
+            --test-root-dirs=\"$basedir/testsuite/tests/stage1\" \
+            --test-compiler=\"$testghc\" \
+            --summary=$basedir/testsuite_summary_stage1.txt \
+            --summary-junit=$basedir/testsuite_stage1.xml"
+        sh -c "$hadrian $hadrian_test_with_args_stage1 \"$test_perf_args\""
+
+        echo '==== STAGE 1 TESTS (using Hadrian) ==== '
+        cat testsuite_summary_stage1.txt
+    fi
+
+    echo '==== STAGE 2 TESTS (using Hadrian) ==== '
+    cat testsuite_summary.txt
 
     echo "Checking packages after running the testsuite..."
     check_packages post-testsuite
-
 fi # Test run is complete
 
 if [ "$hpc" = YES ]
@@ -464,47 +387,29 @@ then
     --srcdir=testsuite/hpc_output --destdir=testsuite/hpc_output testsuite/hpc_output/ghc.tix
 fi
 
-if [ "$use_hadrian" = "YES" ]; then
-    if
-        grep '\<0 caused framework failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
-        grep '\<0 unexpected passes' testsuite_summary.txt >/dev/null 2>/dev/null &&
-        grep '\<0 unexpected failures' testsuite_summary.txt >/dev/null 2>/dev/null; then
+if  grep '\<0 caused framework failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
+    grep '\<0 unexpected passes' testsuite_summary.txt >/dev/null 2>/dev/null &&
+    grep '\<0 unexpected failures' testsuite_summary.txt >/dev/null 2>/dev/null; then
 
-        no_hadrian_stage_2_failures=1
+    no_hadrian_stage_2_failures=1
 
-        if [ "$BINDIST" = "NO" ]; then
-            grep '\<0 caused framework failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
-            grep '\<0 unexpected passes' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
-            grep '\<0 unexpected failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null;
-
-                no_hadrian_stage_1_failures=1
-        fi
-
-        if [ "$BINDIST" = "NO" ]; then
-            no_hadrian_test_failures=$no_hadrian_stage_1_failures && $no_hadrian_stage_2_failures
-        else
-            no_hadrian_test_failures=$no_hadrian_stage_2_failures
-        fi
-    fi
-    if
-        grep '\<0 unexpected stat failures' testsuite_summary.txt >/dev/null 2>/dev/null; then
-
-        no_hadrian_perf_test_failures=1
-    fi
-elif [ "$use_hadrian" = "NO" ]; then
-    if
-        grep '\<0 caused framework failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
-        grep '\<0 unexpected passes' testsuite_summary.txt >/dev/null 2>/dev/null &&
-        grep '\<0 unexpected failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
-        grep '\<0 unexpected stat failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
+    if [ "$BINDIST" = "NO" ]; then
         grep '\<0 caused framework failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
         grep '\<0 unexpected passes' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
-        grep '\<0 unexpected failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
-        grep '\<0 unexpected stat failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null; then
+        grep '\<0 unexpected failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null;
 
-        no_make_test_failures=1
-        no_make_perf_test_failures=1
+            no_hadrian_stage_1_failures=1
     fi
+
+    if [ "$BINDIST" = "NO" ]; then
+        no_hadrian_test_failures=$no_hadrian_stage_1_failures && $no_hadrian_stage_2_failures
+    else
+        no_hadrian_test_failures=$no_hadrian_stage_2_failures
+    fi
+fi
+if grep '\<0 unexpected stat failures' testsuite_summary.txt >/dev/null 2>/dev/null; then
+
+    no_hadrian_perf_test_failures=1
 fi
 
 if [ $no_hadrian_test_failures ] || [ $no_make_test_failures ]; then
