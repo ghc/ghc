@@ -350,6 +350,11 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
     StgMutArrPtrs_ptrs(arr) = n;
     StgMutArrPtrs_size(arr) = size;
 
+    /* Ensure that the card array is initialized */
+    if (n != 0) {
+        setCardsValue(arr, 0, n, 0);
+    }
+
     // Initialise all elements of the array with the value in R2
     p = arr + SIZEOF_StgMutArrPtrs;
   for:
