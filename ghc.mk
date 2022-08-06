@@ -136,7 +136,7 @@ ifeq "$(ProjectVersion)" ""
 $(error Please run ./configure first)
 endif
 ifneq "$(CanBootWithMake)" "YES"
-$(error The make build system requires a boot compiler older than ghc-9.2. Your boot compiler is too new and cannot be used to build ghc-9.4 with make. Either boot with ghc 9.0.2)
+$(error The make build system requires a boot compiler older than ghc-9.2. Your boot compiler is too new and cannot be used to build ghc-9.4 with make. Either boot with ghc 9.0.2 or build with hadrian. See https://www.haskell.org/ghc/blog/20220805-make-to-hadrian.html for advice on transitioning to hadrian.)
 endif
 endif
 
