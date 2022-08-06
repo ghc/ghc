@@ -55,13 +55,10 @@ from topdir we can find package.conf, ghc-asm, etc.
 Note [tooldir: How GHC finds mingw on Windows]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC has some custom logic on Windows for finding the mingw
-toolchain and perl. Depending on whether GHC is built
-with the make build system or Hadrian, and on whether we're
-running a bindist, we might find the mingw toolchain
-either under $topdir/../{mingw, perl}/ or
-$topdir/../../{mingw, perl}/.
+toolchain. In general we will find the mingw toolchain
+in $topdir/../../mingw/.
 
-This story is long and with lots of twist and turns..  But lets talk about how
+This story is long and with lots of twist and turns..  But let's talk about how
 the build system finds and wires through the toolchain information.
 
 1) It all starts in configure.ac which has two modes it operates on:
@@ -90,25 +87,11 @@ the build system finds and wires through the toolchain information.
   From `aclocal.m4` we export a couple of variables starting with `Settings`
   which will be used to generate the settings file.
 
-3) The next step is to generate the settings file, this is where things diverge
-   based on the build system.  Both Make and Hadrian handle this differently:
-
-make)
-  Make deals with this rather simply.  As an output of configure.ac
-  `config.mk.in` is processed and `config.mk` generated which has the values we
-  set in `aclocal.m4`. This allows the rest of the build system to have access
-  to these and other values determined by configure.
-
-  Based on this file, `rts/include/ghc.mk` when ran will produce the settings file
-  by echoing the values into a the final file.  Coincidentally this is also
-  where `ghcplatform.h` and `ghcversion.h` generated which contains information
-  about the build platform and sets CPP for use by the entire build.
-
-hadrian)
-  For hadrian the file `cfg/system.config.in` is preprocessed by configure and
-  the output written to `system.config`.  This serves the same purpose as
-  `config.mk` but it rewrites the values that were exported.  As an example
-  `SettingsCCompilerCommand` is rewritten to `settings-c-compiler-command`.
+3) The next step is to generate the settings file: The file
+  `cfg/system.config.in` is preprocessed by configure and the output written to
+  `system.config`.  This serves the same purpose as `config.mk` but it rewrites
+  the values that were exported.  As an example `SettingsCCompilerCommand` is
+  rewritten to `settings-c-compiler-command`.
 
   Next up is `src/Oracles/Settings.hs` which makes from some Haskell ADT to
   the settings `keys` in the `system.config`.  As an example,
