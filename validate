@@ -65,6 +65,42 @@ Flags:
 EOF
 }
 
+# Note [validate and testsuite speed]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# There are 3 different validate and testsuite speed settings:
+# fast, normal and slow.
+#
+#                              how    how   used
+#           cd tests  config.  many   many  by
+# validate  && make   speed=   tests  ways  whom
+# =============================================================================
+# --fast    fast      2        some   1+exs Travis (to stay within time limit)
+# --normal  test      1        all    1+exs Phabricator (slow takes too long?)
+# --slow    slow      0        all    all   Nightly (slow is ok)
+#
+#           accept    1        all    1
+#
+# `--fast` and `--normal` run one default way, as well as any other ways which
+# are explicitly requested by the test using extra_ways().
+#
+# `make accept` should run all tests exactly once. There is no point in
+# accepting a test for multiple ways, since it should produce the same output
+# for all ways.
+#
+# To make sure all .stderr and .stdout files in the testsuite are never
+# out-of-date, it is useful if CI runs each test at least once.
+
+# Note [Default build system verbosity]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# From https://gitlab.haskell.org/ghc/ghc/wikis/design/build-system:
+#
+#   "The build system should clearly report what it's doing (and sometimes
+#   why), without being too verbose. It should emit actual command lines as
+#   much as possible, so that they can be inspected and cut & pasted."
+#
+# That should be the default. Only suppress commands, by setting V=0 and using
+# `make -s`, when user explicitly asks for it with `./validate --quiet`.
+
 no_clean=0
 testsuite_only=0
 build_only=0
