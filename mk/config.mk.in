@@ -387,8 +387,6 @@ SRC_HC_WARNING_OPTS_STAGE2 =
 # -----------------------------------------------------------------------------
 # Names of programs in the GHC tree
 
-MKDIRHIER           = $(INPLACE_BIN)/mkdirhier
-
 GENERATED_FILE  = chmod a-w
 EXECUTABLE_FILE = chmod +x
 
