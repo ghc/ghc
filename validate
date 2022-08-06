@@ -108,8 +108,7 @@ hpc=NO
 speed=NORMAL
 be_quiet=0
 # Validate uses gzip compression for the binary distribution to avoid the rather
-# heavy cost of xz, which is the typical default. The options are defined in
-# mk/config.mk.in
+# heavy cost of xz, which is the typical default.
 tar_comp=gzip
 use_stack=NO
 ignore_perf_all=NO

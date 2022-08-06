@@ -73,9 +73,6 @@ cat rts/ghcversion.h.bottom                                             >> rts/i
 # Hmmm, we fix the RPM release number to 1 here... Is this convenient?
 AC_SUBST([release], [1])
 
-# First off, a distrib sanity check..
-AC_CONFIG_SRCDIR([mk/config.mk.in])
-
 dnl * We require autoconf version 2.69 due to
 dnl   https://bugs.ruby-lang.org/issues/8179. Also see #14910.
 dnl * We need 2.50 due to the use of AC_SYS_LARGEFILE and AC_MSG_NOTICE.
@@ -1202,12 +1199,7 @@ checkMake380() {
 checkMake380 make
 checkMake380 gmake
 
-dnl Things specific to the make build system
-AC_CONFIG_FILES(
-[ mk/config.mk
-  mk/install.mk
-  mk/project.mk
-])
+AC_CONFIG_FILES([ mk/project.mk ])
 
 dnl When adding things to this list be sure to update hadrian's
 dnl Rules.Configure.configureResults list.
