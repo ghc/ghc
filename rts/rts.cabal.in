@@ -77,13 +77,9 @@ library
       -- ^ see Note [Packaging libffi headers] in
       -- GHC.Driver.CodeOutput.
 
-    -- The make build system does something special in config.mk.in
-    -- for generating profiled, debugged, etc builds of those
-    -- libraries, but we need to be transparent for hadrian which
-    -- gets information about the rts "package" through Cabal and
-    -- this cabal file. We therefore declare several
-    -- flavours to be available when passing the suitable (combination of)
-    -- flag(s) when configuring the RTS from hadrian, using Cabal.
+    -- Here we declare several flavours to be available when passing the
+    -- suitable (combination of) flag(s) when configuring the RTS from hadrian,
+    -- using Cabal.
     extra-library-flavours: _thr
 
     if flag(profiling)
