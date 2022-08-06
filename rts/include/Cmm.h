@@ -870,10 +870,11 @@
 /*
  * Set the cards in the array pointed to by arr for an
  * update to n elements, starting at element dst_off to value (0 to indicate
- * clean, 1 to indicate dirty).
+ * clean, 1 to indicate dirty). n must be non-zero.
  */
 #define setCardsValue(arr, dst_off, n, value)                                    \
     W_ __start_card, __end_card, __cards, __dst_cards_p;                         \
+    ASSERT(n != 0); \
     __dst_cards_p = (arr) + SIZEOF_StgMutArrPtrs + WDS(StgMutArrPtrs_ptrs(arr)); \
     __start_card = mutArrPtrCardDown(dst_off);                                   \
     __end_card = mutArrPtrCardDown((dst_off) + (n) - 1);                         \
