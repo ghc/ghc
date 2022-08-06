@@ -166,7 +166,9 @@ install_bin_libdir:
 		cp -R $$i "$(DESTDIR)$(ActualBinsDir)"; \
 	done
 	# Work around #17418 on Darwin
-	if [ -e "${XATTR}" ]; then "${XATTR}" -c -r "$(DESTDIR)$(ActualBinsDir)"; fi
+	if [ -e "${XATTR}" ]; then \
+		"${XATTR}" -c -r "$(DESTDIR)$(ActualBinsDir)"; \
+	fi
 
 install_bin_direct:
 	@echo "Copying binaries to $(DESTDIR)$(WrapperBinsDir)"
@@ -179,7 +181,11 @@ install_lib: lib/settings
 	$(INSTALL_DIR) "$(DESTDIR)$(ActualLibsDir)"
 	for i in $(LIBRARIES); do \
 		cp -R $$i "$(DESTDIR)$(ActualLibsDir)/"; \
-	done
+	done; \
+	# Work around #17418 on Darwin
+	if [ -e "${XATTR}" ]; then \
+		"${XATTR}" -c -r "$(DESTDIR)$(ActualLibsDir)"; \
+	fi
 
 INCLUDES = $(wildcard ./include/*)
 install_includes:
