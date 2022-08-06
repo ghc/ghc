@@ -209,6 +209,9 @@ install_lib: lib/settings
 		esac; \
 	done; \
 	chmod ugo+rx "$$dest"/bin/*
+	for i in $(DOCS); do \
+		cp -R $$i "$(DESTDIR)$(docdir)/"; \
+	done
 
 install_docs:
 	@echo "Copying docs to $(DESTDIR)$(docdir)"
