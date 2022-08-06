@@ -347,8 +347,6 @@ compressorExtension Bzip2 = "bz2"
 bindistInstallFiles :: [FilePath]
 bindistInstallFiles =
     [ "config.sub", "config.guess", "install-sh"
-    , "mk" -/- "config.mk.in" -- TODO: Remove when make is gone
-    , "mk" -/- "install.mk.in" -- TODO: Remove when make is gone
     , "mk" -/- "project.mk"
     , "mk" -/- "relpath.sh"
     , "mk" -/- "system-cxx-std-lib-1.0.conf.in"

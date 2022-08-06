@@ -82,10 +82,6 @@ Executable ghc
             UnboxedTuples
             ViewPatterns
 
-    -- The flag being True by default, this reflects the
-    -- mk/config.mk.in logic for GhcThreaded (which ends up
-    -- always being True as well). One can still opt out by
-    -- disabling this flag.
     if flag(threaded)
       ghc-options: -threaded
 
