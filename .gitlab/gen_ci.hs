@@ -325,8 +325,15 @@ opsysVariables _ FreeBSD13 = mconcat
   ]
 opsysVariables ARMv7 (Linux distro) =
   distroVariables distro <>
-  mconcat [ -- ld.gold is affected by #16177 and therefore cannot be used.
-            "CONFIGURE_ARGS" =: "LD=ld.lld"
+  mconcat [ "CONFIGURE_ARGS" =: "--host=armv7-linux-gnueabihf --build=armv7-linux-gnueabihf --target=armv7-linux-gnueabihf"
+            -- N.B. We disable ld.lld explicitly here because it appears to fail
+            -- non-deterministically on ARMv7. See #18280.
+          , "LD" =: "ld.gold"
+          , "GccUseLdOpt" =: "-fuse-ld=gold"
+            -- Awkwardly, this appears to be necessary to work around a
+            -- live-lock exhibited by the CPython (at least in 3.9 and 3.8)
+            -- interpreter on ARMv7
+          , "HADRIAN_ARGS" =: "--test-verbose=3"
           ]
 opsysVariables _ (Linux distro) = distroVariables distro
 opsysVariables AArch64 (Darwin {}) =
