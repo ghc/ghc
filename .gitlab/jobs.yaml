@@ -174,7 +174,10 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-armv7-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "LD=ld.lld ",
+      "CONFIGURE_ARGS": "--host=armv7-linux-gnueabihf --build=armv7-linux-gnueabihf --target=armv7-linux-gnueabihf ",
+      "GccUseLdOpt": "-fuse-ld=gold",
+      "HADRIAN_ARGS": "--test-verbose=3",
+      "LD": "ld.gold",
       "TEST_ENV": "armv7-linux-deb10-validate"
     }
   },
@@ -412,7 +415,10 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-armv7-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "LD=ld.lld ",
+      "CONFIGURE_ARGS": "--host=armv7-linux-gnueabihf --build=armv7-linux-gnueabihf --target=armv7-linux-gnueabihf ",
+      "GccUseLdOpt": "-fuse-ld=gold",
+      "HADRIAN_ARGS": "--test-verbose=3",
+      "LD": "ld.gold",
       "TEST_ENV": "armv7-linux-deb10-validate",
       "XZ_OPT": "-9"
     }
@@ -1918,8 +1924,11 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-armv7-linux-deb10-release",
       "BUILD_FLAVOUR": "release",
-      "CONFIGURE_ARGS": "LD=ld.lld ",
+      "CONFIGURE_ARGS": "--host=armv7-linux-gnueabihf --build=armv7-linux-gnueabihf --target=armv7-linux-gnueabihf ",
+      "GccUseLdOpt": "-fuse-ld=gold",
+      "HADRIAN_ARGS": "--test-verbose=3",
       "IGNORE_PERF_FAILURES": "all",
+      "LD": "ld.gold",
       "TEST_ENV": "armv7-linux-deb10-release",
       "XZ_OPT": "-9"
     }
