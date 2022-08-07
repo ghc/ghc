@@ -352,6 +352,7 @@ bindistInstallFiles =
     , "mk" -/- "project.mk"
     , "mk" -/- "relpath.sh"
     , "mk" -/- "system-cxx-std-lib-1.0.conf.in"
+    , "mk" -/- "install_script.sh"
     , "README", "INSTALL" ]
 
 -- | This auxiliary function gives us a top-level 'Filepath' that we can 'need'

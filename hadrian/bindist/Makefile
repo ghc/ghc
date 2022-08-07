@@ -23,43 +23,6 @@ ifeq "$(Darwin_Host)" "YES"
 XATTR ?= /usr/bin/xattr
 endif
 
-# installscript
-#
-# $1 = package name
-# $2 = wrapper path
-# $3 = bindir
-# $4 = ghcbindir
-# $5 = Executable binary path
-# $6 = Library Directory
-# $7 = Docs Directory
-# $8 = Includes Directory
-# We are installing wrappers to programs by searching corresponding
-# wrappers. If wrapper is not found, we are attaching the common wrapper
-# to it. This implementation is a bit hacky and depends on consistency
-# of program names. For hadrian build this will work as programs have a
-# consistent naming procedure.
-define installscript
-	echo "installscript $1 -> $2"
-	@if [ -L 'wrappers/$1' ]; then                \
-		$(CP) -P 'wrappers/$1' '$2' ;             \
-	else								          \
-		rm -f '$2' && 		                      \
-		$(CREATE_SCRIPT) '$2' &&                  \
-		echo "#!$(SHELL)" >>  '$2'  &&            \
-		echo "exedir=\"$4\"" >> '$2'  &&          \
-		echo "exeprog=\"$1\"" >> '$2'  &&         \
-		echo "executablename=\"$5\"" >> '$2'  &&  \
-		echo "bindir=\"$3\"" >> '$2'  &&          \
-		echo "libdir=\"$6\"" >> '$2'  &&          \
-		echo "docdir=\"$7\"" >> '$2'  &&          \
-		echo "includedir=\"$8\"" >> '$2'  &&      \
-		echo "" >> '$2'  &&                       \
-		cat 'wrappers/$1' >> '$2'  &&             \
-		$(EXECUTABLE_FILE) '$2' ;                 \
-	fi
-	@echo "$1 installed to $2"
-endef
-
 # patchpackageconf
 #
 # Hacky function to patch up the 'haddock-interfaces' and 'haddock-html'
@@ -230,12 +193,13 @@ install_docs:
 		$(INSTALL_SCRIPT) docs-utils/gen_contents_index "$(DESTDIR)$(docdir)/html/libraries/"; \
 	fi
 
-BINARY_NAMES=$(shell ls ./wrappers/)
+export SHELL
 install_wrappers: install_bin_libdir
 	@echo "Installing wrapper scripts"
 	$(INSTALL_DIR) "$(DESTDIR)$(WrapperBinsDir)"
-	$(foreach p, $(BINARY_NAMES),\
-		$(call installscript,$p,$(DESTDIR)$(WrapperBinsDir)/$p,$(WrapperBinsDir),$(ActualBinsDir),$(ActualBinsDir)/$p,$(ActualLibsDir),$(docdir),$(includedir)))
+	for p in `cd wrappers; $(FIND) . ! -type d`; do \
+	    mk/install_script.sh "$$p" "$(DESTDIR)/$(WrapperBinsDir)/$$p" "$(WrapperBinsDir)" "$(ActualBinsDir)" "$(ActualBinsDir)/$$p" "$(ActualLibsDir)" "$(docdir)" "$(includedir)"; \
+	done
 
 PKG_CONFS = $(shell find "$(DESTDIR)$(ActualLibsDir)/package.conf.d" -name '*.conf' | sed "s:   :\0xxx\0:g")
 update_package_db: install_bin install_lib

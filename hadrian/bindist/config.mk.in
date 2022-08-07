@@ -93,9 +93,6 @@ ghcheaderdir  = $(ghclibdir)/rts/include
 #-----------------------------------------------------------------------------
 # Utilities needed by the installation Makefile
 
-GENERATED_FILE  = chmod a-w
-EXECUTABLE_FILE = chmod +x
-CP              = cp
 FIND            = @FindCmd@
 INSTALL         = @INSTALL@
 INSTALL        := $(subst .././install-sh,$(TOP)/install-sh,$(INSTALL))
@@ -103,6 +100,8 @@ LN_S            = @LN_S@
 MV              = mv
 SED             = @SedCmd@
 SHELL           = @SHELL@
+RANLIB_CMD      = @RanlibCmd@
+STRIP_CMD       = @StripCmd@
 
 #
 # Invocations of `install' for different classes
@@ -116,9 +115,6 @@ INSTALL_HEADER  = $(INSTALL) -m 644
 INSTALL_MAN     = $(INSTALL) -m 644
 INSTALL_DOC     = $(INSTALL) -m 644
 INSTALL_DIR     = $(INSTALL) -m 755 -d
-
-CREATE_SCRIPT   = create () { touch "$$1" && chmod 755 "$$1" ; } && create
-CREATE_DATA     = create () { touch "$$1" && chmod 644 "$$1" ; } && create
 
 #-----------------------------------------------------------------------------
 # Build configuration
