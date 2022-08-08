@@ -1037,12 +1037,8 @@ can_eq_nc' _rewritten _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
            (FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
            (FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
-  | af1 == af2
-  , Just (tc1, args1) <- funTyConApp_maybe getRuntimeRep_maybe af1 am1 ty1a ty1b
-  , Just (tc2, args2) <- funTyConApp_maybe getRuntimeRep_maybe af2 am2 ty2a ty2b
-                         -- getRutimeRep_maybe: see Note [Decomposing FunTy]
-  = assert (tc1 == tc2) $  -- These will match if af1==af2
-    canDecomposableTyConAppOK ev eq_rel tc1 args1 args2
+  | af1 == af2  -- See Note [Decomposing FunTy]
+  = canDecomposableFunTy ev eq_rel [am1,ty1a,ty1b] [am2,ty2a,ty2b]
 
 -- Decompose type constructor applications
 -- NB: we have expanded type synonyms already
@@ -1598,6 +1594,7 @@ canTyConApp ev eq_rel tc1 tys1 tc2 tys2
   | eq_rel == ReprEq && not (isGenerativeTyCon tc1 Representational &&
                              isGenerativeTyCon tc2 Representational)
   = canEqFailure ev eq_rel ty1 ty2
+
   | otherwise
   = canEqHardFailure ev ty1 ty2
   where
@@ -1904,11 +1901,11 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
     ; stopWith ev "Decomposed TyConApp" }
 
   where
-    loc        = ctEvLoc ev
-    role       = eqRelRole eq_rel
+    loc  = ctEvLoc ev
+    role = eqRelRole eq_rel
 
-      -- infinite, as tyConRolesX returns an infinite tail of Nominal
-    tc_roles   = tyConRolesX role tc
+    -- Infinite, to allow for over-saturated TyConApps
+    tc_roles = tyConRolesX role tc
 
       -- Add nuances to the location during decomposition:
       --  * if the argument is a kind argument, remember this, so that error
@@ -1929,6 +1926,32 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
                               | otherwise
                               = new_loc0 ]
                ++ repeat loc
+
+canDecomposableFunTy :: CtEvidence -> EqRel -> [Type] -> [Type]
+                     -> TcS (StopOrContinue Ct)
+canDecomposableFunTy ev eq_rel tys1 tys2
+  = do { traceTcS "canDecomposableFunTy"
+                  (ppr ev $$ ppr eq_rel $$ ppr tys1 $$ ppr tys2)
+       ; case ev of
+           CtWanted { ctev_dest = dest, ctev_rewriters = rewriters }
+             -> do { [mult,arg,res] <- zipWith4M (unifyWanted rewriters) new_locs tc_roles tys1 tys2
+                   ; setWantedEq dest (mkFunCo role mult arg res) }
+
+           CtGiven { ctev_evar = evar }
+             -> do { let ev_co = mkCoVarCo evar
+                   ; given_evs <- newGivenEvVars loc $
+                                  [ ( mkPrimEqPredRole r ty1 ty2
+                                    , evCoercion $ mkNthCo r i ev_co )
+                                  | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..] ]
+                   ; emitWorkNC given_evs }
+
+    ; stopWith ev "Decomposed TyConApp" }
+
+  where
+    loc      = ctEvLoc ev
+    role     = eqRelRole eq_rel
+    tc_roles = funRolesX role
+    new_locs = [updateCtLocOrigin loc toInvisibleOrigin, loc, loc]
 
 -- | Call when canonicalizing an equality fails, but if the equality is
 -- representational, there is some hope for the future.
@@ -3108,7 +3131,7 @@ unifyWanted rewriters loc role orig_ty1 orig_ty2
       = do { co_s <- unifyWanted rewriters loc role s1 s2
            ; co_t <- unifyWanted rewriters loc role t1 t2
            ; co_w <- unifyWanted rewriters loc Nominal w1 w2
-           ; return (mkFunCo role af1 co_w co_s co_t) }
+           ; return (mkFunCo role co_w co_s co_t) }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality

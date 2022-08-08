@@ -56,7 +56,7 @@ module GHC.Tc.Utils.TcType (
   --------------------------------
   -- Builders
   mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy, mkPhiTy, tcMkPhiTy,
-  mkDFunTy, mkDFunPhiTy,
+  tcMkDFunSigmaTy, tcMkDFunPhiTy,
   mkTcAppTy, mkTcAppTys, mkTcCastTy,
 
   --------------------------------
@@ -1294,10 +1294,10 @@ mkSigmaTy :: HasDebugCallStack => [TyCoVarBinder] -> [PredType] -> Type -> Type
 -- Result is TypeLike
 mkSigmaTy bndrs theta tau = mkForAllTys bndrs (mkPhiTy theta tau)
 
-mkDFunTy :: [TyVar] -> ThetaType -> Type -> Type
-mkDFunTy tvs theta res_ty
+tcMkDFunSigmaTy :: [TyVar] -> ThetaType -> Type -> Type
+tcMkDFunSigmaTy tvs theta res_ty
  = mkForAllTys (mkTyCoVarBinders Specified tvs) $
-   mkDFunPhiTy theta res_ty
+   tcMkDFunPhiTy theta res_ty
 
 mkPhiTy :: HasDebugCallStack => [PredType] -> Type -> Type
 -- Result type is TypeLike
@@ -1307,11 +1307,11 @@ tcMkPhiTy :: HasDebugCallStack => [PredType] -> Type -> Type
 -- Like mkPhiTy, but with no assertion checks; it is called
 -- by the type checker and the result kind may not be zonked yet
 -- But the result kind is TypeLike
-tcMkPhiTy tys ty = foldr tcMkInvisFunTy ty tys
+tcMkPhiTy tys ty = foldr (tcMkInvisFunTy TypeLike) ty tys
 
-mkDFunPhiTy :: HasDebugCallStack => [PredType] -> Type -> Type
--- Result type is ConstraintLike
-mkDFunPhiTy preds res = foldr (mkFunTy invisArgConstraintLike ManyTy) res preds
+tcMkDFunPhiTy :: HasDebugCallStack => [PredType] -> Type -> Type
+-- Just like tcMkPhiTy, but result type is ConstraintLike
+tcMkDFunPhiTy preds res = foldr (tcMkInvisFunTy ConstraintLike) res preds
 
 ---------------
 getDFunTyKey :: Type -> OccName -- Get some string from a type, to be used to

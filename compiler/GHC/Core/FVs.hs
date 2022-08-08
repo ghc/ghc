@@ -389,7 +389,7 @@ orphNamesOfCo (TyConAppCo _ tc cos) = unitNameSet (getName tc) `unionNameSet` or
 orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
 orphNamesOfCo (ForAllCo _ kind_co co)     = orphNamesOfCo kind_co
                                             `unionNameSet` orphNamesOfCo co
-orphNamesOfCo (FunCo _ _ co_mult co1 co2) = orphNamesOfCo co_mult
+orphNamesOfCo (FunCo _ co_mult co1 co2) = orphNamesOfCo co_mult
                                             `unionNameSet` orphNamesOfCo co1
                                             `unionNameSet` orphNamesOfCo co2
 orphNamesOfCo (CoVarCo _)           = emptyNameSet

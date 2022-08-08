@@ -359,7 +359,7 @@ mkFunRedn r af
   (Reduction arg_co arg_ty)
   (Reduction res_co res_ty)
     = mkReduction
-        (mkFunCo r af w_co arg_co res_co)
+        (mkFunCo r w_co arg_co res_co)
         (mkFunTy af w_ty arg_ty res_ty)
 {-# INLINE mkFunRedn #-}
 

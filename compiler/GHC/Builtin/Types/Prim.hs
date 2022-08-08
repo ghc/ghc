@@ -567,7 +567,7 @@ rather than by using a TyConApp.
   Note that of the four type constructors, only `FUN` takes a Multiplicity.
 
 * Functions in GHC.Core.Type help to build and decompose `FunTy`.
-  * `funTyConApp_maybe`
+  * `funTyConAppTy_maybe`
   * `anonArgTyCon`
   * `tyConAppFun_maybe`
   Use them!

@@ -132,7 +132,7 @@ mkTcNomReflCo          :: TcType -> TcCoercionN
 mkTcRepReflCo          :: TcType -> TcCoercionR
 mkTcTyConAppCo         :: Role -> TyCon -> [TcCoercion] -> TcCoercion
 mkTcAppCo              :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcFunCo              :: Role -> AnonArgFlag -> TcCoercion -> TcCoercion -> TcCoercion -> TcCoercion
+mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion -> TcCoercion
 mkTcAxInstCo           :: Role -> CoAxiom br -> BranchIndex
                        -> [TcType] -> [TcCoercion] -> TcCoercion
 mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
@@ -311,7 +311,7 @@ mkWpFun co1          co2          t1            _  = WpFun co1 co2 t1
 
 mk_fun_co :: Mult -> TcCoercionR -> TcCoercionR -> TcCoercionR
 mk_fun_co mult arg_co res_co
-  = mkTcFunCo Representational visArgTypeLike (multToCo mult) arg_co res_co
+  = mkTcFunCo Representational (multToCo mult) arg_co res_co
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co

@@ -2178,7 +2178,7 @@ lintCoercion co@(ForAllCo tcv kind_co body_co)
 
        ; return (ForAllCo tcv' kind_co' body_co') } }
 
-lintCoercion co@(FunCo r af cow co1 co2)
+lintCoercion co@(FunCo r cow co1 co2)
   = do { co1' <- lintCoercion co1
        ; co2' <- lintCoercion co2
        ; cow' <- lintCoercion cow
@@ -2195,7 +2195,7 @@ lintCoercion co@(FunCo r af cow co1 co2)
                                     Phantom -> Phantom
                                     _ -> Nominal
        ; lintRole cow expected_mult_role (coercionRole cow)
-       ; return (FunCo r af cow' co1' co2') }
+       ; return (FunCo r cow' co1' co2') }
 
 -- See Note [Bad unsafe coercion]
 lintCoercion co@(UnivCo prov r ty1 ty2)
@@ -2311,6 +2311,12 @@ lintCoercion the_co@(NthCo r0 n co)
              -> do { lintRole the_co Nominal r0
                    ; return (NthCo r0 n co') }
 
+         ; _ -> case (isFunTy s, isFunTy t) of
+         { (True, True)
+             | n < 3
+             -> do { lintRole the_co (nthFunRole r n) r0
+                   ; return (NthCo r0 n co') }
+
          ; _ -> case (splitTyConApp_maybe s, splitTyConApp_maybe t) of
          { (Just (tc_s, tys_s), Just (tc_t, tys_t))
              | tc_s == tc_t
@@ -2318,13 +2324,11 @@ lintCoercion the_co@(NthCo r0 n co)
                  -- see Note [NthCo and newtypes] in GHC.Core.TyCo.Rep
              , tys_s `equalLength` tys_t
              , tys_s `lengthExceeds` n
-             -> do { lintRole the_co tr r0
+             -> do { lintRole the_co (nthRole r tc_s n) r0
                    ; return (NthCo r0 n co') }
-                where
-                  tr = nthRole r tc_s n
 
          ; _ -> failWithL (hang (text "Bad getNth:")
-                              2 (ppr the_co $$ ppr s $$ ppr t)) }}}
+                              2 (ppr the_co $$ ppr s $$ ppr t)) }}}}
 
 lintCoercion the_co@(LRCo lr co)
   = do { co' <- lintCoercion co

@@ -2589,10 +2589,10 @@ tryEtaReduce rec_ids bndrs body eval_sd
        = Just (mkFunResCo Representational (idScaledType bndr) co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (af, fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , Just (_, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , bndr == v
        , fun_mult `eqType` idMult bndr
-       = Just (mkFunCo Representational af (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
+       = Just (mkFunCo Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
     ok_arg bndr (Tick t arg) co fun_ty

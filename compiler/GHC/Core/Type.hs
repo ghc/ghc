@@ -36,7 +36,7 @@ module GHC.Core.Type (
         tcMkVisFunTy, tcMkScaledFunTys, tcMkInvisFunTy,
         splitFunTy, splitFunTy_maybe,
         splitFunTys, funResultTy, funArgTy,
-        funTyConApp_maybe, funTyConAppTy_maybe, tyConAppFun_maybe,
+        funTyConAppTy_maybe, tyConAppFun_maybe,
         funTyAnonArgFlag, anonArgTyCon,
         mkFunctionType, mkScaledFunctionTys, chooseAnonArgFlag,
 
@@ -584,8 +584,8 @@ expandTypeSynonyms ty
     go_co subst (ForAllCo tv kind_co co)
       = let (subst', tv', kind_co') = go_cobndr subst tv kind_co in
         mkForAllCo tv' kind_co' (go_co subst' co)
-    go_co subst (FunCo r af w co1 co2)
-      = mkFunCo r af (go_co subst w) (go_co subst co1) (go_co subst co2)
+    go_co subst (FunCo r w co1 co2)
+      = mkFunCo r (go_co subst w) (go_co subst co1) (go_co subst co2)
     go_co subst (CoVarCo cv)
       = substCoVar subst cv
     go_co subst (AxiomInstCo ax ind args)
@@ -951,7 +951,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_co env (Refl ty)           = Refl <$> go_ty env ty
     go_co env (GRefl r ty mco)    = mkGReflCo r <$> go_ty env ty <*> go_mco env mco
     go_co env (AppCo c1 c2)       = mkAppCo <$> go_co env c1 <*> go_co env c2
-    go_co env (FunCo r af cw c1 c2) = mkFunCo r af <$> go_co env cw
+    go_co env (FunCo r cw c1 c2)  = mkFunCo r <$> go_co env cw
                                       <*> go_co env c1 <*> go_co env c2
     go_co env (CoVarCo cv)        = covar env cv
     go_co env (HoleCo hole)       = cohole env hole
@@ -1316,24 +1316,19 @@ anonArgTyCon (VisArg   ConstraintLike) = tcArrowTyCon
 anonArgTyCon (InvisArg TypeLike)       = ctArrowTyCon
 anonArgTyCon (InvisArg ConstraintLike) = ccArrowTyCon
 
-funTyConApp_maybe :: (a -> Maybe a)   -- How to extract a RuntimeRep
-                  -> AnonArgFlag -> a -> a -> a
-                  -> Maybe (TyCon, [a])
+funTyConAppTy_maybe :: AnonArgFlag -> Type -> Type -> Type
+                    -> Maybe (TyCon, [Type])
 -- Given the components of a FunTy/FuNCo,
--- figure out the corresponding TyConApp/TyConAppCo
--- The type 'a' always has kind Type or Coercion
--- The (a -> Maybe a) function extracts a RuntimeRep from arg/res
-funTyConApp_maybe get_rr af mult arg res
-  | Just arg_rep <- get_rr arg
-  , Just res_rep <- get_rr res
+-- figure out the corresponding TyConApp.
+-- Not used for coercions
+funTyConAppTy_maybe af mult arg res
+  | Just arg_rep <- getRuntimeRep_maybe arg
+  , Just res_rep <- getRuntimeRep_maybe res
   , let args | isFUNAnonArg af = [mult, arg_rep, res_rep, arg, res]
              | otherwise       = [      arg_rep, res_rep, arg, res]
   = Just $ (anonArgTyCon af, args)
   | otherwise
   = Nothing
-
-funTyConAppTy_maybe :: AnonArgFlag -> Mult -> Type -> Type -> Maybe (TyCon, [Type])
-funTyConAppTy_maybe = funTyConApp_maybe getRuntimeRep_maybe
 
 tyConAppFun_maybe :: (HasDebugCallStack, Outputable a) => (Type->a) -> TyCon -> [a]
                    -> Maybe (AnonArgFlag, a, a, a)
@@ -1393,7 +1388,7 @@ chooseAnonArgFlag :: HasDebugCallStack => Type -> Type -> AnonArgFlag
 chooseAnonArgFlag arg_ty res_ty
   = choose_anon_arg_flag_help arg_ty (typeTypeOrConstraint res_ty)
 
-choose_anon_arg_flag_help :: Type -> TypeOrConstraint -> AnonArgFlag
+choose_anon_arg_flag_help :: HasDebugCallStack => Type -> TypeOrConstraint -> AnonArgFlag
 choose_anon_arg_flag_help arg_ty res_torc
   = case typeTypeOrConstraint arg_ty of
        TypeLike       -> VisArg   res_torc   -- (arg -> res), (arg -=> res)
@@ -3341,10 +3336,10 @@ occCheckExpand vs_to_avoid ty
                  as'  = as `delVarSet` tv
            ; body' <- go_co (as', env') body_co
            ; return (ForAllCo tv' kind_co' body') }
-    go_co cxt (FunCo r af w co1 co2)    = do { co1' <- go_co cxt co1
+    go_co cxt (FunCo r  w co1 co2)      = do { co1' <- go_co cxt co1
                                              ; co2' <- go_co cxt co2
                                              ; w' <- go_co cxt w
-                                             ; return (mkFunCo r af w' co1' co2') }
+                                             ; return (mkFunCo r w' co1' co2') }
     go_co (as,env) co@(CoVarCo c)
       | Just c' <- lookupVarEnv env c   = return (mkCoVarCo c')
       | bad_var_occ as c                = Nothing
@@ -3419,7 +3414,7 @@ tyConsOfType ty
      go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args
      go_co (AppCo co arg)          = go_co co `unionUniqSets` go_co arg
      go_co (ForAllCo _ kind_co co) = go_co kind_co `unionUniqSets` go_co co
-     go_co (FunCo _ _ m a r)       = go_co m `unionUniqSets` go_co a `unionUniqSets` go_co r
+     go_co (FunCo _ m a r)         = go_co m `unionUniqSets` go_co a `unionUniqSets` go_co r
      go_co (AxiomInstCo ax _ args) = go_ax ax `unionUniqSets` go_cos args
      go_co (UnivCo p _ t1 t2)      = go_prov p `unionUniqSets` go t1 `unionUniqSets` go t2
      go_co (CoVarCo {})            = emptyUniqSet

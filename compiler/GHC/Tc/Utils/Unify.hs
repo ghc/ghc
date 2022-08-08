@@ -1845,7 +1845,7 @@ uType t_or_k origin orig_ty1 orig_ty2
       = do { co_l <- uType t_or_k origin arg1 arg2
            ; co_r <- uType t_or_k origin res1 res2
            ; co_w <- uType t_or_k origin w1 w2
-           ; return $ mkFunCo Nominal af1 co_w co_l co_r }
+           ; return $ mkFunCo Nominal co_w co_l co_r }
 
         -- Always defer if a type synonym family (type function)
         -- is involved.  (Data families behave rigidly.)
@@ -2537,7 +2537,7 @@ matchExpectedFunKind hs_ty n k = go n k
     go n (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
       | isVisibleAnonArg af
       = do { co <- go (n-1) res
-           ; return (mkTcFunCo Nominal af (mkTcNomReflCo w) (mkTcNomReflCo arg) co) }
+           ; return (mkTcFunCo Nominal (mkTcNomReflCo w) (mkTcNomReflCo arg) co) }
 
     go n other
      = defer n other

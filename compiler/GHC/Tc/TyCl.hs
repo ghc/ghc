@@ -3522,7 +3522,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; tkvs <- kindGeneralizeAll skol_info
                     (mkInvisForAllTys outer_tv_bndrs $
                      mkPhiTy ctxt                    $
-                     mkScaledFunTys arg_tys             $
+                     tcMkScaledFunTys arg_tys             $
                      res_ty)
        ; traceTc "tcConDecl:GADT" (ppr names $$ ppr res_ty $$ ppr tkvs)
        ; reportUnsolvedEqualities skol_info tkvs tclvl wanted

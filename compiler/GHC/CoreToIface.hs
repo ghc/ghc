@@ -303,8 +303,8 @@ toIfaceCoercionX fr co
       =  assertPpr (isNothing (tyConAppFun_maybe (mkReflCo r) tc cos)) (ppr co) $
          IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
 
-    go (FunCo r af w co1 co2)
-      = IfaceFunCo r af (go w) (go co1) (go co2)
+    go (FunCo r w co1 co2)
+      = IfaceFunCo r (go w) (go co1) (go co2)
 
     go (ForAllCo tv k co) = IfaceForAllCo (toIfaceBndr tv)
                                           (toIfaceCoercionX fr' k)

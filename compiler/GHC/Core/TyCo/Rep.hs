@@ -1091,12 +1091,12 @@ tcMkVisFunTy mult arg res
   = FunTy { ft_af = visArgTypeLike, ft_mult = mult
           , ft_arg = arg, ft_res = res }
 
-tcMkInvisFunTy :: Type -> Type -> Type
+tcMkInvisFunTy :: TypeOrConstraint -> Type -> Type -> Type
 -- Always TypeLike, invisible argument
 -- Does not have the assert-checking in mkFunTy: used by the typechecker
 -- to avoid looking at the result kind, which may not be zonked
-tcMkInvisFunTy arg res
-  = FunTy { ft_af = invisArgTypeLike, ft_mult = manyDataConTy
+tcMkInvisFunTy res_torc arg res
+  = FunTy { ft_af = invisArg res_torc, ft_mult = manyDataConTy
           , ft_arg = arg, ft_res = res }
 
 mkVisFunTy :: HasDebugCallStack => Mult -> Type -> Type -> Type
@@ -1214,7 +1214,7 @@ data Coercion
   | ForAllCo TyCoVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
-  | FunCo Role AnonArgFlag CoercionN Coercion Coercion     -- lift FunTy
+  | FunCo Role CoercionN Coercion Coercion     -- lift FunTy
          -- FunCo :: "e" -> N -> e -> e -> e
 
   -- These are special
@@ -1977,7 +1977,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (GRefl _ ty (MCo co))   = go_ty env ty `mappend` go_co env co
     go_co env (TyConAppCo _ _ args)   = go_cos env args
     go_co env (AppCo c1 c2)           = go_co env c1 `mappend` go_co env c2
-    go_co env (FunCo _ _ cw c1 c2)    = go_co env cw `mappend`
+    go_co env (FunCo _ cw c1 c2)      = go_co env cw `mappend`
                                         go_co env c1 `mappend`
                                         go_co env c2
     go_co env (CoVarCo cv)            = covar env cv
@@ -2044,7 +2044,7 @@ coercionSize (GRefl _ ty (MCo co)) = 1 + typeSize ty + coercionSize co
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
 coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
-coercionSize (FunCo _ _ w c1 c2) = 1 + coercionSize c1 + coercionSize c2
+coercionSize (FunCo _ w c1 c2)   = 1 + coercionSize c1 + coercionSize c2
                                                         + coercionSize w
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1

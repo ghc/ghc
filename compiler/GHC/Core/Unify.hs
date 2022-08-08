@@ -1606,10 +1606,14 @@ ty_co_match menv subst ty1 (AppCo co2 arg2) _lkco _rkco
 ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
   = ty_co_match_tc menv subst tc1 tys tc2 cos
 
-ty_co_match menv subst (FunTy af w ty1 ty2) co _lkco _rkco
-  | Just (tc2, cos) <- splitTyConAppCo_maybe co
-  , Just (tc1,tys)  <- funTyConAppTy_maybe af w ty1 ty2
-  = ty_co_match_tc menv subst tc1 tys tc2 cos
+ty_co_match menv subst (FunTy _af w ty1 ty2) (FunCo _r co_w co1 co2) _lkco _rkco
+  = ty_co_match_args menv subst [w,    rep1,    rep2,    ty1, ty2]
+                                [co_w, co1_rep, co2_rep, co1, co2]
+  where
+     rep1    = getRuntimeRep ty1
+     rep2    = getRuntimeRep ty2
+     co1_rep = mkRuntimeRepCo co1
+     co2_rep = mkRuntimeRepCo co2
     -- NB: we include the RuntimeRep arguments in the matching;
     --     not doing so caused #21205.
 
@@ -1676,10 +1680,7 @@ ty_co_match_tc :: MatchEnv -> LiftCoEnv
                -> Maybe LiftCoEnv
 ty_co_match_tc menv subst tc1 tys1 tc2 cos2
   = do { guard (tc1 == tc2)
-       ; ty_co_match_args menv subst tys1 cos2 lkcos rkcos }
-  where
-    Pair lkcos rkcos
-      = traverse (fmap (mkNomReflCo . typeKind) . coercionKind) cos2
+       ; ty_co_match_args menv subst tys1 cos2 }
 
 ty_co_match_app :: MatchEnv -> LiftCoEnv
                 -> Type -> [Type] -> Coercion -> [Coercion]
@@ -1693,29 +1694,30 @@ ty_co_match_app menv subst ty1 ty1args co2 co2args
   = do { subst1 <- ty_co_match menv subst ki1 ki2 ki_ki_co ki_ki_co
        ; let Pair lkco rkco = mkNomReflCo <$> coercionKind ki2
        ; subst2 <- ty_co_match menv subst1 ty1 co2 lkco rkco
-       ; let Pair lkcos rkcos = traverse (fmap (mkNomReflCo . typeKind) . coercionKind) co2args
-       ; ty_co_match_args menv subst2 ty1args co2args lkcos rkcos }
+       ; ty_co_match_args menv subst2 ty1args co2args }
   where
     ki1 = typeKind ty1
     ki2 = promoteCoercion co2
     ki_ki_co = mkNomReflCo liftedTypeKind
 
-ty_co_match_args :: MatchEnv -> LiftCoEnv -> [Type]
-                 -> [Coercion] -> [Coercion] -> [Coercion]
+ty_co_match_args :: MatchEnv -> LiftCoEnv -> [Type] -> [Coercion]
                  -> Maybe LiftCoEnv
-ty_co_match_args _    subst []       []         _ _ = Just subst
-ty_co_match_args menv subst (ty:tys) (arg:args) (lkco:lkcos) (rkco:rkcos)
-  = do { subst' <- ty_co_match menv subst ty arg lkco rkco
-       ; ty_co_match_args menv subst' tys args lkcos rkcos }
-ty_co_match_args _    _     _        _          _ _ = Nothing
+ty_co_match_args menv subst (ty:tys) (arg:args)
+  = do { let Pair lty rty = coercionKind arg
+             lkco = mkNomReflCo (typeKind lty)
+             rkco = mkNomReflCo (typeKind rty)
+       ; subst' <- ty_co_match menv subst ty arg lkco rkco
+       ; ty_co_match_args menv subst' tys args }
+ty_co_match_args _    subst []       [] = Just subst
+ty_co_match_args _    _     _        _  = Nothing
 
 pushRefl :: Coercion -> Maybe Coercion
 pushRefl co =
   case (isReflCo_maybe co) of
     Just (AppTy ty1 ty2, Nominal)
       -> Just (AppCo (mkReflCo Nominal ty1) (mkNomReflCo ty2))
-    Just (FunTy af w ty1 ty2, r)
-      ->  Just (FunCo r af (mkReflCo r w) (mkReflCo r ty1) (mkReflCo r ty2))
+    Just (FunTy _ w ty1 ty2, r)
+      ->  Just (FunCo r (mkReflCo r w) (mkReflCo r ty1) (mkReflCo r ty2))
     Just (TyConApp tc tys, r)
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRolesX r tc) tys))
     Just (ForAllTy (Bndr tv _) ty, r)

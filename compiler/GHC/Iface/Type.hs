@@ -370,7 +370,7 @@ data IfaceMCoercion
 data IfaceCoercion
   = IfaceReflCo       IfaceType
   | IfaceGReflCo      Role IfaceType (IfaceMCoercion)
-  | IfaceFunCo        Role AnonArgFlag IfaceCoercion IfaceCoercion IfaceCoercion
+  | IfaceFunCo        Role IfaceCoercion IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
   | IfaceForAllCo     IfaceBndr IfaceCoercion IfaceCoercion
@@ -574,7 +574,7 @@ substIfaceType env ty
 
     go_co (IfaceReflCo ty)           = IfaceReflCo (go ty)
     go_co (IfaceGReflCo r ty mco)    = IfaceGReflCo r (go ty) (go_mco mco)
-    go_co (IfaceFunCo r af w c1 c2)  = IfaceFunCo r af (go_co w) (go_co c1) (go_co c2)
+    go_co (IfaceFunCo r w c1 c2)     = IfaceFunCo r (go_co w) (go_co c1) (go_co c2)
     go_co (IfaceTyConAppCo r tc cos) = IfaceTyConAppCo r tc (go_cos cos)
     go_co (IfaceAppCo c1 c2)         = IfaceAppCo (go_co c1) (go_co c2)
     go_co (IfaceForAllCo {})         = pprPanic "substIfaceCoercion" (ppr ty)
@@ -1727,17 +1727,17 @@ ppr_co ctxt_prec (IfaceGReflCo r ty (IfaceMCo co))
   = ppr_special_co ctxt_prec
     (text "GRefl" <+> ppr r <+> pprParendIfaceType ty) [co]
 
-ppr_co ctxt_prec (IfaceFunCo r af co_mult co1 co2)
+ppr_co ctxt_prec (IfaceFunCo r co_mult co1 co2)
   = maybeParen ctxt_prec funPrec $
-    sep (ppr_co funPrec co1 : ppr_fun_tail af co_mult co2)
+    sep (ppr_co funPrec co1 : ppr_fun_tail co_mult co2)
   where
-    ppr_fun_tail af1 co_mult1 (IfaceFunCo r af2 co_mult2 co1 co2)
-      = (ppr_arrow af1 co_mult1 <> ppr_role r <+> ppr_co funPrec co1)
-        : ppr_fun_tail af2 co_mult2 co2
-    ppr_fun_tail af1 co_mult1 other_co
-      = [ppr_arrow af1 co_mult1 <> ppr_role r <+> pprIfaceCoercion other_co]
+    ppr_fun_tail co_mult1 (IfaceFunCo r co_mult2 co1 co2)
+      = (ppr_arrow co_mult1 <> ppr_role r <+> ppr_co funPrec co1)
+        : ppr_fun_tail co_mult2 co2
+    ppr_fun_tail co_mult1 other_co
+      = [ppr_arrow co_mult1 <> ppr_role r <+> pprIfaceCoercion other_co]
 
-    ppr_arrow = pprArrow (mb_conc, ppr_co)
+    ppr_arrow = pprArrow (mb_conc, ppr_co) visArgTypeLike
     mb_conc (IfaceTyConAppCo _ tc _) = Just tc
     mb_conc _                        = Nothing
 
@@ -2036,10 +2036,9 @@ instance Binary IfaceCoercion where
           put_ bh a
           put_ bh b
           put_ bh c
-  put_ bh (IfaceFunCo a af w b c) = do
+  put_ bh (IfaceFunCo a w b c) = do
           putByte bh 3
           put_ bh a
-          put_ bh af
           put_ bh w
           put_ bh b
           put_ bh c
@@ -2116,11 +2115,10 @@ instance Binary IfaceCoercion where
                    c <- get bh
                    return $ IfaceGReflCo a b c
            3 -> do a  <- get bh
-                   af <- get bh
                    w  <- get bh
                    b  <- get bh
                    c  <- get bh
-                   return $ IfaceFunCo a af w b c
+                   return $ IfaceFunCo a w b c
            4 -> do a <- get bh
                    b <- get bh
                    c <- get bh
@@ -2226,7 +2224,7 @@ instance NFData IfaceCoercion where
   rnf = \case
     IfaceReflCo f1 -> rnf f1
     IfaceGReflCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
-    IfaceFunCo f1 f2 f3 f4 f5 -> f1 `seq` f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5
+    IfaceFunCo f1 f2 f3 f4 -> f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
     IfaceTyConAppCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
     IfaceAppCo f1 f2 -> rnf f1 `seq` rnf f2
     IfaceForAllCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3

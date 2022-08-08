@@ -1364,7 +1364,7 @@ mkDictFunId dfun_name tvs theta clas tys
                       dfun_ty
   where
     is_nt = isNewTyCon (classTyCon clas)
-    dfun_ty = TcType.mkDFunTy tvs theta (mkClassPred clas tys)
+    dfun_ty = TcType.tcMkDFunSigmaTy tvs theta (mkClassPred clas tys)
 
 {-
 ************************************************************************
