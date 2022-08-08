@@ -85,7 +85,6 @@ pkgs.writeTextFile {
     export PATH
     PATH="${pkgs.autoconf}/bin:$PATH"
     PATH="${pkgs.automake}/bin:$PATH"
-    PATH="${pkgs.coreutils}/bin:$PATH"
     export FONTCONFIG_FILE=${fonts}
     export XELATEX="${ourtexlive}/bin/xelatex"
     export MAKEINDEX="${ourtexlive}/bin/makeindex"
