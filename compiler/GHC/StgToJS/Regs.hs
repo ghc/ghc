@@ -6,9 +6,14 @@ module GHC.StgToJS.Regs
   , sp
   , stack
   , r1, r2, r3, r4
+  , regsFromR1
+  , regsFromR2
+  , jsRegsFromR1
+  , jsRegsFromR2
   , StgRet (..)
   , jsRegToInt
   , intToJSReg
+  , jsReg
   , maxReg
   , minReg
   )
@@ -107,18 +112,38 @@ jsRegToInt = (+1) . fromEnum
 intToJSReg :: Int -> StgReg
 intToJSReg r = toEnum (r - 1)
 
+jsReg :: Int -> JExpr
+jsReg r = toJExpr (intToJSReg r)
+
 maxReg :: Int
 maxReg = jsRegToInt maxBound
 
 minReg :: Int
 minReg = jsRegToInt minBound
+
+-- | List of registers, starting from R1
+regsFromR1 :: [StgReg]
+regsFromR1 = enumFrom R1
+
+-- | List of registers, starting from R2
+regsFromR2 :: [StgReg]
+regsFromR2 = tail regsFromR1
+
+-- | List of registers, starting from R1 as JExpr
+jsRegsFromR1 :: [JExpr]
+jsRegsFromR1 = fmap toJExpr regsFromR1
+
+-- | List of registers, starting from R2 as JExpr
+jsRegsFromR2 :: [JExpr]
+jsRegsFromR2 = tail jsRegsFromR1
+
 ---------------------------------------------------
 -- caches
 ---------------------------------------------------
 
 -- cache JExpr representing StgReg
 registers :: Array StgReg JExpr
-registers = listArray (minBound, maxBound) (map regN (enumFrom R1))
+registers = listArray (minBound, maxBound) (map regN regsFromR1)
   where
     regN r
       | fromEnum r < 32 = var . mkFastString . ("h$"++) . map toLower . show $ r

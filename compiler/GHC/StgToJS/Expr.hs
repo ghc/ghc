@@ -62,7 +62,6 @@ import qualified Control.Monad.Trans.State.Strict as State
 import GHC.Data.FastString
 import qualified GHC.Data.List.SetOps as ListSetOps
 
-import Data.Ord
 import Data.Monoid
 import Data.Maybe
 import Data.Function
@@ -154,7 +153,7 @@ genBind ctx bndr =
        | snd (isInlineExpr (ctxEvaluatedIds ctx) expr) = do
            d   <- declIds b
            tgt <- genIds b
-           let ctx' = ctx { ctxTarget = alignIdExprs b tgt }
+           let ctx' = ctx { ctxTarget = assocIdExprs b tgt }
            (j, _) <- genExpr ctx' expr
            return (Just (d <> j))
      assign _b StgRhsCon{} = return Nothing
@@ -289,12 +288,12 @@ genBody ctx i startReg args e = do
   la <- loadArgs startReg args
   lav <- verifyRuntimeReps args
   let ids :: [TypedExpr]
-      ids = -- take (resultSize args $ idType i) (map toJExpr $ enumFrom R1)
+      ids = -- take (resultSize args $ idType i) jsRegsFromR1
             reverse . fst $
             foldl' (\(rs, vs) (rep, size) ->
                        let (vs0, vs1) = splitAt size vs
                        in  (TypedExpr rep vs0:rs,vs1))
-                   ([], map toJExpr $ enumFrom R1)
+                   ([], jsRegsFromR1)
                    (resultSize args $ idType i)
   (e, _r) <- genExpr (ctx { ctxTarget = ids }) e
   return $ la <> lav <> e <> returnStack
@@ -341,7 +340,7 @@ resultSize [] t
   -- RuntimeRep.
   -- FIXME: Luite (2022,07): typeLevity_maybe can panic, doesn't the next case
   -- give us the right answer?
-  -- | Nothing <- typeLevity_maybe t' = [(LiftedRep, 1)]
+  --  Nothing <- typeLevity_maybe t' = [(LiftedRep, 1)]
   | otherwise = fmap (\p -> (p, slotCount (primRepSize p))) (typePrimReps t)
   where
     t' = unwrapType t
@@ -521,7 +520,7 @@ genCase ctx bnd e at alts l
   | snd (isInlineExpr (ctxEvaluatedIds ctx) e) = withNewIdent $ \ccsVar -> do
       bndi <- genIdsI bnd
       let ctx' = ctxSetTop bnd
-                  $ ctxSetTarget (alignIdExprs bnd (map toJExpr bndi))
+                  $ ctxSetTarget (assocIdExprs bnd (map toJExpr bndi))
                   $ ctx
       (ej, r) <- genExpr ctx' e
       let d = case r of
@@ -547,7 +546,7 @@ genCase ctx bnd e at alts l
   | otherwise = do
       rj       <- genRet (ctxAssertEvaluated bnd ctx) bnd at alts l
       let ctx' = ctxSetTop bnd
-                  $ ctxSetTarget (alignIdExprs bnd (map toJExpr [R1 ..]))
+                  $ ctxSetTarget (assocIdExprs bnd (map toJExpr [R1 ..]))
                   $ ctx
       (ej, _r) <- genExpr ctx' e
       return (rj <> ej, ExprCont)
@@ -733,7 +732,7 @@ normalizeBranches ctx brs
         (ExprInline Nothing, brs)
   where
     mkCont b = case branch_result b of
-      ExprInline{} -> b { branch_stat   = branch_stat b <> assignAll (map toJExpr $ enumFrom R1)
+      ExprInline{} -> b { branch_stat   = branch_stat b <> assignAll jsRegsFromR1
                                                                      (concatMap typex_expr $ ctxTarget ctx)
                         , branch_result = ExprCont
                         }

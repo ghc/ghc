@@ -76,11 +76,11 @@ data StgToJSConfig = StgToJSConfig
 
 data ClosureInfo = ClosureInfo
   { ciVar     :: FastString -- ^ object being infod
-  , ciRegs    :: CIRegs    -- ^ things in registers when this is the next closure to enter
+  , ciRegs    :: CIRegs     -- ^ things in registers when this is the next closure to enter
   , ciName    :: FastString -- ^ friendly name for printing
-  , ciLayout  :: CILayout  -- ^ heap/stack layout of the object
-  , ciType    :: CIType    -- ^ type of the object, with extra info where required
-  , ciStatic  :: CIStatic  -- ^ static references of this object
+  , ciLayout  :: CILayout   -- ^ heap/stack layout of the object
+  , ciType    :: CIType     -- ^ type of the object, with extra info where required
+  , ciStatic  :: CIStatic   -- ^ static references of this object
   }
   deriving stock (Eq, Show, Generic)
 

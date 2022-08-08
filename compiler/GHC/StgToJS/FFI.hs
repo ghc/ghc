@@ -332,7 +332,7 @@ genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) t tgt args = do
     async | isJsCc    = playInterruptible safety
           | otherwise = playInterruptible safety || playSafe safety
 
-    tgt'  | async     = take (length tgt) (map toJExpr $ enumFrom R1)
+    tgt'  | async     = take (length tgt) jsRegsFromR1
           | otherwise = tgt
 
     wrapperPrefix = "ghczuwrapperZC"
