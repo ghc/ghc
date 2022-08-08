@@ -184,10 +184,12 @@ install_lib: lib/settings
 install_docs:
 	@echo "Copying docs to $(DESTDIR)$(docdir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
-	cd doc; $(FIND) . -type f -exec sh -c \
-			'$(INSTALL_DIR) "$(DESTDIR)$(docdir)/`dirname $$1`" && \
-			 $(INSTALL_DATA) "$$1" "$(DESTDIR)$(docdir)/`dirname $$1`" \
-		' sh '{}' \;
+	
+	if [ -d doc ]; then \
+		cd doc; $(FIND) . -type f -exec sh -c \
+			'$(INSTALL_DIR) "$(DESTDIR)$(docdir)/`dirname $$1`" && $(INSTALL_DATA) "$$1" "$(DESTDIR)$(docdir)/`dirname $$1`"' \
+			sh '{}' ';'; \
+	fi
 	
 	if [ -d docs-utils ]; then \
 		$(INSTALL_DIR) "$(DESTDIR)$(docdir)/html/libraries/"; \
