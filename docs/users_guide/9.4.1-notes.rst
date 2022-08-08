@@ -31,7 +31,7 @@ upgrading to GHC 9.4:
   and are deprecated, having been superceded by the now levity-polymorphic
   ``Array#`` type.
 
-- The type equality operator, ``(~)``, is not considered to be a type operator
+- The type equality operator, ``(~)``, is now considered to be a type operator
   (exported from ``Prelude``) and therefore requires the enabling of the
   :extension:`TypeOperators` extension rather than :extension:`GADTs` or
   :extension:`TypeFamilies` as was sufficient previously.
