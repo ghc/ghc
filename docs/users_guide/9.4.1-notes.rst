@@ -62,7 +62,7 @@ Language
 - GHC Proposal `#511
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0511-deep-subsumption.rst>`_
   has been implemented, introducing a new language extension,
-  :lang-ext:`DeepSubsumption`. This extension allows the user
+  :extension:`DeepSubsumption`. This extension allows the user
   to opt-in to the deep type subsumption-checking behavior implemented by GHC
   8.10 and earlier.
 
@@ -283,7 +283,7 @@ Runtime system
 ~~~~~~~~~~~~~~~~
 
 - ``GHC.Generics`` now provides a set of newtypes, ``Generically`` and
-  ``Generically1``, for deriving generic instances via :lang-ext:`DerivingVia`.
+  ``Generically1``, for deriving generic instances via :extension:`DerivingVia`.
   ``Generically`` instances include ``Semigroup`` and ``Monoid``.
 
 - There's a new special function ``withDict`` in ``GHC.Exts``: ::
