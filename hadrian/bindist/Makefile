@@ -45,6 +45,8 @@ define patchpackageconf \
 	((echo "$1" | grep rts) && (cat '$2.copy' | sed 's|haddock-.*||' > '$2.copy.copy')) || (cat '$2.copy' > '$2.copy.copy')
 	# We finally replace the original file.
 	mv '$2.copy.copy' '$2'
+	# Fix the mode, in case umask is set
+	chmod 644 '$2'
 endef
 
 # QUESTION : should we use shell commands?
