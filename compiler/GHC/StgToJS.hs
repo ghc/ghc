@@ -25,56 +25,115 @@ import GHC.StgToJS.CodeGen
 --
 -- Primitives
 -- ~~~~~~~~~~
---  See GHC.StgToJS.Types:VarType
---  - Addr#: represented with two fields: array (used as a namespace) and index
---  - StablePtr#: similar to Addr# with array fixed to h$stablePtrBuf
---  - Int64#/Word64#: represented with two fields: high, low
---  - Float#/Double#: both represented as Javascript Double (no Float!)
---  - JSVal#: any Javascript object (used to pass JS objects via FFI)
---  - TVar#, MVar#, etc. are represented with a JS object
+-- Haskell primitives have to be represented as JavaScript values. This is done
+-- as follows:
+--
+--  - Int#/Int32#     -> number in Int32 range
+--  - Int16#          -> number in Int16 range
+--  - Int8#           -> number in Int8 range
+--  - Word#/Word32#   -> number in Word32 range
+--  - Word16#         -> number in Word16 range
+--  - Word8#          -> number in Word8 range
+--
+--  - Float#/Double#  -> both represented as Javascript Double (no Float!)
+--
+--  - Int64#          -> represented with two fields:
+--                          high -> number in Int32 range
+--                          low  -> number in Word32 range
+--  - Word64#         -> represented with two fields: high, low
+--                          high -> number in Word32 range
+--                          low  -> number in Word32 range
+--
+--  - Addr#           -> represented with two fields: array (used as a namespace) and index
+--  - StablePtr#      -> similar to Addr# with array fixed to h$stablePtrBuf
+--
+--  - JSVal#          -> any Javascript object (used to pass JS objects via FFI)
+--
+--  - TVar#, MVar#, etc. are represented with JS objects
 --
 -- Foreign JavaScript imports
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- StgToJS supports inline JavaScript code. Example:
 --
 --    > foreign import javascript unsafe
---    >   "$1 + $2"
+--    >   "((x,y) => x + y)"
 --    >   plus :: Int -> Int -> Int
 --
--- The parser is inherited from JMacro and supports local variable declarations,
--- loops, etc. Local variables are converted to hygienic names to avoid capture.
+-- Currently the JS backend only supports functions as JS imports.
+-- 
+-- In comparison, GHCJS supports JavaScript snippets with $1, $2... variables
+-- as placeholders for the arguments. It requires a JavaScript parser that the
+-- JS backend lacks. In GHCJS, the parser is inherited from JMacro and supports
+-- local variable declarations, loops, etc. Local variables are converted to
+-- hygienic names to avoid capture.
 --
--- TODO: argument order for multi-values primreps (Int64#, Word64#, Addr#)
--- TODO: "$c" safe call continuation?
+-- Primitives that are represented as multiple values (Int64#, Word64#, Addr#)
+-- are passed to FFI functions with multiple arguments.
+--
+-- FIXME: specify argument order:
+--    high then low (Int64#/Word64#)?
+--    array then offset(Addr#)?
+--    StablePtr#: do we pass the array?
+-- FIXME: how do we return them from FFI? With h$retN variables as for
+-- unboex tuples?
+--
+-- Interruptible convention: FFI imports with the "interruptible" calling
+-- convention are passed an extra argument (usually named "$c") that is a
+-- continuation function. The FFI function must call this function to return to
+-- Haskell code.
+--
+-- Unboxed tuples: returning an unboxed tuple can be done with the predefined
+-- macros RETURN_UBX_TUPn where n is the size of the tuples. Internally it uses
+-- predefined "h$retN" global variables to pass additional values; the first
+-- element of the tuple is returned normally.
 --
 -- Memory management
 -- ~~~~~~~~~~~~~~~~~
--- Stack: the Haskell stack is implemented with a dynamically growing JavaScript
--- array ("h$stack").
---  TODO: does it shrink sometimes?
---  TODO: what are the elements of the stack? one JS object per stack frame?
+-- Heap objects are represented as JavaScript values.
 --
--- Heap: objects on the heap ("closures") are represented as JavaScript objects
--- with the following fields:
+-- Most heap objects are represented generically as JavaScript "objects" (hash
+-- maps). However, some Haskell heap objects can use use a more memory efficient
+-- JavaScript representation: number, string... An example of a consequence of
+-- this is that both Int# and Int are represented the same as a JavaScript
+-- number. JavaScript introspection (e.g. typeof) is used to differentiate
+-- heap object representations when necessary.
 --
---  { f: function -- entry function
---  , m: meta     -- meta data
---  , d1: x       -- closure specific fields
---  , d2: y
+-- Generic representation: objects on the heap ("closures") are represented as
+-- JavaScript objects with the following fields:
+--
+--  { f   -- (function) entry function + info table
+--  , d1  -- two fields of payload
+--  , d2
+--  , m   -- GC mark
+--  , cc  -- optional cost-center
 --  }
 --
--- Every heap object has an entry function "f".
+-- Payload: payload only consists of two fields (d1, d2). When more than two
+-- fields of payload are required, the second field is itself an object.
+--    payload []         ==> { d1 = null, d2 = null                   }
+--    payload [a]        ==> { d1 = a   , d2 = null                   }
+--    payload [a,b]      ==> { d1 = a   , d2 = b                      }
+--    payload [a,b,c]    ==> { d1 = a   , d2 = { d1 = b, d2 = c}      }
+--    payload [a,b,c...] ==> { d1 = a   , d2 = { d1 = b, d2 = c, ...} }
 --
--- Similarly to info tables in native code generation, the JS function object
--- "f" also contains some metadata about the Haskell object:
---
---    { t: closure type
---    , a: constructor tag / fun arity
+-- Entry function/ info tables: JavaScript functions are JavaScript objects. If
+-- "f" is a function, we can:
+--    - call it, e.g. "f(arg0,arg1...)"
+--    - get/set its fields, e.g. "f.xyz = abc"
+-- This is used to implement the equivalent of tables-next-to-code in
+-- JavaScript: every heap object has an entry function "f" that also contains
+-- some metadata (info table) about the Haskell object:
+--    { t     -- object type
+--    , size  -- number of fields in the payload (-1 if variable layout)
+--    , i     -- (array) fields layout (empty if variable layout)
+--    , n     -- (string) object name for easier dubugging
+--    , a     -- constructor tag / fun arity
+--    , r     -- FIXME
+--    , s     -- static references? FIXME
+--    , m     -- GC mark?
 --    }
 --
--- Note that functions in JS are objects so if "f" is a function we can:
---  - call it, e.g. "f(arg0,arg1...)"
---  - get/set its metadata, e.g. "var closureType = f.t"
+-- Payloads for each kind of heap object:
 --
 -- THUNK =
 --  { f  = returns the object reduced to WHNF
@@ -126,6 +185,12 @@ import GHC.StgToJS.CodeGen
 --
 -- When a shared thunk is entered, it is overriden with a black hole ("eager
 -- blackholing") and an update frame is pushed on the stack.
+--
+-- Stack: the Haskell stack is implemented with a dynamically growing JavaScript
+-- array ("h$stack").
+--  TODO: does it shrink sometimes?
+--  TODO: what are the elements of the stack? one JS object per stack frame?
+--
 --
 -- Interaction with JavaScript's garbage collector
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -51,7 +51,6 @@ import Data.Array
 import Data.Monoid
 import Data.Char (toLower, toUpper)
 import qualified Data.Bits          as Bits
-import qualified Data.Map           as M
 
 
 -----------------------------------------------------------------------------
@@ -313,9 +312,9 @@ regGettersSetters =
           ]
   where
     getRegCases =
-      map (\r -> (toJExpr (jsRegToInt r) , returnS (toJExpr r))) (enumFrom R1)
+      map (\r -> (toJExpr (jsRegToInt r) , returnS (toJExpr r))) regsFromR1
     setRegCases v =
-      map (\r -> (toJExpr (jsRegToInt r), (toJExpr r |= toJExpr v) <> returnS undefined_)) (enumFrom R1)
+      map (\r -> (toJExpr (jsRegToInt r), (toJExpr r |= toJExpr v) <> returnS undefined_)) regsFromR1
 
 loadRegs :: JStat
 loadRegs = mconcat $ map mkLoad [1..32]
@@ -329,8 +328,8 @@ loadRegs = mconcat $ map mkLoad [1..32]
                                 -- structure to hold the regs. Or perhaps we
                                 -- steal the indices from the registers array?
                                 -- Either way we can avoid allocating this
-                                -- intermediate `enumFrom R1` list
-                              args (reverse $ take n (enumFrom R1))
+                                -- intermediate `regsFromR1` list
+                              args (reverse $ take n regsFromR1)
                    fname  = TxtI $ mkFastString ("h$l" ++ show n)
                    fun    = JFunc args (mconcat assign)
                in fname ||= toJExpr fun
@@ -343,7 +342,7 @@ assignRegs s xs
   | l <= 32 && not (csInlineLoadRegs s)
       = ApplStat (ValExpr (JVar $ assignRegs'!l)) (reverse xs)
   | otherwise = mconcat . reverse $
-      zipWith (\r ex -> toJExpr r |= ex) (take l $ enumFrom R1) xs
+      zipWith (\r ex -> toJExpr r |= ex) (take l regsFromR1) xs
   where
     l = length xs
 

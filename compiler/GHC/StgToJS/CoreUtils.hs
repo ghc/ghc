@@ -49,6 +49,7 @@ isUnboxable DoubleV = True
 isUnboxable IntV    = True -- includes Char#
 isUnboxable _       = False
 
+-- | Number of slots occupied by a PrimRep
 data SlotCount
   = NoSlot
   | OneSlot
@@ -58,14 +59,17 @@ data SlotCount
 instance Outputable SlotCount where
   ppr = text . show
 
-varSize :: VarType -> Int
-varSize = slotCount . varSlotCount
-
+-- | Return SlotCount as an Int
 slotCount :: SlotCount -> Int
 slotCount = \case
   NoSlot   -> 0
   OneSlot  -> 1
   TwoSlots -> 2
+
+
+-- | Number of slots occupied by a value with the given VarType
+varSize :: VarType -> Int
+varSize = slotCount . varSlotCount
 
 varSlotCount :: VarType -> SlotCount
 varSlotCount VoidV = NoSlot
@@ -240,21 +244,25 @@ typePrimReps = typePrimRep . unwrapType
 primRepSize :: PrimRep -> SlotCount
 primRepSize p = varSlotCount (primRepVt p)
 
--- | Assign values to each prim rep slot
-alignPrimReps :: Outputable a => [PrimRep] -> [a] -> [(PrimRep, [a])]
-alignPrimReps []     _  = []
-alignPrimReps (r:rs) vs = case (primRepSize r,vs) of
-  (NoSlot,   xs)     -> (r,[])    : alignPrimReps rs xs
-  (OneSlot,  x:xs)   -> (r,[x])   : alignPrimReps rs xs
-  (TwoSlots, x:y:xs) -> (r,[x,y]) : alignPrimReps rs xs
-  err                -> pprPanic "alignPrimReps" (ppr err)
+-- | Associate the given values to each RrimRep in the given order, taking into
+-- account the number of slots per PrimRep
+assocPrimReps :: Outputable a => [PrimRep] -> [a] -> [(PrimRep, [a])]
+assocPrimReps []     _  = []
+assocPrimReps (r:rs) vs = case (primRepSize r,vs) of
+  (NoSlot,   xs)     -> (r,[])    : assocPrimReps rs xs
+  (OneSlot,  x:xs)   -> (r,[x])   : assocPrimReps rs xs
+  (TwoSlots, x:y:xs) -> (r,[x,y]) : assocPrimReps rs xs
+  err                -> pprPanic "assocPrimReps" (ppr err)
 
-alignIdPrimReps :: Outputable a => Id -> [a] -> [(PrimRep, [a])]
-alignIdPrimReps i = alignPrimReps (idPrimReps i)
+-- | Associate the given values to the Id's PrimReps, taking into account the
+-- number of slots per PrimRep
+assocIdPrimReps :: Outputable a => Id -> [a] -> [(PrimRep, [a])]
+assocIdPrimReps i = assocPrimReps (idPrimReps i)
 
-
-alignIdExprs :: Id -> [JExpr] -> [TypedExpr]
-alignIdExprs i es = fmap (uncurry TypedExpr) (alignIdPrimReps i es)
+-- | Associate the given JExpr to the Id's PrimReps, taking into account the
+-- number of slots per PrimRep
+assocIdExprs :: Id -> [JExpr] -> [TypedExpr]
+assocIdExprs i es = fmap (uncurry TypedExpr) (assocIdPrimReps i es)
 
 -- | Return False only if we are *sure* it's a data type
 -- Look through newtypes etc as much as possible
