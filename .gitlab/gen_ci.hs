@@ -501,6 +501,7 @@ data Rule = FastCI       -- ^ Run this job when the fast-ci label is set
           | Nightly      -- ^ Only run this job in the nightly pipeline
           | LLVMBackend  -- ^ Only run this job when the "LLVM backend" label is present
           | FreeBSDLabel -- ^ Only run this job when the "FreeBSD" label is set.
+          | ARMLabel    -- ^ Only run this job when the "ARM" label is set.
           | Disable      -- ^ Don't run this job.
           deriving (Bounded, Enum, Ord, Eq)
 
@@ -521,6 +522,8 @@ ruleString On LLVMBackend = "$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/"
 ruleString Off LLVMBackend = true
 ruleString On FreeBSDLabel = "$CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/"
 ruleString Off FreeBSDLabel = true
+ruleString On ARMLabel = "$CI_MERGE_REQUEST_LABELS =~ /.*ARM.*/"
+ruleString Off ARMLabel = true
 ruleString On ReleaseOnly = "$RELEASE_JOB == \"yes\""
 ruleString Off ReleaseOnly = "$RELEASE_JOB != \"yes\""
 ruleString On Nightly = "$NIGHTLY"
@@ -792,7 +795,7 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      , standardBuilds AArch64 Darwin
      , standardBuilds AArch64 (Linux Debian10)
      , disableValidate (standardBuilds AArch64 (Linux Debian11))
-     , allowFailureGroup (disableValidate (standardBuilds ARMv7 (Linux Debian10)))
+     , allowFailureGroup (addValidateRule ARMLabel (standardBuilds ARMv7 (Linux Debian10)))
      , standardBuilds I386 (Linux Debian9)
      , allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) static)
      , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
