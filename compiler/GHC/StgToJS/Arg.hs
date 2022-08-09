@@ -39,6 +39,60 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import qualified Control.Monad.Trans.State.Strict as State
 
+{-
+Note [ Unboxable Literals Optimization ]
+~~~~~~~~~~~~~~~~~~
+
+Boxable types in the JS backend are represented as heap objects. See Note
+[StgToJS design] in GHC.StgToJS.hs for more details. Some types, such as Int8
+do not benefit from not being wrapped in an object in the JS runtime. This optimization
+detects such types and changes the code generator to generate a more efficient
+representation. The change is minor and saves one level on indirection. Instead
+of generating a wrapper object with a field for the value's payload, such as:
+
+// a JS object for an Int8
+var anInt8 = { d1 = <Int8# payload>
+             , f  : entry function which would scrutinize the payload
+             }
+
+we instead generate:
+
+// notice, no wrapper object. This representation is essentially an Int8# in the JS backend
+var anInt8 = <Int8# payload>
+
+This optimization fires when the follow invariants hold:
+  1. The value in question has a Type which has a single data constructor
+  2. The data constructor holds a single field that is monomorphic
+  3. The value in question is distinguishable from a THUNK using the JavaScript typeof operator.
+
+From the haskell perspective this means that:
+  1. An Int8# is always a JavaScript 'number', never a JavaScript object.
+  2. An Int8 is either a JavaScript 'number' _or_ a JavaScript object depending on
+     its use case and this optimization.
+
+How is this sound?
+~~~~~~~~~~~~~~~~~~
+
+Normally this optimization would violate the guarantees of call-by-need, however
+we are able to statically detect whether the type in question will be a THUNK or
+not during code gen because the JS backend is consuming STG and we can check
+during runtime with the typeof operator. Similarly we can check at runtime using
+JavaScript's introspection operator `typeof`. Thus, when we know the value in
+question will not be a THUNK we can safely elide the wrapping object, which
+unboxes the value in the JS runtime. For example, an Int8 contains an Int8#
+which has the JavaScript type 'number'. A THUNK of type Int8 would have a
+JavaScript type 'object', so using 'typeof' allows us to check if we have
+something that is definitely evaluated (i.e., a 'number') or something else. If
+it is an 'object' then we may need to enter it to begin its evaluation. Consider
+a type which has a 'ThreadId#' field; such as type would not be subject to this
+optimization because it has to be represented as a JavaScript 'object' and thus
+cannot be unboxed in this way. Another (edge) case is Int64#. Int64# is
+similarly not unboxable in this way because Int64# does not fit in one
+JavaScript variable and thus requires an 'object' for its representation in the
+JavaScript runtime.
+
+-}
+
 genStaticArg :: HasDebugCallStack => StgArg -> G [StaticArg]
 genStaticArg a = case a of
   StgLitArg l -> map StaticLitArg <$> genStaticLit l
@@ -130,6 +184,8 @@ allocConStatic (TxtI to) cc con args = do
   cc' <- costCentreStackLbl cc
   allocConStatic' cc' (concat as)
   where
+    -- see Note [ Unboxable Literals Optimization ] for the purpose of these
+    -- checks
     allocConStatic' :: HasDebugCallStack => Maybe Ident -> [StaticArg] -> G ()
     allocConStatic' cc' []
       | isBoolDataCon con && dataConTag con == 1 =
