@@ -350,9 +350,12 @@ then
 
     AC_ARG_VAR(EMSDK,[Use as the full path to Emscripten. [default=autodetect]])
     AC_ARG_VAR(EMSDK_LLVM,[Use as the full path to Emscripten LLVM. [default=autodetect]])
+    AC_ARG_VAR(EMSDK_BIN,[Use as the full path to Emscripten binary folder. [default=autodetect]])
 
     if test "$EMSDK" != "" ; then
         echo "Using emsdk: $EMSDK"
+    elif test "$EMSDK_LLVM" != "" && "$EMSDK_BIN" != "" ; then
+        echo "Using manually defined emsdk LLVM and bin."
     else
         echo -e "Error: Could not find Emscripten SDK.\nCheck the EMSDK environment variable."
         exit 1
