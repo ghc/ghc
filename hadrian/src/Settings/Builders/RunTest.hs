@@ -285,6 +285,7 @@ runTestBuilderArgs = builder Testsuite ? do
       where emitWhenSet Nothing  _ = mempty
             emitWhenSet (Just v) f = f v
 
+            stageNumber :: Stage -> Int
             stageNumber (Stage0 GlobalLibs) = error "stageNumber stageBoot"
             stageNumber (Stage0 InTreeLibs) = 1
             stageNumber Stage1 = 2
