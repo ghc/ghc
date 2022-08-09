@@ -1450,19 +1450,17 @@ promoteCoercion :: Coercion -> CoercionN
 -- First cases handles anything that should yield refl.
 promoteCoercion co = case co of
 
-    _ | ki1 `eqType` ki2
-      -> mkNomReflCo (typeKind ty1)
-     -- no later branch should return refl
-     --    The assert (False )s throughout
-     -- are these cases explicitly, but they should never fire.
+    Refl _ -> mkNomReflCo ki1
 
-    Refl _ -> assert False $
-              mkNomReflCo ki1
-
-    GRefl _ _ MRefl -> assert False $
-                       mkNomReflCo ki1
+    GRefl _ _ MRefl -> mkNomReflCo ki1
 
     GRefl _ _ (MCo co) -> co
+
+    _ | ki1 `eqType` ki2
+      -> mkNomReflCo (typeKind ty1)
+     -- No later branch should return refl
+     -- The assert (False )s throughout
+     -- are these cases explicitly, but they should never fire.
 
     TyConAppCo _ tc args
       | Just co' <- instCoercions (mkNomReflCo (tyConKind tc)) args
@@ -1481,13 +1479,19 @@ promoteCoercion co = case co of
       | isTyVar tv
       -> promoteCoercion g
 
-    ForAllCo _ _ _
+    ForAllCo {}
       -> assert False $
+            -- (ForAllCo {} :: (forall cv.t1) ~ (forall cv.t2)
+            -- The tyvar case is handled above, so the bound var is a
+            -- a coercion variable. So both sides have kind Type
+            -- (Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep).
+            -- So the result is Refl, and that should have been caught by
+            -- the first equation above
          mkNomReflCo liftedTypeKind
-      -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep
 
-    FunCo {} -> assert False $
-                mkNomReflCo liftedTypeKind
+    FunCo {} -> mkKindCo co
+       -- We can get Type~Constraint or Constraint~Type
+       -- from FunCo {} :: (a -> (b::Type)) ~ (a -=> (b'::Constraint))
 
     CoVarCo {}     -> mkKindCo co
     HoleCo {}      -> mkKindCo co
@@ -1531,7 +1535,7 @@ promoteCoercion co = case co of
            -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep
 
     KindCo _
-      -> assert False $
+      -> assert False $ -- See the first equation above
          mkNomReflCo liftedTypeKind
 
     SubCo g
@@ -1541,6 +1545,9 @@ promoteCoercion co = case co of
     Pair ty1 ty2 = coercionKind co
     ki1 = typeKind ty1
     ki2 = typeKind ty2
+    doc = vcat[ ppr co
+              , text "ty1" <+> ppr ty1 <+> dcolon <+> ppr ki1
+              , text "ty2" <+> ppr ty2 <+> dcolon <+> ppr ki2 ]
 
 -- | say @g = promoteCoercion h@. Then, @instCoercion g w@ yields @Just g'@,
 -- where @g' = promoteCoercion (h w)@.
