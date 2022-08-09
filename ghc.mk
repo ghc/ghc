@@ -510,6 +510,11 @@ libraries/containers/containers/dist-install/build/Data/Graph.o: libraries/templ
 libraries/containers/containers/dist-install/build/Data/Set/Internal.o: libraries/template-haskell/dist-install/build/Language/Haskell/TH/Lib/Internal.hi
 libraries/containers/containers/dist-install/build/Data/IntSet/Internal.o: libraries/template-haskell/dist-install/build/Language/Haskell/TH/Lib/Internal.hi
 
+libraries/containers/containers/dist-install/build/Data/IntMap/Internal.p_o: libraries/template-haskell/dist-install/build/Language/Haskell/TH/Lib/Internal.p_hi
+libraries/containers/containers/dist-install/build/Data/Graph.p_o: libraries/template-haskell/dist-install/build/Language/Haskell/TH/Lib/Internal.p_hi
+libraries/containers/containers/dist-install/build/Data/Set/Internal.p_o: libraries/template-haskell/dist-install/build/Language/Haskell/TH/Lib/Internal.p_hi
+libraries/containers/containers/dist-install/build/Data/IntSet/Internal.p_o: libraries/template-haskell/dist-install/build/Language/Haskell/TH/Lib/Internal.p_hi
+
 ifeq "$(BIGNUM_BACKEND)" "gmp"
 GMP_ENABLED = YES
 libraries/ghc-bignum_CONFIGURE_OPTS += --configure-option="--with-gmp"
