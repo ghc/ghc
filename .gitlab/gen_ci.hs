@@ -337,6 +337,10 @@ opsysVariables _ FreeBSD13 = mconcat
   , "HADRIAN_ARGS" =: "--docs=no-sphinx"
   , "GHC_VERSION" =: "9.2.2"
   , "CABAL_INSTALL_VERSION" =: "3.6.2.0"
+    -- We workaround an upstream clang/FreeBSD bug (#21986) by using clang++14 rather than
+    -- the default clang-13 compiler.
+  , "CC" =: "clang14"
+  , "CXX" =: "clang++14"
   ]
 opsysVariables ARMv7 (Linux distro) =
   distroVariables distro <>
