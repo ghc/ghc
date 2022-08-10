@@ -1203,7 +1203,7 @@ fixHashesIter n invDeps allKeys checkKeys sccs hashes finalHashes
         lookupDep (LexicalFastString d)
           | Just b <- lookupUniqMap finalHashes d = b
           | Just i <- lookupUniqMap toHashIdx d
-              = grpHash <> (utf8EncodeString . show $ i)
+              = grpHash <> (utf8EncodeByteString . show $ i)
           | otherwise
               = panic $ "Gen2.Compactor.hashRootSCC: unknown key: " ++
                               unpackFS d
@@ -1287,7 +1287,7 @@ hd d = HashBuilder (BB.doubleLE d) []
 htxt :: FastString -> HashBuilder
 htxt x = HashBuilder (BB.int64LE (fromIntegral $ BS.length bs) <> BB.byteString bs) []
   where
-    bs = utf8EncodeString $ unpackFS x
+    bs = utf8EncodeByteString $ unpackFS x
 
 hobj :: FastString -> HashBuilder
 hobj x = HashBuilder (BB.int8 127) [x]
