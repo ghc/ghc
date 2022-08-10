@@ -853,6 +853,10 @@ expirationTime mgr us = do
 -- The timeout is automatically unregistered when it fires.
 --
 -- The 'TimeoutCallback' will not be called more than once.
+--
+-- Be careful not to exceed @maxBound :: Int@, which on 32-bit machines is only
+-- 2147483647 μs, less than 36 minutes.
+--
 {-# NOINLINE registerTimeout #-}
 registerTimeout :: Manager -> Int -> TimeoutCallback -> IO TimeoutKey
 registerTimeout mgr@Manager{..} uSrelTime cb = do
@@ -866,6 +870,10 @@ registerTimeout mgr@Manager{..} uSrelTime cb = do
 -- | Update an active timeout to fire in the given number of seconds (from the
 -- time 'updateTimeout' is called), instead of when it was going to fire.
 -- This has no effect if the timeout has already fired.
+--
+-- Be careful not to exceed @maxBound :: Int@, which on 32-bit machines is only
+-- 2147483647 μs, less than 36 minutes.
+--
 updateTimeout :: Manager -> TimeoutKey -> Seconds -> IO ()
 updateTimeout mgr (TK key) relTime = do
     now <- getTime (mgrClock mgr)

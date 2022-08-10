@@ -19,6 +19,8 @@ ensureIOManagerIsRunning = wakeupIOManager
 interruptIOManager :: IO ()
 interruptIOManager = interruptSystemManager
 
+-- | Be careful not to exceed @maxBound :: Int@, which on 32-bit machines is only
+-- 2147483647 μs, less than 36 minutes.
 threadDelay :: Int -> IO ()
 threadDelay usecs = mask_ $ do
     m <- newEmptyIOPort
@@ -26,6 +28,8 @@ threadDelay usecs = mask_ $ do
     reg <- registerTimeout mgr usecs $ writeIOPort m () >> return ()
     readIOPort m `onException` unregisterTimeout mgr reg
 
+-- | Be careful not to exceed @maxBound :: Int@, which on 32-bit machines is only
+-- 2147483647 μs, less than 36 minutes.
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs = do
     t <- newTVarIO False

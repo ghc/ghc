@@ -107,6 +107,9 @@ asyncWriteBA fd isSock len off bufB =
 -- when the delay has expired, but the thread will never continue to
 -- run /earlier/ than specified.
 --
+-- Be careful not to exceed @maxBound :: Int@, which on 32-bit machines is only
+-- 2147483647 μs, less than 36 minutes.
+--
 threadDelay :: Int -> IO ()
 threadDelay time
   | threaded  = waitForDelayEvent time
@@ -117,6 +120,9 @@ threadDelay time
 
 -- | Set the value of returned TVar to True after a given number of
 -- microseconds. The caveats associated with threadDelay also apply.
+--
+-- Be careful not to exceed @maxBound :: Int@, which on 32-bit machines is only
+-- 2147483647 μs, less than 36 minutes.
 --
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs
