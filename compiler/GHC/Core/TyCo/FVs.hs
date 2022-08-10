@@ -673,8 +673,8 @@ almost_devoid_co_var_of_co (AppCo co arg) cv
 almost_devoid_co_var_of_co (ForAllCo v kind_co co) cv
   = almost_devoid_co_var_of_co kind_co cv
   && (v == cv || almost_devoid_co_var_of_co co cv)
-almost_devoid_co_var_of_co (FunCo o_ w co1 co2) cv
-  = almost_devoid_co_var_of_co w cv
+almost_devoid_co_var_of_co (FunCo _ w co1 co2) cv
+  =  almost_devoid_co_var_of_co w   cv
   && almost_devoid_co_var_of_co co1 cv
   && almost_devoid_co_var_of_co co2 cv
 almost_devoid_co_var_of_co (CoVarCo v) cv = v /= cv
