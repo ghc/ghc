@@ -810,7 +810,7 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
      , fastCI (standardBuilds Amd64 Windows)
      , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
      , standardBuilds Amd64 Darwin
-     , allowFailureGroup (addValidateRule FreeBSDLabel (standardBuilds Amd64 FreeBSD13))
+     , addValidateRule FreeBSDLabel (standardBuilds Amd64 FreeBSD13)
      , standardBuilds AArch64 Darwin
      , standardBuilds AArch64 (Linux Debian10)
      , allowFailureGroup (addValidateRule ARMLabel (standardBuilds ARMv7 (Linux Debian10)))
