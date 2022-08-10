@@ -791,6 +791,7 @@ Library
         GHC.Utils.FV
         GHC.Utils.GlobalVars
         GHC.Utils.IO.Unsafe
+        GHC.Utils.Indentable
         GHC.Utils.Json
         GHC.Utils.Lexeme
         GHC.Utils.Logger
