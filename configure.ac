@@ -415,17 +415,6 @@ then
     AC_PATH_TARGET_TOOL([OBJDUMP],[objdump])
 
 else
-    AC_PATH_TOOL([CC],[gcc], [clang])
-    AC_PATH_TOOL([CXX],[g++], [clang++])
-    AC_PATH_TOOL([NM],[nm])
-    # N.B. we don't probe for LD here but instead
-    # do so in FIND_LD to avoid #21778.
-    AC_PATH_TOOL([AR],[ar])
-    AC_PATH_TOOL([RANLIB],[ranlib])
-    AC_PATH_TOOL([OBJDUMP],[objdump])
-    AC_PATH_TOOL([DllWrap],[dllwrap])
-    AC_PATH_TOOL([Windres],[windres])
-    AC_PATH_TOOL([Genlib],[genlib])
 
   # Extract and configure the Windows toolchain
   if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
@@ -434,17 +423,17 @@ else
       # Ideally should use AC_CHECK_TARGET_TOOL but our triples
       # are screwed up. Configure doesn't think they're ever equal and
       # so never tried without the prefix.
-      AC_PATH_PROG([CC],[gcc], [clang])
-      AC_PATH_PROG([CXX],[g++], [clang++])
-      AC_PATH_PROG([NM],[nm])
+      AC_PATH_TOOL([CC],[gcc], [clang])
+      AC_PATH_TOOL([CXX],[g++], [clang++])
+      AC_PATH_TOOL([NM],[nm])
       # N.B. we don't probe for LD here but instead
       # do so in FIND_LD to avoid #21778.
-      AC_PATH_PROG([AR],[ar])
-      AC_PATH_PROG([RANLIB],[ranlib])
-      AC_PATH_PROG([OBJDUMP],[objdump])
-      AC_PATH_PROG([DllWrap],[dllwrap])
-      AC_PATH_PROG([Windres],[windres])
-      AC_PATH_PROG([Genlib],[genlib])
+      AC_PATH_TOOL([AR],[ar])
+      AC_PATH_TOOL([RANLIB],[ranlib])
+      AC_PATH_TOOL([OBJDUMP],[objdump])
+      AC_PATH_TOOL([DllWrap],[dllwrap])
+      AC_PATH_TOOL([Windres],[windres])
+      AC_PATH_TOOL([Genlib],[genlib])
 
       HAVE_GENLIB=False
       if test "$HostOS" = "mingw32"; then
@@ -777,8 +766,12 @@ AC_SUBST(CONF_HC_OPTS_STAGE0)
 AC_SUBST(CONF_HC_OPTS_STAGE1)
 AC_SUBST(CONF_HC_OPTS_STAGE2)
 
-dnl Identify C++ standard library flavour and location
-FP_FIND_CXX_STD_LIB
+dnl Identify C++ standard library flavour and location only when _not_ compiling
+dnl the JS backend. The JS backend uses emscripten to wrap c++ utilities which
+dnl fails this check, so we avoid it when compiling to JS.
+if test "$TargetOS" != "ghcjs"; then
+   FP_FIND_CXX_STD_LIB
+fi
 AC_CONFIG_FILES([mk/system-cxx-std-lib-1.0.conf])
 
 dnl ** Set up the variables for the platform in the settings file.
