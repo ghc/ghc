@@ -634,7 +634,8 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
                         floats' = floats `extendFloats` NonRec bndr' triv_rhs
                   ; return ( floats', setInScopeFromF env floats' ) } }
   where
-    occ_fs = getOccFS bndr
+    -- Force the occ_fs so that the old Id is not retained in the new Id.
+    !occ_fs = getOccFS bndr
     uf_opts = seUnfoldingOpts env
     work_ty = coercionLKind co
     info   = idInfo bndr
@@ -711,9 +712,11 @@ prepareBinding env top_lvl is_rec strict_bind bndr rhs_floats rhs
          -- rhs_env: add to in-scope set the binders from rhs_floats
          -- so that prepareRhs knows what is in scope in rhs
        ; let rhs_env = env `setInScopeFromF` rhs_floats1
+             -- Force the occ_fs so that the old Id is not retained in the new Id.
+             !occ_fs = getOccFS bndr
 
        -- Now ANF-ise the remaining rhs
-       ; (anf_floats, rhs2) <- prepareRhs rhs_env top_lvl (getOccFS bndr) rhs1
+       ; (anf_floats, rhs2) <- prepareRhs rhs_env top_lvl occ_fs rhs1
 
        -- Finally, decide whether or not to float
        ; let all_floats = rhs_floats1 `addLetFloats` anf_floats
