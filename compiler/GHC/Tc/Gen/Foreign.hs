@@ -326,7 +326,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) (L ls safety) mh
   | cconv == JavaScriptCallConv = do
       checkCg (Right idecl) backendValidityOfCImport
       -- leave the rest to the JS backend (at least for now)
-      return idecl
+      return (CImport src (L lc cconv) (L ls safety) mh (CFunction target))
   | otherwise = do              -- Normal foreign import
       checkCg (Right idecl) backendValidityOfCImport
       cconv' <- checkCConv (Right idecl) cconv

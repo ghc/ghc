@@ -124,7 +124,7 @@ import           System.Directory ( createDirectoryIfMissing
                                   )
 
 import GHC.Driver.Session (targetWays_, DynFlags(..))
-import GHC.Unit.Module.Name
+import Language.Haskell.Syntax.Module.Name
 import GHC.Unit.Module (moduleStableString)
 import GHC.Utils.Logger (Logger)
 import GHC.Utils.TmpFs (TmpFs)
