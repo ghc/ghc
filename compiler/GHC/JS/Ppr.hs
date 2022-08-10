@@ -7,6 +7,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE BlockArguments #-}
 
+-- For Outputable instances for JS syntax
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 -- | Pretty-printing JavaScript
 module GHC.JS.Ppr
   ( renderJs
@@ -31,19 +34,22 @@ import GHC.JS.Syntax
 import GHC.JS.Transform
 
 
-import Data.Function
 import Data.Char (isControl, ord)
-import qualified Data.Map as M
-import Data.List
-import Data.Ord
+import Data.List (sortOn)
 
 import Numeric(showHex)
 
+import GHC.Utils.Outputable (Outputable (..), docToSDoc)
 import GHC.Utils.Ppr as PP
-import qualified GHC.Data.ShortText as ST
-import GHC.Data.ShortText (ShortText)
 import GHC.Data.FastString
 import GHC.Types.Unique.Map
+
+instance Outputable JExpr where
+  ppr = docToSDoc . renderJs
+
+instance Outputable JVal where
+  ppr = docToSDoc . renderJs
+
 
 ($$$) :: Doc -> Doc -> Doc
 --x $$$ y = align (nest 2 $ x $+$ y) -- FIXME (Sylvain, 2022/02)

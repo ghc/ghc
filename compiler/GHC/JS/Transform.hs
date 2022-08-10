@@ -41,12 +41,9 @@ import Data.Functor.Identity
 import Control.Monad
 import Data.Semigroup
 import Data.Bifunctor
-import Data.List
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import qualified GHC.Data.ShortText as ST
-import GHC.Data.ShortText (ShortText)
 import GHC.Data.FastString
 import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Panic
