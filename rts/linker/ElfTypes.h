@@ -6,6 +6,7 @@
 #include "ghcplatform.h"
 
 #include <elf.h>
+#include "linker/InitFini.h"
 
 /*
  * Define a set of types which can be used for both ELF32 and ELF64
@@ -137,6 +138,8 @@ struct ObjectCodeFormatInfo {
     ElfRelocationTable   *relTable;
     ElfRelocationATable  *relaTable;
 
+    struct InitFiniList* init; // Freed by ocRunInit_PEi386
+    struct InitFiniList* fini; // Freed by ocRunFini_PEi386
 
     /* pointer to the global offset table */
     void *                got_start;
@@ -164,7 +167,7 @@ struct SectionFormatInfo {
     size_t nstubs;
     Stub * stubs;
 
-    char * name;
+    const char * name;
 
     Elf_Shdr *sectionHeader;
 };

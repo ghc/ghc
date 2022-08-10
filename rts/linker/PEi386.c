@@ -308,7 +308,6 @@
 
 #include "RtsUtils.h"
 #include "RtsSymbolInfo.h"
-#include "GetEnv.h"
 #include "CheckUnload.h"
 #include "LinkerInternals.h"
 #include "linker/PEi386.h"
@@ -385,45 +384,6 @@ const int default_alignment = 8;
    location of the I/O structures in memory.  As such we need RODATA to contain
    the pointer as a redirect.  Essentially it's a DATA DLL reference.  */
 const void* __rts_iob_func = (void*)&__acrt_iob_func;
-
-enum SortOrder { INCREASING, DECREASING };
-
-// Sort a SectionList by priority.
-static void sortSectionList(struct SectionList **slist, enum SortOrder order)
-{
-    // Bubble sort
-    bool done = false;
-    while (!done) {
-        struct SectionList **last = slist;
-        done = true;
-        while (*last != NULL && (*last)->next != NULL) {
-            struct SectionList *s0 = *last;
-            struct SectionList *s1 = s0->next;
-            bool flip;
-            switch (order) {
-                case INCREASING: flip = s0->priority > s1->priority; break;
-                case DECREASING: flip = s0->priority < s1->priority; break;
-            }
-            if (flip) {
-                s0->next = s1->next;
-                s1->next = s0;
-                *last = s1;
-                done = false;
-            } else {
-                last = &s0->next;
-            }
-        }
-    }
-}
-
-static void freeSectionList(struct SectionList *slist)
-{
-    while (slist != NULL) {
-        struct SectionList *next = slist->next;
-        stgFree(slist);
-        slist = next;
-    }
-}
 
 void initLinker_PEi386()
 {
@@ -553,8 +513,8 @@ static void releaseOcInfo(ObjectCode* oc) {
     if (!oc) return;
 
     if (oc->info) {
-        freeSectionList(oc->info->init);
-        freeSectionList(oc->info->fini);
+        freeInitFiniList(oc->info->init);
+        freeInitFiniList(oc->info->fini);
         stgFree (oc->info->ch_info);
         stgFree (oc->info->symbols);
         stgFree (oc->info->str_tab);
@@ -1513,26 +1473,28 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       if (0==strncmp(".ctors", section->info->name, 6)) {
           /* N.B. a compilation unit may have more than one .ctor section; we
            * must run them all. See #21618 for a case where this happened */
-          struct SectionList *slist = stgMallocBytes(sizeof(struct SectionList), "ocGetNames_PEi386");
-          slist->section = &oc->sections[i];
-          slist->next = oc->info->init;
-          if (sscanf(section->info->name, ".ctors.%d", &slist->priority) != 1) {
-              // Sections without an explicit priority must be run last
-              slist->priority = 0;
+          uint32_t prio;
+          if (sscanf(section->info->name, ".ctors.%d", &prio) != 1) {
+              // Sections without an explicit priority are run last
+              prio = 0;
           }
-          oc->info->init = slist;
+          // .ctors/.dtors are executed in reverse order: higher numbers are
+          // executed first
+          prio = 0xffff - prio;
+          addInitFini(&oc->info->init, &oc->sections[i], INITFINI_CTORS, prio);
           kind = SECTIONKIND_INIT_ARRAY;
       }
 
       if (0==strncmp(".dtors", section->info->name, 6)) {
-          struct SectionList *slist = stgMallocBytes(sizeof(struct SectionList), "ocGetNames_PEi386");
-          slist->section = &oc->sections[i];
-          slist->next = oc->info->fini;
-          if (sscanf(section->info->name, ".dtors.%d", &slist->priority) != 1) {
-              // Sections without an explicit priority must be run last
-              slist->priority = INT_MAX;
+          uint32_t prio;
+          if (sscanf(section->info->name, ".dtors.%d", &prio) != 1) {
+              // Sections without an explicit priority are run last
+              prio = 0;
           }
-          oc->info->fini = slist;
+          // .ctors/.dtors are executed in reverse order: higher numbers are
+          // executed first
+          prio = 0xffff - prio;
+          addInitFini(&oc->info->fini, &oc->sections[i], INITFINI_DTORS, prio);
           kind = SECTIONKIND_FINI_ARRAY;
       }
 
@@ -1631,10 +1593,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       addSection(section, kind, SECTION_NOMEM, start, sz, 0, 0, 0);
       addProddableBlock(oc, oc->sections[i].start, sz);
    }
-
-   /* Sort the constructors and finalizers by priority */
-   sortSectionList(&oc->info->init, DECREASING);
-   sortSectionList(&oc->info->fini, INCREASING);
 
    /* Copy exported symbols into the ObjectCode. */
 
@@ -2170,95 +2128,23 @@ ocResolve_PEi386 ( ObjectCode* oc )
   content of .pdata on to RtlAddFunctionTable and the OS will do
   the rest.  When we're unloading the object we have to unregister
   them using RtlDeleteFunctionTable.
-
 */
 
-/*
- * Note [Initializers and finalizers (PEi386)]
- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * COFF/PE allows an object to define initializers and finalizers to be run
- * at load/unload time, respectively. These are listed in the `.ctors` and
- * `.dtors` sections. Moreover, these section names may be suffixed with an
- * integer priority (e.g. `.ctors.1234`). Sections are run in order of
- * high-to-low priority. Sections without a priority (e.g.  `.ctors`) are run
- * last.
- *
- * A `.ctors`/`.dtors` section contains an array of pointers to
- * `init_t`/`fini_t` functions, respectively. Note that `.ctors` must be run in
- * reverse order.
- *
- * For more about how the code generator emits initializers and finalizers see
- * Note [Initializers and finalizers in Cmm] in GHC.Cmm.InitFini.
- */
-
-
-// Run the constructors/initializers of an ObjectCode.
-// Returns 1 on success.
-// See Note [Initializers and finalizers (PEi386)].
 bool
 ocRunInit_PEi386 ( ObjectCode *oc )
 {
-  if (!oc || !oc->info || !oc->info->init) {
-    return true;
-  }
-
-  int argc, envc;
-  char **argv, **envv;
-
-  getProgArgv(&argc, &argv);
-  getProgEnvv(&envc, &envv);
-
-  for (struct SectionList *slist = oc->info->init;
-       slist != NULL;
-       slist = slist->next) {
-    Section *section = slist->section;
-    CHECK(SECTIONKIND_INIT_ARRAY == section->kind);
-    uint8_t *init_startC = section->start;
-    init_t *init_start   = (init_t*)init_startC;
-    init_t *init_end     = (init_t*)(init_startC + section->size);
-
-    // ctors are run *backwards*!
-    for (init_t *init = init_end - 1; init >= init_start; init--) {
-        (*init)(argc, argv, envv);
+    if (oc && oc->info && oc->info->init) {
+        return runInit(&oc->info->init);
     }
-  }
-
-  freeSectionList(oc->info->init);
-  oc->info->init = NULL;
-
-  freeProgEnvv(envc, envv);
-  return true;
+    return true;
 }
 
-// Run the finalizers of an ObjectCode.
-// Returns 1 on success.
-// See Note [Initializers and finalizers (PEi386)].
 bool ocRunFini_PEi386( ObjectCode *oc )
 {
-  if (!oc || !oc->info || !oc->info->fini) {
-    return true;
-  }
-
-  for (struct SectionList *slist = oc->info->fini;
-       slist != NULL;
-       slist = slist->next) {
-    Section section = *slist->section;
-    CHECK(SECTIONKIND_FINI_ARRAY == section.kind);
-
-    uint8_t *fini_startC = section.start;
-    fini_t *fini_start   = (fini_t*)fini_startC;
-    fini_t *fini_end     = (fini_t*)(fini_startC + section.size);
-
-    // dtors are run in forward order.
-    for (fini_t *fini = fini_end - 1; fini >= fini_start; fini--) {
-      (*fini)();
+    if (oc && oc->info && oc->info->fini) {
+        return runFini(&oc->info->fini);
     }
-  }
-
-  freeSectionList(oc->info->fini);
-  oc->info->fini = NULL;
-
-  return true;
+    return true;
 }
 
 SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType *type)
