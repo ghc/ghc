@@ -115,7 +115,7 @@ test('encoding001', [], compile_and_run, [''])
 
 test('encoding002', normal, compile_and_run, [''])
 test('encoding003', normal, compile_and_run, [''])
-test('encoding004', extra_files(['encoded-data/']), compile_and_run, [''])
+test('encoding004', [when(opsys('freebsd'), expect_broken(22003)), extra_files(['encoded-data/'])], compile_and_run, [''])
 test('encoding005', normal, compile_and_run, [''])
 
 test('environment001', [], makefile_test, ['environment001-test'])
