@@ -4294,7 +4294,8 @@ simplRules env mb_new_id rules bind_cxt
                  lhs_env = updMode updModeForRules env'
                  rhs_env = updMode (updModeForStableUnfoldings act) env'
                            -- See Note [Simplifying the RHS of a RULE]
-                 fn_name' = case mb_new_id of
+                 -- Force this to avoid retaining reference to old Id
+                 !fn_name' = case mb_new_id of
                               Just id -> idName id
                               Nothing -> fn_name
 
