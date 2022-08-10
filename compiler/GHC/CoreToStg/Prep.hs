@@ -2153,7 +2153,9 @@ cpCloneBndr env bndr
        -- Drop (now-useless) rules/unfoldings
        -- See Note [Drop unfoldings and rules]
        -- and Note [Preserve evaluatedness] in GHC.Core.Tidy
-       ; let unfolding' = trimUnfolding (realIdUnfolding bndr)
+       -- And force it.. otherwise the old unfolding is just retained.
+       -- See #22071
+       ; let !unfolding' = trimUnfolding (realIdUnfolding bndr)
                           -- Simplifier will set the Id's unfolding
 
              bndr'' = bndr' `setIdUnfolding`      unfolding'
