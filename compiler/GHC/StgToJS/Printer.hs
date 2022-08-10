@@ -20,23 +20,21 @@ module GHC.StgToJS.Printer
   ( pretty
   , ghcjsRenderJs
   , prettyBlock
-  ) where
+  )
+where
+
+import GHC.Prelude
 
 
 import GHC.JS.Syntax
 import GHC.JS.Ppr
 
-import qualified GHC.Data.ShortText as T
-import           GHC.Utils.Ppr      as PP
-import           GHC.Data.FastString
-import           GHC.Types.Unique.Map
+import GHC.Utils.Ppr      as PP
+import GHC.Data.FastString
+import GHC.Types.Unique.Map
 
-import qualified Data.Map           as M
-import           Data.List
-
+import Data.List (sortOn)
 import Data.Char (isAlpha,isDigit)
-
-import GHC.Prelude
 
 pretty :: JStat -> Doc
 pretty = jsToDocR ghcjsRenderJs

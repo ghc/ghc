@@ -24,7 +24,6 @@ import GHC.Prelude
 import GHC.JS.Syntax
 import GHC.JS.Make
 
-import qualified GHC.Data.ShortText as ST
 import GHC.Data.FastString
 
 import Data.Array

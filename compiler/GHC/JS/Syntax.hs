@@ -94,7 +94,6 @@ import GHC.Prelude
 import Control.DeepSeq
 
 import Data.Function
-import qualified Data.Map as M
 import qualified Data.Set as Set
 import Data.Data
 import Data.Word
@@ -102,12 +101,9 @@ import qualified Data.Semigroup as Semigroup
 
 import GHC.Generics
 
-import GHC.Utils.Outputable (Outputable (..))
-import qualified GHC.Utils.Outputable as O
 import GHC.Data.FastString
 import GHC.Utils.Monad.State.Strict
 import GHC.Types.Unique.Map
-import GHC.Utils.Binary
 
 -- FIXME: Jeff (2022,03): This state monad is strict, but uses a lazy list as
 -- the state, since the strict state monad evaluates to WHNF, this state monad
@@ -255,9 +251,6 @@ data JExpr
                                     --   See 'pseudoSaturate'
   deriving (Eq, Typeable, Generic)
 
-instance Outputable JExpr where
-  ppr x = undefined -- O.text (show x)
-
 -- * Useful pattern synonyms to ease programming with the deeply embedded JS
 --   AST. Each pattern wraps @JUOp@ and @JOp@ into a @JExpr@s to save typing and
 --   for convienience. In addition we include a string wrapper for JS string
@@ -361,10 +354,6 @@ data JVal
   | JFunc    [Ident] JStat              -- ^ A function
   | UnsatVal (IdentSupply JVal)         -- ^ An /Unsaturated/ value, see 'pseudoSaturate'
   deriving (Eq, Typeable, Generic)
-
-instance Outputable JVal where
-  ppr x = undefined -- O.text (show x)
-
 
 --------------------------------------------------------------------------------
 --                            Operators

@@ -142,8 +142,6 @@ import qualified Data.Map as M
 import qualified Data.List as List
 
 import GHC.Utils.Outputable (Outputable (..))
-import qualified GHC.Data.ShortText as ST
-import GHC.Data.ShortText (ShortText)
 import GHC.Data.FastString
 import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Panic
