@@ -1151,7 +1151,7 @@ data CoreRule
 
         -- Rough-matching stuff
         -- see comments with InstEnv.ClsInst( is_cls, is_rough )
-        ru_fn    :: Name,               -- ^ Name of the 'GHC.Types.Id.Id' at the head of this rule
+        ru_fn    :: !Name,               -- ^ Name of the 'GHC.Types.Id.Id' at the head of this rule
         ru_rough :: [Maybe Name],       -- ^ Name at the head of each argument to the left hand side
 
         -- Proper-matching stuff
