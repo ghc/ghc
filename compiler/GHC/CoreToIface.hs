@@ -340,7 +340,7 @@ toIfaceAppArgsX fr kind ty_args
   | null ty_args
   = IA_Nil
   | otherwise
-  = go (mkEmptyvSubst in_scope) kind ty_args
+  = go (mkEmptySubst in_scope) kind ty_args
   where
     in_scope = mkInScopeSet (tyCoVarsOfTypes ty_args)
 
