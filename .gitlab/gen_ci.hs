@@ -794,7 +794,6 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      , allowFailureGroup (addValidateRule FreeBSDLabel (standardBuilds Amd64 FreeBSD13))
      , standardBuilds AArch64 Darwin
      , standardBuilds AArch64 (Linux Debian10)
-     , disableValidate (standardBuilds AArch64 (Linux Debian11))
      , allowFailureGroup (addValidateRule ARMLabel (standardBuilds ARMv7 (Linux Debian10)))
      , standardBuilds I386 (Linux Debian9)
      , allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) static)
