@@ -57,6 +57,7 @@ import GHC.Utils.Panic.Plain
 -- just for implementing a fast [0,61) -> Char function
 import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
 
+import Data.Int         ( Int64 )
 import Data.Char        ( chr, ord )
 
 import Language.Haskell.Syntax.Module.Name
@@ -91,21 +92,21 @@ GHC.Builtin.Uniques. See Note [Uniques for wired-in prelude things and known mas
 -- the functions from the 'UniqSupply' module
 --
 -- These are sometimes also referred to as \"keys\" in comments in GHC.
-newtype Unique = MkUnique Int
+newtype Unique = MkUnique Int64
 
 {-# INLINE uNIQUE_BITS #-}
 uNIQUE_BITS :: Int
-uNIQUE_BITS = finiteBitSize (0 :: Int) - UNIQUE_TAG_BITS
+uNIQUE_BITS = finiteBitSize (0 :: Int64) - UNIQUE_TAG_BITS
 
 {-
 Now come the functions which construct uniques from their pieces, and vice versa.
 The stuff about unique *supplies* is handled further down this module.
 -}
 
-unpkUnique      :: Unique -> (Char, Int)        -- The reverse
+unpkUnique      :: Unique -> (Char, Int64)      -- The reverse
 
-mkUniqueGrimily :: Int -> Unique                -- A trap-door for UniqSupply
-getKey          :: Unique -> Int                -- for Var
+mkUniqueGrimily :: Int64 -> Unique              -- A trap-door for UniqSupply
+getKey          :: Unique -> Int64              -- for Var
 
 incrUnique   :: Unique -> Unique
 stepUnique   :: Unique -> Int -> Unique
@@ -117,9 +118,9 @@ mkUniqueGrimily = MkUnique
 getKey (MkUnique x) = x
 
 incrUnique (MkUnique i) = MkUnique (i + 1)
-stepUnique (MkUnique i) n = MkUnique (i + n)
+stepUnique (MkUnique i) n = MkUnique (i + fromIntegral n)
 
-mkLocalUnique :: Int -> Unique
+mkLocalUnique :: Int64 -> Unique
 mkLocalUnique i = mkUnique 'X' i
 
 minLocalUnique :: Unique
@@ -133,7 +134,7 @@ newTagUnique u c = mkUnique c i where (_,i) = unpkUnique u
 
 -- | How many bits are devoted to the unique index (as opposed to the class
 -- character).
-uniqueMask :: Int
+uniqueMask :: Int64
 uniqueMask = (1 `shiftL` uNIQUE_BITS) - 1
 
 -- pop the Char in the top 8 bits of the Unique(Supply)
@@ -142,20 +143,20 @@ uniqueMask = (1 `shiftL` uNIQUE_BITS) - 1
 
 -- and as long as the Char fits in 8 bits, which we assume anyway!
 
-mkUnique :: Char -> Int -> Unique       -- Builds a unique from pieces
+mkUnique :: Char -> Int64 -> Unique       -- Builds a unique from pieces
 -- EXPORTED and used only in GHC.Builtin.Uniques
 mkUnique c i
-  = MkUnique (tag .|. bits)
+  = MkUnique $ fromIntegral (tag .|. bits)
   where
-    tag  = ord c `shiftL` uNIQUE_BITS
+    tag  = fromIntegral (ord c) `shiftL` uNIQUE_BITS
     bits = i .&. uniqueMask
 
 unpkUnique (MkUnique u)
   = let
         -- as long as the Char may have its eighth bit set, we
         -- really do need the logical right-shift here!
-        tag = chr (u `shiftR` uNIQUE_BITS)
-        i   = u .&. uniqueMask
+        tag = chr $ fromIntegral (u `shiftR` uNIQUE_BITS)
+        i   = fromIntegral u .&. uniqueMask
     in
     (tag, i)
 
@@ -187,7 +188,7 @@ instance Uniquable FastString where
  getUnique fs = mkUniqueGrimily (uniqueOfFS fs)
 
 instance Uniquable Int where
- getUnique i = mkUniqueGrimily i
+ getUnique i = mkUniqueGrimily (fromIntegral i)
 
 instance Uniquable ModuleName where
   getUnique (ModuleName nm) = getUnique nm
@@ -307,15 +308,15 @@ The ``62-its'' are \tr{[0-9a-zA-Z]}.  We don't handle negative Ints.
 Code stolen from Lennart.
 -}
 
-iToBase62 :: Int -> String
+iToBase62 :: Int64 -> String
 iToBase62 n_
   = assert (n_ >= 0) $ go n_ ""
   where
     go n cs | n < 62
-            = let !c = chooseChar62 n in c : cs
+            = let !c = chooseChar62 (fromIntegral n) in c : cs
             | otherwise
             = go q (c : cs) where (!q, r) = quotRem n 62
-                                  !c = chooseChar62 r
+                                  !c = chooseChar62 (fromIntegral r)
 
     chooseChar62 :: Int -> Char
     {-# INLINE chooseChar62 #-}

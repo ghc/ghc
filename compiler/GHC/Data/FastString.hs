@@ -623,8 +623,8 @@ unconsFS fs =
     []          -> Nothing
     (chr : str) -> Just (chr, mkFastString str)
 
-uniqueOfFS :: FastString -> Int
-uniqueOfFS fs = uniq fs
+uniqueOfFS :: FastString -> Int64
+uniqueOfFS fs = fromIntegral (uniq fs)
 
 nilFS :: FastString
 nilFS = mkFastString ""
