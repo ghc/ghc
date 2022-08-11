@@ -333,10 +333,11 @@ class  (Eq a) => Ord a  where
                   else if x <= y then LT
                   else GT
 
-    x <  y = case compare x y of { LT -> True;  _ -> False }
     x <= y = case compare x y of { GT -> False; _ -> True }
-    x >  y = case compare x y of { GT -> True;  _ -> False }
-    x >= y = case compare x y of { LT -> False; _ -> True }
+    x >= y = y <= x
+    x > y = not (x <= y)
+    x < y = not (y <= x)
+
 
         -- These two default methods use '<=' rather than 'compare'
         -- because the latter is often more expensive

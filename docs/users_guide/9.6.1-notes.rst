@@ -94,6 +94,10 @@ This can be convenient when pasting large multi-line blocks of code into GHCi.
   label (:base-ref:`GHC.Conc.threadLabel`) and status
   (:base-ref:`GHC.Conc.threadStatus`).
 
+- Change default ``Ord`` implementation of ``(>=)``, ``(>)``, and ``(<)`` to use
+  ``(<=)`` instead of ``compare`` per CLC proposal:
+  https://github.com/haskell/core-libraries-committee/issues/24
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 

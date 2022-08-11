@@ -22,6 +22,9 @@
   * `GHC.Conc.Sync.threadLabel` was added, allowing the user to query the label
     of a given `ThreadId`.
   * Add `inits1` and `tails1` to `Data.List.NonEmpty`.
+  * Change default `Ord` implementation of `(>=)`, `(>)`, and `(<)` to use
+    `(<=)` instead of `compare` per
+    [Core Libraries proposal](https://github.com/haskell/core-libraries-committee/issues/24).
 
 ## 4.17.0.0 *August 2022*
 
