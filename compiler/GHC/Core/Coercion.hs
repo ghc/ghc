@@ -1545,9 +1545,6 @@ promoteCoercion co = case co of
     Pair ty1 ty2 = coercionKind co
     ki1 = typeKind ty1
     ki2 = typeKind ty2
-    doc = vcat[ ppr co
-              , text "ty1" <+> ppr ty1 <+> dcolon <+> ppr ki1
-              , text "ty2" <+> ppr ty2 <+> dcolon <+> ppr ki2 ]
 
 -- | say @g = promoteCoercion h@. Then, @instCoercion g w@ yields @Just g'@,
 -- where @g' = promoteCoercion (h w)@.

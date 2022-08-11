@@ -665,7 +665,7 @@ kindRep k = case kindRep_maybe k of
 kindRep_maybe :: HasDebugCallStack => Kind -> Maybe RuntimeRepType
 kindRep_maybe kind
   | Just (_, rep) <- sORTKind_maybe kind = Just rep
-  | otherwise                              = Nothing
+  | otherwise                            = Nothing
 
 -- | Returns True if the argument is a lifted SORT
 -- See Note [Kind Constraint and kind Type]
@@ -1627,7 +1627,7 @@ splitTyConAppNoSyn_maybe ty
 -- of @a@ isn't of the form @TYPE rep@). Consequently, you may need to zonk your
 -- type before using this function.
 --
--- Differs from splitTyConApp_maybe in taht it does *not* split types
+-- Differs from splitTyConApp_maybe in that it does *not* split types
 -- headed with (=>), as that's not a TyCon in the type-checker.
 --
 -- Moreover, for a FunTy, it only succeeds if the argument types
@@ -1646,7 +1646,7 @@ tcSplitTyConApp_maybe ty
       TyConApp tc tys -> Just (tc, tys)
       FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res}
         | isVisibleAnonArg af    -- Visible args only. See Note [Decomposing fat arrow c=>t]
-                      -> funTyConAppTy_maybe af w arg res
+        -> funTyConAppTy_maybe af w arg res
       _ -> Nothing
 
 -------------------
