@@ -41,6 +41,7 @@ module GHC.Driver.Session (
         DynamicTooState(..), dynamicTooState, setDynamicNow,
         sccProfilingEnabled,
         needSourceNotes,
+        OnOff(..),
         DynFlags(..),
         outputFile, objectSuf, ways,
         FlagSpec(..),
