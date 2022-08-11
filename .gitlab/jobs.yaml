@@ -59,7 +59,8 @@
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "aarch64-darwin",
-      "TEST_ENV": "aarch64-darwin-validate"
+      "TEST_ENV": "aarch64-darwin-validate",
+      "TEST_SPEED": "normal"
     }
   },
   "aarch64-linux-deb10-validate": {
@@ -117,7 +118,8 @@
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
-      "TEST_ENV": "aarch64-linux-deb10-validate"
+      "TEST_ENV": "aarch64-linux-deb10-validate",
+      "TEST_SPEED": "normal"
     }
   },
   "i386-linux-deb9-validate": {
@@ -175,7 +177,8 @@
       "BIN_DIST_NAME": "ghc-i386-linux-deb9-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
-      "TEST_ENV": "i386-linux-deb9-validate"
+      "TEST_ENV": "i386-linux-deb9-validate",
+      "TEST_SPEED": "normal"
     }
   },
   "nightly-aarch64-darwin-validate": {
@@ -238,6 +241,7 @@
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "aarch64-darwin",
       "TEST_ENV": "aarch64-darwin-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -297,6 +301,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb10-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -356,6 +361,7 @@
       "BUILD_FLAVOUR": "validate+llvm",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb10-validate+llvm",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -415,6 +421,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "i386-linux-deb9-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -478,6 +485,7 @@
       "MACOSX_DEPLOYMENT_TARGET": "10.10",
       "NIX_SYSTEM": "x86_64-darwin",
       "TEST_ENV": "x86_64-darwin-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9",
       "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
@@ -542,6 +550,7 @@
       "GHC_VERSION": "9.4.3",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "TEST_ENV": "x86_64-freebsd13-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -604,6 +613,7 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
       "TEST_ENV": "x86_64-linux-alpine3_12-int_native-validate+fully_static",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -666,6 +676,7 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
       "TEST_ENV": "x86_64-linux-alpine3_12-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -728,6 +739,7 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
       "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -789,6 +801,7 @@
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -850,6 +863,7 @@
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -911,6 +925,7 @@
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -971,6 +986,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "TEST_ENV": "x86_64-linux-centos7-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1030,6 +1046,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-int_native-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1089,6 +1106,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--disable-tables-next-to-code",
       "TEST_ENV": "x86_64-linux-deb10-no_tntc-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1149,6 +1167,7 @@
       "CONFIGURE_ARGS": "",
       "ENABLE_NUMA": "1",
       "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate",
+      "TEST_SPEED": "slow",
       "XZ_OPT": "-9"
     }
   },
@@ -1208,6 +1227,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-unregisterised",
       "TEST_ENV": "x86_64-linux-deb10-unreg-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1267,6 +1287,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1326,6 +1347,7 @@
       "BUILD_FLAVOUR": "validate+debug_info",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+debug_info",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1385,6 +1407,7 @@
       "BUILD_FLAVOUR": "validate+llvm",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+llvm",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1445,6 +1468,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--docs=none",
       "TEST_ENV": "x86_64-linux-deb10-validate+thread_sanitizer",
+      "TEST_SPEED": "normal",
       "TSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions",
       "XZ_OPT": "-9"
     }
@@ -1507,6 +1531,7 @@
       "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
       "CROSS_TARGET": "aarch64-linux-gnu",
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1569,6 +1594,7 @@
       "CROSS_EMULATOR": "js-emulator",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
       "TEST_ENV": "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1628,6 +1654,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1688,6 +1715,7 @@
       "CONFIGURE_ARGS": "",
       "RUNTEST_ARGS": "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity",
       "TEST_ENV": "x86_64-linux-deb11-validate+boot_nonmoving_gc",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1747,6 +1775,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb9-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1808,6 +1837,7 @@
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1870,6 +1900,7 @@
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1931,6 +1962,7 @@
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "TEST_ENV": "x86_64-linux-fedora33-validate+debug_info",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -1991,6 +2023,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "TEST_ENV": "x86_64-linux-rocky8-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2050,6 +2083,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu18_04-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2109,6 +2143,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu20_04-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2168,6 +2203,7 @@
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "TEST_ENV": "x86_64-windows-int_native-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2227,6 +2263,7 @@
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "TEST_ENV": "x86_64-windows-validate",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2291,6 +2328,7 @@
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "aarch64-darwin",
       "TEST_ENV": "aarch64-darwin-release",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2352,6 +2390,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "aarch64-linux-deb10-release+no_split_sections",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2413,6 +2452,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "i386-linux-deb9-release+no_split_sections",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2477,6 +2517,7 @@
       "MACOSX_DEPLOYMENT_TARGET": "10.10",
       "NIX_SYSTEM": "x86_64-darwin",
       "TEST_ENV": "x86_64-darwin-release",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9",
       "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
@@ -2543,6 +2584,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
       "TEST_ENV": "x86_64-linux-alpine3_12-int_native-release+fully_static",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2606,6 +2648,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
       "TEST_ENV": "x86_64-linux-alpine3_12-release+fully_static+no_split_sections",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2669,6 +2712,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
       "TEST_ENV": "x86_64-linux-alpine3_12-release+no_split_sections",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2730,6 +2774,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "x86_64-linux-centos7-release+no_split_sections",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2791,6 +2836,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "x86_64-linux-deb10-release",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2852,6 +2898,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "x86_64-linux-deb10-release+debug_info",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2913,6 +2960,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "x86_64-linux-deb11-release",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -2975,6 +3023,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "RUNTEST_ARGS": "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity",
       "TEST_ENV": "x86_64-linux-deb11-release+boot_nonmoving_gc",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -3036,6 +3085,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "x86_64-linux-deb9-release+no_split_sections",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -3099,6 +3149,7 @@
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -3162,6 +3213,7 @@
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "TEST_ENV": "x86_64-linux-fedora33-release+debug_info",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -3225,6 +3277,7 @@
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -3286,6 +3339,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "x86_64-linux-rocky8-release",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -3347,6 +3401,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "x86_64-linux-ubuntu18_04-release",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -3408,6 +3463,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
       "TEST_ENV": "x86_64-linux-ubuntu20_04-release",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -3468,6 +3524,7 @@
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "TEST_ENV": "x86_64-windows-int_native-release+no_split_sections",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -3528,6 +3585,7 @@
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "TEST_ENV": "x86_64-windows-release+no_split_sections",
+      "TEST_SPEED": "normal",
       "XZ_OPT": "-9"
     }
   },
@@ -3591,6 +3649,7 @@
       "MACOSX_DEPLOYMENT_TARGET": "10.10",
       "NIX_SYSTEM": "x86_64-darwin",
       "TEST_ENV": "x86_64-darwin-validate",
+      "TEST_SPEED": "normal",
       "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
       "ac_cv_func_utimensat": "no"
@@ -3653,7 +3712,8 @@
       "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
       "GHC_VERSION": "9.4.3",
       "HADRIAN_ARGS": "--docs=no-sphinx",
-      "TEST_ENV": "x86_64-freebsd13-validate"
+      "TEST_ENV": "x86_64-freebsd13-validate",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-alpine3_12-validate+fully_static": {
@@ -3714,7 +3774,8 @@
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
-      "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static"
+      "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static": {
@@ -3774,7 +3835,8 @@
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
-      "TEST_ENV": "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static"
+      "TEST_ENV": "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static": {
@@ -3835,7 +3897,8 @@
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
-      "TEST_ENV": "x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static"
+      "TEST_ENV": "x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static": {
@@ -3896,7 +3959,8 @@
       "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
-      "TEST_ENV": "x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static"
+      "TEST_ENV": "x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-deb10-int_native-validate": {
@@ -3954,7 +4018,8 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-int_native-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb10-int_native-validate"
+      "TEST_ENV": "x86_64-linux-deb10-int_native-validate",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-deb10-no_tntc-validate": {
@@ -4013,7 +4078,8 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-no_tntc-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--disable-tables-next-to-code",
-      "TEST_ENV": "x86_64-linux-deb10-no_tntc-validate"
+      "TEST_ENV": "x86_64-linux-deb10-no_tntc-validate",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-deb10-numa-slow-validate": {
@@ -4072,7 +4138,8 @@
       "BUILD_FLAVOUR": "slow-validate",
       "CONFIGURE_ARGS": "",
       "ENABLE_NUMA": "1",
-      "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate"
+      "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate",
+      "TEST_SPEED": "slow"
     }
   },
   "x86_64-linux-deb10-unreg-validate": {
@@ -4130,7 +4197,8 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-unreg-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-unregisterised",
-      "TEST_ENV": "x86_64-linux-deb10-unreg-validate"
+      "TEST_ENV": "x86_64-linux-deb10-unreg-validate",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-deb10-validate": {
@@ -4188,7 +4256,8 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-ipe-data-compression",
-      "TEST_ENV": "x86_64-linux-deb10-validate"
+      "TEST_ENV": "x86_64-linux-deb10-validate",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-deb10-validate+debug_info": {
@@ -4246,7 +4315,8 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+debug_info",
       "BUILD_FLAVOUR": "validate+debug_info",
       "CONFIGURE_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb10-validate+debug_info"
+      "TEST_ENV": "x86_64-linux-deb10-validate+debug_info",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-deb10-validate+llvm": {
@@ -4304,7 +4374,8 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+llvm",
       "BUILD_FLAVOUR": "validate+llvm",
       "CONFIGURE_ARGS": "",
-      "TEST_ENV": "x86_64-linux-deb10-validate+llvm"
+      "TEST_ENV": "x86_64-linux-deb10-validate+llvm",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-deb10-validate+thread_sanitizer": {
@@ -4365,6 +4436,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--docs=none",
       "TEST_ENV": "x86_64-linux-deb10-validate+thread_sanitizer",
+      "TEST_SPEED": "normal",
       "TSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
     }
   },
@@ -4425,7 +4497,8 @@
       "CONFIGURE_ARGS": "--with-intree-gmp",
       "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
       "CROSS_TARGET": "aarch64-linux-gnu",
-      "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
+      "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate": {
@@ -4486,7 +4559,8 @@
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
-      "TEST_ENV": "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate"
+      "TEST_ENV": "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-deb11-validate+boot_nonmoving_gc": {
@@ -4545,7 +4619,8 @@
       "BUILD_FLAVOUR": "validate+boot_nonmoving_gc",
       "CONFIGURE_ARGS": "",
       "RUNTEST_ARGS": "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity",
-      "TEST_ENV": "x86_64-linux-deb11-validate+boot_nonmoving_gc"
+      "TEST_ENV": "x86_64-linux-deb11-validate+boot_nonmoving_gc",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-linux-fedora33-release": {
@@ -4605,7 +4680,8 @@
       "CONFIGURE_ARGS": "",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
-      "TEST_ENV": "x86_64-linux-fedora33-release"
+      "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_SPEED": "normal"
     }
   },
   "x86_64-windows-validate": {
@@ -4663,7 +4739,8 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
-      "TEST_ENV": "x86_64-windows-validate"
+      "TEST_ENV": "x86_64-windows-validate",
+      "TEST_SPEED": "normal"
     }
   }
 }
