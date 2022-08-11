@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, MultiWayIf #-}
 
 module GHC.Core.Coercion.Opt
    ( optCoercion
@@ -136,14 +136,16 @@ optCoercion' env co
     assertPpr (substTyUnchecked env in_ty1 `eqType` out_ty1 &&
                substTyUnchecked env in_ty2 `eqType` out_ty2 &&
                in_role == out_role)
-              ( text "optCoercion changed types!"
-                 $$ hang (text "in_co:") 2 (ppr co)
-                 $$ hang (text "in_ty1:") 2 (ppr in_ty1)
-                 $$ hang (text "in_ty2:") 2 (ppr in_ty2)
-                 $$ hang (text "out_co:") 2 (ppr out_co)
-                 $$ hang (text "out_ty1:") 2 (ppr out_ty1)
-                 $$ hang (text "out_ty2:") 2 (ppr out_ty2)
-                 $$ hang (text "subst:") 2 (ppr env))
+              (hang (text "optCoercion changed types!")
+                  2 (vcat [ text "in_co:" <+> ppr co
+                          , text "in_ty1:" <+> ppr in_ty1
+                          , text "in_ty2:" <+> ppr in_ty2
+                          , text "out_co:" <+> ppr out_co
+                          , text "out_ty1:" <+> ppr out_ty1
+                          , text "out_ty2:" <+> ppr out_ty2
+                          , text "in_role:" <+> ppr in_role
+                          , text "out_role:" <+> ppr out_role
+                          , text "subst:" <+> ppr env ]))
               out_co
 
   | otherwise         = opt_co1 lc False co
@@ -335,15 +337,21 @@ opt_co4 env sym rep r (TransCo co1 co2)
 
 opt_co4 env _sym rep r (NthCo _r n co)
   | Just (ty, _) <- isReflCo_maybe co
-  , Just (_tc, args) <- assert (r == _r )
-                        splitTyConApp_maybe ty
-  = liftCoSubst (chooseRole rep r) env (args `getNth` n)
+  = assert (r == _r ) $
+    let arg_ty | n == 0
+               , Just (tv, _) <- splitForAllTyCoVar_maybe ty
+               = varType tv -- works for both tyvar and covar
 
-  | Just (ty, _) <- isReflCo_maybe co
-  , n == 0
-  , Just (tv, _) <- splitForAllTyCoVar_maybe ty
-      -- works for both tyvar and covar
-  = liftCoSubst (chooseRole rep r) env (varType tv)
+               | Just (_af, mult, arg, res) <- splitFunTy_maybe ty
+               = getNthFun n mult arg res
+
+               | Just (_tc, args) <- splitTyConApp_maybe ty
+               = args `getNth` n
+
+               | otherwise
+               = pprPanic "opt_co4" (ppr n $$ ppr ty)
+
+    in liftCoSubst (chooseRole rep r) env arg_ty
 
 opt_co4 env sym rep r (NthCo r1 n (TyConAppCo _ _ cos))
   = assert (r == r1 )
@@ -352,7 +360,7 @@ opt_co4 env sym rep r (NthCo r1 n (TyConAppCo _ _ cos))
 -- see the definition of GHC.Builtin.Types.Prim.funTyCon
 opt_co4 env sym rep r (NthCo r1 n (FunCo _r2 w co1 co2))
   = assert (r == r1 )
-    opt_co4_wrap env sym rep r (mkNthCoFunCo n w co1 co2)
+    opt_co4_wrap env sym rep r (getNthFun n w co1 co2)
 
 opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
       -- works for both tyvar and covar
@@ -362,10 +370,10 @@ opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
 
 opt_co4 env sym rep r (NthCo _r n co)
   | Just nth_co <- case co' of
-      TyConAppCo _ _ cos   -> Just (cos `getNth` n)
-      FunCo _ w co1 co2 -> Just (mkNthCoFunCo n w co1 co2)
-      ForAllCo _ eta _     -> Just eta
-      _                    -> Nothing
+      TyConAppCo _ _ cos -> Just (cos `getNth` n)
+      FunCo _ w co1 co2  -> Just (getNthFun n w co1 co2)
+      ForAllCo _ eta _   -> Just eta
+      _                  -> Nothing
   = if rep && (r == Nominal)
       -- keep propagating the SubCo
     then opt_co4_wrap (zapLiftingContext env) False True Nominal nth_co

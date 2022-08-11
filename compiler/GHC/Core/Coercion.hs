@@ -34,7 +34,7 @@ module GHC.Core.Coercion (
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo,
-        mkNthCo, mkNthCoFunCo, nthCoRole, mkLRCo,
+        mkNthCo, getNthFun, nthCoRole, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo, mkFunResCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos,
         mkPhantomCo,
@@ -1109,7 +1109,7 @@ mkNthCo_maybe r n co
       -- then (nth 0 co :: (t1 ~ t2) ~N (t3 ~ t4))
 
     go n (FunCo _ w arg res)
-      = Just (mkNthCoFunCo n w arg res)
+      = Just (getNthFun n w arg res)
 
     go n (TyConAppCo r0 tc arg_cos) = assertPpr (r == nthRole r0 tc n)
                                                   (vcat [ ppr tc
@@ -1165,11 +1165,11 @@ mkNthCo_maybe r n co
       = True
 
 -- | Extract the nth field of a FunCo
-mkNthCoFunCo :: Int         -- ^ "n"
-             -> CoercionN   -- ^ multiplicity coercion
-             -> Coercion    -- ^ argument coercion
-             -> Coercion    -- ^ result coercion
-             -> Coercion    -- ^ nth coercion from a FunCo
+getNthFun :: Int  -- ^ "n"
+          -> a    -- ^ multiplicity
+          -> a    -- ^ argument
+          -> a    -- ^ result
+          -> a    -- ^ One of rhe above three
 -- See Note [Function coercions]
 -- If FunCo _ mult arg_co res_co ::   (s1:TYPE sk1 :mult-> s2:TYPE sk2)
 --                                  ~ (t1:TYPE tk1 :mult-> t2:TYPE tk2)
@@ -1179,14 +1179,14 @@ mkNthCoFunCo :: Int         -- ^ "n"
 --    argk_co :: sk1 ~ tk1  =  mkNthCo 0 (mkKindCo arg_co)
 --    resk_co :: sk2 ~ tk2  =  mkNthCo 0 (mkKindCo res_co)
 --                             i.e. mkRuntimeRepCo
-mkNthCoFunCo n w co1 co2
+getNthFun n mult arg res
   = case n of
-      0 -> w
-      1 -> co1
-      2 -> co2
+      0 -> mult
+      1 -> arg
+      2 -> res
       _ -> bad_n
   where
-    bad_n = pprPanic "mkNthCo(FunCo)" (ppr n $$ ppr w $$ ppr co1 $$ ppr co2)
+    bad_n = pprPanic "getNthFun" (ppr n)
 
 -- | If you're about to call @mkNthCo r n co@, then @r@ should be
 -- whatever @nthCoRole n co@ returns.

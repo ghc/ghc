@@ -1190,7 +1190,6 @@ repSplitAppTys ty = split ty []
       | Just (tc, tys) <- funTyConAppTy_maybe af w ty1 ty2
       = assert (null args )
         (TyConApp tc [], tys)
-      where
 
     split ty args = (ty, args)
 
