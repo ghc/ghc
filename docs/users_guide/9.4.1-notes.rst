@@ -104,7 +104,7 @@ Language
 - GHC Proposal `#302 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0302-cases.rst>`_ has been implemented.
   This means under ``-XLambdaCase``, a new expression heralded by ``\cases`` is
   available, which works like ``\case`` but can match on multiple patterns.
-  This means constructor patterns with arguments have to parenthesized here,
+  This means constructor patterns with arguments have to be parenthesized here,
   just like in lambda expressions.
 
 - The parsing of implicit parameters is slightly more permissive, as GHC now allows ::
