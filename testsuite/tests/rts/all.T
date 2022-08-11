@@ -574,12 +574,24 @@ test('cloneMyStack', [req_c,only_ways(['normal']), extra_files(['cloneStackLib.c
 
 test('cloneMyStack2',
   [ ignore_stdout
+  , only_ways(['normal'])
   , js_broken(22261) # cloneMyStack# not yet implemented
   ], compile_and_run, [''])
 
-test('cloneMyStack_retBigStackFrame', [req_c, extra_files(['cloneStackLib.c']), ignore_stdout], compile_and_run, ['cloneStackLib.c'])
+test('cloneMyStack_retBigStackFrame',
+  [ req_c
+  , only_ways(['normal'])
+  , extra_files(['cloneStackLib.c'])
+  , ignore_stdout
+  ], compile_and_run, ['cloneStackLib.c'])
 
-test('cloneThreadStack', [req_c, only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c']), req_ghc_with_threaded_rts], compile_and_run, ['cloneStackLib.c -threaded'])
+test('cloneThreadStack',
+  [ req_c
+  , only_ways(['threaded1'])
+  , extra_ways(['threaded1'])
+  , extra_files(['cloneStackLib.c'])
+  , req_ghc_with_threaded_rts
+  ], compile_and_run, ['cloneStackLib.c -threaded'])
 
 test('cloneThreadStackMigrating',
   [ ignore_stdout
@@ -591,7 +603,8 @@ test('cloneThreadStackMigrating',
   ], compile_and_run, ['-threaded -debug -rtsopts'])
 
 test('decodeMyStack',
-  [ omit_ghci, js_broken(22261) # cloneMyStack# not yet implemented
+  [ only_ways(['normal'])
+  , js_broken(22261) # cloneMyStack# not yet implemented
   , when(ghc_with_ipe(), skip) # IPE builds can change decoded stack output.
   ], compile_and_run, ['-finfo-table-map'])
 
@@ -599,7 +612,8 @@ test('decodeMyStack',
 #   - `-kc8K`: Set stack chunk size to it's minimum to provoke underflow stack frames.
 test('decodeMyStack_underflowFrames',
   [ extra_run_opts('+RTS -kc8K -RTS')
-  , omit_ghci, js_broken(22261) # cloneMyStack# not yet implemented
+  , only_ways(['threaded1'])
+  , js_broken(22261) # cloneMyStack# not yet implemented
   , when(ghc_with_ipe(), skip) # IPE builds can change decoded stack layout/length.
   ], compile_and_run, ['-finfo-table-map -rtsopts'])
 
@@ -607,6 +621,7 @@ test('decodeMyStack_underflowFrames',
 test('decodeMyStack_emptyListForMissingFlag',
   [ ignore_stdout
   , ignore_stderr
+  , only_ways(['threaded1'])
   , js_broken(22261) # cloneMyStack# not yet implemented
   , when(ghc_with_ipe(), skip) # IPE builds can populate IPE info even without -finfo-table-map on this module.
   ], compile_and_run, [''])
