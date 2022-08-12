@@ -21,7 +21,7 @@ import GHC.Core.Opt.Simplify.Iteration ( simplTopBinds, simplExpr, simplImpRules
 import GHC.Core.Opt.Simplify.Utils ( activeRule, activeUnfolding )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Opt.Stats ( simplCountN )
+import GHC.Core.Opt.Stats ( SimplCountM, addCounts, simplCountN )
 import GHC.Core.FamInstEnv
 
 import GHC.Utils.Error  ( withTiming )
@@ -44,6 +44,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Name.Ppr
 
 import Control.Monad
+import Control.Monad.IO.Class ( liftIO )
 import Data.Foldable ( for_ )
 
 #if __GLASGOW_HASKELL__ <= 810
@@ -144,9 +145,20 @@ simplifyPgm :: Logger
             -> UnitEnv
             -> SimplifyOpts
             -> ModGuts
-            -> IO (ModGuts, SimplCount)  -- New bindings
+            -> SimplCountM ModGuts  -- New bindings
+simplifyPgm logger read_ruleenv unit_env opts guts = do
+    (nguts, sc) <- liftIO $ simplifyPgmIO logger read_ruleenv unit_env opts guts
+    addCounts sc
+    return nguts
 
-simplifyPgm logger read_ruleenv unit_env opts
+simplifyPgmIO :: Logger
+              -> IO RuleEnv -- ^ Action to get the current RuleEnv
+              -> UnitEnv
+              -> SimplifyOpts
+              -> ModGuts
+              -> IO (ModGuts, SimplCount)  -- New bindings
+
+simplifyPgmIO logger read_ruleenv unit_env opts
             guts@(ModGuts { mg_module = this_mod
                           , mg_rdr_env = rdr_env
                           , mg_binds = binds, mg_rules = rules

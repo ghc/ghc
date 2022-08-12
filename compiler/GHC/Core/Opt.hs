@@ -30,7 +30,7 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.SpecConstr   ( specConstrProgram )
 import GHC.Core.Opt.Specialise   ( specProgram )
 import GHC.Core.Opt.StaticArgs   ( doStaticArgs )
-import GHC.Core.Opt.Stats        ( SimplCountM, addCounts )
+import GHC.Core.Opt.Stats        ( SimplCountM )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Core.LateCC           ( addLateCostCentresMG )
 import GHC.Core.Rules            ( extendRuleBaseList, extendRuleEnv )
@@ -126,10 +126,8 @@ doCorePass env pass guts = do
   let !read_ruleenv = readRuleEnv env guts
 
   case pass of
-    CoreDoSimplify opts       -> {-# SCC "Simplify" #-} do
-                                 (guts', sc) <- liftIO $ simplifyPgm (co_logger env) read_ruleenv (co_unitEnv env) opts guts
-                                 addCounts sc
-                                 return guts'
+    CoreDoSimplify opts       -> {-# SCC "Simplify" #-}
+                                 simplifyPgm (co_logger env) read_ruleenv (co_unitEnv env) opts guts
 
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
                                  updateBinds cseProgram
