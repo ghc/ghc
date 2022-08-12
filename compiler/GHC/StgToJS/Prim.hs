@@ -40,7 +40,7 @@ genPrim :: Bool     -- ^ Profiling (cost-centres) enabled
         -> [JExpr]  -- ^ where to store the result
         -> [JExpr]  -- ^ arguments
         -> PrimRes
-genPrim prof ty = \case
+genPrim prof ty op = case op of
   CharGtOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>. y)
   CharGeOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>=. y)
   CharEqOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
@@ -321,10 +321,12 @@ genPrim prof ty = \case
      , r2 |= x2
      ]
 
-  Word64EqOp  -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LAnd (l0 .===. l1) (h0 .===. h1))
-  Word64NeOp  -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LOr (l0 .!==. l1) (h0 .!==. h1))
-
-  Word64AddOp -> \[hr,hl] [h0, l0, h1, l1] -> PrimInline $ appT [hr, hl] "h$hs_plusInt64" [h0, l0, h1, l1]
+  Word64EqOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LAnd (l0 .===. l1) (h0 .===. h1))
+  Word64NeOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LOr (l0 .!==. l1) (h0 .!==. h1))
+  Word64GeOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LOr (h0 .>. h1) (LAnd (h0 .!==. h1) (l0 .>=. l1)))
+  Word64GtOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LOr (h0 .>. h1) (LAnd (h0 .!==. h1) (l0 .>. l1)))
+  Word64LeOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LOr (h0 .<. h1) (LAnd (h0 .!==. h1) (l0 .<=. l1)))
+  Word64LtOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LOr (h0 .<. h1) (LAnd (h0 .!==. h1) (l0 .<. l1)))
 
   Word64SllOp -> \[hr,hl] [h, l, n] -> PrimInline $ appT [hr, hl] "h$hs_uncheckedIShiftL64" [h, l, n]
   Word64SrlOp -> \[hr,hl] [h, l, n] -> PrimInline $ appT [hr, hl] "h$hs_uncheckedShiftRL64" [h, l, n]
@@ -353,6 +355,12 @@ genPrim prof ty = \case
         [ hr |= BNot h
         , hl |= BNot l
         ]
+
+  Word64AddOp  -> \[hr,lr] [h0,l0,h1,l1] -> PrimInline $ appT [hr,lr] "h$hs_plusWord64"  [h0,l0,h1,l1]
+  Word64SubOp  -> \[hr,lr] [h0,l0,h1,l1] -> PrimInline $ appT [hr,lr] "h$hs_minusWord64" [h0,l0,h1,l1]
+  Word64MulOp  -> \[hr,lr] [h0,l0,h1,l1] -> PrimInline $ appT [hr,lr] "h$hs_timesWord64" [h0,l0,h1,l1]
+  Word64QuotOp -> \[hr,lr] [h0,l0,h1,l1] -> PrimInline $ appT [hr,lr] "h$hs_quotWord64"  [h0,l0,h1,l1]
+  Word64RemOp  -> \[hr,lr] [h0,l0,h1,l1] -> PrimInline $ appT [hr,lr] "h$hs_remWord64"   [h0,l0,h1,l1]
 
 ------------------------------ Word ---------------------------------------------
 
@@ -1012,77 +1020,162 @@ genPrim prof ty = \case
   TraceEventBinaryOp -> \[] [ed,eo,len] -> PrimInline $ appS "h$traceEventBinary" [ed,eo,len]
   TraceMarkerOp      -> \[] [ed,eo]     -> PrimInline $ appS "h$traceMarker" [ed,eo]
 
--- FIXME: Sylvain (2022-06) We want to support every primop, or disable them
--- explicitly. So we should remove this catch-all case ultimately, or make it
--- crash at compilation time.
-  op -> \rs as -> PrimInline $ mconcat
-    [ appS "h$log" [toJExpr $ mconcat
-        [ "warning, unhandled primop: "
-        , renderWithContext defaultSDocContext (ppr op)
-        , " "
-        , show (length rs, length as)
-        ]]
-    , appS (mkFastString $ "h$primop_" ++ zEncodeString (renderWithContext defaultSDocContext (ppr op))) as
-      -- copyRes
-    , mconcat $ zipWith (\r reg -> r |= toJExpr reg) rs (enumFrom Ret1)
-    ]
+------------------------------ Unhandled primops -------------------
 
-{- new ops in 8.6
-   , IndexByteArrayOp_Word8AsChar
-   , IndexByteArrayOp_Word8AsWideChar
-   , IndexByteArrayOp_Word8AsAddr
-   , IndexByteArrayOp_Word8AsFloat
-   , IndexByteArrayOp_Word8AsDouble
-   , IndexByteArrayOp_Word8AsStablePtr
-   , IndexByteArrayOp_Word8AsInt16
-   , IndexByteArrayOp_Word8AsInt32
-   , IndexByteArrayOp_Word8AsInt64
-   , IndexByteArrayOp_Word8AsInt
-   , IndexByteArrayOp_Word8AsWord16
-   , IndexByteArrayOp_Word8AsWord32
-   , IndexByteArrayOp_Word8AsWord64
-   , IndexByteArrayOp_Word8AsWord
+  BRevOp                            -> unhandledPrimop op
+  BRev8Op                           -> unhandledPrimop op
+  BRev16Op                          -> unhandledPrimop op
+  BRev32Op                          -> unhandledPrimop op
+  BRev64Op                          -> unhandledPrimop op
 
-   , ReadByteArrayOp_Word8AsChar
-   , ReadByteArrayOp_Word8AsWideChar
-   , ReadByteArrayOp_Word8AsAddr
-   , ReadByteArrayOp_Word8AsFloat
-   , ReadByteArrayOp_Word8AsDouble
-   , ReadByteArrayOp_Word8AsStablePtr
-   , ReadByteArrayOp_Word8AsInt16
-   , ReadByteArrayOp_Word8AsInt32
-   , ReadByteArrayOp_Word8AsInt64
-   , ReadByteArrayOp_Word8AsInt
-   , ReadByteArrayOp_Word8AsWord16
-   , ReadByteArrayOp_Word8AsWord32
-   , ReadByteArrayOp_Word8AsWord64
-   , ReadByteArrayOp_Word8AsWord
-   , WriteByteArrayOp_Word8AsChar
-   , WriteByteArrayOp_Word8AsWideChar
-   , WriteByteArrayOp_Word8AsAddr
-   , WriteByteArrayOp_Word8AsFloat
-   , WriteByteArrayOp_Word8AsDouble
-   , WriteByteArrayOp_Word8AsStablePtr
-   , WriteByteArrayOp_Word8AsInt16
-   , WriteByteArrayOp_Word8AsInt32
-   , WriteByteArrayOp_Word8AsInt64
-   , WriteByteArrayOp_Word8AsInt
-   , WriteByteArrayOp_Word8AsWord16
-   , WriteByteArrayOp_Word8AsWord32
-   , WriteByteArrayOp_Word8AsWord64
-   , WriteByteArrayOp_Word8AsWord
- -}
-{-
-AnyToAddrOp
-MkApUpd0_Op
-NewBCOOp
-UnpackClosureOp
-GetApStackValOp
--}
+  DoubleExpM1Op                     -> unhandledPrimop op
+  DoubleLog1POp                     -> unhandledPrimop op
+  FloatExpM1Op                      -> unhandledPrimop op
+  FloatLog1POp                      -> unhandledPrimop op
 
-{-
-GetSparkOp
--}
+  ShrinkSmallMutableArrayOp_Char    -> unhandledPrimop op
+  GetSizeofSmallMutableArrayOp      -> unhandledPrimop op
+
+  IndexByteArrayOp_Word8AsChar      -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsWideChar  -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsAddr      -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsFloat     -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsDouble    -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsStablePtr -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsInt16     -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsInt32     -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsInt64     -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsInt       -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsWord16    -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsWord32    -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsWord64    -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsWord      -> unhandledPrimop op
+
+  ReadByteArrayOp_Word8AsChar       -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsWideChar   -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsAddr       -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsFloat      -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsDouble     -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsStablePtr  -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsInt16      -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsInt32      -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsInt64      -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsInt        -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsWord16     -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsWord32     -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsWord64     -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsWord       -> unhandledPrimop op
+
+  WriteByteArrayOp_Word8AsChar      -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsWideChar  -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsAddr      -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsFloat     -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsDouble    -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsStablePtr -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsInt16     -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsInt32     -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsInt64     -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsInt       -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsWord16    -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsWord32    -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsWord64    -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsWord      -> unhandledPrimop op
+
+  CasByteArrayOp_Int8               -> unhandledPrimop op
+  CasByteArrayOp_Int16              -> unhandledPrimop op
+  CasByteArrayOp_Int32              -> unhandledPrimop op
+  CasByteArrayOp_Int64              -> unhandledPrimop op
+
+  InterlockedExchange_Addr          -> unhandledPrimop op
+  InterlockedExchange_Word          -> unhandledPrimop op
+
+  CasAddrOp_Addr                    -> unhandledPrimop op
+  CasAddrOp_Word                    -> unhandledPrimop op
+  CasAddrOp_Word8                   -> unhandledPrimop op
+  CasAddrOp_Word16                  -> unhandledPrimop op
+  CasAddrOp_Word32                  -> unhandledPrimop op
+  CasAddrOp_Word64                  -> unhandledPrimop op
+
+  FetchAddAddrOp_Word               -> unhandledPrimop op
+  FetchSubAddrOp_Word               -> unhandledPrimop op
+  FetchAndAddrOp_Word               -> unhandledPrimop op
+  FetchNandAddrOp_Word              -> unhandledPrimop op
+  FetchOrAddrOp_Word                -> unhandledPrimop op
+  FetchXorAddrOp_Word               -> unhandledPrimop op
+
+  AtomicReadAddrOp_Word             -> unhandledPrimop op
+  AtomicWriteAddrOp_Word            -> unhandledPrimop op
+
+  NewIOPortOp                       -> unhandledPrimop op
+  ReadIOPortOp                      -> unhandledPrimop op
+  WriteIOPortOp                     -> unhandledPrimop op
+
+  KeepAliveOp                       -> unhandledPrimop op
+
+  GetSparkOp                        -> unhandledPrimop op
+  AnyToAddrOp                       -> unhandledPrimop op
+  MkApUpd0_Op                       -> unhandledPrimop op
+  NewBCOOp                          -> unhandledPrimop op
+  UnpackClosureOp                   -> unhandledPrimop op
+  ClosureSizeOp                     -> unhandledPrimop op
+  GetApStackValOp                   -> unhandledPrimop op
+  WhereFromOp                       -> unhandledPrimop op -- should be easily implementable with o.f.n
+  SetThreadAllocationCounter        -> unhandledPrimop op
+
+  VecBroadcastOp _ _ _              -> unhandledPrimop op
+  VecPackOp _ _ _                   -> unhandledPrimop op
+  VecUnpackOp _ _ _                 -> unhandledPrimop op
+  VecInsertOp _ _ _                 -> unhandledPrimop op
+  VecAddOp _ _ _                    -> unhandledPrimop op
+  VecSubOp _ _ _                    -> unhandledPrimop op
+  VecMulOp _ _ _                    -> unhandledPrimop op
+  VecDivOp _ _ _                    -> unhandledPrimop op
+  VecQuotOp _ _ _                   -> unhandledPrimop op
+  VecRemOp _ _ _                    -> unhandledPrimop op
+  VecNegOp _ _ _                    -> unhandledPrimop op
+  VecIndexByteArrayOp _ _ _         -> unhandledPrimop op
+  VecReadByteArrayOp _ _ _          -> unhandledPrimop op
+  VecWriteByteArrayOp _ _ _         -> unhandledPrimop op
+  VecIndexOffAddrOp _ _ _           -> unhandledPrimop op
+  VecReadOffAddrOp _ _ _            -> unhandledPrimop op
+  VecWriteOffAddrOp _ _ _           -> unhandledPrimop op
+
+  VecIndexScalarByteArrayOp _ _ _   -> unhandledPrimop op
+  VecReadScalarByteArrayOp _ _ _    -> unhandledPrimop op
+  VecWriteScalarByteArrayOp _ _ _   -> unhandledPrimop op
+  VecIndexScalarOffAddrOp _ _ _     -> unhandledPrimop op
+  VecReadScalarOffAddrOp _ _ _      -> unhandledPrimop op
+  VecWriteScalarOffAddrOp _ _ _     -> unhandledPrimop op
+
+  PrefetchByteArrayOp3              -> unhandledPrimop op
+  PrefetchMutableByteArrayOp3       -> unhandledPrimop op
+  PrefetchAddrOp3                   -> unhandledPrimop op
+  PrefetchValueOp3                  -> unhandledPrimop op
+  PrefetchByteArrayOp2              -> unhandledPrimop op
+  PrefetchMutableByteArrayOp2       -> unhandledPrimop op
+  PrefetchAddrOp2                   -> unhandledPrimop op
+  PrefetchValueOp2                  -> unhandledPrimop op
+  PrefetchByteArrayOp1              -> unhandledPrimop op
+  PrefetchMutableByteArrayOp1       -> unhandledPrimop op
+  PrefetchAddrOp1                   -> unhandledPrimop op
+  PrefetchValueOp1                  -> unhandledPrimop op
+  PrefetchByteArrayOp0              -> unhandledPrimop op
+  PrefetchMutableByteArrayOp0       -> unhandledPrimop op
+  PrefetchAddrOp0                   -> unhandledPrimop op
+  PrefetchValueOp0                  -> unhandledPrimop op
+
+unhandledPrimop :: PrimOp -> [JExpr] -> [JExpr] -> PrimRes
+unhandledPrimop op rs as = PrimInline $ mconcat
+  [ appS "h$log" [toJExpr $ mconcat
+      [ "warning, unhandled primop: "
+      , renderWithContext defaultSDocContext (ppr op)
+      , " "
+      , show (length rs, length as)
+      ]]
+  , appS (mkFastString $ "h$primop_" ++ zEncodeString (renderWithContext defaultSDocContext (ppr op))) as
+    -- copyRes
+  , mconcat $ zipWith (\r reg -> r |= toJExpr reg) rs (enumFrom Ret1)
+  ]
 
 
 -- tuple returns
