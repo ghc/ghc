@@ -34,7 +34,7 @@ module GHC.Core.Coercion (
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo,
-        mkNthCo, getNthFun, nthCoRole, mkLRCo,
+        mkNthCo, getNthFun, getNthFromType, nthCoRole, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo, mkFunResCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos,
         mkPhantomCo,
@@ -1087,18 +1087,7 @@ mkNthCo_maybe r n co
 
     go n co
       | Just (ty, _) <- isReflCo_maybe co
-      = case splitForAllTyCoVar_maybe ty of {
-          Just (tv,_) | n == 0
-              -> -- Works for both tyvar and covar
-                 -- nth:0 pulls out a kind coercion from a hetero forall
-                 assert (r == Nominal) $
-                 Just (mkNomReflCo (varType tv)) ;
-          _ -> case splitTyConApp_maybe ty of {
-
-          Just (_, tys) | tys `lengthExceeds` n
-              -> Just (mkReflCo r (tys `getNth` n)) ;
-
-          _ -> Nothing } }
+      = Just (mkReflCo r (getNthFromType n ty))
 
     go 0 (ForAllCo _ kind_co _)
       = assert (r == Nominal)
@@ -2375,7 +2364,7 @@ coercionLKind co
     go (InstCo aco arg)         = go_app aco [go arg]
     go (KindCo co)              = typeKind (go co)
     go (SubCo co)               = go co
-    go (NthCo _ d co)           = go_nth d (go co)
+    go (NthCo _ d co)           = getNthFromType d (go co)
     go (AxiomInstCo ax ind cos) = go_ax_inst ax ind (map go cos)
     go (AxiomRuleCo ax cos)     = pFst $ expectJust "coercionKind" $
                                   coaxrProves ax $ map coercionKind cos
@@ -2398,14 +2387,10 @@ coercionLKind co
     go_app (InstCo co arg) args = go_app co (go arg:args)
     go_app co              args = piResultTys (go co) args
 
-go_nth :: HasDebugCallStack => Int -> Type -> Type
-go_nth d ty
+getNthFromType :: HasDebugCallStack => Int -> Type -> Type
+getNthFromType d ty
   | Just (_af, mult, arg, res) <- splitFunTy_maybe ty
-  = case d of
-       0 -> mult
-       1 -> arg
-       2 -> res
-       _ -> pprPanic "coercionKind1" bad_doc
+  = getNthFun d mult arg res
 
   | Just args <- tyConAppArgs_maybe ty
   = assertPpr (args `lengthExceeds` d) bad_doc $
@@ -2413,11 +2398,12 @@ go_nth d ty
 
   | d == 0
   , Just (tv,_) <- splitForAllTyCoVar_maybe ty
+     -- Works for both tyvar and covar
+     -- nth:0 pulls out a kind coercion from a hetero forall
   = tyVarKind tv
 
   | otherwise
-  = pprPanic "coercionKind2" bad_doc
-
+  = pprPanic "getNthFromType" bad_doc
   where
     bad_doc = ppr d $$ ppr ty
 
@@ -2440,7 +2426,7 @@ coercionRKind co
     go (InstCo aco arg)         = go_app aco [go arg]
     go (KindCo co)              = typeKind (go co)
     go (SubCo co)               = go co
-    go (NthCo _ d co)           = go_nth d (go co)
+    go (NthCo _ d co)           = getNthFromType d (go co)
     go (AxiomInstCo ax ind cos) = go_ax_inst ax ind (map go cos)
     go (AxiomRuleCo ax cos)     = pSnd $ expectJust "coercionKind" $
                                   coaxrProves ax $ map coercionKind cos

@@ -23,6 +23,7 @@ import GHC.Core.Unify
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Unique.Set
 
 import GHC.Data.Pair
 import GHC.Data.List.SetOps ( getNth )
@@ -145,12 +146,14 @@ optCoercion' env co
                           , text "out_ty2:" <+> ppr out_ty2
                           , text "in_role:" <+> ppr in_role
                           , text "out_role:" <+> ppr out_role
+                          , vcat $ map ppr_one $ nonDetEltsUniqSet $ coVarsOfCo co
                           , text "subst:" <+> ppr env ]))
-              out_co
+               out_co
 
   | otherwise         = opt_co1 lc False co
   where
     lc = mkSubstLiftingContext env
+    ppr_one cv = ppr cv <+> dcolon <+> ppr (coVarKind cv)
 
 
 type NormalCo    = Coercion
@@ -338,20 +341,7 @@ opt_co4 env sym rep r (TransCo co1 co2)
 opt_co4 env _sym rep r (NthCo _r n co)
   | Just (ty, _) <- isReflCo_maybe co
   = assert (r == _r ) $
-    let arg_ty | n == 0
-               , Just (tv, _) <- splitForAllTyCoVar_maybe ty
-               = varType tv -- works for both tyvar and covar
-
-               | Just (_af, mult, arg, res) <- splitFunTy_maybe ty
-               = getNthFun n mult arg res
-
-               | Just (_tc, args) <- splitTyConApp_maybe ty
-               = args `getNth` n
-
-               | otherwise
-               = pprPanic "opt_co4" (ppr n $$ ppr ty)
-
-    in liftCoSubst (chooseRole rep r) env arg_ty
+    liftCoSubst (chooseRole rep r) env (getNthFromType n ty)
 
 opt_co4 env sym rep r (NthCo r1 n (TyConAppCo _ _ cos))
   = assert (r == r1 )
