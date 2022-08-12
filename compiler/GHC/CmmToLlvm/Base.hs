@@ -58,7 +58,7 @@ import GHC.Utils.Logger
 
 import Data.Maybe (fromJust)
 import Control.Monad (ap)
-import Data.List (sortBy, groupBy)
+import Data.List (sortBy, groupBy, isPrefixOf)
 import Data.Ord (comparing)
 
 -- ----------------------------------------------------------------------------
@@ -504,6 +504,12 @@ generateExternDecls = do
   modifyEnv $ \env -> env { envAliases = emptyUniqSet }
   return (concat defss, [])
 
+-- | Is a variable one of the special @$llvm@ globals?
+isBuiltinLlvmVar :: LlvmVar -> Bool
+isBuiltinLlvmVar (LMGlobalVar lbl _ _ _ _ _) =
+    "$llvm" `isPrefixOf` unpackFS lbl
+isBuiltinLlvmVar _ = False
+
 -- | Here we take a global variable definition, rename it with a
 -- @$def@ suffix, and generate the appropriate alias.
 aliasify :: LMGlobal -> LlvmM [LMGlobal]
@@ -511,8 +517,9 @@ aliasify :: LMGlobal -> LlvmM [LMGlobal]
 -- Here we obtain the indirectee's precise type and introduce
 -- fresh aliases to both the precise typed label (lbl$def) and the i8*
 -- typed (regular) label of it with the matching new names.
-aliasify (LMGlobal (LMGlobalVar lbl ty@LMAlias{} link sect align Alias)
-                   (Just orig)) = do
+aliasify (LMGlobal var@(LMGlobalVar lbl ty@LMAlias{} link sect align Alias)
+                   (Just orig))
+  | not $ isBuiltinLlvmVar var = do
     let defLbl = llvmDefLabel lbl
         LMStaticPointer (LMGlobalVar origLbl _ oLnk Nothing Nothing Alias) = orig
         defOrigLbl = llvmDefLabel origLbl
@@ -525,7 +532,8 @@ aliasify (LMGlobal (LMGlobalVar lbl ty@LMAlias{} link sect align Alias)
     pure [ LMGlobal (LMGlobalVar defLbl ty link sect align Alias) (Just defOrig)
          , LMGlobal (LMGlobalVar lbl i8Ptr link sect align Alias) (Just orig')
          ]
-aliasify (LMGlobal var val) = do
+aliasify (LMGlobal var val)
+  | not $ isBuiltinLlvmVar var = do
     let LMGlobalVar lbl ty link sect align const = var
 
         defLbl = llvmDefLabel lbl
@@ -543,6 +551,7 @@ aliasify (LMGlobal var val) = do
     return [ LMGlobal defVar val
            , LMGlobal aliasVar (Just aliasVal)
            ]
+aliasify global = pure [global]
 
 -- Note [Llvm Forward References]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -601,3 +610,6 @@ aliasify (LMGlobal var val) = do
 -- away with casting the alias to the desired type in @getSymbolPtr@
 -- and instead just emit a reference to the definition symbol directly.
 -- This is the @Just@ case in @getSymbolPtr@.
+--
+-- Note that we must take care not to turn LLVM's builtin variables into
+-- aliases (e.g. $llvm.global_ctors) since this confuses LLVM.
