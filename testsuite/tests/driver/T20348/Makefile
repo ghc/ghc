@@ -15,7 +15,7 @@ clean:
 T20348: clean
 	# First run: should produce .hi, .o, .dyn_hi, .dyn_o files.
 	echo 'first run'
-	'$(TEST_HC)' $(TEST_HC_OPTS) -fno-code -fwrite-interface A.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -fno-code -fwrite-interface B.hs
 	$(call checkExists,A.hi)
 	$(call checkExists,A.o)
 	$(call checkExists,A.dyn_hi)

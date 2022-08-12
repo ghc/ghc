@@ -625,6 +625,11 @@ Options affecting code generation
     Omit code generation (and all later phases) altogether. This is
     useful if you're only interested in type checking code.
 
+    If a module contains a Template Haskell splice then in ``--make`` mode, code
+    generation will be automatically turned on for all dependencies. By default
+    object files are generated but if ghc-flag:`-fprefer-byte-code` is enable then
+    byte-code will be generated instead.
+
 .. ghc-flag:: -fwrite-interface
     :shortdesc: Always write interface files
     :type: dynamic
