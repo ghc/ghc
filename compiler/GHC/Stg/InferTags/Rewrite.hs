@@ -128,7 +128,7 @@ getMap :: RM (UniqFM Id TagSig)
 getMap = RM $ ((\(fst,_,_,_) -> fst) <$> get)
 
 setMap :: (UniqFM Id TagSig) -> RM ()
-setMap m = RM $ do
+setMap !m = RM $ do
     (_,us,mod,lcls) <- get
     put (m, us,mod,lcls)
 
@@ -139,7 +139,7 @@ getFVs :: RM IdSet
 getFVs = RM $ ((\(_,_,_,lcls) -> lcls) <$> get)
 
 setFVs :: IdSet -> RM ()
-setFVs fvs = RM $ do
+setFVs !fvs = RM $ do
     (tag_map,us,mod,_lcls) <- get
     put (tag_map, us,mod,fvs)
 
@@ -195,9 +195,9 @@ withBinders NotTopLevel sigs cont = do
 withClosureLcls :: DIdSet -> RM a -> RM a
 withClosureLcls fvs act = do
     old_fvs <- getFVs
-    let fvs' = nonDetStrictFoldDVarSet (flip extendVarSet) old_fvs fvs
+    let !fvs' = nonDetStrictFoldDVarSet (flip extendVarSet) old_fvs fvs
     setFVs fvs'
-    r <- act
+    !r <- act
     setFVs old_fvs
     return r
 
@@ -206,9 +206,9 @@ withClosureLcls fvs act = do
 withLcl :: Id -> RM a -> RM a
 withLcl fv act = do
     old_fvs <- getFVs
-    let fvs' = extendVarSet old_fvs fv
+    let !fvs' = extendVarSet old_fvs fv
     setFVs fvs'
-    r <- act
+    !r <- act
     setFVs old_fvs
     return r
 
@@ -222,7 +222,7 @@ isTagged v = do
             | otherwise -> do -- Local binding
                 !s <- getMap
                 let !sig = lookupWithDefaultUFM s (pprPanic "unknown Id:" (ppr v)) v
-                return $ case sig of
+                return $! case sig of
                     TagSig info ->
                         case info of
                             TagDunno -> False
@@ -234,7 +234,7 @@ isTagged v = do
             , isNullaryRepDataCon con
             -> return True
             | Just lf_info <- idLFInfo_maybe v
-            -> return $
+            -> return $!
                 -- Can we treat the thing as tagged based on it's LFInfo?
                 case lf_info of
                     -- Function, applied not entered.
@@ -353,7 +353,7 @@ rewriteArg  (lit@StgLitArg{}) = return lit
 
 rewriteId :: Id -> RM Id
 rewriteId v = do
-    is_tagged <- isTagged v
+    !is_tagged <- isTagged v
     if is_tagged then return $! setIdTagSig v (TagSig TagProper)
                  else return v
 
