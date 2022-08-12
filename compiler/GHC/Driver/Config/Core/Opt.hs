@@ -1,7 +1,7 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[SimplCore]{Configuration of the driver for simplifying @Core@ programs}
+\section[GHC.Driver.Config.Core.Opt]{Configuration of the driver for optimizing @Core@ programs}
 -}
 
 {-# LANGUAGE CPP #-}
@@ -41,6 +41,8 @@ import Data.Foldable
 ************************************************************************
 -}
 
+-- | Construct the main optimisation pipeline from the driver's session state.
+-- See Note [The architecture of the Core optimizer].
 getCoreToDo :: DynFlags -> [Var] -> [CoreToDo]
 getCoreToDo dflags extra_vars = execWriter $ do
   -- We want to do the static argument transform before full laziness as it

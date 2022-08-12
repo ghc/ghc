@@ -34,7 +34,7 @@ import GHC.Utils.Logger as Logger
 import Control.Monad.IO.Class
 
 --------------------------------------------------------------
--- Simplifiers
+-- Core optimization entrypoints
 --------------------------------------------------------------
 
 -- | Run Core optimizer. The list of String is a list of (Core) plugin
@@ -84,11 +84,6 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                                                  , gwib_isBoot = NotBoot })
     hpt_rule_base  = mkRuleBase home_pkg_rules
 
-    -- mod: get the module out of the current HscEnv so we can retrieve it from the monad.
-    -- This is very convienent for the users of the monad (e.g. plugins do not have to
-    -- consume the ModGuts to find the module) but somewhat ugly because mg_module may
-    -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
-    -- would mean our cached value would go out of date.
     env = CoreOptEnv
       { co_logger        = logger
       , co_debugSetting  = InheritDebugLevel
@@ -111,6 +106,11 @@ liftCoreMToSimplCountM hsc_env debug_settings guts m = do
   return a
   where
     mod = mg_module guts
+    -- mod: get the module out of the ModGuts so we can retrieve it from the monad.
+    -- This is very convienent for the users of the monad (e.g. plugins do not have to
+    -- consume the ModGuts to find the module) but somewhat ugly because mg_module may
+    -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
+    -- would mean our cached value would go out of date.
     loc = mg_loc guts
     orph_mods = mkModuleSet (mod : dep_orphs (mg_deps guts))
     gwib = GWIB { gwib_mod = moduleName mod, gwib_isBoot = NotBoot }
@@ -122,3 +122,56 @@ liftCoreMToSimplCountM hsc_env debug_settings guts m = do
       NoDebugging -> let
         dflags' = (hsc_dflags hsc_env) { debugLevel = 0 }
         in hsc_env { hsc_dflags = dflags' }
+
+{-
+Note [The architecture of the Core optimizer]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Conceptually the Core optimizer consists of two stages:
+
+ 1. The planning stage.
+ 2. The execution stage.
+
+This division is mirrored in the interface of the different optimizations. For
+each of those optimzations we have
+
+ 1. a configuration record bundeling the options for a particular optimization
+    pass.
+ 2. an initialization function used to obtain such a configuration from
+    `DynFlags`. This function typically lives in a module named after the pass
+    in the `GHC.Driver.Config.Core.Opt` namespace and is used in the planning
+    stage.
+ 3. the actual optimization pass itself, with an entrypoint that takes the
+    configuration of the pass along with the execution context as arguments.
+    This entrypoint is called in the execution stage.
+
+The plan that is the result of the first stage is constructed by the
+`getCoreToDo` function found in the `GHC.Driver.Config.Core.Opt` module. This
+function determines the sequence of optimization passes run on the module in
+question and derives the configuration for each pass from the session's state
+(`DynFlags`) using the aforementioned initialization functions. The `CoreToDo`
+type that is finally used to wrap this configuration value is a sum type
+enumerating all the optimizations available in GHC.
+
+The entrypoint of the second stage are the `optimizeCore*` functions found in
+GHC.Driver.Core.Opt. These functions is part of the Application Layer and
+utilize the `runCorePasses` function from `GHC.Core.Opt` which is the
+counterpart of these functions in the Domain Layer. In other words, while the
+`optimizeCore*` know about `HscEnv` and are therefore bound to a concrete
+driver, `runCorePasses` is more independent as it is a component of its own.
+
+`runCorePasses` is essentially an interpreter for the `CoreToDo`s constructed in
+the planning phase. It calls the entrypoints of the passes with their respective
+configurations as arguments as well as some execution context like the unit
+environment, the rules and the type family instance in scope, and most notably
+the module we wish to compile (`ModGuts`).
+
+A similar split in functionality is done for the Core Linting: After each pass
+we may check the sanity of the resulting Core running a so-called EndPass check.
+The entrypoint for this check is the `endPass` function found in
+GHC.Core.EndPass. It comes as well with a configuration record and a
+corresponding initialization function for it in GHC.Driver.Core.EndPass. The
+definition of what actually is a correct Core program is defined by the linting
+functions in GHC.Core.Lint. These are used by the EndPass to check the program.
+
+-}

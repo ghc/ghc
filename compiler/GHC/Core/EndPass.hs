@@ -57,11 +57,13 @@ data EndPassConfig = EndPassConfig
   , ep_passDetails :: !SDoc
   }
 
+-- | Check the correctness of a Core program after running an optimization pass.
+-- Used by CorePrep too.
+-- See Note [The architecture of the Core optimizer].
 endPass :: Logger
         -> EndPassConfig
         -> CoreProgram -> [CoreRule]
         -> IO ()
--- Used by CorePrep too
 endPass logger cfg binds rules
   = do { dumpPassResult logger (ep_dumpCoreSizes cfg) (ep_printUnqual cfg) mb_flag
                         (renderWithContext defaultSDocContext (ep_prettyPass cfg))

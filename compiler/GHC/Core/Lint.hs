@@ -9,6 +9,7 @@
 
 A ``lint'' pass to check for Core correctness.
 See Note [Core Lint guarantee].
+See Note [The architecture of the Core optimizer].
 -}
 
 module GHC.Core.Lint (

@@ -1,7 +1,7 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[SimplCore]{Driver for simplifying @Core@ programs}
+\section[GHC.Core.Opt]{Driver for optimizing @Core@ programs}
 -}
 
 {-# LANGUAGE CPP #-}
@@ -87,6 +87,7 @@ data CoreOptEnv = CoreOptEnv
 -- creation of the '[CoreToDo]') happens in
 -- 'GHC.Driver.Config.Core.Opt'. Then this function "executes" that
 -- plan.
+-- See Note [The architecture of the Core optimizer].
 runCorePasses :: CoreOptEnv
               -> [CoreToDo]
               -> ModGuts

@@ -34,10 +34,10 @@ import GHC.Utils.Outputable as Outputable
 -- | A description of the plugin pass itself
 type CorePluginPass = ModGuts -> CoreM ModGuts
 
-data CoreToDo           -- These are diff core-to-core passes,
-                        -- which may be invoked in any order,
-                        -- as many times as you like.
-
+-- | These are diff core-to-core passes, which may be invoked in any order, as
+-- many times as you like.
+-- See Note [The architecture of the Core optimizer].
+data CoreToDo
   = -- | The core-to-core simplifier.
     CoreDoSimplify !SimplifyOpts
   | CoreDoPluginPass String CorePluginPass
