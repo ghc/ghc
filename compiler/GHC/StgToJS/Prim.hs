@@ -1120,7 +1120,10 @@ genPrim prof ty op = case op of
   ClosureSizeOp                     -> unhandledPrimop op
   GetApStackValOp                   -> unhandledPrimop op
   WhereFromOp                       -> unhandledPrimop op -- should be easily implementable with o.f.n
+
   SetThreadAllocationCounter        -> unhandledPrimop op
+  GetThreadLabelOp                  -> unhandledPrimop op
+  ListThreadsOp                     -> unhandledPrimop op
 
   VecBroadcastOp _ _ _              -> unhandledPrimop op
   VecPackOp _ _ _                   -> unhandledPrimop op
