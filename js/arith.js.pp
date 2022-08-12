@@ -7,6 +7,8 @@ function h$logArith() { h$log.apply(h$log,arguments); }
 #define TRACE_ARITH(args...)
 #endif
 
+#define UN(x) ((x)>>>0)
+
 function h$hs_leInt64(h1,l1,h2,l2) {
   if(h1 === h2) {
     var l1s = l1 >>> 1;
@@ -48,15 +50,82 @@ function h$hs_gtInt64(h1,l1,h2,l2) {
 }
 
 function h$hs_quotWord64(h1,l1,h2,l2) {
-  throw "hs_quotWord64 not implemented yet";
-  // var a = h$ghcjsbn_mkBigNat_ww(h1,l1); // bigFromWord64(h1,l1);
-  // var b = h$ghcjsbn_mkBigNat_ww(h2,l2); // bigFromWord64(h2,l2);
-  var q = h$ghcjsbn_quot_bb(h$ghcjsbn_mkBigNat_ww(h1,l1),
-                            h$ghcjsbn_mkBigNat_ww(h2,l2));
-  return h$ghcjsbn_toWord64_b(q); // this should return the tuple
-  //RETURN_UBX_TUP2(h$ghcjsbn_toWord_b(h$ghcjsbn_shr_b(q, 32))
-  //  a.divide(b);
-  // RETURN_UBX_TUP2(c.shiftRight(32).intValue(), c.intValue());
+  // algorithm adapted from Hacker's Delight p198
+
+  // if divisor > numerator, just return 0
+  if ((h2 > h1) || (h2 === h1 && l2 > l1)) {
+    RETURN_UBX_TUP2(0,0);
+  }
+
+  if (h2 === 0) {
+    if (h1 < l2) {
+      var ql = h$quotRem2Word32(h1,l1,l2);
+      RETURN_UBX_TUP2(0,ql);
+    }
+    else {
+      var qh = h$quotRem2Word32(0,h1,l2);
+      var rh = h$ret1; // remainder
+      var ql = h$quotRem2Word32(rh,l1,l2);
+      RETURN_UBX_TUP2(qh,ql);
+    }
+  }
+  else {
+    var n = Math.clz32(h2);
+    // normalize divisor (MSB = 1)
+    var dh = UN((h2 << n) | (l2 >>> (32-n)));
+    // shift numerator 1 bit right (MSB = 0)
+    var nh = h1 >>> 1;
+    var nl = UN((h1 << 31) | (l1 >>> 1));
+    // compute quotient estimation
+    var q1 = h$quotRem2Word32(nh,nl,dh);
+    // undo normalization and division of numerator by 2
+    var q0 = q1 >>> (31 - n);
+    if (q0 !== 0) {
+      q0 = UN(q0 - 1);
+    }
+    // q0 might be too small by 1. q0*arg2 doesn't overflow
+    var q0vh = h$hs_timesWord64(h2,l2,0,q0);
+    var q0vl = h$ret1;
+    var sh = h$hs_minusWord64(h1,l1,q0vh,q0vl);
+    var sl = h$ret1;
+    if ((sh > h2) || (sh === h2 && sl >= l2)) {
+      q0 = UN(q0 + 1);
+    }
+    RETURN_UBX_TUP2(0,q0);
+  }
+}
+
+function h$hs_remWord64(h1,l1,h2,l2) {
+  var qh = h$hs_quotWord64(h1,l1,h2,l2);
+  var ql = h$ret1;
+  var qvh = h$hs_timesWord64(h2,l2,qh,ql);
+  var qvl = h$ret1;
+  return h$hs_minusWord64(h1,l1,qvh,qvl);
+}
+
+function h$hs_timesWord64(h1,l1,h2,l2) {
+  var rl = UN(l1 * l2);
+  var rh = UN(UN(l2 * h1) + UN(l1 * h2));
+  RETURN_UBX_TUP2(rh,rl);
+}
+
+function h$hs_minusWord64(h1,l1,h2,l2) {
+  var b  = l2 > l1 ? 1 : 0
+  var rl = UN(l1 - l2);
+  var rh = UN(UN(h2 - h1) - b);
+  RETURN_UBX_TUP2(rh,rl);
+}
+
+function h$hs_plusWord64(h1,l1,h2,l2) {
+  var c1 = (l1 & 0x80000000) >>> 31;
+  var c2 = (l2 & 0x80000000) >>> 31;
+  var rl = UN(l1 & 0x7FFFFFFF) + UN(l1 & 0x7FFFFFFF);
+  var cr = (rl & 0x80000000) >>> 31;
+  var rh = UN(h1+h2);
+  var c  = UN(c1+c2+cr);
+  rl = UN(rl + UN(c << 31));
+  rh = UN(rh + (c >>> 1));
+  RETURN_UBX_TUP2(rh,rl);
 }
 
 function h$hs_timesInt64(h1,l1,h2,l2) {
@@ -434,8 +503,6 @@ function h$quotRemWord32(n,d) {
   var c = (r >>> 0) >= (d >>> 0);
   RETURN_UBX_TUP2((q + (c ? 1 : 0)) >>> 0, (r - (c ? d : 0)) >>> 0);
 }
-
-#define UN(x) ((x)>>>0)
 
 function h$quotRem2Word32(nh,nl,d) {
   // from Hacker's Delight book (p196)
