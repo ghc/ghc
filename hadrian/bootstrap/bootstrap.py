@@ -86,14 +86,17 @@ class Compiler:
 
         self.ghc_path = ghc_path.resolve()
 
+        exe = ''
+        if platform.system() == 'Windows': exe = '.exe'
+
         info = self._get_ghc_info()
         self.version = info['Project version']
         #self.lib_dir = Path(info['LibDir'])
         #self.ghc_pkg_path = (self.lib_dir / 'bin' / 'ghc-pkg').resolve()
-        self.ghc_pkg_path = (self.ghc_path.parent / 'ghc-pkg').resolve()
+        self.ghc_pkg_path = (self.ghc_path.parent / ('ghc-pkg' + exe)).resolve()
         if not self.ghc_pkg_path.is_file():
             raise TypeError(f'ghc-pkg {self.ghc_pkg_path} is not a file')
-        self.hsc2hs_path = (self.ghc_path.parent / 'hsc2hs').resolve()
+        self.hsc2hs_path = (self.ghc_path.parent / ('hsc2hs' + exe)).resolve()
         if not self.hsc2hs_path.is_file():
             raise TypeError(f'hsc2hs {self.hsc2hs_path} is not a file')
 
@@ -367,6 +370,11 @@ def main() -> None:
                         help='path to GHC')
     parser.add_argument('-s', '--bootstrap-sources', type=Path,
                         help='Path to prefetched bootstrap sources tarball')
+    parser.add_argument('--archive', dest='want_archive', action='store_true',
+                       help='produce a Hadrian distribution archive (default)')
+    parser.add_argument('--no-archive', dest='want_archive', action='store_false',
+                       help='do not produce a Hadrian distribution archive')
+    parser.set_defaults(want_archive=True)
 
     subparsers = parser.add_subparsers(dest="command")
 
@@ -381,6 +389,9 @@ def main() -> None:
 
     ghc = None
 
+    sources_fmt = 'gztar' # The archive format for the bootstrap sources archive.
+    if platform.system() == 'Windows': sources_fmt = 'zip'
+
     if args.deps is None:
       if args.bootstrap_sources is None:
         # find appropriate plan in the same directory as the script
@@ -390,7 +401,7 @@ def main() -> None:
       # We have a tarball with all the required information, unpack it and use for further
       elif args.bootstrap_sources is not None and args.command != 'list-sources':
         print(f'Unpacking {args.bootstrap_sources} to {TARBALLS}')
-        shutil.unpack_archive(args.bootstrap_sources.resolve(), TARBALLS, 'gztar')
+        shutil.unpack_archive(args.bootstrap_sources.resolve(), TARBALLS, sources_fmt)
         args.deps = TARBALLS / 'plan-bootstrap.json'
         print(f"using plan-bootstrap.json ({args.deps}) from {args.bootstrap_sources}")
       else:
@@ -428,10 +439,7 @@ def main() -> None:
 
         shutil.copyfile(args.deps, rootdir / 'plan-bootstrap.json')
 
-        fmt = 'gztar'
-        if platform.system() == 'Windows': fmt = 'zip'
-
-        archivename = shutil.make_archive(args.output, fmt, root_dir=rootdir)
+        archivename = shutil.make_archive(args.output, sources_fmt, root_dir=rootdir)
 
         print(f"""
 Bootstrap sources saved to {archivename}
@@ -475,21 +483,21 @@ Alternatively, you could use `bootstrap.py -w {ghc.ghc_path} -d {args.deps} fetc
         bootstrap(info, ghc)
         hadrian_path = (BINDIR / 'hadrian').resolve()
 
-        archive = make_archive(hadrian_path)
-
         print(dedent(f'''
             Bootstrapping finished!
 
             The resulting hadrian executable can be found at
 
                 {hadrian_path}
-
-            It has been archived for distribution in
-
-                {archive}
-
-            You can use this executable to build GHC.
         '''))
+
+        if args.want_archive:
+            dist_archive = make_archive(hadrian_path)
+            print(dedent(f'''
+                The Hadrian executable has been archived for distribution in
+
+                    {dist_archive}
+            '''))
     else:
       print(f"No such command: {args.command}")
 
