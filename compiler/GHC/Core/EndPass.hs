@@ -10,7 +10,7 @@ compilation pass that returns Core. Heavily leverages `GHC.Core.Lint`.
 
 module GHC.Core.EndPass (
     EndPassConfig (..),
-    endPassIO,
+    endPass,
     dumpPassResult
  ) where
 
@@ -57,12 +57,12 @@ data EndPassConfig = EndPassConfig
   , ep_passDetails :: !SDoc
   }
 
-endPassIO :: Logger
-          -> EndPassConfig
-          -> CoreProgram -> [CoreRule]
-          -> IO ()
--- Used by the IO-is CorePrep too
-endPassIO logger cfg binds rules
+endPass :: Logger
+        -> EndPassConfig
+        -> CoreProgram -> [CoreRule]
+        -> IO ()
+-- Used by CorePrep too
+endPass logger cfg binds rules
   = do { dumpPassResult logger (ep_dumpCoreSizes cfg) (ep_printUnqual cfg) mb_flag
                         (renderWithContext defaultSDocContext (ep_prettyPass cfg))
                         (ep_passDetails cfg) binds rules

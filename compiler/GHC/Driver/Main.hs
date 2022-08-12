@@ -158,7 +158,7 @@ import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result)
 import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
 import GHC.Core
-import GHC.Core.EndPass ( EndPassConfig(..), endPassIO )
+import GHC.Core.EndPass ( EndPassConfig(..), endPass )
 import GHC.Core.Lint ( LintFlags(..), StaticPtrCheck(..) )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Tidy           ( tidyExpr )
@@ -2317,7 +2317,7 @@ hscTidy hsc_env guts = do
         , ep_prettyPass = tidy_ppr
         , ep_passDetails = empty
         }
-  endPassIO logger tidy_cfg all_tidy_binds tidy_rules
+  endPass logger tidy_cfg all_tidy_binds tidy_rules
 
   -- If the endPass didn't print the rules, but ddump-rules is
   -- on, print now

@@ -32,7 +32,7 @@ import GHC.Builtin.Types
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
-import GHC.Core.EndPass    ( EndPassConfig(..), endPassIO )
+import GHC.Core.EndPass    ( EndPassConfig(..), endPass )
 import GHC.Core
 import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type
@@ -258,8 +258,7 @@ corePrepPgm logger cp_cfg pgm_cfg
                       floats2 <- corePrepTopBinds initialCorePrepEnv implicit_binds
                       return (deFloatTop (floats1 `appendFloats` floats2))
 
-    endPassIO logger (cpPgm_endPassConfig pgm_cfg)
-              binds_out []
+    endPass logger (cpPgm_endPassConfig pgm_cfg) binds_out []
     return binds_out
 
 corePrepExpr :: Logger -> CorePrepConfig -> CoreExpr -> IO CoreExpr

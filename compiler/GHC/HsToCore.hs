@@ -48,7 +48,7 @@ import GHC.Core.Type
 import GHC.Core.TyCon     ( tyConDataCons )
 import GHC.Core
 import GHC.Core.FVs       ( exprsSomeFreeVarsList )
-import GHC.Core.EndPass   ( EndPassConfig(..), endPassIO )
+import GHC.Core.EndPass   ( EndPassConfig(..), endPass )
 import GHC.Core.Lint      ( LintFlags(..) )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
@@ -240,7 +240,7 @@ deSugar hsc_env
                 , ep_prettyPass = desugar_before_ppr
                 , ep_passDetails = empty
                 }
-        ; endPassIO (hsc_logger hsc_env) desugar_before_cfg final_pgm rules_for_imps
+        ; endPass (hsc_logger hsc_env) desugar_before_cfg final_pgm rules_for_imps
 
         ; let simpl_opts = initSimpleOpts dflags
         ; let (ds_binds, ds_rules_for_imps, occ_anald_binds)
@@ -267,7 +267,7 @@ deSugar hsc_env
                 , ep_prettyPass = desugar_after_ppr
                 , ep_passDetails = empty
                 }
-        ; endPassIO (hsc_logger hsc_env) desugar_after_cfg ds_binds ds_rules_for_imps
+        ; endPass (hsc_logger hsc_env) desugar_after_cfg ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
               pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))

@@ -11,7 +11,7 @@ module GHC.Core.Opt ( CoreOptEnv (..), runCorePasses ) where
 import GHC.Prelude
 
 import GHC.Core
-import GHC.Core.EndPass  ( EndPassConfig, endPassIO )
+import GHC.Core.EndPass  ( EndPassConfig, endPass )
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Ppr     ( pprCoreBindings )
 import GHC.Core.Lint    ( LintAnnotationsConfig, DebugSetting(..), lintAnnots )
@@ -104,7 +104,7 @@ runCorePasses env passes guts
 
       withTiming (co_logger env) (ppr pass <+> brackets (ppr this_mod)) (const ()) $ do
         guts' <- lintAnnots (co_logger env) lint_anno_cfg doCorePassWithoutDebug guts
-        liftIO $ endPassIO (co_logger env) end_pass_cfg (mg_binds guts') (mg_rules guts')
+        liftIO $ endPass (co_logger env) end_pass_cfg (mg_binds guts') (mg_rules guts')
         return guts'
 
     this_mod = mg_module guts
