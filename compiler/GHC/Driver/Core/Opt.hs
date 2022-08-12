@@ -1,4 +1,4 @@
-module GHC.Driver.Core.Opt ( hscSimplify, hscSimplify' ) where
+module GHC.Driver.Core.Opt ( optimizeCoreHsc, optimizeCoreIO ) where
 
 import GHC.Prelude
 
@@ -37,24 +37,24 @@ import Control.Monad.IO.Class
 -- Simplifiers
 --------------------------------------------------------------
 
--- | Run Core2Core simplifier. The list of String is a list of (Core) plugin
+-- | Run Core optimizer. The list of String is a list of (Core) plugin
 -- module names added via TH (cf 'addCorePlugin').
-hscSimplify :: HscEnv -> [String] -> ModGuts -> IO ModGuts
-hscSimplify hsc_env plugins modguts =
-    runHsc hsc_env $ hscSimplify' plugins modguts
-
--- | Run Core2Core simplifier. The list of String is a list of (Core) plugin
--- module names added via TH (cf 'addCorePlugin').
-hscSimplify' :: [String] -> ModGuts -> Hsc ModGuts
-hscSimplify' plugins ds_result = do
-    hsc_env <- getHscEnv
+optimizeCoreIO :: HscEnv -> [String] -> ModGuts -> IO ModGuts
+optimizeCoreIO hsc_env plugins guts = do
     hsc_env_with_plugins <- if null plugins -- fast path
         then return hsc_env
-        else liftIO $ initializePlugins
-                    $ hscUpdateFlags (\dflags -> foldr addPluginModuleName dflags plugins)
-                      hsc_env
+        else initializePlugins
+             $ hscUpdateFlags (\dflags -> foldr addPluginModuleName dflags plugins)
+             hsc_env
     {-# SCC "Core2Core" #-}
-      liftIO $ core2core hsc_env_with_plugins ds_result
+      core2core hsc_env_with_plugins guts
+
+-- | Run Core optimizer. The list of String is a list of (Core) plugin
+-- module names added via TH (cf 'addCorePlugin').
+optimizeCoreHsc :: [String] -> ModGuts -> Hsc ModGuts
+optimizeCoreHsc plugins guts = do
+    hsc_env <- getHscEnv
+    liftIO $ optimizeCoreIO hsc_env plugins guts
 
 core2core :: HscEnv -> ModGuts -> IO ModGuts
 core2core hsc_env guts@(ModGuts { mg_module  = mod

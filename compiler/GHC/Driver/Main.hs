@@ -59,7 +59,7 @@ module GHC.Driver.Main
     , hscTypecheckAndGetWarnings
     , hscDesugar
     , makeSimpleDetails
-    , hscSimplify -- ToDo, shouldn't really export this
+    , optimizeCoreIO -- TODO: shouldn't really export this
     , hscDesugarAndSimplify
 
     -- * Safe Haskell
@@ -88,7 +88,7 @@ module GHC.Driver.Main
     , hscCompileCoreExpr'
       -- We want to make sure that we export enough to be able to redefine
       -- hsc_typecheck in client code
-    , hscParse', hscSimplify', hscDesugar', tcRnModule', doCodeGen
+    , hscParse', optimizeCoreHsc, hscDesugar', tcRnModule', doCodeGen
     , getHscEnv
     , hscSimpleIface'
     , oneShotMsg
@@ -123,7 +123,7 @@ import GHC.Driver.Config.Stg.Ppr  (initStgPprOpts)
 import GHC.Driver.Config.Stg.Pipeline (initStgPipelineOpts)
 import GHC.Driver.Config.StgToCmm  (initStgToCmmConfig)
 import GHC.Driver.Config.Cmm       (initCmmConfig)
-import GHC.Driver.Core.Opt         ( hscSimplify, hscSimplify' )
+import GHC.Driver.Core.Opt         ( optimizeCoreHsc, optimizeCoreIO )
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Tidy
 import GHC.Driver.Hooks
@@ -1008,7 +1008,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
       -- Just cause we desugared doesn't mean we are generating code, see above.
       Just desugared_guts | backendGeneratesCode bcknd -> do
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
-          simplified_guts <- hscSimplify' plugins desugared_guts
+          simplified_guts <- optimizeCoreHsc plugins desugared_guts
 
           (cg_guts, details) <-
               liftIO $ hscTidy hsc_env simplified_guts
@@ -2098,7 +2098,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     {- Simplify -}
     simpl_mg <- liftIO $ do
       plugins <- readIORef (tcg_th_coreplugins tc_gblenv)
-      hscSimplify hsc_env plugins ds_result
+      optimizeCoreIO hsc_env plugins ds_result
 
     {- Tidy -}
     (tidy_cg, mod_details) <- liftIO $ hscTidy hsc_env simpl_mg

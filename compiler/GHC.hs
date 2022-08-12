@@ -1285,7 +1285,7 @@ compileCore simplify fn = do
              hsc_env <- getSession
              simpl_guts <- liftIO $ do
                plugins <- readIORef (tcg_th_coreplugins tcg)
-               hscSimplify hsc_env plugins mod_guts
+               optimizeCoreIO hsc_env plugins mod_guts
              tidy_guts <- liftIO $ hscTidy hsc_env simpl_guts
              return $ Left tidy_guts
           else
