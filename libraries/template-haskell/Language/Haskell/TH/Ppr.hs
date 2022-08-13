@@ -817,10 +817,10 @@ pprType _ StarT                  = char '*'
 pprType _ ConstraintT            = text "Constraint"
 pprType _ (SigT ty k)            = parens (ppr ty <+> text "::" <+> ppr k)
 pprType _ WildCardT              = char '_'
-pprType _ t@(InfixT {})          = parens (pprInfixT t)
-pprType _ t@(UInfixT {})         = parens (pprInfixT t)
-pprType _ t@(PromotedInfixT {})  = parens (pprInfixT t)
-pprType _ t@(PromotedUInfixT {}) = parens (pprInfixT t)
+pprType p t@(InfixT {})          = pprInfixT p t
+pprType p t@(UInfixT {})         = pprInfixT p t
+pprType p t@(PromotedInfixT {})  = pprInfixT p t
+pprType p t@(PromotedUInfixT {}) = pprInfixT p t
 pprType _ (ParensT t)            = parens (pprType noPrec t)
 pprType p (ImplicitParamT n ty) =
   parensIf (p >= sigPrec) $ text ('?':n) <+> text "::" <+> pprType sigPrec ty
@@ -836,15 +836,18 @@ pprType p t@AppKindT{}           = pprTyApp p (split t)
 pprParendType :: Type -> Doc
 pprParendType = pprType appPrec
 
-pprInfixT :: Type -> Doc
-pprInfixT = \case
-  (InfixT x n y)          -> with x n y ""  ppr
-  (UInfixT x n y)         -> with x n y ""  pprInfixT
-  (PromotedInfixT x n y)  -> with x n y "'" ppr
-  (PromotedUInfixT x n y) -> with x n y "'" pprInfixT
-  t                       -> ppr t
+pprInfixT :: Precedence -> Type -> Doc
+pprInfixT p = \case
+  InfixT x n y          -> with x n y ""  opPrec
+  UInfixT x n y         -> with x n y ""  unopPrec
+  PromotedInfixT x n y  -> with x n y "'" opPrec
+  PromotedUInfixT x n y -> with x n y "'" unopPrec
+  t                     -> pprParendType t
   where
-    with x n y prefix ppr' = ppr' x <+> text prefix <> pprName' Infix n <+> ppr' y
+    with x n y prefix p' =
+      parensIf
+        (p >= p')
+        (pprType opPrec x <+> text prefix <> pprName' Infix n <+> pprType opPrec y)
 
 instance Ppr Type where
     ppr = pprType noPrec
