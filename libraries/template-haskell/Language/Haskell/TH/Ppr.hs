@@ -23,10 +23,12 @@ nestDepth :: Int
 nestDepth = 4
 
 type Precedence = Int
-appPrec, opPrec, unopPrec, sigPrec, noPrec :: Precedence
-appPrec  = 4    -- Argument of a function application
-opPrec   = 3    -- Argument of an infix operator
-unopPrec = 2    -- Argument of an unresolved infix operator
+appPrec, opPrec, unopPrec, funPrec, qualPrec, sigPrec, noPrec :: Precedence
+appPrec  = 6    -- Argument of a function or type application
+opPrec   = 5    -- Argument of an infix operator
+unopPrec = 4    -- Argument of an unresolved infix operator
+funPrec  = 3    -- Argument of a function arrow
+qualPrec = 2    -- Forall-qualified type or result of a function arrow
 sigPrec  = 1    -- Argument of an explicit type signature
 noPrec   = 0    -- Others
 
@@ -220,7 +222,7 @@ pprExp _ (CompE ss) =
 pprExp _ (ArithSeqE d) = ppr d
 pprExp _ (ListE es) = brackets (commaSep es)
 pprExp i (SigE e t) = parensIf (i > noPrec) $ pprExp sigPrec e
-                                          <+> dcolon <+> ppr t
+                                          <+> dcolon <+> pprType sigPrec t
 pprExp _ (RecConE nm fs) = pprName' Applied nm <> braces (pprFields fs)
 pprExp _ (RecUpdE e fs) = pprExp appPrec e <> braces (pprFields fs)
 pprExp i (StaticE e) = parensIf (i >= appPrec) $
@@ -792,43 +794,47 @@ pprStrictType :: (Strict, Type) -> Doc
 pprStrictType = pprBangType
 
 ------------------------------
-pprParendType :: Type -> Doc
-pprParendType (VarT v)               = pprName' Applied v
+pprType :: Precedence -> Type -> Doc
+pprType _ (VarT v)               = pprName' Applied v
 -- `Applied` is used here instead of `ppr` because of infix names (#13887)
-pprParendType (ConT c)               = pprName' Applied c
-pprParendType (TupleT 0)             = text "()"
-pprParendType (TupleT 1)             = pprParendType (ConT (tupleTypeName 1))
-pprParendType (TupleT n)             = parens (hcat (replicate (n-1) comma))
-pprParendType (UnboxedTupleT n)      = hashParens $ hcat $ replicate (n-1) comma
-pprParendType (UnboxedSumT arity)    = hashParens $ hcat $ replicate (arity-1) bar
-pprParendType ArrowT                 = parens (text "->")
-pprParendType MulArrowT              = text "FUN"
-pprParendType ListT                  = text "[]"
-pprParendType (LitT l)               = pprTyLit l
-pprParendType (PromotedT c)          = text "'" <> pprName' Applied c
-pprParendType (PromotedTupleT 0)     = text "'()"
-pprParendType (PromotedTupleT 1)     = pprParendType (PromotedT (tupleDataName 1))
-pprParendType (PromotedTupleT n)     = quoteParens (hcat (replicate (n-1) comma))
-pprParendType PromotedNilT           = text "'[]"
-pprParendType PromotedConsT          = text "'(:)"
-pprParendType StarT                  = char '*'
-pprParendType ConstraintT            = text "Constraint"
-pprParendType (SigT ty k)            = parens (ppr ty <+> text "::" <+> ppr k)
-pprParendType WildCardT              = char '_'
-pprParendType t@(InfixT {})          = parens (pprInfixT t)
-pprParendType t@(UInfixT {})         = parens (pprInfixT t)
-pprParendType t@(PromotedInfixT {})  = parens (pprInfixT t)
-pprParendType t@(PromotedUInfixT {}) = parens (pprInfixT t)
-pprParendType (ParensT t)            = ppr t
-pprParendType tuple | (TupleT n, args) <- split tuple
-                    , length args == n
-                    = parens (commaSep args)
-pprParendType (ImplicitParamT n t)   = text ('?':n) <+> text "::" <+> ppr t
-pprParendType EqualityT              = text "(~)"
-pprParendType t@(ForallT {})         = parens (ppr t)
-pprParendType t@(ForallVisT {})      = parens (ppr t)
-pprParendType t@(AppT {})            = parens (ppr t)
-pprParendType t@(AppKindT {})        = parens (ppr t)
+pprType _ (ConT c)               = pprName' Applied c
+pprType _ (TupleT 0)             = text "()"
+pprType p (TupleT 1)             = pprType p (ConT (tupleTypeName 1))
+pprType _ (TupleT n)             = parens (hcat (replicate (n-1) comma))
+pprType _ (UnboxedTupleT n)      = hashParens $ hcat $ replicate (n-1) comma
+pprType _ (UnboxedSumT arity)    = hashParens $ hcat $ replicate (arity-1) bar
+pprType _ ArrowT                 = parens (text "->")
+pprType _ MulArrowT              = text "FUN"
+pprType _ ListT                  = text "[]"
+pprType _ (LitT l)               = pprTyLit l
+pprType _ (PromotedT c)          = text "'" <> pprName' Applied c
+pprType _ (PromotedTupleT 0)     = text "'()"
+pprType p (PromotedTupleT 1)     = pprType p (PromotedT (tupleDataName 1))
+pprType _ (PromotedTupleT n)     = quoteParens (hcat (replicate (n-1) comma))
+pprType _ PromotedNilT           = text "'[]"
+pprType _ PromotedConsT          = text "'(:)"
+pprType _ StarT                  = char '*'
+pprType _ ConstraintT            = text "Constraint"
+pprType _ (SigT ty k)            = parens (ppr ty <+> text "::" <+> ppr k)
+pprType _ WildCardT              = char '_'
+pprType _ t@(InfixT {})          = parens (pprInfixT t)
+pprType _ t@(UInfixT {})         = parens (pprInfixT t)
+pprType _ t@(PromotedInfixT {})  = parens (pprInfixT t)
+pprType _ t@(PromotedUInfixT {}) = parens (pprInfixT t)
+pprType _ (ParensT t)            = parens (pprType noPrec t)
+pprType p (ImplicitParamT n ty) =
+  parensIf (p >= sigPrec) $ text ('?':n) <+> text "::" <+> pprType sigPrec ty
+pprType _ EqualityT              = text "(~)"
+pprType p (ForallT tvars ctxt ty) =
+  parensIf (p >= funPrec) $ sep [pprForall tvars ctxt, pprType qualPrec ty]
+pprType p (ForallVisT tvars ty) =
+  parensIf (p >= funPrec) $ sep [pprForallVis tvars [], pprType qualPrec ty]
+pprType p t@AppT{}               = pprTyApp p (split t)
+pprType p t@AppKindT{}           = pprTyApp p (split t)
+
+------------------------------
+pprParendType :: Type -> Doc
+pprParendType = pprType appPrec
 
 pprInfixT :: Type -> Doc
 pprInfixT = \case
@@ -841,11 +847,7 @@ pprInfixT = \case
     with x n y prefix ppr' = ppr' x <+> text prefix <> pprName' Infix n <+> ppr' y
 
 instance Ppr Type where
-    ppr (ForallT tvars ctxt ty) = sep [pprForall tvars ctxt, ppr ty]
-    ppr (ForallVisT tvars ty)   = sep [pprForallVis tvars [], ppr ty]
-    ppr ty = pprTyApp (split ty)
-       -- Works, in a degenerate way, for SigT, and puts parens round (ty :: kind)
-       -- See Note [Pretty-printing kind signatures]
+    ppr = pprType noPrec
 instance Ppr TypeArg where
     ppr (TANormal ty) = parensIf (isStarT ty) (ppr ty)
     ppr (TyArg ki) = char '@' <> parensIf (isStarT ki) (ppr ki)
@@ -866,38 +868,40 @@ parens around it.  E.g. the parens are required here:
    type instance F Int = (Bool :: *)
 So we always print a SigT with parens (see #10050). -}
 
-pprTyApp :: (Type, [TypeArg]) -> Doc
-pprTyApp (MulArrowT, [TANormal (PromotedT c), TANormal arg1, TANormal arg2])
-  | c == oneName  = sep [pprFunArgType arg1 <+> text "%1 ->", ppr arg2]
-  | c == manyName = sep [pprFunArgType arg1 <+> text "->", ppr arg2]
-pprTyApp (MulArrowT, [TANormal argm, TANormal arg1, TANormal arg2]) =
-                     sep [pprFunArgType arg1 <+> text "%" <> ppr argm <+> text "->", ppr arg2]
-pprTyApp (ArrowT, [TANormal arg1, TANormal arg2]) = sep [pprFunArgType arg1 <+> text "->", ppr arg2]
-pprTyApp (EqualityT, [TANormal arg1, TANormal arg2]) =
-    sep [pprFunArgType arg1 <+> text "~", ppr arg2]
-pprTyApp (ListT, [TANormal arg]) = brackets (ppr arg)
-pprTyApp (TupleT 1, args) = pprTyApp (ConT (tupleTypeName 1), args)
-pprTyApp (PromotedTupleT 1, args) = pprTyApp (PromotedT (tupleDataName 1), args)
-pprTyApp (TupleT n, args)
+pprTyApp :: Precedence -> (Type, [TypeArg]) -> Doc
+pprTyApp p app@(MulArrowT, [TANormal (PromotedT c), TANormal arg1, TANormal arg2])
+  | p >= funPrec  = parens (pprTyApp noPrec app)
+  | c == oneName  = sep [pprFunArgType arg1 <+> text "%1 ->", pprType qualPrec arg2]
+  | c == manyName = sep [pprFunArgType arg1 <+> text "->", pprType qualPrec arg2]
+pprTyApp p (MulArrowT, [TANormal argm, TANormal arg1, TANormal arg2]) =
+  parensIf (p >= funPrec) $
+    sep [pprFunArgType arg1 <+> text "%" <> pprType appPrec argm <+> text "->",
+         pprType qualPrec arg2]
+pprTyApp p (ArrowT, [TANormal arg1, TANormal arg2]) =
+  parensIf (p >= funPrec) $
+    sep [pprFunArgType arg1 <+> text "->", pprType qualPrec arg2]
+pprTyApp p (EqualityT, [TANormal arg1, TANormal arg2]) =
+  parensIf (p >= opPrec) $
+    sep [pprType opPrec arg1 <+> text "~", pprType opPrec arg2]
+pprTyApp _ (ListT, [TANormal arg]) = brackets (pprType noPrec arg)
+pprTyApp p (TupleT 1, args) = pprTyApp p (ConT (tupleTypeName 1), args)
+pprTyApp _ (TupleT n, args)
  | length args == n, Just args' <- traverse fromTANormal args
  = parens (commaSep args')
-pprTyApp (PromotedTupleT n, args)
+pprTyApp p (PromotedTupleT 1, args) = pprTyApp p (PromotedT (tupleDataName 1), args)
+pprTyApp _ (PromotedTupleT n, args)
  | length args == n, Just args' <- traverse fromTANormal args
  = quoteParens (commaSep args')
-pprTyApp (fun, args) = pprParendType fun <+> sep (map pprParendTypeArg args)
+pprTyApp p (fun, args) =
+  parensIf (p >= appPrec) $ pprParendType fun <+> sep (map pprParendTypeArg args)
 
 fromTANormal :: TypeArg -> Maybe Type
 fromTANormal (TANormal arg) = Just arg
 fromTANormal (TyArg _) = Nothing
 
-pprFunArgType :: Type -> Doc    -- Should really use a precedence argument
--- Everything except forall and (->) binds more tightly than (->)
-pprFunArgType ty@(ForallT {})                 = parens (ppr ty)
-pprFunArgType ty@(ForallVisT {})              = parens (ppr ty)
-pprFunArgType ty@(((MulArrowT `AppT` _) `AppT` _) `AppT` _)  = parens (ppr ty)
-pprFunArgType ty@((ArrowT `AppT` _) `AppT` _) = parens (ppr ty)
-pprFunArgType ty@(SigT _ _)                   = parens (ppr ty)
-pprFunArgType ty                              = ppr ty
+-- Print the type to the left of @->@. Everything except forall and (->) binds more tightly than (->).
+pprFunArgType :: Type -> Doc
+pprFunArgType = pprType funPrec
 
 data ForallVisFlag = ForallVis   -- forall a -> {...}
                    | ForallInvis -- forall a.   {...}
