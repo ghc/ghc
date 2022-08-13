@@ -57,7 +57,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Types.ForeignCall
 import GHC.Types.Name
-import GHC.Types.Tickish
 
 import qualified Data.ByteString as BS
 import Data.List (isPrefixOf)
@@ -231,44 +230,42 @@ calcUnfoldingGuidance
         -> Bool          -- Definitely a top-level, bottoming binding
         -> CoreExpr      -- Expression to look at
         -> UnfoldingGuidance
-calcUnfoldingGuidance opts is_top_bottoming (Tick t expr)
-  | not (tickishIsCode t)  -- non-code ticks don't matter for unfolding
-  = calcUnfoldingGuidance opts is_top_bottoming expr
 calcUnfoldingGuidance opts is_top_bottoming expr
-  = case sizeExpr opts bOMB_OUT_SIZE val_bndrs body of
-      TooBig -> UnfNever
-      SizeIs size cased_bndrs scrut_discount
-        | uncondInline expr n_val_bndrs size
-        -> UnfWhen { ug_unsat_ok = unSaturatedOk
-                   , ug_boring_ok =  boringCxtOk
-                   , ug_arity = n_val_bndrs }   -- Note [INLINE for small functions]
-
-        | is_top_bottoming
-        -> UnfNever   -- See Note [Do not inline top-level bottoming functions]
-
-        | otherwise
-        -> UnfIfGoodArgs { ug_args  = map (mk_discount cased_bndrs) val_bndrs
-                         , ug_size  = size
-                         , ug_res   = scrut_discount }
-
+  -- See Note [Do not inline top-level bottoming functions]
+  | is_top_bottoming = UnfNever
+  | otherwise = calc opts expr
   where
+    calc !opts !expr
+      = case sizeExpr opts bOMB_OUT_SIZE val_bndrs body of
+          TooBig -> UnfNever
+          SizeIs size cased_bndrs scrut_discount
+            | uncondInline expr n_val_bndrs size
+            -> UnfWhen { ug_unsat_ok = unSaturatedOk
+                      , ug_boring_ok =  boringCxtOk
+                      , ug_arity = n_val_bndrs }   -- Note [INLINE for small functions]
+
+            | otherwise
+            -> UnfIfGoodArgs { ug_args  = map (mk_discount cased_bndrs) val_bndrs
+                            , ug_size  = size
+                            , ug_res   = scrut_discount }
+
     (bndrs, body) = collectBinders expr
     bOMB_OUT_SIZE = unfoldingCreationThreshold opts
-           -- Bomb out if size gets bigger than this
+          -- Bomb out if size gets bigger than this
     val_bndrs   = filter isId bndrs
     n_val_bndrs = length val_bndrs
 
     mk_discount :: Bag (Id,Int) -> Id -> Int
     mk_discount cbs bndr = foldl' combine 0 cbs
-           where
-             combine acc (bndr', disc)
-               | bndr == bndr' = acc `plus_disc` disc
-               | otherwise     = acc
+          where
+            combine acc (bndr', disc)
+              | bndr == bndr' = acc `plus_disc` disc
+              | otherwise     = acc
 
-             plus_disc :: Int -> Int -> Int
-             plus_disc | isFunTy (idType bndr) = max
-                       | otherwise             = (+)
-             -- See Note [Function and non-function discounts]
+            plus_disc :: Int -> Int -> Int
+            plus_disc | isFunTy (idType bndr) = max
+                      | otherwise             = (+)
+              -- See Note [Function and non-function discounts]
 
 {- Note [Inline unsafeCoerce]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
