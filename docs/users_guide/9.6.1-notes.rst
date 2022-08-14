@@ -66,6 +66,21 @@ Compiler
 - The :extension:`TypeInType` is now marked as deprecated. Its meaning has been included 
   in :extension:`PolyKinds` and :extension:`DataKinds`.
 
+
+GHCi
+~~~~
+
+- GHCi will now accept any file-header pragmas it finds, such as 
+  ``{-# OPTIONS_GHC ... #-}`` and ``{-# LANGUAGE ... #-}`` (see :ref:`pragmas`).  For example,
+  instead of using :ghci-cmd:`:set` to enable :ghc-flag:`-Wmissing-signatures`,
+  you could instead write:
+
+  .. code-block:: none
+
+      ghci> {-# OPTIONS_GHC -Wmissing-signatures #-}
+
+This can be convenient when pasting large multi-line blocks of code into GHCi.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

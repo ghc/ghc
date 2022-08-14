@@ -3173,6 +3173,15 @@ example, to turn on :ghc-flag:`-Wmissing-signatures`, you would say:
 
     ghci> :set -Wmissing-signatures
 
+GHCi will also accept any file-header pragmas it finds, such as 
+``{-# OPTIONS_GHC ... #-}`` and ``{-# LANGUAGE ... #-}`` (see :ref:`pragmas`).  For example,
+instead of using :ghci-cmd:`:set` to enable :ghc-flag:`-Wmissing-signatures`,
+you could instead write:
+
+.. code-block:: none
+
+    ghci> {-# OPTIONS_GHC -Wmissing-signatures #-}
+
 Any GHC command-line option that is designated as dynamic (see the table
 in :ref:`flag-reference`), may be set using :ghci-cmd:`:set`. To unset an
 option, you can set the reverse option:

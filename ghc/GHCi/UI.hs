@@ -78,6 +78,7 @@ import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrNam
 import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Parser.Header ( toArgs )
+import qualified GHC.Parser.Header as Header
 import GHC.Types.PkgQual
 
 import GHC.Unit
@@ -1249,6 +1250,9 @@ runStmt input step = do
   let source = progname st
   let line = line_number st
 
+  -- Add any LANGUAGE/OPTIONS_GHC pragmas we find find.
+  set_pragmas pflags
+
   if | GHC.isStmt pflags input -> do
          hsc_env <- GHC.getSession
          mb_stmt <- liftIO (runInteractiveHsc hsc_env (hscParseStmtWithLocation source line input))
@@ -1281,6 +1285,12 @@ runStmt input step = do
     exec_complete = GHC.ExecComplete (Right []) 0
 
     run_imports imports = mapM_ (addImportToContext . unLoc) imports
+
+    set_pragmas pflags =
+      let stringbuf = stringToStringBuffer input
+          (_msgs, loc_opts) = Header.getOptions pflags stringbuf "<interactive>"
+          opts = unLoc <$> loc_opts
+      in setOptions opts
 
     run_stmt :: GhciMonad m => GhciLStmt GhcPs -> m (Maybe GHC.ExecResult)
     run_stmt stmt = do

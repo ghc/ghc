@@ -1,0 +1,5 @@
+:{
+{-# LANGUAGE TypeFamilies #-}
+type family T21507 a where
+  T21507 a = a
+:}
