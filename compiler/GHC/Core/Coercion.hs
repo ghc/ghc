@@ -620,14 +620,14 @@ eqTyConRole tc
   | otherwise
   = pprPanic "eqTyConRole: unknown tycon" (ppr tc)
 
--- | Given a coercion @co1 :: (a :: SORT t_or_c1 r1) ~ (b :: SORT t_or_c2 r2)@,
+-- | Given a coercion @co1 :: (a :: TYPE r1) ~ (b :: TYPE r2)@,
+--   (or CONSTRAINT instead of TPYE)
 -- produce a coercion @rep_co :: r1 ~ r2@.
 mkRuntimeRepCo :: HasDebugCallStack => Coercion -> Coercion
 mkRuntimeRepCo co
-  = mkNthCo Nominal 1 kind_co
+  = mkNthCo Nominal 0 kind_co
   where
-    kind_co = mkKindCo co  -- kind_co :: SORT t_or_c1 r1 ~ SORT t_or_c2 r2
-                           -- (up to silliness with Constraint)
+    kind_co = mkKindCo co  -- kind_co :: TYPE r1 ~ TYPE r2
 
 isReflCoVar_maybe :: Var -> Maybe Coercion
 -- If cv :: t~t then isReflCoVar_maybe cv = Just (Refl t)
