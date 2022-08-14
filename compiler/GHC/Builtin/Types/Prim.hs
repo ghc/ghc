@@ -43,7 +43,8 @@ module GHC.Builtin.Types.Prim(
         multiplicityTyVar1, multiplicityTyVar2,
 
         -- Kind constructors...
-        sORTTyCon, sORTTyConName,
+        tYPETyCon, tYPETyConName, tYPEKind,
+        cONSTRAINTTyCon, cONSTRAINTTyConName, cONSTRAINTKind,
 
         -- Arrows
         fUNTyCon,       fUNTyConName,
@@ -109,7 +110,6 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind, unliftedTypeKind
-  , typeOrConstraintTy
   , boxedRepDataConTyCon, vecRepDataConTyCon
   , liftedRepTy, unliftedRepTy, zeroBitRepTy
   , intRepDataConTy
@@ -125,7 +125,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
   , multiplicityTy
-  , constraintKind, cONSTRAINTTyCon )
+  , constraintKind )
 
 import GHC.Types.Var    ( TyVarBinder, TyVar
                         , mkTyVar, mkTyVarBinder, mkTyVarBinders )
@@ -149,6 +149,12 @@ import Data.Char
              Building blocks
 *                                                                      *
 ********************************************************************* -}
+
+mk_TYPE_app :: Type -> Type
+mk_TYPE_app rep = mkTyConApp tYPETyCon [rep]
+
+mk_CONSTRAINT_app :: Type -> Type
+mk_CONSTRAINT_app rep = mkTyConApp cONSTRAINTTyCon [rep]
 
 mkPrimTc :: FastString -> Unique -> TyCon -> Name
 mkPrimTc = mkGenPrimTc UserSyntax
@@ -175,7 +181,7 @@ pcPrimTyCon name roles res_rep
   where
     bndr_kis    = liftedTypeKind <$ roles
     binders     = mkTemplateAnonTyConBinders bndr_kis
-    result_kind = mkTYPEapp res_rep
+    result_kind = mk_TYPE_app res_rep
 
 -- | Create a primitive nullary 'TyCon' with the given 'Name'
 -- and result kind representation.
@@ -198,14 +204,15 @@ pcPrimTyCon_LevPolyLastArg :: Name
 pcPrimTyCon_LevPolyLastArg name roles res_rep
   = mkPrimTyCon name binders result_kind (Nominal : roles)
     where
-      result_kind = mkTYPEapp res_rep
+      result_kind = mk_TYPE_app res_rep
       lev_bndr = mkNamedTyConBinder Inferred levity1TyVar
       binders  = lev_bndr : mkTemplateAnonTyConBinders anon_bndr_kis
       lev_tv   = mkTyVarTy (binderVar lev_bndr)
 
       -- [ Type, ..., Type, TYPE (BoxedRep l) ]
-      anon_bndr_kis = changeLast (liftedTypeKind <$ roles)
-                        (mkTYPEapp $ mkTyConApp boxedRepDataConTyCon [lev_tv])
+      anon_bndr_kis = changeLast (liftedTypeKind <$ roles) $
+                      mk_TYPE_app $
+                      mkTyConApp boxedRepDataConTyCon [lev_tv]
 
 
 {- *********************************************************************
@@ -267,7 +274,8 @@ exposedPrimTyCons
     , stackSnapshotPrimTyCon
 
     , fUNTyCon
-    , sORTTyCon
+    , tYPETyCon
+    , cONSTRAINTTyCon
 
 #include "primop-vector-tycons.hs-incl"
     ]
@@ -477,7 +485,9 @@ openAlphaTyVar, openBetaTyVar, openGammaTyVar :: TyVar
 -- beta  :: TYPE r2
 -- gamma :: TYPE r3
 [openAlphaTyVar,openBetaTyVar,openGammaTyVar]
-  = mkTemplateTyVars [mkTYPEapp runtimeRep1Ty, mkTYPEapp runtimeRep2Ty, mkTYPEapp runtimeRep3Ty]
+  = mkTemplateTyVars [ mk_TYPE_app runtimeRep1Ty
+                     , mk_TYPE_app runtimeRep2Ty
+                     , mk_TYPE_app runtimeRep3Ty]
 
 openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec :: TyVarBinder
 openAlphaTyVarSpec = mkTyVarBinder Specified openAlphaTyVar
@@ -506,8 +516,8 @@ levity2Ty = mkTyVarTy levity2TyVar
 levPolyAlphaTyVar, levPolyBetaTyVar :: TyVar
 [levPolyAlphaTyVar, levPolyBetaTyVar] =
   mkTemplateTyVars
-    [mkTYPEapp (mkTyConApp boxedRepDataConTyCon [levity1Ty])
-    ,mkTYPEapp (mkTyConApp boxedRepDataConTyCon [levity2Ty])]
+    [ mk_TYPE_app (mkTyConApp boxedRepDataConTyCon [levity1Ty])
+    , mk_TYPE_app (mkTyConApp boxedRepDataConTyCon [levity2Ty])]
 -- alpha :: TYPE ('BoxedRep l)
 -- beta  :: TYPE ('BoxedRep k)
 
@@ -599,8 +609,8 @@ fUNTyCon = mkPrimTyCon fUNTyConName tc_bndrs liftedTypeKind tc_roles
     tc_bndrs = [ mkNamedTyConBinder Required multiplicityTyVar1
                , mkNamedTyConBinder Inferred runtimeRep1TyVar
                , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
-               ++ mkTemplateAnonTyConBinders [ mkTYPEapp runtimeRep1Ty
-                                             , mkTYPEapp runtimeRep2Ty ]
+               ++ mkTemplateAnonTyConBinders [ mk_TYPE_app runtimeRep1Ty
+                                             , mk_TYPE_app runtimeRep2Ty ]
     tc_roles = [Nominal, Nominal, Nominal, Representational, Representational]
 
 -- (=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
@@ -611,8 +621,8 @@ ctArrowTyCon = mkPrimTyCon ctArrowTyConName tc_bndrs liftedTypeKind tc_roles
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
                , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
-               ++ mkTemplateAnonTyConBinders [ mkCONSTRAINTapp runtimeRep1Ty
-                                             , mkTYPEapp       runtimeRep2Ty ]
+               ++ mkTemplateAnonTyConBinders [ mk_CONSTRAINT_app runtimeRep1Ty
+                                             , mk_TYPE_app       runtimeRep2Ty ]
     tc_roles = [Nominal, Nominal, Representational, Representational]
 
 -- (==>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
@@ -623,8 +633,8 @@ ccArrowTyCon = mkPrimTyCon ccArrowTyConName tc_bndrs constraintKind tc_roles
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
                , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
-               ++ mkTemplateAnonTyConBinders [ mkCONSTRAINTapp runtimeRep1Ty
-                                             , mkCONSTRAINTapp runtimeRep2Ty ]
+               ++ mkTemplateAnonTyConBinders [ mk_CONSTRAINT_app runtimeRep1Ty
+                                             , mk_CONSTRAINT_app runtimeRep2Ty ]
     tc_roles = [Nominal, Nominal, Representational, Representational]
 
 -- (-=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
@@ -635,8 +645,8 @@ tcArrowTyCon = mkPrimTyCon tcArrowTyConName tc_bndrs constraintKind tc_roles
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
                , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
-               ++ mkTemplateAnonTyConBinders [ mkTYPEapp       runtimeRep1Ty
-                                             , mkCONSTRAINTapp runtimeRep2Ty ]
+               ++ mkTemplateAnonTyConBinders [ mk_TYPE_app       runtimeRep1Ty
+                                             , mk_CONSTRAINT_app runtimeRep2Ty ]
     tc_roles = [Nominal, Nominal, Representational, Representational]
 
 {-
@@ -731,18 +741,18 @@ either. Reason (c.f. #7451):
   bad; but it's fine provide they are not Apart.
 
 So we ensure that Type and Constraint are not apart; or, more
-precisely, that TypeLike and ConstraintLike are not apart.  This
+precisely, that TYPE and CONSTRAINT are not apart.  This
 non-apart-ness check is implemented in GHC.Core.Unify.unify_ty: look for
 `maybeApart MARTypeVsConstraint`.
 
-Note taht  before, nothing prevents writing instances like:
+Note that, as before, nothing prevents writing instances like:
 
   instance C (Proxy @Type a) where ...
 
-In particular, SORT and TypeLike and ConstraintLike (and the synonyms
-TYPE, CONSTRAINT etc) are all allowed in instance heads. It's just
-that TypeLike is not apart from ConstraintLike so that instance would
-irretrievably overlap with:
+In particular, TYPE and CONSTRAINT (and the synonyms Type, Constraint
+etc) are all allowed in instance heads. It's just that TYPE
+apart from CONSTRAINT so that instance would irretrievably overlap
+with:
 
   instance C (Proxy @Constraint a) where ...
 
@@ -775,15 +785,32 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
                      a -> b -> TYPE ('TupleRep '[r1, r2])
 -}
 
-sORTTyCon :: TyCon
-sORTTyConName :: Name
-
--- SORT :: TypeOrConstraint -> RuntimeRep -> Type
-sORTTyCon = mkPrimTyCon sORTTyConName
-                        (mkTemplateAnonTyConBinders [typeOrConstraintTy, runtimeRepTy])
+----------------------
+tYPETyCon :: TyCon
+tYPETyCon = mkPrimTyCon tYPETyConName
+                        (mkTemplateAnonTyConBinders [runtimeRepTy])
                         liftedTypeKind
                         [Nominal]
-sORTTyConName = mkPrimTc (fsLit "SORT") sORTTyConKey sORTTyCon
+
+tYPETyConName :: Name
+tYPETyConName = mkPrimTc (fsLit "TYPE") tYPETyConKey tYPETyCon
+
+tYPEKind :: Type
+tYPEKind = mkTyConTy tYPETyCon
+
+----------------------
+-- type CONSTRAINT = SORT ConstraintLike
+cONSTRAINTTyCon :: TyCon
+cONSTRAINTTyCon = mkPrimTyCon cONSTRAINTTyConName
+                              (mkTemplateAnonTyConBinders [runtimeRepTy])
+                              liftedTypeKind
+                              [Nominal]
+
+cONSTRAINTTyConName :: Name
+cONSTRAINTTyConName = mkPrimTc (fsLit "CONSTRAINT") cONSTRAINTTyConKey cONSTRAINTTyCon
+
+cONSTRAINTKind :: Type
+cONSTRAINTKind = mkTyConTy cONSTRAINTTyCon
 
 
 {- *********************************************************************

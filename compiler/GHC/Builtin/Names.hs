@@ -1895,15 +1895,13 @@ nonEmptyTyConKey                        = mkPreludeTyConUnique 86
 
 -- Kind constructors
 liftedTypeKindTyConKey, unliftedTypeKindTyConKey,
-  tYPETyConKey, liftedRepTyConKey, unliftedRepTyConKey,
+  tYPETyConKey, cONSTRAINTTyConKey,
+  liftedRepTyConKey, unliftedRepTyConKey,
   constraintKindTyConKey, levityTyConKey, runtimeRepTyConKey,
   vecCountTyConKey, vecElemTyConKey,
-  zeroBitRepTyConKey, zeroBitTypeTyConKey,
-  typeOrConstraintTyConKey, sORTTyConKey, cONSTRAINTTyConKey :: Unique
-typeOrConstraintTyConKey                = mkPreludeTyConUnique 87
+  zeroBitRepTyConKey, zeroBitTypeTyConKey :: Unique
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 88
 unliftedTypeKindTyConKey                = mkPreludeTyConUnique 89
-sORTTyConKey                            = mkPreludeTyConUnique 90
 tYPETyConKey                            = mkPreludeTyConUnique 91
 cONSTRAINTTyConKey                      = mkPreludeTyConUnique 92
 constraintKindTyConKey                  = mkPreludeTyConUnique 93
@@ -2128,10 +2126,6 @@ fingerprintDataConKey                   = mkPreludeDataConUnique 35
 
 srcLocDataConKey :: Unique
 srcLocDataConKey                        = mkPreludeDataConUnique 37
-
-typeLikeDataConKey, constraintLikeDataConKey :: Unique
-typeLikeDataConKey                      = mkPreludeDataConUnique 38
-constraintLikeDataConKey                = mkPreludeDataConUnique 39
 
 trTyConDataConKey, trModuleDataConKey,
   trNameSDataConKey, trNameDDataConKey,

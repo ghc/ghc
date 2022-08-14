@@ -1081,14 +1081,6 @@ unify_ty env ty1 (TyVarTy tv2) kco
   = uVar (umSwapRn env) tv2 ty1 (mkSymCo kco)
 
 unify_ty env ty1 ty2 _kco
-  -- Type and Constraint are not Apart
-  -- See Note [Type vs Constraint] in GHC.Builtin.Types.Prim
-  | Just (tc1,_) <- mb_tc_app1
-  , TypeOrConstraint {} <- tyConPromDataConInfo tc1
-  , Just (tc2,_) <- mb_tc_app2
-  , TypeOrConstraint {} <- tyConPromDataConInfo tc2
-  = maybeApart MARTypeVsConstraint
-
   | Just (tc1, tys1) <- mb_tc_app1
   , Just (tc2, tys2) <- mb_tc_app2
   , tc1 == tc2
@@ -1123,6 +1115,13 @@ unify_ty env ty1 ty2 _kco
     --        because the (F ty2) behaves like a variable
     --        NB: we have already dealt with the 'ty1 = variable' case
   = maybeApart MARTypeFamily
+
+  -- TYPE and CONSTRAINT are not Apart
+  -- See Note [Type vs Constraint] in GHC.Builtin.Types.Prim
+  -- NB: at this point we know that the two TyCons do not match
+  | Just {} <- sORTKind_maybe ty1
+  , Just {} <- sORTKind_maybe ty2
+  = maybeApart MARTypeVsConstraint
 
   where
     mb_tc_app1 = splitTyConApp_maybe ty1

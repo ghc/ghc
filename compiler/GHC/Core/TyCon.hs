@@ -521,8 +521,9 @@ mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: TyConBinder -> Kind -> Kind
-    mk (Bndr tv (AnonTCB af))   k = mkNakedKindFunTy af (varType tv) k
     mk (Bndr tv (NamedTCB vis)) k = mkForAllTy tv vis k
+    mk (Bndr tv (AnonTCB af))   k = mkNakedKindFunTy af (varType tv) k
+    -- mkNakedKindFunTy: see Note [Naked FunTy] in GHC.Builtin.Types
 
 tyConInvisTVBinders :: [TyConBinder]   -- From the TyCon
                     -> [InvisTVBinder] -- Suitable for the foralls of a term function
@@ -1239,8 +1240,6 @@ data PromDataConInfo
   | VecElem PrimElemRep  -- ^ A constructor of `VecElem`
 
   | Levity Levity        -- ^ A constructor of `Levity`
-
-  | TypeOrConstraint TypeOrConstraint -- ^ A constructor of `TypeOrConstraint`
 
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in

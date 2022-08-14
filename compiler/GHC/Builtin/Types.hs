@@ -130,11 +130,6 @@ module GHC.Builtin.Types (
         liftedDataConTyCon, unliftedDataConTyCon,
         liftedDataConTy,    unliftedDataConTy,
 
-        -- * TypeOrConstraint
-        typeOrConstraintTyCon, typeOrConstraintTy,
-        typeLikeDataConTyCon, constraintLikeDataConTyCon,
-        typeLikeDataConTy,    constraintLikeDataConTy,
-
         intRepDataConTy,
         int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
         wordRepDataConTy,
@@ -183,12 +178,12 @@ import GHC.Core.Coercion.Axiom
 import GHC.Types.Id
 import GHC.Types.TyThing
 import GHC.Types.SourceText
-import GHC.Types.Var ( VarBndr (Bndr), visArgTypeLike )
+import GHC.Types.Var ( VarBndr (Bndr) )
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import GHC.Unit.Module        ( Module )
 import GHC.Core.Type
 import qualified GHC.Core.TyCo.Rep as TyCoRep (Type(TyConApp))
-import GHC.Core.TyCo.Rep ( RuntimeRepType, mkNakedKindFunTy )
+import GHC.Core.TyCo.Rep ( RuntimeRepType )
 import GHC.Types.RepType
 import GHC.Core.DataCon
 import GHC.Core.ConLike
@@ -315,14 +310,11 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , typeSymbolKindCon
                 , runtimeRepTyCon
                 , levityTyCon
-                , typeOrConstraintTyCon
                 , vecCountTyCon
                 , vecElemTyCon
                 , constraintKindTyCon
                 , liftedTypeKindTyCon
                 , unliftedTypeKindTyCon
-                , tYPETyCon
-                , cONSTRAINTTyCon
                 , multiplicityTyCon
                 , naturalTyCon
                 , integerTyCon
@@ -1472,12 +1464,12 @@ unrestrictedFunTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->
 *                                                                      *
       Type synonyms (all declared in ghc-prim:GHC.Types)
 
-         type CONSTRAINT   = SORT ConstraintLike   :: RuntimeRep -> Type -- cONSTRAINTKind
-         type Constraint   = CONSTRAINT LiftedRep  :: Type               -- constraintKind
+         type CONSTRAINT   :: RuntimeRep -> Type -- primitive; cONSTRAINTKind
+         type Constraint   = CONSTRAINT LiftedRep  :: Type    -- constraintKind
 
-         type TYPE         = SORT TypeLike    :: RuntimeRep -> Type  -- tYPEKind
-         type Type         = TYPE LiftedRep   :: Type                -- liftedTypeKind
-         type UnliftedType = TYPE UnliftedRep :: Type                -- unliftedTypeKind
+         type TYPE         :: RuntimeRep -> Type  -- primitive; tYPEKind
+         type Type         = TYPE LiftedRep   :: Type         -- liftedTypeKind
+         type UnliftedType = TYPE UnliftedRep :: Type         -- unliftedTypeKind
 
          type LiftedRep    = BoxedRep Lifted   :: RuntimeRep  -- liftedRepTy
          type UnliftedRep  = BoxedRep Unlifted :: RuntimeRep  -- unliftedRepTy
@@ -1501,37 +1493,6 @@ so the check will loop infinitely.  Hence the use of a naked FunTy
 constructor in tTYPETyCon and cONSTRAINTTyCon.
 -}
 
-----------------------
--- type TYPE = SORT TypeLike
-tYPETyCon :: TyCon
-tYPETyCon = buildSynTyCon tYPETyConName [] kind [] rhs
-  where
-    rhs  = TyCoRep.TyConApp sORTTyCon [typeLikeDataConTy]
-    -- See Note [Naked FunTy]
-    kind = mkNakedKindFunTy visArgTypeLike runtimeRepTy liftedTypeKind
-
-tYPETyConName :: Name
-tYPETyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "TYPE")
-                                   tYPETyConKey tYPETyCon
-
-tYPEKind :: Type
-tYPEKind = mkTyConTy tYPETyCon
-
-----------------------
--- type CONSTRAINT = SORT ConstraintLike
-cONSTRAINTTyCon :: TyCon
-cONSTRAINTTyCon = buildSynTyCon cONSTRAINTTyConName [] kind [] rhs
-  where
-    rhs = TyCoRep.TyConApp sORTTyCon [constraintLikeDataConTy]
-    -- See Note [Naked FunTy]
-    kind = mkNakedKindFunTy visArgTypeLike runtimeRepTy liftedTypeKind
-
-cONSTRAINTTyConName :: Name
-cONSTRAINTTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "CONSTRAINT")
-                                         cONSTRAINTTyConKey cONSTRAINTTyCon
-
-cONSTRAINTKind :: Type
-cONSTRAINTKind = mkTyConTy cONSTRAINTTyCon
 
 ----------------------
 -- type Constraint = CONSTRAINT LiftedRep
@@ -1581,45 +1542,6 @@ unliftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Unli
 unliftedTypeKind :: Type
 unliftedTypeKind = mkTyConTy unliftedTypeKindTyCon
 
-
-{- *********************************************************************
-*                                                                      *
-      data TypeOrConstraint = TypeLike | ConstraintLike
-*                                                                      *
-********************************************************************* -}
-
-typeOrConstraintTyConName, typeLikeDataConName, constraintLikeDataConName :: Name
-typeOrConstraintTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "TypeOrConstraint")
-                                               typeOrConstraintTyConKey typeOrConstraintTyCon
-typeLikeDataConName       = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TypeLike")
-                                                 typeLikeDataConKey typeLikeDataCon
-constraintLikeDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "ConstraintLike")
-                                                 constraintLikeDataConKey constraintLikeDataCon
-
-typeOrConstraintTyCon :: TyCon
-typeOrConstraintTyCon = pcTyCon typeOrConstraintTyConName Nothing []
-                                [typeLikeDataCon, constraintLikeDataCon]
-
-typeOrConstraintTy :: Type
-typeOrConstraintTy = mkTyConTy typeOrConstraintTyCon
-
-typeLikeDataCon, constraintLikeDataCon :: DataCon
-typeLikeDataCon = pcSpecialDataCon typeLikeDataConName
-    [] typeOrConstraintTyCon (TypeOrConstraint TypeLike)
-constraintLikeDataCon = pcSpecialDataCon constraintLikeDataConName
-    [] typeOrConstraintTyCon (TypeOrConstraint ConstraintLike)
-
-typeLikeDataConTyCon :: TyCon
-typeLikeDataConTyCon = promoteDataCon typeLikeDataCon
-
-constraintLikeDataConTyCon :: TyCon
-constraintLikeDataConTyCon = promoteDataCon constraintLikeDataCon
-
-typeLikeDataConTy :: Type
-typeLikeDataConTy = mkTyConTy typeLikeDataConTyCon
-
-constraintLikeDataConTy :: Type
-constraintLikeDataConTy = mkTyConTy constraintLikeDataConTyCon
 
 {- *********************************************************************
 *                                                                      *

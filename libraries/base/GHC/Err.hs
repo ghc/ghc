@@ -23,7 +23,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.Err( absentErr, error, errorWithoutStackTrace, undefined ) where
-import GHC.Types (Char, RuntimeRep, TYPE)
+import GHC.Types (Char, RuntimeRep)
 import GHC.Stack.Types
 import GHC.Prim
 import {-# SOURCE #-} GHC.Exception

@@ -106,12 +106,6 @@ type UnliftedRep = 'BoxedRep 'Unlifted
 type ZeroBitRep = 'TupleRep '[]
 
 -------------------------
--- | The kind of types
-type TYPE       = SORT TypeLike
-
--- | The kind of constraints
-type CONSTRAINT = SORT ConstraintLike
-
 -- | The kind of lifted constraints
 type Constraint = CONSTRAINT LiftedRep
 

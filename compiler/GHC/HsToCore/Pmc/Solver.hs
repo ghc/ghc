@@ -72,7 +72,6 @@ import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Builtin.Names
 import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim (sORTTyCon)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst (elemSubst)
 import GHC.Core.Type
@@ -146,10 +145,10 @@ updRcm f (RCM vanilla pragmas)
 -- Ex.: @vanillaCompleteMatchTC 'Maybe' ==> Just ("Maybe", {'Just','Nothing'})@
 vanillaCompleteMatchTC :: TyCon -> Maybe CompleteMatch
 vanillaCompleteMatchTC tc =
-  let -- SORT acts like an empty data type on the term-level (#14086), but
+  let -- TYPE acts like an empty data type on the term-level (#14086), but
       -- it is a PrimTyCon, so tyConDataCons_maybe returns Nothing. Hence a
       -- special case.
-      mb_dcs | tc == sORTTyCon = Just []
+      mb_dcs | tc == tYPETyCon = Just []
              | otherwise       = tyConDataCons_maybe tc
   in vanillaCompleteMatch . mkUniqDSet . map RealDataCon <$> mb_dcs
 
