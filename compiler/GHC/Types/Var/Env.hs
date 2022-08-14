@@ -47,7 +47,7 @@ module GHC.Types.Var.Env (
         anyDVarEnv,
 
         -- * The InScopeSet type
-        InScopeSet,
+        InScopeSet(..),
 
         -- ** Operations on InScopeSets
         emptyInScopeSet, mkInScopeSet, mkInScopeSetList, delInScopeSet,

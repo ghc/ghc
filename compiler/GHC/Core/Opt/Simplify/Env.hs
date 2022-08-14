@@ -815,10 +815,6 @@ addJoinFloats floats join_floats
            , sfInScope    = foldlOL extendInScopeSetBind
                                     (sfInScope floats) join_floats }
 
-extendInScopeSetBind :: InScopeSet -> CoreBind -> InScopeSet
-extendInScopeSetBind in_scope bind
-  = extendInScopeSetList in_scope (bindersOf bind)
-
 addFloats :: SimplFloats -> SimplFloats -> SimplFloats
 -- Add both let-floats and join-floats for env2 to env1;
 -- *plus* the in-scope set for env2, which is bigger

@@ -28,7 +28,7 @@ import GHC.Core
 import GHC.Core.Rules
 import GHC.Core.Utils     ( exprIsTrivial
                           , mkCast, exprType
-                          , stripTicksTop )
+                          , stripTicksTop, mkInScopeSetBndrs )
 import GHC.Core.FVs
 import GHC.Core.TyCo.Rep (TyCoBinder (..))
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
@@ -603,8 +603,10 @@ specProgram guts@(ModGuts { mg_module = this_mod
               -- accidentally re-use a unique that's already in use
               -- Easiest thing is to do it all at once, as if all the top-level
               -- decls were mutually recursive
-       ; let top_env = SE { se_subst = Core.mkEmptySubst $ mkInScopeSetList $
-                                       bindersOfBinds binds
+       ; let top_env = SE { se_subst = Core.mkEmptySubst $
+                                        mkInScopeSetBndrs binds
+                                      --    mkInScopeSetList $
+                                      --  bindersOfBinds binds
                           , se_module = this_mod
                           , se_dflags = dflags }
 

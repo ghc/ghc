@@ -62,7 +62,7 @@ exitifyProgram binds = map goTopLvl binds
     goTopLvl (Rec pairs) = Rec (map (second (go in_scope_toplvl)) pairs)
       -- Top-level bindings are never join points
 
-    in_scope_toplvl = emptyInScopeSet `extendInScopeSetList` bindersOfBinds binds
+    in_scope_toplvl = emptyInScopeSet `extendInScopeSetBndrs` binds
 
     go :: InScopeSet -> CoreExpr -> CoreExpr
     go _    e@(Var{})       = e
@@ -94,7 +94,7 @@ exitifyProgram binds = map goTopLvl binds
       | otherwise   = Let (Rec pairs') body'
       where
         is_join_rec = any (isJoinId . fst) pairs
-        in_scope'   = in_scope `extendInScopeSetList` bindersOf (Rec pairs)
+        in_scope'   = in_scope `extendInScopeSetBind` (Rec pairs)
         pairs'      = mapSnd (go in_scope') pairs
         body'       = go in_scope' body
 
