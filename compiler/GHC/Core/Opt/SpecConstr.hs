@@ -952,8 +952,7 @@ initScEnv guts
                        sc_vals        = emptyVarEnv,
                        sc_annotations = anns }) }
   where
-    init_subst = mkEmptySubst $ mkInScopeSet $ mkVarSet $
-                 bindersOfBinds (mg_binds guts)
+    init_subst = mkEmptySubst $ mkInScopeSetBndrs (mg_binds guts)
         -- Acccount for top-level bindings that are not in dependency order;
         -- see Note [Glomming] in GHC.Core.Opt.OccurAnal
         -- Easiest thing is to bring all the top level binders into scope at once,

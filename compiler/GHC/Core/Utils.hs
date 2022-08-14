@@ -47,6 +47,9 @@ module GHC.Core.Utils (
         stripTicksTop, stripTicksTopE, stripTicksTopT,
         stripTicksE, stripTicksT,
 
+        -- * InScopeSet things which work over CoreBinds
+        mkInScopeSetBndrs, extendInScopeSetBind, extendInScopeSetBndrs,
+
         -- * StaticPtr
         collectMakeStaticArgs,
 
@@ -2335,6 +2338,26 @@ normSplitTyConApp_maybe fam_envs ty
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   = Just (tc, tc_args, co)
 normSplitTyConApp_maybe _ _ = Nothing
+
+{-
+*****************************************************
+*
+* InScopeSet things
+*
+*****************************************************
+-}
+
+
+extendInScopeSetBind :: InScopeSet -> CoreBind -> InScopeSet
+extendInScopeSetBind (InScope in_scope) binds
+   = InScope $ foldBindersOfBindStrict extendVarSet in_scope binds
+
+extendInScopeSetBndrs :: InScopeSet -> [CoreBind] -> InScopeSet
+extendInScopeSetBndrs (InScope in_scope) binds
+   = InScope $ foldBindersOfBindsStrict extendVarSet in_scope binds
+
+mkInScopeSetBndrs :: [CoreBind] -> InScopeSet
+mkInScopeSetBndrs binds = foldBindersOfBindsStrict extendInScopeSet emptyInScopeSet binds
 
 {-
 *****************************************************

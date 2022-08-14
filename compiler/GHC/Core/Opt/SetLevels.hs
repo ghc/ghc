@@ -82,7 +82,7 @@ import GHC.Core.Utils   ( exprType, exprIsHNF
                         , exprOkForSpeculation
                         , exprIsTopLevelBindable
                         , collectMakeStaticArgs
-                        , mkLamTypes
+                        , mkLamTypes, extendInScopeSetBndrs
                         )
 import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isOneShotBndr )
 import GHC.Core.FVs     -- all of it
@@ -1566,7 +1566,7 @@ initialEnv float_lams binds
        , le_subst     = mkEmptySubst in_scope_toplvl
        , le_env       = emptyVarEnv }
   where
-    in_scope_toplvl = emptyInScopeSet `extendInScopeSetList` bindersOfBinds binds
+    in_scope_toplvl = emptyInScopeSet `extendInScopeSetBndrs` binds
       -- The Simplifier (see Note [Glomming] in GHC.Core.Opt.OccurAnal) and
       -- the specialiser (see Note [Top level scope] in GHC.Core.Opt.Specialise)
       -- may both produce top-level bindings where an early binding refers

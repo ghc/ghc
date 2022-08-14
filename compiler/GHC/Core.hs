@@ -42,6 +42,7 @@ module GHC.Core (
 
         -- ** Simple 'Expr' access functions and predicates
         bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
+        foldBindersOfBindStrict, foldBindersOfBindsStrict,
         collectBinders, collectTyBinders, collectTyAndValBinders,
         collectNBinders, collectNValBinders_maybe,
         collectArgs, stripNArgs, collectArgsTicks, flattenBinds,
@@ -1925,6 +1926,21 @@ bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 -- | 'bindersOf' applied to a list of binding groups
 bindersOfBinds :: [Bind b] -> [b]
 bindersOfBinds binds = foldr ((++) . bindersOf) [] binds
+
+-- We inline this to avoid unknown function calls.
+{-# INLINE foldBindersOfBindStrict #-}
+foldBindersOfBindStrict :: (a -> b -> a) -> a -> Bind b -> a
+foldBindersOfBindStrict f
+  = \z bind -> case bind of
+      NonRec b _rhs -> f z b
+      Rec pairs -> foldl' f z $ map fst pairs
+
+{-# INLINE foldBindersOfBindsStrict #-}
+foldBindersOfBindsStrict :: (a -> b -> a) -> a -> [Bind b] -> a
+foldBindersOfBindsStrict f = \z binds -> foldl' fold_bind z binds
+  where
+    fold_bind = (foldBindersOfBindStrict f)
+
 
 rhssOfBind :: Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]
