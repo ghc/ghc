@@ -153,7 +153,7 @@ Note [Overall plumbing for rules]
 
   In a single simplifier run new rules can be added into the EPS so it matters
   to keep an up-to-date view of which rules have been loaded. For examples of
-  where this went wrong and caused cryptic performance regressions seee
+  where this went wrong and caused cryptic performance regressions 
   see T19790 and !6735.
 
 
@@ -971,7 +971,7 @@ match renv subst e1 (Var v2) mco  -- Note [Expanding variables]
 -- Note the match on MRefl!  We fail if there is a cast in the target
 --     (e1 e2) ~ (d1 d2) |> co
 -- See Note [Cancel reflexive casts]: in the Cast equations for 'match'
--- we agressively ensure that if MCo is reflective, it really is MRefl.
+-- we aggressively ensure that if MCo is reflective, it really is MRefl.
 match renv subst (App f1 a1) (App f2 a2) MRefl
   = do  { subst' <- match renv subst f1 f2 MRefl
         ; match renv subst' a1 a2 MRefl }
@@ -1150,7 +1150,7 @@ when we eta-reduce (\a b. blah a b) to 'blah', we'll get
 and we really want to spot that the co/sym-co cancels out.
 Hence
   * We keep an invariant that the MCoercion is always MRefl
-    if the MCoercion is reflextve
+    if the MCoercion is reflexive
   * We maintain this invariant via the call to checkReflexiveMCo
     in the Cast case of 'match'.
 -}

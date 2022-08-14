@@ -1330,7 +1330,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
             Addr# address_of_C_fn
             <placeholder-for-result#> (must be an unboxed type)
 
-         The interpreter then calls the marshall code mentioned
+         The interpreter then calls the marshal code mentioned
          in the CCALL insn, passing it (& <placeholder-for-result#>),
          that is, the addr of the topmost word in the stack.
          When this returns, the placeholder will have been

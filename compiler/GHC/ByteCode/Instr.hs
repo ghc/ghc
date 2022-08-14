@@ -300,7 +300,7 @@ instance Outputable BCInstr where
    ppr CASEFAIL              = text "CASEFAIL"
    ppr (JMP lab)             = text "JMP"      <+> ppr lab
    ppr (CCALL off marshall_addr flags) = text "CCALL   " <+> ppr off
-                                                <+> text "marshall code at"
+                                                <+> text "marshal code at"
                                                <+> text (show marshall_addr)
                                                <+> (case flags of
                                                       0x1 -> text "(interruptible)"

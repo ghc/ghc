@@ -129,7 +129,7 @@ The goal of this pass is to prepare for code generation.
     annotate according to scoping rules when floating.
 
 11. Collect cost centres (including cost centres in unfoldings) if we're in
-    profiling mode. We have to do this here beucase we won't have unfoldings
+    profiling mode. We have to do this here because we won't have unfoldings
     after this pass (see `trimUnfolding` and Note [Drop unfoldings and rules].
 
 12. Eliminate case clutter in favour of unsafe coercions.
@@ -179,7 +179,7 @@ CorePrep does these two transformations:
    Tiresome, but not difficult.
 
 These transformations get rid of "case clutter", leaving only casts.
-We are doing no further significant tranformations, so the reasons
+We are doing no further significant transformations, so the reasons
 for the case forms have disappeared. And it is extremely helpful for
 the ANF-ery, CoreToStg, and backends, if trivial expressions really do
 look trivial. #19700 was an example.
@@ -2028,7 +2028,7 @@ enterRecGroupRHSs env grp
 {- Note [CpeTyCoEnv]
 ~~~~~~~~~~~~~~~~~~~~
 The cpe_tyco_env :: Maybe CpeTyCoEnv field carries a substitution
-for type and coercion varibles
+for type and coercion variables
 
 * We need the coercion substitution to support the elimination of
   unsafeEqualityProof (see Note [Unsafe coercions])

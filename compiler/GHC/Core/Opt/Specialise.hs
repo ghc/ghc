@@ -307,7 +307,7 @@ only it knows how to build the dictionaries d1 and d2!  For example
 Here, the specialised version of g is an application of g's rhs to the
 Ord dictionary for (Tree Int), which only the type checker can conjure
 up.  There might not even *be* one, if (Tree Int) is not an instance of
-Ord!  (All the other specialision has suitable dictionaries to hand
+Ord!  (All the other specialisation has suitable dictionaries to hand
 from actual calls.)
 
 Problem.  The type checker doesn't have to hand a convenient <f_rhs>, because
@@ -1335,7 +1335,7 @@ specBind top_lvl env (NonRec fn rhs) do_body
 
              fn3 = zapIdDemandInfo fn2
              -- We zap the demand info because the binding may float,
-             -- which would invaidate the demand info (see #17810 for example).
+             -- which would invalidate the demand info (see #17810 for example).
              -- Destroying demand info is not terrible; specialisation is
              -- always followed soon by demand analysis.
 

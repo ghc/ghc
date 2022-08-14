@@ -68,8 +68,8 @@ is much coarser. In particular, STG programs must be /well-kinded/.
 More precisely, if f :: ty1 -> ty2, then in the application (f e)
 where e :: ty1', we must have kind(ty1) = kind(ty1').
 
-So the STG type system does not distinguish beteen Int and Bool,
-but it /does/ distinguish beteen Int and Int#, because they have
+So the STG type system does not distinguish between Int and Bool,
+but it /does/ distinguish between Int and Int#, because they have
 different kinds.  Actually, since all terms have kind (TYPE rep),
 we might say that the STG language is well-runtime-rep'd.
 
@@ -356,7 +356,7 @@ lintStgAppReps fun args = do
         | and $ zipWith (primRepCompatible platform) actual_rep expected_rep
         = match_args actual_reps_left expected_reps_left
 
-        | otherwise = addErrL $ hang (text "Function type reps and function argument reps missmatched") 2 $
+        | otherwise = addErrL $ hang (text "Function type reps and function argument reps mismatched") 2 $
             (text "In application " <> ppr fun <+> ppr args $$
               text "argument rep:" <> ppr actual_rep $$
               text "expected rep:" <> ppr expected_rep $$
