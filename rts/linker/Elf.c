@@ -719,6 +719,9 @@ ocGetNames_ELF ( ObjectCode* oc )
       if (kind == SECTIONKIND_CODE_OR_RODATA
             && 0 == memcmp(".init", sh_name, 5)) {
           addInitFini(&oc->info->init, &oc->sections[i], INITFINI_INIT, 0);
+      } else if (kind == SECTIONKIND_CODE_OR_RODATA
+            && 0 == memcmp(".fini", sh_name, 5)) {
+          addInitFini(&oc->info->fini, &oc->sections[i], INITFINI_FINI, 0);
       } else if (kind == SECTIONKIND_INIT_ARRAY
             || 0 == memcmp(".init_array", sh_name, 11)) {
           uint32_t prio;
