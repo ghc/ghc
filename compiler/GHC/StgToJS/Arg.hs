@@ -28,7 +28,6 @@ import GHC.StgToJS.Profiling
 import GHC.Builtin.Types
 import GHC.Stg.Syntax
 import GHC.Core.DataCon
-import GHC.Data.FastString
 
 import GHC.Types.CostCentre
 import GHC.Types.Unique.FM
@@ -126,24 +125,25 @@ genStaticArg a = case a of
              return [StaticConArg e as]
        unfloated x = pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
 
+-- | Generate JS code for an StgArg
 genArg :: HasDebugCallStack => StgArg -> G [JExpr]
 genArg a = case a of
   StgLitArg l -> genLit l
   StgVarArg i -> do
     unFloat <- State.gets gsUnfloated
     case lookupUFM unFloat i of
-      Nothing -> reg
       Just expr -> unfloated expr
+      Nothing
+       | isVoid r            -> return []
+       | i == trueDataConId  -> return [true_]
+       | i == falseDataConId -> return [false_]
+       | isMultiVar r        -> mapM (jsIdN i) [1..varSize r]
+       | otherwise           -> (:[]) <$> jsId i
+
    where
      -- if our argument is a joinid, it can be an unboxed tuple
      r :: HasDebugCallStack => VarType
      r = uTypeVt . stgArgType $ a
-     reg
-       | isVoid r     = return []
-       | i == trueDataConId  = return [true_]
-       | i == falseDataConId = return [false_]
-       | isMultiVar r = mapM (jsIdN i) [1..varSize r]
-       | otherwise    = (:[]) <$> jsId i
 
      unfloated :: HasDebugCallStack => CgStgExpr -> G [JExpr]
      unfloated = \case

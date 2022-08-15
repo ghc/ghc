@@ -220,7 +220,7 @@ genApp ctx i args
     , idFunRepArity i == 0
     , not (might_be_a_function (idType i))
     = do
-      enter_id <- genArg (StgVarArg i) >>=
+      enter_id <- genIdArg i >>=
                     \case
                        [x] -> return x
                        xs  -> pprPanic "genApp: unexpected multi-var argument"

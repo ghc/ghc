@@ -113,7 +113,6 @@ import GHC.StgToJS.Types
 import GHC.Unit.Module
 
 import GHC.Data.FastString
-import GHC.Data.ShortText as ST
 
 import GHC.Types.Unique.Map
 import GHC.Float (castDoubleToWord64, castWord64ToDouble)
