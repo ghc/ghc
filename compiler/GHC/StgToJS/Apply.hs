@@ -100,17 +100,6 @@ genApp
   -> G (JStat, ExprResult)
 genApp ctx i args
 
--- FIXME (sylvain 2022/02): what's our new equivalent of this?
---  -- special cases for JSString literals
---  -- we could handle unpackNBytes# here, but that's probably not common
---  -- enough to warrant a special case
---  | [StgVarArg v] <- args
---  , [top] <- concatMap snd (ctxTarget ctx)
---  -- , Just (Lit (MachStr bs)) <- expandUnfolding_maybe (idUnfolding v)
---  -- , Just t <- decodeModifiedUTF8 bs -- unpackFS fs -- Just t <- decodeModifiedUTF8 bs
---  , matchVarName "ghcjs-prim" "GHCJS.Prim" "unsafeUnpackJSStringUtf8##" i =
---     (,ExprInline Nothing) . (|=) top . app "h$decodeUtf8z" <$> varsForId v
-
     -- Case: unpackCStringAppend# "some string"# str
     --
     -- Generates h$appendToHsStringA(str, "some string"), which has a faster
@@ -118,16 +107,15 @@ genApp ctx i args
     | [StgLitArg (LitString bs), x] <- args
     , [top] <- concatMap typex_expr (ctxTarget ctx)
     , getUnique i == unpackCStringAppendIdKey
-    -- , Just d <- decodeModifiedUTF8 bs
     , d <- utf8DecodeByteString bs
         -- FIXME (Sylvain, 2022/02): we assume that it decodes but it may not (e.g. embedded file)
     = do
-        -- fixme breaks assumption in codegen if bs doesn't decode
         prof <- csProf <$> getSettings
         let profArg = if prof then [jCafCCS] else []
         a <- genArg x
-        return (top |= app "h$appendToHsStringA" ([toJExpr d, toJExpr a] ++ profArg)
-               ,ExprInline Nothing)
+        return ( top |= app "h$appendToHsStringA" ([toJExpr d, toJExpr a] ++ profArg)
+               , ExprInline Nothing
+               )
 
     -- let-no-escape
     | Just n <- ctxLneBindingStackSize ctx i
