@@ -38,11 +38,11 @@ import GHC.JS.Transform
 import GHC.StgToJS.Apply
 import GHC.StgToJS.Closure
 import GHC.StgToJS.Heap
-import GHC.StgToJS.Monad
 import GHC.StgToJS.Printer
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
 import GHC.StgToJS.Types
+import GHC.StgToJS.Stack
 
 import GHC.Data.FastString
 import GHC.Types.Unique.Map

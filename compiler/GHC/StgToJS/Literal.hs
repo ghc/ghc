@@ -14,6 +14,7 @@ import GHC.JS.Make
 
 import GHC.StgToJS.Types
 import GHC.StgToJS.Monad
+import GHC.StgToJS.Ids
 
 import GHC.Data.FastString
 import GHC.Types.Literal
@@ -36,8 +37,8 @@ genLit :: HasDebugCallStack => Literal -> G [JExpr]
 genLit = \case
   LitChar c     -> return [ toJExpr (ord c) ]
   LitString str ->
-    withNewIdent $ \strLit@(TxtI strLitT) ->
-      withNewIdent $ \strOff@(TxtI strOffT) -> do
+    freshIdent >>= \strLit@(TxtI strLitT) ->
+      freshIdent >>= \strOff@(TxtI strOffT) -> do
         emitStatic strLitT (StaticUnboxed (StaticUnboxedString str)) Nothing
         emitStatic strOffT (StaticUnboxed (StaticUnboxedStringOffset str)) Nothing
         return [ ValExpr (JVar strLit), ValExpr (JVar strOff) ]

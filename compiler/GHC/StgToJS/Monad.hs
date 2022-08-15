@@ -2,6 +2,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BangPatterns #-}
 
+-- | JS codegen state monad
 module GHC.StgToJS.Monad
   ( runG
   , emitGlobal
@@ -12,109 +13,37 @@ module GHC.StgToJS.Monad
   , emitForeign
   , assertRtsStat
   , getSettings
-  , updateThunk
-  , updateThunk'
   , liftToGlobal
-  , bhStats
-  -- * IDs
-  , withNewIdent
-  , makeIdent
-  , freshUnique
-  , jsIdIdent
-  , jsId
-  , jsIdN
-  , jsIdI
-  , jsIdIN
-  , jsIdV
-  , jsEnId
-  , jsEnIdI
-  , jsEntryId
-  , jsEntryIdI
-  , jsDcEntryId
-  , jsDcEntryIdI
-  , genIds
-  , genIdsN
-  , genIdsI
-  , genIdsIN
-  , getStaticRef
-  , declIds
-  -- * Datacon
-  , enterDataCon
-  , enterDataConI
+  , setGlobalIdCache
+  , getGlobalIdCache
   -- * Group
   , modifyGroup
   , resetGroup
-  -- * Stack
-  , resetSlots
-  , isolateSlots
-  , setSlots
-  , getSlots
-  , addSlots
-  , dropSlots
-  , addUnknownSlots
-  , adjPushStack
-  , push
-  , push'
-  , adjSpN
-  , adjSpN'
-  , adjSp'
-  , adjSp
-  , pushNN
-  , pushNN'
-  , pushN'
-  , pushN
-  , pushOptimized'
-  , pushOptimized
-  , pushLneFrame
-  , pop
-  , popn
-  , popUnknown
-  , popSkipUnknown
-  , popSkip
-  , popSkip'
-  , popSkipI
-  , loadSkip
   )
 where
 
 import GHC.Prelude
 
 import GHC.JS.Syntax
-import GHC.JS.Make
 import GHC.JS.Transform
 
-import GHC.StgToJS.ExprCtx
-import GHC.StgToJS.Heap
 import GHC.StgToJS.Types
-import GHC.StgToJS.Regs
-import GHC.StgToJS.CoreUtils
-import GHC.StgToJS.UnitUtils
 
 import GHC.Unit.Module
-import GHC.Core.DataCon
 import GHC.Stg.Syntax
 
 import GHC.Types.SrcLoc
 import GHC.Types.Id
-import GHC.Types.Name
-import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.ForeignCall
 
-import GHC.Utils.Encoding (zEncodeString)
-import GHC.Utils.Misc
 import qualified Control.Monad.Trans.State.Strict as State
 import GHC.Data.FastString
 
 import qualified Data.Map  as M
 import qualified Data.Set  as S
-import qualified Data.Bits as Bits
 import qualified Data.List as L
 import Data.Function
-import Data.Maybe
-import Data.Array
-import Data.Monoid
-import Control.Monad
 
 runG :: StgToJSConfig -> Module -> UniqFM Id CgStgExpr -> G a -> IO a
 runG config m unfloat action = State.evalStateT action (initState config m unfloat)
@@ -187,168 +116,8 @@ emitForeign mbSpan pat safety cconv arg_tys res_ty = modifyGroup mod_group
                 Nothing -> "<unknown>"
 
 
-withNewIdent :: (Ident -> G a) -> G a
-withNewIdent m = makeIdent >>= m
-
-makeIdent :: G Ident
-makeIdent = do
-  i <- freshUnique
-  mod <- State.gets gsModule
-  -- TODO: Is there a better way to concatenate FastStrings?
-  let !name = mkFastString $ mconcat
-                [ "h$$"
-                , zEncodeString (unitModuleString mod)
-                , "_"
-                , encodeUnique i
-                ]
-  return (TxtI name)
-
-encodeUnique :: Int -> String
-encodeUnique = reverse . iToBase62  -- reversed is more compressible
-
-jsId :: Id -> G JExpr
-jsId i
---  | i == trueDataConId  = return $ toJExpr True
---  | i == falseDataConId = return $ toJExpr False
-  | otherwise = ValExpr . JVar <$> jsIdIdent i Nothing IdPlain
-
-jsIdI :: Id -> G Ident
-jsIdI i = jsIdIdent i Nothing IdPlain
-
--- some types, Word64, Addr#, unboxed tuple have more than one javascript var
-jsIdIN :: Id -> Int -> G Ident
-jsIdIN i n = jsIdIdent i (Just n) IdPlain
-
-jsIdN :: Id -> Int -> G JExpr
-jsIdN i n = ValExpr . JVar <$> jsIdIdent i (Just n) IdPlain
-
--- | Generate unique Ident for the given ID (uncached!)
---
--- The ident has the following forms:
---
---    global Id: h$unit:module.name[_num][_type_suffix]
---    local Id: h$$unit:module.name[_num][_type_suffix]_uniq
---
--- Note that the string is z-encoded except for "_" delimiters.
---
--- Optional "_type_suffix" can be:
---  - "_e" for IdEntry
---  - "_con_e" for IdConEntry
---
--- Optional "_num" is passed as an argument to this function.
---
-makeIdentForId :: Id -> Maybe Int -> IdType -> Module -> Ident
-makeIdentForId i num id_type current_module = TxtI ident
-  where
-    exported = isExportedId i
-    name     = getName i
-    !ident   = mkFastString $ mconcat
-      [ "h$"
-      , if exported then "" else "$"
-      , zEncodeString $ unitModuleString $ case exported of
-          True | Just m <- nameModule_maybe name -> m
-          _                                      -> current_module
-      , zEncodeString "."
-      , zString (zEncodeFS (occNameFS (nameOccName name)))
-      , case num of
-          Nothing -> ""
-          Just v  -> "_" ++ show v
-      , case id_type of
-          IdPlain    -> ""
-          IdEntry    -> "_e"
-          IdConEntry -> "_con_e"
-      , if exported
-          then ""
-          else "_" ++ encodeUnique (getKey (getUnique i))
-      ]
 
 
--- entry id
-jsEnId :: Id -> G JExpr
-jsEnId i = ValExpr . JVar <$> jsEnIdI i
-
-jsEnIdI :: Id -> G Ident
-jsEnIdI i = jsIdIdent i Nothing IdEntry
-
-jsEntryId :: Id -> G JExpr
-jsEntryId i = ValExpr . JVar <$> jsEntryIdI i
-
-jsEntryIdI :: Id -> G Ident
-jsEntryIdI i = jsIdIdent i Nothing IdEntry
-
--- datacon entry, different name than the wrapper
-jsDcEntryId :: Id -> G JExpr
-jsDcEntryId i = ValExpr . JVar <$> jsDcEntryIdI i
-
-jsDcEntryIdI :: Id -> G Ident
-jsDcEntryIdI i = jsIdIdent i Nothing IdConEntry
-
--- entry function of the worker
-enterDataCon :: DataCon -> G JExpr
-enterDataCon d = jsDcEntryId (dataConWorkId d)
-
-enterDataConI :: DataCon -> G Ident
-enterDataConI d = jsDcEntryIdI (dataConWorkId d)
-
-
-jsIdV :: Id -> G JVal
-jsIdV i = JVar <$> jsIdIdent i Nothing IdPlain
-
-
--- | generate all js vars for the ids (can be multiple per var)
-genIds :: Id -> G [JExpr]
-genIds i
-  | s == 0    = return mempty
-  | s == 1    = (:[]) <$> jsId i
-  | otherwise = mapM (jsIdN i) [1..s]
-  where
-    s  = typeSize (idType i)
-
-genIdsN :: Id -> Int -> G JExpr
-genIdsN i n = do
-  xs <- genIds i
-  return $ xs !! (n-1)
-
--- | get all idents for an id
-genIdsI :: Id -> G [Ident]
-genIdsI i
-  | s == 1    = (:[]) <$> jsIdI i
-  | otherwise = mapM (jsIdIN i) [1..s]
-        where
-          s = typeSize (idType i)
-
-genIdsIN :: Id -> Int -> G Ident
-genIdsIN i n = do
-  xs <- genIdsI i
-  return $ xs !! (n-1)
-
-jsIdIdent :: Id -> Maybe Int -> IdType -> G Ident
-jsIdIdent i mi suffix = do
-  IdCache cache <- State.gets gsIdents
-  ident <- case M.lookup key cache of
-    Just ident -> pure ident
-    Nothing -> do
-      mod <- State.gets gsModule
-      let !ident  = makeIdIdent i mi suffix mod
-      let !cache' = IdCache (M.insert key ident cache)
-      State.modify (\s -> s { gsIdents = cache' })
-      pure ident
-  updateGlobalIdCache ident
-  where
-    !key = IdKey (getKey . getUnique $ i) (fromMaybe 0 mi) suffix
-    updateGlobalIdCache :: Ident -> G Ident
-    updateGlobalIdCache ji
-      -- fixme also allow caching entries for lifting?
-      | not (isGlobalId i) || isJust mi || suffix /= IdPlain = pure ji
-      | otherwise = do
-          GlobalIdCache gidc <- getGlobalIdCache
-          case M.lookup ji gidc of
-            Nothing -> setGlobalIdCache $ GlobalIdCache (M.insert ji (key, i) gidc)
-            Just _  -> pure ()
-          pure ji
-
-getStaticRef :: Id -> G (Maybe FastString)
-getStaticRef = fmap (fmap itxt . listToMaybe) . genIdsI
 
 
 -- | start with a new binding group
@@ -364,225 +133,6 @@ emptyGlobalIdCache = GlobalIdCache M.empty
 emptyIdCache :: IdCache
 emptyIdCache = IdCache M.empty
 
--- | run the action with no stack info
-resetSlots :: G a -> G a
-resetSlots m = do
-  s <- getSlots
-  d <- getStackDepth
-  setSlots []
-  a <- m
-  setSlots s
-  setStackDepth d
-  return a
-
--- | run the action with current stack info, but don't let modifications propagate
-isolateSlots :: G a -> G a
-isolateSlots m = do
-  s <- getSlots
-  d <- getStackDepth
-  a <- m
-  setSlots s
-  setStackDepth d
-  pure a
-
--- | Set stack depth
-setStackDepth :: Int -> G ()
-setStackDepth d = modifyGroup (\s -> s { ggsStackDepth = d})
-
--- | Get stack depth
-getStackDepth :: G Int
-getStackDepth = State.gets (ggsStackDepth . gsGroup)
-
--- | Modify stack depth
-modifyStackDepth :: (Int -> Int) -> G ()
-modifyStackDepth f = modifyGroup (\s -> s { ggsStackDepth = f (ggsStackDepth s) })
-
--- | overwrite our stack knowledge
-setSlots :: [StackSlot] -> G ()
-setSlots xs = modifyGroup (\g -> g { ggsStack = xs})
-
--- | retrieve our current stack knowledge
-getSlots :: G [StackSlot]
-getSlots = State.gets (ggsStack . gsGroup)
-
--- | Modify stack slots
-modifySlots :: ([StackSlot] -> [StackSlot]) -> G ()
-modifySlots f = modifyGroup (\g -> g { ggsStack = f (ggsStack g)})
-
--- | add `n` unknown slots to our stack knowledge
-addUnknownSlots :: Int -> G ()
-addUnknownSlots n = addSlots (replicate n SlotUnknown)
-
--- | add knowledge about the stack slots
-addSlots :: [StackSlot] -> G ()
-addSlots xs = do
-  s <- getSlots
-  setSlots (xs ++ s)
-
-dropSlots :: Int -> G ()
-dropSlots n = modifySlots (drop n)
-
-adjPushStack :: Int -> G ()
-adjPushStack n = do
-  modifyStackDepth (+n)
-  dropSlots n
-
-push :: [JExpr] -> G JStat
-push xs = do
-  dropSlots (length xs)
-  modifyStackDepth (+ (length xs))
-  flip push' xs <$> getSettings
-
-push' :: StgToJSConfig -> [JExpr] -> JStat
-push' _ [] = mempty
-push' cs xs
-   | csInlinePush cs || l > 32 || l < 2 = adjSp' l <> mconcat items
-   | otherwise                          = ApplStat (toJExpr $ pushN ! l) xs
-  where
-    items = zipWith (\i e -> AssignStat ((IdxExpr stack) (toJExpr (offset i))) (toJExpr e))
-                    [(1::Int)..] xs
-    offset i | i == l    = sp
-             | otherwise = InfixExpr SubOp sp (toJExpr (l - i))
-    l = length xs
-
-
-adjSp' :: Int -> JStat
-adjSp' 0 = mempty
-adjSp' n = sp |= InfixExpr AddOp sp (toJExpr n)
-
-adjSpN' :: Int -> JStat
-adjSpN' 0 = mempty
-adjSpN' n = sp |= InfixExpr SubOp sp (toJExpr n)
-
-adjSp :: Int -> G JStat
-adjSp 0 = return mempty
-adjSp n = do
-  modifyStackDepth (+n)
-  return (adjSp' n)
-
-adjSpN :: Int -> G JStat
-adjSpN 0 = return mempty
-adjSpN n = do
-  modifyStackDepth (\x -> x - n)
-  return (adjSpN' n)
-
-pushN :: Array Int Ident
-pushN = listArray (1,32) $ map (TxtI . mkFastString . ("h$p"++) . show) [(1::Int)..32]
-
-pushN' :: Array Int JExpr
-pushN' = fmap (ValExpr . JVar) pushN
-
-pushNN :: Array Integer Ident
-pushNN = listArray (1,255) $ map (TxtI . mkFastString . ("h$pp"++) . show) [(1::Int)..255]
-
-pushNN' :: Array Integer JExpr
-pushNN' = fmap (ValExpr . JVar) pushNN
-
-pushOptimized' :: [(Id,Int)] -> G JStat
-pushOptimized' xs = do
-  slots  <- getSlots
-  pushOptimized =<< (zipWithM f xs (slots++repeat SlotUnknown))
-  where
-    f (i1,n1) (SlotId i2 n2) = (,i1==i2&&n1==n2) <$> genIdsN i1 n1
-    f (i1,n1) _              = (,False)          <$> genIdsN i1 n1
-
--- | optimized push that reuses existing values on stack automatically chooses
--- an optimized partial push (h$ppN) function when possible.
-pushOptimized :: [(JExpr,Bool)] -- ^ contents of the slots, True if same value is already there
-              -> G JStat
-pushOptimized [] = return mempty
-pushOptimized xs = do
-  dropSlots l
-  modifyStackDepth (+ length xs)
-  go .  csInlinePush <$> getSettings
-  where
-    go True = inlinePush
-    go _
-     | all snd xs                  = adjSp' l
-     | all (not.snd) xs && l <= 32 =
-        ApplStat (pushN' ! l) (map fst xs)
-     | l <= 8 && not (snd $ last xs) =
-        ApplStat (pushNN' ! sig) [ e | (e,False) <- xs ]
-     | otherwise = inlinePush
-    l   = length xs
-    sig :: Integer
-    sig = L.foldl1' (Bits..|.) $ zipWith (\(_e,b) i -> if not b then Bits.bit i else 0) xs [0..]
-    inlinePush = adjSp' l <> mconcat (zipWith pushSlot [1..] xs)
-    pushSlot i (ex, False) = IdxExpr stack (offset i) |= ex
-    pushSlot _ _           = mempty
-    offset i | i == l    = sp
-             | otherwise = InfixExpr SubOp sp (toJExpr (l - i))
-
-pushLneFrame :: HasDebugCallStack => Int -> ExprCtx -> G JStat
-pushLneFrame size ctx =
-  let ctx' = ctxLneShrinkStack ctx size
-  in pushOptimized' (ctxLneFrameVars ctx')
-
-popUnknown :: [JExpr] -> G JStat
-popUnknown xs = popSkipUnknown 0 xs
-
-popSkipUnknown :: Int -> [JExpr] -> G JStat
-popSkipUnknown n xs = popSkip n (map (,SlotUnknown) xs)
-
-pop :: [(JExpr,StackSlot)] -> G JStat
-pop = popSkip 0
-
--- | pop the expressions, but ignore the top n elements of the stack
-popSkip :: Int -> [(JExpr,StackSlot)] -> G JStat
-popSkip 0 [] = pure mempty
-popSkip n [] = addUnknownSlots n >> adjSpN n
-popSkip n xs = do
-  addUnknownSlots n
-  addSlots (map snd xs)
-  a <- adjSpN (length xs + n)
-  return (loadSkip n (map fst xs) <> a)
-
--- | pop things, don't upstate stack knowledge
-popSkip' :: Int     -- ^ number of slots to skip
-         -> [JExpr] -- ^ assign stack slot values to these
-         -> JStat
-popSkip' 0 []  = mempty
-popSkip' n []  = adjSpN' n
-popSkip' n tgt = loadSkip n tgt <> adjSpN' (length tgt + n)
-
--- | like popSkip, but without modifying the stack pointer
-loadSkip :: Int -> [JExpr] -> JStat
-loadSkip = loadSkipFrom sp
-
-loadSkipFrom :: JExpr -> Int -> [JExpr] -> JStat
-loadSkipFrom fr n xs = mconcat items
-    where
-      items = reverse $ zipWith (\i ex -> ex |= IdxExpr stack (toJExpr (offset (i+n))))
-                                [(0::Int)..]
-                                (reverse xs)
-      offset 0 = toJExpr fr
-      offset n = InfixExpr SubOp (toJExpr fr) (toJExpr n)
-
-
--- declare and pop
-popSkipI :: Int -> [(Ident,StackSlot)] -> G JStat
-popSkipI 0 [] = pure mempty
-popSkipI n [] = adjSpN n
-popSkipI n xs = do
-  addUnknownSlots n
-  addSlots (map snd xs)
-  a <- adjSpN (length xs + n)
-  return (loadSkipI n (map fst xs) <> a)
-
--- like popSkip, but without modifying sp
-loadSkipI :: Int -> [Ident] -> JStat
-loadSkipI = loadSkipIFrom sp
-
-loadSkipIFrom :: JExpr -> Int -> [Ident] -> JStat
-loadSkipIFrom fr n xs = mconcat items
-    where
-      items = reverse $ zipWith f [(0::Int)..] (reverse xs)
-      offset 0 = fr
-      offset n = InfixExpr SubOp fr (toJExpr n)
-      f i ex = ex ||= IdxExpr stack (toJExpr (offset (i+n)))
-
-popn :: Int -> G JStat
-popn n = addUnknownSlots n >> adjSpN n
 
 
 assertRtsStat :: G JStat -> G JStat
@@ -599,40 +149,6 @@ getGlobalIdCache = State.gets (ggsGlobalIdCache . gsGroup)
 setGlobalIdCache :: GlobalIdCache -> G ()
 setGlobalIdCache v = State.modify (\s -> s { gsGroup = (gsGroup s) { ggsGlobalIdCache = v}})
 
-updateThunk' :: StgToJSConfig -> JStat
-updateThunk' settings =
-  if csInlineBlackhole settings
-    then bhStats settings True
-    else ApplStat (var "h$bh") []
-
--- | Generate statemeents to update the current node with a blackhole
-bhStats :: StgToJSConfig -> Bool -> JStat
-bhStats s pushUpd = mconcat
-  [ if pushUpd then push' s [r1, var "h$upd_frame"] else mempty
-  , toJExpr R1 .^ closureEntry_  |= var "h$blackhole"
-  , toJExpr R1 .^ closureField1_ |= var "h$currentThread"
-  , toJExpr R1 .^ closureField2_ |= null_ -- will be filled with waiters array
-  ]
-
-updateThunk :: G JStat
-updateThunk = do
-  settings <- getSettings
-  adjPushStack 2 -- update frame size
-  return $ (updateThunk' settings)
-
--- | declare all js vars for the id
-declIds :: Id -> G JStat
-declIds  i
-  | s == 0    = return mempty
-  | s == 1    = DeclStat <$> jsIdI i
-  | otherwise = mconcat <$> mapM (\n -> DeclStat <$> jsIdIN i n) [1..s]
-  where
-    s  = typeSize (idType i)
-
-freshUnique :: G Int
-freshUnique = do
-  State.modify (\s -> s { gsId = gsId s + 1})
-  State.gets gsId
 
 liftToGlobal :: JStat -> G [(Ident, Id)]
 liftToGlobal jst = do
@@ -648,10 +164,3 @@ nub' xs = go S.empty xs
     go _ []     = []
     go s (x:xs) | S.member x s = go s xs
                 | otherwise    = x : go (S.insert x s) xs
---       ids  = filter M.member gidc
-{-
-  algorithm:
-   - collect all Id refs that are in the cache, count usage
-   - order by increasing use
-   - prepend loading lives var to body: body can stay the same
--}

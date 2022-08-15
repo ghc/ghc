@@ -43,6 +43,8 @@ import GHC.StgToJS.Regs
 import GHC.StgToJS.CoreUtils
 import GHC.StgToJS.Utils
 import GHC.StgToJS.Rts.Types
+import GHC.StgToJS.Stack
+import GHC.StgToJS.Ids
 
 import GHC.Types.Literal
 import GHC.Types.Id
@@ -107,7 +109,7 @@ genApp ctx i args
 --  -- , Just (Lit (MachStr bs)) <- expandUnfolding_maybe (idUnfolding v)
 --  -- , Just t <- decodeModifiedUTF8 bs -- unpackFS fs -- Just t <- decodeModifiedUTF8 bs
 --  , matchVarName "ghcjs-prim" "GHCJS.Prim" "unsafeUnpackJSStringUtf8##" i =
---     (,ExprInline Nothing) . (|=) top . app "h$decodeUtf8z" <$> genIds v
+--     (,ExprInline Nothing) . (|=) top . app "h$decodeUtf8z" <$> varsForId v
 
     -- Case: unpackCStringAppend# "some string"# str
     --
@@ -131,7 +133,7 @@ genApp ctx i args
     | Just n <- ctxLneBindingStackSize ctx i
     = do
       as'      <- concatMapM genArg args
-      ei       <- jsEntryId i
+      ei       <- varForEntryId i
       let ra = mconcat . reverse $
                  zipWith (\r a -> toJExpr r |= a) [R1 ..] as'
       p <- pushLneFrame n ctx
@@ -171,7 +173,7 @@ genApp ctx i args
     , ctxIsEvaluated ctx i
     = do
       let c = head (concatMap typex_expr $ ctxTarget ctx)
-      is <- genIds i
+      is <- varsForId i
       case is of
         [i'] ->
           return ( c |= if_ (isObject i') (closureField1 i') i'
@@ -237,7 +239,7 @@ genApp ctx i args
     , isStrictId i
     = do
       as' <- concatMapM genArg args
-      is  <- assignAll jsRegsFromR1 <$> genIds i
+      is  <- assignAll jsRegsFromR1 <$> varsForId i
       jmp <- jumpToII i as' is
       return (jmp, ExprCont)
 
@@ -252,7 +254,7 @@ genApp ctx i args
       let (reg,over) = splitAt (idFunRepArity i) args
       reg' <- concatMapM genArg reg
       pc   <- pushCont over
-      is   <- assignAll jsRegsFromR1 <$> genIds i
+      is   <- assignAll jsRegsFromR1 <$> varsForId i
       jmp  <- jumpToII i reg' is
       return (pc <> jmp, ExprCont)
 
@@ -262,7 +264,7 @@ genApp ctx i args
     --  - otherwise use generic apply function h$ap_gen_fast
     | otherwise
     = do
-      is  <- assignAll jsRegsFromR1 <$> genIds i
+      is  <- assignAll jsRegsFromR1 <$> varsForId i
       jmp <- jumpToFast args is
       return (jmp, ExprCont)
 
@@ -271,14 +273,14 @@ genApp ctx i args
 jumpToII :: Id -> [JExpr] -> JStat -> G JStat
 jumpToII i args afterLoad
   | isLocalId i = do
-     ii <- jsId i
+     ii <- varForId i
      return $ mconcat
       [ ra
       , afterLoad
       , returnS (closureEntry ii)
       ]
   | otherwise   = do
-     ei <- jsEntryId i
+     ei <- varForEntryId i
      return $ mconcat
       [ ra
       , afterLoad
@@ -1048,7 +1050,7 @@ initClosure cfg entry values ccs =
 
 -- | Return an expression for every field of the given Id
 getIdFields :: Id -> G [TypedExpr]
-getIdFields i = assocIdExprs i <$> genIds i
+getIdFields i = assocIdExprs i <$> varsForId i
 
 -- | Store fields of Id into the given target expressions
 storeIdFields :: Id -> [TypedExpr] -> G JStat

@@ -33,6 +33,8 @@ import GHC.StgToJS.Regs
 import GHC.StgToJS.StgUtils
 import GHC.StgToJS.CoreUtils
 import GHC.StgToJS.Utils
+import GHC.StgToJS.Stack
+import GHC.StgToJS.Ids
 
 import GHC.Types.Basic
 import GHC.Types.CostCentre
@@ -143,16 +145,16 @@ genBind ctx bndr =
            let sel_tag | the_offset == 2 = if total_size == 2 then "2a"
                                                               else "2b"
                        | otherwise       = show the_offset
-           tgts <- genIdsI b
-           the_fvjs <- genIds the_fv
+           tgts <- identsForId b
+           the_fvjs <- varsForId the_fv
            case (tgts, the_fvjs) of
              ([tgt], [the_fvj]) -> return $ Just
                (tgt ||= ApplExpr (var ("h$c_sel_" <> mkFastString sel_tag)) [the_fvj])
              _ -> panic "genBind.assign: invalid size"
      assign b (StgRhsClosure _ext _ccs _upd [] expr)
        | snd (isInlineExpr (ctxEvaluatedIds ctx) expr) = do
-           d   <- declIds b
-           tgt <- genIds b
+           d   <- declVarsForId b
+           tgt <- varsForId b
            let ctx' = ctx { ctxTarget = assocIdExprs b tgt }
            (j, _) <- genExpr ctx' expr
            return (Just (d <> j))
@@ -175,7 +177,7 @@ genBindLne ctx bndr = do
   vis  <- map (\(x,y,_) -> (x,y)) <$>
             optimizeFree oldFrameSize (newLvs++map fst updBinds)
   -- initialize updatable bindings to null_
-  declUpds <- mconcat <$> mapM (fmap (||= null_) . jsIdI . fst) updBinds
+  declUpds <- mconcat <$> mapM (fmap (||= null_) . identForId . fst) updBinds
   -- update expression context to include the updated LNE frame
   let ctx' = ctxUpdateLneFrame vis bound ctx
   mapM_ (uncurry $ genEntryLne ctx') binds
@@ -220,7 +222,7 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body) =
          | otherwise = mempty
   lvs  <- popLneFrame True payloadSize ctx
   body <- genBody ctx i R1 args body
-  ei@(TxtI eii)   <- jsEntryIdI i
+  ei@(TxtI eii)   <- identForEntryId i
   sr   <- genStaticRefsRhs rhs
   let f = JFunc [] (bh <> lvs <> body)
   emitClosureInfo $
@@ -234,9 +236,9 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body) =
   emitToplevel (ei ||= toJExpr f)
 genEntryLne ctx i (StgRhsCon cc con _mu _ticks args) = resetSlots $ do
   let payloadSize = ctxLneFrameSize ctx
-  ei@(TxtI _eii) <- jsEntryIdI i
-  -- di <- enterDataCon con
-  ii <- makeIdent
+  ei@(TxtI _eii) <- identForEntryId i
+  -- di <- varForDataConWorker con
+  ii <- freshIdent
   p  <- popLneFrame True payloadSize ctx
   args' <- concatMapM genArg args
   ac    <- allocCon ii con cc args'
@@ -252,7 +254,7 @@ genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body) = res
   llv   <- verifyRuntimeReps live
   upd   <- genUpdFrame upd_flag i
   body  <- genBody entryCtx i R2 args body
-  ei@(TxtI eii) <- jsEntryIdI i
+  ei@(TxtI eii) <- identForEntryId i
   et    <- genEntryType args
   setcc <- ifProfiling $
              if et == CIThunk
@@ -358,7 +360,7 @@ verifyRuntimeReps xs = do
     else mconcat <$> mapM verifyRuntimeRep xs
   where
     verifyRuntimeRep i = do
-      i' <- genIds i
+      i' <- varsForId i
       pure $ go i' (idVt i)
     go js         (VoidV:vs) = go js vs
     go (j1:j2:js) (LongV:vs) = v "h$verify_rep_long" [j1,j2] <> go js vs
@@ -376,7 +378,7 @@ verifyRuntimeReps xs = do
 
 loadLiveFun :: [Id] -> G JStat
 loadLiveFun l = do
-   l' <- concat <$> mapM genIdsI l
+   l' <- concat <$> mapM identsForId l
    case l' of
      []  -> return mempty
      [v] -> return (v ||= r1 .^ closureField1_)
@@ -385,7 +387,7 @@ loadLiveFun l = do
                         , v2 ||= r1 .^ closureField2_
                         ]
      (v:vs)  -> do
-       d <- makeIdent
+       d <- freshIdent
        let l'' = mconcat . zipWith (loadLiveVar $ toJExpr d) [(1::Int)..] $ vs
        return $ mconcat
                [ v ||= r1 .^ closureField1_
@@ -400,8 +402,15 @@ popLneFrame :: Bool -> Int -> ExprCtx -> G JStat
 popLneFrame inEntry size ctx = do
   let ctx' = ctxLneShrinkStack ctx size
 
-  is <- mapM (\(i,n) -> (,SlotId i n) <$> genIdsIN i n)
-             (ctxLneFrameVars ctx')
+  let gen_id_slot (i,n) = do
+        -- FIXME (Sylvain 2022-08): do we really need to generate all the Idents here
+        -- to only select one? Is it because we need the side effect that consists in
+        -- filling the GlobalId cache?
+        ids <- identsForId i
+        let !id_n = ids !! (n-1)
+        pure (id_n, SlotId i n)
+
+  is <- mapM gen_id_slot (ctxLneFrameVars ctx')
 
   let skip = if inEntry then 1 else 0 -- pop the frame header
   popSkipI skip is
@@ -449,6 +458,9 @@ genStaticRefs lv
   where
     sv = liveStatic lv
 
+    getStaticRef :: Id -> G (Maybe FastString)
+    getStaticRef = fmap (fmap itxt . listToMaybe) . identsForId
+
 -- reorder the things we need to push to reuse existing stack values as much as possible
 -- True if already on the stack at that location
 optimizeFree :: HasDebugCallStack => Int -> [Id] -> G [(Id,Int,Bool)]
@@ -486,25 +498,25 @@ allocCls dynMiddle xs = do
        proper candidates for this optimization should have been floated
        already
       toCl (i, StgRhsCon cc con []) = do
-      ii <- jsIdI i
+      ii <- identForId i
       Left <$> (return (decl ii) <> allocCon ii con cc []) -}
     toCl (i, StgRhsCon cc con _mui _ticjs [a]) | isUnboxableCon con = do
-      ii <- jsIdI i
+      ii <- identForId i
       ac <- allocCon ii con cc =<< genArg a
       pure (Left (DeclStat ii <> ac))
 
     -- dynamics
     toCl (i, StgRhsCon cc con _mu _ticks ar) =
       -- fixme do we need to handle unboxed?
-      Right <$> ((,,,) <$> jsIdI i
-                       <*> enterDataCon con
+      Right <$> ((,,,) <$> identForId i
+                       <*> varForDataConWorker con
                        <*> concatMapM genArg ar
                        <*> pure cc)
     toCl (i, cl@(StgRhsClosure _ext cc _upd_flag _args _body)) =
       let live = stgLneLiveExpr cl
-      in  Right <$> ((,,,) <$> jsIdI i
-                       <*> jsEntryId i
-                       <*> concatMapM genIds live
+      in  Right <$> ((,,,) <$> identForId i
+                       <*> varForEntryId i
+                       <*> concatMapM varsForId live
                        <*> pure cc)
 
 -- fixme CgCase has a reps_compatible check here
@@ -517,8 +529,8 @@ genCase :: HasDebugCallStack
         -> LiveVars
         -> G (JStat, ExprResult)
 genCase ctx bnd e at alts l
-  | snd (isInlineExpr (ctxEvaluatedIds ctx) e) = withNewIdent $ \ccsVar -> do
-      bndi <- genIdsI bnd
+  | snd (isInlineExpr (ctxEvaluatedIds ctx) e) = freshIdent >>= \ccsVar -> do
+      bndi <- identsForId bnd
       let ctx' = ctxSetTop bnd
                   $ ctxSetTarget (assocIdExprs bnd (map toJExpr bndi))
                   $ ctx
@@ -558,7 +570,7 @@ genRet :: HasDebugCallStack
        -> [CgStgAlt]
        -> LiveVars
        -> G JStat
-genRet ctx e at as l = withNewIdent f
+genRet ctx e at as l = freshIdent >>= f
   where
     allRefs :: [Id]
     allRefs =  S.toList . S.unions $ fmap (exprRefs emptyUFM . alt_rhs) as
@@ -598,8 +610,8 @@ genRet ctx e at as l = withNewIdent f
       _              -> [PtrV]
 
     fun free = resetSlots $ do
-      decs          <- declIds e
-      load          <- flip assignAll (map toJExpr [R1 ..]) . map toJExpr <$> genIdsI e
+      decs          <- declVarsForId e
+      load          <- flip assignAll (map toJExpr [R1 ..]) . map toJExpr <$> identsForId e
       loadv         <- verifyRuntimeReps [e]
       ras           <- loadRetArgs free
       rasv          <- verifyRuntimeReps (map (\(x,_,_)->x) free)
@@ -627,15 +639,15 @@ genAlts ctx e at me alts = do
     PrimAlt _tc
       | [GenStgAlt _ bs expr] <- alts
       -> do
-        ie       <- genIds e
-        dids     <- mconcat <$> mapM declIds bs
-        bss      <- concatMapM genIds bs
+        ie       <- varsForId e
+        dids     <- mconcat <$> mapM declVarsForId bs
+        bss      <- concatMapM varsForId bs
         (ej, er) <- genExpr ctx expr
         return (dids <> assignAll bss ie <> ej, er)
 
     PrimAlt tc
       -> do
-        ie <- genIds e
+        ie <- varsForId e
         (r, bss) <- normalizeBranches ctx <$>
            mapM (isolateSlots . mkPrimIfBranch ctx [primRepVt tc]) alts
         setSlots []
@@ -644,7 +656,7 @@ genAlts ctx e at me alts = do
     MultiValAlt n
       | [GenStgAlt _ bs expr] <- alts
       -> do
-        eids     <- genIds e
+        eids     <- varsForId e
         l        <- loadUbxTup eids bs n
         (ej, er) <- genExpr ctx expr
         return (l <> ej, er)
@@ -659,7 +671,7 @@ genAlts ctx e at me alts = do
       , [GenStgAlt (DataAlt dc) bs expr] <- alts
       , not (isUnboxableCon dc)
       -> do
-        bsi <- mapM genIdsI bs
+        bsi <- mapM identsForId bs
         (ej, er) <- genExpr ctx expr
         return (declAssignAll (concat bsi) es <> ej, er)
 
@@ -674,7 +686,7 @@ genAlts ctx e at me alts = do
       , DataAlt dc <- alt_con alt
       , isBoolDataCon dc
       -> do
-        i <- jsId e
+        i <- varForId e
         nbs <- normalizeBranches ctx <$>
             mapM (isolateSlots . mkAlgBranch ctx e) alts
         case nbs of
@@ -689,7 +701,7 @@ genAlts ctx e at me alts = do
     -- FIXME: add all alts
 
     AlgAlt _tc -> do
-        ei <- jsId e
+        ei <- varForId e
         (r, brs) <- normalizeBranches ctx <$>
             mapM (isolateSlots . mkAlgBranch ctx e) alts
         setSlots []
@@ -707,7 +719,7 @@ verifyMatchRep x alt = do
     then pure mempty
     else case alt of
       AlgAlt tc -> do
-        ix <- genIds x
+        ix <- varsForId x
         pure $ ApplStat (var "h$verify_match_alg") (ValExpr(JStr(mkFastString (renderWithContext defaultSDocContext (ppr tc)))):ix)
       _ -> pure mempty
 
@@ -740,7 +752,7 @@ normalizeBranches ctx brs
 
 loadUbxTup :: [JExpr] -> [Id] -> Int -> G JStat
 loadUbxTup es bs _n = do
-  bs' <- concatMapM genIdsI bs
+  bs' <- concatMapM identsForId bs
   return $ declAssignAll bs' es
 
 mkSw :: [JExpr] -> [Branch (Maybe [JExpr])] -> JStat
@@ -796,8 +808,8 @@ mkAlgBranch top d alt
   , isUnboxableCon dc
   , [b] <- alt_bndrs alt
   = do
-    idd  <- jsId d
-    fldx <- genIdsI b
+    idd  <- varForId d
+    fldx <- identsForId b
     case fldx of
       [fld] -> do
         (ej, er) <- genExpr top (alt_rhs alt)
@@ -807,7 +819,7 @@ mkAlgBranch top d alt
   | otherwise
   = do
     cc       <- caseCond (alt_con alt)
-    idd      <- jsId d
+    idd      <- varForId d
     b        <- loadParams idd (alt_bndrs alt)
     (ej, er) <- genExpr top (alt_rhs alt)
     return (Branch cc (b <> ej) er)
@@ -838,7 +850,7 @@ caseCond = \case
 -- fixme use single tmp var for all branches
 loadParams :: JExpr -> [Id] -> G JStat
 loadParams from args = do
-  as <- concat <$> zipWithM (\a u -> map (,u) <$> genIdsI a) args use
+  as <- concat <$> zipWithM (\a u -> map (,u) <$> identsForId a) args use
   return $ case as of
     []                 -> mempty
     [(x,u)]            -> loadIfUsed (from .^ closureField1_) x  u

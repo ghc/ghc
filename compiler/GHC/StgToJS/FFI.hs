@@ -23,6 +23,7 @@ import GHC.StgToJS.Types
 import GHC.StgToJS.Literal
 import GHC.StgToJS.Regs
 import GHC.StgToJS.CoreUtils
+import GHC.StgToJS.Ids
 
 import GHC.Types.RepType
 import GHC.Types.ForeignCall
@@ -101,9 +102,9 @@ parseFFIPatternA :: Bool  -- ^ async
 -- async calls get an extra callback argument
 -- call it with the result
 parseFFIPatternA True True pat t es as  = do
-  cb <- makeIdent
-  x  <- makeIdent
-  d  <- makeIdent
+  cb <- freshIdent
+  x  <- freshIdent
+  d  <- freshIdent
   stat <- parseFFIPattern' (Just (toJExpr cb)) True pat t es as
   return $ mconcat
     [ x  ||= (toJExpr (jhFromList [("mv", null_)]))
@@ -220,11 +221,11 @@ genFFIArg _isJavaScriptCc (StgLitArg l) = (mempty,) <$> genLit l
 genFFIArg isJavaScriptCc a@(StgVarArg i)
     | not isJavaScriptCc &&
       (tycon == byteArrayPrimTyCon || tycon == mutableByteArrayPrimTyCon) =
-        (\x -> (mempty,[x, zero_])) <$> jsId i
+        (\x -> (mempty,[x, zero_])) <$> varForId i
     | isVoid r                  = return (mempty, [])
 --    | Just x <- marshalFFIArg a = x
-    | isMultiVar r              = (mempty,) <$> mapM (jsIdN i) [1..varSize r]
-    | otherwise                 = (\x -> (mempty,[x])) <$> jsId i
+    | isMultiVar r              = (mempty,) <$> mapM (varForIdN i) [1..varSize r]
+    | otherwise                 = (\x -> (mempty,[x])) <$> varForId i
    where
      tycon  = tyConAppTyCon (unwrapType arg_ty)
      arg_ty = stgArgType a

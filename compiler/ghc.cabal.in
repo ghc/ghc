@@ -645,6 +645,7 @@ Library
         GHC.StgToJS.ExprCtx
         GHC.StgToJS.FFI
         GHC.StgToJS.Heap
+        GHC.StgToJS.Ids
         GHC.StgToJS.Literal
         GHC.StgToJS.Monad
         GHC.StgToJS.Object
@@ -655,6 +656,7 @@ Library
         GHC.StgToJS.Rts.Types
         GHC.StgToJS.Rts.Rts
         GHC.StgToJS.Sinker
+        GHC.StgToJS.Stack
         GHC.StgToJS.StaticPtr
         GHC.StgToJS.StgUtils
         GHC.StgToJS.Types
