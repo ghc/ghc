@@ -97,7 +97,6 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain( assert )
 
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
