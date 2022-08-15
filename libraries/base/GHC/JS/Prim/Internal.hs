@@ -2,17 +2,17 @@
 
  -}
 
-module GHCJS.Prim.Internal ( blockedIndefinitelyOnMVar
-                           , blockedIndefinitelyOnSTM
-                           , wouldBlock
-                           , ignoreException
-                           , setCurrentThreadResultException
-                           , setCurrentThreadResultValue
-                           ) where
+module GHC.JS.Prim.Internal ( blockedIndefinitelyOnMVar
+                            , blockedIndefinitelyOnSTM
+                            , wouldBlock
+                            , ignoreException
+                            , setCurrentThreadResultException
+                            , setCurrentThreadResultValue
+                            ) where
 
 import           Control.Exception
 
-import           GHCJS.Prim
+import           GHC.JS.Prim
 
 wouldBlock :: SomeException
 wouldBlock = toException WouldBlockException
