@@ -22,7 +22,7 @@
   * `GHC.Conc.Sync.threadLabel` was added, allowing the user to query the label
     of a given `ThreadId`.
 
-## 4.17.0.0 *TBA*
+## 4.17.0.0 *August 2022*
 
   * Add explicitly bidirectional `pattern TypeRep` to `Type.Reflection`.
 
@@ -66,13 +66,54 @@
     A [migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/no-monadfail-st-inst.md)
     is available.
 
-  * Add functions `traceWith`, `traceShowWith`, `traceEventWith` to
-    `Debug.Trace`, per
-    [CLC #36](https://github.com/haskell/core-libraries-committee/issues/36).
-
   * Re-export `augment` and `build` function from `GHC.List`
 
   * Re-export the `IsList` typeclass from the new `GHC.IsList` module.
+
+  * There's a new special function ``withDict`` in ``GHC.Exts``: ::
+
+        withDict :: forall {rr :: RuntimeRep} cls meth (r :: TYPE rr). WithDict cls meth => meth -> (cls => r) -> r
+
+    where ``cls`` must be a class containing exactly one method, whose type
+    must be ``meth``.
+
+    This function converts ``meth`` to a type class dictionary.
+    It removes the need for ``unsafeCoerce`` in implementation of reflection
+    libraries. It should be used with care, because it can introduce
+    incoherent instances.
+
+    For example, the ``withTypeable`` function from the
+    ``Type.Reflection`` module can now be defined as: ::
+
+          withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
+                       => TypeRep a -> (Typeable a => r) -> r
+          withTypeable rep k = withDict @(Typeable a) rep k
+
+    Note that the explicit type application is required, as the call to
+    ``withDict`` would be ambiguous otherwise.
+
+    This replaces the old ``GHC.Exts.magicDict``, which required
+    an intermediate data type and was less reliable.
+
+  * `Data.Word.Word64` and `Data.Int.Int64` are now always represented by
+    `Word64#` and `Int64#`, respectively. Previously on 32-bit platforms these
+    were rather represented by `Word#` and `Int#`. See GHC #11953.
+
+## 4.16.3.0 *May 2022*
+
+  * Shipped with GHC 9.2.4
+
+  * winio: make consoleReadNonBlocking not wait for any events at all.
+
+  * winio: Add support to console handles to handleToHANDLE
+
+## 4.16.2.0 *May 2022*
+
+  * Shipped with GHC 9.2.2
+
+  * Export GHC.Event.Internal on Windows (#21245)
+
+  # Documentation Fixes
 
 ## 4.16.1.0 *Feb 2022*
 
@@ -498,7 +539,7 @@
     in constant space when applied to lists. (#10830)
 
   * `mkFunTy`, `mkAppTy`, and `mkTyConApp` from `Data.Typeable` no longer exist.
-    This functionality is superseded by the interfaces provided by
+    This functionality is superceded by the interfaces provided by
     `Type.Reflection`.
 
   * `mkTyCon3` is no longer exported by `Data.Typeable`. This function is
