@@ -1,15 +1,16 @@
 {-# LANGUAGE LambdaCase #-}
 
-{-# OPTIONS_GHC -fno-warn-orphans #-} -- For ToJExpr StaticArg, see FIXME
+-- | Code generation of application arguments
 module GHC.StgToJS.Arg
   ( genArg
-  , genStaticArg
   , genIdArg
   , genIdArgI
   , genIdStackArgI
   , allocConStatic
   , allocUnboxedConStatic
   , allocateStaticList
+  , jsStaticArg
+  , jsStaticArgs
   )
 where
 
@@ -250,16 +251,16 @@ allocateStaticList xs a@(StgVarArg i)
           pprPanic "allocateStaticList: invalid argument (tail)" (ppr (xs, r))
 allocateStaticList _ _ = panic "allocateStaticList: unexpected literal in list"
 
--- FIXME: Jeff (2022,03): Fix this orphan instance. It is consumed by
--- Linker.Linker but requires allocDynamicE, hence its presence in this file. If
--- we put it in StgToJS.Types (where StaticArg is defined) then we'll end up in
--- an obvious module cycle. We could put it in DataCon but then we lose cohesion
--- in that module (i.e., why should the DataCon module be exporting this
--- instance?). It seems to be that this module should be the one that defines
--- StaticArg, but I leave that for a refactor later.
-instance ToJExpr StaticArg where
-  toJExpr (StaticLitArg l) = toJExpr l
-  toJExpr (StaticObjArg t) = ValExpr (JVar (TxtI t))
-  toJExpr (StaticConArg c args) =
+-- | Generate JS code corresponding to a static arg
+jsStaticArg :: StaticArg -> JExpr
+jsStaticArg = \case
+  StaticLitArg l      -> toJExpr l
+  StaticObjArg t      -> ValExpr (JVar (TxtI t))
+  StaticConArg c args ->
     -- FIXME: cost-centre stack
-    allocDynamicE False (ValExpr . JVar . TxtI $ c) (map toJExpr args) Nothing
+    allocDynamicE False (ValExpr . JVar . TxtI $ c) (map jsStaticArg args) Nothing
+
+-- | Generate JS code corresponding to a list of static args
+jsStaticArgs :: [StaticArg] -> JExpr
+jsStaticArgs = ValExpr . JList . map jsStaticArg
+
