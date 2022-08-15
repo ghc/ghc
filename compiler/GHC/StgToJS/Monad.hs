@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE BangPatterns #-}
 
 module GHC.StgToJS.Monad
   ( runG
@@ -24,7 +25,6 @@ module GHC.StgToJS.Monad
   , jsIdN
   , jsIdI
   , jsIdIN
-  , jsIdIdent'
   , jsIdV
   , jsEnId
   , jsEnIdI
@@ -102,7 +102,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.ForeignCall
 
 import GHC.Utils.Encoding (zEncodeString)
-import GHC.Utils.Outputable hiding ((<>))
 import GHC.Utils.Misc
 import qualified Control.Monad.Trans.State.Strict as State
 import GHC.Data.FastString
@@ -223,24 +222,46 @@ jsIdIN i n = jsIdIdent i (Just n) IdPlain
 jsIdN :: Id -> Int -> G JExpr
 jsIdN i n = ValExpr . JVar <$> jsIdIdent i (Just n) IdPlain
 
--- uncached
-jsIdIdent' :: Id -> Maybe Int -> IdType -> G Ident
-jsIdIdent' i mn suffix0 = do
-  (prefix, u) <- mkPrefixU
-  let i' = (\x -> mkFastString $ "h$"++prefix++x++mns++suffix++u) . zEncodeString $ name
-  i' `seq` return (TxtI i')
-    where
-      suffix = idTypeSuffix suffix0
-      mns = maybe "" (('_':).show) mn
-      name = ('.':) . nameStableString . localiseName . getName $ i
+-- | Generate unique Ident for the given ID (uncached!)
+--
+-- The ident has the following forms:
+--
+--    global Id: h$unit:module.name[_num][_type_suffix]
+--    local Id: h$$unit:module.name[_num][_type_suffix]_uniq
+--
+-- Note that the string is z-encoded except for "_" delimiters.
+--
+-- Optional "_type_suffix" can be:
+--  - "_e" for IdEntry
+--  - "_con_e" for IdConEntry
+--
+-- Optional "_num" is passed as an argument to this function.
+--
+makeIdentForId :: Id -> Maybe Int -> IdType -> Module -> Ident
+makeIdentForId i num id_type current_module = TxtI ident
+  where
+    exported = isExportedId i
+    name     = getName i
+    !ident   = mkFastString $ mconcat
+      [ "h$"
+      , if exported then "" else "$"
+      , zEncodeString $ unitModuleString $ case exported of
+          True | Just m <- nameModule_maybe name -> m
+          _                                      -> current_module
+      , zEncodeString "."
+      , zString (zEncodeFS (occNameFS (nameOccName name)))
+      , case num of
+          Nothing -> ""
+          Just v  -> "_" ++ show v
+      , case id_type of
+          IdPlain    -> ""
+          IdEntry    -> "_e"
+          IdConEntry -> "_con_e"
+      , if exported
+          then ""
+          else "_" ++ encodeUnique (getKey (getUnique i))
+      ]
 
-      mkPrefixU :: G (String, String)
-      mkPrefixU
-        | isExportedId i, Just x <- (nameModule_maybe . getName) i = do
-           let xstr = unitModuleString x
-           return (zEncodeString xstr, "")
-        | otherwise = (,('_':) . encodeUnique . getKey . getUnique $ i) . ('$':)
-                    . zEncodeString . unitModuleString <$> State.gets gsModule
 
 -- entry id
 jsEnId :: Id -> G JExpr
@@ -322,52 +343,13 @@ jsIdIdent i mi suffix = do
       | otherwise = do
           GlobalIdCache gidc <- getGlobalIdCache
           case M.lookup ji gidc of
-            Nothing -> do
-              let mod_group g = g { ggsGlobalIdCache = GlobalIdCache (M.insert ji (key, i) gidc) }
-              State.modify (\s -> s { gsGroup = mod_group (gsGroup s) })
+            Nothing -> setGlobalIdCache $ GlobalIdCache (M.insert ji (key, i) gidc)
             Just _  -> pure ()
           pure ji
 
 getStaticRef :: Id -> G (Maybe FastString)
 getStaticRef = fmap (fmap itxt . listToMaybe) . genIdsI
 
--- uncached
-makeIdIdent :: Id -> Maybe Int -> IdType -> Module -> Ident
-makeIdIdent i mn suffix0 mod = TxtI txt
-  where
-    !txt = mkFastString full_name
-
-    full_name = mconcat
-      ["h$"
-      , prefix
-      , zEncodeString ('.':name)
-      , mns
-      , suffix
-      , u
-      ]
-
-    -- prefix and suffix (unique)
-    (prefix,u)
-      | isExportedId i
-      , Just x <- (nameModule_maybe . getName) i
-      = ( zEncodeString (unitModuleString x)
-        , ""
-        )
-      | otherwise
-      = ( '$':zEncodeString (unitModuleString mod)
-        , '_': encodeUnique (getKey (getUnique i))
-        )
-
-    suffix = idTypeSuffix suffix0
-    mns = maybe "" (('_':).show) mn
-    name = renderWithContext defaultSDocContext . pprNameUnqualified . getName $ i
-
-
-
-idTypeSuffix :: IdType -> String
-idTypeSuffix IdPlain = ""
-idTypeSuffix IdEntry = "_e"
-idTypeSuffix IdConEntry = "_con_e"
 
 -- | start with a new binding group
 resetGroup :: G ()
@@ -613,6 +595,9 @@ getSettings = State.gets gsSettings
 
 getGlobalIdCache :: G GlobalIdCache
 getGlobalIdCache = State.gets (ggsGlobalIdCache . gsGroup)
+
+setGlobalIdCache :: GlobalIdCache -> G ()
+setGlobalIdCache v = State.modify (\s -> s { gsGroup = (gsGroup s) { ggsGlobalIdCache = v}})
 
 updateThunk' :: StgToJSConfig -> JStat
 updateThunk' settings =
