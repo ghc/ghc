@@ -350,7 +350,7 @@ getClosureDataFromHeapRepPrim getConDesc decodeCCS itbl heapRep pts = do
                            [p] -> Just p
                            _   -> error $ "Expected 4 or 5 words in WEAK, found " ++ show (length pts)
                 }
-        TSO | [ u_lnk, u_gbl_lnk, tso_stack, u_trec, u_blk_ex, u_bq] <- pts
+        TSO | ( u_lnk : u_gbl_lnk : tso_stack : u_trec : u_blk_ex : u_bq : other)  <- pts
                 -> withArray rawHeapWords (\ptr -> do
                     fields <- FFIClosures.peekTSOFields decodeCCS ptr
                     pure $ TSOClosure
@@ -361,6 +361,10 @@ getClosureDataFromHeapRepPrim getConDesc decodeCCS itbl heapRep pts = do
                         , trec = u_trec
                         , blocked_exceptions = u_blk_ex
                         , bq = u_bq
+                        , thread_label = case other of
+                                          [tl] -> Just tl
+                                          [] -> Nothing
+                                          _ -> error $ "thead_label:Expected 0 or 1 extra arguments"
                         , what_next = FFIClosures.tso_what_next fields
                         , why_blocked = FFIClosures.tso_why_blocked fields
                         , flags = FFIClosures.tso_flags fields
@@ -372,7 +376,7 @@ getClosureDataFromHeapRepPrim getConDesc decodeCCS itbl heapRep pts = do
                         , prof = FFIClosures.tso_prof fields
                         })
             | otherwise
-                -> fail $ "Expected 6 ptr arguments to TSO, found "
+                -> fail $ "Expected at least 6 ptr arguments to TSO, found "
                         ++ show (length pts)
         STACK
             | [] <- pts
