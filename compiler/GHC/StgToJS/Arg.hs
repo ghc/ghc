@@ -25,6 +25,7 @@ import GHC.StgToJS.Monad
 import GHC.StgToJS.Literal
 import GHC.StgToJS.CoreUtils
 import GHC.StgToJS.Profiling
+import GHC.StgToJS.Ids
 
 import GHC.Builtin.Types
 import GHC.Stg.Syntax
@@ -111,18 +112,18 @@ genStaticArg a = case a of
          | i == falseDataConId =
              return [StaticLitArg (BoolLit False)]
          | isMultiVar r        =
-             map (\(TxtI t) -> StaticObjArg t) <$> mapM (jsIdIN i) [1..varSize r] -- this seems wrong, not an obj?
-         | otherwise           = (\(TxtI it) -> [StaticObjArg it]) <$> jsIdI i
+             map (\(TxtI t) -> StaticObjArg t) <$> mapM (identForIdN i) [1..varSize r] -- this seems wrong, not an obj?
+         | otherwise           = (\(TxtI it) -> [StaticObjArg it]) <$> identForId i
 
        unfloated :: CgStgExpr -> G [StaticArg]
        unfloated (StgLit l) = map StaticLitArg <$> genStaticLit l
        unfloated (StgConApp dc _n args _)
          | isBoolDataCon dc || isUnboxableCon dc =
              (:[]) . allocUnboxedConStatic dc . concat <$> mapM genStaticArg args -- fixme what is allocunboxedcon?
-         | null args = (\(TxtI t) -> [StaticObjArg t]) <$> jsIdI (dataConWorkId dc)
+         | null args = (\(TxtI t) -> [StaticObjArg t]) <$> identForId (dataConWorkId dc)
          | otherwise = do
              as       <- concat <$> mapM genStaticArg args
-             (TxtI e) <- enterDataConI dc
+             (TxtI e) <- identForDataConWorker dc
              return [StaticConArg e as]
        unfloated x = pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
 
@@ -138,8 +139,8 @@ genArg a = case a of
        | isVoid r            -> return []
        | i == trueDataConId  -> return [true_]
        | i == falseDataConId -> return [false_]
-       | isMultiVar r        -> mapM (jsIdN i) [1..varSize r]
-       | otherwise           -> (:[]) <$> jsId i
+       | isMultiVar r        -> mapM (varForIdN i) [1..varSize r]
+       | otherwise           -> (:[]) <$> varForId i
 
    where
      -- if our argument is a joinid, it can be an unboxed tuple
@@ -152,10 +153,10 @@ genArg a = case a of
       StgConApp dc _n args _
        | isBoolDataCon dc || isUnboxableCon dc
        -> (:[]) . allocUnboxedCon dc . concat <$> mapM genArg args
-       | null args -> (:[]) <$> jsId (dataConWorkId dc)
+       | null args -> (:[]) <$> varForId (dataConWorkId dc)
        | otherwise -> do
            as <- concat <$> mapM genArg args
-           e  <- enterDataCon dc
+           e  <- varForDataConWorker dc
            inl_alloc <- csInlineAlloc <$> getSettings
            return [allocDynamicE inl_alloc e as Nothing] -- FIXME: ccs
       x -> pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
@@ -166,8 +167,8 @@ genIdArg i = genArg (StgVarArg i)
 genIdArgI :: HasDebugCallStack => Id -> G [Ident]
 genIdArgI i
   | isVoid r     = return []
-  | isMultiVar r = mapM (jsIdIN i) [1..varSize r]
-  | otherwise    = (:[]) <$> jsIdI i
+  | isMultiVar r = mapM (identForIdN i) [1..varSize r]
+  | otherwise    = (:[]) <$> identForId i
   where
     r = uTypeVt . idType $ i
 
@@ -194,7 +195,7 @@ allocConStatic (TxtI to) cc con args = do
       | isBoolDataCon con && dataConTag con == 2 =
            emitStatic to (StaticUnboxed $ StaticUnboxedBool True) cc'
       | otherwise = do
-           (TxtI e) <- enterDataConI con
+           (TxtI e) <- identForDataConWorker con
            emitStatic to (StaticData e []) cc'
     allocConStatic' cc' [x]
       | isUnboxableCon con =
@@ -213,7 +214,7 @@ allocConStatic (TxtI to) cc con args = do
                 (a0:a1:_) -> flip (emitStatic to) cc' =<< allocateStaticList [a0] a1
                 _         -> panic "allocConStatic: invalid args for consDataCon"
               else do
-                (TxtI e) <- enterDataConI con
+                (TxtI e) <- identForDataConWorker con
                 emitStatic to (StaticData e xs) cc'
 
 allocUnboxedConStatic :: DataCon -> [StaticArg] -> StaticArg

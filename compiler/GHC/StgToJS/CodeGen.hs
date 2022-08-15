@@ -30,6 +30,8 @@ import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
 import GHC.StgToJS.StaticPtr
 import GHC.StgToJS.UnitUtils
+import GHC.StgToJS.Stack
+import GHC.StgToJS.Ids
 
 import GHC.Stg.Syntax
 import GHC.Core.DataCon
@@ -86,7 +88,7 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
 
         -- (exported symbol names, javascript statements) for each linkable unit
         p <- forM lus \u -> do
-           ts <- mapM (fmap (\(TxtI i) -> i) . jsIdI) (luIdExports u)
+           ts <- mapM (fmap (\(TxtI i) -> i) . identForId) (luIdExports u)
            return (ts ++ luOtherExports u, luStat u)
 
         deps <- genDependencyData this_mod lus
@@ -191,7 +193,7 @@ genUnits m ss spt_entries foreign_stubs
                     -> Int
                     -> G (Object.SymbolTable, Maybe LinkableUnit)
       generateBlock st (StgTopStringLit bnd str) n = do
-        bids <- genIdsI bnd
+        bids <- identsForId bnd
         case bids of
           [(TxtI b1t),(TxtI b2t)] -> do
             -- [e1,e2] <- genLit (MachStr str)
@@ -242,7 +244,7 @@ serializeLinkableUnit _m st i ci si stat rawStat fe fi = do
   !(!st', !o) <- lift $ Object.serializeStat st ci si stat rawStat fe fi
   return (st', i', o) -- deepseq results?
     where
-      idStr i = itxt <$> jsIdI i
+      idStr i = itxt <$> identForId i
 
 -- | variable prefix for the nth block in module
 modulePrefix :: Module -> Int -> FastString
@@ -274,7 +276,7 @@ genToplevelConEntry i rhs = case rhs of
 
 genSetConInfo :: HasDebugCallStack => Id -> DataCon -> LiveVars -> G JStat
 genSetConInfo i d l {- srt -} = do
-  ei@(TxtI eii) <- jsDcEntryIdI i
+  ei@(TxtI eii) <- identForDataConEntryId i
   sr <- genStaticRefs l
   emitClosureInfo $ ClosureInfo eii
                                 (CIRegs 0 [PtrV])
@@ -296,12 +298,19 @@ genToplevelRhs :: Id -> CgStgRhs -> G JStat
 -- general cases:
 genToplevelRhs i rhs = case rhs of
   StgRhsCon cc con _mu _tys args -> do
-    ii <- jsIdI i
+    ii <- identForId i
     allocConStatic ii cc con args
     return mempty
   StgRhsClosure _ext cc _upd_flag {- srt -} args body -> do
-    eid@(TxtI eidt) <- jsEnIdI i
-    (TxtI idt)   <- jsIdI i
+    {-
+      algorithm:
+       - collect all Id refs that are in the global id cache
+       - count usage in body for each ref
+       - order by increasing use
+       - prepend loading lives var to body: body can stay the same
+    -}
+    eid@(TxtI eidt) <- identForEntryId i
+    (TxtI idt)   <- identForId i
     body <- genBody (initExprCtx i) i R2 args body
     (lidents, lids) <- unzip <$> liftToGlobal (jsSaturate (Just "ghcjs_tmp_sat_") body)
     let lidents' = map (\(TxtI t) -> t) lidents

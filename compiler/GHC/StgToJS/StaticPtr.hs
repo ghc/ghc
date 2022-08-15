@@ -15,15 +15,14 @@ import GHC.JS.Make
 
 import GHC.StgToJS.Types
 import GHC.StgToJS.Literal
-import GHC.StgToJS.Monad
+import GHC.StgToJS.Ids
 
 initStaticPtrs :: [SptEntry] -> G JStat
 initStaticPtrs ptrs = mconcat <$> mapM initStatic ptrs
   where
     initStatic (SptEntry sp_id (Fingerprint w1 w2)) = do
-      i <- jsId sp_id
+      i <- varForId sp_id
       fpa <- concat <$> mapM (genLit . mkLitWord64 . fromIntegral) [w1,w2]
       let sptInsert = ApplExpr (var "h$hs_spt_insert") (fpa ++ [i])
-      -- fixme can precedence be so that parens aren't needed?
       return $ (var "h$initStatic" .^ "push") `ApplStat` [jLam sptInsert]
 

@@ -22,6 +22,7 @@ import GHC.StgToJS.Monad
 import GHC.StgToJS.CoreUtils
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Utils
+import GHC.StgToJS.Ids
 
 import GHC.Core.DataCon
 
@@ -53,10 +54,10 @@ allocCon to con cc xs
   | isBoolDataCon con || isUnboxableCon con =
       return (toJExpr to |= allocUnboxedCon con xs)
 {-  | null xs = do
-      i <- jsId (dataConWorkId con)
+      i <- varForId (dataConWorkId con)
       return (assignj to i) -}
   | otherwise = do
-      e <- enterDataCon con
+      e <- varForDataConWorker con
       cs <- getSettings
       prof <- profiling
       ccsJ <- if prof then ccsVarJ cc else return Nothing
