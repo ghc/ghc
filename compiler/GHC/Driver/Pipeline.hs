@@ -171,7 +171,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
         -> Just (DriverPsHeaderMessage (PsHeaderMessage msg))
       _ -> Nothing
 
-    pipe_env = mkPipeEnv StopPreprocess input_fn (Temporary TFL_GhcSession)
+    pipe_env = mkPipeEnv StopPreprocess input_fn mb_phase (Temporary TFL_GhcSession)
     mkInputFn  =
       case mb_input_buf of
         Just input_buf -> do
@@ -238,7 +238,7 @@ compileOne' mHscMessage
                    [ml_obj_file $ ms_location summary]
 
    plugin_hsc_env <- initializePlugins hsc_env
-   let pipe_env = mkPipeEnv NoStop input_fn pipelineOutput
+   let pipe_env = mkPipeEnv NoStop input_fn Nothing pipelineOutput
    status <- hscRecompStatus mHscMessage plugin_hsc_env upd_summary
                 mb_old_iface mb_old_linkable (mod_index, nmods)
    let pipeline = hscPipeline pipe_env (setDumpPrefix pipe_env plugin_hsc_env, upd_summary, status)
@@ -513,7 +513,7 @@ oneShot hsc_env stop_phase srcs = do
     NoStop -> doLink hsc_env o_files
 
 compileFile :: HscEnv -> StopPhase -> (FilePath, Maybe Phase) -> IO (Maybe FilePath)
-compileFile hsc_env stop_phase (src, _mb_phase) = do
+compileFile hsc_env stop_phase (src, mb_phase) = do
    exists <- doesFileExist src
    when (not exists) $
         throwGhcExceptionIO (CmdLineError ("does not exist: " ++ src))
@@ -534,8 +534,8 @@ compileFile hsc_env stop_phase (src, _mb_phase) = do
          | isJust mb_o_file = SpecificFile
                 -- -o foo applies to the file we are compiling now
          | otherwise = Persistent
-        pipe_env = mkPipeEnv stop_phase src output
-        pipeline = pipelineStart pipe_env (setDumpPrefix pipe_env hsc_env) src
+        pipe_env = mkPipeEnv stop_phase src mb_phase output
+        pipeline = pipelineStart pipe_env (setDumpPrefix pipe_env hsc_env) src mb_phase
    runPipeline (hsc_hooks hsc_env) pipeline
 
 
@@ -584,7 +584,7 @@ compileForeign hsc_env lang stub_c = do
 #if __GLASGOW_HASKELL__ < 811
               RawObject  -> panic "compileForeign: should be unreachable"
 #endif
-            pipe_env = mkPipeEnv NoStop stub_c (Temporary TFL_GhcSession)
+            pipe_env = mkPipeEnv NoStop stub_c Nothing (Temporary TFL_GhcSession)
         res <- runPipeline (hsc_hooks hsc_env) (pipeline pipe_env hsc_env Nothing stub_c)
         case res of
           -- This should never happen as viaCPipeline should only return `Nothing` when the stop phase is `StopC`.
@@ -608,7 +608,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   let home_unit = hsc_home_unit hsc_env
       src = text "int" <+> ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
   writeFile empty_stub (showSDoc dflags (pprCode CStyle src))
-  let pipe_env = (mkPipeEnv NoStop empty_stub Persistent) { src_basename = basename}
+  let pipe_env = (mkPipeEnv NoStop empty_stub Nothing Persistent) { src_basename = basename}
       pipeline = viaCPipeline HCc pipe_env hsc_env (Just location) empty_stub
   _ <- runPipeline (hsc_hooks hsc_env) pipeline
   return ()
@@ -618,15 +618,17 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
 
 mkPipeEnv :: StopPhase -- End phase
           -> FilePath -- input fn
+          -> Maybe Phase
           -> PipelineOutput -- Output
           -> PipeEnv
-mkPipeEnv stop_phase  input_fn output =
+mkPipeEnv stop_phase  input_fn start_phase output =
   let (basename, suffix) = splitExtension input_fn
       suffix' = drop 1 suffix -- strip off the .
       env = PipeEnv{ stop_phase,
                      src_filename = input_fn,
                      src_basename = basename,
                      src_suffix = suffix',
+                     start_phase = fromMaybe (startPhase suffix') start_phase,
                      output_spec = output }
   in env
 
@@ -696,8 +698,7 @@ preprocessPipeline pipe_env hsc_env input_fn = do
   where platform = targetPlatform (hsc_dflags hsc_env)
         runAfter :: P p => Phase
                   -> a -> p a -> p a
-        runAfter = phaseIfAfter platform start_phase
-        start_phase = startPhase (src_suffix pipe_env)
+        runAfter = phaseIfAfter platform (start_phase pipe_env)
         runAfterFlag :: P p
                   => HscEnv
                   -> Phase
@@ -823,9 +824,9 @@ hscPostBackendPipeline pipe_env hsc_env _ bcknd ml input_fn =
         Interpreter -> return Nothing
 
 -- Pipeline from a given suffix
-pipelineStart :: P m => PipeEnv -> HscEnv -> FilePath -> m (Maybe FilePath)
-pipelineStart pipe_env hsc_env input_fn =
-  fromSuffix (src_suffix pipe_env)
+pipelineStart :: P m => PipeEnv -> HscEnv -> FilePath -> Maybe Phase -> m (Maybe FilePath)
+pipelineStart pipe_env hsc_env input_fn mb_phase =
+  fromPhase (fromMaybe (startPhase $ src_suffix pipe_env)  mb_phase)
   where
    stop_after = stop_phase pipe_env
    frontend :: P m => HscSource -> m (Maybe FilePath)
@@ -857,33 +858,24 @@ pipelineStart pipe_env hsc_env input_fn =
    objFromLinkable _ = Nothing
 
 
-   fromSuffix :: P m => String -> m (Maybe FilePath)
-   fromSuffix "lhs"      = frontend HsSrcFile
-   fromSuffix "lhs-boot" = frontend HsBootFile
-   fromSuffix "lhsig"    = frontend HsigFile
-   fromSuffix "hs"       = frontend HsSrcFile
-   fromSuffix "hs-boot"  = frontend HsBootFile
-   fromSuffix "hsig"     = frontend HsigFile
-   fromSuffix "hscpp"    = frontend HsSrcFile
-   fromSuffix "hspp"     = frontend HsSrcFile
-   fromSuffix "hc"       = c HCc
-   fromSuffix "c"        = c Cc
-   fromSuffix "cpp"      = c Ccxx
-   fromSuffix "C"        = c Cc
-   fromSuffix "m"        = c Cobjc
-   fromSuffix "M"        = c Cobjcxx
-   fromSuffix "mm"       = c Cobjcxx
-   fromSuffix "cc"       = c Ccxx
-   fromSuffix "cxx"      = c Ccxx
-   fromSuffix "s"        = as False
-   fromSuffix "S"        = as True
-   fromSuffix "ll"       = llvmPipeline pipe_env hsc_env Nothing input_fn
-   fromSuffix "bc"       = llvmLlcPipeline pipe_env hsc_env Nothing input_fn
-   fromSuffix "lm_s"     = llvmManglePipeline pipe_env hsc_env Nothing input_fn
-   fromSuffix "o"        = return (Just input_fn)
-   fromSuffix "cmm"      = Just <$> cmmCppPipeline pipe_env hsc_env input_fn
-   fromSuffix "cmmcpp"   = Just <$> cmmPipeline pipe_env hsc_env input_fn
-   fromSuffix _          = return (Just input_fn)
+   fromPhase :: P m => Phase -> m (Maybe FilePath)
+   fromPhase (Unlit p)  = frontend p
+   fromPhase (Cpp p)    = frontend p
+   fromPhase (HsPp p)   = frontend p
+   fromPhase (Hsc p)    = frontend p
+   fromPhase HCc        = c HCc
+   fromPhase Cc         = c Cc
+   fromPhase Ccxx       = c Ccxx
+   fromPhase Cobjc      = c Cobjc
+   fromPhase Cobjcxx    = c Cobjcxx
+   fromPhase (As p)     = as p
+   fromPhase LlvmOpt    = llvmPipeline pipe_env hsc_env Nothing input_fn
+   fromPhase LlvmLlc    = llvmLlcPipeline pipe_env hsc_env Nothing input_fn
+   fromPhase LlvmMangle = llvmManglePipeline pipe_env hsc_env Nothing input_fn
+   fromPhase StopLn     = return (Just input_fn)
+   fromPhase CmmCpp     = Just <$> cmmCppPipeline pipe_env hsc_env input_fn
+   fromPhase Cmm        = Just <$> cmmPipeline pipe_env hsc_env input_fn
+   fromPhase MergeForeign = panic "fromPhase: MergeForeign"
 
 {-
 Note [The Pipeline Monad]

@@ -750,3 +750,11 @@ T21869:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T21869.hs -S
 	[ -f T21869.s ] || (echo "assembly file does not exist" && exit 2)
 	[ ! -f T21869.o ] || (echo "object file exists" && exit 2)
+
+.PHONY: T22044
+T22044:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -E -cpp -x hs T22044.bazoo -o T22044.hs -DBAZOO=1
+	# Test the file exists and is preprocessed
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T22044.hs
+
+
