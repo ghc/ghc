@@ -614,8 +614,8 @@ Options affecting code generation
 
     .. note::
 
-        Note that this GHC release expects an LLVM version in the |llvm-version|
-        release series.
+        Note that this GHC release expects an LLVM version between |llvm-version-min|
+        and |llvm-version-max|.
 
 .. ghc-flag:: -fno-code
     :shortdesc: Omit code generation
