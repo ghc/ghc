@@ -2,6 +2,7 @@
 
 enum InitFiniKind {
     INITFINI_INIT,       // .init section
+    INITFINI_FINI,       // .fini section
     INITFINI_CTORS,      // .ctors section
     INITFINI_DTORS,      // .dtors section
     INITFINI_INIT_ARRAY, // .init_array section

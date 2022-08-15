@@ -120,6 +120,11 @@ static bool runInitFini(struct InitFiniList **head)
             (*init)(argc, argv, envv);
             break;
         }
+        case INITFINI_FINI: {
+            fini_t *fini = (fini_t*)section->start;
+            (*fini)();
+            break;
+        }
         case INITFINI_CTORS: {
             uint8_t *init_startC = section->start;
             init_t *init_start   = (init_t*)init_startC;
