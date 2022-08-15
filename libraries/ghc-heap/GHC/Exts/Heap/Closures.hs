@@ -280,6 +280,7 @@ data GenClosure b
       , trec                :: !b
       , blocked_exceptions  :: !b
       , bq                  :: !b
+      , thread_label        :: !(Maybe b)
       -- values
       , what_next           :: !WhatNext
       , why_blocked         :: !WhyBlocked
