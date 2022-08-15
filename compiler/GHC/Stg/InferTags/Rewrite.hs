@@ -25,7 +25,8 @@ import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.FM
 import GHC.Types.RepType
-import GHC.Unit.Types (Module, isInteractiveModule)
+import GHC.Types.Var.Set
+import GHC.Unit.Types
 
 import GHC.Core.DataCon
 import GHC.Core (AltCon(..) )
@@ -216,7 +217,8 @@ withLcl fv act = do
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When compiling bytecode we call myCoreToStg to get STG code first.
 myCoreToStg in turn calls out to stg2stg which runs the STG to STG
-passes followed by free variables analysis and tag inference at the end.
+passes followed by free variables analysis and the tag inference pass including
+it's rewriting phase at the end.
 Running tag inference is important as it upholds Note [Strict Field Invariant].
 While code executed by GHCi doesn't take advantage of the SFI it can call into
 compiled code which does. So it must still make sure that the SFI is upheld.
