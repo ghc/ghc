@@ -100,7 +100,7 @@ module GHC.JS.Make
   , mask8, mask16
   , signExtend8, signExtend16
   , typeof
-  , returnStack, assignAllEqual, assignAll
+  , returnStack, assignAllEqual, assignAll, assignAllReverseOrder
   , declAssignAll
   , nullStat, (.^)
   -- ** Hash combinators
@@ -529,6 +529,10 @@ assignAllEqual xs ys = mconcat (zipWithEqual "assignAllEqual" (|=) xs ys)
 
 assignAll :: [JExpr] -> [JExpr] -> JStat
 assignAll xs ys = mconcat (zipWith (|=) xs ys)
+
+assignAllReverseOrder :: [JExpr] -> [JExpr] -> JStat
+assignAllReverseOrder xs ys = mconcat (reverse (zipWith (|=) xs ys))
+
 
 declAssignAll :: [Ident] -> [JExpr] -> JStat
 declAssignAll xs ys = mconcat (zipWith (||=) xs ys)
