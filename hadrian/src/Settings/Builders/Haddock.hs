@@ -43,9 +43,8 @@ haddockBuilderArgs = mconcat
         context  <- getContext
         version  <- expr $ pkgVersion  pkg
         synopsis <- expr $ pkgSynopsis pkg
-        trans_deps <- expr $ contextDependencies context
-        pkgs <- expr $ mapM (pkgIdentifier . C.package) $ trans_deps
         haddocks <- expr $ haddockDependencies context
+        haddocks_with_versions <- expr $ sequence $ [(,h) <$> pkgIdentifier p | (p, h) <- haddocks]
         hVersion <- expr $ pkgVersion haddock
         statsDir <- expr $ haddockStatsFilesDir
         baseUrlTemplate <- expr (docsBaseUrl <$> userSetting defaultDocArgs)
@@ -69,7 +68,7 @@ haddockBuilderArgs = mconcat
             , map ("--hide=" ++) <$> getContextData otherModules
             , pure [ "--read-interface=../" ++ p
                      ++ "," ++ baseUrl p ++ "/src/%{MODULE}.html#%{NAME},"
-                     ++ haddock | (p, haddock) <- zip pkgs haddocks ]
+                     ++ haddock | (p, haddock) <- haddocks_with_versions ]
             , pure [ "--optghc=" ++ opt | opt <- ghcOpts, not ("--package-db" `isInfixOf` opt) ]
             , getInputs
             , arg "+RTS"
