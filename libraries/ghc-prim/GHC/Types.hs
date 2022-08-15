@@ -40,7 +40,7 @@ module GHC.Types (
         type (~), type (~~), Coercible,
 
         -- * Representation polymorphism
-        TYPE, CONSTRAINT, TypeOrConstraint,
+        TYPE, CONSTRAINT,
         Levity(..), RuntimeRep(..),
         LiftedRep, UnliftedRep,
         Type, UnliftedType, Constraint,
@@ -118,9 +118,6 @@ type UnliftedType = TYPE UnliftedRep
 
 -- | The kind of the empty unboxed tuple type (# #)
 type ZeroBitType = TYPE ZeroBitRep
-
--------------------------
-data TypeOrConstraint = TypeLike | ConstraintLike
 
 -------------------------
 data Multiplicity = Many | One
