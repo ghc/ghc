@@ -4441,6 +4441,12 @@ checkValidDataCon dflags existential_ok tc con
                , isUnliftedType orig_arg_ty
                = addDiagnosticTc $ TcRnBangOnUnliftedType orig_arg_ty
 
+               -- Warn about a ~ on an unlifted type (#21951)
+               -- e.g.   data T = MkT ~Int#
+               | HsSrcBang _ _ SrcLazy <- bang
+               , isUnliftedType orig_arg_ty
+               = addDiagnosticTc $ TcRnLazyBangOnUnliftedType orig_arg_ty
+
                | HsSrcBang _ want_unpack _ <- bang
                , isSrcUnpacked want_unpack
                , case rep_bang of { HsUnpack {} -> False; _ -> True }

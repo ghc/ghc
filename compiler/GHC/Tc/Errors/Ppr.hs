@@ -445,6 +445,9 @@ instance Diagnostic TcRnMessage where
     TcRnBangOnUnliftedType ty
       -> mkSimpleDecorated $
            text "Strictness flag has no effect on unlifted type" <+> quotes (ppr ty)
+    TcRnLazyBangOnUnliftedType ty
+      -> mkSimpleDecorated $
+           text "Lazy flag has no effect on unlifted type" <+> quotes (ppr ty)
     TcRnMultipleDefaultDeclarations dup_things
       -> mkSimpleDecorated $
            hang (text "Multiple default declarations")
@@ -1094,6 +1097,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnBangOnUnliftedType{}
       -> WarningWithFlag Opt_WarnRedundantStrictnessFlags
+    TcRnLazyBangOnUnliftedType{}
+      -> WarningWithFlag Opt_WarnRedundantStrictnessFlags
     TcRnMultipleDefaultDeclarations{}
       -> ErrorWithoutFlag
     TcRnBadDefaultType{}
@@ -1423,6 +1428,8 @@ instance Diagnostic TcRnMessage where
              | otherwise
              -> noHints
     TcRnBangOnUnliftedType{}
+      -> noHints
+    TcRnLazyBangOnUnliftedType{}
       -> noHints
     TcRnMultipleDefaultDeclarations{}
       -> noHints

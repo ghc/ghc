@@ -1133,6 +1133,17 @@ data TcRnMessage where
   -}
   TcRnBangOnUnliftedType :: !Type -> TcRnMessage
 
+  {-| TcRnLazyBangOnUnliftedType is a warning (controlled by -Wredundant-strictness-flags) that
+      occurs when a lazy annotation is applied to an unlifted type.
+
+      Example(s):
+      data T = MkT ~Int# -- Lazy flag has no effect on unlifted types
+
+     Test cases: typecheck/should_compile/T21951a
+                 typecheck/should_compile/T21951b
+  -}
+  TcRnLazyBangOnUnliftedType :: !Type -> TcRnMessage
+
   {-| TcRnMultipleDefaultDeclarations is an error that occurs when a module has
       more than one default declaration.
 
