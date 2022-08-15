@@ -30,7 +30,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique.FM
 import GHC.Types.RepType
 import GHC.Types.Var.Set
-import GHC.Unit.Types      ( Module )
+import GHC.Unit.Types
 
 import GHC.Core.DataCon
 import GHC.Core            ( AltCon(..) )
@@ -215,9 +215,49 @@ withLcl fv act = do
     setFVs old_fvs
     return r
 
+{- Note [Tag inference for interactive contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When compiling bytecode we call myCoreToStg to get STG code first.
+myCoreToStg in turn calls out to stg2stg which runs the STG to STG
+passes followed by free variables analysis and the tag inference pass including
+it's rewriting phase at the end.
+Running tag inference is important as it upholds Note [Strict Field Invariant].
+While code executed by GHCi doesn't take advantage of the SFI it can call into
+compiled code which does. So it must still make sure that the SFI is upheld.
+See also #21083 and #22042.
+
+However there one important difference in code generation for GHCi and regular
+compilation. When compiling an entire module (not a GHCi expression), we call
+`stg2stg` on the entire module which allows us to build up a map which is guaranteed
+to have an entry for every binder in the current module.
+For non-interactive compilation the tag inference rewrite pass takes advantage
+of this by building up a map from binders to their tag signatures.
+
+When compiling a GHCi expression on the other hand we invoke stg2stg separately
+for each expression on the prompt. This means in GHCi for a sequence of:
+    > let x = True
+    > let y = StrictJust x
+We first run stg2stg for `[x = True]`. And then again for [y = StrictJust x]`.
+
+While computing the tag signature for `y` during tag inference inferConTag will check
+if `x` is already tagged by looking up the tagsig of `x` in the binder->signature mapping.
+However since this mapping isn't persistent between stg2stg
+invocations the lookup will fail. This isn't a correctness issue since it's always
+safe to assume a binding isn't tagged and that's what we do in such cases.
+
+However for non-interactive mode we *don't* want to do this. Since in non-interactive mode
+we have all binders of the module available for each invocation we can expect the binder->signature
+mapping to be complete and all lookups to succeed. This means in non-interactive contexts a failed lookup
+indicates a bug in the tag inference implementation.
+For this reason we assert that we are running in interactive mode if a lookup fails.
+-}
 isTagged :: Id -> RM Bool
 isTagged v = do
     this_mod <- getMod
+    -- See Note [Tag inference for interactive contexts]
+    let lookupDefault v = assertPpr (isInteractiveModule this_mod)
+                                    (text "unknown Id:" <> ppr this_mod <+> ppr v)
+                                    (TagSig TagDunno)
     case nameIsLocalOrFrom this_mod (idName v) of
         True
             | Just Unlifted <- typeLevity_maybe (idType v)
@@ -226,8 +266,8 @@ isTagged v = do
             -> return True
             | otherwise -> do -- Local binding
                 !s <- getMap
-                let !sig = lookupWithDefaultUFM s (pprPanic "unknown Id:" (ppr v)) v
-                return $! case sig of
+                let !sig = lookupWithDefaultUFM s (lookupDefault v) v
+                return $ case sig of
                     TagSig info ->
                         case info of
                             TagDunno -> False

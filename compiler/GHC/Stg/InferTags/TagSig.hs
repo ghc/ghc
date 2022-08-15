@@ -16,6 +16,7 @@ import GHC.Types.Var
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
 import GHC.Utils.Panic.Plain
+import Data.Coerce
 
 data TagInfo
   = TagDunno            -- We don't know anything about the tag.
@@ -64,3 +65,12 @@ isTaggedSig :: TagSig -> Bool
 isTaggedSig (TagSig TagProper) = True
 isTaggedSig (TagSig TagTagged) = True
 isTaggedSig _ = False
+
+seqTagSig :: TagSig -> ()
+seqTagSig = coerce seqTagInfo
+
+seqTagInfo :: TagInfo -> ()
+seqTagInfo TagTagged      = ()
+seqTagInfo TagDunno       = ()
+seqTagInfo TagProper      = ()
+seqTagInfo (TagTuple tis) = foldl' (\_unit sig -> seqTagSig (coerce sig)) () tis
