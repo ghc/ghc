@@ -950,8 +950,8 @@ apostrophes themselves: to hyperlink ``foo'`` one would simply type
 
     -- | A prefix operator @'(++)'@ and an infix identifier @'`elem`'@.
 
-Emphasis, Bold and Monospaced styled Text
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Emphasis, Bold and Monospaced Styled Text
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Text can be emphasized, made bold (strong) or monospaced (typewriter font) 
 by surrounding it with slashes, double-underscores or at-symbols: ::
