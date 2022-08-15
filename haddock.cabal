@@ -1,6 +1,6 @@
-cabal-version:        2.4
+cabal-version:        3.0
 name:                 haddock
-version:              2.26.0
+version:              2.27.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:
   This is Haddock, a tool for automatically generating documentation
@@ -23,6 +23,8 @@ description:
   without any documentation annotations, Haddock can generate useful documentation
   from your source code.
   .
+  Documentation for the haddock binary is available at [readthedocs](https://haskell-haddock.readthedocs.io/en/latest/).
+  .
   <<https://cdn.rawgit.com/haskell/haddock/ghc-8.10/doc/cheatsheet/haddocks.svg>>
 license:              BSD-3-Clause
 license-file:         LICENSE
@@ -33,7 +35,7 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==9.2.*
+tested-with:          GHC==9.4.*
 
 extra-source-files:
   CHANGES.md
@@ -81,7 +83,7 @@ executable haddock
       xhtml >= 3000.2 && < 3000.3,
       ghc-boot,
       ghc-boot-th,
-      ghc == 9.5.*,
+      ghc == 9.4.*,
       bytestring,
       parsec,
       text,
@@ -148,7 +150,7 @@ executable haddock
   else
     -- in order for haddock's advertised version number to have proper meaning,
     -- we pin down to a single haddock-api version.
-    build-depends:  haddock-api == 2.26.0
+    build-depends:  haddock-api == 2.27.0
 
 test-suite html-test
   type:             exitcode-stdio-1.0

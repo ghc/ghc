@@ -515,7 +515,6 @@ renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
                    , con_args = details', con_doc = mbldoc' })
 
 renameCon ConDeclGADT { con_names = lnames, con_bndrs = bndrs
-                            , con_dcolon = dcol
                             , con_mb_cxt = lcontext, con_g_args = details
                             , con_res_ty = res_ty
                             , con_doc = mbldoc } = do
@@ -526,8 +525,7 @@ renameCon ConDeclGADT { con_names = lnames, con_bndrs = bndrs
       res_ty'   <- renameLType res_ty
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
       return (ConDeclGADT
-                   { con_g_ext = noExtField, con_names = lnames'
-                   , con_dcolon = dcol, con_bndrs = bndrs'
+                   { con_g_ext = noExtField, con_names = lnames', con_bndrs = bndrs'
                    , con_mb_cxt = lcontext', con_g_args = details'
                    , con_res_ty = res_ty', con_doc = mbldoc' })
 

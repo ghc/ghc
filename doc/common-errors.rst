@@ -7,7 +7,7 @@ Common Errors
 This is probably caused by the ``-- | xxx`` comment not following a declaration. I.e. use ``-- xxx`` instead. See :ref:`top-level-declaration`.
 
 ``parse error on input ‘-- $ xxx’``
-----------------------------------
+-----------------------------------
 
 You've probably commented out code like::
 

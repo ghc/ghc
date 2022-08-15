@@ -1263,7 +1263,7 @@ latexMarkup = Markup
   , markupPic                  = \p _ -> inlineElem (markupPic p)
   , markupMathInline           = \p _ -> inlineElem (markupMathInline p)
   , markupMathDisplay          = \p _ -> blockElem (markupMathDisplay p)
-  , markupOrderedList          = \p v -> blockElem (enumeratedList (map (\p' -> p' v empty) p))
+  , markupOrderedList          = \p v -> blockElem (enumeratedList (map (\(_, p') -> p' v empty) p))
   , markupDefList              = \l v -> blockElem (descriptionList (map (\(a,b) -> (a v empty, b v empty)) l))
   , markupCodeBlock            = \p _ -> blockElem (quote (verb (p Verb empty)))
   , markupHyperlink            = \(Hyperlink u l) v -> inlineElem (markupLink u (fmap (\x -> x v empty) l))
@@ -1299,7 +1299,7 @@ latexMarkup = Markup
       Just label -> text "\\href" <> braces (text url) <> braces label
       Nothing    -> text "\\url"  <> braces (text url)
 
-    -- Is there a better way of doing this? Just a space is an aribtrary choice.
+    -- Is there a better way of doing this? Just a space is an arbitrary choice.
     markupPic (Picture uri title) = parens (imageText title)
       where
         imageText Nothing = beg
@@ -1331,7 +1331,7 @@ rdrDocToLaTeX doc = markup latexMarkup doc Plain empty
 
 data StringContext
   = Plain  -- ^ all special characters have to be escape
-  | Mono   -- ^ on top of special characters, escape space chraacters
+  | Mono   -- ^ on top of special characters, escape space characters
   | Verb   -- ^ don't escape anything
 
 
@@ -1392,7 +1392,7 @@ bold ltx = text "\\textbf" <> braces ltx
 
 -- TODO: @verbatim@ is too much since
 --
---   * Haddock supports markup _inside_ of codeblocks. Right now, the LaTeX
+--   * Haddock supports markup _inside_ of code blocks. Right now, the LaTeX
 --     representing that markup gets printed verbatim
 --   * Verbatim environments are not supported everywhere (example: not nested
 --     inside a @tabulary@ environment)

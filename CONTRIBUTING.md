@@ -3,6 +3,10 @@
 Thank you for contributing to Haddock! Here is the information you will need in
 order to make your contribution
 
+## Code of Conduct
+
+We need you to read, acknowledge, and abide by our [Code of Conduct][CoC].
+
 ## Reporting issues
 
 Please open a ticket if you get an unexpected behaviour from Haddock!  
@@ -44,7 +48,7 @@ so that documentation built within GHC can benefit from it.
 
 #### Using `cabal`
 
-Requires cabal `>= 3.4` and the latest build of GHC:
+Requires cabal `>= 3.4` and GHC `== 9.4`:
 
 You can install the latest build of GHC via ghcup using this command:
 
@@ -71,4 +75,4 @@ cabal v2-test html-test latex-test hoogle-test hypsrc-test \
 
 
 [SSCCE]: http://sscce.org/
-
+[CoC]: ./CODE_OF_CONDUCT.md

@@ -9,7 +9,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wwarn #-}
@@ -82,7 +81,7 @@ import GHC.Types.Unique.Map
 
 newtype IfEnv m = IfEnv
   {
-    -- | Lookup names in the enviroment.
+    -- | Lookup names in the environment.
     ife_lookup_name :: Name -> m (Maybe TyThing)
   }
 
@@ -264,7 +263,7 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
   mod_warning <- liftErrMsg (moduleWarning dflags tcg_rdr_env tcg_warns)
 
   let
-    -- Warnings in this module and transitive warnings from dependend modules
+    -- Warnings in this module and transitive warnings from dependent modules
     warnings :: Map Name (Doc Name)
     warnings = M.unions (decl_warnings : map ifaceWarningMap (M.elems ifaces))
 
@@ -333,7 +332,7 @@ mkAliasMap state impDecls =
   M.fromList $
   mapMaybe (\(SrcLoc.L _ impDecl) -> do
     SrcLoc.L _ alias <- ideclAs impDecl
-    return $
+    return
       (lookupModuleDyn state
          -- TODO: This is supremely dodgy, because in general the
          -- UnitId isn't going to look anything like the package
@@ -1137,8 +1136,7 @@ extractDecl declMap name decl
               _ -> Left "internal: extractDecl (ClsInstD)"
       _ -> Left ("extractDecl: Unhandled decl for " ++ getOccString name)
 
-extractPatternSyn :: HasCallStack
-                  => Name -> Name
+extractPatternSyn :: Name -> Name
                   -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn]
                   -> Either ErrMsg (LSig GhcRn)
 extractPatternSyn nm t tvs cons =

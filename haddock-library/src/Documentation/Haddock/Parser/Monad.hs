@@ -1,10 +1,8 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 -- |
 -- Module      :  Documentation.Haddock.Parser.Monad
 -- Copyright   :  (c) Alec Theriault 2018-2019,
@@ -41,7 +39,7 @@ import           Documentation.Haddock.Types ( Version )
 import           Prelude hiding (takeWhile)
 import           CompatPrelude
 
--- | The only bit of information we really care about truding along with us
+-- | The only bit of information we really care about trudging along with us
 -- through parsing is the version attached to a @\@since@ annotation - if
 -- the doc even contained one.
 newtype ParserState = ParserState {

@@ -78,7 +78,7 @@ overIdentifier f d = g d
     g (DocMonospaced x) = DocMonospaced $ g x
     g (DocBold x) = DocBold $ g x
     g (DocUnorderedList x) = DocUnorderedList $ fmap g x
-    g (DocOrderedList x) = DocOrderedList $ fmap g x
+    g (DocOrderedList x) = DocOrderedList $ fmap (\(index, a) -> (index, g a)) x
     g (DocDefList x) = DocDefList $ fmap (\(y, z) -> (g y, g z)) x
     g (DocCodeBlock x) = DocCodeBlock $ g x
     g (DocHyperlink (Hyperlink u x)) = DocHyperlink (Hyperlink u (fmap g x))
@@ -173,11 +173,11 @@ encodedChar = "&#" *> c <* ";"
 -- Once we have checked for any of these and tried to parse the
 -- relevant markup, we can assume they are used as regular text.
 specialChar :: [Char]
-specialChar = "_/<@\"&'`# "
+specialChar = "_/<@\"&'`#[ "
 
 -- | Plain, regular parser for text. Called as one of the last parsers
 -- to ensure that we have already given a chance to more meaningful parsers
--- before capturing their characers.
+-- before capturing their characters.
 string' :: Parser (DocH mod a)
 string' = DocString . unescape . T.unpack <$> takeWhile1_ (`notElem` specialChar)
   where
@@ -361,7 +361,7 @@ table = do
     firstRow <- parseFirstRow
     let len = T.length firstRow
 
-    -- then we parse all consequtive rows starting and ending with + or |,
+    -- then we parse all consecutive rows starting and ending with + or |,
     -- of the width `len`.
     restRows <- many (try (parseRestRows len))
 
@@ -577,9 +577,23 @@ unorderedList indent = DocUnorderedList <$> p
 orderedList :: Text -> Parser (DocH mod Identifier)
 orderedList indent = DocOrderedList <$> p
   where
-    p = (paren <|> dot) *> innerList indent p
+    p = do
+      index <- paren <|> dot
+      innerList' indent p index
     dot = (decimal :: Parser Int) <* "."
     paren = "(" *> decimal <* ")"
+
+-- | Like 'innerList' but takes the parsed index of the list item
+innerList' :: Text -> Parser [(Int, DocH mod Identifier)]
+           -> Int
+           -> Parser [(Int, DocH mod Identifier)]
+innerList' indent item index = do
+  c <- takeLine
+  (cs, items) <- more indent item
+  let contents = docParagraph . parseText . dropNLs . T.unlines $ c : cs
+  return $ case items of
+    Left p -> [(index, contents `docAppend` p)]
+    Right i -> (index, contents) : i
 
 -- | Generic function collecting any further lines belonging to the
 -- list entry and recursively collecting any further lists in the
@@ -710,7 +724,7 @@ stripSpace = fromMaybe <*> mapM strip'
                  Just (' ',t') -> Just t'
                  _ -> Nothing
 
--- | Parses examples. Examples are a paragraph level entitity (separated by an empty line).
+-- | Parses examples. Examples are a paragraph level entity (separated by an empty line).
 -- Consecutive examples are accepted.
 examples :: Parser (DocH mod a)
 examples = DocExamples <$> (many (try (skipHorizontalSpace *> "\n")) *> go)

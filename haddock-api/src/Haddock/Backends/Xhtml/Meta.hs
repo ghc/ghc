@@ -14,7 +14,7 @@ quickjumpVersion = 1
 
 -- | Writes a json encoded file containing additional
 -- information about the generated documentation. This
--- is useful for external tools (e.g. hackage).
+-- is useful for external tools (e.g., Hackage).
 writeHaddockMeta :: FilePath -> Bool -> IO ()
 writeHaddockMeta odir withQuickjump = do
   let

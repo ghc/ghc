@@ -1,4 +1,3 @@
-{-# LANGUAGE ExplicitForAll    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes        #-}
 
@@ -401,7 +400,7 @@ parseIntegralFromDouble d =
     let r = toRational d
         x = truncate r
     in if toRational x == r
-         then pure $ x
+         then pure x
          else fail $ "unexpected floating number " <> show d
 
 parseIntegral :: Integral a => String -> Value -> Parser a

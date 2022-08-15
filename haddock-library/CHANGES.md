@@ -1,3 +1,10 @@
+## Changes in version 1.11.0
+
+  * Add support for linking identifiers with a quote between backticks (#1408)
+
+## Changes in version 1.10.0
+
+  * Add support for labeled module references (#1360)
 ## Changes in version 1.9.0
 
  * Fix build-time regression for `base < 4.7` (#1119)

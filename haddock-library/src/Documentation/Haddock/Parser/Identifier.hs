@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ViewPatterns #-}
 -- |
 -- Module      :  Documentation.Haddock.Parser.Identifier
 -- Copyright   :  (c) Alec Theriault 2019,
@@ -150,9 +149,9 @@ takeIdentifier input = listToMaybe $ do
       | otherwise = Nothing
 
     -- | Parse all but the last quote off the front of the input
-    -- PRECONDITION: T.head t == '\''
+    -- PRECONDITION: T.head t `elem` ['\'', '`']
     quotes :: Text -> (Int, Text)
-    quotes t = let !n = T.length (T.takeWhile (== '\'') t) - 1
+    quotes t = let !n = T.length (T.takeWhile (`elem` ['\'', '`']) t) - 1
                in (n, T.drop n t)
 
     -- | Parse an operator off the front of the input

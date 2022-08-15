@@ -1,0 +1,82 @@
+# Warnings currently triggered
+- ignore: {name: "Avoid lambda"} # 3 hints
+- ignore: {name: "Avoid lambda using `infix`"} # 5 hints
+- ignore: {name: "Eta reduce"} # 18 hints
+- ignore: {name: "Functor law"} # 3 hints
+- ignore: {name: "Fuse concatMap/map"} # 1 hint
+- ignore: {name: "Fuse foldr/map"} # 2 hints
+- ignore: {name: "Fuse mapM/map"} # 2 hints
+- ignore: {name: "Hoist not"} # 1 hint
+- ignore: {name: "Move brackets to avoid $"} # 7 hints
+- ignore: {name: "Move guards forward"} # 1 hint
+- ignore: {name: "Move map inside list comprehension"} # 2 hints
+- ignore: {name: "Redundant <$>"} # 3 hints
+- ignore: {name: "Redundant bracket"} # 44 hints
+- ignore: {name: "Redundant id"} # 1 hint
+- ignore: {name: "Redundant if"} # 3 hints
+- ignore: {name: "Redundant lambda"} # 2 hints
+- ignore: {name: "Redundant map"} # 3 hints
+- ignore: {name: "Redundant return"} # 1 hint
+- ignore: {name: "Replace case with fromMaybe"} # 2 hints
+- ignore: {name: "Replace case with maybe"} # 4 hints
+- ignore: {name: "Use $>"} # 4 hints
+- ignore: {name: "Use ++"} # 3 hints
+- ignore: {name: "Use :"} # 4 hints
+- ignore: {name: "Use <$>"} # 12 hints
+- ignore: {name: "Use <&>"} # 1 hint
+- ignore: {name: "Use <|>"} # 1 hint
+- ignore: {name: "Use =<<"} # 1 hint
+- ignore: {name: "Use all"} # 1 hint
+- ignore: {name: "Use bimap"} # 1 hint
+- ignore: {name: "Use camelCase"} # 31 hints
+- ignore: {name: "Use concatMap"} # 1 hint
+- ignore: {name: "Use const"} # 4 hints
+- ignore: {name: "Use fewer LANGUAGE pragmas"} # 1 hint
+- ignore: {name: "Use find"} # 1 hint
+- ignore: {name: "Use fmap"} # 12 hints
+- ignore: {name: "Use foldr"} # 1 hint
+- ignore: {name: "Use fromMaybe"} # 2 hints
+- ignore: {name: "Use infix"} # 3 hints
+- ignore: {name: "Use intercalate"} # 1 hint
+- ignore: {name: "Use isAsciiLower"} # 1 hint
+- ignore: {name: "Use isAsciiUpper"} # 1 hint
+- ignore: {name: "Use isDigit"} # 1 hint
+- ignore: {name: "Use lambda-case"} # 4 hints
+- ignore: {name: "Use let"} # 2 hints
+- ignore: {name: "Use list comprehension"} # 2 hints
+- ignore: {name: "Use list literal pattern"} # 1 hint
+- ignore: {name: "Use map once"} # 1 hint
+- ignore: {name: "Use maybe"} # 2 hints
+- ignore: {name: "Use newtype instead of data"} # 13 hints
+- ignore: {name: "Use notElem"} # 2 hints
+- ignore: {name: "Use print"} # 3 hints
+- ignore: {name: "Use record patterns"} # 5 hints
+- ignore: {name: "Use second"} # 3 hints
+- ignore: {name: "Use sortOn"} # 3 hints
+- ignore: {name: "Use tuple-section"} # 3 hints
+- ignore: {name: "Use unless"} # 1 hint
+- ignore: {name: "Use void"} # 1 hint
+# Ignore within modules where following hlint or adding an HLint annotation
+# would alter the expected test output.
+- ignore: {name: "Unused LANGUAGE pragma", within: [QuasiExpr, TH, Ticket112]}
+# Module names (not all unique) where CPP can be used
+- extensions:
+  - name: CPP
+    within:
+    - Bug1091
+    - CompatPrelude
+    - CPP
+    - Documentation.Haddock.Parser.UtilSpec
+    - Documentation.Haddock.Types
+    - Haddock
+    - Haddock.Config
+    - Haddock.Convert
+    - Haddock.Interface
+    - Haddock.Interface.Create
+    - Haddock.InterfaceFile
+    - Haddock.Types
+    - Haddock.Utils
+    - Haddock.Version
+    - Haddock.Backends.Xhtml
+    - Main
+    - Test.Haddock.Config

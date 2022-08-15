@@ -121,6 +121,9 @@ spec = do
       it "can parse identifiers ending with a single quote" $ do
         "'foo''" `shouldParseTo` DocIdentifier "foo'"
 
+      it "can parse identifiers in backticks ending with a single quote" $ do
+        "`foo'`" `shouldParseTo` DocIdentifier "foo'"
+
       it "can parse an identifier containing a digit" $ do
         "'f0'" `shouldParseTo` DocIdentifier "f0"
 
@@ -576,27 +579,37 @@ spec = do
         it "turns it into a code block" $ do
           "@foo@" `shouldParseTo` DocCodeBlock "foo"
 
-      context "when a paragraph starts with a markdown link" $ do
-        it "correctly parses it as a text paragraph (not a definition list)" $ do
-          "[label](url)" `shouldParseTo`
-            DocParagraph (hyperlink "url" "label")
+      context "when a paragraph contains a markdown link" $ do
+        it "correctly parses the link" $ do
+          "Blah [label](url)" `shouldParseTo`
+            DocParagraph ("Blah " <> hyperlink "url" "label")
 
-        it "can be followed by an other paragraph" $ do
-          "[label](url)\n\nfoobar" `shouldParseTo`
-            DocParagraph (hyperlink "url" "label") <> DocParagraph "foobar"
-
-        context "when paragraph contains additional text" $ do
-          it "accepts more text after the link" $ do
-            "[label](url) foo bar baz" `shouldParseTo`
-              DocParagraph (hyperlink "url" "label" <> " foo bar baz")
-
-          it "accepts a newline right after the markdown link" $ do
-            "[label](url)\nfoo bar baz" `shouldParseTo`
-              DocParagraph (hyperlink "url" "label" <> " foo bar baz")
+        context "when the paragraph starts with the markdown link" $ do
+          it "correctly parses it as a text paragraph (not a definition list)" $ do
+            "[label](url)" `shouldParseTo`
+              DocParagraph (hyperlink "url" "label")
 
           it "can be followed by an other paragraph" $ do
-            "[label](url)foo\n\nbar" `shouldParseTo`
-              DocParagraph (hyperlink "url" "label" <> "foo") <> DocParagraph "bar"
+            "[label](url)\n\nfoobar" `shouldParseTo`
+              DocParagraph (hyperlink "url" "label") <> DocParagraph "foobar"
+
+          context "when paragraph contains additional text" $ do
+            it "accepts more text after the link" $ do
+              "[label](url) foo bar baz" `shouldParseTo`
+                DocParagraph (hyperlink "url" "label" <> " foo bar baz")
+
+            it "accepts a newline right after the markdown link" $ do
+              "[label](url)\nfoo bar baz" `shouldParseTo`
+                DocParagraph (hyperlink "url" "label" <> " foo bar baz")
+
+            it "can be followed by an other paragraph" $ do
+              "[label](url)foo\n\nbar" `shouldParseTo`
+                DocParagraph (hyperlink "url" "label" <> "foo") <> DocParagraph "bar"
+
+        context "when the link starts on a new line not at the beginning of the paragraph" $ do
+          it "correctly parses the link" $ do
+            "Bla\n[label](url)" `shouldParseTo`
+              DocParagraph ("Bla\n" <> hyperlink "url" "label")
 
     context "when parsing birdtracks" $ do
       it "parses them as a code block" $ do
@@ -810,7 +823,7 @@ spec = do
       it "can nest another type of list inside" $ do
         "* foo\n\n    1. bar" `shouldParseTo`
           DocUnorderedList [ DocParagraph "foo"
-                             <> DocOrderedList [DocParagraph "bar"]]
+                             <> DocOrderedList [(1, DocParagraph "bar")]]
 
       it "can nest a code block inside" $ do
         "* foo\n\n    @foo bar baz@" `shouldParseTo`
@@ -849,7 +862,7 @@ spec = do
           DocUnorderedList [ DocParagraph "foo"
                              <> DocUnorderedList [ DocParagraph "bar" ]
                            ]
-          <> DocOrderedList [ DocParagraph "baz" ]
+          <> DocOrderedList [ (1, DocParagraph "baz") ]
 
       it "allows arbitrary initial indent of a list" $ do
         unlines
@@ -873,20 +886,20 @@ spec = do
           DocDefList [ ("foo", "foov"
                                <> DocDefList [ ("bar", "barv") ])
                      ]
-          <> DocOrderedList [ DocParagraph "baz" ]
+          <> DocOrderedList [ (1, DocParagraph "baz") ]
 
       it "list order is preserved in presence of nesting + extra text" $ do
         "1. Foo\n\n    > Some code\n\n2. Bar\n\nSome text"
           `shouldParseTo`
-          DocOrderedList [ DocParagraph "Foo" <> DocCodeBlock "Some code"
-                         , DocParagraph "Bar"
+          DocOrderedList [ (1, DocParagraph "Foo" <> DocCodeBlock "Some code")
+                         , (2, DocParagraph "Bar")
                          ]
           <> DocParagraph (DocString "Some text")
 
         "1. Foo\n\n2. Bar\n\nSome text"
           `shouldParseTo`
-          DocOrderedList [ DocParagraph "Foo"
-                         , DocParagraph "Bar"
+          DocOrderedList [ (1, DocParagraph "Foo")
+                         , (2, DocParagraph "Bar")
                          ]
           <> DocParagraph (DocString "Some text")
 
@@ -970,9 +983,9 @@ spec = do
           , " 3. three"
           ]
         `shouldParseTo` DocOrderedList [
-            DocParagraph "one"
-          , DocParagraph "two"
-          , DocParagraph "three"
+            (1, DocParagraph "one")
+          , (1, DocParagraph "two")
+          , (3, DocParagraph "three")
           ]
 
       it "ignores empty lines between list items" $ do
@@ -982,12 +995,12 @@ spec = do
           , "2. two"
           ]
         `shouldParseTo` DocOrderedList [
-            DocParagraph "one"
-          , DocParagraph "two"
+            (1, DocParagraph "one")
+          , (2, DocParagraph "two")
           ]
 
       it "accepts an empty list item" $ do
-        "1." `shouldParseTo` DocOrderedList [DocParagraph DocEmpty]
+        "1." `shouldParseTo` DocOrderedList [(1, DocParagraph DocEmpty)]
 
       it "accepts multi-line list items" $ do
         unlines [
@@ -997,12 +1010,12 @@ spec = do
           , "more two"
           ]
         `shouldParseTo` DocOrderedList [
-            DocParagraph "point one\n  more one"
-          , DocParagraph "point two\nmore two"
+            (1, DocParagraph "point one\n  more one")
+          , (1, DocParagraph "point two\nmore two")
           ]
 
       it "accepts markup in list items" $ do
-        "1. /foo/" `shouldParseTo` DocOrderedList [DocParagraph (DocEmphasis "foo")]
+        "1. /foo/" `shouldParseTo` DocOrderedList [(1, DocParagraph (DocEmphasis "foo"))]
 
       it "requires empty lines between list and other paragraphs" $ do
         unlines [
@@ -1012,7 +1025,7 @@ spec = do
           , ""
           , "baz"
           ]
-        `shouldParseTo` DocParagraph "foo" <> DocOrderedList [DocParagraph "bar"] <> DocParagraph "baz"
+        `shouldParseTo` DocParagraph "foo" <> DocOrderedList [(1, DocParagraph "bar")] <> DocParagraph "baz"
 
     context "when parsing definition lists" $ do
       it "parses a simple list" $ do
@@ -1099,8 +1112,8 @@ spec = do
                 ] `shouldParseTo`
           DocUnorderedList [ DocParagraph "bullet"
                            , DocParagraph "different bullet"]
-          <> DocOrderedList [ DocParagraph "ordered"
-                            , DocParagraph "different bullet"
+          <> DocOrderedList [ (1, DocParagraph "ordered")
+                            , (2, DocParagraph "different bullet")
                             ]
           <> DocDefList [ ("cat", "kitten")
                         , ("pineapple", "fruit")

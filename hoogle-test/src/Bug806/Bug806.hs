@@ -1,5 +1,4 @@
 {-# LANGUAGE Haskell2010 #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Bug806 where

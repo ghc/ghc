@@ -1,6 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 
@@ -24,6 +23,7 @@ import System.FilePath.Posix ((</>))
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.List as List
 
 import Text.XHtml (Html, HtmlAttr, (!))
 import qualified Text.XHtml as Html
@@ -141,8 +141,8 @@ richToken srcs details Token{..}
 
     contexts = concatMap (Set.elems . identInfo) . Map.elems . nodeIdentifiers $ details
 
-    -- pick an arbitary non-evidence identifier to hyperlink with
-    identDet = Map.lookupMin $ Map.filter notEvidence $ nodeIdentifiers $ details
+    -- pick an arbitrary non-evidence identifier to hyperlink with
+    identDet = Map.lookupMin $ Map.filter notEvidence $ nodeIdentifiers details
     notEvidence = not . any isEvidenceContext . identInfo
 
     -- If we have name information, we can make links
@@ -249,14 +249,20 @@ hyperlink (srcs, srcs') ident = case ident of
     Left name -> externalModHyperlink name
 
   where
+    -- In a Nix environment, we have file:// URLs with absolute paths
+    makeHyperlinkUrl url | List.isPrefixOf "file://" url = url
+    makeHyperlinkUrl url = ".." </> url
+
     internalHyperlink name content =
         Html.anchor content ! [ Html.href $ "#" ++ internalAnchorIdent name ]
 
     externalNameHyperlink name content = case Map.lookup mdl srcs of
         Just SrcLocal -> Html.anchor content !
             [ Html.href $ hypSrcModuleNameUrl mdl name ]
-        Just (SrcExternal path) -> Html.anchor content !
-            [ Html.href $ spliceURL Nothing (Just mdl) (Just name) Nothing (".." </> path) ]
+        Just (SrcExternal path) ->
+          let hyperlinkUrl = makeHyperlinkUrl path </> hypSrcModuleNameUrl mdl name
+           in Html.anchor content !
+                [ Html.href $ spliceURL Nothing (Just mdl) (Just name) Nothing hyperlinkUrl ]
         Nothing -> content
       where
         mdl = nameModule name
@@ -265,8 +271,10 @@ hyperlink (srcs, srcs') ident = case ident of
         case Map.lookup moduleName srcs' of
           Just SrcLocal -> Html.anchor content !
             [ Html.href $ hypSrcModuleUrl' moduleName ]
-          Just (SrcExternal path) -> Html.anchor content !
-            [ Html.href $ spliceURL' Nothing (Just moduleName) Nothing Nothing (".." </> path) ]
+          Just (SrcExternal path) ->
+            let hyperlinkUrl = makeHyperlinkUrl path </> hypSrcModuleUrl' moduleName
+             in Html.anchor content !
+                  [ Html.href $ spliceURL' Nothing (Just moduleName) Nothing Nothing hyperlinkUrl ]
           Nothing -> content
 
 

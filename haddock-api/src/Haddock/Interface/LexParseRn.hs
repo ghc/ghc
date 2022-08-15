@@ -89,6 +89,10 @@ processModuleHeader dflags pkgName gre safety mayStr = do
   where
     failure = (emptyHaddockModInfo, Nothing)
 
+traverseSnd :: (Traversable t, Applicative f) => (a -> f b) -> t (x, a) -> f (t (x, b))
+traverseSnd f = traverse (\(x, a) ->
+                             (\b -> (x, b)) <$> f a)
+
 -- | Takes a 'GlobalRdrEnv' which (hopefully) contains all the
 -- definitions and a parsed comment and we attempt to make sense of
 -- where the identifiers in the comment point to. We're in effect
@@ -151,7 +155,7 @@ rename dflags gre = rn
       DocBold doc -> DocBold <$> rn doc
       DocMonospaced doc -> DocMonospaced <$> rn doc
       DocUnorderedList docs -> DocUnorderedList <$> traverse rn docs
-      DocOrderedList docs -> DocOrderedList <$> traverse rn docs
+      DocOrderedList docs -> DocOrderedList <$> traverseSnd rn docs
       DocDefList list -> DocDefList <$> traverse (\(a, b) -> (,) <$> rn a <*> rn b) list
       DocCodeBlock doc -> DocCodeBlock <$> rn doc
       DocIdentifierUnchecked x -> pure (DocIdentifierUnchecked x)
@@ -172,7 +176,7 @@ rename dflags gre = rn
 -- 'GlobalReaderEnv' during 'rename') in an appropriate doc. Currently
 -- we simply monospace the identifier in most cases except when the
 -- identifier is qualified: if the identifier is qualified then we can
--- still try to guess and generate anchors accross modules but the
+-- still try to guess and generate anchors across modules but the
 -- users shouldn't rely on this doing the right thing. See tickets
 -- #253 and #375 on the confusion this causes depending on which
 -- default we pick in 'rename'.

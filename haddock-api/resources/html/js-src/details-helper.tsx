@@ -407,7 +407,6 @@ function restoreToggled() {
 // <details> element with id given by the 'data-details-id' property
 // of the "toggle" element.
 function onToggleClick(ev: MouseEvent) {
-  ev.preventDefault();
   const toggle = ev.currentTarget as HTMLElement;
   toggleDetails(toggle);
   storeLocalConfig();

@@ -1,8 +1,8 @@
-cabal-version:        >= 1.10
+cabal-version:        3.0
 name:                 haddock-test
 version:              0.0.1
 synopsis:             Test utilities for Haddock
-license:              BSD2
+license:              BSD-2-Clause
 author:               Simon Marlow, David Waern
 maintainer:           Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
 homepage:             http://www.haskell.org/haddock/
@@ -10,7 +10,7 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==9.0.*
+tested-with:          GHC==9.4.*
 stability:            experimental
 
 library

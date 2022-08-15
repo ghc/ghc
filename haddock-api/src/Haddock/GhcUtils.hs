@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, StandaloneDeriving, FlexibleInstances, ViewPatterns #-}
+{-# LANGUAGE BangPatterns, FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE RankNTypes #-}
@@ -135,7 +135,7 @@ hsSigTypeI = sig_body . unLoc
 
 mkEmptySigType :: LHsType GhcRn -> LHsSigType GhcRn
 -- Dubious, because the implicit binders are empty even
--- though the type might have free varaiables
+-- though the type might have free variables
 mkEmptySigType lty@(L loc ty) = L loc $ case ty of
   HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = bndrs }
              , hst_body = body }
@@ -471,7 +471,7 @@ instance Parent (ConDecl GhcRn) where
 instance Parent (TyClDecl GhcRn) where
   children d
     | isDataDecl  d = map unLoc $ concatMap (getConNames . unLoc)
-                              $ (dd_cons . tcdDataDefn) $ d
+                                $ (dd_cons . tcdDataDefn) d
     | isClassDecl d =
         map (unLoc . fdLName . unLoc) (tcdATs d) ++
         [ unLoc n | L _ (TypeSig _ ns _) <- tcdSigs d, n <- ns ]
@@ -553,7 +553,7 @@ stringBufferFromByteString bs =
 --
 -- /O(1)/
 takeStringBuffer :: Int -> StringBuffer -> ByteString
-takeStringBuffer !n !(S.StringBuffer fp _ cur) = BS.PS fp cur n
+takeStringBuffer !n (S.StringBuffer fp _ cur) = BS.PS fp cur n
 
 -- | Return the prefix of the first 'StringBuffer' that /isn't/ in the second
 -- 'StringBuffer'. **The behavior is undefined if the 'StringBuffers' use

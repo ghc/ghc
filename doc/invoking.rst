@@ -58,6 +58,7 @@ The following options are available:
             --read-interface=<docpath>,<file>
             -i <docpath>,<srcpath>,<file>
             --read-interface=<docpath>,<srcpath>,<file>
+            -i <docpath>,<srcpath>,<visibility>,<file>
 
     Read the interface file in file, which must have been produced by
     running Haddock with the :option:`--dump-interface` option. The interface
@@ -76,6 +77,9 @@ The following options are available:
     Similarly to docpath, srcpath is used generate cross-package
     hyperlinks but within sources rendered with :option:`--hyperlinked-source`
     option.
+
+    If visibility is set to `hidden`, modules from that interface file will
+    not be listed in haddock generated content file.
 
     Multiple :option:`--read-interface` options may be given.
 

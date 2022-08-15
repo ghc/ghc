@@ -15,7 +15,7 @@ module Haddock.Backends.Xhtml.Layout (
 
   divPackageHeader, divContent, divModuleHeader, divFooter,
   divTableOfContents, divDescription, divSynopsis, divInterface,
-  divIndex, divAlphabet, divModuleList, divContentsList,
+  divIndex, divAlphabet, divPackageList, divModuleList,  divContentsList,
 
   sectionName,
   nonEmptySectionName,
@@ -81,7 +81,7 @@ nonEmptySectionName c
 
 divPackageHeader, divContent, divModuleHeader, divFooter,
   divTableOfContents, divDescription, divSynopsis, divInterface,
-  divIndex, divAlphabet, divModuleList, divContentsList
+  divIndex, divAlphabet, divPackageList, divModuleList, divContentsList
     :: Html -> Html
 
 divPackageHeader    = sectionDiv "package-header"
@@ -96,6 +96,7 @@ divInterface        = sectionDiv "interface"
 divIndex            = sectionDiv "index"
 divAlphabet         = sectionDiv "alphabet"
 divModuleList       = sectionDiv "module-list"
+divPackageList      = sectionDiv "module-list"
 
 
 --------------------------------------------------------------------------------
@@ -219,7 +220,7 @@ subOrphanInstances pkg qual lnks splice  = maybe noHtml wrap . instTable
   where
     wrap = ((h1 << "Orphan instances") +++)
     instTable = fmap (thediv ! [ identifier ("section." ++ id_) ] <<) . subTableSrc pkg qual lnks splice
-    id_ = makeAnchorId $ "orphans"
+    id_ = makeAnchorId "orphans"
 
 
 subInstHead :: String -- ^ Instance unique id (for anchor generation)
