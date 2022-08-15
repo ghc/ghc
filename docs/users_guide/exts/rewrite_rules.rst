@@ -438,8 +438,8 @@ earlier versions of GHC. For example, suppose that: ::
 where ``intLookup`` is an implementation of ``genericLookup`` that works
 very fast for keys of type ``Int``. You might wish to tell GHC to use
 ``intLookup`` instead of ``genericLookup`` whenever the latter was
-called with type ``Table Int b -> Int -> b``. It used to be possible to
-write ::
+called with type ``Table Int b -> Int -> b``. It used to be possible to write a
+:pragma:`SPECIALIZE ⟨name⟩ :: ⟨type⟩` pragma with a right-hand-side: ::
 
     {-# SPECIALIZE genericLookup :: Table Int b -> Int -> b = intLookup #-}
 
