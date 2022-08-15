@@ -27,7 +27,6 @@ import GHC.Stg.InferTags.Types
 import GHC.Stg.InferTags.Rewrite (rewriteTopBinds)
 import Data.Maybe
 import GHC.Types.Name.Env (mkNameEnv, NameEnv)
-import GHC.Driver.Config.Stg.Ppr
 import GHC.Driver.Session
 import GHC.Utils.Logger
 import qualified GHC.Unit.Types
@@ -217,17 +216,17 @@ the output of itself.
 --           -> CollectedCCs
 --           -> [CgStgTopBinding] -- ^ Bindings come already annotated with fvs
 --           -> HpcInfo
---           -> IO (Stream IO CmmGroupSRTs CgInfos)
+--           -> IO (Stream IO CmmGroupSRTs CmmCgInfos)
 --          -- Note we produce a 'Stream' of CmmGroups, so that the
 --          -- backend can be run incrementally.  Otherwise it generates all
 --          -- the C-- up front, which has a significant space cost.
-inferTags :: DynFlags -> Logger -> (GHC.Unit.Types.Module) -> [CgStgTopBinding] -> IO ([TgStgTopBinding], NameEnv TagSig)
-inferTags dflags logger this_mod stg_binds = do
+inferTags :: StgPprOpts -> Logger -> (GHC.Unit.Types.Module) -> [CgStgTopBinding] -> IO ([TgStgTopBinding], NameEnv TagSig)
+inferTags ppr_opts logger this_mod stg_binds = do
 
     -- Annotate binders with tag information.
     let (!stg_binds_w_tags) = {-# SCC "StgTagFields" #-}
                                         inferTagsAnal stg_binds
-    putDumpFileMaybe logger Opt_D_dump_stg_tags "CodeGenAnal STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_tags)
+    putDumpFileMaybe logger Opt_D_dump_stg_tags "CodeGenAnal STG:" FormatSTG (pprGenStgTopBindings ppr_opts stg_binds_w_tags)
 
     let export_tag_info = collectExportInfo stg_binds_w_tags
 

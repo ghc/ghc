@@ -1,7 +1,7 @@
 
 
 module GHC.StgToCmm.Types
-  ( CgInfos (..)
+  ( CmmCgInfos (..)
   , LambdaFormInfo (..)
   , ModuleLFInfos
   , StandardFormInfo (..)
@@ -12,8 +12,6 @@ module GHC.StgToCmm.Types
 import GHC.Prelude
 
 import GHC.Core.DataCon
-
-import GHC.Stg.InferTags.TagSig
 
 import GHC.Runtime.Heap.Layout
 
@@ -85,7 +83,7 @@ moving parts are:
 --
 -- See also Note [Conveying CAF-info and LFInfo between modules] above.
 --
-data CgInfos = CgInfos
+data CmmCgInfos = CmmCgInfos
   { cgNonCafs :: !NonCaffySet
       -- ^ Exported Non-CAFFY closures in the current module. Everything else is
       -- either not exported of CAFFY.
@@ -93,7 +91,6 @@ data CgInfos = CgInfos
       -- ^ LambdaFormInfos of exported closures in the current module.
   , cgIPEStub :: !CStub
       -- ^ The C stub which is used for IPE information
-  , cgTagSigs :: !(NameEnv TagSig)
   }
 
 --------------------------------------------------------------------------------

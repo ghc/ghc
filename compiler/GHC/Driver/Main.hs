@@ -192,15 +192,14 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
 
 import GHC.Stg.Syntax
-import GHC.Stg.Pipeline ( stg2stg )
-import GHC.Stg.InferTags
+import GHC.Stg.Pipeline ( stg2stg, StgCgInfos )
 
 import GHC.Builtin.Utils
 import GHC.Builtin.Names
 import GHC.Builtin.Uniques ( mkPseudoUniqueE )
 
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
-import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
+import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos)
 
 import GHC.Cmm
 import GHC.Cmm.Info.Build
@@ -281,6 +280,8 @@ import Data.Time
 
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
+import GHC.Stg.InferTags.TagSig (seqTagSig)
+import GHC.Types.Unique.FM
 
 
 {- **********************************************************************
@@ -1770,7 +1771,7 @@ hscSimpleIface' mb_core_program tc_result summary = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
-               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe CgInfos)
+               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe StgCgInfos, Maybe CmmCgInfos )
                 -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts location output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
@@ -1820,11 +1821,16 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             this_mod location late_cc_binds data_tycons
 
         -----------------  Convert to STG ------------------
-        (stg_binds, denv, (caf_ccs, caf_cc_stacks))
+        (stg_binds, denv, (caf_ccs, caf_cc_stacks), stg_cg_infos)
             <- {-# SCC "CoreToStg" #-}
                withTiming logger
                    (text "CoreToStg"<+>brackets (ppr this_mod))
-                   (\(a, b, (c,d)) -> a `seqList` b `seq` c `seqList` d `seqList` ())
+                   (\(a, b, (c,d), tag_env) ->
+                        a `seqList`
+                        b `seq`
+                        c `seqList`
+                        d `seqList`
+                        (seqEltsUFM (seqTagSig) tag_env))
                    (myCoreToStg logger dflags (hsc_IC hsc_env) False this_mod location prepd_binds)
 
         let cost_centre_info =
@@ -1863,11 +1869,12 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             let foreign_stubs st = foreign_stubs0 `appendStubC` prof_init
                                                   `appendStubC` cgIPEStub st
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
+            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cmm_cg_infos)
                 <- {-# SCC "codeOutput" #-}
                   codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
-            return (output_filename, stub_c_exists, foreign_fps, Just cg_infos)
+            return  ( output_filename, stub_c_exists, foreign_fps
+                    , Just stg_cg_infos, Just cmm_cg_infos)
 
 
 -- The part of CgGuts that we need for HscInteractive
@@ -1915,7 +1922,9 @@ hscInteractive hsc_env cgguts location = do
         (initCorePrepPgmConfig (hsc_dflags hsc_env) (interactiveInScope $ hsc_IC hsc_env))
         this_mod location core_binds data_tycons
 
-    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
+    -- The stg cg info only provides a runtime benfit, but is not requires so we just
+    -- omit it here
+    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks, _ignore_stg_cg_infos)
       <- {-# SCC "CoreToStg" #-}
           myCoreToStg logger dflags (hsc_IC hsc_env) True this_mod location prepd_binds
     -----------------  Generate byte code ------------------
@@ -2036,7 +2045,7 @@ doCodeGen :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
           -> CollectedCCs
           -> [CgStgTopBinding] -- ^ Bindings come already annotated with fvs
           -> HpcInfo
-          -> IO (Stream IO CmmGroupSRTs CgInfos)
+          -> IO (Stream IO CmmGroupSRTs CmmCgInfos)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -2047,13 +2056,10 @@ doCodeGen hsc_env this_mod denv data_tycons
         hooks      = hsc_hooks  hsc_env
         tmpfs      = hsc_tmpfs  hsc_env
         platform   = targetPlatform dflags
-
-    -- Do tag inference on optimized STG
-    (!stg_post_infer,export_tag_info) <-
-        {-# SCC "StgTagFields" #-} inferTags dflags logger this_mod stg_binds_w_fvs
+        stg_ppr_opts = (initStgPprOpts dflags)
 
     putDumpFileMaybe logger Opt_D_dump_stg_final "Final STG:" FormatSTG
-        (pprGenStgTopBindings (initStgPprOpts dflags) stg_post_infer)
+        (pprGenStgTopBindings stg_ppr_opts stg_binds_w_fvs)
 
     let stg_to_cmm dflags mod = case stgToCmmHook hooks of
                         Nothing -> StgToCmm.codeGen logger tmpfs (initStgToCmmConfig dflags mod)
@@ -2061,8 +2067,8 @@ doCodeGen hsc_env this_mod denv data_tycons
 
     let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
-        cmm_stream = stg_post_infer `seqList` {-# SCC "StgToCmm" #-}
-            stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_post_infer hpc_info
+        cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
+            stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_binds_w_fvs hpc_info
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one
@@ -2093,7 +2099,7 @@ doCodeGen hsc_env this_mod denv data_tycons
             putDumpFileMaybe logger Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
           return a
 
-    return $ Stream.mapM dump2 $ generateCgIPEStub hsc_env this_mod denv export_tag_info pipeline_stream
+    return $ Stream.mapM dump2 $ generateCgIPEStub hsc_env this_mod denv pipeline_stream
 
 myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
                 -> Bool
@@ -2101,7 +2107,8 @@ myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
                 -> IO ( Id
                       , [CgStgTopBinding]
                       , InfoTableProvMap
-                      , CollectedCCs )
+                      , CollectedCCs
+                      , StgCgInfos )
 myCoreToStgExpr logger dflags ictxt for_bytecode this_mod ml prepd_expr = do
     {- Create a temporary binding (just because myCoreToStg needs a
        binding for the stg2stg step) -}
@@ -2109,7 +2116,7 @@ myCoreToStgExpr logger dflags ictxt for_bytecode this_mod ml prepd_expr = do
                                 (mkPseudoUniqueE 0)
                                 Many
                                 (exprType prepd_expr)
-    (stg_binds, prov_map, collected_ccs) <-
+    (stg_binds, prov_map, collected_ccs, stg_cg_infos) <-
        myCoreToStg logger
                    dflags
                    ictxt
@@ -2117,20 +2124,21 @@ myCoreToStgExpr logger dflags ictxt for_bytecode this_mod ml prepd_expr = do
                    this_mod
                    ml
                    [NonRec bco_tmp_id prepd_expr]
-    return (bco_tmp_id, stg_binds, prov_map, collected_ccs)
+    return (bco_tmp_id, stg_binds, prov_map, collected_ccs, stg_cg_infos)
 
 myCoreToStg :: Logger -> DynFlags -> InteractiveContext
             -> Bool
             -> Module -> ModLocation -> CoreProgram
             -> IO ( [CgStgTopBinding] -- output program
                   , InfoTableProvMap
-                  , CollectedCCs )  -- CAF cost centre info (declared and used)
+                  , CollectedCCs -- CAF cost centre info (declared and used)
+                  , StgCgInfos )
 myCoreToStg logger dflags ictxt for_bytecode this_mod ml prepd_binds = do
     let (stg_binds, denv, cost_centre_info)
          = {-# SCC "Core2Stg" #-}
            coreToStg dflags this_mod ml prepd_binds
 
-    stg_binds_with_fvs
+    (stg_binds_with_fvs,stg_cg_info)
         <- {-# SCC "Stg2Stg" #-}
            stg2stg logger (interactiveInScope ictxt) (initStgPipelineOpts dflags for_bytecode)
                    this_mod stg_binds
@@ -2138,7 +2146,7 @@ myCoreToStg logger dflags ictxt for_bytecode this_mod ml prepd_binds = do
     putDumpFileMaybe logger Opt_D_dump_stg_cg "CodeGenInput STG:" FormatSTG
         (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_with_fvs)
 
-    return (stg_binds_with_fvs, denv, cost_centre_info)
+    return (stg_binds_with_fvs, denv, cost_centre_info, stg_cg_info)
 
 {- **********************************************************************
 %*                                                                      *
@@ -2289,7 +2297,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
         (initCorePrepPgmConfig (hsc_dflags hsc_env) (interactiveInScope $ hsc_IC hsc_env))
         this_mod iNTERACTIVELoc core_binds data_tycons
 
-    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
+    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks, _stg_cg_info)
         <- {-# SCC "CoreToStg" #-}
            liftIO $ myCoreToStg (hsc_logger hsc_env)
                                 (hsc_dflags hsc_env)
@@ -2527,7 +2535,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
                                       ml_hie_file  = panic "hscCompileCoreExpr':ml_hie_file" }
 
          ; let ictxt = hsc_IC hsc_env
-         ; (binding_id, stg_expr, _, _) <-
+         ; (binding_id, stg_expr, _, _, _stg_cg_info) <-
              myCoreToStgExpr logger
                              dflags
                              ictxt

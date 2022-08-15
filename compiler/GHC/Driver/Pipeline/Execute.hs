@@ -536,10 +536,10 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
            else if backendWritesFiles (backend dflags) then
              do
               output_fn <- phaseOutputFilenameNew next_phase pipe_env hsc_env (Just location)
-              (outputFilename, mStub, foreign_files, cg_infos) <-
+              (outputFilename, mStub, foreign_files, stg_infos, cg_infos) <-
 
                 hscGenHardCode hsc_env cgguts mod_location output_fn
-              final_iface <- mkFullIface hsc_env partial_iface cg_infos
+              final_iface <- mkFullIface hsc_env partial_iface stg_infos cg_infos
 
               -- See Note [Writing interface files]
               hscMaybeWriteIface logger dflags False final_iface mb_old_iface_hash mod_location
@@ -567,7 +567,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               -- In interpreted mode the regular codeGen backend is not run so we
               -- generate a interface without codeGen info.
             do
-              final_iface <- mkFullIface hsc_env partial_iface Nothing
+              final_iface <- mkFullIface hsc_env partial_iface Nothing Nothing
               hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
               bc <- generateFreshByteCode hsc_env mod_name (mkCgInteractiveGuts cgguts) mod_location
               return ([], final_iface, emptyHomeModInfoLinkable { homeMod_bytecode = Just bc } , panic "interpreter")

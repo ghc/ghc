@@ -1,2 +1,2 @@
-d = (_t1::forall {k} {a :: k}. D a)
+d = <D>
 ()
