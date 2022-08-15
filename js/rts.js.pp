@@ -703,3 +703,11 @@ function h$catch(a, handler) {
   h$r1 = a;
   return h$ap_1_0_fast();
 }
+
+function h$keepAlive(x, f) {
+  h$sp += 2;
+  h$stack[h$sp-1] = x;
+  h$stack[h$sp] = h$keepAlive_e;
+  h$r1 = f;
+  return h$ap_1_0_fast();
+}
