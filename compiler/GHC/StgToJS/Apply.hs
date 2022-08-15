@@ -74,8 +74,7 @@ import Data.Array
 -- These are bundled with the RTS.
 rtsApply :: StgToJSConfig -> JStat
 rtsApply cfg = BlockStat $
-  map (uncurry (stackApply cfg)) applySpec
-  ++ map (uncurry (fastApply cfg)) applySpec
+  map (specApply cfg) applySpec
   ++ map (pap cfg) specPap
   ++ [ mkApplyArr
      , genericStackApply cfg
@@ -259,78 +258,153 @@ genApp ctx i args
 -- avoid one indirection for global ids
 -- fixme in many cases we can also jump directly to the entry for local?
 jumpToII :: Id -> [JExpr] -> JStat -> G JStat
-jumpToII i args afterLoad
+jumpToII i vars load_app_in_r1
   | isLocalId i = do
      ii <- varForId i
      return $ mconcat
-      [ ra
-      , afterLoad
+      [ assignAllReverseOrder jsRegsFromR2 vars
+      , load_app_in_r1
       , returnS (closureEntry ii)
       ]
   | otherwise   = do
      ei <- varForEntryId i
      return $ mconcat
-      [ ra
-      , afterLoad
+      [ assignAllReverseOrder jsRegsFromR2 vars
+      , load_app_in_r1
       , returnS ei
       ]
-  where
-    ra = mconcat . reverse $ zipWith (\r a -> r |= a) jsRegsFromR2 args
 
 -- | Try to use a specialized pre-generated application function.
 -- If there is none, use h$ap_gen_fast instead
 jumpToFast :: HasDebugCallStack => [StgArg] -> JStat -> G JStat
-jumpToFast as afterLoad = do
-  regs <- concatMapM genArg as
-  spec <- selectApply True as regs
+jumpToFast args load_app_in_r1 = do
+  -- get JS expressions for every argument
+  -- Arguments may have more than one expression (e.g. Word64#)
+  vars <- concatMapM genArg args
+  -- try to find a specialized apply function
+  let spec = mkApplySpec RegsConv args vars
+  ap_fun <- selectApply spec
   pure $ mconcat
-    [ mconcat (ra regs)
-    , afterLoad
-    , case spec of
+    [ assignAllReverseOrder jsRegsFromR2 vars
+    , load_app_in_r1
+    , case ap_fun of
+        -- specialized apply: no tag
         Right fun -> returnS (ApplExpr fun [])
-        Left  fun -> returnS (ApplExpr fun [toJExpr (mkTag regs as)])
+        -- generic apply: pass a tag indicating number of args/slots
+        Left  fun -> returnS (ApplExpr fun [specTagExpr spec])
     ]
-    where
-      ra regs   = reverse $ zipWith (\r ex -> r |= ex) jsRegsFromR2 regs
-      mkTag rs as = (length rs `Bits.shiftL` 8) Bits..|. length as
+
+-- | Calling convention for an apply function
+data ApplyConv
+  = RegsConv  -- ^ Fast calling convention: use registers
+  | StackConv -- ^ Slow calling convention: use the stack
+  deriving (Show,Eq,Ord)
+
+-- | Name of the generic apply function
+genericApplyName :: ApplyConv -> FastString
+genericApplyName = \case
+  RegsConv  -> "h$ap_gen_fast"
+  StackConv -> "h$ap_gen"
+
+-- | Expr of the generic apply function
+genericApplyExpr :: ApplyConv -> JExpr
+genericApplyExpr conv = var (genericApplyName conv)
+
+
+-- | Return the name of the specialized apply function for the given number of
+-- args, number of arg variables, and calling convention.
+specApplyName :: ApplySpec -> FastString
+specApplyName = \case
+  -- specialize a few for compiler performance (avoid building FastStrings over
+  -- and over for common cases)
+  ApplySpec RegsConv  0 0    -> "h$ap_0_0_fast"
+  ApplySpec StackConv 0 0    -> "h$ap_0_0"
+  ApplySpec RegsConv  1 0    -> "h$ap_1_0_fast"
+  ApplySpec StackConv 1 0    -> "h$ap_1_0"
+  ApplySpec RegsConv  1 1    -> "h$ap_1_1_fast"
+  ApplySpec StackConv 1 1    -> "h$ap_1_1"
+  ApplySpec RegsConv  1 2    -> "h$ap_1_2_fast"
+  ApplySpec StackConv 1 2    -> "h$ap_1_2"
+  ApplySpec RegsConv  2 1    -> "h$ap_2_1_fast"
+  ApplySpec StackConv 2 1    -> "h$ap_2_1"
+  ApplySpec RegsConv  2 2    -> "h$ap_2_2_fast"
+  ApplySpec StackConv 2 2    -> "h$ap_2_2"
+  ApplySpec RegsConv  2 3    -> "h$ap_2_3_fast"
+  ApplySpec StackConv 2 3    -> "h$ap_2_3"
+  ApplySpec conv nargs nvars -> mkFastString $ mconcat
+                                  [ "h$ap_", show nargs
+                                  , "_"    , show nvars
+                                  , case conv of
+                                      RegsConv  -> "_fast"
+                                      StackConv -> ""
+                                  ]
+
+-- | Return the expression of the specialized apply function for the given
+-- number of args, number of arg variables, and calling convention.
+--
+-- Warning: the returned function may not be generated! Use specApplyExprMaybe
+-- if you want to ensure that it exists.
+specApplyExpr :: ApplySpec -> JExpr
+specApplyExpr spec = var (specApplyName spec)
+
+-- | Return the expression of the specialized apply function for the given
+-- number of args, number of arg variables, and calling convention.
+-- Return Nothing if it isn't generated.
+specApplyExprMaybe :: ApplySpec -> Maybe JExpr
+specApplyExprMaybe spec =
+  if spec `elem` applySpec
+    then Just (specApplyExpr spec)
+    else Nothing
+
+-- | Make an ApplySpec from a calling convention, a list of Haskell args, and a
+-- list of corresponding JS variables
+mkApplySpec :: ApplyConv -> [StgArg] -> [JExpr] -> ApplySpec
+mkApplySpec conv args vars = ApplySpec
+  { specConv = conv
+  , specArgs = length args
+  , specVars = length vars
+  }
 
 -- | Find a specialized application function if there is one
 selectApply
-  :: Bool                   -- ^ true for fast apply, false for stack apply
-  -> [StgArg]               -- ^ Raw arguments
-  -> [JExpr]                -- ^ JS arguments
+  :: ApplySpec
   -> G (Either JExpr JExpr) -- ^ the function to call (Left for generic, Right for specialized)
-selectApply fast args as =
-  case specApply fast (length args) (length as) of
+selectApply spec =
+  case specApplyExprMaybe spec of
     Just e  -> return (Right e)
-    Nothing -> return (Left (var $ "h$ap_gen" <> fastSuff))
-  where
-    fastSuff | fast      = "_fast"
-             | otherwise = ""
+    Nothing -> return (Left (genericApplyExpr (specConv spec)))
 
 
--- specialized apply for these
--- make sure that once you are in spec, you stay there
-applySpec :: [(Int,Int)] -- regs,arity
-applySpec = [ (regs,arity)  | arity <- [1..4], regs <- [max 0 (arity-1)..(arity*2)]]
+-- | Apply specification
+data ApplySpec = ApplySpec
+  { specConv :: !ApplyConv -- ^ Calling convention
+  , specArgs :: !Int       -- ^ number of Haskell arguments
+  , specVars :: !Int       -- ^ number of JavaScript variables for the arguments
+  }
+  deriving (Show,Eq,Ord)
 
-specApply :: Bool -> Int -> Int -> Maybe JExpr
-specApply fast n r
-  | (r,n) == (0,0)         = Just (var . mkFastString $ ("h$ap_0_0" ++ fastSuff))
-  | (r,n) == (0,1)         = Just (var . mkFastString $ ("h$ap_1_0" ++ fastSuff))
-  | (r,n) `elem` applySpec = Just (var . mkFastString $ ("h$ap_" ++ show n ++ "_" ++ show r ++ fastSuff))
-  | otherwise              = Nothing
-   where
-      fastSuff | fast      = "_fast"
-               | otherwise = ""
+-- | List of specialized apply function templates
+applySpec :: [ApplySpec]
+applySpec = [ ApplySpec conv nargs nvars
+            | conv  <- [RegsConv, StackConv]
+            , nargs <- [0..4]
+            , nvars <- [max 0 (nargs-1)..(nargs*2)]
+            ]
 
-{-
-  Build arrays to quickly lookup apply functions, getting the fast variant when possible
-   - h$apply[r << 8 | n] = function application for r regs, n args
-   - h$paps[r]           = partial application for r registers (number of args is in the object)
- -}
-  -- FIXME (Jeff, 2022/03): Perf: This code would benefit a great deal by using
-  -- a datastucture that supports fast merging.
+-- | Generate a tag for the given ApplySpec
+--
+-- Warning: tag doesn't take into account the calling convention
+specTag :: ApplySpec -> Int
+specTag spec = Bits.shiftL (specVars spec) 8 Bits..|. (specArgs spec)
+
+-- | Generate a tag expression for the given ApplySpec
+specTagExpr :: ApplySpec -> JExpr
+specTagExpr = toJExpr . specTag
+
+-- | Build arrays to quickly lookup apply functions
+--
+--  h$apply[r << 8 | n] = function application for r regs, n args
+--  h$paps[r]           = partial application for r registers (number of args is in the object)
 mkApplyArr :: JStat
 mkApplyArr = mconcat
   [ TxtI "h$apply" ||= toJExpr (JList [])
@@ -347,17 +421,19 @@ mkApplyArr = mconcat
             [ var "h$paps" .! i |= var "h$pap_gen"
             , preIncrS i
             ]
-        , var "h$apply" .! zero_ |= var "h$ap_0_0"
         , mconcat (map assignSpec applySpec)
         , mconcat (map assignPap specPap)
         ]
     ]
   ]
   where
-    assignSpec :: (Int, Int) -> JStat
-    assignSpec (r,n) =
-      var "h$apply" .! (toJExpr $ Bits.shiftL r 8 Bits..|. n) |=
-           (var (mkFastString ("h$ap_" ++ show n ++ "_" ++ show r)))
+    assignSpec :: ApplySpec -> JStat
+    assignSpec spec = case specConv spec of
+      -- both fast/slow (regs/stack) specialized apply functions have the same
+      -- tags. We store the stack ones in the array because they are used as
+      -- continuation stack frames.
+      StackConv -> var "h$apply" .! specTagExpr spec |= specApplyExpr spec
+      RegsConv  -> mempty
 
     assignPap :: Int -> JStat
     assignPap p = var "h$paps" .! toJExpr p |=
@@ -370,41 +446,41 @@ mkApplyArr = mconcat
 pushCont :: HasDebugCallStack
          => [StgArg]
          -> G JStat
-pushCont as = do
-  as' <- concatMapM genArg as
-  spec <- selectApply False as as'
-  case spec of
-    Right app -> push $ reverse $ app : as'
-    Left  app -> push $ reverse $ app : mkTag as' as : as'
-  where
-    mkTag rs ns = toJExpr ((length rs `Bits.shiftL` 8) Bits..|. length ns)
+pushCont args = do
+  vars <- concatMapM genArg args
+  let spec = mkApplySpec StackConv args vars
+  selectApply spec >>= \case
+    Right app -> push $ reverse $ app : vars
+    Left  app -> push $ reverse $ app : specTagExpr spec : vars
 
 -- | Generic stack apply function (h$ap_gen) that can do everything, but less
 -- efficiently than other more specialized functions.
 --
 -- Stack layout:
---  0. tag: (regs << 8 | arity)
---  1. args
+--  -3: ...
+--  -2: args
+--  -1: tag (number of arg slots << 8 | number of args)
 --
 -- Regs:
---  R1 = closure to apply to
+--  R1 = applied closure
 --
--- FIXME: set closure info of stack frame
 genericStackApply :: StgToJSConfig -> JStat
-genericStackApply cfg =
-  closure info $ jVar \cf ->
-    [ traceRts cfg (jString "h$ap_gen")
-    , cf |= closureEntry r1
-      -- switch on closure type
-    , SwitchStat (entryClosureType cf)
-      [ (toJExpr Thunk    , thunk_case cfg cf)
-      , (toJExpr Fun      , fun_case cf (funArity' cf))
-      , (toJExpr Pap      , fun_case cf (papArity r1))
-      , (toJExpr Blackhole, blackhole_case cfg)
-      ]
-      (default_case cf)
-    ]
+genericStackApply cfg = closure info body
   where
+    -- h$ap_gen body
+    body = jVar \cf ->
+      [ traceRts cfg (jString "h$ap_gen")
+      , cf |= closureEntry r1
+        -- switch on closure type
+      , SwitchStat (entryClosureType cf)
+        [ (toJExpr Thunk    , thunk_case cfg cf)
+        , (toJExpr Fun      , fun_case cf (funArity' cf))
+        , (toJExpr Pap      , fun_case cf (papArity r1))
+        , (toJExpr Blackhole, blackhole_case cfg)
+        ]
+        (default_case cf)
+      ]
+
     -- info table for h$ap_gen
     info = ClosureInfo
       { ciVar     = "h$ap_gen"
@@ -428,51 +504,88 @@ genericStackApply cfg =
       , returnS (app "h$blockOnBlackhole" [r1])
       ]
 
-    fun_case c arity = jVar \myArity ar myAr myRegs regs newTag newAp p dat ->
-      [ myArity |= stack .! (sp - 1)
-      , ar |= mask8 arity
-      , myAr |= mask8 myArity
-      , myRegs |= myArity .>>. 8
-      , traceRts cfg (jString "h$ap_gen: args: " + myAr
-                    + jString " regs: " + myRegs)
-      , ifBlockS (myAr .===. ar)
-        -- then
+    fun_case c arity = jVar \tag needed_args needed_regs given_args given_regs newTag newAp p dat ->
+      [ tag         |= stack .! (sp - 1) -- tag on the stack
+      , given_args  |= mask8 tag         -- indicates the number of passed args
+      , given_regs  |= tag .>>. 8        -- and the number of passed values for registers
+      , needed_args |= mask8 arity
+      , needed_regs |= arity .>>. 8
+      , traceRts cfg (jString "h$ap_gen: args: " + given_args
+                    + jString " regs: " + given_regs)
+      , ifBlockS (given_args .===. needed_args)
+        --------------------------------
+        -- exactly saturated application
+        --------------------------------
         [ traceRts cfg (jString "h$ap_gen: exact")
-        , loop 0 (.<. myRegs)
-                         (\i -> appS "h$setReg" [i+2, stack .! (sp-2-i)]
-                           <> postIncrS i)
-        , (sp |= sp - myRegs - 2)
+        -- Set registers to register values on the stack
+        , loop 0 (.<. given_regs) \i -> mconcat
+            [ appS "h$setReg" [i+2, stack .! (sp-2-i)]
+            , postIncrS i
+            ]
+        -- drop register values from the stack
+        , sp |= sp - given_regs - 2
+        -- enter closure in R1
         , returnS c
         ]
-        -- else
-        [ ifBlockS (myAr .>. ar)
-            --then
-            [ regs |= arity .>>. 8
-            , traceRts cfg (jString "h$ap_gen: oversat: arity: " + ar
-                          + jString " regs: " + regs)
-            , loop 0 (.<. regs)
-              (\i -> traceRts cfg (jString "h$ap_gen: loading register: " + i)
-                <> appS "h$setReg" [i+2, stack .! (sp-2-i)]
-                <> postIncrS i)
-            , newTag |= ((myRegs-regs).<<.8).|.myAr - ar
+        [ ifBlockS (given_args .>. needed_args)
+            ----------------------------
+            -- oversaturated application
+            ----------------------------
+            [ traceRts cfg (jString "h$ap_gen: oversat: arity: " + needed_args
+                          + jString " regs: " + needed_regs)
+            -- load needed register values
+            , loop 0 (.<. needed_regs) \i -> mconcat
+                [ traceRts cfg (jString "h$ap_gen: loading register: " + i)
+                , appS "h$setReg" [i+2, stack .! (sp-2-i)]
+                , postIncrS i
+                ]
+            -- compute new tag with consumed register values and args removed
+            , newTag |= ((given_regs-needed_regs).<<.8) .|. (given_args - needed_args)
+            -- find application function for the remaining regs/args
             , newAp |= var "h$apply" .! newTag
             , traceRts cfg (jString "h$ap_gen: next: " + (newAp .^ "n"))
+
+            -- Drop used registers from the stack.
+            -- Test if the application function needs a tag and push it.
             , ifS (newAp .===. var "h$ap_gen")
-                   ((sp |= sp - regs) <> (stack .! (sp - 1) |= newTag))
-                   (sp |= sp - regs - 1)
+                   ((sp |= sp - needed_regs) <> (stack .! (sp - 1) |= newTag))
+                   (sp |= sp - needed_regs - 1)
+                -- FIXME (Sylvain 2022-08): this is fragile and probably inefficient.
+                -- Instead of filling h$apply array with h$ap_gen, we should leave
+                -- it with empty items and match "undefined" here.
+
+            -- Push generic application function as continuation
             , stack .! sp |= newAp
+
+            -- Push "current thread CCS restore" function as continuation
             , profStat cfg pushRestoreCCS
+
+            -- enter closure in R1
             , returnS c
             ]
-            -- else
+
+            -----------------------------
+            -- undersaturated application
+            -----------------------------
             [ traceRts cfg (jString "h$ap_gen: undersat")
-            , p   |= var "h$paps" .! myRegs
-            , dat |= toJExpr [r1, ((arity .>>. 8)-myRegs)*256+ar-myAr]
-            ,  loop 0 (.<. myRegs)
-               (\i -> (dat .^ "push") `ApplStat` [stack .! (sp - i - 2)]
-                      <> postIncrS i)
-            , sp  |= sp - myRegs - 2
+            -- find PAP entry function corresponding to given_regs count
+            , p      |= var "h$paps" .! given_regs
+
+            -- build PAP payload: R1 + tag + given register values
+            , newTag |= ((needed_regs-given_regs) .<<. 8) .|. (needed_args-given_args)
+            , dat    |= toJExpr [r1, newTag]
+            , loop 0 (.<. given_regs) \i -> mconcat
+                [ (dat .^ "push") `ApplStat` [stack .! (sp - i - 2)]
+                , postIncrS i
+                ]
+
+            -- remove register values from the stack.
+            , sp  |= sp - given_regs - 2
+
+            -- alloc PAP closure, store reference to it in R1.
             , r1  |= initClosure cfg p dat jCurrentCCS
+
+            -- return to the continuation on the stack
             , returnStack
             ]
         ]
@@ -590,51 +703,65 @@ genericFastApply s =
                              <> postDecrS i
                            )
 
-stackApply :: StgToJSConfig
-           -> Int         -- ^ number of registers in stack frame
-           -> Int         -- ^ number of arguments
-           -> JStat
-stackApply s r n =
-  closure (ClosureInfo funcName (CIRegs 0 [PtrV]) funcName layout CIStackFrame mempty)
-          body
-  where
-    layout    = CILayoutUnknown r
+-- | Make specialized apply function for the given ApplySpec
+specApply :: StgToJSConfig -> ApplySpec -> JStat
+specApply cfg spec@(ApplySpec conv nargs nvars) =
+  let fun_name = specApplyName spec
+  in case conv of
+    RegsConv  -> fastApply  cfg fun_name nargs nvars
+    StackConv -> stackApply cfg fun_name nargs nvars
 
-    funcName = mkFastString ("h$ap_" ++ show n ++ "_" ++ show r)
+-- | Make specialized apply function with Stack calling convention
+stackApply
+  :: StgToJSConfig
+  -> FastString
+  -> Int
+  -> Int
+  -> JStat
+stackApply s fun_name nargs nvars =
+  -- special case for h$ap_0_0
+  if nargs == 0 && nvars == 0
+    then closure info0 body0
+    else closure info body
+  where
+    info  = ClosureInfo fun_name (CIRegs 0 [PtrV]) fun_name (CILayoutUnknown nvars) CIStackFrame mempty
+    info0 = ClosureInfo fun_name (CIRegs 0 [PtrV]) fun_name (CILayoutFixed 0 [])    CIStackFrame mempty
+
+    body0 = adjSpN' 1 <> enter s r1
 
     body = jVar \c ->
              [ c |= closureEntry r1
-             , traceRts s (toJExpr funcName
+             , traceRts s (toJExpr fun_name
                            + jString " "
                            + (c .^ "n")
                            + jString " sp: " + sp
                            + jString " a: "  + (c .^ "a"))
              , SwitchStat (entryClosureType c)
-               [ (toJExpr Thunk, traceRts s (toJExpr $ funcName <> ": thunk") <> profStat s pushRestoreCCS <> returnS c)
-               , (toJExpr Fun, traceRts s (toJExpr $ funcName <> ": fun") <> funCase c)
-               , (toJExpr Pap, traceRts s (toJExpr $ funcName <> ": pap") <> papCase c)
+               [ (toJExpr Thunk, traceRts s (toJExpr $ fun_name <> ": thunk") <> profStat s pushRestoreCCS <> returnS c)
+               , (toJExpr Fun, traceRts s (toJExpr $ fun_name <> ": fun") <> funCase c)
+               , (toJExpr Pap, traceRts s (toJExpr $ fun_name <> ": pap") <> papCase c)
                , (toJExpr Blackhole, push' s [r1, var "h$return"] <> returnS (app "h$blockOnBlackhole" [r1]))
-               ] (appS "throw" [toJExpr ("panic: " <> funcName <> ", unexpected closure type: ") + (entryClosureType c)])
+               ] (appS "throw" [toJExpr ("panic: " <> fun_name <> ", unexpected closure type: ") + (entryClosureType c)])
              ]
 
-    funExact c = popSkip' 1 (reverse $ take r jsRegsFromR2) <> returnS c
-    stackArgs = map (\x -> stack .! (sp - toJExpr x)) [1..r]
+    funExact c = popSkip' 1 (reverse $ take nvars jsRegsFromR2) <> returnS c
+    stackArgs = map (\x -> stack .! (sp - toJExpr x)) [1..nvars]
 
     papCase :: JExpr -> JStat
     papCase c = jVar \expr arity0 arity ->
       case expr of
         ValExpr (JVar pap) -> [ arity0 |= papArity r1
                               , arity |= mask8 arity0
-                              , traceRts s (toJExpr (funcName <> ": found pap, arity: ") + arity)
-                              , ifS (toJExpr n .===. arity)
+                              , traceRts s (toJExpr (fun_name <> ": found pap, arity: ") + arity)
+                              , ifS (toJExpr nargs .===. arity)
                               --then
-                                (traceRts s (toJExpr (funcName <> ": exact")) <> funExact c)
+                                (traceRts s (toJExpr (fun_name <> ": exact")) <> funExact c)
                               -- else
-                                (ifS (toJExpr n .>. arity)
-                                  (traceRts s (toJExpr (funcName <> ": oversat")) <> oversatCase c arity0 arity)
-                                  (traceRts s (toJExpr (funcName <> ": undersat"))
-                                   <> mkPap s pap r1 (toJExpr n) stackArgs -- FIXME do we want double pap?
-                                   <> (sp |= sp - toJExpr (r + 1))
+                                (ifS (toJExpr nargs .>. arity)
+                                  (traceRts s (toJExpr (fun_name <> ": oversat")) <> oversatCase c arity0 arity)
+                                  (traceRts s (toJExpr (fun_name <> ": undersat"))
+                                   <> mkPap s pap r1 (toJExpr nargs) stackArgs -- FIXME do we want double pap?
+                                   <> (sp |= sp - toJExpr (nvars + 1))
                                    <> (r1 |= toJExpr pap)
                                    <> returnStack))
                               ]
@@ -651,14 +778,14 @@ stackApply s r n =
       case expr of
         ValExpr (JVar pap) -> [ ar0 |= funArity' c
                               , ar |= mask8 ar0
-                              , ifS (toJExpr n .===. ar)
-                                (traceRts s (toJExpr (funcName <> ": exact")) <> funExact c)
-                                (ifS (toJExpr n .>. ar)
-                                 (traceRts s (toJExpr (funcName <> ": oversat"))
+                              , ifS (toJExpr nargs .===. ar)
+                                (traceRts s (toJExpr (fun_name <> ": exact")) <> funExact c)
+                                (ifS (toJExpr nargs .>. ar)
+                                 (traceRts s (toJExpr (fun_name <> ": oversat"))
                                   <> oversatCase c ar0 ar)
-                                 (traceRts s (toJExpr (funcName <> ": undersat"))
-                                  <> mkPap s pap (toJExpr R1) (toJExpr n) stackArgs
-                                  <> (sp |= sp - toJExpr (r+1))
+                                 (traceRts s (toJExpr (fun_name <> ": undersat"))
+                                  <> mkPap s pap (toJExpr R1) (toJExpr nargs) stackArgs
+                                  <> (sp |= sp - toJExpr (nvars+1))
                                   <> (r1 |= toJExpr pap)
                                   <> returnStack))
                               ]
@@ -680,64 +807,68 @@ stackApply s r n =
         [ rs |= (arity .>>. 8)
         , loadRegs rs
         , sp |= sp - rs
-        , newAp |= (var "h$apply" .! (toJExpr n-arity0.|.((toJExpr r-rs).<<.8)))
+        , newAp |= (var "h$apply" .! (toJExpr nargs-arity0.|.((toJExpr nvars-rs).<<.8)))
         , stack .! sp |= newAp
         , profStat s pushRestoreCCS
-        , traceRts s (toJExpr (funcName <> ": new stack frame: ") + (newAp .^ "n"))
+        , traceRts s (toJExpr (fun_name <> ": new stack frame: ") + (newAp .^ "n"))
         , returnS c
         ]
       where
         loadRegs rs = SwitchStat rs switchAlts mempty
           where
-            switchAlts = map (\x -> (toJExpr x, jsReg (x+1) |= stack .! (sp - toJExpr x))) [r,r-1..1]
+            switchAlts = map (\x -> (toJExpr x, jsReg (x+1) |= stack .! (sp - toJExpr x))) [nvars,nvars-1..1]
 
-{-
-  stg_ap_r_n_fast is entered if a function of unknown arity
-  is called, n arguments are already in r registers
--}
-fastApply :: StgToJSConfig -> Int -> Int -> JStat
-fastApply s r n = func ||= toJExpr (JFunc myFunArgs body)
-    where
-      funName = mkFastString ("h$ap_" ++ show n ++ "_" ++ show r ++ "_fast")
-      func    = TxtI funName
+-- | Make specialized apply function with Regs calling convention
+--
+-- h$ap_n_r_fast is entered if a function of unknown arity is called, n
+-- arguments are already in r registers
+fastApply :: StgToJSConfig -> FastString -> Int -> Int -> JStat
+fastApply s fun_name nargs nvars = func ||= body0
+  where
+      -- special case for h$ap_0_0_fast
+      body0 = if nargs == 0 && nvars == 0
+        then jLam (enter s r1)
+        else toJExpr (JFunc myFunArgs body)
+
+      func    = TxtI fun_name
 
       myFunArgs = []
 
-      regArgs = take r jsRegsFromR2
+      regArgs = take nvars jsRegsFromR2
 
       mkAp :: Int -> Int -> [JExpr]
-      mkAp n' r' = [ var . mkFastString $ "h$ap_" ++ show n' ++ "_" ++ show r' ]
+      mkAp n' r' = [ specApplyExpr (ApplySpec StackConv n' r') ]
 
       body =
         jVar \c farity arity ->
           [ c |= closureEntry r1
-          , traceRts s (toJExpr (funName <> ": sp ") + sp)
+          , traceRts s (toJExpr (fun_name <> ": sp ") + sp)
           -- TODO: Jeff (2022,03): factor our and dry out this code
           , SwitchStat (entryClosureType c)
-             [(toJExpr Fun, traceRts s (toJExpr (funName <> ": ")
+             [(toJExpr Fun, traceRts s (toJExpr (fun_name <> ": ")
                                         + clName c
                                         + jString " (arity: " + (c .^ "a") + jString ")")
                             <> (farity |= funArity' c)
                             <> funCase c farity)
-             ,(toJExpr Pap, traceRts s (toJExpr (funName <> ": pap")) <> (arity |= papArity r1) <> funCase c arity)
-             ,(toJExpr Thunk, traceRts s (toJExpr (funName <> ": thunk")) <> push' s (reverse regArgs ++ mkAp n r) <> profStat s pushRestoreCCS <> returnS c)
-             ,(toJExpr Blackhole, traceRts s (toJExpr (funName <> ": blackhole")) <> push' s (reverse regArgs ++ mkAp n r) <> push' s [r1, var "h$return"] <> returnS (app "h$blockOnBlackhole" [r1]))]
-             (appS "throw" [toJExpr (funName <> ": unexpected closure type: ") + entryClosureType c])
+             ,(toJExpr Pap, traceRts s (toJExpr (fun_name <> ": pap")) <> (arity |= papArity r1) <> funCase c arity)
+             ,(toJExpr Thunk, traceRts s (toJExpr (fun_name <> ": thunk")) <> push' s (reverse regArgs ++ mkAp nargs nvars) <> profStat s pushRestoreCCS <> returnS c)
+             ,(toJExpr Blackhole, traceRts s (toJExpr (fun_name <> ": blackhole")) <> push' s (reverse regArgs ++ mkAp nargs nvars) <> push' s [r1, var "h$return"] <> returnS (app "h$blockOnBlackhole" [r1]))]
+             (appS "throw" [toJExpr (fun_name <> ": unexpected closure type: ") + entryClosureType c])
           ]
 
       funCase :: JExpr -> JExpr -> JStat
       funCase c arity = jVar \arg ar -> case arg of
           ValExpr (JVar pap) -> [ ar |= mask8 arity
-                                ,  ifS (toJExpr n .===. ar)
+                                ,  ifS (toJExpr nargs .===. ar)
                                   -- then
-                                  (traceRts s (toJExpr (funName <> ": exact")) <> returnS c)
+                                  (traceRts s (toJExpr (fun_name <> ": exact")) <> returnS c)
                                   -- else
-                                  (ifS (toJExpr n .>. ar)
+                                  (ifS (toJExpr nargs .>. ar)
                                     --then
-                                    (traceRts s (toJExpr (funName <> ": oversat")) <> oversatCase c arity)
+                                    (traceRts s (toJExpr (fun_name <> ": oversat")) <> oversatCase c arity)
                                     -- else
-                                    (traceRts s (toJExpr (funName <> ": undersat"))
-                                     <> mkPap s pap r1 (toJExpr n) regArgs
+                                    (traceRts s (toJExpr (fun_name <> ": undersat"))
+                                     <> mkPap s pap r1 (toJExpr nargs) regArgs
                                      <> (r1 |= toJExpr pap)
                                      <> returnStack))
                                 ]
@@ -752,29 +883,26 @@ fastApply s r n = func ||= toJExpr (JFunc myFunArgs body)
       oversatCase c arity =
          jVar \rs rsRemain ->
            [ rs |= arity .>>. 8
-           , rsRemain |= toJExpr r - rs
+           , rsRemain |= toJExpr nvars - rs
            , traceRts s (toJExpr
-                         (funName <> " regs oversat ")
+                         (fun_name <> " regs oversat ")
                           + rs
                           + jString " remain: "
                           + rsRemain)
            , saveRegs rs
            , sp |= sp + rsRemain + 1
-           , stack .! sp |= var "h$apply" .! ((rsRemain.<<.8).|. toJExpr n - mask8 arity)
+           , stack .! sp |= var "h$apply" .! ((rsRemain.<<.8).|. toJExpr nargs - mask8 arity)
            , profStat s pushRestoreCCS
            , returnS c
            ]
           where
             saveRegs n = SwitchStat n switchAlts mempty
               where
-                switchAlts = map (\x -> (toJExpr x, stack .! (sp + toJExpr (r-x)) |= jsReg (x+2))) [0..r-1]
+                switchAlts = map (\x -> (toJExpr x, stack .! (sp + toJExpr (nvars-x)) |= jsReg (x+2))) [0..nvars-1]
 
 zeroApply :: StgToJSConfig -> JStat
 zeroApply s = mconcat
-  [ TxtI "h$ap_0_0_fast" ||= jLam (enter s r1)
-  , closure (ClosureInfo "h$ap_0_0" (CIRegs 0 [PtrV]) "h$ap_0_0" (CILayoutFixed 0 []) CIStackFrame mempty)
-    (adjSpN' 1 <> enter s r1)
-  , TxtI "h$e" ||= jLam (\c -> (r1 |= c) <> enter s c)
+  [ TxtI "h$e" ||= jLam (\c -> (r1 |= c) <> enter s c)
   ]
 
 -- carefully enter a closure that might be a thunk or a function
@@ -1023,18 +1151,16 @@ moveRegs2 = TxtI "h$moveRegs2" ||= jLam moveSwitch
 
 -- Initalize a variable sized object from an array of values
 initClosure :: StgToJSConfig -> JExpr -> JExpr -> JExpr -> JExpr
-initClosure cfg entry values ccs =
-  let cc | csProf cfg = Just ccs
-         | otherwise  = Nothing
-  in app "h$init_closure" [ newClosure $ Closure
-                              { clEntry  = entry
-                              , clField1 = null_
-                              , clField2 = null_
-                              , clMeta   = 0
-                              , clCC     = cc
-                              }
-                          , values
-                          ]
+initClosure cfg entry values ccs = app "h$init_closure"
+  [ newClosure $ Closure
+      { clEntry  = entry
+      , clField1 = null_
+      , clField2 = null_
+      , clMeta   = 0
+      , clCC     = if csProf cfg then Just ccs else Nothing
+      }
+  , values
+  ]
 
 -- | Return an expression for every field of the given Id
 getIdFields :: Id -> G [TypedExpr]
