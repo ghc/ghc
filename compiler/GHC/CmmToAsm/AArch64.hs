@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
--- | Native code generator for x86 and x86-64 architectures
+-- | Native code generator for AArch64 architectures
 module GHC.CmmToAsm.AArch64
    ( ncgAArch64 )
 where
