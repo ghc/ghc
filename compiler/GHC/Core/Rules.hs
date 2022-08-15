@@ -153,7 +153,7 @@ Note [Overall plumbing for rules]
 
   In a single simplifier run new rules can be added into the EPS so it matters
   to keep an up-to-date view of which rules have been loaded. For examples of
-  where this went wrong and caused cryptic performance regressions 
+  where this went wrong and caused cryptic performance regressions
   see T19790 and !6735.
 
 
