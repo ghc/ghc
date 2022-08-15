@@ -9,7 +9,7 @@ import GHC.Prelude
 
 import GHC.JS.Syntax
 import GHC.JS.Make
-import GHC.JS.Ppr
+import GHC.JS.Ppr ()
 
 import GHC.Stg.Syntax
 import GHC.Core.TyCon

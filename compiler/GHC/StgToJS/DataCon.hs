@@ -32,7 +32,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
 
-import qualified Data.Map as M
 import Data.Maybe
 
 genCon :: ExprCtx -> DataCon -> [JExpr] -> G JStat

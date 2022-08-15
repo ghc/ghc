@@ -23,7 +23,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Float
 
-import qualified Data.ByteString.Short as Short
 import Data.Bits as Bits
 import Data.Char (ord)
 
