@@ -29,6 +29,7 @@ data PipeEnv = PipeEnv {
        src_filename :: String,      -- ^ basename of original input source
        src_basename :: String,      -- ^ basename of original input source
        src_suffix   :: String,      -- ^ its extension
+       start_phase  :: Phase,
        output_spec  :: PipelineOutput -- ^ says where to put the pipeline output
   }
 
