@@ -1048,7 +1048,8 @@ findExternalRules opts binds imp_id_rules unfold_env
             -- In needed_fvs', we don't bother to delete binders from the fv set
 
          local_rules  = [ rule
-                        | id <- bndrs
+                        | (opt_expose_rules opts)
+                        , id <- bndrs
                         , is_external_id id   -- Only collect rules for external Ids
                         , rule <- idCoreRules id
                         , expose_rule rule ]  -- and ones that can fire in a client
