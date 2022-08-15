@@ -463,10 +463,9 @@ Library
 
     if arch(js)
         exposed-modules:
-            -- FIXME: Luite (2022,05): remove GHCJS name
-            GHCJS.Prim
-            GHCJS.Prim.Internal
-            GHCJS.Prim.Internal.Build
+            GHC.JS.Prim
+            GHC.JS.Prim.Internal
+            GHC.JS.Prim.Internal.Build
 
     -- We need to set the unit id to base (without a version number)
     -- as it's magic.

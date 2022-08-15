@@ -5,9 +5,9 @@
              UnboxedTuples
   #-}
 
-module GHCJS.Prim ( JSVal(..), JSVal#
-                  , JSException(..)
-                  , WouldBlockException(..)
+module GHC.JS.Prim ( JSVal(..), JSVal#
+                   , JSException(..)
+                   , WouldBlockException(..)
 #ifdef js_HOST_ARCH
                   , toIO
                   , resolve
@@ -112,9 +112,9 @@ toJSString :: String -> JSVal
 toJSString = js_toJSString . unsafeCoerce . seqList
 {-# INLINE [0] toJSString #-}
 {-# RULES
-"GHCJSPRIM toJSString/literal" forall a.
+"GHC.JS.PRIM toJSString/literal" forall a.
   toJSString (GHC.unpackCString# a) = JSVal (unsafeUnpackJSStringUtf8## a)
-"GHCJSPRIM toJSString/literalUtf8" forall a.
+"GHC.JS.PRIM toJSString/literalUtf8" forall a.
   toJSString (GHC.unpackCStringUtf8# a) = JSVal (unsafeUnpackJSStringUtf8## a)
   #-}
 
@@ -152,9 +152,9 @@ getProp :: JSVal -> String -> IO JSVal
 getProp o p = js_getProp o (unsafeCoerce $ seqList p)
 {-# INLINE [0] getProp #-}
 {-# RULES
-"GHCJSPRIM getProp/literal" forall o a.
+"GHC.JS.PRIM getProp/literal" forall o a.
   getProp o (GHC.unpackCString# a) = getProp# o a
-"GHCJSPRIM getProp/literalUtf8" forall o a.
+"GHC.JS.PRIM getProp/literalUtf8" forall o a.
   getProp o (GHC.unpackCStringUtf8# a) = getPropUtf8# o a
   #-}
 
@@ -163,9 +163,9 @@ unsafeGetProp :: JSVal -> String -> JSVal
 unsafeGetProp o p = js_unsafeGetProp o (unsafeCoerce $ seqList p)
 {-# INLINE [0] unsafeGetProp #-}
 {-# RULES
-"GHCJSPRIM unsafeGetProp/literal" forall o a.
+"GHC.JS.PRIM unsafeGetProp/literal" forall o a.
   unsafeGetProp o (GHC.unpackCString# a) = unsafeGetProp# o a
-"GHCJSPRIM unsafeGetProp/literalUtf8" forall o a.
+"GHC.JS.PRIM unsafeGetProp/literalUtf8" forall o a.
   unsafeGetProp o (GHC.unpackCStringUtf8# a) = unsafeGetPropUtf8# o a
   #-}
 
@@ -173,9 +173,9 @@ getProp' :: JSVal -> JSVal -> IO JSVal
 getProp' o p = js_getProp' o p
 {-# INLINE [0] getProp' #-}
 {-# RULES
-"GHCJSPRIM getProp'/literal" forall o a.
+"GHC.JS.PRIM getProp'/literal" forall o a.
   getProp' o (unsafeUnpackJSString# a) = getProp# o a
-"GHCJSPRIM getProp'/literalUtf8" forall o a.
+"GHC.JS.PRIM getProp'/literalUtf8" forall o a.
   getProp' o (unsafeUnpackJSStringUtf8# a) = getPropUtf8# o a
   #-}
 
@@ -184,9 +184,9 @@ unsafeGetProp' :: JSVal -> JSVal -> JSVal
 unsafeGetProp' o p = js_unsafeGetProp' o p
 {-# INLINE [0] unsafeGetProp' #-}
 {-# RULES
-"GHCJSPRIM unsafeGetProp'/literal" forall o a.
+"GHC.JS.PRIM unsafeGetProp'/literal" forall o a.
   unsafeGetProp' o (unsafeUnpackJSString# a) = unsafeGetPropUtf8# o a
-"GHCJSPRIM unsafeGetProp'/literalUtf8" forall o a.
+"GHC.JS.PRIM unsafeGetProp'/literalUtf8" forall o a.
   unsafeGetProp' o (unsafeUnpackJSStringUtf8# a) = unsafeGetPropUtf8# o a
   #-}
 

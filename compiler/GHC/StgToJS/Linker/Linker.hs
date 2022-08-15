@@ -707,7 +707,6 @@ readArObject ar_state mod ar_file = do
                 ++ " in "
                 ++ ar_file)
                 (BL.fromStrict . Ar.filedata) (find matchTag entries)
-  -- mapM_ (\e -> putStrLn ("found file: " ++ Ar.filename e)) entries
 
 {- | Static dependencies are symbols that need to be linked regardless
      of whether the linked program refers to them. For example
@@ -721,29 +720,6 @@ newtype StaticDeps =
 noStaticDeps :: StaticDeps
 noStaticDeps = StaticDeps []
 
-{- | The input file format for static deps is a yaml document with a
-     package/module/symbol tree where symbols can be either a list or
-     just a single string, for example:
-
-     base:
-       GHC.Conc.Sync:          reportError
-       Control.Exception.Base: nonTermination
-     ghcjs-prim:
-       GHCJS.Prim:
-         - JSVal
-         - JSException
- -}
--- instance FromJSON StaticDeps where
---   parseJSON (Object v) = StaticDeps . concat <$> mapM (uncurry parseMod) (HM.toList v)
---     where
---       parseMod p (Object v) = concat <$> mapM (uncurry (parseSymb p)) (HM.toList v)
---       parseMod _ _          = mempty
---       parseSymb p m (String s) = pure [(p,m,s)]
---       parseSymb p m (Array v)  = mapM (parseSingleSymb p m) (V.toList v)
---       parseSymb _ _ _          = mempty
---       parseSingleSymb p m (String s) = pure (p,m,s)
---       parseSingleSymb _ _ _          = mempty
---   parseJSON _          = mempty
 
 -- | dependencies for the RTS, these need to be always linked
 rtsDeps :: [UnitId] -> IO ([UnitId], Set ExportedFun)
@@ -782,7 +758,7 @@ readSystemDeps' file
   -- wired-in just like in GHC and thus we should make them top level
   -- definitions
   | file == "thdeps.yaml" = pure ( [ baseUnitId ]
-                                 , S.fromList $ d baseUnitId "GHCJS.Prim.TH.Eval" ["runTHServer"])
+                                 , S.fromList $ d baseUnitId "GHC.JS.Prim.TH.Eval" ["runTHServer"])
   | file == "rtsdeps.yaml" = pure ( [ baseUnitId
                                     , primUnitId
                                     , bignumUnitId
@@ -800,8 +776,8 @@ readSystemDeps' file
                                   -- FIXME Sylvain (2022,05): no longer valid
                                   -- integer constructors
                                   -- , d bignumUnitId "GHC.Integer.Type" ["S#", "Jp#", "Jn#"]
-                                  , d baseUnitId "GHCJS.Prim" ["JSVal", "JSException", "$fShowJSException", "$fExceptionJSException", "resolve", "resolveIO", "toIO"]
-                                  , d baseUnitId "GHCJS.Prim.Internal" ["wouldBlock", "blockedIndefinitelyOnMVar", "blockedIndefinitelyOnSTM", "ignoreException", "setCurrentThreadResultException", "setCurrentThreadResultValue"]
+                                  , d baseUnitId "GHC.JS.Prim" ["JSVal", "JSException", "$fShowJSException", "$fExceptionJSException", "resolve", "resolveIO", "toIO"]
+                                  , d baseUnitId "GHC.JS.Prim.Internal" ["wouldBlock", "blockedIndefinitelyOnMVar", "blockedIndefinitelyOnSTM", "ignoreException", "setCurrentThreadResultException", "setCurrentThreadResultValue"]
                                   ]
                                   )
   | otherwise = pure (mempty, mempty)
