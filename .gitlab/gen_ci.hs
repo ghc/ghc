@@ -2,13 +2,16 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {- cabal:
-build-depends: base, monoidal-containers, aeson >= 1.8.1, containers, bytestring
+build-depends: base, aeson >= 1.8.1, containers, bytestring
 -}
 
+import Data.Coerce
 import Data.String (String)
 import Data.Aeson as A
-import qualified Data.Map.Monoidal as M
+import qualified Data.Map as Map
+import Data.Map (Map)
 import qualified Data.ByteString.Lazy as B hiding (putStrLn)
 import qualified Data.ByteString.Lazy.Char8 as B
 import Data.List (intercalate)
@@ -307,10 +310,22 @@ dockerImage _ _ = Nothing
 -- The "proper" solution would be to use a dependent monoidal map where each key specifies
 -- the combination behaviour of it's values. Ie, whether setting it multiple times is an error
 -- or they should be combined.
-type Variables = M.MonoidalMap String [String]
+newtype MonoidalMap k v = MonoidalMap (Map k v)
+    deriving (Eq, Show, Functor, ToJSON)
+
+instance (Ord k, Semigroup v) => Semigroup (MonoidalMap k v) where
+    (MonoidalMap a) <> (MonoidalMap b) = MonoidalMap (Map.unionWith (<>) a b)
+
+instance (Ord k, Semigroup v) => Monoid (MonoidalMap k v) where
+    mempty = MonoidalMap (Map.empty)
+
+mminsertWith :: Ord k => (a -> a -> a) -> k -> a -> MonoidalMap k a -> MonoidalMap k a
+mminsertWith f k v (MonoidalMap m) = MonoidalMap (Map.insertWith f k v m)
+
+type Variables = MonoidalMap String [String]
 
 (=:) :: String -> String -> Variables
-a =: b = M.singleton a [b]
+a =: b = MonoidalMap (Map.singleton a [b])
 
 opsysVariables :: Arch -> Opsys -> Variables
 opsysVariables _ FreeBSD13 = mconcat
@@ -566,7 +581,7 @@ instance ToJSON Job where
     , "allow_failure" A..= jobAllowFailure
     -- Joining up variables like this may well be the wrong thing to do but
     -- at least it doesn't lose information silently by overriding.
-    , "variables" A..= (M.map (intercalate " ") jobVariables)
+    , "variables" A..= fmap (intercalate " ") jobVariables
     , "artifacts" A..= jobArtifacts
     , "cache" A..= jobCache
     , "after_script" A..= jobAfterScript
@@ -621,9 +636,9 @@ job arch opsys buildConfig = (jobName, Job {..})
       , "BUILD_FLAVOUR" =: flavourString jobFlavour
       , "BIGNUM_BACKEND" =: bignumString (bignumBackend buildConfig)
       , "CONFIGURE_ARGS" =: configureArgsStr buildConfig
-      , maybe M.empty ("CROSS_TARGET" =:) (crossTarget buildConfig)
-      , maybe M.empty ("CROSS_EMULATOR" =:) (crossEmulator buildConfig)
-      , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else M.empty
+      , maybe mempty ("CROSS_TARGET" =:) (crossTarget buildConfig)
+      , maybe mempty ("CROSS_EMULATOR" =:) (crossEmulator buildConfig)
+      , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else mempty
       ]
 
     jobArtifacts = Artifacts
@@ -669,7 +684,7 @@ addJobRule :: Rule -> Job -> Job
 addJobRule r j = j { jobRules = enableRule r (jobRules j) }
 
 addVariable :: String -> String -> Job -> Job
-addVariable k v j = j { jobVariables = M.insertWith (++) k [v] (jobVariables j) }
+addVariable k v j = j { jobVariables = mminsertWith (++) k [v] (jobVariables j) }
 
 -- Building the standard jobs
 --
@@ -765,8 +780,8 @@ flattenJobGroup (ValidateOnly a b) = [a, b]
 
 
 -- | Specification for all the jobs we want to build.
-jobs :: M.MonoidalMap String Job
-jobs = M.fromList $ concatMap flattenJobGroup $
+jobs :: Map String Job
+jobs = Map.fromList $ concatMap flattenJobGroup $
      [ disableValidate (standardBuilds Amd64 (Linux Debian10))
      , (standardBuildsWithConfig Amd64 (Linux Debian10) dwarf)
      , (validateBuilds Amd64 (Linux Debian10) nativeInt)
