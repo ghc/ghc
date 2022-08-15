@@ -77,6 +77,21 @@
     `Word64#` and `Int64#`, respectively. Previously on 32-bit platforms these
     were rather represented by `Word#` and `Int#`. See GHC #11953.
 
+## 4.16.3.0 *May 2022*
+
+  * Shipped with GHC 9.2.4
+
+  * winio: make consoleReadNonBlocking not wait for any events at all.
+
+  * winio: Add support to console handles to handleToHANDLE
+
+## 4.16.2.0 *May 2022*
+
+  * Shipped with GHC 9.2.2
+
+  * Export GHC.Event.Internal on Windows (#21245)
+
+  # Documentation Fixes
 
 ## 4.16.1.0 *Feb 2022*
 
