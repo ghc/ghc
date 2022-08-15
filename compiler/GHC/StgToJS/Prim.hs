@@ -930,6 +930,8 @@ genPrim prof ty op = case op of
                                                         ]
   FinalizeWeakOp     -> \[fl,fin] [w] -> PrimInline $ appT [fin, fl] "h$finalizeWeak" [w]
   TouchOp            -> \[] [_e]      -> PrimInline mempty -- fixme what to do?
+  KeepAliveOp        -> \[_r] [x, f]  -> PRPrimCall $ ReturnStat (app "h$keepAlive" [x, f])
+
 
 ------------------------------ Stable pointers and names ------------------------
 
@@ -1108,8 +1110,6 @@ genPrim prof ty op = case op of
   NewIOPortOp                       -> unhandledPrimop op
   ReadIOPortOp                      -> unhandledPrimop op
   WriteIOPortOp                     -> unhandledPrimop op
-
-  KeepAliveOp                       -> unhandledPrimop op
 
   GetSparkOp                        -> unhandledPrimop op
   AnyToAddrOp                       -> unhandledPrimop op

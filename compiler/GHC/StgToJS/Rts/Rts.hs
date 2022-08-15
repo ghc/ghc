@@ -523,6 +523,11 @@ rts' s =
                                   , adjSpN' 1
                                   , returnS (app "h$ap_0_0_fast" [])
                                   ]
+          , closure (ClosureInfo "h$keepAlive_e" (CIRegs 0 [PtrV]) "keepAlive" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
+                    (mconcat [ adjSpN' 2
+                             , returnS (stack .! sp)
+                             ]
+                    )
           -- a thunk that just raises a synchronous exception
           , closure (ClosureInfo "h$raise_e" (CIRegs 0 [PtrV]) "h$raise_e" (CILayoutFixed 0 []) CIThunk mempty)
                (returnS (app "h$throw" [closureField1 r1, false_]))
