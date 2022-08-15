@@ -249,7 +249,7 @@ buildPackageDocumentation = do
         vanillaSrcs <- hsSources context
         let srcs = vanillaSrcs `union` generatedSrcs
 
-        need $ srcs ++ haddocks
+        need $ srcs ++ (map snd haddocks)
 
         -- Build Haddock documentation
         -- TODO: Pass the correct way from Rules via Context.
@@ -364,8 +364,8 @@ buildManPage = do
             copyFileUntracked (dir -/- "ghc.1") file
 
 -- | Find the Haddock files for the dependencies of the current library.
-haddockDependencies :: Context -> Action [FilePath]
+haddockDependencies :: Context -> Action [(Package, FilePath)]
 haddockDependencies context = do
     depNames <- interpretInContext context (getContextData depNames)
-    sequence [ pkgHaddockFile $ vanillaContext Stage1 depPkg
+    sequence [ (,) <$> pure depPkg <*> (pkgHaddockFile $ vanillaContext Stage1 depPkg)
              | Just depPkg <- map findPackageByName depNames, depPkg /= rts ]
