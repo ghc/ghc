@@ -23,7 +23,7 @@ import GHC.Prelude
 
 import GHC.Hs
 
-import GHC.StgToCmm.Types (CgInfos (..))
+import GHC.StgToCmm.Types (CmmCgInfos (..))
 
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
@@ -98,6 +98,7 @@ import Data.Function
 import Data.List ( findIndex, mapAccumL, sortBy )
 import Data.Ord
 import Data.IORef
+import GHC.Stg.Pipeline (StgCgInfos)
 
 
 {-
@@ -133,16 +134,16 @@ mkPartialIface hsc_env mod_details mod_summary
 -- | Fully instantiate an interface. Adds fingerprints and potentially code
 -- generator produced information.
 --
--- CgInfos is not available when not generating code (-fno-code), or when not
+-- CmmCgInfos is not available when not generating code (-fno-code), or when not
 -- generating interface pragmas (-fomit-interface-pragmas). See also
 -- Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe CgInfos -> IO ModIface
-mkFullIface hsc_env partial_iface mb_cg_infos = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> IO ModIface
+mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
           | otherwise
-          = updateDecl (mi_decls partial_iface) mb_cg_infos
+          = updateDecl (mi_decls partial_iface) mb_stg_infos mb_cmm_infos
 
     full_iface <-
       {-# SCC "addFingerprints" #-}
@@ -155,11 +156,16 @@ mkFullIface hsc_env partial_iface mb_cg_infos = do
 
     return full_iface
 
-updateDecl :: [IfaceDecl] -> Maybe CgInfos -> [IfaceDecl]
-updateDecl decls Nothing = decls
-updateDecl decls (Just CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf_infos, cgTagSigs = tag_sigs })
+updateDecl :: [IfaceDecl] -> Maybe StgCgInfos -> Maybe CmmCgInfos -> [IfaceDecl]
+updateDecl decls Nothing Nothing = decls
+updateDecl decls m_stg_infos m_cmm_infos
   = map update_decl decls
   where
+    (non_cafs,lf_infos) = maybe (mempty, mempty)
+                                (\cmm_info -> (ncs_nameSet (cgNonCafs cmm_info), cgLFInfos cmm_info))
+                                m_cmm_infos
+    tag_sigs = fromMaybe mempty m_stg_infos
+
     update_decl (IfaceId nm ty details infos)
       | let not_caffy = elemNameSet nm non_cafs
       , let mb_lf_info = lookupNameEnv lf_infos nm
@@ -176,6 +182,9 @@ updateDecl decls (Just CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf
 
     update_decl decl
       = decl
+
+
+
 
 -- | Make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -230,7 +239,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary
                    docs mod_summary
                    mod_details
 
-          mkFullIface hsc_env partial_iface Nothing
+          mkFullIface hsc_env partial_iface Nothing Nothing
 
 mkIface_ :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv

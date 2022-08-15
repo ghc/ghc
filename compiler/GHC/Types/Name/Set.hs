@@ -220,5 +220,5 @@ findUses dus uses
 
 -- | 'Id's which have no CAF references. This is a result of analysis of C--.
 -- It is always safe to use an empty 'NonCaffySet'. TODO Refer to Note.
-newtype NonCaffySet = NonCaffySet NameSet
+newtype NonCaffySet = NonCaffySet { ncs_nameSet :: NameSet }
   deriving (Semigroup, Monoid)

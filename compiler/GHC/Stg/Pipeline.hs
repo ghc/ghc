@@ -13,6 +13,7 @@ module GHC.Stg.Pipeline
   ( StgPipelineOpts (..)
   , StgToDo (..)
   , stg2stg
+  , StgCgInfos
   ) where
 
 import GHC.Prelude
@@ -38,6 +39,9 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import GHC.Settings (Platform)
+import GHC.Stg.InferTags (inferTags)
+import GHC.Types.Name.Env (NameEnv)
+import GHC.Stg.InferTags.TagSig (TagSig)
 
 data StgPipelineOpts = StgPipelineOpts
   { stgPipeline_phases      :: ![StgToDo]
@@ -50,6 +54,10 @@ data StgPipelineOpts = StgPipelineOpts
 
 newtype StgM a = StgM { _unStgM :: ReaderT Char IO a }
   deriving (Functor, Applicative, Monad, MonadIO)
+
+-- | Information to be exposed in interface files which is produced
+-- by the stg2stg passes.
+type StgCgInfos = NameEnv TagSig
 
 instance MonadUnique StgM where
   getUniqueSupplyM = StgM $ do { mask <- ask
@@ -65,7 +73,7 @@ stg2stg :: Logger
         -> StgPipelineOpts
         -> Module                    -- module being compiled
         -> [StgTopBinding]           -- input program
-        -> IO [CgStgTopBinding]        -- output program
+        -> IO ([CgStgTopBinding], StgCgInfos) -- output program
 stg2stg logger ictxt opts this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
         ; showPass logger "Stg2Stg"
@@ -84,7 +92,8 @@ stg2stg logger ictxt opts this_mod binds
           -- This pass will also augment each closure with non-global free variables
           -- annotations (which is used by code generator to compute offsets into closures)
         ; let binds_sorted_with_fvs = depSortWithAnnotStgPgm this_mod binds'
-        ; return binds_sorted_with_fvs
+        -- See Note [Tag inference for interactive contexts]
+        ; inferTags (stgPipeline_pprOpts opts) logger this_mod binds_sorted_with_fvs
    }
 
   where

@@ -1669,10 +1669,21 @@ pushAtom d p (StgVarArg var)
         case lookupVarEnv topStrings var of
             Just ptr -> pushAtom d p $ StgLitArg $ mkLitWord platform $
               fromIntegral $ ptrToWordPtr $ fromRemotePtr ptr
-            Nothing -> do
-                let sz = idSizeCon platform var
-                massert (sz == wordSize platform)
-                return (unitOL (PUSH_G (getName var)), sz)
+            Nothing
+              -- PUSH_G doesn't tag constructors. So we use PACK here
+              -- if we are dealing with nullary constructor.
+              | Just con <- isDataConWorkId_maybe var
+              -> do
+                  massert (sz == wordSize platform)
+                  massert (isNullaryRepDataCon con)
+                  return (unitOL (PACK con 0), sz)
+              | otherwise
+              -> do
+                  let
+                  massert (sz == wordSize platform)
+                  return (unitOL (PUSH_G (getName var)), sz)
+              where
+                !sz = idSizeCon platform var
 
 
 pushAtom _ _ (StgLitArg lit) = pushLiteral True lit

@@ -735,7 +735,7 @@ hscBackendPipeline pipe_env hsc_env mod_sum result =
     NoBackend ->
       case result of
         HscUpdate iface ->  return (iface, Nothing)
-        HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing) <*> pure Nothing
+        HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing Nothing) <*> pure Nothing
     -- TODO: Why is there not a linkable?
     -- Interpreter -> (,) <$> use (T_IO (mkFullIface hsc_env (hscs_partial_iface result) Nothing)) <*> pure Nothing
     _ -> do
