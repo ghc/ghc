@@ -76,7 +76,7 @@ import           GHC.StgToJS.Types
 import           GHC.StgToJS.Linker.Types
 import           GHC.StgToJS.CoreUtils
 import           GHC.StgToJS.Closure
-import           GHC.StgToJS.Arg()
+import           GHC.StgToJS.Arg
 
 import Prelude
 import GHC.Utils.Encoding
@@ -389,12 +389,12 @@ staticInitStat :: Bool         -- ^ profiling enabled
                -> JStat
 staticInitStat _prof (StaticInfo i sv cc) =
   case sv of
-    StaticData con args -> appS "h$sti" ([var i, var con, toJExpr args] ++ ccArg)
-    StaticFun  f   args -> appS "h$sti" ([var i, var f, toJExpr args] ++ ccArg)
+    StaticData con args -> appS "h$sti" ([var i, var con, jsStaticArgs args] ++ ccArg)
+    StaticFun  f   args -> appS "h$sti" ([var i, var f, jsStaticArgs args] ++ ccArg)
     StaticList args mt   ->
-      appS "h$stl" ([var i, toJExpr args, toJExpr $ maybe null_ (toJExpr . TxtI) mt] ++ ccArg)
+      appS "h$stl" ([var i, jsStaticArgs args, toJExpr $ maybe null_ (toJExpr . TxtI) mt] ++ ccArg)
     StaticThunk (Just (f,args)) ->
-      appS "h$stc" ([var i, var f, toJExpr args] ++ ccArg)
+      appS "h$stc" ([var i, var f, jsStaticArgs args] ++ ccArg)
     _                    -> mempty
   where
     ccArg = maybeToList (fmap toJExpr cc)
