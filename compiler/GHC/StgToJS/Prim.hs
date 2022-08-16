@@ -62,7 +62,6 @@ genPrim prof ty op = case op of
   IntSubOp        -> \[r] [x,y] -> PrimInline $ r |= trunc (Sub x y)
   IntMulOp        -> \[r] [x,y] -> PrimInline $ r |= app "h$mulInt32" [x, y]
   IntMul2Op       -> \[c,hr,lr] [x,y] -> PrimInline $ appT [c,hr,lr] "h$hs_timesInt2" [x, y]
--- fixme may will give the wrong result in case of overflow
   IntMulMayOfloOp -> \[r] [x,y] -> PrimInline $ jVar \tmp -> mconcat
                                             [ tmp |= Mul x y
                                             , r   |= if01 (tmp .===. trunc tmp)
@@ -282,14 +281,13 @@ genPrim prof ty op = case op of
   Int64QuotOp -> \[hr,lr] [h0,l0,h1,l1] -> PrimInline $ appT [hr,lr] "h$hs_quotInt64"  [h0,l0,h1,l1]
   Int64RemOp  -> \[hr,lr] [h0,l0,h1,l1] -> PrimInline $ appT [hr,lr] "h$hs_remInt64"   [h0,l0,h1,l1]
 
-  Int64SllOp  -> \[hr,lr] [h,l,n] -> PrimInline $ appT [hr,lr] "h$hs_uncheckedIShiftL64"  [h,l,n]
-  Int64SraOp  -> \[hr,lr] [h,l,n] -> PrimInline $ appT [hr,lr] "h$hs_uncheckedIShiftRA64" [h,l,n]
-  Int64SrlOp  -> \[hr,lr] [h,l,n] -> PrimInline $ appT [hr,lr] "h$hs_uncheckedShiftRL64"  [h,l,n]
-      -- FIXME: Jeff 06-20222: Is this one right? No h$hs_uncheckedIShiftRL64?
+  Int64SllOp  -> \[hr,lr] [h,l,n] -> PrimInline $ appT [hr,lr] "h$hs_uncheckedShiftLLInt64" [h,l,n]
+  Int64SraOp  -> \[hr,lr] [h,l,n] -> PrimInline $ appT [hr,lr] "h$hs_uncheckedShiftRAInt64" [h,l,n]
+  Int64SrlOp  -> \[hr,lr] [h,l,n] -> PrimInline $ appT [hr,lr] "h$hs_uncheckedShiftRLInt64" [h,l,n]
 
   Int64ToWord64Op   -> \[r1,r2] [x1,x2] ->
       PrimInline $ mconcat
-       [ r1 |= x1
+       [ r1 |= x1 .>>>. 0
        , r2 |= x2
        ]
   IntToInt64Op      -> \[r1,r2] [x] ->
@@ -328,9 +326,8 @@ genPrim prof ty op = case op of
   Word64LeOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LOr (h0 .<. h1) (LAnd (h0 .!==. h1) (l0 .<=. l1)))
   Word64LtOp -> \[r] [h0,l0,h1,l1] -> PrimInline $ r |= if10 (LOr (h0 .<. h1) (LAnd (h0 .!==. h1) (l0 .<. l1)))
 
-  Word64SllOp -> \[hr,hl] [h, l, n] -> PrimInline $ appT [hr, hl] "h$hs_uncheckedIShiftL64" [h, l, n]
-  Word64SrlOp -> \[hr,hl] [h, l, n] -> PrimInline $ appT [hr, hl] "h$hs_uncheckedShiftRL64" [h, l, n]
-      -- FIXME: Jeff 06-20222: Is this one right? No h$hs_uncheckedIShiftRL64?
+  Word64SllOp -> \[hr,hl] [h, l, n] -> PrimInline $ appT [hr, hl] "h$hs_uncheckedShiftLWord64" [h, l, n]
+  Word64SrlOp -> \[hr,hl] [h, l, n] -> PrimInline $ appT [hr, hl] "h$hs_uncheckedShiftRWord64" [h, l, n]
 
   Word64OrOp  -> \[hr,hl] [h0, l0, h1, l1] ->
       PrimInline $ mconcat
