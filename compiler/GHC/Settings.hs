@@ -18,7 +18,6 @@ module GHC.Settings
   , sTopDir
   , sGlobalPackageDatabasePath
   , sLdSupportsCompactUnwind
-  , sLdSupportsBuildId
   , sLdSupportsFilelist
   , sLdIsGnuLd
   , sGccSupportsNoPie
@@ -87,7 +86,6 @@ data Settings = Settings
 -- platform-specific and platform-agnostic.
 data ToolSettings = ToolSettings
   { toolSettings_ldSupportsCompactUnwind :: Bool
-  , toolSettings_ldSupportsBuildId       :: Bool
   , toolSettings_ldSupportsFilelist      :: Bool
   , toolSettings_ldIsGnuLd               :: Bool
   , toolSettings_ccSupportsNoPie         :: Bool
@@ -189,8 +187,6 @@ sGlobalPackageDatabasePath = fileSettings_globalPackageDatabase . sFileSettings
 
 sLdSupportsCompactUnwind :: Settings -> Bool
 sLdSupportsCompactUnwind = toolSettings_ldSupportsCompactUnwind . sToolSettings
-sLdSupportsBuildId :: Settings -> Bool
-sLdSupportsBuildId = toolSettings_ldSupportsBuildId . sToolSettings
 sLdSupportsFilelist :: Settings -> Bool
 sLdSupportsFilelist = toolSettings_ldSupportsFilelist . sToolSettings
 sLdIsGnuLd :: Settings -> Bool

@@ -202,7 +202,6 @@ $(includes_SETTINGS) : rts/include/Makefile | $$(dir $$@)/.
 	@echo ',("ld command", "$(SettingsLdCommand)")' >> $@
 	@echo ',("ld flags", "$(SettingsLdFlags)")' >> $@
 	@echo ',("ld supports compact unwind", "$(LdHasNoCompactUnwind)")' >> $@
-	@echo ',("ld supports build-id", "$(LdHasBuildId)")' >> $@
 	@echo ',("ld supports filelist", "$(LdHasFilelist)")' >> $@
 	@echo ',("ld is GNU ld", "$(LdIsGNULd)")' >> $@
 	@echo ',("Merge objects command", "$(SettingsMergeObjectsCommand)")' >> $@

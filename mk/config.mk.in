@@ -724,10 +724,6 @@ OPT = @OptCmd@
 # overflowing command-line length limits.
 LdIsGNULd		= @LdIsGNULd@
 
-# Set to YES if ld has the --build-id flag.  Sometimes we need to
-# disable it with --build-id=none.
-LdHasBuildId	        = @LdHasBuildId@
-
 # Set to YES if ld has the --no_compact_unwind flag. See #5019
 # and GHC.Driver.Pipeline.
 LdHasNoCompactUnwind	= @LdHasNoCompactUnwind@

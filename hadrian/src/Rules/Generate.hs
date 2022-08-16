@@ -311,7 +311,6 @@ generateSettings = do
         , ("ld command", expr $ settingsFileSetting SettingsFileSetting_LdCommand)
         , ("ld flags", expr $ settingsFileSetting SettingsFileSetting_LdFlags)
         , ("ld supports compact unwind", expr $ lookupSystemConfig "ld-has-no-compact-unwind")
-        , ("ld supports build-id", expr $ lookupSystemConfig "ld-has-build-id")
         , ("ld supports filelist", expr $ lookupSystemConfig "ld-has-filelist")
         , ("ld is GNU ld", expr $ lookupSystemConfig "ld-is-gnu-ld")
         , ("Merge objects command", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsCommand)
