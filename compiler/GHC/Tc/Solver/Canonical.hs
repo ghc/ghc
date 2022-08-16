@@ -52,6 +52,7 @@ import GHC.Data.Pair
 import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Utils.Monad
+import GHC.Utils.Constants( debugIsOn )
 import Control.Monad
 import Data.Maybe ( isJust, isNothing )
 import Data.List  ( zip4 )
@@ -957,8 +958,14 @@ canEqNC :: CtEvidence -> EqRel -> Type -> Type -> TcS (StopOrContinue Ct)
 canEqNC ev eq_rel ty1 ty2
   = do { result <- zonk_eq_types ty1 ty2
        ; case result of
-           Left (Pair ty1' ty2') -> can_eq_nc False ev eq_rel ty1' ty1 ty2' ty2
-           Right ty              -> canEqReflexive ev eq_rel ty }
+           Right ty              -> canEqReflexive ev eq_rel ty
+           Left (Pair ty1' ty2') -> can_eq_nc False ev' eq_rel ty1' ty1' ty2' ty2'
+             where
+               ev' | debugIsOn = setCtEvPredType ev $
+                                 mkPrimEqPredRole (eqRelRole eq_rel) ty1' ty2'
+                   | otherwise = ev
+                   -- ev': satisfy the precondition of can_eq_nc
+       }
 
 can_eq_nc
    :: Bool            -- True => both types are rewritten
@@ -967,6 +974,11 @@ can_eq_nc
    -> Type -> Type    -- LHS, after and before type-synonym expansion, resp
    -> Type -> Type    -- RHS, after and before type-synonym expansion, resp
    -> TcS (StopOrContinue Ct)
+-- Precondition: in DEBUG mode, the `ctev_pred` of `ev` is (ps_ty1 ~# ps_ty2),
+--               without zonking
+-- This precondition is needed (only in DEBUG) to satisfy the assertions
+--   in mkSelCo, called in canDecomposableTyConAppOK and canDecomposableFunTy
+
 can_eq_nc rewritten ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   = do { traceTcS "can_eq_nc" $
          vcat [ ppr rewritten, ppr ev, ppr eq_rel, ppr ty1, ppr ps_ty1, ppr ty2, ppr ps_ty2 ]
@@ -1948,7 +1960,7 @@ canDecomposableFunTy ev eq_rel f1@(m1,a1,r1) f2@(m2,a2,r2)
                                     , evCoercion $ mkSelCo role' (SelFun fs) ev_co )
                                   | (fs, ty1, ty2) <- [(SelMult, m1, m2)
                                                       ,(SelArg,  a1, a2)
-                                                      ,(SelRes,  r2, r2)]
+                                                      ,(SelRes,  r1, r2)]
                                   , let role' = funRole role fs ]
                    ; emitWorkNC given_evs }
 

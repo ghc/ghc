@@ -1380,8 +1380,8 @@ It is easy to see that
 A nominal reflexive coercion is quite common, so we keep the special form Refl to
 save allocation.
 
-Note [Coercion selection]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [SelCo]
+~~~~~~~~~~~~
 The Coercion form SelCo allows us to decompose a structural coercion, one
 between ForallTys, or TyConApps, or FunTys.
 

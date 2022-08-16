@@ -1926,23 +1926,17 @@ arisesFromGivens ct = isGivenCt ct || isGivenLoc (ctLoc ct)
 -- the evidence and the ctev_pred in sync with each other.
 -- See Note [CtEvidence invariants].
 setCtEvPredType :: HasDebugCallStack => CtEvidence -> Type -> CtEvidence
-setCtEvPredType old_ctev new_pred
-  = case old_ctev of
-    CtGiven { ctev_evar = ev, ctev_loc = loc } ->
-      CtGiven { ctev_pred = new_pred
-              , ctev_evar = setVarType ev new_pred
-              , ctev_loc  = loc
-              }
-    CtWanted { ctev_dest = dest, ctev_loc = loc, ctev_rewriters = rewriters } ->
-      CtWanted { ctev_pred      = new_pred
-               , ctev_dest      = new_dest
-               , ctev_loc       = loc
-               , ctev_rewriters = rewriters
-               }
-        where
-          new_dest = case dest of
-            EvVarDest ev -> EvVarDest (setVarType ev new_pred)
-            HoleDest h   -> HoleDest  (setCoHoleType h new_pred)
+setCtEvPredType old_ctev@(CtGiven { ctev_evar = ev }) new_pred
+  = old_ctev { ctev_pred = new_pred
+             , ctev_evar = setVarType ev new_pred }
+
+setCtEvPredType old_ctev@(CtWanted { ctev_dest = dest }) new_pred
+  = old_ctev { ctev_pred = new_pred
+             , ctev_dest = new_dest }
+  where
+    new_dest = case dest of
+      EvVarDest ev -> EvVarDest (setVarType ev new_pred)
+      HoleDest h   -> HoleDest  (setCoHoleType h new_pred)
 
 instance Outputable TcEvDest where
   ppr (HoleDest h)   = text "hole" <> ppr h
