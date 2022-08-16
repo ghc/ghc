@@ -1381,11 +1381,9 @@ deeplySkolemise skol_info ty
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
            ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
            ; let tv_prs1 = map tyVarName tvs `zip` tvs1
-           ; return ( mkWpLams ids1
-                      <.> mkWpTyLams tvs1
-                      <.> mkWpLams ev_vars1
-                      <.> wrap
-                      <.> mkWpEvVarApps ids1
+           ; return ( mkWpEta ids1 (mkWpTyLams tvs1
+                                    <.> mkWpEvLams ev_vars1
+                                    <.> wrap)
                     , tv_prs1  ++ tvs_prs2
                     , ev_vars1 ++ ev_vars2
                     , mkScaledFunTys arg_tys' rho ) }
@@ -1408,10 +1406,7 @@ deeplyInstantiate orig ty
            ; ids1  <- newSysLocalIds (fsLit "di") arg_tys'
            ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
            ; (wrap2, rho2) <- go subst' rho
-           ; return (mkWpLams ids1
-                        <.> wrap2
-                        <.> wrap1
-                        <.> mkWpEvVarApps ids1,
+           ; return (mkWpEta ids1 (wrap2 <.> wrap1),
                      mkScaledFunTys arg_tys' rho2) }
 
       | otherwise

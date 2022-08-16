@@ -8,7 +8,7 @@ module GHC.Tc.Types.Evidence (
   -- * HsWrapper
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
-  mkWpLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR,
+  mkWpEvLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, mkWpEta,
   collectHsWrapBinders,
   idHsWrapper, isIdHsWrapper,
   pprHsWrapper, hsWrapDictBinders,
@@ -68,6 +68,7 @@ import GHC.Prelude
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Var
+import GHC.Types.Id( idScaledType )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
@@ -239,7 +240,8 @@ data HsWrapper
        --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) ~> (exp_arg -> exp_res)
        -- This isn't the same as for mkFunCo, but it has to be this way
        -- because we can't use 'sym' to flip around these HsWrappers
-       -- The TcType is the "from" type of the first wrapper
+       -- The TcType is the "from" type of the first wrapper;
+       --     it always a Type, not a Constraint
        --
        -- NB: a WpFun is always for a VisArg, with (->) function arrow
        --
@@ -251,8 +253,11 @@ data HsWrapper
 
         -- Evidence abstraction and application
         -- (both dictionaries and coercions)
+        -- Both WpEvLam and WpEvApp abstract and apply values
+        --      of kind Constraint or Constraint#
   | WpEvLam EvVar               -- \d. []       the 'd' is an evidence variable
   | WpEvApp EvTerm              -- [] d         the 'd' is evidence for a constraint
+
         -- Kind and Type abstraction and application
   | WpTyLam TyVar       -- \a. []  the 'a' is a type/kind variable (not coercion var)
   | WpTyApp KindOrType  -- [] t    the 't' is a type (not coercion)
@@ -297,8 +302,8 @@ c1 <.> c2    = c1 `WpCompose` c2
 mkWpFun :: HsWrapper -> HsWrapper
         -> Scaled TcTypeFRR -- ^ the "from" type of the first wrapper
                             -- MUST have a fixed RuntimeRep
-        -> TcType           -- ^ either type of the second wrapper (used only when the
-                            -- second wrapper is the identity)
+        -> TcType           -- ^ Either "from" type or "to" type of the second wrapper
+                            --   (used only when the second wrapper is the identity)
         -> HsWrapper
   -- NB: we can't check that the argument type has a fixed RuntimeRep with an assertion,
   -- because of [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep]
@@ -308,6 +313,14 @@ mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  = WpCast (mk_fun_co w (mkTcRe
 mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 = WpCast (mk_fun_co w (mkTcSymCo co1)    (mkTcRepReflCo t2))
 mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  = WpCast (mk_fun_co w (mkTcSymCo co1)    co2)
 mkWpFun co1          co2          t1            _  = WpFun co1 co2 t1
+
+mkWpEta :: [Id] -> HsWrapper -> HsWrapper
+-- (mkWpEta [x1, x2] wrap) [e]
+--   = \x1. \x2.  wrap[e x1 x2]
+-- Just generates a bunch of WpFuns
+mkWpEta xs wrap = foldr eta_one wrap xs
+  where
+    eta_one x wrap = WpFun idHsWrapper wrap (idScaledType x)
 
 mk_fun_co :: Mult -> TcCoercionR -> TcCoercionR -> TcCoercionR
 mk_fun_co mult arg_co res_co
@@ -338,8 +351,8 @@ mkWpEvVarApps vs = mk_co_app_fn WpEvApp (map (EvExpr . evId) vs)
 mkWpTyLams :: [TyVar] -> HsWrapper
 mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
 
-mkWpLams :: [Var] -> HsWrapper
-mkWpLams ids = mk_co_lam_fn WpEvLam ids
+mkWpEvLams :: [Var] -> HsWrapper
+mkWpEvLams ids = mk_co_lam_fn WpEvLam ids
 
 mkWpLet :: TcEvBinds -> HsWrapper
 -- This no-op is a quite a common case

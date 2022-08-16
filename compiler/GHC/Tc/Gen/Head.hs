@@ -949,7 +949,7 @@ tcExprSig _ expr sig@(PartialSig { psig_name = name, sig_loc = loc })
        ; traceTc "tcExpSig" (ppr qtvs $$ ppr givens $$ ppr inferred_sigma $$ ppr my_sigma)
        ; let poly_wrap = wrap
                          <.> mkWpTyLams qtvs
-                         <.> mkWpLams givens
+                         <.> mkWpEvLams givens
                          <.> mkWpLet  ev_binds
        ; return (mkLHsWrap poly_wrap expr', my_sigma) }
 

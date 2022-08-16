@@ -1785,7 +1785,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
         meth_tau     = classMethodInstTy sel_id inst_tys
         error_string dflags = showSDoc dflags
                               (hcat [ppr inst_loc, vbar, ppr sel_id ])
-        lam_wrapper  = mkWpTyLams tyvars <.> mkWpLams dfun_ev_vars
+        lam_wrapper  = mkWpTyLams tyvars <.> mkWpEvLams dfun_ev_vars
 
     ----------------------
     -- Check if one of the minimal complete definitions is satisfied

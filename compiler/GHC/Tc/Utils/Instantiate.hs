@@ -187,7 +187,7 @@ topSkolemise skolem_info ty
       = do { (subst', tvs1) <- tcInstSkolTyVarsX skolem_info subst tvs
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
            ; go subst'
-                (wrap <.> mkWpTyLams tvs1 <.> mkWpLams ev_vars1)
+                (wrap <.> mkWpTyLams tvs1 <.> mkWpEvLams ev_vars1)
                 (tv_prs ++ (map tyVarName tvs `zip` tvs1))
                 (ev_vars ++ ev_vars1)
                 inner_ty }
