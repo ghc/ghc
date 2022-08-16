@@ -156,7 +156,7 @@ cpsTop logger platform cfg proc =
            return $ if cmmOptControlFlow cfg
                     then map (cmmCfgOptsProc splitting_proc_points) g
                     else g
-      g <- return (map removeUnreachableBlocksProc g)
+      g <- return $ map (removeUnreachableBlocksProc platform) g
            -- See Note [unreachable blocks]
       dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
 

@@ -1,6 +1,5 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module GHC.Cmm.ContFlowOpt
     ( cmmCfgOpts
@@ -21,8 +20,10 @@ import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch (mapSwitchTargets, switchTargetsToList)
 import GHC.Data.Maybe
-import GHC.Utils.Panic
+import GHC.Platform
 import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Control.Monad
 
@@ -422,9 +423,9 @@ predMap blocks = foldr add_preds mapEmpty blocks
     add_preds block env = foldr add env (successors block)
       where add lbl env = mapInsertWith (+) lbl 1 env
 
--- Removing unreachable blocks
-removeUnreachableBlocksProc :: CmmDecl -> CmmDecl
-removeUnreachableBlocksProc proc@(CmmProc info lbl live g)
+-- Remove unreachable blocks from procs
+removeUnreachableBlocksProc :: Platform -> CmmDecl -> CmmDecl
+removeUnreachableBlocksProc _ proc@(CmmProc info lbl live g)
    | used_blocks `lengthLessThan` mapSize (toBlockMap g)
    = CmmProc info' lbl live g'
    | otherwise
@@ -446,3 +447,5 @@ removeUnreachableBlocksProc proc@(CmmProc info lbl live g)
 
      used_lbls :: LabelSet
      used_lbls = setFromList $ map entryLabel used_blocks
+removeUnreachableBlocksProc platform data'@(CmmData _ _) =
+    pprPanic "removeUnreachableBlocksProc: passed data declaration instead of procedure" (pdoc platform data')
