@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleInstances, DeriveFunctor, DerivingVia #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS -fno-warn-name-shadowing #-}
 
 -----------------------------------------------------------------------------
 --
@@ -474,10 +473,10 @@ printStats dflags ActionStats{actionAllocs = mallocs, actionElapsedTime = secs}
                            Just allocs ->
                              text (separateThousands allocs) <+> text "bytes")))
   where
-    separateThousands n = reverse . sep . reverse . show $ n
-      where sep n'
+    separateThousands n = reverse . separate . reverse . show $ n
+      where separate n'
               | n' `lengthAtMost` 3 = n'
-              | otherwise           = take 3 n' ++ "," ++ sep (drop 3 n')
+              | otherwise           = take 3 n' ++ "," ++ separate (drop 3 n')
 
 -----------------------------------------------------------------------------
 -- reverting CAFs
@@ -526,13 +525,13 @@ turnOffBuffering_ fhv = do
   liftIO $ evalIO interp fhv
 
 mkEvalWrapper :: GhcMonad m => String -> [String] ->  m ForeignHValue
-mkEvalWrapper progname args =
+mkEvalWrapper progname' args' =
   runInternal $ GHC.compileParsedExprRemote
-  $ evalWrapper `GHC.mkHsApp` nlHsString progname
-                `GHC.mkHsApp` nlList (map nlHsString args)
+  $ evalWrapper' `GHC.mkHsApp` nlHsString progname'
+                 `GHC.mkHsApp` nlList (map nlHsString args')
   where
     nlHsString = nlHsLit . mkHsString
-    evalWrapper =
+    evalWrapper' =
       GHC.nlHsVar $ RdrName.mkOrig gHC_GHCI_HELPERS (mkVarOcc "evalWrapper")
 
 -- | Run a 'GhcMonad' action to compile an expression for internal usage.
