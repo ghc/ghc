@@ -2041,7 +2041,7 @@ that returned coercion. If we get long chains, that can be asymptotically
 inefficient, notably in
 * TransCo
 * InstCo
-* NthCo (cf #9233)
+* SelCo (cf #9233)
 * LRCo
 
 But the code is simple.  And this is only Lint.  Let's wait to see if
@@ -2299,33 +2299,34 @@ lintCoercion co@(TransCo co1 co2)
        ; lintRole co (coercionRole co1) (coercionRole co2)
        ; return (TransCo co1' co2') }
 
-lintCoercion the_co@(NthCo r0 n co)
+lintCoercion the_co@(SelCo r0 cs co)
   = do { co' <- lintCoercion co
        ; let (Pair s t, r) = coercionKindRole co'
        ; case (splitForAllTyCoVar_maybe s, splitForAllTyCoVar_maybe t) of
          { (Just _, Just _)
              -- works for both tyvar and covar
-             | n == 0
+             | SelForAll <- cs
              ,  (isForAllTy_ty s && isForAllTy_ty t)
              || (isForAllTy_co s && isForAllTy_co t)
              -> do { lintRole the_co Nominal r0
-                   ; return (NthCo r0 n co') }
+                   ; return (SelCo r0 cs co') }
 
          ; _ -> case (isFunTy s, isFunTy t) of
          { (True, True)
-             | n < 3
-             -> do { lintRole the_co (nthFunRole r n) r0
-                   ; return (NthCo r0 n co') }
+             | SelFun fs <- cs
+             -> do { lintRole the_co (funRole r fs) r0
+                   ; return (SelCo r0 cs co') }
 
          ; _ -> case (splitTyConApp_maybe s, splitTyConApp_maybe t) of
          { (Just (tc_s, tys_s), Just (tc_t, tys_t))
              | tc_s == tc_t
+             , SelTyCon n <- cs
              , isInjectiveTyCon tc_s r
-                 -- see Note [NthCo and newtypes] in GHC.Core.TyCo.Rep
+                 -- see Note [SelCo and newtypes] in GHC.Core.TyCo.Rep
              , tys_s `equalLength` tys_t
              , tys_s `lengthExceeds` n
-             -> do { lintRole the_co (nthRole r tc_s n) r0
-                   ; return (NthCo r0 n co') }
+             -> do { lintRole the_co (tyConRole r tc_s n) r0
+                   ; return (SelCo r0 cs co') }
 
          ; _ -> failWithL (hang (text "Bad getNth:")
                               2 (ppr the_co $$ ppr s $$ ppr t)) }}}}

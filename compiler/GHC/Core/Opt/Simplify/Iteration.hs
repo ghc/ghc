@@ -1546,7 +1546,7 @@ In particular, we want to behave well on
 
  * (f |> co) @t1 @t2 ... @tn x1 .. xm
    Here we will use pushCoTyArg and pushCoValArg successively, which
-   build up NthCo stacks.  Silly to do that if co is reflexive.
+   build up SelCo stacks.  Silly to do that if co is reflexive.
 
 However, we don't want to call isReflexiveCo too much, because it uses
 type equality which is expensive on big types (#14737 comment:7).

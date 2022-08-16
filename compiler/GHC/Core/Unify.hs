@@ -1117,7 +1117,7 @@ unify_ty env ty1 ty2 _kco
   = maybeApart MARTypeFamily
 
   -- TYPE and CONSTRAINT are not Apart
-  -- See Note [Type vs Constraint] in GHC.Builtin.Types.Prim
+  -- See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim
   -- NB: at this point we know that the two TyCons do not match
   | Just {} <- sORTKind_maybe ty1
   , Just {} <- sORTKind_maybe ty2
@@ -1637,9 +1637,9 @@ ty_co_match menv subst (ForAllTy (Bndr tv1 _) ty1)
 --   1. Given:
 --        cv1      :: (s1 :: k1) ~r (s2 :: k2)
 --        kind_co2 :: (s1' ~ s2') ~N (t1 ~ t2)
---        eta1      = mkNthCo role 2 (downgradeRole r Nominal kind_co2)
+--        eta1      = mkSelCo role (SelTyCon 2) (downgradeRole r Nominal kind_co2)
 --                 :: s1' ~ t1
---        eta2      = mkNthCo role 3 (downgradeRole r Nominal kind_co2)
+--        eta2      = mkSelCo role (SelTyCon 3) (downgradeRole r Nominal kind_co2)
 --                 :: s2' ~ t2
 --      Wanted:
 --        subst1 <- ty_co_match menv subst  s1 eta1 kco1 kco2

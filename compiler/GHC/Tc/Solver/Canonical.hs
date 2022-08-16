@@ -1038,7 +1038,7 @@ can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
            (FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
            (FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
   | af1 == af2  -- See Note [Decomposing FunTy]
-  = canDecomposableFunTy ev eq_rel [am1,ty1a,ty1b] [am2,ty2a,ty2b]
+  = canDecomposableFunTy ev eq_rel (am1,ty1a,ty1b) (am2,ty2a,ty2b)
 
 -- Decompose type constructor applications
 -- NB: we have expanded type synonyms already
@@ -1779,8 +1779,8 @@ Conclusion:
 It all comes from the fact that newtypes aren't necessarily injective
 w.r.t. representational equality.
 
-Furthermore, as explained in Note [NthCo and newtypes] in GHC.Core.TyCo.Rep, we can't use
-NthCo on representational coercions over newtypes. NthCo comes into play
+Furthermore, as explained in Note [SelCo and newtypes] in GHC.Core.TyCo.Rep, we can't use
+SelCo on representational coercions over newtypes. SelCo comes into play
 only when decomposing givens.
 
 Conclusion:
@@ -1892,7 +1892,7 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
              -> do { let ev_co = mkCoVarCo evar
                    ; given_evs <- newGivenEvVars loc $
                                   [ ( mkPrimEqPredRole r ty1 ty2
-                                    , evCoercion $ mkNthCo r i ev_co )
+                                    , evCoercion $ mkSelCo r (SelTyCon i) ev_co )
                                   | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..]
                                   , r /= Phantom
                                   , not (isCoercionTy ty1) && not (isCoercionTy ty2) ]
@@ -1927,22 +1927,29 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
                               = new_loc0 ]
                ++ repeat loc
 
-canDecomposableFunTy :: CtEvidence -> EqRel -> [Type] -> [Type]
+canDecomposableFunTy :: CtEvidence -> EqRel
+                     -> (Type,Type,Type)   -- (multiplicity,arg,res)
+                     -> (Type,Type,Type)   -- (multiplicity,arg,res)
                      -> TcS (StopOrContinue Ct)
-canDecomposableFunTy ev eq_rel tys1 tys2
+canDecomposableFunTy ev eq_rel f1@(m1,a1,r1) f2@(m2,a2,r2)
   = do { traceTcS "canDecomposableFunTy"
-                  (ppr ev $$ ppr eq_rel $$ ppr tys1 $$ ppr tys2)
+                  (ppr ev $$ ppr eq_rel $$ ppr f1 $$ ppr f2)
        ; case ev of
            CtWanted { ctev_dest = dest, ctev_rewriters = rewriters }
-             -> do { [mult,arg,res] <- zipWith4M (unifyWanted rewriters) new_locs tc_roles tys1 tys2
+             -> do { mult <- unifyWanted rewriters mult_loc (funRole role SelMult) m1 m2
+                   ; arg  <- unifyWanted rewriters loc      (funRole role SelArg)  a1 a2
+                   ; res  <- unifyWanted rewriters loc      (funRole role SelRes)  r1 r2
                    ; setWantedEq dest (mkFunCo role mult arg res) }
 
            CtGiven { ctev_evar = evar }
              -> do { let ev_co = mkCoVarCo evar
                    ; given_evs <- newGivenEvVars loc $
-                                  [ ( mkPrimEqPredRole r ty1 ty2
-                                    , evCoercion $ mkNthCo r i ev_co )
-                                  | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..] ]
+                                  [ ( mkPrimEqPredRole role' ty1 ty2
+                                    , evCoercion $ mkSelCo role' (SelFun fs) ev_co )
+                                  | (fs, ty1, ty2) <- [(SelMult, m1, m2)
+                                                      ,(SelArg,  a1, a2)
+                                                      ,(SelRes,  r2, r2)]
+                                  , let role' = funRole role fs ]
                    ; emitWorkNC given_evs }
 
     ; stopWith ev "Decomposed TyConApp" }
@@ -1950,8 +1957,7 @@ canDecomposableFunTy ev eq_rel tys1 tys2
   where
     loc      = ctEvLoc ev
     role     = eqRelRole eq_rel
-    tc_roles = funRolesX role
-    new_locs = [updateCtLocOrigin loc toInvisibleOrigin, loc, loc]
+    mult_loc = updateCtLocOrigin loc toInvisibleOrigin
 
 -- | Call when canonicalizing an equality fails, but if the equality is
 -- representational, there is some hope for the future.

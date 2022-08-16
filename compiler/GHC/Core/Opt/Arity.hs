@@ -2703,11 +2703,11 @@ pushCoTyArg co ty
        -- tyL = forall (a1 :: k1). ty1
        -- tyR = forall (a2 :: k2). ty2
 
-    co1 = mkSymCo (mkNthCo Nominal 0 co)
+    co1 = mkSymCo (mkSelCo Nominal SelForAll co)
        -- co1 :: k2 ~N k1
-       -- Note that NthCo can extract a Nominal equality between the
+       -- Note that SelCo can extract a Nominal equality between the
        -- kinds of the types related by a coercion between forall-types.
-       -- See the NthCo case in GHC.Core.Lint.
+       -- See the SelCo case in GHC.Core.Lint.
 
     co2 = mkInstCo co (mkGReflLeftCo Nominal ty co1)
         -- co2 :: ty1[ (ty|>co1)/a1 ] ~ ty2[ ty/a2 ]
@@ -2898,14 +2898,14 @@ collectBindersPushingCo e
       , let Pair tyL tyR = coercionKind co
       , assert (isForAllTy_ty tyL) $
         isForAllTy_ty tyR
-      , isReflCo (mkNthCo Nominal 0 co)  -- See Note [collectBindersPushingCo]
+      , isReflCo (mkSelCo Nominal SelForAll co)  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkTyVarTy b)))
 
       | isCoVar b
       , let Pair tyL tyR = coercionKind co
       , assert (isForAllTy_co tyL) $
         isForAllTy_co tyR
-      , isReflCo (mkNthCo Nominal 0 co)  -- See Note [collectBindersPushingCo]
+      , isReflCo (mkSelCo Nominal SelForAll co)  -- See Note [collectBindersPushingCo]
       , let cov = mkCoVarCo b
       = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkCoercionTy cov)))
 

@@ -1420,8 +1420,8 @@ tcIfaceCo = go
                                             <*> go c2
     go (IfaceInstCo c1 t2)       = InstCo   <$> go c1
                                             <*> go t2
-    go (IfaceNthCo d c)          = do { c' <- go c
-                                      ; return $ mkNthCo (nthCoRole d c') d c' }
+    go (IfaceSelCo d c)          = do { c' <- go c
+                                      ; return $ mkSelCo (nthCoRole d c') d c' }
     go (IfaceLRCo lr c)          = LRCo lr  <$> go c
     go (IfaceKindCo c)           = KindCo   <$> go c
     go (IfaceSubCo c)            = SubCo    <$> go c

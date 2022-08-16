@@ -46,7 +46,7 @@ module GHC.Tc.Types.Evidence (
   mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos,
   mkTcSymCo, mkTcSymMCo,
   mkTcTransCo,
-  mkTcNthCo, mkTcLRCo, mkTcSubCo, maybeTcSymCo,
+  mkTcSelCo, mkTcLRCo, mkTcSubCo, maybeTcSymCo,
   maybeTcSubCo, tcDowngradeRole,
   mkTcAxiomRuleCo, mkTcGReflRightCo, mkTcGReflRightMCo, mkTcGReflLeftCo, mkTcGReflLeftMCo,
   mkTcPhantomCo,
@@ -139,7 +139,7 @@ mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
                        -> [TcCoercion] -> TcCoercionR
 mkTcForAllCo           :: TyVar -> TcCoercionN -> TcCoercion -> TcCoercion
 mkTcForAllCos          :: [(TyVar, TcCoercionN)] -> TcCoercion -> TcCoercion
-mkTcNthCo              :: Role -> Int -> TcCoercion -> TcCoercion
+mkTcSelCo              :: Role -> CoSel -> TcCoercion -> TcCoercion
 mkTcLRCo               :: LeftOrRight -> TcCoercion -> TcCoercion
 mkTcSubCo              :: HasDebugCallStack => TcCoercionN -> TcCoercionR
 tcDowngradeRole        :: Role -> Role -> TcCoercion -> TcCoercion
@@ -177,7 +177,7 @@ mkTcAxInstCo           = mkAxInstCo
 mkTcUnbranchedAxInstCo = mkUnbranchedAxInstCo Representational
 mkTcForAllCo           = mkForAllCo
 mkTcForAllCos          = mkForAllCos
-mkTcNthCo              = mkNthCo
+mkTcSelCo              = mkSelCo
 mkTcLRCo               = mkLRCo
 mkTcSubCo              = mkSubCo
 tcDowngradeRole        = downgradeRole

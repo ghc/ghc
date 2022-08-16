@@ -1249,7 +1249,7 @@ checkBootTyCon is_boot tc1 tc2
     --          data T a = MkT
     --
     -- If you write this, we'll treat T as injective, and make inferences
-    -- like T a ~R T b ==> a ~N b (mkNthCo).  But if we can
+    -- like T a ~R T b ==> a ~N b (mkSelCo).  But if we can
     -- subsequently replace T with one at phantom role, we would then be able to
     -- infer things like T Int ~R T Bool which is bad news.
     --

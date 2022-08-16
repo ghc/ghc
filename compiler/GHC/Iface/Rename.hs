@@ -697,7 +697,7 @@ rnIfaceCo (IfaceTransCo c1 c2)
     = IfaceTransCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
 rnIfaceCo (IfaceInstCo c1 c2)
     = IfaceInstCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
-rnIfaceCo (IfaceNthCo d c) = IfaceNthCo d <$> rnIfaceCo c
+rnIfaceCo (IfaceSelCo d c) = IfaceSelCo d <$> rnIfaceCo c
 rnIfaceCo (IfaceLRCo lr c) = IfaceLRCo lr <$> rnIfaceCo c
 rnIfaceCo (IfaceSubCo c) = IfaceSubCo <$> rnIfaceCo c
 rnIfaceCo (IfaceAxiomRuleCo ax cos)

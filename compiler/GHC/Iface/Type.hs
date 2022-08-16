@@ -74,7 +74,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  , manyDataConTyCon
                                  , liftedRepTyCon, liftedDataConTyCon )
 import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy, anonArgTyCon )
-
+import GHC.Core.TyCo.Rep( CoSel )
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
@@ -383,7 +383,7 @@ data IfaceCoercion
   | IfaceUnivCo       IfaceUnivCoProv Role IfaceType IfaceType
   | IfaceSymCo        IfaceCoercion
   | IfaceTransCo      IfaceCoercion IfaceCoercion
-  | IfaceNthCo        Int IfaceCoercion
+  | IfaceSelCo        CoSel IfaceCoercion
   | IfaceLRCo         LeftOrRight IfaceCoercion
   | IfaceInstCo       IfaceCoercion IfaceCoercion
   | IfaceKindCo       IfaceCoercion
@@ -585,7 +585,7 @@ substIfaceType env ty
     go_co (IfaceUnivCo prov r t1 t2) = IfaceUnivCo (go_prov prov) r (go t1) (go t2)
     go_co (IfaceSymCo co)            = IfaceSymCo (go_co co)
     go_co (IfaceTransCo co1 co2)     = IfaceTransCo (go_co co1) (go_co co2)
-    go_co (IfaceNthCo n co)          = IfaceNthCo n (go_co co)
+    go_co (IfaceSelCo n co)          = IfaceSelCo n (go_co co)
     go_co (IfaceLRCo lr co)          = IfaceLRCo lr (go_co co)
     go_co (IfaceInstCo c1 c2)        = IfaceInstCo (go_co c1) (go_co c2)
     go_co (IfaceKindCo co)           = IfaceKindCo (go_co co)
@@ -1786,8 +1786,8 @@ ppr_co ctxt_prec (IfaceTransCo co1 co2)
         ppr_trans c                    = [semi <+> ppr_co opPrec c]
     in maybeParen ctxt_prec opPrec $
         vcat (ppr_co topPrec co1 : ppr_trans co2)
-ppr_co ctxt_prec (IfaceNthCo d co)
-  = ppr_special_co ctxt_prec (text "Nth:" <> int d) [co]
+ppr_co ctxt_prec (IfaceSelCo d co)
+  = ppr_special_co ctxt_prec (text "Nth:" <> ppr d) [co]
 ppr_co ctxt_prec (IfaceLRCo lr co)
   = ppr_special_co ctxt_prec (ppr lr) [co]
 ppr_co ctxt_prec (IfaceSubCo co)
@@ -2077,7 +2077,7 @@ instance Binary IfaceCoercion where
           putByte bh 11
           put_ bh a
           put_ bh b
-  put_ bh (IfaceNthCo a b) = do
+  put_ bh (IfaceSelCo a b) = do
           putByte bh 12
           put_ bh a
           put_ bh b
@@ -2148,7 +2148,7 @@ instance Binary IfaceCoercion where
                    return $ IfaceTransCo a b
            12-> do a <- get bh
                    b <- get bh
-                   return $ IfaceNthCo a b
+                   return $ IfaceSelCo a b
            13-> do a <- get bh
                    b <- get bh
                    return $ IfaceLRCo a b
@@ -2234,7 +2234,7 @@ instance NFData IfaceCoercion where
     IfaceUnivCo f1 f2 f3 f4 -> rnf f1 `seq` f2 `seq` rnf f3 `seq` rnf f4
     IfaceSymCo f1 -> rnf f1
     IfaceTransCo f1 f2 -> rnf f1 `seq` rnf f2
-    IfaceNthCo f1 f2 -> rnf f1 `seq` rnf f2
+    IfaceSelCo f1 f2 -> rnf f1 `seq` rnf f2
     IfaceLRCo f1 f2 -> f1 `seq` rnf f2
     IfaceInstCo f1 f2 -> rnf f1 `seq` rnf f2
     IfaceKindCo f1 -> rnf f1

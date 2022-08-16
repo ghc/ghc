@@ -56,7 +56,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Core.Type
    ( mkCastTy, mkAppTy, isCoercionTy, mkTyConApp )
 import {-# SOURCE #-} GHC.Core.Coercion
-   ( mkCoVarCo, mkKindCo, mkNthCo, mkTransCo
+   ( mkCoVarCo, mkKindCo, mkSelCo, mkTransCo
    , mkNomReflCo, mkSubCo, mkSymCo
    , mkFunCo, mkForAllCo, mkUnivCo
    , mkAxiomInstCo, mkAppCo, mkGReflCo
@@ -886,7 +886,7 @@ subst_co subst co
                                 (go_ty t1)) $! (go_ty t2)
     go (SymCo co)            = mkSymCo $! (go co)
     go (TransCo co1 co2)     = (mkTransCo $! (go co1)) $! (go co2)
-    go (NthCo r d co)        = mkNthCo r d $! (go co)
+    go (SelCo r d co)        = mkSelCo r d $! (go co)
     go (LRCo lr co)          = mkLRCo lr $! (go co)
     go (InstCo co arg)       = (mkInstCo $! (go co)) $! go arg
     go (KindCo co)           = mkKindCo $! (go co)

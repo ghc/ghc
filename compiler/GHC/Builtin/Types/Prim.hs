@@ -656,32 +656,27 @@ tcArrowTyCon = mkPrimTyCon tcArrowTyConName tc_bndrs constraintKind tc_roles
 *                                                                      *
 ************************************************************************
 
-Note [SORT, TYPE, and CONSTRAINT]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-All types that classify values have a kind of the form (SORT t_or_c rr), where
+Note [TYPE and CONSTRAINT]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC distinguishes Type from Constraint throughout the compiler.
+See GHC Proposal #518, and tickets #21623 and #11715.
 
-  -- Primitive
-  type SORT :: TypeOrConstraint -> RuntimeRep -> Type
+All types that classify values have a kind of the form
+  (TYPE rr) or (CONSTRAINT rr)
+where the `RuntimeRep` parameter, rr, tells us how the value is represented
+at runtime.  TYPE and CONSTRAINT are primitive type constructors.
 
-* The `TypeOrConstraint` tells whether this value is
-  a regular type or a constraint; see Note [Type vs Constraint]
+There are a bunch of type synonyms and data types defined in in the
+library ghc-prim:GHC.Types.  All of them are also wired in to GHC, in
+GHC.Builtin.Types
 
-* The `RuntimeRep` parameter tells us how the value is represented at runtime.
-
-There are a bunch of type synonyms and data types defined in
-in the library ghc-prim:GHC.Types.  All of them are also wired in to GHC,
-in GHC.Builtin.Types
-
-  type CONSTRAINT   = SORT ConstraintLike   :: RuntimeRep -> Type
   type Constraint   = CONSTRAINT LiftedRep  :: Type
 
-  type TYPE         = SORT TypeLike    :: RuntimeRep -> Type
   type Type         = TYPE LiftedRep   :: Type
   type UnliftedType = TYPE UnliftedRep :: Type
 
   type LiftedRep    = BoxedRep Lifted   :: RuntimeRep
   type UnliftedRep  = BoxedRep Unlifted :: RuntimeRep
-
 
   data RuntimeRep     -- Defined in ghc-prim:GHC.Types
       = BoxedRep Levity
@@ -691,7 +686,8 @@ in GHC.Builtin.Types
 
   data Levity = Lifted | Unlifted
 
-  data TypeOrConstraint = TypeLike | ConstraintLike
+We abbreviate '*' specially:
+    type * = Type
 
 So for example:
     Int        :: TYPE (BoxedRep Lifted)
@@ -701,28 +697,18 @@ So for example:
     Maybe      :: TYPE (BoxedRep Lifted) -> TYPE (BoxedRep Lifted)
     (# , #)    :: TYPE r1 -> TYPE r2 -> TYPE (TupleRep [r1, r2])
 
-We abbreviate '*' specially:
-    type * = Type
+    Eq Int       :: CONSTRAINT (BoxedRep Lifted)
+    IP "foo" Int :: CONSTRAINT (BoxedRep Lifted)
+    a ~ b        :: CONSTRAINT (BoxedRep Lifted)
+    a ~# b       :: CONSTRAINT (TupleRep [])
 
-Note [Type vs Constraint]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-GHC distinguishes Type from Constraint, via the TypeOrConstraint
-parameter of SORT. See GHC Proposal #518, and tickets #21623 and #11715.
-
-There are a number of wrinkles
+Note that:
 
 * Type and Constraint are considered distinct throughout GHC. But they
   are not /apart/: see Note [Type and Constraint are not apart]
 
 * Constraints are mostly lifted, but unlifted ones are useful too.
   Specifically  (a ~# b) :: CONSTRAINT (TupleRep [])
-
-Examples:
-
-  Eq Int       :: CONSTRAINT (BoxedRep Lifted)
-  IP "foo" Int :: CONSTRAINT (BoxedRep Lifted)
-  a ~ b        :: CONSTRAINT (BoxedRep Lifted)
-  a ~# b       :: CONSTRAINT (TupleRep [])
 
 Note [Type and Constraint are not apart]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -733,17 +719,17 @@ either. Reason (c.f. #7451):
     class C a where { op :: a -> a }
 
 * The axiom for such a class will look like
-    axiom axC a :: C a ~# (a->a)
+    axiom axC a :: (C a :: Constraint) ~# (a->a :: Type)
 
 * This axion connects a type of kind Type with one of kind Constraint
   That is dangerous: kindCo (axC Int) :: Type ~ Constraint
   In general, having a "contradictory proof" like (Int ~ Bool) would be very
-  bad; but it's fine provide they are not Apart.
+  bad; but it's fine provided they are not Apart.
 
 So we ensure that Type and Constraint are not apart; or, more
 precisely, that TYPE and CONSTRAINT are not apart.  This
-non-apart-ness check is implemented in GHC.Core.Unify.unify_ty: look for
-`maybeApart MARTypeVsConstraint`.
+non-apart-ness check is implemented in GHC.Core.Unify.unify_ty: look
+for `maybeApart MARTypeVsConstraint`.
 
 Note that, as before, nothing prevents writing instances like:
 
@@ -799,7 +785,6 @@ tYPEKind :: Type
 tYPEKind = mkTyConTy tYPETyCon
 
 ----------------------
--- type CONSTRAINT = SORT ConstraintLike
 cONSTRAINTTyCon :: TyCon
 cONSTRAINTTyCon = mkPrimTyCon cONSTRAINTTyConName
                               (mkTemplateAnonTyConBinders [runtimeRepTy])

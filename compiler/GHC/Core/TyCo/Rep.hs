@@ -36,7 +36,7 @@ module GHC.Core.TyCo.Rep (
         ArgFlag(..), AnonArgFlag(..),
 
         -- * Coercions
-        Coercion(..),
+        Coercion(..), CoSel(..), FunSel(..),
         UnivCoProvenance(..),
         CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,
@@ -97,10 +97,12 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Binary
 
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
 import Data.IORef ( IORef )   -- for CoercionHole
+import Control.DeepSeq
 
 {- **********************************************************************
 *                                                                       *
@@ -1208,7 +1210,7 @@ data Coercion
   | ForAllCo TyCoVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
-  | FunCo Role CoercionN Coercion Coercion     -- lift FunTy
+  | FunCo Role CoercionN Coercion Coercion     -- See Note [FunCo]
          -- FunCo :: "e" -> N -> e -> e -> e
 
   -- These are special
@@ -1236,14 +1238,7 @@ data Coercion
   | SymCo Coercion             -- :: e -> e
   | TransCo Coercion Coercion  -- :: e -> e -> e
 
-  | NthCo  Role Int Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
-    -- :: "e" -> _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
-    -- Using NthCo on a ForAllCo gives an N coercion always
-    -- See Note [NthCo and newtypes]
-    --
-    -- Invariant:  (NthCo r i co), it is always the case that r = role of (Nth i co)
-    -- That is: the role of the entire coercion is redundantly cached here.
-    -- See Note [NthCo Cached Roles]
+  | SelCo  Role CoSel Coercion  -- See Note [SelCo]
 
   | LRCo   LeftOrRight CoercionN     -- Decomposes (t_left t_right)
     -- :: _ -> N -> N
@@ -1263,6 +1258,18 @@ data Coercion
                                      -- Only present during typechecking
   deriving Data.Data
 
+data CoSel  -- See Note [SelCo]
+  = SelTyCon Int    -- Decomposes (T co1 ... con); zero-indexed
+  | SelFun FunSel   -- Decomposes (co1 -> co2)
+  | SelForAll       -- Decomposes (forall a. co)
+  deriving( Eq, Data.Data )
+
+data FunSel  -- See Note [SelCo]
+  = SelMult  -- Multiplicity
+  | SelArg   -- Argument of function
+  | SelRes   -- Result of function
+  deriving( Eq, Data.Data )
+
 type CoercionN = Coercion       -- always nominal
 type CoercionR = Coercion       -- always representational
 type CoercionP = Coercion       -- always phantom
@@ -1270,6 +1277,36 @@ type KindCoercion = CoercionN   -- always nominal
 
 instance Outputable Coercion where
   ppr = pprCo
+
+instance Outputable CoSel where
+  ppr (SelTyCon n) = text "Tc" <> parens (int n)
+  ppr SelForAll    = text "All"
+  ppr (SelFun fs)  = text "Fun" <> parens (ppr fs)
+
+instance Outputable FunSel where
+  ppr SelMult = text "mult"
+  ppr SelArg  = text "arg"
+  ppr SelRes  = text "res"
+
+instance Binary CoSel where
+   put_ bh (SelTyCon n)     = do { putByte bh 0; put_ bh n }
+   put_ bh SelForAll        = putByte bh 1
+   put_ bh (SelFun SelMult) = putByte bh 2
+   put_ bh (SelFun SelArg)  = putByte bh 3
+   put_ bh (SelFun SelRes)  = putByte bh 4
+
+   get bh = do { h <- getByte bh
+               ; case h of
+                   0 -> do { n <- get bh; return (SelTyCon n) }
+                   1 -> return SelForAll
+                   2 -> return (SelFun SelMult)
+                   3 -> return (SelFun SelArg)
+                   _ -> return (SelFun SelRes) }
+
+instance NFData CoSel where
+  rnf (SelTyCon n) = n `seq` ()
+  rnf SelForAll    = ()
+  rnf (SelFun fs)  = fs `seq` ()
 
 -- | A semantically more meaningful type to represent what may or may not be a
 -- useful 'Coercion'.
@@ -1342,6 +1379,71 @@ It is easy to see that
 
 A nominal reflexive coercion is quite common, so we keep the special form Refl to
 save allocation.
+
+Note [Coercion selection]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The Coercion form SelCo allows us to decompose a structural coercion, one
+between ForallTys, or TyConApps, or FunTys.
+
+Invariant:  (SelCo r cs co), it is always the case that
+            r = role of (Nth cs co)
+   That is: the role of the entire coercion is redundantly cached here.
+   See Note [SelCo Cached Roles]
+
+There are three forms, split by the CoSel field inside the SelCo:
+SelTyCon, SelForAll, and SelFun.
+
+* SelTyCon:
+
+      co : (T s1..sn) ~r0 (T t1..tn)
+      T is a data type not a newtype
+      r = tyConRole tc r0 i
+      i < n    (i is zero-indexed)
+      ----------------------------------
+      SelCo r (SelTyCon i) : si ~r ti
+
+  See Note [SelCo and newtypes]
+
+
+* SelForAll:
+      co : forall (a:k1).t1 ~r0 forall (a:k2).t2
+      ----------------------------------
+      SelCo N SelForAll : k1 ~N k2
+
+  NB: SelForAll always gives a Nominal coercion.
+
+* The SelFun form, for functions, has three sub-forms for the three
+  components of the function type (multiplicity, argument, result).
+
+      co : (s1 %{m1}-> t1) ~r0 (s2 %{m2}-> t2)
+      r = funRole r0 SelMult
+      ----------------------------------
+      SelCo r (SelFun SelMult) : m1 ~r m2
+
+      co : (s1 %{m1}-> t1) ~r0 (s2 %{m2}-> t2)
+      r = funRole r0 SelArg
+      ----------------------------------
+      SelCo r (SelFun SelArg) : s1 ~r s2
+
+      co : (s1 %{m1}-> t1) ~r0 (s2 %{m2}-> t2)
+      r = funRole r0 SelRes
+      ----------------------------------
+      SelCo r (SelFun SelRes) : t1 ~r t2
+
+Note [FunCo]
+~~~~~~~~~~~~
+You might think that a FunCo (which connects two function types should
+contain the AnonArgFlag from the function types.  But we are allowed to
+have an axiom (and hence a coercion) connecting Type and Constraint, thus
+    co :: (t::Type) ~ (c::Constraint)
+c.f. GHC.Builtin.Types.Prim Note [Type and Constraint are not apart]
+Given such a coercion we can use FunCo to make
+    FunCo co <Int> :: (t -> Int) ~ (c => Int)
+Note that the two arrows are different: those FunTys have different
+AnonArgFlags!  That's why:
+
+* FunCo does not store an AnonArgFlag
+* We use mkFuntionType in the FunCo case of coercionLKind/coercoinRKind,
 
 Note [Coercion axioms applied to coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1575,7 +1677,7 @@ TyConAppCo Phantom Foo (UnivCo Phantom Int Bool) : Foo Int ~P Foo Bool
 The rules here dictate the roles of the parameters to mkTyConAppCo
 (should be checked by Lint).
 
-Note [NthCo and newtypes]
+Note [SelCo and newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
 
@@ -1592,20 +1694,20 @@ We can then build
   co = NTCo:N a ; sym (NTCo:N b)
 
 for any `a` and `b`. Because of the role annotation on N, if we use
-NthCo, we'll get out a representational coercion. That is:
+SelCo, we'll get out a representational coercion. That is:
 
-  NthCo r 0 co :: forall a b. a ~R b
+  SelCo r 0 co :: forall a b. a ~R b
 
 Yikes! Clearly, this is terrible. The solution is simple: forbid
-NthCo to be used on newtypes if the internal coercion is representational.
+SelCo to be used on newtypes if the internal coercion is representational.
 
 This is not just some corner case discovered by a segfault somewhere;
 it was discovered in the proof of soundness of roles and described
 in the "Safe Coercions" paper (ICFP '14).
 
-Note [NthCo Cached Roles]
+Note [SelCo Cached Roles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Why do we cache the role of NthCo in the NthCo constructor?
+Why do we cache the role of SelCo in the SelCo constructor?
 Because computing role(Nth i co) involves figuring out that
 
   co :: T tys1 ~ T tys2
@@ -1615,7 +1717,7 @@ at the tyConRoles of T. Avoiding bad asymptotic behaviour here means
 we have to compute the kind and role of a coercion simultaneously,
 which makes the code complicated and inefficient.
 
-This only happens for NthCo. Caching the role solves the problem, and
+This only happens for SelCo. Caching the role solves the problem, and
 allows coercionKind and coercionRole to be simple.
 
 See #11735
@@ -1982,7 +2084,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (SymCo co)              = go_co env co
     go_co env (TransCo c1 c2)         = go_co env c1 `mappend` go_co env c2
     go_co env (AxiomRuleCo _ cos)     = go_cos env cos
-    go_co env (NthCo _ _ co)          = go_co env co
+    go_co env (SelCo _ _ co)          = go_co env co
     go_co env (LRCo _ co)             = go_co env co
     go_co env (InstCo co arg)         = go_co env co `mappend` go_co env arg
     go_co env (KindCo co)             = go_co env co
@@ -2046,7 +2148,7 @@ coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
 coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
-coercionSize (NthCo _ _ co)      = 1 + coercionSize co
+coercionSize (SelCo _ _ co)      = 1 + coercionSize co
 coercionSize (LRCo  _ co)        = 1 + coercionSize co
 coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg
 coercionSize (KindCo co)         = 1 + coercionSize co

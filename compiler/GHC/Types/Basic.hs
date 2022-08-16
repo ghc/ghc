@@ -127,13 +127,11 @@ import qualified Data.Semigroup as Semi
 import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
 import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag)
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
           Binary choice
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 data LeftOrRight = CLeft | CRight
                  deriving( Eq, Data )
