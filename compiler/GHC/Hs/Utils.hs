@@ -264,7 +264,7 @@ mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noExtField matches))
 
 mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
-                                       <.> mkWpLams dicts) expr
+                                       <.> mkWpEvLams dicts) expr
 
 -- |A simple case alternative with a single pattern, no binds, no guards;
 -- pre-typechecking
