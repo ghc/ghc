@@ -345,109 +345,36 @@ AC_SUBST(TargetHasRTSLinker)
 # Requires FPTOOLS_SET_PLATFORMS_VARS to be run first.
 FP_FIND_ROOT
 
-if test "$TargetOS" = "ghcjs"
-then
-
-    AC_ARG_VAR(EMSDK,[Use as the full path to Emscripten. [default=autodetect]])
-    AC_ARG_VAR(EMSDK_LLVM,[Use as the full path to Emscripten LLVM. [default=autodetect]])
-    AC_ARG_VAR(EMSDK_BIN,[Use as the full path to Emscripten binary folder. [default=autodetect]])
-
-    if test "$EMSDK" != "" ; then
-        echo "Using emsdk: $EMSDK"
-    elif test "$EMSDK_LLVM" != "" && "$EMSDK_BIN" != "" ; then
-        echo "Using manually defined emsdk LLVM and bin."
-    else
-        echo -e "Error: Could not find Emscripten SDK.\nCheck the EMSDK environment variable."
-        exit 1
-    fi
-
-    if test "$EMSDK_LLVM" != "" ; then
-        echo "Using emsdk LLVM: $EMSDK_LLVM"
-    else
-        echo "No emsdk LLVM set: defaulting to $EMSDK/upstream"
-        EMSDK_LLVM="$EMSDK/upstream"
-    fi
-
-    if test "$EMSDK_BIN" != "" ; then
-        echo "Using emsdk bin: $EMSDK_BIN"
-    else
-        echo "No emsdk bin set: defaulting to $EMSDK/upstream/emscripten"
-    fi
-
-    test -d inplace || mkdir inplace
-
-    ghcjsbin="$hardtop/inplace/ghcjs_toolchain/bin/"
-    mkdir -p $ghcjsbin
-
-    echo "#!/usr/bin/env bash"                         > "$ghcjsbin/js-unknown-ghcjs-cc"
-    echo "exec \"$EMSDK_BIN/emcc\" \"\$@\"" >> "$ghcjsbin/js-unknown-ghcjs-cc"
-    chmod 755 "$ghcjsbin/js-unknown-ghcjs-cc"
-
-    echo "#!/usr/bin/env bash"                         > "$ghcjsbin/js-unknown-ghcjs-ar"
-    echo "exec \"$EMSDK_LLVM/bin/llvm-ar\" \"\$@\""    >> "$ghcjsbin/js-unknown-ghcjs-ar"
-    chmod 755 "$ghcjsbin/js-unknown-ghcjs-ar"
-
-    echo "#!/usr/bin/env bash"                           > "$ghcjsbin/js-unknown-ghcjs-ranlib"
-    echo "exec \"$EMSDK_LLVM/bin/llvm-ranlib\" \"\$@\""  >> "$ghcjsbin/js-unknown-ghcjs-ranlib"
-    chmod 755 "$ghcjsbin/js-unknown-ghcjs-ranlib"
-
-    echo "#!/usr/bin/env bash"                           > "$ghcjsbin/js-unknown-ghcjs-nm"
-    echo "exec \"$EMSDK_LLVM/bin/llvm-nm\" \"\$@\""      >> "$ghcjsbin/js-unknown-ghcjs-nm"
-    chmod 755 "$ghcjsbin/js-unknown-ghcjs-nm"
-
-    dnl the linker shouldn't be used because GHC does the JS linking.
-    dnl it makes no harm to pass emscripten's one here though and it avoids
-    dnl dealing with the rest of the build system that assumes that a linker is
-    dnl available.
-    echo "#!/usr/bin/env bash"                       > "$ghcjsbin/js-unknown-ghcjs-ld"
-    echo "exec \"$EMSDK_LLVM/bin/llvm-link\" \"\$@\""  >> "$ghcjsbin/js-unknown-ghcjs-ld"
-    chmod 755 "$ghcjsbin/js-unknown-ghcjs-ld"
-
-    export PATH=$ghcjsbin:$PATH
-
-    dnl We need to use AC_CHECK_TARGET_TOOL instead of AC_PATH_PROG below that
-    dnl doesn't take into account the target triple...
-    dnl Why are we inflicting all this to ourselves?
-    AC_PATH_TARGET_TOOL([CC],[gcc])
-    AC_PATH_TARGET_TOOL([CXX],[g++])
-    AC_PATH_TARGET_TOOL([NM],[nm])
-    AC_PATH_TARGET_TOOL([AR],[ar])
-    AC_PATH_TARGET_TOOL([RANLIB],[ranlib])
-    AC_PATH_TARGET_TOOL([OBJDUMP],[objdump])
-
+# Extract and configure the Windows toolchain
+if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
+    FP_SETUP_WINDOWS_TOOLCHAIN
 else
+    # Ideally should use AC_CHECK_TARGET_TOOL but our triples
+    # are screwed up. Configure doesn't think they're ever equal and
+    # so never tried without the prefix.
+    AC_PATH_TOOL([CC],[gcc], [clang])
+    AC_PATH_TOOL([CXX],[g++], [clang++])
+    AC_PATH_TOOL([NM],[nm])
+    # N.B. we don't probe for LD here but instead
+    # do so in FIND_LD to avoid #21778.
+    AC_PATH_TOOL([AR],[ar])
+    AC_PATH_TOOL([RANLIB],[ranlib])
+    AC_PATH_TOOL([OBJDUMP],[objdump])
+    AC_PATH_TOOL([DllWrap],[dllwrap])
+    AC_PATH_TOOL([Windres],[windres])
+    AC_PATH_TOOL([Genlib],[genlib])
 
-  # Extract and configure the Windows toolchain
-  if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
-      FP_SETUP_WINDOWS_TOOLCHAIN
-  else
-      # Ideally should use AC_CHECK_TARGET_TOOL but our triples
-      # are screwed up. Configure doesn't think they're ever equal and
-      # so never tried without the prefix.
-      AC_PATH_TOOL([CC],[gcc], [clang])
-      AC_PATH_TOOL([CXX],[g++], [clang++])
-      AC_PATH_TOOL([NM],[nm])
-      # N.B. we don't probe for LD here but instead
-      # do so in FIND_LD to avoid #21778.
-      AC_PATH_TOOL([AR],[ar])
-      AC_PATH_TOOL([RANLIB],[ranlib])
-      AC_PATH_TOOL([OBJDUMP],[objdump])
-      AC_PATH_TOOL([DllWrap],[dllwrap])
-      AC_PATH_TOOL([Windres],[windres])
-      AC_PATH_TOOL([Genlib],[genlib])
+    HAVE_GENLIB=False
+    if test "$HostOS" = "mingw32"; then
+        AC_CHECK_TARGET_TOOL([Windres],[windres])
+        AC_CHECK_TARGET_TOOL([DllWrap],[dllwrap])
+        AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
 
-      HAVE_GENLIB=False
-      if test "$HostOS" = "mingw32"; then
-          AC_CHECK_TARGET_TOOL([Windres],[windres])
-          AC_CHECK_TARGET_TOOL([DllWrap],[dllwrap])
-          AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
-
-          if test "$Genlib" != ""; then
-              GenlibCmd="$(cygpath -m $Genlib)"
-              HAVE_GENLIB=True
-          fi
-      fi
-  fi
+        if test "$Genlib" != ""; then
+            GenlibCmd="$(cygpath -m $Genlib)"
+            HAVE_GENLIB=True
+        fi
+    fi
 fi
 
 if test "$HostOS" = "mingw32"; then
