@@ -1184,16 +1184,9 @@ joinObjectFiles hsc_env o_files output_fn
   let toolSettings' = toolSettings dflags
       ldIsGnuLd = toolSettings_ldIsGnuLd toolSettings'
       ld_r args = GHC.SysTools.runMergeObjects (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (hsc_dflags hsc_env) (
-                        map GHC.SysTools.Option ld_build_id
-                     ++ [ GHC.SysTools.Option "-o",
+                        [ GHC.SysTools.Option "-o",
                           GHC.SysTools.FileOption "" output_fn ]
                      ++ args)
-
-      -- suppress the generation of the .note.gnu.build-id section,
-      -- which we don't need and sometimes causes ld to emit a
-      -- warning:
-      ld_build_id | toolSettings_ldSupportsBuildId toolSettings' = ["--build-id=none"]
-                  | otherwise                                    = []
 
   if ldIsGnuLd
      then do

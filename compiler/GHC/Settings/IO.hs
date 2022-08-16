@@ -94,7 +94,6 @@ initSettings top_dir = do
       cc_args  = words cc_args_str ++ unreg_cc_args
       cxx_args = words cxx_args_str
   ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
-  ldSupportsBuildId       <- getBooleanSetting "ld supports build-id"
   ldSupportsFilelist      <- getBooleanSetting "ld supports filelist"
   ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
   arSupportsDashL         <- getBooleanSetting "ar supports -L"
@@ -163,7 +162,6 @@ initSettings top_dir = do
 
     , sToolSettings = ToolSettings
       { toolSettings_ldSupportsCompactUnwind = ldSupportsCompactUnwind
-      , toolSettings_ldSupportsBuildId       = ldSupportsBuildId
       , toolSettings_ldSupportsFilelist      = ldSupportsFilelist
       , toolSettings_ldIsGnuLd               = ldIsGnuLd
       , toolSettings_ccSupportsNoPie         = gccSupportsNoPie

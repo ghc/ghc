@@ -81,7 +81,6 @@ module GHC.Driver.Session (
         sTopDir,
         sGlobalPackageDatabasePath,
         sLdSupportsCompactUnwind,
-        sLdSupportsBuildId,
         sLdSupportsFilelist,
         sLdIsGnuLd,
         sGccSupportsNoPie,
