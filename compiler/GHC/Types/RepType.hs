@@ -31,7 +31,6 @@ import GHC.Prelude
 
 import GHC.Types.Basic (Arity, RepArity)
 import GHC.Core.DataCon
-import GHC.Builtin.Names
 import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
@@ -56,7 +55,6 @@ import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Data.List (sort)
 import qualified Data.IntSet as IS
@@ -589,19 +587,16 @@ kindPrimRep doc ki
 -- NB: We could implement the partial methods by calling into the maybe
 -- variants here. But then both would need to pass around the doc argument.
 
--- | Take a kind (of shape @TYPE rr@) and produce the 'PrimRep's
+-- | Take a kind (of shape `TYPE rr` or `CONSTRAINT rr`) and produce the 'PrimRep's
 -- of values of types of this kind.
 -- See also Note [Getting from RuntimeRep to PrimRep]
 -- Returns Nothing if rep can't be determined. Eg. levity polymorphic types.
 kindPrimRep_maybe :: HasDebugCallStack => Kind -> Maybe [PrimRep]
 kindPrimRep_maybe ki
-  | Just ki' <- coreView ki
-  = kindPrimRep_maybe ki'
-kindPrimRep_maybe (TyConApp typ [runtime_rep])
-  = assert (typ `hasKey` tYPETyConKey) $
-    runtimeRepPrimRep_maybe runtime_rep
-kindPrimRep_maybe _ki
-  = Nothing
+  | Just (_torc, rep) <- sORTKind_maybe ki
+  = runtimeRepPrimRep_maybe rep
+  | otherwise
+  = pprPanic "kindPrimRep" (ppr ki)
 
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
 -- it encodes. See also Note [Getting from RuntimeRep to PrimRep]

@@ -1396,14 +1396,14 @@ SelTyCon, SelForAll, and SelFun.
 * SelTyCon:
 
       co : (T s1..sn) ~r0 (T t1..tn)
-      T is a data type not a newtype
+      T is a data type, not a newtype, nor an arrow type
       r = tyConRole tc r0 i
       i < n    (i is zero-indexed)
       ----------------------------------
       SelCo r (SelTyCon i) : si ~r ti
 
-  See Note [SelCo and newtypes]
-
+  "Not a newtype": see Note [SelCo and newtypes]
+  "Not an arrow type": see SelFun below
 
 * SelForAll:
       co : forall (a:k1).t1 ~r0 forall (a:k2).t2

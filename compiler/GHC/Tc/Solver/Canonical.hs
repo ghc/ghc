@@ -961,9 +961,10 @@ canEqNC ev eq_rel ty1 ty2
            Right ty              -> canEqReflexive ev eq_rel ty
            Left (Pair ty1' ty2') -> can_eq_nc False ev' eq_rel ty1' ty1' ty2' ty2'
              where
-               ev' | debugIsOn = setCtEvPredType ev $
-                                 mkPrimEqPredRole (eqRelRole eq_rel) ty1' ty2'
-                   | otherwise = ev
+                 ev' = ev
+--               ev' | debugIsOn = setCtEvPredType ev $
+--                                 mkPrimEqPredRole (eqRelRole eq_rel) ty1' ty2'
+--                   | otherwise = ev
                    -- ev': satisfy the precondition of can_eq_nc
        }
 
