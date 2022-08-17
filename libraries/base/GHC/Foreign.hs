@@ -19,6 +19,7 @@
 
 module GHC.Foreign (
     -- * C strings with a configurable encoding
+    CString, CStringLen,
 
     -- conversion of C strings into Haskell strings
     --
@@ -74,8 +75,11 @@ putDebugMsg | c_DEBUG_DUMP = debugLn
             | otherwise    = const (return ())
 
 
--- These definitions are identical to those in Foreign.C.String, but copied in here to avoid a cycle:
+-- | A C string is a reference to an array of C characters terminated by NUL.
 type CString    = Ptr CChar
+
+-- | A string with explicit length information in bytes instead of a
+-- terminating NUL (allowing NUL characters in the middle of the string).
 type CStringLen = (Ptr CChar, Int)
 
 -- exported functions
