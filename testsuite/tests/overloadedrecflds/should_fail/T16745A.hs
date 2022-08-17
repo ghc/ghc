@@ -1,6 +1,8 @@
 module T16745A where
 
-import T16745B hiding (field)
-import T16745D hiding (foo)
+import T16745B        (field)  -- imports both 'field's
+import T16745D hiding (foo)    -- allowed, hides both 'foo' fields
 
-wrong = foo -- should not be in scope
+foo = foo
+
+wrong = field -- ambiguous which 'field' is meant

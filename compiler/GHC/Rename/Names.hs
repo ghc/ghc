@@ -1165,7 +1165,7 @@ Suppose we have:
     data T = mkT { foo :: Int }
 
   module N where
-    import M (foo)    -- this is an ambiguity error (A)
+    import M (foo)    -- this is allowed (A)
     import M (S(foo)) -- this is allowed (B)
 
 Here M exports the OccName 'foo' twice, so we get an imp_occ_env where 'foo'
@@ -1176,8 +1176,8 @@ names (see Note [FieldLabel] in GHC.Types.FieldLabel).
          , $sel:foo:MKT -> (foo, T(foo), Nothing)
          ]
 
-Then when we look up 'foo' in lookup_name for case (A) we get both entries and
-hence report an ambiguity error.  Whereas in case (B) we reach the lookup_ie
+Then when we look up 'foo' in lookup_names for case (A) we get both entries and
+hence two Avails.  Whereas in case (B) we reach the lookup_ie
 case for IEThingWith, which looks up 'S' and then finds the unique 'foo' amongst
 its children.
 
@@ -1252,13 +1252,21 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
     isAvailTC AvailTC{} = True
     isAvailTC _ = False
 
+    -- Look up a RdrName used in an import, failing if it is ambiguous
+    -- (e.g. because it refers to multiple record fields)
     lookup_name :: IE GhcPs -> RdrName -> IELookupM (Name, AvailInfo, Maybe Name)
-    lookup_name ie rdr
+    lookup_name ie rdr = do
+        xs <- lookup_names ie rdr
+        case xs of
+          [cax] -> return cax
+          _     -> failLookupWith (AmbiguousImport rdr (map sndOf3 xs))
+
+    -- Look up a RdrName used in an import, returning multiple values if there
+    -- are several fields with the same name exposed by the module
+    lookup_names :: IE GhcPs -> RdrName -> IELookupM [(Name, AvailInfo, Maybe Name)]
+    lookup_names ie rdr
        | isQual rdr              = failLookupWith (QualImportError rdr)
-       | Just succ <- mb_success = case nonDetNameEnvElts succ of
-                                     -- See Note [Importing DuplicateRecordFields]
-                                     [(c,a,x)] -> return (greNameMangledName c, a, x)
-                                     xs -> failLookupWith (AmbiguousImport rdr (map sndOf3 xs))
+       | Just succ <- mb_success = return $ map (\ (c,a,x) -> (greNameMangledName c, a, x)) (nonDetNameEnvElts succ)
        | otherwise               = failLookupWith (BadImport ie)
       where
         mb_success = lookupOccEnv imp_occ_env (rdrNameOcc rdr)
@@ -1311,9 +1319,11 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
     lookup_ie ie = handle_bad_import $
       case ie of
         IEVar _ (L l n) -> do
-            (name, avail, _) <- lookup_name ie $ ieWrappedName n
+            -- See Note [Importing DuplicateRecordFields]
+            xs <- lookup_names ie (ieWrappedName n)
             return ([(IEVar noExtField (L l (replaceWrappedName n name)),
-                                                  trimAvail avail name)], [])
+                                                  trimAvail avail name)
+                    | (name, avail, _) <- xs ], [])
 
         IEThingAll _ (L l tc) -> do
             (name, avail, mb_parent) <- lookup_name ie $ ieWrappedName tc
