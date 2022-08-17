@@ -17,6 +17,7 @@
 #include "HsBaseConfig.h"
 #include "rts/Libdw.h"
 
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MultiWayIf #-}
 
 module GHC.ExecutionStack.Internal (
@@ -31,7 +32,13 @@ module GHC.ExecutionStack.Internal (
   , invalidateDebugCache
   ) where
 
-import Control.Monad (join)
+import GHC.Base
+import GHC.Show
+import GHC.List (reverse, null)
+import GHC.Num ((-))
+import GHC.Real (fromIntegral)
+import Data.Maybe
+import Data.Functor ((<$>))
 import Data.Word
 import Foreign.C.Types
 import Foreign.C.String (peekCString, CString)

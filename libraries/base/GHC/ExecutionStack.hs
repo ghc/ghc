@@ -1,3 +1,5 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.ExecutionStack
@@ -36,7 +38,7 @@ module GHC.ExecutionStack (
   , showStackTrace
   ) where
 
-import Control.Monad (join)
+import GHC.Base
 import GHC.ExecutionStack.Internal
 
 -- | Get a trace of the current execution stack state.
