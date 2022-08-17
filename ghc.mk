@@ -135,8 +135,11 @@ include mk/config.mk
 ifeq "$(ProjectVersion)" ""
 $(error Please run ./configure first)
 endif
+
+ifneq "$(BINDIST)" "YES"
 ifneq "$(CanBootWithMake)" "YES"
 $(error The make build system requires a boot compiler older than ghc-9.2. Your boot compiler is too new and cannot be used to build ghc-9.4 with make. Either boot with ghc 9.0.2 or build with hadrian. See https://www.haskell.org/ghc/blog/20220805-make-to-hadrian.html for advice on transitioning to hadrian.)
+endif
 endif
 endif
 
@@ -493,6 +496,8 @@ libraries/ghc-bignum_CONFIGURE_OPTS += -f $(BIGNUM_BACKEND)
 CABAL_DEPS = text transformers mtl parsec Cabal/Cabal-syntax
 CABAL_BOOT_DEPS = process array filepath base bytestring containers deepseq time unix pretty directory
 
+# N.B. This shouldn't be needed while installing a binary distribution.
+ifneq "$(BINDIST)" "YES"
 BOOT_PKG_DEPS := \
     $(foreach p,$(CABAL_BOOT_DEPS),\
         --dependency="$p=$p-$(shell $(GHC_PKG) --simple-output field $p version)")
@@ -501,6 +506,7 @@ STAGE0_PKG_DEPS := \
     $(foreach d,$(CABAL_DEPS),\
         $(foreach p,$(basename $(notdir $(wildcard libraries/$d/*.cabal))),\
             --dependency="$p=$p-$(shell grep -i "^Version:" libraries/$d/$p.cabal | sed "s/[^0-9.]//g")"))
+endif
 
 libraries/Cabal/Cabal_dist-boot_CONFIGURE_OPTS += --exact-configuration $(BOOT_PKG_DEPS) $(STAGE0_PKG_DEPS)
 
