@@ -156,9 +156,6 @@ data TypeMapX a
 -- | Squeeze out any synonyms, and change TyConApps to nested AppTys. Why the
 -- last one? See Note [Equality on AppTys] in GHC.Core.Type
 --
--- Note, however, that we keep Constraint and Type apart here, despite the fact
--- that they are both synonyms of TYPE 'LiftedRep (see #11715).
---
 -- We also keep (Eq a => a) as a FunTy, distinct from ((->) (Eq a) a).
 trieMapView :: Type -> Maybe Type
 trieMapView ty
@@ -168,7 +165,9 @@ trieMapView ty
   = Just $ foldl' AppTy (mkTyConTy tc) tys
 
   -- Then resolve any remaining nullary synonyms.
-  | Just ty' <- tcView ty = Just ty'
+  | Just ty' <- tcView ty
+  = Just ty'
+
 trieMapView _ = Nothing
 
 instance TrieMap TypeMapX where

@@ -258,6 +258,7 @@ basicKnownKeyNames
         starKindRepName,
         starArrStarKindRepName,
         starArrStarArrStarKindRepName,
+        constraintKindRepName,
 
         -- WithDict
         withDictClassName,
@@ -1401,10 +1402,12 @@ typeCharTypeRepName   = varQual tYPEABLE_INTERNAL (fsLit "typeCharTypeRep") type
 trGhcPrimModuleName   = varQual gHC_TYPES         (fsLit "tr$ModuleGHCPrim")  trGhcPrimModuleKey
 
 -- Typeable KindReps for some common cases
-starKindRepName, starArrStarKindRepName, starArrStarArrStarKindRepName :: Name
-starKindRepName        = varQual gHC_TYPES         (fsLit "krep$*")         starKindRepKey
-starArrStarKindRepName = varQual gHC_TYPES         (fsLit "krep$*Arr*")     starArrStarKindRepKey
-starArrStarArrStarKindRepName = varQual gHC_TYPES  (fsLit "krep$*->*->*")   starArrStarArrStarKindRepKey
+starKindRepName, starArrStarKindRepName,
+  starArrStarArrStarKindRepName, constraintKindRepName :: Name
+starKindRepName        = varQual gHC_TYPES         (fsLit "krep$*")          starKindRepKey
+starArrStarKindRepName = varQual gHC_TYPES         (fsLit "krep$*Arr*")      starArrStarKindRepKey
+starArrStarArrStarKindRepName = varQual gHC_TYPES  (fsLit "krep$*->*->*")    starArrStarArrStarKindRepKey
+constraintKindRepName  = varQual gHC_TYPES         (fsLit "krep$Constraint") constraintKindRepKey
 
 -- WithDict
 withDictClassName :: Name
@@ -2492,14 +2495,15 @@ tr'PtrRepLiftedKey     = mkPreludeMiscIdUnique 515
 trLiftedRepKey         = mkPreludeMiscIdUnique 516
 
 -- KindReps for common cases
-starKindRepKey, starArrStarKindRepKey, starArrStarArrStarKindRepKey :: Unique
-starKindRepKey        = mkPreludeMiscIdUnique 520
-starArrStarKindRepKey = mkPreludeMiscIdUnique 521
+starKindRepKey, starArrStarKindRepKey, starArrStarArrStarKindRepKey, constraintKindRepKey :: Unique
+starKindRepKey               = mkPreludeMiscIdUnique 520
+starArrStarKindRepKey        = mkPreludeMiscIdUnique 521
 starArrStarArrStarKindRepKey = mkPreludeMiscIdUnique 522
+constraintKindRepKey         = mkPreludeMiscIdUnique 523
 
 -- Dynamic
 toDynIdKey :: Unique
-toDynIdKey            = mkPreludeMiscIdUnique 523
+toDynIdKey            = mkPreludeMiscIdUnique 530
 
 
 bitIntegerIdKey :: Unique

@@ -1087,8 +1087,8 @@ mkAbsentErrorApp :: Type         -- The type to instantiate 'a'
 mkAbsentErrorApp res_ty err_msg
   = mkApps (Var err_id) [ Type res_ty, err_string ]
   where
-    err_id | isConstraintKind (typeKind res_ty) = aBSENT_CONSTRAINT_ERROR_ID
-           | otherwise                          = aBSENT_ERROR_ID
+    err_id | isConstraintLikeKind (typeKind res_ty) = aBSENT_CONSTRAINT_ERROR_ID
+           | otherwise                              = aBSENT_ERROR_ID
     err_string = Lit (mkLitString err_msg)
 
 absentErrorName, absentConstraintErrorName :: Name

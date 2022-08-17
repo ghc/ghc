@@ -1177,7 +1177,7 @@ tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
   = tc_lhs_type mode rn_ty exp_kind
 
   -- See Note [Body kind of a HsQualTy]
-  | isConstraintKind exp_kind
+  | isConstraintLikeKind exp_kind
   = do { ctxt' <- tc_hs_context mode ctxt
        ; ty'   <- tc_lhs_type mode rn_ty constraintKind
        ; return (tcMkDFunPhiTy ctxt' ty') }
@@ -1395,9 +1395,9 @@ tupKindSort_maybe :: TcKind -> Maybe TupleSort
 tupKindSort_maybe k
   | Just (k', _) <- splitCastTy_maybe k = tupKindSort_maybe k'
   | Just k'      <- tcView k            = tupKindSort_maybe k'
-  | isConstraintKind k = Just ConstraintTuple
-  | tcIsLiftedTypeKind k   = Just BoxedTuple
-  | otherwise            = Nothing
+  | isConstraintKind k                  = Just ConstraintTuple
+  | tcIsLiftedTypeKind k                = Just BoxedTuple
+  | otherwise                           = Nothing
 
 tc_tuple :: HsType GhcRn -> TcTyMode -> TupleSort -> [LHsType GhcRn] -> TcKind -> TcM TcType
 tc_tuple rn_ty mode tup_sort tys exp_kind
@@ -3729,8 +3729,8 @@ splitTyConKind skol_info in_scope avoid_occs kind
         ; return (go new_occs new_uniqs subst [] kind) }
 
 isAllowedDataResKind :: AllowedDataResKind -> Kind -> Bool
-isAllowedDataResKind AnyTYPEKind  kind = tcIsRuntimeTypeKind kind
-isAllowedDataResKind AnyBoxedKind kind = tcIsBoxedTypeKind kind
+isAllowedDataResKind AnyTYPEKind  kind = isTypeLikeKind     kind
+isAllowedDataResKind AnyBoxedKind kind = tcIsBoxedTypeKind  kind
 isAllowedDataResKind LiftedKind   kind = tcIsLiftedTypeKind kind
 
 -- | Checks that the return kind in a data declaration's kind signature is
@@ -3821,7 +3821,7 @@ checkDataKindSig data_sort kind
       TcRnInvalidReturnKind data_sort (allowed_kind dflags) kind (ext_hint dflags)
 
     ext_hint dflags
-      | tcIsRuntimeTypeKind kind
+      | isTypeLikeKind kind
       , is_newtype
       , not (xopt LangExt.UnliftedNewtypes dflags)
       = Just SuggestUnliftedNewtypes

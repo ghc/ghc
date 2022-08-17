@@ -156,8 +156,9 @@ module GHC.Core.Type (
 
         -- ** Finding the kind of a type
         typeKind, tcTypeKind, typeHasFixedRuntimeRep, argsHaveFixedRuntimeRep,
-        tcIsLiftedTypeKind, isConstraintKind, tcReturnsConstraintKind,
-        tcIsBoxedTypeKind, tcIsRuntimeTypeKind,
+        tcIsLiftedTypeKind,
+        isConstraintKind, isConstraintLikeKind, returnsConstraintKind,
+        tcIsBoxedTypeKind, isTypeLikeKind,
 
         -- ** Common Kind
         liftedTypeKind, unliftedTypeKind,
@@ -1662,63 +1663,6 @@ tcSplitTyConApp_maybe ty
 mkTyConTy :: TyCon -> Type
 mkTyConTy tycon = tyConNullaryTy tycon
 
--- | A key function: builds a 'TyConApp' or 'FunTy' as appropriate to
--- its arguments.  Applies its arguments to the constructor from left to right.
-mkTyConApp :: TyCon -> [Type] -> Type
-mkTyConApp tycon []
-  = -- See Note [Sharing nullary TyConApps] in GHC.Core.TyCon
-    mkTyConTy tycon
-
-mkTyConApp tycon tys@(ty1:rest)
-  | Just (af, mult, arg, res) <- tyConAppFun_maybe id tycon tys
-  = FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res }
-
-  -- See Note [Using synonyms to compress types]
-  | key == tYPETyConKey
-  = assert (null rest) $
---    mkTYPEapp_maybe ty1 `orElse` bale_out
-    case mkTYPEapp_maybe ty1 of
-      Just ty -> ty -- pprTrace "mkTYPEapp:yes" (ppr ty) ty
-      Nothing -> bale_out -- pprTrace "mkTYPEapp:no" (ppr bale_out) bale_out
-
-  -- See Note [Using synonyms to compress types]
-  | key == boxedRepDataConTyConKey
-  = assert (null rest) $
---     mkBoxedRepApp_maybe ty1 `orElse` bale_out
-    case mkBoxedRepApp_maybe ty1 of
-      Just ty -> ty -- pprTrace "mkBoxedRepApp:yes" (ppr ty) ty
-      Nothing -> bale_out -- pprTrace "mkBoxedRepApp:no" (ppr bale_out) bale_out
-
-  | key == tupleRepDataConTyConKey
-  = case mkTupleRepApp_maybe ty1 of
-      Just ty -> ty -- pprTrace "mkTupleRepApp:yes" (ppr ty) ty
-      Nothing -> bale_out -- pprTrace "mkTupleRepApp:no" (ppr bale_out) bale_out
-
-  -- The catch-all case
-  | otherwise
-  = bale_out
-  where
-    key = tyConUnique tycon
-    bale_out = TyConApp tycon tys
-
-
-{- Note [Care using synonyms to compress types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Using a synonym to compress a types has a tricky wrinkle. Consider
-coreView applied to (TyConApp LiftedRep [])
-
-* coreView expands the LiftedRep synonym:
-     type LiftedRep = BoxedRep Lifted
-
-* Danger: we might apply the empty substitution to the RHS of the
-  synonym.  And substTy calls mkTyConApp BoxedRep [Lifted]. And
-  mkTyConApp compresses that back to LiftedRep.  Loop!
-
-* Solution: in expandSynTyConApp_maybe, don't call substTy for nullary
-  type synonyms.  That's more efficient anyway.
--}
-
-
 -------------------
 newTyConInstRhs :: TyCon -> [Type] -> Type
 -- ^ Unwrap one 'layer' of newtype on a type constructor and its
@@ -3085,13 +3029,19 @@ classifiesTypeWithValues :: Kind -> Bool
 -- ^ True of a kind `TYPE _` or `CONSTRAINT _`
 classifiesTypeWithValues k = isJust (sORTKind_maybe k)
 
-isConstraintKind :: Kind -> Bool
+isConstraintLikeKind :: Kind -> Bool
 -- True of (CONSTRAINT _)
+isConstraintLikeKind kind
+  = case sORTKind_maybe kind of
+      Just (ConstraintLike, _) -> True
+      _                        -> False
+
+isConstraintKind :: Kind -> Bool
+-- True of (CONSTRAINT LiftedRep)
 isConstraintKind kind
-  | Just (ConstraintLike, _) <- sORTKind_maybe kind
-  = True
-  | otherwise
-  = False
+  = case sORTKind_maybe kind of
+      Just (ConstraintLike, rep) -> isLiftedRuntimeRep rep
+      _                          -> False
 
 tcIsLiftedTypeKind :: Kind -> Bool
 -- ^ Is this kind equivalent to 'Type' i.e. TYPE LiftedRep?
@@ -3118,23 +3068,21 @@ tcIsBoxedTypeKind kind
 -- | Is this kind equivalent to @TYPE r@ (for some unknown r)?
 --
 -- This considers 'Constraint' to be distinct from @*@.
-tcIsRuntimeTypeKind :: Kind -> Bool
-tcIsRuntimeTypeKind kind
-  | Just (TypeLike, _) <- sORTKind_maybe kind
-  = True
-  | otherwise
-  = False
+isTypeLikeKind :: Kind -> Bool
+isTypeLikeKind kind
+  = case sORTKind_maybe kind of
+      Just (TypeLike, _) -> True
+      _                  -> False
 
-tcReturnsConstraintKind :: Kind -> Bool
+returnsConstraintKind :: Kind -> Bool
 -- True <=> the Kind ultimately returns a Constraint
 --   E.g.  * -> Constraint
 --         forall k. k -> Constraint
-tcReturnsConstraintKind kind
-  | Just kind' <- tcView kind = tcReturnsConstraintKind kind'
-tcReturnsConstraintKind (ForAllTy _ ty)         = tcReturnsConstraintKind ty
-tcReturnsConstraintKind (FunTy { ft_res = ty }) = tcReturnsConstraintKind ty
-tcReturnsConstraintKind (TyConApp tc _)         = isConstraintKindCon tc
-tcReturnsConstraintKind _                       = False
+returnsConstraintKind kind
+  | Just kind' <- tcView kind = returnsConstraintKind kind'
+returnsConstraintKind (ForAllTy _ ty)         = returnsConstraintKind ty
+returnsConstraintKind (FunTy { ft_res = ty }) = returnsConstraintKind ty
+returnsConstraintKind kind                    = isConstraintLikeKind kind
 
 --------------------------
 typeLiteralKind :: TyLit -> Kind
@@ -3958,6 +3906,59 @@ e.g., during comparison.
 
 See #17958, #20541
 -}
+
+-- | A key function: builds a 'TyConApp' or 'FunTy' as appropriate to
+-- its arguments.  Applies its arguments to the constructor from left to right.
+mkTyConApp :: TyCon -> [Type] -> Type
+mkTyConApp tycon []
+  = -- See Note [Sharing nullary TyConApps] in GHC.Core.TyCon
+    mkTyConTy tycon
+
+mkTyConApp tycon tys@(ty1:rest)
+  | Just (af, mult, arg, res) <- tyConAppFun_maybe id tycon tys
+  = FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res }
+
+  -- See Note [Using synonyms to compress types]
+  | key == tYPETyConKey
+  , Just ty <- mkTYPEapp_maybe ty1
+  = assert (null rest) ty
+
+  | key == cONSTRAINTTyConKey
+  , Just ty <- mkCONSTRAINTapp_maybe ty1
+  = assert (null rest) ty
+
+  -- See Note [Using synonyms to compress types]
+  | key == boxedRepDataConTyConKey
+  , Just ty <- mkBoxedRepApp_maybe ty1
+  = assert (null rest) ty
+
+  | key == tupleRepDataConTyConKey
+  , Just ty <- mkTupleRepApp_maybe ty1
+  = assert (null rest) ty
+
+  -- The catch-all case
+  | otherwise
+  = TyConApp tycon tys
+  where
+    key = tyConUnique tycon
+
+
+{- Note [Care using synonyms to compress types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Using a synonym to compress a types has a tricky wrinkle. Consider
+coreView applied to (TyConApp LiftedRep [])
+
+* coreView expands the LiftedRep synonym:
+     type LiftedRep = BoxedRep Lifted
+
+* Danger: we might apply the empty substitution to the RHS of the
+  synonym.  And substTy calls mkTyConApp BoxedRep [Lifted]. And
+  mkTyConApp compresses that back to LiftedRep.  Loop!
+
+* Solution: in expandSynTyConApp_maybe, don't call substTy for nullary
+  type synonyms.  That's more efficient anyway.
+-}
+
 
 mkTYPEapp :: RuntimeRepType -> Type
 mkTYPEapp rr

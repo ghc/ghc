@@ -2085,7 +2085,7 @@ pprTcSolverReportMsg _
       2 (text "but" <+> quotes (ppr thing) <+> text "has kind" <+>
         quotes (ppr act))
   where
-    kind_desc | isConstraintKind exp = text "a constraint"
+    kind_desc | isConstraintLikeKind exp = text "a constraint"
               | Just arg <- kindRep_maybe exp  -- TYPE t0
               , tcIsTyVarTy arg = sdocOption sdocPrintExplicitRuntimeReps $ \case
                                    True  -> text "kind" <+> quotes (ppr exp)
