@@ -79,7 +79,7 @@ module GHC.Types.Var (
         mkTyVarBinder, mkTyVarBinders,
         isTyVarBinder,
         tyVarSpecToBinder, tyVarSpecToBinders, tyVarReqToBinder, tyVarReqToBinders,
-        mapVarBndr, mapVarBndrs, lookupVarBndr,
+        mapVarBndr, mapVarBndrs,
 
         -- ** Constructing TyVar's
         mkTyVar, mkTcTyVar,
@@ -695,11 +695,6 @@ mapVarBndr f (Bndr v fl) = Bndr (f v) fl
 
 mapVarBndrs :: (var -> var') -> [VarBndr var flag] -> [VarBndr var' flag]
 mapVarBndrs f = map (mapVarBndr f)
-
-lookupVarBndr :: Eq var => var -> [VarBndr var flag] -> Maybe flag
-lookupVarBndr var bndrs = lookup var zipped_bndrs
-  where
-    zipped_bndrs = map (\(Bndr v f) -> (v,f)) bndrs
 
 instance Outputable tv => Outputable (VarBndr tv ArgFlag) where
   ppr (Bndr v Required)  = ppr v
