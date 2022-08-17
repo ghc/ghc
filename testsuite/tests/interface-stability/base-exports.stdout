@@ -8267,10 +8267,13 @@ module GHC.MVar where
   -- Safety: Unsafe
   type MVar :: * -> *
   data MVar a = MVar (GHC.Prim.MVar# GHC.Prim.RealWorld a)
+  type PrimMVar :: *
+  data PrimMVar
   addMVarFinalizer :: forall a. MVar a -> GHC.Types.IO () -> GHC.Types.IO ()
   isEmptyMVar :: forall a. MVar a -> GHC.Types.IO GHC.Types.Bool
   newEmptyMVar :: forall a. GHC.Types.IO (MVar a)
   newMVar :: forall a. a -> GHC.Types.IO (MVar a)
+  newStablePtrPrimMVar :: forall a. MVar a -> GHC.Types.IO (GHC.Stable.StablePtr PrimMVar)
   putMVar :: forall a. MVar a -> a -> GHC.Types.IO ()
   readMVar :: forall a. MVar a -> GHC.Types.IO a
   takeMVar :: forall a. MVar a -> GHC.Types.IO a
