@@ -22,7 +22,7 @@ module GHC.Internal.Stack.CloneStack (
   decode
   ) where
 
-import GHC.Internal.Control.Concurrent.MVar
+import GHC.Internal.MVar
 import GHC.Internal.Data.Maybe (catMaybes)
 import GHC.Internal.Base
 import GHC.Internal.Conc.Sync
