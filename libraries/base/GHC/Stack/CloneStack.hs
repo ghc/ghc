@@ -22,14 +22,15 @@ module GHC.Stack.CloneStack (
   decode
   ) where
 
-import Control.Concurrent.MVar
+import GHC.MVar
 import Data.Maybe (catMaybes)
-import Foreign
-import GHC.Conc.Sync
-import GHC.Exts (Int (I#), RealWorld, StackSnapshot#, ThreadId#, Array#, sizeofArray#, indexArray#, State#, StablePtr#)
+import GHC.Conc.Sync (ThreadId(ThreadId))
+import GHC.Int (Int (I#))
+import GHC.Prim (RealWorld, StackSnapshot#, ThreadId#, Array#, sizeofArray#, indexArray#, State#, StablePtr#)
 import GHC.IO (IO (..))
 import GHC.InfoProv (InfoProv (..), InfoProvEnt, ipLoc, ipeProv, peekInfoProv)
 import GHC.Stable
+import GHC.Ptr
 
 -- | A frozen snapshot of the state of an execution stack.
 --
