@@ -110,19 +110,10 @@ import GHC.Base
 
 import {-# SOURCE #-} GHC.IO.Encoding
 import qualified GHC.Foreign as GHC
+import GHC.Foreign (CString, CStringLen)
 
 -----------------------------------------------------------------------------
 -- Strings
-
--- representation of strings in C
--- ------------------------------
-
--- | A C string is a reference to an array of C characters terminated by NUL.
-type CString    = Ptr CChar
-
--- | A string with explicit length information in bytes instead of a
--- terminating NUL (allowing NUL characters in the middle of the string).
-type CStringLen = (Ptr CChar, Int)
 
 -- exported functions
 -- ------------------
