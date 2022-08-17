@@ -428,6 +428,9 @@ RTS_FUN_DECL(stg_threadFinished);
 
 RTS_FUN_DECL(StgReturn);
 
+// Used by -dtag-inference-checks
+RTS_FUN_DECL(barf);
+
 /* -----------------------------------------------------------------------------
    PrimOps
    -------------------------------------------------------------------------- */
