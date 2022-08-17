@@ -1,6 +1,6 @@
 module Main where
 
-import GHC.Stack.CCS
+import GHC.InfoProv
 
 data D = D Int deriving Show
 
