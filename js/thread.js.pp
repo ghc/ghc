@@ -817,7 +817,7 @@ function h$handleBlockedSyncThread(c) {
       TRACE_SCHEDULER("blocking synchronous thread: exception");
       h$sp += 2;
       h$currentThread.sp = h$sp;
-      h$stack[h$sp-1] = h$baseZCGHCJSziPrimziInternalziwouldBlock;
+      h$stack[h$sp-1] = h$baseZCGHCziJSziPrimziInternalziwouldBlock;
       h$stack[h$sp]   = h$raiseAsync_frame;
       h$forceWakeupThread(h$currentThread);
       c = h$raiseAsync_frame;
@@ -889,7 +889,7 @@ function h$setCurrentThreadResultValue(v) {
 function h$runSyncReturn(a, cont) {
   var t = new h$Thread();
   TRACE_SCHEDULER("h$runSyncReturn created thread: " + h$threadString(t));
-  var aa = MK_AP1(h$baseZCGHCJSziPrimziInternalzisetCurrentThreadResultValue, a);
+  var aa = MK_AP1(h$baseZCGHCziJSziPrimziInternalzisetCurrentThreadResultValue, a);
   h$runSyncAction(t, aa, cont);
   if(t.status === THREAD_FINISHED) {
     if(t.resultIsException) {
@@ -932,7 +932,7 @@ function h$runSync(a, cont) {
 function h$runSyncAction(t, a, cont) {
   h$runInitStatic();
   var c = h$return;
-  t.stack[2] = h$baseZCGHCJSziPrimziInternalzisetCurrentThreadResultException;
+  t.stack[2] = h$baseZCGHCziJSziPrimziInternalzisetCurrentThreadResultException;
   t.stack[4] = h$ap_1_0;
   t.stack[5] = a;
   t.stack[6] = h$return;
