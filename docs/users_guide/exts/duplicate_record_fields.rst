@@ -57,4 +57,11 @@ However, this would not be permitted, because ``x`` is ambiguous: ::
 
     module M (x) where ...
 
-The same restrictions apply on imports.
+For ``import`` statements, it is possible to import multiple fields with the
+same name, as well as importing individual fields as part of their datatypes.
+For example, the following imports are allowed: ::
+
+    import M (S(x))        -- imports the type S and the 'x' field of S (but not the field of T)
+    import M (x)           -- imports both 'x' fields
+    import M hiding (S(x)) -- imports everything except the type S and its 'x' field
+    import M hiding (x)    -- imports everything except the two 'x' fields
