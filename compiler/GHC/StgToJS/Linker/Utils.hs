@@ -126,17 +126,17 @@ genCommonCppDefs profiling = mconcat
 
   -- GHCJS.Prim.JSVal
   , if profiling
-      then "#define MK_JSVAL(x) (h$baseZCGHCJSziPrimziJSVal_con_e, (x), h$CCS_SYSTEM)\n"
-      else "#define MK_JSVAL(x) (h$baseZCGHCJSziPrimziJSVal_con_e, (x))\n"
+      then "#define MK_JSVAL(x) (h$baseZCGHCziJSziPrimziJSVal_con_e, (x), h$CCS_SYSTEM)\n"
+      else "#define MK_JSVAL(x) (h$baseZCGHCziJSziPrimziJSVal_con_e, (x))\n"
   ,  "#define JSVAL_VAL(x) ((x).d1)\n"
 
   -- GHCJS.Prim.JSException
   , if profiling
-      then "#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$baseZCGHCJSziPrimziJSException_con_e,(msg),(hsMsg),h$CCS_SYSTEM))\n"
-      else "#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$baseZCGHCJSziPrimziJSException_con_e,(msg),(hsMsg)))\n"
+      then "#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$baseZCGHCziJSziPrimziJSException_con_e,(msg),(hsMsg),h$CCS_SYSTEM))\n"
+      else "#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$baseZCGHCziJSziPrimziJSException_con_e,(msg),(hsMsg)))\n"
 
   -- Exception dictionary for JSException
-  , "#define HS_JSEXCEPTION_EXCEPTION h$baseZCGHCJSziPrimzizdfExceptionJSException\n"
+  , "#define HS_JSEXCEPTION_EXCEPTION h$baseZCGHCziJSziPrimzizdfExceptionJSException\n"
 
   -- SomeException
   , if profiling

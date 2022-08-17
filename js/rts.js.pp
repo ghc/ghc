@@ -2,7 +2,7 @@ var h$start = new Date();
 
 function h$rts_eval(action, unbox) {
   return new Promise((accept, reject) =>
-    h$run(MK_AP3( h$baseZCGHCJSziPrimziresolveIO
+    h$run(MK_AP3( h$baseZCGHCziJSziPrimziresolveIO
                 , x => { accept(unbox(x))}
                 , e => { reject(new h$HaskellException(e))}
                 , action
@@ -13,7 +13,7 @@ function h$rts_eval(action, unbox) {
 function h$rts_eval_sync(closure, unbox) {
   var res, status = 0;
   try {
-  h$runSync(MK_AP3( h$baseZCGHCJSziPrimziresolveIO
+  h$runSync(MK_AP3( h$baseZCGHCziJSziPrimziresolveIO
            , MK_JSVAL(x => { status = 1; res = unbox(x); })
            , MK_JSVAL(e => { status = 2; res = new h$HaskellException(e); })
            , closure), false);
@@ -149,7 +149,7 @@ function h$rts_getFunPtr(x) {
 }
 
 function h$rts_toIO(x) {
-  return MK_AP1(h$baseZCGHCJSziPrimzitoIO, x);
+  return MK_AP1(h$baseZCGHCziJSziPrimzitoIO, x);
 }
 
 // running IO actions
