@@ -43,6 +43,7 @@ import GHC.Tc.Solver
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
+import GHC.Core.TyCo.Ppr( pprTyVars )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Pat
 import GHC.Tc.Utils.TcMType
@@ -59,7 +60,7 @@ import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
-import GHC.Types.Var.Env( TidyEnv )
+import GHC.Types.Var.Env( TidyEnv, TyVarEnv, mkVarEnv, lookupVarEnv )
 import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -934,7 +935,8 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
        ; let psig_qtvs    = map binderVar psig_qtv_bndrs
              psig_qtv_set = mkVarSet psig_qtvs
              psig_qtv_prs = psig_qtv_nms `zip` psig_qtvs
-
+             psig_bndr_map :: TyVarEnv InvisTVBinder
+             psig_bndr_map = mkVarEnv [ (binderVar tvb, tvb) | tvb <- psig_qtv_bndrs ]
 
             -- Check whether the quantified variables of the
             -- partial signature have been unified together
@@ -950,32 +952,35 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
 
        ; annotated_theta      <- zonkTcTypes annotated_theta
        ; (free_tvs, my_theta) <- choose_psig_context psig_qtv_set annotated_theta wcx
+                                 -- NB: free_tvs includes tau_tvs
 
-       ; let keep_me    = free_tvs `unionVarSet` psig_qtv_set
-             final_qtvs = [ mkTyVarBinder vis tv
-                          | tv <- qtvs -- Pulling from qtvs maintains original order
-                          , tv `elemVarSet` keep_me
-                          , let vis = case lookupVarBndr tv psig_qtv_bndrs of
-                                  Just spec -> spec
-                                  Nothing   -> InferredSpec ]
+       ; let (_,final_qtvs) = foldr (choose_qtv psig_bndr_map) (free_tvs, []) qtvs
+                              -- Pulling from qtvs maintains original order
+                              -- NB: qtvs is already in dependency order
+
+       ; traceTc "chooseInferredQuantifiers" $
+         vcat [ text "qtvs" <+> pprTyVars qtvs
+              , text "psig_qtv_bndrs" <+> ppr psig_qtv_bndrs
+              , text "free_tvs" <+> ppr free_tvs
+              , text "final_tvs" <+> ppr final_qtvs ]
 
        ; return (final_qtvs, my_theta) }
   where
-    report_dup_tyvar_tv_err (n1,n2)
-      = addErrTc (TcRnPartialTypeSigTyVarMismatch n1 n2 fn_name hs_ty)
-
-    report_mono_sig_tv_err (n,tv)
-      = addErrTc (TcRnPartialTypeSigBadQuantifier n fn_name m_unif_ty hs_ty)
-      where
-        m_unif_ty = listToMaybe
-                      [ rhs
-                      -- recall that residuals are always implications
-                      | residual_implic <- bagToList $ wc_impl residual
-                      , residual_ct <- bagToList $ wc_simple (ic_wanted residual_implic)
-                      , let residual_pred = ctPred residual_ct
-                      , Just (Nominal, lhs, rhs) <- [ getEqPredTys_maybe residual_pred ]
-                      , Just lhs_tv <- [ tcGetTyVar_maybe lhs ]
-                      , lhs_tv == tv ]
+    choose_qtv :: TyVarEnv InvisTVBinder -> TcTyVar
+             -> (TcTyVarSet, [InvisTVBinder]) -> (TcTyVarSet, [InvisTVBinder])
+    -- Pick which of the original qtvs should be retained
+    -- Keep it if (a) it is mentioned in the body of the type (free_tvs)
+    --            (b) it is a forall'd variable of the partial signature (psig_qtv_bndrs)
+    --            (c) it is mentioned in the kind of a retained qtv (#22065)
+    choose_qtv psig_bndr_map tv (free_tvs, qtvs)
+       | Just psig_bndr <- lookupVarEnv psig_bndr_map tv
+       = (free_tvs', psig_bndr : qtvs)
+       | tv `elemVarSet` free_tvs
+       = (free_tvs', mkTyVarBinder InferredSpec tv : qtvs)
+       | otherwise  -- Do not pick it
+       = (free_tvs, qtvs)
+       where
+         free_tvs' = free_tvs `unionVarSet` tyCoVarsOfType (tyVarKind tv)
 
     choose_psig_context :: VarSet -> TcThetaType -> Maybe TcType
                         -> TcM (VarSet, TcThetaType)
@@ -1018,6 +1023,22 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
            ; return (free_tvs, annotated_theta ++ diff_theta) }
              -- Return (annotated_theta ++ diff_theta)
              -- See Note [Extra-constraints wildcards]
+
+    report_dup_tyvar_tv_err (n1,n2)
+      = addErrTc (TcRnPartialTypeSigTyVarMismatch n1 n2 fn_name hs_ty)
+
+    report_mono_sig_tv_err (n,tv)
+      = addErrTc (TcRnPartialTypeSigBadQuantifier n fn_name m_unif_ty hs_ty)
+      where
+        m_unif_ty = listToMaybe
+                      [ rhs
+                      -- recall that residuals are always implications
+                      | residual_implic <- bagToList $ wc_impl residual
+                      , residual_ct <- bagToList $ wc_simple (ic_wanted residual_implic)
+                      , let residual_pred = ctPred residual_ct
+                      , Just (Nominal, lhs, rhs) <- [ getEqPredTys_maybe residual_pred ]
+                      , Just lhs_tv <- [ tcGetTyVar_maybe lhs ]
+                      , lhs_tv == tv ]
 
     mk_ctuple preds = mkBoxedTupleTy preds
        -- Hack alert!  See GHC.Tc.Gen.HsType:
