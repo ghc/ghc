@@ -18,7 +18,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.MVar (
-        -- * MVars
+          -- * MVars
           MVar(..)
         , newMVar
         , newEmptyMVar
@@ -30,9 +30,15 @@ module GHC.MVar (
         , tryReadMVar
         , isEmptyMVar
         , addMVarFinalizer
+
+          -- * PrimMVar
+        , PrimMVar
+        , newStablePtrPrimMVar
     ) where
 
 import GHC.Base
+import GHC.Stable       ( StablePtr(..) )
+import Unsafe.Coerce    ( unsafeCoerce# )
 
 data MVar a = MVar (MVar# RealWorld a)
 {- ^
@@ -179,4 +185,18 @@ isEmptyMVar (MVar mv#) = IO $ \ s# ->
 addMVarFinalizer :: MVar a -> IO () -> IO ()
 addMVarFinalizer (MVar m) (IO finalizer) =
     IO $ \s -> case mkWeak# m () finalizer s of { (# s1, _ #) -> (# s1, () #) }
+
+data PrimMVar
+
+-- | Make a 'StablePtr' that can be passed to the C function
+-- @hs_try_putmvar()@.  The RTS wants a 'StablePtr' to the
+-- underlying 'MVar#', but a 'StablePtr#' can only refer to
+-- lifted types, so we have to cheat by coercing.
+newStablePtrPrimMVar :: MVar a -> IO (StablePtr PrimMVar)
+newStablePtrPrimMVar (MVar m) = IO $ \s0 ->
+  case makeStablePtr# (unsafeCoerce# m :: PrimMVar) s0 of
+    -- Coerce unlifted  m :: MVar# RealWorld a
+    --     to lifted    PrimMVar
+    -- apparently because mkStablePtr is not representation-polymorphic
+    (# s1, sp #) -> (# s1, StablePtr sp #)
 

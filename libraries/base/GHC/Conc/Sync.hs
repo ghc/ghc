@@ -121,10 +121,7 @@ import GHC.IORef
 import GHC.MVar
 import GHC.Real         ( fromIntegral )
 import GHC.Show         ( Show(..), showParen, showString )
-import GHC.Stable       ( StablePtr(..) )
 import GHC.Weak
-
-import Unsafe.Coerce    ( unsafeCoerce# )
 
 infixr 0 `par`, `pseq`
 
@@ -662,20 +659,6 @@ mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
    case mkWeakNoFinalizer# t# t s of
       (# s1, w #) -> (# s1, Weak w #)
 
-
-data PrimMVar
-
--- | Make a 'StablePtr' that can be passed to the C function
--- @hs_try_putmvar()@.  The RTS wants a 'StablePtr' to the
--- underlying 'MVar#', but a 'StablePtr#' can only refer to
--- lifted types, so we have to cheat by coercing.
-newStablePtrPrimMVar :: MVar a -> IO (StablePtr PrimMVar)
-newStablePtrPrimMVar (MVar m) = IO $ \s0 ->
-  case makeStablePtr# (unsafeCoerce# m :: PrimMVar) s0 of
-    -- Coerce unlifted  m :: MVar# RealWorld a
-    --     to lifted    PrimMVar
-    -- apparently because mkStablePtr is not representation-polymorphic
-    (# s1, sp #) -> (# s1, StablePtr sp #)
 
 -----------------------------------------------------------------------------
 -- Transactional heap operations
