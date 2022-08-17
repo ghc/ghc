@@ -22,7 +22,7 @@ module GHC.Stack.CloneStack (
   decode
   ) where
 
-import Control.Concurrent.MVar
+import GHC.MVar
 import Data.Maybe (catMaybes)
 import Foreign
 import GHC.Base
