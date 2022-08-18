@@ -56,8 +56,6 @@ import GHC.Driver.Config
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
-import GHC.Builtin.PrimOps
-import GHC.Builtin.PrimOps.Ids
 
 import GHC.Data.FastString
 import GHC.Data.Pair
@@ -667,15 +665,13 @@ jsResultWrapper result_ty
 
   -- Data types with a single constructor, which has a single arg
   -- This includes types like Ptr and ForeignPtr
-  | Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) <- splitDataProductType_maybe result_ty,
+  | Just (_tycon, tycon_arg_tys, data_con, data_con_arg_tys) <- splitDataProductType_maybe result_ty,
     dataConSourceArity data_con == 1
-  = do let
-           (unwrapped_res_ty : _) = data_con_arg_tys
-           narrow_wrapper         = maybeJsNarrow tycon
+  = do let (unwrapped_res_ty : _) = data_con_arg_tys
        (maybe_ty, wrapper) <- jsResultWrapper (scaledThing unwrapped_res_ty)
        return
          (maybe_ty, \e -> mkApps (Var (dataConWrapId data_con))
-                                 (map Type tycon_arg_tys ++ [wrapper (narrow_wrapper e)]))
+                                 (map Type tycon_arg_tys ++ [wrapper e]))
 
   | otherwise
   = pprPanic "jsResultWrapper" (ppr result_ty)
@@ -690,16 +686,3 @@ mkJsCall u tgt args t = mkFCall u ccall args t
               (StaticTarget NoSourceText (mkFastString tgt) (Just primUnit) True)
               JavaScriptCallConv
               PlayRisky
-
--- narrow int32 and word32 since JS numbers can contain more
-maybeJsNarrow :: TyCon -> (CoreExpr -> CoreExpr)
-maybeJsNarrow tycon
-  | tycon `hasKey` intTyConKey    = \e -> App (Var (primOpId Narrow32IntOp)) e
-  | tycon `hasKey` int8TyConKey   = \e -> App (Var (primOpId Narrow8IntOp)) e
-  | tycon `hasKey` int16TyConKey  = \e -> App (Var (primOpId Narrow16IntOp)) e
-  | tycon `hasKey` int32TyConKey  = \e -> App (Var (primOpId Narrow32IntOp)) e
-  | tycon `hasKey` wordTyConKey   = \e -> App (Var (primOpId Narrow32WordOp)) e
-  | tycon `hasKey` word8TyConKey  = \e -> App (Var (primOpId Narrow8WordOp)) e
-  | tycon `hasKey` word16TyConKey = \e -> App (Var (primOpId Narrow16WordOp)) e
-  | tycon `hasKey` word32TyConKey = \e -> App (Var (primOpId Narrow32WordOp)) e
-  | otherwise                     = id
