@@ -2103,40 +2103,62 @@ pprTcSolverReportMsg ctxt
                   , teq_mismatch_what     = mb_thing })
   = addArising ct_loc $ pprWithExplicitKindsWhen ppr_explicit_kinds msg
   where
-    msg
-      | isUnliftedTypeKind act, isLiftedTypeKind exp
-      = sep [ text "Expecting a lifted type, but"
-            , thing_msg mb_thing (text "an") (text "unlifted") ]
-      | isLiftedTypeKind act, isUnliftedTypeKind exp
-      = sep [ text "Expecting an unlifted type, but"
-            , thing_msg mb_thing (text "a") (text "lifted") ]
-      | tcIsLiftedTypeKind exp
-      = maybe_num_args_msg $$
-        sep [ text "Expected a type, but"
+    msg | Just (torc, rep) <- sORTKind_maybe exp
+        = msg_for_exp_sort torc rep
+
+        | Just nargs_msg <- num_args_msg
+        , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
+        = nargs_msg $$ pprTcSolverReportMsg ctxt ea_msg
+
+        | -- pprTrace "check" (ppr ea_looks_same $$ ppr exp $$ ppr act $$ ppr ty1 $$ ppr ty2) $
+          ea_looks_same ty1 ty2 exp act
+        , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
+        = pprTcSolverReportMsg ctxt ea_msg
+
+        | otherwise = bale_out_msg
+
+      -- bale_out_msg: the mismatched types are /inside/ exp and act
+    bale_out_msg = vcat $ map (pprTcSolverReportMsg ctxt) errs
+      where
+         errs = case mk_ea_msg ctxt Nothing level orig of
+                   Left ea_info -> [ mkTcReportWithInfo mismatch_err ea_info ]
+                   Right ea_err -> [ mismatch_err, ea_err ]
+         mismatch_err = Mismatch False item ty1 ty2
+
+      -- 'expected' is (TYPE rep) or (CONSTRAINT rep)
+    msg_for_exp_sort exp_torc exp_rep
+      | Just (act_torc, act_rep) <- sORTKind_maybe act
+      , act_torc == exp_torc
+      = -- (TYPE exp_rep) ~ (TYPE act_rep) or similar with CONSTRAINT
+        case (runtimeRepLevity_maybe exp_rep, runtimeRepLevity_maybe act_rep) of
+          (Just exp_lev, Just act_lev)
+             -> sep [ text "Expecting" <+> ppr_an_lev exp_lev <+> pp_exp_thing <+> text "but"
+                    , case mb_thing of
+                        Just thing -> quotes (ppr thing) <+> text "is" <+> ppr_lev act_lev
+                        Nothing    -> text "got" <+> ppr_an_lev act_lev <+> pp_exp_thing ]
+          _ -> bale_out_msg
+
+      | otherwise
+      = -- (TYPE _) ~ (CONSTRAINT _) or (TYPE _) ~ Bool, etc
+        maybe_num_args_msg $$
+        sep [ text "Expected a" <+> pp_exp_thing <+> text "but"
             , case mb_thing of
                 Nothing    -> text "found something with kind"
                 Just thing -> quotes (ppr thing) <+> text "has kind"
             , quotes (pprWithTYPE act) ]
-      | Just nargs_msg <- num_args_msg
-      , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
-      = nargs_msg $$ pprTcSolverReportMsg ctxt ea_msg
-      | -- pprTrace "check" (ppr ea_looks_same $$ ppr exp $$ ppr act $$ ppr ty1 $$ ppr ty2) $
-        ea_looks_same ty1 ty2 exp act
-      , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
-      = pprTcSolverReportMsg ctxt ea_msg
-      -- The mismatched types are /inside/ exp and act
-      | let mismatch_err = Mismatch False item ty1 ty2
-            errs = case mk_ea_msg ctxt Nothing level orig of
-              Left ea_info -> [ mkTcReportWithInfo mismatch_err ea_info ]
-              Right ea_err -> [ mismatch_err, ea_err ]
-      = vcat $ map (pprTcSolverReportMsg ctxt) errs
+
+      where
+        pp_exp_thing = case exp_torc of TypeLike       -> text "type";
+                                        ConstraintLike -> text "constraint"
+        ppr_lev Lifted      = text "lifted"
+        ppr_lev Unlifted    = text "unlifted"
+        ppr_an_lev Lifted   = text "a lifted"
+        ppr_an_lev Unlifted = text "an unlifted"
+
 
     ct_loc = errorItemCtLoc item
     orig   = errorItemOrigin item
     level  = ctLocTypeOrKind_maybe ct_loc `orElse` TypeLevel
-
-    thing_msg (Just thing) _  levity = quotes (ppr thing) <+> text "is" <+> levity
-    thing_msg Nothing      an levity = text "got" <+> an <+> levity <+> text "type"
 
     num_args_msg = case level of
       KindLevel

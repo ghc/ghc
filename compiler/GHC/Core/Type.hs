@@ -734,11 +734,11 @@ isBoxedRuntimeRep_maybe rep
 
 -- | Check whether a type of kind 'RuntimeRep' is lifted, unlifted, or unknown.
 --
--- @isLiftedRuntimeRep rr@ returns:
+-- `isLiftedRuntimeRep rr` returns:
 --
---   * @Just Lifted@ if @rr@ is @LiftedRep :: RuntimeRep@
---   * @Just Unlifted@ if @rr@ is definitely unlifted, e.g. @IntRep@
---   * @Nothing@ if not known (e.g. it's a type variable or a type family application).
+--   * `Just Lifted` if `rr` is `LiftedRep :: RuntimeRep`
+--   * `Just Unlifted` if `rr` is definitely unlifted, e.g. `IntRep`
+--   * `Nothing` if not known (e.g. it's a type variable or a type family application).
 runtimeRepLevity_maybe :: Type -> Maybe Levity
 runtimeRepLevity_maybe rep
   | TyConApp rr_tc args <- coreFullView rep
@@ -756,14 +756,14 @@ runtimeRepLevity_maybe rep
         -- hence the isPromotedDataCon rr_tc
 runtimeRepLevity_maybe _ = Nothing
 
--- | Check whether a kind is of the form @TYPE (BoxedRep Lifted)@
--- or @TYPE (BoxedRep Unlifted)@.
+-- | Check whether a kind is of the form `TYPE (BoxedRep Lifted)`
+-- or `TYPE (BoxedRep Unlifted)`.
 --
 -- Returns:
 --
---  - @Just Lifted@ for @TYPE (BoxedRep Lifted)@ and @Type@,
---  - @Just Unlifted@ for @TYPE (BoxedRep Unlifted)@ and @UnliftedType@,
---  - @Nothing@ for anything else, e.g. @TYPE IntRep@, @TYPE (BoxedRep l)@, etc.
+--  - `Just Lifted` for `TYPE (BoxedRep Lifted)` and `Type`,
+--  - `Just Unlifted` for `TYPE (BoxedRep Unlifted)` and `UnliftedType`,
+--  - `Nothing` for anything else, e.g. `TYPE IntRep`, `TYPE (BoxedRep l)`, etc.
 kindBoxedRepLevity_maybe :: Type -> Maybe Levity
 kindBoxedRepLevity_maybe ty
   | Just rep <- kindRep_maybe ty
