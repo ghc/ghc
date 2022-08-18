@@ -15,6 +15,11 @@ import Rules.Register
 import Settings
 import Target
 import Utilities
+import Data.Time.Clock
+import Rules.Generate (generatedDependencies)
+import Hadrian.Oracles.Cabal (readPackageData)
+import Oracles.Flag
+
 
 -- * Library 'Rules'
 
@@ -25,6 +30,7 @@ libraryRules = do
     root -/- "**/libHS*-*.so"          %> buildDynamicLib root "so"
     root -/- "**/libHS*-*.dll"         %> buildDynamicLib root "dll"
     root -/- "**/*.a"                  %> buildStaticLib  root
+    root -/- "**/stamp-*"              %> buildPackage root
     priority 2 $ do
         root -/- "stage*/lib/**/libHS*-*.dylib" %> registerDynamicLib root "dylib"
         root -/- "stage*/lib/**/libHS*-*.so"    %> registerDynamicLib root "so"
@@ -104,6 +110,60 @@ buildGhciLibO root ghcilibPath = do
     objs <- allObjects context
     need objs
     build $ target context (MergeObjects stage) objs [ghcilibPath]
+
+
+{-
+Note [Stamp Files]
+~~~~~~~~~~~~~~~~~~
+
+A package stamp file exists to communicate that all the objects for a certain
+package are built.
+
+If you need a stamp file, then it needs all the library dependencies
+
+The format for a stamp file is defined in `pkgStampFile`. The stamp file is named
+"stamp-<way>" so if you want to build base in dynamic way then need `_build/stage1/libraries/base/stamp-dyn`
+
+By using stamp files you can easily say you want to build a library in a certain
+way by needing the stamp file for that context.
+
+Before these stamp files existed the way to declare that all objects in a certain way
+were build was by needing the .conf file for the package. Stamp files decouple this
+decision from creating the .conf file which does extra stuff such as linking, copying
+files etc.
+
+-}
+
+
+buildPackage :: FilePath -> FilePath -> Action ()
+buildPackage root fp = do
+  l@(BuildPath _ stage _ (PkgStamp _ _ way)) <- parsePath (parseStampPath root) "<.stamp parser>" fp
+  let ctx = stampContext l
+  srcs <- hsSources ctx
+  gens <- interpretInContext ctx generatedDependencies
+
+  depPkgs <- packageDependencies <$> readPackageData (package ctx)
+  -- Stage packages are those we have in this stage.
+  stagePkgs <- stagePackages stage
+  -- We'll need those packages in our package database.
+  deps <- sequence [ pkgConfFile (ctx { package = pkg })
+                   | pkg <- depPkgs, pkg `elem` stagePkgs ]
+  need deps
+  need (srcs ++ gens)
+
+  need =<< libraryTargets True ctx
+  time <- liftIO $ getCurrentTime
+  liftIO $ writeFile fp (show time)
+  ways <- interpretInContext ctx getLibraryWays
+  let hasVanilla = elem vanilla ways
+      hasDynamic = elem dynamic ways
+  support <- platformSupportsSharedLibs
+  when ((hasVanilla && hasDynamic) &&
+        support && way == vanilla) $ do
+    stamp <- (pkgStampFile (ctx { way = dynamic }))
+    liftIO $ writeFile stamp (show time)
+
+
 
 -- * Helpers
 
@@ -199,6 +259,22 @@ libDynContext (BuildPath _ stage pkgpath (LibDyn pkgname _ way _)) =
   where
     pkg = library pkgname pkgpath
 
+-- | Get the 'Context' corresponding to the build path for a given static library.
+stampContext :: BuildPath PkgStamp -> Context
+stampContext (BuildPath _ stage _ (PkgStamp pkgname _ way)) =
+    Context stage pkg way
+  where
+    pkg = unsafeFindPackageByName pkgname
+
+data PkgStamp = PkgStamp String [Integer] Way deriving (Eq, Show)
+
+
+-- | Parse a path to a ghci library to be built, making sure the path starts
+-- with the given build root.
+parseStampPath :: FilePath -> Parsec.Parsec String () (BuildPath PkgStamp)
+parseStampPath root = parseBuildPath root parseStamp
+
+
 -- | Parse a path to a registered ghc-pkg static library to be built, making
 -- sure the path starts with the given build root.
 parseGhcPkgLibA :: FilePath -> Parsec.Parsec String () (GhcPkgPath LibA)
@@ -261,6 +337,13 @@ parseLibDynFilename ext = do
     _ <- optional $ Parsec.string "-ghc" *> parsePkgVersion
     _ <- Parsec.string ("." ++ ext)
     return (LibDyn pkgname pkgver way $ if ext == "so" then So else Dylib)
+
+parseStamp :: Parsec.Parsec String () PkgStamp
+parseStamp = do
+    _ <- Parsec.string "stamp-"
+    (pkgname, pkgver) <- parsePkgId
+    way <- parseWaySuffix vanilla
+    return (PkgStamp pkgname pkgver way)
 
 -- | Get the package identifier given the package name and version.
 pkgId :: String -> [Integer] -> String

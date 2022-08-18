@@ -9,8 +9,6 @@ import Packages
 import Rules.Documentation
 import Settings.Builders.Common
 import Settings.Builders.Ghc
-import Utilities
-import Context.Type as C
 import CommandLine
 import qualified Data.Text as T
 
