@@ -9315,6 +9315,7 @@ module GHC.Stack where
   getCurrentCCS :: forall dummy. dummy -> GHC.Types.IO (GHC.Ptr.Ptr CostCentreStack)
   popCallStack :: CallStack -> CallStack
   prettyCallStack :: CallStack -> GHC.Base.String
+  prettyCallStackLines :: CallStack -> [GHC.Base.String]
   prettySrcLoc :: SrcLoc -> GHC.Base.String
   pushCallStack :: ([GHC.Types.Char], SrcLoc) -> CallStack -> CallStack
   renderStack :: [GHC.Base.String] -> GHC.Base.String
