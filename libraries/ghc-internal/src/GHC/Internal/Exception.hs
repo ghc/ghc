@@ -2,7 +2,6 @@
 {-# LANGUAGE NoImplicitPrelude
            , ExistentialQuantification
            , MagicHash
-           , RecordWildCards
            , PatternSynonyms
   #-}
 {-# LANGUAGE DataKinds, PolyKinds #-}
@@ -62,6 +61,7 @@ import GHC.Internal.Stack.Types
 import GHC.Internal.Data.OldList
 import GHC.Internal.IO.Unsafe
 import {-# SOURCE #-} GHC.Internal.Stack.CCS
+import {-# SOURCE #-} GHC.Internal.Stack (prettyCallStackLines, prettyCallStack, prettySrcLoc)
 import GHC.Internal.Exception.Type
 
 -- | Throw an exception.  Exceptions may be thrown from purely
@@ -111,31 +111,3 @@ showCCSStack :: [String] -> [String]
 showCCSStack [] = []
 showCCSStack stk = "CallStack (from -prof):" : map ("  " ++) (reverse stk)
 
--- prettySrcLoc and prettyCallStack are defined here to avoid hs-boot
--- files. See Note [Definition of CallStack]
-
--- | Pretty print a 'SrcLoc'.
---
--- @since base-4.9.0.0
-prettySrcLoc :: SrcLoc -> String
-prettySrcLoc SrcLoc {..}
-  = foldr (++) ""
-      [ srcLocFile, ":"
-      , show srcLocStartLine, ":"
-      , show srcLocStartCol, " in "
-      , srcLocPackage, ":", srcLocModule
-      ]
-
--- | Pretty print a 'CallStack'.
---
--- @since base-4.9.0.0
-prettyCallStack :: CallStack -> String
-prettyCallStack = intercalate "\n" . prettyCallStackLines
-
-prettyCallStackLines :: CallStack -> [String]
-prettyCallStackLines cs = case getCallStack cs of
-  []  -> []
-  stk -> "CallStack (from HasCallStack):"
-       : map (("  " ++) . prettyCallSite) stk
-  where
-    prettyCallSite (f, loc) = f ++ ", called at " ++ prettySrcLoc loc
