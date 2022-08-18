@@ -9,7 +9,7 @@ module Context (
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile,
     pkgHaddockFile, pkgRegisteredLibraryFile, pkgRegisteredLibraryFileName,
     pkgLibraryFile, pkgGhciLibraryFile,
-    pkgConfFile, objectPath, contextPath, getContextPath, libPath, distDir,
+    pkgConfFile, pkgStampFile, objectPath, contextPath, getContextPath, libPath, distDir,
     haddockStatsFilesDir
     ) where
 
@@ -131,6 +131,12 @@ pkgConfFile Context {..} = do
     pid  <- pkgIdentifier package
     dbPath <- packageDbPath stage
     return $ dbPath -/- pid <.> "conf"
+
+pkgStampFile :: Context -> Action FilePath
+pkgStampFile c@Context{..} = do
+    let extension = waySuffix way
+    pkgFile c "stamp-" extension
+
 
 -- | Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
 -- to its object file. For example:

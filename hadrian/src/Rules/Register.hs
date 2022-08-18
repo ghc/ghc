@@ -124,7 +124,7 @@ buildConf _ context@Context {..} _conf = do
     need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
 
     ways <- interpretInContext context (getLibraryWays <> if package == rts then getRtsWays else mempty)
-    need =<< concatMapM (libraryTargets True) [ context { way = w } | w <- Set.toList ways ]
+    need =<< mapM pkgStampFile [ context { way = w } | w <- Set.toList ways ]
 
     -- We might need some package-db resource to limit read/write, see packageRules.
     path <- buildPath context
