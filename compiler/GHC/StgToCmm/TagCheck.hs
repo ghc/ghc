@@ -19,9 +19,13 @@ import GHC.Prelude
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
+import GHC.StgToCmm.Layout (emitCall)
+import GHC.StgToCmm.Lit (newStringCLit)
 import GHC.Cmm
 import GHC.Cmm.BlockId
+import GHC.Cmm.CLabel (mkTagInferenceCheckFailureLabel)
 import GHC.Cmm.Graph as CmmGraph
+import GHC.Cmm.Utils
 
 import GHC.Core.Type
 import GHC.Types.Id
@@ -95,7 +99,8 @@ emitTagAssertion onWhat fun = do
   ; needsArgTag fun lbarf lret
 
   ; emitLabel lbarf
-  ; emitBarf ("Tag inference failed on:" ++ onWhat)
+  ; onWhat_str <- newStringCLit onWhat
+  ; _ <- emitCall (NativeNodeCall, NativeReturn) (mkLblExpr mkTagInferenceCheckFailureLabel) [CmmLit onWhat_str]
   ; emitLabel lret
   }
 

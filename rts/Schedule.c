@@ -571,8 +571,12 @@ run_thread:
         ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
         break;
 
+    case ThreadAborted:
+        interruptStgRts();
+        break;
+
     default:
-      barf("schedule: invalid thread return code %d", (int)ret);
+        barf("schedule: invalid thread return code %d", (int)ret);
     }
 
     if (ready_to_gc || scheduleNeedHeapProfile(ready_to_gc)) {
@@ -3090,7 +3094,7 @@ findRetryFrameHelper (Capability *cap, StgTSO *tso)
 /* -----------------------------------------------------------------------------
    findAtomicallyFrameHelper
 
-   This function is called by stg_abort via catch_retry_frame primitive.  It is
+   This function is called by stg_abort_tx via catch_retry_frame primitive. It is
    like findRetryFrameHelper but it will only stop at ATOMICALLY_FRAME.
    -------------------------------------------------------------------------- */
 

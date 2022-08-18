@@ -3211,7 +3211,7 @@ doBoundsCheck idx sz = do
     when do_bounds_check (doCheck platform)
   where
     doCheck platform = do
-        boundsCheckFailed <- getCode $ emitCCall [] (mkLblExpr mkOutOfBoundsAccessLabel) []
+        boundsCheckFailed <- getCode $ emitCall (NativeNodeCall, NativeReturn) (mkLblExpr mkOutOfBoundsAccessLabel) [idx, sz]
         emit =<< mkCmmIfThen' isOutOfBounds boundsCheckFailed (Just False)
       where
         uGE = cmmUGeWord platform

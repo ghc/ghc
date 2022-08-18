@@ -320,21 +320,3 @@ rtsDebugMsgFn(const char *s, va_list ap)
   return r;
 }
 
-
-// Used in stg_badAlignment_entry defined in StgStartup.cmm.
-void rtsBadAlignmentBarf(void) GNUC3_ATTRIBUTE(__noreturn__);
-
-void
-rtsBadAlignmentBarf()
-{
-    barf("Encountered incorrectly aligned pointer. This can't be good.");
-}
-
-// Used by code generator
-void rtsOutOfBoundsAccess(void) GNUC3_ATTRIBUTE(__noreturn__);
-
-void
-rtsOutOfBoundsAccess()
-{
-    barf("Encountered out of bounds array access.");
-}

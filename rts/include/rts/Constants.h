@@ -268,6 +268,7 @@
 #define ThreadYielding 3
 #define ThreadBlocked  4
 #define ThreadFinished 5
+#define ThreadAborted  6                /* See Note [Aborting from the mutator] */
 
 /*
  * Flags for the tso->flags field.

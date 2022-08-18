@@ -1486,3 +1486,49 @@ section "data" {
 }
 
 #endif
+
+/* Note [Aborting from the mutator]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * GHC supports a number of runtime checking modes (largely for debugging
+ * purposes) which may need to abort execution at runtime. This include
+ * -dtag-inference-check, -dcheck-prim-bounds, and -falignment-sanitisation.
+ * To abort execution one might think that we could just call `barf`; however
+ * this is not ideal since it doesn't allow the RTS to gracefully shutdown.
+ *
+ * In #22038 we saw this manifest as a deadlock when -dcheck-prim-bounds
+ * failed. In particular, we saw the following:
+ *
+ * 1. the mutator takes a capability and begins execution
+ * 2. the bounds check fails, calling `barf`
+ * 3. `barf` calls `rtsFatalInternalErrorFn`, which in turn calls `endEventLogging`
+ * 4. `endEventLogging` calls `flushEventLog`, which it turn initiates a
+ *    sync to request that all capabilities flush their local event logs
+ * 5. we deadlock as the the capability held by the crashing mutator can
+ *    never yields to the sync
+ *
+ * Consequently, we instead crash in a more principled manner by yielding back
+ * to the scheduler, indicating that we should abort by setting the thread's
+ * return value to ThreadAborted. This is done by stg_abort().
+ */
+
+stg_tagInferenceCheckFailure(W_ what) {
+    ccall debugBelch("Tag inference failed on: %s\n", what);
+    jump stg_abort();
+}
+
+stg_outOfBoundsAccess(W_ ind, W_ sz) {
+    ccall debugBelch("Encountered out of bounds array access (index=%d, size=%d)", ind, sz);
+    jump stg_abort();
+}
+
+stg_badAlignment() {
+    ccall debugBelch("Encountered incorrectly aligned pointer. This can't be good.");
+    jump stg_abort();
+}
+
+stg_abort() {
+    StgTSO_what_next(CurrentTSO) = ThreadKilled :: I16;
+    StgRegTable_rRet(BaseReg) = ThreadAborted :: W_;
+    R1 = BaseReg;
+    jump stg_returnToSched [R1];
+}
