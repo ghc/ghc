@@ -51,7 +51,6 @@
 --  - Employ the type system more effectively for @readSystemDeps'@, in
 --      particular get rid of the string literals
 --  - fix foldl' memory leak in @staticDeps@
---  - move @mkSymb@
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Linker.Linker where
@@ -783,21 +782,17 @@ readSystemDeps' file
   | otherwise = pure (mempty, mempty)
   where
 
-    d :: UnitId -> String -> [String] -> [ExportedFun]
-    d uid mod symbols = map (let pkg_module = mkJsModule uid mod
-                              in ExportedFun pkg_module
-                                 . LexicalFastString
-                                 . mkHaskellSym pkg_module (mkFastString mod)
-                                 . mkFastString)
-                        symbols
-    zenc  = mkFastString . zEncodeString . unpackFS
+    d :: UnitId -> FastString -> [FastString] -> [ExportedFun]
+    d uid mod symbols =
+      let pkg_module = mkJsModule uid mod
+      in map (ExportedFun pkg_module
+              . LexicalFastString
+              . mkJsSymbol pkg_module
+             )
+             symbols
 
-    mkHaskellSym :: Module -> FastString -> FastString -> FastString
-    mkHaskellSym mod _m s = "h$" <> zenc (mkFastString (unitModuleString mod)
-                                       <> "."
-                                       <> s)
-    mkJsModule :: UnitId -> String -> GenModule Unit
-    mkJsModule uid mod = mkModule (RealUnit (Definite uid)) (mkModuleName mod)
+    mkJsModule :: UnitId -> FastString -> Module
+    mkJsModule uid mod = mkModule (RealUnit (Definite uid)) (mkModuleNameFS mod)
 
 {-
   b  <- readBinaryFile (getLibDir dflags </> file)
@@ -817,6 +812,16 @@ readSystemDeps' file
               return (pkgs, funs)
 
 -}
+
+-- | Make JS symbol corresponding to the given Haskell symbol in the given
+-- module
+mkJsSymbol :: Module -> FastString -> FastString
+mkJsSymbol mod s = mkFastString $ mconcat
+  [ "h$"
+  , zEncodeString (unitModuleString mod <> ".")
+  , zString (zEncodeFS s)
+  ]
+
 
 readSystemWiredIn :: HscEnv -> IO [(FastString, UnitId)]
 readSystemWiredIn _ = pure [] -- XXX
@@ -851,7 +856,6 @@ staticDeps :: UnitEnv
                                       --   for which no package could be found
 staticDeps unit_env wiredin sdeps = mkDeps sdeps
   where
-    zenc  = mkFastString . zEncodeString . unpackFS
     u_st  = ue_units unit_env
     mkDeps (StaticDeps ds) =
       -- FIXME: Jeff (2022,03): this foldl' will leak memory due to the tuple
@@ -887,16 +891,8 @@ staticDeps unit_env wiredin sdeps = mkDeps sdeps
                  Just _ -> ( unresolved
                            , S.insert mod_uid pkgs
                            , S.insert (ExportedFun mod
-                                       . LexicalFastString $ mkSymb mod mod_name s) resolved
+                                       . LexicalFastString $ mkJsSymbol mod s) resolved
                            )
-    -- confusingly with the new ghc api we now use Module where we formerly had
-    -- Package, so this becomes Module -> Module -> Symbol where the first
-    -- Module is GHC's module type and the second is the SDep Moudle read as a
-    -- FastString
-    -- FIXME: Jeff (2022,03): should mkSymb be in the UnitUtils?
-    mkSymb :: Module -> FastString -> FastString -> FastString
-    mkSymb p _m s  =
-      "h$" <> zenc (mkFastString (unitModuleString p) <> "." <> s)
 
 closePackageDeps :: UnitState -> Set UnitId -> Set UnitId
 closePackageDeps u_st pkgs
