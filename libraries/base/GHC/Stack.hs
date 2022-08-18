@@ -1,5 +1,6 @@
 {-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Trustworthy #-}
 
@@ -27,8 +28,9 @@ module GHC.Stack (
 
     -- * HasCallStack call stacks
     CallStack, HasCallStack, callStack, emptyCallStack, freezeCallStack,
-    fromCallSiteList, getCallStack, popCallStack, prettyCallStack,
+    fromCallSiteList, getCallStack, popCallStack,
     pushCallStack, withFrozenCallStack,
+    prettyCallStackLines, prettyCallStack,
 
     -- * Source locations
     SrcLoc(..), prettySrcLoc,
@@ -48,12 +50,14 @@ module GHC.Stack (
     renderStack
   ) where
 
+import GHC.Show
 import GHC.Stack.CCS
 import GHC.Stack.Types
 import GHC.IO
 import GHC.Base
 import GHC.List
 import GHC.Exception
+import Data.OldList (intercalate)
 
 -- | Like the function 'error', but appends a stack trace to the error
 -- message if one is available.
@@ -104,3 +108,32 @@ withFrozenCallStack do_this =
   -- withFrozenCallStack's call-site
   let ?callStack = freezeCallStack (popCallStack callStack)
   in do_this
+
+-- prettySrcLoc and prettyCallStack are defined here to avoid hs-boot
+-- files. See Note [Definition of CallStack]
+
+-- | Pretty print a 'SrcLoc'.
+--
+-- @since 4.9.0.0
+prettySrcLoc :: SrcLoc -> String
+prettySrcLoc SrcLoc {..}
+  = foldr (++) ""
+      [ srcLocFile, ":"
+      , show srcLocStartLine, ":"
+      , show srcLocStartCol, " in "
+      , srcLocPackage, ":", srcLocModule
+      ]
+
+-- | Pretty print a 'CallStack'.
+--
+-- @since 4.9.0.0
+prettyCallStack :: CallStack -> String
+prettyCallStack = intercalate "\n" . prettyCallStackLines
+
+prettyCallStackLines :: CallStack -> [String]
+prettyCallStackLines cs = case getCallStack cs of
+  []  -> []
+  stk -> "CallStack (from HasCallStack):"
+       : map (("  " ++) . prettyCallSite) stk
+  where
+    prettyCallSite (f, loc) = f ++ ", called at " ++ prettySrcLoc loc
