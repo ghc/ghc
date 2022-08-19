@@ -13,17 +13,9 @@
 
 #include "BeginPrivate.h"
 
-#define IPE_LIST_NODE_BUFFER_SIZE 126
-
-typedef struct IpeBufferListNode_ {
-    InfoProvEnt **buffer[IPE_LIST_NODE_BUFFER_SIZE];
-    StgWord8 count;
-    struct IpeBufferListNode_ *next;
-} IpeBufferListNode;
-
 void dumpIPEToEventLog(void);
 void updateIpeMap(void);
-void initIpeMapLock(void);
-void closeIpeMapLock(void);
+void initIpe(void);
+void exitIpe(void);
 
 #include "EndPrivate.h"
