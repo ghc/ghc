@@ -209,6 +209,8 @@ Library
         GHC.Err
         GHC.Event.TimeOut
         GHC.Exception
+        GHC.Exception.Backtrace
+        GHC.Exception.Context
         GHC.Exception.Type
         GHC.ExecutionStack
         GHC.ExecutionStack.Internal

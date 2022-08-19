@@ -1,1 +1,9 @@
-Exception during weak pointer finalization (ignored): <stdout>: hFlush: resource exhausted (No space left on device)
+Exception during Weak# finalization (ignored): <stdout>: hFlush: resource exhausted (No space left on device)
+HasCallStack backtrace:
+CallStack (from HasCallStack):
+  collectBacktrace, called at libraries/base/GHC/Exception/Backtrace.hs:54:25 in base:GHC.Exception.Backtrace
+  collectBacktraces, called at libraries/base/GHC/IO.hs:242:13 in base:GHC.IO
+  throwIO, called at libraries/base/GHC/IO/Exception.hs:315:19 in base:GHC.IO.Exception
+  ioException, called at libraries/base/GHC/IO/Exception.hs:319:20 in base:GHC.IO.Exception
+  ioError, called at libraries/base/GHC/IO/Handle/Internals.hs:181:13 in base:GHC.IO.Handle.Internals
+

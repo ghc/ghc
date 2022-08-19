@@ -1,10 +1,12 @@
 Stopped in <exception thrown>, <unknown>
-_exception :: e = _
+_exception :: e = GHC.Exception.Type.SomeException
+                    (GHC.Exception.ErrorCallWithLocation _ _)
 :steplocal is not possible.
 Cannot determine current top-level binding after a break on error / exception.
 Use :stepmodule.
 Stopped in <exception thrown>, <unknown>
-_exception :: e = _
+_exception :: e = GHC.Exception.Type.SomeException
+                    (GHC.Exception.ErrorCallWithLocation _ _)
 :steplocal is not possible.
 Cannot determine current top-level binding after a break on error / exception.
 Use :stepmodule.

@@ -71,12 +71,6 @@
     * `InfoProv` now has additional `ipSrcFile` and `ipSrcSpan` fields. `ipLoc`
       is now a function computed from these fields.
     * The `whereFrom` function has been moved
-  * Add functions `traceWith`, `traceShowWith`, `traceEventWith` to
-    `Debug.Trace`, per
-    [CLC proposal #36](https://github.com/haskell/core-libraries-committee/issues/36).
-  * Refactor `generalCategory` to stop very large literal string being inlined to call-sites.
-      ([CLC proposal #130](https://github.com/haskell/core-libraries-committee/issues/130))
-  * Add INLINABLE pragmas to `generic*` functions in Data.OldList ([CLC proposal #129](https://github.com/haskell/core-libraries-committee/issues/130))
 
 ## 4.17.0.0 *August 2022*
 

@@ -56,6 +56,7 @@ import GHC.Exception
 import GHC.IO.Handle.Types
 import GHC.OldList ( intercalate )
 import {-# SOURCE #-} GHC.Stack.CCS
+import GHC.Stack.Types (HasCallStack)
 import Foreign.C.Types
 
 import Data.Typeable ( cast )
@@ -184,18 +185,17 @@ instance Show SomeAsyncException where
 -- | @since 4.7.0.0
 instance Exception SomeAsyncException
 
--- |@since 4.7.0.0
+-- | @since 4.7.0.0
 asyncExceptionToException :: Exception e => e -> SomeException
 asyncExceptionToException = toException . SomeAsyncException
 
--- |@since 4.7.0.0
+-- | @since 4.7.0.0
 asyncExceptionFromException :: Exception e => SomeException -> Maybe e
 asyncExceptionFromException x = do
     SomeAsyncException a <- fromException x
     cast a
 
-
--- |Asynchronous exceptions.
+-- | Asynchronous exceptions.
 data AsyncException
   = StackOverflow
         -- ^The current thread\'s stack exceeded its limit.
@@ -306,11 +306,11 @@ data ExitCode
 -- | @since 4.1.0.0
 instance Exception ExitCode
 
-ioException     :: IOException -> IO a
+ioException     :: HasCallStack => IOException -> IO a
 ioException err = throwIO err
 
 -- | Raise an 'IOError' in the 'IO' monad.
-ioError         :: IOError -> IO a
+ioError         :: HasCallStack => IOError -> IO a
 ioError         =  ioException
 
 -- ---------------------------------------------------------------------------

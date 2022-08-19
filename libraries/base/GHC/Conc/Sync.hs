@@ -106,7 +106,6 @@ module GHC.Conc.Sync
 import Foreign
 import Foreign.C
 
-import Data.Typeable
 import Data.Maybe
 
 import GHC.Base
@@ -944,7 +943,7 @@ uncaughtExceptionHandler :: IORef (SomeException -> IO ())
 uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
    where
       defaultHandler :: SomeException -> IO ()
-      defaultHandler se@(SomeException ex) = do
+      defaultHandler se = do
          (hFlush stdout) `catchAny` (\ _ -> return ())
          let msg = displayException se
          withCString "%s" $ \cfmt ->

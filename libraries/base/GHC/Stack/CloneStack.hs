@@ -19,7 +19,8 @@ module GHC.Stack.CloneStack (
   StackEntry(..),
   cloneMyStack,
   cloneThreadStack,
-  decode
+  decode,
+  prettyStackEntry
   ) where
 
 import GHC.MVar
@@ -263,3 +264,7 @@ getDecodedStackArray (StackSnapshot s) =
     stackEntryAt :: Array# (Ptr InfoProvEnt) -> Int -> Ptr InfoProvEnt
     stackEntryAt stack (I# i) = case indexArray# stack i of
       (# se #) -> se
+
+prettyStackEntry :: StackEntry -> String
+prettyStackEntry (StackEntry {moduleName=mod_nm, functionName=fun_nm, srcLoc=loc}) =
+    "  " ++ mod_nm ++ "." ++ fun_nm ++ " (" ++ loc ++ ")"

@@ -28,6 +28,7 @@ module GHC.IO (
         unsafePerformIO, unsafeInterleaveIO,
         unsafeDupablePerformIO, unsafeDupableInterleaveIO,
         noDuplicate,
+        annotateIO,
 
         -- To and from ST
         stToIO, ioToST, unsafeIOToST, unsafeSTToIO,
@@ -47,8 +48,11 @@ import GHC.ST
 import GHC.Exception
 import GHC.Show
 import GHC.IO.Unsafe
+import GHC.Stack.Types ( HasCallStack )
 import Unsafe.Coerce ( unsafeCoerce )
 
+import GHC.Exception.Context ( ExceptionAnnotation )
+import {-# SOURCE #-} GHC.Exception.Backtrace ( collectBacktraces )
 import {-# SOURCE #-} GHC.IO.Exception ( userError, IOError )
 
 -- ---------------------------------------------------------------------------
@@ -182,10 +186,11 @@ catch   :: Exception e
         -> IO a
 -- See #exceptions_and_strictness#.
 catch (IO io) handler = IO $ catch# io handler'
-    where handler' e = case fromException e of
-                       Just e' -> unIO (handler e')
-                       Nothing -> raiseIO# e
-
+  where
+    handler' e =
+      case fromException e of
+        Just e' -> unIO (withAugmentedContext (exceptionContext e) (handler e'))
+        Nothing -> raiseIO# e
 
 -- | Catch any 'Exception' type in the 'IO' monad.
 --
@@ -194,7 +199,21 @@ catch (IO io) handler = IO $ catch# io handler'
 -- details.
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny !(IO io) handler = IO $ catch# io handler'
-    where handler' (SomeException e) = unIO (handler e)
+  where
+    handler' se@(SomeException e) =
+        unIO (withAugmentedContext (exceptionContext se) (handler e))
+
+withAugmentedContext :: ExceptionContext -> IO a -> IO a
+withAugmentedContext ctxt (IO io) = IO (catch# io handler)
+  where
+    handler se = raiseIO# (augmentExceptionContext ctxt se)
+
+-- | Execute an 'IO' action, adding the given 'ExceptionContext'
+-- to any thrown synchronous exceptions.
+annotateIO :: forall e a. ExceptionAnnotation e => e -> IO a -> IO a
+annotateIO ann (IO io) = IO (catch# io handler)
+  where
+    handler se = raiseIO# (addExceptionContext ann se)
 
 -- Using catchException here means that if `m` throws an
 -- 'IOError' /as an imprecise exception/, we will not catch
@@ -235,8 +254,11 @@ mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 -- for a more technical introduction to how GHC optimises around precise vs.
 -- imprecise exceptions.
 --
-throwIO :: Exception e => e -> IO a
-throwIO e = IO (raiseIO# (toException e))
+throwIO :: (HasCallStack, Exception e) => e -> IO a
+throwIO e = do
+    context <- collectBacktraces
+    let !exc = addExceptionContext context (toException e)
+    IO (raiseIO# exc)
 
 -- -----------------------------------------------------------------------------
 -- Controlling asynchronous exception delivery

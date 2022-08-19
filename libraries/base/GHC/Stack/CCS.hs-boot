@@ -14,3 +14,4 @@ module GHC.Stack.CCS where
 import GHC.Base
 
 currentCallStack :: IO [String]
+renderStack :: [String] -> String
