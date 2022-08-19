@@ -562,6 +562,7 @@ RTS_FUN_DECL(stg_getSparkzh);
 RTS_FUN_DECL(stg_numSparkszh);
 
 RTS_FUN_DECL(stg_noDuplicatezh);
+RTS_FUN(stg_noDuplicate);
 
 RTS_FUN_DECL(stg_traceCcszh);
 RTS_FUN_DECL(stg_clearCCSzh);
