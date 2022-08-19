@@ -680,9 +680,9 @@ void traceIPE(const InfoProvEnt *ipe)
         ACQUIRE_LOCK(&trace_utx);
 
         tracePreface();
-        debugBelch("IPE: table_name %s, closure_desc %s, ty_desc %s, label %s, module %s, srcloc %s\n",
+        debugBelch("IPE: table_name %s, closure_desc %s, ty_desc %s, label %s, module %s, srcloc %s:%s\n",
                    ipe->prov.table_name, ipe->prov.closure_desc, ipe->prov.ty_desc,
-                   ipe->prov.label, ipe->prov.module, ipe->prov.srcloc);
+                   ipe->prov.label, ipe->prov.module, ipe->prov.src_file, ipe->prov.src_span);
 
         RELEASE_LOCK(&trace_utx);
     } else

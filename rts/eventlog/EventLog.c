@@ -166,7 +166,7 @@ static inline void postWord64(EventsBuf *eb, StgWord64 i)
     postWord32(eb, (StgWord32)i);
 }
 
-static inline void postBuf(EventsBuf *eb, StgWord8 *buf, uint32_t size)
+static inline void postBuf(EventsBuf *eb, const StgWord8 *buf, uint32_t size)
 {
     memcpy(eb->pos, buf, size);
     eb->pos += size;
@@ -1429,10 +1429,13 @@ void postIPE(const InfoProvEnt *ipe)
     StgWord ty_desc_len = strlen(ipe->prov.ty_desc);
     StgWord label_len = strlen(ipe->prov.label);
     StgWord module_len = strlen(ipe->prov.module);
-    StgWord srcloc_len = strlen(ipe->prov.srcloc);
+    StgWord src_file_len = strlen(ipe->prov.src_file);
+    StgWord src_span_len = strlen(ipe->prov.src_span);
+
     // 8 for the info word
-    // 6 for the number of strings in the payload as postString adds 1 to the length
-    StgWord len = 8+table_name_len+closure_desc_len+ty_desc_len+label_len+module_len+srcloc_len+6;
+    // 1 null after each string
+    // 1 colon between src_file and src_span
+    StgWord len = 8+table_name_len+1+closure_desc_len+1+ty_desc_len+1+label_len+1+module_len+1+src_file_len+1+src_span_len+1;
     ensureRoomForVariableEvent(&eventBuf, len);
     postEventHeader(&eventBuf, EVENT_IPE);
     postPayloadSize(&eventBuf, len);
@@ -1442,7 +1445,13 @@ void postIPE(const InfoProvEnt *ipe)
     postString(&eventBuf, ipe->prov.ty_desc);
     postString(&eventBuf, ipe->prov.label);
     postString(&eventBuf, ipe->prov.module);
-    postString(&eventBuf, ipe->prov.srcloc);
+
+    // Manually construct the location field: "<file>:<span>\0"
+    postBuf(&eventBuf, (const StgWord8*) ipe->prov.src_file, src_file_len);
+    StgWord8 colon = ':';
+    postBuf(&eventBuf, &colon, 1);
+    postString(&eventBuf, ipe->prov.src_span);
+
     RELEASE_LOCK(&eventBufMutex);
 }
 

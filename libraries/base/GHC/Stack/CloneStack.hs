@@ -28,7 +28,7 @@ import Foreign
 import GHC.Conc.Sync
 import GHC.Exts (Int (I#), RealWorld, StackSnapshot#, ThreadId#, Array#, sizeofArray#, indexArray#, State#, StablePtr#)
 import GHC.IO (IO (..))
-import GHC.Stack.CCS (InfoProv (..), InfoProvEnt, ipeProv, peekInfoProv)
+import GHC.Stack.CCS (InfoProv (..), InfoProvEnt, ipSrcFile, ipSrcSpan, ipeProv, peekInfoProv)
 import GHC.Stable
 
 -- | A frozen snapshot of the state of an execution stack.
@@ -245,7 +245,7 @@ decode stackSnapshot = do
         StackEntry
         { functionName = ipLabel infoProv,
           moduleName = ipMod infoProv,
-          srcLoc = ipLoc infoProv,
+          srcLoc = ipSrcFile infoProv ++ ":" ++ ipSrcSpan infoProv,
           -- read looks dangerous, be we can trust that the closure type is always there.
           closureType = read . ipDesc $ infoProv
         }

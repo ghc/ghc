@@ -1,3 +1,3 @@
-Just (InfoProv {ipName = "D_Main_4_con_info", ipDesc = "2", ipTyDesc = "D", ipLabel = "main", ipMod = "Main", ipLoc = "staticcallstack001.hs:16:13-27"})
-Just (InfoProv {ipName = "D_Main_2_con_info", ipDesc = "2", ipTyDesc = "D", ipLabel = "caf", ipMod = "Main", ipLoc = "staticcallstack001.hs:13:1-9"})
-Just (InfoProv {ipName = "sat_s11g_info", ipDesc = "15", ipTyDesc = "D", ipLabel = "main", ipMod = "Main", ipLoc = "staticcallstack001.hs:18:23-32"})
+Just (InfoProv {ipName = "D_Main_4_con_info", ipDesc = "2", ipTyDesc = "D", ipLabel = "main", ipMod = "Main", ipSrcFile = "staticcallstack001.hs", ipSrcSpan = "16:13-27"})
+Just (InfoProv {ipName = "D_Main_2_con_info", ipDesc = "2", ipTyDesc = "D", ipLabel = "caf", ipMod = "Main", ipSrcFile = "staticcallstack001.hs", ipSrcSpan = "13:1-9"})
+Just (InfoProv {ipName = "sat_s11M_info", ipDesc = "15", ipTyDesc = "D", ipLabel = "main", ipMod = "Main", ipSrcFile = "staticcallstack001.hs", ipSrcSpan = "18:23-32"})

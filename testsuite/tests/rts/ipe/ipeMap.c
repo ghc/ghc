@@ -64,7 +64,8 @@ HaskellObj shouldFindOneIfItHasBeenRegistered(Capability *cap) {
     assertStringsEqual(result->prov.ty_desc, "ty_desc_042");
     assertStringsEqual(result->prov.label, "label_042");
     assertStringsEqual(result->prov.module, "module_042");
-    assertStringsEqual(result->prov.srcloc, "srcloc_042");
+    assertStringsEqual(result->prov.src_file, "src_file_042");
+    assertStringsEqual(result->prov.src_span, "src_span_042");
 
     return fortyTwo;
 }

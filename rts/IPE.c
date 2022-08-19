@@ -78,7 +78,8 @@ static InfoProvEnt ipeBufferEntryToIpe(const IpeBufferListNode *node, const IpeB
                 .ty_desc = &strings[ent->ty_desc],
                 .label = &strings[ent->label],
                 .module = &strings[ent->module_name],
-                .srcloc = &strings[ent->srcloc]
+                .src_file = &strings[ent->src_file],
+                .src_span = &strings[ent->src_span]
             }
     };
 }

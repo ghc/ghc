@@ -4,6 +4,8 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Unit.Module
 import GHC.Utils.Outputable
+import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
+import GHC.Data.FastString (unpackFS)
 
 import GHC.Cmm.CLabel
 import GHC.Cmm.Expr
@@ -16,7 +18,6 @@ import GHC.StgToCmm.Utils
 import GHC.Data.ShortText (ShortText)
 import qualified GHC.Data.ShortText as ST
 
-import Data.Bifunctor (first)
 import qualified Data.Map.Strict as M
 import Control.Monad.Trans.State.Strict
 import qualified Data.ByteString as BS
@@ -45,7 +46,9 @@ emitIpeBufferListNode this_mod ents = do
             , strtab_offset (ipeTypeDesc cg_ipe)
             , strtab_offset (ipeLabel cg_ipe)
             , strtab_offset (ipeModuleName cg_ipe)
-            , strtab_offset (ipeSrcLoc cg_ipe)
+            , strtab_offset (ipeSrcFile cg_ipe)
+            , strtab_offset (ipeSrcSpan cg_ipe)
+            , int32 0
             ]
 
         int n = mkIntCLit platform n
@@ -64,16 +67,25 @@ toCgIPE platform ctx module_name ipe = do
     table_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (pprCLabel platform CStyle (infoTablePtr ipe))
     closure_desc <- lookupStringTable $ ST.pack $ show (infoProvEntClosureType ipe)
     type_desc <- lookupStringTable $ ST.pack $ infoTableType ipe
-    let (src_loc_str, label_str) = maybe ("", "") (first (renderWithContext ctx . ppr)) (infoTableProv ipe)
+    let label_str = maybe "" snd (infoTableProv ipe)
+    let (src_loc_file, src_loc_span) =
+            case infoTableProv ipe of
+              Nothing -> ("", "")
+              Just (span, _) ->
+                  let file = unpackFS $ srcSpanFile span
+                      coords = renderWithContext ctx (pprUserRealSpan False span)
+                  in (file, coords)
     label <- lookupStringTable $ ST.pack label_str
-    src_loc <- lookupStringTable $ ST.pack src_loc_str
+    src_file <- lookupStringTable $ ST.pack src_loc_file
+    src_span <- lookupStringTable $ ST.pack src_loc_span
     return $ CgInfoProvEnt { ipeInfoTablePtr = infoTablePtr ipe
                            , ipeTableName = table_name
                            , ipeClosureDesc = closure_desc
                            , ipeTypeDesc = type_desc
                            , ipeLabel = label
                            , ipeModuleName = module_name
-                           , ipeSrcLoc = src_loc
+                           , ipeSrcFile = src_file
+                           , ipeSrcSpan = src_span
                            }
 
 data CgInfoProvEnt = CgInfoProvEnt
@@ -83,7 +95,8 @@ data CgInfoProvEnt = CgInfoProvEnt
                                , ipeTypeDesc :: !StrTabOffset
                                , ipeLabel :: !StrTabOffset
                                , ipeModuleName :: !StrTabOffset
-                               , ipeSrcLoc :: !StrTabOffset
+                               , ipeSrcFile :: !StrTabOffset
+                               , ipeSrcSpan :: !StrTabOffset
                                }
 
 data StringTable = StringTable { stStrings :: DList ShortText
