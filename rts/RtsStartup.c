@@ -386,7 +386,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #if defined(PROFILING)
     initProfiling();
 #endif
-    initIpeMapLock();
+    initIpe();
     traceInitEvent(dumpIPEToEventLog);
     initHeapProfiling();
 
@@ -611,7 +611,7 @@ hs_exit_(bool wait_foreign)
     // Free threading resources
     freeThreadingResources();
 
-    closeIpeMapLock();
+    exitIpe();
 }
 
 // Flush stdout and stderr.  We do this during shutdown so that it

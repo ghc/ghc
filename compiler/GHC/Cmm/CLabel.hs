@@ -301,6 +301,7 @@ data ModuleLabelKind
     | MLK_InitializerArray
     | MLK_Finalizer String
     | MLK_FinalizerArray
+    | MLK_IPEBuffer
     deriving (Eq, Ord)
 
 instance Outputable ModuleLabelKind where
@@ -308,6 +309,7 @@ instance Outputable ModuleLabelKind where
     ppr (MLK_Initializer s)  = text ("init__" ++ s)
     ppr MLK_FinalizerArray   = text "fini_arr"
     ppr (MLK_Finalizer s)    = text ("fini__" ++ s)
+    ppr MLK_IPEBuffer        = text "ipe_buf"
 
 isIdLabel :: CLabel -> Bool
 isIdLabel IdLabel{} = True
@@ -832,10 +834,10 @@ instance OutputableP Platform InfoProvEnt where
 -- Constructing Cost Center Labels
 mkCCLabel  :: CostCentre      -> CLabel
 mkCCSLabel :: CostCentreStack -> CLabel
-mkIPELabel :: InfoProvEnt -> CLabel
+mkIPELabel :: Module          -> CLabel
 mkCCLabel           cc          = CC_Label cc
 mkCCSLabel          ccs         = CCS_Label ccs
-mkIPELabel          ipe         = IPE_Label ipe
+mkIPELabel          mod         = ModuleLabel mod MLK_IPEBuffer
 
 mkRtsApFastLabel :: FastString -> CLabel
 mkRtsApFastLabel str = RtsLabel (RtsApFast (NonDetFastString str))
@@ -1013,6 +1015,7 @@ modLabelNeedsCDecl :: ModuleLabelKind -> Bool
 -- Code for finalizers and initializers are emitted in stub objects
 modLabelNeedsCDecl (MLK_Initializer _)  = True
 modLabelNeedsCDecl (MLK_Finalizer   _)  = True
+modLabelNeedsCDecl MLK_IPEBuffer        = True
 -- The finalizer and initializer arrays are emitted in the code of the module
 modLabelNeedsCDecl MLK_InitializerArray = False
 modLabelNeedsCDecl MLK_FinalizerArray   = False
@@ -1210,6 +1213,7 @@ moduleLabelKindType kind =
     MLK_InitializerArray -> DataLabel
     MLK_Finalizer _      -> CodeLabel
     MLK_FinalizerArray   -> DataLabel
+    MLK_IPEBuffer        -> DataLabel
 
 idInfoLabelType :: IdLabelInfo -> CLabelType
 idInfoLabelType info =

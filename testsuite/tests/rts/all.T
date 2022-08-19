@@ -196,37 +196,6 @@ test('EventlogOutput_IPE',
 def noCapabilityOutputFilter(s):
      return re.sub(r'[a-f0-9]+: IPE:', 'IPE:', s)
 
-# Manually create IPE entries and dump them to event log (stderr).
-test('ipeEventLog',
-     [ c_src,
-       extra_files(['ipeEventLog_lib.c']),
-       extra_run_opts('+RTS -va -RTS'),
-       grep_errmsg('IPE:'),
-       only_ways(debug_ways),
-       normalise_errmsg_fun(noCapabilityOutputFilter),
-       ignore_stdout,
-       # Due to issues on Darwin CI runners that couldn't be tracked down.
-       # In general this test should work on Darwin - Just not on our CI.
-       when(opsys('darwin'), fragile(0))
-     ],
-     compile_and_run, ['ipeEventLog_lib.c'])
-
-# Manually create IPE entries, force the initialization of the underlying hash map
-# and dump them to event log (stderr).
-test('ipeEventLog_fromMap',
-     [ c_src,
-       extra_files(['ipeEventLog_lib.c']),
-       extra_run_opts('+RTS -va -RTS'),
-       grep_errmsg('IPE:'),
-       only_ways(debug_ways),
-       normalise_errmsg_fun(noCapabilityOutputFilter),
-       ignore_stdout,
-       # Due to issues on Darwin CI runners that couldn't be tracked down.
-       # In general this test should work on Darwin - Just not on our CI.
-       when(opsys('darwin'), fragile(0))
-     ],
-     compile_and_run, ['ipeEventLog_lib.c'])
-
 test('T4059', [], makefile_test, ['T4059'])
 
 # Test for #4274
@@ -508,8 +477,6 @@ test('T19381',
      compile_and_run, [''])
 test('T20199', [ grep_errmsg('Hello') ]
       , makefile_test, [])
-
-test('ipeMap', [c_src], compile_and_run, [''])
 
 test('cloneMyStack', [extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c'])
 test('cloneMyStack2', ignore_stdout, compile_and_run, [''])

@@ -568,3 +568,20 @@ atomic_dec(StgVolatilePtr p)
 #define VOLATILE_LOAD(p) ((StgWord)*((StgWord*)(p)))
 
 #endif /* !THREADED_RTS */
+
+/* Helpers implemented in terms of the above */
+#if !IN_STG_CODE || IN_STGCRUN
+
+INLINE_HEADER void *
+xchg_ptr(void **p, void *w)
+{
+    return (void *) xchg((StgPtr) p, (StgWord) w);
+}
+
+INLINE_HEADER void *
+cas_ptr(volatile void **p, void *o, void *n)
+{
+    return (void *) cas((StgVolatilePtr) p, (StgWord) o, (StgWord) n);
+}
+
+#endif

@@ -17,18 +17,17 @@
 #include "BeginPrivate.h"
 
 // Segments
-#define NONMOVING_SEGMENT_BITS 15   // 2^15 = 32kByte
+#define NONMOVING_SEGMENT_BITS 15UL   // 2^15 = 32kByte
 // Mask to find base of segment
-#define NONMOVING_SEGMENT_MASK ((1 << NONMOVING_SEGMENT_BITS) - 1)
+#define NONMOVING_SEGMENT_MASK ((1UL << NONMOVING_SEGMENT_BITS) - 1)
 // In bytes
-#define NONMOVING_SEGMENT_SIZE (1 << NONMOVING_SEGMENT_BITS)
+#define NONMOVING_SEGMENT_SIZE (1UL << NONMOVING_SEGMENT_BITS)
 // In words
-#define NONMOVING_SEGMENT_SIZE_W ((1 << NONMOVING_SEGMENT_BITS) / SIZEOF_VOID_P)
+#define NONMOVING_SEGMENT_SIZE_W ((1UL << NONMOVING_SEGMENT_BITS) / SIZEOF_VOID_P)
 // In blocks
 #define NONMOVING_SEGMENT_BLOCKS (NONMOVING_SEGMENT_SIZE / BLOCK_SIZE)
 
-_Static_assert(NONMOVING_SEGMENT_SIZE % BLOCK_SIZE == 0,
-               "non-moving segment size must be multiple of block size");
+GHC_STATIC_ASSERT(NONMOVING_SEGMENT_SIZE % BLOCK_SIZE == 0, "non-moving segment size must be multiple of block size");
 
 // The index of a block within a segment
 typedef uint16_t nonmoving_block_idx;

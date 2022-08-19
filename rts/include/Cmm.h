@@ -249,6 +249,8 @@
 #define IF_DEBUG(c,s)  /* nothing */
 #endif
 
+#define GHC_STATIC_ASSERT(x) static_assert(x)
+
 /* -----------------------------------------------------------------------------
    Entering
 
