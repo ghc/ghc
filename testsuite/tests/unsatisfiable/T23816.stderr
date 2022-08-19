@@ -1,6 +1,14 @@
-T23816.exe: T23816.hs:18:15: error: [GHC-22250]
+T23816: T23816.hs:18:15: error: [GHC-22250]
     • Msg
     • In the first argument of ‘print’, namely ‘(meth1 'x')’
       In the expression: print (meth1 'x')
       In an equation for ‘main’: main = print (meth1 'x')
 (deferred type error)
+HasCallStack backtrace:
+CallStack (from HasCallStack):
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Exception.hs:88:13 in ghc-internal:GHC.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Exception.hs:81:32 in ghc-internal:GHC.Exception
+  throw, called at libraries/ghc-internal/src/Control/Exception/Base.hs:423:30 in ghc-internal:Control.Exception.Base
+
+
+

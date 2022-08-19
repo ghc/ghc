@@ -1,2 +1,12 @@
-ghc-stage2: default output name would overwrite the input file; must specify -o explicitly
+ghc: default output name would overwrite the input file; must specify -o explicitly
 Usage: For basic information, try the `--help' option.
+HasCallStack backtrace:
+CallStack (from HasCallStack):
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Exception.hs:88:13 in ghc-internal:GHC.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/IO.hs:258:11 in ghc-internal:GHC.IO
+  throwIO, called at libraries/exceptions/src/Control/Monad/Catch.hs:371:12 in exceptions-0.10.7-inplace:Control.Monad.Catch
+  throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:860:84 in exceptions-0.10.7-inplace:Control.Monad.Catch
+  onException, called at compiler/GHC/Driver/Make.hs:2974:23 in ghc-9.9-inplace:GHC.Driver.Make
+
+
+

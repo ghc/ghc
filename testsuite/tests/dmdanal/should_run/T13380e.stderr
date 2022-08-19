@@ -1,1 +1,9 @@
 T13380e: user error (What)
+HasCallStack backtrace:
+CallStack (from HasCallStack):
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Exception.hs:88:13 in ghc-internal:GHC.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/IO.hs:258:11 in ghc-internal:GHC.IO
+  throwIO, called at T13380e.hs:8:10 in main:Main
+
+
+

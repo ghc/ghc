@@ -1,4 +1,4 @@
-T9497b-run.exe: T9497b-run.hs:2:8: error: [GHC-88464]
+T9497b-run: T9497b-run.hs:2:8: error: [GHC-88464]
     • Found hole: _main :: IO ()
       Or perhaps ‘_main’ is mis-spelled, or not in scope
     • In an equation for ‘main’: main = _main
@@ -15,3 +15,11 @@ T9497b-run.exe: T9497b-run.hs:2:8: error: [GHC-88464]
           (imported from ‘Prelude’ at T9497b-run.hs:1:1
            (and originally defined in ‘GHC.Base’))
 (deferred type error)
+HasCallStack backtrace:
+CallStack (from HasCallStack):
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Exception.hs:88:13 in ghc-internal:GHC.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Exception.hs:81:32 in ghc-internal:GHC.Exception
+  throw, called at libraries/ghc-internal/src/Control/Exception/Base.hs:423:30 in ghc-internal:Control.Exception.Base
+
+
+

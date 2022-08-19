@@ -1,3 +1,10 @@
 T7411: Prelude.undefined
 CallStack (from HasCallStack):
   undefined, called at T7411.hs:3:25 in main:Main
+HasCallStack backtrace:
+CallStack (from HasCallStack):
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Exception.hs:88:13 in ghc-internal:GHC.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Exception.hs:124:3 in ghc-internal:GHC.Exception
+
+
+

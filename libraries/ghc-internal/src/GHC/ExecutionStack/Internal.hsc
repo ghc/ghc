@@ -27,6 +27,7 @@
 module GHC.ExecutionStack.Internal (
   -- * Internal
     Location (..)
+  , showLocation
   , SrcLoc (..)
   , StackTrace
   , stackFrames

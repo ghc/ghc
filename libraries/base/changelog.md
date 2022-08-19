@@ -11,6 +11,11 @@
   * Implement `sconcat` for `instance Semigroup Data.Semigroup.First` and `instance Semigroup Data.Monoid.First` explicitly, increasing laziness ([CLC proposal #246](https://github.com/haskell/core-libraries-committee/issues/246))
   * Add laws relating between `Foldable` / `Traversable` with `Bifoldable` / `Bitraversable` ([CLC proposal #205](https://github.com/haskell/core-libraries-committee/issues/205))
   * The `Enum Int64` and `Enum Word64` instances now use native operations on 32-bit platforms, increasing performance by up to 1.5x on i386 and up to 5.6x with the JavaScript backend. ([CLC proposal #187](https://github.com/haskell/core-libraries-committee/issues/187))
+  * Exceptions can now be decorated with user-defined annotations via `ExceptionContext`.
+  * Exceptions now capture backtrace information via their `ExceptionContext`. GHC
+    supports several mechanisms by which backtraces can be collected which can be
+    individually enabled and disabled via
+    `GHC.Exception.Backtrace.setEnabledBacktraceMechanisms`.
   * Update to [Unicode 15.1.0](https://www.unicode.org/versions/Unicode15.1.0/).
   * Fix `withFile`, `withFileBlocking`, and `withBinaryFile` to not incorrectly annotate exceptions raised in wrapped computation. ([CLC proposal #237](https://github.com/haskell/core-libraries-committee/issues/237))
   * Fix `fdIsNonBlocking` to always be `0` for regular files and block devices on unix, regardless of `O_NONBLOCK`

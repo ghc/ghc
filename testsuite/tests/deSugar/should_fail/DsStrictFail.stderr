@@ -1,2 +1,10 @@
 DsStrictFail: DsStrictFail.hs:4:12-23: Non-exhaustive patterns in False
 
+HasCallStack backtrace:
+CallStack (from HasCallStack):
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Exception.hs:88:13 in ghc-internal:GHC.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Exception.hs:81:32 in ghc-internal:GHC.Exception
+  throw, called at libraries/ghc-internal/src/Control/Exception/Base.hs:422:30 in ghc-internal:Control.Exception.Base
+
+
+

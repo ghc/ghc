@@ -2,4 +2,12 @@
 did you mean one of:
   -XCUSKs
 
+HasCallStack backtrace:
+CallStack (from HasCallStack):
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Exception.hs:88:13 in ghc-internal:GHC.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/IO.hs:258:11 in ghc-internal:GHC.IO
+  throwIO, called at compiler/GHC/Utils/Error.hs:512:19 in ghc-9.9-inplace:GHC.Utils.Error
+
+
+
 1

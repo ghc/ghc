@@ -30,3 +30,10 @@ hello, trace
 cgrun025: hello, error
 CallStack (from HasCallStack):
   error, called at cgrun025.hs:25:75 in main:Main
+HasCallStack backtrace:
+CallStack (from HasCallStack):
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Exception.hs:88:13 in ghc-internal:GHC.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Exception.hs:124:3 in ghc-internal:GHC.Exception
+
+
+

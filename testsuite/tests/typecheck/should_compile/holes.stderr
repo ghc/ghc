@@ -92,7 +92,9 @@ holes.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         asTypeOf :: forall a. a -> a -> a
         id :: forall a. a -> a
         until :: forall a. (a -> Bool) -> (a -> a) -> a -> a
-        ioError :: forall a. IOError -> IO a
+        ioError :: forall a.
+                   GHC.Stack.Types.HasCallStack =>
+                   IOError -> IO a
         (!!) :: forall a. GHC.Stack.Types.HasCallStack => [a] -> Int -> a
         break :: forall a. (a -> Bool) -> [a] -> ([a], [a])
         cycle :: forall a. GHC.Stack.Types.HasCallStack => [a] -> [a]

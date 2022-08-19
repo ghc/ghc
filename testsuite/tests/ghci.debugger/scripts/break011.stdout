@@ -33,17 +33,9 @@ _exception :: SomeException = SomeException
 CallStack (from HasCallStack):
   error, called at Test7.hs:2:18 in main:Main
 Stopped in <exception thrown>, <unknown>
-_exception :: e = SomeException
-                    (ErrorCallWithLocation
-                       "foo"
-                       "CallStack (from HasCallStack):
-  error, called at Test7.hs:2:18 in main:Main")
+_exception :: e = _
 Stopped in <exception thrown>, <unknown>
-_exception :: e = SomeException
-                    (ErrorCallWithLocation
-                       "foo"
-                       "CallStack (from HasCallStack):
-  error, called at Test7.hs:2:18 in main:Main")
+_exception :: e = _
 *** Exception: foo
 CallStack (from HasCallStack):
   error, called at Test7.hs:2:18 in main:Main

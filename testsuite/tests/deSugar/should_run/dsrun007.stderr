@@ -1,2 +1,10 @@
 dsrun007: dsrun007.hs:5:23-25: Missing field in record construction 
 
+HasCallStack backtrace:
+CallStack (from HasCallStack):
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Exception.hs:88:13 in ghc-internal:GHC.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Exception.hs:81:32 in ghc-internal:GHC.Exception
+  throw, called at libraries/ghc-internal/src/Control/Exception/Base.hs:420:30 in ghc-internal:Control.Exception.Base
+
+
+

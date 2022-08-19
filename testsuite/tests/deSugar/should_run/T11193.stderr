@@ -1,3 +1,10 @@
 T11193: error here!
-CallStack (from ImplicitParams):
+CallStack (from HasCallStack):
   error, called at T11193.hs:7:16 in main:Main
+HasCallStack backtrace:
+CallStack (from HasCallStack):
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Exception.hs:88:13 in ghc-internal:GHC.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Exception.hs:124:3 in ghc-internal:GHC.Exception
+
+
+
