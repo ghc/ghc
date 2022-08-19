@@ -54,10 +54,15 @@ IpeBufferEntry makeAnyProvEntry(Capability *cap, StringTable *st, HaskellObj clo
     snprintf(module, moduleLength, "module_%03i", i);
     provEnt.module_name = add_string(st, module);
 
-    unsigned int srcLocLength = strlen("srcloc_") + 3 /* digits */ + 1 /* null character */;
-    char *srcLoc = malloc(sizeof(char) * srcLocLength);
-    snprintf(srcLoc, srcLocLength, "srcloc_%03i", i);
-    provEnt.srcloc = add_string(st, srcLoc);
+    unsigned int srcFileLength = strlen("src_file_") + 3 /* digits */ + 1 /* null character */;
+    char *srcFile = malloc(sizeof(char) * srcFileLength);
+    snprintf(srcFile, srcFileLength, "src_file_%03i", i);
+    provEnt.src_file = add_string(st, srcFile);
+
+    unsigned int srcSpanLength = strlen("src_span_") + 3 /* digits */ + 1 /* null character */;
+    char *srcSpan = malloc(sizeof(char) * srcSpanLength);
+    snprintf(srcSpan, srcSpanLength, "src_span_%03i", i);
+    provEnt.src_span = add_string(st, srcSpan);
 
     return provEnt;
 }
