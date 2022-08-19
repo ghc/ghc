@@ -673,13 +673,7 @@ void traceHeapProfSampleString(StgWord8 profile_id,
     }
 }
 
-void traceIPE(StgInfoTable * info,
-              const char *table_name,
-              const char *closure_desc,
-              const char *ty_desc,
-              const char *label,
-              const char *module,
-              const char *srcloc )
+void traceIPE(const InfoProvEnt *ipe)
 {
 #if defined(DEBUG)
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
@@ -687,13 +681,14 @@ void traceIPE(StgInfoTable * info,
 
         tracePreface();
         debugBelch("IPE: table_name %s, closure_desc %s, ty_desc %s, label %s, module %s, srcloc %s\n",
-                   table_name, closure_desc, ty_desc, label, module, srcloc);
+                   ipe->prov.table_name, ipe->prov.closure_desc, ipe->prov.ty_desc,
+                   ipe->prov.label, ipe->prov.module, ipe->prov.srcloc);
 
         RELEASE_LOCK(&trace_utx);
     } else
 #endif
     if (eventlog_enabled) {
-        postIPE((W_) INFO_PTR_TO_STRUCT(info), table_name, closure_desc, ty_desc, label, module, srcloc);
+        postIPE(ipe);
     }
 }
 
