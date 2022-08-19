@@ -591,6 +591,7 @@ Library
         GHC.StgToCmm.Foreign
         GHC.StgToCmm.Heap
         GHC.StgToCmm.Hpc
+        GHC.StgToCmm.InfoTableProv
         GHC.StgToCmm.Layout
         GHC.StgToCmm.Lit
         GHC.StgToCmm.Monad

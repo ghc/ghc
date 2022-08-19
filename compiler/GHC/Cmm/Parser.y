@@ -229,6 +229,7 @@ import GHC.StgToCmm.Layout     hiding (ArgRep(..))
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Prof
 import GHC.StgToCmm.Bind  ( emitBlackHoleCode, emitUpdateFrame )
+import GHC.StgToCmm.InfoTableProv
 
 import GHC.Cmm.Opt
 import GHC.Cmm.Graph
@@ -1519,14 +1520,18 @@ parseCmmFile dflags this_mod home_unit filename = do
     POk pst code -> do
         st <- initC
         let fstate = F.initFCodeState (profilePlatform $ targetProfile dflags)
+        let config = initStgToCmmConfig dflags no_module
         let fcode = do
               ((), cmm) <- getCmm $ unEC code "global" (initEnv (targetProfile dflags)) [] >> return ()
               -- See Note [Mapping Info Tables to Source Positions] (IPE Maps)
-              let used_info = map (cmmInfoTableToInfoProvEnt this_mod)
-                                              (mapMaybe topInfoTable cmm)
-              ((), cmm2) <- getCmm $ mapM_ emitInfoTableProv used_info
+              let used_info
+                    | do_ipe    = map (cmmInfoTableToInfoProvEnt this_mod) (mapMaybe topInfoTable cmm)
+                    | otherwise = []
+                    where
+                      do_ipe = stgToCmmInfoTableMap config
+              ((), cmm2) <- getCmm $ emitIpeBufferListNode this_mod used_info
               return (cmm ++ cmm2, used_info)
-            (cmm, _) = runC (initStgToCmmConfig dflags no_module) fstate st fcode
+            (cmm, _) = runC config fstate st fcode
             (warnings,errors) = getPsMessages pst
         if not (isEmptyMessages errors)
          then return (warnings, errors, Nothing)

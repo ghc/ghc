@@ -370,26 +370,17 @@ ipInitCode
   :: Bool            -- is Opt_InfoTableMap enabled or not
   -> Platform
   -> Module
-  -> [InfoProvEnt]
   -> CStub
-ipInitCode do_info_table platform this_mod ents
+ipInitCode do_info_table platform this_mod
   | not do_info_table = mempty
-  | otherwise = initializerCStub platform fn_nm decls body
+  | otherwise = initializerCStub platform fn_nm ipe_buffer_decl body
  where
    fn_nm = mkInitializerStubLabel this_mod "ip_init"
-   decls = vcat
-        $  map emit_ipe_decl ents
-        ++ [emit_ipe_list ents]
-   body = text "registerInfoProvList" <> parens local_ipe_list_label <> semi
-   emit_ipe_decl ipe =
-       text "extern InfoProvEnt" <+> ipe_lbl <> text "[];"
-     where ipe_lbl = pprCLabel platform CStyle (mkIPELabel ipe)
-   local_ipe_list_label = text "local_ipe_" <> ppr this_mod
-   emit_ipe_list ipes =
-      text "static InfoProvEnt *" <> local_ipe_list_label <> text "[] ="
-      <+> braces (vcat $ [ pprCLabel platform CStyle (mkIPELabel ipe) <> comma
-                         | ipe <- ipes
-                         ] ++ [text "NULL"])
-      <> semi
 
+   body = text "registerInfoProvList" <> parens (text "&" <> ipe_buffer_label) <> semi
+
+   ipe_buffer_label = pprCLabel platform CStyle (mkIPELabel this_mod)
+
+   ipe_buffer_decl =
+       text "extern IpeBufferListNode" <+> ipe_buffer_label <> text ";"
 

@@ -11,7 +11,7 @@ module GHC.StgToCmm.Prof (
         mkCCostCentre, mkCCostCentreStack,
 
         -- infoTablePRov
-        initInfoTableProv, emitInfoTableProv,
+        initInfoTableProv,
 
         -- Cost-centre Profiling
         dynProfHdr, profDynAlloc, profAlloc, staticProfHdr, initUpdFrameProf,
@@ -32,6 +32,7 @@ import GHC.Platform
 import GHC.Platform.Profile
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Config
+import GHC.StgToCmm.InfoTableProv
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Lit
@@ -55,7 +56,6 @@ import GHC.Utils.Encoding
 
 import Control.Monad
 import Data.Char       (ord)
-import Data.Bifunctor  (first)
 import GHC.Utils.Monad (whenM)
 
 -----------------------------------------------------------------------------
@@ -274,9 +274,8 @@ sizeof_ccs_words platform
   where
    (ws,ms) = pc_SIZEOF_CostCentreStack (platformConstants platform) `divMod` platformWordSizeInBytes platform
 
-
+-- | Emit info-table provenance declarations
 initInfoTableProv ::  [CmmInfoTable] -> InfoTableProvMap -> FCode CStub
--- Emit the declarations
 initInfoTableProv infos itmap
   = do
        cfg <- getStgToCmmConfig
@@ -284,42 +283,16 @@ initInfoTableProv infos itmap
            info_table = stgToCmmInfoTableMap cfg
            platform   = stgToCmmPlatform     cfg
            this_mod   = stgToCmmThisModule   cfg
-       -- Output the actual IPE data
-       mapM_ emitInfoTableProv ents
-       -- Create the C stub which initialises the IPE map
-       return (ipInitCode info_table platform this_mod ents)
 
---- Info Table Prov stuff
-emitInfoTableProv :: InfoProvEnt  -> FCode ()
-emitInfoTableProv ip = do
-  { cfg <- getStgToCmmConfig
-  ; let mod      = infoProvModule ip
-        ctx      = stgToCmmContext  cfg
-        platform = stgToCmmPlatform cfg
-  ; let (src, label) = maybe ("", "") (first (renderWithContext ctx . ppr)) (infoTableProv ip)
-        mk_string    = newByteStringCLit . utf8EncodeString
-  ; label <- mk_string label
-  ; modl  <- newByteStringCLit (bytesFS $ moduleNameFS
-                                        $ moduleName mod)
+       case ents of
+         [] -> return mempty
+         _  -> do
+           -- Emit IPE buffer
+           emitIpeBufferListNode this_mod ents
 
-  ; ty_string  <- mk_string (infoTableType ip)
-  ; loc        <- mk_string src
-  ; table_name <- mk_string (renderWithContext ctx
-                             (pprCLabel platform CStyle (infoTablePtr ip)))
-  ; closure_type <- mk_string (renderWithContext ctx
-                               (text $ show $ infoProvEntClosureType ip))
-  ; let
-     lits = [ CmmLabel (infoTablePtr ip), -- Info table pointer
-              table_name,     -- char *table_name
-              closure_type,   -- char *closure_desc -- Filled in from the InfoTable
-              ty_string,      -- char *ty_string
-              label,          -- char *label,
-              modl,           -- char *module,
-              loc,            -- char *srcloc,
-              zero platform   -- struct _InfoProvEnt *link
-            ]
-  ; emitDataLits (mkIPELabel ip) lits
-  }
+           -- Create the C stub which initialises the IPE map
+           return (ipInitCode info_table platform this_mod)
+
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack
 

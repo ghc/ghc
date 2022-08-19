@@ -1770,7 +1770,7 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
         -- lest we reproduce #11784.
         mod_name = mkModuleName $ "Cmm$" ++ original_filename
         cmm_mod = mkHomeModule home_unit mod_name
-    (cmm, ents) <- ioMsgMaybe
+    (cmm, ipe_ents) <- ioMsgMaybe
                $ do
                   (warns,errs,cmm) <- withTiming logger (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
                                        $ parseCmmFile dflags cmm_mod home_unit filename
@@ -1796,10 +1796,11 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
           Nothing -> cmmToRawCmm logger profile (Stream.yield cmmgroup)
           Just h  -> h           dflags Nothing (Stream.yield cmmgroup)
 
-        let foreign_stubs _ =
-              let ip_init   = ipInitCode do_info_table platform cmm_mod ents
-              in NoStubs `appendStubC` ip_init
-
+        let foreign_stubs _
+              | not $ null ipe_ents =
+                  let ip_init = ipInitCode do_info_table platform cmm_mod
+                  in NoStubs `appendStubC` ip_init
+              | otherwise     = NoStubs
         (_output_filename, (_stub_h_exists, stub_c_exists), _foreign_fps, _caf_infos)
           <- codeOutput logger tmpfs dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] S.empty
              rawCmms
