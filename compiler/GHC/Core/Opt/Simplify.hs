@@ -74,6 +74,7 @@ import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Utils.Logger
 import GHC.Utils.Misc
 
+-- import Data.Maybe( isJust )
 import Control.Monad
 
 
@@ -1738,7 +1739,7 @@ simplNonRecE env bndr (rhs, rhs_se) body cont
 
              -- Deal with strict bindings
              -- See Note [Dark corner with representation polymorphism]
-            | isStrictId bndr1 && sm_case_case (getMode env)
+            | isStrictId bndr1 -- && sm_case_case (getMode env)
             || needs_case_binding ->
             simplExprF (rhs_se `setInScopeFromE` env) rhs
                        (StrictBind { sc_bndr = bndr, sc_body = body
@@ -2190,7 +2191,7 @@ rebuildCall env fun_info
 
   -- Strict arguments
   | isStrictArgInfo fun_info
-  , sm_case_case (getMode env)
+--  , sm_case_case (getMode env)
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setInScopeFromE` env) arg
                (StrictArg { sc_fun = fun_info, sc_fun_ty = fun_ty
@@ -2911,32 +2912,66 @@ doCaseToLet scrut case_bndr
 --------------------------------------------------
 
 reallyRebuildCase env scrut case_bndr alts cont
-  | not (sm_case_case (getMode env))
-  = do { case_expr <- simplAlts env scrut case_bndr alts
-                                (mkBoringStop (contHoleType cont))
-       ; rebuild env case_expr cont }
-
-  | otherwise
+  | sm_case_case (getMode env) -- || do_case_of_case_anyway
   = do { (floats, env', cont') <- mkDupableCaseCont env alts cont
        ; case_expr <- simplAlts env' scrut
                                 (scaleIdBy holeScaling case_bndr)
                                 (scaleAltsBy holeScaling alts)
                                 cont'
        ; return (floats, case_expr) }
+
+  | otherwise   -- No case-of-case
+  = do { case_expr <- simplAlts env scrut case_bndr alts
+                                (mkBoringStop (contHoleType cont))
+       ; rebuild env case_expr cont }
+
   where
     holeScaling = contHoleScaling cont
     -- Note [Scaling in case-of-case]
 
 {-
-simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
-try to eliminate uses of v in the RHSs in favour of case_bndr; that
-way, there's a chance that v will now only be used once, and hence
-inlined.
+    do_case_case_anyway = not many_alts && strict_arg_with_rules
+    many_alts = case alts of { [] -> False; [_] -> False; _ -> True }
 
-Historical note: we use to do the "case binder swap" in the Simplifier
-so there were additional complications if the scrutinee was a variable.
-Now the binder-swap stuff is done in the occurrence analyser; see
-"GHC.Core.Opt.OccurAnal" Note [Binder swap].
+    strict_arg_with_rules = case cont of
+       StrictArg { sc_fun = info } -> isJust (ai_rules info)
+       _                           -> False
+-}
+
+{-
+Note [Limiting case-of-case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The sm_case_case flag limits the applicability of the case-of-case
+transformation.  We switch off sm_case_case in InitialPhase.  Why?
+Suppose f is strict and consider
+   \v -> ...(f v (case x of I# y -> blah[y]))
+
+where blah does not mention v.  The FloatOut pass can float the entire
+case expression out of the \v.  But now suppose we do case-of-case,
+on that strict argument.  We get
+   \v -> ...(case x of I# y -> f v blah[y])
+
+And now we can't float anything. The blah[y] is trapped by the `I# y`
+pattern.  And the (f v blah[y]) is trapped by the \v.  Boo.
+
+This happens in nofib spectral/mate, which slows down 20% or so because
+of loss of floating.
+
+On the other hand, sometimes it is highly desirable to float those
+cases.  Consider this, which comes from `polynomial` in nofib spectral/simple:
+
+   \v -> ...(foldr k z (case degree of I# d# -> build (\cn. blah)))
+
+The `case degree` gets in the way of the fold/build rule.  Better
+to do case-of-case to get
+
+   \v -> ...(case degree of I# d# -> foldr k z (build (\cn. blah)))
+
+Yuk. There is no perfect answer here.  So we do something very ad-hoc:
+we do case-of-case, even in InitialPhase, if
+* there is just one case alternative
+* we are in the strict argument of a function with RULES
+
 
 Note [knownCon occ info]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3007,7 +3042,6 @@ robust here.  (Otherwise, there's a danger that we'll simply drop the
 
 Note [Scaling in case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When two cases commute, if done naively, the multiplicities will be wrong:
 
   case (case u of w[1] { (x[1], y[1]) } -> f x y) of w'[Many]
@@ -3037,6 +3071,14 @@ This is materialised, in the simplifier, by the fact that every time we simplify
 case alternatives with a continuation (the surrounded case (or more!)), we must
 scale the entire case we are simplifying, by a scaling factor which can be
 computed in the continuation (with function `contHoleScaling`).
+
+Historical Note [Binder swap]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We use to do the "case binder swap" in the Simplifier so there were
+additional complications if the scrutinee was a variable.  Now the
+binder-swap stuff is done in the occurrence analyser; see
+"GHC.Core.Opt.OccurAnal" Note [Binder swap].
+
 -}
 
 simplAlts :: SimplEnv
@@ -3050,6 +3092,8 @@ simplAlts env0 scrut case_bndr alts cont'
   = do  { traceSmpl "simplAlts" (vcat [ ppr case_bndr
                                       , text "cont':" <+> ppr cont'
                                       , text "in_scope" <+> ppr (seInScope env0) ])
+
+        -- Deal with the case binder; see Historical Note [Binder swap]
         ; (env1, case_bndr1) <- simplBinder env0 case_bndr
         ; let case_bndr2 = case_bndr1 `setIdUnfolding` evaldUnfolding
               env2       = modifyInScope env1 case_bndr2
