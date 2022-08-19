@@ -20,6 +20,7 @@
 
 module GHC.InfoProv
     ( InfoProv(..)
+    , ipLoc
     , ipeProv
     , whereFrom
       -- * Internals
@@ -42,9 +43,14 @@ data InfoProv = InfoProv {
   ipTyDesc :: String,
   ipLabel :: String,
   ipMod :: String,
-  ipLoc :: String
+  ipSrcFile :: String,
+  ipSrcSpan :: String
 } deriving (Eq, Show)
+
 data InfoProvEnt
+
+ipLoc :: InfoProv -> String
+ipLoc ipe = ipSrcFile ipe ++ ":" ++ ipSrcSpan ipe
 
 getIPE :: a -> IO (Ptr InfoProvEnt)
 getIPE obj = IO $ \s ->
@@ -54,13 +60,14 @@ getIPE obj = IO $ \s ->
 ipeProv :: Ptr InfoProvEnt -> Ptr InfoProv
 ipeProv p = (#ptr InfoProvEnt, prov) p
 
-peekIpName, peekIpDesc, peekIpLabel, peekIpModule, peekIpSrcLoc, peekIpTyDesc :: Ptr InfoProv -> IO CString
-peekIpName p   =  (# peek InfoProv, table_name) p
-peekIpDesc p   =  (# peek InfoProv, closure_desc) p
-peekIpLabel p  =  (# peek InfoProv, label) p
-peekIpModule p =  (# peek InfoProv, module) p
-peekIpSrcLoc p =  (# peek InfoProv, srcloc) p
-peekIpTyDesc p =  (# peek InfoProv, ty_desc) p
+peekIpName, peekIpDesc, peekIpLabel, peekIpModule, peekIpSrcFile, peekIpSrcSpan, peekIpTyDesc :: Ptr InfoProv -> IO CString
+peekIpName p    =  (# peek InfoProv, table_name) p
+peekIpDesc p    =  (# peek InfoProv, closure_desc) p
+peekIpLabel p   =  (# peek InfoProv, label) p
+peekIpModule p  =  (# peek InfoProv, module) p
+peekIpSrcFile p =  (# peek InfoProv, src_file) p
+peekIpSrcSpan p =  (# peek InfoProv, src_span) p
+peekIpTyDesc p  =  (# peek InfoProv, ty_desc) p
 
 peekInfoProv :: Ptr InfoProv -> IO InfoProv
 peekInfoProv infop = do
@@ -69,14 +76,16 @@ peekInfoProv infop = do
   tyDesc <- peekCString utf8 =<< peekIpTyDesc infop
   label <- peekCString utf8 =<< peekIpLabel infop
   mod <- peekCString utf8 =<< peekIpModule infop
-  loc <- peekCString utf8 =<< peekIpSrcLoc infop
+  file <- peekCString utf8 =<< peekIpSrcFile infop
+  span <- peekCString utf8 =<< peekIpSrcSpan infop
   return InfoProv {
       ipName = name,
       ipDesc = desc,
       ipTyDesc = tyDesc,
       ipLabel = label,
       ipMod = mod,
-      ipLoc = loc
+      ipSrcFile = file,
+      ipSrcSpan = span
     }
 
 -- | Get information about where a value originated from.
