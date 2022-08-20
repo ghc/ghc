@@ -139,7 +139,11 @@ install_bin_libdir:
 	@echo "Copying binaries to $(DESTDIR)$(ActualBinsDir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(ActualBinsDir)"
 	for i in $(BINARIES); do \
-		$(INSTALL_PROGRAM) $$i "$(DESTDIR)$(ActualBinsDir)"; \
+		if test -L "$$i"; then \
+			cp -RP "$$i" "$(DESTDIR)$(ActualBinsDir)"; \
+		else \
+			$(INSTALL_PROGRAM) "$$i" "$(DESTDIR)$(ActualBinsDir)"; \
+		fi; \
 	done
 	# Work around #17418 on Darwin
 	if [ -e "${XATTR}" ]; then \
