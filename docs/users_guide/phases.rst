@@ -788,6 +788,13 @@ for example).
     You can use an external main function if you initialize the RTS manually
     and pass ``-no-hs-main``. See also :ref:`using-own-main`.
 
+.. ghc-flag:: -no-link
+    :shortdesc: Stop after generating object (``.o``) file
+    :type: mode
+    :category: linking
+
+    Omits the link step.
+
 .. ghc-flag:: -c
     :shortdesc: Stop after generating object (``.o``) file
     :type: mode

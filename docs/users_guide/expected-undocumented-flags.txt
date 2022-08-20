@@ -80,7 +80,6 @@
 -n
 -no-keep-hi-file
 -no-keep-o-file
--no-link
 -no-recomp
 -no-rtsopts
 -no-user-package-conf
