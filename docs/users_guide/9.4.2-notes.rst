@@ -1,0 +1,88 @@
+.. _release-9-4-2:
+
+Version 9.4.2
+==============
+
+The significant changes to the various parts of the compiler are listed in the
+following sections.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+10, 11, 12, or 13.
+
+Significant Changes
+~~~~~~~~~~~~~~~~~~~~
+
+This is primarily a bug-fix release addressing packaging issues found in 9.4.1.
+These issues include:
+
+ * Building with the ``make`` build system should now work reliably with
+   GHC 9.0 (:ghc-ticket:`21897`, :ghc-ticket:`22047`)
+ * Make-built binary distributions should no longer complain about incorrect
+   GHC versions during installation (:ghc-ticket:)
+ * Generated Haddock package index pages uploaded to Hackage lacked quick-jump
+   support (:ghc-ticket:`21984`)
+ * Cross-package identifier referenced are now linked correctly in Haddock
+   documentation (:ghc-ticket:`20001`)
+ * Hadrian-built binary distributions no longer attempt to install documentation
+   if documentation was not built (:ghc-ticket:`21976`)
+ * Package registration files installed by Hadrian-built binary distributions now
+   have the correct permissions
+
+In addition, a few non-packaging issues have been resolved:
+
+ * the :ghc-flag:`-no-link` flag no longer attempts to link (:ghc-ticket:`21866`)
+ * a soundness issue in GHCi has been resolved (:ghc-ticket:`22042`,
+   :ghc-ticket:`21083`)
+ * a subtle race condition in the IO manager triggered by changing the
+   capability count was fixed (:ghc-ticket:`21651`)
+ * GHC no longer attempts to use the platform-reserved `x18` register on
+   AArch64/Darwin (:ghc-ticket:`21964`)
+ * GHC's internal linker is now able to resolve symbols provided by FreeBSD's
+   built-in ``iconv`` implementation (:ghc-ticket:`20354`)
+ * GHC is now able to correctly locate ``libc++`` on FreeBSD systems
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:  Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal: Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal: Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+
