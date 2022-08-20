@@ -28,7 +28,6 @@ import GHC.Data.Bag
 import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
 import GHC.Types.Basic hiding (EP)
-import GHC.Types.Fixity
 import GHC.Types.ForeignCall
 import GHC.Types.Name.Reader
 import GHC.Types.PkgQual
@@ -40,7 +39,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.TypeLits
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Syntax.Basic (FieldLabelString(..), Fixity(..))
 
 import Control.Monad.Identity
 import Control.Monad.RWS
@@ -2298,16 +2297,16 @@ instance ExactPrint (HsCmdTop GhcPs) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (HsCmd GhcPs) where
-  getAnnotationEntry (HsCmdArrApp an _ _ _ _)   = fromAnn an
-  getAnnotationEntry (HsCmdArrForm an _ _ _ _ ) = fromAnn an
-  getAnnotationEntry (HsCmdApp an _ _ )         = fromAnn an
-  getAnnotationEntry (HsCmdLam {})              = NoEntryVal
-  getAnnotationEntry (HsCmdPar an _ _ _)        = fromAnn an
-  getAnnotationEntry (HsCmdCase an _ _)         = fromAnn an
-  getAnnotationEntry (HsCmdLamCase an _ _)      = fromAnn an
-  getAnnotationEntry (HsCmdIf an _ _ _ _)       = fromAnn an
-  getAnnotationEntry (HsCmdLet an _ _ _ _)      = fromAnn an
-  getAnnotationEntry (HsCmdDo an _)             = fromAnn an
+  getAnnotationEntry (HsCmdArrApp an _ _ _ _) = fromAnn an
+  getAnnotationEntry (HsCmdArrForm an _ _ _ ) = fromAnn an
+  getAnnotationEntry (HsCmdApp an _ _ )       = fromAnn an
+  getAnnotationEntry (HsCmdLam {})            = NoEntryVal
+  getAnnotationEntry (HsCmdPar an _ _ _)      = fromAnn an
+  getAnnotationEntry (HsCmdCase an _ _)       = fromAnn an
+  getAnnotationEntry (HsCmdLamCase an _ _)    = fromAnn an
+  getAnnotationEntry (HsCmdIf an _ _ _ _)     = fromAnn an
+  getAnnotationEntry (HsCmdLet an _ _ _ _)    = fromAnn an
+  getAnnotationEntry (HsCmdDo an _)           = fromAnn an
 
 
 
@@ -2322,7 +2321,7 @@ instance ExactPrint (HsCmd GhcPs) where
         markKw (anns an)
         markAnnotated arr
 
-  exact (HsCmdArrForm an e fixity _mf cs) = do
+  exact (HsCmdArrForm an e fixity cs) = do
     markLocatedMAA an al_open
     case (fixity, cs) of
       (Infix, (arg1:argrest)) -> do

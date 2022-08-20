@@ -120,6 +120,7 @@ GHC.Driver.Plugins.External
 GHC.Driver.Ppr
 GHC.Driver.Session
 GHC.Hs
+GHC.Hs.Basic
 GHC.Hs.Binds
 GHC.Hs.Decls
 GHC.Hs.Doc
