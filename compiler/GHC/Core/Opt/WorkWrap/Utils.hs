@@ -136,19 +136,18 @@ the unusable strictness-info into the interfaces.
 
 data WwOpts
   = MkWwOpts
-  -- | Environment of type/data family instances
-  { wo_fam_envs          :: !FamInstEnvs
-  -- | Options for the "Simple optimiser"
-  , wo_simple_opts       :: !SimpleOpts
-  -- | Whether to enable "Constructed Product Result" analysis.
-  -- (Originally from DOI: 10.1017/S0956796803004751)
-  , wo_cpr_anal          :: !Bool
-  -- | Used for absent argument error message
-  , wo_module            :: !Module
-  -- | Generate workers even if the only effect is some args get passed
-  -- unlifted. See Note [WW for calling convention]
-  , wo_unlift_strict     :: !Bool
-  }
+  { -- | Environment of type/data family instances
+    wo_fam_envs          :: !FamInstEnvs
+  , -- | Options for the "Simple optimiser"
+    wo_simple_opts       :: !SimpleOpts
+  , -- | Whether to enable "Constructed Product Result" analysis.
+    -- (Originally from DOI: 10.1017/S0956796803004751)
+    wo_cpr_anal          :: !Bool
+  , -- | Used for absent argument error message
+    wo_module            :: !Module
+  , -- | Generate workers even if the only effect is some args get passed
+    -- unlifted. See Note [WW for calling convention]
+    wo_unlift_strict     :: !Bool }
 
 type WwResult
   = ([Demand],              -- Demands for worker (value) args
