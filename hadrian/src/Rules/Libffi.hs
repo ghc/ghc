@@ -75,11 +75,11 @@ needLibffi stage = do
 libffiContext :: Stage -> Action Context
 libffiContext stage = do
     ways <- interpretInContext
-            (Context stage libffi (error "libffiContext: way not set"))
+            (Context stage libffi (error "libffiContext: way not set") (error "libffiContext: iplace not set"))
             getLibraryWays
-    return . Context stage libffi $ if any (wayUnit Dynamic) ways
+    return $ (\w -> Context stage libffi w Final) (if any (wayUnit Dynamic) ways
         then dynamic
-        else vanilla
+        else vanilla)
 
 -- | The name of the library
 libffiName :: Expr String

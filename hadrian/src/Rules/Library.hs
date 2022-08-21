@@ -17,7 +17,6 @@ import Target
 import Utilities
 import Data.Time.Clock
 import Rules.Generate (generatedDependencies)
-import Hadrian.Oracles.Cabal (readPackageData)
 import Oracles.Flag
 
 
@@ -46,13 +45,12 @@ libraryRules = do
 registerStaticLib :: FilePath -> FilePath -> Action ()
 registerStaticLib root archivePath = do
     -- Simply need the ghc-pkg database .conf file.
-    GhcPkgPath _ stage _ (LibA name version _)
+    GhcPkgPath _ stage _ (LibA name _ w)
         <- parsePath (parseGhcPkgLibA root)
                     "<.a library (register) path parser>"
                     archivePath
-    need [ root -/- relativePackageDbPath stage
-                -/- (pkgId name version) ++ ".conf"
-         ]
+    let ctx = Context stage (unsafeFindPackageByName name) w Final
+    need . (:[]) =<< pkgConfFile ctx
 
 -- | Build a static library ('LibA') under the given build root, whose path is
 -- the second argument.
@@ -77,13 +75,12 @@ buildStaticLib root archivePath = do
 registerDynamicLib :: FilePath -> String -> FilePath -> Action ()
 registerDynamicLib root suffix dynlibpath = do
     -- Simply need the ghc-pkg database .conf file.
-    (GhcPkgPath _ stage _ (LibDyn name version _ _))
+    (GhcPkgPath _ stage _ (LibDyn name _ w _))
         <- parsePath (parseGhcPkgLibDyn root suffix)
                             "<dyn register lib parser>"
                             dynlibpath
-    need [ root -/- relativePackageDbPath stage
-                -/- pkgId name version ++ ".conf"
-         ]
+    let ctx = Context stage (unsafeFindPackageByName name) w Final
+    need . (:[]) =<< pkgConfFile ctx
 
 -- | Build a dynamic library ('LibDyn') under the given build root, with the
 -- given suffix (@.so@ or @.dylib@, @.dll@), where the complete path of the
@@ -137,21 +134,17 @@ files etc.
 
 buildPackage :: FilePath -> FilePath -> Action ()
 buildPackage root fp = do
-  l@(BuildPath _ stage _ (PkgStamp _ _ way)) <- parsePath (parseStampPath root) "<.stamp parser>" fp
+  l@(BuildPath _ _ _ (PkgStamp _ _ way)) <- parsePath (parseStampPath root) "<.stamp parser>" fp
   let ctx = stampContext l
   srcs <- hsSources ctx
   gens <- interpretInContext ctx generatedDependencies
 
-  depPkgs <- packageDependencies <$> readPackageData (package ctx)
-  -- Stage packages are those we have in this stage.
-  stagePkgs <- stagePackages stage
-  -- We'll need those packages in our package database.
-  deps <- sequence [ pkgConfFile (ctx { package = pkg })
-                   | pkg <- depPkgs, pkg `elem` stagePkgs ]
-  need deps
-  need (srcs ++ gens)
+  lib_targets <- libraryTargets True ctx
 
-  need =<< libraryTargets True ctx
+  need (srcs ++ gens ++ lib_targets)
+
+  -- Write the current time into the file so the file always changes if
+  -- we restamp it because a dependency changes.
   time <- liftIO $ getCurrentTime
   liftIO $ writeFile fp (show time)
   ways <- interpretInContext ctx getLibraryWays
@@ -241,28 +234,28 @@ data LibGhci = LibGhci String [Integer] Way deriving (Eq, Show)
 -- | Get the 'Context' corresponding to the build path for a given static library.
 libAContext :: BuildPath LibA -> Context
 libAContext (BuildPath _ stage pkgpath (LibA pkgname _ way)) =
-    Context stage pkg way
+    Context stage pkg way Final
   where
     pkg = library pkgname pkgpath
 
 -- | Get the 'Context' corresponding to the build path for a given GHCi library.
 libGhciContext :: BuildPath LibGhci -> Context
 libGhciContext (BuildPath _ stage pkgpath (LibGhci pkgname _ way)) =
-    Context stage pkg way
+    Context stage pkg way Final
   where
     pkg = library pkgname pkgpath
 
 -- | Get the 'Context' corresponding to the build path for a given dynamic library.
 libDynContext :: BuildPath LibDyn -> Context
 libDynContext (BuildPath _ stage pkgpath (LibDyn pkgname _ way _)) =
-    Context stage pkg way
+    Context stage pkg way Final
   where
     pkg = library pkgname pkgpath
 
 -- | Get the 'Context' corresponding to the build path for a given static library.
 stampContext :: BuildPath PkgStamp -> Context
 stampContext (BuildPath _ stage _ (PkgStamp pkgname _ way)) =
-    Context stage pkg way
+    Context stage pkg way Final
   where
     pkg = unsafeFindPackageByName pkgname
 
@@ -344,7 +337,3 @@ parseStamp = do
     (pkgname, pkgver) <- parsePkgId
     way <- parseWaySuffix vanilla
     return (PkgStamp pkgname pkgver way)
-
--- | Get the package identifier given the package name and version.
-pkgId :: String -> [Integer] -> String
-pkgId name version = name ++ "-" ++ intercalate "." (map show version)

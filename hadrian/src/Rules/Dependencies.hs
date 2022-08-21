@@ -20,7 +20,7 @@ buildPackageDependencies rs = do
     root <- buildRootRules
     root -/- "**/.dependencies.mk" %> \mk -> do
         DepMkFile stage pkgpath <- getDepMkFile root mk
-        let context = Context stage (unsafeFindPackageByPath pkgpath) vanilla
+        let context = Context stage (unsafeFindPackageByPath pkgpath) vanilla Inplace
         srcs <- hsSources context
         gens <- interpretInContext context generatedDependencies
         need (srcs ++ gens)

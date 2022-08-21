@@ -114,7 +114,7 @@ testRules = do
       need [stage0prog]
       abs_prog_path <- liftIO (IO.canonicalizePath stage0prog)
       -- Use the stage1 package database
-      pkgDb <- liftIO . IO.makeAbsolute =<< packageDbPath Stage1
+      pkgDb <- liftIO . IO.makeAbsolute =<< packageDbPath (PackageDbLoc Stage1 Final)
       if prog `elem` ["ghc","runghc"] then do
           let flags = [ "-no-global-package-db", "-no-user-package-db", "-hide-package", "ghc" , "-package-env","-","-package-db",pkgDb]
           writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
@@ -163,7 +163,7 @@ testRules = do
         let testGhc = testCompiler args
         ghcPath <- getCompilerPath testGhc
         whenJust (stageOf testGhc) $ \stg ->
-          need . (:[]) =<< programPath (Context stg ghc vanilla)
+          need . (:[]) =<< programPath (Context stg ghc vanilla Final)
         ghcConfigProgPath <- programPath =<< programContext stage0InTree ghcConfig
         cwd <- liftIO $ IO.getCurrentDirectory
         need [makeRelative cwd ghcPath, ghcConfigProgPath]
@@ -322,18 +322,18 @@ needIservBins stg = do
     -- not working with the testsuite, see #19624
     canBuild (Stage0 {}) _ = pure Nothing
     canBuild stg w = do
-      contextDeps <- contextDependencies (Context stg iserv w)
+      contextDeps <- contextDependencies (Context stg iserv w Final)
       ws <- forM contextDeps $ \c ->
               interpretInContext c (getLibraryWays <>
                                     if Context.Type.package c == rts
                                       then getRtsWays
                                       else mempty)
       if (all (w `elem`) ws)
-        then Just <$> programPath (Context stg iserv w)
+        then Just <$> programPath (Context stg iserv w Final)
         else return Nothing
 
 
 pkgFile :: Stage -> Package -> Action FilePath
 pkgFile stage pkg
-    | isLibrary pkg = pkgConfFile (Context stage pkg profilingDynamic)
+    | isLibrary pkg = pkgConfFile (Context stage pkg profilingDynamic Final)
     | otherwise     = programPath =<< programContext stage pkg

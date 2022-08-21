@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Stage (Stage (..), WhichLibs(..), isStage0, stage0InTree, stage0Boot, allStages,predStage, succStage, stageString) where
+module Stage (Stage (..), WhichLibs(..), Inplace(..), isStage0, stage0InTree, stage0Boot, allStages,predStage, succStage, stageString) where
 
 import Development.Shake.Classes
 import GHC.Generics
@@ -27,6 +27,38 @@ import GHC.Generics
 --   build is usually omitted in the build process.
 data Stage = Stage0 WhichLibs | Stage1 | Stage2 | Stage3
     deriving (Show, Eq, Ord, Generic)
+
+{-
+Note [Inplace vs Final package databases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are two package databases we maintain an "inplace" one and a "final" one.
+The inplace one is created by pre-configuring all the packages before doing any
+building. All GHC invocations to build .hs files will use an inplace package database
+for two reasons.
+
+1. To increase parallelism
+2. ./hadrian/ghci-multi can use the inplace package db to avoid having to build everything
+   before starting.
+
+The "inplace" database has .conf files which point directly to the build folders.
+The "final" database has a .conf file which points like normall to the install folder.
+
+Therefore when we are building modules, we can start compiling a module as soon as
+all it's dependencies are available in the build folder, rather than waiting for the
+whole package to finish, be copied and installed like before.
+
+Once we need to do a final link then we need to wait for the "final" versions to
+be enabled because then we want to make sure to create objects with the right rpaths and
+so on. The "final" .conf has dependencies on all the objects in the package (unlike the "inplace" .conf
+which has no such dependencies).
+
+-}
+data Inplace = Inplace | Final deriving (Show, Eq, Generic)
+
+instance Binary   Inplace
+instance Hashable Inplace
+instance NFData   Inplace
 
 
 -- | See Note [Stage 0 build plans]

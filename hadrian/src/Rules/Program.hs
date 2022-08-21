@@ -65,8 +65,8 @@ getProgramContexts stage = do
     ctx <- programContext stage pkg -- TODO: see todo on programContext.
     let allCtxs = if pkg == iserv
         then [ vanillaContext stage pkg
-             , Context stage pkg profiling
-             , Context stage pkg dynamic
+             , Context stage pkg profiling Final
+             , Context stage pkg dynamic Final
              ]
         else [ ctx ]
     forM allCtxs $ \ctx -> do

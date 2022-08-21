@@ -266,7 +266,7 @@ data PkgDocTarget = DotHaddock PackageName | HaddockPrologue PackageName
   deriving (Eq, Show)
 
 pkgDocContext :: PkgDocTarget -> Context
-pkgDocContext target = Context Stage1 (unsafeFindPackageByName name) vanilla
+pkgDocContext target = Context Stage1 (unsafeFindPackageByName name) vanilla Final
   where
     name = case target of DotHaddock n      -> n
                           HaddockPrologue n -> n

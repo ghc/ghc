@@ -447,7 +447,7 @@ iservBins :: Action [(Package, FilePath)]
 iservBins = do
   rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
   traverse (fmap (\p -> (iserv, p)) . programPath)
-      [ Context Stage1 iserv w
+      [ Context Stage1 iserv w Final
       | w <- [vanilla, profiling, dynamic]
       , w `elem` rtsways
       ]

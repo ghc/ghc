@@ -230,7 +230,7 @@ withBuilderArgs :: Builder -> Args
 withBuilderArgs b = case b of
     Ghc _ stage -> do
       top   <- expr topDirectory
-      pkgDb <- expr $ packageDbPath stage
+      pkgDb <- expr $ packageDbPath (PackageDbLoc stage Inplace)
       -- GHC starts with a nonempty package DB stack, so we need to tell it
       -- to empty the stack first for it to truly consider only the package
       -- DB we explicitly provide. See #17468.
@@ -238,7 +238,7 @@ withBuilderArgs b = case b of
                   arg ("--ghc-option=-package-db=" ++ top -/- pkgDb)
     GhcPkg _ stage -> do
       top   <- expr topDirectory
-      pkgDb <- expr $ packageDbPath stage
+      pkgDb <- expr $ packageDbPath (PackageDbLoc stage Inplace)
       notStage0 ? arg ("--ghc-pkg-option=--global-package-db=" ++ top -/- pkgDb)
     _          -> return [] -- no arguments
 

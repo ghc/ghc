@@ -29,6 +29,8 @@ module Base (
     ghcBinDeps, ghcLibDeps, haddockDeps,
     relativePackageDbPath, packageDbPath, packageDbStamp, mingwStamp,
     systemCxxStdLibConf, systemCxxStdLibConfPath
+    , PackageDbLoc(..), Inplace(..)
+
     ) where
 
 import Control.Applicative
@@ -82,13 +84,17 @@ shakeFilesDir = "hadrian"
 
 -- | Path to the package database for a given build stage, relative to the build
 -- root.
-relativePackageDbPath :: Stage -> FilePath
-relativePackageDbPath stage = stageString stage -/- "lib/package.conf.d"
+relativePackageDbPath :: PackageDbLoc -> FilePath
+relativePackageDbPath (PackageDbLoc stage Final) = stageString stage-/- "lib/package.conf.d"
+relativePackageDbPath (PackageDbLoc stage Inplace) = stageString stage -/- "inplace/package.conf.d"
+
+-- See Note [Inplace vs Final package databases]
+data PackageDbLoc = PackageDbLoc { db_stage :: Stage, db_inplace :: Inplace }
 
 -- | Path to the package database used in a given 'Stage', including
 --   the build root.
-packageDbPath :: Stage -> Action FilePath
-packageDbPath stage = buildRoot <&> (-/- relativePackageDbPath stage)
+packageDbPath :: PackageDbLoc -> Action FilePath
+packageDbPath db_loc = buildRoot <&> (-/- relativePackageDbPath db_loc)
 
 -- | We use a stamp file to track the existence of a package database.
 packageDbStamp :: FilePath
@@ -99,7 +105,7 @@ systemCxxStdLibConf = "system-cxx-std-lib-1.0.conf"
 
 -- | The name of the generated @system-cxx-std-lib-1.0.conf@ package database
 -- entry.
-systemCxxStdLibConfPath :: Stage -> Action FilePath
+systemCxxStdLibConfPath :: PackageDbLoc -> Action FilePath
 systemCxxStdLibConfPath stage =
     packageDbPath stage <&> (-/- systemCxxStdLibConf)
 
@@ -112,14 +118,14 @@ stageLibPath :: Stage -> Action FilePath
 stageLibPath stage = buildRoot <&> (-/- stageString stage -/- "lib")
 
 -- | Files the GHC library depends on
-ghcLibDeps :: Stage -> Action [FilePath]
-ghcLibDeps stage = do
+ghcLibDeps :: Stage -> Inplace -> Action [FilePath]
+ghcLibDeps stage iplace = do
     ps <- mapM (\f -> stageLibPath stage <&> (-/- f))
         [ "llvm-targets"
         , "llvm-passes"
         , "settings"
         ]
-    cxxStdLib <- systemCxxStdLibConfPath stage
+    cxxStdLib <- systemCxxStdLibConfPath (PackageDbLoc stage iplace)
     return (cxxStdLib : ps)
 
 -- | Files the GHC binary depends on.

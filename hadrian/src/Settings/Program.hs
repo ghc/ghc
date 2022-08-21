@@ -14,7 +14,7 @@ programContext :: Stage -> Package -> Action Context
 programContext stage pkg = do
     profiled <- askGhcProfiled stage
     dynGhcProgs <- askDynGhcPrograms --dynamicGhcPrograms =<< flavour
-    return $ Context stage pkg (wayFor profiled dynGhcProgs)
+    return $ Context stage pkg (wayFor profiled dynGhcProgs) Final
 
     where wayFor prof dyn
             | prof && dyn                          =

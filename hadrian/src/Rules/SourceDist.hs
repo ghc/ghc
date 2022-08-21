@@ -160,7 +160,7 @@ prepareTree dest = do
 
     copyAlexHappyFiles =
       forM_ alexHappyFiles $ \(stg, pkg, inp, out) -> do
-        let ctx = Context stg pkg vanilla
+        let ctx = Context stg pkg vanilla Inplace
             srcInputFile = dest -/- pkgPath pkg -/- inp
             generatedFile = dest -/- pkgPath pkg -/- out
             builder =

@@ -89,7 +89,7 @@ inTreeCompilerArgs stg = do
 
 
     (hasDynamicRts, hasThreadedRts) <- do
-      ways <- interpretInContext (Context stg rts vanilla) getRtsWays
+      ways <- interpretInContext (vanillaContext stg rts) getRtsWays
       return (dynamic `elem` ways, threaded `elem` ways)
     -- MP: We should be able to vary if stage1/stage2 is dynamic, ie a dynamic stage1
     -- should be able to built a static stage2?
@@ -119,7 +119,7 @@ inTreeCompilerArgs stg = do
     top         <- topDirectory
 
     pkgConfCacheFile <- System.FilePath.normalise . (top -/-)
-                    <$> (packageDbPath stg <&> (-/- "package.cache"))
+                    <$> (packageDbPath (PackageDbLoc stg Final) <&> (-/- "package.cache"))
     libdir           <- System.FilePath.normalise . (top -/-)
                     <$> stageLibPath stg
 

@@ -28,7 +28,7 @@ ghcBuilderArgs = mconcat
       let nextStageRtsBuildIncludeDir = nextStageRtsBuildDir </> "include"
       builder Ghc ? arg ("-I" ++ nextStageRtsBuildIncludeDir)
   , compileAndLinkHs, compileC, compileCxx, findHsDependencies
-  , toolArgs]
+  , toolArgs ]
 
 toolArgs :: Args
 toolArgs = do

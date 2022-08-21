@@ -102,7 +102,7 @@ instance NFData   ConfigurationInfo
 -- TODO: Do we really need all these modes? Why do we need 'Dependencies'? We
 -- can extract dependencies using the Cabal library.
 -- | 'GhcPkg' can initialise a package database and register packages in it.
-data GhcPkgMode = Init         -- ^ Initialise an empty package database
+data GhcPkgMode = Recache      -- ^ Recache a package database
                 | Copy         -- ^ Copy a package from one database to another.
                 | Dependencies -- ^ Compute package dependencies.
                 | Unregister   -- ^ Unregister a package.

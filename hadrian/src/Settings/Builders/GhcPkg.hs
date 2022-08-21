@@ -4,9 +4,9 @@ import Settings.Builders.Common
 
 ghcPkgBuilderArgs :: Args
 ghcPkgBuilderArgs = mconcat
-    [ builder (GhcPkg Init) ? do
-        stage     <- getStage
-        pkgDb     <- expr $ packageDbPath stage
+    [ builder (GhcPkg Recache) ? do
+        loc <- getPackageDbLoc
+        pkgDb     <- expr $ packageDbPath loc
         -- Confusingly calls recache rather than init because shake "creates"
         -- the package db by virtue of creating the path to it, so we just recache
         -- to create the package.cache file.
@@ -14,16 +14,16 @@ ghcPkgBuilderArgs = mconcat
 
     , builder (GhcPkg Copy) ? do
         verbosity <- expr getVerbosity
-        stage     <- getStage
-        pkgDb     <- expr $ packageDbPath stage
+        loc <- getPackageDbLoc
+        pkgDb     <- expr $ packageDbPath loc
         mconcat [ use_db pkgDb
                 , arg "register"
                 , verbosity < Verbose ? arg "-v0"
                 ]
     , builder (GhcPkg Unregister) ? do
         verbosity <- expr getVerbosity
-        stage     <- getStage
-        pkgDb     <- expr $ packageDbPath stage
+        loc <- getPackageDbLoc
+        pkgDb     <- expr $ packageDbPath loc
         mconcat [ use_db pkgDb
                 , arg "unregister"
                 , arg "--force"
@@ -31,16 +31,14 @@ ghcPkgBuilderArgs = mconcat
                 ]
     , builder (GhcPkg Update) ? do
         verbosity <- expr getVerbosity
-        context   <- getContext
-        config    <- expr $ pkgInplaceConfig context
-        stage     <- getStage
-        pkgDb     <- expr $ packageDbPath stage
+        loc <- getPackageDbLoc
+        pkgDb     <- expr $ packageDbPath loc
         mconcat [ notM stage0 ? use_db pkgDb
                 , arg "update"
                 , arg "--force"
                 , verbosity < Verbose ? arg "-v0"
                 , bootPackageDatabaseArgs
-                , arg config ] ]
+                , arg =<< getInput ] ]
     where
         use_db db = mconcat
             -- We use ghc-pkg's --global-package-db to manipulate our databases.
