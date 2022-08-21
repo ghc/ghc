@@ -47,7 +47,9 @@ module Data.List.NonEmpty (
    , sort        -- :: NonEmpty a -> NonEmpty a
    , reverse     -- :: NonEmpty a -> NonEmpty a
    , inits       -- :: Foldable f => f a -> NonEmpty a
+   , inits1      -- :: NonEmpty a -> NonEmpty (NonEmpty a)
    , tails       -- :: Foldable f => f a -> NonEmpty a
+   , tails1      -- :: NonEmpty a -> NonEmpty (NonEmpty a)
    , append      -- :: NonEmpty a -> NonEmpty a -> NonEmpty a
    , appendList  -- :: NonEmpty a -> [a] -> NonEmpty a
    , prependList -- :: [a] -> NonEmpty a -> NonEmpty a
@@ -215,14 +217,57 @@ map :: (a -> b) -> NonEmpty a -> NonEmpty b
 map f ~(a :| as) = f a :| fmap f as
 
 -- | The 'inits' function takes a stream @xs@ and returns all the
--- finite prefixes of @xs@.
+-- finite prefixes of @xs@, starting with the shortest. The result is
+-- 'NonEmpty' because the result always contains the empty list as the first
+-- element.
+--
+-- > inits [1,2,3] == [] :| [[1], [1,2], [1,2,3]]
+-- > inits [1] == [] :| [[1]]
+-- > inits [] == [] :| []
 inits :: Foldable f => f a -> NonEmpty [a]
 inits = fromList . List.inits . Foldable.toList
 
+-- | The 'inits1' function takes a 'NonEmpty' stream @xs@ and returns all the
+-- 'NonEmpty' finite prefixes of @xs@, starting with the shortest.
+--
+-- > inits1 (1 :| [2,3]) == (1 :| []) :| [1 :| [2], 1 :| [2,3]]
+-- > inits1 (1 :| []) == (1 :| []) :| []
+inits1 :: NonEmpty a -> NonEmpty (NonEmpty a)
+inits1 =
+  -- fromList is an unsafe function, but this usage should be safe, since:
+  -- * `inits xs = [[], ..., init (init xs), init xs, xs]`
+  -- * If `xs` is nonempty, it follows that `inits xs` contains at least one nonempty
+  --   list, since `last (inits xs) = xs`.
+  -- * The only empty element of `inits xs` is the first one (by the definition of `inits`)
+  -- * Therefore, if we take all but the first element of `inits xs` i.e.
+  --   `tail (inits xs)`, we have a nonempty list of nonempty lists
+  fromList . Prelude.map fromList . List.tail . List.inits . Foldable.toList
+
 -- | The 'tails' function takes a stream @xs@ and returns all the
--- suffixes of @xs@.
+-- suffixes of @xs@, starting with the longest. The result is 'NonEmpty'
+-- because the result always contains the empty list as the last element.
+--
+-- > tails [1,2,3] == [1,2,3] :| [[2,3], [3], []]
+-- > tails [1] == [1] :| [[]]
+-- > tails [] == [] :| []
 tails   :: Foldable f => f a -> NonEmpty [a]
 tails = fromList . List.tails . Foldable.toList
+
+-- | The 'tails1' function takes a 'NonEmpty' stream @xs@ and returns all the
+-- non-empty suffixes of @xs@, starting with the longest.
+--
+-- > tails1 (1 :| [2,3]) == (1 :| [2,3]) :| [2 :| [3], 3 :| []]
+-- > tails1 (1 :| []) == (1 :| []) :| []
+tails1 :: NonEmpty a -> NonEmpty (NonEmpty a)
+tails1 =
+  -- fromList is an unsafe function, but this usage should be safe, since:
+  -- * `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
+  -- * If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
+  --   list, since `head (tails xs) = xs`.
+  -- * The only empty element of `tails xs` is the last one (by the definition of `tails`)
+  -- * Therefore, if we take all but the last element of `tails xs` i.e.
+  --   `init (tails xs)`, we have a nonempty list of nonempty lists
+  fromList . Prelude.map fromList . List.init . List.tails . Foldable.toList
 
 -- | @'insert' x xs@ inserts @x@ into the last position in @xs@ where it
 -- is still less than or equal to the next element. In particular, if the
