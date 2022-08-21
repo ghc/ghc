@@ -13,6 +13,7 @@ import qualified Context as Context
 import Rules.Libffi (libffiName)
 import qualified Data.Set as Set
 import System.Directory
+import Data.Version.Extra
 
 ghcBuilderArgs :: Args
 ghcBuilderArgs = mconcat
@@ -245,12 +246,15 @@ wayGhcArgs = do
 packageGhcArgs :: Args
 packageGhcArgs = do
     package <- getPackage
+    ghc_ver <- readVersion <$> (expr . ghcVersionStage =<< getStage)
     pkgId   <- expr $ pkgIdentifier package
     mconcat [ arg "-hide-all-packages"
             , arg "-no-user-package-db"
             , arg "-package-env -"
             , packageDatabaseArgs
-            , libraryPackage ? arg ("-this-unit-id " ++ pkgId)
+            -- We want to pass -this-unit-id for executables as well for multi-repl to
+            -- work with executable packages but this is buggy on GHC-9.0.2
+            , (isLibrary package || (ghc_ver >= makeVersion [9,2,1])) ?  arg ("-this-unit-id " ++ pkgId)
             , map ("-package-id " ++) <$> getContextData depIds ]
 
 includeGhcArgs :: Args
