@@ -215,6 +215,7 @@ expanding it to ``\x -> x \`g3a\` "hello"``.
     :shortdesc: Enable deep subsumption
 
     :since: 9.2.4
+    :status: Included in :extension:`Haskell98` and :extension:`Haskell2010`
 
     Relax the simple subsumption rules, implicitly inserting eta-expansions
     when matching up function types with different quantification structures.

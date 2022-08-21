@@ -98,6 +98,7 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
 
      * :extension:`CUSKs`
      * :extension:`DatatypeContexts`
+     * :extension:`DeepSubsumption`
      * :extension:`DoAndIfThenElse`
      * :extension:`EmptyDataDecls`
      * :extension:`FieldSelectors`
@@ -120,6 +121,7 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
 
      * :extension:`CUSKs`
      * :extension:`DatatypeContexts`
+     * :extension:`DeepSubsumption`
      * :extension:`FieldSelectors`
      * :extension:`ImplicitPrelude`
      * :extension:`MonomorphismRestriction`
@@ -147,5 +149,3 @@ a large swath of the extensions supported by GHC at once.
     Enabling these options is the *only* effect of ``-fglasgow-exts``. We are trying
     to move away from this portmanteau flag, and towards enabling features
     individually.
-
-
