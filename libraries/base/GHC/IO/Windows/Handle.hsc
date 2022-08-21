@@ -576,24 +576,23 @@ consoleWriteNonBlocking hwnd ptr _offset bytes
 
 consoleRead :: Bool -> Io ConsoleHandle -> Ptr Word8 -> Word64 -> Int -> IO Int
 consoleRead blocking hwnd ptr _offset bytes
-  = withUTF16ToGhcInternal ptr bytes $ \reqBytes w_ptr ->
-      alloca $ \res -> do
-       cooked <- isCooked hwnd
-       -- Cooked input must be handled differently when the STD handles are
-       -- attached to a real console handle.  For File based handles we can't do
-       -- proper cooked inputs, but since the actions are async you would get
-       -- results as soon as available.
-       --
-       -- For console handles We have to use a lower level API then ReadConsole,
-       -- namely we must use ReadConsoleInput which requires us to process
-       -- all console message manually.
-       --
-       -- Do note that MSYS2 shells such as bash don't attach to a real handle,
-       -- and instead have by default a pipe/file based std handles.  Which
-       -- means the cooked behaviour is best when used in a native Windows
-       -- terminal such as cmd, powershell or ConEmu.
-       case cooked || not blocking of
-        False -> do
+  = alloca $ \res -> do
+      cooked <- isCooked hwnd
+      -- Cooked input must be handled differently when the STD handles are
+      -- attached to a real console handle.  For File based handles we can't do
+      -- proper cooked inputs, but since the actions are async you would get
+      -- results as soon as available.
+      --
+      -- For console handles We have to use a lower level API then ReadConsole,
+      -- namely we must use ReadConsoleInput which requires us to process
+      -- all console message manually.
+      --
+      -- Do note that MSYS2 shells such as bash don't attach to a real handle,
+      -- and instead have by default a pipe/file based std handles.  Which
+      -- means the cooked behaviour is best when used in a native Windows
+      -- terminal such as cmd, powershell or ConEmu.
+      case cooked || not blocking of
+        False -> withUTF16ToGhcInternal ptr bytes $ \reqBytes w_ptr ->  do
           debugIO "consoleRead :: un-cooked I/O read."
           -- eotControl allows us to handle control characters like EOL
           -- without needing a newline, which would sort of defeat the point
@@ -628,9 +627,9 @@ consoleRead blocking hwnd ptr _offset bytes
           -- characters as they are.  Technically this function can handle any
           -- console event.  Including mouse, window and virtual key events
           -- but for now I'm only interested in key presses.
-          let entries = fromIntegral $ reqBytes `div` (#size INPUT_RECORD)
+          let entries = fromIntegral $ bytes `div` (#size INPUT_RECORD)
           allocaBytes entries $ \p_inputs ->
-            maybeReadEvent p_inputs entries res w_ptr
+            maybeReadEvent p_inputs entries res ptr
 
           -- Check to see if we have been explicitly asked to do a non-blocking
           -- I/O, and if we were, make sure that if we didn't have any console
@@ -657,6 +656,7 @@ consoleRead blocking hwnd ptr _offset bytes
 
             b_read <- fromIntegral <$> peek res
             read <- cobble b_read w_ptr p_inputs
+            debugIO $ "readEvent: =" ++ show read
             if read > 0
                then return $ fromIntegral read
                else maybeReadEvent p_inputs entries res w_ptr
@@ -665,7 +665,7 @@ consoleRead blocking hwnd ptr _offset bytes
           -- minimum required to know which key/sequences were pressed.  To do
           -- this and prevent having to fully port the PINPUT_RECORD structure
           -- in Haskell we use some GCC builtins to find the correct offsets.
-          cobble :: Int -> Ptr Word16 -> PINPUT_RECORD -> IO Int
+          cobble :: Int -> Ptr Word8 -> PINPUT_RECORD -> IO Int
           cobble 0 _ _ = do debugIO "cobble: done."
                             return 0
           cobble n w_ptr p_inputs =
@@ -690,8 +690,18 @@ consoleRead blocking hwnd ptr _offset bytes
                           debugIO $ "cobble: offset - " ++ show char_offset
                           debugIO $ "cobble: show > " ++ show char
                           debugIO $ "cobble: repeat: " ++ show repeated
+                          -- The documentation here is rather subtle, but
+                          -- according to MSDN the uWChar being provided here
+                          -- has been "translated".  What this actually means
+                          -- is that the surrogate pairs have already been
+                          -- translated into byte sequences.  That is, despite
+                          -- the Word16 storage type, it's actually a byte
+                          -- stream.  This means we shouldn't try to decode
+                          -- to UTF-8 again since we'd end up incorrectly
+                          -- interpreting two bytes as an extended unicode
+                          -- character.
                           pokeArray w_ptr $ replicate repeated char
-                          (+1) <$> cobble n' w_ptr' p_inputs'
+                          (+repeated) <$> cobble n' w_ptr' p_inputs'
                   else do debugIO $ "cobble: skip event."
                           cobble n' w_ptr p_inputs'
 
