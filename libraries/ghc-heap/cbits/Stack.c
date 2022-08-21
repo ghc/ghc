@@ -1,8 +1,13 @@
 #include "Rts.h"
+#include "rts/Messages.h"
+#include "rts/storage/InfoTables.h"
 
 // Only exists to make the stack_frame_sizeW macro available in Haskell code
 // (via FFI).
-StgWord stackFrameSizeW(StgClosure *frame) { return stack_frame_sizeW(frame); }
+StgWord stackFrameSizeW(StgClosure *frame) {
+  debugBelch("stackFrameSizeW - frame: %p - size %lu \n", frame, stack_frame_sizeW(frame));
+  return stack_frame_sizeW(frame);
+}
 
 // Only exists to make the get_itbl macro available in Haskell code (via FFI).
 const StgInfoTable *getItbl(StgClosure *closure) {
@@ -71,3 +76,14 @@ StgWord getBitmapWord(StgInfoTable *info){
   debugBelch("getBitmapWord - bitmapWord : %lu \n", bitmapWord);
   return bitmapWord;
 }
+
+StgLargeBitmap* getLargeBitmapPtr(const StgInfoTable *info) {
+  return GET_LARGE_BITMAP(info);
+}
+
+#if defined(DEBUG)
+extern void        printStack ( StgStack *stack );
+void belchStack(StgStack* stack){
+  printStack(stack);
+}
+#endif

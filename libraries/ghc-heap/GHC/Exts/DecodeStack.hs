@@ -1,22 +1,21 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GHCForeignImportPrim #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE UnliftedFFITypes #-}
-
-{-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeInType #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnliftedFFITypes #-}
 
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack where
 
 #if MIN_VERSION_base(4,17,0)
 import Data.Bits
-import Foreign (Storable (peekElemOff))
+import Foreign
 
 import Prelude
 import GHC.Stack.CloneStack
@@ -28,6 +27,12 @@ import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 import Numeric
 import qualified GHC.Exts.Heap.Closures as CL
 import GHC.Exts.Heap.StackFFI as StackFFI
+import Data.Bits
+
+import GHC.Exts.Heap (Closure)
+import GHC.Exts.Heap.StackFFI (bitsInWord)
+import GHC.Exts.Heap.Closures (closureSize)
+import System.Mem (performMajorGC)
 
 data BitmapPayload = Closure CL.Closure | Primitive Word
 
@@ -79,9 +84,17 @@ foreign import ccall "getSpecialRetSmall" getSpecialRetSmall :: Addr# -> Word
 foreign import ccall "getBitmapSize" getBitmapSize :: Ptr StgInfoTable -> Word
 foreign import ccall "getBitmapWord" getBitmapWord :: Ptr StgInfoTable -> Word
 foreign import prim "stg_unpackClosurezh" unpackClosure_prim# :: Word# -> (# Addr#, ByteArray#, Array# b #)
+foreign import ccall "getLargeBitmapPtr" getLargeBitmapPtr :: Ptr StgInfoTable -> Ptr LargeBitmap
+#if defined(DEBUG)
+foreign import ccall "belchStack" belchStack :: StackSnapshot# -> IO ()
+#endif
 
 decodeStack :: StackSnapshot -> IO [StackFrame]
 decodeStack (StackSnapshot stack) = do
+#if defined(DEBUG)
+  performMajorGC
+  belchStack stack
+#endif
   let (stgStackPtr :: Ptr FFIClosures.StackFields) = Ptr (unsafeCoerce# stack)
   stgStack <- FFIClosures.peekStackFields stgStackPtr
   traceM $ "stack_dirty  " ++ show (FFIClosures.stack_dirty  stgStack)
@@ -107,8 +120,8 @@ decodeStackFrame buttom sp | (addrToInt sp) >= (addrToInt buttom) = do
               traceM "buttom reached"
               pure []
 decodeStackFrame buttom sp = do
-  traceM $ "decodeStackFrame - (addrToInt sp) >= (addrToInt buttom)" ++ show ((addrToInt sp) >= (addrToInt buttom))
-  traceM $ "decodeStackFrame - buttom " ++ showAddr# buttom
+--  traceM $ "decodeStackFrame - (addrToInt sp) >= (addrToInt buttom)" ++ show ((addrToInt sp) >= (addrToInt buttom))
+--  traceM $ "decodeStackFrame - buttom " ++ showAddr# buttom
   traceM $ "decodeStackFrame - sp " ++ showAddr# sp
   frame <- toStackFrame sp
   traceM $  "decodeStackFrame - frame " ++ show frame
@@ -118,6 +131,8 @@ decodeStackFrame buttom sp = do
     closureSize = stackFrameSizeW sp
     closureSizeInBytes = 8 * closureSize
     nextSp = plusAddr# sp (integralToInt# closureSizeInBytes)
+
+  traceM $ "decodeStackFrame - closureSize " ++ show closureSize ++ " sp " ++ showAddr# sp
   traceM $ "decodeStackFrame - nextSp " ++ showAddr# nextSp
   otherFrames <- decodeStackFrame buttom nextSp
   return $ frame : otherFrames
@@ -140,9 +155,14 @@ toStackFrame sp = do
             payloads <- peekBitmapPayloadArray bSize bWord (Ptr payloadAddr#)
             pure $ RetSmall special payloads
      RET_BIG -> do
-       pPtr <- payloadPtr (Ptr sp)
-       largeBitmap <- peekStgLargeBitmap itblPtr
-       payloads <- peekLargeBitmap (StackFFI.size largeBitmap) (StackFFI.bitmap largeBitmap) pPtr
+       let pPtr = payloadPtr (Ptr sp)
+       traceM $ "toStackFrame - BIG_RET - pPtr " ++ show pPtr
+       let largeBitmapPtr = getLargeBitmapPtr itblPtr
+       largeBitmap <- peekStgLargeBitmap largeBitmapPtr
+       traceM $ "toStackFrame - BIG_RET - largeBitmap " ++ show largeBitmap
+       let entries = bitmapEntries pPtr largeBitmap
+       traceM $ "toStackFrame - BIG_RET - entries " ++ show entries
+       payloads <- mapM toClosure $ bitmapEntries pPtr largeBitmap
        pure $ RetBig payloads
      RET_FUN -> pure RetFun
      UPDATE_FRAME -> pure UpdateFrame
@@ -153,6 +173,47 @@ toStackFrame sp = do
      CATCH_RETRY_FRAME -> pure CatchRetryFrame
      CATCH_STM_FRAME -> pure CatchStmFrame
      _ -> error $ "Unexpected closure type on stack: " ++ show (tipe itbl)
+
+toClosure :: BitmapEntry -> IO BitmapPayload
+toClosure (BitmapEntry ptr isPrimitive) = if isPrimitive then
+          do
+            -- TODO: duplicated line with else branch
+            e <- peek ptr
+            pure $ Primitive e
+          else
+            do
+              e <- peek ptr
+              c <- getClosureDataFromHeapObject' (toWord# e)
+              pure $ Closure c
+
+-- Idea:
+-- 1. convert to list of (significant) bits
+-- Convert to tupe (Ptr addr, closure type)
+-- This is pure! And, should be easy to decode, debug and reuse.
+data BitmapEntry = BitmapEntry {
+  closurePtr :: Ptr Word,
+  isPrimitive :: Bool
+                               } deriving (Show)
+
+bitmapEntries :: Ptr Word -> LargeBitmap -> [BitmapEntry]
+bitmapEntries payloadPtr (LargeBitmap size ws) =
+    map toBitmapEntry $ zip (bits size ws) [0..]
+  where
+    toBitmapEntry :: (Bool, Int) -> BitmapEntry
+    toBitmapEntry (b,i) = BitmapEntry {
+      closurePtr = plusPtr payloadPtr (i * (fromIntegral bytesInWord)),
+      isPrimitive = b
+                                      }
+
+bits :: Word -> [Word] -> [Bool]
+bits size ws = take (fromIntegral size) $ concat (map toBits ws)
+
+toBits :: Word -> [Bool]
+toBits w = go 0
+  where
+    go :: Int -> [Bool]
+    go b | b == (fromIntegral bitsInWord) = []
+    go b = (w .&. (1 `shiftL` b) == 1) : go (b + 1)
 
 peekLargeBitmap :: Word -> [Word] -> Ptr Word -> IO [BitmapPayload]
 peekLargeBitmap 0 _ _ = pure []

@@ -545,6 +545,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
     ASSERT(sp <= spBottom);
     for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
+        debugBelch("printStackChunk - closure size : %lu , sp : %p \n", stack_frame_sizeW((StgClosure *)sp), sp);
         debugBelch("printStackChunk - spBottom : %p\n", spBottom);
         debugBelch("printStackChunk - sp : %p\n", sp);
         info = get_itbl((StgClosure *)sp);
@@ -671,7 +672,10 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
         case RET_BIG:
             debugBelch("RET_BIG (%p)\n", sp);
+            debugBelch("payload ptr : %p \n", (StgPtr)((StgClosure *) sp)->payload);
             StgLargeBitmap* bitmap = GET_LARGE_BITMAP(info);
+            debugBelch("bitmap ptr %p\n", bitmap);
+            debugBelch("bitmap size %ul\n", bitmap->size);
             printLargeBitmap(spBottom,
                             (StgPtr)((StgClosure *) sp)->payload,
                             bitmap,
