@@ -79,8 +79,6 @@ multiSetup pkg_s = do
                           (Ghc ToolArgs stage0InTree) [] ["ignored"]
       arg_list <- interpret fake_target getArgs
       let c = Context stage0InTree p (if windowsHost then vanilla else dynamic) Inplace -- Critical use of Inplace, one of the main motivations!
-      -- readContextData has the effect of configuring the package so all
-      -- dependent packages will also be built.
       cd <- readContextData c
       srcs <- hsSources c
       gens <- interpretInContext c generatedDependencies
@@ -128,7 +126,6 @@ mkToolTarget es p = do
     let fake_target = target context
                         (Ghc ToolArgs stage0InTree) [] ["ignored"]
     -- Generate any source files for this target
-    cd <- readContextData context
     srcs <- hsSources context
     gens <- interpretInContext context generatedDependencies
 
@@ -154,17 +151,17 @@ toolTargets = [ binary
               , directory
               , process
               , exceptions
---            , ghc     # depends on ghc library
---            , runGhc  # depends on ghc library
+              -- , ghc     -- # depends on ghc library
+              -- , runGhc  -- # depends on ghc library
               , ghcBoot
               , ghcBootTh
               , ghcHeap
               , ghci
---            , ghcPkg  # executable
---            , haddock # depends on ghc library
---            , hsc2hs  # executable
+              , ghcPkg  -- # executable
+              -- , haddock -- # depends on ghc library
+              , hsc2hs  -- # executable
               , hpc
---            , hpcBin  # executable
+              , hpcBin  -- # executable
               , mtl
               , parsec
               , time
@@ -172,7 +169,7 @@ toolTargets = [ binary
               , text
               , terminfo
               , transformers
---            , unlit  # executable
+              , unlit  -- # executable
               ] ++ if windowsHost then [ win32 ] else [ unix ]
 
 -- | Create a mapping from files to which component it belongs to.
