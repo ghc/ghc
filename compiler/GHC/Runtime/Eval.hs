@@ -642,7 +642,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just ibi) = do
    newTyVars :: UniqSupply -> [TcTyVar] -> Subst
      -- Similarly, clone the type variables mentioned in the types
      -- we have here, *and* make them all RuntimeUnk tyvars
-   newTyVars us tvs = foldl' new_tv emptySubst (tvs `zip` uniqsFromSupply us)
+   newTyVars us tvs = foldl' new_tv emptySubst (tvs `zip` uniqListFromSupply us)
    new_tv subst (tv,uniq) = extendTCvSubstWithClone subst tv new_tv
     where
      new_tv = mkRuntimeUnkTyVar (setNameUnique (tyVarName tv) uniq)

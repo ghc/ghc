@@ -1,5 +1,6 @@
 {-# language GADTs, LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 module GHC.CmmToAsm.AArch64.CodeGen (
       cmmTopCodeGen
     , generateJumpTableForInstr
@@ -50,7 +51,9 @@ import GHC.Types.Unique.DSM
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
 
-import Control.Monad    ( mapAndUnzipM )
+import Control.Monad    ( join, mapAndUnzipM )
+import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
+import qualified Data.List.NonEmpty as NE
 import GHC.Float
 
 import GHC.Types.Basic
@@ -1587,7 +1590,7 @@ genCondJump bid expr = do
       _ -> pprPanic "AArch64.genCondJump: " (text $ show expr)
 
 -- A conditional jump with at least +/-128M jump range
-genCondFarJump :: MonadGetUnique m => Cond -> Target -> m InstrBlock
+genCondFarJump :: MonadGetUnique m => Cond -> Target -> m (NonEmpty Instr)
 genCondFarJump cond far_target = do
   skip_lbl_id <- newBlockId
   jmp_lbl_id <- newBlockId
@@ -1597,11 +1600,13 @@ genCondFarJump cond far_target = do
   -- need to consider float orderings.
   -- So we take the hit of the additional jump in the false
   -- case for now.
-  return $ toOL [ BCOND cond (TBlock jmp_lbl_id)
-                , B (TBlock skip_lbl_id)
-                , NEWBLOCK jmp_lbl_id
-                , B far_target
-                , NEWBLOCK skip_lbl_id]
+  pure
+    ( BCOND cond (TBlock jmp_lbl_id) :|
+      B (TBlock skip_lbl_id) :
+      NEWBLOCK jmp_lbl_id :
+      B far_target :
+      NEWBLOCK skip_lbl_id :
+      [] )
 
 genCondBranch :: BlockId      -- the true branch target
     -> BlockId      -- the false branch target
@@ -2457,48 +2462,49 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
 
     -- Replace out of range conditional jumps with unconditional jumps.
     replace_blk :: LabelMap Int -> Int -> GenBasicBlock Instr -> UniqDSM (Int, [GenBasicBlock Instr])
-    replace_blk !m !pos (BasicBlock lbl instrs) = do
-      -- Account for a potential info table before the label.
-      let !block_pos = pos + infoTblSize_maybe lbl
-      (!pos', instrs') <- mapAccumLM (replace_jump m) block_pos instrs
-      let instrs'' = concat instrs'
-      -- We might have introduced new labels, so split the instructions into basic blocks again if neccesary.
-      let (top, split_blocks, no_data) = foldr mkBlocks ([],[],[]) instrs''
-      -- There should be no data in the instruction stream at this point
-      massert (null no_data)
+    replace_blk !m !pos (BasicBlock lbl instrs) = case nonEmpty instrs of
+      Nothing -> pure (0, [])
+      Just instrs -> do
+        -- Account for a potential info table before the label.
+        let !block_pos = pos + infoTblSize_maybe lbl
+        (!pos', instrs') <- mapAccumLM (replace_jump m) block_pos instrs
+        let instrs'' = join instrs'
+        -- We might have introduced new labels, so split the instructions into basic blocks again if neccesary.
+        let (top, split_blocks, no_data) = foldr mkBlocks ([],[],[]) instrs''
+        -- There should be no data in the instruction stream at this point
+        massert (null no_data)
 
-      let final_blocks = BasicBlock lbl top : split_blocks
-      pure (pos', final_blocks)
+        let final_blocks = BasicBlock lbl top : split_blocks
+        pure (pos', final_blocks)
 
-    replace_jump :: LabelMap Int -> Int -> Instr -> UniqDSM (Int, [Instr])
+    replace_jump :: LabelMap Int -> Int -> Instr -> UniqDSM (Int, NonEmpty Instr)
     replace_jump !m !pos instr = do
       case instr of
         ANN ann instr -> do
-          replace_jump m pos instr >>= \case
-            (idx,instr':instrs') ->
-              pure (idx, ANN ann instr':instrs')
-            (idx,[]) -> pprPanic "replace_jump" (text "empty return list for " <+> ppr idx)
+          replace_jump m pos instr >>= \
+            (idx,instr':|instrs') ->
+              pure (idx, ANN ann instr':|instrs')
         BCOND cond t
           -> case target_in_range m t pos of
-              InRange -> pure (pos+long_bc_jump_size,[instr])
+              InRange -> pure (pos+long_bc_jump_size, NE.singleton instr)
               NotInRange far_target -> do
                 jmp_code <- genCondFarJump cond far_target
-                pure (pos+long_bc_jump_size, fromOL jmp_code)
+                pure (pos+long_bc_jump_size, jmp_code)
         CBZ op t -> long_zero_jump op t EQ
         CBNZ op t -> long_zero_jump op t NE
         instr
-          | isMetaInstr instr -> pure (pos,[instr])
-          | otherwise -> pure (pos+1, [instr])
+          | isMetaInstr instr -> pure (pos, NE.singleton instr)
+          | otherwise -> pure (pos+1, NE.singleton instr)
 
       where
         -- cmp_op: EQ = CBZ, NEQ = CBNZ
         long_zero_jump op t cmp_op =
           case target_in_range m t pos of
-              InRange -> pure (pos+long_bz_jump_size,[instr])
+              InRange -> pure (pos+long_bz_jump_size, NE.singleton instr)
               NotInRange far_target -> do
                 jmp_code <- genCondFarJump cmp_op far_target
                 -- TODO: Fix zero reg so we can use it here
-                pure (pos + long_bz_jump_size, CMP op (OpImm (ImmInt 0)) : fromOL jmp_code)
+                pure (pos + long_bz_jump_size, CMP op (OpImm (ImmInt 0)) NE.<| jmp_code)
 
 
     target_in_range :: LabelMap Int -> Target -> Int -> BlockInRange

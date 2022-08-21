@@ -145,7 +145,7 @@ mkUnsafeCall env ftgt formals args =
     -- arguments as Cmm-Lint checks this. To accomplish this we instead bind
     -- the arguments to local registers.
     arg_regs :: [CmmReg]
-    arg_regs = zipWith arg_reg (uniqsFromSupply arg_us) args
+    arg_regs = zipWith arg_reg (uniqListFromSupply arg_us) args
       where
         arg_reg :: Unique -> CmmExpr -> CmmReg
         arg_reg u expr = CmmLocal $ LocalReg u (cmmExprType (platform env) expr)
@@ -169,7 +169,7 @@ saveRestoreCallerRegs us platform =
 
     nodes :: [(CmmNode O O, CmmNode O O)]
     nodes =
-        zipWith mk_reg regs_to_save (uniqsFromSupply us)
+        zipWith mk_reg regs_to_save (uniqListFromSupply us)
       where
         mk_reg :: GlobalReg -> Unique -> (CmmNode O O, CmmNode O O)
         mk_reg reg u =

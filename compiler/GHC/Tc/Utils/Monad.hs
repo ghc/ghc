@@ -744,11 +744,9 @@ newSysLocalId fs w ty
   = do  { u <- newUnique
         ; return (mkSysLocal fs u w ty) }
 
-newSysLocalIds :: FastString -> [Scaled TcType] -> TcRnIf gbl lcl [TcId]
-newSysLocalIds fs tys
-  = do  { us <- getUniquesM
-        ; let mkId' n (Scaled w t) = mkSysLocal fs n w t
-        ; return (zipWith mkId' us tys) }
+newSysLocalIds :: (Traversable t) => FastString -> t (Scaled TcType) -> TcRnIf gbl lcl (t TcId)
+newSysLocalIds fs = withUniquesM (\ u (Scaled w t) -> mkSysLocal fs u w t)
+{-# INLINE newSysLocalIds #-}
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where
         getUniqueM = newUnique

@@ -172,6 +172,8 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Control.Monad.Trans.State (evalState, state)
+
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setIdUnfolding`,
           `setIdArity`,
@@ -398,12 +400,14 @@ mkScaledTemplateLocal i (Scaled w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltin
    -- and "~" and "~~" have coercion "superclasses".
 
 -- | Create a template local for a series of types
-mkTemplateLocals :: [Type] -> [Id]
+mkTemplateLocals :: Traversable f => f Type -> f Id
 mkTemplateLocals = mkTemplateLocalsNum 1
+{-# SPECIALIZE mkTemplateLocals :: [Type] -> [Id] #-}
 
 -- | Create a template local for a series of type, but start from a specified template local
-mkTemplateLocalsNum :: Int -> [Type] -> [Id]
-mkTemplateLocalsNum n tys = zipWith mkTemplateLocal [n..] tys
+mkTemplateLocalsNum :: Traversable f => Int -> f Type -> f Id
+mkTemplateLocalsNum n = flip evalState n . traverse (state . \ ty n -> (mkTemplateLocal n ty, succ n))
+{-# SPECIALIZE mkTemplateLocalsNum :: Int -> [Type] -> [Id] #-}
 
 {- Note [Exported LocalIds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

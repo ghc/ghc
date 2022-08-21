@@ -262,11 +262,9 @@ newIfaceName occ
   = do  { uniq <- newUnique
         ; return $! mkInternalName uniq occ noSrcSpan }
 
-newIfaceNames :: [OccName] -> IfL [Name]
-newIfaceNames occs
-  = do  { uniqs <- getUniquesM
-        ; return [ mkInternalName uniq occ noSrcSpan
-                 | (occ,uniq) <- occs `zip` uniqs] }
+newIfaceNames :: Traversable t => t OccName -> IfL (t Name)
+newIfaceNames = withUniquesM (\ uniq occ -> mkInternalName uniq occ noSrcSpan)
+{-# INLINE newIfaceNames #-}
 
 trace_if :: Logger -> SDoc -> IO ()
 {-# INLINE trace_if #-} -- see Note [INLINE conditional tracing utilities]

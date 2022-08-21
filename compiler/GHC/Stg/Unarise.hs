@@ -731,7 +731,10 @@ unariseAlts rho (MultiValAlt _) bndr [GenStgAlt{ alt_con    = DEFAULT
 
 unariseAlts rho (MultiValAlt _) bndr alts
   | isUnboxedSumBndr bndr
-  = do (rho_sum_bndrs, scrt_bndrs@(tag_bndr : real_bndrs)) <- unariseConArgBinder rho bndr
+  = do (rho_sum_bndrs, scrt_bndrs) <- unariseConArgBinder rho bndr
+       let (tag_bndr, real_bndrs) = case scrt_bndrs of
+               [] -> panic "unariseAlts: empty scrt_bndrs"
+               x:xs -> (x, xs)
        alts' <- unariseSumAlts rho_sum_bndrs (map StgVarArg real_bndrs) alts
        let inner_case = StgCase (StgApp tag_bndr []) tag_bndr tagAltTy alts'
        return [GenStgAlt{ alt_con   = DataAlt (tupleDataCon Unboxed (length scrt_bndrs))
@@ -849,7 +852,7 @@ mapSumIdBinders alt_bndr args rhs rho0
       mkCastInput :: (Id,PrimRep,UniqSupply) -> ([(PrimOp,Type,Unique)],Id,Id)
       mkCastInput (id,rep,bndr_us) =
         let (ops,types) = unzip $ getCasts (typePrimRepU $ idType id) rep
-            cst_opts = zip3 ops types $ uniqsFromSupply bndr_us
+            cst_opts = zip3 ops types $ uniqListFromSupply bndr_us
             out_id = case cst_opts of
               [] -> id
               _ ->  let (_,ty,uq) = last cst_opts
@@ -960,7 +963,7 @@ mkUbxSum dc ty_args args0 us
         , (ops,types) <- unzip $ getCasts (stgArgRepU arg) $ slotPrimRep slot_ty
         , not . null $ ops
         = let (us1,us2) = splitUniqSupply us
-              cast_uqs = uniqsFromSupply us1
+              cast_uqs = uniqListFromSupply us1
               cast_opts = zip3 ops types cast_uqs
               (_op,out_ty,out_uq) = last cast_opts
               casts = castArgRename cast_opts arg :: StgExpr -> StgExpr
