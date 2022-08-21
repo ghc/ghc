@@ -13,6 +13,7 @@ data Context = Context
     { stage   :: Stage   -- ^ Currently build Stage
     , package :: Package -- ^ Currently build Package
     , way     :: Way     -- ^ Currently build Way (usually 'vanilla')
+    , iplace  :: Inplace -- ^ Whether to use the inplace or final package database
     } deriving (Eq, Generic, Show)
 
 instance Binary   Context

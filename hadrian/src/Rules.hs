@@ -88,7 +88,7 @@ packageTargets includeGhciLib stage pkg = do
         then do -- Collect all targets of a library package.
             let pkgWays = if pkg == rts then getRtsWays else getLibraryWays
             ways  <- interpretInContext context pkgWays
-            libs  <- mapM (pkgLibraryFile . Context stage pkg) (Set.toList ways)
+            libs  <- mapM (\w -> pkgLibraryFile (Context stage pkg w (error "unused"))) (Set.toList ways)
             more  <- Rules.Library.libraryTargets includeGhciLib context
             setupConfig <- pkgSetupConfigFile context
             return $ [setupConfig] ++ libs ++ more
@@ -113,7 +113,7 @@ packageRules = do
     Rules.Program.buildProgramRules readPackageDb
     Rules.Register.configurePackageRules
 
-    forM_ allStages (Rules.Register.registerPackageRules writePackageDb)
+    forM_ [Inplace, Final] $ \iplace -> forM_ allStages $ \stage -> (Rules.Register.registerPackageRules writePackageDb stage iplace)
 
     -- TODO: Can we get rid of this enumeration of contexts? Since we iterate
     --       over it to generate all 4 types of rules below, all the time, we

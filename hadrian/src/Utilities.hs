@@ -36,7 +36,7 @@ askWithResources rs target = H.askWithResources rs target getArgs
 contextDependencies :: Context -> Action [Context]
 contextDependencies Context {..} = do
     depPkgs <- go [package]
-    return [ Context stage pkg way | pkg <- depPkgs, pkg /= package ]
+    return [ Context stage pkg way iplace | pkg <- depPkgs, pkg /= package ]
   where
     go pkgs  = do
         deps <- concatMapM step pkgs

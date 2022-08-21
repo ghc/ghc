@@ -191,7 +191,7 @@ parseBuildObject root = parseBuildPath root parseObject
 
 objectContext :: BuildPath Object -> Context
 objectContext (BuildPath _ stage pkgPath obj) =
-    Context stage (unsafeFindPackageByPath pkgPath) way
+    Context stage (unsafeFindPackageByPath pkgPath) way Inplace
   where
     way = case obj of
         NonHs (NonHsObject _lang _file w)         -> w

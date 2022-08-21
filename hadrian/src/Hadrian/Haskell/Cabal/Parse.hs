@@ -12,7 +12,7 @@
 -----------------------------------------------------------------------------
 module Hadrian.Haskell.Cabal.Parse (
     parsePackageData, resolveContextData, parseCabalPkgId, configurePackage,
-    buildAutogenFiles, copyPackage, registerPackage
+    buildAutogenFiles, copyPackage, writeInplacePkgConf, registerPackage
     ) where
 
 import Data.Bifunctor
@@ -62,6 +62,13 @@ import Context
 import Flavour
 import Packages
 import Settings
+import Distribution.Simple.LocalBuildInfo
+import qualified Distribution.Simple.Register as C
+import System.Directory (getCurrentDirectory)
+import qualified Distribution.InstalledPackageInfo as CP
+import Distribution.Simple.Utils (writeUTF8File)
+import Utilities
+
 
 -- | Parse the Cabal file of a given 'Package'. This operation is cached by the
 -- "Hadrian.Oracles.TextFile.readPackageData" oracle.
@@ -179,24 +186,15 @@ copyPackage context@Context {..} = do
     putProgressInfo $ "| Copy package " ++ quote (pkgName package)
     gpd <- pkgGenericDescription package
     ctxPath   <- Context.contextPath context
-    pkgDbPath <- packageDbPath stage
+    pkgDbPath <- packageDbPath (PackageDbLoc stage iplace)
     verbosity <- getVerbosity
     let v = if verbosity >= Diagnostic then "-v3" else "-v0"
     traced "cabal-copy" $
         C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
             [ "copy", "--builddir", ctxPath, "--target-package-db", pkgDbPath, v ]
 
--- | Register the 'Package' of a given 'Context' into the package database.
-registerPackage :: Context -> Action ()
-registerPackage context@Context {..} = do
-    putProgressInfo $ "| Register package " ++ quote (pkgName package)
-    ctxPath <- Context.contextPath context
-    gpd <- pkgGenericDescription package
-    verbosity <- getVerbosity
-    let v = if verbosity >= Diagnostic then "-v3" else "-v0"
-    traced "cabal-register" $
-        C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
-            [ "register", "--builddir", ctxPath, v ]
+
+
 -- | What type of file is Main
 data MainSourceType = HsMain | CppMain | CMain
 
@@ -299,6 +297,84 @@ resolveContextData context@Context {..} = do
 
       in return cdata
 
+-- Writes a .conf file which points directly into the build directory of a package
+-- so the artefacts can be used as they are produced.
+write_inplace_conf :: FilePath -> FilePath -> C.PackageDescription -> LocalBuildInfo -> IO ()
+write_inplace_conf pkg_path res_path pd lbi = do
+       withLibLBI pd lbi $ \lib clbi ->
+           do cwd <- getCurrentDirectory
+              let fixupIncludeDir dir | cwd `isPrefixOf` dir = [prefix ++ drop (length cwd) dir]
+                                      | otherwise            = [dir]
+                    where
+                      prefix = "${pkgroot}/../../../"
+              let installedPkgInfo =
+
+                    C.inplaceInstalledPackageInfo (cwd </> pkg_path) build_dir pd (C.mkAbiHash "inplace") lib lbi clbi
+
+                  build_dir = "${pkgroot}/../" ++ pkg_path ++ "/build"
+                  pkg_name = C.display (C.pkgName (CP.sourcePackageId installedPkgInfo))
+                  final_ipi = installedPkgInfo {
+                                 Installed.includeDirs = concatMap fixupIncludeDir (Installed.includeDirs installedPkgInfo),
+                                 Installed.libraryDirs = [ build_dir ],
+                                 Installed.libraryDynDirs = [ build_dir ],
+                                 Installed.dataDir = "${pkgroot}/../../../../" ++ pkg_path,
+                                 Installed.haddockHTMLs = [build_dir ++ "/doc/html/" ++ C.display (CP.sourcePackageId installedPkgInfo)],
+                                 Installed.haddockInterfaces = [build_dir ++ "/doc/html/" ++  pkg_name ++ "/" ++ pkg_name ++ ".haddock"],
+                                 Installed.importDirs = [build_dir]
+
+                              }
+
+                  content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
+              C.writeFileAtomic res_path
+                              (C.toUTF8LBS content)
+
+-- This uses the API directly because no way to register into a different package db which is
+-- configured. See the use of C.SpecificPackageDB
+registerPackage :: [(Resource, Int)] -> Context -> Action ()
+registerPackage rs context = do
+    cPath <- Context.contextPath context
+    setupConfig <- pkgSetupConfigFile context
+    need [setupConfig] -- This triggers 'configurePackage'
+    pd <- packageDescription <$> readContextData context
+    db_path <- packageDbPath (PackageDbLoc (stage context) (iplace context))
+    dist_dir <- Context.buildPath context
+    pid <- pkgIdentifier (package context)
+    -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
+    -- from the local build info @lbi@.
+    lbi <- liftIO $ C.getPersistBuildConfig cPath
+    liftIO $ register db_path pid dist_dir pd lbi
+    -- Then after the register, which just writes the .conf file, do the recache step.
+    buildWithResources rs $
+      target context (GhcPkg Recache (stage context)) [] []
+
+-- This is copied and simplified from Cabal, because we want to install the package
+-- into a different package database to the one it was configured against.
+register :: FilePath
+         -> FilePath
+         -> FilePath
+         -> C.PackageDescription
+         -> LocalBuildInfo
+         -> IO ()
+register pkg_db conf_file build_dir pd lbi
+  = withLibLBI pd lbi $ \lib clbi -> do
+
+    absPackageDBs    <- C.absolutePackageDBPaths packageDbs
+    installedPkgInfo <- C.generateRegistrationInfo
+                           C.silent pd lib lbi clbi False reloc build_dir
+                           (C.registrationPackageDB absPackageDBs)
+
+    writeRegistrationFile installedPkgInfo
+
+  where
+    regFile             = conf_file
+    reloc     = relocatable lbi
+    -- Using a specific package db here is why we have to copy the function from Cabal.
+    packageDbs = [C.SpecificPackageDB pkg_db]
+
+    writeRegistrationFile installedPkgInfo = do
+      writeUTF8File (pkg_db </> regFile <.> "conf") (CP.showInstalledPackageInfo installedPkgInfo)
+
+
 -- | Build autogenerated files @autogen/cabal_macros.h@ and @autogen/Paths_*.hs@.
 buildAutogenFiles :: Context -> Action ()
 buildAutogenFiles context = do
@@ -311,6 +387,21 @@ buildAutogenFiles context = do
     traced "cabal-autogen" $ do
         lbi <- C.getPersistBuildConfig cPath
         C.initialBuildSteps cPath pd (lbi { C.localPkgDescr = pd }) C.silent
+
+-- | Write a .conf file for the inplace package database which points into the
+-- build directories rather than the final install locations.
+writeInplacePkgConf :: Context -> Action ()
+writeInplacePkgConf context = do
+    cPath <- Context.contextPath context
+    setupConfig <- pkgSetupConfigFile context
+    need [setupConfig] -- This triggers 'configurePackage'
+    pd <- packageDescription <$> readContextData context
+    conf <- pkgInplaceConfig context
+    -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
+    -- from the local build info @lbi@.
+    lbi <- liftIO $ C.getPersistBuildConfig cPath
+    liftIO $ write_inplace_conf (pkgPath (package context)) conf pd (lbi { C.localPkgDescr = pd })
+
 
 -- | Look for a @.buildinfo@ in all of the specified directories, stopping on
 -- the first one we find.

@@ -150,7 +150,7 @@ needRtsLibffiTargets stage = do
 needRtsSymLinks :: Stage -> Set.Set Way -> Action ()
 needRtsSymLinks stage rtsWays
     = forM_ (Set.filter (wayUnit Dynamic) rtsWays) $ \ way -> do
-        let ctx = Context stage rts way
+        let ctx = Context stage rts way Final
         libPath     <- libPath ctx
         distDir     <- distDir stage
         rtsLibFile  <- takeFileName <$> pkgLibraryFile ctx

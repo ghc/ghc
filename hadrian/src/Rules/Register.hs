@@ -12,7 +12,6 @@ import Hadrian.Haskell.Cabal
 import Oracles.Flag (platformSupportsGhciObjects)
 import Packages
 import Rules.Rts
-import {-# SOURCE #-} Rules.Library (needLibrary)
 import Settings
 import Target
 import Utilities
@@ -39,19 +38,18 @@ configurePackageRules = do
     root -/- "**/setup-config" %> \out -> do
         (stage, path) <- parsePath (parseSetupConfig root) "<setup config path parser>" out
         let pkg = unsafeFindPackageByPath path
-        let ctx = Context stage pkg vanilla
+        let ctx = Context stage pkg vanilla Inplace
         buildP <- buildPath ctx
         when (pkg == ghcBignum) $ do
           isGmp <- (== "gmp") <$> interpretInContext ctx getBignumBackend
           when isGmp $
             need [buildP -/- "include/ghc-gmp.h"]
-        needLibrary =<< contextDependencies ctx
         Cabal.configurePackage ctx
 
     root -/- "**/autogen/cabal_macros.h" %> \out -> do
         (stage, path) <- parsePath (parseToBuildSubdirectory root) "<cabal macros path parser>" out
         let pkg = unsafeFindPackageByPath path
-        Cabal.buildAutogenFiles (Context stage pkg vanilla)
+        Cabal.buildAutogenFiles (Context stage pkg vanilla Inplace)
 
     root -/- "**/autogen/Paths_*.hs" %> \out ->
         need [takeDirectory out -/- "cabal_macros.h"]
@@ -87,44 +85,52 @@ registerPackages ctxs = do
 
 -- | Register a package and initialise the corresponding package database if
 -- need be. Note that we only register packages in 'Stage0' and 'Stage1'.
-registerPackageRules :: [(Resource, Int)] -> Stage -> Rules ()
-registerPackageRules rs stage = do
+registerPackageRules :: [(Resource, Int)] -> Stage -> Inplace -> Rules ()
+registerPackageRules rs stage iplace = do
     root <- buildRootRules
 
     -- Initialise the package database.
-    root -/- relativePackageDbPath stage -/- packageDbStamp %> \stamp -> do
+    root -/- relativePackageDbPath (PackageDbLoc stage iplace) -/- packageDbStamp %> \stamp -> do
         -- This command initialises the package.cache file to avoid a race where
         -- a package gets registered but there's not a package.cache file (which
         -- leads to errors in GHC).
         buildWithResources rs $
-            target (Context stage compiler vanilla) (GhcPkg Init stage) [] []
+            target (Context stage compiler vanilla iplace) (GhcPkg Recache stage) [] []
         writeFileLines stamp []
 
     -- Register a package.
-    root -/- relativePackageDbPath stage -/- "*.conf" %> \conf -> do
+    root -/- relativePackageDbPath (PackageDbLoc stage iplace) -/- "*.conf" %> \conf -> do
         historyDisable
 
         pkgName <- getPackageNameFromConfFile conf
         let pkg = unsafeFindPackageByName pkgName
 
-        when (pkg == compiler) $ need =<< ghcLibDeps stage
+        when (pkg == compiler) $ need =<< ghcLibDeps stage iplace
 
         -- Only used in guard when Stage0 {} but can be GlobalLibs or InTreeLibs
         isBoot <- (pkg `notElem`) <$> stagePackages stage
 
-        let ctx = Context stage pkg vanilla
+        let ctx = Context stage pkg vanilla iplace
         case stage of
             Stage0 _ | isBoot -> copyConf  rs ctx conf
-            _               -> buildConf rs ctx conf
+            _               ->
+              -- See Note [Inplace vs Final package databases]
+              case iplace of
+                Inplace -> buildConfInplace rs ctx conf
+                Final   -> buildConfFinal rs ctx conf
 
-buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
-buildConf _ context@Context {..} _conf = do
+buildConfFinal :: [(Resource, Int)] -> Context -> FilePath -> Action ()
+buildConfFinal rs context@Context {..} _conf = do
     depPkgIds <- cabalDependencies context
     ensureConfigured context
-    need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
-
     ways <- interpretInContext context (getLibraryWays <> if package == rts then getRtsWays else mempty)
-    need =<< mapM pkgStampFile [ context { way = w } | w <- Set.toList ways ]
+    stamps <- mapM pkgStampFile [ context { way = w } | w <- Set.toList ways ]
+    confs <- mapM (\pkgId -> packageDbPath (PackageDbLoc stage Final) <&> (-/- pkgId <.> "conf")) depPkgIds
+    -- Important to need these together to avoid introducing a linearisation. This is not the most critical place
+    -- though because needing the stamp file, will cause all dependent object files to be built anyway (even if other packages)
+    -- so the .conf file being needed will probably not have to build so much (only stuff which is not use transitively). It's
+    -- still better though to need both together to give hadrian the best chance possible to build things in parallel.
+    need (stamps ++ confs)
 
     -- We might need some package-db resource to limit read/write, see packageRules.
     path <- buildPath context
@@ -148,7 +154,7 @@ buildConf _ context@Context {..} _conf = do
 
     -- Copy and register the package.
     Cabal.copyPackage context
-    Cabal.registerPackage context
+    Cabal.registerPackage rs context
 
     -- We declare that this rule also produces files matching:
     --   - <root>/stage<N>/lib/<arch>-<os>-ghc-<version>/*libHS<pkgid>*
@@ -165,11 +171,44 @@ buildConf _ context@Context {..} _conf = do
            <*> getDirectoryFilesIO "." [dir -/- pkgid -/- "**"]
     produces files
 
+buildConfInplace :: [(Resource, Int)] -> Context -> FilePath -> Action ()
+buildConfInplace rs context@Context {..} _conf = do
+    depPkgIds <- cabalDependencies context
+    ensureConfigured context
+    need =<< mapM (\pkgId -> packageDbPath (PackageDbLoc stage Inplace) <&> (-/- pkgId <.> "conf")) depPkgIds
+
+    path <- buildPath context
+
+    -- Special package cases (these should ideally be rolled into Cabal).
+    when (package == rts) $
+        -- If Cabal knew about "generated-headers", we could read them from the
+        -- 'configuredCabal' information, and just "need" them here.
+        need [ path -/- "include/DerivedConstants.h"
+             , path -/- "include/ghcautoconf.h"
+             , path -/- "include/ghcplatform.h"
+             , path -/- "include/rts/EventLogConstants.h"
+             , path -/- "include/rts/EventTypes.h"
+             ]
+
+    -- we need to generate this file for GMP
+    when (package == ghcBignum) $ do
+        bignum <- interpretInContext context getBignumBackend
+        when (bignum == "gmp") $
+            need [path -/- "include/ghc-gmp.h"]
+
+    -- Write an "inplace" package conf which points into the build directories
+    -- for finding the build products
+    Cabal.writeInplacePkgConf context
+    conf <- pkgInplaceConfig context
+    buildWithResources rs $
+      target context (GhcPkg Update stage) [conf] []
+
+
 copyConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 copyConf rs context@Context {..} conf = do
     depPkgIds <- fmap stdOutToPkgIds . askWithResources rs $
         target context (GhcPkg Dependencies stage) [pkgName package] []
-    need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
+    need =<< mapM (\pkgId -> packageDbPath (PackageDbLoc stage iplace) <&> (-/- pkgId <.> "conf")) depPkgIds
     -- We should unregister if the file exists since @ghc-pkg@ will complain
     -- about existing package: https://github.com/snowleopard/hadrian/issues/543.
     -- Also, we don't always do the unregistration + registration to avoid

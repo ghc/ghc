@@ -53,15 +53,15 @@ cWarnings = mconcat
 
 packageDatabaseArgs :: Args
 packageDatabaseArgs = do
-    stage <- getStage
-    dbPath <- expr (packageDbPath stage)
+    loc <- getPackageDbLoc
+    dbPath <- expr (packageDbPath loc)
     expr (need [dbPath -/- packageDbStamp])
     prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")
     arg $ prefix ++ dbPath
 
 bootPackageDatabaseArgs :: Args
 bootPackageDatabaseArgs = do
-    stage  <- getStage
-    dbPath <- expr $ packageDbPath stage
+    loc <- getPackageDbLoc
+    dbPath <- expr $ packageDbPath loc
     expr $ need [dbPath -/- packageDbStamp]
     stage0 ? packageDatabaseArgs

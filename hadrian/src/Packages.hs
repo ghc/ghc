@@ -249,6 +249,7 @@ libffiBuildPath stage = buildPath $ Context
     stage
     libffi
     (error "libffiBuildPath: way not set.")
+    (error "libffiBuildPath: inplace not set.")
 
 {-
 Note [Hadrian's ghci-wrapper package]

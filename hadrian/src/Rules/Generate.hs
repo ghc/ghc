@@ -99,7 +99,7 @@ generate file context expr = do
     putSuccess $ "| Successfully generated " ++ file ++ "."
 
 generatePackageCode :: Context -> Rules ()
-generatePackageCode context@(Context stage pkg _) = do
+generatePackageCode context@(Context stage pkg _ _) = do
     root <- buildRootRules
     let dir         = buildDir context
         generated f = (root -/- dir -/- "**/*.hs") ?== f && not ("//autogen/*" ?== f)
@@ -107,7 +107,9 @@ generatePackageCode context@(Context stage pkg _) = do
     generated ?> \file -> do
         let unpack = fromMaybe . error $ "No generator for " ++ file ++ "."
         (src, builder) <- unpack <$> findGenerator context file
-        need [src]
+        -- Make sure we have configured the package before running the builder
+        pkg_setup <- pkgSetupConfigFile context
+        need [src, pkg_setup]
         build $ target context builder [src] [file]
         let boot = src -<.> "hs-boot"
         whenM (doesFileExist boot) $ do
@@ -150,7 +152,7 @@ genEventTypes flag file = do
       [] []
 
 genPrimopCode :: Context -> FilePath -> Action ()
-genPrimopCode context@(Context stage _pkg _) file = do
+genPrimopCode context@(Context stage _pkg _ _) file = do
     root <- buildRoot
     need [root -/- primopsTxt stage]
     build $ target context GenPrimopCode [root -/- primopsTxt stage] [file]
@@ -192,7 +194,8 @@ copyRules = do
         prefix -/- "html/**"           <~ return "utils/haddock/haddock-api/resources"
         prefix -/- "latex/**"          <~ return "utils/haddock/haddock-api/resources"
 
-        root -/- relativePackageDbPath stage -/- systemCxxStdLibConf %> \file -> do
+        forM_ [Inplace, Final] $ \iplace ->
+          root -/- relativePackageDbPath (PackageDbLoc stage iplace) -/- systemCxxStdLibConf %> \file -> do
             copyFile ("mk" -/- "system-cxx-std-lib-1.0.conf") file
 
 generateRules :: Rules ()
@@ -229,7 +232,7 @@ emptyTarget = vanillaContext (error "Rules.Generate.emptyTarget: unknown stage")
 ghcWrapper :: Stage -> Expr String
 ghcWrapper (Stage0 {}) = error "Stage0 GHC does not require a wrapper script to run."
 ghcWrapper stage  = do
-    dbPath  <- expr $ (</>) <$> topDirectory <*> packageDbPath stage
+    dbPath  <- expr $ (</>) <$> topDirectory <*> packageDbPath (PackageDbLoc stage Final)
     ghcPath <- expr $ (</>) <$> topDirectory
                             <*> programPath (vanillaContext (predStage stage) ghc)
     return $ unwords $ map show $ [ ghcPath ]
