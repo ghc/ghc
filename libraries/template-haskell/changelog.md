@@ -1,5 +1,10 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.20.0.0
+
+  * The `Ppr.pprInfixT` function has gained a `Precedence` argument. 
+  * The values of named precedence levels like `Ppr.appPrec` have changed.
+
 ## 2.19.0.0
 
   * Add `DefaultD` constructor to support Haskell `default` declarations.
