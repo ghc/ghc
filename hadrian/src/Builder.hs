@@ -6,7 +6,7 @@ module Builder (
     TarMode (..), GitMode (..), Builder (..), Win32TarballsMode(..),
 
     -- * Builder properties
-    builderProvenance, systemBuilderPath, builderPath, isSpecified, needBuilder,
+    builderProvenance, systemBuilderPath, builderPath, isSpecified, needBuilders,
     runBuilder, runBuilderWith, runBuilderWithCmdOptions, getBuilderPath,
     builderEnvironment,
 
@@ -266,7 +266,7 @@ instance H.Builder Builder where
         GhcPkg Dependencies _ -> do
             let input  = fromSingleton msgIn buildInputs
                 msgIn  = "[askBuilder] Exactly one input file expected."
-            needBuilder builder
+            needBuilders [builder]
             path <- H.builderPath builder
             -- we do not depend on bare builders. E.g. we won't depend on `clang`
             -- or `ld` or `ar`.  Unless they are provided with fully qualified paths
@@ -484,7 +484,7 @@ isSpecified = fmap (not . null) . systemBuilderPath
 applyPatch :: FilePath -> FilePath -> Action ()
 applyPatch dir patch = do
     let file = dir -/- patch
-    needBuilder Patch
+    needBuilders [Patch]
     path <- builderPath Patch
     putBuild $ "| Apply patch " ++ file
     quietly $ cmd' [Cwd dir, FileStdin file] [path, "-p0"]
