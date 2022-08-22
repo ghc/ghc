@@ -1699,7 +1699,7 @@ non-exported generic functions.
 -}
 
 unifyType :: Maybe TypedThing  -- ^ If present, the thing that has type ty1
-          -> TcTauType -> TcTauType    -- ty1, ty2
+          -> TcTauType -> TcTauType    -- ty1 (actual), ty2 (expected)
           -> TcM TcCoercionN           -- :: ty1 ~# ty2
 -- Actual and expected types
 -- Returns a coercion : ty1 ~ ty2
@@ -1753,6 +1753,8 @@ uType, uType_defer
 --------------
 -- It is always safe to defer unification to the main constraint solver
 -- See Note [Deferred unification]
+--    ty1 is "actual"
+--    ty2 is "expected"
 uType_defer t_or_k origin ty1 ty2
   = do { co <- emitWantedEq origin t_or_k Nominal ty1 ty2
 

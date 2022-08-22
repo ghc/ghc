@@ -2030,6 +2030,7 @@ pprTcSolverReportMsg _ (CannotUnifyWithPolytype item tv1 ty2) =
   where
     what = text $ levelString $
            ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel
+
 pprTcSolverReportMsg _
   (Mismatch { mismatch_ea   = add_ea
             , mismatch_item = item
@@ -2058,11 +2059,11 @@ pprTcSolverReportMsg _
 
     herald1 = conc [ "Couldn't match"
                    , if is_repr then "representation of" else ""
-                   , if add_ea then "expected"          else ""
+                   , if add_ea  then "expected"          else ""
                    , what ]
     herald2 = conc [ "with"
-                   , if is_repr then "that of"          else ""
-                   , if add_ea then ("actual " ++ what) else "" ]
+                   , if is_repr then "that of"           else ""
+                   , if add_ea  then ("actual " ++ what) else "" ]
 
     padding = length herald1 - length herald2
 
@@ -2077,6 +2078,7 @@ pprTcSolverReportMsg _
     add_space s1 s2 | null s1   = s2
                     | null s2   = s1
                     | otherwise = s1 ++ (' ' : s2)
+
 pprTcSolverReportMsg _
   (KindMismatch { kmismatch_what     = thing
                 , kmismatch_expected = exp
@@ -2096,10 +2098,10 @@ pprTcSolverReportMsg _
 pprTcSolverReportMsg ctxt
   (TypeEqMismatch { teq_mismatch_ppr_explicit_kinds = ppr_explicit_kinds
                   , teq_mismatch_item     = item
-                  , teq_mismatch_ty1      = ty1   -- These types are the context
-                  , teq_mismatch_ty2      = ty2   --   of the mis-match
-                  , teq_mismatch_expected = exp   -- These are the kinds that
-                  , teq_mismatch_actual   = act   --   don't match
+                  , teq_mismatch_ty1      = ty1   -- These types are the actual types
+                  , teq_mismatch_ty2      = ty2   --   that don't match; may be swapped
+                  , teq_mismatch_expected = exp   -- These are the context of
+                  , teq_mismatch_actual   = act   --   the mis-match
                   , teq_mismatch_what     = mb_thing })
   = addArising ct_loc $ pprWithExplicitKindsWhen ppr_explicit_kinds msg
   where
@@ -2139,8 +2141,8 @@ pprTcSolverReportMsg ctxt
       | otherwise
       = -- (TYPE _) ~ (CONSTRAINT _) or (TYPE _) ~ Bool, etc
         maybe_num_args_msg $$
-        sep [ text "Expected a" <+> pp_exp_thing <> text ", but"
-            , case mb_thing of
+        sep [ text "Expected a" <+> pp_exp_thing <> comma
+            , text "but" <+> case mb_thing of
                 Nothing    -> text "found something with kind"
                 Just thing -> quotes (ppr thing) <+> text "has kind"
             , quotes (pprWithTYPE act) ]
@@ -2155,8 +2157,8 @@ pprTcSolverReportMsg ctxt
           , [act_lev_ty] <- act_rr_args
           , Just exp_lev <- levityType_maybe exp_lev_ty
           , Just act_lev <- levityType_maybe act_lev_ty
-          = sep [ text "Expected" <+> ppr_an_lev exp_lev <+> pp_exp_thing <> text ", but"
-                , case mb_thing of
+          = sep [ text "Expected" <+> ppr_an_lev exp_lev <+> pp_exp_thing <> comma
+                , text "but" <+> case mb_thing of
                      Just thing -> quotes (ppr thing) <+> text "is" <+> ppr_lev act_lev
                      Nothing    -> text "got" <+> ppr_an_lev act_lev <+> pp_exp_thing ]
         msg_for_same_rep _ _
@@ -2164,8 +2166,8 @@ pprTcSolverReportMsg ctxt
 
         -- (TYPE (BoxedRep lev)) ~ (TYPE IntRep); or CONSTRAINT ditto
         msg_for_different_rep exp_rr_tc act_rr_tc
-          = sep [ text "Expected a" <+> what <> text ", but"
-                , case mb_thing of
+          = sep [ text "Expected a" <+> what <> comma
+                , text "but" <+> case mb_thing of
                      Just thing -> quotes (ppr thing)
                      Nothing    -> quotes (pprWithTYPE act)
                   <+> text "has representation" <+> ppr_rep act_rr_tc ]
