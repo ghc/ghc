@@ -112,16 +112,15 @@ commonCabalArgs stage = do
             , arg "--htmldir"
             , arg $ "${pkgroot}/../../doc/html/libraries/" ++ package_id
 
-            , withStaged $ Ghc CompileHs
+            -- These trigger a need on each dependency, so every important to need
+            -- them in parallel or  it linearises the build of Ghc and GhcPkg
+            , withStageds [Ghc CompileHs, GhcPkg Update, Cc CompileC, Ar Pack]
             , withBuilderArgs (Ghc CompileHs stage)
-            , withStaged (GhcPkg Update)
             , withBuilderArgs (GhcPkg Update stage)
             , bootPackageDatabaseArgs
             , libraryArgs
             , bootPackageConstraints
-            , withStaged $ Cc CompileC
             , notStage0 ? with (Ld stage)
-            , withStaged (Ar Pack)
             , with Alex
             , with Happy
             -- Update Target.trackArgument if changing these:
@@ -244,16 +243,23 @@ withBuilderArgs b = case b of
 
 -- | Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
 with :: Builder -> Args
-with b = do
-    path <- getBuilderPath b
-    if null path then mempty else do
-        top <- expr topDirectory
-        expr $ needBuilder b
+with b = withs [b]
+
+-- | Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
+withs :: [Builder] -> Args
+withs bs = do
+    paths <- filter (not . null . snd) <$> mapM (\b -> (b,) <$> getBuilderPath b) bs
+    let bs = map fst paths
+    expr $ (needBuilders bs)
+    top <- expr topDirectory
+    mconcat $ map (\(b, path) ->
         -- Do not inject top, if we have a bare name. E.g. do not turn
         -- `ar` into `$top/ar`. But let `ar` be `ar` as found on $PATH.
         arg  $ withBuilderKey b ++ unifyPath (if path /= takeFileName path
                                               then top </> path
-                                              else path)
+                                              else path)) paths
 
-withStaged :: (Stage -> Builder) -> Args
-withStaged sb = with . sb =<< getStage
+withStageds :: [Stage -> Builder] -> Args
+withStageds sb = do
+  st <- getStage
+  withs (map (\f -> f st) sb)

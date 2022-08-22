@@ -53,4 +53,4 @@ needNofibDeps = do
     unlitPath <- programPath (vanillaContext Stage1 unlit)
     mtlPath   <- pkgConfFile (vanillaContext Stage1 mtl  )
     need [ unlitPath, mtlPath ]
-    needBuilder (Ghc CompileHs Stage2)
+    needBuilders [Ghc CompileHs Stage2]
