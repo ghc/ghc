@@ -233,6 +233,11 @@ unexposedPrimTyCons
   = [ eqPrimTyCon
     , eqReprPrimTyCon
     , eqPhantPrimTyCon
+
+    -- These are un-exposed for now
+    , ctArrowTyCon  -- (=>)
+    , ccArrowTyCon  -- (==>)
+    , tcArrowTyCon  -- (-=>)
     ]
 
 -- | Primitive 'TyCon's that are defined in, and exported from, GHC.Prim.
@@ -972,6 +977,8 @@ It is an almost-ordinary class defined as if by
 
  * In addition (~) is magical syntax, as ~ is a reserved symbol.
    It cannot be exported or imported.
+
+ * The data constructor of the class is "Eq#", not ":C~"
 
 Within GHC, ~ is called eqTyCon, and it is defined in GHC.Builtin.Types.
 

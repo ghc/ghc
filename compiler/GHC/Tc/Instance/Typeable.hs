@@ -422,9 +422,8 @@ mkTyConRepBinds stuff todo (TypeableTyCon {..})
 -- | Is a particular 'TyCon' representable by @Typeable@?. These exclude type
 -- families and polytypes.
 tyConIsTypeable :: TyCon -> Bool
-tyConIsTypeable tc =
-       isJust (tyConRepName_maybe tc)
-    && kindIsTypeable (dropForAlls $ tyConKind tc)
+tyConIsTypeable tc = isJust (tyConRepName_maybe tc)
+                  && kindIsTypeable (dropForAlls $ tyConKind tc)
 
 -- | Is a particular 'Kind' representable by @Typeable@? Here we look for
 -- polytypes and types containing casts (which may be, for instance, a type

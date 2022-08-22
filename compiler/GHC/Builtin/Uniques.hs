@@ -358,7 +358,7 @@ initExitJoinUnique = mkUnique 's' 0
 --    * u+1: the TyConRepName of the TyCon
 
 mkPreludeTyConUnique   :: Int -> Unique
-mkPreludeTyConUnique i                = mkUnique '3' (2*i)
+mkPreludeTyConUnique i = mkUnique '3' (2*i)
 
 tyConRepNameUnique :: Unique -> Unique
 tyConRepNameUnique  u = incrUnique u
@@ -371,7 +371,7 @@ tyConRepNameUnique  u = incrUnique u
 -- Prelude data constructors are too simple to need wrappers.
 
 mkPreludeDataConUnique :: Int -> Unique
-mkPreludeDataConUnique i              = mkUnique '6' (3*i)    -- Must be alphabetic
+mkPreludeDataConUnique i = mkUnique '6' (3*i)    -- Must be alphabetic
 
 --------------------------------------------------
 dataConTyRepNameUnique, dataConWorkerUnique :: Unique -> Unique

@@ -654,7 +654,6 @@ matchTypeable clas [k,t]  -- clas = Typeable
   | k `eqType` naturalTy                   = doTyLit knownNatClassName         t
   | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
   | k `eqType` charTy                      = doTyLit knownCharClassName        t
-  | isConstraintKind t                     = doTyConApp clas t constraintKindTyCon []
   | Just (af,mult,arg,ret) <- splitFunTy_maybe t
    , isVisibleAnonArg af                   = doFunTy    clas t mult arg ret
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
@@ -682,10 +681,9 @@ doFunTy clas ty mult arg_ty ret_ty
 doTyConApp :: Class -> Type -> TyCon -> [Kind] -> TcM ClsInstResult
 doTyConApp clas ty tc kind_args
   | tyConIsTypeable tc
-  = do
-     return $ OneInst { cir_new_theta = (map (mk_typeable_pred clas) kind_args)
-                      , cir_mk_ev     = mk_ev
-                      , cir_what      = BuiltinTypeableInstance tc }
+  = return $ OneInst { cir_new_theta = map (mk_typeable_pred clas) kind_args
+                     , cir_mk_ev     = mk_ev
+                     , cir_what      = BuiltinTypeableInstance tc }
   | otherwise
   = return NoInstance
   where
