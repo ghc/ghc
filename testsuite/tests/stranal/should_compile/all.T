@@ -69,3 +69,4 @@ test('T20663', [ grep_errmsg(r'\$wyeah ::') ], compile, ['-dppr-cols=1000 -ddump
 
 test('T19180', normal, compile, [''])
 test('T19849', normal, compile, [''])
+test('T22039', normal, compile, [''])

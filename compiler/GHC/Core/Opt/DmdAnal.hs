@@ -439,10 +439,11 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
         -- whole DmdEnv
         !(!bndrs', !scrut_sd)
           | DataAlt _ <- alt
-          , id_dmds <- addCaseBndrDmd case_bndr_sd dmds
-          -- See Note [Demand on scrutinee of a product case]
-          = let !new_info = setBndrsDemandInfo bndrs id_dmds
-                !new_prod = mkProd id_dmds
+          -- See Note [Demand on the scrutinee of a product case]
+          , let !scrut_sd = scrutSubDmd case_bndr_sd dmds
+          , let !fld_dmds' = fieldBndrDmds scrut_sd (length dmds)
+          = let !new_info = setBndrsDemandInfo bndrs fld_dmds'
+                !new_prod = mkProd fld_dmds'
             in (new_info, new_prod)
           | otherwise
           -- __DEFAULT and literal alts. Simply add demands and discard the
@@ -556,11 +557,32 @@ dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
   , WithDmdType rhs_ty rhs' <- dmdAnal rhs_env dmd rhs
   , WithDmdType alt_ty dmds <- findBndrsDmds env rhs_ty bndrs
   , let (_ :* case_bndr_sd) = findIdDemand alt_ty case_bndr
-        -- See Note [Demand on scrutinee of a product case]
-        id_dmds             = addCaseBndrDmd case_bndr_sd dmds
+        -- See Note [Demand on case-alternative binders]
+        -- we can't use the scrut_sd, because it says 'Prod' and we'll use
+        -- topSubDmd anyway for scrutinees of sum types.
+        scrut_sd = scrutSubDmd case_bndr_sd dmds
+        id_dmds = fieldBndrDmds scrut_sd (length dmds)
         -- Do not put a thunk into the Alt
-        !new_ids  = setBndrsDemandInfo bndrs id_dmds
-  = WithDmdType alt_ty (Alt con new_ids rhs')
+        !new_ids            = setBndrsDemandInfo bndrs id_dmds
+  = -- pprTrace "dmdAnalSumAlt" (ppr con $$ ppr case_bndr $$ ppr dmd $$ ppr alt_ty) $
+    WithDmdType alt_ty (Alt con new_ids rhs')
+
+-- See Note [Demand on the scrutinee of a product case]
+scrutSubDmd :: SubDemand -> [Demand] -> SubDemand
+scrutSubDmd case_sd fld_dmds =
+  -- pprTraceWith "scrutSubDmd" (\scrut_sd -> ppr case_sd $$ ppr fld_dmds $$ ppr scrut_sd) $
+  case_sd `plusSubDmd` mkProd fld_dmds
+
+-- See Note [Demand on case-alternative binders]
+fieldBndrDmds :: SubDemand -- on the scrutinee
+              -> Arity
+              -> [Demand]  -- Final demands for the components of the DataCon
+fieldBndrDmds scrut_sd n_flds =
+  case viewProd n_flds scrut_sd of
+    Just ds -> ds
+    Nothing      -> replicate n_flds topDmd
+                      -- Either an arity mismatch or scrut_sd was a call demand.
+                      -- See Note [Untyped demand on case-alternative binders]
 
 {-
 Note [Analysing with absent demand]
@@ -671,6 +693,89 @@ If we just take scrut_demand = 1P(L,A), then we won't pass x to the
 worker, so the worker will rebuild
      x = (a, absent-error)
 and that'll crash.
+
+Note [Demand on case-alternative binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The demand on a binder in a case alternative comes
+  (a) From the demand on the binder itself
+  (b) From the demand on the case binder
+Forgetting (b) led directly to #10148.
+
+Example. Source code:
+  f x@(p,_) = if p then foo x else True
+
+  foo (p,True) = True
+  foo (p,q)    = foo (q,p)
+
+After strictness analysis, forgetting (b):
+  f = \ (x_an1 [Dmd=1P(1L,ML)] :: (Bool, Bool)) ->
+      case x_an1
+      of wild_X7 [Dmd=MP(ML,ML)]
+      { (p_an2 [Dmd=1L], ds_dnz [Dmd=A]) ->
+      case p_an2 of _ {
+        False -> GHC.Types.True;
+        True -> foo wild_X7 }
+
+Note that ds_dnz is syntactically dead, but the expression bound to it is
+reachable through the case binder wild_X7. Now watch what happens if we inline
+foo's wrapper:
+  f = \ (x_an1 [Dmd=1P(1L,ML)] :: (Bool, Bool)) ->
+      case x_an1
+      of _ [Dmd=MP(ML,ML)]
+      { (p_an2 [Dmd=1L], ds_dnz [Dmd=A]) ->
+      case p_an2 of _ {
+        False -> GHC.Types.True;
+        True -> $wfoo_soq GHC.Types.True ds_dnz }
+
+Look at that! ds_dnz has come back to life in the call to $wfoo_soq! A second
+run of demand analysis would no longer infer ds_dnz to be absent.
+But unlike occurrence analysis, which infers properties of the *syntactic*
+shape of the program, the results of demand analysis describe expressions
+*semantically* and are supposed to be mostly stable across Simplification.
+That's why we should better account for (b).
+In #10148, we ended up emitting a single-entry thunk instead of an updateable
+thunk for a let binder that was an an absent case-alt binder during DmdAnal.
+
+This is needed even for non-product types, in case the case-binder
+is used but the components of the case alternative are not.
+
+Note [Untyped demand on case-alternative binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With unsafeCoerce, #8037 and #22039 taught us that the demand on the case binder
+may be a call demand or have a different number of fields than the constructor
+of the case alternative it is used in. From T22039:
+
+  blarg :: (Int, Int) -> Int
+  blarg (x,y) = x+y
+  -- blarg :: <1!P(1L,1L)>
+
+  f :: Either Int Int -> Int
+  f Left{} = 0
+  f e = blarg (unsafeCoerce e)
+  ==> { desugars to }
+  f = \ (ds_d1nV :: Either Int Int) ->
+      case ds_d1nV of wild_X1 {
+        Left ds_d1oV -> lvl_s1Q6;
+        Right ipv_s1Pl ->
+          blarg
+            (case unsafeEqualityProof @(*) @(Either Int Int) @(Int, Int) of
+             { UnsafeRefl co_a1oT ->
+             wild_X1 `cast` (Sub (Sym co_a1oT) :: Either Int Int ~R# (Int, Int))
+             })
+      }
+
+The case binder `e`/`wild_X1` has demand 1!P(1L,1L), with two fields, from the call
+to `blarg`, but `Right` only has one field. Although the code will crash when
+executed, we must be able to analyse it in 'fieldBndrDmds' and conservatively
+approximate with Top instead of panicking because of the mismatch.
+In #22039, this kind of code was guarded behind a safe `cast` and thus dead
+code, but nevertheless led to a panic of the compiler.
+
+You might wonder why the same problem doesn't come up when scrutinising a
+product type instead of a sum type. It appears that for products, `wild_X1`
+will be inlined before DmdAnal.
+
+See also Note [mkWWstr and unsafeCoerce] for a related issue.
 
 Note [Aggregated demand for cardinality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
