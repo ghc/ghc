@@ -17,6 +17,7 @@ There are two modes, preparation and upload.
 """
 
 from subprocess import run, check_call
+from getpass import getpass
 import shutil
 from pathlib import Path
 from typing import NamedTuple, Callable, List, Dict, Optional
@@ -35,6 +36,10 @@ class Package(NamedTuple):
     name: str
     path: Path
     prepare_sdist: Callable[[], None]
+
+class Credentials(NamedTuple):
+    username: str
+    password: str
 
 def no_prep():
     pass
@@ -97,11 +102,15 @@ PACKAGES = {
 }
 # Dict[str, Package]
 
-def cabal_upload(tarball: Path, publish: bool=False, extra_args=[]):
+def cabal_upload(tarball: Path, creds: Credentials, publish: bool=False, extra_args=[]):
     if publish:
         extra_args += ['--publish']
 
-    run(['cabal', 'upload'] + extra_args + [tarball], check=True)
+    creds_args = [
+        f'--username={creds.username}',
+        f'--password={creds.password}'
+    ]
+    run(['cabal', 'upload'] + extra_args + [tarball] + creds_args, check=True)
 
 def prepare_sdist(pkg: Package):
 
@@ -115,13 +124,13 @@ def prepare_sdist(pkg: Package):
     res_path = shutil.copy(sdist, OUT_DIR)
     return os.path.relpath(res_path, OUT_DIR)
 
-def upload_pkg_sdist(sdist : Path, pkg : Package, publish : bool):
+def upload_pkg_sdist(sdist : Path, pkg: Package, publish: bool, creds: Credentials):
     publish_tag = '-publish' if publish else ''
     stamp = WORK_DIR / f'{pkg.name}-sdist{publish_tag}'
     if stamp.is_file():
         return
     print(f'Uploading package {pkg.name}...')
-    cabal_upload(sdist, publish)
+    cabal_upload(sdist, publish=publish, creds=creds)
     stamp.write_text('')
 
 def get_version(cabal_file: Path) -> Optional[str]:
@@ -137,8 +146,8 @@ def prepare_docs(bindist: Path, pkg: Package):
     """
     cabal_file = pkg.path / f'{pkg.name}.cabal'
     version = get_version(cabal_file)
-    docdir = bindist / 'doc' / 'html' / 'libraries' / (pkg.name + "-" + version)
     assert version is not None
+    docdir = bindist / 'doc' / 'html' / 'libraries' / (pkg.name + "-" + version)
 
     # Build the documentation tarball from the bindist documentation
     stem = f'{pkg.name}-{version}-docs'
@@ -148,20 +157,20 @@ def prepare_docs(bindist: Path, pkg: Package):
     run(['tar', '-czf', OUT_DIR / tarball, '-H', 'ustar', '-C', tmp.name, stem])
     return tarball
 
-def upload_docs(tarball : Path, pkg : Package, publish : bool):
+def upload_docs(tarball : Path, pkg : Package, publish : bool, creds: Credentials):
     publish_tag = '-publish' if publish else ''
     stamp = WORK_DIR / f'{pkg.name}-docs{publish_tag}'
     if stamp.is_file():
         return
     # Upload the documentation tarball
     print(f'Uploading documentation for {pkg.name}...')
-    cabal_upload(tarball, publish=publish, extra_args=['--documentation'])
+    cabal_upload(tarball, publish=publish, extra_args=['--documentation'], creds=creds)
     stamp.write_text('')
 
-def upload_pkg(pkg: Package, d : Path, meta, publish : bool):
+def upload_pkg(pkg: Package, d : Path, meta, publish : bool, creds: Credentials):
     print(f'Uploading {pkg.name}...')
-    upload_pkg_sdist(d / meta['sdist'], pkg, publish=publish)
-    upload_docs(d / meta['docs'], pkg, publish=publish)
+    upload_pkg_sdist(d / meta['sdist'], pkg, publish=publish, creds=creds)
+    upload_docs(d / meta['docs'], pkg, publish=publish, creds=creds)
 
 def prepare_pkg(bindist : Path, pkg : Package):
     if pkg.path.exists():
@@ -171,11 +180,6 @@ def prepare_pkg(bindist : Path, pkg : Package):
         return { 'sdist' : p1, 'docs': p2 }
     else:
         print(f"Package {pkg.name} doesn't exist... skipping")
-
-
-def upload_all(bindist: Path):
-    for pkg in PACKAGES.values():
-        upload_pkg(bindist, pkg)
 
 def main() -> None:
     import argparse
@@ -212,13 +216,16 @@ def main() -> None:
             pickle.dump(manifest, fout)
 
     elif args.command == "upload":
+        username = input('Hackage username: ')
+        password = getpass('Hackage password: ')
+        creds = Credentials(username, password)
         manifest_path = args.docs
         with open(manifest_path / 'manifest.pickle', 'rb') as fin:
             manifest = pickle.load(fin)
         for pkg, item in manifest.items():
             if pkg.name in pkgs:
                 print(pkg, item)
-                upload_pkg(pkg, manifest_path, item, publish=args.publish)
+                upload_pkg(pkg, manifest_path, item, publish=args.publish, creds=creds)
 
 if __name__ == '__main__':
     main()
