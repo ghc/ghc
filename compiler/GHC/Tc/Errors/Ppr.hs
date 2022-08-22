@@ -2149,21 +2149,22 @@ pprTcSolverReportMsg ctxt
         pp_exp_thing = case exp_torc of TypeLike       -> text "type";
                                         ConstraintLike -> text "constraint"
 
-        -- (TYPE (BoxedRep lev1)) ~ (TYPE (BoxedRep lev2))
+        -- (TYPE (BoxedRep lev1)) ~ (TYPE (BoxedRep lev2)); or CONSTRAINT ditto
         msg_for_same_rep exp_rr_args act_rr_args
           | [exp_lev_ty] <- exp_rr_args     -- BoxedRep has exactly one arg
           , [act_lev_ty] <- act_rr_args
           , Just exp_lev <- levityType_maybe exp_lev_ty
           , Just act_lev <- levityType_maybe act_lev_ty
-          = sep [ text "Expecting" <+> ppr_an_lev exp_lev <+> pp_exp_thing <+> text "but"
+          = sep [ text "Expected" <+> ppr_an_lev exp_lev <+> pp_exp_thing <> text ", but"
                 , case mb_thing of
                      Just thing -> quotes (ppr thing) <+> text "is" <+> ppr_lev act_lev
                      Nothing    -> text "got" <+> ppr_an_lev act_lev <+> pp_exp_thing ]
         msg_for_same_rep _ _
           = bale_out_msg
 
+        -- (TYPE (BoxedRep lev)) ~ (TYPE IntRep); or CONSTRAINT ditto
         msg_for_different_rep exp_rr_tc act_rr_tc
-          = sep [ text "Expecting a" <+> what <+> text "but"
+          = sep [ text "Expected a" <+> what <> text ", but"
                 , case mb_thing of
                      Just thing -> quotes (ppr thing)
                      Nothing    -> quotes (pprWithTYPE act)

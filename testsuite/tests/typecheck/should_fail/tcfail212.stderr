@@ -10,9 +10,9 @@ tcfail212.hs:10:14: error:
     • In the type signature: f :: (Maybe, Either Int)
 
 tcfail212.hs:13:7: error:
-    • Expecting a lifted type, but ‘Int#’ is unlifted
+    • Expected a boxed type, but ‘Int#’ has representation ‘IntRep’
     • In the type signature: g :: (Int#, Int#)
 
 tcfail212.hs:13:13: error:
-    • Expecting a lifted type, but ‘Int#’ is unlifted
+    • Expected a boxed type, but ‘Int#’ has representation ‘IntRep’
     • In the type signature: g :: (Int#, Int#)
