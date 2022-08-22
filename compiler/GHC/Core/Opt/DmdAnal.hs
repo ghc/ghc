@@ -455,8 +455,9 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt_con bndrs rhs])
         !(!bndrs', !scrut_sd)
           | DataAlt _ <- alt_con
           -- See Note [Demand on the scrutinee of a product case]
+          , let !scrut_sd = scrutSubDmd case_bndr_sd fld_dmds
           -- See Note [Demand on case-alternative binders]
-          , (!scrut_sd, fld_dmds') <- addCaseBndrDmd case_bndr_sd fld_dmds
+          , let !fld_dmds' = fieldBndrDmds scrut_sd (length fld_dmds)
           , let !bndrs' = setBndrsDemandInfo bndrs fld_dmds'
           = (bndrs', scrut_sd)
           | otherwise
@@ -560,7 +561,6 @@ forcesRealWorld fam_envs ty
   = False
 
 dmdAnalSumAlts :: AnalEnv -> SubDemand -> Id -> [CoreAlt] -> WithDmdType [CoreAlt]
-
 dmdAnalSumAlts _ _ _ [] = WithDmdType botDmdType []
   -- Base case is botDmdType, for empty case alternatives
   -- This is a unit for lubDmdType, and the right result
@@ -580,28 +580,29 @@ dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
         -- See Note [Demand on case-alternative binders]
         -- we can't use the scrut_sd, because it says 'Prod' and we'll use
         -- topSubDmd anyway for scrutinees of sum types.
-        (!_scrut_sd, dmds') = addCaseBndrDmd case_bndr_sd dmds
+        scrut_sd = scrutSubDmd case_bndr_sd dmds
+        dmds' = fieldBndrDmds scrut_sd (length dmds)
         -- Do not put a thunk into the Alt
         !new_ids            = setBndrsDemandInfo bndrs dmds'
   = -- pprTrace "dmdAnalSumAlt" (ppr con $$ ppr case_bndr $$ ppr dmd $$ ppr alt_ty) $
     WithDmdType alt_ty (Alt con new_ids rhs')
 
--- Precondition: The SubDemand is not a Call
 -- See Note [Demand on the scrutinee of a product case]
--- and Note [Demand on case-alternative binders]
-addCaseBndrDmd :: SubDemand -- On the case binder
-               -> [Demand]  -- On the fields of the constructor
-               -> (SubDemand, [Demand])
-                            -- SubDemand on the case binder incl. field demands
-                            -- and final demands for the components of the constructor
-addCaseBndrDmd case_sd fld_dmds
-  | Just (_, ds) <- viewProd (length fld_dmds) scrut_sd
-  -- , pprTrace "addCaseBndrDmd" (ppr case_sd $$ ppr fld_dmds $$ ppr scrut_sd) True
-  = (scrut_sd, ds)
-  | otherwise
-  = pprPanic "was a call demand" (ppr case_sd $$ ppr fld_dmds) -- See the Precondition
-  where
-    scrut_sd = case_sd `plusSubDmd` mkProd Unboxed fld_dmds
+scrutSubDmd :: SubDemand -> [Demand] -> SubDemand
+scrutSubDmd case_sd fld_dmds =
+  -- pprTraceWith "scrutSubDmd" (\scrut_sd -> ppr case_sd $$ ppr fld_dmds $$ ppr scrut_sd) $
+  case_sd `plusSubDmd` mkProd Unboxed fld_dmds
+
+-- See Note [Demand on case-alternative binders]
+fieldBndrDmds :: SubDemand -- on the scrutinee
+              -> Arity
+              -> [Demand]  -- Final demands for the components of the DataCon
+fieldBndrDmds scrut_sd n_flds =
+  case viewProd n_flds scrut_sd of
+    Just (_, ds) -> ds
+    Nothing      -> replicate n_flds topDmd
+                      -- Either an arity mismatch or scrut_sd was a call demand.
+                      -- See Note [Untyped demand on case-alternative binders]
 
 {-
 Note [Anticipating ANF in demand analysis]
@@ -829,6 +830,44 @@ thunk for a let binder that was an an absent case-alt binder during DmdAnal.
 
 This is needed even for non-product types, in case the case-binder
 is used but the components of the case alternative are not.
+
+Note [Untyped demand on case-alternative binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With unsafeCoerce, #8037 and #22039 taught us that the demand on the case binder
+may be a call demand or have a different number of fields than the constructor
+of the case alternative it is used in. From T22039:
+
+  blarg :: (Int, Int) -> Int
+  blarg (x,y) = x+y
+  -- blarg :: <1!P(1L,1L)>
+
+  f :: Either Int Int -> Int
+  f Left{} = 0
+  f e = blarg (unsafeCoerce e)
+  ==> { desugars to }
+  f = \ (ds_d1nV :: Either Int Int) ->
+      case ds_d1nV of wild_X1 {
+        Left ds_d1oV -> lvl_s1Q6;
+        Right ipv_s1Pl ->
+          blarg
+            (case unsafeEqualityProof @(*) @(Either Int Int) @(Int, Int) of
+             { UnsafeRefl co_a1oT ->
+             wild_X1 `cast` (Sub (Sym co_a1oT) :: Either Int Int ~R# (Int, Int))
+             })
+      }
+
+The case binder `e`/`wild_X1` has demand 1!P(1L,1L), with two fields, from the call
+to `blarg`, but `Right` only has one field. Although the code will crash when
+executed, we must be able to analyse it in 'fieldBndrDmds' and conservatively
+approximate with Top instead of panicking because of the mismatch.
+In #22039, this kind of code was guarded behind a safe `cast` and thus dead
+code, but nevertheless led to a panic of the compiler.
+
+You might wonder why the same problem doesn't come up when scrutinising a
+product type instead of a sum type. It appears that for products, `wild_X1`
+will be inlined before DmdAnal.
+
+See also Note [mkWWstr and unsafeCoerce] for a related issue.
 
 Note [Aggregated demand for cardinality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
