@@ -15,6 +15,7 @@ module GHC.Parser.Annotation (
   AddEpAnn(..),
   EpaLocation(..), epaLocationRealSrcSpan, epaLocationFromSrcAnn,
   TokenLocation(..),
+  mkTokenLocation, tokenSrcSpan,
   DeltaPos(..), deltaPos, getDeltaLine,
 
   EpAnn(..), Anchor(..), AnchorOperation(..),
@@ -413,6 +414,15 @@ data EpaLocation = EpaSpan !RealSrcSpan
 data TokenLocation = NoTokenLoc | TokenLoc !EpaLocation
                deriving (Data,Eq)
 
+mkTokenLocation :: SrcSpan -> TokenLocation
+mkTokenLocation (UnhelpfulSpan _) = NoTokenLoc
+mkTokenLocation (RealSrcSpan r _)  = TokenLoc (EpaSpan r)
+
+tokenSrcSpan :: TokenLocation -> SrcSpan
+tokenSrcSpan NoTokenLoc = UnhelpfulSpan UnhelpfulNoLocationInfo -- TODO reason in TokenLocation?
+tokenSrcSpan (TokenLoc (EpaSpan r)) = RealSrcSpan r Strict.Nothing
+tokenSrcSpan (TokenLoc _          ) = error "Not yet handled"
+
 instance Outputable a => Outputable (GenLocated TokenLocation a) where
   ppr (L _ x) = ppr x
 
@@ -461,6 +471,10 @@ instance Outputable EpaLocation where
 
 instance Outputable AddEpAnn where
   ppr (AddEpAnn kw ss) = text "AddEpAnn" <+> ppr kw <+> ppr ss
+
+instance Outputable TokenLocation where
+  ppr NoTokenLoc = text "NoTokenLoc"
+  ppr (TokenLoc e) = text "TokenLoc" <+> ppr e
 
 -- ---------------------------------------------------------------------
 

@@ -3028,7 +3028,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                               (map (const Nominal) qtvs)
                               (locA loc)) }
 
-checkTyFamInstEqn :: TcTyCon -> Name -> [HsArg tm ty] -> TcM ()
+checkTyFamInstEqn :: TcTyCon -> Name -> [HsArg GhcRn tm ty] -> TcM ()
 checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats =
   do { -- Ensure that each equation's type constructor is for the right
        -- type family.  E.g. barf on

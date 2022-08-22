@@ -62,7 +62,6 @@ import Language.Haskell.Syntax.Extension
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.DataCon( HsSrcBang(..) )
 import GHC.Core.Type (Specificity)
-import GHC.Types.SrcLoc (SrcSpan)
 
 import GHC.Hs.Doc (LHsDoc)
 import GHC.Data.FastString (FastString)
@@ -755,6 +754,7 @@ data HsType pass
 
   | HsAppKindTy         (XAppKindTy pass) -- type level type app
                         (LHsType pass)
+                        (LHsToken "@" pass)
                         (LHsKind pass)
 
   | HsFunTy             (XFunTy pass)
@@ -1178,29 +1178,32 @@ if they correspond to a visible 'forall'.
 -}
 
 -- | Arguments in an expression/type after splitting
-data HsArg tm ty
-  = HsValArg tm   -- Argument is an ordinary expression     (f arg)
-  | HsTypeArg SrcSpan ty -- Argument is a visible type application (f @ty)
-                         -- SrcSpan is location of the `@`
-  | HsArgPar SrcSpan -- See Note [HsArgPar]
+--
+-- A HsArgPar indicates that everything to the left of this in the argument list is
+-- enclosed in parentheses together with the function itself. It is necessary so
+-- that we can recreate the parenthesis structure in the original source after
+-- typechecking the arguments.
+--
+-- The SrcSpan is the span of the original HsPar
+--
+-- @((f arg1) arg2 arg3)@ results in an input argument list of
+-- @[HsValArg arg1, HsArgPar span1, HsValArg arg2, HsValArg arg3, HsArgPar span2]@
+data HsArg pass tm ty
+
+  -- | Argument is an ordinary expression     (f arg)
+  = HsValArg tm
+
+  -- | Argument is a visible type application (f @ty)
+  | HsTypeArg (LHsToken "@" pass) ty
+
+  -- | A closing paren.
+  --
+  -- The correponding opening parens are all at the front, so there is
+  -- no ambiguity from just storing the closing one.
+  | HsArgPar (LHsToken ")" pass)
 
 -- type level equivalent
-type LHsTypeArg p = HsArg (LHsType p) (LHsKind p)
-
-{-
-Note [HsArgPar]
-~~~~~~~~~~~~~~~
-A HsArgPar indicates that everything to the left of this in the argument list is
-enclosed in parentheses together with the function itself. It is necessary so
-that we can recreate the parenthesis structure in the original source after
-typechecking the arguments.
-
-The SrcSpan is the span of the original HsPar
-
-((f arg1) arg2 arg3) results in an input argument list of
-[HsValArg arg1, HsArgPar span1, HsValArg arg2, HsValArg arg3, HsArgPar span2]
-
--}
+type LHsTypeArg p = HsArg p (LHsType p) (LHsKind p)
 
 
 {-

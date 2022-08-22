@@ -1375,7 +1375,7 @@ repTy (HsAppTy _ f a)       = do
                                 f1 <- repLTy f
                                 a1 <- repLTy a
                                 repTapp f1 a1
-repTy (HsAppKindTy _ ty ki) = do
+repTy (HsAppKindTy _ ty _ ki) = do
                                 ty1 <- repLTy ty
                                 ki1 <- repLTy ki
                                 repTappKind ty1 ki1

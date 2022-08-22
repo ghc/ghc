@@ -552,6 +552,9 @@ instance HasLoc (LocatedA a) where
 instance HasLoc (LocatedN a) where
   loc (L la _) = locA la
 
+instance HasLoc (GenLocated TokenLocation a) where
+  loc (L tl _) = tokenSrcSpan tl
+
 instance HasLoc a => HasLoc [a] where
   loc [] = noSrcSpan
   loc xs = foldl1' combineSrcSpans $ map loc xs
@@ -563,10 +566,10 @@ instance (HasLoc a, HiePass p) => HasLoc (FamEqn (GhcPass p) a) where
     HsOuterExplicit{hso_bndrs = tvs} ->
       foldl1' combineSrcSpans [loc a, loc tvs, loc b, loc c]
 
-instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg tm ty) where
+instance (HiePass p, HasLoc tm, HasLoc ty) => HasLoc (HsArg (GhcPass p) tm ty) where
   loc (HsValArg tm) = loc tm
   loc (HsTypeArg _ ty) = loc ty
-  loc (HsArgPar sp)  = sp
+  loc (HsArgPar sp)  = loc sp
 
 instance HasLoc (HsDataDefn GhcRn) where
   loc def@(HsDataDefn{}) = loc $ dd_cons def
@@ -594,6 +597,9 @@ instance (ToHie a) => ToHie (Bag a) where
 
 instance (ToHie a) => ToHie (Maybe a) where
   toHie = maybe (pure []) toHie
+
+instance ToHie (GenLocated TokenLocation (HsToken sym)) where
+  toHie = locOnly . loc
 
 instance ToHie (IEContext (LocatedA ModuleName)) where
   toHie (IEC c (L (SrcSpanAnn _ (RealSrcSpan span _)) mname)) = do
@@ -1760,8 +1766,9 @@ instance ToHie (LocatedA (HsType GhcRn)) where
         [ toHie a
         , toHie b
         ]
-      HsAppKindTy _ ty ki ->
+      HsAppKindTy _ ty at ki ->
         [ toHie ty
+        , toHie at
         , toHie ki
         ]
       HsFunTy _ w a b ->
@@ -1818,10 +1825,10 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsStarTy _ _ -> []
       XHsType _ -> []
 
-instance (ToHie tm, ToHie ty) => ToHie (HsArg tm ty) where
+instance (ToHie tm, ToHie ty) => ToHie (HsArg GhcRn tm ty) where
   toHie (HsValArg tm) = toHie tm
   toHie (HsTypeArg _ ty) = toHie ty
-  toHie (HsArgPar sp) = locOnly sp
+  toHie (HsArgPar sp) = toHie sp
 
 instance Data flag => ToHie (TVScoped (LocatedA (HsTyVarBndr flag GhcRn))) where
   toHie (TVS tsc sc (L span bndr)) = concatM $ makeNodeA bndr span : case bndr of

@@ -77,9 +77,6 @@ module GHC.Parser.PostProcess (
         UnpackednessPragma(..),
         mkMultTy,
 
-        -- Token location
-        mkTokenLocation,
-
         -- Help with processing exports
         ImpExpSubSpec(..),
         ImpExpQcSpec(..),
@@ -891,7 +888,7 @@ checkTyVars pp_what equals_or_where tc tparms
     check (HsTypeArg _ ki@(L loc _)) = addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
                                          (PsErrUnexpectedTypeAppInDecl ki pp_what (unLoc tc))
     check (HsValArg ty) = chkParens [] [] emptyComments ty
-    check (HsArgPar sp) = addFatalError $ mkPlainErrorMsgEnvelope sp $
+    check (HsArgPar sp) = addFatalError $ mkPlainErrorMsgEnvelope (tokenSrcSpan $ getLoc sp) $
                             (PsErrMalformedDecl pp_what (unLoc tc))
         -- Keep around an action for adjusting the annotations of extra parens
     chkParens :: [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> LHsType GhcPs
@@ -1019,7 +1016,7 @@ checkTyClHdr is_cls ty
       where
         (o,c) = mkParensEpAnn (realSrcSpan l)
     go _ (HsAppTy _ t1 t2) acc ops cps fix = goL t1 (HsValArg t2:acc) ops cps fix
-    go _ (HsAppKindTy l ty ki) acc ops cps fix = goL ty (HsTypeArg l ki:acc) ops cps fix
+    go _ (HsAppKindTy _ ty at ki) acc ops cps fix = goL ty (HsTypeArg at ki:acc) ops cps fix
     go l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ops cps fix
       = return (L (noAnnSrcSpan l) (nameRdrName tup_name)
                , map HsValArg ts, fix, (reverse ops)++cps)
@@ -1956,7 +1953,7 @@ class DisambTD b where
   -- | Disambiguate @f x@ (function application or prefix data constructor).
   mkHsAppTyPV :: LocatedA b -> LHsType GhcPs -> PV (LocatedA b)
   -- | Disambiguate @f \@t@ (visible kind application)
-  mkHsAppKindTyPV :: LocatedA b -> SrcSpan -> LHsType GhcPs -> PV (LocatedA b)
+  mkHsAppKindTyPV :: LocatedA b -> LHsToken "@" GhcPs -> LHsType GhcPs -> PV (LocatedA b)
   -- | Disambiguate @f \# x@ (infix operator)
   mkHsOpTyPV :: PromotionFlag -> LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> PV (LocatedA b)
   -- | Disambiguate @{-\# UNPACK \#-} t@ (unpack/nounpack pragma)
@@ -1965,7 +1962,7 @@ class DisambTD b where
 instance DisambTD (HsType GhcPs) where
   mkHsAppTyHeadPV = return
   mkHsAppTyPV t1 t2 = return (mkHsAppTy t1 t2)
-  mkHsAppKindTyPV t l_at ki = return (mkHsAppKindTy l_at t ki)
+  mkHsAppKindTyPV t at ki = return (mkHsAppKindTy t at ki)
   mkHsOpTyPV prom t1 op t2 = return (mkLHsOpTy prom t1 op t2)
   mkUnpackednessPV = addUnpackednessP
 
@@ -2001,8 +1998,8 @@ instance DisambTD DataConBuilder where
     -- the grammar in Parser.y is written (see infixtype/ftype).
     panic "mkHsAppTyPV: InfixDataConBuilder"
 
-  mkHsAppKindTyPV lhs l_at ki =
-    addFatalError $ mkPlainErrorMsgEnvelope l_at $
+  mkHsAppKindTyPV lhs at ki =
+    addFatalError $ mkPlainErrorMsgEnvelope (tokenSrcSpan $ getLoc at) $
                       (PsErrUnexpectedKindAppInDataCon (unLoc lhs) (unLoc ki))
 
   mkHsOpTyPV prom lhs tc rhs = do
@@ -3101,10 +3098,6 @@ mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText "1") 1))) arr
     locOfPct1 :: TokenLocation
     locOfPct1 = token_location_widenR (getLoc pct) (locA (getLoc t))
 mkMultTy pct t arr = HsExplicitMult pct t arr
-
-mkTokenLocation :: SrcSpan -> TokenLocation
-mkTokenLocation (UnhelpfulSpan _) = NoTokenLoc
-mkTokenLocation (RealSrcSpan r _)  = TokenLoc (EpaSpan r)
 
 -- Precondition: the TokenLocation has EpaSpan, never EpaDelta.
 token_location_widenR :: TokenLocation -> SrcSpan -> TokenLocation
