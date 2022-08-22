@@ -54,7 +54,7 @@ import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Core.Class   ( Class )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
-import GHC.Builtin.Types ( mkBoxedTupleTy )
+import GHC.Builtin.Types ( mkConstraintTupleTy )
 import GHC.Builtin.Types.Prim
 import GHC.Types.SourceText
 import GHC.Types.Id
@@ -1010,7 +1010,7 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
                -- We know that wc_co must have type kind(wc_var) ~ Constraint, as it
                -- comes from the checkExpectedKind in GHC.Tc.Gen.HsType.tcAnonWildCardOcc.
                -- So, to make the kinds work out, we reverse the cast here.
-               Just (wc_var, wc_co) -> writeMetaTyVar wc_var (mk_ctuple diff_theta
+               Just (wc_var, wc_co) -> writeMetaTyVar wc_var (mkConstraintTupleTy diff_theta
                                                               `mkCastTy` mkTcSymCo wc_co)
                Nothing              -> pprPanic "chooseInferredQuantifiers 1" (ppr wc_var_ty)
 
@@ -1039,10 +1039,6 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
                       , Just (Nominal, lhs, rhs) <- [ getEqPredTys_maybe residual_pred ]
                       , Just lhs_tv <- [ tcGetTyVar_maybe lhs ]
                       , lhs_tv == tv ]
-
-    mk_ctuple preds = mkBoxedTupleTy preds
-       -- Hack alert!  See GHC.Tc.Gen.HsType:
-       -- Note [Extra-constraint holes in partial type signatures]
 
 chooseInferredQuantifiers _ _ _ _ (Just (TISI { sig_inst_sig = sig@(CompleteSig {}) }))
   = pprPanic "chooseInferredQuantifiers" (ppr sig)

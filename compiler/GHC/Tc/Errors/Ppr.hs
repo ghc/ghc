@@ -2096,10 +2096,10 @@ pprTcSolverReportMsg _
 pprTcSolverReportMsg ctxt
   (TypeEqMismatch { teq_mismatch_ppr_explicit_kinds = ppr_explicit_kinds
                   , teq_mismatch_item     = item
-                  , teq_mismatch_ty1      = ty1
-                  , teq_mismatch_ty2      = ty2
-                  , teq_mismatch_expected = exp
-                  , teq_mismatch_actual   = act
+                  , teq_mismatch_ty1      = ty1   -- These types are the context
+                  , teq_mismatch_ty2      = ty2   --   of the mis-match
+                  , teq_mismatch_expected = exp   -- These are the kinds that
+                  , teq_mismatch_actual   = act   --   don't match
                   , teq_mismatch_what     = mb_thing })
   = addArising ct_loc $ pprWithExplicitKindsWhen ppr_explicit_kinds msg
   where
@@ -2130,18 +2130,16 @@ pprTcSolverReportMsg ctxt
       | Just (act_torc, act_rep) <- sORTKind_maybe act
       , act_torc == exp_torc
       = -- (TYPE exp_rep) ~ (TYPE act_rep) or similar with CONSTRAINT
-        case (runtimeRepLevity_maybe exp_rep, runtimeRepLevity_maybe act_rep) of
-          (Just exp_lev, Just act_lev)
-             -> sep [ text "Expecting" <+> ppr_an_lev exp_lev <+> pp_exp_thing <+> text "but"
-                    , case mb_thing of
-                        Just thing -> quotes (ppr thing) <+> text "is" <+> ppr_lev act_lev
-                        Nothing    -> text "got" <+> ppr_an_lev act_lev <+> pp_exp_thing ]
-          _ -> bale_out_msg
+        case (splitRuntimeRep_maybe exp_rep, splitRuntimeRep_maybe act_rep) of
+          (Just (exp_rr_tc, exp_rr_args), Just (act_rr_tc, act_rr_args))
+             | exp_rr_tc == act_rr_tc -> msg_for_same_rep exp_rr_args act_rr_args
+             | otherwise              -> msg_for_different_rep exp_rr_tc act_rr_tc
+          _                           -> bale_out_msg
 
       | otherwise
       = -- (TYPE _) ~ (CONSTRAINT _) or (TYPE _) ~ Bool, etc
         maybe_num_args_msg $$
-        sep [ text "Expected a" <+> pp_exp_thing <+> text "but"
+        sep [ text "Expected a" <+> pp_exp_thing <> text ", but"
             , case mb_thing of
                 Nothing    -> text "found something with kind"
                 Just thing -> quotes (ppr thing) <+> text "has kind"
@@ -2150,11 +2148,31 @@ pprTcSolverReportMsg ctxt
       where
         pp_exp_thing = case exp_torc of TypeLike       -> text "type";
                                         ConstraintLike -> text "constraint"
-        ppr_lev Lifted      = text "lifted"
-        ppr_lev Unlifted    = text "unlifted"
-        ppr_an_lev Lifted   = text "a lifted"
-        ppr_an_lev Unlifted = text "an unlifted"
 
+        -- (TYPE (BoxedRep lev1)) ~ (TYPE (BoxedRep lev2))
+        msg_for_same_rep exp_rr_args act_rr_args
+          | [exp_lev_ty] <- exp_rr_args     -- BoxedRep has exactly one arg
+          , [act_lev_ty] <- act_rr_args
+          , Just exp_lev <- levityType_maybe exp_lev_ty
+          , Just act_lev <- levityType_maybe act_lev_ty
+          = sep [ text "Expecting" <+> ppr_an_lev exp_lev <+> pp_exp_thing <+> text "but"
+                , case mb_thing of
+                     Just thing -> quotes (ppr thing) <+> text "is" <+> ppr_lev act_lev
+                     Nothing    -> text "got" <+> ppr_an_lev act_lev <+> pp_exp_thing ]
+        msg_for_same_rep _ _
+          = bale_out_msg
+
+        msg_for_different_rep exp_rr_tc act_rr_tc
+          = sep [ text "Expecting a" <+> what <+> text "but"
+                , case mb_thing of
+                     Just thing -> quotes (ppr thing)
+                     Nothing    -> quotes (pprWithTYPE act)
+                  <+> text "has representation" <+> ppr_rep act_rr_tc ]
+          where
+            what | exp_rr_tc `hasKey` boxedRepDataConKey
+                 = text "boxed" <+> pp_exp_thing
+                 | otherwise
+                 = pp_exp_thing <+> text "with representation" <+> ppr_rep exp_rr_tc
 
     ct_loc = errorItemCtLoc item
     orig   = errorItemOrigin item
@@ -2180,6 +2198,14 @@ pprTcSolverReportMsg ctxt
     maybe_num_args_msg = num_args_msg `orElse` empty
 
     count_args ty = count isVisibleBinder $ fst $ splitPiTys ty
+
+    ppr_lev Lifted      = text "lifted"
+    ppr_lev Unlifted    = text "unlifted"
+    ppr_an_lev Lifted   = text "a lifted"
+    ppr_an_lev Unlifted = text "an unlifted"
+
+    ppr_rep rep_tc = quotes (ppr (getOccName rep_tc))  -- Don't qualify
+
 pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
   vcat (map make_msg frr_origs)
   where

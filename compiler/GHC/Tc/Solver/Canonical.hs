@@ -943,7 +943,7 @@ unknown kind. For instance, we may have,
 
     FunTy (a :: k) Int
 
-Where k is a unification variable. So the calls to getRuntimeRep_maybe may
+Where k is a unification variable. So the calls to splitRuntimeRep_maybe may
 fail (returning Nothing).  In that case we'll fall through, zonk, and try again.
 Zonking should fill the variable k, meaning that decomposition will succeed the
 second time around.

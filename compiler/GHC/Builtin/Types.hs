@@ -83,7 +83,7 @@ module GHC.Builtin.Types (
         unboxedUnitTy,
         unboxedUnitTyCon, unboxedUnitDataCon,
         unboxedTupleKind, unboxedSumKind,
-        filterCTuple,
+        filterCTuple, mkConstraintTupleTy,
 
         -- ** Constraint tuples
         cTupleTyCon, cTupleTyConName, cTupleTyConNames, isCTupleTyConName,
@@ -2149,6 +2149,17 @@ mkBoxedTupleTy tys = mkTupleTy Boxed tys
 
 unitTy :: Type
 unitTy = mkTupleTy Boxed []
+
+-- Make a constraint tuple
+-- One-tuples vanish
+-- If we get a constraint tuple that is bigger than the pre-built
+-- ones (in ghc-prim:GHC.Tuple), then just make one up anyway; it
+-- this is used only in filling in extra-constraint wildcards
+-- See GHC.Tc.Gen.HsType Note [Extra-constraint holes in partial type signatures]
+mkConstraintTupleTy :: [Type] -> Type
+mkConstraintTupleTy [ty] = ty
+mkConstraintTupleTy tys = mkTyConApp (cTupleTyCon (length tys)) tys
+
 
 {- *********************************************************************
 *                                                                      *

@@ -3,7 +3,7 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE FlexibleContexts, PatternSynonyms, ViewPatterns #-}
+{-# LANGUAGE FlexibleContexts, PatternSynonyms, ViewPatterns, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -72,7 +72,8 @@ module GHC.Core.Type (
 
         isPredTy,
 
-        getRuntimeRep_maybe, kindRep_maybe, kindRep,
+        getRuntimeRep, splitRuntimeRep_maybe, kindRep_maybe, kindRep,
+        getLevity, levityType_maybe,
 
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
 
@@ -140,7 +141,6 @@ module GHC.Core.Type (
         isLevityTy, isLevityVar,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
         dropRuntimeRepArgs,
-        getRuntimeRep, getLevity, getLevity_maybe,
 
         -- * Multiplicity
 
@@ -716,46 +716,6 @@ pickyIsLiftedTypeKind kind
   , tc `hasKey` liftedTypeKindTyConKey = True
   | otherwise                          = False
 
-
--- | See 'isBoxedRuntimeRep_maybe'.
-isBoxedRuntimeRep :: Type -> Bool
-isBoxedRuntimeRep rep = isJust (isBoxedRuntimeRep_maybe rep)
-
--- | `isBoxedRuntimeRep_maybe (rep :: RuntimeRep)` returns `Just lev` if `rep`
--- expands to `Boxed lev` and returns `Nothing` otherwise.
---
--- Types with this runtime rep are represented by pointers on the GC'd heap.
-isBoxedRuntimeRep_maybe :: Type -> Maybe Type
-isBoxedRuntimeRep_maybe rep
-  | Just [lev] <- isTyConKeyApp_maybe boxedRepDataConKey rep
-  = Just lev
-  | otherwise
-  = Nothing
-
--- | Check whether a type of kind 'RuntimeRep' is lifted, unlifted, or unknown.
---
--- `isLiftedRuntimeRep rr` returns:
---
---   * `Just Lifted` if `rr` is `LiftedRep :: RuntimeRep`
---   * `Just Unlifted` if `rr` is definitely unlifted, e.g. `IntRep`
---   * `Nothing` if not known (e.g. it's a type variable or a type family application).
-runtimeRepLevity_maybe :: Type -> Maybe Levity
-runtimeRepLevity_maybe rep
-  | TyConApp rr_tc args <- coreFullView rep
-  , isPromotedDataCon rr_tc =
-      -- NB: args might be non-empty e.g. TupleRep [r1, .., rn]
-      if (rr_tc `hasKey` boxedRepDataConKey)
-        then case args of
-          [lev] | isLiftedLevity   lev -> Just Lifted
-                | isUnliftedLevity lev -> Just Unlifted
-          _                            -> Nothing
-        else Just Unlifted
-        -- Avoid searching all the unlifted RuntimeRep type cons
-        -- In the RuntimeRep data type, only LiftedRep is lifted
-        -- But be careful of type families (F tys) :: RuntimeRep,
-        -- hence the isPromotedDataCon rr_tc
-runtimeRepLevity_maybe _ = Nothing
-
 -- | Check whether a kind is of the form `TYPE (BoxedRep Lifted)`
 -- or `TYPE (BoxedRep Unlifted)`.
 --
@@ -834,6 +794,82 @@ isMultiplicityTy  = isNullaryTyConKeyApp multiplicityTyConKey
 -- | Is a tyvar of type 'Multiplicity'?
 isMultiplicityVar :: TyVar -> Bool
 isMultiplicityVar = isMultiplicityTy . tyVarKind
+
+--------------------------------------------
+--  Splitting RuntimeRep
+--------------------------------------------
+
+-- | (splitRuntimeRep_maybe rr) takes a Type rr :: RuntimeRep, and
+--   returns the (TyCon,[Type]) for the RuntimeRep, if possible, where
+--   the TyCon is one of the promoted DataCons of RuntimeRep.
+-- Remember: the unique on TyCon that is a a promoted DataCon is the
+--           same as the unique on the DataCon
+--           See Note [Promoted data constructors] in GHC.Core.TyCon
+-- May not be possible if `rr` is a type variable or type
+--   family application
+splitRuntimeRep_maybe :: Type -> Maybe (TyCon, [Type])
+splitRuntimeRep_maybe rep
+  | TyConApp rr_tc args <- coreFullView rep
+  , isPromotedDataCon rr_tc
+  = Just (rr_tc, args)
+  | otherwise
+  = Nothing
+
+-- | See 'isBoxedRuntimeRep_maybe'.
+isBoxedRuntimeRep :: Type -> Bool
+isBoxedRuntimeRep rep = isJust (isBoxedRuntimeRep_maybe rep)
+
+-- | `isBoxedRuntimeRep_maybe (rep :: RuntimeRep)` returns `Just lev` if `rep`
+-- expands to `Boxed lev` and returns `Nothing` otherwise.
+--
+-- Types with this runtime rep are represented by pointers on the GC'd heap.
+isBoxedRuntimeRep_maybe :: Type -> Maybe Type
+isBoxedRuntimeRep_maybe rep
+  | Just (rr_tc, args) <- splitRuntimeRep_maybe rep
+  , rr_tc `hasKey` boxedRepDataConKey
+  , [lev] <- args
+  = Just lev
+  | otherwise
+  = Nothing
+
+-- | Check whether a type of kind 'RuntimeRep' is lifted, unlifted, or unknown.
+--
+-- `isLiftedRuntimeRep rr` returns:
+--
+--   * `Just Lifted` if `rr` is `LiftedRep :: RuntimeRep`
+--   * `Just Unlifted` if `rr` is definitely unlifted, e.g. `IntRep`
+--   * `Nothing` if not known (e.g. it's a type variable or a type family application).
+runtimeRepLevity_maybe :: Type -> Maybe Levity
+runtimeRepLevity_maybe rep
+  | Just (rr_tc, args) <- splitRuntimeRep_maybe rep
+  =       -- NB: args might be non-empty e.g. TupleRep [r1, .., rn]
+    if (rr_tc `hasKey` boxedRepDataConKey)
+    then case args of
+            [lev] -> levityType_maybe lev
+            _     -> pprPanic "runtimeRepLevity_maybe" (ppr rep)
+    else Just Unlifted
+        -- Avoid searching all the unlifted RuntimeRep type cons
+        -- In the RuntimeRep data type, only LiftedRep is lifted
+        -- But be careful of type families (F tys) :: RuntimeRep,
+        -- hence the isPromotedDataCon rr_tc
+  | otherwise
+  = Nothing
+
+--------------------------------------------
+--  Splitting Levity
+--------------------------------------------
+
+-- | `levity_maybe` takes a Type of kind Levity, and returns its levity
+-- May not be possible for a type variable or type family application
+levityType_maybe :: Type -> Maybe Levity
+levityType_maybe lev
+  | TyConApp lev_tc args <- coreFullView lev
+  = if | lev_tc `hasKey` liftedDataConKey   -> assert( null args) $ Just Lifted
+       | lev_tc `hasKey` unliftedDataConKey -> assert( null args) $ Just Unlifted
+       | otherwise                          -> Nothing
+  | otherwise
+  = Nothing
+
 
 {- *********************************************************************
 *                                                                      *
