@@ -266,9 +266,15 @@ function h$errorMsg(pat) {
     str = str.replace(/%s/, arguments[i]);
   }
 #ifndef GHCJS_BROWSER
+  // basename that only works on Linux for now...
+  function basename(path) {
+   return path.split('/').reverse()[0];
+  }
   if(h$isGHCJSi) {
     // ignore message
   } else if(h$isNode) {
+    // append program name
+    str = basename(process.argv[1]) + ": " + str;
     process.stderr.write(str);
   } else if (h$isJsShell && typeof printErr !== 'undefined') {
     if(str.length) printErr(stripTrailingNewline(str));
