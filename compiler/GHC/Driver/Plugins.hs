@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE CPP #-}
 
-#if defined(HAVE_INTERNAL_INTERPRETER)
+#if defined(HAVE_INTERNAL_INTERPRETER) && defined(CAN_LOAD_DLL)
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -103,7 +103,7 @@ import qualified Data.Semigroup
 
 import Control.Monad
 
-#if defined(HAVE_INTERNAL_INTERPRETER)
+#if defined(HAVE_INTERNAL_INTERPRETER) && defined(CAN_LOAD_DLL)
 import GHCi.ObjLink
 import GHC.Exts (addrToAny#, Ptr(..))
 import GHC.Utils.Encoding
