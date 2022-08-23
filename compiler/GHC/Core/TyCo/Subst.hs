@@ -52,6 +52,7 @@ module GHC.Core.TyCo.Subst
         checkValidSubst, isValidTCvSubst,
 
         TTCvSubst(..),
+        mkTTCvSubst,
         substTyUncheckedT, substTyVarBndrT,
   ) where
 
@@ -275,6 +276,9 @@ isEmptyTTCvSubst (TTCvSubst _ tenv cenv) = isEmptyVarEnv tenv && isEmptyVarEnv c
 
 mkTCvSubst :: InScopeSet -> (TvSubstEnv, CvSubstEnv) -> TCvSubst
 mkTCvSubst in_scope (tenv, cenv) = TCvSubst in_scope tenv cenv
+
+mkTTCvSubst :: TInScopeSet s -> (TvSubstEnv, CvSubstEnv) -> TTCvSubst s
+mkTTCvSubst in_scope (tenv, cenv) = TTCvSubst in_scope tenv cenv
 
 mkTvSubst :: InScopeSet -> TvSubstEnv -> TCvSubst
 -- ^ Make a TCvSubst with specified tyvar subst and empty covar subst

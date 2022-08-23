@@ -63,7 +63,8 @@ import GHC.Driver.Session       ( DynFlags )
 import GHC.Builtin.Types
 import GHC.Core.TyCo.Rep        ( TyCoBinder(..) )
 import qualified GHC.Core.Type as Type
-import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, extendTvSubst, extendCvSubst )
+import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, extendTvSubst, extendCvSubst
+                                , substTyVarBndrT )
 import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
 import GHC.Types.Basic
@@ -75,6 +76,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Logger
 import GHC.Types.Unique.FM      ( pprUniqFM )
 
+import Control.Monad.ST
 import Data.List (mapAccumL)
 
 {-
@@ -111,6 +113,17 @@ data SimplEnv
       , seInScope   :: !InScopeSet       -- OutVars only
 
       , seCaseDepth :: !Int  -- Depth of multi-branch case alternatives
+    }
+
+data TSimplEnv s
+  = TSimplEnv {
+        tseMode      :: !SimplMode
+      , tseTvSubst   :: TvSubstEnv
+      , tseCvSubst   :: CvSubstEnv
+      , tseIdSubst   :: SimplIdSubst
+      , tseRecIds :: !UnVarSet
+      , tseInScope   :: !(TInScopeSet s)
+      , tseCaseDepth :: !Int
     }
 
 data SimplFloats
@@ -438,6 +451,16 @@ setSubstEnv env tvs cvs ids = env { seTvSubst = tvs, seCvSubst = cvs, seIdSubst 
 
 mkContEx :: SimplEnv -> InExpr -> SimplSR
 mkContEx (SimplEnv { seTvSubst = tvs, seCvSubst = cvs, seIdSubst = ids }) e = ContEx tvs cvs ids e
+
+transientSimplEnv :: SimplEnv -> TSimplEnv s
+transientSimplEnv (SimplEnv mode tv_subst cv_subst id_subst rec_ids in_scope case_depth)
+  = let transient_in_scope = transientInScopeSet in_scope
+    in TSimplEnv mode tv_subst cv_subst id_subst rec_ids transient_in_scope case_depth
+
+persistentSimplEnv :: TSimplEnv s -> ST s SimplEnv
+persistentSimplEnv (TSimplEnv mode tv_subst cv_subst id_subst rec_ids in_scope case_depth) = do
+  persistent_in_scope <- persistentInScopeSet in_scope
+  return (SimplEnv mode tv_subst cv_subst id_subst rec_ids persistent_in_scope case_depth)
 
 {-
 ************************************************************************
@@ -799,7 +822,13 @@ See also Note [Scaling join point arguments].
 -}
 
 simplBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
-simplBinders  !env bndrs = mapAccumLM simplBinder  env bndrs
+simplBinders  !env bndrs = return $ runST $ do
+  (env', bndrs') <- simplBindersT (transientSimplEnv env) bndrs
+  persistent_env <- persistentSimplEnv env'
+  return (persistent_env, bndrs')
+
+simplBindersT :: TSimplEnv s -> [InBndr] -> ST s (TSimplEnv s, [OutBndr])
+simplBindersT !env bndrs = mapAccumLM simplBinderT env bndrs
 
 -------------
 simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
@@ -812,6 +841,13 @@ simplBinder !env bndr
   | isTyVar bndr  = do  { let (env', tv) = substTyVarBndr env bndr
                         ; seqTyVar tv `seq` return (env', tv) }
   | otherwise     = do  { let (env', id) = substIdBndr env bndr
+                        ; seqId id `seq` return (env', id) }
+
+simplBinderT :: TSimplEnv s -> InBndr -> ST s (TSimplEnv s, OutBndr)
+simplBinderT !env bndr
+  | isTyVar bndr  = do  { (env', tv) <- substTyVarBndrT env bndr
+                        ; seqTyVar tv `seq` return (env', tv) }
+  | otherwise     = do  { (env', id) <- substIdBndrT env bndr
                         ; seqId id `seq` return (env', id) }
 
 ---------------
@@ -838,6 +874,16 @@ substIdBndr env bndr
   | isCoVar bndr  = substCoVarBndr env bndr
   | otherwise     = substNonCoVarIdBndr env bndr
 
+substIdBndrT :: TSimplEnv s -> InBndr -> ST s (TSimplEnv s, OutBndr)
+-- Might be a coercion variable
+substIdBndrT env bndr
+  | isCoVar bndr = do
+      -- TODO: Make a substCoVarBndrT version of substCoVarBndr
+      persistent_env <- persistentSimplEnv env
+      let (env', id) = substCoVarBndr persistent_env bndr
+      return (transientSimplEnv env', id)
+  | otherwise = substNonCoVarIdBndrT env bndr
+
 ---------------
 substNonCoVarIdBndr
    :: SimplEnv
@@ -861,6 +907,9 @@ substNonCoVarIdBndr
 --      the type of id_subst differs
 --      all fragile info is zapped
 substNonCoVarIdBndr env id = subst_id_bndr env id (\x -> x)
+
+substNonCoVarIdBndrT :: TSimplEnv s -> InBndr -> ST s (TSimplEnv s, OutBndr)
+substNonCoVarIdBndrT env id = subst_id_bndr_t env id (\x -> x)
 
 -- Inline to make the (OutId -> OutId) function a known call.
 -- This is especially important for `substNonCoVarIdBndr` which
@@ -897,6 +946,34 @@ subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
               = delVarEnv id_subst old_id
 
     !new_in_scope = in_scope `extendInScopeSet` new_id
+
+-- Inline to make the (OutId -> OutId) function a known call.
+-- This is especially important for `substNonCoVarIdBndrT` which
+-- passes an identity lambda.
+{-# INLINE subst_id_bndr_t #-}
+subst_id_bndr_t :: TSimplEnv s
+                -> InBndr    -- Env and binder to transform
+                -> (OutId -> OutId)  -- Adjust the type
+                -> ST s (TSimplEnv s, OutBndr)
+subst_id_bndr_t env@(TSimplEnv { tseInScope = in_scope, tseIdSubst = id_subst })
+                old_id adjust_type
+  = assertPpr (not (isCoVar old_id)) (ppr old_id) $ do
+    !id1 <- uniqAwayT in_scope old_id
+    !id2 <- substIdTypeT env id1
+    let !id3  = zapFragileIdInfo id2   -- Zaps rules, worker-info, unfolding
+                                       -- and fragile OccInfo
+        !new_id = adjust_type id3
+
+            -- Extend the substitution if the unique has changed,
+            -- or there's some useful occurrence information
+            -- See the notes with substTyVarBndr for the delSubstEnv
+        !new_subst | new_id /= old_id
+                  = extendVarEnv id_subst old_id (DoneId new_id)
+                  | otherwise
+                  = delVarEnv id_subst old_id
+
+    new_in_scope <- in_scope `extendTInScopeSet` new_id
+    return (env { tseInScope = new_in_scope, tseIdSubst = new_subst }, new_id)
 
 ------------------------------------
 seqTyVar :: TyVar -> ()
@@ -1044,6 +1121,11 @@ getTCvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env
                       , seCvSubst = cv_env })
   = mkTCvSubst in_scope (tv_env, cv_env)
 
+getTTCvSubst :: TSimplEnv s -> TTCvSubst s
+getTTCvSubst (TSimplEnv { tseInScope = in_scope, tseTvSubst = tv_env
+                        , tseCvSubst = cv_env })
+  = mkTTCvSubst in_scope (tv_env, cv_env)
+
 substTy :: HasDebugCallStack => SimplEnv -> Type -> Type
 substTy env ty = Type.substTy (getTCvSubst env) ty
 
@@ -1055,6 +1137,11 @@ substTyVarBndr env tv
   = case Type.substTyVarBndr (getTCvSubst env) tv of
         (TCvSubst in_scope' tv_env' cv_env', tv')
            -> (env { seInScope = in_scope', seTvSubst = tv_env', seCvSubst = cv_env' }, tv')
+
+substTyVarBndrT :: TSimplEnv s -> TyVar -> ST s (TSimplEnv s, TyVar)
+substTyVarBndrT env tv = do
+  (TTCvSubst in_scope' tv_env' cv_env', tv') <- Type.substTyVarBndrT (getTTCvSubst env) tv
+  return (env { tseInScope = in_scope', tseTvSubst = tv_env', tseCvSubst = cv_env' }, tv')
 
 substCoVar :: SimplEnv -> CoVar -> Coercion
 substCoVar env tv = Coercion.substCoVar (getTCvSubst env) tv
@@ -1081,5 +1168,21 @@ substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv
   where
     no_free_vars = noFreeVarsOfType old_ty && noFreeVarsOfType old_w
     subst = TCvSubst in_scope tv_env cv_env
+    old_ty = idType id
+    old_w  = varMult id
+
+-- | Persists the 'TInScopeSet' before it is modfied.
+substIdTypeT :: TSimplEnv s -> Id -> ST s Id
+substIdTypeT (TSimplEnv { tseInScope = in_scope, tseTvSubst = tv_env, tseCvSubst = cv_env }) id
+  | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
+    || no_free_vars
+  = return id
+  | otherwise = Id.updateIdTypeAndMultM (Type.substTyUncheckedT subst) id
+                -- The tyCoVarsOfType is cheaper than it looks
+                -- because we cache the free tyvars of the type
+                -- in a Note in the id's type itself
+  where
+    no_free_vars = noFreeVarsOfType old_ty && noFreeVarsOfType old_w
+    subst = TTCvSubst in_scope tv_env cv_env
     old_ty = idType id
     old_w  = varMult id

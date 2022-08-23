@@ -225,7 +225,7 @@ module GHC.Core.Type (
         substTyCoBndr,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
-        substTyUncheckedT, substTyVarBndrT,
+        mkTTCvSubst, substTyUncheckedT, substTyVarBndrT,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
