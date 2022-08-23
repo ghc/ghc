@@ -18,7 +18,8 @@ import GHC.Prelude
 
 import GHC.Builtin.Types       ( liftedTypeKindTyCon, unliftedTypeKindTyCon )
 
-import GHC.Core.Coercion       ( coToMCo, mkCastTyMCo )
+import GHC.Core.Coercion       ( coToMCo, mkCastTyMCo
+                               , mkGReflRightMCo, mkNomReflCo )
 import GHC.Core.TyCo.Rep       ( Type(..), MCoercion(..) )
 import GHC.Core.TyCon          ( isConcreteTyCon )
 import GHC.Core.Type           ( isConcrete, typeKind, tyVarKind, tcView
@@ -26,8 +27,7 @@ import GHC.Core.Type           ( isConcrete, typeKind, tyVarKind, tcView
 
 import GHC.Tc.Types            ( TcM, ThStage(..), PendingStuff(..) )
 import GHC.Tc.Types.Constraint ( NotConcreteError(..), NotConcreteReason(..) )
-import GHC.Tc.Types.Evidence   ( Role(..), TcCoercionN, TcMCoercionN
-                               , mkTcGReflRightMCo, mkTcNomReflCo )
+import GHC.Tc.Types.Evidence   ( Role(..), TcCoercionN, TcMCoercionN )
 import GHC.Tc.Types.Origin     ( CtOrigin(..), FixedRuntimeRepContext, FixedRuntimeRepOrigin(..) )
 import GHC.Tc.Utils.Monad      ( emitNotConcreteError, setTcLevel, getCtLocM, getStage, traceTc )
 import GHC.Tc.Utils.TcType     ( TcType, TcKind, TcTypeFRR
@@ -455,12 +455,12 @@ checkFRR_with check_kind frr_ctxt ty
           -- Otherwise: ensure that the kind 'ki' of 'ty' is concrete.
           | otherwise
           -> do { kco <- check_kind frr_orig ki
-                ; return ( mkTcGReflRightMCo Nominal ty kco
+                ; return ( mkGReflRightMCo Nominal ty kco
                          , mkCastTyMCo ty kco ) } }
 
   where
     refl :: (TcCoercionN, TcType)
-    refl = (mkTcNomReflCo ty, ty)
+    refl = (mkNomReflCo ty, ty)
     ki :: TcKind
     ki = typeKind ty
     frr_orig :: FixedRuntimeRepOrigin

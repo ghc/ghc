@@ -338,30 +338,28 @@ opt_co4 env sym rep r (TransCo co1 co2)
     co2' = opt_co4_wrap env sym rep r co2
     in_scope = lcInScopeSet env
 
-opt_co4 env _sym rep r (SelCo _r n co)
-  | Just (ty, _) <- isReflCo_maybe co
-  = assert (r == _r ) $
+opt_co4 env _sym rep r (SelCo n co)
+  | Just (ty, co_role) <- isReflCo_maybe co
+  = assert (r == co_role ) $
     liftCoSubst (chooseRole rep r) env (getNthFromType n ty)
 
-opt_co4 env sym rep r (SelCo r1 (SelTyCon n) (TyConAppCo _ _ cos))
+opt_co4 env sym rep r (SelCo (SelTyCon n r1) (TyConAppCo _ _ cos))
   = assert (r == r1 )
     opt_co4_wrap env sym rep r (cos `getNth` n)
 
 -- see the definition of GHC.Builtin.Types.Prim.funTyCon
-opt_co4 env sym rep r (SelCo r1 (SelFun fs) (FunCo _r2 w co1 co2))
-  = assert (r == r1 )
-    opt_co4_wrap env sym rep r (getNthFun fs w co1 co2)
+opt_co4 env sym rep r (SelCo (SelFun fs) (FunCo _r2 w co1 co2))
+  = opt_co4_wrap env sym rep r (getNthFun fs w co1 co2)
 
-opt_co4 env sym rep r (SelCo _r SelForAll (ForAllCo _ eta _))
+opt_co4 env sym rep _ (SelCo SelForAll (ForAllCo _ eta _))
       -- works for both tyvar and covar
-  = assert (r == _r )
-    opt_co4_wrap env sym rep Nominal eta
+  = opt_co4_wrap env sym rep Nominal eta
 
-opt_co4 env sym rep r (SelCo _r n co)
+opt_co4 env sym rep r (SelCo n co)
   | Just nth_co <- case (co', n) of
-      (TyConAppCo _ _ cos, SelTyCon n) -> Just (cos `getNth` n)
-      (FunCo _ w co1 co2, SelFun fs)   -> Just (getNthFun fs w co1 co2)
-      (ForAllCo _ eta _, SelForAll)    -> Just eta
+      (TyConAppCo _ _ cos, SelTyCon n _) -> Just (cos `getNth` n)
+      (FunCo _ w co1 co2, SelFun fs)     -> Just (getNthFun fs w co1 co2)
+      (ForAllCo _ eta _, SelForAll)      -> Just eta
       _                  -> Nothing
   = if rep && (r == Nominal)
       -- keep propagating the SubCo
@@ -369,7 +367,7 @@ opt_co4 env sym rep r (SelCo _r n co)
     else nth_co
 
   | otherwise
-  = wrapRole rep r $ SelCo r n co'
+  = wrapRole rep r $ SelCo n co'
   where
     co' = opt_co1 env sym co
 
@@ -452,8 +450,8 @@ opt_co4 env sym rep r (InstCo co1 arg)
             -- new_co = (h1 :: t1 ~ t2) ~ ((n1;h2;sym n2) :: t1 ~ t2)
             r2  = coVarRole cv
             kind_co' = downgradeRole r2 Nominal kind_co
-            n1 = mkSelCo r2 (SelTyCon 2) kind_co'
-            n2 = mkSelCo r2 (SelTyCon 3) kind_co'
+            n1 = mkSelCo (SelTyCon 2 r2) kind_co'
+            n2 = mkSelCo (SelTyCon 3 r2) kind_co'
          in mkProofIrrelCo Nominal (Refl (coercionType h1)) h1
                            (n1 `mkTransCo` h2 `mkTransCo` (mkSymCo n2))
 
@@ -574,9 +572,9 @@ opt_univ env sym prov role oty1 oty2
         eta   = mkUnivCo prov' Nominal k1 k2
         eta_d = downgradeRole r' Nominal eta
           -- eta gets opt'ed soon, but not yet.
-        n_co  = (mkSymCo $ mkSelCo r' (SelTyCon 2) eta_d) `mkTransCo`
+        n_co  = (mkSymCo $ mkSelCo (SelTyCon 2 r') eta_d) `mkTransCo`
                 (mkCoVarCo cv1) `mkTransCo`
-                (mkSelCo r' (SelTyCon 3) eta_d)
+                (mkSelCo (SelTyCon 3 r') eta_d)
         ty2'  = substTyWithCoVars [cv2] [n_co] ty2
 
         (env', cv1', eta') = optForAllCoBndr env sym cv1 eta
@@ -648,13 +646,12 @@ opt_trans_rule is in_co1@(GRefl r1 t1 (MCo co1)) in_co2@(GRefl r2 _ (MCo co2))
     mkGReflRightCo r1 t1 (opt_trans is co1 co2)
 
 -- Push transitivity through matching destructors
-opt_trans_rule is in_co1@(SelCo r1 d1 co1) in_co2@(SelCo r2 d2 co2)
+opt_trans_rule is in_co1@(SelCo d1 co1) in_co2@(SelCo d2 co2)
   | d1 == d2
   , coercionRole co1 == coercionRole co2
   , co1 `compatible_co` co2
-  = assert (r1 == r2) $
-    fireTransRule "PushNth" in_co1 in_co2 $
-    mkSelCo r1 d1 (opt_trans is co1 co2)
+  = fireTransRule "PushNth" in_co1 in_co2 $
+    mkSelCo d1 (opt_trans is co1 co2)
 
 opt_trans_rule is in_co1@(LRCo d1 co1) in_co2@(LRCo d2 co2)
   | d1 == d2
@@ -769,8 +766,8 @@ opt_trans_rule is co1 co2
       is'  = is `extendInScopeSet` cv1
       role = coVarRole cv1
       eta1' = downgradeRole role Nominal eta1
-      n1   = mkSelCo role (SelTyCon 2) eta1'
-      n2   = mkSelCo role (SelTyCon 3) eta1'
+      n1   = mkSelCo (SelTyCon 2 role) eta1'
+      n2   = mkSelCo (SelTyCon 3 role) eta1'
       r2'  = substCo (zipCvSubst [cv2] [(mkSymCo n1) `mkTransCo`
                                         (mkCoVarCo cv1) `mkTransCo` n2])
                     r2
@@ -1132,8 +1129,8 @@ Similarly, we do this
 Here,
 
   h1   = mkSelCo Nominal 0 g       :: (s1~s2)~(s3~s4)
-  eta1 = mkSelCo r (SelTyCon 2) h1 :: (s1 ~ s3)
-  eta2 = mkSelCo r (SelTyCon 3) h1 :: (s2 ~ s4)
+  eta1 = mkSelCo (SelTyCon 2 r) h1 :: (s1 ~ s3)
+  eta2 = mkSelCo (SelTyCon 3 r) h1 :: (s2 ~ s4)
   h2   = mkInstCo g (cv1 ~ (sym eta1;c1;eta2))
 -}
 etaForAllCo_ty_maybe :: Coercion -> Maybe (TyVar, Coercion, Coercion)
@@ -1145,7 +1142,7 @@ etaForAllCo_ty_maybe co
   | Pair ty1 ty2  <- coercionKind co
   , Just (tv1, _) <- splitForAllTyVar_maybe ty1
   , isForAllTy_ty ty2
-  , let kind_co = mkSelCo Nominal SelForAll co
+  , let kind_co = mkSelCo SelForAll co
   = Just ( tv1, kind_co
          , mkInstCo co (mkGReflRightCo Nominal (TyVarTy tv1) kind_co))
 
@@ -1161,13 +1158,13 @@ etaForAllCo_co_maybe co
   | Pair ty1 ty2  <- coercionKind co
   , Just (cv1, _) <- splitForAllCoVar_maybe ty1
   , isForAllTy_co ty2
-  = let kind_co  = mkSelCo Nominal SelForAll co
+  = let kind_co  = mkSelCo SelForAll co
         r        = coVarRole cv1
         l_co     = mkCoVarCo cv1
         kind_co' = downgradeRole r Nominal kind_co
-        r_co     = mkSymCo (mkSelCo r (SelTyCon 2) kind_co')
+        r_co     = mkSymCo (mkSelCo (SelTyCon 2 r) kind_co')
                    `mkTransCo` l_co
-                   `mkTransCo` mkSelCo r (SelTyCon 3) kind_co'
+                   `mkTransCo` mkSelCo (SelTyCon 3 r) kind_co'
     in Just ( cv1, kind_co
             , mkInstCo co (mkProofIrrelCo Nominal kind_co l_co r_co))
 

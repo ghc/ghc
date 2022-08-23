@@ -604,8 +604,8 @@ expandTypeSynonyms ty
       = mkSymCo (go_co subst co)
     go_co subst (TransCo co1 co2)
       = mkTransCo (go_co subst co1) (go_co subst co2)
-    go_co subst (SelCo r n co)
-      = mkSelCo r n (go_co subst co)
+    go_co subst (SelCo n co)
+      = mkSelCo n (go_co subst co)
     go_co subst (LRCo lr co)
       = mkLRCo lr (go_co subst co)
     go_co subst (InstCo co arg)
@@ -1003,7 +1003,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_co env (SymCo co)          = mkSymCo <$> go_co env co
     go_co env (TransCo c1 c2)     = mkTransCo <$> go_co env c1 <*> go_co env c2
     go_co env (AxiomRuleCo r cos) = AxiomRuleCo r <$> go_cos env cos
-    go_co env (SelCo r i co)      = mkSelCo r i <$> go_co env co
+    go_co env (SelCo i co)        = mkSelCo i <$> go_co env co
     go_co env (LRCo lr co)        = mkLRCo lr <$> go_co env co
     go_co env (InstCo co arg)     = mkInstCo <$> go_co env co <*> go_co env arg
     go_co env (KindCo co)         = mkKindCo <$> go_co env co
@@ -3325,8 +3325,8 @@ occCheckExpand vs_to_avoid ty
     go_co cxt (TransCo co1 co2)         = do { co1' <- go_co cxt co1
                                              ; co2' <- go_co cxt co2
                                              ; return (mkTransCo co1' co2') }
-    go_co cxt (SelCo r n co)            = do { co' <- go_co cxt co
-                                             ; return (mkSelCo r n co') }
+    go_co cxt (SelCo n co)              = do { co' <- go_co cxt co
+                                             ; return (mkSelCo n co') }
     go_co cxt (LRCo lr co)              = do { co' <- go_co cxt co
                                              ; return (mkLRCo lr co') }
     go_co cxt (InstCo co arg)           = do { co' <- go_co cxt co
@@ -3386,7 +3386,7 @@ tyConsOfType ty
      go_co (HoleCo {})             = emptyUniqSet
      go_co (SymCo co)              = go_co co
      go_co (TransCo co1 co2)       = go_co co1 `unionUniqSets` go_co co2
-     go_co (SelCo _ _ co)          = go_co co
+     go_co (SelCo _ co)            = go_co co
      go_co (LRCo _ co)             = go_co co
      go_co (InstCo co arg)         = go_co co `unionUniqSets` go_co arg
      go_co (KindCo co)             = go_co co

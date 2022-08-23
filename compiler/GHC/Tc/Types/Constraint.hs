@@ -1892,7 +1892,7 @@ ctEvExpr ev = evId (ctEvEvId ev)
 
 ctEvCoercion :: HasDebugCallStack => CtEvidence -> TcCoercion
 ctEvCoercion (CtGiven { ctev_evar = ev_id })
-  = mkTcCoVarCo ev_id
+  = mkCoVarCo ev_id
 ctEvCoercion (CtWanted { ctev_dest = dest })
   | HoleDest hole <- dest
   = -- ctEvCoercion is only called on type equalities

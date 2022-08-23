@@ -36,7 +36,7 @@ module GHC.Core.Coercion (
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo,
-        mkSelCo, getNthFun, getNthFromType, nthCoRole, mkLRCo,
+        mkSelCo, getNthFun, getNthFromType, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo, mkFunResCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos,
         mkPhantomCo,
@@ -420,25 +420,24 @@ decomposeCo :: Arity -> Coercion
                        -- entries as the Arity provided
             -> [Coercion]
 decomposeCo arity co rs
-  = [mkSelCo r (SelTyCon n) co | (n,r) <- [0..(arity-1)] `zip` rs ]
+  = [mkSelCo (SelTyCon n r) co | (n,r) <- [0..(arity-1)] `zip` rs ]
      -- Remember, SelTyCon is zero-indexed
 
 decomposeFunCo :: HasDebugCallStack
-               => Role      -- Role of the input coercion
-               -> Coercion  -- Input coercion
+               => Coercion  -- Input coercion
                -> (CoercionN, Coercion, Coercion)
 -- Expects co :: (s1 -> t1) ~ (s2 -> t2)
 -- Returns (co1 :: s1~s2, co2 :: t1~t2)
 -- See Note [Function coercions] for the "3" and "4"
 
-decomposeFunCo _ (FunCo _ w co1 co2) = (w, co1, co2)
+decomposeFunCo (FunCo _ w co1 co2) = (w, co1, co2)
    -- Short-circuits the calls to mkSelCo
 
-decomposeFunCo r co
+decomposeFunCo co
   = assertPpr all_ok (ppr co) $
-    ( mkSelCo Nominal (SelFun SelMult) co
-    , mkSelCo r (SelFun SelArg) co
-    , mkSelCo r (SelFun SelRes) co )
+    ( mkSelCo (SelFun SelMult) co
+    , mkSelCo (SelFun SelArg) co
+    , mkSelCo (SelFun SelRes) co )
   where
     Pair s1t1 s2t2 = coercionKind co
     all_ok = isFunTy s1t1 && isFunTy s2t2
@@ -499,7 +498,7 @@ decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
         --          ty :: s2
         -- need arg_co :: s2 ~ s1
         --      res_co :: t1[ty |> arg_co / a] ~ t2[ty / b]
-      = let arg_co  = mkSelCo Nominal SelForAll (mkSymCo co)
+      = let arg_co  = mkSelCo SelForAll (mkSymCo co)
             res_co  = mkInstCo co (mkGReflLeftCo Nominal ty arg_co)
             subst1' = extendTCvSubst subst1 a (ty `CastTy` arg_co)
             subst2' = extendTCvSubst subst2 b ty
@@ -514,7 +513,7 @@ decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
         --          ty :: s2
         -- need arg_co :: s2 ~ s1
         --      res_co :: t1 ~ t2
-      = let (_, sym_arg_co, res_co) = decomposeFunCo Nominal co
+      = let (_, sym_arg_co, res_co) = decomposeFunCo co
             -- It should be fine to ignore the multiplicity bit
             -- of the coercion for a Nominal coercion.
             arg_co = mkSymCo sym_arg_co
@@ -629,7 +628,7 @@ eqTyConRole tc
 -- produce a coercion @rep_co :: r1 ~ r2@.
 mkRuntimeRepCo :: HasDebugCallStack => Coercion -> Coercion
 mkRuntimeRepCo co
-  = mkSelCo Nominal (SelTyCon 0) kind_co
+  = mkSelCo (SelTyCon 0 Nominal) kind_co
   where
     kind_co = mkKindCo co  -- kind_co :: TYPE r1 ~ TYPE r2
 
@@ -1071,47 +1070,39 @@ mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
 mkTransCo co1 co2                = TransCo co1 co2
 
 mkSelCo :: HasDebugCallStack
-        => Role  -- The role of the coercion you're creating
-        -> CoSel
+        => CoSel
         -> Coercion
         -> Coercion
-mkSelCo r n co = mkSelCo_maybe r n co `orElse` SelCo r n co
+mkSelCo n co = mkSelCo_maybe n co `orElse` SelCo n co
 
 mkSelCo_maybe :: HasDebugCallStack
-        => Role  -- The role of the coercion you're creating
-        -> CoSel
+        => CoSel
         -> Coercion
         -> Maybe Coercion
 -- mkSelCo_maybe tries to optimise call to mkSelCo
-mkSelCo_maybe r cs co
-  = assertPpr good_call bad_call_msg $
+mkSelCo_maybe cs co
+  = assertPpr (good_call cs) bad_call_msg $
     go cs co
   where
     Pair ty1 ty2 = coercionKind co
 
     go cs co
-      | Just (ty, _) <- isReflCo_maybe co
+      | Just (ty, r) <- isReflCo_maybe co
       = Just (mkReflCo r (getNthFromType cs ty))
 
     go SelForAll (ForAllCo _ kind_co _)
-      = assert (r == Nominal)
-        Just kind_co
+      = Just kind_co
       -- If co :: (forall a1:k1. t1) ~ (forall a2:k2. t2)
       -- then (nth SelForAll co :: k1 ~N k2)
       -- If co :: (forall a1:t1 ~ t2. t1) ~ (forall a2:t3 ~ t4. t2)
       -- then (nth SelForAll co :: (t1 ~ t2) ~N (t3 ~ t4))
 
-    go (SelFun fs) (FunCo r0 w arg res)
-      = assertPpr (r == funRole r0 fs) (ppr r <+> ppr fs $$ ppr co) $
-        Just (getNthFun fs w arg res)
+    go (SelFun fs) (FunCo _ w arg res)
+      = Just (getNthFun fs w arg res)
 
-    go (SelTyCon i) (TyConAppCo r0 tc arg_cos)
+    go (SelTyCon i r) (TyConAppCo r0 tc arg_cos)
       = assertPpr (r == tyConRole r0 tc i)
-                  (vcat [ ppr tc
-                        , ppr arg_cos
-                        , ppr r0
-                        , ppr i
-                        , ppr r ]) $
+                  (vcat [ ppr tc, ppr arg_cos, ppr r0, ppr i, ppr r ]) $
         Just (arg_cos `getNth` i)
 
     go cs (SymCo co)  -- Recurse, hoping to get to a TyConAppCo or FunCo
@@ -1123,44 +1114,29 @@ mkSelCo_maybe r cs co
     bad_call_msg = vcat [ text "Coercion =" <+> ppr co
                         , text "LHS ty =" <+> ppr ty1
                         , text "RHS ty =" <+> ppr ty2
-                        , text "cs =" <+> ppr cs, text "r =" <+> ppr r
+                        , text "cs =" <+> ppr cs
                         , text "coercion role =" <+> ppr (coercionRole co) ]
-    good_call
-      -- If the Coercion passed in is between forall-types, then the Int must
-      -- be 0 and the role must be Nominal.
+
+    -- good_call checks the typing rules given in Note [SelCo]
+    good_call SelForAll
       | Just (_tv1, _) <- splitForAllTyCoVar_maybe ty1
       , Just (_tv2, _) <- splitForAllTyCoVar_maybe ty2
-      , SelForAll <- cs
-      = r == Nominal
+      =  True
 
-      -- If the Coercion passed in is between T tys and T tys', then the Int
-      -- must be less than the length of tys/tys' (which must be the same
-      -- lengths).
-      --
-      -- If the role of the Coercion is nominal, then the role passed in must
-      -- be nominal. If the role of the Coercion is representational, then the
-      -- role passed in must be tyConRolesRepresentational T !! n. If the role
-      -- of the Coercion is Phantom, then the role passed in must be Phantom.
-      --
-      -- See also Note [SelCo Cached Roles] if you're wondering why it's
-      -- glaringly obvious that we should be *computing* this role instead of
-      -- npassing it in.
-      | isFunTy ty1, isFunTy ty2
-      , SelFun fs <- cs
-      = r == funRole (coercionRole co) fs
+    good_call (SelFun {})
+       = isFunTy ty1 && isFunTy ty2
 
-      | Just (tc1, tys1) <- splitTyConApp_maybe ty1
-      , Just (tc2, tys2) <- splitTyConApp_maybe ty2
-      , tc1 == tc2
-      , SelTyCon n <- cs
-      = let len1 = length tys1
-            len2 = length tys2
-        in len1 == len2
-           && n < len1
-           && r == tyConRole (coercionRole co) tc1 n
+    good_call (SelTyCon n r)
+       | Just (tc1, tys1) <- splitTyConApp_maybe ty1
+       , Just (tc2, tys2) <- splitTyConApp_maybe ty2
+       , let { len1 = length tys1
+             ; len2 = length tys2 }
+       =  tc1 == tc2
+       && len1 == len2
+       && n < len1
+       && r == tyConRole (coercionRole co) tc1 n
 
-      | otherwise
-      = False
+    good_call _ = False
 
 -- | Extract the nth field of a FunCo
 getNthFun :: FunSel
@@ -1180,28 +1156,6 @@ getNthFun :: FunSel
 getNthFun SelMult mult _   _   = mult
 getNthFun SelArg _     arg _   = arg
 getNthFun SelRes _     _   res = res
-
--- | If you're about to call @mkSelCo r n co@, then @r@ should be
--- whatever @nthCoRole n co@ returns.
-nthCoRole :: CoSel -> Coercion -> Role
-nthCoRole cs co
-  | SelFun fs <- cs, isFunTy lty
-  = funRole r fs
-
-  | SelTyCon n <- cs
-  , Just (tc, _) <- splitTyConApp_maybe lty
-  = tyConRole r tc n
-
-  | SelForAll <- cs
-  , Just _ <- splitForAllTyCoVar_maybe lty
-  = Nominal
-
-  | otherwise
-  = pprPanic "nthCoRole" (ppr co)
-
-  where
-    lty = coercionLKind co
-    r   = coercionRole co
 
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkLRCo lr co
@@ -1365,10 +1319,10 @@ setNominalRole_maybe r co
       = AppCo <$> setNominalRole_maybe_helper co1 <*> pure co2
     setNominalRole_maybe_helper (ForAllCo tv kind_co co)
       = ForAllCo tv kind_co <$> setNominalRole_maybe_helper co
-    setNominalRole_maybe_helper (SelCo _r n co)
+    setNominalRole_maybe_helper (SelCo n co)
       -- NB, this case recurses via setNominalRole_maybe, not
       -- setNominalRole_maybe_helper!
-      = SelCo Nominal n <$> setNominalRole_maybe (coercionRole co) co
+      = SelCo n <$> setNominalRole_maybe (coercionRole co) co
     setNominalRole_maybe_helper (InstCo co arg)
       = InstCo <$> setNominalRole_maybe_helper co <*> pure arg
     setNominalRole_maybe_helper (UnivCo prov _ co1 co2)
@@ -1502,8 +1456,8 @@ promoteCoercion co = case co of
     TransCo co1 co2
       -> mkTransCo (promoteCoercion co1) (promoteCoercion co2)
 
-    SelCo r n co1
-      | Just co' <- mkSelCo_maybe r n co1
+    SelCo n co1
+      | Just co' <- mkSelCo_maybe n co1
       -> promoteCoercion co'
 
       | otherwise
@@ -1560,7 +1514,7 @@ instCoercion (Pair lty rty) g w
   | isFunTy lty && isFunTy rty
     -- g :: (t1 -> t2) ~ (t3 -> t4)
     -- returns t2 ~ t4
-  = Just $ mkSelCo Nominal (SelFun SelRes) g -- extract result type
+  = Just $ mkSelCo (SelFun SelRes) g -- extract result type
 
   | otherwise -- one forall, one funty...
   = Nothing
@@ -2208,8 +2162,8 @@ liftCoSubstCoVarBndrUsing view_co fun lc@(LC subst cenv) old_var
 
     role   = coVarRole old_var
     eta'   = downgradeRole role Nominal eta
-    eta1   = mkSelCo role (SelTyCon 2) eta'
-    eta2   = mkSelCo role (SelTyCon 3) eta'
+    eta1   = mkSelCo (SelTyCon 2 role) eta'
+    eta2   = mkSelCo (SelTyCon 3 role) eta'
 
     co1     = mkCoVarCo new_var
     co2     = mkSymCo eta1 `mkTransCo` co1 `mkTransCo` eta2
@@ -2304,7 +2258,7 @@ seqCo (UnivCo p r t1 t2)
   = seqProv p `seq` r `seq` seqType t1 `seq` seqType t2
 seqCo (SymCo co)                = seqCo co
 seqCo (TransCo co1 co2)         = seqCo co1 `seq` seqCo co2
-seqCo (SelCo r n co)            = r `seq` n `seq` seqCo co
+seqCo (SelCo n co)              = n `seq` seqCo co
 seqCo (LRCo lr co)              = lr `seq` seqCo co
 seqCo (InstCo co arg)           = seqCo co `seq` seqCo arg
 seqCo (KindCo co)               = seqCo co
@@ -2370,7 +2324,7 @@ coercionLKind co
     go (InstCo aco arg)         = go_app aco [go arg]
     go (KindCo co)              = typeKind (go co)
     go (SubCo co)               = go co
-    go (SelCo _ d co)           = getNthFromType d (go co)
+    go (SelCo d co)             = getNthFromType d (go co)
     go (AxiomInstCo ax ind cos) = go_ax_inst ax ind (map go cos)
     go (AxiomRuleCo ax cos)     = pFst $ expectJust "coercionKind" $
                                   coaxrProves ax $ map coercionKind cos
@@ -2398,7 +2352,7 @@ getNthFromType (SelFun fs) ty
   | Just (_af, mult, arg, res) <- splitFunTy_maybe ty
   = getNthFun fs mult arg res
 
-getNthFromType (SelTyCon n) ty
+getNthFromType (SelTyCon n _) ty
   | Just args <- tyConAppArgs_maybe ty
   = assertPpr (args `lengthExceeds` n) (ppr n $$ ppr ty) $
     args `getNth` n
@@ -2429,7 +2383,7 @@ coercionRKind co
     go (InstCo aco arg)         = go_app aco [go arg]
     go (KindCo co)              = typeKind (go co)
     go (SubCo co)               = go co
-    go (SelCo _ d co)           = getNthFromType d (go co)
+    go (SelCo d co)             = getNthFromType d (go co)
     go (AxiomInstCo ax ind cos) = go_ax_inst ax ind (map go cos)
     go (AxiomRuleCo ax cos)     = pSnd $ expectJust "coercionKind" $
                                   coaxrProves ax $ map coercionKind cos
@@ -2477,8 +2431,8 @@ coercionRKind co
         k2    = coercionRKind k_co
         r     = coVarRole cv1
         k_co' = downgradeRole r Nominal k_co
-        eta1  = mkSelCo r (SelTyCon 2) k_co'
-        eta2  = mkSelCo r (SelTyCon 3) k_co'
+        eta1  = mkSelCo (SelTyCon 2 r) k_co'
+        eta2  = mkSelCo (SelTyCon 3 r) k_co'
 
         -- k_co :: (t1 ~r t2) ~N (s1 ~r s2)
         -- k1    = t1 ~r t2
@@ -2532,7 +2486,9 @@ coercionRole = go
     go (UnivCo _ r _ _)  = r
     go (SymCo co) = go co
     go (TransCo co1 _co2) = go co1
-    go (SelCo r _d _co) = r
+    go (SelCo SelForAll      _co) = Nominal
+    go (SelCo (SelTyCon _ r) _co) = r
+    go (SelCo (SelFun fs)     co) = funRole (coercionRole co) fs
     go (LRCo {}) = Nominal
     go (InstCo co _) = go co
     go (KindCo {}) = Nominal
@@ -2673,8 +2629,8 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
 
             r    = coVarRole cv1
             kind_co' = downgradeRole r Nominal kind_co
-            eta1 = mkSelCo r (SelTyCon 2) kind_co'
-            eta2 = mkSelCo r (SelTyCon 3) kind_co'
+            eta1 = mkSelCo (SelTyCon 2 r) kind_co'
+            eta2 = mkSelCo (SelTyCon 3 r) kind_co'
 
             subst = mkEmptySubst $ mkInScopeSet $
                       tyCoVarsOfType ty2 `unionVarSet` tyCoVarsOfCo kind_co

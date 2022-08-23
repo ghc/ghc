@@ -8,7 +8,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
-{-
+{-a
 %
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -40,6 +40,7 @@ import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst (substTyWithInScope)
 import GHC.Core.TyCo.FVs( shallowTyCoVarsOfType )
 import GHC.Core.Type
+import GHC.Core.Coercion
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var.Set
 import GHC.Builtin.PrimOps( tagToEnumKey )
@@ -652,7 +653,7 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
                  arg_tys = mkTyVarTys arg_nus
                  res_ty  = mkTyVarTy res_nu
                  fun_ty' = mkScaledFunTys (zipWithEqual "tcInstFun" mkScaled mults arg_tys) res_ty
-                 co_wrap = mkWpCastN (mkTcGReflLeftCo Nominal fun_ty' kind_co)
+                 co_wrap = mkWpCastN (mkGReflLeftCo Nominal fun_ty' kind_co)
                  acc'    = addArgWrap co_wrap acc
                  -- Suppose kappa :: kk
                  -- Then fun_ty :: kk, fun_ty' :: Type, kind_co :: Type ~ kk
@@ -1216,7 +1217,7 @@ tcTagToEnum tc_fun fun_ctxt tc_args res_ty
          check_enumeration res_ty rep_tc
        ; let rep_ty  = mkTyConApp rep_tc rep_args
              tc_fun' = mkHsWrap (WpTyApp rep_ty) tc_fun
-             df_wrap = mkWpCastR (mkTcSymCo coi)
+             df_wrap = mkWpCastR (mkSymCo coi)
        ; tc_expr <- rebuildHsApps tc_fun' fun_ctxt [val_arg] res_ty
        ; return (mkHsWrap df_wrap tc_expr) }}}}}
 

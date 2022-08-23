@@ -2703,7 +2703,7 @@ pushCoTyArg co ty
        -- tyL = forall (a1 :: k1). ty1
        -- tyR = forall (a2 :: k2). ty2
 
-    co1 = mkSymCo (mkSelCo Nominal SelForAll co)
+    co1 = mkSymCo (mkSelCo SelForAll co)
        -- co1 :: k2 ~N k1
        -- Note that SelCo can extract a Nominal equality between the
        -- kinds of the types related by a coercion between forall-types.
@@ -2735,7 +2735,7 @@ pushCoValArg co
   = Just (MRefl, MRefl)
 
   | isFunTy tyL
-  , (co_mult, co1, co2) <- decomposeFunCo Representational co
+  , (co_mult, co1, co2) <- decomposeFunCo co
       -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
       -- then co1 :: tyL1 ~ tyR1
       --      co2 :: tyL2 ~ tyR2
@@ -2779,7 +2779,7 @@ pushCoercionIntoLambda in_scope x e co
     , Pair s1s2 t1t2 <- coercionKind co
     , Just {}              <- splitFunTy_maybe s1s2
     , Just (_, w1, t1,_t2) <- splitFunTy_maybe t1t2
-    , (co_mult, co1, co2)  <- decomposeFunCo Representational co
+    , (co_mult, co1, co2)  <- decomposeFunCo co
     , isReflexiveCo co_mult
       -- We can't push the coercion in the case where co_mult isn't
       -- reflexivity. See pushCoValArg for more details.
@@ -2898,21 +2898,21 @@ collectBindersPushingCo e
       , let Pair tyL tyR = coercionKind co
       , assert (isForAllTy_ty tyL) $
         isForAllTy_ty tyR
-      , isReflCo (mkSelCo Nominal SelForAll co)  -- See Note [collectBindersPushingCo]
+      , isReflCo (mkSelCo SelForAll co)  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkTyVarTy b)))
 
       | isCoVar b
       , let Pair tyL tyR = coercionKind co
       , assert (isForAllTy_co tyL) $
         isForAllTy_co tyR
-      , isReflCo (mkSelCo Nominal SelForAll co)  -- See Note [collectBindersPushingCo]
+      , isReflCo (mkSelCo SelForAll co)  -- See Note [collectBindersPushingCo]
       , let cov = mkCoVarCo b
       = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkCoercionTy cov)))
 
       | isId b
       , let Pair tyL tyR = coercionKind co
       , assert (isFunTy tyL) $ isFunTy tyR
-      , (co_mult, co_arg, co_res) <- decomposeFunCo Representational co
+      , (co_mult, co_arg, co_res) <- decomposeFunCo co
       , isReflCo co_mult -- See Note [collectBindersPushingCo]
       , isReflCo co_arg  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e co_res

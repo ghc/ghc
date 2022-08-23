@@ -1094,7 +1094,7 @@ addDeferredBinding ctxt err (EI { ei_evdest = Just dest, ei_pred = item_ty
              -> do { -- See Note [Deferred errors for coercion holes]
                      let co_var = coHoleCoVar hole
                    ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var err_tm
-                   ; fillCoercionHole hole (mkTcCoVarCo co_var) } }
+                   ; fillCoercionHole hole (mkCoVarCo co_var) } }
 addDeferredBinding _ _ _ = return ()    -- Do not set any evidence for Given
 
 mkErrorTerm :: SolverReportErrCtxt -> CtLoc -> Type  -- of the error term

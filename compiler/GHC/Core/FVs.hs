@@ -398,7 +398,7 @@ orphNamesOfCo (UnivCo p _ t1 t2)    = orphNamesOfProv p `unionNameSet` orphNames
                                       `unionNameSet` orphNamesOfType t2
 orphNamesOfCo (SymCo co)            = orphNamesOfCo co
 orphNamesOfCo (TransCo co1 co2)     = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
-orphNamesOfCo (SelCo _ _ co)        = orphNamesOfCo co
+orphNamesOfCo (SelCo _ co)          = orphNamesOfCo co
 orphNamesOfCo (LRCo  _ co)          = orphNamesOfCo co
 orphNamesOfCo (InstCo co arg)       = orphNamesOfCo co `unionNameSet` orphNamesOfCo arg
 orphNamesOfCo (KindCo co)           = orphNamesOfCo co

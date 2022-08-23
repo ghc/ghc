@@ -56,6 +56,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Core.TyCon
 import GHC.Core.Type
+import GHC.Core.Coercion
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
@@ -234,7 +235,7 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
                                 -- level, we'd be in checking mode (see tcConArg)
                                 -- hence this assertion
                                 do { bndr_ty <- inferResultToType infer_res
-                                   ; return (mkTcNomReflCo bndr_ty, bndr_ty) }
+                                   ; return (mkNomReflCo bndr_ty, bndr_ty) }
        ; let bndr_mult = scaledMult exp_pat_ty
        ; bndr_id <- newLetBndr no_gen bndr_name bndr_mult bndr_ty
        ; traceTc "tcPatBndr(nosig)" (vcat [ ppr bind_lvl
@@ -1108,7 +1109,7 @@ matchExpectedPatTy inner_match (PE { pe_orig = orig }) pat_ty
        ; (wrap, pat_rho) <- topInstantiate orig pat_ty
        ; (co, res) <- inner_match pat_rho
        ; traceTc "matchExpectedPatTy" (ppr pat_ty $$ ppr wrap)
-       ; return (mkWpCastN (mkTcSymCo co) <.> wrap, res) }
+       ; return (mkWpCastN (mkSymCo co) <.> wrap, res) }
 
 ----------------------------
 matchExpectedConTy :: PatEnv
@@ -1145,10 +1146,10 @@ matchExpectedConTy (PE { pe_orig = orig }) data_tc exp_pat_ty
              -- for actual vs. expected in error messages.
 
        ; let tys' = mkTyVarTys tvs'
-             co2 = mkTcUnbranchedAxInstCo co_tc tys' []
+             co2 = mkUnbranchedAxInstCo Representational co_tc tys' []
              -- co2 : T (ty1,ty2) ~R T7 ty1 ty2
 
-             full_co = mkTcSubCo (mkTcSymCo co1) `mkTcTransCo` co2
+             full_co = mkSubCo (mkSymCo co1) `mkTransCo` co2
              -- full_co :: pat_rho ~R T7 ty1 ty2
 
        ; return ( mkWpCastR full_co <.> wrap, tys') }
@@ -1157,7 +1158,7 @@ matchExpectedConTy (PE { pe_orig = orig }) data_tc exp_pat_ty
   = do { pat_ty <- expTypeToType (scaledThing exp_pat_ty)
        ; (wrap, pat_rho) <- topInstantiate orig pat_ty
        ; (coi, tys) <- matchExpectedTyConApp data_tc pat_rho
-       ; return (mkWpCastN (mkTcSymCo coi) <.> wrap, tys) }
+       ; return (mkWpCastN (mkSymCo coi) <.> wrap, tys) }
 
 {-
 Note [Matching constructor patterns]

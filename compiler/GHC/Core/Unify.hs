@@ -1153,7 +1153,7 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
            CoVarCo cv
              | not (um_unif env)
              , not (cv `elemVarEnv` c_subst)
-             , let (_, co_l, co_r) = decomposeFunCo Nominal kco
+             , let (_, co_l, co_r) = decomposeFunCo kco
                      -- Because the coercion is used in a type, it should be safe to
                      -- ignore the multiplicity coercion.
                       -- cv :: t1 ~ t2
@@ -1637,9 +1637,9 @@ ty_co_match menv subst (ForAllTy (Bndr tv1 _) ty1)
 --   1. Given:
 --        cv1      :: (s1 :: k1) ~r (s2 :: k2)
 --        kind_co2 :: (s1' ~ s2') ~N (t1 ~ t2)
---        eta1      = mkSelCo role (SelTyCon 2) (downgradeRole r Nominal kind_co2)
+--        eta1      = mkSelCo (SelTyCon 2 role) (downgradeRole r Nominal kind_co2)
 --                 :: s1' ~ t1
---        eta2      = mkSelCo role (SelTyCon 3) (downgradeRole r Nominal kind_co2)
+--        eta2      = mkSelCo (SelTyCon 3 role) (downgradeRole r Nominal kind_co2)
 --                 :: s2' ~ t2
 --      Wanted:
 --        subst1 <- ty_co_match menv subst  s1 eta1 kco1 kco2

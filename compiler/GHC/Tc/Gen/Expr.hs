@@ -69,6 +69,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Core.TyCon
 import GHC.Core.Type
+import GHC.Core.Coercion( mkSymCo )
 import GHC.Tc.Types.Evidence
 import GHC.Builtin.Types
 import GHC.Builtin.Names
@@ -846,7 +847,7 @@ tcSynArgA orig op sigma_ty arg_shapes res_shape thing_inside
            ; (list_co, elt_ty)   <- matchExpectedListTy rho_ty
                -- list_co :: [elt_ty] ~N rho_ty
            ; result <- thing_inside [elt_ty]
-           ; return (result, mkWpCastN (mkTcSymCo list_co) <.> inst_wrap) }
+           ; return (result, mkWpCastN (mkSymCo list_co) <.> inst_wrap) }
     tc_syn_arg _ (SynFun {}) _
       = pprPanic "tcSynArgA hits a SynFun" (ppr orig)
     tc_syn_arg res_ty (SynType the_ty) thing_inside

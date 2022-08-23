@@ -52,6 +52,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Core.Class   ( Class )
+import GHC.Core.Coercion( mkSymCo )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
 import GHC.Builtin.Types ( mkConstraintTupleTy )
@@ -1011,7 +1012,7 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
                -- comes from the checkExpectedKind in GHC.Tc.Gen.HsType.tcAnonWildCardOcc.
                -- So, to make the kinds work out, we reverse the cast here.
                Just (wc_var, wc_co) -> writeMetaTyVar wc_var (mkConstraintTupleTy diff_theta
-                                                              `mkCastTy` mkTcSymCo wc_co)
+                                                              `mkCastTy` mkSymCo wc_co)
                Nothing              -> pprPanic "chooseInferredQuantifiers 1" (ppr wc_var_ty)
 
            ; traceTc "completeTheta" $

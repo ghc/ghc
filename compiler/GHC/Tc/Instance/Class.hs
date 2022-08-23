@@ -38,6 +38,7 @@ import GHC.Types.Id.Make ( nospecId )
 import GHC.Types.Var
 
 import GHC.Core.Predicate
+import GHC.Core.Coercion
 import GHC.Core.InstEnv
 import GHC.Core.Type
 import GHC.Core.Make ( mkCharExpr, mkNaturalExpr, mkStringExprFS, mkCoreLams )
@@ -427,7 +428,7 @@ makeLitDict clas ty et
                     -- then tcRep is SNat
     , Just (_, co_rep) <- tcInstNewTyCon_maybe tcRep [ty]
           -- SNat n ~ Integer
-    , let ev_tm = mkEvCast et (mkTcSymCo (mkTcTransCo co_dict co_rep))
+    , let ev_tm = mkEvCast et (mkSymCo (mkTransCo co_dict co_rep))
     = return $ OneInst { cir_new_theta = []
                        , cir_mk_ev     = \_ -> ev_tm
                        , cir_what      = BuiltinInstance }
@@ -476,7 +477,7 @@ matchWithDict [cls, mty]
                    `App`
                  Var k
                    `App`
-                 (Var sv `Cast` mkTcTransCo (mkTcSubCo co2) (mkTcSymCo co))
+                 (Var sv `Cast` mkTransCo (mkSubCo co2) (mkSymCo co))
 
        ; tc <- tcLookupTyCon withDictClassName
        ; let Just withdict_data_con
@@ -960,8 +961,8 @@ matchHasField dflags short_cut clas tys
                          -- it to a HasField dictionary.
                          mk_ev (ev1:evs) = evSelector sel_id tvs evs `evCast` co
                            where
-                             co = mkTcSubCo (evTermCoercion (EvExpr ev1))
-                                      `mkTcTransCo` mkTcSymCo co2
+                             co = mkSubCo (evTermCoercion (EvExpr ev1))
+                                      `mkTransCo` mkSymCo co2
                          mk_ev [] = panic "matchHasField.mk_ev"
 
                          Just (_, co2) = tcInstNewTyCon_maybe (classTyCon clas)

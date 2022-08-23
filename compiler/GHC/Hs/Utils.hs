@@ -122,12 +122,15 @@ import GHC.Hs.Extension
 import GHC.Parser.Annotation
 
 import GHC.Tc.Types.Evidence
-import GHC.Core.TyCo.Rep
+
+import GHC.Core.Coercion( isReflCo )
 import GHC.Core.Multiplicity ( pattern ManyTy )
-import GHC.Builtin.Types ( unitTy )
-import GHC.Tc.Utils.TcType
 import GHC.Core.DataCon
 import GHC.Core.ConLike
+import GHC.Core.Type( Type, isUnliftedType )
+
+import GHC.Builtin.Types ( unitTy )
+
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Set hiding ( unitFV )
@@ -138,6 +141,7 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Fixity
 import GHC.Types.SourceText
+
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Settings.Constants
@@ -808,7 +812,7 @@ mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
                        | otherwise           = XPat $ CoPat co_fn p ty
 
 mkHsWrapPatCo :: TcCoercionN -> Pat GhcTc -> Type -> Pat GhcTc
-mkHsWrapPatCo co pat ty | isTcReflCo co = pat
+mkHsWrapPatCo co pat ty | isReflCo co = pat
                         | otherwise     = XPat $ CoPat (mkWpCastN co) pat ty
 
 mkHsDictLet :: TcEvBinds -> LHsExpr GhcTc -> LHsExpr GhcTc

@@ -18,14 +18,9 @@ import GHC.Types.Var
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names ( coercibleTyConKey, heqTyConKey, eqTyConKey, ipClassKey )
-import GHC.Core.Coercion.Axiom ( CoAxBranch (..), CoAxiom (..), TypeEqn, fromBranches, sfInteractInert, sfInteractTop )
-import GHC.Core.Class
-import GHC.Core.TyCon
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
 import GHC.Tc.Instance.Class ( InstanceWhat(..), safeOverlap )
-import GHC.Core.FamInstEnv
-import GHC.Core.Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
 
 import GHC.Tc.Types.Evidence
 import GHC.Utils.Outputable
@@ -33,27 +28,37 @@ import GHC.Utils.Panic
 
 import GHC.Tc.Types
 import GHC.Tc.Types.Constraint
-import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcMType( promoteMetaTyVarTo )
 import GHC.Tc.Solver.Types
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
-import GHC.Data.Bag
-import GHC.Utils.Monad ( concatMapM, foldlM )
 
 import GHC.Core
-import Data.List( deleteFirstsBy )
-import Data.Function ( on )
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Core.Predicate
+import GHC.Core.Coercion
+import GHC.Core.FamInstEnv
+import GHC.Core.Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
+import GHC.Core.Coercion.Axiom ( CoAxBranch (..), CoAxiom (..), TypeEqn, fromBranches
+                               , sfInteractInert, sfInteractTop )
+
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Env
-
-import qualified Data.Semigroup as S
-import Control.Monad
-import GHC.Data.Pair (Pair(..))
 import GHC.Types.Unique( hasKey )
+
+import GHC.Data.Bag
+import GHC.Data.Pair (Pair(..))
+
+import GHC.Utils.Monad ( concatMapM, foldlM )
 import GHC.Driver.Session
 import GHC.Utils.Misc
+
+import Data.List( deleteFirstsBy )
+import Data.Function ( on )
+import qualified Data.Semigroup as S
+import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad.Trans.Class
@@ -671,7 +676,7 @@ interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_reason = reason })
     swap_me swap ev
       = case swap of
            NotSwapped -> ctEvTerm ev
-           IsSwapped  -> evCoercion (mkTcSymCo (evTermCoercion (ctEvTerm ev)))
+           IsSwapped  -> evCoercion (mkSymCo (evTermCoercion (ctEvTerm ev)))
 
 interactIrred _ wi = pprPanic "interactIrred" (ppr wi)
 
@@ -1522,10 +1527,10 @@ interactEq inerts workItem@(CEqCan { cc_lhs = lhs
                                    , cc_eq_rel = eq_rel })
   | Just (ev_i, swapped) <- inertsCanDischarge inerts workItem
   = do { setEvBindIfWanted ev $
-         evCoercion (maybeTcSymCo swapped $
-                     tcDowngradeRole (eqRelRole eq_rel)
-                                     (ctEvRole ev_i)
-                                     (ctEvCoercion ev_i))
+         evCoercion (maybeSymCo swapped $
+                     downgradeRole (eqRelRole eq_rel)
+                                   (ctEvRole ev_i)
+                                   (ctEvCoercion ev_i))
 
        ; stopWith ev "Solved from inert" }
 
@@ -1590,7 +1595,7 @@ solveByUnification wd tv xi
                              text "Left Kind is:" <+> ppr (tcTypeKind tv_ty),
                              text "Right Kind is:" <+> ppr (tcTypeKind xi) ]
        ; unifyTyVar tv xi
-       ; setEvBindIfWanted wd (evCoercion (mkTcNomReflCo xi))
+       ; setEvBindIfWanted wd (evCoercion (mkNomReflCo xi))
        ; n_kicked <- kickOutAfterUnification tv
        ; return (Stop wd (text "Solved by unification" <+> pprKicked n_kicked)) }
 

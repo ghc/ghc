@@ -1235,7 +1235,7 @@ can_eq_nc_forall ev eq_rel s1 s2
                          -- skol_tv is already in the in-scope set, but the
                          -- free vars of kind_co are not; hence "...AndInScope"
                    ; (co, wanteds2) <- go skol_tvs subst' bndrs2
-                   ; return ( mkTcForAllCo skol_tv kind_co co
+                   ; return ( mkForAllCo skol_tv kind_co co
                             , wanteds1 `unionBags` wanteds2 ) }
 
             -- Done: unify phi1 ~ phi2
@@ -1265,7 +1265,7 @@ can_eq_nc_forall ev eq_rel s1 s2
     -- than putting it in the work list
     unify loc rewriters role ty1 ty2
       | ty1 `tcEqType` ty2
-      = return (mkTcReflCo role ty1, emptyBag)
+      = return (mkReflCo role ty1, emptyBag)
       | otherwise
       = do { (wanted, co) <- newWantedEq loc rewriters role ty1 ty2
            ; return (co, unitBag (mkNonCanonical wanted)) }
@@ -1540,9 +1540,9 @@ can_eq_app ev s1 t1 s2 t2
   = canEqHardFailure ev (s1 `mkAppTy` t1) (s2 `mkAppTy` t2)
 
   | CtGiven { ctev_evar = evar } <- ev
-  = do { let co   = mkTcCoVarCo evar
-             co_s = mkTcLRCo CLeft  co
-             co_t = mkTcLRCo CRight co
+  = do { let co   = mkCoVarCo evar
+             co_s = mkLRCo CLeft  co
+             co_t = mkLRCo CRight co
        ; evar_s <- newGivenEvVar loc ( mkTcEqPredLikeEv ev s1 s2
                                      , evCoercion co_s )
        ; evar_t <- newGivenEvVar loc ( mkTcEqPredLikeEv ev t1 t2
@@ -1904,7 +1904,7 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
              -> do { let ev_co = mkCoVarCo evar
                    ; given_evs <- newGivenEvVars loc $
                                   [ ( mkPrimEqPredRole r ty1 ty2
-                                    , evCoercion $ mkSelCo r (SelTyCon i) ev_co )
+                                    , evCoercion $ mkSelCo (SelTyCon i r) ev_co )
                                   | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..]
                                   , r /= Phantom
                                   , not (isCoercionTy ty1) && not (isCoercionTy ty2) ]
@@ -1957,7 +1957,7 @@ canDecomposableFunTy ev eq_rel f1@(m1,a1,r1) f2@(m2,a2,r2)
              -> do { let ev_co = mkCoVarCo evar
                    ; given_evs <- newGivenEvVars loc $
                                   [ ( mkPrimEqPredRole role' ty1 ty2
-                                    , evCoercion $ mkSelCo role' (SelFun fs) ev_co )
+                                    , evCoercion $ mkSelCo (SelFun fs) ev_co )
                                   | (fs, ty1, ty2) <- [(SelMult, m1, m2)
                                                       ,(SelArg,  a1, a2)
                                                       ,(SelRes,  r1, r2)]
@@ -2167,7 +2167,7 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ki1 xi2 ki2
     mk_kind_eq :: TcS (CtEvidence, CoercionN)
     mk_kind_eq = case ev of
       CtGiven { ctev_evar = evar }
-        -> do { let kind_co = maybe_sym $ mkTcKindCo (mkTcCoVarCo evar)  -- :: k2 ~ k1
+        -> do { let kind_co = maybe_sym $ mkKindCo (mkCoVarCo evar)  -- :: k2 ~ k1
               ; kind_ev <- newGivenEvVar kind_loc (kind_pty, evCoercion kind_co)
               ; return (kind_ev, ctEvCoercion kind_ev) }
 
@@ -2183,7 +2183,7 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ki1 xi2 ki2
     maybe_sym = case swapped of
           IsSwapped  -> id         -- if the input is swapped, then we already
                                    -- will have k2 ~ k1
-          NotSwapped -> mkTcSymCo
+          NotSwapped -> mkSymCo
 
 -- guaranteed that tcTypeKind lhs == tcTypeKind rhs
 canEqCanLHSHomo :: CtEvidence
@@ -2195,7 +2195,7 @@ canEqCanLHSHomo :: CtEvidence
 canEqCanLHSHomo ev eq_rel swapped lhs1 ps_xi1 xi2 ps_xi2
   | (xi2', mco) <- split_cast_ty xi2
   , Just lhs2 <- canEqLHS_maybe xi2'
-  = canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 (ps_xi2 `mkCastTyMCo` mkTcSymMCo mco) mco
+  = canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 (ps_xi2 `mkCastTyMCo` mkSymMCo mco) mco
 
   | otherwise
   = canEqCanLHSFinish ev eq_rel swapped lhs1 ps_xi2
@@ -2312,7 +2312,7 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
   = finish_without_swapping
 
   where
-    sym_mco = mkTcSymMCo mco
+    sym_mco = mkSymMCo mco
 
     do_swap = rewriteCastedEquality ev eq_rel swapped (canEqLHSType lhs1) (canEqLHSType lhs2) mco
     finish_without_swapping = canEqCanLHSFinish ev eq_rel swapped lhs1 (ps_xi2 `mkCastTyMCo` mco)
@@ -2351,7 +2351,7 @@ canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
                                   (TyFamLHS fun_tc2 fun_args2)
                                   (ps_xi1 `mkCastTyMCo` sym_mco) } }
   where
-    sym_mco = mkTcSymMCo mco
+    sym_mco = mkSymMCo mco
     rhs = ps_xi2 `mkCastTyMCo` mco
 
 -- The RHS here is either not CanEqLHS, or it's one that we
@@ -2458,7 +2458,7 @@ canEqReflexive :: CtEvidence    -- ty ~ ty
                -> TcS (StopOrContinue Ct)   -- always Stop
 canEqReflexive ev eq_rel ty
   = do { setEvBindIfWanted ev (evCoercion $
-                               mkTcReflCo (eqRelRole eq_rel) ty)
+                               mkReflCo (eqRelRole eq_rel) ty)
        ; stopWith ev "Solved by reflexivity" }
 
 rewriteCastedEquality :: CtEvidence     -- :: lhs ~ (rhs |> mco), or (rhs |> mco) ~ lhs
@@ -2474,7 +2474,7 @@ rewriteCastedEquality ev eq_rel swapped lhs rhs mco
     lhs_redn = mkGReflRightMRedn role lhs sym_mco
     rhs_redn = mkGReflLeftMRedn  role rhs mco
 
-    sym_mco = mkTcSymMCo mco
+    sym_mco = mkSymMCo mco
     role    = eqRelRole eq_rel
 
 {- Note [Equalities with incompatible kinds]
@@ -3011,7 +3011,7 @@ the rewriter set. We check this with an assertion.
 
 
 rewriteEvidence rewriters old_ev (Reduction co new_pred)
-  | isTcReflCo co -- See Note [Rewriting with Refl]
+  | isReflCo co -- See Note [Rewriting with Refl]
   = assert (isEmptyRewriterSet rewriters) $
     continueWith (setCtEvPredType old_ev new_pred)
 
@@ -3023,7 +3023,7 @@ rewriteEvidence rewriters ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc })
   where
     -- mkEvCast optimises ReflCo
     new_tm = mkEvCast (evId old_evar)
-                (tcDowngradeRole Representational (ctEvRole ev) co)
+                (downgradeRole Representational (ctEvRole ev) co)
 
 rewriteEvidence new_rewriters
                 ev@(CtWanted { ctev_dest = dest
@@ -3031,10 +3031,10 @@ rewriteEvidence new_rewriters
                              , ctev_rewriters = rewriters })
                 (Reduction co new_pred)
   = do { mb_new_ev <- newWanted loc rewriters' new_pred
-       ; massert (tcCoercionRole co == ctEvRole ev)
+       ; massert (coercionRole co == ctEvRole ev)
        ; setWantedEvTerm dest
             (mkEvCast (getEvExpr mb_new_ev)
-                      (tcDowngradeRole Representational (ctEvRole ev) (mkSymCo co)))
+                      (downgradeRole Representational (ctEvRole ev) (mkSymCo co)))
        ; case mb_new_ev of
             Fresh  new_ev -> continueWith new_ev
             Cached _      -> stopWith ev "Cached wanted" }
@@ -3068,14 +3068,14 @@ rewriteEqEvidence :: RewriterSet        -- New rewriters
 -- It's all a form of rewriteEvidence, specialised for equalities
 rewriteEqEvidence new_rewriters old_ev swapped (Reduction lhs_co nlhs) (Reduction rhs_co nrhs)
   | NotSwapped <- swapped
-  , isTcReflCo lhs_co      -- See Note [Rewriting with Refl]
-  , isTcReflCo rhs_co
+  , isReflCo lhs_co      -- See Note [Rewriting with Refl]
+  , isReflCo rhs_co
   = return (setCtEvPredType old_ev new_pred)
 
   | CtGiven { ctev_evar = old_evar } <- old_ev
-  = do { let new_tm = evCoercion ( mkTcSymCo lhs_co
-                                  `mkTcTransCo` maybeTcSymCo swapped (mkTcCoVarCo old_evar)
-                                  `mkTcTransCo` rhs_co)
+  = do { let new_tm = evCoercion ( mkSymCo lhs_co
+                                  `mkTransCo` maybeSymCo swapped (mkCoVarCo old_evar)
+                                  `mkTransCo` rhs_co)
        ; newGivenEvVar loc' (new_pred, new_tm) }
 
   | CtWanted { ctev_dest = dest
@@ -3083,10 +3083,10 @@ rewriteEqEvidence new_rewriters old_ev swapped (Reduction lhs_co nlhs) (Reductio
   , let rewriters' = rewriters S.<> new_rewriters
   = do { (new_ev, hole_co) <- newWantedEq loc' rewriters'
                                           (ctEvRole old_ev) nlhs nrhs
-       ; let co = maybeTcSymCo swapped $
+       ; let co = maybeSymCo swapped $
                   lhs_co
                   `mkTransCo` hole_co
-                  `mkTransCo` mkTcSymCo rhs_co
+                  `mkTransCo` mkSymCo rhs_co
        ; setWantedEq dest co
        ; traceTcS "rewriteEqEvidence" (vcat [ ppr old_ev
                                             , ppr nlhs
@@ -3174,6 +3174,6 @@ unifyWanted rewriters loc role orig_ty1 orig_ty2
     go ty1 ty2 = bale_out ty1 ty2
 
     bale_out ty1 ty2
-       | ty1 `tcEqType` ty2 = return (mkTcReflCo role ty1)
+       | ty1 `tcEqType` ty2 = return (mkReflCo role ty1)
         -- Check for equality; e.g. a ~ a, or (m a) ~ (m a)
        | otherwise = emitNewWantedEq loc rewriters role orig_ty1 orig_ty2

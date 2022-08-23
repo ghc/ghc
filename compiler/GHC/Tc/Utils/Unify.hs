@@ -511,7 +511,7 @@ matchExpectedTyConApp tc orig_ty
 
     go ty@(TyConApp tycon args)
        | tc == tycon  -- Common case
-       = return (mkTcNomReflCo ty, args)
+       = return (mkNomReflCo ty, args)
 
     go (TyVarTy tv)
        | isMetaTyVar tv
@@ -554,7 +554,7 @@ matchExpectedAppTy orig_ty
       | Just ty' <- tcView ty = go ty'
 
       | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
-      = return (mkTcNomReflCo orig_ty, (fun_ty, arg_ty))
+      = return (mkNomReflCo orig_ty, (fun_ty, arg_ty))
 
     go (TyVarTy tv)
       | isMetaTyVar tv
@@ -652,7 +652,7 @@ fillInferResult act_res_ty (IR { ir_uniq = u
                            Just frr_orig -> hasFixedRuntimeRep frr_orig act_res_ty
 
                      -- Compose the two coercions.
-                     ; let final_co = prom_co `mkTcTransCo` frr_co
+                     ; let final_co = prom_co `mkTransCo` frr_co
 
                      ; writeTcRef ref (Just act_res_ty)
 
@@ -841,7 +841,7 @@ tcSubTypePat _ _ (Infer inf_res) ty_expected
   = do { co <- fillInferResult ty_expected inf_res
                -- In patterns we do not instantatiate
 
-       ; return (mkWpCastN (mkTcSymCo co)) }
+       ; return (mkWpCastN (mkSymCo co)) }
 
 ---------------
 tcSubType :: CtOrigin -> UserTypeCtxt
@@ -2080,14 +2080,14 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
                   , ppr ty2 <+> dcolon <+> ppr (tcTypeKind  ty2)
-                  , ppr (isTcReflCo co_k), ppr co_k ]
+                  , ppr (isReflCo co_k), ppr co_k ]
 
-           ; if isTcReflCo co_k
+           ; if isReflCo co_k
                -- Only proceed if the kinds match
                -- NB: tv1 should still be unfilled, despite the kind unification
                --     because tv1 is not free in ty2 (or, hence, in its kind)
              then do { writeMetaTyVar tv1 ty2
-                     ; return (mkTcNomReflCo ty2) }
+                     ; return (mkNomReflCo ty2) }
 
              else defer }} -- This cannot be solved now.  See GHC.Tc.Solver.Canonical
                            -- Note [Equalities with incompatible kinds] for how
@@ -2534,7 +2534,7 @@ matchExpectedFunKind hs_ty n k = go n k
     go n (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
       | isVisibleAnonArg af
       = do { co <- go (n-1) res
-           ; return (mkTcFunCo Nominal (mkTcNomReflCo w) (mkTcNomReflCo arg) co) }
+           ; return (mkFunCo Nominal (mkNomReflCo w) (mkNomReflCo arg) co) }
 
     go n other
      = defer n other

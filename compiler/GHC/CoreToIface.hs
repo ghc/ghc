@@ -289,7 +289,7 @@ toIfaceCoercionX fr co
     go (AppCo co1 co2)      = IfaceAppCo  (go co1) (go co2)
     go (SymCo co)           = IfaceSymCo (go co)
     go (TransCo co1 co2)    = IfaceTransCo (go co1) (go co2)
-    go (SelCo _r d co)      = IfaceSelCo d (go co)
+    go (SelCo d co)         = IfaceSelCo d (go co)
     go (LRCo lr co)         = IfaceLRCo lr (go co)
     go (InstCo co arg)      = IfaceInstCo (go co) (go arg)
     go (KindCo c)           = IfaceKindCo (go c)

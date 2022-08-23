@@ -41,22 +41,7 @@ module GHC.Tc.Types.Evidence (
   TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
   TcMCoercion, TcMCoercionN, TcMCoercionR,
   Role(..), LeftOrRight(..), pickLR,
-  mkTcReflCo, mkTcNomReflCo, mkTcRepReflCo,
-  mkTcTyConAppCo, mkTcAppCo, mkTcFunCo,
-  mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos,
-  mkTcSymCo, mkTcSymMCo,
-  mkTcTransCo,
-  mkTcSelCo, mkTcLRCo, mkTcSubCo, maybeTcSymCo,
-  maybeTcSubCo, tcDowngradeRole,
-  mkTcAxiomRuleCo, mkTcGReflRightCo, mkTcGReflRightMCo, mkTcGReflLeftCo, mkTcGReflLeftMCo,
-  mkTcPhantomCo,
-  mkTcCoherenceLeftCo,
-  mkTcCoherenceRightCo,
-  mkTcKindCo,
-  tcCoercionKind,
-  mkTcCoVarCo,
-  isTcReflCo, isTcReflexiveCo,
-  tcCoercionRole,
+  maybeSymCo,
   unwrapIP, wrapIP,
 
   -- * QuoteWrapper
@@ -80,7 +65,6 @@ import GHC.Builtin.Names
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Predicate
-import GHC.Data.Pair
 import GHC.Types.Basic
 
 import GHC.Core
@@ -117,97 +101,18 @@ kosher free variables.
 
 -}
 
-type TcCoercion  = Coercion
-type TcCoercionN = CoercionN    -- A Nominal          coercion ~N
-type TcCoercionR = CoercionR    -- A Representational coercion ~R
-type TcCoercionP = CoercionP    -- a phantom coercion
+type TcCoercion   = Coercion
+type TcCoercionN  = CoercionN    -- A Nominal          coercion ~N
+type TcCoercionR  = CoercionR    -- A Representational coercion ~R
+type TcCoercionP  = CoercionP    -- a phantom coercion
 type TcMCoercion  = MCoercion
 type TcMCoercionN = MCoercionN  -- nominal
 type TcMCoercionR = MCoercionR  -- representational
 
-mkTcReflCo             :: Role -> TcType -> TcCoercion
-mkTcSymCo              :: TcCoercion -> TcCoercion
-mkTcSymMCo             :: TcMCoercion -> TcMCoercion
-mkTcTransCo            :: TcCoercion -> TcCoercion -> TcCoercion
-mkTcNomReflCo          :: TcType -> TcCoercionN
-mkTcRepReflCo          :: TcType -> TcCoercionR
-mkTcTyConAppCo         :: Role -> TyCon -> [TcCoercion] -> TcCoercion
-mkTcAppCo              :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion -> TcCoercion
-mkTcAxInstCo           :: Role -> CoAxiom br -> BranchIndex
-                       -> [TcType] -> [TcCoercion] -> TcCoercion
-mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
-                       -> [TcCoercion] -> TcCoercionR
-mkTcForAllCo           :: TyVar -> TcCoercionN -> TcCoercion -> TcCoercion
-mkTcForAllCos          :: [(TyVar, TcCoercionN)] -> TcCoercion -> TcCoercion
-mkTcSelCo              :: Role -> CoSel -> TcCoercion -> TcCoercion
-mkTcLRCo               :: LeftOrRight -> TcCoercion -> TcCoercion
-mkTcSubCo              :: HasDebugCallStack => TcCoercionN -> TcCoercionR
-tcDowngradeRole        :: Role -> Role -> TcCoercion -> TcCoercion
-mkTcAxiomRuleCo        :: CoAxiomRule -> [TcCoercion] -> TcCoercionR
-mkTcGReflRightCo       :: Role -> TcType -> TcCoercionN -> TcCoercion
-mkTcGReflRightMCo      :: Role -> TcType -> TcMCoercionN -> TcCoercion
-mkTcGReflLeftCo        :: Role -> TcType -> TcCoercionN -> TcCoercion
-mkTcGReflLeftMCo       :: Role -> TcType -> TcMCoercionN -> TcCoercion
-mkTcCoherenceLeftCo    :: Role -> TcType -> TcCoercionN
-                       -> TcCoercion -> TcCoercion
-mkTcCoherenceRightCo   :: Role -> TcType -> TcCoercionN
-                       -> TcCoercion -> TcCoercion
-mkTcPhantomCo          :: TcCoercionN -> TcType -> TcType -> TcCoercionP
-mkTcKindCo             :: TcCoercion -> TcCoercionN
-mkTcCoVarCo            :: CoVar -> TcCoercion
-
-tcCoercionKind         :: TcCoercion -> Pair TcType
-tcCoercionRole         :: TcCoercion -> Role
-isTcReflCo             :: TcCoercion -> Bool
-
--- | This version does a slow check, calculating the related types and seeing
--- if they are equal.
-isTcReflexiveCo        :: TcCoercion -> Bool
-
-mkTcReflCo             = mkReflCo
-mkTcSymCo              = mkSymCo
-mkTcSymMCo             = mkSymMCo
-mkTcTransCo            = mkTransCo
-mkTcNomReflCo          = mkNomReflCo
-mkTcRepReflCo          = mkRepReflCo
-mkTcTyConAppCo         = mkTyConAppCo
-mkTcAppCo              = mkAppCo
-mkTcFunCo              = mkFunCo
-mkTcAxInstCo           = mkAxInstCo
-mkTcUnbranchedAxInstCo = mkUnbranchedAxInstCo Representational
-mkTcForAllCo           = mkForAllCo
-mkTcForAllCos          = mkForAllCos
-mkTcSelCo              = mkSelCo
-mkTcLRCo               = mkLRCo
-mkTcSubCo              = mkSubCo
-tcDowngradeRole        = downgradeRole
-mkTcAxiomRuleCo        = mkAxiomRuleCo
-mkTcGReflRightCo       = mkGReflRightCo
-mkTcGReflRightMCo      = mkGReflRightMCo
-mkTcGReflLeftCo        = mkGReflLeftCo
-mkTcGReflLeftMCo       = mkGReflLeftMCo
-mkTcCoherenceLeftCo    = mkCoherenceLeftCo
-mkTcCoherenceRightCo   = mkCoherenceRightCo
-mkTcPhantomCo          = mkPhantomCo
-mkTcKindCo             = mkKindCo
-mkTcCoVarCo            = mkCoVarCo
-
-tcCoercionKind         = coercionKind
-tcCoercionRole         = coercionRole
-isTcReflCo             = isReflCo
-isTcReflexiveCo        = isReflexiveCo
-
--- | If the EqRel is ReprEq, makes a SubCo; otherwise, does nothing.
--- Note that the input coercion should always be nominal.
-maybeTcSubCo :: HasDebugCallStack => EqRel -> TcCoercionN -> TcCoercion
-maybeTcSubCo NomEq  = id
-maybeTcSubCo ReprEq = mkTcSubCo
-
 -- | If a 'SwapFlag' is 'IsSwapped', flip the orientation of a coercion
-maybeTcSymCo :: SwapFlag -> TcCoercion -> TcCoercion
-maybeTcSymCo IsSwapped  co = mkTcSymCo co
-maybeTcSymCo NotSwapped co = co
+maybeSymCo :: SwapFlag -> TcCoercion -> TcCoercion
+maybeSymCo IsSwapped  co = mkSymCo co
+maybeSymCo NotSwapped co = co
 
 {-
 %************************************************************************
@@ -309,9 +214,9 @@ mkWpFun :: HsWrapper -> HsWrapper
   -- because of [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep]
   -- in GHC.Tc.Utils.Concrete.
 mkWpFun WpHole       WpHole       _             _  = WpHole
-mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  = WpCast (mk_fun_co w (mkTcRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 = WpCast (mk_fun_co w (mkTcSymCo co1)    (mkTcRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  = WpCast (mk_fun_co w (mkTcSymCo co1)    co2)
+mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  = WpCast (mk_fun_co w (mkRepReflCo t1) co2)
+mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 = WpCast (mk_fun_co w (mkSymCo co1)    (mkRepReflCo t2))
+mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  = WpCast (mk_fun_co w (mkSymCo co1)    co2)
 mkWpFun co1          co2          t1            _  = WpFun co1 co2 t1
 
 mkWpEta :: [Id] -> HsWrapper -> HsWrapper
@@ -324,19 +229,19 @@ mkWpEta xs wrap = foldr eta_one wrap xs
 
 mk_fun_co :: Mult -> TcCoercionR -> TcCoercionR -> TcCoercionR
 mk_fun_co mult arg_co res_co
-  = mkTcFunCo Representational (multToCo mult) arg_co res_co
+  = mkFunCo Representational (multToCo mult) arg_co res_co
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
-  | isTcReflCo co = WpHole
-  | otherwise     = assertPpr (tcCoercionRole co == Representational) (ppr co) $
-                    WpCast co
+  | isReflCo co = WpHole
+  | otherwise   = assertPpr (coercionRole co == Representational) (ppr co) $
+                  WpCast co
 
 mkWpCastN :: TcCoercionN -> HsWrapper
 mkWpCastN co
-  | isTcReflCo co = WpHole
-  | otherwise     = assertPpr (tcCoercionRole co == Nominal) (ppr co) $
-                    WpCast (mkTcSubCo co)
+  | isReflCo co = WpHole
+  | otherwise   = assertPpr (coercionRole co == Nominal) (ppr co) $
+                  WpCast (mkSubCo co)
     -- The mkTcSubCo converts Nominal to Representational
 
 mkWpTyApps :: [Type] -> HsWrapper
@@ -874,10 +779,10 @@ Important Details:
 
 mkEvCast :: EvExpr -> TcCoercion -> EvTerm
 mkEvCast ev lco
-  | assertPpr (tcCoercionRole lco == Representational)
+  | assertPpr (coercionRole lco == Representational)
               (vcat [text "Coercion of wrong role passed to mkEvCast:", ppr ev, ppr lco]) $
-    isTcReflCo lco = EvExpr ev
-  | otherwise      = evCast ev lco
+    isReflCo lco = EvExpr ev
+  | otherwise    = evCast ev lco
 
 
 mkEvScSelectors         -- Assume   class (..., D ty, ...) => C a b

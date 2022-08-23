@@ -1688,7 +1688,7 @@ setWantedEvTerm (HoleDest hole) tm
   = -- See Note [Yukky eq_sel for a HoleDest]
     do { let co_var = coHoleCoVar hole
        ; setEvBind (mkWantedEvBind co_var tm)
-       ; fillCoercionHole hole (mkTcCoVarCo co_var) }
+       ; fillCoercionHole hole (mkCoVarCo co_var) }
 
 setWantedEvTerm (EvVarDest ev_id) tm
   = setEvBind (mkWantedEvBind ev_id tm)

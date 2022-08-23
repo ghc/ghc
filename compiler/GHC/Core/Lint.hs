@@ -2299,34 +2299,32 @@ lintCoercion co@(TransCo co1 co2)
        ; lintRole co (coercionRole co1) (coercionRole co2)
        ; return (TransCo co1' co2') }
 
-lintCoercion the_co@(SelCo r0 cs co)
+lintCoercion the_co@(SelCo cs co)
   = do { co' <- lintCoercion co
-       ; let (Pair s t, r) = coercionKindRole co'
+       ; let (Pair s t, co_role) = coercionKindRole co'
        ; case (splitForAllTyCoVar_maybe s, splitForAllTyCoVar_maybe t) of
          { (Just _, Just _)
              -- works for both tyvar and covar
              | SelForAll <- cs
              ,  (isForAllTy_ty s && isForAllTy_ty t)
              || (isForAllTy_co s && isForAllTy_co t)
-             -> do { lintRole the_co Nominal r0
-                   ; return (SelCo r0 cs co') }
+             -> return (SelCo cs co')
 
          ; _ -> case (isFunTy s, isFunTy t) of
          { (True, True)
              | SelFun fs <- cs
-             -> do { lintRole the_co (funRole r fs) r0
-                   ; return (SelCo r0 cs co') }
+             -> return (SelCo cs co')
 
          ; _ -> case (splitTyConApp_maybe s, splitTyConApp_maybe t) of
          { (Just (tc_s, tys_s), Just (tc_t, tys_t))
              | tc_s == tc_t
-             , SelTyCon n <- cs
-             , isInjectiveTyCon tc_s r
+             , SelTyCon n r0 <- cs
+             , isInjectiveTyCon tc_s co_role
                  -- see Note [SelCo and newtypes] in GHC.Core.TyCo.Rep
              , tys_s `equalLength` tys_t
              , tys_s `lengthExceeds` n
-             -> do { lintRole the_co (tyConRole r tc_s n) r0
-                   ; return (SelCo r0 cs co') }
+             -> do { lintRole the_co (tyConRole co_role tc_s n) r0
+                   ; return (SelCo cs co') }
 
          ; _ -> failWithL (hang (text "Bad getNth:")
                               2 (ppr the_co $$ ppr s $$ ppr t)) }}}}

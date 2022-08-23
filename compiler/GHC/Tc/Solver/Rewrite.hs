@@ -606,8 +606,8 @@ rewrite_app_ty_args fun_redn@(Reduction fun_co fun_xi) arg_tys
                       app_co = case eq_rel of
                         NomEq  -> mkAppCos fun_co arg_cos
                         ReprEq -> mkAppCos fun_co (map mkNomReflCo arg_tys)
-                                  `mkTcTransCo`
-                                  mkTcTyConAppCo Representational tc
+                                  `mkTransCo`
+                                  mkTyConAppCo Representational tc
                                     (zipWith mkReflCo tc_roles xis ++ arg_cos)
 
                 ; return $

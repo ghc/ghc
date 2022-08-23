@@ -2189,14 +2189,6 @@ pprTcSolverReportMsg ctxt
     ppr_torc TypeLike       = text "type";
     ppr_torc ConstraintLike = text "constraint"
 
-    ppr_lev Lifted      = text "lifted"
-    ppr_lev Unlifted    = text "unlifted"
-
-    ppr_an_lev Lifted   = text "a lifted"
-    ppr_an_lev Unlifted = text "an unlifted"
-
-    ppr_rep rep_tc = quotes (ppr (getOccName rep_tc))  -- Don't qualify
-
     describe_rep :: RuntimeRepType -> Maybe SDoc
     describe_rep rep
       | Just (rr_tc, rr_args) <- splitRuntimeRep_maybe rep

@@ -25,8 +25,8 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Expr
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Unify( buildImplicationFor )
-import GHC.Tc.Types.Evidence( mkTcCoVarCo )
 import GHC.Core.Type
+import GHC.Core.Coercion( mkCoVarCo )
 import GHC.Core.TyCon( isTypeFamilyTyCon )
 import GHC.Types.Id
 import GHC.Types.Var( EvVar, tyVarName )
@@ -444,7 +444,7 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
           EvVarDest ev_id -> return ev_id
           HoleDest hole   -> -- See Note [Quantifying over coercion holes]
                              do { ev_id <- newEvVar pred
-                                ; fillCoercionHole hole (mkTcCoVarCo ev_id)
+                                ; fillCoercionHole hole (mkCoVarCo ev_id)
                                 ; return ev_id }
     mk_quant_ev ct = pprPanic "mk_quant_ev" (ppr ct)
 
