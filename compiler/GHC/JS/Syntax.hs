@@ -105,35 +105,6 @@ import GHC.Data.FastString
 import GHC.Utils.Monad.State.Strict
 import GHC.Types.Unique.Map
 
--- FIXME: Jeff (2022,03): This state monad is strict, but uses a lazy list as
--- the state, since the strict state monad evaluates to WHNF, this state monad
--- will only evaluate to the first cons cell, i.e., we will be spine strict but
--- store possible huge thunks. This isn't a problem as long as we use this list
--- as a stack, but if we don't then any kind of Functor or Traverse operation
--- over this state will yield a lot of thunks.
---
--- FIXME: Jeff (2022,05): IdentSupply is quite weird, it is used in
--- GHC.JS.Make.ToSat to record new identifiers but uses a list which could be
--- empty, even though the empty case has no denotation in the domain (i.e. it is
--- a meaningless case!) and sure enough newIdentSupply makes sure we can never
--- hit this case! But it is even /more/ weird because it is a wrapper around a
--- state monad /that doesn't/ itself instantiate a state monad! So we end up
--- with a lot of weird unboxing, boxing, and running of this "monad". It is
--- almost as if it wants to redefine 'MonadTransControl'! The situation gets
--- even /more/ weird when you look at the 'GHC.JS.Make.ToSat', which has
--- numerous problems: it isn't polymorphic over the "IdentSupply" monad, of the
--- instances it defines there is only one that is monadic, it has 7 call sites
--- in JS.Make and /each one/ is fed to 'runIdentSupply'. Basically we have a
--- monad that is never called a monad and so is run all over the place to get
--- non-monadic (although still pure) values back out. To make matters worse our
--- ASTs embed this monad statically! See the UnsatFoo constuctors in JExpr,
--- JStat, and JVal. Why do my ASTs know anything about the state of the
--- interpreter!? This is quite the confusion. It confuses the AST with the code
--- that interprets the AST. The fix is to just derive the state monad with
--- generalized newtype deriving and derivingStrategies, and swap this list out
--- for something that is NonEmpty and doesn't need to be reversed all the time!
--- And clean up the mess in the ASTs.
-
 -- | A supply of identifiers, possibly empty
 newtype IdentSupply a
   = IS {runIdentSupply :: State [Ident] a}
@@ -153,8 +124,6 @@ newIdentSupply (Just pfx) = [ TxtI (mconcat [pfx,"_",mkFastString (show x)])
                             | x <- [(0::Word64)..]
                             ]
 
--- FIXME: Jeff (2022,05): Create note for reason behind pseudoSaturate
--- FIXME: Jeff (2022,05): make "<<unsatId>>" a constant
 -- | Given a Pseudo-saturate a value with garbage @<<unsatId>>@ identifiers.
 pseudoSaturate :: IdentSupply a -> a
 pseudoSaturate x = evalState (runIdentSupply x) $ newIdentSupply (Just "<<unsatId>>")
@@ -170,19 +139,6 @@ instance Show a => Show (IdentSupply a) where
 --------------------------------------------------------------------------------
 --                            Statements
 --------------------------------------------------------------------------------
--- FIXME: Jeff (2022,05): TryStat only conforms to the largest case of the
--- standard. See [try](https://tc39.es/ecma262/#sec-try-statement), notice that
--- we only encode the case where we have: try BLOCK IDENT BLOCK BLOCK, where the
--- inner IDENT BLOCK is actually the Catch production rule. Because we've opted
--- to deeply embed only a single case we are under-specifying the other cases
--- and probably have to check for empty JStats to know which case the TryStat
--- will be. We should partition this out into its own data type.
-
--- FIXME: Jeff (2022,05) Remove the Bools in For and While for real data types
-
--- FIXME: Jeff (2022,05): Why is Application a statement and not an expression?
--- Same for Unary Operators. I guess because these are side-effectual in JS?
-
 -- | JavaScript statements, see the [ECMA262
 -- Reference](https://tc39.es/ecma262/#sec-ecmascript-language-statements-and-declarations)
 -- for details
@@ -211,8 +167,6 @@ type JsLabel = LexicalFastString
 instance Semigroup JStat where
   (<>) = appendJStat
 
--- FIXME (Sylvain, 2022/03): should we use OrdList instead of lists in
--- BlockStat?
 instance Monoid JStat where
   mempty = BlockStat []
 
@@ -234,9 +188,6 @@ appendJStat mx my = case (mx,my) of
 --------------------------------------------------------------------------------
 --                            Expressions
 --------------------------------------------------------------------------------
--- FIXME: annotate expressions with type. This is an EDSL of JS ASTs in Haskell.
--- There are many approaches to leveraging the GHCs type system for correctness
--- guarentees in EDSLs and we should use them
 -- | JavaScript Expressions
 data JExpr
   = ValExpr    JVal                 -- ^ All values are trivially expressions
@@ -458,9 +409,6 @@ jsKeywords = Set.fromList $ TxtI <$>
            , "null", "true", "false"
            ]
 
--- FIXME (Jeff, 2022/05): This predicate should be encoded in the type system as
--- a newtype over Ident. Basically we should be using nominal typing so that a
--- regular Ident can never be confused with a Keyword
 -- | Predicate which checks if input 'Ident' is a JS keyword or not.
 isJsKeyword :: Ident -> Bool
 isJsKeyword = flip Set.member jsKeywords

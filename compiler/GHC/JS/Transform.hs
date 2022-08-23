@@ -79,7 +79,6 @@ mapIdent f = (map_expr, map_stat)
       JHash me    -> ValExpr $ JHash (fmap map_expr me)
       JFunc is s  -> ValExpr $ JFunc is (map_stat s)
       UnsatVal v2 -> ValExpr $ UnsatVal v2
-                      -- FIXME: shouldn't we transform this into `UnsatExpr (map_val v2)`?
 
     map_stat s = case s of
       DeclStat{}            -> s

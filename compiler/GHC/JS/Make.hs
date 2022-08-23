@@ -159,7 +159,6 @@ import GHC.Types.Unique.Map
 -- Instantiate for any necessary data structures.
 class ToJExpr a where
     toJExpr         :: a   -> JExpr
-    -- FIXME: Jeff (2022,05): Convert list to Foldable
     toJExprFromList :: [a] -> JExpr
     toJExprFromList = ValExpr . JList . map toJExpr
 
@@ -173,8 +172,6 @@ instance ToJExpr () where
     toJExpr _ = ValExpr $ JList []
 
 instance ToJExpr Bool where
-    -- FIXME: Jeff (2022,05): these 'var "true"' and 'var "false"' should be
-    -- constants instead of created on the fly
     toJExpr True  = var "true"
     toJExpr False = var "false"
 
@@ -231,7 +228,6 @@ class ToStat a where
 instance ToStat JStat where
     toStat = id
 
--- FIXME: Jeff (2022,05): Convert list to Foldable
 instance ToStat [JStat] where
     toStat = BlockStat
 
@@ -327,7 +323,6 @@ jhSingle k v = jhAdd k v jhEmpty
 jhAdd :: (Ord k, ToJExpr a) => k -> a -> M.Map k JExpr -> M.Map k JExpr
 jhAdd  k v m = M.insert k (toJExpr v) m
 
--- FIXME: Jeff (2022,05): remove list for foldable and specialize
 -- | Construct a JS HashMap from a list of key-value pairs
 jhFromList :: [(FastString, JExpr)] -> JVal
 jhFromList = JHash . listToUniqMap
@@ -418,7 +413,6 @@ if10 e = IfExpr e one_ zero_
 if01 :: JExpr -> JExpr
 if01 e = IfExpr e zero_ one_
 
--- FIXME: Jeff (2022,05): Shouldn't app take an Ident?
 -- | an expression application, see related 'appS'
 --
 -- > app f xs ==> f(xs)
@@ -633,8 +627,6 @@ instance Fractional JExpr where
 -- $misc
 -- Everything else,
 
--- FIXME: Jeff (2022,05): Consider moving these
-
 -- | Cache "dXXX" field names
 dataFieldCache :: Array Int FastString
 dataFieldCache = listArray (0,nFieldCache) (map (mkFastString . ('d':) . show) [(0::Int)..nFieldCache])
@@ -674,9 +666,6 @@ allocClsA i = toJExpr (TxtI (clsCache ! i))
 class ToSat a where
     toSat_ :: a -> [Ident] -> IdentSupply (JStat, [Ident])
 
--- FIXME: Jeff (2022,05): Remove list to avoid reversals. Obviously ordering is
--- important since we need to reverse so lets use a data structure that produces
--- the correct ordering even if that structure is a bankers queue
 instance ToSat [JStat] where
     toSat_ f vs = IS $ return $ (BlockStat f, reverse vs)
 
@@ -689,12 +678,8 @@ instance ToSat JExpr where
 instance ToSat [JExpr] where
     toSat_ f vs = IS $ return $ (BlockStat $ map expr2stat f, reverse vs)
 
--- FIXME: Jeff (2022,05): Why type equality and not ToExpr? Also why is the type
--- signature written like a profunctor lmap?
 instance (ToSat a, b ~ JExpr) => ToSat (b -> a) where
     toSat_ f vs = IS $ do
-      -- FIXME Jeff (2022,05): We pop an Ident just to wrap into a JVar and then
-      -- push the Ident back onto the Ident stream. Why not just peek?
       x <- takeOneIdent
       runIdentSupply $ toSat_ (f (ValExpr $ JVar x)) (x:vs)
 
@@ -707,13 +692,6 @@ expr2stat (IfExpr x y z) = IfStat x (expr2stat y) (expr2stat z)
 expr2stat (UOpExpr o x) = UOpStat o x
 expr2stat _ = nullStat
 
--- FIXME: Jeff (2022,05): This function checks for an empty list via the case
--- expression. That the empty case produces an error indicates that this list
--- should be 'NonEmpty'. The fix is to change this type to a NonEmpty list, then
--- when we initialize the environment we /begin/ with a List: [], but once we
--- add the very first ident we convert the list to a NonEmpty. If you check the
--- definition of 'JS.Syntax.newIdentSupply' you'll see that this error case can
--- actually never happen. So we should encode that in the type system!
 takeOneIdent :: State [Ident] Ident
 takeOneIdent = do
   xxs <- get
