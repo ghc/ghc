@@ -1787,7 +1787,7 @@ ppr_co ctxt_prec (IfaceTransCo co1 co2)
     in maybeParen ctxt_prec opPrec $
         vcat (ppr_co topPrec co1 : ppr_trans co2)
 ppr_co ctxt_prec (IfaceSelCo d co)
-  = ppr_special_co ctxt_prec (text "Nth:" <> ppr d) [co]
+  = ppr_special_co ctxt_prec (text "SelCo:" <> ppr d) [co]
 ppr_co ctxt_prec (IfaceLRCo lr co)
   = ppr_special_co ctxt_prec (ppr lr) [co]
 ppr_co ctxt_prec (IfaceSubCo co)

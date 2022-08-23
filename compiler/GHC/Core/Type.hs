@@ -20,7 +20,7 @@ module GHC.Core.Type (
         KindOrType, PredType, ThetaType, FRRType,
         Var, TyVar, isTyVar, TyCoVar, TyCoBinder, TyCoVarBinder, TyVarBinder,
         Mult, Scaled,
-        KnotTied,
+        KnotTied, RuntimeRepType,
 
         -- ** Constructing and deconstructing types
         mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, repGetTyVar_maybe,
@@ -44,7 +44,7 @@ module GHC.Core.Type (
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
 
-        splitTyConApp_maybe, splitTyConAppNoSyn_maybe, splitTyConApp, tyConAppArgN,
+        splitTyConApp_maybe, splitTyConAppNoSyn_maybe, splitTyConApp,
         tcSplitTyConApp_maybe,
 
         mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoInvForAllTys,
@@ -241,7 +241,6 @@ module GHC.Core.Type (
         tidyTyCoVarBinder, tidyTyCoVarBinders,
 
         -- * Kinds
-        isConstraintKindCon,
         classifiesTypeWithValues,
         isConcrete, isFixedRuntimeRepKind,
     ) where
@@ -299,7 +298,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Data.Pair
-import GHC.Data.List.SetOps
 import GHC.Types.Unique ( nonDetCmpUnique )
 
 import GHC.Data.Maybe   ( orElse, isJust )
@@ -807,7 +805,7 @@ isMultiplicityVar = isMultiplicityTy . tyVarKind
 --           See Note [Promoted data constructors] in GHC.Core.TyCon
 -- May not be possible if `rr` is a type variable or type
 --   family application
-splitRuntimeRep_maybe :: Type -> Maybe (TyCon, [Type])
+splitRuntimeRep_maybe :: RuntimeRepType -> Maybe (TyCon, [Type])
 splitRuntimeRep_maybe rep
   | TyConApp rr_tc args <- coreFullView rep
   , isPromotedDataCon rr_tc
@@ -1636,13 +1634,6 @@ tyConAppArgs_maybe ty = case splitTyConApp_maybe ty of
 
 tyConAppArgs :: HasCallStack => Type -> [Type]
 tyConAppArgs ty = tyConAppArgs_maybe ty `orElse` pprPanic "tyConAppArgs" (ppr ty)
-
-tyConAppArgN :: Int -> Type -> Type
--- Executing Nth
-tyConAppArgN n ty
-  = case tyConAppArgs_maybe ty of
-      Just tys -> tys `getNth` n
-      Nothing  -> pprPanic "tyConAppArgN" (ppr n <+> ppr ty)
 
 -- | Attempts to tease a type apart into a type constructor and the application
 -- of a number of arguments to that constructor. Panics if that is not possible.
@@ -2838,15 +2829,11 @@ nonDetCmpTypesX _   []        _         = LT
 nonDetCmpTypesX _   _         []        = GT
 
 -------------
--- | Compare two 'TyCon's. NB: This should /never/ see 'Constraint' (as
--- recognized by Kind.isConstraintKindCon) which is considered a synonym for
--- 'Type' in Core.
--- See Note [Kind Constraint and kind Type] in "GHC.Core.Type".
+-- | Compare two 'TyCon's.
 -- See Note [nonDetCmpType nondeterminism]
 nonDetCmpTc :: TyCon -> TyCon -> Ordering
 nonDetCmpTc tc1 tc2
-  = assert (not (isConstraintKindCon tc1) && not (isConstraintKindCon tc2)) $
-    u1 `nonDetCmpUnique` u2
+  = u1 `nonDetCmpUnique` u2
   where
     u1  = tyConUnique tc1
     u2  = tyConUnique tc2

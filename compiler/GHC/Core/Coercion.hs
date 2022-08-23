@@ -421,7 +421,7 @@ decomposeCo :: Arity -> Coercion
             -> [Coercion]
 decomposeCo arity co rs
   = [mkSelCo r (SelTyCon n) co | (n,r) <- [0..(arity-1)] `zip` rs ]
-           -- Remember, Nth is zero-indexed
+     -- Remember, SelTyCon is zero-indexed
 
 decomposeFunCo :: HasDebugCallStack
                => Role      -- Role of the input coercion
@@ -1851,7 +1851,7 @@ The KPUSH rule deals with this situation
 We want to push the coercion inside the constructor application.
 So we do this
 
-   g' :: t1~t2  =  Nth 0 g
+   g' :: t1~t2  =  SelCo (SelTyCon 0) g
 
    case K @t2 (x |> g' -> Maybe g') of
      K (y:t2 -> Maybe t2) -> rhs
@@ -1868,7 +1868,7 @@ available at www.cis.upenn.edu/~sweirich/papers/fckinds-extended.pdf
 Note [extendLiftingContextEx]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider we have datatype
-  K :: \/k. \/a::k. P -> T k  -- P be some type
+  K :: /\k. /\a::k. P -> T k  -- P be some type
   g :: T k1 ~ T k2
 
   case (K @k1 @t1 x) |> g of
@@ -1876,7 +1876,7 @@ Consider we have datatype
 
 We want to push the coercion inside the constructor application.
 We first get the coercion mapped by the universal type variable k:
-   lc = k |-> Nth 0 g :: k1~k2
+   lc = k |-> SelCo (SelTyCon 0) g :: k1~k2
 
 Here, the important point is that the kind of a is coerced, and P might be
 dependent on the existential type variable a.

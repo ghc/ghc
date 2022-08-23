@@ -1194,7 +1194,9 @@ etaAppCo_maybe co
 etaTyConAppCo_maybe :: TyCon -> Coercion -> Maybe [Coercion]
 -- If possible, split a coercion
 --       g :: T s1 .. sn ~ T t1 .. tn
--- into [ Nth 0 g :: s1~t1, ..., Nth (n-1) g :: sn~tn ]
+-- into [ SelCo (SelTyCon 0)     g :: s1~t1
+--      , ...
+--      , SelCo (SelTyCon (n-1)) g :: sn~tn ]
 etaTyConAppCo_maybe tc (TyConAppCo _ tc2 cos2)
   = assert (tc == tc2) $ Just cos2
 

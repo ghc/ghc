@@ -2867,11 +2867,11 @@ pushCoDataCon dc dc_args co
 collectBindersPushingCo :: CoreExpr -> ([Var], CoreExpr)
 -- Collect lambda binders, pushing coercions inside if possible
 -- E.g.   (\x.e) |> g         g :: <Int> -> blah
---        = (\x. e |> Nth 1 g)
+--        = (\x. e |> SelCo (SelFun SelRes) g)
 --
 -- That is,
 --
--- collectBindersPushingCo ((\x.e) |> g) === ([x], e |> Nth 1 g)
+-- collectBindersPushingCo ((\x.e) |> g) === ([x], e |> SelCo (SelFun SelRes) g)
 collectBindersPushingCo e
   = go [] e
   where

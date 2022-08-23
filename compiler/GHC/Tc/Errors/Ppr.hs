@@ -2112,8 +2112,7 @@ pprTcSolverReportMsg ctxt
         , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
         = nargs_msg $$ pprTcSolverReportMsg ctxt ea_msg
 
-        | -- pprTrace "check" (ppr ea_looks_same $$ ppr exp $$ ppr act $$ ppr ty1 $$ ppr ty2) $
-          ea_looks_same ty1 ty2 exp act
+        | ea_looks_same ty1 ty2 exp act
         , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
         = pprTcSolverReportMsg ctxt ea_msg
 
@@ -2130,52 +2129,37 @@ pprTcSolverReportMsg ctxt
       -- 'expected' is (TYPE rep) or (CONSTRAINT rep)
     msg_for_exp_sort exp_torc exp_rep
       | Just (act_torc, act_rep) <- sORTKind_maybe act
-      , act_torc == exp_torc
-      = -- (TYPE exp_rep) ~ (TYPE act_rep) or similar with CONSTRAINT
-        case (splitRuntimeRep_maybe exp_rep, splitRuntimeRep_maybe act_rep) of
-          (Just (exp_rr_tc, exp_rr_args), Just (act_rr_tc, act_rr_args))
-             | exp_rr_tc == act_rr_tc -> msg_for_same_rep exp_rr_args act_rr_args
-             | otherwise              -> msg_for_different_rep exp_rr_tc act_rr_tc
-          _                           -> bale_out_msg
-
+      = -- (TYPE exp_rep) ~ (CONSTRAINT act_rep) etc
+        msg_torc_torc act_torc act_rep
       | otherwise
-      = -- (TYPE _) ~ (CONSTRAINT _) or (TYPE _) ~ Bool, etc
+      = -- (TYPE _) ~ Bool, etc
         maybe_num_args_msg $$
-        sep [ text "Expected a" <+> pp_exp_thing <> comma
+        sep [ text "Expected a" <+> ppr_torc exp_torc <> comma
             , text "but" <+> case mb_thing of
                 Nothing    -> text "found something with kind"
                 Just thing -> quotes (ppr thing) <+> text "has kind"
             , quotes (pprWithTYPE act) ]
 
       where
-        pp_exp_thing = case exp_torc of TypeLike       -> text "type";
-                                        ConstraintLike -> text "constraint"
-
-        -- (TYPE (BoxedRep lev1)) ~ (TYPE (BoxedRep lev2)); or CONSTRAINT ditto
-        msg_for_same_rep exp_rr_args act_rr_args
-          | [exp_lev_ty] <- exp_rr_args     -- BoxedRep has exactly one arg
-          , [act_lev_ty] <- act_rr_args
-          , Just exp_lev <- levityType_maybe exp_lev_ty
-          , Just act_lev <- levityType_maybe act_lev_ty
-          = sep [ text "Expected" <+> ppr_an_lev exp_lev <+> pp_exp_thing <> comma
+        msg_torc_torc act_torc act_rep
+          | exp_torc == act_torc
+          = msg_same_torc act_torc act_rep
+          | otherwise
+          = sep [ text "Expected a" <+> ppr_torc exp_torc <> comma
                 , text "but" <+> case mb_thing of
-                     Just thing -> quotes (ppr thing) <+> text "is" <+> ppr_lev act_lev
-                     Nothing    -> text "got" <+> ppr_an_lev act_lev <+> pp_exp_thing ]
-        msg_for_same_rep _ _
-          = bale_out_msg
+                     Nothing    -> text "found a"
+                     Just thing -> quotes (ppr thing) <+> text "is a"
+                  <+> ppr_torc act_torc ]
 
-        -- (TYPE (BoxedRep lev)) ~ (TYPE IntRep); or CONSTRAINT ditto
-        msg_for_different_rep exp_rr_tc act_rr_tc
-          = sep [ text "Expected a" <+> what <> comma
+        msg_same_torc act_torc act_rep
+          | Just exp_doc <- describe_rep exp_rep
+          , Just act_doc <- describe_rep act_rep
+          = sep [ text "Expected" <+> exp_doc <+> ppr_torc exp_torc <> comma
                 , text "but" <+> case mb_thing of
-                     Just thing -> quotes (ppr thing)
-                     Nothing    -> quotes (pprWithTYPE act)
-                  <+> text "has representation" <+> ppr_rep act_rr_tc ]
-          where
-            what | exp_rr_tc `hasKey` boxedRepDataConKey
-                 = text "boxed" <+> pp_exp_thing
-                 | otherwise
-                 = pp_exp_thing <+> text "with representation" <+> ppr_rep exp_rr_tc
+                     Just thing -> quotes (ppr thing) <+> text "is"
+                     Nothing    -> text "got"
+                  <+> act_doc <+> ppr_torc act_torc ]
+        msg_same_torc _ _ = bale_out_msg
 
     ct_loc = errorItemCtLoc item
     orig   = errorItemOrigin item
@@ -2202,12 +2186,35 @@ pprTcSolverReportMsg ctxt
 
     count_args ty = count isVisibleBinder $ fst $ splitPiTys ty
 
+    ppr_torc TypeLike       = text "type";
+    ppr_torc ConstraintLike = text "constraint"
+
     ppr_lev Lifted      = text "lifted"
     ppr_lev Unlifted    = text "unlifted"
+
     ppr_an_lev Lifted   = text "a lifted"
     ppr_an_lev Unlifted = text "an unlifted"
 
     ppr_rep rep_tc = quotes (ppr (getOccName rep_tc))  -- Don't qualify
+
+    describe_rep :: RuntimeRepType -> Maybe SDoc
+    describe_rep rep
+      | Just (rr_tc, rr_args) <- splitRuntimeRep_maybe rep
+      = case rr_args of
+          [lev_ty] | rr_tc `hasKey` boxedRepDataConKey
+                   , Just lev <- levityType_maybe lev_ty
+                -> case lev of
+                      Lifted   -> Just (text "a lifted")
+                      Unlifted -> Just (text "a boxed unlifted")
+          [] | rr_tc `hasKey` tupleRepDataConTyConKey -> Just (text "a zero-bit")
+             | starts_with_vowel rr_tc -> Just (text "an" <+> ppr rr_tc)
+             | otherwise               -> Just (text "a"  <+> ppr rr_tc)
+          _ -> Nothing -- Must be TupleRep [r1..rn]
+      | otherwise = Nothing
+
+    starts_with_vowel tc
+      | (c:_) <- occNameString (getOccName tc) = c `elem` "aeiou"
+      | otherwise                              = False
 
 pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
   vcat (map make_msg frr_origs)

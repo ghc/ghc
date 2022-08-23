@@ -1563,7 +1563,7 @@ their representation type (see Type.coreView and Type.predTypeRep).
 This collapse is done by mkPredCo; there is no PredCo constructor
 in Coercion.  This is important because we need Nth to work on
 predicates too:
-    Nth 1 ((~) [c] g) = g
+    SelCo (SelTyCon 1) ((~) [c] g) = g
 See Simplify.simplCoercionF, which generates such selections.
 
 Note [Roles]

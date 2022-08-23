@@ -183,7 +183,6 @@ import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import GHC.Unit.Module        ( Module )
 import GHC.Core.Type
 import qualified GHC.Core.TyCo.Rep as TyCoRep (Type(TyConApp))
-import GHC.Core.TyCo.Rep ( RuntimeRepType )
 import GHC.Types.RepType
 import GHC.Core.DataCon
 import GHC.Core.ConLike
@@ -520,20 +519,6 @@ vecRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "VecRep") v
 tupleRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TupleRep") tupleRepDataConKey tupleRepDataCon
 sumRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "SumRep") sumRepDataConKey sumRepDataCon
 boxedRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "BoxedRep") boxedRepDataConKey boxedRepDataCon
-
--- See Note [Wiring in RuntimeRep]
-runtimeRepSimpleDataConNames :: [Name]
-runtimeRepSimpleDataConNames
-  = zipWith3Lazy mk_special_dc_name
-      [ fsLit "IntRep"
-      , fsLit "Int8Rep", fsLit "Int16Rep", fsLit "Int32Rep", fsLit "Int64Rep"
-      , fsLit "WordRep"
-      , fsLit "Word8Rep", fsLit "Word16Rep", fsLit "Word32Rep", fsLit "Word64Rep"
-      , fsLit "AddrRep"
-      , fsLit "FloatRep", fsLit "DoubleRep"
-      ]
-      runtimeRepSimpleDataConKeys
-      runtimeRepSimpleDataCons
 
 vecCountTyConName :: Name
 vecCountTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "VecCount") vecCountTyConKey vecCountTyCon
@@ -1505,8 +1490,6 @@ constraintKindTyCon
 constraintKindTyConName :: Name
 constraintKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Constraint")
                                              constraintKindTyConKey constraintKindTyCon
--- Old comment: todo
--- 'TyCon.isConstraintKindCon' assumes that this is an AlgTyCon!
 
 typeToTypeKind, constraintKind :: Kind
 constraintKind = mkTyConTy constraintKindTyCon
@@ -1693,6 +1676,20 @@ runtimeRepSimpleDataCons
   where
     mk_runtime_rep_dc primrep name
       = pcSpecialDataCon name [] runtimeRepTyCon (RuntimeRep (\_ -> [primrep]))
+
+-- See Note [Wiring in RuntimeRep]
+runtimeRepSimpleDataConNames :: [Name]
+runtimeRepSimpleDataConNames
+  = zipWith3Lazy mk_special_dc_name
+      [ fsLit "IntRep"
+      , fsLit "Int8Rep", fsLit "Int16Rep", fsLit "Int32Rep", fsLit "Int64Rep"
+      , fsLit "WordRep"
+      , fsLit "Word8Rep", fsLit "Word16Rep", fsLit "Word32Rep", fsLit "Word64Rep"
+      , fsLit "AddrRep"
+      , fsLit "FloatRep", fsLit "DoubleRep"
+      ]
+      runtimeRepSimpleDataConKeys
+      runtimeRepSimpleDataCons
 
 -- See Note [Wiring in RuntimeRep]
 intRepDataConTy,

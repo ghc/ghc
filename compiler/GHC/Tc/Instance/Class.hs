@@ -654,10 +654,15 @@ matchTypeable clas [k,t]  -- clas = Typeable
   | k `eqType` naturalTy                   = doTyLit knownNatClassName         t
   | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
   | k `eqType` charTy                      = doTyLit knownCharClassName        t
+
+  -- Functions
   | Just (af,mult,arg,ret) <- splitFunTy_maybe t
    , isVisibleAnonArg af                   = doFunTy    clas t mult arg ret
+
+  -- Applications
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
   , onlyNamedBndrsApplied tc ks            = doTyConApp clas t tc ks
+
   | Just (f,kt)   <- splitAppTy_maybe t    = doTyApp    clas t f kt
 
 matchTypeable _ _ = return NoInstance
@@ -738,14 +743,31 @@ doTyLit kc t = do { kc_clas <- tcLookupClass kc
 
 {- Note [Typeable (T a b c)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For type applications we always decompose using binary application,
-via doTyApp, until we get to a *kind* instantiation.  Example
-   Proxy :: forall k. k -> *
 
-To solve Typeable (Proxy (* -> *) Maybe) we
-  - First decompose with doTyApp,
-    to get (Typeable (Proxy (* -> *))) and Typeable Maybe
-  - Then solve (Typeable (Proxy (* -> *))) with doTyConApp
+For type applications we always decompose using binary application,
+via doTyApp (building a TrApp), until we get to a *kind* instantiation
+(building a TrTyCon).  We detect a pure kind instantiation using
+`onlyNamedBndrsApplied`.
+
+Example: Proxy :: forall k. k -> *
+
+  To solve Typeable (Proxy @(* -> *) Maybe) we
+
+  - First decompose with doTyApp (onlyNamedBndrsApplied is False)
+    to get (Typeable (Proxy @(* -> *))) and Typeable Maybe.
+    This step returns a TrApp.
+
+  - Then solve (Typeable (Proxy @(* -> *))) with doTyConApp
+    (onlyNamedBndrsApplied is True).
+    This step returns a TrTyCon
+
+  So the TypeRep we build is
+    TrApp (TrTyCon ("Proxy" @(*->*))) (TrTyCon "Maybe")
+
+Notice also that TYPE and CONSTRAINT are distinct so, in effect, we
+allow (Typeable TYPE) and (Typeable CONSTRAINT), giving disinct TypeReps.
+This is very important: we may want to get a TypeRep for a kind like
+   Type -> Constraint
 
 If we attempt to short-cut by solving it all at once, via
 doTyConApp
