@@ -40,7 +40,7 @@ import GHC.Types.Demand( etaConvertDmdSig, topSubDmd )
 import GHC.Types.Tickish
 import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
-                            , isInScope, substTyVarBndr, cloneTyVarBndr )
+                            , isInScope, substTyVarBndr, cloneTyVarBndr, substTyVarBndrT )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 import GHC.Builtin.Types
 import GHC.Builtin.Names
@@ -51,8 +51,10 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
+import GHC.Utils.Monad
 import GHC.Data.Maybe       ( orElse )
 import GHC.Data.Graph.UnVar
+import Control.Monad.ST
 import Data.List (mapAccumL)
 import qualified Data.ByteString as BS
 
@@ -198,11 +200,36 @@ data SimpleOptEnv
              -- See Note [Eta reduction in recursive RHSs]
         }
 
+data TSimpleOptEnv s
+  = TSOE { tsoe_opts :: {-# UNPACK #-} !SimpleOpts
+              -- ^ Simplifier options
+
+         , tsoe_inl :: IdEnv SimpleClo
+              -- ^ Deals with preInlineUnconditionally; things
+              -- that occur exactly once and are inlined
+              -- without having first been simplified
+
+         , tsoe_subst :: TSubst s
+              -- ^ Deals with cloning; includes the InScopeSet
+
+         , tsoe_rec_ids :: !UnVarSet
+              -- ^ Fast OutVarSet tracking which recursive RHSs we are analysing.
+              -- See Note [Eta reduction in recursive RHSs]
+         }
+
 instance Outputable SimpleOptEnv where
   ppr (SOE { soe_inl = inl, soe_subst = subst })
     = text "SOE {" <+> vcat [ text "soe_inl   =" <+> ppr inl
                             , text "soe_subst =" <+> ppr subst ]
                    <+> text "}"
+
+transientSOE :: SimpleOptEnv -> TSimpleOptEnv s
+transientSOE (SOE opts inl subst ids) = TSOE opts inl (transientSubst subst) ids
+
+persistentSOE :: TSimpleOptEnv s -> ST s SimpleOptEnv
+persistentSOE (TSOE opts inl subst ids) = do
+  persistent_subst <- persistentSubst subst
+  return (SOE opts inl persistent_subst ids)
 
 emptyEnv :: SimpleOpts -> SimpleOptEnv
 emptyEnv opts = SOE { soe_inl     = emptyVarEnv
@@ -685,7 +712,13 @@ it outputs.
 
 ----------------------
 subst_opt_bndrs :: SimpleOptEnv -> [InVar] -> (SimpleOptEnv, [OutVar])
-subst_opt_bndrs env bndrs = mapAccumL subst_opt_bndr env bndrs
+subst_opt_bndrs env bndrs = runST $ do
+  (env', bndrs') <- subst_opt_bndrs_t (transientSOE env) bndrs
+  persistent_env <- persistentSOE env'
+  return (persistent_env, bndrs')
+
+subst_opt_bndrs_t :: TSimpleOptEnv s -> [InVar] -> ST s (TSimpleOptEnv s, [OutVar])
+subst_opt_bndrs_t env bndrs = mapAccumLM subst_opt_bndr_t env bndrs
 
 subst_opt_bndr :: SimpleOptEnv -> InVar -> (SimpleOptEnv, OutVar)
 subst_opt_bndr env bndr
@@ -696,6 +729,22 @@ subst_opt_bndr env bndr
     subst           = soe_subst env
     (subst_tv, tv') = substTyVarBndr subst bndr
     (subst_cv, cv') = substCoVarBndr subst bndr
+
+subst_opt_bndr_t :: TSimpleOptEnv s -> InVar -> ST s (TSimpleOptEnv s, OutVar)
+subst_opt_bndr_t env bndr
+  | isTyVar bndr  = do
+      (subst_tv, tv') <- substTyVarBndrT subst bndr
+      return (env { tsoe_subst = subst_tv }, tv')
+  | isCoVar bndr  = do
+      persistent_subst <- persistentSubst subst
+      let (subst_cv, cv') = substCoVarBndr persistent_subst bndr
+      return (env { tsoe_subst = transientSubst subst_cv }, cv')
+  | otherwise     = do
+      persistent_env <- persistentSOE env
+      let (env', id') = subst_opt_id_bndr persistent_env bndr
+      return (transientSOE env', id')
+  where
+    subst           = tsoe_subst env
 
 subst_opt_id_bndr :: SimpleOptEnv -> InId -> (SimpleOptEnv, OutId)
 -- Nuke all fragile IdInfo, unfolding, and RULES; it gets added back later by

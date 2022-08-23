@@ -32,6 +32,8 @@ module GHC.Core.Subst (
         substBndr, substBndrs, substRecBndrs, substTyVarBndr, substCoVarBndr,
         cloneBndr, cloneBndrs, cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
 
+        TSubst(..),
+        transientSubst, persistentSubst, substTyVarBndrT,
     ) where
 
 import GHC.Prelude
