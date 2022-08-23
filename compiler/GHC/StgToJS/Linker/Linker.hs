@@ -125,7 +125,7 @@ import           System.Directory ( createDirectoryIfMissing
 import GHC.Driver.Session (targetWays_, DynFlags(..))
 import Language.Haskell.Syntax.Module.Name
 import GHC.Unit.Module (moduleStableString)
-import GHC.Utils.Logger (Logger)
+import GHC.Utils.Logger (Logger, logVerbAtLeast)
 import GHC.Utils.TmpFs (TmpFs)
 
 import GHC.Linker.Static.Utils (exeFileName)
@@ -301,7 +301,8 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
       (archsDepsMap, archsRequiredUnits) <- loadArchiveDeps env =<< getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state pkgs')
       pkgArchs <- getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state pkgs'')
 
-      logInfo logger $ hang (text "Linking with archives:") 2 (vcat (fmap text pkgArchs))
+      when (logVerbAtLeast logger 2) $
+        logInfo logger $ hang (text "Linking with archives:") 2 (vcat (fmap text pkgArchs))
 
       -- compute dependencies
       -- FIXME (Sylvain 2022-06): why are we appending the home unit here?
@@ -313,8 +314,9 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
 
       all_deps <- getDeps (fmap fst dep_map) excluded_units dep_fun_roots dep_unit_roots
 
-      logInfo logger $ hang (text "Units to link:") 2 (vcat (fmap ppr dep_units))
-      -- logInfo logger $ hang (text "All deps:") 2 (vcat (fmap ppr (S.toList all_deps)))
+      when (logVerbAtLeast logger 2) $
+        logInfo logger $ hang (text "Units to link:") 2 (vcat (fmap ppr dep_units))
+        -- logInfo logger $ hang (text "All deps:") 2 (vcat (fmap ppr (S.toList all_deps)))
 
       -- retrieve code for dependencies
       code <- collectDeps dep_map dep_units all_deps
