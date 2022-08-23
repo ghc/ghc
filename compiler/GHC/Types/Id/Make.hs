@@ -310,14 +310,15 @@ for symmetry with the way data instances are handled.
 
 Note [Newtype datacons]
 ~~~~~~~~~~~~~~~~~~~~~~~
-The "data constructor" for a newtype should always be vanilla.  At one
-point this wasn't true, because the newtype arising from
+The "data constructor" for a newtype should have no existentials. It's
+not quite a "vanilla" data constructor, because the newtype arising from
      class C a => D a
-looked like
-       newtype T:D a = D:D (C a)
-so the data constructor for T:C had a single argument, namely the
-predicate (C a).  But now we treat that as an ordinary argument, not
-part of the theta-type, so all is well.
+looks like
+       newtype T:D a = C:D (C a)
+so the data constructor for T:C has a single argument, namely the
+predicate (C a).  That ends up in the dcOtherTheta for the data con,
+which makes it not vanilla.  So the assert just tests for existentials.
+The rest is checked by having a singleton arg_tys.
 
 Note [Newtype workers]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -590,8 +591,10 @@ mkDataConWorkId wkr_name data_con
 
     wkr_inline_prag = defaultInlinePragma { inl_rule = ConLike }
     wkr_arity = dataConRepArity data_con
+
     ----------- Workers for newtypes --------------
     univ_tvs = dataConUnivTyVars data_con
+    ex_tcvs  = dataConExTyCoVars data_con
     arg_tys  = dataConRepArgTys  data_con  -- Should be same as dataConOrigArgTys
     nt_work_info = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
                   `setArityInfo` 1      -- Arity 1
@@ -599,8 +602,8 @@ mkDataConWorkId wkr_name data_con
                   `setUnfoldingInfo`      newtype_unf
     id_arg1      = mkScaledTemplateLocal 1 (head arg_tys)
     res_ty_args  = mkTyCoVarTys univ_tvs
-    newtype_unf  = assertPpr (isVanillaDataCon data_con && isSingleton arg_tys)
-                             (ppr data_con) $
+    newtype_unf  = assertPpr (null ex_tcvs && isSingleton arg_tys)
+                             (ppr data_con)
                               -- Note [Newtype datacons]
                    mkCompulsoryUnfolding defaultSimpleOpts $
                    mkLams univ_tvs $ Lam id_arg1 $

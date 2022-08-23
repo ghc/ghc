@@ -3970,7 +3970,7 @@ tcHsPartialSigType ctxt sig_ty
 
          -- No kind-generalization here:
        ; kindGeneralizeNone (mkInvisForAllTys outer_tv_bndrs $
-                             mkPhiTy theta $
+                             tcMkPhiTy theta $
                              tau)
 
        -- Spit out the wildcards (including the extra-constraints one)

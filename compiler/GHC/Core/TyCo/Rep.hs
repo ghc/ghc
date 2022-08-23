@@ -1124,6 +1124,7 @@ mkScaledFunTys tys ty = foldr (mkScaledFunTy af) ty tys
 tcMkScaledFunTys :: [Scaled Type] -> Type -> Type
 -- All visible args
 -- Result type must be TypeLike
+-- No mkFunTy assert checking; result kind may not be zonked
 tcMkScaledFunTys tys ty = foldr mk ty tys
   where
     mk (Scaled mult arg) res = tcMkVisFunTy mult arg res
