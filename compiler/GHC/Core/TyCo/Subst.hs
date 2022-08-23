@@ -76,6 +76,7 @@ import GHC.Types.Var.Env
 import GHC.Data.Pair
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
+import GHC.Utils.Monad
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
@@ -84,7 +85,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
-import Data.List (mapAccumL)
+import Control.Monad.ST
 
 {-
 %************************************************************************
@@ -116,6 +117,11 @@ data TCvSubst
         -- and Note [Extending the TCvSubstEnv]
         -- and Note [Substituting types and coercions]
         -- and Note [The substitution invariant]
+
+data TTCvSubst s
+  = TTCvSubst (TInScopeSet s)
+              TvSubstEnv
+              CvSubstEnv
 
 -- | A substitution of 'Type's for 'TyVar's
 --                 and 'Kind's for 'KindVar's
@@ -466,6 +472,15 @@ zipCoEnv cvs cos
   = pprPanic "zipCoEnv" (ppr cvs <+> ppr cos)
   | otherwise
   = mkVarEnv (zipEqual "zipCoEnv" cvs cos)
+
+transientTCvSubst :: TCvSubst -> TTCvSubst s
+transientTCvSubst (TCvSubst in_scope tenv cenv)
+  = TTCvSubst (transientInScopeSet in_scope) tenv cenv
+
+persistentTCvSubst :: TTCvSubst s -> ST s TCvSubst
+persistentTCvSubst (TTCvSubst in_scope tenv cenv) = do
+  persistent_in_scope <- persistentInScopeSet in_scope
+  return (TCvSubst persistent_in_scope tenv cenv)
 
 instance Outputable TCvSubst where
   ppr (TCvSubst ins tenv cenv)
@@ -950,14 +965,32 @@ lookupCoVar (TCvSubst _ _ cenv) v = lookupVarEnv cenv v
 substTyVarBndr :: HasDebugCallStack => TCvSubst -> TyVar -> (TCvSubst, TyVar)
 substTyVarBndr = substTyVarBndrUsing substTy
 
+substTyVarBndrT :: HasDebugCallStack => TTCvSubst s -> TyVar -> ST s (TTCvSubst s, TyVar)
+substTyVarBndrT = substTyVarBndrUsingT substTy
+
 substTyVarBndrs :: HasDebugCallStack => TCvSubst -> [TyVar] -> (TCvSubst, [TyVar])
-substTyVarBndrs = mapAccumL substTyVarBndr
+substTyVarBndrs subst tvs = runST $ do
+  (subst', tvs') <- substTyVarBndrsT (transientTCvSubst subst) tvs
+  persistent_subst <- persistentTCvSubst subst'
+  return (persistent_subst, tvs')
+
+substTyVarBndrsT :: HasDebugCallStack => TTCvSubst s -> [TyVar] -> ST s (TTCvSubst s, [TyVar])
+substTyVarBndrsT = mapAccumLM substTyVarBndrT
 
 substVarBndr :: HasDebugCallStack => TCvSubst -> TyCoVar -> (TCvSubst, TyCoVar)
 substVarBndr = substVarBndrUsing substTy
 
+substVarBndrT :: HasDebugCallStack => TTCvSubst s -> TyCoVar -> ST s (TTCvSubst s, TyCoVar)
+substVarBndrT = substVarBndrUsingT substTy
+
 substVarBndrs :: HasDebugCallStack => TCvSubst -> [TyCoVar] -> (TCvSubst, [TyCoVar])
-substVarBndrs = mapAccumL substVarBndr
+substVarBndrs subst vs = runST $ do
+  (subst', vs') <- substVarBndrsT (transientTCvSubst subst) vs
+  persistent_subst <- persistentTCvSubst subst'
+  return (persistent_subst, vs')
+
+substVarBndrsT :: HasDebugCallStack => TTCvSubst s -> [TyCoVar] -> ST s (TTCvSubst s, [TyCoVar])
+substVarBndrsT = mapAccumLM substVarBndrT
 
 substCoVarBndr :: HasDebugCallStack => TCvSubst -> CoVar -> (TCvSubst, CoVar)
 substCoVarBndr = substCoVarBndrUsing substTy
@@ -975,6 +1008,15 @@ substVarBndrUsing :: (TCvSubst -> Type -> Type)
 substVarBndrUsing subst_fn subst v
   | isTyVar v = substTyVarBndrUsing subst_fn subst v
   | otherwise = substCoVarBndrUsing subst_fn subst v
+
+substVarBndrUsingT :: (TCvSubst -> Type -> Type)
+                  -> TTCvSubst s -> TyCoVar -> ST s (TTCvSubst s, TyCoVar)
+substVarBndrUsingT subst_fn subst v
+  | isTyVar v = substTyVarBndrUsingT subst_fn subst v
+  | otherwise = do
+      persistent_subst <- persistentTCvSubst subst
+      let (subst', v') = substCoVarBndrUsing subst_fn persistent_subst v
+      return (transientTCvSubst subst', v')
 
 -- | Substitute a tyvar in a binding position, returning an
 -- extended subst and a new tyvar.
@@ -1010,6 +1052,52 @@ substTyVarBndrUsing subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
             | otherwise = uniqAway in_scope $
                           setTyVarKind old_var (subst_fn subst old_ki)
         -- The uniqAway part makes sure the new variable is not already in scope
+
+-- | Substitute a tyvar in a binding position, returning an
+-- extended subst and a new tyvar.
+-- Use the supplied function to substitute in the kind
+substTyVarBndrUsingT
+  :: (TCvSubst -> Type -> Type)  -- ^ Use this to substitute in the kind
+  -> TTCvSubst s -> TyVar -> ST s (TTCvSubst s, TyVar)
+substTyVarBndrUsingT subst_fn (TTCvSubst in_scope tenv cenv) old_var
+  = assert (isTyVar old_var ) $ do
+    (in_scope', new_var) <-
+      if no_kind_change
+        then do
+          new_var <- uniqAwayT in_scope old_var
+          pure (in_scope, new_var)
+        else do
+          persistent_in_scope <- persistentInScopeSet in_scope
+          let subst = TCvSubst persistent_in_scope tenv cenv
+          let new_var = uniqAway persistent_in_scope $
+                        setTyVarKind old_var (subst_fn subst old_ki)
+          pure (transientInScopeSet persistent_in_scope, new_var)
+    -- The uniqAway part makes sure the new variable is not already in scope
+
+    let new_env | no_change = delVarEnv tenv old_var
+                | otherwise = extendVarEnv tenv old_var (TyVarTy new_var)
+
+        _no_capture = not (new_var `elemVarSet` shallowTyCoVarsOfTyVarEnv tenv)
+        -- Assertion check that we are not capturing something in the substitution
+
+        no_change = no_kind_change && (new_var == old_var)
+        -- no_change means that the new_var is identical in
+        -- all respects to the old_var (same unique, same kind)
+        -- See Note [Extending the TCvSubstEnv]
+        --
+        -- In that case we don't need to extend the substitution
+        -- to map old to new.  But instead we must zap any
+        -- current substitution for the variable. For example:
+        --      (\x.e) with id_subst = [x |-> e']
+        -- Here we must simply zap the substitution for x
+
+    massertPpr _no_capture (pprTyVar old_var $$ pprTyVar new_var)
+
+    new_in_scope <- in_scope' `extendTInScopeSet` new_var
+    return (TTCvSubst new_in_scope new_env cenv, new_var)
+  where
+    old_ki = tyVarKind old_var
+    no_kind_change = noFreeVarsOfType old_ki -- verify that kind is closed
 
 -- | Substitute a covar in a binding position, returning an
 -- extended subst and a new covar.
