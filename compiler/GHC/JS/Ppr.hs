@@ -52,7 +52,6 @@ instance Outputable JVal where
 
 
 ($$$) :: Doc -> Doc -> Doc
---x $$$ y = align (nest 2 $ x $+$ y) -- FIXME (Sylvain, 2022/02)
 x $$$ y = nest 2 $ x $+$ y
 
 -- | Render a syntax tree as a pretty-printable document
@@ -92,8 +91,6 @@ braceNest x = char '{' <+> nest 2 x $$ char '}'
 braceNest' :: Doc -> Doc
 braceNest' x = nest 2 (char '{' $+$ x) $$ char '}'
 
--- FIXME: Jeff (2022,03): better naming of braceNest'' functions. Stop the
--- madness!
 -- somewhat more compact (egyptian style) braces
 braceNest'' :: Doc -> Doc
 braceNest'' x = nest 2 (char '{' $$ x) $$ char '}'
