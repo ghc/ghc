@@ -194,6 +194,7 @@ module GHC.Core.Type (
         -- * Main type substitution data types
         TvSubstEnv,     -- Representation widely visible
         TCvSubst(..),    -- Representation visible to a few friends
+        TTCvSubst(..),
 
         -- ** Manipulating type substitutions
         emptyTvSubstEnv, emptyTCvSubst, mkEmptyTCvSubst,
@@ -223,6 +224,8 @@ module GHC.Core.Type (
         substVarBndr, substVarBndrs,
         substTyCoBndr,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
+
+        substTyUncheckedT, substTyVarBndrT,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,

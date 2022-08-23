@@ -46,7 +46,7 @@ import qualified GHC.Core.Coercion as Coercion
         -- We are defining local versions
 import GHC.Core.Type hiding
    ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
-   , isInScope, substTyVarBndr, cloneTyVarBndr )
+   , isInScope, substTyVarBndr, cloneTyVarBndr, substTyVarBndrT )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 
 import GHC.Types.Var.Set
@@ -62,10 +62,12 @@ import GHC.Builtin.Names
 import GHC.Data.Maybe
 
 import GHC.Utils.Misc
+import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
+import Control.Monad.ST
 import Data.List (mapAccumL)
 
 
@@ -101,6 +103,12 @@ data Subst
         --              see Note [Substitutions apply only once] in GHC.Core.TyCo.Subst
         --
         -- INVARIANT 3: See Note [Extending the Subst]
+
+data TSubst s
+  = TSubst (TInScopeSet s)
+           IdSubstEnv
+           TvSubstEnv
+           CvSubstEnv
 
 {-
 Note [Extending the Subst]
@@ -259,6 +267,20 @@ lookupIdSubst (Subst in_scope ids _ _) v
         -- it's a bad bug and we reallly want to know
   | otherwise = pprPanic "lookupIdSubst" (ppr v $$ ppr in_scope)
 
+-- | Find the substitution for an 'Id' in the 'Subst'
+lookupIdSubstT :: HasDebugCallStack => TSubst s -> Id -> ST s CoreExpr
+lookupIdSubstT (TSubst in_scope ids _ _) v
+  | not (isLocalId v) = return $ Var v
+  | Just e  <- lookupVarEnv ids v = return e
+  | otherwise = do
+      mb_v <- lookupTInScope in_scope v
+      return $! case mb_v of
+        Just v -> Var v
+        -- Vital! See Note [Extending the Subst]
+        -- If v isn't in the InScopeSet, we panic, because
+        -- it's a bad bug and we reallly want to know
+        Nothing -> pprPanic "lookupIdSubst" (ppr v)
+
 delBndr :: Subst -> Var -> Subst
 delBndr (Subst in_scope ids tvs cvs) v
   | isCoVar v = Subst in_scope ids tvs (delVarEnv cvs v)
@@ -280,6 +302,14 @@ mkOpenSubst in_scope pairs = Subst in_scope
                                    (mkVarEnv [(tv,ty) | (tv, Type ty) <- pairs])
                                    (mkVarEnv [(v,co)  | (v, Coercion co) <- pairs])
 
+transientSubst :: Subst -> TSubst s
+transientSubst (Subst in_scope id_env tv_env cv_env)
+  = TSubst (transientInScopeSet in_scope) id_env tv_env cv_env
+
+persistentSubst :: TSubst s -> ST s Subst
+persistentSubst (TSubst in_scope id_env tv_env cv_env) = do
+  persistent_in_scope <- persistentInScopeSet in_scope
+  return (Subst persistent_in_scope id_env tv_env cv_env)
 ------------------------------
 isInScope :: Var -> Subst -> Bool
 isInScope v (Subst in_scope _ _ _) = v `elemInScopeSet` in_scope
@@ -441,16 +471,39 @@ substBndr subst bndr
   | isCoVar bndr  = substCoVarBndr subst bndr
   | otherwise     = substIdBndr (text "var-bndr") subst subst bndr
 
+-- | Substitutes a 'Var' for another one according to the 'TSubst' given, returning
+-- the result and an updated 'TSubst' that should be used by subsequent substitutions.
+-- 'IdInfo' is preserved by this process, although it is substituted into appropriately.
+substBndrT :: TSubst s -> Var -> ST s (TSubst s, Var)
+substBndrT subst bndr
+  | isTyVar bndr  = substTyVarBndrT subst bndr
+  | isCoVar bndr  = do
+      persistent_subst <- persistentSubst subst
+      -- TODO: Make a substCoVarBndrT version of substCoVarBndr
+      let (subst', bndr') = substCoVarBndr persistent_subst bndr
+      return (transientSubst subst', bndr')
+  | otherwise     = substIdBndrT (text "var-bndr") subst bndr
+
 -- | Applies 'substBndr' to a number of 'Var's, accumulating a new 'Subst' left-to-right
 substBndrs :: Subst -> [Var] -> (Subst, [Var])
-substBndrs subst bndrs = mapAccumL substBndr subst bndrs
+substBndrs subst bndrs = runST $ do
+  (subst', bndrs') <- substBndrsT (transientSubst subst) bndrs
+  persistent_subst <- persistentSubst subst'
+  return (persistent_subst, bndrs')
+
+-- | Applies 'substBndrT' to a number of 'Var's, accumulating a new 'TSubst' left-to-right
+substBndrsT :: TSubst s -> [Var] -> ST s (TSubst s, [Var])
+substBndrsT subst bndrs = mapAccumLM substBndrT subst bndrs
 
 -- | Substitute in a mutually recursive group of 'Id's
 substRecBndrs :: Subst -> [Id] -> (Subst, [Id])
-substRecBndrs subst bndrs
-  = (new_subst, new_bndrs)
-  where         -- Here's the reason we need to pass rec_subst to subst_id
-    (new_subst, new_bndrs) = mapAccumL (substIdBndr (text "rec-bndr") new_subst) subst bndrs
+substRecBndrs subst bndrs = runST $ fixST $ \(~(new_subst, _new_bndrs)) -> do
+  (new_subst', new_bndrs) <-
+    mapAccumLM (substIdBndrWithRecSubstT (text "rec-bndr") new_subst)
+               (transientSubst subst)
+               bndrs
+  persistent_new_subst <- persistentSubst new_subst'
+  return (persistent_new_subst, new_bndrs)
 
 substIdBndr :: SDoc
             -> Subst            -- ^ Substitution to use for the IdInfo
@@ -486,6 +539,74 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
     no_change = id1 == old_id
         -- See Note [Extending the Subst]
         -- it's /not/ necessary to check mb_new_info and no_type_change
+
+substIdBndrWithRecSubstT :: SDoc
+                         -> Subst                 -- ^ Substitution to use for the IdInfo
+                         -> (TSubst s) -> Id      -- ^ Substitution and Id to transform
+                         -> ST s (TSubst s, Id)   -- ^ Transformed pair
+                                                  -- NB: unfolding may be zapped
+substIdBndrWithRecSubstT _doc rec_subst subst@(TSubst in_scope env tvs cvs) old_id = do
+  id1 <- uniqAwayT in_scope old_id
+  id2 <-
+    if no_type_change
+      then pure id1
+      else updateIdTypeAndMultM (substTyT subst) id1
+
+      -- new_id has the right IdInfo
+      -- The lazy-set is because we're in a loop here, with
+      -- rec_subst, when dealing with a mutually-recursive group
+  let new_id = maybeModifyIdInfo mb_new_info id2
+      mb_new_info = substIdInfo rec_subst id2 (idInfo id2)
+      -- NB: unfolding info may be zapped
+
+      -- Extend the substitution if the unique has changed
+      -- See the notes with substTyVarBndr for the delVarEnv
+      new_env | no_change = delVarEnv env old_id
+              | otherwise = extendVarEnv env old_id (Var new_id)
+
+      no_change = id1 == old_id
+      -- See Note [Extending the Subst]
+      -- it's /not/ necessary to check mb_new_info and no_type_change
+
+  new_in_scope <- in_scope `InScopeSet.extendTInScopeSet` new_id
+  return (TSubst new_in_scope new_env tvs cvs, new_id)
+  where
+    old_ty = idType old_id
+    old_w = idMult old_id
+    no_type_change = (isEmptyVarEnv tvs && isEmptyVarEnv cvs) ||
+                     (noFreeVarsOfType old_ty && noFreeVarsOfType old_w)
+
+substIdBndrT :: SDoc
+             -> (TSubst s) -> Id      -- ^ Substitution and Id to transform
+             -> ST s (TSubst s, Id)   -- ^ Transformed pair
+                                      -- NB: unfolding may be zapped
+substIdBndrT _doc subst@(TSubst in_scope env tvs cvs) old_id = do
+  id1 <- uniqAwayT in_scope old_id
+  id2 <-
+    if no_type_change
+      then pure id1
+      else updateIdTypeAndMultM (substTyT subst) id1
+
+  mb_new_info <- substIdInfoT subst id2 (idInfo id2)
+  let new_id = maybeModifyIdInfo mb_new_info id2
+      -- NB: unfolding info may be zapped
+
+      -- Extend the substitution if the unique has changed
+      -- See the notes with substTyVarBndr for the delVarEnv
+      new_env | no_change = delVarEnv env old_id
+              | otherwise = extendVarEnv env old_id (Var new_id)
+
+      no_change = id1 == old_id
+      -- See Note [Extending the Subst]
+      -- it's /not/ necessary to check mb_new_info and no_type_change
+
+  new_in_scope <- in_scope `InScopeSet.extendTInScopeSet` new_id
+  return (TSubst new_in_scope new_env tvs cvs, new_id)
+  where
+    old_ty = idType old_id
+    old_w = idMult old_id
+    no_type_change = (isEmptyVarEnv tvs && isEmptyVarEnv cvs) ||
+                     (noFreeVarsOfType old_ty && noFreeVarsOfType old_w)
 
 {-
 Now a variant that unconditionally allocates a new unique.
@@ -556,6 +677,12 @@ substTyVarBndr (Subst in_scope id_env tv_env cv_env) tv
         (TCvSubst in_scope' tv_env' cv_env', tv')
            -> (Subst in_scope' id_env tv_env' cv_env', tv')
 
+substTyVarBndrT :: TSubst s -> TyVar -> ST s (TSubst s, TyVar)
+substTyVarBndrT (TSubst in_scope id_env tv_env cv_env) tv = do
+  (TTCvSubst in_scope' tv_env' cv_env', tv') <-
+    Type.substTyVarBndrT (TTCvSubst in_scope tv_env cv_env) tv
+  return (TSubst in_scope' id_env tv_env' cv_env', tv')
+
 cloneTyVarBndr :: Subst -> TyVar -> Unique -> (Subst, TyVar)
 cloneTyVarBndr (Subst in_scope id_env tv_env cv_env) tv uniq
   = case Type.cloneTyVarBndr (TCvSubst in_scope tv_env cv_env) tv uniq of
@@ -572,8 +699,15 @@ substCoVarBndr (Subst in_scope id_env tv_env cv_env) cv
 substTy :: Subst -> Type -> Type
 substTy subst ty = Type.substTyUnchecked (getTCvSubst subst) ty
 
+-- | Persists 'subst' before it is modified.
+substTyT :: TSubst s  -> Type -> ST s Type
+substTyT subst ty = Type.substTyUncheckedT (getTTCvSubst subst) ty
+
 getTCvSubst :: Subst -> TCvSubst
 getTCvSubst (Subst in_scope _ tenv cenv) = TCvSubst in_scope tenv cenv
+
+getTTCvSubst :: TSubst s -> TTCvSubst s
+getTTCvSubst (TSubst in_scope _ tenv cenv) = TTCvSubst in_scope tenv cenv
 
 -- | See 'Coercion.substCo'
 substCo :: HasCallStack => Subst -> Coercion -> Coercion
@@ -612,6 +746,20 @@ substIdInfo subst new_id info
     old_unf       = realUnfoldingInfo info
     nothing_to_do = isEmptyRuleInfo old_rules && not (hasCoreUnfolding old_unf)
 
+-- | Substitute into some 'IdInfo' with regard to the supplied new 'Id'.
+-- Persists 'subst' before it is modified.
+substIdInfoT :: TSubst s -> Id -> IdInfo -> ST s (Maybe IdInfo)
+substIdInfoT subst new_id info
+  | nothing_to_do = return Nothing
+  | otherwise     = do
+      new_rules <- substRuleInfoT subst new_id old_rules
+      new_unf <- substUnfoldingT subst old_unf
+      return $ Just (info `setRuleInfo` new_rules `setUnfoldingInfo` new_unf)
+  where
+    old_rules     = ruleInfo info
+    old_unf       = realUnfoldingInfo info
+    nothing_to_do = isEmptyRuleInfo old_rules && not (hasCoreUnfolding old_unf)
+
 ------------------
 -- | Substitutes for the 'Id's within an unfolding
 -- NB: substUnfolding /discards/ any unfolding without
@@ -643,6 +791,27 @@ substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
 
 substUnfolding _ unf = unf      -- NoUnfolding, OtherCon
 
+-- | Persists 'subst' before it is modified.
+substUnfoldingT :: TSubst s -> Unfolding -> ST s Unfolding
+substUnfoldingT subst df@(DFunUnfolding { df_bndrs = bndrs, df_args = args }) = do
+  persistent_subst <- persistentSubst subst
+  -- TODO: Use substBndrsT and make a substExprT version of substExpr
+  let (subst',bndrs') = substBndrs persistent_subst bndrs
+      args'           = map (substExpr subst') args
+  return df { df_bndrs = bndrs', df_args = args' }
+
+substUnfoldingT subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
+        -- Retain an InlineRule!
+  | not (isStableSource src)  -- Zap an unstable unfolding, to save substitution work
+  = return NoUnfolding
+  | otherwise                 -- But keep a stable one!
+  = do
+    persistent_subst <- persistentSubst subst
+    let new_tmpl = substExpr persistent_subst tmpl
+    seqExpr new_tmpl `seq` return unf { uf_tmpl = new_tmpl }
+
+substUnfoldingT _ unf = return unf      -- NoUnfolding, OtherCon
+
 ------------------
 substIdOcc :: Subst -> Id -> Id
 -- These Ids should not be substituted to non-Ids
@@ -656,6 +825,16 @@ substRuleInfo :: Subst -> Id -> RuleInfo -> RuleInfo
 substRuleInfo subst new_id (RuleInfo rules rhs_fvs)
   = RuleInfo (map (substRule subst subst_ru_fn) rules)
                   (substDVarSet subst rhs_fvs)
+  where
+    subst_ru_fn = const (idName new_id)
+
+-- | Substitutes for the 'Id's within the 'RuleInfo' given the new function 'Id'
+-- Persists 'subst' before it is modified.
+substRuleInfoT :: TSubst s -> Id -> RuleInfo -> ST s RuleInfo
+substRuleInfoT subst new_id (RuleInfo rules rhs_fvs) = do
+  rules' <- mapM (substRuleT subst subst_ru_fn) rules
+  rhs_fvs' <- substDVarSetT subst rhs_fvs
+  return $ RuleInfo rules' rhs_fvs'
   where
     subst_ru_fn = const (idName new_id)
 
@@ -690,6 +869,31 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
   where
     (subst', bndrs') = substBndrs subst bndrs
 
+-- | Persists 'subst' before it is modified.
+substRuleT :: TSubst s -> (Name -> Name) -> CoreRule -> ST s CoreRule
+
+-- The subst_ru_fn argument is applied to substitute the ru_fn field
+-- of the rule:
+--    - Rules for *imported* Ids never change ru_fn
+--    - Rules for *local* Ids are in the IdInfo for that Id,
+--      and the ru_fn field is simply replaced by the new name
+--      of the Id
+substRuleT _ _ rule@(BuiltinRule {}) = return rule
+substRuleT subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
+                                       , ru_fn = fn_name, ru_rhs = rhs
+                                       , ru_local = is_local })
+  = do
+    persistent_subst <- persistentSubst subst
+    let (subst', bndrs') = substBndrs persistent_subst bndrs
+    return rule { ru_bndrs = bndrs'
+                , ru_fn    = if is_local
+                                then subst_ru_fn fn_name
+                                else fn_name
+                , ru_args  = map (substExpr subst') args
+                , ru_rhs   = substExpr subst' rhs }
+                  -- Do NOT optimise the RHS (previously we did simplOptExpr here)
+                  -- See Note [Substitute lazily]
+
 ------------------
 substDVarSet :: HasDebugCallStack => Subst -> DVarSet -> DVarSet
 substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
@@ -706,6 +910,23 @@ substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
      | otherwise
      , let fv_expr = lookupIdSubst subst fv
      = expr_fvs fv_expr isLocalVar emptyVarSet $! acc
+
+-- Does not modify subst.
+substDVarSetT :: HasDebugCallStack => TSubst s -> DVarSet -> ST s DVarSet
+substDVarSetT subst@(TSubst _ _ tv_env cv_env) fvs
+  = mkDVarSet . fst <$> (foldrM subst_fv ([], emptyVarSet) $ dVarSetElems fvs)
+  where
+  subst_fv fv acc
+     | isTyVar fv
+     , let fv_ty = lookupVarEnv tv_env fv `orElse` mkTyVarTy fv
+     = return $! tyCoFVsOfType fv_ty (const True) emptyVarSet $! acc
+     | isCoVar fv
+     , let fv_co = lookupVarEnv cv_env fv `orElse` mkCoVarCo fv
+     = return $! tyCoFVsOfCo fv_co (const True) emptyVarSet $! acc
+     | otherwise
+     = do
+       fv_expr <- lookupIdSubstT subst fv
+       return $! expr_fvs fv_expr isLocalVar emptyVarSet $! acc
 
 ------------------
 substTickish :: Subst -> CoreTickish -> CoreTickish

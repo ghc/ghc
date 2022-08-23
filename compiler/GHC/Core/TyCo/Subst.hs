@@ -50,6 +50,9 @@ module GHC.Core.TyCo.Subst
         substForAllCoBndr,
         substVarBndrUsing, substForAllCoBndrUsing,
         checkValidSubst, isValidTCvSubst,
+
+        TTCvSubst(..),
+        substTyUncheckedT, substTyVarBndrT,
   ) where
 
 import GHC.Prelude
@@ -266,6 +269,9 @@ mkEmptyTCvSubst is = TCvSubst is emptyTvSubstEnv emptyCvSubstEnv
 isEmptyTCvSubst :: TCvSubst -> Bool
          -- See Note [Extending the TCvSubstEnv]
 isEmptyTCvSubst (TCvSubst _ tenv cenv) = isEmptyVarEnv tenv && isEmptyVarEnv cenv
+
+isEmptyTTCvSubst :: TTCvSubst s -> Bool
+isEmptyTTCvSubst (TTCvSubst _ tenv cenv) = isEmptyVarEnv tenv && isEmptyVarEnv cenv
 
 mkTCvSubst :: InScopeSet -> (TvSubstEnv, CvSubstEnv) -> TCvSubst
 mkTCvSubst in_scope (tenv, cenv) = TCvSubst in_scope tenv cenv
@@ -694,6 +700,12 @@ substTyUnchecked subst ty
                  | isEmptyTCvSubst subst = ty
                  | otherwise             = subst_ty subst ty
 
+-- | Persists 'subst' before it is modified.
+substTyUncheckedT :: TTCvSubst s -> Type -> ST s Type
+substTyUncheckedT subst ty
+                  | isEmptyTTCvSubst subst = return ty
+                  | otherwise              = subst_ty_t subst ty
+
 substScaledTy :: HasDebugCallStack => TCvSubst -> Scaled Type -> Scaled Type
 substScaledTy subst scaled_ty = mapScaledType (substTy subst) scaled_ty
 
@@ -777,8 +789,58 @@ subst_ty subst ty
     go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
+-- | Persists 'subst' before it is modified.
+subst_ty_t :: TTCvSubst s -> Type -> ST s Type
+-- subst_ty is the main workhorse for type substitution
+--
+-- Note that the in_scope set is poked only if we hit a forall
+-- so it may often never be fully computed
+subst_ty_t subst ty
+   = go ty
+  where
+    go (TyVarTy tv) = return $! substTyVarT subst tv
+    go (AppTy fun arg) = do
+      ty1 <- go fun
+      ty2 <- go arg
+      return $! (mkAppTy $! ty1) $! ty2
+                -- The mkAppTy smart constructor is important
+                -- we might be replacing (a Int), represented with App
+                -- by [Int], represented with TyConApp
+    go ty@(TyConApp tc []) = return $ tc `seq` ty  -- avoid allocation in this common case
+    go (TyConApp tc tys) = (mkTyConApp $! tc) <$> mapM go tys
+                               -- NB: mkTyConApp, not TyConApp.
+                               -- mkTyConApp has optimizations.
+                               -- See Note [Using synonyms to compress types]
+                               -- in GHC.Core.Type
+    go ty@(FunTy { ft_mult = mult, ft_arg = arg, ft_res = res }) = do
+      !mult' <- go mult
+      !arg' <- go arg
+      !res' <- go res
+      return $! ty { ft_mult = mult', ft_arg = arg', ft_res = res' }
+    go (ForAllTy (Bndr tv vis) ty) = do
+      persistent_subst <- persistentTCvSubst subst
+      case substVarBndrUnchecked persistent_subst tv of
+        (subst', tv') ->
+          return $! (ForAllTy $! ((Bndr $! tv') vis)) $! (subst_ty subst' ty)
+    go (LitTy n) = return $ LitTy $! n
+    -- TODO: make a subst_co_t version of subst_co
+    go (CastTy ty co) = do
+      ty' <- go ty
+      persistent_subst <- persistentTCvSubst subst
+      return $! (mkCastTy $! ty') $! (subst_co persistent_subst co)
+    go (CoercionTy co) = do
+      persistent_subst <- persistentTCvSubst subst
+      return $! CoercionTy $! (subst_co persistent_subst co)
+
 substTyVar :: TCvSubst -> TyVar -> Type
 substTyVar (TCvSubst _ tenv _) tv
+  = assert (isTyVar tv) $
+    case lookupVarEnv tenv tv of
+      Just ty -> ty
+      Nothing -> TyVarTy tv
+
+substTyVarT :: TTCvSubst s -> TyVar -> Type
+substTyVarT (TTCvSubst _ tenv _) tv
   = assert (isTyVar tv) $
     case lookupVarEnv tenv tv of
       Just ty -> ty
