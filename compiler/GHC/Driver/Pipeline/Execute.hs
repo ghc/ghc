@@ -1180,7 +1180,7 @@ via gcc.
 -- | See Note [Object merging].
 joinObjectFiles :: HscEnv -> [FilePath] -> FilePath -> IO ()
 joinObjectFiles hsc_env o_files output_fn
-  | can_merge_objs = do
+  | can_merge_objs && not dashLSupported = do
   let toolSettings' = toolSettings dflags
       ldIsGnuLd = toolSettings_ldIsGnuLd toolSettings'
       ld_r args = GHC.SysTools.runMergeObjects (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (hsc_dflags hsc_env) (
