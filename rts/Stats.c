@@ -839,7 +839,7 @@ static void report_summary(const RTSSummaryStats* sum)
     statsPrintf("%16s bytes maximum slop\n", temp);
 
     statsPrintf("%16" FMT_Word64 " MiB total memory in use (%"
-                FMT_Word64 " MB lost due to fragmentation)\n\n",
+                FMT_Word64 " MiB lost due to fragmentation)\n\n",
                 stats.max_mem_in_use_bytes  / (1024 * 1024),
                 sum->fragmentation_bytes / (1024 * 1024));
 
