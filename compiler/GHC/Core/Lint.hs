@@ -2312,7 +2312,7 @@ lintCoercion the_co@(SelCo cs co)
 
          ; _ -> case (isFunTy s, isFunTy t) of
          { (True, True)
-             | SelFun fs <- cs
+             | SelFun {} <- cs
              -> return (SelCo cs co')
 
          ; _ -> case (splitTyConApp_maybe s, splitTyConApp_maybe t) of
