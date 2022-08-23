@@ -56,6 +56,17 @@ module GHC.Types.Var.Env (
         unionInScope, elemInScopeSet, uniqAway,
         varSetInScope,
         unsafeGetFreshLocalUnique,
+        transientInScopeSet,
+
+        -- * The transient TInScopeSet type
+        TInScopeSet,
+
+        -- ** Operations on InScopeSets
+        emptyTInScopeSet, mkTInScopeSet, delTInScopeSet,
+        extendTInScopeSet, extendTInScopeSetList, extendTInScopeSetSet,
+        lookupTInScope,
+        unionTInScope, elemTInScopeSet, uniqAwayT,
+        persistentInScopeSet,
 
         -- * The RnEnv2 type
         RnEnv2,
@@ -150,6 +161,38 @@ subFastVarSet set1 (FastVarSet set2)
       | k1 == k2 = go ks1 ks2
       | otherwise = go (k1 : ks1) ks2
 
+
+newtype TFastVarSet s = TFastVarSet (TWordMap s Var)
+
+emptyTFastVarSet :: TFastVarSet s
+emptyTFastVarSet = TFastVarSet WordMap.emptyT
+
+extendTFastVarSet :: TFastVarSet s -> Var -> ST s (TFastVarSet s)
+extendTFastVarSet (TFastVarSet set) var = TFastVarSet <$> insertT (varToKey var) var set
+
+extendTFastVarSetList :: Foldable f => TFastVarSet s -> f Var -> ST s (TFastVarSet s)
+extendTFastVarSetList (TFastVarSet set) vars
+  = TFastVarSet <$> foldM (\map var -> insertT (varToKey var) var map) set vars
+
+extendTFastVarSetSet :: TFastVarSet s -> VarSet -> ST s (TFastVarSet s)
+extendTFastVarSetSet (TFastVarSet set1) set2
+  = TFastVarSet <$> extendFromAscListT (map intKeyToWordKey $ varSetToAscList set2) set1
+  where
+    intKeyToWordKey (k, v) = (fromIntegral k, v)
+
+delTFastVarSet :: TFastVarSet s -> Var -> ST s (TFastVarSet s)
+delTFastVarSet (TFastVarSet set) var = TFastVarSet <$> deleteT (varToKey var) set
+
+elemTFastVarSet :: Var -> TFastVarSet s -> ST s Bool
+elemTFastVarSet var (TFastVarSet set) = isJust <$> (WordMap.lookupT (varToKey var) set)
+
+lookupTFastVarSet :: TFastVarSet s -> Var -> ST s (Maybe Var)
+lookupTFastVarSet (TFastVarSet set) var = WordMap.lookupT (varToKey var) set
+
+unionTFastVarSet :: TFastVarSet s -> TFastVarSet s -> ST s (TFastVarSet s)
+-- WordMap.unionT is left-biased, unionTFastVarSet should be right-biased.
+unionTFastVarSet (TFastVarSet set1) (TFastVarSet set2) = TFastVarSet <$> unionT set2 set1
+
 {-
 ************************************************************************
 *                                                                      *
@@ -239,6 +282,53 @@ unionInScope (InScope s1) (InScope s2)
 varSetInScope :: VarSet -> InScopeSet -> Bool
 varSetInScope vars (InScope s1) = vars `subFastVarSet` s1
 
+
+newtype TInScopeSet s = TInScope (TFastVarSet s)
+
+emptyTInScopeSet :: TInScopeSet s
+emptyTInScopeSet = TInScope emptyTFastVarSet
+
+mkTInScopeSet :: VarSet -> ST s (TInScopeSet s)
+mkTInScopeSet in_scope = do
+  tmap <- WordMap.fromAscListT $ map intKeyToWordKey $ varSetToAscList in_scope
+  return $ TInScope (TFastVarSet tmap)
+  where
+    intKeyToWordKey (k, v) = (fromIntegral k, v)
+
+extendTInScopeSet :: TInScopeSet s -> Var -> ST s (TInScopeSet s)
+extendTInScopeSet (TInScope in_scope) v
+  = TInScope <$> (extendTFastVarSet in_scope v)
+
+extendTInScopeSetList :: TInScopeSet s -> [Var] -> ST s (TInScopeSet s)
+extendTInScopeSetList (TInScope in_scope) vs
+  = TInScope <$> (extendTFastVarSetList in_scope vs)
+
+extendTInScopeSetSet :: TInScopeSet s -> VarSet -> ST s (TInScopeSet s)
+extendTInScopeSetSet (TInScope in_scope) vs
+  = TInScope <$> (extendTFastVarSetSet in_scope vs)
+
+delTInScopeSet :: TInScopeSet s -> Var -> ST s (TInScopeSet s)
+delTInScopeSet (TInScope in_scope) v = TInScope <$> (in_scope `delTFastVarSet` v)
+
+elemTInScopeSet :: Var -> TInScopeSet s -> ST s Bool
+elemTInScopeSet v (TInScope in_scope) = v `elemTFastVarSet` in_scope
+
+lookupTInScope :: TInScopeSet s -> Var -> ST s (Maybe Var)
+lookupTInScope (TInScope in_scope) v = lookupTFastVarSet in_scope v
+
+unionTInScope :: TInScopeSet s -> TInScopeSet s -> ST s (TInScopeSet s)
+unionTInScope (TInScope s1) (TInScope s2)
+  = TInScope <$> (s1 `unionTFastVarSet` s2)
+
+
+transientInScopeSet :: InScopeSet -> TInScopeSet s
+transientInScopeSet (InScope (FastVarSet in_scope))
+  = TInScope (TFastVarSet (transient in_scope))
+
+persistentInScopeSet :: TInScopeSet s -> ST s (InScopeSet)
+persistentInScopeSet (TInScope (TFastVarSet in_scope))
+  = InScope . FastVarSet <$> persistent in_scope
+
 {-
 Note [Local uniques]
 ~~~~~~~~~~~~~~~~~~~~
@@ -286,6 +376,34 @@ unsafeGetFreshLocalUnique (InScope (FastVarSet set))
 
   | otherwise
   = minLocalUnique
+
+-- | @uniqAwayT in_scope v@ finds a unique that is not used in the
+-- in-scope set, and gives that to v. See Note [Local uniques] and
+-- Note [The InScopeSet invariant].
+uniqAwayT :: TInScopeSet s -> Var -> ST s Var
+uniqAwayT in_scope var = do
+  elemInScope <- var `elemTInScopeSet` in_scope
+  if elemInScope
+    then uniqAwayT' in_scope var    -- Make a new one
+    else return var                 -- Nothing to do
+
+uniqAwayT' :: TInScopeSet s -> Var -> ST s Var
+-- This one *always* makes up a new variable
+uniqAwayT' in_scope var
+  = setVarUnique var <$> unsafeGetFreshLocalUniqueT in_scope
+
+-- | @unsafeGetFreshUniqueT in_scope@ finds a unique that is not in-scope in the
+-- given 'InScopeSet'. This must be used very carefully since one can very easily
+-- introduce non-unique 'Unique's this way. See Note [Local uniques].
+unsafeGetFreshLocalUniqueT :: TInScopeSet s -> ST s Unique
+unsafeGetFreshLocalUniqueT (TInScope (TFastVarSet set)) = do
+  mb_uniq <- WordMap.lookupLTT (fromIntegral $ getKey maxLocalUnique) set
+  case mb_uniq of
+    Just (uniq,_)
+      | let uniq' = mkLocalUnique (fromIntegral uniq)
+      , not $ uniq' `ltUnique` minLocalUnique 
+      -> return $! incrUnique uniq'
+    _ -> return minLocalUnique
 
 {-
 ************************************************************************
