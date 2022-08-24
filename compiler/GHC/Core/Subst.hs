@@ -374,37 +374,65 @@ substExprSC subst orig_expr
 -- See Note [Extending the Subst]
 substExpr :: HasDebugCallStack => Subst -> CoreExpr -> CoreExpr
    -- HasDebugCallStack so we can track failures in lookupIdSubst
-substExpr subst expr
+substExpr subst expr = runST $ substExprT (transientSubst subst) expr
+
+substExprT :: HasDebugCallStack => TSubst s -> CoreExpr -> ST s CoreExpr
+substExprT subst expr
   = go expr
   where
-    go (Var v)         = lookupIdSubst subst v
-    go (Type ty)       = Type (substTy subst ty)
-    go (Coercion co)   = Coercion (substCo subst co)
-    go (Lit lit)       = Lit lit
-    go (App fun arg)   = App (go fun) (go arg)
-    go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)     = Cast (go e) (substCo subst co)
+    go (Var v)         = lookupIdSubstT subst v
+    go (Type ty)       = Type <$> (substTyT subst ty)
+    go (Lit lit)       = return $ Lit lit
+
+    go (Coercion co) = do
+      persistent_subst <- persistentSubst subst
+      return $ Coercion (substCo persistent_subst co)
+
+    go (App fun arg) = do
+      _ <- persistentSubst subst
+      fun' <- go fun
+      arg' <- go arg
+      return $ App fun' arg'
+
+    go (Tick tickish e) = do
+      t <- substTickishT subst tickish
+      e' <- go e
+      return $ mkTick t e'
+
+    go (Cast e co) = do
+      persistent_subst <- persistentSubst subst
+      e' <- go e
+      return $ Cast e' (substCo persistent_subst co)
        -- Do not optimise even identity coercions
        -- Reason: substitution applies to the LHS of RULES, and
        --         if you "optimise" an identity coercion, you may
        --         lose a binder. We optimise the LHS of rules at
        --         construction time
 
-    go (Lam bndr body) = Lam bndr' (substExpr subst' body)
-                       where
-                         (subst', bndr') = substBndr subst bndr
+    go (Lam bndr body) = do
+      (subst', bndr') <- substBndrT subst bndr
+      body' <- substExprT subst' body
+      return $ Lam bndr' body'
 
-    go (Let bind body) = Let bind' (substExpr subst' body)
-                       where
-                         (subst', bind') = substBind subst bind
+    go (Let bind body) = do
+      persistent_subst <- persistentSubst subst
+      let (subst', bind') = substBind persistent_subst bind
+      body' <- substExprT (transientSubst subst') body
+      return $ Let bind' body'
 
-    go (Case scrut bndr ty alts) = Case (go scrut) bndr' (substTy subst ty) (map (go_alt subst') alts)
-                                 where
-                                 (subst', bndr') = substBndr subst bndr
+    go (Case scrut bndr ty alts) = do
+      _ <- persistentSubst subst
+      scrut' <- go scrut
+      (subst', bndr') <- substBndrT subst bndr
+      persistent_subst' <- persistentSubst subst'
+      ty' <- substTyT subst ty
+      alts' <- mapM (go_alt persistent_subst') alts
+      return $ Case scrut' bndr' ty' alts'
 
-    go_alt subst (Alt con bndrs rhs) = Alt con bndrs' (substExpr subst' rhs)
-                                 where
-                                   (subst', bndrs') = substBndrs subst bndrs
+    go_alt subst (Alt con bndrs rhs) = do
+      (subst', bndrs') <- substBndrsT (transientSubst subst) bndrs
+      rhs' <- substExprT subst' rhs
+      return $ Alt con bndrs' rhs'
 
 -- | Apply a substitution to an entire 'CoreBind', additionally returning an updated 'Subst'
 -- that should be used by subsequent substitutions.
@@ -939,6 +967,13 @@ substTickish subst (Breakpoint ext n ids)
  where
     do_one = getIdFromTrivialExpr . lookupIdSubst subst
 substTickish _subst other = other
+
+substTickishT :: TSubst s -> CoreTickish -> ST s CoreTickish
+substTickishT subst (Breakpoint ext n ids)
+   = Breakpoint ext n <$> (mapM do_one ids)
+ where
+    do_one id = getIdFromTrivialExpr <$> lookupIdSubstT subst id
+substTickishT _subst other = return other
 
 {- Note [Substitute lazily]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
