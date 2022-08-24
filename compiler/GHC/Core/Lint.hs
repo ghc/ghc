@@ -3437,24 +3437,26 @@ lintAnnots pname pass guts = {-# SCC "lintAnnots" #-} do
   logger <- getLogger
   when (gopt Opt_DoAnnotationLinting dflags) $
     liftIO $ Err.showPass logger "Annotation linting - first run"
-  nguts <- pass guts
   -- If appropriate re-run it without debug annotations to make sure
   -- that they made no difference.
-  when (gopt Opt_DoAnnotationLinting dflags) $ do
-    liftIO $ Err.showPass logger "Annotation linting - second run"
-    nguts' <- withoutAnnots pass guts
-    -- Finally compare the resulting bindings
-    liftIO $ Err.showPass logger "Annotation linting - comparison"
-    let binds = flattenBinds $ mg_binds nguts
-        binds' = flattenBinds $ mg_binds nguts'
-        (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'
-    when (not (null diffs)) $ GHC.Core.Opt.Monad.putMsg $ vcat
-      [ lint_banner "warning" pname
-      , text "Core changes with annotations:"
-      , withPprStyle defaultDumpStyle $ nest 2 $ vcat diffs
-      ]
-  -- Return actual new guts
-  return nguts
+  if gopt Opt_DoAnnotationLinting dflags
+    then do
+      nguts <- pass guts
+      liftIO $ Err.showPass logger "Annotation linting - second run"
+      nguts' <- withoutAnnots pass guts
+      -- Finally compare the resulting bindings
+      liftIO $ Err.showPass logger "Annotation linting - comparison"
+      let binds = flattenBinds $ mg_binds nguts
+          binds' = flattenBinds $ mg_binds nguts'
+          (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'
+      when (not (null diffs)) $ GHC.Core.Opt.Monad.putMsg $ vcat
+        [ lint_banner "warning" pname
+        , text "Core changes with annotations:"
+        , withPprStyle defaultDumpStyle $ nest 2 $ vcat diffs
+        ]
+      return nguts
+    else
+      pass guts
 
 -- | Run the given pass without annotations. This means that we both
 -- set the debugLevel setting to 0 in the environment as well as all
