@@ -153,7 +153,7 @@ simplifyPgm logger unit_env opts
                           , mg_binds = binds, mg_rules = rules
                           , mg_fam_inst_env = fam_inst_env })
   = do { (termination_msg, it_count, counts_out, guts')
-           <- do_iteration 1 [] binds rules
+            <- do_iteration 1 [] binds rules
 
         ; when (logHasDumpFlag logger Opt_D_verbose_core2core
                 && logHasDumpFlag logger Opt_D_dump_simpl_stats) $
@@ -175,6 +175,9 @@ simplifyPgm logger unit_env opts
     print_unqual    = mkPrintUnqualified unit_env rdr_env
     active_rule     = activeRule mode
     active_unf      = activeUnfolding mode
+    -- Note the bang in !guts_no_binds.  If you don't force `guts_no_binds`
+    -- the old bindings are retained until the end of all simplifier iterations
+    !guts_no_binds = guts { mg_binds = [], mg_rules = [] }
 
     do_iteration :: Int -- Counts iterations
                  -> [SimplCount] -- Counts from earlier iterations, reversed
@@ -198,7 +201,7 @@ simplifyPgm logger unit_env opts
                 -- number of iterations we actually completed
         return ( "Simplifier baled out", iteration_no - 1
                , totalise counts_so_far
-               , guts { mg_binds = binds, mg_rules = rules } )
+               , guts_no_binds { mg_binds = binds, mg_rules = rules } )
 
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
@@ -253,7 +256,7 @@ simplifyPgm logger unit_env opts
            if isZeroSimplCount counts1 then
                 return ( "Simplifier reached fixed point", iteration_no
                        , totalise (counts1 : counts_so_far)  -- Include "free" ticks
-                       , guts { mg_binds = binds1, mg_rules = rules1 } )
+                       , guts_no_binds { mg_binds = binds1, mg_rules = rules1 } )
            else do {
                 -- Short out indirections
                 -- We do this *after* at least one run of the simplifier
