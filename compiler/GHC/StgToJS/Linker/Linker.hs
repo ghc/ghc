@@ -18,39 +18,6 @@
 -- GHCJS linker, collects dependencies from the object files (.js_o, js_p_o),
 -- which contain linkable units with dependency information
 --
------------------------------ FIXMEs -------------------------------------------
--- FIXME: Jeff (2022,03): Finish module description. Specifically:
--- 1. What are the important modules this module uses
--- 2. Who is the consumer for this module (hint: DynamicLinking)
--- 3. What features are missing due to the implementation in this module? For
--- example, Are we blocked from linking foreign imports due to some code in this
--- module?
---
---  - add ForeignRefs imports in @link@
---  - factor out helper functions in @link'@
---  - remove @head@ function in @link'@
---  - remove @ue_unsafeHomeUnit@ function in @link'@
---  - use newtypes instead of strings for output directories in @writeRunner@
---  - add support for windows in @writeRunner@
---  - resolve strange unpack call in @writeExterns@ the right thing to do here
---      might be to just remove it
---  - fix: @collectDeps@ inputs a [UnitId], but [] is unordered yet comments in
---      @collectDeps@ indicate a specific ordering is needed. This ordering
---      should be enforced in some data structure other than [] which is
---      obviously ordered but in an undefined and ad-hoc way
---  - fix: For most of the Linker I pass around UnitIds, I (Jeff) am unsure if
---      these should really be modules. Or to say this another way is UnitId the
---      right abstraction level? Or is Module? Or some other unit thing?
---  - fix: Gen2.GHCJS used NFData instances over a lot of types. Replicating
---      these instances would mean adding a Generic and NFData instance to some
---      internal GHC types. I (Jeff) do not think we want to do that. Instead, we
---      should use strict data structures as a default and then implement lazy
---      ones where it makes sense and only if it makes sense. IMHO Gen2.GHCJS was
---      overly lazy and we should avoid repeating that here. Let profiling be our
---      guide during our performance refactoring.
---  - Employ the type system more effectively for @readSystemDeps'@, in
---      particular get rid of the string literals
---  - fix foldl' memory leak in @staticDeps@
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Linker.Linker where
@@ -182,13 +149,6 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
       -- dump foreign references file (.frefs)
       unless (lcOnlyOut lc_cfg) $ do
         let frefsFile   = if genBase then "out.base.frefs" else "out.frefs"
-            -- FIXME: Jeff (2022,03): GHCJS used Aeson to encode Foreign
-            -- references as StaticDeps to a Bytestring and then write these out
-            -- to a tmp file for linking. We do not have access to Aeson so
-            -- we'll need to find an alternative coding strategy to write these
-            -- out. See the commented instance for FromJSON StaticDeps below.
-            -- - this line called out to the FromJSon Instance
-            -- jsonFrefs  = Aeson.encode (linkForeignRefs link_res)
             jsonFrefs  = mempty
 
         BL.writeFile (out </> frefsFile <.> "json") jsonFrefs
@@ -239,8 +199,6 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
                  writeHtml    out
                  writeRunMain out
                  writeRunner lc_cfg out
-                 -- FIXME (Sylvain 2022-05): disabled for now
-                 -- writeWebAppManifest top out
                  writeExterns out
 
 -- | link in memory
@@ -260,17 +218,12 @@ link' :: GhcjsEnv
       -> IO LinkResult
 link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFiles isRootFun extraStaticDeps
   = do
-  -- FIXME: Jeff (2022,04): This function has several helpers that should be
-  -- factored out. In its current condition it is hard to read exactly whats
-  -- going on and why.
       (objDepsMap, objRequiredUnits) <- loadObjDeps objFiles
 
       let rootSelector | Just baseMod <- lcGenBase lc_cfg =
                            \(ExportedFun  m _s) -> m == baseMod
                        | otherwise = isRootFun
           roots    = S.fromList . filter rootSelector $ concatMap (M.keys . depsHaskellExported . fst) (M.elems objDepsMap)
-          -- FIXME: Jeff (2022,03): Remove head. opt for NonEmptyList. Every
-          -- head is a time bomb waiting to explode
           rootMods = map (moduleNameString . moduleName . head) . group . sort . map funModule . S.toList $ roots
           objPkgs  = map moduleUnitId $ nub (M.keys objDepsMap)
 
@@ -289,7 +242,6 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
       -- c   <- newMVar M.empty
       let preload_units = preloadUnits (ue_units unit_env)
 
-      -- FIXME (Sylvain 2022-06): what are these "@rts" units?
       let rtsPkgs     =  map stringToUnitId ["@rts", "@rts_" ++ waysTag (targetWays_ $ dflags)]
           pkgs' :: [UnitId]
           pkgs'       = nub (rtsPkgs ++ preload_units ++ rdPkgs ++ reverse objPkgs ++ reverse pkgs)
@@ -305,8 +257,7 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
         logInfo logger $ hang (text "Linking with archives:") 2 (vcat (fmap text pkgArchs))
 
       -- compute dependencies
-      -- FIXME (Sylvain 2022-06): why are we appending the home unit here?
-      let dep_units      = pkgs' ++ [homeUnitId (ue_unsafeHomeUnit $ unit_env)] -- FIXME: dont use unsafe
+      let dep_units      = pkgs' ++ [homeUnitId (ue_unsafeHomeUnit $ unit_env)]
           dep_map        = objDepsMap `M.union` archsDepsMap
           excluded_units = baseUnits base -- already linked units
           dep_fun_roots  = roots `S.union` rds `S.union` extraStaticDeps
@@ -326,9 +277,6 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
           base'  = Base compactorState (nub $ basePkgs base ++ pkgs'')
                          (all_deps `S.union` baseUnits base)
 
-      -- FIXME: (Sylvain, 2022-05): disabled because it comes from shims.
-      -- (alreadyLinkedBefore, alreadyLinkedAfter) <- getShims [] (filter (isAlreadyLinked base) pkgs')
-      -- (shimsBefore, shimsAfter) <- getShims jsFiles pkgs''
       return $ LinkResult
         { linkOut         = outJs
         , linkOutStats    = stats
@@ -389,8 +337,6 @@ renderLinker settings cfg renamer_state rtsDeps code =
     rendered_mods    = fmap render_js compacted
     rendered_meta    = render_js meta
     render_js        = BC.pack . (<>"\n") . show . pretty
-                         -- FIXME (Sylvain 2022-06): this must be utterly slow.
-                         -- Replace with something faster.
     rendered_exports = BC.concat . map bytesFS . filter (not . nullFS) $ map mc_exports code
     meta_length      = fromIntegral (BC.length rendered_meta)
     -- make LinkerStats entry for the given ModuleCode.
@@ -403,8 +349,6 @@ linkerStats :: Int64         -- ^ code size of packed metadata
             -> LinkerStats   -- ^ code size per module
             -> String
 linkerStats meta s =
-  -- FIXME (Sylvain 2022-06): this function shouldn't use String. Use faster Doc
-  -- pretty-printing instead
   intercalate "\n\n" [meta_stats, package_stats, module_stats] <> "\n\n"
   where
     meta_stats = "number of modules: " <> show (length bytes_per_mod)
@@ -508,34 +452,16 @@ writeRunMain out = do
 runMainJS :: B.ByteString
 runMainJS = "h$main(h$mainZCZCMainzimain);\n"
 
--- FIXME: Jeff (2022,03): Use Newtypes instead of Strings for these directories
 writeRunner :: JSLinkConfig -- ^ Settings
             -> FilePath     -- ^ Output directory
             -> IO ()
-writeRunner _settings out =
-  -- FIXME: Jeff (2022,03): why was the buildRunner check removed? If we don't
-  -- need to check then does the flag need to exist?
-  {-when (lcBuildRunner _settings) $ -} do
+writeRunner _settings out = do
   cd    <- getCurrentDirectory
   let arch_os = hostPlatformArchOS
   let runner  = cd </> exeFileName arch_os False (Just (dropExtension out))
       srcFile = out </> "all" <.> "js"
-  -- nodeSettings <- readNodeSettings dflags
       nodePgm :: B.ByteString
-      nodePgm = "node" -- XXX we don't read nodeSettings.json anymore, we should somehow know how to find node?
-
-  ---------------------------------------------
-  -- FIXME: Jeff (2022,03): Add support for windows. Detect it and act on it here:
-  -- if Platform.isWindows
-  -- then do
-  --   copyFile (topDir dflags </> "bin" </> "wrapper" <.> "exe")
-  --            runner
-  --   writeFile (runner <.> "options") $ unlines
-  --               [ mkFastString nodePgm -- mkFastString (nodeProgram nodeSettings)
-  --               , mkFastString ("{{EXEPATH}}" </> out </> "all" <.> "js")
-  --               ]
-  -- else do
-  ---------------------------------------------
+      nodePgm = "node"
   src <- B.readFile (cd </> srcFile)
   B.writeFile runner ("#!/usr/bin/env " <> nodePgm <> "\n" <> src)
   perms <- getPermissions runner
@@ -559,8 +485,7 @@ rtsExterns =
 
 writeExterns :: FilePath -> IO ()
 writeExterns out = writeFile (out </> "all.js.externs")
-  $ unpackFS rtsExterns -- FIXME: Jeff (2022,03): Why write rtsExterns as
-                        -- FastString just to unpack?
+  $ unpackFS rtsExterns
 
 -- | get all functions in a module
 modFuns :: Deps -> [ExportedFun]
@@ -613,12 +538,6 @@ getDeps loaded_deps base fun startlu = go' S.empty (S.fromList startlu) (S.toLis
                             S.member s base
       in  open `S.union` S.fromList (filter (not . alreadyLinked) newUnits)
 
--- FIXME: Jeff: (2022,03): if the order of the [UnitId] list matters after
--- ghc-prim then we should be using an Ordered Set or something
--- similar since the implementation of this function uses a lot of
--- expensive operations on this list and a lot of
--- serialization/deserialization
--- FIXME: Jeff (2022,03): Should [UnitId] be [Module]?
 -- | collect dependencies for a set of roots
 collectDeps :: Map Module (Deps, DepsLocation) -- ^ Dependency map
             -> [UnitId]                        -- ^ packages, code linked in this order
@@ -658,15 +577,10 @@ extractDeps ar_state units deps loc =
         ArchiveFile a -> (collectCode
                         <=< readObjectKeys (a ++ ':':moduleNameString (moduleName mod)) selector)
                         =<< readArObject ar_state mod a
-                            --  error ("Ar.readObject: " ++ a ++ ':' : unpackFS mod))
-                            -- Ar.readObject (mkModuleName $ unpackFS mod) a)
         InMemory n b  -> collectCode =<< readObjectKeys n selector b
-      -- evaluate (rnf x) -- See FIXME Re: NFData instance on Safety and
-                          -- ForeignJSRefs below
       return x
   where
     mod           = depsModule deps
-    -- FIXME: Jeff (2022,03): remove this hacky reimplementation of unlines
     newline       = mkFastString "\n"
     unlines'      = intersperse newline . map oiRaw
     collectCode l = let x = ModuleCode
@@ -677,13 +591,6 @@ extractDeps ar_state units deps loc =
                               , mc_statics  = concatMap oiStatic l
                               , mc_frefs    = concatMap oiFImports l
                               }
-                -- FIXME: (2022,04): this evaluate and rnf require an NFData
-                -- instance on ForeignJSRef which in turn requries a NFData
-                -- instance on Safety. Does this even make sense? We'll skip
-                -- this for now.
-
-                --  in evaluate (rnf x) >> return (Just x)
-
                     in return (Just x)
 
 readArObject :: ArchiveState -> Module -> FilePath -> IO BL.ByteString
@@ -731,10 +638,9 @@ rtsDeps pkgs = readSystemDeps pkgs "rtsdeps.yaml"
 thDeps :: [UnitId] -> IO ([UnitId], Set ExportedFun)
 thDeps pkgs = readSystemDeps pkgs "thdeps.yaml"
 
--- FIXME: Jeff (2022,03): fill in the ?
 -- | A helper function to read system dependencies that are hardcoded via a file
 -- path.
-readSystemDeps :: [UnitId]    -- ^ Packages to ??
+readSystemDeps :: [UnitId]    -- ^ Packages that are already Linked
                -> FilePath    -- ^ File to read
                -> IO ([UnitId], Set ExportedFun)
 readSystemDeps pkgs file = do
@@ -745,9 +651,6 @@ readSystemDeps pkgs file = do
        )
 
   where
-    -- FIXME: Jeff (2022,03): Each time we _do not_ use a list like a stack we
-    -- gain evidence that we should be using a different data structure. @pkgs@
-    -- is the list in question here
     linked_pkgs     = S.fromList pkgs
 
 
@@ -755,9 +658,6 @@ readSystemDeps' :: FilePath -> IO ([UnitId], Set ExportedFun)
 readSystemDeps' file
   -- hardcode contents to get rid of yaml dep
   -- XXX move runTHServer to some suitable wired-in package
-  -- FIXME: Jeff (2022,03): Use types not string matches, These should be
-  -- wired-in just like in GHC and thus we should make them top level
-  -- definitions
   | file == "thdeps.yaml" = pure ( [ baseUnitId ]
                                  , S.fromList $ d baseUnitId "GHC.JS.Prim.TH.Eval" ["runTHServer"])
   | file == "rtsdeps.yaml" = pure ( [ baseUnitId
@@ -774,9 +674,6 @@ readSystemDeps' file
                                   , d baseUnitId "GHC.Ptr" ["Ptr"]
                                   , d primUnitId "GHC.Types" [":", "[]"]
                                   , d primUnitId "GHC.Tuple" ["(,)", "(,,)", "(,,,)", "(,,,,)", "(,,,,,)","(,,,,,,)", "(,,,,,,,)", "(,,,,,,,,)", "(,,,,,,,,,)"]
-                                  -- FIXME Sylvain (2022,05): no longer valid
-                                  -- integer constructors
-                                  -- , d bignumUnitId "GHC.Integer.Type" ["S#", "Jp#", "Jn#"]
                                   , d baseUnitId "GHC.JS.Prim" ["JSVal", "JSException", "$fShowJSException", "$fExceptionJSException", "resolve", "resolveIO", "toIO"]
                                   , d baseUnitId "GHC.JS.Prim.Internal" ["wouldBlock", "blockedIndefinitelyOnMVar", "blockedIndefinitelyOnSTM", "ignoreException", "setCurrentThreadResultException", "setCurrentThreadResultValue"]
                                   ]
@@ -796,25 +693,6 @@ readSystemDeps' file
     mkJsModule :: UnitId -> FastString -> Module
     mkJsModule uid mod = mkModule (RealUnit (Definite uid)) (mkModuleNameFS mod)
 
-{-
-  b  <- readBinaryFile (getLibDir dflags </> file)
-  wi <- readSystemWiredIn dflags
-  case Yaml.decodeEither b of
-    Left err -> panic $ "could not read " ++ depsName ++
-                        " dependencies from " ++ file ++ ":\n" ++ err
-    Right sdeps ->
-      let (StaticDeps unresolved, pkgs, funs) = staticDeps wi sdeps
-      in  case unresolved of
-            ((p,_,_):_) ->
-                  panic $ "Package `" ++ unpackFS p ++ "' is required for " ++
-                          requiredFor ++ ", but was not found"
-            _ ->
-              -- putStrLn "system dependencies:"
-              -- print (map installedUnitIdString pkgs, funs)
-              return (pkgs, funs)
-
--}
-
 -- | Make JS symbol corresponding to the given Haskell symbol in the given
 -- module
 mkJsSymbol :: Module -> FastString -> FastString
@@ -824,23 +702,6 @@ mkJsSymbol mod s = mkFastString $ mconcat
   , zString (zEncodeFS s)
   ]
 
-
-readSystemWiredIn :: HscEnv -> IO [(FastString, UnitId)]
-readSystemWiredIn _ = pure [] -- XXX
-{-
-readSystemWiredIn dflags = do
-  b <- B.readFile filename
-  case Yaml.decodeEither b of
-     Left _err -> error $ "could not read wired-in package keys from " ++ filename
-     Right m  -> return . M.toList
-                        . M.union ghcWiredIn -- GHC wired-in package keys override those in the file
-                        . fmap stringToUnitId $ m
-  where
-    filename = getLibDir dflags </> "wiredinkeys" <.> "yaml"
-    ghcWiredIn :: Map Text UnitId
-    ghcWiredIn = M.fromList $ map (\k -> (mkFastString (installedUnitIdString k), k))
-                                  (map toUnitId wiredInUnitIds)
-                                  -}
 {- | read a static dependencies specification and give the roots
 
      if dependencies come from a versioned (non-hardwired) package
@@ -860,10 +721,6 @@ staticDeps unit_env wiredin sdeps = mkDeps sdeps
   where
     u_st  = ue_units unit_env
     mkDeps (StaticDeps ds) =
-      -- FIXME: Jeff (2022,03): this foldl' will leak memory due to the tuple
-      -- and in the list in the fst position because the list is neither spine
-      -- nor value strict. So the WHNF computed by foldl' will by a 3-tuple with
-      -- 3 thunks and the WHNF for the list will be a cons cell
       let (u, p, r) = foldl' resolveDep ([], S.empty, S.empty) ds
       in  (StaticDeps u, closePackageDeps u_st p, r)
     resolveDep :: ([SDep], Set UnitId, Set ExportedFun)
