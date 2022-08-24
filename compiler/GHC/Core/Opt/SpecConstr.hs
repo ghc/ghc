@@ -79,6 +79,7 @@ import Control.Monad    ( zipWithM )
 import Data.List (nubBy, sortBy, partition, dropWhileEnd, mapAccumL )
 import Data.Maybe( mapMaybe )
 import Data.Ord( comparing )
+import Data.Tuple
 
 {-
 -----------------------------------------------------
@@ -971,8 +972,18 @@ lookupHowBound env id = lookupVarEnv (sc_how_bound env) id
 scSubstId :: ScEnv -> InId -> OutExpr
 scSubstId env v = lookupIdSubst (sc_subst env) v
 
-scSubstTy :: ScEnv -> InType -> OutType
-scSubstTy env ty = substTyUnchecked (sc_subst env) ty
+-- The !subst ensures that we force the selection `(sc_subst env)`, which avoids
+-- retaining all of `env` when we only need `subst`.  The `Solo` means that the
+-- substitution itself is lazy, because that type is often discarded.
+-- The callers of `scSubstTy` always force the result (to unpack the `Solo`)
+-- so we get the desired effect: we leave a thunk, but retain only the subst,
+-- not the whole env.
+--
+-- Fully forcing the result of `scSubstTy` regresses performance (#22102)
+scSubstTy :: ScEnv -> InType -> Solo OutType
+scSubstTy env ty =
+  let !subst = sc_subst env
+  in Solo (substTyUnchecked subst ty)
 
 scSubstCo :: ScEnv -> Coercion -> Coercion
 scSubstCo env co = substCo (sc_subst env) co
@@ -1407,7 +1418,9 @@ scExpr' env (Var v)      = case scSubstId env v of
                             Var v' -> return (mkVarUsage env v' [], Var v')
                             e'     -> scExpr (zapScSubst env) e'
 
-scExpr' env (Type t)     = return (nullUsage, Type (scSubstTy env t))
+scExpr' env (Type t)     =
+  let !(Solo ty') = scSubstTy env t
+  in return (nullUsage, Type ty')
 scExpr' env (Coercion c) = return (nullUsage, Coercion (scSubstCo env c))
 scExpr' _   e@(Lit {})   = return (nullUsage, e)
 scExpr' env (Tick t e)   = do (usg, e') <- scExpr env e
@@ -1451,9 +1464,10 @@ scExpr' env (Case scrut b ty alts)
                 -- The combined usage of the scrutinee is given
                 -- by scrut_occ, which is passed to scScrut, which
                 -- in turn treats a bare-variable scrutinee specially
+          ; let !(Solo ty') = scSubstTy env ty
 
           ; return (foldr combineUsage scrut_usg' alt_usgs,
-                    Case scrut' b' (scSubstTy env ty) alts') }
+                    Case scrut' b' ty'  alts') }
 
     sc_alt env scrut' b' (Alt con bs rhs)
      = do { let (env1, bs1) = extendBndrsWith RecArg env bs
