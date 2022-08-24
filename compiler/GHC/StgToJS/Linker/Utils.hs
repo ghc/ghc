@@ -13,9 +13,6 @@
 --
 -- Various utilies used in the JS Linker
 --
------------------------------ FIXMEs -------------------------------------------
---  - resolve macOS comment in @writeBinaryFile@
---  - remove redundant function @jsExeFileName@
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Linker.Utils where
@@ -39,14 +36,6 @@ import           Prelude
 import GHC.Platform
 import Data.List (isPrefixOf)
 
-{-
-      macOS has trouble writing more than 2GiB at once to a file
-  (tested with 10.14.6), and the base library doesn't work around this
-  problem yet (tested with GHC 8.6), so we work around it here.
-
-  in this workaround we write a binary file in chunks of 1 GiB
-  FIXME: Jeff (2022,03): Is this still true?
- -}
 writeBinaryFile :: FilePath -> ByteString -> IO ()
 writeBinaryFile file bs =
   withBinaryFile file WriteMode $ \h -> mapM_ (B.hPut h) (chunks bs)
@@ -80,9 +69,6 @@ commonCppDefs_vanilla, commonCppDefs_profiled :: ByteString
 commonCppDefs_vanilla  = genCommonCppDefs False
 commonCppDefs_profiled = genCommonCppDefs True
 
--- FIXME (Sylvain 2022-06): many of these strings should be derived from
--- wired-in names and using the JS dsl (e.g. for field names of JS heap
--- objects).
 genCommonCppDefs :: Bool -> ByteString
 genCommonCppDefs profiling = mconcat
   [
@@ -149,8 +135,6 @@ genCommonCppDefs profiling = mconcat
       else "#define MK_PTR(val,offset) (h$c2(h$baseZCGHCziPtrziPtr_con_e, (val), (offset)))\n"
 
   -- GHC.Integer.GMP.Internals
-  -- FIXME (Sylvain 2022-06): this is wrong since ghc-bignum. integer-wired-in
-  -- is ghc-bignum now
   , "#define IS_INTEGER_S(cl) ((cl).f === h$integerzmwiredzminZCGHCziIntegerziTypeziSzh_con_e)\n"
   , "#define IS_INTEGER_Jp(cl) ((cl).f === h$integerzmwiredzminZCGHCziIntegerziTypeziJpzh_con_e)\n"
   , "#define IS_INTEGER_Jn(cl) ((cl).f === h$integerzmwiredzminZCGHCziIntegerziTypeziJnzh_con_e)\n"
@@ -173,7 +157,7 @@ genCommonCppDefs profiling = mconcat
   , "#define IS_NOTHING(cl) ((cl).f === h$baseZCGHCziMaybeziNothing_con_e)\n"
   , "#define IS_JUST(cl) ((cl).f === h$baseZCGHCziMaybeziJust_con_e)\n"
   , "#define JUST_VAL(jj) ((jj).d1)\n"
-  -- "#define HS_NOTHING h$nothing\n" -- FIXME (Sylvain 2022-06): just remove?
+  -- "#define HS_NOTHING h$nothing\n"
   , if profiling
       then "#define MK_JUST(val) (h$c1(h$baseZCGHCziMaybeziJust_con_e, (val), h$CCS_SYSTEM))\n"
       else "#define MK_JUST(val) (h$c1(h$baseZCGHCziMaybeziJust_con_e, (val)))\n"
@@ -262,7 +246,7 @@ genCommonCppDefs profiling = mconcat
         ]
 
   -- unboxed tuple returns
-  -- , "#define RETURN_UBX_TUP1(x) return x;\n" FIXME (Sylvain 2022-06): remove?
+  -- , "#define RETURN_UBX_TUP1(x) return x;\n"
   , "#define RETURN_UBX_TUP2(x1,x2) { h$ret1 = (x2); return (x1); }\n"
   , "#define RETURN_UBX_TUP3(x1,x2,x3) { h$ret1 = (x2); h$ret2 = (x3); return (x1); }\n"
   , "#define RETURN_UBX_TUP4(x1,x2,x3,x4) { h$ret1 = (x2); h$ret2 = (x3); h$ret3 = (x4); return (x1); }\n"
@@ -284,15 +268,12 @@ genCommonCppDefs profiling = mconcat
   , "#define CALL_UBX_TUP10(r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,c) { (r1) = (c); (r2) = h$ret1; (r3) = h$ret2; (r4) = h$ret3; (r5) = h$ret4; (r6) = h$ret5; (r7) = h$ret6; (r8) = h$ret7; (r9) = h$ret8; (r10) = h$ret9; }\n"
   ]
 
--- FIXME: Jeff (2022,04): remove this function since it is a duplicate of
--- GHC.Linker.Static.Utils.exeFileName
 jsExeFileName :: DynFlags -> FilePath
 jsExeFileName dflags
   | Just s <- outputFile_ dflags =
       -- unmunge the extension
       let s' = dropPrefix "js_" (drop 1 $ takeExtension s)
-                    -- FIXME: add this check when support for Windows check is added
-      in if Prelude.null s' -- \|\| (Platform.isWindows && map toLower s' == "exe")
+      in if Prelude.null s'
            then dropExtension s <.> jsexeExtension
            else dropExtension s <.> s'
   | otherwise =

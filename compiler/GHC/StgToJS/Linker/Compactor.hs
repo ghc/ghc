@@ -31,7 +31,6 @@
 
 module GHC.StgToJS.Linker.Compactor
   ( compact
-    -- FIXME (Sylvain 2022-04): remove or use these exports
   , collectGlobals
   , debugShowStat
   , packStrings
@@ -300,14 +299,8 @@ renameInternals ln_cfg cfg cs0 rtsDeps stats0a = (cs, stats, meta)
 
     renamed :: State CompactorState ([JStat], JStat)
     renamed
-      -- \| csDebugAlloc cfg || csProf cfg = do -- FIXME: Jeff (2022,03): Move these Way flags into JSLinkConfig
+      -- \| csDebugAlloc cfg || csProf cfg = do
 
-      -- FIXME (Sylvain, 2022-05): forced for now until packStrings creates a
-      -- proper string table.
-      -- NOTE (Jeff, 2022-06): I've commented out the block of code for the
-      -- otherwise case in the below guard. This is to silence warnings about
-      -- the redundant pattern match. Once packStrings works make sure to
-      -- re-enable and remove this comment and previous fixme
       | True = do
         cs <- get
         let renamedStats = map (identsS' (lookupRenamed cs) . lu_js_code) stats0
@@ -332,7 +325,6 @@ renameInternals ln_cfg cfg cs0 rtsDeps stats0a = (cs, stats, meta)
         -- sort our entries, store the results
         -- propagate all renamings throughtout the code
         cs <- get
-            -- FIXME: Jeff (2022,03): Is this workaround still needed?
             -- Safari on iOS 10 (64 bit only?) crashes on very long arrays
             -- safariCrashWorkaround :: [Ident] -> JExpr
             -- safariCrashWorkaround xs =
@@ -411,19 +403,10 @@ staticDeclStat (StaticInfo si sv _) =
       ssu (StaticUnboxedDouble d) = app "h$p" [toJExpr (unSaneDouble d)]
       ssu (StaticUnboxedString str) = ApplExpr (initStr str) []
       ssu StaticUnboxedStringOffset {} = 0
-  -- FIXME, we shouldn't do h$di, we need to record the statement to init the thunks
   in  maybe (appS "h$di" [toJExpr si']) (\v -> DeclStat si' `mappend` (toJExpr si' |= v)) (ssv sv)
 
 initStr :: BS.ByteString -> JExpr
 initStr str = app "h$str" [ValExpr (JStr . mkFastString . BSC.unpack $! str)]
-      --TODO: Jeff (2022,03): This function used to call @decodeModifiedUTF8 in
-      --Gen2.Utils. I've removed the call site and opted to keep the Just case.
-      --We'll need to double check to see if we indeed do need to decoded the
-      --UTF8 strings and implement a replace function on bytestrings once the
-      --Linker is up.
-      -- Nothing -> app "h$rstr" [toJExpr $ map toInteger (BS.unpack str)]
-      -- error "initStr"
-      -- [je| h$rstr(`map toInteger (B.unpack str)`) |]
 
 -- | rename a heap object, which means adding it to the
 --  static init table in addition to the renamer
@@ -682,7 +665,6 @@ encodeStatic0 cs (StaticInfo _to sv _)
     -- encodeArg x                             = panic ("encodeArg: unexpected: " ++ show x)
     -- encodeChar = ord -- fixme make characters more readable
 
--- FIXME: Jeff (2022,03): Use FastString or ShortByteString and remove this
 -- serialization/deserialization
 encodeString :: FastString -> [Int]
 encodeString = encodeBinary . BSC.pack . unpackFS
@@ -784,7 +766,6 @@ compact ln_cfg cfg cs0 rtsDeps0 input0
   let rtsDeps1 = rtsDeps0 ++
                  map (<> "_e") rtsDeps0 ++
                  map (<> "_con_e") rtsDeps0
-      -- FIXME (Sylvain, 2022-05): disabled (again)
       -- (cs1, input1) = packStrings ln_cfg cs0 input0
   in  renameInternals ln_cfg cfg cs0 rtsDeps1 input0
 
@@ -1143,7 +1124,6 @@ fixHashes hashes = fmap (second (map replaceHash)) hashes
     sccs         = map fromSCC $
                    G.stronglyConnComp (map (\(k, (_bs, deps)) -> (k, LexicalFastString k, deps)) kvs)
     kvs          = List.sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap hashes -- sort lexically to avoid non-determinism
-    -- FIXME: Can we make this more efficient by avoiding lists and staying in GHC Unique collections?
     ks           = fst $ unzip kvs
     invDeps      = listToUniqMap_C (++) (concatMap mkInvDeps kvs)
     mkInvDeps (k, (_, ds)) = map (\(LexicalFastString d) -> (d,[k])) ds
@@ -1223,8 +1203,6 @@ fixHashesIter n invDeps allKeys checkKeys sccs hashes finalHashes
 
 makeFinalHash :: BS.ByteString -> [BS.ByteString] -> BS.ByteString
 makeFinalHash b bs = mconcat (b:bs)
--- FIXME: Jeff (2022,03): I've removed the SHA256.hash function which would be
--- producing this final bytestring. Do we need it? If so how to replace it?
 
 -- do not deduplicate thunks
 ignoreStatic :: StaticInfo -> Bool
@@ -1232,7 +1210,6 @@ ignoreStatic (StaticInfo _ StaticThunk {} _) = True
 ignoreStatic _                               = False
 
 -- combine hashes from x and y, leaving only those which have an entry in both
--- FIXME: Make users of this function consume a UniqMap
 combineHashes :: [(FastString, HashBuilder)]
               -> [(FastString, HashBuilder)]
               -> [(FastString, HashBuilder)]
@@ -1315,13 +1292,6 @@ hashSingleDefinition globals (TxtI i) expr = (i, ht 0 <> render st <> mconcat (m
     render     = htxt . mkFastString. show . pretty
 
 
--- FIXME: Jeff (2022,03): reduce the redundancy between these idents functions
--- and the idents functions in GHC.JS.Transform These helper functions also
--- exist in non-ticked for, e.g., @identsE@ in GHC.JS.Transform. These are
--- essential Functor instances over the JS syntax tree. We rewrite them here for
--- consumers like hashSingleDefinition. Had we used the Transform version we'll
--- end up with a compiler error in @expr'@ since AssignStat takes an Expr, but
--- Transform.IdentsE returns [Ident]
 identsE' :: (Ident -> Ident) -> JExpr -> JExpr
 identsE' f (ValExpr v)         = ValExpr     $! identsV' f v
 identsE' f (SelExpr e i)       = SelExpr     (identsE' f e) i -- do not rename properties
@@ -1436,8 +1406,6 @@ hashSaneDouble (SaneDouble sd) = hd sd
 
 finalizeHash :: HashBuilder -> Hash
 finalizeHash (HashBuilder hb tt) =
--- FIXME: Jeff (2022,03): I've removed the SHA256.hash function which would be
--- producing h. Do we need it? If so how to replace it?
   let h = (BL.toStrict $ BB.toLazyByteString hb)
   in  h `seq` (h, map LexicalFastString tt)
 
@@ -1445,8 +1413,5 @@ finalizeHash' :: HashBuilder -> (Int, BS.ByteString, [FastString])
 finalizeHash' (HashBuilder hb tt) =
   let b  = BL.toStrict (BB.toLazyByteString hb)
       bl = BS.length b
--- FIXME: Jeff (2022,03): I've removed the SHA256.hash function which would be
--- producing h. So it is purposeful that `h = b` looks unnecessary. Do we need
--- it? If so how to replace it?
       h  = b
   in  h `seq` bl `seq` (bl, h, tt)
