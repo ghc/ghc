@@ -389,8 +389,6 @@ var h$mulInt32 = Math.imul ? Math.imul : h$imul_shim;
 function h$hs_timesInt2(a,b) {
   TRACE_ARITH("timesInt2 " + a + " " + b);
 
-  // adapted from Hacker's Delight (p174)
-
   // check for 0 and 1 operands
   if (a === 0) {
     RETURN_UBX_TUP3(0,0,0);
@@ -405,22 +403,11 @@ function h$hs_timesInt2(a,b) {
     RETURN_UBX_TUP3(0,a<0?(-1):0,a);
   }
 
-  var cl = h$mulInt32(a,b);
-
-  var ha = a >> 16;
-  var la = a & 0xFFFF;
-
-  var hb = b >> 16;
-  var lb = b & 0xFFFF;
-
-  var w0 = la * lb;
-  var t  = (h$mulInt32(ha,lb) + (w0 >>> 16))|0;
-  var w1 = t & 0xFFFF;
-  var w2 = t >> 16;
-  w1 = (h$mulInt32(la,hb) + w1)|0;
-
-  var ch = ((h$mulInt32(ha,hb) + w2)|0 + (w1 >> 16))|0;
-  var nh = ((ch === 0 && cl >= 0) || (ch === -1 && cl < 0)) ? 0 : 1
+  var ha = a < 0 ? (-1) : 0;
+  var hb = b < 0 ? (-1) : 0;
+  var ch = h$hs_timesInt64(ha,a,hb,b);
+  var cl = h$ret1;
+  var nh = ((ch === 0 && cl >= 0) || (ch === -1 && cl < 0)) ? 0 : 1;
 
   TRACE_ARITH("timesInt2 results:" + nh + " " + ch + " " + cl);
   RETURN_UBX_TUP3(nh, ch, cl);
