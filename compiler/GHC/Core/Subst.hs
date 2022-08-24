@@ -33,7 +33,7 @@ module GHC.Core.Subst (
         cloneBndr, cloneBndrs, cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
 
         TSubst(..),
-        transientSubst, persistentSubst, substTyVarBndrT, substCoVarBndrT
+        transientSubst, persistentSubst, substTyT, substTyVarBndrT, substCoVarBndrT
     ) where
 
 import GHC.Prelude
@@ -479,11 +479,7 @@ substBndr subst bndr
 substBndrT :: TSubst s -> Var -> ST s (TSubst s, Var)
 substBndrT subst bndr
   | isTyVar bndr  = substTyVarBndrT subst bndr
-  | isCoVar bndr  = do
-      persistent_subst <- persistentSubst subst
-      -- TODO: Make a substCoVarBndrT version of substCoVarBndr
-      let (subst', bndr') = substCoVarBndr persistent_subst bndr
-      return (transientSubst subst', bndr')
+  | isCoVar bndr  = substCoVarBndrT subst bndr
   | otherwise     = substIdBndrT (text "var-bndr") subst bndr
 
 -- | Applies 'substBndr' to a number of 'Var's, accumulating a new 'Subst' left-to-right

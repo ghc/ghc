@@ -66,7 +66,7 @@ import qualified GHC.Core.Type as Type
 import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, extendTvSubst, extendCvSubst
                                 , substTyVarBndrT )
 import qualified GHC.Core.Coercion as Coercion
-import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
+import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr, substCoVarBndrT )
 import GHC.Types.Basic
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
@@ -877,11 +877,7 @@ substIdBndr env bndr
 substIdBndrT :: TSimplEnv s -> InBndr -> ST s (TSimplEnv s, OutBndr)
 -- Might be a coercion variable
 substIdBndrT env bndr
-  | isCoVar bndr = do
-      -- TODO: Make a substCoVarBndrT version of substCoVarBndr
-      persistent_env <- persistentSimplEnv env
-      let (env', id) = substCoVarBndr persistent_env bndr
-      return (transientSimplEnv env', id)
+  | isCoVar bndr = substCoVarBndrT env bndr
   | otherwise = substNonCoVarIdBndrT env bndr
 
 ---------------
@@ -1151,6 +1147,11 @@ substCoVarBndr env cv
   = case Coercion.substCoVarBndr (getTCvSubst env) cv of
         (TCvSubst in_scope' tv_env' cv_env', cv')
            -> (env { seInScope = in_scope', seTvSubst = tv_env', seCvSubst = cv_env' }, cv')
+
+substCoVarBndrT :: TSimplEnv s -> CoVar -> ST s (TSimplEnv s, CoVar)
+substCoVarBndrT env cv = do
+  (TTCvSubst in_scope' tv_env' cv_env', cv') <- Coercion.substCoVarBndrT (getTTCvSubst env) cv
+  return (env { tseInScope = in_scope', tseTvSubst = tv_env', tseCvSubst = cv_env' }, cv')
 
 substCo :: SimplEnv -> Coercion -> Coercion
 substCo env co = Coercion.substCo (getTCvSubst env) co

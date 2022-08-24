@@ -41,7 +41,7 @@ import GHC.Types.Tickish
 import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr, substTyVarBndrT )
-import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
+import GHC.Core.Coercion hiding ( substCo, substCoVarBndr, substCoVarBndrT )
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Types.Basic
@@ -732,19 +732,15 @@ subst_opt_bndr env bndr
 
 subst_opt_bndr_t :: TSimpleOptEnv s -> InVar -> ST s (TSimpleOptEnv s, OutVar)
 subst_opt_bndr_t env bndr
-  | isTyVar bndr  = do
+  | isTyVar bndr = do
       (subst_tv, tv') <- substTyVarBndrT subst bndr
       return (env { tsoe_subst = subst_tv }, tv')
-  | isCoVar bndr  = do
-      persistent_subst <- persistentSubst subst
-      let (subst_cv, cv') = substCoVarBndr persistent_subst bndr
-      return (env { tsoe_subst = transientSubst subst_cv }, cv')
-  | otherwise     = do
-      persistent_env <- persistentSOE env
-      let (env', id') = subst_opt_id_bndr persistent_env bndr
-      return (transientSOE env', id')
+  | isCoVar bndr = do
+      (subst_cv, cv') <- substCoVarBndrT subst bndr
+      return (env { tsoe_subst = subst_cv }, cv')
+  | otherwise = subst_opt_id_bndr_t env bndr
   where
-    subst           = tsoe_subst env
+    subst = tsoe_subst env
 
 subst_opt_id_bndr :: SimpleOptEnv -> InId -> (SimpleOptEnv, OutId)
 -- Nuke all fragile IdInfo, unfolding, and RULES; it gets added back later by
@@ -778,6 +774,30 @@ subst_opt_id_bndr env@(SOE { soe_subst = subst, soe_inl = inl }) old_id
 
     new_subst = Subst new_in_scope new_id_subst tv_subst cv_subst
     new_inl   = delVarEnv inl old_id
+
+subst_opt_id_bndr_t :: TSimpleOptEnv s -> InId -> ST s (TSimpleOptEnv s, OutId)
+subst_opt_id_bndr_t env@(TSOE { tsoe_subst = subst, tsoe_inl = inl }) old_id = do
+  id1 <- uniqAwayT in_scope old_id
+  id2 <- updateIdTypeAndMultM (substTyT subst) id1
+
+  let new_id = zapFragileIdInfo id2
+               -- Zaps rules, unfolding, and fragile OccInfo
+               -- The unfolding and rules will get added back later, by add_info
+
+  new_in_scope <- in_scope `extendTInScopeSet` new_id
+  let no_change = new_id == old_id
+
+          -- Extend the substitution if the unique has changed,
+          -- See the notes with substTyVarBndr for the delSubstEnv
+      new_id_subst
+        | no_change = delVarEnv id_subst old_id
+        | otherwise = extendVarEnv id_subst old_id (Var new_id)
+
+      new_subst = TSubst new_in_scope new_id_subst tv_subst cv_subst
+  return (env { tsoe_subst = new_subst, tsoe_inl = new_inl }, new_id)
+  where
+    TSubst in_scope id_subst tv_subst cv_subst = subst
+    new_inl = delVarEnv inl old_id
 
 ----------------------
 add_info :: SimpleOptEnv -> InVar -> TopLevelFlag -> OutExpr -> OutVar -> OutVar
