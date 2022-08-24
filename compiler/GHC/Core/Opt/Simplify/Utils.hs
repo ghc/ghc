@@ -42,7 +42,7 @@ module GHC.Core.Opt.Simplify.Utils (
         isExitJoinId
     ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding (head, init, last, tail)
 
 import GHC.Core
 import GHC.Types.Literal ( isLitRubbish )
@@ -84,6 +84,7 @@ import GHC.Utils.Trace
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
+import qualified Data.List as Partial ( head )
 
 {- *********************************************************************
 *                                                                      *
@@ -450,7 +451,7 @@ mkRhsStop ty is_rec bndr_dmd = Stop ty (RhsCtxt is_rec) (subDemandIfEvaluated bn
 mkLazyArgStop :: OutType -> ArgInfo -> SimplCont
 mkLazyArgStop ty fun_info = Stop ty (lazyArgContext fun_info) arg_sd
   where
-    arg_sd = subDemandIfEvaluated (head (ai_dmds fun_info))
+    arg_sd = subDemandIfEvaluated (Partial.head (ai_dmds fun_info))
 
 -------------------
 contIsRhs :: SimplCont -> Maybe RecFlag
@@ -592,7 +593,7 @@ contEvalContext k = case k of
     -- then it *should* be "C(1,C(S,C(1,L))", so perhaps correct after all.
     -- But for now we just panic:
   ApplyToVal{}               -> pprPanic "contEvalContext" (ppr k)
-  StrictArg{sc_fun=fun_info} -> subDemandIfEvaluated (head (ai_dmds fun_info))
+  StrictArg{sc_fun=fun_info} -> subDemandIfEvaluated (Partial.head (ai_dmds fun_info))
   StrictBind{sc_bndr=bndr}   -> subDemandIfEvaluated (idDemandInfo bndr)
   Select{}                   -> topSubDmd
     -- Perhaps reconstruct the demand on the scrutinee by looking at field
@@ -1665,7 +1666,7 @@ rebuildLam :: SimplEnv
 rebuildLam _env [] body _cont
   = return body
 
-rebuildLam env bndrs body cont
+rebuildLam env bndrs@(bndr:_) body cont
   = {-# SCC "rebuildLam" #-} try_eta bndrs body
   where
     rec_ids  = seRecIds env
@@ -1682,7 +1683,7 @@ rebuildLam env bndrs body cont
       | -- Try eta reduction
         seDoEtaReduction env
       , Just etad_lam <- tryEtaReduce rec_ids bndrs body eval_sd
-      = do { tick (EtaReduction (head bndrs))
+      = do { tick (EtaReduction bndr)
            ; return etad_lam }
 
       | -- Try eta expansion
@@ -1690,7 +1691,7 @@ rebuildLam env bndrs body cont
       , seEtaExpand env
       , any isRuntimeVar bndrs  -- Only when there is at least one value lambda already
       , Just body_arity <- exprEtaExpandArity (seArityOpts env) body
-      = do { tick (EtaExpansion (head bndrs))
+      = do { tick (EtaExpansion bndr)
            ; let body' = etaExpandAT in_scope body_arity body
            ; traceSmpl "eta expand" (vcat [text "before" <+> ppr body
                                           , text "after" <+> ppr body'])
@@ -2391,12 +2392,12 @@ mkCase mode scrut bndr alts_ty alts = mkCase1 mode scrut bndr alts_ty alts
 --      2. Eliminate Identity Case
 --------------------------------------------------
 
-mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : _)      -- Identity case
+mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity case
   | all identity_alt alts
   = do { tick (CaseIdentity case_bndr)
        ; return (mkTicks ticks $ re_cast scrut rhs1) }
   where
-    ticks = concatMap (\(Alt _ _ rhs) -> stripTicksT tickishFloatable rhs) (tail alts)
+    ticks = concatMap (\(Alt _ _ rhs) -> stripTicksT tickishFloatable rhs) alts'
     identity_alt (Alt con args rhs) = check_eq rhs con args
 
     check_eq (Cast rhs co) con args        -- See Note [RHS casts]
