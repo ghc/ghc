@@ -39,6 +39,7 @@ import GHC.Hs.Lit
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import GHC.Hs.Extension
+import GHC.Hs.Extension.Ppr
 import GHC.Hs.Type
 import GHC.Hs.Binds
 import GHC.Parser.Annotation

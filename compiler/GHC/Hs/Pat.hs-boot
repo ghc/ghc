@@ -8,7 +8,8 @@
 module GHC.Hs.Pat where
 
 import GHC.Utils.Outputable
-import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
+import GHC.Hs.Extension ( GhcPass )
+import GHC.Hs.Extension.Ppr ( OutputableBndrId )
 
 import Language.Haskell.Syntax.Pat
 

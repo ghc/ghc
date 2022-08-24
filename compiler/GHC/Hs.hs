@@ -31,6 +31,7 @@ module GHC.Hs (
         module GHC.Hs.Utils,
         module GHC.Hs.Doc,
         module GHC.Hs.Extension,
+        module GHC.Hs.Extension.Ppr,
         module GHC.Parser.Annotation,
         Fixity,
 
@@ -48,6 +49,7 @@ import GHC.Hs.ImpExp
 import GHC.Hs.Lit
 import Language.Haskell.Syntax
 import GHC.Hs.Extension
+import GHC.Hs.Extension.Ppr
 import GHC.Parser.Annotation
 import GHC.Hs.Pat
 import GHC.Hs.Type

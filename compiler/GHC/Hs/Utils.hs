@@ -119,6 +119,7 @@ import GHC.Hs.Type
 import GHC.Hs.Lit
 import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
+import GHC.Hs.Extension.Ppr
 import GHC.Parser.Annotation
 
 import GHC.Tc.Types.Evidence

@@ -31,6 +31,7 @@ import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Parser.Annotation
 import GHC.Hs.Extension
+import GHC.Hs.Extension.Ppr
 import GHC.Types.Name
 import GHC.Types.PkgQual
 

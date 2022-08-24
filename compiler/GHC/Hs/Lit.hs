@@ -31,6 +31,7 @@ import GHC.Types.SourceText
 import GHC.Core.Type
 import GHC.Utils.Outputable
 import GHC.Hs.Extension
+import GHC.Hs.Extension.Ppr
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit

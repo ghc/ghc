@@ -453,6 +453,7 @@ Library
         GHC.Hs.Expr
         GHC.Hs.Syn.Type
         GHC.Hs.Extension
+        GHC.Hs.Extension.Ppr
         GHC.Hs.ImpExp
         GHC.Hs.Instances
         GHC.Hs.Lit

@@ -35,6 +35,7 @@ import GHC.Cmm.Switch
 import GHC.Data.FastString
 import GHC.Types.ForeignCall
 import GHC.Utils.Outputable
+import GHC.Hs.Extension.Ppr ()
 import GHC.Runtime.Heap.Layout
 import GHC.Types.Tickish (CmmTickish)
 import qualified GHC.Types.Unique as U

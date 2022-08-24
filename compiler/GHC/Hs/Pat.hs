@@ -64,6 +64,7 @@ import GHC.Hs.Lit
 import Language.Haskell.Syntax.Extension
 import GHC.Parser.Annotation
 import GHC.Hs.Extension
+import GHC.Hs.Extension.Ppr
 import GHC.Hs.Type
 import GHC.Tc.Types.Evidence
 import GHC.Types.Basic

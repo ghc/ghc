@@ -97,6 +97,7 @@ import {-# SOURCE #-} GHC.Hs.Expr ( pprUntypedSplice, HsUntypedSpliceResult(..) 
 import Language.Haskell.Syntax.Extension
 import GHC.Core.DataCon( SrcStrictness(..), SrcUnpackedness(..), HsImplBang(..) )
 import GHC.Hs.Extension
+import GHC.Hs.Extension.Ppr
 import GHC.Parser.Annotation
 
 import GHC.Types.Fixity ( LexicalFixity(..) )

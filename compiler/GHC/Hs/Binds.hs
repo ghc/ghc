@@ -36,6 +36,7 @@ import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
 
 import GHC.Types.Tickish
 import GHC.Hs.Extension
+import GHC.Hs.Extension.Ppr
 import GHC.Parser.Annotation
 import GHC.Hs.Type
 import GHC.Tc.Types.Evidence

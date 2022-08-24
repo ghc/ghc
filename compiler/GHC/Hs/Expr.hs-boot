@@ -19,7 +19,8 @@ import Language.Haskell.Syntax.Expr
   , GRHSs
   , HsUntypedSplice
   )
-import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
+import GHC.Hs.Extension ( GhcPass )
+import GHC.Hs.Extension.Ppr ( OutputableBndrId )
 import GHC.Types.Name   ( Name )
 import Data.Bool  ( Bool )
 import Data.Maybe ( Maybe )
