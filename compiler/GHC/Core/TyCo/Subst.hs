@@ -53,7 +53,7 @@ module GHC.Core.TyCo.Subst
 
         TTCvSubst(..),
         mkTTCvSubst,
-        substTyUncheckedT, substTyVarBndrT,
+        substTyUncheckedT, substTyVarBndrT, substCoVarBndrT,
   ) where
 
 import GHC.Prelude
@@ -694,6 +694,15 @@ substTy subst ty
   | otherwise             = checkValidSubst subst [ty] [] $
                             subst_ty subst ty
 
+-- | Substitute within a 'Type'
+-- The substitution has to satisfy the invariants described in
+-- Note [The substitution invariant].
+-- Persists 'subst' before it is modified.
+substTyT :: HasDebugCallStack => TTCvSubst s -> Type  -> ST s Type
+substTyT subst ty
+  | isEmptyTTCvSubst subst = return ty
+  | otherwise              = subst_ty_t subst ty
+
 -- | Substitute within a 'Type' disabling the sanity checks.
 -- The problems that the sanity checks in substTy catch are described in
 -- Note [The substitution invariant].
@@ -1032,7 +1041,7 @@ substTyVarBndr :: HasDebugCallStack => TCvSubst -> TyVar -> (TCvSubst, TyVar)
 substTyVarBndr = substTyVarBndrUsing substTy
 
 substTyVarBndrT :: HasDebugCallStack => TTCvSubst s -> TyVar -> ST s (TTCvSubst s, TyVar)
-substTyVarBndrT = substTyVarBndrUsingT substTy
+substTyVarBndrT = substTyVarBndrUsingT substTyT
 
 substTyVarBndrs :: HasDebugCallStack => TCvSubst -> [TyVar] -> (TCvSubst, [TyVar])
 substTyVarBndrs subst tvs = runST $ do
@@ -1047,7 +1056,7 @@ substVarBndr :: HasDebugCallStack => TCvSubst -> TyCoVar -> (TCvSubst, TyCoVar)
 substVarBndr = substVarBndrUsing substTy
 
 substVarBndrT :: HasDebugCallStack => TTCvSubst s -> TyCoVar -> ST s (TTCvSubst s, TyCoVar)
-substVarBndrT = substVarBndrUsingT substTy
+substVarBndrT = substVarBndrUsingT substTyT
 
 substVarBndrs :: HasDebugCallStack => TCvSubst -> [TyCoVar] -> (TCvSubst, [TyCoVar])
 substVarBndrs subst vs = runST $ do
@@ -1060,6 +1069,9 @@ substVarBndrsT = mapAccumLM substVarBndrT
 
 substCoVarBndr :: HasDebugCallStack => TCvSubst -> CoVar -> (TCvSubst, CoVar)
 substCoVarBndr = substCoVarBndrUsing substTy
+
+substCoVarBndrT :: HasDebugCallStack => TTCvSubst s -> CoVar -> ST s (TTCvSubst s, CoVar)
+substCoVarBndrT = substCoVarBndrUsingT substTyT
 
 -- | Like 'substVarBndr', but disables sanity checks.
 -- The problems that the sanity checks in substTy catch are described in
@@ -1075,14 +1087,12 @@ substVarBndrUsing subst_fn subst v
   | isTyVar v = substTyVarBndrUsing subst_fn subst v
   | otherwise = substCoVarBndrUsing subst_fn subst v
 
-substVarBndrUsingT :: (TCvSubst -> Type -> Type)
+-- | 'subst_fn' must persist the subst before modifying it.
+substVarBndrUsingT :: (TTCvSubst s -> Type -> ST s Type)
                   -> TTCvSubst s -> TyCoVar -> ST s (TTCvSubst s, TyCoVar)
 substVarBndrUsingT subst_fn subst v
   | isTyVar v = substTyVarBndrUsingT subst_fn subst v
-  | otherwise = do
-      persistent_subst <- persistentTCvSubst subst
-      let (subst', v') = substCoVarBndrUsing subst_fn persistent_subst v
-      return (transientTCvSubst subst', v')
+  | otherwise = substCoVarBndrUsingT subst_fn subst v
 
 -- | Substitute a tyvar in a binding position, returning an
 -- extended subst and a new tyvar.
@@ -1122,22 +1132,19 @@ substTyVarBndrUsing subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
 -- | Substitute a tyvar in a binding position, returning an
 -- extended subst and a new tyvar.
 -- Use the supplied function to substitute in the kind
+-- 'subst_fn' must persist the subst before modifying it.
 substTyVarBndrUsingT
-  :: (TCvSubst -> Type -> Type)  -- ^ Use this to substitute in the kind
+  :: (TTCvSubst s -> Type -> ST s Type)  -- ^ Use this to substitute in the kind
   -> TTCvSubst s -> TyVar -> ST s (TTCvSubst s, TyVar)
-substTyVarBndrUsingT subst_fn (TTCvSubst in_scope tenv cenv) old_var
+substTyVarBndrUsingT subst_fn subst@(TTCvSubst in_scope tenv cenv) old_var
   = assert (isTyVar old_var ) $ do
-    (in_scope', new_var) <-
+    new_var <-
       if no_kind_change
-        then do
-          new_var <- uniqAwayT in_scope old_var
-          pure (in_scope, new_var)
+        then
+          uniqAwayT in_scope old_var
         else do
-          persistent_in_scope <- persistentInScopeSet in_scope
-          let subst = TCvSubst persistent_in_scope tenv cenv
-          let new_var = uniqAway persistent_in_scope $
-                        setTyVarKind old_var (subst_fn subst old_ki)
-          pure (transientInScopeSet persistent_in_scope, new_var)
+          kind <- subst_fn subst old_ki
+          uniqAwayT in_scope $ setTyVarKind old_var kind
     -- The uniqAway part makes sure the new variable is not already in scope
 
     let new_env | no_change = delVarEnv tenv old_var
@@ -1159,7 +1166,7 @@ substTyVarBndrUsingT subst_fn (TTCvSubst in_scope tenv cenv) old_var
 
     massertPpr _no_capture (pprTyVar old_var $$ pprTyVar new_var)
 
-    new_in_scope <- in_scope' `extendTInScopeSet` new_var
+    new_in_scope <- in_scope `extendTInScopeSet` new_var
     return (TTCvSubst new_in_scope new_env cenv, new_var)
   where
     old_ki = tyVarKind old_var
@@ -1191,6 +1198,35 @@ substCoVarBndrUsing subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
     new_var_type = mkCoercionType role t1' t2'
                   -- It's important to do the substitution for coercions,
                   -- because they can have free type variables
+
+-- | Substitute a covar in a binding position, returning an
+-- extended subst and a new covar.
+-- Use the supplied function to substitute in the kind
+-- 'subst_fn' must persist the subst before modifying it.
+substCoVarBndrUsingT
+  :: (TTCvSubst s -> Type -> ST s Type)
+  -> TTCvSubst s -> CoVar -> ST s (TTCvSubst s, CoVar)
+substCoVarBndrUsingT subst_fn subst@(TTCvSubst in_scope tenv cenv) old_var
+  = assert (isCoVar old_var) $ do
+    t1' <- subst_fn subst t1
+    t2' <- subst_fn subst t2
+
+    let subst_old_var = mkCoVar (varName old_var) new_var_type
+        new_var_type = mkCoercionType role t1' t2'
+
+    new_var <- uniqAwayT in_scope subst_old_var
+
+    let new_co    = mkCoVarCo new_var
+        no_change = new_var == old_var && no_kind_change
+
+        new_cenv | no_change = delVarEnv cenv old_var
+                 | otherwise = extendVarEnv cenv old_var new_co
+
+    new_in_scope <- in_scope `extendTInScopeSet` new_var
+    return (TTCvSubst new_in_scope tenv new_cenv, new_var)
+  where
+    no_kind_change = noFreeVarsOfTypes [t1, t2]
+    (_, _, t1, t2, role) = coVarKindsTypesRole old_var
 
 cloneTyVarBndr :: TCvSubst -> TyVar -> Unique -> (TCvSubst, TyVar)
 cloneTyVarBndr subst@(TCvSubst in_scope tv_env cv_env) tv uniq

@@ -33,7 +33,7 @@ module GHC.Core.Subst (
         cloneBndr, cloneBndrs, cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
 
         TSubst(..),
-        transientSubst, persistentSubst, substTyVarBndrT,
+        transientSubst, persistentSubst, substTyVarBndrT, substCoVarBndrT
     ) where
 
 import GHC.Prelude
@@ -49,7 +49,7 @@ import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Type hiding
    ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
    , isInScope, substTyVarBndr, cloneTyVarBndr, substTyVarBndrT )
-import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
+import GHC.Core.Coercion hiding ( substCo, substCoVarBndr, substCoVarBndrT )
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env as InScopeSet
@@ -696,6 +696,12 @@ substCoVarBndr (Subst in_scope id_env tv_env cv_env) cv
   = case Coercion.substCoVarBndr (TCvSubst in_scope tv_env cv_env) cv of
         (TCvSubst in_scope' tv_env' cv_env', cv')
            -> (Subst in_scope' id_env tv_env' cv_env', cv')
+
+substCoVarBndrT :: TSubst s -> CoVar -> ST s (TSubst s, CoVar)
+substCoVarBndrT (TSubst in_scope id_env tv_env cv_env) cv = do
+  (TTCvSubst in_scope' tv_env' cv_env', cv') <-
+    Coercion.substCoVarBndrT (TTCvSubst in_scope tv_env cv_env) cv
+  return (TSubst in_scope' id_env tv_env' cv_env', cv')
 
 -- | See 'GHC.Core.Type.substTy'.
 substTy :: Subst -> Type -> Type

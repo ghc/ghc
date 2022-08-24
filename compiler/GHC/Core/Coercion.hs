@@ -91,6 +91,8 @@ module GHC.Core.Coercion (
         substCoVarBndr,
         extendTvSubstAndInScope, getCvSubstEnv,
 
+        substCoVarBndrT,
+
         -- ** Lifting
         liftCoSubst, liftCoSubstTyVar, liftCoSubstWith, liftCoSubstWithEx,
         emptyLiftingContext, extendLiftingContext, extendLiftingContextAndInScope,
