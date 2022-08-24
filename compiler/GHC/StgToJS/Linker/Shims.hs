@@ -165,8 +165,6 @@ tryReadShimFile :: Logger -> TmpFs -> DynFlags -> UnitEnv -> FilePath -> IO Shim
 tryReadShimFile logger tmpfs dflags unit_env file = do
   if needsCpp file
   then do
-    -- FIXME (Sylvain 2022-06): we should get profiling from the codegen options
-    -- (was GHCJS_PROF CPP define)
     let profiling = False
         use_cpp_and_not_cc_dash_E = False
         extra_opts = []

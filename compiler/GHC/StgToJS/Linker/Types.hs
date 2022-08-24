@@ -30,15 +30,6 @@
 --
 --  The base contains a CompactorState for consistent renaming of private names
 --  and packed initialization of info tables and static closures.
-
------------------------------ FIXMEs -------------------------------------------
---  - Find a better data structure for linkerArchiveDeps
---  - Specialize Functor instances for helpers
---  - Better name for Base
---  - Remove unsafeShowSDoc
---  - Better implementation for Monoid JSLinkConfig
---  - Should we use (Messages String) or parameterize over (Messages e) in ThRunner?
---  - Fix name collision between LinkableUnit type in this module and the LinkableUnit type in StgToJS.Types
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Linker.Types where
@@ -94,9 +85,6 @@ renamedVars = map (\(TxtI xs) -> TxtI ("h$$"<>xs)) newLocals
 -- CompactorState
 --------------------------------------------------------------------------------
 
--- FIXME: Jeff (2022,03): These maps should be newtyped so we cannot confuse
--- them and thus accidently construct hard to understand bugs. When we newtype
--- we should use deriving via to avoid boilerplate
 data CompactorState = CompactorState
   { csIdentSupply   :: [Ident]                     -- ^ ident supply for new names
   , csNameMap       :: !(UniqMap FastString Ident) -- ^ renaming mapping for internal names
@@ -138,8 +126,6 @@ instance DB.Binary StringTable where
 emptyStringTable :: StringTable
 emptyStringTable = StringTable (listArray (0,-1) []) M.empty emptyUniqMap
 
--- FIXME: Jeff: (2022,03): Each of these helper functions carry a Functor f
--- constraint. We should specialize these once we know how they are used
 entries :: Functor f
         => (UniqMap FastString Int -> f (UniqMap FastString Int))
         -> CompactorState
@@ -298,9 +284,6 @@ addLabel new cs =
 -- Base
 --------------------------------------------------------------------------------
 
--- FIXME: Jeff (2022,03): Pick a better name than Base, and should baseUnits be
--- Set UnitId and basePkgs be [PackageId]? I'm unsure if this should hold
--- UnitIds or UnitInfos or PackageIds or PackageNames
 -- | The Base bundle. Used for incremental linking it maintains the compactor
 -- state the base packages and units.
 data Base = Base { baseCompactorState :: CompactorState
@@ -315,8 +298,7 @@ instance DB.Binary Base where
 showBase :: Base -> String
 showBase b = unlines
   [ "Base:"
-  , "  packages: " ++ showSDocUnsafe (ppr (basePkgs b)) -- FIXME: Jeff (2022,03): Either use the sdoc context in the StgToJS
-                                                        -- config or find a better way than showSDocUnsafe
+  , "  packages: " ++ showSDocUnsafe (ppr (basePkgs b))
   , "  number of units: " ++ show (S.size $ baseUnits b)
   , "  renaming table size: " ++
     show (sizeUniqMap . csNameMap . baseCompactorState $ b)
@@ -338,7 +320,7 @@ putBase (Base cs packages funs) = do
     pi :: Int -> DB.Put
     pi = DB.putWord32le . fromIntegral
     uniq :: Ord a => [a] -> [a]
-    uniq  = S.toList . S.fromList                    -- FIXME: Ick! Just use the Set in the first place!
+    uniq  = S.toList . S.fromList
     -- pkgs  = uniq (map fst $ S.toList funs)
     -- pkgsM = M.fromList (zip pkgs [(0::Int)..])
     mods  = uniq (map fst $ S.toList funs)
@@ -477,16 +459,7 @@ generateAllJs s
   | NoBase <- lcUseBase s = not (lcOnlyOut s) && not (lcNoRts s)
   | otherwise             = False
 
-{-
- -- FIXME: Jeff (2022,03): This instance is supposed to capture overriding
- -- settings, where one group comes from the environment (env vars, config
- -- files) and the other from the command line. (env `mappend` cmdLine) should
- -- give the combined settings, but it doesn't work very well. find something
- -- better.
- -}
 instance Monoid JSLinkConfig where
-  -- FIXME: Jeff (2022,03): Adding no hs main to config, should False be default
-  -- here?
   mempty = JSLinkConfig False   False   False   False False
                         Nothing Nothing Nothing False
                         False   False   Nothing NoBase
@@ -515,12 +488,9 @@ instance Semigroup JSLinkConfig where
 
 --------------------------------------------------------------------------------
 -- Linker Environment
--- TODO: Jeff: (2022,03): Move to separate module, same as Config?
 --------------------------------------------------------------------------------
 -- | A LinkableUnit is a pair of a module and the index of the block in the
 -- object file
--- FIXME: Jeff: (2022,03): Refactor to avoid name collision between
--- StgToJS.Linker.Types.LinkableUnit and StgToJS.Types.LinkableUnit
 type LinkableUnit = (Module, Int)
 
 data LinkedUnit = LinkedUnit
@@ -529,7 +499,6 @@ data LinkedUnit = LinkedUnit
   , lu_statics  :: ![StaticInfo]
   }
 
--- TODO: Jeff: (2022,03):  Where to move LinkedObj
 -- | An object file that's either already in memory (with name) or on disk
 data LinkedObj = ObjFile   FilePath             -- ^ load from this file
                | ObjLoaded String BL.ByteString -- ^ already loaded: description and payload
@@ -537,16 +506,8 @@ data LinkedObj = ObjFile   FilePath             -- ^ load from this file
 
 data GhcjsEnv = GhcjsEnv
   { compiledModules   :: MVar (Map Module ByteString)  -- ^ keep track of already compiled modules so we don't compile twice for dynamic-too
-  , thRunners         :: MVar THRunnerState -- (Map String ThRunner)   -- ^ template haskell runners
+  , thRunners         :: MVar THRunnerState            -- ^ template haskell runners
   , thSplice          :: MVar Int
-  -- FIXME: Jeff a Map keyed on a Set is going to be quite costly. The Eq
-  -- instance over Sets _can_ be fast if the sets are different sizes, this
-  -- would be O(1), however if they are equal size then we incur a costly
-  -- converstion to an Ascending List O(n) and then perform the element wise
-  -- check hence O(mn) where m is the cost of the element check. Thus, we should
-  -- fix this data structure and use something more efficient, HashMap if
-  -- available, IntMap if possible. Nested maps, in particular, seem like a
-  -- design smell.
   , linkerArchiveDeps :: MVar (Map (Set FilePath)
                                    (Map Module (Deps, DepsLocation)
                                    , [LinkableUnit]
@@ -572,9 +533,6 @@ data THRunner =
            , thrHandleIn       :: Handle
            , thrHandleErr      :: Handle
            , thrBase           :: MVar Base
-           -- FIXME: Jeff (2022,03): Is String the right type here? I chose it
-           -- because it was easy but I am unsure what the needs of its consumer
-           -- are.
            , thrRecover        :: MVar [Messages String]
            , thrExceptions     :: MVar (I.IntMap E.SomeException)
            }

@@ -14,10 +14,6 @@
 --                Josh Meredith  <josh.meredith@iohk.io>
 -- Stability   :  experimental
 --
---  FIXME: Jeff(2022,04): Remove this module completely, its only consumer is
---  GHC.StgToJS.Linker.Dynamic and is likely no longer necessary with the new
---  GHC Api. I simply decided adapting this module was faster/easier than
---  removing it and figuring out GHC.StgToJS.Linker.Dynamic with the new API
 -----------------------------------------------------------------------------
 module GHC.StgToJS.Linker.Archive
   ( Entry(..), Index, IndexEntry(..), Meta(..)
