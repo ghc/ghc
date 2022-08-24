@@ -82,33 +82,36 @@ instance Ord (Shim' a) where
 
 -- | A tag to label shim payloads, the ordering dictates the ordering shim files
 -- are linked.
-data ShimLbl = ShStructs
-             | ShProfiling
-             | ShRts
-             | ShGc
-             | ShArith
-             | ShCompact
-             | ShDebug
-             | ShEnum
-             | ShEnvironment
-             | ShErrno
-             | ShGoog
-             | ShHsCore
-             | ShMd5
-             | ShMem
-             | ShNodeExports
-             | ShObject
-             | ShPlatform
-             | ShStablePtr
-             | ShStaticPtr
-             | ShStm
-             | ShString
-             | ShThread
-             | ShUnicode
-             | ShVerify
-             | ShWeak
-             | ShBase
-             deriving (Eq, Ord)
+data ShimLbl
+    -- Platform must be loaded quite early as it sets h$isNode which is used by
+    -- other shims (e.g. ShEnvironment)
+  = ShPlatform
+  | ShStructs
+  | ShProfiling
+  | ShRts
+  | ShGc
+  | ShArith
+  | ShCompact
+  | ShDebug
+  | ShEnum
+  | ShEnvironment
+  | ShErrno
+  | ShGoog
+  | ShHsCore
+  | ShMd5
+  | ShMem
+  | ShNodeExports
+  | ShObject
+  | ShStablePtr
+  | ShStaticPtr
+  | ShStm
+  | ShString
+  | ShThread
+  | ShUnicode
+  | ShVerify
+  | ShWeak
+  | ShBase
+  deriving (Eq, Ord)
 
 -- | Given a file path, check that the file is a shim file and construct a Shim
 -- value if so. This is the sole exported constructor for a Shim type.
