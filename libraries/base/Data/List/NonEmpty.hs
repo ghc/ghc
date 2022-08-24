@@ -232,6 +232,8 @@ inits = fromList . List.inits . Foldable.toList
 --
 -- > inits1 (1 :| [2,3]) == (1 :| []) :| [1 :| [2], 1 :| [2,3]]
 -- > inits1 (1 :| []) == (1 :| []) :| []
+--
+-- @since 4.18
 inits1 :: NonEmpty a -> NonEmpty (NonEmpty a)
 inits1 =
   -- fromList is an unsafe function, but this usage should be safe, since:
@@ -258,6 +260,8 @@ tails = fromList . List.tails . Foldable.toList
 --
 -- > tails1 (1 :| [2,3]) == (1 :| [2,3]) :| [2 :| [3], 3 :| []]
 -- > tails1 (1 :| []) == (1 :| []) :| []
+--
+-- @since 4.18
 tails1 :: NonEmpty a -> NonEmpty (NonEmpty a)
 tails1 =
   -- fromList is an unsafe function, but this usage should be safe, since:
