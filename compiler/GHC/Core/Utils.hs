@@ -706,7 +706,11 @@ filterAlts :: TyCon                -- ^ Type constructor of scrutinee's type (us
              -- in a "case" statement then they will need to manually add a dummy case branch that just
              -- calls "error" or similar.
 filterAlts _tycon inst_tys imposs_cons alts
-  = (imposs_deflt_cons, addDefault trimmed_alts maybe_deflt)
+  = imposs_deflt_cons `seqList`
+      (imposs_deflt_cons, addDefault trimmed_alts maybe_deflt)
+  -- Very important to force `imposs_deflt_cons` as that forces `alt_cons`, which
+  -- is essentially as retaining `alts_wo_default` or any `Alt b` for that matter
+  -- leads to a huge space leak (see #22102 and !8896)
   where
     (alts_wo_default, maybe_deflt) = findDefault alts
     alt_cons = [con | Alt con _ _ <- alts_wo_default]
