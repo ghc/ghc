@@ -2190,6 +2190,9 @@ pprTcSolverReportMsg ctxt
     ppr_torc ConstraintLike = text "constraint"
 
     describe_rep :: RuntimeRepType -> Maybe SDoc
+    -- describe_rep IntRep            = Just "an IntRep"
+    -- describe_rep (BoxedRep Lifted) = Just "a lifted"
+    --   etc
     describe_rep rep
       | Just (rr_tc, rr_args) <- splitRuntimeRep_maybe rep
       = case rr_args of
@@ -2199,14 +2202,16 @@ pprTcSolverReportMsg ctxt
                       Lifted   -> Just (text "a lifted")
                       Unlifted -> Just (text "a boxed unlifted")
           [] | rr_tc `hasKey` tupleRepDataConTyConKey -> Just (text "a zero-bit")
-             | starts_with_vowel rr_tc -> Just (text "an" <+> ppr rr_tc)
-             | otherwise               -> Just (text "a"  <+> ppr rr_tc)
+             | starts_with_vowel rr_occ -> Just (text "an" <+> text rr_occ)
+             | otherwise                -> Just (text "a"  <+> text rr_occ)
+             where
+               rr_occ = occNameString (getOccName rr_tc)
+
           _ -> Nothing -- Must be TupleRep [r1..rn]
       | otherwise = Nothing
 
-    starts_with_vowel tc
-      | (c:_) <- occNameString (getOccName tc) = c `elem` "aeiou"
-      | otherwise                              = False
+    starts_with_vowel (c:_) = c `elem` "AEIOU"
+    starts_with_vowel []    = False
 
 pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
   vcat (map make_msg frr_origs)
