@@ -429,10 +429,10 @@ genPrim prof ty op = case op of
       r |= BOr ((mask8 x) .<<. (Int 8))
                (mask8 (x .>>>. (Int 8)))
   BSwap32Op   -> \[r] [x]   -> PrimInline $
-      r |= (x .<<. (Int 24))
+      r |= u32 ((x .<<. (Int 24))
             `BOr` ((BAnd x (Int 0xFF00)) .<<. (Int 8))
             `BOr` ((BAnd x (Int 0xFF0000)) .>>. (Int 8))
-            `BOr` (x .>>>. (Int 24))
+            `BOr` (x .>>>. (Int 24)))
   BSwap64Op   -> \[r1,r2] [x,y] -> PrimInline $ appT [r1,r2] "h$bswap64" [x,y]
   BSwapOp     -> \[r] [x]       -> genPrim prof ty BSwap32Op [r] [x]
 
