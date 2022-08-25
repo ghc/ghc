@@ -60,6 +60,7 @@ import GHC.Types.ForeignCall
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
 
 -- Note [General layout of an NCG]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -135,10 +136,11 @@ basicBlockCodeGen block = do
       id = entryLabel block
       stmts = blockToList nodes
 
-      header_comment_instr = unitOL $ MULTILINE_COMMENT (
+      header_comment_instr | debugIsOn = unitOL $ MULTILINE_COMMENT (
           text "-- --------------------------- basicBlockCodeGen --------------------------- --\n"
-          $+$ pdoc (ncgPlatform config) block
+          $+$ withPprStyle defaultDumpStyle (pdoc (ncgPlatform config) block)
           )
+                           | otherwise = nilOL
   -- Generate location directive
   dbg <- getDebugBlock (entryLabel block)
   loc_instrs <- case dblSourceTick =<< dbg of

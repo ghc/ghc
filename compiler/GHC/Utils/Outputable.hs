@@ -96,7 +96,7 @@ module GHC.Utils.Outputable (
         defaultSDocContext, traceSDocContext,
         getPprStyle, withPprStyle, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
-        codeStyle, userStyle, dumpStyle, asmStyle,
+        codeStyle, userStyle, dumpStyle,
         qualName, qualModule, qualPackage,
         mkErrStyle, defaultErrStyle, defaultDumpStyle, mkDumpStyle, defaultUserStyle,
         mkUserStyle, cmdlineParserStyle, Depth(..),
@@ -170,7 +170,7 @@ data PprStyle
                 -- Does not assume tidied code: non-external names
                 -- are printed with uniques.
 
-  | PprCode !LabelStyle -- ^ Print code; either C or assembler
+  | PprCode -- ^ Print code; either C or assembler
 
 -- | Style of label pretty-printing.
 --
@@ -550,12 +550,8 @@ queryQual s = QueryQualify (qualName s)
                            (qualPackage s)
 
 codeStyle :: PprStyle -> Bool
-codeStyle (PprCode _)     = True
-codeStyle _               = False
-
-asmStyle :: PprStyle -> Bool
-asmStyle (PprCode AsmStyle)  = True
-asmStyle _other              = False
+codeStyle PprCode     = True
+codeStyle _           = False
 
 dumpStyle :: PprStyle -> Bool
 dumpStyle (PprDump {}) = True
@@ -603,9 +599,9 @@ bufLeftRenderSDoc :: SDocContext -> BufHandle -> SDoc -> IO ()
 bufLeftRenderSDoc ctx bufHandle doc =
   Pretty.bufLeftRender bufHandle (runSDoc doc ctx)
 
-pprCode :: LabelStyle -> SDoc -> SDoc
+pprCode :: SDoc -> SDoc
 {-# INLINE CONLIKE pprCode #-}
-pprCode cs d = withPprStyle (PprCode cs) d
+pprCode d = withPprStyle PprCode d
 
 renderWithContext :: SDocContext -> SDoc -> String
 renderWithContext ctx sdoc

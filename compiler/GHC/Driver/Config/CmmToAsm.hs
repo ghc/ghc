@@ -18,7 +18,7 @@ initNCGConfig :: DynFlags -> Module -> NCGConfig
 initNCGConfig dflags this_mod = NCGConfig
    { ncgPlatform              = targetPlatform dflags
    , ncgThisModule            = this_mod
-   , ncgAsmContext            = initSDocContext dflags (PprCode AsmStyle)
+   , ncgAsmContext            = initSDocContext dflags PprCode
    , ncgProcAlignment         = cmmProcAlignment dflags
    , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
    , ncgPIC                   = positionIndependent dflags

@@ -77,7 +77,7 @@ data DebugBlock =
   , dblBlocks     :: ![DebugBlock] -- ^ Nested blocks
   }
 
-instance OutputableP env CLabel => OutputableP env DebugBlock where
+instance OutputableP Platform DebugBlock where
   pdoc env blk =
             (if | dblProcedure blk == dblLabel blk
                 -> text "proc"
@@ -85,7 +85,7 @@ instance OutputableP env CLabel => OutputableP env DebugBlock where
                 -> text "pp-blk"
                 | otherwise
                 -> text "blk") <+>
-            ppr (dblLabel blk) <+> parens (pdoc env (dblCLabel blk)) <+>
+            ppr (dblLabel blk) <+> parens (pprAsmLabel env (dblCLabel blk)) <+>
             (maybe empty ppr (dblSourceTick blk)) <+>
             (maybe (text "removed") ((text "pos " <>) . ppr)
                    (dblPosition blk)) <+>
@@ -495,9 +495,9 @@ LOC this information will end up in is Y.
 -- | A label associated with an 'UnwindTable'
 data UnwindPoint = UnwindPoint !CLabel !UnwindTable
 
-instance OutputableP env CLabel => OutputableP env UnwindPoint where
+instance OutputableP Platform UnwindPoint where
   pdoc env (UnwindPoint lbl uws) =
-      braces $ pdoc env lbl <> colon
+      braces $ pprAsmLabel env lbl <> colon
       <+> hsep (punctuate comma $ map pprUw $ Map.toList uws)
     where
       pprUw (g, expr) = ppr g <> char '=' <> pdoc env expr
@@ -519,16 +519,16 @@ data UnwindExpr = UwConst !Int                  -- ^ literal value
                 | UwTimes UnwindExpr UnwindExpr
                 deriving (Eq)
 
-instance OutputableP env CLabel => OutputableP env UnwindExpr where
+instance OutputableP Platform UnwindExpr where
   pdoc = pprUnwindExpr 0
 
-pprUnwindExpr :: OutputableP env CLabel => Rational -> env -> UnwindExpr -> SDoc
+pprUnwindExpr :: Rational -> Platform -> UnwindExpr -> SDoc
 pprUnwindExpr p env = \case
   UwConst i     -> ppr i
   UwReg g 0     -> ppr g
   UwReg g x     -> pprUnwindExpr p env (UwPlus (UwReg g 0) (UwConst x))
   UwDeref e     -> char '*' <> pprUnwindExpr 3 env e
-  UwLabel l     -> pdoc env l
+  UwLabel l     -> pprAsmLabel env l
   UwPlus e0 e1
    | p <= 0     -> pprUnwindExpr 0 env e0 <> char '+' <> pprUnwindExpr 0 env e1
   UwMinus e0 e1

@@ -23,6 +23,7 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 import GHC.Cmm.Liveness
 import GHC.Cmm.Switch (switchTargetsToList)
+import GHC.Cmm.CLabel (pprDebugCLabel)
 import GHC.Utils.Outputable
 
 import Control.Monad (ap, unless)
@@ -55,7 +56,7 @@ lintCmmDecl :: GenCmmDecl h i CmmGraph -> CmmLint ()
 lintCmmDecl (CmmProc _ lbl _ g)
   = do
     platform <- getPlatform
-    addLintInfo (text "in proc " <> pdoc platform lbl) $ lintCmmGraph g
+    addLintInfo (text "in proc " <> pprDebugCLabel platform lbl) $ lintCmmGraph g
 lintCmmDecl (CmmData {})
   = return ()
 

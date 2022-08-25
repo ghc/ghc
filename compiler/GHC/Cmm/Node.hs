@@ -508,9 +508,9 @@ pprForeignTarget platform (PrimTarget op)
  -- HACK: We're just using a ForeignLabel to get this printed, the label
  --       might not really be foreign.
  = pdoc platform
-               (CmmLabel (mkForeignLabel
+               (mkForeignLabel
                           (mkFastString (show op))
-                          Nothing ForeignLabelInThisPackage IsFunction))
+                          Nothing ForeignLabelInThisPackage IsFunction)
 
 instance Outputable Convention where
   ppr = pprConvention

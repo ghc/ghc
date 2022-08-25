@@ -173,7 +173,7 @@ outputC logger dflags filenm cmm_stream unit_deps =
                           "C backend output"
                           FormatC
                           doc
-            let ctx = initSDocContext dflags (PprCode CStyle)
+            let ctx = initSDocContext dflags PprCode
             printSDocLn ctx LeftMode h doc
       Stream.consume cmm_stream id writeC
 
@@ -253,11 +253,11 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
 
      ForeignStubs (CHeader h_code) (CStub c_code _ _) -> do
         let
-            stub_c_output_d = pprCode CStyle c_code
+            stub_c_output_d = pprCode c_code
             stub_c_output_w = showSDoc dflags stub_c_output_d
 
             -- Header file protos for "foreign export"ed functions.
-            stub_h_output_d = pprCode CStyle h_code
+            stub_h_output_d = pprCode h_code
             stub_h_output_w = showSDoc dflags stub_h_output_d
 
         createDirectoryIfMissing True (takeDirectory stub_h)
@@ -330,6 +330,7 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
  = {-# SCC profilingInitCode #-}
    initializerCStub platform fn_name decls body
  where
+   pdocC = pprCLabel platform CStyle
    fn_name = mkInitializerStubLabel this_mod "prof_init"
    decls = vcat
         $  map emit_cc_decl local_CCs
@@ -342,22 +343,22 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
         ]
    emit_cc_decl cc =
        text "extern CostCentre" <+> cc_lbl <> text "[];"
-     where cc_lbl = pdoc platform (mkCCLabel cc)
+     where cc_lbl = pdocC (mkCCLabel cc)
    local_cc_list_label = text "local_cc_" <> ppr this_mod
    emit_cc_list ccs =
       text "static CostCentre *" <> local_cc_list_label <> text "[] ="
-      <+> braces (vcat $ [ pdoc platform (mkCCLabel cc) <> comma
+      <+> braces (vcat $ [ pdocC (mkCCLabel cc) <> comma
                          | cc <- ccs
                          ] ++ [text "NULL"])
       <> semi
 
    emit_ccs_decl ccs =
        text "extern CostCentreStack" <+> ccs_lbl <> text "[];"
-     where ccs_lbl = pdoc platform (mkCCSLabel ccs)
+     where ccs_lbl = pdocC (mkCCSLabel ccs)
    singleton_cc_list_label = text "singleton_cc_" <> ppr this_mod
    emit_ccs_list ccs =
       text "static CostCentreStack *" <> singleton_cc_list_label <> text "[] ="
-      <+> braces (vcat $ [ pdoc platform (mkCCSLabel cc) <> comma
+      <+> braces (vcat $ [ pdocC (mkCCSLabel cc) <> comma
                          | cc <- ccs
                          ] ++ [text "NULL"])
       <> semi

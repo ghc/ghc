@@ -396,7 +396,7 @@ cmmNativeGens logger config modLoc ncgImpl h dbgMap = go
 
         -- force evaluation all this stuff to avoid space leaks
         let platform = ncgPlatform config
-        {-# SCC "seqString" #-} evaluate $ seqList (showSDocUnsafe $ vcat $ map (pdoc platform) imports) ()
+        {-# SCC "seqString" #-} evaluate $ seqList (showSDocUnsafe $ vcat $ map (pprAsmLabel platform) imports) ()
 
         let !labels' = if ncgDwarfEnabled config
                        then cmmDebugLabels isMetaInstr native else []
@@ -455,7 +455,7 @@ cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap cmm count
         let weights  = ncgCfgWeights config
 
         let proc_name = case cmm of
-                (CmmProc _ entry_label _ _) -> pdoc platform entry_label
+                (CmmProc _ entry_label _ _) -> pprAsmLabel platform entry_label
                 _                           -> text "DataChunk"
 
         -- rewrite assignments to global regs
@@ -789,7 +789,7 @@ makeImportsDoc config imports
 
         doPpr lbl = (lbl, renderWithContext
                               (ncgAsmContext config)
-                              (pprCLabel platform AsmStyle lbl))
+                              (pprAsmLabel platform lbl))
 
 -- -----------------------------------------------------------------------------
 -- Generate jump tables
