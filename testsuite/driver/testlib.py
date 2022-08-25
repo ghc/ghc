@@ -137,6 +137,11 @@ def no_deps( name, opts):
 def skip( name, opts ):
     opts.skip = True
 
+# disable test on JS arch
+def js_skip( name, opts ):
+    if arch("js"):
+        skip(name,opts)
+
 def expect_fail( name, opts ):
     # The compiler, testdriver, OS or platform is missing a certain
     # feature, and we don't plan to or can't fix it now or in the
@@ -730,6 +735,8 @@ def objcpp_src( name, opts ):
 
 def cmm_src( name, opts ):
     opts.cmm_src = True
+    # JS backend doesn't support Cmm
+    js_skip(name, opts)
 
 def outputdir( odir ):
     return lambda name, opts, d=odir: _outputdir(name, opts, d)
