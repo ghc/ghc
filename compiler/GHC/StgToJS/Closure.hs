@@ -61,9 +61,9 @@ setObjInfoL debug obj rs layout t n a
   = setObjInfo debug obj t n field_types a size rs
       where
         size = case layout of
-          CILayoutVariable     -> (-1)
-          CILayoutUnknown size -> size
-          CILayoutFixed size _ -> size
+          CILayoutVariable   -> (-1)
+          CILayoutUnknown sz -> sz
+          CILayoutFixed sz _ -> sz
         field_types = case layout of
           CILayoutVariable     -> []
           CILayoutUnknown size -> toTypeList (replicate size ObjV)

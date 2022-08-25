@@ -77,7 +77,7 @@ data StgToJSConfig = StgToJSConfig
 
 data ClosureInfo = ClosureInfo
   { ciVar     :: FastString -- ^ object being infod
-  , ciRegs    :: CIRegs     -- ^ things in registers when this is the next closure to enter
+  , ciRegs    :: CIRegs     -- ^ size of the payload (in number of JS values)
   , ciName    :: FastString -- ^ friendly name for printing
   , ciLayout  :: CILayout   -- ^ heap/stack layout of the object
   , ciType    :: CIType     -- ^ type of the object, with extra info where required
