@@ -19,12 +19,6 @@
 -- Haskell. It assumes the existence of pre-generated JS functions, included as
 -- js-sources...
 --
--- FIXME: Jeff (2022,03): Finish module description. Specifically:
--- 1. Since this is the top level module for the RTS, what is the architecture
--- of the RTS? How does it all hold together? Describe the memory layout, any
--- other tricks the RTS plays, and relevant sibling modules
--- Sylvain (2022/03): memory layout is described in GHC.StgToJS (WIP)
---
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Rts.Rts where
@@ -52,45 +46,6 @@ import Data.Monoid
 import Data.Char (toLower, toUpper)
 import qualified Data.Bits          as Bits
 
-
------------------------------------------------------------------------------
---
--- Pre-generated RTS for the JS backend
---
--- TODO: Jeff (2022,03):
-
--- 1. There are numerous string literals sprinkled throughout the RTS, these
--- should be moved and isolated into a single module and then used throughout
--- the RTS and StgToJS Pipeline
---
--- 2. The RTS makes a lot of use of the Monoid instances on lists since the
--- Haskell portion is essentially building a JavaScript AST for the JS Rts and
--- then pretty printing it so it can be used by the js backend. However, all
--- this merging on lists is going to be extremely inefficient. (++) is O(n^2)
--- and furthermore we have nested list structures. This implies a better data
--- structure with an emphasis on fast merging is likely to reduce compile times
--- for this RTS.
---
--- 3. Similar to (2), most of the RTS is a function foo :: <something> with
--- definition foo [...<something>...] = mconcat ...<the body is JS land>... This
--- is fine, however it implies a monadic design for this EDSL might lead to more
--- readable code. Or in other words, `mconcat` and friends are just boiler
--- plate, and what we really have is a monadic EDSL where the monad is a kind of
--- Writer monad. Which we have essentially recreated here since bind in the
--- Writer monad is mapConcat and you'll notice that most of the functions in the
--- RTS do exactly that, i.e., apply a function which generates a list, then
--- concats. So we are dealing with a Writer monad but aren't using Haskell's
--- language facilities to be explicit about it. Hence all the boilerplate. Side
--- note, we might also consider two alternative approaches if we go with a
--- monadic design:
--- -- a. Continuation passing style so that intermediate lists fuse
--- -- b. A writer monad with a difference list, this would essentially be a
--- -- zipper but whether it is worth it or not depend on how often children need
--- -- to access their siblings, if they do that a lot then we'll have huge
--- -- speedups, if not then we likely won't gain anything
-
------------------------------------------------------------------------------
-
 garbageCollector :: JStat
 garbageCollector =
   mconcat [ TxtI "h$resetRegisters"  ||= jLam (mconcat $ map resetRegister [minBound..maxBound])
@@ -117,7 +72,6 @@ closureConstructors s = BlockStat
       , clMeta   = 0
       , clCC     = ccVal
       }
-    -- FIXME: same as h$c, maybe remove one of them?
   , declClsConstr "h$c0" ["f"] $ Closure
       { clEntry  = var "f"
       , clField1 = null_
@@ -205,17 +159,14 @@ closureConstructors s = BlockStat
     mkClosureCon :: Int -> JStat
     mkClosureCon n = funName ||= toJExpr fun
       where
-        funName = TxtI $ mkFastString ("h$c" ++ show n) -- FIXME (Sylvain 2022-03): cache this
+        funName = TxtI $ mkFastString ("h$c" ++ show n)
         -- args are: f x1 x2 .. xn [cc]
         args   = TxtI "f" : addCCArg' (map (TxtI . mkFastString . ('x':) . show) [(1::Int)..n])
         fun    = JFunc args funBod
         -- x1 goes into closureField1. All the other args are bundled into an
         -- object in closureField2: { d1 = x2, d2 = x3, ... }
         --
-        -- FIXME (Sylvain 2022-03): share code and comment with mkDataFill
         extra_args = ValExpr . JHash . listToUniqMap $ zip
-                   -- FIXME (Sylvain 2002-03): use dataFieldCache and another
-                   -- cache for "xN" names
                    (map (mkFastString . ('d':) . show) [(1::Int)..])
                    (map (toJExpr . TxtI . mkFastString . ('x':) . show) [2..n])
 
@@ -236,7 +187,6 @@ closureConstructors s = BlockStat
     mkDataFill :: Int -> JStat
     mkDataFill n = funName ||= toJExpr fun
       where
-        -- FIXME (Sylvain 2002-03): use dataFieldCache and dataCache
         funName    = TxtI $ mkFastString ("h$d" ++ show n)
         ds         = map (mkFastString . ('d':) . show) [(1::Int)..n]
         extra_args = ValExpr . JHash . listToUniqMap . zip ds $ map (toJExpr . TxtI) ds
@@ -292,9 +242,7 @@ bhLneStats _s p frameSize =
                     ]
 
 
--- FIXME move somewhere else
 declRegs :: JStat
--- FIXME prevent holes
 declRegs =
   mconcat [ TxtI "h$regs" ||= toJExpr (JList [])
           , mconcat (map declReg (enumFromTo R1 R32))
@@ -322,13 +270,6 @@ loadRegs = mconcat $ map mkLoad [1..32]
     mkLoad :: Int -> JStat
     mkLoad n = let args   = map (TxtI . mkFastString . ("x"++) . show) [1..n]
                    assign = zipWith (\a r -> toJExpr r |= toJExpr a)
-                                -- FIXME: Jeff (2022,03) the use of reverse,
-                                -- take, and enumFrom here heavily implies
-                                -- Data.Sequence would be a better data
-                                -- structure to hold the regs. Or perhaps we
-                                -- steal the indices from the registers array?
-                                -- Either way we can avoid allocating this
-                                -- intermediate `regsFromR1` list
                               args (reverse $ take n regsFromR1)
                    fname  = TxtI $ mkFastString ("h$l" ++ show n)
                    fun    = JFunc args (mconcat assign)
@@ -382,11 +323,9 @@ rtsDecls = jsSaturate (Just "h$RTSD") $
           , declRegs
           , declRets]
 
--- FIXME (Sylvain 2022-06): don't use String
 rtsText :: StgToJSConfig -> String
 rtsText = show . pretty . rts
 
--- FIXME (Sylvain 2022-06): don't use String
 rtsDeclsText :: String
 rtsDeclsText = show . pretty $ rtsDecls
 
@@ -398,17 +337,14 @@ rts' s =
   mconcat [ closureConstructors s
           , garbageCollector
           , stackManip
-          -- settings (FIXME should be const)
           , TxtI "h$rts_traceForeign" ||= toJExpr (csTraceForeign s)
           , TxtI "h$rts_profiling"    ||= toJExpr (csProf s)
-          -- closure types (FIXME should be const)
           , TxtI "h$ct_fun"        ||= toJExpr Fun
           , TxtI "h$ct_con"        ||= toJExpr Con
           , TxtI "h$ct_thunk"      ||= toJExpr Thunk
           , TxtI "h$ct_pap"        ||= toJExpr Pap
           , TxtI "h$ct_blackhole"  ||= toJExpr Blackhole
           , TxtI "h$ct_stackframe" ||= toJExpr StackFrame
-          -- var / closure field types (FIXME should be const)
           , TxtI "h$vt_ptr"    ||= toJExpr PtrV
           , TxtI "h$vt_void"   ||= toJExpr VoidV
           , TxtI "h$vt_double" ||= toJExpr IntV
@@ -461,7 +397,7 @@ rts' s =
           , closure (ClosureInfo "h$ap2_e" (CIRegs 0 [PtrV]) "apply2" (CILayoutFixed 3 [PtrV, PtrV, PtrV]) CIThunk mempty)
                (jVar $ \d1 d2 d3 ->
                    mconcat [ d1 |= closureField1 r1
-                           , d2 |= closureField2 r1 .^ "d1" -- FIXME (Sylvain 2022-03): extra args are named like closureFieldN... not so good! Find something else
+                           , d2 |= closureField2 r1 .^ "d1"
                            , d3 |= closureField2 r1 .^ "d2"
                            , appS "h$bh" []
                            , profStat s enterCostCentreThunk

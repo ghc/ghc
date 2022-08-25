@@ -15,7 +15,6 @@
 -- Stability   :  experimental
 --
 -- Types and utility functions used in the JS RTS.
--- FIXME: Jeff (2022,03): Add more details
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Rts.Types where
@@ -62,9 +61,7 @@ stackFrameSize :: JExpr -- ^ assign frame size to this
                -> JStat -- ^ size of the frame, including header
 stackFrameSize tgt f =
   ifS (f .===. var "h$ap_gen") -- h$ap_gen is special
-      (tgt |= (stack .! (sp - 1) .>>. 8) + 2)  -- special case, FIXME (Jeff, 2022/03): what and why is
-                                               -- it special and how does its
-                                               -- special-ness change this code
+      (tgt |= (stack .! (sp - 1) .>>. 8) + 2)
       (jVar (\tag ->
                mconcat
                [tag |= f .^ "size"
