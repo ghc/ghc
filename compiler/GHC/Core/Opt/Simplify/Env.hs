@@ -861,12 +861,17 @@ simplNonRecBndr !env id
 ---------------
 simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
 -- Recursive let binders
-simplRecBndrs env@(SimplEnv {}) ids
+simplRecBndrs env@(SimplEnv {}) ids = return $ runST $ do
+  env' <- simplRecBndrsT (transientSimplEnv env) ids
+  persistentSimplEnv env'
+
+simplRecBndrsT :: TSimplEnv s -> [InBndr] -> ST s (TSimplEnv s)
+-- Recursive let binders
+simplRecBndrsT env@(TSimplEnv {}) ids
   -- See Note [Bangs in the Simplifier]
   = assert (all (not . isJoinId) ids) $
-    do  { let (!env1, ids1) = mapAccumL substIdBndr env ids
+    do  { (!env1, ids1) <- mapAccumLM substIdBndrT env ids
         ; seqIds ids1 `seq` return env1 }
-
 ---------------
 substIdBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)
 -- Might be a coercion variable
