@@ -1007,7 +1007,7 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
            -- NB: my_theta already includes all the annotated constraints
            ; diff_theta <- findInferredDiff annotated_theta my_theta
 
-           ; case tcGetCastedTyVar_maybe wc_var_ty of
+           ; case getCastedTyVar_maybe wc_var_ty of
                -- We know that wc_co must have type kind(wc_var) ~ Constraint, as it
                -- comes from the checkExpectedKind in GHC.Tc.Gen.HsType.tcAnonWildCardOcc.
                -- So, to make the kinds work out, we reverse the cast here.

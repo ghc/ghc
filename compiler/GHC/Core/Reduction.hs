@@ -829,7 +829,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
     go lc (binder:binders) inner_ki (role:roles) (arg_redn:arg_redns)
       =  -- We rewrite an argument ty with arg_redn = Reduction arg_co arg
          -- By Note [Rewriting] in GHC.Tc.Solver.Rewrite invariant (F2),
-         -- tcTypeKind(ty) = tcTypeKind(arg).
+         -- typeKind(ty) = typeKind(arg).
          -- However, it is possible that arg will be used as an argument to a function
          -- whose kind is different, if earlier arguments have been rewritten.
          -- We thus need to compose the reduction with a kind coercion to ensure

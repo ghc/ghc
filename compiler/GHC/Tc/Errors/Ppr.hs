@@ -1719,7 +1719,7 @@ format_frr_err ty
   = (bullet <+> ppr tidy_ty <+> dcolon <+> ppr tidy_ki)
   where
     (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
-    tidy_ki             = tidyType tidy_env (tcTypeKind ty)
+    tidy_ki             = tidyType tidy_env (typeKind ty)
 
 pprField :: (FieldLabelString, TcType) -> SDoc
 pprField (f,ty) = ppr f <+> dcolon <+> ppr ty
@@ -2462,7 +2462,7 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
                , not (isTypeFamilyTyCon tc)
                = hang (text "GHC can't yet do polykinded")
                     2 (text "Typeable" <+>
-                       parens (ppr ty <+> dcolon <+> ppr (tcTypeKind ty)))
+                       parens (ppr ty <+> dcolon <+> ppr (typeKind ty)))
                | otherwise
                = empty
 
@@ -2805,9 +2805,9 @@ pprTcSolverReportInfo ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
        || not (cty1 `pickyEqType` cty2)
       then vcat [ hang (text "When matching" <+> sub_whats)
                       2 (vcat [ ppr cty1 <+> dcolon <+>
-                               ppr (tcTypeKind cty1)
+                               ppr (typeKind cty1)
                              , ppr cty2 <+> dcolon <+>
-                               ppr (tcTypeKind cty2) ])
+                               ppr (typeKind cty2) ])
                 , supplementary ]
       else text "When matching the kind of" <+> quotes (ppr cty1)
   where
@@ -2888,7 +2888,7 @@ pprHoleError ctxt (Hole { hole_ty, hole_occ}) (HoleError sort other_tvs hole_sko
         hang (text "Found extra-constraints wildcard standing for")
           2 (quotes $ pprType hole_ty)  -- always kind constraint
 
-    hole_kind = tcTypeKind hole_ty
+    hole_kind = typeKind hole_ty
 
     pp_hole_type_with_kind
       | isLiftedTypeKind hole_kind

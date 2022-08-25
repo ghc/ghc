@@ -918,7 +918,7 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
                                               _ -> True
                             allConcrete = all notAbstract z_wrp_tys
                       ; z_vars  <- zonkTcTyVars ref_vars
-                      ; let z_mtvs = mapMaybe tcGetTyVar_maybe z_vars
+                      ; let z_mtvs = mapMaybe getTyVar_maybe z_vars
                       ; allFilled <- not <$> anyM isFlexiTyVar z_mtvs
                       ; allowAbstract <- goptM Opt_AbstractRefHoleFits
                       ; if allowAbstract || (allFilled && allConcrete )

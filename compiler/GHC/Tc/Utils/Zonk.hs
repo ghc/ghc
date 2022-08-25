@@ -1009,7 +1009,7 @@ zonk_cmd_top env (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
        new_ty <- zonkTcTypeToTypeX env ty
        new_ids <- mapSndM (zonkExpr env) ids
 
-       massert (isLiftedTypeKind (tcTypeKind new_stack_tys))
+       massert (isLiftedTypeKind (typeKind new_stack_tys))
          -- desugarer assumes that this is not representation-polymorphic...
          -- but indeed it should always be lifted due to the typing
          -- rules for arrows

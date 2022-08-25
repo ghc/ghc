@@ -24,7 +24,8 @@ module GHC.Core.Unify (
         liftCoMatch,
 
         -- The core flattening algorithm
-        flattenTys, flattenTysX
+        flattenTys, flattenTysX,
+
    ) where
 
 import GHC.Prelude
@@ -2041,3 +2042,4 @@ mkFlattenFreshCoVar in_scope kind
   = let uniq = unsafeGetFreshLocalUnique in_scope
         name = mkSystemVarName uniq (fsLit "flc")
     in mkCoVar name kind
+

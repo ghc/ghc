@@ -972,7 +972,7 @@ writeMetaTyVarRef tyvar ref ty
        -- Zonk kinds to allow the error check to work
        ; zonked_tv_kind <- zonkTcType tv_kind
        ; zonked_ty      <- zonkTcType ty
-       ; let zonked_ty_kind = tcTypeKind zonked_ty
+       ; let zonked_ty_kind = typeKind zonked_ty
              zonked_ty_lvl  = tcTypeLevel zonked_ty
              level_check_ok  = not (zonked_ty_lvl `strictlyDeeperThan` tv_lvl)
              level_check_msg = ppr zonked_ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty
@@ -2521,7 +2521,7 @@ zonkTcTyVarsToTcTyVars = mapM zonkTcTyVarToTcTyVar
 zonkTcTyVarToTcTyVar :: HasDebugCallStack => TcTyVar -> TcM TcTyVar
 zonkTcTyVarToTcTyVar tv
   = do { ty <- zonkTcTyVar tv
-       ; let tv' = case tcGetTyVar_maybe ty of
+       ; let tv' = case getTyVar_maybe ty of
                      Just tv' -> tv'
                      Nothing  -> pprPanic "zonkTcTyVarToTcTyVar"
                                           (ppr tv $$ ppr ty)

@@ -716,6 +716,9 @@ binderArgFlag (Bndr _ argf) = argf
 binderType :: VarBndr TyCoVar argf -> Type
 binderType (Bndr tv _) = varType tv
 
+isTyVarBinder :: VarBndr TyCoVar vis -> Bool
+isTyVarBinder (Bndr tcv _) = isTyVar tcv
+
 -- | Make a named binder
 mkTyCoVarBinder :: vis -> TyCoVar -> VarBndr TyCoVar vis
 mkTyCoVarBinder vis var = Bndr var vis
@@ -735,9 +738,6 @@ mkTyCoVarBinders vis = map (mkTyCoVarBinder vis)
 -- Input vars should be type variables
 mkTyVarBinders :: vis -> [TyVar] -> [VarBndr TyVar vis]
 mkTyVarBinders vis = map (mkTyVarBinder vis)
-
-isTyVarBinder :: TyCoVarBinder -> Bool
-isTyVarBinder (Bndr v _) = isTyVar v
 
 mapVarBndr :: (var -> var') -> (VarBndr var flag) -> (VarBndr var' flag)
 mapVarBndr f (Bndr v fl) = Bndr (f v) fl

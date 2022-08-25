@@ -325,7 +325,7 @@ data GenericKind_DC = Gen0_DC | Gen1_DC TyVar
 gk2gkDC :: GenericKind -> DataCon -> [Type] -> GenericKind_DC
 gk2gkDC Gen0 _  _       = Gen0_DC
 gk2gkDC Gen1 dc tc_args = Gen1_DC $ assert (isTyVarTy last_dc_inst_univ)
-                                  $ getTyVar "gk2gkDC" last_dc_inst_univ
+                                  $ getTyVar last_dc_inst_univ
   where
     dc_inst_univs = dataConInstUnivs dc tc_args
     last_dc_inst_univ = assert (not (null dc_inst_univs)) $

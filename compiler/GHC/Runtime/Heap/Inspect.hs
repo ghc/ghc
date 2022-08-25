@@ -672,7 +672,7 @@ applyRevSubst pairs = liftTcM (mapM_ do_pair pairs)
   where
     do_pair (tc_tv, rtti_tv)
       = do { tc_ty <- zonkTcTyVar tc_tv
-           ; case tcGetTyVar_maybe tc_ty of
+           ; case getTyVar_maybe tc_ty of
                Just tv | isMetaTyVar tv -> writeMetaTyVar tv (mkTyVarTy rtti_tv)
                _                        -> return () }
 

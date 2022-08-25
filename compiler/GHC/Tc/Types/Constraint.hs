@@ -234,7 +234,7 @@ data Ct
        --               Note [CEqCan occurs check]
        --   * (TyEq:F) rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
-       --   * (TyEq:K) tcTypeKind lhs `tcEqKind` tcTypeKind rhs; Note [Ct kind invariant]
+       --   * (TyEq:K) typeKind lhs `tcEqKind` typeKind rhs; Note [Ct kind invariant]
        --   * (TyEq:N) If the equality is representational, rhs has no top-level newtype
        --     See Note [No top-level newtypes on RHS of representational equalities]
        --     in GHC.Tc.Solver.Canonical. (Applies only when constructor of newtype is
@@ -693,7 +693,7 @@ instance Outputable Ct where
 -- Does not look through type synonyms.
 canEqLHS_maybe :: Xi -> Maybe CanEqLHS
 canEqLHS_maybe xi
-  | Just tv <- tcGetTyVar_maybe xi
+  | Just tv <- getTyVar_maybe xi
   = Just $ TyVarLHS tv
 
   | Just (tc, args) <- tcSplitTyConApp_maybe xi

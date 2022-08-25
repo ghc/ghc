@@ -1592,8 +1592,8 @@ solveByUnification wd tv xi
        ; traceTcS "Sneaky unification:" $
                        vcat [text "Unifies:" <+> ppr tv <+> text ":=" <+> ppr xi,
                              text "Coercion:" <+> pprEq tv_ty xi,
-                             text "Left Kind is:" <+> ppr (tcTypeKind tv_ty),
-                             text "Right Kind is:" <+> ppr (tcTypeKind xi) ]
+                             text "Left Kind is:" <+> ppr (typeKind tv_ty),
+                             text "Right Kind is:" <+> ppr (typeKind xi) ]
        ; unifyTyVar tv xi
        ; setEvBindIfWanted wd (evCoercion (mkNomReflCo xi))
        ; n_kicked <- kickOutAfterUnification tv

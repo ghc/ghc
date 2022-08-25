@@ -275,8 +275,8 @@ rewriteType loc ty
 
 Key invariants:
   (F0) co :: zonk(ty') ~ xi   where zonk(ty') ~ zonk(ty)
-  (F1) tcTypeKind(xi) succeeds and returns a fully zonked kind
-  (F2) tcTypeKind(xi) `eqType` zonk(tcTypeKind(ty))
+  (F1) typeKind(xi) succeeds and returns a fully zonked kind
+  (F2) typeKind(xi) `eqType` zonk(typeKind(ty))
 
 Note that it is rewrite's job to try to reduce *every type function it sees*.
 
@@ -297,14 +297,14 @@ It is for this reason that we occasionally have to explicitly zonk,
 when (co :: ty ~ xi) is important even before we zonk the whole program.
 For example, see the RTRNotFollowed case in rewriteTyVar.
 
-Why have these invariants on rewriting? Because we sometimes use tcTypeKind
+Why have these invariants on rewriting? Because we sometimes use typeKind
 during canonicalisation, and we want this kind to be zonked (e.g., see
 GHC.Tc.Solver.Canonical.canEqCanLHS).
 
 Rewriting is always homogeneous. That is, the kind of the result of rewriting is
 always the same as the kind of the input, modulo zonking. More formally:
 
-  (F2) zonk(tcTypeKind(ty)) `eqType` tcTypeKind(xi)
+  (F2) zonk(typeKind(ty)) `eqType` typeKind(xi)
 
 This invariant means that the kind of a rewritten type might not itself be rewritten.
 
@@ -398,7 +398,7 @@ rewrite_args :: [TyCoBinder] -> Bool -- Binders, and True iff any of them are
 -- This function returns ArgsReductions (Reductions cos xis) res_co
 --   coercions: co_i :: ty_i ~ xi_i, at roles given
 --   types:     xi_i
---   coercion:  res_co :: tcTypeKind(fun tys) ~N tcTypeKind(fun xis)
+--   coercion:  res_co :: typeKind(fun tys) ~N typeKind(fun xis)
 -- That is, the result coercion relates the kind of some function (whose kind is
 -- passed as the first parameter) instantiated at tys to the kind of that
 -- function instantiated at the xis. This is useful in keeping rewriting
@@ -589,7 +589,7 @@ rewrite_app_ty_args fun_redn@(Reduction fun_co fun_xi) arg_tys
              do { let tc_roles  = tyConRolesRepresentational tc
                       arg_roles = dropList xis tc_roles
                 ; ArgsReductions (Reductions arg_cos arg_xis) kind_co
-                    <- rewrite_vector (tcTypeKind fun_xi) arg_roles arg_tys
+                    <- rewrite_vector (typeKind fun_xi) arg_roles arg_tys
 
                   -- We start with a reduction of the form
                   --   fun_co :: ty ~ T xi_1 ... xi_n
@@ -616,7 +616,7 @@ rewrite_app_ty_args fun_redn@(Reduction fun_co fun_xi) arg_tys
                       kind_co }
            Nothing ->
              do { ArgsReductions redns kind_co
-                    <- rewrite_vector (tcTypeKind fun_xi) (repeat Nominal) arg_tys
+                    <- rewrite_vector (typeKind fun_xi) (repeat Nominal) arg_tys
                 ; return $ mkHetReduction (mkAppRedns fun_redn redns) kind_co }
 
        ; role <- getRole

@@ -47,6 +47,7 @@ module GHC.Builtin.Types.Prim(
         cONSTRAINTTyCon, cONSTRAINTTyConName, cONSTRAINTKind,
 
         -- Arrows
+        anonArgTyCon,
         fUNTyCon,       fUNTyConName,
         ctArrowTyCon, ctArrowTyConName,
         ccArrowTyCon, ccArrowTyConName,
@@ -127,20 +128,22 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , multiplicityTy
   , constraintKind )
 
+import {-# SOURCE #-} GHC.Types.TyThing
+import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, mkTyConApp, getLevity )
+
 import GHC.Types.Var    ( TyVarBinder, TyVar
                         , mkTyVar, mkTyVarBinder, mkTyVarBinders )
 import GHC.Types.Name
-import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Core.TyCon
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+import GHC.Types.Basic( TypeOrConstraint(..) )
 import GHC.Builtin.Uniques
 import GHC.Builtin.Names
 import GHC.Data.FastString
 import GHC.Utils.Misc ( changeLast )
 import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
                          -- import loops which show up if you import Type instead
-import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, mkTyConApp, getLevity )
 
 import Data.Char
 
@@ -587,6 +590,12 @@ rather than by using a TyConApp.
   * `tyConAppFun_maybe`
   Use them!
 -}
+
+anonArgTyCon :: AnonArgFlag -> TyCon
+anonArgTyCon (VisArg   TypeLike)       = fUNTyCon
+anonArgTyCon (VisArg   ConstraintLike) = tcArrowTyCon
+anonArgTyCon (InvisArg TypeLike)       = ctArrowTyCon
+anonArgTyCon (InvisArg ConstraintLike) = ccArrowTyCon
 
 fUNTyConName, ctArrowTyConName, ccArrowTyConName, tcArrowTyConName :: Name
 fUNTyConName     = mkPrimTc        (fsLit "FUN") fUNTyConKey       fUNTyCon

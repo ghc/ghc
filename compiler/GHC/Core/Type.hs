@@ -45,7 +45,7 @@ module GHC.Core.Type (
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
 
         splitTyConApp_maybe, splitTyConAppNoSyn_maybe, splitTyConApp,
-        tcSplitTyConApp_maybe,
+        tcSplitTyConApp, tcSplitTyConApp_maybe,
 
         mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoInvForAllTys,
         mkSpecForAllTy, mkSpecForAllTys,
@@ -155,7 +155,7 @@ module GHC.Core.Type (
         Kind,
 
         -- ** Finding the kind of a type
-        typeKind, tcTypeKind, typeHasFixedRuntimeRep, argsHaveFixedRuntimeRep,
+        typeKind, typeHasFixedRuntimeRep, argsHaveFixedRuntimeRep,
         tcIsLiftedTypeKind,
         isConstraintKind, isConstraintLikeKind, returnsConstraintKind,
         tcIsBoxedTypeKind, isTypeLikeKind,
@@ -279,11 +279,11 @@ import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-} GHC.Core.Coercion
    ( mkNomReflCo, mkGReflCo, mkReflCo
-   , mkTyConAppCo, mkAppCo, mkCoVarCo, mkAxiomRuleCo
+   , mkTyConAppCo, mkAppCo,
    , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
    , mkSymCo, mkTransCo, mkSelCo, mkLRCo, mkInstCo
    , mkKindCo, mkSubCo
-   , decomposePiCos, coercionKind, coercionLKind
+   , decomposePiCos, coercionKind,
    , coercionRKind, coercionType
    , isReflexiveCo, seqCo
    , topNormaliseNewType_maybe
@@ -1041,17 +1041,23 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
 
 -- | Attempts to obtain the type variable underlying a 'Type', and panics with the
 -- given message if this is not a type variable type. See also 'getTyVar_maybe'
-getTyVar :: String -> Type -> TyVar
-getTyVar msg ty = case getTyVar_maybe ty of
+getTyVar :: Type -> TyVar
+getTyVar ty = case getTyVar_maybe ty of
                     Just tv -> tv
-                    Nothing -> panic ("getTyVar: " ++ msg)
-
-isTyVarTy :: Type -> Bool
-isTyVarTy ty = isJust (getTyVar_maybe ty)
+                    Nothing -> pprPanic "getTyVar" (ppr ty)
 
 -- | Attempts to obtain the type variable underlying a 'Type'
 getTyVar_maybe :: Type -> Maybe TyVar
 getTyVar_maybe = repGetTyVar_maybe . coreFullView
+
+-- | Attempts to obtain the type variable underlying a 'Type', without
+-- any expansion
+repGetTyVar_maybe :: Type -> Maybe TyVar
+repGetTyVar_maybe (TyVarTy tv) = Just tv
+repGetTyVar_maybe _            = Nothing
+
+isTyVarTy :: Type -> Bool
+isTyVarTy ty = isJust (getTyVar_maybe ty)
 
 -- | If the type is a tyvar, possibly under a cast, returns it, along
 -- with the coercion. Thus, the co is :: kind tv ~N kind ty
@@ -1060,12 +1066,6 @@ getCastedTyVar_maybe ty = case coreFullView ty of
   CastTy (TyVarTy tv) co -> Just (tv, co)
   TyVarTy tv             -> Just (tv, mkReflCo Nominal (tyVarKind tv))
   _                      -> Nothing
-
--- | Attempts to obtain the type variable underlying a 'Type', without
--- any expansion
-repGetTyVar_maybe :: Type -> Maybe TyVar
-repGetTyVar_maybe (TyVarTy tv) = Just tv
-repGetTyVar_maybe _            = Nothing
 
 
 {- *********************************************************************
@@ -1352,12 +1352,6 @@ See #11714.
 -}
 
 -----------------------------------------------
-anonArgTyCon :: AnonArgFlag -> TyCon
-anonArgTyCon (VisArg   TypeLike)       = fUNTyCon
-anonArgTyCon (VisArg   ConstraintLike) = tcArrowTyCon
-anonArgTyCon (InvisArg TypeLike)       = ctArrowTyCon
-anonArgTyCon (InvisArg ConstraintLike) = ccArrowTyCon
-
 funTyConAppTy_maybe :: AnonArgFlag -> Type -> Type -> Type
                     -> Maybe (TyCon, [Type])
 -- Given the components of a FunTy/FuNCo,
@@ -1650,38 +1644,45 @@ splitTyConAppNoSyn_maybe :: Type -> Maybe (TyCon, [Type])
 -- Same as splitTyConApp_maybe but without looking through synonyms
 splitTyConAppNoSyn_maybe ty
   = case ty of
-      TyConApp tc tys -> Just (tc, tys)
       FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res}
                       -> funTyConAppTy_maybe af w arg res
-      _ -> Nothing
+      TyConApp tc tys -> Just (tc, tys)
+      _               -> Nothing
 
--- | Split a type constructor application into its type constructor and
--- applied types. Note that this may fail in the case of a 'FunTy' with an
--- argument of unknown kind 'FunTy' (e.g. @FunTy (a :: k) Int@. since the kind
--- of @a@ isn't of the form @TYPE rep@). Consequently, you may need to zonk your
--- type before using this function.
+-- | Split a type constructor application into its type constructor
+-- and applied types.
 --
 -- Differs from splitTyConApp_maybe in that it does *not* split types
 -- headed with (=>), as that's not a TyCon in the type-checker.
 --
--- Moreover, for a FunTy, it only succeeds if the argument types
--- have enough info to extract the runtime-rep arguments that
--- the funTyCon requires.  This will usually be true;
--- but may be temporarily false during canonicalization:
+--
+-- Note that this may fail (in funTyConAppTy_maybe) in the case
+-- of a 'FunTy' with an argument of unknown kind 'FunTy'
+-- (e.g. `FunTy (a :: k) Int`, since the kind of @a@ isn't of
+-- the form `TYPE rep`.  This isn't usually a problem but may
+-- be temporarily the cas during canonicalization:
 --     see Note [Decomposing FunTy] in GHC.Tc.Solver.Canonical
 --     and Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType,
 --         Wrinkle around FunTy
 --
--- If you only need the 'TyCon', consider using 'tcTyConAppTyCon_maybe'.
+-- Consequently, you may need to zonk your type before
+-- using this function.
+
 tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
 -- Defined here to avoid module loops between Unify and TcType.
 tcSplitTyConApp_maybe ty
   = case coreFullView ty of
-      TyConApp tc tys -> Just (tc, tys)
       FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res}
-        | isVisibleAnonArg af    -- Visible args only. See Note [Decomposing fat arrow c=>t]
-        -> funTyConAppTy_maybe af w arg res
-      _ -> Nothing
+                      | isVisibleAnonArg af    -- Visible args only
+                        -- See Note [Decomposing fat arrow c=>t]
+                      -> funTyConAppTy_maybe af w arg res
+      TyConApp tc tys -> Just (tc, tys)
+      _               -> Nothing
+
+tcSplitTyConApp :: Type -> (TyCon, [Type])
+tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
+                        Just stuff -> stuff
+                        Nothing    -> pprPanic "tcSplitTyConApp" (ppr ty)
 
 ---------------------------
 -- | (mkTyConTy tc) returns (TyConApp tc [])
@@ -2734,8 +2735,8 @@ nonDetCmpTypeX :: RnEnv2 -> Type -> Type -> Ordering  -- Main workhorse
     -- See Note [Computing equality on types]
 nonDetCmpTypeX env orig_t1 orig_t2 =
     case go env orig_t1 orig_t2 of
-      -- If there are casts then we also need to do a comparison of the kinds of
-      -- the types being compared
+      -- If there are casts then we also need to do a comparison of
+      -- the kinds of the types being compared
       TEQX          -> toOrdering $ go env k1 k2
       ty_ordering   -> toOrdering ty_ordering
   where
@@ -2762,8 +2763,8 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     hasCast TEQ = TEQX
     hasCast rel = rel
 
-    -- Returns both the resulting ordering relation between the two types
-    -- and whether either contains a cast.
+    -- Returns both the resulting ordering relation between
+    -- the two types and whether either contains a cast.
     go :: RnEnv2 -> Type -> Type -> TypeOrdering
     -- See Note [Comparing nullary type synonyms].
     go _   (TyConApp tc1 []) (TyConApp tc2 [])
@@ -2845,18 +2846,6 @@ nonDetCmpTc tc1 tc2
 *                                                                      *
 ************************************************************************
 
-Note [typeKind vs tcTypeKind]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We have two functions to get the kind of a type
-
-  * typeKind   ignores  the distinction between Constraint and *
-  * tcTypeKind respects the distinction between Constraint and *
-
-tcTypeKind is used by the type inference engine, for which Constraint
-and * are different; after that we use typeKind.
-
-See also Note [coreView vs tcView]
-
 Note [Kinding rules for types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In typeKind we consider Constraint and (TYPE LiftedRep) to be identical.
@@ -2871,8 +2860,6 @@ We then have
          `a` is not free in rep
 (FORALL) -----------------------
          forall a. ty : TYPE rep
-
-In tcTypeKind we consider Constraint and (TYPE LiftedRep) to be distinct:
 
           t1 : TYPE rep1
           t2 : TYPE rep2
@@ -2969,51 +2956,6 @@ typeKind ty@(ForAllTy {})
 -- Utilities to be used in GHC.Core.Unify,
 -- which uses "tc" functions
 ---------------------------------------------
-
-
-tcTypeKind :: HasDebugCallStack => Type -> Kind
-tcTypeKind = typeKind
-
-
-{-
--- No need to expand synonyms
-tcTypeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
-tcTypeKind (LitTy l)         = typeLiteralKind l
-tcTypeKind (TyVarTy tyvar)   = tyVarKind tyvar
-tcTypeKind (CastTy _ty co)   = coercionRKind co
-tcTypeKind (CoercionTy co)   = coercionType co
-
-tcTypeKind (FunTy { ft_af = af })
-  | InvisArg2 <- af
-  = constraintKind     -- Eq a ==> Ord a        :: Constraint
-  | otherwise          -- Eq a => a -> a        :: TYPE LiftedRep
-  = liftedTypeKind     -- Eq a => Array# Int    :: Type LiftedRep (not TYPE PtrRep)
-
-tcTypeKind (AppTy fun arg)
-  = go fun [arg]
-  where
-    -- Accumulate the type arguments, so we can call piResultTys,
-    -- rather than a succession of calls to piResultTy (which is
-    -- asymptotically costly as the number of arguments increases)
-    go (AppTy fun arg) args = go fun (arg:args)
-    go fun             args = piResultTys (tcTypeKind fun) args
-
-tcTypeKind ty@(ForAllTy {})
-  | isConstraintKind body_kind
-  = constraintKind
-
-  | otherwise
-  = case occCheckExpand tvs body_kind of
-      -- We must make sure tv does not occur in kind
-      -- As it is already out of scope!
-      -- See Note [Phantom type variables in kinds]
-      Just k' -> k'
-      Nothing -> pprPanic "tcTypeKind"
-                  (ppr ty $$ ppr tvs $$ ppr body <+> dcolon <+> ppr body_kind)
-  where
-    (tvs, body) = splitForAllTyVars ty
-    body_kind = tcTypeKind body
--}
 
 sORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
 -- Sees if the argument is of form (TYPE rep) or (CONSTRAINT rep)
@@ -3143,208 +3085,6 @@ argsHaveFixedRuntimeRep ty
     bndrs :: [TyCoBinder]
     (bndrs, _) = splitPiTys ty
 
-{- **********************************************************************
-*                                                                       *
-           Occurs check expansion
-%*                                                                      *
-%********************************************************************* -}
-
-{- Note [Occurs check expansion]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(occurCheckExpand tv xi) expands synonyms in xi just enough to get rid
-of occurrences of tv outside type function arguments, if that is
-possible; otherwise, it returns Nothing.
-
-For example, suppose we have
-  type F a b = [a]
-Then
-  occCheckExpand b (F Int b) = Just [Int]
-but
-  occCheckExpand a (F a Int) = Nothing
-
-We don't promise to do the absolute minimum amount of expanding
-necessary, but we try not to do expansions we don't need to.  We
-prefer doing inner expansions first.  For example,
-  type F a b = (a, Int, a, [a])
-  type G b   = Char
-We have
-  occCheckExpand b (F (G b)) = Just (F Char)
-even though we could also expand F to get rid of b.
-
-Note [Occurrence checking: look inside kinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we are considering unifying
-   (alpha :: *)  ~  Int -> (beta :: alpha -> alpha)
-This may be an error (what is that alpha doing inside beta's kind?),
-but we must not make the mistake of actually unifying or we'll
-build an infinite data structure.  So when looking for occurrences
-of alpha in the rhs, we must look in the kinds of type variables
-that occur there.
-
-occCheckExpand tries to expand type synonyms to remove
-unnecessary occurrences of a variable, and thereby get past an
-occurs-check failure.  This is good; but
-     we can't do it in the /kind/ of a variable /occurrence/
-
-For example #18451 built an infinite type:
-    type Const a b = a
-    data SameKind :: k -> k -> Type
-    type T (k :: Const Type a) = forall (b :: k). SameKind a b
-
-We have
-  b :: k
-  k :: Const Type a
-  a :: k   (must be same as b)
-
-So if we aren't careful, a's kind mentions a, which is bad.
-And expanding an /occurrence/ of 'a' doesn't help, because the
-/binding site/ is the master copy and all the occurrences should
-match it.
-
-Here's a related example:
-   f :: forall a b (c :: Const Type b). Proxy '[a, c]
-
-The list means that 'a' gets the same kind as 'c'; but that
-kind mentions 'b', so the binders are out of order.
-
-Bottom line: in occCheckExpand, do not expand inside the kinds
-of occurrences.  See bad_var_occ in occCheckExpand.  And
-see #18451 for more debate.
--}
-
-occCheckExpand :: [Var] -> Type -> Maybe Type
--- See Note [Occurs check expansion]
--- We may have needed to do some type synonym unfolding in order to
--- get rid of the variable (or forall), so we also return the unfolded
--- version of the type, which is guaranteed to be syntactically free
--- of the given type variable.  If the type is already syntactically
--- free of the variable, then the same type is returned.
-occCheckExpand vs_to_avoid ty
-  | null vs_to_avoid  -- Efficient shortcut
-  = Just ty           -- Can happen, eg. GHC.Core.Utils.mkSingleAltCase
-
-  | otherwise
-  = go (mkVarSet vs_to_avoid, emptyVarEnv) ty
-  where
-    go :: (VarSet, VarEnv TyCoVar) -> Type -> Maybe Type
-          -- The VarSet is the set of variables we are trying to avoid
-          -- The VarEnv carries mappings necessary
-          -- because of kind expansion
-    go (as, env) ty@(TyVarTy tv)
-      | Just tv' <- lookupVarEnv env tv = return (mkTyVarTy tv')
-      | bad_var_occ as tv               = Nothing
-      | otherwise                       = return ty
-
-    go _   ty@(LitTy {}) = return ty
-    go cxt (AppTy ty1 ty2) = do { ty1' <- go cxt ty1
-                                ; ty2' <- go cxt ty2
-                                ; return (mkAppTy ty1' ty2') }
-    go cxt ty@(FunTy _ w ty1 ty2)
-       = do { w'   <- go cxt w
-            ; ty1' <- go cxt ty1
-            ; ty2' <- go cxt ty2
-            ; return (ty { ft_mult = w', ft_arg = ty1', ft_res = ty2' }) }
-    go cxt@(as, env) (ForAllTy (Bndr tv vis) body_ty)
-       = do { ki' <- go cxt (varType tv)
-            ; let tv'  = setVarType tv ki'
-                  env' = extendVarEnv env tv tv'
-                  as'  = as `delVarSet` tv
-            ; body' <- go (as', env') body_ty
-            ; return (ForAllTy (Bndr tv' vis) body') }
-
-    -- For a type constructor application, first try expanding away the
-    -- offending variable from the arguments.  If that doesn't work, next
-    -- see if the type constructor is a type synonym, and if so, expand
-    -- it and try again.
-    go cxt ty@(TyConApp tc tys)
-      = case mapM (go cxt) tys of
-          Just tys' -> return (mkTyConApp tc tys')
-          Nothing | Just ty' <- tcView ty -> go cxt ty'
-                  | otherwise             -> Nothing
-                      -- Failing that, try to expand a synonym
-
-    go cxt (CastTy ty co) =  do { ty' <- go cxt ty
-                                ; co' <- go_co cxt co
-                                ; return (mkCastTy ty' co') }
-    go cxt (CoercionTy co) = do { co' <- go_co cxt co
-                                ; return (mkCoercionTy co') }
-
-    ------------------
-    bad_var_occ :: VarSet -> Var -> Bool
-    -- Works for TyVar and CoVar
-    -- See Note [Occurrence checking: look inside kinds]
-    bad_var_occ vs_to_avoid v
-       =  v                          `elemVarSet`       vs_to_avoid
-       || tyCoVarsOfType (varType v) `intersectsVarSet` vs_to_avoid
-
-    ------------------
-    go_mco _   MRefl = return MRefl
-    go_mco ctx (MCo co) = MCo <$> go_co ctx co
-
-    ------------------
-    go_co cxt (Refl ty)                 = do { ty' <- go cxt ty
-                                             ; return (mkNomReflCo ty') }
-    go_co cxt (GRefl r ty mco)          = do { mco' <- go_mco cxt mco
-                                             ; ty' <- go cxt ty
-                                             ; return (mkGReflCo r ty' mco') }
-      -- Note: Coercions do not contain type synonyms
-    go_co cxt (TyConAppCo r tc args)    = do { args' <- mapM (go_co cxt) args
-                                             ; return (mkTyConAppCo r tc args') }
-    go_co cxt (AppCo co arg)            = do { co' <- go_co cxt co
-                                             ; arg' <- go_co cxt arg
-                                             ; return (mkAppCo co' arg') }
-    go_co cxt@(as, env) (ForAllCo tv kind_co body_co)
-      = do { kind_co' <- go_co cxt kind_co
-           ; let tv' = setVarType tv $
-                       coercionLKind kind_co'
-                 env' = extendVarEnv env tv tv'
-                 as'  = as `delVarSet` tv
-           ; body' <- go_co (as', env') body_co
-           ; return (ForAllCo tv' kind_co' body') }
-    go_co cxt (FunCo r  w co1 co2)      = do { co1' <- go_co cxt co1
-                                             ; co2' <- go_co cxt co2
-                                             ; w' <- go_co cxt w
-                                             ; return (mkFunCo r w' co1' co2') }
-    go_co (as,env) co@(CoVarCo c)
-      | Just c' <- lookupVarEnv env c   = return (mkCoVarCo c')
-      | bad_var_occ as c                = Nothing
-      | otherwise                       = return co
-
-    go_co (as,_) co@(HoleCo h)
-      | bad_var_occ as (ch_co_var h)    = Nothing
-      | otherwise                       = return co
-
-    go_co cxt (AxiomInstCo ax ind args) = do { args' <- mapM (go_co cxt) args
-                                             ; return (mkAxiomInstCo ax ind args') }
-    go_co cxt (UnivCo p r ty1 ty2)      = do { p' <- go_prov cxt p
-                                             ; ty1' <- go cxt ty1
-                                             ; ty2' <- go cxt ty2
-                                             ; return (mkUnivCo p' r ty1' ty2') }
-    go_co cxt (SymCo co)                = do { co' <- go_co cxt co
-                                             ; return (mkSymCo co') }
-    go_co cxt (TransCo co1 co2)         = do { co1' <- go_co cxt co1
-                                             ; co2' <- go_co cxt co2
-                                             ; return (mkTransCo co1' co2') }
-    go_co cxt (SelCo n co)              = do { co' <- go_co cxt co
-                                             ; return (mkSelCo n co') }
-    go_co cxt (LRCo lr co)              = do { co' <- go_co cxt co
-                                             ; return (mkLRCo lr co') }
-    go_co cxt (InstCo co arg)           = do { co' <- go_co cxt co
-                                             ; arg' <- go_co cxt arg
-                                             ; return (mkInstCo co' arg') }
-    go_co cxt (KindCo co)               = do { co' <- go_co cxt co
-                                             ; return (mkKindCo co') }
-    go_co cxt (SubCo co)                = do { co' <- go_co cxt co
-                                             ; return (mkSubCo co') }
-    go_co cxt (AxiomRuleCo ax cs)       = do { cs' <- mapM (go_co cxt) cs
-                                             ; return (mkAxiomRuleCo ax cs') }
-
-    ------------------
-    go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
-    go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co
-    go_prov _   p@(PluginProv _)    = return p
-    go_prov _   p@(CorePrepProv _)  = return p
-
 
 {-
 %************************************************************************
@@ -3354,61 +3094,6 @@ occCheckExpand vs_to_avoid ty
 %************************************************************************
 
 -}
--- | All type constructors occurring in the type; looking through type
---   synonyms, but not newtypes.
---  When it finds a Class, it returns the class TyCon.
-tyConsOfType :: Type -> UniqSet TyCon
-tyConsOfType ty
-  = go ty
-  where
-     go :: Type -> UniqSet TyCon  -- The UniqSet does duplicate elim
-     go ty | Just ty' <- coreView ty = go ty'
-     go (TyVarTy {})                = emptyUniqSet
-     go (LitTy {})                  = emptyUniqSet
-     go (TyConApp tc tys)           = go_tc tc `unionUniqSets` go_s tys
-     go (AppTy a b)                 = go a `unionUniqSets` go b
-     go (FunTy af w a b)            = go w `unionUniqSets`
-                                      go a `unionUniqSets` go b
-                                      `unionUniqSets` go_tc (anonArgTyCon af)
-     go (ForAllTy (Bndr tv _) ty)   = go ty `unionUniqSets` go (varType tv)
-     go (CastTy ty co)              = go ty `unionUniqSets` go_co co
-     go (CoercionTy co)             = go_co co
-
-     go_co (Refl ty)               = go ty
-     go_co (GRefl _ ty mco)        = go ty `unionUniqSets` go_mco mco
-     go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args
-     go_co (AppCo co arg)          = go_co co `unionUniqSets` go_co arg
-     go_co (ForAllCo _ kind_co co) = go_co kind_co `unionUniqSets` go_co co
-     go_co (FunCo _ m a r)         = go_co m `unionUniqSets` go_co a `unionUniqSets` go_co r
-     go_co (AxiomInstCo ax _ args) = go_ax ax `unionUniqSets` go_cos args
-     go_co (UnivCo p _ t1 t2)      = go_prov p `unionUniqSets` go t1 `unionUniqSets` go t2
-     go_co (CoVarCo {})            = emptyUniqSet
-     go_co (HoleCo {})             = emptyUniqSet
-     go_co (SymCo co)              = go_co co
-     go_co (TransCo co1 co2)       = go_co co1 `unionUniqSets` go_co co2
-     go_co (SelCo _ co)            = go_co co
-     go_co (LRCo _ co)             = go_co co
-     go_co (InstCo co arg)         = go_co co `unionUniqSets` go_co arg
-     go_co (KindCo co)             = go_co co
-     go_co (SubCo co)              = go_co co
-     go_co (AxiomRuleCo _ cs)      = go_cos cs
-
-     go_mco MRefl    = emptyUniqSet
-     go_mco (MCo co) = go_co co
-
-     go_prov (PhantomProv co)    = go_co co
-     go_prov (ProofIrrelProv co) = go_co co
-     go_prov (PluginProv _)      = emptyUniqSet
-     go_prov (CorePrepProv _)    = emptyUniqSet
-        -- this last case can happen from the tyConsOfType used from
-        -- checkTauTvUpdate
-
-     go_s tys     = foldr (unionUniqSets . go)     emptyUniqSet tys
-     go_cos cos   = foldr (unionUniqSets . go_co)  emptyUniqSet cos
-
-     go_tc tc = unitUniqSet tc
-     go_ax ax = go_tc $ coAxiomTyCon ax
-
 -- | Retrieve the free variables in this type, splitting them based
 -- on whether they are used visibly or invisibly. Invisible ones come
 -- first.

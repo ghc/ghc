@@ -1932,7 +1932,7 @@ reifyInstances' th_nm th_tys
                 -- In particular, the type might have kind
                 -- variables inside it (#7477)
 
-        ; traceTc "reifyInstances'" (ppr ty $$ ppr (tcTypeKind ty))
+        ; traceTc "reifyInstances'" (ppr ty $$ ppr (typeKind ty))
         ; case splitTyConApp_maybe ty of   -- This expands any type synonyms
             Just (tc, tys)                 -- See #7910
                | Just cls <- tyConClass_maybe tc
@@ -2382,7 +2382,7 @@ annotThType :: Bool   -- True <=> annotate
 annotThType _    _  th_ty@(TH.SigT {}) = return th_ty
 annotThType True ty th_ty
   | not $ isEmptyVarSet $ filterVarSet isTyVar $ tyCoVarsOfType ty
-  = do { let ki = tcTypeKind ty
+  = do { let ki = typeKind ty
        ; th_ki <- reifyKind ki
        ; return (TH.SigT th_ty th_ki) }
 annotThType _    _ th_ty = return th_ty
@@ -2564,7 +2564,7 @@ reifyFamilyInstance is_poly_tvs (FamInst { fi_flavor = flavor
                -- Note [Reified instances and explicit kind signatures]
                if (null cons || isGadtSyntaxTyCon rep_tc)
                      && tyConAppNeedsKindSig False fam_tc (length ee_lhs)
-               then do { let full_kind = tcTypeKind (mkTyConApp fam_tc ee_lhs)
+               then do { let full_kind = typeKind (mkTyConApp fam_tc ee_lhs)
                        ; th_full_kind <- reifyKind full_kind
                        ; pure $ Just th_full_kind }
                else pure Nothing
@@ -2724,7 +2724,7 @@ reify_tc_app tc tys
                 -- don't count specified binders as contributing towards
                 -- injective positions in the kind of the tycon.
           tc (length tys)
-      = do { let full_kind = tcTypeKind (mkTyConApp tc tys)
+      = do { let full_kind = typeKind (mkTyConApp tc tys)
            ; th_full_kind <- reifyKind full_kind
            ; return (TH.SigT th_type th_full_kind) }
       | otherwise

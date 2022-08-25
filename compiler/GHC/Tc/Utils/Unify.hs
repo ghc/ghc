@@ -572,7 +572,7 @@ matchExpectedAppTy orig_ty
            ; co <- unifyType Nothing (mkAppTy ty1 ty2) orig_ty
            ; return (co, (ty1, ty2)) }
 
-    orig_kind = tcTypeKind orig_ty
+    orig_kind = typeKind orig_ty
     kind1 = mkVisFunTyMany liftedTypeKind orig_kind
     kind2 = liftedTypeKind    -- m :: * -> k
                               -- arg type :: *
@@ -2029,7 +2029,7 @@ uUnfilledVar1 :: CtOrigin
               -> TcTauType      -- Type 2, zonked
               -> TcM Coercion
 uUnfilledVar1 origin t_or_k swapped tv1 ty2
-  | Just tv2 <- tcGetTyVar_maybe ty2
+  | Just tv2 <- getTyVar_maybe ty2
   = go tv2
 
   | otherwise
@@ -2076,10 +2076,10 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
            ; if not can_continue_solving
              then not_ok_so_defer
              else
-        do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2) (tyVarKind tv1)
+        do { co_k <- uType KindLevel kind_origin (typeKind ty2) (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
-                  , ppr ty2 <+> dcolon <+> ppr (tcTypeKind  ty2)
+                  , ppr ty2 <+> dcolon <+> ppr (typeKind  ty2)
                   , ppr (isReflCo co_k), ppr co_k ]
 
            ; if isReflCo co_k
@@ -2133,7 +2133,7 @@ startSolvingByUnification info xi
                [] -> return True
                _  -> return False }
       TyVarTv ->
-        case tcGetTyVar_maybe xi of
+        case getTyVar_maybe xi of
            Nothing -> return False
            Just tv ->
              case tcTyVarDetails tv of -- (TYVAR-TV) wrinkle

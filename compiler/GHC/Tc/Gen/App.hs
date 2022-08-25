@@ -574,7 +574,7 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
 
     -- go: If fun_ty=kappa, look it up in Theta
     go delta acc so_far fun_ty args
-      | Just kappa <- tcGetTyVar_maybe fun_ty
+      | Just kappa <- getTyVar_maybe fun_ty
       , kappa `elemVarSet` delta
       = do { cts <- readMetaTyVar kappa
            ; case cts of
@@ -625,7 +625,7 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
 
     -- Rule IVAR from Fig 4 of the QL paper:
     go1 delta acc so_far fun_ty args@(EValArg {} : _)
-      | Just kappa <- tcGetTyVar_maybe fun_ty
+      | Just kappa <- getTyVar_maybe fun_ty
       , kappa `elemVarSet` delta
       = -- Function type was of form   f :: forall a b. t1 -> t2 -> b
         -- with 'b', one of the quantified type variables, in the corner
@@ -735,7 +735,7 @@ tcVTA fun_ty hs_ty
        ; traceTc "VTA" (vcat [ text "fun_ty" <+> ppr fun_ty
                              , text "tv" <+> ppr tv <+> dcolon <+> debugPprType kind
                              , text "ty_arg" <+> debugPprType ty_arg <+> dcolon
-                                             <+> debugPprType (tcTypeKind ty_arg)
+                                             <+> debugPprType (typeKind ty_arg)
                              , text "inner_ty" <+> debugPprType inner_ty
                              , text "insted_ty" <+> debugPprType insted_ty ])
        ; return (ty_arg, insted_ty) }
@@ -878,7 +878,7 @@ quickLookArg delta larg (Scaled _ arg_ty)
               -- This top-level zonk step, which is the reason
               -- we need a local 'go' loop, is subtle
               -- See Section 9 of the QL paper
-              | Just kappa <- tcGetTyVar_maybe arg_ty
+              | Just kappa <- getTyVar_maybe arg_ty
               , kappa `elemVarSet` delta
               = do { info <- readMetaTyVar kappa
                    ; case info of

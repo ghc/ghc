@@ -464,7 +464,7 @@ checkForeignRes non_io_result_ok check_safe pred_res_ty ty
 
   -- We disallow nested foralls in foreign types
   -- (at least, for the time being). See #16702.
-  | tcIsForAllTy ty
+  | isForAllTy ty
   = addErrTc $ TcRnIllegalForeignType (Just Result) UnexpectedNestedForall
 
   -- Case for non-IO result type with FFI Import

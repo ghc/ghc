@@ -3831,7 +3831,7 @@ rejigConRes tc_tvbndrs res_tmpl dc_tvbndrs res_ty
         -- since the dcUserTyVarBinders invariant guarantees that the
         -- substitution has *all* the tyvars in its domain.
         -- See Note [DataCon user type variable binders] in GHC.Core.DataCon.
-        subst_user_tvs  = mapVarBndrs (getTyVar "rejigConRes" . substTyVar arg_subst)
+        subst_user_tvs  = mapVarBndrs (getTyVar . substTyVar arg_subst)
         substed_tvbndrs = subst_user_tvs dc_tvbndrs
 
         substed_eqs = map (substEqSpec arg_subst) raw_eqs
@@ -4352,8 +4352,8 @@ checkValidDataCon dflags existential_ok tc con
 
         ; traceTc "checkValidDataCon" (vcat
               [ ppr con, ppr tc, ppr tc_tvs
-              , ppr res_ty_tmpl <+> dcolon <+> ppr (tcTypeKind res_ty_tmpl)
-              , ppr orig_res_ty <+> dcolon <+> ppr (tcTypeKind orig_res_ty)])
+              , ppr res_ty_tmpl <+> dcolon <+> ppr (typeKind res_ty_tmpl)
+              , ppr orig_res_ty <+> dcolon <+> ppr (typeKind orig_res_ty)])
 
 
         -- Check that the return type of the data constructor
@@ -4571,7 +4571,7 @@ checkNewDataCon con
 checkEscapingKind :: DataCon -> TcM ()
 checkEscapingKind data_con
   | null eq_spec, null theta, null arg_tys
-  , let tau_kind = tcTypeKind res_ty
+  , let tau_kind = typeKind res_ty
   , Nothing <- occCheckExpand (univ_tvs ++ ex_tvs) tau_kind
     -- Ensure that none of the tvs occur in the kind of the forall
     -- /after/ expanding type synonyms.

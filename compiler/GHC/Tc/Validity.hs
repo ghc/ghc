@@ -366,7 +366,7 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 --    that is, checkValidType doesn't need to do kind checking
 -- Not used for instance decls; checkValidInstance instead
 checkValidType ctxt ty
-  = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (tcTypeKind ty))
+  = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (typeKind ty))
        ; rankn_flag  <- xoptM LangExt.RankNTypes
        ; impred_flag <- xoptM LangExt.ImpredicativeTypes
        ; let gen_rank :: Rank -> Rank
@@ -432,7 +432,7 @@ checkValidType ctxt ty
        --     and there may be nested foralls for the subtype test to examine
        ; checkAmbiguity ctxt ty
 
-       ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (tcTypeKind ty)) }
+       ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (typeKind ty)) }
 
 checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
@@ -459,7 +459,7 @@ checkTySynRhs ctxt ty
   | otherwise
   = return ()
   where
-    actual_kind = tcTypeKind ty
+    actual_kind = typeKind ty
 
 funArgResRank :: Rank -> (Rank, Rank)             -- Function argument and result
 funArgResRank (LimitedRank _ arg_rank) = (arg_rank, LimitedRank (forAllAllowed arg_rank) arg_rank)
@@ -1551,7 +1551,7 @@ tcInstHeadTyAppAllTyVars ty
         -- and that each is distinct
     ok tys = equalLength tvs tys && hasNoDups tvs
            where
-             tvs = mapMaybe tcGetTyVar_maybe tys
+             tvs = mapMaybe getTyVar_maybe tys
 
 dropCasts :: Type -> Type
 -- See Note [Casts during validity checking]

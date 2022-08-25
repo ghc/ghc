@@ -1621,7 +1621,7 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
     -- like startSolvingByUnification, but allows cbv variables to unify
     can_unify :: TcTyVar -> MetaInfo -> Type -> Bool
     can_unify _lhs_tv TyVarTv rhs_ty  -- see Example 3 from the Note
-      | Just rhs_tv <- tcGetTyVar_maybe rhs_ty
+      | Just rhs_tv <- getTyVar_maybe rhs_ty
       = case tcTyVarDetails rhs_tv of
           MetaTv { mtv_info = TyVarTv } -> True
           MetaTv {}                     -> False  -- could unify with anything

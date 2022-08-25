@@ -631,7 +631,7 @@ tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
 tcHsDeriv hs_ty
   = do { ty <- tcTopLHsType DerivClauseCtxt hs_ty
        ; let (tvs, pred)    = splitForAllTyCoVars ty
-             (kind_args, _) = splitFunTys (tcTypeKind pred)
+             (kind_args, _) = splitFunTys (typeKind pred)
        ; case getClassPredTys_maybe pred of
            Just (cls, tys) -> return (tvs, cls, tys, map scaledThing kind_args)
            Nothing -> failWithTc $ TcRnIllegalDerivingItem hs_ty }
@@ -1060,7 +1060,7 @@ tc_infer_hs_type _ (XHsType ty)
                      (mkInScopeSetList $ map snd subst_prs)
                      (listToUFM_Directly $ map (liftSnd mkTyVarTy) subst_prs)
            ty' = substTy subst ty
-       return (ty', tcTypeKind ty')
+       return (ty', typeKind ty')
 
 tc_infer_hs_type _ (HsExplicitListTy _ _ tys)
   | null tys  -- this is so that we can use visible kind application with '[]
@@ -1567,12 +1567,12 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
     go_init n fun all_args
       = go n fun empty_subst fun_ki all_args
       where
-        fun_ki = tcTypeKind fun
-           -- We do (tcTypeKind fun) here, even though the caller
+        fun_ki = typeKind fun
+           -- We do (typeKind fun) here, even though the caller
            -- knows the function kind, to absolutely guarantee
            -- INVARIANT for 'go'
            -- Note that in a typical application (F t1 t2 t3),
-           -- the 'fun' is just a TyCon, so tcTypeKind is fast
+           -- the 'fun' is just a TyCon, so typeKind is fast
 
         empty_subst = mkEmptySubst $ mkInScopeSet $
                       tyCoVarsOfType fun_ki
@@ -1584,13 +1584,13 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
        -> [LHsTypeArg GhcRn]    -- Un-type-checked args
        -> TcM (TcType, TcKind)  -- Result type and its kind
     -- INVARIANT: in any call (go n fun subst fun_ki args)
-    --               tcTypeKind fun  =  subst(fun_ki)
+    --               typeKind fun  =  subst(fun_ki)
     -- So the 'subst' and 'fun_ki' arguments are simply
-    -- there to avoid repeatedly calling tcTypeKind.
+    -- there to avoid repeatedly calling typeKind.
     --
     -- Reason for INVARIANT: to support the Purely Kinded Type Invariant
     -- it's important that if fun_ki has a forall, then so does
-    -- (tcTypeKind fun), because the next thing we are going to do
+    -- (typeKind fun), because the next thing we are going to do
     -- is apply 'fun' to an argument type.
 
     -- Dispatch on all_args first, for performance reasons
@@ -1670,7 +1670,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
                    vcat [ ppr fun <+> dcolon <+> ppr fun_ki
                         , ppr arrows_needed
                         , ppr co
-                        , ppr fun' <+> dcolon <+> ppr (tcTypeKind fun')]
+                        , ppr fun' <+> dcolon <+> ppr (typeKind fun')]
               ; go_init n fun' all_args }
                 -- Use go_init to establish go's INVARIANT
       where
@@ -1710,7 +1710,7 @@ mkAppTyM :: Subst
 --               That is, the application makes sense
 --
 -- Precondition: for (mkAppTyM subst fun bndr arg)
---       tcTypeKind fun  =  Pi bndr. body
+--       typeKind fun  =  Pi bndr. body
 --  That is, fun always has a ForAllTy or FunTy at the top
 --           and 'bndr' is fun's pi-binder
 --
@@ -1718,7 +1718,7 @@ mkAppTyM :: Subst
 --                invariant, then so does the result type (fun arg)
 --
 -- We do not require that
---    tcTypeKind arg = tyVarKind (binderVar bndr)
+--    typeKind arg = tyVarKind (binderVar bndr)
 -- This must be true after zonking (precondition 1), but it's not
 -- required for the (PKTI).
 mkAppTyM subst fun ki_binder arg
@@ -1753,7 +1753,7 @@ mk_app_ty fun arg
               (ppr fun <+> dcolon <+> ppr fun_kind $$ ppr arg) $
     mkAppTy fun arg
   where
-    fun_kind = tcTypeKind fun
+    fun_kind = typeKind fun
 
 isTrickyTvBinder :: TcTyVar -> Bool
 -- NB: isTrickyTvBinder is just an optimisation
@@ -1764,14 +1764,14 @@ isTrickyTvBinder tv = isPiTy (tyVarKind tv)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 During type inference, we maintain this invariant
 
- (PKTI) It is legal to call 'tcTypeKind' on any Type ty,
+ (PKTI) It is legal to call 'typeKind' on any Type ty,
         on any sub-term of ty, /without/ zonking ty
 
         Moreover, any such returned kind
         will itself satisfy (PKTI)
 
-By "legal to call tcTypeKind" we mean "tcTypeKind will not crash".
-The way in which tcTypeKind can crash is in applications
+By "legal to call typeKind" we mean "typeKind will not crash".
+The way in which typeKind can crash is in applications
     (a t1 t2 .. tn)
 if 'a' is a type variable whose kind doesn't have enough arrows
 or foralls.  (The crash is in piResultTys.)
@@ -1784,7 +1784,7 @@ For example, suppose
     a :: kappa
 then consider the type
     (a Int)
-If we call tcTypeKind on that, we'll crash, because the (un-zonked)
+If we call typeKind on that, we'll crash, because the (un-zonked)
 kind of 'a' is just kappa, not an arrow kind.  So we must zonk first.
 
 So the type inference engine is very careful when building applications.
@@ -1843,7 +1843,7 @@ bound variable has a pi-type.  Hence isTrickyTvBinder.
 
 saturateFamApp :: TcType -> TcKind -> TcM (TcType, TcKind)
 -- Precondition for (saturateFamApp ty kind):
---     tcTypeKind ty = kind
+--     typeKind ty = kind
 --
 -- If 'ty' is an unsaturated family application with trailing
 -- invisible arguments, instantiate them.
@@ -3813,7 +3813,7 @@ checkDataKindSig data_sort kind
     -- In the particular case of a data family, permit a return kind of the
     -- form `:: k` (where `k` is a bare kind variable).
     is_kind_var :: Bool
-    is_kind_var | is_data_family = isJust (tcGetCastedTyVar_maybe res_kind)
+    is_kind_var | is_data_family = isJust (getCastedTyVar_maybe res_kind)
                 | otherwise      = False
 
     err_msg :: DynFlags -> TcRnMessage

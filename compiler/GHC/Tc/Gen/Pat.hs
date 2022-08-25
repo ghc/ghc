@@ -395,7 +395,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 
         -- Check that the expected pattern type is itself lifted
         ; pat_ty <- readExpType (scaledThing pat_ty)
-        ; _ <- unifyType Nothing (tcTypeKind pat_ty) liftedTypeKind
+        ; _ <- unifyType Nothing (typeKind pat_ty) liftedTypeKind
 
         ; return (mkHsWrapPat mult_wrap (LazyPat x pat') pat_ty, res) }
 

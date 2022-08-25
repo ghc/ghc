@@ -1944,7 +1944,7 @@ breakTyEqCycle_maybe ev cte_result lhs rhs
                               -- causing trouble? See Detail (5) of Note.
       = do { let (fun_args, extra_args) = splitAt (tyConArity tc) tys
                  fun_app                = mkTyConApp tc fun_args
-                 fun_app_kind           = tcTypeKind fun_app
+                 fun_app_kind           = typeKind fun_app
            ; fun_redn <- emit_work fun_app_kind fun_app
            ; arg_redns <- unzipRedns <$> mapM go extra_args
            ; return $ mkAppRedns fun_redn arg_redns }

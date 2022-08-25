@@ -2715,7 +2715,7 @@ tcRnType hsc_env flexi normalise rdr_type
                                normaliseType fam_envs Nominal ty
                  | otherwise = ty
 
-       ; return (ty', mkInfForAllTys kvs (tcTypeKind ty')) }
+       ; return (ty', mkInfForAllTys kvs (typeKind ty')) }
 
 
 {- Note [TcRnExprMode]

@@ -338,7 +338,7 @@ tcLookupInstance cls tys
     errNotExact = text "Not an exact match (i.e., some variables get instantiated)"
 
     uniqueTyVars tys = all isTyVarTy tys
-                    && hasNoDups (map (getTyVar "tcLookupInstance") tys)
+                    && hasNoDups (map getTyVar tys)
 
 tcGetInstEnvs :: TcM InstEnvs
 -- Gets both the external-package inst-env

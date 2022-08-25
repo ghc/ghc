@@ -793,7 +793,7 @@ substEqSpec :: Subst -> EqSpec -> EqSpec
 substEqSpec subst (EqSpec tv ty)
   = EqSpec tv' (substTy subst ty)
   where
-    tv' = getTyVar "substEqSpec" (substTyVar subst tv)
+    tv' = getTyVar (substTyVar subst tv)
 
 -- | Filter out any 'TyVar's mentioned in an 'EqSpec'.
 filterEqSpec :: [EqSpec] -> [TyVar] -> [TyVar]
@@ -1249,7 +1249,7 @@ dataConKindEqSpec (MkData {dcExTyCoVars = ex_tcvs})
     | cv <- ex_tcvs
     , isCoVar cv
     , let (_, _, ty1, ty, _) = coVarKindsTypesRole cv
-          tv = getTyVar "dataConKindEqSpec" ty1
+          tv = getTyVar ty1
     ]
 
 -- | The *full* constraints on the constructor type, including dependent GADT

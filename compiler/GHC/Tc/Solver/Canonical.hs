@@ -1553,8 +1553,8 @@ can_eq_app ev s1 t1 s2 t2
   where
     loc = ctEvLoc ev
 
-    s1k = tcTypeKind s1
-    s2k = tcTypeKind s2
+    s1k = typeKind s1
+    s2k = typeKind s2
 
     k1 `mismatches` k2
       =  isForAllTy k1 && not (isForAllTy k2)
@@ -2133,7 +2133,7 @@ canEqCanLHS ev eq_rel swapped lhs1 ps_xi1 xi2 ps_xi2
 
   where
     k1 = canEqLHSKind lhs1
-    k2 = tcTypeKind xi2
+    k2 = typeKind xi2
 
 canEqCanLHSHetero :: CtEvidence         -- :: (xi1 :: ki1) ~ (xi2 :: ki2)
                   -> EqRel -> SwapFlag
@@ -2185,7 +2185,7 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ki1 xi2 ki2
                                    -- will have k2 ~ k1
           NotSwapped -> mkSymCo
 
--- guaranteed that tcTypeKind lhs == tcTypeKind rhs
+-- guaranteed that typeKind lhs == typeKind rhs
 canEqCanLHSHomo :: CtEvidence
                 -> EqRel -> SwapFlag
                 -> CanEqLHS           -- lhs (or, if swapped, rhs)
@@ -2374,7 +2374,7 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
                                      (mkReflRedn role rhs)
 
      -- by now, (TyEq:K) is already satisfied
-       ; massert (canEqLHSKind lhs `eqType` tcTypeKind rhs)
+       ; massert (canEqLHSKind lhs `eqType` typeKind rhs)
 
      -- by now, (TyEq:N) is already satisfied (if applicable)
        ; assertPprM ty_eq_N_OK $
@@ -3135,7 +3135,7 @@ unifyWanted :: RewriterSet -> CtLoc
 -- See Note [unifyWanted]
 -- The returned coercion's role matches the input parameter
 unifyWanted rewriters loc Phantom ty1 ty2
-  = do { kind_co <- unifyWanted rewriters loc Nominal (tcTypeKind ty1) (tcTypeKind ty2)
+  = do { kind_co <- unifyWanted rewriters loc Nominal (typeKind ty1) (typeKind ty2)
        ; return (mkPhantomCo kind_co ty1 ty2) }
 
 unifyWanted rewriters loc role orig_ty1 orig_ty2

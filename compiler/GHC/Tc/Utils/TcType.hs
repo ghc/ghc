@@ -61,8 +61,7 @@ module GHC.Tc.Utils.TcType (
 
   --------------------------------
   -- Splitters
-  -- These are important because they do not look through newtypes
-  getTyVar,
+  getTyVar, getTyVar_maybe,
   tcSplitForAllTyVarBinder_maybe,
   tcSplitForAllTyVars, tcSplitForAllInvisTyVars, tcSplitSomeForAllTyVars,
   tcSplitForAllReqTVBinders, tcSplitForAllInvisTVBinders,
@@ -73,24 +72,25 @@ module GHC.Tc.Utils.TcType (
   tcSplitTyConApp, tcSplitTyConApp_maybe,
   tcTyConAppTyCon, tcTyConAppTyCon_maybe, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcRepSplitAppTy_maybe,
-  tcRepGetNumAppTys,
-  tcGetCastedTyVar_maybe, tcGetTyVar_maybe, tcGetTyVar,
   tcSplitSigmaTy, tcSplitNestedSigmaTys,
 
   ---------------------------------
   -- Predicates.
   -- Again, newtypes are opaque
-  eqType, eqTypes, nonDetCmpType, nonDetCmpTypes, eqTypeX,
-  pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
-  tcEqTyConApps,
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingPrimTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isNaturalTy,
   isBoolTy, isUnitTy, isCharTy,
-  isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
+  isTauTy, isTauTyCon, tcIsTyVarTy,
   isPredTy, isTyVarClassPred,
   checkValidClsArgs, hasTyVarHead,
   isRigidTy,
+
+  ---------------------------------
+  -- Comparisons
+  eqType, eqTypes, nonDetCmpType, nonDetCmpTypes, eqTypeX,
+  pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
+  tcEqTyConApps,
 
   ---------------------------------
   -- Misc type manipulators
@@ -132,7 +132,7 @@ module GHC.Tc.Utils.TcType (
 
   --------------------------------
   -- Reexported from Kind
-  Kind, tcTypeKind,
+  Kind, typeKind,
   liftedTypeKind,
   constraintKind,
   isLiftedTypeKind, isUnliftedTypeKind, classifiesTypeWithValues,
@@ -1357,12 +1357,6 @@ mkTcCastTy = mkCastTy   -- Do we need a tc version of mkCastTy?
    Expanding and splitting
 *                                                                      *
 ************************************************************************
-
-These tcSplit functions are like their non-Tc analogues, but
-        *) they do not look through newtypes
-
-However, they are non-monadic and do not follow through mutable type
-variables.  It's up to you to make sure this doesn't matter.
 -}
 
 -- | Splits a forall type into a list of 'TyBinder's and the inner type.
@@ -1375,7 +1369,7 @@ tcSplitPiTys ty
 -- | Splits a type into a TyBinder and a body, if possible. Panics otherwise
 tcSplitPiTy_maybe :: Type -> Maybe (TyBinder, Type)
 tcSplitPiTy_maybe ty
-  = assert (isMaybeTyBinder sty ) sty
+  = assert (isMaybeTyBinder sty) sty
   where
     sty = splitPiTy_maybe ty
     isMaybeTyBinder (Just (t,_)) = isTyBinder t
@@ -1414,25 +1408,19 @@ tcSplitSomeForAllTyVars argf_pred ty
 -- | Like 'tcSplitForAllTyVars', but only splits 'ForAllTy's with 'Required' type
 -- variable binders. All split tyvars are annotated with '()'.
 tcSplitForAllReqTVBinders :: Type -> ([TcReqTVBinder], Type)
-tcSplitForAllReqTVBinders ty = assert (all (isTyVar . binderVar) (fst sty) ) sty
+tcSplitForAllReqTVBinders ty = assert (all isTyVarBinder (fst sty) ) sty
   where sty = splitForAllReqTVBinders ty
 
 -- | Like 'tcSplitForAllTyVars', but only splits 'ForAllTy's with 'Invisible' type
 -- variable binders. All split tyvars are annotated with their 'Specificity'.
 tcSplitForAllInvisTVBinders :: Type -> ([TcInvisTVBinder], Type)
-tcSplitForAllInvisTVBinders ty = assert (all (isTyVar . binderVar) (fst sty) ) sty
+tcSplitForAllInvisTVBinders ty = assert (all (isTyVar . binderVar) (fst sty)) sty
   where sty = splitForAllInvisTVBinders ty
 
 -- | Like 'tcSplitForAllTyVars', but splits off only named binders.
 tcSplitForAllTyVarBinders :: Type -> ([TyVarBinder], Type)
 tcSplitForAllTyVarBinders ty = assert (all isTyVarBinder (fst sty)) sty
   where sty = splitForAllTyCoVarBinders ty
-
--- | Is this a ForAllTy with a named binder?
-tcIsForAllTy :: Type -> Bool
-tcIsForAllTy ty | Just ty' <- tcView ty = tcIsForAllTy ty'
-tcIsForAllTy (ForAllTy {}) = True
-tcIsForAllTy _             = False
 
 tcSplitPredFunTy_maybe :: Type -> Maybe (PredType, Type)
 -- Split off the first predicate argument from a type
@@ -1529,11 +1517,6 @@ tcTyConAppArgs ty = case tcSplitTyConApp_maybe ty of
                         Just (_, args) -> args
                         Nothing        -> pprPanic "tcTyConAppArgs" (pprType ty)
 
-tcSplitTyConApp :: Type -> (TyCon, [Type])
-tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
-                        Just stuff -> stuff
-                        Nothing    -> pprPanic "tcSplitTyConApp" (pprType ty)
-
 -----------------------
 tcSplitFunTys :: Type -> ([Scaled Type], Type)
 tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
@@ -1579,7 +1562,7 @@ tcSplitFunTy :: Type -> (Scaled Type, Type)
 tcSplitFunTy  ty = expectJust "tcSplitFunTy" (tcSplitFunTy_maybe ty)
 
 tcFunArgTy :: Type -> Scaled Type
-tcFunArgTy    ty = fst (tcSplitFunTy ty)
+tcFunArgTy ty = fst (tcSplitFunTy ty)
 
 tcFunResultTy :: Type -> Type
 tcFunResultTy ty = snd (tcSplitFunTy ty)
@@ -1610,32 +1593,7 @@ tcSplitAppTys ty
                    Just (ty', arg) -> go ty' (arg:args)
                    Nothing         -> (ty,args)
 
--- | Returns the number of arguments in the given type, without
--- looking through synonyms. This is used only for error reporting.
--- We don't look through synonyms because of #11313.
-tcRepGetNumAppTys :: Type -> Arity
-tcRepGetNumAppTys = length . snd . repSplitAppTys
-
 -----------------------
--- | If the type is a tyvar, possibly under a cast, returns it, along
--- with the coercion. Thus, the co is :: kind tv ~N kind type
-tcGetCastedTyVar_maybe :: Type -> Maybe (TyVar, CoercionN)
-tcGetCastedTyVar_maybe ty | Just ty' <- tcView ty = tcGetCastedTyVar_maybe ty'
-tcGetCastedTyVar_maybe (CastTy (TyVarTy tv) co) = Just (tv, co)
-tcGetCastedTyVar_maybe (TyVarTy tv)             = Just (tv, mkNomReflCo (tyVarKind tv))
-tcGetCastedTyVar_maybe _                        = Nothing
-
-tcGetTyVar_maybe :: Type -> Maybe TyVar
-tcGetTyVar_maybe ty | Just ty' <- tcView ty = tcGetTyVar_maybe ty'
-tcGetTyVar_maybe (TyVarTy tv)   = Just tv
-tcGetTyVar_maybe _              = Nothing
-
-tcGetTyVar :: String -> Type -> TyVar
-tcGetTyVar msg ty
-  = case tcGetTyVar_maybe ty of
-     Just tv -> tv
-     Nothing -> pprPanic msg (ppr ty)
-
 tcIsTyVarTy :: Type -> Bool
 tcIsTyVarTy ty | Just ty' <- tcView ty = tcIsTyVarTy ty'
 tcIsTyVarTy (CastTy ty _) = tcIsTyVarTy ty  -- look through casts, as
@@ -1698,8 +1656,8 @@ tcEqType ty1 ty2
   =  tcEqTypeNoSyns ki1 ki2
   && tcEqTypeNoSyns ty1 ty2
   where
-    ki1 = tcTypeKind ty1
-    ki2 = tcTypeKind ty2
+    ki1 = typeKind ty1
+    ki2 = typeKind ty2
 
 -- | Just like 'tcEqType', but will return True for types of different kinds
 -- as long as their non-coercion structure is identical.
@@ -1921,8 +1879,8 @@ boxEqPred eq_rel ty1 ty2
                                     --       so we can't abstract over it
                                     -- Nothing fundamental: we could add it
  where
-   k1 = tcTypeKind ty1
-   k2 = tcTypeKind ty2
+   k1 = typeKind ty1
+   k2 = typeKind ty2
    homo_kind = k1 `tcEqType` k2
 
 pickCapturedPreds
