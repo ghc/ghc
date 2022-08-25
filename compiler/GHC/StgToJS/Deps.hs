@@ -39,7 +39,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State
 
-data DependencyDataCache = DDC -- FIXME Sylvain 2022-02: use UniqFM
+data DependencyDataCache = DDC
   { ddcModule :: !(IntMap Unit)               -- ^ Unique Module -> Object.Package
   , ddcId     :: !(IntMap Object.ExportedFun) -- ^ Unique Id     -> Object.ExportedFun (only to other modules)
   , ddcOther  :: !(Map OtherSymb Object.ExportedFun)

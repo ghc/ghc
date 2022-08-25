@@ -331,18 +331,10 @@ resultSize xxs@(_:xs) t
   | otherwise = [(LiftedRep, 1)] -- possibly newtype family, must be boxed
 
 resultSize [] t
-  -- FIXME: Jeff (2022,05): Is this check actually needed? If we have a runtime
-  -- rep kinded type can't we just call typePrimReps to get the PrimReps and
-  -- then primRep size just like in the catchall case? I don't see why this
-  -- doesn't work.
   | isRuntimeRepKindedTy t' = pprPanic "resultSize: Type was RuntimeRepKinded don't know the size! " (ppr t')
-
   -- Note that RuntimeRep from Builtins.Types hits this case. A singleton of
   -- (LiftedRep, 1) is exactly what's returned by the otherwise case for
   -- RuntimeRep.
-  -- FIXME: Luite (2022,07): typeLevity_maybe can panic, doesn't the next case
-  -- give us the right answer?
-  --  Nothing <- typeLevity_maybe t' = [(LiftedRep, 1)]
   | otherwise = fmap (\p -> (p, slotCount (primRepSize p))) (typePrimReps t)
   where
     t' = unwrapType t
@@ -403,9 +395,6 @@ popLneFrame inEntry size ctx = do
   let ctx' = ctxLneShrinkStack ctx size
 
   let gen_id_slot (i,n) = do
-        -- FIXME (Sylvain 2022-08): do we really need to generate all the Idents here
-        -- to only select one? Is it because we need the side effect that consists in
-        -- filling the GlobalId cache?
         ids <- identsForId i
         let !id_n = ids !! (n-1)
         pure (id_n, SlotId i n)
@@ -698,8 +687,6 @@ genAlts ctx e at me alts = do
             return (s, r)
           _ -> error "genAlts: invalid branches for Bool"
 
-    -- FIXME: add all alts
-
     AlgAlt _tc -> do
         ei <- varForId e
         (r, brs) <- normalizeBranches ctx <$>
@@ -923,11 +910,7 @@ allocDynAll haveDecl middle cls = do
 
     fillObjs = mconcat $ map fillObj cls
     fillObj (i,_,es,_)
-      | csInlineAlloc settings || length es > 24 = -- FIXME (Jeff, 2022/03): the call to length means `es`
-                                                   -- should be something other than
-                                                   -- a list. Also why is 24
-                                                   -- important? And 24 should be a
-                                                   -- constant such as `fooThreshold`
+      | csInlineAlloc settings || length es > 24 =
           case es of
             []      -> mempty
             [ex]    -> toJExpr i .^ closureField1_ |= toJExpr ex

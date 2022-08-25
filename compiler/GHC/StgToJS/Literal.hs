@@ -73,12 +73,6 @@ genStaticLit = \case
   LitChar c                -> return [ IntLit (fromIntegral $ ord c) ]
   LitString str
     | True                 -> return [ StringLit (mkFastStringByteString str), IntLit 0]
-    -- FIXME: documentation for LitString says it's always UTF8 encoded but it's
-    -- not true (e.g. for embedded files).
-    --  1) We should add a decoding function that detects errors in
-    --  GHC.Utils.Encoding
-    --  2) We should perhaps add a different LitBin constructor that would
-    --  benefit other backends?
     -- \|  invalid UTF8         -> return [ BinLit str, IntLit 0]
   LitNullAddr              -> return [ NullLit, IntLit 0 ]
   LitNumber nt v           -> case nt of
@@ -97,7 +91,6 @@ genStaticLit = \case
   LitDouble r              -> return [ DoubleLit . SaneDouble . r2d $ r ]
   LitLabel name _size fod  -> return [ LabelLit (fod == IsFunction) (mkFastString $ "h$" ++ unpackFS name)
                                      , IntLit 0 ]
-  -- FIXME: handle other LitRubbish, etc.
   l -> pprPanic "genStaticLit" (ppr l)
 
 -- make an unsigned 32 bit number from this unsigned one, lower 32 bits

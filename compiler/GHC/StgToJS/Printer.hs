@@ -63,8 +63,6 @@ ghcjsRenderJsV r (JHash m)
     quoteIfRequired x
       | isUnquotedKey x' = text x'
       | otherwise        = PP.squotes (text x')
-    -- FIXME: Jeff (2022,03): remove the deserialization to String. We are only
-    -- converting from ShortText to String here to call @all@ and @tail@.
       where x' = unpackFS x
 
     isUnquotedKey :: String -> Bool
@@ -74,7 +72,6 @@ ghcjsRenderJsV r (JHash m)
                                       && all validOtherIdent (tail x)
 
 
-    -- fixme, this will quote some idents that don't really need to be quoted
     validFirstIdent c = c == '_' || c == '$' || isAlpha c
     validOtherIdent c = isAlpha c || isDigit c
 ghcjsRenderJsV r v = renderJsV defaultRenderJs r v
@@ -119,7 +116,7 @@ prettyBlock' r ( (DeclStat i)
                )
       | i == i' = (text "var" <+> jsToDocR r i <+> char '=' <+> jsToDocR r v) : prettyBlock' r xs
 
--- modify/assign operators (fixme this should be more general, but beware of side effects like PPostExpr)
+-- modify/assign operators
 prettyBlock' r ( (AssignStat (ValExpr (JVar i)) (InfixExpr AddOp (ValExpr (JVar i')) (ValExpr (JInt 1))))
                : xs
                )

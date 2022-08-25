@@ -107,7 +107,6 @@ genApp ctx i args
     , [top] <- concatMap typex_expr (ctxTarget ctx)
     , getUnique i == unpackCStringAppendIdKey
     , d <- utf8DecodeByteString bs
-        -- FIXME (Sylvain, 2022/02): we assume that it decodes but it may not (e.g. embedded file)
     = do
         prof <- csProf <$> getSettings
         let profArg = if prof then [jCafCCS] else []
@@ -222,7 +221,7 @@ genApp ctx i args
     | n <- length args
     , n /= 0
     , idFunRepArity i == n
-    , not (isLocalId i) -- FIXME (Sylvain 2022-08): why are we testing this here and not in the oversaturated case below?
+    , not (isLocalId i)
     , isStrictId i
     = do
       as' <- concatMapM genArg args
@@ -550,9 +549,6 @@ genericStackApply cfg = closure info body
             , ifS (newAp .===. var "h$ap_gen")
                    ((sp |= sp - needed_regs) <> (stack .! (sp - 1) |= newTag))
                    (sp |= sp - needed_regs - 1)
-                -- FIXME (Sylvain 2022-08): this is fragile and probably inefficient.
-                -- Instead of filling h$apply array with h$ap_gen, we should leave
-                -- it with empty items and match "undefined" here.
 
             -- Push generic application function as continuation
             , stack .! sp |= newAp
@@ -760,17 +756,12 @@ stackApply s fun_name nargs nvars =
                                 (ifS (toJExpr nargs .>. arity)
                                   (traceRts s (toJExpr (fun_name <> ": oversat")) <> oversatCase c arity0 arity)
                                   (traceRts s (toJExpr (fun_name <> ": undersat"))
-                                   <> mkPap s pap r1 (toJExpr nargs) stackArgs -- FIXME do we want double pap?
+                                   <> mkPap s pap r1 (toJExpr nargs) stackArgs
                                    <> (sp |= sp - toJExpr (nvars + 1))
                                    <> (r1 |= toJExpr pap)
                                    <> returnStack))
                               ]
-        _                   -> mempty -- FIXME: Jeff (2022,03), just quieting non-exhaustive
-                                      -- patterns. That the code wants to do this
-                                      -- means we should be encoding that funCase is
-                                      -- only callable on ValExpr (JVar pap)'s in
-                                      -- the type system, perhaps with a GADT or
-                                      -- phantom
+        _                   -> mempty
 
 
     funCase :: JExpr -> JStat
@@ -789,12 +780,7 @@ stackApply s fun_name nargs nvars =
                                   <> (r1 |= toJExpr pap)
                                   <> returnStack))
                               ]
-        _                  -> mempty  -- FIXME: Jeff (2022,03), just quieting non-exhaustive
-                                      -- patterns. That the code wants to do this
-                                      -- means we should be encoding that funCase is
-                                      -- only callable on ValExpr (JVar pap)'s in
-                                      -- the type system, perhaps with a GADT or
-                                      -- phantom
+        _                  -> mempty
 
 
     -- oversat: call the function but keep enough on the stack for the next
@@ -843,7 +829,6 @@ fastApply s fun_name nargs nvars = func ||= body0
         jVar \c farity arity ->
           [ c |= closureEntry r1
           , traceRts s (toJExpr (fun_name <> ": sp ") + sp)
-          -- TODO: Jeff (2022,03): factor our and dry out this code
           , SwitchStat (entryClosureType c)
              [(toJExpr Fun, traceRts s (toJExpr (fun_name <> ": ")
                                         + clName c
@@ -872,12 +857,7 @@ fastApply s fun_name nargs nvars = func ||= body0
                                      <> (r1 |= toJExpr pap)
                                      <> returnStack))
                                 ]
-          _             -> mempty -- FIXME: Jeff (2022,03), just quieting non-exhaustive
-                                  -- patterns. That the code wants to do this
-                                  -- means we should be encoding that funCase is
-                                  -- only callable on ValExpr (JVar pap)'s in
-                                  -- the type system, perhaps with a GADT or
-                                  -- phantom
+          _             -> mempty
 
       oversatCase :: JExpr -> JExpr -> JStat
       oversatCase c arity =
@@ -1130,13 +1110,11 @@ papGen cfg =
 
 -- general utilities
 -- move the first n registers, starting at R2, m places up (do not use with negative m)
--- FIXME (Jeff, 2022/03): pick a better name, e.g., `r2moveRegs`
 moveRegs2 :: JStat
 moveRegs2 = TxtI "h$moveRegs2" ||= jLam moveSwitch
   where
     moveSwitch n m = SwitchStat ((n .<<. 8) .|. m) switchCases (defaultCase n m)
     -- fast cases
-    -- TODO: tune the parameteters for performance and size
     switchCases = [switchCase n m | n <- [1..5], m <- [1..4]]
     switchCase :: Int -> Int -> (JExpr, JStat)
     switchCase n m = (toJExpr $

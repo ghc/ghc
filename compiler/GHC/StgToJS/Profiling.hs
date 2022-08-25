@@ -88,7 +88,6 @@ enterCostCentreThunk :: JStat
 enterCostCentreThunk = ApplStat (var "h$enterThunkCCS") [r1 .^ "cc"]
 
 setCC :: CostCentre -> Bool -> Bool -> G JStat
--- FIXME: ignoring tick flags for now
 setCC cc _tick True = do
   ccI@(TxtI _ccLbl) <- costCentreLbl cc
   addDependency $ OtherSymb (cc_mod cc)
@@ -147,7 +146,7 @@ costCentreStackLbl' :: CostCentreStack -> G (Maybe String)
 costCentreStackLbl' ccs = do
   ifProfilingM f
   where
-    f | isCurrentCCS ccs   = return $ Just "h$currentThread.ccs" -- FIXME
+    f | isCurrentCCS ccs   = return $ Just "h$currentThread.ccs"
       | dontCareCCS == ccs = return $ Just "h$CCS_DONT_CARE"
       | otherwise          =
           case maybeSingletonCCS ccs of

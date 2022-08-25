@@ -127,7 +127,6 @@ ctxUpdateLneFrame new_spilled_vars new_lne_ids ctx =
     { ctxLneFrameBs   = addListToUFM (ctxLneFrameBs ctx) (map (,new_frame_size) new_lne_ids)
     , ctxLneFrameSize = new_frame_size
     , ctxLneFrameVars = ctxLneFrameVars ctx ++ new_spilled_vars
-                          -- FIXME: could we use a stack? (i.e. cons new variables)
     }
 
 -- | Remove information about the current LNE frame
