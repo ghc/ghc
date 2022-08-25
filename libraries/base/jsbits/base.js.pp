@@ -142,23 +142,23 @@ function h$base_isatty(fd) {
  * NaN will be returned as zero.
  * Infinity is converted to max value and
  * -Infinity to min value.
- * @param {f} value The number in question.
+ * @param {f} The number in question.
  * @param {c} the continuation taking high and low bits
  */
 function h$long_from_number(f,c) {
-  if (value > 0) {
-      if (value >= TWO_PWR_63_DBL_) {
+  if (f > 0) {
+      if (f >= TWO_PWR_63_DBL_) {
         // return max value
         return c(0x7FFFFFFF,0xFFFFFFFF);
       }
-      return c(value / TWO_PWR_32_DBL_, value);
-    } else if (value < 0) {
-      if (value <= -TWO_PWR_63_DBL_) {
+      return c(f / TWO_PWR_32_DBL_, f);
+    } else if (f < 0) {
+      if (f <= -TWO_PWR_63_DBL_) {
         // return min value
         return c(0x80000000,0);
       }
-      var h = -value / TWO_PWR_32_DBL_;
-      var l = -value;
+      var h = -f / TWO_PWR_32_DBL_;
+      var l = -f;
       // negate h l
       var nl = (~l + 1) | 0;
       var nh = (~h + !nl) | 0;
