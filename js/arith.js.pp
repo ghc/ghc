@@ -14,7 +14,7 @@ function h$logArith() { h$log.apply(h$log,arguments); }
 #define W64l(x) (Number(BigInt.asUintN(32, x)) >>> 0)
 #define I64(h,l) ((BigInt(h) << BigInt(32)) | BigInt(l>>>0))
 #define I64h(x) (Number(x >> BigInt(32))|0)
-#define I64l(x) (Number(BigInt.asIntN(32,x))|0)
+#define I64l(x) (Number(BigInt.asUintN(32,x)) >>> 0)
 #define RETURN_I64(x) RETURN_UBX_TUP2(I64h(x), I64l(x))
 #define RETURN_W64(x) RETURN_UBX_TUP2(W64h(x), W64l(x))
 #define RETURN_W32(x) return Number(x)
@@ -214,10 +214,10 @@ function h$hs_timesInt2(l1,l2) {
   var a = I32(l1);
   var b = I32(l2);
   var r = BigInt.asIntN(64, a * b);
-  TRACE_ARITH("Int64: " + a + " * " + b + " ==> " + r);
+  TRACE_ARITH("Int32: " + a + " * " + b + " ==> " + r + " (Int64)");
 
   var rh = I64h(r);
-  var rl = I64l(r);
+  var rl = I64l(r)|0;
   var nh = ((rh === 0 && rl >= 0) || (rh === -1 && rl < 0)) ? 0 : 1;
   RETURN_UBX_TUP3(nh, rh, rl);
 }
@@ -276,7 +276,7 @@ function h$quotRem2Word32(nh,nl,d) {
 function h$wordAdd2(l1,l2) {
   var a = W32(l1);
   var b = W32(l2);
-  var r = BigInt.asUintN(64, a * b);
+  var r = BigInt.asUintN(64, a + b);
   TRACE_ARITH("Word32: " + a + " + " + b + " ==> " + r + " (Word64)");
   RETURN_W64(r);
 }
