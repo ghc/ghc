@@ -9,7 +9,7 @@ module GHC.Types.Var.Env (
 
         -- ** Manipulating these environments
         emptyVarEnv, unitVarEnv, mkVarEnv, mkVarEnv_Directly,
-        elemVarEnv, disjointVarEnv,
+        elemVarEnv, disjointVarEnv, anyVarEnv,
         extendVarEnv, extendVarEnv_C, extendVarEnv_Acc,
         extendVarEnvList,
         plusVarEnv, plusVarEnv_C, plusVarEnv_CD, plusMaybeVarEnv_C,
@@ -62,7 +62,8 @@ module GHC.Types.Var.Env (
 
         -- ** Operations on RnEnv2s
         mkRnEnv2, rnBndr2, rnBndrs2, rnBndr2_var,
-        rnOccL, rnOccR, inRnEnvL, inRnEnvR, rnOccL_maybe, rnOccR_maybe,
+        rnOccL, rnOccR, inRnEnvL, inRnEnvR,  anyInRnEnvR,
+        rnOccL_maybe, rnOccR_maybe,
         rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR, rnSwap,
         delBndrL, delBndrR, delBndrsL, delBndrsR,
         extendRnInScopeSetList,
@@ -72,7 +73,7 @@ module GHC.Types.Var.Env (
 
         -- * TidyEnv and its operation
         TidyEnv,
-        emptyTidyEnv, mkEmptyTidyEnv, delTidyEnvList, anyInRnEnvR
+        emptyTidyEnv, mkEmptyTidyEnv, delTidyEnvList
     ) where
 
 import GHC.Prelude
@@ -409,7 +410,7 @@ anyInRnEnvR :: RnEnv2 -> VarSet -> Bool
 anyInRnEnvR (RV2 { envR = env }) vs
   -- Avoid allocating the predicate if we deal with an empty env.
   | isEmptyVarEnv env = False
-  | otherwise = anyVarEnv (`elemVarSet` vs) env
+  | otherwise         = anyVarSet (`elemVarEnv` env) vs
 
 lookupRnInScope :: RnEnv2 -> Var -> Var
 lookupRnInScope env v = lookupInScope (in_scope env) v `orElse` v
