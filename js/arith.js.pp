@@ -9,6 +9,7 @@ function h$logArith() { h$log.apply(h$log,arguments); }
 
 #define UN(x) ((x)>>>0)
 #define W32(x) (BigInt(x))
+#define I32(x) (BigInt(x))
 #define W64(h,l) ((BigInt(h) << BigInt(32)) | BigInt(l>>>0))
 #define W64h(x) (Number(x >> BigInt(32)) >>> 0)
 #define W64l(x) (Number(BigInt.asUintN(32, x)) >>> 0)
