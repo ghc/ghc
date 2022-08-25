@@ -505,8 +505,8 @@ function h$popCnt64(x1,x2) {
 }
 
 function h$bswap64(x1,x2) {
-  RETURN_UBX_TUP2((x2 >>> 24) | (x2 << 24) | ((x2 & 0xFF00) << 8) | ((x2 & 0xFF0000) >> 8)
-                 ,(x1 >>> 24) | (x1 << 24) | ((x1 & 0xFF00) << 8) | ((x1 & 0xFF0000) >> 8));
+  RETURN_UBX_TUP2(UN((x2 >>> 24) | (x2 << 24) | ((x2 & 0xFF00) << 8) | ((x2 & 0xFF0000) >> 8))
+                 ,UN((x1 >>> 24) | (x1 << 24) | ((x1 & 0xFF00) << 8) | ((x1 & 0xFF0000) >> 8)));
 }
 
 var h$clz32 = Math.clz32 || function(x) {
