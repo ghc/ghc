@@ -20,6 +20,9 @@
 #define GHCJS_BUSY_YIELD 500
 #endif
 
+// Watch for insertion of null or undefined in the stack
+//#define GHCJS_DEBUG_STACK
+
 #ifdef GHCJS_TRACE_SCHEDULER
 function h$logSched() { if(arguments.length == 1) {
                           if(h$currentThread != null) {
@@ -66,6 +69,18 @@ function h$Thread() {
     this.tid = ++h$threadIdN;
     this.status = THREAD_RUNNING;
     this.stack = [h$done, 0, h$baseZCGHCziConcziSynczireportError, h$catch_e];
+#ifdef GHCJS_DEBUG_STACK
+    this.stack = new Proxy(this.stack, {
+     set(obj,prop,value) {
+       if (value === undefined || value === null) {
+          throw new Error("setting stack offset " + prop + " to " + value);
+       }
+       else {
+         return Reflect.set(...arguments);
+       }
+     }
+    });
+#endif
     this.sp = 3;
     this.mask = 0;                // async exceptions masked (0 unmasked, 1: uninterruptible, 2: interruptible)
     this.interruptible = false;   // currently in an interruptible operation
