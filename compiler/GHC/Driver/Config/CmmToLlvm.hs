@@ -20,7 +20,7 @@ initLlvmCgConfig logger config_cache dflags = do
   llvm_config <- readLlvmConfigCache config_cache
   pure $! LlvmCgConfig {
     llvmCgPlatform               = targetPlatform dflags
-    , llvmCgContext              = initSDocContext dflags (PprCode CStyle)
+    , llvmCgContext              = initSDocContext dflags PprCode
     , llvmCgFillUndefWithGarbage = gopt Opt_LlvmFillUndefWithGarbage dflags
     , llvmCgSplitSection         = gopt Opt_SplitSections dflags
     , llvmCgBmiVersion           = case platformArch (targetPlatform dflags) of

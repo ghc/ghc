@@ -184,14 +184,14 @@ pprDwarfInfoOpen platform haveSrc (DwarfCompileUnit _ name producer compDir lowL
      then sectionOffset platform lineLbl dwarfLineLabel
      else empty
 pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label parent) =
-  pdoc platform (mkAsmTempDieLabel label) <> colon
+  pprAsmLabel platform (mkAsmTempDieLabel label) <> colon
   $$ pprAbbrev abbrev
   $$ pprString name
   $$ pprLabelString platform label
   $$ pprFlag (externallyVisibleCLabel label)
      -- Offset due to Note [Info Offset]
-  $$ pprWord platform (pdoc platform label <> text "-1")
-  $$ pprWord platform (pdoc platform $ mkAsmTempProcEndLabel label)
+  $$ pprWord platform (pprAsmLabel platform label <> text "-1")
+  $$ pprWord platform (pprAsmLabel platform $ mkAsmTempProcEndLabel label)
   $$ pprByte 1
   $$ pprByte dW_OP_call_frame_cfa
   $$ parentValue
@@ -199,17 +199,17 @@ pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label parent) =
     abbrev = case parent of Nothing -> DwAbbrSubprogram
                             Just _  -> DwAbbrSubprogramWithParent
     parentValue = maybe empty pprParentDie parent
-    pprParentDie sym = sectionOffset platform (pdoc platform sym) dwarfInfoLabel
+    pprParentDie sym = sectionOffset platform (pprAsmLabel platform sym) dwarfInfoLabel
 pprDwarfInfoOpen platform _ (DwarfBlock _ label Nothing) =
-  pdoc platform (mkAsmTempDieLabel label) <> colon
+  pprAsmLabel platform (mkAsmTempDieLabel label) <> colon
   $$ pprAbbrev DwAbbrBlockWithoutCode
   $$ pprLabelString platform label
 pprDwarfInfoOpen platform _ (DwarfBlock _ label (Just marker)) =
-  pdoc platform (mkAsmTempDieLabel label) <> colon
+  pprAsmLabel platform (mkAsmTempDieLabel label) <> colon
   $$ pprAbbrev DwAbbrBlock
   $$ pprLabelString platform label
-  $$ pprWord platform (pdoc platform marker)
-  $$ pprWord platform (pdoc platform $ mkAsmTempEndLabel marker)
+  $$ pprWord platform (pprAsmLabel platform marker)
+  $$ pprWord platform (pprAsmLabel platform $ mkAsmTempEndLabel marker)
 pprDwarfInfoOpen _ _ (DwarfSrcNote ss) =
   pprAbbrev DwAbbrGhcSrcNote
   $$ pprString' (ftext $ srcSpanFile ss)
@@ -245,7 +245,7 @@ pprDwarfARanges platform arngs unitU =
       initialLength = 8 + paddingSize + (1 + length arngs) * 2 * wordSize
   in pprDwWord (ppr initialLength)
      $$ pprHalf 2
-     $$ sectionOffset platform (pdoc platform $ mkAsmTempLabel $ unitU) dwarfInfoLabel
+     $$ sectionOffset platform (pprAsmLabel platform $ mkAsmTempLabel $ unitU) dwarfInfoLabel
      $$ pprByte (fromIntegral wordSize)
      $$ pprByte 0
      $$ pad paddingSize
@@ -258,11 +258,11 @@ pprDwarfARanges platform arngs unitU =
 pprDwarfARange :: Platform -> DwarfARange -> SDoc
 pprDwarfARange platform arng =
     -- Offset due to Note [Info Offset].
-    pprWord platform (pdoc platform (dwArngStartLabel arng) <> text "-1")
+    pprWord platform (pprAsmLabel platform (dwArngStartLabel arng) <> text "-1")
     $$ pprWord platform length
   where
-    length = pdoc platform (dwArngEndLabel arng)
-             <> char '-' <> pdoc platform (dwArngStartLabel arng)
+    length = pprAsmLabel platform (dwArngEndLabel arng)
+             <> char '-' <> pprAsmLabel platform (dwArngStartLabel arng)
 
 -- | Information about unwind instructions for a procedure. This
 -- corresponds to a "Common Information Entry" (CIE) in DWARF.
@@ -293,7 +293,7 @@ data DwarfFrameBlock
       -- in the block
     }
 
-instance OutputableP env CLabel => OutputableP env DwarfFrameBlock where
+instance OutputableP Platform DwarfFrameBlock where
   pdoc env (DwarfFrameBlock hasInfo unwinds) = braces $ ppr hasInfo <+> pdoc env unwinds
 
 -- | Header for the @.debug_frame@ section. Here we emit the "Common
@@ -303,7 +303,7 @@ pprDwarfFrame :: Platform -> DwarfFrame -> SDoc
 pprDwarfFrame platform DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCieProcs=procs}
   = let cieStartLabel= mkAsmTempDerivedLabel cieLabel (fsLit "_start")
         cieEndLabel = mkAsmTempEndLabel cieLabel
-        length      = pdoc platform cieEndLabel <> char '-' <> pdoc platform cieStartLabel
+        length      = pprAsmLabel platform cieEndLabel <> char '-' <> pprAsmLabel platform cieStartLabel
         spReg       = dwarfGlobalRegNo platform Sp
         retReg      = dwarfReturnRegNo platform
         wordSize    = platformWordSizeInBytes platform
@@ -316,9 +316,9 @@ pprDwarfFrame platform DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCiePro
           ArchX86    -> pprByte dW_CFA_same_value $$ pprLEBWord 4
           ArchX86_64 -> pprByte dW_CFA_same_value $$ pprLEBWord 7
           _          -> empty
-    in vcat [ pdoc platform cieLabel <> colon
+    in vcat [ pprAsmLabel platform cieLabel <> colon
             , pprData4' length -- Length of CIE
-            , pdoc platform cieStartLabel <> colon
+            , pprAsmLabel platform cieStartLabel <> colon
             , pprData4' (text "-1")
                                -- Common Information Entry marker (-1 = 0xf..f)
             , pprByte 3        -- CIE version (we require DWARF 3)
@@ -346,7 +346,7 @@ pprDwarfFrame platform DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCiePro
             , pprLEBWord 0
             ] $$
        wordAlign platform $$
-       pdoc platform cieEndLabel <> colon $$
+       pprAsmLabel platform cieEndLabel <> colon $$
        -- Procedure unwind tables
        vcat (map (pprFrameProc platform cieLabel cieInit) procs)
 
@@ -360,17 +360,17 @@ pprFrameProc platform frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
         procEnd     = mkAsmTempProcEndLabel procLbl
         ifInfo str  = if hasInfo then text str else empty
                       -- see Note [Info Offset]
-    in vcat [ whenPprDebug $ text "# Unwinding for" <+> pdoc platform procLbl <> colon
-            , pprData4' (pdoc platform fdeEndLabel <> char '-' <> pdoc platform fdeLabel)
-            , pdoc platform fdeLabel <> colon
-            , pprData4' (pdoc platform frameLbl <> char '-' <> dwarfFrameLabel)    -- Reference to CIE
-            , pprWord platform (pdoc platform procLbl <> ifInfo "-1") -- Code pointer
-            , pprWord platform (pdoc platform procEnd <> char '-' <>
-                                 pdoc platform procLbl <> ifInfo "+1") -- Block byte length
+    in vcat [ whenPprDebug $ text "# Unwinding for" <+> pprAsmLabel platform procLbl <> colon
+            , pprData4' (pprAsmLabel platform fdeEndLabel <> char '-' <> pprAsmLabel platform fdeLabel)
+            , pprAsmLabel platform fdeLabel <> colon
+            , pprData4' (pprAsmLabel platform frameLbl <> char '-' <> dwarfFrameLabel)    -- Reference to CIE
+            , pprWord platform (pprAsmLabel platform procLbl <> ifInfo "-1") -- Code pointer
+            , pprWord platform (pprAsmLabel platform procEnd <> char '-' <>
+                                 pprAsmLabel platform procLbl <> ifInfo "+1") -- Block byte length
             ] $$
        vcat (S.evalState (mapM (pprFrameBlock platform) blocks) initUw) $$
        wordAlign platform $$
-       pdoc platform fdeEndLabel <> colon
+       pprAsmLabel platform fdeEndLabel <> colon
 
 -- | Generates unwind information for a block. We only generate
 -- instructions where unwind information actually changes. This small
@@ -402,7 +402,7 @@ pprFrameBlock platform (DwarfFrameBlock hasInfo uws0) =
              then (empty, oldUws)
              else let -- see Note [Info Offset]
                       needsOffset = firstDecl && hasInfo
-                      lblDoc = pdoc platform lbl <>
+                      lblDoc = pprAsmLabel platform lbl <>
                                if needsOffset then text "-1" else empty
                       doc = pprByte dW_CFA_set_loc $$ pprWord platform lblDoc $$
                             vcat (map (uncurry $ pprSetUnwind platform) changed)
@@ -513,7 +513,7 @@ pprUnwindExpr platform spIsCFA expr
         pprE (UwReg g i)      = pprByte (dW_OP_breg0+dwarfGlobalRegNo platform g) $$
                                pprLEBInt i
         pprE (UwDeref u)      = pprE u $$ pprByte dW_OP_deref
-        pprE (UwLabel l)      = pprByte dW_OP_addr $$ pprWord platform (pdoc platform l)
+        pprE (UwLabel l)      = pprByte dW_OP_addr $$ pprWord platform (pprAsmLabel platform l)
         pprE (UwPlus u1 u2)   = pprE u1 $$ pprE u2 $$ pprByte dW_OP_plus
         pprE (UwMinus u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_minus
         pprE (UwTimes u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_mul

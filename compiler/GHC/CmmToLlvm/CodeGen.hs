@@ -1705,7 +1705,6 @@ genMachOp_slow opt op [x, y] = case op of
 
     where
         binLlvmOp ty binOp allow_y_cast = do
-          cfg      <- getConfig
           platform <- getPlatform
           runExprData $ do
             vx <- exprToVarW x
@@ -1721,13 +1720,7 @@ genMachOp_slow opt op [x, y] = case op of
                     doExprW (ty vx) $ binOp vx vy'
 
                | otherwise
-               -> do
-                    -- Error. Continue anyway so we can debug the generated ll file.
-                    let render   = renderWithContext (llvmCgContext cfg)
-                        cmmToStr = (lines . render . pdoc platform)
-                    statement $ Comment $ map fsLit $ cmmToStr x
-                    statement $ Comment $ map fsLit $ cmmToStr y
-                    doExprW (ty vx) $ binOp vx vy
+               -> pprPanic "binLlvmOp types" (pdoc platform x $$ pdoc platform y)
 
         binCastLlvmOp ty binOp = runExprData $ do
             vx <- exprToVarW x

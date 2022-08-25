@@ -93,7 +93,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
       pprProcAlignment config $$
       pprProcLabel config lbl $$
       (if platformHasSubsectionsViaSymbols platform
-          then pdoc platform (mkDeadStripPreventer info_lbl) <> colon
+          then pprAsmLabel platform (mkDeadStripPreventer info_lbl) <> colon
           else empty) $$
       vcat (map (pprBasicBlock config top_info) blocks) $$
       ppWhen (ncgDwarfEnabled config) (pprProcEndLabel platform info_lbl) $$
@@ -102,9 +102,9 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
       (if platformHasSubsectionsViaSymbols platform
        then -- See Note [Subsections Via Symbols]
                 text "\t.long "
-            <+> pdoc platform info_lbl
+            <+> pprAsmLabel platform info_lbl
             <+> char '-'
-            <+> pdoc platform (mkDeadStripPreventer info_lbl)
+            <+> pprAsmLabel platform (mkDeadStripPreventer info_lbl)
        else empty) $$
       pprSizeDecl platform info_lbl
 
@@ -120,18 +120,18 @@ pprProcLabel config lbl
 pprProcEndLabel :: Platform -> CLabel -- ^ Procedure name
                 -> SDoc
 pprProcEndLabel platform lbl =
-    pdoc platform (mkAsmTempProcEndLabel lbl) <> colon
+    pprAsmLabel platform (mkAsmTempProcEndLabel lbl) <> colon
 
 pprBlockEndLabel :: Platform -> CLabel -- ^ Block name
                  -> SDoc
 pprBlockEndLabel platform lbl =
-    pdoc platform (mkAsmTempEndLabel lbl) <> colon
+    pprAsmLabel platform (mkAsmTempEndLabel lbl) <> colon
 
 -- | Output the ELF .size directive.
 pprSizeDecl :: Platform -> CLabel -> SDoc
 pprSizeDecl platform lbl
  = if osElfTarget (platformOS platform)
-   then text "\t.size" <+> pdoc platform lbl <> text ", .-" <> pdoc platform lbl
+   then text "\t.size" <+> pprAsmLabel platform lbl <> text ", .-" <> pprAsmLabel platform lbl
    else empty
 
 pprBasicBlock :: NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
@@ -156,7 +156,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
            vcat (map (pprData config) info) $$
            pprLabel platform infoLbl $$
            c $$
-           ppWhen (ncgDwarfEnabled config) (pdoc platform (mkAsmTempEndLabel infoLbl) <> colon)
+           ppWhen (ncgDwarfEnabled config) (pprAsmLabel platform (mkAsmTempEndLabel infoLbl) <> colon)
 
     -- Make sure the info table has the right .loc for the block
     -- coming right after it. See Note [Info Offset]
@@ -175,7 +175,7 @@ pprDatas config (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticL
   , Just ind' <- labelInd ind
   , alias `mayRedirectTo` ind'
   = pprGloblDecl (ncgPlatform config) alias
-    $$ text ".equiv" <+> pdoc (ncgPlatform config) alias <> comma <> pdoc (ncgPlatform config) (CmmLabel ind')
+    $$ text ".equiv" <+> pprAsmLabel (ncgPlatform config) alias <> comma <> pprAsmLabel (ncgPlatform config) ind'
 
 pprDatas config (align, (CmmStaticsRaw lbl dats))
  = vcat (pprAlign platform align : pprLabel platform lbl : map (pprData config) dats)
@@ -197,7 +197,7 @@ pprData config (CmmStaticLit lit) = pprDataItem config lit
 pprGloblDecl :: Platform -> CLabel -> SDoc
 pprGloblDecl platform lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = text ".globl " <> pdoc platform lbl
+  | otherwise = text ".globl " <> pprAsmLabel platform lbl
 
 pprLabelType' :: Platform -> CLabel -> SDoc
 pprLabelType' platform lbl =
@@ -260,14 +260,14 @@ pprLabelType' platform lbl =
 pprTypeDecl :: Platform -> CLabel -> SDoc
 pprTypeDecl platform lbl
     = if osElfTarget (platformOS platform) && externallyVisibleCLabel lbl
-      then text ".type " <> pdoc platform lbl <> text ", " <> pprLabelType' platform lbl
+      then text ".type " <> pprAsmLabel platform lbl <> text ", " <> pprLabelType' platform lbl
       else empty
 
 pprLabel :: Platform -> CLabel -> SDoc
 pprLabel platform lbl =
    pprGloblDecl platform lbl
    $$ pprTypeDecl platform lbl
-   $$ (pdoc platform lbl <> colon)
+   $$ (pprAsmLabel platform lbl <> colon)
 
 pprAlign :: Platform -> Alignment -> SDoc
 pprAlign platform alignment
@@ -430,8 +430,8 @@ pprImm :: Platform -> Imm -> SDoc
 pprImm platform = \case
    ImmInt i            -> int i
    ImmInteger i        -> integer i
-   ImmCLbl l           -> pdoc platform l
-   ImmIndex l i        -> pdoc platform l <> char '+' <> int i
+   ImmCLbl l           -> pprAsmLabel platform l
+   ImmIndex l i        -> pprAsmLabel platform l <> char '+' <> int i
    ImmLit s            -> text s
    ImmFloat f          -> float $ fromRational f
    ImmDouble d         -> double $ fromRational d
@@ -576,7 +576,7 @@ pprInstr platform i = case i of
 
    UNWIND lbl d
       -> asmComment (text "\tunwind = " <> pdoc platform d)
-         $$ pdoc platform lbl <> colon
+         $$ pprAsmLabel platform lbl <> colon
 
    LDATA _ _
       -> panic "pprInstr: LDATA"
@@ -818,7 +818,7 @@ pprInstr platform i = case i of
       -> pprFormatOpReg (text "xchg") format src val
 
    JXX cond blockid
-      -> pprCondInstr (text "j") cond (pdoc platform lab)
+      -> pprCondInstr (text "j") cond (pprAsmLabel platform lab)
          where lab = blockLbl blockid
 
    JXX_GBL cond imm

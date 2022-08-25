@@ -297,7 +297,7 @@ direct_call caller call_conv lbl arity args
        platform <- getPlatform
        pprPanic "direct_call" $
             text caller <+> ppr arity <+>
-            pdoc platform lbl <+> ppr (length args) <+>
+            pprDebugCLabel platform lbl <+> ppr (length args) <+>
             pdoc platform (map snd args) <+> ppr (map fst args)
 
   | null rest_args  -- Precisely the right number of arguments

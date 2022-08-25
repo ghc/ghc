@@ -729,7 +729,7 @@ pprImportedSymbol config importedLbl = case (arch,os) of
    _ -> panic "PIC.pprImportedSymbol: no match"
  where
    platform = ncgPlatform config
-   ppr_lbl  = pprCLabel     platform AsmStyle
+   ppr_lbl  = pprAsmLabel   platform
    arch     = platformArch  platform
    os       = platformOS    platform
    pic      = ncgPIC config

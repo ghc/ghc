@@ -51,8 +51,8 @@ dwarfGen config modLoc us blocks = do
         , dwName = fromMaybe "" (ml_hs_file modLoc)
         , dwCompDir = addTrailingPathSeparator compPath
         , dwProducer = cProjectName ++ " " ++ cProjectVersion
-        , dwLowLabel = pdoc platform lowLabel
-        , dwHighLabel = pdoc platform highLabel
+        , dwLowLabel = pprAsmLabel platform lowLabel
+        , dwHighLabel = pprAsmLabel platform highLabel
         , dwLineLabel = dwarfLineLabel
         }
 
@@ -109,9 +109,9 @@ mkDwarfARange proc = DwarfARange lbl end
 compileUnitHeader :: Platform -> Unique -> SDoc
 compileUnitHeader platform unitU =
   let cuLabel = mkAsmTempLabel unitU  -- sits right before initialLength field
-      length = pdoc platform (mkAsmTempEndLabel cuLabel) <> char '-' <> pdoc platform cuLabel
+      length = pprAsmLabel platform (mkAsmTempEndLabel cuLabel) <> char '-' <> pprAsmLabel platform cuLabel
                <> text "-4"       -- length of initialLength field
-  in vcat [ pdoc platform cuLabel <> colon
+  in vcat [ pprAsmLabel platform cuLabel <> colon
           , text "\t.long " <> length  -- compilation unit size
           , pprHalf 3                          -- DWARF version
           , sectionOffset platform dwarfAbbrevLabel dwarfAbbrevLabel
@@ -123,7 +123,7 @@ compileUnitHeader platform unitU =
 compileUnitFooter :: Platform -> Unique -> SDoc
 compileUnitFooter platform unitU =
   let cuEndLabel = mkAsmTempEndLabel $ mkAsmTempLabel unitU
-  in pdoc platform cuEndLabel <> colon
+  in pprAsmLabel platform cuEndLabel <> colon
 
 -- | Splits the blocks by procedures. In the result all nested blocks
 -- will come from the same procedure as the top-level block. See

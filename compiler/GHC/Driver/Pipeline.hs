@@ -606,7 +606,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   empty_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
   let home_unit = hsc_home_unit hsc_env
       src = text "int" <+> ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
-  writeFile empty_stub (showSDoc dflags (pprCode CStyle src))
+  writeFile empty_stub (showSDoc dflags (pprCode src))
   let pipe_env = (mkPipeEnv NoStop empty_stub Nothing Persistent) { src_basename = basename}
       pipeline = viaCPipeline HCc pipe_env hsc_env (Just location) empty_stub
   _ <- runPipeline (hsc_hooks hsc_env) pipeline

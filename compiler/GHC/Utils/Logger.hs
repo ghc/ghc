@@ -332,7 +332,7 @@ jsonLogAction _ (MCDiagnostic SevIgnore _) _ _ = return () -- suppress the messa
 jsonLogAction logflags msg_class srcSpan msg
   =
     defaultLogActionHPutStrDoc logflags True stdout
-      (withPprStyle (PprCode CStyle) (doc $$ text ""))
+      (withPprStyle PprCode (doc $$ text ""))
     where
       str = renderWithContext (log_default_user_context logflags) msg
       doc = renderJSON $

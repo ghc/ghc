@@ -63,7 +63,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             _ -> pprLabel platform lbl) $$ -- blocks guaranteed not null,
                                            -- so label needed
          vcat (map (pprBasicBlock config top_info) blocks) $$
-         ppWhen (ncgDwarfEnabled config) (pdoc platform (mkAsmTempEndLabel lbl)
+         ppWhen (ncgDwarfEnabled config) (pprAsmLabel platform (mkAsmTempEndLabel lbl)
                                           <> char ':' $$
                                           pprProcEndLabel platform lbl) $$
          pprSizeDecl platform lbl
@@ -71,7 +71,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
     Just (CmmStaticsRaw info_lbl _) ->
       pprSectionAlign config (Section Text info_lbl) $$
       (if platformHasSubsectionsViaSymbols platform
-          then pdoc platform (mkDeadStripPreventer info_lbl) <> char ':'
+          then pprAsmLabel platform (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock config top_info) blocks) $$
       -- above: Even the first block gets a label, because with branch-chain
@@ -80,9 +80,9 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
        then
        -- See Note [Subsections Via Symbols] in X86/Ppr.hs
                 text "\t.long "
-            <+> pdoc platform info_lbl
+            <+> pprAsmLabel platform info_lbl
             <+> char '-'
-            <+> pdoc platform (mkDeadStripPreventer info_lbl)
+            <+> pprAsmLabel platform (mkDeadStripPreventer info_lbl)
        else empty) $$
       pprSizeDecl platform info_lbl
 
@@ -93,7 +93,7 @@ pprSizeDecl platform lbl
    then text "\t.size" <+> prettyLbl <> text ", .-" <> codeLbl
    else empty
   where
-    prettyLbl = pdoc platform lbl
+    prettyLbl = pprAsmLabel platform lbl
     codeLbl
       | platformArch platform == ArchPPC_64 ELF_V1 = char '.' <> prettyLbl
       | otherwise                                  = prettyLbl
@@ -102,33 +102,33 @@ pprFunctionDescriptor :: Platform -> CLabel -> SDoc
 pprFunctionDescriptor platform lab = pprGloblDecl platform lab
                         $$  text "\t.section \".opd\", \"aw\""
                         $$  text "\t.align 3"
-                        $$  pdoc platform lab <> char ':'
+                        $$  pprAsmLabel platform lab <> char ':'
                         $$  text "\t.quad ."
-                        <>  pdoc platform lab
+                        <>  pprAsmLabel platform lab
                         <>  text ",.TOC.@tocbase,0"
                         $$  text "\t.previous"
                         $$  text "\t.type"
-                        <+> pdoc platform lab
+                        <+> pprAsmLabel platform lab
                         <>  text ", @function"
-                        $$  char '.' <> pdoc platform lab <> char ':'
+                        $$  char '.' <> pprAsmLabel platform lab <> char ':'
 
 pprFunctionPrologue :: Platform -> CLabel ->SDoc
 pprFunctionPrologue platform lab =  pprGloblDecl platform lab
                         $$  text ".type "
-                        <> pdoc platform lab
+                        <> pprAsmLabel platform lab
                         <> text ", @function"
-                        $$ pdoc platform lab <> char ':'
+                        $$ pprAsmLabel platform lab <> char ':'
                         $$ text "0:\taddis\t" <> pprReg toc
                         <> text ",12,.TOC.-0b@ha"
                         $$ text "\taddi\t" <> pprReg toc
                         <> char ',' <> pprReg toc <> text ",.TOC.-0b@l"
-                        $$ text "\t.localentry\t" <> pdoc platform lab
-                        <> text ",.-" <> pdoc platform lab
+                        $$ text "\t.localentry\t" <> pprAsmLabel platform lab
+                        <> text ",.-" <> pprAsmLabel platform lab
 
 pprProcEndLabel :: Platform -> CLabel -- ^ Procedure name
                 -> SDoc
 pprProcEndLabel platform lbl =
-    pdoc platform (mkAsmTempProcEndLabel lbl) <> char ':'
+    pprAsmLabel platform (mkAsmTempProcEndLabel lbl) <> char ':'
 
 pprBasicBlock :: NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr
               -> SDoc
@@ -137,7 +137,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
     pprLabel platform asmLbl $$
     vcat (map (pprInstr platform) instrs) $$
     ppWhen (ncgDwarfEnabled config) (
-      pdoc platform (mkAsmTempEndLabel asmLbl) <> char ':'
+      pprAsmLabel platform (mkAsmTempEndLabel asmLbl) <> char ':'
       <> pprProcEndLabel platform asmLbl
     )
   where
@@ -162,7 +162,7 @@ pprDatas platform (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLi
   , Just ind' <- labelInd ind
   , alias `mayRedirectTo` ind'
   = pprGloblDecl platform alias
-    $$ text ".equiv" <+> pdoc platform alias <> comma <> pdoc platform (CmmLabel ind')
+    $$ text ".equiv" <+> pprAsmLabel platform alias <> comma <> pprAsmLabel platform ind'
 pprDatas platform (CmmStaticsRaw lbl dats) = vcat (pprLabel platform lbl : map (pprData platform) dats)
 
 pprData :: Platform -> CmmStatic -> SDoc
@@ -175,20 +175,20 @@ pprData platform d = case d of
 pprGloblDecl :: Platform -> CLabel -> SDoc
 pprGloblDecl platform lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = text ".globl " <> pdoc platform lbl
+  | otherwise = text ".globl " <> pprAsmLabel platform lbl
 
 pprTypeAndSizeDecl :: Platform -> CLabel -> SDoc
 pprTypeAndSizeDecl platform lbl
   = if platformOS platform == OSLinux && externallyVisibleCLabel lbl
     then text ".type " <>
-         pdoc platform lbl <> text ", @object"
+         pprAsmLabel platform lbl <> text ", @object"
     else empty
 
 pprLabel :: Platform -> CLabel -> SDoc
 pprLabel platform lbl =
    pprGloblDecl platform lbl
    $$ pprTypeAndSizeDecl platform lbl
-   $$ (pdoc platform lbl <> char ':')
+   $$ (pprAsmLabel platform lbl <> char ':')
 
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
@@ -238,8 +238,8 @@ pprImm :: Platform -> Imm -> SDoc
 pprImm platform = \case
    ImmInt i       -> int i
    ImmInteger i   -> integer i
-   ImmCLbl l      -> pdoc platform l
-   ImmIndex l i   -> pdoc platform l <> char '+' <> int i
+   ImmCLbl l      -> pprAsmLabel platform l
+   ImmIndex l i   -> pprAsmLabel platform l <> char '+' <> int i
    ImmLit s       -> text s
    ImmFloat f     -> float $ fromRational f
    ImmDouble d    -> double $ fromRational d
@@ -559,7 +559,7 @@ pprInstr platform instr = case instr of
            pprCond cond,
            pprPrediction prediction,
            char '\t',
-           pdoc platform lbl
+           pprAsmLabel platform lbl
            ]
          where lbl = mkLocalBlockLabel (getUnique blockid)
                pprPrediction p = case p of
@@ -577,7 +577,7 @@ pprInstr platform instr = case instr of
            ],
            hcat [
                text "\tb\t",
-               pdoc platform lbl
+               pprAsmLabel platform lbl
            ]
           ]
           where lbl = mkLocalBlockLabel (getUnique blockid)
@@ -594,7 +594,7 @@ pprInstr platform instr = case instr of
            char '\t',
            text "b",
            char '\t',
-           pdoc platform lbl
+           pprAsmLabel platform lbl
        ]
 
    MTCTR reg
@@ -625,12 +625,12 @@ pprInstr platform instr = case instr of
              -- they'd technically be more like 'ForeignLabel's.
              hcat [
                text "\tbl\t.",
-               pdoc platform lbl
+               pprAsmLabel platform lbl
              ]
            _ ->
              hcat [
                text "\tbl\t",
-               pdoc platform lbl
+               pprAsmLabel platform lbl
              ]
 
    BCTRL _

@@ -210,7 +210,7 @@ pprGNUSectionHeader config t suffix =
     platform      = ncgPlatform config
     splitSections = ncgSplitSections config
     subsection
-      | splitSections = sep <> pdoc platform suffix
+      | splitSections = sep <> pprAsmLabel platform suffix
       | otherwise     = empty
     header = case t of
       Text -> text ".text"

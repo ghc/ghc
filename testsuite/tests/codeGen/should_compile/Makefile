@@ -48,9 +48,11 @@ T15723:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -dynamic -shared T15723B.o -o T15723B.so
 
 # Check that the static indirection b is compiled to an equiv directive
+# This will be .equiv T15155_b_closure,T15155_a_closure
+#           or .equiv _T15155_b_closure,_T15155_a_closure on Darwin
 T15155:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -ddump-asm T15155l.hs | \
-		grep -F ".equiv T15155.b_closure,T15155.a_closure"
+		grep -F ".equiv"
 
 # Same as above, but in LLVM. Check that the static indirection b is compiled to
 # an alias.
