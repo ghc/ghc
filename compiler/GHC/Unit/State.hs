@@ -1105,31 +1105,29 @@ findWiredInUnits logger prec_map pkgs vis_map = do
         -- available.
         --
         findWiredInUnit :: [UnitInfo] -> UnitId -> IO (Maybe (UnitId, UnitInfo))
-        findWiredInUnit pkgs wired_pkg =
-           let all_ps = [ p | p <- pkgs, p `matches` wired_pkg ]
-               all_exposed_ps =
-                    [ p | p <- all_ps
-                        , Map.member (mkUnit p) vis_map ] in
-           case all_exposed_ps of
-            [] -> case all_ps of
-                       []   -> notfound
-                       many -> pick (head (sortByPreference prec_map many))
-            many -> pick (head (sortByPreference prec_map many))
+        findWiredInUnit pkgs wired_pkg = firstJustsM [try all_exposed_ps, try all_ps, notfound]
           where
+                all_ps = [ p | p <- pkgs, p `matches` wired_pkg ]
+                all_exposed_ps = [ p | p <- all_ps, Map.member (mkUnit p) vis_map ]
+
+                try ps = case sortByPreference prec_map ps of
+                    p:_ -> Just <$> pick p
+                    _ -> pure Nothing
+
                 notfound = do
                           debugTraceMsg logger 2 $
                             text "wired-in package "
                                  <> ftext (unitIdFS wired_pkg)
                                  <> text " not found."
                           return Nothing
-                pick :: UnitInfo -> IO (Maybe (UnitId, UnitInfo))
+                pick :: UnitInfo -> IO (UnitId, UnitInfo)
                 pick pkg = do
                         debugTraceMsg logger 2 $
                             text "wired-in package "
                                  <> ftext (unitIdFS wired_pkg)
                                  <> text " mapped to "
                                  <> ppr (unitId pkg)
-                        return (Just (wired_pkg, pkg))
+                        return (wired_pkg, pkg)
 
 
   mb_wired_in_pkgs <- mapM (findWiredInUnit pkgs) wiredInUnitIds
