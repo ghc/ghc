@@ -458,7 +458,7 @@ foreign import javascript interruptible "(($1_1,$1_2,$2_1,$2_2,$c) => { return h
    lstat :: CFilePath -> Ptr CStat -> IO CInt
 foreign import javascript interruptible "(($1_1,$1_2,$2,$3,$c) => { return h$base_open($1_1,$1_2,$2,$3,$c); })"
    c_open :: CFilePath -> CInt -> CMode -> IO CInt
-foreign import javascript interruptible "(($1, $2, $3, $c) => { return h$c_interruptible_open($1,$2,$3,$c); })"
+foreign import javascript interruptible "(($1_1,$1_2,$2,$3,$c) => { return h$base_open($1_1,$1_2,$2,$3,$c); })"
    c_interruptible_open_ :: CFilePath -> CInt -> CMode -> IO CInt
 foreign import javascript interruptible "(($1_1,$1_2,$2,$3,$c) => { return h$base_open($1_1,$1_2,$2,$3,$c); })"
    c_safe_open_ :: CFilePath -> CInt -> CMode -> IO CInt
