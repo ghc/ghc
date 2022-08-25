@@ -6,6 +6,7 @@ test('HooplPostorder',
 test('cmp64',
      [    extra_run_opts('"' + config.libdir + '"')
      ,    omit_ways(['ghci'])
+     ,    js_skip
      ],
      multi_compile_and_run,
      ['cmp64', [('cmp64_cmm.cmm', '')], '-O'])
@@ -20,6 +21,7 @@ test('cmp64',
 test('ByteSwitch',
      [    extra_run_opts('"' + config.libdir + '"')
      ,    omit_ways(['ghci'])
+     ,    js_skip
      ],
      multi_compile_and_run,
      ['ByteSwitch', [('ByteSwitch_cmm.cmm', '')], ''])

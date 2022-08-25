@@ -74,7 +74,7 @@ test('cgrun065', normal, compile_and_run, [''])
 test('cgrun066', normal, compile_and_run, [''])
 test('cgrun067', [extra_files(['Cgrun067A.hs'])], compile_and_run, [''])
 test('cgrun069',
-     [ omit_ways(['ghci'])],
+     [ omit_ways(['ghci']), js_skip],
      multi_compile_and_run,
      ['cgrun069', [('cgrun069_cmm.cmm', '')], ''])
 test('cgrun070', normal, compile_and_run, [''])
@@ -99,7 +99,7 @@ test('T3207', normal, compile_and_run, [''])
 test('T3561', normal, compile_and_run, [''])
 test('T3677', extra_run_opts('+RTS -K8k -RTS'), compile_and_run, [''])
 test('T4441', normal, compile_and_run, [''])
-test('T5149', omit_ways(['ghci']), multi_compile_and_run,
+test('T5149', [omit_ways(['ghci']), js_skip], multi_compile_and_run,
                  ['T5149', [('T5149_cmm.cmm', '')], ''])
 test('T5129',
      # The bug is in simplifier when run with -O1 and above, so only run it
@@ -161,7 +161,7 @@ test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2']), req_smp],
 test('T10521', normal, compile_and_run, [''])
 test('T10521b', normal, compile_and_run, [''])
 test('T10870', when(wordsize(32), skip), compile_and_run, [''])
-test('PopCnt', omit_ways(['ghci']), multi_compile_and_run,
+test('PopCnt', [omit_ways(['ghci']), js_skip], multi_compile_and_run,
                  ['PopCnt', [('PopCnt_cmm.cmm', '')], ''])
 test('T12059', normal, compile_and_run, [''])
 test('T12433', normal, compile_and_run, [''])
