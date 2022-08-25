@@ -433,6 +433,7 @@ inlining.
 Exit join points, recognizable using `isExitJoinId` are join points with an
 occurrence in a recursive group, and can be recognized (after the occurrence
 analyzer ran!) using `isExitJoinId`.
+
 This function detects joinpoints with `occ_in_lam (idOccinfo id) == True`,
 because the lambdas of a non-recursive join point are not considered for
 `occ_in_lam`.  For example, in the following code, `j1` is /not/ marked
@@ -445,6 +446,29 @@ To prevent inlining, we check for isExitJoinId
 * In `preInlineUnconditionally` directly.
 * In `simplLetUnfolding` we simply give exit join points no unfolding, which
   prevents inlining in `postInlineUnconditionally` and call sites.
+
+But see Note [Be selective about not-inlining exit join points]
+
+Note [Be selective about not-inlining exit join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we follow "do not inline exit join points" mantra throughout,
+some bad things happen.
+
+* We can lose CPR information: see #21148
+
+* We get useless clutter (#22084) that
+  - makes the program bigger (including duplicated code #20739), and
+  - adds extra jumps (and maybe stack saves) at runtime
+
+So instead we follow "do not inline exit join points" for a /single run/
+of the simplifier, right after Exitification.  That should give a
+sufficient chance for used-once things to inline, but subsequent runs
+will inline them back in.  (Annoyingly, as things stand, only with -O2
+is there a subsequent run, but that might change, and it's not a huge
+deal anyway.)
+
+This is controlled by the Simplifier's sm_keep_exits flag; see
+GHC.Core.Opt.Pipeline.
 
 Note [Placement of the exitification pass]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

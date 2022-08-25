@@ -1512,8 +1512,10 @@ scExpr' env (Case scrut b ty alts)
                 scrut_occ = case con of
                                DataAlt dc -- See Note [Do not specialise evals]
                                   | not (single_alt && all deadArgOcc arg_occs)
-                                  -> ScrutOcc (unitUFM dc arg_occs)
-                               _  -> UnkOcc
+                                  -> -- pprTrace "sc_alt1" (ppr b' $$ ppr con $$ ppr bs $$ ppr arg_occs) $
+                                     ScrutOcc (unitUFM dc arg_occs)
+                               _  -> -- pprTrace "sc_alt1" (ppr b' $$ ppr con $$ ppr bs $$ ppr arg_occs) $
+                                     UnkOcc
           ; return (usg', b_occ `combineOcc` scrut_occ, Alt con bs2 rhs') }
 
 
