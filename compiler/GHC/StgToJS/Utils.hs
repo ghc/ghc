@@ -52,7 +52,6 @@ assignCoerce (TypedExpr AddrRep [a_val, a_off]) (TypedExpr UnliftedRep [sptr]) =
     , a_off |= sptr
     ]
 assignCoerce (TypedExpr UnliftedRep [sptr]) (TypedExpr AddrRep [_a_val, a_off]) =
-  -- FIXME: (Sylvain 2022-03-11): why can we ignore a_val?
   sptr |= a_off
 assignCoerce p1 p2 = assignTypedExprs [p1] [p2]
 

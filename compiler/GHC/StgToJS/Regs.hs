@@ -29,18 +29,6 @@ import GHC.Data.FastString
 import Data.Array
 import Data.Char
 
--- FIXME: Perf: Jeff (2022,03): as far as I can tell, we never pattern match on
--- these registers and make heavy use of the Enum, Bounded, and Ix, instances.
--- This heavily implies to me that we should be using something like: StgReg =
--- StgReg { unStgReg :: Int8# } and then store two nibbles in a single byte. Not
--- only would this be more memory efficient, but it would also allow for
--- optimizations such as pointer tagging and avoiding chasing the info table,
--- although I'm not sure if this would really benefit the backend as currently
--- written. Other than that a newtype wrapper with a custom bounded instance
--- (hand written or deriving via) would be better. In almost all functions that
--- take an StgReg we use either the Bounded or the Enum methods, thus we likely
--- don't gain anything from having these registers explicitly represented in
--- data constructors.
 -- | General purpose "registers"
 --
 -- The JS backend arbitrarily supports 128 registers
@@ -103,8 +91,6 @@ r3 = toJExpr R3
 r4 = toJExpr R4
 
 
--- FIXME: Jeff (2022,03): remove these serialization functions after adding a
--- StgReg type with a proper bounded and enum instance
 jsRegToInt :: StgReg -> Int
 jsRegToInt = (+1) . fromEnum
 

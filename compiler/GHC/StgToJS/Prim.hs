@@ -578,7 +578,6 @@ genPrim prof ty op = case op of
                                                                     , a .! i |= new
                                                                     , s |= zero_
                                                                     ]
-                                                                    -- fixme both new?
                                                                     [ s |= one_
                                                                     , o |= x
                                                                     ]
@@ -705,7 +704,6 @@ genPrim prof ty op = case op of
       PrimInline $ r |= app "h$compareByteArrays" [a1,o1,a2,o2,n]
 
   CopyByteArrayOp -> \[] [a1,o1,a2,o2,n] ->
-      -- FIXME: we can do faster by copying 32 bit ints or doubles
       PrimInline $ loopBlockS (Sub n one_) (.>=. zero_) \i ->
         [ u8_ a2 (Add i o2) |= u8_ a1 (Add i o1)
         , postDecrS i
@@ -742,7 +740,7 @@ genPrim prof ty op = case op of
   AddrSubOp   -> \[i]     [_a1,o1,_a2,o2] -> PrimInline $ i |= Sub o1 o2
   AddrRemOp   -> \[r]     [_a,o,i]        -> PrimInline $ r |= Mod o i
   AddrToIntOp -> \[i]     [_a,o]          -> PrimInline $ i |= o -- only usable for comparisons within one range
-  IntToAddrOp -> \[a,o]   [i]             -> PrimInline $ mconcat [a |= null_, o |= i] -- FIXME: unsupported
+  IntToAddrOp -> \[a,o]   [i]             -> PrimInline $ mconcat [a |= null_, o |= i]
   AddrGtOp -> \[r] [a1,o1,a2,o2] -> PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .>. zero_)
   AddrGeOp -> \[r] [a1,o1,a2,o2] -> PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .>=. zero_)
   AddrEqOp -> \[r] [a1,o1,a2,o2] -> PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .===. zero_)
@@ -920,13 +918,13 @@ genPrim prof ty op = case op of
 
   MkWeakOp              -> \[r] [o,b,c] -> PrimInline $ r |= app "h$makeWeak" [o,b,c]
   MkWeakNoFinalizerOp   -> \[r] [o,b]   -> PrimInline $ r |= app "h$makeWeakNoFinalizer" [o,b]
-  AddCFinalizerToWeakOp -> \[r] [_a1,_a1o,_a2,_a2o,_i,_a3,_a3o,_w] -> PrimInline $ r |= one_ -- fixme
+  AddCFinalizerToWeakOp -> \[r] [_a1,_a1o,_a2,_a2o,_i,_a3,_a3o,_w] -> PrimInline $ r |= one_
   DeRefWeakOp           -> \[f,v] [w] -> PrimInline $ mconcat
                                                         [ v |= w .^ "val"
                                                         , f |= if01 (v .===. null_)
                                                         ]
   FinalizeWeakOp     -> \[fl,fin] [w] -> PrimInline $ appT [fin, fl] "h$finalizeWeak" [w]
-  TouchOp            -> \[] [_e]      -> PrimInline mempty -- fixme what to do?
+  TouchOp            -> \[] [_e]      -> PrimInline mempty
   KeepAliveOp        -> \[_r] [x, f]  -> PRPrimCall $ ReturnStat (app "h$keepAlive" [x, f])
 
 

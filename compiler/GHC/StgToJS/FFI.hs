@@ -50,7 +50,6 @@ import Control.Monad
 import Control.Applicative
 import qualified Text.ParserCombinators.ReadP as P
 
--- FIXME: what if the call returns a thunk?
 genPrimCall :: ExprCtx -> PrimCall -> [StgArg] -> Type -> G (JStat, ExprResult)
 genPrimCall ctx (PrimCall lbl _) args t = do
   j <- parseFFIPattern False False False ("h$" ++ unpackFS lbl) t (concatMap typex_expr $ ctxTarget ctx) args
@@ -140,8 +139,7 @@ parseFFIPattern' :: Maybe JExpr -- ^ Nothing for sync, Just callback for async
 parseFFIPattern' callback javascriptCc pat t ret args
   | not javascriptCc = mkApply pat
   | otherwise =
-   if True -- FIXME (Sylvain 2022-03): we don't support parsing of JS imports.
-           -- So we assume that we can directly apply to them...
+   if True
      then mkApply pat
      else do
       u <- freshUnique
@@ -278,13 +276,9 @@ callbackPlaceholders (Just e) = [((TxtI "$c"), e)]
 
 parseFfiJME :: String -> Int -> Either String JExpr
 parseFfiJME _xs _u =  Left "parseFfiJME not yet implemented"
-  -- FIXME (Sylvain 2022-02): removed temporarily for the codegen merge. Need to
-  -- decide which syntax we support
 
 parseFfiJM :: String -> Int -> Either String JStat
 parseFfiJM _xs _u = Left "parseFfiJM not yet implemented"
-  -- FIXME (Sylvain 2022-02): removed temporarily for the codegen merge. Need to
-  -- decide which syntax we support
 
 saturateFFI :: JMacro a => Int -> a -> a
 saturateFFI u = jsSaturate (Just . mkFastString $ "ghcjs_ffi_sat_" ++ show u)

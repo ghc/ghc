@@ -203,9 +203,9 @@ primTypeVt t = case tyConAppTyCon_maybe (unwrapType t) of
     | tc == mutVarPrimTyCon            -> RtsObjV
     | tc == mVarPrimTyCon              -> RtsObjV
     | tc == tVarPrimTyCon              -> RtsObjV
-    | tc == bcoPrimTyCon               -> RtsObjV -- fixme what do we need here?
+    | tc == bcoPrimTyCon               -> RtsObjV -- unsupported?
     | tc == stackSnapshotPrimTyCon     -> RtsObjV
-    | tc == ioPortPrimTyCon            -> RtsObjV -- FIXME: Jeff (2022, 05) IOPort, how to handle in JS?
+    | tc == ioPortPrimTyCon            -> RtsObjV -- unsupported?
     | tc == anyTyCon                   -> PtrV
     | tc == compactPrimTyCon           -> ObjV -- unsupported?
     | tc == eqPrimTyCon                -> VoidV -- coercion token?

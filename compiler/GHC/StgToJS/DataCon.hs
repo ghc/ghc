@@ -43,9 +43,6 @@ genCon ctx con args
   | [ValExpr (JVar ctxi)] <- concatMap typex_expr (ctxTarget ctx)
   = allocCon ctxi con currentCCS args
 
-  -- FIXME: (Sylvain 2022-03-11) Do we support e.g. "data T = MkT Word64"? It
-  -- would return two JExprs
-
   | xs <- concatMap typex_expr (ctxTarget ctx)
   = pprPanic "genCon: unhandled DataCon" (ppr (con, args, xs))
 

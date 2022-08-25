@@ -138,7 +138,7 @@ genUnits m ss spt_entries foreign_stubs
         staticInit <-
           initStaticPtrs spt_entries
         (st', _, bs) <- serializeLinkableUnit m st [] [] []
-                         ( -- FIXME (Sylvain, 2022/02): optimizer disabled: O.optimize .
+                         ( -- O.optimize .
                            jsSaturate (Just $ modulePrefix m 1)
                          $ mconcat (reverse glbl) <> staticInit) "" [] []
         return ( st'
@@ -218,8 +218,7 @@ genUnits m ss spt_entries foreign_stubs
         let allDeps  = collectIds unf decl
             topDeps  = collectTopIds decl
             required = hasExport decl
-            stat     = -- FIXME (Sylvain 2022/02): optimizer disabled:
-                       -- {-decl -} Opt.optimize .
+            stat     = -- Opt.optimize .
                        jsSaturate (Just $ modulePrefix m n)
                      $ mconcat (reverse extraTl) <> tl
         (st', _ss, bs) <- serializeLinkableUnit m st topDeps ci si stat mempty [] fRefs

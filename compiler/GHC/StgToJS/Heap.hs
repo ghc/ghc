@@ -43,21 +43,6 @@ import GHC.JS.Make
 import GHC.StgToJS.Types
 import GHC.Data.FastString
 
--- FIXME: Jeff (2022,03): These helpers are a classic case of using a newtype
--- over a type synonym to leverage GHC's type checker. Basically we never want
--- to mix these up, and so we should have:
---------------------------------------
--- newtype ClosureEntry  = ClosureEntry  { unClosureEntry  :: FastString }
--- newtype ClosureExtra1 = ClosureExtra1 { unClosureExtra1 :: FastString }
--- newtype ClosureExtra2 = ClosureExtra2 { unClosureExtra2 :: FastString }
--- newtype ClosureMeta   = ClosureMeta   { unClosureMeta   :: FastString }
---------------------------------------
--- especially since any bugs which result from confusing these will be catastrophic and hard to debug
--- also NOTE: if ClosureExtra<N> is truly unbounded then we should have:
--- newtype ClosureExtras = ClosureExtras { unClosureExtras :: [FastString] }
--- or use an Array and amortize increasing the arrays size when needed; depending
--- on its use case in the RTS of course
-
 closureEntry_ :: FastString
 closureEntry_ = "f"
 

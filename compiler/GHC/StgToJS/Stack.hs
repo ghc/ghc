@@ -182,9 +182,6 @@ pushOptimized' xs = do
   pushOptimized =<< (zipWithM f xs (slots++repeat SlotUnknown))
   where
     f (i1,n1) xs2 = do
-      -- FIXME (Sylvain 2022-08): do we really need to generate all the Idents here
-      -- to only select one? Is it because we need the side effect that consists in
-      -- filling the GlobalId cache?
       xs <- varsForId i1
       let !id_n1 = xs !! (n1-1)
 

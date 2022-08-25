@@ -158,7 +158,7 @@ genArg a = case a of
            as <- concat <$> mapM genArg args
            e  <- varForDataConWorker dc
            inl_alloc <- csInlineAlloc <$> getSettings
-           return [allocDynamicE inl_alloc e as Nothing] -- FIXME: ccs
+           return [allocDynamicE inl_alloc e as Nothing]
       x -> pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
 
 genIdArg :: HasDebugCallStack => Id -> G [JExpr]
@@ -258,7 +258,6 @@ jsStaticArg = \case
   StaticLitArg l      -> toJExpr l
   StaticObjArg t      -> ValExpr (JVar (TxtI t))
   StaticConArg c args ->
-    -- FIXME: cost-centre stack
     allocDynamicE False (ValExpr . JVar . TxtI $ c) (map jsStaticArg args) Nothing
 
 -- | Generate JS code corresponding to a list of static args

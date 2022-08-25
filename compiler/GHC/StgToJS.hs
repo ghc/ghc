@@ -70,13 +70,6 @@ import GHC.StgToJS.CodeGen
 -- Primitives that are represented as multiple values (Int64#, Word64#, Addr#)
 -- are passed to FFI functions with multiple arguments.
 --
--- FIXME: specify argument order:
---    high then low (Int64#/Word64#)?
---    array then offset(Addr#)?
---    StablePtr#: do we pass the array?
--- FIXME: how do we return them from FFI? With h$retN variables as for
--- unboex tuples?
---
 -- Interruptible convention: FFI imports with the "interruptible" calling
 -- convention are passed an extra argument (usually named "$c") that is a
 -- continuation function. The FFI function must call this function to return to
@@ -128,8 +121,8 @@ import GHC.StgToJS.CodeGen
 --    , i     -- (array) fields layout (empty if variable layout)
 --    , n     -- (string) object name for easier dubugging
 --    , a     -- constructor tag / fun arity
---    , r     -- FIXME
---    , s     -- static references? FIXME
+--    , r     -- ??
+--    , s     -- static references?
 --    , m     -- GC mark?
 --    }
 --

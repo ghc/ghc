@@ -6,7 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TupleSections              #-}
 
--- only for DB.Binary instances on Module see FIXME below
+-- only for DB.Binary instances on Module
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
@@ -36,16 +36,7 @@
 --   - dependency info
 --   - closureinfo index
 --   - closureinfo data (offsets described by index)
-
--- FIXME: Jeff (2022,03): There are orphan instances for DB.Binary Module and
--- ModuleName. These are needed in StgToJS.Linker.Types for @Base@ serialization
--- in @putBase@. We end up in this situation because Base now holds a @Module@
--- type instead of GHCJS's previous @Package@ type. In addition to this GHC uses
--- GHC.Utils.Binary for binary instances rather than Data.Binary (even though
--- Data.Binary is a boot lib) so to fix the situation we must:
--- - 1. Choose to use GHC.Utils.Binary or Data.Binary
--- - 2. Remove Binary since this is redundant
--- - 3. Adapt the Linker types, like Base to the new Binary methods
+--
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Object
@@ -174,7 +165,6 @@ trim = let f = dropWhile isSpace . reverse in f . f
 isGlobalUnit :: Int -> Bool
 isGlobalUnit n = n == 0
 
--- fixme document, exports unit is always linked
 isExportsUnit :: Int -> Bool
 isExportsUnit n = n == 1
 
@@ -492,9 +482,6 @@ putSymbolTable (SymbolTable _ hm) = st
       st = DB.runPut $ do
               DB.putWord32le (fromIntegral $ length xs)
               mapM_ DB.put xs
-              -- fixme: this is a workaround for some weird issue sometimes causing zero-length
-              --        strings when using the Data.Text instance directly
-              -- mapM_ (DB.put . TE.encodeUtf8) xs
       xs :: [FastString]
       xs = map fst . sortBy (compare `on` snd) . nonDetEltsUniqMap $ hm
       -- We can use `nonDetEltsUniqMap` because the paired `Int`s introduce ordering.
