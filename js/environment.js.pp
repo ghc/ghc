@@ -246,8 +246,23 @@ function h$errorBelch() {
 }
 
 function h$errorBelch2(buf1, buf_offset1, buf2, buf_offset2) {
-//  log("### errorBelch2");
-  h$errorMsg(h$decodeUtf8z(buf1, buf_offset1), h$decodeUtf8z(buf2, buf_offset2));
+  var pat = h$decodeUtf8z(buf1, buf_offset1);
+  h$errorMsg(h$append_prog_name(pat), h$decodeUtf8z(buf2, buf_offset2));
+}
+
+// append program name to the given string if possible
+function h$append_prog_name(str) {
+  // basename that only works with Unix paths for now...
+  function basename(path) {
+   return path.split('/').reverse()[0];
+  }
+
+  // only works for node for now
+  if(h$isNode) {
+    return basename(process.argv[1]) + ": " + str;
+  }
+
+  return str;
 }
 
 function h$debugBelch2(buf1, buf_offset1, buf2, buf_offset2) {
@@ -266,15 +281,9 @@ function h$errorMsg(pat) {
     str = str.replace(/%s/, arguments[i]);
   }
 #ifndef GHCJS_BROWSER
-  // basename that only works on Linux for now...
-  function basename(path) {
-   return path.split('/').reverse()[0];
-  }
   if(h$isGHCJSi) {
     // ignore message
   } else if(h$isNode) {
-    // append program name
-    str = basename(process.argv[1]) + ": " + str;
     process.stderr.write(str);
   } else if (h$isJsShell && typeof printErr !== 'undefined') {
     if(str.length) printErr(stripTrailingNewline(str));
