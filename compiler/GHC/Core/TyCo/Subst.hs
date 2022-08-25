@@ -836,14 +836,10 @@ subst_ty_t subst ty
         (subst', tv') ->
           return $! (ForAllTy $! ((Bndr $! tv') vis)) $! (subst_ty subst' ty)
     go (LitTy n) = return $ LitTy $! n
-    -- TODO: make a subst_co_t version of subst_co
     go (CastTy ty co) = do
       ty' <- go ty
-      persistent_subst <- persistentTCvSubst subst
-      return $! (mkCastTy $! ty') $! (subst_co persistent_subst co)
-    go (CoercionTy co) = do
-      persistent_subst <- persistentTCvSubst subst
-      return $! CoercionTy $! (subst_co persistent_subst co)
+      (mkCastTy $! ty') <$> (subst_co_t subst co)
+    go (CoercionTy co) = CoercionTy <$> (subst_co_t subst co)
 
 substTyVar :: TCvSubst -> TyVar -> Type
 substTyVar (TCvSubst _ tenv _) tv
@@ -948,6 +944,55 @@ subst_co subst co
     go_hole h@(CoercionHole { ch_co_var = cv })
       = h { ch_co_var = updateVarType go_ty cv }
 
+-- | Persists 'subst' before it is modified.
+subst_co_t :: TTCvSubst s -> Coercion -> ST s Coercion
+subst_co_t subst co
+  = go co
+  where
+    go_ty = subst_ty_t subst
+
+    go_mco MRefl    = return MRefl
+    go_mco (MCo co) = MCo <$> go co
+
+    go (Refl ty)             = mkNomReflCo <$> (go_ty ty)
+    go (GRefl r ty mco)      = (mkGReflCo r <$> (go_ty ty)) <*> (go_mco mco)
+    go (TyConAppCo r tc args) = do
+      args' <- mapM go args
+      args' `seqList` (return $ mkTyConAppCo r tc args')
+    go (AppCo co arg) = (mkAppCo <$> go co) <*> go arg
+    go (ForAllCo tv kind_co co) = do
+      persistent_subst <- persistentTCvSubst subst
+      case substForAllCoBndrUnchecked persistent_subst tv kind_co of
+        (subst', tv', kind_co') ->
+          return $! ((mkForAllCo $! tv') $! kind_co') $! subst_co subst' co
+    go (FunCo r w co1 co2)   = ((mkFunCo r <$> go w) <*> go co1) <*> go co2
+    go (CoVarCo cv)          = return $ substCoVarT subst cv
+    go (AxiomInstCo con ind cos) = mkAxiomInstCo con ind <$> mapM go cos
+    go (UnivCo p r t1 t2) = do
+      p' <- go_prov p
+      (((mkUnivCo $! p') $! r) <$> (go_ty t1)) <*> (go_ty t2)
+    go (SymCo co)            = mkSymCo <$> (go co)
+    go (TransCo co1 co2)     = (mkTransCo <$> (go co1)) <*> (go co2)
+    go (NthCo r d co)        = mkNthCo r d <$> (go co)
+    go (LRCo lr co)          = mkLRCo lr <$> (go co)
+    go (InstCo co arg)       = (mkInstCo <$> (go co)) <*> go arg
+    go (KindCo co)           = mkKindCo <$> (go co)
+    go (SubCo co)            = mkSubCo <$> (go co)
+    go (AxiomRuleCo c cs) = do
+      cs1 <- mapM go cs
+      cs1 `seqList` (return $ AxiomRuleCo c cs1)
+    go (HoleCo h)            = HoleCo <$> go_hole h
+
+    go_prov (PhantomProv kco)    = PhantomProv <$> go kco
+    go_prov (ProofIrrelProv kco) = ProofIrrelProv <$> go kco
+    go_prov p@(PluginProv _)     = return p
+    go_prov p@(CorePrepProv _)   = return p
+
+    -- See Note [Substituting in a coercion hole]
+    go_hole h@(CoercionHole { ch_co_var = cv }) = do
+      cv' <- updateVarTypeM go_ty cv
+      return h { ch_co_var = cv' }
+
 substForAllCoBndr :: TCvSubst -> TyCoVar -> KindCoercion
                   -> (TCvSubst, TyCoVar, Coercion)
 substForAllCoBndr subst
@@ -1027,6 +1072,12 @@ substForAllCoCoVarBndrUsing sym sco (TCvSubst in_scope tenv cenv)
 
 substCoVar :: TCvSubst -> CoVar -> Coercion
 substCoVar (TCvSubst _ _ cenv) cv
+  = case lookupVarEnv cenv cv of
+      Just co -> co
+      Nothing -> CoVarCo cv
+
+substCoVarT :: TTCvSubst s -> CoVar -> Coercion
+substCoVarT (TTCvSubst _ _ cenv) cv
   = case lookupVarEnv cenv cv of
       Just co -> co
       Nothing -> CoVarCo cv
