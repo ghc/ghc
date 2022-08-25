@@ -273,7 +273,7 @@ exception handler.
 WARNING: Exceptions in the new thread will not be rethrown in the thread that
 created it. This means that you might be completely unaware of the problem
 if/when this happens.  You may want to use the
-<hackage.haskell.org/package/async async> library instead.
+<https://hackage.haskell.org/package/async async> library instead.
 -}
 forkIO :: IO () -> IO ThreadId
 forkIO action = IO $ \ s ->
