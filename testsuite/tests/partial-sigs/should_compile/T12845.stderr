@@ -1,7 +1,8 @@
 
 T12845.hs:18:70: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found extra-constraints wildcard standing for ‘()’
+    • Found extra-constraints wildcard standing for ‘() :: Constraint’
     • In the type signature:
-        broken :: forall r r' rngs.
-                  ('(r, r') ~ Head rngs, Bar r r' ~ 'True, _) =>
-                  Foo r -> Proxy rngs -> ()
+        broken :: forall r r' rngs. ('(r, r') ~ Head rngs,
+                                     Bar r r' ~ 'True,
+                                     _) =>
+                                    Foo r -> Proxy rngs -> ()

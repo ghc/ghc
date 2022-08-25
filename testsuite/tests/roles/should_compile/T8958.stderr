@@ -16,7 +16,7 @@ CLASS INSTANCES
     -- Defined at T8958.hs:11:10
   instance [incoherent] Nominal a -- Defined at T8958.hs:8:10
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.17.0.0]
 
 ==================== Typechecker ====================
 T8958.$tcMap
@@ -46,7 +46,8 @@ T8958.$tc'C:Nominal
 $krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
 $krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepFun GHC.Types.krep$* GHC.Types.krep$Constraint
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
       GHC.Tuple.$tc(,)
@@ -61,9 +62,6 @@ $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
       GHC.Types.$tcList
       ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep)
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
-      GHC.Types.$tcConstraint [] @GHC.Types.KindRep
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
       T8958.$tcRepresentational

@@ -5,7 +5,7 @@ T7609.hs:7:16: error:
     • In the type signature: f :: (a `X` a, Maybe)
 
 T7609.hs:10:7: error:
-    • Expected a constraint, but ‘a `X` a’ has kind ‘*’
+    • Expected a constraint, but ‘a `X` a’ is a type
     • In the type signature: g :: (a `X` a) => Maybe
 
 T7609.hs:10:19: error:

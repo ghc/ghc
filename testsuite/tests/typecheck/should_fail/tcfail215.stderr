@@ -1,4 +1,4 @@
 
 tcfail215.hs:8:15: error:
-    • Expected a boxed type, but ‘Int#’ has representation ‘IntRep’
+    • Expected a lifted type, but ‘Int#’ is an IntRep type
     • In the type signature: foo :: (?x :: Int#) => Int

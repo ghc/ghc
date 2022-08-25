@@ -1,6 +1,6 @@
 
 UnliftedNewtypesMismatchedKind.hs:12:10: error:
-    • Expected a boxed type, but ‘Int#’ has representation ‘IntRep’
+    • Expected a lifted type, but ‘Int#’ is an IntRep type
     • In the type ‘Int#’
       In the definition of data constructor ‘MkT’
       In the newtype declaration for ‘T’

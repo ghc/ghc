@@ -1,5 +1,6 @@
 
 saks_fail012.hs:8:1: error:
-    • Couldn't match expected kind ‘Constraint’
-                  with actual kind ‘* -> Constraint’
+    • Expected a constraint,
+      but found something with kind
+      ‘* -> Constraint’
     • In the class declaration for ‘C’
