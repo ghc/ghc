@@ -58,9 +58,10 @@ import GHC.Types.Var.Set
 import GHC.Core
 import GHC.Core.FVs       (exprFreeVars)
 import GHC.Core.Map.Expr
+import GHC.Core.Predicate (typeDeterminesValue)
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
 import GHC.Core.Utils     (exprType)
-import GHC.Core.Make      (mkListExpr, mkCharExpr)
+import GHC.Core.Make      (mkListExpr, mkCharExpr, mkRuntimeErrorApp, rUNTIME_ERROR_ID)
 import GHC.Types.Unique.Supply
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
@@ -941,22 +942,121 @@ addCoreCt nabla x e = do
     pm_alt_con_app :: Id -> PmAltCon -> [TyVar] -> [Id] -> StateT Nabla (MaybeT DsM) ()
     pm_alt_con_app x con tvs args = modifyT $ \nabla -> addConCt nabla x con tvs args
 
+-- | Like 'modify', but with an effectful modifier action
+modifyT :: Monad m => (s -> m s) -> StateT s m ()
+modifyT f = StateT $ fmap ((,) ()) . f
+
 -- | Finds a representant of the semantic equality class of the given @e@.
 -- Which is the @x@ of a @let x = e'@ constraint (with @e@ semantically
 -- equivalent to @e'@) we encountered earlier, or a fresh identifier if
 -- there weren't any such constraints.
 representCoreExpr :: Nabla -> CoreExpr -> DsM (Id, Nabla)
 representCoreExpr nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_reps = reps } } e
-  | Just rep <- lookupCoreMap reps e = pure (rep, nabla)
+  | Just rep <- lookupCoreMap reps key = pure (rep, nabla)
   | otherwise = do
       rep <- mkPmId (exprType e)
-      let reps'  = extendCoreMap reps e rep
+      let reps'  = extendCoreMap reps key rep
       let nabla' = nabla{ nabla_tm_st = ts{ ts_reps = reps' } }
       pure (rep, nabla')
+  where
+    key = makeDictsCoherent e
+      -- Use a key in which dictionaries for the same type become equal.
+      -- See Note [Unique dictionaries in the TmOracle CoreMap]
 
--- | Like 'modify', but with an effectful modifier action
-modifyT :: Monad m => (s -> m s) -> StateT s m ()
-modifyT f = StateT $ fmap ((,) ()) . f
+-- | Change out 'Id's which are uniquely determined by their type to a
+-- common value, so that different names for dictionaries of the same type
+-- are considered equal when building a 'CoreMap'.
+--
+-- See Note [Unique dictionaries in the TmOracle CoreMap]
+makeDictsCoherent :: CoreExpr -> CoreExpr
+makeDictsCoherent var@(Var v)
+  | let ty = idType v
+  , typeDeterminesValue ty
+  = mkRuntimeErrorApp rUNTIME_ERROR_ID ty "dictionary"
+  | otherwise
+  = var
+makeDictsCoherent lit@(Lit {})
+  = lit
+makeDictsCoherent (App f a)
+  = App (makeDictsCoherent f) (makeDictsCoherent a)
+makeDictsCoherent (Lam f body)
+  = Lam f (makeDictsCoherent body)
+makeDictsCoherent (Let bndr body)
+  = Let
+      (go_bndr bndr)
+      (makeDictsCoherent body)
+  where
+    go_bndr (NonRec bndr expr) = NonRec bndr (makeDictsCoherent expr)
+    go_bndr (Rec bndrs) = Rec (map ( \(b, expr) -> (b, makeDictsCoherent expr) ) bndrs)
+makeDictsCoherent (Case scrut bndr ty alts)
+  = Case scrut bndr ty
+      [ Alt con bndr expr'
+      | Alt con bndr expr <- alts
+      , let expr' = makeDictsCoherent expr ]
+makeDictsCoherent (Cast expr co)
+  = Cast (makeDictsCoherent expr) co
+makeDictsCoherent (Tick tick expr)
+  = Tick tick (makeDictsCoherent expr)
+makeDictsCoherent ty@(Type {})
+  = ty
+makeDictsCoherent co@(Coercion {})
+  = co
+
+{- Note [Unique dictionaries in the TmOracle CoreMap]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Any two dictionaries for a coherent typeclass should be considered equal
+in the TmOracle CoreMap, as this allows us to report better pattern-match
+warnings.
+
+Consider for example T21662:
+
+  view_fn :: forall (n :: Nat). KnownNat n => Int -> Bool
+
+  foo :: Int -> Int
+  foo (view_fn @12 -> True ) = 0
+  foo (view_fn @12 -> False) = 1
+
+In this example, the pattern match is exhaustive because we have covered
+the range of the view pattern function. However, we may fail to recognise
+the fact that the two cases use the same view function if the KnownNat
+dictionaries aren't syntactically equal:
+
+  eqn 1: [let ds_d1p0 = view_fn @12 $dKnownNat_a1ny ds_d1oR,  True <- ds_d1p0]
+  eqn 2: [let ds_d1p6 = view_fn @12 $dKnownNat_a1nC ds_d1oR, False <- ds_d1p6]
+
+Note that the uniques of the KnownNat 12 dictionary differ. If we fail to utilise
+the coherence of the KnownNat constraint, then we have to pessimistically assume
+that we have two function calls with different arguments:
+
+  foo (fn arg1 -> True ) = ...
+  foo (fn arg2 -> False) = ...
+
+In this case we can't determine whether the pattern matches are complete, so we
+emit a pattern match warning.
+
+Solution: replace all 'Id's whose type uniquely determines its value with
+a common value, e.g. in the above example we would replace both
+$dKnownNat_a1ny and $dKnownNat_a1nC with error @(KnownNat 12).
+
+Why did we choose this solution? Here are some alternatives that were considered:
+
+  1. Perform CSE first. This would common up the dictionaries before we compare
+     using the CoreMap.
+     However, this is architecturally difficult as it would require threading
+     a CSEnv through to desugarPat.
+  2. Directly modify CoreMap so that any two dictionaries of the same type are
+     considered equal.
+     The problem is that this affects all users of CoreMap. For example, CSE
+     would now assume that any two dictionaries of the same type are equal,
+     but this isn't necessarily true in the presence of magicDict, which
+     violates coherence by design. It seems more prudent to limit the changes
+     to the pattern-match checker only, to avoid undesirable consequences.
+
+In the end, replacing dictionaries with an error value in the pattern-match
+checker was the most self-contained, although we might want to revisit once
+we implement a more robust approach to computing equality in the pattern-match
+checker (see #19272).
+-}
 
 {- Note [The Pos/Neg invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

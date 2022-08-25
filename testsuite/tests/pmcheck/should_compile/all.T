@@ -111,6 +111,7 @@ test('CyclicSubst', [],  compile, [overlapping_incomplete])
 test('CaseOfKnownCon', [], compile, [overlapping_incomplete])
 test('TooManyDeltas', [], compile, [overlapping_incomplete+'-fmax-pmcheck-models=0'])
 test('LongDistanceInfo', [], compile, [overlapping_incomplete])
+test('T21662', [],  compile, [overlapping_incomplete])
 
 # Series (inspired) by Luke Maranget
 

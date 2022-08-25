@@ -243,7 +243,6 @@ isEqPrimPred ty = isCoVarType ty
 isCTupleClass :: Class -> Bool
 isCTupleClass cls = isTupleTyCon (classTyCon cls)
 
-
 {- *********************************************************************
 *                                                                      *
               Implicit parameters
