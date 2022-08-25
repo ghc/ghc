@@ -50,7 +50,6 @@ import           GHC.Unit.Env
 import           GHC.Unit.Home
 import           GHC.Unit.Types
 import           GHC.Utils.Error
-import           GHC.Driver.Env.Types
 import           GHC.Data.FastString
 
 import           Control.Concurrent.MVar
