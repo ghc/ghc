@@ -807,7 +807,7 @@ stackApply s fun_name nargs nvars =
         [ rs |= (arity .>>. 8)
         , loadRegs rs
         , sp |= sp - rs
-        , newAp |= (var "h$apply" .! (toJExpr nargs-arity0.|.((toJExpr nvars-rs).<<.8)))
+        , newAp |= (var "h$apply" .! ((toJExpr nargs-arity0).|.((toJExpr nvars-rs).<<.8)))
         , stack .! sp |= newAp
         , profStat s pushRestoreCCS
         , traceRts s (toJExpr (fun_name <> ": new stack frame: ") + (newAp .^ "n"))
@@ -891,7 +891,7 @@ fastApply s fun_name nargs nvars = func ||= body0
                           + rsRemain)
            , saveRegs rs
            , sp |= sp + rsRemain + 1
-           , stack .! sp |= var "h$apply" .! ((rsRemain.<<.8).|. toJExpr nargs - mask8 arity)
+           , stack .! sp |= var "h$apply" .! ((rsRemain.<<.8).|. (toJExpr nargs - mask8 arity))
            , profStat s pushRestoreCCS
            , returnS c
            ]
