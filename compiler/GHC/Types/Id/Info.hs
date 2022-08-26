@@ -816,7 +816,7 @@ zapFragileUnfolding unf
 trimUnfolding :: Unfolding -> Unfolding
 -- Squash all unfolding info, preserving only evaluated-ness
 trimUnfolding unf | isEvaldUnfolding unf = evaldUnfolding
-                 | otherwise            = noUnfolding
+                  | otherwise            = noUnfolding
 
 zapTailCallInfo :: IdInfo -> Maybe IdInfo
 zapTailCallInfo info

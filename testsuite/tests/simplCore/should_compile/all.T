@@ -415,6 +415,7 @@ test('T17966',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])
 # We expect to see a SPEC rule for $cm
 test('T19644',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])
 test('T21391', normal, compile, ['-O -dcore-lint'])
+test('T22112', normal, compile, ['-O -dsuppress-uniques -dno-typeable-binds -ddump-simpl'])
 test('T21391a', normal, compile, ['-O -dcore-lint'])
 # We don't want to see a thunk allocation for the insertBy expression after CorePrep.
 test('T21392', [ grep_errmsg(r'sat.* :: \[\(.*Unique, .*Int\)\]'), expect_broken(21392) ], compile, ['-O -ddump-prep -dno-typeable-binds -dsuppress-uniques'])
