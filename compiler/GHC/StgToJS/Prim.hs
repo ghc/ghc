@@ -866,6 +866,9 @@ genPrim prof ty op = case op of
                              -- slots, depending on the return type.
   RaiseOp                 -> \_r [a] -> PRPrimCall $ returnS (app "h$throw" [a, false_])
   RaiseIOOp               -> \_r [a] -> PRPrimCall $ returnS (app "h$throw" [a, false_])
+  RaiseUnderflowOp        -> \_r []  -> PRPrimCall $ returnS (app "h$throw" [var "h$baseZCGHCziExceptionziTypeziunderflowException", false_])
+  RaiseOverflowOp         -> \_r []  -> PRPrimCall $ returnS (app "h$throw" [var "h$baseZCGHCziExceptionziTypezioverflowException", false_])
+  RaiseDivZeroOp          -> \_r []  -> PRPrimCall $ returnS (app "h$throw" [var "h$baseZCGHCziExceptionziTypezidivZZeroException", false_])
   MaskAsyncExceptionsOp   -> \_r [a] -> PRPrimCall $ returnS (app "h$maskAsync" [a])
   MaskUninterruptibleOp   -> \_r [a] -> PRPrimCall $ returnS (app "h$maskUnintAsync" [a])
   UnmaskAsyncExceptionsOp -> \_r [a] -> PRPrimCall $ returnS (app "h$unmaskAsync" [a])

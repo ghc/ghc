@@ -662,12 +662,16 @@ readSystemDeps' file
                                  , S.fromList $ d baseUnitId "GHC.JS.Prim.TH.Eval" ["runTHServer"])
   | file == "rtsdeps.yaml" = pure ( [ baseUnitId
                                     , primUnitId
-                                    , bignumUnitId
                                     ]
                                   , S.fromList $ concat
                                   [ d baseUnitId "GHC.Conc.Sync" ["reportError"]
                                   , d baseUnitId "Control.Exception.Base" ["nonTermination"]
-                                  , d baseUnitId "GHC.Exception.Type" ["SomeException"]
+                                  , d baseUnitId "GHC.Exception.Type"
+                                      [ "SomeException"
+                                      , "underflowException"
+                                      , "overflowException"
+                                      , "divZeroException"
+                                      ]
                                   , d baseUnitId "GHC.TopHandler" ["runMainIO", "topHandler"]
                                   , d baseUnitId "GHC.Base" ["$fMonadIO"]
                                   , d baseUnitId "GHC.Maybe" ["Nothing", "Just"]
