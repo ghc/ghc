@@ -90,6 +90,47 @@ if(h$isNode) {
 }
 #endif
 
+//filter RTS arguments
+var h$rtsArgs = [];
+{
+    var prog_args = [];
+    var rts_args = [];
+    var in_rts = false;
+    var i = 0;
+    for(i=0;i<h$programArgs.length;i++) {
+        var a = h$programArgs[i];
+        // The '--RTS' argument disables all future
+        // +RTS ... -RTS processing.
+        if (a === "--RTS") {
+            break;
+        }
+        // The '--' argument is passed through to the program, but
+        // disables all further +RTS ... -RTS processing.
+        else if (a === "--") {
+            break;
+        }
+        else if (a === "+RTS") {
+            in_rts = true;
+        }
+        else if (a === "-RTS") {
+            in_rts = false;
+        }
+        else if (in_rts) {
+            rts_args.push(a);
+        }
+        else {
+            prog_args.push(a);
+        }
+    }
+    // process remaining program arguments
+    for (;i<h$programArgs.length;i++) {
+        prog_args.push(h$programArgs[i]);
+    }
+    //set global variables
+    h$programArgs = prog_args;
+    h$rtsArgs     = rts_args;
+}
+
 function h$getProgArgv(argc_v,argc_off,argv_v,argv_off) {
   TRACE_ENV("getProgArgV");
   var c = h$programArgs.length;
