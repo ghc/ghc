@@ -1046,7 +1046,7 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
                       , residual_ct <- bagToList $ wc_simple (ic_wanted residual_implic)
                       , let residual_pred = ctPred residual_ct
                       , Just (Nominal, lhs, rhs) <- [ getEqPredTys_maybe residual_pred ]
-                      , Just lhs_tv <- [ tcGetTyVar_maybe lhs ]
+                      , Just lhs_tv <- [ getTyVar_maybe lhs ]
                       , lhs_tv == tv ]
 
 chooseInferredQuantifiers _ _ _ _ (Just (TISI { sig_inst_sig = sig@(CompleteSig {}) }))

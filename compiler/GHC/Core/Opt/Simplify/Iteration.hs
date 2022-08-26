@@ -2189,7 +2189,7 @@ rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
                             ; return (Lam s' body') }
                             -- Important: do not try to eta-expand this lambda
                             -- See Note [No eta-expansion in runRW#]
-           _ -> do { s' <- newId (fsLit "s") Many realWorldStatePrimTy
+           _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
                    ; let (m,_,_) = splitFunTy fun_ty
                          env'  = arg_env `addNewInScopeIds` [s']
                          cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s'
