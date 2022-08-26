@@ -4,18 +4,10 @@ import glob
 import os
 import os.path
 import sys
-import argparse
 from textwrap import dedent
 import subprocess
 import re
 import shutil
-
-cwd = os.getcwd()
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--validate', action='store_true', help='Run in validate mode')
-parser.add_argument('--hadrian', action='store_true', help='Do not assume the make base build system')
-args = parser.parse_args()
 
 # Packages whose libraries aren't in the submodule root
 EXCEPTIONS = {

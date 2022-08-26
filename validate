@@ -259,7 +259,7 @@ if [ $build_only -eq 1 ] ||
 
     if [ $no_clean -eq 0 ]; then
         $hadrian clean && rm -rf $hadrian_build_root
-        python3 ./boot --validate
+        python3 ./boot
         $configure_cmd --enable-tarballs-autodownload $CONFIG_ARGS
     fi
 
