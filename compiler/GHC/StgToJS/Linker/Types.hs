@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 
+{-# OPTIONS_GHC -Wno-orphans #-} -- for Ident's Binary instance
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.StgToJS.Linker.Types
