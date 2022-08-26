@@ -49,14 +49,11 @@ import           Control.Applicative
 import           GHC.Utils.Monad.State.Strict
 import           Data.Function
 
-import qualified Data.Bits as Bits
-import           Data.Bits (shiftL, shiftR)
 import           Data.Bifunctor (second)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Builder as BB
-import           Data.Char (chr)
 import qualified Data.Graph as G
 import qualified Data.Map.Strict as M
 import           Data.Map (Map)
@@ -64,7 +61,6 @@ import           Data.Int
 import qualified Data.List as List
 import           Data.Maybe
 import qualified Data.Set as S
-import           Data.Set (Set)
 import           GHC.Data.FastString
 
 import           GHC.JS.Syntax
@@ -73,7 +69,6 @@ import           GHC.JS.Transform
 import           GHC.StgToJS.Printer             (pretty)
 import           GHC.StgToJS.Types
 import           GHC.StgToJS.Linker.Types
-import           GHC.StgToJS.CoreUtils
 import           GHC.StgToJS.Closure
 import           GHC.StgToJS.Arg
 
@@ -417,6 +412,7 @@ renameObj xs = do
   modify (addStaticEntry xs') -- and now the table
   return xs'
 
+{-
 renameEntry :: Ident
             -> State CompactorState Ident
 renameEntry i = do
@@ -436,6 +432,7 @@ collectLabels si = mapM_ go (labelsV . siVal $ si)
     labelsA _                = []
     labelsL (LabelLit _ lbl) = [lbl]
     labelsL _                = []
+-}
 
 lookupRenamed :: CompactorState -> Ident -> Ident
 lookupRenamed cs i@(TxtI t) =
@@ -502,6 +499,7 @@ staticIdentsA f (StaticObjArg t) = StaticObjArg $! f t
 staticIdentsA _ x = x
 
 
+{-
 {-
    simple encoding of naturals using only printable low char points,
    rely on gzip to compress repeating sequences,
@@ -731,6 +729,8 @@ encodeDouble (SaneDouble d)
 encodeMax :: Integer
 encodeMax = 737189
 
+-}
+
 {- |
   The Base data structure contains the information we need
   to do incremental linking against a base bundle.
@@ -953,6 +953,7 @@ findLocals (BlockStat ss)      = concatMap findLocals ss
 findLocals (DeclStat (TxtI i)) = [i]
 findLocals _                   = []
 
+{-
 nub' :: Ord a => [a] -> [a]
 nub' = go S.empty
   where
@@ -960,6 +961,7 @@ nub' = go S.empty
     go s (x:xs)
       | x `S.member` s = go s xs
       | otherwise      = x : go (S.insert x s) xs
+-}
 
 data HashIdx = HashIdx (UniqMap FastString Hash) (Map Hash FastString)
 
