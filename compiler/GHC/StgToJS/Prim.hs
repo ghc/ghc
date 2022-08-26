@@ -113,11 +113,11 @@ genPrim prof ty op = case op of
   Int8AddOp         -> \[r] [x,y]     -> PrimInline $ r |= signExtend8 (Add x y)
   Int8SubOp         -> \[r] [x,y]     -> PrimInline $ r |= signExtend8 (Sub x y)
   Int8MulOp         -> \[r] [x,y]     -> PrimInline $ r |= signExtend8 (Mul x y)
-  Int8QuotOp        -> \[r] [x,y]     -> PrimInline $ r |= quotShortInt 8 x y
-  Int8RemOp         -> \[r] [x,y]     -> PrimInline $ r |= remShortInt 8 x y
+  Int8QuotOp        -> \[r] [x,y]     -> PrimInline $ r |= signExtend8 (quotShortInt 8 x y)
+  Int8RemOp         -> \[r] [x,y]     -> PrimInline $ r |= signExtend8 (remShortInt 8 x y)
   Int8QuotRemOp     -> \[r1,r2] [x,y] -> PrimInline $ mconcat
-                                                [ r1 |= quotShortInt 8 x y
-                                                , r2 |= remShortInt 8 x y
+                                                [ r1 |= signExtend8 (quotShortInt 8 x y)
+                                                , r2 |= signExtend8 (remShortInt 8 x y)
                                                 ]
   Int8EqOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
   Int8GeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .<<. (Int 24)) .>=. (y .<<. (Int 24)))
@@ -168,11 +168,11 @@ genPrim prof ty op = case op of
   Int16AddOp         -> \[r] [x,y]     -> PrimInline $ r |= signExtend16 (Add x y)
   Int16SubOp         -> \[r] [x,y]     -> PrimInline $ r |= signExtend16 (Sub x y)
   Int16MulOp         -> \[r] [x,y]     -> PrimInline $ r |= signExtend16 (Mul x y)
-  Int16QuotOp        -> \[r] [x,y]     -> PrimInline $ r |= quotShortInt 16 x y
-  Int16RemOp         -> \[r] [x,y]     -> PrimInline $ r |= remShortInt 16 x y
+  Int16QuotOp        -> \[r] [x,y]     -> PrimInline $ r |= signExtend16 (quotShortInt 16 x y)
+  Int16RemOp         -> \[r] [x,y]     -> PrimInline $ r |= signExtend16 (remShortInt 16 x y)
   Int16QuotRemOp     -> \[r1,r2] [x,y] -> PrimInline $ mconcat
-                                                [ r1 |= quotShortInt 16 x y
-                                                , r2 |= remShortInt 16 x y
+                                                [ r1 |= signExtend16 (quotShortInt 16 x y)
+                                                , r2 |= signExtend16 (remShortInt 16 x y)
                                                 ]
   Int16EqOp          -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
   Int16GeOp          -> \[r] [x,y] -> PrimInline $ r |= if10 ((x .<<. (Int 16)) .>=. (y .<<. (Int 16)))
