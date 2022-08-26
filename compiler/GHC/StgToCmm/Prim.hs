@@ -1563,6 +1563,9 @@ emitPrimOp cfg primop =
   CasMutVarOp -> alwaysExternal
   CatchOp -> alwaysExternal
   RaiseOp -> alwaysExternal
+  RaiseUnderflowOp -> alwaysExternal
+  RaiseOverflowOp -> alwaysExternal
+  RaiseDivZeroOp -> alwaysExternal
   RaiseIOOp -> alwaysExternal
   MaskAsyncExceptionsOp -> alwaysExternal
   MaskUninterruptibleOp -> alwaysExternal
