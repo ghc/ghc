@@ -24,16 +24,17 @@ import GHC.Tc.Utils.Env
 
 import GHC.Core
 import GHC.Core.Unfold
-import GHC.Core.Unfold.Make
+-- import GHC.Core.Unfold.Make
 import GHC.Core.FVs
 import GHC.Core.Tidy
-import GHC.Core.Seq     (seqBinds)
+import GHC.Core.Seq         ( seqBinds )
 import GHC.Core.Opt.Arity   ( exprArity, typeArity, exprBotStrictness_maybe )
 import GHC.Core.InstEnv
 import GHC.Core.Type     ( Type, tidyTopType )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
+import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 
 import GHC.Iface.Tidy.StaticPtrTable
 import GHC.Iface.Env
@@ -383,8 +384,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
   (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod binds implicit_binds imp_rules
   let (trimmed_binds, trimmed_rules) = findExternalRules opts binds imp_rules unfold_env
 
-  let uf_opts = opt_unfolding_opts opts
-  (tidy_env, tidy_binds) <- tidyTopBinds uf_opts unfold_env boot_exports tidy_occ_env trimmed_binds
+  (tidy_env, tidy_binds) <- tidyTopBinds unfold_env boot_exports tidy_occ_env trimmed_binds
 
   -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
   (spt_entries, mcstub, tidy_binds') <- case opt_static_ptr_opts opts of
@@ -1152,60 +1152,49 @@ tidyTopName mod name_cache maybe_ref occ_env id
 --
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
 
-tidyTopBinds :: UnfoldingOpts
-             -> UnfoldEnv
+tidyTopBinds :: UnfoldEnv
              -> NameSet
              -> TidyOccEnv
              -> CoreProgram
              -> IO (TidyEnv, CoreProgram)
 
-tidyTopBinds uf_opts unfold_env boot_exports init_occ_env binds
+tidyTopBinds unfold_env boot_exports init_occ_env binds
   = do let result = tidy init_env binds
        seqBinds (snd result) `seq` return result
        -- This seqBinds avoids a spike in space usage (see #13564)
   where
     init_env = (init_occ_env, emptyVarEnv)
 
-    tidy = mapAccumL (tidyTopBind uf_opts unfold_env boot_exports)
+    tidy = mapAccumL (tidyTopBind unfold_env boot_exports)
 
 ------------------------
-tidyTopBind  :: UnfoldingOpts
-             -> UnfoldEnv
+tidyTopBind  :: UnfoldEnv
              -> NameSet
              -> TidyEnv
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind uf_opts unfold_env boot_exports
+tidyTopBind unfold_env boot_exports
             (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
-    Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    (bndr', rhs') = tidyTopPair uf_opts show_unfold boot_exports tidy_env2 name' (bndr, rhs)
+    (bndr', rhs') = tidyTopPair unfold_env boot_exports tidy_env2 (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind uf_opts unfold_env boot_exports (occ_env, subst1) (Rec prs)
+tidyTopBind unfold_env boot_exports (occ_env, subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
-    prs' = [ tidyTopPair uf_opts show_unfold boot_exports tidy_env2 name' (id,rhs)
-           | (id,rhs) <- prs,
-             let (name',show_unfold) =
-                    expectJust "tidyTopBind" $ lookupVarEnv unfold_env id
-           ]
-
-    subst2    = extendVarEnvList subst1 (bndrs `zip` map fst prs')
+    prs'      = map (tidyTopPair unfold_env boot_exports tidy_env2) prs
+    subst2    = extendVarEnvList subst1 (map fst prs `zip` map fst prs')
     tidy_env2 = (occ_env, subst2)
-
-    bndrs = map fst prs
+    -- This is where we "tie the knot": tidy_env2 is fed into tidyTopPair
 
 -----------------------------------------------------------
-tidyTopPair :: UnfoldingOpts
-            -> Bool  -- show unfolding
+tidyTopPair :: UnfoldEnv
             -> NameSet
             -> TidyEnv  -- The TidyEnv is used to tidy the IdInfo
                         -- It is knot-tied: don't look at it!
-            -> Name             -- New name
             -> (Id, CoreExpr)   -- Binder and RHS before tidying
             -> (Id, CoreExpr)
         -- This function is the heart of Step 2
@@ -1214,17 +1203,18 @@ tidyTopPair :: UnfoldingOpts
         -- group, a variable late in the group might be mentioned
         -- in the IdInfo of one early in the group
 
-tidyTopPair uf_opts show_unfold boot_exports rhs_tidy_env name' (bndr, rhs)
+tidyTopPair unfold_env boot_exports rhs_tidy_env (bndr, rhs)
   = -- pprTrace "tidyTop" (ppr name' <+> ppr details <+> ppr rhs) $
     (bndr1, rhs1)
 
   where
+    Just (name',show_unfold) = lookupVarEnv unfold_env bndr
     !cbv_bndr = tidyCbvInfoTop boot_exports bndr rhs
     bndr1    = mkGlobalId details name' ty' idinfo'
     details  = idDetails cbv_bndr -- Preserve the IdDetails
     ty'      = tidyTopType (idType cbv_bndr)
     rhs1     = tidyExpr rhs_tidy_env rhs
-    idinfo'  = tidyTopIdInfo uf_opts rhs_tidy_env name' ty'
+    idinfo'  = tidyTopIdInfo rhs_tidy_env name' ty'
                              rhs rhs1 (idInfo cbv_bndr) show_unfold
 
 -- tidyTopIdInfo creates the final IdInfo for top-level
@@ -1234,9 +1224,9 @@ tidyTopPair uf_opts show_unfold boot_exports rhs_tidy_env name' (bndr, rhs)
 --      Indeed, CorePrep must eta expand where necessary to make
 --      the manifest arity equal to the claimed arity.
 --
-tidyTopIdInfo :: UnfoldingOpts -> TidyEnv -> Name -> Type
+tidyTopIdInfo :: TidyEnv -> Name -> Type
               -> CoreExpr -> CoreExpr -> IdInfo -> Bool -> IdInfo
-tidyTopIdInfo uf_opts rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
+tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
   | not is_external     -- For internal Ids (not externally visible)
   = vanillaIdInfo       -- we only need enough info for code generation
                         -- Arity and strictness info are enough;
@@ -1292,31 +1282,20 @@ tidyTopIdInfo uf_opts rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unf
           Just (arity, _, _) -> not (isDeadEndAppSig id_sig arity)
 
     --------- Unfolding ------------
-    unf_info = realUnfoldingInfo idinfo
-    -- Force this, otherwise the old unfolding is retained over code generation
-    -- See #22071
-    !unfold_info
-      | isCompulsoryUnfolding unf_info || show_unfold
-      = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
-      | otherwise
-      = minimal_unfold_info
-    !minimal_unfold_info = trimUnfolding unf_info
-    unf_from_rhs = mkFinalUnfolding uf_opts InlineRhs final_sig tidy_rhs
-    -- NB: do *not* expose the worker if show_unfold is off,
-    --     because that means this thing is a loop breaker or
-    --     marked NOINLINE or something like that
-    -- This is important: if you expose the worker for a loop-breaker
-    -- then you can make the simplifier go into an infinite loop, because
-    -- in effect the unfolding is exposed.  See #1709
-    --
-    -- You might think that if show_unfold is False, then the thing should
-    -- not be w/w'd in the first place.  But a legitimate reason is this:
-    --    the function returns bottom
-    -- In this case, show_unfold will be false (we don't expose unfoldings
-    -- for bottoming functions), but we might still have a worker/wrapper
-    -- split (see Note [Worker/wrapper for bottoming functions] in
-    -- GHC.Core.Opt.WorkWrap)
+    -- Force unfold_info (hence bangs), otherwise the old unfolding
+    -- is retained during code generation. See #22071
 
+    unf_info = realUnfoldingInfo idinfo
+    !minimal_unfold_info = trimUnfolding unf_info
+
+    !unfold_info | isCompulsoryUnfolding unf_info || show_unfold
+                 = tidyTopUnfolding rhs_tidy_env tidy_rhs unf_info
+                 | otherwise
+                 = minimal_unfold_info
+--    unf_from_rhs = mkFinalUnfolding uf_opts InlineRhs final_sig orig_rhs
+     -- NB: use `orig_rhs` not `tidy_rhs` in this call to mkFinalUnfolding
+     -- else you get a black hole (#22122). Reason: mkFinalUnfolding
+     -- looks at IdInfo, and that is knot-tied in tidyTopBind (the Rec case)
 
     --------- Arity ------------
     -- Usually the Id will have an accurate arity on it, because
@@ -1328,10 +1307,59 @@ tidyTopIdInfo uf_opts rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unf
     arity = exprArity orig_rhs `min` typeArity rhs_ty
             -- orig_rhs: using tidy_rhs would make a black hole, since
             --           exprArity uses the arities of Ids inside the rhs
+            --
             -- typeArity: see Note [Arity invariants for bindings]
             --            in GHC.Core.Opt.Arity
 
-{-
+------------ Unfolding  --------------
+tidyTopUnfolding :: TidyEnv -> CoreExpr -> Unfolding -> Unfolding
+tidyTopUnfolding _ _ NoUnfolding   = NoUnfolding
+tidyTopUnfolding _ _ BootUnfolding = BootUnfolding
+tidyTopUnfolding _ _ (OtherCon {}) = evaldUnfolding
+
+tidyTopUnfolding tidy_env _ df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
+  = df { df_bndrs = bndrs', df_args = map (tidyExpr tidy_env') args }
+  where
+    (tidy_env', bndrs') = tidyBndrs tidy_env bndrs
+
+tidyTopUnfolding tidy_env tidy_rhs
+     unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src  })
+  = -- See Note [tidyTopUnfolding: avoiding black holes]
+    unf { uf_tmpl = tidy_unf_rhs }
+  where
+    tidy_unf_rhs | isStableSource src
+                 = tidyExpr tidy_env unf_rhs    -- Preserves OccInfo in unf_rhs
+                 | otherwise
+                 = occurAnalyseExpr tidy_rhs    -- Do occ-anal
+
+{- Note [tidyTopUnfolding: avoiding black holes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we are exposing all unfoldings we don't want to tidy the unfolding
+twice -- we just want to use the tidied RHS.  That tidied RHS itself
+contains fully-tidied Ids -- it is knot-tied.  So the uf_tmpl for the
+unfolding contains stuff we can't look at.  Now consider (#22112)
+   foo = foo
+If we freshly compute the uf_is_value field for foo's unfolding,
+we'll call `exprIsValue`, which will look at foo's unfolding!
+Whether or not the RHS is a value depends on whether foo is a value...
+black hole.
+
+In the Simplifier we deal with this by not giving `foo` an unfolding
+in its own RHS.  And we could do that here.  But it's qite nice
+to common everything up to a single Id for foo, used everywhere.
+
+And it's not too hard: simply leave the unfolding undisturbed, except
+tidy the uf_tmpl field. Hence tidyTopUnfolding does
+   unf { uf_tmpl = tidy_unf_rhs }
+
+Don't mess with uf_is_value, or guidance; in particular don't recompute
+them from tidy_unf_rhs.
+
+And (unlike tidyNestedUnfolding) don't deep-seq the new unfolding,
+because that'll cause a black hole (I /think/ because occurAnalyseExpr
+looks in IdInfo).
+
+
 ************************************************************************
 *                                                                      *
                   Old, dead, type-trimming code
