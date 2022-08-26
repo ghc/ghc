@@ -608,7 +608,7 @@ readArObject ar_state mod ar_file = do
         | otherwise
         = False
 
-  -- XXX this shouldn't be an exception probably    
+  -- XXX this shouldn't be an exception probably
   pure $! maybe (error $ "could not find object for module "
                 ++ moduleNameString (moduleName mod)
                 ++ " in "
