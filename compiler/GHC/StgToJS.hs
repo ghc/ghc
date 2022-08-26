@@ -60,7 +60,7 @@ import GHC.StgToJS.CodeGen
 --    >   plus :: Int -> Int -> Int
 --
 -- Currently the JS backend only supports functions as JS imports.
--- 
+--
 -- In comparison, GHCJS supports JavaScript snippets with $1, $2... variables
 -- as placeholders for the arguments. It requires a JavaScript parser that the
 -- JS backend lacks. In GHCJS, the parser is inherited from JMacro and supports
