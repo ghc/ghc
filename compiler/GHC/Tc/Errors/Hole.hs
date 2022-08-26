@@ -42,6 +42,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
+import GHC.Core.TyCo.Compare( tcEqType, eqType )
 import GHC.Core.DataCon
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( pprNameProvenance , GlobalRdrElt (..)

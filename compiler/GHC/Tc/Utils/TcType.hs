@@ -61,7 +61,7 @@ module GHC.Tc.Utils.TcType (
 
   --------------------------------
   -- Splitters
-  getTyVar, getTyVar_maybe,
+  getTyVar, getTyVar_maybe, getCastedTyVar_maybe,
   tcSplitForAllTyVarBinder_maybe,
   tcSplitForAllTyVars, tcSplitForAllInvisTyVars, tcSplitSomeForAllTyVars,
   tcSplitForAllReqTVBinders, tcSplitForAllInvisTVBinders,
@@ -85,12 +85,6 @@ module GHC.Tc.Utils.TcType (
   isPredTy, isTyVarClassPred,
   checkValidClsArgs, hasTyVarHead,
   isRigidTy,
-
-  ---------------------------------
-  -- Comparisons
-  eqType, eqTypes, nonDetCmpType, nonDetCmpTypes, eqTypeX,
-  pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
-  tcEqTyConApps,
 
   ---------------------------------
   -- Misc type manipulators
@@ -132,9 +126,7 @@ module GHC.Tc.Utils.TcType (
 
   --------------------------------
   -- Reexported from Kind
-  Kind, typeKind,
-  liftedTypeKind,
-  constraintKind,
+  Kind, liftedTypeKind, constraintKind,
   isLiftedTypeKind, isUnliftedTypeKind, classifiesTypeWithValues,
 
   --------------------------------
@@ -207,6 +199,7 @@ import GHC.Prelude
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst ( mkTvSubst, substTyWithCoVars )
+import GHC.Core.TyCo.Compare( tcEqType, eqType )
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
 import GHC.Core.Class
@@ -230,7 +223,6 @@ import GHC.Types.Name as Name
             -- We use this to make dictionaries for type literals.
             -- Perhaps there's a better way to do this?
 import GHC.Types.Name.Set
-import GHC.Types.Var.Env
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( coercibleClass, eqClass, heqClass, unitTyCon, unitTyConKey
                          , listTyCon, constraintKind )
@@ -1639,178 +1631,6 @@ tcSplitMethodTy ty
   | otherwise
   = pprPanic "tcSplitMethodTy" (ppr ty)
 
-
-{- *********************************************************************
-*                                                                      *
-            Type equalities
-*                                                                      *
-********************************************************************* -}
-
-tcEqKind :: HasDebugCallStack => TcKind -> TcKind -> Bool
-tcEqKind = tcEqType
-
-tcEqType :: HasDebugCallStack => TcType -> TcType -> Bool
--- ^ tcEqType implements typechecker equality, as described in
--- @Note [Typechecker equality vs definitional equality]@.
-tcEqType ty1 ty2
-  =  tcEqTypeNoSyns ki1 ki2
-  && tcEqTypeNoSyns ty1 ty2
-  where
-    ki1 = typeKind ty1
-    ki2 = typeKind ty2
-
--- | Just like 'tcEqType', but will return True for types of different kinds
--- as long as their non-coercion structure is identical.
-tcEqTypeNoKindCheck :: TcType -> TcType -> Bool
-tcEqTypeNoKindCheck ty1 ty2
-  = tcEqTypeNoSyns ty1 ty2
-
--- | Check whether two TyConApps are the same; if the number of arguments
--- are different, just checks the common prefix of arguments.
-tcEqTyConApps :: TyCon -> [Type] -> TyCon -> [Type] -> Bool
-tcEqTyConApps tc1 args1 tc2 args2
-  = tc1 == tc2 &&
-    and (zipWith tcEqTypeNoKindCheck args1 args2)
-    -- No kind check necessary: if both arguments are well typed, then
-    -- any difference in the kinds of later arguments would show up
-    -- as differences in earlier (dependent) arguments
-
-{-
-Note [Specialising tc_eq_type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The type equality predicates in TcType are hit pretty hard during typechecking.
-Consequently we take pains to ensure that these paths are compiled to
-efficient, minimally-allocating code.
-
-To this end we place an INLINE on tc_eq_type, ensuring that it is inlined into
-its publicly-visible interfaces (e.g. tcEqType). In addition to eliminating
-some dynamic branches, this allows the simplifier to eliminate the closure
-allocations that would otherwise be necessary to capture the two boolean "mode"
-flags. This reduces allocations by a good fraction of a percent when compiling
-Cabal.
-
-See #19226.
--}
-
--- | Type equality comparing both visible and invisible arguments and expanding
--- type synonyms.
-tcEqTypeNoSyns :: TcType -> TcType -> Bool
-tcEqTypeNoSyns ta tb = tc_eq_type False False ta tb
-
--- | Like 'tcEqType', but returns True if the /visible/ part of the types
--- are equal, even if they are really unequal (in the invisible bits)
-tcEqTypeVis :: TcType -> TcType -> Bool
-tcEqTypeVis ty1 ty2 = tc_eq_type False True ty1 ty2
-
--- | Like 'pickyEqTypeVis', but returns a Bool for convenience
-pickyEqType :: TcType -> TcType -> Bool
--- Check when two types _look_ the same, _including_ synonyms.
--- So (pickyEqType String [Char]) returns False
--- This ignores kinds and coercions, because this is used only for printing.
-pickyEqType ty1 ty2 = tc_eq_type True False ty1 ty2
-
--- | Real worker for 'tcEqType'. No kind check!
-tc_eq_type :: Bool          -- ^ True <=> do not expand type synonyms
-           -> Bool          -- ^ True <=> compare visible args only
-           -> Type -> Type
-           -> Bool
--- Flags False, False is the usual setting for tc_eq_type
--- See Note [Computing equality on types] in Type
-tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
-  = go orig_env orig_ty1 orig_ty2
-  where
-    go :: RnEnv2 -> Type -> Type -> Bool
-    -- See Note [Comparing nullary type synonyms] in GHC.Core.Type.
-    go _   (TyConApp tc1 []) (TyConApp tc2 [])
-      | tc1 == tc2
-      = True
-
-    go env t1 t2 | not keep_syns, Just t1' <- tcView t1 = go env t1' t2
-    go env t1 t2 | not keep_syns, Just t2' <- tcView t2 = go env t1 t2'
-
-    go env (TyVarTy tv1) (TyVarTy tv2)
-      = rnOccL env tv1 == rnOccR env tv2
-
-    go _   (LitTy lit1) (LitTy lit2)
-      = lit1 == lit2
-
-    go env (ForAllTy (Bndr tv1 vis1) ty1)
-           (ForAllTy (Bndr tv2 vis2) ty2)
-      =  vis1 `sameVis` vis2
-           -- See Note [ForAllTy and typechecker equality] in
-           -- GHC.Tc.Solver.Canonical for why we use `sameVis` here
-      && (vis_only || go env (varType tv1) (varType tv2))
-      && go (rnBndr2 env tv1 tv2) ty1 ty2
-
-    -- Make sure we handle all FunTy cases since falling through to the
-    -- AppTy case means that tcRepSplitAppTy_maybe may see an unzonked
-    -- kind variable, which causes things to blow up.
-    -- See Note [Equality on FunTys] in GHC.Core.TyCo.Rep: we must check
-    -- kinds here
-    go env (FunTy _ w1 arg1 res1) (FunTy _ w2 arg2 res2)
-      = kinds_eq && go env arg1 arg2 && go env res1 res2 && go env w1 w2
-      where
-        kinds_eq | vis_only  = True
-                 | otherwise = go env (typeKind arg1) (typeKind arg2) &&
-                               go env (typeKind res1) (typeKind res2)
-
-      -- See Note [Equality on AppTys] in GHC.Core.Type
-    go env (AppTy s1 t1)        ty2
-      | Just (s2, t2) <- tcRepSplitAppTy_maybe ty2
-      = go env s1 s2 && go env t1 t2
-    go env ty1                  (AppTy s2 t2)
-      | Just (s1, t1) <- tcRepSplitAppTy_maybe ty1
-      = go env s1 s2 && go env t1 t2
-
-    go env (TyConApp tc1 ts1)   (TyConApp tc2 ts2)
-      = tc1 == tc2 && gos env (tc_vis tc1) ts1 ts2
-
-    go env (CastTy t1 _)   t2              = go env t1 t2
-    go env t1              (CastTy t2 _)   = go env t1 t2
-    go _   (CoercionTy {}) (CoercionTy {}) = True
-
-    go _ _ _ = False
-
-    gos _   _         []       []      = True
-    gos env (ig:igs) (t1:ts1) (t2:ts2) = (ig || go env t1 t2)
-                                      && gos env igs ts1 ts2
-    gos _ _ _ _ = False
-
-    tc_vis :: TyCon -> [Bool]  -- True for the fields we should ignore
-    tc_vis tc | vis_only  = inviss ++ repeat False    -- Ignore invisibles
-              | otherwise = repeat False              -- Ignore nothing
-       -- The repeat False is necessary because tycons
-       -- can legitimately be oversaturated
-      where
-        bndrs = tyConBinders tc
-        inviss  = map isInvisibleTyConBinder bndrs
-
-    orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
-
-{-# INLINE tc_eq_type #-} -- See Note [Specialising tc_eq_type].
-
-{- Note [Typechecker equality vs definitional equality]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-GHC has two notions of equality over Core types:
-
-* Definitional equality, as implemented by GHC.Core.Type.eqType.
-  See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
-* Typechecker equality, as implemented by tcEqType (in GHC.Tc.Utils.TcType).
-  GHC.Tc.Solver.Canonical.canEqNC also respects typechecker equality.
-
-Typechecker equality implies definitional equality: if two types are equal
-according to typechecker equality, then they are also equal according to
-definitional equality. The converse is not always true, as typechecker equality
-is more finer-grained than definitional equality in two places:
-
-* Unlike definitional equality, which equates Type and Constraint, typechecker
-  treats them as distinct types. See Note [Kind Constraint and kind Type] in
-  GHC.Core.Type.
-* Unlike definitional equality, which does not care about the ArgFlag of a
-  ForAllTy, typechecker equality treats Required type variable binders as
-  distinct from Invisible type variable binders.
-  See Note [ForAllTy and typechecker equality] in GHC.Tc.Solver.Canonical.
--}
 
 {- *********************************************************************
 *                                                                      *

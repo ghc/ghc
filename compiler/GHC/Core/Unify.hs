@@ -38,8 +38,9 @@ import GHC.Core.Type     hiding ( getTvSubstEnv )
 import GHC.Core.Coercion hiding ( getCvSubstEnv )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.FVs   ( tyCoVarsOfCoList, tyCoFVsOfTypes )
-import GHC.Core.TyCo.Subst ( mkTvSubst, emptyIdSubstEnv )
+import GHC.Core.TyCo.Compare ( eqType, tcEqType )
+import GHC.Core.TyCo.FVs     ( tyCoVarsOfCoList, tyCoFVsOfTypes )
+import GHC.Core.TyCo.Subst   ( mkTvSubst, emptyIdSubstEnv )
 import GHC.Core.RoughMap
 import GHC.Core.Map.Type
 import GHC.Utils.FV( FV, fvVarList )
@@ -49,7 +50,6 @@ import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import {-# SOURCE #-} GHC.Tc.Utils.TcType ( tcEqType )
 import GHC.Exts( oneShot )
 import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
@@ -536,10 +536,13 @@ data UnifyResultM a = Unifiable a        -- the subst that unifies the types
 -- This is used (only) in Note [Infinitary substitution in lookup] in GHC.Core.InstEnv
 -- As of Feb 2022, we never differentiate between MARTypeFamily and MARTypeVsConstraint;
 -- it's really only MARInfinite that's interesting here.
-data MaybeApartReason = MARTypeFamily   -- ^ matching e.g. F Int ~? Bool
-                      | MARInfinite     -- ^ matching e.g. a ~? Maybe a
-                      | MARTypeVsConstraint  -- ^ matching Type ~? Constraint
-                                             -- See Note [coreView vs tcView] in GHC.Core.Type
+data MaybeApartReason
+  = MARTypeFamily   -- ^ matching e.g. F Int ~? Bool
+
+  | MARInfinite     -- ^ matching e.g. a ~? Maybe a
+
+  | MARTypeVsConstraint  -- ^ matching Type ~? Constraint
+    -- See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim
 
 instance Outputable MaybeApartReason where
   ppr MARTypeFamily       = text "MARTypeFamily"
@@ -1065,8 +1068,8 @@ unify_ty _env (TyConApp tc1 []) (TyConApp tc2 []) _kco
 
 unify_ty env ty1 ty2 kco
     -- Now handle the cases we can "look through": synonyms and casts.
-  | Just ty1' <- tcView ty1   = unify_ty env ty1' ty2 kco
-  | Just ty2' <- tcView ty2   = unify_ty env ty1 ty2' kco
+  | Just ty1' <- coreView ty1 = unify_ty env ty1' ty2 kco
+  | Just ty2' <- coreView ty2 = unify_ty env ty1 ty2' kco
   | CastTy ty1' co <- ty1     = if um_unif env
                                 then unify_ty env ty1' ty2 (co `mkTransCo` kco)
                                 else -- See Note [Matching in the presence of casts (1)]
@@ -1244,8 +1247,7 @@ uUnrefined :: UMEnv
 -- We know that tv1 isn't refined
 
 uUnrefined env tv1' ty2 ty2' kco
-    -- Use tcView, not coreView. See Note [coreView vs tcView] in GHC.Core.Type.
-  | Just ty2'' <- tcView ty2'
+  | Just ty2'' <- coreView ty2'
   = uUnrefined env tv1' ty2 ty2'' kco    -- Unwrap synonyms
                 -- This is essential, in case we have
                 --      type Foo a = a
@@ -1539,8 +1541,6 @@ ty_co_match :: MatchEnv   -- ^ ambient helpful info
    -- where lsubst = lcSubstLeft(env) and rsubst = lcSubstRight(env)
 ty_co_match menv subst ty co lkco rkco
   | Just ty' <- coreView ty = ty_co_match menv subst ty' co lkco rkco
-     -- why coreView here, not tcView? Because we're firmly after type-checking.
-     -- This function is used only during coercion optimisation.
 
   -- handle Refl case:
   | tyCoVarsOfType ty `isNotInDomainOf` subst

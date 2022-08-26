@@ -2137,7 +2137,7 @@ mkTupleTy boxity  tys  = mkTupleTy1 boxity tys
 mkTupleTy1 :: Boxity -> [Type] -> Type
 mkTupleTy1 Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
 mkTupleTy1 Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
-                                         (map getRuntimeRep tys ++ tys)
+                                     (map getRuntimeRep tys ++ tys)
 
 -- | Build the type of a small tuple that holds the specified type of thing
 -- Flattens 1-tuples. See Note [One-tuples].
@@ -2147,12 +2147,13 @@ mkBoxedTupleTy tys = mkTupleTy Boxed tys
 unitTy :: Type
 unitTy = mkTupleTy Boxed []
 
--- Make a constraint tuple
--- One-tuples vanish
+-- Make a constraint tuple, flattening a 1-tuple as usual
 -- If we get a constraint tuple that is bigger than the pre-built
--- ones (in ghc-prim:GHC.Tuple), then just make one up anyway; it
--- this is used only in filling in extra-constraint wildcards
--- See GHC.Tc.Gen.HsType Note [Extra-constraint holes in partial type signatures]
+--   ones (in ghc-prim:GHC.Tuple), then just make one up anyway; it won't
+--   have an info table in the RTS, so we can't use it at runtime.  But
+--   this is used only in filling in extra-constraint wildcards, so it
+--   never is used at runtime anyway
+--   See GHC.Tc.Gen.HsType Note [Extra-constraint holes in partial type signatures]
 mkConstraintTupleTy :: [Type] -> Type
 mkConstraintTupleTy [ty] = ty
 mkConstraintTupleTy tys = mkTyConApp (cTupleTyCon (length tys)) tys

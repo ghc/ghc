@@ -67,7 +67,9 @@ module GHC.Types.Literal
 import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
-import GHC.Core.Type
+import GHC.Core.Type( Type, mkForAllTy, mkTyVarTy, mkTYPEapp, mkCONSTRAINTapp )
+import GHC.Core.TyCo.Compare( nonDetCmpType )
+import GHC.Types.Var
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.Basic

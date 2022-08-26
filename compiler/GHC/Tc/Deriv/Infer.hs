@@ -16,16 +16,6 @@ where
 
 import GHC.Prelude
 
-import GHC.Data.Bag
-import GHC.Types.Basic
-import GHC.Core.Class
-import GHC.Core.DataCon
-import GHC.Utils.Error
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
-import GHC.Data.Pair
-import GHC.Builtin.Names
 import GHC.Tc.Deriv.Utils
 import GHC.Tc.Utils.Env
 import GHC.Tc.Deriv.Generate
@@ -35,20 +25,36 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
-import GHC.Core.Predicate
 import GHC.Tc.Utils.TcType
-import GHC.Core.TyCon
-import GHC.Core.TyCo.Ppr (pprTyVars)
-import GHC.Core.Type
 import GHC.Tc.Solver
 import GHC.Tc.Solver.Monad ( runTcS )
 import GHC.Tc.Validity (validDerivPred)
 import GHC.Tc.Utils.Unify (buildImplicationFor)
-import GHC.Builtin.Types (typeToTypeKind)
+
+import GHC.Core.Class
+import GHC.Core.DataCon
+import GHC.Core.TyCo.Compare( tcEqKind, eqType, nonDetCmpType )
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Ppr (pprTyVars)
+import GHC.Core.Type
+import GHC.Core.Predicate
 import GHC.Core.Unify (tcUnifyTy)
+
+import GHC.Data.Pair
+import GHC.Builtin.Names
+import GHC.Builtin.Types (typeToTypeKind)
+
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
+
+import GHC.Types.Basic
 import GHC.Types.Var
 import GHC.Types.Var.Set
+
+import GHC.Data.Bag
 
 import Control.Monad
 import Control.Monad.Trans.Class  (lift)

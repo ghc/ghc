@@ -65,6 +65,7 @@ import GHC.Core.Coercion
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep   -- for checkValidRoles
 import GHC.Core.TyCo.Ppr( pprTyVars )
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCon

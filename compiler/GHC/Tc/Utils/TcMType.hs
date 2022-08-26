@@ -120,6 +120,7 @@ import GHC.Tc.Errors.Ppr
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.Coercion
@@ -977,8 +978,6 @@ writeMetaTyVarRef tyvar ref ty
              level_check_ok  = not (zonked_ty_lvl `strictlyDeeperThan` tv_lvl)
              level_check_msg = ppr zonked_ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty
              kind_check_ok = zonked_ty_kind `eqType` zonked_tv_kind
-             -- Hack alert! eqType, not tcEqType. see:
-             -- Note [coreView vs tcView] in GHC.Core.Type
              -- Note [Extra-constraint holes in partial type signatures] in GHC.Tc.Gen.HsType
 
              kind_msg = hang (text "Ill-kinded update to meta tyvar")

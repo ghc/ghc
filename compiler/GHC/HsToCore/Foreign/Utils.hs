@@ -18,6 +18,7 @@ import GHC.Core (CoreExpr)
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Compare( eqType )
 
 import GHC.Types.Id
 import GHC.Types.RepType

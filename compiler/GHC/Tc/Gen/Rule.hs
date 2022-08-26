@@ -17,7 +17,6 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Solver
 import GHC.Tc.Solver.Monad ( runTcS )
 import GHC.Tc.Types.Constraint
-import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
@@ -25,9 +24,13 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Expr
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Unify( buildImplicationFor )
+
 import GHC.Core.Type
 import GHC.Core.Coercion( mkCoVarCo )
 import GHC.Core.TyCon( isTypeFamilyTyCon )
+import GHC.Core.Predicate
+import GHC.Core.TyCo.Compare( tcEqType )
+
 import GHC.Types.Id
 import GHC.Types.Var( EvVar, tyVarName )
 import GHC.Types.Var.Set

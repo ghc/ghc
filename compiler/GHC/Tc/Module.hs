@@ -122,6 +122,7 @@ import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Unify( RoughMatchTc(..) )
+import GHC.Core.TyCo.Compare( eqType, eqTypeX, eqVarBndrs )
 import GHC.Core.FamInstEnv
    ( FamInst, pprFamInst, famInstsRepTyCons
    , famInstEnvElts, extendFamInstEnvList, normaliseType )

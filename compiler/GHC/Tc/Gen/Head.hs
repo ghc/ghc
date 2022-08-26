@@ -35,20 +35,20 @@ module GHC.Tc.Gen.Head
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckMonoExprNC, tcCheckPolyExprNC )
 
+import GHC.Prelude
+import GHC.Hs
+
 import GHC.Tc.Gen.HsType
+import GHC.Rename.Unbound     ( unknownNameSuggestions, WhatLooking(..) )
+
 import GHC.Tc.Gen.Bind( chooseInferredQuantifiers )
 import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig, lhsSigWcTypeContextSpan )
 import GHC.Tc.TyCl.PatSyn( patSynBuilderOcc )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
-import GHC.Types.Basic
-import GHC.Types.Error
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
-import GHC.Core.FamInstEnv    ( FamInstEnvs )
-import GHC.Core.UsageEnv      ( unitUE )
-import GHC.Rename.Unbound     ( unknownNameSuggestions, WhatLooking(..) )
 import GHC.Unit.Module        ( getModule )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
@@ -56,36 +56,42 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
-import GHC.Hs
+import GHC.Tc.Types.Evidence
 import GHC.Hs.Syn.Type
-import GHC.Types.Var( isInvisibleAnonArg )
-import GHC.Types.Id
-import GHC.Types.Id.Info
+
+import GHC.Core.FamInstEnv    ( FamInstEnvs )
+import GHC.Core.UsageEnv      ( unitUE )
 import GHC.Core.PatSyn( PatSyn )
 import GHC.Core.ConLike( ConLike(..) )
 import GHC.Core.DataCon
-import GHC.Types.Name
-import GHC.Types.Name.Reader
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.Tc.Types.Evidence
+import GHC.Core.TyCo.Compare( eqType )
+
+import GHC.Types.Var( isInvisibleAnonArg )
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Name
+import GHC.Types.Name.Reader
+import GHC.Types.SrcLoc
+import GHC.Types.Basic
+import GHC.Types.Error
+
 import GHC.Builtin.Types( multiplicityTy )
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH( liftStringName, liftName )
+
 import GHC.Driver.Env
 import GHC.Driver.Session
-import GHC.Types.SrcLoc
 import GHC.Utils.Misc
-import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+
+import GHC.Data.Maybe
 import Control.Monad
 
-import Data.Function
-
-import GHC.Prelude
 
 
 {- *********************************************************************

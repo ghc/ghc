@@ -82,7 +82,6 @@ import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
-import GHC.Core.Predicate
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
@@ -91,13 +90,17 @@ import GHC.Tc.Utils.Unify
 import GHC.IfaceToCore
 import GHC.Tc.Solver
 import GHC.Tc.Utils.Zonk
-import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Ppr
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBindersN,
                                   tcInstInvisibleTyBinder, tcSkolemiseInvisibleBndrs,
                                   tcInstTypeBndrs )
+
 import GHC.Core.Type
+import GHC.Core.Predicate
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Ppr
+import GHC.Core.TyCo.Compare( tcEqType )
+
 import GHC.Builtin.Types.Prim
 import GHC.Types.Error
 import GHC.Types.Name.Env

@@ -33,6 +33,9 @@ module GHC.Core.TyCo.FVs
         -- * Free type constructors
         tyConsOfType,
 
+        -- * Free vars with visible/invisible separate
+        visVarsOfTypes, visVarsOfType,
+
         -- * Occurrence-check expansion
         occCheckExpand,
 
@@ -69,6 +72,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Data.Pair
 
 {-
 %************************************************************************
@@ -757,6 +761,43 @@ almost_devoid_co_var_of_types (ty:tys) cv
   = almost_devoid_co_var_of_type ty cv
   && almost_devoid_co_var_of_types tys cv
 
+
+
+{-
+%************************************************************************
+%*                                                                      *
+        Free tyvars, but with visible/invisible info
+%*                                                                      *
+%************************************************************************
+
+-}
+-- | Retrieve the free variables in this type, splitting them based
+-- on whether they are used visibly or invisibly. Invisible ones come
+-- first.
+visVarsOfType :: Type -> Pair TyCoVarSet
+visVarsOfType orig_ty = Pair invis_vars vis_vars
+  where
+    Pair invis_vars1 vis_vars = go orig_ty
+    invis_vars = invis_vars1 `minusVarSet` vis_vars
+
+    go (TyVarTy tv)      = Pair (tyCoVarsOfType $ tyVarKind tv) (unitVarSet tv)
+    go (AppTy t1 t2)     = go t1 `mappend` go t2
+    go (TyConApp tc tys) = go_tc tc tys
+    go (FunTy _ w t1 t2) = go w `mappend` go t1 `mappend` go t2
+    go (ForAllTy (Bndr tv _) ty)
+      = ((`delVarSet` tv) <$> go ty) `mappend`
+        (invisible (tyCoVarsOfType $ varType tv))
+    go (LitTy {}) = mempty
+    go (CastTy ty co) = go ty `mappend` invisible (tyCoVarsOfCo co)
+    go (CoercionTy co) = invisible $ tyCoVarsOfCo co
+
+    invisible vs = Pair vs emptyVarSet
+
+    go_tc tc tys = let (invis, vis) = partitionInvisibleTypes tc tys in
+                   invisible (tyCoVarsOfTypes invis) `mappend` foldMap go vis
+
+visVarsOfTypes :: [Type] -> Pair TyCoVarSet
+visVarsOfTypes = foldMap visVarsOfType
 
 
 {- *********************************************************************

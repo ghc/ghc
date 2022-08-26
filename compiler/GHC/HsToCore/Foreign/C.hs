@@ -19,6 +19,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core
 import GHC.Core.Unfold.Make
 import GHC.Core.Type
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity

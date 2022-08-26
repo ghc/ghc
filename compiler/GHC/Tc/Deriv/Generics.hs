@@ -24,18 +24,23 @@ where
 import GHC.Prelude
 
 import GHC.Hs
-import GHC.Core.Type
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Deriv.Generate
 import GHC.Tc.Deriv.Functor
 import GHC.Tc.Errors.Types
+import GHC.Tc.Instance.Family
+
+import GHC.Core.Type
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.FamInstEnv ( FamInst, FamFlavor(..), mkSingleCoAxiom )
-import GHC.Tc.Instance.Family
+
 import GHC.Unit.Module ( moduleName, moduleUnit
                        , unitFS, getModule )
+
 import GHC.Iface.Env    ( newGlobalBinder )
+
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Name.Reader
 import GHC.Types.SourceText

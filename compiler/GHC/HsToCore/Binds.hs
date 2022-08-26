@@ -54,6 +54,7 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity
 import GHC.Core.Rules
+import GHC.Core.TyCo.Compare( eqType )
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )

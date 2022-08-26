@@ -75,7 +75,6 @@ module GHC.Types.Var (
         TypeOrConstraint(..),  -- Re-export this: it's an argument of AnonArgFlag
         Specificity(..),
         isVisibleArgFlag, isInvisibleArgFlag, isInferredArgFlag,
-        sameVis,
 
         -- * TyVar's
         VarBndr(..), TyCoVarBinder, TyVarBinder, InvisTVBinder, ReqTVBinder,
@@ -478,14 +477,6 @@ isInferredArgFlag :: ArgFlag -> Bool
 -- More restrictive than isInvisibleArgFlag
 isInferredArgFlag (Invisible InferredSpec) = True
 isInferredArgFlag _                        = False
-
--- | Do these denote the same level of visibility? 'Required'
--- arguments are visible, others are not. So this function
--- equates 'Specified' and 'Inferred'. Used for printing.
-sameVis :: ArgFlag -> ArgFlag -> Bool
-sameVis Required      Required      = True
-sameVis (Invisible _) (Invisible _) = True
-sameVis _             _             = False
 
 instance Outputable ArgFlag where
   ppr Required  = text "[req]"

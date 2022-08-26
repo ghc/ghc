@@ -11,8 +11,6 @@ import GHC.Types.Basic ( SwapFlag(..),
                          infinity, IntWithInf, intGtLimit )
 import GHC.Tc.Solver.Canonical
 import GHC.Types.Var.Set
-import GHC.Core.Type as Type
-import GHC.Core.InstEnv         ( DFunInstType )
 
 import GHC.Types.Var
 import GHC.Tc.Errors.Types
@@ -35,6 +33,9 @@ import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
 
 import GHC.Core
+import GHC.Core.Type as Type
+import GHC.Core.TyCo.Compare( tcEqType, tcEqTypeNoKindCheck )
+import GHC.Core.InstEnv     ( DFunInstType )
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Predicate

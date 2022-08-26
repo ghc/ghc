@@ -28,23 +28,8 @@ import GHC.Prelude
 
 import GHC.Data.Bag
 import GHC.Types.Basic
-import GHC.Core.Class
-import GHC.Core.DataCon
-import GHC.Core.FamInstEnv
-import GHC.Driver.Session
-import GHC.Utils.Error
-import GHC.Types.Fixity.Env (lookupFixity)
-import GHC.Hs
+
 import GHC.Tc.Utils.Instantiate
-import GHC.Core.InstEnv
-import GHC.Iface.Load   (loadInterfaceForName)
-import GHC.Unit.Module (getModule)
-import GHC.Unit.Module.ModIface (mi_fix)
-import GHC.Types.Name
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Builtin.Names
-import GHC.Types.SrcLoc
 import GHC.Tc.Deriv.Generate
 import GHC.Tc.Deriv.Functor
 import GHC.Tc.Deriv.Generics
@@ -55,11 +40,33 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify (tcSubTypeSigma)
 import GHC.Tc.Utils.Zonk
-import GHC.Builtin.Names.TH (liftClassKey)
+
+import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.Class
+import GHC.Core.DataCon
+import GHC.Core.FamInstEnv
+import GHC.Core.InstEnv
 import GHC.Core.TyCon
 import GHC.Core.Type
+
+import GHC.Hs
+import GHC.Driver.Session
+import GHC.Unit.Module (getModule)
+import GHC.Unit.Module.ModIface (mi_fix)
+
+import GHC.Types.Fixity.Env (lookupFixity)
+import GHC.Iface.Load   (loadInterfaceForName)
+import GHC.Types.Name
+import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Types.Var.Set
+
+import GHC.Builtin.Names
+import GHC.Builtin.Names.TH (liftClassKey)
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Error
 
 import Control.Monad.Trans.Reader
 import Data.Foldable (traverse_)

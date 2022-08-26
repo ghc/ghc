@@ -32,6 +32,7 @@ import GHC.Types.CostCentre (mkUserCC, CCFlavour(DeclCC))
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Hs
+
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
@@ -42,46 +43,53 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Solver
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
-import GHC.Core.Predicate
-import GHC.Core.TyCo.Ppr( pprTyVars )
+
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Pat
 import GHC.Tc.Utils.TcMType
+import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Validity (checkValidType)
+
+import GHC.Core.Predicate
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
-import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Core.Class   ( Class )
 import GHC.Core.Coercion( mkSymCo )
-import GHC.Tc.Utils.TcType
 import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
+import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCo.Ppr( pprTyVars )
+
 import GHC.Builtin.Types ( mkConstraintTupleTy )
 import GHC.Builtin.Types.Prim
+import GHC.Unit.Module
+
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env( TidyEnv, TyVarEnv, mkVarEnv, lookupVarEnv )
-import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
-import GHC.Data.Bag
+
 import GHC.Utils.Error
-import GHC.Data.Graph.Directed
-import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Types.Basic
 import GHC.Types.CompleteMatch
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Builtin.Names( ipClassName )
-import GHC.Tc.Validity (checkValidType)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
 import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Data.Bag
+import GHC.Data.Graph.Directed
+import GHC.Data.Maybe
 
 import Control.Monad
 import Data.Foldable (find)

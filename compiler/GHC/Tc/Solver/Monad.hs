@@ -131,27 +131,30 @@ import qualified GHC.Tc.Instance.Class as TcM( matchGlobalInst, ClsInstResult(..
 import qualified GHC.Tc.Utils.Env      as TcM
        ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl
        , tcInitTidyEnv )
+
+import GHC.Driver.Session
+
 import GHC.Tc.Instance.Class( InstanceWhat(..), safeOverlap, instanceReturnsDictCon )
 import GHC.Tc.Utils.TcType
-import GHC.Driver.Session
-import GHC.Core.Type
-import qualified GHC.Core.TyCo.Rep as Rep  -- this needs to be used only very locally
-import GHC.Core.Coercion
-import GHC.Core.Reduction
-
 import GHC.Tc.Solver.Types
 import GHC.Tc.Solver.InertSet
-
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Errors.Types
+
+import GHC.Core.Type
+import qualified GHC.Core.TyCo.Rep as Rep  -- this needs to be used only very locally
+import GHC.Core.TyCo.Compare( tcEqType )
+import GHC.Core.Coercion
+import GHC.Core.Reduction
 import GHC.Core.Class
 import GHC.Core.TyCon
-import GHC.Tc.Errors.Types
-import GHC.Types.Error ( mkPlainError, noHints )
 
+import GHC.Types.Error ( mkPlainError, noHints )
 import GHC.Types.Name
 import GHC.Types.TyThing
-import GHC.Unit.Module ( HasModule, getModule, extractModule )
 import GHC.Types.Name.Reader ( GlobalRdrEnv, GlobalRdrElt )
+
+import GHC.Unit.Module ( HasModule, getModule, extractModule )
 import qualified GHC.Rename.Env as TcM
 import GHC.Types.Var
 import GHC.Types.Var.Env

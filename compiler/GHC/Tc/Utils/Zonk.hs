@@ -57,7 +57,8 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env   ( tcLookupGlobalOnly )
 import GHC.Tc.Types.Evidence
 
-import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Core.TyCo.Ppr     ( pprTyVar )
+import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion

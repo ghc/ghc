@@ -64,6 +64,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.Subst    as Core
 import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
+import GHC.Core.TyCo.Compare( eqType )
 
 import GHC.Types.Demand
 import GHC.Types.Cpr( CprSig, mkCprSig, botCpr )

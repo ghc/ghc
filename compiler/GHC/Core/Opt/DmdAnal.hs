@@ -34,7 +34,8 @@ import GHC.Core.Type
 import GHC.Core.Predicate( isClassPred )
 import GHC.Core.FVs      ( rulesRhsFreeIds, bndrRuleAndUnfoldingIds )
 import GHC.Core.Coercion ( Coercion )
-import GHC.Core.TyCo.FVs ( coVarsOfCos )
+import GHC.Core.TyCo.FVs     ( coVarsOfCos )
+import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Utils.Misc

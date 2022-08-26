@@ -112,6 +112,7 @@ import GHC.Tc.Types.Origin
 import GHC.Core
 
 import GHC.Core.TyCo.Ppr
+import GHC.Core.TyCo.Compare( tcEqType, tcEqTyConApps )
 import GHC.Utils.FV
 import GHC.Types.Var.Set
 import GHC.Driver.Session

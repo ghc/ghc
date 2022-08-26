@@ -61,8 +61,8 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Coercion
-import GHC.Core.TyCo.Ppr  ( pprTyVars
-                           )
+import GHC.Core.TyCo.Ppr     ( pprTyVars )
+import GHC.Core.TyCo.Compare ( tcEqType, eqType, nonDetCmpType, tcEqTypeVis )
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
 import GHC.Core.DataCon

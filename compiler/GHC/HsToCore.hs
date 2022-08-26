@@ -45,7 +45,8 @@ import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances )
 import GHC.Tc.Module ( runTcInteractive )
 
 import GHC.Core.Type
-import GHC.Core.TyCon     ( tyConDataCons )
+import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCon       ( tyConDataCons )
 import GHC.Core
 import GHC.Core.FVs       ( exprsSomeFreeVarsList )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )

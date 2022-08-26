@@ -21,6 +21,7 @@ import GHC.Types.SrcLoc
 import GHC.CoreToIface
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Compare( nonDetCmpType )
 import GHC.Core.Type
 import GHC.Types.Var
 import GHC.Types.Var.Env

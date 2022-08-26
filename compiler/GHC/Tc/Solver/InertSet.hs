@@ -52,6 +52,7 @@ import GHC.Types.Var.Env
 import GHC.Core.Reduction
 import GHC.Core.Predicate
 import GHC.Core.TyCo.FVs
+import GHC.Core.TyCo.Compare( tcEqTypeNoKindCheck, tcEqTyConApps, eqType )
 import qualified GHC.Core.TyCo.Rep as Rep
 import GHC.Core.TyCon
 import GHC.Core.Unify

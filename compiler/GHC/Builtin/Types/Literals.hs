@@ -29,12 +29,12 @@ import GHC.Prelude
 
 import GHC.Core.Type
 import GHC.Data.Pair
-import GHC.Tc.Utils.TcType ( TcType, tcEqType )
 import GHC.Core.TyCon    ( TyCon, FamTyConFlav(..), mkFamilyTyCon
                          , Injectivity(..) )
 import GHC.Core.Coercion ( Role(..) )
 import GHC.Tc.Types.Constraint ( Xi )
 import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
+import GHC.Core.TyCo.Compare   ( tcEqType )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
 import GHC.Types.Unique.FM
 import GHC.Builtin.Types
@@ -630,7 +630,7 @@ isOrderingLitTy tc =
          | tc1 == promotedGTDataCon -> return GT
          | otherwise                -> Nothing
 
-known :: (Integer -> Bool) -> TcType -> Bool
+known :: (Integer -> Bool) -> Type -> Bool
 known p x = case isNumLitTy x of
               Just a  -> p a
               Nothing -> False

@@ -51,6 +51,7 @@ import GHC.Core.Utils  ( cheapEqExpr, exprIsHNF, exprType
 import GHC.Core.Multiplicity
 import GHC.Core.Rules.Config
 import GHC.Core.Type
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCon
    ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
    , isNewTyCon, tyConDataCons

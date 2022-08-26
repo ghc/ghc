@@ -21,17 +21,28 @@ where
 import GHC.Prelude
 
 import GHC.Hs
+
 import GHC.Tc.Gen.Pat
-import GHC.Core.Multiplicity
-import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType, isManyTy, mkTYPEapp )
-import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.TcMType
+import GHC.Tc.Utils.Zonk
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Sig ( TcPragEnv, emptyPragEnv, completeSigFromId, lookupPragEnv
                       , addInlinePrags, addInlinePragArity )
-import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.TcMType
-import GHC.Tc.Utils.Zonk
+import GHC.Tc.Solver
+import GHC.Tc.Utils.Unify
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.Origin
+import GHC.Tc.TyCl.Build
+
+import GHC.Core.Multiplicity
+import GHC.Core.Type ( typeKind, tidyTyCoVarBinders, tidyTypes, tidyType, isManyTy, mkTYPEapp )
+import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
+import GHC.Core.TyCo.Compare( tcEqType )
+import GHC.Core.Predicate
+
 import GHC.Builtin.Types.Prim
 import GHC.Types.Error
 import GHC.Types.Name
@@ -47,14 +58,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info( RecSelParent(..) )
 import GHC.Tc.Gen.Bind
 import GHC.Types.Basic
-import GHC.Tc.Solver
-import GHC.Tc.Utils.Unify
-import GHC.Core.Predicate
 import GHC.Builtin.Types
-import GHC.Tc.Utils.TcType
-import GHC.Tc.Types.Evidence
-import GHC.Tc.Types.Origin
-import GHC.Tc.TyCl.Build
 import GHC.Types.Var.Set
 import GHC.Types.Id.Make
 import GHC.Tc.TyCl.Utils

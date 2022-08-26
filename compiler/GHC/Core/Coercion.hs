@@ -138,6 +138,7 @@ import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.Tidy
+import GHC.Core.TyCo.Compare( eqType, eqTypeX )
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk

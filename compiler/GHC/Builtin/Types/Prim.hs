@@ -666,11 +666,11 @@ tcArrowTyCon = mkPrimTyCon tcArrowTyConName tc_bndrs constraintKind tc_roles
 {-
 ************************************************************************
 *                                                                      *
-                Kinds
+                Type and Constraint
 *                                                                      *
 ************************************************************************
 
-Note [TYPE and CONSTRAINT]
+Note [TYPE and CONSTRAINT]  aka Note [Type vs Constraint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC distinguishes Type from Constraint throughout the compiler.
 See GHC Proposal #518, and tickets #21623 and #11715.

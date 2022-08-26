@@ -34,6 +34,7 @@ import GHC.Core.ConLike
 import GHC.Core.FamInstEnv (famInstAxiom)
 import GHC.Core.InstEnv
 import GHC.Core.TyCo.Rep (Type(..))
+import GHC.Core.TyCo.Compare ( pickyEqType, eqType )
 import GHC.Core.TyCo.Ppr (pprWithExplicitKindsWhen,
                           pprSourceTyCon, pprTyVars, pprWithTYPE)
 import GHC.Core.PatSyn ( patSynName, pprPatSynType )

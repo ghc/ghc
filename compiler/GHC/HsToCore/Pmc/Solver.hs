@@ -45,6 +45,7 @@ import GHC.Utils.Monad (allM)
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.Bag
+
 import GHC.Types.Basic (Levity(..))
 import GHC.Types.CompleteMatch
 import GHC.Types.Unique.Set
@@ -55,13 +56,16 @@ import GHC.Types.Name
 import GHC.Types.Var      (EvVar)
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.Unique.Supply
+
 import GHC.Core
-import GHC.Core.FVs       (exprFreeVars)
+import GHC.Core.FVs         (exprFreeVars)
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Map.Expr
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
 import GHC.Core.Utils     (exprType)
 import GHC.Core.Make      (mkListExpr, mkCharExpr)
-import GHC.Types.Unique.Supply
+
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import GHC.Data.Maybe

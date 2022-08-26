@@ -53,6 +53,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core
 import GHC.Core.Type( pattern ManyTy, mkFunTy )
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Make
 import GHC.Core.Utils
 

@@ -47,6 +47,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
+import GHC.Core.TyCo.Compare( eqType )
 
 import GHC.Driver.Session
 import GHC.Types.CostCentre

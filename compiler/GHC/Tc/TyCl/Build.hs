@@ -22,6 +22,7 @@ import GHC.Core.FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
 import GHC.Builtin.Types( isCTupleTyConName, unboxedUnitTy )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
+import GHC.Core.TyCo.Compare( eqType, eqTypes )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Basic

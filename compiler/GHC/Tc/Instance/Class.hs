@@ -45,6 +45,7 @@ import GHC.Core.Make ( mkCharExpr, mkNaturalExpr, mkStringExprFS, mkCoreLams )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
+import GHC.Core.TyCo.Compare( eqType )
 
 import GHC.Core ( Expr(Var, App, Cast, Type) )
 

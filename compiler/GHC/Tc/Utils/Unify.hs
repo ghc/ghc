@@ -42,8 +42,7 @@ module GHC.Tc.Utils.Unify (
 import GHC.Prelude
 
 import GHC.Hs
-import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Ppr( debugPprType )
+
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep, makeTypeConcrete, hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Instantiate
@@ -52,6 +51,10 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Ppr( debugPprType )
+import GHC.Core.TyCo.Compare( tcEqType, tcEqTyConApps )
+import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity
 
@@ -62,7 +65,6 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Types.Name( Name, isSystemName )
 
-import GHC.Core.TyCon
 import GHC.Builtin.Types
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set

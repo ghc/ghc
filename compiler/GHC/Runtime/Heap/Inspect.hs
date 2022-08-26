@@ -36,7 +36,9 @@ import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Core.Multiplicity
 import qualified GHC.Core.Unify as U
-import GHC.Types.Var
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Compare( eqType )
+
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
@@ -44,7 +46,7 @@ import GHC.Tc.Utils.Zonk ( zonkTcTypeToTypeX, mkEmptyZonkEnv, ZonkFlexi( Runtime
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
 
-import GHC.Core.TyCon
+import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Name.Occurrence as OccName
 import GHC.Unit.Module

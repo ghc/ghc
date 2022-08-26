@@ -75,6 +75,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  , liftedRepTyCon, liftedDataConTyCon )
 import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy, anonArgTyCon )
 import GHC.Core.TyCo.Rep( CoSel )
+import GHC.Core.TyCo.Compare( eqForAllVis )
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
@@ -1250,9 +1251,9 @@ ppr_itv_bndrs :: [IfaceForAllBndr]
              -> ArgFlag  -- ^ visibility of the first binder in the list
              -> ([IfaceForAllBndr], [SDoc])
 ppr_itv_bndrs all_bndrs@(bndr@(Bndr _ vis) : bndrs) vis1
-  | vis `sameVis` vis1 = let (bndrs', doc) = ppr_itv_bndrs bndrs vis1 in
-                         (bndrs', pprIfaceForAllBndr bndr : doc)
-  | otherwise   = (all_bndrs, [])
+  | vis `eqForAllVis` vis1 = let (bndrs', doc) = ppr_itv_bndrs bndrs vis1 in
+                             (bndrs', pprIfaceForAllBndr bndr : doc)
+  | otherwise              = (all_bndrs, [])
 ppr_itv_bndrs [] _ = ([], [])
 
 pprIfaceForAllCo :: [(IfLclName, IfaceCoercion)] -> SDoc

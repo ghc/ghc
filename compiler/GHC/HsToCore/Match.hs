@@ -38,27 +38,31 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.HsToCore.Pmc
 import GHC.HsToCore.Pmc.Types ( Nablas, initNablas )
-import GHC.Core
-import GHC.Types.Literal
-import GHC.Core.Utils
-import GHC.Core.Make
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Binds
 import GHC.HsToCore.GuardedRHSs
 import GHC.HsToCore.Utils
-import GHC.Types.Id
-import GHC.Core.ConLike
-import GHC.Core.DataCon
-import GHC.Core.PatSyn
 import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.Match.Constructor
 import GHC.HsToCore.Match.Literal
+
+import GHC.Core
+import GHC.Core.Utils
+import GHC.Core.Make
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.PatSyn
 import GHC.Core.Type
+import GHC.Core.TyCo.Compare( eqType, eqTypes )
 import GHC.Core.Coercion ( eqCoercion )
 import GHC.Core.TyCon    ( isNewTyCon )
 import GHC.Core.Multiplicity
 import GHC.Builtin.Types
+
+import GHC.Types.Id
+import GHC.Types.Literal
 import GHC.Types.SrcLoc
+
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Types.Name

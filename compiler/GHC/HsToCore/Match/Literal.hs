@@ -41,6 +41,7 @@ import GHC.Types.SourceText
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.TyCon
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.DataCon
 import GHC.Tc.Utils.Zonk ( shortCutLit )

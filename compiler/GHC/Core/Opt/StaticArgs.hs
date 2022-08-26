@@ -54,20 +54,23 @@ module GHC.Core.Opt.StaticArgs ( doStaticArgs ) where
 
 import GHC.Prelude
 
-import GHC.Types.Var
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.TyCo.Compare( eqType )
+
+import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Unique.Supply
-import GHC.Utils.Misc
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Set
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
+
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 

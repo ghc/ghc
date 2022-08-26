@@ -47,6 +47,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Ppr
+import GHC.Core.TyCo.Compare( eqTypes )
 import GHC.Core.Unify( RoughMatchTc(..) )
 
 import GHC.Driver.Config.HsToCore.Usage

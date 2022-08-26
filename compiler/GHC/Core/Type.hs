@@ -96,7 +96,6 @@ module GHC.Core.Type (
         newTyConInstRhs,
 
         -- ** Binders
-        sameVis,
         mkTyCoVarBinder, mkTyCoVarBinders,
         mkTyVarBinder, mkTyVarBinders,
         tyVarSpecToBinders,
@@ -172,7 +171,6 @@ module GHC.Core.Type (
 
         anyFreeVarsOfType, anyFreeVarsOfTypes,
         noFreeVarsOfType,
-        splitVisVarsOfType, splitVisVarsOfTypes,
         expandTypeSynonyms,
         typeSize, occCheckExpand,
 
@@ -183,11 +181,6 @@ module GHC.Core.Type (
         -- * Well-scoped lists of variables
         scopedSort, tyCoVarsOfTypeWellScoped,
         tyCoVarsOfTypesWellScoped,
-
-        -- * Type comparison
-        eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
-        nonDetCmpTypesX, nonDetCmpTc,
-        eqVarBndrs,
 
         -- * Forcing evaluation of types
         seqType, seqTypes,
@@ -279,11 +272,11 @@ import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-} GHC.Core.Coercion
    ( mkNomReflCo, mkGReflCo, mkReflCo
-   , mkTyConAppCo, mkAppCo,
+   , mkTyConAppCo, mkAppCo
    , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
    , mkSymCo, mkTransCo, mkSelCo, mkLRCo, mkInstCo
    , mkKindCo, mkSubCo
-   , decomposePiCos, coercionKind,
+   , decomposePiCos, coercionKind
    , coercionRKind, coercionType
    , isReflexiveCo, seqCo
    , topNormaliseNewType_maybe
@@ -297,8 +290,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
-import GHC.Data.Pair
-import GHC.Types.Unique ( nonDetCmpUnique )
 
 import GHC.Data.Maybe   ( orElse, isJust )
 import Control.Monad    ( guard )
@@ -419,12 +410,8 @@ unification in GHC.Tc.Utils.TcMType.writeMetaTyVarRef.
 
 -}
 
--- | Gives the typechecker view of a type. This unwraps synonyms but
--- leaves 'Constraint' alone. c.f. 'coreView', which turns 'Constraint' into
--- 'Type'. Returns 'Nothing' if no unwrapping happens.
--- See also Note [coreView vs tcView]
+-- Scheduled for demolition
 tcView :: Type -> Maybe Type
-{-# INLINE tcView #-}
 tcView ty = coreView ty
 
 coreView :: Type -> Maybe Type
@@ -675,7 +662,7 @@ kindRep_maybe kind
   | otherwise                            = Nothing
 
 -- | Returns True if the argument is a lifted type or constraint
--- See Note [Kind Constraint and kind Type]
+-- See Note [TYPE and CONSTRAINT] in GHC.Builtin.Types.Prim
 isLiftedTypeKind :: Kind -> Bool
 isLiftedTypeKind kind
   = case kindRep_maybe kind of
@@ -2598,250 +2585,6 @@ seqTypes (ty:tys) = seqType ty `seq` seqTypes tys
 {-
 ************************************************************************
 *                                                                      *
-                Comparison for types
-        (We don't use instances so that we know where it happens)
-*                                                                      *
-************************************************************************
-
-Note [Equality on AppTys]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-In our cast-ignoring equality, we want to say that the following two
-are equal:
-
-  (Maybe |> co) (Int |> co')   ~?       Maybe Int
-
-But the left is an AppTy while the right is a TyConApp. The solution is
-to use repSplitAppTy_maybe to break up the TyConApp into its pieces and
-then continue. Easy to do, but also easy to forget to do.
-
-Note [Comparing nullary type synonyms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider the task of testing equality between two 'Type's of the form
-
-  TyConApp tc []
-
-where @tc@ is a type synonym. A naive way to perform this comparison these
-would first expand the synonym and then compare the resulting expansions.
-
-However, this is obviously wasteful and the RHS of @tc@ may be large; it is
-much better to rather compare the TyCons directly. Consequently, before
-expanding type synonyms in type comparisons we first look for a nullary
-TyConApp and simply compare the TyCons if we find one. Of course, if we find
-that the TyCons are *not* equal then we still need to perform the expansion as
-their RHSs may still be equal.
-
-We perform this optimisation in a number of places:
-
- * GHC.Core.Types.eqType
- * GHC.Core.Types.nonDetCmpType
- * GHC.Core.Unify.unify_ty
- * TcCanonical.can_eq_nc'
- * TcUnify.uType
-
-This optimisation is especially helpful for the ubiquitous GHC.Types.Type,
-since GHC prefers to use the type synonym over @TYPE 'LiftedRep@ applications
-whenever possible. See Note [Using synonyms to compress types] in
-GHC.Core.Type for details.
-
--}
-
-eqType :: Type -> Type -> Bool
--- ^ Type equality on source types. Does not look through @newtypes@,
--- 'PredType's or type families, but it does look through type synonyms.
--- This first checks that the kinds of the types are equal and then
--- checks whether the types are equal, ignoring casts and coercions.
--- (The kind check is a recursive call, but since all kinds have type
--- @Type@, there is no need to check the types of kinds.)
--- See also Note [Non-trivial definitional equality] in "GHC.Core.TyCo.Rep".
-eqType t1 t2 = isEqual $ nonDetCmpType t1 t2
-  -- It's OK to use nonDetCmpType here and eqType is deterministic,
-  -- nonDetCmpType does equality deterministically
-
--- | Compare types with respect to a (presumably) non-empty 'RnEnv2'.
-eqTypeX :: RnEnv2 -> Type -> Type -> Bool
-eqTypeX env t1 t2 = isEqual $ nonDetCmpTypeX env t1 t2
-  -- It's OK to use nonDetCmpType here and eqTypeX is deterministic,
-  -- nonDetCmpTypeX does equality deterministically
-
--- | Type equality on lists of types, looking through type synonyms
--- but not newtypes.
-eqTypes :: [Type] -> [Type] -> Bool
-eqTypes tys1 tys2 = isEqual $ nonDetCmpTypes tys1 tys2
-  -- It's OK to use nonDetCmpType here and eqTypes is deterministic,
-  -- nonDetCmpTypes does equality deterministically
-
-eqVarBndrs :: RnEnv2 -> [Var] -> [Var] -> Maybe RnEnv2
--- Check that the var lists are the same length
--- and have matching kinds; if so, extend the RnEnv2
--- Returns Nothing if they don't match
-eqVarBndrs env [] []
- = Just env
-eqVarBndrs env (tv1:tvs1) (tv2:tvs2)
- | eqTypeX env (varType tv1) (varType tv2)
- = eqVarBndrs (rnBndr2 env tv1 tv2) tvs1 tvs2
-eqVarBndrs _ _ _= Nothing
-
--- Now here comes the real worker
-
-{-
-Note [nonDetCmpType nondeterminism]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-nonDetCmpType is implemented in terms of nonDetCmpTypeX. nonDetCmpTypeX
-uses nonDetCmpTc which compares TyCons by their Unique value. Using Uniques for
-ordering leads to nondeterminism. We hit the same problem in the TyVarTy case,
-comparing type variables is nondeterministic, note the call to nonDetCmpVar in
-nonDetCmpTypeX.
-See Note [Unique Determinism] for more details.
-
-Note [Computing equality on types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There are several places within GHC that depend on the precise choice of
-definitional equality used. If we change that definition, all these places
-must be updated. This Note merely serves as a place for all these places
-to refer to, so searching for references to this Note will find every place
-that needs to be updated.
-
-See also Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
-
--}
-
-nonDetCmpType :: Type -> Type -> Ordering
-nonDetCmpType (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2
-  = EQ
-nonDetCmpType t1 t2
-  -- we know k1 and k2 have the same kind, because they both have kind *.
-  = nonDetCmpTypeX rn_env t1 t2
-  where
-    rn_env = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes [t1, t2]))
-{-# INLINE nonDetCmpType #-}
-
-nonDetCmpTypes :: [Type] -> [Type] -> Ordering
-nonDetCmpTypes ts1 ts2 = nonDetCmpTypesX rn_env ts1 ts2
-  where
-    rn_env = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes (ts1 ++ ts2)))
-
--- | An ordering relation between two 'Type's (known below as @t1 :: k1@
--- and @t2 :: k2@)
-data TypeOrdering = TLT  -- ^ @t1 < t2@
-                  | TEQ  -- ^ @t1 ~ t2@ and there are no casts in either,
-                         -- therefore we can conclude @k1 ~ k2@
-                  | TEQX -- ^ @t1 ~ t2@ yet one of the types contains a cast so
-                         -- they may differ in kind.
-                  | TGT  -- ^ @t1 > t2@
-                  deriving (Eq, Ord, Enum, Bounded)
-
-nonDetCmpTypeX :: RnEnv2 -> Type -> Type -> Ordering  -- Main workhorse
-    -- See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep
-    -- See Note [Computing equality on types]
-nonDetCmpTypeX env orig_t1 orig_t2 =
-    case go env orig_t1 orig_t2 of
-      -- If there are casts then we also need to do a comparison of
-      -- the kinds of the types being compared
-      TEQX          -> toOrdering $ go env k1 k2
-      ty_ordering   -> toOrdering ty_ordering
-  where
-    k1 = typeKind orig_t1
-    k2 = typeKind orig_t2
-
-    toOrdering :: TypeOrdering -> Ordering
-    toOrdering TLT  = LT
-    toOrdering TEQ  = EQ
-    toOrdering TEQX = EQ
-    toOrdering TGT  = GT
-
-    liftOrdering :: Ordering -> TypeOrdering
-    liftOrdering LT = TLT
-    liftOrdering EQ = TEQ
-    liftOrdering GT = TGT
-
-    thenCmpTy :: TypeOrdering -> TypeOrdering -> TypeOrdering
-    thenCmpTy TEQ  rel  = rel
-    thenCmpTy TEQX rel  = hasCast rel
-    thenCmpTy rel  _    = rel
-
-    hasCast :: TypeOrdering -> TypeOrdering
-    hasCast TEQ = TEQX
-    hasCast rel = rel
-
-    -- Returns both the resulting ordering relation between
-    -- the two types and whether either contains a cast.
-    go :: RnEnv2 -> Type -> Type -> TypeOrdering
-    -- See Note [Comparing nullary type synonyms].
-    go _   (TyConApp tc1 []) (TyConApp tc2 [])
-      | tc1 == tc2
-      = TEQ
-    go env t1 t2
-      | Just t1' <- coreView t1 = go env t1' t2
-      | Just t2' <- coreView t2 = go env t1 t2'
-
-    go env (TyVarTy tv1)       (TyVarTy tv2)
-      = liftOrdering $ rnOccL env tv1 `nonDetCmpVar` rnOccR env tv2
-    go env (ForAllTy (Bndr tv1 _) t1) (ForAllTy (Bndr tv2 _) t2)
-      = go env (varType tv1) (varType tv2)
-        `thenCmpTy` go (rnBndr2 env tv1 tv2) t1 t2
-        -- See Note [Equality on AppTys]
-    go env (AppTy s1 t1) ty2
-      | Just (s2, t2) <- repSplitAppTy_maybe ty2
-      = go env s1 s2 `thenCmpTy` go env t1 t2
-    go env ty1 (AppTy s2 t2)
-      | Just (s1, t1) <- repSplitAppTy_maybe ty1
-      = go env s1 s2 `thenCmpTy` go env t1 t2
-    go env (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
-        -- NB: nonDepCmpTypeX does the kind check requested by
-        -- Note [Equality on FunTys] in GHC.Core.TyCo.Rep
-      = liftOrdering (nonDetCmpTypeX env s1 s2 `thenCmp` nonDetCmpTypeX env t1 t2)
-          `thenCmpTy` go env w1 w2
-        -- Comparing multiplicities last because the test is usually true
-    go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
-      = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
-    go _   (LitTy l1)          (LitTy l2)          = liftOrdering (nonDetCmpTyLit l1 l2)
-    go env (CastTy t1 _)       t2                  = hasCast $ go env t1 t2
-    go env t1                  (CastTy t2 _)       = hasCast $ go env t1 t2
-
-    go _   (CoercionTy {})     (CoercionTy {})     = TEQ
-
-        -- Deal with the rest: TyVarTy < CoercionTy < AppTy < LitTy < TyConApp < ForAllTy
-    go _ ty1 ty2
-      = liftOrdering $ (get_rank ty1) `compare` (get_rank ty2)
-      where get_rank :: Type -> Int
-            get_rank (CastTy {})
-              = pprPanic "nonDetCmpTypeX.get_rank" (ppr [ty1,ty2])
-            get_rank (TyVarTy {})    = 0
-            get_rank (CoercionTy {}) = 1
-            get_rank (AppTy {})      = 3
-            get_rank (LitTy {})      = 4
-            get_rank (TyConApp {})   = 5
-            get_rank (FunTy {})      = 6
-            get_rank (ForAllTy {})   = 7
-
-    gos :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
-    gos _   []         []         = TEQ
-    gos _   []         _          = TLT
-    gos _   _          []         = TGT
-    gos env (ty1:tys1) (ty2:tys2) = go env ty1 ty2 `thenCmpTy` gos env tys1 tys2
-
--------------
-nonDetCmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering
-nonDetCmpTypesX _   []        []        = EQ
-nonDetCmpTypesX env (t1:tys1) (t2:tys2) = nonDetCmpTypeX env t1 t2
-                                          `thenCmp`
-                                          nonDetCmpTypesX env tys1 tys2
-nonDetCmpTypesX _   []        _         = LT
-nonDetCmpTypesX _   _         []        = GT
-
--------------
--- | Compare two 'TyCon's.
--- See Note [nonDetCmpType nondeterminism]
-nonDetCmpTc :: TyCon -> TyCon -> Ordering
-nonDetCmpTc tc1 tc2
-  = u1 `nonDetCmpUnique` u2
-  where
-    u1  = tyConUnique tc1
-    u2  = tyConUnique tc2
-
-{-
-************************************************************************
-*                                                                      *
         The kind of a type
 *                                                                      *
 ************************************************************************
@@ -3084,87 +2827,6 @@ argsHaveFixedRuntimeRep ty
 
     bndrs :: [TyCoBinder]
     (bndrs, _) = splitPiTys ty
-
-
-{-
-%************************************************************************
-%*                                                                      *
-        Miscellaneous functions
-%*                                                                      *
-%************************************************************************
-
--}
--- | Retrieve the free variables in this type, splitting them based
--- on whether they are used visibly or invisibly. Invisible ones come
--- first.
-splitVisVarsOfType :: Type -> Pair TyCoVarSet
-splitVisVarsOfType orig_ty = Pair invis_vars vis_vars
-  where
-    Pair invis_vars1 vis_vars = go orig_ty
-    invis_vars = invis_vars1 `minusVarSet` vis_vars
-
-    go (TyVarTy tv)      = Pair (tyCoVarsOfType $ tyVarKind tv) (unitVarSet tv)
-    go (AppTy t1 t2)     = go t1 `mappend` go t2
-    go (TyConApp tc tys) = go_tc tc tys
-    go (FunTy _ w t1 t2) = go w `mappend` go t1 `mappend` go t2
-    go (ForAllTy (Bndr tv _) ty)
-      = ((`delVarSet` tv) <$> go ty) `mappend`
-        (invisible (tyCoVarsOfType $ varType tv))
-    go (LitTy {}) = mempty
-    go (CastTy ty co) = go ty `mappend` invisible (tyCoVarsOfCo co)
-    go (CoercionTy co) = invisible $ tyCoVarsOfCo co
-
-    invisible vs = Pair vs emptyVarSet
-
-    go_tc tc tys = let (invis, vis) = partitionInvisibleTypes tc tys in
-                   invisible (tyCoVarsOfTypes invis) `mappend` foldMap go vis
-
-splitVisVarsOfTypes :: [Type] -> Pair TyCoVarSet
-splitVisVarsOfTypes = foldMap splitVisVarsOfType
-
-{-
-************************************************************************
-*                                                                      *
-        Functions over Kinds
-*                                                                      *
-************************************************************************
-
-Note [Kind Constraint and kind Type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The kind Constraint is the kind of classes and other type constraints.
-The special thing about types of kind Constraint is that
- * They are displayed with double arrow:
-     f :: Ord a => a -> a
- * They are implicitly instantiated at call sites; so the type inference
-   engine inserts an extra argument of type (Ord a) at every call site
-   to f.
-
-However, once type inference is over, there is *no* distinction between
-Constraint and Type. Indeed we can have coercions between the two. Consider
-   class C a where
-     op :: a -> a
-For this single-method class we may generate a newtype, which in turn
-generates an axiom witnessing
-    C a ~ (a -> a)
-so on the left we have Constraint, and on the right we have Type.
-See #7451.
-
-Because we treat Constraint/Type differently during and after type inference,
-GHC has two notions of equality that differ in whether they equate
-Constraint/Type or not:
-
-* GHC.Tc.Utils.TcType.tcEqType implements typechecker equality (see
-  Note [Typechecker equality vs definitional equality] in GHC.Tc.Utils.TcType),
-  which treats Constraint and Type as distinct. This is used during type
-  inference. See #11715 for issues that arise from this.
-* GHC.Core.TyCo.Rep.eqType implements definitional equality (see
-  Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep), which treats
-  Constraint and Type as equal. This is used after type inference.
-
-Bottom line: although 'Type' and 'Constraint' are distinct TyCons, with
-distinct uniques, they are treated as equal at all times except
-during type inference.
--}
 
 -- | Checks that a kind of the form 'Type', 'Constraint'
 -- or @'TYPE r@ is concrete. See 'isConcrete'.

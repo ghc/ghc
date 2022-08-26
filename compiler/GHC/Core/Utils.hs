@@ -72,6 +72,7 @@ import GHC.Core.DataCon
 import GHC.Core.Type as Type
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
+import GHC.Core.TyCo.Compare( eqType, eqTypeX )
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.TyCon

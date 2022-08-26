@@ -38,6 +38,7 @@ import GHC.Prelude
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Compare( eqForAllVis )
 import GHC.Data.TrieMap
 
 import GHC.Data.FastString
@@ -165,7 +166,7 @@ trieMapView ty
   = Just $ foldl' AppTy (mkTyConTy tc) tys
 
   -- Then resolve any remaining nullary synonyms.
-  | Just ty' <- tcView ty
+  | Just ty' <- coreView ty
   = Just ty'
 
 trieMapView _ = Nothing
@@ -181,27 +182,6 @@ instance TrieMap TypeMapX where
 
 instance Eq (DeBruijn Type) where
   (==) = eqDeBruijnType
-
-{- Note [Using tcView inside eqDeBruijnType]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-`eqDeBruijnType` uses `tcView` and thus treats Type and Constraint as
-distinct -- see Note [coreView vs tcView] in GHC.Core.Type. We do that because
-`eqDeBruijnType` is used in TrieMaps, which are used for instance for instance
-selection in the type checker. [Or at least will be soon.]
-
-However, the odds that we have two expressions that are identical save for the
-'Type'/'Constraint' distinction are low. (Not impossible to do. But doubtful
-anyone has ever done so in the history of Haskell.)
-
-And it's actually all OK: 'eqExpr' is conservative: if `eqExpr e1 e2` returns
-'True', thne it must be that `e1` behaves identically to `e2` in all contexts.
-But if `eqExpr e1 e2` returns 'False', then we learn nothing. The use of
-'tcView' where we expect 'coreView' means 'eqExpr' returns 'False' bit more
-often that it should. This might, say, stop a `RULE` from firing or CSE from
-optimizing an expression. Stopping `RULE` firing is good actually: `RULES` are
-written in Haskell, where `Type /= Constraint`. Stopping CSE is unfortunate,
-but tolerable.
--}
 
 -- | An equality relation between two 'Type's (known below as @t1 :: k2@
 -- and @t2 :: k2@)
@@ -244,9 +224,8 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
       | tc1 == tc2
       = TEQ
     go env_t@(D env t) env_t'@(D env' t')
-      -- See Note [Using tcView inside eqDeBruijnType]
-      | Just new_t  <- tcView t  = go (D env new_t) env_t'
-      | Just new_t' <- tcView t' = go env_t (D env' new_t')
+      | Just new_t  <- coreView t  = go (D env new_t) env_t'
+      | Just new_t' <- coreView t' = go env_t (D env' new_t')
       | otherwise
       = case (t, t') of
           -- See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep
@@ -274,9 +253,9 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
           (LitTy l, LitTy l')
               -> liftEquality (l == l')
           (ForAllTy (Bndr tv vis) ty, ForAllTy (Bndr tv' vis') ty')
-              -> -- See Note [ForAllTy and typechecker equality] in
-                 -- GHC.Tc.Solver.Canonical for why we use `sameVis` here
-                 liftEquality (vis `sameVis` vis') `andEq`
+              -> -- See Note [ForAllTy and type equality] in
+                 -- GHC.Core.TyCo.Compare for why we use `eqForAllVis` here
+                 liftEquality (vis `eqForAllVis` vis') `andEq`
                  go (D env (varType tv)) (D env' (varType tv')) `andEq`
                  go (D (extendCME env tv) ty) (D (extendCME env' tv') ty')
           (CoercionTy {}, CoercionTy {})
