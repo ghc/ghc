@@ -590,7 +590,8 @@ pcDataCon n univs tys
                       (map linear tys)
 
 pcDataConConstraint :: Name -> [TyVar] -> ThetaType -> TyCon -> DataCon
--- Used for the data constructor of the Coercible (
+-- Used for data constructors whose arguments are all constraints.
+-- Notably constraint tuples, Eq# etc.
 pcDataConConstraint n univs theta
   = pcDataConWithFixity False n univs
                       []    -- No ex_tvs

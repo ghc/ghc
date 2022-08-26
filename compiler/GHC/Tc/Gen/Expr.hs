@@ -1182,7 +1182,7 @@ desugarRecordUpd record_expr rbnds res_ty
           -- the record to disambiguate its fields, so we must infer the record
           -- type here before we can desugar. See Wrinkle [Disambiguating fields]
           -- in Note [Record Updates].
-       ; ((_, record_rho), _lie) <- captureConstraints    $  -- see (1) below
+       ; ((_, record_rho), _lie) <- captureConstraints    $ -- see (1) below
                                     tcScalingUsage ManyTy $ -- see (2) below
                                     tcInferRho record_expr
 

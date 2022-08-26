@@ -2143,8 +2143,10 @@ reifyTyCon tc
   | Just cls <- tyConClass_maybe tc
   = reifyClass cls
 
+{-  Seems to be just a short cut for the next equation -- omit
   | tc `hasKey` fUNTyConKey -- I'm not quite sure what is happening here
   = return (TH.PrimTyConI (reifyName tc) 2 False)
+-}
 
   | isPrimTyCon tc
   = return (TH.PrimTyConI (reifyName tc) (length (tyConVisibleTyVars tc))

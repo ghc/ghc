@@ -141,7 +141,10 @@ normaliseFfiType' env ty0 = runWriterT $ go Representational initRecTc ty0
     go_tc_app role rec_nts tc tys
         -- We don't want to look through the IO newtype, even if it is
         -- in scope, so we have a special case for it:
-        | tc_key `elem` [ioTyConKey, funPtrTyConKey, fUNTyConKey]
+        | isArrowTyCon tc
+        = children_only
+
+        | tc_key `elem` [ioTyConKey, funPtrTyConKey]
         = children_only
 
         | isNewTyCon tc         -- Expand newtypes

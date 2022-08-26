@@ -47,7 +47,7 @@ module GHC.Builtin.Types.Prim(
         cONSTRAINTTyCon, cONSTRAINTTyConName, cONSTRAINTKind,
 
         -- Arrows
-        anonArgTyCon,
+        anonArgTyCon, isArrowTyCon,
         fUNTyCon,       fUNTyConName,
         ctArrowTyCon, ctArrowTyConName,
         ccArrowTyCon, ccArrowTyConName,
@@ -597,6 +597,11 @@ anonArgTyCon (VisArg   ConstraintLike) = tcArrowTyCon
 anonArgTyCon (InvisArg TypeLike)       = ctArrowTyCon
 anonArgTyCon (InvisArg ConstraintLike) = ccArrowTyCon
 
+isArrowTyCon :: TyCon -> Bool
+isArrowTyCon tc
+  = getUnique tc `elem`
+    [fUNTyConKey, ctArrowTyConKey, ccArrowTyConKey, tcArrowTyConKey]
+
 fUNTyConName, ctArrowTyConName, ccArrowTyConName, tcArrowTyConName :: Name
 fUNTyConName     = mkPrimTc        (fsLit "FUN") fUNTyConKey       fUNTyCon
 ctArrowTyConName = mkBuiltInPrimTc (fsLit "=>")  ctArrowTyConKey ctArrowTyCon
@@ -680,7 +685,7 @@ All types that classify values have a kind of the form
 where the `RuntimeRep` parameter, rr, tells us how the value is represented
 at runtime.  TYPE and CONSTRAINT are primitive type constructors.
 
-There are a bunch of type synonyms and data types defined in in the
+There are a bunch of type synonyms and data types defined in the
 library ghc-prim:GHC.Types.  All of them are also wired in to GHC, in
 GHC.Builtin.Types
 
@@ -750,9 +755,9 @@ Note that, as before, nothing prevents writing instances like:
   instance C (Proxy @Type a) where ...
 
 In particular, TYPE and CONSTRAINT (and the synonyms Type, Constraint
-etc) are all allowed in instance heads. It's just that TYPE
-apart from CONSTRAINT so that instance would irretrievably overlap
-with:
+etc) are all allowed in instance heads. It's just that TYPE apart from
+CONSTRAINT, which means that the above instance would irretrievably
+overlap with:
 
   instance C (Proxy @Constraint a) where ...
 

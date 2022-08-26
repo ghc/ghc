@@ -37,28 +37,46 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
-{- Note [Comparision of types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This module implements type comparison, notably `eqType`.
 
-* It uses a few functions from GHC.Core.Type, notably `typeKind`, so it
-  currently sits "on top of" GHC.Core.Type.
+{- Note [GHC.Core.TyCo.Compare overview]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This module implements type equality and comparison
 
+It uses a few functions from GHC.Core.Type, notably `typeKind`,
+so it currently sits "on top of" GHC.Core.Type.
 -}
-
 
 {- *********************************************************************
 *                                                                      *
-            Type equalities
+            Type equality
 *                                                                      *
 ********************************************************************* -}
+
+{- Note [Computing equality on types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This module implements type equality, notably `eqType`. This is
+"definitional equality" or just "equality" for short.
+
+There are several places within GHC that depend on the precise choice of
+definitional equality used. If we change that definition, all these places
+must be updated. This Note merely serves as a place for all these places
+to refer to, so searching for references to this Note will find every place
+that needs to be updated.
+
+* See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
+
+* See Historical Note [Typechecker equality vs definitional equality]
+  below
+-}
+
 
 tcEqKind :: HasDebugCallStack => Kind -> Kind -> Bool
 tcEqKind = tcEqType
 
 tcEqType :: HasDebugCallStack => Type -> Type -> Bool
--- ^ tcEqType implements typechecker equality, as described in
--- @Note [Typechecker equality vs definitional equality]@.
+-- ^ tcEqType implements typechecker equality
+-- It behaves just like eqType, but is implemented
+-- differently (for now)
 tcEqType ty1 ty2
   =  tcEqTypeNoSyns ki1 ki2
   && tcEqTypeNoSyns ty1 ty2
@@ -215,29 +233,7 @@ cmpForAllVis (Invisible _) Required       = GT
 cmpForAllVis (Invisible _) (Invisible _)  = EQ
 
 
-{- Note [Typechecker equality vs definitional equality]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-GHC has two notions of equality over Core types:
-
-* Definitional equality, as implemented by GHC.Core.Type.eqType.
-  See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
-* Typechecker equality, as implemented by tcEqType (in GHC.Tc.Utils.TcType).
-  GHC.Tc.Solver.Canonical.canEqNC also respects typechecker equality.
-
-Typechecker equality implies definitional equality: if two types are equal
-according to typechecker equality, then they are also equal according to
-definitional equality. The converse is not always true, as typechecker equality
-is more finer-grained than definitional equality in two places:
-
-* Unlike definitional equality, which equates Type and Constraint, typechecker
-  treats them as distinct types. See Note [Kind Constraint and kind Type] in
-  GHC.Core.Type.
-* Unlike definitional equality, which does not care about the ArgFlag of a
-  ForAllTy, typechecker equality treats Required type variable binders as
-  distinct from Invisible type variable binders.
-  See Note [ForAllTy and type equality]
-
-Note [ForAllTy and type equality]
+{- Note [ForAllTy and type equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we compare (ForAllTy (Bndr tv1 vis1) ty1)
          and    (ForAllTy (Bndr tv2 vis2) ty2)
@@ -271,9 +267,8 @@ specified or inferred can be somewhat subtle, however, especially for kinds
 that aren't explicitly written out in the source code (like in D above).
 
 For now, we decide to not make the specified/inferred status of an invisible
-type variable binder affect GHC's notion of typechecker equality
-(see Note [Typechecker equality vs definitional equality] in
-GHC.Tc.Utils.TcType). That is, we have the following:
+type variable binder affect GHC's notion of equality. That is, we have the
+following:
 
   --------------------------------------------------
   | Type 1            | Type 2            | Equal? |
@@ -290,6 +285,36 @@ GHC.Tc.Utils.TcType). That is, we have the following:
   |                   | forall {k}. <...> | No     |
   |                   | forall k -> <...> | Yes    |
   --------------------------------------------------
+
+Historical Note [Typechecker equality vs definitional equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note describes some history, in case there are vesitges of this
+history lying around in the code.
+
+Summary: prior to summer 2022, GHC had have two notions of equality
+over Core types.  But now there is only one: definitional equality,
+or just equality for short.
+
+The old setup was:
+
+* Definitional equality, as implemented by GHC.Core.Type.eqType.
+  See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
+
+* Typechecker equality, as implemented by tcEqType.
+  GHC.Tc.Solver.Canonical.canEqNC also respects typechecker equality.
+
+Typechecker equality implied definitional equality: if two types are equal
+according to typechecker equality, then they are also equal according to
+definitional equality. The converse is not always true, as typechecker equality
+is more finer-grained than definitional equality in two places:
+
+* Constraint vs Type.  Definitional equality equated Type and
+  Constraint, but typechecker treats them as distinct types.
+
+* Unlike definitional equality, which does not care about the ArgFlag of a
+  ForAllTy, typechecker equality treats Required type variable binders as
+  distinct from Invisible type variable binders.
+  See Note [ForAllTy and type equality]
 
 
 ************************************************************************
@@ -388,17 +413,6 @@ ordering leads to nondeterminism. We hit the same problem in the TyVarTy case,
 comparing type variables is nondeterministic, note the call to nonDetCmpVar in
 nonDetCmpTypeX.
 See Note [Unique Determinism] for more details.
-
-Note [Computing equality on types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There are several places within GHC that depend on the precise choice of
-definitional equality used. If we change that definition, all these places
-must be updated. This Note merely serves as a place for all these places
-to refer to, so searching for references to this Note will find every place
-that needs to be updated.
-
-See also Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
-
 -}
 
 nonDetCmpType :: Type -> Type -> Ordering

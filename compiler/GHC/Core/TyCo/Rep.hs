@@ -547,12 +547,6 @@ cannot appear outside a coercion. We do not (yet) have a function to
 extract relevant free variables, but it would not be hard to write if
 the need arises.
 
-Besides eqType, another equality relation that upholds the (EQ) property above
-is /typechecker equality/, which is implemented as
-GHC.Tc.Utils.TcType.tcEqType. See
-Note [Typechecker equality vs definitional equality] in GHC.Tc.Utils.TcType for
-what the difference between eqType and tcEqType is.
-
 Note [Respecting definitional equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Note [Non-trivial definitional equality] introduces the property (EQ).
@@ -1439,7 +1433,7 @@ SelTyCon, SelForAll, and SelFun.
 
 Note [FunCo]
 ~~~~~~~~~~~~
-You might think that a FunCo (which connects two function types should
+You might think that a FunCo (which connects two function types) should
 contain the AnonArgFlag from the function types.  But we are allowed to
 have an axiom (and hence a coercion) connecting Type and Constraint, thus
     co :: (t::Type) ~ (c::Constraint)
@@ -2223,6 +2217,3 @@ So that Mult feels a bit more structured, we provide pattern synonyms and smart
 constructors for these.
 -}
 type Mult = Type
-
-
-

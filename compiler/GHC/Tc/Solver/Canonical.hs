@@ -952,7 +952,8 @@ second time around.
 Also note that we require the AnonArgFlag to match.  This will stop
 us decomposing
    (Int -> Bool)  ~  (Show a => blah)
-It's as if we treat (->) and (=>) as different type constructors.
+It's as if we treat (->) and (=>) as different type constructors, which
+indeed they are!
 -}
 
 canEqNC :: CtEvidence -> EqRel -> Type -> Type -> TcS (StopOrContinue Ct)

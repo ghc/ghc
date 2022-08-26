@@ -8,7 +8,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
-{-a
+{-
 %
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -1008,7 +1008,7 @@ qlUnify delta ty1 ty2
     -- impredicative instantiation info from there seems...remote.
     go bvs (FunTy { ft_af = af1, ft_arg = arg1, ft_res = res1, ft_mult = mult1 })
            (FunTy { ft_af = af2, ft_arg = arg2, ft_res = res2, ft_mult = mult2 })
-      | af1 == af2
+      | af1 == af2 -- Match the arrow TyCon
       = do { when (isVisibleAnonArg af1) (go bvs arg1 arg2)
            ; when (isFUNAnonArg af1)     (go bvs mult1 mult2)
            ; go bvs res1 res2 }

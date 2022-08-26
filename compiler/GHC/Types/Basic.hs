@@ -1881,7 +1881,7 @@ isKindLevel KindLevel = True
 ********************************************************************* -}
 
 {- The types `Levity` and `TypeOrConstraint` are internal to GHC.
-   They are the same shape as the eponomyous types in the library
+   They have the same shape as the eponymous types in the library
       ghc-prim:GHC.Types
    but they aren't the same types -- after all, they are defined in a
    different module.

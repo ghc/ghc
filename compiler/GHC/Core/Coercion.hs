@@ -625,7 +625,7 @@ eqTyConRole tc
   = pprPanic "eqTyConRole: unknown tycon" (ppr tc)
 
 -- | Given a coercion @co1 :: (a :: TYPE r1) ~ (b :: TYPE r2)@,
---   (or CONSTRAINT instead of TPYE)
+--   (or CONSTRAINT instead of TYPE)
 -- produce a coercion @rep_co :: r1 ~ r2@.
 mkRuntimeRepCo :: HasDebugCallStack => Coercion -> Coercion
 mkRuntimeRepCo co

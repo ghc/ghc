@@ -428,12 +428,21 @@ coreView _                 = Nothing
 -- See Note [Inlining coreView].
 {-# INLINE coreView #-}
 
---------------------------
--- *** TODO: strange change in coreView ****
---------------------------
+coreFullView, core_full_view :: Type -> Type
+-- ^ Iterates 'coreView' until there is no more to synonym to expand.
+-- NB: coreFullView is non-recursive and can be inlined;
+--     core_full_view is the recursive one
+-- See Note [Inlining coreView].
+coreFullView ty@(TyConApp tc _)
+  | isTypeSynonymTyCon tc = core_full_view ty
+coreFullView ty = ty
+{-# INLINE coreFullView #-}
+
+core_full_view ty
+  | Just ty' <- coreView ty = core_full_view ty'
+  | otherwise               = ty
 
 -----------------------------------------------
-
 -- | @expandSynTyConApp_maybe tc tys@ expands the RHS of type synonym @tc@
 -- instantiated at arguments @tys@, or returns 'Nothing' if @tc@ is not a
 -- synonym.
@@ -489,21 +498,6 @@ expand_syn tvs rhs arg_tys
     go _ (_:_) [] = pprPanic "expand_syn" (ppr tvs $$ ppr rhs $$ ppr arg_tys)
                    -- Under-saturated, precondition failed
 
-coreFullView, core_full_view :: Type -> Type
--- ^ Iterates 'coreView' until there is no more to synonym to expand.
--- NB: coreFullView is non-recursive and can be inlined;
---     core_full_view is the recursive one
--- See Note [Inlining coreView].
-coreFullView ty@(TyConApp tc _)
-  | isTypeSynonymTyCon tc = core_full_view ty
-coreFullView ty = ty
-{-# INLINE coreFullView #-}
-
-core_full_view ty
-  | Just ty' <- coreView ty = core_full_view ty'
-  | otherwise               = ty
-
-
 {- Note [Inlining coreView]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It is very common to have a function
@@ -522,7 +516,13 @@ in its fast path. For this to really be fast, all calls made
 on its fast path must also be inlined, linked back to this Note.
 -}
 
------------------------------------------------
+
+{- *********************************************************************
+*                                                                      *
+                expandTypeSynonyms
+*                                                                      *
+********************************************************************* -}
+
 expandTypeSynonyms :: Type -> Type
 -- ^ Expand out all type synonyms.  Actually, it'd suffice to expand out
 -- just the ones that discard type variables (e.g.  type Funny a = Int)
@@ -631,6 +631,12 @@ not                                ([a], a -> a)
 The reason is that we then get better (shorter) type signatures in
 interfaces.  Notably this plays a role in tcTySigs in GHC.Tc.Gen.Bind.
 -}
+
+{- *********************************************************************
+*                                                                      *
+                Random functions (todo: organise)
+*                                                                      *
+********************************************************************* -}
 
 -- | An INLINE helper for function such as 'kindRep_maybe' below.
 --
@@ -1085,6 +1091,8 @@ the test in repSplitAppTy_maybe, which applies throughout, because
 the other calls to splitAppTy are in GHC.Core.Unify, which is also used by
 the type checker (e.g. when matching type-function equations).
 
+We are willing to split (t1 -=> t2) because the argument is still of
+kind Type, not Constraint.  So the criterion is isVisibleAnonArg.
 -}
 
 -- | Applies a type to another, as in e.g. @k a@
@@ -1130,17 +1138,22 @@ splitAppTy_maybe :: Type -> Maybe (Type, Type)
 -- that type family applications are NEVER unsaturated by this!
 splitAppTy_maybe = repSplitAppTy_maybe . coreFullView
 
+splitAppTy :: Type -> (Type, Type)
+-- ^ Attempts to take a type application apart, as in 'splitAppTy_maybe',
+-- and panics if this is not possible
+splitAppTy ty = splitAppTy_maybe ty `orElse` pprPanic "splitAppTy" (ppr ty)
+
 -------------
 repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
--- any Core view stuff is already done
+-- any coreView stuff is already done
+repSplitAppTy_maybe (AppTy ty1 ty2)
+  = Just (ty1, ty2)
+
 repSplitAppTy_maybe (FunTy af w ty1 ty2)
   | Just (tc, tys)   <- funTyConAppTy_maybe af w ty1 ty2
   , Just (tys', ty') <- snocView tys
   = Just (TyConApp tc tys', ty')
-
-repSplitAppTy_maybe (AppTy ty1 ty2)
-  = Just (ty1, ty2)
 
 repSplitAppTy_maybe (TyConApp tc tys)
   | not (mustBeSaturated tc) || tys `lengthExceeds` tyConArity tc
@@ -1149,38 +1162,15 @@ repSplitAppTy_maybe (TyConApp tc tys)
 
 repSplitAppTy_maybe _other = Nothing
 
--- This one doesn't break apart (c => t).
--- See Note [Decomposing fat arrow c=>t]
--- Defined here to avoid module loops between Unify and TcType.
 tcRepSplitAppTy_maybe :: Type -> Maybe (Type,Type)
--- ^ Does the AppTy split as in 'tcSplitAppTy_maybe', but assumes that
--- any coreView stuff is already done. Refuses to look through (c => t)
-tcRepSplitAppTy_maybe (FunTy { ft_af = af, ft_mult = w, ft_arg = ty1, ft_res = ty2 })
-  | isVisibleAnonArg af  -- See Note [Decomposing fat arrow c=>t]
-
-  -- See Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType,
-  -- Wrinkle around FunTy
-  , Just rep1 <- getRuntimeRep_maybe ty1
-  , Just rep2 <- getRuntimeRep_maybe ty2
-  = Just (TyConApp fUNTyCon [w, rep1, rep2, ty1], ty2)
-
-  | otherwise
+-- ^ Just like repSplitAppTy_maybe, but does not split (c => t)
+-- See Note [Decomposing fat arrow c=>t]
+tcRepSplitAppTy_maybe ty
+  | FunTy { ft_af = af } <- ty
+  , not (isVisibleAnonArg af)  -- See Note [Decomposing fat arrow c=>t]
   = Nothing
-
-tcRepSplitAppTy_maybe (AppTy ty1 ty2)    = Just (ty1, ty2)
-tcRepSplitAppTy_maybe (TyConApp tc tys)
-  | not (mustBeSaturated tc) || tys `lengthExceeds` tyConArity tc
-  , Just (tys', ty') <- snocView tys
-  = Just (TyConApp tc tys', ty')    -- Never create unsaturated type family apps!
-tcRepSplitAppTy_maybe _other = Nothing
-
--------------
-splitAppTy :: Type -> (Type, Type)
--- ^ Attempts to take a type application apart, as in 'splitAppTy_maybe',
--- and panics if this is not possible
-splitAppTy ty = case splitAppTy_maybe ty of
-                Just pr -> pr
-                Nothing -> panic "splitAppTy"
+  | otherwise
+  = repSplitAppTy_maybe ty
 
 -------------
 splitAppTys :: Type -> (Type, [Type])
@@ -1341,9 +1331,8 @@ See #11714.
 -----------------------------------------------
 funTyConAppTy_maybe :: AnonArgFlag -> Type -> Type -> Type
                     -> Maybe (TyCon, [Type])
--- Given the components of a FunTy/FuNCo,
+-- Given the components of a FunTy
 -- figure out the corresponding TyConApp.
--- Not used for coercions
 funTyConAppTy_maybe af mult arg res
   | Just arg_rep <- getRuntimeRep_maybe arg
   , Just res_rep <- getRuntimeRep_maybe res
@@ -1642,7 +1631,6 @@ splitTyConAppNoSyn_maybe ty
 -- Differs from splitTyConApp_maybe in that it does *not* split types
 -- headed with (=>), as that's not a TyCon in the type-checker.
 --
---
 -- Note that this may fail (in funTyConAppTy_maybe) in the case
 -- of a 'FunTy' with an argument of unknown kind 'FunTy'
 -- (e.g. `FunTy (a :: k) Int`, since the kind of @a@ isn't of
@@ -1667,9 +1655,8 @@ tcSplitTyConApp_maybe ty
       _               -> Nothing
 
 tcSplitTyConApp :: Type -> (TyCon, [Type])
-tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
-                        Just stuff -> stuff
-                        Nothing    -> pprPanic "tcSplitTyConApp" (ppr ty)
+tcSplitTyConApp ty
+  = tcSplitTyConApp_maybe ty `orElse` pprPanic "tcSplitTyConApp" (ppr ty)
 
 ---------------------------
 -- | (mkTyConTy tc) returns (TyConApp tc [])
