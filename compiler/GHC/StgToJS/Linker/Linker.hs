@@ -226,10 +226,11 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
           rootMods = map (moduleNameString . moduleName . head) . group . sort . map funModule . S.toList $ roots
           objPkgs  = map moduleUnitId $ nub (M.keys objDepsMap)
 
-      _ <- compilationProgressMsg logger . text $
-                case lcGenBase lc_cfg of
-                  Just baseMod -> "Linking base bundle " ++ target ++ " (" ++ moduleNameString (moduleName baseMod) ++ ")"
-                  _            -> "Linking " ++ target ++ " (" ++ intercalate "," rootMods ++ ")"
+      when (logVerbAtLeast logger 2) $ void $
+        compilationProgressMsg logger . text $
+          case lcGenBase lc_cfg of
+            Just baseMod -> "Linking base bundle " ++ target ++ " (" ++ moduleNameString (moduleName baseMod) ++ ")"
+            _            -> "Linking " ++ target ++ " (" ++ intercalate "," rootMods ++ ")"
 
       base <- case lcUseBase lc_cfg of
         NoBase        -> return emptyBase
