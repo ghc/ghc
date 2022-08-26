@@ -237,7 +237,7 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
         BaseFile file -> loadBase file
         BaseState b   -> return b
 
-      (rdPkgs, rds) <- rtsDeps pkgs
+      let (rdPkgs, rds) = rtsDeps pkgs
 
       -- c   <- newMVar M.empty
       let preload_units = preloadUnits (ue_units unit_env)
@@ -629,73 +629,103 @@ noStaticDeps :: StaticDeps
 noStaticDeps = StaticDeps []
 
 
+-- | A helper function to read system dependencies that are hardcoded via a file
+-- path.
+diffDeps
+  :: [UnitId]                    -- ^ Packages that are already Linked
+  -> ([UnitId], Set ExportedFun) -- ^ New units and functions to link
+  -> ([UnitId], Set ExportedFun) -- ^ Diff
+diffDeps pkgs (deps_pkgs,deps_funs) =
+  ( filter   linked_pkg deps_pkgs
+  , S.filter linked_fun deps_funs
+  )
+  where
+    linked_fun f = moduleUnitId (funModule f) `S.member` linked_pkgs
+    linked_pkg p = S.member p linked_pkgs
+    linked_pkgs  = S.fromList pkgs
+
 -- | dependencies for the RTS, these need to be always linked
-rtsDeps :: [UnitId] -> IO ([UnitId], Set ExportedFun)
-rtsDeps pkgs = readSystemDeps pkgs "rtsdeps.yaml"
+rtsDeps :: [UnitId] -> ([UnitId], Set ExportedFun)
+rtsDeps pkgs = diffDeps pkgs $
+  ( [baseUnitId, primUnitId]
+  , S.fromList $ concat
+      [ mkBaseFuns "GHC.Conc.Sync"
+          ["reportError"]
+      , mkBaseFuns "Control.Exception.Base"
+          ["nonTermination"]
+      , mkBaseFuns "GHC.Exception.Type"
+          [ "SomeException"
+          , "underflowException"
+          , "overflowException"
+          , "divZeroException"
+          ]
+      , mkBaseFuns "GHC.TopHandler"
+          [ "runMainIO"
+          , "topHandler"
+          ]
+      , mkBaseFuns "GHC.Base"
+          ["$fMonadIO"]
+      , mkBaseFuns "GHC.Maybe"
+          [ "Nothing"
+          , "Just"
+          ]
+      , mkBaseFuns "GHC.Ptr"
+          ["Ptr"]
+      , mkBaseFuns "GHC.JS.Prim"
+          [ "JSVal"
+          , "JSException"
+          , "$fShowJSException"
+          , "$fExceptionJSException"
+          , "resolve"
+          , "resolveIO"
+          , "toIO"
+          ]
+      , mkBaseFuns "GHC.JS.Prim.Internal"
+          [ "wouldBlock"
+          , "blockedIndefinitelyOnMVar"
+          , "blockedIndefinitelyOnSTM"
+          , "ignoreException"
+          , "setCurrentThreadResultException"
+          , "setCurrentThreadResultValue"
+          ]
+      , mkPrimFuns "GHC.Types"
+          [ ":"
+          , "[]"
+          ]
+      , mkPrimFuns "GHC.Tuple"
+          [ "(,)"
+          , "(,,)"
+          , "(,,,)"
+          , "(,,,,)"
+          , "(,,,,,)"
+          , "(,,,,,,)"
+          , "(,,,,,,,)"
+          , "(,,,,,,,,)"
+          , "(,,,,,,,,,)"
+          ]
+      ]
+  )
 
 -- | dependencies for the Template Haskell, these need to be linked when running
 --   Template Haskell (in addition to the RTS deps)
-thDeps :: [UnitId] -> IO ([UnitId], Set ExportedFun)
-thDeps pkgs = readSystemDeps pkgs "thdeps.yaml"
+thDeps :: [UnitId] -> ([UnitId], Set ExportedFun)
+thDeps pkgs = diffDeps pkgs $
+  ( [ baseUnitId ]
+  , S.fromList $ mkBaseFuns "GHC.JS.Prim.TH.Eval" ["runTHServer"]
+  )
 
--- | A helper function to read system dependencies that are hardcoded via a file
--- path.
-readSystemDeps :: [UnitId]    -- ^ Packages that are already Linked
-               -> FilePath    -- ^ File to read
-               -> IO ([UnitId], Set ExportedFun)
-readSystemDeps pkgs file = do
-  (deps_pkgs, deps_funs) <- readSystemDeps' file
-  pure ( filter (`S.member` linked_pkgs) deps_pkgs
-       , S.filter (\fun ->
-                     moduleUnitId (funModule fun) `S.member` linked_pkgs) deps_funs
-       )
 
+mkBaseFuns :: FastString -> [FastString] -> [ExportedFun]
+mkBaseFuns = mkExportedFuns baseUnitId
+
+mkPrimFuns :: FastString -> [FastString] -> [ExportedFun]
+mkPrimFuns = mkExportedFuns primUnitId
+
+mkExportedFuns :: UnitId -> FastString -> [FastString] -> [ExportedFun]
+mkExportedFuns uid mod_name symbols = map mk_fun symbols
   where
-    linked_pkgs     = S.fromList pkgs
-
-
-readSystemDeps' :: FilePath -> IO ([UnitId], Set ExportedFun)
-readSystemDeps' file
-  -- hardcode contents to get rid of yaml dep
-  -- XXX move runTHServer to some suitable wired-in package
-  | file == "thdeps.yaml" = pure ( [ baseUnitId ]
-                                 , S.fromList $ d baseUnitId "GHC.JS.Prim.TH.Eval" ["runTHServer"])
-  | file == "rtsdeps.yaml" = pure ( [ baseUnitId
-                                    , primUnitId
-                                    ]
-                                  , S.fromList $ concat
-                                  [ d baseUnitId "GHC.Conc.Sync" ["reportError"]
-                                  , d baseUnitId "Control.Exception.Base" ["nonTermination"]
-                                  , d baseUnitId "GHC.Exception.Type"
-                                      [ "SomeException"
-                                      , "underflowException"
-                                      , "overflowException"
-                                      , "divZeroException"
-                                      ]
-                                  , d baseUnitId "GHC.TopHandler" ["runMainIO", "topHandler"]
-                                  , d baseUnitId "GHC.Base" ["$fMonadIO"]
-                                  , d baseUnitId "GHC.Maybe" ["Nothing", "Just"]
-                                  , d baseUnitId "GHC.Ptr" ["Ptr"]
-                                  , d primUnitId "GHC.Types" [":", "[]"]
-                                  , d primUnitId "GHC.Tuple" ["(,)", "(,,)", "(,,,)", "(,,,,)", "(,,,,,)","(,,,,,,)", "(,,,,,,,)", "(,,,,,,,,)", "(,,,,,,,,,)"]
-                                  , d baseUnitId "GHC.JS.Prim" ["JSVal", "JSException", "$fShowJSException", "$fExceptionJSException", "resolve", "resolveIO", "toIO"]
-                                  , d baseUnitId "GHC.JS.Prim.Internal" ["wouldBlock", "blockedIndefinitelyOnMVar", "blockedIndefinitelyOnSTM", "ignoreException", "setCurrentThreadResultException", "setCurrentThreadResultValue"]
-                                  ]
-                                  )
-  | otherwise = pure (mempty, mempty)
-  where
-
-    d :: UnitId -> FastString -> [FastString] -> [ExportedFun]
-    d uid mod symbols =
-      let pkg_module = mkJsModule uid mod
-      in map (ExportedFun pkg_module
-              . LexicalFastString
-              . mkJsSymbol pkg_module
-             )
-             symbols
-
-    mkJsModule :: UnitId -> FastString -> Module
-    mkJsModule uid mod = mkModule (RealUnit (Definite uid)) (mkModuleNameFS mod)
+    mod        = mkModule (RealUnit (Definite uid)) (mkModuleNameFS mod_name)
+    mk_fun sym = ExportedFun mod (LexicalFastString (mkJsSymbol mod sym))
 
 -- | Make JS symbol corresponding to the given Haskell symbol in the given
 -- module
