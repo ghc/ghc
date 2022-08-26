@@ -267,11 +267,11 @@ genPrim prof ty op = case op of
 
 ------------------------------ Int64 --------------------------------------------
 
-  Int64ToIntOp      -> \[r] [_h,l] -> PrimInline $ r |= l
+  Int64ToIntOp      -> \[r] [_h,l] -> PrimInline $ r |= i32 l
 
   Int64NegOp        -> \[r_h,r_l] [h,l] ->
       PrimInline $ mconcat
-        [ r_l |= i32 (BNot l + 1)
+        [ r_l |= u32 (BNot l + 1)
         , r_h |= i32 (BNot h + Not r_l)
         ]
 
