@@ -137,7 +137,17 @@ defRenderJsS r = \case
                       | otherwise = text "catch" <> parens (jsToDocR r i) $$ braceNest' (jsToDocR r s1)
               mbFinally | s2 == BlockStat [] = PP.empty
                         | otherwise = text "finally" $$ braceNest' (jsToDocR r s2)
-  AssignStat i x    -> jsToDocR r i <+> char '=' <+> jsToDocR r x
+  AssignStat i x    -> case x of
+    -- special treatment for functions, otherwise there is too much left padding
+    -- (more than the length of the expression assigned to). E.g.
+    --
+    --    var long_variable_name = (function()
+    --                               {
+    --                               ...
+    --                             });
+    --
+    ValExpr (JFunc is b) -> sep [jsToDocR r i <+> text "= function" <> parens (hsep . punctuate comma . map (jsToDocR r) $ is) <> char '{', nest 2 (jsToDocR r b), text "}"]
+    _                    -> jsToDocR r i <+> char '=' <+> jsToDocR r x
   UOpStat op x
     | isPre op && isAlphaOp op -> ftext (uOpText op) <+> optParens r x
     | isPre op                 -> ftext (uOpText op) <> optParens r x
