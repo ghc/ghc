@@ -393,4 +393,5 @@ test('OpaqueNoStrictArgWW', normal, compile, ['-O -fworker-wrapper-cbv -ddump-si
 test('OpaqueNoWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
 
 test('T21144',  normal, compile, ['-O'])
+test('T22112', normal, compile, ['-O -dsuppress-uniques -dno-typeable-binds -ddump-simpl'])
 

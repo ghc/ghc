@@ -1,0 +1,14 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 2, types: 2, coercions: 0, joins: 0/0}
+
+Rec {
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+foo [Occ=LoopBreaker] :: () -> ()
+[GblId, Str=b, Cpr=b]
+foo = foo
+end Rec }
+
+
+

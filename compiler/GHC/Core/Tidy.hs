@@ -10,7 +10,7 @@ The code for *top-level* bindings is in GHC.Iface.Tidy.
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module GHC.Core.Tidy (
-        tidyExpr, tidyRules, tidyUnfolding, tidyCbvInfoTop
+        tidyExpr, tidyRules, tidyCbvInfoTop, tidyBndrs
     ) where
 
 import GHC.Prelude
@@ -345,33 +345,36 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
                     `setUnfoldingInfo`  new_unf
 
         old_unf = realUnfoldingInfo old_info
-        new_unf | isStableUnfolding old_unf = tidyUnfolding rec_tidy_env old_unf old_unf
-                | otherwise                 = trimUnfolding old_unf
-                                              -- See Note [Preserve evaluatedness]
+        new_unf = tidyNestedUnfolding rec_tidy_env old_unf
 
     in
     ((tidy_env', var_env'), id') }
 
 ------------ Unfolding  --------------
-tidyUnfolding :: TidyEnv -> Unfolding -> Unfolding -> Unfolding
-tidyUnfolding tidy_env df@(DFunUnfolding { df_bndrs = bndrs, df_args = args }) _
+tidyNestedUnfolding :: TidyEnv -> Unfolding -> Unfolding
+tidyNestedUnfolding _ NoUnfolding   = NoUnfolding
+tidyNestedUnfolding _ BootUnfolding = BootUnfolding
+tidyNestedUnfolding _ (OtherCon {}) = evaldUnfolding
+
+tidyNestedUnfolding tidy_env df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
   = df { df_bndrs = bndrs', df_args = map (tidyExpr tidy_env') args }
   where
     (tidy_env', bndrs') = tidyBndrs tidy_env bndrs
 
-tidyUnfolding tidy_env
-              unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
-              unf_from_rhs
+tidyNestedUnfolding tidy_env
+    unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src, uf_is_value = is_value })
   | isStableSource src
   = seqIt $ unf { uf_tmpl = tidyExpr tidy_env unf_rhs }    -- Preserves OccInfo
-    -- This seqIt avoids a space leak: otherwise the uf_is_value,
-    -- uf_is_conlike, ... fields may retain a reference to the
-    -- pre-tidied expression forever (GHC.CoreToIface doesn't look at them)
+            -- This seqIt avoids a space leak: otherwise the uf_is_value,
+            -- uf_is_conlike, ... fields may retain a reference to the
+            -- pre-tidied expression forever (GHC.CoreToIface doesn't look at them)
 
-  | otherwise
-  = unf_from_rhs
-  where seqIt unf = seqUnfolding unf `seq` unf
-tidyUnfolding _ unf _ = unf     -- NoUnfolding or OtherCon
+  -- Discard unstable unfoldings, but see Note [Preserve evaluatedness]
+  | is_value = evaldUnfolding
+  | otherwise = noUnfolding
+
+  where
+    seqIt unf = seqUnfolding unf `seq` unf
 
 {-
 Note [Tidy IdInfo]
