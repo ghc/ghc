@@ -23,7 +23,11 @@ import qualified Distribution.ModuleName                       as C
 import qualified Distribution.Package                          as C
 import qualified Distribution.PackageDescription               as C
 import qualified Distribution.PackageDescription.Configuration as C
+#if MIN_VERSION_Cabal(3,8,0)
+import qualified Distribution.Simple.PackageDescription        as C
+#else
 import qualified Distribution.PackageDescription.Parsec        as C
+#endif
 import qualified Distribution.Simple.Compiler                  as C
 import qualified Distribution.Simple.Program.Db                as C
 import qualified Distribution.Simple                           as C
