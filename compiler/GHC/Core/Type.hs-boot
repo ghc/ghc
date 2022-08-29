@@ -14,7 +14,6 @@ isCoercionTy :: Type -> Bool
 
 mkAppTy    :: Type -> Type -> Type
 mkCastTy   :: Type -> Coercion -> Type
-mkTyConTy  :: TyCon -> Type
 mkTyConApp :: TyCon -> [Type] -> Type
 mkCoercionTy :: Coercion -> Type
 piResultTy :: HasDebugCallStack => Type -> Type -> Type

@@ -87,7 +87,7 @@ module GHC.Core.TyCon(
         tyConFamilySize,
         tyConStupidTheta,
         tyConArity,
-        tyConNullaryTy,
+        tyConNullaryTy, mkTyConTy,
         tyConRoles,
         tyConFlavour,
         tyConTuple_maybe, tyConClass_maybe, tyConATs,
@@ -524,6 +524,13 @@ mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
     mk (Bndr tv (NamedTCB vis)) k = mkForAllTy tv vis k
     mk (Bndr tv (AnonTCB af))   k = mkNakedKindFunTy af (varType tv) k
     -- mkNakedKindFunTy: see Note [Naked FunTy] in GHC.Builtin.Types
+
+-- | (mkTyConTy tc) returns (TyConApp tc [])
+-- but arranges to share that TyConApp among all calls
+-- See Note [Sharing nullary TyConApps]
+-- So it's just an alias for tyConNullaryTy!
+mkTyConTy :: TyCon -> Type
+mkTyConTy tycon = tyConNullaryTy tycon
 
 tyConInvisTVBinders :: [TyConBinder]   -- From the TyCon
                     -> [InvisTVBinder] -- Suitable for the foralls of a term function

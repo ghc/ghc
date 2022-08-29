@@ -129,7 +129,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , constraintKind )
 
 import {-# SOURCE #-} GHC.Types.TyThing
-import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, mkTyConApp, getLevity )
+import {-# SOURCE #-} GHC.Core.Type ( mkTyConApp, getLevity )
 
 import GHC.Types.Var    ( TyVarBinder, TyVar
                         , mkTyVar, mkTyVarBinder, mkTyVarBinders )

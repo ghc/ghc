@@ -5,7 +5,7 @@
 
 {-# LANGUAGE FlexibleContexts, PatternSynonyms, ViewPatterns, MultiWayIf #-}
 
--- | Main functions for manipulating types and type-related things
+-- | Type equality and comparison
 module GHC.Core.TyCo.Compare (
 
     -- * Type comparison
