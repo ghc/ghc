@@ -143,7 +143,7 @@ data Symbol
 
 -- | The type constructor 'Any' is type to which you can unsafely coerce any
 -- lifted type, and back. More concretely, for a lifted type @t@ and
--- value @x :: t@, -- @unsafeCoerce (unsafeCoerce x :: Any) :: t@ is equivalent
+-- value @x :: t@, @unsafeCoerce (unsafeCoerce x :: Any) :: t@ is equivalent
 -- to @x@.
 --
 type family Any :: k where { }
