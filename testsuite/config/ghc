@@ -182,6 +182,8 @@ llvm_ways     = [x[0] for x in config.way_flags.items()
 def get_compiler_info():
     if config.unregisterised:
         print("Unregisterised build; skipping LLVM ways...")
+    elif config.arch == "js":
+        print("JavaScript backend; skipping LLVM ways...")
     elif config.have_llvm:
         config.compile_ways.append('optllvm')
         config.run_ways.append('optllvm')
