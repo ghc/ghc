@@ -17,7 +17,7 @@ variables:
   # Overridden by individual jobs
   CONFIGURE_ARGS: ""
 
-  GIT_SUBMODULE_STRATEGY: "recursive"
+  GIT_SUBMODULE_STRATEGY: "normal"
 
   # Makes ci.sh isolate CABAL_DIR
   HERMETIC: "YES"
