@@ -51,17 +51,6 @@
   The simplifier tries to get rid of occurrences of x, in favour of wild,
   in the hope that there will only be one remaining occurrence of x, namely
   the scrutinee of the case, and we can inline it.
-
-  This can only work if @wild@ is an unrestricted binder. Indeed, even with the
-  extended typing rule (in the linter) for case expressions, if
-       case x of wild % 1 { p -> e}
-  is well-typed, then
-       case x of wild % 1 { p -> e[wild\x] }
-  is only well-typed if @e[wild\x] = e@ (that is, if @wild@ is not used in @e@
-  at all). In which case, it is, of course, pointless to do the substitution
-  anyway. So for a linear binder (and really anything which isn't unrestricted),
-  doing this substitution would either produce ill-typed terms or be the
-  identity.
 -}
 
 module GHC.Core.Opt.SetLevels (
@@ -1602,7 +1591,9 @@ extendCaseBndrEnv :: LevelEnv
                   -> LevelEnv
 extendCaseBndrEnv le@(LE { le_subst = subst, le_env = id_env })
                   case_bndr (Var scrut_var)
-    | Many <- varMult case_bndr
+  -- We could use OccurAnal. scrutBinderSwap_maybe here, and perhaps
+  -- get a bit more floating.  But we didn't in the past and it's
+  -- an unforced change, so I'm leaving it.
   = le { le_subst   = extendSubstWithVar subst case_bndr scrut_var
        , le_env     = add_id id_env (case_bndr, scrut_var) }
 extendCaseBndrEnv env _ _ = env

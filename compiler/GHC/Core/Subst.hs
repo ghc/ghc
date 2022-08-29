@@ -41,7 +41,6 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Seq
 import GHC.Core.Utils
-import GHC.Core.TyCo.Subst ( substCo )
 
         -- We are defining local versions
 import GHC.Core.Type hiding ( substTy )
