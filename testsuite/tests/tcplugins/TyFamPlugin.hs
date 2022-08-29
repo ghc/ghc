@@ -19,10 +19,12 @@ import GHC.Core.Predicate
   ( EqRel(NomEq), Pred(EqPred)
   , classifyPredType
   )
+import GHC.Core.TyCo.Compare
+  ( eqType )
 import GHC.Core.TyCo.Rep
   ( Type, UnivCoProvenance(PluginProv) )
 import GHC.Core.Type
-  ( eqType, mkTyConApp, splitTyConApp_maybe )
+  ( mkTyConApp, splitTyConApp_maybe )
 import GHC.Plugins
   ( Plugin )
 import GHC.Tc.Plugin

@@ -244,10 +244,17 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
        ; (Reduction norm_co norm_sig_ty, gres) <- normaliseFfiType sig_ty
        ; let
-           -- Drop the foralls before inspecting the
-           -- structure of the foreign type.
-             (arg_tys, res_ty) = tcSplitFunTys (dropForAlls norm_sig_ty)
-             id                = mkLocalId nm ManyTy sig_ty
+             -- Drop the foralls before inspecting the
+             -- structure of the foreign type.
+             -- Use splitFunTys, which splits (=>) as well as (->)
+             -- so that for  foreign import foo :: Eq a => a -> blah
+             -- we get "unacceptable argument Eq a" rather than
+             --        "unacceptable result Eq a => a -> blah"
+             -- Not a big deal.  We could make a better error message specially
+             -- for overloaded functions, but doesn't seem worth it
+             (arg_tys, res_ty) = splitFunTys (dropForAlls norm_sig_ty)
+
+             id = mkLocalId nm ManyTy sig_ty
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
                  -- (so GHC.Tc.Utils.Zonk.zonkForeignExports ignores it).

@@ -12,7 +12,8 @@ import Data.List
 import GHC.Tc.Types
 import qualified Data.Map as M
 import Control.Monad (liftM2)
-import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.TcType( isAmbiguousTyVar )
+import GHC.Core.TyCo.Compare( eqType, nonDetCmpType )
 
 class DefaultType x (y :: x)
 

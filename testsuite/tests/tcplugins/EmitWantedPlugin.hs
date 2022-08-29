@@ -19,7 +19,7 @@ import GHC.Core.DataCon
   ( classDataCon )
 import GHC.Core.Make
   ( mkCoreConApps, unitExpr )
-import GHC.Core.Type
+import GHC.Core.TyCo.Compare
   ( eqType )
 import GHC.Core.Utils
   ( mkCast )

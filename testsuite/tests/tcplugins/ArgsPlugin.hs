@@ -17,7 +17,7 @@ import GHC.Core.DataCon
   ( classDataCon )
 import GHC.Core.Make
   ( mkCoreConApps, mkIntegerExpr )
-import GHC.Core.Type
+import GHC.Core.TyCo.Compare
   ( eqType )
 import GHC.Plugins
   ( Plugin )

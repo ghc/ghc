@@ -61,6 +61,7 @@ GHC.Core.SimpleOpt
 GHC.Core.Stats
 GHC.Core.Subst
 GHC.Core.Tidy
+GHC.Core.TyCo.Compare
 GHC.Core.TyCo.FVs
 GHC.Core.TyCo.Ppr
 GHC.Core.TyCo.Rep

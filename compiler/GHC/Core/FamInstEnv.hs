@@ -367,7 +367,7 @@ type FamInstEnvs = (FamInstEnv, FamInstEnv)
 
 data FamInstEnv
   = FamIE !Int -- The number of instances, used to choose the smaller environment
-               -- when checking type family consistnecy of home modules.
+               -- when checking type family consistency of home modules.
           !(RoughMap FamInst)
      -- See Note [FamInstEnv]
      -- See Note [FamInstEnv determinism]

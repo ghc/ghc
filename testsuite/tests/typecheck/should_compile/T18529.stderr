@@ -17,23 +17,21 @@ Bug.$tc'C:C
   = GHC.Types.TyCon
       302756782745842909##64 14248103394115774781##64 Bug.$trModule
       (GHC.Types.TrNameS "'C:C"#) 2# $krep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      Bug.$tcC
+      ((:) @GHC.Types.KindRep
+         $krep ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep))
 $krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
 $krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
-      GHC.Types.$tcConstraint [] @GHC.Types.KindRep
+  = GHC.Types.KindRepFun GHC.Types.krep$* GHC.Types.krep$Constraint
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp GHC.Tuple.$tc() [] @GHC.Types.KindRep
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
-      Bug.$tcC
-      ((:) @GHC.Types.KindRep
-         $krep ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep))
 Bug.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Bug"#)

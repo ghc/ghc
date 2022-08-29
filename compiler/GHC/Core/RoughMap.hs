@@ -37,6 +37,7 @@ import GHC.Core.Type
 import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Builtin.Types.Prim( cONSTRAINTTyConName, tYPETyConName )
 
 import Control.Monad (join)
 import Data.Data (Data)
@@ -275,10 +276,22 @@ typeToRoughMatchTc :: Type -> RoughMatchTc
 typeToRoughMatchTc ty
   | Just (ty', _) <- splitCastTy_maybe ty   = typeToRoughMatchTc ty'
   | Just (tc,_)   <- splitTyConApp_maybe ty
-  , not (isTypeFamilyTyCon tc)              = assertPpr (isGenerativeTyCon tc Nominal) (ppr tc)
-                                              RM_KnownTc $! tyConName tc
+  , not (isTypeFamilyTyCon tc)              = RM_KnownTc $! roughMatchTyConName tc
     -- See Note [Rough matching in class and family instances]
   | otherwise                               = RM_WildCard
+
+roughMatchTyConName :: TyCon -> Name
+roughMatchTyConName tc
+  | tc_name == cONSTRAINTTyConName
+  = tYPETyConName  -- TYPE and CONSTRAINT are not apart, so they must use
+                   -- the same rough-map key. We arbitrarily use TYPE.
+                   -- See Note [Type and Constraint are not apart]
+                   -- in GHC.Builtin.Types.Prim
+  | otherwise
+  = assertPpr (isGenerativeTyCon tc Nominal) (ppr tc) tc_name
+  where
+    tc_name = tyConName tc
+
 
 -- | Trie of @[RoughMatchTc]@
 --
@@ -333,6 +346,7 @@ lookupRM' (RML_KnownTc tc : tcs) rm  =
       (m, u) = maybe (emptyBag, []) (lookupRM' tcs) (lookupDNameEnv (rm_known rm) tc)
   in (rm_empty rm `unionBags` common_m `unionBags` m
      , bagToList (rm_empty rm) ++ common_u ++ u)
+
 -- A RML_NoKnownTC does **not** match any KnownTC but can unify
 lookupRM' (RML_NoKnownTc : tcs)  rm      =
 

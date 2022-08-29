@@ -1491,9 +1491,8 @@ constraintKindTyConName :: Name
 constraintKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Constraint")
                                              constraintKindTyConKey constraintKindTyCon
 
-typeToTypeKind, constraintKind :: Kind
+constraintKind :: Kind
 constraintKind = mkTyConTy constraintKindTyCon
-typeToTypeKind = liftedTypeKind `mkVisFunTyMany` liftedTypeKind
 
 ----------------------
 -- type Type = TYPE LiftedRep
@@ -1507,8 +1506,9 @@ liftedTypeKindTyConName :: Name
 liftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Type")
                                              liftedTypeKindTyConKey liftedTypeKindTyCon
 
-liftedTypeKind :: Type
+liftedTypeKind, typeToTypeKind :: Type
 liftedTypeKind = mkTyConTy liftedTypeKindTyCon
+typeToTypeKind = liftedTypeKind `mkVisFunTyMany` liftedTypeKind
 
 ----------------------
 -- type UnliftedType = TYPE ('BoxedRep 'Unlifted)
