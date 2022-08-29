@@ -52,6 +52,7 @@ module GHC.Core.TyCo.Rep (
         mkForAllTy, mkForAllTys, mkInvisForAllTys,
         mkPiTy, mkPiTys,
         mkVisFunTyMany, mkVisFunTysMany,
+        tyConAppFun_maybe,
         nonDetCmpTyLit, cmpTyLit,
 
         -- * Functions over binders
@@ -1151,6 +1152,31 @@ mkPiTys tbs ty = foldr mkPiTy ty tbs
 -- what 'mkNakedTyConTy' is for.
 mkNakedTyConTy :: TyCon -> Type
 mkNakedTyConTy tycon = TyConApp tycon []
+
+tyConAppFun_maybe :: (HasDebugCallStack, Outputable a) => (Type->a) -> TyCon -> [a]
+                   -> Maybe (AnonArgFlag, a, a, a)
+-- Return Just if this TyConApp/TyConAppCo should be represented as a FunTy/FunCo
+-- The type 'a' is always Type or Coercion
+-- The (Type->a) argument turns 'Many into type or coercion resp
+tyConAppFun_maybe mk tc args
+  | tc `hasKey` fUNTyConKey, (w:_r1:_r2:a1:a2:rest) <- args
+  = assertPpr (null rest) (ppr tc <+> ppr args) $
+    Just (VisArg TypeLike, w, a1, a2)
+
+  | tc `hasKey` tcArrowTyConKey, (_r1:_r2:a1:a2:rest) <- args
+  = assertPpr (null rest) (ppr tc <+> ppr args) $
+    Just (VisArg ConstraintLike, mk manyDataConTy, a1,a2)
+
+  | tc `hasKey` ctArrowTyConKey, (_r1:_r2:a1:a2:rest) <- args
+  = assertPpr (null rest) (ppr tc <+> ppr args) $
+    Just (InvisArg TypeLike, mk manyDataConTy, a1,a2)
+
+  | tc `hasKey` ccArrowTyConKey, (_r1:_r2:a1:a2:rest) <- args
+  = assertPpr (null rest) (ppr tc <+> ppr args) $
+    Just (InvisArg ConstraintLike, mk manyDataConTy, a1,a2)
+
+  | otherwise
+  = Nothing
 
 {-
 %************************************************************************

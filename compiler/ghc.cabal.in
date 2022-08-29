@@ -348,6 +348,7 @@ Library
         GHC.CoreToStg.Prep
         GHC.Core.TyCo.FVs
         GHC.Core.TyCo.Compare
+        GHC.Core.TyCo.Utils
         GHC.Core.TyCon
         GHC.Core.TyCon.Env
         GHC.Core.TyCon.RecWalk
