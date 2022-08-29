@@ -425,6 +425,7 @@ test('T21848', [grep_errmsg(r'SPEC wombat') ], compile, ['-O -ddump-spec'])
 test('T21694b', [grep_errmsg(r'Arity=4') ], compile, ['-O -ddump-simpl'])
 test('T21960', [grep_errmsg(r'^ Arity=5') ], compile, ['-O2 -ddump-simpl'])
 test('T21948', [grep_errmsg(r'^ Arity=5') ], compile, ['-O -ddump-simpl'])
+test('DataToTagFamilyScrut', normal, compile, ['-O -ddump-simpl -dsuppress-all -dno-typeable-binds -dsuppress-uniques'])
 test('T21763', only_ways(['optasm']), compile, ['-O2 -ddump-rules'])
 test('T21763a', only_ways(['optasm']), compile, ['-O2 -ddump-rules'])
 test('T22028', normal, compile, ['-O -ddump-rule-firings'])
@@ -447,6 +448,7 @@ test('T22347a', normal, compile, ['-O2 -fno-full-laziness'])
 test('T17366',  normal, multimod_compile, ['T17366', '-O -v0 -ddump-rule-firings -fpolymorphic-specialisation'])
 test('T17366_AR',  [grep_errmsg(r'SPEC')], multimod_compile, ['T17366_AR', '-O -v0 -ddump-rule-firings -fpolymorphic-specialisation'])
 test('T22375', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds -dsuppress-unfoldings'])
+test('T22375DataFamily', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds -dsuppress-unfoldings'])
 
 # One module, T21851_2.hs, has OPTIONS_GHC -ddump-simpl
 # Expecting to see $s$wwombat

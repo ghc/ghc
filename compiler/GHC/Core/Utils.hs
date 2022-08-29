@@ -1857,19 +1857,19 @@ Consider these examples:
  * case x of y { DEFAULT -> ....y.... }
    Should 'y' (alone) be considered ok-for-speculation?
 
- * case x of y { DEFAULT -> ....let z = dataToTag# y... }
-   Should (dataToTag# y) be considered ok-for-spec? Recall that
-     dataToTag# :: forall a. a -> Int#
-   must always evaluate its argument. (See also Note [dataToTag# magic].)
+ * case x of y { DEFAULT -> ....let z = dataToTagLarge# y... }
+   Should (dataToTagLarge# y) be considered ok-for-spec? Recall that
+     dataToTagLarge# :: forall a. a -> Int#
+   must always evaluate its argument. (See also Note [DataToTag overview].)
 
 You could argue 'yes', because in the case alternative we know that
 'y' is evaluated.  But the binder-swap transformation, which is
 extremely useful for float-out, changes these expressions to
    case x of y { DEFAULT -> ....x.... }
-   case x of y { DEFAULT -> ....let z = dataToTag# x... }
+   case x of y { DEFAULT -> ....let z = dataToTagLarge# x... }
 
 And now the expression does not obey the let-can-float invariant!  Yikes!
-Moreover we really might float (dataToTag# x) outside the case,
+Moreover we really might float (dataToTagLarge# x) outside the case,
 and then it really, really doesn't obey the let-can-float invariant.
 
 The solution is simple: exprOkForSpeculation does not try to take

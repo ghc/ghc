@@ -5,6 +5,21 @@
 - The `unsafeThawByteArray#` primop was added, serving as a inverse to the existing
   `unsafeFreezeByteArray#` primop (see #22710).
 
+- `dataToTag#` has been moved to `GHC.Magic` and made the sole method
+  of a new class:
+
+  ```haskell
+  type DataToTag :: forall {lev :: Levity}. TYPE (BoxedRep lev) -> Constraint
+  class DataToTag a where
+    dataToTag# :: a -> Int#
+  ```
+
+  In particular, it is now applicable only at some (not all)
+  lifted types.  However, if `t` is an algebraic data type (i.e. `t`
+  matches a `data` or `data instance` declaration) with all of its
+  constructors in scope and the levity of `t` is statically known,
+  then the constraint `DataToTag t` can always be solved.
+
 ## 0.11.0
 
 - Shipped with GHC 9.8.1

@@ -1,36 +1,40 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 76, types: 37, coercions: 0, joins: 0/0}
+  = {terms: 76, types: 41, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 14, types: 7, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 14, types: 9, coercions: 0, joins: 0/0}
 T22375.$fEqX_$c== :: X -> X -> Bool
 [GblId,
  Arity=2,
  Str=<SL><SL>,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=True)}]
 T22375.$fEqX_$c==
   = \ (a :: X) (b :: X) ->
-      case GHC.Prim.dataToTag# @X a of a# { __DEFAULT ->
-      case GHC.Prim.dataToTag# @X b of b# { __DEFAULT ->
+      case GHC.Prim.dataToTagLarge# @GHC.Types.Lifted @X a of a#
+      { __DEFAULT ->
+      case GHC.Prim.dataToTagLarge# @GHC.Types.Lifted @X b of b#
+      { __DEFAULT ->
       GHC.Prim.tagToEnum# @Bool (GHC.Prim.==# a# b#)
       }
       }
 
--- RHS size: {terms: 18, types: 7, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 18, types: 9, coercions: 0, joins: 0/0}
 T22375.$fEqX_$c/= [InlPrag=INLINE (sat-args=2)] :: X -> X -> Bool
 [GblId,
  Arity=2,
  Str=<SL><SL>,
- Unf=Unf{Src=StableUser, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableUser, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=False,boring_ok=False)}]
 T22375.$fEqX_$c/=
   = \ (eta :: X) (eta1 :: X) ->
-      case GHC.Prim.dataToTag# @X eta of a# { __DEFAULT ->
-      case GHC.Prim.dataToTag# @X eta1 of b# { __DEFAULT ->
+      case GHC.Prim.dataToTagLarge# @GHC.Types.Lifted @X eta of a#
+      { __DEFAULT ->
+      case GHC.Prim.dataToTagLarge# @GHC.Types.Lifted @X eta1 of b#
+      { __DEFAULT ->
       case GHC.Prim.==# a# b# of {
         __DEFAULT -> GHC.Types.True;
         1# -> GHC.Types.False
@@ -51,8 +55,9 @@ T22375.$wf [InlPrag=[2]] :: X -> GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId[StrictWorker([!])],
  Arity=2,
  Str=<1L><L>,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [64 0] 55 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [64 0] 55 0}]
 T22375.$wf
   = \ (x :: X) (ww :: GHC.Prim.Int#) ->
       case x of {
@@ -69,8 +74,8 @@ f [InlPrag=[2]] :: X -> Int -> Int
  Arity=2,
  Str=<1L><1!P(L)>,
  Cpr=1,
- Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)}]
 f = \ (x :: X) (v :: Int) ->
       case v of { GHC.Types.I# ww ->

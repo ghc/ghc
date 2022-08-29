@@ -2464,9 +2464,9 @@ subtle example from #22375.  We start with
 
 In Core after a bit of simplification we get:
 
-    f x = case dataToTag# x of a# { _DEFAULT ->
+    f x = case dataToTagLarge# x of a# { _DEFAULT ->
           case a# of
-            _DEFAULT -> case dataToTag# x of b# { _DEFAULT ->
+            _DEFAULT -> case dataToTagLarge# x of b# { _DEFAULT ->
                         case b# of
                            _DEFAULT -> ...
                            1# -> "two"
@@ -2478,8 +2478,8 @@ Now consider what mkCase does to these case expressions.
 The case-merge transformation Note [Merge Nested Cases]
 does this (affecting both pairs of cases):
 
-    f x = case dataToTag# x of a# {
-             _DEFAULT -> case dataToTag# x of b# {
+    f x = case dataToTagLarge# x of a# {
+             _DEFAULT -> case dataToTagLarge# x of b# {
                           _DEFAULT -> ...
                           1# -> "two"
                          }
@@ -2487,22 +2487,22 @@ does this (affecting both pairs of cases):
           }
 
 Now Note [caseRules for dataToTag] does its work, again
-on both dataToTag# cases:
+on both dataToTagLarge# cases:
 
     f x = case x of x1 {
-             _DEFAULT -> case dataToTag# x1 of a# { _DEFAULT ->
+             _DEFAULT -> case dataToTagLarge# x1 of a# { _DEFAULT ->
                          case x of x2 {
-                           _DEFAULT -> case dataToTag# x2 of b# { _DEFAULT -> ... }
+                           _DEFAULT -> case dataToTagLarge# x2 of b# { _DEFAULT -> ... }
                            B -> "two"
                          }}
              A -> "one"
           }
 
 
-The new dataToTag# calls come from the "reconstruct scrutinee" part of
+The new dataToTagLarge# calls come from the "reconstruct scrutinee" part of
 caseRules (note that a# and b# were not dead in the original program
 before all this merging).  However, since a# and b# /are/ in fact dead
-in the resulting program, we are left with redundant dataToTag# calls.
+in the resulting program, we are left with redundant dataToTagLarge# calls.
 But they are easily eliminated by doing caseRules again, in
 the next Simplifier iteration, this time noticing that a# and b# are
 dead.  Hence the "dead-binder" sub-case of Wrinkle 1 of Note

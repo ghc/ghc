@@ -117,7 +117,11 @@ import GHC.Classes
 import GHC.CString
 import GHC.Magic
 import GHC.Magic.Dict
-import GHC.Prim
+import GHC.Prim hiding (dataToTagLarge#)
+  -- Hide dataToTagLarge# because it is expected to break for
+  -- GHC-internal reasons in the near future, and shouldn't
+  -- be exposed from base (not even GHC.Exts)
+
 import GHC.Prim.Ext
 import GHC.Prim.PtrEq
 import GHC.Err
@@ -1909,12 +1913,13 @@ unIO :: IO a -> (State# RealWorld -> (# State# RealWorld, a #))
 unIO (IO a) = a
 
 {- |
-Returns the tag of a constructor application; this function is used
+Returns the tag of a constructor application; this function was once used
 by the deriving code for Eq, Ord and Enum.
 -}
 {-# INLINE getTag #-}
-getTag :: a -> Int#
-getTag x = dataToTag# x
+getTag :: forall {lev :: Levity} (a :: TYPE (BoxedRep lev))
+       .  DataToTag a => a -> Int#
+getTag = dataToTag#
 
 ----------------------------------------------
 -- Numeric primops

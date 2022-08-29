@@ -400,7 +400,7 @@ follows, in decreasing order of permissiveness:
       even when used in a "correct" and well-specified way.
 
     See also Note [Exceptions: asynchronous, synchronous, and unchecked].
-    Examples include raise#, raiseIO#, dataToTag#, and seq#.
+    Examples include raise#, raiseIO#, dataToTagLarge#, and seq#.
 
     Note that whether an exception is considered precise or imprecise
     does not matter for the purposes of the PrimOpEffect flag.
@@ -480,8 +480,8 @@ Duplicate              YES        YES            YES                NO
 
     Discarding a ThrowsException primop would also discard any exception
     it might have thrown.  For `raise#` or `raiseIO#` this would defeat
-    the whole point of the primop, while for `dataToTag#` or `seq#` this
-    would make programs unexpectly lazier.
+    the whole point of the primop, while for `dataToTagLarge#` or `seq#`
+    this would make programs unexpectly lazier.
 
     However, it's fine to discard a CanFail primop.  For example
        case (indexIntArray# a i) of _ -> True

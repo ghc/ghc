@@ -12,6 +12,21 @@
   * Deprecate `Data.List.NonEmpty.unzip` ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
   * Fix exponent overflow/underflow bugs in the `Read` instances for `Float` and `Double` ([CLC proposal #192](https://github.com/haskell/core-libraries-committee/issues/192))
 
+  * The functions `GHC.Exts.dataToTag#` and `GHC.Base.getTag` have had
+    their types changed to the following:
+
+    ```haskell
+    dataToTag#, getTag
+      :: forall {lev :: Levity} (a :: TYPE (BoxedRep lev))
+      .  DataToTag a => a -> Int#
+    ```
+
+    In particular, they are now applicable only at some (not all)
+    lifted types.  However, if `t` is an algebraic data type (i.e. `t`
+    matches a `data` or `data instance` declaration) with all of its
+    constructors in scope and the levity of `t` is statically known,
+    then the constraint `DataToTag t` can always be solved.
+
 ## 4.19.0.0 *October 2023*
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.

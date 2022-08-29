@@ -3177,6 +3177,10 @@ module GHC.Base where
   data Compact#
   type Constraint :: *
   type Constraint = CONSTRAINT LiftedRep
+  type DataToTag :: forall {lev :: Levity}. TYPE (BoxedRep lev) -> Constraint
+  class DataToTag a where
+    dataToTag# :: a -> Int#
+    {-# MINIMAL dataToTag# #-}
   type DictBox :: Constraint -> *
   data DictBox a = a => MkDictBox
   type Double :: *
@@ -3596,7 +3600,6 @@ module GHC.Base where
   ctz32# :: Word# -> Word#
   ctz64# :: Word64# -> Word#
   ctz8# :: Word# -> Word#
-  dataToTag# :: forall a. a -> Int#
   deRefStablePtr# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #)
   deRefWeak# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, a #)
   decodeDouble_2Int# :: Double# -> (# Int#, Word#, Word#, Int# #)
@@ -3701,7 +3704,7 @@ module GHC.Base where
   getSizeofMutableByteArray# :: forall d. MutableByteArray# d -> State# d -> (# State# d, Int# #)
   getSizeofSmallMutableArray# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). SmallMutableArray# d a -> State# d -> (# State# d, Int# #)
   getSpark# :: forall d a. State# d -> (# State# d, Int#, a #)
-  getTag :: forall a. a -> Int#
+  getTag :: forall {lev :: Levity} (a :: TYPE (BoxedRep lev)). DataToTag a => a -> Int#
   getThreadAllocationCounter# :: State# RealWorld -> (# State# RealWorld, Int64# #)
   gtAddr# :: Addr# -> Addr# -> Int#
   gtChar# :: Char# -> Char# -> Int#
@@ -5290,6 +5293,10 @@ module GHC.Exts where
   data Compact#
   type Constraint :: *
   type Constraint = CONSTRAINT LiftedRep
+  type DataToTag :: forall {lev :: Levity}. TYPE (BoxedRep lev) -> Constraint
+  class DataToTag a where
+    dataToTag# :: a -> Int#
+    {-# MINIMAL dataToTag# #-}
   type DictBox :: Constraint -> *
   data DictBox a = a => MkDictBox
   type Double :: *
@@ -5667,7 +5674,6 @@ module GHC.Exts where
   ctz64# :: Word64# -> Word#
   ctz8# :: Word# -> Word#
   currentCallStack :: GHC.Types.IO [GHC.Base.String]
-  dataToTag# :: forall a. a -> Int#
   deRefStablePtr# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #)
   deRefWeak# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, a #)
   decodeDouble_2Int# :: Double# -> (# Int#, Word#, Word#, Int# #)

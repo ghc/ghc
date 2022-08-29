@@ -1,0 +1,36 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 53, types: 76, coercions: 29, joins: 0/0}
+
+$WC0 = \ @x conrep -> (C0 conrep) `cast` <Co:3> :: ...
+
+$WC1 = \ @x -> C1 `cast` <Co:3> :: ...
+
+$WC2 = \ @x -> C2 `cast` <Co:3> :: ...
+
+$WC3 = \ @x -> C3 `cast` <Co:3> :: ...
+
+$WC4 = \ @x conrep -> (C4 conrep) `cast` <Co:3> :: ...
+
+$WC5 = \ @x conrep -> (C5 conrep) `cast` <Co:3> :: ...
+
+$WC6 = \ @x -> C6 `cast` <Co:3> :: ...
+
+$WC7 = \ @x -> C7 `cast` <Co:3> :: ...
+
+$WC8 = \ @x -> C8 `cast` <Co:3> :: ...
+
+testFun
+  = \ @x v ->
+      case v `cast` <Co:2> :: ... of {
+        __DEFAULT -> 47#;
+        C0 ipv -> -3#;
+        C2 -> 13#;
+        C4 ds -> 15#;
+        C5 ds -> case ds of { I# w -> w };
+        C6 -> 12#
+      }
+
+
+

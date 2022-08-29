@@ -495,10 +495,10 @@ occurrence of `x` and `y` to record whether it is evaluated and
 properly tagged. For the vast majority of primops that's a waste of
 time: the argument is an `Int#` or something.
 
-But code generation for `seq#` and `dataToTag#` /does/ consult that
+But code generation for `seq#` and `dataToTagLarge#` /does/ consult that
 tag, to statically avoid generating an eval:
 * `seq#`: uses `getCallMethod` on its first argument, which looks at the `tagSig`
-* `dataToTag#`: checks `tagSig` directly in the `DataToTagOp` case of `cgExpr`.
+* `dataToTagLarge#`: checks `tagSig` directly in the `DataToTagOp` case of `cgExpr`.
 
 So for these we should call `rewriteArgs`.
 

@@ -54,9 +54,8 @@ import GHC.Core.Rules.Config
 import GHC.Core.Type
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCon
-   ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
-   , isNewTyCon, tyConDataCons
-   , tyConFamilySize, isTypeDataTyCon )
+   ( TyCon, tyConDataCons_maybe, tyConDataCons, tyConFamilySize
+   , isEnumerationTyCon, isValidDTT2TyCon, isNewTyCon )
 import GHC.Core.Map.Expr ( eqCoreExpr )
 
 import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
@@ -103,7 +102,7 @@ That is why these rules are built in here.
 primOpRules ::  Name -> PrimOp -> Maybe CoreRule
 primOpRules nm = \case
    TagToEnumOp -> mkPrimOpRule nm 2 [ tagToEnumRule ]
-   DataToTagOp -> mkPrimOpRule nm 2 [ dataToTagRule ]
+   DataToTagOp -> mkPrimOpRule nm 3 [ dataToTagRule ]
 
    -- Int8 operations
    Int8AddOp   -> mkPrimOpRule nm 2 [ binaryLit (int8Op2 (+))
@@ -1986,12 +1985,12 @@ tagToEnumRule = do
 
 ------------------------------
 dataToTagRule :: RuleM CoreExpr
--- See Note [dataToTag# magic].
+-- See Note [DataToTag overview] in GHC.Tc.Instance.Class.
 dataToTagRule = a `mplus` b
   where
     -- dataToTag (tagToEnum x)   ==>   x
     a = do
-      [Type ty1, Var tag_to_enum `App` Type ty2 `App` tag] <- getArgs
+      [Type _lev, Type ty1, Var tag_to_enum `App` Type ty2 `App` tag] <- getArgs
       guard $ tag_to_enum `hasKey` tagToEnumKey
       guard $ ty1 `eqType` ty2
       return tag
@@ -2002,34 +2001,12 @@ dataToTagRule = a `mplus` b
     -- where x's unfolding is a constructor application
     b = do
       platform <- getPlatform
-      [_, val_arg] <- getArgs
+      [_lev, _ty, val_arg] <- getArgs
       in_scope <- getInScopeEnv
       (_,floats, dc,_,_) <- liftMaybe $ exprIsConApp_maybe in_scope val_arg
       massert (not (isNewTyCon (dataConTyCon dc)))
       return $ wrapFloats floats (mkIntVal platform (toInteger (dataConTagZ dc)))
 
-{- Note [dataToTag# magic]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-The primop dataToTag# is unusual because it evaluates its argument.
-Only `SeqOp` shares that property.  (Other primops do not do anything
-as fancy as argument evaluation.)  The special handling for dataToTag#
-is:
-
-* There is a special case for DataToTagOp in GHC.StgToCmm.Expr.cgExpr,
-  that evaluates its argument and then extracts the tag from
-  the returned value.
-
-* An application like (dataToTag# (Just x)) is optimised by
-  dataToTagRule in GHC.Core.Opt.ConstantFold.
-
-* A case expression like
-     case (dataToTag# e) of <alts>
-  gets transformed t
-     case e of <transformed alts>
-  by GHC.Core.Opt.ConstantFold.caseRules; see Note [caseRules for dataToTag]
-
-See #15696 for a long saga.
--}
 
 {- *********************************************************************
 *                                                                      *
@@ -3396,14 +3373,21 @@ caseRules platform (App (App (Var f) type_arg) v)
            , \v -> (App (App (Var f) type_arg) (Var v)))
 
 -- See Note [caseRules for dataToTag]
-caseRules _ (App (App (Var f) (Type ty)) v)       -- dataToTag x
+caseRules _ (Var f `App` Type lev `App` Type ty `App` v) -- dataToTag x
   | Just DataToTagOp <- isPrimOpId_maybe f
-  , Just (tc, _) <- tcSplitTyConApp_maybe ty
-  , isAlgTyCon tc
-  , not (isTypeDataTyCon tc) -- See wrinkle (W2c) in GHC.Rename.Module
-                             -- Note [Type data declarations]
-  = Just (v, tx_con_dtt ty
-           , \v -> App (App (Var f) (Type ty)) (Var v))
+  = case splitTyConApp_maybe ty of
+      Just (tc, _) | isValidDTT2TyCon tc
+        -> Just (v, tx_con_dtt tc
+                , \v' -> Var f `App` Type lev `App` Type ty `App` Var v')
+      _ -> pprTraceUserWarning warnMsg Nothing
+  where
+    warnMsg = vcat $ map text
+      [ "Found dataToTag primop applied to a non-ADT type. This"
+      , "could be a future bug in GHC, or it may be caused by an"
+      , "unsupported use of the ghc-internal primop dataToTagLarge#."
+      , "In either case, the GHC developers would like to know about it!"
+      , "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug"
+      ]
 
 caseRules _ _ = Nothing
 
@@ -3511,9 +3495,9 @@ tx_con_tte _        alt@(LitAlt {}) = pprPanic "caseRules" (ppr alt)
 tx_con_tte platform (DataAlt dc)  -- See Note [caseRules for tagToEnum]
   = Just $ LitAlt $ mkLitInt platform $ toInteger $ dataConTagZ dc
 
-tx_con_dtt :: Type -> AltCon -> Maybe AltCon
+tx_con_dtt :: TyCon -> AltCon -> Maybe AltCon
 tx_con_dtt _  DEFAULT = Just DEFAULT
-tx_con_dtt ty (LitAlt (LitNumber LitNumInt i))
+tx_con_dtt tc (LitAlt (LitNumber LitNumInt i))
    | tag >= 0
    , tag < n_data_cons
    = Just (DataAlt (data_cons !! tag))   -- tag is zero-indexed, as is (!!)
@@ -3521,11 +3505,10 @@ tx_con_dtt ty (LitAlt (LitNumber LitNumInt i))
    = Nothing
    where
      tag         = fromInteger i :: ConTagZ
-     tc          = tyConAppTyCon ty
      n_data_cons = tyConFamilySize tc
      data_cons   = tyConDataCons tc
 
-tx_con_dtt _ alt = pprPanic "caseRules" (ppr alt)
+tx_con_dtt _ alt = pprPanic "caseRules/dataToTag: bad alt" (ppr alt)
 
 
 {- Note [caseRules for tagToEnum]
@@ -3568,10 +3551,10 @@ Instead, we deal with turning one branch into DEFAULT in GHC.Core.Opt.Simplify.U
 
 Note [caseRules for dataToTag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also Note [dataToTag# magic].
+See also Note [DataToTag overview] in GHC.Tc.Instance.Class.
 
 We want to transform
-  case dataToTag x of
+  case dataToTagLarge# x of
     DEFAULT -> e1
     1# -> e2
 into
@@ -3579,14 +3562,18 @@ into
     DEFAULT -> e1
     (:) _ _ -> e2
 
-Note the need for some wildcard binders in
-the 'cons' case.
+(Note the need for some wildcard binders in the 'cons' case.)
 
-For the time, we only apply this transformation when the type of `x` is a type
-headed by a normal tycon. In particular, we do not apply this in the case of a
-data family tycon, since that would require carefully applying coercion(s)
-between the data family and the data family instance's representation type,
-which caseRules isn't currently engineered to handle (#14680).
+This transformation often enables further optimisation via
+case-flattening and case-of-known-constructor and can be very
+important for code using derived Eq instances.
+
+We can apply this transformation only when we can easily get the
+constructors from the type at which dataToTagLarge# is used.  And we
+cannot apply this transformation at "type data"-related types without
+breaking invariant I1 from Note [Type data declarations] in
+GHC.Rename.Module.  That leaves exactly the types satisfying condition
+DTT2 from Note [DataToTag overview] in GHC.Tc.Instance.Class.
 
 Note [Unreachable caseRules alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -3,16 +3,16 @@
 Derived class instances:
   instance GHC.Classes.Eq T17240.Nullary where
     (GHC.Classes.==) a b
-      = case (GHC.Prim.dataToTag# a) of
+      = case (GHC.Magic.dataToTag# a) of
           a#
-            -> case (GHC.Prim.dataToTag# b) of
+            -> case (GHC.Magic.dataToTag# b) of
                  b# -> (GHC.Prim.tagToEnum# (a# GHC.Prim.==# b#))
   
   instance GHC.Classes.Eq T17240.T where
     (GHC.Classes.==) a b
       = case
-            (case (GHC.Prim.dataToTag# a) of
-               a# -> case (GHC.Prim.dataToTag# b) of b# -> a# GHC.Prim./=# b#)
+            (case (GHC.Magic.dataToTag# a) of
+               a# -> case (GHC.Magic.dataToTag# b) of b# -> a# GHC.Prim./=# b#)
         of
           1# -> GHC.Types.False
           _ -> case a of

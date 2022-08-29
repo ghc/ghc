@@ -865,6 +865,7 @@ lintCoreExpr (Var var)
       var_pair@(var_ty, _) <- lintIdOcc var 0
       -- See Note [Linting representation-polymorphic builtins]
       checkRepPolyBuiltin (Var var) [] var_ty
+      --checkDataToTagPrimOpTyCon (Var var) []
       return var_pair
 
 lintCoreExpr (Lit lit)
@@ -961,6 +962,7 @@ lintCoreExpr e@(App _ _)
 
        -- See Note [Linting representation-polymorphic builtins]
        ; checkRepPolyBuiltin fun args app_ty
+       ; --checkDataToTagPrimOpTyCon fun args
 
        ; return app_pair}
   where
@@ -1127,6 +1129,32 @@ checkTypeDataConOcc :: String -> DataCon -> LintM ()
 checkTypeDataConOcc what dc
   = checkL (not (isTypeDataTyCon (dataConTyCon dc))) $
     (text "type data constructor found in a" <+> text what <> colon <+> ppr dc)
+
+{-
+-- | Check that a use of dataToTagLarge# satisfies condition DTT2
+-- from Note [DataToTag overview] in GHC.Tc.Instance.Class
+--
+-- Ignores applications not headed by dataToTagLarge#.
+
+-- Commented out because GHC.PrimopWrappers doesn't respect this condition yet.
+checkDataToTagPrimOpTyCon
+  :: CoreExpr   -- ^ the function (head of the application) we are checking
+  -> [CoreArg]  -- ^ The arguments to the application
+  -> LintM ()
+checkDataToTagPrimOpTyCon (Var fun_id) args
+  | Just DataToTagOp <- isPrimOpId_maybe fun_id
+  = case args of
+      Type _levity : Type dty : _rest
+        | Just (tc, _) <- splitTyConApp_maybe dty
+        , isValidDTT2TyCon tc
+          -> pure ()
+        | otherwise -> failWithL $ text "dataToTagLarge# used at non-ADT type:"
+                                   <+> ppr dty
+      _ -> failWithL $ text "dataToTagLarge# needs two type arguments but has args:"
+                       <+> ppr (take 2 args)
+
+checkDataToTagPrimOpTyCon _ _ = pure ()
+-}
 
 -- | Check representation-polymorphic invariants in an application of a
 -- built-in function or newtype constructor.

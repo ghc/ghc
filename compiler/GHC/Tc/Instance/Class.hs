@@ -1,4 +1,4 @@
-
+{-# LANGUAGE MultiWayIf #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Tc.Instance.Class (
@@ -23,11 +23,13 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin (InstanceWhat (..), SafeOverlapping)
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
-import GHC.Rename.Env( addUsedGRE, DeprecationWarnings (..) )
+import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
 
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
+import GHC.Builtin.PrimOps ( PrimOp(..) )
+import GHC.Builtin.PrimOps.Ids ( primOpId )
 
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
@@ -46,7 +48,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
 
-import GHC.Core ( Expr(Var, App, Cast) )
+import GHC.Core ( Expr(..) )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -61,6 +63,9 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import GHC.Types.Id.Info
 import GHC.Tc.Errors.Types
 import Control.Monad
+
+import Data.Functor
+import Data.Maybe
 
 {- *******************************************************************
 *                                                                    *
@@ -140,6 +145,7 @@ matchGlobalInst dflags short_cut clas tys
   | isCTupleClass clas                 = matchCTuple                       clas tys
   | cls_name == typeableClassName      = matchTypeable                     clas tys
   | cls_name == withDictClassName      = matchWithDict                          tys
+  | cls_name == dataToTagClassName     = matchDataToTag                    clas tys
   | cls_name == hasFieldClassName      = matchHasField    dflags short_cut clas tys
   | cls_name == unsatisfiableClassName = return NoInstance -- See (B) in Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors
   | otherwise                          = matchInstEnv     dflags short_cut clas tys
@@ -389,8 +395,8 @@ matchKnownChar df sc clas tys = matchInstEnv df sc clas tys
 
 makeLitDict :: Class -> Type -> EvExpr -> TcM ClsInstResult
 -- makeLitDict adds a coercion that will convert the literal into a dictionary
--- of the appropriate type.  See Note [KnownNat & KnownSymbol and EvLit]
--- in GHC.Tc.Types.Evidence.  The coercion happens in 2 steps:
+-- of the appropriate type.  See Note [KnownNat & KnownSymbol and EvLit].
+-- The coercion happens in 2 steps:
 --
 --     Integer -> SNat n     -- representation of literal to singleton
 --     SNat n  -> KnownNat n -- singleton to dictionary
@@ -608,7 +614,251 @@ Some further observations about `withDict`:
 
       See test-case T21575b.
 
+
+
+Note [DataToTag overview]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Class `DataToTag` is defined like this, in GHC.Magic:
+
+  type DataToTag :: forall {lev :: Levity}.
+                    TYPE (BoxedRep lev) -> Constraint
+  class DataToTag a where
+     dataToTag# :: a -> Int#
+
+`dataToTag#`, evaluates its argument and returns the index of the data
+constructor used to build that argument.  Clearly, `dataToTag#` cannot
+work on /any/ type, only on data types, hence the type-class constraint.
+
+Users cannot define instances of `DataToTag`
+(see `GHC.Tc.Validity.check_special_inst_head`).
+Instead, GHC's constraint solver has built-in solving behaviour,
+ implemented in `GHC.Tc.Instance.Class.matchGlobalInst`.
+
+(#20441: This common handling of special typeclasses is a bit of a
+mess and could use some love, and a dedicated Note.)
+
+GHC solves a wanted constraint `DataToTag @{lev} dty`
+when all of the following conditions are met:
+
+C1: `dty` is an algebraic data type, i.e. `dty` matches any of:
+       * a "data" declaration,
+       * a "data instance" declaration,
+       * a boxed tuple type
+      "type data" declarations are NOT included; see also wrinkle W2c
+      of Note [Type data declarations] in GHC.Rename.Module.
+      (In principle we could accept newtypes that wrap algebraic data
+      types, but we do not do so.)
+
+C2: All of the constructors of that "data" or "data instance"
+      declaration are in scope.  Otherwise, `dataToTag#` could be
+      used to peek behind the curtain when used with an abstract
+      data type whose constructors are intentionally hidden.
+
+C3: `lev` is statically known, either Lifted or Unlifted:
+      Otherwise the argument to `dataToTag#` would be
+      representation-polymorphic and we couldn't do anything
+      with it without Core Lint rightfully complaining.
+      This guarantees invariant (DTT1) below.
+
+It would be possible for GHC to generate custom code for each type, like
+this:
+
+   instance DataToTag [a] where
+     dataToTag# []    = 0#
+     dataToTag# (_:_) = 1#
+
+But, to avoid all this boilerplate code, and improve optimisation opportunities,
+GHC generates instances like this:
+
+   instance DataToTag [a] where
+     dataToTag# = dataToTagLarge#
+
+using a (temporarily strangely-named) primop `dataToTagLarge#`. The
+primop has the following over-polymorphic type
+
+  dataToTagLarge# :: forall {l::levity} (a::TYPE (BoxedRep l)). a -> Int#
+
+Every call to (dataToTagLarge# @{lev} @ty) that we generate should
+satisfy these conditions:
+
+(DTT1) `lev` is concrete (either lifted or unlifted), not polymorphic.
+   This is an invariant--we must satisfy this or Core Lint will complain.
+   (This falls under situation 1 in GHC.Core.Lint's
+   Note [Linting representation-polymorphic builtins].)
+
+(DTT2) `ty` is always headed by a TyCon corresponding to one of the following:
+   * A boxed tuple
+   * A "data" declaration (but NOT a "type data" declaration)
+   * The /representation type/ for a "data instance" declaration
+     (but NOT the data family TyCon itself)
+
+   This ensures that the DataCons associated with `ty` are easily
+   accessible and safe to use in Core without running afoul of
+   invariant I1 from Note [Type data declarations] in
+   GHC.Rename.Module.  See Note [caseRules for dataToTag] in
+   GHC.Core.Opt.ConstantFold for why this matters.
+
+   While the dataToTagLarge# primop remains exposed from GHC.Prim
+   (and abused in GHC.PrimopWrappers), this cannot be a true invariant.
+   But with a little effort we can ensure that every `dataToTagLarge#`
+   call we generate in a DataToTag instance satisfies this condition.
+
+The `dataToTagLarge#` primop has special handling in several parts of
+the compiler:
+
+- It has a couple of built-in rewrite rules, implemented in
+  GHC.Core.Opt.ConstantFold.dataToTagRule
+
+- The simplifier rewrites most case expressions scrutinizing its result.
+  See Note [caseRules for dataToTag] in GHC.Core.Opt.ConstantFold.
+
+- It evaluates its argument; this is implemented via a special case in
+  GHC.StgToCmm.Expr.cgExpr.
+
+- Additionally, a special case in GHC.Stg.InferTags.Rewrite.rewriteExpr ensures
+  that that any inferred tag information on the argument is retained until then.
+
+Wrinkles:
+
+(DTW1) To guarantee (DTT2) we need to take care with data families.
+  Consider  data family D a
+            data instance D (Either p q) = D1 | D2 p q
+  To solve the constraint
+     [W] DataToTag (D (Either t1 t2))
+  GHC uses the built-in instance
+     instance DataToTag (D (Either p q)) where
+        dataToTag# x = dataToTagLarge# @Lifted @(R:DEither p q)
+                                       (x |> sym (ax:DEither p q))
+  where `ax:DEither` is the axiom arising from the `data instance`:
+    ax:DEither p q :: D (Either p q) ~ R:DEither p q
+
+  Notice that we cast `x` before giving it to `dataToTagLarge#`, so
+  that (DTT2) is satisfied.
+
+(DTW2) Suppose we have module A (T(..)) where { data T = TCon }
+  and in module B, the constraint `DataToTag T` is needed. Per
+  condition C2, we only solve this constraint if `TCon` is in
+  scope.  So we had better not later report a warning about the
+  import of `TCon` being unused in module B!
+
+  To avoid this simply call `addUsedDataCons` when creating a built-in
+  DataToTag instance.
+
+(DTW3) Similar to DTW2, consider this example:
+
+    {-# LANGUAGE MagicHash #-}
+    module A (X(X2, X3), f) where
+    -- see also testsuite/tests/warnings/should_compile/DataToTagWarnings.hs
+    import GHC.Exts (dataToTag#, Int#)
+    data X = X1 | X2 | X3 | X4
+    g :: X -> Int#
+    g X2 = 12#
+    g v = dataToTag# v
+
+  QUESTION: What warnings should be emitted with -Wunused-top-binds?
+
+  The X1 and X4 constructors are used only in the solving of a
+  `DataToTag X` constraint in the second equation for `g`.  But if
+  these constructors were just removed, they would not be needed for
+  the solving of that `DataToTag X` constraint!  So for now we take
+  the stance that both X1 and X4 should be reported as unused.
+
+  It's not entirely clear if this is the right behavior:
+  Notice that removing X1 changes the value of `g X3` from 2# to 1#.
+  (Removing X4 causes no observable change in behavior.)
+  But this is a very obscure program!  The current "warn about both"
+  approach is not obviously wrong, either, and is consistent with the
+  behavior of derived Ix instances.
+
+  To get these warnings, we do nothing; in particular we do not call
+  keepAlive on the constructor names.
+  (Contrast with Note [Unused name reporting and HasField].)
+
+(DTW4) It is expected that in the future some instances may select more
+  efficient specialised implementations; for example we may use a
+  separate `dataToTagSmall#` primop for a type with only a few
+  constructors; see #17079 and #21710.
+
+(DTW5) We make no promises about the primops used to implement
+  DataToTag instances.  Changes to GHC's representation of algebraic
+  data types at runtime may force us to redesign these primops.
+  Indeed, accommodating such changes without breaking users of the
+  original (no longer existing) "dataToTag#" primop is one of the
+  main reasons the DataToTag class exists!
+
+  We can currently get away with using the same primop for every
+  DataToTag instance because every Haskell-land data constructor use
+  gets translated to its own "real" heap or static data object at
+  runtime and the index of that constructor is always exposed via
+  pointer tagging and via the object's info table.
+
+
+Historical note:
+During its time as a primop, `dataToTag#` underwent several changes,
+mostly relating to under what circumstances it evaluates its argument.
+Today, that story is simple: A dataToTag primop always evaluates its
+argument, unless tag inference determines the argument was already
+evaluated and correctly tagged.  Getting here was a long journey, with
+many similarities to the story behind Note [Strict Field Invariant] in
+GHC.Stg.InferTags.  See also #15696.
+
 -}
+
+
+{- ********************************************************************
+*                                                                     *
+                   Class lookup for DataToTag
+*                                                                     *
+***********************************************************************-}
+
+matchDataToTag :: Class -> [Type] -> TcM ClsInstResult
+-- See Note [DataToTag overview]
+matchDataToTag dataToTagClass [levity, dty] = do
+  famEnvs <- tcGetFamInstEnvs
+  (gbl_env, _lcl_env) <- getEnvs
+  if | isConcreteType levity -- condition C3
+     , Just (rawTyCon, rawTyConArgs) <- tcSplitTyConApp_maybe dty
+     , let (repTyCon, repArgs, repCo)
+             = tcLookupDataFamInst famEnvs rawTyCon rawTyConArgs
+
+     , not (isTypeDataTyCon repTyCon)
+     , Just constrs <- tyConAlgDataCons_maybe repTyCon
+         -- condition C1
+
+     , let  rdr_env = tcg_rdr_env gbl_env
+            inScope con = isJust $ lookupGRE_Name rdr_env $ dataConName con
+     , all inScope constrs -- condition C2
+     , let  repTy = mkTyConApp repTyCon repArgs
+            whichOp
+              -- TODO: More optimized implementations for:
+              --    * small constructor families
+              --    * Bool/Int/Float/etc. on JS backend
+              | otherwise
+                = primOpId DataToTagOp
+
+            -- See wrinkle DTW1; we must apply the underlying
+            -- operation at the representation type and cast it
+            methodRep = Var whichOp `App` Type levity `App` Type repTy
+            methodCo = mkFunCo Representational
+                               FTF_T_T
+                               (mkNomReflCo ManyTy)
+                               (mkSymCo repCo)
+                               (mkReflCo Representational intPrimTy)
+            dataToTagDataCon = tyConSingleDataCon (classTyCon dataToTagClass)
+            mk_ev _ = evDataConApp dataToTagDataCon
+                                   [levity, dty]
+                                   [methodRep `Cast` methodCo]
+     -> addUsedDataCons rdr_env repTyCon -- See wrinkles DTW2 and DTW3
+          $> OneInst { cir_new_theta = [] -- (Ignore stupid theta.)
+                     , cir_mk_ev = mk_ev
+                     , cir_canonical = True
+                     , cir_what = BuiltinInstance
+                     }
+     | otherwise -> pure NoInstance
+
+matchDataToTag _ _ = pure NoInstance
+
+
 
 {- ********************************************************************
 *                                                                     *

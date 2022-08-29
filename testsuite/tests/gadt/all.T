@@ -130,4 +130,4 @@ test('T19847', normal, compile, [''])
 test('T19847a', normal, compile, ['-ddump-types'])
 test('T19847b', normal, compile, [''])
 test('T23022', normal, compile, ['-dcore-lint'])
-test('T23023', normal, compile, ['-dcore-lint'])
+test('T23023', normal, compile_fail, ['-O -dcore-lint']) # todo: move this test?

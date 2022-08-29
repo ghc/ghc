@@ -1,0 +1,40 @@
+{-# LANGUAGE MagicHash                   #-}
+
+-- This should probably work, but it currently doesn't...
+-- And the error message quality is poor.
+
+-- It may be better to disallow DataToTag instances
+-- in signatures until this is figured out.
+
+unit indef where
+
+   signature Abstract where
+     import GHC.Exts (DataToTag)
+
+     data DataType
+     instance DataToTag DataType
+     sampleVals :: [DataType]
+
+   module Util where
+     import Abstract
+     import GHC.Exts (DataToTag(..), Int(I#))
+
+     printSomething :: IO ()
+     printSomething = print [I# (dataToTag# v) | v <- sampleVals]
+
+unit concrete where
+
+    module Concrete where
+      type DataType = Ordering
+      sampleVals :: [DataType]
+      sampleVals = [EQ, LT, GT]
+
+
+unit main where
+   dependency indef[Abstract=concrete:Concrete] (Util as MyUtil)
+
+   module Main where
+     import MyUtil
+
+     main :: IO ()
+     main = printSomething

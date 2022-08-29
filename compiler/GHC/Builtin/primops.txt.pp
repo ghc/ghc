@@ -3689,12 +3689,22 @@ section "Tag to enum stuff"
         and small integers.}
 ------------------------------------------------------------------------
 
--- See Note [dataToTag# magic] in GHC.Core.Opt.ConstantFold
-primop  DataToTagOp "dataToTag#" GenPrimOp
-   a -> Int#  -- Zero-indexed; the first constructor has tag zero
-   { Evaluates the argument and returns the tag of the result.
-     Tags are Zero-indexed; the first constructor has tag zero. }
+primop  DataToTagOp "dataToTagLarge#" GenPrimOp
+   a_levpoly -> Int#
+   { Used internally to implement @dataToTag#@: Use that function instead!
+     This one offers /no advantage/ and comes with no stability
+     guarantees: it may change its type, its name, or its behavior
+     with /no warning/ between compiler releases.
+
+     It is expected that this function will be un-exposed in a future
+     release of ghc.
+
+     For more details, look at @Note [DataToTag overview]@
+     in GHC.Tc.Instance.Class in the source code for
+     /the specific compiler version you are using./
+   }
    with
+   deprecated_msg = { Use dataToTag# from \"GHC.Magic\" instead. }
    strictness = { \ _arity -> mkClosedDmdSig [evalDmd] topDiv }
    effect = ThrowsException
    cheap = True

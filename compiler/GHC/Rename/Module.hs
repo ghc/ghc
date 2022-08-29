@@ -2023,13 +2023,17 @@ Wrinkles:
            with the data constructor, else (I1) is violated. See GHC.Core.Utils
            Note [Refine DEFAULT case alternatives] Exception 2
 
-     (W2c) In `GHC.Core.Opt.ConstantFold.caseRules`, disable the rule for
-           `dataToTag#` in the case of `type data`.  We do not want to transform
-              case dataToTag# x of t -> blah
+     (W2c) In `GHC.Core.Opt.ConstantFold.caseRules`, we do not want to transform
+              case dataToTagLarge# x of t -> blah
            into
               case x of { A -> ...; B -> .. }
            because again that conjures up the type-level-only data contructors
            `A` and `B` in a pattern, violating (I1) (#23023).
+           So we check for "type data" TyCons before applying this
+           transformation.  (In practice, this doesn't matter because
+           we also refuse to solve DataToTag instances at types
+           corresponding to type data declarations.  See rule C1 from
+           Note [DataToTag overview] in GHC.Tc.Instance.Class.)
 
 The main parts of the implementation are:
 

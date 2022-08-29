@@ -73,13 +73,13 @@ cgExpr (StgApp fun args)     = cgIdApp fun args
 cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
   cgIdApp a []
 
--- dataToTag# :: a -> Int#
--- See Note [dataToTag# magic] in GHC.Core.Opt.ConstantFold
+-- dataToTagLarge# :: a_levpoly -> Int#
+-- See Note [DataToTag overview] in GHC.Tc.Instance.Class
 -- TODO: There are some more optimization ideas for this code path
 -- in #21710
 cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   platform <- getPlatform
-  emitComment (mkFastString "dataToTag#")
+  emitComment (mkFastString "dataToTagLarge#")
   info <- getCgIdInfo a
   let amode = idInfoToAmode info
   tag_reg <- assignTemp $ cmmConstrTag1 platform amode
@@ -638,7 +638,8 @@ isSimpleScrut _                    _         = return False
 isSimpleOp :: StgOp -> [StgArg] -> FCode Bool
 -- True iff the op cannot block or allocate
 isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) _ = return $! not (playSafe safe)
--- dataToTag# evaluates its argument, see Note [dataToTag# magic] in GHC.Core.Opt.ConstantFold
+-- dataToTagLarge# evaluates its argument;
+-- see Note [DataToTag overview] in GHC.Tc.Instance.Class
 isSimpleOp (StgPrimOp DataToTagOp) _ = return False
 isSimpleOp (StgPrimOp op) stg_args                  = do
     arg_exprs <- getNonVoidArgAmodes stg_args

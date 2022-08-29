@@ -75,6 +75,7 @@ module GHC.Core.TyCon(
         isTcTyCon, setTcTyConKind,
         tcHasFixedRuntimeRep,
         isConcreteTyCon,
+        isValidDTT2TyCon,
 
         -- ** Extracting information out of TyCons
         tyConName,
@@ -1951,6 +1952,12 @@ isVanillaAlgTyCon :: TyCon -> Bool
 isVanillaAlgTyCon (TyCon { tyConDetails = details })
   | AlgTyCon { algTcFlavour = VanillaAlgTyCon _ } <- details = True
   | otherwise                                                = False
+
+-- | Returns @True@ if a boxed type headed by the given @TyCon@
+-- satisfies condition DTT2 of Note [DataToTag overview] in
+-- GHC.Tc.Instance.Class
+isValidDTT2TyCon :: TyCon -> Bool
+isValidDTT2TyCon = isDataTyCon
 
 isDataTyCon :: TyCon -> Bool
 -- ^ Returns @True@ for data types that are /definitely/ represented by

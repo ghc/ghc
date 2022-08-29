@@ -1602,7 +1602,9 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
   -- Handwritten instances of KnownNat/KnownChar/KnownSymbol
   -- are forbidden outside of signature files (#12837).
   -- Derived instances are forbidden completely (#21087).
-  | clas_nm `elem` [ knownNatClassName, knownSymbolClassName, knownCharClassName ]
+     -- FIXME: DataToTag instances in signature files don't actually work yet
+  | clas_nm `elem` [ knownNatClassName, knownSymbolClassName
+                   , knownCharClassName, dataToTagClassName ]
   , (not (hs_src == HsigFile) && hand_written_bindings) || derived_instance
     -- Note [Instances of built-in classes in signature files]
   = fail_with_inst_err $ IllegalSpecialClassInstance clas False

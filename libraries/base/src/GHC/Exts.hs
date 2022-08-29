@@ -126,11 +126,18 @@ module GHC.Exts
         --   @since 4.17.0.0
         WithDict(..),
 
+        -- * Converting ADTs to constructor tags
+        DataToTag(..),
+
         -- * The maximum tuple size
         maxTupleSize,
        ) where
 
-import GHC.Prim hiding ( coerce )
+import GHC.Prim hiding ( coerce, dataToTagLarge# )
+  -- Hide dataToTagLarge# because it is expected to break for
+  -- GHC-internal reasons in the near future, and shouldn't
+  -- be exposed from base (not even GHC.Exts)
+
 import GHC.Types
   hiding ( IO   -- Exported from "GHC.IO"
          , Type -- Exported from "Data.Kind"

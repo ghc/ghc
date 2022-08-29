@@ -270,6 +270,9 @@ basicKnownKeyNames
         -- WithDict
         withDictClassName,
 
+        -- DataToTag
+        dataToTagClassName,
+
         -- Dynamic
         toDynName,
 
@@ -754,7 +757,7 @@ not_RDR, dataToTag_RDR, succ_RDR, pred_RDR, minBound_RDR, maxBound_RDR,
     unsafeIndex_RDR, unsafeRangeSize_RDR :: RdrName
 and_RDR                 = varQual_RDR gHC_CLASSES (fsLit "&&")
 not_RDR                 = varQual_RDR gHC_CLASSES (fsLit "not")
-dataToTag_RDR           = varQual_RDR gHC_PRIM (fsLit "dataToTag#")
+dataToTag_RDR           = varQual_RDR gHC_MAGIC (fsLit "dataToTag#")
 succ_RDR                = varQual_RDR gHC_ENUM (fsLit "succ")
 pred_RDR                = varQual_RDR gHC_ENUM (fsLit "pred")
 minBound_RDR            = varQual_RDR gHC_ENUM (fsLit "minBound")
@@ -1394,6 +1397,10 @@ withDictClassName = clsQual gHC_MAGIC_DICT (fsLit "WithDict") withDictClassKey
 nonEmptyTyConName :: Name
 nonEmptyTyConName = tcQual gHC_BASE (fsLit "NonEmpty") nonEmptyTyConKey
 
+-- DataToTag
+dataToTagClassName :: Name
+dataToTagClassName    = clsQual gHC_MAGIC      (fsLit "DataToTag") dataToTagClassKey
+
 -- Custom type errors
 errorMessageTypeErrorFamName
   , typeErrorTextDataConName
@@ -1709,6 +1716,9 @@ typeableClassKey        = mkPreludeClassUnique 20
 withDictClassKey :: Unique
 withDictClassKey        = mkPreludeClassUnique 21
 
+dataToTagClassKey :: Unique
+dataToTagClassKey       = mkPreludeClassUnique 23
+
 monadFixClassKey :: Unique
 monadFixClassKey        = mkPreludeClassUnique 28
 
@@ -1737,11 +1747,11 @@ datatypeClassKey    = mkPreludeClassUnique 39
 constructorClassKey = mkPreludeClassUnique 40
 selectorClassKey    = mkPreludeClassUnique 41
 
--- KnownNat: see Note [KnownNat & KnownSymbol and EvLit] in GHC.Tc.Types.Evidence
+-- KnownNat: see Note [KnownNat & KnownSymbol and EvLit] in GHC.Tc.Instance.Class
 knownNatClassNameKey :: Unique
 knownNatClassNameKey = mkPreludeClassUnique 42
 
--- KnownSymbol: see Note [KnownNat & KnownSymbol and EvLit] in GHC.Tc.Types.Evidence
+-- KnownSymbol: see Note [KnownNat & KnownSymbol and EvLit] in GHC.Tc.Instance.Class
 knownSymbolClassNameKey :: Unique
 knownSymbolClassNameKey = mkPreludeClassUnique 43
 

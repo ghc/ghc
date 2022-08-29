@@ -89,8 +89,29 @@ Runtime system
 
 - Updated to `Unicode 15.1.0 <https://www.unicode.org/versions/Unicode15.1.0/>`_.
 
+- The functions :base-ref:`GHC.Exts.dataToTag#` and
+  :base-ref:`GHC.Base.getTag` have had their types changed to the
+  following:
+
+  ::
+
+    dataToTag#, getTag
+      :: forall {lev :: Levity} (a :: TYPE (BoxedRep lev))
+      .  DataToTag a => a -> Int#
+
+  In particular, they are now applicable only at some (not all)
+  lifted types.  However, if ``t`` is an algebraic data type (i.e. ``t``
+  matches a ``data`` or ``data instance`` declaration) with all of its
+  constructors in scope and the levity of ``t`` is statically known,
+  then the constraint ``DataToTag t`` can always be solved.
+
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
+
+- ``dataToTag#`` has been moved from ``GHC.Prim``.  It remains
+  exported by ``GHC.Exts``, but with a different type, as described in
+  the notes for ``base`` above.
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
