@@ -377,8 +377,8 @@ function cleanup_submodules() {
     # On Windows submodules can inexplicably get into funky states where git
     # believes that the submodule is initialized yet its associated repository
     # is not valid. Avoid failing in this case with the following insanity.
-    git submodule sync --recursive || git submodule deinit --force --all
-    git submodule update --init --recursive
+    git submodule sync || git submodule deinit --force --all
+    git submodule update --init
     git submodule foreach git clean -xdf
   else
     info "Not cleaning submodules, not in a git repo"
