@@ -2545,6 +2545,93 @@ data TcRnMessage where
   -}
   TcRnInterfaceLookupError :: !Name -> !SDoc -> TcRnMessage
 
+  {- | TcRnUnsatisfiedMinimalDef is a warning that occurs when a class instance
+       is missing methods that are required by the minimal definition.
+
+       Example:
+          class C a where
+            foo :: a -> a
+          instance C ()        -- | foo needs to be defined here
+
+       Test cases:
+         testsuite/tests/typecheck/prog001/typecheck.prog001
+         testsuite/tests/typecheck/should_compile/tc126
+         testsuite/tests/typecheck/should_compile/T7903
+         testsuite/tests/typecheck/should_compile/tc116
+         testsuite/tests/typecheck/should_compile/tc175
+         testsuite/tests/typecheck/should_compile/HasKey
+         testsuite/tests/typecheck/should_compile/tc125
+         testsuite/tests/typecheck/should_compile/tc078
+         testsuite/tests/typecheck/should_compile/tc161
+         testsuite/tests/typecheck/should_fail/T5051
+         testsuite/tests/typecheck/should_fail/T21583
+         testsuite/tests/backpack/should_compile/bkp47
+         testsuite/tests/backpack/should_fail/bkpfail25
+         testsuite/tests/parser/should_compile/T2245
+         testsuite/tests/parser/should_compile/read014
+         testsuite/tests/indexed-types/should_compile/Class3
+         testsuite/tests/indexed-types/should_compile/Simple2
+         testsuite/tests/indexed-types/should_fail/T7862
+         testsuite/tests/deriving/should_compile/deriving-1935
+         testsuite/tests/deriving/should_compile/T9968a
+         testsuite/tests/deriving/should_compile/drv003
+         testsuite/tests/deriving/should_compile/T4966
+         testsuite/tests/deriving/should_compile/T14094
+         testsuite/tests/perf/compiler/T15304
+         testsuite/tests/warnings/minimal/WarnMinimal
+         testsuite/tests/simplCore/should_compile/simpl020
+         testsuite/tests/deSugar/should_compile/T14546d
+         testsuite/tests/ghci/scripts/T5820
+         testsuite/tests/ghci/scripts/ghci019
+  -}
+  TcRnUnsatisfiedMinimalDef :: ClassMinimalDef -> TcRnMessage
+
+  {- | 'TcRnMisplacedInstSig' is an error that happens when a method in
+       a class instance is given a type signature, but the user has not
+       enabled the @InstanceSigs@ extension.
+
+       Test case:
+       testsuite/tests/module/mod45
+  -}
+  TcRnMisplacedInstSig :: Name -> (LHsSigType GhcRn) -> TcRnMessage
+  {- | 'TcRnBadBootFamInstDecl' is an error that is triggered by a
+       type family instance being declared in an hs-boot file.
+
+       Test case:
+       testsuite/tests/indexed-types/should_fail/HsBootFam
+  -}
+  TcRnBadBootFamInstDecl :: {} -> TcRnMessage
+  {- | 'TcRnIllegalFamilyInstance' is an error that occurs when an associated
+       type or data family is given a top-level instance.
+
+       Test case:
+       testsuite/tests/indexed-types/should_fail/T3092
+  -}
+  TcRnIllegalFamilyInstance :: TyCon -> TcRnMessage
+  {- | 'TcRnMissingClassAssoc' is an error that occurs when a class instance
+       for a class with an associated type or data family is missing a corresponding
+       family instance declaration.
+
+       Test case:
+       testsuite/tests/indexed-types/should_fail/SimpleFail7
+  -}
+  TcRnMissingClassAssoc :: TyCon -> TcRnMessage
+  {- | 'TcRnBadFamInstDecl' is an error that is triggered by a type or data family
+       instance without the @TypeFamilies@ extension.
+
+       Test case:
+       testsuite/tests/indexed-types/should_fail/BadFamInstDecl
+  -}
+  TcRnBadFamInstDecl :: TyCon -> TcRnMessage
+  {- | 'TcRnNotOpenFamily' is an error that is triggered by attempting to give
+       a top-level (open) type family instance for a closed type family.
+
+       Test cases:
+         testsuite/tests/indexed-types/should_fail/Overlap7
+         testsuite/tests/indexed-types/should_fail/Overlap3
+  -}
+  TcRnNotOpenFamily :: TyCon -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.

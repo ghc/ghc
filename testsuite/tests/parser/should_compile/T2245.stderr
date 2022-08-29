@@ -1,12 +1,12 @@
 
-T2245.hs:4:10: warning: [-Wmissing-methods (in -Wdefault)]
+T2245.hs:4:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         ‘+’, ‘*’, ‘abs’, ‘signum’, ‘fromInteger’, and (either ‘negate’
                                                               or
                                                               ‘-’)
     • In the instance declaration for ‘Num T’
 
-T2245.hs:5:10: warning: [-Wmissing-methods (in -Wdefault)]
+T2245.hs:5:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         ‘fromRational’ and (either ‘recip’ or ‘/’)
     • In the instance declaration for ‘Fractional T’

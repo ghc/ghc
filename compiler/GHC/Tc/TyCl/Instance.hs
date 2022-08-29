@@ -81,7 +81,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
-import GHC.Data.BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
+import GHC.Data.BooleanFormula ( isUnsatisfied )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -591,7 +591,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
 
          -- (0) Check it's an open type family
        ; checkTc (isTypeFamilyTyCon fam_tc)     (wrongKindOfFamily fam_tc)
-       ; checkTc (isOpenTypeFamilyTyCon fam_tc) (notOpenFamily fam_tc)
+       ; checkTc (isOpenTypeFamilyTyCon fam_tc) (TcRnNotOpenFamily fam_tc)
 
          -- (1) do the work of verifying the synonym group
          -- For some reason we don't have a location for the equation
@@ -618,16 +618,16 @@ tcFamInstDeclChecks mb_clsinfo fam_tc
        ; traceTc "tcFamInstDecl" (ppr fam_tc)
        ; type_families <- xoptM LangExt.TypeFamilies
        ; is_boot       <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
-       ; checkTc type_families $ badFamInstDecl fam_tc
-       ; checkTc (not is_boot) $ badBootFamInstDeclErr
+       ; checkTc type_families (TcRnBadFamInstDecl fam_tc)
+       ; checkTc (not is_boot) TcRnBadBootFamInstDecl
 
        -- Check that it is a family TyCon, and that
        -- oplevel type instances are not for associated types.
-       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
+       ; checkTc (isFamilyTyCon fam_tc) (TcRnIllegalFamilyInstance fam_tc)
 
        ; when (isNotAssociated mb_clsinfo &&   -- Not in a class decl
                isTyConAssoc fam_tc)            -- but an associated type
-              (addErr $ assocInClassErr fam_tc)
+              (addErr $ TcRnMissingClassAssoc fam_tc)
        }
 
 {- Note [Associated type instances]
@@ -1937,7 +1937,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
   = do { (sig_ty, hs_wrap)
              <- setSrcSpan (getLocA hs_sig_ty) $
                 do { inst_sigs <- xoptM LangExt.InstanceSigs
-                   ; checkTc inst_sigs (misplacedInstSig sel_name hs_sig_ty)
+                   ; checkTc inst_sigs (TcRnMisplacedInstSig sel_name hs_sig_ty)
                    ; let ctxt = FunSigCtxt sel_name NoRRC
                    ; sig_ty  <- tcHsSigType ctxt hs_sig_ty
                    ; let local_meth_ty = idType local_meth_id
@@ -2024,14 +2024,6 @@ methSigCtxt sel_name sig_ty meth_ty env0
                               , text "Instance sig:" <+> ppr sig_ty
                               , text "   Class sig:" <+> ppr meth_ty ])
        ; return (env2, msg) }
-
-misplacedInstSig :: Name -> LHsSigType GhcRn -> TcRnMessage
-misplacedInstSig name hs_ty
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ hang (text "Illegal type signature in instance declaration:")
-              2 (hang (pprPrefixName name)
-                    2 (dcolon <+> ppr hs_ty))
-         , text "(Use InstanceSigs to allow this)" ]
 
 {- Note [Instance method signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2155,14 +2147,9 @@ derivBindCtxt sel_id clas tys
 warnUnsatisfiedMinimalDefinition :: ClassMinimalDef -> TcM ()
 warnUnsatisfiedMinimalDefinition mindef
   = do { warn <- woptM Opt_WarnMissingMethods
-       ; let msg = mkTcRnUnknownMessage $
-               mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingMethods) noHints message
+       ; let msg = TcRnUnsatisfiedMinimalDef mindef
        ; diagnosticTc warn msg
        }
-  where
-    message = vcat [text "No explicit implementation for"
-                   ,nest 2 $ pprBooleanFormulaNice mindef
-                   ]
 
 {-
 Note [Export helper functions]
@@ -2376,30 +2363,3 @@ inst_decl_ctxt :: SDoc -> SDoc
 inst_decl_ctxt doc = hang (text "In the instance declaration for")
                         2 (quotes doc)
 
-badBootFamInstDeclErr :: TcRnMessage
-badBootFamInstDeclErr
-  = mkTcRnUnknownMessage $ mkPlainError noHints $ text "Illegal family instance in hs-boot file"
-
-notFamily :: TyCon -> TcRnMessage
-notFamily tycon
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ text "Illegal family instance for" <+> quotes (ppr tycon)
-         , nest 2 $ parens (ppr tycon <+> text "is not an indexed type family")]
-
-assocInClassErr :: TyCon -> TcRnMessage
-assocInClassErr name
- = mkTcRnUnknownMessage $ mkPlainError noHints $
-   text "Associated type" <+> quotes (ppr name) <+>
-   text "must be inside a class instance"
-
-badFamInstDecl :: TyCon -> TcRnMessage
-badFamInstDecl tc_name
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ text "Illegal family instance for" <+>
-           quotes (ppr tc_name)
-         , nest 2 (parens $ text "Use TypeFamilies to allow indexed type families") ]
-
-notOpenFamily :: TyCon -> TcRnMessage
-notOpenFamily tc
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-  text "Illegal instance for closed family" <+> quotes (ppr tc)

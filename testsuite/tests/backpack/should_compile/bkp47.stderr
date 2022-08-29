@@ -6,7 +6,7 @@
   [1 of 4] Compiling A[sig]           ( r/A.hsig, nothing )
   [2 of 4] Compiling B                ( r/B.hs, nothing )
 
-bkp47.bkp:19:18: warning: [-Wmissing-methods (in -Wdefault)]
+bkp47.bkp:19:18: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         either ‘f’ or ‘g’
     • In the instance declaration for ‘C Int’

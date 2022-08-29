@@ -482,6 +482,13 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnCannotRepresentType"                       = 75721
   GhcDiagnosticCode "TcRnReportCustomQuasiError"                    = 39584
   GhcDiagnosticCode "TcRnInterfaceLookupError"                      = 52243
+  GhcDiagnosticCode "TcRnUnsatisfiedMinimalDef"                     = 06201
+  GhcDiagnosticCode "TcRnMisplacedInstSig"                          = 06202
+  GhcDiagnosticCode "TcRnBadBootFamInstDecl"                        = 06203
+  GhcDiagnosticCode "TcRnIllegalFamilyInstance"                     = 06204
+  GhcDiagnosticCode "TcRnMissingClassAssoc"                         = 06205
+  GhcDiagnosticCode "TcRnBadFamInstDecl"                            = 06206
+  GhcDiagnosticCode "TcRnNotOpenFamily"                             = 06207
 
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517

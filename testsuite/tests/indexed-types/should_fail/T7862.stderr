@@ -1,5 +1,5 @@
 
-T7862.hs:23:10: warning: [-Wmissing-methods (in -Wdefault)]
+T7862.hs:23:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         ‘+’, ‘*’, ‘abs’, ‘signum’, ‘fromInteger’, and (either ‘negate’
                                                               or

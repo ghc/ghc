@@ -1154,6 +1154,34 @@ instance Diagnostic TcRnMessage where
                            False -> text (TH.pprint item))
     TcRnReportCustomQuasiError _ msg -> mkSimpleDecorated $ text msg
     TcRnInterfaceLookupError _ sdoc -> mkSimpleDecorated sdoc
+    TcRnUnsatisfiedMinimalDef mindef
+      -> mkSimpleDecorated $
+        vcat [text "No explicit implementation for"
+              ,nest 2 $ pprBooleanFormulaNice mindef
+             ]
+    TcRnMisplacedInstSig name hs_ty
+      -> mkSimpleDecorated $
+        vcat [ hang (text "Illegal type signature in instance declaration:")
+                  2 (hang (pprPrefixName name)
+                        2 (dcolon <+> ppr hs_ty))
+             ]
+    TcRnBadBootFamInstDecl {}
+      -> mkSimpleDecorated $
+        text "Illegal family instance in hs-boot file"
+    TcRnIllegalFamilyInstance tycon
+      -> mkSimpleDecorated $
+        vcat [ text "Illegal family instance for" <+> quotes (ppr tycon)
+             , nest 2 $ parens (ppr tycon <+> text "is not an indexed type family")]
+    TcRnMissingClassAssoc name
+      -> mkSimpleDecorated $
+        text "Associated type" <+> quotes (ppr name) <+>
+        text "must be inside a class instance"
+    TcRnBadFamInstDecl tc_name
+      -> mkSimpleDecorated $
+        text "Illegal family instance for" <+> quotes (ppr tc_name)
+    TcRnNotOpenFamily tc
+      -> mkSimpleDecorated $
+        text "Illegal instance for closed family" <+> quotes (ppr tc)
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1521,6 +1549,20 @@ instance Diagnostic TcRnMessage where
     TcRnReportCustomQuasiError isError _
       -> if isError then ErrorWithoutFlag else WarningWithoutFlag
     TcRnInterfaceLookupError{}
+      -> ErrorWithoutFlag
+    TcRnUnsatisfiedMinimalDef{}
+      -> WarningWithFlag (Opt_WarnMissingMethods)
+    TcRnMisplacedInstSig{}
+      -> ErrorWithoutFlag
+    TcRnBadBootFamInstDecl{}
+      -> ErrorWithoutFlag
+    TcRnIllegalFamilyInstance{}
+      -> ErrorWithoutFlag
+    TcRnMissingClassAssoc{}
+      -> ErrorWithoutFlag
+    TcRnBadFamInstDecl{}
+      -> ErrorWithoutFlag
+    TcRnNotOpenFamily{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -1891,6 +1933,20 @@ instance Diagnostic TcRnMessage where
     TcRnReportCustomQuasiError{}
       -> noHints
     TcRnInterfaceLookupError{}
+      -> noHints
+    TcRnUnsatisfiedMinimalDef{}
+      -> noHints
+    TcRnMisplacedInstSig{}
+      -> [suggestExtension LangExt.InstanceSigs]
+    TcRnBadBootFamInstDecl{}
+      -> noHints
+    TcRnIllegalFamilyInstance{}
+      -> noHints
+    TcRnMissingClassAssoc{}
+      -> noHints
+    TcRnBadFamInstDecl{}
+      -> [suggestExtension LangExt.TypeFamilies]
+    TcRnNotOpenFamily{}
       -> noHints
 
   diagnosticCode = constructorCode

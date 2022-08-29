@@ -6,7 +6,7 @@ read014.hs:4:1: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
 read014.hs:4:5: warning: [-Wunused-matches (in -Wextra)]
     Defined but not used: ‘x’
 
-read014.hs:6:10: warning: [-Wmissing-methods (in -Wdefault)]
+read014.hs:6:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         ‘+’, ‘*’, ‘abs’, ‘signum’, and ‘fromInteger’
     • In the instance declaration for ‘Num (a, b)’
