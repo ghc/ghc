@@ -873,23 +873,48 @@ exprEtaExpandArity opts e
 *                                                                      *
 ********************************************************************* -}
 
-findRhsArity :: ArityOpts -> RecFlag -> Id -> CoreExpr -> Arity -> SafeArityType
+findRhsArity :: ArityOpts -> RecFlag -> Id -> CoreExpr
+             -> (Bool, SafeArityType)
 -- This implements the fixpoint loop for arity analysis
 -- See Note [Arity analysis]
--- If findRhsArity e = (n, is_bot) then
---  (a) any application of e to <n arguments will not do much work,
---      so it is safe to expand e  ==>  (\x1..xn. e x1 .. xn)
---  (b) if is_bot=True, then e applied to n args is guaranteed bottom
 --
--- Returns an ArityType that is guaranteed trimmed to typeArity of 'bndr'
+-- The Bool is True if the returned arity is greater than (exprArity rhs)
+--     so the caller should do eta-expansion
+-- That Bool is never True for join points, which are never eta-expanded
+--
+-- Returns an SafeArityType that is guaranteed trimmed to typeArity of 'bndr'
 --         See Note [Arity trimming]
-findRhsArity opts is_rec bndr rhs old_arity
-  = case is_rec of
-      Recursive    -> go 0 botArityType
-      NonRecursive -> step init_env
+
+findRhsArity opts is_rec bndr rhs
+  | isJoinId bndr
+  = (False, join_arity_type)
+    -- False: see Note [Do not eta-expand join points]
+    -- But do return the correct arity and bottom-ness, because
+    -- these are used to set the bndr's IdInfo (#15517)
+    -- Note [Invariants on join points] invariant 2b, in GHC.Core
+
+  | otherwise
+  = (arity_increased, non_join_arity_type)
+    -- arity_increased: eta-expand if we'll get more lambdas
+    -- to the top of the RHS
   where
+    old_arity = exprArity rhs
+
     init_env :: ArityEnv
     init_env = findRhsArityEnv opts (isJoinId bndr)
+
+    -- Non-join-points only
+    non_join_arity_type = case is_rec of
+                             Recursive    -> go 0 botArityType
+                             NonRecursive -> step init_env
+    arity_increased = arityTypeArity non_join_arity_type > old_arity
+
+    -- Join-points only
+    -- See Note [Arity for non-recursive join bindings]
+    -- and Note [Arity for recursive join bindings]
+    join_arity_type = case is_rec of
+                         Recursive    -> go 0 botArityType
+                         NonRecursive -> trimArityType ty_arity (cheapArityType rhs)
 
     ty_arity     = typeArity (idType bndr)
     id_one_shots = idDemandOneShots bndr
@@ -1076,6 +1101,117 @@ But /only/ for called-once demands.  Suppose we had
 Now we don't want to eta-expand f1 to have 3 args; only two.
 Nor, in the case of f2, do we want to push that error call under
 a lambda.  Hence the takeWhile in combineWithDemandDoneShots.
+
+Note [Do not eta-expand join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Similarly to CPR (see Note [Don't w/w join points for CPR] in
+GHC.Core.Opt.WorkWrap), a join point stands well to gain from its outer binding's
+eta-expansion, and eta-expanding a join point is fraught with issues like how to
+deal with a cast:
+
+    let join $j1 :: IO ()
+             $j1 = ...
+             $j2 :: Int -> IO ()
+             $j2 n = if n > 0 then $j1
+                              else ...
+
+    =>
+
+    let join $j1 :: IO ()
+             $j1 = (\eta -> ...)
+                     `cast` N:IO :: State# RealWorld -> (# State# RealWorld, ())
+                                 ~  IO ()
+             $j2 :: Int -> IO ()
+             $j2 n = (\eta -> if n > 0 then $j1
+                                       else ...)
+                     `cast` N:IO :: State# RealWorld -> (# State# RealWorld, ())
+                                 ~  IO ()
+
+The cast here can't be pushed inside the lambda (since it's not casting to a
+function type), so the lambda has to stay, but it can't because it contains a
+reference to a join point. In fact, $j2 can't be eta-expanded at all. Rather
+than try and detect this situation (and whatever other situations crop up!), we
+don't bother; again, any surrounding eta-expansion will improve these join
+points anyway, since an outer cast can *always* be pushed inside. By the time
+CorePrep comes around, the code is very likely to look more like this:
+
+    let join $j1 :: State# RealWorld -> (# State# RealWorld, ())
+             $j1 = (...) eta
+             $j2 :: Int -> State# RealWorld -> (# State# RealWorld, ())
+             $j2 = if n > 0 then $j1
+                            else (...) eta
+
+Note [Arity for recursive join bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f x = joinrec j 0 = \ a b c -> (a,x,b)
+                j n = j (n-1)
+        in j 20
+
+Obviously `f` should get arity 4.  But it's a bit tricky:
+
+1. Remember, we don't eta-expand join points; see
+   Note [Do not eta-expand join points].
+
+2. But even though we aren't going to eta-expand it, we still want `j` to get
+   idArity=4, via the findRhsArity fixpoint.  Then when we are doing findRhsArity
+   for `f`, we'll call arityType on f's RHS:
+    - At the letrec-binding for `j` we'll whiz up an arity-4 ArityType
+      for `j` (See Note [arityType for non-recursive let-bindings]
+      in GHC.Core.Opt.Arity)b
+    - At the occurrence (j 20) that arity-4 ArityType will leave an arity-3
+      result.
+
+3. All this, even though j's /join-arity/ (stored in the JoinId) is 1.
+   This is is the Main Reason that we want the idArity to sometimes be
+   larger than the join-arity c.f. Note [Invariants on join points] item 2b
+   in GHC.Core.
+
+4. Be very careful of things like this (#21755):
+     g x = let j 0 = \y -> (x,y)
+               j n = expensive n `seq` j (n-1)
+           in j x
+   Here we do /not/ want eta-expand `g`, lest we duplicate all those
+   (expensive n) calls.
+
+   But it's fine: the findRhsArity fixpoint calculation will compute arity-1
+   for `j` (not arity 2); and that's just what we want. But we do need that
+   fixpoint.
+
+   Historical note: an earlier version of GHC did a hack in which we gave
+   join points an ArityType of ABot, but that did not work with this #21755
+   case.
+
+5. arityType does not usually expect to encounter free join points;
+   see GHC.Core.Opt.Arity Note [No free join points in arityType].
+   But consider
+          f x = join    j1 y = .... in
+                joinrec j2 z = ...j1 y... in
+                j2 v
+
+   When doing findRhsArity on `j2` we'll encounter the free `j1`.
+   But that is fine, because we aren't going to eta-expand `j2`;
+   we just want to know its arity.  So we have a flag am_no_eta,
+   switched on when doing findRhsArity on a join point RHS. If
+   the flag is on, we allow free join points, but not otherwise.
+
+
+Note [Arity for non-recursive join bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Arity for recursive join bindings] deals with recursive join
+bindings. But what about /non-recursive/ones?  If we just call
+findRhsArity, it will call arityType.  And that can be expensive when
+we have deeply nested join points:
+  join j1 x1 = join j2 x2 = join j3 x3 = blah3
+                            in blah2
+               in blah1
+(e.g. test T18698b).
+
+So we call cheapArityType instead.  It's good enough for practical
+purposes.
+
+(Side note: maybe we should use cheapArity for the RHS of let bindings
+in the main arityType function.)
 -}
 
 
