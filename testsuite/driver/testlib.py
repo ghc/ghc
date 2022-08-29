@@ -2322,7 +2322,7 @@ def normalise_errmsg(s: str) -> str:
     s = re.sub('ghc-stage[123]', 'ghc', s)
     # Remove platform prefix (e.g. js-unknown-ghcjs) for cross-compiled ghc
     s = re.sub('^\\w+-\\w+-\\w+-ghc', 'ghc', s)
-    s = re.sub('^\\w+-\\w+-\\w+-unlit', 'unlit', s)
+    s = re.sub('\\w+-\\w+-\\w+-unlit', 'unlit', s)
 
     # On windows error messages can mention versioned executables
     s = re.sub('ghc-[0-9.]+', 'ghc', s)
