@@ -400,8 +400,9 @@ staticDeclStat (StaticInfo si sv _) =
       ssu StaticUnboxedStringOffset {} = 0
   in  maybe (appS "h$di" [toJExpr si']) (\v -> DeclStat si' `mappend` (toJExpr si' |= v)) (ssv sv)
 
+-- | JS expression corresponding to a static string
 initStr :: BS.ByteString -> JExpr
-initStr str = app "h$str" [ValExpr (JStr . mkFastString . BSC.unpack $! str)]
+initStr str = app "h$str" [ValExpr (JStr . mkFastStringByteString $! str)]
 
 -- | rename a heap object, which means adding it to the
 --  static init table in addition to the renamer
