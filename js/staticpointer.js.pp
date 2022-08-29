@@ -36,9 +36,15 @@ function h$hs_spt_keys(tgt_d, tgt_o, n) {
     return Math.min(n,ks.length);
 }
 
-function h$hs_spt_lookup(key1,key2,key3,key4) {
-    // var i3 = key_d.i3, o = key_o >> 2;
-    // h$log("hs_spt_lookup");
+function h$hs_spt_lookup(key_v,key_o) {
+    // We know that the array is freshly allocated so we don't have to care
+    // about the offset (should be 0).
+    //
+    // note that the order of the keys is weird due to endianness
+    var key2 = key_v.i3[0] >>> 0;
+    var key1 = key_v.i3[1] >>> 0;
+    var key4 = key_v.i3[2] >>> 0;
+    var key3 = key_v.i3[3] >>> 0;
     RETURN_UBX_TUP2(h$hs_spt_lookup_key(key1,key2,key3,key4), 0);
 }
 
