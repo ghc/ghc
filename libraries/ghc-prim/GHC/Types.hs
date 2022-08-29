@@ -165,7 +165,7 @@ type family Any :: k where { }
 -- ==== __Examples__
 --
 -- Unless the OverloadedLists extension is enabled, list literals are
--- syntatic sugar for repeated applications of @:@ and @[]@.
+-- syntactic sugar for repeated applications of @:@ and @[]@.
 --
 -- >>> 1:2:3:4:[] == [1,2,3,4]
 -- True
