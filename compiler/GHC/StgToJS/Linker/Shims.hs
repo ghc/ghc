@@ -32,7 +32,7 @@ import           GHC.StgToJS.Linker.Utils
 
 import           System.FilePath
 import           GHC.Driver.Session
-import           GHC.Driver.Pipeline.Execute (doCpp)
+import           GHC.Driver.Pipeline.Execute (doCpp, CppOpts(..))
 
 import           GHC.Unit.Env
 import           GHC.Utils.TmpFs
@@ -166,7 +166,10 @@ tryReadShimFile logger tmpfs dflags unit_env file = do
   if needsCpp file
   then do
     let profiling = False
-        use_cpp_and_not_cc_dash_E = False
+        cpp_opts = CppOpts
+          { cppUseCc       = True
+          , cppLinePragmas = False -- LINE pragmas aren't JS compatible
+          }
         extra_opts = []
 
     -- load the shim into memory
@@ -179,7 +182,7 @@ tryReadShimFile logger tmpfs dflags unit_env file = do
            B.writeFile infile $ (commonCppDefs profiling) <> payload
            outfile <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "jspp"
            -- do the business
-           doCpp logger tmpfs dflags unit_env use_cpp_and_not_cc_dash_E extra_opts infile outfile
+           doCpp logger tmpfs dflags unit_env cpp_opts extra_opts infile outfile
            B.readFile outfile
   else parseShim file
 
