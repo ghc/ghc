@@ -121,7 +121,10 @@ runPhase (T_CmmCpp pipe_env hsc_env input_fn) = do
         (hsc_tmpfs hsc_env)
         (hsc_dflags hsc_env)
         (hsc_unit_env hsc_env)
-        False{-not raw-}
+        (CppOpts
+          { cppUseCc       = True
+          , cppLinePragmas = True
+          })
         []
         input_fn output_fn
   return output_fn
@@ -625,7 +628,10 @@ runCppPhase hsc_env input_fn output_fn = do
            (hsc_tmpfs hsc_env)
            (hsc_dflags hsc_env)
            (hsc_unit_env hsc_env)
-           True{-raw-}
+           (CppOpts
+              { cppUseCc = False
+              , cppLinePragmas = True
+              })
            []
            input_fn output_fn
   return output_fn
@@ -968,11 +974,16 @@ offsetIncludePaths dflags (IncludeSpecs incs quotes impl) =
 -- -----------------------------------------------------------------------------
 -- Running CPP
 
+data CppOpts = CppOpts
+  { cppUseCc       :: !Bool -- ^ Use "cc -E" as preprocessor, otherwise use "cpp"
+  , cppLinePragmas :: !Bool -- ^ Enable generation of LINE pragmas
+  }
+
 -- | Run CPP
 --
 -- UnitEnv is needed to compute MIN_VERSION macros
-doCpp :: Logger -> TmpFs -> DynFlags -> UnitEnv -> Bool -> [Option] -> FilePath -> FilePath -> IO ()
-doCpp logger tmpfs dflags unit_env raw extra_opts input_fn output_fn = do
+doCpp :: Logger -> TmpFs -> DynFlags -> UnitEnv -> CppOpts -> [Option] -> FilePath -> FilePath -> IO ()
+doCpp logger tmpfs dflags unit_env opts extra_opts input_fn output_fn = do
     let hscpp_opts = picPOpts dflags
     let cmdline_include_paths = offsetIncludePaths dflags (includePaths dflags)
     let unit_state = ue_units unit_env
@@ -996,9 +1007,10 @@ doCpp logger tmpfs dflags unit_env raw extra_opts input_fn output_fn = do
 
     let verbFlags = getVerbFlags dflags
 
-    let cpp_prog args | raw       = GHC.SysTools.runCpp logger dflags args
-                      | otherwise = GHC.SysTools.runCc Nothing logger tmpfs dflags
-                                        (GHC.SysTools.Option "-E" : args)
+    let cpp_prog args
+          | cppUseCc opts = GHC.SysTools.runCc Nothing logger tmpfs dflags
+                                               (GHC.SysTools.Option "-E" : args)
+          | otherwise     = GHC.SysTools.runCpp logger dflags args
 
     let platform   = targetPlatform dflags
         targetArch = stringEncodeArch $ platformArch platform
@@ -1051,6 +1063,10 @@ doCpp logger tmpfs dflags unit_env raw extra_opts input_fn output_fn = do
                     return [GHC.SysTools.FileOption "-include" macro_stub]
             else return []
 
+    let line_pragmas
+          | cppLinePragmas opts = [] -- on by default
+          | otherwise           = [GHC.SysTools.Option "-P"] -- disable LINE markers
+
     cpp_prog       (   map GHC.SysTools.Option verbFlags
                     ++ map GHC.SysTools.Option include_paths
                     ++ map GHC.SysTools.Option hsSourceCppOpts
@@ -1063,13 +1079,13 @@ doCpp logger tmpfs dflags unit_env raw extra_opts input_fn output_fn = do
                     ++ map GHC.SysTools.Option io_manager_defs
                     ++ mb_macro_include
                     ++ extra_opts
+                    ++ line_pragmas
         -- Set the language mode to assembler-with-cpp when preprocessing. This
         -- alleviates some of the C99 macro rules relating to whitespace and the hash
         -- operator, which we tend to abuse. Clang in particular is not very happy
         -- about this.
                     ++ [ GHC.SysTools.Option     "-x"
                        , GHC.SysTools.Option     "assembler-with-cpp"
-                       , GHC.SysTools.Option     "-P" -- disable line markers
                        , GHC.SysTools.Option     input_fn
         -- We hackily use Option instead of FileOption here, so that the file
         -- name is not back-slashed on Windows.  cpp is capable of
