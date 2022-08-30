@@ -17,6 +17,8 @@ import qualified Data.Set    as Set
 import Flavour
 import qualified Context.Type as C
 import System.Directory (findExecutable)
+import Settings.Program
+import qualified Context.Type
 
 getTestSetting :: TestSetting -> Action String
 getTestSetting key = testSetting key
@@ -91,16 +93,16 @@ inTreeCompilerArgs stg = do
       return (dynamic `elem` ways, threaded `elem` ways)
     -- MP: We should be able to vary if stage1/stage2 is dynamic, ie a dynamic stage1
     -- should be able to built a static stage2?
-    hasDynamic          <- flavour >>= dynamicGhcPrograms
+    hasDynamic          <- (dynamic ==) . Context.Type.way <$> (programContext stg ghc)
     -- LeadingUnderscore is a property of the system so if cross-compiling stage1/stage2 could
     -- have different values? Currently not possible to express.
     leadingUnderscore   <- flag LeadingUnderscore
-    -- MP: This setting seems to only dictate whether we turn on optasm as a compiler
-    -- way, but a lot of tests which use only_ways(optasm) seem to not test the NCG?
     withInterpreter     <- ghcWithInterpreter
     unregisterised      <- flag GhcUnregisterised
     withSMP             <- targetSupportsSMP
-    debugAssertions     <- ghcDebugAssertions <$> flavour
+    debugAssertions     <- if stg >= Stage2
+                            then ghcDebugAssertions <$> flavour
+                            else return False
     profiled            <- ghcProfiled        <$> flavour <*> pure stg
 
     os          <- setting HostOs
