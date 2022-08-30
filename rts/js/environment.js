@@ -94,6 +94,47 @@ if(h$isNode) {
 }
 #endif
 
+//filter RTS arguments
+var h$rtsArgs = [];
+{
+    var prog_args = [];
+    var rts_args = [];
+    var in_rts = false;
+    var i = 0;
+    for(i=0;i<h$programArgs.length;i++) {
+        var a = h$programArgs[i];
+        // The '--RTS' argument disables all future
+        // +RTS ... -RTS processing.
+        if (a === "--RTS") {
+            break;
+        }
+        // The '--' argument is passed through to the program, but
+        // disables all further +RTS ... -RTS processing.
+        else if (a === "--") {
+            break;
+        }
+        else if (a === "+RTS") {
+            in_rts = true;
+        }
+        else if (a === "-RTS") {
+            in_rts = false;
+        }
+        else if (in_rts) {
+            rts_args.push(a);
+        }
+        else {
+            prog_args.push(a);
+        }
+    }
+    // process remaining program arguments
+    for (;i<h$programArgs.length;i++) {
+        prog_args.push(h$programArgs[i]);
+    }
+    //set global variables
+    h$programArgs = prog_args;
+    h$rtsArgs     = rts_args;
+}
+
 function h$getProgArgv(argc_v,argc_off,argv_v,argv_off) {
   TRACE_ENV("getProgArgV");
   var c = h$programArgs.length;
@@ -250,8 +291,23 @@ function h$errorBelch() {
 }
 
 function h$errorBelch2(buf1, buf_offset1, buf2, buf_offset2) {
-//  log("### errorBelch2");
-  h$errorMsg(h$decodeUtf8z(buf1, buf_offset1), h$decodeUtf8z(buf2, buf_offset2));
+  var pat = h$decodeUtf8z(buf1, buf_offset1);
+  h$errorMsg(h$append_prog_name(pat), h$decodeUtf8z(buf2, buf_offset2));
+}
+
+// append program name to the given string if possible
+function h$append_prog_name(str) {
+  // basename that only works with Unix paths for now...
+  function basename(path) {
+   return path.split('/').reverse()[0];
+  }
+
+  // only works for node for now
+  if(h$isNode) {
+    return basename(process.argv[1]) + ": " + str;
+  }
+
+  return str;
 }
 
 function h$debugBelch2(buf1, buf_offset1, buf2, buf_offset2) {

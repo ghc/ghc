@@ -10,293 +10,279 @@ function h$logArith() { h$log.apply(h$log,arguments); }
 #define TRACE_ARITH(args...)
 #endif
 
-function h$hs_leInt64(h1,l1,h2,l2) {
-  if(h1 === h2) {
-    var l1s = l1 >>> 1;
-    var l2s = l2 >>> 1;
-    return (l1s < l2s || (l1s === l2s && ((l1&1) <= (l2&1)))) ? 1 : 0;
-  } else {
-    return (h1 < h2) ? 1 : 0;
-  }
-}
-
-function h$hs_ltInt64(h1,l1,h2,l2) {
-  if(h1 === h2) {
-    var l1s = l1 >>> 1;
-    var l2s = l2 >>> 1;
-    return (l1s < l2s || (l1s === l2s && ((l1&1) < (l2&1)))) ? 1 : 0;
-  } else {
-    return (h1 < h2) ? 1 : 0;
-  }
-}
-
-function h$hs_geInt64(h1,l1,h2,l2) {
-  if(h1 === h2) {
-    var l1s = l1 >>> 1;
-    var l2s = l2 >>> 1;
-    return (l1s > l2s || (l1s === l2s && ((l1&1) >= (l2&1)))) ? 1 : 0;
-  } else {
-    return (h1 > h2) ? 1 : 0;
-  }
-}
-
-function h$hs_gtInt64(h1,l1,h2,l2) {
-  if(h1 === h2) {
-    var l1s = l1 >>> 1;
-    var l2s = l2 >>> 1;
-    return (l1s > l2s || (l1s === l2s && ((l1&1) > (l2&1)))) ? 1 : 0;
-  } else {
-    return (h1 > h2) ? 1 : 0;
-  }
-}
+#define UN(x) ((x)>>>0)
+#define W32(x) (BigInt(x))
+#define I32(x) (BigInt(x))
+#define W64(h,l) ((BigInt(h) << BigInt(32)) | BigInt(l>>>0))
+#define W64h(x) (Number(x >> BigInt(32)) >>> 0)
+#define W64l(x) (Number(BigInt.asUintN(32, x)) >>> 0)
+#define I64(h,l) ((BigInt(h) << BigInt(32)) | BigInt(l>>>0))
+#define I64h(x) (Number(x >> BigInt(32))|0)
+#define I64l(x) (Number(BigInt.asUintN(32,x)) >>> 0)
+#define RETURN_I64(x) RETURN_UBX_TUP2(I64h(x), I64l(x))
+#define RETURN_W64(x) RETURN_UBX_TUP2(W64h(x), W64l(x))
+#define RETURN_W32(x) return Number(x)
 
 function h$hs_quotWord64(h1,l1,h2,l2) {
-  // var a = h$ghcjsbn_mkBigNat_ww(h1,l1); // bigFromWord64(h1,l1);
-  // var b = h$ghcjsbn_mkBigNat_ww(h2,l2); // bigFromWord64(h2,l2);
-  var q = h$ghcjsbn_quot_bb(h$ghcjsbn_mkBigNat_ww(h1,l1),
-                            h$ghcjsbn_mkBigNat_ww(h2,l2));
-  return h$ghcjsbn_toWord64_b(q); // this should return the tuple
-  //RETURN_UBX_TUP2(h$ghcjsbn_toWord_b(h$ghcjsbn_shr_b(q, 32))
-  //  a.divide(b);
-  // RETURN_UBX_TUP2(c.shiftRight(32).intValue(), c.intValue());
-}
-
-function h$hs_timesInt64(h1,l1,h2,l2) {
-  var c = goog.math.Long.fromBits(l1,h1).multiply(goog.math.Long.fromBits(l2,h2));
-  RETURN_UBX_TUP2(c.getHighBits(), c.getLowBits());
-}
-
-function h$hs_quotInt64(h1,l1,h2,l2) {
-  var c = goog.math.Long.fromBits(l1,h1).div(goog.math.Long.fromBits(l2,h2));
-  RETURN_UBX_TUP2(c.getHighBits(), c.getLowBits());
-}
-
-function h$hs_remInt64(h1,l1,h2,l2) {
-  var c = goog.math.Long.fromBits(l1,h1).modulo(goog.math.Long.fromBits(l2,h2));
-  RETURN_UBX_TUP2(c.getHighBits(), c.getLowBits());
-}
-
-function h$hs_plusInt64(h1,l1,h2,l2) {
-  const a48 = h1 >>> 16;
-  const a32 = h1 & 0xFFFF;
-  const a16 = l1 >>> 16;
-  const a00 = l1 & 0xFFFF;
-
-  const b48 = h2 >>> 16;
-  const b32 = h2 & 0xFFFF;
-  const b16 = l2 >>> 16;
-  const b00 = l2 & 0xFFFF;
-
-  var c48 = 0, c32 = 0, c16 = 0, c00 = 0;
-  c00 += a00 + b00;
-  c16 += c00 >>> 16;
-  c00 &= 0xFFFF;
-  c16 += a16 + b16;
-  c32 += c16 >>> 16;
-  c16 &= 0xFFFF;
-  c32 += a32 + b32;
-  c48 += c32 >>> 16;
-  c32 &= 0xFFFF;
-  c48 += a48 + b48;
-  c48 &= 0xFFFF;
-  RETURN_UBX_TUP2((c48 << 16) | c32, (c16 << 16) | c00);
-}
-
-function h$hs_minusInt64(h1,l1,h2,l2) {
-  // negate arg2 and adds it
-  const nl2 = (~l2 + 1)    | 0;
-  const nh2 = (~h2 + !nl2) | 0;
-  h$hs_plusInt64(h1,l1,nh2,nl2);
-}
-
-function h$hs_leWord64(h1,l1,h2,l2) {
-  if(h1 === h2) {
-    var l1s = l1 >>> 1;
-    var l2s = l2 >>> 1;
-    return (l1s < l2s || (l1s === l2s && ((l1&1) <= (l2&1)))) ? 1 : 0;
-  } else {
-    var h1s = h1 >>> 1;
-    var h2s = h2 >>> 1;
-    return (h1s < h2s || (h1s === h2s && ((h1&1) <= (h2&1)))) ? 1 : 0;
-  }
-}
-
-function h$hs_ltWord64(h1,l1,h2,l2) {
-  if(h1 === h2) {
-    var l1s = l1 >>> 1;
-    var l2s = l2 >>> 1;
-    return (l1s < l2s || (l1s === l2s && ((l1&1) < (l2&1)))) ? 1 : 0;
-  } else {
-    var h1s = h1 >>> 1;
-    var h2s = h2 >>> 1;
-    return (h1s < h2s || (h1s === h2s && ((h1&1) < (h2&1)))) ? 1 : 0;
-  }
-}
-
-function h$hs_geWord64(h1,l1,h2,l2) {
-  if(h1 === h2) {
-    var l1s = l1 >>> 1;
-    var l2s = l2 >>> 1;
-    return (l1s > l2s || (l1s === l2s && ((l1&1) >= (l2&1)))) ? 1 : 0;
-  } else {
-    var h1s = h1 >>> 1;
-    var h2s = h2 >>> 1;
-    return (h1s > h2s || (h1s === h2s && ((h1&1) >= (h2&1)))) ? 1 : 0;
-  }
-}
-
-function h$hs_gtWord64(h1,l1,h2,l2) {
-  if(h1 === h2) {
-    var l1s = l1 >>> 1;
-    var l2s = l2 >>> 1;
-    return (l1s > l2s || (l1s === l2s && ((l1&1) > (l2&1)))) ? 1 : 0;
-  } else {
-    var h1s = h1 >>> 1;
-    var h2s = h2 >>> 1;
-    return (h1s > h2s || (h1s === h2s && ((h1&1) > (h2&1)))) ? 1 : 0;
-  }
+  var a = W64(h1,l1);
+  var b = W64(h2,l2);
+  var r = BigInt.asUintN(64, a / b);
+  TRACE_ARITH("Word64: " + a + " / " + b + " ==> " + r);
+  RETURN_W64(r);
 }
 
 function h$hs_remWord64(h1,l1,h2,l2) {
-  /* var a = h$bigFromWord64(h1,l1);
-     var b = h$bigFromWord64(h2,l2);
-     var c = a.mod(b); */
-  var r = h$ghcjsbn_rem_bb(h$ghcjsbn_mkBigNat_ww(h1,l1)
-                           ,h$ghcjsbn_mkBigNat_ww(h2,l2));
-  return h$ghcjsbn_toWord64_b(r);
-  // RETURN_UBX_TUP2(c.shiftRight(32).intValue(), c.intValue());
+  var a = W64(h1,l1);
+  var b = W64(h2,l2);
+  var r = BigInt.asUintN(64, a % b);
+  TRACE_ARITH("Word64: " + a + " % " + b + " ==> " + r);
+  RETURN_W64(r);
 }
 
-function h$hs_uncheckedIShiftL64(h,l,n) {
+function h$hs_timesWord64(h1,l1,h2,l2) {
+  var a = W64(h1,l1);
+  var b = W64(h2,l2);
+  var r = BigInt.asUintN(64, a * b);
+  TRACE_ARITH("Word64: " + a + " * " + b + " ==> " + r);
+  RETURN_W64(r);
+}
+
+function h$hs_minusWord64(h1,l1,h2,l2) {
+  var a = (BigInt(h1) << BigInt(32)) | BigInt(l1>>>0);
+  var b = (BigInt(h2) << BigInt(32)) | BigInt(l2>>>0);
+  var r = BigInt.asUintN(64, a - b);
+  TRACE_ARITH("Word64: " + a + " - " + b + " ==> " + r);
+  RETURN_W64(r);
+}
+
+function h$hs_plusWord64(h1,l1,h2,l2) {
+  var a = W64(h1,l1);
+  var b = W64(h2,l2);
+  var r = BigInt.asUintN(64, a + b);
+  TRACE_ARITH("Word64: " + a + " + " + b + " ==> " + r);
+  RETURN_W64(r);
+}
+
+function h$hs_timesInt64(h1,l1,h2,l2) {
+  var a = I64(h1,l1);
+  var b = I64(h2,l2);
+  var r = BigInt.asIntN(64, a * b);
+  TRACE_ARITH("Int64: " + a + " * " + b + " ==> " + r);
+  RETURN_I64(r);
+}
+
+function h$hs_quotInt64(h1,l1,h2,l2) {
+  var a = I64(h1,l1);
+  var b = I64(h2,l2);
+  var r = BigInt.asIntN(64, a / b);
+  TRACE_ARITH("Int64: " + a + " / " + b + " ==> " + r);
+  RETURN_I64(r);
+}
+
+function h$hs_remInt64(h1,l1,h2,l2) {
+  var a = I64(h1,l1);
+  var b = I64(h2,l2);
+  var r = BigInt.asIntN(64, a % b);
+  TRACE_ARITH("Int64: " + a + " % " + b + " ==> " + r);
+  RETURN_I64(r);
+}
+
+function h$hs_plusInt64(h1,l1,h2,l2) {
+  var a = I64(h1,l1);
+  var b = I64(h2,l2);
+  var r = BigInt.asIntN(64, a + b);
+  TRACE_ARITH("Int64: " + a + " + " + b + " ==> " + r);
+  RETURN_I64(r);
+}
+
+function h$hs_minusInt64(h1,l1,h2,l2) {
+  var a = I64(h1,l1);
+  var b = I64(h2,l2);
+  var r = BigInt.asIntN(64, a - b);
+  TRACE_ARITH("Int64: " + a + " - " + b + " ==> " + r);
+  RETURN_I64(r);
+}
+
+function h$hs_uncheckedShiftLWord64(h,l,n) {
+  var rh, rl;
+
   n &= 63;
   if (n == 0) {
-    RETURN_UBX_TUP2(h,l);
+    rh = h;
+    rl = l;
+  } else if (n === 32) {
+    rh = l;
+    rl = 0;
+  } else if (n < 32) {
+    rh = UN((h << n) | (l >>> (32 - n)));
+    rl = UN(l << n);
   } else {
-    if (n < 32) {
-      RETURN_UBX_TUP2((h << n) | (l >>> (32 - n)), l << n);
-    } else {
-      RETURN_UBX_TUP2(l << (n - 32), 0);
-    }
+    rh = UN(l << (n - 32));
+    rl = 0;
   }
+
+  TRACE_ARITH("Word64: " + W64(h,l) + " << " + n + " ==> " + W64(rh,rl));
+  RETURN_UBX_TUP2(rh,rl);
 }
 
-function h$hs_uncheckedIShiftRA64(h,l,n) {
+function h$hs_uncheckedShiftRWord64(h,l,n) {
+  var rh, rl;
+
+  n &= 63;
+  if(n == 0) {
+    rh = h;
+    rl = l;
+  } else if(n === 32) {
+    rh = 0;
+    rl = h;
+  } else if(n < 32) {
+    rh = h >>> n;
+    rl = UN((l >>> n ) | (h << (32-n)));
+  } else {
+    rh = 0;
+    rl = h >>> (n-32);
+  }
+  TRACE_ARITH("Word64: " + W64(h,l) + " >>> " + n + " ==> " + W64(rh,rl));
+  RETURN_UBX_TUP2(rh,rl);
+}
+
+function h$hs_uncheckedShiftLLInt64(h,l,n) {
+  var rh,rl;
+
   n &= 63;
   if (n == 0) {
-    RETURN_UBX_TUP2(h,l);
+    rh = h;
+    rl = l;
+  } else if (n === 32) {
+    rh = l|0;
+    rl = 0;
+  } else if (n < 32) {
+    rh = (h << n) | (l >>> (32 - n));
+    rl = UN(l << n);
   } else {
-    if (n < 32) {
-      RETURN_UBX_TUP2(h >> n, (l >>> n) | (h << (32 - n)));
-    } else {
-      RETURN_UBX_TUP2(h >= 0 ? 0 : -1, h >> (n - 32));
-    }
+    rh = l << (n - 32);
+    rl = 0;
   }
+
+  TRACE_ARITH("Int64: " + W64(h,l) + " << " + n + " ==> " + W64(rh,rl));
+  RETURN_UBX_TUP2(rh,rl);
 }
 
-// always nonnegative n?
-function h$hs_uncheckedShiftL64(h1,l1,n) {
-  TRACE_ARITH("hs_uncheckedShiftL64 " + h1 + " " + l1 + " " + n);
+function h$hs_uncheckedShiftRAInt64(h,l,n) {
+  var rh,rl;
+
   n &= 63;
-  TRACE_ARITH("hs_uncheckedShiftL64 n " + n);
-  if(n == 0) {
-    TRACE_ARITH("hs_uncheckedShiftL64 zero");
-    RETURN_UBX_TUP2(h1, l1);
-  } else if(n < 32) {
-    TRACE_ARITH("hs_uncheckedShiftL64 sm32");
-    RETURN_UBX_TUP2((h1 << n) | (l1 >>> (32-n)), l1 << n);
+  if (n == 0) {
+    rh = h;
+    rl = l;
+  } else if (n < 32) {
+    rh = h >> n;
+    rl = UN((l >>> n) | UN(h << (32 - n)));
   } else {
-    TRACE_ARITH("hs_uncheckedShiftL64 result " + ((l1 << (n-32))|0) + " " + 0);
-    RETURN_UBX_TUP2(((l1 << (n-32))|0), 0);
+    rh = h >= 0 ? 0 : -1;
+    rl = UN(h >> (n - 32));
   }
+
+  TRACE_ARITH("Int64: " + W64(h,l) + " >> " + n + " ==> " + W64(rh,rl));
+  RETURN_UBX_TUP2(rh,rl);
 }
 
-function h$hs_uncheckedShiftRL64(h1,l1,n) {
-  TRACE_ARITH("hs_uncheckedShiftRL64 " + h1 + " " + l1 + " " + n);
-  n &= 63;
-  if(n == 0) {
-    RETURN_UBX_TUP2(h1, l1);
-  } else if(n < 32) {
-    RETURN_UBX_TUP2(h1 >>> n, (l1 >>> n ) | (h1 << (32-n)));
-  } else {
-    RETURN_UBX_TUP2(0, (h1 >>> (n-32))|0);
-  }
-}
+function h$hs_uncheckedShiftRLInt64(h,l,n) {
+  var rh,rl;
 
-// fixme this function appears to deoptimize a lot due to smallint overflows
-function h$imul_shim(a, b) {
-    var ah  = (a >>> 16) & 0xffff;
-    var al = a & 0xffff;
-    var bh  = (b >>> 16) & 0xffff;
-    var bl = b & 0xffff;
-    // the shift by 0 fixes the sign on the high part
-    // the final |0 converts the unsigned value into a signed value
-    return (((al * bl)|0) + (((ah * bl + al * bh) << 16) >>> 0)|0);
-}
-
-var h$mulInt32 = Math.imul ? Math.imul : h$imul_shim;
-
-// function h$mulInt32(a,b) {
-//  return goog.math.Long.fromInt(a).multiply(goog.math.Long.fromInt(b)).getLowBits();
-// }
-// var hs_mulInt32 = h$mulInt32;
-
-function h$mulWord32(a,b) {
-  return goog.math.Long.fromBits(a,0).multiply(goog.math.Long.fromBits(b,0)).getLowBits();
-}
-
-function h$mul2Word32(a,b) {
-  var c = goog.math.Long.fromBits(a,0).multiply(goog.math.Long.fromBits(b,0));
-  RETURN_UBX_TUP2(c.getHighBits(), c.getLowBits());
-}
-
-function h$quotWord32(a,b) {
-  return goog.math.Long.fromBits(a,0).div(goog.math.Long.fromBits(b,0)).getLowBits();
-}
-
-function h$remWord32(a,b) {
-  return goog.math.Long.fromBits(a,0).modulo(goog.math.Long.fromBits(b,0)).getLowBits();
-}
-
-function h$quotRem2Word32(h1,l1,b) {
-/*  var a = h$bigFromWord64(h1,l1);
-  var b = h$bigFromWord(b);
- var d = a.divide(b); */
-  /* var a = h$ghcjsbn_mkBigNat_ww(h1,l1);
-  var b = h$ghcjsbn_mkBigNat_w(b); */
-  var q = [], r = [];
-  h$ghcjsbn_quotRem_bb(q,r,h$ghcjsbn_mkBigNat_ww(h1,l1),h$ghcjsbn_mkBigNat_w(b));
-  RETURN_UBX_TUP2(h$ghcjsbn_toWord_b(q), h$ghcjsbn_toWord_b(r));
-  // RETURN_UBX_TUP2(d.intValue(), a.subtract(b.multiply(d)).intValue());
-}
-
-function h$wordAdd2(a,b) {
-  const a16 = a >>> 16;
-  const a00 = a & 0xFFFF;
-
-  const b16 = b >>> 16;
-  const b00 = b & 0xFFFF;
-
-  var c32 = 0, c16 = 0, c00 = 0;
-  c00 += a00 + b00;
-  c16 += c00 >>> 16;
-  c00 &= 0xFFFF;
-  c16 += a16 + b16;
-  c32 += c16 >>> 16;
-  c16 &= 0xFFFF;
-  RETURN_UBX_TUP2(c32, (c16 << 16) | c00);
-}
-
-// this does an unsigned shift, is that ok?
-function h$uncheckedShiftRL64(h1,l1,n) {
-  if(n < 0) throw "unexpected right shift";
   n &= 63;
   if(n == 0) {
-    RETURN_UBX_TUP2(h1, l1);
+    rh = h;
+    rl = l;
+  } else if(n == 32) {
+    rh = 0;
+    rl = UN(h);
   } else if(n < 32) {
-    RETURN_UBX_TUP2((h1 >>> n), (l1 >>> n) | (h1 << (32 - n)));
+    rh = h >>> n;
+    rl = UN((l >>> n) | (h << (32-n)));
   } else {
-    RETURN_UBX_TUP2(0, (l1 >>> (n - 32))|0);
+    rh = 0;
+    rl = h >>> (n-32);
   }
+
+  TRACE_ARITH("Int64: " + W64(h,l) + " >>> " + n + " ==> " + W64(rh,rl));
+  RETURN_UBX_TUP2(rh,rl);
+}
+
+var h$mulInt32 = Math.imul;
+
+// Compute product of two Ints. Returns (nh,ch,cl)
+// where (ch,cl) are the two parts of the 64-bit result
+// and nh is 0 if ch can be safely dropped (i.e. it's a sign-extension of cl).
+function h$hs_timesInt2(l1,l2) {
+  var a = I32(l1);
+  var b = I32(l2);
+  var r = BigInt.asIntN(64, a * b);
+  TRACE_ARITH("Int32: " + a + " * " + b + " ==> " + r + " (Int64)");
+
+  var rh = I64h(r);
+  var rl = I64l(r)|0;
+  var nh = ((rh === 0 && rl >= 0) || (rh === -1 && rl < 0)) ? 0 : 1;
+  RETURN_UBX_TUP3(nh, rh, rl);
+}
+
+
+function h$mulWord32(l1,l2) {
+  var a = W32(l1);
+  var b = W32(l2);
+  var r = BigInt.asUintN(32, a * b);
+  TRACE_ARITH("Word32: " + a + " * " + b + " ==> " + r);
+  RETURN_W32(r);
+}
+
+function h$mul2Word32(l1,l2) {
+  var a = W32(l1);
+  var b = W32(l2);
+  var r = BigInt.asUintN(64, a * b);
+  TRACE_ARITH("Word32: " + a + " * " + b + " ==> " + r + " (Word64)");
+  RETURN_W64(r);
+}
+
+function h$quotWord32(n,d) {
+  var a = W32(n);
+  var b = W32(d);
+  var r = BigInt.asUintN(32, a / b);
+  TRACE_ARITH("Word32: " + a + " / " + b + " ==> " + r);
+  RETURN_W32(r);
+}
+
+function h$remWord32(n,d) {
+  var a = W32(n);
+  var b = W32(d);
+  var r = BigInt.asUintN(32, a % b);
+  TRACE_ARITH("Word32: " + a + " % " + b + " ==> " + r);
+  RETURN_W32(r);
+}
+
+function h$quotRemWord32(n,d) {
+  var a = W32(n);
+  var b = W32(d);
+  var q = BigInt.asUintN(32, a / b);
+  var r = BigInt.asUintN(32, a % b);
+  TRACE_ARITH("Word32: " + a + " `quotRem` " + b + " ==> (" + q + ", " + r + ")");
+  RETURN_UBX_TUP2(Number(q),Number(r));
+}
+
+function h$quotRem2Word32(nh,nl,d) {
+  var a = W64(nh,nl);
+  var b = W32(d);
+  var q = BigInt.asUintN(32, a / b);
+  var r = BigInt.asUintN(32, a % b);
+  TRACE_ARITH("Word32: " + a + " `quotRem2` " + b + " ==> (" + q + ", " + r + ")");
+  RETURN_UBX_TUP2(Number(q),Number(r));
+}
+
+function h$wordAdd2(l1,l2) {
+  var a = W32(l1);
+  var b = W32(l2);
+  var r = BigInt.asUintN(64, a + b);
+  TRACE_ARITH("Word32: " + a + " + " + b + " ==> " + r + " (Word64)");
+  RETURN_W64(r);
 }
 
 function h$isDoubleNegativeZero(d) {
@@ -522,8 +508,8 @@ function h$popCnt64(x1,x2) {
 }
 
 function h$bswap64(x1,x2) {
-  RETURN_UBX_TUP2((x2 >>> 24) | (x2 << 24) | ((x2 & 0xFF00) << 8) | ((x2 & 0xFF0000) >> 8)
-                 ,(x1 >>> 24) | (x1 << 24) | ((x1 & 0xFF00) << 8) | ((x1 & 0xFF0000) >> 8));
+  RETURN_UBX_TUP2(UN((x2 >>> 24) | (x2 << 24) | ((x2 & 0xFF00) << 8) | ((x2 & 0xFF0000) >> 8))
+                 ,UN((x1 >>> 24) | (x1 << 24) | ((x1 & 0xFF00) << 8) | ((x1 & 0xFF0000) >> 8)));
 }
 
 var h$clz32 = Math.clz32 || function(x) {
@@ -570,4 +556,42 @@ if(typeof Math.fround === 'function') {
     h$truncateFloat_buf[0] = f;
     return h$truncateFloat_buf[0];
   }
+}
+
+function h$decodeDoubleInt64(d) {
+  TRACE_ARITH("decodeDoubleInt64: " + d);
+  if(isNaN(d)) {
+    RETURN_UBX_TUP3(972, -1572864, 0);
+  }
+  h$convertDouble[0] = d;
+  var i0 = h$convertInt[0], i1 = h$convertInt[1];
+  var exp = (i1&2146435072)>>>20;
+  var ret1, ret2 = i0, ret3;
+  if(exp === 0) { // denormal or zero
+    if((i1&2147483647) === 0 && ret2 === 0) {
+      ret1 = 0;
+      ret3 = 0;
+    } else {
+      h$convertDouble[0] = d*9007199254740992;
+      i1 = h$convertInt[1];
+      ret1 = (i1&1048575)|1048576;
+      ret2 = h$convertInt[0];
+      ret3 = ((i1&2146435072)>>>20)-1128;
+    }
+  } else {
+    ret3 = exp-1075;
+    ret1 = (i1&1048575)|1048576;
+  }
+  // negate mantissa for negative input
+  if(d < 0) {
+    if(ret2 === 0) {
+      ret1 = ((~ret1) + 1) | 0;
+      // ret2 = 0;
+    } else {
+      ret1 = ~ret1;
+      ret2 = ((~ret2) + 1) | 0;
+    }
+  }
+  // prim ubx tup returns don't return the first value!
+  RETURN_UBX_TUP3(ret3,ret1,ret2);
 }

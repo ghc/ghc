@@ -24,6 +24,9 @@
 #define GHCJS_BUSY_YIELD 500
 #endif
 
+// Watch for insertion of null or undefined in the stack
+//#define GHCJS_DEBUG_STACK
+
 #ifdef GHCJS_TRACE_SCHEDULER
 function h$logSched() { if(arguments.length == 1) {
                           if(h$currentThread != null) {
@@ -70,6 +73,18 @@ function h$Thread() {
     this.tid = ++h$threadIdN;
     this.status = THREAD_RUNNING;
     this.stack = [h$done, 0, h$baseZCGHCziConcziSynczireportError, h$catch_e];
+#ifdef GHCJS_DEBUG_STACK
+    this.stack = new Proxy(this.stack, {
+     set(obj,prop,value) {
+       if (value === undefined || value === null) {
+          throw new Error("setting stack offset " + prop + " to " + value);
+       }
+       else {
+         return Reflect.set(...arguments);
+       }
+     }
+    });
+#endif
     this.sp = 3;
     this.mask = 0;                // async exceptions masked (0 unmasked, 1: uninterruptible, 2: interruptible)
     this.interruptible = false;   // currently in an interruptible operation
@@ -821,7 +836,7 @@ function h$handleBlockedSyncThread(c) {
       TRACE_SCHEDULER("blocking synchronous thread: exception");
       h$sp += 2;
       h$currentThread.sp = h$sp;
-      h$stack[h$sp-1] = h$baseZCGHCJSziPrimziInternalziwouldBlock;
+      h$stack[h$sp-1] = h$baseZCGHCziJSziPrimziInternalziwouldBlock;
       h$stack[h$sp]   = h$raiseAsync_frame;
       h$forceWakeupThread(h$currentThread);
       c = h$raiseAsync_frame;
@@ -893,7 +908,7 @@ function h$setCurrentThreadResultValue(v) {
 function h$runSyncReturn(a, cont) {
   var t = new h$Thread();
   TRACE_SCHEDULER("h$runSyncReturn created thread: " + h$threadString(t));
-  var aa = MK_AP1(h$baseZCGHCJSziPrimziInternalzisetCurrentThreadResultValue, a);
+  var aa = MK_AP1(h$baseZCGHCziJSziPrimziInternalzisetCurrentThreadResultValue, a);
   h$runSyncAction(t, aa, cont);
   if(t.status === THREAD_FINISHED) {
     if(t.resultIsException) {
@@ -936,7 +951,7 @@ function h$runSync(a, cont) {
 function h$runSyncAction(t, a, cont) {
   h$runInitStatic();
   var c = h$return;
-  t.stack[2] = h$baseZCGHCJSziPrimziInternalzisetCurrentThreadResultException;
+  t.stack[2] = h$baseZCGHCziJSziPrimziInternalzisetCurrentThreadResultException;
   t.stack[4] = h$ap_1_0;
   t.stack[5] = a;
   t.stack[6] = h$return;
