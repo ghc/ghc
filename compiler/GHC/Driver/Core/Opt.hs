@@ -138,9 +138,7 @@ each of those optimzations we have
  1. a configuration record bundeling the options for a particular optimization
     pass.
  2. an initialization function used to obtain such a configuration from
-    `DynFlags`. This function typically lives in a module named after the pass
-    in the `GHC.Driver.Config.Core.Opt` namespace and is used in the planning
-    stage.
+    `DynFlags`.
  3. the actual optimization pass itself, with an entrypoint that takes the
     configuration of the pass along with the execution context as arguments.
     This entrypoint is called in the execution stage.
@@ -149,9 +147,10 @@ The plan that is the result of the first stage is constructed by the
 `getCoreToDo` function found in the `GHC.Driver.Config.Core.Opt` module. This
 function determines the sequence of optimization passes run on the module in
 question and derives the configuration for each pass from the session's state
-(`DynFlags`) using the aforementioned initialization functions. The `CoreToDo`
-type that is finally used to wrap this configuration value is a sum type
-enumerating all the optimizations available in GHC.
+(`DynFlags`) using the aforementioned initialization functions that live in
+`GHC.Driver.Config.Core.Opt` as well. The `CoreToDo` type that is finally used
+to wrap this configuration value is a sum type enumerating all the optimizations
+available in GHC.
 
 The entrypoint of the second stage are the `optimizeCore*` functions found in
 GHC.Driver.Core.Opt. These functions is part of the Application Layer and

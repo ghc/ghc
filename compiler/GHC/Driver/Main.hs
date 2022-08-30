@@ -115,7 +115,7 @@ import GHC.Driver.CodeOutput
 import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
 import GHC.Driver.Config.Core.Lint ( defaultLintFlags, maybeInitLintPassResultConfig )
 import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
-import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyExprOpts )
+import GHC.Driver.Config.Core.Opt ( initSimplifyExprOpts )
 import GHC.Driver.Config.CoreToStg.Prep
 import GHC.Driver.Config.Logger   (initLogFlags)
 import GHC.Driver.Config.Parser   (initParserOpts)

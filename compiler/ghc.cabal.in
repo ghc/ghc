@@ -406,15 +406,6 @@ Library
         GHC.Driver.Config.Core.Lint
         GHC.Driver.Config.Core.Lint.Interactive
         GHC.Driver.Config.Core.Opt
-        GHC.Driver.Config.Core.Opt.Arity
-        GHC.Driver.Config.Core.Opt.CallerCC
-        GHC.Driver.Config.Core.Opt.DmdAnal
-        GHC.Driver.Config.Core.Opt.LiberateCase
-        GHC.Driver.Config.Core.Opt.RuleCheck
-        GHC.Driver.Config.Core.Opt.Simplify
-        GHC.Driver.Config.Core.Opt.SpecConstr
-        GHC.Driver.Config.Core.Opt.Specialise
-        GHC.Driver.Config.Core.Opt.WorkWrap
         GHC.Driver.Config.Core.Rules
         GHC.Driver.Config.CoreToStg.Prep
         GHC.Driver.Config.Diagnostic

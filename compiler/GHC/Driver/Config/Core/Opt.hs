@@ -6,26 +6,53 @@
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Driver.Config.Core.Opt ( getCoreToDo ) where
+module GHC.Driver.Config.Core.Opt
+  ( getCoreToDo
+
+  , initArityOpts
+  , initCallerCCOpts
+  , initDmdAnalOpts
+  , initLiberateCaseOpts
+  , initRuleCheckOpts
+  , initSimplifyExprOpts
+  , initSimplifyOpts
+  , initSimplMode
+  , initGentleSimplMode
+  , initSpecConstrOpts
+  , initSpecialiseOpts
+  , initWorkWrapOpts
+  ) where
 
 import GHC.Prelude
 
+import GHC.Driver.Config ( initOptCoercionOpts, initSimpleOpts )
+import GHC.Driver.Config.Core.Lint ( defaultLintFlags, initLintPassResultConfig )
+import GHC.Driver.Config.Core.Rules ( initRuleOpts )
+import GHC.Driver.Config.Diagnostic ( initDiagOpts )
 import GHC.Driver.Session
-import GHC.Driver.Config.Core.Opt.CallerCC ( initCallerCCOpts )
-import GHC.Driver.Config.Core.Opt.DmdAnal ( initDmdAnalOpts )
-import GHC.Driver.Config.Core.Opt.LiberateCase ( initLiberateCaseOpts )
-import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyOpts, initSimplMode, initGentleSimplMode )
-import GHC.Driver.Config.Core.Opt.SpecConstr ( initSpecConstrOpts )
-import GHC.Driver.Config.Core.Opt.Specialise ( initSpecialiseOpts )
-import GHC.Driver.Config.Core.Opt.RuleCheck ( initRuleCheckOpts )
-import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core.Opt.Config ( CoreToDo(..) )
 import GHC.Core.Opt.FloatOutSwitches ( FloatOutSwitches(..) )
+import GHC.Core.Opt.Arity ( ArityOpts(..) )
+import GHC.Core.Opt.CallerCC ( CallerCCOpts(..) )
+import GHC.Core.Opt.DmdAnal ( DmdAnalOpts(..) )
+import GHC.Core.Opt.LiberateCase ( LibCaseOpts(..) )
+import GHC.Core.Opt.RuleCheck ( RuleCheckOpts(..) )
+import GHC.Core.Opt.Simplify ( SimplifyExprOpts(..), SimplifyOpts(..) )
+import GHC.Core.Opt.Simplify.Env ( FloatEnable(..), SimplMode(..) )
+import GHC.Core.Opt.Simplify.Monad ( TopEnvConfig(..) )
+import GHC.Core.Opt.SpecConstr ( SpecConstrOpts (..) )
+import GHC.Core.Opt.Specialise ( SpecialiseOpts (..) )
+import GHC.Core.Opt.WorkWrap ( WwOpts(..) )
+
+import GHC.Runtime.Context ( InteractiveContext(..) )
 
 import GHC.Types.Basic
 import GHC.Types.Var ( Var )
+
+import GHC.Utils.Error ( mkMCDiagnostic )
+import GHC.Utils.Outputable ( defaultUserStyle, text )
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -359,3 +386,216 @@ with -O2 -flate-specialise
 This extra run of the simplifier has a cost, but this is only with -O2.
 
 -}
+
+{-
+************************************************************************
+*                                                                      *
+           Initialization of the configuration of the Arity pass
+*                                                                      *
+************************************************************************
+-}
+
+initArityOpts :: DynFlags -> ArityOpts
+initArityOpts dflags = ArityOpts
+  { ao_ped_bot = gopt Opt_PedanticBottoms dflags
+  , ao_dicts_cheap = gopt Opt_DictsCheap dflags
+  }
+
+{-
+************************************************************************
+*                                                                      *
+           Initialization of the configuration of the CallerCC pass
+*                                                                      *
+************************************************************************
+-}
+
+initCallerCCOpts :: DynFlags -> CallerCCOpts
+initCallerCCOpts dflags = CallerCCOpts
+  { cc_countEntries = gopt Opt_ProfCountEntries dflags
+  , cc_filters = callerCcFilters dflags
+  }
+
+{-
+************************************************************************
+*                                                                      *
+           Initialization of the configuration of the DmdAnal pass
+*                                                                      *
+************************************************************************
+-}
+
+initDmdAnalOpts :: DynFlags -> DmdAnalOpts
+initDmdAnalOpts dflags = DmdAnalOpts
+  { dmd_strict_dicts    = gopt Opt_DictsStrict dflags
+  , dmd_unbox_width     = dmdUnboxWidth dflags
+  , dmd_max_worker_args = maxWorkerArgs dflags
+  , dmd_ppr_debug       = hasPprDebug dflags
+  }
+
+{-
+************************************************************************
+*                                                                      *
+           Initialization of the configuration of the LiberateCase pass
+*                                                                      *
+************************************************************************
+-}
+
+-- | Initialize configuration for the liberate case Core optomization
+-- pass.
+initLiberateCaseOpts :: DynFlags -> LibCaseOpts
+initLiberateCaseOpts dflags = LibCaseOpts
+  { lco_threshold = liberateCaseThreshold dflags
+  , lco_unfolding_opts = unfoldingOpts dflags
+  }
+
+{-
+************************************************************************
+*                                                                      *
+           Initialization of the configuration of the RuleCheck pass
+*                                                                      *
+************************************************************************
+-}
+
+initRuleCheckOpts :: DynFlags -> CompilerPhase -> String -> RuleCheckOpts
+initRuleCheckOpts dflags phase pat = RuleCheckOpts
+  { rc_phase = phase
+  , rc_pattern = pat
+  , rc_rule_opts = initRuleOpts dflags
+  }
+
+{-
+************************************************************************
+*                                                                      *
+           Initialization of the configuration of the Simplify pass
+*                                                                      *
+************************************************************************
+-}
+
+initSimplifyExprOpts :: DynFlags -> InteractiveContext -> SimplifyExprOpts
+initSimplifyExprOpts dflags ic = SimplifyExprOpts
+  { se_fam_inst = snd $ ic_instances ic
+  , se_mode = (initSimplMode dflags InitialPhase "GHCi")
+    { sm_inline = False
+      -- Do not do any inlining, in case we expose some
+      -- unboxed tuple stuff that confuses the bytecode
+      -- interpreter
+    }
+  , se_top_env_cfg = TopEnvConfig
+    { te_history_size = historySize dflags
+    , te_tick_factor = simplTickFactor dflags
+    }
+  }
+
+initSimplifyOpts :: DynFlags -> [Var] -> Int -> SimplMode -> SimplifyOpts
+initSimplifyOpts dflags extra_vars iterations mode = SimplifyOpts
+  { so_dump_core_sizes = not $ gopt Opt_SuppressCoreSizes dflags
+  , so_iterations = iterations
+  , so_mode = mode
+  , so_pass_result_cfg = if gopt Opt_DoCoreLinting dflags
+    then Just $ initLintPassResultConfig dflags extra_vars
+      (defaultLintFlags dflags)
+      (text "Simplifier")
+      -- Disable Lint warnings on the first simplifier pass, because
+      -- there may be some INLINE knots still tied, which is tiresomely noisy
+      (sm_phase mode /= InitialPhase)
+    else Nothing
+  , so_top_env_cfg = TopEnvConfig
+      { te_history_size = historySize dflags
+      , te_tick_factor = simplTickFactor dflags
+      }
+  }
+
+initSimplMode :: DynFlags -> CompilerPhase -> String -> SimplMode
+initSimplMode dflags phase name = SimplMode
+  { sm_names = [name]
+  , sm_phase = phase
+  , sm_rules = gopt Opt_EnableRewriteRules dflags
+  , sm_eta_expand = gopt Opt_DoLambdaEtaExpansion dflags
+  , sm_cast_swizzle = True
+  , sm_inline = True
+  , sm_uf_opts = unfoldingOpts dflags
+  , sm_case_case = True
+  , sm_pre_inline = gopt Opt_SimplPreInlining dflags
+  , sm_float_enable = floatEnable dflags
+  , sm_do_eta_reduction = gopt Opt_DoEtaReduction dflags
+  , sm_arity_opts = initArityOpts dflags
+  , sm_rule_opts = initRuleOpts dflags
+  , sm_case_folding = gopt Opt_CaseFolding dflags
+  , sm_case_merge = gopt Opt_CaseMerge dflags
+  , sm_co_opt_opts = initOptCoercionOpts dflags
+  }
+
+initGentleSimplMode :: DynFlags -> SimplMode
+initGentleSimplMode dflags = (initSimplMode dflags InitialPhase "Gentle")
+  { -- Don't do case-of-case transformations.
+    -- This makes full laziness work better
+    sm_case_case = False
+  }
+
+floatEnable :: DynFlags -> FloatEnable
+floatEnable dflags =
+  case (gopt Opt_LocalFloatOut dflags, gopt Opt_LocalFloatOutTopLevel dflags) of
+    (True, True) -> FloatEnabled
+    (True, False)-> FloatNestedOnly
+    (False, _)   -> FloatDisabled
+
+{-
+************************************************************************
+*                                                                      *
+           Initialization of the configuration of the SpecConstr pass
+*                                                                      *
+************************************************************************
+-}
+
+initSpecConstrOpts :: DynFlags -> SpecConstrOpts
+initSpecConstrOpts dflags = SpecConstrOpts
+  { sc_max_args    = maxWorkerArgs dflags
+  , sc_debug       = hasPprDebug dflags
+  , sc_uf_opts     = unfoldingOpts dflags
+  , sc_size        = specConstrThreshold dflags
+  , sc_count       = specConstrCount     dflags
+  , sc_recursive   = specConstrRecursive dflags
+  , sc_keen        = gopt Opt_SpecConstrKeen dflags
+  }
+
+{-
+************************************************************************
+*                                                                      *
+           Initialization of the configuration of the Specialise pass
+*                                                                      *
+************************************************************************
+-}
+
+initSpecialiseOpts :: DynFlags -> Char -> SpecialiseOpts
+initSpecialiseOpts dflags mask = SpecialiseOpts
+  { so_uniq_mask = mask
+  , so_cross_module_specialise = gopt Opt_CrossModuleSpecialise dflags
+  , so_specialise_aggressively = gopt Opt_SpecialiseAggressively dflags
+  , so_warn_missed_specs = warn_missed_specs
+  , so_warn_all_missed_specs = warn_all_missed_specs
+  , so_sdoc_context = initSDocContext dflags defaultUserStyle
+  , so_simpl_opts = initSimpleOpts dflags
+  , so_rule_opts = initRuleOpts dflags
+  }
+  where
+    diag_opts = initDiagOpts dflags
+    warn_missed_specs
+      | wopt Opt_WarnMissedSpecs dflags = Just $ mkMCDiagnostic diag_opts (WarningWithFlag Opt_WarnMissedSpecs)
+      | otherwise = Nothing
+    warn_all_missed_specs
+      | wopt Opt_WarnAllMissedSpecs dflags = Just $ mkMCDiagnostic diag_opts (WarningWithFlag Opt_WarnAllMissedSpecs)
+      | otherwise = Nothing
+
+{-
+************************************************************************
+*                                                                      *
+           Initialization of the configuration of the WorkWrap pass
+*                                                                      *
+************************************************************************
+-}
+
+initWorkWrapOpts :: DynFlags -> WwOpts
+initWorkWrapOpts dflags = MkWwOpts
+  { wo_simple_opts       = initSimpleOpts dflags
+  , wo_cpr_anal          = gopt Opt_CprAnal dflags
+  , wo_unlift_strict     = gopt Opt_WorkerWrapperUnlift dflags
+  }
