@@ -34,22 +34,22 @@
 
 
 
-// GHCJS.Prim.JSVal
+// GHC.JS.Prim.JSVal
 #ifdef GHCJS_PROF
-#define MK_JSVAL(x) (h$c1(h$ghcjszmprimZCGHCJSziPrimziJSVal_con_e, (x), h$CCS_SYSTEM))
+#define MK_JSVAL(x) (h$c1(h$baseZCGHCziJSziPrimziJSVal_con_e, (x), h$CCS_SYSTEM))
 #else
-#define MK_JSVAL(x) (h$c1(h$ghcjszmprimZCGHCJSziPrimziJSVal_con_e, (x)))
+#define MK_JSVAL(x) (h$c1(h$baseZCGHCziJSziPrimziJSVal_con_e, (x)))
 #endif
 #define JSVAL_VAL(x) ((x).d1)
 
-// GHCJS.Prim.JSException
+// GHC.JS.Prim.JSException
 #ifdef GHCJS_PROF
-#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$ghcjszmprimZCGHCJSziPrimziJSException_con_e,(msg),(hsMsg),h$CCS_SYSTEM))
+#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$baseZCGHCziJSziPrimziJSException_con_e,(msg),(hsMsg),h$CCS_SYSTEM))
 #else
-#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$ghcjszmprimZCGHCJSziPrimziJSException_con_e,(msg),(hsMsg)))
+#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$baseZCGHCziJSziPrimziJSException_con_e,(msg),(hsMsg)))
 #endif
 // Exception dictionary for JSException
-#define HS_JSEXCEPTION_EXCEPTION h$ghcjszmprimZCGHCJSziPrimzizdfExceptionJSException
+#define HS_JSEXCEPTION_EXCEPTION h$baseZCGHCziJSziPrimzizdfExceptionJSException
 
 // SomeException
 #ifdef GHCJS_PROF
