@@ -58,6 +58,7 @@ import GHC.Data.Maybe
 import GHC.Iface.Make
 import GHC.Driver.Config.Parser
 import GHC.Parser.Header
+import qualified GHC.JS.Parser.Header as JSHeader
 import GHC.Data.StringBuffer
 import GHC.Types.SourceError
 import GHC.Unit.Finder
@@ -128,6 +129,9 @@ runPhase (T_CmmCpp pipe_env hsc_env input_fn) = do
         []
         input_fn output_fn
   return output_fn
+runPhase (T_Js pipe_env hsc_env mb_location js_src) = do
+  out_path <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
+  runJsPhase pipe_env hsc_env mb_location js_src
 runPhase (T_Cmm pipe_env hsc_env input_fn) = do
   let dflags = hsc_dflags hsc_env
   let next_phase = hscPostBackendPhase HsSrcFile (backend dflags)
@@ -341,6 +345,47 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
         runAssembler input_fn output_fn
 
         return output_fn
+
+
+runJsPhase :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO FilePath
+runJsPhase pipe_env hsc_env location input_fn = do
+        let dflags     = hsc_dflags   hsc_env
+        let logger     = hsc_logger   hsc_env
+        let tmpfs      = hsc_tmpfs    hsc_env
+        let unit_env   = hsc_unit_env hsc_env
+        let platform   = ue_platform unit_env
+        -- the header lets the linker recognize processed JavaScript files
+        let header     = "//JavaScript\n"
+
+        output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
+        need_cpp <- jsFileNeedsCpp hsc_env input_fn
+        tmp_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
+        -- if the input filename is the same as the output, then we've probably
+        -- generated the object ourselves, we leave the file alone
+        -- FIXME (Luite 2022-08) we should make sure that we never add the JavaScript header to object files
+        when (input_fn /= output_fn) $ do
+          if need_cpp
+          then do
+            doCpp logger
+                    tmpfs
+                    dflags
+                    unit_env
+                    (CppOpts
+                        { cppUseCc = True
+                        , cppLinePragmas = False
+                        })
+                    []
+                    input_fn
+                    tmp_fn
+            copyWithHeader header tmp_fn output_fn
+          else copyWithHeader header input_fn output_fn
+        return output_fn
+
+jsFileNeedsCpp :: HscEnv -> FilePath -> IO Bool
+jsFileNeedsCpp hsc_env fn = do
+  opts <- JSHeader.getOptionsFromJsFile fn
+  pure (JSHeader.CPP `elem` opts)
+
 
 applyAssemblerInfoGetter
     :: DefunctionalizedAssemblerInfoGetter

@@ -378,7 +378,8 @@ Library
           cbits/StackCloningDecoding.cmm
 
     js-sources:
-        jsbits/base.js.pp
+        jsbits/base.js
+        jsbits/errno.js
 
     include-dirs: include
     includes:

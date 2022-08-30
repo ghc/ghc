@@ -13,5 +13,6 @@ data ForeignSrcLang
   | LangObjc   -- ^ Objective C
   | LangObjcxx -- ^ Objective C++
   | LangAsm    -- ^ Assembly language (.s)
+  | LangJs     -- ^ JavaScript
   | RawObject  -- ^ Object (.o)
   deriving (Eq, Show, Generic)

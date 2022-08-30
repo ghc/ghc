@@ -62,8 +62,9 @@ buildStaticLib root archivePath = do
                      archivePath
     let context = libAContext l
     objs <- libraryObjects context
+    resources <- libraryResources context
     removeFile archivePath
-    build $ target context (Ar Pack stage) objs [archivePath]
+    build $ target context (Ar Pack stage) (objs ++ resources) [archivePath]
     synopsis <- pkgSynopsis (package context)
     putSuccess $ renderLibrary
         (quote pkgname ++ " (" ++ show stage ++ ", way " ++ show way ++ ").")
@@ -191,6 +192,18 @@ cObjects context = do
     return $ if Threaded `wayUnit` way context
         then objs
         else filter ((`notElem` ["Evac_thr", "Scav_thr"]) . takeBaseName) objs
+
+libraryResources :: Context -> Action [FilePath]
+libraryResources context = do
+    jsFls <- jsFiles context
+    need jsFls
+    return jsFls
+
+-- | Return all the JS sources to be included in the library.
+jsFiles :: Context -> Action [FilePath]
+jsFiles context = do
+  srcs <- interpretInContext context (getContextData jsSrcs)
+  mapM (objectPath context) srcs
 
 -- | Return extra object files needed to build the given library context. The
 -- resulting list is currently non-empty only when the package from the
