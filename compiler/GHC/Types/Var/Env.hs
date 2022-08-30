@@ -246,7 +246,7 @@ mkInScopeSet :: VarSet -> InScopeSet
 mkInScopeSet in_scope
   = InScope (FastVarSet (WordMap.fromAscList $ map intKeyToWordKey $ varSetToAscList in_scope))
   where
-    intKeyToWordKey (k, v) = (fromIntegral k, v)
+    intKeyToWordKey (k, v) = ((,) $! fromIntegral k) v
 
 extendInScopeSet :: InScopeSet -> Var -> InScopeSet
 extendInScopeSet (InScope in_scope) v
@@ -293,7 +293,7 @@ mkTInScopeSet in_scope = do
   tmap <- WordMap.fromAscListT $ map intKeyToWordKey $ varSetToAscList in_scope
   return $ TInScope (TFastVarSet tmap)
   where
-    intKeyToWordKey (k, v) = (fromIntegral k, v)
+    intKeyToWordKey (k, v) = ((,) $! fromIntegral k) v
 
 extendTInScopeSet :: TInScopeSet s -> Var -> ST s (TInScopeSet s)
 extendTInScopeSet (TInScope in_scope) v
@@ -401,7 +401,7 @@ unsafeGetFreshLocalUniqueT (TInScope (TFastVarSet set)) = do
   case mb_uniq of
     Just (uniq,_)
       | let uniq' = mkLocalUnique (fromIntegral uniq)
-      , not $ uniq' `ltUnique` minLocalUnique 
+      , not $ uniq' `ltUnique` minLocalUnique
       -> return $! incrUnique uniq'
     _ -> return minLocalUnique
 

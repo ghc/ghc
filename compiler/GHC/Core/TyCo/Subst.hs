@@ -580,9 +580,9 @@ substitution.
 substTyWith :: HasDebugCallStack => [TyVar] -> [Type] -> Type -> Type
 -- Works only if the domain of the substitution is a
 -- superset of the type being substituted into
-substTyWith tvs tys = {-#SCC "substTyWith" #-}
-                      assert (tvs `equalLength` tys )
-                      substTy (zipTvSubst tvs tys)
+substTyWith tvs tys ty = {-#SCC "substTyWith" #-}
+                         assert (tvs `equalLength` tys )
+                         substTy (zipTvSubst tvs tys) ty
 
 -- | Type substitution, see 'zipTvSubst'. Disables sanity checks.
 -- The problems that the sanity checks in substTy catch are described in
@@ -590,9 +590,9 @@ substTyWith tvs tys = {-#SCC "substTyWith" #-}
 -- The goal of #11371 is to migrate all the calls of substTyUnchecked to
 -- substTy and remove this function. Please don't use in new code.
 substTyWithUnchecked :: [TyVar] -> [Type] -> Type -> Type
-substTyWithUnchecked tvs tys
+substTyWithUnchecked tvs tys ty
   = assert (tvs `equalLength` tys )
-    substTyUnchecked (zipTvSubst tvs tys)
+    substTyUnchecked (zipTvSubst tvs tys) ty
 
 -- | Substitute tyvars within a type using a known 'InScopeSet'.
 -- Pre-condition: the 'in_scope' set should satisfy Note [The substitution
@@ -606,8 +606,8 @@ substTyWithInScope in_scope tvs tys ty =
 
 -- | Coercion substitution, see 'zipTvSubst'
 substCoWith :: HasDebugCallStack => [TyVar] -> [Type] -> Coercion -> Coercion
-substCoWith tvs tys = assert (tvs `equalLength` tys )
-                      substCo (zipTvSubst tvs tys)
+substCoWith tvs tys co = assert (tvs `equalLength` tys )
+                         substCo (zipTvSubst tvs tys) co
 
 -- | Coercion substitution, see 'zipTvSubst'. Disables sanity checks.
 -- The problems that the sanity checks in substCo catch are described in
@@ -615,25 +615,25 @@ substCoWith tvs tys = assert (tvs `equalLength` tys )
 -- The goal of #11371 is to migrate all the calls of substCoUnchecked to
 -- substCo and remove this function. Please don't use in new code.
 substCoWithUnchecked :: [TyVar] -> [Type] -> Coercion -> Coercion
-substCoWithUnchecked tvs tys
+substCoWithUnchecked tvs tys co
   = assert (tvs `equalLength` tys )
-    substCoUnchecked (zipTvSubst tvs tys)
+    substCoUnchecked (zipTvSubst tvs tys) co
 
 
 
 -- | Substitute covars within a type
 substTyWithCoVars :: [CoVar] -> [Coercion] -> Type -> Type
-substTyWithCoVars cvs cos = substTy (zipCvSubst cvs cos)
+substTyWithCoVars cvs cos ty = substTy (zipCvSubst cvs cos) ty
 
 -- | Type substitution, see 'zipTvSubst'
 substTysWith :: [TyVar] -> [Type] -> [Type] -> [Type]
-substTysWith tvs tys = assert (tvs `equalLength` tys )
-                       substTys (zipTvSubst tvs tys)
+substTysWith tvs tys ty = assert (tvs `equalLength` tys )
+                          substTys (zipTvSubst tvs tys) ty
 
 -- | Type substitution, see 'zipTvSubst'
 substTysWithCoVars :: [CoVar] -> [Coercion] -> [Type] -> [Type]
-substTysWithCoVars cvs cos = assert (cvs `equalLength` cos )
-                             substTys (zipCvSubst cvs cos)
+substTysWithCoVars cvs cos tys = assert (cvs `equalLength` cos )
+                                 substTys (zipCvSubst cvs cos) tys
 
 -- | Substitute within a 'Type' after adding the free variables of the type
 -- to the in-scope set. This is useful for the case when the free variables
@@ -774,7 +774,7 @@ subst_ty :: TCvSubst -> Type -> Type
 --
 -- Note that the in_scope set is poked only if we hit a forall
 -- so it may often never be fully computed
-subst_ty subst ty
+subst_ty !subst ty
    = go ty
   where
     go (TyVarTy tv)      = substTyVar subst tv
@@ -1306,4 +1306,3 @@ substTyCoBndr subst (Anon af ty)          = (subst, Anon af (substScaledTy subst
 substTyCoBndr subst (Named (Bndr tv vis)) = (subst', Named (Bndr tv' vis))
                                           where
                                             (subst', tv') = substVarBndr subst tv
-

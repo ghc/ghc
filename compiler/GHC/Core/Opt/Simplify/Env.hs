@@ -1141,8 +1141,9 @@ substTyVarBndr env tv
 
 substTyVarBndrT :: TSimplEnv s -> TyVar -> ST s (TSimplEnv s, TyVar)
 substTyVarBndrT env tv = do
-  (TTCvSubst in_scope' tv_env' cv_env', tv') <- Type.substTyVarBndrT (getTTCvSubst env) tv
-  return (env { tseInScope = in_scope', tseTvSubst = tv_env', tseCvSubst = cv_env' }, tv')
+  (TTCvSubst in_scope' tv_env' cv_env', !tv') <- Type.substTyVarBndrT (getTTCvSubst env) tv
+  let !env' = env { tseInScope = in_scope', tseTvSubst = tv_env', tseCvSubst = cv_env' }
+  return (env', tv')
 
 substCoVar :: SimplEnv -> CoVar -> Coercion
 substCoVar env tv = Coercion.substCoVar (getTCvSubst env) tv
@@ -1155,8 +1156,9 @@ substCoVarBndr env cv
 
 substCoVarBndrT :: TSimplEnv s -> CoVar -> ST s (TSimplEnv s, CoVar)
 substCoVarBndrT env cv = do
-  (TTCvSubst in_scope' tv_env' cv_env', cv') <- Coercion.substCoVarBndrT (getTTCvSubst env) cv
-  return (env { tseInScope = in_scope', tseTvSubst = tv_env', tseCvSubst = cv_env' }, cv')
+  (TTCvSubst in_scope' tv_env' cv_env', !cv') <- Coercion.substCoVarBndrT (getTTCvSubst env) cv
+  let !env' = env { tseInScope = in_scope', tseTvSubst = tv_env', tseCvSubst = cv_env' }
+  return (env', cv')
 
 substCo :: SimplEnv -> Coercion -> Coercion
 substCo env co = Coercion.substCo (getTCvSubst env) co
