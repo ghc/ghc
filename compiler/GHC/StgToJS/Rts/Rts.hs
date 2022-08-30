@@ -319,6 +319,8 @@ rtsDecls = jsSaturate (Just "h$RTSD") $
           , TxtI "h$initStatic"      ||= toJExpr (JList [])      -- we need delayed initialization for static objects, push functions here to be initialized just before haskell runs
           , TxtI "h$staticThunks"    ||= toJExpr (jhFromList []) --  funcName -> heapidx map for srefs
           , TxtI "h$staticThunksArr" ||= toJExpr (JList [])      -- indices of updatable thunks in static heap
+          , TxtI "h$CAFs"            ||= toJExpr (JList [])
+          , TxtI "h$CAFsReset"       ||= toJExpr (JList [])
           -- stg registers
           , declRegs
           , declRets]

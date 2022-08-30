@@ -99,6 +99,7 @@ data Phase
         | CmmCpp        -- pre-process Cmm source
         | Cmm           -- parse & compile Cmm code
         | MergeForeign  -- merge in the foreign object files
+        | Js            -- pre-process Js source
 
         -- The final phase is a pseudo-phase that tells the pipeline to stop.
         | StopLn        -- Stop, but linking will follow, so generate .o file
@@ -134,6 +135,7 @@ eqPhase MergeForeign MergeForeign  = True
 eqPhase StopLn      StopLn     = True
 eqPhase Ccxx        Ccxx       = True
 eqPhase Cobjcxx     Cobjcxx    = True
+eqPhase Js          Js         = True
 eqPhase _           _          = False
 
 -- MP: happensBefore is only used in preprocessPipeline, that usage should
@@ -165,6 +167,7 @@ nextPhase platform p
       Cmm        -> maybeHCc
       HCc        -> MergeForeign
       MergeForeign -> StopLn
+      Js         -> StopLn
       StopLn     -> panic "nextPhase: nothing after StopLn"
     where maybeHCc = if platformUnregisterised platform
                      then HCc
@@ -198,6 +201,7 @@ startPhase "lm_s"     = LlvmMangle
 startPhase "o"        = StopLn
 startPhase "cmm"      = CmmCpp
 startPhase "cmmcpp"   = Cmm
+startPhase "js"       = Js
 startPhase _          = StopLn     -- all unknown file types
 
 -- This is used to determine the extension for the output from the
@@ -226,10 +230,11 @@ phaseInputExt LlvmMangle          = "lm_s"
 phaseInputExt CmmCpp              = "cmmcpp"
 phaseInputExt Cmm                 = "cmm"
 phaseInputExt MergeForeign        = "o"
+phaseInputExt Js                  = "js"
 phaseInputExt StopLn              = "o"
 
 haskellish_src_suffixes, backpackish_suffixes, haskellish_suffixes, cish_suffixes,
-    haskellish_user_src_suffixes, haskellish_sig_suffixes
+    js_suffixes, haskellish_user_src_suffixes, haskellish_sig_suffixes
  :: [String]
 -- When a file with an extension in the haskellish_src_suffixes group is
 -- loaded in --make mode, its imports will be loaded too.
@@ -238,6 +243,7 @@ haskellish_src_suffixes      = haskellish_user_src_suffixes ++
 haskellish_suffixes          = haskellish_src_suffixes ++
                                [ "hc", "cmm", "cmmcpp" ]
 cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S", "ll", "bc", "lm_s", "m", "M", "mm" ]
+js_suffixes                  = [ "js" ]
 
 -- Will not be deleted as temp files:
 haskellish_user_src_suffixes =
@@ -266,6 +272,7 @@ isBackpackishSuffix    s = s `elem` backpackish_suffixes
 isHaskellSigSuffix     s = s `elem` haskellish_sig_suffixes
 isHaskellSrcSuffix     s = s `elem` haskellish_src_suffixes
 isCishSuffix           s = s `elem` cish_suffixes
+isJsSuffix             s = s `elem` js_suffixes
 isHaskellUserSrcSuffix s = s `elem` haskellish_user_src_suffixes
 
 isObjectSuffix, isDynLibSuffix :: Platform -> String -> Bool
@@ -275,6 +282,7 @@ isDynLibSuffix platform s = s `elem` dynlib_suffixes platform
 isSourceSuffix :: String -> Bool
 isSourceSuffix suff  = isHaskellishSuffix suff
                     || isCishSuffix suff
+                    || isJsSuffix suff
                     || isBackpackishSuffix suff
 
 -- | When we are given files (modified by -x arguments) we need
@@ -291,7 +299,7 @@ isHaskellishTarget :: (String, Maybe Phase) -> Bool
 isHaskellishTarget (f,Nothing) =
   looksLikeModuleName f || isHaskellSrcFilename f || not (hasExtension f)
 isHaskellishTarget (_,Just phase) =
-  phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcxx, CmmCpp, Cmm
+  phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcxx, CmmCpp, Cmm, Js
                   , StopLn]
 
 isHaskellishFilename, isHaskellSrcFilename, isCishFilename,
@@ -319,4 +327,5 @@ phaseForeignLanguage phase = case phase of
   HCc          -> Just LangC
   As _         -> Just LangAsm
   MergeForeign -> Just RawObject
+  Js           -> Just LangJs
   _            -> Nothing

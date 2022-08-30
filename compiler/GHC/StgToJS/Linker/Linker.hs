@@ -160,31 +160,15 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
           let stats = linkerStats (linkOutMetaSize link_res) (linkOutStats link_res)
           writeFile (out </> statsFile) stats
 
-        -- Sylvain (2022-06): find RTS js files (shims) via an environment variable...
-        -- Remove when all files are located via Cabal's js-sources
-        let is_js_file f = "js" `isExtensionOf` f || "pp" `isExtensionOf` f
-        let find_env_shims env_var = do
-              lookupEnv env_var >>= \case
-                Nothing  -> error (env_var ++ " env var not set!")
-                Just dir -> do
-                  (fmap (dir </>) . filter is_js_file) <$> listDirectory dir
-
         -- link with the RTS
         unless (lcNoRts lc_cfg) $ do
-          static_rts_files <- find_env_shims "JS_RTS_PATH"
-          let all_rts_js = linkLibRTS link_res ++ static_rts_files
-
-          rts_js_bss <- streamShims <$> readShimFiles logger tmpfs dflags unit_env all_rts_js
-          BL.writeFile (out </> "rts.js") (BLC.pack rtsDeclsText
-                                           <> BL.fromChunks rts_js_bss
+          BL.writeFile (out </> "rts.js") ( BLC.pack rtsDeclsText
                                            <> BLC.pack (rtsText cfg))
 
-        static_base_files <- find_env_shims "JS_BASE_PATH"
-        let all_lib_js = linkLibA link_res ++ static_base_files
+        let all_lib_js = linkLibA link_res
         lla'    <- streamShims <$> readShimFiles logger tmpfs dflags unit_env all_lib_js
-        -- llarch' <- mapM (readShimsArchive dflags) (linkLibArch link_res)
-        -- let lib_js = BL.fromChunks $ llarch' ++ lla'
-        let lib_js = BL.fromChunks $! lla'
+        llarch' <- mapM (readShimsArchive dflags) (linkLibAArch link_res)
+        let lib_js = BL.fromChunks $! llarch' ++ lla'
         BL.writeFile (out </> "lib" <.> jsExt) lib_js
 
         if genBase
@@ -199,6 +183,19 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
                  writeRunMain out
                  writeRunner lc_cfg out
                  writeExterns out
+
+readShimsArchive :: DynFlags -> FilePath -> IO B.ByteString
+readShimsArchive dflags ar_file = do
+  (Ar.Archive entries) <- Ar.loadAr ar_file
+  jsdata <- catMaybes <$> mapM readEntry entries
+  return (B.intercalate "\n" jsdata)
+    where
+      readEntry :: Ar.ArchiveEntry -> IO (Maybe B.ByteString)
+      readEntry ar_entry
+        | isJsFile ar_entry = pure $ Just (Ar.filedata ar_entry)
+        | otherwise = pure Nothing
+
+
 
 -- | link in memory
 link' :: GhcjsEnv
@@ -828,15 +825,22 @@ loadArchiveDeps' archives = do
     where
       readEntry :: FilePath -> Ar.ArchiveEntry -> IO (Maybe (Deps, DepsLocation))
       readEntry ar_file ar_entry
-        | isObjFile (Ar.filename ar_entry) =
+        | isObjFile ar_entry =
             fmap (,ArchiveFile ar_file) <$>
                  (readDepsMaybe (ar_file ++ ':':Ar.filename ar_entry) (BL.fromStrict $ Ar.filedata ar_entry))
         | otherwise = return Nothing
 
 
-isObjFile :: FilePath -> Bool
-isObjFile file = ".o" `isSuffixOf` file || -- vanilla
-                 "_o" `isSuffixOf` file    -- some "Way", like .p_o
+isObjFile :: Ar.ArchiveEntry -> Bool
+isObjFile = checkEntryHeader "GHCJSOBJ"
+
+isJsFile :: Ar.ArchiveEntry -> Bool
+isJsFile = checkEntryHeader "//JavaScript"
+
+checkEntryHeader :: B.ByteString -> Ar.ArchiveEntry -> Bool
+checkEntryHeader header entry =
+  B.take (B.length header) (Ar.filedata entry) == header
+
 
 prepareLoadedDeps :: [(Deps, DepsLocation)]
                   -> ( Map Module (Deps, DepsLocation)

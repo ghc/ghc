@@ -521,6 +521,7 @@ Library
         GHC.JS.Ppr
         GHC.JS.Syntax
         GHC.JS.Transform
+        GHC.JS.Parser.Header
         GHC.Linker
         GHC.Linker.Dynamic
         GHC.Linker.ExtraObj

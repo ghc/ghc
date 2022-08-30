@@ -9,7 +9,7 @@ module Context (
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile, pkgSetupConfigDir,
     pkgHaddockFile, pkgRegisteredLibraryFile, pkgRegisteredLibraryFileName,
     pkgLibraryFile, pkgGhciLibraryFile,
-    pkgConfFile, pkgStampFile, objectPath, contextPath, getContextPath, libPath, distDir,
+    pkgConfFile, pkgStampFile, resourcePath, objectPath, contextPath, getContextPath, libPath, distDir,
     haddockStatsFilesDir
     ) where
 
@@ -163,3 +163,10 @@ objectPath context@Context {..} src = do
                | "*hs*" ?== extension = path -/- obj
                | otherwise            = path -/- extension -/- obj
     return result
+
+
+resourcePath :: Context -> FilePath -> Action FilePath
+resourcePath context src = do
+    path <- buildPath context
+    let extension = drop 1 $ takeExtension src
+    return (path -/- extension -/- src)

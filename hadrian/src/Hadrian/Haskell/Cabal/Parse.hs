@@ -281,6 +281,7 @@ resolveContextData context@Context {..} = do
           , cSrcs           = C.cSources        buildInfo ++ [ ms | Just (_,ms) <- pure main_src, CMain   <- pure (classifyMain ms)]
           , cxxSrcs         = C.cxxSources      buildInfo ++ [ ms | Just (_,ms) <- pure main_src, CppMain <- pure (classifyMain ms)]
           , cmmSrcs         = C.cmmSources      buildInfo
+          , jsSrcs          = C.jsSources       buildInfo
           , hcOpts          = C.programDefaultArgs ghcProg
               ++ C.hcOptions C.GHC buildInfo
               ++ C.languageToFlags   (C.compiler lbi') (C.defaultLanguage buildInfo)
