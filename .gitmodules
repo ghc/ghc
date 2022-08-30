@@ -116,5 +116,5 @@
 	ignore = untracked
 [submodule "libraries/haskell-transients"]
 	path = libraries/haskell-transients
-	url = https://github.com/PascEll/haskell-transients.git
+	url = git@github.com:PascEll/haskell-transients.git
 	ignore = untracked
