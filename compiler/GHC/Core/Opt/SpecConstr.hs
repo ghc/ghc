@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-
 ToDo [Oct 2013]
 ~~~~~~~~~~~~~~~
@@ -973,6 +974,14 @@ lookupHowBound env id = lookupVarEnv (sc_how_bound env) id
 
 scSubstId :: ScEnv -> InId -> OutExpr
 scSubstId env v = lookupIdSubst (sc_subst env) v
+
+
+-- Solo is only defined in base starting from ghc-9.2
+#if !(MIN_VERSION_base(4, 16, 0))
+
+data Solo a = Solo a
+
+#endif
 
 -- The !subst ensures that we force the selection `(sc_subst env)`, which avoids
 -- retaining all of `env` when we only need `subst`.  The `Solo` means that the
