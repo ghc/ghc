@@ -518,7 +518,7 @@ genCase :: HasDebugCallStack
         -> LiveVars
         -> G (JStat, ExprResult)
 genCase ctx bnd e at alts l
-  | snd (isInlineExpr (ctxEvaluatedIds ctx) e) = freshIdent >>= \ccsVar -> do
+  | snd (isInlineExpr (ctxEvaluatedIds ctx) e) = do
       bndi <- identsForId bnd
       let ctx' = ctxSetTop bnd
                   $ ctxSetTarget (assocIdExprs bnd (map toJExpr bndi))
@@ -529,15 +529,17 @@ genCase ctx bnd e at alts l
                 ExprCont -> pprPanic "genCase: expression was not inline"
                                      (pprStgExpr panicStgPprOpts e)
 
-          ww = mempty -- if snd (isInlineExpr emptyUniqSet e) then mempty else [j| h$log('danger will robinson'); |]
       (aj, ar) <- genAlts (ctxAssertEvaluated bnd ctx) bnd at d alts
-      saveCCS <- ifProfiling (toJExpr ccsVar |= toJExpr jCurrentCCS)
-      restoreCCS <- ifProfiling (toJExpr jCurrentCCS |= toJExpr ccsVar)
+      (declCCS,saveCCS,restoreCCS) <- ifProfilingM $ do
+        ccsVar <- freshIdent
+        pure ( DeclStat ccsVar
+             , toJExpr ccsVar |= toJExpr jCurrentCCS
+             , toJExpr jCurrentCCS |= toJExpr ccsVar
+             )
       return ( mconcat
-          [ DeclStat ccsVar
+          [ declCCS
           , mconcat (map DeclStat bndi)
           , saveCCS
-          , ww
           , ej
           , restoreCCS
           , aj
@@ -940,7 +942,7 @@ allocDynAll haveDecl middle cls = do
     dec i | haveDecl  = DeclStat i
           | otherwise = mempty
     checkObjs | csAssertRts settings  = mconcat $
-                map (\(i,_,_,_) -> ApplStat (ValExpr (JVar (TxtI "h$checkObj"))) [toJExpr i] {-[j| h$checkObj(`i`); |]-}) cls
+                map (\(i,_,_,_) -> ApplStat (ValExpr (JVar (TxtI "h$checkObj"))) [toJExpr i]) cls
               | otherwise = mempty
 
   objs <- makeObjs
