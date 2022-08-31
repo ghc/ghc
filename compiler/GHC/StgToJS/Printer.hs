@@ -105,9 +105,8 @@ prettyBlock' r ( (DeclStat i)
                : (AssignStat (ValExpr (JVar i')) (ValExpr (JFunc is b)))
                : xs
                )
-      | i == i' = (text "function" <+> jsToDocR r i
-                   <> parens (fsep . punctuate comma . map (jsToDocR r) $ is)
-                   $$ braceNest' (jsToDocR r b)
+      | i == i' = (hangBrace (text "function" <+> jsToDocR r i <> parens (fsep . punctuate comma . map (jsToDocR r) $ is))
+                             (jsToDocR r b)
                   ) : prettyBlock' r xs
 -- declare/assign
 prettyBlock' r ( (DeclStat i)
@@ -140,7 +139,8 @@ prettyBlock' _ [] = []
 
 -- build the for block
 mkFor :: RenderJs -> Bool -> Ident -> JExpr -> JExpr -> JStat -> [JStat] -> Doc
-mkFor r decl i v0 p s1 sb = text "for" <> forCond <+> braceNest'' (jsToDocR r $ BlockStat sb)
+mkFor r decl i v0 p s1 sb = hangBrace (text "for" <> forCond)
+                                      (jsToDocR r $ BlockStat sb)
     where
       c0 | decl      = text "var" <+> jsToDocR r i <+> char '=' <+> jsToDocR r v0
          | otherwise =                jsToDocR r i <+> char '=' <+> jsToDocR r v0
