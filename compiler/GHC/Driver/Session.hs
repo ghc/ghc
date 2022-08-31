@@ -5023,7 +5023,6 @@ initSDocContext dflags style = SDC
   , sdocSuppressStgExts             = gopt Opt_SuppressStgExts dflags
   , sdocErrorSpans                  = gopt Opt_ErrorSpans dflags
   , sdocStarIsType                  = xopt LangExt.StarIsType dflags
-  , sdocImpredicativeTypes          = xopt LangExt.ImpredicativeTypes dflags
   , sdocLinearTypes                 = xopt LangExt.LinearTypes dflags
   , sdocListTuplePuns               = True
   , sdocPrintTypeAbbreviations      = True

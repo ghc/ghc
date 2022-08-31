@@ -34,7 +34,7 @@ import GHC.Prelude
 
 import GHC.Platform
 
-import GHC.Types.Id.Make ( voidPrimId )
+import GHC.Types.Id.Make ( unboxedUnitExpr )
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Types.Name.Occurrence ( occNameFS )
@@ -2107,7 +2107,7 @@ builtinBignumRules =
         let ret n v = pure $ mkCoreUbxSum 2 n [unboxedUnitTy,naturalTy] v
         platform <- getPlatform
         if x < y
-            then ret 1 $ Var voidPrimId
+            then ret 1 unboxedUnitExpr
             else ret 2 $ mkNaturalExpr platform (x - y)
 
     -- unary operations

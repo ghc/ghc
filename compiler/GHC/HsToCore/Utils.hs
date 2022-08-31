@@ -917,7 +917,7 @@ mkFailurePair expr
        ; fail_fun_arg <- newSysLocalDs Many unboxedUnitTy
        ; let real_arg = setOneShotLambda fail_fun_arg
        ; return (NonRec fail_fun_var (Lam real_arg expr),
-                 App (Var fail_fun_var) (Var voidPrimId)) }
+                 App (Var fail_fun_var) unboxedUnitExpr) }
   where
     ty = exprType expr
 

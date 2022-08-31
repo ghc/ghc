@@ -57,7 +57,7 @@ import GHC.Driver.Config.Diagnostic
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
              Resume, SingleStep, Ghc,
-             GetDocsFailure(..), putLogMsgM, pushLogHookM,
+             GetDocsFailure(..), pushLogHookM,
              getModuleGraph, handleSourceError, ms_mod )
 import GHC.Driver.Main (hscParseModuleWithLocation, hscParseStmtWithLocation)
 import GHC.Hs.ImpExp
@@ -3289,7 +3289,8 @@ showCmd str = do
             , action "bindings"   $ showBindings
             , action "linker"     $ do
                msg <- liftIO $ Loader.showLoaderState (hscInterp hsc_env)
-               putLogMsgM MCDump noSrcSpan msg
+               dflags <- getDynFlags
+               liftIO $ putStrLn $ showSDoc dflags msg
             , action "breaks"     $ showBkptTable
             , action "context"    $ showContext
             , action "packages"   $ showUnits

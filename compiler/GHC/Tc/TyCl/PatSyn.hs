@@ -56,7 +56,6 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Tc.TyCl.Build
 import GHC.Types.Var.Set
-import GHC.Types.Id.Make
 import GHC.Tc.TyCl.Utils
 import GHC.Core.ConLike
 import GHC.Types.FieldLabel
@@ -796,8 +795,8 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              res_ty = mkTyVarTy res_tv
              is_unlifted = null args && null prov_dicts
              (cont_args, cont_arg_tys)
-               | is_unlifted = ([nlHsVar voidPrimId], [unboxedUnitTy])
-               | otherwise   = (args,                 arg_tys)
+               | is_unlifted = ([nlHsDataCon unboxedUnitDataCon], [unboxedUnitTy])
+               | otherwise   = (args,                             arg_tys)
              cont_ty = mkInfSigmaTy ex_tvs prov_theta $
                        mkVisFunTysMany cont_arg_tys res_ty
 
@@ -818,7 +817,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              inst_wrap = mkWpEvApps prov_dicts <.> mkWpTyApps ex_tys
              cont' = foldl' nlHsApp (mkLHsWrap inst_wrap (nlHsVar cont)) cont_args
 
-             fail' = nlHsApps fail [nlHsVar voidPrimId]
+             fail' = nlHsApps fail [nlHsDataCon unboxedUnitDataCon]
 
              args = map nlVarPat [scrutinee, cont, fail]
              lwpat = noLocA $ WildPat pat_ty
