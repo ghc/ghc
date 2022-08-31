@@ -51,22 +51,30 @@ The detailed design is in the _Linear Haskell_ article
 [https://arxiv.org/abs/1710.09756]. Other important resources in the linear
 types implementation wiki page
 [https://gitlab.haskell.org/ghc/ghc/wikis/linear-types/implementation], and the
-proposal [https://github.com/ghc-proposals/ghc-proposals/pull/111] which
+proposal [https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0111-linear-types.rst] which
 describes the concrete design at length.
 
 For the busy developer, though, here is a high-level view of linear types is the following:
 
 - Function arrows are annotated with a multiplicity (as defined by type `Mult`
   and its smart constructors in this module)
-    - Because, as a type constructor, the type of function now has an extra
-      argument, the notation (->) is no longer suitable. We named the function
-      type constructor `FUN`.
-    - (->) retains its backward compatible meaning: `(->) a b = a -> b`. To
-      achieve this, `(->)` is defined as a type synonym to `FUN Many` (see
+    - Multiplicities, in Haskell, are types of kind `GHC.Types.Multiplicity`.
+      as in
+
+        map :: forall (p :: Multiplicity). (a %p -> b) -> [a] %p -> [b]
+
+    - The type constructor for function types (FUN) has type
+
+        FUN :: forall (m :: Multiplicity) -> forall {r1) {r2}. TYPE r1 -> TYPE r2 -> Type
+
+      The argument order is explained in https://gitlab.haskell.org/ghc/ghc/-/issues/20164
+    - (->) retains its backward compatible meaning:
+
+        (->) a b = a -> b = a %'Many -> b
+
+      To achieve this, `(->)` is defined as a type synonym to `FUN Many` (see
       below).
-- Multiplicities can be reified in Haskell as types of kind
-  `GHC.Types.Multiplicity`
-- Ground multiplicity (that is, without a variable) can be `One` or `Many`
+- A ground multiplicity (that is, without a variable) can be `One` or `Many`
   (`Many` is generally rendered as ω in the scientific literature).
   Functions whose type is annotated with `One` are linear functions, functions whose
   type is annotated with `Many` are regular functions, often called “unrestricted”
@@ -75,19 +83,9 @@ For the busy developer, though, here is a high-level view of linear types is the
   consumed exactly once, *then* its argument is consumed exactly once. You can
   think of “consuming exactly once” as evaluating a value in normal form exactly
   once (though not necessarily in one go). The _Linear Haskell_ article (see
-  infra) has a more precise definition of “consuming exactly once”.
-- Data types can have unrestricted fields (the canonical example being the
-  `Unrestricted` data type), then these don't need to be consumed for a value to
-  be consumed exactly once. So consuming a value of type `Unrestricted` exactly
-  once means forcing it at least once.
-- Why “at least once”? Because if `case u of { C x y -> f (C x y) }` is linear
-  (provided `f` is a linear function). So we might as well have done `case u of
-  { !z -> f z }`. So, we can observe constructors as many times as we want, and
-  we are actually allowed to force the same thing several times because laziness
-  means that we are really forcing a the value once, and observing its
-  constructor several times. The type checker and the linter recognise some (but
-  not all) of these multiple forces as indeed linear. Mostly just enough to
-  support variable patterns.
+  supra) has a more precise definition of “consuming exactly once”.
+- Data constructors are linear by default.
+  See Note [Data constructors are linear by default].
 - Multiplicities form a semiring.
 - Multiplicities can also be variables and we can universally quantify over
   these variables. This is referred to as “multiplicity
@@ -101,6 +99,8 @@ For the busy developer, though, here is a high-level view of linear types is the
   case expression is consumed exactly once); whereas a case expression with
   multiplicity `Many` can consume its scrutinee as many time as it wishes (no
   matter how much the case expression is consumed).
+
+For linear types in the linter see Note [Linting linearity] in GHC.Core.Lint.
 
 Note [Usages]
 ~~~~~~~~~~~~~
@@ -208,8 +208,8 @@ branch.
 
 Note [Data constructors are linear by default]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Data constructors defined without -XLinearTypes (as well as data constructors
-defined with the Haskell 98 in all circumstances) have all their fields linear.
+All data constructors defined without -XLinearTypes, as well as data constructors
+defined with the Haskell 98 in all circumstances, have all their fields linear.
 
 That is, in
 
@@ -219,9 +219,51 @@ We have
 
     Just :: a %1 -> Just a
 
+Irrespective of whether -XLinearTypes is turned on or not. Furthermore, when
+-XLinearTypes is turned off, the declaration
+
+    data Endo a where { MkIntEndo :: (Int -> Int) -> T Int }
+
+gives
+
+    MkIntEndo :: (Int -> Int) %1 -> T Int
+
+With -XLinearTypes turned on, instead, this would give
+
+    data EndoU a where { MkIntEndoU :: (Int -> Int) -> T Int }
+    MkIntEndoU :: (Int -> Int) -> T Int
+
+With -XLinearTypes turned on, to get a linear field with GADT syntax we
+would need to write
+
+    data EndoL a where { MkIntEndoL :: (Int -> Int) %1 -> T Int }
+
 The goal is to maximise reuse of types between linear code and traditional
 code. This is argued at length in the proposal and the article (links in Note
 [Linear types]).
+
+Unrestricted field don't need to be consumed for a value to be consumed exactly
+once. So consuming a value of type `IntEndoU a` exactly once means forcing it at
+least once.
+
+Why “at least once”? Because if `case u of { MkIntEndoL x -> f (MkIntEndoL x) }`
+is linear (provided `f` is a linear function). But we might as well have done
+`case u of { !z -> f z }`. So, we can observe constructors as many times as we
+want, and we are actually allowed to force the same thing several times because
+laziness means that we are really forcing the value once, and observing its
+constructor several times. The type checker and the linter recognise some (but
+not all) of these multiple forces as indeed linear. Mostly just enough to
+support variable patterns.
+
+In summary:
+
+- Fields of data constructors defined with Haskell 98 syntax are always linear
+  (even if `-XLinearTypes` is off). This choice has been made to favour sharing
+  types between linearly typed Haskell and traditional Haskell. To avoid an
+  ecosystem split.
+- When `-XLinearTypes` is off, GADT-syntax declaration can only use the regular
+  arrow `(->)`. However all the fields are linear.
+
 
 Note [Polymorphisation of linear fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
