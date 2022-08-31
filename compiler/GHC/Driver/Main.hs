@@ -123,6 +123,7 @@ import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyExprOpts )
 import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
 import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
+import GHC.Driver.Config.CoreToStg
 import GHC.Driver.Config.CoreToStg.Prep
 import GHC.Driver.Config.Logger   (initLogFlags)
 import GHC.Driver.Config.Parser   (initParserOpts)
@@ -2141,7 +2142,7 @@ myCoreToStg :: Logger -> DynFlags -> InteractiveContext
 myCoreToStg logger dflags ictxt for_bytecode this_mod ml prepd_binds = do
     let (stg_binds, denv, cost_centre_info)
          = {-# SCC "Core2Stg" #-}
-           coreToStg dflags this_mod ml prepd_binds
+           coreToStg (initCoreToStgOpts dflags) this_mod ml prepd_binds
 
     (stg_binds_with_fvs,stg_cg_info)
         <- {-# SCC "Stg2Stg" #-}

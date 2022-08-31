@@ -407,6 +407,7 @@ Library
         GHC.Driver.Config.Core.Opt.Simplify
         GHC.Driver.Config.Core.Opt.WorkWrap
         GHC.Driver.Config.Core.Rules
+        GHC.Driver.Config.CoreToStg
         GHC.Driver.Config.CoreToStg.Prep
         GHC.Driver.Config.Diagnostic
         GHC.Driver.Config.Finder

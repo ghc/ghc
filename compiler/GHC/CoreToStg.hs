@@ -14,12 +14,9 @@
 -- And, as we have the info in hand, we may convert some lets to
 -- let-no-escapes.
 
-module GHC.CoreToStg ( coreToStg ) where
+module GHC.CoreToStg ( CoreToStgOpts (..), coreToStg ) where
 
 import GHC.Prelude
-
-import GHC.Driver.Session
-import GHC.Driver.Config.Stg.Debug
 
 import GHC.Core
 import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
@@ -50,6 +47,7 @@ import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
 
 import GHC.Unit.Module
 import GHC.Data.FastString
+import GHC.Platform        ( Platform )
 import GHC.Platform.Ways
 import GHC.Builtin.PrimOps ( PrimCall(..), primOpWrapperId )
 
@@ -62,7 +60,6 @@ import GHC.Utils.Trace
 
 import Control.Monad (ap)
 import Data.Maybe (fromMaybe)
-import Data.Tuple (swap)
 
 -- Note [Live vs free]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -235,24 +232,29 @@ import Data.Tuple (swap)
 -- --------------------------------------------------------------
 
 
-coreToStg :: DynFlags -> Module -> ModLocation -> CoreProgram
+coreToStg :: CoreToStgOpts -> Module -> ModLocation -> CoreProgram
           -> ([StgTopBinding], InfoTableProvMap, CollectedCCs)
-coreToStg dflags this_mod ml pgm
+coreToStg opts@CoreToStgOpts
+  { coreToStg_ways = ways
+  , coreToStg_AutoSccsOnIndividualCafs = opt_AutoSccsOnIndividualCafs
+  , coreToStg_InfoTableMap = opt_InfoTableMap
+  , coreToStg_stgDebugOpts = stgDebugOpts
+  } this_mod ml pgm
   = (pgm'', denv, final_ccs)
   where
     (_, (local_ccs, local_cc_stacks), pgm')
-      = coreTopBindsToStg dflags this_mod emptyVarEnv emptyCollectedCCs pgm
+      = coreTopBindsToStg opts this_mod emptyVarEnv emptyCollectedCCs pgm
 
     -- See Note [Mapping Info Tables to Source Positions]
-    (!pgm'', !denv) =
-        if gopt Opt_InfoTableMap dflags
-          then collectDebugInformation (initStgDebugOpts dflags) ml pgm'
-          else (pgm', emptyInfoTableProvMap)
+    (!pgm'', !denv)
+      | opt_InfoTableMap
+      = collectDebugInformation stgDebugOpts ml pgm'
+      | otherwise = (pgm', emptyInfoTableProvMap)
 
-    prof = ways dflags `hasWay` WayProf
+    prof = hasWay ways WayProf
 
     final_ccs
-      | prof && gopt Opt_AutoSccsOnIndividualCafs dflags
+      | prof && opt_AutoSccsOnIndividualCafs
       = (local_ccs,local_cc_stacks)  -- don't need "all CAFs" CC
       | prof
       = (all_cafs_cc:local_ccs, all_cafs_ccs:local_cc_stacks)
@@ -262,7 +264,7 @@ coreToStg dflags this_mod ml pgm
     (all_cafs_cc, all_cafs_ccs) = getAllCAFsCC this_mod
 
 coreTopBindsToStg
-    :: DynFlags
+    :: CoreToStgOpts
     -> Module
     -> IdEnv HowBound           -- environment for the bindings
     -> CollectedCCs
@@ -271,17 +273,17 @@ coreTopBindsToStg
 
 coreTopBindsToStg _      _        env ccs []
   = (env, ccs, [])
-coreTopBindsToStg dflags this_mod env ccs (b:bs)
+coreTopBindsToStg opts this_mod env ccs (b:bs)
   | NonRec _ rhs <- b, isTyCoArg rhs
-  = coreTopBindsToStg dflags this_mod env1 ccs1 bs
+  = coreTopBindsToStg opts this_mod env1 ccs1 bs
   | otherwise
   = (env2, ccs2, b':bs')
   where
-    (env1, ccs1, b' ) = coreTopBindToStg dflags this_mod env ccs b
-    (env2, ccs2, bs') = coreTopBindsToStg dflags this_mod env1 ccs1 bs
+    (env1, ccs1, b' ) = coreTopBindToStg opts this_mod env ccs b
+    (env2, ccs2, bs') = coreTopBindsToStg opts this_mod env1 ccs1 bs
 
 coreTopBindToStg
-        :: DynFlags
+        :: CoreToStgOpts
         -> Module
         -> IdEnv HowBound
         -> CollectedCCs
@@ -297,16 +299,18 @@ coreTopBindToStg _ _ env ccs (NonRec id e)
         how_bound = LetBound TopLet 0
     in (env', ccs, StgTopStringLit id str)
 
-coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
+coreTopBindToStg opts@CoreToStgOpts
+  { coreToStg_platform = platform
+  } this_mod env ccs (NonRec id rhs)
   = let
         env'      = extendVarEnv env id how_bound
         how_bound = LetBound TopLet $! manifestArity rhs
 
-        (stg_rhs, ccs') =
-            initCts dflags env $
-              coreToTopStgRhs dflags ccs this_mod (id,rhs)
+        (ccs', (id', stg_rhs)) =
+            initCts platform env $
+              coreToTopStgRhs opts this_mod ccs (id,rhs)
 
-        bind = StgTopLifted $ StgNonRec id stg_rhs
+        bind = StgTopLifted $ StgNonRec id' stg_rhs
     in
       -- NB: previously the assertion printed 'rhs' and 'bind'
       --     as well as 'id', but that led to a black hole
@@ -314,42 +318,38 @@ coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
       --     assertion again!
     (env', ccs', bind)
 
-coreTopBindToStg dflags this_mod env ccs (Rec pairs)
+coreTopBindToStg opts@CoreToStgOpts
+  { coreToStg_platform = platform
+  } this_mod env ccs (Rec pairs)
   = assert (not (null pairs)) $
     let
-        binders = map fst pairs
-
         extra_env' = [ (b, LetBound TopLet $! manifestArity rhs)
                      | (b, rhs) <- pairs ]
         env' = extendVarEnvList env extra_env'
 
         -- generate StgTopBindings and CAF cost centres created for CAFs
         (ccs', stg_rhss)
-          = initCts dflags env' $
-              mapAccumLM (\ccs rhs -> swap <$> coreToTopStgRhs dflags ccs this_mod rhs)
-                         ccs
-                         pairs
-        bind = StgTopLifted $ StgRec (zip binders stg_rhss)
+          = initCts platform env' $ mapAccumLM (coreToTopStgRhs opts this_mod) ccs pairs
+        bind = StgTopLifted $ StgRec stg_rhss
     in
     (env', ccs', bind)
 
 coreToTopStgRhs
-        :: DynFlags
-        -> CollectedCCs
+        :: CoreToStgOpts
         -> Module
+        -> CollectedCCs
         -> (Id,CoreExpr)
-        -> CtsM (StgRhs, CollectedCCs)
+        -> CtsM (CollectedCCs, (Id, StgRhs))
 
-coreToTopStgRhs dflags ccs this_mod (bndr, rhs)
+coreToTopStgRhs opts this_mod ccs (bndr, rhs)
   = do { new_rhs <- coreToPreStgRhs rhs
 
        ; let (stg_rhs, ccs') =
-               mkTopStgRhs dflags this_mod ccs bndr new_rhs
+               mkTopStgRhs opts this_mod ccs bndr new_rhs
              stg_arity =
                stgRhsArity stg_rhs
 
-       ; return (assertPpr (arity_ok stg_arity) (mk_arity_msg stg_arity) stg_rhs,
-                 ccs') }
+       ; pure (ccs', (bndr, assertPpr (arity_ok stg_arity) (mk_arity_msg stg_arity) stg_rhs)) }
   where
         -- It's vital that the arity on a top-level Id matches
         -- the arity of the generated STG binding, else an importing
@@ -616,7 +616,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         -- or foreign call.
         -- Wanted: a better solution than this hacky warning
 
-    platform <- targetPlatform <$> getDynFlags
+    platform <- getPlatform
     let
         arg_rep = typePrimRep (exprType arg)
         stg_arg_rep = typePrimRep (stgArgType stg_arg)
@@ -708,10 +708,14 @@ coreToPreStgRhs expr
 
 -- Generate a top-level RHS. Any new cost centres generated for CAFs will be
 -- appended to `CollectedCCs` argument.
-mkTopStgRhs :: DynFlags -> Module -> CollectedCCs
+mkTopStgRhs :: CoreToStgOpts -> Module -> CollectedCCs
             -> Id -> PreStgRhs -> (StgRhs, CollectedCCs)
 
-mkTopStgRhs dflags this_mod ccs bndr (PreStgRhs bndrs rhs)
+mkTopStgRhs CoreToStgOpts
+  { coreToStg_platform = platform
+  , coreToStg_ExternalDynamicRefs = opt_ExternalDynamicRefs
+  , coreToStg_AutoSccsOnIndividualCafs = opt_AutoSccsOnIndividualCafs
+  } this_mod ccs bndr (PreStgRhs bndrs rhs)
   | not (null bndrs)
   = -- The list of arguments is non-empty, so not CAF
     ( StgRhsClosure noExtFieldSilent
@@ -724,14 +728,14 @@ mkTopStgRhs dflags this_mod ccs bndr (PreStgRhs bndrs rhs)
   -- so this is not a function binding
   | StgConApp con mn args _ <- unticked_rhs
   , -- Dynamic StgConApps are updatable
-    not (isDllConApp (targetPlatform dflags) (gopt Opt_ExternalDynamicRefs dflags) this_mod con args)
+    not (isDllConApp platform opt_ExternalDynamicRefs this_mod con args)
   = -- CorePrep does this right, but just to make sure
     assertPpr (not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
               (ppr bndr $$ ppr con $$ ppr args)
     ( StgRhsCon dontCareCCS con mn ticks args, ccs )
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
-  | gopt Opt_AutoSccsOnIndividualCafs dflags
+  | opt_AutoSccsOnIndividualCafs
   = ( StgRhsClosure noExtFieldSilent
                     caf_ccs
                     upd_flag [] rhs
@@ -855,7 +859,7 @@ isPAP env _               = False
 -- *down*.
 
 newtype CtsM a = CtsM
-    { unCtsM :: DynFlags -- Needed for checking for bad coercions in coreToStgArgs
+    { unCtsM :: Platform -- Needed for checking for bad coercions in coreToStgArgs
              -> IdEnv HowBound
              -> a
     }
@@ -893,8 +897,8 @@ data LetInfo
 
 -- The std monad functions:
 
-initCts :: DynFlags -> IdEnv HowBound -> CtsM a -> a
-initCts dflags env m = unCtsM m dflags env
+initCts :: Platform -> IdEnv HowBound -> CtsM a -> a
+initCts platform env m = unCtsM m platform env
 
 
 
@@ -905,8 +909,8 @@ returnCts :: a -> CtsM a
 returnCts e = CtsM $ \_ _ -> e
 
 thenCts :: CtsM a -> (a -> CtsM b) -> CtsM b
-thenCts m k = CtsM $ \dflags env
-  -> unCtsM (k (unCtsM m dflags env)) dflags env
+thenCts m k = CtsM $ \platform env
+  -> unCtsM (k (unCtsM m platform env)) platform env
 
 instance Applicative CtsM where
     pure = returnCts
@@ -915,15 +919,15 @@ instance Applicative CtsM where
 instance Monad CtsM where
     (>>=)  = thenCts
 
-instance HasDynFlags CtsM where
-    getDynFlags = CtsM $ \dflags _ -> dflags
+getPlatform :: CtsM Platform
+getPlatform = CtsM const
 
 -- Functions specific to this monad:
 
 extendVarEnvCts :: [(Id, HowBound)] -> CtsM a -> CtsM a
 extendVarEnvCts ids_w_howbound expr
-   =    CtsM $   \dflags env
-   -> unCtsM expr dflags (extendVarEnvList env ids_w_howbound)
+   =    CtsM $   \platform env
+   -> unCtsM expr platform (extendVarEnvList env ids_w_howbound)
 
 lookupVarCts :: Id -> CtsM HowBound
 lookupVarCts v = CtsM $ \_ env -> lookupBinding env v
@@ -995,3 +999,12 @@ stgArity :: Id -> HowBound -> Arity
 stgArity _ (LetBound _ arity) = arity
 stgArity f ImportBound        = idArity f
 stgArity _ LambdaBound        = 0
+
+data CoreToStgOpts = CoreToStgOpts
+  { coreToStg_platform :: Platform
+  , coreToStg_ways :: Ways
+  , coreToStg_AutoSccsOnIndividualCafs :: Bool
+  , coreToStg_InfoTableMap :: Bool
+  , coreToStg_ExternalDynamicRefs :: Bool
+  , coreToStg_stgDebugOpts :: StgDebugOpts
+  }
