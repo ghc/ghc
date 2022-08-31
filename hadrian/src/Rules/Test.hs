@@ -9,6 +9,7 @@ import Expression
 import Flavour
 import Hadrian.Haskell.Cabal.Type (packageDependencies)
 import Hadrian.Oracles.Cabal (readPackageData)
+import Hadrian.Oracles.Path (fixAbsolutePathOnWindows)
 import Oracles.Setting
 import Oracles.TestSettings
 import Oracles.Flag
@@ -191,9 +192,31 @@ testRules = do
         -- Prepare Ghc configuration file for input compiler.
         need [root -/- timeoutPath]
 
+        cross <- flag CrossCompiling
+
+        -- get absolute path for the given program in the given stage
+        let absolute_path_stage s p = do
+              rel_path <- programPath =<< programContext s p
+              abs_path <- liftIO (IO.makeAbsolute rel_path)
+              fixAbsolutePathOnWindows abs_path
+
+        -- get absolute path for the given program in the target stage
+        let absolute_path = absolute_path_stage stg
+
+        -- get absolute path for the given program in stage1 (useful for
+        -- cross-compilers)
+        let absolute_path1
+              | cross     = absolute_path_stage (Stage0 InTreeLibs)
+              | otherwise = absolute_path_stage stg
 
         ghcPath <- getCompilerPath testCompilerArg
 
+        prog_ghc_pkg     <- absolute_path ghcPkg
+        prog_hsc2hs      <- absolute_path hsc2hs
+        prog_hp2ps       <- absolute_path hp2ps
+        prog_hpc         <- absolute_path1 hpc
+        prog_haddock     <- absolute_path1 haddock
+        prog_runghc      <- absolute_path1 runGhc
 
         makePath        <- builderPath $ Make ""
         top             <- topDirectory
@@ -222,6 +245,14 @@ testRules = do
             setEnv "TEST_HC_OPTS_INTERACTIVE" ghciFlags
             setEnv "TEST_CC" ccPath
             setEnv "TEST_CC_OPTS" ccFlags
+
+            setEnv "GHC_PKG"   prog_ghc_pkg
+            setEnv "HSC2HS"    prog_hsc2hs
+            setEnv "HP2PS_ABS" prog_hp2ps
+            setEnv "HPC"       prog_hpc
+            setEnv "HADDOCK"   prog_haddock
+            setEnv "RUNGHC"    prog_runghc
+
             setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
             setEnv "CHECK_EXACT" (top -/- root -/- checkExactProgPath)
             setEnv "COUNT_DEPS" (top -/- root -/- countDepsProgPath)

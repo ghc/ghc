@@ -150,17 +150,7 @@ BIN_ROOT = $(shell dirname '$(TEST_HC)')
 ifeq "$(IMPLICIT_COMPILER)" "YES"
 find_tool = $(shell which $(1))
 else
-find_tool = $(BIN_ROOT)/$(PLATFORM_PREFIX)$(1)
-endif
-
-ifeq "$(IMPLICIT_COMPILER)" "YES"
-find_other_tool = $(shell which $(1))
-else
-	ifeq "$(TOOL_ROOT)" ""
-    find_other_tool = $(BIN_ROOT)/$(PLATFORM_PREFIX)$(1)
-  else
-  	find_other_tool = $(TOOL_ROOT)/$(PLATFORM_PREFIX)$(1)
-  endif
+find_tool = $(BIN_ROOT)/$(1)
 endif
 
 ifeq "$(GHC_PKG)" ""
@@ -168,11 +158,11 @@ GHC_PKG := $(call find_tool,ghc-pkg)
 endif
 
 ifeq "$(RUNGHC)" ""
-RUNGHC := $(call find_other_tool,runghc)
+RUNGHC := $(call find_tool,runghc)
 endif
 
 ifeq "$(HADDOCK)" ""
-HADDOCK := $(call find_other_tool,haddock)
+HADDOCK := $(call find_tool,haddock)
 endif
 
 ifeq "$(HSC2HS)" ""
@@ -184,7 +174,7 @@ HP2PS_ABS := $(call find_tool,hp2ps)
 endif
 
 ifeq "$(HPC)" ""
-HPC := $(call find_other_tool,hpc)
+HPC := $(call find_tool,hpc)
 endif
 
 $(eval $(call canonicaliseExecutable,TEST_HC))
