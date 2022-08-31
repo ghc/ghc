@@ -170,7 +170,7 @@ genApp ctx i args
     -- case of Id without args and known to be already evaluated: return fields
     -- individually
     | [] <- args
-    , ctxIsEvaluated ctx i || isStrictId i
+    , ctxIsEvaluated ctx i || isStrictType (idType i)
     = do
       a <- storeIdFields i (ctxTarget ctx)
       -- optional runtime assert for detecting unexpected thunks (unevaluated)

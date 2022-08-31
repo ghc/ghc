@@ -255,8 +255,8 @@ isInlineApp v i = \case
   _ | isJoinId i -> False
   [] -> isUnboxedTupleType (idType i) ||
                      isStrictType (idType i) ||
-                     i `elementOfUniqSet` v ||
-                     isStrictId i
+                     i `elementOfUniqSet` v
+
   [StgVarArg a]
     | DataConWrapId dc <- idDetails i
     , isNewTyCon (dataConTyCon dc)
