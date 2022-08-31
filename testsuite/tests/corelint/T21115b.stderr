@@ -22,7 +22,7 @@ foo
               case patError "T21115b.hs:(10,4)-(15,4)|\\case"# of wild { } } in
       let { fail = \ ds -> 5# } in
       case ds of ds {
-        __DEFAULT -> fail void#;
+        __DEFAULT -> fail (##);
         0.0## -> 2#;
         2.0## -> 3#
       }

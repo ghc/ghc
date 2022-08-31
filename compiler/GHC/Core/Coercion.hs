@@ -45,7 +45,6 @@ module GHC.Core.Coercion (
         mkKindCo,
         castCoercionKind, castCoercionKind1, castCoercionKind2,
 
-        mkHeteroCoercionType,
         mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
         mkHeteroPrimEqPred, mkHeteroReprPrimEqPred,
 
@@ -77,7 +76,6 @@ module GHC.Core.Coercion (
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
-        isCoVar_maybe,
 
         -- ** Free variables
         tyCoVarsOfCo, tyCoVarsOfCos, coVarsOfCo,
@@ -521,7 +519,9 @@ decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
       -- didn't have enough binders
     go acc_arg_cos _ki1 co _ki2 _tys = (reverse acc_arg_cos, co)
 
--- | Attempts to obtain the type variable underlying a 'Coercion'
+-- | Extract a covar, if possible. This check is dirty. Be ashamed
+-- of yourself. (It's dirty because it cares about the structure of
+-- a coercion, which is morally reprehensible.)
 getCoVar_maybe :: Coercion -> Maybe CoVar
 getCoVar_maybe (CoVarCo cv) = Just cv
 getCoVar_maybe _            = Nothing
@@ -952,13 +952,6 @@ valid (although see Note [Unbound RULE binders] in GHC.Core.Rules), but
 it's a relatively expensive test and perhaps better done in
 optCoercion.  Not a big deal either way.
 -}
-
--- | Extract a covar, if possible. This check is dirty. Be ashamed
--- of yourself. (It's dirty because it cares about the structure of
--- a coercion, which is morally reprehensible.)
-isCoVar_maybe :: Coercion -> Maybe CoVar
-isCoVar_maybe (CoVarCo cv) = Just cv
-isCoVar_maybe _            = Nothing
 
 mkAxInstCo :: Role -> CoAxiom br -> BranchIndex -> [Type] -> [Coercion]
            -> Coercion
@@ -2557,11 +2550,6 @@ mkCoercionType Phantom          = \ty1 ty2 ->
       ki2 = typeKind ty2
   in
   TyConApp eqPhantPrimTyCon [ki1, ki2, ty1, ty2]
-
-mkHeteroCoercionType :: Role -> Kind -> Kind -> Type -> Type -> Type
-mkHeteroCoercionType Nominal          = mkHeteroPrimEqPred
-mkHeteroCoercionType Representational = mkHeteroReprPrimEqPred
-mkHeteroCoercionType Phantom          = panic "mkHeteroCoercionType"
 
 -- | Creates a primitive type equality predicate.
 -- Invariant: the types are not Coercions

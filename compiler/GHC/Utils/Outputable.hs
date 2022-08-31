@@ -390,7 +390,6 @@ data SDocContext = SDC
   , sdocErrorSpans                  :: !Bool
   , sdocStarIsType                  :: !Bool
   , sdocLinearTypes                 :: !Bool
-  , sdocImpredicativeTypes          :: !Bool
   , sdocListTuplePuns               :: !Bool
   , sdocPrintTypeAbbreviations      :: !Bool
   , sdocUnitIdForUser               :: !(FastString -> SDoc)
@@ -450,7 +449,6 @@ defaultSDocContext = SDC
   , sdocSuppressStgExts             = False
   , sdocErrorSpans                  = False
   , sdocStarIsType                  = False
-  , sdocImpredicativeTypes          = False
   , sdocLinearTypes                 = False
   , sdocListTuplePuns               = True
   , sdocPrintTypeAbbreviations      = True

@@ -25,6 +25,7 @@ module GHC.Types.Id.Make (
         DataConBoxer(..), vanillaDataConBoxer,
         mkDataConRep, mkDataConWorkId,
         DataConBangOpts (..), BangOpts (..),
+        unboxedUnitExpr,
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
@@ -1812,9 +1813,10 @@ voidPrimId :: Id     -- Global constant :: Void#
                      -- We cannot define it in normal Haskell, since it's
                      -- a top-level unlifted value.
 voidPrimId  = pcMiscPrelId voidPrimIdName unboxedUnitTy
-                (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding defaultSimpleOpts rhs)
-    where rhs = Var (dataConWorkId unboxedUnitDataCon)
+                (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding defaultSimpleOpts unboxedUnitExpr)
 
+unboxedUnitExpr :: CoreExpr
+unboxedUnitExpr = Var (dataConWorkId unboxedUnitDataCon)
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
 voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Many unboxedUnitTy
