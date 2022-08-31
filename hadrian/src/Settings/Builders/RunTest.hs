@@ -100,9 +100,7 @@ inTreeCompilerArgs stg = do
     withInterpreter     <- ghcWithInterpreter
     unregisterised      <- flag GhcUnregisterised
     withSMP             <- targetSupportsSMP
-    debugAssertions     <- if stg >= Stage2
-                            then ghcDebugAssertions <$> flavour
-                            else return False
+    debugAssertions     <- ($ stg) . ghcDebugAssertions <$> flavour
     profiled            <- ghcProfiled        <$> flavour <*> pure stg
 
     os          <- setting HostOs

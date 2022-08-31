@@ -23,6 +23,7 @@ validateFlavour = enableLinting $ werror $ defaultFlavour
                             [ dynamic, threadedDynamic, debugDynamic, threadedDebugDynamic
                             ]
                         ]
+    , ghcDebugAssertions = (<= Stage1)
     }
 
 validateArgs :: Args
@@ -33,15 +34,16 @@ validateArgs = sourceArgs SourceArgs
                            , notStage0 ? arg "-dno-debug-output"
                            ]
     , hsLibrary  = pure ["-O"]
-    , hsCompiler = mconcat [ stage0 ? pure ["-O2", "-DDEBUG"]
+    , hsCompiler = mconcat [ stage0 ? pure ["-O2"]
                            , notStage0 ? pure ["-O" ]
                            ]
     , hsGhc      = pure ["-O"] }
 
+
 slowValidateFlavour :: Flavour
 slowValidateFlavour = validateFlavour
     { name = "slow-validate"
-    , ghcDebugAssertions = True
+    , ghcDebugAssertions = const True
     }
 
 quickValidateArgs :: Args
