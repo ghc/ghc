@@ -23,8 +23,7 @@ module GHC.JS.Ppr
   , pprStringLit
   , flattenBlocks
   , braceNest
-  , braceNest'
-  , braceNest''
+  , hangBrace
   )
 where
 
@@ -88,12 +87,13 @@ renderPrefixJs' r pfx = jsToDocR r . jsSaturate (Just $ "jmId_" `mappend` pfx)
 braceNest :: Doc -> Doc
 braceNest x = char '{' <+> nest 2 x $$ char '}'
 
-braceNest' :: Doc -> Doc
-braceNest' x = nest 2 (char '{' $+$ x) $$ char '}'
-
--- somewhat more compact (egyptian style) braces
-braceNest'' :: Doc -> Doc
-braceNest'' x = nest 2 (char '{' $$ x) $$ char '}'
+-- | Hang with braces:
+--
+--  hdr {
+--    body
+--  }
+hangBrace :: Doc -> Doc -> Doc
+hangBrace hdr body = sep [ hdr <> char ' ' <> char '{', nest 2 body, char '}' ]
 
 class JsToDoc a where jsToDocR :: RenderJs -> a -> Doc
 instance JsToDoc JStat where jsToDocR r = renderJsS r r
@@ -107,12 +107,14 @@ instance JsToDoc [JStat] where
 
 defRenderJsS :: RenderJs -> JStat -> Doc
 defRenderJsS r = \case
-  IfStat cond x y -> text "if" <> parens (jsToDocR r cond) $$ braceNest' (jsToDocR r x) $$ mbElse
+  IfStat cond x y -> hangBrace (text "if" <> parens (jsToDocR r cond))
+                               (jsToDocR r x)
+                     $$ mbElse
         where mbElse | y == BlockStat []  = PP.empty
-                     | otherwise = text "else" $$ braceNest' (jsToDocR r y)
+                     | otherwise = hangBrace (text "else") (jsToDocR r y)
   DeclStat x          -> text "var" <+> jsToDocR r x
-  WhileStat False p b -> text "while" <> parens (jsToDocR r p) $$ braceNest' (jsToDocR r b)
-  WhileStat True  p b -> (text "do" $$ braceNest' (jsToDocR r b)) $+$ text "while" <+> parens (jsToDocR r p)
+  WhileStat False p b -> hangBrace (text "while" <> parens (jsToDocR r p)) (jsToDocR r b)
+  WhileStat True  p b -> (hangBrace (text "do") (jsToDocR r b)) $+$ text "while" <+> parens (jsToDocR r p)
   UnsatBlock e        -> jsToDocR r $ pseudoSaturate e
   BreakStat l         -> maybe (text "break")    (\(LexicalFastString s) -> (text "break"    <+> ftext s)) l
   ContinueStat l      -> maybe (text "continue") (\(LexicalFastString s) -> (text "continue" <+> ftext s)) l
@@ -124,19 +126,19 @@ defRenderJsS r = \case
           interSemi [] = []
           interSemi (x:xs) = (jsToDocR r x <> semi) : interSemi xs
 
-  ForInStat each i e b -> text txt <> parens (jsToDocR r i <+> text "in" <+> jsToDocR r e) $$ braceNest' (jsToDocR r b)
+  ForInStat each i e b -> hangBrace (text txt <> parens (jsToDocR r i <+> text "in" <+> jsToDocR r e)) (jsToDocR r b)
         where txt | each = "for each"
                   | otherwise = "for"
-  SwitchStat e l d     -> text "switch" <+> parens (jsToDocR r e) $$ braceNest' cases
+  SwitchStat e l d     -> hangBrace (text "switch" <+> parens (jsToDocR r e)) cases
         where l' = map (\(c,s) -> (text "case" <+> parens (jsToDocR r c) <> char ':') $$$ (jsToDocR r s)) l ++ [text "default:" $$$ (jsToDocR r d)]
               cases = vcat l'
   ReturnStat e      -> text "return" <+> jsToDocR r e
   ApplStat e es     -> jsToDocR r e <> (parens . hsep . punctuate comma $ map (jsToDocR r) es)
-  TryStat s i s1 s2 -> text "try" $$ braceNest' (jsToDocR r s) $$ mbCatch $$ mbFinally
+  TryStat s i s1 s2 -> hangBrace (text "try") (jsToDocR r s) $$ mbCatch $$ mbFinally
         where mbCatch | s1 == BlockStat [] = PP.empty
-                      | otherwise = text "catch" <> parens (jsToDocR r i) $$ braceNest' (jsToDocR r s1)
+                      | otherwise = hangBrace (text "catch" <> parens (jsToDocR r i)) (jsToDocR r s1)
               mbFinally | s2 == BlockStat [] = PP.empty
-                        | otherwise = text "finally" $$ braceNest' (jsToDocR r s2)
+                        | otherwise = hangBrace (text "finally") (jsToDocR r s2)
   AssignStat i x    -> case x of
     -- special treatment for functions, otherwise there is too much left padding
     -- (more than the length of the expression assigned to). E.g.
@@ -198,7 +200,7 @@ defRenderJsV r = \case
                           -- nonDetEltsUniqMap doesn't introduce non-determinism here
                           -- because we sort the elements lexically
                           $ sortOn (LexicalFastString . fst) (nonDetEltsUniqMap m)
-  JFunc is b -> parens $ text "function" <> parens (hsep . punctuate comma . map (jsToDocR r) $ is) $$ braceNest' (jsToDocR r b)
+  JFunc is b -> parens $ hangBrace (text "function" <> parens (hsep . punctuate comma . map (jsToDocR r) $ is)) (jsToDocR r b)
   UnsatVal f -> jsToDocR r $ pseudoSaturate f
 
 defRenderJsI :: RenderJs -> Ident -> Doc
