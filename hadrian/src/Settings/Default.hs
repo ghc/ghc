@@ -240,7 +240,7 @@ defaultFlavour = Flavour
     , ghcProfiled        = const False
     , ghcDebugged        = const False
     , ghcThreaded        = const True
-    , ghcDebugAssertions = False
+    , ghcDebugAssertions = const False
     , ghcDocs            = cmdDocsArgs }
 
 -- | Default logic for determining whether to build

@@ -35,7 +35,7 @@ data Flavour = Flavour {
     -- | Build GHC with the debug RTS.
     ghcDebugged :: Stage -> Bool,
     -- | Build GHC with debug assertions.
-    ghcDebugAssertions :: Bool,
+    ghcDebugAssertions :: Stage -> Bool,
     -- | Build the GHC executable against the threaded runtime system.
     ghcThreaded :: Stage -> Bool,
     -- | Whether to build docs and which ones

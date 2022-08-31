@@ -52,7 +52,7 @@ packageArgs = do
           [ builder Alex ? arg "--latin1"
 
           , builder (Ghc CompileHs) ? mconcat
-            [ debugAssertions ? notStage0 ? arg "-DDEBUG"
+            [ debugAssertions stage ?  arg "-DDEBUG"
 
             , inputs ["**/GHC.hs", "**/GHC/Driver/Make.hs"] ? arg "-fprof-auto"
             , input "**/Parser.hs" ?
@@ -83,7 +83,7 @@ packageArgs = do
         , package ghc ? mconcat
           [ builder Ghc ? mconcat
              [ arg ("-I" ++ compilerPath)
-             , debugAssertions ? notStage0 ? arg "-DDEBUG" ]
+             , debugAssertions stage ? arg "-DDEBUG" ]
 
           , builder (Cabal Flags) ? mconcat
             [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"

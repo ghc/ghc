@@ -241,7 +241,10 @@ enableLateCCS = addArgs
 
 -- | Enable assertions for the stage2 compiler
 enableAssertions :: Flavour -> Flavour
-enableAssertions flav = flav { ghcDebugAssertions = True }
+enableAssertions flav = flav { ghcDebugAssertions = f }
+  where
+    f Stage2 = True
+    f st = ghcDebugAssertions flav st
 
 -- | Produce fully statically-linked executables and build libraries suitable
 -- for static linking.

@@ -15,7 +15,7 @@ developmentFlavour ghcStage = defaultFlavour
     , libraryWays = pure $ Set.fromList [vanilla]
     , rtsWays = pure $ Set.fromList [vanilla, debug, threaded, threadedDebug]
     , dynamicGhcPrograms = return False
-    , ghcDebugAssertions = True }
+    , ghcDebugAssertions = (>= Stage2) }
     where
       stageString Stage2 = "2"
       stageString Stage1 = "1"
