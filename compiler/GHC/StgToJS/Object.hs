@@ -30,7 +30,10 @@
 --   serialized [Text] -> ([ClosureInfo], JStat) blocks
 --
 --  file layout:
---   - header ["GHCJSOBJ", length of symbol table, length of dependencies, length of index]
+--   - magic "GHCJSOBJ"
+--   - length of symbol table
+--   - length of dependencies
+--   - length of index
 --   - compiler version tag
 --   - symbol table
 --   - dependency info
@@ -50,7 +53,7 @@ module GHC.StgToJS.Object
   , readObjectFileKeys
   , readObject
   , readObjectKeys
-  , serializeStat
+  , putLinkableUnit
   , emptySymbolTable
   , isGlobalUnit
   , isExportsUnit -- XXX verify that this is used
@@ -61,6 +64,7 @@ module GHC.StgToJS.Object
   , Deps (..), BlockDeps (..), DepsLocation (..)
   , ExpFun (..), ExportedFun (..)
   , versionTag, versionTagLength
+  , runPutS
   )
 where
 
@@ -226,6 +230,7 @@ runGetS name st m bl = do
   let bh = setUserData bh0 (newReadState undefined (readTable (ObjEnv st name)))
   m bh
 
+-- temporary kludge to bridge BinHandle and ByteString
 runPutS :: SymbolTable -> (BinHandle -> IO ()) -> IO (SymbolTable, ByteString)
 runPutS st ps = do
   bh0 <- openBinMem (1024 * 1024)
@@ -258,24 +263,23 @@ data ObjUnit = ObjUnit
   , oiFImports :: [ForeignJSRef]
   }
 
-serializeStat :: SymbolTable
-              -> [ClosureInfo]
-              -> [StaticInfo]
-              -> JStat
-              -> FastString
-              -> [ExpFun]
-              -> [ForeignJSRef]
-              -> IO (SymbolTable, BS.ByteString)
-serializeStat st ci si s sraw fe fi = do
-  -- TODO: Did any of the Objectable instances previously used here interact with the `State`?
-  (st', bs) <- runPutS st $ \bh -> do
-                  put_ bh ci
-                  put_ bh si
-                  put_ bh s
-                  put_ bh sraw
-                  put_ bh fe
-                  put_ bh fi
-  return (st', B.toStrict bs)
+-- | Write a linkable unit
+putLinkableUnit
+  :: BinHandle
+  -> [ClosureInfo]
+  -> [StaticInfo]
+  -> JStat
+  -> FastString
+  -> [ExpFun]
+  -> [ForeignJSRef]
+  -> IO ()
+putLinkableUnit bh ci si s sraw fe fi = do
+  put_ bh ci
+  put_ bh si
+  put_ bh s
+  put_ bh sraw
+  put_ bh fe
+  put_ bh fi
 
 -- tag to store the module name in the object file
 moduleNameTag :: ModuleName -> BS.ByteString
@@ -297,10 +301,9 @@ writeObject' mod_name st0 deps0 os = do
   (sti, idx) <- putIndex st0 os
   let symbs  =  putSymbolTable sti
   deps1      <- putDepsSection deps0
+  let bl = fromIntegral . B.length
   let hdr = putHeader (Header (moduleNameTag mod_name) (bl symbs) (bl deps1) (bl idx))
   return $ hdr <> symbs <> deps1 <> idx <> mconcat (map snd os)
-  where
-    bl = fromIntegral . B.length
 
 putIndex :: SymbolTable -> [([FastString], ByteString)] -> IO (SymbolTable, ByteString)
 putIndex st xs = runPutS st (\bh -> put_ bh $ zip symbols offsets)
