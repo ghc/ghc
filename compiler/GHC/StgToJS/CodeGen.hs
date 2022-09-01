@@ -92,7 +92,7 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
            return (ts ++ luOtherExports u, luStat u)
 
         deps <- genDependencyData this_mod lus
-        lift $ Object.object' (moduleName this_mod) sym_table deps (map (second BL.fromStrict) p)
+        lift $ Object.writeObject' (moduleName this_mod) sym_table deps (map (second BL.fromStrict) p)
 
   -- Doc to dump when -ddump-js is enabled
   let mod_name = renderWithContext defaultSDocContext (ppr this_mod)
