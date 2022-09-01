@@ -34,7 +34,7 @@ module GHC.Utils.Binary
     SymbolTable, Dictionary,
 
    BinData(..), dataHandle, handleData,
-   packBinBuffer, unpackBinBuffer,
+   packBinBuffer, unpackBinBuffer, unsafeUnpackBinBuffer,
 
    openBinMem,
 --   closeBin,
@@ -50,6 +50,7 @@ module GHC.Utils.Binary
    readBinMem,
 
    putAt, getAt,
+   forwardPut, forwardPut_, forwardGet,
 
    -- * For writing instances
    putByte,
@@ -72,8 +73,11 @@ module GHC.Utils.Binary
 
    -- * User data
    UserData(..), getUserData, setUserData,
-   newReadState, newWriteState,
+   newReadState, newWriteState, defaultUserData,
+
+   -- * String table ("dictionary")
    putDictionary, getDictionary, putFS,
+   BinDictionary, initBinDictionary, getDictFastString, putDictFastString,
 
    -- * Newtype wrappers
    BinSpan(..), BinSrcSpan(..), BinLocated(..)
@@ -90,10 +94,11 @@ import GHC.Types.Unique.FM
 import GHC.Data.FastMutInt
 import GHC.Utils.Fingerprint
 import GHC.Types.SrcLoc
+import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
 
 import Control.DeepSeq
-import Foreign hiding (shiftL, shiftR)
+import Foreign hiding (shiftL, shiftR, void)
 import Data.Array
 import Data.Array.IO
 import Data.Array.Unsafe
@@ -108,7 +113,7 @@ import Data.Set                 ( Set )
 import qualified Data.Set as Set
 import Data.Time
 import Data.List (unfoldr)
-import Control.Monad            ( when, (<$!>), unless, forM_ )
+import Control.Monad            ( when, (<$!>), unless, forM_, void )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
@@ -155,7 +160,7 @@ dataHandle (BinData size bin) = do
   ixr <- newFastMutInt 0
   szr <- newFastMutInt size
   binr <- newIORef bin
-  return (BinMem noUserData ixr szr binr)
+  return (BinMem defaultUserData ixr szr binr)
 
 handleData :: BinHandle -> IO BinData
 handleData (BinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef binr
@@ -166,7 +171,7 @@ handleData (BinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef 
 
 data BinHandle
   = BinMem {                     -- binary data stored in an unboxed array
-     bh_usr :: UserData,         -- sigh, need parameterized modules :-)
+     bh_usr :: !UserData,        -- sigh, need parameterized modules :-)
      _off_r :: !FastMutInt,      -- the current offset
      _sz_r  :: !FastMutInt,      -- size of the array (cached)
      _arr_r :: !(IORef BinArray) -- the array (bounds: (0,size-1))
@@ -205,6 +210,13 @@ unpackBinBuffer n from = do
   seekBin bh (BinPtr 0)
   return bh
 
+unsafeUnpackBinBuffer :: ByteString -> IO BinHandle
+unsafeUnpackBinBuffer (BS.BS arr len) = do
+  arr_r <- newIORef arr
+  ix_r <- newFastMutInt 0
+  sz_r <- newFastMutInt len
+  return (BinMem defaultUserData ix_r sz_r arr_r)
+
 ---------------------------------------------------------------
 -- Bin
 ---------------------------------------------------------------
@@ -240,13 +252,13 @@ getAt bh p = do seekBin bh p; get bh
 
 openBinMem :: Int -> IO BinHandle
 openBinMem size
- | size <= 0 = error "Data.Binary.openBinMem: size must be >= 0"
+ | size <= 0 = error "GHC.Utils.Binary.openBinMem: size must be >= 0"
  | otherwise = do
    arr <- mallocForeignPtrBytes size
    arr_r <- newIORef arr
    ix_r <- newFastMutInt 0
    sz_r <- newFastMutInt size
-   return (BinMem noUserData ix_r sz_r arr_r)
+   return (BinMem defaultUserData ix_r sz_r arr_r)
 
 tellBin :: BinHandle -> IO (Bin a)
 tellBin (BinMem _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
@@ -256,6 +268,14 @@ seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
   sz <- readFastMutInt sz_r
   if (p >= sz)
         then do expandBin h p; writeFastMutInt ix_r p
+        else writeFastMutInt ix_r p
+
+-- | SeekBin but without calling expandBin
+seekBinNoExpand :: BinHandle -> Bin a -> IO ()
+seekBinNoExpand (BinMem _ ix_r sz_r _) (BinPtr !p) = do
+  sz <- readFastMutInt sz_r
+  if (p >= sz)
+        then panic "seekBinNoExpand: seek out of range"
         else writeFastMutInt ix_r p
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
@@ -280,7 +300,7 @@ readBinMem filename = do
   arr_r <- newIORef arr
   ix_r <- newFastMutInt 0
   sz_r <- newFastMutInt filesize
-  return (BinMem noUserData ix_r sz_r arr_r)
+  return (BinMem defaultUserData ix_r sz_r arr_r)
 
 -- expand the size of the array to include a specified offset
 expandBin :: BinHandle -> Int -> IO ()
@@ -575,7 +595,9 @@ getSLEB128 bh = do
 -- | Encode the argument in it's full length. This is different from many default
 -- binary instances which make no guarantee about the actual encoding and
 -- might do things use variable length encoding.
-newtype FixedLengthEncoding a = FixedLengthEncoding { unFixedLength :: a }
+newtype FixedLengthEncoding a
+  = FixedLengthEncoding { unFixedLength :: a }
+  deriving (Eq,Ord,Show)
 
 instance Binary (FixedLengthEncoding Word8) where
   put_ h (FixedLengthEncoding x) = putByte h x
@@ -938,6 +960,45 @@ instance Binary (Bin a) where
 
 
 -- -----------------------------------------------------------------------------
+-- Forward reading/writing
+
+-- | "forwardPut put_A put_B" outputs A after B but allows A to be read before B
+-- by using a forward reference
+forwardPut :: BinHandle -> (b -> IO a) -> IO b -> IO (a,b)
+forwardPut bh put_A put_B = do
+  -- write placeholder pointer to A
+  pre_a <- tellBin bh
+  put_ bh pre_a
+
+  -- write B
+  r_b <- put_B
+
+  -- update A's pointer
+  a <- tellBin bh
+  putAt bh pre_a a
+  seekBinNoExpand bh a
+
+  -- write A
+  r_a <- put_A r_b
+  pure (r_a,r_b)
+
+forwardPut_ :: BinHandle -> (b -> IO a) -> IO b -> IO ()
+forwardPut_ bh put_A put_B = void $ forwardPut bh put_A put_B
+
+-- | Read a value stored using a forward reference
+forwardGet :: BinHandle -> IO a -> IO a
+forwardGet bh get_A = do
+    -- read forward reference
+    p <- get bh -- a BinPtr
+    -- store current position
+    p_a <- tellBin bh
+    -- go read the forward value, then seek back
+    seekBinNoExpand bh p
+    r <- get_A
+    seekBinNoExpand bh p_a
+    pure r
+
+-- -----------------------------------------------------------------------------
 -- Lazy reading/writing
 
 lazyPut :: Binary a => BinHandle -> a -> IO ()
@@ -1044,8 +1105,14 @@ newWriteState put_nonbinding_name put_binding_name put_fs
                ud_put_fs   = put_fs
              }
 
-noUserData :: a
-noUserData = undef "UserData"
+defaultUserData :: UserData
+defaultUserData = UserData
+  { ud_get_name            = undef "get_name"
+  , ud_get_fs              = undef "get_fs"
+  , ud_put_nonbinding_name = undef "put_nonbinding_name"
+  , ud_put_binding_name    = undef "put_binding_name"
+  , ud_put_fs              = undef "put_fs"
+  }
 
 undef :: String -> a
 undef s = panic ("Binary.UserData: no " ++ s)
@@ -1072,6 +1139,56 @@ getDictionary bh = do
     fs <- getFS bh
     writeArray mut_arr i fs
   unsafeFreeze mut_arr
+
+getDictFastString :: Dictionary -> BinHandle -> IO FastString
+getDictFastString dict bh = do
+    j <- get bh
+    return $! (dict ! fromIntegral (j :: Word32))
+
+
+initBinDictionary :: BinHandle -> IO (BinHandle, BinDictionary, IO Int)
+initBinDictionary bh = do
+  dict_next_ref <- newFastMutInt 0
+  dict_map_ref <- newIORef emptyUFM
+  let bin_dict = BinDictionary
+        { bin_dict_next = dict_next_ref
+        , bin_dict_map  = dict_map_ref
+        }
+  let put_dict = do
+        fs_count <- readFastMutInt dict_next_ref
+        dict_map  <- readIORef dict_map_ref
+        putDictionary bh fs_count dict_map
+        pure fs_count
+
+  -- BinHandle with FastString writing support
+  let ud = getUserData bh
+  let ud_fs = ud { ud_put_fs = putDictFastString bin_dict }
+  let bh_fs = setUserData bh ud_fs
+
+  return (bh_fs,bin_dict,put_dict)
+
+putDictFastString :: BinDictionary -> BinHandle -> FastString -> IO ()
+putDictFastString dict bh fs = allocateFastString dict fs >>= put_ bh
+
+allocateFastString :: BinDictionary -> FastString -> IO Word32
+allocateFastString BinDictionary { bin_dict_next = j_r,
+                                   bin_dict_map  = out_r} f = do
+    out <- readIORef out_r
+    let !uniq = getUnique f
+    case lookupUFM_Directly out uniq of
+        Just (j, _)  -> return (fromIntegral j :: Word32)
+        Nothing -> do
+           j <- readFastMutInt j_r
+           writeFastMutInt j_r (j + 1)
+           writeIORef out_r $! addToUFM_Directly out uniq (j, f)
+           return (fromIntegral j :: Word32)
+
+data BinDictionary = BinDictionary {
+        bin_dict_next :: !FastMutInt, -- The next index to use
+        bin_dict_map  :: !(IORef (UniqFM FastString (Int,FastString)))
+                                -- indexed by FastString
+  }
+
 
 ---------------------------------------------------------
 -- The Symbol Table

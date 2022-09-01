@@ -1,6 +1,5 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE TupleSections      #-}
+{-# LANGUAGE LambdaCase         #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -17,174 +16,133 @@
 -----------------------------------------------------------------------------
 module GHC.StgToJS.Linker.Archive
   ( Entry(..), Index, IndexEntry(..), Meta(..)
-  , buildArchive
+  , writeArchive
   , readMeta, readIndex
-  , readSource, readAllSources
-  , readObject, withObject, withAllObjects
+  , getArchiveEntries
+  , getArchiveEntry
   ) where
 
-import           Control.Monad
-
-import           Data.Binary
-import           Data.Binary.Get
-import           Data.Binary.Put
-import           Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as B
-import           Data.Data
-import           Data.Int
-import           GHC.Data.ShortText (ShortText)
-import qualified GHC.Data.ShortText as T
-
-import           GHC.Generics hiding (Meta)
-
-import           System.IO
 import Prelude
+import Data.ByteString (ByteString)
+import Data.Word
+import Control.Monad
 
-import           GHC.Unit.Module
+import GHC.Unit.Module
+import GHC.Utils.Binary
+import GHC.Utils.Panic
+import GHC.Utils.Monad
+import GHC.Settings.Constants (hiVersion)
 
-import           GHC.StgToJS.Object ( versionTag, versionTagLength )
 
-
--- entry, offset in data section, length
 type Index = [IndexEntry]
 
-data IndexEntry = IndexEntry { ieEntry  :: Entry
-                             , ieOffset :: Int64
-                             , ieLength :: Int64
-                             } deriving (Show, Typeable, Generic)
+data IndexEntry = IndexEntry
+  { ieEntry  :: !Entry              -- ^ Entry identifier
+  , ieOffset :: !(Bin ByteString)   -- ^ Offset in the archive
+  } deriving (Show)
 
-instance Binary IndexEntry
+instance Binary IndexEntry where
+  put_ bh (IndexEntry a b) = do
+    put_ bh a
+    put_ bh b
+  get bh = IndexEntry <$> get bh <*> get bh
 
-data Entry = Object    ShortText -- module name
-           | JsSource  FilePath
-           deriving (Show, Typeable, Generic)
+data Entry
+  = Object    !ModuleName
+  | JsSource  !FilePath
+  deriving (Show)
 
-instance Binary Entry
+instance Binary Entry where
+  put_ bh = \case
+    Object m   -> putByte bh 0 >> put_ bh m
+    JsSource p -> putByte bh 1 >> put_ bh p
+  get bh = getByte bh >>= \case
+    0 -> Object   <$> get bh
+    _ -> JsSource <$> get bh
 
-data Meta = Meta { metaCppOptions :: [String]
-                 } deriving (Show, Typeable, Generic)
 
-instance Binary Meta
+data Meta = Meta
+  { metaCppOptions :: [String]
+  }
 
--- sizes of the sections in bytes
-data Sections = Sections { sectionIndex :: !Word64
-                         , sectionMeta  :: !Word64
-                         , sectionData  :: !Word64
-                         } deriving (Eq, Ord, Generic)
+instance Binary Meta where
+  put_ bh (Meta a) = put_ bh a
+  get bh = Meta <$> get bh
 
-instance Binary Sections where
-  put (Sections i m d) = putWord64le i >> putWord64le m >> putWord64le d
-  get = Sections <$> getWord64le <*> getWord64le <*> getWord64le
+magic :: FixedLengthEncoding Word64
+magic = FixedLengthEncoding 0x435241534a434847 -- "GHCJSARC"
 
-sectionsLength :: Int
-sectionsLength = 24
+writeArchive :: FilePath -> Meta -> [(Entry, ByteString)] -> IO ()
+writeArchive path meta entries = do
+  bh <- openBinMem (4*1024*1000)
+  put_ bh magic
+  put_ bh (show hiVersion)
 
-buildArchive :: Meta -> [(Entry, ByteString)] -> ByteString
-buildArchive meta entries =
-  versionTag <> sections <> index <> meta' <> entries'
-  where
-    bl       = fromIntegral . B.length
-    sections = runPut . put $ Sections (bl index) (bl meta') (bl entries')
-    meta'    = runPut (put meta)
-    index    = runPut . put $ scanl1 (\(IndexEntry _ o l) (IndexEntry e _ l') -> IndexEntry e (o+l) l') $
-                              map (\(e,b) -> IndexEntry e 0 (B.length b)) entries
-    entries' = mconcat (map snd entries)
+  put_ bh meta
+
+  -- forward put the index
+  forwardPut_ bh (put_ bh) $ do
+    idx <- forM entries $ \(e,bs) -> do
+      p <- tellBin bh
+      put_ bh bs
+      pure $ IndexEntry
+        { ieEntry  = e
+        , ieOffset = p
+        }
+    pure idx
+
+  writeBinMem bh path
+
+data Header = Header
+  { hdrMeta   :: !Meta
+  , hdrIndex  :: !Index
+  , hdrHandle :: !BinHandle
+  }
+
+getArchiveHeader :: BinHandle -> IO Header
+getArchiveHeader bh = do
+  is_magic <- (== magic) <$> get bh
+  unless is_magic $ panic "getArchiveHeader: invalid magic header"
+
+  is_correct_version <- ((== hiVersion) . read) <$> get bh
+  unless is_correct_version $ panic "getArchiveHeader: invalid header version"
+
+  meta <- get bh
+  idx  <- forwardGet bh (get bh)
+  pure $ Header
+    { hdrMeta   = meta
+    , hdrIndex  = idx
+    , hdrHandle = bh
+    }
 
 readMeta :: FilePath -> IO Meta
-readMeta file = withBinaryFile file ReadMode $ \h -> do
-  sections <- hReadHeader ("readMeta " ++ file) h
-  hSeek h RelativeSeek (toInteger $ sectionIndex sections)
-  m <- B.hGet h (fromIntegral $ sectionMeta sections)
-  return $! runGet get m
+readMeta file = do
+  bh <- readBinMem file
+  hdr <- getArchiveHeader bh
+  pure $! hdrMeta hdr
 
 readIndex :: FilePath -> IO Index
-readIndex file =
-  withArchive "readIndex" file $ \_sections index _h -> return index
+readIndex file = do
+  bh <- readBinMem file
+  hdr <- getArchiveHeader bh
+  pure $! hdrIndex hdr
 
-readSource :: FilePath -> FilePath -> IO ByteString
-readSource source file = withArchive "readSource" file $
-  withEntry ("readSource " ++ file)
-            ("source file " ++ source)
-            selectSrc
-            (\h l -> B.hGet h $ fromIntegral l)
+getArchiveEntries :: Header -> (Entry -> Bool) -> IO [ByteString]
+getArchiveEntries hdr pred = mapMaybeM read_entry (hdrIndex hdr)
   where
-    selectSrc (JsSource src) = src == source
-    selectSrc _              = False
+    bh = hdrHandle hdr
+    read_entry (IndexEntry e offset)
+      | pred e  = do
+          seekBin bh offset
+          Just <$> get bh
+      | otherwise = pure Nothing
 
-readAllSources :: FilePath -> IO [(FilePath, ByteString)]
-readAllSources file = withArchive "readAllSources" file $ \sections index h ->
-  forM [ (o, l, src) | IndexEntry (JsSource src) o l <- index ] $ \(o, l, src) -> do
-    hSeek h AbsoluteSeek (fromIntegral $ dataSectionStart sections + fromIntegral o)
-    (src,) <$> B.hGet h (fromIntegral l)
-
-readObject :: ModuleName -> FilePath -> IO ByteString
-readObject m file = withArchive "readObject" file $
-  withModuleObject ("readObject " ++ file) m (\h l -> B.hGet h $ fromIntegral l)
-
--- | seeks to the starting position of the object in the file
-withObject :: ModuleName -> FilePath -> (Handle -> Int64 -> IO a) -> IO a
-withObject m file f = withArchive "withObject" file $
-  withModuleObject ("withObject " ++ file) m f
-
-
-withAllObjects :: FilePath -> (ModuleName -> Handle -> Int64 -> IO a) -> IO [a]
-withAllObjects file f = withArchive "withAllObjects" file $ \sections index h ->
-  forM [ (o, l, mn) | IndexEntry (Object mn) o l <- index ] $ \(o, l, mn) -> do
-    hSeek h AbsoluteSeek (fromIntegral $ dataSectionStart sections + fromIntegral o)
-    f (mkModuleName (T.unpack mn)) h l
-
----------------------------------------------------------------------------------
-
-withArchive :: String -> FilePath -> (Sections -> Index -> Handle -> IO a) -> IO a
-withArchive name file f = withBinaryFile file ReadMode $ \h -> do
-  let name' = name ++ " " ++ file
-  putStrLn ("reading archive: " ++ name ++ " -> " ++ file)
-  sections <- hReadHeader name' h
-  index <- hReadIndex name' sections h
-  f sections index h
-
--- | seeks to start of entry data in file, then runs the action
---   exactly one matching entry is expected
-withEntry :: String -> String
-          -> (Entry -> Bool) -> (Handle -> Int64 -> IO a)
-          -> Sections -> Index -> Handle
-          -> IO a
-withEntry name entryName p f sections index h =
-  case filter (p . ieEntry) index of
-    [] -> error (name ++ ": cannot find " ++ entryName)
-    [IndexEntry _ o l] -> do
-      hSeek h AbsoluteSeek (dataSectionStart sections + toInteger o)
-      f h (fromIntegral l)
-    _ -> error (name ++ ": multiple matches for " ++ entryName)
-
-withModuleObject :: String -> ModuleName -> (Handle -> Int64 -> IO a)
-                 -> Sections -> Index -> Handle
-                 -> IO a
-withModuleObject name m f =
-  withEntry name ("object for module " ++ ms) selectEntry f
+getArchiveEntry :: Header -> (Entry -> Bool) -> IO (Maybe ByteString)
+getArchiveEntry hdr pred = go (hdrIndex hdr)
   where
-    ms = moduleNameString m
-    mt = T.pack ms
-    selectEntry (Object m') = mt == m'
-    selectEntry _           = False
-
--- | expects Handle to be positioned at the start of the header
---   Handle is positioned at start of index after return
-hReadHeader :: String -> Handle -> IO Sections
-hReadHeader name h = do
-  ts <- B.hGet h (versionTagLength + sectionsLength)
-  when (B.take (fromIntegral versionTagLength) ts /= versionTag)
-       (error $ name ++ ": version tag mismatch")
-  return $! runGet get (B.drop (fromIntegral versionTagLength) ts)
-
--- | expects Handle to be positioned at the start of the index
---   Handle is positioned at start of metadata section after return
-hReadIndex :: String -> Sections -> Handle -> IO Index
-hReadIndex _name s h = do
-  i <- B.hGet h (fromIntegral $ sectionIndex s)
-  return $! runGet get i
-
--- start of data section in file
-dataSectionStart :: Sections -> Integer
-dataSectionStart s = toInteger (versionTagLength + sectionsLength)
-                   + toInteger (sectionIndex s + sectionMeta s)
+    bh = hdrHandle hdr
+    go = \case
+      (IndexEntry e offset:es)
+        | pred e    -> seekBin bh offset >> (Just <$> get bh)
+        | otherwise -> go es
+      []            -> pure Nothing

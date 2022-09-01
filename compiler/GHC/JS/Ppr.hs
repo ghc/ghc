@@ -63,10 +63,10 @@ renderJs' :: (JsToDoc a, JMacro a) => RenderJs -> a -> Doc
 renderJs' r = jsToDocR r . jsSaturate Nothing
 
 data RenderJs = RenderJs
-  { renderJsS :: RenderJs -> JStat -> Doc
-  , renderJsE :: RenderJs -> JExpr -> Doc
-  , renderJsV :: RenderJs -> JVal  -> Doc
-  , renderJsI :: RenderJs -> Ident -> Doc
+  { renderJsS :: !(RenderJs -> JStat -> Doc)
+  , renderJsE :: !(RenderJs -> JExpr -> Doc)
+  , renderJsV :: !(RenderJs -> JVal  -> Doc)
+  , renderJsI :: !(RenderJs -> Ident -> Doc)
   }
 
 defaultRenderJs :: RenderJs

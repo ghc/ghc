@@ -250,7 +250,7 @@ data ForeignJSRef = ForeignJSRef
 
 -- | data used to generate one ObjUnit in our object file
 data LinkableUnit = LinkableUnit
-  { luStat         :: BS.ByteString -- ^ serialized JS AST
+  { luObjUnit      :: ObjUnit       -- ^ serializable unit info
   , luIdExports    :: [Id]          -- ^ exported names from haskell identifiers
   , luOtherExports :: [FastString]  -- ^ other exports
   , luIdDeps       :: [Id]          -- ^ identifiers this unit depends on
@@ -259,6 +259,39 @@ data LinkableUnit = LinkableUnit
   , luRequired     :: Bool          -- ^ always link this unit
   , luForeignRefs  :: [ForeignJSRef]
   }
+
+-- one toplevel block in the object file
+data ObjUnit = ObjUnit
+  { oiSymbols  :: ![FastString]   -- toplevel symbols (stored in index)
+  , oiClInfo   :: ![ClosureInfo]  -- closure information of all closures in block
+  , oiStatic   :: ![StaticInfo]   -- static closure data
+  , oiStat     :: !JStat          -- the code
+  , oiRaw      :: !BS.ByteString  -- raw JS code
+  , oiFExports :: ![ExpFun]
+  , oiFImports :: ![ForeignJSRef]
+  }
+
+data ExpFun = ExpFun
+  { isIO   :: !Bool
+  , args   :: [JSFFIType]
+  , result :: !JSFFIType
+  } deriving (Eq, Ord, Show)
+
+data JSFFIType
+  = Int8Type
+  | Int16Type
+  | Int32Type
+  | Int64Type
+  | Word8Type
+  | Word16Type
+  | Word32Type
+  | Word64Type
+  | DoubleType
+  | ByteArrayType
+  | PtrType
+  | RefType
+  deriving (Show, Ord, Eq, Enum)
+
 
 -- | Typed expression
 data TypedExpr = TypedExpr

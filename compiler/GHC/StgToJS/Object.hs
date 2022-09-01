@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE OverloadedStrings          #-}
@@ -31,75 +30,49 @@
 --
 --  file layout:
 --   - magic "GHCJSOBJ"
---   - length of symbol table
---   - length of dependencies
---   - length of index
 --   - compiler version tag
---   - symbol table
---   - dependency info
---   - closureinfo index
---   - closureinfo data (offsets described by index)
+--   - module name
+--   - offsets of string table
+--   - dependencies
+--   - offset of the index
+--   - unit infos
+--   - index
+--   - string table
 --
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Object
-  ( writeObject'
-  , readDepsFile
-  , readDepsFileEither
-  , hReadDeps
-  , hReadDepsEither
-  , readDeps, readDepsMaybe
-  , readObjectFile
-  , readObjectFileKeys
+  ( putObject
+  , getObjectHeader
+  , getObjectBody
+  , getObject
   , readObject
-  , readObjectKeys
-  , putLinkableUnit
-  , emptySymbolTable
+  , getObjectUnits
+  , readObjectUnits
+  , readObjectDeps
   , isGlobalUnit
-  , isExportsUnit -- XXX verify that this is used
-  -- XXX probably should instead do something that just inspects the header instead of exporting it
-  , Header(..), getHeader, moduleNameTag
-  , SymbolTable
-  , ObjUnit (..)
+  , Object(..)
+  , IndexEntry(..)
   , Deps (..), BlockDeps (..), DepsLocation (..)
-  , ExpFun (..), ExportedFun (..)
-  , versionTag, versionTagLength
-  , runPutS
+  , ExportedFun (..)
   )
 where
 
 import GHC.Prelude
 
-import           Control.Exception (bracket)
 import           Control.Monad
 
 import           Data.Array
-import           Data.Monoid
-import qualified Data.Binary     as DB
-import qualified Data.Binary.Get as DB
-import qualified Data.Binary.Put as DB
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as B
-import           Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy.Char8 as C8 (pack, unpack)
-import qualified Data.ByteString.Short as SBS
-import           Data.Function (on)
 import           Data.Int
 import           Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
-import           Data.IORef
-import           Data.List (sortBy, sortOn)
+import           Data.List (sortOn)
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Maybe (catMaybes)
 import           Data.Word
-import           Data.Char (isSpace)
+import           Data.Char
 
-import           GHC.Generics
-import           GHC.Settings.Constants (hiVersion)
-
-import           System.IO (openBinaryFile, withBinaryFile, Handle,
-                            hClose, hSeek, SeekMode(..), IOMode(..) )
+import GHC.Settings.Constants (hiVersion)
 
 import GHC.JS.Syntax
 import GHC.StgToJS.Types
@@ -110,16 +83,19 @@ import GHC.Data.FastString
 
 import GHC.Types.Unique.Map
 import GHC.Float (castDoubleToWord64, castWord64ToDouble)
-import GHC.Utils.Binary hiding (SymbolTable)
-import GHC.Utils.Misc
-import GHC.Utils.Outputable (ppr, Outputable, hcat, vcat, text)
 
-data Header = Header
-  { hdrModuleName :: !BS.ByteString
-  , hdrSymbsLen   :: !Int64
-  , hdrDepsLen    :: !Int64
-  , hdrIdxLen     :: !Int64
-  } deriving (Eq, Ord, Show)
+import GHC.Utils.Binary hiding (SymbolTable)
+import GHC.Utils.Outputable (ppr, Outputable, hcat, vcat, text)
+import GHC.Utils.Panic
+import GHC.Utils.Monad (mapMaybeM)
+
+data Object = Object
+  { objModuleName    :: !ModuleName
+  , objHandle        :: !BinHandle     -- ^ BinHandle that can be used to read the ObjUnits
+  , objPayloadOffset :: !(Bin ObjUnit) -- ^ Offset of the payload (units)
+  , objDeps          :: !Deps
+  , objIndex         :: !Index
+  }
 
 type BlockId  = Int
 type BlockIds = IntSet
@@ -135,7 +111,7 @@ data Deps = Deps
       -- ^ exported Haskell functions -> block
   , depsBlocks          :: !(Array BlockId BlockDeps)
       -- ^ info about each block
-  } deriving (Generic)
+  }
 
 instance Outputable Deps where
   ppr d = vcat
@@ -144,29 +120,17 @@ instance Outputable Deps where
     ]
 
 -- | Where are the dependencies
-data DepsLocation = ObjectFile  FilePath           -- ^ In an object file at path
-                  | ArchiveFile FilePath           -- ^ In a Ar file at path
-                  | InMemory    String ByteString  -- ^ In memory
-                  deriving (Eq, Show)
-
-instance Outputable DepsLocation where
-  ppr x = text (show x)
+data DepsLocation
+  = ObjectFile  FilePath       -- ^ In an object file at path
+  | ArchiveFile FilePath       -- ^ In a Ar file at path
+  | InMemory    String Object  -- ^ In memory
 
 data BlockDeps = BlockDeps
   { blockBlockDeps       :: [Int]         -- ^ dependencies on blocks in this object
   , blockFunDeps         :: [ExportedFun] -- ^ dependencies on exported symbols in other objects
   -- , blockForeignExported :: [ExpFun]
   -- , blockForeignImported :: [ForeignRef]
-  } deriving (Generic)
-
-data ExpFun = ExpFun
-  { isIO   :: !Bool
-  , args   :: [JSFFIType]
-  , result :: !JSFFIType
-  } deriving (Eq, Ord, Show)
-
-trim :: String -> String
-trim = let f = dropWhile isSpace . reverse in f . f
+  }
 
 {- | we use the convention that the first unit (0) is a module-global
      unit that's always included when something from the module
@@ -175,24 +139,6 @@ trim = let f = dropWhile isSpace . reverse in f . f
  -}
 isGlobalUnit :: Int -> Bool
 isGlobalUnit n = n == 0
-
-isExportsUnit :: Int -> Bool
-isExportsUnit n = n == 1
-
-data JSFFIType
-  = Int8Type
-  | Int16Type
-  | Int32Type
-  | Int64Type
-  | Word8Type
-  | Word16Type
-  | Word32Type
-  | Word64Type
-  | DoubleType
-  | ByteArrayType
-  | PtrType
-  | RefType
-  deriving (Show, Ord, Eq, Enum)
 
 data ExportedFun = ExportedFun
   { funModule  :: !Module
@@ -205,138 +151,135 @@ instance Outputable ExportedFun where
     , hcat [ text "symbol: ", ppr f ]
     ]
 
--- we need to store the size separately, since getting a HashMap's size is O(n)
-data SymbolTable
-  = SymbolTable !Int !(UniqMap FastString Int)
+-- | Write an ObjUnit, except for the top level symbols which are stored in the
+-- index
+putObjUnit :: BinHandle -> ObjUnit -> IO ()
+putObjUnit bh (ObjUnit _syms b c d e f g) = do
+    put_ bh b
+    put_ bh c
+    put_ bh d
+    put_ bh e
+    put_ bh f
+    put_ bh g
 
-emptySymbolTable :: SymbolTable
-emptySymbolTable = SymbolTable 0 emptyUniqMap
+-- | Read an ObjUnit and associate it to the given symbols (that must have been
+-- read from the index)
+getObjUnit :: [FastString] -> BinHandle -> IO ObjUnit
+getObjUnit syms bh = do
+    b <- get bh
+    c <- get bh
+    d <- get bh
+    e <- get bh
+    f <- get bh
+    g <- get bh
+    pure (ObjUnit syms b c d e f g)
 
-insertSymbol :: FastString -> SymbolTable -> (SymbolTable, Int)
-insertSymbol s st@(SymbolTable n t) =
-  case lookupUniqMap t s of
-    Just k  -> (st, k)
-    Nothing -> (SymbolTable (n+1) (addToUniqMap t s n), n)
 
-data ObjEnv = ObjEnv
-  { oeSymbols :: Dictionary
-  , _oeName   :: String
+magic :: String
+magic = "GHCJSOBJ"
+
+-- | Serialized unit indexes and their exported symbols
+-- (the first unit is module-global)
+type Index = [IndexEntry]
+data IndexEntry = IndexEntry
+  { idxSymbols :: ![FastString]  -- ^ Symbols exported by a unit
+  , idxOffset  :: !(Bin ObjUnit) -- ^ Offset of the unit in the object file
   }
 
-runGetS :: HasDebugCallStack => String -> Dictionary -> (BinHandle -> IO a) -> ByteString -> IO a
-runGetS name st m bl = do
-  let bs = B.toStrict bl
-  bh0 <- unpackBinBuffer (BS.length bs) bs
-  let bh = setUserData bh0 (newReadState undefined (readTable (ObjEnv st name)))
-  m bh
+instance Binary IndexEntry where
+  put_ bh (IndexEntry a b) = put_ bh a >> put_ bh b
+  get bh = IndexEntry <$> get bh <*> get bh
 
--- temporary kludge to bridge BinHandle and ByteString
-runPutS :: SymbolTable -> (BinHandle -> IO ()) -> IO (SymbolTable, ByteString)
-runPutS st ps = do
-  bh0 <- openBinMem (1024 * 1024)
-  t_r <- newIORef st
-  let bh = setUserData bh0 (newWriteState undefined undefined (insertTable t_r))
-  ps bh
-  (,) <$> readIORef t_r <*> (B.fromStrict <$> packBinBuffer bh)
-
-insertTable :: IORef SymbolTable -> BinHandle -> FastString -> IO ()
-insertTable t_r bh s = do
-  t <- readIORef t_r
-  let !(t', n) = insertSymbol s t
-  writeIORef t_r t'
-  put_ bh n
-  return ()
-
-readTable :: ObjEnv -> BinHandle -> IO FastString
-readTable e bh = do
-  n :: Int <- get bh
-  return $ (oeSymbols e) ! fromIntegral n
-
--- one toplevel block in the object file
-data ObjUnit = ObjUnit
-  { oiSymbols  :: [FastString]   -- toplevel symbols (stored in index)
-  , oiClInfo   :: [ClosureInfo]  -- closure information of all closures in block
-  , oiStatic   :: [StaticInfo]   -- static closure data
-  , oiStat     :: JStat          -- the code
-  , oiRaw      :: FastString     -- raw JS code
-  , oiFExports :: [ExpFun]
-  , oiFImports :: [ForeignJSRef]
-  }
-
--- | Write a linkable unit
-putLinkableUnit
+putObject
   :: BinHandle
-  -> [ClosureInfo]
-  -> [StaticInfo]
-  -> JStat
-  -> FastString
-  -> [ExpFun]
-  -> [ForeignJSRef]
+  -> ModuleName -- ^ module
+  -> Deps       -- ^ dependencies
+  -> [ObjUnit]  -- ^ linkable units and their symbols
   -> IO ()
-putLinkableUnit bh ci si s sraw fe fi = do
-  put_ bh ci
-  put_ bh si
-  put_ bh s
-  put_ bh sraw
-  put_ bh fe
-  put_ bh fi
+putObject bh mod_name deps os = do
+  forM_ magic (putByte bh . fromIntegral . ord)
+  put_ bh (show hiVersion)
 
--- tag to store the module name in the object file
-moduleNameTag :: ModuleName -> BS.ByteString
-moduleNameTag (ModuleName fs) = case compare len moduleNameLength of
-  EQ -> tag
-  LT -> tag <> BS.replicate (moduleNameLength - len) 0 -- pad with 0s
-  GT -> BS.drop (len - moduleNameLength) tag           -- take only the ending chars
-  where
-    !tag = SBS.fromShort (fs_sbs fs)
-    !len = n_chars fs
+  -- we store the module name as a String because we don't want to have to
+  -- decode the FastString table just to decode it when we're looking for an
+  -- object in an archive.
+  put_ bh (moduleNameString mod_name)
 
-writeObject'
-  :: ModuleName                  -- ^ module
-  -> SymbolTable                 -- ^ final symbol table
-  -> Deps                        -- ^ dependencies
-  -> [([FastString],ByteString)] -- ^ serialized units and their exported symbols, the first unit is module-global
-  -> IO ByteString
-writeObject' mod_name st0 deps0 os = do
-  (sti, idx) <- putIndex st0 os
-  let symbs  =  putSymbolTable sti
-  deps1      <- putDepsSection deps0
-  let bl = fromIntegral . B.length
-  let hdr = putHeader (Header (moduleNameTag mod_name) (bl symbs) (bl deps1) (bl idx))
-  return $ hdr <> symbs <> deps1 <> idx <> mconcat (map snd os)
+  (bh_fs, _bin_dict, put_dict) <- initBinDictionary bh
 
-putIndex :: SymbolTable -> [([FastString], ByteString)] -> IO (SymbolTable, ByteString)
-putIndex st xs = runPutS st (\bh -> put_ bh $ zip symbols offsets)
-  where
-    (symbols, values) = unzip xs
-    offsets = scanl (+) 0 (map B.length values)
+  forwardPut_ bh (const put_dict) $ do
+    put_ bh_fs deps
 
-getIndex :: HasDebugCallStack => String -> Dictionary -> ByteString -> IO [([FastString], Int64)]
-getIndex name st bs = runGetS name st get bs
+    -- forward put the index
+    forwardPut_ bh_fs (put_ bh_fs) $ do
+      idx <- forM os $ \o -> do
+        p <- tellBin bh_fs
+        -- write units without their symbols
+        putObjUnit bh_fs o
+        -- return symbols and offset to store in the index
+        pure (oiSymbols o,p)
+      pure idx
 
-putDeps :: SymbolTable -> Deps -> IO (SymbolTable, ByteString)
-putDeps st deps = runPutS st (\bh -> put_ bh deps)
+-- | Parse object header
+getObjectHeader :: BinHandle -> IO (Either String ModuleName)
+getObjectHeader bh = do
+  let go_magic = \case
+        []     -> pure True
+        (e:es) -> getByte bh >>= \case
+          c | fromIntegral (ord e) == c -> go_magic es
+            | otherwise                 -> pure False
 
-getDeps :: HasDebugCallStack => String -> Dictionary -> ByteString -> IO Deps
-getDeps name st bs = runGetS name st get bs
+  is_magic <- go_magic magic
+  case is_magic of
+    False -> pure (Left "invalid magic header")
+    True  -> do
+      is_correct_version <- ((== hiVersion) . read) <$> get bh
+      case is_correct_version of
+        False -> pure (Left "invalid header version")
+        True  -> do
+          mod_name <- get bh
+          pure (Right (mkModuleName (mod_name)))
+
+
+-- | Parse object body. Must be called after a sucessful getObjectHeader
+getObjectBody :: BinHandle -> ModuleName -> IO Object
+getObjectBody bh0 mod_name = do
+  -- Read the string table
+  dict <- forwardGet bh0 (getDictionary bh0)
+  let bh = setUserData bh0 $ defaultUserData { ud_get_fs = getDictFastString dict }
+
+  deps     <- get bh
+  idx      <- forwardGet bh (get bh)
+  payload_pos <- tellBin bh
+
+  pure $ Object
+    { objModuleName    = mod_name
+    , objHandle        = bh
+    , objPayloadOffset = payload_pos
+    , objDeps          = deps
+    , objIndex         = idx
+    }
+
+-- | Parse object
+getObject :: BinHandle -> IO Object
+getObject bh = do
+  getObjectHeader bh >>= \case
+    Left err       -> panic ("getObject: " ++ err)
+    Right mod_name -> getObjectBody bh mod_name
+
+-- | Read object from file
+--
+-- The object is still in memory after this (see objHandle).
+readObject :: FilePath -> IO Object
+readObject file = do
+  bh <- readBinMem file
+  getObject bh
 
 toI32 :: Int -> Int32
 toI32 = fromIntegral
 
 fromI32 :: Int32 -> Int
 fromI32 = fromIntegral
-
-putDepsSection :: Deps -> IO ByteString
-putDepsSection deps = do
-  (st, depsbs) <- putDeps emptySymbolTable deps
-  let stbs     = putSymbolTable st
-  return $ DB.runPut (DB.putWord32le (fromIntegral $ B.length stbs)) <> stbs <> depsbs
-
-getDepsSection :: HasDebugCallStack => String -> ByteString -> IO Deps
-getDepsSection name bs =
-  let symbsLen = fromIntegral $ DB.runGet DB.getWord32le bs
-      symbs    = getSymbolTable (B.drop 4 bs)
-  in  getDeps name symbs (B.drop (4+symbsLen) bs)
 
 instance Binary Deps where
   put_ bh (Deps m r e b) = do
@@ -362,177 +305,48 @@ instance Binary ExpFun where
   put_ bh (ExpFun isIO args res) = put_ bh isIO >> put_ bh args >> put_ bh res
   get bh                        = ExpFun <$> get bh <*> get bh <*> get bh
 
--- | reads only the part necessary to get bh the dependencies
---   so it's potentially more efficient than readDeps <$> B.readFile file
-readDepsFile :: FilePath -> IO Deps
-readDepsFile file = withBinaryFile file ReadMode (hReadDeps file)
-
-readDepsFileEither :: FilePath -> IO (Either String Deps)
-readDepsFileEither file = withBinaryFile file ReadMode (hReadDepsEither file)
-
-hReadDeps :: String -> Handle -> IO Deps
-hReadDeps name h = do
-  res <- hReadDepsEither name h
-  case res of
-    Left err -> error ("hReadDeps: not a valid GHCJS object: " ++ name ++ "\n    " ++ err)
-    Right deps -> pure deps
-
-hReadDepsEither :: String -> Handle -> IO (Either String Deps)
-hReadDepsEither name h = do
-  mhdr <- getHeader <$> B.hGet h headerLength
-  case mhdr of
-    Left err -> pure (Left err)
-    Right hdr -> do
-      hSeek h RelativeSeek (fromIntegral $ hdrSymbsLen hdr)
-      Right <$> (getDepsSection name =<< B.hGet h (fromIntegral $ hdrDepsLen hdr))
-
-readDepsEither :: String -> ByteString -> IO (Either String Deps)
-readDepsEither name bs =
-  case getHeader bs of
-    Left err -> return $ Left err
-    Right hdr ->
-      let depsStart = fromIntegral headerLength + fromIntegral (hdrSymbsLen hdr)
-      in  Right <$> getDepsSection name (B.drop depsStart bs)
+-- | Reads only the part necessary to get the dependencies
+readObjectDeps :: FilePath -> IO Deps
+readObjectDeps file = do
+  bh <- readBinMem file
+  obj <- getObject bh
+  pure $! objDeps obj
 
 
--- | call with contents of the file
-readDeps :: String -> B.ByteString -> IO Deps
-readDeps name bs = do
-  mdeps <- readDepsEither name bs
-  case mdeps of
-    Left err -> error ("readDeps: not a valid GHCJS object: " ++ name ++ "\n   " ++ err)
-    Right deps -> return deps
-
-readDepsMaybe :: String -> ByteString -> IO (Maybe Deps)
-readDepsMaybe name bs = either (const Nothing) Just <$> readDepsEither name bs
-
--- | extract the linkable units from an object file
-readObjectFile :: FilePath -> IO [ObjUnit]
-readObjectFile = readObjectFileKeys (\_ _ -> True)
-
-readObjectFileKeys :: (Int -> [FastString] -> Bool) -> FilePath -> IO [ObjUnit]
-readObjectFileKeys p file = bracket (openBinaryFile file ReadMode) hClose $ \h -> do
-  mhdr <- getHeader <$> B.hGet h headerLength
-  case mhdr of
-    Left err -> error ("readObjectFileKeys: not a valid GHCJS object: " ++ file ++ "\n    " ++ err)
-    Right hdr -> do
-      bss <- B.hGet h (fromIntegral $ hdrSymbsLen hdr)
-      hSeek h RelativeSeek (fromIntegral $ hdrDepsLen hdr)
-      bsi <- B.fromStrict <$> BS.hGetContents h
-      readObjectKeys' file p (getSymbolTable bss) bsi (B.drop (fromIntegral $ hdrIdxLen hdr) bsi)
-
-readObject :: String -> ByteString -> IO [ObjUnit]
-readObject name = readObjectKeys name (\_ _ -> True)
-
-readObjectKeys :: HasDebugCallStack => String -> (Int -> [FastString] -> Bool) -> ByteString -> IO [ObjUnit]
-readObjectKeys name p bs =
-  case getHeader bs of
-    Left err -> error ("readObjectKeys: not a valid GHCJS object: " ++ name ++ "\n    " ++ err)
-    Right hdr ->
-      let bssymbs = B.drop (fromIntegral headerLength) bs
-          bsidx   = B.drop (fromIntegral $ hdrSymbsLen hdr + hdrDepsLen hdr) bssymbs
-          bsobjs  = B.drop (fromIntegral $ hdrIdxLen hdr) bsidx
-      in readObjectKeys' name p (getSymbolTable bssymbs) bsidx bsobjs
-
-readObjectKeys' :: HasDebugCallStack
-                => String
-                -> (Int -> [FastString] -> Bool)
-                -> Dictionary
-                -> ByteString
-                -> ByteString
-                -> IO [ObjUnit]
-readObjectKeys' name p st bsidx bsobjs = do
-  idx <- getIndex name st bsidx
-  catMaybes <$> zipWithM readObj [0..] idx
+-- | Get units in the object file, using the given filtering function
+getObjectUnits :: Object -> (Word -> IndexEntry -> Bool) -> IO [ObjUnit]
+getObjectUnits obj pred = mapMaybeM read_entry (zip (objIndex obj) [0..])
   where
-    readObj n (x,off)
-      | p n x = do
-         (ci, si, s, sraw, fe, fi) <- runGetS name st getOU (B.drop off bsobjs)
-         return $ Just (ObjUnit x ci si s sraw fe fi)
-      | otherwise = return Nothing
-    getOU bh = (,,,,,) <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+    bh = objHandle obj
+    read_entry (e@(IndexEntry syms offset),i)
+      | pred i e  = do
+          seekBin bh offset
+          Just <$> getObjUnit syms bh
+      | otherwise = pure Nothing
 
-getSymbolTable :: HasDebugCallStack => ByteString -> Dictionary
-getSymbolTable bs = listArray (0,n-1) xs
-  where
-    (n,xs) = DB.runGet getter bs
-    getter :: DB.Get (Int, [FastString])
-    getter = do
-      l <- DB.getWord32le
-      let l' = fromIntegral l
-      (l',) <$> replicateM l' DB.get
-
-putSymbolTable :: SymbolTable -> ByteString
-putSymbolTable (SymbolTable _ hm) = st
-    where
-      st = DB.runPut $ do
-              DB.putWord32le (fromIntegral $ length xs)
-              mapM_ DB.put xs
-      xs :: [FastString]
-      xs = map fst . sortBy (compare `on` snd) . nonDetEltsUniqMap $ hm
-      -- We can use `nonDetEltsUniqMap` because the paired `Int`s introduce ordering.
-
-headerLength :: Int
-headerLength = 32 + versionTagLength + moduleNameLength
-
--- human readable version string in object
-versionTag :: ByteString
-versionTag = B.take 32 . C8.pack $ show hiVersion ++ replicate versionTagLength ' '
-
-versionTagLength :: Int
-versionTagLength = 32
-
--- last part of the module name, to disambiguate files
-moduleNameLength :: Int
-moduleNameLength = 128
-
-getHeader :: HasDebugCallStack => ByteString -> Either String Header
-getHeader bs
-  | B.length bs < fromIntegral headerLength = Left "not enough input, file truncated?"
-  | magic /= "GHCJSOBJ"                     = Left $ "magic number incorrect, not a JavaScript .o file?"
-  | tag   /= versionTag                     = Left $ "incorrect version, expected " ++ show hiVersion ++
-                                                     " but got " ++ (trim . C8.unpack $ tag)
-  | otherwise                               = Right (Header mn sl dl il)
-   where
-     g                    = fromIntegral <$> DB.getWord64le
-     (magic, tag, mn, sl, dl, il) = DB.runGet ((,,,,,) <$> DB.getByteString 8
-                                                       <*> DB.getLazyByteString (fromIntegral versionTagLength)
-                                                       <*> DB.getByteString (fromIntegral moduleNameLength)
-                                                       <*> g
-                                                       <*> g
-                                                       <*> g
-                                      ) bs
-
-putHeader :: Header -> ByteString
-putHeader (Header mn sl dl il) = DB.runPut $ do
-  DB.putByteString "GHCJSOBJ"
-  DB.putLazyByteString versionTag
-  DB.putByteString mn
-  mapM_ (DB.putWord64le . fromIntegral) [sl, dl, il]
-
-tag :: BinHandle -> Word8 -> IO ()
-tag = put_
-
-getTag :: BinHandle -> IO Word8
-getTag = get
+-- | Read units in the object file, using the given filtering function
+readObjectUnits :: FilePath -> (Word -> IndexEntry -> Bool) -> IO [ObjUnit]
+readObjectUnits file pred = do
+  obj <- readObject file
+  getObjectUnits obj pred
 
 instance Binary JStat where
-  put_ bh (DeclStat i)         = tag bh 1  >> put_ bh i
-  put_ bh (ReturnStat e)       = tag bh 2  >> put_ bh e
-  put_ bh (IfStat e s1 s2)     = tag bh 3  >> put_ bh e  >> put_ bh s1 >> put_ bh s2
-  put_ bh (WhileStat b e s)    = tag bh 4  >> put_ bh b  >> put_ bh e  >> put_ bh s
-  put_ bh (ForInStat b i e s)  = tag bh 5  >> put_ bh b  >> put_ bh i  >> put_ bh e  >> put_ bh s
-  put_ bh (SwitchStat e ss s)  = tag bh 6  >> put_ bh e  >> put_ bh ss >> put_ bh s
-  put_ bh (TryStat s1 i s2 s3) = tag bh 7  >> put_ bh s1 >> put_ bh i  >> put_ bh s2 >> put_ bh s3
-  put_ bh (BlockStat xs)       = tag bh 8  >> put_ bh xs
-  put_ bh (ApplStat e es)      = tag bh 9  >> put_ bh e  >> put_ bh es
-  put_ bh (UOpStat o e)        = tag bh 10 >> put_ bh o  >> put_ bh e
-  put_ bh (AssignStat e1 e2)   = tag bh 11 >> put_ bh e1 >> put_ bh e2
+  put_ bh (DeclStat i)         = putByte bh 1  >> put_ bh i
+  put_ bh (ReturnStat e)       = putByte bh 2  >> put_ bh e
+  put_ bh (IfStat e s1 s2)     = putByte bh 3  >> put_ bh e  >> put_ bh s1 >> put_ bh s2
+  put_ bh (WhileStat b e s)    = putByte bh 4  >> put_ bh b  >> put_ bh e  >> put_ bh s
+  put_ bh (ForInStat b i e s)  = putByte bh 5  >> put_ bh b  >> put_ bh i  >> put_ bh e  >> put_ bh s
+  put_ bh (SwitchStat e ss s)  = putByte bh 6  >> put_ bh e  >> put_ bh ss >> put_ bh s
+  put_ bh (TryStat s1 i s2 s3) = putByte bh 7  >> put_ bh s1 >> put_ bh i  >> put_ bh s2 >> put_ bh s3
+  put_ bh (BlockStat xs)       = putByte bh 8  >> put_ bh xs
+  put_ bh (ApplStat e es)      = putByte bh 9  >> put_ bh e  >> put_ bh es
+  put_ bh (UOpStat o e)        = putByte bh 10 >> put_ bh o  >> put_ bh e
+  put_ bh (AssignStat e1 e2)   = putByte bh 11 >> put_ bh e1 >> put_ bh e2
   put_ _  (UnsatBlock {})      = error "put_ bh JStat: UnsatBlock"
-  put_ bh (LabelStat l s)      = tag bh 12 >> put_ bh l  >> put_ bh s
-  put_ bh (BreakStat ml)       = tag bh 13 >> put_ bh ml
-  put_ bh (ContinueStat ml)    = tag bh 14 >> put_ bh ml
-  get bh = getTag bh >>= \case
+  put_ bh (LabelStat l s)      = putByte bh 12 >> put_ bh l  >> put_ bh s
+  put_ bh (BreakStat ml)       = putByte bh 13 >> put_ bh ml
+  put_ bh (ContinueStat ml)    = putByte bh 14 >> put_ bh ml
+  get bh = getByte bh >>= \case
     1  -> DeclStat     <$> get bh
     2  -> ReturnStat   <$> get bh
     3  -> IfStat       <$> get bh <*> get bh <*> get bh
@@ -550,15 +364,15 @@ instance Binary JStat where
     n -> error ("Binary get bh JStat: invalid tag: " ++ show n)
 
 instance Binary JExpr where
-  put_ bh (ValExpr v)          = tag bh 1 >> put_ bh v
-  put_ bh (SelExpr e i)        = tag bh 2 >> put_ bh e  >> put_ bh i
-  put_ bh (IdxExpr e1 e2)      = tag bh 3 >> put_ bh e1 >> put_ bh e2
-  put_ bh (InfixExpr o e1 e2)  = tag bh 4 >> put_ bh o  >> put_ bh e1 >> put_ bh e2
-  put_ bh (UOpExpr o e)        = tag bh 5 >> put_ bh o  >> put_ bh e
-  put_ bh (IfExpr e1 e2 e3)    = tag bh 6 >> put_ bh e1 >> put_ bh e2 >> put_ bh e3
-  put_ bh (ApplExpr e es)      = tag bh 7 >> put_ bh e  >> put_ bh es
+  put_ bh (ValExpr v)          = putByte bh 1 >> put_ bh v
+  put_ bh (SelExpr e i)        = putByte bh 2 >> put_ bh e  >> put_ bh i
+  put_ bh (IdxExpr e1 e2)      = putByte bh 3 >> put_ bh e1 >> put_ bh e2
+  put_ bh (InfixExpr o e1 e2)  = putByte bh 4 >> put_ bh o  >> put_ bh e1 >> put_ bh e2
+  put_ bh (UOpExpr o e)        = putByte bh 5 >> put_ bh o  >> put_ bh e
+  put_ bh (IfExpr e1 e2 e3)    = putByte bh 6 >> put_ bh e1 >> put_ bh e2 >> put_ bh e3
+  put_ bh (ApplExpr e es)      = putByte bh 7 >> put_ bh e  >> put_ bh es
   put_ _  (UnsatExpr {})       = error "put_ bh JExpr: UnsatExpr"
-  get bh = getTag bh >>= \case
+  get bh = getByte bh >>= \case
     1 -> ValExpr   <$> get bh
     2 -> SelExpr   <$> get bh <*> get bh
     3 -> IdxExpr   <$> get bh <*> get bh
@@ -569,16 +383,16 @@ instance Binary JExpr where
     n -> error ("Binary get bh JExpr: invalid tag: " ++ show n)
 
 instance Binary JVal where
-  put_ bh (JVar i)      = tag bh 1 >> put_ bh i
-  put_ bh (JList es)    = tag bh 2 >> put_ bh es
-  put_ bh (JDouble d)   = tag bh 3 >> put_ bh d
-  put_ bh (JInt i)      = tag bh 4 >> put_ bh i
-  put_ bh (JStr xs)     = tag bh 5 >> put_ bh xs
-  put_ bh (JRegEx xs)   = tag bh 6 >> put_ bh xs
-  put_ bh (JHash m)     = tag bh 7 >> put_ bh (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap m)
-  put_ bh (JFunc is s)  = tag bh 8 >> put_ bh is >> put_ bh s
+  put_ bh (JVar i)      = putByte bh 1 >> put_ bh i
+  put_ bh (JList es)    = putByte bh 2 >> put_ bh es
+  put_ bh (JDouble d)   = putByte bh 3 >> put_ bh d
+  put_ bh (JInt i)      = putByte bh 4 >> put_ bh i
+  put_ bh (JStr xs)     = putByte bh 5 >> put_ bh xs
+  put_ bh (JRegEx xs)   = putByte bh 6 >> put_ bh xs
+  put_ bh (JHash m)     = putByte bh 7 >> put_ bh (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap m)
+  put_ bh (JFunc is s)  = putByte bh 8 >> put_ bh is >> put_ bh s
   put_ _  (UnsatVal {}) = error "put_ bh JVal: UnsatVal"
-  get bh = getTag bh >>= \case
+  get bh = getByte bh >>= \case
     1 -> JVar    <$> get bh
     2 -> JList   <$> get bh
     3 -> JDouble <$> get bh
@@ -596,12 +410,12 @@ instance Binary Ident where
 -- we need to preserve NaN and infinities, unfortunately the Binary instance for Double does not do this
 instance Binary SaneDouble where
   put_ bh (SaneDouble d)
-    | isNaN d               = tag bh 1
-    | isInfinite d && d > 0 = tag bh 2
-    | isInfinite d && d < 0 = tag bh 3
-    | isNegativeZero d      = tag bh 4
-    | otherwise             = tag bh 5 >> put_ bh (castDoubleToWord64 d)
-  get bh = getTag bh >>= \case
+    | isNaN d               = putByte bh 1
+    | isInfinite d && d > 0 = putByte bh 2
+    | isInfinite d && d < 0 = putByte bh 3
+    | isNegativeZero d      = putByte bh 4
+    | otherwise             = putByte bh 5 >> put_ bh (castDoubleToWord64 d)
+  get bh = getByte bh >>= \case
     1 -> pure $ SaneDouble (0    / 0)
     2 -> pure $ SaneDouble (1    / 0)
     3 -> pure $ SaneDouble ((-1) / 0)
@@ -623,9 +437,9 @@ instance Binary VarType where
   get bh = getEnum bh
 
 instance Binary CIRegs where
-  put_ bh CIRegsUnknown       = tag bh 1
-  put_ bh (CIRegs skip types) = tag bh 2 >> put_ bh skip >> put_ bh types
-  get bh = getTag bh >>= \case
+  put_ bh CIRegsUnknown       = putByte bh 1
+  put_ bh (CIRegs skip types) = putByte bh 2 >> put_ bh skip >> put_ bh types
+  get bh = getByte bh >>= \case
     1 -> pure CIRegsUnknown
     2 -> CIRegs <$> get bh <*> get bh
     n -> error ("Binary get bh CIRegs: invalid tag: " ++ show n)
@@ -640,29 +454,29 @@ instance Binary JUOp where
 
 -- 16 bit sizes should be enough...
 instance Binary CILayout where
-  put_ bh CILayoutVariable           = tag bh 1
-  put_ bh (CILayoutUnknown size)     = tag bh 2 >> put_ bh size
-  put_ bh (CILayoutFixed size types) = tag bh 3 >> put_ bh size >> put_ bh types
-  get bh = getTag bh >>= \case
+  put_ bh CILayoutVariable           = putByte bh 1
+  put_ bh (CILayoutUnknown size)     = putByte bh 2 >> put_ bh size
+  put_ bh (CILayoutFixed size types) = putByte bh 3 >> put_ bh size >> put_ bh types
+  get bh = getByte bh >>= \case
     1 -> pure CILayoutVariable
     2 -> CILayoutUnknown <$> get bh
     3 -> CILayoutFixed   <$> get bh <*> get bh
     n -> error ("Binary get bh CILayout: invalid tag: " ++ show n)
 
 instance Binary CIStatic where
-  put_ bh (CIStaticRefs refs) = tag bh 1 >> put_ bh refs
-  get bh = getTag bh >>= \case
+  put_ bh (CIStaticRefs refs) = putByte bh 1 >> put_ bh refs
+  get bh = getByte bh >>= \case
     1 -> CIStaticRefs <$> get bh
     n -> error ("Binary get bh CIStatic: invalid tag: " ++ show n)
 
 instance Binary CIType where
-  put_ bh (CIFun arity regs) = tag bh 1 >> put_ bh arity >> put_ bh regs
-  put_ bh CIThunk            = tag bh 2
-  put_ bh (CICon conTag)     = tag bh 3 >> put_ bh conTag
-  put_ bh CIPap              = tag bh 4
-  put_ bh CIBlackhole        = tag bh 5
-  put_ bh CIStackFrame       = tag bh 6
-  get bh = getTag bh >>= \case
+  put_ bh (CIFun arity regs) = putByte bh 1 >> put_ bh arity >> put_ bh regs
+  put_ bh CIThunk            = putByte bh 2
+  put_ bh (CICon conTag)     = putByte bh 3 >> put_ bh conTag
+  put_ bh CIPap              = putByte bh 4
+  put_ bh CIBlackhole        = putByte bh 5
+  put_ bh CIStackFrame       = putByte bh 6
+  get bh = getByte bh >>= \case
     1 -> CIFun <$> get bh <*> get bh
     2 -> pure CIThunk
     3 -> CICon <$> get bh
@@ -675,37 +489,6 @@ instance Binary ExportedFun where
   put_ bh (ExportedFun modu symb) = put_ bh modu >> put_ bh symb
   get bh = ExportedFun <$> get bh <*> get bh
 
-instance DB.Binary Module where
-  put (Module unit mod_name) = DB.put unit >> DB.put mod_name
-  get = Module <$> DB.get <*> DB.get
-
-instance DB.Binary ModuleName where
-  put (ModuleName fs) = DB.put fs
-  get = ModuleName <$> DB.get
-
-instance DB.Binary Unit where
-  put = \case
-    RealUnit (Definite uid) -> DB.put (0 :: Int) >> DB.put uid
-    VirtUnit uid            -> DB.put (1 :: Int) >> DB.put uid
-    HoleUnit                -> DB.put (2 :: Int)
-  get = DB.get >>= \case
-    (0 :: Int) -> RealUnit . Definite <$> DB.get
-    1          -> VirtUnit              <$> DB.get
-    _          -> pure HoleUnit
-
-instance DB.Binary UnitId where
-  put (UnitId fs) = DB.put fs
-  get = UnitId <$> DB.get
-
-instance DB.Binary InstantiatedUnit where
-  put indef = do
-    DB.put (instUnitInstanceOf indef)
-    DB.put (instUnitInsts indef)
-  get = mkInstantiatedUnitSorted <$> DB.get <*> DB.get
-
-instance DB.Binary FastString where
-  put fs = DB.put (unpackFS fs)
-  get = mkFastString <$> DB.get
 
 putEnum :: Enum a => BinHandle -> a -> IO ()
 putEnum bh x | n > 65535 = error ("putEnum: out of range: " ++ show n)
@@ -720,12 +503,12 @@ instance Binary StaticInfo where
   get bh = StaticInfo <$> get bh <*> get bh <*> get bh
 
 instance Binary StaticVal where
-  put_ bh (StaticFun f args)   = tag bh 1 >> put_ bh f  >> put_ bh args
-  put_ bh (StaticThunk t)      = tag bh 2 >> put_ bh t
-  put_ bh (StaticUnboxed u)    = tag bh 3 >> put_ bh u
-  put_ bh (StaticData dc args) = tag bh 4 >> put_ bh dc >> put_ bh args
-  put_ bh (StaticList xs t)    = tag bh 5 >> put_ bh xs >> put_ bh t
-  get bh = getTag bh >>= \case
+  put_ bh (StaticFun f args)   = putByte bh 1 >> put_ bh f  >> put_ bh args
+  put_ bh (StaticThunk t)      = putByte bh 2 >> put_ bh t
+  put_ bh (StaticUnboxed u)    = putByte bh 3 >> put_ bh u
+  put_ bh (StaticData dc args) = putByte bh 4 >> put_ bh dc >> put_ bh args
+  put_ bh (StaticList xs t)    = putByte bh 5 >> put_ bh xs >> put_ bh t
+  get bh = getByte bh >>= \case
     1 -> StaticFun     <$> get bh <*> get bh
     2 -> StaticThunk   <$> get bh
     3 -> StaticUnboxed <$> get bh
@@ -734,12 +517,12 @@ instance Binary StaticVal where
     n -> error ("Binary get bh StaticVal: invalid tag " ++ show n)
 
 instance Binary StaticUnboxed where
-  put_ bh (StaticUnboxedBool b)           = tag bh 1 >> put_ bh b
-  put_ bh (StaticUnboxedInt i)            = tag bh 2 >> put_ bh i
-  put_ bh (StaticUnboxedDouble d)         = tag bh 3 >> put_ bh d
-  put_ bh (StaticUnboxedString str)       = tag bh 4 >> put_ bh str
-  put_ bh (StaticUnboxedStringOffset str) = tag bh 5 >> put_ bh str
-  get bh = getTag bh >>= \case
+  put_ bh (StaticUnboxedBool b)           = putByte bh 1 >> put_ bh b
+  put_ bh (StaticUnboxedInt i)            = putByte bh 2 >> put_ bh i
+  put_ bh (StaticUnboxedDouble d)         = putByte bh 3 >> put_ bh d
+  put_ bh (StaticUnboxedString str)       = putByte bh 4 >> put_ bh str
+  put_ bh (StaticUnboxedStringOffset str) = putByte bh 5 >> put_ bh str
+  get bh = getByte bh >>= \case
     1 -> StaticUnboxedBool         <$> get bh
     2 -> StaticUnboxedInt          <$> get bh
     3 -> StaticUnboxedDouble       <$> get bh
@@ -748,24 +531,24 @@ instance Binary StaticUnboxed where
     n -> error ("Binary get bh StaticUnboxed: invalid tag " ++ show n)
 
 instance Binary StaticArg where
-  put_ bh (StaticObjArg i)      = tag bh 1 >> put_ bh i
-  put_ bh (StaticLitArg p)      = tag bh 2 >> put_ bh p
-  put_ bh (StaticConArg c args) = tag bh 3 >> put_ bh c >> put_ bh args
-  get bh = getTag bh >>= \case
+  put_ bh (StaticObjArg i)      = putByte bh 1 >> put_ bh i
+  put_ bh (StaticLitArg p)      = putByte bh 2 >> put_ bh p
+  put_ bh (StaticConArg c args) = putByte bh 3 >> put_ bh c >> put_ bh args
+  get bh = getByte bh >>= \case
     1 -> StaticObjArg <$> get bh
     2 -> StaticLitArg <$> get bh
     3 -> StaticConArg <$> get bh <*> get bh
     n -> error ("Binary get bh StaticArg: invalid tag " ++ show n)
 
 instance Binary StaticLit where
-  put_ bh (BoolLit b)    = tag bh 1 >> put_ bh b
-  put_ bh (IntLit i)     = tag bh 2 >> put_ bh i
-  put_ bh NullLit        = tag bh 3
-  put_ bh (DoubleLit d)  = tag bh 4 >> put_ bh d
-  put_ bh (StringLit t)  = tag bh 5 >> put_ bh t
-  put_ bh (BinLit b)     = tag bh 6 >> put_ bh b
-  put_ bh (LabelLit b t) = tag bh 7 >> put_ bh b >> put_ bh t
-  get bh = getTag bh >>= \case
+  put_ bh (BoolLit b)    = putByte bh 1 >> put_ bh b
+  put_ bh (IntLit i)     = putByte bh 2 >> put_ bh i
+  put_ bh NullLit        = putByte bh 3
+  put_ bh (DoubleLit d)  = putByte bh 4 >> put_ bh d
+  put_ bh (StringLit t)  = putByte bh 5 >> put_ bh t
+  put_ bh (BinLit b)     = putByte bh 6 >> put_ bh b
+  put_ bh (LabelLit b t) = putByte bh 7 >> put_ bh b >> put_ bh t
+  get bh = getByte bh >>= \case
     1 -> BoolLit   <$> get bh
     2 -> IntLit    <$> get bh
     3 -> pure NullLit

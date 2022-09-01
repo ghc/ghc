@@ -15,7 +15,6 @@ module GHC.Iface.Binary (
         readBinIface,
         readBinIfaceHeader,
         getSymtabName,
-        getDictFastString,
         CheckHiWay(..),
         TraceBinIFace(..),
         getWithUserData,
@@ -24,11 +23,8 @@ module GHC.Iface.Binary (
         -- * Internal serialisation functions
         getSymbolTable,
         putName,
-        putDictionary,
-        putFastString,
         putSymbolTable,
         BinSymbolTable(..),
-        BinDictionary(..)
     ) where
 
 import GHC.Prelude
@@ -48,7 +44,6 @@ import GHC.Utils.Outputable
 import GHC.Types.Name.Cache
 import GHC.Types.SrcLoc
 import GHC.Platform
-import GHC.Data.FastString
 import GHC.Settings.Constants
 import GHC.Utils.Fingerprint
 
@@ -153,31 +148,28 @@ readBinIface profile name_cache checkHiWay traceBinIface hi_path = do
 -- Names or FastStrings.
 getWithUserData :: Binary a => NameCache -> BinHandle -> IO a
 getWithUserData name_cache bh = do
+  bh <- getTables name_cache bh
+  get bh
+
+-- | Setup a BinHandle to read something written using putWithTables
+--
+-- Reading names has the side effect of adding them into the given NameCache.
+getTables :: NameCache -> BinHandle -> IO BinHandle
+getTables name_cache bh = do
     -- Read the dictionary
     -- The next word in the file is a pointer to where the dictionary is
     -- (probably at the end of the file)
-    dict_p <- Binary.get bh
-    data_p <- tellBin bh          -- Remember where we are now
-    seekBin bh dict_p
-    dict   <- getDictionary bh
-    seekBin bh data_p             -- Back to where we were before
+    dict <- Binary.forwardGet bh (getDictionary bh)
 
     -- Initialise the user-data field of bh
-    bh <- do
-        bh <- return $ setUserData bh $ newReadState (error "getSymtabName")
-                                                     (getDictFastString dict)
-        symtab_p <- Binary.get bh     -- Get the symtab ptr
-        data_p <- tellBin bh          -- Remember where we are now
-        seekBin bh symtab_p
-        symtab <- getSymbolTable bh name_cache
-        seekBin bh data_p             -- Back to where we were before
+    let bh_fs = setUserData bh $ newReadState (error "getSymtabName")
+                                              (getDictFastString dict)
 
-        -- It is only now that we know how to get a Name
-        return $ setUserData bh $ newReadState (getSymtabName name_cache dict symtab)
-                                               (getDictFastString dict)
+    symtab <- Binary.forwardGet bh_fs (getSymbolTable bh_fs name_cache)
 
-    -- Read the interface file
-    get bh
+    -- It is only now that we know how to get a Name
+    return $ setUserData bh $ newReadState (getSymtabName name_cache dict symtab)
+                                           (getDictFastString dict)
 
 -- | Write an interface file
 writeBinIface :: Profile -> TraceBinIFace -> FilePath -> ModIface -> IO ()
@@ -211,64 +203,63 @@ writeBinIface profile traceBinIface hi_path mod_iface = do
 -- This segment should be read using `getWithUserData`.
 putWithUserData :: Binary a => TraceBinIFace -> BinHandle -> a -> IO ()
 putWithUserData traceBinIface bh payload = do
-    -- Remember where the dictionary pointer will go
-    dict_p_p <- tellBin bh
-    -- Placeholder for ptr to dictionary
-    put_ bh dict_p_p
+  (name_count, fs_count, _b) <- putWithTables bh (\bh' -> put bh' payload)
 
-    -- Remember where the symbol table pointer will go
-    symtab_p_p <- tellBin bh
-    put_ bh symtab_p_p
-    -- Make some initial state
+  case traceBinIface of
+    QuietBinIFace         -> return ()
+    TraceBinIFace printer -> do
+       printer (text "writeBinIface:" <+> int name_count
+                                      <+> text "Names")
+       printer (text "writeBinIface:" <+> int fs_count
+                                      <+> text "dict entries")
+
+-- | Write name/symbol tables
+--
+-- 1. setup the given BinHandle with Name/FastString table handling
+-- 2. write the following
+--    - FastString table pointer
+--    - Name table pointer
+--    - payload
+--    - Name table
+--    - FastString table
+--
+-- It returns (number of names, number of FastStrings, payload write result)
+--
+putWithTables :: BinHandle -> (BinHandle -> IO b) -> IO (Int,Int,b)
+putWithTables bh put_payload = do
+    -- initialize state for the name table and the FastString table.
     symtab_next <- newFastMutInt 0
     symtab_map <- newIORef emptyUFM
-    let bin_symtab = BinSymbolTable {
-                         bin_symtab_next = symtab_next,
-                         bin_symtab_map  = symtab_map }
-    dict_next_ref <- newFastMutInt 0
-    dict_map_ref <- newIORef emptyUFM
-    let bin_dict = BinDictionary {
-                       bin_dict_next = dict_next_ref,
-                       bin_dict_map  = dict_map_ref }
+    let bin_symtab = BinSymbolTable
+                      { bin_symtab_next = symtab_next
+                      , bin_symtab_map  = symtab_map
+                      }
 
-    -- Put the main thing,
-    bh <- return $ setUserData bh $ newWriteState (putName bin_dict bin_symtab)
-                                                  (putName bin_dict bin_symtab)
-                                                  (putFastString bin_dict)
-    put_ bh payload
+    (bh_fs, bin_dict, put_dict) <- initBinDictionary bh
 
-    -- Write the symtab pointer at the front of the file
-    symtab_p <- tellBin bh        -- This is where the symtab will start
-    putAt bh symtab_p_p symtab_p  -- Fill in the placeholder
-    seekBin bh symtab_p           -- Seek back to the end of the file
+    (fs_count,(name_count,r)) <- forwardPut bh (const put_dict) $ do
 
-    -- Write the symbol table itself
-    symtab_next <- readFastMutInt symtab_next
-    symtab_map  <- readIORef symtab_map
-    putSymbolTable bh symtab_next symtab_map
-    case traceBinIface of
-      QuietBinIFace         -> return ()
-      TraceBinIFace printer ->
-         printer (text "writeBinIface:" <+> int symtab_next
-                                        <+> text "Names")
+      -- NB. write the dictionary after the symbol table, because
+      -- writing the symbol table may create more dictionary entries.
+      let put_symtab = do
+            name_count <- readFastMutInt symtab_next
+            symtab_map  <- readIORef symtab_map
+            putSymbolTable bh_fs name_count symtab_map
+            pure name_count
 
-    -- NB. write the dictionary after the symbol table, because
-    -- writing the symbol table may create more dictionary entries.
+      forwardPut bh_fs (const put_symtab) $ do
 
-    -- Write the dictionary pointer at the front of the file
-    dict_p <- tellBin bh          -- This is where the dictionary will start
-    putAt bh dict_p_p dict_p      -- Fill in the placeholder
-    seekBin bh dict_p             -- Seek back to the end of the file
+        -- BinHandle with FastString and Name writing support
+        let ud_fs = getUserData bh_fs
+        let ud_name = ud_fs
+                        { ud_put_nonbinding_name = putName bin_dict bin_symtab
+                        , ud_put_binding_name    = putName bin_dict bin_symtab
+                        }
+        let bh_name = setUserData bh ud_name
 
-    -- Write the dictionary itself
-    dict_next <- readFastMutInt dict_next_ref
-    dict_map  <- readIORef dict_map_ref
-    putDictionary bh dict_next dict_map
-    case traceBinIface of
-      QuietBinIFace         -> return ()
-      TraceBinIFace printer ->
-         printer (text "writeBinIface:" <+> int dict_next
-                                        <+> text "dict entries")
+        put_payload bh_name
+
+    return (name_count, fs_count, r)
 
 
 
@@ -287,9 +278,9 @@ binaryInterfaceMagic platform
 --
 
 putSymbolTable :: BinHandle -> Int -> UniqFM Name (Int,Name) -> IO ()
-putSymbolTable bh next_off symtab = do
-    put_ bh next_off
-    let names = elems (array (0,next_off-1) (nonDetEltsUFM symtab))
+putSymbolTable bh name_count symtab = do
+    put_ bh name_count
+    let names = elems (array (0,name_count-1) (nonDetEltsUFM symtab))
       -- It's OK to use nonDetEltsUFM here because the elements have
       -- indices that array uses to create order
     mapM_ (\n -> serialiseName bh n symtab) names
@@ -390,32 +381,5 @@ data BinSymbolTable = BinSymbolTable {
         bin_symtab_next :: !FastMutInt, -- The next index to use
         bin_symtab_map  :: !(IORef (UniqFM Name (Int,Name)))
                                 -- indexed by Name
-  }
-
-putFastString :: BinDictionary -> BinHandle -> FastString -> IO ()
-putFastString dict bh fs = allocateFastString dict fs >>= put_ bh
-
-allocateFastString :: BinDictionary -> FastString -> IO Word32
-allocateFastString BinDictionary { bin_dict_next = j_r,
-                                   bin_dict_map  = out_r} f = do
-    out <- readIORef out_r
-    let !uniq = getUnique f
-    case lookupUFM_Directly out uniq of
-        Just (j, _)  -> return (fromIntegral j :: Word32)
-        Nothing -> do
-           j <- readFastMutInt j_r
-           writeFastMutInt j_r (j + 1)
-           writeIORef out_r $! addToUFM_Directly out uniq (j, f)
-           return (fromIntegral j :: Word32)
-
-getDictFastString :: Dictionary -> BinHandle -> IO FastString
-getDictFastString dict bh = do
-    j <- get bh
-    return $! (dict ! fromIntegral (j :: Word32))
-
-data BinDictionary = BinDictionary {
-        bin_dict_next :: !FastMutInt, -- The next index to use
-        bin_dict_map  :: !(IORef (UniqFM FastString (Int,FastString)))
-                                -- indexed by FastString
   }
 

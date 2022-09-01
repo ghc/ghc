@@ -41,7 +41,6 @@ import           GHC.StgToJS.Object
 import           GHC.StgToJS.Types (ClosureInfo, StaticInfo)
 
 import           GHC.Unit.Types
-import           GHC.Utils.Panic
 import           GHC.Utils.Outputable hiding ((<>))
 import           GHC.Data.FastString
 import           GHC.Driver.Env.Types (HscEnv)
@@ -51,14 +50,9 @@ import           GHC.Types.Unique.Map
 import           Control.Monad
 
 import           Data.Array
-import qualified Data.Binary          as DB
-import qualified Data.Binary.Get      as DB
-import qualified Data.Binary.Put      as DB
 import           Data.ByteString      (ByteString)
-import qualified Data.ByteString.Lazy as BL
 import           Data.Map.Strict      (Map)
 import qualified Data.Map.Strict      as M
-import           Data.List            (sortOn)
 import           Data.Set             (Set)
 import qualified Data.Set             as S
 import qualified Data.IntMap          as I
@@ -111,19 +105,19 @@ data StringTable = StringTable
   , stIdents      :: !(UniqMap FastString (Either Int Int)) -- ^ identifiers in the table
   }
 
-instance DB.Binary Ident where
-  put (TxtI s) = DB.put $ unpackFS s
-  get = TxtI . mkFastString <$> DB.get
+-- instance DB.Binary Ident where
+--   put (TxtI s) = DB.put $ unpackFS s
+--   get = TxtI . mkFastString <$> DB.get
 
-instance DB.Binary StringTable where
-  put (StringTable tids offs idents) = do
-    DB.put tids
-    DB.put (M.toList offs)
-    -- The lexical sorting allows us to use nonDetEltsUniqMap without introducing non-determinism
-    DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap idents)
-  get = StringTable <$> DB.get
-                    <*> fmap M.fromList DB.get
-                    <*> fmap listToUniqMap DB.get
+-- instance DB.Binary StringTable where
+--   put (StringTable tids offs idents) = do
+--     DB.put tids
+--     DB.put (M.toList offs)
+--     -- The lexical sorting allows us to use nonDetEltsUniqMap without introducing non-determinism
+--     DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap idents)
+--   get = StringTable <$> DB.get
+--                     <*> fmap M.fromList DB.get
+--                     <*> fmap listToUniqMap DB.get
 
 emptyStringTable :: StringTable
 emptyStringTable = StringTable (listArray (0,-1) []) M.empty emptyUniqMap
@@ -293,9 +287,9 @@ data Base = Base { baseCompactorState :: CompactorState
                  , baseUnits          :: Set (Module, Int)
                  }
 
-instance DB.Binary Base where
-  get = getBase "<unknown file>"
-  put = putBase
+-- instance DB.Binary Base where
+--   get = getBase "<unknown file>"
+--   put = putBase
 
 showBase :: Base -> String
 showBase b = unlines
@@ -309,96 +303,96 @@ showBase b = unlines
 emptyBase :: Base
 emptyBase = Base emptyCompactorState [] S.empty
 
-putBase :: Base -> DB.Put
-putBase (Base cs packages funs) = do
-  DB.putByteString "GHCJSBASE"
-  DB.putLazyByteString versionTag
-  putCs cs
-  putList DB.put packages
-  -- putList putPkg pkgs
-  putList DB.put mods
-  putList putFun (S.toList funs)
-  where
-    pi :: Int -> DB.Put
-    pi = DB.putWord32le . fromIntegral
-    uniq :: Ord a => [a] -> [a]
-    uniq  = S.toList . S.fromList
-    -- pkgs  = uniq (map fst $ S.toList funs)
-    -- pkgsM = M.fromList (zip pkgs [(0::Int)..])
-    mods  = uniq (map fst $ S.toList funs)
-    modsM = M.fromList (zip mods [(0::Int)..])
-    putList f xs = pi (length xs) >> mapM_ f xs
-    -- serialise the compactor state
-    putCs (CompactorState [] _ _ _ _ _ _ _ _ _ _ _) =
-      panic "putBase: putCs exhausted renamer symbol names"
-    putCs (CompactorState (ns:_) nm es _ ss _ ls _ pes pss pls sts) = do
-      DB.put ns
-      -- We can use nonDetEltsUniqMap without introducing non-determinism by sorting lexically
-      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap nm)
-      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap es)
-      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap ss)
-      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap ls)
-      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap pes)
-      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap pss)
-      DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap pls)
-      DB.put sts
-    -- putPkg mod = DB.put mod
-    -- fixme group things first
-    putFun (m,s) = --pi (pkgsM M.! p) >>
-                   pi (modsM M.! m) >> DB.put s
+-- putBase :: Base -> DB.Put
+-- putBase (Base cs packages funs) = do
+--   DB.putByteString "GHCJSBASE"
+--   DB.putLazyByteString versionTag
+--   putCs cs
+--   putList DB.put packages
+--   -- putList putPkg pkgs
+--   putList DB.put mods
+--   putList putFun (S.toList funs)
+--   where
+--     pi :: Int -> DB.Put
+--     pi = DB.putWord32le . fromIntegral
+--     uniq :: Ord a => [a] -> [a]
+--     uniq  = S.toList . S.fromList
+--     -- pkgs  = uniq (map fst $ S.toList funs)
+--     -- pkgsM = M.fromList (zip pkgs [(0::Int)..])
+--     mods  = uniq (map fst $ S.toList funs)
+--     modsM = M.fromList (zip mods [(0::Int)..])
+--     putList f xs = pi (length xs) >> mapM_ f xs
+--     -- serialise the compactor state
+--     putCs (CompactorState [] _ _ _ _ _ _ _ _ _ _ _) =
+--       panic "putBase: putCs exhausted renamer symbol names"
+--     putCs (CompactorState (ns:_) nm es _ ss _ ls _ pes pss pls sts) = do
+--       DB.put ns
+--       -- We can use nonDetEltsUniqMap without introducing non-determinism by sorting lexically
+--       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap nm)
+--       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap es)
+--       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap ss)
+--       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap ls)
+--       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap pes)
+--       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap pss)
+--       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap pls)
+--       DB.put sts
+--     -- putPkg mod = DB.put mod
+--     -- fixme group things first
+--     putFun (m,s) = --pi (pkgsM M.! p) >>
+--                    pi (modsM M.! m) >> DB.put s
 
-getBase :: FilePath -> DB.Get Base
-getBase file = getBase'
-  where
-    gi :: DB.Get Int
-    gi = fromIntegral <$> DB.getWord32le
-    getList f = DB.getWord32le >>= \n -> replicateM (fromIntegral n) f
-    getFun ms = (,) <$>
-                   -- ((ps!) <$> gi) <*>
-                   ((ms!) <$> gi) <*> DB.get
-    la xs = listArray (0, length xs - 1) xs
-    -- getPkg = DB.get
-    getCs = do
-      n   <- DB.get
-      nm  <- listToUniqMap <$> DB.get
-      es  <- listToUniqMap <$> DB.get
-      ss  <- listToUniqMap <$> DB.get
-      ls  <- listToUniqMap <$> DB.get
-      pes <- listToUniqMap <$> DB.get
-      pss <- listToUniqMap <$> DB.get
-      pls <- listToUniqMap <$> DB.get
-      CompactorState (dropWhile (/=n) renamedVars)
-                             nm
-                             es
-                             (sizeUniqMap es)
-                             ss
-                             (sizeUniqMap ss)
-                             ls
-                             (sizeUniqMap ls)
-                             pes
-                             pss
-                             pls <$> DB.get
-    getBase' = do
-      hdr <- DB.getByteString 9
-      when (hdr /= "GHCJSBASE")
-           (panic $ "getBase: invalid base file: " <> file)
-      vt  <- DB.getLazyByteString (fromIntegral versionTagLength)
-      when (vt /= versionTag)
-           (panic $ "getBase: incorrect version: " <> file)
-      cs <- makeCompactorParent <$> getCs
-      linkedPackages <- getList DB.get
-      -- pkgs <- la <$> getList getPkg
-      mods <- la <$> getList DB.get
-      funs <- getList (getFun mods)
-      return (Base cs linkedPackages $ S.fromList funs)
+-- getBase :: FilePath -> DB.Get Base
+-- getBase file = getBase'
+--   where
+--     gi :: DB.Get Int
+--     gi = fromIntegral <$> DB.getWord32le
+--     getList f = DB.getWord32le >>= \n -> replicateM (fromIntegral n) f
+--     getFun ms = (,) <$>
+--                    -- ((ps!) <$> gi) <*>
+--                    ((ms!) <$> gi) <*> DB.get
+--     la xs = listArray (0, length xs - 1) xs
+--     -- getPkg = DB.get
+--     getCs = do
+--       n   <- DB.get
+--       nm  <- listToUniqMap <$> DB.get
+--       es  <- listToUniqMap <$> DB.get
+--       ss  <- listToUniqMap <$> DB.get
+--       ls  <- listToUniqMap <$> DB.get
+--       pes <- listToUniqMap <$> DB.get
+--       pss <- listToUniqMap <$> DB.get
+--       pls <- listToUniqMap <$> DB.get
+--       CompactorState (dropWhile (/=n) renamedVars)
+--                              nm
+--                              es
+--                              (sizeUniqMap es)
+--                              ss
+--                              (sizeUniqMap ss)
+--                              ls
+--                              (sizeUniqMap ls)
+--                              pes
+--                              pss
+--                              pls <$> DB.get
+--     getBase' = do
+--       hdr <- DB.getByteString 9
+--       when (hdr /= "GHCJSBASE")
+--            (panic $ "getBase: invalid base file: " <> file)
+--       vt  <- DB.getLazyByteString (fromIntegral versionTagLength)
+--       when (vt /= versionTag)
+--            (panic $ "getBase: incorrect version: " <> file)
+--       cs <- makeCompactorParent <$> getCs
+--       linkedPackages <- getList DB.get
+--       -- pkgs <- la <$> getList getPkg
+--       mods <- la <$> getList DB.get
+--       funs <- getList (getFun mods)
+--       return (Base cs linkedPackages $ S.fromList funs)
 
--- | lazily render the base metadata into a bytestring
-renderBase :: Base -> BL.ByteString
-renderBase = DB.runPut . putBase
-
--- | lazily load base metadata from a file, see @UseBase@.
-loadBase :: FilePath -> IO Base
-loadBase file = DB.runGet (getBase file) <$> BL.readFile file
+-- -- | lazily render the base metadata into a bytestring
+-- renderBase :: Base -> BL.ByteString
+-- renderBase = DB.runPut . putBase
+-- 
+-- -- | lazily load base metadata from a file, see @UseBase@.
+-- loadBase :: FilePath -> IO Base
+-- loadBase file = DB.runGet (getBase file) <$> BL.readFile file
 
 -- | There are 3 ways the linker can use @Base@. We can not use it, and thus not
 -- do any incremental linking. We can load it from a file, where we assume that
@@ -502,9 +496,9 @@ data LinkedUnit = LinkedUnit
   }
 
 -- | An object file that's either already in memory (with name) or on disk
-data LinkedObj = ObjFile   FilePath             -- ^ load from this file
-               | ObjLoaded String BL.ByteString -- ^ already loaded: description and payload
-               deriving (Eq, Ord, Show)
+data LinkedObj
+  = ObjFile   FilePath      -- ^ load from this file
+  | ObjLoaded String Object -- ^ already loaded: description and payload
 
 data GhcjsEnv = GhcjsEnv
   { compiledModules   :: MVar (Map Module ByteString)  -- ^ keep track of already compiled modules so we don't compile twice for dynamic-too
