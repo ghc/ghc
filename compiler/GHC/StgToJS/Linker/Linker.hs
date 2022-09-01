@@ -66,7 +66,7 @@ import           Data.IntSet              (IntSet)
 import qualified Data.IntSet              as IS
 import           Data.IORef
 import           Data.List  ( partition, nub, foldl', intercalate, group, sort
-                            , groupBy, isSuffixOf, find, intersperse
+                            , groupBy, intersperse
                             )
 import           Data.Map.Strict          (Map)
 import qualified Data.Map.Strict          as M
@@ -77,15 +77,13 @@ import           Data.Word
 
 import           GHC.Generics (Generic)
 
-import           System.FilePath (splitPath, (<.>), (</>), dropExtension, isExtensionOf)
-import           System.Environment (lookupEnv)
+import           System.FilePath (splitPath, (<.>), (</>), dropExtension)
 import           System.Directory ( createDirectoryIfMissing
                                   , doesFileExist
                                   , getCurrentDirectory
                                   , Permissions(..)
                                   , setPermissions
                                   , getPermissions
-                                  , listDirectory
                                   )
 
 import GHC.Driver.Session (targetWays_, DynFlags(..))
@@ -93,6 +91,7 @@ import Language.Haskell.Syntax.Module.Name
 import GHC.Unit.Module (moduleStableString)
 import GHC.Utils.Logger (Logger, logVerbAtLeast)
 import GHC.Utils.TmpFs (TmpFs)
+import GHC.Utils.Binary
 
 import GHC.Linker.Static.Utils (exeFileName)
 
@@ -102,7 +101,7 @@ newtype LinkerStats = LinkerStats
 
 -- | result of a link pass
 data LinkResult = LinkResult
-  { linkOut         :: B.ByteString   -- ^ compiled Haskell code
+  { linkOut         :: BL.ByteString  -- ^ compiled Haskell code
   , linkOutStats    :: LinkerStats    -- ^ statistics about generated code
   , linkOutMetaSize :: Int64          -- ^ size of packed metadata in generated code
   , linkForeignRefs :: [ForeignJSRef] -- ^ foreign code references in compiled haskell code
@@ -143,7 +142,7 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
           jsExt | genBase   = "base.js"
                 | otherwise = "js"
       createDirectoryIfMissing False out
-      B.writeFile (out </> "out" <.> jsExt) (linkOut link_res)
+      BL.writeFile (out </> "out" <.> jsExt) (linkOut link_res)
 
       -- dump foreign references file (.frefs)
       unless (lcOnlyOut lc_cfg) $ do
@@ -167,12 +166,13 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
 
         let all_lib_js = linkLibA link_res
         lla'    <- streamShims <$> readShimFiles logger tmpfs dflags unit_env all_lib_js
-        llarch' <- mapM (readShimsArchive dflags) (linkLibAArch link_res)
+        llarch' <- mapM readShimsArchive (linkLibAArch link_res)
         let lib_js = BL.fromChunks $! llarch' ++ lla'
         BL.writeFile (out </> "lib" <.> jsExt) lib_js
 
         if genBase
-          then generateBase out (linkBase link_res)
+          then panic "support for base bundle not implemented"
+            -- generateBase out (linkBase link_res)
           else when (    not (lcOnlyOut lc_cfg)
                       && not (lcNoRts   lc_cfg)
                       && not (usingBase lc_cfg)
@@ -184,8 +184,8 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
                  writeRunner lc_cfg out
                  writeExterns out
 
-readShimsArchive :: DynFlags -> FilePath -> IO B.ByteString
-readShimsArchive dflags ar_file = do
+readShimsArchive :: FilePath -> IO B.ByteString
+readShimsArchive ar_file = do
   (Ar.Archive entries) <- Ar.loadAr ar_file
   jsdata <- catMaybes <$> mapM readEntry entries
   return (B.intercalate "\n" jsdata)
@@ -231,7 +231,7 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
 
       base <- case lcUseBase lc_cfg of
         NoBase        -> return emptyBase
-        BaseFile file -> loadBase file
+        BaseFile _file -> panic "support for base bundle not implemented" -- loadBase file
         BaseState b   -> return b
 
       let (rdPkgs, rds) = rtsDeps pkgs
@@ -269,9 +269,8 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
       -- retrieve code for dependencies
       code <- collectDeps dep_map dep_units all_deps
 
-      let (outJs, metaSize, compactorState, stats) =
-             renderLinker lc_cfg cfg (baseCompactorState base) rds code
-          base'  = Base compactorState (nub $ basePkgs base ++ pkgs'')
+      (outJs, metaSize, compactorState, stats) <- renderLinker lc_cfg cfg (baseCompactorState base) rds code
+      let base'  = Base compactorState (nub $ basePkgs base ++ pkgs'')
                          (all_deps `S.union` baseUnits base)
 
       return $ LinkResult
@@ -299,7 +298,7 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
 data ModuleCode = ModuleCode
   { mc_module   :: !Module
   , mc_js_code  :: !JStat
-  , mc_exports  :: !FastString        -- ^ rendered exports
+  , mc_exports  :: !B.ByteString        -- ^ rendered exports
   , mc_closures :: ![ClosureInfo]
   , mc_statics  :: ![StaticInfo]
   , mc_frefs    :: ![ForeignJSRef]
@@ -311,35 +310,39 @@ renderLinker
   -> CompactorState
   -> Set ExportedFun
   -> [ModuleCode] -- ^ linked code per module
-  -> (B.ByteString, Int64, CompactorState, LinkerStats)
-renderLinker settings cfg renamer_state rtsDeps code =
-  ( rendered_all
-  , meta_length
-  , renamer_state'
-  , stats
-  )
-  where
-    -- extract ModuleCode fields required to make a LinkedUnit
-    code_to_linked_unit c = LinkedUnit
-      { lu_js_code  = mc_js_code c
-      , lu_closures = mc_closures c
-      , lu_statics  = mc_statics c
-      }
-    -- call the compactor
-    (renamer_state', compacted, meta) = compact settings cfg renamer_state
-                                          (map ((\(LexicalFastString f) -> f) . funSymbol) $ S.toList rtsDeps)
-                                          (map code_to_linked_unit code)
+  -> IO (BL.ByteString, Int64, CompactorState, LinkerStats)
+renderLinker settings cfg renamer_state rtsDeps code = do
+
+  -- extract ModuleCode fields required to make a LinkedUnit
+  let code_to_linked_unit c = LinkedUnit
+        { lu_js_code  = mc_js_code c
+        , lu_closures = mc_closures c
+        , lu_statics  = mc_statics c
+        }
+
+  -- call the compactor
+  let (renamer_state', compacted, meta) = compact settings cfg renamer_state
+                                            (map ((\(LexicalFastString f) -> f) . funSymbol) $ S.toList rtsDeps)
+                                            (map code_to_linked_unit code)
+  let
     -- render result into JS code
     rendered_all     = mconcat [mconcat rendered_mods, rendered_meta, rendered_exports]
     rendered_mods    = fmap render_js compacted
     rendered_meta    = render_js meta
-    render_js        = BC.pack . (<>"\n") . show . pretty
-    rendered_exports = BC.concat . map bytesFS . filter (not . nullFS) $ map mc_exports code
-    meta_length      = fromIntegral (BC.length rendered_meta)
+    render_js x      = BL.fromChunks [BC.pack (show (pretty x)), BC.pack "\n"]
+    rendered_exports = BL.fromChunks (map mc_exports code)
+    meta_length      = fromIntegral (BL.length rendered_meta)
     -- make LinkerStats entry for the given ModuleCode.
     -- For now, only associate generated code size in bytes to each module
-    mk_stat c b = (mc_module c, fromIntegral . BC.length $ b)
+    mk_stat c b = (mc_module c, fromIntegral . BL.length $ b)
     stats = LinkerStats $ M.fromList $ zipWith mk_stat code rendered_mods
+
+  pure
+    ( rendered_all
+    , meta_length
+    , renamer_state'
+    , stats
+    )
 
 -- | Render linker stats
 linkerStats :: Int64         -- ^ code size of packed metadata
@@ -567,30 +570,33 @@ extractDeps :: ArchiveState
 extractDeps ar_state units deps loc =
   case M.lookup mod units of
     Nothing       -> return Nothing
-    Just modUnits -> do
-      let selector n _  = n `IS.member` modUnits || isGlobalUnit n
-      x <- case loc of
-        ObjectFile o  -> collectCode =<< readObjectFileKeys selector o
-        ArchiveFile a -> (collectCode
-                        <=< readObjectKeys (a ++ ':':moduleNameString (moduleName mod)) selector)
-                        =<< readArObject ar_state mod a
-        InMemory n b  -> collectCode =<< readObjectKeys n selector b
-      return x
+    Just mod_units -> Just <$> do
+      let selector n _  = fromIntegral n `IS.member` mod_units || isGlobalUnit (fromIntegral n)
+      case loc of
+        ObjectFile fp -> do
+          us <- readObjectUnits fp selector
+          pure (collectCode us)
+        ArchiveFile a -> do
+          obj <- readArObject ar_state mod a
+          us <- getObjectUnits obj selector
+          pure (collectCode us)
+        InMemory _n obj -> do
+          us <- getObjectUnits obj selector
+          pure (collectCode us)
   where
     mod           = depsModule deps
-    newline       = mkFastString "\n"
+    newline       = BC.pack "\n"
     unlines'      = intersperse newline . map oiRaw
-    collectCode l = let x = ModuleCode
-                              { mc_module   = mod
-                              , mc_js_code  = mconcat (map oiStat l)
-                              , mc_exports  = mconcat (unlines' l)
-                              , mc_closures = concatMap oiClInfo l
-                              , mc_statics  = concatMap oiStatic l
-                              , mc_frefs    = concatMap oiFImports l
-                              }
-                    in return (Just x)
+    collectCode l = ModuleCode
+                      { mc_module   = mod
+                      , mc_js_code  = mconcat (map oiStat l)
+                      , mc_exports  = mconcat (unlines' l)
+                      , mc_closures = concatMap oiClInfo l
+                      , mc_statics  = concatMap oiStatic l
+                      , mc_frefs    = concatMap oiFImports l
+                      }
 
-readArObject :: ArchiveState -> Module -> FilePath -> IO BL.ByteString
+readArObject :: ArchiveState -> Module -> FilePath -> IO Object
 readArObject ar_state mod ar_file = do
   loaded_ars <- readIORef (loadedArchives ar_state)
   (Ar.Archive entries) <- case M.lookup ar_file loaded_ars of
@@ -599,19 +605,27 @@ readArObject ar_state mod ar_file = do
       a <- Ar.loadAr ar_file
       modifyIORef (loadedArchives ar_state) (M.insert ar_file a)
       pure a
-  let tag = moduleNameTag $ moduleName mod
-      matchTag entry
-        | Right hdr <- getHeader (BL.fromStrict $ Ar.filedata entry)
-        = hdrModuleName hdr == tag
-        | otherwise
-        = False
 
-  -- XXX this shouldn't be an exception probably
-  pure $! maybe (error $ "could not find object for module "
-                ++ moduleNameString (moduleName mod)
-                ++ " in "
-                ++ ar_file)
-                (BL.fromStrict . Ar.filedata) (find matchTag entries)
+  -- look for the right object in archive
+  let go_entries = \case
+        -- XXX this shouldn't be an exception probably
+        [] -> panic $ "could not find object for module "
+                      ++ moduleNameString (moduleName mod)
+                      ++ " in "
+                      ++ ar_file
+
+        (e:es) -> do
+          let bs = Ar.filedata e
+          bh <- unsafeUnpackBinBuffer bs
+          getObjectHeader bh >>= \case
+            Left _         -> go_entries es -- not a valid object entry
+            Right mod_name
+              | mod_name /= moduleName mod
+              -> go_entries es -- not the module we're looking for
+              | otherwise
+              -> getObjectBody bh mod_name -- found it
+
+  go_entries entries
 
 {- | Static dependencies are symbols that need to be linked regardless
      of whether the linked program refers to them. For example
@@ -824,15 +838,15 @@ loadArchiveDeps' archives = do
   return (prepareLoadedDeps $ concat archDeps)
     where
       readEntry :: FilePath -> Ar.ArchiveEntry -> IO (Maybe (Deps, DepsLocation))
-      readEntry ar_file ar_entry
-        | isObjFile ar_entry =
-            fmap (,ArchiveFile ar_file) <$>
-                 (readDepsMaybe (ar_file ++ ':':Ar.filename ar_entry) (BL.fromStrict $ Ar.filedata ar_entry))
-        | otherwise = return Nothing
-
-
-isObjFile :: Ar.ArchiveEntry -> Bool
-isObjFile = checkEntryHeader "GHCJSOBJ"
+      readEntry ar_file ar_entry = do
+          let bs = Ar.filedata ar_entry
+          bh <- unsafeUnpackBinBuffer bs
+          getObjectHeader bh >>= \case
+            Left _         -> pure Nothing -- not a valid object entry
+            Right mod_name -> do
+              obj <- getObjectBody bh mod_name
+              let !deps = objDeps obj
+              pure $ Just (deps, ArchiveFile ar_file)
 
 isJsFile :: Ar.ArchiveEntry -> Bool
 isJsFile = checkEntryHeader "//JavaScript"
@@ -857,12 +871,15 @@ requiredUnits d = map (depsModule d,) (IS.toList $ depsRequired d)
 -- read dependencies from an object that might have already been into memory
 -- pulls in all Deps from an archive
 readDepsFile' :: LinkedObj -> IO (Deps, DepsLocation)
-readDepsFile' (ObjLoaded name bs) = (,InMemory name bs) <$>
-                                    readDeps name bs
-readDepsFile' (ObjFile file)      =
-  (,ObjectFile file) <$> readDepsFile file
+readDepsFile' = \case
+  ObjLoaded name obj -> do
+    let !deps = objDeps obj
+    pure (deps,InMemory name obj)
+  ObjFile file -> do
+    deps <- readObjectDeps file
+    pure (deps,ObjectFile file)
 
-generateBase :: FilePath -> Base -> IO ()
-generateBase outDir b =
-  BL.writeFile (outDir </> "out.base.symbs") (renderBase b)
+-- generateBase :: FilePath -> Base -> IO ()
+-- generateBase outDir b =
+--   BL.writeFile (outDir </> "out.base.symbs") (renderBase b)
 

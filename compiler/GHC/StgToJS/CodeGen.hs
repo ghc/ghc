@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | JavaScript code generator
 module GHC.StgToJS.CodeGen
@@ -52,16 +53,13 @@ import GHC.Utils.Encoding
 import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.Binary
 import qualified Control.Monad.Trans.State.Strict as State
 import GHC.Utils.Outputable hiding ((<>))
 
 import qualified Data.Set as S
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as BL
 import Data.Monoid
 import Control.Monad
-import Control.Monad.Trans.Class
-import Data.Bifunctor
 
 -- | Code generator for JavaScript
 stgToJS
@@ -82,26 +80,21 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
 
     -- TODO: add dump pass for optimized STG ast for JS
 
-  obj <- runG config this_mod unfloated_binds $ do
-        ifProfilingM $ initCostCentres cccs
-        (sym_table, lus) <- genUnits this_mod stg_binds spt_entries foreign_stubs
-
-        -- (exported symbol names, javascript statements) for each linkable unit
-        p <- forM lus \u -> do
-           ts <- mapM (fmap (\(TxtI i) -> i) . identForId) (luIdExports u)
-           return (ts ++ luOtherExports u, luStat u)
-
-        deps <- genDependencyData this_mod lus
-        lift $ Object.writeObject' (moduleName this_mod) sym_table deps (map (second BL.fromStrict) p)
+  (deps,lus) <- runG config this_mod unfloated_binds $ do
+    ifProfilingM $ initCostCentres cccs
+    lus  <- genUnits this_mod stg_binds spt_entries foreign_stubs
+    deps <- genDependencyData this_mod lus
+    pure (deps,lus)
 
   -- Doc to dump when -ddump-js is enabled
-  let mod_name = renderWithContext defaultSDocContext (ppr this_mod)
   when (logHasDumpFlag logger Opt_D_dump_js) $ do
-    o <- Object.readObject mod_name obj
     putDumpFileMaybe logger Opt_D_dump_js "JavaScript code" FormatJS
-      $ vcat (fmap (docToSDoc . jsToDoc . Object.oiStat) o)
+      $ vcat (fmap (docToSDoc . jsToDoc . oiStat . luObjUnit) lus)
 
-  BL.writeFile output_fn obj
+  -- Write the object file
+  bh <- openBinMem (4 * 1024 * 1000) -- a bit less than 4kB
+  Object.putObject bh (moduleName this_mod) deps (map luObjUnit lus)
+  writeBinMem bh output_fn
 
 
 
@@ -111,53 +104,59 @@ genUnits :: HasDebugCallStack
          -> [CgStgTopBinding]
          -> [SptEntry]
          -> ForeignStubs
-         -> G (Object.SymbolTable, [LinkableUnit]) -- ^ the final symbol table and the linkable units
-genUnits m ss spt_entries foreign_stubs
-                                 = generateGlobalBlock =<<
-                                   generateExportsBlock =<<
-                                   go 2 Object.emptySymbolTable ss
+         -> G [LinkableUnit] -- ^ the linkable units
+genUnits m ss spt_entries foreign_stubs = do
+    gbl     <- generateGlobalBlock
+    exports <- generateExportsBlock
+    others  <- go 2 ss
+    pure (gbl:exports:others)
     where
       go :: HasDebugCallStack
          => Int                 -- the block we're generating (block 0 is the global unit for the module)
-         -> Object.SymbolTable  -- the shared symbol table
          -> [CgStgTopBinding]
-         -> G (Object.SymbolTable, [LinkableUnit])
-      go !n st (x:xs) = do
-        (st', mlu) <- generateBlock st x n
-        (st'', lus)  <- go (n+1) st' xs
-        return (st'', maybe lus (:lus) mlu)
-      go _ st []     = return (st, [])
+         -> G [LinkableUnit]
+      go !n = \case
+        []     -> pure []
+        (x:xs) -> do
+          mlu <- generateBlock x n
+          lus <- go (n+1) xs
+          return (maybe lus (:lus) mlu)
 
       --   Generate the global unit that all other blocks in the module depend on
       --   used for cost centres and static initializers
       --   the global unit has no dependencies, exports the moduleGlobalSymbol
-      generateGlobalBlock :: HasDebugCallStack
-                          => (Object.SymbolTable, [LinkableUnit])
-                          -> G (Object.SymbolTable, [LinkableUnit])
-      generateGlobalBlock (st, lus) = do
+      generateGlobalBlock :: HasDebugCallStack => G LinkableUnit
+      generateGlobalBlock = do
         glbl <- State.gets gsGlobal
         staticInit <-
           initStaticPtrs spt_entries
-        (st', _, bs) <- serializeLinkableUnit m st [] [] []
-                         ( -- O.optimize .
-                           jsSaturate (Just $ modulePrefix m 1)
-                         $ mconcat (reverse glbl) <> staticInit) "" [] []
-        return ( st'
-               , LinkableUnit bs
-                              []
-                              [moduleGlobalSymbol m]
-                              []
-                              []
-                              []
-                              False
-                              []
-                 : lus
-               )
+        let stat = ( -- O.optimize .
+                     jsSaturate (Just $ modulePrefix m 1)
+                   $ mconcat (reverse glbl) <> staticInit)
+        let syms = [moduleGlobalSymbol m]
+        let oi = ObjUnit
+                  { oiSymbols  = syms
+                  , oiClInfo   = []
+                  , oiStatic   = []
+                  , oiStat     = stat
+                  , oiRaw      = mempty
+                  , oiFExports = []
+                  , oiFImports = []
+                  }
+        let lu = LinkableUnit
+                  { luObjUnit      = oi
+                  , luIdExports    = []
+                  , luOtherExports = syms
+                  , luIdDeps       = []
+                  , luPseudoIdDeps = []
+                  , luOtherDeps    = []
+                  , luRequired     = False
+                  , luForeignRefs  = []
+                  }
+        pure lu
 
-      generateExportsBlock :: HasDebugCallStack
-                          => (Object.SymbolTable, [LinkableUnit])
-                          -> G (Object.SymbolTable, [LinkableUnit])
-      generateExportsBlock (st, lus) = do
+      generateExportsBlock :: HasDebugCallStack => G LinkableUnit
+      generateExportsBlock = do
         let (f_hdr, f_c) = case foreign_stubs of
                                   NoStubs            -> (empty, empty)
                                   ForeignStubs hdr c -> (getCHeader hdr, getCStub c)
@@ -165,87 +164,107 @@ genUnits m ss spt_entries foreign_stubs
             mkUniqueDep (tag:xs) = mkUnique tag (read xs)
             mkUniqueDep []       = panic "mkUniqueDep"
 
-        (st', _, bs) <- serializeLinkableUnit m
-                                              st
-                                              []
-                                              []
-                                              []
-                                              mempty
-                                              (mkFastString $ renderWithContext defaultSDocContext f_c)
-                                              []
-                                              []
-        return ( st'
-               , LinkableUnit bs
-                              []
-                              [moduleExportsSymbol m]
-                              [] -- id deps
-                              unique_deps -- pseudo id deps
-                              []
-                              True
-                              []
-                 : lus
-               )
+        let syms = [moduleExportsSymbol m]
+        let raw  = utf8EncodeByteString $ renderWithContext defaultSDocContext f_c
+        let oi = ObjUnit
+                  { oiSymbols  = syms
+                  , oiClInfo   = []
+                  , oiStatic   = []
+                  , oiStat     = mempty
+                  , oiRaw      = raw
+                  , oiFExports = []
+                  , oiFImports = []
+                  }
+        let lu = LinkableUnit
+                  { luObjUnit      = oi
+                  , luIdExports    = []
+                  , luOtherExports = syms
+                  , luIdDeps       = []
+                  , luPseudoIdDeps = unique_deps
+                  , luOtherDeps    = []
+                  , luRequired     = True
+                  , luForeignRefs  = []
+                  }
+        pure lu
 
       --   Generate the linkable unit for one binding or group of
       --   mutually recursive bindings
       generateBlock :: HasDebugCallStack
-                    => Object.SymbolTable
-                    -> CgStgTopBinding
+                    => CgStgTopBinding
                     -> Int
-                    -> G (Object.SymbolTable, Maybe LinkableUnit)
-      generateBlock st (StgTopStringLit bnd str) n = do
-        bids <- identsForId bnd
-        case bids of
-          [(TxtI b1t),(TxtI b2t)] -> do
-            -- [e1,e2] <- genLit (MachStr str)
-            emitStatic b1t (StaticUnboxed (StaticUnboxedString str)) Nothing
-            emitStatic b2t (StaticUnboxed (StaticUnboxedStringOffset str)) Nothing
-            _extraTl   <- State.gets (ggsToplevelStats . gsGroup)
-            si        <- State.gets (ggsStatic . gsGroup)
-            let stat = mempty -- mconcat (reverse extraTl) <> b1 ||= e1 <> b2 ||= e2
-            (st', _ss, bs) <- serializeLinkableUnit m st [bnd] [] si
-                              (jsSaturate (Just $ modulePrefix m n) stat) "" [] []
-            pure (st', Just $ LinkableUnit bs [bnd] [] [] [] [] False [])
-          _ -> panic "generateBlock: invalid size"
-      generateBlock st (StgTopLifted decl) n = do
-        tl        <- genToplevel decl
-        extraTl   <- State.gets (ggsToplevelStats . gsGroup)
-        ci        <- State.gets (ggsClosureInfo . gsGroup)
-        si        <- State.gets (ggsStatic . gsGroup)
-        unf       <- State.gets gsUnfloated
-        extraDeps <- State.gets (ggsExtraDeps . gsGroup)
-        fRefs     <- State.gets (ggsForeignRefs . gsGroup)
-        resetGroup
-        let allDeps  = collectIds unf decl
-            topDeps  = collectTopIds decl
-            required = hasExport decl
-            stat     = -- Opt.optimize .
-                       jsSaturate (Just $ modulePrefix m n)
-                     $ mconcat (reverse extraTl) <> tl
-        (st', _ss, bs) <- serializeLinkableUnit m st topDeps ci si stat mempty [] fRefs
-        return $! seqList topDeps `seq` seqList allDeps `seq` st' `seq`
-          (st', Just $ LinkableUnit bs topDeps [] allDeps [] (S.toList extraDeps) required fRefs)
+                    -> G (Maybe LinkableUnit)
+      generateBlock top_bind n = case top_bind of
+        StgTopStringLit bnd str -> do
+          bids <- identsForId bnd
+          case bids of
+            [(TxtI b1t),(TxtI b2t)] -> do
+              -- [e1,e2] <- genLit (MachStr str)
+              emitStatic b1t (StaticUnboxed (StaticUnboxedString str)) Nothing
+              emitStatic b2t (StaticUnboxed (StaticUnboxedStringOffset str)) Nothing
+              _extraTl   <- State.gets (ggsToplevelStats . gsGroup)
+              si        <- State.gets (ggsStatic . gsGroup)
+              let body = mempty -- mconcat (reverse extraTl) <> b1 ||= e1 <> b2 ||= e2
+              let stat = jsSaturate (Just $ modulePrefix m n) body
+              let ids = [bnd]
+              syms <- (\(TxtI i) -> [i]) <$> identForId bnd
+              let oi = ObjUnit
+                        { oiSymbols  = syms
+                        , oiClInfo   = []
+                        , oiStatic   = si
+                        , oiStat     = stat
+                        , oiRaw      = ""
+                        , oiFExports = []
+                        , oiFImports = []
+                        }
+              let lu = LinkableUnit
+                        { luObjUnit      = oi
+                        , luIdExports    = ids
+                        , luOtherExports = []
+                        , luIdDeps       = []
+                        , luPseudoIdDeps = []
+                        , luOtherDeps    = []
+                        , luRequired     = False
+                        , luForeignRefs  = []
+                        }
+              pure (Just lu)
+            _ -> panic "generateBlock: invalid size"
 
--- | serialize the payload of a linkable unit in the object file, adding strings
--- to the SymbolTable where necessary
-serializeLinkableUnit :: HasDebugCallStack
-                      => Module
-                      -> Object.SymbolTable  -- symbol table to start with
-                      -> [Id]                -- id's exported by unit
-                      -> [ClosureInfo]
-                      -> [StaticInfo]
-                      -> JStat               -- generated code for the unit
-                      -> FastString
-                      -> [Object.ExpFun]
-                      -> [ForeignJSRef]
-                      -> G (Object.SymbolTable, [FastString], BS.ByteString)
-serializeLinkableUnit _m st i ci si stat rawStat fe fi = do
-  !i' <- mapM idStr i
-  !(!st', !lo) <- lift $ Object.runPutS st $ \bh -> Object.putLinkableUnit bh ci si stat rawStat fe fi
-  let !o = BL.toStrict lo
-  return (st', i', o) -- deepseq results?
-    where
-      idStr i = itxt <$> identForId i
+        StgTopLifted decl -> do
+          tl        <- genToplevel decl
+          extraTl   <- State.gets (ggsToplevelStats . gsGroup)
+          ci        <- State.gets (ggsClosureInfo . gsGroup)
+          si        <- State.gets (ggsStatic . gsGroup)
+          unf       <- State.gets gsUnfloated
+          extraDeps <- State.gets (ggsExtraDeps . gsGroup)
+          fRefs     <- State.gets (ggsForeignRefs . gsGroup)
+          resetGroup
+          let allDeps  = collectIds unf decl
+              topDeps  = collectTopIds decl
+              required = hasExport decl
+              stat     = -- Opt.optimize .
+                         jsSaturate (Just $ modulePrefix m n)
+                       $ mconcat (reverse extraTl) <> tl
+          syms <- mapM (fmap (\(TxtI i) -> i) . identForId) topDeps
+          let oi = ObjUnit
+                    { oiSymbols  = syms
+                    , oiClInfo   = ci
+                    , oiStatic   = si
+                    , oiStat     = stat
+                    , oiRaw      = ""
+                    , oiFExports = []
+                    , oiFImports = fRefs
+                    }
+          let lu = LinkableUnit
+                    { luObjUnit      = oi
+                    , luIdExports    = topDeps
+                    , luOtherExports = []
+                    , luIdDeps       = allDeps
+                    , luPseudoIdDeps = []
+                    , luOtherDeps    = S.toList extraDeps
+                    , luRequired     = required
+                    , luForeignRefs  = fRefs
+                    }
+          pure $! seqList topDeps `seq` seqList allDeps `seq` Just lu
 
 -- | variable prefix for the nth block in module
 modulePrefix :: Module -> Int -> FastString

@@ -21,8 +21,12 @@
 module GHC.StgToJS.Linker.Dynamic
   ( jsLinkBinary
   , jsLinkLib
-  ) where
+  )
+where
 
+import GHC.Driver.Session
+
+import GHC.StgToJS.Types
 import GHC.StgToJS.Linker.Archive
 import GHC.StgToJS.Linker.Types
 import GHC.StgToJS.Linker.Utils
@@ -32,7 +36,6 @@ import GHC.Linker.Types
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
-import GHC.Driver.Session
 
 import GHC.Types.Unique.DFM
 import GHC.Types.Basic
@@ -44,15 +47,12 @@ import Prelude
 
 import           Control.Monad
 
-import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString as BS
 import           Data.List ( nub )
-import qualified GHC.Data.ShortText as T
 
 import           System.FilePath
 import GHC.Platform.Ways
 import GHC.Utils.Logger
-import GHC.StgToJS.Types
 import GHC.Utils.TmpFs (TmpFs)
 
 ---------------------------------------------------------------------------------
@@ -77,13 +77,13 @@ jsLinkLib settings jsFiles dflags _logger hpt
           jsFiles' = nub (lcJsLibSrcs settings ++ jsFiles)
           meta    = Meta (opt_P dflags)
       jsEntries <- forM jsFiles' $ \file ->
-        (JsSource file,) . B.fromStrict <$> BS.readFile file
+        (JsSource file,) <$> BS.readFile file
       objEntries <- forM (eltsUDFM hpt) $ \hmi -> do
-        let mt    = T.pack . moduleNameString . moduleName . mi_module . hm_iface $ hmi
+        let mod_name = moduleName . mi_module . hm_iface $ hmi
             files = maybe [] (\l -> [ o | DotO o <- linkableUnlinked l]) (hm_linkable hmi)
         -- fixme archive does not handle multiple files for a module yet
-        forM files (fmap ((Object mt,) . B.fromStrict) . BS.readFile)
-      B.writeFile outputFile (buildArchive meta (concat objEntries ++ jsEntries))
+        forM files (fmap ((Object mod_name,)) . BS.readFile)
+      writeArchive outputFile meta (concat objEntries ++ jsEntries)
       -- we don't use shared js_so libraries ourselves, but Cabal expects that we
       -- generate one when building with --dynamic-too. Just write an empty file
       when (gopt Opt_BuildDynamicToo dflags || WayDyn `elem` ways dflags) $ do
