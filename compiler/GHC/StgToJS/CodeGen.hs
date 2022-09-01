@@ -96,9 +96,10 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
 
   -- Doc to dump when -ddump-js is enabled
   let mod_name = renderWithContext defaultSDocContext (ppr this_mod)
-  o <- Object.readObject mod_name obj
-  putDumpFileMaybe logger Opt_D_dump_js "JavaScript code" FormatJS
-    $ vcat (fmap (docToSDoc . jsToDoc . Object.oiStat) o)
+  when (logHasDumpFlag logger Opt_D_dump_js) $ do
+    o <- Object.readObject mod_name obj
+    putDumpFileMaybe logger Opt_D_dump_js "JavaScript code" FormatJS
+      $ vcat (fmap (docToSDoc . jsToDoc . Object.oiStat) o)
 
   BL.writeFile output_fn obj
 
