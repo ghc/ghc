@@ -117,12 +117,20 @@ data Header = Header
   , hdrIdxLen     :: !Int64
   } deriving (Eq, Ord, Show)
 
+type BlockId  = Int
+type BlockIds = IntSet
+
 -- | dependencies for a single module
 data Deps = Deps
-  { depsModule          :: !Module                 -- ^ module
-  , depsRequired        :: !IntSet                 -- ^ blocks that always need to be linked when this object is loaded (e.g. everything that contains initializer code or foreign exports)
-  , depsHaskellExported :: !(Map ExportedFun Int)  -- ^ exported Haskell functions -> block
-  , depsBlocks          :: !(Array Int BlockDeps)  -- ^ info about each block
+  { depsModule          :: !Module
+      -- ^ module
+  , depsRequired        :: !BlockIds
+      -- ^ blocks that always need to be linked when this object is loaded (e.g.
+      -- everything that contains initializer code or foreign exports)
+  , depsHaskellExported :: !(Map ExportedFun BlockId)
+      -- ^ exported Haskell functions -> block
+  , depsBlocks          :: !(Array BlockId BlockDeps)
+      -- ^ info about each block
   } deriving (Generic)
 
 instance Outputable Deps where
@@ -207,16 +215,11 @@ insertSymbol s st@(SymbolTable n t) =
     Nothing -> (SymbolTable (n+1) (addToUniqMap t s n), n)
 
 data ObjEnv = ObjEnv
-  { oeSymbols :: SymbolTableR
-  , _oeName    :: String
+  { oeSymbols :: Dictionary
+  , _oeName   :: String
   }
 
-data SymbolTableR = SymbolTableR
-  { strText   :: Array Int FastString
-  , _strString :: Array Int String
-  }
-
-runGetS :: HasDebugCallStack => String -> SymbolTableR -> (BinHandle -> IO a) -> ByteString -> IO a
+runGetS :: HasDebugCallStack => String -> Dictionary -> (BinHandle -> IO a) -> ByteString -> IO a
 runGetS name st m bl = do
   let bs = B.toStrict bl
   bh0 <- unpackBinBuffer (BS.length bs) bs
@@ -242,7 +245,7 @@ insertTable t_r bh s = do
 readTable :: ObjEnv -> BinHandle -> IO FastString
 readTable e bh = do
   n :: Int <- get bh
-  return $ strText (oeSymbols e) ! fromIntegral n
+  return $ (oeSymbols e) ! fromIntegral n
 
 -- one toplevel block in the object file
 data ObjUnit = ObjUnit
@@ -305,13 +308,13 @@ putIndex st xs = runPutS st (\bh -> put_ bh $ zip symbols offsets)
     (symbols, values) = unzip xs
     offsets = scanl (+) 0 (map B.length values)
 
-getIndex :: HasDebugCallStack => String -> SymbolTableR -> ByteString -> IO [([FastString], Int64)]
+getIndex :: HasDebugCallStack => String -> Dictionary -> ByteString -> IO [([FastString], Int64)]
 getIndex name st bs = runGetS name st get bs
 
 putDeps :: SymbolTable -> Deps -> IO (SymbolTable, ByteString)
 putDeps st deps = runPutS st (\bh -> put_ bh deps)
 
-getDeps :: HasDebugCallStack => String -> SymbolTableR -> ByteString -> IO Deps
+getDeps :: HasDebugCallStack => String -> Dictionary -> ByteString -> IO Deps
 getDeps name st bs = runGetS name st get bs
 
 toI32 :: Int -> Int32
@@ -431,7 +434,7 @@ readObjectKeys name p bs =
 readObjectKeys' :: HasDebugCallStack
                 => String
                 -> (Int -> [FastString] -> Bool)
-                -> SymbolTableR
+                -> Dictionary
                 -> ByteString
                 -> ByteString
                 -> IO [ObjUnit]
@@ -446,8 +449,8 @@ readObjectKeys' name p st bsidx bsobjs = do
       | otherwise = return Nothing
     getOU bh = (,,,,,) <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
 
-getSymbolTable :: HasDebugCallStack => ByteString -> SymbolTableR
-getSymbolTable bs = SymbolTableR (listArray (0,n-1) xs) (listArray (0,n-1) (map unpackFS xs))
+getSymbolTable :: HasDebugCallStack => ByteString -> Dictionary
+getSymbolTable bs = listArray (0,n-1) xs
   where
     (n,xs) = DB.runGet getter bs
     getter :: DB.Get (Int, [FastString])
