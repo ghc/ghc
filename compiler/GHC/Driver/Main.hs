@@ -1854,6 +1854,9 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                         stub_c_exists = Nothing
                         foreign_fps   = []
 
+                    putDumpFileMaybe logger Opt_D_dump_stg_final "Final STG:" FormatSTG
+                        (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds)
+
                     -- do the unfortunately effectual business
                     stgToJS logger js_config stg_binds this_mod spt_entries foreign_stubs0 cost_centre_info output_filename
                     return (output_filename, stub_c_exists, foreign_fps, cg_infos)
