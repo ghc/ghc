@@ -498,7 +498,7 @@ infixl 8 .^
 
 -- | Assign a variable to an expression
 --
--- > foo |= expr ==> foo = expr;
+-- > foo |= expr ==> var foo = expr;
 (|=) :: JExpr -> JExpr -> JStat
 (|=) = AssignStat
 
