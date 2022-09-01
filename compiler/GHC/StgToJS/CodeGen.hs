@@ -241,7 +241,8 @@ serializeLinkableUnit :: HasDebugCallStack
                       -> G (Object.SymbolTable, [FastString], BS.ByteString)
 serializeLinkableUnit _m st i ci si stat rawStat fe fi = do
   !i' <- mapM idStr i
-  !(!st', !o) <- lift $ Object.serializeStat st ci si stat rawStat fe fi
+  !(!st', !lo) <- lift $ Object.runPutS st $ \bh -> Object.putLinkableUnit bh ci si stat rawStat fe fi
+  let !o = BL.toStrict lo
   return (st', i', o) -- deepseq results?
     where
       idStr i = itxt <$> identForId i
