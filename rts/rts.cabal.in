@@ -75,30 +75,35 @@ library
       -- dummy file to force the build of a .a lib
       -- FIXME (Luite, 2022-08) do we still need the c-sources file?
       c-sources: version.c
-      js-sources: js/structs.js
-                  js/arith.js
-                  js/compact.js
-                  js/debug.js
-                  js/enum.js
-                  js/environment.js
-                  js/gc.js
-                  js/goog.js
-                  js/hscore.js
-                  js/md5.js
-                  js/mem.js
-                  js/node-exports.js
-                  js/object.js
-                  js/platform.js
-                  js/profiling.js
-                  js/rts.js
-                  js/stableptr.js
-                  js/staticpointer.js
-                  js/stm.js
-                  js/string.js
-                  js/thread.js
-                  js/unicode.js
-                  js/verify.js
-                  js/weak.js
+
+      js-sources:
+        -- "platform" must be linked first because it defines global constants
+        -- (e.g. h$isNode)
+        js/platform.js
+
+        js/structs.js
+        js/arith.js
+        js/compact.js
+        js/debug.js
+        js/enum.js
+        js/environment.js
+        js/gc.js
+        js/goog.js
+        js/hscore.js
+        js/md5.js
+        js/mem.js
+        js/node-exports.js
+        js/object.js
+        js/profiling.js
+        js/rts.js
+        js/stableptr.js
+        js/staticpointer.js
+        js/stm.js
+        js/string.js
+        js/thread.js
+        js/unicode.js
+        js/verify.js
+        js/weak.js
 
       install-includes: HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
                         ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
