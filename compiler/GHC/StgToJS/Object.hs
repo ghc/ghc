@@ -40,8 +40,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Object
-  ( object
-  , object'
+  ( writeObject'
   , readDepsFile
   , readDepsFileEither
   , hReadDeps
@@ -235,7 +234,7 @@ runPutS st ps = do
 insertTable :: IORef SymbolTable -> BinHandle -> FastString -> IO ()
 insertTable t_r bh s = do
   t <- readIORef t_r
-  let (t', n) = insertSymbol s t
+  let !(t', n) = insertSymbol s t
   writeIORef t_r t'
   put_ bh n
   return ()
@@ -244,10 +243,6 @@ readTable :: ObjEnv -> BinHandle -> IO FastString
 readTable e bh = do
   n :: Int <- get bh
   return $ strText (oeSymbols e) ! fromIntegral n
-
--- unexpected :: String -> GetS a
--- unexpected err = ask >>= \e ->
---   error (oeName e ++ ": " ++ err)
 
 -- one toplevel block in the object file
 data ObjUnit = ObjUnit
@@ -259,21 +254,6 @@ data ObjUnit = ObjUnit
   , oiFExports :: [ExpFun]
   , oiFImports :: [ForeignJSRef]
   }
-
--- | build an object file
-object :: ModuleName     -- ^ the module name
-       -> Deps           -- ^ the dependencies
-       -> [ObjUnit]      -- ^ units, the first unit is the module-global one
-       -> IO ByteString  -- ^ serialized object
-object mname ds units = do
-  (xs, symbs) <- go emptySymbolTable units
-  object' mname symbs ds xs
-  where
-    go st0 (ObjUnit sy cl si st str fe fi : ys) = do
-      (st1, bs ) <- serializeStat st0 cl si st str fe fi
-      (bss, st2) <- go st1 ys
-      return ((sy,B.fromChunks [bs]):bss, st2)
-    go st0 [] = return ([], st0)
 
 serializeStat :: SymbolTable
               -> [ClosureInfo]
@@ -304,13 +284,13 @@ moduleNameTag (ModuleName fs) = case compare len moduleNameLength of
     !tag = SBS.fromShort (fs_sbs fs)
     !len = n_chars fs
 
-object'
+writeObject'
   :: ModuleName                  -- ^ module
   -> SymbolTable                 -- ^ final symbol table
   -> Deps                        -- ^ dependencies
   -> [([FastString],ByteString)] -- ^ serialized units and their exported symbols, the first unit is module-global
   -> IO ByteString
-object' mod_name st0 deps0 os = do
+writeObject' mod_name st0 deps0 os = do
   (sti, idx) <- putIndex st0 os
   let symbs  =  putSymbolTable sti
   deps1      <- putDepsSection deps0
@@ -529,19 +509,6 @@ tag = put_
 
 getTag :: BinHandle -> IO Word8
 getTag = get
-
--- instance Binary ShortText where
---   put_ bh t = put_ bh (mkFastString $ ST.unpack t)
---   get bh = ST.pack . unpackFS <$> get bh
-  -- put_ bh t = do
-    -- symbols <- St.get
-    -- let (symbols', n) = insertSymbol t symbols
-    -- St.put symbols'
-    -- lift (DB.putWord32le $ fromIntegral n)
-  -- get bh = do
-    -- st <- oeSymbols <$> ask
-    -- n <- lift DB.getWord32le
-    -- return (strText st ! fromIntegral n)
 
 instance Binary JStat where
   put_ bh (DeclStat i)         = tag bh 1  >> put_ bh i
