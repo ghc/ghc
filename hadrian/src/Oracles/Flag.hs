@@ -81,8 +81,9 @@ platformSupportsSharedLibs = do
     windows       <- isWinTarget
     ppc_linux     <- anyTargetPlatform [ "powerpc-unknown-linux" ]
     solaris       <- anyTargetPlatform [ "i386-unknown-solaris2" ]
+    javascript    <- anyTargetArch     [ "js" ]
     solarisBroken <- flag SolarisBrokenShld
-    return $ not (windows || ppc_linux || solaris && solarisBroken)
+    return $ not (windows || ppc_linux || (solaris && solarisBroken) || javascript)
 
 -- | Does the target support the threaded runtime system?
 targetSupportsSMP :: Action Bool
