@@ -41,6 +41,7 @@ flavourTransformers = M.fromList
     [ "werror" =: werror
     , "debug_info" =: enableDebugInfo
     , "ticky_ghc" =: enableTickyGhc
+    , "ticky_ghc0" =: enableTickyGhc0
     , "split_sections" =: splitSections
     , "thread_sanitizer" =: enableThreadSanitizer
     , "llvm" =: viaLlvmBackend
@@ -91,13 +92,14 @@ parseFlavour baseFlavours transformers str =
     baseFlavour =
         P.choice [ f <$ P.try (P.string (name f))
                  | f <- reverse (sortOn name baseFlavours)
-                 ]      -- needed to parse e.g. "quick-debug" before "quick"
+                 ]      -- reverse&sort needed to parse e.g. "quick-debug" before "quick"
 
     flavourTrans :: Parser (Flavour -> Flavour)
     flavourTrans = do
         void $ P.char '+'
         P.choice [ trans <$ P.try (P.string nm)
-                 | (nm, trans) <- M.toList transformers
+                 | (nm, trans) <- reverse $ sortOn fst $ M.toList transformers
+                      -- reverse&sort needed to parse e.g. "ticky_ghc0" before "ticky_ghc"
                  ]
 
 -- | Add arguments to the 'args' of a 'Flavour'.
@@ -122,18 +124,27 @@ enableDebugInfo = addArgs $ notStage0 ? mconcat
 enableTickyGhc :: Flavour -> Flavour
 enableTickyGhc =
     addArgs $ stage1 ? mconcat
-      [ builder (Ghc CompileHs) ? ticky
-      , builder (Ghc LinkHs) ? ticky
+      [ builder (Ghc CompileHs) ? tickyArgs
+      , builder (Ghc LinkHs) ? tickyArgs
       ]
-  where
-    ticky = mconcat
-      [ arg "-ticky"
-      , arg "-ticky-allocd"
-      , arg "-ticky-dyn-thunk"
-      -- You generally need STG dumps to interpret ticky profiles
-      , arg "-ddump-to-file"
-      , arg "-ddump-stg-final"
+
+-- | Enable the ticky-ticky profiler in stage1 GHC
+enableTickyGhc0 :: Flavour -> Flavour
+enableTickyGhc0 =
+    addArgs $ stage0 ? mconcat
+      [ builder (Ghc CompileHs) ? tickyArgs
+      , builder (Ghc LinkHs) ? tickyArgs
       ]
+
+tickyArgs :: Args
+tickyArgs = mconcat
+  [ arg "-ticky"
+  , arg "-ticky-allocd"
+  , arg "-ticky-dyn-thunk"
+  -- You generally need STG dumps to interpret ticky profiles
+  , arg "-ddump-to-file"
+  , arg "-ddump-stg-final"
+  ]
 
 -- | Enable Core, STG, and (not C--) linting in all compilations with the stage1 compiler.
 enableLinting :: Flavour -> Flavour
