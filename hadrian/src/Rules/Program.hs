@@ -120,10 +120,12 @@ buildBinary rs bin context@Context {..} = do
     asmObjs <- mapM (objectPath context) asmSrcs
     cSrcs   <- interpretInContext context (getContextData cSrcs)
     cxxSrcs <- interpretInContext context (getContextData cxxSrcs)
+    jsSrcs  <- interpretInContext context (getContextData jsSrcs)
     cObjs   <- mapM (objectPath context) cSrcs
     cxxObjs <- mapM (objectPath context) cxxSrcs
+    jsObjs  <- mapM (objectPath context) jsSrcs
     hsObjs  <- hsObjects context
-    let binDeps = asmObjs ++ cObjs ++ cxxObjs ++ hsObjs
+    let binDeps = asmObjs ++ cObjs ++ cxxObjs ++ jsObjs ++ hsObjs
     need binDeps
     buildWithResources rs $ target context (Ghc LinkHs stage) binDeps [bin]
     synopsis <- pkgSynopsis package

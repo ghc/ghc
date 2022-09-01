@@ -62,9 +62,8 @@ buildStaticLib root archivePath = do
                      archivePath
     let context = libAContext l
     objs <- libraryObjects context
-    resources <- libraryResources context
     removeFile archivePath
-    build $ target context (Ar Pack stage) (objs ++ resources) [archivePath]
+    build $ target context (Ar Pack stage) objs [archivePath]
     synopsis <- pkgSynopsis (package context)
     putSuccess $ renderLibrary
         (quote pkgname ++ " (" ++ show stage ++ ", way " ++ show way ++ ").")
@@ -173,10 +172,11 @@ nonHsObjects context = do
     asmObjs <- mapM (objectPath context) asmSrcs
     cObjs   <- cObjects context
     cxxObjs <- cxxObjects context
+    jsObjs  <- jsObjects context
     cmmSrcs <- interpretInContext context (getContextData cmmSrcs)
     cmmObjs <- mapM (objectPath context) cmmSrcs
     eObjs   <- extraObjects context
-    return $ asmObjs ++ cObjs ++ cxxObjs ++ cmmObjs ++ eObjs
+    return $ asmObjs ++ cObjs ++ cxxObjs ++ cmmObjs ++ jsObjs ++ eObjs
 
 -- | Return all the Cxx object files needed to build the given library context.
 cxxObjects :: Context -> Action [FilePath]
@@ -193,15 +193,9 @@ cObjects context = do
         then objs
         else filter ((`notElem` ["Evac_thr", "Scav_thr"]) . takeBaseName) objs
 
-libraryResources :: Context -> Action [FilePath]
-libraryResources context = do
-    jsFls <- jsFiles context
-    need jsFls
-    return jsFls
-
--- | Return all the JS sources to be included in the library.
-jsFiles :: Context -> Action [FilePath]
-jsFiles context = do
+-- | Return all the JS object files to be included in the library.
+jsObjects :: Context -> Action [FilePath]
+jsObjects context = do
   srcs <- interpretInContext context (getContextData jsSrcs)
   mapM (objectPath context) srcs
 
