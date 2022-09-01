@@ -1035,50 +1035,124 @@ genPrim prof ty op = case op of
   ShrinkSmallMutableArrayOp_Char    -> unhandledPrimop op
   GetSizeofSmallMutableArrayOp      -> unhandledPrimop op
 
-  IndexByteArrayOp_Word8AsChar      -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsWideChar  -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsAddr      -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsFloat     -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsDouble    -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsStablePtr -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsInt16     -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsInt32     -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsInt64     -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsInt       -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsWord16    -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsWord32    -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsWord64    -> unhandledPrimop op
-  IndexByteArrayOp_Word8AsWord      -> unhandledPrimop op
+  IndexByteArrayOp_Word8AsChar      -> \[r] [a,i] -> PrimInline $ r |= dv_u8  a i
+  IndexByteArrayOp_Word8AsWideChar  -> \[r] [a,i] -> PrimInline $ r |= dv_i32 a i
+  IndexByteArrayOp_Word8AsAddr      -> \[r1,r2] [a,i] ->
+    PrimInline $ jVar \t -> mconcat
+    [-- grab the "array" property
+      t |= a .^ "arr"
+    -- make sure we have a non-empty array
+    , ifBlockS (t .&&. t .! i)
+      -- we do, r1 is the ArrayBuffer, r2 is the payload offset
+      [ r1 |= t
+      , r2 |= dv_u32 t i
+      ]
+      -- we don't
+      [ r1 |= null_
+      , r2 |= zero_
+      ]
+    ]
+  IndexByteArrayOp_Word8AsFloat     -> \[r] [a,i] -> PrimInline $ r |= dv_f32 a i
+  IndexByteArrayOp_Word8AsDouble    -> \[r] [a,i] -> PrimInline $ r |= dv_f32 a i
+  IndexByteArrayOp_Word8AsStablePtr -> \[r1,r2] [a,i] ->
+    PrimInline $ mconcat
+    [ r1 |= var "h$stablePtrBuf"
+    , r2 |= dv_i32 a i
+    ]
+  IndexByteArrayOp_Word8AsInt16     -> \[r] [a,i] -> PrimInline $ r |= dv_i16 a i
+  IndexByteArrayOp_Word8AsInt32     -> \[r] [a,i] -> PrimInline $ r |= dv_i32 a i
+  IndexByteArrayOp_Word8AsInt64     -> \[h,l] [a,i] ->
+    PrimInline $ mconcat
+        [ h |= dv_u32 a (Add i (Int 4))
+        , l |= dv_u32 a i
+        ]
+  IndexByteArrayOp_Word8AsInt       -> \[r] [a,i] -> PrimInline $ r |= dv_i32  a i
+  IndexByteArrayOp_Word8AsWord16    -> \[r] [a,i] -> PrimInline $ r |= dv_u16  a i
+  IndexByteArrayOp_Word8AsWord32    -> \[r] [a,i] -> PrimInline $ r |= dv_u32  a i
+  IndexByteArrayOp_Word8AsWord64    -> \[h,l] [a,i] ->
+    PrimInline $ mconcat
+        [ h |= dv_u32 a (Add i (Int 4))
+        , l |= dv_u32 a i
+        ]
+  IndexByteArrayOp_Word8AsWord      -> \[r] [a,i] -> PrimInline $ r |= dv_u32  a i
 
-  ReadByteArrayOp_Word8AsChar       -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsWideChar   -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsAddr       -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsFloat      -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsDouble     -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsStablePtr  -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsInt16      -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsInt32      -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsInt64      -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsInt        -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsWord16     -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsWord32     -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsWord64     -> unhandledPrimop op
-  ReadByteArrayOp_Word8AsWord       -> unhandledPrimop op
+  ReadByteArrayOp_Word8AsChar       -> \[r] [a,i] -> PrimInline $ r |= dv_u8  a i
+  ReadByteArrayOp_Word8AsWideChar   -> \[r] [a,i] -> PrimInline $ r |= dv_i32 a i
+  ReadByteArrayOp_Word8AsAddr       -> \[r1,r2] [a,i] ->
+    PrimInline $ jVar \t -> mconcat
+    [-- grab the "array" property
+      t |= a .^ "arr"
+    -- make sure we have a non-empty array
+    , ifBlockS (t .&&. t .! i)
+      -- we do, r1 is the ArrayBuffer, r2 is the payload offset
+      [ r1 |= t
+      , r2 |= dv_u32 t i
+      ]
+      -- we don't
+      [ r1 |= null_
+      , r2 |= zero_
+      ]
+    ]
+  ReadByteArrayOp_Word8AsFloat      -> \[r] [a,i] -> PrimInline $ r |= dv_f32 a i
+  ReadByteArrayOp_Word8AsDouble     -> \[r] [a,i] -> PrimInline $ r |= dv_f32 a i
+  ReadByteArrayOp_Word8AsStablePtr  -> \[r1,r2] [a,i] ->
+    PrimInline $ mconcat
+    [ r1 |= var "h$stablePtrBuf"
+    , r2 |= dv_i32 a i
+    ]
+  ReadByteArrayOp_Word8AsInt16      -> \[r] [a,i] -> PrimInline $ r |= dv_i16 a i
+  ReadByteArrayOp_Word8AsInt32      -> \[r] [a,i] -> PrimInline $ r |= dv_i32 a i
+  ReadByteArrayOp_Word8AsInt64      -> \[h,l] [a,i] ->
+    PrimInline $ mconcat
+      [ h |= dv_i32 a (Add i (Int 4))
+      , l |= dv_u32 a i
+      ]
+  ReadByteArrayOp_Word8AsInt        -> \[r] [a,i] -> PrimInline $ r |= dv_i32  a i
+  ReadByteArrayOp_Word8AsWord16     -> \[r] [a,i] -> PrimInline $ r |= dv_u16  a i
+  ReadByteArrayOp_Word8AsWord32     -> \[r] [a,i] -> PrimInline $ r |= dv_u32  a i
+  ReadByteArrayOp_Word8AsWord64     -> \[h,l] [a,i] ->
+    PrimInline $ mconcat
+        [ h |= dv_u32 a (Add i (Int 4))
+        , l |= dv_u32 a i
+        ]
+  ReadByteArrayOp_Word8AsWord       -> \[r] [a,i] -> PrimInline $ r |= dv_u32  a i
 
-  WriteByteArrayOp_Word8AsChar      -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsWideChar  -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsAddr      -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsFloat     -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsDouble    -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsStablePtr -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsInt16     -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsInt32     -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsInt64     -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsInt       -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsWord16    -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsWord32    -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsWord64    -> unhandledPrimop op
-  WriteByteArrayOp_Word8AsWord      -> unhandledPrimop op
+  WriteByteArrayOp_Word8AsChar      -> \[] [a,i,e] -> PrimInline $ dv_s_u8  a i e
+  WriteByteArrayOp_Word8AsWideChar  -> \[] [a,i,e] -> PrimInline $ dv_s_i32 a i e
+  WriteByteArrayOp_Word8AsAddr      -> \[] [a,i,e1,e2] ->
+    PrimInline $ mconcat
+    [ ifS (Not (a .^ "arr"))
+          -- if we don't have the "arr" property then make it
+          (a .^ "arr" |= ValExpr (JList []))
+          -- else noop
+          mempty
+    , dv_s_i32 (a .^ "arr") i (ValExpr (JList [e1, e2]))
+    ]
+  WriteByteArrayOp_Word8AsFloat     -> \[] [a,i,e] -> PrimInline $ dv_s_f32 a i e
+  WriteByteArrayOp_Word8AsDouble    -> \[] [a,i,e] -> PrimInline $ dv_s_f32 a i e
+  WriteByteArrayOp_Word8AsStablePtr -> \[] [a,i,_e1,e2] -> PrimInline $ dv_s_i32 a i e2
+  WriteByteArrayOp_Word8AsInt16     -> \[] [a,i,e] -> PrimInline $ dv_s_i16 a i e
+  WriteByteArrayOp_Word8AsInt32     -> \[] [a,i,e] -> PrimInline $ dv_s_i32 a i e
+  WriteByteArrayOp_Word8AsInt64     -> \[] [a,i,h,l] ->
+    -- JS Numbers are little-endian and 32-bit, so write the lower 4 bytes at i
+    -- then write the higher 4 bytes to i+4
+    PrimInline $ mconcat [ dv_s_i32 a (Add i (Int 4)) h
+                         , dv_s_i32 a i               l
+                         ]
+  -- it is probably strange to be using dv_s_i32, and dv_s_i16 when dv_s_u16 and
+  -- dv_s_u32 exist. Unfortunately this is a infelicity of the JS Backend. u32_
+  -- and friends are only valid for reading. For writing, we use i32 and friends
+  -- because u32_ uses the i32_ views internally and then coerces the Int32 to a
+  -- Word32. We must go through this ceremony because JS doesn't really have the
+  -- concept of a Word32, so we have to cast to Int32 and write using i32_.
+  WriteByteArrayOp_Word8AsInt       -> \[] [a,i,e] -> PrimInline $ dv_s_i32 a i e
+  WriteByteArrayOp_Word8AsWord16    -> \[] [a,i,e] -> PrimInline $ dv_s_i16 a i e
+  WriteByteArrayOp_Word8AsWord32    -> \[] [a,i,e] -> PrimInline $ dv_s_i32 a i e
+  WriteByteArrayOp_Word8AsWord64    -> \[] [a,i,h,l] ->
+    PrimInline $ mconcat [ dv_s_i32 a  (Add i (Int 4)) (i32 h)
+                         , dv_s_i32 a  i               (i32 l)
+                         ]
+  WriteByteArrayOp_Word8AsWord      -> \[] [a,i,e] -> PrimInline $ dv_s_u32 a i (i32 e)
 
   CasByteArrayOp_Int8               -> unhandledPrimop op
   CasByteArrayOp_Int16              -> unhandledPrimop op
@@ -1195,8 +1269,17 @@ f6_ a i = IdxExpr (a .^ "f6") i
 f3_ a i = IdxExpr (a .^ "f3") i
 u1_ a i = IdxExpr (a .^ "u1") i
 
-dv_s_i8, dv_s_i16, dv_s_u16, dv_s_i32, dv_s_u32, dv_s_f32, dv_s_f64 :: JExpr -> JExpr -> JExpr -> JStat
+-- | Data View helper functions. In the JS backend we keep a field @dv@ for each
+-- ByteArray. The @dv@ field is a JS @DataView@ that is a low level interface
+-- for reading/writing number types into a JS @ArrayBuffer@. See
+-- 'h$newByteArray' in 'ghc/rts/js/mem.js' for details. These helper functions
+-- wrap useful @DataView@ methods for us in PrimOps. The argument list consists
+-- of the index @i@, the new value to set (in the case of a setter) @v@, and a
+-- Boolean flag indicating whether the type in question is stored in
+-- little-endian (True) or big-endian (False) format.
+dv_s_i8, dv_s_u8, dv_s_i16, dv_s_u16, dv_s_i32, dv_s_u32, dv_s_f32, dv_s_f64 :: JExpr -> JExpr -> JExpr -> JStat
 dv_s_i8  a i v = ApplStat (a .^ "dv" .^ "setInt8"   ) [i, v, true_]
+dv_s_u8  a i v = ApplStat (a .^ "dv" .^ "setUInt8"  ) [i, v, true_]
 dv_s_u16 a i v = ApplStat (a .^ "dv" .^ "setUint16" ) [i, v, true_]
 dv_s_i16 a i v = ApplStat (a .^ "dv" .^ "setInt16"  ) [i, v, true_]
 dv_s_i32 a i v = ApplStat (a .^ "dv" .^ "setInt32"  ) [i, v, true_]
@@ -1204,7 +1287,8 @@ dv_s_u32 a i v = ApplStat (a .^ "dv" .^ "setUint32" ) [i, v, true_]
 dv_s_f32 a i v = ApplStat (a .^ "dv" .^ "setFloat32") [i, v, true_]
 dv_s_f64 a i v = ApplStat (a .^ "dv" .^ "setFloat64") [i, v, true_]
 
-dv_i8, dv_i16, dv_u16, dv_i32, dv_u32, dv_f32, dv_f64 :: JExpr -> JExpr -> JExpr
+dv_i8, dv_u8, dv_i16, dv_u16, dv_i32, dv_u32, dv_f32, dv_f64 :: JExpr -> JExpr -> JExpr
+dv_u8  a i = ApplExpr (a .^ "dv" .^ "getUInt8"   ) [i, true_]
 dv_i8  a i = ApplExpr (a .^ "dv" .^ "getInt8"   ) [i, true_]
 dv_i16 a i = ApplExpr (a .^ "dv" .^ "getInt16"  ) [i, true_]
 dv_u16 a i = ApplExpr (a .^ "dv" .^ "getUint16" ) [i, true_]
@@ -1242,11 +1326,17 @@ newByteArray tgt len =
   tgt |= app "h$newByteArray" [len]
 
 
--- e|0  (32 bit signed integer truncation)
+-- e|0 (32 bit signed integer truncation) required because of JS numbers. e|0
+-- converts e to an Int32. Note that e|0 _is still a Double_ because JavaScript.
+-- So (x|0) * (y|0) can still return values outside of the Int32 range. You have
+-- been warned!
 i32 :: JExpr -> JExpr
 i32 e = BOr e zero_
 
 -- e>>>0  (32 bit unsigned integer truncation)
+-- required because of JS numbers. e>>>0 converts e to a Word32
+-- so  (-2147483648)       >>> 0  = 2147483648
+-- and ((-2147483648) >>>0) | 0   = -2147483648
 u32 :: JExpr -> JExpr
 u32 e = e .>>>. zero_
 

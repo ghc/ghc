@@ -940,6 +940,7 @@ function h$roundUpToMultipleOf(n,m) {
   return rem === 0 ? n : n - rem + m;
 }
 
+// len in bytes
 function h$newByteArray(len) {
   var len0 = Math.max(h$roundUpToMultipleOf(len, 8), 8);
   var buf = new ArrayBuffer(len0);
