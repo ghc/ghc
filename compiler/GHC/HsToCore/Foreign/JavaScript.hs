@@ -336,7 +336,7 @@ dsJsFExportDynamic id co0 cconv = do
     return ([fed], h_code, c_code)
 
 toJsName :: Id -> String
-toJsName i = renderWithContext defaultSDocContext (pprCode CStyle (ppr (idName i)))
+toJsName i = renderWithContext defaultSDocContext (pprCode (ppr (idName i)))
 
 dsJsCall :: Id -> Coercion -> ForeignCall -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], CHeader, CStub)
