@@ -462,17 +462,17 @@ foreign import javascript interruptible "(($1_1,$1_2,$2,$3,$c) => { return h$bas
    c_interruptible_open_ :: CFilePath -> CInt -> CMode -> IO CInt
 foreign import javascript interruptible "(($1_1,$1_2,$2,$3,$c) => { return h$base_open($1_1,$1_2,$2,$3,$c); })"
    c_safe_open_ :: CFilePath -> CInt -> CMode -> IO CInt
-foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$4,$c) => { return h$base_read($1,$2_1,$2_2,$3,$4,$c); })"
+foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$c) => { return h$base_read($1,$2_1,$2_2,$3,$c); })"
    c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
-foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$4,$c) => { return h$base_read($1,$2_1,$2_2,$3,$4,$c); })"
+foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$c) => { return h$base_read($1,$2_1,$2_2,$3,$c); })"
    c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 foreign import javascript interruptible "(($1_1,$1_2,$2_1,$2_2,$c) => { return h$base_stat($1_1,$1_2,$2_1,$2_2,$c); })" -- fixme wrong type
    c_stat :: CFilePath -> Ptr CStat -> IO CInt
 foreign import javascript unsafe "(($1) => { return h$base_umask($1); })"
    c_umask :: CMode -> IO CMode
-foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$4,$c) => { return h$base_write($1,$2_1,$2_2,$3,$4,$c); })"
+foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$c) => { return h$base_write($1,$2_1,$2_2,$3,$c); })"
    c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
-foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$4,$c) => { return h$base_write($1,$2_1,$2_2,$3,$4,$c); })"
+foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$c) => { return h$base_write($1,$2_1,$2_2,$3,$c); })"
    c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 foreign import javascript interruptible "(($1,$2_1,$2_2,$c) => { return h$base_ftruncate($1,$2_1,$2_2,$c); })" -- fixme COff
    c_ftruncate :: CInt -> FileOffset -> IO CInt
