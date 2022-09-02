@@ -135,7 +135,7 @@ costCentreLbl' :: CostCentre -> G String
 costCentreLbl' cc = do
   curModl <- State.gets gsModule
   let lbl = renderWithContext defaultSDocContext
-              $ withPprStyle (PprCode CStyle) (ppr cc)
+              $ withPprStyle PprCode (ppr cc)
   return . ("h$"++) . zEncodeString $
     moduleNameColons (moduleName curModl) ++ "_" ++ if isCafCC cc then "CAF_ccs" else lbl
 
