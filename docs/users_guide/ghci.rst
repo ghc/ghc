@@ -2183,7 +2183,7 @@ commonly used commands.
     Abandons the current evaluation (only available when stopped at a
     breakpoint).
 
-.. ghci-cmd:: :add;[*] ⟨module⟩
+.. ghci-cmd:: :add; [*]⟨module⟩
 
     Add ⟨module⟩(s) to the current target set, and perform a reload.
     Normally pre-compiled code for the module will be loaded if
