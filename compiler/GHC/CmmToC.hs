@@ -251,7 +251,7 @@ pprStmt platform stmt =
                         -- can't add the @n suffix ourselves, because
                         -- it isn't valid C.
                 | CmmNeverReturns <- ret ->
-                    pprCall platform cast_fn cconv hresults hargs <> semi
+                    pprCall platform cast_fn cconv hresults hargs <> semi <> text "__builtin_unreachable();"
                 | not (isMathFun lbl) ->
                     pprForeignCall platform (pprCLabel platform CStyle lbl) cconv hresults hargs
               _ ->
