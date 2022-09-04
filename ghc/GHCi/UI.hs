@@ -1994,7 +1994,7 @@ instancesCmd s = do
     printForUser $ vcat $ map ppr res
 
 -----------------------------------------------------------------------------
--- :load, :add, :reload
+-- :load, :add, :unadd, :reload
 
 -- | Sets '-fdefer-type-errors' if 'defer' is true, executes 'load' and unsets
 -- '-fdefer-type-errors' again if it has not been set before.

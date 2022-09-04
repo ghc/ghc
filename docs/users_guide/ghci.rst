@@ -541,8 +541,9 @@ including entities that are in scope in the current module context.
 
 .. warning::
     Temporary bindings introduced at the prompt only last until the
-    next :ghci-cmd:`:load` or :ghci-cmd:`:reload` command, at which time they
-    will be simply lost. However, they do survive a change of context with
+    next :ghci-cmd:`:load`, :ghci-cmd:`:reload`, :ghci-cmd:`:add` or 
+    :ghci-cmd:`:unadd` command, at which time they will be simply lost.
+    However, they do survive a change of context with
     :ghci-cmd:`:module`: the temporary bindings just move to the new location.
 
 .. hint::
@@ -731,7 +732,7 @@ When you type an expression at the prompt, what identifiers and types
 are in scope? GHCi provides a flexible way to control exactly how the
 context for an expression is constructed:
 
--  The :ghci-cmd:`:load`, :ghci-cmd:`:add`, and :ghci-cmd:`:reload` commands
+-  The :ghci-cmd:`:load`, :ghci-cmd:`:reload`, :ghci-cmd:`:add` and :ghci-cmd:`:unadd` commands
    (:ref:`ghci-load-scope`).
 
 -  The ``import`` declaration (:ref:`ghci-import-decl`).
@@ -751,7 +752,7 @@ contribute to the top-level scope.
 The effect of ``:load`` on what is in scope
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The :ghci-cmd:`:load`, :ghci-cmd:`:add`, and :ghci-cmd:`:reload` commands
+The :ghci-cmd:`:load`, :ghci-cmd:`:reload`, :ghci-cmd:`:add` and :ghci-cmd:`:unadd` commands
 (:ref:`loading-source-files` and :ref:`ghci-compiled`) affect the
 top-level scope. Let's start with the simple cases; when you start GHCi
 the prompt looks like this:
@@ -796,7 +797,7 @@ automatically-added imports can be seen with :ghci-cmd:`:show imports`:
     *ghci>
 
 and the automatically-added import is replaced the next time you use
-:ghci-cmd:`:load`, :ghci-cmd:`:add`, or :ghci-cmd:`:reload`. It can also be
+:ghci-cmd:`:load`, :ghci-cmd:`:reload`, :ghci-cmd:`:add` or :ghci-cmd:`:unadd`. It can also be
 removed by :ghci-cmd:`:module` as with normal imports.
 
 .. _ghci-import-decl:
@@ -895,13 +896,13 @@ can use both to bring a module into scope. However, there is a very important
 difference. GHCi is concerned with two sets of modules:
 
 -  The set of modules that are currently *loaded*. This set is modified
-   by :ghci-cmd:`:load`, :ghci-cmd:`:add` and :ghci-cmd:`:reload`, and can be shown with
+   by :ghci-cmd:`:load`, :ghci-cmd:`:reload`, :ghci-cmd:`:add` and :ghci-cmd:`:unadd`, and can be shown with
    :ghci-cmd:`:show modules`.
 
 -  The set of modules that are currently *in scope* at the prompt. This set is
    modified by ``import`` and :ghci-cmd:`:module`, and it is also modified
-   automatically after :ghci-cmd:`:load`, :ghci-cmd:`:add`, and
-   :ghci-cmd:`:reload`, as described above. The set of modules in scope can be
+   automatically after :ghci-cmd:`:load`, :ghci-cmd:`:reload`, :ghci-cmd:`:add`
+   and :ghci-cmd:`:unadd`, as described above. The set of modules in scope can be
    shown with :ghci-cmd:`:show imports`.
 
 You can add a module to the scope (via :ghci-cmd:`:module` or ``import``) only
@@ -1173,7 +1174,7 @@ The :ghc-flag:`-interactive-print ⟨name⟩` flag allows to specify any functio
 of type ``C a => a -> IO ()``, for some constraint ``C``, as the function for
 printing evaluated expressions. The function can reside in any loaded module or
 any registered package, but only when it resides in a registered package will
-it survive a :ghci-cmd:`:cd`, :ghci-cmd:`:add`, :ghci-cmd:`:load`,
+it survive a :ghci-cmd:`:cd`, :ghci-cmd:`:add`, :ghci-cmd:`:unadd`, :ghci-cmd:`:load`,
 :ghci-cmd:`:reload` or, :ghci-cmd:`:set`.
 
 .. ghc-flag:: -interactive-print ⟨name⟩
@@ -2191,7 +2192,7 @@ commonly used commands.
     Using the ``*`` prefix forces the module to be loaded as byte-code.
 
     ⟨module⟩ may be a file path. A "``~``" symbol at the beginning of
-    ⟨module⟩  will be replaced by the contents of the environment variable
+    ⟨module⟩ will be replaced by the contents of the environment variable
     :envvar:`HOME`.
 
 .. ghci-cmd:: :all-types
@@ -2948,6 +2949,12 @@ commonly used commands.
     Show the currently active language flags for expressions typed at
     the prompt (see also :ghci-cmd:`:seti`).
 
+.. ghci-cmd:: :show targets
+
+    Show list of currently loaded modules.
+    This set of loaded modules can be modified by :ghci-cmd:`:load`,
+    :ghci-cmd:`:reload`, :ghci-cmd:`:add` and :ghci-cmd:`:unadd`.
+
 .. ghci-cmd:: :show; [args|prog|prompt|editor|stop]
 
     Displays the specified setting (see :ghci-cmd:`:set`).
@@ -3043,6 +3050,11 @@ commonly used commands.
     :ghci-cmd:`:type-at` falls back to a general :ghci-cmd:`:type` like lookup.
 
     The :ghci-cmd:`:type-at` command requires :ghci-cmd:`:set +c` to be set.
+
+.. ghci-cmd:: :unadd; ⟨module⟩
+
+    Removes ⟨module⟩(s) from the current target set, and perform a reload
+    (see :ghci-cmd:`:add` above).
 
 .. ghci-cmd:: :undef; ⟨name⟩
 
