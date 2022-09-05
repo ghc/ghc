@@ -92,6 +92,7 @@ import GHC.Unit.Module (moduleStableString)
 import GHC.Utils.Logger (Logger, logVerbAtLeast)
 import GHC.Utils.TmpFs (TmpFs)
 import GHC.Utils.Binary
+import GHC.Utils.Ppr (Style(..), renderStyle, Mode(..))
 
 import GHC.Linker.Static.Utils (exeFileName)
 
@@ -101,14 +102,14 @@ newtype LinkerStats = LinkerStats
 
 -- | result of a link pass
 data LinkResult = LinkResult
-  { linkOut         :: BL.ByteString  -- ^ compiled Haskell code
-  , linkOutStats    :: LinkerStats    -- ^ statistics about generated code
-  , linkOutMetaSize :: Int64          -- ^ size of packed metadata in generated code
-  , linkForeignRefs :: [ForeignJSRef] -- ^ foreign code references in compiled haskell code
-  , linkLibRTS      :: [FilePath]     -- ^ library code to load with the RTS
-  , linkLibA        :: [FilePath]     -- ^ library code to load after RTS
-  , linkLibAArch    :: [FilePath]     -- ^ library code to load from archives after RTS
-  , linkBase        :: Base           -- ^ base metadata to use if we want to link incrementally against this result
+  { linkOut         :: FilePath -> IO () -- ^ compiled Haskell code
+  , linkOutStats    :: LinkerStats       -- ^ statistics about generated code
+  , linkOutMetaSize :: Int64             -- ^ size of packed metadata in generated code
+  , linkForeignRefs :: [ForeignJSRef]    -- ^ foreign code references in compiled haskell code
+  , linkLibRTS      :: [FilePath]        -- ^ library code to load with the RTS
+  , linkLibA        :: [FilePath]        -- ^ library code to load after RTS
+  , linkLibAArch    :: [FilePath]        -- ^ library code to load from archives after RTS
+  , linkBase        :: Base              -- ^ base metadata to use if we want to link incrementally against this result
   } deriving (Generic)
 
 newtype ArchiveState = ArchiveState { loadedArchives :: IORef (Map FilePath Ar.Archive) }
@@ -142,7 +143,7 @@ link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFil
           jsExt | genBase   = "base.js"
                 | otherwise = "js"
       createDirectoryIfMissing False out
-      BL.writeFile (out </> "out" <.> jsExt) (linkOut link_res)
+      linkOut link_res (out </> "out" <.> jsExt)
 
       -- dump foreign references file (.frefs)
       unless (lcOnlyOut lc_cfg) $ do
@@ -310,7 +311,7 @@ renderLinker
   -> CompactorState
   -> Set ExportedFun
   -> [ModuleCode] -- ^ linked code per module
-  -> IO (BL.ByteString, Int64, CompactorState, LinkerStats)
+  -> IO (FilePath -> IO (), Int64, CompactorState, LinkerStats)
 renderLinker settings cfg renamer_state rtsDeps code = do
 
   -- extract ModuleCode fields required to make a LinkedUnit
@@ -325,11 +326,21 @@ renderLinker settings cfg renamer_state rtsDeps code = do
                                             (map ((\(LexicalFastString f) -> f) . funSymbol) $ S.toList rtsDeps)
                                             (map code_to_linked_unit code)
   let
+    render_all fp = do
+      BL.writeFile fp rendered_all
+
     -- render result into JS code
     rendered_all     = mconcat [mconcat rendered_mods, rendered_meta, rendered_exports]
     rendered_mods    = fmap render_js compacted
     rendered_meta    = render_js meta
-    render_js x      = BL.fromChunks [BC.pack (show (pretty x)), BC.pack "\n"]
+    doc_str          = renderStyle (Style
+                          { lineLength = 100
+                          , ribbonsPerLine = 1.5
+                          , mode = LeftMode
+                            -- Faster to write but uglier code.
+                            -- Use "PageMode False" to enable nicer code instead
+                          })
+    render_js x      = BL.fromChunks [BC.pack (doc_str (pretty x)), BC.pack "\n"]
     rendered_exports = BL.fromChunks (map mc_exports code)
     meta_length      = fromIntegral (BL.length rendered_meta)
     -- make LinkerStats entry for the given ModuleCode.
@@ -338,7 +349,7 @@ renderLinker settings cfg renamer_state rtsDeps code = do
     stats = LinkerStats $ M.fromList $ zipWith mk_stat code rendered_mods
 
   pure
-    ( rendered_all
+    ( render_all
     , meta_length
     , renamer_state'
     , stats
