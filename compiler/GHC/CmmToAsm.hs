@@ -787,7 +787,7 @@ makeImportsDoc config imports
                 | otherwise
                 = Outputable.empty
 
-        doPpr lbl = (lbl, renderWithContext
+        doPpr lbl = (lbl, showSDocOneLine
                               (ncgAsmContext config)
                               (pprAsmLabel platform lbl))
 

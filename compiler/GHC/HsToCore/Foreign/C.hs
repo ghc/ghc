@@ -333,7 +333,7 @@ dsFCall fn_id co fcall mDeclHeader = do
 
 
 toCName :: Id -> String
-toCName i = renderWithContext defaultSDocContext (pprCode (ppr (idName i)))
+toCName i = showSDocOneLine defaultSDocContext (pprCode (ppr (idName i)))
 
 toCType :: Type -> (Maybe Header, SDoc)
 toCType = f False

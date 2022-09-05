@@ -20,7 +20,6 @@ module GHC.Tc.Gen.Pat
    , tcCheckPat, tcCheckPat_O, tcInferPat
    , tcPats
    , addDataConStupidTheta
-   , polyPatSig
    )
 where
 
@@ -36,7 +35,6 @@ import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
-import GHC.Types.Error
 import GHC.Types.FieldLabel
 import GHC.Types.Id
 import GHC.Types.Var
@@ -1503,8 +1501,3 @@ checkGADT conlike ex_tvs arg_tys = \case
   where
     has_existentials :: Bool
     has_existentials = any (`elemVarSet` tyCoVarsOfTypes arg_tys) ex_tvs
-
-polyPatSig :: TcType -> SDoc
-polyPatSig sig_ty
-  = hang (text "Illegal polymorphic type signature in pattern:")
-       2 (ppr sig_ty)

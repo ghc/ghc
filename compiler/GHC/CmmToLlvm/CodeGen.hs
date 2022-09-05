@@ -1203,10 +1203,10 @@ genStore_slow addr val alignment meta = do
 
         other ->
             pprPanic "genStore: ptr not right type!"
-                    (pdoc platform addr <+> text (
-                        "Size of Ptr: "   ++ show (llvmPtrBits platform) ++
-                        ", Size of var: " ++ show (llvmWidthInBits platform other) ++
-                        ", Var: "         ++ renderWithContext (llvmCgContext cfg) (ppVar cfg vaddr)))
+                    (pdoc platform addr $$
+                     text "Size of Ptr:" <+> ppr (llvmPtrBits platform) $$
+                     text "Size of var:" <+> ppr (llvmWidthInBits platform other) $$
+                     text "Var:"         <+> ppVar cfg vaddr)
 
 mkStore :: LlvmVar -> LlvmVar -> AlignmentSpec -> LlvmStatement
 mkStore vval vptr alignment =
@@ -1255,7 +1255,7 @@ genExpectLit expLit expTy var = do
     lit = LMLitVar $ LMIntLit expLit expTy
 
     llvmExpectName
-      | isInt expTy = fsLit $ "llvm.expect." ++ renderWithContext (llvmCgContext cfg) (ppr expTy)
+      | isInt expTy = fsLit $ "llvm.expect." ++ showSDocOneLine (llvmCgContext cfg) (ppr expTy)
       | otherwise   = panic "genExpectedLit: Type not an int!"
 
   (llvmExpect, stmts, top) <-
@@ -1874,10 +1874,10 @@ genLoad_slow atomic e ty align meta = do
                     doExprW (cmmToLlvmType ty) (MExpr meta $ mkLoad atomic ptr align)
 
         other -> pprPanic "exprToVar: CmmLoad expression is not right type!"
-                     (pdoc platform e <+> text (
-                         "Size of Ptr: "   ++ show (llvmPtrBits platform) ++
-                         ", Size of var: " ++ show (llvmWidthInBits platform other) ++
-                         ", Var: " ++ renderWithContext (llvmCgContext cfg) (ppVar cfg iptr)))
+                     (pdoc platform e $$
+                      text "Size of Ptr:" <+> ppr (llvmPtrBits platform) $$
+                      text "Size of var:" <+> ppr (llvmWidthInBits platform other) $$
+                      text "Var:" <+> (ppVar cfg iptr))
 
 {-
 Note [Alignment of vector-typed values]
