@@ -152,7 +152,7 @@ compileCmmForRegAllocStats logger home_unit dflags cmmFile ncgImplF us = do
 
     -- compile and discard the generated code, returning regalloc stats
     mapM (\ (count, thisCmm) ->
-        cmmNativeGen logger thisModLoc ncgImpl
+        cmmNativeGen logger ncgImpl
             usb dwarfFileIds dbgMap thisCmm count >>=
                 (\(_, _, _, _, colorStats, linearStats, _) ->
                 -- scrub unneeded output from cmmNativeGen
@@ -167,7 +167,6 @@ compileCmmForRegAllocStats logger home_unit dflags cmmFile ncgImplF us = do
           thisMod = mkModule
                         (stringToUnit . show . uniqFromSupply $ usc)
                         (mkModuleName . show . uniqFromSupply $ usd)
-          thisModLoc = mkHiOnlyModLocation (initFinderOpts dflags) "hi" "dyn_hi" "" cmmFile
 
 
 -- | The register allocator should be able to see that each variable only

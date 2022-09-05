@@ -331,7 +331,7 @@ cmmNativeGenStream logger config modLoc ncgImpl h us cmm_stream ngs
                   dbgMap = debugToMap ndbgs
 
               -- Generate native code
-              (ngs',us') <- cmmNativeGens logger config modLoc ncgImpl h
+              (ngs',us') <- cmmNativeGens logger config ncgImpl h
                                           dbgMap us cmms ngs 0
 
               -- Link native code information into debug blocks
@@ -355,7 +355,6 @@ cmmNativeGens :: forall statics instr jumpDest.
                  (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
               => Logger
               -> NCGConfig
-              -> ModLocation
               -> NcgImpl statics instr jumpDest
               -> BufHandle
               -> LabelMap DebugBlock
@@ -365,7 +364,7 @@ cmmNativeGens :: forall statics instr jumpDest.
               -> Int
               -> IO (NativeGenAcc statics instr, UniqSupply)
 
-cmmNativeGens logger config modLoc ncgImpl h dbgMap = go
+cmmNativeGens logger config ncgImpl h dbgMap = go
   where
     go :: UniqSupply -> [RawCmmDecl]
        -> NativeGenAcc statics instr -> Int
@@ -378,7 +377,7 @@ cmmNativeGens logger config modLoc ncgImpl h dbgMap = go
         let fileIds = ngs_dwarfFiles ngs
         (us', fileIds', native, imports, colorStats, linearStats, unwinds)
           <- {-# SCC "cmmNativeGen" #-}
-             cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap
+             cmmNativeGen logger ncgImpl us fileIds dbgMap
                           cmm count
 
         -- Generate .file directives for every new file that has been
@@ -432,7 +431,6 @@ emitNativeCode logger config h sdoc = do
 cmmNativeGen
     :: forall statics instr jumpDest. (Instruction instr, OutputableP Platform statics, Outputable jumpDest)
     => Logger
-    -> ModLocation
     -> NcgImpl statics instr jumpDest
         -> UniqSupply
         -> DwarfFiles
@@ -448,7 +446,7 @@ cmmNativeGen
                 , LabelMap [UnwindPoint]                    -- unwinding information for blocks
                 )
 
-cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap cmm count
+cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
  = do
         let config   = ncgConfig ncgImpl
         let platform = ncgPlatform config
@@ -478,7 +476,7 @@ cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap cmm count
         -- generate native code from cmm
         let ((native, lastMinuteImports, fileIds', nativeCfgWeights), usGen) =
                 {-# SCC "genMachCode" #-}
-                initUs us $ genMachCode config modLoc
+                initUs us $ genMachCode config
                                         (cmmTopCodeGen ncgImpl)
                                         fileIds dbgMap opt_cmm cmmCfg
 
@@ -902,7 +900,6 @@ apply_mapping ncgImpl ufm (CmmProc info lbl live (ListGraph blocks))
 
 genMachCode
         :: NCGConfig
-        -> ModLocation
         -> (RawCmmDecl -> NatM [NatCmmDecl statics instr])
         -> DwarfFiles
         -> LabelMap DebugBlock
@@ -915,10 +912,10 @@ genMachCode
                 , CFG
                 )
 
-genMachCode config modLoc cmmTopCodeGen fileIds dbgMap cmm_top cmm_cfg
+genMachCode config cmmTopCodeGen fileIds dbgMap cmm_top cmm_cfg
   = do  { initial_us <- getUniqueSupplyM
         ; let initial_st           = mkNatM_State initial_us 0 config
-                                                  modLoc fileIds dbgMap cmm_cfg
+                                                  fileIds dbgMap cmm_cfg
               (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
               final_delta          = natm_delta final_st
               final_imports        = natm_imports final_st

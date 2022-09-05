@@ -32,7 +32,6 @@ module GHC.CmmToAsm.Monad (
         getPicBaseMaybeNat,
         getPicBaseNat,
         getCfgWeights,
-        getModLoc,
         getFileId,
         getDebugBlock,
 
@@ -111,7 +110,6 @@ data NatM_State
                 natm_imports     :: [(CLabel)],
                 natm_pic         :: Maybe Reg,
                 natm_config      :: NCGConfig,
-                natm_modloc      :: ModLocation,
                 natm_fileid      :: DwarfFiles,
                 natm_debug_map   :: LabelMap DebugBlock,
                 natm_cfg         :: CFG
@@ -128,17 +126,16 @@ newtype NatM result = NatM (NatM_State -> (result, NatM_State))
 unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a
 
-mkNatM_State :: UniqSupply -> Int -> NCGConfig -> ModLocation ->
+mkNatM_State :: UniqSupply -> Int -> NCGConfig ->
                 DwarfFiles -> LabelMap DebugBlock -> CFG -> NatM_State
 mkNatM_State us delta config
-        = \loc dwf dbg cfg ->
+        = \dwf dbg cfg ->
                 NatM_State
                         { natm_us = us
                         , natm_delta = delta
                         , natm_imports = []
                         , natm_pic = Nothing
                         , natm_config = config
-                        , natm_modloc = loc
                         , natm_fileid = dwf
                         , natm_debug_map = dbg
                         , natm_cfg = cfg
@@ -308,10 +305,6 @@ getPicBaseNat rep
                  -> do
                         reg <- getNewRegNat rep
                         NatM (\state -> (reg, state { natm_pic = Just reg }))
-
-getModLoc :: NatM ModLocation
-getModLoc
-        = NatM $ \ st -> (natm_modloc st, st)
 
 -- | Get native code generator configuration
 getConfig :: NatM NCGConfig
