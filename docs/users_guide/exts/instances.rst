@@ -591,16 +591,15 @@ Instance signatures: type signatures in instance declarations
 
     Allow type signatures for members in instance definitions.
 
-In Haskell, you can't write a type signature in an instance declaration,
-but it is sometimes convenient to do so, and the language extension
-:extension:`InstanceSigs` allows you to do so. For example: ::
+The :extension:`InstanceSigs` extension allows users to give type signatures
+to the class methods in a class instance declaration. For example: ::
 
       data T a = MkT a a
       instance Eq a => Eq (T a) where
-        (==) :: T a -> T a -> Bool   -- The signature
+        (==) :: T a -> T a -> Bool   -- The instance signature
         (==) (MkT x1 x2) (MkTy y1 y2) = x1==y1 && x2==y2
 
-Some details
+Some details:
 
 -  The type signature in the instance declaration must be more
    polymorphic than (or the same as) the one in the class declaration,
@@ -613,10 +612,36 @@ Some details
    Here the signature in the instance declaration is more polymorphic
    than that required by the instantiated class method.
 
+   Note that, to check that the instance signature is more polymorphic,
+   GHC performs a sub-type check, which can solve constraints using available
+   top-level instances.
+   This means that the following instance signature is accepted: ::
+
+      instance Eq (T Int) where
+        (==) :: Eq Int => T Int -> T Int -> Bool
+        (==) (MkT x1 _) (MkT y1 _) = x1 == y1
+
+   The ``Eq Int`` constraint in the instance signature will be solved
+   by the top-level ``Eq Int`` instance, from which it follows that the
+   instance signature is indeed as general as the instantiated class
+   method type ``T Int -> T Int -> Bool``.
+
 -  The code for the method in the instance declaration is typechecked
    against the type signature supplied in the instance declaration, as
    you would expect. So if the instance signature is more polymorphic
    than required, the code must be too.
+
+-  The instance signature is purely local to the class instance
+   declaration. It only affects the typechecking of the method in
+   the instance; it does not affect anything outside the class
+   instance. In this way, it is similar to an inline type signature:
+
+       instance Eq a => Eq (T a) where
+           (==) = (\ x y -> True) :: forall b. b -> b -> Bool
+
+   In particular, adding constraints such as `HasCallStack` to the
+   instance signature will not have an effect; they need to be added
+   to the class instead.
 
 -  One stylistic reason for wanting to write a type signature is simple
    documentation. Another is that you may want to bring scoped type
