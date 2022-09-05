@@ -56,7 +56,7 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
        funDec   <- llvmFunSig live lbl link
        cfg      <- getConfig
        platform <- getPlatform
-       let buildArg = fsLit . renderWithContext (llvmCgContext cfg). ppPlainName cfg
+       let buildArg = fsLit . showSDocOneLine (llvmCgContext cfg). ppPlainName cfg
            funArgs = map buildArg (llvmFunArgs platform live)
            funSect = llvmFunSection cfg (decName funDec)
 

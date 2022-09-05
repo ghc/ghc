@@ -208,7 +208,7 @@ slowCall fun stg_args
            r <- direct_call "slow_call" NativeNodeCall
                  (mkRtsApFastLabel rts_fun) arity ((P,Just fun):argsreps)
            emitComment $ mkFastString ("slow_call for " ++
-                                      renderWithContext ctx (pdoc platform fun) ++
+                                      showSDocOneLine ctx (pdoc platform fun) ++
                                       " with pat " ++ unpackFS rts_fun)
            return r
 

@@ -783,5 +783,5 @@ closureDescription
         -- Not called for StgRhsCon which have global info tables built in
         -- CgConTbls.hs with a description generated from the data constructor
 closureDescription mod_name name
-  = renderWithContext defaultSDocContext
+  = showSDocOneLine defaultSDocContext
     (char '<' <> pprFullName mod_name name <> char '>')

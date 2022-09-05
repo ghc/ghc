@@ -1213,7 +1213,7 @@ tryUnfolding logger opts !case_depth id lone_variable
              , text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"]
 
     ctx = log_default_dump_context (logFlags logger)
-    str = "Considering inlining: " ++ renderWithContext ctx (ppr id)
+    str = "Considering inlining: " ++ showSDocOneLine ctx (ppr id)
     n_val_args = length arg_infos
 
            -- some_benefit is used when the RHS is small enough

@@ -38,9 +38,7 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 
-import GHC.Utils.Outputable( Outputable(..), text, int, hcat, (<+>)
-                           , showSDocUnsafe
-                           )
+import GHC.Utils.Outputable( Outputable(..), text, int, hcat, (<+>))
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
@@ -188,7 +186,7 @@ gwdRPNumber g l = findLabelIn l (gwd_rpnumbering g)
 findLabelIn :: HasDebugCallStack => Label -> LabelMap a -> a
 findLabelIn lbl = mapFindWithDefault failed lbl
   where failed =
-            panic $ "label " ++ showSDocUnsafe (ppr lbl) ++ " not found in result of analysis"
+            pprPanic "label not found in result of analysis" (ppr lbl)
 
 -- | Use `gwdDominatorsOf` on the result of the dominator analysis to get
 -- a mapping from the `Label` of each reachable block to the dominator

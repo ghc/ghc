@@ -447,7 +447,7 @@ strCLabel_llvm lbl = do
     ctx <- llvmCgContext <$> getConfig
     platform <- getPlatform
     let sdoc = pprCLabel platform CStyle lbl
-        str = Outp.renderWithContext ctx sdoc
+        str = Outp.showSDocOneLine ctx sdoc
     return (fsLit str)
 
 -- ----------------------------------------------------------------------------
