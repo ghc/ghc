@@ -237,6 +237,7 @@ enableIPE = addArgs
 enableLateCCS :: Flavour -> Flavour
 enableLateCCS = addArgs
   $ notStage0 ? builder (Ghc CompileHs)
+  ? ((Profiling `wayUnit`) <$> getWay)
   ? arg "-fprof-late"
 
 -- | Enable assertions for the stage2 compiler
@@ -525,4 +526,3 @@ builderSetting =
         stages = map (\stg -> (stageString stg, stg)) allStages
 
         pkgs = map (\pkg -> (pkgName pkg, pkg)) (ghcPackages ++ userPackages)
-
