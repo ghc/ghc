@@ -118,7 +118,7 @@ readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
 
     check_tag <- get bh
     let tag = profileBuildTag profile
-    wantedGot "Way" tag check_tag ppr
+    wantedGot "Way" tag check_tag text
     when (checkHiWay == CheckHiWay) $
         errorOnMismatch "mismatched interface file profile tag" tag check_tag
 
@@ -381,7 +381,7 @@ getSymtabName _name_cache _dict symtab bh = do
         in
           return $! case lookupKnownKeyName u of
                       Nothing -> pprPanic "getSymtabName:unknown known-key unique"
-                                          (ppr i $$ ppr (unpkUnique u))
+                                          (ppr i $$ ppr u)
                       Just n  -> n
 
       _ -> pprPanic "getSymtabName:unknown name tag" (ppr i)

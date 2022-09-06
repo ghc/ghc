@@ -895,8 +895,8 @@ keyword = coloured Col.colBold
 class Outputable a where
     ppr :: a -> SDoc
 
-instance Outputable Char where
-    ppr c = text [c]
+-- There's no Outputable for Char; it's too easy to use Outputable
+-- on String and have ppr "hello" rendered as "h,e,l,l,o".
 
 instance Outputable Bool where
     ppr True  = text "True"

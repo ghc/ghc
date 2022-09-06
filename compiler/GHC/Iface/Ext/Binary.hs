@@ -331,7 +331,7 @@ fromHieName nc hie_name = do
 
     KnownKeyName u -> case lookupKnownKeyName u of
       Nothing -> pprPanic "fromHieName:unknown known-key unique"
-                          (ppr (unpkUnique u))
+                          (ppr u)
       Just n -> pure n
 
 -- ** Reading and writing `HieName`'s

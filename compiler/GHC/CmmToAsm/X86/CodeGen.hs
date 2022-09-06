@@ -2015,10 +2015,10 @@ genCondBranch' _ bid id false bool = do
                   -- Use ASSERT so we don't break releases if
                   -- LTT/LE creep in somehow.
                   LTT ->
-                    assertPpr False (ppr "Should have been turned into >")
+                    assertPpr False (text "Should have been turned into >")
                     and_ordered
                   LE  ->
-                    assertPpr False (ppr "Should have been turned into >=")
+                    assertPpr False (text "Should have been turned into >=")
                     and_ordered
                   _   -> and_ordered
 
@@ -3088,9 +3088,9 @@ condFltReg is32Bit cond x y = condFltReg_sse2
                 GU  -> plain_test   dst
                 GEU -> plain_test   dst
                 -- Use ASSERT so we don't break releases if these creep in.
-                LTT -> assertPpr False (ppr "Should have been turned into >") $
+                LTT -> assertPpr False (text "Should have been turned into >") $
                        and_ordered  dst
-                LE  -> assertPpr False (ppr "Should have been turned into >=") $
+                LE  -> assertPpr False (text "Should have been turned into >=") $
                        and_ordered  dst
                 _   -> and_ordered  dst)
 

@@ -653,14 +653,14 @@ checkDependencies hsc_env summary iface
       text "package " <> quotes (ppr old) <>
         text "no longer in dependencies"
      return $ needsRecompileBecause $ UnitDepRemoved old
-   check_packages (new:news) olds
+   check_packages ((new_name, new_unit):news) olds
     | Just (old, olds') <- uncons olds
-    , snd new == old = check_packages (dropWhile ((== (snd new)) . snd) news) olds'
+    , new_unit == old = check_packages (dropWhile ((== new_unit) . snd) news) olds'
     | otherwise = do
         trace_hi_diffs logger $
-         text "imported package " <> quotes (ppr new) <>
-           text " not among previous dependencies"
-        return $ needsRecompileBecause $ ModulePackageChanged $ fst new
+         text "imported package" <+> text new_name <+> ppr new_unit <+>
+           text "not among previous dependencies"
+        return $ needsRecompileBecause $ ModulePackageChanged new_name
 
 
 needInterface :: Module -> (ModIface -> IO RecompileRequired)
