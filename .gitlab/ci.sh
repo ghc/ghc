@@ -503,7 +503,7 @@ function build_hadrian() {
   if [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian build-cabal -V
   else
-    run_hadrian binary-dist -V
+    XZ_OPT="${XZ_OPT:-} -T$cores" run_hadrian binary-dist -V
     mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
   fi
 
