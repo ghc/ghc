@@ -77,10 +77,6 @@ library
       c-sources: version.c
 
       js-sources:
-        -- "platform" must be linked first because it defines global constants
-        -- (e.g. h$isNode)
-        js/platform.js
-
         js/structs.js
         js/arith.js
         js/compact.js
