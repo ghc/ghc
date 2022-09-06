@@ -378,6 +378,9 @@ Library
           cbits/StackCloningDecoding.cmm
 
     js-sources:
+        -- "platform" must be linked first because it defines global constants
+        -- (e.g. h$isNode)
+        jsbits/platform.js
         jsbits/base.js
         jsbits/errno.js
 
