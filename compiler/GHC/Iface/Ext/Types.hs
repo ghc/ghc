@@ -774,7 +774,7 @@ hieNameOcc (KnownKeyName u) =
   case lookupKnownKeyName u of
     Just n -> nameOccName n
     Nothing -> pprPanic "hieNameOcc:unknown known-key unique"
-                        (ppr (unpkUnique u))
+                        (ppr u)
 
 toHieName :: Name -> HieName
 toHieName name

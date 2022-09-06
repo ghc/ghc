@@ -589,7 +589,7 @@ compileForeign hsc_env lang stub_c = do
           -- This should never happen as viaCPipeline should only return `Nothing` when the stop phase is `StopC`.
           -- and the same should never happen for asPipeline
           -- Future refactoring to not check StopC for this case
-          Nothing -> pprPanic "compileForeign" (ppr stub_c)
+          Nothing -> pprPanic "compileForeign" (text stub_c)
           Just fp -> return fp
 
 compileEmptyStub :: DynFlags -> HscEnv -> FilePath -> ModLocation -> ModuleName -> IO ()

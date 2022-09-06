@@ -1926,7 +1926,7 @@ genFamInsts spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
           -- canDeriveAnyClass should ensure that this code can't be reached
           -- unless -XDeriveAnyClass is enabled.
           assertPpr (xopt LangExt.DeriveAnyClass dflags)
-                    (ppr "genFamInsts: bad derived class" <+> ppr clas) $
+                    (text "genFamInsts: bad derived class" <+> ppr clas) $
           mapM (tcATDefault loc mini_subst emptyNameSet)
                (classATItems clas)
         pure $ concat tyfam_insts

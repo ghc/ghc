@@ -860,9 +860,11 @@ getOutputFilename logger tmpfs stop_phase output basename dflags next_phase mayb
  | otherwise                             = newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule
    suffix
     where
-          getOutputFile_ dflags = case outputFile_ dflags of
-                                    Nothing -> pprPanic "SpecificFile: No filename" (ppr $ (dynamicNow dflags, outputFile_ dflags, dynOutputFile_ dflags))
-                                    Just fn -> fn
+          getOutputFile_ dflags =
+            case outputFile_ dflags of
+              Nothing -> pprPanic "SpecificFile: No filename" (ppr (dynamicNow dflags) $$
+                                                               text (fromMaybe "-" (dynOutputFile_ dflags)))
+              Just fn -> fn
 
           hcsuf      = hcSuf dflags
           odir       = objectDir dflags

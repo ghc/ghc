@@ -698,7 +698,7 @@ maybeDumpCfg logger (Just cfg) msg proc_name
 checkLayout :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr]
             -> [NatCmmDecl statics instr]
 checkLayout procsUnsequenced procsSequenced =
-        assertPpr (setNull diff) (ppr "Block sequencing dropped blocks:" <> ppr diff)
+        assertPpr (setNull diff) (text "Block sequencing dropped blocks:" <> ppr diff)
         procsSequenced
   where
         blocks1 = foldl' (setUnion) setEmpty $

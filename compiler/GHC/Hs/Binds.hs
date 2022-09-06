@@ -848,7 +848,7 @@ pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 
 instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl)
-    = ppr (extractSpecPragName $ inl_src inl) <+> pprSpec var (text "<type>") inl
+    = text (extractSpecPragName $ inl_src inl) <+> pprSpec var (text "<type>") inl
 
 pprMinimalSig :: (OutputableBndr name)
               => LBooleanFormula (GenLocated l name) -> SDoc

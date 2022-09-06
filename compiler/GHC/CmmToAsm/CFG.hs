@@ -660,7 +660,7 @@ getCfg platform weights graph =
         (CmmCall { cml_cont = Nothing })   -> []
         other ->
             panic "Foo" $
-            assertPpr False (ppr "Unknown successor cause:" <>
+            assertPpr False (text "Unknown successor cause:" <>
               (pdoc platform branch <+> text "=>" <> pdoc platform (G.successors other))) $
             map (\x -> ((bid,x),mkEdgeInfo 0)) $ G.successors other
       where
