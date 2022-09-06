@@ -56,6 +56,7 @@ flavourTransformers = M.fromList
     , "debug_stage1_ghc" =: debugGhc stage0InTree
     , "lint" =: enableLinting
     , "haddock" =: enableHaddock
+    , "late_ccs" =: enableLateCCS
     ]
   where (=:) = (,)
 
