@@ -1866,7 +1866,7 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
              rawCmms
         return stub_c_exists
   where
-    no_loc = ModLocation{ ml_hs_file  = Just filename,
+    no_loc = ModLocation{ ml_hs_file  = Just original_filename,
                           ml_hi_file  = panic "hscCompileCmmFile: no hi file",
                           ml_obj_file = panic "hscCompileCmmFile: no obj file",
                           ml_dyn_obj_file = panic "hscCompileCmmFile: no dyn obj file",
