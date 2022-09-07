@@ -85,6 +85,7 @@ Library
                    hpc        == 0.6.*,
                    transformers >= 0.5 && < 0.7,
                    exceptions == 0.10.*,
+                   semaphore-compat,
                    stm,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
@@ -436,6 +437,7 @@ Library
         GHC.Driver.GenerateCgIPEStub
         GHC.Driver.Hooks
         GHC.Driver.LlvmConfigCache
+        GHC.Driver.MakeSem
         GHC.Driver.Main
         GHC.Driver.Make
         GHC.Driver.MakeFile

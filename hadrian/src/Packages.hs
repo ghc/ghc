@@ -8,7 +8,7 @@ module Packages (
     ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
-    runGhc, stm, templateHaskell, terminfo, text, time, timeout, touchy,
+    runGhc, semaphoreCompat, stm, templateHaskell, terminfo, text, time, timeout, touchy,
     transformers, unlit, unix, win32, xhtml,
     lintersCommon, lintNotes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
     ghcPackages, isGhcPackage,
@@ -39,7 +39,7 @@ ghcPackages =
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh
     , ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs
     , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, mtl
-    , parsec, pretty, process, rts, runGhc, stm, templateHaskell
+    , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
     , timeout
     , lintersCommon
@@ -55,7 +55,7 @@ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, count
   exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
   ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs,
   hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy, remoteIserv, libffi, mtl,
-  parsec, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
+  parsec, pretty, primitive, process, rts, runGhc, semaphoreCompat, stm, templateHaskell,
   terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml,
   timeout,
   lintersCommon, lintNotes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace
@@ -110,6 +110,7 @@ process             = lib  "process"
 remoteIserv         = util "remote-iserv"
 rts                 = top  "rts"
 runGhc              = util "runghc"
+semaphoreCompat     = lib  "semaphore-compat"
 stm                 = lib  "stm"
 templateHaskell     = lib  "template-haskell"
 terminfo            = lib  "terminfo"

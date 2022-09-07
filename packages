@@ -65,5 +65,6 @@ libraries/Win32              -           -                               https:/
 libraries/xhtml              -           -                               https://github.com/haskell/xhtml.git
 libraries/exceptions         -           -                               https://github.com/ekmett/exceptions.git
 nofib                        nofib       -                               -
+libraries/semaphore-compat   -           -                               -
 libraries/stm                -           -                               ssh://git@github.com/haskell/stm.git
 .                            -           ghc.git                         -

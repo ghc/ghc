@@ -28,6 +28,7 @@ packages: ./compiler
           ./libraries/parsec/
           -- ./libraries/pretty/
           ./libraries/process/
+          ./libraries/semaphore-compat
           ./libraries/stm
           -- ./libraries/template-haskell/
           ./libraries/terminfo/

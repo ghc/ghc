@@ -87,6 +87,13 @@ Compiler
 
       deriving instance TypeError (Text "Boo") => Bar Baz
 
+- GHC Proposal `#540 https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0540-jsem.rst`_ has been implemented.
+  This adds the `-jsem`:ghc-flag: flag, which instructs GHC to act as a jobserver client.
+  This enables multiple GHC processes running at once to share system resources
+  with each other, communicating via the system semaphore specified by
+  the flag argument.
+
+
 GHCi
 ~~~~
 

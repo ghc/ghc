@@ -83,6 +83,10 @@
 	url = https://gitlab.haskell.org/ghc/packages/unix.git
 	ignore = untracked
 	branch = 2.7
+[submodule "libraries/semaphore-compat"]
+	path = libraries/semaphore-compat
+	url = https://gitlab.haskell.org/ghc/semaphore-compat.git
+	ignore = untracked
 [submodule "libraries/stm"]
 	path = libraries/stm
 	url = https://gitlab.haskell.org/ghc/packages/stm.git

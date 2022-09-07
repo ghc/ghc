@@ -48,6 +48,7 @@ module GHC.Driver.Session (
         needSourceNotes,
         OnOff(..),
         DynFlags(..),
+        ParMakeCount(..),
         outputFile, objectSuf, ways,
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
@@ -467,9 +468,9 @@ data DynFlags = DynFlags {
   ruleCheck             :: Maybe String,
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
 
-  parMakeCount          :: Maybe Int,   -- ^ The number of modules to compile in parallel
-                                        --   in --make mode, where Nothing ==> compile as
-                                        --   many in parallel as there are CPUs.
+  parMakeCount          :: Maybe ParMakeCount,
+    -- ^ The number of modules to compile in parallel
+    --   If unspecified, compile with a single job.
 
   enableTimeStats       :: Bool,        -- ^ Enable RTS timing statistics?
   ghcHeapSize           :: Maybe Int,   -- ^ The heap size to set.
@@ -790,6 +791,16 @@ instance (Monad m, HasDynFlags m) => HasDynFlags (ExceptT e m) where
 
 class ContainsDynFlags t where
     extractDynFlags :: t -> DynFlags
+
+-- | The type for the -jN argument, specifying that -j on its own represents
+-- using the number of machine processors.
+data ParMakeCount
+  -- | Use this many processors (@-j<n>@ flag).
+  = ParMakeThisMany Int
+  -- | Use parallelism with as many processors as possible (@-j@ flag without an argument).
+  | ParMakeNumProcessors
+  -- | Use the specific semaphore @<sem>@ to control parallelism (@-jsem <sem>@ flag).
+  | ParMakeSemaphore FilePath
 
 -----------------------------------------------------------------------------
 -- Accessors from 'DynFlags'
@@ -1154,7 +1165,7 @@ defaultDynFlags mySettings =
         historySize             = 20,
         strictnessBefore        = [],
 
-        parMakeCount            = Just 1,
+        parMakeCount            = Nothing,
 
         enableTimeStats         = False,
         ghcHeapSize             = Nothing,
@@ -2120,14 +2131,16 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "j"     (OptIntSuffix
         (\n -> case n of
                  Just n
-                     | n > 0     -> upd (\d -> d { parMakeCount = Just n })
+                     | n > 0     -> upd (\d -> d { parMakeCount = Just (ParMakeThisMany n) })
                      | otherwise -> addErr "Syntax: -j[n] where n > 0"
-                 Nothing -> upd (\d -> d { parMakeCount = Nothing })))
+                 Nothing -> upd (\d -> d { parMakeCount = Just ParMakeNumProcessors })))
                  -- When the number of parallel builds
                  -- is omitted, it is the same
                  -- as specifying that the number of
                  -- parallel builds is equal to the
                  -- result of getNumProcessors
+  , make_ord_flag defGhcFlag "jsem" $ hasArg $ \f d -> d { parMakeCount = Just (ParMakeSemaphore f) }
+
   , make_ord_flag defFlag "instantiated-with"   (sepArg setUnitInstantiations)
   , make_ord_flag defFlag "this-component-id"   (sepArg setUnitInstanceOf)
 
