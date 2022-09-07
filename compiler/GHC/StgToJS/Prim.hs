@@ -1038,20 +1038,14 @@ genPrim prof ty op = case op of
   IndexByteArrayOp_Word8AsChar      -> \[r] [a,i] -> PrimInline $ r |= dv_u8  a i
   IndexByteArrayOp_Word8AsWideChar  -> \[r] [a,i] -> PrimInline $ r |= dv_i32 a i
   IndexByteArrayOp_Word8AsAddr      -> \[r1,r2] [a,i] ->
-    PrimInline $ jVar \t -> mconcat
-    [-- grab the "array" property
-      t |= a .^ "arr"
-    -- make sure we have a non-empty array
-    , ifBlockS (t .&&. t .! i)
-      -- we do, r1 is the ArrayBuffer, r2 is the payload offset
-      [ r1 |= t
-      , r2 |= dv_u32 t i
-      ]
-      -- we don't
-      [ r1 |= null_
-      , r2 |= zero_
-      ]
-    ]
+      PrimInline $ jVar \x -> mconcat
+        [ x |= i .<<. two_
+        , ifS (a .^ "arr" .&&. a .^ "arr" .! x)
+               (mconcat [ r1 |= a .^ "arr" .! x .! zero_
+                        , r2 |= a .^ "arr" .! x .! one_
+                        ])
+               (mconcat [r1 |= null_, r2 |= one_])
+        ]
   IndexByteArrayOp_Word8AsFloat     -> \[r] [a,i] -> PrimInline $ r |= dv_f32 a i
   IndexByteArrayOp_Word8AsDouble    -> \[r] [a,i] -> PrimInline $ r |= dv_f32 a i
   IndexByteArrayOp_Word8AsStablePtr -> \[r1,r2] [a,i] ->
@@ -1063,7 +1057,7 @@ genPrim prof ty op = case op of
   IndexByteArrayOp_Word8AsInt32     -> \[r] [a,i] -> PrimInline $ r |= dv_i32 a i
   IndexByteArrayOp_Word8AsInt64     -> \[h,l] [a,i] ->
     PrimInline $ mconcat
-        [ h |= dv_u32 a (Add i (Int 4))
+        [ h |= dv_i32 a (Add i (Int 4))
         , l |= dv_u32 a i
         ]
   IndexByteArrayOp_Word8AsInt       -> \[r] [a,i] -> PrimInline $ r |= dv_i32  a i
@@ -1079,20 +1073,14 @@ genPrim prof ty op = case op of
   ReadByteArrayOp_Word8AsChar       -> \[r] [a,i] -> PrimInline $ r |= dv_u8  a i
   ReadByteArrayOp_Word8AsWideChar   -> \[r] [a,i] -> PrimInline $ r |= dv_i32 a i
   ReadByteArrayOp_Word8AsAddr       -> \[r1,r2] [a,i] ->
-    PrimInline $ jVar \t -> mconcat
-    [-- grab the "array" property
-      t |= a .^ "arr"
-    -- make sure we have a non-empty array
-    , ifBlockS (t .&&. t .! i)
-      -- we do, r1 is the ArrayBuffer, r2 is the payload offset
-      [ r1 |= t
-      , r2 |= dv_u32 t i
-      ]
-      -- we don't
-      [ r1 |= null_
-      , r2 |= zero_
-      ]
-    ]
+      PrimInline $ jVar \x -> mconcat
+        [ x |= i .<<. two_
+        , ifS (a .^ "arr" .&&. a .^ "arr" .! x)
+               (mconcat [ r1 |= a .^ "arr" .! x .! zero_
+                        , r2 |= a .^ "arr" .! x .! one_
+                        ])
+               (mconcat [r1 |= null_, r2 |= one_])
+        ]
   ReadByteArrayOp_Word8AsFloat      -> \[r] [a,i] -> PrimInline $ r |= dv_f32 a i
   ReadByteArrayOp_Word8AsDouble     -> \[r] [a,i] -> PrimInline $ r |= dv_f32 a i
   ReadByteArrayOp_Word8AsStablePtr  -> \[r1,r2] [a,i] ->
@@ -1117,17 +1105,14 @@ genPrim prof ty op = case op of
         ]
   ReadByteArrayOp_Word8AsWord       -> \[r] [a,i] -> PrimInline $ r |= dv_u32  a i
 
-  WriteByteArrayOp_Word8AsChar      -> \[] [a,i,e] -> PrimInline $ dv_s_u8  a i e
+  WriteByteArrayOp_Word8AsChar      -> \[] [a,i,e] -> PrimInline $ dv_s_i8  a i e
   WriteByteArrayOp_Word8AsWideChar  -> \[] [a,i,e] -> PrimInline $ dv_s_i32 a i e
   WriteByteArrayOp_Word8AsAddr      -> \[] [a,i,e1,e2] ->
     PrimInline $ mconcat
-    [ ifS (Not (a .^ "arr"))
-          -- if we don't have the "arr" property then make it
-          (a .^ "arr" |= ValExpr (JList []))
-          -- else noop
-          mempty
-    , dv_s_i32 (a .^ "arr") i (ValExpr (JList [e1, e2]))
-    ]
+      [ ifS (Not (a .^ "arr")) (a .^ "arr" |= ValExpr (JList [])) mempty
+      , a .^ "arr" .! (i .<<. two_) |= ValExpr (JList [e1, e2])
+      ]
+
   WriteByteArrayOp_Word8AsFloat     -> \[] [a,i,e] -> PrimInline $ dv_s_f32 a i e
   WriteByteArrayOp_Word8AsDouble    -> \[] [a,i,e] -> PrimInline $ dv_s_f32 a i e
   WriteByteArrayOp_Word8AsStablePtr -> \[] [a,i,_e1,e2] -> PrimInline $ dv_s_i32 a i e2
@@ -1136,8 +1121,8 @@ genPrim prof ty op = case op of
   WriteByteArrayOp_Word8AsInt64     -> \[] [a,i,h,l] ->
     -- JS Numbers are little-endian and 32-bit, so write the lower 4 bytes at i
     -- then write the higher 4 bytes to i+4
-    PrimInline $ mconcat [ dv_s_i32 a (Add i (Int 4)) h
-                         , dv_s_i32 a i               l
+    PrimInline $ mconcat [ dv_s_i32 a (Add i (Int 4)) (i32 h)
+                         , dv_s_u32 a i               l
                          ]
   -- it is probably strange to be using dv_s_i32, and dv_s_i16 when dv_s_u16 and
   -- dv_s_u32 exist. Unfortunately this is a infelicity of the JS Backend. u32_
@@ -1154,27 +1139,73 @@ genPrim prof ty op = case op of
                          ]
   WriteByteArrayOp_Word8AsWord      -> \[] [a,i,e] -> PrimInline $ dv_s_u32 a i (i32 e)
 
-  CasByteArrayOp_Int8               -> unhandledPrimop op
-  CasByteArrayOp_Int16              -> unhandledPrimop op
-  CasByteArrayOp_Int32              -> unhandledPrimop op
-  CasByteArrayOp_Int64              -> unhandledPrimop op
+  CasByteArrayOp_Int8               -> \[r] [a,i,old,new] -> PrimInline $ casOp u8_  r a i old new
+  CasByteArrayOp_Int16              -> \[r] [a,i,old,new] -> PrimInline $ casOp u1_  r a i old new
+  CasByteArrayOp_Int32              -> \[r] [a,i,old,new] -> PrimInline $ casOp i32_ r a i old new
+
+  CasByteArrayOp_Int64              -> \[r_h,r_l] [a,i,old_h,old_l,new_h,new_l] -> PrimInline $
+    jVar \t_h t_l -> mconcat [ t_h |= i32_ a (Add (i .<<. one_) one_)
+                             , t_l |= i32_ a (i .<<. one_)
+                             , r_h |= t_h
+                             , r_l |= t_l
+                             , ifS (t_l .===. old_l) -- small optimization, check low bits first, fail fast
+                                   (ifBlockS (t_h .===. old_h)
+                                            -- Pre-Condition is good, do the write
+                                             [ i32_ a (Add (i .<<. one_) one_) |=     new_h
+                                             , i32_ a (i .<<. one_)            |= i32 new_l
+                                             ]
+                                             -- no good, don't write
+                                             mempty)
+                                   mempty
+                             ]
+
 
   InterlockedExchange_Addr          -> unhandledPrimop op
   InterlockedExchange_Word          -> unhandledPrimop op
 
-  CasAddrOp_Addr                    -> unhandledPrimop op
-  CasAddrOp_Word                    -> unhandledPrimop op
-  CasAddrOp_Word8                   -> unhandledPrimop op
-  CasAddrOp_Word16                  -> unhandledPrimop op
-  CasAddrOp_Word32                  -> unhandledPrimop op
-  CasAddrOp_Word64                  -> unhandledPrimop op
+  CasAddrOp_Addr                    -> \[r_a,r_o] [a1,o1,a2,o2,a3,o3] -> PrimInline $
+                    mconcat [ ifS (app "h$comparePointer" [a1,o1,a2,o2])
+                                  (appS "h$memcpy" [a3,o3,a1,o1,8])
+                                  mempty
+                            , r_a |= a1
+                            , r_o |= o1
+                            ]
+  CasAddrOp_Word                    -> \[r] [a,o,old,new] -> PrimInline $
+                    mconcat [ r |= u32_ a o
+                            , ifS (r .===. old)
+                            -- use i32_ instead of u32_, u32_ cannot be used for writing due to
+                            -- hard coded conversion to word using (.>>>. zero_). You see we still
+                            -- do the same convnersion but on the value to write
+                                  (i32_ a o |= (new .>>>. zero_))
+                                  mempty
+                            ]
 
-  FetchAddAddrOp_Word               -> unhandledPrimop op
-  FetchSubAddrOp_Word               -> unhandledPrimop op
-  FetchAndAddrOp_Word               -> unhandledPrimop op
-  FetchNandAddrOp_Word              -> unhandledPrimop op
-  FetchOrAddrOp_Word                -> unhandledPrimop op
-  FetchXorAddrOp_Word               -> unhandledPrimop op
+  CasAddrOp_Word8                   -> \[r] [a,o,old,new] -> PrimInline $ casOp u8_  r a o old new
+  CasAddrOp_Word16                  -> \[r] [a,o,old,new] -> PrimInline $ casOp u1_  r a o old new
+  CasAddrOp_Word32                  -> \[r] [a,o,old,new] -> PrimInline $
+                    mconcat [ r |= u32_ a o
+                            , ifS (r .===. old)
+                                  (i32_ a o |= (new .>>>. zero_))
+                                  mempty
+                            ]
+  CasAddrOp_Word64                  -> \[r_h,r_l] [a,o,old_h,old_l,new_h,new_l] -> PrimInline $
+                     mconcat [ r_h |= dv_u32 a (Add o (Int 4))
+                             , r_l |= dv_u32 a o
+                             , ifS (r_l .===. old_l)
+                                   (ifBlockS (r_h .===. old_h)
+                                             [ dv_s_u32 a (Add o (Int 4)) new_h
+                                             , dv_s_u32 a o               new_l
+                                             ]
+                                             mempty)
+                               mempty
+                             ]
+
+  FetchAddAddrOp_Word               -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr Add r a o v
+  FetchSubAddrOp_Word               -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr Sub  r a o v
+  FetchAndAddrOp_Word               -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr BAnd  r a o v
+  FetchNandAddrOp_Word              -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr ((BNot .) . BAnd) r a o v
+  FetchOrAddrOp_Word                -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr BOr   r a o v
+  FetchXorAddrOp_Word               -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr BXor  r a o v
 
   AtomicReadAddrOp_Word             -> unhandledPrimop op
   AtomicWriteAddrOp_Word            -> unhandledPrimop op
@@ -1197,6 +1228,12 @@ genPrim prof ty op = case op of
   ListThreadsOp                     -> unhandledPrimop op
   LabelThreadOp                     -> unhandledPrimop op -- \[] [t,la,lo] -> PrimInline $ t .^ "label" |= ValExpr (JList [la, lo])
 
+------------------------------- Vector -----------------------------------------
+-- For now, vectors are unsupported on the JS backend. Simply put, they do not
+-- make much sense to support given support for arrays and lack of SIMD support
+-- in JS. We could try to roll something special but we would not be able to
+-- give any performance guarentees to the user and so we leave these has
+-- unhandled for now.
   VecBroadcastOp _ _ _              -> unhandledPrimop op
   VecPackOp _ _ _                   -> unhandledPrimop op
   VecUnpackOp _ _ _                 -> unhandledPrimop op
@@ -1222,22 +1259,22 @@ genPrim prof ty op = case op of
   VecReadScalarOffAddrOp _ _ _      -> unhandledPrimop op
   VecWriteScalarOffAddrOp _ _ _     -> unhandledPrimop op
 
-  PrefetchByteArrayOp3              -> unhandledPrimop op
-  PrefetchMutableByteArrayOp3       -> unhandledPrimop op
-  PrefetchAddrOp3                   -> unhandledPrimop op
-  PrefetchValueOp3                  -> unhandledPrimop op
-  PrefetchByteArrayOp2              -> unhandledPrimop op
-  PrefetchMutableByteArrayOp2       -> unhandledPrimop op
-  PrefetchAddrOp2                   -> unhandledPrimop op
-  PrefetchValueOp2                  -> unhandledPrimop op
-  PrefetchByteArrayOp1              -> unhandledPrimop op
-  PrefetchMutableByteArrayOp1       -> unhandledPrimop op
-  PrefetchAddrOp1                   -> unhandledPrimop op
-  PrefetchValueOp1                  -> unhandledPrimop op
-  PrefetchByteArrayOp0              -> unhandledPrimop op
-  PrefetchMutableByteArrayOp0       -> unhandledPrimop op
-  PrefetchAddrOp0                   -> unhandledPrimop op
-  PrefetchValueOp0                  -> unhandledPrimop op
+  PrefetchByteArrayOp3              -> noOp
+  PrefetchMutableByteArrayOp3       -> noOp
+  PrefetchAddrOp3                   -> noOp
+  PrefetchValueOp3                  -> noOp
+  PrefetchByteArrayOp2              -> noOp
+  PrefetchMutableByteArrayOp2       -> noOp
+  PrefetchAddrOp2                   -> noOp
+  PrefetchValueOp2                  -> noOp
+  PrefetchByteArrayOp1              -> noOp
+  PrefetchMutableByteArrayOp1       -> noOp
+  PrefetchAddrOp1                   -> noOp
+  PrefetchValueOp1                  -> noOp
+  PrefetchByteArrayOp0              -> noOp
+  PrefetchMutableByteArrayOp0       -> noOp
+  PrefetchAddrOp0                   -> noOp
+  PrefetchValueOp0                  -> noOp
 
 unhandledPrimop :: PrimOp -> [JExpr] -> [JExpr] -> PrimRes
 unhandledPrimop op rs as = PrimInline $ mconcat
@@ -1252,6 +1289,12 @@ unhandledPrimop op rs as = PrimInline $ mconcat
   , mconcat $ zipWith (\r reg -> r |= toJExpr reg) rs (enumFrom Ret1)
   ]
 
+-- | A No Op, used for primops the JS platform cannot or do not support. For
+-- example, the prefetching primops do not make sense on the JS platform because
+-- we do not have enough control over memory to provide any kind of prefetching
+-- mechanism. Hence, these are NoOps.
+noOp :: Foldable f => f a -> f a -> PrimRes
+noOp = const . const $ PrimInline mempty
 
 -- tuple returns
 appT :: [JExpr] -> FastString -> [JExpr] -> JStat
@@ -1277,9 +1320,8 @@ u1_ a i = IdxExpr (a .^ "u1") i
 -- of the index @i@, the new value to set (in the case of a setter) @v@, and a
 -- Boolean flag indicating whether the type in question is stored in
 -- little-endian (True) or big-endian (False) format.
-dv_s_i8, dv_s_u8, dv_s_i16, dv_s_u16, dv_s_i32, dv_s_u32, dv_s_f32, dv_s_f64 :: JExpr -> JExpr -> JExpr -> JStat
+dv_s_i8, dv_s_i16, dv_s_u16, dv_s_i32, dv_s_u32, dv_s_f32, dv_s_f64 :: JExpr -> JExpr -> JExpr -> JStat
 dv_s_i8  a i v = ApplStat (a .^ "dv" .^ "setInt8"   ) [i, v, true_]
-dv_s_u8  a i v = ApplStat (a .^ "dv" .^ "setUInt8"  ) [i, v, true_]
 dv_s_u16 a i v = ApplStat (a .^ "dv" .^ "setUint16" ) [i, v, true_]
 dv_s_i16 a i v = ApplStat (a .^ "dv" .^ "setInt16"  ) [i, v, true_]
 dv_s_i32 a i v = ApplStat (a .^ "dv" .^ "setInt32"  ) [i, v, true_]
@@ -1288,7 +1330,7 @@ dv_s_f32 a i v = ApplStat (a .^ "dv" .^ "setFloat32") [i, v, true_]
 dv_s_f64 a i v = ApplStat (a .^ "dv" .^ "setFloat64") [i, v, true_]
 
 dv_i8, dv_u8, dv_i16, dv_u16, dv_i32, dv_u32, dv_f32, dv_f64 :: JExpr -> JExpr -> JExpr
-dv_u8  a i = ApplExpr (a .^ "dv" .^ "getUInt8"   ) [i, true_]
+dv_u8  a i = ApplExpr (a .^ "dv" .^ "getUint8"   ) [i, true_]
 dv_i8  a i = ApplExpr (a .^ "dv" .^ "getInt8"   ) [i, true_]
 dv_i16 a i = ApplExpr (a .^ "dv" .^ "getInt16"  ) [i, true_]
 dv_u16 a i = ApplExpr (a .^ "dv" .^ "getUint16" ) [i, true_]
@@ -1302,6 +1344,26 @@ fetchOpByteArray op tgt src i v = mconcat
   [ tgt |= i32_ src i
   , i32_ src i |= op tgt v
   ]
+
+fetchOpAddr :: (JExpr -> JExpr -> JExpr) -> JExpr -> JExpr -> JExpr -> JExpr -> JStat
+fetchOpAddr op tgt src i v = mconcat
+  [ tgt      |= src .! i
+  , src .! i |= op tgt v
+  ]
+
+casOp
+  :: (JExpr -> JExpr -> JExpr) -- view, the view of the ArrayBuffer to use
+  -> JExpr                     -- target register  to store result
+  -> JExpr                     -- source arrays
+  -> JExpr                     -- index
+  -> JExpr                     -- old value to compare
+  -> JExpr                     -- new value to write
+  -> JStat
+casOp view tgt src i old new = mconcat [ tgt |= view src i
+                                       , ifS (tgt .===. old)
+                                             (view src i |= new)
+                                              mempty
+                                       ]
 
 --------------------------------------------------------------------------------
 --                            Lifted Arrays
@@ -1337,6 +1399,10 @@ i32 e = BOr e zero_
 -- required because of JS numbers. e>>>0 converts e to a Word32
 -- so  (-2147483648)       >>> 0  = 2147483648
 -- and ((-2147483648) >>>0) | 0   = -2147483648
+--
+-- Warning: This function will throw an exception if it ends up on the left side
+-- of an assignment. The reason it blows up is because of the bit shift (used
+-- for coercion) is illegal on the LHS of an assignment
 u32 :: JExpr -> JExpr
 u32 e = e .>>>. zero_
 
