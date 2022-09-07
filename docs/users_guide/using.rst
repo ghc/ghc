@@ -751,6 +751,60 @@ search path (see :ref:`search-path`).
     number of processors. Note that compilation of a module may not begin
     until its dependencies have been built.
 
+
+GHC Jobserver Protocol
+~~~~~~~~~~~~~~~~~~~~~~
+
+The GHC Jobserver Protocol was specified in `GHC proposal #540 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0540-jsem.rst>`__.
+
+This protocol allows
+a server to dynamically invoke many instances of a client process,
+while restricting all of those instances to use no more than <n> capabilities.
+This is achieved by coordination over a system semaphore (either a POSIX
+semaphore in the case of Linux and Darwin, or a Win32 semaphore
+in the case of Windows platforms).
+
+There are two kinds of participants in the GHC Jobserver protocol:
+
+- The *jobserver* creates a system semaphore with a certain number of
+  available tokens.
+
+  Each time the jobserver wants to spawn a new jobclient subprocess, it **must**
+  first acquire a single token from the semaphore, before spawning
+  the subprocess. This token **must** be released once the subprocess terminates.
+
+  Once work is finished, the jobserver **must** destroy the semaphore it created.
+
+- A *jobclient* is a subprocess spawned by the jobserver or another jobclient.
+
+  Each jobclient starts with one available token (its *implicit token*,
+  which was acquired by the parent which spawned it), and can request more
+  tokens through the Jobserver Protocol by waiting on the semaphore.
+
+  Each time a jobclient wants to spawn a new jobclient subprocess, it **must**
+  pass on a single token to the child jobclient. This token can either be the
+  jobclient's implicit token, or another token which the jobclient acquired
+  from the semaphore.
+
+  Each jobclient **must** release exactly as many tokens as it has acquired from
+  the semaphore (this does not include the implicit tokens).
+
+  GHC itself acts as a jobclient which can be enabled by using the flag ``-jsem``.
+
+.. ghc-flag:: -jsem
+    :shortdesc: When compiling with :ghc-flag:`--make`, coordinate with
+                other processes through the semaphore ⟨sem⟩ to compile
+                modules in parallel.
+    :type: dynamic
+    :category: misc
+
+    Perform compilation in parallel when possible, coordinating with other
+    processes through the semaphore ⟨sem⟩ (specified as a string).
+    Error if the semaphore doesn't exist.
+
+    Use of ``-jsem`` will override use of :ghc-flag:``-j[⟨n⟩]``,
+    and vice-versa.
+
 .. _multi-home-units:
 
 Multiple Home Units

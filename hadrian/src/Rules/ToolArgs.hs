@@ -171,6 +171,7 @@ toolTargets = [ binary
               , templateHaskell
               , text
               , transformers
+              , semaphoreCompat
               , unlit  -- # executable
               ] ++ if windowsHost then [ win32 ] else [ unix ]
 

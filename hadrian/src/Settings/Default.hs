@@ -95,6 +95,7 @@ stage0Packages = do
              , hpcBin
              , mtl
              , parsec
+             , semaphoreCompat
              , time
              , templateHaskell
              , text
@@ -142,6 +143,7 @@ stage1Packages = do
         , integerGmp
         , pretty
         , rts
+        , semaphoreCompat
         , stm
         , unlit
         , xhtml
