@@ -19,6 +19,7 @@ import GHC.Driver.Flags
 
 import GHC.Core
 import GHC.Core.Opt.Simplify.Monad
+import GHC.Core.Opt.ConstantFold
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Opt.Simplify.Env
@@ -3039,6 +3040,14 @@ rebuildCase env scrut case_bndr alts@[Alt _ bndrs rhs] cont
        ; case mb_rule of
            Just (env', rule_rhs, cont') -> simplExprF env' rule_rhs cont'
            Nothing                      -> reallyRebuildCase env scrut case_bndr alts cont }
+
+--------------------------------------------------
+--      3. Primop-related case-rules
+--------------------------------------------------
+
+  |Just (scrut', case_bndr', alts') <- caseRules2 scrut case_bndr alts
+  = reallyRebuildCase env scrut' case_bndr' alts' cont
+
   where
     all_dead_bndrs = all isDeadBinder bndrs       -- bndrs are [InId]
     is_plain_seq   = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect

@@ -27,6 +27,7 @@ module GHC.Core.Opt.ConstantFold
    ( primOpRules
    , builtinRules
    , caseRules
+   , caseRules2
    )
 where
 
@@ -3190,6 +3191,61 @@ caseRules _ (App (App (Var f) (Type ty)) v)       -- dataToTag x
            , \v -> App (App (Var f) (Type ty)) (Var v))
 
 caseRules _ _ = Nothing
+
+
+-- | Case rules
+--
+-- It's important that occurence info are present, hence the use of In* types.
+caseRules2
+   :: InExpr  -- ^ Scutinee
+   -> InId    -- ^ Case-binder
+   -> [InAlt] -- ^ Alternatives in standard (increasing) order
+   -> Maybe (InExpr, InId, [InAlt])
+caseRules2 scrut bndr alts
+
+  -- case quotRem# x y of
+  --    (# q, _ #) -> body
+  -- ====>
+  --  case quot# x y of
+  --    q -> body
+  --
+  -- case quotRem# x y of
+  --    (# _, r #) -> body
+  -- ====>
+  --  case rem# x y of
+  --    r -> body
+  | BinOpApp x op y <- scrut
+  , Just (quot,rem) <- is_any_quot_rem op
+  , [Alt (DataAlt _) [q,r] body] <- alts
+  , isDeadBinder bndr
+  , dead_q <- isDeadBinder q
+  , dead_r <- isDeadBinder r
+  , dead_q || dead_r
+  = if
+      | dead_q    -> Just $ (BinOpApp x rem  y, r, [Alt DEFAULT [] body])
+      | dead_r    -> Just $ (BinOpApp x quot y, q, [Alt DEFAULT [] body])
+      | otherwise -> Nothing
+
+  | otherwise
+  = Nothing
+
+
+-- | If the given primop is a quotRem, return the corresponding (quot,rem).
+is_any_quot_rem :: PrimOp -> Maybe (PrimOp, PrimOp)
+is_any_quot_rem = \case
+  IntQuotRemOp    -> Just (IntQuotOp ,  IntRemOp)
+  Int8QuotRemOp   -> Just (Int8QuotOp,  Int8RemOp)
+  Int16QuotRemOp  -> Just (Int16QuotOp, Int16RemOp)
+  Int32QuotRemOp  -> Just (Int32QuotOp, Int32RemOp)
+  -- Int64QuotRemOp doesn't exist (yet)
+
+  WordQuotRemOp   -> Just (WordQuotOp,   WordRemOp)
+  Word8QuotRemOp  -> Just (Word8QuotOp,  Word8RemOp)
+  Word16QuotRemOp -> Just (Word16QuotOp, Word16RemOp)
+  Word32QuotRemOp -> Just (Word32QuotOp, Word32RemOp)
+  -- Word64QuotRemOp doesn't exist (yet)
+
+  _ -> Nothing
 
 
 tx_lit_con :: Platform -> (Integer -> Integer) -> AltCon -> Maybe AltCon
