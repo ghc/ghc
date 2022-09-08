@@ -53,7 +53,7 @@ import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Id.Make   ( seqId )
 import GHC.Types.Id.Info
-import GHC.Types.Name   ( mkSystemVarName, isExternalName, getOccFS )
+import GHC.Types.Name   ( mkSystemVarName, isExternalName, getOccFS, nameModule, nameUnique )
 import GHC.Types.Demand
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Types.Unique ( hasKey )
@@ -62,7 +62,7 @@ import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
-import GHC.Builtin.Names( runRWKey )
+import GHC.Builtin.Names( runRWKey, unsafePersistNodeIdKey, shareNodeIdKey, unsafePersistNodeName )
 
 import GHC.Data.Maybe   ( isNothing, orElse )
 import GHC.Data.FastString
@@ -77,6 +77,11 @@ import GHC.Utils.Logger
 import GHC.Utils.Misc
 
 import Control.Monad
+import GHC.Unit.Types (moduleUnit)
+import GHC.Unit.State (unitPackageName)
+import GHC.Unit (unitFS)
+import GHC.Builtin.Utils (knownKeyNames)
+import GHC.Core.TyCo.Rep (UnivCoProvenance(CorePrepProv))
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -2889,12 +2894,81 @@ rebuildCase env scrut case_bndr alts@[Alt _ bndrs rhs] cont
        ; case mb_rule of
            Just (env', rule_rhs, cont') -> simplExprF env' rule_rhs cont'
            Nothing                      -> reallyRebuildCase env scrut case_bndr alts cont }
+
+  -- 2d. Try the builtin unsafePersistNode/shareNode rule. Recall that
+  --
+  -- > shareNode :: forall s a. Node a -> TNode s a
+  -- > unsafePersistNode :: forall s a. TNode s a -> State# s -> (# State# s, Node a #)
+  --
+  -- Now if
+  --     a) the scrutinee is `unsafePersistNode @RealWorld @ty_a tn s`
+  --     b) The case alt looks like `(# s', n #) -> rhs[s', shareNode @RealWorld @ty_a n]`
+  --     c) n's OccInfo tells us that its only OneOcc is in that call to shareNode
+  -- Then rewrite the expr to `rhs[s, tn]`.
+  | Just (env', rhs') <- rewriteTransientPersistent env scrut case_bndr bndrs rhs
+  = simplExprF env' rhs' cont
   where
     all_dead_bndrs = all isDeadBinder bndrs       -- bndrs are [InId]
     is_plain_seq   = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect
 
 rebuildCase env scrut case_bndr alts cont
   = reallyRebuildCase env scrut case_bndr alts cont
+
+-- shareNode :: forall s a. Node a -> TNode s a
+-- unsafePersistNode :: forall s a. TNode s a -> State# s -> (# State# s, Node a #)
+-- case unsafePersistNode @ty_s @ty_a tm s of
+--   (# s', m #) -> E[s', shareNode @ty_s @ty_a m]
+-- ==> { if `shareNode m` is the only occurrence of m and not under a multishot lambda }
+-- E[s, tm]
+rewriteTransientPersistent :: SimplEnv -> OutExpr -> InId -> [InId] -> InExpr -> Maybe (SimplEnv, InExpr)
+rewriteTransientPersistent env scrut case_bndr alt_bndrs rhs
+  | isDeadBinder case_bndr -- Otherwise we might dup the map
+  , [s', m] <- alt_bndrs -- (# s', m #) ->
+--  , pprTrace "rewrite? 1" (ppr scrut) True
+  , OneOcc { occ_in_lam = NotInsideLam } <- idOccInfo m
+--  , pprTrace "rewrite? occ OK 2" empty True
+  , (Var fun_id, [_ty_s, _ty_a, tm, Var s]) <- collectArgs scrut -- unsafePersistNode @ty_s @ty_a (tm :: TWordMap ty_s ty_a) RealWorld
+--  , pprTrace "rewrite? App recogn 3" (ppr fun_id) True
+  , fun_id `hasKey` unsafePersistNodeIdKey
+--  , pprTrace "rewrite? Id matches 4" empty True
+  , let tm_in_id = mkLocalId (idName m) (idMult m) (exprType tm) -- we simply take m's InId Unique as the InId Unique for tm
+  , Just rhs' <- rw m tm_in_id rhs
+--  , pprTrace "rewrite? Yes!" (ppr rhs $$ ppr rhs') True
+  , let env' = extendIdSubst (extendIdSubst env tm_in_id (DoneEx tm Nothing)) s' (DoneId s)
+  = Just (env', rhs') -- substitute s for s'
+  | otherwise
+  = Nothing
+  where
+    rw :: InId -> InId -> InExpr -> Maybe InExpr
+    rw m tm e = go e
+      where
+        go e@App{} = case collectArgs e of
+          (Var fun_id, [_ty_s, _ty_a, Var m'])
+            | fun_id `hasKey` shareNodeIdKey
+            , m == m'
+            , let co = mkUnivCo (CorePrepProv False) Representational (idType tm) (exprType e)
+            , pprTrace "rw: found app" (ppr e $$ ppr co) True
+            -> Just (mkCast (Var tm) co)
+          (f, args)
+            -> mkApps <$> go f <*> traverse go args
+        go (Var v) | v == m = Nothing -- at least one occurrence outside of a unsafePersistNode call ==> abort
+        go (Tick t e) = Tick t <$> go e
+        go (Cast e c) = flip Cast c <$> go e
+        go (Lam b e) = Lam b <$> shadow [b] go e
+        go (Case s b ty alts) = Case <$> go s <*> pure b <*> pure ty <*> traverse (shadow [b] go_alt) alts
+        go (Let b e) = Let <$> go_bind b <*> shadow (bindersOf b) go e
+        go e = Just e
+
+        shadow :: [Var] -> (a -> Maybe a) -> a -> Maybe a
+        shadow bs f a | m `elem` bs = Just a -- NB: Don't need to check tm because it has the same unique as m
+                      | otherwise   = f a
+
+        go_bind (NonRec b e) = NonRec b <$> go e
+        go_bind (Rec pairs)  = (Rec . zip bs) <$> traverse (shadow bs go) rhss
+          where
+            (bs, rhss) = unzip pairs
+
+        go_alt (Alt con bs rhs) = Alt con bs <$> shadow bs go rhs
 
 
 doCaseToLet :: OutExpr          -- Scrutinee

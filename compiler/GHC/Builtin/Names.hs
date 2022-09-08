@@ -497,6 +497,12 @@ basicKnownKeyNames
         , unsafeEqualityTyConName
         , unsafeReflDataConName
         , unsafeCoercePrimName
+
+        -- unsafePersistNode/shareNode rewrite rule
+        , unsafePersistNodeName
+        , shareNodeName
+        , wordMapTyConName
+        , tWordMapTyConName
     ]
 
 genericTyConNames :: [Name]
@@ -643,6 +649,9 @@ gHC_RECORDS = mkBaseModule (fsLit "GHC.Records")
 
 rOOT_MAIN :: Module
 rOOT_MAIN       = mkMainModule (fsLit ":Main") -- Root module for initialisation
+
+wORD_MAP :: Module
+wORD_MAP = mkModule transientsUnit (mkModuleNameFS (fsLit "WordMap"))
 
 mkInteractiveModule :: Int -> Module
 -- (mkInteractiveMoudule 9) makes module 'interactive:Ghci9'
@@ -1101,16 +1110,6 @@ mconcatName        = varQual gHC_BASE       (fsLit "mconcat")   mconcatClassOpKe
 joinMName, alternativeClassName :: Name
 joinMName            = varQual gHC_BASE (fsLit "join")        joinMIdKey
 alternativeClassName = clsQual mONAD (fsLit "Alternative") alternativeClassKey
-
---
-joinMIdKey, apAClassOpKey, pureAClassOpKey, thenAClassOpKey,
-    alternativeClassKey :: Unique
-joinMIdKey          = mkPreludeMiscIdUnique 750
-apAClassOpKey       = mkPreludeMiscIdUnique 751 -- <*>
-pureAClassOpKey     = mkPreludeMiscIdUnique 752
-thenAClassOpKey     = mkPreludeMiscIdUnique 753
-alternativeClassKey = mkPreludeMiscIdUnique 754
-
 
 -- Functions for GHC extensions
 considerAccessibleName :: Name
@@ -1653,6 +1652,12 @@ fromStaticPtrName =
 fingerprintDataConName :: Name
 fingerprintDataConName =
     dcQual gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
+
+shareNodeName, unsafePersistNodeName, wordMapTyConName, tWordMapTyConName :: Name
+shareNodeName = varQual  wORD_MAP (fsLit "shareNode") shareNodeIdKey
+unsafePersistNodeName = varQual  wORD_MAP (fsLit "unsafePersistNode") unsafePersistNodeIdKey
+wordMapTyConName = tcQual  wORD_MAP (fsLit "WordMap") wordMapTyConKey
+tWordMapTyConName = tcQual  wORD_MAP (fsLit "TWordMap") tWordMapTyConKey
 
 {-
 ************************************************************************
@@ -2673,6 +2678,29 @@ bignatCompareWordIdKey     = mkPreludeMiscIdUnique 693
 mkRationalBase2IdKey, mkRationalBase10IdKey :: Unique
 mkRationalBase2IdKey  = mkPreludeMiscIdUnique 700
 mkRationalBase10IdKey = mkPreludeMiscIdUnique 701 :: Unique
+
+------------------------------------------------------
+-- Applicative/Alternative/Monad combinators 750-754 uniques
+------------------------------------------------------
+
+joinMIdKey, apAClassOpKey, pureAClassOpKey, thenAClassOpKey,
+    alternativeClassKey :: Unique
+joinMIdKey          = mkPreludeMiscIdUnique 750
+apAClassOpKey       = mkPreludeMiscIdUnique 751 -- <*>
+pureAClassOpKey     = mkPreludeMiscIdUnique 752
+thenAClassOpKey     = mkPreludeMiscIdUnique 753
+alternativeClassKey = mkPreludeMiscIdUnique 754
+
+
+------------------------------------------------------
+-- haskell-transients 755-759 uniques
+------------------------------------------------------
+
+shareNodeIdKey, unsafePersistNodeIdKey, wordMapTyConKey, tWordMapTyConKey :: Unique
+shareNodeIdKey  = mkPreludeMiscIdUnique 755
+unsafePersistNodeIdKey  = mkPreludeMiscIdUnique 756
+wordMapTyConKey  = mkPreludeMiscIdUnique 757
+tWordMapTyConKey  = mkPreludeMiscIdUnique 758
 
 {-
 ************************************************************************

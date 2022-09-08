@@ -159,6 +159,10 @@ packageArgs = do
           ? notM (expr $ anyTargetOs ["freebsd", "solaris2"])? mconcat
           [ builder (Ghc LinkHs) ? arg "-optl-Wl,--export-dynamic" ]
 
+        -------------------------------- haskell-transients -------------------------------
+        , package haskellTransients ?
+          builder (Cabal Flags) ? notStage0 `cabalFlag` "wired-in"
+
         -------------------------------- haddock -------------------------------
         , package haddock ?
           builder (Cabal Flags) ? arg "in-ghc-tree"

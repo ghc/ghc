@@ -67,6 +67,7 @@ module GHC.Unit.Types
    , mainUnitId
    , thisGhcUnitId
    , interactiveUnitId
+   , transientsUnitId
 
    , primUnit
    , bignumUnit
@@ -76,6 +77,7 @@ module GHC.Unit.Types
    , mainUnit
    , thisGhcUnit
    , interactiveUnit
+   , transientsUnit
 
    , isInteractiveModule
    , wiredInUnitIds
@@ -581,10 +583,12 @@ Make sure you change 'GHC.Unit.State.findWiredInUnits' if you add an entry here.
 -}
 
 bignumUnitId, primUnitId, baseUnitId, rtsUnitId,
-  thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
+  thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId,
+  transientsUnitId  :: UnitId
 
 bignumUnit, primUnit, baseUnit, rtsUnit,
-  thUnit, mainUnit, thisGhcUnit, interactiveUnit  :: Unit
+  thUnit, mainUnit, thisGhcUnit, interactiveUnit,
+  transientsUnit  :: Unit
 
 primUnitId        = UnitId (fsLit "ghc-prim")
 bignumUnitId      = UnitId (fsLit "ghc-bignum")
@@ -593,6 +597,7 @@ rtsUnitId         = UnitId (fsLit "rts")
 thisGhcUnitId     = UnitId (fsLit "ghc")
 interactiveUnitId = UnitId (fsLit "interactive")
 thUnitId          = UnitId (fsLit "template-haskell")
+transientsUnitId  = UnitId (fsLit "haskell-transients")
 
 thUnit            = RealUnit (Definite thUnitId)
 primUnit          = RealUnit (Definite primUnitId)
@@ -601,6 +606,7 @@ baseUnit          = RealUnit (Definite baseUnitId)
 rtsUnit           = RealUnit (Definite rtsUnitId)
 thisGhcUnit       = RealUnit (Definite thisGhcUnitId)
 interactiveUnit   = RealUnit (Definite interactiveUnitId)
+transientsUnit    = RealUnit (Definite transientsUnitId)
 
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix
@@ -619,6 +625,7 @@ wiredInUnitIds =
    , rtsUnitId
    , thUnitId
    , thisGhcUnitId
+   , transientsUnitId
    ]
 
 ---------------------------------------------------------------------
