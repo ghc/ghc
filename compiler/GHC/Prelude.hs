@@ -14,6 +14,7 @@
 
 module GHC.Prelude
   (module X
+  ,Applicative (..)
   ,module Bits
   ,shiftL, shiftR
   ) where
@@ -47,7 +48,8 @@ NoImplicitPrelude. There are two motivations for this:
     extensions.
 -}
 
-import Prelude as X hiding ((<>))
+import Prelude as X hiding ((<>), Applicative(..))
+import Control.Applicative (Applicative(..))
 import Data.Foldable as X (foldl')
 
 #if MIN_VERSION_base(4,16,0)

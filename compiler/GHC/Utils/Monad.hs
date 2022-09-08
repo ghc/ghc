@@ -27,9 +27,8 @@ module GHC.Utils.Monad
 -- Imports
 -------------------------------------------------------------------------------
 
-import GHC.Prelude hiding (Applicative(..))
+import GHC.Prelude
 
-import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.IO.Class

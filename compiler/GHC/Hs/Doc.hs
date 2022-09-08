@@ -26,7 +26,7 @@ module GHC.Hs.Doc
   , emptyDocs
   ) where
 
-import GHC.Prelude hiding (Applicative(..))
+import GHC.Prelude
 
 import GHC.Utils.Binary
 import GHC.Types.Name
@@ -38,7 +38,6 @@ import GHC.Types.Avail
 import GHC.Types.Name.Set
 import GHC.Driver.Flags
 
-import Control.Applicative (Applicative(..))
 import Data.Data
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap

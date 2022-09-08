@@ -127,7 +127,7 @@ module GHC.Utils.Misc (
         HasDebugCallStack,
     ) where
 
-import GHC.Prelude hiding (Applicative(..))
+import GHC.Prelude
 
 import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain
@@ -141,7 +141,6 @@ import Data.List.NonEmpty  ( NonEmpty(..) )
 import GHC.Exts
 import GHC.Stack (HasCallStack)
 
-import Control.Applicative (Applicative(..))
 import Control.Monad    ( liftM, guard )
 import Control.Monad.IO.Class ( MonadIO, liftIO )
 import System.IO.Error as IO ( isDoesNotExistError )

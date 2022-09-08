@@ -115,7 +115,7 @@ module GHC.Types.SrcLoc (
 
     ) where
 
-import GHC.Prelude hiding (Applicative(..))
+import GHC.Prelude
 
 import GHC.Utils.Misc
 import GHC.Utils.Json
@@ -125,7 +125,6 @@ import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 
 import Control.DeepSeq
-import Control.Applicative (Applicative(..))
 import Data.Data
 import Data.List (sortBy, intercalate)
 import Data.Function (on)
