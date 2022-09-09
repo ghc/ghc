@@ -157,6 +157,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.TyThing.Ppr ( pprTyThingInContext )
 import GHC.Types.PkgQual
+import GHC.Types.ConInfo (mkConInfo)
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Unit.External
@@ -2099,8 +2100,8 @@ runTcInteractive hsc_env thing_inside
                                                (extendFamInstEnvList (tcg_fam_inst_env gbl_env)
                                                                      ic_finsts)
                                                home_fam_insts
-                                    , tcg_field_env    = mkNameEnv con_fields
-                                         -- setting tcg_field_env is necessary
+                                    , tcg_con_env    = mkNameEnv con_fields
+                                         -- setting tcg_con_env is necessary
                                          -- to make RecordWildCards work (test: ghci049)
                                     , tcg_fix_env      = ic_fix_env icxt
                                     , tcg_default      = ic_default icxt
@@ -2135,7 +2136,7 @@ runTcInteractive hsc_env thing_inside
                 -- Putting the dfuns in the type_env
                 -- is just to keep Core Lint happy
 
-    con_fields = [ (dataConName c, dataConFieldLabels c)
+    con_fields = [ (dataConName c, mkConInfo (dataConSourceArity c) (dataConFieldLabels c))
                  | ATyCon t <- top_ty_things
                  , c <- tyConDataCons t ]
 

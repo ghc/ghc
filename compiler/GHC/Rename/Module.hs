@@ -1,5 +1,6 @@
 
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 
@@ -79,6 +80,7 @@ import Data.List.NonEmpty ( NonEmpty(..), head )
 import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 import Data.Function ( on )
+import GHC.Types.ConInfo (ConInfo, mkConInfo, conInfoFields)
 
 {- | @rnSourceDecl@ "renames" declarations.
 It simultaneously performs dependency analysis and precedence parsing.
@@ -2646,23 +2648,23 @@ extendPatSynEnv :: DuplicateRecordFields -> FieldSelectors -> HsValBinds GhcPs -
                 -> ([Name] -> TcRnIf TcGblEnv TcLclEnv a) -> TcM a
 extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
      names_with_fls <- new_ps val_decls
-   ; let pat_syn_bndrs = concat [ name: map flSelector fields
+   ; let pat_syn_bndrs = concat [ name : map flSelector (conInfoFields fields)
                                 | (name, fields) <- names_with_fls ]
    ; let avails = map avail (map fst names_with_fls)
-               ++ map availField (concatMap snd names_with_fls)
+               ++ map availField (concatMap (conInfoFields  . snd) names_with_fls)
    ; (gbl_env, lcl_env) <- extendGlobalRdrEnvRn avails local_fix_env
 
-   ; let field_env' = extendNameEnvList (tcg_field_env gbl_env) names_with_fls
-         final_gbl_env = gbl_env { tcg_field_env = field_env' }
+   ; let field_env' = extendNameEnvList (tcg_con_env gbl_env) names_with_fls
+         final_gbl_env = gbl_env { tcg_con_env = field_env' }
    ; restoreEnvs (final_gbl_env, lcl_env) (thing pat_syn_bndrs) }
   where
-    new_ps :: HsValBinds GhcPs -> TcM [(Name, [FieldLabel])]
+    new_ps :: HsValBinds GhcPs -> TcM [(Name, ConInfo)]
     new_ps (ValBinds _ binds _) = foldrM new_ps' [] binds
     new_ps _ = panic "new_ps"
 
     new_ps' :: LHsBindLR GhcPs GhcPs
-            -> [(Name, [FieldLabel])]
-            -> TcM [(Name, [FieldLabel])]
+            -> [(Name, ConInfo)]
+            -> TcM [(Name, ConInfo)]
     new_ps' bind names
       | (L bind_loc (PatSynBind _ (PSB { psb_id = L _ n
                                        , psb_args = RecCon as }))) <- bind
@@ -2670,11 +2672,20 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
           bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
           let field_occs = map ((\ f -> L (noAnnSrcSpan $ getLocA (foLabel f)) f) . recordPatSynField) as
           flds <- mapM (newRecordSelector dup_fields_ok has_sel [bnd_name]) field_occs
-          return ((bnd_name, flds): names)
-      | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n})) <- bind
+          let conInfo =
+                mkConInfo
+                  (conDetailsArity length (RecCon as))
+                  flds
+          return ((bnd_name, conInfo): names)
+      | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n
+                                      , psb_args})) <- bind
       = do
         bnd_name <- newTopSrcBinder (L (la2na bind_loc) n)
-        return ((bnd_name, []): names)
+        let conInfo =
+              mkConInfo
+                (conDetailsArity length psb_args)
+                []
+        return ((bnd_name, conInfo): names)
       | otherwise
       = return names
 

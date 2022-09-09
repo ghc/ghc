@@ -36,7 +36,7 @@ module GHC.Rename.Env (
         lookupSigCtxtOccRn, lookupSigCtxtOccRnN,
 
         lookupInstDeclBndr, lookupFamInstName,
-        lookupConstructorFields,
+        lookupConstructorInfo, lookupConstructorFields,
 
         lookupGreAvailRn,
 
@@ -105,6 +105,7 @@ import GHC.Types.FieldLabel
 import GHC.Data.Bag
 import GHC.Types.PkgQual
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import GHC.Types.ConInfo (ConInfo, conInfoFields, mkConInfo)
 
 {-
 *********************************************************
@@ -399,27 +400,34 @@ lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f GHC.Rename.Bind.rnM
 lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
   = lookupLocatedOccRnConstr tc_rdr
 
------------------------------------------------
-lookupConstructorFields :: Name -> RnM [FieldLabel]
--- Look up the fields of a given constructor
+lookupConstructorInfo :: Name -> RnM ConInfo
+-- Look up the info for a given constructor
 --   *  For constructors from this module, use the record field env,
 --      which is itself gathered from the (as yet un-typechecked)
 --      data type decls
+--      For more details, see Note [Local constructor info in the renamer]
 --
 --    * For constructors from imported modules, use the *type* environment
 --      since imported modules are already compiled, the info is conveniently
 --      right there
 
-lookupConstructorFields con_name
+lookupConstructorInfo con_name
   = do  { this_mod <- getModule
         ; if nameIsLocalOrFrom this_mod con_name then
-          do { field_env <- getRecFieldEnv
-             ; traceTc "lookupCF" (ppr con_name $$ ppr (lookupNameEnv field_env con_name) $$ ppr field_env)
-             ; return (lookupNameEnv field_env con_name `orElse` []) }
+          do { con_env <- getConEnv
+             ; let conInfo = lookupNameEnv con_env con_name
+             ; traceTc "lookupCF" (ppr con_name $$ ppr conInfo $$ ppr con_env)
+             -- we always info for all the constructors in the current module in GHC.Rename.mk_con_env
+             -- hence we should be able to look up the constructor in tcg_con_env if it's from the current module
+             ; return (conInfo `orElse` panic "GHC.Rename.Env.lookupConstructorInfo") }
           else
           do { con <- tcLookupConLike con_name
              ; traceTc "lookupCF 2" (ppr con)
-             ; return (conLikeFieldLabels con) } }
+             ; pure $ mkConInfo (conLikeArity con) (conLikeFieldLabels con) } }
+
+-----------------------------------------------
+lookupConstructorFields :: Name -> RnM [FieldLabel]
+lookupConstructorFields = fmap conInfoFields . lookupConstructorInfo
 
 
 -- In CPS style as `RnM r` is monadic

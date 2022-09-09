@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+{-# LANGUAGE LambdaCase #-}
                                       -- in module Language.Haskell.Syntax.Extension
 {-
 (c) The University of Glasgow 2006
@@ -44,7 +45,7 @@ module Language.Haskell.Syntax.Type (
 
         ConDeclField(..), LConDeclField,
 
-        HsConDetails(..), noTypeArgs,
+        HsConDetails(..), noTypeArgs, conDetailsArity,
 
         FieldOcc(..), LFieldOcc,
         AmbiguousFieldOcc(..), LAmbiguousFieldOcc,
@@ -64,6 +65,7 @@ import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.DataCon( HsSrcBang(..) )
 import GHC.Core.Type (Specificity)
 import GHC.Types.SrcLoc (SrcSpan)
+import GHC.Types.Basic (Arity)
 
 import GHC.Hs.Doc (LHsDoc)
 import GHC.Data.FastString (FastString)
@@ -74,7 +76,7 @@ import Data.Maybe
 import Data.Eq
 import Data.Bool
 import Data.Char
-import Prelude (Integer)
+import Prelude (Integer, length)
 
 {-
 ************************************************************************
@@ -1071,6 +1073,12 @@ data HsConDetails tyarg arg rec
 -- type arguments allowed in cases where HsConDetails is applied to Void.
 noTypeArgs :: [Void]
 noTypeArgs = []
+
+conDetailsArity :: (rec -> Arity) -> HsConDetails tyarg arg rec -> Arity
+conDetailsArity recToArity = \case
+  PrefixCon _ args -> length args
+  RecCon rec -> recToArity rec
+  InfixCon _ _ -> 2
 
 {-
 Note [ConDeclField pass]

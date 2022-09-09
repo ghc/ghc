@@ -64,12 +64,13 @@ import GHC.Types.Avail
 import GHC.Types.FieldLabel
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.Basic  ( TopLevelFlag(..) )
+import GHC.Types.Basic  ( Arity, TopLevelFlag(..) )
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.HpcInfo
 import GHC.Types.Error
 import GHC.Types.PkgQual
+import GHC.Types.ConInfo (ConInfo, mkConInfo)
 
 import GHC.Unit
 import GHC.Unit.Module.Warnings
@@ -95,6 +96,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Function    ( on )
 import qualified Data.Set as S
 import Data.Foldable    ( toList )
+import Data.Void        ( Void )
 import System.FilePath  ((</>))
 
 import System.IO
@@ -936,11 +938,11 @@ getLocalNonValBinders fixity_env
 
         -- Force the field access so that tcg_env is not retained. The
         -- selector thunk optimisation doesn't kick-in, see #20139
-        ; let !old_field_env = tcg_field_env tcg_env
-        -- Extend tcg_field_env with new fields (this used to be the
+        ; let !old_field_env = tcg_con_env tcg_env
+        -- Extend tcg_con_env with new fields (this used to be the
         -- work of extendRecordFieldEnv)
               field_env = extendNameEnvList old_field_env flds
-              envs      = (tcg_env { tcg_field_env = field_env }, tcl_env)
+              envs      = (tcg_env { tcg_con_env = field_env }, tcl_env)
 
         ; traceRn "getLocalNonValBinders 3" (vcat [ppr flds, ppr field_env])
         ; return (envs, new_bndrs) } }
@@ -955,39 +957,75 @@ getLocalNonValBinders fixity_env
                             ; return (avail nm) }
 
     new_tc :: DuplicateRecordFields -> FieldSelectors -> LTyClDecl GhcPs
-           -> RnM (AvailInfo, [(Name, [FieldLabel])])
+           -> RnM (AvailInfo, [(Name, ConInfo)])
     new_tc dup_fields_ok has_sel tc_decl -- NOT for type/data instances
         = do { let (bndrs, flds) = hsLTyClDeclBinders tc_decl
              ; names@(main_name : sub_names) <- mapM (newTopSrcBinder . l2n) bndrs
              ; flds' <- mapM (newRecordSelector dup_fields_ok has_sel sub_names) flds
              ; let fld_env = case unLoc tc_decl of
-                     DataDecl { tcdDataDefn = d } -> mk_fld_env d names flds'
+                     DataDecl { tcdDataDefn = d } -> mk_con_env d names flds'
                      _                            -> []
              ; return (availTC main_name names flds', fld_env) }
 
 
-    -- Calculate the mapping from constructor names to fields, which
-    -- will go in tcg_field_env. It's convenient to do this here where
+    -- Calculate the mapping from constructor names to arity and fields, which
+    -- will go in tcg_con_env. It's convenient to do this here where
     -- we are working with a single datatype definition.
-    mk_fld_env :: HsDataDefn GhcPs -> [Name] -> [FieldLabel]
-               -> [(Name, [FieldLabel])]
-    mk_fld_env d names flds = concatMap find_con_flds (dd_cons d)
+    -- For more details, see Note [Local constructor info in the renamer]
+    mk_con_env :: HsDataDefn GhcPs -> [Name] -> [FieldLabel]
+               -> [(Name, ConInfo)]
+    mk_con_env d names flds = concatMap find_con_flds (dd_cons d)
       where
+        find_con_flds :: GenLocated l (ConDecl GhcPs) -> [(Name, ConInfo)]
         find_con_flds (L _ (ConDeclH98 { con_name = L _ rdr
-                                       , con_args = RecCon cdflds }))
+                                       , con_args = con_det }))
             = [( find_con_name rdr
-               , concatMap find_con_decl_flds (unLoc cdflds) )]
+               , con_det_con_info con_det
+               )]
         find_con_flds (L _ (ConDeclGADT { con_names = rdrs
-                                        , con_g_args = RecConGADT flds _ }))
+                                        , con_g_args = con_gadt_det }))
             = [ ( find_con_name rdr
-                 , concatMap find_con_decl_flds (unLoc flds))
+                , gadt_det_con_info con_gadt_det
+                )
               | L _ rdr <- toList rdrs ]
-
-        find_con_flds _ = []
 
         find_con_name rdr
           = expectJust "getLocalNonValBinders/find_con_name" $
               find (\ n -> nameOccName n == rdrNameOcc rdr) names
+
+        con_det_con_info
+          :: HsConDetails Void (HsScaled GhcPs (GenLocated SrcSpanAnnA (HsType GhcPs))) (GenLocated SrcSpanAnnL [GenLocated SrcSpanAnnA (ConDeclField GhcPs)])
+          -> ConInfo
+        con_det_con_info con_det =
+          let
+            (arity, fields) =
+              case con_det of
+                PrefixCon _ args ->
+                  (length args, [])
+                RecCon cdflds ->
+                  ((find_con_decl_field_arity . unLoc) cdflds, concatMap find_con_decl_flds $ unLoc cdflds)
+                InfixCon _ _ ->
+                  (2, [])
+           in
+            mkConInfo
+              arity
+              fields
+
+        gadt_det_con_info :: HsConDeclGADTDetails GhcPs -> ConInfo
+        gadt_det_con_info con_gadt_det =
+          let
+            (arity, fields) =
+              case con_gadt_det of
+                PrefixConGADT args ->
+                  (length args, [])
+                RecConGADT (L _ args) _ ->
+                  (find_con_decl_field_arity args, concatMap find_con_decl_flds args)
+           in
+            mkConInfo
+              arity
+              fields
+
+        find_con_decl_flds :: GenLocated l (ConDeclField GhcPs) -> [FieldLabel]
         find_con_decl_flds (L _ x)
           = map find_con_decl_fld (cd_fld_names x)
 
@@ -996,14 +1034,17 @@ getLocalNonValBinders fixity_env
               find (\ fl -> flLabel fl == lbl) flds
           where lbl = FieldLabelString $ occNameFS (rdrNameOcc rdr)
 
+        find_con_decl_field_arity :: [GenLocated SrcSpanAnnA (ConDeclField GhcPs)] -> Arity
+        find_con_decl_field_arity = length . concatMap (cd_fld_names . unLoc)
+
     new_assoc :: DuplicateRecordFields -> FieldSelectors -> LInstDecl GhcPs
-              -> RnM ([AvailInfo], [(Name, [FieldLabel])])
+              -> RnM ([AvailInfo], [(Name, ConInfo)])
     new_assoc _ _ (L _ (TyFamInstD {})) = return ([], [])
       -- type instances don't bind new names
 
     new_assoc dup_fields_ok has_sel (L _ (DataFamInstD _ d))
-      = do { (avail, flds) <- new_di dup_fields_ok has_sel Nothing d
-           ; return ([avail], flds) }
+      = do { (avail, arityAndFlds) <- new_di dup_fields_ok has_sel Nothing d
+           ; return ([avail], arityAndFlds) }
     new_assoc dup_fields_ok has_sel (L _ (ClsInstD _ (ClsInstDecl { cid_poly_ty = inst_ty
                                                       , cid_datafam_insts = adts })))
       = do -- First, attempt to grab the name of the class from the instance.
@@ -1032,7 +1073,7 @@ getLocalNonValBinders fixity_env
                pure (avails, concat fldss)
 
     new_di :: DuplicateRecordFields -> FieldSelectors -> Maybe Name -> DataFamInstDecl GhcPs
-                   -> RnM (AvailInfo, [(Name, [FieldLabel])])
+                   -> RnM (AvailInfo, [(Name, ConInfo)])
     new_di dup_fields_ok has_sel mb_cls dfid@(DataFamInstDecl { dfid_eqn = ti_decl })
         = do { main_name <- lookupFamInstName mb_cls (feqn_tycon ti_decl)
              ; let (bndrs, flds) = hsDataFamInstBinders dfid
@@ -1040,11 +1081,11 @@ getLocalNonValBinders fixity_env
              ; flds' <- mapM (newRecordSelector dup_fields_ok has_sel sub_names) flds
              ; let avail    = availTC (unLoc main_name) sub_names flds'
                                   -- main_name is not bound here!
-                   fld_env  = mk_fld_env (feqn_rhs ti_decl) sub_names flds'
+                   fld_env  = mk_con_env (feqn_rhs ti_decl) sub_names flds'
              ; return (avail, fld_env) }
 
     new_loc_di :: DuplicateRecordFields -> FieldSelectors -> Maybe Name -> LDataFamInstDecl GhcPs
-                   -> RnM (AvailInfo, [(Name, [FieldLabel])])
+                   -> RnM (AvailInfo, [(Name, ConInfo)])
     new_loc_di dup_fields_ok has_sel mb_cls (L _ d) = new_di dup_fields_ok has_sel mb_cls d
 
 newRecordSelector :: DuplicateRecordFields -> FieldSelectors -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel

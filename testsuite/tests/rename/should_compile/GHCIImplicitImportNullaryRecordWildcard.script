@@ -1,0 +1,3 @@
+:set -XRecordWildCards
+
+f x = GHC.Generics.U1 {..}

@@ -82,6 +82,7 @@ import Data.Maybe
 import Data.Ratio
 import GHC.Types.FieldLabel (DuplicateRecordFields(..))
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import GHC.Types.ConInfo (ConInfo(..), conInfoFields)
 
 {-
 *********************************************************
@@ -809,8 +810,8 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
         do { dd_flag <- xoptM LangExt.RecordWildCards
            ; checkErr dd_flag (needFlagDotDot ctxt)
            ; (rdr_env, lcl_env) <- getRdrEnvs
-           ; con_fields <- lookupConstructorFields con
-           ; when (null con_fields) (addErr (TcRnIllegalWildcardsInConstructor con))
+           ; conInfo <- lookupConstructorInfo con
+           ; when (conInfo == ConHasPositionalArgs) (addErr (TcRnIllegalWildcardsInConstructor con))
            ; let present_flds = mkOccSet $ map rdrNameOcc (getFieldLbls flds)
 
                    -- For constructor uses (but not patterns)
@@ -822,7 +823,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
 
                  (dot_dot_fields, dot_dot_gres)
                         = unzip [ (fl, gre)
-                                | fl <- con_fields
+                                | fl <- conInfoFields conInfo
                                 , let lbl = mkVarOccFS (field_label $ flLabel fl)
                                 , not (lbl `elemOccSet` present_flds)
                                 , Just gre <- [lookupGRE_FieldLabel rdr_env fl]

@@ -1,0 +1,5 @@
+:set -XRecordWildCards
+
+data Foo = Foo
+
+f Foo {..} = Foo {..}

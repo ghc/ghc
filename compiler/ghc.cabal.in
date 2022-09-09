@@ -751,6 +751,7 @@ Library
         GHC.Types.Basic
         GHC.Types.BreakInfo
         GHC.Types.CompleteMatch
+        GHC.Types.ConInfo
         GHC.Types.CostCentre
         GHC.Types.CostCentre.State
         GHC.Types.Cpr

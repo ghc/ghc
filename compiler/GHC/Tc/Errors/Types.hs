@@ -591,7 +591,11 @@ data TcRnMessage where
 
       Examples(s): None
 
-     Test cases: None
+     Test cases:
+       rename/should_fail/T9815.hs
+       rename/should_fail/T9815b.hs
+       rename/should_fail/T9815ghci.hs
+       rename/should_fail/T9815bghci.hs
   -}
   TcRnIllegalWildcardsInConstructor :: !Name -> TcRnMessage
 

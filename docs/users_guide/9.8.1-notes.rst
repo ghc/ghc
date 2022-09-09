@@ -21,6 +21,12 @@ Compiler
 
       foo (\x -> x*2 + x)
 
+- GHC Proposal `#496
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0496-empty-record-wildcards.rst>`_
+  has been implemented, allowing ``{..}`` syntax for constructors without fields, for consistency.
+  This is convenient for TH code generation, as you can now uniformly use record wildcards
+  regardless of number of fields.
+
 GHCi
 ~~~~
 

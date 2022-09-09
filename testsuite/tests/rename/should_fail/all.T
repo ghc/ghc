@@ -110,6 +110,9 @@ test('T9436', normal, compile_fail, [''])
 test('T9437', normal, compile_fail, [''])
 test('T9077', normal, compile_fail, [''])
 test('T9815', normal, compile_fail, [''])
+test('T9815b', [extra_files(['T9815.hs'])], multimod_compile_fail, ['T9815b', '-v0'])
+test('T9815ghci', normal, ghci_script, ['T9815ghci.script'])
+test('T9815bghci', normal, ghci_script, ['T9815bghci.script'])
 
 test('T9032',
      normal,

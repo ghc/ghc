@@ -251,8 +251,10 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $ text "character literal out of range: '\\" <> char c  <> char '\''
     TcRnIllegalWildcardsInConstructor con
       -> mkSimpleDecorated $
-           vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
-                , nest 2 (text "The constructor has no labelled fields") ]
+           vcat [ text "Illegal `{..}' notation for constructor" <+> quotes (ppr con)
+                , nest 2 (text "Record wildcards may not be used for constructors with unlabelled fields.")
+                , nest 2 (text "Possible fix: Remove the `{..}' and add a match for each field of the constructor.")
+                ]
     TcRnIgnoringAnnotations anns
       -> mkSimpleDecorated $
            text "Ignoring ANN annotation" <> plural anns <> comma

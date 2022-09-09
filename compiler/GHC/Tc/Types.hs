@@ -40,7 +40,7 @@ module GHC.Tc.Types(
         FrontendResult(..),
 
         -- Renamer types
-        ErrCtxt, RecFieldEnv, pushErrCtxt, pushErrCtxtSameOrigin,
+        ErrCtxt, pushErrCtxt, pushErrCtxtSameOrigin,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
         WhereFrom(..), mkModDeps,
 
@@ -126,7 +126,6 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Predicate
 
 import GHC.Types.Id         ( idType, idName )
-import GHC.Types.FieldLabel ( FieldLabel )
 import GHC.Types.Fixity.Env
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
@@ -146,6 +145,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Basic
 import GHC.Types.CostCentre.State
 import GHC.Types.HpcInfo
+import GHC.Types.ConInfo (ConFieldEnv)
 
 import GHC.Data.IOEnv
 import GHC.Data.Bag
@@ -167,8 +167,8 @@ import GHC.Builtin.Names ( isUnboundName )
 
 import Data.Set      ( Set )
 import qualified Data.Set as S
-import Data.Map ( Map )
 import Data.Dynamic  ( Dynamic )
+import Data.Map ( Map )
 import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
 import GHCi.Message
@@ -443,8 +443,10 @@ data TcGblEnv
           -- ^ Types used for defaulting. @Nothing@ => no @default@ decl
 
         tcg_fix_env   :: FixityEnv,     -- ^ Just for things in this module
-        tcg_field_env :: RecFieldEnv,   -- ^ Just for things in this module
-                                        -- See Note [The interactive package] in "GHC.Runtime.Context"
+        tcg_con_env :: ConFieldEnv,
+          -- ^ Just for things in this module
+          -- For information on why this is necessary, see Note [Local constructor info in the renamer]
+          -- See Note [The interactive package] in "GHC.Runtime.Context"
 
         tcg_type_env :: TypeEnv,
           -- ^ Global type env for the module we are compiling now.  All
@@ -686,15 +688,6 @@ tcVisibleOrphanMods tcg_env
 
 instance ContainsModule TcGblEnv where
     extractModule env = tcg_semantic_mod env
-
-type RecFieldEnv = NameEnv [FieldLabel]
-        -- Maps a constructor name *in this module*
-        -- to the fields for that constructor.
-        -- This is used when dealing with ".." notation in record
-        -- construction and pattern matching.
-        -- The FieldEnv deals *only* with constructors defined in *this*
-        -- module.  For imported modules, we get the same info from the
-        -- TypeEnv
 
 data SelfBootInfo
   = NoSelfBoot    -- No corresponding hi-boot file
