@@ -51,6 +51,8 @@ flag debug
   default: False
 flag dynamic
   default: False
+flag threaded
+  default: False
 flag thread-sanitizer
   description:
     Enable checking for data races using the ThreadSanitizer (TSAN)
@@ -78,17 +80,26 @@ library
     -- Here we declare several flavours to be available when passing the
     -- suitable (combination of) flag(s) when configuring the RTS from hadrian,
     -- using Cabal.
-    extra-library-flavours: _thr
+    if flag(threaded)
+      extra-library-flavours: _thr
 
     if flag(profiling)
-      extra-library-flavours: _p _thr_p
+      extra-library-flavours: _p
+      if flag(threaded)
+        extra-library-flavours: _thr_p
       if flag(debug)
-        extra-library-flavours: _debug_p _thr_debug_p
+        extra-library-flavours: _debug_p
+        if flag(threaded)
+          extra-library-flavours: _thr_debug_p
     if flag(debug)
-      extra-library-flavours: _debug _thr_debug
+      extra-library-flavours: _debug
+      if flag(threaded)
+        extra-library-flavours: _thr_debug
       if flag(dynamic)
-        extra-dynamic-library-flavours: _debug _thr_debug
-    if flag(dynamic)
+        extra-dynamic-library-flavours: _debug
+        if flag(threaded)
+          extra-dynamic-library-flavours: _thr_debug
+    if flag(dynamic) && flag(threaded)
       extra-dynamic-library-flavours: _thr
 
     if flag(thread-sanitizer)

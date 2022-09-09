@@ -389,6 +389,7 @@ rtsPackageArgs = package rts ? do
           [ any (wayUnit Profiling) rtsWays `cabalFlag` "profiling"
           , any (wayUnit Debug) rtsWays     `cabalFlag` "debug"
           , any (wayUnit Dynamic) rtsWays   `cabalFlag` "dynamic"
+          , any (wayUnit Threaded) rtsWays  `cabalFlag` "threaded"
           , useSystemFfi                    `cabalFlag` "use-system-libffi"
           , useLibffiForAdjustors           `cabalFlag` "libffi-adjustors"
           , Debug `wayUnit` way             `cabalFlag` "find-ptr"
