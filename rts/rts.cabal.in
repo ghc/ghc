@@ -49,8 +49,6 @@ flag profiling
   default: False
 flag debug
   default: False
-flag logging
-  default: False
 flag dynamic
   default: False
 flag thread-sanitizer
