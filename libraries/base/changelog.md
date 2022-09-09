@@ -31,8 +31,8 @@
     as well as [the migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/export-lifta2-prelude.md)
   * Update to [Unicode 15.0.0](https://www.unicode.org/versions/Unicode15.0.0/).
   * Add standard Unicode case predicates `isUpperCase` and `isLowerCase` to
-    `GHC.Unicode` and `Data.Char`. These predicates use the standard Unicode 
-    case properties and are more intuitive than `isUpper` and `isLower`. See 
+    `GHC.Unicode` and `Data.Char`. These predicates use the standard Unicode
+    case properties and are more intuitive than `isUpper` and `isLower`. See
     [CLC proposal #90](https://github.com/haskell/core-libraries-committee/issues/90).
   * Add `Eq` and `Ord` instances for `Generically1`.
   * Relax instances for Functor combinators; put superclass on Class1 and Class2
@@ -50,6 +50,10 @@
   * The `Enum` instance of `Down a` now enumerates values in the opposite
     order as the `Enum a` instance, per
     [CLC proposal #51](https://github.com/haskell/core-libraries-committee/issues/51).
+  * `Foreign.Marshal.Pool` now uses the RTS internal arena instead of libc
+    `malloc` for allocation. It avoids the O(n) overhead of maintaining a list
+    of individually allocated pointers as well as freeing each one of them when
+    freeing a `Pool`. (#14762) (#18338)
 
 ## 4.17.0.0 *August 2022*
 
