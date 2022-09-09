@@ -1643,11 +1643,7 @@ rebuildLam env bndrs body cont
     mb_rhs   = contIsRhs cont
 
     -- See Note [Eta reduction based on evaluation context]
-    eval_sd
-      | sePedanticBottoms env = topSubDmd
-          -- See Note [Eta reduction soundness], criterion (S)
-          -- the bit about -fpedantic-bottoms
-      | otherwise = contEvalContext cont
+    eval_sd = contEvalContext cont
         -- NB: cont is never ApplyToVal, because beta-reduction would
         -- have happened.  So contEvalContext can panic on ApplyToVal.
 

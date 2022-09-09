@@ -407,8 +407,7 @@ test('T21144',  normal, compile, ['-O'])
 test('T20040', [ grep_errmsg(r'ifoldl\'') ], compile, ['-O -ddump-stg-final -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
 
 # Key here is that yes* become visibly trivial due to eta-reduction, while no* are not eta-reduced.
-test('T21261',          [ grep_errmsg(r'^(yes|no)') ], compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
-test('T21261_pedantic', [ grep_errmsg(r'^(yes|no)') ], compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
+test('T21261', [ grep_errmsg(r'^(yes|no)') ], compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
 
 # We expect to see a SPEC rule for $cm
 test('T17966',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])

@@ -4,7 +4,7 @@ T21081.blah: <LCL(C1(L))><1!P(1L)>
 T21081.blurg: <S!P(SL)>
 T21081.blurg2: <S!P(SL)>
 T21081.call1: <MP(1L,A)>
-T21081.call2: <LP(SL,A)>
+T21081.call2: <LP(L,A)>
 T21081.call3: <LP(ML,A)>
 T21081.call4: <MP(1L,A)><1A>
 T21081.call5: <MP(1L,A)><MA>
@@ -50,7 +50,7 @@ T21081.blah: <LCL(C1(L))><1!P(1L)>
 T21081.blurg: <1!P(SL)>
 T21081.blurg2: <1!P(SL)>
 T21081.call1: <MP(1L,A)>
-T21081.call2: <LP(SL,A)>
+T21081.call2: <LP(L,A)>
 T21081.call3: <LP(ML,A)>
 T21081.call4: <MP(1L,A)><1A>
 T21081.call5: <MP(1L,A)><MA>

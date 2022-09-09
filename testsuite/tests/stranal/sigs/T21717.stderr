@@ -1,18 +1,15 @@
 
 ==================== Strictness signatures ====================
-Foo.f: <LP(A,L,A)><L>
-Foo.foogle: <L><L>
+T21717.g: <SCS(P(ML,ML))>
 
 
 
 ==================== Cpr signatures ====================
-Foo.f: 1
-Foo.foogle: 1
+T21717.g: 1
 
 
 
 ==================== Strictness signatures ====================
-Foo.f: <MP(A,1C1(L),A)><L>
-Foo.foogle: <L><L>
+T21717.g: <SCS(P(ML,ML))>
 
 

@@ -34,18 +34,26 @@ f5 c = Just (c 1 2 + c 3 4)
 yes2_lazy :: (Int -> Int -> Int) -> Maybe Int
 yes2_lazy c = f5 (\x y -> c x y)
 
--- These last two here are disallowed in T21261_pedantic.hs, which activates
--- -fpedantic-bottoms. It would be unsound to eta reduce these bindings with
--- -fpedantic-bottoms, but without it's fine to eta reduce:
+-- These last two here are tricky. It is unsound to eta reduce
+-- the args to f6 and f7 because we could call both functions
+-- at a c like `\x -> if x == 1 then undefined else id`.
+-- Note that if we do so and *do* eta-reduce, we'll see a crash!
+-- Whereas we *don't* see a crash if we keep the original,
+-- eta-expanded arguments.
+--
+-- This is issue is discussed in Note [Eta reduction soundness], condition (S).
+--
+-- This is a variant of #21717 (and tested by T21717), where
+-- prior to the fix we observed an unsound strictness signature.
 
 f6 :: (Int -> Int -> Int) -> Int
 f6 c = c 1 `seq` c 2 3
 {-# NOINLINE f6 #-}
-yes_non_pedantic :: (Int -> Int -> Int) -> Int
-yes_non_pedantic c = f6 (\x y -> c x y)
+no_tricky :: (Int -> Int -> Int) -> Int
+no_tricky c = f6 (\x y -> c x y)
 
 f7 :: (Int -> Int -> Int) -> Maybe Int
 f7 c = Just (c 1 `seq` c 3 4)
 {-# NOINLINE f7 #-}
-yes_non_pedantic_lazy :: (Int -> Int -> Int) -> Maybe Int
-yes_non_pedantic_lazy c = f7 (\x y -> c x y)
+no_tricky_lazy :: (Int -> Int -> Int) -> Maybe Int
+no_tricky_lazy c = f7 (\x y -> c x y)

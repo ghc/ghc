@@ -598,26 +598,6 @@ multCard (Card a) (Card b)
     bit1 = (a .&. b)                   .&. 0b010
     bitN = (a .|. b) .&. shiftL bit1 1 .&. 0b100
 
--- | Denotes '∪' on lower and '+' on upper bounds of 'Card'.
-lubPlusCard :: Card -> Card -> Card
--- See Note [Algebraic specification for plusCard and multCard]
-lubPlusCard (Card a) (Card b)
-  = Card (bit0 .|. bit1 .|. bitN)
-  where
-    bit0 =  (a .|. b)                         .&. 0b001
-    bit1 =  (a .|. b)                         .&. 0b010
-    bitN = ((a .|. b) .|. shiftL (a .&. b) 1) .&. 0b100
-
--- | Denotes '+' on lower and '∪' on upper bounds of 'Card'.
-plusLubCard :: Card -> Card -> Card
--- See Note [Algebraic specification for plusCard and multCard]
-plusLubCard (Card a) (Card b)
-  = Card (bit0 .|. bit1 .|. bitN)
-  where
-    bit0 = (a .&. b) .&. 0b001
-    bit1 = (a .|. b) .&. 0b010
-    bitN = (a .|. b) .&. 0b100
-
 {-
 ************************************************************************
 *                                                                      *
@@ -626,11 +606,11 @@ plusLubCard (Card a) (Card b)
 ************************************************************************
 -}
 
--- | A demand describes a /scaled evaluation context/, e.g. how many times
--- and how deep the denoted thing is evaluated.
+-- | A demand describes
 --
--- The "how many" component is represented by a 'Card'inality.
--- The "how deep" component is represented by a 'SubDemand'.
+--   * How many times a variable is evaluated, via a 'Card'inality, and
+--   * How deep its value was evaluated in turn, via a 'SubDemand'.
+--
 -- Examples (using Note [Demand notation]):
 --
 --   * 'seq' puts demand @1A@ on its first argument: It evaluates the argument
@@ -674,8 +654,8 @@ viewDmdPair BotDmd   = (C_10, botSubDmd)
 viewDmdPair AbsDmd   = (C_00, botSubDmd)
 viewDmdPair (D n sd) = (n, sd)
 
--- | @c :* sd@ is a demand that says \"evaluated @c@ times, and each time it
--- was evaluated, it was at least as deep as @sd@\".
+-- | @c :* sd@ is a demand that says \"evaluated @c@ times, and any trace in
+-- which it is evaluated will evaluate at least as deep as @sd@\".
 --
 -- Matching on this pattern synonym is a complete match.
 -- If the matched demand was 'AbsDmd', it will match as @C_00 :* seqSubDmd@.
@@ -695,8 +675,9 @@ pattern n :* sd <- (viewDmdPair -> (n, sd)) where
   n    :* sd = D n sd & assertPpr (isCardNonAbs n)  (ppr n $$ ppr sd)
 {-# COMPLETE (:*) #-}
 
--- | A sub-demand describes an /evaluation context/, e.g. how deep the
--- denoted thing is evaluated. See 'Demand' for examples.
+-- | A sub-demand describes an /evaluation context/ (in the sense of an
+-- operational semantics), e.g. how deep the denoted thing is going to be
+-- evaluated. See 'Demand' for examples.
 --
 -- See Note [SubDemand denotes at least one evaluation] for a more detailed
 -- description of what a sub-demand means.
@@ -714,14 +695,17 @@ data SubDemand
   -- @Poly b n@ is semantically equivalent to @Prod b [n :* Poly b n, ...]
   -- or @Call n (Poly Boxed n)@. 'viewCall' and 'viewProd' do these rewrites.
   --
-  -- In Note [Demand notation]: @L  === P(L,L,...)@  and @L  === CL(L)@,
-  --                            @B  === P(B,B,...)@  and @B  === CB(B)@,
-  --                            @!A === !P(A,A,...)@ and @!A === !CA(B)@,
+  -- In Note [Demand notation]: @L  === P(L,L,...)@  and @L  === C(L)@,
+  --                            @B  === P(B,B,...)@  and @B  === C(B)@,
+  --                            @!A === !P(A,A,...)@ and @!A === C(A)@,
   --                            and so on.
   --
   -- We'll only see 'Poly' with 'C_10' (B), 'C_00' (A), 'C_0N' (L) and sometimes
   -- 'C_1N' (S) through 'plusSubDmd', never 'C_01' (M) or 'C_11' (1) (grep the
   -- source code). Hence 'CardNonOnce', which is closed under 'lub' and 'plus'.
+  --
+  -- Why doesn't this constructor simply carry a 'Demand' instead of its fields?
+  -- See Note [Call SubDemand vs. evaluation Demand].
   | Call !CardNonAbs !SubDemand
   -- ^ @Call n sd@ describes the evaluation context of @n@ function
   -- applications (with one argument), where the result of each call is
@@ -803,7 +787,7 @@ viewProd _ _
 -- equality @Call C_0N (Poly C_0N) === Poly C_0N@, simplifying to 'Poly' 'SubDemand's
 -- when possible.
 mkCall :: CardNonAbs -> SubDemand -> SubDemand
-mkCall C_1N sd@(Poly Boxed C_1N) = sd
+--mkCall C_1N sd@(Poly Boxed C_1N) = sd -- NO! #21085 strikes. See Note [mkCall and plusSubDmd]
 mkCall C_0N sd@(Poly Boxed C_0N) = sd
 mkCall n    sd                   = assertPpr (isCardNonAbs n) (ppr n $$ ppr sd) $
                                    Call n sd
@@ -838,17 +822,6 @@ unboxDeeplyDmd BotDmd   = BotDmd
 unboxDeeplyDmd dmd@(D n sd) | isStrict n = D n (unboxDeeplySubDmd sd)
                             | otherwise  = dmd
 
-multSubDmd :: Card -> SubDemand -> SubDemand
-multSubDmd C_11 sd           = sd -- An optimisation, for when sd is a deep Prod
--- The following three equations don't have an impact on Demands, only on
--- Boxity. They are needed so that we don't trigger the assertions in `:*`
--- when called from `multDmd`.
-multSubDmd C_00 _            = seqSubDmd -- Otherwise `multSubDmd A L == A /= !A`
-multSubDmd C_10 (Poly _ n)   = if isStrict n then botSubDmd else seqSubDmd -- Otherwise `multSubDmd B L == B /= !B`
-multSubDmd C_10 (Call n _)   = if isStrict n then botSubDmd else seqSubDmd -- Otherwise we'd call `mkCall` with absent cardinality
-multSubDmd n    (Poly b m)   = Poly b (multCard n m)
-multSubDmd n    (Call n' sd) = mkCall (multCard n n') sd
-multSubDmd n    (Prod b ds)  = mkProd b (strictMap (multDmd n) ds)
 
 multDmd :: Card -> Demand -> Demand
 multDmd C_11 dmd       = dmd -- An optimisation
@@ -866,170 +839,85 @@ multDmd n    BotDmd   = if isStrict n then BotDmd else AbsDmd
 -- See Note [SubDemand denotes at least one evaluation] for the strictifyCard
 multDmd n    (D m sd) = multCard n m :* multSubDmd (strictifyCard n) sd
 
-{- Note [Manual specialisation of lub*Dmd/plus*Dmd]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As Note [SubDemand denotes at least one evaluation] points out, we need all 4
-different combinations of lub/plus demand operations on upper and lower bounds
-  lubDmd, plusDmd, lubPlusDmd, plusLubDmd
-and the same for lubSubDmd, etc. In order to share as much code as possible
-and for the programmer to see immediately how the operations differ, we have
-one implementation of opDmd (and opSubDmd) that dispatches on a 'OpMode'.
+multSubDmd :: Card -> SubDemand -> SubDemand
+multSubDmd C_11 sd           = sd -- An optimisation, for when sd is a deep Prod
+-- The following three equations don't have an impact on Demands, only on
+-- Boxity. They are needed so that we don't trigger the assertions in `:*`
+-- when called from `multDmd`.
+multSubDmd C_00 _            = seqSubDmd -- Otherwise `multSubDmd A L == A /= !A`
+multSubDmd C_10 (Poly _ n)   = if isStrict n then botSubDmd else seqSubDmd -- Otherwise `multSubDmd B L == B /= !B`
+multSubDmd C_10 (Call n _)   = if isStrict n then botSubDmd else seqSubDmd -- Otherwise we'd call `mkCall` with absent cardinality
+multSubDmd n    (Poly b m)   = Poly b (multCard n m)
+multSubDmd n    (Call n' sd) = mkCall (multCard n n') sd
+multSubDmd n    (Prod b ds)  = mkProd b (strictMap (multDmd n) ds)
 
-For good perf, we specialise this one implementation to the four different
-modes. So ideally we'd write
-```
-lubSubDmd = opSubDmd (Lub, Lub)
-opSubDmd (l, u) = ... opSubDmd ...
-{-# RULES "lubSubDmd" opSubDmd (Lub, Lub) = lubSubDmd #-}
-```
-But unfortunately, 'opSubDmd' will be picked as a loop-breaker and thus never
-inline into 'lubSubDmd', so its body will never actually be specialised for
-the op mode `(Lub, Lub)`. So instead we write
-```
-lubSubDmd = opSubDmdInl (Lub, Lub)
-opSubDmdInl (l, u) = ... opSubDmd ...
-{-# INLINE opSubDmdInl #-}
-opSubDmd = opSubDmdInl
-{-# RULES "lubSubDmd" forall l r. opSubDmd (Lub, Lub) = lubSubDmd #-}
-```
-Here, 'opSubDmdInl' will not be picked as the loop-breaker and thus inline into
-'lubSubDmd' and 'opSubDmd'. Since the latter will never inline, we'll specialise
-all call sites of 'opSubDmd' for the proper op mode. A nice trick!
--}
-
-data LubOrPlus = Lub | Plus deriving Show
-instance Outputable LubOrPlus where ppr = text . show
-
--- | Determines whether to use 'LubOrPlus' for lower bounds and upper bounds,
--- respectively. See Note [Manual specialisation of lub*Dmd/plus*Dmd].
-type OpMode = (LubOrPlus, LubOrPlus)
-
--- | Denotes '∪' on 'SubDemand'.
-lubSubDmd :: SubDemand -> SubDemand -> SubDemand
--- See Note [Manual specialisation of lub*Dmd/plus*Dmd]
-lubSubDmd l r = opSubDmdInl (Lub, Lub) l r
+lazifyIfStrict :: Card -> SubDemand -> SubDemand
+lazifyIfStrict n sd = multSubDmd (glbCard C_01 n) sd
 
 -- | Denotes '∪' on 'Demand'.
 lubDmd :: Demand -> Demand -> Demand
--- See Note [Manual specialisation of lub*Dmd/plus*Dmd]
-lubDmd l r = opDmdInl (Lub, Lub) l r
+lubDmd BotDmd      dmd2        = dmd2
+lubDmd dmd1        BotDmd      = dmd1
+lubDmd (n1 :* sd1) (n2 :* sd2) = -- pprTraceWith "lubDmd" (\it -> ppr (n1:*sd1) $$ ppr (n2:*sd2) $$ ppr it) $
+  lubCard n1 n2 :* lubSubDmd sd1 sd2
 
--- | Denotes '+' on 'SubDemand'.
-plusSubDmd :: SubDemand -> SubDemand -> SubDemand
--- See Note [Manual specialisation of lub*Dmd/plus*Dmd]
-plusSubDmd l r = opSubDmdInl (Plus, Plus) l r
+lubSubDmd :: SubDemand -> SubDemand -> SubDemand
+-- Shortcuts for neutral and absorbing elements.
+-- Below we assume that Boxed always wins.
+lubSubDmd (Poly Unboxed C_10)  sd                   = sd
+lubSubDmd sd                   (Poly Unboxed C_10)  = sd
+lubSubDmd sd@(Poly Boxed C_0N) _                    = sd
+lubSubDmd _                    sd@(Poly Boxed C_0N) = sd
+-- Handle Prod
+lubSubDmd (Prod b1 ds1) (Poly b2 n2)
+  | let !d = polyFieldDmd b2 n2
+  = mkProd (lubBoxity b1 b2) (strictMap (lubDmd d) ds1)
+lubSubDmd (Prod b1 ds1) (Prod b2 ds2)
+  | equalLength ds1 ds2
+  = mkProd (lubBoxity b1 b2) (strictZipWith lubDmd ds1 ds2)
+-- Handle Call
+lubSubDmd (Call n1 sd1) (viewCall -> Just (n2, sd2)) =
+  mkCall (lubCard n1 n2) (lubSubDmd sd1 sd2)
+-- Handle Poly
+lubSubDmd (Poly b1 n1) (Poly b2 n2) = Poly (lubBoxity b1 b2) (lubCard n1 n2)
+-- Other Poly case by commutativity
+lubSubDmd sd1@Poly{}   sd2          = lubSubDmd sd2 sd1
+-- Otherwise (Call `lub` Prod) return Top
+lubSubDmd _            _            = topSubDmd
 
 -- | Denotes '+' on 'Demand'.
 plusDmd :: Demand -> Demand -> Demand
--- See Note [Manual specialisation of lub*Dmd/plus*Dmd]
-plusDmd l r = opDmdInl (Plus, Plus) l r
+plusDmd AbsDmd      dmd2        = dmd2
+plusDmd dmd1        AbsDmd      = dmd1
+plusDmd (n1 :* sd1) (n2 :* sd2) = -- pprTraceWith "plusDmd" (\it -> ppr (n1:*sd1) $$ ppr (n2:*sd2) $$ ppr it) $
+  -- Why lazify? See Note [SubDemand denotes at least one evaluation]
+  -- and also Note [Unrealised opportunity in plusDmd] which applies when both
+  -- n1 and n2 are lazy already
+  plusCard n1 n2 :* plusSubDmd (lazifyIfStrict n1 sd1) (lazifyIfStrict n2 sd2)
 
--- | Denotes '∪' on lower bounds and '+' on upper bounds on 'SubDemand'.
-lubPlusSubDmd :: SubDemand -> SubDemand -> SubDemand
--- See Note [Manual specialisation of lub*Dmd/plus*Dmd]
-lubPlusSubDmd l r = opSubDmdInl (Lub, Plus) l r
-
--- | Denotes '∪' on lower bounds and '+' on upper bounds on 'Demand'.
-lubPlusDmd :: Demand -> Demand -> Demand
--- See Note [Manual specialisation of lub*Dmd/plus*Dmd]
-lubPlusDmd l r = opDmdInl (Lub, Plus) l r
-
--- | Denotes '+' on lower bounds and '∪' on upper bounds on 'SubDemand'.
-plusLubSubDmd :: SubDemand -> SubDemand -> SubDemand
--- See Note [Manual specialisation of lub*Dmd/plus*Dmd]
-plusLubSubDmd l r = opSubDmdInl (Plus, Lub) l r
-
--- | Denotes '∪' on lower bounds and '+' on upper bounds on 'SubDemand'.
-plusLubDmd :: Demand -> Demand -> Demand
--- See Note [Manual specialisation of lub*Dmd/plus*Dmd]
-plusLubDmd l r = opDmdInl (Plus, Lub) l r
-
--- See Note [Manual specialisation of lub*Dmd/plus*Dmd]
-{-# RULES "lubSubDmd"     opSubDmd (Lub, Lub)   = lubSubDmd #-}
-{-# RULES "lubDmd"        opDmd (Lub, Lub)      = lubDmd #-}
-{-# RULES "plusSubDmd"    opSubDmd (Plus, Plus) = plusSubDmd #-}
-{-# RULES "plusDmd"       opDmd (Plus, Plus)    = plusDmd #-}
-{-# RULES "lubPlusSubDmd" opSubDmd (Lub, Plus)  = lubPlusSubDmd #-}
-{-# RULES "lubPlusDmd"    opDmd (Lub, Plus)     = lubPlusDmd #-}
-{-# RULES "plusLubSubDmd" opSubDmd (Plus, Lub)  = plusLubSubDmd #-}
-{-# RULES "plusLubDmd"    opDmd (Plus, Lub)     = plusLubDmd #-}
-
---
--- And now the actual implementation that is to be specialised:
---
-
-neutralCard :: OpMode -> Card
-neutralCard (Lub, _)  = C_10
-neutralCard (Plus, _) = C_00
-{-# INLINE neutralCard #-}
-
-absorbingCard :: OpMode -> Card
-absorbingCard (Lub, _)  = C_0N
-absorbingCard (Plus, _) = C_1N
-{-# INLINE absorbingCard #-}
-
-opCard :: OpMode -> Card -> Card -> Card
-opCard (Lub,  Lub)  = lubCard
-opCard (Lub,  Plus) = lubPlusCard
-opCard (Plus, Lub)  = plusLubCard
-opCard (Plus, Plus) = plusCard
-{-# INLINE opCard #-}
-
-opDmdInl, opDmd :: OpMode -> Demand -> Demand -> Demand
-opDmdInl m       (n1 :* _)   dmd2        | n1 == neutralCard m = dmd2
-opDmdInl m       dmd1        (n2 :* _)   | n2 == neutralCard m = dmd1
-opDmdInl m@(l,u) (n1 :* sd1) (n2 :* sd2) = -- pprTraceWith "opDmd" (\it -> ppr l <+> ppr u $$ ppr (n1:*sd1) $$ ppr (n2:*sd2) $$ ppr it) $
-  opCard m n1 n2 :* case l of
-    Lub  -> opSubDmd m sd1 sd2
-    -- For Plus, there are four special cases due to strictness demands and
-    -- Note [SubDemand denotes at least one evaluation]:
-    Plus -> case (isStrict n1, isStrict n2) of
-      (True,  True)  -> opSubDmd (Plus, u) sd1 sd2                  -- (D1)
-      (True,  False) -> opSubDmd (Plus, u) sd1 (lazifySubDmd sd2)   -- (D2)
-      (False, True)  -> opSubDmd (Plus, u) (lazifySubDmd sd1) sd2   -- (D2)
-      (False, False) -> opSubDmd (Lub, u)  sd1 sd2                  -- (D3)
-
--- See Note [Manual specialisation of lub*Dmd/plus*Dmd]
-opDmd = opDmdInl
-{-# INLINE opDmdInl #-}
-{-# NOINLINE opDmd #-}
-
-opSubDmdInl, opSubDmd :: OpMode -> SubDemand -> SubDemand -> SubDemand
+plusSubDmd :: SubDemand -> SubDemand -> SubDemand
 -- Shortcuts for neutral and absorbing elements.
 -- Below we assume that Boxed always wins.
-opSubDmdInl m (Poly Unboxed n)  sd                | n == neutralCard m   = sd
-opSubDmdInl m sd                (Poly Unboxed n)  | n == neutralCard m   = sd
-opSubDmdInl m sd@(Poly Boxed n) _                 | n == absorbingCard m = sd
-opSubDmdInl m _                 sd@(Poly Boxed n) | n == absorbingCard m = sd
+plusSubDmd (Poly Unboxed C_00)  sd                   = sd
+plusSubDmd sd                   (Poly Unboxed C_00)  = sd
+plusSubDmd sd@(Poly Boxed C_1N) _                    = sd
+plusSubDmd _                    sd@(Poly Boxed C_1N) = sd
 -- Handle Prod
-opSubDmdInl m (Prod b1 ds1) (Poly b2 n2)
+plusSubDmd (Prod b1 ds1) (Poly b2 n2)
   | let !d = polyFieldDmd b2 n2
-  = mkProd (lubBoxity b1 b2) (strictMap (opDmd m d) ds1)
-opSubDmdInl m (Prod b1 ds1) (Prod b2 ds2)
+  = mkProd (lubBoxity b1 b2) (strictMap (plusDmd d) ds1)
+plusSubDmd (Prod b1 ds1) (Prod b2 ds2)
   | equalLength ds1 ds2
-  = mkProd (lubBoxity b1 b2) (strictZipWith (opDmd m) ds1 ds2)
+  = mkProd (lubBoxity b1 b2) (strictZipWith plusDmd ds1 ds2)
 -- Handle Call
-opSubDmdInl m@(l, _) (Call n1 sd1) (viewCall -> Just (n2, sd2)) =
-  mkCall (opCard m n1 n2) $! case l of
-    Lub  -> opSubDmd (Lub, Lub) sd1 sd2
-    -- For Plus, there are four special cases due to strictness demands and
-    -- Note [SubDemand denotes at least one evaluation]. Usage is always lubbed:
-    Plus -> case (isStrict n1, isStrict n2) of
-      (True,  True)  -> opSubDmd (Plus, Lub) sd1 sd2                  -- (C3)
-      (False, True)  -> opSubDmd (Plus, Lub) (lazifySubDmd sd1) sd2   -- (C2)
-      (True,  False) -> opSubDmd (Plus, Lub) sd1 (lazifySubDmd sd2)   -- (C2)
-      (False, False) -> opSubDmd (Lub,  Lub) sd1 sd2                  -- (C1)
+plusSubDmd (Call n1 sd1) (viewCall -> Just (n2, sd2)) =
+  mkCall (plusCard n1 n2) (lubSubDmd sd1 sd2)
 -- Handle Poly
-opSubDmdInl m (Poly b1 n1) (Poly b2 n2) = Poly (lubBoxity b1 b2) (opCard m n1 n2)
+plusSubDmd (Poly b1 n1) (Poly b2 n2) = Poly (lubBoxity b1 b2) (plusCard n1 n2)
 -- Other Poly case by commutativity
-opSubDmdInl m sd1@Poly{}   sd2          = opSubDmd m sd2 sd1
--- Otherwise (Call `op` Prod) return Top
-opSubDmdInl _ _            _            = topSubDmd
-
--- See Note [Manual specialisation of lub*Dmd/plus*Dmd]
-opSubDmd = opSubDmdInl
-{-# INLINE opSubDmdInl #-}
-{-# NOINLINE opSubDmd #-}
+plusSubDmd sd1@Poly{}   sd2          = plusSubDmd sd2 sd1
+-- Otherwise (Call `plus` Prod) return Top
+plusSubDmd _            _            = topSubDmd
 
 -- | Used to suppress pretty-printing of an uninformative demand
 isTopDmd :: Demand -> Bool
@@ -1129,11 +1017,6 @@ strictifyDictDmd _  dmd = dmd
 lazifyDmd :: Demand -> Demand
 lazifyDmd = multDmd C_01
 
-
--- | Make a 'SubDemand' lazy.
-lazifySubDmd :: SubDemand -> SubDemand
-lazifySubDmd = multSubDmd C_01
-
 -- | Wraps the 'SubDemand' with a one-shot call demand: @d@ -> @C1(d)@.
 mkCalledOnceDmd :: SubDemand -> SubDemand
 mkCalledOnceDmd sd = mkCall C_11 sd
@@ -1166,7 +1049,7 @@ subDemandIfEvaluated (_ :* sd) = sd
 mkWorkerDemand :: Int -> Demand
 mkWorkerDemand n = C_01 :* go n
   where go 0 = topSubDmd
-        go n = Call C_01 $ go (n-1)
+        go n = mkCall C_01 $ go (n-1)
 
 argsOneShots :: DmdSig -> Arity -> [[OneShotInfo]]
 -- ^ See Note [Computing one-shot info]
@@ -1242,22 +1125,24 @@ NB: The Premise only makes a difference for lower bounds/strictness.
 Upper bounds/usage are unaffected by adding or leaving out evaluations that
 never happen.
 
-So if `x` was demanded with `LP(1L)`, so perhaps `<body>` was
-  f1 x = (x `seq` case x of (a,b) -> a, True)
-then `x` will be evaluated lazily, but any time `x` is evaluated, `e` is
-evaluated with sub-demand `P(1L)`, e.g., the first field of `e` is evaluated
-strictly, too.
+The Premise comes into play when we have lazy Demands. For example, if `x` was
+demanded with `LP(SL,A)`, so perhaps the full expression was
+  let x = (e1, e2) in (x `seq` fun y `seq` case x of (a,b) -> a, True)
+then `x` will be evaluated lazily, but in any trace in which `x` is evaluated,
+the pair in its RHS will ultimately be evaluated deeply with sub-demand
+`P(SL,A)`. That means that `e1` is ultimately evaluated strictly, even though
+evaluation of the field does not directly follow the eval of `x` due to the
+intermittent call `fun y`.
 
-How does the additional strictness help? The long version is in #21081.
+How does the additional strictness help? The long version is the list of
+examples at the end of this Note (as procured in #21081 and #18903).
 The short version is
 
-  * We get to take advantage of call-by-value/let-to-case in more situations.
-    See example "More let-to-case" below.
+  * We get to take advantage of call-by-value/let-to-case in more situations,
+    as for e1 above. See example "More let-to-case" below.
   * Note [Eta reduction based on evaluation context] applies in more situations.
     See example "More eta reduction" below.
   * We get to unbox more results, see example "More CPR" below.
-  * We prevent annoying issues with `Poly` equalities, #21085. In short, we'd get
-    `L + S = S = CS(S) < CS(L) = C(L+S)(LuS) = L + CS(S)` although `S = CS(S)`.
 
 It seems like we don't give up anything in return. Indeed that is the case:
 
@@ -1271,47 +1156,26 @@ It seems like we don't give up anything in return. Indeed that is the case:
     well as when expanding absent 'Poly's to 'Call' sub-demands in 'viewCall'.
 
 Of course, we now have to maintain the Premise when we unpack and rebuild
-SubDemands. For strict demands, we know that the Premise indeed always holds for
+Demands. For strict demands, we know that the Premise indeed always holds for
 any program trace abstracted over, whereas we have to be careful for lazy
 demands.
-That makes for a strange definition of `plusDmd`, where we use `plusSubDmd`
-throughout for upper bounds (every eval returns the same, memoised heap object),
-but what we do on lower bounds depends on the strictness of both arguments:
 
- D1 `plusSubDmd` on the nested SubDemands if both args are strict.
- D2 `plusSubDmd` on the nested SubDemands if one of them is lazy, which we
-    *lazify* before (that's new), so that e.g.
-      `LP(SL) + SP(L) = (L+S)P((M*SL)+L) = SP(L+L) = SP(L)`
-    Multiplying with `M`/`C_01` is the "lazify" part here.
-    Example proving that point:
-        d2 :: <LP(SL)><SP(A)>
-        d2 x y = y `seq` (case x of (a,b) -> a, True)
-        -- What is demand on x in (d2 x x)? NOT SP(SL)!!
- D3 `lubPlusSubDmd` on the nested SubDemands if both args are lazy.
-    This new operation combines `lubSubDmd` on lower bounds with `plusSubDmd`
-    on upper bounds.
-    Examples proving that point:
-        d3 :: <LP(SL)><LP(A)>
-        d3 x y = (case x of (a,b) -> a, y `seq` ())
-        -- What is demand on x in `snd (d3 x x)`?
-        -- Not LP(SL)!!  d3 might evaluate second argument but not first.
-        -- Lub lower bounds because we might evaluate one OR the other.
+In particular, when doing `plusDmd` we have to *lazify* the nested SubDemand
+if the outer cardinality is lazy. E.g.,
+  LP(SL) + SP(L) = (L+S)P((M*SL)+L) = SP(L+L) = SP(L)
+Multiplying with `M`/`C_01` is the "lazify" part here and is implemented in
+`lazifyIfStrict`. Example proving that point:
+  d2 :: <LP(SL)><SP(A)>
+  d2 x y = y `seq` (case x of (a,b) -> a, True)
+  -- What is the demand on x in (d2 x x)? NOT SP(SL)!!
 
-Similarly, in the handling of Call SubDemands `Cn(sd)` in `plusSubDmd`, we use
-`lub` for upper bounds (because every call returns a fresh heap object), but
-what we do for lower bounds depends on whether the outer `n`s are strict:
+We used to apply the same reasoning to Call SubDemands `Cn(sd)` in `plusSubDmd`,
+but that led to #21717, because different calls return different heap objects.
+See Note [Call SubDemand vs. evaluation Demand].
 
- C1 `lubSubDmd` on the nested SubDemands if both args are lazy.
- C2 `plusLubSubDmd` on the nested `sd`s if one of the `n`s is lazy. That one's
-    nested `sd` we *lazify*, so that e.g.
-      `CL(SL) + CS(L) = C(L+S)((M*SL)+L) = CS(L+L) = CS(L)`
-    `plusLubSubDmd` combines `plusSubDmd` on lower bounds with `lubSubDmd` on
-    upper bounds.
- C3 `plusLubSubDmd` on the nested SubDemands if both args are strict.
-
-There are a couple of other examples in T21081.
-Here is a selection of examples demonstrating the
-usefulness of The Premise:
+There are a couple more examples that improve in T21081.
+Here is a selection of those examples demonstrating the usefulness of The
+Premise:
 
   * "More let-to-case" (from testcase T21081):
     ```hs
@@ -1354,6 +1218,102 @@ usefulness of The Premise:
     call site of `g`, we are strict in the second component of the returned
     pair. That in turn means that Nested CPR can unbox the result of the
     division even though it might throw.
+
+Note [Unrealised opportunity in plusDmd]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Recall the lazification of SubDemands happening in `plusDmd` as described in
+Note [SubDemand denotes at least one evaluation].
+
+We *could* do better when both Demands are lazy already. Example
+  (fun 1, fun 2)
+Both args put Demand SCS(L) on `fun`. The lazy pair arg context lazifies
+this to LCS(L), and it would be reasonable to report this Demand on `fun` for
+the entire pair expression; after all, `fun` is called whenever it is evaluated.
+But our definition of `plusDmd` will compute
+  LCS(L) + LCS(L) = (L+L)(M*CS(L) + M*CS(L)) = L(CL(L)) = L
+Which is clearly less precise.
+Doing better here could mean to `lub` when both demands are lazy, e.g.,
+  LCS(L) + LCS(L) = (L+L)(CS(L) ⊔ CS(L)) = L(CS(L))
+Indeed that's what we did at one point between 9.4 and 9.6 after !7599, but it
+means that we need a function `lubPlusSubDmd` that lubs on lower bounds but
+plus'es upper bounds, implying maintenance challenges and complicated
+explanations.
+
+Plus, NoFib says that this special case doesn't bring all that much
+(geom. mean +0.0% counted instructions), so we don't bother anymore.
+
+Note [Call SubDemand vs. evaluation Demand]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Although both evaluation Demands and Call SubDemands carry a (Card,SubDemand)
+pair, their interpretation is quite different. Example:
+
+  f x = fst x * snd x
+    -- f :: <SP(1L,1L)>, because 1P(1L,A)+1P(A,1L) = SP(1L,1L)
+  g x = fst (x 1) * snd (x 2)
+    -- g :: <SCS(P(ML,ML))>, because 1C1(P(1L,A))+1C1(P(A,1L)) = SCS(P(ML,ML))
+
+The point about this example is that both demands have P(A,1L)/P(1L,A) as
+sub-expressions, but when these sub-demands occur
+
+  1. under an evaluation demand, we combine with `plusSubDmd`
+  2. whereas under a Call sub-demand, we combine with `lubSubDmd`
+
+And thus (1) yields a stricter demand on the pair components than (2).
+
+In #21717 we saw that we really need lub in (2), because otherwise we make an
+unsound prediction in `g (\n -> if n == 1 then (1,1) else (bot,2))`; we'd say
+that the `bot` expression is always evaluated, when it clearly is not.
+Operationally, every call to `g` gives back a potentially distinct,
+heap-allocated pair with potentially different contents, and we must `lubSubDmd`
+over all such calls to approximate how any of those pairs might be used.
+
+That is in stark contrast to f's argument `x`: Operationally, every eval of
+`x` must yield the same pair and `f` evaluates both components of that pair.
+The theorem "every eval of `x` returns the same heap object" is a very strong
+MUST-alias property and we capitalise on that by using `plusSubDmd` in (1).
+
+And indeed we *must* use `plusSubDmd` in (1) for sound upper bounds in an
+analysis that assumes call-by-need (as opposed to the weaker call-by-name) for
+let bindings. Consider
+
+  h x = fst x * fst x
+    -- h :: <SP(SL,A)>
+
+And the expression `let a=1; p=(a,a)} in h p`. Here, *although* the RHS of `p`
+is only evaluated once under call-by-need, `a` is still evaluated twice.
+If we had used `lubSubDmd`, we'd see SP(1L,A) and the 1L unsoundly says "exactly
+once".
+
+If the analysis had assumed call-by-name, it would be sound to say "a is used
+once in p": p is used multiple times and hence so would a, as if p was a
+function. So using `plusSubDmd` does not only yield better strictness, it is
+also "holding up the other end of the bargain" of the call-by-need assumption
+for upper bounds.
+
+(To SG's knowledge, the distinction between call-by-name and call-by-need does
+not matter for strictness analysis/lower bounds, thus it would be sound to use
+`lubSubDmd` all the time there.)
+
+Note [mkCall and plusSubDmd]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We never rewrite a strict, non-absent Call sub-demand like CS(S) to a
+polymorphic sub-demand like S, otherwise #21085 strikes. Consider the
+following inequality (would also for M and 1 instead of L and S, but we forbid
+such Polys):
+
+  L+S = S = CS(S) < CS(L) = CL(L)+CS(S)
+
+Note that L=CL(L). If we also had S=CS(S), we'd be in trouble: Now
+`plusSubDmd` would no longer maintain the equality relation on sub-demands,
+much less monotonicity. Bad!
+
+Clearly, `n <= Cn(n)` is unproblematic, as is `n >= Cn(n)` for any `n`
+except 1 and S. But `CS(S) >= S` would mean trouble, because then we'd get
+the problematic `CS(S) = S`. We have just established that `S < CS(S)`!
+As such, the rewrite CS(S) to S is anti-monotone and we forbid it, first
+and foremost in `mkCall` (which is the only place that rewrites Cn(n) to n).
+
+Crisis and #21085 averted!
 
 Note [Computing one-shot info]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2102,7 +2062,7 @@ If this same function is applied to one arg, all we can say is that it
 uses x with 1L, and its arg with demand 1P(L,L).
 
 Note [Understanding DmdType and DmdSig]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Demand types are sound approximations of an expression's semantics relative to
 the incoming demand we put the expression under. Consider the following
 expression:

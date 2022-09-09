@@ -509,9 +509,6 @@ this transformation.  So we try to limit it as much as possible:
 
 Of course both (1) and (2) are readily defeated by disguising the bottoms.
 
-Another place where -fpedantic-bottoms comes up is during eta-reduction.
-See Note [Eta reduction soundness], the bit about -fpedantic-bottoms.
-
 4. Note [Newtype arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Non-recursive newtypes are transparent, and should not get in the way.
@@ -2382,20 +2379,13 @@ case where `e` is trivial):
     `e = \x y. bot`.
 
     Could we relax to "*At least one call in the same trace* is with n args"?
-    (NB: Strictness analysis can only answer this relaxed question, not the
-     original formulation.)
-    Consider what happens for
+    No. Consider what happens for
       ``g2 c = c True `seq` c False 42``
     Here, `g2` will call `c` with 2 arguments (if there is a call at all).
     But it is unsound to eta-reduce the arg in `g2 (\x y. e x y)` to `g2 e`
     when `e = \x. if x then bot else id`, because the latter will diverge when
-    the former would not.
-
-    On the other hand, with `-fno-pedantic-bottoms` , we will have eta-expanded
-    the definition of `e` and then eta-reduction is sound
-    (see Note [Dealing with bottom]).
-    Consequence: We have to check that `-fpedantic-bottoms` is off; otherwise
-    eta-reduction based on demands is in fact unsound.
+    the former would not. Fortunately, the strictness analyser will report
+    "Not always called with two arguments" for `g2` and we won't eta-expand.
 
     See Note [Eta reduction based on evaluation context] for the implementation
     details. This criterion is tested extensively in T21261.
@@ -2541,7 +2531,7 @@ Then this is how the pieces are put together:
     Because it's irrelevant! When we simplify an expression, we do so under the
     assumption that it is currently under evaluation.)
     This sub-demand literally says "Whenever this expression is evaluated, it
-    is also called with two arguments, potentially multiple times".
+    is called with at least two arguments, potentially multiple times".
 
   * Then the simplifier takes apart the lambda and simplifies the lambda group
     and then calls 'tryEtaReduce' when rebuilding the lambda, passing the
