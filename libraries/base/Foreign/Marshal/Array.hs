@@ -76,6 +76,15 @@ import GHC.Num
 import GHC.List
 import GHC.Base
 
+{- Note [Specialising array operations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The functions in this module are all overloaded, and specialising them
+is sometimes crucial for performance.  So they all have
+
+* An INLINE pragma, so they outright inline
+* An INLINEABLE pragma, so they can be specialised to the call site
+-}
+
 -- allocation
 -- ----------
 
@@ -83,29 +92,34 @@ import GHC.Base
 -- (like 'Foreign.Marshal.Alloc.malloc', but for multiple elements).
 --
 mallocArray :: forall a . Storable a => Int -> IO (Ptr a)
+{-# INLINE mallocArray #-}
 mallocArray  size = mallocBytes (size * sizeOf (undefined :: a))
 
 -- |Like 'mallocArray', but add an extra position to hold a special
 -- termination element.
 --
 mallocArray0      :: Storable a => Int -> IO (Ptr a)
+{-# INLINE mallocArray0 #-}
 mallocArray0 size  = mallocArray (size + 1)
 
 -- |Like 'mallocArray', but allocated memory is filled with bytes of value zero.
 --
 callocArray :: forall a . Storable a => Int -> IO (Ptr a)
+{-# INLINE callocArray #-}
 callocArray size = callocBytes (size * sizeOf (undefined :: a))
 
 -- |Like 'callocArray0', but allocated memory is filled with bytes of value
 -- zero.
 --
 callocArray0 :: Storable a => Int -> IO (Ptr a)
+{-# INLINE callocArray0 #-}
 callocArray0 size  = callocArray (size + 1)
 
 -- |Temporarily allocate space for the given number of elements
 -- (like 'Foreign.Marshal.Alloc.alloca', but for multiple elements).
 --
 allocaArray :: forall a b . Storable a => Int -> (Ptr a -> IO b) -> IO b
+{-# INLINE allocaArray #-}
 allocaArray size = allocaBytesAligned (size * sizeOf (undefined :: a))
                                       (alignment (undefined :: a))
 
@@ -121,11 +135,13 @@ allocaArray0 size  = allocaArray (size + 1)
 -- |Adjust the size of an array
 --
 reallocArray :: forall a . Storable a => Ptr a -> Int -> IO (Ptr a)
+{-# INLINE reallocArray #-}
 reallocArray ptr size = reallocBytes ptr (size * sizeOf (undefined :: a))
 
 -- |Adjust the size of an array including an extra position for the end marker.
 --
 reallocArray0          :: Storable a => Ptr a -> Int -> IO (Ptr a)
+{-# INLINE reallocArray0 #-}
 reallocArray0 ptr size  = reallocArray ptr (size + 1)
 
 
@@ -136,6 +152,7 @@ reallocArray0 ptr size  = reallocArray ptr (size + 1)
 -- is tail-recursive and so uses constant stack space.
 --
 peekArray          :: Storable a => Int -> Ptr a -> IO [a]
+{-# INLINEABLE peekArray #-}
 peekArray size ptr | size <= 0 = return []
                  | otherwise = f (size-1) []
   where
@@ -145,6 +162,7 @@ peekArray size ptr | size <= 0 = return []
 -- |Convert an array terminated by the given end marker into a Haskell list
 --
 peekArray0            :: (Storable a, Eq a) => a -> Ptr a -> IO [a]
+{-# INLINEABLE peekArray0 #-}
 peekArray0 marker ptr  = do
   size <- lengthArray0 marker ptr
   peekArray size ptr
@@ -152,6 +170,7 @@ peekArray0 marker ptr  = do
 -- |Write the list elements consecutive into memory
 --
 pokeArray :: Storable a => Ptr a -> [a] -> IO ()
+{-# INLINEABLE pokeArray #-}
 pokeArray ptr vals0 = go vals0 0#
   where go [] _          = return ()
         go (val:vals) n# = do pokeElemOff ptr (I# n#) val; go vals (n# +# 1#)
@@ -160,6 +179,7 @@ pokeArray ptr vals0 = go vals0 0#
 -- given marker element
 --
 pokeArray0 :: Storable a => a -> Ptr a -> [a] -> IO ()
+{-# INLINEABLE pokeArray0 #-}
 pokeArray0 marker ptr vals0 = go vals0 0#
   where go [] n#         = pokeElemOff ptr (I# n#) marker
         go (val:vals) n# = do pokeElemOff ptr (I# n#) val; go vals (n# +# 1#)
@@ -172,6 +192,7 @@ pokeArray0 marker ptr vals0 = go vals0 0#
 -- (like 'Foreign.Marshal.Utils.new', but for multiple elements).
 --
 newArray      :: Storable a => [a] -> IO (Ptr a)
+{-# INLINEABLE newArray #-}
 newArray vals  = do
   ptr <- mallocArray (length vals)
   pokeArray ptr vals
@@ -181,6 +202,7 @@ newArray vals  = do
 -- sequence of storable values, where the end is fixed by the given end marker
 --
 newArray0             :: Storable a => a -> [a] -> IO (Ptr a)
+{-# INLINEABLE newArray0 #-}
 newArray0 marker vals  = do
   ptr <- mallocArray0 (length vals)
   pokeArray0 marker ptr vals
@@ -190,12 +212,14 @@ newArray0 marker vals  = do
 -- (like 'Foreign.Marshal.Utils.with', but for multiple elements).
 --
 withArray :: Storable a => [a] -> (Ptr a -> IO b) -> IO b
+{-# INLINE withArray #-}
 withArray vals = withArrayLen vals . const
 
 -- |Like 'withArray', but the action gets the number of values
 -- as an additional parameter
 --
 withArrayLen :: Storable a => [a] -> (Int -> Ptr a -> IO b) -> IO b
+{-# INLINEABLE withArrayLen #-}
 withArrayLen vals f  =
   allocaArray len $ \ptr -> do
       pokeArray ptr vals
@@ -206,11 +230,13 @@ withArrayLen vals f  =
 -- |Like 'withArray', but a terminator indicates where the array ends
 --
 withArray0 :: Storable a => a -> [a] -> (Ptr a -> IO b) -> IO b
+{-# INLINE withArray0 #-}
 withArray0 marker vals = withArrayLen0 marker vals . const
 
 -- |Like 'withArrayLen', but a terminator indicates where the array ends
 --
 withArrayLen0 :: Storable a => a -> [a] -> (Int -> Ptr a -> IO b) -> IO b
+{-# INLINEABLE withArrayLen0 #-}
 withArrayLen0 marker vals f  =
   allocaArray0 len $ \ptr -> do
       pokeArray0 marker ptr vals
@@ -225,13 +251,15 @@ withArrayLen0 marker vals f  =
 -- first array (destination); the copied areas may /not/ overlap
 --
 copyArray :: forall a . Storable a => Ptr a -> Ptr a -> Int -> IO ()
+{-# INLINE copyArray #-}
 copyArray dest src size = copyBytes dest src (size * sizeOf (undefined :: a))
 
 -- |Copy the given number of elements from the second array (source) into the
 -- first array (destination); the copied areas /may/ overlap
 --
 moveArray :: forall a . Storable a => Ptr a -> Ptr a -> Int -> IO ()
-moveArray  dest src size = moveBytes dest src (size * sizeOf (undefined :: a))
+{-# INLINE moveArray #-}
+moveArray dest src size = moveBytes dest src (size * sizeOf (undefined :: a))
 
 
 -- finding the length
@@ -240,6 +268,7 @@ moveArray  dest src size = moveBytes dest src (size * sizeOf (undefined :: a))
 -- |Return the number of elements in an array, excluding the terminator
 --
 lengthArray0            :: (Storable a, Eq a) => a -> Ptr a -> IO Int
+{-# INLINEABLE lengthArray0 #-}
 lengthArray0 marker ptr  = loop 0
   where
     loop i = do
@@ -253,4 +282,5 @@ lengthArray0 marker ptr  = loop 0
 -- |Advance a pointer into an array by the given number of elements
 --
 advancePtr :: forall a . Storable a => Ptr a -> Int -> Ptr a
+{-# INLINE advancePtr #-}
 advancePtr ptr i = ptr `plusPtr` (i * sizeOf (undefined :: a))
