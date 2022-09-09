@@ -2226,7 +2226,7 @@ loop:
     if (q == stg_END_TSO_QUEUE_closure) {
         /* No takes, the IOPort is now full. */
         if (info == stg_MVAR_CLEAN_info) {
-            ccall dirty_MVAR(BaseReg "ptr", ioport "ptr");
+            ccall dirty_MVAR(BaseReg "ptr", ioport "ptr", StgMVar_value(ioport) "ptr");
         }
         StgMVar_value(ioport) = val;
 
