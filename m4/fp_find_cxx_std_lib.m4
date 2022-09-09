@@ -75,6 +75,7 @@ EOF
         case $CXX_STD_LIB_FLAVOUR in
         c++)
             try_libs "-lc++ -lc++abi" "libc++.so" "c++ c++abi" || \
+            try_libs "-lc++ -lc++abi -lpthread" "libc++.so" "c++ c++abi pthread" || \
             try_libs "-lc++ -lcxxrt" "libc++.so" "c++ cxxrt" ||
             AC_MSG_ERROR([Failed to find C++ standard library]) ;;
         stdc++)
