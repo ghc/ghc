@@ -163,6 +163,7 @@ $small     = [$ascsmall $unismall \_]
 
 $uniidchar = \x07 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $idchar    = [$small $large $digit $uniidchar \']
+$labelchar = [$small $large $digit $uniidchar \' \.]
 
 $unigraphic = \x06 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $graphic   = [$small $large $symbol $digit $idchar $special $unigraphic \"\']
@@ -451,7 +452,8 @@ $tab          { warnTab }
 }
 
 <0> {
-  "#" @varid / { ifExtension OverloadedLabelsBit } { skip_one_varid ITlabelvarid }
+  "#" $labelchar+ / { ifExtension OverloadedLabelsBit } { skip_one_varid ITlabelvarid }
+  "#" \" / { ifExtension OverloadedLabelsBit } { lex_quoted_label }
 }
 
 <0> {
@@ -2023,46 +2025,64 @@ lex_string_prag_comment mkTok span _buf _len _buf2
 
 lex_string_tok :: Action
 lex_string_tok span buf _len _buf2 = do
-  tok <- lex_string ""
+  lexed <- lex_string
   (AI end bufEnd) <- getInput
   let
-    tok' = case tok of
-            ITprimstring _ bs -> ITprimstring (SourceText src) bs
-            ITstring _ s -> ITstring (SourceText src) s
-            _ -> panic "lex_string_tok"
+    tok = case lexed of
+      LexedPrimString s -> ITprimstring (SourceText src) (unsafeMkByteString s)
+      LexedRegularString s -> ITstring (SourceText src) (mkFastString s)
     src = lexemeToString buf (cur bufEnd - cur buf)
-  return (L (mkPsSpan (psSpanStart span) end) tok')
+  return $ L (mkPsSpan (psSpanStart span) end) tok
 
-lex_string :: String -> P Token
-lex_string s = do
+
+lex_quoted_label :: Action
+lex_quoted_label span _buf _len _buf2 = do
+  s <- lex_string_helper ""
+  (AI end _) <- getInput
+  let
+    token = ITlabelvarid (mkFastString s)
+    start = psSpanStart span
+
+  return $ L (mkPsSpan start end) token
+
+
+data LexedString = LexedRegularString String | LexedPrimString String
+
+lex_string :: P LexedString
+lex_string = do
+  s <- lex_string_helper ""
+  magicHash <- getBit MagicHashBit
+  if magicHash
+    then do
+      i <- getInput
+      case alexGetChar' i of
+        Just ('#',i) -> do
+          setInput i
+          when (any (> '\xFF') s) $ do
+            pState <- getPState
+            let msg = PsErrPrimStringInvalidChar
+            let err = mkPlainErrorMsgEnvelope (mkSrcSpanPs (last_loc pState)) msg
+            addError err
+          return $ LexedPrimString s
+        _other ->
+          return $ LexedRegularString s
+    else
+      return $ LexedRegularString s
+
+
+lex_string_helper :: String -> P String
+lex_string_helper s = do
   i <- getInput
   case alexGetChar' i of
     Nothing -> lit_error i
 
     Just ('"',i)  -> do
-        setInput i
-        let s' = reverse s
-        magicHash <- getBit MagicHashBit
-        if magicHash
-          then do
-            i <- getInput
-            case alexGetChar' i of
-              Just ('#',i) -> do
-                setInput i
-                when (any (> '\xFF') s') $ do
-                  pState <- getPState
-                  let msg = PsErrPrimStringInvalidChar
-                  let err = mkPlainErrorMsgEnvelope (mkSrcSpanPs (last_loc pState)) msg
-                  addError err
-                return (ITprimstring (SourceText s') (unsafeMkByteString s'))
-              _other ->
-                return (ITstring (SourceText s') (mkFastString s'))
-          else
-                return (ITstring (SourceText s') (mkFastString s'))
+      setInput i
+      return (reverse s)
 
     Just ('\\',i)
         | Just ('&',i) <- next -> do
-                setInput i; lex_string s
+                setInput i; lex_string_helper s
         | Just (c,i) <- next, c <= '\x7f' && is_space c -> do
                            -- is_space only works for <= '\x7f' (#3751, #5425)
                 setInput i; lex_stringgap s
@@ -2070,16 +2090,17 @@ lex_string s = do
 
     Just (c, i1) -> do
         case c of
-          '\\' -> do setInput i1; c' <- lex_escape; lex_string (c':s)
-          c | isAny c -> do setInput i1; lex_string (c:s)
+          '\\' -> do setInput i1; c' <- lex_escape; lex_string_helper (c':s)
+          c | isAny c -> do setInput i1; lex_string_helper (c:s)
           _other -> lit_error i
 
-lex_stringgap :: String -> P Token
+
+lex_stringgap :: String -> P String
 lex_stringgap s = do
   i <- getInput
   c <- getCharOrFail i
   case c of
-    '\\' -> lex_string s
+    '\\' -> lex_string_helper s
     c | c <= '\x7f' && is_space c -> lex_stringgap s
                            -- is_space only works for <= '\x7f' (#3751, #5425)
     _other -> lit_error i

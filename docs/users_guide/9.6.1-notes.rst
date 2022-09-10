@@ -78,6 +78,15 @@ Language
   Then GHC will use the second quantified constraint to solve ``C a b Int``,
   as it has a strictly weaker precondition.
 
+- GHC proposal `#170 Unrestricted OverloadedLabels
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0170-unrestricted-overloadedlabels.rst>`_
+  has been implemented.
+  This extends the variety syntax for constructing labels under :extension:`OverloadedLabels`.
+  Examples of newly allowed syntax:
+  - Leading capital letters: `#Foo` equivalant to `getLabel @"Foo"`
+  - Numeric characters: `#3.14` equivalent to `getLabel @"3.14"`
+  - Arbitrary strings: `#"Hello, World!"` equivalent to `getLabel @"Hello, World!"`
+
 Compiler
 ~~~~~~~~
 
