@@ -538,8 +538,36 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
 
     go _ _ = (caseTrivial,False)
 
--- Return all syntactic subterms of ty that contain var somewhere
--- These are the things that should appear in instance constraints
+-- | Return all syntactic subterms of a 'Type' that are applied to the 'TyVar'
+-- argument. This determines what constraints should be inferred for derived
+-- 'Functor', 'Foldable', and 'Traversable' instances in "GHC.Tc.Deriv.Infer".
+-- For instance, if we have:
+--
+-- @
+-- data Foo a = MkFoo Int a (Maybe a) (Either Int (Maybe a))
+-- @
+--
+-- Then the following would hold:
+--
+-- * @'deepSubtypesContaining' a Int@ would return @[]@, since @Int@ does not
+--   contain the type variable @a@ at all.
+--
+-- * @'deepSubtypesContaining' a a@ would return @[]@. Although the type @a@
+--   contains the type variable @a@, it is not /applied/ to @a@, which is the
+--   criterion that 'deepSubtypesContaining' checks for.
+--
+-- * @'deepSubtypesContaining' a (Maybe a)@ would return @[Maybe]@, as @Maybe@
+--   is applied to @a@.
+--
+-- * @'deepSubtypesContaining' a (Either Int (Maybe a))@ would return
+--   @[Either Int, Maybe]@. Both of these types are applied to @a@ through
+--   composition.
+--
+-- As used in "GHC.Tc.Deriv.Infer", the 'Type' argument will always come from
+-- 'derivDataConInstArgTys', so it is important that the 'TyVar' comes from
+-- 'dataConUnivTyVars' to match. Make sure /not/ to take the 'TyVar' from
+-- 'tyConTyVars', as these differ from the 'dataConUnivTyVars' when the data
+-- type is a GADT. (See #22167 for what goes wrong if 'tyConTyVars' is used.)
 deepSubtypesContaining :: TyVar -> Type -> [TcType]
 deepSubtypesContaining tv
   = functorLikeTraverse tv
