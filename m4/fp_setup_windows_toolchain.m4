@@ -82,7 +82,11 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
 
     CC="${mingwbin}clang.exe"
     CXX="${mingwbin}clang++.exe"
-    cflags="--rtlib=compiler-rt"
+
+    # Signal that we are linking against UCRT with the _UCRT macro. This is
+    # necessary to ensure correct behavior when MinGW-w64 headers are in the
+    # header include path (#22159).
+    cflags="--rtlib=compiler-rt -D_UCRT"
     CFLAGS="$cflags"
     CONF_CC_OPTS_STAGE1="$cflags"
     CONF_CC_OPTS_STAGE2="$cflags"
