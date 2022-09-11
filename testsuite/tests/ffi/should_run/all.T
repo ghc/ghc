@@ -229,3 +229,8 @@ test('T19237', normal, compile_and_run, ['T19237_c.c'])
 
 test('T21305', omit_ways(['ghci']), multi_compile_and_run,
                  ['T21305', [('T21305_cmm.cmm', '')], ''])
+
+test('T22159',
+     [unless(opsys('mingw32'), skip),
+      extra_files(['T22159_c.c'])],
+     makefile_test, ['T22159'])
