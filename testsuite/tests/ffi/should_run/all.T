@@ -224,3 +224,8 @@ test('IncallAffinity',
      ['IncallAffinity_c.c -no-hs-main'])
 
 test('T19237', normal, compile_and_run, ['T19237_c.c'])
+
+test('T22159',
+     [unless(opsys('mingw32'), skip),
+      extra_files(['T22159_c.c'])],
+     makefile_test, ['T22159'])
