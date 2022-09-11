@@ -481,6 +481,12 @@ wanteds os = concat
           ,closureFieldGcptr C "StgAP_STACK" "fun"
           ,closurePayload    C "StgAP_STACK" "payload"
 
+          ,closureSize       C "StgContinuation"
+          ,closureField      C "StgContinuation" "apply_mask_frame"
+          ,closureField      C "StgContinuation" "mask_frame_offset"
+          ,closureField      C "StgContinuation" "stack_size"
+          ,closurePayload    C "StgContinuation" "stack"
+
           ,thunkSize C "StgSelector"
 
           ,closureFieldGcptr C "StgInd" "indirectee"
@@ -1005,4 +1011,3 @@ execute verbose prog args
       ec <- rawSystem prog args
       unless (ec == ExitSuccess) $
           die ("Executing " ++ show prog ++ " failed")
-

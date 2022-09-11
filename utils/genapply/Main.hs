@@ -726,7 +726,8 @@ genApply regstatus args =
         text "     FUN_2_0,",
         text "     FUN_1_1,",
         text "     FUN_0_2,",
-        text "     FUN_STATIC: {",
+        text "     FUN_STATIC,",
+        text "     CONTINUATION: {",
         nest 4 (vcat [
           text "arity = TO_W_(StgFunInfoExtra_arity(%FUN_INFO(info)));",
           text "ASSERT(arity > 0);",
@@ -851,7 +852,8 @@ genApplyFast regstatus args =
           text "     FUN_2_0,",
           text "     FUN_1_1,",
           text "     FUN_0_2,",
-          text "     FUN_STATIC: {",
+          text "     FUN_STATIC,",
+          text "     CONTINUATION: {",
           nest 4 (vcat [
             text "arity = TO_W_(StgFunInfoExtra_arity(%GET_FUN_INFO(R1)));",
             text "ASSERT(arity > 0);",

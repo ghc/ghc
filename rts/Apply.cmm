@@ -87,7 +87,8 @@ again:
             FUN_2_0,
             FUN_1_1,
             FUN_0_2,
-            FUN_STATIC:
+            FUN_STATIC,
+            CONTINUATION:
         {
             arity = TO_W_(StgFunInfoExtra_arity(%FUN_INFO(info)));
         dofun:

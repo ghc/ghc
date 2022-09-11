@@ -492,15 +492,14 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                                              , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
                                 []) }
 
-        | 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
-                -- ptrs, nptrs, closure type, description, type, fun type
+        | 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ',' INT ')'
+                -- ptrs, nptrs, closure type, description, type, arity, fun type
                 {% do
                       home_unit_id <- getHomeUnitId
                       liftP $ pure $ do
                         profile <- getProfile
                         let prof = profilingInfo profile $11 $13
-                            ty   = Fun 0 (ArgSpec (fromIntegral $15))
-                                  -- Arity zero, arg_type $15
+                            ty   = Fun (fromIntegral $15) (ArgSpec (fromIntegral $17))
                             rep = mkRTSRep (fromIntegral $9) $
                                       mkHeapRep profile False (fromIntegral $5)
                                                       (fromIntegral $7) ty
@@ -510,7 +509,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                                              , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
                                 []) }
                 -- we leave most of the fields zero here.  This is only used
-                -- to generate the BCO info table in the RTS at the moment.
+                -- to generate the BCO and CONTINUATION info tables in the RTS at the moment.
 
         | 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- ptrs, nptrs, tag, closure type, description, type

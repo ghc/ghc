@@ -63,14 +63,13 @@ Language
 Compiler
 ~~~~~~~~
 
-- The :extension:`TypeInType` is now marked as deprecated. Its meaning has been included 
+- The :extension:`TypeInType` is now marked as deprecated. Its meaning has been included
   in :extension:`PolyKinds` and :extension:`DataKinds`.
-
 
 GHCi
 ~~~~
 
-- GHCi will now accept any file-header pragmas it finds, such as 
+- GHCi will now accept any file-header pragmas it finds, such as
   ``{-# OPTIONS_GHC ... #-}`` and ``{-# LANGUAGE ... #-}`` (see :ref:`pragmas`).  For example,
   instead of using :ghci-cmd:`:set` to enable :ghc-flag:`-Wmissing-signatures`,
   you could instead write:
@@ -80,6 +79,17 @@ GHCi
       ghci> {-# OPTIONS_GHC -Wmissing-signatures #-}
 
 This can be convenient when pasting large multi-line blocks of code into GHCi.
+
+Runtime system
+~~~~~~~~~~~~~~
+
+- The `Delimited continuation primops <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0313-delimited-continuation-primops.rst>`_
+  proposal has been implemented, adding native support for first-class,
+  delimited continuations to the RTS. For the reasons given in the proposal,
+  no safe API to access this functionality is provided anywhere in ``base``.
+  Instead, the ``prompt#`` and ``control0#`` primops are intended to be consumed
+  by library authors directly, who may wrap them a safe API that maintains the
+  necessary invariants. See the documentation in ``GHC.Exts`` for more details.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
@@ -152,4 +162,3 @@ for further change information.
     libraries/unix/unix.cabal:               Dependency of ``ghc`` library
     libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
     libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
-

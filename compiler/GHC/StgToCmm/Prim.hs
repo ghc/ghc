@@ -1568,6 +1568,9 @@ emitPrimOp cfg primop =
   MaskUninterruptibleOp -> alwaysExternal
   UnmaskAsyncExceptionsOp -> alwaysExternal
   MaskStatus -> alwaysExternal
+  NewPromptTagOp -> alwaysExternal
+  PromptOp -> alwaysExternal
+  Control0Op -> alwaysExternal
   AtomicallyOp -> alwaysExternal
   RetryOp -> alwaysExternal
   CatchRetryOp -> alwaysExternal

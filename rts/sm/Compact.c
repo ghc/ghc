@@ -451,6 +451,13 @@ thread_AP_STACK (StgAP_STACK *ap)
     return (P_)ap + sizeofW(StgAP_STACK) + ap->size;
 }
 
+STATIC_INLINE P_
+thread_continuation(StgContinuation *cont)
+{
+    thread_stack(cont->stack, cont->stack + cont->stack_size);
+    return (P_)cont + continuation_sizeW(cont);
+}
+
 static P_
 thread_TSO (StgTSO *tso)
 {
@@ -613,6 +620,10 @@ update_fwd_large( bdescr *bd )
         }
         continue;
     }
+
+    case CONTINUATION:
+        thread_continuation((StgContinuation *)p);
+        continue;
 
     default:
       barf("update_fwd_large: unknown/strange object  %d", (int)(info->type));
@@ -799,6 +810,9 @@ thread_obj (const StgInfoTable *info, P_ p)
         }
         return p + sizeofW(StgTRecChunk);
     }
+
+    case CONTINUATION:
+        return thread_continuation((StgContinuation *)p);
 
     default:
         barf("update_fwd: unknown/strange object  %d", (int)(info->type));

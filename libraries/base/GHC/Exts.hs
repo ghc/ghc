@@ -59,6 +59,7 @@ module GHC.Exts
         sameMutVar#,
         sameTVar#,
         sameIOPort#,
+        samePromptTag#,
 
         -- ** Compat wrapper
         atomicModifyMutVar#,

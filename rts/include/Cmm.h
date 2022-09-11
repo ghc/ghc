@@ -335,7 +335,8 @@
     FUN_0_2,                                            \
     FUN_STATIC,                                         \
     BCO,                                                \
-    PAP:                                                \
+    PAP,                                                \
+    CONTINUATION:                                       \
    {                                                    \
        ret(x);                                          \
    }                                                    \
@@ -498,6 +499,12 @@
 #define GC_PRIM_PP(fun,arg1,arg2)               \
         jump stg_gc_prim_pp(arg1,arg2,fun);
 
+#define GC_PRIM_PP_LL(fun,arg1,arg2)            \
+        R1 = arg1;                              \
+        R2 = arg2;                              \
+        R3 = fun;                               \
+        jump stg_gc_prim_pp_ll [R1,R2,R3];
+
 #define MAYBE_GC_(fun)                          \
     if (CHECK_GC()) {                           \
         HpAlloc = 0;                            \
@@ -538,6 +545,12 @@
     TICK_BUMP(STK_CHK_ctr);                     \
     if (Sp - (n) < SpLim) {                     \
         GC_PRIM_PP(fun,arg1,arg2)               \
+    }
+
+#define STK_CHK_PP_LL(n, fun, arg1, arg2)       \
+    TICK_BUMP(STK_CHK_ctr);                     \
+    if (Sp - (n) < SpLim) {                     \
+        GC_PRIM_PP_LL(fun,arg1,arg2)            \
     }
 
 #define STK_CHK_ENTER(n, closure)               \
@@ -685,6 +698,7 @@
 #define TICK_ENT_PAP()                  TICK_BUMP(ENT_PAP_ctr)
 #define TICK_ENT_AP()                   TICK_BUMP(ENT_AP_ctr)
 #define TICK_ENT_AP_STACK()             TICK_BUMP(ENT_AP_STACK_ctr)
+#define TICK_ENT_CONTINUATION()         TICK_BUMP(ENT_CONTINUATION_ctr)
 #define TICK_ENT_BH()                   TICK_BUMP(ENT_BH_ctr)
 #define TICK_ENT_LNE()                  TICK_BUMP(ENT_LNE_ctr)
 #define TICK_UNKNOWN_CALL()             TICK_BUMP(UNKNOWN_CALL_ctr)

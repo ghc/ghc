@@ -80,6 +80,7 @@ data ClosureType
     | SMALL_MUT_ARR_PTRS_FROZEN_DIRTY
     | SMALL_MUT_ARR_PTRS_FROZEN_CLEAN
     | COMPACT_NFDATA
+    | CONTINUATION
     | N_CLOSURE_TYPES
  deriving (Enum, Eq, Ord, Show, Generic)
 

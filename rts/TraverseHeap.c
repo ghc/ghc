@@ -336,8 +336,8 @@ traversePushReturn(traverseState *ts, StgClosure *c, stackAccum acc, stackElemen
  *
  * Invariants:
  *
- *  - 'c' is not any of TSO, AP, PAP, AP_STACK, which means that there cannot
- *       be any stack objects.
+ *  - 'c' is not any of TSO, AP, PAP, AP_STACK, or CONTINUATION, which means
+ *    that there cannot be any stack objects.
  *
  * Note: SRTs are considered to be children as well.
  */
@@ -517,6 +517,7 @@ traverseGetChildren(StgClosure *c, StgClosure **first_child, bool *other_childre
     case PAP:
     case AP:
     case AP_STACK:
+    case CONTINUATION:
     case TSO:
     case STACK:
     case IND_STATIC:
@@ -818,6 +819,7 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data,
         case PAP:
         case AP:
         case AP_STACK:
+        case CONTINUATION:
         case TSO:
         case STACK:
         case IND_STATIC:
@@ -1288,6 +1290,14 @@ inner_loop:
                     (StgPtr)((StgAP_STACK *)c)->payload +
                              ((StgAP_STACK *)c)->size);
         goto loop;
+
+    case CONTINUATION:
+    {
+        StgContinuation *cont = (StgContinuation *)c;
+        traversePushStack(ts, c, sep, child_data,
+                          cont->stack, cont->stack + cont->stack_size);
+        goto loop;
+    }
     }
 
     stackElement se;

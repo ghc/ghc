@@ -300,6 +300,10 @@ EXTERN_INLINE StgOffset AP_STACK_sizeW ( uint32_t size );
 EXTERN_INLINE StgOffset AP_STACK_sizeW ( uint32_t size )
 { return sizeofW(StgAP_STACK) + size; }
 
+EXTERN_INLINE StgWord CONTINUATION_sizeW(StgWord stack_size);
+EXTERN_INLINE StgWord CONTINUATION_sizeW(StgWord stack_size)
+{ return sizeofW(StgContinuation) + stack_size; }
+
 EXTERN_INLINE StgOffset CONSTR_sizeW( uint32_t p, uint32_t np );
 EXTERN_INLINE StgOffset CONSTR_sizeW( uint32_t p, uint32_t np )
 { return sizeofW(StgHeader) + p + np; }
@@ -339,6 +343,10 @@ EXTERN_INLINE StgOffset ap_sizeW( StgAP* x )
 EXTERN_INLINE StgOffset pap_sizeW( StgPAP* x );
 EXTERN_INLINE StgOffset pap_sizeW( StgPAP* x )
 { return PAP_sizeW(x->n_args); }
+
+EXTERN_INLINE StgWord continuation_sizeW(StgContinuation *x);
+EXTERN_INLINE StgWord continuation_sizeW(StgContinuation *x)
+{ return CONTINUATION_sizeW(x->stack_size); }
 
 EXTERN_INLINE StgWord arr_words_words( StgArrBytes* x);
 EXTERN_INLINE StgWord arr_words_words( StgArrBytes* x)

@@ -119,6 +119,7 @@ processHeapClosureForDead( const StgClosure *c )
     case FUN_2_0:
     case FUN_1_1:
     case FUN_0_2:
+    case CONTINUATION:
     case BLACKHOLE:
     case BLOCKING_QUEUE:
         /*

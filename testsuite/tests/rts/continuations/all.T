@@ -1,0 +1,4 @@
+test('cont_simple_shift', [extra_files(['ContIO.hs'])], multimod_compile_and_run, ['cont_simple_shift', ''])
+test('cont_exn_masking', [extra_files(['ContIO.hs'])], multimod_compile_and_run, ['cont_exn_masking', ''])
+test('cont_missing_prompt_err', [extra_files(['ContIO.hs']), exit_code(1)], multimod_compile_and_run, ['cont_missing_prompt_err', ''])
+test('cont_nondet_handler', [extra_files(['ContIO.hs'])], multimod_compile_and_run, ['cont_nondet_handler', ''])

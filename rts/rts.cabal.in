@@ -431,6 +431,7 @@ library
 
     cmm-sources: Apply.cmm
                  Compact.cmm
+                 ContinuationOps.cmm
                  Exception.cmm
                  HeapStackCheck.cmm
                  PrimOps.cmm
@@ -475,6 +476,7 @@ library
                CloneStack.c
                ClosureFlags.c
                ClosureSize.c
+               Continuation.c
                Disassembler.c
                FileLock.c
                ForeignExports.c

@@ -442,6 +442,7 @@ extern char **environ;
       SymI_HasProto(ENT_DYN_IND_ctr)                    \
       SymI_HasProto(ENT_PERM_IND_ctr)                   \
       SymI_HasProto(ENT_PAP_ctr)                        \
+      SymI_HasProto(ENT_CONTINUATION_ctr)                  \
       SymI_HasProto(ENT_AP_ctr)                         \
       SymI_HasProto(ENT_AP_STACK_ctr)                   \
       SymI_HasProto(ENT_BH_ctr)                         \
@@ -1047,6 +1048,9 @@ extern char **environ;
       SymI_HasProto(sendCloneStackMessage)                              \
       SymI_HasProto(cloneStack)                                         \
       SymI_HasProto(decodeClonedStack)                                  \
+      SymI_HasProto(stg_newPromptTagzh)                                 \
+      SymI_HasProto(stg_promptzh)                                       \
+      SymI_HasProto(stg_control0zh)                                     \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 

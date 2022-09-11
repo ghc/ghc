@@ -63,6 +63,8 @@ closure_sizeW_ (const StgClosure *p, const StgInfoTable *info)
         return bco_sizeW((StgBCO *)p);
     case TREC_CHUNK:
         return sizeofW(StgTRecChunk);
+    case CONTINUATION:
+        return continuation_sizeW((StgContinuation *)p);
     default:
         return sizeW_fromITBL(info);
     }

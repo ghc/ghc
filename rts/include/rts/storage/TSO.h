@@ -266,11 +266,16 @@ typedef struct StgStack_ {
     StgWord    stack[];
 } StgStack;
 
+INLINE_HEADER StgPtr stack_SpLim(StgStack *stack)
+{
+    return stack->stack + RESERVED_STACK_WORDS;
+}
+
 // Calculate SpLim from a TSO (reads tso->stackobj, but no fields from
 // the stackobj itself).
 INLINE_HEADER StgPtr tso_SpLim (StgTSO* tso)
 {
-    return tso->stackobj->stack + RESERVED_STACK_WORDS;
+    return stack_SpLim(tso->stackobj);
 }
 
 /* -----------------------------------------------------------------------------

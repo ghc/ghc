@@ -423,6 +423,15 @@ printClosure( const StgClosure *obj )
         debugBelch("TREC_CHUNK\n");
         break;
 
+    case CONTINUATION:
+    {
+        StgContinuation *u = (StgContinuation *)obj;
+        debugBelch("CONTINUATION(apply_mask_frame=");
+        printPtr((StgPtr)u->apply_mask_frame);
+        debugBelch(",stack_size=%" FMT_Word ")\n", u->stack_size);
+        break;
+    }
+
     default:
             //barf("printClosure %d",get_itbl(obj)->type);
             debugBelch("*** printClosure: unknown type %d ****\n",
@@ -563,6 +572,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                 debugBelch("stg_ret_d_info\n" );
             } else if (c == (StgWord)&stg_ret_l_info) {
                 debugBelch("stg_ret_l_info\n" );
+            } else if (c == (StgWord)&stg_prompt_frame_info) {
+                debugBelch("stg_prompt_frame_info\n");
 #if defined(PROFILING)
             } else if (c == (StgWord)&stg_restore_cccs_info) {
                 debugBelch("stg_restore_cccs_info\n" );
@@ -1063,10 +1074,11 @@ const char *closure_type_names[] = {
  [SMALL_MUT_ARR_PTRS_DIRTY] = "SMALL_MUT_ARR_PTRS_DIRTY",
  [SMALL_MUT_ARR_PTRS_FROZEN_DIRTY] = "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY",
  [SMALL_MUT_ARR_PTRS_FROZEN_CLEAN] = "SMALL_MUT_ARR_PTRS_FROZEN_CLEAN",
- [COMPACT_NFDATA]        = "COMPACT_NFDATA"
+ [COMPACT_NFDATA]        = "COMPACT_NFDATA",
+ [CONTINUATION]          = "CONTINUATION",
 };
 
-#if N_CLOSURE_TYPES != 64
+#if N_CLOSURE_TYPES != 65
 #error Closure types changed: update Printer.c!
 #endif
 

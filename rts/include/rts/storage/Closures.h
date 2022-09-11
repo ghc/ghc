@@ -658,3 +658,31 @@ typedef struct StgCompactNFData_ {
       // Used by compacting GC for linking CNFs with threaded hash tables.
       // See Note [CNFs in compacting GC] in Compact.c for details.
 } StgCompactNFData;
+
+/* ----------------------------------------------------------------------------
+   Continuations (see Note [Continuations overview] in Continuation.c)
+   ------------------------------------------------------------------------- */
+
+typedef StgClosure *StgPromptTag;
+
+typedef struct {
+    StgHeader header;
+    StgPromptTag tag;
+} StgPromptFrame;
+
+// Closure types: CONTINUATION
+typedef struct {
+    StgHeader header;
+    const StgInfoTable *apply_mask_frame;
+      // A pointer to a stack frame info table that should be returned to after
+      // applying this continuation to update the async exception masking state,
+      // or NULL if the masking state of the calling context should be preserved;
+      // see Note [Continuations and async exception masking] in Continuation.c
+    StgWord mask_frame_offset;
+      // Word offset into `stack` for the outermost mask/unmask frame, or 0 if
+      // `apply_mask_frame` is NULL;
+      // see Note [Continuations and async exception masking] in Continuation.c
+    StgWord stack_size;
+      // Number of words of captured stack
+    StgWord stack[];
+} StgContinuation;

@@ -177,6 +177,7 @@ isRetainer( const StgClosure *c )
     case FUN_0_2:
         // partial applications
     case PAP:
+    case CONTINUATION:
         // indirection
     // IND_STATIC used to be an error, but at the moment it can happen
     // as isAlive doesn't look through IND_STATIC as it ignores static

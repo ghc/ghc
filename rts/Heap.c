@@ -241,6 +241,10 @@ StgWord collect_pointers(StgClosure *closure, StgClosure *ptrs[]) {
             break;
         }
 
+        case CONTINUATION:
+            // See the note in AP_STACK about the stack chunk.
+            break;
+
         default:
             fprintf(stderr,"closurePtrs: Cannot handle type %s yet\n",
                            closure_type_names[info->type]);

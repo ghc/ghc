@@ -1627,6 +1627,12 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     case COMPACT_NFDATA:
         break;
 
+    case CONTINUATION: {
+        StgContinuation *cont = (StgContinuation *)p;
+        trace_stack_(queue, cont->stack, cont->stack + cont->stack_size);
+        break;
+    }
+
     default:
         barf("mark_closure: unimplemented/strange closure type %d @ %p",
              info->type, p);

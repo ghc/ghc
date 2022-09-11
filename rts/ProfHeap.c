@@ -1219,6 +1219,10 @@ heapCensusBlock(Census *census, bdescr *bd)
             size = sizeofW(StgTRecChunk);
             break;
 
+        case CONTINUATION:
+            size = continuation_sizeW((StgContinuation *)p);
+            break;
+
         case COMPACT_NFDATA:
             barf("heapCensus, found compact object in the wrong list");
             break;

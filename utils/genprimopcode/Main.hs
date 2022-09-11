@@ -298,8 +298,7 @@ gen_hs_source (Info defaults entries) =
            hdr (PrimVecTypeSpec { ty = TyApp (VecTyCon n _) _ }) = wrapOp n ++ ","
            hdr (PrimVecTypeSpec {})                              = error $ "Illegal type spec"
 
-           sec s = "\n-- * " ++ title s ++ "\n"
-                    ++ (unlines $ map ("-- " ++ ) $ lines $ "|" ++ desc s)
+           sec s = "\n{- * " ++ title s ++ "-}\n{-|" ++ desc s ++ "-}"
 
 
            ent   (Section {})         = []
@@ -313,7 +312,7 @@ gen_hs_source (Info defaults entries) =
              -- Doc comments
              [ case desc o ++ extra (opts o) of
                  "" -> []
-                 cmmt -> map ("-- " ++) $ lines $ "|" ++ cmmt
+                 cmmt -> lines ("{-|" ++ cmmt ++ "-}")
 
              -- Deprecations
              , [ d | Just n <- [getName o], d <- prim_deprecated (opts o) n ]
@@ -804,6 +803,8 @@ ppType (TyApp (TyCon "IOPort#") [x,y])   = "mkIOPortPrimTy " ++ ppType x
                                            ++ " " ++ ppType y
 ppType (TyApp (TyCon "TVar#") [x,y])     = "mkTVarPrimTy " ++ ppType x
                                            ++ " " ++ ppType y
+
+ppType (TyApp (TyCon "PromptTag#") [x])  = "mkPromptTagPrimTy " ++ ppType x
 ppType (TyApp (VecTyCon _ pptc) [])      = pptc
 
 ppType (TyUTup ts) = "(mkTupleTy Unboxed "

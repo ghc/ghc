@@ -2633,6 +2633,192 @@ primop  MaskStatus "getMaskingState#" GenPrimOp
    has_side_effects = True
 
 ------------------------------------------------------------------------
+section "Continuations"
+  { These operations provide access to first-class delimited continuations,
+    which allow a computation to access and manipulate portions of its
+    /current continuation/. Operationally, they are implemented by direct
+    manipulation of the RTS call stack, which may provide significant
+    performance gains relative to manual continuation-passing style (CPS) for
+    some programs.
+
+    Intuitively, the delimited control operators 'prompt#' and
+    'control0#' can be understood by analogy to 'catch#' and 'raiseIO#',
+    respectively:
+
+      * Like 'catch#', 'prompt#' does not do anything on its own, it
+        just /delimits/ a subcomputation (the source of the name "delimited
+        continuations").
+
+      * Like 'raiseIO#', 'control0#' aborts to the nearest enclosing
+        'prompt#' before resuming execution.
+
+    However, /unlike/ 'raiseIO#', 'control0#' does /not/ discard
+    the aborted computation: instead, it /captures/ it in a form that allows
+    it to be resumed later. In other words, 'control0#' does not
+    irreversibly abort the local computation before returning to the enclosing
+    'prompt#', it merely suspends it. All local context of the suspended
+    computation is packaged up and returned as an ordinary function that can be
+    invoked at a later point in time to /continue/ execution, which is why
+    the suspended computation is known as a /first-class continuation/.
+
+    In GHC, every continuation prompt is associated with exactly one
+    'PromptTag#'. Prompt tags are unique, opaque values created by
+    'newPromptTag#' that may only be compared for equality. Both 'prompt#'
+    and 'control0#' accept a 'PromptTag#' argument, and 'control0#'
+    captures the continuation up to the nearest enclosing use of 'prompt#'
+    /with the same tag/. This allows a program to control exactly which
+    prompt it will abort to by using different tags, similar to how a program
+    can control which 'catch' it will abort to by throwing different types
+    of exceptions. Additionally, 'PromptTag#' accepts a single type parameter,
+    which is used to relate the expected result type at the point of the
+    'prompt#' to the type of the continuation produced by 'control0#'.
+
+    == The gory details
+
+    The high-level explanation provided above should hopefully provide some
+    intuition for what these operations do, but it is not very precise; this
+    section provides a more thorough explanation.
+
+    The 'prompt#' operation morally has the following type:
+
+@
+'prompt#' :: 'PromptTag#' a -> IO a -> IO a
+@
+
+    If a computation @/m/@ never calls 'control0#', then
+    @'prompt#' /tag/ /m/@ is equivalent to just @/m/@, i.e. the 'prompt#' is
+    a no-op. This implies the following law:
+
+    \[
+    \mathtt{prompt\#}\ \mathit{tag}\ (\mathtt{pure}\ x) \equiv \mathtt{pure}\ x
+    \]
+
+    The 'control0#' operation morally has the following type:
+
+@
+'control0#' :: 'PromptTag#' a -> ((IO b -> IO a) -> IO a) -> IO b
+@
+
+    @'control0#' /tag/ /f/@ captures the current continuation up to the nearest
+    enclosing @'prompt#' /tag/@ and resumes execution from the point of the call
+    to 'prompt#', passing the captured continuation to @/f/@. To make that
+    somewhat more precise, we can say 'control0#' obeys the following law:
+
+    \[
+    \mathtt{prompt\#}\ \mathit{tag}\ (\mathtt{control0\#}\ tag\ f \mathbin{\mathtt{>>=}} k)
+      \equiv f\ (\lambda\ m \rightarrow m \mathbin{\mathtt{>>=}} k)
+    \]
+
+    However, this law does not fully describe the behavior of 'control0#',
+    as it does not account for situations where 'control0#' does not appear
+    immediately inside 'prompt#'. Capturing the semantics more precisely
+    requires some additional notational machinery; a common approach is to
+    use [reduction semantics](https://en.wikipedia.org/wiki/Operational_semantics#Reduction_semantics).
+    Assuming an appropriate definition of evaluation contexts \(E\), the
+    semantics of 'prompt#' and 'control0#' can be given as follows:
+
+    \[
+    \begin{aligned}
+    E[\mathtt{prompt\#}\ \mathit{tag}\ (\mathtt{pure}\ v)]
+      &\longrightarrow E[\mathtt{pure}\ v] \\[8pt]
+    E_1[\mathtt{prompt\#}\ \mathit{tag}\ E_2[\mathtt{control0\#}\ tag\ f]]
+      &\longrightarrow E_1[f\ (\lambda\ m \rightarrow E_2[m])] \\[-2pt]
+      \mathrm{where}\;\: \mathtt{prompt\#}\ \mathit{tag} &\not\in E_2
+    \end{aligned}
+    \]
+
+    A full treatment of the semantics and metatheory of delimited control is
+    well outside the scope of this documentation, but a good, thorough
+    overview (in Haskell) is provided in [A Monadic Framework for Delimited
+    Continuations](https://legacy.cs.indiana.edu/~dyb/pubs/monadicDC.pdf) by
+    Dybvig et al.
+
+    == Safety and invariants
+
+    Correct uses of 'control0#' must obey the following restrictions:
+
+    1. The behavior of 'control0#' is only well-defined within a /strict
+       'State#' thread/, such as those associated with @IO@ and strict @ST@
+       computations.
+
+    2. Furthermore, 'control0#' may only be called within the dynamic extent
+       of a 'prompt#' with a matching tag somewhere in the /current/ strict
+       'State#' thread. Effectively, this means that a matching prompt must
+       exist somewhere, and the captured continuation must /not/ contain any
+       uses of @unsafePerformIO@, @runST@, @unsafeInterleaveIO@, etc. For
+       example, the following program is ill-defined:
+
+        @
+        'prompt#' /tag/ $
+          evaluate (unsafePerformIO $ 'control0#' /tag/ /f/)
+        @
+
+        In this example, the use of 'prompt#' appears in a different 'State#'
+        thread from the use of 'control0#', so there is no valid prompt in
+        scope to capture up to.
+
+    3. Finally, 'control0#' may not be used within 'State#' threads associated
+       with an STM transaction (i.e. those introduced by 'atomically#').
+
+    If the runtime is able to detect that any of these invariants have been
+    violated in a way that would compromise internal invariants of the runtime,
+    'control0#' will fail by raising an exception. However, such violations
+    are only detected on a best-effort basis, as the bookkeeping necessary for
+    detecting /all/ illegal uses of 'control0#' would have significant overhead.
+    Therefore, although the operations are “safe” from the runtime’s point of
+    view (e.g. they will not compromise memory safety or clobber internal runtime
+    state), it is still ultimately the programmer’s responsibility to ensure
+    these invariants hold to guarantee predictable program behavior.
+
+    In a similar vein, since each captured continuation includes the full local
+    context of the suspended computation, it can safely be resumed arbitrarily
+    many times without violating any invariants of the runtime system. However,
+    use of these operations in an arbitrary 'IO' computation may be unsafe for
+    other reasons, as most 'IO' code is not written with reentrancy in mind. For
+    example, a computation suspended in the middle of reading a file will likely
+    finish reading it when it is resumed; further attempts to resume from the
+    same place would then fail because the file handle was already closed.
+
+    In other words, although the RTS ensures that a computation’s control state
+    and local variables are properly restored for each distinct resumption of
+    a continuation, it makes no attempt to duplicate any local state the
+    computation may have been using (and could not possibly do so in general).
+    Furthermore, it provides no mechanism for an arbitrary computation to
+    protect itself against unwanted reentrancy (i.e. there is no analogue to
+    Scheme’s @dynamic-wind@). For those reasons, manipulating the continuation
+    is only safe if the caller can be certain that doing so will not violate any
+    expectations or invariants of the enclosing computation. }
+------------------------------------------------------------------------
+
+primtype PromptTag# a
+
+primop  NewPromptTagOp "newPromptTag#" GenPrimOp
+        State# RealWorld -> (# State# RealWorld, PromptTag# a #)
+   with
+   out_of_line = True
+   has_side_effects = True
+
+primop  PromptOp "prompt#" GenPrimOp
+        PromptTag# a
+     -> (State# RealWorld -> (# State# RealWorld, a #))
+     -> State# RealWorld -> (# State# RealWorld, a #)
+   with
+   strictness = { \ _arity -> mkClosedDmdSig [topDmd, strictOnceApply1Dmd, topDmd] topDiv }
+   out_of_line = True
+   has_side_effects = True
+
+primop  Control0Op "control0#" GenPrimOp
+        PromptTag# a
+     -> (((State# RealWorld -> (# State# RealWorld, p #))
+          -> State# RealWorld -> (# State# RealWorld, a #))
+         -> State# RealWorld -> (# State# RealWorld, a #))
+     -> State# RealWorld -> (# State# RealWorld, p #)
+   with
+   strictness = { \ _arity -> mkClosedDmdSig [topDmd, lazyApply2Dmd, topDmd] topDiv }
+   out_of_line = True
+   has_side_effects = True
+
+------------------------------------------------------------------------
 section "STM-accessible Mutable Variables"
 ------------------------------------------------------------------------
 

@@ -1062,6 +1062,10 @@ loop:
       copy(p,info,q,sizeofW(StgTRecChunk),gen_no);
       return;
 
+  case CONTINUATION:
+      copy(p,info,q,continuation_sizeW((StgContinuation*)q),gen_no);
+      return;
+
   default:
     barf("evacuate: strange closure type %d", (int)(INFO_PTR_TO_STRUCT(info)->type));
   }

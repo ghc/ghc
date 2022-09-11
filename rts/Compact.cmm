@@ -133,7 +133,8 @@ eval:
         FUN_0_2,
         FUN_STATIC,
         BCO,
-        PAP: {
+        PAP,
+        CONTINUATION: {
         jump stg_raisezh(base_GHCziIOziException_cannotCompactFunction_closure);
     }
 

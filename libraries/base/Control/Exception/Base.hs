@@ -42,6 +42,7 @@ module Control.Exception.Base (
         RecUpdError(..),
         ErrorCall(..),
         TypeError(..), -- #10284, custom error type for deferred type errors
+        NoMatchingContinuationPrompt(..),
 
         -- * Throwing exceptions
         throwIO,
@@ -96,7 +97,7 @@ module Control.Exception.Base (
         recSelError, recConError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
         typeError,
-        nonTermination, nestedAtomically,
+        nonTermination, nestedAtomically, noMatchingContinuationPrompt,
   ) where
 
 import           GHC.Base
@@ -391,6 +392,22 @@ instance Exception NestedAtomically
 
 -----
 
+-- | Thrown when the program attempts a continuation capture, but no prompt with
+-- the given prompt tag exists in the current continuation.
+--
+-- @since 4.18
+data NoMatchingContinuationPrompt = NoMatchingContinuationPrompt
+
+-- | @since 4.18
+instance Show NoMatchingContinuationPrompt where
+  showsPrec _ NoMatchingContinuationPrompt =
+    showString "GHC.Exts.control0#: no matching prompt in the current continuation"
+
+-- | @since 4.18
+instance Exception NoMatchingContinuationPrompt
+
+-----
+
 -- See Note [Compiler error functions] in ghc-prim:GHC.Prim.Panic
 recSelError, recConError, runtimeError,
   nonExhaustiveGuardsError, patError, noMethodBindingError,
@@ -414,3 +431,7 @@ nonTermination = toException NonTermination
 -- GHC's RTS calls this
 nestedAtomically :: SomeException
 nestedAtomically = toException NestedAtomically
+
+-- GHC's RTS calls this
+noMatchingContinuationPrompt :: SomeException
+noMatchingContinuationPrompt = toException NoMatchingContinuationPrompt

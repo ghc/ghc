@@ -30,6 +30,7 @@ module GHC.Prim.PtrEq
     sameTVar#,
     sameMVar#,
     sameIOPort#,
+    samePromptTag#,
     eqStableName#
   ) where
 
@@ -112,6 +113,10 @@ sameMVar# = reallyUnsafePtrEquality#
 -- | Compare the underlying pointers of two 'IOPort#'s.
 sameIOPort# :: IOPort# s a -> IOPort# s a -> Int#
 sameIOPort# = reallyUnsafePtrEquality#
+
+-- | Compare the underlying pointers of two 'PromptTag#'s.
+samePromptTag# :: PromptTag# a -> PromptTag# a -> Int#
+samePromptTag# = reallyUnsafePtrEquality#
 
 -- Note [Comparing stable names]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

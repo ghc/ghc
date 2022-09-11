@@ -560,6 +560,19 @@ checkClosure( const StgClosure* p )
         return sizeofW(StgTRecChunk);
       }
 
+    case CONTINUATION:
+    {
+        StgContinuation *cont = (StgContinuation *)p;
+        if (cont->apply_mask_frame) {
+          ASSERT(cont->apply_mask_frame == &stg_unmaskAsyncExceptionszh_ret_info
+              || cont->apply_mask_frame == &stg_maskAsyncExceptionszh_ret_info
+              || cont->apply_mask_frame == &stg_maskUninterruptiblezh_ret_info);
+          ASSERT(LOOKS_LIKE_CLOSURE_PTR(cont->stack + cont->mask_frame_offset));
+        }
+        checkStackChunk(cont->stack, cont->stack + cont->stack_size);
+        return continuation_sizeW(cont);
+    }
+
     default:
         barf("checkClosure (closure type %d)", info->type);
     }

@@ -64,6 +64,7 @@ RTS_RET(stg_stack_underflow_frame);
 RTS_RET(stg_keepAlive_frame);
 RTS_RET(stg_restore_cccs);
 RTS_RET(stg_restore_cccs_eval);
+RTS_RET(stg_prompt_frame);
 
 // RTS_FUN(stg_interp_constr1_entry);
 // RTS_FUN(stg_interp_constr2_entry);
@@ -211,6 +212,8 @@ RTS_ENTRY(stg_AP);
 RTS_ENTRY(stg_AP_NOUPD);
 RTS_ENTRY(stg_AP_STACK);
 RTS_ENTRY(stg_AP_STACK_NOUPD);
+RTS_ENTRY(stg_CONTINUATION);
+RTS_ENTRY(stg_PROMPT_TAG);
 RTS_ENTRY(stg_dummy_ret);
 RTS_ENTRY(stg_raise);
 RTS_ENTRY(stg_raise_ret);
@@ -355,6 +358,7 @@ RTS_FUN_DECL(stg_ap_pppp_fast);
 RTS_FUN_DECL(stg_ap_ppppp_fast);
 RTS_FUN_DECL(stg_ap_pppppp_fast);
 RTS_FUN_DECL(stg_PAP_apply);
+RTS_FUN_DECL(stg_CONTINUATION_apply);
 
 /* standard GC & stack check entry points, all defined in HeapStackCheck.cmm */
 
@@ -374,7 +378,9 @@ RTS_FUN_DECL(stg_gc_prim_pp);
 RTS_FUN_DECL(stg_gc_prim_n);
 
 RTS_RET(stg_gc_prim_p_ll_ret);
+RTS_RET(stg_gc_prim_pp_ll_ret);
 RTS_FUN_DECL(stg_gc_prim_p_ll);
+RTS_FUN_DECL(stg_gc_prim_pp_ll);
 
 RTS_RET(stg_enter);
 RTS_FUN_DECL(__stg_gc_enter_1);
@@ -501,6 +507,11 @@ RTS_FUN_DECL(stg_raiseIOzh);
 RTS_FUN_DECL(stg_paniczh);
 RTS_FUN_DECL(stg_keepAlivezh);
 RTS_FUN_DECL(stg_absentErrorzh);
+
+RTS_FUN_DECL(stg_newPromptTagzh);
+RTS_FUN_DECL(stg_promptzh);
+RTS_FUN_DECL(stg_control0zh);
+RTS_FUN_DECL(stg_control0zh_ll);
 
 RTS_FUN_DECL(stg_makeStableNamezh);
 RTS_FUN_DECL(stg_makeStablePtrzh);

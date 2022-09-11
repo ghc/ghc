@@ -6,7 +6,7 @@
  *
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
- * 
+ *
  *   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/storage/gc
  *
  * ---------------------------------------------------------------------------*/
@@ -24,6 +24,7 @@ void    scavenge_thunk_srt (const StgInfoTable *info);
 StgPtr  scavenge_mut_arr_ptrs (StgMutArrPtrs *a);
 StgPtr  scavenge_PAP (StgPAP *pap);
 StgPtr  scavenge_AP (StgAP *ap);
+StgPtr  scavenge_continuation(StgContinuation *pap);
 void    scavenge_compact (StgCompactNFData *str);
 
 #if defined(THREADED_RTS)
@@ -36,6 +37,7 @@ void    scavenge_thunk_srt1 (const StgInfoTable *info);
 StgPtr  scavenge_mut_arr_ptrs1 (StgMutArrPtrs *a);
 StgPtr  scavenge_PAP1 (StgPAP *pap);
 StgPtr  scavenge_AP1 (StgAP *ap);
+StgPtr  scavenge_continuation1(StgContinuation *pap);
 void    scavenge_compact1 (StgCompactNFData *str);
 #endif
 

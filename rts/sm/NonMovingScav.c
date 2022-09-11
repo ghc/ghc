@@ -428,6 +428,10 @@ nonmovingScavengeOne (StgClosure *q)
         scavenge_compact((StgCompactNFData*)p);
         break;
 
+    case CONTINUATION:
+        scavenge_continuation((StgContinuation *)p);
+        break;
+
     default:
         barf("nonmoving scavenge: unimplemented/strange closure type %d @ %p",
              info->type, p);

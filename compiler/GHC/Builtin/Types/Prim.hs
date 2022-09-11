@@ -80,6 +80,7 @@ module GHC.Builtin.Types.Prim(
         weakPrimTyCon,                  mkWeakPrimTy,
         threadIdPrimTyCon,              threadIdPrimTy,
         stackSnapshotPrimTyCon,         stackSnapshotPrimTy,
+        promptTagPrimTyCon,             mkPromptTagPrimTy,
 
         int8PrimTyCon,          int8PrimTy, int8PrimTyConName,
         word8PrimTyCon,         word8PrimTy, word8PrimTyConName,
@@ -198,6 +199,7 @@ exposedPrimTyCons
     , word32PrimTyCon
     , word64PrimTyCon
     , stackSnapshotPrimTyCon
+    , promptTagPrimTyCon
 
     , tYPETyCon
     , funTyCon
@@ -231,7 +233,7 @@ charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int3
   stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName,
   weakPrimTyConName, threadIdPrimTyConName,
   eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName,
-  stackSnapshotPrimTyConName :: Name
+  stackSnapshotPrimTyConName, promptTagPrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
 int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey int8PrimTyCon
@@ -269,6 +271,7 @@ stackSnapshotPrimTyConName    = mkPrimTc (fsLit "StackSnapshot#") stackSnapshotP
 bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTyCon
 weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
+promptTagPrimTyConName        = mkPrimTc (fsLit "PromptTag#") promptTagPrimTyConKey promptTagPrimTyCon
 
 {-
 ************************************************************************
@@ -1167,6 +1170,20 @@ threadIdPrimTy :: Type
 threadIdPrimTy    = mkTyConTy threadIdPrimTyCon
 threadIdPrimTyCon :: TyCon
 threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName unliftedRepTy
+
+{-
+************************************************************************
+*                                                                      *
+   The ``prompt tag'' type
+*                                                                      *
+************************************************************************
+-}
+
+promptTagPrimTyCon :: TyCon
+promptTagPrimTyCon = pcPrimTyCon promptTagPrimTyConName [Representational] unliftedRepTy
+
+mkPromptTagPrimTy :: Type -> Type
+mkPromptTagPrimTy v = TyConApp promptTagPrimTyCon [v]
 
 {-
 ************************************************************************

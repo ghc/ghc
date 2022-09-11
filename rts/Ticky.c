@@ -287,6 +287,7 @@ PrintTickyInfo(void)
   PR_CTR(ENT_AP_ctr);
   PR_CTR(ENT_PAP_ctr);
   PR_CTR(ENT_AP_STACK_ctr);
+  PR_CTR(ENT_CONTINUATION_ctr);
   PR_CTR(ENT_BH_ctr);
   PR_CTR(ENT_STATIC_THK_SINGLE_ctr);
   PR_CTR(ENT_STATIC_THK_MANY_ctr);

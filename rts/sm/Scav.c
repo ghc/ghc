@@ -90,6 +90,7 @@ static void scavenge_large_bitmap (StgPtr p,
 # define scavenge_mut_arr_ptrs(info) scavenge_mut_arr_ptrs1(info)
 # define scavenge_PAP(pap) scavenge_PAP1(pap)
 # define scavenge_AP(ap) scavenge_AP1(ap)
+# define scavenge_continuation(pap) scavenge_continuation1(pap)
 # define scavenge_compact(str) scavenge_compact1(str)
 #endif
 
@@ -384,6 +385,13 @@ scavenge_AP (StgAP *ap)
 {
     evacuate(&ap->fun);
     return scavenge_PAP_payload (ap->fun, ap->payload, ap->n_args);
+}
+
+StgPtr
+scavenge_continuation(StgContinuation *cont)
+{
+    scavenge_stack(cont->stack, cont->stack + cont->stack_size);
+    return (StgPtr)cont + continuation_sizeW(cont);
 }
 
 /* -----------------------------------------------------------------------------
@@ -831,6 +839,10 @@ scavenge_block (bdescr *bd)
         break;
       }
 
+    case CONTINUATION:
+        p = scavenge_continuation((StgContinuation *)p);
+        break;
+
     default:
         barf("scavenge: unimplemented/strange closure type %d @ %p",
              info->type, p);
@@ -1223,6 +1235,10 @@ scavenge_mark_stack(void)
             break;
           }
 
+        case CONTINUATION:
+            scavenge_continuation((StgContinuation *)p);
+            break;
+
         default:
             barf("scavenge_mark_stack: unimplemented/strange closure type %d @ %p",
                  info->type, p);
@@ -1579,6 +1595,10 @@ scavenge_one(StgPtr p)
 
     case COMPACT_NFDATA:
         scavenge_compact((StgCompactNFData*)p);
+        break;
+
+    case CONTINUATION:
+        scavenge_continuation((StgContinuation *)p);
         break;
 
     default:
