@@ -91,10 +91,25 @@ gen_Generic_binds gk loc dit = do
 ************************************************************************
 -}
 
+-- | Called by 'GHC.Tc.Deriv.Infer.inferConstraints'; generates a list of
+-- types, each of which must be a 'Functor' in order for the 'Generic1'
+-- instance to work. For instance, if we have:
+--
+-- @
+-- data Foo a = MkFoo Int a (Maybe a) (Either Int (Maybe a))
+-- @
+--
+-- Then @'get_gen1_constrained_tys' a (f (g a))@ would return @[Either Int]@,
+-- as a derived 'Generic1' instance would need to call 'fmap' at that type.
+-- Invoking @'get_gen1_constrained_tys' a@ on any of the other fields would
+-- return @[]@.
+--
+-- 'get_gen1_constrained_tys' is very similar in spirit to
+-- 'deepSubtypesContaining' in "GHC.Tc.Deriv.Functor". Just like with
+-- 'deepSubtypesContaining', it is important that the 'TyVar' argument come
+-- from 'dataConUnivTyVars'. (See #22167 for what goes wrong if 'tyConTyVars'
+-- is used.)
 get_gen1_constrained_tys :: TyVar -> Type -> [Type]
--- called by GHC.Tc.Deriv.Infer.inferConstraints; generates a list of
--- types, each of which must be a Functor in order for the Generic1 instance to
--- work.
 get_gen1_constrained_tys argVar
   = argTyFold argVar $ ArgTyAlg { ata_rec0 = const []
                                 , ata_par1 = [], ata_rec1 = const []

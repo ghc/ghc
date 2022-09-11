@@ -176,9 +176,10 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
 
               -- Constraints arising from the arguments of each constructor
            con_arg_constraints
-             :: (CtOrigin -> TypeOrKind
-                          -> Type
-                          -> [(ThetaSpec, Maybe TCvSubst)])
+             :: ([TyVar] -> CtOrigin
+                         -> TypeOrKind
+                         -> Type
+                         -> [(ThetaSpec, Maybe TCvSubst)])
              -> (ThetaSpec, [TyVar], [TcType], DerivInstTys)
            con_arg_constraints get_arg_constraints
              = let -- Constraints from the fields of each data constructor.
@@ -193,7 +194,8 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
                      , not (isUnliftedType arg_ty)
                      , let orig = DerivOriginDC data_con arg_n wildcard
                      , preds_and_mbSubst
-                         <- get_arg_constraints orig arg_t_or_k arg_ty
+                         <- get_arg_constraints (dataConUnivTyVars data_con)
+                                                orig arg_t_or_k arg_ty
                      ]
                    -- Stupid constraints from DatatypeContexts. Note that we
                    -- must gather these constraints from the data constructors,
@@ -235,21 +237,39 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
            is_functor_like = tcTypeKind inst_ty `tcEqKind` typeToTypeKind
                           || is_generic1
 
-           get_gen1_constraints :: Class -> CtOrigin -> TypeOrKind -> Type
-                                -> [(ThetaSpec, Maybe TCvSubst)]
-           get_gen1_constraints functor_cls orig t_or_k ty
+           get_gen1_constraints ::
+                Class
+             -> [TyVar] -- The universally quantified type variables for the
+                        -- data constructor
+             -> CtOrigin -> TypeOrKind -> Type
+             -> [(ThetaSpec, Maybe TCvSubst)]
+           get_gen1_constraints functor_cls dc_univs orig t_or_k ty
               = mk_functor_like_constraints orig t_or_k functor_cls $
-                get_gen1_constrained_tys last_tv ty
+                get_gen1_constrained_tys last_dc_univ ty
+             where
+               -- If we are deriving an instance of 'Generic1' and have made
+               -- it this far, then there should be at least one universal type
+               -- variable, making this use of 'last' safe.
+               last_dc_univ = assert (not (null dc_univs)) $
+                              last dc_univs
 
-           get_std_constrained_tys :: CtOrigin -> TypeOrKind -> Type
-                                   -> [(ThetaSpec, Maybe TCvSubst)]
-           get_std_constrained_tys orig t_or_k ty
+           get_std_constrained_tys ::
+                [TyVar] -- The universally quantified type variables for the
+                        -- data constructor
+             -> CtOrigin -> TypeOrKind -> Type
+             -> [(ThetaSpec, Maybe TCvSubst)]
+           get_std_constrained_tys dc_univs orig t_or_k ty
                | is_functor_like
                = mk_functor_like_constraints orig t_or_k main_cls $
-                 deepSubtypesContaining last_tv ty
+                 deepSubtypesContaining last_dc_univ ty
                | otherwise
                = [( [mk_cls_pred orig t_or_k main_cls ty]
                   , Nothing )]
+             where
+               -- If 'is_functor_like' holds, then there should be at least one
+               -- universal type variable, making this use of 'last' safe.
+               last_dc_univ = assert (not (null dc_univs)) $
+                              last dc_univs
 
            mk_functor_like_constraints :: CtOrigin -> TypeOrKind
                                        -> Class -> [Type]
@@ -276,9 +296,6 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
                                ]
                              , tcUnifyTy ki typeToTypeKind
                              )
-
-           rep_tc_tvs      = tyConTyVars rep_tc
-           last_tv         = last rep_tc_tvs
 
            -- Extra Data constraints
            -- The Data class (only) requires that for
@@ -318,7 +335,7 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
              -- Generic1 needs Functor
              -- See Note [Getting base classes]
           |  is_generic1
-           -> assert (rep_tc_tvs `lengthExceeds` 0) $
+           -> assert (tyConTyVars rep_tc `lengthExceeds` 0) $
               -- Generic1 has a single kind variable
               assert (cls_tys `lengthIs` 1) $
               do { functorClass <- lift $ tcLookupClass functorClassName
