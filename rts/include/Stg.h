@@ -325,7 +325,11 @@ external prototype return neither of these types to workaround #11395.
    Tail calls
    -------------------------------------------------------------------------- */
 
-#define JMP_(cont) return((StgFunPtr)(cont))
+#if defined(HAS_MUSTTAIL)
+#define JMP_(cont) { StgFunPtr (*_f)(void) = (StgFunPtr (*)(void))(cont); __attribute__((musttail)) return _f(); }
+#else
+#define JMP_(cont) return (StgFunPtr)(cont)
+#endif
 
 /* -----------------------------------------------------------------------------
    Other Stg stuff...
@@ -591,4 +595,3 @@ typedef union {
   c;                                            \
 })
 #endif
-

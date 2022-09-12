@@ -996,6 +996,8 @@ fi
 
 FP_VISIBILITY_HIDDEN
 
+FP_MUSTTAIL
+
 dnl ** check for librt
 AC_CHECK_LIB([rt], [clock_gettime])
 AC_CHECK_LIB([rt], [clock_gettime], [AC_SUBST([CabalHaveLibrt], [True])], [AC_SUBST([CabalHaveLibrt], [False])])
