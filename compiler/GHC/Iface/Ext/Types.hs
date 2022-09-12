@@ -781,5 +781,5 @@ toHieName name
   | isKnownKeyName name = KnownKeyName (nameUnique name)
   | isExternalName name = ExternalName (nameModule name)
                                        (nameOccName name)
-                                       (nameSrcSpan name)
-  | otherwise = LocalName (nameOccName name) (nameSrcSpan name)
+                                       (removeBufSpan $ nameSrcSpan name)
+  | otherwise = LocalName (nameOccName name) (removeBufSpan $ nameSrcSpan name)

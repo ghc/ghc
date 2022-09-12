@@ -1306,19 +1306,6 @@ instance Binary RealSrcSpan where
             return (mkRealSrcSpan (mkRealSrcLoc f sl sc)
                                   (mkRealSrcLoc f el ec))
 
-instance Binary BufPos where
-  put_ bh (BufPos i) = put_ bh i
-  get bh = BufPos <$> get bh
-
-instance Binary BufSpan where
-  put_ bh (BufSpan start end) = do
-    put_ bh start
-    put_ bh end
-  get bh = do
-    start <- get bh
-    end <- get bh
-    return (BufSpan start end)
-
 instance Binary UnhelpfulSpanReason where
   put_ bh r = case r of
     UnhelpfulNoLocationInfo -> putByte bh 0
@@ -1337,10 +1324,11 @@ instance Binary UnhelpfulSpanReason where
       _ -> UnhelpfulOther <$> get bh
 
 instance Binary SrcSpan where
-  put_ bh (RealSrcSpan ss sb) = do
+  put_ bh (RealSrcSpan ss _sb) = do
           putByte bh 0
+          -- BufSpan doesn't ever get serialised because the positions depend
+          -- on build location.
           put_ bh ss
-          put_ bh sb
 
   put_ bh (UnhelpfulSpan s) = do
           putByte bh 1
@@ -1350,8 +1338,7 @@ instance Binary SrcSpan where
           h <- getByte bh
           case h of
             0 -> do ss <- get bh
-                    sb <- get bh
-                    return (RealSrcSpan ss sb)
+                    return (RealSrcSpan ss Strict.Nothing)
             _ -> do s <- get bh
                     return (UnhelpfulSpan s)
 
