@@ -77,7 +77,7 @@ module GHC.Utils.Binary
 
    -- * String table ("dictionary")
    putDictionary, getDictionary, putFS,
-   BinDictionary, initBinDictionary, getDictFastString, putDictFastString,
+   FSTable, initFSTable, getDictFastString, putDictFastString,
   ) where
 
 import GHC.Prelude
@@ -1143,13 +1143,13 @@ getDictFastString dict bh = do
     return $! (dict ! fromIntegral (j :: Word32))
 
 
-initBinDictionary :: BinHandle -> IO (BinHandle, BinDictionary, IO Int)
-initBinDictionary bh = do
+initFSTable :: BinHandle -> IO (BinHandle, FSTable, IO Int)
+initFSTable bh = do
   dict_next_ref <- newFastMutInt 0
   dict_map_ref <- newIORef emptyUFM
-  let bin_dict = BinDictionary
-        { bin_dict_next = dict_next_ref
-        , bin_dict_map  = dict_map_ref
+  let bin_dict = FSTable
+        { fs_tab_next = dict_next_ref
+        , fs_tab_map  = dict_map_ref
         }
   let put_dict = do
         fs_count <- readFastMutInt dict_next_ref
@@ -1164,12 +1164,13 @@ initBinDictionary bh = do
 
   return (bh_fs,bin_dict,put_dict)
 
-putDictFastString :: BinDictionary -> BinHandle -> FastString -> IO ()
+putDictFastString :: FSTable -> BinHandle -> FastString -> IO ()
 putDictFastString dict bh fs = allocateFastString dict fs >>= put_ bh
 
-allocateFastString :: BinDictionary -> FastString -> IO Word32
-allocateFastString BinDictionary { bin_dict_next = j_r,
-                                   bin_dict_map  = out_r} f = do
+allocateFastString :: FSTable -> FastString -> IO Word32
+allocateFastString FSTable { fs_tab_next = j_r
+                           , fs_tab_map  = out_r
+                           } f = do
     out <- readIORef out_r
     let !uniq = getUnique f
     case lookupUFM_Directly out uniq of
@@ -1180,9 +1181,10 @@ allocateFastString BinDictionary { bin_dict_next = j_r,
            writeIORef out_r $! addToUFM_Directly out uniq (j, f)
            return (fromIntegral j :: Word32)
 
-data BinDictionary = BinDictionary {
-        bin_dict_next :: !FastMutInt, -- The next index to use
-        bin_dict_map  :: !(IORef (UniqFM FastString (Int,FastString)))
+-- FSTable is an exact copy of Haddock.InterfaceFile.BinDictionary. We rename to
+-- avoid a collision and copy to avoid a dependency.
+data FSTable = FSTable { fs_tab_next :: !FastMutInt -- The next index to use
+                       , fs_tab_map  :: !(IORef (UniqFM FastString (Int,FastString)))
                                 -- indexed by FastString
   }
 

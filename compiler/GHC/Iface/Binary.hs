@@ -235,7 +235,7 @@ putWithTables bh put_payload = do
                       , bin_symtab_map  = symtab_map
                       }
 
-    (bh_fs, bin_dict, put_dict) <- initBinDictionary bh
+    (bh_fs, bin_dict, put_dict) <- initFSTable bh
 
     (fs_count,(name_count,r)) <- forwardPut bh (const put_dict) $ do
 
@@ -331,7 +331,7 @@ serialiseName bh name _ = do
 
 
 -- See Note [Symbol table representation of names]
-putName :: BinDictionary -> BinSymbolTable -> BinHandle -> Name -> IO ()
+putName :: FSTable -> BinSymbolTable -> BinHandle -> Name -> IO ()
 putName _dict BinSymbolTable{
                bin_symtab_map = symtab_map_ref,
                bin_symtab_next = symtab_next }

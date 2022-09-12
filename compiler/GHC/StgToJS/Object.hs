@@ -205,7 +205,7 @@ putObject bh mod_name deps os = do
   -- object in an archive.
   put_ bh (moduleNameString mod_name)
 
-  (bh_fs, _bin_dict, put_dict) <- initBinDictionary bh
+  (bh_fs, _bin_dict, put_dict) <- initFSTable bh
 
   forwardPut_ bh (const put_dict) $ do
     put_ bh_fs deps
