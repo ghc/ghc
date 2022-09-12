@@ -96,6 +96,7 @@ stage0Packages = do
              , parsec
              , time
              , templateHaskell
+             , templateHaskellSyntax
              , text
              , transformers
              , unlit

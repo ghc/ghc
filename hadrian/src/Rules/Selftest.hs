@@ -57,10 +57,10 @@ testDependencies :: Action ()
 testDependencies = do
     putBuild "==== pkgDependencies"
     let pkgs = ghcPackages \\ [libffi] -- @libffi@ does not have a Cabal file.
-    depLists <- mapM pkgDependencies pkgs
+    depLists <- mapM (pkgDependencies Stage1) pkgs
     test $ and [ deps == sort deps | deps <- depLists ]
     putBuild "==== Dependencies of the 'ghc-bin' binary"
-    ghcDeps <- pkgDependencies ghc
+    ghcDeps <- pkgDependencies Stage1 ghc
     test $ pkgName compiler `elem` ghcDeps
     stage0Deps <- contextDependencies (vanillaContext stage0InTree ghc)
     stage1Deps <- contextDependencies (vanillaContext Stage1 ghc)

@@ -1159,6 +1159,7 @@ LIBRARY_VERSION(base)
 LIBRARY_VERSION(Cabal, Cabal/Cabal/Cabal.cabal)
 dnl template-haskell.cabal is generated later
 dnl but the .in file already has the version
+LIBRARY_VERSION(template-haskell-syntax, template-haskell-syntax/template-haskell-syntax.cabal.in)
 LIBRARY_VERSION(template-haskell, template-haskell/template-haskell.cabal.in)
 LIBRARY_VERSION(array)
 LIBRARY_VERSION(ghc-prim)
@@ -1219,6 +1220,7 @@ AC_CONFIG_FILES(
   libraries/ghc-heap/ghc-heap.cabal
   libraries/libiserv/libiserv.cabal
   libraries/template-haskell/template-haskell.cabal
+  libraries/template-haskell-syntax/template-haskell-syntax.cabal
   docs/users_guide/ghc_config.py
   libraries/prologue.txt
   distrib/configure.ac

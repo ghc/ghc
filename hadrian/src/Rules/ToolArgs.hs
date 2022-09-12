@@ -15,6 +15,9 @@ import Hadrian.Haskell.Cabal.Type
 import System.Directory (canonicalizePath)
 import System.Environment (lookupEnv)
 import qualified Data.Set as Set
+import Oracles.ModuleFiles
+import Utilities
+import Hadrian.Haskell.Cabal
 
 -- | @tool:@ is used by tooling in order to get the arguments necessary
 -- to set up a GHC API session which can compile modules from GHC. When
@@ -66,8 +69,7 @@ multiSetup pkg_s = do
     resp_file root p = root </> "multi" </> pkgName p
 
     pkg_deps pkg = do
-      deps <- readPackageData pkg
-      let immediate_deps = filter (`elem` toolTargets) (packageDependencies deps)
+      immediate_deps <- filter (`elem` toolTargets) . mapMaybe findPackageByName <$> pkgDependencies stage0InTree pkg
       trans_deps <- Set.unions <$> mapM pkg_deps immediate_deps
       return (Set.fromList immediate_deps `Set.union` trans_deps)
 
@@ -176,6 +178,7 @@ toolTargets = [ binary
               , parsec
               , time
               , templateHaskell
+              , templateHaskellSyntax
               , text
               , transformers
 --            , unlit  # executable

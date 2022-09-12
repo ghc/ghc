@@ -7,7 +7,6 @@ import Base
 import CommandLine
 import Expression
 import Flavour
-import Hadrian.Haskell.Cabal.Type (packageDependencies)
 import Hadrian.Oracles.Cabal (readPackageData)
 import Oracles.Setting
 import Oracles.TestSettings
@@ -20,6 +19,7 @@ import Target
 import Utilities
 import Context.Type
 import qualified System.Directory as IO
+import Hadrian.Haskell.Cabal
 
 checkPprProgPath, checkPprSourcePath :: FilePath
 checkPprProgPath = "test/bin/check-ppr" <.> exe
@@ -146,7 +146,8 @@ testRules = do
             -- otherwise, build it by directly invoking ghc
               Nothing -> do
                 top <- topDirectory
-                depsPkgs <- mod_pkgs . packageDependencies <$> readPackageData progPkg
+                -- TODO, this is not correct.. should be the version of the out of tree compiler.
+                depsPkgs <- mod_pkgs . mapMaybe findPackageByName <$> pkgDependencies Stage2 progPkg
                 bindir <- getBinaryDirectory testGhc
                 test_args <- outOfTreeCompilerArgs
                 let dynPrograms = hasDynamic test_args

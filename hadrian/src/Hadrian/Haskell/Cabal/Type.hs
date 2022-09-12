@@ -16,6 +16,9 @@ import Distribution.PackageDescription
 import GHC.Generics
 
 import Hadrian.Package as Hadrian
+import Data.Version
+import Stage
+import qualified Distribution.Types.CondTree as C
 
 -- | Haskell package metadata extracted from a Cabal file without performing
 -- the resolution of package configuration flags and associated conditionals,
@@ -29,9 +32,10 @@ data PackageData = PackageData
     , version                   :: String
     , synopsis                  :: String
     , description               :: String
-    , packageDependencies       :: [Package]
+    , packageDependenciesConds  :: C.CondTree ConfVar [Dependency] ()
     , genericPackageDescription :: GenericPackageDescription
     } deriving (Eq, Generic, Show, Typeable)
+
 
 -- | Haskell package metadata obtained after resolving package configuration
 -- flags and associated conditionals according to the current build context.

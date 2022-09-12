@@ -43,7 +43,9 @@ contextDependencies Context {..} = do
         let newPkgs = nubOrd $ sort (deps ++ pkgs)
         if pkgs == newPkgs then return pkgs else go newPkgs
     step pkg = do
-        deps   <- pkgDependencies pkg
+        --MP: Using pkgDependencies here is wrong as it's an overapproximation, it should be using readContextData
+        -- which is after configuring and hence has resolved all conditionals.
+        deps   <- pkgDependencies stage pkg
         active <- sort <$> stagePackages stage
         return $ intersectOrd (compare . pkgName) active deps
 

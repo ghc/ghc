@@ -27,6 +27,7 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 import GHC.Exts (TYPE)
 import Prelude
 
+
 ----------------------------------------------------------
 -- * Type synonyms
 ----------------------------------------------------------

@@ -133,9 +133,9 @@ import GHC.Data.Maybe( MaybeErr(..) )
 import qualified GHC.Data.EnumSet as EnumSet
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
 import qualified Language.Haskell.TH.Syntax as TH
+import qualified Language.Haskell.TH.Ppr as TH
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 -- Because GHC.Desugar might not be in the base library of the bootstrapping compiler

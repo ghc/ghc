@@ -592,7 +592,7 @@ baseUnitId        = UnitId (fsLit "base")
 rtsUnitId         = UnitId (fsLit "rts")
 thisGhcUnitId     = UnitId (fsLit "ghc")
 interactiveUnitId = UnitId (fsLit "interactive")
-thUnitId          = UnitId (fsLit "template-haskell")
+thUnitId          = UnitId (fsLit "template-haskell-syntax")
 
 thUnit            = RealUnit (Definite thUnitId)
 primUnit          = RealUnit (Definite primUnitId)

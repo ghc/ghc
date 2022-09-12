@@ -48,8 +48,6 @@ module Language.Haskell.TH(
         reifyAnnotations, AnnLookup(..),
         -- *** Constructor strictness lookup
         reifyConStrictness,
-        -- *** Project root
-        getPackageRoot, makeRelativeToProject,
 
         -- * Typed expressions
         TExp, unType,
@@ -107,12 +105,3 @@ module Language.Haskell.TH(
 import Language.Haskell.TH.Syntax as Syntax
 import Language.Haskell.TH.Lib
 import Language.Haskell.TH.Ppr
-import System.FilePath
-import Prelude(return)
-
--- | The input is a filepath, which if relative is offset by the package root.
-makeRelativeToProject :: FilePath -> Q FilePath
-makeRelativeToProject fp | isRelative fp = do
-  root <- getPackageRoot
-  return (root </> fp)
-makeRelativeToProject fp = return fp

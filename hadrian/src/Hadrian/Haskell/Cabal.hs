@@ -15,11 +15,20 @@ module Hadrian.Haskell.Cabal (
     ) where
 
 import Development.Shake
-import Distribution.PackageDescription (GenericPackageDescription)
+import Distribution.PackageDescription (GenericPackageDescription, ConfVar (Impl, PackageFlag), mkFlagName)
 
 import Hadrian.Haskell.Cabal.Type
 import Hadrian.Oracles.Cabal
 import Hadrian.Package
+import Stage
+import Oracles.Setting
+import Data.Version.Extra
+import qualified Distribution.Types.CondTree as C
+import qualified Distribution.Types.Dependency as C
+import qualified Distribution.Types.Condition as C
+import Data.Maybe
+import Data.List.Extra
+import qualified Distribution.Simple                           as C
 
 -- | Read a Cabal file and return the package version. The Cabal file is tracked.
 pkgVersion :: Package -> Action String
@@ -47,8 +56,47 @@ pkgDescription = fmap description . readPackageData
 -- The current version does not take care of Cabal conditionals and therefore
 -- returns a crude overapproximation of actual dependencies. The Cabal file is
 -- tracked.
-pkgDependencies :: Package -> Action [PackageName]
-pkgDependencies = fmap (map pkgName . packageDependencies) . readPackageData
+pkgDependencies :: Stage -> Package -> Action [PackageName]
+pkgDependencies st pkg =  do
+  ghc_ver <- readVersion <$> ghcVersionStage st
+  deps <- packageDependenciesConds <$> readPackageData pkg
+  let dep_pkgs = resolve_package (C.mkVersion' ghc_ver) deps
+  return dep_pkgs
+
+  where
+    resolve_package ghc_ver deps =
+        let
+          allDeps = collectDeps deps
+          sorted :: [PackageName]
+          sorted  = sort [ C.unPackageName p | C.Dependency p _ _ <- allDeps ]
+          final_deps = nubOrd sorted \\ [pkgName pkg]
+        in final_deps
+
+      where
+        -- Collect an overapproximation of dependencies by ignoring conditionals
+        collectDeps :: C.CondTree ConfVar [C.Dependency] a -> [C.Dependency]
+        collectDeps ct = simplifyCondTreeAccum resolveConf ct
+
+        resolveConf (Impl C.GHC vr) = Right (C.withinRange ghc_ver vr)
+        resolveConf v@(PackageFlag fn) = if fn == mkFlagName "template-haskell-quotes" then (Right (st >= Stage1)) else Left v
+        resolveConf v = Left v
+
+-- | Flatten a CondTree.  This will resolve the CondTree by taking all
+-- cannot be evaluated, both branches are returned
+simplifyCondTreeAccum :: (Show v, Monoid d) =>
+                    (v -> Either v Bool)
+                 -> C.CondTree v d a
+                 -> d
+simplifyCondTreeAccum env (C.CondNode _a d ifs) =
+    foldl (<>) d $ mapMaybe simplifyIf ifs
+  where
+    simplifyIf (C.CondBranch cnd t me) =
+        case C.simplifyCondition cnd env of
+          (C.Lit True, _) -> Just $ simplifyCondTreeAccum env t
+          (C.Lit False, _) -> fmap (simplifyCondTreeAccum env) me
+          _ -> Just $ (simplifyCondTreeAccum env t) <>
+                        fromMaybe mempty (fmap (simplifyCondTreeAccum env) me)
+
 
 -- | Read a Cabal file and return the 'GenericPackageDescription'. The Cabal
 -- file is tracked.

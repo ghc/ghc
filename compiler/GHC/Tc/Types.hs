@@ -174,7 +174,7 @@ import Data.Maybe    ( mapMaybe )
 import GHCi.Message
 import GHCi.RemoteTypes
 
-import qualified Language.Haskell.TH as TH
+import qualified Language.Haskell.TH.Syntax as TH
 import GHC.Driver.Env.KnotVars
 import GHC.Linker.Types
 

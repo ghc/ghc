@@ -67,7 +67,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Splice
 import GHC.Tc.Utils.Zonk
 
 import GHCi.RemoteTypes ( ForeignRef )
-import qualified Language.Haskell.TH as TH (Q)
+import qualified Language.Haskell.TH.Syntax as TH (Q)
 
 import qualified GHC.LanguageExtensions as LangExt
 

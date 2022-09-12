@@ -154,7 +154,7 @@ import GHC.Parser.Errors.Types ( PsWarning, PsError )
 import GHC.Types.Error         ( Messages )
 import GHC.Hs                  ( HsParsedModule )
 
-import qualified Language.Haskell.TH as TH
+import qualified Language.Haskell.TH.Syntax as TH
 
 {- This instance is defined outside GHC.Core.Opt.Monad so that
    GHC.Core.Opt.Monad does not depend on GHC.Tc.Utils.Env -}

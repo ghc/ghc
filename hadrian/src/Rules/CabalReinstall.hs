@@ -24,7 +24,7 @@ The libdir of the reinstalled GHC points to the libdir of the stage 2 compiler (
 
 -- | We don't support reinstalling these
 cabalExcludedPackages :: [Package]
-cabalExcludedPackages = [array, base, deepseq, filepath, ghcBignum, ghcBootTh, ghcPrim, integerGmp, integerSimple, pretty, templateHaskell]
+cabalExcludedPackages = [array, base, deepseq, filepath, ghcBignum, ghcBootTh, ghcPrim, integerGmp, integerSimple, pretty, templateHaskellSyntax]
 
 findCabalPackageDb :: String -> FilePath
 findCabalPackageDb env = go $ map (\l -> (words l, l)) (lines env)

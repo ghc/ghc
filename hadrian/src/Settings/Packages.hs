@@ -40,6 +40,15 @@ packageArgs = do
           -- See: https://github.com/snowleopard/hadrian/issues/259.
           , builder (Ghc CompileCWithGhc) ? arg "-optc-O2" ]
 
+        , package bytestring ? mconcat
+          [ builder (Cabal Flags) ? notStage0 `cabalFlag` "template-haskell-quotes"]
+
+        , package exceptions ? mconcat
+          [ builder (Cabal Flags) ? notStage0 `cabalFlag` "template-haskell-quotes"]
+
+        , package text ? mconcat
+          [ builder (Cabal Flags) ? notStage0 `cabalFlag` "template-haskell-quotes"]
+
         --------------------------------- cabal --------------------------------
         -- Cabal is a large library and slow to compile. Moreover, we build it
         -- for Stage0 only so we can link ghc-pkg against it, so there is little
@@ -144,7 +153,16 @@ packageArgs = do
               (andM [cross, bootCross] `cabalFlag` "internal-interpreter")
               (arg "internal-interpreter")
 
+
+
+
           ]
+
+        , package templateHaskellSyntax ? notStage0
+            ? mconcat
+              [ builder Ghc ? arg "-this-unit-id template-haskell-syntax"
+              , builder (Cabal Setup) ? arg "--ghc-options=\"-this-unit-id template-haskell-syntax\""
+              ]
 
         --------------------------------- iserv --------------------------------
         -- Add -Wl,--export-dynamic enables GHCi to load dynamic objects that
@@ -213,11 +231,6 @@ packageArgs = do
         , package hpcBin
           ? builder (Cabal Flags) ? arg "-build-tool-depends"
 
-        --------------------------------- template-haskell ----------------------------------
-
-        , package templateHaskell
-            ? mconcat [ builder (Cabal Flags) ? notStage0 ? arg "+vendor-filepath"
-                      , builder Ghc ? notStage0 ? arg ("-i" <> (root </> pkgPath filepath)) ]
         ]
 
 ghcBignumArgs :: Args

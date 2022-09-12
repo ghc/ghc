@@ -40,7 +40,6 @@ import GHC.HsToCore.Match.Literal
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Binds
 
-import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Syntax as TH
 
 import GHC.Hs
@@ -90,6 +89,7 @@ import Data.Kind (Constraint)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import qualified Language.Haskell.TH.Lib as TH
 
 import Data.ByteString ( unpack )
 import Control.Monad

@@ -61,7 +61,7 @@ import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
 import Control.Applicative( (<|>) )
 import Data.Maybe( catMaybes, isNothing )
-import Language.Haskell.TH as TH hiding (sigP)
+import qualified Language.Haskell.TH.Ppr as TH
 import Language.Haskell.TH.Syntax as TH
 import Foreign.ForeignPtr
 import Foreign.Ptr
@@ -152,7 +152,7 @@ wrapMsg what item (CvtM m)
     msg = hang (text "When splicing a TH" <+> text what <> colon)
                  2 (getPprDebug $ \case
                      True  -> text (show item)
-                     False -> text (pprint item))
+                     False -> text (TH.pprint item))
 
 wrapL :: CvtM a -> CvtM (Located a)
 wrapL (CvtM m) = CvtM $ \origin loc -> case m origin loc of

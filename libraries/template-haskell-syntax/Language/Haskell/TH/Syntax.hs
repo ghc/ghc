@@ -34,7 +34,6 @@ module Language.Haskell.TH.Syntax
 import Data.Data hiding (Fixity(..))
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
-import System.FilePath
 import GHC.IO.Unsafe    ( unsafeDupableInterleaveIO )
 import Control.Monad (liftM)
 import Control.Monad.IO.Class (MonadIO (..))
@@ -761,15 +760,6 @@ runIO m = Q (qRunIO m)
 -- appropiately.
 getPackageRoot :: Q FilePath
 getPackageRoot = Q qGetPackageRoot
-
--- | The input is a filepath, which if relative is offset by the package root.
-makeRelativeToProject :: FilePath -> Q FilePath
-makeRelativeToProject fp | isRelative fp = do
-  root <- getPackageRoot
-  return (root </> fp)
-makeRelativeToProject fp = return fp
-
-
 
 -- | Record external files that runIO is using (dependent upon).
 -- The compiler can then recognize that it should re-compile the Haskell file

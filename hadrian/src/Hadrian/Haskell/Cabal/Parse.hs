@@ -73,23 +73,23 @@ parsePackageData pkg = do
         pkgId   = C.package pd
         name    = C.unPackageName (C.pkgName pkgId)
         version = C.display (C.pkgVersion pkgId)
-        libDeps = collectDeps (C.condLibrary gpd)
-        exeDeps = map (collectDeps . Just . snd) (C.condExecutables gpd)
-        allDeps = concat (libDeps : exeDeps)
-        sorted  = sort [ C.unPackageName p | C.Dependency p _ _ <- allDeps ]
-        deps    = nubOrd sorted \\ [name]
-        depPkgs = catMaybes $ map findPackageByName deps
+        libDeps = fmap (const ()) <$> (C.condLibrary gpd)
+        exeDeps = map (fmap (const ()) . snd) (C.condExecutables gpd)
+        allDeps = mconcat (fromMaybe mempty libDeps : exeDeps)
     return $ PackageData name version
                          (C.fromShortText (C.synopsis pd))
                          (C.fromShortText (C.description pd))
-                         depPkgs gpd
+                         allDeps gpd
   where
-    -- Collect an overapproximation of dependencies by ignoring conditionals
-    collectDeps :: Maybe (C.CondTree v [C.Dependency] a) -> [C.Dependency]
-    collectDeps Nothing = []
-    collectDeps (Just (C.CondNode _ deps ifs)) = deps ++ concatMap f ifs
-      where
-        f (C.CondBranch _ t mt) = collectDeps (Just t) ++ collectDeps mt
+
+instance (Semigroup a, Semigroup c) => Semigroup (C.CondTree v c a) where
+   (C.CondNode a c bs) <> (C.CondNode a' c' bs') = C.CondNode (a <> a') (c <> c') (bs <> bs')
+
+instance (Semigroup a, Semigroup c, Monoid a, Monoid c) => Monoid (C.CondTree v c a) where
+   mappend = (<>)
+   mempty = C.CondNode mempty mempty mempty
+
+
 
 -- | Parse the package identifier from a Cabal file.
 parseCabalPkgId :: FilePath -> IO String
@@ -125,7 +125,7 @@ configurePackage :: Context -> Action ()
 configurePackage context@Context {..} = do
     putProgressInfo $ "| Configure package " ++ quote (pkgName package)
     gpd     <- pkgGenericDescription package
-    depPkgs <- packageDependencies <$> readPackageData package
+    depPkgs <- mapMaybe findPackageByName <$> pkgDependencies stage package
 
     -- Stage packages are those we have in this stage.
     stagePkgs <- stagePackages stage
