@@ -3,6 +3,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic PsMessage
 
@@ -18,6 +20,7 @@ import GHC.Types.Hint
 import GHC.Types.Error
 import GHC.Types.Hint.Ppr (perhapsAsPat)
 import GHC.Types.SrcLoc
+import GHC.Types.Error.Codes ( constructorCode )
 import GHC.Types.Name.Reader ( opIsAt, rdrNameOcc, mkUnqual )
 import GHC.Types.Name.Occurrence (isSymOcc, occNameFS, varName)
 import GHC.Utils.Outputable
@@ -785,6 +788,8 @@ instance Diagnostic PsMessage where
     PsErrInvalidPackageName{}                     -> noHints
     PsErrIllegalGadtRecordMultiplicity{}          -> noHints
     PsErrInvalidCApiImport {}                     -> noHints
+
+  diagnosticCode = constructorCode
 
 psHeaderMessageDiagnostic :: PsHeaderMessage -> DecoratedSDoc
 psHeaderMessageDiagnostic = \case

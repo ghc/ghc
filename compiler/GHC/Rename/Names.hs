@@ -352,7 +352,7 @@ rnImportDecl this_mod
              NoPkgQual         -> True
              ThisPkg uid       -> uid == homeUnitId_ (hsc_dflags hsc_env)
              OtherPkg _        -> False))
-         (addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+         (addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
            (text "A module cannot import itself:" <+> ppr imp_mod_name))
 
     -- Check for a missing import list (Opt_WarnMissingImportList also
@@ -362,7 +362,7 @@ rnImportDecl this_mod
         _  | implicit   -> return () -- Do not bleat for implicit imports
            | qual_only  -> return ()
            | otherwise  -> whenWOptM Opt_WarnMissingImportList $ do
-                             let msg = TcRnUnknownMessage $
+                             let msg = mkTcRnUnknownMessage $
                                    mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingImportList)
                                                      noHints
                                                      (missingImportListWarn imp_mod_name)
@@ -387,7 +387,7 @@ rnImportDecl this_mod
     warnIf ((want_boot == IsBoot) && (mi_boot iface == NotBoot) && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
-        addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+        addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
           (text "safe import can't be used as Safe Haskell isn't on!"
                 $+$ text ("please enable Safe Haskell through either Safe, Trustworthy or Unsafe"))
 
@@ -429,7 +429,7 @@ rnImportDecl this_mod
     -- Complain if we import a deprecated module
     case mi_warns iface of
        WarnAll txt -> do
-         let msg = TcRnUnknownMessage $
+         let msg = mkTcRnUnknownMessage $
                mkPlainDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
                                  noHints
                                  (moduleWarn imp_mod_name txt)
@@ -610,7 +610,7 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
 warnUnqualifiedImport :: ImportDecl GhcPs -> ModIface -> RnM ()
 warnUnqualifiedImport decl iface =
     when bad_import $ do
-      let msg = TcRnUnknownMessage $
+      let msg = mkTcRnUnknownMessage $
             mkPlainDiagnostic (WarningWithFlag Opt_WarnCompatUnqualifiedImports)
                               noHints
                               warning
@@ -643,7 +643,7 @@ warnUnqualifiedImport decl iface =
 
 warnRedundantSourceImport :: ModuleName -> TcRnMessage
 warnRedundantSourceImport mod_name
-  = TcRnUnknownMessage $ mkPlainDiagnostic WarningWithoutFlag noHints $
+  = mkTcRnUnknownMessage $ mkPlainDiagnostic WarningWithoutFlag noHints $
       text "Unnecessary {-# SOURCE #-} in the import of module" <+> quotes (ppr mod_name)
 
 {-
@@ -1277,7 +1277,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
             emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
               addTcRnDiagnostic (TcRnMissingImportList ieRdr)
             emit_warning (BadImportW ie) = whenWOptM Opt_WarnDodgyImports $ do
-              let msg = TcRnUnknownMessage $
+              let msg = mkTcRnUnknownMessage $
                     mkPlainDiagnostic (WarningWithFlag Opt_WarnDodgyImports)
                                       noHints
                                       (lookup_err_msg (BadImport ie))
@@ -1286,7 +1286,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
             run_lookup :: IELookupM a -> TcRn (Maybe a)
             run_lookup m = case m of
               Failed err -> do
-                addErr $ TcRnUnknownMessage $ mkPlainError noHints (lookup_err_msg err)
+                addErr $ mkTcRnUnknownMessage $ mkPlainError noHints (lookup_err_msg err)
                 return Nothing
               Succeeded a -> return (Just a)
 
@@ -1834,7 +1834,7 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
 
   -- Nothing used; drop entire declaration
   | null used
-  = let dia = TcRnUnknownMessage $
+  = let dia = mkTcRnUnknownMessage $
           mkPlainDiagnostic (WarningWithFlag flag) noHints msg1
     in addDiagnosticAt (locA loc) dia
 
@@ -1847,12 +1847,12 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
   | Just (_, L _ imports) <- ideclImportList decl
   , length unused == 1
   , Just (L loc _) <- find (\(L _ ie) -> ((ieName ie) :: Name) `elem` unused) imports
-  = let dia = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints msg2
+  = let dia = mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints msg2
     in addDiagnosticAt (locA loc) dia
 
   -- Some imports are unused
   | otherwise
-  = let dia = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints msg2
+  = let dia = mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints msg2
     in addDiagnosticAt (locA loc) dia
 
   where
@@ -2144,7 +2144,7 @@ illegalImportItemErr = text "Illegal import item"
 addDupDeclErr :: [GlobalRdrElt] -> TcRn ()
 addDupDeclErr [] = panic "addDupDeclErr: empty list"
 addDupDeclErr gres@(gre : _)
-  = addErrAt (getSrcSpan (last sorted_names)) $ TcRnUnknownMessage $ mkPlainError noHints $
+  = addErrAt (getSrcSpan (last sorted_names)) $ mkTcRnUnknownMessage $ mkPlainError noHints $
     -- Report the error at the later location
     vcat [text "Multiple declarations of" <+>
              quotes (ppr (greOccName gre)),
@@ -2175,7 +2175,7 @@ moduleWarn mod (DeprecatedTxt _ txt)
 
 packageImportErr :: TcRnMessage
 packageImportErr
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
   text "Package-qualified imports are not enabled; use PackageImports"
 
 -- This data decl will parse OK
@@ -2193,5 +2193,5 @@ checkConName name = checkErr (isRdrDataCon name) (badDataCon name)
 
 badDataCon :: RdrName -> TcRnMessage
 badDataCon name
-   = TcRnUnknownMessage $ mkPlainError noHints $
+   = mkTcRnUnknownMessage $ mkPlainError noHints $
    hsep [text "Illegal data constructor name", quotes (ppr name)]

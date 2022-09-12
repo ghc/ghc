@@ -300,7 +300,7 @@ loadSrcInterface :: SDoc
 loadSrcInterface doc mod want_boot maybe_pkg
   = do { res <- loadSrcInterface_maybe doc mod want_boot maybe_pkg
        ; case res of
-           Failed err      -> failWithTc (TcRnUnknownMessage $ mkPlainError noHints err)
+           Failed err      -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints err)
            Succeeded iface -> return iface }
 
 -- | Like 'loadSrcInterface', but returns a 'MaybeErr'.

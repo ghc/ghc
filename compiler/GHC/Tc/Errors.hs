@@ -13,7 +13,6 @@ module GHC.Tc.Errors(
 
        -- * GHC API helper functions
        solverReportMsg_ExpectedActuals,
-       solverReportInfo_ExpectedActuals
   ) where
 
 import GHC.Prelude
@@ -79,13 +78,12 @@ import GHC.Data.List.SetOps ( equivClasses, nubOrdBy )
 import GHC.Data.Maybe
 import qualified GHC.Data.Strict as Strict
 
-import Control.Monad    ( unless, when, foldM, forM_ )
-import Data.Foldable    ( toList )
-import Data.Function    ( on )
-import Data.List        ( partition, sort, sortBy )
-import Data.List.NonEmpty ( NonEmpty(..), (<|) )
-import qualified Data.List.NonEmpty as NE ( map, reverse )
-import Data.Ord         ( comparing )
+import Control.Monad      ( unless, when, foldM, forM_ )
+import Data.Foldable      ( toList )
+import Data.Function      ( on )
+import Data.List          ( partition, sort, sortBy )
+import Data.List.NonEmpty ( NonEmpty(..) )
+import Data.Ord           ( comparing )
 import qualified Data.Semigroup as S
 
 {-
@@ -263,13 +261,18 @@ report_unsolved type_errors expr_holes
 
 -- | Make a report from a single 'TcSolverReportMsg'.
 important :: SolverReportErrCtxt -> TcSolverReportMsg -> SolverReport
-important ctxt doc = mempty { sr_important_msgs = [SolverReportWithCtxt ctxt doc] }
+important ctxt doc
+  = SolverReport { sr_important_msg = SolverReportWithCtxt ctxt doc
+                 , sr_supplementary = []
+                 , sr_hints         = [] }
 
-mk_relevant_bindings :: RelevantBindings -> SolverReport
-mk_relevant_bindings binds = mempty { sr_supplementary = [SupplementaryBindings binds] }
+add_relevant_bindings :: RelevantBindings -> SolverReport -> SolverReport
+add_relevant_bindings binds report@(SolverReport { sr_supplementary = supp })
+  = report { sr_supplementary = SupplementaryBindings binds : supp }
 
-mk_report_hints :: [GhcHint] -> SolverReport
-mk_report_hints hints = mempty { sr_hints = hints }
+add_report_hints :: [GhcHint] -> SolverReport -> SolverReport
+add_report_hints hints report@(SolverReport { sr_hints = prev_hints })
+  = report { sr_hints = prev_hints ++ hints }
 
 -- | Returns True <=> the SolverReportErrCtxt indicates that something is deferred
 deferringAnyBindings :: SolverReportErrCtxt -> Bool
@@ -436,7 +439,7 @@ reportBadTelescope :: SolverReportErrCtxt -> TcLclEnv -> SkolemInfoAnon -> [TcTy
 reportBadTelescope ctxt env (ForAllSkol telescope) skols
   = do { msg <- mkErrorReport
                   env
-                  (TcRnSolverReport [report] ErrorWithoutFlag noHints)
+                  (TcRnSolverReport report ErrorWithoutFlag noHints)
                   (Just ctxt)
                   []
        ; reportDiagnostic msg }
@@ -905,7 +908,7 @@ reportNotConcreteErrs ctxt errs@(err0:_)
 
     frr_origins = acc_errors errs
     diag = TcRnSolverReport
-             [SolverReportWithCtxt ctxt (FixedRuntimeRepError frr_origins)]
+             (SolverReportWithCtxt ctxt (FixedRuntimeRepError frr_origins))
              ErrorWithoutFlag noHints
 
     -- Accumulate the different kind of errors arising from syntactic equality.
@@ -961,10 +964,10 @@ mkGivenErrorReporter ctxt items
                    -- with one from the immediately-enclosing implication.
                    -- See Note [Inaccessible code]
 
-       ; (eq_err_msgs, _hints) <- mkEqErr_help ctxt item' ty1 ty2
+       ; (eq_err_msg, _hints) <- mkEqErr_help ctxt item' ty1 ty2
        -- The hints wouldn't help in this situation, so we discard them.
        ; let supplementary = [ SupplementaryBindings relevant_binds ]
-             msg = TcRnInaccessibleCode implic (NE.reverse . NE.map (SolverReportWithCtxt ctxt) $ eq_err_msgs)
+             msg = TcRnInaccessibleCode implic (SolverReportWithCtxt ctxt eq_err_msg)
        ; msg <- mkErrorReport (ctLocEnv loc') msg (Just ctxt) supplementary
        ; reportDiagnostic msg }
   where
@@ -1061,7 +1064,7 @@ nonDeferrableOrigin _                       = False
 maybeReportError :: SolverReportErrCtxt
                  -> [ErrorItem]     -- items covered by the Report
                  -> SolverReport -> TcM ()
-maybeReportError ctxt items@(item1:_) (SolverReport { sr_important_msgs = important
+maybeReportError ctxt items@(item1:_) (SolverReport { sr_important_msg = important
                                                     , sr_supplementary = supp
                                                     , sr_hints = hints })
   = unless (cec_suppress ctxt  -- Some worse error has occurred, so suppress this diagnostic
@@ -1099,7 +1102,7 @@ addDeferredBinding _ _ _ = return ()    -- Do not set any evidence for Given
 
 mkErrorTerm :: SolverReportErrCtxt -> CtLoc -> Type  -- of the error term
             -> SolverReport -> TcM EvTerm
-mkErrorTerm ctxt ct_loc ty (SolverReport { sr_important_msgs = important, sr_supplementary = supp })
+mkErrorTerm ctxt ct_loc ty (SolverReport { sr_important_msg = important, sr_supplementary = supp })
   = do { msg <- mkErrorReport
                   (ctLocEnv ct_loc)
                   (TcRnSolverReport important ErrorWithoutFlag noHints) (Just ctxt) supp
@@ -1278,10 +1281,10 @@ coercion.
 
 mkIrredErr :: SolverReportErrCtxt -> [ErrorItem] -> TcM SolverReport
 mkIrredErr ctxt items
-  = do { (ctxt, binds_msg, item1) <- relevantBindings True ctxt item1
-       ; let msg = important ctxt $
+  = do { (ctxt, binds, item1) <- relevantBindings True ctxt item1
+       ; let msg = important ctxt $ mkPlainMismatchMsg $
                    CouldNotDeduce (getUserGivens ctxt) (item1 :| others) Nothing
-       ; return $ msg `mappend` mk_relevant_bindings binds_msg }
+       ; return $ add_relevant_bindings binds msg  }
   where
     (item1:others) = final_items
 
@@ -1342,11 +1345,11 @@ mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_occ = occ, hole_loc = ct_loc 
                 = unknownNameSuggestions WL_Anything
                     dflags hpt curr_mod rdr_env
                     (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ)
-             errs   = [SolverReportWithCtxt ctxt (ReportHoleError hole $ OutOfScopeHole imp_errs)]
-             report = SolverReport errs [] hints
+             err    = SolverReportWithCtxt ctxt (ReportHoleError hole $ OutOfScopeHole imp_errs)
+             report = SolverReport err [] hints
 
        ; maybeAddDeferredBindings ctxt hole report
-       ; mkErrorReport lcl_env (TcRnSolverReport errs (cec_out_of_scope_holes ctxt) hints) Nothing []
+       ; mkErrorReport lcl_env (TcRnSolverReport err (cec_out_of_scope_holes ctxt) hints) Nothing []
           -- Pass the value 'Nothing' for the context, as it's generally not helpful
           -- to include the context here.
        }
@@ -1376,14 +1379,14 @@ mkHoleError lcl_name_cache tidy_simples ctxt
        ; (grouped_skvs, other_tvs) <- zonkAndGroupSkolTvs hole_ty
        ; let reason | ExprHole _ <- sort = cec_expr_holes ctxt
                     | otherwise          = cec_type_holes ctxt
-             errs = [SolverReportWithCtxt ctxt $ ReportHoleError hole $ HoleError sort other_tvs grouped_skvs]
+             err  = SolverReportWithCtxt ctxt $ ReportHoleError hole $ HoleError sort other_tvs grouped_skvs
              supp = [ SupplementaryBindings rel_binds
                     , SupplementaryCts      relevant_cts
                     , SupplementaryHoleFits hole_fits ]
 
-       ; maybeAddDeferredBindings ctxt hole (SolverReport errs supp [])
+       ; maybeAddDeferredBindings ctxt hole (SolverReport err supp [])
 
-       ; mkErrorReport lcl_env (TcRnSolverReport errs reason noHints) (Just ctxt) supp
+       ; mkErrorReport lcl_env (TcRnSolverReport err reason noHints) (Just ctxt) supp
        }
 
   where
@@ -1472,9 +1475,9 @@ mkIPErr :: SolverReportErrCtxt -> [ErrorItem] -> TcM SolverReport
 -- Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint? Very unclear
 -- what's best. Let's not worry about this.
 mkIPErr ctxt items
-  = do { (ctxt, binds_msg, item1) <- relevantBindings True ctxt item1
+  = do { (ctxt, binds, item1) <- relevantBindings True ctxt item1
        ; let msg = important ctxt $ UnboundImplicitParams (item1 :| others)
-       ; return $ msg `mappend` mk_relevant_bindings binds_msg }
+       ; return $ add_relevant_bindings binds msg }
   where
     item1:others = items
 
@@ -1584,19 +1587,13 @@ mkEqErr ctxt items
 mkEqErr1 :: SolverReportErrCtxt -> ErrorItem -> TcM SolverReport
 mkEqErr1 ctxt item   -- Wanted only
                      -- givens handled in mkGivenErrorReporter
-  = do { (ctxt, binds_msg, item) <- relevantBindings True ctxt item
-       ; rdr_env <- getGlobalRdrEnv
-       ; fam_envs <- tcGetFamInstEnvs
-       ; let mb_coercible_msg = case errorItemEqRel item of
-               NomEq  -> Nothing
-               ReprEq -> ReportCoercibleMsg <$> mkCoercibleExplanation rdr_env fam_envs ty1 ty2
+  = do { (ctxt, binds, item) <- relevantBindings True ctxt item
        ; traceTc "mkEqErr1" (ppr item $$ pprCtOrigin (errorItemOrigin item))
-       ; (last_msg :| prev_msgs, hints) <- mkEqErr_help ctxt item ty1 ty2
+       ; (err_msg, hints) <- mkEqErr_help ctxt item ty1 ty2
        ; let
-           report = foldMap (important ctxt) (reverse prev_msgs)
-                  `mappend` (important ctxt $ mkTcReportWithInfo last_msg $ maybeToList mb_coercible_msg)
-                  `mappend` (mk_relevant_bindings binds_msg)
-                  `mappend` (mk_report_hints hints)
+           report = add_relevant_bindings binds
+                  $ add_report_hints hints
+                  $ important ctxt err_msg
        ; return report }
   where
     (ty1, ty2) = getEqPredTys (errorItemPred item)
@@ -1642,38 +1639,55 @@ mkCoercibleExplanation rdr_env fam_envs ty1 ty2
       | otherwise
       = False
 
--- | Accumulated messages in reverse order.
-type AccReportMsgs = NonEmpty TcSolverReportMsg
-
 mkEqErr_help :: SolverReportErrCtxt
              -> ErrorItem
-             -> TcType -> TcType -> TcM (AccReportMsgs, [GhcHint])
+             -> TcType -> TcType -> TcM (TcSolverReportMsg, [GhcHint])
 mkEqErr_help ctxt item ty1 ty2
   | Just casted_tv1 <- tcGetCastedTyVar_maybe ty1
   = mkTyVarEqErr ctxt item casted_tv1 ty2
   | Just casted_tv2 <- tcGetCastedTyVar_maybe ty2
   = mkTyVarEqErr ctxt item casted_tv2 ty1
   | otherwise
-  = return (reportEqErr ctxt item ty1 ty2 :| [], [])
+  = do
+    err <- reportEqErr ctxt item ty1 ty2
+    return (err, noHints)
 
 reportEqErr :: SolverReportErrCtxt
             -> ErrorItem
-            -> TcType -> TcType -> TcSolverReportMsg
+            -> TcType -> TcType
+            -> TcM TcSolverReportMsg
 reportEqErr ctxt item ty1 ty2
-  = mkTcReportWithInfo mismatch eqInfos
+  = do
+    mb_coercible_info <-
+      if errorItemEqRel item == ReprEq
+      then coercible_msg ty1 ty2
+      else return Nothing
+    return $
+      Mismatch
+       { mismatchMsg           = mismatch
+       , mismatchTyVarInfo     = Nothing
+       , mismatchAmbiguityInfo = eqInfos
+       , mismatchCoercibleInfo = mb_coercible_info }
   where
     mismatch = misMatchOrCND False ctxt item ty1 ty2
     eqInfos  = eqInfoMsgs ty1 ty2
 
+coercible_msg :: TcType -> TcType -> TcM (Maybe CoercibleMsg)
+coercible_msg ty1 ty2
+  = do
+    rdr_env  <- getGlobalRdrEnv
+    fam_envs <- tcGetFamInstEnvs
+    return $ mkCoercibleExplanation rdr_env fam_envs ty1 ty2
+
 mkTyVarEqErr :: SolverReportErrCtxt -> ErrorItem
-             -> (TcTyVar, TcCoercionN) -> TcType -> TcM (AccReportMsgs, [GhcHint])
+             -> (TcTyVar, TcCoercionN) -> TcType -> TcM (TcSolverReportMsg, [GhcHint])
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr ctxt item casted_tv1 ty2
   = do { traceTc "mkTyVarEqErr" (ppr item $$ ppr casted_tv1 $$ ppr ty2)
        ; mkTyVarEqErr' ctxt item casted_tv1 ty2 }
 
 mkTyVarEqErr' :: SolverReportErrCtxt -> ErrorItem
-              -> (TcTyVar, TcCoercionN) -> TcType -> TcM (AccReportMsgs, [GhcHint])
+              -> (TcTyVar, TcCoercionN) -> TcType -> TcM (TcSolverReportMsg, [GhcHint])
 mkTyVarEqErr' ctxt item (tv1, co1) ty2
 
   -- Is this a representation-polymorphism error, e.g.
@@ -1681,24 +1695,28 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
   | Just frr_info <- mb_concrete_reason
   = do
       (_, infos) <- zonkTidyFRRInfos (cec_tidy ctxt) [frr_info]
-      return (FixedRuntimeRepError infos :| [], [])
+      return (FixedRuntimeRepError infos, [])
 
   -- Impredicativity is a simple error to understand; try it before
   -- anything more complicated.
   | check_eq_result `cterHasProblem` cteImpredicative
   = do
-    tyvar_eq_info <- extraTyVarEqInfo tv1 ty2
+    tyvar_eq_info <- extraTyVarEqInfo (tv1, Nothing) ty2
     let
-        poly_msg = CannotUnifyWithPolytype item tv1 ty2
-        poly_msg_with_info
+        poly_msg = CannotUnifyWithPolytype item tv1 ty2 mb_tv_info
+        mb_tv_info
           | isSkolemTyVar tv1
-          = mkTcReportWithInfo poly_msg tyvar_eq_info
+          = Just tyvar_eq_info
           | otherwise
-          = poly_msg
+          = Nothing
+        main_msg =
+          CannotUnifyVariable
+            { mismatchMsg       = headline_msg
+            , cannotUnifyReason = poly_msg }
         -- Unlike the other reports, this discards the old 'report_important'
         -- instead of augmenting it.  This is because the details are not likely
         -- to be helpful since this is just an unimplemented feature.
-    return (poly_msg_with_info <| headline_msg :| [], [])
+    return (main_msg, [])
 
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
                        -- swapped in Solver.Canonical.canEqTyVarHomo
@@ -1706,30 +1724,43 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
     || errorItemEqRel item == ReprEq
      -- The cases below don't really apply to ReprEq (except occurs check)
   = do
-    tv_extra     <- extraTyVarEqInfo tv1 ty2
-    return (mkTcReportWithInfo headline_msg tv_extra :| [], add_sig)
+    tv_extra <- extraTyVarEqInfo (tv1, Nothing) ty2
+    reason <-
+      if errorItemEqRel item == ReprEq
+      then RepresentationalEq tv_extra <$> coercible_msg ty1 ty2
+      else return $ DifferentTyVars tv_extra
+    let main_msg =
+          CannotUnifyVariable
+            { mismatchMsg       = headline_msg
+            , cannotUnifyReason = reason }
+    return (main_msg, add_sig)
 
   | cterHasOccursCheck check_eq_result
     -- We report an "occurs check" even for  a ~ F t a, where F is a type
     -- function; it's not insoluble (because in principle F could reduce)
     -- but we have certainly been unable to solve it
-  = let extras2 = eqInfoMsgs ty1 ty2
+  = let ambiguity_infos = eqInfoMsgs ty1 ty2
 
         interesting_tyvars = filter (not . noFreeVarsOfType . tyVarKind) $
                              filter isTyVar $
                              fvVarList $
                              tyCoFVsOfType ty1 `unionFV` tyCoFVsOfType ty2
 
-        extras3 = case interesting_tyvars of
-          [] -> []
-          (tv : tvs) -> [OccursCheckInterestingTyVars (tv :| tvs)]
+        occurs_err =
+          OccursCheck
+            { occursCheckInterestingTyVars = interesting_tyvars
+            , occursCheckAmbiguityInfos    = ambiguity_infos }
+        main_msg =
+          CannotUnifyVariable
+            { mismatchMsg       = headline_msg
+            , cannotUnifyReason = occurs_err }
 
-    in return (mkTcReportWithInfo headline_msg (extras2 ++ extras3) :| [], [])
+    in return (main_msg, [])
 
     -- This is wrinkle (4) in Note [Equalities with incompatible kinds] in
     -- GHC.Tc.Solver.Canonical
   | hasCoercionHoleCo co1 || hasCoercionHoleTy ty2
-  = return (mkBlockedEqErr item :| [], [])
+  = return (mkBlockedEqErr item, [])
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
@@ -1739,15 +1770,25 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
   , Implic { ic_skols = skols } <- implic
   , tv1 `elem` skols
   = do
-    tv_extra     <- extraTyVarEqInfo tv1 ty2
-    return (mkTcReportWithInfo mismatch_msg tv_extra :| [], [])
+    tv_extra <- extraTyVarEqInfo (tv1, Nothing) ty2
+    let msg = Mismatch
+               { mismatchMsg           = mismatch_msg
+               , mismatchTyVarInfo     = Just tv_extra
+               , mismatchAmbiguityInfo = []
+               , mismatchCoercibleInfo = Nothing }
+    return (msg, [])
 
   -- Check for skolem escape
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
   , Implic { ic_skols = skols } <- implic
   , let esc_skols = filter (`elemVarSet` (tyCoVarsOfType ty2)) skols
   , not (null esc_skols)
-  = return (SkolemEscape item implic esc_skols :| [mismatch_msg], [])
+  = let main_msg =
+          CannotUnifyVariable
+            { mismatchMsg       = mismatch_msg
+            , cannotUnifyReason = SkolemEscape item implic esc_skols }
+
+  in return (main_msg, [])
 
   -- Nastiest case: attempt to unify an untouchable variable
   -- So tv is a meta tyvar (or started that way before we
@@ -1758,12 +1799,19 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
   , Implic { ic_tclvl = lvl } <- implic
   = assertPpr (not (isTouchableMetaTyVar lvl tv1))
               (ppr tv1 $$ ppr lvl) $ do -- See Note [Error messages for untouchables]
-    let tclvl_extra = UntouchableVariable tv1 implic
-    tv_extra     <- extraTyVarEqInfo tv1 ty2
-    return (mkTcReportWithInfo tclvl_extra tv_extra :| [mismatch_msg], add_sig)
+    tv_extra     <- extraTyVarEqInfo (tv1, Just implic) ty2
+    let tv_extra' = tv_extra { thisTyVarIsUntouchable = Just implic }
+        msg = Mismatch
+               { mismatchMsg           = mismatch_msg
+               , mismatchTyVarInfo     = Just tv_extra'
+               , mismatchAmbiguityInfo = []
+               , mismatchCoercibleInfo = Nothing }
+    return (msg, add_sig)
 
   | otherwise
-  = return (reportEqErr ctxt item (mkTyVarTy tv1) ty2 :| [], [])
+  = do
+    err <- reportEqErr ctxt item (mkTyVarTy tv1) ty2
+    return (err, [])
         -- This *can* happen (#6123)
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
@@ -1802,7 +1850,7 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
 
     insoluble_occurs_check = check_eq_result `cterHasProblem` cteInsolubleOccurs
 
-eqInfoMsgs :: TcType -> TcType -> [TcSolverReportInfo]
+eqInfoMsgs :: TcType -> TcType -> [AmbiguityInfo]
 -- Report (a) ambiguity if either side is a type function application
 --            e.g. F a0 ~ Int
 --        (b) warning about injectivity if both sides are the same
@@ -1836,7 +1884,7 @@ eqInfoMsgs ty1 ty2
               = Nothing
 
 misMatchOrCND :: Bool -> SolverReportErrCtxt -> ErrorItem
-              -> TcType -> TcType -> TcSolverReportMsg
+              -> TcType -> TcType -> MismatchMsg
 -- If oriented then ty1 is actual, ty2 is expected
 misMatchOrCND insoluble_occurs_check ctxt item ty1 ty2
   | insoluble_occurs_check  -- See Note [Insoluble occurs check]
@@ -1904,23 +1952,30 @@ addition to superclasses (see Note [Remove redundant provided dicts]
 in GHC.Tc.TyCl.PatSyn).
 -}
 
-extraTyVarEqInfo :: TcTyVar -> TcType -> TcM [TcSolverReportInfo]
+extraTyVarEqInfo :: (TcTyVar, Maybe Implication) -> TcType -> TcM TyVarInfo
 -- Add on extra info about skolem constants
 -- NB: The types themselves are already tidied
-extraTyVarEqInfo tv1 ty2
-  = (:) <$> extraTyVarInfo tv1 <*> ty_extra ty2
+extraTyVarEqInfo (tv1, mb_implic) ty2
+  = do
+      tv1_info <- extraTyVarInfo tv1
+      ty2_info <- ty_extra ty2
+      return $
+        TyVarInfo
+          { thisTyVar              = tv1_info
+          , thisTyVarIsUntouchable = mb_implic
+          , otherTy                = ty2_info }
   where
     ty_extra ty = case tcGetCastedTyVar_maybe ty of
-                    Just (tv, _) -> (:[]) <$> extraTyVarInfo tv
-                    Nothing      -> return []
+                    Just (tv, _) -> Just <$> extraTyVarInfo tv
+                    Nothing      -> return Nothing
 
-extraTyVarInfo :: TcTyVar -> TcM TcSolverReportInfo
+extraTyVarInfo :: TcTyVar -> TcM TyVar
 extraTyVarInfo tv = assertPpr (isTyVar tv) (ppr tv) $
   case tcTyVarDetails tv of
     SkolemTv skol_info lvl overlaps -> do
       new_skol_info <- zonkSkolemInfo skol_info
-      return $ TyVarInfo (mkTcTyVar (tyVarName tv) (tyVarKind tv) (SkolemTv new_skol_info lvl overlaps))
-    _ -> return $ TyVarInfo tv
+      return $ mkTcTyVar (tyVarName tv) (tyVarKind tv) (SkolemTv new_skol_info lvl overlaps)
+    _ -> return tv
 
 
 suggestAddSig :: SolverReportErrCtxt -> TcType -> TcType -> Maybe GhcHint
@@ -1949,30 +2004,30 @@ suggestAddSig ctxt ty1 _ty2
        = find implics (seen_eqs || ic_given_eqs implic /= NoGivenEqs) tv
 
 --------------------
-mkMismatchMsg :: ErrorItem -> Type -> Type -> TcSolverReportMsg
+mkMismatchMsg :: ErrorItem -> Type -> Type -> MismatchMsg
 mkMismatchMsg item ty1 ty2 =
   case orig of
     TypeEqOrigin { uo_actual, uo_expected, uo_thing = mb_thing } ->
-      mkTcReportWithInfo
-        (TypeEqMismatch
-          { teq_mismatch_ppr_explicit_kinds = ppr_explicit_kinds
-          , teq_mismatch_item = item
-          , teq_mismatch_ty1  = ty1
-          , teq_mismatch_ty2  = ty2
-          , teq_mismatch_actual   = uo_actual
-          , teq_mismatch_expected = uo_expected
-          , teq_mismatch_what     = mb_thing})
-        extras
+      (TypeEqMismatch
+        { teq_mismatch_ppr_explicit_kinds = ppr_explicit_kinds
+        , teq_mismatch_item = item
+        , teq_mismatch_ty1  = ty1
+        , teq_mismatch_ty2  = ty2
+        , teq_mismatch_actual   = uo_actual
+        , teq_mismatch_expected = uo_expected
+        , teq_mismatch_what     = mb_thing
+        , teq_mb_same_occ       = sameOccExtras ty2 ty1 })
     KindEqOrigin cty1 cty2 sub_o mb_sub_t_or_k ->
-      mkTcReportWithInfo (Mismatch False item ty1 ty2)
-        (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k : extras)
+      (mkBasicMismatchMsg NoEA item ty1 ty2)
+        { mismatch_whenMatching = Just $ WhenMatching cty1 cty2 sub_o mb_sub_t_or_k
+        , mismatch_mb_same_occ  = mb_same_occ
+        }
     _ ->
-      mkTcReportWithInfo
-        (Mismatch False item ty1 ty2)
-        extras
+      (mkBasicMismatchMsg NoEA item ty1 ty2)
+        { mismatch_mb_same_occ  = mb_same_occ }
   where
     orig = errorItemOrigin item
-    extras = sameOccExtras ty2 ty1
+    mb_same_occ = sameOccExtras ty2 ty1
     ppr_explicit_kinds = shouldPprWithExplicitKinds ty1 ty2 orig
 
 -- | Whether to print explicit kinds (with @-fprint-explicit-kinds@)
@@ -2011,7 +2066,7 @@ This is done in misMatchOrCND (via the insoluble_occurs_check arg)
 want to be as draconian with them.)
 -}
 
-sameOccExtras :: TcType -> TcType -> [TcSolverReportInfo]
+sameOccExtras :: TcType -> TcType -> Maybe SameOccInfo
 -- See Note [Disambiguating (X ~ X) errors]
 sameOccExtras ty1 ty2
   | Just (tc1, _) <- tcSplitTyConApp_maybe ty1
@@ -2022,9 +2077,9 @@ sameOccExtras ty1 ty2
         same_pkg = moduleUnit (nameModule n1) == moduleUnit (nameModule n2)
   , n1 /= n2   -- Different Names
   , same_occ   -- but same OccName
-  = [SameOcc same_pkg n1 n2]
+  = Just $ SameOcc same_pkg n1 n2
   | otherwise
-  = []
+  = Nothing
 
 {- Note [Suggest adding a type signature]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2468,28 +2523,14 @@ are created by in GHC.Runtime.Heap.Inspect.zonkRTTIType.
 solverReportMsg_ExpectedActuals :: TcSolverReportMsg -> [(Type, Type)]
 solverReportMsg_ExpectedActuals
   = \case
-    TcReportWithInfo msg infos ->
-      solverReportMsg_ExpectedActuals msg
-      ++ (solverReportInfo_ExpectedActuals =<< toList infos)
-    Mismatch { mismatch_ty1 = exp, mismatch_ty2 = act } ->
-      [(exp, act)]
-    KindMismatch { kmismatch_expected = exp, kmismatch_actual = act } ->
-      [(exp, act)]
-    TypeEqMismatch { teq_mismatch_expected = exp, teq_mismatch_actual = act } ->
-      [(exp,act)]
-    _ -> []
-
--- | Retrieves all @"expected"/"actual"@ messages from a 'TcSolverReportInfo'.
---
--- Prefer using this over inspecting the 'TcSolverReportInfo' datatype if
--- you just need this information, as the datatype itself is subject to change
--- across GHC versions.
-solverReportInfo_ExpectedActuals :: TcSolverReportInfo -> [(Type, Type)]
-solverReportInfo_ExpectedActuals
-  = \case
-    ExpectedActual { ea_expected = exp, ea_actual = act } ->
-      [(exp, act)]
-    ExpectedActualAfterTySynExpansion
-      { ea_expanded_expected = exp, ea_expanded_actual = act } ->
-      [(exp, act)]
+    Mismatch { mismatchMsg = mismatch_msg } ->
+      case mismatch_msg of
+        BasicMismatch { mismatch_ty1 = exp, mismatch_ty2 = act } ->
+          [(exp, act)]
+        KindMismatch { kmismatch_expected = exp, kmismatch_actual = act } ->
+          [(exp, act)]
+        TypeEqMismatch { teq_mismatch_expected = exp, teq_mismatch_actual = act } ->
+          [(exp,act)]
+        CouldNotDeduce {} ->
+          []
     _ -> []

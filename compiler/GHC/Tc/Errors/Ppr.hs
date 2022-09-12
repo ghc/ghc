@@ -3,6 +3,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DataKinds #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic TcRnMessage
 
@@ -56,6 +57,7 @@ import GHC.Types.FieldLabel (flIsOverloaded)
 import GHC.Types.Hint (UntickedPromotedThing(..), pprUntickedConstructor, isBareSymbol)
 import GHC.Types.Hint.Ppr () -- Outputable GhcHint
 import GHC.Types.Basic
+import GHC.Types.Error.Codes ( constructorCode )
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( GreName(..), pprNameProvenance
@@ -102,19 +104,18 @@ instance Diagnostic TcRnMessage where
       -> case msg_with_info of
            TcRnMessageDetailed err_info msg
              -> messageWithInfoDiagnosticMessage unit_state err_info (diagnosticMessage msg)
-    TcRnSolverReport msgs _ _
-      -> mkDecorated $
-           map pprSolverReportWithCtxt msgs
+    TcRnSolverReport msg _ _
+      -> mkSimpleDecorated $ pprSolverReportWithCtxt msg
     TcRnRedundantConstraints redundants (info, show_info)
       -> mkSimpleDecorated $
          text "Redundant constraint" <> plural redundants <> colon
            <+> pprEvVarTheta redundants
          $$ if show_info then text "In" <+> ppr info else empty
-    TcRnInaccessibleCode implic contras
+    TcRnInaccessibleCode implic contra
       -> mkSimpleDecorated $
          hang (text "Inaccessible code in")
            2 (ppr (ic_info implic))
-         $$ vcat (map pprSolverReportWithCtxt (NE.toList contras))
+         $$ pprSolverReportWithCtxt contra
     TcRnTypeDoesNotHaveFixedRuntimeRep ty prov (ErrInfo extra supplementary)
       -> mkDecorated [pprTypeDoesNotHaveFixedRuntimeRep ty prov, extra, supplementary]
     TcRnImplicitLift id_or_name ErrInfo{..}
@@ -906,7 +907,7 @@ instance Diagnostic TcRnMessage where
                      TyConPE        -> same_rec_group_msg
                      TermVariablePE -> text "term variables cannot be promoted"
           same_rec_group_msg = text "it is defined and used in the same recursive group"
-    TcRnMatchesHaveDiffNumArgs argsContext match1 bad_matches
+    TcRnMatchesHaveDiffNumArgs argsContext (MatchArgMatches match1 bad_matches)
       -> mkSimpleDecorated $
            (vcat [ pprArgsContext argsContext <+>
                    text "have different numbers of arguments"
@@ -1634,16 +1635,29 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnSpecialiseNotVisible name
       -> [SuggestSpecialiseVisibilityHints name]
-    TcRnNameByTemplateHaskellQuote{} -> noHints
-    TcRnIllegalBindingOfBuiltIn{} -> noHints
-    TcRnPragmaWarning{} -> noHints
-    TcRnIllegalHsigDefaultMethods{} -> noHints
-    TcRnBadGenericMethod{} -> noHints
-    TcRnWarningMinimalDefIncomplete{} -> noHints
-    TcRnDefaultMethodForPragmaLacksBinding{} -> noHints
-    TcRnIgnoreSpecialisePragmaOnDefMethod{} -> noHints
-    TcRnBadMethodErr{} -> noHints
-    TcRnNoExplicitAssocTypeOrDefaultDeclaration{} -> noHints
+    TcRnNameByTemplateHaskellQuote{}
+      -> noHints
+    TcRnIllegalBindingOfBuiltIn{}
+      -> noHints
+    TcRnPragmaWarning{}
+      -> noHints
+    TcRnIllegalHsigDefaultMethods{}
+      -> noHints
+    TcRnBadGenericMethod{}
+      -> noHints
+    TcRnWarningMinimalDefIncomplete{}
+      -> noHints
+    TcRnDefaultMethodForPragmaLacksBinding{}
+      -> noHints
+    TcRnIgnoreSpecialisePragmaOnDefMethod{}
+      -> noHints
+    TcRnBadMethodErr{}
+      -> noHints
+    TcRnNoExplicitAssocTypeOrDefaultDeclaration{}
+      -> noHints
+
+  diagnosticCode = constructorCode
+
 
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",
 -- and so on.  The `and` stands for any `conjunction`, which is passed in.
@@ -2059,11 +2073,6 @@ pprSolverReportWithCtxt (SolverReportWithCtxt { reportContext = ctxt, reportCont
 
 -- | Pretty-print a 'TcSolverReportMsg', with its enclosing 'SolverReportErrCtxt'.
 pprTcSolverReportMsg :: SolverReportErrCtxt -> TcSolverReportMsg -> SDoc
-pprTcSolverReportMsg ctxt (TcReportWithInfo msg (info :| infos)) =
-  vcat
-    ( pprTcSolverReportMsg ctxt msg
-    : pprTcSolverReportInfo ctxt info
-    : map (pprTcSolverReportInfo ctxt) infos )
 pprTcSolverReportMsg _ (BadTelescope telescope skols) =
   hang (text "These kind and type variables:" <+> ppr telescope $$
        text "are out of dependency order. Perhaps try this ordering:")
@@ -2074,143 +2083,22 @@ pprTcSolverReportMsg _ (UserTypeError ty) =
   pprUserTypeErrorTy ty
 pprTcSolverReportMsg ctxt (ReportHoleError hole err) =
   pprHoleError ctxt hole err
-pprTcSolverReportMsg _ (CannotUnifyWithPolytype item tv1 ty2) =
-  vcat [ (if isSkolemTyVar tv1
-          then text "Cannot equate type variable"
-          else text "Cannot instantiate unification variable")
-         <+> quotes (ppr tv1)
-       , hang (text "with a" <+> what <+> text "involving polytypes:") 2 (ppr ty2) ]
-  where
-    what = text $ levelString $
-           ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel
-pprTcSolverReportMsg _
-  (Mismatch { mismatch_ea   = add_ea
-            , mismatch_item = item
-            , mismatch_ty1  = ty1
-            , mismatch_ty2  = ty2 })
-  = addArising (errorItemCtLoc item) msg
-  where
-    msg
-      | (isLiftedRuntimeRep ty1 && isUnliftedRuntimeRep ty2) ||
-        (isLiftedRuntimeRep ty2 && isUnliftedRuntimeRep ty1) ||
-        (isLiftedLevity ty1 && isUnliftedLevity ty2) ||
-        (isLiftedLevity ty2 && isUnliftedLevity ty1)
-      = text "Couldn't match a lifted type with an unlifted type"
-
-      | isAtomicTy ty1 || isAtomicTy ty2
-      = -- Print with quotes
-        sep [ text herald1 <+> quotes (ppr ty1)
-            , nest padding $
-              text herald2 <+> quotes (ppr ty2) ]
-
-      | otherwise
-      = -- Print with vertical layout
-        vcat [ text herald1 <> colon <+> ppr ty1
-             , nest padding $
-               text herald2 <> colon <+> ppr ty2 ]
-
-    herald1 = conc [ "Couldn't match"
-                   , if is_repr then "representation of" else ""
-                   , if add_ea then "expected"          else ""
-                   , what ]
-    herald2 = conc [ "with"
-                   , if is_repr then "that of"          else ""
-                   , if add_ea then ("actual " ++ what) else "" ]
-
-    padding = length herald1 - length herald2
-
-    is_repr = case errorItemEqRel item of { ReprEq -> True; NomEq -> False }
-
-    what = levelString (ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel)
-
-    conc :: [String] -> String
-    conc = foldr1 add_space
-
-    add_space :: String -> String -> String
-    add_space s1 s2 | null s1   = s2
-                    | null s2   = s1
-                    | otherwise = s1 ++ (' ' : s2)
-pprTcSolverReportMsg _
-  (KindMismatch { kmismatch_what     = thing
-                , kmismatch_expected = exp
-                , kmismatch_actual   = act })
-  = hang (text "Expected" <+> kind_desc <> comma)
-      2 (text "but" <+> quotes (ppr thing) <+> text "has kind" <+>
-        quotes (ppr act))
-  where
-    kind_desc | tcIsConstraintKind exp = text "a constraint"
-              | Just arg <- kindRep_maybe exp  -- TYPE t0
-              , tcIsTyVarTy arg = sdocOption sdocPrintExplicitRuntimeReps $ \case
-                                   True  -> text "kind" <+> quotes (ppr exp)
-                                   False -> text "a type"
-              | otherwise       = text "kind" <+> quotes (ppr exp)
-
-
 pprTcSolverReportMsg ctxt
-  (TypeEqMismatch { teq_mismatch_ppr_explicit_kinds = ppr_explicit_kinds
-                  , teq_mismatch_item     = item
-                  , teq_mismatch_ty1      = ty1
-                  , teq_mismatch_ty2      = ty2
-                  , teq_mismatch_expected = exp
-                  , teq_mismatch_actual   = act
-                  , teq_mismatch_what     = mb_thing })
-  = addArising ct_loc $ pprWithExplicitKindsWhen ppr_explicit_kinds msg
-  where
-    msg
-      | isUnliftedTypeKind act, isLiftedTypeKind exp
-      = sep [ text "Expecting a lifted type, but"
-            , thing_msg mb_thing (text "an") (text "unlifted") ]
-      | isLiftedTypeKind act, isUnliftedTypeKind exp
-      = sep [ text "Expecting an unlifted type, but"
-            , thing_msg mb_thing (text "a") (text "lifted") ]
-      | tcIsLiftedTypeKind exp
-      = maybe_num_args_msg $$
-        sep [ text "Expected a type, but"
-            , case mb_thing of
-                Nothing    -> text "found something with kind"
-                Just thing -> quotes (ppr thing) <+> text "has kind"
-            , quotes (pprWithTYPE act) ]
-      | Just nargs_msg <- num_args_msg
-      , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
-      = nargs_msg $$ pprTcSolverReportMsg ctxt ea_msg
-      | -- pprTrace "check" (ppr ea_looks_same $$ ppr exp $$ ppr act $$ ppr ty1 $$ ppr ty2) $
-        ea_looks_same ty1 ty2 exp act
-      , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
-      = pprTcSolverReportMsg ctxt ea_msg
-      -- The mismatched types are /inside/ exp and act
-      | let mismatch_err = Mismatch False item ty1 ty2
-            errs = case mk_ea_msg ctxt Nothing level orig of
-              Left ea_info -> [ mkTcReportWithInfo mismatch_err ea_info ]
-              Right ea_err -> [ mismatch_err, ea_err ]
-      = vcat $ map (pprTcSolverReportMsg ctxt) errs
-
-    ct_loc = errorItemCtLoc item
-    orig   = errorItemOrigin item
-    level  = ctLocTypeOrKind_maybe ct_loc `orElse` TypeLevel
-
-    thing_msg (Just thing) _  levity = quotes (ppr thing) <+> text "is" <+> levity
-    thing_msg Nothing      an levity = text "got" <+> an <+> levity <+> text "type"
-
-    num_args_msg = case level of
-      KindLevel
-        | not (isMetaTyVarTy exp) && not (isMetaTyVarTy act)
-           -- if one is a meta-tyvar, then it's possible that the user
-           -- has asked for something impredicative, and we couldn't unify.
-           -- Don't bother with counting arguments.
-        -> let n_act = count_args act
-               n_exp = count_args exp in
-           case n_act - n_exp of
-             n | n > 0   -- we don't know how many args there are, so don't
-                         -- recommend removing args that aren't
-               , Just thing <- mb_thing
-               -> Just $ pprTcSolverReportMsg ctxt (ExpectingMoreArguments n thing)
-             _ -> Nothing
-
-      _ -> Nothing
-
-    maybe_num_args_msg = num_args_msg `orElse` empty
-
-    count_args ty = count isVisibleBinder $ fst $ splitPiTys ty
+  (CannotUnifyVariable
+    { mismatchMsg             = msg
+    , cannotUnifyReason       = reason })
+  =  pprMismatchMsg ctxt msg
+  $$ pprCannotUnifyVariableReason ctxt reason
+pprTcSolverReportMsg ctxt
+  (Mismatch
+     { mismatchMsg           = mismatch_msg
+     , mismatchTyVarInfo     = tv_info
+     , mismatchAmbiguityInfo = ambig_infos
+     , mismatchCoercibleInfo = coercible_info })
+  = hang (pprMismatchMsg ctxt mismatch_msg)
+     2 (vcat ( maybe empty (pprTyVarInfo ctxt) tv_info
+             : maybe empty pprCoercibleMsg coercible_info
+             : map pprAmbiguityInfo ambig_infos ))
 pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
   vcat (map make_msg frr_origs)
   where
@@ -2287,28 +2175,6 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
           = quotes (text "Levity")
           | otherwise
           = text "type"
-
-pprTcSolverReportMsg _ (SkolemEscape item implic esc_skols) =
-  let
-    esc_doc = sep [ text "because" <+> what <+> text "variable" <> plural esc_skols
-                <+> pprQuotedList esc_skols
-              , text "would escape" <+>
-                if isSingleton esc_skols then text "its scope"
-                                         else text "their scope" ]
-  in
-  vcat [ nest 2 $ esc_doc
-       , sep [ (if isSingleton esc_skols
-                then text "This (rigid, skolem)" <+>
-                     what <+> text "variable is"
-                else text "These (rigid, skolem)" <+>
-                     what <+> text "variables are")
-         <+> text "bound by"
-       , nest 2 $ ppr (ic_info implic)
-       , nest 2 $ text "at" <+>
-         ppr (getLclEnvLoc (ic_env implic)) ] ]
-  where
-    what = text $ levelString $
-           ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel
 pprTcSolverReportMsg _ (UntouchableVariable tv implic)
   | Implic { ic_given = given, ic_info = skol_info } <- implic
   = sep [ quotes (ppr tv) <+> text "is untouchable"
@@ -2333,52 +2199,11 @@ pprTcSolverReportMsg ctxt (UnboundImplicitParams (item :| items)) =
      then addArising (errorItemCtLoc item) $
             sep [ text "Unbound implicit parameter" <> plural preds
                 , nest 2 (pprParendTheta preds) ]
-     else pprTcSolverReportMsg ctxt (CouldNotDeduce givens (item :| items) Nothing)
+     else pprMismatchMsg ctxt (CouldNotDeduce givens (item :| items) Nothing)
   where
     preds = map errorItemPred (item : items)
-pprTcSolverReportMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extra)
-  = main_msg $$
-     case supplementary of
-      Left infos
-        -> vcat (map (pprTcSolverReportInfo ctxt) infos)
-      Right other_msg
-        -> pprTcSolverReportMsg ctxt other_msg
-  where
-    main_msg
-      | null useful_givens
-      = addArising ct_loc (no_instance_msg <+> missing)
-      | otherwise
-      = vcat (addArising ct_loc (no_deduce_msg <+> missing)
-              : pp_givens useful_givens)
-
-    supplementary = case mb_extra of
-      Nothing
-        -> Left []
-      Just (CND_Extra level ty1 ty2)
-        -> mk_supplementary_ea_msg ctxt level ty1 ty2 orig
-    ct_loc = errorItemCtLoc item
-    orig   = ctLocOrigin ct_loc
-    wanteds = map errorItemPred (item:others)
-
-    no_instance_msg =
-      case wanteds of
-        [wanted] | Just (tc, _) <- splitTyConApp_maybe wanted
-                 -- Don't say "no instance" for a constraint such as "c" for a type variable c.
-                 , isClassTyCon tc -> text "No instance for"
-        _ -> text "Could not solve:"
-
-    no_deduce_msg =
-      case wanteds of
-        [_wanted] -> text "Could not deduce"
-        _         -> text "Could not deduce:"
-
-    missing =
-      case wanteds of
-        [wanted] -> quotes (ppr wanted)
-        _        -> pprTheta wanteds
-
-pprTcSolverReportMsg ctxt (AmbiguityPreventsSolvingCt item ambigs) =
-  pprTcSolverReportInfo ctxt (Ambiguity True ambigs) <+>
+pprTcSolverReportMsg _ (AmbiguityPreventsSolvingCt item ambigs) =
+  pprAmbiguityInfo (Ambiguity True ambigs) <+>
   pprArising (errorItemCtLoc item) $$
   text "prevents the constraint" <+> quotes (pprParendType $ errorItemPred item)
   <+> text "from being solved."
@@ -2386,12 +2211,12 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
   (CannotResolveInstance item unifiers candidates imp_errs suggs binds)
   =
     vcat
-      [ pprTcSolverReportMsg ctxt no_inst_msg
+      [ no_inst_msg
       , nest 2 extra_note
       , mb_patsyn_prov `orElse` empty
       , ppWhen (has_ambigs && not (null unifiers && null useful_givens))
         (vcat [ ppUnless lead_with_ambig $
-                  pprTcSolverReportInfo ctxt (Ambiguity False (ambig_kvs, ambig_tvs))
+                  pprAmbiguityInfo (Ambiguity False (ambig_kvs, ambig_tvs))
               , pprRelevantBindings binds
               , potential_msg ])
       , ppWhen (isNothing mb_patsyn_prov) $
@@ -2421,12 +2246,12 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
                    && not (null unifiers)
                    && null useful_givens
 
-    no_inst_msg :: TcSolverReportMsg
+    no_inst_msg :: SDoc
     no_inst_msg
       | lead_with_ambig
-      = AmbiguityPreventsSolvingCt item (ambig_kvs, ambig_tvs)
+      = pprTcSolverReportMsg ctxt $ AmbiguityPreventsSolvingCt item (ambig_kvs, ambig_tvs)
       | otherwise
-      = CouldNotDeduce useful_givens (item :| []) Nothing
+      = pprMismatchMsg ctxt $ CouldNotDeduce useful_givens (item :| []) Nothing
 
     -- Report "potential instances" only when the constraint arises
     -- directly from the user's use of an overloaded function
@@ -2555,6 +2380,242 @@ pprTcSolverReportMsg _ (UnsafeOverlap item matches unsafe_overlapped) =
     ct_loc      = errorItemCtLoc item
     pred        = errorItemPred item
     (clas, tys) = getClassPredTys pred
+
+pprCannotUnifyVariableReason :: SolverReportErrCtxt -> CannotUnifyVariableReason -> SDoc
+pprCannotUnifyVariableReason ctxt (CannotUnifyWithPolytype item tv1 ty2 mb_tv_info) =
+  vcat [ (if isSkolemTyVar tv1
+          then text "Cannot equate type variable"
+          else text "Cannot instantiate unification variable")
+         <+> quotes (ppr tv1)
+       , hang (text "with a" <+> what <+> text "involving polytypes:") 2 (ppr ty2)
+       , maybe empty (pprTyVarInfo ctxt) mb_tv_info ]
+  where
+    what = text $ levelString $
+           ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel
+
+pprCannotUnifyVariableReason _ (SkolemEscape item implic esc_skols) =
+  let
+    esc_doc = sep [ text "because" <+> what <+> text "variable" <> plural esc_skols
+                <+> pprQuotedList esc_skols
+              , text "would escape" <+>
+                if isSingleton esc_skols then text "its scope"
+                                         else text "their scope" ]
+  in
+  vcat [ nest 2 $ esc_doc
+       , sep [ (if isSingleton esc_skols
+                then text "This (rigid, skolem)" <+>
+                     what <+> text "variable is"
+                else text "These (rigid, skolem)" <+>
+                     what <+> text "variables are")
+         <+> text "bound by"
+       , nest 2 $ ppr (ic_info implic)
+       , nest 2 $ text "at" <+>
+         ppr (getLclEnvLoc (ic_env implic)) ] ]
+  where
+    what = text $ levelString $
+           ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel
+
+pprCannotUnifyVariableReason ctxt
+  (OccursCheck
+    { occursCheckInterestingTyVars = interesting_tvs
+    , occursCheckAmbiguityInfos    = ambig_infos })
+  = ppr_interesting_tyVars interesting_tvs
+  $$ vcat (map pprAmbiguityInfo ambig_infos)
+  where
+    ppr_interesting_tyVars [] = empty
+    ppr_interesting_tyVars (tv:tvs) =
+      hang (text "Type variable kinds:") 2 $
+      vcat (map (tyvar_binding . tidyTyCoVarOcc (cec_tidy ctxt))
+                (tv:tvs))
+    tyvar_binding tyvar = ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar)
+pprCannotUnifyVariableReason ctxt (DifferentTyVars tv_info)
+  = pprTyVarInfo ctxt tv_info
+pprCannotUnifyVariableReason ctxt (RepresentationalEq tv_info mb_coercible_msg)
+  = pprTyVarInfo ctxt tv_info
+  $$ maybe empty pprCoercibleMsg mb_coercible_msg
+
+pprMismatchMsg :: SolverReportErrCtxt -> MismatchMsg -> SDoc
+pprMismatchMsg ctxt
+  (BasicMismatch { mismatch_ea   = ea
+                 , mismatch_item = item
+                 , mismatch_ty1  = ty1
+                 , mismatch_ty2  = ty2
+                 , mismatch_whenMatching = mb_match_txt
+                 , mismatch_mb_same_occ  = same_occ_info })
+  = addArising (errorItemCtLoc item) msg
+  $$ maybe empty (pprWhenMatching ctxt) mb_match_txt
+  $$ maybe empty pprSameOccInfo same_occ_info
+  where
+    msg
+      | (isLiftedRuntimeRep ty1 && isUnliftedRuntimeRep ty2) ||
+        (isLiftedRuntimeRep ty2 && isUnliftedRuntimeRep ty1) ||
+        (isLiftedLevity ty1 && isUnliftedLevity ty2) ||
+        (isLiftedLevity ty2 && isUnliftedLevity ty1)
+      = text "Couldn't match a lifted type with an unlifted type"
+
+      | isAtomicTy ty1 || isAtomicTy ty2
+      = -- Print with quotes
+        sep [ text herald1 <+> quotes (ppr ty1)
+            , nest padding $
+              text herald2 <+> quotes (ppr ty2) ]
+
+      | otherwise
+      = -- Print with vertical layout
+        vcat [ text herald1 <> colon <+> ppr ty1
+             , nest padding $
+               text herald2 <> colon <+> ppr ty2 ]
+
+    want_ea = case ea of { NoEA -> False; EA {} -> True }
+
+    herald1 = conc [ "Couldn't match"
+                   , if is_repr then "representation of" else ""
+                   , if want_ea then "expected"          else ""
+                   , what ]
+    herald2 = conc [ "with"
+                   , if is_repr then "that of"          else ""
+                   , if want_ea then ("actual " ++ what) else "" ]
+
+    padding = length herald1 - length herald2
+
+    is_repr = case errorItemEqRel item of { ReprEq -> True; NomEq -> False }
+
+    what = levelString (ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel)
+
+    conc :: [String] -> String
+    conc = foldr1 add_space
+
+    add_space :: String -> String -> String
+    add_space s1 s2 | null s1   = s2
+                    | null s2   = s1
+                    | otherwise = s1 ++ (' ' : s2)
+pprMismatchMsg _
+  (KindMismatch { kmismatch_what     = thing
+                , kmismatch_expected = exp
+                , kmismatch_actual   = act })
+  = hang (text "Expected" <+> kind_desc <> comma)
+      2 (text "but" <+> quotes (ppr thing) <+> text "has kind" <+>
+        quotes (ppr act))
+  where
+    kind_desc | tcIsConstraintKind exp = text "a constraint"
+              | Just arg <- kindRep_maybe exp  -- TYPE t0
+              , tcIsTyVarTy arg = sdocOption sdocPrintExplicitRuntimeReps $ \case
+                                   True  -> text "kind" <+> quotes (ppr exp)
+                                   False -> text "a type"
+              | otherwise       = text "kind" <+> quotes (ppr exp)
+
+pprMismatchMsg ctxt
+  (TypeEqMismatch { teq_mismatch_ppr_explicit_kinds = ppr_explicit_kinds
+                  , teq_mismatch_item     = item
+                  , teq_mismatch_ty1      = ty1
+                  , teq_mismatch_ty2      = ty2
+                  , teq_mismatch_expected = exp
+                  , teq_mismatch_actual   = act
+                  , teq_mismatch_what     = mb_thing
+                  , teq_mb_same_occ       = mb_same_occ })
+  = (addArising ct_loc $ pprWithExplicitKindsWhen ppr_explicit_kinds msg)
+  $$ maybe empty pprSameOccInfo mb_same_occ
+  where
+    msg
+      | isUnliftedTypeKind act, isLiftedTypeKind exp
+      = sep [ text "Expecting a lifted type, but"
+            , thing_msg mb_thing (text "an") (text "unlifted") ]
+      | isLiftedTypeKind act, isUnliftedTypeKind exp
+      = sep [ text "Expecting an unlifted type, but"
+            , thing_msg mb_thing (text "a") (text "lifted") ]
+      | tcIsLiftedTypeKind exp
+      = maybe_num_args_msg $$
+        sep [ text "Expected a type, but"
+            , case mb_thing of
+                Nothing    -> text "found something with kind"
+                Just thing -> quotes (ppr thing) <+> text "has kind"
+            , quotes (pprWithTYPE act) ]
+      | Just nargs_msg <- num_args_msg
+      , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
+      = nargs_msg $$ pprMismatchMsg ctxt ea_msg
+      | -- pprTrace "check" (ppr ea_looks_same $$ ppr exp $$ ppr act $$ ppr ty1 $$ ppr ty2) $
+        ea_looks_same ty1 ty2 exp act
+      , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
+      = pprMismatchMsg ctxt ea_msg
+
+      | otherwise
+      =
+      -- The mismatched types are /inside/ exp and act
+        let mismatch_err = mkBasicMismatchMsg NoEA item ty1 ty2
+            errs = case mk_ea_msg ctxt Nothing level orig of
+              Left ea_info -> pprMismatchMsg ctxt mismatch_err : map (pprExpectedActualInfo ctxt) ea_info
+              Right ea_err -> [ pprMismatchMsg ctxt mismatch_err, pprMismatchMsg ctxt ea_err ]
+        in vcat errs
+
+    ct_loc = errorItemCtLoc item
+    orig   = errorItemOrigin item
+    level  = ctLocTypeOrKind_maybe ct_loc `orElse` TypeLevel
+
+    thing_msg (Just thing) _  levity = quotes (ppr thing) <+> text "is" <+> levity
+    thing_msg Nothing      an levity = text "got" <+> an <+> levity <+> text "type"
+
+    num_args_msg = case level of
+      KindLevel
+        | not (isMetaTyVarTy exp) && not (isMetaTyVarTy act)
+           -- if one is a meta-tyvar, then it's possible that the user
+           -- has asked for something impredicative, and we couldn't unify.
+           -- Don't bother with counting arguments.
+        -> let n_act = count_args act
+               n_exp = count_args exp in
+           case n_act - n_exp of
+             n | n > 0   -- we don't know how many args there are, so don't
+                         -- recommend removing args that aren't
+               , Just thing <- mb_thing
+               -> Just $ pprTcSolverReportMsg ctxt (ExpectingMoreArguments n thing)
+             _ -> Nothing
+
+      _ -> Nothing
+
+    maybe_num_args_msg = num_args_msg `orElse` empty
+
+    count_args ty = count isVisibleBinder $ fst $ splitPiTys ty
+
+pprMismatchMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extra)
+  = main_msg $$
+     case supplementary of
+      Left infos
+        -> vcat (map (pprExpectedActualInfo ctxt) infos)
+      Right other_msg
+        -> pprMismatchMsg ctxt other_msg
+  where
+    main_msg
+      | null useful_givens
+      = addArising ct_loc (no_instance_msg <+> missing)
+      | otherwise
+      = vcat (addArising ct_loc (no_deduce_msg <+> missing)
+              : pp_givens useful_givens)
+
+    supplementary = case mb_extra of
+      Nothing
+        -> Left []
+      Just (CND_Extra level ty1 ty2)
+        -> mk_supplementary_ea_msg ctxt level ty1 ty2 orig
+    ct_loc = errorItemCtLoc item
+    orig   = ctLocOrigin ct_loc
+    wanteds = map errorItemPred (item:others)
+
+    no_instance_msg =
+      case wanteds of
+        [wanted] | Just (tc, _) <- splitTyConApp_maybe wanted
+                 -- Don't say "no instance" for a constraint such as "c" for a type variable c.
+                 , isClassTyCon tc -> text "No instance for"
+        _ -> text "Could not solve:"
+
+    no_deduce_msg =
+      case wanteds of
+        [_wanted] -> text "Could not deduce"
+        _         -> text "Could not deduce:"
+
+    missing =
+      case wanteds of
+        [wanted] -> quotes (ppr wanted)
+        _        -> pprTheta wanteds
+
+
 
 {- *********************************************************************
 *                                                                      *
@@ -2746,13 +2807,70 @@ we want to give it a bit of structure.  Here's the plan
 
 {- *********************************************************************
 *                                                                      *
-                    Outputting TcSolverReportInfo
+             Outputting additional solver report information
 *                                                                      *
 **********************************************************************-}
 
 -- | Pretty-print an informational message, to accompany a 'TcSolverReportMsg'.
-pprTcSolverReportInfo :: SolverReportErrCtxt -> TcSolverReportInfo -> SDoc
-pprTcSolverReportInfo _ (Ambiguity prepend_msg (ambig_kvs, ambig_tvs)) = msg
+pprExpectedActualInfo :: SolverReportErrCtxt -> ExpectedActualInfo -> SDoc
+pprExpectedActualInfo _ (ExpectedActual { ea_expected = exp, ea_actual = act }) =
+  vcat
+    [ text "Expected:" <+> ppr exp
+    , text "  Actual:" <+> ppr act ]
+pprExpectedActualInfo _
+  (ExpectedActualAfterTySynExpansion
+    { ea_expanded_expected = exp
+    , ea_expanded_actual   = act } )
+  = vcat
+      [ text "Type synonyms expanded:"
+      , text "Expected type:" <+> ppr exp
+      , text "  Actual type:" <+> ppr act ]
+
+pprCoercibleMsg :: CoercibleMsg -> SDoc
+pprCoercibleMsg (UnknownRoles ty) =
+  hang (text "NB: We cannot know what roles the parameters to" <+>
+          quotes (ppr ty) <+> text "have;")
+       2 (text "we must assume that the role is nominal")
+pprCoercibleMsg (TyConIsAbstract tc) =
+  hsep [ text "NB: The type constructor"
+       , quotes (pprSourceTyCon tc)
+       , text "is abstract" ]
+pprCoercibleMsg (OutOfScopeNewtypeConstructor tc dc) =
+  hang (text "The data constructor" <+> quotes (ppr $ dataConName dc))
+    2 (sep [ text "of newtype" <+> quotes (pprSourceTyCon tc)
+           , text "is not in scope" ])
+
+pprWhenMatching :: SolverReportErrCtxt -> WhenMatching -> SDoc
+pprWhenMatching ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
+  sdocOption sdocPrintExplicitCoercions $ \printExplicitCoercions ->
+    if printExplicitCoercions
+       || not (cty1 `pickyEqType` cty2)
+      then vcat [ hang (text "When matching" <+> sub_whats)
+                      2 (vcat [ ppr cty1 <+> dcolon <+>
+                               ppr (tcTypeKind cty1)
+                             , ppr cty2 <+> dcolon <+>
+                               ppr (tcTypeKind cty2) ])
+                , supplementary ]
+      else text "When matching the kind of" <+> quotes (ppr cty1)
+  where
+    sub_t_or_k = mb_sub_t_or_k `orElse` TypeLevel
+    sub_whats  = text (levelString sub_t_or_k) <> char 's'
+    supplementary =
+      case mk_supplementary_ea_msg ctxt sub_t_or_k cty1 cty2 sub_o of
+        Left infos -> vcat $ map (pprExpectedActualInfo ctxt) infos
+        Right msg  -> pprMismatchMsg ctxt msg
+
+pprTyVarInfo :: SolverReportErrCtxt -> TyVarInfo -> SDoc
+pprTyVarInfo ctxt (TyVarInfo { thisTyVar = tv1, otherTy = mb_tv2 }) =
+  mk_msg tv1 $$ case mb_tv2 of { Nothing -> empty; Just tv2 -> mk_msg tv2 }
+  where
+    mk_msg tv = case tcTyVarDetails tv of
+      SkolemTv sk_info _ _ -> pprSkols ctxt [(getSkolemInfo sk_info, [tv])]
+      RuntimeUnk {} -> quotes (ppr tv) <+> text "is an interactive-debugger skolem"
+      MetaTv {}     -> empty
+
+pprAmbiguityInfo :: AmbiguityInfo -> SDoc
+pprAmbiguityInfo (Ambiguity prepend_msg (ambig_kvs, ambig_tvs)) = msg
   where
 
     msg |  any isRuntimeUnkSkol ambig_kvs  -- See Note [Runtime skolems]
@@ -2775,47 +2893,12 @@ pprTcSolverReportInfo _ (Ambiguity prepend_msg (ambig_kvs, ambig_tvs)) = msg
       | otherwise -- "The type variable 't0' is ambiguous"
       = text "The" <+> what <+> text "variable" <> plural tkvs
         <+> pprQuotedList tkvs <+> isOrAre tkvs <+> text "ambiguous"
-pprTcSolverReportInfo ctxt (TyVarInfo tv ) =
-  case tcTyVarDetails tv of
-    SkolemTv sk_info _ _   -> pprSkols ctxt [(getSkolemInfo sk_info, [tv])]
-    RuntimeUnk {} -> quotes (ppr tv) <+> text "is an interactive-debugger skolem"
-    MetaTv {}     -> empty
-pprTcSolverReportInfo _ (NonInjectiveTyFam tc) =
+pprAmbiguityInfo (NonInjectiveTyFam tc) =
   text "NB:" <+> quotes (ppr tc)
   <+> text "is a non-injective type family"
-pprTcSolverReportInfo _ (ReportCoercibleMsg msg) =
-  pprCoercibleMsg msg
-pprTcSolverReportInfo _ (ExpectedActual { ea_expected = exp, ea_actual = act }) =
-  vcat
-    [ text "Expected:" <+> ppr exp
-    , text "  Actual:" <+> ppr act ]
-pprTcSolverReportInfo _
-  (ExpectedActualAfterTySynExpansion
-    { ea_expanded_expected = exp
-    , ea_expanded_actual   = act } )
-  = vcat
-      [ text "Type synonyms expanded:"
-      , text "Expected type:" <+> ppr exp
-      , text "  Actual type:" <+> ppr act ]
-pprTcSolverReportInfo ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
-  sdocOption sdocPrintExplicitCoercions $ \printExplicitCoercions ->
-    if printExplicitCoercions
-       || not (cty1 `pickyEqType` cty2)
-      then vcat [ hang (text "When matching" <+> sub_whats)
-                      2 (vcat [ ppr cty1 <+> dcolon <+>
-                               ppr (tcTypeKind cty1)
-                             , ppr cty2 <+> dcolon <+>
-                               ppr (tcTypeKind cty2) ])
-                , supplementary ]
-      else text "When matching the kind of" <+> quotes (ppr cty1)
-  where
-    sub_t_or_k = mb_sub_t_or_k `orElse` TypeLevel
-    sub_whats  = text (levelString sub_t_or_k) <> char 's'
-    supplementary =
-      case mk_supplementary_ea_msg ctxt sub_t_or_k cty1 cty2 sub_o of
-        Left infos -> vcat $ map (pprTcSolverReportInfo ctxt) infos
-        Right msg  -> pprTcSolverReportMsg ctxt msg
-pprTcSolverReportInfo _ (SameOcc same_pkg n1 n2) =
+
+pprSameOccInfo :: SameOccInfo -> SDoc
+pprSameOccInfo (SameOcc same_pkg n1 n2) =
   text "NB:" <+> (ppr_from same_pkg n1 $$ ppr_from same_pkg n2)
   where
     ppr_from same_pkg nm
@@ -2831,26 +2914,6 @@ pprTcSolverReportInfo _ (SameOcc same_pkg n1 n2) =
         pkg = moduleUnit mod
         mod = nameModule nm
         loc = nameSrcSpan nm
-pprTcSolverReportInfo ctxt (OccursCheckInterestingTyVars (tv :| tvs)) =
-  hang (text "Type variable kinds:") 2 $
-    vcat (map (tyvar_binding . tidyTyCoVarOcc (cec_tidy ctxt))
-              (tv:tvs))
-  where
-    tyvar_binding tyvar = ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar)
-
-pprCoercibleMsg :: CoercibleMsg -> SDoc
-pprCoercibleMsg (UnknownRoles ty) =
-  hang (text "NB: We cannot know what roles the parameters to" <+>
-          quotes (ppr ty) <+> text "have;")
-       2 (text "we must assume that the role is nominal")
-pprCoercibleMsg (TyConIsAbstract tc) =
-  hsep [ text "NB: The type constructor"
-       , quotes (pprSourceTyCon tc)
-       , text "is abstract" ]
-pprCoercibleMsg (OutOfScopeNewtypeConstructor tc dc) =
-  hang (text "The data constructor" <+> quotes (ppr $ dataConName dc))
-    2 (sep [ text "of newtype" <+> quotes (pprSourceTyCon tc)
-           , text "is not in scope" ])
 
 {- *********************************************************************
 *                                                                      *
@@ -3229,7 +3292,7 @@ skolsSpan skol_tvs = foldr1 combineSrcSpans (map getSrcSpan skol_tvs)
 **********************************************************************-}
 
 mk_supplementary_ea_msg :: SolverReportErrCtxt -> TypeOrKind
-                        -> Type -> Type -> CtOrigin -> Either [TcSolverReportInfo] TcSolverReportMsg
+                        -> Type -> Type -> CtOrigin -> Either [ExpectedActualInfo] MismatchMsg
 mk_supplementary_ea_msg ctxt level ty1 ty2 orig
   | TypeEqOrigin { uo_expected = exp, uo_actual = act } <- orig
   , not (ea_looks_same ty1 ty2 exp act)
@@ -3252,7 +3315,7 @@ ea_looks_same ty1 ty2 exp act
       -- (TYPE 'LiftedRep) and Type both print the same way.
 
 mk_ea_msg :: SolverReportErrCtxt -> Maybe ErrorItem -> TypeOrKind
-          -> CtOrigin -> Either [TcSolverReportInfo] TcSolverReportMsg
+          -> CtOrigin -> Either [ExpectedActualInfo] MismatchMsg
 -- Constructs a "Couldn't match" message
 -- The (Maybe ErrorItem) says whether this is the main top-level message (Just)
 --     or a supplementary message (Nothing)
@@ -3264,16 +3327,9 @@ mk_ea_msg ctxt at_top level
                          , kmismatch_expected = exp
                          , kmismatch_actual   = act }
   | Just item <- at_top
-  , let mismatch =
-          Mismatch
-            { mismatch_ea   = True
-            , mismatch_item = item
-            , mismatch_ty1  = exp
-            , mismatch_ty2  = act }
-  = Right $
-    if expanded_syns
-    then mkTcReportWithInfo mismatch [ea_expanded]
-    else mismatch
+  , let  ea = EA $ if expanded_syns then Just ea_expanded else Nothing
+         mismatch = mkBasicMismatchMsg ea item exp act
+  = Right mismatch
   | otherwise
   = Left $
     if expanded_syns

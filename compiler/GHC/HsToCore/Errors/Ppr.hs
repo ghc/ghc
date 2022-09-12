@@ -1,4 +1,6 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic DsMessage
 
 module GHC.HsToCore.Errors.Ppr where
@@ -11,6 +13,7 @@ import GHC.HsToCore.Errors.Types
 import GHC.Prelude
 import GHC.Types.Basic (pprRuleName)
 import GHC.Types.Error
+import GHC.Types.Error.Codes ( constructorCode )
 import GHC.Types.Id (idType)
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
@@ -271,6 +274,8 @@ instance Diagnostic DsMessage where
     DsRecBindsNotAllowedForUnliftedTys{}        -> noHints
     DsRuleMightInlineFirst _ lhs_id rule_act    -> [SuggestAddInlineOrNoInlinePragma lhs_id rule_act]
     DsAnotherRuleMightFireFirst _ bad_rule _    -> [SuggestAddPhaseToCompetingRule bad_rule]
+
+  diagnosticCode = constructorCode
 
 {-
 Note [Suggest NegativeLiterals]

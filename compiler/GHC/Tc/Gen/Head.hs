@@ -1334,7 +1334,7 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
                                        [getRuntimeRep id_ty, id_ty]
 
                    -- Warning for implicit lift (#17804)
-        ; addDetailedDiagnostic (TcRnImplicitLift id)
+        ; addDetailedDiagnostic (TcRnImplicitLift $ idName id)
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var

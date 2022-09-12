@@ -34,7 +34,8 @@ import GHC.Driver.Config.HsToCore
 
 import GHC.Hs
 
-import GHC.Tc.Errors.Types ( TcRnMessage(..), FixedRuntimeRepProvenance(..) )
+import GHC.Tc.Errors.Types ( TcRnMessage(..), FixedRuntimeRepProvenance(..)
+                           , mkTcRnUnknownMessage )
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
                     , reportUnsolvedEqualities )
@@ -2541,7 +2542,7 @@ tcDefaultAssocDecl _ []
   = return Nothing  -- No default declaration
 
 tcDefaultAssocDecl _ (d1:_:_)
-  = failWithTc (TcRnUnknownMessage $ mkPlainError noHints $
+  = failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints $
                 text "More than one default declaration for"
                 <+> ppr (tyFamInstDeclName (unLoc d1)))
 
@@ -2828,7 +2829,7 @@ tcInjectivity tcbs (Just (L loc (InjectivityAnn _ _ lInjNames)))
     do { let tvs = binderVars tcbs
        ; dflags <- getDynFlags
        ; checkTc (xopt LangExt.TypeFamilyDependencies dflags)
-                 (TcRnUnknownMessage $ mkPlainError noHints $
+                 (mkTcRnUnknownMessage $ mkPlainError noHints $
                   text "Illegal injectivity annotation" $$
                   text "Use TypeFamilyDependencies to allow this")
        ; inj_tvs <- mapM (tcLookupTyVar . unLoc) lInjNames
@@ -4237,7 +4238,7 @@ checkValidTyCon tc
                ; ClosedSynFamilyTyCon Nothing   -> return ()
                ; AbstractClosedSynFamilyTyCon ->
                  do { hsBoot <- tcIsHsBootOrSig
-                    ; checkTc hsBoot $ TcRnUnknownMessage $ mkPlainError noHints $
+                    ; checkTc hsBoot $ mkTcRnUnknownMessage $ mkPlainError noHints $
                       text "You may define an abstract closed type family" $$
                       text "only in a .hs-boot file" }
                ; DataFamilyTyCon {}           -> return ()
@@ -4315,7 +4316,7 @@ checkPartialRecordField :: [DataCon] -> FieldLabel -> TcM ()
 checkPartialRecordField all_cons fld
   = setSrcSpan loc $
       warnIf (not is_exhaustive && not (startsWithUnderscore occ_name))
-        (TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnPartialFields) noHints $
+        (mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnPartialFields) noHints $
           sep [text "Use of partial record field selector" <> colon,
                 nest 2 $ quotes (ppr occ_name)])
   where
@@ -4426,13 +4427,13 @@ checkValidDataCon dflags existential_ok tc con
               check_bang orig_arg_ty bang rep_bang n
                | HsSrcBang _ _ SrcLazy <- bang
                , not (bang_opt_strict_data bang_opts)
-               = addErrTc $ TcRnUnknownMessage $ mkPlainError noHints $
+               = addErrTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
                  (bad_bang n (text "Lazy annotation (~) without StrictData"))
 
                | HsSrcBang _ want_unpack strict_mark <- bang
                , isSrcUnpacked want_unpack, not (is_strict strict_mark)
                , not (isUnliftedType orig_arg_ty)
-               = addDiagnosticTc $ TcRnUnknownMessage $
+               = addDiagnosticTc $ mkTcRnUnknownMessage $
                    mkPlainDiagnostic WarningWithoutFlag noHints (bad_bang n (text "UNPACK pragma lacks '!'"))
 
                -- Warn about a redundant ! on an unlifted type
@@ -4461,7 +4462,7 @@ checkValidDataCon dflags existential_ok tc con
                -- warn in this case (it gives users the wrong idea about whether
                -- or not UNPACK on abstract types is supported; it is!)
                , isHomeUnitDefinite (hsc_home_unit hsc_env)
-               = addDiagnosticTc $ TcRnUnknownMessage $
+               = addDiagnosticTc $ mkTcRnUnknownMessage $
                    mkPlainDiagnostic WarningWithoutFlag noHints (bad_bang n (text "Ignoring unusable UNPACK pragma"))
 
                | otherwise
@@ -4523,18 +4524,18 @@ checkNewDataCon con
         ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
         ; let allowedArgType =
                 unlifted_newtypes || typeLevity_maybe (scaledThing arg_ty1) == Just Lifted
-        ; checkTc allowedArgType $ TcRnUnknownMessage $ mkPlainError noHints $ vcat
+        ; checkTc allowedArgType $ mkTcRnUnknownMessage $ mkPlainError noHints $ vcat
           [ text "A newtype cannot have an unlifted argument type"
           , text "Perhaps you intended to use UnliftedNewtypes"
           ]
         ; show_linear_types <- xopt LangExt.LinearTypes <$> getDynFlags
 
         ; let check_con what msg =
-               checkTc what $ TcRnUnknownMessage $ mkPlainError noHints $
+               checkTc what $ mkTcRnUnknownMessage $ mkPlainError noHints $
                  (msg $$ ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con))
 
         ; checkTc (ok_mult (scaledMult arg_ty1)) $
-          TcRnUnknownMessage $ mkPlainError noHints $ text "A newtype constructor must be linear"
+          mkTcRnUnknownMessage $ mkPlainError noHints $ text "A newtype constructor must be linear"
 
         ; check_con (null eq_spec) $
           text "A newtype constructor must have a return type of form T a1 ... an"
@@ -4630,7 +4631,7 @@ checkValidClass cls
         ; unless undecidable_super_classes $
           case checkClassCycles cls of
              Just err -> setSrcSpan (getSrcSpan cls) $
-                         addErrTc (TcRnUnknownMessage $ mkPlainError noHints err)
+                         addErrTc (mkTcRnUnknownMessage $ mkPlainError noHints err)
              Nothing  -> return ()
 
         -- Check the class operations.
@@ -4773,7 +4774,7 @@ checkValidClass cls
           --    default foo2 :: a -> b
           unless (isJust $ tcMatchTys [dm_phi_ty, vanilla_phi_ty]
                                       [vanilla_phi_ty, dm_phi_ty]) $ addErrTc $
-               TcRnUnknownMessage $ mkPlainError noHints $
+               mkTcRnUnknownMessage $ mkPlainError noHints $
                hang (text "The default type signature for"
                      <+> ppr sel_id <> colon)
                  2 (ppr dm_ty)
@@ -4793,14 +4794,14 @@ checkFamFlag tc_name
        ; checkTc idx_tys err_msg }
   where
     err_msg :: TcRnMessage
-    err_msg = TcRnUnknownMessage $ mkPlainError noHints $
+    err_msg = mkTcRnUnknownMessage $ mkPlainError noHints $
       hang (text "Illegal family declaration for" <+> quotes (ppr tc_name))
          2 (text "Enable TypeFamilies to allow indexed type families")
 
 checkResultSigFlag :: Name -> FamilyResultSig GhcRn -> TcM ()
 checkResultSigFlag tc_name (TyVarSig _ tvb)
   = do { ty_fam_deps <- xoptM LangExt.TypeFamilyDependencies
-       ; checkTc ty_fam_deps $ TcRnUnknownMessage $ mkPlainError noHints $
+       ; checkTc ty_fam_deps $ mkTcRnUnknownMessage $ mkPlainError noHints $
          hang (text "Illegal result type variable" <+> ppr tvb <+> text "for" <+> quotes (ppr tc_name))
             2 (text "Enable TypeFamilyDependencies to allow result variable names") }
 checkResultSigFlag _ _ = return ()  -- other cases OK
@@ -5143,7 +5144,7 @@ checkValidRoles tc
         check_ty_roles env role ty
 
     report_error doc
-      = addErrTc $ TcRnUnknownMessage $ mkPlainError noHints $
+      = addErrTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
          vcat [text "Internal error in role inference:",
                doc,
                text "Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug"]
@@ -5227,14 +5228,14 @@ tcAddClosedTypeFamilyDeclCtxt tc
 
 resultTypeMisMatch :: FieldLabelString -> DataCon -> DataCon -> TcRnMessage
 resultTypeMisMatch field_name con1 con2
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
                 text "have a common field" <+> quotes (ppr field_name) <> comma],
           nest 2 $ text "but have different result types"]
 
 fieldTypeMisMatch :: FieldLabelString -> DataCon -> DataCon -> TcRnMessage
 fieldTypeMisMatch field_name con1 con2
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
          text "give different types for field", quotes (ppr field_name)]
 
@@ -5259,20 +5260,20 @@ classArityErr n cls
     | n == 0 = mkErr "No" "no-parameter"
     | otherwise = mkErr "Too many" "multi-parameter"
   where
-    mkErr howMany allowWhat = TcRnUnknownMessage $ mkPlainError noHints $
+    mkErr howMany allowWhat = mkTcRnUnknownMessage $ mkPlainError noHints $
         vcat [text (howMany ++ " parameters for class") <+> quotes (ppr cls),
               parens (text ("Enable MultiParamTypeClasses to allow "
                                     ++ allowWhat ++ " classes"))]
 
 classFunDepsErr :: Class -> TcRnMessage
 classFunDepsErr cls
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [text "Fundeps in class" <+> quotes (ppr cls),
           parens (text "Enable FunctionalDependencies to allow fundeps")]
 
 badMethPred :: Id -> TcPredType -> TcRnMessage
 badMethPred sel_id pred
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ hang (text "Constraint" <+> quotes (ppr pred)
                  <+> text "in the type of" <+> quotes (ppr sel_id))
               2 (text "constrains only the class type variables")
@@ -5280,14 +5281,14 @@ badMethPred sel_id pred
 
 noClassTyVarErr :: Class -> TyCon -> TcRnMessage
 noClassTyVarErr clas fam_tc
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     sep [ text "The associated type" <+> quotes (ppr fam_tc <+> hsep (map ppr (tyConTyVars fam_tc)))
         , text "mentions none of the type or kind variables of the class" <+>
                 quotes (ppr clas <+> hsep (map ppr (classTyVars clas)))]
 
 badDataConTyCon :: DataCon -> Type -> TcRnMessage
 badDataConTyCon data_con res_ty_tmpl
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Data constructor" <+> quotes (ppr data_con) <+>
                 text "returns type" <+> quotes (ppr actual_res_ty))
        2 (text "instead of an instance of its parent type" <+> quotes (ppr res_ty_tmpl))
@@ -5296,13 +5297,13 @@ badDataConTyCon data_con res_ty_tmpl
 
 badGadtDecl :: Name -> TcRnMessage
 badGadtDecl tc_name
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ text "Illegal generalised algebraic data declaration for" <+> quotes (ppr tc_name)
          , nest 2 (parens $ text "Enable the GADTs extension to allow this") ]
 
 badExistential :: DataCon -> TcRnMessage
 badExistential con
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     sdocOption sdocLinearTypes (\show_linear_types ->
       hang (text "Data constructor" <+> quotes (ppr con) <+>
                   text "has existential type variables, a context, or a specialised result type")
@@ -5311,43 +5312,43 @@ badExistential con
 
 badStupidTheta :: Name -> TcRnMessage
 badStupidTheta tc_name
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
   text "A data type declared in GADT style cannot have a context:" <+> quotes (ppr tc_name)
 
 newtypeConError :: Name -> Int -> TcRnMessage
 newtypeConError tycon n
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     sep [text "A newtype must have exactly one constructor,",
          nest 2 $ text "but" <+> quotes (ppr tycon) <+> text "has" <+> speakN n ]
 
 newtypeStrictError :: DataCon -> TcRnMessage
 newtypeStrictError con
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
   sep [text "A newtype constructor cannot have a strictness annotation,",
          nest 2 $ text "but" <+> quotes (ppr con) <+> text "does"]
 
 newtypeFieldErr :: DataCon -> Int -> TcRnMessage
 newtypeFieldErr con_name n_flds
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     sep [text "The constructor of a newtype must have exactly one field",
          nest 2 $ text "but" <+> quotes (ppr con_name) <+> text "has" <+> speakN n_flds]
 
 badSigTyDecl :: Name -> TcRnMessage
 badSigTyDecl tc_name
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ text "Illegal kind signature" <+>
            quotes (ppr tc_name)
          , nest 2 (parens $ text "Use KindSignatures to allow kind signatures") ]
 
 emptyConDeclsErr :: Name -> TcRnMessage
 emptyConDeclsErr tycon
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     sep [quotes (ppr tycon) <+> text "has no constructors",
          nest 2 $ text "(EmptyDataDecls permits this)"]
 
 wrongKindOfFamily :: TyCon -> TcRnMessage
 wrongKindOfFamily family
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     text "Wrong category of family instance; declaration was for a"
     <+> kindOfFamily
   where
@@ -5360,13 +5361,13 @@ wrongKindOfFamily family
 -- See Note [Oversaturated type family equations] in "GHC.Tc.Validity".
 wrongNumberOfParmsErr :: Arity -> TcRnMessage
 wrongNumberOfParmsErr max_args
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     text "Number of parameters must match family declaration; expected"
     <+> ppr max_args
 
 badRoleAnnot :: Name -> Role -> Role -> TcRnMessage
 badRoleAnnot var annot inferred
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Role mismatch on variable" <+> ppr var <> colon)
        2 (sep [ text "Annotation says", ppr annot
               , text "but role", ppr inferred
@@ -5374,7 +5375,7 @@ badRoleAnnot var annot inferred
 
 wrongNumberOfRoles :: [a] -> LRoleAnnotDecl GhcRn -> TcRnMessage
 wrongNumberOfRoles tyvars d@(L _ (RoleAnnotDecl _ _ annots))
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Wrong number of roles listed in role annotation;" $$
           text "Expected" <+> (ppr $ length tyvars) <> comma <+>
           text "got" <+> (ppr $ length annots) <> colon)
@@ -5385,25 +5386,25 @@ illegalRoleAnnotDecl :: LRoleAnnotDecl GhcRn -> TcM ()
 illegalRoleAnnotDecl (L loc (RoleAnnotDecl _ tycon _))
   = setErrCtxt [] $
     setSrcSpanA loc $
-    addErrTc $ TcRnUnknownMessage $ mkPlainError noHints $
+    addErrTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
       (text "Illegal role annotation for" <+> ppr tycon <> char ';' $$
        text "they are allowed only for datatypes and classes.")
 
 needXRoleAnnotations :: TyCon -> TcRnMessage
 needXRoleAnnotations tc
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     text "Illegal role annotation for" <+> ppr tc <> char ';' $$
     text "did you intend to use RoleAnnotations?"
 
 incoherentRoles :: TcRnMessage
-incoherentRoles = TcRnUnknownMessage $ mkPlainError noHints $
+incoherentRoles = mkTcRnUnknownMessage $ mkPlainError noHints $
   (text "Roles other than" <+> quotes (text "nominal") <+>
    text "for class parameters can lead to incoherence.") $$
   (text "Use IncoherentInstances to allow this; bad role found")
 
 wrongTyFamName :: Name -> Name -> TcRnMessage
 wrongTyFamName fam_tc_name eqn_tc_name
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Mismatched type name in type family instance.")
        2 (vcat [ text "Expected:" <+> ppr fam_tc_name
                , text "  Actual:" <+> ppr eqn_tc_name ])

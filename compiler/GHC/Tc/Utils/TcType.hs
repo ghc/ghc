@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
@@ -246,6 +247,7 @@ import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
 import Data.List ( partition )
 
+import GHC.Generics ( Generic )
 
 {-
 ************************************************************************
@@ -2244,6 +2246,7 @@ data IllegalForeignTypeReason
   | LinearTypesNotAllowed
   | OneArgExpected
   | AtLeastOneArgExpected
+  deriving Generic
 
 -- | Reason why a type cannot be marshalled through the FFI.
 data TypeCannotBeMarshaledReason
@@ -2254,6 +2257,7 @@ data TypeCannotBeMarshaledReason
   | ForeignLabelNotAPtr
   | NotSimpleUnliftedType
   | NotBoxedKindAny
+  deriving Generic
 
 isFFIArgumentTy :: DynFlags -> Safety -> Type -> Validity' IllegalForeignTypeReason
 -- Checks for valid argument type for a 'foreign import'

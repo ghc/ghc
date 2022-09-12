@@ -208,7 +208,7 @@ checkTyConIsAcyclic tc m = SynCycleM $ \s ->
 checkSynCycles :: Unit -> [TyCon] -> [LTyClDecl GhcRn] -> TcM ()
 checkSynCycles this_uid tcs tyclds =
     case runSynCycleM (mapM_ (go emptyTyConSet []) tcs) emptyTyConSet of
-        Left (loc, err) -> setSrcSpan loc $ failWithTc (TcRnUnknownMessage $ mkPlainError noHints err)
+        Left (loc, err) -> setSrcSpan loc $ failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints err)
         Right _  -> return ()
   where
     -- Try our best to print the LTyClDecl for locally defined things

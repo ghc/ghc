@@ -2229,9 +2229,9 @@ withDeferredDiagnostics f = do
     let deferDiagnostics _dflags !msgClass !srcSpan !msg = do
           let action = logMsg logger msgClass srcSpan msg
           case msgClass of
-            MCDiagnostic SevWarning _reason
+            MCDiagnostic SevWarning _reason _code
               -> atomicModifyIORef' warnings $ \i -> (action: i, ())
-            MCDiagnostic SevError _reason
+            MCDiagnostic SevError _reason _code
               -> atomicModifyIORef' errors   $ \i -> (action: i, ())
             MCFatal
               -> atomicModifyIORef' fatals   $ \i -> (action: i, ())
@@ -2252,7 +2252,8 @@ withDeferredDiagnostics f = do
 noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope GhcMessage
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
-  = mkPlainErrorMsgEnvelope loc $ GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
+  = mkPlainErrorMsgEnvelope loc $ GhcDriverMessage $
+    DriverUnknownMessage $ UnknownDiagnostic $ mkPlainError noHints $
     cannotFindModule hsc_env wanted_mod err
 
 {-

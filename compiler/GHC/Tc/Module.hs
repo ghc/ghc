@@ -264,7 +264,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                implicit_prelude import_decls }
 
         ; when (notNull prel_imports) $ do
-            let msg = TcRnUnknownMessage $
+            let msg = mkTcRnUnknownMessage $
                         mkPlainDiagnostic (WarningWithFlag Opt_WarnImplicitPrelude) noHints (implicitPreludeWarn)
             addDiagnostic msg
 
@@ -627,7 +627,7 @@ tc_rn_src_decls ds
                         { Nothing -> return ()
                         ; Just (SpliceDecl _ (L loc _) _, _) ->
                             setSrcSpanA loc
-                            $ addErr (TcRnUnknownMessage $ mkPlainError noHints $ text
+                            $ addErr (mkTcRnUnknownMessage $ mkPlainError noHints $ text
                                 ("Declaration splices are not "
                                   ++ "permitted inside top-level "
                                   ++ "declarations added with addTopDecls"))
@@ -749,7 +749,7 @@ tcRnHsBootDecls hsc_src decls
 
 badBootDecl :: HscSource -> String -> LocatedA decl -> TcM ()
 badBootDecl hsc_src what (L loc _)
-  = addErrAt (locA loc) $ TcRnUnknownMessage $ mkPlainError noHints $
+  = addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
     (char 'A' <+> text what
       <+> text "declaration is not (currently) allowed in a"
       <+> (case hsc_src of
@@ -1378,7 +1378,7 @@ emptyRnEnv2 = mkRnEnv2 emptyInScopeSet
 ----------------
 missingBootThing :: Bool -> Name -> String -> TcRnMessage
 missingBootThing is_boot name what
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     quotes (ppr name) <+> text "is exported by the"
     <+> (if is_boot then text "hs-boot" else text "hsig")
     <+> text "file, but not"
@@ -1386,7 +1386,7 @@ missingBootThing is_boot name what
 
 badReexportedBootThing :: Bool -> Name -> Name -> TcRnMessage
 badReexportedBootThing is_boot name name'
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     withUserStyle alwaysQualify AllTheWay $ vcat
         [ text "The" <+> (if is_boot then text "hs-boot" else text "hsig")
            <+> text "file (re)exports" <+> quotes (ppr name)
@@ -1395,7 +1395,7 @@ badReexportedBootThing is_boot name name'
 
 bootMisMatch :: Bool -> SDoc -> TyThing -> TyThing -> TcRnMessage
 bootMisMatch is_boot extra_info real_thing boot_thing
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     pprBootMisMatch is_boot extra_info real_thing real_doc boot_doc
   where
     to_doc
@@ -1426,7 +1426,7 @@ bootMisMatch is_boot extra_info real_thing boot_thing
 
 instMisMatch :: DFunId -> TcRnMessage
 instMisMatch dfun
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     hang (text "instance" <+> ppr (idType dfun))
        2 (text "is defined in the hs-boot file, but not in the module itself")
 
@@ -1619,7 +1619,7 @@ tcPreludeClashWarn warnFlag name = do
                 (hang (ppr name) 4 (sep [ppr clashingElts]))
 
     ; let warn_msg x = addDiagnosticAt (nameSrcSpan (greMangledName x)) $
-            TcRnUnknownMessage $
+            mkTcRnUnknownMessage $
             mkPlainDiagnostic (WarningWithFlag warnFlag) noHints $ (hsep
               [ text "Local definition of"
               , (quotes . ppr . nameOccName . greMangledName) x
@@ -1732,7 +1732,7 @@ tcMissingParentClassWarn warnFlag isName shouldName
            ; let instLoc = srcLocSpan . nameSrcLoc $ getName isInst
                  warnMsg (RM_KnownTc name:_) =
                       addDiagnosticAt instLoc $
-                        TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag warnFlag) noHints $
+                        mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag warnFlag) noHints $
                            hsep [ (quotes . ppr . nameOccName) name
                                 , text "is an instance of"
                                 , (ppr . nameOccName . className) isClass
@@ -1870,7 +1870,7 @@ checkMain explicit_mod_hdr export_ies
         -- in other modes, add error message and go on with typechecking.
 
     noMainMsg main_mod main_occ
-      = TcRnUnknownMessage $ mkPlainError noHints $
+      = mkTcRnUnknownMessage $ mkPlainError noHints $
             text "The" <+> ppMainFn main_occ
         <+> text "is not" <+> text defOrExp <+> text "module"
         <+> quotes (ppr main_mod)
@@ -2188,7 +2188,7 @@ tcRnStmt hsc_env rdr_stmt
     return (global_ids, zonked_expr, fix_env)
     }
   where
-    bad_unboxed id = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+    bad_unboxed id = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
       (sep [text "GHCi can't bind a variable of unlifted type:",
                                   nest 2 (pprPrefixOcc id <+> dcolon <+> ppr (idType id))])
 
@@ -2543,8 +2543,8 @@ isGHCiMonad hsc_env ty
                 _ <- tcLookupInstance ghciClass [userTy]
                 return name
 
-            Just _  -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $ text "Ambiguous type!"
-            Nothing -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $ text ("Can't find type:" ++ ty)
+            Just _  -> failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $ text "Ambiguous type!"
+            Nothing -> failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $ text ("Can't find type:" ++ ty)
 
 -- | How should we infer a type? See Note [TcRnExprMode]
 data TcRnExprMode = TM_Inst     -- ^ Instantiate inferred quantifiers only (:type)
@@ -2847,7 +2847,7 @@ tcRnLookupRdrName hsc_env (L loc rdr_name)
          let rdr_names = dataTcOccs rdr_name
        ; names_s <- mapM lookupInfoOccRn rdr_names
        ; let names = concat names_s
-       ; when (null names) (addErrTc $ TcRnUnknownMessage $ mkPlainError noHints $
+       ; when (null names) (addErrTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
            (text "Not in scope:" <+> quotes (ppr rdr_name)))
        ; return names }
 

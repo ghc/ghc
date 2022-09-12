@@ -1872,7 +1872,7 @@ solverDepthError loc ty
        ; env0 <- TcM.tcInitTidyEnv
        ; let tidy_env     = tidyFreeTyCoVars env0 (tyCoVarsOfTypeList ty)
              tidy_ty      = tidyType tidy_env ty
-             msg = TcRnUnknownMessage $ mkPlainError noHints $
+             msg = mkTcRnUnknownMessage $ mkPlainError noHints $
                vcat [ text "Reduction stack overflow; size =" <+> ppr depth
                       , hang (text "When simplifying the following type:")
                            2 (ppr tidy_ty)

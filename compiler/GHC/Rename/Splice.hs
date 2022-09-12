@@ -84,7 +84,7 @@ checkForTemplateHaskellQuotes :: HsExpr GhcPs ->  RnM ()
 checkForTemplateHaskellQuotes e =
     do { thQuotesEnabled <- xoptM LangExt.TemplateHaskellQuotes
        ; unless thQuotesEnabled $
-           failWith ( TcRnUnknownMessage $ mkPlainError noHints $ vcat
+           failWith ( mkTcRnUnknownMessage $ mkPlainError noHints $ vcat
                       [ text "Syntax error on" <+> ppr e
                       , text ("Perhaps you intended to use TemplateHaskell"
                               ++ " or TemplateHaskellQuotes") ] )
@@ -235,21 +235,21 @@ untypedQuotationCtxtDoc br_body
          2 (ppr br_body)
 
 illegalBracket :: TcRnMessage
-illegalBracket = TcRnUnknownMessage $ mkPlainError noHints $
+illegalBracket = mkTcRnUnknownMessage $ mkPlainError noHints $
     text "Template Haskell brackets cannot be nested" <+>
     text "(without intervening splices)"
 
 illegalTypedBracket :: TcRnMessage
-illegalTypedBracket = TcRnUnknownMessage $ mkPlainError noHints $
+illegalTypedBracket = mkTcRnUnknownMessage $ mkPlainError noHints $
     text "Typed brackets may only appear in typed splices."
 
 illegalUntypedBracket :: TcRnMessage
-illegalUntypedBracket = TcRnUnknownMessage $ mkPlainError noHints $
+illegalUntypedBracket = mkTcRnUnknownMessage $ mkPlainError noHints $
     text "Untyped brackets may only appear in untyped splices."
 
 quotedNameStageErr :: HsQuote GhcPs -> TcRnMessage
 quotedNameStageErr br
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     sep [ text "Stage error: the non-top-level quoted name" <+> ppr br
         , text "must be used at the same stage at which it is bound" ]
 
@@ -331,7 +331,7 @@ checkTopSpliceAllowed splice = do
   let (herald, ext) = spliceExtension splice
   extEnabled <- xoptM ext
   unless extEnabled
-    (failWith $ TcRnUnknownMessage $ mkPlainError noHints $
+    (failWith $ mkTcRnUnknownMessage $ mkPlainError noHints $
        text herald <+> text "are not permitted without" <+> ppr ext)
   where
      spliceExtension :: HsUntypedSplice GhcPs -> (String, LangExt.Extension)
@@ -462,7 +462,7 @@ rnTypedSplice expr
 
         _ -> do { extEnabled <- xoptM LangExt.TemplateHaskell
                 ; unless extEnabled
-                    (failWith $ TcRnUnknownMessage $ mkPlainError noHints $
+                    (failWith $ mkTcRnUnknownMessage $ mkPlainError noHints $
                        text "Top-level splices are not permitted without"
                          <+> ppr LangExt.TemplateHaskell)
 
@@ -886,11 +886,11 @@ traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
              , gen ]
 
 illegalTypedSplice :: TcRnMessage
-illegalTypedSplice = TcRnUnknownMessage $ mkPlainError noHints $
+illegalTypedSplice = mkTcRnUnknownMessage $ mkPlainError noHints $
   text "Typed splices may not appear in untyped brackets"
 
 illegalUntypedSplice :: TcRnMessage
-illegalUntypedSplice = TcRnUnknownMessage $ mkPlainError noHints $
+illegalUntypedSplice = mkTcRnUnknownMessage $ mkPlainError noHints $
   text "Untyped splices may not appear in typed brackets"
 
 checkThLocalName :: Name -> RnM ()

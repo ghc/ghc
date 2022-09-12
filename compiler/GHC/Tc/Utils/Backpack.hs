@@ -90,9 +90,10 @@ import Data.List (find)
 
 import {-# SOURCE #-} GHC.Tc.Module
 
+
 fixityMisMatch :: TyThing -> Fixity -> Fixity -> TcRnMessage
 fixityMisMatch real_thing real_fixity sig_fixity =
-  TcRnUnknownMessage $ mkPlainError noHints $
+  mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ppr real_thing <+> text "has conflicting fixities in the module",
           text "and its hsig file",
           text "Main module:" <+> ppr_fix real_fixity,
@@ -169,7 +170,7 @@ checkHsigIface tcg_env gr sig_iface
         -- tcg_env (TODO: but maybe this isn't relevant anymore).
         r <- tcLookupImported_maybe name
         case r of
-          Failed err -> addErr (TcRnUnknownMessage $ mkPlainError noHints err)
+          Failed err -> addErr (mkTcRnUnknownMessage $ mkPlainError noHints err)
           Succeeded real_thing -> checkHsigDeclM sig_iface sig_thing real_thing
 
       -- The hsig did NOT define this function; that means it must
@@ -687,7 +688,7 @@ mergeSignatures
             -- 3(d). Extend the name substitution (performing shaping)
             mb_r <- extend_ns nsubst as2
             case mb_r of
-                Left err -> failWithTc (TcRnUnknownMessage $ mkPlainError noHints err)
+                Left err -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints err)
                 Right nsubst' -> return (nsubst',oks',(imod, thinned_iface):ifaces)
         nsubst0 = mkNameShape (moduleName inner_mod) (mi_exports lcl_iface0)
         ok_to_use0 = mkOccSet (exportOccs (mi_exports lcl_iface0))
@@ -994,7 +995,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
                                                isig_mod sig_mod NotBoot
     isig_iface <- case mb_isig_iface of
         Succeeded (iface, _) -> return iface
-        Failed err -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+        Failed err -> failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
             hang (text "Could not find hi interface for signature" <+>
                   quotes (ppr isig_mod) <> colon) 4 err
 
@@ -1002,7 +1003,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     -- we need.  (Notice we IGNORE the Modules in the AvailInfos.)
     forM_ (exportOccs (mi_exports isig_iface)) $ \occ ->
         case lookupGlobalRdrEnv impl_gr occ of
-            [] -> addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+            [] -> addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
                         quotes (ppr occ)
                     <+> text "is exported by the hsig file, but not exported by the implementing module"
                     <+> quotes (pprWithUnitState unit_state $ ppr impl_mod)

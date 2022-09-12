@@ -1199,7 +1199,7 @@ checkSimplifiableClassConstraint env dflags ctxt cls tys
   = do { result <- matchGlobalInst dflags False cls tys
        ; case result of
            OneInst { cir_what = what }
-              -> let dia = TcRnUnknownMessage $
+              -> let dia = mkTcRnUnknownMessage $
                        mkPlainDiagnostic (WarningWithFlag Opt_WarnSimplifiableClassConstraints)
                                          noHints
                                          (simplifiable_constraint_warn what)
@@ -1327,7 +1327,7 @@ tyConArityErr tc tks
 
 arityErr :: Outputable a => SDoc -> a -> Int -> Int -> TcRnMessage
 arityErr what name n m
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     hsep [ text "The" <+> what, quotes (ppr name), text "should have",
            n_arguments <> comma, text "but has been given",
            if m==0 then text "none" else int m]
@@ -1568,7 +1568,7 @@ dropCastsB b = b   -- Don't bother in the kind of a forall
 
 instTypeErr :: Class -> [Type] -> SDoc -> TcRnMessage
 instTypeErr cls tys msg
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     hang (hang (text "Illegal instance declaration for")
              2 (quotes (pprClassPred cls tys)))
        2 msg
@@ -1831,11 +1831,11 @@ checkInstTermination theta head_pred
               -- when the predicates are individually checked for validity
 
    check2 foralld_tvs pred pred_size
-     | not (null bad_tvs)     = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+     | not (null bad_tvs)     = failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
        (noMoreMsg bad_tvs what (ppr head_pred))
-     | not (isTyFamFree pred) = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+     | not (isTyFamFree pred) = failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
        (nestedMsg what)
-     | pred_size >= head_size = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+     | pred_size >= head_size = failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
        (smallerMsg what (ppr head_pred))
      | otherwise              = return ()
      -- isTyFamFree: see Note [Type families in instance contexts]
@@ -1918,7 +1918,7 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
     --   (b) failure of injectivity
     check_branch_compat prev_branches cur_branch
       | cur_branch `isDominatedBy` prev_branches
-      = do { let dia = TcRnUnknownMessage $
+      = do { let dia = mkTcRnUnknownMessage $
                    mkPlainDiagnostic WarningWithoutFlag noHints (inaccessibleCoAxBranch fam_tc cur_branch)
            ; addDiagnosticAt (coAxBranchSpan cur_branch) dia
            ; return prev_branches }
@@ -2035,7 +2035,7 @@ checkValidAssocTyFamDeflt fam_tc pats =
     extract_tv pat pat_vis =
       case getTyVar_maybe pat of
         Just tv -> pure tv
-        Nothing -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+        Nothing -> failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
           pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
           hang (text "Illegal argument" <+> quotes (ppr pat) <+> text "in:")
              2 (vcat [ppr_eqn, suggestion])
@@ -2053,7 +2053,7 @@ checkValidAssocTyFamDeflt fam_tc pats =
       let dups = findDupsEq ((==) `on` fst) cpt_tvs_vis in
       traverse_
         (\d -> let (pat_tv, pat_vis) = NE.head d in failWithTc $
-               TcRnUnknownMessage $ mkPlainError noHints $
+               mkTcRnUnknownMessage $ mkPlainError noHints $
                pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
                hang (text "Illegal duplicate variable"
                        <+> quotes (ppr pat_tv) <+> text "in:")
@@ -2078,7 +2078,7 @@ checkFamInstRhs :: TyCon -> [Type]         -- LHS
                 -> [(TyCon, [Type])]       -- type family calls in RHS
                 -> [TcRnMessage]
 checkFamInstRhs lhs_tc lhs_tys famInsts
-  = map (TcRnUnknownMessage . mkPlainError noHints) $ mapMaybe check famInsts
+  = map (mkTcRnUnknownMessage . mkPlainError noHints) $ mapMaybe check famInsts
   where
    lhs_size  = sizeTyConAppArgs lhs_tc lhs_tys
    inst_head = pprType (TyConApp lhs_tc lhs_tys)
@@ -2149,7 +2149,7 @@ checkFamPatBinders fam_tc qtvs pats rhs
     dodgy_tvs   = cpt_tvs `minusVarSet` inj_cpt_tvs
 
     check_tvs tvs what what2
-      = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $ TcRnUnknownMessage $ mkPlainError noHints $
+      = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $ mkTcRnUnknownMessage $ mkPlainError noHints $
         hang (text "Type variable" <> plural tvs <+> pprQuotedList tvs
               <+> isOrAre tvs <+> what <> comma)
            2 (vcat [ text "but not" <+> what2 <+> text "the family instance"
@@ -2180,7 +2180,7 @@ checkValidTypePats tc pat_ty_args
        -- Ensure that no type family applications occur a type pattern
        ; case tcTyConAppTyFamInstsAndVis tc pat_ty_args of
             [] -> pure ()
-            ((tf_is_invis_arg, tf_tc, tf_args):_) -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+            ((tf_is_invis_arg, tf_tc, tf_args):_) -> failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
                ty_fam_inst_illegal_err tf_is_invis_arg
                                        (mkTyConApp tf_tc tf_args) }
   where
@@ -2281,7 +2281,7 @@ checkConsistentFamInst (InClsInst { ai_class = clas
       , Just rl_subst1 <- tcMatchTyX_BM bind_me rl_subst ty2 ty1
       = go lr_subst1 rl_subst1 triples
       | otherwise
-      = addErrTc (TcRnUnknownMessage $ mkPlainError noHints $ pp_wrong_at_arg vis)
+      = addErrTc (mkTcRnUnknownMessage $ mkPlainError noHints $ pp_wrong_at_arg vis)
 
     -- The /scoped/ type variables from the class-instance header
     -- should not be alpha-renamed.  Inferred ones can be.
@@ -2709,7 +2709,7 @@ checkTyConTelescope :: TyCon -> TcM ()
 checkTyConTelescope tc
   | bad_scope
   = -- See "Ill-scoped binders" in Note [Bad TyCon telescopes]
-    addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+    addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ hang (text "The kind of" <+> quotes (ppr tc) <+> text "is ill-scoped")
               2 pp_tc_kind
          , extra

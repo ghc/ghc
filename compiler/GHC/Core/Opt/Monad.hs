@@ -35,7 +35,7 @@ module GHC.Core.Opt.Monad (
     getAnnotations, getFirstAnnotations,
 
     -- ** Screen output
-    putMsg, putMsgS, errorMsg, errorMsgS, msg,
+    putMsg, putMsgS, errorMsg, msg,
     fatalErrorMsg, fatalErrorMsgS,
     debugTraceMsg, debugTraceMsgS,
   ) where
@@ -363,9 +363,9 @@ msg msg_class doc = do
     loc    <- getSrcSpanM
     unqual <- getPrintUnqualified
     let sty = case msg_class of
-                MCDiagnostic _ _ -> err_sty
-                MCDump           -> dump_sty
-                _                -> user_sty
+                MCDiagnostic _ _ _ -> err_sty
+                MCDump             -> dump_sty
+                _                  -> user_sty
         err_sty  = mkErrStyle unqual
         user_sty = mkUserStyle unqual AllTheWay
         dump_sty = mkDumpStyle unqual
@@ -378,10 +378,6 @@ putMsgS = putMsg . text
 -- | Output a message to the screen
 putMsg :: SDoc -> CoreM ()
 putMsg = msg MCInfo
-
--- | Output an error to the screen. Does not cause the compiler to die.
-errorMsgS :: String -> CoreM ()
-errorMsgS = errorMsg . text
 
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsg :: SDoc -> CoreM ()

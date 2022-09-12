@@ -60,6 +60,8 @@ Language
   add an injectivity annotation to the type family in the case that
   the type family is in fact injective.
 
+- Error messages are now assigned unique error codes, of the form ``[GHC-12345]``.
+
 Compiler
 ~~~~~~~~
 

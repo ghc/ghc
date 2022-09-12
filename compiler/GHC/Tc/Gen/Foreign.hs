@@ -340,14 +340,14 @@ tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) (L ls safety) mh
 
 -- This makes a convenient place to check
 -- that the C identifier is valid for C
-checkCTarget :: ForeignImport p -> CCallTarget -> TcM ()
+checkCTarget :: ForeignImport GhcRn -> CCallTarget -> TcM ()
 checkCTarget idecl (StaticTarget _ str _ _) = do
     checkCg (Right idecl) backendValidityOfCImport
     checkTc (isCLabelString str) (TcRnInvalidCIdentifier str)
 
 checkCTarget _ DynamicTarget = panic "checkCTarget DynamicTarget"
 
-checkMissingAmpersand :: ForeignImport p -> [Type] -> Type -> TcM ()
+checkMissingAmpersand :: ForeignImport GhcRn -> [Type] -> Type -> TcM ()
 checkMissingAmpersand idecl arg_tys res_ty
   | null arg_tys && isFunPtrTy res_ty
   = addDiagnosticTc $ TcRnFunPtrImportWithoutAmpersand idecl
@@ -497,7 +497,8 @@ checkSafe, noCheckSafe :: Bool
 checkSafe   = True
 noCheckSafe = False
 
-checkCg :: Either (ForeignExport p) (ForeignImport p) -> (Backend -> Validity' ExpectedBackends) -> TcM ()
+checkCg :: Either (ForeignExport GhcRn) (ForeignImport GhcRn)
+        -> (Backend -> Validity' ExpectedBackends) -> TcM ()
 checkCg decl check = do
     dflags <- getDynFlags
     let bcknd = backend dflags
@@ -508,7 +509,8 @@ checkCg decl check = do
 
 -- Calling conventions
 
-checkCConv :: Either (ForeignExport p) (ForeignImport p) -> CCallConv -> TcM CCallConv
+checkCConv :: Either (ForeignExport GhcRn) (ForeignImport GhcRn)
+           -> CCallConv -> TcM CCallConv
 checkCConv _ CCallConv    = return CCallConv
 checkCConv _ CApiConv     = return CApiConv
 checkCConv decl StdCallConv = do

@@ -2929,7 +2929,7 @@ addMsg is_error env msgs msg
                []    -> noSrcSpan
                (s:_) -> s
    !diag_opts = le_diagOpts env
-   mk_msg msg = mkLocMessage (mkMCDiagnostic diag_opts WarningWithoutFlag) msg_span
+   mk_msg msg = mkLocMessage (mkMCDiagnostic diag_opts WarningWithoutFlag Nothing) msg_span
                              (msg $$ context)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a

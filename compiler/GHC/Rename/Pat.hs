@@ -643,7 +643,7 @@ rnConPatAndThen mk con (PrefixCon tyargs pats)
       unless (scoped_tyvars && type_app) $
         case listToMaybe tyargs of
           Nothing -> pure ()
-          Just tyarg -> addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+          Just tyarg -> addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
             hang (text "Illegal visible type application in a pattern:"
                     <+> quotes (ppr tyarg))
                2 (text "Both ScopedTypeVariables and TypeApplications are"

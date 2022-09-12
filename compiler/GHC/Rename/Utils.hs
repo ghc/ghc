@@ -203,7 +203,7 @@ checkInferredVars ctxt (Just msg) ty =
   let bndrs = sig_ty_bndrs ty
   in case find ((==) InferredSpec . hsTyVarBndrFlag) bndrs of
     Nothing -> return ()
-    Just _  -> addErr $ TcRnUnknownMessage $ mkPlainError noHints (withHsDocContext ctxt msg)
+    Just _  -> addErr $ mkTcRnUnknownMessage $ mkPlainError noHints (withHsDocContext ctxt msg)
   where
     sig_ty_bndrs :: LHsSigType GhcPs -> [HsTyVarBndr Specificity GhcPs]
     sig_ty_bndrs (L _ (HsSig{sig_bndrs = outer_bndrs}))
@@ -312,7 +312,7 @@ noNestedForallsContextsErr what lty =
 addNoNestedForallsContextsErr :: HsDocContext -> SDoc -> LHsType GhcRn -> RnM ()
 addNoNestedForallsContextsErr ctxt what lty =
   whenIsJust (noNestedForallsContextsErr what lty) $ \(l, err_msg) ->
-    addErrAt l $ TcRnUnknownMessage $ mkPlainError noHints (withHsDocContext ctxt err_msg)
+    addErrAt l $ mkTcRnUnknownMessage $ mkPlainError noHints (withHsDocContext ctxt err_msg)
 
 {-
 ************************************************************************
@@ -390,7 +390,7 @@ checkUnusedRecordWildcard loc fvs (Just dotdot_names) =
 warnRedundantRecordWildcard :: RnM ()
 warnRedundantRecordWildcard =
   whenWOptM Opt_WarnRedundantRecordWildcards $
-    let msg = TcRnUnknownMessage $
+    let msg = mkTcRnUnknownMessage $
                 mkPlainDiagnostic (WarningWithFlag Opt_WarnRedundantRecordWildcards)
                                   noHints
                                   redundantWildcardWarning
@@ -489,7 +489,7 @@ reportable child
 
 addUnusedWarning :: WarningFlag -> OccName -> SrcSpan -> SDoc -> RnM ()
 addUnusedWarning flag occ span msg = do
-  let diag = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints $
+  let diag = mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints $
         sep [msg <> colon,
              nest 2 $ pprNonVarNameSpace (occNameSpace occ)
                             <+> quotes (ppr occ)]
@@ -497,7 +497,7 @@ addUnusedWarning flag occ span msg = do
 
 unusedRecordWildcardWarning :: TcRnMessage
 unusedRecordWildcardWarning =
-  TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedRecordWildcards) noHints $
+  mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedRecordWildcards) noHints $
     wildcardDoc $ text "No variables bound in the record wildcard match are used"
 
 redundantWildcardWarning :: SDoc
@@ -547,7 +547,7 @@ addNameClashErrRn rdr_name gres
   -- already, and we don't want an error cascade.
   = return ()
   | otherwise
-  = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+  = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
     (vcat [ text "Ambiguous occurrence" <+> quotes (ppr rdr_name)
                  , text "It could refer to"
                  , nest 3 (vcat (msg1 : msgs)) ])
@@ -600,7 +600,7 @@ addNameClashErrRn rdr_name gres
 
 dupNamesErr :: Outputable n => (n -> SrcSpan) -> NE.NonEmpty n -> RnM ()
 dupNamesErr get_loc names
-  = addErrAt big_loc $ TcRnUnknownMessage $ mkPlainError noHints $
+  = addErrAt big_loc $ mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [text "Conflicting definitions for" <+> quotes (ppr (NE.head names)),
           locations]
   where
@@ -610,19 +610,19 @@ dupNamesErr get_loc names
 
 badQualBndrErr :: RdrName -> TcRnMessage
 badQualBndrErr rdr_name
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
   text "Qualified name in binding position:" <+> ppr rdr_name
 
 typeAppErr :: String -> LHsType GhcPs -> TcRnMessage
 typeAppErr what (L _ k)
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Illegal visible" <+> text what <+> text "application"
             <+> quotes (char '@' <> ppr k))
        2 (text "Perhaps you intended to use TypeApplications")
 
 badFieldConErr :: Name -> FieldLabelString -> TcRnMessage
 badFieldConErr con field
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     hsep [text "Constructor" <+> quotes (ppr con),
           text "does not have field", quotes (ppr field)]
 
@@ -633,7 +633,7 @@ checkTupSize tup_size
   | tup_size <= mAX_TUPLE_SIZE
   = return ()
   | otherwise
-  = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+  = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
     sep [text "A" <+> int tup_size <> text "-tuple is too large for GHC",
                  nest 2 (parens (text "max size is" <+> int mAX_TUPLE_SIZE)),
                  nest 2 (text "Workaround: use nested tuples or define a data type")]
@@ -644,7 +644,7 @@ checkCTupSize tup_size
   | tup_size <= mAX_CTUPLE_SIZE
   = return ()
   | otherwise
-  = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+  = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Constraint tuple arity too large:" <+> int tup_size
                   <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
                2 (text "Instead, use a nested tuple")

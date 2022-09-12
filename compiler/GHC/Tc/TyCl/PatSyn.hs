@@ -241,7 +241,7 @@ dependentArgErr :: (Id, DTyCoVarSet) -> TcM ()
 -- See Note [Coercions that escape]
 dependentArgErr (arg, bad_cos)
   = failWithTc $  -- fail here: otherwise we get downstream errors
-    TcRnUnknownMessage $ mkPlainError noHints $
+    mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ text "Iceland Jack!  Iceland Jack! Stop torturing me!"
          , hang (text "Pattern-bound variable")
               2 (ppr arg <+> dcolon <+> ppr (idType arg))
@@ -406,7 +406,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        -- The existential 'x' should not appear in the result type
        -- Can't check this until we know P's arity (decl_arity above)
        ; let bad_tvs = filter (`elemVarSet` tyCoVarsOfType pat_ty) $ binderVars explicit_ex_bndrs
-       ; checkTc (null bad_tvs) $ TcRnUnknownMessage $ mkPlainError noHints $
+       ; checkTc (null bad_tvs) $ mkTcRnUnknownMessage $ mkPlainError noHints $
          hang (sep [ text "The result type of the signature for" <+> quotes (ppr name) <> comma
                    , text "namely" <+> quotes (ppr pat_ty) ])
             2 (text "mentions existential type variable" <> plural bad_tvs
@@ -680,7 +680,7 @@ collectPatSynArgInfo details =
 
 wrongNumberOfParmsErr :: Name -> Arity -> Arity -> TcM a
 wrongNumberOfParmsErr name decl_arity missing
-  = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+  = failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Pattern synonym" <+> quotes (ppr name) <+> text "has"
           <+> speakNOf decl_arity (text "argument"))
        2 (text "but its type signature has" <+> int missing <+> text "fewer arrows")
@@ -922,7 +922,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
   = return emptyBag
 
   | Left why <- mb_match_group       -- Can't invert the pattern
-  = setSrcSpan (getLocA lpat) $ failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+  = setSrcSpan (getLocA lpat) $ failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ hang (text "Invalid right-hand side of bidirectional pattern synonym"
                  <+> quotes (ppr ps_name) <> colon)
               2 why

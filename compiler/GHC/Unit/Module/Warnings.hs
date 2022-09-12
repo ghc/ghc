@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -29,6 +30,7 @@ import GHC.Utils.Binary
 import Language.Haskell.Syntax.Extension
 
 import Data.Data
+import GHC.Generics ( Generic )
 
 -- | Warning Text
 --
@@ -40,6 +42,7 @@ data WarningTxt pass
    | DeprecatedTxt
       (Located SourceText)
       [Located (WithHsDocIdentifiers StringLiteral pass)]
+  deriving Generic
 
 deriving instance Eq (IdP pass) => Eq (WarningTxt pass)
 deriving instance (Data pass, Data (IdP pass)) => Data (WarningTxt pass)

@@ -2030,7 +2030,7 @@ methSigCtxt sel_name sig_ty meth_ty env0
 
 misplacedInstSig :: Name -> LHsSigType GhcRn -> TcRnMessage
 misplacedInstSig name hs_ty
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ hang (text "Illegal type signature in instance declaration:")
               2 (hang (pprPrefixName name)
                     2 (dcolon <+> ppr hs_ty))
@@ -2158,7 +2158,7 @@ derivBindCtxt sel_id clas tys
 warnUnsatisfiedMinimalDefinition :: ClassMinimalDef -> TcM ()
 warnUnsatisfiedMinimalDefinition mindef
   = do { warn <- woptM Opt_WarnMissingMethods
-       ; let msg = TcRnUnknownMessage $
+       ; let msg = mkTcRnUnknownMessage $
                mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingMethods) noHints message
        ; diagnosticTc warn msg
        }
@@ -2381,28 +2381,28 @@ inst_decl_ctxt doc = hang (text "In the instance declaration for")
 
 badBootFamInstDeclErr :: TcRnMessage
 badBootFamInstDeclErr
-  = TcRnUnknownMessage $ mkPlainError noHints $ text "Illegal family instance in hs-boot file"
+  = mkTcRnUnknownMessage $ mkPlainError noHints $ text "Illegal family instance in hs-boot file"
 
 notFamily :: TyCon -> TcRnMessage
 notFamily tycon
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ text "Illegal family instance for" <+> quotes (ppr tycon)
          , nest 2 $ parens (ppr tycon <+> text "is not an indexed type family")]
 
 assocInClassErr :: TyCon -> TcRnMessage
 assocInClassErr name
- = TcRnUnknownMessage $ mkPlainError noHints $
+ = mkTcRnUnknownMessage $ mkPlainError noHints $
    text "Associated type" <+> quotes (ppr name) <+>
    text "must be inside a class instance"
 
 badFamInstDecl :: TyCon -> TcRnMessage
 badFamInstDecl tc_name
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ text "Illegal family instance for" <+>
            quotes (ppr tc_name)
          , nest 2 (parens $ text "Use TypeFamilies to allow indexed type families") ]
 
 notOpenFamily :: TyCon -> TcRnMessage
 notOpenFamily tc
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
   text "Illegal instance for closed family" <+> quotes (ppr tc)

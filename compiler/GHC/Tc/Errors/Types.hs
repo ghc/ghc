@@ -1,8 +1,11 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
 
 module GHC.Tc.Errors.Types (
   -- * Main types
     TcRnMessage(..)
+  , mkTcRnUnknownMessage
   , TcRnMessageDetailed(..)
   , ErrInfo(..)
   , FixedRuntimeRepProvenance(..)
@@ -48,9 +51,16 @@ module GHC.Tc.Errors.Types (
   , SolverReportWithCtxt(..)
   , SolverReportErrCtxt(..)
   , getUserGivens, discardProvCtxtGivens
-  , TcSolverReportMsg(..), TcSolverReportInfo(..)
+  , TcSolverReportMsg(..)
+  , CannotUnifyVariableReason(..)
+  , MismatchMsg(..)
+  , MismatchEA(..)
+  , mkPlainMismatchMsg, mkBasicMismatchMsg
+  , WhenMatching(..)
+  , ExpectedActualInfo(..)
+  , TyVarInfo(..), SameOccInfo(..)
+  , AmbiguityInfo(..)
   , CND_Extra(..)
-  , mkTcReportWithInfo
   , FitsMbSuppressed(..)
   , ValidHoleFits(..), noValidHoleFits
   , HoleFitDispConfig(..)
@@ -64,7 +74,7 @@ module GHC.Tc.Errors.Types (
   , UnsupportedCallConvention(..)
   , ExpectedBackends
   , ArgOrResult(..)
-  , MatchArgsContext(..)
+  , MatchArgsContext(..), MatchArgBadMatches(..)
   ) where
 
 import GHC.Prelude
@@ -111,9 +121,10 @@ import GHC.Data.FastString (FastString)
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.List.NonEmpty as NE
-import           Data.Typeable hiding (TyCon)
-import qualified Data.Semigroup as Semigroup
+import           Data.Typeable (Typeable)
 import GHC.Unit.Module.Warnings (WarningTxt)
+
+import GHC.Generics ( Generic )
 
 {-
 Note [Migrating TcM Messages]
@@ -167,13 +178,17 @@ data TcRnMessageDetailed
   = TcRnMessageDetailed !ErrInfo
                         -- ^ Extra info associated with the message
                         !TcRnMessage
+  deriving Generic
+
+mkTcRnUnknownMessage :: (Diagnostic a, Typeable a) => a -> TcRnMessage
+mkTcRnUnknownMessage diag = TcRnUnknownMessage (UnknownDiagnostic diag)
 
 -- | An error which might arise during typechecking/renaming.
 data TcRnMessage where
   {-| Simply wraps a generic 'Diagnostic' message @a@. It can be used by plugins
       to provide custom diagnostic messages originated during typechecking/renaming.
   -}
-  TcRnUnknownMessage :: (Diagnostic a, Typeable a) => a -> TcRnMessage
+  TcRnUnknownMessage :: UnknownDiagnostic -> TcRnMessage
 
   {-| TcRnMessageWithInfo is a constructor which is used when extra information is needed
       to be provided in order to qualify a diagnostic and where it was originated (and why).
@@ -193,7 +208,7 @@ data TcRnMessage where
       See the documentation of the 'TcSolverReportMsg' datatype for an overview
       of the different errors.
   -}
-  TcRnSolverReport :: [SolverReportWithCtxt]
+  TcRnSolverReport :: SolverReportWithCtxt
                    -> DiagnosticReason
                    -> [GhcHint]
                    -> TcRnMessage
@@ -234,8 +249,8 @@ data TcRnMessage where
 
     Test cases: T7293, T7294, T15558, T17646, T18572, T18610, tcfail167.
   -}
-  TcRnInaccessibleCode :: Implication -- ^ The implication containing a contradiction.
-                       -> NE.NonEmpty SolverReportWithCtxt -- ^ The contradiction(s).
+  TcRnInaccessibleCode :: Implication          -- ^ The implication containing a contradiction.
+                       -> SolverReportWithCtxt -- ^ The contradiction.
                        -> TcRnMessage
 
   {-| A type which was expected to have a fixed runtime representation
@@ -263,7 +278,7 @@ data TcRnMessage where
 
      Test cases: th/T17804
   -}
-  TcRnImplicitLift :: Outputable var => var -> !ErrInfo -> TcRnMessage
+  TcRnImplicitLift :: Name -> !ErrInfo -> TcRnMessage
   {-| TcRnUnusedPatternBinds is a warning (controlled with -Wunused-pattern-binds)
       that occurs if a pattern binding binds no variables at all, unless it is a
       lone wild-card pattern, or a banged pattern.
@@ -1744,7 +1759,7 @@ data TcRnMessage where
 
     Test cases: ffi/should_fail/T20116
   -}
-  TcRnForeignImportPrimExtNotSet :: ForeignImport p -> TcRnMessage
+  TcRnForeignImportPrimExtNotSet :: ForeignImport GhcRn -> TcRnMessage
 
   {- TcRnForeignImportPrimSafeAnn is an error declaring that the safe/unsafe
      annotation should not be used with @prim@ foreign imports.
@@ -1754,7 +1769,7 @@ data TcRnMessage where
 
     Test cases: None
   -}
-  TcRnForeignImportPrimSafeAnn :: ForeignImport p -> TcRnMessage
+  TcRnForeignImportPrimSafeAnn :: ForeignImport GhcRn -> TcRnMessage
 
   {- TcRnForeignFunctionImportAsValue is an error explaining that foreign @value@
      imports cannot have function types.
@@ -1764,7 +1779,7 @@ data TcRnMessage where
 
     Test cases: ffi/should_fail/capi_value_function
   -}
-  TcRnForeignFunctionImportAsValue :: ForeignImport p -> TcRnMessage
+  TcRnForeignFunctionImportAsValue :: ForeignImport GhcRn -> TcRnMessage
 
   {- TcRnFunPtrImportWithoutAmpersand is a warning controlled by @-Wdodgy-foreign-imports@
      that informs the user of a possible missing @&@ in the declaration of a
@@ -1775,7 +1790,7 @@ data TcRnMessage where
 
     Test cases: ffi/should_compile/T1357
   -}
-  TcRnFunPtrImportWithoutAmpersand :: ForeignImport p -> TcRnMessage
+  TcRnFunPtrImportWithoutAmpersand :: ForeignImport GhcRn -> TcRnMessage
 
   {- TcRnIllegalForeignDeclBackend is an error occurring when a foreign import declaration
      is not compatible with the code generation backend being used.
@@ -1785,7 +1800,7 @@ data TcRnMessage where
     Test cases: None
   -}
   TcRnIllegalForeignDeclBackend
-    :: Either (ForeignExport p) (ForeignImport p)
+    :: Either (ForeignExport GhcRn) (ForeignImport GhcRn)
     -> Backend
     -> ExpectedBackends
     -> TcRnMessage
@@ -1799,7 +1814,9 @@ data TcRnMessage where
 
     Test cases: None
   -}
-  TcRnUnsupportedCallConv :: Either (ForeignExport p) (ForeignImport p) -> UnsupportedCallConvention -> TcRnMessage
+  TcRnUnsupportedCallConv :: Either (ForeignExport GhcRn) (ForeignImport GhcRn)
+                          -> UnsupportedCallConvention
+                          -> TcRnMessage
 
   {- TcRnIllegalForeignType is an error for when a type appears in a foreign
      function signature that is not compatible with the FFI.
@@ -2055,8 +2072,7 @@ data TcRnMessage where
   -}
   TcRnMatchesHaveDiffNumArgs
     :: !MatchArgsContext
-    -> !(LocatedA (Match GhcRn body))
-    -> !(NE.NonEmpty (LocatedA (Match GhcRn body))) -- ^ bad matches
+    -> !MatchArgBadMatches
     -> TcRnMessage
 
   {- TcRnCannotBindScopedTyVarInPatSig is an error stating that scoped type
@@ -2271,6 +2287,8 @@ data TcRnMessage where
   TcRnNoExplicitAssocTypeOrDefaultDeclaration
             :: Name
             -> TcRnMessage
+
+  deriving Generic
 
 -- | Specifies which back ends can handle a requested foreign import or export
 type ExpectedBackends = [Backend]
@@ -2492,6 +2510,7 @@ data DeriveInstanceErrReason
   -- | We couldn't derive an instance either because the type was not an
   -- enum type or because it did have more than one constructor.
   | DerivErrEnumOrProduct !DeriveInstanceErrReason !DeriveInstanceErrReason
+  deriving Generic
 
 data DeriveInstanceBadConstructor
   =
@@ -2643,9 +2662,9 @@ See 'GHC.Tc.Errors.Types.SolverReport' and 'GHC.Tc.Errors.mkErrorReport'.
 -- See Note [Error report] for details.
 data SolverReport
   = SolverReport
-  { sr_important_msgs :: [SolverReportWithCtxt]
-  , sr_supplementary  :: [SolverReportSupplementary]
-  , sr_hints          :: [GhcHint]
+  { sr_important_msg :: SolverReportWithCtxt
+  , sr_supplementary :: [SolverReportSupplementary]
+  , sr_hints         :: [GhcHint]
   }
 
 -- | Additional information to print in a 'SolverReport', after the
@@ -2668,14 +2687,7 @@ data SolverReportWithCtxt =
     , reportContent :: TcSolverReportMsg
       -- ^ The content of the message to report.
     }
-
-instance Semigroup SolverReport where
-    SolverReport main1 supp1 hints1 <> SolverReport main2 supp2 hints2
-      = SolverReport (main1 ++ main2) (supp1 ++ supp2) (hints1 ++ hints2)
-
-instance Monoid SolverReport where
-    mempty = SolverReport [] [] []
-    mappend = (Semigroup.<>)
+  deriving Generic
 
 -- | Context needed when reporting a 'TcSolverReportMsg', such as
 -- the enclosing implication constraints or whether we are deferring type errors.
@@ -2820,15 +2832,6 @@ discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]
 -- This is usually, some sort of unsolved constraint error,
 -- but we try to be specific about the precise problem we encountered.
 data TcSolverReportMsg
-  -- NB: this datatype is only a first step in refactoring GHC.Tc.Errors
-  -- to use the diagnostic infrastructure (TcRnMessage etc).
-  -- If you see possible improvements, please go right ahead!
-
-  -- | Wrap a message with additional information.
-  --
-  -- Prefer using the 'mkTcReportWithInfo' smart constructor
-  = TcReportWithInfo TcSolverReportMsg (NE.NonEmpty TcSolverReportInfo)
-
   -- | Quantified variables appear out of dependency order.
   --
   -- Example:
@@ -2836,7 +2839,7 @@ data TcSolverReportMsg
   --   forall (a :: k) k. ...
   --
   -- Test cases: BadTelescope2, T16418, T16247, T16726, T18451.
-  | BadTelescope TyVarBndrs [TyCoVar]
+  = BadTelescope TyVarBndrs [TyCoVar]
 
   -- | We came across a custom type error and we have decided to report it.
   --
@@ -2855,68 +2858,30 @@ data TcSolverReportMsg
   -- See 'HoleError'.
   | ReportHoleError Hole HoleError
 
-  -- | A type equality between a type variable and a polytype.
+  -- | Trying to unify an untouchable variable, e.g. a variable from an outer scope.
   --
-  -- Test cases: T12427a, T2846b, T10194, ...
-  | CannotUnifyWithPolytype ErrorItem TyVar Type
+  -- Test case: Simple14
+  | UntouchableVariable
+    { untouchableTyVar :: TyVar
+    , untouchableTyVarImplication :: Implication
+    }
 
-  -- | Couldn't unify two types or kinds.
-  --
-  --  Example:
-  --
-  --    3 + 3# -- can't match a lifted type with an unlifted type
-  --
-  --  Test cases: T1396, T8263, ...
+  -- | Cannot unify a variable, because of a type mismatch.
+  | CannotUnifyVariable
+    { mismatchMsg             :: MismatchMsg
+    , cannotUnifyReason       :: CannotUnifyVariableReason }
+
+  -- | A mismatch between two types.
   | Mismatch
-      { mismatch_ea   :: Bool        -- ^ Should this be phrased in terms of expected vs actual?
-      , mismatch_item :: ErrorItem   -- ^ The constraint in which the mismatch originated.
-      , mismatch_ty1  :: Type        -- ^ First type (the expected type if if mismatch_ea is True)
-      , mismatch_ty2  :: Type        -- ^ Second type (the actual type if mismatch_ea is True)
-      }
-
-  -- | A type has an unexpected kind.
-  --
-  -- Test cases: T2994, T7609, ...
-  | KindMismatch
-      { kmismatch_what     :: TypedThing -- ^ What thing is 'kmismatch_actual' the kind of?
-      , kmismatch_expected :: Type
-      , kmismatch_actual   :: Type
-      }
-    -- TODO: combine 'Mismatch' and 'KindMismatch' messages.
-
-  -- | A mismatch between two types, which arose from a type equality.
-  --
-  -- Test cases: T1470, tcfail212.
-  | TypeEqMismatch
-      { teq_mismatch_ppr_explicit_kinds :: Bool
-      , teq_mismatch_item     :: ErrorItem
-      , teq_mismatch_ty1      :: Type
-      , teq_mismatch_ty2      :: Type
-      , teq_mismatch_expected :: Type -- ^ The overall expected type
-      , teq_mismatch_actual   :: Type -- ^ The overall actual type
-      , teq_mismatch_what     :: Maybe TypedThing -- ^ What thing is 'teq_mismatch_actual' the kind of?
-      }
-    -- TODO: combine 'Mismatch' and 'TypeEqMismatch' messages.
+     { mismatchMsg           :: MismatchMsg
+     , mismatchTyVarInfo     :: Maybe TyVarInfo
+     , mismatchAmbiguityInfo :: [AmbiguityInfo]
+     , mismatchCoercibleInfo :: Maybe CoercibleMsg }
 
    -- | A violation of the representation-polymorphism invariants.
    --
    -- See 'FixedRuntimeRepErrorInfo' and 'FixedRuntimeRepContext' for more information.
   | FixedRuntimeRepError [FixedRuntimeRepErrorInfo]
-
-  -- | A skolem type variable escapes its scope.
-  --
-  -- Example:
-  --
-  --   data Ex where { MkEx :: a -> MkEx }
-  --   foo (MkEx x) = x
-  --
-  -- Test cases: TypeSkolEscape, T11142.
-  | SkolemEscape ErrorItem Implication [TyVar]
-
-  -- | Trying to unify an untouchable variable, e.g. a variable from an outer scope.
-  --
-  -- Test case: Simple14
-  | UntouchableVariable TyVar Implication
 
   -- | An equality between two types is blocked on a kind equality
   -- beteen their kinds.
@@ -2943,21 +2908,6 @@ data TcSolverReportMsg
   -- Test case: tcfail130.
   | UnboundImplicitParams
       (NE.NonEmpty ErrorItem)
-
-  -- | Couldn't solve some Wanted constraints using the Givens.
-  -- This is the most commonly used constructor, used for generic
-  -- @"No instance for ..."@ and @"Could not deduce ... from"@ messages.
-  | CouldNotDeduce
-     { cnd_user_givens :: [Implication]
-        -- | The Wanted constraints we couldn't solve.
-        --
-        -- N.B.: the 'ErrorItem' at the head of the list has been tidied,
-        -- perhaps not the others.
-     , cnd_wanted      :: NE.NonEmpty ErrorItem
-
-       -- | Some additional info consumed by 'mk_supplementary_ea_msg'.
-     , cnd_extra       :: Maybe CND_Extra
-     }
 
   -- | A constraint couldn't be solved because it contains
   -- ambiguous type variables.
@@ -3008,17 +2958,148 @@ data TcSolverReportMsg
     , unsafeOverlap_matches :: [ClsInst]
     , unsafeOverlapped      :: [ClsInst] }
 
+  deriving Generic
+
+data MismatchMsg
+  =  -- | Couldn't unify two types or kinds.
+  --
+  --  Example:
+  --
+  --    3 + 3# -- can't match a lifted type with an unlifted type
+  --
+  --  Test cases: T1396, T8263, ...
+    BasicMismatch -- SLD TODO rename this
+      { mismatch_ea           :: MismatchEA  -- ^ Should this be phrased in terms of expected vs actual?
+      , mismatch_item         :: ErrorItem   -- ^ The constraint in which the mismatch originated.
+      , mismatch_ty1          :: Type        -- ^ First type (the expected type if if mismatch_ea is True)
+      , mismatch_ty2          :: Type        -- ^ Second type (the actual type if mismatch_ea is True)
+      , mismatch_whenMatching :: Maybe WhenMatching
+      , mismatch_mb_same_occ  :: Maybe SameOccInfo
+      }
+
+  -- | A type has an unexpected kind.
+  --
+  -- Test cases: T2994, T7609, ...
+  | KindMismatch
+      { kmismatch_what     :: TypedThing -- ^ What thing is 'kmismatch_actual' the kind of?
+      , kmismatch_expected :: Type
+      , kmismatch_actual   :: Type
+      }
+    -- TODO: combine with 'BasicMismatch'.
+
+  -- | A mismatch between two types, which arose from a type equality.
+  --
+  -- Test cases: T1470, tcfail212.
+  | TypeEqMismatch
+      { teq_mismatch_ppr_explicit_kinds :: Bool
+      , teq_mismatch_item     :: ErrorItem
+      , teq_mismatch_ty1      :: Type
+      , teq_mismatch_ty2      :: Type
+      , teq_mismatch_expected :: Type -- ^ The overall expected type
+      , teq_mismatch_actual   :: Type -- ^ The overall actual type
+      , teq_mismatch_what     :: Maybe TypedThing -- ^ What thing is 'teq_mismatch_actual' the kind of?
+      , teq_mb_same_occ       :: Maybe SameOccInfo
+      }
+    -- TODO: combine with 'BasicMismatch'.
+
+  -- | Couldn't solve some Wanted constraints using the Givens.
+  -- Used for messages such as @"No instance for ..."@ and
+  -- @"Could not deduce ... from"@.
+  | CouldNotDeduce
+     { cnd_user_givens :: [Implication]
+        -- | The Wanted constraints we couldn't solve.
+        --
+        -- N.B.: the 'ErrorItem' at the head of the list has been tidied,
+        -- perhaps not the others.
+     , cnd_wanted      :: NE.NonEmpty ErrorItem
+
+       -- | Some additional info consumed by 'mk_supplementary_ea_msg'.
+     , cnd_extra       :: Maybe CND_Extra
+     }
+  deriving Generic
+
+mkBasicMismatchMsg :: MismatchEA -> ErrorItem -> Type -> Type -> MismatchMsg
+mkBasicMismatchMsg ea item ty1 ty2
+  = BasicMismatch
+      { mismatch_ea           = ea
+      , mismatch_item         = item
+      , mismatch_ty1          = ty1
+      , mismatch_ty2          = ty2
+      , mismatch_whenMatching = Nothing
+      , mismatch_mb_same_occ  = Nothing
+      }
+
+-- | Whether to use expected/actual in a type mismatch message.
+data MismatchEA
+  -- | Don't use expected/actual.
+  = NoEA
+  -- | Use expected/actual.
+  | EA
+  { mismatch_mbEA :: Maybe ExpectedActualInfo
+    -- ^ Whether to also mention type synonym expansion.
+  }
+
+data CannotUnifyVariableReason
+  =  -- | A type equality between a type variable and a polytype.
+    --
+    -- Test cases: T12427a, T2846b, T10194, ...
+    CannotUnifyWithPolytype ErrorItem TyVar Type (Maybe TyVarInfo)
+
+  -- | An occurs check.
+  | OccursCheck
+    { occursCheckInterestingTyVars :: [TyVar]
+    , occursCheckAmbiguityInfos    :: [AmbiguityInfo] }
+
+  -- | A skolem type variable escapes its scope.
+  --
+  -- Example:
+  --
+  --   data Ex where { MkEx :: a -> MkEx }
+  --   foo (MkEx x) = x
+  --
+  -- Test cases: TypeSkolEscape, T11142.
+  | SkolemEscape ErrorItem Implication [TyVar]
+
+  -- | Can't unify the type variable with the other type
+  -- due to the kind of type variable it is.
+  --
+  -- For example, trying to unify a 'SkolemTv' with the
+  -- type Int, or with a 'TyVarTv'.
+  | DifferentTyVars TyVarInfo
+  | RepresentationalEq TyVarInfo (Maybe CoercibleMsg)
+  deriving Generic
+
+mkPlainMismatchMsg :: MismatchMsg -> TcSolverReportMsg
+mkPlainMismatchMsg msg
+  = Mismatch
+     { mismatchMsg           = msg
+     , mismatchTyVarInfo     = Nothing
+     , mismatchAmbiguityInfo = []
+     , mismatchCoercibleInfo = Nothing }
+
 -- | Additional information to be given in a 'CouldNotDeduce' message,
 -- which is then passed on to 'mk_supplementary_ea_msg'.
 data CND_Extra = CND_Extra TypeOrKind Type Type
 
--- | Additional information that can be appended to an existing 'TcSolverReportMsg'.
-data TcSolverReportInfo
-  -- NB: this datatype is only a first step in refactoring GHC.Tc.Errors
-  -- to use the diagnostic infrastructure (TcRnMessage etc).
-  -- It would be better for these constructors to not be so closely tied
-  -- to the constructors of 'TcSolverReportMsg'.
-  -- If you see possible improvements, please go right ahead!
+-- | A cue to print out information about type variables,
+-- e.g. where they were bound, when there is a mismatch @tv1 ~ ty2@.
+data TyVarInfo =
+  TyVarInfo { thisTyVar :: TyVar
+            , thisTyVarIsUntouchable :: Maybe Implication
+            , otherTy   :: Maybe TyVar }
+
+-- | Add some information to disambiguate errors in which
+-- two 'Names' would otherwise appear to be identical.
+--
+-- See Note [Disambiguating (X ~ X) errors].
+data SameOccInfo
+  = SameOcc
+    { sameOcc_same_pkg :: Bool -- ^ Whether the two 'Name's also came from the same package.
+    , sameOcc_lhs :: Name
+    , sameOcc_rhs :: Name }
+
+-- | Add some information about ambiguity
+data AmbiguityInfo
 
   -- | Some type variables remained ambiguous: print them to the user.
   = Ambiguity
@@ -3028,38 +3109,24 @@ data TcSolverReportInfo
                                                 -- Guaranteed to not both be empty.
     }
 
-  -- | Specify some information about a type variable,
-  -- e.g. its 'SkolemInfo'.
-  | TyVarInfo TyVar
-
   -- | Remind the user that a particular type family is not injective.
   | NonInjectiveTyFam TyCon
 
-  -- | Explain why we couldn't coerce between two types. See 'CoercibleMsg'.
-  | ReportCoercibleMsg CoercibleMsg
-
+-- | Expected/actual information.
+data ExpectedActualInfo
   -- | Display the expected and actual types.
-  | ExpectedActual
+  = ExpectedActual
      { ea_expected, ea_actual :: Type }
 
   -- | Display the expected and actual types, after expanding type synonyms.
   | ExpectedActualAfterTySynExpansion
      { ea_expanded_expected, ea_expanded_actual :: Type }
 
-  -- | Explain how a kind equality originated.
-  | WhenMatching TcType TcType CtOrigin (Maybe TypeOrKind)
+-- | Explain how a kind equality originated.
+data WhenMatching
 
-  -- | Add some information to disambiguate errors in which
-  -- two 'Names' would otherwise appear to be identical.
-  --
-  -- See Note [Disambiguating (X ~ X) errors].
-  | SameOcc
-    { sameOcc_same_pkg :: Bool -- ^ Whether the two 'Name's also came from the same package.
-    , sameOcc_lhs :: Name
-    , sameOcc_rhs :: Name }
-
-  -- | Report some type variables that might be participating in an occurs-check failure.
-  | OccursCheckInterestingTyVars (NE.NonEmpty TyVar)
+  = WhenMatching TcType TcType CtOrigin (Maybe TypeOrKind)
+  deriving Generic
 
 -- | Some form of @"not in scope"@ error. See also the 'OutOfScopeHole'
 -- constructor of 'HoleError'.
@@ -3099,6 +3166,7 @@ data NotInScopeError
   -- or, a class doesn't have an associated type with this name,
   -- or, a record doesn't have a record field with this name.
   | UnknownSubordinate SDoc
+  deriving Generic
 
 -- | Create a @"not in scope"@ error message for the given 'RdrName'.
 mkTcRnNotInScope :: RdrName -> NotInScopeError -> TcRnMessage
@@ -3174,15 +3242,6 @@ data PotentialInstances
   { matches  :: [ClsInst]
   , unifiers :: [ClsInst]
   }
-
--- | Append additional information to a `TcSolverReportMsg`.
-mkTcReportWithInfo :: TcSolverReportMsg -> [TcSolverReportInfo] -> TcSolverReportMsg
-mkTcReportWithInfo msg []
-  = msg
-mkTcReportWithInfo (TcReportWithInfo msg (prev NE.:| prevs)) infos
-  = TcReportWithInfo msg (prev NE.:| prevs ++ infos)
-mkTcReportWithInfo msg (info : infos)
-  = TcReportWithInfo msg (info NE.:| infos)
 
 -- | A collection of valid hole fits or refinement fits,
 -- in which some fits might have been suppressed.
@@ -3323,3 +3382,11 @@ data MatchArgsContext
       !Name -- ^ Name of the function
   | PatternArgs
       !(HsMatchContext GhcTc) -- ^ Pattern match specifics
+
+-- | The information necessary to report mismatched
+-- numbers of arguments in a match group.
+data MatchArgBadMatches where
+  MatchArgMatches
+    ::  { matchArgFirstMatch :: LocatedA (Match GhcRn body)
+        , matchArgBadMatches :: NE.NonEmpty (LocatedA (Match GhcRn body)) }
+    -> MatchArgBadMatches

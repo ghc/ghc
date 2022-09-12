@@ -1159,7 +1159,8 @@ check_match_pats _ (MG { mg_alts = L _ [] })
     = return ()
 check_match_pats matchContext (MG { mg_alts = L _ (match1:matches) })
     | Just bad_matches <- mb_bad_matches
-    = failWithTc $ TcRnMatchesHaveDiffNumArgs matchContext match1 bad_matches
+    = failWithTc $ TcRnMatchesHaveDiffNumArgs matchContext
+                 $ MatchArgMatches match1 bad_matches
     | otherwise
     = return ()
   where

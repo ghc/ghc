@@ -1845,7 +1845,7 @@ defaultTyVar def_strat tv
            ; writeMetaTyVar kv liftedTypeKind
            ; return True }
       | otherwise
-      = do { addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+      = do { addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
                (vcat [ text "Cannot default kind variable" <+> quotes (ppr kv')
                      , text "of kind:" <+> ppr (tyVarKind kv')
                      , text "Perhaps enable PolyKinds or add a kind signature" ])
@@ -2065,7 +2065,7 @@ doNotQuantifyTyVars dvs where_found
        ; unless (null leftover_metas) $
          do { let (tidy_env1, tidied_tvs) = tidyOpenTyCoVars emptyTidyEnv leftover_metas
             ; (tidy_env2, where_doc) <- where_found tidy_env1
-            ; let msg = TcRnUnknownMessage            $
+            ; let msg = mkTcRnUnknownMessage            $
                         mkPlainError noHints          $
                         pprWithExplicitKindsWhen True $
                     vcat [ text "Uninferrable type variable"
@@ -2735,7 +2735,7 @@ naughtyQuantification orig_ty tv escapees
 
              orig_ty'   = tidyType env orig_ty1
              ppr_tidied = pprTyVars . map (tidyTyCoVarOcc env)
-             msg = TcRnUnknownMessage $ mkPlainError noHints $
+             msg = mkTcRnUnknownMessage $ mkPlainError noHints $
                    pprWithExplicitKindsWhen True $
                    vcat [ sep [ text "Cannot generalise type; skolem" <> plural escapees'
                               , quotes $ ppr_tidied escapees'

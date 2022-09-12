@@ -27,6 +27,7 @@ import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import GHC.Types.Error (UnknownDiagnostic(..))
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
 import GHC.Types.PkgQual
@@ -306,7 +307,8 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
     fail ->
         throwOneError $
           mkPlainErrorMsgEnvelope srcloc $
-          GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
+          GhcDriverMessage $ DriverUnknownMessage $
+             UnknownDiagnostic $ mkPlainError noHints $
              cannotFindModule hsc_env imp fail
 
 -----------------------------

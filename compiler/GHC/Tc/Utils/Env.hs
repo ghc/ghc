@@ -257,7 +257,7 @@ tcLookupGlobal name
     do  { mb_thing <- tcLookupImported_maybe name
         ; case mb_thing of
             Succeeded thing -> return thing
-            Failed msg      -> failWithTc (TcRnUnknownMessage $ mkPlainError noHints msg)
+            Failed msg      -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints msg)
         }}}
 
 -- Look up only in this module's global env't. Don't look in imports, etc.
@@ -328,11 +328,11 @@ tcLookupInstance cls tys
   = do { instEnv <- tcGetInstEnvs
        ; case lookupUniqueInstEnv instEnv cls tys of
            Left err             ->
-             failWithTc $ TcRnUnknownMessage
+             failWithTc $ mkTcRnUnknownMessage
                         $ mkPlainError noHints (text "Couldn't match instance:" <+> err)
            Right (inst, tys)
              | uniqueTyVars tys -> return inst
-             | otherwise        -> failWithTc (TcRnUnknownMessage $ mkPlainError noHints errNotExact)
+             | otherwise        -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints errNotExact)
        }
   where
     errNotExact = text "Not an exact match (i.e., some variables get instantiated)"
@@ -899,7 +899,7 @@ checkWellStaged pp_thing bind_lvl use_lvl
 
   | otherwise                   -- Badly staged
   = failWithTc $                -- E.g.  \x -> $(f x)
-    TcRnUnknownMessage $ mkPlainError noHints $
+    mkTcRnUnknownMessage $ mkPlainError noHints $
     text "Stage error:" <+> pp_thing <+>
         hsep   [text "is bound at stage" <+> ppr bind_lvl,
                 text "but used at stage" <+> ppr use_lvl]
@@ -907,7 +907,7 @@ checkWellStaged pp_thing bind_lvl use_lvl
 stageRestrictionError :: SDoc -> TcM a
 stageRestrictionError pp_thing
   = failWithTc $
-    TcRnUnknownMessage $ mkPlainError noHints $
+    mkTcRnUnknownMessage $ mkPlainError noHints $
     sep [ text "GHC stage restriction:"
         , nest 2 (vcat [ pp_thing <+> text "is used in a top-level splice, quasi-quote, or annotation,"
                        , text "and must be imported, not defined locally"])]
@@ -1175,7 +1175,7 @@ notFound name
                                             -- don't report it again (#11941)
              | otherwise -> stageRestrictionError (quotes (ppr name))
            _ -> failWithTc $
-                TcRnUnknownMessage $ mkPlainError noHints $
+                mkTcRnUnknownMessage $ mkPlainError noHints $
                 vcat[text "GHC internal error:" <+> quotes (ppr name) <+>
                      text "is not in scope during type checking, but it passed the renamer",
                      text "tcl_env of environment:" <+> ppr (tcl_env lcl_env)]
@@ -1188,7 +1188,7 @@ notFound name
 
 wrongThingErr :: String -> TcTyThing -> Name -> TcM a
 wrongThingErr expected thing name
-  = let msg = TcRnUnknownMessage $ mkPlainError noHints $
+  = let msg = mkTcRnUnknownMessage $ mkPlainError noHints $
           (pprTcTyThingCategory thing <+> quotes (ppr name) <+>
                      text "used as a" <+> text expected)
   in failWithTc msg

@@ -1568,6 +1568,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
          (logDiagnostics $ singleMessage $
              mkPlainMsgEnvelope diag_opts (warnUnsafeOnLoc dflags) $
              GhcDriverMessage $ DriverUnknownMessage $
+             UnknownDiagnostic $
              mkPlainDiagnostic reason noHints $
              whyUnsafe' dflags)
 
@@ -2227,7 +2228,8 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
             [L _ i] -> return i
             _ -> liftIO $ throwOneError $
                      mkPlainErrorMsgEnvelope noSrcSpan $
-                     GhcPsMessage $ PsUnknownMessage $ mkPlainError noHints $
+                     GhcPsMessage $ PsUnknownMessage $
+                     UnknownDiagnostic $ mkPlainError noHints $
                          text "parse error in import declaration"
 
 -- | Typecheck an expression (but don't run it)
@@ -2258,7 +2260,7 @@ hscParseExpr expr = do
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
     _ -> throwOneError $
            mkPlainErrorMsgEnvelope noSrcSpan $
-           GhcPsMessage $ PsUnknownMessage $ mkPlainError noHints $
+           GhcPsMessage $ PsUnknownMessage $ UnknownDiagnostic $ mkPlainError noHints $
              text "not an expression:" <+> quotes (text expr)
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))

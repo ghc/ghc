@@ -668,7 +668,7 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
 
 dupFixityDecl :: SrcSpan -> RdrName -> TcRnMessage
 dupFixityDecl loc rdr_name
-  = TcRnUnknownMessage $ mkPlainError noHints $
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [text "Multiple fixity declarations for" <+> quotes (ppr rdr_name),
           text "also at " <+> ppr loc]
 
@@ -759,7 +759,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
 
     patternSynonymErr :: TcRnMessage
     patternSynonymErr
-      = TcRnUnknownMessage $ mkPlainError noHints $
+      = mkTcRnUnknownMessage $ mkPlainError noHints $
         hang (text "Illegal pattern synonym declaration")
            2 (text "Use -XPatternSynonyms to enable this extension")
 
@@ -915,7 +915,7 @@ rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
 -- Report error for all other forms of bindings
 -- This is why we use a fold rather than map
 rnMethodBindLHS is_cls_decl _ (L loc bind) rest
-  = do { addErrAt (locA loc) $ TcRnUnknownMessage $ mkPlainError noHints $
+  = do { addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
          vcat [ what <+> text "not allowed in" <+> decl_sort
               , nest 2 (ppr bind) ]
        ; return rest }
@@ -1060,7 +1060,7 @@ renameSig _ctxt sig@(CompleteMatchSig (_, s) (L l bf) mty)
        return (CompleteMatchSig (noAnn, s) (L l new_bf) new_mty, emptyFVs)
   where
     orphanError :: TcRnMessage
-    orphanError = TcRnUnknownMessage $ mkPlainError noHints $
+    orphanError = mkTcRnUnknownMessage $ mkPlainError noHints $
       text "Orphan COMPLETE pragmas not supported" $$
       text "A COMPLETE pragma must mention at least one data constructor" $$
       text "or pattern synonym defined in the same module."
@@ -1250,7 +1250,7 @@ rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
                         , m_grhss = grhss'}, grhss_fvs ) }
 
 emptyCaseErr :: HsMatchContext GhcRn -> TcRnMessage
-emptyCaseErr ctxt = TcRnUnknownMessage $ mkPlainError noHints $ message ctxt
+emptyCaseErr ctxt = mkTcRnUnknownMessage $ mkPlainError noHints $ message ctxt
   where
     pp_ctxt :: HsMatchContext GhcRn -> SDoc
     pp_ctxt c = case c of
@@ -1308,7 +1308,7 @@ rnGRHS' ctxt rnBody (GRHS _ guards rhs)
                                     rnBody rhs
 
         ; unless (pattern_guards_allowed || is_standard_guard guards') $
-            let diag = TcRnUnknownMessage $
+            let diag = mkTcRnUnknownMessage $
                   mkPlainDiagnostic WarningWithoutFlag noHints (nonStdGuardErr guards')
             in addDiagnostic diag
 
@@ -1363,7 +1363,7 @@ rnSrcFixityDecl sig_ctxt = rn_decl
 
 dupSigDeclErr :: NonEmpty (LocatedN RdrName, Sig GhcPs) -> RnM ()
 dupSigDeclErr pairs@((L loc name, sig) :| _)
-  = addErrAt (locA loc) $ TcRnUnknownMessage $ mkPlainError noHints $
+  = addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ text "Duplicate" <+> what_it_is
            <> text "s for" <+> quotes (ppr name)
          , text "at" <+> vcat (map ppr $ sortBy SrcLoc.leftmost_smallest
@@ -1375,18 +1375,18 @@ dupSigDeclErr pairs@((L loc name, sig) :| _)
 
 misplacedSigErr :: LSig GhcRn -> RnM ()
 misplacedSigErr (L loc sig)
-  = addErrAt (locA loc) $ TcRnUnknownMessage $ mkPlainError noHints $
+  = addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
     sep [text "Misplaced" <+> hsSigDoc sig <> colon, ppr sig]
 
 defaultSigErr :: Sig GhcPs -> TcRnMessage
-defaultSigErr sig = TcRnUnknownMessage $ mkPlainError noHints $
+defaultSigErr sig = mkTcRnUnknownMessage $ mkPlainError noHints $
   vcat [ hang (text "Unexpected default signature:")
          2 (ppr sig)
        , text "Use DefaultSignatures to enable default signatures" ]
 
 bindInHsBootFileErr :: LHsBindLR GhcRn GhcPs -> RnM ()
 bindInHsBootFileErr (L loc _)
-  = addErrAt (locA loc) $ TcRnUnknownMessage $ mkPlainError noHints $
+  = addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
       vcat [ text "Bindings in hs-boot files are not allowed" ]
 
 nonStdGuardErr :: (Outputable body,
@@ -1398,7 +1398,7 @@ nonStdGuardErr guards
 
 dupMinimalSigErr :: [LSig GhcPs] -> RnM ()
 dupMinimalSigErr sigs@(L loc _ : _)
-  = addErrAt (locA loc) $ TcRnUnknownMessage $ mkPlainError noHints $
+  = addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ text "Multiple minimal complete definitions"
          , text "at" <+> vcat (map ppr $ sortBy SrcLoc.leftmost_smallest $ map getLocA sigs)
          , text "Combine alternative minimal complete definitions with `|'" ]

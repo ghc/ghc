@@ -576,9 +576,9 @@ tcHiBootIface hsc_src mod
             Nothing -> return NoSelfBoot
             -- error cases
             Just (GWIB { gwib_isBoot = is_boot }) -> case is_boot of
-              IsBoot -> failWithTc (TcRnUnknownMessage $ mkPlainError noHints (elaborate err))
+              IsBoot -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints (elaborate err))
               -- The hi-boot file has mysteriously disappeared.
-              NotBoot -> failWithTc (TcRnUnknownMessage $ mkPlainError noHints moduleLoop)
+              NotBoot -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints moduleLoop)
               -- Someone below us imported us!
               -- This is a loop with no hi-boot in the way
     }}}}

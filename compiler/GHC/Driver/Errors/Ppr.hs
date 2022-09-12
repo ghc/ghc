@@ -1,8 +1,11 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic {DriverMessage, GhcMessage}
 
-module GHC.Driver.Errors.Ppr where
+module GHC.Driver.Errors.Ppr (
+  -- This module only exports Diagnostic instances.
+  ) where
 
 import GHC.Prelude
 
@@ -13,6 +16,7 @@ import GHC.HsToCore.Errors.Ppr ()
 import GHC.Parser.Errors.Ppr ()
 import GHC.Tc.Errors.Ppr ()
 import GHC.Types.Error
+import GHC.Types.Error.Codes ( constructorCode )
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 import GHC.Unit.Module
@@ -69,6 +73,8 @@ instance Diagnostic GhcMessage where
       -> diagnosticHints m
     GhcUnknownMessage m
       -> diagnosticHints m
+
+  diagnosticCode = constructorCode
 
 instance Diagnostic DriverMessage where
   diagnosticMessage = \case
@@ -311,3 +317,5 @@ instance Diagnostic DriverMessage where
       -> noHints
     DriverHomePackagesNotClosed {}
       -> noHints
+
+  diagnosticCode = constructorCode
