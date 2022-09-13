@@ -958,16 +958,6 @@ AC_CHECK_DECLS([ctime_r], , ,
 #define _POSIX_C_SOURCE 199506L
 #include <time.h>])
 
-dnl ** check for mingwex library
-AC_CHECK_LIB(
-  [mingwex],
-  [closedir],
-  [AC_SUBST([HaveLibMingwEx],[YES])] [AC_SUBST([CabalMingwex],[True])],
-  [AC_SUBST([HaveLibMingwEx],[NO])] [AC_SUBST([CabalMingwex],[False])])
-
-if test $HaveLibMingwEx = YES ; then
-  AC_DEFINE([HAVE_MINGWEX], [1], [Define to 1 if you have the mingwex library.])
-fi
 
 dnl ** check for math library
 dnl    Keep that check as early as possible.

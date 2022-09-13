@@ -38,7 +38,7 @@ AC_CHECK_FUNCS([lstat])
 AC_CHECK_LIB([rt], [clock_gettime])
 AC_CHECK_FUNCS([clock_gettime])
 AC_CHECK_FUNCS([getclock getrusage times])
-AC_CHECK_FUNCS([_chsize ftruncate])
+AC_CHECK_FUNCS([_chsize_s ftruncate])
 
 # event-related fun
 # The line below already defines HAVE_KQUEUE and HAVE_POLL, so technically some of the

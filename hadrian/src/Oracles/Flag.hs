@@ -30,7 +30,6 @@ data Flag = ArSupportsAtFile
           | SolarisBrokenShld
           | WithLibdw
           | WithLibnuma
-          | HaveLibMingwEx
           | UseSystemFfi
           | BootstrapThreadedRts
           | BootstrapEventLoggingRts
@@ -55,7 +54,6 @@ flag f = do
             SolarisBrokenShld    -> "solaris-broken-shld"
             WithLibdw            -> "with-libdw"
             WithLibnuma          -> "with-libnuma"
-            HaveLibMingwEx       -> "have-lib-mingw-ex"
             UseSystemFfi         -> "use-system-ffi"
             BootstrapThreadedRts -> "bootstrap-threaded-rts"
             BootstrapEventLoggingRts -> "bootstrap-event-logging-rts"

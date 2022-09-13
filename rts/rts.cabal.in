@@ -24,8 +24,6 @@ flag need-pthread
   default: @CabalNeedLibpthread@
 flag libbfd
   default: @CabalHaveLibbfd@
-flag mingwex
-  default: @CabalMingwex@
 flag need-atomic
   default: @CabalNeedLibatomic@
 flag libdw
@@ -145,8 +143,6 @@ library
     if flag(libbfd)
        -- for debugging
        extra-libraries: bfd iberty
-    if flag(mingwex)
-       extra-libraries: mingwex
     if flag(libdw)
        -- for backtraces
        extra-libraries: elf dw

@@ -409,7 +409,7 @@ rtsPackageArgs = package rts ? do
           [ "-DTOP="             ++ show top ]
 
         , builder HsCpp ? flag WithLibdw ? arg "-DUSE_LIBDW"
-        , builder HsCpp ? flag HaveLibMingwEx ? arg "-DHAVE_LIBMINGWEX" ]
+        ]
 
 -- Compile various performance-critical pieces *without* -fPIC -dynamic
 -- even when building a shared library.  If we don't do this, then the
