@@ -35,7 +35,6 @@ data Flag = ArSupportsAtFile
           | UseLibffiForAdjustors
           | UseLibdw
           | UseLibnuma
-          | UseLibmingwex
           | UseLibm
           | UseLibrt
           | UseLibdl
@@ -66,7 +65,6 @@ flag f = do
             UseLibffiForAdjustors -> "use-libffi-for-adjustors"
             UseLibdw             -> "use-lib-dw"
             UseLibnuma           -> "use-lib-numa"
-            UseLibmingwex        -> "use-lib-mingw-ex"
             UseLibm              -> "use-lib-m"
             UseLibrt             -> "use-lib-rt"
             UseLibdl             -> "use-lib-dl"

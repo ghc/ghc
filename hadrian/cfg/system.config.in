@@ -205,7 +205,6 @@ libnuma-lib-dir       = @LibNumaLibDir@
 
 use-lib-dw        = @UseLibdw@
 use-lib-numa      = @UseLibNuma@
-use-lib-mingw-ex  = @HaveLibMingwEx@
 use-lib-m         = @UseLibm@
 use-lib-rt        = @UseLibrt@
 use-lib-dl        = @UseLibdl@
