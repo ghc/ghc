@@ -1890,11 +1890,17 @@ dmdFix top_lvl env let_dmd orig_pairs
         final_anal_env    = extendAnalEnvs top_lvl env (map fst pairs')
 
     step :: Bool -> [(Id, CoreExpr)] -> (DmdEnv, [(Id, CoreExpr)])
-    step first_round pairs = (lazy_fv, pairs')
+    step first_round pairs = (lazy_fv, pairs'')
       where
         -- In all but the first iteration, delete the virgin flag
         start_env | first_round = env
                   | otherwise   = nonVirgin env
+
+        bot_to_exn_div p@(id,rhs) | DmdSig ty <- idDmdSig id
+                                  , dt_div ty == botDiv
+                                  = (id `setIdDmdSig` DmdSig ty{dt_div=exnDiv},rhs)
+                                  | otherwise
+                                  = p
 
         start = (extendAnalEnvs top_lvl start_env (map fst pairs), emptyVarEnv)
 
@@ -1902,6 +1908,8 @@ dmdFix top_lvl env let_dmd orig_pairs
                 -- mapAccumL: Use the new signature to do the next pair
                 -- The occurrence analyser has arranged them in a good order
                 -- so this can significantly reduce the number of iterations needed
+        !pairs'' | first_round = map bot_to_exn_div pairs' -- Note TODO
+                 | otherwise   = pairs'
 
         my_downRhs (env, lazy_fv) (id,rhs)
           = -- pprTrace "my_downRhs" (ppr id $$ ppr (idDmdSig id) $$ ppr sig) $
