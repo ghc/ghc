@@ -2,7 +2,7 @@
 module Oracles.ModuleFiles (
     decodeModule, encodeModule, findGenerator, hsSources, hsObjects,
     determineBuilder,
-    moduleFilesOracle
+    moduleFilesOracle, moduleSource
     ) where
 
 import qualified Data.HashMap.Strict as Map
