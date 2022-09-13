@@ -135,7 +135,8 @@ extern void iconv();
    This is to enable lazy loading of symbols. Eager loading is problematic
    as it means that all symbols must be available, even those which we will
    never use. This is especially painful on Windows, where the number of
-   libraries required to link things like mingwex grows to be quite high.
+   libraries required to link things like mingwex (TODO: We no longer depend
+   on mingwex, so think of a different example here) grows to be quite high.
 
    We proceed through these stages as follows,
 
@@ -193,7 +194,8 @@ extern void iconv();
 
    1) Dependency chains, if A.o required a .o in libB but A.o isn't required to link
       then we don't need to load libB. This means the dependency chain for libraries
-      such as mingw32 and mingwex can be broken down.
+      such as mingw32 and mingwex (TODO: We no longer depend on mingwex, so think of
+      a different example here) can be broken down.
 
    2) The number of duplicate symbols, since now only symbols that are
       true duplicates will display the error.

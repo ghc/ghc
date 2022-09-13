@@ -266,7 +266,6 @@ templateRules = do
     target_word_size       <- settingWord TargetWordSize
     lib_dw                 <- flag UseLibdw
     lib_numa               <- flag UseLibnuma
-    lib_mingwex            <- flag UseLibmingwex
     lib_m                  <- flag UseLibm
     lib_rt                 <- flag UseLibrt
     lib_dl                 <- flag UseLibdl
@@ -283,7 +282,6 @@ templateRules = do
         subst = replace "@ProjectVersion@" project_version
                 . replace "@ProjectVersionMunged@" project_version_munged
                 . replace "@Cabal64bit@" (cabal_bool (target_word_size == 8))
-                . replace "@CabalMingwex@" (cabal_bool lib_mingwex)
                 . replace "@CabalHaveLibdw@" (cabal_bool lib_dw)
                 . replace "@CabalHaveLibm@" (cabal_bool lib_m)
                 . replace "@CabalHaveLibrt@" (cabal_bool lib_rt)

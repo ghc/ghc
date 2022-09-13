@@ -452,7 +452,6 @@ foreign import ccall unsafe "HsBase.h __hscore_fstat"
 
 foreign import ccall unsafe "HsBase.h __hscore_lstat"
    lstat :: CFilePath -> Ptr CStat -> IO CInt
-
 #endif
 
 #if defined(js_HOST_ARCH)
@@ -592,24 +591,106 @@ foreign import javascript unsafe "(($1,$2,$3_1,$3_2) => { return h$base_c_fcntl_
 
 #else
 
-{- Note: Win32 POSIX functions
-Functions that are not part of the POSIX standards were
-at some point deprecated by Microsoft. This deprecation
-was performed by renaming the functions according to the
-C++ ABI Section 17.6.4.3.2b. This was done to free up the
-namespace of normal Windows programs since Windows isn't
-POSIX compliant anyway.
+#if defined(mingw32_HOST_OS)
+-- See Note [Windows types]
+foreign import capi unsafe "HsBase.h _read"
+   c_read :: CInt -> Ptr Word8 -> CUInt -> IO CInt
 
-These were working before since the RTS was re-exporting
-these symbols under the undeprecated names. This is no longer
-being done. See #11223
+-- See Note [Windows types]
+foreign import capi safe "HsBase.h _read"
+   c_safe_read :: CInt -> Ptr Word8 -> CUInt -> IO CInt
 
-See https://msdn.microsoft.com/en-us/library/ms235384.aspx
-for more.
+foreign import ccall unsafe "HsBase.h _umask"
+   c_umask :: CMode -> IO CMode
 
-However since we can't hope to get people to support Windows
-packages we should support the deprecated names. See #12497
--}
+-- See Note [Windows types]
+foreign import capi unsafe "HsBase.h _write"
+   c_write :: CInt -> Ptr Word8 -> CUInt -> IO CInt
+
+-- See Note [Windows types]
+foreign import capi safe "HsBase.h _write"
+   c_safe_write :: CInt -> Ptr Word8 -> CUInt -> IO CInt
+
+foreign import ccall unsafe "HsBase.h _pipe"
+   c_pipe :: Ptr CInt -> IO CInt
+
+foreign import capi unsafe "HsBase.h _lseeki64"
+   c_lseek :: CInt -> Int64 -> CInt -> IO Int64
+
+foreign import capi unsafe "HsBase.h _access"
+   c_access :: CString -> CInt -> IO CInt
+
+#if !defined(HAVE_CHMOD)
+c_chmod :: CString -> CMode -> IO CInt
+c_chmod _ _ = ioError (ioeSetLocation unsupportedOperation "_chmod")
+#else
+foreign import ccall unsafe "HsBase.h _chmod"
+   c_chmod :: CString -> CMode -> IO CInt
+#endif
+
+foreign import capi unsafe "HsBase.h _close"
+   c_close :: CInt -> IO CInt
+
+foreign import capi unsafe "HsBase.h _creat"
+   c_creat :: CString -> CMode -> IO CInt
+
+#if !defined(HAVE_DUP)
+c_dup :: CInt -> IO CInt
+c_dup _ = ioError (ioeSetLocation unsupportedOperation "_dup")
+
+c_dup2 :: CInt -> CInt -> IO CInt
+c_dup2 _ _ = ioError (ioeSetLocation unsupportedOperation "_dup2")
+#else
+foreign import ccall unsafe "HsBase.h _dup"
+   c_dup :: CInt -> IO CInt
+
+foreign import ccall unsafe "HsBase.h _dup2"
+   c_dup2 :: CInt -> CInt -> IO CInt
+#endif
+
+foreign import capi unsafe "HsBase.h _isatty"
+   c_isatty :: CInt -> IO CInt
+
+foreign import capi unsafe "HsBase.h _unlink"
+   c_unlink :: CString -> IO CInt
+
+foreign import capi unsafe "HsBase.h _utime"
+   c_utime :: CString -> Ptr CUtimbuf -> IO CInt
+
+foreign import capi unsafe "HsBase.h _getpid"
+   c_getpid :: IO CPid
+#else
+-- We use CAPI as on some OSs (eg. Linux) this is wrapped by a macro
+-- which redirects to the 64-bit-off_t versions when large file
+-- support is enabled.
+
+-- See Note [Windows types]
+foreign import capi unsafe "HsBase.h read"
+   c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+
+-- See Note [Windows types]
+foreign import capi safe "HsBase.h read"
+   c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+
+foreign import ccall unsafe "HsBase.h umask"
+   c_umask :: CMode -> IO CMode
+
+-- See Note [Windows types]
+foreign import capi unsafe "HsBase.h write"
+   c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+
+-- See Note [Windows types]
+foreign import capi safe "HsBase.h write"
+   c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+
+#if !defined(HAVE_PIPE)
+c_pipe :: Ptr CInt -> IO CInt
+c_pipe _ = ioError (ioeSetLocation unsupportedOperation "pipe")
+#else
+foreign import ccall unsafe "HsBase.h pipe"
+   c_pipe :: Ptr CInt -> IO CInt
+#endif
+
 foreign import capi unsafe "unistd.h lseek"
    c_lseek :: CInt -> COff -> CInt -> IO COff
 
@@ -647,66 +728,6 @@ foreign import ccall unsafe "HsBase.h dup2"
 foreign import ccall unsafe "HsBase.h isatty"
    c_isatty :: CInt -> IO CInt
 
-#if defined(mingw32_HOST_OS)
--- See Note: Windows types
-foreign import capi unsafe "HsBase.h _read"
-   c_read :: CInt -> Ptr Word8 -> CUInt -> IO CInt
-
--- See Note: Windows types
-foreign import capi safe "HsBase.h _read"
-   c_safe_read :: CInt -> Ptr Word8 -> CUInt -> IO CInt
-
-foreign import ccall unsafe "HsBase.h _umask"
-   c_umask :: CMode -> IO CMode
-
--- See Note: Windows types
-foreign import capi unsafe "HsBase.h _write"
-   c_write :: CInt -> Ptr Word8 -> CUInt -> IO CInt
-
--- See Note: Windows types
-foreign import capi safe "HsBase.h _write"
-   c_safe_write :: CInt -> Ptr Word8 -> CUInt -> IO CInt
-
-foreign import ccall unsafe "HsBase.h _pipe"
-   c_pipe :: Ptr CInt -> IO CInt
-#else
--- We use CAPI as on some OSs (eg. Linux) this is wrapped by a macro
--- which redirects to the 64-bit-off_t versions when large file
--- support is enabled.
-
--- See Note: Windows types
-foreign import capi unsafe "HsBase.h read"
-   c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
-
--- See Note: Windows types
-foreign import capi safe "HsBase.h read"
-   c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
-
-#if defined(HAVE_UMASK)
-foreign import ccall unsafe "HsBase.h umask"
-   c_umask :: CMode -> IO CMode
-#else
-c_umask :: CMode -> IO CMode
-c_umask _ = ioError (ioeSetLocation unsupportedOperation "umask")
-#endif
-
--- See Note: Windows types
-foreign import capi unsafe "HsBase.h write"
-   c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
-
--- See Note: Windows types
-foreign import capi safe "HsBase.h write"
-   c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
-
-#if !defined(HAVE_PIPE)
-c_pipe :: Ptr CInt -> IO CInt
-c_pipe _ = ioError (ioeSetLocation unsupportedOperation "pipe")
-#else
-foreign import ccall unsafe "HsBase.h pipe"
-   c_pipe :: Ptr CInt -> IO CInt
-#endif
-#endif
-
 foreign import ccall unsafe "HsBase.h unlink"
    c_unlink :: CString -> IO CInt
 
@@ -719,6 +740,7 @@ c_getpid = pure 1
 #else
 foreign import ccall unsafe "HsBase.h getpid"
    c_getpid :: IO CPid
+#endif
 #endif
 
 #if !defined(js_HOST_ARCH)
@@ -881,7 +903,7 @@ foreign import capi  unsafe "stdio.h value SEEK_END" sEEK_END :: CInt
 #endif
 
 {-
-Note: Windows types
+Note [Windows types]
 
 Windows' _read and _write have types that differ from POSIX. They take an
 unsigned int for length and return a signed int where POSIX uses size_t and
