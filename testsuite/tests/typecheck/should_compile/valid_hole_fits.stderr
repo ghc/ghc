@@ -1,7 +1,7 @@
 [1 of 2] Compiling ValidHoleFits    ( ValidHoleFits.hs, ValidHoleFits.o )
 [2 of 2] Compiling Foo              ( valid_hole_fits.hs, valid_hole_fits.o )
 
-valid_hole_fits.hs:9:6: warning: [-Wdeferred-out-of-scope-variables (in -Wdefault)]
+valid_hole_fits.hs:9:6: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
     Variable not in scope: putStrLn :: String -> IO ()
     Suggested fixes:
       • Perhaps use one of these:
@@ -11,7 +11,7 @@ valid_hole_fits.hs:9:6: warning: [-Wdeferred-out-of-scope-variables (in -Wdefaul
         from the explicit hiding list in the import of ‘Prelude’
         (valid_hole_fits.hs:3:1-40).
 
-valid_hole_fits.hs:17:17: warning: [-Wtyped-holes (in -Wdefault)]
+valid_hole_fits.hs:17:17: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> IO Int
     • In a stmt of a 'do' block: y <- _ x
       In the expression:
@@ -39,7 +39,7 @@ valid_hole_fits.hs:17:17: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
 
-valid_hole_fits.hs:21:8: warning: [-Wtyped-holes (in -Wdefault)]
+valid_hole_fits.hs:21:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [Maybe a] -> [a]
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:
@@ -58,7 +58,7 @@ valid_hole_fits.hs:21:8: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
 
-valid_hole_fits.hs:24:9: warning: [-Wtyped-holes (in -Wdefault)]
+valid_hole_fits.hs:24:9: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Integer -> ValidHoleFits.Moo
     • In an equation for ‘test2’: test2 = _
     • Relevant bindings include
@@ -71,7 +71,7 @@ valid_hole_fits.hs:24:9: warning: [-Wtyped-holes (in -Wdefault)]
           (imported qualified from ‘ValidHoleFits’ at valid_hole_fits.hs:6:1-30
            (and originally defined at ValidHoleFits.hs:4:12-22))
 
-valid_hole_fits.hs:27:5: warning: [-Wtyped-holes (in -Wdefault)]
+valid_hole_fits.hs:27:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: t0 -> Maybe Integer
       Where: ‘t0’ is an ambiguous type variable
     • In the expression: _ 2
@@ -92,7 +92,7 @@ valid_hole_fits.hs:27:5: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
 
-valid_hole_fits.hs:30:10: warning: [-Wtyped-holes (in -Wdefault)]
+valid_hole_fits.hs:30:10: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a1
       Where: ‘a1’ is an ambiguous type variable
     • In the first argument of ‘show’, namely ‘_’
@@ -128,7 +128,7 @@ valid_hole_fits.hs:30:10: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Float’))
 
-valid_hole_fits.hs:34:11: warning: [-Wtyped-holes (in -Wdefault)]
+valid_hole_fits.hs:34:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Bool -> a0
       Where: ‘a0’ is an ambiguous type variable
     • In the first argument of ‘show’, namely ‘(_ (_ :: Bool))’
@@ -176,7 +176,7 @@ valid_hole_fits.hs:34:11: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Show’))
 
-valid_hole_fits.hs:34:14: warning: [-Wtyped-holes (in -Wdefault)]
+valid_hole_fits.hs:34:14: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Bool
     • In the first argument of ‘_’, namely ‘(_ :: Bool)’
       In the first argument of ‘show’, namely ‘(_ (_ :: Bool))’
@@ -202,7 +202,7 @@ valid_hole_fits.hs:34:14: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Enum’))
 
-valid_hole_fits.hs:38:10: warning: [-Wtyped-holes (in -Wdefault)]
+valid_hole_fits.hs:38:10: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a -> [a] -> [a]
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:
@@ -229,7 +229,7 @@ valid_hole_fits.hs:38:10: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
 
-valid_hole_fits.hs:41:8: warning: [-Wtyped-holes (in -Wdefault)]
+valid_hole_fits.hs:41:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: String -> IO ()
     • In the expression: _ "hello, world"
       In an equation for ‘main’: main = _ "hello, world"

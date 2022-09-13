@@ -1,5 +1,5 @@
 
-T2851.hs:9:15: error:
+T2851.hs:9:15: error: [GHC-39999]
     • No instance for ‘Show (F a)’
         arising from the first field of ‘D’ (type ‘F a’)
       Possible fix:

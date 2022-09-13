@@ -1,5 +1,5 @@
 
-T13499.hs:7:19: error:
+T13499.hs:7:19: error: [GHC-88464]
     • Found hole: _ :: a
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:

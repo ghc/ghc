@@ -1,5 +1,5 @@
 
-T5777.hs:13:18: error:
+T5777.hs:13:18: error: [GHC-64525]
     • Proc patterns cannot use existential or GADT data constructors
     • In the pattern: BoolVal
       In the expression: proc BoolVal -> returnA -< ()

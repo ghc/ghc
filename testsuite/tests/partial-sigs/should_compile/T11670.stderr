@@ -1,5 +1,5 @@
 
-T11670.hs:10:42: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T11670.hs:10:42: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘CLong’
     • In the first argument of ‘IO’, namely ‘_’
       In the type ‘IO _’
@@ -8,7 +8,7 @@ T11670.hs:10:42: warning: [-Wpartial-type-signatures (in -Wdefault)]
         ptr :: Ptr a (bound at T11670.hs:10:6)
         peek :: Ptr a -> IO CLong (bound at T11670.hs:10:1)
 
-T11670.hs:13:40: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T11670.hs:13:40: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found extra-constraints wildcard standing for ‘Storable w’
       Where: ‘w’ is a rigid type variable bound by
                the inferred type of <expression> :: Storable w => IO w
@@ -21,7 +21,7 @@ T11670.hs:13:40: warning: [-Wpartial-type-signatures (in -Wdefault)]
         ptr :: Ptr a (bound at T11670.hs:13:7)
         peek2 :: Ptr a -> IO CLong (bound at T11670.hs:13:1)
 
-T11670.hs:13:48: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T11670.hs:13:48: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘w’
       Where: ‘w’ is a rigid type variable bound by
                the inferred type of <expression> :: Storable w => IO w

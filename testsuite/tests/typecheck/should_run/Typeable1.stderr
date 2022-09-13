@@ -1,5 +1,5 @@
 
-Typeable1.hs:22:5: error: [-Winaccessible-code (in -Wdefault), -Werror=inaccessible-code]
+Typeable1.hs:22:5: error: [GHC-40564] [-Winaccessible-code (in -Wdefault), Werror=inaccessible-code]
     • Inaccessible code in
         a pattern with pattern synonym:
           App :: forall k2 (t :: k2).

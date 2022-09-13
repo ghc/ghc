@@ -1,5 +1,5 @@
 
-T11265.hs:6:12: error:
+T11265.hs:6:12: error: [GHC-88634]
     • Pattern synonym ‘A’ cannot be used here
         (pattern synonyms cannot be promoted)
     • In the first argument of ‘F’, namely ‘A’

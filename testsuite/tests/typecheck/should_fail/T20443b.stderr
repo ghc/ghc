@@ -1,5 +1,5 @@
 
-T20443b.hs:13:4: error:
+T20443b.hs:13:4: error: [GHC-01629]
     • Too many type arguments in constructor pattern for ‘Proxy’
       Expected no more than 1; got 2
     • In the pattern: Proxy @Type @Int

@@ -1,5 +1,5 @@
 
-T20768_arrow_fail.hs:9:10: error:
+T20768_arrow_fail.hs:9:10: error: [GHC-91938]
     • \cases alternatives within arrow notation have different numbers of arguments
         T20768_arrow_fail.hs:10:6-54
         T20768_arrow_fail.hs:12:6-25
@@ -19,7 +19,7 @@ T20768_arrow_fail.hs:9:10: error:
                                -> returnA -< "none") |)
                         x
 
-T20768_arrow_fail.hs:17:9: error:
+T20768_arrow_fail.hs:17:9: error: [GHC-39999]
     • Could not deduce ‘ArrowChoice p’ arising from an arrow command
       from the context: Arrow p
         bound by the type signature for:
@@ -51,7 +51,7 @@ T20768_arrow_fail.hs:17:9: error:
                          Nothing -> returnA -< "none") |)
                     x
 
-T20768_arrow_fail.hs:26:21: error:
+T20768_arrow_fail.hs:26:21: error: [GHC-39999]
     • Could not deduce ‘Num (Maybe Int)’ arising from the literal ‘100’
       from the context: ArrowChoice p
         bound by the type signature for:

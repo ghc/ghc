@@ -1,5 +1,5 @@
 
-T19415.hs:27:8: error:
+T19415.hs:27:8: error: [GHC-18872]
     • Couldn't match type ‘[Char]’ with ‘Char’
         arising from a functional dependency between:
           constraint ‘SetField "name" (Pet a0) (Pet b) Char’

@@ -1,5 +1,5 @@
 
-tcrun042.hs:20:5: error:
+tcrun042.hs:20:5: error: [GHC-91028]
     • Couldn't match type ‘t0’ with ‘forall b. b -> b -> b’
       Expected: a
                 -> (forall b. b -> b -> b) -> (a, String, forall c. c -> c -> c)

@@ -1,5 +1,5 @@
 
-T20465.hs:17:7: error:
+T20465.hs:17:7: error: [GHC-43085]
     • Overlapping instances for Cls Proxy arising from a use of ‘foo’
       Matching instances:
         instance Cls a -- Defined at T20465.hs:12:10

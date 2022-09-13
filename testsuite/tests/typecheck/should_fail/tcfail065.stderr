@@ -1,5 +1,5 @@
 
-tcfail065.hs:29:20: error:
+tcfail065.hs:29:20: error: [GHC-25897]
     • Couldn't match expected type ‘x’ with actual type ‘x1’
       ‘x1’ is a rigid type variable bound by
         the type signature for:

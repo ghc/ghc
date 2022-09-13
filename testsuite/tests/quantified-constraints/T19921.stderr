@@ -1,5 +1,5 @@
 
-T19921.hs:29:8: error:
+T19921.hs:29:8: error: [GHC-05617]
     • Could not deduce ‘r’ arising from a use of ‘Dict’
       from the context: (x \/ y) \/ z
         bound by a quantified context at T19921.hs:29:8-11

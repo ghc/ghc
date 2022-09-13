@@ -1,5 +1,5 @@
 
-T1897a.hs:9:1: error:
+T1897a.hs:9:1: error: [GHC-39999]
     • Could not deduce ‘Wob a0 b’
       from the context: Wob a b
         bound by the inferred type for ‘foo’:

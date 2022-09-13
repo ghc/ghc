@@ -1,5 +1,5 @@
 
-T9872b_defer.hs:19:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T9872b_defer.hs:19:8: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
     • No instance for ‘Show
                          (Proxy
                             '[ '[ 'Cube 'G 'B 'W 'R 'B 'G, 'Cube 'W 'G 'B 'W 'R 'R,

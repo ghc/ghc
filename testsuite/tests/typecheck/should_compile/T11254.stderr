@@ -1,10 +1,10 @@
 
-T11254.hs:16:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T11254.hs:16:10: warning: [GHC-18872] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘Frac Int’ with ‘Int’
         arising from the superclasses of an instance declaration
     • In the instance declaration for ‘ID Rational’
 
-T11254.hs:18:12: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T11254.hs:18:12: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘GHC.Real.Ratio Integer’ with ‘Int’
       Expected: Rational -> Frac Rational
         Actual: Rational -> Rational

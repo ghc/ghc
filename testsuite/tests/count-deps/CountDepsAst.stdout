@@ -198,6 +198,7 @@ GHC.Types.CostCentre.State
 GHC.Types.Cpr
 GHC.Types.Demand
 GHC.Types.Error
+GHC.Types.Error.Codes
 GHC.Types.FieldLabel
 GHC.Types.Fixity
 GHC.Types.Fixity.Env

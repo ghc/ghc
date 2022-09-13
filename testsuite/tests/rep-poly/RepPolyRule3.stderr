@@ -1,5 +1,5 @@
 
-RepPolyRule3.hs:17:57: error:
+RepPolyRule3.hs:17:57: error: [GHC-55287]
     • The argument ‘x’ of ‘g’
       does not have a fixed runtime representation.
       Its kind is:
@@ -8,7 +8,7 @@ RepPolyRule3.hs:17:57: error:
     • In the expression: g x
       When checking the rewrite rule "g_id"
 
-RepPolyRule3.hs:23:52: error:
+RepPolyRule3.hs:23:52: error: [GHC-55287]
     • The argument ‘x’ of ‘h’
       does not have a fixed runtime representation.
       Its kind is:

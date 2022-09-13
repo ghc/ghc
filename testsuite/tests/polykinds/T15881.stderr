@@ -1,5 +1,5 @@
 
-T15881.hs:8:18: error:
+T15881.hs:8:18: error: [GHC-27958]
     • Expected kind ‘k0’, but ‘n’ has kind ‘k0 -> *’
     • In the first argument of ‘n’, namely ‘n’
       In the kind ‘n n’

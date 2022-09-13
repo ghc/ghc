@@ -1,5 +1,5 @@
 
-T20113.hs:7:35: error:
+T20113.hs:7:35: error: [GHC-55287]
     • The newtype constructor pattern
       does not have a fixed runtime representation.
       Its type is:
@@ -8,7 +8,7 @@ T20113.hs:7:35: error:
       In an equation for ‘T20113.$sel:y_fld:MkY’:
           T20113.$sel:y_fld:MkY MkY {y_fld = $sel:y_fld:MkY} = $sel:y_fld:MkY
 
-T20113.hs:7:35: error:
+T20113.hs:7:35: error: [GHC-55287]
     The first pattern in the equation for ‘$sel:y_fld:MkY’
     does not have a fixed runtime representation.
     Its type is:

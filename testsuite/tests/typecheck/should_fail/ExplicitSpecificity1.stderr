@@ -1,5 +1,5 @@
 
-ExplicitSpecificity1.hs:9:15: error:
+ExplicitSpecificity1.hs:9:15: error: [GHC-95781]
     • Cannot apply expression of type ‘a0 -> a0’
       to a visible type argument ‘Int’
     • In the expression: foo @Int 42

@@ -1,4 +1,4 @@
 
-T13450.hs:4:15: error:
+T13450.hs:4:15: error: [GHC-11861]
     Parser error on `''`
     Character literals may not be empty

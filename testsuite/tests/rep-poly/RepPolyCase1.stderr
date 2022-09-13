@@ -1,5 +1,5 @@
 
-RepPolyCase1.hs:14:7: error:
+RepPolyCase1.hs:14:7: error: [GHC-55287]
     • The scrutinee of the case statement
       does not have a fixed runtime representation.
       Its type is:

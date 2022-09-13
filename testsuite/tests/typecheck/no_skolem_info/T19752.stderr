@@ -1,5 +1,5 @@
 
-T19752.hs:12:10: error:
+T19752.hs:12:10: error: [GHC-25897]
     • Could not deduce ‘F b0 ~ a’
       from the context: F b ~ a
         bound by the type signature for:

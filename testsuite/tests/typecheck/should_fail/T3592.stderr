@@ -1,5 +1,5 @@
 
-T3592.hs:8:5: error:
+T3592.hs:8:5: error: [GHC-91028]
     • Couldn't match type ‘a0’ with ‘T a’
       Expected: T a -> String
         Actual: a0 -> String

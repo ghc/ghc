@@ -1,5 +1,5 @@
 
-T10709b.hs:6:22: error:
+T10709b.hs:6:22: error: [GHC-91028]
     • Couldn't match type ‘p1’ with ‘forall a. IO a -> IO a’
       Expected: (p1 -> IO ()) -> IO ()
         Actual: ((forall a. IO a -> IO a) -> IO ()) -> IO ()
@@ -10,7 +10,7 @@ T10709b.hs:6:22: error:
       In an equation for ‘x4’:
           x4 = (replicateM 2 . mask) (\ _ -> return ())
 
-T10709b.hs:7:22: error:
+T10709b.hs:7:22: error: [GHC-91028]
     • Couldn't match type ‘t0’ with ‘forall a1. IO a1 -> IO a1’
       Expected: (t0 -> IO a) -> IO a
         Actual: ((forall a1. IO a1 -> IO a1) -> IO a) -> IO a
@@ -21,7 +21,7 @@ T10709b.hs:7:22: error:
       In an equation for ‘x5’:
           x5 = (replicateM 2 . mask) (\ x -> undefined x)
 
-T10709b.hs:8:22: error:
+T10709b.hs:8:22: error: [GHC-91028]
     • Couldn't match type ‘p0’ with ‘forall a1. IO a1 -> IO a1’
       Expected: (p0 -> IO a) -> IO a
         Actual: ((forall a1. IO a1 -> IO a1) -> IO a) -> IO a
@@ -32,7 +32,7 @@ T10709b.hs:8:22: error:
       In an equation for ‘x6’:
           x6 = (replicateM 2 . mask) (id (\ _ -> undefined))
 
-T10709b.hs:9:22: error:
+T10709b.hs:9:22: error: [GHC-91028]
     • Couldn't match type ‘b0’ with ‘forall a1. IO a1 -> IO a1’
       Expected: (b0 -> IO a) -> IO a
         Actual: ((forall a1. IO a1 -> IO a1) -> IO a) -> IO a
@@ -43,7 +43,7 @@ T10709b.hs:9:22: error:
       In an equation for ‘x7’:
           x7 = (replicateM 2 . mask) (const undefined)
 
-T10709b.hs:10:22: error:
+T10709b.hs:10:22: error: [GHC-91028]
     • Couldn't match type ‘a0’ with ‘forall a1. IO a1 -> IO a1’
       Expected: (a0 -> IO a) -> IO a
         Actual: ((forall a1. IO a1 -> IO a1) -> IO a) -> IO a

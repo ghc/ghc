@@ -1,63 +1,69 @@
 
-<interactive>:10:23:
+<interactive>:10:23: error:
     Incorrect type variable on the LHS of injectivity condition
          Expected : r
          Actual   : a
 
-<interactive>:11:24:
+<interactive>:11:24: error:
     Incorrect type variable on the LHS of injectivity condition
          Expected : r
          Actual   : a
 
-<interactive>:12:37:
+<interactive>:12:37: error:
     Incorrect type variable on the LHS of injectivity condition
          Expected : r
          Actual   : a
 
-<interactive>:15:19:
+<interactive>:15:19: error:
     Type variable ‘a’, naming a type family result,
     shadows an already bound type variable
 
-<interactive>:16:20:
+<interactive>:16:20: error:
     Type variable ‘a’, naming a type family result,
     shadows an already bound type variable
 
-<interactive>:19:20:
+<interactive>:19:20: error:
     Type variable ‘a’, naming a type family result,
     shadows an already bound type variable
 
-<interactive>:19:24:
+<interactive>:19:24: error:
     Unknown type variable on the RHS of injectivity condition: a
 
-<interactive>:20:21:
+<interactive>:20:21: error:
     Type variable ‘a’, naming a type family result,
     shadows an already bound type variable
 
-<interactive>:20:25:
+<interactive>:20:25: error:
     Unknown type variable on the RHS of injectivity condition: a
 
-<interactive>:21:35:
+<interactive>:21:35: error:
     Type variable ‘a’, naming a type family result,
     shadows an already bound type variable
 
-<interactive>:21:39:
+<interactive>:21:39: error:
     Unknown type variable on the RHS of injectivity condition: a
 
-<interactive>:24:1: Not in scope: type variable ‘c’
+<interactive>:24:1: error: [GHC-76037]
+    Not in scope: type variable ‘c’
 
-<interactive>:25:1: Not in scope: type variable ‘c’
+<interactive>:25:1: error: [GHC-76037]
+    Not in scope: type variable ‘c’
 
-<interactive>:26:23: Not in scope: type variable ‘c’
+<interactive>:26:23: error: [GHC-76037]
+    Not in scope: type variable ‘c’
 
-<interactive>:34:1: Not in scope: type variable ‘c’
+<interactive>:34:1: error: [GHC-76037]
+    Not in scope: type variable ‘c’
 
-<interactive>:35:1: Not in scope: type variable ‘c’
+<interactive>:35:1: error: [GHC-76037]
+    Not in scope: type variable ‘c’
 
-<interactive>:36:23: Not in scope: type variable ‘c’
+<interactive>:36:23: error: [GHC-76037]
+    Not in scope: type variable ‘c’
 
-<interactive>:39:33:
+<interactive>:39:33: error:
     Type variable ‘a’, naming a type family result,
     shadows an already bound type variable
 
-<interactive>:42:37:
+<interactive>:42:37: error:
     Unknown type variable on the RHS of injectivity condition: b

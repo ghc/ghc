@@ -1,5 +1,5 @@
 
-ado002.hs:8:8: error:
+ado002.hs:8:8: error: [GHC-83865]
     • Couldn't match expected type: Char -> IO b0
                   with actual type: IO Char
     • The function ‘getChar’ is applied to one value argument,
@@ -10,7 +10,7 @@ ado002.hs:8:8: error:
            y <- getChar 'a'
            print (x, y)
 
-ado002.hs:9:3: error:
+ado002.hs:9:3: error: [GHC-83865]
     • Couldn't match type ‘()’ with ‘Int’
       Expected: IO Int
         Actual: IO ()
@@ -24,7 +24,7 @@ ado002.hs:9:3: error:
                  y <- getChar 'a'
                  print (x, y)
 
-ado002.hs:15:11: error:
+ado002.hs:15:11: error: [GHC-83865]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
     • In the expression: y
       In a stmt of a 'do' block: return (y, x)
@@ -33,7 +33,7 @@ ado002.hs:15:11: error:
            y <- getChar
            return (y, x)
 
-ado002.hs:15:13: error:
+ado002.hs:15:13: error: [GHC-83865]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
     • In the expression: x
       In a stmt of a 'do' block: return (y, x)
@@ -42,7 +42,7 @@ ado002.hs:15:13: error:
            y <- getChar
            return (y, x)
 
-ado002.hs:23:9: error:
+ado002.hs:23:9: error: [GHC-83865]
     • Couldn't match expected type: Char -> IO a0
                   with actual type: IO Char
     • The function ‘getChar’ is applied to one value argument,
@@ -56,7 +56,7 @@ ado002.hs:23:9: error:
            x5 <- getChar x4
            return (x2, x4)
 
-ado002.hs:24:11: error:
+ado002.hs:24:11: error: [GHC-83865]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
     • In the expression: x2
       In a stmt of a 'do' block: return (x2, x4)
@@ -68,7 +68,7 @@ ado002.hs:24:11: error:
            x5 <- getChar x4
            return (x2, x4)
 
-ado002.hs:24:14: error:
+ado002.hs:24:14: error: [GHC-83865]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
     • In the expression: x4
       In a stmt of a 'do' block: return (x2, x4)

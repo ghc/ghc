@@ -2,7 +2,7 @@
 [2 of 4] Compiling SafeLang10_B     ( SafeLang10_B.hs, SafeLang10_B.o )
 [3 of 4] Compiling Main             ( SafeLang10.hs, SafeLang10.o )
 
-SafeLang10.hs:9:13: error:
+SafeLang10.hs:9:13: error: [GHC-36705]
     • Unsafe overlapping instances for Pos [Int]
         arising from a use of ‘res’
       The matching instance is:

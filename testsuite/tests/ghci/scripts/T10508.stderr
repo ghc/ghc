@@ -1,5 +1,5 @@
 
-<interactive>:1:15: error:
+<interactive>:1:15: error: [GHC-83865]
     • Couldn't match type: a0 -> a0
                      with: [Char]
       Expected: Prelude.String

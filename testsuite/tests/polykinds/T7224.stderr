@@ -1,5 +1,5 @@
 
-T7224.hs:7:19: error:
+T7224.hs:7:19: error: [GHC-25897]
     • Expected kind ‘i’, but ‘i’ has kind ‘*’
       ‘i’ is a rigid type variable bound by
         the class declaration for ‘PMonad'’
@@ -8,7 +8,7 @@ T7224.hs:7:19: error:
       In the type signature: ret' :: a -> m i i a
       In the class declaration for ‘PMonad'’
 
-T7224.hs:8:14: error:
+T7224.hs:8:14: error: [GHC-25897]
     • Expected kind ‘i’, but ‘i’ has kind ‘*’
       ‘i’ is a rigid type variable bound by
         the class declaration for ‘PMonad'’

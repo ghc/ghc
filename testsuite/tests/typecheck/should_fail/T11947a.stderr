@@ -1,5 +1,5 @@
 
-T11947a.hs:4:19: error:
+T11947a.hs:4:19: error: [GHC-39999]
     • Could not deduce ‘RealFloat a0’
       from the context: RealFloat a
         bound by the type signature for:

@@ -1,21 +1,26 @@
-T21583.hs:14:23: error: [-Wstar-is-type (in -Wall, -Wcompat), -Werror=star-is-type]
+
+T21583.hs:14:23: error: [GHC-39567] [-Wstar-is-type (in -Wall, -Wcompat), Werror=star-is-type]
     Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
     relies on the StarIsType extension, which will become
     deprecated in the future.
     Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
-T21583.hs:14:28: error: [-Wstar-is-type (in -Wall, -Wcompat), -Werror=star-is-type]
+
+T21583.hs:14:28: error: [GHC-39567] [-Wstar-is-type (in -Wall, -Wcompat), Werror=star-is-type]
     Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
     relies on the StarIsType extension, which will become
     deprecated in the future.
     Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+
 T21583.hs:56:10: warning: [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         ‘fmap’
     • In the instance declaration for ‘Functor (SplitFunctor g f)’
+
 T21583.hs:58:10: warning: [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         either ‘foldMap’ or ‘foldr’
     • In the instance declaration for ‘Foldable (SplitFunctor g f)’
+
 T21583.hs:60:10: warning: [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         either ‘traverse’ or ‘sequenceA’

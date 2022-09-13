@@ -1,5 +1,5 @@
 
-T15859.hs:9:19: error:
+T15859.hs:9:19: error: [GHC-51580]
     • Illegal visible, dependent quantification in the type of a term:
         forall k -> k -> *
       (GHC does not yet support this)

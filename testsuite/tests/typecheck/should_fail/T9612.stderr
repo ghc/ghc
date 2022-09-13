@@ -1,5 +1,5 @@
 
-T9612.hs:16:9: error:
+T9612.hs:16:9: error: [GHC-18872]
     • Couldn't match type: [(Int, a)]
                      with: (Int, a)
         arising from a functional dependency between:

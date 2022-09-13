@@ -1,5 +1,5 @@
 
-T4254b.hs:10:10: error:
+T4254b.hs:10:10: error: [GHC-25897]
     • Couldn't match type ‘b’ with ‘Bool’
         arising from a functional dependency between constraints:
           ‘FD Int Bool’

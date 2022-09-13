@@ -2,7 +2,7 @@
 tcfail067.hs:1:14: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
-tcfail067.hs:12:16: error:
+tcfail067.hs:12:16: error: [GHC-39999]
     • No instance for ‘Ord a’ arising from a use of ‘SubRange’
       Possible fix:
         add (Ord a) to the context of
@@ -12,7 +12,7 @@ tcfail067.hs:12:16: error:
       In an equation for ‘subRangeValue’:
           subRangeValue (SubRange (lower, upper) value) = value
 
-tcfail067.hs:15:11: error:
+tcfail067.hs:15:11: error: [GHC-39999]
     • No instance for ‘Ord a’ arising from a use of ‘SubRange’
       Possible fix:
         add (Ord a) to the context of
@@ -21,7 +21,7 @@ tcfail067.hs:15:11: error:
     • In the pattern: SubRange r value
       In an equation for ‘subRange’: subRange (SubRange r value) = r
 
-tcfail067.hs:46:12: error:
+tcfail067.hs:46:12: error: [GHC-39999]
     • Could not deduce ‘Ord a’ arising from a use of ‘SubRange’
       from the context: Show a
         bound by the type signature for:
@@ -36,7 +36,7 @@ tcfail067.hs:46:12: error:
           showRange (SubRange (lower, upper) value)
             = show value ++ " :" ++ show lower ++ ".." ++ show upper
 
-tcfail067.hs:61:12: error:
+tcfail067.hs:61:12: error: [GHC-39999]
     • Could not deduce ‘Ord a’
         arising from a use of ‘numSubRangeNegate’
       from the context: Num a
@@ -47,7 +47,7 @@ tcfail067.hs:61:12: error:
       In an equation for ‘negate’: negate = numSubRangeNegate
       In the instance declaration for ‘Num (SubRange a)’
 
-tcfail067.hs:65:19: error:
+tcfail067.hs:65:19: error: [GHC-39999]
     • Could not deduce ‘Ord a’ arising from a use of ‘SubRange’
       from the context: Num a
         bound by the instance declaration at tcfail067.hs:60:10-34
@@ -60,7 +60,7 @@ tcfail067.hs:65:19: error:
             = SubRange (fromInteger a, fromInteger a) (fromInteger a)
       In the instance declaration for ‘Num (SubRange a)’
 
-tcfail067.hs:74:5: error:
+tcfail067.hs:74:5: error: [GHC-39999]
     • Could not deduce ‘Ord a’ arising from a use of ‘SubRange’
       from the context: Num a
         bound by the type signature for:

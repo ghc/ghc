@@ -1,5 +1,5 @@
 
-T10463.hs:5:9: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T10463.hs:5:9: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘[Char]’
     • In a pattern type signature: _
       In the pattern: x :: _

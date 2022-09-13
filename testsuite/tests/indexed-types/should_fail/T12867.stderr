@@ -1,5 +1,5 @@
 
-T12867.hs:8:21: error:
+T12867.hs:8:21: error: [GHC-83865]
     • Expected kind ‘k0 -> *’, but ‘TestM’ has kind ‘*’
     • In the first argument of ‘Eq’, namely ‘(TestM a)’
       In the type ‘(Eq (TestM a))’

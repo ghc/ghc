@@ -1,5 +1,5 @@
 
-T8518.hs:14:18: error:
+T8518.hs:14:18: error: [GHC-83865]
     • Couldn't match expected type: Z c -> B c -> t0
                   with actual type: F c
     • The function ‘rpt’ is applied to four value arguments,
@@ -17,7 +17,7 @@ T8518.hs:14:18: error:
         c :: c (bound at T8518.hs:14:10)
         callCont :: c -> Z c -> B c -> Maybe (F c) (bound at T8518.hs:14:1)
 
-T8518.hs:17:9: error:
+T8518.hs:17:9: error: [GHC-83865]
     • Couldn't match type: F t2
                      with: Z t2 -> B t2 -> F t2
       Expected: t1 -> t2 -> F t2

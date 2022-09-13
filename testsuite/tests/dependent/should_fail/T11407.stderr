@@ -1,5 +1,5 @@
 
-T11407.hs:10:40: error:
+T11407.hs:10:40: error: [GHC-25897]
     • Expected kind ‘x a’, but ‘a’ has kind ‘k’
       ‘k’ is a rigid type variable bound by
         a family instance declaration

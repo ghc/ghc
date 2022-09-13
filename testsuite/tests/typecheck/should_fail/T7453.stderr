@@ -1,5 +1,5 @@
 
-T7453.hs:9:15: error:
+T7453.hs:9:15: error: [GHC-25897]
     • Couldn't match type ‘t’ with ‘p’
       Expected: Id t
         Actual: Id p
@@ -29,7 +29,7 @@ T7453.hs:9:15: error:
         v :: p (bound at T7453.hs:7:7)
         cast1 :: p -> a (bound at T7453.hs:7:1)
 
-T7453.hs:15:15: error:
+T7453.hs:15:15: error: [GHC-25897]
     • Couldn't match type ‘t1’ with ‘p’
       Expected: () -> t1
         Actual: () -> p
@@ -59,7 +59,7 @@ T7453.hs:15:15: error:
         v :: p (bound at T7453.hs:13:7)
         cast2 :: p -> t (bound at T7453.hs:13:1)
 
-T7453.hs:21:15: error:
+T7453.hs:21:15: error: [GHC-25897]
     • Couldn't match expected type ‘t1’ with actual type ‘p’
       ‘t1’ is a rigid type variable bound by
         the type signature for:

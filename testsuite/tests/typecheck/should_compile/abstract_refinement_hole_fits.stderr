@@ -1,5 +1,5 @@
 
-abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
+abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [Integer] -> Integer
     • In an equation for ‘f’: f = _
     • Relevant bindings include
@@ -124,7 +124,7 @@ abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
         ($!) (_ :: t0 -> [Integer] -> Integer) (_ :: t0)
           where ($!) :: forall a b. (a -> b) -> a -> b
 
-abstract_refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
+abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Integer -> [Integer] -> Integer
     • In the expression: _ 0
       In an equation for ‘g’: g = _ 0

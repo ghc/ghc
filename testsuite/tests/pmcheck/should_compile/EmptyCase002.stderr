@@ -1,23 +1,23 @@
 
-EmptyCase002.hs:16:6: warning: [-Wincomplete-patterns (in -Wextra)]
+EmptyCase002.hs:16:6: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a \case alternative: Patterns of type ‘T’ not matched: MkT _
 
-EmptyCase002.hs:43:6: warning: [-Wincomplete-patterns (in -Wextra)]
+EmptyCase002.hs:43:6: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a \case alternative:
         Patterns of type ‘T1 B’ not matched:
             MkT1 B1
             MkT1 B2
 
-EmptyCase002.hs:47:6: warning: [-Wincomplete-patterns (in -Wextra)]
+EmptyCase002.hs:47:6: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a \case alternative:
         Patterns of type ‘T1 (E Int)’ not matched:
             MkT1 False
             MkT1 True
 
-EmptyCase002.hs:51:6: warning: [-Wincomplete-patterns (in -Wextra)]
+EmptyCase002.hs:51:6: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a \case alternative:
         Patterns of type ‘T1

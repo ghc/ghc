@@ -1,5 +1,5 @@
 
-T22065.hs:10:30: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T22065.hs:10:30: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Foo’
     • In an expression type signature: forall a. _
       In the expression: Apply f x :: forall a. _
@@ -16,7 +16,7 @@ T22065.hs:10:30: warning: [-Wpartial-type-signatures (in -Wdefault)]
         x :: forall {w}. [w] (bound at T22065.hs:16:3)
         foo :: Foo (bound at T22065.hs:10:1)
 
-T22065.hs:12:9: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T22065.hs:12:9: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘w’
       Where: ‘w’ is a rigid type variable bound by
                the inferred type of f :: [w] -> Int
@@ -35,7 +35,7 @@ T22065.hs:12:9: warning: [-Wpartial-type-signatures (in -Wdefault)]
         x :: forall {w}. [w] (bound at T22065.hs:16:3)
         foo :: Foo (bound at T22065.hs:10:1)
 
-T22065.hs:15:9: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T22065.hs:15:9: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘w’
       Where: ‘w’ is a rigid type variable bound by
                the inferred type of x :: [w]

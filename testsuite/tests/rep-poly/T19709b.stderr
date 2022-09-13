@@ -1,5 +1,5 @@
 
-T19709b.hs:11:15: error:
+T19709b.hs:11:15: error: [GHC-55287]
     • The argument ‘(error @Any "e2")’ of ‘levfun’
       does not have a fixed runtime representation.
       Its type is:

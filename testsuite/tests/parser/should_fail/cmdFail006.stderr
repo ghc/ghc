@@ -1,2 +1,3 @@
 
-cmdFail006.hs:4:15: error: Parse error in command: ~(_ -< _)
+cmdFail006.hs:4:15: error: [GHC-03790]
+    Parse error in command: ~(_ -< _)

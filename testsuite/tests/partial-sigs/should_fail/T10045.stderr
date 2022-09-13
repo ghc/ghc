@@ -1,5 +1,5 @@
 
-T10045.hs:6:18: error:
+T10045.hs:6:18: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘t1 -> Bool -> t2’
       Where: ‘t1’, ‘t2’ are rigid type variables bound by
                the inferred type of copy :: t1 -> Bool -> t2

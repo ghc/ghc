@@ -3,7 +3,7 @@
 [3 of 5] Compiling OverloadedRecFldsFail10_C ( OverloadedRecFldsFail10_C.hs, OverloadedRecFldsFail10_C.o )
 [4 of 5] Compiling Main             ( overloadedrecfldsfail10.hs, overloadedrecfldsfail10.o )
 
-overloadedrecfldsfail10.hs:6:20: error:
+overloadedrecfldsfail10.hs:6:20: error: [GHC-69158]
     Conflicting exports for ‘foo’:
        ‘F(..)’ exports ‘OverloadedRecFldsFail10_B.foo’
          imported from ‘OverloadedRecFldsFail10_B’ at overloadedrecfldsfail10.hs:8:1-32

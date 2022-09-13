@@ -1,5 +1,5 @@
 
-SimpleFail5a.hs:31:11: error:
+SimpleFail5a.hs:31:11: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘Int’
       Expected: S3 a
         Actual: S3 Int

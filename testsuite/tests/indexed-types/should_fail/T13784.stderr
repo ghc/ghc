@@ -1,5 +1,5 @@
 
-T13784.hs:29:28: error:
+T13784.hs:29:28: error: [GHC-25897]
     • Couldn't match type ‘as’ with ‘a : Divide a as’
       Expected: Product (Divide a (a : as))
         Actual: Product as1
@@ -13,7 +13,7 @@ T13784.hs:29:28: error:
         divide :: Product (a : as) -> (a, Product (Divide a (a : as)))
           (bound at T13784.hs:29:5)
 
-T13784.hs:33:24: error:
+T13784.hs:33:24: error: [GHC-83865]
     • Couldn't match type: Product (a : as0)
                      with: (b, Product (a : Divide b as))
       Expected: (b, Product (Divide b (a : as)))
@@ -25,7 +25,7 @@ T13784.hs:33:24: error:
         divide :: Product (a : as) -> (b, Product (Divide b (a : as)))
           (bound at T13784.hs:33:5)
 
-T13784.hs:33:29: error:
+T13784.hs:33:29: error: [GHC-83865]
     • Couldn't match type: (a0, Product (Divide a0 as))
                      with: Product as0
       Expected: Product as0

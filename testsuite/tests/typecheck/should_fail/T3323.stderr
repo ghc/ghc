@@ -1,5 +1,5 @@
 
-T3323.hs:18:7: error:
+T3323.hs:18:7: error: [GHC-39999]
     • Could not deduce ‘GHC.IO.Device.RawIO dev0’
       from the context: (GHC.IO.Device.RawIO dev,
                          GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev,

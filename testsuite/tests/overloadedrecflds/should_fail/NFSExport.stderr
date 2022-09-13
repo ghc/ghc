@@ -1,5 +1,5 @@
 
-NFSExport.hs:2:27: error:
+NFSExport.hs:2:27: error: [GHC-76037]
     Not in scope: ‘foo’
     Suggested fix:
       Notice that ‘foo’ is a field selector belonging to the type ‘T’

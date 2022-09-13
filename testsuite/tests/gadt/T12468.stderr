@@ -1,5 +1,5 @@
 
-T12468.hs:9:7: error:
+T12468.hs:9:7: error: [GHC-88464]
     • Found hole: _ :: Int
     • In an equation for ‘f’: f I = _
     • Relevant bindings include f :: T a -> a (bound at T12468.hs:9:1)

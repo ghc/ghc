@@ -1,5 +1,5 @@
 
-T7210.hs:5:19: error:
+T7210.hs:5:19: error: [GHC-18932]
     • Unexpected strictness annotation: !IntMap
       strictness annotation cannot appear nested inside a type
     • In the type ‘!IntMap Int’

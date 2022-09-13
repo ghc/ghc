@@ -1,5 +1,5 @@
 
-T4093b.hs:31:13: error:
+T4093b.hs:31:13: error: [GHC-25897]
     • Could not deduce ‘e ~ C’
       from the context: (EitherCO e (A C O n) (A O O n) ~ A e O n,
                          EitherCO x (A C C n) (A C O n) ~ A C x n)

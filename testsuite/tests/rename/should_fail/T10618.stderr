@@ -1,5 +1,5 @@
 
-T10618.hs:3:22: error:
+T10618.hs:3:22: error: [GHC-88464]
     Variable not in scope: (<|>) :: Maybe (Maybe a0) -> Maybe a1 -> t
     Suggested fix:
       Perhaps use one of these:

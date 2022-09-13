@@ -1,5 +1,5 @@
 
-drvfail008.hs:11:43: error:
+drvfail008.hs:11:43: error: [GHC-82023]
     • Can't make a derived instance of ‘Monad M’:
         ‘Monad’ is not a stock derivable class (Eq, Show, etc.)
     • In the newtype declaration for ‘M’

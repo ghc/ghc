@@ -1,5 +1,5 @@
 
-T7278.hs:9:43: error:
+T7278.hs:9:43: error: [GHC-25897]
     • Expected kind ‘* -> * -> *’, but ‘t’ has kind ‘k1’
       ‘k1’ is a rigid type variable bound by
         the type signature for ‘f’

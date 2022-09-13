@@ -1,5 +1,5 @@
 
-T12083b.hs:7:5: error:
+T12083b.hs:7:5: error: [GHC-91510]
     • Illegal qualified type: Eq a => r
     • When checking the class method:
         test :: forall a r. Class a => a -> (Eq a => r) -> r

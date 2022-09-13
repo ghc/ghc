@@ -1,5 +1,5 @@
 
-RepPolyArgument.hs:10:18: error:
+RepPolyArgument.hs:10:18: error: [GHC-55287]
     • The argument ‘(undefined @(R @RuntimeRep))’ of ‘undefined’
       does not have a fixed runtime representation.
       Its type is:

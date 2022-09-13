@@ -1,5 +1,5 @@
 
-T15918.hs:19:19: error:
+T15918.hs:19:19: error: [GHC-83865]
     • Couldn't match kind ‘*’ with ‘k0 -> *’
       Expected kind ‘(k0 -> *) -> Constraint’, but ‘[]’ has kind ‘* -> *’
     • In the first argument of ‘Build’, namely ‘[]’

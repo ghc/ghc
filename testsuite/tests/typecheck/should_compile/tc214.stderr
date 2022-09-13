@@ -1,9 +1,9 @@
 
-tc214.hs:19:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+tc214.hs:19:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
     Pattern match has inaccessible right hand side
     In an equation for ‘bar2’: bar2 (F2 _) = ...
 
-tc214.hs:19:7: warning: [-Winaccessible-code (in -Wdefault)]
+tc214.hs:19:7: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
     • Inaccessible code in
         a pattern with constructor: F2 :: forall a. a -> Foo2 [a],
         in an equation for ‘bar2’

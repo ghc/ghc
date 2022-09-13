@@ -1,5 +1,5 @@
 
-RepPolyApp.hs:11:9: error:
+RepPolyApp.hs:11:9: error: [GHC-55287]
     • The argument ‘(undefined :: a)’ of ‘f’
       does not have a fixed runtime representation.
       Its type is:

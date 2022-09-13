@@ -1,5 +1,5 @@
 
-RenamingStar.hs:5:13: error:
+RenamingStar.hs:5:13: error: [GHC-24180]
     Operator applied to too few arguments: *
     Suggested fix:
       Use ‘Type’ from ‘Data.Kind’ instead.

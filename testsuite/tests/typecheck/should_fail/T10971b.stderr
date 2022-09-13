@@ -1,5 +1,5 @@
 
-T10971b.hs:4:11: error:
+T10971b.hs:4:11: error: [GHC-39999]
     • Ambiguous type variable ‘t2’ arising from a use of ‘length’
       prevents the constraint ‘(Foldable t2)’ from being solved.
       Relevant bindings include
@@ -10,13 +10,13 @@ T10971b.hs:4:11: error:
         instance Foldable (Either a) -- Defined in ‘Data.Foldable’
         instance Foldable Maybe -- Defined in ‘Data.Foldable’
         ...plus three others
-        ...plus 29 instances involving out-of-scope types
+        ...plus 26 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: length x
       In the expression: \ x -> length x
       In an equation for ‘f’: f = \ x -> length x
 
-T10971b.hs:5:13: error:
+T10971b.hs:5:13: error: [GHC-39999]
     • Ambiguous type variable ‘t1’ arising from a use of ‘fmapDefault’
       prevents the constraint ‘(Traversable t1)’ from being solved.
       Relevant bindings include
@@ -33,7 +33,7 @@ T10971b.hs:5:13: error:
       In the expression: \ f x -> fmapDefault f x
       In an equation for ‘g’: g = \ f x -> fmapDefault f x
 
-T10971b.hs:6:14: error:
+T10971b.hs:6:14: error: [GHC-39999]
     • Ambiguous type variable ‘t0’ arising from a use of ‘fmapDefault’
       prevents the constraint ‘(Traversable t0)’ from being solved.
       Relevant bindings include
@@ -50,7 +50,7 @@ T10971b.hs:6:14: error:
       In the expression: (fmapDefault f x, length x)
       In the expression: \ f x -> (fmapDefault f x, length x)
 
-T10971b.hs:6:31: error:
+T10971b.hs:6:31: error: [GHC-39999]
     • Ambiguous type variable ‘t0’ arising from a use of ‘length’
       prevents the constraint ‘(Foldable t0)’ from being solved.
       Relevant bindings include
@@ -61,7 +61,7 @@ T10971b.hs:6:31: error:
         instance Foldable (Either a) -- Defined in ‘Data.Foldable’
         instance Foldable Maybe -- Defined in ‘Data.Foldable’
         ...plus three others
-        ...plus 29 instances involving out-of-scope types
+        ...plus 26 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: length x
       In the expression: (fmapDefault f x, length x)

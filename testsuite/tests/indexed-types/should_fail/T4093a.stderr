@@ -1,5 +1,5 @@
 
-T4093a.hs:8:8: error:
+T4093a.hs:8:8: error: [GHC-25897]
     • Could not deduce ‘e ~ ()’
       from the context: Foo e ~ Maybe e
         bound by the type signature for:

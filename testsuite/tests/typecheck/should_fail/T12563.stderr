@@ -1,5 +1,5 @@
 
-T12563.hs:8:15: error:
+T12563.hs:8:15: error: [GHC-91028]
     • Couldn't match expected type ‘(forall a. f a) -> f r’
                   with actual type ‘p’
       Cannot equate type variable ‘p’

@@ -1,5 +1,5 @@
 
-T14066e.hs:13:65: error:
+T14066e.hs:13:65: error: [GHC-25897]
     • Expected a type, but ‘c'’ has kind ‘k1’
       ‘k1’ is a rigid type variable bound by
         the type signature for:

@@ -1,5 +1,5 @@
 
-ArrowExistential.hs:16:27: error:
+ArrowExistential.hs:16:27: error: [GHC-64525]
     • Proc patterns cannot use existential or GADT data constructors
     • In the pattern: Bar a
       In a case alternative within arrow notation: Bar a -> foo -< a

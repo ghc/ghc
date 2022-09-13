@@ -1,5 +1,5 @@
 
-T19843i.hs:5:5: error:
+T19843i.hs:5:5: error: [GHC-76037]
     Not in scope: ‘M.getSum’
     Suggested fix:
       Perhaps you want to add ‘getSum’ to the import list

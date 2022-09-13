@@ -1,5 +1,5 @@
 
-T2664.hs:32:52: error:
+T2664.hs:32:52: error: [GHC-25897]
     • Could not deduce ‘b ~ a’ arising from a use of ‘newPChan’
       from the context: ((a :*: b) ~ Dual c, c ~ Dual (a :*: b))
         bound by the type signature for:

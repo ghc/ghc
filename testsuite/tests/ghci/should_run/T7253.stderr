@@ -1,5 +1,5 @@
 
-<interactive>:19:1: warning: [-Wunrecognised-pragmas (in -Wdefault)]
+<interactive>:19:1: warning: [GHC-42044] [-Wunrecognised-pragmas (in -Wdefault)]
     Unrecognised pragma: FOO
 
 <interactive>:61:1: error:

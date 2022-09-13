@@ -16,7 +16,7 @@ Template.hs:16:3: warning: [-Wnoncanonical-monoid-instances (in -Wdefault, -Wcom
     Either remove definition for ‘mappend’ (recommended) or define as ‘mappend = (<>)’
     See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid
 
-Template.hs:20:15: warning: [-Wstar-is-type (in -Wall, -Wcompat)]
+Template.hs:20:15: warning: [GHC-39567] [-Wstar-is-type (in -Wall, -Wcompat)]
     Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
     relies on the StarIsType extension, which will become
     deprecated in the future.

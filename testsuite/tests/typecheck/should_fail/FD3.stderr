@@ -1,5 +1,5 @@
 
-FD3.hs:15:15: error:
+FD3.hs:15:15: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘(String, a)’
         arising from a functional dependency between:
           constraint ‘MkA (String, a) a’ arising from a use of ‘mkA’

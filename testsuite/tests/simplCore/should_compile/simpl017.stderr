@@ -1,5 +1,5 @@
 
-simpl017.hs:55:5: error:
+simpl017.hs:55:5: error: [GHC-83865]
     • Couldn't match type: [E m i] -> E' v0 m a
                      with: forall v. [E m i] -> E' v m a
       Expected: m (forall v. [E m i] -> E' v m a)
@@ -24,7 +24,7 @@ simpl017.hs:55:5: error:
         liftArray :: arr i a -> E m (forall v. [E m i] -> E' v m a)
           (bound at simpl017.hs:50:1)
 
-simpl017.hs:71:10: error:
+simpl017.hs:71:10: error: [GHC-83865]
     • Couldn't match type: forall v. [E (ST s) Int] -> E' v (ST s) Int
                      with: [E (ST t0) Int] -> E (ST s) Int
       Expected: E' RValue (ST s) ([E (ST t0) Int] -> E (ST s) Int)

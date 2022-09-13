@@ -1,5 +1,5 @@
 
-T10746.hs:9:10: warning: [-Wincomplete-patterns (in -Wextra)]
+T10746.hs:9:10: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns of type ‘Bool’ not matched:

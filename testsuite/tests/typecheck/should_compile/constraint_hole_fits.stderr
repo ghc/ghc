@@ -1,5 +1,5 @@
 
-constraint_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
+constraint_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [a] -> a
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:

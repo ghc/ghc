@@ -1,5 +1,5 @@
 
-T16902.hs:12:10: error:
+T16902.hs:12:10: error: [GHC-25897]
     • Expected a type, but found something with kind ‘a’
       ‘a’ is a rigid type variable bound by
         the type signature for ‘MkF’

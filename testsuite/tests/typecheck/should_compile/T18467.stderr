@@ -1,10 +1,10 @@
 
-T18467.hs:9:7: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T18467.hs:9:7: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Int’ with actual type ‘Float’
     • In the expression: x :: Int
       In an equation for ‘g’: g z = x :: Int
 
-T18467.hs:12:29: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T18467.hs:12:29: warning: [GHC-25897] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘[a1]’ with actual type ‘a1’
       ‘a1’ is a rigid type variable bound by
         the inferred type of t :: a1 -> (a, [a1])

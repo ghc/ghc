@@ -1,5 +1,5 @@
 
-mod54.hs:3:22: error:
+mod54.hs:3:22: error: [GHC-39999]
     • No instance for ‘Eq T’
         arising from the 'deriving' clause of a data type declaration
       Possible fix:

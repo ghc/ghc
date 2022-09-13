@@ -1,5 +1,5 @@
 
-T10285.hs:8:17: error:
+T10285.hs:8:17: error: [GHC-10283]
     • Could not deduce ‘Coercible a b’ arising from a use of ‘coerce’
       from the context: Coercible (N a) (N b)
         bound by a pattern with constructor:

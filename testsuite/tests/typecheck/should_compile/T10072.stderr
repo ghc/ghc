@@ -1,5 +1,5 @@
 
-T10072.hs:3:31: error:
+T10072.hs:3:31: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘b’
       Where: ‘b’ is a rigid type variable bound by
                the RULE "map/empty"

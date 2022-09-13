@@ -1,12 +1,12 @@
 
-tc141.hs:11:12: error:
+tc141.hs:11:12: error: [GHC-46131]
     • You cannot bind scoped type variable ‘a’
         in a pattern binding signature
     • In the pattern: p :: a
       In the pattern: (p :: a, q :: a)
       In a pattern binding: (p :: a, q :: a) = x
 
-tc141.hs:11:31: error:
+tc141.hs:11:31: error: [GHC-25897]
     • Couldn't match expected type ‘a1’ with actual type ‘b’
       ‘a1’ is a rigid type variable bound by
         an expression type signature:
@@ -24,7 +24,7 @@ tc141.hs:11:31: error:
         x :: (b, b) (bound at tc141.hs:11:3)
         f :: (b, b) -> (a, b) (bound at tc141.hs:11:1)
 
-tc141.hs:13:13: error:
+tc141.hs:13:13: error: [GHC-46131]
     • You cannot bind scoped type variable ‘a’
         in a pattern binding signature
     • In the pattern: y :: a
@@ -36,7 +36,7 @@ tc141.hs:13:13: error:
           v = b
         in v
 
-tc141.hs:15:18: error:
+tc141.hs:15:18: error: [GHC-25897]
     • Couldn't match expected type ‘a1’ with actual type ‘p2’
       ‘a1’ is a rigid type variable bound by
         the type signature for:

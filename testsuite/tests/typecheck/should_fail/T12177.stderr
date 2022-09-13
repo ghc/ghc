@@ -1,5 +1,5 @@
 
-T12177.hs:3:19: error:
+T12177.hs:3:19: error: [GHC-88464]
     • Found hole: _ :: p3
       Where: ‘p3’ is a rigid type variable bound by
                the inferred type of bar :: p1 -> p2 -> p3
@@ -11,7 +11,7 @@ T12177.hs:3:19: error:
         x :: p2 (bound at T12177.hs:3:14)
         bar :: p1 -> p2 -> p3 (bound at T12177.hs:3:1)
 
-T12177.hs:5:37: error:
+T12177.hs:5:37: error: [GHC-88464]
     • Found hole: _ :: p6
       Where: ‘p6’ is a rigid type variable bound by
                the inferred type of baz :: p1 -> p2 -> p3 -> p4 -> p5 -> p6

@@ -1,5 +1,5 @@
 
-T13568.hs:7:8: error:
+T13568.hs:7:8: error: [GHC-76037]
     Not in scope: type constructor or class ‘A’
     Suggested fix:
       Perhaps you intended to use DataKinds

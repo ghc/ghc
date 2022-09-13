@@ -1,5 +1,5 @@
 
-T16245a.hs:12:66: error:
+T16245a.hs:12:66: error: [GHC-25897]
     • Expected kind ‘k1’, but ‘b’ has kind ‘k2’
       ‘k2’ is a rigid type variable bound by
         the newtype declaration for ‘T’

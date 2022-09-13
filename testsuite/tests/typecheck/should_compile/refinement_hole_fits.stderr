@@ -1,5 +1,5 @@
 
-refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
+refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [Integer] -> Integer
     • In an equation for ‘f’: f = _
     • Relevant bindings include
@@ -117,7 +117,7 @@ refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.List’))
 
-refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
+refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Integer -> [Integer] -> Integer
     • In the expression: _ 0
       In an equation for ‘g’: g = _ 0
@@ -219,7 +219,7 @@ refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.List’))
 
-refinement_hole_fits.hs:10:7: warning: [-Wtyped-holes (in -Wdefault)]
+refinement_hole_fits.hs:10:7: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:

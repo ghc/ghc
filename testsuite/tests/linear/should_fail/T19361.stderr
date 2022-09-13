@@ -1,5 +1,5 @@
 
-T19361.hs:6:3: error:
+T19361.hs:6:3: error: [GHC-25897]
     • Couldn't match type ‘m’ with ‘'Many’
         arising from multiplicity of ‘x’
       ‘m’ is a rigid type variable bound by

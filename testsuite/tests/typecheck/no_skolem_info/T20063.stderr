@@ -1,5 +1,5 @@
 
-T20063.hs:25:21: error:
+T20063.hs:25:21: error: [GHC-25897]
     • Could not deduce ‘ctx4 ~ (ctx0 :*& l0)’
       from the context: (ctx1 ~ 'Extend ctx7, ctx2 ~ 'Extend ctx8)
         bound by a pattern with constructor:

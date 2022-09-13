@@ -1,19 +1,19 @@
 
-T10403.hs:16:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T10403.hs:16:7: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found extra-constraints wildcard standing for ‘Functor f’
       Where: ‘f’ is a rigid type variable bound by
                the inferred type of h1 :: Functor f => (a1 -> a2) -> f a1 -> H f
                at T10403.hs:18:1-41
     • In the type signature: h1 :: _ => _
 
-T10403.hs:16:12: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T10403.hs:16:12: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘(a1 -> a2) -> f a1 -> H f’
       Where: ‘a2’, ‘a1’, ‘f’ are rigid type variables bound by
                the inferred type of h1 :: Functor f => (a1 -> a2) -> f a1 -> H f
                at T10403.hs:18:1-41
     • In the type signature: h1 :: _ => _
 
-T10403.hs:20:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T10403.hs:20:7: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’
         standing for ‘(a1 -> a2) -> f0 a1 -> H f0’
       Where: ‘f0’ is an ambiguous type variable
@@ -22,7 +22,7 @@ T10403.hs:20:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
                at T10403.hs:23:1-41
     • In the type signature: h2 :: _
 
-T10403.hs:23:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T10403.hs:23:15: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
     • Ambiguous type variable ‘f0’ arising from a use of ‘fmap’
       prevents the constraint ‘(Functor f0)’ from being solved.
       Relevant bindings include
@@ -39,7 +39,7 @@ T10403.hs:23:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In the expression: (H . fmap (const ())) (fmap f b)
       In an equation for ‘h2’: h2 f b = (H . fmap (const ())) (fmap f b)
 
-T10403.hs:29:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T10403.hs:29:8: warning: [GHC-46956] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘f0’ with ‘B t’
       Expected: H (B t)
         Actual: H f0

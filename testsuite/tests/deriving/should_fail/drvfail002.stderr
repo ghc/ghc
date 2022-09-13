@@ -1,5 +1,5 @@
 
-drvfail002.hs:19:23: error:
+drvfail002.hs:19:23: error: [GHC-39999]
     • No instance for ‘X T c0’
         arising from the first field of ‘S’ (type ‘T’)
       Possible fix:

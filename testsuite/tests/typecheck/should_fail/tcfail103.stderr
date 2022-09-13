@@ -1,5 +1,5 @@
 
-tcfail103.hs:15:23: error:
+tcfail103.hs:15:23: error: [GHC-25897]
     • Couldn't match type ‘s’ with ‘t’
       Expected: STRef s Int
         Actual: STRef t Int

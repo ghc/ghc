@@ -1,5 +1,5 @@
 
-T17817.hs:16:10: error:
+T17817.hs:16:10: error: [GHC-55287]
     • Unsaturated use of a representation-polymorphic primitive function.
       The first argument of ‘mkWeak#’
       does not have a fixed runtime representation.

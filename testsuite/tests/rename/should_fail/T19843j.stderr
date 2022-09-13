@@ -1,5 +1,5 @@
 
-T19843j.hs:5:5: error:
+T19843j.hs:5:5: error: [GHC-88464]
     Variable not in scope: guard
     Suggested fix:
       Perhaps you want to add ‘guard’ to the import list in the import of

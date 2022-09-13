@@ -1,5 +1,5 @@
 
-overloadedlabelsfail03.hs:3:8: error:
+overloadedlabelsfail03.hs:3:8: error: [GHC-95781]
     • Cannot apply expression of type ‘()’
       to a visible type argument ‘"foo"’
     • In the expression: #foo

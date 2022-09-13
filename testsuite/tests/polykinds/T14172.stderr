@@ -1,5 +1,5 @@
 
-T14172.hs:7:46: error:
+T14172.hs:7:46: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘a'’
       Where: ‘a'’ is a rigid type variable bound by
                the inferred type of
@@ -10,7 +10,7 @@ T14172.hs:7:46: error:
       In the first argument of ‘f’, namely ‘(h _)’
       In the type ‘(a -> f b) -> g a -> f (h _)’
 
-T14172.hs:8:19: error:
+T14172.hs:8:19: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘g'1 a'0’
       Expected: (f'0 a -> f (f'0 b)) -> g a -> f (h a')
         Actual: (Unwrapped (Compose f'0 g'1 a'0) -> f (Unwrapped (h a')))

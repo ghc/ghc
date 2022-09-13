@@ -1,5 +1,5 @@
 
-FrozenErrorTests.hs:26:9: error:
+FrozenErrorTests.hs:26:9: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘[a]’ arising from a use of ‘goo1’
       ‘a’ is a rigid type variable bound by
         the inferred type of test1 :: a
@@ -9,20 +9,20 @@ FrozenErrorTests.hs:26:9: error:
     • Relevant bindings include
         test1 :: a (bound at FrozenErrorTests.hs:26:1)
 
-FrozenErrorTests.hs:29:15: error:
+FrozenErrorTests.hs:29:15: error: [GHC-18872]
     • Couldn't match type ‘Int’ with ‘[Int]’
         arising from a use of ‘goo1’
     • In the first argument of ‘goo2’, namely ‘(goo1 False undefined)’
       In the expression: goo2 (goo1 False undefined)
       In an equation for ‘test2’: test2 = goo2 (goo1 False undefined)
 
-FrozenErrorTests.hs:30:9: error:
+FrozenErrorTests.hs:30:9: error: [GHC-18872]
     • Couldn't match type ‘Int’ with ‘[Int]’
         arising from a use of ‘goo1’
     • In the expression: goo1 False (goo2 undefined)
       In an equation for ‘test3’: test3 = goo1 False (goo2 undefined)
 
-FrozenErrorTests.hs:45:15: error:
+FrozenErrorTests.hs:45:15: error: [GHC-18872]
     • Couldn't match type: T2 c c
                      with: M (T2 (T2 c c) c)
         arising from a use of ‘goo3’
@@ -32,7 +32,7 @@ FrozenErrorTests.hs:45:15: error:
     • Relevant bindings include
         test4 :: T2 (T2 c c) c (bound at FrozenErrorTests.hs:45:1)
 
-FrozenErrorTests.hs:46:9: error:
+FrozenErrorTests.hs:46:9: error: [GHC-18872]
     • Couldn't match type: T2 c c
                      with: M (T2 (T2 c c) c)
         arising from a use of ‘goo3’

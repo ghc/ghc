@@ -1,5 +1,5 @@
 
-GADTwrong1.hs:12:21: error:
+GADTwrong1.hs:12:21: error: [GHC-25897]
     • Couldn't match expected type ‘b’ with actual type ‘c’
       ‘c’ is a rigid type variable bound by
         a pattern with constructor: T :: forall c. c -> T (Const c),

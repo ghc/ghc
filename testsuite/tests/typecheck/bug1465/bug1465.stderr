@@ -1,5 +1,5 @@
 
-C.hs:6:11: error:
+C.hs:6:11: error: [GHC-83865]
     • Couldn't match expected type ‘bug1465-1.0:A.T’
                   with actual type ‘A.T’
       NB: ‘bug1465-1.0:A.T’ is defined in ‘A’ in package ‘bug1465-1.0’

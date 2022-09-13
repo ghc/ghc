@@ -1,5 +1,5 @@
 
-T20470.hs:12:5: error:
+T20470.hs:12:5: error: [GHC-64525]
     • Proc patterns cannot use existential or GADT data constructors
     • In the pattern: A x B
       In a case alternative within arrow notation: A x B -> id -< x

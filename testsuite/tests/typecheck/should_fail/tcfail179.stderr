@@ -1,5 +1,5 @@
 
-tcfail179.hs:14:39: error:
+tcfail179.hs:14:39: error: [GHC-25897]
     • Couldn't match expected type ‘s’ with actual type ‘x’
       ‘x’ is a rigid type variable bound by
         a pattern with constructor:

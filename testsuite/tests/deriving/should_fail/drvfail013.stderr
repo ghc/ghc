@@ -1,5 +1,5 @@
 
-drvfail013.hs:4:70: error:
+drvfail013.hs:4:70: error: [GHC-39999]
     • No instance for ‘Eq (m (Maybe a))’
         arising from the 'deriving' clause of a data type declaration
       Possible fix:
@@ -7,7 +7,7 @@ drvfail013.hs:4:70: error:
           so you can specify the instance context yourself
     • When deriving the instance for (Eq (MaybeT m a))
 
-drvfail013.hs:6:70: error:
+drvfail013.hs:6:70: error: [GHC-39999]
     • No instance for ‘Eq (m (Maybe a))’
         arising from the first field of ‘MaybeT'’ (type ‘m (Maybe a)’)
       Possible fix:

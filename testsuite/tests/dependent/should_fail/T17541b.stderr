@@ -1,5 +1,5 @@
 
-T17541b.hs:8:20: error:
+T17541b.hs:8:20: error: [GHC-25897]
     • Expected kind ‘k’, but ‘Int’ has kind ‘*’
     • In the second argument of ‘T’, namely ‘Int’
       In the type ‘T Type Int’

@@ -1,5 +1,5 @@
 
-deriving-via-fail5.hs:8:1: error:
+deriving-via-fail5.hs:8:1: error: [GHC-10283]
     • Couldn't match representation of type ‘a’ with that of ‘b’
         arising from a use of ‘GHC.Prim.coerce’
       ‘a’ is a rigid type variable bound by
@@ -25,7 +25,7 @@ deriving-via-fail5.hs:8:1: error:
         showsPrec :: Int -> Foo4 a -> ShowS
           (bound at deriving-via-fail5.hs:8:1)
 
-deriving-via-fail5.hs:8:1: error:
+deriving-via-fail5.hs:8:1: error: [GHC-10283]
     • Couldn't match representation of type ‘a’ with that of ‘b’
         arising from a use of ‘GHC.Prim.coerce’
       ‘a’ is a rigid type variable bound by
@@ -48,7 +48,7 @@ deriving-via-fail5.hs:8:1: error:
     • Relevant bindings include
         show :: Foo4 a -> String (bound at deriving-via-fail5.hs:8:1)
 
-deriving-via-fail5.hs:8:1: error:
+deriving-via-fail5.hs:8:1: error: [GHC-10283]
     • Couldn't match representation of type ‘a’ with that of ‘b’
         arising from a use of ‘GHC.Prim.coerce’
       ‘a’ is a rigid type variable bound by

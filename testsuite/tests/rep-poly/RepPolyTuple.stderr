@@ -1,5 +1,5 @@
 
-RepPolyTuple.hs:11:9: error:
+RepPolyTuple.hs:11:9: error: [GHC-55287]
     • • The tuple argument in third position
         does not have a fixed runtime representation.
         Its type is:

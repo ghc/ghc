@@ -1,5 +1,5 @@
 
-LinearViewPattern.hs:11:4: error:
+LinearViewPattern.hs:11:4: error: [GHC-18872]
     • Couldn't match type ‘'Many’ with ‘'One’
         arising from a non-linear pattern
     • In the pattern: not -> True

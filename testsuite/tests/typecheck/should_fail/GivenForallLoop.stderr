@@ -1,5 +1,5 @@
 
-GivenForallLoop.hs:8:11: error:
+GivenForallLoop.hs:8:11: error: [GHC-25897]
     • Could not deduce ‘a ~ b’
       from the context: a ~ (forall b1. F a b1)
         bound by the type signature for:

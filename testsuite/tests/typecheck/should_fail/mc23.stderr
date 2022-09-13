@@ -1,5 +1,5 @@
 
-mc23.hs:9:29: error:
+mc23.hs:9:29: error: [GHC-83865]
     • Couldn't match type: [a0]
                      with: a -> b
       Expected: (a -> b) -> [a] -> m a

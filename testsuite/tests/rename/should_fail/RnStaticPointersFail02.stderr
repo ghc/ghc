@@ -1,5 +1,5 @@
 
-RnStaticPointersFail02.hs:5:12: error:
+RnStaticPointersFail02.hs:5:12: error: [GHC-31891]
     • Illegal term-level use of the type constructor or class ‘T’
     • defined at RnStaticPointersFail02.hs:7:1
     • In the body of a static form: T

@@ -1,2 +1,2 @@
 
-T2302.hs:2:5: error: Data constructor not in scope: À
+T2302.hs:2:5: error: [GHC-88464] Data constructor not in scope: À

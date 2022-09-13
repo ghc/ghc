@@ -1,5 +1,5 @@
 
-T14658.hs:9:28: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T14658.hs:9:28: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found extra-constraints wildcard standing for ‘Eq a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of

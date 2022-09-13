@@ -6,7 +6,7 @@ SimpleFail2a.hs:11:3: error:
     • In the data instance declaration for ‘Sd’
       In the instance declaration for ‘C Int’
 
-SimpleFail2a.hs:11:11: error:
+SimpleFail2a.hs:11:11: error: [GHC-34447]
     Conflicting family instance declarations:
       Sd a -- Defined at SimpleFail2a.hs:11:11
       Sd Int -- Defined at SimpleFail2a.hs:12:11

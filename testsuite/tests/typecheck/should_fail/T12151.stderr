@@ -5,7 +5,7 @@ T12151.hs:9:13: error:
     • When checking the class method: put :: forall a. Put a => a
       In the class declaration for ‘Put’
 
-T12151.hs:9:13: error:
+T12151.hs:9:13: error: [GHC-39999]
     • Could not deduce ‘Put a0’
       from the context: Put a
         bound by the type signature for:

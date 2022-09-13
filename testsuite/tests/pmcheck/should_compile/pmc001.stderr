@@ -1,5 +1,5 @@
 
-pmc001.hs:14:1: warning: [-Wincomplete-patterns (in -Wextra)]
+pmc001.hs:14:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘f’:
         Patterns of type ‘T [a]’, ‘T [a]’ not matched:
@@ -8,7 +8,7 @@ pmc001.hs:14:1: warning: [-Wincomplete-patterns (in -Wextra)]
             MkT3 MkT1
             MkT3 (MkT2 _)
 
-pmc001.hs:19:1: warning: [-Wincomplete-patterns (in -Wextra)]
+pmc001.hs:19:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘g’:
         Patterns of type ‘T [a]’, ‘T [a]’ not matched:

@@ -1,3 +1,4 @@
 parsePlugin
 
-<no location info>: A lambda requires at least one parameter
+<no location info>: error: [GHC-71614]
+    A lambda requires at least one parameter

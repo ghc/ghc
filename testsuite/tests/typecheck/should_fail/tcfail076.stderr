@@ -1,5 +1,5 @@
 
-tcfail076.hs:19:82: error:
+tcfail076.hs:19:82: error: [GHC-25897]
     • Couldn't match type ‘res1’ with ‘res’
       Expected: m res1
         Actual: m res

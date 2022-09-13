@@ -1,5 +1,5 @@
 
-RepPolyLambda.hs:11:5: error:
+RepPolyLambda.hs:11:5: error: [GHC-55287]
     • The binder of the lambda expression
       does not have a fixed runtime representation.
       Its type is:

@@ -1,5 +1,5 @@
 
-tcfail193.hs:10:31: error:
+tcfail193.hs:10:31: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘[a]’
       Expected: [a] -> [a]
         Actual: [a] -> [[a]]

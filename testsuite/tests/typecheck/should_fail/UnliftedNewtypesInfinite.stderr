@@ -1,5 +1,5 @@
 
-UnliftedNewtypesInfinite.hs:9:20: error:
+UnliftedNewtypesInfinite.hs:9:20: error: [GHC-27958]
     • Couldn't match kind ‘t0’
                      with ‘'GHC.Types.TupleRep '[ 'GHC.Types.IntRep, t0]’
       Expected kind ‘TYPE t0’,

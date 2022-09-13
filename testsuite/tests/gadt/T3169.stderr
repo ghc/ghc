@@ -1,5 +1,5 @@
 
-T3169.hs:13:22: error:
+T3169.hs:13:22: error: [GHC-25897]
     • Couldn't match type ‘elt’ with ‘Map b elt’
       Expected: Map a (Map b elt)
         Actual: Map (a, b) elt

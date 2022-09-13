@@ -1,5 +1,5 @@
 
-T13674.hs:56:21: error:
+T13674.hs:56:21: error: [GHC-25897]
     • Couldn't match type ‘m’ with ‘Lcm m m’
       Expected: GF m
         Actual: GF (Lcm m m)
@@ -18,7 +18,7 @@ T13674.hs:56:21: error:
         x :: GF m (bound at T13674.hs:56:6)
         bar :: GF m -> GF m -> GF m (bound at T13674.hs:56:1)
 
-T13674.hs:56:31: error:
+T13674.hs:56:31: error: [GHC-25897]
     • Couldn't match type ‘m’ with ‘Lcm m m’
       Expected: GF m
         Actual: GF (Lcm m m)

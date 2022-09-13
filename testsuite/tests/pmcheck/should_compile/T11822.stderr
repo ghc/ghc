@@ -1,5 +1,5 @@
 
-T11822.hs:33:1: warning: [-Wincomplete-patterns (in -Wextra)]
+T11822.hs:33:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘mkTreeNode’:
         Patterns of type ‘prefix’, ‘Seq SiblingDependencies’, ‘Set prefix’,

@@ -1,5 +1,5 @@
 
-RepPolyMcBody.hs:30:16: error:
+RepPolyMcBody.hs:30:16: error: [GHC-55287]
     • The first argument of the rebindable syntax operator ‘(>>)’
         arising from a statement in a monad comprehension
       does not have a fixed runtime representation.

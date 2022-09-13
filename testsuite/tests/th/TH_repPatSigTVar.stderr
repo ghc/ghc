@@ -1,5 +1,5 @@
 
-TH_repPatSigTVar.hs:8:64: error:
+TH_repPatSigTVar.hs:8:64: error: [GHC-76037]
     • Not in scope: type variable ‘c’
     • In the Template Haskell quotation ''c
       In the untyped splice: $(sigE (varE 'undefined) (varT ''c))

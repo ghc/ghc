@@ -1,5 +1,5 @@
 
-RepPolyRecordUpdate.hs:7:35: error:
+RepPolyRecordUpdate.hs:7:35: error: [GHC-55287]
     • The newtype constructor pattern
       does not have a fixed runtime representation.
       Its type is:
@@ -7,13 +7,13 @@ RepPolyRecordUpdate.hs:7:35: error:
     • In the pattern: MkX {fld = fld}
       In an equation for ‘fld’: fld MkX {fld = fld} = fld
 
-RepPolyRecordUpdate.hs:7:35: error:
+RepPolyRecordUpdate.hs:7:35: error: [GHC-55287]
     The first pattern in the equation for ‘fld’
     does not have a fixed runtime representation.
     Its type is:
       X a :: TYPE rep
 
-RepPolyRecordUpdate.hs:13:9: error:
+RepPolyRecordUpdate.hs:13:9: error: [GHC-55287]
     • The record update at field ‘fld’
       does not have a fixed runtime representation.
       Its type is:

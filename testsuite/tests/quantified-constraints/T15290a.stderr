@@ -1,5 +1,5 @@
 
-T15290a.hs:25:12: error:
+T15290a.hs:25:12: error: [GHC-18872]
     • Couldn't match representation of type: m (Int, IntStateT m a1)
                                with that of: m (Int, StateT Int m a1)
         arising from a use of ‘coerce’

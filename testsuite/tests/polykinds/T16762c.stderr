@@ -1,5 +1,5 @@
 
-T16762c.hs:10:17: error:
+T16762c.hs:10:17: error: [GHC-97739]
     • These kind and type variables: a k (b :: k)
       are out of dependency order. Perhaps try this ordering:
         k (a :: k) (b :: k)

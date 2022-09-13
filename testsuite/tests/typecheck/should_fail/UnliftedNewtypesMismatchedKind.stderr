@@ -1,5 +1,5 @@
 
-UnliftedNewtypesMismatchedKind.hs:12:10: error:
+UnliftedNewtypesMismatchedKind.hs:12:10: error: [GHC-83865]
     • Expecting a lifted type, but ‘Int#’ is unlifted
     • In the type ‘Int#’
       In the definition of data constructor ‘MkT’

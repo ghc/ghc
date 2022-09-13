@@ -1,5 +1,5 @@
 
-T14561.hs:12:9: error:
+T14561.hs:12:9: error: [GHC-55287]
     • Unsaturated use of a representation-polymorphic primitive function.
       The first argument of ‘unsafeCoerce#’
       does not have a fixed runtime representation.

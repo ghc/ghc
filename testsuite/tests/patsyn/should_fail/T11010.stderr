@@ -1,5 +1,5 @@
 
-T11010.hs:9:34: error:
+T11010.hs:9:34: error: [GHC-25897]
     • Couldn't match type ‘a1’ with ‘Int’
       Expected: a -> b
         Actual: a1 -> b

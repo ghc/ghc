@@ -1,5 +1,5 @@
 
-T15629.hs:27:31: error:
+T15629.hs:27:31: error: [GHC-25897]
     • Couldn't match kind ‘z’ with ‘ab’
       Expected kind ‘F x ab ~> F x ab’,
         but ‘Comp (F1Sym :: x ~> F x z) F2Sym’ has kind ‘TyFun

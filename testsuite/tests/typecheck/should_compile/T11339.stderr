@@ -1,5 +1,5 @@
 
-T11339.hs:15:5: error:
+T11339.hs:15:5: error: [GHC-16675]
     • Overloaded signature conflicts with monomorphism restriction
         t :: forall (f :: * -> *). Applicative f => (a -> f b) -> f t
     • In an equation for ‘failing’:

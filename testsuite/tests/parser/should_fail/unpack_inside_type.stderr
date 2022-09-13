@@ -1,5 +1,5 @@
 
-unpack_inside_type.hs:3:25: error:
+unpack_inside_type.hs:3:25: error: [GHC-18932]
     • Unexpected UNPACK annotation: {-# UNPACK #-}Int
       UNPACK annotation cannot appear nested inside a type
     • In the first argument of ‘Maybe’, namely ‘({-# UNPACK #-}Int)’

@@ -1,4 +1,4 @@
 
-Defaulting1MROff.hs:7:10: warning: [-Wpartial-type-signatures (in -Wdefault)]
+Defaulting1MROff.hs:7:10: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Integer’
     • In the type signature: alpha :: _

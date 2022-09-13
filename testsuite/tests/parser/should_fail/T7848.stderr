@@ -1,5 +1,5 @@
 
-T7848.hs:10:9: error:
+T7848.hs:10:9: error: [GHC-25897]
     • Couldn't match expected type ‘Char’ with actual type ‘a’
       ‘a’ is a rigid type variable bound by
         the type signature for:

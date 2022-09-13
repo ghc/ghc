@@ -2,7 +2,7 @@
 tcfail102.hs:1:14: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
-tcfail102.hs:9:7: error:
+tcfail102.hs:9:7: error: [GHC-39999]
     • Could not deduce ‘Integral (Ratio a)’
       from the context: Integral a
         bound by the type signature for:

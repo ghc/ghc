@@ -1,5 +1,5 @@
 
-T21650_b.hs:34:7: error:
+T21650_b.hs:34:7: error: [GHC-55287]
     • Unsaturated use of a representation-polymorphic newtype constructor.
       The first argument of ‘MkN’
       does not have a fixed runtime representation.
@@ -8,7 +8,7 @@ T21650_b.hs:34:7: error:
     • In the expression: MkN
       In an equation for ‘foo’: foo = MkN
 
-T21650_b.hs:37:7: error:
+T21650_b.hs:37:7: error: [GHC-55287]
     • Unsaturated use of a representation-polymorphic newtype constructor.
       The first argument of ‘MkN’
       does not have a fixed runtime representation.

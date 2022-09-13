@@ -1,12 +1,12 @@
 
-T6018failclosed.hs:11:5: error:
+T6018failclosed.hs:11:5: error: [GHC-05175]
     • Type family equation violates the family's injectivity annotation.
       RHS of injective type family equation cannot be a type family:
         IdProxyClosed a = IdClosed a -- Defined at T6018failclosed.hs:11:5
     • In the equations for closed type family ‘IdProxyClosed’
       In the type family declaration for ‘IdProxyClosed’
 
-T6018failclosed.hs:19:5: error:
+T6018failclosed.hs:19:5: error: [GHC-05175]
     • Type family equation right-hand sides overlap; this violates
       the family's injectivity annotation:
         PClosed 'Z m = m -- Defined at T6018failclosed.hs:19:5
@@ -15,7 +15,7 @@ T6018failclosed.hs:19:5: error:
     • In the equations for closed type family ‘PClosed’
       In the type family declaration for ‘PClosed’
 
-T6018failclosed.hs:19:5: error:
+T6018failclosed.hs:19:5: error: [GHC-05175]
     • Type family equation violates the family's injectivity annotation.
       RHS of injective type family equation is a bare type variable
       but these LHS type and kind patterns are not bare variables: ‘'Z’
@@ -23,7 +23,7 @@ T6018failclosed.hs:19:5: error:
     • In the equations for closed type family ‘PClosed’
       In the type family declaration for ‘PClosed’
 
-T6018failclosed.hs:25:5: error:
+T6018failclosed.hs:25:5: error: [GHC-05175]
     • Type family equation violates the family's injectivity annotation.
       Type/kind variables ‘k1’, ‘b’
       cannot be inferred from the right-hand side.
@@ -34,7 +34,7 @@ T6018failclosed.hs:25:5: error:
     • In the equations for closed type family ‘JClosed’
       In the type family declaration for ‘JClosed’
 
-T6018failclosed.hs:30:5: error:
+T6018failclosed.hs:30:5: error: [GHC-05175]
     • Type family equation violates the family's injectivity annotation.
       Type variable ‘n’ cannot be inferred from the right-hand side.
       In the type family equation:
@@ -42,7 +42,7 @@ T6018failclosed.hs:30:5: error:
     • In the equations for closed type family ‘KClosed’
       In the type family declaration for ‘KClosed’
 
-T6018failclosed.hs:35:5: error:
+T6018failclosed.hs:35:5: error: [GHC-05175]
     • Type family equation violates the family's injectivity annotation.
       RHS of injective type family equation cannot be a type family:
         forall {k} {a :: k}.
@@ -50,7 +50,7 @@ T6018failclosed.hs:35:5: error:
     • In the equations for closed type family ‘LClosed’
       In the type family declaration for ‘LClosed’
 
-T6018failclosed.hs:39:5: error:
+T6018failclosed.hs:39:5: error: [GHC-05175]
     • Type family equation right-hand sides overlap; this violates
       the family's injectivity annotation:
         FClosed Char Bool Int = Int -- Defined at T6018failclosed.hs:39:5
@@ -58,7 +58,7 @@ T6018failclosed.hs:39:5: error:
     • In the equations for closed type family ‘FClosed’
       In the type family declaration for ‘FClosed’
 
-T6018failclosed.hs:43:5: error:
+T6018failclosed.hs:43:5: error: [GHC-05175]
     • Type family equation right-hand sides overlap; this violates
       the family's injectivity annotation:
         IClosed Int Char Bool = Bool -- Defined at T6018failclosed.hs:43:5
@@ -66,7 +66,7 @@ T6018failclosed.hs:43:5: error:
     • In the equations for closed type family ‘IClosed’
       In the type family declaration for ‘IClosed’
 
-T6018failclosed.hs:49:3: error:
+T6018failclosed.hs:49:3: error: [GHC-05175]
     • Type family equation right-hand sides overlap; this violates
       the family's injectivity annotation:
         E2 'True = 'False -- Defined at T6018failclosed.hs:49:3
@@ -74,7 +74,7 @@ T6018failclosed.hs:49:3: error:
     • In the equations for closed type family ‘E2’
       In the type family declaration for ‘E2’
 
-T6018failclosed.hs:50:3: error:
+T6018failclosed.hs:50:3: error: [GHC-05175]
     • Type family equation violates the family's injectivity annotation.
       Type variable ‘a’ cannot be inferred from the right-hand side.
       In the type family equation:
@@ -82,7 +82,7 @@ T6018failclosed.hs:50:3: error:
     • In the equations for closed type family ‘E2’
       In the type family declaration for ‘E2’
 
-T6018failclosed.hs:61:3: error:
+T6018failclosed.hs:61:3: error: [GHC-05175]
     • Type family equation right-hand sides overlap; this violates
       the family's injectivity annotation:
         F a IO = IO a -- Defined at T6018failclosed.hs:61:3
@@ -90,7 +90,7 @@ T6018failclosed.hs:61:3: error:
     • In the equations for closed type family ‘F’
       In the type family declaration for ‘F’
 
-T6018failclosed.hs:66:5: error:
+T6018failclosed.hs:66:5: error: [GHC-05175]
     • Type family equation violates the family's injectivity annotation.
       Type/kind variable ‘k’ cannot be inferred from the right-hand side.
       In the type family equation:

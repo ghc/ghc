@@ -1,5 +1,5 @@
 
-tcfail099.hs:9:20: error:
+tcfail099.hs:9:20: error: [GHC-25897]
     • Couldn't match expected type ‘a’ with actual type ‘p’
       ‘a’ is a rigid type variable bound by
         a pattern with constructor: C :: forall a. (a -> Int) -> DS,

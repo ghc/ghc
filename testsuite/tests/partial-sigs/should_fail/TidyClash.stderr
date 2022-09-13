@@ -1,5 +1,5 @@
 
-TidyClash.hs:8:19: error:
+TidyClash.hs:8:19: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘w1’
       Where: ‘w1’ is a rigid type variable bound by
                the inferred type of bar :: w_ -> (w_, w1 -> w2)
@@ -8,7 +8,7 @@ TidyClash.hs:8:19: error:
     • In the type ‘w_ -> (w_, _ -> _)’
       In the type signature: bar :: w_ -> (w_, _ -> _)
 
-TidyClash.hs:8:24: error:
+TidyClash.hs:8:24: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘w2’
       Where: ‘w2’ is a rigid type variable bound by
                the inferred type of bar :: w_ -> (w_, w1 -> w2)

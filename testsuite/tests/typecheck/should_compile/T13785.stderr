@@ -1,5 +1,5 @@
 
-T13785.hs:16:5: warning: [-Wmonomorphism-restriction]
+T13785.hs:16:5: warning: [GHC-55524] [-Wmonomorphism-restriction]
     • The Monomorphism Restriction applies to the bindings
       for ‘bar2’, ‘baz2’
     • In an equation for ‘foo’:

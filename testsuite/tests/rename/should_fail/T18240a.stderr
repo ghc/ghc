@@ -3,7 +3,8 @@ T18240a.hs:11:11: error:
     Instance head cannot contain nested ‘forall’s or contexts
     In an instance declaration
 
-T18240a.hs:12:15: error: Not in scope: type variable ‘a’
+T18240a.hs:12:15: error: [GHC-76037]
+    Not in scope: type variable ‘a’
 
 T18240a.hs:14:11: error:
     Instance head cannot contain nested ‘forall’s or contexts
@@ -13,13 +14,15 @@ T18240a.hs:17:11: error:
     Instance head cannot contain nested ‘forall’s or contexts
     In an instance declaration
 
-T18240a.hs:18:22: error: Not in scope: type variable ‘a’
+T18240a.hs:18:22: error: [GHC-76037]
+    Not in scope: type variable ‘a’
 
 T18240a.hs:20:21: error:
     Instance head cannot contain nested ‘forall’s or contexts
     In an instance declaration
 
-T18240a.hs:21:24: error: Not in scope: type variable ‘b’
+T18240a.hs:21:24: error: [GHC-76037]
+    Not in scope: type variable ‘b’
 
 T18240a.hs:23:19: error:
     Instance head cannot contain nested ‘forall’s or contexts

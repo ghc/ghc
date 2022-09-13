@@ -1,5 +1,5 @@
 
-T5858.hs:11:7: error:
+T5858.hs:11:7: error: [GHC-39999]
     • Ambiguous type variables ‘a0’, ‘a1’ arising from a use of ‘infer’
       prevents the constraint ‘(InferOverloaded
                                   ([a0], [a1]))’ from being solved.

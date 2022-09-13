@@ -1,5 +1,5 @@
 
-T18960b.hs:11:7: warning: [-Wincomplete-patterns (in -Wextra)]
+T18960b.hs:11:7: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns of type ‘((), String)’ not matched:
@@ -9,7 +9,7 @@ T18960b.hs:11:7: warning: [-Wincomplete-patterns (in -Wextra)]
             P ((), ['h'])
             ...
 
-T18960b.hs:18:7: warning: [-Wincomplete-patterns (in -Wextra)]
+T18960b.hs:18:7: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns of type ‘((), String)’ not matched:

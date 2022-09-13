@@ -1,5 +1,5 @@
 
-T13450TH.hs:6:15: error:
+T13450TH.hs:6:15: error: [GHC-11861]
     Parser error on `''`
     Character literals may not be empty
     Suggested fix:

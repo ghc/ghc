@@ -1,5 +1,5 @@
 
-T8155.hs:26:14: error:
+T8155.hs:26:14: error: [GHC-39999]
     • Could not deduce ‘Integral (BoundsOf (a -> a))’
         arising from a use of ‘buildV’
       from the context: Num a

@@ -1,5 +1,5 @@
 
-T16453E2.hs:1:28: error:
+T16453E2.hs:1:28: error: [GHC-69158]
     Conflicting exports for ‘main’:
        ‘T16453T.main’ exports ‘T16453T.main’
          imported from ‘T16453T’ at T16453E2.hs:2:1-14

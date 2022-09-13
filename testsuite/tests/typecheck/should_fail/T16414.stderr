@@ -1,5 +1,5 @@
 
-T16414.hs:15:6: error:
+T16414.hs:15:6: error: [GHC-43085]
     • Overlapping instances for AllZip2 f0 arising from a use of ‘f2’
       Matching givens (or their superclasses):
         AllZip2 I

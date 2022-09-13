@@ -1,5 +1,5 @@
 
-T11948.hs:21:18: error:
+T11948.hs:21:18: error: [GHC-39999]
     • Could not deduce ‘Bar (F zq) zq’ arising from a use of ‘bar’
       from the context: Bar (Foo (F zq)) (Foo zq)
         bound by the type signature for:

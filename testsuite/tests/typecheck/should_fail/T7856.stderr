@@ -1,5 +1,5 @@
 
-T7856.hs:4:7: error:
+T7856.hs:4:7: error: [GHC-83865]
     • Couldn't match expected type: String -> IO ()
                   with actual type: IO ()
     • Possible cause: ‘sequence_’ is applied to too many arguments

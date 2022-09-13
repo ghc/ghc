@@ -1,5 +1,5 @@
 
-holes3.hs:3:5: error:
+holes3.hs:3:5: error: [GHC-88464]
     • Found hole: _ :: p
       Where: ‘p’ is a rigid type variable bound by
                the inferred type of f :: p
@@ -8,7 +8,7 @@ holes3.hs:3:5: error:
     • Relevant bindings include f :: p (bound at holes3.hs:3:1)
       Valid hole fits include f :: forall {p}. p
 
-holes3.hs:6:7: error:
+holes3.hs:6:7: error: [GHC-88464]
     • Found hole: _gr :: Char
       Or perhaps ‘_gr’ is mis-spelled, or not in scope
     • In an equation for ‘g’: g x = _gr
@@ -20,7 +20,7 @@ holes3.hs:6:7: error:
         maxBound :: forall a. Bounded a => a
         minBound :: forall a. Bounded a => a
 
-holes3.hs:8:5: error:
+holes3.hs:8:5: error: [GHC-88464]
     • Found hole: _aa :: [Char]
       Or perhaps ‘_aa’ is mis-spelled, or not in scope
     • In the first argument of ‘(++)’, namely ‘_aa’
@@ -33,7 +33,7 @@ holes3.hs:8:5: error:
         [] :: forall a. [a]
         mempty :: forall a. Monoid a => a
 
-holes3.hs:11:15: error:
+holes3.hs:11:15: error: [GHC-88464]
     • Found hole: _x :: b0
       Where: ‘b0’ is an ambiguous type variable
       Or perhaps ‘_x’ is mis-spelled, or not in scope

@@ -1,5 +1,5 @@
 
-T7857.hs:8:11: error:
+T7857.hs:8:11: error: [GHC-39999]
     • Could not deduce ‘PrintfType a0’ arising from a use of ‘printf’
       from the context: PrintfArg t
         bound by the inferred type of g :: PrintfArg t => t -> b

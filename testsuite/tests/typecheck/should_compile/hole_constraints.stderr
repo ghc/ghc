@@ -1,5 +1,5 @@
 
-hole_constraints.hs:8:6: warning: [-Wtyped-holes (in -Wdefault)]
+hole_constraints.hs:8:6: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:
@@ -11,7 +11,7 @@ hole_constraints.hs:8:6: warning: [-Wtyped-holes (in -Wdefault)]
       Constraints include Eq a (from hole_constraints.hs:7:1-15)
       Valid hole fits include f1 :: a
 
-hole_constraints.hs:12:6: warning: [-Wtyped-holes (in -Wdefault)]
+hole_constraints.hs:12:6: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:
@@ -27,7 +27,7 @@ hole_constraints.hs:12:6: warning: [-Wtyped-holes (in -Wdefault)]
         f2 :: a
         f1 :: forall a. Eq a => a
 
-hole_constraints.hs:16:35: warning: [-Wtyped-holes (in -Wdefault)]
+hole_constraints.hs:16:35: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [a]
       Where: ‘a’ is a rigid type variable bound by
                the instance declaration
@@ -43,7 +43,7 @@ hole_constraints.hs:16:35: warning: [-Wtyped-holes (in -Wdefault)]
         [] :: forall a. [a]
         mempty :: forall a. Monoid a => a
 
-hole_constraints.hs:20:19: warning: [-Wtyped-holes (in -Wdefault)]
+hole_constraints.hs:20:19: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:
@@ -56,7 +56,7 @@ hole_constraints.hs:20:19: warning: [-Wtyped-holes (in -Wdefault)]
       Constraints include b ~ a (from hole_constraints.hs:20:10-13)
       Valid hole fits include x :: a
 
-hole_constraints.hs:27:32: warning: [-Wtyped-holes (in -Wdefault)]
+hole_constraints.hs:27:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: String
     • In a case alternative: AnyShow x -> _
       In the expression: case a of AnyShow x -> _

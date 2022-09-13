@@ -1,5 +1,5 @@
 
-test-hole-plugin.hs:12:5: warning: [-Wtyped-holes (in -Wdefault)]
+test-hole-plugin.hs:12:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _too_long :: [Int] -> Int
       Or perhaps ‘_too_long’ is mis-spelled, or not in scope
     • In an equation for ‘f’: f = _too_long
@@ -8,7 +8,7 @@ test-hole-plugin.hs:12:5: warning: [-Wtyped-holes (in -Wdefault)]
       Valid hole fits include
         Error: Too many holes were checked, and the search aborted forthis hole. Try again with a higher limit.
 
-test-hole-plugin.hs:13:5: warning: [-Wtyped-holes (in -Wdefault)]
+test-hole-plugin.hs:13:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [Int] -> Int
     • In an equation for ‘j’: j = _
     • Relevant bindings include
@@ -22,7 +22,7 @@ test-hole-plugin.hs:13:5: warning: [-Wtyped-holes (in -Wdefault)]
         head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
         (Some hole fits suppressed; use -fmax-valid-hole-fits=N or -fno-max-valid-hole-fits)
 
-test-hole-plugin.hs:14:5: warning: [-Wtyped-holes (in -Wdefault)]
+test-hole-plugin.hs:14:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _sort_by_mod_desc :: [Int] -> Int
       Or perhaps ‘_sort_by_mod_desc’ is mis-spelled, or not in scope
     • In an equation for ‘i’: i = _sort_by_mod_desc
@@ -37,7 +37,7 @@ test-hole-plugin.hs:14:5: warning: [-Wtyped-holes (in -Wdefault)]
         last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
         (Some hole fits suppressed; use -fmax-valid-hole-fits=N or -fno-max-valid-hole-fits)
 
-test-hole-plugin.hs:15:5: warning: [-Wtyped-holes (in -Wdefault)]
+test-hole-plugin.hs:15:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _only_Data_List :: [Int] -> Int
       Or perhaps ‘_only_Data_List’ is mis-spelled, or not in scope
     • In an equation for ‘g’: g = _only_Data_List
@@ -47,7 +47,7 @@ test-hole-plugin.hs:15:5: warning: [-Wtyped-holes (in -Wdefault)]
         head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
         last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
 
-test-hole-plugin.hs:16:5: warning: [-Wtyped-holes (in -Wdefault)]
+test-hole-plugin.hs:16:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _only_Prelude :: [Int] -> Int
       Or perhaps ‘_only_Prelude’ is mis-spelled, or not in scope
     • In an equation for ‘h’: h = _only_Prelude

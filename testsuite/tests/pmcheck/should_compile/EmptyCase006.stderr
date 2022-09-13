@@ -1,10 +1,10 @@
 
-EmptyCase006.hs:18:7: warning: [-Wincomplete-patterns (in -Wextra)]
+EmptyCase006.hs:18:7: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a \case alternative:
         Patterns of type ‘Foo1 Int’ not matched: Foo1 MkGA1
 
-EmptyCase006.hs:26:7: warning: [-Wincomplete-patterns (in -Wextra)]
+EmptyCase006.hs:26:7: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a \case alternative:
         Patterns of type ‘Foo1 a’ not matched:

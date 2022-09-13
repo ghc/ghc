@@ -1,5 +1,5 @@
 
-T17021.hs:18:5: error:
+T17021.hs:18:5: error: [GHC-55287]
     • The argument ‘42’ of ‘MkT’
       does not have a fixed runtime representation.
       Its kind is:

@@ -1,5 +1,5 @@
 
-T9201.hs:7:17: error:
+T9201.hs:7:17: error: [GHC-25897]
     • Expected kind ‘x’, but ‘a’ has kind ‘y’
       ‘y’ is a rigid type variable bound by
         the class declaration for ‘MonoidalCCC’

@@ -1,5 +1,5 @@
 
-T8428.hs:11:19: error:
+T8428.hs:11:19: error: [GHC-83865]
     • Couldn't match type: (forall s. ST s) a
                      with: forall s. ST s a
       Expected: IdentityT (forall s. ST s) a -> forall s. ST s a

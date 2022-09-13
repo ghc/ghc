@@ -1,5 +1,5 @@
 
-T9858e.hs:9:7: error:
+T9858e.hs:9:7: error: [GHC-83865]
     • Couldn't match type: Eq Int => Int
                      with: a0 b0
       Expected: Proxy (a0 b0)

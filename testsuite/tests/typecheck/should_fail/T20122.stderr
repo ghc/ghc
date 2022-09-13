@@ -1,5 +1,5 @@
 
-T20122.hs:11:7: error:
+T20122.hs:11:7: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from a use of ‘test’
       prevents the constraint ‘(Testable a0)’ from being solved.
       Relevant bindings include

@@ -1,5 +1,5 @@
 
-mod131.hs:2:27:
+mod131.hs:2:27: error: [GHC-69158]
     Conflicting exports for ‘f’:
        ‘module Mod131_B’ exports ‘f’
          imported from ‘Mod131_B’ at mod131.hs:3:17

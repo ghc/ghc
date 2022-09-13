@@ -1,5 +1,5 @@
 
-T20680.hs:26:50: error:
+T20680.hs:26:50: error: [GHC-25897]
     • Couldn't match kind ‘k’ with ‘*’
       Expected kind ‘* -> *’, but ‘Rec1 f’ has kind ‘k -> *’
       ‘k’ is a rigid type variable bound by

@@ -1,5 +1,5 @@
 
-ExpandSynsFail4.hs:11:22: error:
+ExpandSynsFail4.hs:11:22: error: [GHC-83865]
     • Couldn't match type ‘Bool’ with ‘Int’
       Expected: T Int
         Actual: T Bool

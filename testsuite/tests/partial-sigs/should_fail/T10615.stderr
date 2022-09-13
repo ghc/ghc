@@ -1,12 +1,12 @@
 
-T10615.hs:5:7: error:
+T10615.hs:5:7: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘w1’
       Where: ‘w1’ is an ambiguous type variable
       To use the inferred type, enable PartialTypeSignatures
     • In the type ‘_ -> f’
       In the type signature: f1 :: _ -> f
 
-T10615.hs:6:6: error:
+T10615.hs:6:6: error: [GHC-25897]
     • Couldn't match type ‘f’ with ‘b1 -> w1’
       Expected: w1 -> f
         Actual: w1 -> b1 -> w1
@@ -17,14 +17,14 @@ T10615.hs:6:6: error:
       In an equation for ‘f1’: f1 = const
     • Relevant bindings include f1 :: w1 -> f (bound at T10615.hs:6:1)
 
-T10615.hs:8:7: error:
+T10615.hs:8:7: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘w0’
       Where: ‘w0’ is an ambiguous type variable
       To use the inferred type, enable PartialTypeSignatures
     • In the type ‘_ -> _f’
       In the type signature: f2 :: _ -> _f
 
-T10615.hs:9:6: error:
+T10615.hs:9:6: error: [GHC-25897]
     • Couldn't match type ‘_f’ with ‘b0 -> w0’
       Expected: w0 -> _f
         Actual: w0 -> b0 -> w0

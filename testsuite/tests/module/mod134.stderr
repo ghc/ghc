@@ -1,5 +1,5 @@
 
-mod134.hs:6:19: error:
+mod134.hs:6:19: error: [GHC-76037]
     Not in scope: ‘Prelude.head’
     Suggested fixes:
       • Perhaps use one of these:

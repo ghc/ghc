@@ -1,5 +1,5 @@
 
-T10945.hs:7:11: error:
+T10945.hs:7:11: error: [GHC-83865]
     • Couldn't match type: [Dec]
                      with: Q [Dec]
       Expected: DecsQ

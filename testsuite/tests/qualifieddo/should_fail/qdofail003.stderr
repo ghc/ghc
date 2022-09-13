@@ -1,5 +1,5 @@
 
-qdofail003.hs:11:5: error:
+qdofail003.hs:11:5: error: [GHC-76037]
     Not in scope: ‘P.>>’
     Suggested fix:
       Perhaps you want to remove ‘>>’ from the explicit hiding list

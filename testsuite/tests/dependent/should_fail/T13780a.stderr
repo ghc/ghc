@@ -1,5 +1,5 @@
 
-T13780a.hs:9:40: error:
+T13780a.hs:9:40: error: [GHC-25897]
     • Couldn't match kind ‘a’ with ‘Bool’
       Expected kind ‘Foo a’, but ‘MkFoo’ has kind ‘Foo Bool’
       ‘a’ is a rigid type variable bound by

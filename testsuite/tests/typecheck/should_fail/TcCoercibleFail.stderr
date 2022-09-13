@@ -1,12 +1,12 @@
 
-TcCoercibleFail.hs:11:8: error:
+TcCoercibleFail.hs:11:8: error: [GHC-18872]
     • Couldn't match representation of type ‘Int’ with that of ‘()’
         arising from a use of ‘coerce’
     • In the first argument of ‘($)’, namely ‘coerce’
       In the expression: coerce $ one :: ()
       In an equation for ‘foo1’: foo1 = coerce $ one :: ()
 
-TcCoercibleFail.hs:14:8: error:
+TcCoercibleFail.hs:14:8: error: [GHC-18872]
     • Couldn't match representation of type: m Int
                                with that of: m Age
         arising from a use of ‘coerce’
@@ -18,14 +18,14 @@ TcCoercibleFail.hs:14:8: error:
     • Relevant bindings include
         foo2 :: m Age (bound at TcCoercibleFail.hs:14:1)
 
-TcCoercibleFail.hs:16:8: error:
+TcCoercibleFail.hs:16:8: error: [GHC-18872]
     • Couldn't match type ‘Int’ with ‘Age’
         arising from a use of ‘coerce’
     • In the first argument of ‘($)’, namely ‘coerce’
       In the expression: coerce $ Map one () :: Map Age ()
       In an equation for ‘foo3’: foo3 = coerce $ Map one () :: Map Age ()
 
-TcCoercibleFail.hs:18:8: error:
+TcCoercibleFail.hs:18:8: error: [GHC-18872]
     • Couldn't match representation of type ‘Int’
                                with that of ‘Down Int’
         arising from a use of ‘coerce’
@@ -35,13 +35,13 @@ TcCoercibleFail.hs:18:8: error:
       In the expression: coerce $ one :: Down Int
       In an equation for ‘foo4’: foo4 = coerce $ one :: Down Int
 
-TcCoercibleFail.hs:21:8: error:
+TcCoercibleFail.hs:21:8: error: [GHC-18872]
     • Couldn't match representation of type ‘Void’ with that of ‘()’
         arising from a use of ‘coerce’
     • In the expression: coerce :: Void -> ()
       In an equation for ‘foo5’: foo5 = coerce :: Void -> ()
 
-TcCoercibleFail.hs:30:9: error:
+TcCoercibleFail.hs:30:9: error: [GHC-18872]
     • Couldn't match representation of type ‘VoidBad ()’
                                with that of ‘()’
         arising from a use of ‘coerce’
@@ -59,7 +59,7 @@ TcCoercibleFail.hs:35:8: error:
       In an equation for ‘foo6’:
           foo6 = coerce :: Fix (Either Int) -> Fix (Either Age)
 
-TcCoercibleFail.hs:36:8: error:
+TcCoercibleFail.hs:36:8: error: [GHC-18872]
     • Couldn't match representation of type ‘Either
                                                Int (Fix (Either Int))’
                                with that of ‘()’

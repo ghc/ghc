@@ -1,5 +1,5 @@
 
-T15321.hs:9:9: error:
+T15321.hs:9:9: error: [GHC-88464]
     • Found hole: _ :: String -> Language.Haskell.TH.Lib.Internal.ExpQ
     • In the expression: _ "baz"
       In the untyped splice: $(_ "baz")

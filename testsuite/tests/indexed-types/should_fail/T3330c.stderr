@@ -1,5 +1,5 @@
 
-T3330c.hs:25:43: error:
+T3330c.hs:25:43: error: [GHC-18872]
     • Couldn't match kind ‘*’ with ‘* -> *’
       When matching types
         f1 :: * -> *

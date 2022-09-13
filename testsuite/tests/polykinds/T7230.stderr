@@ -1,5 +1,5 @@
 
-T7230.hs:48:32: error:
+T7230.hs:48:32: error: [GHC-05617]
     • Could not deduce ‘(x :<<= x1) ~ 'True’
       from the context: Increasing xs ~ 'True
         bound by the type signature for:

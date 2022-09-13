@@ -1,5 +1,5 @@
 
-T17139.hs:15:16: error:
+T17139.hs:15:16: error: [GHC-88464]
     • Found hole: _ :: (a -> b0) -> f a -> TypeFam f b0
       Where: ‘b0’ is an ambiguous type variable
              ‘a’, ‘f’ are rigid type variables bound by
@@ -15,7 +15,7 @@ T17139.hs:15:16: error:
         f :: a -> b (bound at T17139.hs:15:6)
         lift :: (a -> b) -> TypeFam f (a -> b) (bound at T17139.hs:15:1)
 
-T17139.hs:15:19: error:
+T17139.hs:15:19: error: [GHC-25897]
     • Couldn't match type ‘b’ with ‘a -> b0’
       Expected: a -> a -> b0
         Actual: a -> b

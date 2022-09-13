@@ -1,7 +1,8 @@
 
-T15839a.hs:6:30: warning: [-Wderiving-defaults (in -Wdefault)]
+T15839a.hs:6:30: warning: [GHC-20042] [-Wderiving-defaults (in -Wdefault)]
     • Both DeriveAnyClass and GeneralizedNewtypeDeriving are enabled
       Defaulting to the DeriveAnyClass strategy for instantiating C
     • In the newtype declaration for ‘T’
     Suggested fix:
-      Use DerivingStrategies to pick a different strategy
+      Use DerivingStrategies
+      to pick a different strategy

@@ -1,5 +1,5 @@
 
-tcfail046.hs:10:50: error:
+tcfail046.hs:10:50: error: [GHC-39999]
     • No instance for ‘Eq (Process a)’
         arising from the first field of ‘Do’ (type ‘Process a’)
         (maybe you haven't applied a function to enough arguments?)
@@ -8,7 +8,7 @@ tcfail046.hs:10:50: error:
           so you can specify the instance context yourself
     • When deriving the instance for (Eq (Continuation a))
 
-tcfail046.hs:22:25: error:
+tcfail046.hs:22:25: error: [GHC-39999]
     • Could not deduce ‘Eq (Process a)’
         arising from the first field of ‘Create’ (type ‘Process a’)
       from the context: Eq a

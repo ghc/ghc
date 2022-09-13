@@ -1,5 +1,5 @@
 
-LinearBottomMult.hs:13:3: error:
+LinearBottomMult.hs:13:3: error: [GHC-18872]
     • Couldn't match type ‘'Many’ with ‘'One’
         arising from multiplicity of ‘x’
     • In an equation for ‘f’:

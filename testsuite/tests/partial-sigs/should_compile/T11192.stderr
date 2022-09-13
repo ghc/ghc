@@ -1,5 +1,5 @@
 
-T11192.hs:7:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T11192.hs:7:14: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Int -> p -> p’
       Where: ‘p’ is a rigid type variable bound by
                the inferred type of go :: Int -> p -> p
@@ -18,7 +18,7 @@ T11192.hs:7:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
               in go (0 :: Int) undefined
     • Relevant bindings include fails :: a (bound at T11192.hs:6:1)
 
-T11192.hs:13:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T11192.hs:13:14: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘p1 -> p2 -> p2’
       Where: ‘p1’, ‘p2’ are rigid type variables bound by
                the inferred type of go :: p1 -> p2 -> p2

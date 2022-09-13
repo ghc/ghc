@@ -1,5 +1,5 @@
 
-T7010.hs:53:27: error:
+T7010.hs:53:27: error: [GHC-83865]
     • Couldn't match type: IO Float
                      with: Serial (IO Float)
       Expected: (Float, ValueTuple Vector)

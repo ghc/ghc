@@ -1,5 +1,5 @@
 
-saks_fail019.hs:9:1: error:
+saks_fail019.hs:9:1: error: [GHC-25897]
     • Couldn't match kind ‘x’ with ‘*’
       Expected: x -> *
         Actual: * -> *

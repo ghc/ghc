@@ -1,5 +1,5 @@
 
-mc19.hs:10:31: error:
+mc19.hs:10:31: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘[a]’
       Expected: [a] -> [a]
         Actual: [a] -> [[a]]

@@ -1,5 +1,5 @@
 
-T7748a.hs:14:24: error:
+T7748a.hs:14:24: error: [GHC-25897]
     • Couldn't match expected type ‘a’
                   with actual type ‘Maybe (Maybe (r -> ()))’
       ‘a’ is a rigid type variable bound by

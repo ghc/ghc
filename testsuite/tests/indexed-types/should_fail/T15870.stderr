@@ -1,5 +1,5 @@
 
-T15870.hs:32:34: error:
+T15870.hs:32:34: error: [GHC-25897]
     • Couldn't match kind ‘k’ with ‘*’
       Expected kind ‘Optic @{k} a’, but ‘g2’ has kind ‘Optic @{*} b’
       ‘k’ is a rigid type variable bound by

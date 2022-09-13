@@ -1,5 +1,5 @@
 
-T14369.hs:29:5: error:
+T14369.hs:29:5: error: [GHC-25897]
     • Couldn't match type ‘a1’ with ‘a2’
       Expected: Sing x -> Maybe (Demote a2)
         Actual: Sing x -> Demote (Maybe a1)

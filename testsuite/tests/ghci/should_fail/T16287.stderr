@@ -2,7 +2,7 @@
 <interactive>:1:1: error:
     The type synonym ‘F1’ should have 1 argument, but has been given none
 
-<interactive>:1:4: error:
+<interactive>:1:4: error: [GHC-91028]
     • Expected kind ‘forall k. k’, but ‘F2’ has kind ‘k0’
       Cannot instantiate unification variable ‘k0’
       with a kind involving polytypes: forall k. k
@@ -12,7 +12,7 @@
 <interactive>:1:1: error:
     The type synonym ‘F1’ should have 1 argument, but has been given none
 
-<interactive>:1:11: error:
+<interactive>:1:11: error: [GHC-91028]
     • Expected kind ‘forall k. k’, but ‘F2’ has kind ‘k0’
       Cannot instantiate unification variable ‘k0’
       with a kind involving polytypes: forall k. k

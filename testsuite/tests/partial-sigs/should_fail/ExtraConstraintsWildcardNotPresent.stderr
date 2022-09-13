@@ -1,5 +1,5 @@
 
-ExtraConstraintsWildcardNotPresent.hs:6:11: error:
+ExtraConstraintsWildcardNotPresent.hs:6:11: error: [GHC-39999]
     • No instance for ‘Show a’ arising from a use of ‘show’
       Possible fix:
         add (Show a) to the context of

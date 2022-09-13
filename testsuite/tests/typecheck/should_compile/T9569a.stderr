@@ -1,5 +1,5 @@
 
-T9569a.hs:10:6: error:
+T9569a.hs:10:6: error: [GHC-83865]
     • Couldn't match type: Int -> Int
                      with: forall a. a -> a
       Expected: (forall a. a -> a) -> Int

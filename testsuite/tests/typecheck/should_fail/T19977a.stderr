@@ -1,5 +1,5 @@
 
-T19977a.hs:11:7: error:
+T19977a.hs:11:7: error: [GHC-39999]
     • Could not deduce ‘Show a’ arising from a use of ‘f’
       from the context: Show [a]
         bound by the type signature for:

@@ -1,5 +1,5 @@
 
-T12444.hs:19:11: error:
+T12444.hs:19:11: error: [GHC-25897]
     • Couldn't match type ‘b’ with ‘'Succ (c :+: b)’
       Expected: SNat ('Succ (c :+: b))
         Actual: SNat b

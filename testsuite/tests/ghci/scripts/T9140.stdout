@@ -1,9 +1,9 @@
 
-<interactive>:2:5: error:
+<interactive>:2:5: error: [GHC-20036]
     You can't mix polymorphic and unlifted bindings: a = (# 1 #)
     Suggested fix: Add a type signature.
 
-<interactive>:3:5: error:
+<interactive>:3:5: error: [GHC-20036]
     You can't mix polymorphic and unlifted bindings: a = (# 1, 3 #)
     Suggested fix: Add a type signature.
 

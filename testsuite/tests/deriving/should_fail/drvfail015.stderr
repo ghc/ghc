@@ -6,7 +6,7 @@ drvfail015.hs:11:19: error:
          Use TypeSynonymInstances if you want to disable this.)
     • In the stand-alone deriving instance for ‘Eq T’
 
-drvfail015.hs:14:1: error:
+drvfail015.hs:14:1: error: [GHC-54540]
     • Can't make a derived instance of ‘Eq Handle’:
         The data constructors of ‘Handle’ are not all in scope
           so you cannot derive an instance for it

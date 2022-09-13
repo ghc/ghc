@@ -1,5 +1,5 @@
 
-T20466.hs:28:7: error:
+T20466.hs:28:7: error: [GHC-43085]
     • Overlapping instances for Cls (Either a (F (Either (G a) (G b))))
         arising from a use of ‘foo’
       Matching instance:
@@ -13,7 +13,7 @@ T20466.hs:28:7: error:
     • In the expression: foo
       In an equation for ‘bar’: bar = foo
 
-T20466.hs:34:8: error:
+T20466.hs:34:8: error: [GHC-43085]
     • Overlapping instances for Cls (Either Int (F Bool))
         arising from a use of ‘foo'’
       Matching instance:

@@ -1,8 +1,8 @@
 
-T16385.hs:4:10: error:
+T16385.hs:4:10: error: [GHC-56538]
     • Instance head is not headed by a class: c
     • In the instance declaration for ‘c’
 
-T16385.hs:5:10: error:
+T16385.hs:5:10: error: [GHC-56538]
     • Instance head is not headed by a class: c
     • In the instance declaration for ‘c’

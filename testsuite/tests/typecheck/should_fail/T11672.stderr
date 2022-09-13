@@ -1,5 +1,5 @@
 
-T11672.hs:9:10: error:
+T11672.hs:9:10: error: [GHC-18872]
     • Couldn't match kind ‘*’ with ‘Symbol’
       When matching types
         a0 :: Symbol

@@ -1,5 +1,5 @@
 
-T1133A.hs:7:28: error:
+T1133A.hs:7:28: error: [GHC-30750]
     • Can't make a derived instance of ‘Enum X’:
         ‘X’ must be an enumeration type
         (an enumeration consists of one or more nullary, non-GADT constructors)

@@ -1,5 +1,5 @@
 
-Overlap6.hs:15:7: error:
+Overlap6.hs:15:7: error: [GHC-25897]
     • Couldn't match type ‘x’ with ‘And x 'True’
       Expected: Proxy (And x 'True)
         Actual: Proxy x

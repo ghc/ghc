@@ -1,5 +1,5 @@
 
-T17773.hs:16:22: error:
+T17773.hs:16:22: error: [GHC-88464]
     • Found hole: _Refl :: Mzero x y :~: (x <|> y)
       Where: ‘x’, ‘f’, ‘k’, ‘a’, ‘y’ are rigid type variables bound by
                the type signature for:

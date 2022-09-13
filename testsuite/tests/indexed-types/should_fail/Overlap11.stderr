@@ -1,5 +1,5 @@
 
-Overlap11.hs:10:8: error:
+Overlap11.hs:10:8: error: [GHC-83865]
     • Couldn't match expected type ‘F a Int’ with actual type ‘Int’
     • In the expression: 5 :: Int
       In an equation for ‘g’: g x = (5 :: Int)

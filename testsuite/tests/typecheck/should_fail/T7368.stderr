@@ -1,5 +1,5 @@
 
-T7368.hs:3:10: error:
+T7368.hs:3:10: error: [GHC-18872]
     • Couldn't match kind ‘* -> *’ with ‘*’
       When matching types
         b0 :: *

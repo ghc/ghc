@@ -1,5 +1,5 @@
 
-T14265.hs:7:12: error:
+T14265.hs:7:12: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘w :: k’
       Where: ‘k’, ‘w’ are rigid type variables bound by
                the inferred type of f :: proxy w -> ()
@@ -9,7 +9,7 @@ T14265.hs:7:12: error:
       In the type ‘proxy _ -> ()’
       In the type signature: f :: proxy _ -> ()
 
-T14265.hs:10:15: error:
+T14265.hs:10:15: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘w1’
       Where: ‘w1’ is a rigid type variable bound by
                the inferred type of foo :: StateT w1 w2 ()
@@ -19,7 +19,7 @@ T14265.hs:10:15: error:
       In the type ‘StateT _ _ ()’
       In the type signature: foo :: StateT _ _ ()
 
-T14265.hs:10:17: error:
+T14265.hs:10:17: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘w2 :: * -> *’
       Where: ‘w2’ is a rigid type variable bound by
                the inferred type of foo :: StateT w1 w2 ()

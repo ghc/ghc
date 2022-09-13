@@ -1,5 +1,5 @@
 
-tcfail218.hs:16:5: error:
+tcfail218.hs:16:5: error: [GHC-43085]
     • Overlapping instances for C [a] Bool arising from a use of ‘foo’
       Matching instance:
         instance C [a] b -- Defined at tcfail218.hs:8:29

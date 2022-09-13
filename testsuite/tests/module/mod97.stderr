@@ -1,5 +1,5 @@
 
-mod97.hs:4:9: error:
+mod97.hs:4:9: error: [GHC-88464]
     Variable not in scope:
       (==) :: GHC.Types.Char -> GHC.Types.Char -> t
     Suggested fix:

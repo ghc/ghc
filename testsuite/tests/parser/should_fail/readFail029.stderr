@@ -1,5 +1,5 @@
 
-readFail029.hs:1:14:
+readFail029.hs:1:14: error: [GHC-68686]
     Cannot parse LANGUAGE pragma
     Expecting comma-separated list of language options,
     each starting with a capital letter

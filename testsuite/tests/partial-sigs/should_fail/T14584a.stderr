@@ -1,11 +1,11 @@
 
-T14584a.hs:12:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T14584a.hs:12:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘()’ with actual type ‘m -> m’
-      Probable cause: ‘id’ is applied to too few arguments
-    • In the expression: id @m :: _
+    • Probable cause: ‘id’ is applied to too few arguments
+      In the expression: id @m :: _
       In an equation for ‘f’: f = id @m :: _
 
-T14584a.hs:12:9: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T14584a.hs:12:9: warning: [GHC-25897] [-Wdeferred-type-errors (in -Wdefault)]
     • Expected a type, but ‘m’ has kind ‘k’
       ‘k’ is a rigid type variable bound by
         the type signature for:
@@ -15,14 +15,14 @@ T14584a.hs:12:9: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In the expression: id @m :: _
       In an equation for ‘f’: f = id @m :: _
 
-T14584a.hs:12:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T14584a.hs:12:14: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘()’
     • In an expression type signature: _
       In the expression: id @m :: _
       In an equation for ‘f’: f = id @m :: _
     • Relevant bindings include f :: () (bound at T14584a.hs:12:1)
 
-T14584a.hs:15:17: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T14584a.hs:15:17: warning: [GHC-25897] [-Wdeferred-type-errors (in -Wdefault)]
     • Expected a type, but ‘m’ has kind ‘k’
       ‘k’ is a rigid type variable bound by
         the type signature for:

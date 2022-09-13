@@ -1,5 +1,5 @@
 
-T15370.hs:14:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T15370.hs:14:10: warning: [GHC-25897] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘n’ with ‘j’
       Expected: n :~: j
         Actual: n :~: n
@@ -16,7 +16,7 @@ T15370.hs:14:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Relevant bindings include
         mkRefl :: n :~: j (bound at T15370.hs:14:1)
 
-T15370.hs:20:13: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T15370.hs:20:13: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘S r’ with ‘()’
       Expected: ()
         Actual: S r
@@ -27,7 +27,7 @@ T15370.hs:20:13: warning: [-Wdeferred-type-errors (in -Wdefault)]
         no :: S r (bound at T15370.hs:18:7)
         right :: S r -> () (bound at T15370.hs:18:1)
 
-T15370.hs:20:18: warning: [-Wtyped-holes (in -Wdefault)]
+T15370.hs:20:18: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: ()
     • In the second argument of ‘(+)’, namely ‘_’
       In the expression: no + _

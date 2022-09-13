@@ -1,5 +1,5 @@
 
-T2688.hs:8:22: error:
+T2688.hs:8:22: error: [GHC-25897]
     • Couldn't match expected type ‘v’ with actual type ‘s’
       ‘s’ is a rigid type variable bound by
         the class declaration for ‘VectorSpace’

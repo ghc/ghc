@@ -1,5 +1,5 @@
 
-T15361.hs:13:13: error:
+T15361.hs:13:13: error: [GHC-25897]
     • Could not deduce ‘a ~ c’
       from the context: b ~ a
         bound by a pattern with constructor:
@@ -21,7 +21,7 @@ T15361.hs:13:13: error:
     • Relevant bindings include
         foo :: (a :~~: b) -> a :~~: c (bound at T15361.hs:13:1)
 
-T15361.hs:20:27: error:
+T15361.hs:20:27: error: [GHC-39999]
     • Could not deduce ‘Show a’ arising from a use of ‘show’
       from the context: Ord a
         bound by a pattern with constructor:

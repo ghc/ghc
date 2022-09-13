@@ -1,5 +1,5 @@
 
-T9872b.hs:19:8: error:
+T9872b.hs:19:8: error: [GHC-39999]
     • No instance for ‘Show
                          (Proxy
                             '[ '[ 'Cube 'G 'B 'W 'R 'B 'G, 'Cube 'W 'G 'B 'W 'R 'R,

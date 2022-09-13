@@ -1,5 +1,5 @@
 
-overloadedlistsfail04.hs:3:15: error:
+overloadedlistsfail04.hs:3:15: error: [GHC-39999]
     • No instance for ‘Enum [Char]’
         arising from the arithmetic sequence ‘"a" .. "b"’
     • In the first argument of ‘print’, namely

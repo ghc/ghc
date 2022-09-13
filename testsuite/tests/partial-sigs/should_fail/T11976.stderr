@@ -1,5 +1,5 @@
 
-T11976.hs:7:20: error:
+T11976.hs:7:20: error: [GHC-83865]
     • Expected kind ‘k0 -> *’, but ‘Lens _ _’ has kind ‘*’
     • In the type ‘Lens _ _ _’
       In an expression type signature: Lens _ _ _

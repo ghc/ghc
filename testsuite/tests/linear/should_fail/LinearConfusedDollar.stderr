@@ -1,5 +1,5 @@
 
-LinearConfusedDollar.hs:12:7: error:
+LinearConfusedDollar.hs:12:7: error: [GHC-83865]
     • Couldn't match type ‘'One’ with ‘'Many’
       Expected: a -> a
         Actual: a %1 -> a

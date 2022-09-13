@@ -1,5 +1,5 @@
 
-T17173.hs:6:7: error:
+T17173.hs:6:7: error: [GHC-95781]
     • Cannot apply expression of type ‘a0 -> a0’
       to a visible type argument ‘Bool’
     • In the expression:

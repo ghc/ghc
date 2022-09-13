@@ -1,5 +1,5 @@
 
-T8450.hs:8:7: error:
+T8450.hs:8:7: error: [GHC-25897]
     • Couldn't match expected type ‘a’ with actual type ‘()’
       ‘a’ is a rigid type variable bound by
         the type signature for:

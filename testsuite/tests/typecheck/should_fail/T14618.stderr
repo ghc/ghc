@@ -1,5 +1,5 @@
 
-T14618.hs:7:14: error:
+T14618.hs:7:14: error: [GHC-25897]
     • Couldn't match expected type ‘b’ with actual type ‘a’
       ‘a’ is a rigid type variable bound by
         the type signature for:

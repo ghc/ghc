@@ -1,5 +1,5 @@
 
-RepPolyRule1.hs:11:51: error:
+RepPolyRule1.hs:11:51: error: [GHC-55287]
     • The argument ‘x’ of ‘f’
       does not have a fixed runtime representation.
       Its type is:
@@ -12,7 +12,7 @@ RepPolyRule1.hs:11:51: error:
     • Relevant bindings include
         x :: a2 (bound at RepPolyRule1.hs:11:26)
 
-RepPolyRule1.hs:11:55: error:
+RepPolyRule1.hs:11:55: error: [GHC-55287]
     • The argument ‘x’ of ‘f’
       does not have a fixed runtime representation.
       Its type is:

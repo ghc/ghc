@@ -1,5 +1,5 @@
 
-ExtraConstraintsWildcardNotEnabled.hs:4:10: error:
+ExtraConstraintsWildcardNotEnabled.hs:4:10: error: [GHC-88464]
     • Found extra-constraints wildcard standing for ‘Show a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of show' :: Show a => a -> String

@@ -1,5 +1,5 @@
 
-hole_constraints_nested.hs:12:16: warning: [-Wtyped-holes (in -Wdefault)]
+hole_constraints_nested.hs:12:16: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In a case alternative: EqOrd -> _
       In the expression: case d2 of EqOrd -> _

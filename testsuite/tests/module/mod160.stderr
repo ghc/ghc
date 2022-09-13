@@ -1,5 +1,5 @@
 
-mod160.hs:12:5: error:
+mod160.hs:12:5: error: [GHC-88464]
     Variable not in scope: m3 :: Char -> t
     Suggested fix:
       Perhaps use one of these:

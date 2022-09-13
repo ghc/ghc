@@ -1,5 +1,5 @@
 
-T1899.hs:12:29: error:
+T1899.hs:12:29: error: [GHC-25897]
     • Couldn't match expected type ‘a’
                   with actual type ‘Proposition a0’
       ‘a’ is a rigid type variable bound by

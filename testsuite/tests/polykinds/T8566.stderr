@@ -1,5 +1,5 @@
 
-T8566.hs:35:9: error:
+T8566.hs:35:9: error: [GHC-39999]
     • Could not deduce ‘C ('AA (t (I a ps)) as) ps fs0’
         arising from a use of ‘c’
       from the context: C ('AA (t (I a ps)) as) ps fs

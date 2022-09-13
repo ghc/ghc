@@ -1,5 +1,5 @@
 
-T21306.hs:23:15: error:
+T21306.hs:23:15: error: [GHC-25897]
     • Couldn't match type ‘xs’ with ‘xs1’
       Expected: EqualLists xs xs2
         Actual: EqualLists xs1 ys

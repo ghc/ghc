@@ -1,5 +1,5 @@
 
-tcfail014.hs:5:33: error:
+tcfail014.hs:5:33: error: [GHC-25897]
     • Couldn't match expected type ‘t5’ with actual type ‘t5 -> t6’
       ‘t5’ is a rigid type variable bound by
         the inferred type of h :: (t5 -> t6) -> t6

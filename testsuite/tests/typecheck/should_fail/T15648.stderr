@@ -1,5 +1,5 @@
 
-T15648.hs:23:21: error:
+T15648.hs:23:21: error: [GHC-83865]
     • Couldn't match type: (a0 GHC.Prim.~# b0) -> JankyEquality a0 b0
                      with: JankyEquality a a
       Expected: JankyEquality a b
@@ -11,7 +11,7 @@ T15648.hs:23:21: error:
         legitToJank :: LegitEquality a b -> JankyEquality a b
           (bound at T15648.hs:23:1)
 
-T15648.hs:30:33: error:
+T15648.hs:30:33: error: [GHC-25897]
     • Couldn't match expected type ‘a’ with actual type ‘b’
       ‘b’ is a rigid type variable bound by
         the type signature for:

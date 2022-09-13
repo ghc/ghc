@@ -1,5 +1,5 @@
 
-T16758.hs:14:8: error:
+T16758.hs:14:8: error: [GHC-25897]
     • Couldn't match expected kind ‘Int’ with actual kind ‘a’
       ‘a’ is a rigid type variable bound by
         the class declaration for ‘C’

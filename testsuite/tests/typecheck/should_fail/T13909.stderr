@@ -1,5 +1,5 @@
 
-T13909.hs:11:18: error:
+T13909.hs:11:18: error: [GHC-91028]
     • Expecting two more arguments to ‘Hm’
       Expected kind ‘k’, but ‘Hm’ has kind ‘forall k -> k -> *’
       Cannot equate type variable ‘k’

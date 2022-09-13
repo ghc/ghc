@@ -1,5 +1,5 @@
 
-T15962.hs:28:11: error:
+T15962.hs:28:11: error: [GHC-88464]
     • Found hole: _ :: Big ks -> Big (Eval (Map Dual ks))
       Where: ‘ks’ is a rigid type variable bound by
                the type signature for:
@@ -14,5 +14,5 @@ T15962.hs:28:11: error:
         dualBig :: Big ks -> Big (Eval (Map Dual ks))
           (bound at T15962.hs:28:1)
 
-T15962.hs:34:12: error:
+T15962.hs:34:12: error: [GHC-88464]
     Variable not in scope: iDontExist :: Big ('Conjunction : ks)

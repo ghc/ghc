@@ -1,12 +1,12 @@
 
-tcfail206.hs:5:5: error:
+tcfail206.hs:5:5: error: [GHC-83865]
     • Couldn't match type ‘Bool’ with ‘Int’
       Expected: Bool -> (Int, Bool)
         Actual: Bool -> (Bool, Bool)
     • In the expression: (, True)
       In an equation for ‘a’: a = (, True)
 
-tcfail206.hs:8:5: error:
+tcfail206.hs:8:5: error: [GHC-83865]
     • Couldn't match type: (t1, Int)
                      with: Bool -> (Int, Bool)
       Expected: Int -> Bool -> (Int, Bool)
@@ -14,7 +14,7 @@ tcfail206.hs:8:5: error:
     • In the expression: (1,)
       In an equation for ‘b’: b = (1,)
 
-tcfail206.hs:11:5: error:
+tcfail206.hs:11:5: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘Bool’
       Expected: a -> (a, Bool)
         Actual: a -> (Bool, a)
@@ -27,14 +27,14 @@ tcfail206.hs:11:5: error:
     • Relevant bindings include
         c :: a -> (a, Bool) (bound at tcfail206.hs:11:1)
 
-tcfail206.hs:14:5: error:
+tcfail206.hs:14:5: error: [GHC-83865]
     • Couldn't match type ‘Bool’ with ‘Int’
       Expected: Bool -> (# Int, Bool #)
         Actual: Bool -> (# Bool, Bool #)
     • In the expression: (# , True #)
       In an equation for ‘d’: d = (# , True #)
 
-tcfail206.hs:17:5: error:
+tcfail206.hs:17:5: error: [GHC-83865]
     • Couldn't match type: (# t0, Int #)
                      with: Bool -> (# Int, Bool #)
       Expected: Int -> Bool -> (# Int, Bool #)
@@ -42,7 +42,7 @@ tcfail206.hs:17:5: error:
     • In the expression: (# 1, #)
       In an equation for ‘e’: e = (# 1, #)
 
-tcfail206.hs:20:5: error:
+tcfail206.hs:20:5: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘Bool’
       Expected: a -> (# a, Bool #)
         Actual: a -> (# Bool, a #)

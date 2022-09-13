@@ -1,5 +1,5 @@
 
-NamedWildcardsNotEnabled.hs:5:9: error:
+NamedWildcardsNotEnabled.hs:5:9: error: [GHC-25897]
     • Couldn't match expected type ‘_b’ with actual type ‘Bool’
       ‘_b’ is a rigid type variable bound by
         the type signature for:
@@ -10,7 +10,7 @@ NamedWildcardsNotEnabled.hs:5:9: error:
     • Relevant bindings include
         foo :: _a -> _b (bound at NamedWildcardsNotEnabled.hs:5:1)
 
-NamedWildcardsNotEnabled.hs:5:13: error:
+NamedWildcardsNotEnabled.hs:5:13: error: [GHC-25897]
     • Couldn't match expected type ‘Bool’ with actual type ‘_a’
       ‘_a’ is a rigid type variable bound by
         the type signature for:

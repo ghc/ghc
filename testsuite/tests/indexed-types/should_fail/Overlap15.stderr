@@ -1,5 +1,5 @@
 
-Overlap15.hs:16:9: error:
+Overlap15.hs:16:9: error: [GHC-83865]
     • Couldn't match expected type ‘F b [b] Bool’
                   with actual type ‘Bool’
     • In the expression: False

@@ -1,5 +1,5 @@
 
-T11520.hs:16:77: error:
+T11520.hs:16:77: error: [GHC-25897]
     • Expected kind ‘k2 -> k1’, but ‘g’ has kind ‘k4’
       ‘k4’ is a rigid type variable bound by
         an instance declaration

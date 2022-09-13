@@ -1,5 +1,5 @@
 
-holes.hs:3:5: warning: [-Wtyped-holes (in -Wdefault)]
+holes.hs:3:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: p
       Where: ‘p’ is a rigid type variable bound by
                the inferred type of f :: p
@@ -8,7 +8,7 @@ holes.hs:3:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Relevant bindings include f :: p (bound at holes.hs:3:1)
       Valid hole fits include f :: forall {p}. p
 
-holes.hs:6:7: warning: [-Wtyped-holes (in -Wdefault)]
+holes.hs:6:7: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Char
     • In an equation for ‘g’: g x = _
     • Relevant bindings include
@@ -19,7 +19,7 @@ holes.hs:6:7: warning: [-Wtyped-holes (in -Wdefault)]
         maxBound :: forall a. Bounded a => a
         minBound :: forall a. Bounded a => a
 
-holes.hs:8:5: warning: [-Wtyped-holes (in -Wdefault)]
+holes.hs:8:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [Char]
     • In the first argument of ‘(++)’, namely ‘_’
       In the expression: _ ++ "a"
@@ -31,7 +31,7 @@ holes.hs:8:5: warning: [-Wtyped-holes (in -Wdefault)]
         [] :: forall a. [a]
         mempty :: forall a. Monoid a => a
 
-holes.hs:11:15: warning: [-Wtyped-holes (in -Wdefault)]
+holes.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: b0
       Where: ‘b0’ is an ambiguous type variable
     • In the second argument of ‘const’, namely ‘_’

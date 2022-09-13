@@ -1,4 +1,4 @@
 
-T19843g.hs:10:12: error:
+T19843g.hs:10:12: error: [GHC-76037]
     Not in scope: ‘mup’
     Suggested fix: Perhaps use ‘mop’ (line 7)

@@ -1,5 +1,5 @@
 
-NamedWildcardExplicitForall.hs:8:7: error:
+NamedWildcardExplicitForall.hs:8:7: error: [GHC-25897]
     • Couldn't match type ‘_a’ with ‘Bool’
       Expected: _a -> _a
         Actual: Bool -> Bool
@@ -12,17 +12,17 @@ NamedWildcardExplicitForall.hs:8:7: error:
     • Relevant bindings include
         foo :: _a -> _a (bound at NamedWildcardExplicitForall.hs:8:1)
 
-NamedWildcardExplicitForall.hs:10:8: error:
+NamedWildcardExplicitForall.hs:10:8: error: [GHC-88464]
     • Found type wildcard ‘_a’ standing for ‘Bool’
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: bar :: _a -> _a
 
-NamedWildcardExplicitForall.hs:13:26: error:
+NamedWildcardExplicitForall.hs:13:26: error: [GHC-88464]
     • Found type wildcard ‘_b’ standing for ‘Bool’
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: baz :: forall _a. _a -> _b -> (_a, _b)
 
-NamedWildcardExplicitForall.hs:14:12: error:
+NamedWildcardExplicitForall.hs:14:12: error: [GHC-25897]
     • Couldn't match expected type ‘_a’ with actual type ‘Bool’
       ‘_a’ is a rigid type variable bound by
         the inferred type of baz :: _a -> Bool -> (_a, Bool)
@@ -35,7 +35,7 @@ NamedWildcardExplicitForall.hs:14:12: error:
         baz :: _a -> Bool -> (_a, Bool)
           (bound at NamedWildcardExplicitForall.hs:14:1)
 
-NamedWildcardExplicitForall.hs:16:8: error:
+NamedWildcardExplicitForall.hs:16:8: error: [GHC-88464]
     • Found type wildcard ‘_a’ standing for ‘Bool’
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: qux :: _a -> (forall _a. _a -> _a) -> _a

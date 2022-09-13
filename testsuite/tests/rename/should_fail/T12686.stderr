@@ -1,8 +1,8 @@
 
-T12686.hs:7:16:
+T12686.hs:7:16: error: [GHC-88634]
     Term variable ‘x’ cannot be used here
       (term variables cannot be promoted)
 
-T12686.hs:12:19:
+T12686.hs:12:19: error: [GHC-88634]
     Term variable ‘a’ cannot be used here
       (term variables cannot be promoted)

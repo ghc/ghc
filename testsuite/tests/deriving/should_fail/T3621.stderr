@@ -1,5 +1,5 @@
 
-T3621.hs:24:43: error:
+T3621.hs:24:43: error: [GHC-25897]
     • Couldn't match type ‘s’ with ‘state’
         arising from a functional dependency between:
           constraint ‘MonadState state (State s)’

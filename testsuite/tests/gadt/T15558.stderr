@@ -1,5 +1,5 @@
 
-T15558.hs:11:15: warning: [-Winaccessible-code (in -Wdefault)]
+T15558.hs:11:15: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
     • Inaccessible code in
         a type expected by the context:
           (a ~ Bool) => ()

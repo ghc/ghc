@@ -1,5 +1,5 @@
 
-T16326_Fail2.hs:6:37: error:
+T16326_Fail2.hs:6:37: error: [GHC-51580]
     • Illegal visible, dependent quantification in the type of a term:
         forall a -> a -> IO ()
       (GHC does not yet support this)

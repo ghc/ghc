@@ -1,5 +1,5 @@
 
-T13233.hs:14:11: error:
+T13233.hs:14:11: error: [GHC-55287]
     • • Unsaturated use of a representation-polymorphic data constructor.
         The second argument of ‘(#,#)’
         does not have a fixed runtime representation.
@@ -14,7 +14,7 @@ T13233.hs:14:11: error:
       In the expression: bar (#,#)
       In an equation for ‘baz’: baz = bar (#,#)
 
-T13233.hs:22:16: error:
+T13233.hs:22:16: error: [GHC-55287]
     • • Unsaturated use of a representation-polymorphic data constructor.
         The second argument of ‘(#,#)’
         does not have a fixed runtime representation.

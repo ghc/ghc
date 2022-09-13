@@ -1,5 +1,5 @@
 
-T13506.hs:16:12: error:
+T13506.hs:16:12: error: [GHC-18872]
     • Couldn't match type ‘Char’ with ‘()’
         arising from a functional dependency between:
           constraint ‘FunDep [Char] ()’ arising from a use of ‘singleton’

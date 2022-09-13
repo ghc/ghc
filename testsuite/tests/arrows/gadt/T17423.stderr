@@ -1,5 +1,5 @@
 
-T17423.hs:19:13: error:
+T17423.hs:19:13: error: [GHC-64525]
     • Proc patterns cannot use existential or GADT data constructors
     • In the pattern: DecoBool i c
       In the expression:

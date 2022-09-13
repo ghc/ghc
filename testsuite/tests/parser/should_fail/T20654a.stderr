@@ -1,5 +1,5 @@
 
-T20654a.hs:7:9: error:
+T20654a.hs:7:9: error: [GHC-18872]
     • Couldn't match type: forall a. a -> a
                      with: Int -> Int
         arising from a functional dependency between constraints:

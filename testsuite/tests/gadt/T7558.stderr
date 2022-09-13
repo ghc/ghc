@@ -1,5 +1,5 @@
 
-T7558.hs:8:18: error:
+T7558.hs:8:18: error: [GHC-25897]
     • Couldn't match expected type ‘a’ with actual type ‘Maybe a’
       ‘a’ is a rigid type variable bound by
         the type signature for:

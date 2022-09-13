@@ -1,5 +1,5 @@
 
-tcfail033.hs:4:12: error:
+tcfail033.hs:4:12: error: [GHC-25897]
     • Couldn't match expected type ‘(a, b)’ with actual type ‘a’
       ‘a’ is a rigid type variable bound by
         the inferred type of buglet :: [(a, b)]

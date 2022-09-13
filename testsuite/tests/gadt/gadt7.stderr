@@ -1,5 +1,5 @@
 
-gadt7.hs:16:38: error:
+gadt7.hs:16:38: error: [GHC-25897]
     • Could not deduce ‘p1 ~ p2’
       from the context: a ~ Int
         bound by a pattern with constructor: K :: T Int,

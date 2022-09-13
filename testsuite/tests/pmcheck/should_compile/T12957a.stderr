@@ -1,5 +1,5 @@
 
-T12957a.hs:25:35: warning: [-Winaccessible-code (in -Wdefault)]
+T12957a.hs:25:35: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
     • Inaccessible code in
         a pattern with constructor: BFields :: [()] -> Fields 'B,
         in a case alternative
@@ -12,7 +12,7 @@ T12957a.hs:25:35: warning: [-Winaccessible-code (in -Wdefault)]
       with type constructor ‘S’
       and data constructor ‘S’.
 
-T12957a.hs:25:35: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T12957a.hs:25:35: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘'B’ with ‘'A’
       Expected: Fields 'A
         Actual: Fields 'B

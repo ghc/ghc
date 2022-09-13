@@ -1,5 +1,5 @@
 
-<interactive>:1:8: error:
+<interactive>:1:8: error: [GHC-83865]
     • Expected a type, but ‘'()’ has kind ‘()’
     • In the kind ‘'()’
       In the type ‘(() :: '())’

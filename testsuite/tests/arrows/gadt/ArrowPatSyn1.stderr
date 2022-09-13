@@ -1,5 +1,5 @@
 
-ArrowPatSyn1.hs:16:15: error:
+ArrowPatSyn1.hs:16:15: error: [GHC-64525]
     • Proc patterns cannot use existential or GADT data constructors
     • In the pattern: P x
       In the expression: proc (P x) -> show -< x

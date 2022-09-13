@@ -1,5 +1,5 @@
 
-tcfail184.hs:9:19: error:
+tcfail184.hs:9:19: error: [GHC-91510]
     • Illegal polymorphic type: forall a. Ord a => [a] -> [a]
     • In the definition of data constructor ‘MkSwizzle’
       In the newtype declaration for ‘Swizzle’

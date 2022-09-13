@@ -1,5 +1,5 @@
 
-T2714.hs:8:7: error:
+T2714.hs:8:7: error: [GHC-25897]
     • Couldn't match type ‘c’ with ‘f0 (a -> b)’
       Expected: c -> a
         Actual: f0 (a -> b) -> f0 b

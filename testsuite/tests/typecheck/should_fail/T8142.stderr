@@ -1,10 +1,10 @@
 
-T8142.hs:6:10: error:
+T8142.hs:6:10: error: [GHC-83865]
     • Couldn't match type: Nu f0
                      with: c -> f c
       Expected: (c -> f c) -> c -> f c
         Actual: Nu ((,) a0) -> Nu f0
-      The type variable ‘f0’ is ambiguous
+        The type variable ‘f0’ is ambiguous
     • In the expression: h
       In an equation for ‘tracer’:
           tracer
@@ -14,7 +14,7 @@ T8142.hs:6:10: error:
     • Relevant bindings include
         tracer :: (c -> f c) -> c -> f c (bound at T8142.hs:6:1)
 
-T8142.hs:6:57: error:
+T8142.hs:6:57: error: [GHC-83865]
     • Couldn't match type: Nu ((,) a)
                      with: f1 (Nu ((,) a))
       Expected: Nu ((,) a) -> (a, f1 (Nu ((,) a)))

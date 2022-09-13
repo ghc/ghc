@@ -1,5 +1,5 @@
 
-T13877.hs:65:41: error:
+T13877.hs:65:41: error: [GHC-83865]
     • Expecting one more argument to ‘p’
       Expected kind ‘(-?>) [a] (*) (':->)’, but ‘p’ has kind ‘[a] ~> *’
     • In the type ‘p’

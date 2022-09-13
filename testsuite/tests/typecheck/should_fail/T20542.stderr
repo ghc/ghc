@@ -1,5 +1,5 @@
 
-T20542.hs:17:7: error:
+T20542.hs:17:7: error: [GHC-43085]
     • Overlapping instances for Foo String String
         arising from a use of ‘foo’
       Matching instances:

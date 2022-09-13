@@ -1,5 +1,5 @@
 
-TH_localname.hs:3:11: error:
+TH_localname.hs:3:11: error: [GHC-39999]
     • Ambiguous type variable ‘t0’ arising from a use of ‘Language.Haskell.TH.Syntax.lift’
       prevents the constraint ‘(Language.Haskell.TH.Syntax.Lift
                                   t0)’ from being solved.
@@ -17,7 +17,7 @@ TH_localname.hs:3:11: error:
                  Language.Haskell.TH.Syntax.Lift (Maybe a)
           -- Defined in ‘Language.Haskell.TH.Syntax’
         ...plus 15 others
-        ...plus 12 instances involving out-of-scope types
+        ...plus 13 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: Language.Haskell.TH.Syntax.lift y
       In the expression:

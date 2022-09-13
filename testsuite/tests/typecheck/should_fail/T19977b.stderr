@@ -1,5 +1,5 @@
 
-T19977b.hs:21:5: error:
+T19977b.hs:21:5: error: [GHC-39999]
     • Could not deduce ‘C a’ arising from a use of ‘h’
       from the context: D a
         bound by the type signature for:

@@ -1,5 +1,5 @@
 
-T4272.hs:15:26: error:
+T4272.hs:15:26: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘TermFamily a a’
       Expected: TermFamily a (TermFamily a a)
         Actual: TermFamily a a

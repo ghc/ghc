@@ -1,5 +1,5 @@
 
-RepPolyArrowFun.hs:29:19: error:
+RepPolyArrowFun.hs:29:19: error: [GHC-55287]
     • • The function in the first order arrow application of
           ‘undefined’
         to

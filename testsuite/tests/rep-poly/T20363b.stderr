@@ -1,5 +1,5 @@
 
-T20363b.hs:48:10: error:
+T20363b.hs:48:10: error: [GHC-55287]
     • • The newtype constructor pattern
         does not have a fixed runtime representation.
         Its type is:

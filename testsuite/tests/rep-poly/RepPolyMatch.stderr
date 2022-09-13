@@ -1,5 +1,5 @@
 
-RepPolyMatch.hs:11:9: error:
+RepPolyMatch.hs:11:9: error: [GHC-55287]
     • The binder of the \case expression
       does not have a fixed runtime representation.
       Its type is:

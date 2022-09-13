@@ -1,5 +1,5 @@
 
-T20232.hs:7:5: error:
+T20232.hs:7:5: error: [GHC-25897]
     • Couldn't match type ‘p’ with ‘'One’
         arising from multiplicity of ‘x’
       ‘p’ is a rigid type variable bound by

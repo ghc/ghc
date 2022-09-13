@@ -1,5 +1,5 @@
 
-T9662.hs:49:8: error:
+T9662.hs:49:8: error: [GHC-25897]
     • Couldn't match type ‘k’ with ‘Int’
       Expected: Exp (((sh :. k) :. m) :. n)
                 -> Exp (((sh :. m) :. n) :. k)

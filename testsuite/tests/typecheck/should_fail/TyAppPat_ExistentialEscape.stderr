@@ -1,5 +1,5 @@
 
-TyAppPat_ExistentialEscape.hs:10:20: error:
+TyAppPat_ExistentialEscape.hs:10:20: error: [GHC-25897]
     • Couldn't match expected type ‘p’ with actual type ‘a’
       ‘a’ is a rigid type variable bound by
         a pattern with constructor: Some :: forall a. a -> Some,

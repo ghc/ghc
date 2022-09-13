@@ -1,5 +1,5 @@
 
-T15695.hs:40:14: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T15695.hs:40:14: warning: [GHC-25897] [-Wdeferred-type-errors (in -Wdefault)]
     • Could not deduce ‘a2 ~ NA 'VO’
       from the context: ((* -> * -> *) ~ (k -> k1 -> *), Either ~~ f,
                          ctx ~~ (a2 ':&: (a3 ':&: 'E)), f a2 ~~ f1, f1 a3 ~~ a4)
@@ -33,7 +33,7 @@ T15695.hs:40:14: warning: [-Wdeferred-type-errors (in -Wdefault)]
         from' :: ApplyT (* -> * -> *) Either ctx -> NS (NP NA) '[ '[ 'VO]]
           (bound at T15695.hs:40:1)
 
-T15695.hs:41:33: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T15695.hs:41:33: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type: a0 : as0
                      with: '[]
       Expected: NS (NP NA) '[]

@@ -2,6 +2,6 @@
 WildcardInADTContext2.hs:1:53: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
-WildcardInADTContext2.hs:4:10: error:
+WildcardInADTContext2.hs:4:10: error: [GHC-76037]
     Not in scope: type variable ‘_a’
     Suggested fix: Perhaps use ‘a’ (line 4)

@@ -4,7 +4,7 @@ data T a = MkT {foo :: Bool, ...}
   	-- Defined at <interactive>:4:18
 foo :: T a -> Bool
 
-<interactive>:9:6: error:
+<interactive>:9:6: error: [GHC-83865]
     • Couldn't match expected type ‘T a0’ with actual type ‘S’
     • In the first argument of ‘foo’, namely ‘(MkS 42)’
       In the expression: foo (MkS 42)

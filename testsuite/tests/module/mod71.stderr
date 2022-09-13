@@ -1,5 +1,5 @@
 
-mod71.hs:4:9: error:
+mod71.hs:4:9: error: [GHC-88464]
     • Found hole: _ :: t2
       Where: ‘t2’ is a rigid type variable bound by
                the inferred type of f :: Num t1 => (t2 -> t1 -> t3) -> t3

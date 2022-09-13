@@ -1,5 +1,5 @@
 
-tcfail153.hs:6:7: error:
+tcfail153.hs:6:7: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘Bool’
       Expected: [a]
         Actual: [Bool]

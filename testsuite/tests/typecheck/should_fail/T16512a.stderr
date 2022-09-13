@@ -1,5 +1,5 @@
 
-T16512a.hs:41:25: error:
+T16512a.hs:41:25: error: [GHC-25897]
     • Couldn't match type ‘as’ with ‘a : as’
       Expected: AST (ListVariadic (a : as) b)
         Actual: AST (ListVariadic as (a -> b))

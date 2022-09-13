@@ -1,5 +1,5 @@
 
-T15883e.hs:16:1: error:
+T15883e.hs:16:1: error: [GHC-39999]
     • Ambiguous type variable ‘d0’ arising from a use of ‘k’
       prevents the constraint ‘(Data d0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘d0’ should be.
@@ -18,13 +18,13 @@ T15883e.hs:16:1: error:
         To see the code I am typechecking, use -ddump-deriv
       In the instance declaration for ‘Data (Foo LiftedRep)’
 
-T15883e.hs:16:1: error:
+T15883e.hs:16:1: error: [GHC-46956]
     • Couldn't match expected type ‘a’ with actual type ‘d0’
-        because type variable ‘a’ would escape its scope
-      This (rigid, skolem) type variable is bound by
-        a type expected by the context:
-          forall a. a
-        at T15883e.hs:16:1-52
+    • because type variable ‘a’ would escape its scope
+    This (rigid, skolem) type variable is bound by
+      a type expected by the context:
+        forall a. a
+      at T15883e.hs:16:1-52
     • In the first argument of ‘MkFoo’, namely ‘a1’
       In the expression: MkFoo a1
       In the first argument of ‘z’, namely ‘(\ a1 -> MkFoo a1)’
@@ -33,7 +33,7 @@ T15883e.hs:16:1: error:
         To see the code I am typechecking, use -ddump-deriv
     • Relevant bindings include a1 :: d0 (bound at T15883e.hs:16:1)
 
-T15883e.hs:16:1: error:
+T15883e.hs:16:1: error: [GHC-39999]
     • Ambiguous type variable ‘b0’ arising from a use of ‘k’
       prevents the constraint ‘(Data b0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘b0’ should be.
@@ -52,13 +52,13 @@ T15883e.hs:16:1: error:
         To see the code I am typechecking, use -ddump-deriv
       In the instance declaration for ‘Data (Foo LiftedRep)’
 
-T15883e.hs:16:1: error:
+T15883e.hs:16:1: error: [GHC-46956]
     • Couldn't match expected type ‘a’ with actual type ‘b0’
-        because type variable ‘a’ would escape its scope
-      This (rigid, skolem) type variable is bound by
-        a type expected by the context:
-          forall a. a
-        at T15883e.hs:16:1-52
+    • because type variable ‘a’ would escape its scope
+    This (rigid, skolem) type variable is bound by
+      a type expected by the context:
+        forall a. a
+      at T15883e.hs:16:1-52
     • In the first argument of ‘MkFoo’, namely ‘a1’
       In the expression: MkFoo a1
       In the first argument of ‘z’, namely ‘(\ a1 -> MkFoo a1)’

@@ -1,5 +1,5 @@
 
-overloadedrecfldsfail14.hs:12:7: error:
-     No type has all these fields: ‘x’, ‘y’
-    In the expression: r {x = 3, y = False}
-    In an equation for ‘f’: f r = r {x = 3, y = False}
+overloadedrecfldsfail14.hs:12:7: error: [GHC-33238]
+    • No type has all these fields: ‘x’, ‘y’
+    • In the expression: r {x = 3, y = False}
+      In an equation for ‘f’: f r = r {x = 3, y = False}

@@ -1,5 +1,5 @@
 
-T13640.hs:13:22: error:
+T13640.hs:13:22: error: [GHC-88464]
     Variable not in scope:
       (.)
         :: (f0 a c0 -> f0 b c0)

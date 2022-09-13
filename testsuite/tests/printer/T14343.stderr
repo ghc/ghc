@@ -1,5 +1,5 @@
 
-T14343.hs:10:9: error:
+T14343.hs:10:9: error: [GHC-88464]
     • Found hole: _ :: Proxy '[ 'True]
     • In the expression: _ :: Proxy '[ 'True]
       In an equation for ‘test1’: test1 = _ :: Proxy '[ 'True]
@@ -11,7 +11,7 @@ T14343.hs:10:9: error:
           with Proxy @'[ 'True]
           (defined at T14343.hs:8:16)
 
-T14343.hs:11:9: error:
+T14343.hs:11:9: error: [GHC-88464]
     • Found hole: _ :: Proxy '[ '[1]]
     • In the expression: _ :: Proxy '[ '[1]]
       In an equation for ‘test2’: test2 = _ :: Proxy '[ '[1]]
@@ -23,7 +23,7 @@ T14343.hs:11:9: error:
           with Proxy @'[ '[1]]
           (defined at T14343.hs:8:16)
 
-T14343.hs:12:9: error:
+T14343.hs:12:9: error: [GHC-88464]
     • Found hole: _ :: Proxy '[ '("Symbol", 1)]
     • In the expression: _ :: Proxy '[ '("Symbol", 1)]
       In an equation for ‘test3’: test3 = _ :: Proxy '[ '("Symbol", 1)]

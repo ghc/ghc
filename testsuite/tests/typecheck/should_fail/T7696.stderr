@@ -1,5 +1,5 @@
 
-T7696.hs:9:6: error:
+T7696.hs:9:6: error: [GHC-18872]
     • Couldn't match kind ‘*’ with ‘* -> *’
       When matching types
         t0 :: (* -> *) -> *

@@ -1,7 +1,7 @@
 
-NoBlockArgumentsFail3.hs:7:22: error:
+NoBlockArgumentsFail3.hs:7:22: error: [GHC-77182]
     Unexpected \case expression in function application:
         \case Just 3 -> print x
     Suggested fixes:
-      Use parentheses.
-      Perhaps you intended to use BlockArguments
+      • Use parentheses.
+      • Perhaps you intended to use BlockArguments

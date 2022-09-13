@@ -1,5 +1,5 @@
 
-T15039d.hs:19:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T15039d.hs:19:14: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Dict ((a :: *) ~ (b :: *))’
       Where: ‘a’, ‘b’ are rigid type variables bound by
                the type signature for:
@@ -11,7 +11,7 @@ T15039d.hs:19:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Relevant bindings include
         ex1 :: Dict ((a :: *) ~ (b :: *)) -> () (bound at T15039d.hs:19:1)
 
-T15039d.hs:22:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T15039d.hs:22:14: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’
         standing for ‘Dict ((a :: *) ~~ (b :: *))’
       Where: ‘a’, ‘b’ are rigid type variables bound by
@@ -24,7 +24,7 @@ T15039d.hs:22:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Relevant bindings include
         ex2 :: Dict ((a :: *) ~~ (b :: *)) -> () (bound at T15039d.hs:22:1)
 
-T15039d.hs:25:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T15039d.hs:25:14: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’
         standing for ‘Dict ((a :: *) ~~ (b :: k))’
       Where: ‘a’, ‘k’, ‘b’ are rigid type variables bound by
@@ -37,7 +37,7 @@ T15039d.hs:25:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Relevant bindings include
         ex3 :: Dict ((a :: *) ~~ (b :: k)) -> () (bound at T15039d.hs:25:1)
 
-T15039d.hs:33:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T15039d.hs:33:14: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Dict (Coercible @(*) a b)’
       Where: ‘a’, ‘b’ are rigid type variables bound by
                the type signature for:
@@ -49,7 +49,7 @@ T15039d.hs:33:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Relevant bindings include
         ex6 :: Dict (Coercible @(*) a b) -> () (bound at T15039d.hs:33:1)
 
-T15039d.hs:35:8: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T15039d.hs:35:8: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found extra-constraints wildcard standing for
         ‘Coercible @(*) a b’
       Where: ‘a’, ‘b’ are rigid type variables bound by

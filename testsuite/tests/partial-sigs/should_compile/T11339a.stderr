@@ -1,5 +1,5 @@
 
-T11339a.hs:5:8: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T11339a.hs:5:8: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘a -> a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of bar :: a -> a

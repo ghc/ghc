@@ -3,4 +3,5 @@ T12411.hs:5:1: error:
     Illegal visible type application ‘@Q’
       Perhaps you intended to use TypeApplications
 
-T12411.hs:5:7: error: Not in scope: type constructor or class ‘Q’
+T12411.hs:5:7: error: [GHC-76037]
+    Not in scope: type constructor or class ‘Q’

@@ -1,3 +1,2 @@
 
-InfixAppPatErr.hs:2:7: error:
-    do-notation in pattern
+InfixAppPatErr.hs:2:7: error: [GHC-06446] do-notation in pattern

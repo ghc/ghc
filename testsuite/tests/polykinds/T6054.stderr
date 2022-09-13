@@ -1,5 +1,5 @@
 
-T6054.hs:7:14: error:
+T6054.hs:7:14: error: [GHC-39999]
     • No instance for ‘Bar '() a0’
         arising from an expression type signature
     • In the first argument of ‘print’, namely

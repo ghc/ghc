@@ -1,5 +1,5 @@
 
-T2534.hs:3:19: error:
+T2534.hs:3:19: error: [GHC-83865]
     • Couldn't match expected type: a -> a -> b
                   with actual type: [a0]
     • In the second argument of ‘foldr’, namely ‘[]’

@@ -1,5 +1,5 @@
 
-ado005.hs:8:3: error:
+ado005.hs:8:3: error: [GHC-39999]
     • Could not deduce ‘Monad f’ arising from a do statement
       from the context: Applicative f
         bound by the type signature for:

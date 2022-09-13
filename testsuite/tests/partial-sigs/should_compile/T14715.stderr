@@ -1,5 +1,5 @@
 
-T14715.hs:13:53: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T14715.hs:13:53: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found extra-constraints wildcard standing for ‘Reduce z zq’
       Where: ‘z’, ‘zq’ are rigid type variables bound by
                the inferred type of

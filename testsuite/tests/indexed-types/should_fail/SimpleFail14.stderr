@@ -1,5 +1,5 @@
 
-SimpleFail14.hs:5:15: error:
+SimpleFail14.hs:5:15: error: [GHC-83865]
     • Expected a type, but ‘a ~ a’ has kind ‘Constraint’
     • In the type ‘(a ~ a)’
       In the definition of data constructor ‘T’

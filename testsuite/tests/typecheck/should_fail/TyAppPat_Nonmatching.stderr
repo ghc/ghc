@@ -1,5 +1,5 @@
 
-TyAppPat_Nonmatching.hs:9:6: error:
+TyAppPat_Nonmatching.hs:9:6: error: [GHC-25897]
     • Couldn't match expected type ‘a’ with actual type ‘Int’
       ‘a’ is a rigid type variable bound by
         the type signature for:

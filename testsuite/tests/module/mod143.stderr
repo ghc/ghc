@@ -1,5 +1,5 @@
 
-mod143.hs:2:21:
+mod143.hs:2:21: error: [GHC-69158]
     Conflicting exports for ‘Foo’:
        ‘module Mod143_A’ exports ‘Mod143_A.Foo’
          imported from ‘Mod143_A’ at mod143.hs:4:1-15

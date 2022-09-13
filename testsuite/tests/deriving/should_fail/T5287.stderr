@@ -1,5 +1,5 @@
 
-T5287.hs:7:10: error:
+T5287.hs:7:10: error: [GHC-39999]
     • Could not deduce ‘A a oops0’
       from the context: A a oops
         bound by an instance declaration:

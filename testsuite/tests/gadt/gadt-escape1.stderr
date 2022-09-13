@@ -1,5 +1,5 @@
 
-gadt-escape1.hs:19:58: error:
+gadt-escape1.hs:19:58: error: [GHC-25897]
     • Could not deduce ‘p ~ ExpGADT Int’
       from the context: t ~ Int
         bound by a pattern with constructor: ExpInt :: Int -> ExpGADT Int,

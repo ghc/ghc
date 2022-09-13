@@ -1,5 +1,5 @@
 
-drvfail003.hs:16:56: error:
+drvfail003.hs:16:56: error: [GHC-39999]
     • No instance for ‘Show (v (v a))’
         arising from the first field of ‘End’ (type ‘v (v a)’)
       Possible fix:

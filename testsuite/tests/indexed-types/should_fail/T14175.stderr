@@ -1,5 +1,5 @@
 
-T14175.hs:7:42: error:
+T14175.hs:7:42: error: [GHC-83865]
     • Expecting one more argument to ‘k’
       Expected a type, but ‘k’ has kind ‘j -> *’
     • In the kind ‘k’

@@ -7,7 +7,7 @@ T7437.hs:14:13: error:
         put :: forall a. Put a => a -> [()]
       In the class declaration for ‘Put’
 
-T7437.hs:14:13: error:
+T7437.hs:14:13: error: [GHC-39999]
     • Could not deduce ‘Put a0’
       from the context: (Put a, Generic t, GPut (Rep t))
         bound by the type signature for:

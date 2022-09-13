@@ -1,5 +1,5 @@
 
-tcfail166.hs:6:13: error:
+tcfail166.hs:6:13: error: [GHC-25955]
     Illegal symbol ‘forall’ in type
     Suggested fix:
       Perhaps you intended to use RankNTypes

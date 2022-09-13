@@ -1,5 +1,5 @@
 
-RepPolyPatBind.hs:18:5: error:
+RepPolyPatBind.hs:18:5: error: [GHC-55287]
     • • The binder ‘y’ does not have a fixed runtime representation.
         Its type is:
           a :: TYPE rep

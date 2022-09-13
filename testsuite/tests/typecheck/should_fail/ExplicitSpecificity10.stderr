@@ -1,5 +1,5 @@
 
-ExplicitSpecificity10.hs:8:10: error:
+ExplicitSpecificity10.hs:8:10: error: [GHC-95781]
     • Cannot apply expression of type ‘a0 -> a0’
       to a visible type argument ‘Bool’
     • In the expression: unT t @Bool

@@ -1,5 +1,5 @@
 
-T12906.hs:2:7: error:
+T12906.hs:2:7: error: [GHC-83865]
     • Couldn't match type: IO ()
                      with: [Char]
       Expected: String

@@ -1,5 +1,5 @@
 
-local_hole_fits.hs:4:15: warning: [-Wtyped-holes (in -Wdefault)]
+local_hole_fits.hs:4:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:
@@ -12,7 +12,7 @@ local_hole_fits.hs:4:15: warning: [-Wtyped-holes (in -Wdefault)]
         head :: [a] -> a (bound at local_hole_fits.hs:4:1)
       Valid hole fits include x :: a (bound at local_hole_fits.hs:4:7)
 
-local_hole_fits.hs:8:11: warning: [-Wtyped-holes (in -Wdefault)]
+local_hole_fits.hs:8:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:

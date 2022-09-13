@@ -1,5 +1,5 @@
 
-T21719.hs:29:27: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T21719.hs:29:27: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found extra-constraints wildcard standing for
         ‘MonadCheckedThrow m1’
       Where: ‘m1’ is a rigid type variable bound by
@@ -17,7 +17,7 @@ T21719.hs:29:27: warning: [-Wpartial-type-signatures (in -Wdefault)]
                 baz = throwChecked Foo
     • Relevant bindings include foo :: m Int (bound at T21719.hs:24:1)
 
-T21719.hs:29:33: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T21719.hs:29:33: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘m1 a’
       Where: ‘m1’, ‘a’ are rigid type variables bound by
                the inferred type of

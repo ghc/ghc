@@ -1,5 +1,5 @@
 
-T18640c.hs:14:11: error:
+T18640c.hs:14:11: error: [GHC-25897]
     • Couldn't match kind ‘x’ with ‘*’
       Expected kind ‘forall (k1 :: k) -> x’,
         but ‘F1’ has kind ‘forall (k1 :: k) -> *’

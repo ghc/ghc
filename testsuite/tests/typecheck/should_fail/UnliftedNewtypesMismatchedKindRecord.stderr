@@ -1,5 +1,5 @@
 
-UnliftedNewtypesMismatchedKindRecord.hs:11:23: error:
+UnliftedNewtypesMismatchedKindRecord.hs:11:23: error: [GHC-83865]
     • Couldn't match kind ‘'WordRep’ with ‘'IntRep’
       Expected kind ‘TYPE 'IntRep’, but ‘Word#’ has kind ‘TYPE 'WordRep’
     • In the type ‘Word#’

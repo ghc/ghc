@@ -1,5 +1,5 @@
 
-T11514.hs:6:7: error:
+T11514.hs:6:7: error: [GHC-91028]
     • Couldn't match expected type ‘(Show a => a -> a) -> ()’
                   with actual type ‘a0’
       Cannot instantiate unification variable ‘a0’

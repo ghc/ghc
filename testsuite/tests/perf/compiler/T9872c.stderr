@@ -1,5 +1,5 @@
 
-T9872c.hs:18:8: error:
+T9872c.hs:18:8: error: [GHC-39999]
     • No instance for ‘Show
                          (Proxy
                             (Cons

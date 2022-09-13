@@ -1,5 +1,5 @@
 
-drvfail004.hs:8:12: error:
+drvfail004.hs:8:12: error: [GHC-39999]
     • Could not deduce ‘Eq (Foo a b)’
         arising from the 'deriving' clause of a data type declaration
       from the context: (Ord a, Ord b)

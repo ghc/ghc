@@ -1,5 +1,5 @@
 
-tcfail032.hs:14:8: error:
+tcfail032.hs:14:8: error: [GHC-25897]
     • Couldn't match expected type ‘a1 -> Int’ with actual type ‘p’
       ‘p’ is a rigid type variable bound by
         the inferred type of f :: Eq a => p -> a -> Int

@@ -1,3 +1,4 @@
 
-<interactive>:0:33: error: Variable not in scope: a :: IO a
+<interactive>:0:33: error: [GHC-88464]
+    Variable not in scope: a :: IO a
 1

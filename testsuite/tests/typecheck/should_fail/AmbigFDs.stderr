@@ -1,5 +1,5 @@
 
-AmbigFDs.hs:10:8: error:
+AmbigFDs.hs:10:8: error: [GHC-25897]
     • Couldn't match type ‘b1’ with ‘b2’
         arising from a functional dependency between constraints:
           ‘C a b2’

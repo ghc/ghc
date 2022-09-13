@@ -1,5 +1,5 @@
 
-valid_hole_fits_interactions.hs:15:5: warning: [-Wtyped-holes (in -Wdefault)]
+valid_hole_fits_interactions.hs:15:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: SBool 'True
     • In an equation for ‘f’: f = _
     • Relevant bindings include

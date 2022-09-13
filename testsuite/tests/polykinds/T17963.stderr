@@ -1,5 +1,5 @@
 
-T17963.hs:15:23: error:
+T17963.hs:15:23: error: [GHC-25897]
     • Couldn't match kind ‘rep’ with ‘GHC.Types.LiftedRep’
       When matching kinds
         k0 :: *

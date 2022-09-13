@@ -1,5 +1,5 @@
 
-ExplicitForAllRules1.hs:45:31: warning: [-Wforall-identifier (in -Wdefault)]
+ExplicitForAllRules1.hs:45:31: warning: [GHC-64088] [-Wforall-identifier (in -Wdefault)]
     The use of ‘forall’ as an identifier
     will become an error in a future GHC release.
     Suggested fix:

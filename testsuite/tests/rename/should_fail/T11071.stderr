@@ -1,42 +1,42 @@
 
-T11071.hs:19:12: error:
+T11071.hs:19:12: error: [GHC-76037]
     Not in scope: ‘NoSuchModule.foo’
     NB: no module named ‘NoSuchModule’ is imported.
 
-T11071.hs:20:12: error:
+T11071.hs:20:12: error: [GHC-76037]
     Not in scope: ‘Data.List.foobar’
     NB: the module ‘Data.List’ does not export ‘foobar’.
 
-T11071.hs:21:12: error:
+T11071.hs:21:12: error: [GHC-76037]
     Not in scope: ‘M.foobar’
     NB: neither ‘Data.IntMap’ nor ‘Data.Map’ export ‘foobar’.
 
-T11071.hs:22:12: error:
+T11071.hs:22:12: error: [GHC-76037]
     Not in scope: ‘M'.foobar’
     NB: neither ‘System.IO’,
                 ‘Data.IntMap’ nor ‘Data.Map’ export ‘foobar’.
 
-T11071.hs:23:12: error:
+T11071.hs:23:12: error: [GHC-76037]
     Not in scope: ‘Data.List.sort’
     Suggested fix:
       Perhaps you want to add ‘sort’ to the import list in the import of
       ‘Data.List’ (T11071.hs:3:1-24).
 
-T11071.hs:24:12: error:
+T11071.hs:24:12: error: [GHC-76037]
     Not in scope: ‘Data.List.unlines’
     Suggested fixes:
       • Perhaps use ‘Data.List.lines’ (imported from Data.List)
       • Perhaps you want to add ‘unlines’ to the import list
         in the import of ‘Data.List’ (T11071.hs:3:1-24).
 
-T11071.hs:25:12: error:
+T11071.hs:25:12: error: [GHC-76037]
     Not in scope: ‘M.size’
     Suggested fix:
       Perhaps you want to add ‘size’ to one of these import lists:
         ‘Data.IntMap’ (T11071.hs:5:1-36)
         ‘Data.Map’ (T11071.hs:4:1-33)
 
-T11071.hs:26:12: error:
+T11071.hs:26:12: error: [GHC-76037]
     Not in scope: ‘M.valid’
     Suggested fixes:
       • Perhaps use one of these:
@@ -45,13 +45,13 @@ T11071.hs:26:12: error:
       • Perhaps you want to add ‘valid’ to the import list
         in the import of ‘Data.Map’ (T11071.hs:4:1-33).
 
-T11071.hs:27:12: error:
+T11071.hs:27:12: error: [GHC-76037]
     Not in scope: data constructor ‘Ord.Down’
     Suggested fix:
       Perhaps you want to remove ‘Down’ from the explicit hiding list
       in the import of ‘Data.Ord’ (T11071.hs:8:1-46).
 
-T11071.hs:28:12: error:
+T11071.hs:28:12: error: [GHC-76037]
     Not in scope: ‘M'.size’
     Suggested fix:
       Perhaps you want to remove ‘size’ from the hiding clauses

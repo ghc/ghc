@@ -1,5 +1,5 @@
 
-T3330a.hs:19:34: error:
+T3330a.hs:19:34: error: [GHC-25897]
     • Couldn't match type ‘ix’
                      with ‘r ix1 -> Writer [AnyF s] (r'0 ix1)’
       Expected: (s0 ix0 -> ix1) -> r ix1 -> Writer [AnyF s] (r'0 ix1)
@@ -17,7 +17,7 @@ T3330a.hs:19:34: error:
         p :: s ix (bound at T3330a.hs:19:10)
         children :: s ix -> PF s r ix -> [AnyF s] (bound at T3330a.hs:19:1)
 
-T3330a.hs:19:44: error:
+T3330a.hs:19:44: error: [GHC-25897]
     • Couldn't match type ‘ix’
                      with ‘r0 ix0 -> Writer [AnyF s0] (r0 ix0)’
       Expected: PF s r (r0 ix0 -> Writer [AnyF s0] (r0 ix0))

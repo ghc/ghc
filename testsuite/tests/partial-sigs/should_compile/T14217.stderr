@@ -1,5 +1,5 @@
 
-T14217.hs:32:11: error:
+T14217.hs:32:11: error: [GHC-88464]
     • Found extra-constraints wildcard standing for
         ‘(Eq a1, Eq a2, Eq a3, Eq a4, Eq a5, Eq a6, Eq a7, Eq a8, Eq a9,
           Eq a10, Eq a11, Eq a12, Eq a13, Eq a14, Eq a15, Eq a16, Eq a17,

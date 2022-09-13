@@ -1,5 +1,5 @@
 
-EtaExpandStupid2.hs:16:8: error:
+EtaExpandStupid2.hs:16:8: error: [GHC-39999]
     • No instance for ‘Num c’ arising from a use of ‘MkD4’
       Possible fix:
         add (Num c) to the context of

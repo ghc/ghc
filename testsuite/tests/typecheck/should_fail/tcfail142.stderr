@@ -1,5 +1,5 @@
 
-tcfail142.hs:19:8: error:
+tcfail142.hs:19:8: error: [GHC-39999]
     • Could not deduce ‘Bar a0 r’
       from the context: Bar a r
         bound by the type signature for:

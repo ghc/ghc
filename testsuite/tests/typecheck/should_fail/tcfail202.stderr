@@ -1,5 +1,5 @@
 
-tcfail202.hs:11:10:
+tcfail202.hs:11:10: error: [GHC-46208]
     Functional dependencies conflict between instance declarations:
       instance [incoherent] C Bool Int Float
         -- Defined at tcfail202.hs:11:10

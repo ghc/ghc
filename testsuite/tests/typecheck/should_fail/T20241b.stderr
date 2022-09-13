@@ -1,12 +1,12 @@
 
-T20241b.hs:16:8: error:
+T20241b.hs:16:8: error: [GHC-47403]
     • Boom
     • In the type signature:
         foo :: ((TypeError (Text "Boom") :: (Type -> Type)
                                             -> Type -> Constraint) IO) a =>
                Proxy a -> ()
 
-T20241b.hs:20:8: error:
+T20241b.hs:20:8: error: [GHC-47403]
     • Boom
     • In the type signature:
         bar :: ((c :: Constraint

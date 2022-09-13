@@ -1,5 +1,5 @@
 
-T12531.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
+T12531.hs:6:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int#
     • In the first argument of ‘(+#)’, namely ‘_’
       In the first argument of ‘I#’, namely ‘(_ +# x)’

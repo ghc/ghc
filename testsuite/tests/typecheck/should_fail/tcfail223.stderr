@@ -1,5 +1,5 @@
 
-tcfail223.hs:10:10: error:
+tcfail223.hs:10:10: error: [GHC-39999]
     • Could not deduce ‘Class1 a’
         arising from the superclasses of an instance declaration
       from the context: Class3 a

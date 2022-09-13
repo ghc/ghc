@@ -1,5 +1,5 @@
 
-T1496.hs:10:32: error:
+T1496.hs:10:32: error: [GHC-18872]
     • Couldn't match representation of type: c Int
                                with that of: c Moo
         arising from the coercion of the method ‘isInt’

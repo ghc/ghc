@@ -1,5 +1,5 @@
 
-ExpandSynsFail1.hs:4:31: error:
+ExpandSynsFail1.hs:4:31: error: [GHC-83865]
     • Couldn't match type ‘Bool’ with ‘Int’
       Expected: Foo
         Actual: Bar

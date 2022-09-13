@@ -1,5 +1,5 @@
 
-deriving-via-fail2.hs:7:1: error:
+deriving-via-fail2.hs:7:1: error: [GHC-63174]
     • Cannot derive instance via ‘Maybe’
         Class ‘C’ expects an argument of kind ‘*’,
         but ‘Maybe’ has kind ‘* -> *’

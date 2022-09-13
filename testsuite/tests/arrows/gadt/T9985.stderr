@@ -1,5 +1,5 @@
 
-T9985.hs:29:18: error:
+T9985.hs:29:18: error: [GHC-64525]
     • Proc patterns cannot use existential or GADT data constructors
     • In the pattern: VNil
       In the pattern: a :> VNil

@@ -1,5 +1,5 @@
 
-gadt13.hs:15:13: error:
+gadt13.hs:15:13: error: [GHC-25897]
     • Could not deduce ‘p ~ (String -> [Char])’
       from the context: a ~ Int
         bound by a pattern with constructor: I :: Int -> Term Int,

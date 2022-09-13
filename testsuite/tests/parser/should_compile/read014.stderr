@@ -1,5 +1,5 @@
 
-read014.hs:4:1: warning: [-Wmissing-signatures (in -Wall)]
+read014.hs:4:1: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
     Top-level binding with no type signature:
       ng1 :: Num a => p -> a -> a
 

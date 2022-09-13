@@ -1,5 +1,5 @@
 
-T14066d.hs:11:35: error:
+T14066d.hs:11:35: error: [GHC-25897]
     • Couldn't match type ‘b1’ with ‘b’
       Expected: (Proxy a, Proxy c, b1)
         Actual: (Proxy a, Proxy c, b)

@@ -1,5 +1,5 @@
 
-T20189.hs:6:5: error:
+T20189.hs:6:5: error: [GHC-88464]
     • Found hole: _ :: t
       Where: ‘t’ is a rigid type variable bound by
                the type signature for:

@@ -1,5 +1,5 @@
 
-T11355.hs:5:7: error:
+T11355.hs:5:7: error: [GHC-91510]
     • Illegal polymorphic type: forall a. a
     • In the expression:
         const @_ @((forall a. a) -> forall a. a) () (id @(forall a. a))

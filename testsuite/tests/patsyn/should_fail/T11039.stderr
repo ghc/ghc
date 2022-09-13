@@ -1,5 +1,5 @@
 
-T11039.hs:8:15: error:
+T11039.hs:8:15: error: [GHC-25897]
     • Couldn't match type ‘f’ with ‘A’
       Expected: f a
         Actual: A a

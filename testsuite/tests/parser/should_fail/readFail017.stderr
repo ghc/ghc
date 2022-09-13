@@ -1,2 +1,2 @@
 
-readFail017.hs:4:4: Parse error in pattern: f
+readFail017.hs:4:4: error: [GHC-07626] Parse error in pattern: f

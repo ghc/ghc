@@ -1,5 +1,5 @@
 
-saks007_fail.hs:15:10: error:
+saks007_fail.hs:15:10: error: [GHC-83865]
     • Couldn't match kind ‘'True’ with ‘'False’
       Expected: G (*)
         Actual: F (*)

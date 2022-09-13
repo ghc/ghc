@@ -1,5 +1,5 @@
 
-RecordDotSyntaxFail13.hs:26:11: error:
+RecordDotSyntaxFail13.hs:26:11: error: [GHC-18872]
     • Couldn't match type ‘Int’ with ‘Foo -> Int’
         arising from a functional dependency between:
           constraint ‘HasField "foo" Foo (Foo -> Int)’

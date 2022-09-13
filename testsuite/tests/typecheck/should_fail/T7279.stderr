@@ -1,5 +1,5 @@
 
-T7279.hs:6:10: error:
+T7279.hs:6:10: error: [GHC-39999]
     • Could not deduce ‘Show b0’
       from the context: (Eq a, Show b)
         bound by an instance declaration:

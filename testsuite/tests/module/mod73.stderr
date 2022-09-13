@@ -1,5 +1,5 @@
 
-mod73.hs:3:7: error:
+mod73.hs:3:7: error: [GHC-76037]
     Not in scope: ‘Prelude.g’
     NB: the module ‘Prelude’ does not export ‘g’.
     Suggested fix:

@@ -1,2 +1,3 @@
 
-unboxedsums4.hs:3:7: error: Boxed sums not supported: ( 10 | )
+unboxedsums4.hs:3:7: error: [GHC-09550]
+    Boxed sums not supported: ( 10 | )

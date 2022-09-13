@@ -1,11 +1,11 @@
 
-T10598_fail2.hs:5:37: error:
+T10598_fail2.hs:5:37: error: [GHC-38178]
     • Can't make a derived instance of
         ‘Eq A’ with the anyclass strategy:
     • In the data declaration for ‘A’
     Suggested fix: Perhaps you intended to use DeriveAnyClass
 
-T10598_fail2.hs:6:37: error:
+T10598_fail2.hs:6:37: error: [GHC-26557]
     • Can't make a derived instance of
         ‘Eq B’ with the newtype strategy:
     • In the newtype declaration for ‘B’

@@ -1,5 +1,5 @@
 
-T9774.hs:5:29: error:
+T9774.hs:5:29: error: [GHC-83865]
     • Couldn't match type ‘Char’ with ‘[Char]’
       Expected: String
         Actual: Char

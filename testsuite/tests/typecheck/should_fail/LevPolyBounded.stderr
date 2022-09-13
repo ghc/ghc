@@ -1,5 +1,5 @@
 
-LevPolyBounded.hs:11:15: error:
+LevPolyBounded.hs:11:15: error: [GHC-25897]
     • Expected a type, but ‘a’ has kind ‘TYPE r’
       ‘r’ is a rigid type variable bound by
         the class declaration for ‘XBounded’
@@ -7,7 +7,7 @@ LevPolyBounded.hs:11:15: error:
     • In the type signature: LevPolyBounded.minBound :: a
       In the class declaration for ‘XBounded’
 
-LevPolyBounded.hs:12:15: error:
+LevPolyBounded.hs:12:15: error: [GHC-25897]
     • Expected a type, but ‘a’ has kind ‘TYPE r’
       ‘r’ is a rigid type variable bound by
         the class declaration for ‘XBounded’

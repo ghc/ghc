@@ -1,5 +1,5 @@
 
-T19615.hs:17:21: error:
+T19615.hs:17:21: error: [GHC-55287]
     • The argument ‘(f x)’ of ‘lift'’
       does not have a fixed runtime representation.
       Its type is:

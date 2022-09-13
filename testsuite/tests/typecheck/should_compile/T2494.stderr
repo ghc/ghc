@@ -1,5 +1,5 @@
 
-T2494.hs:15:14: error:
+T2494.hs:15:14: error: [GHC-25897]
     • Couldn't match type ‘b’ with ‘a’
       Expected: Maybe (m a) -> Maybe (m a)
         Actual: Maybe (m b) -> Maybe (m b)
@@ -19,7 +19,7 @@ T2494.hs:15:14: error:
           (bound at T2494.hs:14:11)
         x :: Maybe a (bound at T2494.hs:14:65)
 
-T2494.hs:15:30: error:
+T2494.hs:15:30: error: [GHC-25897]
     • Couldn't match type ‘b’ with ‘a’
       Expected: Maybe (m a) -> Maybe (m a)
         Actual: Maybe (m b) -> Maybe (m b)

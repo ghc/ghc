@@ -1,5 +1,5 @@
 
-LinearErrOrigin.hs:7:7: error:
+LinearErrOrigin.hs:7:7: error: [GHC-25897]
     • Couldn't match type ‘p’ with ‘q’ arising from multiplicity of ‘x’
       ‘p’ is a rigid type variable bound by
         the type signature for:

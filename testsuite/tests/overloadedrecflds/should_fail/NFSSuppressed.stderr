@@ -1,5 +1,5 @@
 
-NFSSuppressed.hs:9:5: error:
+NFSSuppressed.hs:9:5: error: [GHC-88464]
     Variable not in scope: foo
     Suggested fixes:
       • Perhaps use data constructor ‘Foo’ (line 7)

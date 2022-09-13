@@ -1,5 +1,5 @@
 
-T12373.hs:10:19: error:
+T12373.hs:10:19: error: [GHC-18872]
     • Couldn't match a lifted type with an unlifted type
       When matching types
         a0 :: *

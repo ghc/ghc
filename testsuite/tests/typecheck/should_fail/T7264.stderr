@@ -1,5 +1,5 @@
 
-T7264.hs:13:19: error:
+T7264.hs:13:19: error: [GHC-91028]
     • Couldn't match type ‘a’ with ‘forall r. r -> String’
       Expected: a -> Foo
         Actual: (forall r. r -> String) -> Foo

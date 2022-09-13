@@ -1,5 +1,5 @@
 
-T7729a.hs:36:26: error:
+T7729a.hs:36:26: error: [GHC-83865]
     • Couldn't match type: BasePrimMonad m
                      with: t0 m0
       Expected: BasePrimMonad (Rand m) a

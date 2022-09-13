@@ -1,5 +1,5 @@
 
-FD2.hs:26:34: error:
+FD2.hs:26:34: error: [GHC-25897]
     • Couldn't match expected type ‘e1’ with actual type ‘e’
       ‘e1’ is a rigid type variable bound by
         the type signature for:

@@ -1,5 +1,5 @@
 
-T9600.hs:4:39: error:
+T9600.hs:4:39: error: [GHC-82023]
     • Can't make a derived instance of ‘Applicative Foo’:
         ‘Applicative’ is not a stock derivable class (Eq, Show, etc.)
     • In the newtype declaration for ‘Foo’

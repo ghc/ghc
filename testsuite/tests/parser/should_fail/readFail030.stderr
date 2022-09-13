@@ -1,2 +1,3 @@
 
-readFail030.hs:1:14: Unsupported extension: ExtensibleRecords
+readFail030.hs:1:14: error: [GHC-46537]
+    Unsupported extension: ExtensibleRecords

@@ -1,5 +1,5 @@
 
-T7354a.hs:5:13: error:
+T7354a.hs:5:13: error: [GHC-83865]
     • Couldn't match expected type ‘Base t t’ with actual type ‘()’
     • In the first argument of ‘embed’, namely ‘()’
       In the expression: embed ()

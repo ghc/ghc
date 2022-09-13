@@ -1,5 +1,5 @@
 
-tc168.hs:17:1: error:
+tc168.hs:17:1: error: [GHC-39999]
     • Could not deduce ‘C a1 (a2, b0)’
       from the context: C a1 (a2, b)
         bound by the inferred type for ‘g’:

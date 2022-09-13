@@ -1,5 +1,5 @@
 
-T8616.hs:8:30: error:
+T8616.hs:8:30: error: [GHC-25897]
     • Expected a type, but ‘Any :: k’ has kind ‘k’
       ‘k’ is a rigid type variable bound by
         the type signature for:

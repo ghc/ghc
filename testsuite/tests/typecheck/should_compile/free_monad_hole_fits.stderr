@@ -1,5 +1,5 @@
 
-free_monad_hole_fits.hs:14:28: warning: [-Wtyped-holes (in -Wdefault)]
+free_monad_hole_fits.hs:14:28: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole:
         _a :: (Free f a -> Free f b) -> f (Free f a) -> f (Free f b)
       Where: ‘a’, ‘b’ are rigid type variables bound by
@@ -34,7 +34,7 @@ free_monad_hole_fits.hs:14:28: warning: [-Wtyped-holes (in -Wdefault)]
         pure (_ :: f (Free f a) -> f (Free f b))
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
 
-free_monad_hole_fits.hs:25:31: warning: [-Wtyped-holes (in -Wdefault)]
+free_monad_hole_fits.hs:25:31: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _a :: Free f a -> Free f b
       Where: ‘a’, ‘b’ are rigid type variables bound by
                the type signature for:

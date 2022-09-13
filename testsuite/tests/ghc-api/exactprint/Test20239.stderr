@@ -324,5 +324,5 @@
 
 
 
-Test20239.hs:4:15: error:
+Test20239.hs:4:15: error: [GHC-76037]
     Not in scope: type constructor or class ‘Method’

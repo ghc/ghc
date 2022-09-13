@@ -1,5 +1,5 @@
 
-tcfail198.hs:6:36: error:
+tcfail198.hs:6:36: error: [GHC-25897]
     • Couldn't match expected type ‘a1’ with actual type ‘a’
       ‘a1’ is a rigid type variable bound by
         an expression type signature:

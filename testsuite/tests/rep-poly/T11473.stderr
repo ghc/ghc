@@ -1,5 +1,5 @@
 
-T11473.hs:19:1: error:
+T11473.hs:19:1: error: [GHC-55287]
     The first pattern in the equation for ‘hello’
     does not have a fixed runtime representation.
     Its type is:

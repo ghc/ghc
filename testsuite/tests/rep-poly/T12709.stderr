@@ -1,5 +1,5 @@
 
-T12709.hs:28:13: error:
+T12709.hs:28:13: error: [GHC-55287]
     • The argument ‘1’ of ‘(+)’
       does not have a fixed runtime representation.
       Its type is:

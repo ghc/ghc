@@ -1,7 +1,7 @@
 
 T7276.hs:6:5: error:
     • Exception when trying to run compile-time code:
-        T7276.hs:6:8: error:
+        T7276.hs:6:8: error: [GHC-83865]
     • Couldn't match type ‘[Language.Haskell.TH.Syntax.Dec]’
                      with ‘Language.Haskell.TH.Syntax.Exp’
       Expected: Language.Haskell.TH.Lib.Internal.ExpQ

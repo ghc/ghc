@@ -1,5 +1,5 @@
 
-UnliftedNewtypesInstanceFail.hs:13:3: error:
+UnliftedNewtypesInstanceFail.hs:13:3: error: [GHC-83865]
     • Couldn't match kind ‘'IntRep’ with ‘'WordRep’
       Expected kind ‘TYPE 'WordRep’,
         but ‘Bar Bool’ has kind ‘TYPE 'IntRep’

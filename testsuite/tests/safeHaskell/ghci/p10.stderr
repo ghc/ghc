@@ -1,2 +1,2 @@
 
-<interactive>:10:1: error: Variable not in scope: b
+<interactive>:10:1: error: [GHC-88464] Variable not in scope: b

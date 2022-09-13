@@ -1,5 +1,5 @@
 
-T2627b.hs:20:24: error:
+T2627b.hs:20:24: error: [GHC-27958]
     • Could not deduce ‘Dual (Dual a0) ~ a0’
         arising from a use of ‘conn’
       from the context: (Dual a ~ b, Dual b ~ a)

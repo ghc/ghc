@@ -1,3 +1,2 @@
 
-readFail011.hs:7:10: error:
-    parse error on input ‘=’
+readFail011.hs:7:10: error: [GHC-58481] parse error on input ‘=’

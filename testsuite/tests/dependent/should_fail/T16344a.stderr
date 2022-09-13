@@ -1,5 +1,5 @@
 
-T16344a.hs:11:36: error:
+T16344a.hs:11:36: error: [GHC-25897]
     • Expected a type, but ‘a’ has kind ‘ka’
       ‘ka’ is a rigid type variable bound by
         the data type declaration for ‘T2’

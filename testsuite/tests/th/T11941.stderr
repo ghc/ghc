@@ -1,5 +1,5 @@
 
-T11941.hs:7:30: error:
+T11941.hs:7:30: error: [GHC-76037]
     Not in scope: ‘getFrst’
     Suggested fix:
       Perhaps use one of these:

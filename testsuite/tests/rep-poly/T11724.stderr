@@ -1,5 +1,5 @@
 
-T11724.hs:7:44: error:
+T11724.hs:7:44: error: [GHC-18478]
     • The data constructor field does not have a fixed runtime representation:
       • a :: TYPE r
     • In the definition of data constructor ‘Foo’

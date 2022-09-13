@@ -1,5 +1,5 @@
 
-<interactive>:6:49: error:
+<interactive>:6:49: error: [GHC-25897]
     • Couldn't match expected type ‘ListableElem (a, a)’
                   with actual type ‘a’
       ‘a’ is a rigid type variable bound by

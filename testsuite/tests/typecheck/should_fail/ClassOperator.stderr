@@ -1,5 +1,5 @@
 
-ClassOperator.hs:14:3: error:
+ClassOperator.hs:14:3: error: [GHC-39999]
     • Could not deduce ‘a ><> b0’
       from the context: a ><> b
         bound by the type signature for:
@@ -12,7 +12,7 @@ ClassOperator.hs:14:3: error:
         (**>) :: forall a b. (a ><> b) => a -> a -> ()
       In the class declaration for ‘><>’
 
-ClassOperator.hs:14:3: error:
+ClassOperator.hs:14:3: error: [GHC-39999]
     • Could not deduce ‘a ><> b0’
       from the context: a ><> b
         bound by the type signature for:
@@ -25,7 +25,7 @@ ClassOperator.hs:14:3: error:
         (**<) :: forall a b. (a ><> b) => a -> a -> ()
       In the class declaration for ‘><>’
 
-ClassOperator.hs:14:3: error:
+ClassOperator.hs:14:3: error: [GHC-39999]
     • Could not deduce ‘a ><> b0’
       from the context: a ><> b
         bound by the type signature for:
@@ -38,7 +38,7 @@ ClassOperator.hs:14:3: error:
         (>**) :: forall a b. (a ><> b) => a -> a -> ()
       In the class declaration for ‘><>’
 
-ClassOperator.hs:14:3: error:
+ClassOperator.hs:14:3: error: [GHC-39999]
     • Could not deduce ‘a ><> b0’
       from the context: a ><> b
         bound by the type signature for:

@@ -1,5 +1,5 @@
 
-T17841.hs:8:45: error:
+T17841.hs:8:45: error: [GHC-25897]
     • Expected a type, but ‘t’ has kind ‘k’
       ‘k’ is a rigid type variable bound by
         the class declaration for ‘Foo’

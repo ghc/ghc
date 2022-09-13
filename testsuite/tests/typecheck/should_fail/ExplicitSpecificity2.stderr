@@ -1,5 +1,5 @@
 
-ExplicitSpecificity2.hs:11:15: error:
+ExplicitSpecificity2.hs:11:15: error: [GHC-95781]
     • Cannot apply expression of type ‘Proxy (*) -> T (*)’
       to a visible type argument ‘Int’
     • In the expression: C @Type @Int Proxy

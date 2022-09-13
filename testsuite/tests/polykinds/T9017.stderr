@@ -1,5 +1,5 @@
 
-T9017.hs:8:7: error:
+T9017.hs:8:7: error: [GHC-25897]
     • Couldn't match kind ‘k2’ with ‘*’
       When matching types
         a0 :: * -> * -> *

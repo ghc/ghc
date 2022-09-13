@@ -1,5 +1,5 @@
 
-<interactive>:3:1: error:
+<interactive>:3:1: error: [GHC-88464]
     • Found hole: _ :: p
       Where: ‘p’ is a rigid type variable bound by
                the inferred type of it :: p

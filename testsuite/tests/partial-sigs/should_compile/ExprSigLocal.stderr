@@ -1,5 +1,5 @@
 
-ExprSigLocal.hs:9:35: warning: [-Wpartial-type-signatures (in -Wdefault)]
+ExprSigLocal.hs:9:35: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of <expression> :: a -> a
@@ -10,7 +10,7 @@ ExprSigLocal.hs:9:35: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Relevant bindings include
         y :: b -> b (bound at ExprSigLocal.hs:9:1)
 
-ExprSigLocal.hs:11:21: warning: [-Wpartial-type-signatures (in -Wdefault)]
+ExprSigLocal.hs:11:21: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of g :: a -> a

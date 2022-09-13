@@ -1,2 +1,2 @@
 
-T16116b.hs:7:16: error: Not in scope: type variable ‘b’
+T16116b.hs:7:16: error: [GHC-76037] Not in scope: type variable ‘b’

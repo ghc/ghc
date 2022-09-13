@@ -1,5 +1,5 @@
 
-T7594.hs:37:12: error:
+T7594.hs:37:12: error: [GHC-25897]
     • Could not deduce ‘b ~ IO ()’
       from the context: (:&:) c0 Real a
         bound by a type expected by the context:

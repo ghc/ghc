@@ -1,5 +1,5 @@
 
-T20921.hs:37:46: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T20921.hs:37:46: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found extra-constraints wildcard standing for ‘C i’
       Where: ‘i’ is a rigid type variable bound by
                the inferred type of quux :: (OK (Boo i), C i) => Int

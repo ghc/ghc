@@ -1,5 +1,5 @@
 
-UnliftedNewtypesUnassociatedFamilyFail.hs:21:30: error:
+UnliftedNewtypesUnassociatedFamilyFail.hs:21:30: error: [GHC-25897]
     • Couldn't match kind ‘t’ with ‘'IntRep’
       Expected a type, but ‘Int#’ has kind ‘TYPE 'IntRep’
       ‘t’ is a rigid type variable bound by
@@ -9,7 +9,7 @@ UnliftedNewtypesUnassociatedFamilyFail.hs:21:30: error:
       In the definition of data constructor ‘MkDF1a’
       In the newtype instance declaration for ‘DF’
 
-UnliftedNewtypesUnassociatedFamilyFail.hs:22:30: error:
+UnliftedNewtypesUnassociatedFamilyFail.hs:22:30: error: [GHC-25897]
     • Couldn't match kind ‘t’ with ‘'WordRep’
       Expected a type, but ‘Word#’ has kind ‘TYPE 'WordRep’
       ‘t’ is a rigid type variable bound by
@@ -19,7 +19,7 @@ UnliftedNewtypesUnassociatedFamilyFail.hs:22:30: error:
       In the definition of data constructor ‘MkDF2a’
       In the newtype instance declaration for ‘DF’
 
-UnliftedNewtypesUnassociatedFamilyFail.hs:23:30: error:
+UnliftedNewtypesUnassociatedFamilyFail.hs:23:30: error: [GHC-25897]
     • Couldn't match kind ‘t’ with ‘'TupleRep '[ 'IntRep, 'WordRep]’
       Expected a type,
         but ‘(# Int#, Word# #)’ has kind ‘TYPE

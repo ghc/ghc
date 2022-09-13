@@ -1,5 +1,5 @@
 
-mc22.hs:10:26: error:
+mc22.hs:10:26: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘t a’
       Expected: [a] -> [t a]
         Actual: [a] -> [a]

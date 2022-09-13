@@ -1,5 +1,5 @@
 
-T14479.hs:9:5: error:
+T14479.hs:9:5: error: [GHC-94185]
     • Can't quantify over ‘b’
         bound by the partial type signature: g :: forall b. Num b => _ -> b
     • In an equation for ‘foo’:

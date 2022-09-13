@@ -1,5 +1,5 @@
 
-readFail003.hs:4:27: error:
+readFail003.hs:4:27: error: [GHC-25897]
     • Couldn't match expected type ‘(a1, [a2], [a3])’
                   with actual type ‘a1’
       ‘a1’ is a rigid type variable bound by

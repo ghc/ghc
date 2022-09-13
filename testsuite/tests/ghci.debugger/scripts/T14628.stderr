@@ -1,5 +1,5 @@
 
-<interactive>:4:17: error:
+<interactive>:4:17: error: [GHC-25897]
     • Couldn't match type ‘m’ with ‘(,) a0’
       Expected: StateT Int ((,) a0) ()
         Actual: StateT Int m ()

@@ -1,5 +1,5 @@
 
-WildcardsInPatternAndExprSig.hs:4:18: error:
+WildcardsInPatternAndExprSig.hs:4:18: error: [GHC-88464]
     • Found type wildcard ‘_a’ standing for ‘w’
       Where: ‘w’ is a rigid type variable bound by
                the inferred type of bar :: Maybe [w] -> w -> [w]
@@ -12,7 +12,7 @@ WildcardsInPatternAndExprSig.hs:4:18: error:
         bar :: Maybe [w] -> w -> [w]
           (bound at WildcardsInPatternAndExprSig.hs:4:1)
 
-WildcardsInPatternAndExprSig.hs:4:25: error:
+WildcardsInPatternAndExprSig.hs:4:25: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘[w]’
       Where: ‘w’ is a rigid type variable bound by
                the inferred type of bar :: Maybe [w] -> w -> [w]
@@ -25,7 +25,7 @@ WildcardsInPatternAndExprSig.hs:4:25: error:
         bar :: Maybe [w] -> w -> [w]
           (bound at WildcardsInPatternAndExprSig.hs:4:1)
 
-WildcardsInPatternAndExprSig.hs:4:38: error:
+WildcardsInPatternAndExprSig.hs:4:38: error: [GHC-88464]
     • Found type wildcard ‘_b’ standing for ‘w’
       Where: ‘w’ is a rigid type variable bound by
                the inferred type of bar :: Maybe [w] -> w -> [w]
@@ -40,7 +40,7 @@ WildcardsInPatternAndExprSig.hs:4:38: error:
         bar :: Maybe [w] -> w -> [w]
           (bound at WildcardsInPatternAndExprSig.hs:4:1)
 
-WildcardsInPatternAndExprSig.hs:4:49: error:
+WildcardsInPatternAndExprSig.hs:4:49: error: [GHC-88464]
     • Found type wildcard ‘_c’ standing for ‘w’
       Where: ‘w’ is a rigid type variable bound by
                the inferred type of bar :: Maybe [w] -> w -> [w]
@@ -56,7 +56,7 @@ WildcardsInPatternAndExprSig.hs:4:49: error:
         bar :: Maybe [w] -> w -> [w]
           (bound at WildcardsInPatternAndExprSig.hs:4:1)
 
-WildcardsInPatternAndExprSig.hs:4:66: error:
+WildcardsInPatternAndExprSig.hs:4:66: error: [GHC-88464]
     • Found type wildcard ‘_d’ standing for ‘w’
       Where: ‘w’ is a rigid type variable bound by
                the inferred type of bar :: Maybe [w] -> w -> [w]

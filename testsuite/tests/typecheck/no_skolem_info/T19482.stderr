@@ -1,5 +1,5 @@
 
-T19482.hs:11:25: error:
+T19482.hs:11:25: error: [GHC-25897]
     • Expected kind ‘[r]’, but ‘s’ has kind ‘r’
       ‘r’ is a rigid type variable bound by
         the instance declaration

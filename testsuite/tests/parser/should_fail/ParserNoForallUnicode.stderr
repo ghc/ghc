@@ -1,5 +1,5 @@
 
-ParserNoForallUnicode.hs:6:8: error:
+ParserNoForallUnicode.hs:6:8: error: [GHC-25955]
     Illegal symbol ‘∀’ in type
     Suggested fix:
       Perhaps you intended to use RankNTypes

@@ -1,5 +1,5 @@
 
-T13929.hs:29:24: error:
+T13929.hs:29:24: error: [GHC-55287]
     • The tuple argument in first position
       does not have a fixed runtime representation.
       Its type is:
@@ -16,7 +16,7 @@ T13929.hs:29:24: error:
         gunbox :: (:*:) f g p -> GUnboxed (f :*: g) ('TupleRep '[rf, rg])
           (bound at T13929.hs:29:5)
 
-T13929.hs:34:21: error:
+T13929.hs:34:21: error: [GHC-55287]
     • • The unboxed sum does not have a fixed runtime representation.
         Its type is:
           GUnboxed (f :+: g) ('SumRep '[rf, rg]) :: TYPE ('SumRep '[rf, rg])

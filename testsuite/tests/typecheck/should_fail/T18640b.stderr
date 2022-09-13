@@ -1,5 +1,5 @@
 
-T18640b.hs:14:10: error:
+T18640b.hs:14:10: error: [GHC-25897]
     • Couldn't match kind ‘k’ with ‘a’
       Expected kind ‘forall b -> a’, but ‘F1’ has kind ‘forall k -> k’
       ‘k’ is a rigid type variable bound by

@@ -1,5 +1,5 @@
 
-RepPolyClassMethod.hs:10:12: error:
+RepPolyClassMethod.hs:10:12: error: [GHC-25897]
     • Expected a type, but ‘a’ has kind ‘TYPE rep’
       ‘rep’ is a rigid type variable bound by
         the class declaration for ‘C’

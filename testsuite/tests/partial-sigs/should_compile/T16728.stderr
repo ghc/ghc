@@ -1,5 +1,5 @@
 
-T16728.hs:8:37: warning: [-Wpartial-type-signatures (in -Wdefault)]
+T16728.hs:8:37: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘k’
       Where: ‘k’ is a rigid type variable bound by
                the inferred type of f :: Proxy x

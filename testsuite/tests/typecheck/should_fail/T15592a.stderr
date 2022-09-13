@@ -1,5 +1,5 @@
 
-T15592a.hs:8:22: error:
+T15592a.hs:8:22: error: [GHC-20967]
     • Cannot apply function of kind ‘Proxy j
                                      -> Proxy k -> k2 -> Constraint’
       to visible kind argument ‘j’

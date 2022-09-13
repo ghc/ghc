@@ -1,2 +1,2 @@
 
-T19504.hs:3:23: error: Tuple section in pattern context
+T19504.hs:3:23: error: [GHC-09646] Tuple section in pattern context

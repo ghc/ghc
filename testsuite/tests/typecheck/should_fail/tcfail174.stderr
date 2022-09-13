@@ -1,5 +1,5 @@
 
-tcfail174.hs:20:14: error:
+tcfail174.hs:20:14: error: [GHC-25897]
     • Couldn't match type ‘a1’ with ‘a’
       Expected: Capture (forall x. x -> a)
         Actual: Capture (forall a. a -> a)
@@ -15,7 +15,7 @@ tcfail174.hs:20:14: error:
     • Relevant bindings include
         h1 :: Capture a (bound at tcfail174.hs:20:1)
 
-tcfail174.hs:23:14: error:
+tcfail174.hs:23:14: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘b’
       Expected: Capture (forall x. x -> b)
         Actual: Capture (forall a. a -> a)

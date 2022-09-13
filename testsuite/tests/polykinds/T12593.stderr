@@ -1,5 +1,5 @@
 
-T12593.hs:12:31: error:
+T12593.hs:12:31: error: [GHC-83865]
     • Expecting one more argument to ‘k’
       Expected a type, but
       ‘k’ has kind

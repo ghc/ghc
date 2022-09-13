@@ -1,5 +1,5 @@
 
-type_in_type_hole_fits.hs:79:11: warning: [-Wtyped-holes (in -Wdefault)]
+type_in_type_hole_fits.hs:79:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole:
         _a :: [Integer] -> Sorted (O ('NLogN 2 0)) (O N) 'True Integer
       Or perhaps ‘_a’ is mis-spelled, or not in scope
@@ -27,7 +27,7 @@ type_in_type_hole_fits.hs:79:11: warning: [-Wtyped-holes (in -Wdefault)]
           with insertionSort @Integer @(O ('NLogN 2 0)) @(O N) @'True
           (defined at type_in_type_hole_fits.hs:65:1)
 
-type_in_type_hole_fits.hs:82:11: warning: [-Wtyped-holes (in -Wdefault)]
+type_in_type_hole_fits.hs:82:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole:
         _b :: [Integer] -> Sorted (O ('NLogN 1 1)) (O N) 'False Integer
       Or perhaps ‘_b’ is mis-spelled, or not in scope
@@ -59,7 +59,7 @@ type_in_type_hole_fits.hs:82:11: warning: [-Wtyped-holes (in -Wdefault)]
           with mergeSort @Integer @(O ('NLogN 1 1)) @(O N) @'False
           (defined at type_in_type_hole_fits.hs:61:1)
 
-type_in_type_hole_fits.hs:85:11: warning: [-Wtyped-holes (in -Wdefault)]
+type_in_type_hole_fits.hs:85:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole:
         _c :: [Integer] -> Sorted (O ('NLogN 1 1)) (O One) 'False Integer
       Or perhaps ‘_c’ is mis-spelled, or not in scope

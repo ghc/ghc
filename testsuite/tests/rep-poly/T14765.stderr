@@ -1,5 +1,5 @@
 
-T14765.hs:11:29: error:
+T14765.hs:11:29: error: [GHC-55287]
     • The argument ‘(k proxy#)’ of ‘f’
       does not have a fixed runtime representation.
       Its type is:

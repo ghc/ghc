@@ -1,5 +1,5 @@
 
-mc24.hs:10:31: error:
+mc24.hs:10:31: error: [GHC-83865]
     • Couldn't match type: [a1]
                      with: a -> a0
       Expected: (a -> a0) -> [a] -> m [a]

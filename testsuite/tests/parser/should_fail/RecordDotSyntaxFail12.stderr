@@ -1,13 +1,13 @@
 
-RecordDotSyntaxFail12.hs:124:25: error:
+RecordDotSyntaxFail12.hs:124:25: error: [GHC-44287]
     Illegal use of punning for field ‘quux’
     Suggested fix: Perhaps you intended to use NamedFieldPuns
 
-RecordDotSyntaxFail12.hs:124:46: error:
+RecordDotSyntaxFail12.hs:124:46: error: [GHC-44287]
     Illegal use of punning for field ‘baz’
     Suggested fix: Perhaps you intended to use NamedFieldPuns
 
-RecordDotSyntaxFail12.hs:124:65: error:
+RecordDotSyntaxFail12.hs:124:65: error: [GHC-44287]
     Illegal use of punning for field ‘bar’
     Suggested fix: Perhaps you intended to use NamedFieldPuns
 

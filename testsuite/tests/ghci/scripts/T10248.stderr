@@ -1,5 +1,5 @@
 
-<interactive>:2:10: error:
+<interactive>:2:10: error: [GHC-88464]
     • Found hole: _ :: f a
       Where: ‘f’, ‘a’ are rigid type variables bound by
                the inferred type of it :: Functor f => f (Maybe a)

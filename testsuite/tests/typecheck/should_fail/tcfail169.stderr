@@ -1,5 +1,5 @@
 
-tcfail169.hs:7:51: error:
+tcfail169.hs:7:51: error: [GHC-39999]
     • Could not deduce ‘Show (Succ a)’
         arising from the second field of ‘Cons’ (type ‘Seq (Succ a)’)
       from the context: Show a
