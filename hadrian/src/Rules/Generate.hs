@@ -284,8 +284,7 @@ projectVersion = mconcat
 
 rtsCabalFlags :: Interpolations
 rtsCabalFlags = mconcat
-    [ flag "CabalMingwex" UseLibmingwex
-    , flag "CabalHaveLibdw" UseLibdw
+    [ flag "CabalHaveLibdw" UseLibdw
     , flag "CabalHaveLibm" UseLibm
     , flag "CabalHaveLibrt" UseLibrt
     , flag "CabalHaveLibdl" UseLibdl

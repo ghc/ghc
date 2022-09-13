@@ -2171,21 +2171,7 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType 
     } else {
         if (type) *type = pinfo->type;
 
-        // If Windows, perform initialization of uninitialized
-        // Symbols from the C runtime which was loaded above.
-        // We do this on lookup to prevent the hit when
-        // The symbol isn't being used.
-        if (pinfo->value == (void*)0xBAADF00D)
-        {
-            char symBuffer[50];
-            const char *crt_impl = "ucrtbase";
-            sprintf(symBuffer, "_%s", lbl);
-            static HMODULE crt = NULL;
-            if (!crt) crt = GetModuleHandle(crt_impl);
-            pinfo->value = GetProcAddress(crt, symBuffer);
-            return pinfo->value;
-        }
-        else if (pinfo && pinfo->owner && isSymbolImport (pinfo->owner, lbl))
+        if (pinfo && pinfo->owner && isSymbolImport (pinfo->owner, lbl))
         {
             /* See Note [BFD import library].  */
             HINSTANCE dllInstance = (HINSTANCE)lookupDependentSymbol(pinfo->value, dependent, type);

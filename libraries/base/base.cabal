@@ -397,7 +397,6 @@ Library
     if os(windows)
         -- Windows requires some extra libraries for linking because the RTS
         -- is no longer re-exporting them.
-        -- mingwex: provides C99 compatibility. libm is a stub on MingW.
         -- mingw32: Unfortunately required because of a resource leak between
         --          mingwex and mingw32. the __math_err symbol is defined in
         --          mingw32 which is required by mingwex.
@@ -410,7 +409,7 @@ Library
         -- advapi32: provides advanced kernel functions
         extra-libraries:
             wsock32, user32, shell32, mingw32, kernel32, advapi32,
-            mingwex, ws2_32, shlwapi, ole32, rpcrt4, ntdll
+            ws2_32, shlwapi, ole32, rpcrt4, ntdll
         -- Minimum supported Windows version.
         -- These numbers can be found at:
         --  https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx

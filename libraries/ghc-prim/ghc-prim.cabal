@@ -66,15 +66,14 @@ Library
     if os(windows)
         -- Windows requires some extra libraries for linking because the RTS
         -- is no longer re-exporting them (see #11223)
-        -- msvcrt: standard C library. The RTS will automatically include this,
-        --         but is added for completeness.
-        -- mingwex: provides C99 compatibility. libm is a stub on MingW.
+        -- ucrt: standard C library. The RTS will automatically include this,
+        --       but is added for completeness.
         -- mingw32: Unfortunately required because of a resource leak between
         --          mingwex and mingw32. the __math_err symbol is defined in
         --          mingw32 which is required by mingwex.
         -- user32: provides access to apis to modify user components (UI etc)
         --         on Windows. Required because of mingw32.
-        extra-libraries: user32, mingw32, mingwex, ucrt
+        extra-libraries: user32, mingw32, ucrt
 
     if os(linux)
         -- we need libm, but for musl and other's we might need libc, as libm
