@@ -781,7 +781,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
            EvalSuccess _ -> go (pred max_depth) my_ty old_ty a
            EvalException ex -> do
               -- Report the exception to the UI
-              traceTR $ text "Exception occured:" <+> text (show ex)
+              traceTR $ text "Exception occurred:" <+> text (show ex)
               liftIO $ throwIO $ fromSerializableException ex
 -- Blackholes are indirections iff the payload is not TSO or BLOCKING_QUEUE. If
 -- the indirection is a TSO or BLOCKING_QUEUE, we return the BLACKHOLE itself as
@@ -836,7 +836,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
           Nothing -> do -- This can happen for private constructors compiled -O0
                         -- where the .hi descriptor does not export them
                         -- In such case, we return a best approximation:
-                        --  ignore the unpointed args, and recover the pointeds
+                        --  ignore the unpointed args, and recover the pointed ones
                         -- This preserves laziness, and should be safe.
                        traceTR (text "Not constructor" <+> ppr dcname)
                        let dflags = hsc_dflags hsc_env
@@ -1219,7 +1219,7 @@ The checks:
 ~~~~~~~~~~~
 Consider a function obtainType that takes a value and a type and produces
 the Term representation and a substitution (the improvement).
-Assume an auxiliar rtti' function which does the actual job if recovering
+Assume an auxiliary rtti' function which does the actual job if recovering
 the type, but which may produce a false type.
 
 In pseudocode:

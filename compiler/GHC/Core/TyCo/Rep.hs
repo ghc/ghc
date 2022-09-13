@@ -569,7 +569,7 @@ Accordingly, by eliminating reflexive casts, splitTyConApp need not worry
 about outermost casts to uphold (EQ). Eliminating reflexive casts is done
 in mkCastTy. This is (EQ1) below.
 
-Unforunately, that's not the end of the story. Consider comparing
+Unfortunately, that's not the end of the story. Consider comparing
   (T a b c)      =?       (T a b |> (co -> <Type>)) (c |> co)
 These two types have the same kind (Type), but the left type is a TyConApp
 while the right type is not. To handle this case, we say that the right-hand
@@ -1720,7 +1720,7 @@ the evidence for unboxed equalities:
     holes are easier.
 
   - Moreover, nothing is lost from the lack of let-bindings. For
-    dictionaries want to achieve sharing to avoid recomoputing the
+    dictionaries want to achieve sharing to avoid recomputing the
     dictionary.  But coercions are entirely erased, so there's little
     benefit to sharing. Indeed, even if we had a let-binding, we
     always inline types and coercions at every use site and drop the

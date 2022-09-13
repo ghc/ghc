@@ -184,7 +184,7 @@ import GHC.Linker.Types
 -- 'ns_module_name' @A@, defines a mapping from @{A.T}@
 -- (for some 'OccName' @T@) to some arbitrary other 'Name'.
 --
--- The most intruiging thing about a 'NameShape', however, is
+-- The most intriguing thing about a 'NameShape', however, is
 -- how it's constructed.  A 'NameShape' is *implied* by the
 -- exported 'AvailInfo's of the implementor of an interface:
 -- if an implementor of signature @\<H>@ exports @M.T@, you implicitly
@@ -401,7 +401,7 @@ data FrontendResult
 --        signatures (we just generate blank object files for
 --        hsig files.)
 --
---        A corrolary of this is that the following invariant holds at any point
+--        A corollary of this is that the following invariant holds at any point
 --        past desugaring,
 --
 --            if I have a Module, this_mod, in hand representing the module
@@ -1138,7 +1138,7 @@ data TcTyThing
   | ATyVar  Name TcTyVar   -- See Note [Type variables in the type environment]
 
   | ATcTyCon TyCon   -- Used temporarily, during kind checking, for the
-                     -- tycons and clases in this recursive group
+                     -- tycons and classes in this recursive group
                      -- The TyCon is always a TcTyCon.  Its kind
                      -- can be a mono-kind or a poly-kind; in TcTyClsDcls see
                      -- Note [Type checking recursive type and class declarations]

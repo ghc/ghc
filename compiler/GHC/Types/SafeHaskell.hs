@@ -43,7 +43,7 @@ instance Outputable SafeHaskellMode where
     ppr = text . show
 
 -- | Safe Haskell information for 'ModIface'
--- Simply a wrapper around SafeHaskellMode to sepperate iface and flags
+-- Simply a wrapper around SafeHaskellMode to separate iface and flags
 newtype IfaceTrustInfo = TrustInfo SafeHaskellMode
 
 getSafeMode :: IfaceTrustInfo -> SafeHaskellMode

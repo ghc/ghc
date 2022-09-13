@@ -422,7 +422,7 @@ f x True = False
 
 Adding 'f x False = error "Non-exhaustive pattern..."' would violate
 the linearity of x.
-Instead, we use 'f x False = case error "Non-exhausive pattern..." :: () of {}'.
+Instead, we use 'f x False = case error "Non-exhaustive pattern..." :: () of {}'.
 This case expression accounts for linear variables by assigning bottom usage
 (See Note [Bottom as a usage] in GHC.Core.Multiplicity).
 This is done in mkErrorAppDs, called from mkFailExpr.
@@ -1066,7 +1066,7 @@ isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 -- Returns Just {..} if we're sure that the expression is True
 -- I.e.   * 'True' datacon
 --        * 'otherwise' Id
---        * Trivial wappings of these
+--        * Trivial wrappings of these
 -- The arguments to Just are any HsTicks that we have found,
 -- because we still want to tick then, even it they are always evaluated.
 isTrueLHsExpr (L _ (HsVar _ (L _ v)))

@@ -86,7 +86,7 @@ Some notes relative to the paper
 
 * When QL is done, we don't need to turn the un-filled-in
   instantiation variables into unification variables -- they
-  already /are/ unification varibles!  See also
+  already /are/ unification variables!  See also
   Note [Instantiation variables are short lived].
 
 * We cleverly avoid the quadratic cost of QL, alluded to in the paper.
@@ -216,7 +216,7 @@ Fig 3, plus the modification in Fig 5, of the QL paper:
 
 It treats application chains (f e1 @ty e2) specially:
 
-* So we can report errors like "in the third arument of a call of f"
+* So we can report errors like "in the third argument of a call of f"
 
 * So we can do Visible Type Application (VTA), for which we must not
   eagerly instantiate the function part of the application.
@@ -1060,7 +1060,7 @@ qlUnify delta ty1 ty2
            ; writeMetaTyVar kappa (mkCastTy ty2 co) }
 
       | otherwise
-      = return ()   -- Occurs-check or forall-bound varialbe
+      = return ()   -- Occurs-check or forall-bound variable
 
 
 {- Note [Actual unification in qlUnify]
@@ -1085,7 +1085,7 @@ That is the entire point of qlUnify!   Wrinkles:
 * What if kappa and ty have different kinds?  We solve that problem by
   calling unifyKind, producing a coercion perhaps emitting some deferred
   equality constraints.  That is /different/ from the approach we use in
-  the main constraint solver for herterogeneous equalities; see Note
+  the main constraint solver for heterogeneous equalities; see Note
   [Equalities with incompatible kinds] in Solver.Canonical
 
   Why different? Because:

@@ -595,7 +595,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
     -- we need to ensure they are emitted in the correct order.  We used to only
     -- emit single instructions in mkSpill/mkReload/mkRegRegMove.
     -- As such order of spills and reloads didn't matter.  However,  with
-    -- mutliple instructions potentially issued by those functions we need to be
+    -- multiple instructions potentially issued by those functions we need to be
     -- careful to not break execution order. Reversing the spills (clobber will
     -- also spill), will ensure they are emitted in the right order.
     --
@@ -618,7 +618,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
                       ]
 
 --    pprTrace "patched-code" ((vcat $ map (docToSDoc . pprInstr) code)) $ do
---    pprTrace "pached-fixup" ((ppr fixup_blocks)) $ do
+--    pprTrace "patched-fixup" ((ppr fixup_blocks)) $ do
 
     return (code, fixup_blocks)
 

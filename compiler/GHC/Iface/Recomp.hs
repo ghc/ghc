@@ -926,7 +926,7 @@ we use is:
     group_fingerprint.
 
     Since we included the sequence number in step (1) programs identical up to
-    transposition of recursive occurrences are distinguisable, avoiding the
+    transposition of recursive occurrences are distinguishable, avoiding the
     second issue mentioned above.
 
  3. Produce the final environment by extending hash_env, mapping each

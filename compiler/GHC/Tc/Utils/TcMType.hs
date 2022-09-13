@@ -614,7 +614,7 @@ ensureMonoType :: TcType -> TcM ()
 -- Assuming that the argument type is of kind (TYPE r),
 -- ensure that it is a /monotype/
 -- If it is not a monotype we can see right away (since unification
--- varibles and type-function applications stand for monotypes), but
+-- variables and type-function applications stand for monotypes), but
 -- we emit a Wanted equality just to delay the error message until later
 ensureMonoType res_ty
   | isTauTy res_ty   -- isTauTy doesn't need zonking or anything
@@ -1969,7 +1969,7 @@ What do do?
  D. We could error.
 
 We choose (D), as described in #17567, and implement this choice in
-doNotQuantifyTyVars.  Dicsussion of alternativs A-C is below.
+doNotQuantifyTyVars.  Discussion of alternativs A-C is below.
 
 NB: this is all rather similar to, but sadly not the same as
     Note [Naughty quantification candidates]

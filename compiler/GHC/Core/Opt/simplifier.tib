@@ -706,7 +706,7 @@ each iteration of Step 2 only performs one transformation, then the
 entire program will to be re-analysed by Step 1, and re-traversed by
 Step 2, for each transformation of the sequence.  Sometimes this is
 unavoidable, but it is often possible to perform a sequence of
-transformtions in a single pass.
+transformations in a single pass.
 
 The key function, which simplifies expressions, has the following type:
 @

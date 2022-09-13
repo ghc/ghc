@@ -695,7 +695,7 @@ Why do we have this invariant?
 
 * Similarly, when typechecking default definitions for class methods, in
   GHC.Tc.TyCl.Class.tcClassDecl2, we only have the (final) Class available;
-  but the variables bound in that class must be in scope.  Eample (#19738):
+  but the variables bound in that class must be in scope.  Example (#19738):
 
     type P :: k -> Type
     data P a = MkP

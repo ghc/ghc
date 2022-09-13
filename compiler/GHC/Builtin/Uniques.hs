@@ -37,7 +37,7 @@ module GHC.Builtin.Uniques
     , mkBuiltinUnique
     , mkPseudoUniqueE
 
-      -- ** Deriving uniquesc
+      -- ** Deriving uniques
       -- *** From TyCon name uniques
     , tyConRepNameUnique
       -- *** From DataCon name uniques

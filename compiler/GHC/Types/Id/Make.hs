@@ -357,7 +357,7 @@ effect whether a wrapper is present or not:
     We'd like 'map Age' to match the LHS. For this to happen, Age
     must be unfolded, otherwise we'll be stuck. This is tested in T16208.
 
-It also allows for the posssibility of representation-polymorphic newtypes
+It also allows for the possibility of representation-polymorphic newtypes
 with wrappers (with -XUnliftedNewtypes):
 
   newtype N (a :: TYPE r) = MkN a
@@ -1506,7 +1506,7 @@ wired in here ONLY because they are use in a representation-polymorphic way
 by the rebindable syntax mechanism. See GHC.Rename.Expr
 Note [Handling overloaded and rebindable constructs].
 
-Alas, we can't currenly give Haskell definitions for
+Alas, we can't currently give Haskell definitions for
 representation-polymorphic functions.
 
 They have Compulsory unfoldings, so that the representation polymorphism

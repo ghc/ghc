@@ -552,7 +552,7 @@ The flow:
    a unit is identified by the -this-unit-id flag and dependencies specified by
    the normal -package-id flag.
 2. Downsweep is augmented to know to know how to look for dependencies in any home unit.
-3. The rest of the compiler is modified appropiately to offset paths to the right places.
+3. The rest of the compiler is modified appropriately to offset paths to the right places.
 4. --make mode can parallelise between home units and multiple units are allowed to produce linkables.
 
 Closure Property
@@ -569,12 +569,12 @@ because q is a dependency of the home unit p which depends on another home unit 
 Offsetting Paths
 ----------------
 
-The main complication to the implementation is to do with offsetting paths appropiately.
+The main complication to the implementation is to do with offsetting paths appropriately.
 For a long time it has been assumed that GHC will execute in the top-directory for a unit,
 normally where the .cabal file is and all paths are interpreted relative to there.
 When you have multiple home units then it doesn't make sense to pick one of these
 units to choose as the base-unit, and you can't robustly change directories when
-using parralelism.
+using parallelism.
 
 Therefore there is an option `-working-directory`, which tells GHC where the relative
 paths for each unit should be interpreted relative to. For example, if you specify

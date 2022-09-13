@@ -267,7 +267,7 @@ data SkolemInfoAnon
   | RuleSkol RuleName   -- The LHS of a RULE
 
   | InferSkol [(Name,TcType)]
-                        -- We have inferred a type for these (mutually-recursivive)
+                        -- We have inferred a type for these (mutually recursive)
                         -- polymorphic Ids, and are now checking that their RHS
                         -- constraints are satisfied.
 
@@ -1056,7 +1056,7 @@ data FixedRuntimeRepContext
   -- Test cases: RepPolyDoBody{1,2}, RepPolyMcBody.
   | FRRBodyStmt !StmtOrigin !Int
 
-  -- | Arguments to a guard in a monad comprehesion must have
+  -- | Arguments to a guard in a monad comprehension must have
   -- a fixed runtime representation.
   --
   -- Test case: RepPolyMcGuard.

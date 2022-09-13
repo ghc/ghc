@@ -412,7 +412,7 @@ Examples of how adding superclasses can help:
       instance L (Maybe a) a
 
     When solving the superclasses of the (C (Maybe a) a) instance, we get
-      [G] C a b, and hance by superclasses, [G] G a, [G] L a b
+      [G] C a b, and hence by superclasses, [G] G a, [G] L a b
       [W] G (Maybe a)
     Use the instance decl to get
       [W] C a beta
@@ -590,7 +590,7 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
                -- GHC.Tc.TyCl.Instance. Skip for a tiny performance win.
 
          -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
-         -- for explantation of InstSCOrigin and Note [Replacement vs keeping] in
+         -- for explanation of InstSCOrigin and Note [Replacement vs keeping] in
          -- GHC.Tc.Solver.Interact for why we need OtherSCOrigin and depths
        | otherwise
        = loc { ctl_origin = new_orig }
@@ -1179,7 +1179,7 @@ respect typechecker equality. sameVis puts both forms of invisible type
 variable binders into the same equivalence class.
 
 Note that we do /not/ use sameVis in GHC.Core.Type.eqType, which implements
-/definitional/ equality, a slighty more coarse-grained notion of equality
+/definitional/ equality, a slightly more coarse-grained notion of equality
 (see Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep) that does
 not consider the ArgFlag of ForAllTys at all. That is, eqType would equate all
 of forall k. <...>, forall {k}. <...>, and forall k -> <...>.
@@ -1972,7 +1972,7 @@ If we see (T s1 t1 ~ T s2 t2), then we can just decompose to
   (s1 ~ s2, t1 ~ t2)
 and push those back into the work list.  But if
   s1 = K k1    s2 = K k2
-then we will just decomopose s1~s2, and it might be better to
+then we will just decompose s1~s2, and it might be better to
 do so on the spot.  An important special case is where s1=s2,
 and we get just Refl.
 
@@ -2827,7 +2827,7 @@ Details:
  (5) The approach here is inefficient because it replaces every (outermost)
      type family application with a type variable, regardless of whether that
      particular appplication is implicated in the occurs check.  An alternative
-     would be to replce only type-family applications that meantion the offending LHS.
+     would be to replce only type-family applications that mention the offending LHS.
      For instance, we could choose to
      affect only type family applications that mention the offending LHS:
      e.g. in a ~ (F b, G a), we need to replace only G a, not F b. Furthermore,

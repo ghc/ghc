@@ -336,7 +336,7 @@ than the surrounding context.) This kappa cannot be solved for while checking
 the pattern signature (which is not kind-generalized). When we are checking
 the *body* of foo, though, we need to unify the type of x with the argument
 type of bar. At this point, the ambient TcLevel is 1, and spotting a
-matavariable with level 2 would violate the (WantedInv) invariant of
+metavariable with level 2 would violate the (WantedInv) invariant of
 Note [TcLevel invariants]. So, instead of kind-generalizing,
 we promote the metavariable to level 1. This is all done in kindGeneralizeNone.
 
@@ -1320,7 +1320,7 @@ This table summarises this relation:
 | f :: forall {a}. type     HsForAllInvis       InferredSpec       Inferred
 | f :: forall a -> type     HsForAllVis         SpecifiedSpec      Required
 | f :: forall {a} -> type   HsForAllVis         InferredSpec       /
-|   This last form is non-sensical and is thus rejected.
+|   This last form is nonsensical and is thus rejected.
 ----------------------------------------------------------------------------
 
 For more information regarding the interpretation of the resulting ArgFlag, see
@@ -2447,7 +2447,7 @@ kcInferDeclHeader
 kcInferDeclHeader name flav
               (HsQTvs { hsq_ext = kv_ns
                       , hsq_explicit = hs_tvs }) kc_res_ki
-  -- No standalane kind signature and no CUSK.
+  -- No standalone kind signature and no CUSK.
   -- See Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
   = addTyConFlavCtxt name flav $
     do { (scoped_kvs, (tc_tvs, res_kind))
@@ -2616,7 +2616,7 @@ matchUpSigWithDecl
                                            --   Argument is excess TyConBinders and tail kind
   -> TcM ( [TcTyConBinder]       -- Skolemised binders, with TcTyVars
          , a )
--- See Note [Matching a kind sigature with a declaration]
+-- See Note [Matching a kind signature with a declaration]
 -- Invariant: Length of returned TyConBinders + length of excess TyConBinders
 --            = length of incoming TyConBinders
 matchUpSigWithDecl sig_tcbs sig_res_kind hs_bndrs thing_inside
@@ -3505,7 +3505,7 @@ bindTyClTyVarsAndZonk tycon_name thing_inside
 zonkAndScopedSort :: [TcTyVar] -> TcM [TcTyVar]
 zonkAndScopedSort spec_tkvs
   = do { spec_tkvs <- zonkTcTyVarsToTcTyVars spec_tkvs
-         -- Zonk the kinds, to we can do the dependency analayis
+         -- Zonk the kinds, to we can do the dependency analysis
 
        -- Do a stable topological sort, following
        -- Note [Ordering of implicit variables] in GHC.Rename.HsType
@@ -3603,7 +3603,7 @@ We must
   * Find the free variables with level > i, in this case gamma[i]
   * Skolemise those free variables and quantify over them, giving
        f :: forall g. beta[i-1] -> g
-  * Emit the residiual constraint wrapped in an implication for g,
+  * Emit the residual constraint wrapped in an implication for g,
     thus   forall g. WC
 
 All of this happens for types too.  Consider
@@ -4063,7 +4063,7 @@ we do the following
 
 * Just as for ordinary signatures, we must solve local equalities and
   zonk the type after kind-checking it, to ensure that all the nested
-  forall binders can "see" their occurrenceds
+  forall binders can "see" their occurrences
 
   Just as for ordinary signatures, this zonk also gets any Refl casts
   out of the way of instantiation.  Example: #18008 had

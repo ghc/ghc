@@ -1,6 +1,6 @@
 
 
--- | Computing fingerprints of values serializeable with GHC's \"Binary\" module.
+-- | Computing fingerprints of values serializable with GHC's \"Binary\" module.
 module GHC.Iface.Recomp.Binary
   ( -- * Computing fingerprints
     fingerprintBinMem

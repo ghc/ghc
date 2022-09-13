@@ -897,7 +897,7 @@ The idea in the future is that we can now implement different instiations of
 `TPipelineClass` to give different behaviours that the default `HookedPhase` implementation:
 
 * Additional logging of different phases
-* Automatic parrelism (in the style of shake)
+* Automatic parallelism (in the style of shake)
 * Easy consumption by external tools such as ghcide
 * Easier to create your own pipeline and extend existing pipelines.
 

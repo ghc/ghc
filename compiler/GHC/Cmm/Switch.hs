@@ -365,7 +365,7 @@ breakTooSmall m
 ---  Step 3: Fill in the blanks
 ---
 
--- | A FlatSwitchPlan is a list of SwitchPlans, with an integer inbetween every
+-- | A FlatSwitchPlan is a list of SwitchPlans, with an integer in between every
 -- two entries, dividing the range.
 -- So if we have (abusing list syntax) [plan1,n,plan2], then we use plan1 if
 -- the expression is < n, and plan2 otherwise.

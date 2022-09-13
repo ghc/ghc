@@ -468,7 +468,7 @@ seIdSubst:
   binding site.
 
 * The in-scope "set" usually maps x->x; we use it simply for its domain.
-  But sometimes we have two in-scope Ids that are synomyms, and should
+  But sometimes we have two in-scope Ids that are synonyms, and should
   map to the same target:  x->x, y->x.  Notably:
         case y of x { ... }
   That's why the "set" is actually a VarEnv Var
@@ -1160,7 +1160,7 @@ simplJoinBndr mult res_ty env id
 adjustJoinPointType :: Mult
                     -> Type     -- New result type
                     -> Id       -- Old join-point Id
-                    -> Id       -- Adjusted jont-point Id
+                    -> Id       -- Adjusted join-point Id
 -- (adjustJoinPointType mult new_res_ty join_id) does two things:
 --
 --   1. Set the return type of the join_id to new_res_ty

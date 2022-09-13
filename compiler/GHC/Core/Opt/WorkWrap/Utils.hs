@@ -524,7 +524,7 @@ reference the wrong, inner a. A similar situation occurred in #12562, we even
 saw a type variable in the worker shadowing an outer term-variable binding.
 
 We avoid the issue by freshening the argument variables from the original fun
-RHS through 'cloneBndrs', which will also take care of subsitution in binder
+RHS through 'cloneBndrs', which will also take care of substitution in binder
 types. Fortunately, it's sufficient to pick the FVs of the arg vars as in-scope
 set, so that we don't need to do a FV traversal over the whole body of the
 original function.
@@ -717,7 +717,7 @@ mkWWcpr. But we still want to emit warning with -DDEBUG, to hopefully catch
 other cases where something went avoidably wrong.
 
 This warning also triggers for the stream fusion library within `text`.
-We can'easily W/W constructed results like `Stream` because we have no simple
+We can't easily W/W constructed results like `Stream` because we have no simple
 way to express existential types in the worker's type signature.
 
 Note [WW for calling convention]
@@ -741,7 +741,7 @@ of work.
 
 Performing W/W might not always be a win. In particular it's easy to break
 (badly written, but common) rule frameworks by doing additional W/W splits.
-See #20364 for a more detailed explaination.
+See #20364 for a more detailed explanation.
 
 Hence we have the following strategies with different trade-offs:
 
@@ -751,7 +751,7 @@ A) Never do W/W *just* for unlifting of arguments.
 
 B) Do W/W on just about anything where it might be
   beneficial.
-  + Exploits pretty much every oppertunity for unlifting.
+  + Exploits pretty much every opportunity for unlifting.
   - A bit of compile time/code size cost for all the wrappers.
   - Can break rules which would otherwise fire. See #20364.
 
@@ -764,7 +764,7 @@ C) Unlift *any* (non-boot exported) functions arguments if they are strict.
   - Requires either:
     ~ Eta-expansion at *all* call sites in order to generate
       an impedance matcher function. Leading to massive code bloat.
-      Essentially we end up creating a imprompto wrapper function
+      Essentially we end up creating a impromptu wrapper function
       wherever we wouldn't inline the wrapper with a W/W approach.
     ~ There is the option of achieving this without eta-expansion if we instead expand
       the partial application code to check for demands on the calling convention and
@@ -864,7 +864,7 @@ mkWWstr opts args str_marks
                     , args1 ++ args2
                     , wrap_fn1 . wrap_fn2
                     , wrap_arg:wrap_args ) }
-    go _ _ = panic "mkWWstr: Impossible - str/arg length missmatch"
+    go _ _ = panic "mkWWstr: Impossible - str/arg length mismatch"
 
 ----------------------
 -- mkWWstr_one wrap_var = (useful, work_args, wrap_fn, wrap_arg)
@@ -909,7 +909,7 @@ mkWWstr_one opts arg str_mark =
     fam_envs   = wo_fam_envs opts
     arg_ty     = idType arg
     arg_dmd    = idDemandInfo arg
-    arg_str    | isTyVar arg = NotMarkedStrict -- Type args don't get stricness marks
+    arg_str    | isTyVar arg = NotMarkedStrict -- Type args don't get strictness marks
                | otherwise   = str_mark
     do_nothing = return (badWorker, [(arg,arg_str)], nop_fn, varToCoreExpr arg)
 
@@ -1291,7 +1291,7 @@ combineIRDCRs = foldl' combineIRDCR NonRecursiveOrUnsure
 --     through one of @dc@'s fields (so surely non-recursive).
 --   * @NonRecursiveOrUnsure@ when @fuel /= Infinity@
 --     and @fuel@ expansions of nested data TyCons were not enough to prove
---     non-recursivenss, nor arrive at an occurrence of @tc@ thus proving
+--     non-recursiveness, nor arrive at an occurrence of @tc@ thus proving
 --     recursiveness. (So not sure if non-recursive.)
 --   * @NonRecursiveOrUnsure@ when we hit an abstract TyCon (one without
 --     visible DataCons), such as those imported from .hs-boot files.
@@ -1595,7 +1595,7 @@ return unboxed instead of in an unboxed singleton tuple:
     We want  `$wh :: Int# -> [Int]`.
     We'd get `$wh :: Int# -> (# [Int] #)`.
 
-By considering vars as unlifted that satsify 'exprIsHNF', we catch (3).
+By considering vars as unlifted that satisfy 'exprIsHNF', we catch (3).
 Why not check for 'exprOkForSpeculation'? Quite perplexingly, evaluated vars
 are not ok-for-spec, see Note [exprOkForSpeculation and evaluated variables].
 For (1) and (2) we would have to look at the term. WW only looks at the
@@ -1607,7 +1607,7 @@ Note [Linear types and CPR]
 Remark on linearity: in both the case of the wrapper and the worker,
 we build a linear case to unpack constructed products. All the
 multiplicity information is kept in the constructors (both C and (#, #)).
-In particular (#,#) is parametrised by the multiplicity of its fields.
+In particular (#,#) is parameterised by the multiplicity of its fields.
 Specifically, in this instance, the multiplicity of the fields of (#,#)
 is chosen to be the same as those of C.
 

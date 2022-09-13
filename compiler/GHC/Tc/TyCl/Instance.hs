@@ -1099,7 +1099,7 @@ however, so this Note aims to describe these subtleties:
   Now the subtleties of Note [Newtype eta and homogeneous axioms] are
   dealt with by the newtype (via mkNewTyConRhs called in tcDataFamInstDecl)
   while the axiom connecting F Int ~ R:FIntb is eta-reduced, but the
-  quantifer 'b' is derived from the original data family F, and so the
+  quantifier 'b' is derived from the original data family F, and so the
   kinds will always match.
 
 Note [Kind inference for data family instances]
@@ -2050,7 +2050,7 @@ The instance signature can be *more* polymorphic than the instantiated
 class method (in this case: Age -> Age -> Bool), but it cannot be less
 polymorphic.  Moreover, if a signature is given, the implementation
 code should match the signature, and type variables bound in the
-singature should scope over the method body.
+signature should scope over the method body.
 
 We achieve this by building a TcSigInfo for the method, whether or not
 there is an instance method signature, and using that to typecheck

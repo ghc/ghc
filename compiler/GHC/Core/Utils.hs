@@ -803,7 +803,7 @@ with a specific constructor is desirable.
    which causes the KnownBranch optimisation to kick in. If we don't
    refine DEFAULT to `Foo ip1`, we are left with both case expressions.
 
-2. combineIdenticalAlts does a better job. For exapple (Simon Jacobi)
+2. combineIdenticalAlts does a better job. For example (Simon Jacobi)
        data D = C0 | C1 | C2
 
        case e of
@@ -2007,7 +2007,7 @@ dataConInstPat :: [FastString]          -- A long enough list of FSs to use for 
 --
 --   ex_tvs are intended to be used as binders for existential type args
 --
---   arg_ids are indended to be used as binders for value arguments,
+--   arg_ids are intended to be used as binders for value arguments,
 --     and their types have been instantiated with inst_tys and ex_tys
 --     The arg_ids include both evidence and
 --     programmer-specified arguments (both after rep-ing)

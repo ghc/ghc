@@ -861,9 +861,9 @@ a pair of an `IO a` action and a `MVar a`, where to place the result.
   blocking.
 * runPipelines takes this list and eventually passes it to runLoop which executes
   each action and places the result into the right MVar.
-* The amount of parrelism is controlled by a semaphore. This is just used around the
+* The amount of parallelism is controlled by a semaphore. This is just used around the
   module compilation step, so that only the right number of modules are compiled at
-  the same time which reduces overal memory usage and allocations.
+  the same time which reduces overall memory usage and allocations.
 * Each proper node has a LogQueue, which dictates where to send it's output.
 * The LogQueue is placed into the LogQueueQueue when the action starts and a worker
   thread processes the LogQueueQueue printing logs for each module in a stable order.
@@ -992,7 +992,7 @@ mkBuildResult = BuildResult
 
 data BuildLoopState = BuildLoopState { buildDep :: M.Map NodeKey BuildResult
                                           -- The current way to build a specific TNodeKey, without cycles this just points to
-                                          -- the appropiate result of compiling a module  but with
+                                          -- the appropriate result of compiling a module  but with
                                           -- cycles there can be additional indirection and can point to the result of typechecking a loop
                                      , nNODE :: Int
                                      , hug_var :: MVar HomeUnitGraph
@@ -2414,7 +2414,7 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mod = do
              -- Localise the hsc_env to use the cached flags
              hscSetFlags lcl_dynflags $
              hydrated_hsc_env
-     -- Compile the module, locking with a semphore to avoid too many modules
+     -- Compile the module, locking with a semaphore to avoid too many modules
      -- being compiled at the same time leading to high memory usage.
      wrapAction lcl_hsc_env $ do
       res <- upsweep_mod lcl_hsc_env env_messager old_hmi mod k n
@@ -2634,7 +2634,7 @@ X.hs     module X where
 ```
 If in `--make` we compile R.hs-boot, then A.hs, then X.hs, we'll get a `ModDetails` for `X` that has an AbstractTyCon for `T` in the the argument type of `MkX`.  So:
 
-* Either we should delay compiling X until after R has beeen compiled. (This is what we do)
+* Either we should delay compiling X until after R has been compiled. (This is what we do)
 * Or we should rehydrate X after compiling R -- because it transitively depends on R.hs-boot.
 
 Ticket #20200 has exposed some issues to do with the knot-tying logic in GHC.Make, in `--make` mode.
@@ -2846,7 +2846,7 @@ runAllPipelines n_jobs env acts = do
   MC.bracket spawn_actions kill_actions $ \_ -> do
     mapM_ waitMakeAction acts
 
--- | Execute each action in order, limiting the amount of parrelism by the given
+-- | Execute each action in order, limiting the amount of parallelism by the given
 -- semaphore.
 runLoop :: (((forall a. IO a -> IO a) -> IO ()) -> IO a) -> MakeEnv -> [MakeAction] -> IO [a]
 runLoop _ _env [] = return []

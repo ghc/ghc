@@ -604,7 +604,7 @@ cmmInfoTableToInfoProvEnt this_mod cmit =
     in InfoProvEnt cl cn "" this_mod Nothing
 
 -- | Convert source information collected about identifiers in 'GHC.STG.Debug'
--- to entries suitable for placing into the info table provenenance table.
+-- to entries suitable for placing into the info table provenance table.
 convertInfoProvMap :: [CmmInfoTable] -> Module -> InfoTableProvMap -> [InfoProvEnt]
 convertInfoProvMap defns this_mod (InfoTableProvMap (UniqMap dcenv) denv infoTableToSourceLocationMap) =
   map (\cmit ->

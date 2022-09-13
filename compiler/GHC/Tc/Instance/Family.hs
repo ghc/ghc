@@ -364,7 +364,7 @@ checkFamInstConsistency directlyImpMods
         -- We could, but doing so means one of two things:
         --
         --   1. When looping over the cartesian product we convert
-        --   a set into a non-deterministicly ordered list. Which
+        --   a set into a non-deterministically ordered list. Which
         --   happens to be fine for interface file determinism
         --   in this case, today, because the order only
         --   determines the order of deferred checks. But such

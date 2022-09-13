@@ -126,7 +126,7 @@ We stop if there are /any/ unsolved constraints, not just insoluble
 ones; because pattern synonyms are top-level things, we will never
 solve them later if we can't solve them now.  And if we were to carry
 on, tc_patsyn_finish does zonkTcTypeToType, which defaults any
-unsolved unificatdion variables to Any, which confuses the error
+unsolved unification variables to Any, which confuses the error
 reporting no end (#15685).
 
 So we use simplifyTop to completely solve the constraint, report
@@ -276,7 +276,7 @@ But neither is 's' itself existentially bound, so the forall (s::k->*)
 can't go in the inner forall either.  (What would the matcher apply
 the continuation to?)
 
-Solution: do not quantiify over any unification variable whose kind
+Solution: do not quantify over any unification variable whose kind
 mentions the existentials.  We can conveniently do that by making the
 "taus" passed to simplifyInfer look like
    forall ex_tvs. arg_ty
@@ -326,7 +326,7 @@ and that is bad because (a ~# Maybe b) is not a predicate type
 and is not implicitly instantiated.
 
 So in mkProvEvidence we lift (a ~# b) to (a ~ b).  Tiresome, and
-marginally less efficient, if the builder/martcher are not inlined.
+marginally less efficient, if the builder/matcher are not inlined.
 
 See also Note [Lift equality constraints when quantifying] in GHC.Tc.Solver
 

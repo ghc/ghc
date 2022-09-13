@@ -705,7 +705,7 @@ pushResume hsc_env resume = hsc_env { hsc_IC = ictxt1 }
   There are 3 situations where items are removed from the Id list
   (or replaced with `Nothing`):
   1.) If function `GHC.StgToByteCode.schemeER_wrk` (which creates
-      the Id list) doesn't find an Id in the ByteCode environement.
+      the Id list) doesn't find an Id in the ByteCode environment.
   2.) If function `GHC.Runtime.Eval.bindLocalsAtBreakpoint`
       filters out unboxed elements from the Id list, because GHCi cannot
       yet handle them.
@@ -849,7 +849,7 @@ moduleIsInterpreted modl = withSession $ \h ->
                 _not_a_home_module -> return False
 
 -- | Looks up an identifier in the current interactive context (for :info)
--- Filter the instances by the ones whose tycons (or clases resp)
+-- Filter the instances by the ones whose tycons (or classes resp)
 -- are in scope (qualified or otherwise).  Otherwise we list a whole lot too many!
 -- The exact choice of which ones to show, and which to hide, is a judgement call.
 --      (see #1581)

@@ -306,7 +306,7 @@ Neither do we want this to happen
   in …
 
 where the floated expression `x+x` is a bit more complicated, but still not
-intersting.
+interesting.
 
 Expressions are interesting when they move an occurrence of a variable outside
 the recursive `go` that can benefit from being obviously called once, for example:
@@ -315,7 +315,7 @@ the recursive `go` that can benefit from being obviously called once, for exampl
    see that it is called at most once, and hence improve the function’s
    strictness signature
 
-So we only hoist an exit expression out if it mentiones at least one free,
+So we only hoist an exit expression out if it mentions at least one free,
 non-imported variable.
 
 Note [Jumps can be interesting]
@@ -430,7 +430,7 @@ would).
 To prevent this, we need to recognize exit join points, and then disable
 inlining.
 
-Exit join points, recognizeable using `isExitJoinId` are join points with an
+Exit join points, recognizable using `isExitJoinId` are join points with an
 occurrence in a recursive group, and can be recognized (after the occurrence
 analyzer ran!) using `isExitJoinId`.
 This function detects joinpoints with `occ_in_lam (idOccinfo id) == True`,

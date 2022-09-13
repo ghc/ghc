@@ -788,7 +788,7 @@ occAnalNonRecBind !env lvl imp_rule_edges bndr rhs body_usage
          --     h = ...
          --     g = ...
          --     RULE map g = h
-         -- Then we want to ensure that h is in scope everwhere
+         -- Then we want to ensure that h is in scope everywhere
          -- that g is (since the RULE might turn g into h), so
          -- we make g mention h.
 
@@ -958,7 +958,7 @@ And now the Simplifer will try to use PreInlineUnconditionally on lvl1
 (which occurs just once), but because it is last we won't actually
 substitute in lvl2.  Sigh.
 
-To avoid this possiblity, we include edges from lvl2 to /both/ its
+To avoid this possibility, we include edges from lvl2 to /both/ its
 stable unfolding /and/ its RHS.  Hence the defn of inl_fvs in
 makeNode.  Maybe we could be more clever, but it's very much a corner
 case.
@@ -1222,7 +1222,7 @@ more likely.  Here's a real example from #1969:
         $s$dm2 = \x. op dBool }
 The RULES stuff means that we can't choose $dm as a loop breaker
 (Note [Choosing loop breakers]), so we must choose at least (say)
-opInt *and* opBool, and so on.  The number of loop breakders is
+opInt *and* opBool, and so on.  The number of loop breakers is
 linear in the number of instance declarations.
 
 Note [Loop breakers and INLINE/INLINABLE pragmas]
@@ -2404,10 +2404,10 @@ A': Non-obviously saturated applications: eg    build (f (\x y -> expensive))
 B:  Let-bindings:  eg   let f = \c. let ... in \n -> blah
                         in (build f, build f)
 
-    Propagate one-shot info from the demanand-info on 'f' to the
+    Propagate one-shot info from the demand-info on 'f' to the
     lambdas in its RHS (which may not be syntactically at the top)
 
-    This information must have come from a previous run of the demanand
+    This information must have come from a previous run of the demand
     analyser.
 
 Previously, the demand analyser would *also* set the one-shot information, but
@@ -2550,7 +2550,7 @@ addOneInScope env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars }) bndr
 
 addInScope :: OccEnv -> [Var] -> OccEnv
 -- See Note [The binder-swap substitution]
--- It's only neccessary to call this on in-scope Ids,
+-- It's only necessary to call this on in-scope Ids,
 -- but harmless to include TyVars too
 addInScope env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars }) bndrs
   | any (`elemVarSet` rng_vars) bndrs = env { occ_bs_env = emptyVarEnv, occ_bs_rng = emptyVarSet }

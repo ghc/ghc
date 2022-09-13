@@ -127,7 +127,7 @@ lookupFixityRn_help' :: Name
 lookupFixityRn_help' name occ
   | isUnboundName name
   = return (False, Fixity NoSourceText minPrecedence InfixL)
-    -- Minimise errors from ubound names; eg
+    -- Minimise errors from unbound names; eg
     --    a>0 `foo` b>0
     -- where 'foo' is not in scope, should not give an error (#7937)
 

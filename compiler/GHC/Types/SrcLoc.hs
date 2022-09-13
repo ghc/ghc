@@ -160,7 +160,7 @@ data RealSrcLoc
 --
 -- The parser guarantees that 'BufPos' are monotonic. See #17632. This means
 -- that syntactic constructs that appear later in the 'StringBuffer' are guaranteed to
--- have a higher 'BufPos'. Constrast that with 'RealSrcLoc', which does *not* make the
+-- have a higher 'BufPos'. Contrast that with 'RealSrcLoc', which does *not* make the
 -- analogous guarantee about higher line/column numbers.
 --
 -- This is due to #line and {-# LINE ... #-} pragmas that can arbitrarily

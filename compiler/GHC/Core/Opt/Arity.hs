@@ -571,7 +571,7 @@ Extrude the g2
   f' = \p. \s. ((error "...") |> g1) s
   f = f' |> (String -> g2)
 
-Discard args for bottomming function
+Discard args for bottoming function
 
   f' = \p. \s. ((error "...") |> g1 |> g3
   g3 :: (S -> (S,T)) ~ (S,T)
@@ -823,7 +823,7 @@ arityTypeOneShots (AT lams _) = map snd lams
 
 safeArityType :: ArityType -> SafeArityType
 -- ^ Assuming this ArityType is all we know, find the arity of
--- the function, and trim the argument info (and Divergenge)
+-- the function, and trim the argument info (and Divergence)
 -- to match that arity. See Note [SafeArityType]
 safeArityType at@(AT lams _)
   = case go 0 IsCheap lams of
@@ -2034,7 +2034,7 @@ This what eta_expand does.  We do it in two steps:
 
    where etas :: EtaInfo
          etaInfoAbs builds the lambdas
-         etaInfoApp builds the applictions
+         etaInfoApp builds the applications
 
    Note that the /same/ EtaInfo drives both etaInfoAbs and etaInfoApp
 
@@ -2391,7 +2391,7 @@ case where `e` is trivial):
     when `e = \x. if x then bot else id`, because the latter will diverge when
     the former would not.
 
-    On the other hand, with `-fno-pendantic-bottoms` , we will have eta-expanded
+    On the other hand, with `-fno-pedantic-bottoms` , we will have eta-expanded
     the definition of `e` and then eta-reduction is sound
     (see Note [Dealing with bottom]).
     Consequence: We have to check that `-fpedantic-bottoms` is off; otherwise
@@ -2487,7 +2487,7 @@ HOWEVER, if we transform
 that might mean that f isn't saturated any more, and does not inline.
 This led to some other regressions.
 
-TL;DR currrently we do /not/ eta reduce if the result is a PAP.
+TL;DR currently we do /not/ eta reduce if the result is a PAP.
 
 Note [Eta reduction with casted arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

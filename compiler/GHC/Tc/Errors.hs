@@ -1484,7 +1484,7 @@ mkIPErr ctxt items
 ----------------
 
 -- | Report a representation-polymorphism error to the user:
--- a type is required to havehave a fixed runtime representation,
+-- a type is required to have a fixed runtime representation,
 -- but doesn't.
 --
 -- See Note [Reporting representation-polymorphism errors] in GHC.Tc.Types.Origin.

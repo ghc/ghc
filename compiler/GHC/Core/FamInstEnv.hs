@@ -366,7 +366,7 @@ type FamInstEnvs = (FamInstEnv, FamInstEnv)
 
 data FamInstEnv
   = FamIE !Int -- The number of instances, used to choose the smaller environment
-               -- when checking type family consistnecy of home modules.
+               -- when checking type family consistency of home modules.
           !(RoughMap FamInst)
      -- See Note [FamInstEnv]
      -- See Note [FamInstEnv determinism]
@@ -549,7 +549,7 @@ data InjectivityCheckResult
    | InjectivityUnified CoAxBranch CoAxBranch
     -- ^ RHSs unify but LHSs don't unify under that substitution.  Relevant for
     -- closed type families where equation after unification might be
-    -- overlpapped (in which case it is OK if they don't unify).  Constructor
+    -- overlapped (in which case it is OK if they don't unify).  Constructor
     -- stores axioms after unification.
 
 -- | Check whether two type family axioms don't violate injectivity annotation.
@@ -920,7 +920,7 @@ See also Note [Injective type families] in GHC.Core.TyCon
 lookupFamInstEnvInjectivityConflicts
     :: [Bool]         -- injectivity annotation for this type family instance
                       -- INVARIANT: list contains at least one True value
-    ->  FamInstEnvs   -- all type instances seens so far
+    ->  FamInstEnvs   -- all type instances seen so far
     ->  FamInst       -- new type instance that we're checking
     -> [CoAxBranch]   -- conflicting instance declarations
 lookupFamInstEnvInjectivityConflicts injList fam_inst_envs

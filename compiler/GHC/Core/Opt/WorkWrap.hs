@@ -486,7 +486,7 @@ Reminder: Note [Don't w/w INLINE things], so we don't need to worry
           about INLINE things here.
 
 
-What if `foo` has no specialiations, is worker/wrappered (with the
+What if `foo` has no specialisations, is worker/wrappered (with the
 wrapper inlining very early), and exported; and then in an importing
 module we have {-# SPECIALISE foo : ... #-}?
 
@@ -645,7 +645,7 @@ as simple as I thought.  Consider this:
         in p `seq` (v,v)
 
 I think we'll give `f` the strictness signature `<SP(M,A)>`, where the
-`M` sayd that we'll evaluate the first component of the pair at most
+`M` says that we'll evaluate the first component of the pair at most
 once.  Why?  Because the RHS of the thunk `v` is evaluated at most
 once.
 

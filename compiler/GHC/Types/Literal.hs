@@ -964,7 +964,7 @@ data type. Here are the moving parts:
    an IR feature.
 
 2. Core: 'LitRubbish' carries a `Type` of kind RuntimeRep,
-   describing the runtime representaion of the literal (is it a
+   describing the runtime representation of the literal (is it a
    pointer, an unboxed Double#, or whatever).
 
    We have it that `RUBBISH[rr]` has type `forall (a :: TYPE rr). a`.
@@ -1011,7 +1011,7 @@ data type. Here are the moving parts:
 Wrinkles
 
 a) Why do we put the `Type` (of kind RuntimeRep) inside the literal?  Could
-   we not instead /apply/ the literal to that RuntimeRep?  Alas no, becuase
+   we not instead /apply/ the literal to that RuntimeRep?  Alas no, because
    then LitRubbish :: forall (rr::RuntimeRep) (a::TYPE rr). a
    and that's am ill-formed type because its kind is `TYPE rr`, which escapes
    the binding site of `rr`. Annoying.
@@ -1043,7 +1043,7 @@ Suppose there is a bug in GHC, and a rubbish value is used after all. That is
 undefined behavior, of course, but let us list a few examples for failure modes:
 
  a) For an value of unboxed numeric type like `Int#`, we just use a silly
-    value like 42#. The error might propoagate indefinitely, hence we better
+    value like 42#. The error might propagate indefinitely, hence we better
     pick a rather unique literal. Same for Word, Floats, Char and VecRep.
  b) For AddrRep (like String lits), we mit a null pointer, resulting in a
     definitive segfault when accessed.

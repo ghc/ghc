@@ -167,11 +167,11 @@ data MatchResult a
   | MR_Fallible (CoreExpr -> DsM a)
   deriving (Functor)
 
--- | Product is an "or" on falliblity---the combined match result is infallible
+-- | Product is an "or" on fallibility---the combined match result is infallible
 -- only if the left and right argument match results both were.
 --
 -- This is useful for combining a bunch of alternatives together and then
--- getting the overall falliblity of the entire group. See 'mkDataConCase' for
+-- getting the overall fallibility of the entire group. See 'mkDataConCase' for
 -- an example.
 instance Applicative MatchResult where
   pure v = MR_Infallible (pure v)

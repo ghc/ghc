@@ -800,12 +800,12 @@ vcat :: [SDoc] -> SDoc
 sep :: [SDoc] -> SDoc
 -- ^ Separate: is either like 'hsep' or like 'vcat', depending on what fits
 cat :: [SDoc] -> SDoc
--- ^ Catenate: is either like 'hcat' or like 'vcat', depending on what fits
+-- ^ Concatenate: is either like 'hcat' or like 'vcat', depending on what fits
 fsep :: [SDoc] -> SDoc
 -- ^ A paragraph-fill combinator. It's much like sep, only it
 -- keeps fitting things on one line until it can't fit any more.
 fcat :: [SDoc] -> SDoc
--- ^ This behaves like 'fsep', but it uses '<>' for horizontal conposition rather than '<+>'
+-- ^ This behaves like 'fsep', but it uses '<>' for horizontal composition rather than '<+>'
 
 
 -- Inline all those wrappers to help ensure we create lists of Doc, not of SDoc

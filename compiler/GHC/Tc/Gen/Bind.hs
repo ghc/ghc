@@ -1153,7 +1153,7 @@ Consider this from #18646
 We get [W] Foo (), [W] Applicative f.   When we do pickCapturedPreds in
 choose_psig_context, we'll discard Foo ()!  Usually would not quantify over
 such (closed) predicates.  So my_theta will be (Applicative f). But we really
-do want to quantify over (Foo ()) -- it was speicfied by the programmer.
+do want to quantify over (Foo ()) -- it was specified by the programmer.
 Solution: always return annotated_theta (user-specified) plus the extra piece
 diff_theta.
 
@@ -1354,7 +1354,7 @@ with -XImpredicativeTypes we can infer a good type for
 (combine head ids), and use that to tell us the polymorphic
 types of x and y.
 
-We don't need to check -XImpredicativeTypes beucase without it
+We don't need to check -XImpredicativeTypes because without it
 these types like [forall a. a->a] are illegal anyway, so this
 special case code only really has an effect if -XImpredicativeTypes
 is on.  Small exception:

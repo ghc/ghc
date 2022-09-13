@@ -244,7 +244,7 @@ getCoreToDo dflags rule_base extra_vars
            -- GHC.Iface.Tidy.StaticPtrTable.
            static_ptrs_float_outwards,
 
-        -- Run the simplier phases 2,1,0 to allow rewrite rules to fire
+        -- Run the simplifier phases 2,1,0 to allow rewrite rules to fire
         runWhen do_simpl3
             (CoreDoPasses $ [ simpl_phase (Phase phase) "main" max_iter
                             | phase <- [phases, phases-1 .. 1] ] ++
@@ -417,7 +417,7 @@ for two reasons, both shown up in test perf/compiler/T16473,
 with -O2 -flate-specialise
 
 1.  I found that running late-Specialise after SpecConstr, with no
-    simplification in between meant that the carefullly constructed
+    simplification in between meant that the carefully constructed
     SpecConstr rule never got to fire.  (It was something like
           lvl = f a   -- Arity 1
           ....g lvl....

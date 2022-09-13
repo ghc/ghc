@@ -43,7 +43,7 @@ import qualified Data.IntSet as S
 -- at hand, and we do not have that when we turn the domain of a VarEnv into a UnVarSet.
 -- Therefore, use a IntSet directly (which is likely also a bit more efficient).
 
--- Set of uniques, i.e. for adjancet nodes
+-- Set of uniques, i.e. for adjacent nodes
 newtype UnVarSet = UnVarSet (S.IntSet)
     deriving Eq
 

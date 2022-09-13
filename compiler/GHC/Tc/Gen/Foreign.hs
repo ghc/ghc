@@ -96,7 +96,7 @@ declaration. If we have
 newtype Age = MkAge Int
 
 we want to see that Age -> IO () is the same as Int -> IO (). But, we don't
-need to recur on any type parameters, because no paramaterized types (with
+need to recur on any type parameters, because no parameterized types (with
 interesting parameters) are marshalable! The full list of marshalable types
 is in the body of boxedMarshalableTyCon in GHC.Tc.Utils.TcType. The only members of that
 list not at kind * are Ptr, FunPtr, and StablePtr, all of which get marshaled

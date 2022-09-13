@@ -538,13 +538,13 @@ lookupUnitId' :: UnitInfoMap -> UnitId -> Maybe UnitInfo
 lookupUnitId' db uid = Map.lookup uid db
 
 
--- | Looks up the given unit in the unit state, panicing if it is not found
+-- | Looks up the given unit in the unit state, panicking if it is not found
 unsafeLookupUnit :: HasDebugCallStack => UnitState -> Unit -> UnitInfo
 unsafeLookupUnit state u = case lookupUnit state u of
    Just info -> info
    Nothing   -> pprPanic "unsafeLookupUnit" (ppr u)
 
--- | Looks up the given unit id in the unit state, panicing if it is not found
+-- | Looks up the given unit id in the unit state, panicking if it is not found
 unsafeLookupUnitId :: HasDebugCallStack => UnitState -> UnitId -> UnitInfo
 unsafeLookupUnitId state uid = case lookupUnitId state uid of
    Just info -> info

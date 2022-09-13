@@ -118,7 +118,7 @@ Note [FractionalLit representation]
 There is a fun wrinkle to this, we used to simply compute the value
 for these literals and store it as `Rational`. While this might seem
 reasonable it meant typechecking literals of extremely large numbers
-wasn't possible. This happend for example in #15646.
+wasn't possible. This happened for example in #15646.
 
 There a user would write in GHCi e.g. `:t 1e1234111111111111111111111`
 which would trip up the compiler. The reason being we would parse it as

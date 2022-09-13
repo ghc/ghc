@@ -161,7 +161,7 @@ bindSuspensions t = do
       return t'
      where
 
---    Processing suspensions. Give names and recopilate info
+--    Processing suspensions. Give names and collect info
         nameSuspensionsAndGetInfos :: HscEnv -> IORef [String]
                                    -> TermFold (IO (Term, [(Name,Type,ForeignHValue)]))
         nameSuspensionsAndGetInfos hsc_env freeNames = TermFold

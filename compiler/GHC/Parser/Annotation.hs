@@ -547,7 +547,7 @@ realSpanAsAnchor s  = Anchor s UnchangedAnchor
 -- element, and print them together with the element, interleaving
 -- them into the output stream.  But when editing the AST to move
 -- fragments around it is useful to be able to first separate the
--- comments into those occuring before the AST element and those
+-- comments into those occurring before the AST element and those
 -- following it.  The 'EpaCommentsBalanced' constructor is used to do
 -- this. The GHC parser will only insert the 'EpaComments' form.
 data EpAnnComments = EpaComments
@@ -633,7 +633,7 @@ meaning we can have type LocatedN RdrName
 -- Annotations for items in a list
 -- ---------------------------------------------------------------------
 
--- | Captures the location of punctuation occuring between items,
+-- | Captures the location of punctuation occurring between items,
 -- normally in a list.  It is captured as a trailing annotation.
 data TrailingAnn
   = AddSemiAnn EpaLocation    -- ^ Trailing ';'

@@ -355,8 +355,8 @@ graphAddConflictSet set graph
    in   graph2
 
 
--- | Add some coalesence edges to the graph
---   Coalesences between virtual and real regs are recorded as preferences.
+-- | Add some coalescence edges to the graph
+--   Coalescences between virtual and real regs are recorded as preferences.
 graphAddCoalesce
         :: (Reg, Reg)
         -> Color.Graph VirtualReg RegClass RealReg

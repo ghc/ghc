@@ -76,7 +76,7 @@ data ModSummary
         ms_textual_imps :: [(PkgQual, Located ModuleName)],
           -- ^ Non-source imports of the module from the module *text*
         ms_ghc_prim_import :: !Bool,
-          -- ^ Whether the special module GHC.Prim was imported explicitliy
+          -- ^ Whether the special module GHC.Prim was imported explicitly
         ms_parsed_mod   :: Maybe HsParsedModule,
           -- ^ The parsed, nonrenamed source, if we have it.  This is also
           -- used to support "inline module syntax" in Backpack files.

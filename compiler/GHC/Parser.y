@@ -462,7 +462,7 @@ Example:
     foo :: (:%)
 
 Ambiguity:
-    If we reduced, (:%) would be parsed as a parenthehsized infix type
+    If we reduced, (:%) would be parsed as a parenthesized infix type
     expression without arguments, resulting in the 'failOpFewArgs' error.
 
     We shift, so it is parsed as a type constructor.

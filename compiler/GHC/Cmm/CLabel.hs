@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Object-file symbols (called CLabel for histerical raisins).
+-- Object-file symbols (called CLabel for historical reasons).
 --
 -- (c) The University of Glasgow 2004-2006
 --
@@ -612,7 +612,7 @@ mkClosureTableLabel         :: Name -> CafInfo -> CLabel
 mkConInfoTableLabel         :: Name -> ConInfoTableLocation -> CLabel
 mkBytesLabel                :: Name -> CLabel
 mkClosureLabel name         c     = IdLabel name c Closure
--- | Decicdes between external and local labels based on the names externality.
+-- | Decides between external and local labels based on the names externality.
 mkInfoTableLabel name       c
   | isExternalName name = IdLabel name c InfoTable
   | otherwise           = IdLabel name c LocalInfoTable

@@ -409,7 +409,7 @@ pmIsClosedType ty
     -- (See "Type#type_classification" for what an algebraic type is.)
     --
     -- This is qualified with \"like\" because of a particular special
-    -- case: TYPE (the underlyind kind behind Type, among others). TYPE
+    -- case: TYPE (the underlying kind behind Type, among others). TYPE
     -- is conceptually a datatype (and thus algebraic), but in practice it is
     -- a primitive builtin type, so we must check for it specially.
     --
@@ -1067,7 +1067,7 @@ or are redundant. Examples:
 * @x ~ Just y@, @x ≁ [Just]@. 'eqPmAltCon' returns @Equal@, so refute.
 * @x ~ Nothing@, @x ≁ [Just]@. 'eqPmAltCon' returns @Disjoint@, so negative
   info is redundant and should be discarded.
-* @x ~ I# y@, @x ≁ [4,2]@. 'eqPmAltCon' returns @PossiblyOverlap@, so orthogal.
+* @x ~ I# y@, @x ≁ [4,2]@. 'eqPmAltCon' returns @PossiblyOverlap@, so orthogonal.
   We keep this info in order to be able to refute a redundant match on i.e. 4
   later on.
 
@@ -1344,7 +1344,7 @@ varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} vi = do
 -- Internally uses and updates the CompleteMatchs in vi_rcm.
 --
 -- NB: Does /not/ filter each CompleteMatch with the oracle; members may
---     remain that do not statisfy it.  This lazy approach just
+--     remain that do not satisfy it.  This lazy approach just
 --     avoids doing unnecessary work.
 instantiate :: Int -> Nabla -> VarInfo -> MaybeT DsM VarInfo
 instantiate fuel nabla vi = {-# SCC "instantiate" #-}
@@ -1481,7 +1481,7 @@ triviallyInhabitedTyConKeys = mkUniqSet [
 compareConLikeTestability :: ConLike -> ConLike -> Ordering
 -- We should instantiate DataCons first, because they are likely to occur in
 -- multiple COMPLETE sets at once and we might find that multiple COMPLETE sets
--- are inhabitated by instantiating only a single DataCon.
+-- are inhabited by instantiating only a single DataCon.
 compareConLikeTestability PatSynCon{}     _               = GT
 compareConLikeTestability _               PatSynCon{}     = GT
 compareConLikeTestability (RealDataCon a) (RealDataCon b) = mconcat
@@ -1620,7 +1620,7 @@ A complete algorithm would mean that
      definition be flagged as inexhaustive (no false positives).
 
 Via the LYG algorithm, we reduce both these properties to a property on
-the inhabitation test of refinementment types:
+the inhabitation test of refinement types:
   *Soundness*:    If the inhabitation test says "no" for a given refinement type
                   Nabla, then it provably has no inhabitant.
   *Completeness*: If the inhabitation test says "yes" for a given refinement type
@@ -1736,7 +1736,7 @@ If we try to instantiate each of its fields, that will require us to once again
 check if `MkT` is inhabitable in each of those three fields, which in turn will
 require us to check if `MkT` is inhabitable again... As you can see, the
 branching factor adds up quickly, and if the initial fuel is, say,
-100, then the inhabiation test will effectively take forever.
+100, then the inhabitation test will effectively take forever.
 
 To mitigate this, we check the branching factor every time we are about to do
 inhabitation testing in 'instCon'. If the branching factor exceeds 1

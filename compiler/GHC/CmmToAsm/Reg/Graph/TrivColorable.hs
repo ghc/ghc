@@ -109,7 +109,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchPPC       -> 16
                             ArchPPC_64 _  -> 15
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            -- We should be able to allocate *a lot* more in princple.
+                            -- We should be able to allocate *a lot* more in principle.
                             -- essentially all 32 - SP, so 31, we'd trash the link reg
                             -- as well as the platform and all others though.
                             ArchAArch64   -> 18
@@ -142,7 +142,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                             ArchPPC       -> 0
                             ArchPPC_64 _  -> 0
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            -- we can in princple address all the float regs as
+                            -- we can in principle address all the float regs as
                             -- segments. So we could have 64 Float regs. Or
                             -- 128 Half regs, or even 256 Byte regs.
                             ArchAArch64   -> 0

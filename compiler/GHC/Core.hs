@@ -1483,7 +1483,7 @@ unfoldingTemplate :: Unfolding -> CoreExpr
 unfoldingTemplate = uf_tmpl
 
 -- | Retrieves the template of an unfolding if possible
--- maybeUnfoldingTemplate is used mainly wnen specialising, and we do
+-- maybeUnfoldingTemplate is used mainly when specialising, and we do
 -- want to specialise DFuns, so it's important to return a template
 -- for DFunUnfoldings
 maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr

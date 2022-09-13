@@ -106,7 +106,7 @@ There are many wrinkles:
 * GHC.Prim doesn't have any associated object code, so we need to put the
   representations for types defined in this module elsewhere. We chose this
   place to be GHC.Types. GHC.Tc.Instance.Typeable.mkPrimTypeableBinds is responsible for
-  injecting the bindings for the GHC.Prim representions when compiling
+  injecting the bindings for the GHC.Prim representations when compiling
   GHC.Types.
 
 * TyCon.tyConRepModOcc is responsible for determining where to find

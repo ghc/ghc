@@ -134,7 +134,7 @@ lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
                    -> [GenStgTopBinding a]
                    -> IO ()
 
-lintStgTopBindings platform logger diag_opts opts extra_vars this_mod unarised whodunnit binds
+lintStgTopBindings platform logger diag_opts opts extra_vars this_mod unarised whodunit binds
   = {-# SCC "StgLint" #-}
     case initL platform diag_opts this_mod unarised opts top_level_binds (lint_binds binds) of
       Nothing  ->
@@ -143,7 +143,7 @@ lintStgTopBindings platform logger diag_opts opts extra_vars this_mod unarised w
         logMsg logger Err.MCDump noSrcSpan
           $ withPprStyle defaultDumpStyle
           (vcat [ text "*** Stg Lint ErrMsgs: in" <+>
-                        text whodunnit <+> text "***",
+                        text whodunit <+> text "***",
                   msg,
                   text "*** Offending Program ***",
                   pprGenStgTopBindings opts binds,

@@ -88,12 +88,12 @@ Which will result in a W/W split along the lines of
     $wf :: (a -> b -> d -> c) -> a -> b -> c -> d
     $wf m1 a b c = m1 a b c
 
-It's notable that the worker is called *undersatured* in the wrapper.
+It's notable that the worker is called *undersaturated* in the wrapper.
 At runtime what happens is that the wrapper will allocate a PAP which
 once fully applied will call the worker. And all is fine.
 
 But what about a call by value function! Well the function returned by `f` would
-be a unknown call, so we lose the ability to enfore the invariant that
+be a unknown call, so we lose the ability to enforce the invariant that
 cbv marked arguments from StictWorkerId's are actually properly tagged
 as the annotations would be unavailable at the (unknown) call site.
 
@@ -505,7 +505,7 @@ getStrictConArgs con args
     -- For proper data cons we have to check.
     | otherwise =
         assertPpr   (length args == length (dataConRuntimeRepStrictness con))
-                    (text "Missmatched con arg and con rep strictness lengths:" $$
+                    (text "Mismatched con arg and con rep strictness lengths:" $$
                      text "Con" <> ppr con <+> text "is applied to" <+> ppr args $$
                      text "But seems to have arity" <> ppr (length repStrictness)) $
         [ arg | (arg,MarkedStrict)

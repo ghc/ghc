@@ -3012,7 +3012,7 @@ The body of the forall in foo's type has kind (K r), and
 normally it would make no sense to have
    forall r. (ty :: K r)
 because the kind of the forall would escape the binding
-of 'r'.  But in this case it's fine because (K r) exapands
+of 'r'.  But in this case it's fine because (K r) expands
 to Type, so we explicitly /permit/ the type
    forall r. T r
 
@@ -3714,7 +3714,7 @@ Must Answer is:
 * Given the first n arguments of T, do the kinds of the non-omitted arguments
   fill in the omitted arguments?
 
-(This is still a bit hand-wavey, but we'll refine this question incrementally
+(This is still a bit hand-wavy, but we'll refine this question incrementally
 as we explain more of the machinery underlying this process.)
 
 Answering this question is precisely the role that the `injectiveVarsOfType`
@@ -3787,7 +3787,7 @@ each form of tycon binder:
 
     There are some situations where using visible kind application is appropriate
     and others where it is not (e.g., TH
-    reification), so the `injective_vars_of_binder` function is parametrized by
+    reification), so the `injective_vars_of_binder` function is parameterized by
     a Bool which decides if specified binders should be counted towards
     injective positions or not.
 

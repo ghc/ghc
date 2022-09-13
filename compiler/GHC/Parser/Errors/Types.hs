@@ -77,7 +77,7 @@ data PsMessage
    {-| PsWarnBidirectionalFormatChars is a warning (controlled by the -Wwarn-bidirectional-format-characters flag)
    that occurs when unicode bi-directional format characters are found within in a file
 
-   The 'PsLoc' contains the exact position in the buffer the character occured, and the
+   The 'PsLoc' contains the exact position in the buffer the character occurred, and the
    string contains a description of the character.
    -}
    | PsWarnBidirectionalFormatChars (NonEmpty (PsLoc, Char, String))
@@ -498,7 +498,7 @@ data ParseContext
   = ParseContext
   { is_infix :: !(Maybe RdrName)
     -- ^ If 'Just', this is an infix
-    -- pattern with the binded operator name
+    -- pattern with the bound operator name
   , incomplete_do_block :: !PatIncompleteDoBlock
     -- ^ Did the parser likely fail due to an incomplete do block?
   } deriving Eq

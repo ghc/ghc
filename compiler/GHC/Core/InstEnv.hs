@@ -1059,7 +1059,7 @@ that overrides it) but might still be useful for eliminating other instances
       A2. M is not overlapping,
       A3. G is overlapping.
 
-    This means that we eliminate G from the set of matches (it is overriden by M),
+    This means that we eliminate G from the set of matches (it is overridden by M),
     but we keep it around until we are done with instance resolution because
     it might still be useful to eliminate other matches.
 
@@ -1067,7 +1067,7 @@ that overrides it) but might still be useful for eliminating other instances
 
     There are two situations in which guards can eliminate a match:
 
-      B1. We want to add a new instance, but it is overriden by a guard.
+      B1. We want to add a new instance, but it is overridden by a guard.
           We can immediately discard the instance.
 
           Example for B1:
@@ -1080,7 +1080,7 @@ that overrides it) but might still be useful for eliminating other instances
 
           Processing them in order: we add J1 as a match, then J2 as a guard.
           Now, when we come across J3, we can immediately discard it because
-          it is overriden by the guard J2.
+          it is overridden by the guard J2.
 
       B2. We have found a new guard. We must use it to discard matches
           we have already found. This is necessary because we must obtain
@@ -1096,7 +1096,7 @@ that overrides it) but might still be useful for eliminating other instances
 
             We start by considering K1 and K2. Neither has any overlapping flag set,
             so we end up with two matches, {K1, K2}.
-            Next we look at K3: it is overriden by K1, but as K1 is not
+            Next we look at K3: it is overridden by K1, but as K1 is not
             overlapping this means K3 should function as a guard.
             We must then ensure we eliminate K2 from the list of matches,
             as K3 guards against it.

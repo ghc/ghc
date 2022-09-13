@@ -318,7 +318,7 @@ We detect an inaccessible RHS simply by pretending it's redundant, until we see
 -- * Formatting and reporting warnings
 --
 
--- | A datatype to accomodate the different call sites of
+-- | A datatype to accommodate the different call sites of
 -- 'formatReportWarnings'. Used for extracting 'CIRB's from a concrete 'ann'
 -- through 'collectInMode'. Since this is only possible for a couple of
 -- well-known 'ann's, this is a GADT.

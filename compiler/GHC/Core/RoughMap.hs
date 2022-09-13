@@ -149,7 +149,7 @@ The lookupRM' function returns a pair of potential /matches/ and potential /unif
 The potential matches is likely to be much smaller than the bag of potential unifiers due
 to the reasoning about rigid type variables described in Note [Matching a RoughMap].
 On the other hand, the instances captured by the RML_NoKnownTC case can still potentially unify
-with any instance (depending on the substituion of said rigid variable) so they can't be discounted
+with any instance (depending on the substitution of said rigid variable) so they can't be discounted
 from the list of potential unifiers. This is achieved by the RML_NoKnownTC case continuing
 the lookup for unifiers by replacing RML_NoKnownTC with RML_LookupOtherTC.
 
@@ -315,7 +315,7 @@ lookupRM tcs rm = bagToList (fst $ lookupRM' tcs rm)
 
 -- | N.B. Returns a 'Bag' for matches, which allows us to avoid rebuilding all of the lists
 -- we find in 'rm_empty', which would otherwise be necessary due to '++' if we
--- returned a list. We use a list for unifiers becuase the tail is computed lazily and
+-- returned a list. We use a list for unifiers because the tail is computed lazily and
 -- we often only care about the first couple of potential unifiers. Constructing a
 -- bag forces the tail which performs much too much work.
 --

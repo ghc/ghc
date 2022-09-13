@@ -711,7 +711,7 @@ greDefinitionModule = nameModule_maybe . greMangledName
 greQualModName :: GlobalRdrElt -> ModuleName
 -- Get a suitable module qualifier for the GRE
 -- (used in mkPrintUnqualified)
--- Prerecondition: the greMangledName is always External
+-- Precondition: the greMangledName is always External
 greQualModName gre@(GRE { gre_lcl = lcl, gre_imp = iss })
  | lcl, Just mod <- greDefinitionModule gre = moduleName mod
  | Just is <- headMaybe iss                 = is_as (is_decl is)

@@ -393,7 +393,7 @@ Hence: Two basic plans for
 
    * If f is recursive, and the hot loop wouldn't allocate, but the exit branch does then we do
    a redundant heap check.
-   * We use one more instruction to de-allocate the unused heap in the branch using less heap. (Neglible)
+   * We use one more instruction to de-allocate the unused heap in the branch using less heap. (Negligible)
    * A small risk of running gc slightly more often than needed especially if one branch allocates a lot.
 
    The upsides are:

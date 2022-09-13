@@ -87,7 +87,7 @@ word2FloatLabel = \case
 atomicRMWLabel :: Width -> AtomicMachOp -> FastString
 atomicRMWLabel w amop = case amop of
   -- lots of boring cases, but we do it this way to get shared FastString
-  -- literals (compared to concatening strings and allocating FastStrings at
+  -- literals (compared to concatenating strings and allocating FastStrings at
   -- runtime)
   AMO_Add  -> case w of
     W8  -> fsLit "hs_atomic_add8"

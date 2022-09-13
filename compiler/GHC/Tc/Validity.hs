@@ -362,7 +362,7 @@ This might not necessarily show up in kind checking.
 checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that a user-written type is valid for the given context
 -- Assumes argument is fully zonked
--- Assumes arugment is well-kinded;
+-- Assumes argument is well-kinded;
 --    that is, checkValidType doesn't need to do kind checking
 -- Not used for instance decls; checkValidInstance instead
 checkValidType ctxt ty
@@ -1379,7 +1379,7 @@ entirely different meaning. To illustrate, suppose in M.hsig we see
     instance KnownNat T
 
 That says that any module satisfying M.hsig must provide a KnownNat
-instance for T.  We absolultely need that instance when compiling a
+instance for T.  We absolutely need that instance when compiling a
 module that imports M.hsig: see #15379 and
 Note [Fabricating Evidence for Literals in Backpack] in GHC.Tc.Instance.Class.
 
@@ -2505,7 +2505,7 @@ Note [Printing conflicts with class header]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's remarkably painful to give a decent error message for conflicts
 with the class header.  Consider
-   clase C b where
+   class C b where
      type F a b c
    instance C [b] where
      type F x Int _ _ = ...
@@ -2557,7 +2557,7 @@ In every case, b is a type variable not determined by the LHS pattern. The
 first is caught by the renamer, but we catch the last two here. Perhaps one
 could argue that the second should be accepted, albeit with a warning, but
 consider the fact that in a type family instance, there is no way to interact
-with such a varable. At least with @x :: forall a. Int@ we can use visibile
+with such a varable. At least with @x :: forall a. Int@ we can use visible
 type application, like @x \@Bool 1@. (Of course it does nothing, but it is
 permissible.) In the type family case, the only sensible explanation is that
 the user has made a mistake -- thus we throw an error.

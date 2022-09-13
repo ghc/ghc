@@ -753,7 +753,7 @@ matchWrapper
       it creates another equation if the match can fail
       (see @GHC.HsToCore.Expr.doDo@ function)
 \item @let@ patterns, are treated by @matchSimply@
-   List Comprension Patterns, are treated by @matchSimply@ also
+   List Comprehension Patterns, are treated by @matchSimply@ also
 \end{itemize}
 
 We can't call @matchSimply@ with Lambda patterns,

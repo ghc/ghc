@@ -172,7 +172,7 @@ newtype SynCycleM a = SynCycleM {
 
 -- TODO: TyConSet is implemented as IntMap over uniques.
 -- But we could get away with something based on IntSet
--- since we only check membershib, but never extract the
+-- since we only check membership, but never extract the
 -- elements.
 type SynCycleState = TyConSet
 

@@ -362,7 +362,7 @@ dmdAnalStar env (n :* sd) e
       -- and Note [Analysing with absent demand]
   = (toPlusDmdArg $ multDmdType n' dmd_ty, e')
 
--- Main Demand Analsysis machinery
+-- Main Demand Analysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
         -> SubDemand         -- The main one takes a *SubDemand*
         -> CoreExpr -> WithDmdType CoreExpr
@@ -1440,7 +1440,7 @@ encoded in the demand signature, because that is the information that
 demand analysis propagates throughout the program. Failing to
 implement the strategy laid out in the signature can result in
 reboxing in unexpected places. Hence, we must completely anticipate
-unboxing decisions during demand analysis and reflect these decicions
+unboxing decisions during demand analysis and reflect these decisions
 in demand annotations. That is the job of 'finaliseArgBoxities',
 which is defined here and called from demand analysis.
 
@@ -1460,8 +1460,8 @@ Note [Finalising boxity for let-bound Ids]
 Consider
   let x = e in body
 where the demand on 'x' is 1!P(blah).  We want to unbox x according to
-Note [Thunk splitting] in GHC.Core.Opt.WorkWrap.  We must do this becuase
-worker/wrapper ignores stricness and looks only at boxity flags; so if
+Note [Thunk splitting] in GHC.Core.Opt.WorkWrap.  We must do this because
+worker/wrapper ignores strictness and looks only at boxity flags; so if
 x's demand is L!P(blah) we might still split it (wrongly).  We want to
 switch to Boxed on any lazy demand.
 
@@ -1933,7 +1933,7 @@ There are two reasons we sometimes trim a demand to match a type.
   1. GADTs
   2. Recursive products and widening
 
-More on both below.  But the botttom line is: we really don't want to
+More on both below.  But the bottom line is: we really don't want to
 have a binder whose demand is more deeply-nested than its type
 "allows". So in findBndrDmd we call trimToType and findTypeShape to
 trim the demand on the binder to a form that matches the type
@@ -1956,7 +1956,7 @@ For (2) consider
   f _ (MkT n t) = f n t
 
 Here f is lazy in T, but its *usage* is infinite: P(L,P(L,P(L, ...))).
-Notice that this happens because T is a product type, and is recrusive.
+Notice that this happens because T is a product type, and is recursive.
 If we are not careful, we'll fail to iterate to a fixpoint in dmdFix,
 and bale out entirely, which is inefficient and over-conservative.
 
@@ -2238,7 +2238,7 @@ The Opt_DictsStrict flag makes GHC use call-by-value for dictionaries.  Why?
 * Generally CBV is more efficient.
 
 * Dictionaries are always non-bottom; and never take much work to
-  compute.  E.g. a dfun from an instance decl always returns a dicionary
+  compute.  E.g. a dfun from an instance decl always returns a dictionary
   record immediately.  See DFunUnfolding in CoreSyn.
   See also Note [Recursive superclasses] in TcInstDcls.
 
@@ -2254,7 +2254,7 @@ The Opt_DictsStrict flag makes GHC use call-by-value for dictionaries.  Why?
 
 See #17758 for more background and perf numbers.
 
-The implementation is extremly simple: just make the strictness
+The implementation is extremely simple: just make the strictness
 analyser strictify the demand on a dictionary binder in
 'findBndrDmd'.
 

@@ -758,7 +758,7 @@ castVars signage vars = do
                 let (vars', stmts) = unzip done
                 return (vars', toOL stmts)
 
--- | Cast an LLVM variable to a specific type, panicing if it can't be done.
+-- | Cast an LLVM variable to a specific type, panicking if it can't be done.
 castVar :: Signage -> LlvmVar -> LlvmType -> LlvmM (LlvmVar, LlvmStatement)
 castVar signage v t | getVarType v == t
             = return (v, Nop)

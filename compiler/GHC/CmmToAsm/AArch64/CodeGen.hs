@@ -179,13 +179,13 @@ ann doc instr {- debugIsOn -} = ANN doc instr
 
 -- Using pprExpr will hide the AST, @ANN@ will end up in the assembly with
 -- -dppr-debug.  The idea is that we can trivially see how a cmm expression
--- ended up producing the assmebly we see.  By having the verbatim AST printed
--- we can simply check the patterns that were matched to arrive at the assmebly
+-- ended up producing the assembly we see.  By having the verbatim AST printed
+-- we can simply check the patterns that were matched to arrive at the assembly
 -- we generated.
 --
 -- pprExpr will hide a lot of noise of the underlying data structure and print
 -- the expression into something that can be easily read by a human. However
--- going back to the exact CmmExpr representation can be labourous and adds
+-- going back to the exact CmmExpr representation can be laborious and adds
 -- indirections to find the matches that lead to the assembly.
 --
 -- An improvement oculd be to have
@@ -937,7 +937,7 @@ getRegister' config plat expr
         -- careful with the floating point operations.
         -- SLE is effectively LE or unordered (NaN)
         -- SLT is the same. ULE, and ULT will not return true for NaN.
-        -- This is a bit counter intutive. Don't let yourself be fooled by
+        -- This is a bit counter-intuitive. Don't let yourself be fooled by
         -- the S/U prefix for floats, it's only meaningful for integers.
         MO_F_Ge w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d OGE ])
         MO_F_Le w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d OLE ]) -- x <= y <=> y > x
@@ -1550,7 +1550,7 @@ genCCall target dest_regs arg_regs bid = do
       genCCall (ForeignTarget target cconv) dest_regs arg_regs bid
 
     -- TODO: Optimize using paired stores and loads (STP, LDP). It is
-    -- automomatically done by the allocator for us. However it's not optimal,
+    -- automatically done by the allocator for us. However it's not optimal,
     -- as we'd rather want to have control over
     --     all spill/load registers, so we can optimize with instructions like
     --       STP xA, xB, [sp, #-16]!

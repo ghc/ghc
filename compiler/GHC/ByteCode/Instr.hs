@@ -68,12 +68,12 @@ data BCInstr
    | PUSH16 !Word16
    | PUSH32 !Word16
 
-   -- Push the specifiec local as a 8, 16, 32 bit value onto the stack, but the
+   -- Push the specified local as a 8, 16, 32 bit value onto the stack, but the
    -- value will take the whole word on the stack (i.e., the stack will grow by
    -- a word)
    -- This is useful when extracting a packed constructor field for further use.
    -- Currently we expect all values on the stack to take full words, except for
-   -- the ones used for PACK (i.e., actually constracting new data types, in
+   -- the ones used for PACK (i.e., actually constructing new data types, in
    -- which case we use PUSH{8,16,32})
    | PUSH8_W  !Word16
    | PUSH16_W !Word16
@@ -299,9 +299,9 @@ instance Outputable BCInstr where
    ppr (TESTEQ_P  i lab)     = text "TESTEQ_P" <+> ppr i <+> text "__" <> ppr lab
    ppr CASEFAIL              = text "CASEFAIL"
    ppr (JMP lab)             = text "JMP"      <+> ppr lab
-   ppr (CCALL off marshall_addr flags) = text "CCALL   " <+> ppr off
+   ppr (CCALL off marshal_addr flags) = text "CCALL   " <+> ppr off
                                                 <+> text "marshal code at"
-                                               <+> text (show marshall_addr)
+                                               <+> text (show marshal_addr)
                                                <+> (case flags of
                                                       0x1 -> text "(interruptible)"
                                                       0x2 -> text "(unsafe)"

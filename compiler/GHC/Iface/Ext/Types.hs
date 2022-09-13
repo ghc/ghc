@@ -621,7 +621,7 @@ instance Outputable RecFieldContext where
   ppr RecFieldDecl = text "declaration"
   ppr RecFieldAssign = text "assignment"
   ppr RecFieldMatch = text "pattern match"
-  ppr RecFieldOcc = text "occurence"
+  ppr RecFieldOcc = text "occurrence"
 
 instance Binary RecFieldContext where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))

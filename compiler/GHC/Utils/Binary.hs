@@ -779,7 +779,7 @@ We can easily do better. The new plan is:
 
 * Start with a tag byte
   * 0 => Int64 (LEB128 encoded)
-  * 1 => Negative large interger
+  * 1 => Negative large integer
   * 2 => Positive large integer
 * Followed by the value:
   * Int64 is encoded as usual

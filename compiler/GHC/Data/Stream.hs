@@ -126,7 +126,7 @@ mapM f str = Stream $ \g h -> runStreamInternal str (g <=< f) h
 -- | Note this is not very efficient because it traverses the whole stream
 -- before rebuilding it, avoid using it if you can. mapAccumL used to
 -- implemented but it wasn't used anywhere in the compiler and has similar
--- effiency problems.
+-- efficiency problems.
 mapAccumL_ :: forall m a b c r . Monad m => (c -> a -> m (c,b)) -> c -> Stream m a r
            -> Stream m b (c, r)
 mapAccumL_ f c str = Stream $ \f h -> go c f h (runStream str)

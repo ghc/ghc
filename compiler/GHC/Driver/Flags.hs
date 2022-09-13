@@ -362,7 +362,7 @@ data GeneralFlag
    | Opt_VersionMacros
    | Opt_WholeArchiveHsLibs
    -- copy all libs into a single folder prior to linking binaries
-   -- this should elivate the excessive command line limit restrictions
+   -- this should alleviate the excessive command line limit restrictions
    -- on windows, by only requiring a single -L argument instead of
    -- one for each dependency.  At the time of this writing, gcc
    -- forwards all -L flags to the collect2 command without using a

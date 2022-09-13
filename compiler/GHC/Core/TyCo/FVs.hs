@@ -219,7 +219,7 @@ kind are free.
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [Acumulating parameter free variables]
+{- Note [Accumulating parameter free variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We can use foldType to build an accumulating-parameter version of a
 free-var finder, thus:
@@ -254,7 +254,7 @@ The "strict in the accumulator" part is to ensure that in the
 AppTy equation we don't build a thunk for (fvs env t2 acc).
 
 The optimiser does do all this, but not very robustly. It depends
-critially on the basic arity-2 function not being exported, so that
+critically on the basic arity-2 function not being exported, so that
 all its calls are visibly to three arguments. This analysis is
 done by the Call Arity pass.
 

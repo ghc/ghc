@@ -2985,7 +2985,7 @@ instance MonadP PV where
 
 {- Note [Parser-Validator Details]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A PV computation is parametrized by some 'ParseContext' for diagnostic messages, which can be set
+A PV computation is parameterized by some 'ParseContext' for diagnostic messages, which can be set
 depending on validation context. We use this in checkPattern to fix #984.
 
 Consider this example, where the user has forgotten a 'do':

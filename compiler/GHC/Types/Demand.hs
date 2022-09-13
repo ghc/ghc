@@ -270,7 +270,7 @@ Observation: Big record arguments (e.g., DynFlags) tend to be modified much less
              frequently than small records (e.g., Int).
 Result:      Big records tend to be passed around boxed (unmodified) much more
              frequently than small records.
-Consequnce:  The larger the record, the more likely conditions (1) and (2) from
+Consequence:  The larger the record, the more likely conditions (1) and (2) from
              Note [Function body boxity and call sites] are met, in which case
              unboxing returned parameters leads to reboxing.
 
@@ -1676,7 +1676,7 @@ is not strict in its argument: Just try this in GHCi
   catch undefined (\(_ :: SomeException) -> putStrLn "you'll see this")
 
 Any analysis that assumes otherwise will be broken in some way or another
-(beyond `-fno-pendantic-bottoms`).
+(beyond `-fno-pedantic-bottoms`).
 
 But then #13380 and #17676 suggest (in Mar 20) that we need to re-introduce a
 subtly different variant of `ThrowsExn` (which we call `ExnOrDiv` now) that is
@@ -2075,8 +2075,8 @@ a demand on the Id into a DmdType, which gives
         c) an indication of the result of applying
            the Id to its arguments
 
-However, in fact we store in the Id an extremely emascuated demand
-transfomer, namely
+However, in fact we store in the Id an extremely emasculated demand
+transformer, namely
 
                 a single DmdType
 (Nevertheless we dignify DmdSig as a distinct type.)

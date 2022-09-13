@@ -3068,7 +3068,7 @@ condIntReg cond x y = do
 --  ja _c2g2
 --  jmp _c2g1
 --
--- Removing the jump reduces the pressure on the branch predidiction system
+-- Removing the jump reduces the pressure on the branch prediction system
 -- and plays better with the uOP cache.
 
 condFltReg :: Bool -> Cond -> CmmExpr -> CmmExpr -> NatM Register

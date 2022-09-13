@@ -57,7 +57,7 @@ Initially 'KnotVars' was just a 'ModuleEnv a' but there is one tricky use of
 the data structure in 'mkDsEnvs' which required this generalised structure.
 
 In interactive mode the TypeEnvs from all the previous statements are merged
-togethed into one big TypeEnv. 'dsLookupVar' relies on `tcIfaceVar'. The normal
+together into one big TypeEnv. 'dsLookupVar' relies on `tcIfaceVar'. The normal
 lookup functions either look in the HPT or EPS but there is no entry for the `Ghci<N>` modules
 in either, so the whole merged TypeEnv for all previous Ghci* is stored in the
 `if_rec_types` variable and then lookup checks there in the case of any interactive module.
@@ -71,7 +71,7 @@ Note [KnotVars: Why store the domain?]
 
 Normally there's a 'Module' at hand to tell us which 'TypeEnv' we want to interrogate
 at a particular time, apart from one case, when constructing the in-scope set
-when linting an unfolding. In this case the whole environemnt is needed to tell us
+when linting an unfolding. In this case the whole environment is needed to tell us
 everything that's in-scope at top-level in the loop because whilst we are linting unfoldings
 the top-level identifiers from modules in the cycle might not be globalised properly yet.
 
@@ -89,7 +89,7 @@ There is a simple invariant which should hold for the KnotVars constructor:
 This invariant is difficult to test but easy to check using ghc-debug. The usage of
 NoKnotVars is intended to make this invariant easier to check.
 
-The most common situation where a KnotVars is retained accidently is if a HscEnv
+The most common situation where a KnotVars is retained accidentally is if a HscEnv
 which contains reference to a KnotVars is used during interface file loading. The
 thunks created during this process will retain a reference to the KnotVars. In theory,
 all these references should be removed by 'maybeRehydrateAfter' as that rehydrates all

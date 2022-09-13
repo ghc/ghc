@@ -469,7 +469,7 @@ rnBindPat name_maker pat = runCps (rnLPatAndThen name_maker pat)
 -}
 
 -- ----------- Entry point 3: rnLPatAndThen -------------------
--- General version: parametrized by how you make new names
+-- General version: parameterized by how you make new names
 
 rnLPatsAndThen :: NameMaker -> [LPat GhcPs] -> CpsRn [LPat GhcRn]
 rnLPatsAndThen mk = mapM (rnLPatAndThen mk)

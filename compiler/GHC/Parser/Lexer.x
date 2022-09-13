@@ -2431,7 +2431,7 @@ data PState = PState {
         -- implement pushCurrentContext (which is only called from one place).
 
         -- AZ question: setLastToken which sets last_loc and last_len
-        -- is called whan processing AlexToken, immediately prior to
+        -- is called when processing AlexToken, immediately prior to
         -- calling the action in the token.  So from the perspective
         -- of the action, it is the *current* token.  Do I understand
         -- correctly?

@@ -2,7 +2,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
--- | Provides factilities for pretty-printing 'Nabla's in a way appropriate for
+-- | Provides facilities for pretty-printing 'Nabla's in a way appropriate for
 -- user facing pattern match warnings.
 module GHC.HsToCore.Pmc.Ppr (
       pprUncovered

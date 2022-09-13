@@ -70,7 +70,7 @@ import qualified Data.ByteString.Lazy.Char8 as B8
    same thing applies to the field containing the number of segments, but we
    don't care about it here).
 
-   ELF-next: to solve this, theses fields in the ELF header have an escape
+   ELF-next: to solve this, these fields in the ELF header have an escape
    value (different for each case), and the actual section number is stashed
    into unused fields in the first section header.
 

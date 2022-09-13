@@ -144,7 +144,7 @@ even though we /also/ carry a substitution x -> y.  Can we just drop
 the binding instead?  Well, not at top level! See Note [Top level and
 postInlineUnconditionally] in GHC.Core.Opt.Simplify.Utils; and in any
 case CSE applies only to the /bindings/ of the program, and we leave
-it to the simplifier to propate effects to the RULES. Finally, it
+it to the simplifier to propagate effects to the RULES. Finally, it
 doesn't seem worth the effort to discard the nested bindings because
 the simplifier will do it next.
 
@@ -356,7 +356,7 @@ the program; it's a kind of synthetic key for recursive bindings.
 
 Note [Separate envs for let rhs and body]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Substituting occurances of the binder in the rhs with the
+Substituting occurrences of the binder in the rhs with the
  renamed binder is wrong for non-recursive bindings. Why?
 Consider this core.
 

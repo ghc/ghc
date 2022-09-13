@@ -144,7 +144,7 @@ one for the context and one for any supplementary information. Consider the foll
 Under the hood, the reporting functions in Tc.Utils.Monad were emitting "Couldn't match"
 as the important part, "In the expression" as the context and "In a stmt..In the expression"
 as the supplementary, with the context and supplementary usually smashed together so that
-the final message would be composed only by two SDoc (which would then be bulletted like in
+the final message would be composed only by two SDoc (which would then be bulleted like in
 the example).
 
 In order for us to smooth out the migration to the new diagnostic infrastructure, we
@@ -331,7 +331,7 @@ data TcRnMessage where
      Test cases: plugins/T19926
   -}
   TcRnUnsafeDueToPlugin :: TcRnMessage
-  {-| TcRnModMissingRealSrcSpan is an error that occurrs when compiling a module that lacks
+  {-| TcRnModMissingRealSrcSpan is an error that occurs when compiling a module that lacks
       an associated 'RealSrcSpan'.
 
      Test cases: None
@@ -2128,7 +2128,7 @@ data TcRnMessage where
     -> !(NE.NonEmpty (LocatedA InlinePragma)) -- ^ Other pragmas
     -> TcRnMessage
 
-  {- TcRnUnexpectedPragmas is a warning that occurrs when unexpected pragmas appear
+  {- TcRnUnexpectedPragmas is a warning that occurs when unexpected pragmas appear
      in the source.
 
      Example(s):
@@ -2150,7 +2150,7 @@ data TcRnMessage where
   -}
   TcRnNonOverloadedSpecialisePragma :: !(LIdP GhcRn) -> TcRnMessage
 
-  {- TcRnSpecialiseNotVisible is a warning that occurrs when the subject of a
+  {- TcRnSpecialiseNotVisible is a warning that occurs when the subject of a
      SPECIALISE pragma has a definition that is not visible from the current module.
 
      Example(s): none
@@ -2481,7 +2481,7 @@ data DeriveInstanceErrReason
                                    !DeriveAnyClassEnabled
                                    -- ^ Whether or not -XDeriveAnyClass is enabled
                                    -- already.
-  -- | Stock deriving won't work, but perhas DeriveAnyClass will.
+  -- | Stock deriving won't work, but perhaps DeriveAnyClass will.
   | DerivErrNotDeriveable !DeriveAnyClassEnabled
   -- | The given 'PredType' is not a class.
   | DerivErrNotAClass !PredType
@@ -2884,7 +2884,7 @@ data TcSolverReportMsg
   | FixedRuntimeRepError [FixedRuntimeRepErrorInfo]
 
   -- | An equality between two types is blocked on a kind equality
-  -- beteen their kinds.
+  -- between their kinds.
   --
   -- Test cases: none.
   | BlockedEquality ErrorItem
@@ -3162,7 +3162,7 @@ data NotInScopeError
   -- Test cases: annfail01, annfail02, annfail11.
   | NoTopLevelBinding
 
-  -- | A class doesnt have a method with this name,
+  -- | A class doesn't have a method with this name,
   -- or, a class doesn't have an associated type with this name,
   -- or, a record doesn't have a record field with this name.
   | UnknownSubordinate SDoc
@@ -3270,7 +3270,7 @@ data RelevantBindings
 -- | Display some relevant bindings.
 pprRelevantBindings :: RelevantBindings -> SDoc
 -- This function should be in "GHC.Tc.Errors.Ppr",
--- but's it's here for the moment as it's needed in "GHC.Tc.Errors".
+-- but it's here for the moment as it's needed in "GHC.Tc.Errors".
 pprRelevantBindings (RelevantBindings bds ran_out_of_fuel) =
   ppUnless (null rel_bds) $
     hang (text "Relevant bindings include")

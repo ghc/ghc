@@ -232,7 +232,7 @@ in wrapper_reqd in GHC.Types.Id.Make.mkDataConRep.
         data T = MkT !(Int,Int)
         \$wMkT :: (Int,Int) -> T
         \$wMkT (x,y) = MkT x y
-  Notice that the worker has two fields where the wapper has
+  Notice that the worker has two fields where the wrapper has
   just one.  That is, the worker has type
                 MkT :: Int -> Int -> T
 

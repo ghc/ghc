@@ -388,7 +388,7 @@ Open type families
 This treatment of type synonyms only applies to Haskell 98-style synonyms.
 General type functions can be recursive, and hence, appear in `alg_decls'.
 
-The kind of an open type family is solely determinded by its kind signature;
+The kind of an open type family is solely determined by its kind signature;
 hence, only kind signatures participate in the construction of the initial
 kind environment (as constructed by `inferInitialKind'). In fact, we ignore
 instances of families altogether in the following. However, we need to include
@@ -645,7 +645,7 @@ Unfortunately this requires reworking a bit of the code in
 Note [Don't process associated types in getInitialKind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Previously, we processed associated types in the thing_inside in getInitialKind,
-but this was wrong -- we want to do ATs sepearately.
+but this was wrong -- we want to do ATs separately.
 The consequence for not doing it this way is #15142:
 
   class ListTuple (tuple :: Type) (as :: [(k, Type)]) where
@@ -985,7 +985,7 @@ following order:
  1. Inferred variables
  2. Specified variables; in the left-to-right order in which
     the user wrote them, modified by scopedSort (see below)
-    to put them in depdendency order.
+    to put them in dependency order.
  3. Required variables before a top-level ::
  4. All variables after a top-level ::
 
@@ -1054,7 +1054,7 @@ Design alternatives
 ~~~~~~~~~~~~~~~~~~~
 * For associated types we considered putting the class variables
   before the local variables, in a nod to the treatment for class
-  methods. But it got too compilicated; see #15592, comment:21ff.
+  methods. But it got too complicated; see #15592, comment:21ff.
 
 * We rigidly require the ordering above, even though we could be much more
   permissive. Relevant musings are at
@@ -1820,7 +1820,7 @@ However, during tcTyClDecl of T (above) we will be in a recursive
 "knot". So we aren't allowed to look at the TyCon T itself; we are only
 allowed to put it (lazily) in the returned structures.  But when
 kind-checking the RHS of T's decl, we *do* need to know T's kind (so
-that we can correctly elaboarate (T k f a).  How can we get T's kind
+that we can correctly elaborate (T k f a).  How can we get T's kind
 without looking at T?  Delicate answer: during tcTyClDecl, we extend
 
   *Global* env with T -> ATyCon (the (not yet built) final TyCon for T)
@@ -2314,7 +2314,7 @@ In the frontend, the following tweaks have been made in the typechecker:
     data family F a :: UnliftedType
     data instance F Int = TInt
 
-  The ommission of a kind signature for `F` should not mean a result kind
+  The omission of a kind signature for `F` should not mean a result kind
   of `Type` (and thus a kind error) here.
 
 * STEP 2: No change to kcTyClDecl.
@@ -3085,7 +3085,7 @@ The wildcards are particularly awkward: they may need to be quantified
 
 So, we use bindOuterFamEqnTKBndrs (which does not create an implication for
 the telescope), and generalise over /all/ the variables in the LHS,
-without treating the explicitly-quantifed ones specially. Wrinkles:
+without treating the explicitly-quantified ones specially. Wrinkles:
 
  - When generalising, include the explicit user-specified forall'd
    variables, so that we get an error from Validity.checkFamPatBinders

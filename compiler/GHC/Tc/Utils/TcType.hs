@@ -329,7 +329,7 @@ so they behave as global constants.  Specifically:
   of Var.Var.  The "tc" prefix means "a type variable that can be
   encountered by the typechecker".
 
-This is a bit of a change from an earlier era when we remoselessly
+This is a bit of a change from an earlier era when we remorselessly
 insisted on real TcTyVars in the type checker.  But that seems
 unnecessary (for skolems, TyVars are fine) and it's now very hard
 to guarantee, with the advent of kind equalities.
@@ -584,7 +584,7 @@ constraint solver.  It's not strictly essential, and indeed
 (historically but still there) Var.tcTyVarDetails returns
 vanillaSkolemTv for a TyVar.
 
-But ultimately I want to seeparate Type from TcType, and in that case
+But ultimately I want to separate Type from TcType, and in that case
 we would need to enforce the separation.
 -}
 
@@ -765,7 +765,7 @@ the constraint (C alpha[3]) disobeys WantedInv:
                         (forall[3] b. alpha[3] ~ b)
 
 We can unify alpha:=b in the inner implication, because 'alpha' is
-touchable; but then 'b' has excaped its scope into the outer implication.
+touchable; but then 'b' has escaped its scope into the outer implication.
 -}
 
 maxTcLevel :: TcLevel -> TcLevel -> TcLevel
@@ -1901,7 +1901,7 @@ boxEqPred eq_rel ty1 ty2
       NomEq  | homo_kind -> Just (eqClass,        [k1,     ty1, ty2])
              | otherwise -> Just (heqClass,       [k1, k2, ty1, ty2])
       ReprEq | homo_kind -> Just (coercibleClass, [k1,     ty1, ty2])
-             | otherwise -> Nothing -- Sigh: we do not have hererogeneous Coercible
+             | otherwise -> Nothing -- Sigh: we do not have heterogeneous Coercible
                                     --       so we can't abstract over it
                                     -- Nothing fundamental: we could add it
  where

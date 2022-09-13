@@ -109,7 +109,7 @@ worst regsOfClass regAlias neighbors classN classC
                         $ powersetLS regsC
 
         -- for each of the subsets of C, the regs which conflict
-        -- with posiblities for N
+        -- with possibilities for N
         regsS_conflict
                 = map (\s -> intersectUniqSets regsN (regAliasS s)) regsS
 

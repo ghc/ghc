@@ -255,7 +255,7 @@ A function with cbv-semantics requires arguments to be visible
 and if no arguments are visible requires us to eta-expand it's
 call site. That is for a binding with three cbv arguments like
 `w[WorkerLikeId[!,!,!]]` we would need to eta expand undersaturated
-occurences like `map w xs` into `map (\x1 x2 x3 -> w x1 x2 x3) xs.
+occurrences like `map w xs` into `map (\x1 x2 x3 -> w x1 x2 x3) xs.
 
 In experiments it turned out that the code size increase of doing so
 can outweigh the performance benefits of doing so.
@@ -265,7 +265,7 @@ Join points are naturally always called saturated so
 this problem can't occur for them.
 For workers and specialized functions there are also always at least
 some applied arguments as we won't inline the wrapper/apply their rule
-if there are unapplied occurances like `map f xs`.
+if there are unapplied occurrences like `map f xs`.
 -}
 
 -- | Recursive Selector Parent

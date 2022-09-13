@@ -192,7 +192,7 @@ lookupIdSubst (Subst in_scope ids _ _) v
   | Just v' <- lookupInScope in_scope v = Var v'
         -- Vital! See Note [Extending the IdSubstEnv]
         -- If v isn't in the InScopeSet, we panic, because
-        -- it's a bad bug and we reallly want to know
+        -- it's a bad bug and we really want to know
   | otherwise = pprPanic "lookupIdSubst" (ppr v $$ ppr in_scope)
 
 delBndr :: Subst -> Var -> Subst

@@ -1753,7 +1753,7 @@ gccSearchDirCache = unsafePerformIO $ newIORef []
 -- fork/exec is expensive on Windows, for each time we ask GCC for a library we
 -- have to eat the cost of af least 3 of these: gcc -> real_gcc -> cc1.
 -- So instead get a list of location that GCC would search and use findDirs
--- which hopefully is written in an optimized mannor to take advantage of
+-- which hopefully is written in an optimized manner to take advantage of
 -- caching. At the very least we remove the overhead of the fork/exec and waits
 -- which dominate a large percentage of startup time on Windows.
 getGccSearchDirectory :: Logger -> DynFlags -> String -> IO [FilePath]

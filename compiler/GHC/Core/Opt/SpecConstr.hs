@@ -2011,7 +2011,7 @@ type argument giving us:
 But if you look closely this wouldn't typecheck!
 If we substitute `f True` with `$sf void#` we expect the type argument to be applied first
 but we apply void# first.
-The easist fix seems to be just to add the void argument to the front of the arguments.
+The easiest fix seems to be just to add the void argument to the front of the arguments.
 Now we get:
     $sf :: Void# -> forall t. bla
     $sf void @t = $se
@@ -2052,7 +2052,7 @@ calcSpecInfo :: Id                     -- The original function
              -> ( [Var]                     -- Demand-decorated binders
                 , DmdSig                    -- Strictness of specialised thing
                 , Arity, Maybe JoinArity )  -- Arities of specialised thing
--- Calcuate bits of IdInfo for the specialised function
+-- Calculate bits of IdInfo for the specialised function
 -- See Note [Transfer strictness]
 -- See Note [Strictness information in worker binders]
 calcSpecInfo fn (CP { cp_qvars = qvars, cp_args = pats }) extra_bndrs
@@ -2593,7 +2593,7 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
   , Just arg_occs <- mb_scrut dc
   = do { let (ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) args
              con_str, matched_str :: [StrictnessMark]
-             -- con_str corrresponds 1-1 with the /value/ arguments
+             -- con_str corresponds 1-1 with the /value/ arguments
              -- matched_str corresponds 1-1 with /all/ arguments
              con_str = dataConRepStrictness dc
              matched_str = match_vals con_str rest_args

@@ -1342,7 +1342,7 @@ mkHsOpTyRn prom1 op1 fix1 ty1 (L loc2 (HsOpTy _ prom2 ty2a op2 ty2b))
   = do  { fix2 <- lookupTyFixityRn op2
         ; mk_hs_op_ty prom1 op1 fix1 ty1 prom2 op2 fix2 ty2a ty2b loc2 }
 
-mkHsOpTyRn prom1 op1 _ ty1 ty2              -- Default case, no rearrangment
+mkHsOpTyRn prom1 op1 _ ty1 ty2              -- Default case, no rearrangement
   = return (HsOpTy noAnn prom1 ty1 op1 ty2)
 
 ---------------
@@ -1410,7 +1410,7 @@ mkOpAppRn ReassociateNegation e1 op1 fix1 e2@(L _ (NegApp {})) -- NegApp can occ
 
 ---------------------------
 --      Default case
-mkOpAppRn _ e1 op fix e2                  -- Default case, no rearrangment
+mkOpAppRn _ e1 op fix e2                  -- Default case, no rearrangement
   = assertPpr (right_op_ok fix (unLoc e2))
               (ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2) $
     return (OpApp fix e1 op e2)
@@ -1422,7 +1422,7 @@ data NegationHandling = ReassociateNegation | KeepNegationIntact
 -- | Name of an operator in an operator application or section
 data OpName = NormalOp Name             -- ^ A normal identifier
             | NegateOp                  -- ^ Prefix negation
-            | UnboundOp OccName         -- ^ An unbound indentifier
+            | UnboundOp OccName         -- ^ An unbound identifier
             | RecFldOp (FieldOcc GhcRn) -- ^ A record field occurrence
 
 instance Outputable OpName where
@@ -1486,7 +1486,7 @@ mkOpFormRn e1@(L loc
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
 --      Default case
-mkOpFormRn arg1 op fix arg2                     -- Default case, no rearrangment
+mkOpFormRn arg1 op fix arg2                     -- Default case, no rearrangement
   = return (HsCmdArrForm noExtField op Infix (Just fix) [arg1, arg2])
 
 
@@ -1524,7 +1524,7 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p1a p1b))) p2
                  }
         }
 
-mkConOpPatRn op _ p1 p2                         -- Default case, no rearrangment
+mkConOpPatRn op _ p1 p2                         -- Default case, no rearrangement
   = assert (not_op_pat (unLoc p2)) $
     return $ ConPat
       { pat_con_ext = noExtField

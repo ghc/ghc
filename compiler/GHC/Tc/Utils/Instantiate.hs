@@ -247,7 +247,7 @@ instTyVarsWith :: CtOrigin -> [TyVar] -> [TcType] -> TcM Subst
 -- types [ta, tb, tc], but when the kinds of 'a' and 'ta' might
 -- not yet match (perhaps because there are unsolved constraints; #14154)
 -- If they don't match, emit a kind-equality to promise that they will
--- eventually do so, and thus make a kind-homongeneous substitution.
+-- eventually do so, and thus make a kind-homogeneous substitution.
 instTyVarsWith orig tvs tys
   = go emptySubst tvs tys
   where
@@ -669,7 +669,7 @@ Then we have to instantiate the kind variables, build a substitution
 from old variables to the new variables, then instantiate the type
 variables substituting the original kind.
 
-Exemple: If we want to instantiate
+Example: If we want to instantiate
   [(k1 :: *), (k2 :: *), (a :: k1 -> k2), (b :: k1)]
 we want
   [(?k1 :: *), (?k2 :: *), (?a :: ?k1 -> ?k2), (?b :: ?k1)]

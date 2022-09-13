@@ -99,7 +99,7 @@ generates
 
         newtype CDict a = CDict (forall b. a -> b -> b)
 
-Now DictTy in Type is just a form of type synomym:
+Now DictTy in Type is just a form of type synonym:
         DictTy c t = TyConTy CDict `AppTy` t
 
 Death to "ExpandingDicts".

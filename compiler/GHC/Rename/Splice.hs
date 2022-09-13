@@ -429,7 +429,7 @@ mkQuasiQuoteExpr flavour quoter (L q_span' quote)
 unqualSplice :: RdrName
 -- The RdrName for a SplicePointName.  See GHC.Hs.Expr
 -- Note [Lifecycle of an untyped splice, and PendingRnSplice]
--- We use "spn" (which is arbitrary) because it is brief but greppable-for.
+-- We use "spn" (which is arbitrary) because it is brief but grepable-for.
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "spn"))
 
 rnUntypedSplice :: HsUntypedSplice GhcPs -> RnM (HsUntypedSplice GhcRn, FreeVars)

@@ -98,7 +98,7 @@ type LHsRecProj p arg = XRec p (RecProj arg)
 @
 
 The @fbind@ rule is then given the type @fbind :: { forall b.
-DisambECP b => PV (Fbind b) }@ accomodating both alternatives:
+DisambECP b => PV (Fbind b) }@ accommodating both alternatives:
 @
 type Fbind b = Either
                   (LHsRecField GhcPs (LocatedA b))
@@ -1166,7 +1166,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
              (SyntaxExpr idR)           -- The `>>=` operator
                                         -- See notes [Monad Comprehensions]
             -- After renaming, the ids are the binders
-            -- bound by the stmts and used after themp
+            -- bound by the stmts and used after them
 
   | TransStmt {
       trS_ext   :: XTransStmt idL idR body, -- Post typecheck,

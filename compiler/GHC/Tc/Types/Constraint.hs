@@ -1404,7 +1404,7 @@ The GivenEqs data type describes the Given constraints of an implication constra
 
 * LocalGivenEqs: definitely no Given equalities that would affect principal
   types.  But may have equalities that affect only skolems of this implication
-  (and hence do not affect princial types)
+  (and hence do not affect principal types)
   Examples: forall a. F a ~ Int => ...
             forall a b. F a ~ G b => ...
 
@@ -1557,7 +1557,7 @@ Note [Shadowing in a constraint]
 We assume NO SHADOWING in a constraint.  Specifically
  * The unification variables are all implicitly quantified at top
    level, and are all unique
- * The skolem variables bound in ic_skols are all freah when the
+ * The skolem variables bound in ic_skols are all fresh when the
    implication is created.
 So we can safely substitute. For example, if we have
    forall a.  a~Int => ...(forall b. ...a...)...
@@ -2248,7 +2248,7 @@ equality simplification, and type family reduction. (Why combine these? Because
 it's actually quite easy to mistake one for another, in sufficiently involved
 scenarios, like ConstraintKinds.)
 
-The flag -freduction-depth=n fixes the maximium level.
+The flag -freduction-depth=n fixes the maximum level.
 
 * The counter includes the depth of type class instance declarations.  Example:
      [W] d{7} : Eq [Int]

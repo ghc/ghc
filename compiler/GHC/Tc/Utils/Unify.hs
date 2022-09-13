@@ -205,7 +205,7 @@ Ugh!
 -- | Like 'matchExpectedFunTys', but used when you have an "actual" type,
 -- for example in function application.
 --
--- INVARIANT: the returned arguemnt types all have a syntactically fixed RuntimeRep
+-- INVARIANT: the returned argument types all have a syntactically fixed RuntimeRep
 -- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 -- See Note [Return arguments with a fixed RuntimeRep].
 matchActualFunTysRho :: ExpectedFunTyOrigin -- ^ See Note [Herald for matchExpectedFunTys]
@@ -721,7 +721,7 @@ There is one wrinkle.  Suppose we have
    case e of
       T1 -> e1 :: (forall a. a->a) -> Int
       G2 -> e2
-where T1 is not GADT or existential, but G2 is a GADT.  Then supppose the
+where T1 is not GADT or existential, but G2 is a GADT.  Then suppose the
 T1 alternative fills the hole with (forall a. a->a) -> Int, which is fine.
 But now the G2 alternative must not *just* unify with that else we'd risk
 allowing through (e2 :: (forall a. a->a) -> Int).  If we'd checked G2 first
@@ -2219,7 +2219,7 @@ There are five reasons not to unify:
    assumptions", section 2.2.  We say that alpha[1] is "untouchable" inside
    this implication.
 
-   Bottom line: at amibient level 'l', when looking at a constraint
+   Bottom line: at ambient level 'l', when looking at a constraint
    alpha[n] ~ ty, do not unify alpha := ty if there are any given equalities
    between levels 'n' and 'l'.
 
@@ -2261,7 +2261,7 @@ There are five reasons not to unify:
    is sensible, but it can lead to very confusing error messages.
    It's very much like a Wanted rewriting a Wanted. Even worse,
    unifying a variable essentially turns an equality into a Given,
-   and so we could not use the tracking mechansim in
+   and so we could not use the tracking mechanism in
    Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
    We thus simply do not unify in this case.
 

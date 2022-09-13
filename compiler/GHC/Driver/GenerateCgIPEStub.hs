@@ -43,7 +43,7 @@ Stacktraces can be created from return frames as they are pushed to stack for ev
 But to make them readable / meaningful, one needs to know the source location of each return frame.
 
 Every return frame has a distinct info table and thus a distinct code pointer (for tables next to
-code) or at least a distict address itself. Info Table Provernance Entries (IPE) are searchable by
+code) or at least a distinct address itself. Info Table Provenance Entries (IPEs) are searchable by
 this pointer and contain a source location.
 
 The info table / info table code pointer to source location map is described in:

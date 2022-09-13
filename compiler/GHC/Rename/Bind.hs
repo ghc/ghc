@@ -767,7 +767,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
 Note [Renaming pattern synonym variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We rename pattern synonym declaractions backwards to normal to reuse
+We rename pattern synonym declarations backwards to normal to reuse
 the logic already implemented for renaming patterns.
 
 We first rename the RHS of a declaration which brings into

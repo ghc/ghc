@@ -758,7 +758,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
             -- builds if something slips through.
             assert (null unplaced) $
             --pprTraceIt "placedBlocks" $
-            -- ++ [] is stil kinda expensive
+            -- ++ [] is still kinda expensive
             if null unplaced then blockList else blockList ++ unplaced
         getBlock bid = expectJust "Block placement" $ mapLookup bid blockMap
     in

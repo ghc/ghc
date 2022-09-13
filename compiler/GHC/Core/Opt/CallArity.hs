@@ -150,7 +150,7 @@ The interesting cases of the analysis:
    any useful co-call information.
    Return (fv e)²
  * Case alternatives alt₁,alt₂,...:
-   Only one can be execuded, so
+   Only one can be executed, so
    Return (alt₁ ∪ alt₂ ∪...)
  * App e₁ e₂ (and analogously Case scrut alts), with non-trivial e₂:
    We get the results from both sides, with the argument evaluated at most once.
@@ -277,7 +277,7 @@ together with what other functions.
 Note [Analysis type signature]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The work-hourse of the analysis is the function `callArityAnal`, with the
+The workhorse of the analysis is the function `callArityAnal`, with the
 following type:
 
     type CallArityRes = (UnVarGraph, VarEnv Arity)

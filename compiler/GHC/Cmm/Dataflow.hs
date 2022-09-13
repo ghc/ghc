@@ -87,7 +87,7 @@ type TransferFun' (n :: Extensibility -> Extensibility -> Type) f =
     Block n C C -> FactBase f -> FactBase f
 
 
--- | Function for rewrtiting and analysis combined. To be used with
+-- | Function for rewriting and analysis combined. To be used with
 -- @rewriteCmm@.
 --
 -- Currently set to work with @UniqSM@ monad, but we could probably abstract

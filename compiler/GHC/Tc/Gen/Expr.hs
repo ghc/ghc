@@ -185,7 +185,7 @@ tcPolyExpr expr res_ty
 
 tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
--- Use tcApp to typecheck appplications, which are treated specially
+-- Use tcApp to typecheck applications, which are treated specially
 -- by Quick Look.  Specifically:
 --   - HsVar         lone variables, to ensure that they can get an
 --                     impredicative instantiation (via Quick Look
@@ -287,7 +287,7 @@ tcExpr e@(HsLamCase x lc_variant matches) res_ty
 ************************************************************************
 -}
 
--- Explict lists [e1,e2,e3] have been expanded already in the renamer
+-- Explicit lists [e1,e2,e3] have been expanded already in the renamer
 -- The expansion includes an ExplicitList, but it is always the built-in
 -- list type, so that's all we need concern ourselves with here.  See
 -- GHC.Rename.Expr. Note [Handling overloaded and rebindable constructs]
@@ -1306,7 +1306,7 @@ desugarRecordUpd record_expr rbnds res_ty
                     ; nm <- newNameAt nm_occ generatedSrcSpan
                     ; let id = mkLocalId nm m actual_arg_ty
                       -- NB: create fresh names to avoid any accidental shadowing
-                      -- occuring in the RHS expressions when creating the let bindings:
+                      -- occurring in the RHS expressions when creating the let bindings:
                       --
                       --  let x1 = e1; x2 = e2; ...
                     ; return (fld_nm, (id, rhs))

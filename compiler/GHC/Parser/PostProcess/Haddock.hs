@@ -1576,7 +1576,7 @@ constructs that are separated by a keyword. For example:
 
 We could use EPA (exactprint annotations) to fix this, but not without
 modification. For example, EpaLocation contains RealSrcSpan but not BufSpan.
-Also, the fix would be more straghtforward after #19623.
+Also, the fix would be more straightforward after #19623.
 
 For examples, see tests/haddock/should_compile_flag_haddock/T17544_kw.hs
 -}

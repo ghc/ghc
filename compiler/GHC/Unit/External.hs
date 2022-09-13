@@ -155,7 +155,7 @@ data ExternalPackageState
         eps_mod_fam_inst_env :: !(ModuleEnv FamInstEnv), -- ^ The family instances accumulated from external
                                                          -- packages, keyed off the module that declared them
 
-        eps_stats :: !EpsStats                 -- ^ Stastics about what was loaded from external packages
+        eps_stats :: !EpsStats                 -- ^ Statistics about what was loaded from external packages
   }
 
 -- | Accumulated statistics about what we are putting into the 'ExternalPackageState'.

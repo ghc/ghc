@@ -1056,7 +1056,7 @@ is usually too small for GHC to do that.
 
 The recommended approach thus far was to increase unfolding threshold, but this
 makes GHC inline more aggressively in general, whereas it should only be more
-aggresive with generics-based code.
+aggressive with generics-based code.
 
 The solution is to use a heuristic that'll annotate Generic class methods with
 INLINE[1] pragmas (the explicit phase is used to give users phase control as

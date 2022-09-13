@@ -584,7 +584,7 @@ runUnlitPhase hsc_env input_fn output_fn = do
        -- Unicode or anything else (so we don't use Util.charToC
        -- here).  If we get this wrong, then in
        -- GHC.HsToCore.Ticks.isGoodTickSrcSpan where we check that the filename in
-       -- a SrcLoc is the same as the source filenaame, the two will
+       -- a SrcLoc is the same as the source filename, the two will
        -- look bogusly different. See test:
        -- libraries/hpc/tests/function/subdir/tough2.hs
        escape ('\\':cs) = '\\':'\\': escape cs
@@ -838,7 +838,7 @@ getOutputFilename logger tmpfs stop_phase output basename dflags next_phase mayb
  | StopLn <- next_phase, Just loc <- maybe_location  =
       return $ if dynamicNow dflags then ml_dyn_obj_file loc
                                     else ml_obj_file loc
- -- 2. If output style is persistant then
+ -- 2. If output style is persistent then
  | is_last_phase, Persistent   <- output = persistent_fn
  -- 3. Specific file is only set when outputFile is set by -o
  -- If we are in dynamic mode but -dyno is not set then write to the same path as
@@ -1138,7 +1138,7 @@ none of this can be used in that case.
 Note [Object merging]
 ~~~~~~~~~~~~~~~~~~~~~
 On most platforms one can "merge" a set of relocatable object files into a new,
-partiall-linked-but-still-relocatable object. In a typical UNIX-style linker,
+partially-linked-but-still-relocatable object. In a typical UNIX-style linker,
 this is accomplished with the `ld -r` command. We rely on this for two ends:
 
  * We rely on `ld -r` to squash together split sections, making GHCi loading
@@ -1369,7 +1369,7 @@ Introduction
   At some point during compilation with -fhpc, in the function
   `GHC.HsToCore.Ticks.isGoodTickSrcSpan`, we compare the filename that a
   `SrcSpan` refers to with the name of the file we are currently compiling.
-  For some reason I don't yet understand, they can sometimes legitimally be
+  For some reason I don't yet understand, they can sometimes legitimately be
   different, and then hpc ignores that SrcSpan.
 
 Problem

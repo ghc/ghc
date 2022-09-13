@@ -378,7 +378,7 @@ instance Data.Data PatSyn where
 -- | Build a new pattern synonym
 mkPatSyn :: Name
          -> Bool                 -- ^ Is the pattern synonym declared infix?
-         -> ([InvisTVBinder], ThetaType) -- ^ Universially-quantified type
+         -> ([InvisTVBinder], ThetaType) -- ^ Universally-quantified type
                                          -- variables and required dicts
          -> ([InvisTVBinder], ThetaType) -- ^ Existentially-quantified type
                                          -- variables and provided dicts

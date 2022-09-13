@@ -144,7 +144,7 @@ the latter case, the signatures are merged to form a new one.
 
 You can think of this as polymorphism at the module level: module signatures
 give constraints on the "type" of module that can be used to fill the hole
-(where "type" means types of the exported module entitites, etc.).
+(where "type" means types of the exported module entities, etc.).
 
 Module signatures contain enough information (datatypes, abstract types, type
 synonyms, classes, etc.) to typecheck modules depending on them but not

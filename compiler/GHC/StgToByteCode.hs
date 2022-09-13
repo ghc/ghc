@@ -1346,7 +1346,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
          copies the args to the C stack, calls the stacked addr,
          and parks the result back in the placeholder.  The interpreter
          calls it as a normal C call, assuming it has a signature
-            void marshall_code ( StgWord* ptr_to_top_of_stack )
+            void marshal_code ( StgWord* ptr_to_top_of_stack )
          -}
          -- resolve static address
          maybe_static_target :: Maybe Literal

@@ -35,7 +35,7 @@ import GHC.Stack
 -- | - Operates on 32-bit   | - Separate reg. bank,  | - Separate reg. bank,   |
 -- |   GP ARM registers     |    32x64-bit NEON regs |   32x128-bit NEON regs  |
 -- | - 8-bit/16-bit integer | - 8/16/32/64-bit int   | - 8/16/32/64-bit int    |
--- |                        | - Single percision fp  | - Single percision fp   |
+-- |                        | - Single precision fp  | - Single precision fp   |
 -- |                        |                        | - Double precision fp   |
 -- |                        |                        | - Single/Double fp are  |
 -- |                        |                        |   IEEE compliant        |

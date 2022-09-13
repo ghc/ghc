@@ -772,7 +772,7 @@ But do not do so if (saves_alloc):
      - the expression is not a HNF, and
      - the expression is not bottoming
 
-Exammples:
+Examples:
 
 * Bottoming
       f x = case x of
@@ -945,7 +945,7 @@ But, as ever, we need to be careful:
     Example:
        ... let { v = \y. error (show x ++ show y) } in ...
     We want to abstract over x and float the whole thing to top:
-       lvl = \xy. errror (show x ++ show y)
+       lvl = \xy. error (show x ++ show y)
        ...let {v = lvl x} in ...
 
     Then of course we don't want to separately float the body (error ...)

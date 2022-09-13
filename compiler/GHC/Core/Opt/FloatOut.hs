@@ -343,7 +343,7 @@ Note [floatBind for top level]
 We may have a *nested* binding whose destination level is (FloatMe tOP_LEVEL), thus
          letrec { foo <0,0> = .... (let bar<0,0> = .. in ..) .... }
 The binding for bar will be in the "tops" part of the floating binds,
-and thus not partioned by floatBody.
+and thus not partitioned by floatBody.
 
 We could perhaps get rid of the 'tops' component of the floating binds,
 but this case works just as well.

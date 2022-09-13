@@ -63,7 +63,7 @@ data LanguageExtensionHint
     -- it's totally irrelevant/redundant for IDEs and other tools.
      SuggestSingleExtension !SDoc !LangExt.Extension
     -- | Suggest to enable the input extensions. The list
-    -- is to be intended as /disjuctive/ i.e. the user is
+    -- is to be intended as /disjunctive/ i.e. the user is
     -- suggested to enable /any/ of the extensions listed. If
     -- the input 'SDoc' is not empty, it will contain some extra
     -- information about the why the extensions are required, but

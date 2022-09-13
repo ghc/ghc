@@ -252,7 +252,7 @@ Note [Distinct Info Tables for Constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In the old times, each usage of a data constructor used the same info table.
-This made it impossible to distinguish which actual usuage of a data constructor was
+This made it impossible to distinguish which actual usage of a data constructor was
 contributing primarily to the allocation in a program. Using the `-fdistinct-info-tables` flag you
 can cause code generation to generate a distinct info table for each usage of
 a constructor. Then, when inspecting the heap you can see precisely which usage of a constructor

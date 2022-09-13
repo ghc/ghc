@@ -187,7 +187,7 @@ in GHC.Core.Opt.WorkWrap.Utils.  (Maybe there are other "clients" of this featur
 
   (SI2) The result of that substitution is used only to check for type
         equality, to check well-typed-ness, /but is then discarded/.
-        The result of substittion does not outlive the CoreLint pass.
+        The result of substitution does not outlive the CoreLint pass.
 
   (SI3) The InScopeSet of le_subst includes only TyVar and CoVar binders.
 
@@ -2079,7 +2079,7 @@ lintCoercion (CoVarCo cv)
                    -> return (CoVarCo cv)
               | otherwise
                    ->
-                      -- lintCoBndr always extends the substitition
+                      -- lintCoBndr always extends the substitution
                       failWithL $
                       hang (text "The coercion variable" <+> pprBndr LetBind cv)
                          2 (text "is out of scope")

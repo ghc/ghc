@@ -132,7 +132,7 @@ for u to typecheck.
 Usages are usually group in a UsageEnv, as defined in the UsageEnv module.
 
 So, in our function application example, the typechecking algorithm would
-receive usage environements f_ue from the typechecking of f, and u_ue from the
+receive usage environments f_ue from the typechecking of f, and u_ue from the
 typechecking of u. Then the output would be f_ue + (k * u_ue). Addition and
 scaling of usage environment is the pointwise extension of the semiring
 operations on multiplicities.

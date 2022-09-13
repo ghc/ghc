@@ -487,7 +487,7 @@ abstraction we match against) might be different than that of @pat@. Data
 instances such as @Sing (a :: Bool)@ are a good example of this: If we would
 just drop the coercion, we'd get a type error when matching @pat@ against its
 value abstraction, with the result being that pmIsSatisfiable decides that every
-possible data constructor fitting @pat@ is rejected as uninhabitated, leading to
+possible data constructor fitting @pat@ is rejected as uninhabited, leading to
 a lot of false warnings.
 
 But we can check whether the coercion is a hole or if it is just refl, in

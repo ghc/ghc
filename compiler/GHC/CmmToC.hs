@@ -130,7 +130,7 @@ pprTop platform = \case
 -- BasicBlocks are self-contained entities: they always end in a jump.
 --
 -- Like nativeGen/AsmCodeGen, we could probably reorder blocks to turn
--- as many jumps as possible into fall throughs.
+-- as many jumps as possible into fallthroughs.
 --
 
 pprBBlock :: Platform -> CmmBlock -> SDoc
@@ -853,7 +853,7 @@ pprMachOp_for_C platform mop = case mop of
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Quot"
                                       ++ " should have been handled earlier!")
 
-        MO_AlignmentCheck {} -> panic "-falignment-santisation not supported by unregisterised backend"
+        MO_AlignmentCheck {} -> panic "-falignment-sanitisation not supported by unregisterised backend"
 
 signedOp :: MachOp -> Bool      -- Argument type(s) are signed ints
 signedOp (MO_S_Quot _)    = True

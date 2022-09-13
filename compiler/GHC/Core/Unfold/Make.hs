@@ -207,7 +207,7 @@ specUnfolding to specialise its unfolding.  Some important points:
   Moreover, keeping the INLINABLE thing isn't much help, because
   the specialised function (probably) isn't overloaded any more.
 
-  Conclusion: drop the INLINEALE pragma.  In practice what this means is:
+  Conclusion: drop the INLINEABLE pragma.  In practice what this means is:
      if a stable unfolding has UnfoldingGuidance of UnfWhen,
         we keep it (so the specialised thing too will always inline)
      if a stable unfolding has UnfoldingGuidance of UnfIfGoodArgs
@@ -419,12 +419,12 @@ Note [Thoughtful forcing in mkCoreUnfolding]
 
 Core expressions retained in unfoldings is one of biggest uses of memory when compiling
 a program. Therefore we have to be careful about retaining copies of old or redundant
-templates (see !6202 for a particularlly bad case).
+templates (see !6202 for a particularly bad case).
 
 With that in mind we want to maintain the invariant that each unfolding only references
 a single CoreExpr. One place where we have to be careful is in mkCoreUnfolding.
 
-* The template of the unfolding is the result of performing occurence analysis
+* The template of the unfolding is the result of performing occurrence analysis
   (Note [Occurrence analysis of unfoldings])
 * Predicates are applied to the unanalysed expression
 
@@ -445,7 +445,7 @@ Therefore we basically had two options in order to fix this:
 1. Perform the predicates on the analysed expression.
 2. Force the predicates to remove retainer to the old expression if we force the template.
 
-Option 1 is bad because occurence analysis is expensive and destroys any sharing of the unfolding
+Option 1 is bad because occurrence analysis is expensive and destroys any sharing of the unfolding
 with the actual program. (Testing this approach showed peak 25G memory usage)
 
 Therefore we got for Option 2 which performs a little more work but compensates by

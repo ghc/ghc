@@ -73,7 +73,7 @@ whenCheckTags act = do
   when check_tags act
 
 -- | Call barf if we failed to predict a tag correctly.
--- This is immensly useful when debugging issues in tag inference
+-- This is immensely useful when debugging issues in tag inference
 -- as it will result in a program abort when we encounter an invalid
 -- call/heap object, rather than leaving it be and segfaulting arbitrary
 -- or producing invalid results.
@@ -174,6 +174,6 @@ checkArgStatic msg MarkedStrict arg = whenCheckTags $
       info <- getCgIdInfo v
       if taggedCgInfo info
           then return ()
-          else pprPanic "Arg not tagged as expectd" (ppr msg <+> ppr arg)
+          else pprPanic "Arg not tagged as expected" (ppr msg <+> ppr arg)
 
 

@@ -95,7 +95,7 @@ colorGraph iterative spinCount colors triv spill graph0
 
         -- try and color the problem nodes
         --      problem nodes are the ones that were left uncolored because they weren't triv.
-        --      theres a change we can color them here anyway.
+        --      there's a change we can color them here anyway.
         (graph_prob, ksNoColor)
                 = assignColors colors graph_triv ksProblems
 

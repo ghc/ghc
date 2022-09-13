@@ -452,7 +452,7 @@ gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
       = nlHsCase (nlHsVar a_RDR) $
         map (mkOrdOpAlt op) tycon_data_cons
         -- i.e.  case a of { C1 x y -> case b of C1 x y -> ....compare x,y...
-        --                   C2 x   -> case b of C2 x -> ....comopare x.... }
+        --                   C2 x   -> case b of C2 x -> ....compare x.... }
 
       | null non_nullary_cons    -- All nullary, so go straight to comparing tags
       = mkTagCmp op

@@ -419,7 +419,7 @@ data TyClDecl pass
     --             'GHC.Parser.Annotation.AnnEqual',
 
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-    SynDecl { tcdSExt   :: XSynDecl pass          -- ^ Post renameer, FVs
+    SynDecl { tcdSExt   :: XSynDecl pass          -- ^ Post renamer, FVs
             , tcdLName  :: LIdP pass              -- ^ Type constructor
             , tcdTyVars :: LHsQTyVars pass        -- ^ Type variables; for an
                                                   -- associated type these
@@ -585,7 +585,7 @@ PRINCIPLE:
 
 Examples:
   * data T1 (a :: *->*) (b :: *) = ....
-    -- Has CUSK; equivalant to   T1 :: (*->*) -> * -> *
+    -- Has CUSK; equivalent to   T1 :: (*->*) -> * -> *
 
  * data T2 a b = ...
    -- No CUSK; we do not want to guess T2 :: * -> * -> *

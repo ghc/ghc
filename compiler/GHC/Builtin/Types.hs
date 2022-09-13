@@ -282,7 +282,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                   unitTyCon
                 , unboxedUnitTyCon
 
-                -- Solo (i.e., the bosed 1-tuple) is also not treated
+                -- Solo (i.e., the boxed 1-tuple) is also not treated
                 -- like other tuples (i.e. we /do/ include it here),
                 -- since it does not use special syntax like other tuples
                 -- See Note [One-tuples] (Wrinkle: Make boxed one-tuple names

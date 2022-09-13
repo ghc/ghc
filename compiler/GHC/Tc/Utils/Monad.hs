@@ -1191,7 +1191,7 @@ is applied to four arguments.  See #18379 for a concrete example.
 
 This reliance on delicate inlining and Called Arity is not good.
 See #18202 for a more general approach.  But meanwhile, these
-ininings seem unobjectional, and they solve the immediate
+inlinings seem unobjectional, and they solve the immediate
 problem.
 
 Note [Error contexts in generated code]
@@ -1970,7 +1970,7 @@ We must not discard the out-of-scope error.
 It's distressingly delicate though:
 
 * If we discard too /many/ constraints we may fail to report the error
-  that led us to interrupte the constraint gathering process.
+  that led us to interrupt the constraint gathering process.
 
   One particular example "variable out of scope" Hole constraints. For
   example (#12529):

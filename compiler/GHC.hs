@@ -586,7 +586,7 @@ initGhcMonad mb_top_dir = setSession =<< liftIO (initHscEnv mb_top_dir)
 -- 'setSessionDynFlags' sets both @DynFlags@, and 'getSessionDynFlags'
 -- retrieves the program @DynFlags@ (for backwards compatibility).
 
--- This is a compatability function which sets dynflags for the top session
+-- This is a compatibility function which sets dynflags for the top session
 -- as well as the unit.
 setSessionDynFlags :: (HasCallStack, GhcMonad m) => DynFlags -> m ()
 setSessionDynFlags dflags0 = do

@@ -338,8 +338,8 @@ patchJumpInstr instr patchF
 --
 -- Using sp to compute the offset will violate assumptions about the stack pointer
 -- pointing to the top of the stack during signal handling.  As we can't force
--- every signal to use its own stack, we have to ensure that the stack poitner
--- always poitns to the top of the stack, and we can't use it for computation.
+-- every signal to use its own stack, we have to ensure that the stack pointer
+-- always points to the top of the stack, and we can't use it for computation.
 --
 -- | An instruction to spill a register into a spill slot.
 mkSpillInstr
@@ -541,7 +541,7 @@ data Instr
     | PUSH_STACK_FRAME
     | POP_STACK_FRAME
     -- 1. Arithmetic Instructions ----------------------------------------------
-    -- | ADC Operand Operand Operang -- rd = rn + rm + C
+    -- | ADC Operand Operand Operand -- rd = rn + rm + C
     -- | ADCS ...
     | ADD Operand Operand Operand -- rd = rn + rm
     -- | ADDS Operand Operand Operand -- rd = rn + rm

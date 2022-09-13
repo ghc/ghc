@@ -1382,7 +1382,7 @@ Note that
   (c) The 'bs' in the second group must obviously not be captured by
       the binding in the first group
 
-To satisfy (a) we nest the segements.
+To satisfy (a) we nest the segments.
 To satisfy (b) we check for duplicates just before thing_inside.
 To satisfy (c) we reset the LocalRdrEnv each time.
 
@@ -1809,7 +1809,7 @@ transformation loses the ability to do A and C in parallel.
 
 The algorithm works by first splitting the sequence of statements into
 independent "segments", and a separate "tail" (the final statement). In
-our example above, the segements would be
+our example above, the segments would be
 
      [ x <- A
      , y <- B x ]
@@ -2727,7 +2727,7 @@ mkExpandedExpr a b = XExpr (HsExpanded a b)
 --
 -- See Note [Overview of record dot syntax] in GHC.Hs.Expr.
 
--- mkGetField arg field calcuates a get_field @field arg expression.
+-- mkGetField arg field calculates a get_field @field arg expression.
 -- e.g. z.x = mkGetField z x = get_field @x z
 mkGetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
 mkGetField get_field arg field = unLoc (head $ mkGet get_field [arg] field)

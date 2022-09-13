@@ -76,7 +76,7 @@ Note [Basic Simplifier Plan]
       - inert reactions
       - spontaneous reactions
       - top-level interactions
-   Each stage returns a StopOrContinue and may have sideffected
+   Each stage returns a StopOrContinue and may have sideeffected
    the inerts or worklist.
 
    The threading of the stages is as follows:
@@ -912,7 +912,7 @@ Note that:
   cannot be solved from instances.
 
 * The (EvBindMap, DictMap CtEvidence) is an accumulating purely-functional
-  state that allows try_solve_from_instance to augmennt the evidence
+  state that allows try_solve_from_instance to augment the evidence
   bindings and inert_solved_dicts as it goes.
 
   If it succeeds, we commit all these bindings and solved dicts to the
@@ -985,7 +985,7 @@ We ingore such fundeps for several reasons:
       [W] iss ~ is2 : beta
 
    Again we can't prove that equality; and worse we'll rewrite iss to
-   (is2:beta) in deeply nested contraints inside this implication,
+   (is2:beta) in deeply nested constraints inside this implication,
    where beta is untouchable (under other equality constraints), leading
    to other insoluble constraints.
 
@@ -1460,7 +1460,7 @@ But it's not so simple:
 
   That first argument is invisible in the source program (aside from
   visible type application), so we'd much prefer to get the error from
-  the second. We track visiblity in the uo_visible field of a TypeEqOrigin.
+  the second. We track visibility in the uo_visible field of a TypeEqOrigin.
   We use this to prioritise visible errors (see GHC.Tc.Errors.tryReporters,
   the partition on isVisibleOrigin).
 
@@ -1810,7 +1810,7 @@ as the fundeps.
 -}
 
 doTopFundepImprovement :: Ct -> TcS (StopOrContinue Ct)
--- Try to functional-dependency improvement betweeen the constraint
+-- Try to functional-dependency improvement between the constraint
 -- and the top-level instance declarations
 -- See Note [Fundeps with instances]
 -- See also Note [Weird fundeps]
@@ -2432,7 +2432,7 @@ And less obviously to:
       instance (c1, c2) => (% c1, c2 %)
   Example in #14218
 
-Exammples: T5853, T10432, T5315, T9222, T2627b, T3028b
+Examples: T5853, T10432, T5315, T9222, T2627b, T3028b
 
 PS: the term "naturally coherent" doesn't really seem helpful.
 Perhaps "invertible" or something?  I left it for now though.
@@ -2457,7 +2457,7 @@ will be constructed by GHC at a call site... from the very instances
 that unify with it here.  It is not like an incoherent user-written
 instance which might have utterly different behaviour.
 
-Consdider  f :: Eq a => blah.  If we have [W] Eq a, we certainly
+Consider  f :: Eq a => blah.  If we have [W] Eq a, we certainly
 get it from the Eq a context, without worrying that there are
 lots of top-level instances that unify with [W] Eq a!  We'll use
 those instances to build evidence to pass to f. That's just the

@@ -334,7 +334,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
   In this case we could assume that we will end up with a jump for BOTH
   branches. In this case it might be best to put the likely path in the true
   branch especially if there are large numbers of predecessors as this saves
-  us the jump thats not taken. However I haven't tested this and as of early
+  us the jump that's not taken. However I haven't tested this and as of early
   2018 we almost never generate cmm where this would apply.
 -}
 

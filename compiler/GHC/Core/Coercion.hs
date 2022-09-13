@@ -304,7 +304,7 @@ tidyCoAxBndrsForUser init_env tcvs
 coToMCo :: Coercion -> MCoercion
 -- Convert a coercion to a MCoercion,
 -- It's not clear whether or not isReflexiveCo would be better here
---    See #19815 for a bit of data and dicussion on this point
+--    See #19815 for a bit of data and discussion on this point
 coToMCo co | isReflCo co = MRefl
            | otherwise   = MCo co
 
@@ -955,7 +955,7 @@ optCoercion.  Not a big deal either way.
 
 mkAxInstCo :: Role -> CoAxiom br -> BranchIndex -> [Type] -> [Coercion]
            -> Coercion
--- mkAxInstCo can legitimately be called over-staturated;
+-- mkAxInstCo can legitimately be called over-saturated;
 -- i.e. with more type arguments than the coercion requires
 mkAxInstCo role ax index tys cos
   | arity == n_tys = downgradeRole role ax_role $
@@ -1615,7 +1615,7 @@ mkPiCo  :: Role -> Var -> Coercion -> Coercion
 mkPiCo r v co | isTyVar v = mkHomoForAllCos [v] co
               | isCoVar v = assert (not (v `elemVarSet` tyCoVarsOfCo co)) $
                   -- We didn't call mkForAllCo here because if v does not appear
-                  -- in co, the argement coercion will be nominal. But here we
+                  -- in co, the argument coercion will be nominal. But here we
                   -- want it to be r. It is only called in 'mkPiCos', which is
                   -- only used in GHC.Core.Opt.Simplify.Utils, where we are sure for
                   -- now (Aug 2018) v won't occur in co.

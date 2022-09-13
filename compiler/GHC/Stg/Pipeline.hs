@@ -96,7 +96,7 @@ stg2stg logger extra_vars opts this_mod binds
           diag_opts ppr_opts
           extra_vars this_mod unarised
       | otherwise
-      = \ _whodunnit _binds -> return ()
+      = \ _whodunit _binds -> return ()
 
     -------------------------------------------
     do_stg_pass :: Module -> [StgTopBinding] -> StgToDo -> StgM [StgTopBinding]

@@ -167,7 +167,7 @@ dynLibSuffix :: GhcNameVersion -> String
 dynLibSuffix (GhcNameVersion name ver) = '-':name ++ ver
 
 -----------------------------------------------------------------------------
--- Accessessors from 'Settings'
+-- Accessors from 'Settings'
 
 sProgramName         :: Settings -> String
 sProgramName = ghcNameVersion_programName . sGhcNameVersion

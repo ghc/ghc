@@ -415,7 +415,7 @@ flattenIncludes specs =
   Build systems with a remote cache like Bazel or Buck (or Shake, see #16956)
   store the build artifacts produced by a build BA for reuse in subsequent builds.
 
-  Embedding source paths in interface fingerprints will thwart these attemps and
+  Embedding source paths in interface fingerprints will thwart these attempts and
   lead to unnecessary recompilations when the source paths in BA differ from the
   source paths in subsequent builds.
  -}
@@ -742,7 +742,7 @@ data DynFlags = DynFlags {
   'doFloatFromRhs'; with this we can control floating out with GHC flags.
 
   This addresses https://gitlab.haskell.org/ghc/ghc/-/issues/13663 and
-  allows for experminentation.
+  allows for experimentation.
 -}
 
 class HasDynFlags m where
@@ -773,7 +773,7 @@ class ContainsDynFlags t where
     extractDynFlags :: t -> DynFlags
 
 -----------------------------------------------------------------------------
--- Accessessors from 'DynFlags'
+-- Accessors from 'DynFlags'
 
 -- | "unbuild" a 'Settings' from a 'DynFlags'. This shouldn't be needed in the
 -- vast majority of code. But GHCi questionably uses this to produce a default
@@ -2382,7 +2382,7 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fdiagnostics-color=never"
       (NoArg (upd (\d -> d { useColor = Never })))
 
-  -- Suppress all that is suppressable in core dumps.
+  -- Suppress all that is suppressible in core dumps.
   -- Except for uniques, as some simplifier phases introduce new variables that
   -- have otherwise identical names.
   , make_ord_flag defGhcFlag "dsuppress-all"

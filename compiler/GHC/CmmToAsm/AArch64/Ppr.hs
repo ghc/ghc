@@ -180,7 +180,7 @@ pprGloblDecl platform lbl
 -- Note [Always use objects for info tables]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- See discussion in X86.Ppr for why this is necessary.  Essentially we need to
--- ensure that we never pass function symbols when we migth want to lookup the
+-- ensure that we never pass function symbols when we might want to lookup the
 -- info table.  If we did, we could end up with procedure linking tables
 -- (PLT)s, and thus the lookup wouldn't point to the function, but into the
 -- jump table.
@@ -263,7 +263,7 @@ pprIm platform im = case im of
   ImmInteger i -> char '#' <> integer i
 
   -- TODO: This will only work for
-  -- The floating point value must be expressable as ±n ÷ 16 × 2^r,
+  -- The floating point value must be expressible as ±n ÷ 16 × 2^r,
   -- where n and r are integers such that 16 ≤ n ≤ 31 and -3 ≤ r ≤ 4.
   -- and 0 needs to be encoded as wzr/xzr.
   --
@@ -307,7 +307,7 @@ pprOp plat op = case op of
   OpRegShift w r s i -> pprReg w r <> comma <+> pprShift s <+> char '#' <> int i
   OpImm im          -> pprIm plat im
   OpImmShift im s i -> pprIm plat im <> comma <+> pprShift s <+> char '#' <> int i
-  -- TODO: Address compuation always use registers as 64bit -- is this correct?
+  -- TODO: Address computation always use registers as 64bit -- is this correct?
   OpAddr (AddrRegReg r1 r2) -> char '[' <+> pprReg W64 r1 <> comma <+> pprReg W64 r2 <+> char ']'
   OpAddr (AddrRegImm r1 im) -> char '[' <+> pprReg W64 r1 <> comma <+> pprImm plat im <+> char ']'
   OpAddr (AddrReg r1)       -> char '[' <+> pprReg W64 r1 <+> char ']'
@@ -560,7 +560,7 @@ pprCond c = case c of
   VS     -> text "vs" -- Overflow                          ; Unordered (at least one NaN operand)
   VC     -> text "vc" -- No overflow                       ; Not unordered
 
-  -- Orderd variants.  Respecting NaN.
+  -- Ordered variants.  Respecting NaN.
   OLT    -> text "mi"
   OLE    -> text "ls"
   OGE    -> text "ge"

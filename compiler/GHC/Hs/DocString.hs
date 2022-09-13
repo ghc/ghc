@@ -124,7 +124,7 @@ instance Binary HsDocStringDecorator where
 
 type LHsDocStringChunk = Located HsDocStringChunk
 
--- | A continguous chunk of documentation
+-- | A contiguous chunk of documentation
 newtype HsDocStringChunk = HsDocStringChunk ByteString
   deriving (Eq,Ord,Data, Show)
 
@@ -192,6 +192,6 @@ unlines' :: [String] -> String
 unlines' = intercalate "\n"
 
 -- | Just get the docstring, without any decorators
--- Seperates docstrings using "\n\n", which is how haddock likes to render them
+-- Separates docstrings using "\n\n", which is how haddock likes to render them
 renderHsDocStrings :: [HsDocString] -> String
 renderHsDocStrings = intercalate "\n\n" . map renderHsDocString

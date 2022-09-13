@@ -9,7 +9,7 @@
 -- hooks. The compiler itself uses hooks in multithreaded code (--make) and it
 -- is also probably used by ghc-api users (IDEs, etc.).
 --
--- In addition to hooks, the Logger suppors LogFlags: basically a subset of the
+-- In addition to hooks, the Logger supports LogFlags: basically a subset of the
 -- command-line flags that control the logger behaviour at a higher level than
 -- hooks.
 --

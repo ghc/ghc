@@ -158,7 +158,7 @@ and hardcode the mask into the MonadUnique instance. On top of all the
 benefits of threading the mask this *also* has the benefit of avoiding
 the mask getting captured in thunks, or being passed around at runtime.
 It does however come at the cost of having to use a fixed Mask for all
-code run in this Monad. But rememeber, the Mask is purely cosmetic:
+code run in this Monad. But remember, the Mask is purely cosmetic:
 See Note [Uniques and masks].
 
 NB: It's *not* an optimization to pass around the UniqSupply inside an

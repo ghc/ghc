@@ -1267,7 +1267,7 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
               | Just (_, bot_str_sig, _) <- mb_bot_str
               = bot_str_sig
 
-              -- No stricness info
+              -- No strictness info
               | otherwise = nopSig
 
     cpr = cprSigInfo idinfo

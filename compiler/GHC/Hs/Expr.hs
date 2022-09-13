@@ -1765,7 +1765,7 @@ pprTypedSplice :: (OutputableBndrId p) => Maybe SplicePointName -> LHsExpr (GhcP
 pprTypedSplice n e = ppr_splice (text "$$") n e
 
 pprUntypedSplice :: forall p. (OutputableBndrId p)
-                 => Bool -- Whether to preceed the splice with "$"
+                 => Bool -- Whether to precede the splice with "$"
                  -> Maybe SplicePointName -- Used for pretty printing when exists
                  -> HsUntypedSplice (GhcPass p)
                  -> SDoc

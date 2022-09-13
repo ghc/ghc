@@ -67,7 +67,7 @@ import Data.Data (Data)
 Global bindings (where clauses)
 -}
 
--- the ...LR datatypes are parametrized by two id types,
+-- the ...LR datatypes are parameterized by two id types,
 -- one for the left and one for the right.
 
 type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = EpAnn AnnList

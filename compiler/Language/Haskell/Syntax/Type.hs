@@ -168,7 +168,7 @@ is a bit complicated.  Here's how it works.
 
     HsOuterImplicit (implicit quantification, added by renamer)
           f :: a -> a     -- Desugars to f :: forall {a}. a -> a
-    HsOuterExplicit (explicit user quantifiation):
+    HsOuterExplicit (explicit user quantification):
           f :: forall a. a -> a
 
   See Note [forall-or-nothing rule].
@@ -361,7 +361,7 @@ hsQTvExplicit = hsq_explicit
 --   HsOuterImplicit (implicit quantification, added by renamer)
 --         f :: a -> a     -- Desugars to f :: forall {a}. a -> a
 --         type instance F (a,b) = a->b
---   HsOuterExplicit (explicit user quantifiation):
+--   HsOuterExplicit (explicit user quantification):
 --         f :: forall a. a -> a
 --         type instance forall a b. F (a,b) = a->b
 --
@@ -487,7 +487,7 @@ action:
                                             -- if you quantify a, you must also quantify b
 
   type F4 :: forall a -> b -> b             -- Legal; the top quantifier (forall a) is a /visible/
-                                            -- quantifer, so the "nothing" part of the forall-or-nothing
+                                            -- quantifier, so the "nothing" part of the forall-or-nothing
                                             -- rule applies, and b is therefore implicitly quantified.
                                             -- Equivalently: forall b. forall a -> b -> b
 
@@ -1033,7 +1033,7 @@ type LConDeclField pass = XRec pass (ConDeclField pass)
 data ConDeclField pass  -- Record fields have Haddock docs on them
   = ConDeclField { cd_fld_ext  :: XConDeclField pass,
                    cd_fld_names :: [LFieldOcc pass],
-                                   -- ^ See Note [ConDeclField passs]
+                                   -- ^ See Note [ConDeclField pass]
                    cd_fld_type :: LBangType pass,
                    cd_fld_doc  :: Maybe (LHsDoc pass)}
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
@@ -1069,7 +1069,7 @@ noTypeArgs :: [Void]
 noTypeArgs = []
 
 {-
-Note [ConDeclField passs]
+Note [ConDeclField pass]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A ConDeclField contains a list of field occurrences: these always

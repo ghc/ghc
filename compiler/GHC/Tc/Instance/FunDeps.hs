@@ -633,7 +633,7 @@ In checkFunDeps we check that a new ClsInst is consistent with all the
 ClsInsts in the environment.
 
 The bogus aspect is discussed in #10675. Currently it if the two
-types are *contradicatory*, using (isNothing . tcUnifyTys).  But all
+types are *contradictory*, using (isNothing . tcUnifyTys).  But all
 the papers say we should check if the two types are *equal* thus
    not (substTys subst rtys1 `eqTypes` substTys subst rtys2)
 For now I'm leaving the bogus form because that's the way it has

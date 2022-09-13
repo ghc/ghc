@@ -762,7 +762,7 @@ data DisambigInfo
           -- monoid will combine them to this failing case.
 
 instance Outputable DisambigInfo where
-  ppr NoOccurrence = text "NoOccurence"
+  ppr NoOccurrence = text "NoOccurrence"
   ppr (UniqueOccurrence gre) = text "UniqueOccurrence:" <+> ppr gre
   ppr (DisambiguatedOccurrence gre) = text "DiambiguatedOccurrence:" <+> ppr gre
   ppr (AmbiguousOccurrence gres)    = text "Ambiguous:" <+> ppr gres
@@ -866,7 +866,7 @@ of 'G' in the 'instance C S' decl is unambiguous, because C has only
 one associated type called G. This is exactly what happens for methods,
 and it is only consistent to do the same thing for types. That's the
 role of the function lookupTcdName; the (Maybe Name) give the class of
-the encloseing instance decl, if any.
+the enclosing instance decl, if any.
 
 Note [Looking up Exact RdrNames]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

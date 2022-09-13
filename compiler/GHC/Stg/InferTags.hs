@@ -184,7 +184,7 @@ For functions we never make use of the tag info so we have two choices:
   careful to make sure we still enter them when needed.
 As it makes little difference for runtime performance I've treated functions as TagDunno in a few places where
 it made the code simpler. But besides implementation complexity there isn't any reason
-why we couldn't be more rigourous in dealing with functions.
+why we couldn't be more rigorous in dealing with functions.
 
 NB: It turned in #21193 that PAPs get tag zero, so the tag check can't be omitted for functions.
 So option two isn't really an option without reworking this anyway.
@@ -571,7 +571,7 @@ as argument. As example:
     let f<?> z = case z of z'<TagProper> -> (# c, x #)
 
 Here we will infer for f the Signature <TagTuple[TagProper,TagDunno]>.
-This information will be used if we scrutinze a saturated application of
+This information will be used if we scrutinize a saturated application of
 `f` in order to determine the taggedness of the result.
 That is for `case f x of (# r1,r2 #) -> rhs` we can infer
 r1<TagProper> and r2<TagDunno> which allows us to skip all tag checks on `r1`

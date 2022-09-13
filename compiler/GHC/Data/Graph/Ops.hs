@@ -253,7 +253,7 @@ addExclusions u getClass colors graph
 
 
 -- | Add a coalescence edge to the graph, creating nodes if required.
---      It is considered adventageous to assign the same color to nodes in a coalesence.
+--      It is considered advantageous to assign the same color to nodes in a coalescence.
 addCoalesce
         :: Uniquable k
         => (k, cls) -> (k, cls)
@@ -491,7 +491,7 @@ freezeNode k
          = if elementOfUniqSet k (nodeCoalesce node)
                 then node { nodeCoalesce = delOneFromUniqSet (nodeCoalesce node) k }
                 else node       -- panic "GHC.Data.Graph.Ops.freezeNode: edge to freeze wasn't in the coalesce set"
-                                -- If the edge isn't actually in the coelesce set then just ignore it.
+                                -- If the edge isn't actually in the coalesce set then just ignore it.
 
         fm2     = nonDetStrictFoldUniqSet (adjustUFM_C (freezeEdge k)) fm1
                     -- It's OK to use a non-deterministic fold here because the
@@ -609,7 +609,7 @@ validateGraph doc isColored graph
                         $  nonDetEltsUFM $ graphMap graph
         , not $ null badNodes
         = pprPanic "GHC.Data.Graph.Ops.validateGraph"
-                (  text "Supposably colored graph has uncolored nodes."
+                (  text "Supposedly colored graph has uncolored nodes."
                 $$ text "  uncolored nodes: " <> hcat (map (ppr . nodeId) badNodes)
                 $$ doc )
 

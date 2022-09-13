@@ -735,7 +735,7 @@ discount of 10, that'll make each alternative RHS cost zero.  We
 charge 10 for each case alternative (see size_up_alt).  If we give a
 bigger discount (say 20) in conSize, we'll make the case expression
 cost *nothing*, and that can make a huge case tree cost nothing. This
-leads to massive, sometimes exponenial inlinings (#18282).  In short,
+leads to massive, sometimes exponential inlinings (#18282).  In short,
 don't give a discount that give a negative size to a sub-expression!
 
 Historical note 2: Much longer ago, Simon M tried a MUCH bigger

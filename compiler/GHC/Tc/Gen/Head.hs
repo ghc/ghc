@@ -956,7 +956,7 @@ tcExprSig _ expr sig@(PartialSig { psig_name = name, sig_loc = loc })
 {- Note [Partial expression signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Partial type signatures on expressions are easy to get wrong.  But
-here is a guiding principile
+here is a guiding principle
     e :: ty
 should behave like
     let x :: ty

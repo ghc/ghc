@@ -125,7 +125,7 @@ are both type constructors into two GRES.
     , T defined at A.hs:4:23 ]
 
 Then, we get  @[C{C;}, C{T;}, T{T;}, T{D;}]@, which eventually gets merged
-into @[C{C, T;}, T{T, D;}]@ (which satsifies the AvailTC invariant).
+into @[C{C, T;}, T{T, D;}]@ (which satisfies the AvailTC invariant).
 -}
 
 data ExportAccum        -- The type of the accumulating parameter of
@@ -758,4 +758,4 @@ exportClashErr global_env child1 child2 ie1 ie2
       case SrcLoc.leftmost_smallest (greSrcSpan gre1) (greSrcSpan gre2) of
         LT -> (child1, gre1, ie1, child2, gre2, ie2)
         GT -> (child2, gre2, ie2, child1, gre1, ie1)
-        EQ -> panic "exportClashErr: clashing exports have idential location"
+        EQ -> panic "exportClashErr: clashing exports have identical location"

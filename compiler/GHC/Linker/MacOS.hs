@@ -36,7 +36,7 @@ import Text.ParserCombinators.ReadP as Parser
 -- macOS Sierra (10.14).
 --
 -- @-dead_strip_dylibs@ does not dead strip @-rpath@ entries, as such passing
--- @-l@ and @-rpath@ to the linker will result in the unnecesasry libraries not
+-- @-l@ and @-rpath@ to the linker will result in the unnecessary libraries not
 -- being included in the load commands, however the @-rpath@ entries are all
 -- forced to be included.  This can lead to 100s of @-rpath@ entries being
 -- included when only a handful of libraries end up being truly linked.

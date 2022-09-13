@@ -658,7 +658,7 @@ to link primops; it rather does a rather hacky symbol lookup (see
 GHC.ByteCode.Linker.primopToCLabel). TODO: Perhaps this should be changed?
 
 Note that these wrappers aren't *quite* as expressive as their unwrapped
-breathren, in that they may exhibit less representation polymorphism.
+brethren, in that they may exhibit less representation polymorphism.
 For instance, consider the case of mkWeakNoFinalizer#, which has type:
 
     mkWeakNoFinalizer# :: forall (r :: RuntimeRep) (k :: TYPE r) (v :: Type).

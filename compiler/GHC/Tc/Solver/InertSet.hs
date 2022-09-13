@@ -338,7 +338,7 @@ VERY IMPORTANT INVARIANT:
      in the above sense
 
    - Exception 1: local quantified constraints have no such guarantee;
-     indeed, adding a "solved dictionary" when appling a quantified
+     indeed, adding a "solved dictionary" when applying a quantified
      constraint led to the ability to define unsafeCoerce
      in #17267.
 
@@ -883,7 +883,7 @@ The idea is that
     (this is Lemma (L0)), and hence this triple never plays a role in application S(f,t).
     It is always safe to extend S with such a triple.
 
-    (NB: we could strengten K1) in this way too, but see K3.
+    (NB: we could strengthen K1) in this way too, but see K3.
 
   - (K2b): if lhs not in s, we have no further opportunity to apply the
     work item

@@ -294,7 +294,7 @@ data CgState
 data FCodeState =
   MkFCodeState { fcs_upframeoffset :: UpdFrameOffset     -- ^ Size of current update frame UpdFrameOffset must be kept lazy or
                                                          -- else the RTS will deadlock _and_ also experience a severe
-                                                         -- performance degredation
+                                                         -- performance degradation
               , fcs_sequel        :: !Sequel             -- ^ What to do at end of basic block
               , fcs_selfloop      :: Maybe SelfLoopInfo  -- ^ Which tail calls can be compiled as local jumps?
                                                          --   See Note [Self-recursive tail calls] in GHC.StgToCmm.Expr

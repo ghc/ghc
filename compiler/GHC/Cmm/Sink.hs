@@ -360,7 +360,7 @@ loads from R1. What happens is that we:
     * The assignment `_c3 = [R1 + 1]`; (R1 already inlined on pickup)
       conflicts with R1 = R1, because it reads `R1` and the node writes
       to R1
-    * This is clearly no-sensical because `R1 = R1` doesn't affect R1's value.
+    * This is clearly nonsensical because `R1 = R1` doesn't affect R1's value.
 
 The solutions is to check if we can discard nodes before and *after* simplifying
 them. We could only do it after as well, but I assume doing it early might save
@@ -490,7 +490,7 @@ tryToInline platform liveAfter node assigs =
           where (final_node, rest') = go usages live' node' (insertLRegSet l skipped) rest
 
                 -- Avoid discarding of assignments to vars on the rhs.
-                -- See Note [Keeping assignemnts mentioned in skipped RHSs]
+                -- See Note [Keeping assignments mentioned in skipped RHSs]
                 -- usages' = foldLocalRegsUsed platform (\m r -> addToUFM m r 2)
                                             -- usages rhs
                 live' = inline foldLocalRegsUsed platform (\m r -> insertLRegSet r m)
@@ -518,7 +518,7 @@ tryToInline platform liveAfter node assigs =
         inl_exp (CmmMachOp op args) = cmmMachOpFold platform op args
         inl_exp other = other
 
-{- Note [Keeping assignemnts mentioned in skipped RHSs]
+{- Note [Keeping assignments mentioned in skipped RHSs]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     If we have to assignments: [z = y, y = e1] and we skip
     z we *must* retain the assignment y = e1. This is because

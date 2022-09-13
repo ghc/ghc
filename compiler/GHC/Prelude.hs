@@ -76,7 +76,7 @@ other depending on the DEBUG setting.
 Why do we then continue on to re-export the rest of Data.Bits?
 If we would not what is likely to happen is:
 * Someone imports Data.Bits, uses xor. Things are fine.
-* They add a shift and get an ambigious definition error.
+* They add a shift and get an ambiguous definition error.
 * The are puzzled for a bit.
 * They either:
   + Remove the import of Data.Bits and get an error because xor is not in scope.

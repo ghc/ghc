@@ -438,7 +438,7 @@ Our solution is this:
 
 
 We re-emit the implication rather than reporting the errors right now,
-so that the error mesages are improved by other solving and defaulting.
+so that the error messages are improved by other solving and defaulting.
 e.g. we prefer
     Cannot match 'Type->Type' with 'Type'
 to  Cannot match 'Type->Type' with 'TYPE r0'
@@ -1013,7 +1013,7 @@ We could do more than once but we'd have to have /some/ limit: in the
 the recursive case, we would go on forever in the common case where
 the constraints /are/ satisfiable (#10592 comment:12!).
 
-For stratightforard situations without type functions the try_harder
+For straightforward situations without type functions the try_harder
 step does nothing.
 
 Note [tcNormalise]
@@ -1668,13 +1668,13 @@ We will ultimately quantify f over (Eq a, C a, <diff>), where
 At least for single functions we would like to quantify f over
 precisely the same theta as <quant-theta>, so that we get to take
 the short-cut path in GHC.Tc.Gen.Bind.mkExport, and avoid calling
-tcSubTypeSigma for impedence matching. Why avoid?  Because it falls
+tcSubTypeSigma for impedance matching. Why avoid?  Because it falls
 over for ambiguous types (#20921).
 
 We can get precisely the same theta by using the same algorithm,
 findInferredDiff.
 
-All of this goes wrong if we have (a) mutual recursion, (b) mutiple
+All of this goes wrong if we have (a) mutual recursion, (b) multiple
 partial type signatures, (c) with different constraints, and (d)
 ambiguous types.  Something like
     f :: forall a. Eq a => F a -> _
@@ -1848,7 +1848,7 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
           -- NB: only pass 'DefaultKindVars' when we know we're dealing with a kind variable.
           tv
 
-       -- this common case (no inferred contraints) should be fast
+       -- this common case (no inferred constraints) should be fast
     simplify_cand [] = return []
        -- see Note [Unconditionally resimplify constraints when quantifying]
     simplify_cand candidates

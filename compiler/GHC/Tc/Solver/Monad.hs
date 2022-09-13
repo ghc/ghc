@@ -902,7 +902,7 @@ runTcS tcs
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
        ; return (res, ev_binds) }
 
--- | This variant of 'runTcS' will immediatley fail upon encountering an
+-- | This variant of 'runTcS' will immediately fail upon encountering an
 -- insoluble ct. See Note [Speeding up valid hole-fits]. Its one usage
 -- site does not need the ev_binds, so we do not return them.
 runTcSEarlyAbort :: TcS a -> TcM a

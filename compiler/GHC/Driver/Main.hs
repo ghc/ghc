@@ -1639,7 +1639,7 @@ hscSimplify' plugins ds_result = do
 -- Interface generators
 --------------------------------------------------------------
 
--- | Generate a striped down interface file, e.g. for boot files or when ghci
+-- | Generate a stripped down interface file, e.g. for boot files or when ghci
 -- generates interface files. See Note [simpleTidyPgm - mkBootModDetailsTc]
 hscSimpleIface :: HscEnv
                -> TcGblEnv

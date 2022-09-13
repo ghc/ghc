@@ -1299,7 +1299,7 @@ with LHSs with a complicated desugaring (and hence unlikely to match);
 (e.g. a case expression is not allowed: too elaborate.)
 
 But there are legitimate non-trivial args ei, like sections and
-lambdas.  So it seems simmpler not to check at all, and that is why
+lambdas.  So it seems simpler not to check at all, and that is why
 check_e is commented out.
 -}
 
@@ -1396,7 +1396,7 @@ Note [Dependency analysis of type, class, and instance decls]
 A TyClGroup represents a strongly connected components of
 type/class/instance decls, together with the role annotations for the
 type/class declarations.  The renamer uses strongly connected
-comoponent analysis to build these groups.  We do this for a number of
+component analysis to build these groups.  We do this for a number of
 reasons:
 
 * Improve kind error messages. Consider
@@ -1516,7 +1516,7 @@ rnTyClDecls :: [TyClGroup GhcPs]
             -> RnM ([TyClGroup GhcRn], FreeVars)
 -- Rename the declarations and do dependency analysis on them
 rnTyClDecls tycl_ds
-  = do { -- Rename the type/class, instance, and role declaraations
+  = do { -- Rename the type/class, instance, and role declarations
        ; tycls_w_fvs <- mapM (wrapLocFstMA rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
        ; let tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
        ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names (tyClGroupKindSigs tycl_ds)

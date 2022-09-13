@@ -219,7 +219,7 @@ hasNode m node =
 
 
 -- | Check if the nodes in the cfg and the set of blocks are the same.
---   In a case of a missmatch we panic and show the difference.
+--   In a case of a mismatch we panic and show the difference.
 sanityCheckCfg :: CFG -> LabelSet -> SDoc -> Bool
 sanityCheckCfg m blockSet msg
     | blockSet == cfgNodes
@@ -414,11 +414,11 @@ getEdgeInfo from to m
 
 getEdgeWeight :: CFG -> BlockId -> BlockId -> EdgeWeight
 getEdgeWeight cfg from to =
-    edgeWeight $ expectJust "Edgeweight for noexisting block" $
+    edgeWeight $ expectJust "Edgeweight for nonexisting block" $
                  getEdgeInfo from to cfg
 
 getTransitionSource :: BlockId -> BlockId -> CFG -> TransitionSource
-getTransitionSource from to cfg = transitionSource $ expectJust "Source info for noexisting block" $
+getTransitionSource from to cfg = transitionSource $ expectJust "Source info for nonexisting block" $
                         getEdgeInfo from to cfg
 
 reverseEdges :: CFG -> CFG
@@ -1020,11 +1020,11 @@ Currently implemented is a heuristic to predict that we do not exit
 loops (lehPredicts) and one to predict that backedges are more likely
 than any other edge.
 
-The back edge case is special as it superceeds any other heuristic if it
+The back edge case is special as it supersedes any other heuristic if it
 applies.
 
 Do NOT rely solely on nofib results for benchmarking this. I recommend at least
-comparing megaparsec and container benchmarks. Nofib does not seeem to have
+comparing megaparsec and container benchmarks. Nofib does not seem to have
 many instances of "loopy" Cmm where these make a difference.
 
 TODO:

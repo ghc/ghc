@@ -1275,7 +1275,7 @@ checkBootTyCon is_boot tc1 tc2
     -- but ONLY if the type synonym is nullary and has no type family
     -- applications.  This arises from two properties of skolem abstract data:
     --
-    --    For any T (with some number of paramaters),
+    --    For any T (with some number of parameters),
     --
     --    1. T is a valid type (it is "curryable"), and
     --
@@ -2727,7 +2727,7 @@ https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0179-printi
 
 :type / TM_Inst
 
-  In this mode, we report the type obained by instantiating only the
+  In this mode, we report the type obtained by instantiating only the
   /inferred/ quantifiers of e's type, solving constraints, and
   re-generalising, as discussed in #11376.
 

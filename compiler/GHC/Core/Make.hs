@@ -105,7 +105,7 @@ infixl 4 `mkCoreApp`, `mkCoreApps`
 -- | Sort the variables, putting type and covars first, in scoped order,
 -- and then other Ids
 --
--- It is a deterministic sort, meaining it doesn't look at the values of
+-- It is a deterministic sort, meaning it doesn't look at the values of
 -- Uniques. For explanation why it's important See Note [Unique Determinism]
 -- in GHC.Types.Unique.
 sortQuantVars :: [Var] -> [Var]
@@ -467,7 +467,7 @@ unitExpr = Var unitDataConId
 ************************************************************************
 -}
 
--- | Builds a selector which scrutises the given
+-- | Builds a selector which scrutinises the given
 -- expression and extracts the one name from the list given.
 -- If you want the no-shadowing rule to apply, the caller
 -- is responsible for making sure that none of these names

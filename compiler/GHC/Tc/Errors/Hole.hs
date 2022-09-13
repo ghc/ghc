@@ -400,7 +400,7 @@ is discarded.
 
 Note [Speeding up valid hole-fits]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-To fix #16875 we noted that a lot of time was being spent on uneccessary work.
+To fix #16875 we noted that a lot of time was being spent on unecessary work.
 
 When we'd call `tcCheckHoleFit hole hole_ty ty`, we would end up by generating
 a constraint to show that `hole_ty ~ ty`, including any constraints in `ty`. For

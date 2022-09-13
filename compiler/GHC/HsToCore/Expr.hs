@@ -325,7 +325,7 @@ which we desugar to `negate (fromIntegral 1)`.
 
 Notice it's crucial we still desugar to the correct (negate (fromIntegral ...)) despite
 performing the negation in order to check whether the application of negate will overflow.
-For a user written Integer instance we can't predict the interation of negate and fromIntegral.
+For a user written Integer instance we can't predict the interaction of negate and fromIntegral.
 
 Also note that this works for detecting the right result for `-128 :: Int8`.. which is
 in-range for Int8 but the correct result is achieved via two overflows.
@@ -592,7 +592,7 @@ beneficial. This is a bit of a trade-off,
 
 At the moment we use a simple heuristic to determine whether build will be
 fruitful: for small lists we assume the benefits of fusion will be worthwhile;
-for long lists we assume that the benefits will be outweighted by the cost of
+for long lists we assume that the benefits will be outweighed by the cost of
 code duplication. This magic length threshold is @maxBuildLength@. Also, fusion
 won't work at all if rewrite rules are disabled, so we don't use the build-based
 desugaring in this case.

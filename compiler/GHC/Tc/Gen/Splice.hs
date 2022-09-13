@@ -449,7 +449,7 @@ RENAMER (rnUntypedBracket):
   SplicePointName, 'spn'
 
 * The SplicePointName connects the `PendingRnSplice` with the particular point
-  in the syntax tree where that expresion should be spliced in.  That point
+  in the syntax tree where that expression should be spliced in.  That point
   in the tree is identified by `(HsUntypedSpliceNested spn)`.  It is used by
   the desugarer, so that we ultimately generate something like
        let spn = g x

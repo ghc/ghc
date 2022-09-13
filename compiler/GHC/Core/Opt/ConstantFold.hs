@@ -1288,7 +1288,7 @@ word64Result' :: Integer -> CoreExpr
 word64Result' result = Lit (mkLitWord64Wrap result)
 
 
--- | 'ambiant (primop x) = x', but not nececesarily 'primop (ambient x) = x'.
+-- | 'ambient (primop x) = x', but not necessarily 'primop (ambient x) = x'.
 semiInversePrimOp :: PrimOp -> RuleM CoreExpr
 semiInversePrimOp primop = do
   [Var primop_id `App` e] <- getArgs
@@ -2909,7 +2909,7 @@ mulFoldingRules' platform arg1 arg2 num_ops = case (arg1,arg2) of
 
 andFoldingRules' :: Platform -> CoreExpr -> CoreExpr -> NumOps -> Maybe CoreExpr
 andFoldingRules' platform arg1 arg2 num_ops = case (arg1, arg2) of
-    -- R2) * `or` `and` simplications
+    -- R2) * `or` `and` simplifications
     -- l1 and (l2 and x) ==> (l1 and l2) and x
     (L l1, is_lit_and num_ops -> Just (l2, x))
        -> Just (mkL (l1 .&. l2) `and` x)
@@ -2932,7 +2932,7 @@ andFoldingRules' platform arg1 arg2 num_ops = case (arg1, arg2) of
 
 orFoldingRules' :: Platform -> CoreExpr -> CoreExpr -> NumOps -> Maybe CoreExpr
 orFoldingRules' platform arg1 arg2 num_ops = case (arg1, arg2) of
-    -- R2) *  `or` `and` simplications
+    -- R2) *  `or` `and` simplifications
     -- l1 or (l2 or x) ==> (l1 or l2) or x
     (L l1, is_lit_or num_ops -> Just (l2, x))
        -> Just (mkL (l1 .|. l2) `or` x)

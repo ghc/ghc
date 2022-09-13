@@ -73,7 +73,7 @@ To be on the safe side and not pessimize ModuleEnv uses nondeterministic
 ordering on Module and normalizes by doing the lexicographic sort when
 turning the env to a list.
 See Note [Unique Determinism] for more information about the source of
-nondeterminismand and Note [Deterministic UniqFM] for explanation of why
+nondeterminism and Note [Deterministic UniqFM] for explanation of why
 it matters for maps.
 -}
 
