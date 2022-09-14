@@ -71,7 +71,6 @@ import GHC.Exts.Heap.Utils
 import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 import qualified GHC.Exts.Heap.ProfInfo.PeekProfInfo as PPI
 
-import Control.Monad
 import Data.Bits
 import Foreign
 import GHC.Exts
@@ -221,135 +220,119 @@ getClosureDataFromHeapRepPrim getConDesc decodeCCS itbl heapRep pts = do
         t | t >= THUNK && t <= THUNK_STATIC -> do
             pure $ ThunkClosure itbl pts npts
 
-        THUNK_SELECTOR -> do
-            unless (length pts >= 1) $
-                fail "Expected at least 1 ptr argument to THUNK_SELECTOR"
-            pure $ SelectorClosure itbl (head pts)
+        THUNK_SELECTOR -> case pts of
+            [] -> fail "Expected at least 1 ptr argument to THUNK_SELECTOR"
+            hd : _ -> pure $ SelectorClosure itbl hd
 
         t | t >= FUN && t <= FUN_STATIC -> do
             pure $ FunClosure itbl pts npts
 
-        AP -> do
-            unless (length pts >= 1) $
-                fail "Expected at least 1 ptr argument to AP"
-            -- We expect at least the arity, n_args, and fun fields
-            unless (length payloadWords >= 2) $
-                fail "Expected at least 2 raw words to AP"
-            let splitWord = payloadWords !! 0
-            pure $ APClosure itbl
+        AP -> case pts of
+            [] -> fail "Expected at least 1 ptr argument to AP"
+            hd : tl -> case payloadWords of
+                -- We expect at least the arity, n_args, and fun fields
+                splitWord : _ : _ ->
+                    pure $ APClosure itbl
 #if defined(WORDS_BIGENDIAN)
-                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
-                (fromIntegral splitWord)
+                        (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
+                        (fromIntegral splitWord)
 #else
-                (fromIntegral splitWord)
-                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
+                        (fromIntegral splitWord)
+                        (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
 #endif
-                (head pts) (tail pts)
+                        hd tl
+                _ -> fail "Expected at least 2 raw words to AP"
 
-        PAP -> do
-            unless (length pts >= 1) $
-                fail "Expected at least 1 ptr argument to PAP"
-            -- We expect at least the arity, n_args, and fun fields
-            unless (length payloadWords >= 2) $
-                fail "Expected at least 2 raw words to PAP"
-            let splitWord = payloadWords !! 0
-            pure $ PAPClosure itbl
+        PAP -> case pts of
+            [] -> fail "Expected at least 1 ptr argument to PAP"
+            hd : tl -> case payloadWords of
+                -- We expect at least the arity, n_args, and fun fields
+                splitWord : _ : _ ->
+                    pure $ PAPClosure itbl
 #if defined(WORDS_BIGENDIAN)
-                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
-                (fromIntegral splitWord)
+                        (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
+                        (fromIntegral splitWord)
 #else
-                (fromIntegral splitWord)
-                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
+                        (fromIntegral splitWord)
+                        (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
 #endif
-                (head pts) (tail pts)
+                        hd tl
+                _ -> fail "Expected at least 2 raw words to PAP"
 
-        AP_STACK -> do
-            unless (length pts >= 1) $
-                fail "Expected at least 1 ptr argument to AP_STACK"
-            pure $ APStackClosure itbl (head pts) (tail pts)
+        AP_STACK -> case pts of
+            [] -> fail "Expected at least 1 ptr argument to AP_STACK"
+            hd : tl -> pure $ APStackClosure itbl hd tl
 
-        IND -> do
-            unless (length pts >= 1) $
-                fail "Expected at least 1 ptr argument to IND"
-            pure $ IndClosure itbl (head pts)
+        IND -> case pts of
+            [] -> fail "Expected at least 1 ptr argument to IND"
+            hd : _ -> pure $ IndClosure itbl hd
 
-        IND_STATIC -> do
-            unless (length pts >= 1) $
-                fail "Expected at least 1 ptr argument to IND_STATIC"
-            pure $ IndClosure itbl (head pts)
+        IND_STATIC -> case pts of
+            [] -> fail "Expected at least 1 ptr argument to IND_STATIC"
+            hd : _ -> pure $ IndClosure itbl hd
 
-        BLACKHOLE -> do
-            unless (length pts >= 1) $
-                fail "Expected at least 1 ptr argument to BLACKHOLE"
-            pure $ BlackholeClosure itbl (head pts)
+        BLACKHOLE -> case pts of
+            [] -> fail "Expected at least 1 ptr argument to BLACKHOLE"
+            hd : _ -> pure $ BlackholeClosure itbl hd
 
-        BCO -> do
-            unless (length pts >= 3) $
-                fail $ "Expected at least 3 ptr argument to BCO, found "
+        BCO -> case pts of
+            pts0 : pts1 : pts2 : _ -> case payloadWords of
+                _ : _ : _ : splitWord : payloadRest ->
+                    pure $ BCOClosure itbl pts0 pts1 pts2
+#if defined(WORDS_BIGENDIAN)
+                        (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
+                        (fromIntegral splitWord)
+#else
+                        (fromIntegral splitWord)
+                        (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
+#endif
+                        payloadRest
+                _ -> fail $ "Expected at least 4 words to BCO, found "
+                            ++ show (length payloadWords)
+            _ -> fail $ "Expected at least 3 ptr argument to BCO, found "
                         ++ show (length pts)
-            unless (length payloadWords >= 4) $
-                fail $ "Expected at least 4 words to BCO, found "
+
+        ARR_WORDS -> case payloadWords of
+            [] -> fail $ "Expected at least 1 words to ARR_WORDS, found "
                         ++ show (length payloadWords)
-            let splitWord = payloadWords !! 3
-            pure $ BCOClosure itbl (pts !! 0) (pts !! 1) (pts !! 2)
-#if defined(WORDS_BIGENDIAN)
-                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
-                (fromIntegral splitWord)
-#else
-                (fromIntegral splitWord)
-                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
-#endif
-                (drop 4 payloadWords)
+            hd : tl -> pure $ ArrWordsClosure itbl hd tl
 
-        ARR_WORDS -> do
-            unless (length payloadWords >= 1) $
-                fail $ "Expected at least 1 words to ARR_WORDS, found "
-                        ++ show (length payloadWords)
-            pure $ ArrWordsClosure itbl (head payloadWords) (tail payloadWords)
-
-        t | t >= MUT_ARR_PTRS_CLEAN && t <= MUT_ARR_PTRS_FROZEN_CLEAN -> do
-            unless (length payloadWords >= 2) $
-                fail $ "Expected at least 2 words to MUT_ARR_PTRS_* "
+        t | t >= MUT_ARR_PTRS_CLEAN && t <= MUT_ARR_PTRS_FROZEN_CLEAN -> case payloadWords of
+            p0 : p1 : _ -> pure $ MutArrClosure itbl p0 p1 pts
+            _ -> fail $ "Expected at least 2 words to MUT_ARR_PTRS_* "
                         ++ "found " ++ show (length payloadWords)
-            pure $ MutArrClosure itbl (payloadWords !! 0) (payloadWords !! 1) pts
 
-        t | t >= SMALL_MUT_ARR_PTRS_CLEAN && t <= SMALL_MUT_ARR_PTRS_FROZEN_CLEAN -> do
-            unless (length payloadWords >= 1) $
-                fail $ "Expected at least 1 word to SMALL_MUT_ARR_PTRS_* "
+        t | t >= SMALL_MUT_ARR_PTRS_CLEAN && t <= SMALL_MUT_ARR_PTRS_FROZEN_CLEAN -> case payloadWords of
+            [] -> fail $ "Expected at least 1 word to SMALL_MUT_ARR_PTRS_* "
                         ++ "found " ++ show (length payloadWords)
-            pure $ SmallMutArrClosure itbl (payloadWords !! 0) pts
+            hd : _ -> pure $ SmallMutArrClosure itbl hd pts
 
-        t | t == MUT_VAR_CLEAN || t == MUT_VAR_DIRTY -> do
-            unless (length pts >= 1) $
-                fail $ "Expected at least 1 words to MUT_VAR, found "
+        t | t == MUT_VAR_CLEAN || t == MUT_VAR_DIRTY -> case pts of
+            [] -> fail $ "Expected at least 1 words to MUT_VAR, found "
                         ++ show (length pts)
-            pure $ MutVarClosure itbl (head pts)
+            hd : _ -> pure $ MutVarClosure itbl hd
 
-        t | t == MVAR_CLEAN || t == MVAR_DIRTY -> do
-            unless (length pts >= 3) $
-                fail $ "Expected at least 3 ptrs to MVAR, found "
+        t | t == MVAR_CLEAN || t == MVAR_DIRTY -> case pts of
+            pts0 : pts1 : pts2 : _ -> pure $ MVarClosure itbl pts0 pts1 pts2
+            _ -> fail $ "Expected at least 3 ptrs to MVAR, found "
                         ++ show (length pts)
-            pure $ MVarClosure itbl (pts !! 0) (pts !! 1) (pts !! 2)
 
         BLOCKING_QUEUE ->
             pure $ OtherClosure itbl pts rawHeapWords
-        --    pure $ BlockingQueueClosure itbl
-        --        (pts !! 0) (pts !! 1) (pts !! 2) (pts !! 3)
 
-        --  pure $ OtherClosure itbl pts rawHeapWords
-        --
-        WEAK -> do
-            pure $ WeakClosure
+        WEAK -> case pts of
+            pts0 : pts1 : pts2 : pts3 : rest -> pure $ WeakClosure
                 { info = itbl
-                , cfinalizers = pts !! 0
-                , key = pts !! 1
-                , value = pts !! 2
-                , finalizer = pts !! 3
-                , weakLink = case drop 4 pts of
+                , cfinalizers = pts0
+                , key = pts1
+                , value = pts2
+                , finalizer = pts3
+                , weakLink = case rest of
                            []  -> Nothing
                            [p] -> Just p
-                           _   -> error $ "Expected 4 or 5 words in WEAK, found " ++ show (length pts)
+                           _   -> error $ "Expected 4 or 5 words in WEAK, but found more: " ++ show (length pts)
                 }
+            _ -> error $ "Expected 4 or 5 words in WEAK, but found less: " ++ show (length pts)
         TSO | ( u_lnk : u_gbl_lnk : tso_stack : u_trec : u_blk_ex : u_bq : other)  <- pts
                 -> withArray rawHeapWords (\ptr -> do
                     fields <- FFIClosures.peekTSOFields decodeCCS ptr

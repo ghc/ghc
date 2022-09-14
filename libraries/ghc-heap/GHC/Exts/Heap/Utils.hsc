@@ -110,11 +110,7 @@ parse (Ptr addr) = if not . all (>0) . fmap length $ [p,m,occ]
     (m, occ)
         = (intercalate "." $ reverse modWords, occWord)
         where
-        (modWords, occWord) =
-            if length rest1 < 1 --  XXXXXXXXx YUKX
-                --then error "getConDescAddress:parse:length rest1 < 1"
-                then parseModOcc [] []
-                else parseModOcc [] (tail rest1)
+        (modWords, occWord) = parseModOcc [] (drop 1 rest1)
     -- We only look for dots if str could start with a module name,
     -- i.e. if it starts with an upper case character.
     -- Otherwise we might think that "X.:->" is the module name in
