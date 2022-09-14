@@ -82,7 +82,6 @@ module GHC.Data.FastString
         lengthFS,
         nullFS,
         appendFS,
-        headFS,
         concatFS,
         consFS,
         nilFS,
@@ -608,11 +607,6 @@ appendFS fs1 fs2 = mkFastStringShortByteString
 
 concatFS :: [FastString] -> FastString
 concatFS = mkFastStringShortByteString . mconcat . map fs_sbs
-
-headFS :: FastString -> Char
-headFS fs
-  | SBS.null $ fs_sbs fs = panic "headFS: Empty FastString"
-headFS fs = head $ unpackFS fs
 
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)

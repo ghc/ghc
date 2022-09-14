@@ -67,19 +67,17 @@ isLexId  cs = isLexConId  cs || isLexVarId  cs
 isLexSym cs = isLexConSym cs || isLexVarSym cs
 
 -------------
-isLexConId cs                           -- Prefix type or data constructors
-  | nullFS cs          = False          --      e.g. "Foo", "[]", "(,)"
-  | cs == (fsLit "[]") = True
-  | otherwise          = startsConId (headFS cs)
+isLexConId cs = case unconsFS cs of     -- Prefix type or data constructors
+  Nothing     -> False                  --      e.g. "Foo", "[]", "(,)"
+  Just (c, _) -> cs == fsLit "[]" || startsConId c
 
-isLexVarId cs                           -- Ordinary prefix identifiers
-  | nullFS cs         = False           --      e.g. "x", "_x"
-  | otherwise         = startsVarId (headFS cs)
+isLexVarId cs = case unconsFS cs of     -- Ordinary prefix identifiers
+  Nothing     -> False                  --      e.g. "x", "_x"
+  Just (c, _) -> startsVarId c
 
-isLexConSym cs                          -- Infix type or data constructors
-  | nullFS cs          = False          --      e.g. ":-:", ":", "->"
-  | cs == (fsLit "->") = True
-  | otherwise          = startsConSym (headFS cs)
+isLexConSym cs = case unconsFS cs of    -- Infix type or data constructors
+  Nothing     -> False                  --      e.g. ":-:", ":", "->"
+  Just (c, _) -> cs == fsLit "->" || startsConSym c
 
 isLexVarSym fs                          -- Infix identifiers e.g. "+"
   | fs == (fsLit "~R#") = True
