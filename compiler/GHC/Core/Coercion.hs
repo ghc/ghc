@@ -874,7 +874,7 @@ Sadly, with heterogeneous equality, this restriction might be able to be violate
 Richard's thesis is unable to prove that it isn't. Specifically, the liftCoSubst
 function might create an invalid coercion. Because a violation of the
 restriction might lead to a program that "goes wrong", it is checked all the time,
-even in a production compiler and without -dcore-list. We *have* proved that the
+even in a production compiler and without -dcore-lint. We *have* proved that the
 problem does not occur with homogeneous equality, so this check can be dropped
 once ~# is made to be homogeneous.
 -}

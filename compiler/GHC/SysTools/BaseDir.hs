@@ -122,7 +122,7 @@ play nice with the system compiler instead.
 -- | Expand occurrences of the @$tooldir@ interpolation in a string
 -- on Windows, leave the string untouched otherwise.
 expandToolDir
-  :: Bool -- ^ whether we are use the ambient mingw toolchain
+  :: Bool -- ^ whether we use the ambient mingw toolchain
   -> Maybe FilePath -- ^ tooldir
   -> String -> String
 #if defined(mingw32_HOST_OS)
@@ -166,7 +166,7 @@ tryFindTopDir Nothing
 -- tooldir can't be located, or returns @Just tooldirpath@.
 -- If the distro toolchain is being used we treat Windows the same as Linux
 findToolDir
-  :: Bool -- ^ whether we are use the ambient mingw toolchain
+  :: Bool -- ^ whether we use the ambient mingw toolchain
   -> FilePath -- ^ topdir
   -> IO (Maybe FilePath)
 #if defined(mingw32_HOST_OS)

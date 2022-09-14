@@ -335,7 +335,7 @@ by saying ``-fno-wombat``.
 
     CPR analysis will see that each code path produces a *constructed product*
     such as ``I# 0#`` in the first branch (where ``GHC.Exts.I#`` is the data
-    constructor of ``Int``, boxing up the the primitive integer literal ``0#``
+    constructor of ``Int``, boxing up the primitive integer literal ``0#``
     of type ``Int#``) and optimise to ::
 
          sum xs = I# ($wsum xs)

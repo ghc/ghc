@@ -153,7 +153,7 @@ stdcall:        Caller allocates parameters, callee deallocates.
 See: http://www.programmersheaven.com/2/Calling-conventions
 -}
 
--- any changes here should be replicated in the CallConv type in template haskell
+-- any changes here should be replicated in the Callconv type in template haskell
 data CCallConv
   = CCallConv
   | CApiConv

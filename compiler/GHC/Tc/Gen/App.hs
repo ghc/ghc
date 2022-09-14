@@ -230,7 +230,7 @@ tcApp works like this:
    returning the function in the corner and the arguments
 
    splitHsApps can deal with infix as well as prefix application,
-   and returns a Rebuilder to re-assemble the the application after
+   and returns a Rebuilder to re-assemble the application after
    typechecking.
 
    The "list of arguments" is [HsExprArg], described in Note [HsExprArg].
@@ -369,7 +369,7 @@ tcApp rn_expr exp_res_ty
                  -- Even though both app_res_rho and exp_res_ty are rho-types,
                  -- they may have nested polymorphism, so if deep subsumption
                  -- is on we must call tcSubType.
-                 -- Zonk app_res_rho first, becuase QL may have instantiated some
+                 -- Zonk app_res_rho first, because QL may have instantiated some
                  -- delta variables to polytypes, and tcSubType doesn't expect that
                  do { app_res_rho <- zonkQuickLook do_ql app_res_rho
                     ; tcSubTypeDS rn_expr app_res_rho exp_res_ty }
@@ -509,7 +509,7 @@ type Delta = TcTyVarSet   -- Set of instantiation variables,
 
 tcInstFun :: Bool   -- True  <=> Do quick-look
           -> Bool   -- False <=> Instantiate only /inferred/ variables at the end
-                    --           so may return a sigma-typex
+                    --           so may return a sigma-type
                     -- True  <=> Instantiate all type variables at the end:
                     --           return a rho-type
                     -- The /only/ call site that passes in False is the one

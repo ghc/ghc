@@ -75,7 +75,7 @@ More details:
    ``c`` is not in scope (apart from the binding of the record selector
    ``c``, of course).
 
--  When record wildcards are use in record construction, a field ``f``
+-  When record wildcards are used in record construction, a field ``f``
    is initialised only if ``f`` is in scope,
    and is not imported or bound at top level.
    For example, ``f`` can be bound by an enclosing pattern match or

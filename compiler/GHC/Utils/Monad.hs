@@ -346,7 +346,7 @@ smart constructor alone we still need the data constructor in
 patterns.)  That's the advantage of the pattern-synonym approach, but
 it is more elaborate.
 
-The pattern synonym approach is due to Sebastian Graaf (#18238)
+The pattern synonym approach is due to Sebastian Graf (#18238)
 
 Do note that for monads for multiple arguments more than one oneShot
 function might be required. For example in FCode we use:
@@ -426,7 +426,7 @@ replaced by (expensive x), but full laziness should pull it back out.
 The magic `inline` function does two things
 * It prevents eta reduction.  If we wrote just
       multiShotIO (IO m) = IO (\s -> m s)
-  the lamda would eta-reduce to 'm' and all would be lost.
+  the lambda would eta-reduce to 'm' and all would be lost.
 
 * It helps ensure that 'm' really does inline.
 

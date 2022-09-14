@@ -1280,7 +1280,7 @@ instance Outputable ArgOcc where
 evalScrutOcc :: ArgOcc
 -- We use evalScrutOcc for
 --   - mkVarUsage: applied functions
---   - scApp: dicts that are the arugment of a classop
+--   - scApp: dicts that are the argument of a classop
 evalScrutOcc = ScrutOcc emptyUFM
 
 -- Experimentally, this version of combineOcc makes ScrutOcc "win", so
@@ -1904,7 +1904,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
               add_void_arg = needsVoidWorkerArg fn arg_bndrs spec_lam_args1
               (spec_lam_args, spec_call_args, spec_arity, spec_join_arity)
                   | add_void_arg
-                  -- See Note [SpecConst needs to add void args first]
+                  -- See Note [SpecConstr needs to add void args first]
                   , (spec_lam_args, spec_call_args, _) <- addVoidWorkerArg spec_lam_args1 []
                       -- needsVoidWorkerArg: usual w/w hack to avoid generating
                       -- a spec_rhs of unlifted type and no args.
@@ -1991,8 +1991,8 @@ mkSeqs seqees res_ty rhs =
         = rhs
 
 
-{- Note [SpecConst needs to add void args first]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [SpecConstr needs to add void args first]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider a function
     f start @t = e
 We want to specialize for a partially applied call `f True`.

@@ -4566,7 +4566,7 @@ checkNewDataCon con
     ok_mult _   = False
 
 
--- | Reject nullary data constructors where a type variables
+-- | Reject nullary data constructors where a type variable
 -- would escape through the result kind
 -- See Note [Check for escaping result kind]
 checkEscapingKind :: DataCon -> TcM ()

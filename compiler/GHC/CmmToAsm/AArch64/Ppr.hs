@@ -273,7 +273,7 @@ pprIm platform im = case im of
   -- This is something the x86 backend does.
   --
   -- We could also just turn them into statics :-/ Which is what the
-  -- PowerPC backend odes.
+  -- PowerPC backend does.
   ImmFloat f | f == 0 -> text "wzr"
   ImmFloat f -> char '#' <> float (fromRational f)
   ImmDouble d | d == 0 -> text "xzr"

@@ -455,7 +455,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
 
        -- Neither argument types nor the return type may be representation polymorphic.
        -- This is because, when creating a matcher:
-       --   - the argument types become the the binder types (see test RepPolyPatySynArg),
+       --   - the argument types become the binder types (see test RepPolyPatySynArg),
        --   - the return type becomes the scrutinee type (see test RepPolyPatSynRes).
        ; let (arg_tys, res_ty) = tcSplitFunTys body_ty
        ; mapM_

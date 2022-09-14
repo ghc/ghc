@@ -1832,7 +1832,7 @@ where $fCInt_$cm is the instance method for `m` in `instance C Int`:
    $fCInt_$cm :: forall b. Show b => Int -> b -> String
    $fCInt_$cm b d x y = show @Int $dShowInt x ++ show @b d y
 
-We want to specialise this! How? By doing the the method-selection rewrite in
+We want to specialise this! How? By doing the method-selection rewrite in
 the Specialiser. Hence
 
 1. In the App case of 'specExpr', try to apply the ClassOp/DFun rule on the

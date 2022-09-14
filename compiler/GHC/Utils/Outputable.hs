@@ -363,7 +363,7 @@ data SDocContext = SDC
   , sdocLineLength                  :: !Int
   , sdocCanUseUnicode               :: !Bool
       -- ^ True if Unicode encoding is supported
-      -- and not disable by GHC_NO_UNICODE environment variable
+      -- and not disabled by GHC_NO_UNICODE environment variable
   , sdocHexWordLiterals             :: !Bool
   , sdocPprDebug                    :: !Bool
   , sdocPrintUnicodeSyntax          :: !Bool

@@ -275,7 +275,7 @@ simple_opt_expr env expr
               (env', mb_prs) = mapAccumL (simple_out_bind NotTopLevel) env $
                                zipEqual "simpleOptExpr" bs es
 
-         -- Note [Getting the map/coerce RULE to work]
+         -- See Note [Getting the map/coerce RULE to work]
       | isDeadBinder b
       , [Alt DEFAULT _ rhs] <- as
       , isCoVarType (varType b)

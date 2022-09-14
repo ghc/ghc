@@ -1867,7 +1867,7 @@ occAnalLam env expr = occAnal env expr
 {- Note [Occ-anal and cast worker/wrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider   y = e; x = y |> co
-If we mark y as used-once, we'll inline y into x, and the the Cast
+If we mark y as used-once, we'll inline y into x, and the Cast
 worker/wrapper transform will float it straight back out again.  See
 Note [Cast worker/wrapper] in GHC.Core.Opt.Simplify.
 

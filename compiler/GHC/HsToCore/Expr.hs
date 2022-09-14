@@ -468,12 +468,12 @@ For record construction we do this (assuming T has three arguments)
 \begin{verbatim}
         T { op2 = e }
 ==>
-        let err = /\a -> recConErr a
-        T (recConErr t1 "M.hs/230/op1")
+        let err = /\a -> recConError a
+        T (recConError t1 "M.hs/230/op1")
           e
-          (recConErr t1 "M.hs/230/op3")
+          (recConError t1 "M.hs/230/op3")
 \end{verbatim}
-@recConErr@ then converts its argument string into a proper message
+@recConError@ then converts its argument string into a proper message
 before printing it as
 \begin{verbatim}
         M.hs, line 230: missing field op1 was evaluated

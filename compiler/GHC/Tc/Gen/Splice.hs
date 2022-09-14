@@ -2641,8 +2641,8 @@ reifyTypes = mapM reifyType
 reifyPatSynType
   :: ([InvisTVBinder], ThetaType, [InvisTVBinder], ThetaType, [Scaled Type], Type) -> TcM TH.Type
 -- reifies a pattern synonym's type and returns its *complete* type
--- signature; see NOTE [Pattern synonym signatures and Template
--- Haskell]
+-- signature; see Note [Pattern synonym type signatures and Template
+-- Haskell] in GHC.ThToHs
 reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
   = do { univTyVars' <- reifyTyVarBndrs univTyVars
        ; req'        <- reifyCxt req

@@ -853,7 +853,7 @@ good reasons; a view pattern in the RHS may mention a value binding).
 It is entirely reasonable to reject this, but to do so we need A to be
 in the kind environment when kind-checking the signature for B.
 
-Hence tcAddPatSynPlaceholers adds a binding
+Hence tcAddPatSynPlaceholders adds a binding
     A -> APromotionErr PatSynPE
 to the environment. Then GHC.Tc.Gen.HsType.tcTyVar will find A in the kind
 environment, and will give a 'wrongThingErr' as a result.  But the
@@ -961,7 +961,7 @@ tcGetDefaultTys
                                 -- User-supplied defaults
            Nothing  -> do
 
-        -- No use-supplied default
+        -- No user-supplied default
         -- Use [Integer, Double], plus modifications
         { integer_ty <- tcMetaTy integerTyConName
         ; list_ty <- tcMetaTy listTyConName

@@ -409,7 +409,7 @@ defaultDumpAction dumps log_action logflags sty flag title _fmt doc =
 -- | Write out a dump.
 --
 -- If --dump-to-file is set then this goes to a file.
--- otherwise emit to stdout (via the the LogAction parameter).
+-- otherwise emit to stdout (via the LogAction parameter).
 --
 -- When @hdr@ is empty, we print in a more compact format (no separators and
 -- blank lines)

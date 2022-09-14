@@ -310,7 +310,7 @@ type UnariseEnv = VarEnv UnariseVal
 
 data UnariseVal
   = MultiVal [OutStgArg] -- MultiVal to tuple. Can be empty list (void).
-  | UnaryVal OutStgArg   -- See NOTE [Renaming during unarisation].
+  | UnaryVal OutStgArg   -- See Note [Renaming during unarisation].
 
 instance Outputable UnariseVal where
   ppr (MultiVal args) = text "MultiVal" <+> ppr args
@@ -709,7 +709,7 @@ For arguments (StgArg) and binders (Id) we have two kind of unarisation:
     Here after unarise we should still get a function with arity 3. Similarly
     in the call site we shouldn't remove void arguments:
 
-      f (# (# #), (# #) #) voidId rw
+      f (# (# #), (# #) #) void# rw
 
     When unarising <body>, we extend the environment with these binders:
 

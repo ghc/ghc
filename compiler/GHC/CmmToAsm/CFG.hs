@@ -307,7 +307,7 @@ shortcutWeightMap cuts cfg
         -- Create a unification variable for each of the nodes in a rewrite
         cuts_vars <- traverse (\p -> (p,) <$> fresh (Just p)) (concatMap (\(a, b) -> [a] ++ maybe [] (:[]) b) cuts_list)
         let cuts_map = mapFromList cuts_vars :: LabelMap (Point s (Maybe BlockId))
-        -- Then unify according the the rewrites in the cuts map
+        -- Then unify according to the rewrites in the cuts map
         mapM_ (\(from, to) -> expectJust "shortcutWeightMap" (mapLookup from cuts_map)
                               `union` expectJust "shortcutWeightMap" (maybe (Just null) (flip mapLookup cuts_map) to) ) cuts_list
         -- Then recover the unique representative, which is the result of following

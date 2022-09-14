@@ -33,7 +33,7 @@ $( return
                  (ConT (mkName "Char")))
    ] )
 
--- this is injective - a type variables mentioned on LHS is not mentioned on RHS
+-- this is injective - a type variable mentioned on LHS is not mentioned on RHS
 -- but we don't claim injectivity in that argument.
 --
 -- type family J a (b :: k) = r | r -> a

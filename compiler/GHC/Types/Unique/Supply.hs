@@ -98,7 +98,7 @@ This is important for example in the simplifier. Most passes of the simplifier u
 the same mask 's'. However in some places we create a unique supply using `mkSplitUniqSupply`
 and thread it through the code, while in GHC.Core.Opt.Simplify.Monad  we use the
 `instance MonadUnique SimplM`, which uses `mkSplitUniqSupply` in getUniqueSupplyM
-and `uniqFromMask` in getUniqeM.
+and `uniqFromMask` in getUniqueM.
 
 Ultimately all these boil down to each new unique consisting of the mask and the result from
 a call to `genSym`. The later producing a distinct number for each invocation ensuring

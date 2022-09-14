@@ -2689,7 +2689,7 @@ code, but:
 
    Moreover, if we simplify this implication more than once
    (e.g. because we can't solve it completely on the first iteration
-   of simpl_looop), we'll generate all the same bindings AGAIN!
+   of simpl_loop), we'll generate all the same bindings AGAIN!
 
 Easy solution: take advantage of the work we are doing to track dead
 (unused) Givens, and use it to prune the Given bindings too.  This is

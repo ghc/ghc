@@ -912,7 +912,7 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -- tag from the info table, and switch on that. The only technically
 -- tricky part is that the default case needs (logical) duplication.
 -- To do this we emit an extra label for it and branch to that from
--- the second switch. This avoids duplicated codegen. See Trac #14373.
+-- the second switch. This avoids duplicated codegen. See #14373.
 -- See Note [Double switching for big families] for the mechanics
 -- involved.
 --

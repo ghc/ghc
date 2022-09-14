@@ -1156,7 +1156,7 @@ The DeepSubsumption extension, documented here
     https://github.com/ghc-proposals/ghc-proposals/pull/511.
 
 makes a best-efforts attempt implement deep subsumption as it was
-prior to the the Simplify Subsumption proposal:
+prior to the Simplify Subsumption proposal:
 
     https://github.com/ghc-proposals/ghc-proposals/pull/287
 

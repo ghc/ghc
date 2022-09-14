@@ -732,7 +732,7 @@ Now $cnoteq is not a loop breaker any more, so the INLINE pragma can
 take effect -- the warning turned out to be temporary.
 
 To stop excessive warnings, this warning for INLINE loop breakers is
-switched off when linting the the result of the desugarer.  See
+switched off when linting the result of the desugarer.  See
 lf_check_inline_loop_breakers in GHC.Core.Lint.
 
 

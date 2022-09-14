@@ -267,7 +267,7 @@ getUniqMask = read cr_uniq_mask
 
 -- Convenience accessors for useful fields of HscEnv
 
--- | Adjust the dyn flags passed to the arugment action
+-- | Adjust the dyn flags passed to the argument action
 mapDynFlagsCoreM :: (DynFlags -> DynFlags) -> CoreM a -> CoreM a
 mapDynFlagsCoreM f m = CoreM $ do
   !e <- getEnv

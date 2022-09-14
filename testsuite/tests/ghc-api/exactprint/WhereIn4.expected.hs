@@ -6,7 +6,7 @@ module WhereIn4 where
 --Demoting a definition narrows down the scope of the definition.
 --In this example, demote the top level 'sq' to 'sumSquares'
 --In this case (there is single matches), if possible,
---the parameters will be folded after demoting and type sigature will be removed.
+--the parameters will be folded after demoting and type signature will be removed.
 
 sumSquares x y = sq p x + sq p y
          where p_2=2  {-There is a comment-}

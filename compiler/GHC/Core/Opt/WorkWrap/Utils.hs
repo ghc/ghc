@@ -389,7 +389,7 @@ needsVoidWorkerArg fn_id wrap_args work_args
 
 -- | Inserts a `Void#` arg before the first argument.
 --
--- Why as the first argument? See Note [SpecConst needs to add void args first]
+-- Why as the first argument? See Note [SpecConstr needs to add void args first]
 -- in SpecConstr.
 addVoidWorkerArg :: [Var] -> [StrictnessMark]
                  -> ([Var],     -- Lambda bound args
