@@ -1483,7 +1483,7 @@ modNodeMapUnionWith f (ModNodeMap m) (ModNodeMap n) = ModNodeMap (M.unionWith f 
 warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
   diag_opts <- initDiagOpts <$> getDynFlags
-  when (diag_wopt Opt_WarnUnusedImports diag_opts) $ do
+  when (diag_wopt Opt_WarnUnusedSourceImports diag_opts) $ do
     let check ms =
            let mods_in_this_cycle = map ms_mod_name ms in
            [ warn i | m <- ms, i <- ms_home_srcimps m,

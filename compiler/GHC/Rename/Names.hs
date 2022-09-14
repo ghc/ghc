@@ -1725,8 +1725,8 @@ warnUnusedImportDecls gbl_env hsc_src
                        (vcat [ text "Uses:" <+> ppr uses
                              , text "Import usage" <+> ppr usage])
 
-       ; whenWOptM Opt_WarnUnusedImports $
-         mapM_ (warnUnusedImport Opt_WarnUnusedImports fld_env) usage
+      ; unused_flags <- mkUnusedImportFlags
+      ; mapM_ (warnUnusedImport unused_flags fld_env) usage
 
        ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports hsc_src usage }
@@ -1828,9 +1828,15 @@ mkImportMap gres
           best_imp_spec = bestImport (bagToList imp_specs)
           add _ gres = gre : gres
 
-warnUnusedImport :: WarningFlag -> NameEnv (FieldLabelString, Parent)
+data UnusedImportFlags = UnusedImportFlags { warnRedundantImports :: Bool, warnUnusedExplicitImports :: Bool }
+
+mkUnusedImportFlags :: RnM UnusedImportFlags
+mkUnusedImportFlags = UnusedImportFlags <$> woptM Opt_WarnRedundantImports <*> woptM Opt_WarnUnusedExplicitImports
+
+warnUnusedImport :: UnusedImportFlags -> NameEnv (FieldLabelString, Parent)
                  -> ImportDeclUsage -> RnM ()
-warnUnusedImport flag fld_env (L loc decl, used, unused)
+warnUnusedImport (UnusedImportFlags False False) _ _ = return ()
+warnUnusedImport flags fld_env (L loc decl, used, unused)
 
   -- Do not warn for 'import M()'
   | Just (Exactly, L _ []) <- ideclImportList decl
@@ -1844,8 +1850,9 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
 
   -- Nothing used; drop entire declaration
   | null used
+  , warnRedundantImports flags
   = let dia = mkTcRnUnknownMessage $
-          mkPlainDiagnostic (WarningWithFlag flag) noHints msg1
+          mkPlainDiagnostic (WarningWithFlag Opt_WarnRedundantImports) noHints msg1
     in addDiagnosticAt (locA loc) dia
 
   -- Everything imported is used; nop
@@ -1854,16 +1861,20 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
 
   -- Only one import is unused, with `SrcSpan` covering only the unused item instead of
   -- the whole import statement
-  | Just (_, L _ imports) <- ideclImportList decl
+  | warnUnusedExplicitImports flags
+  , Just (_, L _ imports) <- ideclImportList decl
   , length unused == 1
   , Just (L loc _) <- find (\(L _ ie) -> ((ieName ie) :: Name) `elem` unused) imports
-  = let dia = mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints msg2
+  = let dia = mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedExplicitImports) noHints msg2
     in addDiagnosticAt (locA loc) dia
 
   -- Some imports are unused
-  | otherwise
-  = let dia = mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints msg2
+  | warnUnusedExplicitImports flags
+  = let dia = mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedExplicitImports) noHints msg2
     in addDiagnosticAt (locA loc) dia
+
+  | otherwise
+  = return ()
 
   where
     msg1 = vcat [ pp_herald <+> quotes pp_mod <+> is_redundant

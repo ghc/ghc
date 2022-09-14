@@ -2916,6 +2916,10 @@ dynamic_flags_deps = [
   , make_ord_flag defHiddenFlag "fwarn-unused-binds" (NoArg enableUnusedBinds)
   , make_ord_flag defHiddenFlag "fno-warn-unused-binds" (NoArg
                                                             disableUnusedBinds)
+  , make_ord_flag defFlag "Wunused-imports" (NoArg enableUnusedImports)
+  , make_ord_flag defFlag "Wno-unused-imports" (NoArg disableUnusedImports)
+  , make_ord_flag defHiddenFlag "fwarn-unused-imports" (NoArg enableUnusedImports)
+  , make_ord_flag defHiddenFlag "fno-warn-unused-imports" (NoArg disableUnusedImports)
 
         ------ Safe Haskell flags -------------------------------------------
   , make_ord_flag defFlag "fpackage-trust"   (NoArg setPackageTrust)
@@ -2952,18 +2956,23 @@ dynamic_flags_deps = [
  ++ [ (NotDeprecated, unrecognisedWarning "W"),
       (Deprecated,    unrecognisedWarning "fwarn-"),
       (Deprecated,    unrecognisedWarning "fno-warn-") ]
- ++ [ make_ord_flag defFlag "Werror=compat"
-        (NoArg (mapM_ setWErrorFlag minusWcompatOpts))
-    , make_ord_flag defFlag "Wno-error=compat"
-        (NoArg (mapM_ unSetFatalWarningFlag minusWcompatOpts))
-    , make_ord_flag defFlag "Wwarn=compat"
-        (NoArg (mapM_ unSetFatalWarningFlag minusWcompatOpts)) ]
+ ++ concatMap werrorFlagGroup ["compat", "unused-binds", "unused-imports"]
  ++ map (mkFlag turnOn  "f"         setExtensionFlag  ) fLangFlagsDeps
  ++ map (mkFlag turnOff "fno-"      unSetExtensionFlag) fLangFlagsDeps
  ++ map (mkFlag turnOn  "X"         setExtensionFlag  ) xFlagsDeps
  ++ map (mkFlag turnOff "XNo"       unSetExtensionFlag) xFlagsDeps
  ++ map (mkFlag turnOn  "X"         setLanguage       ) languageFlagsDeps
  ++ map (mkFlag turnOn  "X"         setSafeHaskell    ) safeHaskellFlagsDeps
+
+werrorFlagGroup :: String -> [(Deprecation, Flag (CmdLineP DynFlags))]
+werrorFlagGroup name =
+    let Just opts = lookup name warningGroups
+    in [ make_ord_flag defFlag ("Werror=" ++ name)
+        (NoArg (mapM_ setWErrorFlag opts))
+       , make_ord_flag defFlag ("Wno-error=" ++ name)
+        (NoArg (mapM_ unSetFatalWarningFlag opts))
+       , make_ord_flag defFlag ("Wwarn=" ++ name)
+         (NoArg (mapM_ unSetFatalWarningFlag opts)) ]
 
 -- | This is where we handle unrecognised warning flags. We only issue a warning
 -- if -Wunrecognised-warning-flags is set. See #11429 for context.
@@ -3291,7 +3300,9 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnUntickedPromotedConstructors,
   warnSpec    Opt_WarnUnusedDoBind,
   warnSpec    Opt_WarnUnusedForalls,
-  warnSpec    Opt_WarnUnusedImports,
+  warnSpec    Opt_WarnUnusedSourceImports,
+  warnSpec    Opt_WarnUnusedExplicitImports,
+  warnSpec    Opt_WarnRedundantImports,
   warnSpec    Opt_WarnUnusedLocalBinds,
   warnSpec    Opt_WarnUnusedMatches,
   warnSpec    Opt_WarnUnusedPatternBinds,
@@ -4033,6 +4044,11 @@ enableUnusedBinds = mapM_ setWarningFlag unusedBindsFlags
 
 disableUnusedBinds :: DynP ()
 disableUnusedBinds = mapM_ unSetWarningFlag unusedBindsFlags
+
+enableUnusedImports, disableUnusedImports :: DynP ()
+enableUnusedImports = mapM_ setWarningFlag unusedImportsFlags
+disableUnusedImports = mapM_ unSetWarningFlag unusedImportsFlags
+
 
 -- | Things you get with `-dlint`.
 enableDLint :: DynP ()

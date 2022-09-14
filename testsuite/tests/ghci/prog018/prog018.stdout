@@ -9,7 +9,7 @@ A.hs:8:15: warning: [-Wunused-matches (in -Wextra)]
     Defined but not used: ‘x’
 [2 of 3] Compiling B                ( B.hs, interpreted )
 
-B.hs:7:1: warning: [-Wunused-imports (in -Wextra)]
+B.hs:7:1: warning: [-Wredundant-imports (in -Wextra, -Wunused-imports)]
     The import of ‘Data.Tuple’ is redundant
       except perhaps to import instances from ‘Data.Tuple’
     To import instances alone, use: import Data.Tuple()

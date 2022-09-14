@@ -222,7 +222,7 @@ instance Diagnostic DriverMessage where
     DriverUnusedPackages{}
       -> WarningWithFlag Opt_WarnUnusedPackages
     DriverUnnecessarySourceImports{}
-      -> WarningWithFlag Opt_WarnUnusedImports
+      -> WarningWithFlag Opt_WarnUnusedSourceImports
     DriverDuplicatedModuleDeclaration{}
       -> ErrorWithoutFlag
     DriverModuleNotFound{}

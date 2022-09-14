@@ -18,6 +18,7 @@ module GHC.Driver.Flags
    , minusWeverythingOpts
    , minusWcompatOpts
    , unusedBindsFlags
+   , unusedImportsFlags
    )
 where
 
@@ -538,7 +539,9 @@ data WarningFlag =
    | Opt_WarnUnusedTopBinds
    | Opt_WarnUnusedLocalBinds
    | Opt_WarnUnusedPatternBinds
-   | Opt_WarnUnusedImports
+   | Opt_WarnUnusedSourceImports
+   | Opt_WarnUnusedExplicitImports
+   | Opt_WarnRedundantImports
    | Opt_WarnUnusedMatches
    | Opt_WarnUnusedTypePatterns
    | Opt_WarnUnusedForalls
@@ -685,7 +688,9 @@ warnFlagNames wflag = case wflag of
   Opt_WarnUntickedPromotedConstructors            -> "unticked-promoted-constructors" :| []
   Opt_WarnUnusedDoBind                            -> "unused-do-bind" :| []
   Opt_WarnUnusedForalls                           -> "unused-foralls" :| []
-  Opt_WarnUnusedImports                           -> "unused-imports" :| []
+  Opt_WarnUnusedExplicitImports                   -> "unused-explicit-imports" :| []
+  Opt_WarnUnusedSourceImports                     -> "unused-source-imports" :| []
+  Opt_WarnRedundantImports                        -> "redundant-imports" :| []
   Opt_WarnUnusedLocalBinds                        -> "unused-local-binds" :| []
   Opt_WarnUnusedMatches                           -> "unused-matches" :| []
   Opt_WarnUnusedPatternBinds                      -> "unused-pattern-binds" :| []
@@ -738,6 +743,7 @@ warningGroups :: [(String, [WarningFlag])]
 warningGroups =
     [ ("compat",       minusWcompatOpts)
     , ("unused-binds", unusedBindsFlags)
+    , ("unused-imports", unusedImportsFlags)
     , ("default",      standardWarnings)
     , ("extra",        minusWOpts)
     , ("all",          minusWallOpts)
@@ -825,7 +831,9 @@ minusWOpts
         Opt_WarnUnusedPatternBinds,
         Opt_WarnUnusedMatches,
         Opt_WarnUnusedForalls,
-        Opt_WarnUnusedImports,
+        Opt_WarnUnusedExplicitImports,
+        Opt_WarnUnusedSourceImports,
+        Opt_WarnRedundantImports,
         Opt_WarnIncompletePatterns,
         Opt_WarnDodgyExports,
         Opt_WarnDodgyImports,
@@ -875,3 +883,10 @@ unusedBindsFlags = [ Opt_WarnUnusedTopBinds
                    , Opt_WarnUnusedLocalBinds
                    , Opt_WarnUnusedPatternBinds
                    ]
+
+-- | Things you get with -Wunused-binds
+unusedImportsFlags :: [WarningFlag]
+unusedImportsFlags = [ Opt_WarnUnusedExplicitImports
+                     , Opt_WarnUnusedSourceImports
+                     , Opt_WarnRedundantImports
+                     ]
