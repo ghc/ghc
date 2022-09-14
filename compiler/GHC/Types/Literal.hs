@@ -1013,7 +1013,7 @@ Wrinkles
 a) Why do we put the `Type` (of kind RuntimeRep) inside the literal?  Could
    we not instead /apply/ the literal to that RuntimeRep?  Alas no, because
    then LitRubbish :: forall (rr::RuntimeRep) (a::TYPE rr). a
-   and that's am ill-formed type because its kind is `TYPE rr`, which escapes
+   and that's an ill-formed type because its kind is `TYPE rr`, which escapes
    the binding site of `rr`. Annoying.
 
 b) A rubbish literal is not bottom, and replies True to exprOkForSpeculation.
@@ -1045,7 +1045,7 @@ undefined behavior, of course, but let us list a few examples for failure modes:
  a) For an value of unboxed numeric type like `Int#`, we just use a silly
     value like 42#. The error might propagate indefinitely, hence we better
     pick a rather unique literal. Same for Word, Floats, Char and VecRep.
- b) For AddrRep (like String lits), we mit a null pointer, resulting in a
+ b) For AddrRep (like String lits), we emit a null pointer, resulting in a
     definitive segfault when accessed.
  c) For boxed values, unlifted or not, we use a pointer to a fixed closure,
     like `()`, so that the GC has a pointer to follow.

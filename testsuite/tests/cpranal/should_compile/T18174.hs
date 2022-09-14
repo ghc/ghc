@@ -75,7 +75,7 @@ h1 m = uncurry (+) (g1 m)
 --
 -- > #c1(#c1(#), *c1(#))
 --
--- In combination with the the fact that all calls to @g2@ evaluate the second
+-- In combination with the fact that all calls to @g2@ evaluate the second
 -- component of the pair, we may unbox @g2@ to @(# Int#, Int# #)@.
 --
 -- Nested CPR light doesn't manage to unbox the second component, though.

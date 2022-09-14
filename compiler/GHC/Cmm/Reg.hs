@@ -352,7 +352,7 @@ globalRegType platform = \case
    (LongReg _)              -> cmmBits W64
    -- TODO: improve the internal model of SIMD/vectorized registers
    -- the right design SHOULd improve handling of float and double code too.
-   -- see remarks in "NOTE [SIMD Design for the future]"" in GHC.StgToCmm.Prim
+   -- see remarks in Note [SIMD Design for the future] in GHC.StgToCmm.Prim
    (XmmReg _) -> cmmVec 4 (cmmBits W32)
    (YmmReg _) -> cmmVec 8 (cmmBits W32)
    (ZmmReg _) -> cmmVec 16 (cmmBits W32)

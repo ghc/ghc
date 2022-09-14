@@ -321,7 +321,7 @@ Why do we do this?  Two reasons:
 * To avoid repeated work, by repeatedly expanding the superclasses of
   same constraint,
 
-* To terminate the above loop, at least in the -XNoRecursiveSuperClasses
+* To terminate the above loop, at least in the -XNoUndecidableSuperClasses
   case.  If there are recursive superclasses we could, in principle,
   expand forever, always encountering new constraints.
 

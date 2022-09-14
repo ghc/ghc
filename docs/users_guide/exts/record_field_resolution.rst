@@ -21,7 +21,7 @@ Those rules are amended by the following extensions:
 * :extension:`DisambiguateRecordFields`: In record construction and pattern matching
   (``C{ x = …}``), an unqualified field name ``x`` is unambiguous if and only if the data constructor (``C``)
   has a field ``x``, and that field is in scope unqualified, or qualified as ``Q.x``, regardless of ``Q``.
-  Similarly, in record construction and pattern matching, a qualified field name ``M.x`` is unambiguous if and only if the the data
+  Similarly, in record construction and pattern matching, a qualified field name ``M.x`` is unambiguous if and only if the data
   constructor (``C``) has a field ``x``, and that field is in scope qualified as ``M.x``.
 
   In record updates (``r{ x = 3 }``), the field name x is unambiguous if and only if there is just one field name x in scope unqualified.
@@ -51,7 +51,7 @@ refer unambiguously to data type ``S``.
     data T = MkT { x :: Int }
 
     x :: String
-    x = "Hello
+    x = "Hello"
 
     f = x
 

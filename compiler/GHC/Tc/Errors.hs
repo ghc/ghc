@@ -1363,7 +1363,7 @@ mkHoleError lcl_name_cache tidy_simples ctxt
              , hole_loc = ct_loc })
   = do { rel_binds
            <- relevant_bindings False lcl_env lcl_name_cache (tyCoVarsOfType hole_ty)
-               -- The 'False' means "don't filter the bindings"; see Trac #8191
+               -- The 'False' means "don't filter the bindings"; see #8191
 
        ; show_hole_constraints <- goptM Opt_ShowHoleConstraints
        ; let relevant_cts

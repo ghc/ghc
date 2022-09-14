@@ -61,7 +61,7 @@ import Data.List (intersperse)
 
 -- | A way
 --
--- Don't change the constructor order as it us used by `waysTag` to create a
+-- Don't change the constructor order as it is used by `waysTag` to create a
 -- unique tag (e.g. thr_debug_p) which is expected by other tools (e.g. Cabal).
 data Way
   = WayCustom String -- ^ for GHC API clients building custom variants

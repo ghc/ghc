@@ -989,7 +989,7 @@ data TyCon
         tyConArity   :: Arity,         -- ^ Arity
         tyConNullaryTy :: Type,           -- ^ A pre-allocated @TyConApp tycon []@
 
-          -- NB: the TyConArity of a TcTyCon must match
+          -- NB: the tyConArity of a TcTyCon must match
           -- the number of Required (positional, user-specified)
           -- arguments to the type constructor; see the use
           -- of tyConArity in generaliseTcTyCon
@@ -1012,7 +1012,7 @@ The tcTyConScopedTyVars field records the lexicial-binding connection
 between the original, user-specified Name (i.e. thing in scope) and
 the TcTyVar that the Name is bound to.
 
-Order *does* matter; the tcTyConScopedTyvars list consists of
+Order *does* matter; the tcTyConScopedTyVars list consists of
      specified_tvs ++ required_tvs
 
 where

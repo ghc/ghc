@@ -248,7 +248,7 @@ constructors can be used.
 
 -  You can't use ``deriving`` to define instances of a data type with
    existentially quantified data constructors. Reason: in most cases it
-   would not make sense. For example:; ::
+   would not make sense. For example: ::
 
        data T = forall a. MkT [a] deriving( Eq )
 

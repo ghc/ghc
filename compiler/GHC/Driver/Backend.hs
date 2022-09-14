@@ -27,7 +27,7 @@ especially the driver.  Examples include the following:
    this back end, then these are the command-line flags you should add
    to any invocation of the C compiler."
 
-These properties are use elsewhere in GHC, primarily in the driver, to
+These properties are used elsewhere in GHC, primarily in the driver, to
 fine-tune operations according to the capabilities of the chosen back
 end.  You might use a property to make GHC aware of a potential
 limitation of certain back ends, or a special feature available only

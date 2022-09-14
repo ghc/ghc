@@ -219,7 +219,7 @@ topInstantiate orig sigma
 instantiateSigma :: CtOrigin -> [TyVar] -> TcThetaType -> TcSigmaType
                  -> TcM ([TcTyVar], HsWrapper, TcSigmaType)
 -- (instantiate orig tvs theta ty)
--- instantiates the the type variables tvs, emits the (instantiated)
+-- instantiates the type variables tvs, emits the (instantiated)
 -- constraints theta, and returns the (instantiated) type ty
 instantiateSigma orig tvs theta body_ty
   = do { (subst, inst_tvs) <- mapAccumLM newMetaTyVarX empty_subst tvs

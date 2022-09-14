@@ -263,7 +263,7 @@ mkUncheckedIntExpr i = mkCoreConApps intDataCon  [Lit (mkLitIntUnchecked i)]
 mkIntExprInt :: Platform -> Int -> CoreExpr         -- Result = I# i :: Int
 mkIntExprInt platform i = mkCoreConApps intDataCon  [mkIntLit platform (fromIntegral i)]
 
--- | Create a 'CoreExpr' which will evaluate to the a @Word@ with the given value
+-- | Create a 'CoreExpr' which will evaluate to a @Word@ with the given value
 mkWordExpr :: Platform -> Integer -> CoreExpr
 mkWordExpr platform w = mkCoreConApps wordDataCon [mkWordLit platform w]
 

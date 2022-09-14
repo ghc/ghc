@@ -85,7 +85,7 @@ The semantics of ``do`` notation statements with ``-XQualifiedDo`` is as follows
     M.do { pat <- u; stmts }  =  u M.>>= \case pat -> M.do { stmts }
 
 *  The desugaring of ``-XApplicativeDo`` uses ``M.fmap``, ``(M.<*>)``,
-   and ``M.join`` (after the the applicative-do grouping has been performed) ::
+   and ``M.join`` (after the applicative-do grouping has been performed) ::
 
     M.do { (x1 <- u1 | … | xn <- un); M.return e }  =
       (\x1 … xn -> e) `M.fmap` u1 M.<*> … M.<*> un

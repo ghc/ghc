@@ -1837,7 +1837,7 @@ DataCons and PatSynCons:
 
 Note [Instantiating a ConLike]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-`instCon` implements the the \(Inst\) function from Figure 8 of the LYG paper.
+`instCon` implements the \(Inst\) function from Figure 8 of the LYG paper.
 
 Given the following type of ConLike `K`
 

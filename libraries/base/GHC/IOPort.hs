@@ -96,7 +96,7 @@ newIOPort value =
     writeIOPort ioport value  >>
     return ioport
 
--- |Atomically read the the contents of the 'IOPort'.  If the 'IOPort' is
+-- |Atomically read the contents of the 'IOPort'.  If the 'IOPort' is
 -- currently empty, 'readIOPort' will wait until it is full.  After a
 -- 'readIOPort', the 'IOPort' is left empty.
 --

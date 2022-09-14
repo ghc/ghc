@@ -18,7 +18,7 @@ which is equivalent to ::
 
       \freshName -> case freshName of { p1 -> e1; ...; pN -> eN }
 
-Since GHC 9.4.1, it also allow expressions with multiple scrutinees (see GHC
+Since GHC 9.4.1, it also allows expressions with multiple scrutinees (see GHC
 proposal `#302 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0302-cases.rst>`_)
 of the form ::
 

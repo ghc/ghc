@@ -106,7 +106,7 @@ instance when queried for an instance with template, e.g., `[KnownTc Fam,
 KnownTc Int, KnownTc Char]`.
 
 This explains the third clause of the mightMatch specification in Note [Simple Matching Semantics].
-As soon as the the lookup key runs out, the remaining instances might match.
+As soon as the lookup key runs out, the remaining instances might match.
 
 Note [Matching a RoughMap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

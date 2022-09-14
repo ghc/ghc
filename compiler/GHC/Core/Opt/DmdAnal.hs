@@ -1376,7 +1376,7 @@ Here is another important case (B):
 
 Again we want `wombat` to pretend to take its Int-typed argument unboxed,
 even though it has to pass it boxed to `f`, so that `g` can take its
-arugment unboxed (and rebox it before calling `wombat`).
+argument unboxed (and rebox it before calling `wombat`).
 
 So here's what we do: while summarising `indexError`'s boxity signature in
 `finaliseArgBoxities`:

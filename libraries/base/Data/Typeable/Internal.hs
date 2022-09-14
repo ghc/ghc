@@ -214,7 +214,7 @@ data TypeRep a where
                , trAppKind :: !(TypeRep k2) }   -- See Note [Kind caching]
             -> TypeRep (a b)
 
-    -- | @TrFun fpr m a b@ represents a function type @a # m -> b@. We use this for
+    -- | @TrFun fpr m a b@ represents a function type @a % m -> b@. We use this for
     -- the sake of efficiency as functions are quite ubiquitous.
     TrFun   :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                       (a :: TYPE r1) (b :: TYPE r2).

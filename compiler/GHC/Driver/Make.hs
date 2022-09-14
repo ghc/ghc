@@ -2632,7 +2632,7 @@ X.hs     module X where
            data XT = MkX T
            fx = ...g...
 ```
-If in `--make` we compile R.hs-boot, then A.hs, then X.hs, we'll get a `ModDetails` for `X` that has an AbstractTyCon for `T` in the the argument type of `MkX`.  So:
+If in `--make` we compile R.hs-boot, then A.hs, then X.hs, we'll get a `ModDetails` for `X` that has an AbstractTyCon for `T` in the argument type of `MkX`.  So:
 
 * Either we should delay compiling X until after R has been compiled. (This is what we do)
 * Or we should rehydrate X after compiling R -- because it transitively depends on R.hs-boot.

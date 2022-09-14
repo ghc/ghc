@@ -1502,7 +1502,7 @@ oneShotId = pcMiscPrelId oneShotName ty info
 {- Note [Wired-in Ids for rebindable syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The functions leftSectionId, rightSectionId are
-wired in here ONLY because they are use in a representation-polymorphic way
+wired in here ONLY because they are used in a representation-polymorphic way
 by the rebindable syntax mechanism. See GHC.Rename.Expr
 Note [Handling overloaded and rebindable constructs].
 

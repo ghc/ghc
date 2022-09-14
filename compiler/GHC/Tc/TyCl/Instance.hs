@@ -1132,7 +1132,7 @@ But what about this?
 
 So what kind do 'p' and 'q' have?  No clues from the header, but from
 the data constructor we can clearly see that (r :: Type->Type).  Does
-that mean that the the /entire data instance/ is instantiated at Type,
+that mean that the /entire data instance/ is instantiated at Type,
 like this?
    data instance T @Type (p :: Type->Type) (q :: Type) where
       ...

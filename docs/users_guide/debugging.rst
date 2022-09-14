@@ -980,8 +980,8 @@ Checking for consistency
     :type: dynamic
 
     Turn on linearity checking in GHC. Currently, some optimizations
-    in GHC might not preserve linearity and they valid programs might
-    fail Linear Core Lint.
+    in GHC might not preserve linearity and there are valid programs
+    that fail Linear Core Lint.
     In the near future, this option will be removed and folded into
     normal Core Lint.
 

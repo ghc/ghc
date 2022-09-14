@@ -1431,7 +1431,7 @@ piResultTys ty orig_args@(arg:args)
         pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
 
 applyTysX :: [TyVar] -> Type -> [Type] -> Type
--- applyTyxX beta-reduces (/\tvs. body_ty) arg_tys
+-- applyTysX beta-reduces (/\tvs. body_ty) arg_tys
 -- Assumes that (/\tvs. body_ty) is closed
 applyTysX tvs body_ty arg_tys
   = assertPpr (tvs `leLength` arg_tys) pp_stuff $
@@ -3079,7 +3079,7 @@ tcTypeKind (FunTy { ft_af = af, ft_res = res })
   , tcIsConstraintKind (tcTypeKind res)
   = constraintKind     -- Eq a => Ord a         :: Constraint
   | otherwise          -- Eq a => a -> a        :: TYPE LiftedRep
-  = liftedTypeKind     -- Eq a => Array# Int    :: Type LiftedRep (not TYPE PtrRep)
+  = liftedTypeKind     -- Eq a => Array# Int    :: TYPE LiftedRep (not TYPE PtrRep)
 
 tcTypeKind (AppTy fun arg)
   = go fun [arg]

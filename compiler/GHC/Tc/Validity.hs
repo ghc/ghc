@@ -1091,7 +1091,7 @@ check_pred_help under_syn env dflags ctxt pred
         | otherwise           -> check_class_pred env dflags ctxt pred cls tys
 
       EqPred _ _ _      -> pprPanic "check_pred_help" (ppr pred)
-              -- EqPreds, such as (t1 ~ #t2) or (t1 ~R# t2), don't even have kind Constraint
+              -- EqPreds, such as (t1 ~# t2) or (t1 ~R# t2), don't even have kind Constraint
               -- and should never appear before the '=>' of a type.  Thus
               --     f :: (a ~# b) => blah
               -- is wrong.  For user written signatures, it'll be rejected by kind-checking
@@ -1742,7 +1742,7 @@ checkValidInstance ctxt hs_type ty
         ; expand <- initialExpandMode
         ; check_valid_theta env0 ctxt expand theta
 
-        -- The Termination and Coverate Conditions
+        -- The Termination and Coverage Conditions
         -- Check that instance inference will terminate (if we care)
         -- For Haskell 98 this will already have been done by checkValidTheta,
         -- but as we may be using other extensions we need to check.
@@ -2557,7 +2557,7 @@ In every case, b is a type variable not determined by the LHS pattern. The
 first is caught by the renamer, but we catch the last two here. Perhaps one
 could argue that the second should be accepted, albeit with a warning, but
 consider the fact that in a type family instance, there is no way to interact
-with such a varable. At least with @x :: forall a. Int@ we can use visible
+with such a variable. At least with @x :: forall a. Int@ we can use visible
 type application, like @x \@Bool 1@. (Of course it does nothing, but it is
 permissible.) In the type family case, the only sensible explanation is that
 the user has made a mistake -- thus we throw an error.

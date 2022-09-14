@@ -565,7 +565,7 @@ data EvTerm
 type EvExpr = CoreExpr
 
 -- An EvTerm is (usually) constructed by any of the constructors here
--- and those more complicates ones who were moved to module GHC.Tc.Types.EvTerm
+-- and those more complicated ones who were moved to module GHC.Tc.Types.EvTerm
 
 -- | Any sort of evidence Id, including coercions
 evId ::  EvId -> EvExpr
@@ -671,7 +671,7 @@ evidence
     dl :: Typeable [a] = EvTypeable [a]
                             (EvTypeableTyApp (EvTypeableTyCon []) (EvId d))
 where
-    d :: Typable a
+    d :: Typeable a
 is the lambda-bound dictionary passed into f.
 
 Note [Coercion evidence terms]

@@ -494,7 +494,7 @@ There are a few subtleties in the desugaring of `seq`:
        let chp = case b of { True -> fst x; False -> 0 }
        case chp of _ { I# -> ...chp... }
 
-    But since chp is cheap, and the case is an alluring contet, we'll
+    But since chp is cheap, and the case is an alluring context, we'll
     inline chp into the case scrutinee.  Now there is only one use of chp,
     so we'll inline a second copy.  Alas, we've now ruined the purpose of
     the seq, by re-introducing the space leak:

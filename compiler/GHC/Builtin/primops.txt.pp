@@ -3658,7 +3658,7 @@ section "Etc"
 ------------------------------------------------------------------------
 
 primtype FUN m a b
-  {The builtin function type, written in infix form as @a # m -> b@.
+  {The builtin function type, written in infix form as @a % m -> b@.
    Values of this type are functions taking inputs of type @a@ and
    producing outputs of type @b@. The multiplicity of the input is
    @m@.

@@ -2240,7 +2240,8 @@ vecElemProjectCast _        WordVec  W64 =  Nothing
 vecElemProjectCast _        _        _   =  Nothing
 
 
--- NOTE [SIMD Design for the future]
+-- Note [SIMD Design for the future]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Check to make sure that we can generate code for the specified vector type
 -- given the current set of dynamic flags.
 -- Currently these checks are specific to x86 and x86_64 architecture.
