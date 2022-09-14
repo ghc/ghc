@@ -29,6 +29,7 @@
     is now exported from `Prelude`. See [CLC #50](https://github.com/haskell/core-libraries-committee/issues/50)
     for the related discussion,
     as well as [the migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/export-lifta2-prelude.md)
+  * Update to Unicode 15.0.0.
 
 ## 4.17.0.0 *August 2022*
 

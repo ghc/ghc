@@ -27,7 +27,7 @@ with Python.
 
 __Warning:__ A Python version with the _exact same Unicode version_ is required.
 
-# GHC
+## GHC
 
 Check the properties of all the characters.
 
@@ -37,7 +37,7 @@ ghc -O2 tests/export_all_chars.hs
 python3 tests/check_all_chars.py tests/all_chars.csv
 ```
 
-# GHC tests data
+## GHC tests data
 
 Check the Unicode test data (`unicodeNNN.stdout`).
 

@@ -12,7 +12,7 @@ main = do
   do_char char = s ++ (take (12-length s) (repeat ' ')) ++ concat (map f bs)
     where
           s = show char
-          bs = map ($char) functions
+          bs = map ($ char) functions
           f True  = "X     "
           f False = "      "
 

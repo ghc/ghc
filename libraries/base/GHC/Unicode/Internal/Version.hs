@@ -19,8 +19,8 @@ where
 import {-# SOURCE #-} Data.Version
 
 -- | Version of Unicode standard used by @base@:
--- [14.0.0](https://www.unicode.org/versions/Unicode14.0.0/).
+-- [15.0.0](https://www.unicode.org/versions/Unicode15.0.0/).
 --
 -- @since 4.15.0.0
 unicodeVersion :: Version
-unicodeVersion = makeVersion [14, 0, 0]
+unicodeVersion = makeVersion [15, 0, 0]
