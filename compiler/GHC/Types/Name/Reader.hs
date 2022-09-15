@@ -825,12 +825,12 @@ pprGlobalRdrEnv locals_only env
     remove_locals gres | locals_only = filter isLocalGRE gres
                        | otherwise   = gres
     pp []   = empty
-    pp gres = hang (ppr occ
+    pp gres@(gre:_) = hang (ppr occ
                      <+> parens (text "unique" <+> ppr (getUnique occ))
                      <> colon)
                  2 (vcat (map ppr gres))
       where
-        occ = nameOccName (greMangledName (head gres))
+        occ = nameOccName (greMangledName gre)
 
 lookupGlobalRdrEnv :: GlobalRdrEnv -> OccName -> [GlobalRdrElt]
 lookupGlobalRdrEnv env occ_name = case lookupOccEnv env occ_name of

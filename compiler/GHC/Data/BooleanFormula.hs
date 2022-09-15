@@ -16,9 +16,10 @@ module GHC.Data.BooleanFormula (
         pprBooleanFormula, pprBooleanFormulaNice
   ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding ( init, last )
 
 import Data.List ( nub, intersperse )
+import Data.List.NonEmpty ( NonEmpty (..), init, last )
 import Data.Data
 
 import GHC.Utils.Monad
@@ -227,7 +228,7 @@ pprBooleanFormulaNice = pprBooleanFormula' pprVar pprAnd pprOr 0
   pprAnd p = cparen (p > 1) . pprAnd'
   pprAnd' [] = empty
   pprAnd' [x,y] = x <+> text "and" <+> y
-  pprAnd' xs@(_:_) = fsep (punctuate comma (init xs)) <> text ", and" <+> last xs
+  pprAnd' (x:xs) = fsep (punctuate comma (init (x:|xs))) <> text ", and" <+> last (x:|xs)
   pprOr p xs = cparen (p > 1) $ text "either" <+> sep (intersperse (text "or") xs)
 
 instance (OutputableBndr a) => Outputable (BooleanFormula a) where

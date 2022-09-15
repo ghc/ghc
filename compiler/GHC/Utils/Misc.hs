@@ -124,7 +124,7 @@ module GHC.Utils.Misc (
         HasDebugCallStack,
     ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding ( last )
 
 import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain
@@ -133,7 +133,7 @@ import GHC.Utils.Fingerprint
 
 import Data.Data
 import qualified Data.List as List
-import Data.List.NonEmpty  ( NonEmpty(..) )
+import Data.List.NonEmpty  ( NonEmpty(..), last )
 
 import GHC.Exts
 import GHC.Stack (HasCallStack)
@@ -750,7 +750,7 @@ last2 = List.foldl' (\(_,x2) x -> (x2,x)) (partialError,partialError)
 
 lastMaybe :: [a] -> Maybe a
 lastMaybe [] = Nothing
-lastMaybe xs = Just $ last xs
+lastMaybe (x:xs) = Just $ last (x:|xs)
 
 -- | @onJust x m f@ applies f to the value inside the Just or returns the default.
 onJust :: b -> Maybe a -> (a->b) -> b
@@ -1293,9 +1293,9 @@ withAtomicRename targetFile f = do
 -- string is returned in the first component (and the second one is just
 -- empty).
 splitLongestPrefix :: String -> (Char -> Bool) -> (String,String)
-splitLongestPrefix str pred
-  | null r_pre = (str,           [])
-  | otherwise  = (reverse (tail r_pre), reverse r_suf)
+splitLongestPrefix str pred = case r_pre of
+    [] -> (str,           [])
+    _:r_pre' -> (reverse r_pre', reverse r_suf)
                            -- 'tail' drops the char satisfying 'pred'
   where (r_suf, r_pre) = break pred (reverse str)
 

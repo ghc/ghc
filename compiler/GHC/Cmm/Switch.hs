@@ -12,7 +12,7 @@ module GHC.Cmm.Switch (
      createSwitchPlan,
   ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding (head)
 
 import GHC.Utils.Outputable
 import GHC.Driver.Backend
@@ -20,7 +20,7 @@ import GHC.Utils.Panic
 import GHC.Cmm.Dataflow.Label (Label)
 
 import Data.Maybe
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty (..), groupWith, head)
 import qualified Data.Map as M
 
 -- Note [Cmm Switches, the general plan]
@@ -200,11 +200,11 @@ switchTargetsToList (SwitchTargets _ _ mbdef branches)
 
 -- | Groups cases with equal targets, suitable for pretty-printing to a
 -- c-like switch statement with fall-through semantics.
-switchTargetsFallThrough :: SwitchTargets -> ([([Integer], Label)], Maybe Label)
+switchTargetsFallThrough :: SwitchTargets -> ([(NonEmpty Integer, Label)], Maybe Label)
 switchTargetsFallThrough (SwitchTargets _ _ mbdef branches) = (groups, mbdef)
   where
-    groups = map (\xs -> (map fst (NE.toList xs), snd (NE.head xs))) $
-             NE.groupWith snd $
+    groups = fmap (\xs -> (fmap fst xs, snd (head xs))) $
+             groupWith snd $
              M.toList branches
 
 -- | Custom equality helper, needed for "GHC.Cmm.CommonBlockElim"

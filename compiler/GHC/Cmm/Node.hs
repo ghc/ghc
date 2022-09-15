@@ -45,6 +45,7 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
+import Data.Foldable (toList)
 import Data.Functor.Classes (liftCompare)
 import Data.Maybe
 import Data.List (tails,sortBy)
@@ -247,7 +248,7 @@ pprNode platform node = pp_node <+> pp_debug
             (cases, mbdef) = switchTargetsFallThrough ids
             ppCase (is,l) = hsep
                             [ text "case"
-                            , commafy $ map integer is
+                            , commafy $ toList $ fmap integer is
                             , text ": goto"
                             , ppr l <> semi
                             ]

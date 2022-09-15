@@ -1200,12 +1200,9 @@ cpeApp top_env expr
           arg_ty' = cpSubstTy env arg_ty
 
       CpeApp (Coercion co)
-        -> rebuild_app' env as (App fun' (Coercion co')) floats ss' rt_ticks req_depth
+        -> rebuild_app' env as (App fun' (Coercion co')) floats (drop 1 ss) rt_ticks req_depth
         where
             co' = cpSubstCo env co
-            ss'
-              | null ss = []
-              | otherwise = tail ss
 
       CpeApp arg -> do
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make

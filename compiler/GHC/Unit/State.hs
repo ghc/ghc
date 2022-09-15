@@ -699,8 +699,8 @@ getUnitDbRefs cfg = do
   let base_conf_refs = case e_pkg_path of
         Left _ -> system_conf_refs
         Right path
-         | not (null path) && isSearchPathSeparator (last path)
-         -> map PkgDbPath (splitSearchPath (init path)) ++ system_conf_refs
+         | Just (xs, x) <- snocView path, isSearchPathSeparator x
+         -> map PkgDbPath (splitSearchPath xs) ++ system_conf_refs
          | otherwise
          -> map PkgDbPath (splitSearchPath path)
 

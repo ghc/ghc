@@ -178,6 +178,8 @@ import qualified GHC.Data.BooleanFormula as BF
 
 import Data.Functor.Classes ( liftEq )
 import Data.List ( sortBy, sort )
+import Data.List.NonEmpty ( NonEmpty (..) )
+import qualified Data.List.NonEmpty as NE
 import Data.Ord
 import Data.Data ( Data )
 import qualified Data.Set as S
@@ -2223,10 +2225,8 @@ type Plan = TcM PlanResult
 
 -- | Try the plans in order. If one fails (by raising an exn), try the next.
 -- If one succeeds, take it.
-runPlans :: [Plan] -> TcM PlanResult
-runPlans []     = panic "runPlans"
-runPlans [p]    = p
-runPlans (p:ps) = tryTcDiscardingErrs (runPlans ps) p
+runPlans :: NonEmpty Plan -> Plan
+runPlans = foldr1 (flip tryTcDiscardingErrs)
 
 -- | Typecheck (and 'lift') a stmt entered by the user in GHCi into the
 -- GHCi 'environment'.
@@ -2298,30 +2298,31 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
 
               -- See Note [GHCi Plans]
 
-              it_plans = [
+              it_plans =
                     -- Plan A
                     do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
                        ; it_ty <- zonkTcType (idType it_id)
-                       ; when (isUnitTy $ it_ty) failM
-                       ; return stuff },
+                       ; when (isUnitTy it_ty) failM
+                       ; return stuff } :|
 
                         -- Plan B; a naked bind statement
-                    tcGhciStmts [bind_stmt],
+                  [ tcGhciStmts [bind_stmt]
 
                         -- Plan C; check that the let-binding is typeable all by itself.
                         -- If not, fail; if so, try to print it.
                         -- The two-step process avoids getting two errors: one from
                         -- the expression itself, and one from the 'print it' part
                         -- This two-step story is very clunky, alas
-                    do { _ <- checkNoErrs (tcGhciStmts [let_stmt])
+                  , do { _ <- checkNoErrs (tcGhciStmts [let_stmt])
                                 --- checkNoErrs defeats the error recovery of let-bindings
                        ; tcGhciStmts [let_stmt, print_it] } ]
 
               -- Plans where we don't bind "it"
-              no_it_plans = [
-                    tcGhciStmts [no_it_a] ,
-                    tcGhciStmts [no_it_b] ,
-                    tcGhciStmts [no_it_c] ]
+              no_it_plans =
+                tcGhciStmts [no_it_a] :|
+                tcGhciStmts [no_it_b] :
+                tcGhciStmts [no_it_c] :
+                []
 
         ; generate_it <- goptM Opt_NoIt
 
@@ -2413,13 +2414,13 @@ tcUserStmt rdr_stmt@(L loc _)
        ; let print_result_plan
                | opt_pr_flag                         -- The flag says "print result"
                , [v] <- collectLStmtBinders CollNoDictBinders gi_stmt  -- One binder
-               = [mk_print_result_plan gi_stmt v]
-               | otherwise = []
+               = Just $ mk_print_result_plan gi_stmt v
+               | otherwise = Nothing
 
         -- The plans are:
         --      [stmt; print v]         if one binder and not v::()
         --      [stmt]                  otherwise
-       ; plan <- runPlans (print_result_plan ++ [tcGhciStmts [gi_stmt]])
+       ; plan <- runPlans $ maybe id (NE.<|) print_result_plan $ NE.singleton $ tcGhciStmts [gi_stmt]
        ; return (plan, fix_env) }
   where
     mk_print_result_plan stmt v

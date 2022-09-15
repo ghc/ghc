@@ -63,6 +63,8 @@ import GHC.Unit.Module( Module )
 import GHC.Unit.Module.ModGuts
 import GHC.Core.Unfold
 
+import Data.List.NonEmpty ( NonEmpty (..) )
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1201,7 +1203,7 @@ specCase env scrut' case_bndr [Alt con args rhs]
   | -- See Note [Floating dictionaries out of cases]
     interestingDict scrut' (idType case_bndr)
   , not (isDeadBinder case_bndr && null sc_args')
-  = do { (case_bndr_flt : sc_args_flt) <- mapM clone_me (case_bndr' : sc_args')
+  = do { case_bndr_flt :| sc_args_flt <- mapM clone_me (case_bndr' :| sc_args')
 
        ; let case_bndr_flt' = case_bndr_flt `addDictUnfolding` scrut'
              scrut_bind     = mkDB (NonRec case_bndr_flt scrut')

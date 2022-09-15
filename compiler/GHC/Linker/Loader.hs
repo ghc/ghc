@@ -1779,9 +1779,9 @@ getGccSearchDirectory logger dflags key = do
             find :: String -> String -> String
             find r x = let lst = lines x
                            val = filter (r `isPrefixOf`) lst
-                       in if null val
-                             then []
-                             else case break (=='=') (head val) of
+                       in case val of
+                              [] -> []
+                              x:_ -> case break (=='=') x of
                                      (_ , [])    -> []
                                      (_, (_:xs)) -> xs
 

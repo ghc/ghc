@@ -2513,10 +2513,10 @@ mkRecConstrOrUpdate _ (L _ (HsVar _ (L l c))) _lrec (fbinds,dd) anns
   | isRdrDataCon c
   = do
       let (fs, ps) = partitionEithers fbinds
-      if not (null ps)
-        then addFatalError $ mkPlainErrorMsgEnvelope (getLocA (head ps)) $
-                               PsErrOverloadedRecordDotInvalid
-        else return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd) anns)
+      case ps of
+          p:_ -> addFatalError $ mkPlainErrorMsgEnvelope (getLocA p) $
+              PsErrOverloadedRecordDotInvalid
+          _ -> return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd) anns)
 mkRecConstrOrUpdate overloaded_update exp _ (fs,dd) anns
   | Just dd_loc <- dd = addFatalError $ mkPlainErrorMsgEnvelope dd_loc $
                                           PsErrDotsInRecordUpdate
@@ -2546,15 +2546,13 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
             [ L l lbl | L _ (HsFieldBind _ (L l lbl) _ _) <- fs'
                       , isQual . rdrNameAmbiguousFieldOcc $ lbl
             ]
-      if not $ null qualifiedFields
-        then
-          addFatalError $ mkPlainErrorMsgEnvelope (getLocA (head qualifiedFields)) $
+      case qualifiedFields of
+          qf:_ -> addFatalError $ mkPlainErrorMsgEnvelope (getLocA qf) $
             PsErrOverloadedRecordUpdateNoQualifiedFields
-        else -- This is a RecordDotSyntax update.
-          return RecordUpd {
-            rupd_ext = anns
-           , rupd_expr = exp
-           , rupd_flds = Right (toProjUpdates fbinds) }
+          _ -> return RecordUpd -- This is a RecordDotSyntax update.
+             { rupd_ext = anns
+             , rupd_expr = exp
+             , rupd_flds = Right (toProjUpdates fbinds) }
   where
     toProjUpdates :: [Fbind (HsExpr GhcPs)] -> [LHsRecUpdProj GhcPs]
     toProjUpdates = map (\case { Right p -> p; Left f -> recFieldToProjUpdate f })

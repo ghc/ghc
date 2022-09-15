@@ -181,7 +181,7 @@ getLitType :: LlvmLit -> LlvmType
 getLitType (LMIntLit   _ t) = t
 getLitType (LMFloatLit _ t) = t
 getLitType (LMVectorLit [])  = panic "getLitType"
-getLitType (LMVectorLit ls)  = LMVector (length ls) (getLitType (head ls))
+getLitType (LMVectorLit ls@(l:_))  = LMVector (length ls) (getLitType l)
 getLitType (LMNullLit    t) = t
 getLitType (LMUndefLit   t) = t
 

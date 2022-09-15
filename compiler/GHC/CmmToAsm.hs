@@ -78,7 +78,7 @@ module GHC.CmmToAsm
    )
 where
 
-import GHC.Prelude
+import GHC.Prelude hiding (head)
 
 import qualified GHC.CmmToAsm.X86   as X86
 import qualified GHC.CmmToAsm.PPC   as PPC
@@ -140,7 +140,7 @@ import GHC.Data.Stream (Stream)
 import qualified GHC.Data.Stream as Stream
 
 import Data.List (sortBy)
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (groupAllWith, head)
 import Data.Maybe
 import Data.Ord         ( comparing )
 import Control.Monad
@@ -776,8 +776,8 @@ makeImportsDoc config imports
                 | needImportedSymbols config
                 = vcat $
                         (pprGotDeclaration config :) $
-                        fmap ( pprImportedSymbol config . fst . NE.head) $
-                        NE.groupAllWith snd $
+                        fmap (pprImportedSymbol config . fst . head) $
+                        groupAllWith snd $
                         map doPpr $
                         imps
                 | otherwise

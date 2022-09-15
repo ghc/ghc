@@ -59,6 +59,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Char
 import Data.List (intersperse)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC.Float
@@ -347,7 +348,7 @@ pprSwitch platform e ids
     rep = typeWidth (cmmExprType platform e)
 
     -- fall through case
-    caseify (ix:ixs, ident) = vcat (map do_fallthrough ixs) $$ final_branch ix
+    caseify (ix:|ixs, ident) = vcat (map do_fallthrough ixs) $$ final_branch ix
         where
         do_fallthrough ix =
                  hsep [ text "case" , pprHexVal platform ix rep <> colon ,
@@ -356,8 +357,6 @@ pprSwitch platform e ids
         final_branch ix =
                 hsep [ text "case" , pprHexVal platform ix rep <> colon ,
                        text "goto" , (pprBlockId ident) <> semi ]
-
-    caseify (_     , _    ) = panic "pprSwitch: switch with no cases!"
 
     def | Just l <- mbdef = text "default: goto" <+> pprBlockId l <> semi
         | otherwise       = text "default: __builtin_unreachable();"
