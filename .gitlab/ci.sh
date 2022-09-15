@@ -801,6 +801,22 @@ function lint_author(){
   done
 }
 
+function abi_of(){
+  DIR=$(realpath $1)
+  mkdir -p "$OUT"
+  pushd $DIR
+  summarise_hi_files
+  popd
+}
+
+# Checks that the interfaces in folder $1 match the interfaces in folder $2
+function compare_interfaces_of(){
+  OUT=$PWD/out/run1 abi_of $1
+  OUT=$PWD/out/run2 abi_of $2
+  check_interfaces out/run1 out/run2 abis "Mismatched ABI hash"
+  check_interfaces out/run1 out/run2 interfaces "Mismatched interface hashes"
+}
+
 
 setup_locale
 
@@ -899,6 +915,7 @@ case $1 in
   abi_test) abi_test ;;
   cabal_test) cabal_test ;;
   lint_author) shift; lint_author "$@" ;;
+  compare_interfaces_of) shift; compare_interfaces_of "$@" ;;
   clean) clean ;;
   save_cache) save_cache ;;
   shell) shift; shell "$@" ;;

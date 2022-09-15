@@ -405,6 +405,33 @@ test-cabal-reinstall-x86_64-linux-deb10:
   rules:
     - if: $NIGHTLY
 
+########################################
+# Testing ABI is invariant across builds
+########################################
+
+abi-test-nightly:
+  stage: full-build
+  needs:
+    - job: nightly-x86_64-linux-fedora33-release-hackage
+    - job: nightly-x86_64-linux-fedora33-release
+  tags:
+    - x86_64-linux
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
+  dependencies: null
+  before_script:
+    - mkdir -p normal
+    - mkdir -p hackage
+    - tar -xf ghc-x86_64-linux-fedora33-release.tar.xz -C normal/
+    - tar -xf ghc-x86_64-linux-fedora33-release-hackage_docs.tar.xz -C hackage/
+  script:
+    - .gitlab/ci.sh compare_interfaces_of "normal/ghc-*" "hackage/ghc-*"
+  artifacts:
+    paths:
+      - out
+  rules:
+    - if: $NIGHTLY
+    - if: '$RELEASE_JOB == "yes"'
+
 ############################################################
 # Packaging
 ############################################################
