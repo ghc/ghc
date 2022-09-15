@@ -147,7 +147,7 @@ executable hadrian
                        , BangPatterns
     other-extensions:    MultiParamTypeClasses
                        , TypeFamilies
-    build-depends:       Cabal                >= 3.2     && < 3.7
+    build-depends:       Cabal                >= 3.2     && < 3.9
                        , base                 >= 4.8     && < 5
                        , bytestring           >= 0.10    && < 0.12
                        , containers           >= 0.5     && < 0.7
