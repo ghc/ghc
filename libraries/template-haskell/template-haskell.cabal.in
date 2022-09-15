@@ -27,14 +27,6 @@ source-repository head
     location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   libraries/template-haskell
 
-
--- We give the option to vendor filepath to avoid making filepath non-reinstallable..
--- see #21738 for why we are doing this now and what the plan is for the future.
-Flag vendor-filepath
-    Description: Vendor the dependency on filepath
-    Default: False
-    Manual: True
-
 Library
     default-language: Haskell2010
     other-extensions:
@@ -68,25 +60,16 @@ Library
         ghc-prim,
         pretty      == 1.1.*
 
-    if flag(vendor-filepath)
-      other-modules:
-        System.FilePath
-        System.FilePath.Posix
-        System.FilePath.Windows
-      hs-source-dirs: ./vendored-filepath .
-      default-extensions:
-        ImplicitPrelude
-    else
-      build-depends: filepath
-      hs-source-dirs: .
+    other-modules:
+      System.FilePath
+      System.FilePath.Posix
+      System.FilePath.Windows
+    hs-source-dirs: ./vendored-filepath .
+    default-extensions:
+      ImplicitPrelude
 
     ghc-options: -Wall
 
     -- We need to set the unit ID to template-haskell (without a
     -- version number) as it's magic.
     ghc-options: -this-unit-id template-haskell
-
-    -- This should match the default-extensions used in 'ghc.cabal'. This way,
-    -- GHCi can be used to load it along with the compiler.
-    Default-Extensions:
-        NoImplicitPrelude

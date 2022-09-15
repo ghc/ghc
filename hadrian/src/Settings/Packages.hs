@@ -213,11 +213,6 @@ packageArgs = do
         , package hpcBin
           ? builder (Cabal Flags) ? arg "-build-tool-depends"
 
-        --------------------------------- template-haskell ----------------------------------
-
-        , package templateHaskell
-            ? mconcat [ builder (Cabal Flags) ? notStage0 ? arg "+vendor-filepath"
-                      , builder Ghc ? notStage0 ? arg ("-i" <> (root </> pkgPath filepath)) ]
         ]
 
 ghcBignumArgs :: Args

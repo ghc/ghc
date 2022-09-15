@@ -81,6 +81,7 @@ stage0Packages = do
              , directory
              , process
              , exceptions
+             , filepath
              , ghc
              , runGhc
              , ghcBoot
@@ -122,7 +123,6 @@ stage1Packages = do
         , containers
         , deepseq
         , exceptions
-        , filepath
         , ghc
         , ghcBignum
         , ghcCompact
