@@ -91,7 +91,7 @@ Runtime system
   no safe API to access this functionality is provided anywhere in ``base``.
   Instead, the ``prompt#`` and ``control0#`` primops are intended to be consumed
   by library authors directly, who may wrap them a safe API that maintains the
-  necessary invariants. See the documentation in ``GHC.Exts`` for more details.
+  necessary invariants. See the documentation in ``GHC.Prim`` for more details.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~

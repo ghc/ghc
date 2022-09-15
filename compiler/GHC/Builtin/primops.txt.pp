@@ -2634,7 +2634,9 @@ primop  MaskStatus "getMaskingState#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Continuations"
-  { These operations provide access to first-class delimited continuations,
+  { #continuations#
+
+    These operations provide access to first-class delimited continuations,
     which allow a computation to access and manipulate portions of its
     /current continuation/. Operationally, they are implemented by direct
     manipulation of the RTS call stack, which may provide significant
@@ -2791,9 +2793,11 @@ section "Continuations"
 ------------------------------------------------------------------------
 
 primtype PromptTag# a
+   { See "GHC.Prim#continuations". }
 
 primop  NewPromptTagOp "newPromptTag#" GenPrimOp
         State# RealWorld -> (# State# RealWorld, PromptTag# a #)
+   { See "GHC.Prim#continuations". }
    with
    out_of_line = True
    has_side_effects = True
@@ -2802,6 +2806,7 @@ primop  PromptOp "prompt#" GenPrimOp
         PromptTag# a
      -> (State# RealWorld -> (# State# RealWorld, a #))
      -> State# RealWorld -> (# State# RealWorld, a #)
+   { See "GHC.Prim#continuations". }
    with
    strictness = { \ _arity -> mkClosedDmdSig [topDmd, strictOnceApply1Dmd, topDmd] topDiv }
    out_of_line = True
@@ -2813,6 +2818,7 @@ primop  Control0Op "control0#" GenPrimOp
           -> State# RealWorld -> (# State# RealWorld, a #))
          -> State# RealWorld -> (# State# RealWorld, a #))
      -> State# RealWorld -> (# State# RealWorld, p #)
+   { See "GHC.Prim#continuations". }
    with
    strictness = { \ _arity -> mkClosedDmdSig [topDmd, lazyApply2Dmd, topDmd] topDiv }
    out_of_line = True
