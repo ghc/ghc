@@ -31,6 +31,8 @@ import Data.Functor.Classes
 import Control.Applicative
 import Data.Coerce (coerce)
 import Data.Data (Data)
+import Data.Foldable (foldMap')
+import Data.Monoid (Sum(..), Any(..), Product(..))
 import Data.Type.Equality (TestEquality(..), (:~:)(..))
 import GHC.Generics (Generic, Generic1)
 import Text.Read (Read(..), ReadPrec, readListDefault, readListPrecDefault)
@@ -112,6 +114,11 @@ instance (Functor f, Functor g) => Functor (Compose f g) where
 -- | @since 4.9.0.0
 instance (Foldable f, Foldable g) => Foldable (Compose f g) where
     foldMap f (Compose t) = foldMap (foldMap f) t
+
+    length (Compose t) = getSum (foldMap' (Sum . length) t)
+    elem x (Compose t) = getAny (foldMap' (Any . elem x) t)
+    sum (Compose t) = getSum (foldMap' (Sum . sum) t)
+    product (Compose t) = getProduct (foldMap' (Product . product) t)
 
 -- | @since 4.9.0.0
 instance (Traversable f, Traversable g) => Traversable (Compose f g) where
