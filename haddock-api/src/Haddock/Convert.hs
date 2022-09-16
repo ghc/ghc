@@ -128,6 +128,7 @@ tyThingToLHsDecl prr t = case t of
 
        in withErrs (lefts atTyClDecls) . TyClD noExtField $ ClassDecl
          { tcdCtxt = Just $ synifyCtx (classSCTheta cl)
+         , tcdLayout = NoLayoutInfo
          , tcdLName = synifyNameN cl
          , tcdTyVars = synifyTyVars vs
          , tcdFixity = synifyFixity cl

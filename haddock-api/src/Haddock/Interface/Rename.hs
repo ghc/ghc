@@ -428,7 +428,8 @@ renameTyClD d = case d of
     return (DataDecl { tcdDExt = noExtField, tcdLName = lname', tcdTyVars = tyvars'
                      , tcdFixity = fixity, tcdDataDefn = defn' })
 
-  ClassDecl { tcdCtxt = lcontext, tcdLName = lname, tcdTyVars = ltyvars, tcdFixity = fixity
+  ClassDecl { tcdLayout = layout
+            , tcdCtxt = lcontext, tcdLName = lname, tcdTyVars = ltyvars, tcdFixity = fixity
             , tcdFDs = lfundeps, tcdSigs = lsigs, tcdATs = ats, tcdATDefs = at_defs } -> do
     lcontext' <- traverse renameLContext lcontext
     lname'    <- renameL lname
@@ -438,10 +439,12 @@ renameTyClD d = case d of
     ats'      <- mapM (renameLThing renameFamilyDecl) ats
     at_defs'  <- mapM (mapM renameTyFamDefltD) at_defs
     -- we don't need the default methods or the already collected doc entities
-    return (ClassDecl { tcdCtxt = lcontext', tcdLName = lname', tcdTyVars = ltyvars'
+    return (ClassDecl { tcdCExt = noExtField
+                      , tcdLayout = renameLayoutInfo layout
+                      , tcdCtxt = lcontext', tcdLName = lname', tcdTyVars = ltyvars'
                       , tcdFixity = fixity
                       , tcdFDs = lfundeps', tcdSigs = lsigs', tcdMeths= emptyBag
-                      , tcdATs = ats', tcdATDefs = at_defs', tcdDocs = [], tcdCExt = noExtField })
+                      , tcdATs = ats', tcdATDefs = at_defs', tcdDocs = [] })
 
   where
     renameLFunDep :: LHsFunDep GhcRn -> RnM (LHsFunDep DocNameI)
@@ -451,6 +454,11 @@ renameTyClD d = case d of
       return (L (locA loc) (FunDep noExtField (map noLocA xs') (map noLocA ys')))
 
     renameLSig (L loc sig) = return . L (locA loc) =<< renameSig sig
+
+renameLayoutInfo :: LayoutInfo GhcRn -> LayoutInfo DocNameI
+renameLayoutInfo (ExplicitBraces ob cb) = ExplicitBraces ob cb
+renameLayoutInfo (VirtualBraces n) = VirtualBraces n
+renameLayoutInfo NoLayoutInfo = NoLayoutInfo
 
 renameFamilyDecl :: FamilyDecl GhcRn -> RnM (FamilyDecl DocNameI)
 renameFamilyDecl (FamilyDecl { fdInfo = info, fdLName = lname
