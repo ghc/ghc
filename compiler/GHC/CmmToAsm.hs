@@ -386,7 +386,7 @@ cmmNativeGens logger config ncgImpl h dbgMap = go
         let newFileIds = sortBy (comparing snd) $
                          nonDetEltsUFM $ fileIds' `minusUFM` fileIds
             -- See Note [Unique Determinism and code generation]
-            pprDecl (f,n) = text "\t.file " <> ppr n <+>
+            pprDecl (f,n) = text "\t.file " <> int n <+>
                             pprFilePathString (unpackFS f)
 
         emitNativeCode logger config h $ vcat $

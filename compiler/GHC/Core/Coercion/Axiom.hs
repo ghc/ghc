@@ -485,7 +485,7 @@ instance Outputable CoAxBranch where
                   , cab_lhs = lhs
                   , cab_rhs = rhs }) =
     text "CoAxBranch" <+> parens (ppr loc) <> colon
-      <+> brackets (fsep (punctuate comma (map pprType lhs)))
+      <+> brackets (pprWithCommas pprType lhs)
       <+> text "=>" <+> pprType rhs
 
 {-

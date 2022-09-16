@@ -524,7 +524,7 @@ instance OutputableP Platform UnwindExpr where
 
 pprUnwindExpr :: Rational -> Platform -> UnwindExpr -> SDoc
 pprUnwindExpr p env = \case
-  UwConst i     -> ppr i
+  UwConst i     -> int i
   UwReg g 0     -> ppr g
   UwReg g x     -> pprUnwindExpr p env (UwPlus (UwReg g 0) (UwConst x))
   UwDeref e     -> char '*' <> pprUnwindExpr 3 env e
