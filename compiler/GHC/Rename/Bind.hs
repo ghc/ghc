@@ -493,18 +493,10 @@ rnBind _ bind@(PatBind { pat_lhs = pat
               bind' = bind { pat_rhs  = grhss'
                            , pat_ext = fvs' }
 
-              ok_nobind_pat
-                  = -- See Note [Pattern bindings that bind no variables]
-                    case unLoc pat of
-                       WildPat {}   -> True
-                       BangPat {}   -> True -- #9127, #13646
-                       SplicePat {} -> True
-                       _            -> False
-
         -- Warn if the pattern binds no variables
         -- See Note [Pattern bindings that bind no variables]
         ; whenWOptM Opt_WarnUnusedPatternBinds $
-          when (null bndrs && not ok_nobind_pat) $
+          when (null bndrs && not (isOkNoBindPattern pat)) $
           addTcRnDiagnostic (TcRnUnusedPatternBinds bind')
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
@@ -540,29 +532,66 @@ rnBind sig_fn (PatSynBind x bind)
 
 rnBind _ b = pprPanic "rnBind" (ppr b)
 
+ -- See Note [Pattern bindings that bind no variables]
+isOkNoBindPattern :: LPat GhcRn -> Bool
+isOkNoBindPattern (L _ pat) =
+  case pat of
+    WildPat{}       -> True -- Exception (1)
+    BangPat {}      -> True -- Exception (2) #9127, #13646
+    p -> patternContainsSplice p -- Exception (3)
+
+    where
+      lpatternContainsSplice :: LPat GhcRn -> Bool
+      lpatternContainsSplice (L _ p) = patternContainsSplice p
+      patternContainsSplice :: Pat GhcRn -> Bool
+      patternContainsSplice p =
+        case p of
+          -- A top-level splice has been evaluated by this point, so we know the pattern it is evaluated to
+          SplicePat (HsUntypedSpliceTop _ p) _ -> patternContainsSplice p
+          -- A nested splice isn't evaluated so we can't guess what it will expand to
+          SplicePat (HsUntypedSpliceNested {}) _ -> True
+          -- The base cases
+          VarPat {} -> False
+          WildPat {} -> False
+          LitPat {} -> False
+          NPat {} -> False
+          NPlusKPat {} -> False
+          -- Recursive cases
+          BangPat _ lp -> lpatternContainsSplice lp
+          LazyPat _ lp -> lpatternContainsSplice lp
+          AsPat _ _ _ lp  -> lpatternContainsSplice lp
+          ParPat _ _ lp _ -> lpatternContainsSplice lp
+          ViewPat _ _ lp -> lpatternContainsSplice lp
+          SigPat _ lp _  -> lpatternContainsSplice lp
+          ListPat _ lps  -> any lpatternContainsSplice lps
+          TuplePat _ lps _ -> any lpatternContainsSplice lps
+          SumPat _ lp _ _ -> lpatternContainsSplice lp
+          ConPat _ _ cpd  -> any lpatternContainsSplice (hsConPatArgs cpd)
+          XPat (HsPatExpanded _orig new) -> patternContainsSplice new
+
 {- Note [Pattern bindings that bind no variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Generally, we want to warn about pattern bindings like
   Just _ = e
 because they don't do anything!  But we have three exceptions:
 
-* A wildcard pattern
+(1) A wildcard pattern
        _ = rhs
   which (a) is not that different from  _v = rhs
         (b) is sometimes used to give a type sig for,
             or an occurrence of, a variable on the RHS
 
-* A strict pattern binding; that is, one with an outermost bang
+(2) A strict pattern binding; that is, one with an outermost bang
      !Just _ = e
   This can fail, so unlike the lazy variant, it is not a no-op.
   Moreover, #13646 argues that even for single constructor
   types, you might want to write the constructor.  See also #9127.
 
-* A splice pattern
+(3) A splice pattern
       $(th-lhs) = rhs
    It is impossible to determine whether or not th-lhs really
-   binds any variable. We should disable the warning for any pattern
-   which contain splices, but that is a more expensive check.
+   binds any variable. You have to recurse all the way into the pattern to check
+   it doesn't contain any splices like this. See #22057.
 
 Note [Free-variable space leak]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
