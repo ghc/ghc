@@ -490,20 +490,12 @@ $tab          { warnTab }
   @conid "#"+       / { ifExtension MagicHashBit } { idtoken conid }
 }
 
--- Operators classified into prefix, suffix, tight infix, and loose infix.
--- See Note [Whitespace-sensitive operator parsing]
-<0> {
-  @varsym / { precededByClosingToken `alexAndPred` followedByOpeningToken } { varsym_tight_infix }
-  @varsym / { followedByOpeningToken }  { varsym_prefix }
-  @varsym / { precededByClosingToken }  { varsym_suffix }
-  @varsym                               { varsym_loose_infix }
-}
-
 -- ToDo: - move `var` and (sym) into lexical syntax?
 --       - remove backquote from $special?
 <0> {
   @qvarsym                                         { idtoken qvarsym }
   @qconsym                                         { idtoken qconsym }
+  @varsym                                          { with_op_ws varsym }
   @consym                                          { consym }
 }
 
@@ -706,6 +698,14 @@ $tab          { warnTab }
 -- Alex "Haskell code fragment bottom"
 
 {
+
+-- Operator whitespace occurrence. See Note [Whitespace-sensitive operator parsing].
+data OpWs
+  = OpWsPrefix         -- a !b
+  | OpWsSuffix         -- a! b
+  | OpWsTightInfix     -- a!b
+  | OpWsLooseInfix     -- a ! b
+  deriving Show
 
 -- -----------------------------------------------------------------------------
 -- The token type
@@ -1166,8 +1166,13 @@ pop_and act span buf len buf2 =
      act span buf len buf2
 
 -- See Note [Whitespace-sensitive operator parsing]
-followedByOpeningToken :: AlexAccPred ExtsBitmap
-followedByOpeningToken _ _ _ (AI _ buf)
+followedByOpeningToken, precededByClosingToken :: AlexAccPred ExtsBitmap
+followedByOpeningToken _ _ _ (AI _ buf) = followedByOpeningToken' buf
+precededByClosingToken _ (AI _ buf) _ _ = precededByClosingToken' buf
+
+-- The input is the buffer *after* the token.
+followedByOpeningToken' :: StringBuffer -> Bool
+followedByOpeningToken' buf
   | atEnd buf = False
   | otherwise =
       case nextChar buf of
@@ -1181,9 +1186,9 @@ followedByOpeningToken _ _ _ (AI _ buf)
         ('⦇', _) -> True
         (c, _) -> isAlphaNum c
 
--- See Note [Whitespace-sensitive operator parsing]
-precededByClosingToken :: AlexAccPred ExtsBitmap
-precededByClosingToken _ (AI _ buf) _ _ =
+-- The input is the buffer *before* the token.
+precededByClosingToken' :: StringBuffer -> Bool
+precededByClosingToken' buf =
   case prevChar buf '\n' of
     '}' -> decodePrevNChars 1 buf /= "-"
     ')' -> True
@@ -1194,6 +1199,19 @@ precededByClosingToken _ (AI _ buf) _ _ =
     '⟧' -> True
     '⦈' -> True
     c -> isAlphaNum c
+
+get_op_ws :: StringBuffer -> StringBuffer -> OpWs
+get_op_ws buf1 buf2 =
+    mk_op_ws (precededByClosingToken' buf1) (followedByOpeningToken' buf2)
+  where
+    mk_op_ws False True  = OpWsPrefix
+    mk_op_ws True  False = OpWsSuffix
+    mk_op_ws True  True  = OpWsTightInfix
+    mk_op_ws False False = OpWsLooseInfix
+
+{-# INLINE with_op_ws #-}
+with_op_ws :: (OpWs -> Action) -> Action
+with_op_ws act span buf len buf2 = act (get_op_ws buf buf2) span buf len buf2
 
 {-# INLINE nextCharIs #-}
 nextCharIs :: StringBuffer -> (Char -> Bool) -> Bool
@@ -1662,8 +1680,8 @@ qvarsym buf len = ITqvarsym $! splitQualName buf len False
 qconsym buf len = ITqconsym $! splitQualName buf len False
 
 -- See Note [Whitespace-sensitive operator parsing]
-varsym_prefix :: Action
-varsym_prefix = sym $ \span exts s ->
+varsym :: OpWs -> Action
+varsym OpWsPrefix = sym $ \span exts s ->
   let warnExtConflict errtok =
         do { addPsMessage (mkSrcSpanPs span) (PsWarnOperatorWhitespaceExtConflict errtok)
            ; return (ITvarsym s) }
@@ -1695,10 +1713,7 @@ varsym_prefix = sym $ \span exts s ->
                 (mkSrcSpanPs span)
                 (PsWarnOperatorWhitespace s OperatorWhitespaceOccurrence_Prefix)
             ; return (ITvarsym s) }
-
--- See Note [Whitespace-sensitive operator parsing]
-varsym_suffix :: Action
-varsym_suffix = sym $ \span _ s ->
+varsym OpWsSuffix = sym $ \span _ s ->
   if | s == fsLit "@" -> failMsgP (\srcLoc -> mkPlainErrorMsgEnvelope srcLoc $ PsErrSuffixAT)
      | s == fsLit "." -> return ITdot
      | otherwise ->
@@ -1706,10 +1721,7 @@ varsym_suffix = sym $ \span _ s ->
                 (mkSrcSpanPs span)
                 (PsWarnOperatorWhitespace s OperatorWhitespaceOccurrence_Suffix)
             ; return (ITvarsym s) }
-
--- See Note [Whitespace-sensitive operator parsing]
-varsym_tight_infix :: Action
-varsym_tight_infix = sym $ \span exts s ->
+varsym OpWsTightInfix = sym $ \span exts s ->
   if | s == fsLit "@" -> return ITat
      | s == fsLit ".", OverloadedRecordDotBit `xtest` exts  -> return (ITproj False)
      | s == fsLit "." -> return ITdot
@@ -1718,10 +1730,7 @@ varsym_tight_infix = sym $ \span exts s ->
                 (mkSrcSpanPs span)
                 (PsWarnOperatorWhitespace s (OperatorWhitespaceOccurrence_TightInfix))
             ;  return (ITvarsym s) }
-
--- See Note [Whitespace-sensitive operator parsing]
-varsym_loose_infix :: Action
-varsym_loose_infix = sym $ \_ _ s ->
+varsym OpWsLooseInfix = sym $ \_ _ s ->
   if | s == fsLit "."
      -> return ITdot
      | otherwise
