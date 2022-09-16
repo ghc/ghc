@@ -6,7 +6,9 @@ import Settings.Builders.Common
 -- want to place these in a response file. This is handled in
 -- 'Hadrian.Builder.Ar.runAr'.
 arBuilderArgs :: Args
-arBuilderArgs = mconcat
+arBuilderArgs = do
+  stage <- getStage
+  mconcat
     [ builder (Ar Pack) ? mconcat
       [ -- When building on platforms which don't support object merging
         -- we must use the -L flag supported by llvm-ar, which ensures that
@@ -14,7 +16,7 @@ arBuilderArgs = mconcat
         -- not added as a single file. This requires that we are using llvm-ar
         --
         -- See Note [Object merging] in GHC.Driver.Pipeline.Execute for details.
-        ifM ((&&) <$> notStage0 <*> expr (flag ArSupportsDashL)) (arg "qL") (arg "q")
+        ifM (expr $ arSupportsDashL stage) (arg "qL") (arg "q")
       , arg =<< getOutput
       ]
     , builder (Ar Unpack) ? mconcat

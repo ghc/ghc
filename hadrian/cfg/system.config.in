@@ -39,10 +39,11 @@ python         = @PythonCmd@
 # Information about builders:
 #============================
 
-ar-supports-at-file = @ArSupportsAtFile@
-ar-supports-dash-l  = @ArSupportsDashL@
-cc-llvm-backend     = @CcLlvmBackend@
-hs-cpp-args         = @HaskellCPPArgs@
+ar-supports-at-file       = @ArSupportsAtFile@
+ar-supports-dash-l        = @ArSupportsDashL@
+system-ar-supports-dash-l = @ArSupportsDashL_STAGE0@
+cc-llvm-backend           = @CcLlvmBackend@
+hs-cpp-args               = @HaskellCPPArgs@
 
 # Build options:
 #===============
