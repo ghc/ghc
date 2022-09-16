@@ -46,9 +46,18 @@ are as follows:
   t_1 :: TYPE r_1, ..., t_n :: TYPE r_n
   s_1 :: TYPE p_1, ..., a_n :: TYPE p_n
 
-Then we must check that each r_i is compatible with s_i. Compatibility
-is weaker than on-the-nose equality: for example, IntRep and WordRep are
-compatible. See Note [Bad unsafe coercion] in GHC.Core.Lint.
+Before unarisation, we must check that each r_i is compatible with s_i.
+Compatibility is weaker than on-the-nose equality: for example,
+IntRep and WordRep are compatible. See Note [Bad unsafe coercion] in GHC.Core.Lint.
+
+After unarisation, a single type might correspond to multiple arguments, e.g.
+
+  (# Int# | Bool #) :: TYPE (SumRep '[ IntRep, LiftedRep ])
+
+will result in two arguments: [Int# :: TYPE 'IntRep, Bool :: TYPE LiftedRep]
+This means post unarise we potentially have to match up multiple arguments with
+the reps of a single argument in the type's definition, because the type of the function
+is *not* in unarised form.
 
 Wrinkle: it can sometimes happen that an argument type in the type of
 the function does not have a fixed runtime representation, i.e.
@@ -122,7 +131,7 @@ import Data.Maybe
 import GHC.Utils.Misc
 import GHC.Core.Multiplicity (scaledThing)
 import GHC.Settings (Platform)
-import GHC.Core.TyCon (primRepCompatible)
+import GHC.Core.TyCon (primRepCompatible, primRepsCompatible)
 import GHC.Utils.Panic.Plain (panic)
 
 lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
@@ -332,14 +341,18 @@ lintStgAppReps _fun [] = return ()
 lintStgAppReps fun args = do
   lf <- getLintFlags
   let platform = lf_platform lf
+
       (fun_arg_tys, _res) = splitFunTys (idType fun)
-      fun_arg_tys' = map (scaledThing ) fun_arg_tys :: [Type]
+      fun_arg_tys' = map scaledThing fun_arg_tys :: [Type]
+
+      -- Might be "wrongly" typed as polymorphic. See #21399
+      -- In these cases typePrimRep_maybe will return Nothing
+      -- and we abort kind checking.
       fun_arg_tys_reps, actual_arg_reps :: [Maybe [PrimRep]]
       fun_arg_tys_reps = map typePrimRep_maybe fun_arg_tys'
       actual_arg_reps = map (typePrimRep_maybe . stgArgType) args
 
       match_args :: [Maybe [PrimRep]] -> [Maybe [PrimRep]] -> LintM ()
-      -- Might be wrongly typed as polymorphic. See #21399
       match_args (Nothing:_) _   = return ()
       match_args (_) (Nothing:_) = return ()
       match_args (Just actual_rep:actual_reps_left) (Just expected_rep:expected_reps_left)
@@ -353,21 +366,36 @@ lintStgAppReps fun args = do
 
         -- Some reps are compatible *even* if they are not the same. E.g. IntRep and WordRep.
         -- We check for that here with primRepCompatible
-        | and $ zipWith (primRepCompatible platform) actual_rep expected_rep
+        | primRepsCompatible platform actual_rep expected_rep
         = match_args actual_reps_left expected_reps_left
 
-        | otherwise = addErrL $ hang (text "Function type reps and function argument reps missmatched") 2 $
+        -- We might distribute args from within one unboxed sum over multiple
+        -- single rep args. This means we might need to match up things like:
+        -- [Just [WordRep, LiftedRep]] with [Just [WordRep],Just [LiftedRep]]
+        -- which happens here.
+        -- See Note [Linting StgApp].
+        | Just (actual,actuals) <- getOneRep actual_rep actual_reps_left
+        , Just (expected,expecteds) <- getOneRep expected_rep expected_reps_left
+        , primRepCompatible platform actual expected
+        = match_args actuals expecteds
+
+        | otherwise = addErrL $ hang (text "Function type reps and function argument reps mismatched") 2 $
             (text "In application " <> ppr fun <+> ppr args $$
-              text "argument rep:" <> ppr actual_rep $$
-              text "expected rep:" <> ppr expected_rep $$
+              text "argument rep:" <> ppr actual_arg_reps $$
+              text "expected rep:" <> ppr fun_arg_tys_reps $$
               -- text "expected reps:" <> ppr arg_ty_reps $$
               text "unarised?:" <> ppr (lf_unarised lf))
         where
           isVoidRep [] = True
           isVoidRep [VoidRep] = True
           isVoidRep _ = False
-
-          -- n_arg_ty_reps = length arg_ty_reps
+          -- Try to strip one non-void arg rep from the current argument type returning
+          -- the remaining list of arguments. We return Nothing for invalid input which
+          -- will result in a lint failure in match_args.
+          getOneRep :: [PrimRep] -> [Maybe [PrimRep]] -> Maybe (PrimRep, [Maybe [PrimRep]])
+          getOneRep [] _rest = Nothing -- Void rep args are invalid at this point.
+          getOneRep [rep] rest = Just (rep,rest) -- A single arg rep arg
+          getOneRep (rep:reps) rest = Just (rep,Just reps:rest) -- Multi rep arg.
 
       match_args _ _ = return () -- Functions are allowed to be over/under applied.
 
