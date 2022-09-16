@@ -130,7 +130,7 @@ runPhase (T_CmmCpp pipe_env hsc_env input_fn) = do
         input_fn output_fn
   return output_fn
 runPhase (T_Js pipe_env hsc_env mb_location js_src) = do
-  out_path <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
+  _out_path <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
   runJsPhase pipe_env hsc_env mb_location js_src
 runPhase (T_Cmm pipe_env hsc_env input_fn) = do
   let dflags = hsc_dflags hsc_env
@@ -348,12 +348,11 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
 
 
 runJsPhase :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO FilePath
-runJsPhase pipe_env hsc_env location input_fn = do
+runJsPhase pipe_env hsc_env _location input_fn = do
         let dflags     = hsc_dflags   hsc_env
         let logger     = hsc_logger   hsc_env
         let tmpfs      = hsc_tmpfs    hsc_env
         let unit_env   = hsc_unit_env hsc_env
-        let platform   = ue_platform unit_env
         -- the header lets the linker recognize processed JavaScript files
         let header     = "//JavaScript\n"
 
@@ -382,7 +381,7 @@ runJsPhase pipe_env hsc_env location input_fn = do
         return output_fn
 
 jsFileNeedsCpp :: HscEnv -> FilePath -> IO Bool
-jsFileNeedsCpp hsc_env fn = do
+jsFileNeedsCpp _hsc_env fn = do
   opts <- JSHeader.getOptionsFromJsFile fn
   pure (JSHeader.CPP `elem` opts)
 
