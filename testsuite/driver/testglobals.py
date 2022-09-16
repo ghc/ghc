@@ -86,6 +86,8 @@ class TestConfig:
         # What is the wordsize (in bits) of this platform?
         self.wordsize = ''
 
+        # Is tables next to code enabled?
+        self.tables_next_to_code = True
         # Verbosity level
         self.verbose = 2
 

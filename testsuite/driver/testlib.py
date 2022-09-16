@@ -569,6 +569,9 @@ def ghc_dynamic() -> bool:
 def leading_underscore() -> bool:
     return config.leading_underscore
 
+# TNTC enabled
+def tables_next_to_code() -> bool:
+    return config.tables_next_to_code
 
 def fast() -> bool:
     return config.speed == 2
