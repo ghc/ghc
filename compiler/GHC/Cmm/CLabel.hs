@@ -1481,28 +1481,28 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
       -> maybe_underscore $ ftext str <> text "_fast"
 
    RtsLabel (RtsSelectorInfoTable upd_reqd offset)
-      -> maybe_underscore $ hcat [ text "stg_sel_", text (show offset)
+      -> maybe_underscore $ hcat [ text "stg_sel_", int offset
                                  , if upd_reqd
                                     then text "_upd_info"
                                     else text "_noupd_info"
                                  ]
 
    RtsLabel (RtsSelectorEntry upd_reqd offset)
-      -> maybe_underscore $ hcat [ text "stg_sel_", text (show offset)
+      -> maybe_underscore $ hcat [ text "stg_sel_", int offset
                                  , if upd_reqd
                                     then text "_upd_entry"
                                     else text "_noupd_entry"
                                  ]
 
    RtsLabel (RtsApInfoTable upd_reqd arity)
-      -> maybe_underscore $ hcat [ text "stg_ap_", text (show arity)
+      -> maybe_underscore $ hcat [ text "stg_ap_", int arity
                                  , if upd_reqd
                                     then text "_upd_info"
                                     else text "_noupd_info"
                                  ]
 
    RtsLabel (RtsApEntry upd_reqd arity)
-      -> maybe_underscore $ hcat [ text "stg_ap_", text (show arity)
+      -> maybe_underscore $ hcat [ text "stg_ap_", int arity
                                  , if upd_reqd
                                     then text "_upd_entry"
                                     else text "_noupd_entry"

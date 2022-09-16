@@ -124,7 +124,7 @@ instance Outputable (HsModule GhcPs) where
               Nothing -> pp_header (text "where")
               Just es -> vcat [
                            pp_header lparen,
-                           nest 8 (fsep (punctuate comma (map ppr (unLoc es)))),
+                           nest 8 (pprWithCommas ppr (unLoc es)),
                            nest 4 (text ") where")
                           ],
             pp_nonnull imports,

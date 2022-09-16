@@ -366,7 +366,7 @@ pprAvail :: AvailInfo -> SDoc
 pprAvail (Avail n)
   = ppr n
 pprAvail (AvailTC n ns)
-  = ppr n <> braces (fsep (punctuate comma (map ppr ns)))
+  = ppr n <> braces (pprWithCommas ppr ns)
 
 instance Binary AvailInfo where
     put_ bh (Avail aa) = do

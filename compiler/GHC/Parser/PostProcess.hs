@@ -1691,7 +1691,7 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsWildCardPV l = cmdFail l (text "_")
   mkHsTySigPV l a sig _ = cmdFail (locA l) (ppr a <+> text "::" <+> ppr sig)
   mkHsExplicitListPV l xs _ = cmdFail l $
-    brackets (fsep (punctuate comma (map ppr xs)))
+    brackets (pprWithCommas ppr xs)
   mkHsSplicePV (L l sp) = cmdFail l (pprUntypedSplice True Nothing sp)
   mkHsRecordPV _ l _ a (fbinds, ddLoc) _ = do
     let (fs, ps) = partitionEithers fbinds

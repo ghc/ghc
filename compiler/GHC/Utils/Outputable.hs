@@ -944,16 +944,16 @@ instance Outputable UTCTime where
     ppr = text . formatShow iso8601Format
 
 instance (Outputable a) => Outputable [a] where
-    ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
+    ppr xs = brackets (pprWithCommas ppr xs)
 
 instance (Outputable a) => Outputable (NonEmpty a) where
     ppr = ppr . NEL.toList
 
 instance (Outputable a) => Outputable (Set a) where
-    ppr s = braces (fsep (punctuate comma (map ppr (Set.toList s))))
+    ppr s = braces (pprWithCommas ppr (Set.toList s))
 
 instance Outputable IntSet.IntSet where
-    ppr s = braces (fsep (punctuate comma (map ppr (IntSet.toList s))))
+    ppr s = braces (pprWithCommas ppr (IntSet.toList s))
 
 instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])

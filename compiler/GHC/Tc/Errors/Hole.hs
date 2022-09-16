@@ -489,8 +489,7 @@ addHoleFitDocs fits =
      { let warning =
              text "WARNING: Couldn't find any documentation for the following modules:" $+$
              nest 2
-                  (fsep (punctuate comma
-                                   (either text ppr <$> Set.toList mods)) $+$
+                  (pprWithCommas (either text ppr) (Set.toList mods) $+$
                    text "Make sure the modules are compiled with '-haddock'.")
      ; warnPprTrace (not $ Set.null mods)"addHoleFitDocs" warning (pure ())
      }
