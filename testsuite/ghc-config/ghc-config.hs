@@ -30,6 +30,7 @@ main = do
   getGhcFieldOrDefault fields "GhcDynamic" "GHC Dynamic" "NO"
   getGhcFieldOrDefault fields "GhcProfiled" "GHC Profiled" "NO"
   getGhcFieldOrDefault fields "LeadingUnderscore" "Leading underscore" "NO"
+  getGhcFieldOrDefault fields "GhcTablesNextToCode" "Tables next to code" "NO"
   getGhcFieldProgWithDefault fields "AR" "ar command" "ar"
   getGhcFieldProgWithDefault fields "CLANG" "LLVM clang command" "clang"
   getGhcFieldProgWithDefault fields "LLC" "LLVM llc command" "llc"
