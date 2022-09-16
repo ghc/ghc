@@ -507,6 +507,24 @@ function h$popCnt64(x1,x2) {
           h$popCntTab[(x2>>>24)&0xFF];
 }
 
+function h$reverseWord(w) {
+  /* Reverse the bits in a 32-bit word this trick comes from
+   * https://graphics.stanford.edu/~seander/bithacks.html#ReverseParallel This
+   * method should use a bit more memory than other methods, but we choose it
+   * because it does not rely on any 64bit multiplication or look up tables.
+   * Note that this could be expressed in the Haskell EDSL, but we choose to not
+   * do that for improved sharing in the JIT. Should be O(lg n)
+   */
+  var r = w;
+  r = ((r >>> 1) & 0x55555555)   | ((r & 0x55555555) << 1);  // swap odd and even bits
+  r = ((r >>> 2) & 0x33333333)   | ((r & 0x33333333) << 2);  // swap consecutive pairs
+  r = ((r >>> 4) & 0x0F0F0F0F)   | ((r & 0x0F0F0F0F) << 4);  // swap nibbles
+  r = ((r >>> 8) & 0x00FF00FF)   | ((r & 0x00FF00FF) << 8);  // swap bytes
+  r = ( r >>> 16             )   | ( r               << 16); // swap 2-byte long pairs
+  r = r >>> 0;                                              // ensure w is unsigned
+  return r;
+}
+
 function h$bswap64(x1,x2) {
   RETURN_UBX_TUP2(UN((x2 >>> 24) | (x2 << 24) | ((x2 & 0xFF00) << 8) | ((x2 & 0xFF0000) >> 8))
                  ,UN((x1 >>> 24) | (x1 << 24) | ((x1 & 0xFF00) << 8) | ((x1 & 0xFF0000) >> 8)));

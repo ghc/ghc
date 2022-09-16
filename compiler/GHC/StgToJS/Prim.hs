@@ -436,23 +436,31 @@ genPrim prof ty op = case op of
   BSwap64Op   -> \[r1,r2] [x,y] -> PrimInline $ appT [r1,r2] "h$bswap64" [x,y]
   BSwapOp     -> \[r] [x]       -> genPrim prof ty BSwap32Op [r] [x]
 
+  BRevOp      -> \[r] [w] -> genPrim prof ty BRev32Op [r] [w]
+  BRev8Op     -> \[r] [w] -> PrimInline $ r |= (app "h$reverseWord" [w] .>>>. 24)
+  BRev16Op    -> \[r] [w] -> PrimInline $ r |= (app "h$reverseWord" [w] .>>>. 16)
+  BRev32Op    -> \[r] [w] -> PrimInline $ r |= app "h$reverseWord" [w]
+  BRev64Op    -> \[rh,rl] [h,l] -> PrimInline $ mconcat [ rl |= app "h$reverseWord" [h]
+                                                        , rh |= app "h$reverseWord" [l]
+                                                        ]
+
 ------------------------------ Narrow -------------------------------------------
 
-  Narrow8IntOp    -> \[r] [x] -> PrimInline $ r |= (BAnd x (Int 0x7F)) `Sub` (BAnd x (Int 0x80))
+  Narrow8IntOp    -> \[r] [x] -> PrimInline $ r |= (BAnd x (Int 0x7F  )) `Sub` (BAnd x (Int 0x80))
   Narrow16IntOp   -> \[r] [x] -> PrimInline $ r |= (BAnd x (Int 0x7FFF)) `Sub` (BAnd x (Int 0x8000))
-  Narrow32IntOp   -> \[r] [x] -> PrimInline $ r |= i32 x
-  Narrow8WordOp   -> \[r] [x] -> PrimInline $ r |= mask8 x
+  Narrow32IntOp   -> \[r] [x] -> PrimInline $ r |= i32    x
+  Narrow8WordOp   -> \[r] [x] -> PrimInline $ r |= mask8  x
   Narrow16WordOp  -> \[r] [x] -> PrimInline $ r |= mask16 x
-  Narrow32WordOp  -> \[r] [x] -> PrimInline $ r |= u32 x
+  Narrow32WordOp  -> \[r] [x] -> PrimInline $ r |= u32    x
 
 ------------------------------ Double -------------------------------------------
 
-  DoubleGtOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>. y)
-  DoubleGeOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>=. y)
+  DoubleGtOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>.   y)
+  DoubleGeOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>=.  y)
   DoubleEqOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
   DoubleNeOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
-  DoubleLtOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<. y)
-  DoubleLeOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<=. y)
+  DoubleLtOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<.   y)
+  DoubleLeOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<=.  y)
   DoubleAddOp       -> \[r] [x,y] -> PrimInline $ r |= Add x y
   DoubleSubOp       -> \[r] [x,y] -> PrimInline $ r |= Sub x y
   DoubleMulOp       -> \[r] [x,y] -> PrimInline $ r |= Mul x y
@@ -461,12 +469,12 @@ genPrim prof ty op = case op of
   DoubleFabsOp      -> \[r] [x]   -> PrimInline $ r |= math_abs [x]
   DoubleToIntOp     -> \[r] [x]   -> PrimInline $ r |= i32 x
   DoubleToFloatOp   -> \[r] [x]   -> PrimInline $ r |= app "h$fround" [x]
-  DoubleExpOp       -> \[r] [x]   -> PrimInline $ r |= math_exp [x]
-  DoubleLogOp       -> \[r] [x]   -> PrimInline $ r |= math_log [x]
+  DoubleExpOp       -> \[r] [x]   -> PrimInline $ r |= math_exp  [x]
+  DoubleLogOp       -> \[r] [x]   -> PrimInline $ r |= math_log  [x]
   DoubleSqrtOp      -> \[r] [x]   -> PrimInline $ r |= math_sqrt [x]
-  DoubleSinOp       -> \[r] [x]   -> PrimInline $ r |= math_sin [x]
-  DoubleCosOp       -> \[r] [x]   -> PrimInline $ r |= math_cos [x]
-  DoubleTanOp       -> \[r] [x]   -> PrimInline $ r |= math_tan [x]
+  DoubleSinOp       -> \[r] [x]   -> PrimInline $ r |= math_sin  [x]
+  DoubleCosOp       -> \[r] [x]   -> PrimInline $ r |= math_cos  [x]
+  DoubleTanOp       -> \[r] [x]   -> PrimInline $ r |= math_tan  [x]
   DoubleAsinOp      -> \[r] [x]   -> PrimInline $ r |= math_asin [x]
   DoubleAcosOp      -> \[r] [x]   -> PrimInline $ r |= math_acos [x]
   DoubleAtanOp      -> \[r] [x]   -> PrimInline $ r |= math_atan [x]
@@ -482,12 +490,12 @@ genPrim prof ty op = case op of
 
 ------------------------------ Float --------------------------------------------
 
-  FloatGtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>. y)
-  FloatGeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>=. y)
+  FloatGtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>.   y)
+  FloatGeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>=.  y)
   FloatEqOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .===. y)
   FloatNeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
-  FloatLtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<. y)
-  FloatLeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<=. y)
+  FloatLtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<.   y)
+  FloatLeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<=.  y)
   FloatAddOp        -> \[r] [x,y] -> PrimInline $ r |= Add x y
   FloatSubOp        -> \[r] [x,y] -> PrimInline $ r |= Sub x y
   FloatMulOp        -> \[r] [x,y] -> PrimInline $ r |= Mul x y
@@ -1020,12 +1028,6 @@ genPrim prof ty op = case op of
   TraceMarkerOp      -> \[] [ed,eo]     -> PrimInline $ appS "h$traceMarker" [ed,eo]
 
 ------------------------------ Unhandled primops -------------------
-
-  BRevOp                            -> unhandledPrimop op
-  BRev8Op                           -> unhandledPrimop op
-  BRev16Op                          -> unhandledPrimop op
-  BRev32Op                          -> unhandledPrimop op
-  BRev64Op                          -> unhandledPrimop op
 
   DoubleExpM1Op                     -> unhandledPrimop op
   DoubleLog1POp                     -> unhandledPrimop op
