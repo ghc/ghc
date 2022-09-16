@@ -1093,60 +1093,61 @@ reservedSymsFM = listToUFM $
 -- -----------------------------------------------------------------------------
 -- Lexer actions
 
-type Action = PsSpan -> StringBuffer -> Int -> P (PsLocated Token)
+type Action = PsSpan -> StringBuffer -> Int -> StringBuffer -> P (PsLocated Token)
 
 special :: Token -> Action
-special tok span _buf _len = return (L span tok)
+special tok span _buf _len _buf2 = return (L span tok)
 
 token, layout_token :: Token -> Action
-token t span _buf _len = return (L span t)
-layout_token t span _buf _len = pushLexState layout >> return (L span t)
+token t span _buf _len _buf2 = return (L span t)
+layout_token t span _buf _len _buf2 = pushLexState layout >> return (L span t)
 
 idtoken :: (StringBuffer -> Int -> Token) -> Action
-idtoken f span buf len = return (L span $! (f buf len))
+idtoken f span buf len _buf2 = return (L span $! (f buf len))
 
 qdo_token :: (Maybe FastString -> Token) -> Action
-qdo_token con span buf len = do
+qdo_token con span buf len _buf2 = do
     maybe_layout token
     return (L span $! token)
   where
     !token = con $! Just $! fst $! splitQualName buf len False
 
 skip_one_varid :: (FastString -> Token) -> Action
-skip_one_varid f span buf len
+skip_one_varid f span buf len _buf2
   = return (L span $! f (lexemeToFastString (stepOn buf) (len-1)))
 
 skip_two_varid :: (FastString -> Token) -> Action
-skip_two_varid f span buf len
+skip_two_varid f span buf len _buf2
   = return (L span $! f (lexemeToFastString (stepOn (stepOn buf)) (len-2)))
 
 strtoken :: (String -> Token) -> Action
-strtoken f span buf len =
+strtoken f span buf len _buf2 =
   return (L span $! (f $! lexemeToString buf len))
 
 begin :: Int -> Action
-begin code _span _str _len = do pushLexState code; lexToken
+begin code _span _str _len _buf2 = do pushLexState code; lexToken
 
 pop :: Action
-pop _span _buf _len = do _ <- popLexState
-                         lexToken
+pop _span _buf _len _buf2 =
+  do _ <- popLexState
+     lexToken
 -- See Note [Nested comment line pragmas]
 failLinePrag1 :: Action
-failLinePrag1 span _buf _len = do
+failLinePrag1 span _buf _len _buf2 = do
   b <- getBit InNestedCommentBit
   if b then return (L span ITcomment_line_prag)
        else lexError LexErrorInPragma
 
 -- See Note [Nested comment line pragmas]
 popLinePrag1 :: Action
-popLinePrag1 span _buf _len = do
+popLinePrag1 span _buf _len _buf2 = do
   b <- getBit InNestedCommentBit
   if b then return (L span ITcomment_line_prag) else do
     _ <- popLexState
     lexToken
 
 hopefully_open_brace :: Action
-hopefully_open_brace span buf len
+hopefully_open_brace span buf len buf2
  = do relaxed <- getBit RelaxedLayoutBit
       ctx <- getContext
       (AI l _) <- getInput
@@ -1155,13 +1156,14 @@ hopefully_open_brace span buf len
                  case ctx of
                  Layout prev_off _ : _ -> prev_off < offset
                  _                     -> True
-      if isOK then pop_and open_brace span buf len
+      if isOK then pop_and open_brace span buf len buf2
               else addFatalError $
                      mkPlainErrorMsgEnvelope (mkSrcSpanPs span) PsErrMissingBlock
 
 pop_and :: Action -> Action
-pop_and act span buf len = do _ <- popLexState
-                              act span buf len
+pop_and act span buf len buf2 =
+  do _ <- popLexState
+     act span buf len buf2
 
 -- See Note [Whitespace-sensitive operator parsing]
 followedByOpeningToken :: AlexAccPred ExtsBitmap
@@ -1289,7 +1291,7 @@ alexOrPred p1 p2 userState in1 len in2
   = p1 userState in1 len in2 || p2 userState in1 len in2
 
 multiline_doc_comment :: Action
-multiline_doc_comment span buf _len = {-# SCC "multiline_doc_comment" #-} withLexedDocType worker
+multiline_doc_comment span buf _len _buf2 = {-# SCC "multiline_doc_comment" #-} withLexedDocType worker
   where
     worker input@(AI start_loc _) docType checkNextLine = go start_loc "" [] input
       where
@@ -1335,11 +1337,11 @@ multiline_doc_comment span buf _len = {-# SCC "multiline_doc_comment" #-} withLe
           Nothing -> input
 
 lineCommentToken :: Action
-lineCommentToken span buf len = do
+lineCommentToken span buf len buf2 = do
   b <- getBit RawTokenStreamBit
   if b then do
          lt <- getLastLocComment
-         strtoken (\s -> ITlineComment s lt) span buf len
+         strtoken (\s -> ITlineComment s lt) span buf len buf2
        else lexToken
 
 
@@ -1348,7 +1350,7 @@ lineCommentToken span buf len = do
   using regular expressions.
 -}
 nested_comment :: Action
-nested_comment span buf len = {-# SCC "nested_comment" #-} do
+nested_comment span buf len _buf2 = {-# SCC "nested_comment" #-} do
   l <- getLastLocComment
   let endComment input (L _ comment) = commentEnd lexToken input (Nothing, ITblockComment comment l) buf span
   input <- getInput
@@ -1357,7 +1359,7 @@ nested_comment span buf len = {-# SCC "nested_comment" #-} do
   nested_comment_logic endComment start_decorator input span
 
 nested_doc_comment :: Action
-nested_doc_comment span buf _len = {-# SCC "nested_doc_comment" #-} withLexedDocType worker
+nested_doc_comment span buf _len _buf2 = {-# SCC "nested_doc_comment" #-} withLexedDocType worker
   where
     worker input docType _checkNextLine = nested_comment_logic endComment "" input span
       where
@@ -1496,7 +1498,7 @@ mkHdkCommentSection loc n mkDS = (HdkCommentSection n ds, ITdocComment ds loc)
 -- RULES pragmas turn on the forall and '.' keywords, and we turn them
 -- off again at the end of the pragma.
 rulePrag :: Action
-rulePrag span buf len = do
+rulePrag span buf len _buf2 = do
   setExts (.|. xbit InRulePragBit)
   let !src = lexemeToString buf len
   return (L span (ITrules_prag (SourceText src)))
@@ -1504,26 +1506,26 @@ rulePrag span buf len = do
 -- When 'UsePosPragsBit' is not set, it is expected that we emit a token instead
 -- of updating the position in 'PState'
 linePrag :: Action
-linePrag span buf len = do
+linePrag span buf len buf2 = do
   usePosPrags <- getBit UsePosPragsBit
   if usePosPrags
-    then begin line_prag2 span buf len
+    then begin line_prag2 span buf len buf2
     else let !src = lexemeToString buf len
          in return (L span (ITline_prag (SourceText src)))
 
 -- When 'UsePosPragsBit' is not set, it is expected that we emit a token instead
 -- of updating the position in 'PState'
 columnPrag :: Action
-columnPrag span buf len = do
+columnPrag span buf len buf2 = do
   usePosPrags <- getBit UsePosPragsBit
   let !src = lexemeToString buf len
   if usePosPrags
-    then begin column_prag span buf len
+    then begin column_prag span buf len buf2
     else let !src = lexemeToString buf len
          in return (L span (ITcolumn_prag (SourceText src)))
 
 endPrag :: Action
-endPrag span _buf _len = do
+endPrag span _buf _len _buf2 = do
   setExts (.&. complement (xbit InRulePragBit))
   return (L span ITclose_prag)
 
@@ -1567,11 +1569,11 @@ errBrace (AI end _) span =
               (\srcLoc -> mkPlainErrorMsgEnvelope srcLoc (PsErrLexer LexUnterminatedComment LexErrKind_EOF))
 
 open_brace, close_brace :: Action
-open_brace span _str _len = do
+open_brace span _str _len _buf2 = do
   ctx <- getContext
   setContext (NoLayout:ctx)
   return (L span ITocurly)
-close_brace span _str _len = do
+close_brace span _str _len _buf2 = do
   popContext
   return (L span ITccurly)
 
@@ -1614,7 +1616,7 @@ splitQualName orig_buf len parens = split orig_buf orig_buf
         qual_size = orig_buf `byteDiff` dot_buf
 
 varid :: Action
-varid span buf len =
+varid span buf len _buf2 =
   case lookupUFM reservedWordsFM fs of
     Just (ITcase, _) -> do
       lastTk <- getLastTk
@@ -1729,7 +1731,7 @@ consym :: Action
 consym = sym (\_span _exts s -> return $ ITconsym s)
 
 sym :: (PsSpan -> ExtsBitmap -> FastString -> P Token) -> Action
-sym con span buf len =
+sym con span buf len _buf2 =
   case lookupUFM reservedSymsFM fs of
     Just (keyword, NormalSyntax, 0) ->
       return $ L span keyword
@@ -1760,7 +1762,7 @@ tok_integral :: (SourceText -> Integer -> Token)
              -> Int -> Int
              -> (Integer, (Char -> Int))
              -> Action
-tok_integral itint transint transbuf translen (radix,char_to_int) span buf len = do
+tok_integral itint transint transbuf translen (radix,char_to_int) span buf len _buf2 = do
   numericUnderscores <- getBit NumericUnderscoresBit  -- #14473
   let src = lexemeToString buf len
   when ((not numericUnderscores) && ('_' `elem` src)) $ do
@@ -1802,7 +1804,7 @@ hexadecimal = (16,hexDigit)
 
 -- readSignificandExponentPair can understand negative rationals, exponents, everything.
 tok_frac :: Int -> (String -> Token) -> Action
-tok_frac drop f span buf len = do
+tok_frac drop f span buf len _buf2 = do
   numericUnderscores <- getBit NumericUnderscoresBit  -- #14473
   let src = lexemeToString buf (len-drop)
   when ((not numericUnderscores) && ('_' `elem` src)) $ do
@@ -1837,7 +1839,7 @@ readFractionalLitX readStr b str =
 
 -- we're at the first token on a line, insert layout tokens if necessary
 do_bol :: Action
-do_bol span _str _len = do
+do_bol span _str _len _buf2 = do
         -- See Note [Nested comment line pragmas]
         b <- getBit InNestedCommentBit
         if b then return (L span ITcomment_line_prag) else do
@@ -1888,7 +1890,7 @@ maybe_layout t = do -- If the alternative layout rule is enabled then
 -- by a 'do', then we allow the new context to be at the same indentation as
 -- the previous context.  This is what the 'strict' argument is for.
 new_layout_context :: Bool -> Bool -> Token -> Action
-new_layout_context strict gen_semic tok span _buf len = do
+new_layout_context strict gen_semic tok span _buf len _buf2 = do
     _ <- popLexState
     (AI l _) <- getInput
     let offset = srcLocCol (psRealLoc l) - len
@@ -1907,7 +1909,7 @@ new_layout_context strict gen_semic tok span _buf len = do
                 return (L span tok)
 
 do_layout_left :: Action
-do_layout_left span _buf _len = do
+do_layout_left span _buf _len _buf2 = do
     _ <- popLexState
     pushLexState bol  -- we must be at the start of a line
     return (L span ITvccurly)
@@ -1916,7 +1918,7 @@ do_layout_left span _buf _len = do
 -- LINE pragmas
 
 setLineAndFile :: Int -> Action
-setLineAndFile code (PsSpan span _) buf len = do
+setLineAndFile code (PsSpan span _) buf len _buf2 = do
   let src = lexemeToString buf (len - 1)  -- drop trailing quotation mark
       linenumLen = length $ head $ words src
       linenum = parseUnsignedInteger buf linenumLen 10 octDecDigit
@@ -1943,7 +1945,7 @@ setLineAndFile code (PsSpan span _) buf len = do
   lexToken
 
 setColumn :: Action
-setColumn (PsSpan span _) buf len = do
+setColumn (PsSpan span _) buf len _buf2 = do
   let column =
         case reads (lexemeToString buf len) of
           [(column, _)] -> column
@@ -1969,7 +1971,7 @@ lex_string_prag mkTok = lex_string_prag_comment mkTok'
     mkTok' s _ = mkTok s
 
 lex_string_prag_comment :: (String -> PsSpan -> Token) -> Action
-lex_string_prag_comment mkTok span _buf _len
+lex_string_prag_comment mkTok span _buf _len _buf2
     = do input <- getInput
          start <- getParsedLoc
          l <- getLastLocComment
@@ -1998,7 +2000,7 @@ lex_string_prag_comment mkTok span _buf _len
 -- This stuff is horrible.  I hates it.
 
 lex_string_tok :: Action
-lex_string_tok span buf _len = do
+lex_string_tok span buf _len _buf2 = do
   tok <- lex_string ""
   (AI end bufEnd) <- getInput
   let
@@ -2068,7 +2070,7 @@ lex_char_tok :: Action
 -- (the parser does that).
 -- So we have to do two characters of lookahead: when we see 'x we need to
 -- see if there's a trailing quote
-lex_char_tok span buf _len = do        -- We've seen '
+lex_char_tok span buf _len _buf2 = do        -- We've seen '
    i1 <- getInput       -- Look ahead to first character
    let loc = psSpanStart span
    case alexGetChar' i1 of
@@ -2246,7 +2248,7 @@ getCharOrFail i =  do
 -- QuasiQuote
 
 lex_qquasiquote_tok :: Action
-lex_qquasiquote_tok span buf len = do
+lex_qquasiquote_tok span buf len _buf2 = do
   let (qual, quoter) = splitQualName (stepOn buf) (len - 2) False
   quoteStart <- getParsedLoc
   quote <- lex_quasiquote (psRealLoc quoteStart) ""
@@ -2258,7 +2260,7 @@ lex_qquasiquote_tok span buf len = do
                            mkPsSpan quoteStart end)))
 
 lex_quasiquote_tok :: Action
-lex_quasiquote_tok span buf len = do
+lex_quasiquote_tok span buf len _buf2 = do
   let quoter = tail (lexemeToString buf (len - 1))
                 -- 'tail' drops the initial '[',
                 -- while the -1 drops the trailing '|'
@@ -2297,14 +2299,14 @@ quasiquote_error start = do
 -- Warnings
 
 warnTab :: Action
-warnTab srcspan _buf _len = do
+warnTab srcspan _buf _len _buf2 = do
     addTabWarning (psRealSpan srcspan)
     lexToken
 
 warnThen :: PsMessage -> Action -> Action
-warnThen warning action srcspan buf len = do
+warnThen warning action srcspan buf len buf2 = do
     addPsMessage (RealSrcSpan (psRealSpan srcspan) Strict.Nothing) warning
-    action srcspan buf len
+    action srcspan buf len buf2
 
 -- -----------------------------------------------------------------------------
 -- The Parse Monad
@@ -3401,7 +3403,7 @@ lexToken = do
         let span = mkPsSpan loc1 end
         let bytes = byteDiff buf buf2
         span `seq` setLastToken span bytes
-        lt <- t span buf bytes
+        lt <- t span buf bytes buf2
         let lt' = unLoc lt
         if (isComment lt') then setLastComment lt else setLastTk lt
         return lt
@@ -3490,9 +3492,10 @@ twoWordPrags = Map.fromList [
      ]
 
 dispatch_pragmas :: Map String Action -> Action
-dispatch_pragmas prags span buf len = case Map.lookup (clean_pragma (lexemeToString buf len)) prags of
-                                       Just found -> found span buf len
-                                       Nothing -> lexError LexUnknownPragma
+dispatch_pragmas prags span buf len buf2 =
+  case Map.lookup (clean_pragma (lexemeToString buf len)) prags of
+    Just found -> found span buf len buf2
+    Nothing -> lexError LexUnknownPragma
 
 known_pragma :: Map String Action -> AlexAccPred ExtsBitmap
 known_pragma prags _ (AI _ startbuf) _ (AI _ curbuf)
@@ -3514,13 +3517,13 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
                           canon_ws s = unwords (map canonical (words s))
 
 warn_unknown_prag :: Map String Action -> Action
-warn_unknown_prag prags span buf len = do
+warn_unknown_prag prags span buf len buf2 = do
   let uppercase    = map toUpper
       unknown_prag = uppercase (clean_pragma (lexemeToString buf len))
       suggestions  = map uppercase (Map.keys prags)
   addPsMessage (RealSrcSpan (psRealSpan span) Strict.Nothing) $
     PsWarnUnrecognisedPragma unknown_prag suggestions
-  nested_comment span buf len
+  nested_comment span buf len buf2
 
 {-
 %************************************************************************
