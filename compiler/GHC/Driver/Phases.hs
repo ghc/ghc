@@ -265,7 +265,7 @@ dynlib_suffixes platform = case platformOS platform of
   _         -> ["so"]
 
 isHaskellishSuffix, isBackpackishSuffix, isHaskellSrcSuffix, isCishSuffix,
-    isHaskellUserSrcSuffix, isHaskellSigSuffix
+    isHaskellUserSrcSuffix, isJsSuffix, isHaskellSigSuffix
  :: String -> Bool
 isHaskellishSuffix     s = s `elem` haskellish_suffixes
 isBackpackishSuffix    s = s `elem` backpackish_suffixes
