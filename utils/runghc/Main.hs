@@ -6,9 +6,9 @@
 --
 -- runghc program, for invoking from a #! line in a script.  For example:
 --
---   script.lhs:
+--   script.hs:
 --      #!/usr/bin/env runghc
---      > main = putStrLn "hello!"
+--      main = putStrLn "hello!"
 --
 -- runghc accepts one flag:
 --
