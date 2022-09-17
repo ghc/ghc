@@ -488,14 +488,14 @@ renameFamilyInfo (ClosedTypeFamily eqns)
        ; return $ ClosedTypeFamily eqns' }
 
 renameDataDefn :: HsDataDefn GhcRn -> RnM (HsDataDefn DocNameI)
-renameDataDefn (HsDataDefn { dd_ND = nd, dd_ctxt = lcontext, dd_cType = cType
+renameDataDefn (HsDataDefn { dd_ctxt = lcontext, dd_cType = cType
                            , dd_kindSig = k, dd_cons = cons }) = do
     lcontext' <- traverse renameLContext lcontext
     k'        <- renameMaybeLKind k
     cons'     <- mapM (mapMA renameCon) cons
     -- I don't think we need the derivings, so we return Nothing
     return (HsDataDefn { dd_ext = noExtField
-                       , dd_ND = nd, dd_ctxt = lcontext', dd_cType = cType
+                       , dd_ctxt = lcontext', dd_cType = cType
                        , dd_kindSig = k', dd_cons = cons'
                        , dd_derivs = [] })
 

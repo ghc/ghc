@@ -43,6 +43,7 @@ import Control.Applicative ((<|>))
 import Control.Monad.Reader (MonadReader (..), ReaderT, asks, runReaderT)
 import Control.Monad.Writer.Strict hiding (tell)
 import Data.Bitraversable (bitraverse)
+import Data.Foldable (toList)
 import Data.List (find, foldl')
 import qualified Data.IntMap as IM
 import Data.IntMap (IntMap)
@@ -1099,8 +1100,8 @@ extractDecl declMap name decl
                          , tcdDataDefn = HsDataDefn { dd_cons = dataCons } } -> do
         let ty_args = lHsQTyVarsToTypes (tyClDeclTyVars d)
         lsig <- if isDataConName name
-                  then extractPatternSyn name dataNm ty_args dataCons
-                  else extractRecSel name dataNm ty_args dataCons
+                  then extractPatternSyn name dataNm ty_args (toList dataCons)
+                  else extractRecSel name dataNm ty_args (toList dataCons)
         pure (SigD noExtField <$> lsig)
 
       TyClD _ FamDecl {}
@@ -1112,12 +1113,12 @@ extractDecl declMap name decl
                                     , feqn_pats  = tys
                                     , feqn_rhs   = defn }))) ->
         if isDataConName name
-        then fmap (SigD noExtField) <$> extractPatternSyn name n tys (dd_cons defn)
-        else fmap (SigD noExtField) <$> extractRecSel name n tys (dd_cons defn)
+        then fmap (SigD noExtField) <$> extractPatternSyn name n tys (toList $ dd_cons defn)
+        else fmap (SigD noExtField) <$> extractRecSel name n tys (toList $ dd_cons defn)
       InstD _ (ClsInstD _ ClsInstDecl { cid_datafam_insts = insts })
         | isDataConName name ->
             let matches = [ d' | L _ d'@(DataFamInstDecl (FamEqn { feqn_rhs = dd })) <- insts
-                               , name `elem` map unLoc (concatMap (getConNames . unLoc) (dd_cons dd))
+                               , name `elem` map unLoc (concatMap (toList . getConNames . unLoc) (dd_cons dd))
                                ]
             in case matches of
                 [d0] -> extractDecl declMap name (noLocA (InstD noExtField (DataFamInstD noExtField d0)))
@@ -1125,8 +1126,8 @@ extractDecl declMap name decl
         | otherwise ->
             let matches = [ d' | L _ d'@(DataFamInstDecl d )
                                    <- insts
-                                 -- , L _ ConDecl { con_details = RecCon rec } <- dd_cons (feqn_rhs d)
-                               , Just rec <- map (getRecConArgs_maybe . unLoc) (dd_cons (feqn_rhs d))
+                                 -- , L _ ConDecl { con_details = RecCon rec } <- toList $ dd_cons (feqn_rhs d)
+                               , Just rec <- toList $ getRecConArgs_maybe . unLoc <$> dd_cons (feqn_rhs d)
                                , ConDeclField { cd_fld_names = ns } <- map unLoc (unLoc rec)
                                , L _ n <- ns
                                , foExt n == name

@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -29,14 +30,16 @@ import Haddock.GhcUtils
 import Haddock.Types
 import Haddock.Doc (combineDocumentation)
 
+import           Data.Foldable         ( toList )
 import           Data.List             ( intersperse, sort )
+import           Data.List.NonEmpty    ( NonEmpty (..) )
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Text.XHtml hiding     ( name, title, p, quote )
 
 import GHC.Core.Type ( Specificity(..) )
 import GHC hiding (LexicalFixity(..), fromMaybeContext)
-import GHC.Exts
+import GHC.Exts hiding (toList)
 import GHC.Types.Name
 import GHC.Data.BooleanFormula
 import GHC.Types.Name.Reader ( rdrNameOcc )
@@ -699,8 +702,8 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead {..}) m
             , mdoc
             , [subFamInstDetails iid pdecl mname])
           where
-            nd = dd_ND (tcdDataDefn dd)
-            pref = case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" }
+            cons = dd_cons (tcdDataDefn dd)
+            pref = case cons of { NewTypeCon _ -> keyword "newtype"; DataTypeCons _ -> keyword "data" }
             pdata = pref <+> typ
             pdecl = pdata <+> ppShortDataDecl False True dd [] unicode qual
   where
@@ -757,18 +760,18 @@ ppShortDataDecl :: Bool -> Bool -> TyClDecl DocNameI
                 -> Unicode -> Qualification -> Html
 ppShortDataDecl summary dataInst dataDecl pats unicode qual
 
-  | [] <- cons
+  | [] <- toList cons
   , [] <- pats = dataHeader
 
-  | [lcon] <- cons, [] <- pats, isH98,
+  | [lcon] <- toList cons, [] <- pats, isH98,
     (cHead,cBody,cFoot) <- ppShortConstrParts summary dataInst (unLoc lcon) unicode qual
        = (dataHeader <+> equals <+> cHead) +++ cBody +++ cFoot
 
   | [] <- pats, isH98 = dataHeader
-      +++ shortSubDecls dataInst (zipWith doConstr ('=':repeat '|') cons ++ pats1)
+      +++ shortSubDecls dataInst (zipWith doConstr ('=':repeat '|') (toList cons) ++ pats1)
 
   | otherwise = (dataHeader <+> keyword "where")
-      +++ shortSubDecls dataInst (map doGADTConstr cons ++ pats1)
+      +++ shortSubDecls dataInst (map doGADTConstr (toList cons) ++ pats1)
 
   where
     dataHeader
@@ -778,7 +781,7 @@ ppShortDataDecl summary dataInst dataDecl pats unicode qual
     doGADTConstr con = ppShortConstr summary (unLoc con) unicode qual
 
     cons      = dd_cons (tcdDataDefn dataDecl)
-    isH98     = case unLoc (head cons) of
+    isH98     = flip any (unLoc <$> cons) $ \ case
                   ConDeclH98 {} -> True
                   ConDeclGADT{} -> False
 
@@ -811,7 +814,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl pats
     docname   = tcdNameI dataDecl
     curname   = Just $ getName docname
     cons      = dd_cons (tcdDataDefn dataDecl)
-    isH98     = case unLoc (head cons) of
+    isH98     = flip any (unLoc <$> cons) $ \ case
                   ConDeclH98 {} -> True
                   ConDeclGADT{} -> False
 
@@ -823,14 +826,14 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl pats
     whereBit
       | null cons
       , null pats = noHtml
-      | null cons = keyword "where"
-      | otherwise = if isH98 then noHtml else keyword "where"
+      | isH98 = noHtml
+      | otherwise = keyword "where"
 
     constrBit = subConstructors pkg qual
       [ ppSideBySideConstr subdocs subfixs unicode pkg qual c
-      | c <- cons
+      | c <- toList cons
       , let subfixs = filter (\(n,_) -> any (\cn -> cn == n)
-                                            (map unL (getConNamesI (unLoc c)))) fixities
+                                            (unL <$> getConNamesI (unLoc c))) fixities
       ]
 
     patternBit = subPatterns pkg qual
@@ -897,7 +900,7 @@ ppShortConstrParts summary dataInst con unicode qual
           )
 
   where
-    occ        = map (nameOccName . getName . unL) $ getConNamesI con
+    occ        = toList $ nameOccName . getName . unL <$> getConNamesI con
     ppOcc      = hsep (punctuate comma (map (ppBinder summary) occ))
     ppOccInfix = hsep (punctuate comma (map (ppBinderInfix summary) occ))
 
@@ -914,10 +917,10 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
    )
  where
     -- Find the name of a constructors in the decl (`getConName` always returns a non-empty list)
-    aConName = unL (head (getConNamesI con))
+    L _ aConName :| _ = getConNamesI con
 
     fixity   = ppFixities fixities qual
-    occ      = map (nameOccName . getName . unL) $ getConNamesI con
+    occ      = toList $ nameOccName . getName . unL <$> getConNamesI con
 
     ppOcc      = hsep (punctuate comma (map (ppBinder False) occ))
     ppOccInfix = hsep (punctuate comma (map (ppBinderInfix False) occ))
@@ -996,7 +999,7 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
 
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
     -- or also because we want Haddock to do the doc-parsing, not GHC.
-    mbDoc = lookup (unL $ head $ getConNamesI con) subdocs >>=
+    mbDoc = lookup aConName subdocs >>=
             combineDocumentation . fst
 
 
@@ -1081,14 +1084,14 @@ ppSideBySidePat fixities unicode qual lnames typ (doc, argDocs) =
 -- Currently doesn't handle 'data instance' decls or kind signatures
 ppDataHeader :: Bool -> TyClDecl DocNameI -> Unicode -> Qualification -> Html
 ppDataHeader summary (DataDecl { tcdDataDefn =
-                                    HsDataDefn { dd_ND = nd
+                                    HsDataDefn { dd_cons = cons
                                                , dd_ctxt = ctxt
                                                , dd_kindSig = ks }
                                , tcdLName = L _ name
                                , tcdTyVars = tvs })
              unicode qual
   = -- newtype or data
-    (case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" })
+    (case cons of { NewTypeCon _ -> keyword "newtype"; DataTypeCons _ -> keyword "data" })
     <+>
     -- context
     ppLContext ctxt unicode qual HideEmptyContexts <+>

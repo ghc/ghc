@@ -30,7 +30,6 @@ import GHC.Types.Name        ( nameOccName )
 import GHC.Types.Name.Reader ( rdrNameOcc )
 import GHC.Core.Type         ( Specificity(..) )
 import GHC.Data.FastString   ( unpackFS )
-import GHC.Utils.Panic       ( panic)
 
 import qualified Data.Map as Map
 import System.Directory
@@ -39,6 +38,8 @@ import Data.Char
 import Control.Monad
 import Data.Maybe
 import Data.List            ( sort )
+import Data.List.NonEmpty ( NonEmpty (..) )
+import Data.Foldable ( toList )
 import Prelude hiding ((<>))
 
 import Haddock.Doc (combineDocumentation)
@@ -694,8 +695,8 @@ ppInstDecl unicode (InstHead {..}) = case ihdInstType of
   ClassInst ctx _ _ _ -> keyword "instance" <+> ppContextNoLocs ctx unicode <+> typ
   TypeInst rhs -> keyword "type" <+> keyword "instance" <+> typ <+> tibody rhs
   DataInst dd ->
-    let nd = dd_ND (tcdDataDefn dd)
-        pref = case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" }
+    let cons = dd_cons (tcdDataDefn dd)
+        pref = case cons of { NewTypeCon _ -> keyword "newtype"; DataTypeCons _ -> keyword "data" }
     in pref <+> keyword "instance" <+> typ
   where
     typ = ppAppNameTypes ihdClsName ihdTypes unicode
@@ -727,7 +728,6 @@ ppDataDecl pats instances subdocs doc dataDecl unicode =
 
   where
     cons      = dd_cons (tcdDataDefn dataDecl)
-    resTy     = (unLoc . head) cons
 
     body = catMaybes [doc >>= documentationToLaTeX, constrBit,patternBit]
 
@@ -735,8 +735,8 @@ ppDataDecl pats instances subdocs doc dataDecl unicode =
       | null cons
       , null pats = (empty,[])
       | null cons = (text "where", repeat empty)
-      | otherwise = case resTy of
-        ConDeclGADT{} -> (text "where", repeat empty)
+      | otherwise = case toList cons of
+        L _ ConDeclGADT{} : _ -> (text "where", repeat empty)
         _             -> (empty, (decltt (text "=") : repeat (decltt (text "|"))))
 
     constrBit
@@ -744,7 +744,7 @@ ppDataDecl pats instances subdocs doc dataDecl unicode =
       | otherwise = Just $
           text "\\enspace" <+> emph (text "Constructors") <> text "\\par" $$
           text "\\haddockbeginconstrs" $$
-          vcat (zipWith (ppSideBySideConstr subdocs unicode) leaders cons) $$
+          vcat (zipWith (ppSideBySideConstr subdocs unicode) leaders (toList cons)) $$
           text "\\end{tabulary}\\par"
 
     patternBit
@@ -790,9 +790,9 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
   where
     -- Find the name of a constructors in the decl (`getConName` always returns
     -- a non-empty list)
-    aConName = unLoc (head (getConNamesI con))
+    L _ aConName :| _ = getConNamesI con
 
-    occ      = map (nameOccName . getName . unLoc) $ getConNamesI con
+    occ      = toList $ nameOccName . getName . unLoc <$> getConNamesI con
 
     ppOcc      = cat (punctuate comma (map ppBinder occ))
     ppOccInfix = cat (punctuate comma (map ppBinderInfix occ))
@@ -877,8 +877,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
     -- or also because we want Haddock to do the doc-parsing, not GHC.
     mbDoc = case getConNamesI con of
-              [] -> panic "empty con_names"
-              (cn:_) -> lookup (unLoc cn) subdocs >>=
+              cn:|_ -> lookup (unLoc cn) subdocs >>=
                         fmap _doc . combineDocumentation . fst
 
 
@@ -927,9 +926,9 @@ ppSideBySidePat lnames typ (doc, argDocs) unicode =
 -- Currently doesn't handle 'data instance' decls or kind signatures
 ppDataHeader :: TyClDecl DocNameI -> Bool -> LaTeX
 ppDataHeader (DataDecl { tcdLName = L _ name, tcdTyVars = tyvars
-                       , tcdDataDefn = HsDataDefn { dd_ND = nd, dd_ctxt = ctxt } }) unicode
+                       , tcdDataDefn = HsDataDefn { dd_cons = cons, dd_ctxt = ctxt } }) unicode
   = -- newtype or data
-    (case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" }) <+>
+    (case cons of { NewTypeCon _ -> keyword "newtype"; DataTypeCons _ -> keyword "data" }) <+>
     -- context
     ppLContext ctxt unicode <+>
     -- T a b c ..., or a :+: b

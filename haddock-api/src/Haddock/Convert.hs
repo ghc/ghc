@@ -59,6 +59,7 @@ import Haddock.Interface.Specialize
 import Haddock.GhcUtils                      ( orderedFVs, defaultRuntimeRepVars, mkEmptySigType )
 
 import Data.Maybe                            ( catMaybes, mapMaybe, maybeToList )
+import Data.Either                           ( partitionEithers )
 
 
 -- | Whether or not to default 'RuntimeRep' variables to 'LiftedRep'. Check
@@ -212,13 +213,12 @@ synifyTyCon prr _coax tc
            , tcdFixity = synifyFixity tc
 
            , tcdDataDefn = HsDataDefn { dd_ext = noExtField
-                                      , dd_ND = DataType  -- arbitrary lie, they are neither
+                                      , dd_cons = DataTypeCons []  -- No constructors; arbitrary lie, they are neither
                                                     -- algebraic data nor newtype:
                                       , dd_ctxt = Nothing
                                       , dd_cType = Nothing
                                       , dd_kindSig = synifyDataTyConReturnKind tc
                                                -- we have their kind accurately:
-                                      , dd_cons = []  -- No constructors
                                       , dd_derivs = [] }
            , tcdDExt = DataDeclRn False emptyNameSet }
   where
@@ -270,52 +270,52 @@ synifyTyCon _prr coax tc
                      , tcdTyVars = synifyTyVars (tyConVisibleTyVars tc)
                      , tcdFixity = synifyFixity tc
                      , tcdRhs = synifyType WithinType [] ty }
-  | otherwise =
+  | otherwise = do
   -- (closed) newtype and data
-  let
-  alg_nd = if isNewTyCon tc then NewType else DataType
-  alg_ctx = synifyCtx (tyConStupidTheta tc)
-  name = case coax of
-    Just a -> synifyNameN a -- Data families are named according to their
+  let alg_ctx = synifyCtx (tyConStupidTheta tc)
+      name = case coax of
+        Just a -> synifyNameN a -- Data families are named according to their
                            -- CoAxioms, not their TyCons
-    _ -> synifyNameN tc
-  tyvars = synifyTyVars (tyConVisibleTyVars tc)
-  kindSig = synifyDataTyConReturnKind tc
-  -- The data constructors.
-  --
-  -- Any data-constructors not exported from the module that *defines* the
-  -- type will not (cannot) be included.
-  --
-  -- Very simple constructors, Haskell98 with no existentials or anything,
-  -- probably look nicer in non-GADT syntax.  In source code, all constructors
-  -- must be declared with the same (GADT vs. not) syntax, and it probably
-  -- is less confusing to follow that principle for the documentation as well.
-  --
-  -- There is no sensible infix-representation for GADT-syntax constructor
-  -- declarations.  They cannot be made in source code, but we could end up
-  -- with some here in the case where some constructors use existentials.
-  -- That seems like an acceptable compromise (they'll just be documented
-  -- in prefix position), since, otherwise, the logic (at best) gets much more
-  -- complicated. (would use dataConIsInfix.)
-  use_gadt_syntax = isGadtSyntaxTyCon tc
-  consRaw = map (synifyDataCon use_gadt_syntax) (tyConDataCons tc)
-  cons = rights consRaw
-  -- "deriving" doesn't affect the signature, no need to specify any.
-  alg_deriv = []
-  defn = HsDataDefn { dd_ext     = noExtField
-                    , dd_ND      = alg_nd
+        _ -> synifyNameN tc
+      tyvars = synifyTyVars (tyConVisibleTyVars tc)
+      kindSig = synifyDataTyConReturnKind tc
+      -- The data constructors.
+      --
+      -- Any data-constructors not exported from the module that *defines* the
+      -- type will not (cannot) be included.
+      --
+      -- Very simple constructors, Haskell98 with no existentials or anything,
+      -- probably look nicer in non-GADT syntax.  In source code, all constructors
+      -- must be declared with the same (GADT vs. not) syntax, and it probably
+      -- is less confusing to follow that principle for the documentation as well.
+      --
+      -- There is no sensible infix-representation for GADT-syntax constructor
+      -- declarations.  They cannot be made in source code, but we could end up
+      -- with some here in the case where some constructors use existentials.
+      -- That seems like an acceptable compromise (they'll just be documented
+      -- in prefix position), since, otherwise, the logic (at best) gets much more
+      -- complicated. (would use dataConIsInfix.)
+      use_gadt_syntax = isGadtSyntaxTyCon tc
+  consRaw <- case partitionEithers $ synifyDataCon use_gadt_syntax <$> tyConDataCons tc of
+      ([], consRaw) -> Right consRaw
+      (errs, _) -> Left (unlines errs)
+  cons <- case (isNewTyCon tc, consRaw) of
+      (False, cons) -> Right (DataTypeCons cons)
+      (True, [con]) -> Right (NewTypeCon con)
+      (True, _) -> Left "Newtype hasn't 1 constructor"
+
+  let -- "deriving" doesn't affect the signature, no need to specify any.
+      alg_deriv = []
+      defn = HsDataDefn { dd_ext     = noExtField
                     , dd_ctxt    = Just alg_ctx
                     , dd_cType   = Nothing
                     , dd_kindSig = kindSig
                     , dd_cons    = cons
                     , dd_derivs  = alg_deriv }
- in case lefts consRaw of
-  [] -> return $
-        DataDecl { tcdLName = name, tcdTyVars = tyvars
+  pure  DataDecl { tcdLName = name, tcdTyVars = tyvars
                  , tcdFixity = synifyFixity name
                  , tcdDataDefn = defn
                  , tcdDExt = DataDeclRn False emptyNameSet }
-  dataConErrs -> Left $ unlines dataConErrs
 
 -- | In this module, every TyCon being considered has come from an interface
 -- file. This means that when considering a data type constructor such as:
@@ -412,7 +412,7 @@ synifyDataCon use_gadt_syntax dc =
          let hat = mk_gadt_arg_tys
          return $ noLocA $ ConDeclGADT
            { con_g_ext  = noAnn
-           , con_names  = [name]
+           , con_names  = pure name
            , con_dcolon = noHsUniTok
            , con_bndrs  = noLocA outer_bndrs
            , con_mb_cxt = ctx

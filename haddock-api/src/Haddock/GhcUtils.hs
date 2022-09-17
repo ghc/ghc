@@ -5,6 +5,8 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonadComprehensions #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -24,7 +26,10 @@ module Haddock.GhcUtils where
 
 
 import Control.Arrow
+import Control.Monad.Fail (MonadFail (..))
 import Data.Char ( isSpace )
+import Data.Foldable ( toList )
+import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe ( mapMaybe, fromMaybe )
 
 import Haddock.Types( DocName, DocNameI, XRecCond )
@@ -126,8 +131,8 @@ hsTyVarNameI (KindedTyVar _ _ (L _ n) _) = n
 hsLTyVarNameI :: LHsTyVarBndr flag DocNameI -> DocName
 hsLTyVarNameI = hsTyVarNameI . unLoc
 
-getConNamesI :: ConDecl DocNameI -> [LocatedN DocName]
-getConNamesI ConDeclH98  {con_name  = name}  = [name]
+getConNamesI :: ConDecl DocNameI -> NonEmpty (LocatedN DocName)
+getConNamesI ConDeclH98  {con_name  = name}  = pure name
 getConNamesI ConDeclGADT {con_names = names} = names
 
 hsSigTypeI :: LHsSigType DocNameI -> LHsType DocNameI
@@ -254,21 +259,19 @@ restrictTo names (L loc decl) = L loc $ case decl of
   _ -> decl
 
 restrictDataDefn :: [Name] -> HsDataDefn GhcRn -> HsDataDefn GhcRn
-restrictDataDefn names defn@(HsDataDefn { dd_ND = new_or_data, dd_cons = cons })
-  | DataType <- new_or_data
-  = defn { dd_cons = restrictCons names cons }
-  | otherwise    -- Newtype
-  = case restrictCons names cons of
-      []    -> defn { dd_ND = DataType, dd_cons = [] }
-      [con] -> defn { dd_cons = [con] }
-      _ -> error "Should not happen"
+restrictDataDefn names d = d { dd_cons = restrictDataDefnCons names (dd_cons d) }
 
-restrictCons :: [Name] -> [LConDecl GhcRn] -> [LConDecl GhcRn]
-restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
+restrictDataDefnCons :: [Name] -> DataDefnCons (LConDecl GhcRn) -> DataDefnCons (LConDecl GhcRn)
+restrictDataDefnCons names = \ case
+    DataTypeCons cons -> DataTypeCons (restrictCons names cons)
+    NewTypeCon con -> maybe (DataTypeCons []) NewTypeCon $ restrictCons names (Just con)
+
+restrictCons :: MonadFail m => [Name] -> m (LConDecl GhcRn) -> m (LConDecl GhcRn)
+restrictCons names decls = [ L p d | L p (Just d) <- fmap keep <$> decls ]
   where
     keep :: ConDecl GhcRn -> Maybe (ConDecl GhcRn)
     keep d
-      | any (\n -> n `elem` names) (map unLoc $ getConNames d) =
+      | any (`elem` names) (unLoc <$> getConNames d) =
         case d of
           ConDeclH98 { con_args = con_args' } -> case con_args' of
             PrefixCon {} -> Just d
@@ -470,7 +473,7 @@ instance Parent (ConDecl GhcRn) where
 
 instance Parent (TyClDecl GhcRn) where
   children d
-    | isDataDecl  d = map unLoc $ concatMap (getConNames . unLoc)
+    | isDataDecl  d = map unLoc $ concatMap (toList . getConNames . unLoc)
                                 $ (dd_cons . tcdDataDefn) d
     | isClassDecl d =
         map (unLoc . fdLName . unLoc) (tcdATs d) ++
@@ -484,7 +487,7 @@ family = getName &&& children
 
 
 familyConDecl :: ConDecl GHC.GhcRn -> [(Name, [Name])]
-familyConDecl d = zip (map unLoc (getConNames d)) (repeat $ children d)
+familyConDecl d = zip (toList $ unLoc <$> getConNames d) (repeat $ children d)
 
 -- | A mapping from the parent (main-binder) to its children and from each
 -- child to its grand-children, recursively.

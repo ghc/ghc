@@ -31,9 +31,11 @@ import GHC.Driver.Ppr
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Unit.State
+import GHC.Hs.Decls (ppDataDefnHeader, pp_vanilla_decl_head)
 
 import Data.Char
-import Data.List (intercalate, isPrefixOf)
+import Data.Foldable (toList)
+import Data.List (dropWhileEnd, intercalate, isPrefixOf)
 import Data.Maybe
 import Data.Version
 
@@ -218,17 +220,10 @@ ppSynonym :: DynFlags -> TyClDecl GhcRn -> [String]
 ppSynonym dflags x = [out dflags x]
 
 ppData :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]
-ppData dflags decl@(DataDecl { tcdDataDefn = defn }) subdocs
-    = showData decl{ tcdDataDefn = defn { dd_cons=[],dd_derivs=[] }} :
+ppData dflags decl@DataDecl { tcdLName = name, tcdTyVars = tvs, tcdFixity = fixity, tcdDataDefn = defn } subdocs
+    = out dflags (ppDataDefnHeader (pp_vanilla_decl_head name tvs fixity) defn) :
       concatMap (ppCtor dflags decl subdocs . unLoc) (dd_cons defn)
     where
-
-        -- GHC gives out "data Bar =", we want to delete the equals.
-        -- There's no need to worry about parenthesizing infix data type names,
-        -- since this Outputable instance for TyClDecl gets this right already.
-        showData d = unwords $ if last xs == "=" then init xs else xs
-            where
-                xs = words $ out dflags d
 ppData _ _ _ = panic "ppData"
 
 -- | for constructors, and named-fields...
@@ -257,7 +252,7 @@ ppCtor dflags dat subdocs con@ConDeclH98 { con_args = con_args' }
 
         -- We print the constructors as comma-separated list. See GHC
         -- docs for con_names on why it is a list to begin with.
-        name = commaSeparate dflags . map unL $ getConNames con
+        name = commaSeparate dflags . toList $ unL <$> getConNames con
 
         tyVarArg (UserTyVar _ _ n) = HsTyVar noAnn NotPromoted n
         tyVarArg (KindedTyVar _ _ n lty) = HsKindSig noAnn (reL (HsTyVar noAnn NotPromoted n)) lty
@@ -275,7 +270,7 @@ ppCtor dflags _dat subdocs (ConDeclGADT { con_names = names
    = concatMap (lookupCon dflags subdocs) names ++ [typeSig]
     where
         typeSig = operator name ++ " :: " ++ outHsSigType dflags con_sig_ty
-        name = out dflags $ map unL names
+        name = out dflags $ unL <$> names
         con_sig_ty = HsSig noExtField outer_bndrs theta_ty where
           theta_ty = case mcxt of
             Just theta -> noLocA (HsQualTy { hst_xqual = noExtField, hst_ctxt = theta, hst_body = tau_ty })
