@@ -7,11 +7,14 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE EmptyCase #-}
 
 module GHC.Cmm (
      -- * Cmm top-level datatypes
      CmmProgram, CmmGroup, CmmGroupSRTs, RawCmmGroup, GenCmmGroup,
      CmmDecl, CmmDeclSRTs, GenCmmDecl(..),
+     CmmDataDecl, cmmDataDeclCmmDecl,
      CmmGraph, GenCmmGraph(..),
      toBlockMap, revPostorder, toBlockList,
      CmmBlock, RawCmmDecl,
@@ -52,6 +55,7 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Utils.Outputable
 
+import Data.Void (Void)
 import Data.List (intersperse)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -116,6 +120,14 @@ instance (OutputableP Platform d, OutputableP Platform info, OutputableP Platfor
 
 type CmmDecl     = GenCmmDecl CmmStatics    CmmTopInfo CmmGraph
 type CmmDeclSRTs = GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph
+type CmmDataDecl = GenCmmDataDecl CmmStatics
+type GenCmmDataDecl d = GenCmmDecl d Void Void -- When `CmmProc` case can be statically excluded
+
+cmmDataDeclCmmDecl :: GenCmmDataDecl d -> GenCmmDecl d h g
+cmmDataDeclCmmDecl = \ case
+    CmmProc void _ _ _ -> case void of
+    CmmData section d -> CmmData section d
+{-# INLINE cmmDataDeclCmmDecl #-}
 
 type RawCmmDecl
    = GenCmmDecl

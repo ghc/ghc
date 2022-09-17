@@ -1,3 +1,4 @@
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -151,6 +152,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NEL
 import Data.Time
 import Data.Time.Format.ISO8601
+import Data.Void
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
@@ -1173,6 +1175,8 @@ instance OutputableP env SDoc where
 instance (OutputableP env a) => OutputableP env (Set a) where
     pdoc env s = braces (fsep (punctuate comma (map (pdoc env) (Set.toList s))))
 
+instance OutputableP env Void where
+    pdoc _ = \ case
 
 {-
 ************************************************************************

@@ -67,8 +67,8 @@ cmmPipeline logger cmm_config srtInfo prog = do
 --     [SRTs].
 --
 --   - in the case of a `CmmData`, the unmodified 'CmmDecl' and a 'CAFSet' containing
-cpsTop :: Logger -> Platform -> CmmConfig -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
-cpsTop _logger platform _ p@(CmmData _ statics) = return (Right (cafAnalData platform statics, p))
+cpsTop :: Logger -> Platform -> CmmConfig -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDataDecl))
+cpsTop _logger platform _ (CmmData section statics) = return (Right (cafAnalData platform statics, CmmData section statics))
 cpsTop logger platform cfg proc =
     do
       ----------- Control-flow optimisations ----------------------------------

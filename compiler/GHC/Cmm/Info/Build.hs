@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, BangPatterns, RecordWildCards,
     GeneralizedNewtypeDeriving, NondecreasingIndentation, TupleSections,
-    ScopedTypeVariables, OverloadedStrings, LambdaCase #-}
+    ScopedTypeVariables, OverloadedStrings, LambdaCase, EmptyCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -884,7 +884,7 @@ doSRTs
   :: CmmConfig
   -> ModuleSRTInfo
   -> [(CAFEnv, [CmmDecl])]   -- ^ 'CAFEnv's and 'CmmDecl's for code blocks
-  -> [(CAFSet, CmmDecl)]     -- ^ static data decls and their 'CAFSet's
+  -> [(CAFSet, CmmDataDecl)]     -- ^ static data decls and their 'CAFSet's
   -> IO (ModuleSRTInfo, [CmmDeclSRTs])
 
 doSRTs cfg moduleSRTInfo procs data_ = do
@@ -900,8 +900,7 @@ doSRTs cfg moduleSRTInfo procs data_ = do
         flip map data_ $
         \(set, decl) ->
           case decl of
-            CmmProc{} ->
-              pprPanic "doSRTs" (text "Proc in static data list:" <+> pdoc platform decl)
+            CmmProc void _ _ _ -> case void of
             CmmData _ static ->
               case static of
                 CmmStatics lbl _ _ _ _ -> (lbl, set)
@@ -909,7 +908,7 @@ doSRTs cfg moduleSRTInfo procs data_ = do
 
       (proc_envs, procss) = unzip procs
       cafEnv = mapUnions proc_envs
-      decls = map snd data_ ++ concat procss
+      decls = map (cmmDataDeclCmmDecl . snd) data_ ++ concat procss
       staticFuns = mapFromList (getStaticFuns decls)
 
       platform = cmmPlatform cfg
@@ -980,8 +979,7 @@ doSRTs cfg moduleSRTInfo procs data_ = do
                       | otherwise ->
                           -- Not an IdLabel, ignore
                           srtMap
-                    CmmProc{} ->
-                      pprPanic "doSRTs" (text "Found Proc in static data list:" <+> pdoc platform decl))
+                    CmmProc void _ _ _ -> case void of)
                (moduleSRTMap moduleSRTInfo') data_
 
   return (moduleSRTInfo'{ moduleSRTMap = srtMap_w_raws }, srt_decls ++ decls')
