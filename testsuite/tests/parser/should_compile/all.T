@@ -193,3 +193,4 @@ test('T20718',  normal, compile, ['-dsuppress-uniques -ddump-parsed-ast -dkeep-c
 test('T20718b',  normal, compile, ['-dsuppress-uniques -ddump-parsed-ast -dkeep-comments'])
 
 test('T21589', normal, compile, [''])
+test('T19372consym', normal, compile, [''])

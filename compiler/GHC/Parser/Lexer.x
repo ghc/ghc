@@ -496,7 +496,7 @@ $tab          { warnTab }
   @qvarsym                                         { idtoken qvarsym }
   @qconsym                                         { idtoken qconsym }
   @varsym                                          { with_op_ws varsym }
-  @consym                                          { consym }
+  @consym                                          { with_op_ws consym }
 }
 
 -- For the normal boxed literals we need to be careful
@@ -1681,7 +1681,7 @@ qconsym buf len = ITqconsym $! splitQualName buf len False
 
 -- See Note [Whitespace-sensitive operator parsing]
 varsym :: OpWs -> Action
-varsym OpWsPrefix = sym $ \span exts s ->
+varsym opws@OpWsPrefix = sym $ \span exts s ->
   let warnExtConflict errtok =
         do { addPsMessage (mkSrcSpanPs span) (PsWarnOperatorWhitespaceExtConflict errtok)
            ; return (ITvarsym s) }
@@ -1709,35 +1709,48 @@ varsym OpWsPrefix = sym $ \span exts s ->
      | s == fsLit "!" -> return ITbang
      | s == fsLit "~" -> return ITtilde
      | otherwise ->
-         do { addPsMessage
-                (mkSrcSpanPs span)
-                (PsWarnOperatorWhitespace s OperatorWhitespaceOccurrence_Prefix)
+         do { warnOperatorWhitespace opws span s
             ; return (ITvarsym s) }
-varsym OpWsSuffix = sym $ \span _ s ->
+varsym opws@OpWsSuffix = sym $ \span _ s ->
   if | s == fsLit "@" -> failMsgP (\srcLoc -> mkPlainErrorMsgEnvelope srcLoc $ PsErrSuffixAT)
      | s == fsLit "." -> return ITdot
      | otherwise ->
-         do { addPsMessage
-                (mkSrcSpanPs span)
-                (PsWarnOperatorWhitespace s OperatorWhitespaceOccurrence_Suffix)
+         do { warnOperatorWhitespace opws span s
             ; return (ITvarsym s) }
-varsym OpWsTightInfix = sym $ \span exts s ->
+varsym opws@OpWsTightInfix = sym $ \span exts s ->
   if | s == fsLit "@" -> return ITat
      | s == fsLit ".", OverloadedRecordDotBit `xtest` exts  -> return (ITproj False)
      | s == fsLit "." -> return ITdot
      | otherwise ->
-         do { addPsMessage
-                (mkSrcSpanPs span)
-                (PsWarnOperatorWhitespace s (OperatorWhitespaceOccurrence_TightInfix))
-            ;  return (ITvarsym s) }
+         do { warnOperatorWhitespace opws span s
+            ; return (ITvarsym s) }
 varsym OpWsLooseInfix = sym $ \_ _ s ->
   if | s == fsLit "."
      -> return ITdot
      | otherwise
      -> return $ ITvarsym s
 
-consym :: Action
-consym = sym (\_span _exts s -> return $ ITconsym s)
+consym :: OpWs -> Action
+consym opws = sym $ \span _exts s ->
+  do { warnOperatorWhitespace opws span s
+     ; return (ITconsym s) }
+
+warnOperatorWhitespace :: OpWs -> PsSpan -> FastString -> P ()
+warnOperatorWhitespace opws span s =
+  whenIsJust (check_unusual_opws opws) $ \opws' ->
+    addPsMessage
+      (mkSrcSpanPs span)
+      (PsWarnOperatorWhitespace s opws')
+
+-- Check an operator occurrence for unusual whitespace (prefix, suffix, tight infix).
+-- This determines if -Woperator-whitespace is triggered.
+check_unusual_opws :: OpWs -> Maybe OperatorWhitespaceOccurrence
+check_unusual_opws opws =
+  case opws of
+    OpWsPrefix     -> Just OperatorWhitespaceOccurrence_Prefix
+    OpWsSuffix     -> Just OperatorWhitespaceOccurrence_Suffix
+    OpWsTightInfix -> Just OperatorWhitespaceOccurrence_TightInfix
+    OpWsLooseInfix -> Nothing
 
 sym :: (PsSpan -> ExtsBitmap -> FastString -> P Token) -> Action
 sym con span buf len _buf2 =

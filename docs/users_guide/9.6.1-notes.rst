@@ -68,6 +68,9 @@ Compiler
 - The :extension:`TypeInType` is now marked as deprecated. Its meaning has been included
   in :extension:`PolyKinds` and :extension:`DataKinds`.
 
+- The :ghc-flag:`-Woperator-whitespace` warning no longer ignores constructor symbols
+  (operators starting with ``:``).
+
 GHCi
 ~~~~
 
