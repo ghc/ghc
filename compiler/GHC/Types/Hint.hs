@@ -401,7 +401,7 @@ data GhcHint
         Test cases: ccfail004
     -}
   | SuggestImportingDataCon
-  {- Found a pragma in the body of a module, suggest
+  {-| Found a pragma in the body of a module, suggest
      placing it in the header
   -}
   | SuggestPlacePragmaInHeader
