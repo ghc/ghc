@@ -419,9 +419,6 @@ library
         -- This symbol is useful in gdb, but not referred to anywhere,
         -- so we need to force it to be included in the binary.
         ld-options: "-Wl,-u,findPtr"
-         -- This symbol is useful in gdb, but not referred to anywhere,
-         -- so we need to force it to be included in the binary.
-         "-Wl,-u,findPtr"
 
     if os(windows)
       if flag(leading-underscore)
