@@ -1678,7 +1678,7 @@ data TcPlugin = forall s. TcPlugin
     -- and possibly emit additional constraints. These returned constraints
     -- must be Givens in the first case, and Wanteds in the second.
     --
-    -- Use @ \\ _ _ _ _ _ -> pure $ TcPluginOK [] [] @ if your plugin
+    -- Use @ \\ _ _ _ _ -> pure $ TcPluginOk [] [] @ if your plugin
     -- does not provide this functionality.
 
   , tcPluginRewrite :: s -> UniqFM TyCon TcPluginRewriter
