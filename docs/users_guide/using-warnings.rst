@@ -60,6 +60,7 @@ To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
         * :ghc-flag:`-Wunrecognised-warning-flags`
         * :ghc-flag:`-Winaccessible-code`
         * :ghc-flag:`-Wstar-binder`
+        * :ghc-flag:`-Wstar-is-type`
         * :ghc-flag:`-Woperator-whitespace-ext-conflict`
         * :ghc-flag:`-Wambiguous-fields`
         * :ghc-flag:`-Wunicode-bidirectional-format-characters`
