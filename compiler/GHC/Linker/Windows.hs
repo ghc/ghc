@@ -50,10 +50,8 @@ maybeCreateManifest logger tmpfs dflags exe_filename = do
            newTempName logger tmpfs (tmpDir dflags) TFL_GhcSession (objectSuf dflags)
 
          writeFile rc_filename $
-             "1 24 MOVEABLE PURE " ++ show manifest_filename ++ "\n"
+             "1 24 MOVEABLE PURE \"" ++ manifest_filename ++ "\"\n"
                -- magic numbers :-)
-               -- show is a bit hackish above, but we need to escape the
-               -- backslashes in the path.
 
          runWindres logger dflags $ map GHC.SysTools.Option $
                ["--input="++rc_filename,
