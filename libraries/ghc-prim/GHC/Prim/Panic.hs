@@ -6,6 +6,8 @@
 {-# LANGUAGE EmptyCase #-}
 
 -- | Primitive panics.
+--
+-- Users should not import this module.  It is GHC internal only.
 module GHC.Prim.Panic
    ( absentSumFieldError
    , panicError

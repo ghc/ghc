@@ -446,7 +446,9 @@ In PrimopWrappers we set some crucial GHC options
 
 gen_wrappers :: Info -> String
 gen_wrappers (Info _ entries)
-   =    "{-# LANGUAGE MagicHash, NoImplicitPrelude, UnboxedTuples #-}\n"
+   =    "-- | Users should not import this module.  It is GHC internal only.\n"
+     ++ "-- Use \"GHC.Exts\" instead.\n"
+     ++ "{-# LANGUAGE MagicHash, NoImplicitPrelude, UnboxedTuples #-}\n"
         -- Dependencies on Prelude must be explicit in libraries/base, but we
         -- don't need the Prelude here so we add NoImplicitPrelude.
      ++ "{-# OPTIONS_GHC -Wno-deprecations -O0 -fno-do-eta-reduction #-}\n"

@@ -6,6 +6,8 @@
 {-# LANGUAGE EmptyCase #-}
 
 -- | Primitive exceptions.
+--
+-- Users should not import this module.  It is GHC internal only.
 module GHC.Prim.Exception
    ( raiseOverflow
    , raiseUnderflow

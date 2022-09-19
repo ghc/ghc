@@ -27,6 +27,9 @@
 -- Portability :  non-portable (GHC extensions)
 --
 -- Basic classes.
+-- Do not import this module directly.  It is an GHC internal only
+-- module.  Some of its contents are instead available from @Prelude@
+-- and @GHC.Int@.
 --
 -----------------------------------------------------------------------------
 
@@ -35,6 +38,8 @@ module GHC.Classes(
     IP(..),
 
     -- * Equality and ordering
+    -- | Do not import these classes from this module. Import them
+    -- from @Prelude@ instead.
     Eq(..),
     Ord(..),
     -- ** Monomorphic equality operators
@@ -48,6 +53,8 @@ module GHC.Classes(
     gtWord, geWord, leWord, ltWord, compareWord, compareWord#,
 
     -- * Functions over Bool
+    -- | Do not import these functions from this module. Import them
+    -- from @Prelude@ instead.
     (&&), (||), not,
 
     -- * Integer arithmetic

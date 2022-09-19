@@ -18,6 +18,9 @@
 
 -- | Extra C-- routines exposed from the RTS
 --
+-- Users should not import this module.  It is GHC internal only.  Use
+-- "GHC.Conc" instead.
+--
 -- Actual primops are emitted by the compiler itself. They are special bits of
 -- code with backend support. The foreign functions in this module aren't actual
 -- primops because the compiler doesn't care about them at all: they just are

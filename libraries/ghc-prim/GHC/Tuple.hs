@@ -12,6 +12,8 @@
 --
 -- The tuple data types
 --
+-- Users should not import this module.  It is GHC internal only.
+--
 -----------------------------------------------------------------------------
 
 module GHC.Tuple where
