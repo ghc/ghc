@@ -3295,13 +3295,12 @@ reads and executes commands from the following files, in this order, if
 they exist:
 
 1. :file:`{ghcappdata}/ghci.conf`, where ⟨ghcappdata⟩ depends on
-   your system, but is usually something like :file:`$HOME/.ghc` on
-   Unix or :file:`C:/Documents and Settings/user/Application
-   Data/ghc` on Windows.
+   your system, but is usually something like :file:`$HOME/.ghc` or
+   :file:`$XDG_CONFIG_HOME/ghc` on Unix or
+   :file:`C:\\Users\\{username}\\AppData\\Roaming\\ghc` on
+   Windows.
 
-2. :file:`$XDG_CONFIG_HOME/.ghci`
-
-3. :file:`./.ghci`
+2. :file:`./.ghci`
 
 The :file:`ghci.conf` file is most useful for turning on favourite options
 (e.g. ``:set +s``), and defining useful macros.
