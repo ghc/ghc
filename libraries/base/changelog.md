@@ -29,7 +29,7 @@
     is now exported from `Prelude`. See [CLC #50](https://github.com/haskell/core-libraries-committee/issues/50)
     for the related discussion,
     as well as [the migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/export-lifta2-prelude.md)
-  * Update to Unicode 15.0.0.
+  * Update to [Unicode 15.0.0](https://www.unicode.org/versions/Unicode15.0.0/).
   * Add `Eq` and `Ord` instances for `Generically1`.
   * Relax instances for Functor combinators; put superclass on Class1 and Class2
     to make non-breaking. See [CLC

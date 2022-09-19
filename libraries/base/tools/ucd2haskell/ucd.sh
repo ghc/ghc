@@ -12,11 +12,7 @@ VERIFY_CHECKSUM=y
 
 # Filename:checksum
 FILES="\
-  ucd/DerivedCoreProperties.txt:e3eddd7d469cd1b0feed7528defad1a1cc7c6a9ceb0ae4446a6d10921ed2e7bc \
-  ucd/DerivedNormalizationProps.txt:b2c444c20730b097787fdf50bd7d6dd3fc5256ab8084f5b35b11c8776eca674c \
-  ucd/UnicodeData.txt:36018e68657fdcb3485f636630ffe8c8532e01c977703d2803f5b89d6c5feafb \
-  ucd/PropList.txt:6bddfdb850417a5bee6deff19290fd1b138589909afb50f5a049f343bf2c6722 \
-  ucd/extracted/DerivedCombiningClass.txt:12b0c3af9b600b49488d66545a3e7844ea980809627201bf9afeebe1c9f16f4e"
+  ucd/UnicodeData.txt:806e9aed65037197f1ec85e12be6e8cd870fc5608b4de0fffd990f689f376a73"
 
 # Download the files
 
@@ -39,10 +35,10 @@ download_file() {
         if test "$__checksum" != "$new_checksum"
         then
             echo "sha256sum of the downloaded __file $__file "
-            echo "   [$new_checksum] does not match the expected __checksum [$__checksum]"
+            echo "   [$new_checksum] does not match the expected checksum [$__checksum]"
             exit 1
         else
-            echo "$__file __checksum ok"
+            echo "$__file checksum ok"
         fi
     fi
 }

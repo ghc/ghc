@@ -129,6 +129,8 @@ Runtime system
   ``(<=)`` instead of ``compare`` per CLC proposal:
   https://github.com/haskell/core-libraries-committee/issues/24
 
+- Updated to `Unicode 15.0.0 <https://www.unicode.org/versions/Unicode15.0.0/>`_.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
