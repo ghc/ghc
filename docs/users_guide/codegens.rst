@@ -108,10 +108,9 @@ disabling some of the platform-specific tricks that GHC normally uses to
 make programs go faster. When compiling unregisterised, GHC simply
 generates a C file which is compiled via gcc.
 
-When GHC is build in unregisterised mode only the LLVM and C code
-generators will be available. The native code generator won't be. LLVM
-usually offers a substantial performance benefit over the C backend in
-unregisterised mode.
+When GHC is built in unregisterised mode only the C code generator is
+available.  Neither the LLVM nor native code generator can be used by an
+unregisterised build.
 
 Unregisterised compilation can be useful when porting GHC to a new
 machine, since it reduces the prerequisite tools to ``gcc``, ``as``, and
