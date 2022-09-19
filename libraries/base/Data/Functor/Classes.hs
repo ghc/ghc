@@ -1,7 +1,10 @@
 {-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE DefaultSignatures    #-}
 {-# LANGUAGE InstanceSigs         #-}
 {-# LANGUAGE Safe                 #-}
+{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Classes
@@ -91,8 +94,18 @@ import Text.Show (showListWith)
 
 -- | Lifting of the 'Eq' class to unary type constructors.
 --
+-- Any instance should be subject to the following law that canonicity
+-- is preserved:
+--
+-- @liftEq (==)@ = @(==)@
+--
+-- This class therefore represents the generalization of 'Eq' by
+-- decomposing its main method into a canonical lifting on a canonical
+-- inner method, so that the lifting can be reused for other arguments
+-- than the canonical one.
+--
 -- @since 4.9.0.0
-class Eq1 f where
+class (forall a. Eq a => Eq (f a)) => Eq1 f where
     -- | Lift an equality test through the type constructor.
     --
     -- The function will usually be applied to an equality function,
@@ -102,6 +115,10 @@ class Eq1 f where
     --
     -- @since 4.9.0.0
     liftEq :: (a -> b -> Bool) -> f a -> f b -> Bool
+    default liftEq
+        :: (f ~ f' c, Eq2 f', Eq c)
+        => (a -> b -> Bool) -> f a -> f b -> Bool
+    liftEq = liftEq2 (==)
 
 -- | Lift the standard @('==')@ function through the type constructor.
 --
@@ -111,8 +128,18 @@ eq1 = liftEq (==)
 
 -- | Lifting of the 'Ord' class to unary type constructors.
 --
+-- Any instance should be subject to the following law that canonicity
+-- is preserved:
+--
+-- @liftCompare compare@ = 'compare'
+--
+-- This class therefore represents the generalization of 'Ord' by
+-- decomposing its main method into a canonical lifting on a canonical
+-- inner method, so that the lifting can be reused for other arguments
+-- than the canonical one.
+--
 -- @since 4.9.0.0
-class (Eq1 f) => Ord1 f where
+class (Eq1 f, forall a. Ord a => Ord (f a)) => Ord1 f where
     -- | Lift a 'compare' function through the type constructor.
     --
     -- The function will usually be applied to a comparison function,
@@ -122,6 +149,10 @@ class (Eq1 f) => Ord1 f where
     --
     -- @since 4.9.0.0
     liftCompare :: (a -> b -> Ordering) -> f a -> f b -> Ordering
+    default liftCompare
+        :: (f ~ f' c, Ord2 f', Ord c)
+        => (a -> b -> Ordering) -> f a -> f b -> Ordering
+    liftCompare = liftCompare2 compare
 
 -- | Lift the standard 'compare' function through the type constructor.
 --
@@ -130,6 +161,22 @@ compare1 :: (Ord1 f, Ord a) => f a -> f a -> Ordering
 compare1 = liftCompare compare
 
 -- | Lifting of the 'Read' class to unary type constructors.
+--
+-- Any instance should be subject to the following laws that canonicity
+-- is preserved:
+--
+-- @liftReadsPrec readsPrec readList@ = 'readsPrec'
+--
+-- @liftReadList readsPrec readList@ = 'readList'
+--
+-- @liftReadPrec readPrec readListPrec@ = 'readPrec'
+--
+-- @liftReadListPrec readPrec readListPrec@ = 'readListPrec'
+--
+-- This class therefore represents the generalization of 'Read' by
+-- decomposing it's methods into a canonical lifting on a canonical
+-- inner method, so that the lifting can be reused for other arguments
+-- than the canonical one.
 --
 -- Both 'liftReadsPrec' and 'liftReadPrec' exist to match the interface
 -- provided in the 'Read' type class, but it is recommended to implement
@@ -145,7 +192,7 @@ compare1 = liftCompare compare
 -- For more information, refer to the documentation for the 'Read' class.
 --
 -- @since 4.9.0.0
-class Read1 f where
+class (forall a. Read a => Read (f a)) => Read1 f where
     {-# MINIMAL liftReadsPrec | liftReadPrec #-}
 
     -- | 'readsPrec' function for an application of the type constructor
@@ -219,14 +266,30 @@ liftReadListPrecDefault rp rl = list (liftReadPrec rp rl)
 
 -- | Lifting of the 'Show' class to unary type constructors.
 --
+-- Any instance should be subject to the following laws that canonicity
+-- is preserved:
+--
+-- @liftShowsPrec showsPrec showList@ = 'showsPrec'
+--
+-- @liftShowList showsPrec showList@ = 'showList'
+--
+-- This class therefore represents the generalization of 'Show' by
+-- decomposing it's methods into a canonical lifting on a canonical
+-- inner method, so that the lifting can be reused for other arguments
+-- than the canonical one.
+--
 -- @since 4.9.0.0
-class Show1 f where
+class (forall a. Show a => Show (f a)) => Show1 f where
     -- | 'showsPrec' function for an application of the type constructor
     -- based on 'showsPrec' and 'showList' functions for the argument type.
     --
     -- @since 4.9.0.0
     liftShowsPrec :: (Int -> a -> ShowS) -> ([a] -> ShowS) ->
         Int -> f a -> ShowS
+    default liftShowsPrec
+        :: (f ~ f' b, Show2 f', Show b)
+        => (Int -> a -> ShowS) -> ([a] -> ShowS) -> Int -> f a -> ShowS
+    liftShowsPrec = liftShowsPrec2 showsPrec showList
 
     -- | 'showList' function for an application of the type constructor
     -- based on 'showsPrec' and 'showList' functions for the argument type.
@@ -248,7 +311,7 @@ showsPrec1 = liftShowsPrec showsPrec showList
 -- | Lifting of the 'Eq' class to binary type constructors.
 --
 -- @since 4.9.0.0
-class Eq2 f where
+class (forall a. Eq a => Eq1 (f a)) => Eq2 f where
     -- | Lift equality tests through the type constructor.
     --
     -- The function will usually be applied to equality functions,
@@ -268,7 +331,7 @@ eq2 = liftEq2 (==) (==)
 -- | Lifting of the 'Ord' class to binary type constructors.
 --
 -- @since 4.9.0.0
-class (Eq2 f) => Ord2 f where
+class (Eq2 f, forall a. Ord a => Ord1 (f a)) => Ord2 f where
     -- | Lift 'compare' functions through the type constructor.
     --
     -- The function will usually be applied to comparison functions,
@@ -302,7 +365,7 @@ compare2 = liftCompare2 compare compare
 -- For more information, refer to the documentation for the 'Read' class.
 --
 -- @since 4.9.0.0
-class Read2 f where
+class (forall a. Read a => Read1 (f a)) => Read2 f where
     {-# MINIMAL liftReadsPrec2 | liftReadPrec2 #-}
 
     -- | 'readsPrec' function for an application of the type constructor
@@ -385,7 +448,7 @@ liftReadListPrec2Default rp1 rl1 rp2 rl2 = list (liftReadPrec2 rp1 rl1 rp2 rl2)
 -- | Lifting of the 'Show' class to binary type constructors.
 --
 -- @since 4.9.0.0
-class Show2 f where
+class (forall a. Show a => Show1 (f a)) => Show2 f where
     -- | 'showsPrec' function for an application of the type constructor
     -- based on 'showsPrec' and 'showList' functions for the argument types.
     --
