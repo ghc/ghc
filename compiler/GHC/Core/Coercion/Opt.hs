@@ -245,7 +245,7 @@ opt_co4 env sym rep r g@(TyConAppCo _r tc cos)
       (True, Nominal) ->
         mkTyConAppCo Representational tc
                      (zipWith3 (opt_co3 env sym)
-                               (map Just (tyConRolesRepresentational tc))
+                               (map Just (tyConRoleListRepresentational tc))
                                (repeat Nominal)
                                cos)
       (False, Nominal) ->
@@ -254,7 +254,7 @@ opt_co4 env sym rep r g@(TyConAppCo _r tc cos)
                       -- must use opt_co2 here, because some roles may be P
                       -- See Note [Optimising coercion optimisation]
         mkTyConAppCo r tc (zipWith (opt_co2 env sym)
-                                   (tyConRolesRepresentational tc)  -- the current roles
+                                   (tyConRoleListRepresentational tc)  -- the current roles
                                    cos)
       (_, Phantom) -> pprPanic "opt_co4 sees a phantom!" (ppr g)
 
@@ -546,7 +546,7 @@ opt_univ env sym prov role oty1 oty2
   , equalLength tys1 tys2 -- see Note [Differing kinds]
       -- NB: prov must not be the two interesting ones (ProofIrrel & Phantom);
       -- Phantom is already taken care of, and ProofIrrel doesn't relate tyconapps
-  = let roles    = tyConRolesX role tc1
+  = let roles    = tyConRoleListX role tc1
         arg_cos  = zipWith3 (mkUnivCo prov') roles tys1 tys2
         arg_cos' = zipWith (opt_co4 env sym False) roles arg_cos
     in

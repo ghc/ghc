@@ -2177,7 +2177,7 @@ lintCoercion co@(TyConAppCo r tc cos)
        ; let (co_kinds, co_roles) = unzip (map coercionKindRole cos')
        ; lint_co_app co (tyConKind tc) (map pFst co_kinds)
        ; lint_co_app co (tyConKind tc) (map pSnd co_kinds)
-       ; zipWithM_ (lintRole co) (tyConRolesX r tc) co_roles
+       ; zipWithM_ (lintRole co) (tyConRoleListX r tc) co_roles
        ; return (TyConAppCo r tc cos') }
 
 lintCoercion co@(AppCo co1 co2)

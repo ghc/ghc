@@ -1742,7 +1742,7 @@ pushRefl co =
       ->  Just (TyConAppCo r funTyCon [ multToCo w, mkReflCo r rep1, mkReflCo r rep2
                                        , mkReflCo r ty1,  mkReflCo r ty2 ])
     Just (TyConApp tc tys, r)
-      -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRolesX r tc) tys))
+      -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRoleListX r tc) tys))
     Just (ForAllTy (Bndr tv _) ty, r)
       -> Just (ForAllCo tv (mkNomReflCo (varType tv)) (mkReflCo r ty))
     -- NB: NoRefl variant. Otherwise, we get a loop!

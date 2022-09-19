@@ -1914,7 +1914,7 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
     role       = eqRelRole eq_rel
 
       -- infinite, as tyConRolesX returns an infinite tail of Nominal
-    tc_roles   = tyConRolesX role tc
+    tc_roles   = tyConRoleListX role tc
 
       -- Add nuances to the location during decomposition:
       --  * if the argument is a kind argument, remember this, so that error
@@ -3128,7 +3128,7 @@ unifyWanted rewriters loc role orig_ty1 orig_ty2
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality
       = do { cos <- zipWith3M (unifyWanted rewriters loc)
-                              (tyConRolesX role tc1) tys1 tys2
+                              (tyConRoleListX role tc1) tys1 tys2
            ; return (mkTyConAppCo role tc1 cos) }
 
     go ty1@(TyVarTy tv) ty2

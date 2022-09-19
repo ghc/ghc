@@ -63,6 +63,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.Bag
+import GHC.Data.List.Infinite (Infinite (..))
+import qualified GHC.Data.List.Infinite as Inf
 
 {-
 ************************************************************************
@@ -1477,7 +1479,7 @@ normalise_type ty
                Nothing ->
                  do { ArgsReductions redns res_co
                         <- normalise_args (typeKind nfun)
-                                          (repeat Nominal)
+                                          (Inf.repeat Nominal)
                                           arg_tys
                     ; role <- getRole
                     ; return $
@@ -1486,7 +1488,7 @@ normalise_type ty
                           (mkSymMCo res_co) } }
 
 normalise_args :: Kind    -- of the function
-               -> [Role]  -- roles at which to normalise args
+               -> Infinite Role  -- roles at which to normalise args
                -> [Type]  -- args
                -> NormM ArgsReductions
 -- returns ArgsReductions (Reductions cos xis) res_co,
@@ -1496,7 +1498,7 @@ normalise_args :: Kind    -- of the function
 -- but the resulting application *will* be well-kinded
 -- cf. GHC.Tc.Solver.Rewrite.rewrite_args_slow
 normalise_args fun_ki roles args
-  = do { normed_args <- zipWithM normalise1 roles args
+  = do { normed_args <- zipWithM normalise1 (Inf.toList roles) args
        ; return $ simplifyArgsWorker ki_binders inner_ki fvs roles normed_args }
   where
     (ki_binders, inner_ki) = splitPiTys fun_ki

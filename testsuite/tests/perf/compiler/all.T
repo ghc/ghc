@@ -650,3 +650,8 @@ test('T21839c',
         only_ways(['normal'])],
     compile,
     ['-O'])
+
+test ('InfiniteListFusion',
+      [collect_stats('bytes allocated',2), when(arch('i386'), skip)],
+      compile_and_run,
+      ['-O2 -package ghc'])

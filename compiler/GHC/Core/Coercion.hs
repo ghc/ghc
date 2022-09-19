@@ -63,6 +63,7 @@ module GHC.Core.Coercion (
         splitForAllCo_ty_maybe, splitForAllCo_co_maybe,
 
         nthRole, tyConRolesX, tyConRolesRepresentational, setNominalRole_maybe,
+        tyConRoleListX, tyConRoleListRepresentational,
 
         pickLR,
 
@@ -154,6 +155,8 @@ import GHC.Builtin.Types.Prim
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Types.Unique.FM
+import GHC.Data.List.Infinite (Infinite (..))
+import qualified GHC.Data.List.Infinite as Inf
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -408,12 +411,10 @@ where co_rep1, co_rep2 are the coercions on the representations.
 --
 -- > decomposeCo 3 c [r1, r2, r3] = [nth r1 0 c, nth r2 1 c, nth r3 2 c]
 decomposeCo :: Arity -> Coercion
-            -> [Role]  -- the roles of the output coercions
-                       -- this must have at least as many
-                       -- entries as the Arity provided
+            -> Infinite Role  -- the roles of the output coercions
             -> [Coercion]
 decomposeCo arity co rs
-  = [mkNthCo r n co | (n,r) <- [0..(arity-1)] `zip` rs ]
+  = [mkNthCo r n co | (n,r) <- [0..(arity-1)] `zip` Inf.toList rs ]
            -- Remember, Nth is zero-indexed
 
 decomposeFunCo :: HasDebugCallStack
@@ -533,7 +534,7 @@ splitTyConAppCo_maybe :: Coercion -> Maybe (TyCon, [Coercion])
 splitTyConAppCo_maybe co
   | Just (ty, r) <- isReflCo_maybe co
   = do { (tc, tys) <- splitTyConApp_maybe ty
-       ; let args = zipWith mkReflCo (tyConRolesX r tc) tys
+       ; let args = zipWith mkReflCo (tyConRoleListX r tc) tys
        ; return (tc, args) }
 splitTyConAppCo_maybe (TyConAppCo _ tc cos) = Just (tc, cos)
 splitTyConAppCo_maybe (FunCo _ w arg res)     = Just (funTyCon, cos)
@@ -819,15 +820,14 @@ mkAppCo co arg
     -- Expand type synonyms; a TyConAppCo can't have a type synonym (#9102)
   = mkTyConAppCo r tc (zip_roles (tyConRolesX r tc) tys)
   where
-    zip_roles (r1:_)  []            = [downgradeRole r1 Nominal arg]
-    zip_roles (r1:rs) (ty1:tys)     = mkReflCo r1 ty1 : zip_roles rs tys
-    zip_roles _       _             = panic "zip_roles" -- but the roles are infinite...
+    zip_roles (Inf r1 _)  []            = [downgradeRole r1 Nominal arg]
+    zip_roles (Inf r1 rs) (ty1:tys)     = mkReflCo r1 ty1 : zip_roles rs tys
 
 mkAppCo (TyConAppCo r tc args) arg
   = case r of
       Nominal          -> mkTyConAppCo Nominal tc (args ++ [arg])
       Representational -> mkTyConAppCo Representational tc (args ++ [arg'])
-        where new_role = (tyConRolesRepresentational tc) !! (length args)
+        where new_role = tyConRolesRepresentational tc Inf.!! length args
               arg'     = downgradeRole new_role Nominal arg
       Phantom          -> mkTyConAppCo Phantom tc (args ++ [toPhantomCo arg])
 mkAppCo co arg = AppCo co  arg
@@ -1153,10 +1153,7 @@ mkNthCo r n co
       , tc1 == tc2
       = let len1 = length tys1
             len2 = length tys2
-            good_role = case coercionRole co of
-                          Nominal -> r == Nominal
-                          Representational -> r == (tyConRolesRepresentational tc1 !! n)
-                          Phantom -> r == Phantom
+            good_role = r == nthRole (coercionRole co) tc1 n
         in len1 == len2 && n < len1 && good_role
 
       | otherwise
@@ -1349,7 +1346,7 @@ setNominalRole_maybe r co
     setNominalRole_maybe_helper co@(Refl _) = Just co
     setNominalRole_maybe_helper (GRefl _ ty co) = Just $ GRefl Nominal ty co
     setNominalRole_maybe_helper (TyConAppCo Representational tc cos)
-      = do { cos' <- zipWithM setNominalRole_maybe (tyConRolesX Representational tc) cos
+      = do { cos' <- zipWithM setNominalRole_maybe (tyConRoleListX Representational tc) cos
            ; return $ TyConAppCo Nominal tc cos' }
     setNominalRole_maybe_helper (FunCo Representational w co1 co2)
       = do { co1' <- setNominalRole_maybe Representational co1
@@ -1393,27 +1390,33 @@ toPhantomCo co
 
 -- Convert args to a TyConAppCo Nominal to the same TyConAppCo Representational
 applyRoles :: TyCon -> [Coercion] -> [Coercion]
-applyRoles tc cos
-  = zipWith (\r -> downgradeRole r Nominal) (tyConRolesRepresentational tc) cos
+applyRoles = zipWith (`downgradeRole` Nominal) . tyConRoleListRepresentational
 
 -- the Role parameter is the Role of the TyConAppCo
 -- defined here because this is intimately concerned with the implementation
 -- of TyConAppCo
 -- Always returns an infinite list (with a infinite tail of Nominal)
-tyConRolesX :: Role -> TyCon -> [Role]
+tyConRolesX :: Role -> TyCon -> Infinite Role
 tyConRolesX Representational tc = tyConRolesRepresentational tc
-tyConRolesX role             _  = repeat role
+tyConRolesX role             _  = Inf.repeat role
+
+tyConRoleListX :: Role -> TyCon -> [Role]
+tyConRoleListX role = Inf.toList . tyConRolesX role
 
 -- Returns the roles of the parameters of a tycon, with an infinite tail
 -- of Nominal
-tyConRolesRepresentational :: TyCon -> [Role]
-tyConRolesRepresentational tc = tyConRoles tc ++ repeat Nominal
+tyConRolesRepresentational :: TyCon -> Infinite Role
+tyConRolesRepresentational tc = tyConRoles tc Inf.++ Inf.repeat Nominal
+
+-- Returns the roles of the parameters of a tycon, with an infinite tail
+-- of Nominal
+tyConRoleListRepresentational :: TyCon -> [Role]
+tyConRoleListRepresentational = Inf.toList . tyConRolesRepresentational
 
 nthRole :: Role -> TyCon -> Int -> Role
 nthRole Nominal _ _ = Nominal
 nthRole Phantom _ _ = Phantom
-nthRole Representational tc n
-  = (tyConRolesRepresentational tc) `getNth` n
+nthRole Representational tc n = tyConRolesRepresentational tc Inf.!! n
 
 ltRole :: Role -> Role -> Bool
 -- Is one role "less" than another?
@@ -2034,7 +2037,7 @@ ty_co_subst !lc role ty
     go r (TyVarTy tv)      = expectJust "ty_co_subst bad roles" $
                              liftCoSubstTyVar lc r tv
     go r (AppTy ty1 ty2)   = mkAppCo (go r ty1) (go Nominal ty2)
-    go r (TyConApp tc tys) = mkTyConAppCo r tc (zipWith go (tyConRolesX r tc) tys)
+    go r (TyConApp tc tys) = mkTyConAppCo r tc (zipWith go (tyConRoleListX r tc) tys)
     go r (FunTy _ w ty1 ty2) = mkFunCo r (go Nominal w) (go r ty1) (go r ty2)
     go r t@(ForAllTy (Bndr v _) ty)
        = let (lc', v', h) = liftCoSubstVarBndr lc v

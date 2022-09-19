@@ -31,7 +31,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe (catMaybes)
 import GHC.Hs.Expr (prependQualified, HsExpr(..), LamCaseVariant(..), lamCaseKeyword)
 import GHC.Hs.Type (pprLHsContext)
-import GHC.Builtin.Names (allNameStrings)
+import GHC.Builtin.Names (allNameStringList)
 import GHC.Builtin.Types (filterCTuple)
 import qualified GHC.LanguageExtensions as LangExt
 import Data.List.NonEmpty (NonEmpty((:|)))
@@ -486,7 +486,7 @@ instance Diagnostic PsMessage where
                  , nest 2
                    (what
                     <+> tc'
-                    <+> hsep (map text (takeList tparms allNameStrings))
+                    <+> hsep (map text (takeList tparms allNameStringList))
                     <+> equals_or_where) ] ]
            where
              -- Avoid printing a constraint tuple in the error message. Print

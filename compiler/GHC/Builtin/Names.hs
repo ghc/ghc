@@ -119,7 +119,6 @@ in GHC.Builtin.Types.
 -}
 
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 module GHC.Builtin.Names
    ( Unique, Uniquable(..), hasKey,  -- Re-exported for convenience
@@ -143,6 +142,8 @@ import GHC.Builtin.Uniques
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Data.FastString
+import GHC.Data.List.Infinite (Infinite (..))
+import qualified GHC.Data.List.Infinite as Inf
 
 import Language.Haskell.Syntax.Module.Name
 
@@ -154,9 +155,13 @@ import Language.Haskell.Syntax.Module.Name
 ************************************************************************
 -}
 
-allNameStrings :: [String]
+allNameStrings :: Infinite String
 -- Infinite list of a,b,c...z, aa, ab, ac, ... etc
-allNameStrings = [ c:cs | cs <- "" : allNameStrings, c <- ['a'..'z'] ]
+allNameStrings = Inf.allListsOf ['a'..'z']
+
+allNameStringList :: [String]
+-- Infinite list of a,b,c...z, aa, ab, ac, ... etc
+allNameStringList = Inf.toList allNameStrings
 
 {-
 ************************************************************************

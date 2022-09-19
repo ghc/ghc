@@ -378,6 +378,7 @@ Library
         GHC.Data.Graph.Ppr
         GHC.Data.Graph.UnVar
         GHC.Data.IOEnv
+        GHC.Data.List.Infinite
         GHC.Data.List.SetOps
         GHC.Data.Maybe
         GHC.Data.OrdList

@@ -173,7 +173,7 @@ normaliseFfiType' env ty0 = runWriterT $ go Representational initRecTc ty0
           children_only
             = do { args <- unzipRedns <$>
                             zipWithM ( \ ty r -> go r rec_nts ty )
-                                     tys (tyConRolesX role tc)
+                                     tys (tyConRoleListX role tc)
                  ; return $ mkTyConAppRedn role tc args }
           nt_co  = mkUnbranchedAxInstCo role (newTyConCo tc) tys []
           nt_rhs = newTyConInstRhs tc tys

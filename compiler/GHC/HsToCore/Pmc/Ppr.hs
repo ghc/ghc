@@ -1,6 +1,5 @@
 
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | Provides facilities for pretty-printing 'Nabla's in a way appropriate for
 -- user facing pattern match warnings.
@@ -10,6 +9,8 @@ module GHC.HsToCore.Pmc.Ppr (
 
 import GHC.Prelude
 
+import GHC.Data.List.Infinite (Infinite (..))
+import qualified GHC.Data.List.Infinite as Inf
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Var.Env
@@ -101,12 +102,11 @@ prettifyRefuts nabla = listToUDFM_Directly . map attach_refuts . udfmToList
     attach_refuts (u, (x, sdoc)) = (u, (sdoc, lookupRefuts nabla x))
 
 
-type PmPprM a = RWS Nabla () (DIdEnv (Id, SDoc), [SDoc]) a
+type PmPprM a = RWS Nabla () (DIdEnv (Id, SDoc), Infinite SDoc) a
 
 -- Try nice names p,q,r,s,t before using the (ugly) t_i
-nameList :: [SDoc]
-nameList = map text ["p","q","r","s","t"] ++
-            [ text ('t':show u) | u <- [(0 :: Int)..] ]
+nameList :: Infinite SDoc
+nameList = map text ["p","q","r","s","t"] Inf.++ flip Inf.unfoldr (0 :: Int) (\ u -> (text ('t':show u), u+1))
 
 runPmPpr :: Nabla -> PmPprM a -> (a, DIdEnv (Id, SDoc))
 runPmPpr nabla m = case runRWS m nabla (emptyDVarEnv, nameList) of
@@ -117,7 +117,7 @@ runPmPpr nabla m = case runRWS m nabla (emptyDVarEnv, nameList) of
 getCleanName :: Id -> PmPprM SDoc
 getCleanName x = do
   (renamings, name_supply) <- get
-  let (clean_name:name_supply') = name_supply
+  let Inf clean_name name_supply' = name_supply
   case lookupDVarEnv renamings x of
     Just (_, nm) -> pure nm
     Nothing -> do

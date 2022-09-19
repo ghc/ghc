@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
@@ -125,6 +126,8 @@ import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.FastString
+import GHC.Data.List.Infinite ( Infinite (..) )
+import qualified GHC.Data.List.Infinite as Inf
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Data.Bag( unitBag )
@@ -3693,12 +3696,10 @@ splitTyConKind skol_info in_scope avoid_occs kind
         ; uniqs   <- newUniqueSupply
         ; rdr_env <- getLocalRdrEnv
         ; lvl     <- getTcLevel
-        ; let new_occs = [ occ
-                         | str <- allNameStrings
-                         , let occ = mkOccName tvName str
-                         , isNothing (lookupLocalRdrOcc rdr_env occ)
-                         -- Note [Avoid name clashes for associated data types]
-                         , not (occ `elem` avoid_occs) ]
+        ; let new_occs = Inf.filter (\ occ ->
+                  isNothing (lookupLocalRdrOcc rdr_env occ) &&
+                  -- Note [Avoid name clashes for associated data types]
+                  not (occ `elem` avoid_occs)) $ mkOccName tvName <$> allNameStrings
               new_uniqs = uniqsFromSupply uniqs
               subst = mkEmptySubst in_scope
               details = SkolemTv skol_info (pushTcLevel lvl) False
@@ -3716,8 +3717,8 @@ splitTyConKind skol_info in_scope avoid_occs kind
                         name   = mkInternalName uniq occ loc
                         tv     = mkTcTyVar name arg' details
                         subst' = extendSubstInScope subst tv
-                        (uniq:uniqs') = uniqs
-                        (occ:occs')   = occs
+                        uniq:uniqs' = uniqs
+                        Inf occ occs' = occs
 
                     Just (Named (Bndr tv vis), kind')
                       -> go occs uniqs subst' (tcb : acc) kind'

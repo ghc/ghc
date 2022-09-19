@@ -42,6 +42,8 @@ import Control.Monad
 import Control.Applicative (liftA3)
 import GHC.Builtin.Types.Prim (tYPETyCon)
 import Data.List ( find )
+import GHC.Data.List.Infinite (Infinite)
+import qualified GHC.Data.List.Infinite as Inf
 
 {-
 ************************************************************************
@@ -368,7 +370,7 @@ we skip adding to the cache here.
 {-# INLINE rewrite_args_tc #-}
 rewrite_args_tc
   :: TyCon         -- T
-  -> Maybe [Role]  -- Nothing: ambient role is Nominal; all args are Nominal
+  -> Maybe (Infinite Role)  -- Nothing: ambient role is Nominal; all args are Nominal
                    -- Otherwise: no assumptions; use roles provided
   -> [Type]
   -> RewriteM ArgsReductions -- See the commentary on rewrite_args
@@ -392,7 +394,7 @@ rewrite_args_tc tc = rewrite_args all_bndrs any_named_bndrs inner_ki emptyVarSet
 rewrite_args :: [TyCoBinder] -> Bool -- Binders, and True iff any of them are
                                      -- named.
              -> Kind -> TcTyCoVarSet -- function kind; kind's free vars
-             -> Maybe [Role] -> [Type]    -- these are in 1-to-1 correspondence
+             -> Maybe (Infinite Role) -> [Type]    -- these are in 1-to-1 correspondence
                                           -- Nothing: use all Nominal
              -> RewriteM ArgsReductions
 -- This function returns ArgsReductions (Reductions cos xis) res_co
@@ -413,7 +415,7 @@ rewrite_args orig_binders
   = case (orig_m_roles, any_named_bndrs) of
       (Nothing, False) -> rewrite_args_fast orig_tys
       _ -> rewrite_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
-        where orig_roles = fromMaybe (repeat Nominal) orig_m_roles
+        where orig_roles = fromMaybe (Inf.repeat Nominal) orig_m_roles
 
 {-# INLINE rewrite_args_fast #-}
 -- | fast path rewrite_args, in which none of the binders are named and
@@ -438,10 +440,10 @@ rewrite_args_fast orig_tys
 -- | Slow path, compared to rewrite_args_fast, because this one must track
 -- a lifting context.
 rewrite_args_slow :: [TyCoBinder] -> Kind -> TcTyCoVarSet
-                  -> [Role] -> [Type]
+                  -> Infinite Role -> [Type]
                   -> RewriteM ArgsReductions
 rewrite_args_slow binders inner_ki fvs roles tys
-  = do { rewritten_args <- zipWithM rw roles tys
+  = do { rewritten_args <- zipWithM rw (Inf.toList roles) tys
        ; return (simplifyArgsWorker binders inner_ki fvs roles rewritten_args) }
   where
     {-# INLINE rw #-}
@@ -587,7 +589,7 @@ rewrite_app_ty_args fun_redn@(Reduction fun_co fun_xi) arg_tys
   = do { het_redn <- case tcSplitTyConApp_maybe fun_xi of
            Just (tc, xis) ->
              do { let tc_roles  = tyConRolesRepresentational tc
-                      arg_roles = dropList xis tc_roles
+                      arg_roles = Inf.dropList xis tc_roles
                 ; ArgsReductions (Reductions arg_cos arg_xis) kind_co
                     <- rewrite_vector (tcTypeKind fun_xi) arg_roles arg_tys
 
@@ -608,7 +610,7 @@ rewrite_app_ty_args fun_redn@(Reduction fun_co fun_xi) arg_tys
                         ReprEq -> mkAppCos fun_co (map mkNomReflCo arg_tys)
                                   `mkTcTransCo`
                                   mkTcTyConAppCo Representational tc
-                                    (zipWith mkReflCo tc_roles xis ++ arg_cos)
+                                    (zipWith mkReflCo (Inf.toList tc_roles) xis ++ arg_cos)
 
                 ; return $
                     mkHetReduction
@@ -616,7 +618,7 @@ rewrite_app_ty_args fun_redn@(Reduction fun_co fun_xi) arg_tys
                       kind_co }
            Nothing ->
              do { ArgsReductions redns kind_co
-                    <- rewrite_vector (tcTypeKind fun_xi) (repeat Nominal) arg_tys
+                    <- rewrite_vector (tcTypeKind fun_xi) (Inf.repeat Nominal) arg_tys
                 ; return $ mkHetReduction (mkAppRedns fun_redn redns) kind_co }
 
        ; role <- getRole
@@ -636,7 +638,7 @@ rewrite_ty_con_app tc tys
 
 -- Rewrite a vector (list of arguments).
 rewrite_vector :: Kind   -- of the function being applied to these arguments
-               -> [Role] -- If we're rewriting w.r.t. ReprEq, what roles do the
+               -> Infinite Role -- If we're rewriting w.r.t. ReprEq, what roles do the
                          -- args have?
                -> [Type] -- the args to rewrite
                -> RewriteM ArgsReductions

@@ -87,6 +87,7 @@ GHC.Data.FiniteMap
 GHC.Data.Graph.Directed
 GHC.Data.Graph.UnVar
 GHC.Data.IOEnv
+GHC.Data.List.Infinite
 GHC.Data.List.SetOps
 GHC.Data.Maybe
 GHC.Data.OrdList

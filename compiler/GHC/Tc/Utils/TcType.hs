@@ -976,7 +976,7 @@ any_rewritable role tv_pred tc_pred should_expand
 
     go_tc NomEq  bvs _  tys = any (go NomEq bvs) tys
     go_tc ReprEq bvs tc tys = any (go_arg bvs)
-                              (tyConRolesRepresentational tc `zip` tys)
+                              (tyConRoleListRepresentational tc `zip` tys)
 
     go_arg bvs (Nominal,          ty) = go NomEq  bvs ty
     go_arg bvs (Representational, ty) = go ReprEq bvs ty
