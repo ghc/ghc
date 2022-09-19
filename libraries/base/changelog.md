@@ -31,6 +31,11 @@
     as well as [the migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/export-lifta2-prelude.md)
   * Update to Unicode 15.0.0.
   * Add `Eq` and `Ord` instances for `Generically1`.
+  * Relax instances for Functor combinators; put superclass on Class1 and Class2
+    to make non-breaking. See [CLC
+    #10](https://github.com/haskell/core-libraries-committee/issues/10) for the
+    related discussion, as well as [the migration
+    guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/functor-combinator-instances-and-class1s.md).
 
 ## 4.17.0.0 *August 2022*
 
