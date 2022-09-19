@@ -117,6 +117,11 @@ data StgArgMap a = SAM
     , sam_lit :: LiteralMap a
     }
 
+-- TODO(22292): derive
+instance Functor StgArgMap where
+    fmap f SAM { sam_var = varm, sam_lit = litm } = SAM
+      { sam_var = fmap f varm, sam_lit = fmap f litm }
+
 instance TrieMap StgArgMap where
     type Key StgArgMap = StgArg
     emptyTM  = SAM { sam_var = emptyTM
@@ -126,12 +131,15 @@ instance TrieMap StgArgMap where
     alterTM  (StgVarArg var) f m = m { sam_var = sam_var m |> xtDFreeVar var f }
     alterTM  (StgLitArg lit) f m = m { sam_lit = sam_lit m |> alterTM lit f }
     foldTM k m = foldTM k (sam_var m) . foldTM k (sam_lit m)
-    mapTM f (SAM {sam_var = varm, sam_lit = litm}) =
-        SAM { sam_var = mapTM f varm, sam_lit = mapTM f litm }
     filterTM f (SAM {sam_var = varm, sam_lit = litm}) =
         SAM { sam_var = filterTM f varm, sam_lit = filterTM f litm }
 
 newtype ConAppMap a = CAM { un_cam :: DNameEnv (ListMap StgArgMap a) }
+
+-- TODO(22292): derive
+instance Functor ConAppMap where
+    fmap f = CAM . fmap (fmap f) . un_cam
+    {-# INLINE fmap #-}
 
 instance TrieMap ConAppMap where
     type Key ConAppMap = (DataCon, [StgArg])
@@ -140,8 +148,7 @@ instance TrieMap ConAppMap where
     alterTM  (dataCon, args) f m =
         m { un_cam = un_cam m |> xtDNamed dataCon |>> alterTM args f }
     foldTM k = un_cam >.> foldTM (foldTM k)
-    mapTM f  = un_cam >.> mapTM (mapTM f) >.> CAM
-    filterTM f = un_cam >.> mapTM (filterTM f) >.> CAM
+    filterTM f = un_cam >.> fmap (filterTM f) >.> CAM
 
 -----------------
 -- The CSE Env --

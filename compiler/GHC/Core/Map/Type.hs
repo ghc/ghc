@@ -83,17 +83,26 @@ import GHC.Data.Maybe
 -- just look up the coercion's type.
 newtype CoercionMap a = CoercionMap (CoercionMapG a)
 
+-- TODO(22292): derive
+instance Functor CoercionMap where
+    fmap f = \ (CoercionMap m) -> CoercionMap (fmap f m)
+    {-# INLINE fmap #-}
+
 instance TrieMap CoercionMap where
    type Key CoercionMap = Coercion
    emptyTM                     = CoercionMap emptyTM
    lookupTM k  (CoercionMap m) = lookupTM (deBruijnize k) m
    alterTM k f (CoercionMap m) = CoercionMap (alterTM (deBruijnize k) f m)
    foldTM k    (CoercionMap m) = foldTM k m
-   mapTM f     (CoercionMap m) = CoercionMap (mapTM f m)
    filterTM f  (CoercionMap m) = CoercionMap (filterTM f m)
 
 type CoercionMapG = GenMap CoercionMapX
 newtype CoercionMapX a = CoercionMapX (TypeMapX a)
+
+-- TODO(22292): derive
+instance Functor CoercionMapX where
+    fmap f = \ (CoercionMapX core_tm) -> CoercionMapX (fmap f core_tm)
+    {-# INLINE fmap #-}
 
 instance TrieMap CoercionMapX where
   type Key CoercionMapX = DeBruijn Coercion
@@ -101,7 +110,6 @@ instance TrieMap CoercionMapX where
   lookupTM = lkC
   alterTM  = xtC
   foldTM f (CoercionMapX core_tm) = foldTM f core_tm
-  mapTM f (CoercionMapX core_tm)  = CoercionMapX (mapTM f core_tm)
   filterTM f (CoercionMapX core_tm) = CoercionMapX (filterTM f core_tm)
 
 instance Eq (DeBruijn Coercion) where
@@ -172,13 +180,21 @@ trieMapView ty
   | Just ty' <- tcView ty = Just ty'
 trieMapView _ = Nothing
 
+-- TODO(22292): derive
+instance Functor TypeMapX where
+    fmap f TM
+      { tm_var = tvar, tm_app = tapp, tm_tycon = ttycon, tm_funty = tfunty, tm_forall = tforall
+      , tm_tylit = tlit, tm_coerce = tcoerce } = TM
+      { tm_var = fmap f tvar, tm_app = fmap (fmap f) tapp, tm_tycon = fmap f ttycon
+      , tm_funty = fmap (fmap (fmap f)) tfunty, tm_forall = fmap (fmap f) tforall
+      , tm_tylit  = fmap f tlit, tm_coerce = fmap f tcoerce }
+
 instance TrieMap TypeMapX where
    type Key TypeMapX = DeBruijn Type
    emptyTM  = emptyT
    lookupTM = lkT
    alterTM  = xtT
    foldTM   = fdT
-   mapTM    = mapT
    filterTM = filterT
 
 instance Eq (DeBruijn Type) where
@@ -313,18 +329,6 @@ emptyT = TM { tm_var  = emptyTM
             , tm_tylit  = emptyTyLitMap
             , tm_coerce = Nothing }
 
-mapT :: (a->b) -> TypeMapX a -> TypeMapX b
-mapT f (TM { tm_var  = tvar, tm_app = tapp, tm_tycon = ttycon
-           , tm_funty = tfunty, tm_forall = tforall, tm_tylit = tlit
-           , tm_coerce = tcoerce })
-  = TM { tm_var    = mapTM f tvar
-       , tm_app    = mapTM (mapTM f) tapp
-       , tm_tycon  = mapTM f ttycon
-       , tm_funty  = mapTM (mapTM (mapTM f)) tfunty
-       , tm_forall = mapTM (mapTM f) tforall
-       , tm_tylit  = mapTM f tlit
-       , tm_coerce = fmap f tcoerce }
-
 -----------------
 lkT :: DeBruijn Type -> TypeMapX a -> Maybe a
 lkT (D env ty) m = go ty m
@@ -382,10 +386,10 @@ filterT f (TM { tm_var  = tvar, tm_app = tapp, tm_tycon = ttycon
               , tm_funty = tfunty, tm_forall = tforall, tm_tylit = tlit
               , tm_coerce = tcoerce })
   = TM { tm_var    = filterTM f tvar
-       , tm_app    = mapTM (filterTM f) tapp
+       , tm_app    = fmap (filterTM f) tapp
        , tm_tycon  = filterTM f ttycon
-       , tm_funty  = mapTM (mapTM (filterTM f)) tfunty
-       , tm_forall = mapTM (filterTM f) tforall
+       , tm_funty  = fmap (fmap (filterTM f)) tfunty
+       , tm_forall = fmap (filterTM f) tforall
        , tm_tylit  = filterTM f tlit
        , tm_coerce = filterMaybe f tcoerce }
 
@@ -395,21 +399,21 @@ data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
                       , tlm_char   :: Map.Map Char a
                       }
 
+-- TODO(22292): derive
+instance Functor TyLitMap where
+    fmap f TLM { tlm_number = tn, tlm_string = ts, tlm_char = tc } = TLM
+      { tlm_number = Map.map f tn, tlm_string = mapUFM f ts, tlm_char = Map.map f tc }
+
 instance TrieMap TyLitMap where
    type Key TyLitMap = TyLit
    emptyTM  = emptyTyLitMap
    lookupTM = lkTyLit
    alterTM  = xtTyLit
    foldTM   = foldTyLit
-   mapTM    = mapTyLit
    filterTM = filterTyLit
 
 emptyTyLitMap :: TyLitMap a
 emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = emptyUFM, tlm_char = Map.empty }
-
-mapTyLit :: (a->b) -> TyLitMap a -> TyLitMap b
-mapTyLit f (TLM { tlm_number = tn, tlm_string = ts, tlm_char = tc })
-  = TLM { tlm_number = Map.map f tn, tlm_string = mapUFM f ts, tlm_char = Map.map f tc }
 
 lkTyLit :: TyLit -> TyLitMap a -> Maybe a
 lkTyLit l =
@@ -439,6 +443,11 @@ filterTyLit f (TLM { tlm_number = tn, tlm_string = ts, tlm_char = tc })
 -- is the type you want. The keys in this map may have different kinds.
 newtype TypeMap a = TypeMap (TypeMapG (TypeMapG a))
 
+-- TODO(22292): derive
+instance Functor TypeMap where
+    fmap f = \ (TypeMap m) -> TypeMap (fmap (fmap f) m)
+    {-# INLINE fmap #-}
+
 lkTT :: DeBruijn Type -> TypeMap a -> Maybe a
 lkTT (D env ty) (TypeMap m) = lkG (D env $ typeKind ty) m
                           >>= lkG (D env ty)
@@ -456,8 +465,7 @@ instance TrieMap TypeMap where
     lookupTM k m = lkTT (deBruijnize k) m
     alterTM k f m = xtTT (deBruijnize k) f m
     foldTM k (TypeMap m) = foldTM (foldTM k) m
-    mapTM f (TypeMap m) = TypeMap (mapTM (mapTM f) m)
-    filterTM f (TypeMap m) = TypeMap (mapTM (filterTM f) m)
+    filterTM f (TypeMap m) = TypeMap (fmap (filterTM f) m)
 
 foldTypeMap :: (a -> b -> b) -> b -> TypeMap a -> b
 foldTypeMap k z m = foldTM k m z
@@ -488,8 +496,12 @@ mkDeBruijnContext = extendCMEs emptyCME
 
 -- | A 'LooseTypeMap' doesn't do a kind-check. Thus, when lookup up (t |> g),
 -- you'll find entries inserted under (t), even if (g) is non-reflexive.
-newtype LooseTypeMap a
-  = LooseTypeMap (TypeMapG a)
+newtype LooseTypeMap a = LooseTypeMap (TypeMapG a)
+
+-- TODO(22292): derive
+instance Functor LooseTypeMap where
+    fmap f = \ (LooseTypeMap m) -> LooseTypeMap (fmap f m)
+    {-# INLINE fmap #-}
 
 instance TrieMap LooseTypeMap where
   type Key LooseTypeMap = Type
@@ -497,7 +509,6 @@ instance TrieMap LooseTypeMap where
   lookupTM k (LooseTypeMap m) = lookupTM (deBruijnize k) m
   alterTM k f (LooseTypeMap m) = LooseTypeMap (alterTM (deBruijnize k) f m)
   foldTM f (LooseTypeMap m) = foldTM f m
-  mapTM f (LooseTypeMap m) = LooseTypeMap (mapTM f m)
   filterTM f (LooseTypeMap m) = LooseTypeMap (filterTM f m)
 
 {-
@@ -566,17 +577,18 @@ instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
 -- of pairs are composition.
 data BndrMap a = BndrMap (TypeMapG (MaybeMap TypeMapG a))
 
+-- TODO(22292): derive
+instance Functor BndrMap where
+    fmap f = \ (BndrMap tm) -> BndrMap (fmap (fmap f) tm)
+    {-# INLINE fmap #-}
+
 instance TrieMap BndrMap where
    type Key BndrMap = Var
    emptyTM  = BndrMap emptyTM
    lookupTM = lkBndr emptyCME
    alterTM  = xtBndr emptyCME
    foldTM   = fdBndrMap
-   mapTM    = mapBndrMap
    filterTM = ftBndrMap
-
-mapBndrMap :: (a -> b) -> BndrMap a -> BndrMap b
-mapBndrMap f (BndrMap tm) = BndrMap (mapTM (mapTM f) tm)
 
 fdBndrMap :: (a -> b -> b) -> BndrMap a -> b -> b
 fdBndrMap f (BndrMap tm) = foldTM (foldTM f) tm
@@ -596,11 +608,15 @@ xtBndr env v xt (BndrMap tymap)  =
   BndrMap (tymap |> xtG (D env (varType v)) |>> (alterTM (D env <$> varMultMaybe v) xt))
 
 ftBndrMap :: (a -> Bool) -> BndrMap a -> BndrMap a
-ftBndrMap f (BndrMap tm) = BndrMap (mapTM (filterTM f) tm)
+ftBndrMap f (BndrMap tm) = BndrMap (fmap (filterTM f) tm)
 
 --------- Variable occurrence -------------
 data VarMap a = VM { vm_bvar   :: BoundVarMap a  -- Bound variable
                    , vm_fvar   :: DVarEnv a }      -- Free variable
+
+-- TODO(22292): derive
+instance Functor VarMap where
+    fmap f VM { vm_bvar = bv, vm_fvar = fv } = VM { vm_bvar = fmap f bv, vm_fvar = fmap f fv }
 
 instance TrieMap VarMap where
    type Key VarMap = Var
@@ -608,12 +624,7 @@ instance TrieMap VarMap where
    lookupTM = lkVar emptyCME
    alterTM  = xtVar emptyCME
    foldTM   = fdVar
-   mapTM    = mapVar
    filterTM = ftVar
-
-mapVar :: (a->b) -> VarMap a -> VarMap b
-mapVar f (VM { vm_bvar = bv, vm_fvar = fv })
-  = VM { vm_bvar = mapTM f bv, vm_fvar = mapTM f fv }
 
 lkVar :: CmEnv -> Var -> VarMap a -> Maybe a
 lkVar env v

@@ -66,12 +66,11 @@ Structures", Section 10.3.2
 type XT a = Maybe a -> Maybe a  -- How to alter a non-existent elt (Nothing)
                                 --               or an existing elt (Just)
 
-class TrieMap m where
+class Functor m => TrieMap m where
    type Key m :: Type
    emptyTM  :: m a
    lookupTM :: forall b. Key m -> m b -> Maybe b
    alterTM  :: forall b. Key m -> XT b -> m b -> m b
-   mapTM    :: (a->b) -> m a -> m b
    filterTM :: (a -> Bool) -> m a -> m a
 
    foldTM   :: (a -> b -> b) -> m a -> b -> b
@@ -117,6 +116,25 @@ deMaybe Nothing  = emptyTM
 deMaybe (Just m) = m
 
 {-
+Note [Every TrieMap is a Functor]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Every TrieMap T admits
+   fmap :: (a->b) -> T a -> T b
+where (fmap f t) applies `f` to every element of the range of `t`.
+Ergo, we make `Functor` a superclass of `TrieMap`.
+
+Moreover it is almost invariably possible to /derive/ Functor for each
+particular instance. E.g. in the list instance we have
+    data ListMap m a
+      = LM { lm_nil  :: Maybe a
+           , lm_cons :: m (ListMap m a) }
+      deriving (Functor)
+    instance TrieMap m => TrieMap (ListMap m) where { .. }
+
+Alas, we not yet derive `Functor` for reasons of performance; see #22292.
+-}
+
+{-
 ************************************************************************
 *                                                                      *
                    IntMaps
@@ -130,7 +148,6 @@ instance TrieMap IntMap.IntMap where
   lookupTM k m = IntMap.lookup k m
   alterTM = xtInt
   foldTM k m z = IntMap.foldr k z m
-  mapTM f m = IntMap.map f m
   filterTM f m = IntMap.filter f m
 
 xtInt :: Int -> XT a -> IntMap.IntMap a -> IntMap.IntMap a
@@ -142,7 +159,6 @@ instance Ord k => TrieMap (Map.Map k) where
   lookupTM = Map.lookup
   alterTM k f m = Map.alter f k m
   foldTM k m z = Map.foldr k z m
-  mapTM f m = Map.map f m
   filterTM f m = Map.filter f m
 
 
@@ -219,7 +235,6 @@ instance forall key. Uniquable key => TrieMap (UniqDFM key) where
   lookupTM k m = lookupUDFM m k
   alterTM k f m = alterUDFM f m k
   foldTM k m z = foldUDFM k z m
-  mapTM f m = mapUDFM f m
   filterTM f m = filterUDFM f m
 
 {-
@@ -235,21 +250,21 @@ then (MaybeMap m) is a map from (Maybe k) -> val
 
 data MaybeMap m a = MM { mm_nothing  :: Maybe a, mm_just :: m a }
 
+-- TODO(22292): derive
+instance Functor m => Functor (MaybeMap m) where
+    fmap f MM { mm_nothing = mn, mm_just = mj } = MM
+      { mm_nothing = fmap f mn, mm_just = fmap f mj }
+
 instance TrieMap m => TrieMap (MaybeMap m) where
    type Key (MaybeMap m) = Maybe (Key m)
    emptyTM  = MM { mm_nothing = Nothing, mm_just = emptyTM }
    lookupTM = lkMaybe lookupTM
    alterTM  = xtMaybe alterTM
    foldTM   = fdMaybe
-   mapTM    = mapMb
    filterTM = ftMaybe
 
 instance TrieMap m => Foldable (MaybeMap m) where
   foldMap = foldMapTM
-
-mapMb :: TrieMap m => (a->b) -> MaybeMap m a -> MaybeMap m b
-mapMb f (MM { mm_nothing = mn, mm_just = mj })
-  = MM { mm_nothing = fmap f mn, mm_just = mapTM f mj }
 
 lkMaybe :: (forall b. k -> m b -> Maybe b)
         -> Maybe k -> MaybeMap m a -> Maybe a
@@ -290,13 +305,17 @@ data ListMap m a
   = LM { lm_nil  :: Maybe a
        , lm_cons :: m (ListMap m a) }
 
+-- TODO(22292): derive
+instance Functor m => Functor (ListMap m) where
+    fmap f LM { lm_nil = mnil, lm_cons = mcons } = LM
+      { lm_nil = fmap f mnil, lm_cons = fmap (fmap f) mcons }
+
 instance TrieMap m => TrieMap (ListMap m) where
    type Key (ListMap m) = [Key m]
    emptyTM  = LM { lm_nil = Nothing, lm_cons = emptyTM }
    lookupTM = lkList lookupTM
    alterTM  = xtList alterTM
    foldTM   = fdList
-   mapTM    = mapList
    filterTM = ftList
 
 instance TrieMap m => Foldable (ListMap m) where
@@ -304,10 +323,6 @@ instance TrieMap m => Foldable (ListMap m) where
 
 instance (TrieMap m, Outputable a) => Outputable (ListMap m a) where
   ppr m = text "List elts" <+> ppr (foldTM (:) m [])
-
-mapList :: TrieMap m => (a->b) -> ListMap m a -> ListMap m b
-mapList f (LM { lm_nil = mnil, lm_cons = mcons })
-  = LM { lm_nil = fmap f mnil, lm_cons = mapTM (mapTM f) mcons }
 
 lkList :: TrieMap m => (forall b. k -> m b -> Maybe b)
         -> [k] -> ListMap m a -> Maybe a
@@ -326,7 +341,7 @@ fdList k m = foldMaybe k          (lm_nil m)
 
 ftList :: TrieMap m => (a -> Bool) -> ListMap m a -> ListMap m a
 ftList f (LM { lm_nil = mnil, lm_cons = mcons })
-  = LM { lm_nil = filterMaybe f mnil, lm_cons = mapTM (filterTM f) mcons }
+  = LM { lm_nil = filterMaybe f mnil, lm_cons = fmap (filterTM f) mcons }
 
 {-
 ************************************************************************
@@ -380,6 +395,11 @@ instance (Outputable a, Outputable (m a)) => Outputable (GenMap m a) where
   ppr (SingletonMap _ v) = text "Singleton map" <+> ppr v
   ppr (MultiMap m) = ppr m
 
+-- TODO(22292): derive
+instance Functor m => Functor (GenMap m) where
+    fmap = mapG
+    {-# INLINE fmap #-}
+
 -- TODO undecidable instance
 instance (Eq (Key m), TrieMap m) => TrieMap (GenMap m) where
    type Key (GenMap m) = Key m
@@ -387,7 +407,6 @@ instance (Eq (Key m), TrieMap m) => TrieMap (GenMap m) where
    lookupTM = lkG
    alterTM  = xtG
    foldTM   = fdG
-   mapTM    = mapG
    filterTM = ftG
 
 instance (Eq (Key m), TrieMap m) => Foldable (GenMap m) where
@@ -431,10 +450,10 @@ xtG k f m@(SingletonMap k' v')
 xtG k f (MultiMap m) = MultiMap (alterTM k f m)
 
 {-# INLINEABLE mapG #-}
-mapG :: TrieMap m => (a -> b) -> GenMap m a -> GenMap m b
+mapG :: Functor m => (a -> b) -> GenMap m a -> GenMap m b
 mapG _ EmptyMap = EmptyMap
 mapG f (SingletonMap k v) = SingletonMap k (f v)
-mapG f (MultiMap m) = MultiMap (mapTM f m)
+mapG f (MultiMap m) = MultiMap (fmap f m)
 
 {-# INLINEABLE fdG #-}
 fdG :: TrieMap m => (a -> b -> b) -> GenMap m a -> b -> b

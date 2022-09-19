@@ -140,7 +140,6 @@ instance TrieMap LabelMap where
   lookupTM k m = mapLookup k m
   alterTM k f m = mapAlter f k m
   foldTM k m z = mapFoldr k z m
-  mapTM f m = mapMap f m
   filterTM f m = mapFilter f m
 
 -----------------------------------------------------------------------------
