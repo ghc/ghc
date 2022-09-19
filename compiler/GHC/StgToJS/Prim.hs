@@ -470,7 +470,9 @@ genPrim prof ty op = case op of
   DoubleToIntOp     -> \[r] [x]   -> PrimInline $ r |= i32 x
   DoubleToFloatOp   -> \[r] [x]   -> PrimInline $ r |= app "h$fround" [x]
   DoubleExpOp       -> \[r] [x]   -> PrimInline $ r |= math_exp  [x]
+  DoubleExpM1Op     -> \[r] [x]   -> PrimInline $ r |= math_exp  [x]
   DoubleLogOp       -> \[r] [x]   -> PrimInline $ r |= math_log  [x]
+  DoubleLog1POp     -> \[r] [x]   -> PrimInline $ r |= math_log  [x]
   DoubleSqrtOp      -> \[r] [x]   -> PrimInline $ r |= math_sqrt [x]
   DoubleSinOp       -> \[r] [x]   -> PrimInline $ r |= math_sin  [x]
   DoubleCosOp       -> \[r] [x]   -> PrimInline $ r |= math_cos  [x]
@@ -504,7 +506,9 @@ genPrim prof ty op = case op of
   FloatFabsOp       -> \[r] [x]   -> PrimInline $ r |= math_abs [x]
   FloatToIntOp      -> \[r] [x]   -> PrimInline $ r |= i32 x
   FloatExpOp        -> \[r] [x]   -> PrimInline $ r |= math_exp [x]
+  FloatExpM1Op      -> \[r] [x]   -> PrimInline $ r |= math_exp [x]
   FloatLogOp        -> \[r] [x]   -> PrimInline $ r |= math_log [x]
+  FloatLog1POp      -> \[r] [x]   -> PrimInline $ r |= math_log [x]
   FloatSqrtOp       -> \[r] [x]   -> PrimInline $ r |= math_sqrt [x]
   FloatSinOp        -> \[r] [x]   -> PrimInline $ r |= math_sin [x]
   FloatCosOp        -> \[r] [x]   -> PrimInline $ r |= math_cos [x]
@@ -1027,16 +1031,6 @@ genPrim prof ty op = case op of
   TraceEventBinaryOp -> \[] [ed,eo,len] -> PrimInline $ appS "h$traceEventBinary" [ed,eo,len]
   TraceMarkerOp      -> \[] [ed,eo]     -> PrimInline $ appS "h$traceMarker" [ed,eo]
 
------------------------------- Unhandled primops -------------------
-
-  DoubleExpM1Op                     -> unhandledPrimop op
-  DoubleLog1POp                     -> unhandledPrimop op
-  FloatExpM1Op                      -> unhandledPrimop op
-  FloatLog1POp                      -> unhandledPrimop op
-
-  ShrinkSmallMutableArrayOp_Char    -> unhandledPrimop op
-  GetSizeofSmallMutableArrayOp      -> unhandledPrimop op
-
   IndexByteArrayOp_Word8AsChar      -> \[r] [a,i] -> PrimInline $ r |= dv_u8  a i
   IndexByteArrayOp_Word8AsWideChar  -> \[r] [a,i] -> PrimInline $ r |= dv_i32 a i
   IndexByteArrayOp_Word8AsAddr      -> \[r1,r2] [a,i] ->
@@ -1161,10 +1155,6 @@ genPrim prof ty op = case op of
                                    mempty
                              ]
 
-
-  InterlockedExchange_Addr          -> unhandledPrimop op
-  InterlockedExchange_Word          -> unhandledPrimop op
-
   CasAddrOp_Addr                    -> \[r_a,r_o] [a1,o1,a2,o2,a3,o3] -> PrimInline $
                     mconcat [ ifS (app "h$comparePointer" [a1,o1,a2,o2])
                                   (appS "h$memcpy" [a3,o3,a1,o1,8])
@@ -1208,6 +1198,24 @@ genPrim prof ty op = case op of
   FetchNandAddrOp_Word              -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr ((BNot .) . BAnd) r a o v
   FetchOrAddrOp_Word                -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr BOr   r a o v
   FetchXorAddrOp_Word               -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr BXor  r a o v
+
+
+------------------------------ Unhandled primops -------------------
+
+  ShrinkSmallMutableArrayOp_Char    -> unhandledPrimop op
+  GetSizeofSmallMutableArrayOp      -> unhandledPrimop op
+
+  InterlockedExchange_Addr          -> \[r_a,r_o] [a1,o1,a2,o2] -> PrimInline $
+                                                             mconcat [ r_a |= a1
+                                                                     , r_o |= o1
+                                                                     , a1 .! o1 |= a2 .! o2
+                                                                     , o1       |= o2
+                                                                     ]
+  InterlockedExchange_Word          -> \[r] [a,o,w] -> PrimInline $
+                                                       mconcat [ r |= a .! o
+                                                               , dv_s_u32 a o w
+                                                               ]
+
 
   AtomicReadAddrOp_Word             -> unhandledPrimop op
   AtomicWriteAddrOp_Word            -> unhandledPrimop op
