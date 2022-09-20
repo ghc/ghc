@@ -827,6 +827,7 @@ addForeignSource lang src = do
                  LangObjc   -> "m"
                  LangObjcxx -> "mm"
                  LangAsm    -> "s"
+                 LangJs     -> "js"
                  RawObject  -> "a"
   path <- addTempFile suffix
   runIO $ writeFile path src
