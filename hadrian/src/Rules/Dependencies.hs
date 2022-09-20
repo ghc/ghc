@@ -14,6 +14,7 @@ import Target
 import Utilities
 import Packages
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import qualified Text.Parsec as Parsec
 
@@ -22,7 +23,7 @@ import qualified Text.Parsec as Parsec
 -- until it does we need to add this dependency ourselves.
 extra_dependencies :: M.Map Package (Stage -> Action [(FilePath, FilePath)])
 extra_dependencies =
-  M.fromList [(containers, fmap sequence (sequence
+  M.fromList [(containers, fmap (fmap concat . sequence) (sequence
     [dep (containers, "Data.IntSet.Internal") th_internal
     ,dep (containers, "Data.Set.Internal") th_internal
     ,dep (containers, "Data.Sequence.Internal") th_internal
@@ -32,9 +33,12 @@ extra_dependencies =
 
   where
     th_internal = (templateHaskell, "Language.Haskell.TH.Lib.Internal")
-    dep (p1, m1) (p2, m2) s = (,) <$> path s p1 m1 <*> path s p2 m2
-    path stage p m =
-      let context = Context stage p vanilla Inplace
+    dep (p1, m1) (p2, m2) s = do
+        let context = Context s p1 (error "extra_dependencies: way not set") (error "extra_dependencies: iplace not set")
+        ways <- interpretInContext context getLibraryWays
+        mapM (\way -> (,) <$> path s way p1 m1 <*> path s way p2 m2) (S.toList ways)
+    path stage way p m =
+      let context = Context stage p way Inplace
       in objectPath context . moduleSource $ m
 
 formatExtra :: (FilePath, FilePath) -> String
