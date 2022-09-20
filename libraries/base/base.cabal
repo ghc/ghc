@@ -361,7 +361,7 @@ Library
         System.Environment.ExecutablePath
         System.CPUTime.Utils
 
-    if !os(ghcjs)
+    if !arch(js)
       c-sources:
           cbits/DarwinUtils.c
           cbits/PrelIOUtils.c
@@ -377,12 +377,13 @@ Library
           cbits/CastFloatWord.cmm
           cbits/StackCloningDecoding.cmm
 
-    js-sources:
-        -- "platform" must be linked first because it defines global constants
-        -- (e.g. h$isNode)
-        jsbits/platform.js
-        jsbits/base.js
-        jsbits/errno.js
+    if arch(js)
+      js-sources:
+          -- "platform" must be linked first because it defines global constants
+          -- (e.g. h$isNode)
+          jsbits/platform.js
+          jsbits/base.js
+          jsbits/errno.js
 
     include-dirs: include
     includes:
