@@ -21,15 +21,19 @@ where
 import GHC.Prelude
 
 import GHC.Builtin.PrimOps ( PrimOp(..) )
+import GHC.Types.Basic     ( CbvMark (..), isMarkedCbv
+                           , TopLevelFlag(..), isTopLevel
+                           , Levity(..) )
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.FM
 import GHC.Types.RepType
-import GHC.Unit.Types (Module)
+import GHC.Types.Var.Set
+import GHC.Unit.Types      ( Module )
 
 import GHC.Core.DataCon
-import GHC.Core (AltCon(..) )
+import GHC.Core            ( AltCon(..) )
 import GHC.Core.Type
 
 import GHC.StgToCmm.Types
@@ -47,8 +51,7 @@ import GHC.Utils.Misc
 import GHC.Stg.InferTags.Types
 
 import Control.Monad
-import GHC.Types.Basic (CbvMark (NotMarkedCbv, MarkedCbv), isMarkedCbv, TopLevelFlag(..), isTopLevel)
-import GHC.Types.Var.Set
+
 -- import GHC.Utils.Trace
 -- import GHC.Driver.Ppr
 
@@ -217,7 +220,9 @@ isTagged v = do
     this_mod <- getMod
     case nameIsLocalOrFrom this_mod (idName v) of
         True
-            | isUnliftedType (idType v)
+            | Just Unlifted <- typeLevity_maybe (idType v)
+              -- NB: v might be the Id of a representation-polymorphic join point,
+              -- so we shouldn't use isUnliftedType here. See T22212.
             -> return True
             | otherwise -> do -- Local binding
                 !s <- getMap
