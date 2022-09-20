@@ -615,7 +615,7 @@ compileForeign hsc_env lang stub_c = do
               LangObjc   -> viaCPipeline Cobjc
               LangObjcxx -> viaCPipeline Cobjcxx
               LangAsm    -> \pe hsc_env ml fp -> asPipeline True pe hsc_env ml fp
-              LangJs     -> panic "GHC.Driver.Pipeline:compileForeign unimplemented"
+              LangJs     -> \pe hsc_env ml fp -> Just <$> jsPipeline pe hsc_env ml fp
 #if __GLASGOW_HASKELL__ < 811
               RawObject  -> panic "compileForeign: should be unreachable"
 #endif
@@ -639,14 +639,27 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   -- and https://github.com/haskell/cabal/issues/2257
   let logger = hsc_logger hsc_env
   let tmpfs  = hsc_tmpfs hsc_env
-  empty_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
   let home_unit = hsc_home_unit hsc_env
-      src = text "int" <+> ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
-  writeFile empty_stub (showSDoc dflags (pprCode src))
-  let pipe_env = (mkPipeEnv NoStop empty_stub Nothing Persistent) { src_basename = basename}
-      pipeline = viaCPipeline HCc pipe_env hsc_env (Just location) empty_stub
-  _ <- runPipeline (hsc_hooks hsc_env) pipeline
-  return ()
+
+  case backendCodeOutput (backend dflags) of
+    JSCodeOutput -> do
+      empty_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
+      let src = ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
+      writeFile empty_stub (showSDoc dflags (pprCode src))
+      let pipe_env = (mkPipeEnv NoStop empty_stub Nothing Persistent) { src_basename = basename}
+          pipeline = Just <$> jsPipeline pipe_env hsc_env (Just location) empty_stub
+      _ <- runPipeline (hsc_hooks hsc_env) pipeline
+      pure ()
+
+    _ -> do
+      empty_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
+      let src = text "int" <+> ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
+      writeFile empty_stub (showSDoc dflags (pprCode src))
+      let pipe_env = (mkPipeEnv NoStop empty_stub Nothing Persistent) { src_basename = basename}
+          pipeline = viaCPipeline HCc pipe_env hsc_env (Just location) empty_stub
+      _ <- runPipeline (hsc_hooks hsc_env) pipeline
+      pure ()
+
 
 
 {- Environment Initialisation -}
