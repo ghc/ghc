@@ -116,6 +116,8 @@ import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 import Data.IntMap (IntMap)
+import System.Directory
+import System.FilePath
 import qualified Data.IntMap as IntMap
 #if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
@@ -277,6 +279,7 @@ seekBinNoExpand (BinMem _ ix_r sz_r _) (BinPtr !p) = do
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem (BinMem _ ix_r _ arr_r) fn = do
+  createDirectoryIfMissing True (takeDirectory fn)
   h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r

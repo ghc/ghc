@@ -35,9 +35,11 @@ import          GHC.StgToJS.Types
 import           Prelude
 import GHC.Platform
 import Data.List (isPrefixOf)
+import System.Directory (createDirectoryIfMissing)
 
 writeBinaryFile :: FilePath -> ByteString -> IO ()
-writeBinaryFile file bs =
+writeBinaryFile file bs = do
+  createDirectoryIfMissing True (takeDirectory file)
   withBinaryFile file WriteMode $ \h -> mapM_ (B.hPut h) (chunks bs)
   where
     -- split the ByteString into a nonempty list of chunks of at most 1GiB

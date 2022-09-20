@@ -44,7 +44,8 @@ import GHC.Settings.IO
 import Control.Monad.Trans.Except (runExceptT)
 import System.IO
 import Foreign.Marshal.Alloc (allocaBytes)
-import System.Directory (copyFile)
+import System.Directory (copyFile,createDirectoryIfMissing)
+import System.FilePath
 
 {-
 Note [How GHC finds toolchain utilities]
@@ -155,7 +156,8 @@ copyHandle hin hout = do
 
 -- | Copy file after printing the given header
 copyWithHeader :: String -> FilePath -> FilePath -> IO ()
-copyWithHeader header from to =
+copyWithHeader header from to = do
+  createDirectoryIfMissing True (takeDirectory to)
   withBinaryFile to WriteMode $ \hout -> do
     -- write the header string in UTF-8.  The header is something like
     --   {-# LINE "foo.hs" #-}
