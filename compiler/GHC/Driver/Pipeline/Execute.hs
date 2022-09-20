@@ -128,9 +128,7 @@ runPhase (T_CmmCpp pipe_env hsc_env input_fn) = do
           })
         input_fn output_fn
   return output_fn
-runPhase (T_Js pipe_env hsc_env mb_location js_src) = do
-  _out_path <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
-  runJsPhase pipe_env hsc_env mb_location js_src
+runPhase (T_Js pipe_env hsc_env _mb_location js_src) = runJsPhase pipe_env hsc_env js_src
 runPhase (T_Cmm pipe_env hsc_env input_fn) = do
   let dflags = hsc_dflags hsc_env
   let next_phase = hscPostBackendPhase HsSrcFile (backend dflags)
@@ -346,8 +344,8 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
         return output_fn
 
 
-runJsPhase :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO FilePath
-runJsPhase pipe_env hsc_env _location input_fn = do
+runJsPhase :: PipeEnv -> HscEnv -> FilePath -> IO FilePath
+runJsPhase pipe_env hsc_env input_fn = do
         let dflags     = hsc_dflags   hsc_env
         let logger     = hsc_logger   hsc_env
         let tmpfs      = hsc_tmpfs    hsc_env
@@ -356,7 +354,7 @@ runJsPhase pipe_env hsc_env _location input_fn = do
         let header     = "//JavaScript\n"
 
         output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
-        need_cpp <- jsFileNeedsCpp hsc_env input_fn
+        need_cpp <- jsFileNeedsCpp input_fn
         tmp_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
         -- if the input filename is the same as the output, then we've probably
         -- generated the object ourselves, we leave the file alone
@@ -379,8 +377,8 @@ runJsPhase pipe_env hsc_env _location input_fn = do
           else copyWithHeader header input_fn output_fn
         return output_fn
 
-jsFileNeedsCpp :: HscEnv -> FilePath -> IO Bool
-jsFileNeedsCpp _hsc_env fn = do
+jsFileNeedsCpp :: FilePath -> IO Bool
+jsFileNeedsCpp fn = do
   opts <- JSHeader.getOptionsFromJsFile fn
   pure (JSHeader.CPP `elem` opts)
 
