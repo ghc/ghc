@@ -51,6 +51,7 @@ module GHC.StgToJS.Object
   , readObjectUnits
   , readObjectDeps
   , isGlobalUnit
+  , isJsObjectFile
   , Object(..)
   , IndexEntry(..)
   , Deps (..), BlockDeps (..), DepsLocation (..)
@@ -220,16 +221,27 @@ putObject bh mod_name deps os = do
         pure (oiSymbols o,p)
       pure idx
 
--- | Parse object header
-getObjectHeader :: BinHandle -> IO (Either String ModuleName)
-getObjectHeader bh = do
+-- | Test if the object file is a JS object
+isJsObjectFile :: FilePath -> IO Bool
+isJsObjectFile fp =
+  readBinMemN (length magic) fp >>= \case
+    Nothing -> pure False
+    Just bh -> getCheckMagic bh
+
+-- | Parse object magic
+getCheckMagic :: BinHandle -> IO Bool
+getCheckMagic bh = do
   let go_magic = \case
         []     -> pure True
         (e:es) -> getByte bh >>= \case
           c | fromIntegral (ord e) == c -> go_magic es
             | otherwise                 -> pure False
+  go_magic magic
 
-  is_magic <- go_magic magic
+-- | Parse object header
+getObjectHeader :: BinHandle -> IO (Either String ModuleName)
+getObjectHeader bh = do
+  is_magic <- getCheckMagic bh
   case is_magic of
     False -> pure (Left "invalid magic header")
     True  -> do

@@ -80,6 +80,7 @@ import GHC.Unit.Module.Env
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.Config.Finder
 import GHC.Rename.Names
+import GHC.StgToJS.Object (isJsObjectFile)
 
 import Language.Haskell.Syntax.Module.Name
 import GHC.Unit.Home.ModInfo
@@ -351,15 +352,20 @@ runJsPhase pipe_env hsc_env input_fn = do
         let logger     = hsc_logger   hsc_env
         let tmpfs      = hsc_tmpfs    hsc_env
         let unit_env   = hsc_unit_env hsc_env
-        -- the header lets the linker recognize processed JavaScript files
-        let header     = "//JavaScript\n"
 
         output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
         need_cpp <- jsFileNeedsCpp input_fn
         tmp_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
+
+        -- the header lets the linker recognize processed JavaScript files
+        -- But don't add JavaScript header to object files!
+        is_js_obj <- isJsObjectFile input_fn
+        let header
+              | is_js_obj = ""
+              | otherwise = "//JavaScript\n"
+
         -- if the input filename is the same as the output, then we've probably
         -- generated the object ourselves, we leave the file alone
-        -- FIXME (Luite 2022-08) we should make sure that we never add the JavaScript header to object files
         when (input_fn /= output_fn) $ do
           if need_cpp
           then do

@@ -48,6 +48,7 @@ module GHC.Utils.Binary
 
    writeBinMem,
    readBinMem,
+   readBinMemN,
 
    putAt, getAt,
    forwardPut, forwardPut_, forwardGet,
@@ -287,11 +288,23 @@ writeBinMem (BinMem _ ix_r _ arr_r) fn = do
   hClose h
 
 readBinMem :: FilePath -> IO BinHandle
--- Return a BinHandle with a totally undefined State
 readBinMem filename = do
   h <- openBinaryFile filename ReadMode
   filesize' <- hFileSize h
   let filesize = fromIntegral filesize'
+  readBinMem_ filesize h
+
+readBinMemN :: Int -> FilePath -> IO (Maybe BinHandle)
+readBinMemN size filename = do
+  h <- openBinaryFile filename ReadMode
+  filesize' <- hFileSize h
+  let filesize = fromIntegral filesize'
+  if filesize < size
+    then pure Nothing
+    else Just <$> readBinMem_ size h
+
+readBinMem_ :: Int -> Handle -> IO BinHandle
+readBinMem_ filesize h = do
   arr <- mallocForeignPtrBytes filesize
   count <- unsafeWithForeignPtr arr $ \p -> hGetBuf h p filesize
   when (count /= filesize) $
