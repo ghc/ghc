@@ -1,6 +1,8 @@
-{-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnboxedSums #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -95,6 +97,8 @@ import Data.List.NonEmpty ( NonEmpty(..), groupWith )
 import Data.List          ( partition )
 import Data.Maybe
 import GHC.Data.Pair
+import GHC.Base (oneShot)
+import GHC.Data.Unboxed
 
 {-
 Note [Core Lint guarantee]
@@ -262,6 +266,42 @@ branch, j is still valid. When we check the scrutinee of the inner
 case, however, we set le_joins to empty, and catch the
 error. Similarly, join points can occur free in RHSes of other join
 points but not the RHSes of value bindings (thunks and functions).
+
+Note [Avoiding compiler perf traps when constructing error messages.]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's quite common to put error messages into a where clause when it might
+be triggered by multiple branches. E.g.
+
+  checkThing x y z =
+    case x of
+      X -> unless (correctX x) $ failWithL errMsg
+      Y -> unless (correctY y) $ failWithL errMsg
+    where
+      errMsg = text "My error involving:" $$ ppr x <+> ppr y
+
+However ghc will compile this to:
+
+  checkThink x y z =
+    let errMsg = text "My error involving:" $$ ppr x <+> ppr y
+    in case x of
+      X -> unless (correctX x) $ failWithL errMsg
+      Y -> unless (correctY y) $ failWithL errMsg
+
+Putting the allocation of errMsg into the common non-error path.
+One way to work around this is to turn errMsg into a function:
+
+  checkThink x y z =
+    case x of
+      X -> unless (correctX x) $ failWithL (errMsg x y)
+      Y -> unless (correctY y) $ failWithL (errMsg x y)
+    where
+      errMsg x y = text "My error involving:" $$ ppr x <+> ppr y
+
+This way `errMsg` is a static function and it being defined in the common
+path does not result in allocation in the hot path. This can be surprisingly
+impactful. Changing `lint_app` reduced allocations for one test program I was
+looking at by ~4%.
+
 
 ************************************************************************
 *                                                                      *
@@ -1825,7 +1865,7 @@ lintTySynFamApp report_unsat ty tc tys
   = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
 
   -- Deal with type synonyms
-  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
+  | ExpandsSyn tenv rhs tys' <- expandSynTyCon_maybe tc tys
   , let expanded_ty = mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
   = do { -- Kind-check the argument types, but without reporting
          -- un-saturated type families/synonyms
@@ -1874,13 +1914,15 @@ lintArrow what t1 t2 tw  -- Eg lintArrow "type or kind `blah'" k1 k2 kw
 
 -----------------
 lint_ty_app :: Type -> LintedKind -> [LintedType] -> LintM ()
-lint_ty_app ty k tys
-  = lint_app (text "type" <+> quotes (ppr ty)) k tys
+lint_ty_app msg_ty k tys
+    -- See Note [Avoiding compiler perf traps when constructing error messages.]
+  = lint_app (\msg_ty -> text "type" <+> quotes (ppr msg_ty)) msg_ty k tys
 
 ----------------
 lint_co_app :: Coercion -> LintedKind -> [LintedType] -> LintM ()
-lint_co_app ty k tys
-  = lint_app (text "coercion" <+> quotes (ppr ty)) k tys
+lint_co_app msg_ty k tys
+    -- See Note [Avoiding compiler perf traps when constructing error messages.]
+  = lint_app (\msg_ty -> text "coercion" <+> quotes (ppr msg_ty)) msg_ty k tys
 
 ----------------
 lintTyLit :: TyLit -> LintM ()
@@ -1891,46 +1933,62 @@ lintTyLit (NumTyLit n)
 lintTyLit (StrTyLit _) = return ()
 lintTyLit (CharTyLit _) = return ()
 
-lint_app :: SDoc -> LintedKind -> [LintedType] -> LintM ()
+lint_app :: Outputable msg_thing => (msg_thing -> SDoc) -> msg_thing -> LintedKind -> [LintedType] -> LintM ()
 -- (lint_app d fun_kind arg_tys)
 --    We have an application (f arg_ty1 .. arg_tyn),
 --    where f :: fun_kind
 
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lint_app doc kfn arg_tys
-    = do { in_scope <- getInScope
+--
+-- Being strict in the kind here avoids quite a few pointless thunks
+-- reducing allocations by ~5%
+lint_app mk_msg msg_type !kfn arg_tys
+    = do { !in_scope <- getInScope
          -- We need the in_scope set to satisfy the invariant in
          -- Note [The substitution invariant] in GHC.Core.TyCo.Subst
-         ; _ <- foldlM (go_app in_scope) kfn arg_tys
-         ; return () }
+         -- Forcing the in scope set eagerly here reduces allocations by up to 4%.
+         ; go_app in_scope kfn arg_tys
+         }
   where
-    fail_msg extra = vcat [ hang (text "Kind application error in") 2 doc
-                          , nest 2 (text "Function kind =" <+> ppr kfn)
-                          , nest 2 (text "Arg types =" <+> ppr arg_tys)
-                          , extra ]
 
-    go_app in_scope kfn ta
+    -- We use explicit recursion instead of a fold here to avoid go_app becoming
+    -- an allocated function closure. This reduced allocations by up to 7% for some
+    -- modules.
+    go_app :: InScopeSet -> LintedKind -> [Type] -> LintM ()
+    go_app !in_scope !kfn ta
       | Just kfn' <- coreView kfn
       = go_app in_scope kfn' ta
 
-    go_app _ fun_kind@(FunTy _ _ kfa kfb) ta
+    go_app _in_scope _kind [] = return ()
+
+    go_app in_scope fun_kind@(FunTy _ _ kfa kfb) (ta:tas)
       = do { let ka = typeKind ta
            ; unless (ka `eqType` kfa) $
-             addErrL (fail_msg (text "Fun:" <+> (ppr fun_kind $$ ppr ta <+> dcolon <+> ppr ka)))
-           ; return kfb }
+             addErrL (lint_app_fail_msg kfn arg_tys mk_msg msg_type (text "Fun:" <+> (ppr fun_kind $$ ppr ta <+> dcolon <+> ppr ka)))
+           ; go_app in_scope kfb tas }
 
-    go_app in_scope (ForAllTy (Bndr kv _vis) kfn) ta
+    go_app in_scope (ForAllTy (Bndr kv _vis) kfn) (ta:tas)
       = do { let kv_kind = varType kv
                  ka      = typeKind ta
            ; unless (ka `eqType` kv_kind) $
-             addErrL (fail_msg (text "Forall:" <+> (ppr kv $$ ppr kv_kind $$
+             addErrL (lint_app_fail_msg kfn arg_tys mk_msg msg_type (text "Forall:" <+> (ppr kv $$ ppr kv_kind $$
                                                     ppr ta <+> dcolon <+> ppr ka)))
-           ; return $ substTy (extendTCvSubst (mkEmptySubst in_scope) kv ta) kfn }
+           ; let kind' = substTy (extendTCvSubst (mkEmptySubst in_scope) kv ta) kfn
+           ; go_app in_scope kind' tas }
 
     go_app _ kfn ta
-       = failWithL (fail_msg (text "Not a fun:" <+> (ppr kfn $$ ppr ta)))
+       = failWithL (lint_app_fail_msg kfn arg_tys mk_msg msg_type (text "Not a fun:" <+> (ppr kfn $$ ppr ta)))
 
+-- This is a top level definition to ensure we pass all variables of the error message
+-- explicitly and don't capture them as free variables. Otherwise this binder might
+-- become a thunk that get's allocated in the hot code path.
+-- See Note [Avoiding compiler perf traps when constructing error messages.]
+lint_app_fail_msg :: (Outputable a1, Outputable a2) => a1 -> a2 -> (t -> SDoc) -> t -> SDoc -> SDoc
+lint_app_fail_msg kfn arg_tys mk_msg msg_type extra = vcat [ hang (text "Kind application error in") 2 (mk_msg msg_type)
+                      , nest 2 (text "Function kind =" <+> ppr kfn)
+                      , nest 2 (text "Arg types =" <+> ppr arg_tys)
+                      , extra ]
 {- *********************************************************************
 *                                                                      *
         Linting rules
@@ -2672,13 +2730,40 @@ data StaticPtrCheck
   deriving Eq
 
 newtype LintM a =
-   LintM { unLintM ::
+   LintM' { unLintM ::
             LintEnv ->
             WarnsAndErrs ->           -- Warning and error messages so far
-            (Maybe a, WarnsAndErrs) } -- Result and messages (if any)
-   deriving (Functor)
+            LResult a } -- Result and messages (if any)
+
+
+pattern LintM :: (LintEnv -> WarnsAndErrs -> LResult a) -> LintM a
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+pattern LintM m <- LintM' m
+  where
+    LintM m = LintM' (oneShot $ \env -> oneShot $ \we -> m env we)
+    -- LintM m = LintM' (oneShot $ oneShot m)
+{-# COMPLETE LintM #-}
+
+instance Functor (LintM) where
+  fmap f (LintM m) = LintM $ \e w -> mapLResult f (m e w)
 
 type WarnsAndErrs = (Bag SDoc, Bag SDoc)
+
+-- Using a unboxed tuple here reduced allocations for a lint heavy
+-- file by ~6%. Using MaybeUB reduced them further by another ~12%.
+type LResult a = (# MaybeUB a, WarnsAndErrs #)
+
+pattern LResult :: MaybeUB a -> WarnsAndErrs -> LResult a
+pattern LResult m w = (# m, w #)
+{-# COMPLETE LResult #-}
+
+mapLResult :: (a1 -> a2) -> LResult a1 -> LResult a2
+mapLResult f (LResult r w) = LResult (fmapMaybeUB f r) w
+
+-- Just for testing.
+fromBoxedLResult :: (Maybe a, WarnsAndErrs) -> LResult a
+fromBoxedLResult (Just x, errs) = LResult (JustUB x) errs
+fromBoxedLResult (Nothing,errs) = LResult NothingUB errs
 
 {- Note [Checking for global Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2804,21 +2889,27 @@ Wrinkle 2: 'hasNoBinding' and laziness
 -}
 
 instance Applicative LintM where
-      pure x = LintM $ \ _ errs -> (Just x, errs)
+      pure x = LintM $ \ _ errs -> LResult (JustUB x) errs
+                                   --(Just x, errs)
       (<*>) = ap
 
 instance Monad LintM where
   m >>= k  = LintM (\ env errs ->
-                       let (res, errs') = unLintM m env errs in
+                       let res = unLintM m env errs in
                          case res of
-                           Just r -> unLintM (k r) env errs'
-                           Nothing -> (Nothing, errs'))
+                           LResult (JustUB r) errs' -> unLintM (k r) env errs'
+                           LResult NothingUB errs' -> LResult NothingUB errs'
+                    )
+                          --  LError errs'-> LError errs')
+                      --  let (res, errs') = unLintM m env errs in
+                          --  Just r -> unLintM (k r) env errs'
+                          --  Nothing -> (Nothing, errs'))
 
 instance MonadFail LintM where
     fail err = failWithL (text err)
 
 getPlatform :: LintM Platform
-getPlatform = LintM (\ e errs -> (Just (le_platform e), errs))
+getPlatform = LintM (\ e errs -> (LResult (JustUB $ le_platform e) errs))
 
 data LintLocInfo
   = RhsOf Id            -- The variable bound
@@ -2851,9 +2942,9 @@ initL :: LintConfig
       -> WarnsAndErrs
 initL cfg m
   = case unLintM m env (emptyBag, emptyBag) of
-      (Just _, errs) -> errs
-      (Nothing, errs@(_, e)) | not (isEmptyBag e) -> errs
-                             | otherwise -> pprPanic ("Bug in Lint: a failure occurred " ++
+      LResult (JustUB _) errs -> errs
+      LResult NothingUB errs@(_, e) | not (isEmptyBag e) -> errs
+                                    | otherwise -> pprPanic ("Bug in Lint: a failure occurred " ++
                                                       "without reporting an error message") empty
   where
     (tcvs, ids) = partition isTyCoVar $ l_vars cfg
@@ -2882,7 +2973,7 @@ noFixedRuntimeRepChecks thing_inside
     in unLintM thing_inside env' errs
 
 getLintFlags :: LintM LintFlags
-getLintFlags = LintM $ \ env errs -> (Just (le_flags env), errs)
+getLintFlags = LintM $ \ env errs -> fromBoxedLResult (Just (le_flags env), errs)
 
 checkL :: Bool -> SDoc -> LintM ()
 checkL True  _   = return ()
@@ -2898,15 +2989,15 @@ checkWarnL False msg = addWarnL msg
 
 failWithL :: SDoc -> LintM a
 failWithL msg = LintM $ \ env (warns,errs) ->
-                (Nothing, (warns, addMsg True env errs msg))
+                fromBoxedLResult (Nothing, (warns, addMsg True env errs msg))
 
 addErrL :: SDoc -> LintM ()
 addErrL msg = LintM $ \ env (warns,errs) ->
-              (Just (), (warns, addMsg True env errs msg))
+              fromBoxedLResult (Just (), (warns, addMsg True env errs msg))
 
 addWarnL :: SDoc -> LintM ()
 addWarnL msg = LintM $ \ env (warns,errs) ->
-              (Just (), (addMsg False env warns msg, errs))
+              fromBoxedLResult (Just (), (addMsg False env warns msg, errs))
 
 addMsg :: Bool -> LintEnv ->  Bag SDoc -> SDoc -> Bag SDoc
 addMsg is_error env msgs msg
@@ -2938,7 +3029,7 @@ addLoc extra_loc m
     unLintM m (env { le_loc = extra_loc : le_loc env }) errs
 
 inCasePat :: LintM Bool         -- A slight hack; see the unique call site
-inCasePat = LintM $ \ env errs -> (Just (is_case_pat env), errs)
+inCasePat = LintM $ \ env errs -> fromBoxedLResult (Just (is_case_pat env), errs)
   where
     is_case_pat (LE { le_loc = CasePat {} : _ }) = True
     is_case_pat _other                           = False
@@ -2954,7 +3045,7 @@ addInScopeId id linted_ty m
       | otherwise   = delVarSet    join_set id -- Remove any existing binding
 
 getInScopeIds :: LintM (VarEnv (Id,LintedType))
-getInScopeIds = LintM (\env errs -> (Just (le_ids env), errs))
+getInScopeIds = LintM (\env errs -> fromBoxedLResult (Just (le_ids env), errs))
 
 extendTvSubstL :: TyVar -> Type -> LintM a -> LintM a
 extendTvSubstL tv ty m
@@ -2974,16 +3065,16 @@ markAllJoinsBadIf True  m = markAllJoinsBad m
 markAllJoinsBadIf False m = m
 
 getValidJoins :: LintM IdSet
-getValidJoins = LintM (\ env errs -> (Just (le_joins env), errs))
+getValidJoins = LintM (\ env errs -> fromBoxedLResult (Just (le_joins env), errs))
 
 getSubst :: LintM Subst
-getSubst = LintM (\ env errs -> (Just (le_subst env), errs))
+getSubst = LintM (\ env errs -> fromBoxedLResult (Just (le_subst env), errs))
 
 getUEAliases :: LintM (NameEnv UsageEnv)
-getUEAliases = LintM (\ env errs -> (Just (le_ue_aliases env), errs))
+getUEAliases = LintM (\ env errs -> fromBoxedLResult (Just (le_ue_aliases env), errs))
 
 getInScope :: LintM InScopeSet
-getInScope = LintM (\ env errs -> (Just (getSubstInScope $ le_subst env), errs))
+getInScope = LintM (\ env errs -> fromBoxedLResult (Just (getSubstInScope $ le_subst env), errs))
 
 lookupIdInScope :: Id -> LintM (Id, LintedType)
 lookupIdInScope id_occ

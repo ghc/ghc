@@ -96,6 +96,7 @@ GHC.Data.Stream
 GHC.Data.Strict
 GHC.Data.StringBuffer
 GHC.Data.TrieMap
+GHC.Data.Unboxed
 GHC.Driver.Backend
 GHC.Driver.Backend.Internal
 GHC.Driver.Backpack.Syntax
