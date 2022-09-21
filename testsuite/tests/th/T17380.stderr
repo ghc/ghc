@@ -8,8 +8,8 @@ T17380.hs:9:7: error: [GHC-83865]
 T17380.hs:12:8: error: [GHC-83865]
     • Couldn't match expected type: Maybe String
                   with actual type: Solo (Maybe String)
-    • In the expression: Solo Just "wat"
-      In an equation for ‘bar’: bar = (Solo Just "wat")
+    • In the expression: MkSolo Just "wat"
+      In an equation for ‘bar’: bar = (MkSolo Just "wat")
 
 T17380.hs:15:6: error: [GHC-83865]
     • Couldn't match expected type: Solo (Maybe String)
@@ -20,8 +20,8 @@ T17380.hs:15:6: error: [GHC-83865]
 T17380.hs:18:7: error: [GHC-83865]
     • Couldn't match expected type: Maybe String
                   with actual type: Solo (Maybe String)
-    • In the pattern: Solo(Just "wat")
-      In an equation for ‘quux’: quux (Solo(Just "wat")) = Just "frerf"
+    • In the pattern: MkSolo(Just "wat")
+      In an equation for ‘quux’: quux (MkSolo(Just "wat")) = Just "frerf"
 
 T17380.hs:21:8: error: [GHC-83865]
     • Couldn't match type: Maybe String

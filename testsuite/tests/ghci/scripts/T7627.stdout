@@ -1,6 +1,6 @@
 type () :: *
 data () = ()
-  	-- Defined in ‘GHC.Tuple’
+  	-- Defined in ‘GHC.Tuple.Prim’
 instance Monoid () -- Defined in ‘GHC.Base’
 instance Semigroup () -- Defined in ‘GHC.Base’
 instance Bounded () -- Defined in ‘GHC.Enum’
@@ -18,7 +18,7 @@ data (##) = (##)
 (#   #) :: (# #)
 type (,) :: * -> * -> *
 data (,) a b = (,) a b
-  	-- Defined in ‘GHC.Tuple’
+  	-- Defined in ‘GHC.Tuple.Prim’
 instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
 instance (Monoid a, Monoid b) => Monoid (a, b)
   -- Defined in ‘GHC.Base’

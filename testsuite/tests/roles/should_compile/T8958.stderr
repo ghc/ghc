@@ -49,7 +49,7 @@ $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
-      GHC.Tuple.$tc(,)
+      GHC.Tuple.Prim.$tc(,)
       ((:) @GHC.Types.KindRep
          $krep ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep))
 $krep [InlPrag=[~]]

@@ -67,7 +67,7 @@ class (Monad m) => MonadFix m where
 -- | @since 4.15
 instance MonadFix Solo where
     mfix f = let a = f (unSolo a) in a
-             where unSolo (Solo x) = x
+             where unSolo (MkSolo x) = x
 
 -- | @since 2.01
 instance MonadFix Maybe where

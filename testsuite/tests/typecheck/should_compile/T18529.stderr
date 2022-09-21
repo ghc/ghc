@@ -28,7 +28,7 @@ $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
       GHC.Types.$tcConstraint [] @GHC.Types.KindRep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp GHC.Tuple.$tc() [] @GHC.Types.KindRep
+  = GHC.Types.KindRepTyConApp GHC.Tuple.Prim.$tc() [] @GHC.Types.KindRep
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
       Bug.$tcC

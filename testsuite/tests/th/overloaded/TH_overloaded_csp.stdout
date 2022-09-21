@@ -1,2 +1,2 @@
-ConE GHC.Tuple.()
-ConE GHC.Tuple.()
+ConE GHC.Tuple.Prim.()
+ConE GHC.Tuple.Prim.()

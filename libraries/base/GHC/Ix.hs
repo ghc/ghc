@@ -271,15 +271,15 @@ instance Ix a => Ix (Solo a) where -- as derived
     {-# SPECIALISE instance Ix (Solo Int) #-}
 
     {-# INLINE range #-}
-    range (Solo l, Solo u) =
-      [ Solo i | i <- range (l,u) ]
+    range (MkSolo l, MkSolo u) =
+      [ MkSolo i | i <- range (l,u) ]
 
     {-# INLINE unsafeIndex #-}
-    unsafeIndex (Solo l, Solo u) (Solo i) =
+    unsafeIndex (MkSolo l, MkSolo u) (MkSolo i) =
       unsafeIndex (l,u) i
 
     {-# INLINE inRange #-}
-    inRange (Solo l, Solo u) (Solo i) =
+    inRange (MkSolo l, MkSolo u) (MkSolo i) =
       inRange (l, u) i
 
     -- Default method for index

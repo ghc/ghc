@@ -549,7 +549,7 @@ ppr_expr (ExplicitTuple _ exprs boxity)
     -- `Solo x`, not `(x)`
   | [Present _ expr] <- exprs
   , Boxed <- boxity
-  = hsep [text (mkTupleStr Boxed 1), ppr expr]
+  = hsep [text (mkTupleStr Boxed dataName 1), ppr expr]
   | otherwise
   = tupleParens (boxityTupleSort boxity) (fcat (ppr_tup_args exprs))
   where

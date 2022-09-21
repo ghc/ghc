@@ -1,4 +1,7 @@
 {-# LANGUAGE CPP #-}
+#if __GLASGOW_HASKELL__ < 905
+{-# LANGUAGE PatternSynonyms #-}
+#endif
 {-
 ToDo [Oct 2013]
 ~~~~~~~~~~~~~~~
@@ -978,9 +981,13 @@ scSubstId env v = lookupIdSubst (sc_subst env) v
 
 -- Solo is only defined in base starting from ghc-9.2
 #if !(MIN_VERSION_base(4, 16, 0))
-
 data Solo a = Solo a
+#endif
 
+-- The Solo constructor was renamed to MkSolo in ghc 9.5
+#if __GLASGOW_HASKELL__ < 905
+pattern MkSolo :: a -> Solo a
+pattern MkSolo a = Solo a
 #endif
 
 -- The !subst ensures that we force the selection `(sc_subst env)`, which avoids
@@ -994,7 +1001,7 @@ data Solo a = Solo a
 scSubstTy :: ScEnv -> InType -> Solo OutType
 scSubstTy env ty =
   let !subst = sc_subst env
-  in Solo (substTyUnchecked subst ty)
+  in MkSolo (substTyUnchecked subst ty)
 
 scSubstCo :: ScEnv -> Coercion -> Coercion
 scSubstCo env co = substCo (sc_subst env) co
@@ -1446,7 +1453,7 @@ scExpr' env (Var v)      = case scSubstId env v of
                             e'     -> scExpr (zapScSubst env) e'
 
 scExpr' env (Type t)     =
-  let !(Solo ty') = scSubstTy env t
+  let !(MkSolo ty') = scSubstTy env t
   in return (nullUsage, Type ty')
 scExpr' env (Coercion c) = return (nullUsage, Coercion (scSubstCo env c))
 scExpr' _   e@(Lit {})   = return (nullUsage, e)
@@ -1490,7 +1497,7 @@ scExpr' env (Case scrut b ty alts)
                 -- The combined usage of the scrutinee is given
                 -- by scrut_occ, which is passed to setScrutOcc, which
                 -- in turn treats a bare-variable scrutinee specially
-          ; let !(Solo ty') = scSubstTy env ty
+          ; let !(MkSolo ty') = scSubstTy env ty
 
           ; return (foldr combineUsage scrut_usg' alt_usgs,
                     Case scrut' b' ty'  alts') }

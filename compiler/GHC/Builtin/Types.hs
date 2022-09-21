@@ -809,7 +809,7 @@ bit odd:
 Zero-tuples have used up the logical name. So we use 'Solo' and 'Solo#'
 for one-tuples.  So in ghc-prim:GHC.Tuple we see the declarations:
   data ()     = ()
-  data Solo a = Solo a
+  data Solo a = MkSolo a
   data (a,b)  = (a,b)
 
 There is no way to write a boxed one-tuple in Haskell using tuple syntax.
@@ -832,7 +832,7 @@ Note [Don't flatten tuples from HsSyn] in GHC.Core.Make.
 -- Wrinkle: Make boxed one-tuple names have known keys
 -----
 
-We make boxed one-tuple names have known keys so that `data Solo a = Solo a`,
+We make boxed one-tuple names have known keys so that `data Solo a = MkSolo a`,
 defined in GHC.Tuple, will be used when one-tuples are spliced in through
 Template Haskell. This program (from #18097) crucially relies on this:
 
@@ -943,20 +943,21 @@ isPunOcc_maybe _ _ = Nothing
 
 mkTupleOcc :: NameSpace -> Boxity -> Arity -> OccName
 -- No need to cache these, the caching is done in mk_tuple
-mkTupleOcc ns Boxed   ar = mkOccName ns (mkBoxedTupleStr   ar)
+mkTupleOcc ns Boxed   ar = mkOccName ns (mkBoxedTupleStr ns ar)
 mkTupleOcc ns Unboxed ar = mkOccName ns (mkUnboxedTupleStr ar)
 
 mkCTupleOcc :: NameSpace -> Arity -> OccName
 mkCTupleOcc ns ar = mkOccName ns (mkConstraintTupleStr ar)
 
-mkTupleStr :: Boxity -> Arity -> String
+mkTupleStr :: Boxity -> NameSpace -> Arity -> String
 mkTupleStr Boxed   = mkBoxedTupleStr
-mkTupleStr Unboxed = mkUnboxedTupleStr
+mkTupleStr Unboxed = const mkUnboxedTupleStr
 
-mkBoxedTupleStr :: Arity -> String
-mkBoxedTupleStr 0  = "()"
-mkBoxedTupleStr 1  = "Solo"   -- See Note [One-tuples]
-mkBoxedTupleStr ar = '(' : commas ar ++ ")"
+mkBoxedTupleStr :: NameSpace -> Arity -> String
+mkBoxedTupleStr _ 0  = "()"
+mkBoxedTupleStr ns 1 | isDataConNameSpace ns = "MkSolo"  -- See Note [One-tuples]
+mkBoxedTupleStr _ 1 = "Solo"                             -- See Note [One-tuples]
+mkBoxedTupleStr _ ar = '(' : commas ar ++ ")"
 
 mkUnboxedTupleStr :: Arity -> String
 mkUnboxedTupleStr 0  = "(##)"
@@ -1117,7 +1118,7 @@ mk_tuple Boxed arity = (tycon, tuple_con)
     tuple_con  = pcDataCon dc_name dc_tvs dc_arg_tys tycon
 
     boxity  = Boxed
-    modu    = gHC_TUPLE
+    modu    = gHC_TUPLE_PRIM
     tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
                          (ATyCon tycon) BuiltInSyntax
     dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq

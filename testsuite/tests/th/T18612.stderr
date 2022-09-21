@@ -8,6 +8,6 @@ T18612.hs:(10,7)-(11,75): Splicing type
   ======>
     Identity (Solo ()) -> Identity (Solo ())
 T18612.hs:12:4-36: Splicing pattern
-    conP 'Identity [tupP [tupP []]] ======> Identity (Solo())
+    conP 'Identity [tupP [tupP []]] ======> Identity (MkSolo())
 T18612.hs:12:41-78: Splicing expression
-    conE 'Identity `appE` tupE [tupE []] ======> Identity (Solo ())
+    conE 'Identity `appE` tupE [tupE []] ======> Identity (MkSolo ())

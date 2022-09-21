@@ -102,7 +102,7 @@ takeUniqFromNameCache (NameCache c _) = uniqFromMask c
 
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ
-  | mod == gHC_TYPES || mod == gHC_PRIM || mod == gHC_TUPLE
+  | mod == gHC_TYPES || mod == gHC_PRIM || mod == gHC_TUPLE_PRIM
   , Just name <- isBuiltInOcc_maybe occ
   =     -- See Note [Known-key names], 3(c) in GHC.Builtin.Names
         -- Special case for tuples; there are too many

@@ -122,7 +122,7 @@ import GHC.Err
 import GHC.Maybe
 import {-# SOURCE #-} GHC.IO (mkUserError, mplusIO)
 
-import GHC.Tuple (Solo (..))     -- Note [Depend on GHC.Tuple]
+import GHC.Tuple (Solo (MkSolo)) -- Note [Depend on GHC.Tuple]
 import GHC.Num.Integer ()        -- Note [Depend on GHC.Num.Integer]
 
 -- for 'class Semigroup'
@@ -383,12 +383,12 @@ instance Monoid () where
 
 -- | @since 4.15
 instance Semigroup a => Semigroup (Solo a) where
-  Solo a <> Solo b = Solo (a <> b)
-  stimes n (Solo a) = Solo (stimes n a)
+  MkSolo a <> MkSolo b = MkSolo (a <> b)
+  stimes n (MkSolo a) = MkSolo (stimes n a)
 
 -- | @since 4.15
 instance Monoid a => Monoid (Solo a) where
-  mempty = Solo mempty
+  mempty = MkSolo mempty
 
 -- | @since 4.9.0.0
 instance (Semigroup a, Semigroup b) => Semigroup (a, b) where
@@ -466,17 +466,17 @@ instance Semigroup a => Monoid (Maybe a) where
 
 -- | @since 4.15
 instance Applicative Solo where
-  pure = Solo
+  pure = MkSolo
 
   -- Note: we really want to match strictly here. This lets us write,
   -- for example,
   --
   -- forceSpine :: Foldable f => f a -> ()
   -- forceSpine xs
-  --   | Solo r <- traverse_ Solo xs
+  --   | MkSolo r <- traverse_ MkSolo xs
   --   = r
-  Solo f <*> Solo x = Solo (f x)
-  liftA2 f (Solo x) (Solo y) = Solo (f x y)
+  MkSolo f <*> MkSolo x = MkSolo (f x)
+  liftA2 f (MkSolo x) (MkSolo y) = MkSolo (f x y)
 
 -- | For tuples, the 'Monoid' constraint on @a@ determines
 -- how the first values merge.
@@ -493,7 +493,7 @@ instance Monoid a => Applicative ((,) a) where
 
 -- | @since 4.15
 instance Monad Solo where
-  Solo x >>= f = f x
+  MkSolo x >>= f = f x
 
 -- | @since 4.9.0.0
 instance Monoid a => Monad ((,) a) where
@@ -1045,12 +1045,12 @@ instance Monad ((->) r) where
 
 -- | @since 4.15
 instance Functor Solo where
-  fmap f (Solo a) = Solo (f a)
+  fmap f (MkSolo a) = MkSolo (f a)
 
   -- Being strict in the `Solo` argument here seems most consistent
   -- with the concept behind `Solo`: always strict in the wrapper and lazy
   -- in the contents.
-  x <$ Solo _ = Solo x
+  x <$ MkSolo _ = MkSolo x
 
 -- | @since 2.01
 instance Functor ((,) a) where

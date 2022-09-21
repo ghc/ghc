@@ -50,7 +50,7 @@ occur. We have to be careful about this in exactly two places:
 This is accomplished through a combination of mechanisms:
 
   1. When parsing source code, the RdrName-decorated AST has some
-     RdrNames which are Exact. These are wired-in RdrNames where the
+     RdrNames which are Exact. These are wired-in RdrNames where
      we could directly tell from the parsed syntax what Name to
      use. For example, when we parse a [] in a type we can just insert
      an Exact RdrName Name with the listTyConKey.
@@ -538,7 +538,7 @@ gHC_PRIM, gHC_PRIM_PANIC, gHC_PRIM_EXCEPTION,
     gHC_GHCI, gHC_GHCI_HELPERS, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_MAYBE,
     gHC_NUM_INTEGER, gHC_NUM_NATURAL, gHC_NUM_BIGNAT,
-    gHC_LIST, gHC_TUPLE, dATA_EITHER, dATA_VOID, dATA_LIST, dATA_STRING,
+    gHC_LIST, gHC_TUPLE, gHC_TUPLE_PRIM, dATA_EITHER, dATA_VOID, dATA_LIST, dATA_STRING,
     dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_IX, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
@@ -573,6 +573,7 @@ gHC_NUM_NATURAL = mkBignumModule (fsLit "GHC.Num.Natural")
 gHC_NUM_BIGNAT  = mkBignumModule (fsLit "GHC.Num.BigNat")
 gHC_LIST        = mkBaseModule (fsLit "GHC.List")
 gHC_TUPLE       = mkPrimModule (fsLit "GHC.Tuple")
+gHC_TUPLE_PRIM  = mkPrimModule (fsLit "GHC.Tuple.Prim")
 dATA_EITHER     = mkBaseModule (fsLit "Data.Either")
 dATA_VOID       = mkBaseModule (fsLit "Data.Void")
 dATA_LIST       = mkBaseModule (fsLit "Data.List")

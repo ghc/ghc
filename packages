@@ -1,4 +1,4 @@
-# Despite the name "package", this file contains the master list of
+# Despite the name "packages", this file contains the master list of
 # the *repositories* that make up GHC. It is parsed by
 # * boot
 # * rules/foreachLibrary.mk

@@ -75,7 +75,7 @@ instance MonadZip Identity where
 -- | @since 4.15.0.0
 instance MonadZip Solo where
     mzipWith = liftM2
-    munzip (Solo (a, b)) = (Solo a, Solo b)
+    munzip (MkSolo (a, b)) = (MkSolo a, MkSolo b)
 
 -- | @since 4.8.0.0
 instance MonadZip Dual where

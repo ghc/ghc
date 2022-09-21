@@ -577,7 +577,7 @@ instance Show2 (,) where
 
 -- | @since 4.15
 instance Eq1 Solo where
-  liftEq eq (Solo a) (Solo b) = a `eq` b
+  liftEq eq (MkSolo a) (MkSolo b) = a `eq` b
 
 -- | @since 4.9.0.0
 instance (Eq a) => Eq1 ((,) a) where
@@ -585,7 +585,7 @@ instance (Eq a) => Eq1 ((,) a) where
 
 -- | @since 4.15
 instance Ord1 Solo where
-  liftCompare cmp (Solo a) (Solo b) = cmp a b
+  liftCompare cmp (MkSolo a) (MkSolo b) = cmp a b
 
 -- | @since 4.9.0.0
 instance (Ord a) => Ord1 ((,) a) where
@@ -593,7 +593,7 @@ instance (Ord a) => Ord1 ((,) a) where
 
 -- | @since 4.15
 instance Read1 Solo where
-    liftReadPrec rp _ = readData (readUnaryWith rp "Solo" Solo)
+    liftReadPrec rp _ = readData (readUnaryWith rp "MkSolo" MkSolo)
 
     liftReadListPrec = liftReadListPrecDefault
     liftReadList     = liftReadListDefault
@@ -607,7 +607,7 @@ instance (Read a) => Read1 ((,) a) where
 
 -- | @since 4.15
 instance Show1 Solo where
-    liftShowsPrec sp _ d (Solo x) = showsUnaryWith sp "Solo" d x
+    liftShowsPrec sp _ d (MkSolo x) = showsUnaryWith sp "MkSolo" d x
 
 -- | @since 4.9.0.0
 instance (Show a) => Show1 ((,) a) where

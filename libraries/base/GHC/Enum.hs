@@ -279,19 +279,19 @@ instance Enum () where
     enumFromThenTo () () () = let many = ():many in many
 
 instance Enum a => Enum (Solo a) where
-    succ (Solo a) = Solo (succ a)
-    pred (Solo a) = Solo (pred a)
+    succ (MkSolo a) = MkSolo (succ a)
+    pred (MkSolo a) = MkSolo (pred a)
 
-    toEnum x = Solo (toEnum x)
+    toEnum x = MkSolo (toEnum x)
 
-    fromEnum (Solo x) = fromEnum x
-    enumFrom (Solo x) = [Solo a | a <- enumFrom x]
-    enumFromThen (Solo x) (Solo y) =
-      [Solo a | a <- enumFromThen x y]
-    enumFromTo (Solo x) (Solo y) =
-      [Solo a | a <- enumFromTo x y]
-    enumFromThenTo (Solo x) (Solo y) (Solo z) =
-      [Solo a | a <- enumFromThenTo x y z]
+    fromEnum (MkSolo x) = fromEnum x
+    enumFrom (MkSolo x) = [MkSolo a | a <- enumFrom x]
+    enumFromThen (MkSolo x) (MkSolo y) =
+      [MkSolo a | a <- enumFromThen x y]
+    enumFromTo (MkSolo x) (MkSolo y) =
+      [MkSolo a | a <- enumFromTo x y]
+    enumFromThenTo (MkSolo x) (MkSolo y) (MkSolo z) =
+      [MkSolo a | a <- enumFromThenTo x y z]
 
 deriving instance Bounded a => Bounded (Solo a)
 -- Report requires instances up to 15

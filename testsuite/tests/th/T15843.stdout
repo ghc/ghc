@@ -2,8 +2,8 @@ TupE [Just (LitE (IntegerL 909)),Nothing]
 (909,)
 TupE [Nothing,Just (LitE (IntegerL 909))]
 (, 909)
-ConE GHC.Tuple.(,)
-GHC.Tuple.(,)
+ConE GHC.Tuple.Prim.(,)
+GHC.Tuple.Prim.(,)
 TupE [Just (LitE (IntegerL 909)),Just (LitE (IntegerL 606))]
 (909, 606)
 TupE [Nothing,Nothing,Just (LitE (IntegerL 909))]
@@ -12,8 +12,8 @@ TupE [Just (LitE (IntegerL 909)),Nothing]
 (909,)
 TupE [Nothing,Just (LitE (IntegerL 909))]
 (, 909)
-ConE GHC.Tuple.(,)
-GHC.Tuple.(,)
+ConE GHC.Tuple.Prim.(,)
+GHC.Tuple.Prim.(,)
 TupE [Just (LitE (IntegerL 909)),Just (LitE (IntegerL 606))]
 (909, 606)
 TupE [Nothing,Nothing,Just (LitE (IntegerL 909))]

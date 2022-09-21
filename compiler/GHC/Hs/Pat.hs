@@ -81,7 +81,7 @@ import GHC.Core.Type
 import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
 import GHC.Data.Maybe
-import GHC.Types.Name (Name)
+import GHC.Types.Name (Name, dataName)
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Data
@@ -353,7 +353,7 @@ pprPat (TuplePat _ pats bx)
     -- `Solo x`, not `(x)`
   | [pat] <- pats
   , Boxed <- bx
-  = hcat [text (mkTupleStr Boxed 1), pprParendLPat appPrec pat]
+  = hcat [text (mkTupleStr Boxed dataName 1), pprParendLPat appPrec pat]
   | otherwise
   = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
 pprPat (SumPat _ pat alt arity) = sumParens (pprAlternative ppr pat alt arity)

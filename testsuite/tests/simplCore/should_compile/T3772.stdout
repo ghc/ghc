@@ -72,12 +72,12 @@ foo [InlPrag=[final]] :: Int -> ()
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once1!] :: Int) ->
                  case n of { GHC.Types.I# ww [Occ=Once1] ->
-                 case T3772.$wfoo ww of { (# #) -> GHC.Tuple.() }
+                 case T3772.$wfoo ww of { (# #) -> GHC.Tuple.Prim.() }
                  }}]
 foo
   = \ (n :: Int) ->
       case n of { GHC.Types.I# ww ->
-      case T3772.$wfoo ww of { (# #) -> GHC.Tuple.() }
+      case T3772.$wfoo ww of { (# #) -> GHC.Tuple.Prim.() }
       }
 
 
