@@ -2617,24 +2617,36 @@ type Cxt = [Pred]                 -- ^ @(Eq a, Ord b)@
 -- be tuples of other constraints.
 type Pred = Type
 
+-- | 'SourceUnpackedness' corresponds to unpack annotations found in the source code.
+--
+-- This may not agree with the annotations returned by 'reifyConStrictness'.
+-- See 'reifyConStrictness' for more information.
 data SourceUnpackedness
   = NoSourceUnpackedness -- ^ @C a@
   | SourceNoUnpack       -- ^ @C { {\-\# NOUNPACK \#-\} } a@
   | SourceUnpack         -- ^ @C { {\-\# UNPACK \#-\} } a@
         deriving (Show, Eq, Ord, Data, Generic)
 
+-- | 'SourceStrictness' corresponds to strictness annotations found in the source code.
+--
+-- This may not agree with the annotations returned by 'reifyConStrictness'.
+-- See 'reifyConStrictness' for more information.
 data SourceStrictness = NoSourceStrictness    -- ^ @C a@
                       | SourceLazy            -- ^ @C {~}a@
                       | SourceStrict          -- ^ @C {!}a@
         deriving (Show, Eq, Ord, Data, Generic)
 
 -- | Unlike 'SourceStrictness' and 'SourceUnpackedness', 'DecidedStrictness'
--- refers to the strictness that the compiler chooses for a data constructor
--- field, which may be different from what is written in source code. See
--- 'reifyConStrictness' for more information.
-data DecidedStrictness = DecidedLazy
-                       | DecidedStrict
-                       | DecidedUnpack
+-- refers to the strictness annotations that the compiler chooses for a data constructor
+-- field, which may be different from what is written in source code.
+--
+-- Note that non-unpacked strict fields are assigned 'DecidedLazy' when a bang would be inappropriate,
+-- such as the field of a newtype constructor and fields that have an unlifted type.
+--
+-- See 'reifyConStrictness' for more information.
+data DecidedStrictness = DecidedLazy -- ^ Field inferred to not have a bang.
+                       | DecidedStrict -- ^ Field inferred to have a bang.
+                       | DecidedUnpack -- ^ Field inferred to be unpacked.
         deriving (Show, Eq, Ord, Data, Generic)
 
 -- | A single data constructor.
