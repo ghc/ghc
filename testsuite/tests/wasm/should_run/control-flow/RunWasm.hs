@@ -36,11 +36,11 @@ withPushedValue _ _ = error "looked for pushed value, but did not find one"
 
 run  :: forall s e m . ControlTestMonad s e m => Stack s e -> m ()
 run [] = return ()
-run (EndLoop s : stack) = run (Run s : EndLoop s : stack)
+run (EndLoop _ : stack) = run stack
 run (EndBlock : stack) = run stack
 run (EndIf : stack) = run stack
 run (Pushed e : frame : stack) = run (frame : Pushed e : stack)
-run (Pushed e : []) = return ()
+run (Pushed _ : []) = return ()
 run (Run s : stack) = step s
   where step :: UntypedControl s e -> m ()
         step (U WasmFallthrough) = run stack
@@ -63,7 +63,7 @@ run (Run s : stack) = step s
 
         step (U (WasmActions s)) = takeAction @s @e s >> run stack
         step (U (WasmSeq s s')) = run (Run (U s) : Run (U s') : stack)
-        br 0 (EndLoop s : stack) = run (EndLoop s : stack)
+        br 0 (EndLoop us : stack) = run (Run us : EndLoop us : stack)
         br 0 (EndBlock : stack) = run stack
         br 0 (EndIf : stack) = run stack
         br k ((Run _) : stack) = br k stack

@@ -183,8 +183,7 @@ structuredControl platform txExpr txBlock g =
                                 CmmSwitch {} -> children
                                    -- N.B. Unlike `if`, translation of Switch uses only labels.
                                 _ -> filter hasMergeRoot children
-           loopContext = LoopHeadedBy (entryLabel x) `inside`
-                           (context `withFallthrough` entryLabel x)
+           loopContext = LoopHeadedBy (entryLabel x) `inside` context
            hasMergeRoot = isMergeNode . Tree.rootLabel
 
    nodeWithin fty x (y_n:ys) (Just zlabel) context =
