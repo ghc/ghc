@@ -20,9 +20,7 @@ then
 #if defined(HAVE_STDLIB_H)
 #include <stdlib.h>
 #endif
-#if defined(HAVE_TIME_H)
 #include <time.h>
-#endif
 #if defined(HAVE_SIGNAL_H)
 #include <signal.h>
 #endif

@@ -78,9 +78,7 @@ AC_DEFUN([FPTOOLS_HTYPE_INCLUDES],
 # include <signal.h>
 #endif
 
-#if HAVE_TIME_H
-# include <time.h>
-#endif
+#include <time.h>
 
 #if HAVE_TERMIOS_H
 # include <termios.h>

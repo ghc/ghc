@@ -11,9 +11,7 @@
 
 #include <windows.h>
 
-#if defined(HAVE_TIME_H)
-# include <time.h>
-#endif
+#include <time.h>
 
 /* Convert FILETIMEs into secs */
 

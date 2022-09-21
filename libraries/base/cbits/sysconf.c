@@ -6,9 +6,7 @@
 #endif
 
 /* for CLK_TCK */
-#if HAVE_TIME_H
 #include <time.h>
-#endif
 
 long clk_tck(void) {
 #if defined(CLK_TCK)

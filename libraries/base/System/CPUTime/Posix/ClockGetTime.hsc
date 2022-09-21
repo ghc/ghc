@@ -2,10 +2,8 @@
 
 #include "HsFFI.h"
 #include "HsBaseConfig.h"
-#if HAVE_TIME_H
 #include <unistd.h>
 #include <time.h>
-#endif
 
 module System.CPUTime.Posix.ClockGetTime
     ( getCPUTime

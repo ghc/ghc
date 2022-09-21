@@ -15,9 +15,7 @@
 #include "Schedule.h"
 #include "RtsFlags.h"
 
-#if defined(HAVE_TIME_H)
 #include <time.h>
-#endif
 
 /* HACK: On Mac OS X 10.4 (at least), time.h doesn't declare ctime_r with
  *       _POSIX_C_SOURCE. If this is the case, we declare it ourselves.
