@@ -9,6 +9,7 @@ where
 
 import GHC.Prelude hiding (succ)
 
+import Control.Applicative
 import Data.Function
 import Data.List (sortBy)
 import qualified Data.Tree as Tree
@@ -151,12 +152,13 @@ emptyPost _ = False
 
 -- | Convert a Cmm CFG to WebAssembly's structured control flow.
 
-structuredControl :: forall expr stmt .
-                     Platform  -- ^ needed for offset calculation
-                  -> (Label -> CmmExpr -> expr) -- ^ translator for expressions
-                  -> (Label -> CmmActions -> stmt) -- ^ translator for straight-line code
+structuredControl :: forall expr stmt m .
+                     Applicative m
+                  => Platform  -- ^ needed for offset calculation
+                  -> (Label -> CmmExpr -> m expr) -- ^ translator for expressions
+                  -> (Label -> CmmActions -> m stmt) -- ^ translator for straight-line code
                   -> CmmGraph -- ^ CFG to be translated
-                  -> WasmControl stmt expr '[] '[ 'I32]
+                  -> m (WasmControl stmt expr '[] '[ 'I32])
 structuredControl platform txExpr txBlock g =
    doTree returns dominatorTree emptyContext
  where
@@ -167,16 +169,16 @@ structuredControl platform txExpr txBlock g =
                                        -- with highest reverse-postorder number first
    dominatorTree = fmap blockLabeled $ sortTree $ gwdDominatorTree gwd
 
-   doTree     :: FT '[] post -> Tree.Tree CfgNode -> Context -> WasmControl stmt expr '[] post
+   doTree     :: FT '[] post -> Tree.Tree CfgNode -> Context -> m (WasmControl stmt expr '[] post)
    nodeWithin :: forall post .
                  FT '[] post -> CfgNode -> [Tree.Tree CfgNode] -> Maybe Label
-                                                   -> Context -> WasmControl stmt expr '[] post
-   doBranch   :: FT '[] post -> Label -> Label     -> Context -> WasmControl stmt expr '[] post
+                                                   -> Context -> m (WasmControl stmt expr '[] post)
+   doBranch   :: FT '[] post -> Label -> Label     -> Context -> m (WasmControl stmt expr '[] post)
 
    doTree fty (Tree.Node x children) context =
        let codeForX = nodeWithin fty x selectedChildren Nothing
        in  if isLoopHeader x then
-             WasmLoop fty (codeForX loopContext)
+             WasmLoop fty <$> codeForX loopContext
            else
              codeForX context
      where selectedChildren = case lastNode x of
@@ -187,47 +189,47 @@ structuredControl platform txExpr txBlock g =
            hasMergeRoot = isMergeNode . Tree.rootLabel
 
    nodeWithin fty x (y_n:ys) (Just zlabel) context =
-       WasmBlock fty $ nodeWithin fty x (y_n:ys) Nothing context'
+       WasmBlock fty <$> nodeWithin fty x (y_n:ys) Nothing context'
      where context' = BlockFollowedBy zlabel `inside` context
    nodeWithin fty x (y_n:ys) Nothing context =
-       nodeWithin doesn'tReturn x ys (Just ylabel) (context `withFallthrough` ylabel) <>
+       nodeWithin doesn'tReturn x ys (Just ylabel) (context `withFallthrough` ylabel) <<>>
        doTree fty y_n context
      where ylabel = treeEntryLabel y_n
    nodeWithin fty x [] (Just zlabel) context
      | not (generatesIf x) =
-         WasmBlock fty (nodeWithin fty x [] Nothing context')
+         WasmBlock fty <$> nodeWithin fty x [] Nothing context'
      where context' = BlockFollowedBy zlabel `inside` context
    nodeWithin fty x [] maybeMarks context =
        translationOfX context
      where xlabel = entryLabel x
 
-           translationOfX :: Context -> WasmControl stmt expr '[] post
+           translationOfX :: Context -> m (WasmControl stmt expr '[] post)
            translationOfX context =
-             WasmActions (txBlock xlabel $ nodeBody x) <>
+             (WasmActions <$> txBlock xlabel (nodeBody x)) <<>>
              case flowLeaving platform x of
                Unconditional l -> doBranch fty xlabel l context
                Conditional e t f ->
                  WasmIf fty
-                        (txExpr xlabel e)
-                        (doBranch fty xlabel t (IfThenElse maybeMarks `inside` context))
-                        (doBranch fty xlabel f (IfThenElse maybeMarks `inside` context))
-               TailCall e -> WasmPush TagI32 (txExpr xlabel e) <> WasmReturnTop TagI32
+                        <$> txExpr xlabel e
+                        <*> doBranch fty xlabel t (IfThenElse maybeMarks `inside` context)
+                        <*> doBranch fty xlabel f (IfThenElse maybeMarks `inside` context)
+               TailCall e -> (WasmPush TagI32 <$> txExpr xlabel e) <<>> pure (WasmReturnTop TagI32)
                Switch e range targets default' ->
-                   WasmBrTable (txExpr xlabel e)
-                               range
-                               (map switchIndex targets)
-                               (switchIndex default')
+                   WasmBrTable <$>  txExpr xlabel e
+                               <$~> range
+                               <$~> map switchIndex targets
+                               <$~> switchIndex default'
             where switchIndex :: Maybe Label -> Int
                   switchIndex Nothing = 0 -- arbitrary; GHC won't go here
                   switchIndex (Just lbl) = index lbl (enclosing context)
 
    doBranch fty from to context
-      | to `elem` fallthrough context && emptyPost fty = WasmFallthrough
+      | to `elem` fallthrough context && emptyPost fty = pure WasmFallthrough
                 -- optimization: `br` is not needed, but it typechecks
                 -- only if nothing is expected to be left on the stack
 
-      | isBackward from to = WasmBr i -- continue
-      | isMergeLabel to = WasmBr i -- exit
+      | isBackward from to = pure $ WasmBr i -- continue
+      | isMergeLabel to = pure $ WasmBr i -- exit
       | otherwise = doTree fty (subtreeAt to) context -- inline the code here
      where i = index to (enclosing context)
 
@@ -351,3 +353,15 @@ findLabelIn :: HasDebugCallStack => Label -> LabelMap a -> a
 findLabelIn lbl = mapFindWithDefault failed lbl
   where failed =
             panic $ "label " ++ showSDocUnsafe (ppr lbl) ++ " not found in control-flow graph"
+
+
+infixl 4 <$~>
+(<$~>) :: Functor m => m (a -> b) -> a -> m b
+(<$~>) f x = fmap ($ x) f
+
+(<<>>) :: forall m s e pre mid post
+       . Applicative m
+       => m (WasmControl s e pre mid)
+       -> m (WasmControl s e mid post)
+       -> m (WasmControl s e pre post)
+(<<>>) = liftA2 (<>)
