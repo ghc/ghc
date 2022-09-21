@@ -4,6 +4,7 @@
 -- Type - public interface
 
 {-# LANGUAGE FlexibleContexts, PatternSynonyms, ViewPatterns #-}
+{-# LANGUAGE MagicHash #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -294,10 +295,10 @@ import GHC.Data.Pair
 import GHC.Data.List.SetOps
 import GHC.Types.Unique ( nonDetCmpUnique )
 
+import GHC.Base (reallyUnsafePtrEquality#)
 import GHC.Data.Maybe   ( orElse, expectJust, isJust )
 import Control.Monad    ( guard )
 import qualified Data.Semigroup as S
--- import GHC.Utils.Trace
 
 -- $type_classification
 -- #type_classification#
@@ -556,7 +557,7 @@ expandTypeSynonyms ty
     in_scope = mkInScopeSet (tyCoVarsOfType ty)
 
     go subst (TyConApp tc tys)
-      | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc expanded_tys
+      | ExpandsSyn tenv rhs tys' <- expandSynTyCon_maybe tc expanded_tys
       = let subst' = mkTvSubst in_scope (mkVarEnv tenv)
             -- Make a fresh substitution; rhs has nothing to
             -- do with anything that has happened so far
@@ -2787,6 +2788,16 @@ comparing type variables is nondeterministic, note the call to nonDetCmpVar in
 nonDetCmpTypeX.
 See Note [Unique Determinism] for more details.
 
+Note [Type comparisons using object pointer comparisons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Quite often we substitute the type from a definition site into
+occurances without a change. This means for code like:
+    \x -> (x,x,x)
+The type of every `x` will often be represented by a single object
+in the heap. We can take advantage of this by shortcutting the equality
+check if two types are represented by the same pointer under the hood.
+In some cases this reduces compiler allocations by ~2%.
+
 Note [Computing equality on types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are several places within GHC that depend on the precise choice of
@@ -2800,11 +2811,15 @@ See also Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
 -}
 
 nonDetCmpType :: Type -> Type -> Ordering
+nonDetCmpType !t1 !t2
+  -- See Note [Type comparisons using object pointer comparisons]
+  | 1# <- reallyUnsafePtrEquality# t1 t2
+  = EQ
 nonDetCmpType (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2
   = EQ
-nonDetCmpType t1 t2
+nonDetCmpType t1 t2 =
   -- we know k1 and k2 have the same kind, because they both have kind *.
-  = nonDetCmpTypeX rn_env t1 t2
+  nonDetCmpTypeX rn_env t1 t2
   where
     rn_env = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes [t1, t2]))
 {-# INLINE nonDetCmpType #-}

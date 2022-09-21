@@ -108,6 +108,7 @@ module GHC.Core.TyCon(
         mkTyConTagMap,
 
         -- ** Manipulating TyCons
+        ExpandSynResult(..),
         expandSynTyCon_maybe,
         newTyConCo, newTyConCo_maybe,
         pprPromotionQuote, mkTyConKind,
@@ -2521,12 +2522,14 @@ isConcreteTyConFlavour = \case
 -----------------------------------------------
 -}
 
+data ExpandSynResult tyco
+  = NoExpansion
+  | ExpandsSyn [(TyVar,tyco)] Type [tyco]
+
 expandSynTyCon_maybe
         :: TyCon
         -> [tyco]                 -- ^ Arguments to 'TyCon'
-        -> Maybe ([(TyVar,tyco)],
-                  Type,
-                  [tyco])         -- ^ Returns a 'TyVar' substitution, the body
+        -> ExpandSynResult tyco       -- ^ Returns a 'TyVar' substitution, the body
                                   -- type of the synonym (not yet substituted)
                                   -- and any arguments remaining from the
                                   -- application
@@ -2536,13 +2539,13 @@ expandSynTyCon_maybe
 expandSynTyCon_maybe tc tys
   | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
   = if arity == 0
-    then Just ([], rhs, tys)  -- Avoid a bit of work in the case of nullary synonyms
+    then ExpandsSyn [] rhs tys  -- Avoid a bit of work in the case of nullary synonyms
     else case tys `listLengthCmp` arity of
-              GT -> Just (tvs `zip` tys, rhs, drop arity tys)
-              EQ -> Just (tvs `zip` tys, rhs, [])
-              LT -> Nothing
+              GT -> ExpandsSyn (tvs `zip` tys) rhs (drop arity tys)
+              EQ -> ExpandsSyn (tvs `zip` tys) rhs []
+              LT -> NoExpansion
    | otherwise
-   = Nothing
+   = NoExpansion
 
 ----------------
 
