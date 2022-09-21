@@ -928,6 +928,7 @@ genPrim prof ty op = case op of
   IsCurrentThreadBoundOp -> \[r] [] -> PrimInline $ r |= one_
   NoDuplicateOp -> \[] [] -> PrimInline mempty -- don't need to do anything as long as we have eager blackholing
   ThreadStatusOp -> \[stat,cap,locked] [tid] -> PrimInline $ appT [stat, cap, locked] "h$threadStatus" [tid]
+  ListThreadsOp  -> \[r] [] -> PrimInline $ r |= var "h$threads"
 
 ------------------------------- Weak Pointers -----------------------------------
 
@@ -1235,7 +1236,6 @@ genPrim prof ty op = case op of
 
   SetThreadAllocationCounter        -> unhandledPrimop op
   GetThreadLabelOp                  -> unhandledPrimop op
-  ListThreadsOp                     -> unhandledPrimop op
   LabelThreadOp                     -> unhandledPrimop op -- \[] [t,la,lo] -> PrimInline $ t .^ "label" |= ValExpr (JList [la, lo])
 
 ------------------------------- Vector -----------------------------------------
