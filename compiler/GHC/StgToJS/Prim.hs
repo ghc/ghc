@@ -1200,12 +1200,6 @@ genPrim prof ty op = case op of
   FetchOrAddrOp_Word                -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr BOr   r a o v
   FetchXorAddrOp_Word               -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr BXor  r a o v
 
-
------------------------------- Unhandled primops -------------------
-
-  ShrinkSmallMutableArrayOp_Char    -> unhandledPrimop op
-  GetSizeofSmallMutableArrayOp      -> unhandledPrimop op
-
   InterlockedExchange_Addr          -> \[r_a,r_o] [a1,o1,a2,o2] -> PrimInline $
                                                              mconcat [ r_a |= a1
                                                                      , r_o |= o1
@@ -1218,8 +1212,14 @@ genPrim prof ty op = case op of
                                                                ]
 
 
-  AtomicReadAddrOp_Word             -> unhandledPrimop op
-  AtomicWriteAddrOp_Word            -> unhandledPrimop op
+------------------------------ Unhandled primops -------------------
+
+  ShrinkSmallMutableArrayOp_Char    -> unhandledPrimop op
+  GetSizeofSmallMutableArrayOp      -> unhandledPrimop op
+
+
+  AtomicReadAddrOp_Word             -> \[r] [a,o]   -> PrimInline $ r |= dv_u32 a o
+  AtomicWriteAddrOp_Word            -> \[]  [a,o,w] -> PrimInline $ dv_s_u32 a o w
 
   NewIOPortOp                       -> unhandledPrimop op
   ReadIOPortOp                      -> unhandledPrimop op
