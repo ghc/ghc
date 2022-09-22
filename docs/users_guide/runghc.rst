@@ -7,7 +7,7 @@ Using runghc
    single: runghc
    single: runhaskell
 
-``runghc`` (or ``runhaskell``, which is its equivalent) allows you to run Haskell programs using the interpreter, instead of having to
+``runghc``/``runhaskell`` allows you to run Haskell programs using the interpreter, instead of having to
 compile them first.
 
 .. _runghc-introduction:
