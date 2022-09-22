@@ -11,9 +11,10 @@ Description:
     to be used as a UNIX-style script interpreter. For instance,
     .
     @
-    $ cat Hi.hs
-    \#!/usr/bin/env runghc
-    main = putStrLn "hello!"
+    $ cat <<EOF > Hi.hs
+    > \#!/usr/bin/env runghc
+    > main = putStrLn "hello!"
+    > EOF
     $ chmod u+x Hi.hs
     $ ./Hi.hs
     hello!
