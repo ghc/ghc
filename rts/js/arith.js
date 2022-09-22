@@ -613,3 +613,19 @@ function h$decodeDoubleInt64(d) {
   // prim ubx tup returns don't return the first value!
   RETURN_UBX_TUP3(ret3,ret1,ret2);
 }
+
+function h$__int_encodeDouble(j,e) {
+  return (j|0) ** (e|0);
+}
+
+function h$__word_encodeDouble(j,e) {
+  return (j>>>0) ** (e|0);
+}
+
+function h$__int_encodeFloat(j,e) {
+  return h$fround((j|0) ** (e|0));
+}
+
+function h$__word_encodeFloat(j,e) {
+  return h$fround((j>>>0) ** (e|0));
+}
