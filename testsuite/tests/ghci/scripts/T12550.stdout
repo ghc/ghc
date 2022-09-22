@@ -26,6 +26,12 @@ class Functor f where
 instance ∀ a. Functor ((,) a) -- Defined in ‘GHC.Base’
 instance ∀ a b. Functor ((,,) a b) -- Defined in ‘GHC.Base’
 instance ∀ a b c. Functor ((,,,) a b c) -- Defined in ‘GHC.Base’
+instance ∀ a b c d. Functor ((,,,,) a b c d)
+  -- Defined in ‘GHC.Base’
+instance ∀ a b c d e. Functor ((,,,,,) a b c d e)
+  -- Defined in ‘GHC.Base’
+instance ∀ a b c d e f. Functor ((,,,,,,) a b c d e f)
+  -- Defined in ‘GHC.Base’
 instance ∀ r. Functor ((->) r) -- Defined in ‘GHC.Base’
 instance Functor IO -- Defined in ‘GHC.Base’
 instance Functor [] -- Defined in ‘GHC.Base’

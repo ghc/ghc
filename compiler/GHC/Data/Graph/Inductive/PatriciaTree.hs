@@ -116,6 +116,9 @@ instance DynGraph Gr where
           in Gr g3
 
 
+instance Functor (Gr a) where
+  fmap = fastEMap
+
 instance Bifunctor Gr where
   bimap = fastNEMap
 

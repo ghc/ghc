@@ -308,7 +308,7 @@ instance Biapplicative (,) where
     (f a b, f' a' b')
 
 newtype WrapBiapp p a b = WrapBiap (p a b)
-  deriving newtype (Bifunctor, Biapplicative, Eq)
+  deriving newtype (Functor, Bifunctor, Biapplicative, Eq)
 
 instance (Biapplicative p, Num a, Num b) => Num (WrapBiapp p a b) where
   (+) = biliftA2 (+) (+)

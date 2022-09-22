@@ -559,6 +559,18 @@ instance (Monoid a, Monoid b, Monoid c) => Applicative ((,,,) a b c) where
 instance (Monoid a, Monoid b, Monoid c) => Monad ((,,,) a b c) where
     (u, v, w, a) >>= k = case k a of (u', v', w', b) -> (u <> u', v <> v', w <> w', b)
 
+-- | @since 4.18.0.0
+instance Functor ((,,,,) a b c d) where
+    fmap f (a, b, c, d, e) = (a, b, c, d, f e)
+
+-- | @since 4.18.0.0
+instance Functor ((,,,,,) a b c d e) where
+    fmap fun (a, b, c, d, e, f) = (a, b, c, d, e, fun f)
+
+-- | @since 4.18.0.0
+instance Functor ((,,,,,,) a b c d e f) where
+    fmap fun (a, b, c, d, e, f, g) = (a, b, c, d, e, f, fun g)
+
 -- | @since 4.10.0.0
 instance Semigroup a => Semigroup (IO a) where
     (<>) = liftA2 (<>)

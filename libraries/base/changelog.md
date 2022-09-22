@@ -1,7 +1,9 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.18.0.0 *TBA*
-
+  * Add `forall a. Functor (p a)` superclass for `Bifunctor p`.
+  * Add Functor instances for `(,,,,) a b c d`, `(,,,,,) a b c d e` and
+    `(,,,,,) a b c d e f`.
   * Exceptions thrown by weak pointer finalizers are now reported via a global
     exception handler.
   * Add `GHC.Weak.Finalize.{get,set}FinalizerExceptionHandler` which the user to

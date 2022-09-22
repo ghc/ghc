@@ -1,5 +1,6 @@
-{-# LANGUAGE Safe #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE Safe #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -39,7 +40,11 @@ import GHC.Generics ( K1(..) )
 -- arguments are covariant.
 --
 -- You can define a 'Bifunctor' by either defining 'bimap' or by
--- defining both 'first' and 'second'.
+-- defining both 'first' and 'second'. A partially applied 'Bifunctor'
+-- must be a 'Functor' and the 'second' method must agree with 'fmap'.
+-- From this it follows that:
+--
+-- @'second' 'id' = 'id'@
 --
 -- If you supply 'bimap', you should ensure that:
 --
@@ -64,8 +69,10 @@ import GHC.Generics ( K1(..) )
 -- 'second' (f '.' g) ≡ 'second' f '.' 'second' g
 -- @
 --
+-- Since 4.18.0.0 'Functor' is a superclass of 'Bifunctor.
+--
 -- @since 4.8.0.0
-class Bifunctor p where
+class (forall a. Functor (p a)) => Bifunctor p where
     {-# MINIMAL bimap | first, second #-}
 
     -- | Map over both arguments at the same time.
