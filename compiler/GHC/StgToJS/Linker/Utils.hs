@@ -37,6 +37,8 @@ import GHC.Platform
 import Data.List (isPrefixOf)
 import System.Directory (createDirectoryIfMissing)
 
+-- | Given a FilePath and payload, write a file to disk creating any directories
+-- along the way if needed.
 writeBinaryFile :: FilePath -> ByteString -> IO ()
 writeBinaryFile file bs = do
   createDirectoryIfMissing True (takeDirectory file)
@@ -48,15 +50,19 @@ writeBinaryFile file bs = do
       let (b1, b2) = B.splitAt 1073741824 b
       in  b1 : if B.null b1 then [] else chunks b2
 
+-- | Retrieve library directories provided by the @UnitId@ in @UnitState@
 getInstalledPackageLibDirs :: UnitState -> UnitId -> [FilePath]
 getInstalledPackageLibDirs us = fmap unpack . maybe mempty unitLibraryDirs . lookupUnitId us
 
+-- | Retrieve the names of the libraries provided by @UnitId@
 getInstalledPackageHsLibs :: UnitState -> UnitId -> [String]
 getInstalledPackageHsLibs us = fmap unpack . maybe mempty unitLibraries . lookupUnitId us
 
+-- | A constant holding the compiler version
 getCompilerVersion :: String
 getCompilerVersion = cProjectVersion
 
+-- | A constant holding the JavaScript executable Filename extension
 jsexeExtension :: String
 jsexeExtension = "jsexe"
 
@@ -66,11 +72,14 @@ commonCppDefs profiling = case profiling of
   True  -> commonCppDefs_profiled
   False -> commonCppDefs_vanilla
 
--- Use CAFs for commonCppDefs_* so that they are shared for every CPP file
+-- | CPP definitions for normal operation and profiling. Use CAFs for
+-- commonCppDefs_* so that they are shared for every CPP file
 commonCppDefs_vanilla, commonCppDefs_profiled :: ByteString
 commonCppDefs_vanilla  = genCommonCppDefs False
 commonCppDefs_profiled = genCommonCppDefs True
 
+-- | Generate CPP Definitions depending on a profiled or normal build. This
+-- occurs at link time.
 genCommonCppDefs :: Bool -> ByteString
 genCommonCppDefs profiling = mconcat
   [
@@ -270,6 +279,8 @@ genCommonCppDefs profiling = mconcat
   , "#define CALL_UBX_TUP10(r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,c) { (r1) = (c); (r2) = h$ret1; (r3) = h$ret2; (r4) = h$ret3; (r5) = h$ret4; (r6) = h$ret5; (r7) = h$ret6; (r8) = h$ret7; (r9) = h$ret8; (r10) = h$ret9; }\n"
   ]
 
+-- | Construct the Filename for the "binary" of Haskell code compiled to
+-- JavaScript.
 jsExeFileName :: DynFlags -> FilePath
 jsExeFileName dflags
   | Just s <- outputFile_ dflags =
