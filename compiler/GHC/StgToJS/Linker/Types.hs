@@ -65,6 +65,7 @@ import           System.Process
 
 import           Prelude
 
+-- | return a list of fresh @Ident@
 newLocals :: [Ident]
 newLocals = filter (not . isJsKeyword) $
             map (TxtI . mkFastString) $
@@ -74,8 +75,11 @@ newLocals = filter (not . isJsKeyword) $
     chars0 = ['a'..'z']++['A'..'Z']
     chars = chars0++['0'..'9']
 
+-- | Rename @newLocals@ to 'h$$' such that these will be compacted by the
+-- compactor.
 renamedVars :: [Ident]
 renamedVars = map (\(TxtI xs) -> TxtI ("h$$"<>xs)) newLocals
+
 
 --------------------------------------------------------------------------------
 -- CompactorState
@@ -99,113 +103,15 @@ data CompactorState = CompactorState
   , csStringTable   :: !StringTable
   }
 
+-- | A Table of Strings representing @Ident@s and their payloads in
+-- @CompactorState@
 data StringTable = StringTable
-  { stTableIdents :: !(Array Int FastString)
+  { stTableIdents :: !(Array Int FastString)                -- ^ An array of table identifiers, used in the compactor
   , stOffsets     :: !(M.Map ByteString (Int, Int))         -- ^ content of the table
   , stIdents      :: !(UniqMap FastString (Either Int Int)) -- ^ identifiers in the table
   }
 
--- instance DB.Binary Ident where
---   put (TxtI s) = DB.put $ unpackFS s
---   get = TxtI . mkFastString <$> DB.get
-
--- instance DB.Binary StringTable where
---   put (StringTable tids offs idents) = do
---     DB.put tids
---     DB.put (M.toList offs)
---     -- The lexical sorting allows us to use nonDetEltsUniqMap without introducing non-determinism
---     DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap idents)
---   get = StringTable <$> DB.get
---                     <*> fmap M.fromList DB.get
---                     <*> fmap listToUniqMap DB.get
-
-emptyStringTable :: StringTable
-emptyStringTable = StringTable (listArray (0,-1) []) M.empty emptyUniqMap
-
-entries :: Functor f
-        => (UniqMap FastString Int -> f (UniqMap FastString Int))
-        -> CompactorState
-        -> f CompactorState
-entries f cs = fmap (\x -> cs { csEntries = x }) (f $ csEntries cs)
-{-# INLINE entries #-}
-
-identSupply :: Functor f
-            => ([Ident] -> f [Ident])
-            -> CompactorState
-            -> f CompactorState
-identSupply f cs = fmap (\x -> cs { csIdentSupply = x }) (f $ csIdentSupply cs)
-{-# INLINE identSupply #-}
-
-labels :: Functor f
-       => (UniqMap FastString Int -> f (UniqMap FastString Int))
-       -> CompactorState
-       -> f CompactorState
-labels f cs = fmap (\x -> cs { csLabels = x }) (f $ csLabels cs)
-{-# INLINE labels #-}
-
-nameMap :: Functor f
-        => (UniqMap FastString Ident -> f (UniqMap FastString Ident))
-        -> CompactorState
-        -> f CompactorState
-nameMap f cs = fmap (\x -> cs { csNameMap = x }) (f $ csNameMap cs)
-{-# INLINE nameMap #-}
-
-numEntries :: Functor f
-           => (Int -> f Int)
-           -> CompactorState
-           -> f CompactorState
-numEntries f cs = fmap (\x -> cs { csNumEntries = x }) (f $ csNumEntries cs)
-{-# INLINE numEntries #-}
-
-numLabels :: Functor f
-          => (Int -> f Int)
-          -> CompactorState
-          -> f CompactorState
-numLabels f cs = fmap (\x -> cs { csNumLabels = x }) (f $ csNumLabels cs)
-{-# INLINE numLabels #-}
-
-numStatics :: Functor f
-           => (Int -> f Int)
-           -> CompactorState
-           -> f CompactorState
-numStatics f cs = fmap (\x -> cs { csNumStatics = x }) (f $ csNumStatics cs)
-{-# INLINE numStatics #-}
-
-parentEntries :: Functor f
-              => (UniqMap FastString Int -> f (UniqMap FastString Int))
-              -> CompactorState
-              -> f CompactorState
-parentEntries f cs = fmap (\x -> cs { csParentEntries = x }) (f $ csParentEntries cs)
-{-# INLINE parentEntries #-}
-
-parentLabels :: Functor f
-             => (UniqMap FastString Int -> f (UniqMap FastString Int))
-             -> CompactorState
-             -> f CompactorState
-parentLabels f cs = fmap (\x -> cs { csParentLabels = x }) (f $ csParentLabels cs)
-{-# INLINE parentLabels #-}
-
-parentStatics :: Functor f
-              => (UniqMap FastString Int -> f (UniqMap FastString Int))
-              -> CompactorState
-              -> f CompactorState
-parentStatics f cs = fmap (\x -> cs { csParentStatics = x }) (f $ csParentStatics cs)
-{-# INLINE parentStatics #-}
-
-statics :: Functor f
-        => (UniqMap FastString Int -> f (UniqMap FastString Int))
-        -> CompactorState
-        -> f CompactorState
-statics f cs = fmap (\x -> cs { csStatics = x }) (f $ csStatics cs)
-{-# INLINE statics #-}
-
-stringTable :: Functor f
-            => (StringTable -> f StringTable)
-            -> CompactorState
-            -> f CompactorState
-stringTable f cs = fmap (\x -> cs { csStringTable = x }) (f $ csStringTable cs)
-{-# INLINE stringTable #-}
-
+-- | The empty @CompactorState@
 emptyCompactorState :: CompactorState
 emptyCompactorState = CompactorState renamedVars
                                      mempty
@@ -220,23 +126,117 @@ emptyCompactorState = CompactorState renamedVars
                                      mempty
                                      emptyStringTable
 
--- | make a base state from a CompactorState: empty the current symbols sets,
---   move everything to the parent
-makeCompactorParent :: CompactorState -> CompactorState
-makeCompactorParent (CompactorState is nm es nes ss nss ls nls pes pss pls sts)
-  = CompactorState is
-                   nm
-                   emptyUniqMap 0
-                   emptyUniqMap 0
-                   emptyUniqMap 0
-                   (plusUniqMap (fmap (+nes) pes) es)
-                   (plusUniqMap (fmap (+nss) pss) ss)
-                   (plusUniqMap (fmap (+nls) pls) ls)
-                   sts
+-- | The empty @StringTable@
+emptyStringTable :: StringTable
+emptyStringTable = StringTable (listArray (0,-1) []) M.empty emptyUniqMap
 
--- Helper functions used in Linker.Compactor. We live with some redundant code
--- to avoid the lens mayhem in Gen2 GHCJS. TODO: refactor to avoid redundant
--- code
+
+--------------------------------------------------------------------------------
+-- CompactorState helper functors
+--------------------------------------------------------------------------------
+
+-- | Update @csEntries@ in @CompactorState@
+entries :: Functor f
+        => (UniqMap FastString Int -> f (UniqMap FastString Int))
+        -> CompactorState
+        -> f CompactorState
+entries f cs = fmap (\x -> cs { csEntries = x }) (f $ csEntries cs)
+{-# INLINE entries #-}
+
+-- | Update @csIdentSupply@ in @CompactorState@
+identSupply :: Functor f
+            => ([Ident] -> f [Ident])
+            -> CompactorState
+            -> f CompactorState
+identSupply f cs = fmap (\x -> cs { csIdentSupply = x }) (f $ csIdentSupply cs)
+{-# INLINE identSupply #-}
+
+-- | Update @csLabels@ in @CompactorState@
+labels :: Functor f
+       => (UniqMap FastString Int -> f (UniqMap FastString Int))
+       -> CompactorState
+       -> f CompactorState
+labels f cs = fmap (\x -> cs { csLabels = x }) (f $ csLabels cs)
+{-# INLINE labels #-}
+
+-- | Update @csNameMap@ in @CompactorState@
+nameMap :: Functor f
+        => (UniqMap FastString Ident -> f (UniqMap FastString Ident))
+        -> CompactorState
+        -> f CompactorState
+nameMap f cs = fmap (\x -> cs { csNameMap = x }) (f $ csNameMap cs)
+{-# INLINE nameMap #-}
+
+-- | Update @csNumEntries@ in @CompactorState@
+numEntries :: Functor f
+           => (Int -> f Int)
+           -> CompactorState
+           -> f CompactorState
+numEntries f cs = fmap (\x -> cs { csNumEntries = x }) (f $ csNumEntries cs)
+{-# INLINE numEntries #-}
+
+-- | Update @csNumLabels@ in @CompactorState@
+numLabels :: Functor f
+          => (Int -> f Int)
+          -> CompactorState
+          -> f CompactorState
+numLabels f cs = fmap (\x -> cs { csNumLabels = x }) (f $ csNumLabels cs)
+{-# INLINE numLabels #-}
+
+-- | Update @csNumStatics@ in @CompactorState@
+numStatics :: Functor f
+           => (Int -> f Int)
+           -> CompactorState
+           -> f CompactorState
+numStatics f cs = fmap (\x -> cs { csNumStatics = x }) (f $ csNumStatics cs)
+{-# INLINE numStatics #-}
+
+-- | Update @csParentEntries@ in @CompactorState@
+parentEntries :: Functor f
+              => (UniqMap FastString Int -> f (UniqMap FastString Int))
+              -> CompactorState
+              -> f CompactorState
+parentEntries f cs = fmap (\x -> cs { csParentEntries = x }) (f $ csParentEntries cs)
+{-# INLINE parentEntries #-}
+
+-- | Update @csParentLabels@ in @CompactorState@
+parentLabels :: Functor f
+             => (UniqMap FastString Int -> f (UniqMap FastString Int))
+             -> CompactorState
+             -> f CompactorState
+parentLabels f cs = fmap (\x -> cs { csParentLabels = x }) (f $ csParentLabels cs)
+{-# INLINE parentLabels #-}
+
+-- | Update @csParentStatics@ in @CompactorState@
+parentStatics :: Functor f
+              => (UniqMap FastString Int -> f (UniqMap FastString Int))
+              -> CompactorState
+              -> f CompactorState
+parentStatics f cs = fmap (\x -> cs { csParentStatics = x }) (f $ csParentStatics cs)
+{-# INLINE parentStatics #-}
+
+-- | Update @csStatics@ in @CompactorState@
+statics :: Functor f
+        => (UniqMap FastString Int -> f (UniqMap FastString Int))
+        -> CompactorState
+        -> f CompactorState
+statics f cs = fmap (\x -> cs { csStatics = x }) (f $ csStatics cs)
+{-# INLINE statics #-}
+
+-- | Update @csStringTable@ in @CompactorState@
+stringTable :: Functor f
+            => (StringTable -> f StringTable)
+            -> CompactorState
+            -> f CompactorState
+stringTable f cs = fmap (\x -> cs { csStringTable = x }) (f $ csStringTable cs)
+{-# INLINE stringTable #-}
+
+
+--------------------------------------------------------------------------------
+-- CompactorState Insertions
+--------------------------------------------------------------------------------
+
+-- | Given a static entry, add the entry to @CompactorState@
 addStaticEntry :: FastString        -- ^ The static entry to add
                -> CompactorState    -- ^ the old state
                -> CompactorState    -- ^ the new state
@@ -251,6 +251,7 @@ addStaticEntry new cs =
                    newCnt = cnt + 1
                in cs {csStatics = newStatics, csNumStatics = newCnt}
 
+-- | Given an entry function, add the entry function to @CompactorState@
 addEntry :: FastString        -- ^ The entry function to add
          -> CompactorState    -- ^ the old state
          -> CompactorState    -- ^ the new state
@@ -264,6 +265,7 @@ addEntry new cs =
                    newCnt = cnt + 1
                in cs {csEntries = newEntries, csNumEntries = newCnt}
 
+-- | Given a label, add the label to @CompactorState@
 addLabel :: FastString        -- ^ The label to add
          -> CompactorState    -- ^ the old state
          -> CompactorState    -- ^ the new state
@@ -276,6 +278,8 @@ addLabel new cs =
                    newLabels = addToUniqMap cur_lbls new cnt
                    newCnt = cnt + 1
                in cs {csEntries = newLabels, csNumLabels = newCnt}
+
+
 --------------------------------------------------------------------------------
 -- Base
 --------------------------------------------------------------------------------
@@ -287,10 +291,7 @@ data Base = Base { baseCompactorState :: CompactorState
                  , baseUnits          :: Set (Module, Int)
                  }
 
--- instance DB.Binary Base where
---   get = getBase "<unknown file>"
---   put = putBase
-
+-- | Custom Show for the @Base@ bundle
 showBase :: Base -> String
 showBase b = unlines
   [ "Base:"
@@ -300,99 +301,23 @@ showBase b = unlines
     show (sizeUniqMap . csNameMap . baseCompactorState $ b)
   ]
 
+-- | The empty @Base@ bundle
 emptyBase :: Base
 emptyBase = Base emptyCompactorState [] S.empty
 
--- putBase :: Base -> DB.Put
--- putBase (Base cs packages funs) = do
---   DB.putByteString "GHCJSBASE"
---   DB.putLazyByteString versionTag
---   putCs cs
---   putList DB.put packages
---   -- putList putPkg pkgs
---   putList DB.put mods
---   putList putFun (S.toList funs)
---   where
---     pi :: Int -> DB.Put
---     pi = DB.putWord32le . fromIntegral
---     uniq :: Ord a => [a] -> [a]
---     uniq  = S.toList . S.fromList
---     -- pkgs  = uniq (map fst $ S.toList funs)
---     -- pkgsM = M.fromList (zip pkgs [(0::Int)..])
---     mods  = uniq (map fst $ S.toList funs)
---     modsM = M.fromList (zip mods [(0::Int)..])
---     putList f xs = pi (length xs) >> mapM_ f xs
---     -- serialise the compactor state
---     putCs (CompactorState [] _ _ _ _ _ _ _ _ _ _ _) =
---       panic "putBase: putCs exhausted renamer symbol names"
---     putCs (CompactorState (ns:_) nm es _ ss _ ls _ pes pss pls sts) = do
---       DB.put ns
---       -- We can use nonDetEltsUniqMap without introducing non-determinism by sorting lexically
---       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap nm)
---       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap es)
---       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap ss)
---       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap ls)
---       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap pes)
---       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap pss)
---       DB.put (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap pls)
---       DB.put sts
---     -- putPkg mod = DB.put mod
---     -- fixme group things first
---     putFun (m,s) = --pi (pkgsM M.! p) >>
---                    pi (modsM M.! m) >> DB.put s
-
--- getBase :: FilePath -> DB.Get Base
--- getBase file = getBase'
---   where
---     gi :: DB.Get Int
---     gi = fromIntegral <$> DB.getWord32le
---     getList f = DB.getWord32le >>= \n -> replicateM (fromIntegral n) f
---     getFun ms = (,) <$>
---                    -- ((ps!) <$> gi) <*>
---                    ((ms!) <$> gi) <*> DB.get
---     la xs = listArray (0, length xs - 1) xs
---     -- getPkg = DB.get
---     getCs = do
---       n   <- DB.get
---       nm  <- listToUniqMap <$> DB.get
---       es  <- listToUniqMap <$> DB.get
---       ss  <- listToUniqMap <$> DB.get
---       ls  <- listToUniqMap <$> DB.get
---       pes <- listToUniqMap <$> DB.get
---       pss <- listToUniqMap <$> DB.get
---       pls <- listToUniqMap <$> DB.get
---       CompactorState (dropWhile (/=n) renamedVars)
---                              nm
---                              es
---                              (sizeUniqMap es)
---                              ss
---                              (sizeUniqMap ss)
---                              ls
---                              (sizeUniqMap ls)
---                              pes
---                              pss
---                              pls <$> DB.get
---     getBase' = do
---       hdr <- DB.getByteString 9
---       when (hdr /= "GHCJSBASE")
---            (panic $ "getBase: invalid base file: " <> file)
---       vt  <- DB.getLazyByteString (fromIntegral versionTagLength)
---       when (vt /= versionTag)
---            (panic $ "getBase: incorrect version: " <> file)
---       cs <- makeCompactorParent <$> getCs
---       linkedPackages <- getList DB.get
---       -- pkgs <- la <$> getList getPkg
---       mods <- la <$> getList DB.get
---       funs <- getList (getFun mods)
---       return (Base cs linkedPackages $ S.fromList funs)
-
--- -- | lazily render the base metadata into a bytestring
--- renderBase :: Base -> BL.ByteString
--- renderBase = DB.runPut . putBase
--- 
--- -- | lazily load base metadata from a file, see @UseBase@.
--- loadBase :: FilePath -> IO Base
--- loadBase file = DB.runGet (getBase file) <$> BL.readFile file
+-- | make a @Base@ state from a @CompactorState@: empty the current symbols
+--   sets, move everything to the parent
+makeCompactorParent :: CompactorState -> CompactorState
+makeCompactorParent (CompactorState is nm es nes ss nss ls nls pes pss pls sts)
+  = CompactorState is
+                   nm
+                   emptyUniqMap 0
+                   emptyUniqMap 0
+                   emptyUniqMap 0
+                   (plusUniqMap (fmap (+nes) pes) es)
+                   (plusUniqMap (fmap (+nss) pss) ss)
+                   (plusUniqMap (fmap (+nls) pls) ls)
+                   sts
 
 -- | There are 3 ways the linker can use @Base@. We can not use it, and thus not
 -- do any incremental linking. We can load it from a file, where we assume that
@@ -419,9 +344,9 @@ instance Semigroup UseBase where
   x <> NoBase = x
   _ <> x      = x
 
+
 --------------------------------------------------------------------------------
 -- Linker Config
--- TODO: Jeff: (2022,03): Move to separate module? Linker.Config? Or Merge with StgToJSConfig?
 --------------------------------------------------------------------------------
 
 data JSLinkConfig =
@@ -444,6 +369,7 @@ data JSLinkConfig =
                , lcDedupe             :: Bool
                }
 
+-- | Check if we are using the @Base@ bundle, or not.
 usingBase :: JSLinkConfig -> Bool
 usingBase s | NoBase <- lcUseBase s = False
             | otherwise             = True
@@ -482,13 +408,16 @@ instance Semigroup JSLinkConfig where
                         (jslsrc1 <> jslsrc2)
                         (dd1 || dd2)
 
+
 --------------------------------------------------------------------------------
 -- Linker Environment
 --------------------------------------------------------------------------------
--- | A LinkableUnit is a pair of a module and the index of the block in the
+
+-- | A @LinkableUnit@ is a pair of a module and the index of the block in the
 -- object file
 type LinkableUnit = (Module, Int)
 
+-- | A @LinkedUnit@ is a payload of JS code with its closures and any static info.
 data LinkedUnit = LinkedUnit
   { lu_js_code  :: !JStat
   , lu_closures :: ![ClosureInfo]
@@ -512,12 +441,18 @@ data GhcjsEnv = GhcjsEnv
   , pluginState       :: MVar (Maybe HscEnv)
   }
 
+-- | return a fresh @GhcjsEnv@
 newGhcjsEnv :: IO GhcjsEnv
 newGhcjsEnv = GhcjsEnv <$> newMVar M.empty
                        <*> newMVar emptyTHRunnerState
                        <*> newMVar 0
                        <*> newMVar M.empty
                        <*> newMVar Nothing
+
+
+--------------------------------------------------------------------------------
+-- Template Haskell
+--------------------------------------------------------------------------------
 
 data THRunnerState = THRunnerState
   { activeRunners :: Map String THRunner
@@ -533,21 +468,30 @@ data THRunner =
            , thrExceptions     :: MVar (I.IntMap E.SomeException)
            }
 
+emptyTHRunnerState :: THRunnerState
+emptyTHRunnerState = THRunnerState mempty mempty
+
+
+--------------------------------------------------------------------------------
+-- Template Haskell helpers
+--------------------------------------------------------------------------------
+
+-- | Add an idle runner to the set of @idleRunners@ in @THRunnerState@
 consIdleRunner :: THRunner -> THRunnerState -> THRunnerState
 consIdleRunner r s = s { idleRunners = r : idleRunners s }
 
+-- | Remove an idle runner from the set of @idleRunners@ in @THRunnerState@
 unconsIdleRunner :: THRunnerState -> Maybe (THRunner, THRunnerState)
 unconsIdleRunner s
   | (r:xs) <- idleRunners s = Just (r, s { idleRunners = xs })
   | otherwise               = Nothing
 
+-- | Remove an active runner from the set of @activeRunners@ in @THRunnerState@
 deleteActiveRunner :: String -> THRunnerState -> THRunnerState
 deleteActiveRunner m s =
   s { activeRunners = M.delete m (activeRunners s) }
 
+-- | Add an active runner to the set of @activeRunners@ in @THRunnerState@
 insertActiveRunner :: String -> THRunner -> THRunnerState -> THRunnerState
 insertActiveRunner m runner s =
   s { activeRunners = M.insert m runner (activeRunners s) }
-
-emptyTHRunnerState :: THRunnerState
-emptyTHRunnerState = THRunnerState mempty mempty
