@@ -663,6 +663,36 @@ function test_hadrian() {
 
 }
 
+function summarise_hi_files() {
+  for iface in $(find . -type f -name "*.hi" | sort); do echo "$iface  $($HC --show-iface $iface | grep "  ABI hash:")"; done | tee $OUT/abis
+  for iface in $(find . -type f -name "*.hi" | sort); do echo "$iface  $($HC --show-iface $iface | grep "  interface hash:")"; done | tee $OUT/interfaces
+  for iface in $(find . -type f -name "*.hi" | sort); do
+      fname="$OUT/$(dirname $iface)"
+      mkdir -p $fname
+      $HC --show-iface $iface > "$OUT/$iface"
+  done
+}
+
+function cabal_abi_test() {
+  if [ -z "$OUT" ]; then
+    fail "OUT not set"
+  fi
+
+  cp -r libraries/Cabal $DIR
+  pushd $DIR
+  echo $PWD
+
+  start_section "Cabal test: $OUT"
+  mkdir -p "$OUT"
+  run "$HC" \
+    -hidir tmp -odir tmp -fforce-recomp -haddock \
+    -iCabal/Cabal/src -XNoPolyKinds Distribution.Simple -j"$cores" \
+    "$@" 2>&1 | tee $OUT/log
+  summarise_hi_files
+  popd
+  end_section "Cabal test: $OUT"
+}
+
 function cabal_test() {
   if [ -z "$OUT" ]; then
     fail "OUT not set"
@@ -691,6 +721,35 @@ function run_perf_test() {
   OUT=out/Cabal-O0 cabal_test -O0
   OUT=out/Cabal-O1 cabal_test -O1
   OUT=out/Cabal-O2 cabal_test -O2
+}
+
+function check_interfaces(){
+  difference=$(diff "$1/$3" "$2/$3") || warn "diff failed"
+  if [ -z "$difference" ]
+   then
+      info "$1 and $2 $3 match"
+   else
+     echo $difference
+     for line in $(echo "$difference" | tr ' ' '\n' | grep ".hi" | sort | uniq); do
+       diff "$1/$line" "$2/$line"
+     done
+     fail "$3"
+  fi
+}
+
+function abi_test() {
+  for i in {1..20}; do info "iteration $i"; run_abi_test; done
+}
+
+function run_abi_test() {
+  if [ -z "$HC" ]; then
+    fail "HC not set"
+  fi
+  mkdir -p out
+  OUT="$PWD/out/run1" DIR=$(mktemp -d XXXX-looooooooong) cabal_abi_test -O0
+  OUT="$PWD/out/run2" DIR=$(mktemp -d XXXX-short) cabal_abi_test -O0
+  check_interfaces out/run1 out/run2 abis "Mismatched ABI hash"
+  check_interfaces out/run1 out/run2 interfaces "Mismatched interface hashes"
 }
 
 function save_cache () {
@@ -837,6 +896,7 @@ case $1 in
     exit $res ;;
   run_hadrian) shift; run_hadrian "$@" ;;
   perf_test) run_perf_test ;;
+  abi_test) abi_test ;;
   cabal_test) cabal_test ;;
   lint_author) shift; lint_author "$@" ;;
   clean) clean ;;

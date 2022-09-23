@@ -753,6 +753,46 @@ perf:
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
+############################################################
+# ABI testing
+############################################################
+
+abi-test:
+  stage: testing
+  needs:
+    - job: x86_64-linux-fedora33-release
+      optional: true
+    - job: nightly-x86_64-linux-fedora33-release
+      optional: true
+    - job: release-x86_64-linux-fedora33-release
+      optional: true
+  dependencies: null
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
+  tags:
+    - x86_64-linux
+  script:
+    - root=$(pwd)/ghc
+    - |
+      mkdir tmp
+      tar -xf ghc-x86_64-linux-fedora33-release.tar.xz -C tmp
+      pushd tmp/ghc-*/
+      ./configure --prefix=$root
+      make install
+      popd
+      rm -Rf tmp
+    - export BOOT_HC=$(which ghc)
+    - export HC=$root/bin/ghc
+    - .gitlab/ci.sh abi_test
+  artifacts:
+    paths:
+      - out
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+
 
 ############################################################
 # Documentation deployment via GitLab Pages
