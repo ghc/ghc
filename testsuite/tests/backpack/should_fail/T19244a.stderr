@@ -13,7 +13,17 @@
     Instantiating user[Map=ordmap:Map]
     [1 of 2] Compiling Map[sig]         ( user/Map.hsig, T19244a.out/user/user-GzloW2NeDdA2M0V8qzN4g2/Map.o )
 
-T19244a.bkp:9:9: error:
+T19244a.bkp:22:9: error:
+    • Type constructor ‘Key’ has conflicting definitions in the module
+      and its hsig file
+      Main module: type Key :: * -> Constraint
+                   type Key = GHC.Classes.Ord :: * -> Constraint
+      Hsig file:  type Key :: forall {k}. k -> Constraint
+                  class Key k1
+      The types have different kinds
+    • while checking that ordmap:Map implements signature Map in user[Map=ordmap:Map]
+
+<no location info>: error:
     • Type constructor ‘Map’ has conflicting definitions in the module
       and its hsig file
       Main module: type role Map nominal representational
@@ -28,16 +38,6 @@ T19244a.bkp:9:9: error:
       Hsig file:  type role Map nominal representational
                   type Map :: forall {k} {k1}. k -> k1 -> *
                   data Map k2 a
-      The types have different kinds
-    • while checking that ordmap:Map implements signature Map in user[Map=ordmap:Map]
-
-T19244a.bkp:22:9: error:
-    • Type constructor ‘Key’ has conflicting definitions in the module
-      and its hsig file
-      Main module: type Key :: * -> Constraint
-                   type Key = GHC.Classes.Ord :: * -> Constraint
-      Hsig file:  type Key :: forall {k}. k -> Constraint
-                  class Key k1
       The types have different kinds
     • while checking that ordmap:Map implements signature Map in user[Map=ordmap:Map]
 

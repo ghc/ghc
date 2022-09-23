@@ -15,10 +15,13 @@ import GHC.Driver.Env
 
 import GHC.Tc.Types
 
+import GHC.Iface.Load
+
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
+import GHC.Utils.Monad
 
 import GHC.Types.Name
 import GHC.Types.Name.Set ( NameSet, allUses )
@@ -70,18 +73,18 @@ data UsageConfig = UsageConfig
   }
 
 mkUsageInfo :: UsageConfig -> Plugins -> FinderCache -> UnitEnv -> Module -> ImportedMods -> NameSet -> [FilePath]
-            -> [(Module, Fingerprint)] -> [Linkable] -> PkgsLoaded -> IO [Usage]
+            -> [(Module, Fingerprint)] -> [Linkable] -> PkgsLoaded -> IfG [Usage]
 mkUsageInfo uc plugins fc unit_env this_mod dir_imp_mods used_names dependent_files merged needed_links needed_pkgs
   = do
-    eps <- readIORef (euc_eps (ue_eps unit_env))
-    hashes <- mapM getFileHash dependent_files
+    eps <- liftIO $ readIORef (euc_eps (ue_eps unit_env))
+    hashes <- liftIO $ mapM getFileHash dependent_files
     let hu = unsafeGetHomeUnit unit_env
         hug = ue_home_unit_graph unit_env
     -- Dependencies on object files due to TH and plugins
-    object_usages <- mkObjectUsage (eps_PIT eps) plugins fc hug needed_links needed_pkgs
-    let mod_usages = mk_mod_usage_info (eps_PIT eps) uc hug hu this_mod
+    object_usages <- liftIO $ mkObjectUsage (eps_PIT eps) plugins fc hug needed_links needed_pkgs
+    mod_usages <- mk_mod_usage_info uc hu this_mod
                                        dir_imp_mods used_names
-        usages = mod_usages ++ [ UsageFile { usg_file_path = f
+    let usages = mod_usages ++ [ UsageFile { usg_file_path = f
                                            , usg_file_hash = hash
                                            , usg_file_label = Nothing }
                                | (f, hash) <- zip dependent_files hashes ]
@@ -189,16 +192,14 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
     librarySpecToUsage (DLLPath fn) = traverse (fing Nothing) [fn]
     librarySpecToUsage _ = return []
 
-mk_mod_usage_info :: PackageIfaceTable
-              -> UsageConfig
-              -> HomeUnitGraph
+mk_mod_usage_info :: UsageConfig
               -> HomeUnit
               -> Module
               -> ImportedMods
               -> NameSet
-              -> [Usage]
-mk_mod_usage_info pit uc hpt home_unit this_mod direct_imports used_names
-  = mapMaybe mkUsage usage_mods
+              -> IfG [Usage]
+mk_mod_usage_info uc home_unit this_mod direct_imports used_names
+  = mapMaybeM mkUsageM usage_mods
   where
     safe_implicit_imps_req = uc_safe_implicit_imps_req uc
 
@@ -234,22 +235,27 @@ mk_mod_usage_info pit uc hpt home_unit this_mod direct_imports used_names
                 in extendModuleEnvWith (\_ xs -> occ:xs) mv_map mod' [occ]
             where occ = nameOccName name
 
+    mkUsageM :: Module -> IfG (Maybe Usage)
+    mkUsageM mod | mod == this_mod -- We don't care about usages of things in *this* module
+                 || moduleUnit mod == interactiveUnit -- ... or in GHCi
+                 = return Nothing
+    mkUsageM mod = do
+      iface <- loadSysInterface (text "mk_mod_usage") mod
+        -- Make sure the interface is loaded even if we don't directly use
+        -- any symbols from it, to ensure determinism. See #22217.
+      return $ mkUsage mod iface
+
+
     -- We want to create a Usage for a home module if
     --  a) we used something from it; has something in used_names
     --  b) we imported it, even if we used nothing from it
     --     (need to recompile if its export list changes: export_fprint)
-    mkUsage :: Module -> Maybe Usage
-    mkUsage mod
-      | isNothing maybe_iface           -- We can't depend on it if we didn't
-                                        -- load its interface.
-      || mod == this_mod                -- We don't care about usages of
-                                        -- things in *this* module
-      = Nothing
-
+    mkUsage :: Module -> ModIface -> Maybe Usage
+    mkUsage mod iface
       | not (isHomeModule home_unit mod)
-      = Just UsagePackageModule{ usg_mod      = mod,
-                                 usg_mod_hash = mod_hash,
-                                 usg_safe     = imp_safe }
+      = Just $ UsagePackageModule{ usg_mod      = mod,
+                                   usg_mod_hash = mod_hash,
+                                   usg_safe     = imp_safe }
         -- for package modules, we record the module hash only
 
       | (null used_occs
@@ -269,11 +275,6 @@ mk_mod_usage_info pit uc hpt home_unit this_mod direct_imports used_names
                       usg_entities = Map.toList ent_hashs,
                       usg_safe     = imp_safe }
       where
-        maybe_iface  = lookupIfaceByModule hpt pit mod
-                -- In one-shot mode, the interfaces for home-package
-                -- modules accumulate in the PIT not HPT.  Sigh.
-
-        Just iface   = maybe_iface
         finsts_mod   = mi_finsts (mi_final_exts iface)
         hash_env     = mi_hash_fn (mi_final_exts iface)
         mod_hash     = mi_mod_hash (mi_final_exts iface)
