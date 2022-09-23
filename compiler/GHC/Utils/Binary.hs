@@ -289,19 +289,19 @@ writeBinMem (BinMem _ ix_r _ arr_r) fn = do
 
 readBinMem :: FilePath -> IO BinHandle
 readBinMem filename = do
-  h <- openBinaryFile filename ReadMode
-  filesize' <- hFileSize h
-  let filesize = fromIntegral filesize'
-  readBinMem_ filesize h
+  withBinaryFile filename ReadMode $ \h -> do
+    filesize' <- hFileSize h
+    let filesize = fromIntegral filesize'
+    readBinMem_ filesize h
 
 readBinMemN :: Int -> FilePath -> IO (Maybe BinHandle)
 readBinMemN size filename = do
-  h <- openBinaryFile filename ReadMode
-  filesize' <- hFileSize h
-  let filesize = fromIntegral filesize'
-  if filesize < size
-    then pure Nothing
-    else Just <$> readBinMem_ size h
+  withBinaryFile filename ReadMode $ \h -> do
+    filesize' <- hFileSize h
+    let filesize = fromIntegral filesize'
+    if filesize < size
+      then pure Nothing
+      else Just <$> readBinMem_ size h
 
 readBinMem_ :: Int -> Handle -> IO BinHandle
 readBinMem_ filesize h = do
@@ -309,7 +309,6 @@ readBinMem_ filesize h = do
   count <- unsafeWithForeignPtr arr $ \p -> hGetBuf h p filesize
   when (count /= filesize) $
        error ("Binary.readBinMem: only read " ++ show count ++ " bytes")
-  hClose h
   arr_r <- newIORef arr
   ix_r <- newFastMutInt 0
   sz_r <- newFastMutInt filesize

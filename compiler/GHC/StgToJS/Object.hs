@@ -72,6 +72,9 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Word
 import           Data.Char
+import Foreign.Storable
+import Foreign.Marshal.Array
+import System.IO
 
 import GHC.Settings.Constants (hiVersion)
 
@@ -235,20 +238,28 @@ putObject bh mod_name deps os = do
 
 -- | Test if the object file is a JS object
 isJsObjectFile :: FilePath -> IO Bool
-isJsObjectFile fp =
-  readBinMemN (length magic) fp >>= \case
-    Nothing -> pure False
-    Just bh -> getCheckMagic bh
+isJsObjectFile fp = do
+  let !n = length magic
+  withBinaryFile fp ReadMode $ \hdl -> do
+    allocaArray n $ \ptr -> do
+      n' <- hGetBuf hdl ptr n
+      if (n' /= n)
+        then pure False
+        else checkMagic (peekElemOff ptr)
+
+-- | Check magic
+checkMagic :: (Int -> IO Word8) -> IO Bool
+checkMagic get_byte = do
+  let go_magic !i = \case
+        []     -> pure True
+        (e:es) -> get_byte i >>= \case
+          c | fromIntegral (ord e) == c -> go_magic (i+1) es
+            | otherwise                 -> pure False
+  go_magic 0 magic
 
 -- | Parse object magic
 getCheckMagic :: BinHandle -> IO Bool
-getCheckMagic bh = do
-  let go_magic = \case
-        []     -> pure True
-        (e:es) -> getByte bh >>= \case
-          c | fromIntegral (ord e) == c -> go_magic es
-            | otherwise                 -> pure False
-  go_magic magic
+getCheckMagic bh = checkMagic (const (getByte bh))
 
 -- | Parse object header
 getObjectHeader :: BinHandle -> IO (Either String ModuleName)
