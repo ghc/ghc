@@ -90,12 +90,18 @@ import GHC.Utils.Outputable (ppr, Outputable, hcat, vcat, text)
 import GHC.Utils.Panic
 import GHC.Utils.Monad (mapMaybeM)
 
+-- | An object file
 data Object = Object
   { objModuleName    :: !ModuleName
-  , objHandle        :: !BinHandle     -- ^ BinHandle that can be used to read the ObjUnits
-  , objPayloadOffset :: !(Bin ObjUnit) -- ^ Offset of the payload (units)
+    -- ^ name of the module
+  , objHandle        :: !BinHandle
+    -- ^ BinHandle that can be used to read the ObjUnits
+  , objPayloadOffset :: !(Bin ObjUnit)
+    -- ^ Offset of the payload (units)
   , objDeps          :: !Deps
+    -- ^ Dependencies
   , objIndex         :: !Index
+    -- ^ The Index, serialed unit indices and their linkable units
   }
 
 type BlockId  = Int
@@ -141,9 +147,10 @@ data BlockDeps = BlockDeps
 isGlobalUnit :: Int -> Bool
 isGlobalUnit n = n == 0
 
+-- | Exported Functions
 data ExportedFun = ExportedFun
-  { funModule  :: !Module
-  , funSymbol  :: !LexicalFastString
+  { funModule  :: !Module              -- ^ The module containing the function
+  , funSymbol  :: !LexicalFastString   -- ^ The function
   } deriving (Eq, Ord)
 
 instance Outputable ExportedFun where
@@ -176,6 +183,8 @@ getObjUnit syms bh = do
     pure (ObjUnit syms b c d e f g)
 
 
+-- | A tag that determines the kind of payload in the .o file. See
+-- @StgToJS.Linker.Arhive.magic@ for another kind of magic
 magic :: String
 magic = "GHCJSOBJ"
 
@@ -187,10 +196,13 @@ data IndexEntry = IndexEntry
   , idxOffset  :: !(Bin ObjUnit) -- ^ Offset of the unit in the object file
   }
 
-instance Binary IndexEntry where
-  put_ bh (IndexEntry a b) = put_ bh a >> put_ bh b
-  get bh = IndexEntry <$> get bh <*> get bh
 
+--------------------------------------------------------------------------------
+-- Essential oeprations on Objects
+--------------------------------------------------------------------------------
+
+-- | Given a handle to a Binary payload, add the module, 'mod_name', its
+-- dependencies, 'deps', and its linkable units to the payload.
 putObject
   :: BinHandle
   -> ModuleName -- ^ module
@@ -287,11 +299,59 @@ readObject file = do
   bh <- readBinMem file
   getObject bh
 
+-- | Reads only the part necessary to get the dependencies
+readObjectDeps :: FilePath -> IO Deps
+readObjectDeps file = do
+  bh <- readBinMem file
+  obj <- getObject bh
+  pure $! objDeps obj
+
+-- | Get units in the object file, using the given filtering function
+getObjectUnits :: Object -> (Word -> IndexEntry -> Bool) -> IO [ObjUnit]
+getObjectUnits obj pred = mapMaybeM read_entry (zip (objIndex obj) [0..])
+  where
+    bh = objHandle obj
+    read_entry (e@(IndexEntry syms offset),i)
+      | pred i e  = do
+          seekBin bh offset
+          Just <$> getObjUnit syms bh
+      | otherwise = pure Nothing
+
+-- | Read units in the object file, using the given filtering function
+readObjectUnits :: FilePath -> (Word -> IndexEntry -> Bool) -> IO [ObjUnit]
+readObjectUnits file pred = do
+  obj <- readObject file
+  getObjectUnits obj pred
+
+
+--------------------------------------------------------------------------------
+-- Helper functions
+--------------------------------------------------------------------------------
+
+putEnum :: Enum a => BinHandle -> a -> IO ()
+putEnum bh x | n > 65535 = error ("putEnum: out of range: " ++ show n)
+             | otherwise = put_ bh n
+  where n = fromIntegral $ fromEnum x :: Word16
+
+getEnum :: Enum a => BinHandle -> IO a
+getEnum bh = toEnum . fromIntegral <$> (get bh :: IO Word16)
+
+-- | Helper to convert Int to Int32
 toI32 :: Int -> Int32
 toI32 = fromIntegral
 
+-- | Helper to convert Int32 to Int
 fromI32 :: Int32 -> Int
 fromI32 = fromIntegral
+
+
+--------------------------------------------------------------------------------
+-- Binary Instances
+--------------------------------------------------------------------------------
+
+instance Binary IndexEntry where
+  put_ bh (IndexEntry a b) = put_ bh a >> put_ bh b
+  get bh = IndexEntry <$> get bh <*> get bh
 
 instance Binary Deps where
   put_ bh (Deps m r e b) = do
@@ -316,31 +376,6 @@ instance Binary ForeignJSRef where
 instance Binary ExpFun where
   put_ bh (ExpFun isIO args res) = put_ bh isIO >> put_ bh args >> put_ bh res
   get bh                        = ExpFun <$> get bh <*> get bh <*> get bh
-
--- | Reads only the part necessary to get the dependencies
-readObjectDeps :: FilePath -> IO Deps
-readObjectDeps file = do
-  bh <- readBinMem file
-  obj <- getObject bh
-  pure $! objDeps obj
-
-
--- | Get units in the object file, using the given filtering function
-getObjectUnits :: Object -> (Word -> IndexEntry -> Bool) -> IO [ObjUnit]
-getObjectUnits obj pred = mapMaybeM read_entry (zip (objIndex obj) [0..])
-  where
-    bh = objHandle obj
-    read_entry (e@(IndexEntry syms offset),i)
-      | pred i e  = do
-          seekBin bh offset
-          Just <$> getObjUnit syms bh
-      | otherwise = pure Nothing
-
--- | Read units in the object file, using the given filtering function
-readObjectUnits :: FilePath -> (Word -> IndexEntry -> Bool) -> IO [ObjUnit]
-readObjectUnits file pred = do
-  obj <- readObject file
-  getObjectUnits obj pred
 
 instance Binary JStat where
   put_ bh (DeclStat i)         = putByte bh 1  >> put_ bh i
@@ -500,15 +535,6 @@ instance Binary CIType where
 instance Binary ExportedFun where
   put_ bh (ExportedFun modu symb) = put_ bh modu >> put_ bh symb
   get bh = ExportedFun <$> get bh <*> get bh
-
-
-putEnum :: Enum a => BinHandle -> a -> IO ()
-putEnum bh x | n > 65535 = error ("putEnum: out of range: " ++ show n)
-             | otherwise = put_ bh n
-  where n = fromIntegral $ fromEnum x :: Word16
-
-getEnum :: Enum a => BinHandle -> IO a
-getEnum bh = toEnum . fromIntegral <$> (get bh :: IO Word16)
 
 instance Binary StaticInfo where
   put_ bh (StaticInfo ident val cc) = put_ bh ident >> put_ bh val >> put_ bh cc
