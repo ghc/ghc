@@ -74,6 +74,7 @@ import qualified Data.Map as M
 import Control.Monad
 import Control.Arrow ((&&&))
 
+-- | Evaluate an expression in the given expression context (continuation)
 genExpr :: HasDebugCallStack => ExprCtx -> CgStgExpr -> G (JStat, ExprResult)
 genExpr ctx stg = case stg of
   StgApp f args -> genApp ctx f args
@@ -287,17 +288,32 @@ genBody :: HasDebugCallStack
          -> CgStgExpr
          -> G JStat
 genBody ctx i startReg args e = do
-  la <- loadArgs startReg args
+  -- load arguments into local variables
+  la <- do
+    args' <- concatMapM genIdArgI args
+    return (declAssignAll args' (fmap toJExpr [startReg..]))
+
+  -- assert that arguments have valid runtime reps
   lav <- verifyRuntimeReps args
-  let ids :: [TypedExpr]
-      ids = -- take (resultSize args $ idType i) jsRegsFromR1
-            reverse . fst $
-            foldl' (\(rs, vs) (rep, size) ->
-                       let (vs0, vs1) = splitAt size vs
-                       in  (TypedExpr rep vs0:rs,vs1))
-                   ([], jsRegsFromR1)
-                   (resultSize args $ idType i)
-  (e, _r) <- genExpr (ctx { ctxTarget = ids }) e
+
+  -- compute PrimReps and their number of slots required to return the result of
+  -- i applied to args.
+  let res_vars = resultSize args (idType i)
+
+  -- compute typed expressions for each slot and assign registers
+  let go_var regs = \case
+        []              -> []
+        ((rep,size):rs) ->
+          let !(regs0,regs1) = splitAt size regs
+              !ts = go_var regs1 rs
+          in TypedExpr rep regs0 : ts
+
+  let tgt  = go_var jsRegsFromR1 res_vars
+  let !ctx' = ctx { ctxTarget = tgt }
+
+  -- generate code for the expression
+  (e, _r) <- genExpr ctx' e
+
   return $ la <> lav <> e <> returnStack
 
 -- find the result type after applying the function to the arguments
@@ -338,11 +354,6 @@ resultSize [] t
   | otherwise = fmap (\p -> (p, slotCount (primRepSize p))) (typePrimReps t)
   where
     t' = unwrapType t
-
-loadArgs :: HasDebugCallStack => StgReg -> [Id] -> G JStat
-loadArgs start args = do
-  args' <- concatMapM genIdArgI args
-  return (declAssignAll args' (fmap toJExpr [start..]))
 
 verifyRuntimeReps :: HasDebugCallStack => [Id] -> G JStat
 verifyRuntimeReps xs = do
