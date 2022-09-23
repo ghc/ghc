@@ -41,7 +41,7 @@ import GHC.HsToCore.Coverage
 import GHC.HsToCore.Docs
 
 import GHC.Tc.Types
-import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances )
+import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances, initIfaceLoad )
 import GHC.Tc.Module ( runTcInteractive )
 
 import GHC.Core.Type
@@ -241,8 +241,9 @@ deSugar hsc_env
         ; let plugins = hsc_plugins hsc_env
         ; let fc = hsc_FC hsc_env
         ; let unit_env = hsc_unit_env hsc_env
-        ; usages <- mkUsageInfo uc plugins fc unit_env mod (imp_mods imports) used_names
-                      dep_files merged needed_mods needed_pkgs
+        ; usages <- initIfaceLoad hsc_env $
+                      mkUsageInfo uc plugins fc unit_env mod (imp_mods imports) used_names
+                        dep_files merged needed_mods needed_pkgs
         -- id_mod /= mod when we are processing an hsig, but hsigs
         -- never desugared and compiled (there's no code!)
         -- Consequently, this should hold for any ModGuts that make

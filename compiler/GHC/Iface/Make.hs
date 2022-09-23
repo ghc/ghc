@@ -232,7 +232,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
           -- but if you pass that in here, we'll decide it's the local
           -- module and does not need to be recorded as a dependency.
           -- See Note [Identity versus semantic module]
-          usages <- mkUsageInfo uc plugins fc unit_env this_mod (imp_mods imports) used_names
+          usages <- initIfaceLoad hsc_env $ mkUsageInfo uc plugins fc unit_env this_mod (imp_mods imports) used_names
                       dep_files merged needed_links needed_pkgs
 
           docs <- extractDocs (ms_hspp_opts mod_summary) tc_result
