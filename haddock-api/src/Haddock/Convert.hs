@@ -213,7 +213,7 @@ synifyTyCon prr _coax tc
            , tcdFixity = synifyFixity tc
 
            , tcdDataDefn = HsDataDefn { dd_ext = noExtField
-                                      , dd_cons = DataTypeCons []  -- No constructors; arbitrary lie, they are neither
+                                      , dd_cons = DataTypeCons False []  -- No constructors; arbitrary lie, they are neither
                                                     -- algebraic data nor newtype:
                                       , dd_ctxt = Nothing
                                       , dd_cType = Nothing
@@ -300,7 +300,7 @@ synifyTyCon _prr coax tc
       ([], consRaw) -> Right consRaw
       (errs, _) -> Left (unlines errs)
   cons <- case (isNewTyCon tc, consRaw) of
-      (False, cons) -> Right (DataTypeCons cons)
+      (False, cons) -> Right (DataTypeCons False cons)
       (True, [con]) -> Right (NewTypeCon con)
       (True, _) -> Left "Newtype hasn't 1 constructor"
 

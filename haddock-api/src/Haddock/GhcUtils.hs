@@ -263,8 +263,8 @@ restrictDataDefn names d = d { dd_cons = restrictDataDefnCons names (dd_cons d) 
 
 restrictDataDefnCons :: [Name] -> DataDefnCons (LConDecl GhcRn) -> DataDefnCons (LConDecl GhcRn)
 restrictDataDefnCons names = \ case
-    DataTypeCons cons -> DataTypeCons (restrictCons names cons)
-    NewTypeCon con -> maybe (DataTypeCons []) NewTypeCon $ restrictCons names (Just con)
+    DataTypeCons is_type_data cons -> DataTypeCons is_type_data (restrictCons names cons)
+    NewTypeCon con -> maybe (DataTypeCons False []) NewTypeCon $ restrictCons names (Just con)
 
 restrictCons :: MonadFail m => [Name] -> m (LConDecl GhcRn) -> m (LConDecl GhcRn)
 restrictCons names decls = [ L p d | L p (Just d) <- fmap keep <$> decls ]

@@ -703,7 +703,7 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead {..}) m
             , [subFamInstDetails iid pdecl mname])
           where
             cons = dd_cons (tcdDataDefn dd)
-            pref = case cons of { NewTypeCon _ -> keyword "newtype"; DataTypeCons _ -> keyword "data" }
+            pref = case cons of { NewTypeCon _ -> keyword "newtype"; DataTypeCons _ _ -> keyword "data" }
             pdata = pref <+> typ
             pdecl = pdata <+> ppShortDataDecl False True dd [] unicode qual
   where
@@ -1091,7 +1091,11 @@ ppDataHeader summary (DataDecl { tcdDataDefn =
                                , tcdTyVars = tvs })
              unicode qual
   = -- newtype or data
-    (case cons of { NewTypeCon _ -> keyword "newtype"; DataTypeCons _ -> keyword "data" })
+    (case cons of
+       { NewTypeCon _ -> keyword "newtype"
+       ; DataTypeCons False _ -> keyword "data"
+       ; DataTypeCons True _ -> keyword "type" <+> keyword "data"
+       })
     <+>
     -- context
     ppLContext ctxt unicode qual HideEmptyContexts <+>

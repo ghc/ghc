@@ -696,7 +696,7 @@ ppInstDecl unicode (InstHead {..}) = case ihdInstType of
   TypeInst rhs -> keyword "type" <+> keyword "instance" <+> typ <+> tibody rhs
   DataInst dd ->
     let cons = dd_cons (tcdDataDefn dd)
-        pref = case cons of { NewTypeCon _ -> keyword "newtype"; DataTypeCons _ -> keyword "data" }
+        pref = case cons of { NewTypeCon _ -> keyword "newtype"; DataTypeCons _ _ -> keyword "data" }
     in pref <+> keyword "instance" <+> typ
   where
     typ = ppAppNameTypes ihdClsName ihdTypes unicode
@@ -928,7 +928,11 @@ ppDataHeader :: TyClDecl DocNameI -> Bool -> LaTeX
 ppDataHeader (DataDecl { tcdLName = L _ name, tcdTyVars = tyvars
                        , tcdDataDefn = HsDataDefn { dd_cons = cons, dd_ctxt = ctxt } }) unicode
   = -- newtype or data
-    (case cons of { NewTypeCon _ -> keyword "newtype"; DataTypeCons _ -> keyword "data" }) <+>
+    (case cons of
+        { NewTypeCon _ -> keyword "newtype"
+        ; DataTypeCons False _ -> keyword "data"
+        ; DataTypeCons True _ -> keyword "type" <+> keyword "data"
+        }) <+>
     -- context
     ppLContext ctxt unicode <+>
     -- T a b c ..., or a :+: b
