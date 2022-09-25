@@ -112,10 +112,12 @@ import GHC.Utils.Trace (pprTrace)
 -- module need to have access to them as well
 
 data CgLoc
-  = CmmLoc CmmExpr      -- A stable CmmExpr; that is, one not mentioning
+  = CmmLoc { cgl_cmm :: CmmExpr }      -- A stable CmmExpr; that is, one not mentioning
                         -- Hp, so that it remains valid across calls
 
-  | LneLoc BlockId [LocalReg]             -- A join point
+  | LneLoc { cgl_lne_block :: BlockId
+           , cgl_lne_regs :: [LocalReg] }
+        -- A join point
         -- A join point (= let-no-escape) should only
         -- be tail-called, and in a saturated way.
         -- To tail-call it, assign to these locals,

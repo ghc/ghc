@@ -3,6 +3,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Cmm.Dataflow.Label
     ( Label
@@ -22,6 +24,7 @@ import GHC.Cmm.Dataflow.Collections
 
 import GHC.Types.Unique (Uniquable(..))
 import GHC.Data.TrieMap
+import Data.Data (Data)
 
 
 -----------------------------------------------------------------------------
@@ -29,7 +32,7 @@ import GHC.Data.TrieMap
 -----------------------------------------------------------------------------
 
 newtype Label = Label { lblToUnique :: Int }
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Data)
 
 mkHooplLabel :: Int -> Label
 mkHooplLabel = Label

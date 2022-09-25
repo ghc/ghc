@@ -37,7 +37,7 @@ import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
-import GHC.Cmm.Utils ( zeroExpr, cmmTagMask, mkWordCLit, mAX_PTR_TAG )
+import GHC.Cmm.Utils ( zeroExpr, cmmTagMask, mkWordCLit, mAX_PTR_TAG, cmmOffset )
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Types.ForeignCall
@@ -45,7 +45,7 @@ import GHC.Types.Id
 import GHC.Builtin.PrimOps
 import GHC.Core.TyCon
 import GHC.Core.Type        ( isUnliftedType )
-import GHC.Types.RepType    ( isZeroBitTy, countConRepArgs, mightBeFunTy, isVirtualTyCon )
+import GHC.Types.RepType    ( isZeroBitTy, countConRepArgs, mightBeFunTy )
 import GHC.Types.CostCentre ( CostCentreStack, currentCCS )
 import GHC.Types.Tickish
 import GHC.Data.Maybe
@@ -60,6 +60,7 @@ import Control.Arrow ( first )
 import Data.List     ( partition )
 import GHC.Stg.InferTags.TagSig (isTaggedSig)
 import GHC.Platform.Profile (profileIsProfiling)
+import GHC.Types.Rep.Virtual
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -130,16 +131,11 @@ cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con mn args _)
   -- Unlike for a regular con for a virtual con we
   -- might have to evaluate the argument here!
-  | isVirtualTyCon (dataConTyCon con)
-  , arg <- getArg args
-  = cgExpr (StgApp arg [])
+  -- | isVirtualDataCon con
+  -- , arg <- getArg args
+  -- = cgExpr (StgApp arg [])
   | otherwise
   = cgConApp con mn args
-  where
-      getArg args
-        | [StgVarArg arg] <- args
-        = arg
-        | otherwise = pprPanic "Very odd virtalCon" (ppr con <> ppr args)
 cgExpr (StgTick t e)         = cgTick t >> cgExpr e
 cgExpr (StgLit lit)          = do cmm_expr <- cgLit lit
                                   emitReturn [cmm_expr]
@@ -989,11 +985,16 @@ cgConApp con mn stg_args
        ; emitReturn arg_exprs }
 
   -- Virtual constructor, just return the argument.
-  | isVirtualTyCon (dataConTyCon con)
+  | isVirtualDataCon con
   , [StgVarArg arg] <- assert (length stg_args == 1) stg_args
   = do
       info <- getCgIdInfo arg
-      emitReturn [idInfoToAmode info]
+      platform <- getPlatform
+      let !arg_cmm = idInfoToAmode info
+      if virtualDataConType con == VirtualBoxed
+        then emitReturn [arg_cmm]
+        -- "Unboxed" heap object without a tag, make one up.
+        else emitReturn [cmmOffset platform arg_cmm 1]
 
   | otherwise   --  Boxed constructors; allocate and return
   = assertPpr (stg_args `lengthIs` countConRepArgs con)

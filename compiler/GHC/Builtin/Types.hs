@@ -180,7 +180,7 @@ import GHC.Unit.Module        ( Module )
 import GHC.Core.Type
 import qualified GHC.Core.TyCo.Rep as TyCoRep (Type(TyConApp))
 import GHC.Core.TyCo.Rep (RuntimeRepType)
-import GHC.Types.RepType ()
+import GHC.Types.RepType (runtimeRepPrimRep, slotPrimRep, ubxSumRepType)
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon

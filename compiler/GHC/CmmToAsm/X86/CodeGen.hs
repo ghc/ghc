@@ -92,6 +92,7 @@ import Data.Maybe
 import Data.Word
 
 import qualified Data.Map as M
+import GHC.Hs.Dump (showAstDataFull)
 
 is32BitPlatform :: NatM Bool
 is32BitPlatform = do
@@ -1237,7 +1238,7 @@ getRegister' platform _ (CmmLit lit)
 
 getRegister' platform _ other
     | isVecExpr other  = needLlvm
-    | otherwise        = pprPanic "getRegister(x86)" (pdoc platform other)
+    | otherwise        = pprPanic "getRegister'(x86)" (pdoc platform other $$ text (show other))
 
 
 intLoadCode :: (Operand -> Operand -> Instr) -> CmmExpr

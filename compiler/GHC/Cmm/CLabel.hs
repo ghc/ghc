@@ -9,6 +9,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 
 module GHC.Cmm.CLabel (
@@ -156,6 +157,7 @@ import GHC.Types.Unique.Set
 import GHC.Utils.Misc
 import GHC.Core.Ppr ( {- instances -} )
 import GHC.Types.SrcLoc
+import Data.Data (Data)
 
 -- -----------------------------------------------------------------------------
 -- The CLabel type
@@ -290,7 +292,7 @@ data CLabel
   | LargeBitmapLabel
         {-# UNPACK #-} !Unique
 
-  deriving Eq
+  deriving (Eq,Data)
 
 instance Show CLabel where
   show = showPprUnsafe . pprDebugCLabel genericPlatform
@@ -300,7 +302,7 @@ data ModuleLabelKind
     | MLK_InitializerArray
     | MLK_Finalizer String
     | MLK_FinalizerArray
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, Data)
 
 instance Outputable ModuleLabelKind where
     ppr MLK_InitializerArray = text "init_arr"
@@ -334,7 +336,7 @@ isTickyLabel _ = False
 -- for why extern declaration are needed at all.
 newtype NeedExternDecl
    = NeedExternDecl Bool
-   deriving (Ord,Eq)
+   deriving (Ord,Eq, Data)
 
 -- This is laborious, but necessary. We can't derive Ord because
 -- Unique doesn't have an Ord instance. Note nonDetCmpUnique in the
@@ -441,7 +443,7 @@ data ForeignLabelSource
    --   destination module.
    | ForeignLabelInThisPackage
 
-   deriving (Eq, Ord)
+   deriving (Eq, Ord, Data)
 
 
 -- | For debugging problems with the CLabel representation.
@@ -470,7 +472,7 @@ pprDebugCLabel platform lbl = pprCLabel platform AsmStyle lbl <> parens extra
 data TickyIdInfo
   = TickyRednCounts           -- ^ Used for dynamic allocations
   | TickyInferedTag !Unique    -- ^ Used to track dynamic hits of tag inference.
-  deriving (Eq,Show)
+  deriving (Eq,Show, Data)
 
 instance Outputable TickyIdInfo where
     ppr TickyRednCounts = text "ct_rdn"
@@ -519,12 +521,12 @@ data IdLabelInfo
                         -- instead of a closure entry-point.
                         -- See Note [Proc-point local block entry-points].
 
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Data)
 
 -- | Which module is the info table from, and which number was it.
 data ConInfoTableLocation = UsageSite Module Int
                           | DefinitionSite
-                              deriving (Eq, Ord)
+                              deriving (Eq, Ord, Data)
 
 instance Outputable ConInfoTableLocation where
   ppr (UsageSite m n) = text "Loc(" <> ppr n <> text "):" <+> ppr m
@@ -562,7 +564,7 @@ data RtsLabelInfo
   | RtsApFast            NonDetFastString    -- ^ _fast versions of generic apply
   | RtsSlowFastTickyCtr String
 
-  deriving (Eq,Ord)
+  deriving (Eq,Ord, Data)
 
 
 -- | What type of Cmm label we're dealing with.
@@ -577,7 +579,7 @@ data CmmLabelInfo
   | CmmCode                     -- ^ misc rts code
   | CmmClosure                  -- ^ closures eg CHARLIKE_closure
   | CmmPrimCall                 -- ^ a prim call to some hand written Cmm code
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Data)
 
 data DynamicLinkerLabelInfo
   = CodeStub                    -- MachO: Lfoo$stub, ELF: foo@plt
@@ -585,7 +587,7 @@ data DynamicLinkerLabelInfo
   | GotSymbolPtr                -- ELF: foo@got
   | GotSymbolOffset             -- ELF: foo@gotoff
 
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Data)
 
 
 -- -----------------------------------------------------------------------------
@@ -823,7 +825,7 @@ data InfoProvEnt = InfoProvEnt
                                -- Origin module
                                , infoTableProv :: !(Maybe (RealSrcSpan, String)) }
                                -- Position and information about the info table
-                               deriving (Eq, Ord)
+                               deriving (Eq, Ord, Data)
 
 instance OutputableP Platform InfoProvEnt where
   pdoc platform (InfoProvEnt clabel _ _ _ _) = pdoc platform clabel

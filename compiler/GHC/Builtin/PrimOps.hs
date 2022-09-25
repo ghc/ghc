@@ -5,6 +5,8 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Builtin.PrimOps (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,
@@ -53,6 +55,7 @@ import GHC.Unit.Types    ( Unit )
 import GHC.Utils.Outputable
 
 import GHC.Data.FastString
+import Data.Data (Data)
 
 {-
 ************************************************************************
@@ -73,7 +76,8 @@ These are in \tr{state-interface.verb} order.
 #include "primop-tag.hs-incl"
 primOpTag _ = error "primOpTag: unknown primop"
 
-
+deriving instance Data PrimOp
+deriving instance Data PrimOpVecCat
 instance Eq PrimOp where
     op1 == op2 = primOpTag op1 == primOpTag op2
 

@@ -189,7 +189,7 @@ data CostCentreStack
 
   | SingletonCCS CostCentre
 
-  deriving (Eq, Ord)    -- needed for Ord on CLabel
+  deriving (Eq, Ord, Data)    -- needed for Ord on CLabel
 
 
 -- synonym for triple which describes the cost centre info in the generated
