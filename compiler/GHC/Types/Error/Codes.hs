@@ -466,6 +466,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIgnoreSpecialisePragmaOnDefMethod"         = 72520
   GhcDiagnosticCode "TcRnBadMethodErr"                              = 46284
   GhcDiagnosticCode "TcRnNoExplicitAssocTypeOrDefaultDeclaration"   = 08585
+  GhcDiagnosticCode "TcRnIllegalTypeData"                           = 15013
+  GhcDiagnosticCode "TcRnTypeDataForbids"                           = 67297
 
   -- TcRnPragmaWarning
   GhcDiagnosticCode "WarningTxt"                                    = 63394

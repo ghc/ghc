@@ -527,7 +527,7 @@ repDataDefn tc opts
                                    ; ksig' <- repMaybeLTy ksig
                                    ; repNewtype cxt1 tc opts ksig' con'
                                                 derivs1 }
-           DataTypeCons cons -> do { ksig' <- repMaybeLTy ksig
+           DataTypeCons _ cons -> do { ksig' <- repMaybeLTy ksig
                                ; consL <- mapM repC cons
                                ; cons1 <- coreListM conTyConName consL
                                ; repData cxt1 tc opts ksig' cons1

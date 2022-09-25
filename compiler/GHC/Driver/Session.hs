@@ -3759,6 +3759,7 @@ xFlagsDeps = [
   flagSpec "TransformListComp"                LangExt.TransformListComp,
   flagSpec "TupleSections"                    LangExt.TupleSections,
   flagSpec "TypeApplications"                 LangExt.TypeApplications,
+  flagSpec "TypeData"                         LangExt.TypeData,
   depFlagSpec' "TypeInType"                   LangExt.TypeInType
     (deprecatedForExtensions ["DataKinds", "PolyKinds"]),
   flagSpec "TypeFamilies"                     LangExt.TypeFamilies,

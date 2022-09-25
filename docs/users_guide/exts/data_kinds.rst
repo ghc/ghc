@@ -15,6 +15,7 @@ system that complements kind polymorphism. It is enabled by
 :extension:`DataKinds`, and described in more detail in the paper `Giving
 Haskell a Promotion <https://dreixel.net/research/pdf/ghp.pdf>`__, which
 appeared at TLDI 2012.
+See also :extension:`TypeData` for a more fine-grained alternative.
 
 Motivation
 ----------

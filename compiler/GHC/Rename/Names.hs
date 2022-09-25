@@ -2198,9 +2198,13 @@ packageImportErr
 -- We can get an operator as the constructor, even in the prefix form:
 --      data T = :% Int Int
 -- from interface files, which always print in prefix form
+--
+-- We also allow type constructor names, which are defined by "type data"
+-- declarations.  See Note [Type data declarations] in GHC.Rename.Module.
 
 checkConName :: RdrName -> TcRn ()
-checkConName name = checkErr (isRdrDataCon name) (badDataCon name)
+checkConName name
+  = checkErr (isRdrDataCon name || isRdrTc name) (badDataCon name)
 
 badDataCon :: RdrName -> TcRnMessage
 badDataCon name

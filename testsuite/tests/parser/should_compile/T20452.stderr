@@ -102,6 +102,7 @@
        (Nothing)
        (Nothing)
        (DataTypeCons
+        (False)
         [(L
           (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:5:26-31 })
           (ConDeclH98
@@ -191,6 +192,7 @@
        (Nothing)
        (Nothing)
        (DataTypeCons
+        (False)
         [(L
           (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:6:26-31 })
           (ConDeclH98

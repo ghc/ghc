@@ -16,6 +16,7 @@ Types
     gadt
     type_families
     data_kinds
+    type_data
     poly_kinds
     representation_polymorphism
     type_literals

@@ -57,7 +57,8 @@ module GHC.Core.DataCon (
         isNullarySrcDataCon, isNullaryRepDataCon,
         isTupleDataCon, isBoxedTupleDataCon, isUnboxedTupleDataCon,
         isUnboxedSumDataCon,
-        isVanillaDataCon, isNewDataCon, classDataCon, dataConCannotMatch,
+        isVanillaDataCon, isNewDataCon, isTypeDataCon,
+        classDataCon, dataConCannotMatch,
         dataConUserTyVarsArePermuted,
         isBanged, isMarkedStrict, cbvFromStrictMark, eqHsBang, isSrcStrict, isSrcUnpacked,
         specialPromotedDc,
@@ -1633,6 +1634,11 @@ isVanillaDataCon dc = dcVanilla dc
 -- | Is this the 'DataCon' of a newtype?
 isNewDataCon :: DataCon -> Bool
 isNewDataCon dc = isNewTyCon (dataConTyCon dc)
+
+-- | Is this data constructor in a "type data" declaration?
+-- See Note [Type data declarations] in GHC.Rename.Module.
+isTypeDataCon :: DataCon -> Bool
+isTypeDataCon dc = isTcClsNameSpace (nameNameSpace (getName dc))
 
 -- | Should this DataCon be allowed in a type even without -XDataKinds?
 -- Currently, only Lifted & Unlifted

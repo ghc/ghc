@@ -215,6 +215,7 @@ mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layoutInfo annsIn
                                   , tcdDocs  = docs })) }
 
 mkTyData :: SrcSpan
+         -> Bool
          -> NewOrData
          -> Maybe (LocatedP CType)
          -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
@@ -223,14 +224,14 @@ mkTyData :: SrcSpan
          -> Located (HsDeriving GhcPs)
          -> [AddEpAnn]
          -> P (LTyClDecl GhcPs)
-mkTyData loc' new_or_data cType (L _ (mcxt, tycl_hdr))
+mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
          ksig data_cons (L _ maybe_deriv) annsIn
   = do { let loc = noAnnSrcSpan loc'
        ; (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; tyvars <- checkTyVars (ppr new_or_data) equalsDots tc tparams
        ; cs <- getCommentsFor (locA loc) -- Get any remaining comments
        ; let anns' = addAnns (EpAnn (spanAsAnchor $ locA loc) annsIn emptyComments) ann cs
-       ; data_cons <- checkNewOrData (locA loc) (unLoc tc) new_or_data data_cons
+       ; data_cons <- checkNewOrData (locA loc) (unLoc tc) is_type_data new_or_data data_cons
        ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataDecl { tcdDExt = anns',
                                    tcdLName = tc, tcdTyVars = tyvars,
@@ -251,7 +252,6 @@ mkDataDefn cType mcxt ksig data_cons maybe_deriv
                             , dd_cons = data_cons
                             , dd_kindSig = ksig
                             , dd_derivs = maybe_deriv }) }
-
 
 mkTySynonym :: SrcSpan
             -> LHsType GhcPs  -- LHS
@@ -327,7 +327,7 @@ mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; cs <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan
        ; let fam_eqn_ans = addAnns (EpAnn (spanAsAnchor loc) ann cs) anns emptyComments
-       ; data_cons <- checkNewOrData loc (unLoc tc) new_or_data data_cons
+       ; data_cons <- checkNewOrData loc (unLoc tc) False new_or_data data_cons
        ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv
        ; return (L (noAnnSrcSpan loc) (DataFamInstD noExtField (DataFamInstDecl
                   (FamEqn { feqn_ext    = fam_eqn_ans
@@ -2622,11 +2622,27 @@ mkOpaquePragma src
                  , inl_rule   = FunLike
                  }
 
-checkNewOrData :: SrcSpan -> RdrName -> NewOrData -> [a] -> P (DataDefnCons a)
-checkNewOrData span name = curry $ \ case
+checkNewOrData :: SrcSpan -> RdrName -> Bool -> NewOrData -> [LConDecl GhcPs]
+               -> P (DataDefnCons (LConDecl GhcPs))
+checkNewOrData span name is_type_data = curry $ \ case
     (NewType, [a]) -> pure $ NewTypeCon a
-    (DataType, as) -> pure $ DataTypeCons as
+    (DataType, as) -> pure $ DataTypeCons is_type_data (handle_type_data as)
     (NewType, as) -> addFatalError $ mkPlainErrorMsgEnvelope span $ PsErrMultipleConForNewtype name (length as)
+  where
+    -- In a "type data" declaration, the constructors are in the type/class
+    -- namespace rather than the data constructor namespace.
+    -- See Note [Type data declarations] in GHC.Rename.Module.
+    handle_type_data
+      | is_type_data = map (fmap promote_constructor)
+      | otherwise = id
+
+    promote_constructor (dc@ConDeclGADT { con_names = cons })
+      = dc { con_names = fmap (fmap promote_name) cons }
+    promote_constructor (dc@ConDeclH98 { con_name = con })
+      = dc { con_name = fmap promote_name con }
+    promote_constructor dc = dc
+
+    promote_name name = fromMaybe name (promoteRdrName name)
 
 -----------------------------------------------------------------------------
 -- utilities for foreign declarations

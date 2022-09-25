@@ -2748,7 +2748,7 @@ exactDataDefn an exactHdr
                              , dd_cons = condecls, dd_derivs = derivings }) = do
   annotationsToComments (epAnnAnns an) [AnnOpenP, AnnCloseP]
   markEpAnn an $ case condecls of
-    DataTypeCons _ -> AnnData
+    DataTypeCons _ _ -> AnnData
     NewTypeCon _ -> AnnNewtype
   markEpAnn an AnnInstance -- optional
   mapM_ markAnnotated mb_ct

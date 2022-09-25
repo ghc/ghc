@@ -7,6 +7,7 @@ module GHC.Tc.Errors.Types (
     TcRnMessage(..)
   , mkTcRnUnknownMessage
   , TcRnMessageDetailed(..)
+  , TypeDataForbids(..)
   , ErrInfo(..)
   , FixedRuntimeRepProvenance(..)
   , pprFixedRuntimeRepProvenance
@@ -2288,7 +2289,47 @@ data TcRnMessage where
             :: Name
             -> TcRnMessage
 
+  {-| TcRnIllegalTypeData is an error that occurs when a @type data@
+      declaration occurs without the TypeOperators extension.
+
+      See Note [Type data declarations]
+
+     Test case:
+       testsuite/tests/type-data/should_fail/TDNoPragma
+  -}
+  TcRnIllegalTypeData :: TcRnMessage
+
+  {-| TcRnTypeDataForbids is an error that occurs when a @type data@
+      declaration contains @data@ declaration features that are
+      forbidden in a @type data@ declaration.
+
+      See Note [Type data declarations]
+
+     Test cases:
+       testsuite/tests/type-data/should_fail/TDDeriving
+       testsuite/tests/type-data/should_fail/TDRecordsGADT
+       testsuite/tests/type-data/should_fail/TDRecordsH98
+       testsuite/tests/type-data/should_fail/TDStrictnessGADT
+       testsuite/tests/type-data/should_fail/TDStrictnessH98
+  -}
+  TcRnTypeDataForbids :: !TypeDataForbids -> TcRnMessage
+
   deriving Generic
+
+-- | Things forbidden in @type data@ declarations.
+-- See Note [Type data declarations]
+data TypeDataForbids
+  = TypeDataForbidsDatatypeContexts
+  | TypeDataForbidsLabelledFields
+  | TypeDataForbidsStrictnessAnnotations
+  | TypeDataForbidsDerivingClauses
+  deriving Generic
+
+instance Outputable TypeDataForbids where
+  ppr TypeDataForbidsDatatypeContexts      = text "Data type contexts"
+  ppr TypeDataForbidsLabelledFields        = text "Labelled fields"
+  ppr TypeDataForbidsStrictnessAnnotations = text "Strictness flags"
+  ppr TypeDataForbidsDerivingClauses       = text "Deriving clauses"
 
 -- | Specifies which back ends can handle a requested foreign import or export
 type ExpectedBackends = [Backend]

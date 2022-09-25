@@ -98,6 +98,7 @@
        (Nothing)
        (Nothing)
        (DataTypeCons
+        (False)
         [(L
           (SrcSpanAnn (EpAnn
                        (Anchor
@@ -536,6 +537,7 @@
        (Nothing)
        (Nothing)
        (DataTypeCons
+        (False)
         [(L
           (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:15:21-29 })
           (ConDeclH98

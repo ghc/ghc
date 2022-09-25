@@ -69,6 +69,7 @@ import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
 import GHC.Types.Unique.Set
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Core.DataCon ( isSrcStrict )
 
 import Control.Monad
 import Control.Arrow ( first )
@@ -1948,6 +1949,10 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
           checkTc (h98_style || null (fromMaybeContext context))
                   (badGadtStupidTheta doc)
 
+        -- Check restrictions on "type data" declarations.
+        -- See Note [Type data declarations].
+        ; when (isTypeDataDefnCons condecls) check_type_data
+
         ; (m_sig', sig_fvs) <- case m_sig of
              Just sig -> first Just <$> rnLHsKind doc sig
              Nothing  -> return (Nothing, emptyFVs)
@@ -1981,6 +1986,121 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
                multipleDerivClausesErr
            ; (ds', fvs) <- mapFvRn (rnLHsDerivingClause doc) ds
            ; return (ds', fvs) }
+
+    -- Given a "type data" declaration, check that the TypeData extension
+    -- is enabled and check restrictions (R1), (R2), (R3) and (R5)
+    -- on the declaration.  See Note [Type data declarations].
+    check_type_data
+      = do { unlessXOptM LangExt.TypeData $ failWith TcRnIllegalTypeData
+           ; unless (null (fromMaybeContext context)) $
+               failWith $ TcRnTypeDataForbids TypeDataForbidsDatatypeContexts
+           ; mapM_ (addLocMA check_type_data_condecl) condecls
+           ; unless (null derivs) $
+               failWith $ TcRnTypeDataForbids TypeDataForbidsDerivingClauses
+           }
+
+    -- Check restrictions (R2) and (R3) on a "type data" constructor.
+    -- See Note [Type data declarations].
+    check_type_data_condecl :: ConDecl GhcPs -> RnM ()
+    check_type_data_condecl condecl
+      = do {
+           ; when (has_labelled_fields condecl) $
+               failWith $ TcRnTypeDataForbids TypeDataForbidsLabelledFields
+           ; when (has_strictness_flags condecl) $
+               failWith $ TcRnTypeDataForbids TypeDataForbidsStrictnessAnnotations
+           }
+
+    has_labelled_fields (ConDeclGADT { con_g_args = RecConGADT _ _ }) = True
+    has_labelled_fields (ConDeclH98 { con_args = RecCon rec })
+      = not (null (unLoc rec))
+    has_labelled_fields _ = False
+
+    has_strictness_flags condecl
+      = any (is_strict . getBangStrictness . hsScaledThing) (con_args condecl)
+
+    is_strict (HsSrcBang _ _ s) = isSrcStrict s
+
+    con_args (ConDeclGADT { con_g_args = PrefixConGADT args }) = args
+    con_args (ConDeclH98 { con_args = PrefixCon _ args }) = args
+    con_args (ConDeclH98 { con_args = InfixCon arg1 arg2 }) = [arg1, arg2]
+    con_args _ = []
+
+{-
+Note [Type data declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With the TypeData extension (GHC proposal #106), one can write "type data"
+declarations, like
+
+    type data Nat = Zero | Succ Nat
+
+or equivalently in GADT style:
+
+    type data Nat where
+        Zero :: Nat
+        Succ :: Nat -> Nat
+
+This defines the constructors Zero and Succ in the TcCls namespace
+(type constructors and classes) instead of the Data namespace (data
+constructors).  This contrasts with the DataKinds extension, which allows
+constructors defined in the Data namespace to be promoted to the TcCls
+namespace at the point of use in a type.
+
+Type data declarations have the syntax of data declarations, either
+ordinary algebraic data types or GADTs, preceded by "type", with the
+following restrictions:
+
+(R1) There are data type contexts (even with the DatatypeContexts extension).
+
+(R2) There are no labelled fields.  Perhaps these could be supported
+     using type families, but they are omitted for now.
+
+(R3) There are no strictness flags, because they don't make sense at
+     the type level.
+
+(R4) The types of the constructors contain no constraints other than
+     equality constraints.  (This is the same restriction imposed
+     on constructors to be promoted with the DataKinds extension in
+     dc_theta_illegal_constraint called from GHC.Tc.Gen.HsType.tcTyVar,
+     but in that case the restriction is imposed if and when a data
+     constructor is used in a type, whereas here it is imposed at
+     the point of definition.  See also Note [Constraints in kinds]
+     in GHC.Core.TyCo.Rep.)
+
+(R5) There are no deriving clauses.
+
+The main parts of the implementation are:
+
+* The Bool argument to DataTypeCons (in Language.Haskell.Syntax.Decls)
+  distinguishes "type data" declarations from ordinary "data" declarations.
+
+* This flag is set, and the constructor names placed in the
+  TcCls namespace, during the initial construction of the AST in
+  GHC.Parser.PostProcess.checkNewOrData.
+
+* GHC.Rename.Module.rnDataDefn calls check_type_data on these
+  declarations, which checks that the TypeData extension is enabled and
+  checks restrictions (R1), (R2), (R3) and (R5).  They could equally
+  well be checked in the typechecker, but we err on the side of catching
+  imposters early.
+
+* GHC.Tc.TyCl.checkValidDataCon checks restriction (R4) on these declarations.
+
+* When beginning to type check a mutually recursive group of declarations,
+  the "type data" constructors are added to the type-checker environment
+  as APromotionErr TyConPE by GHC.Tc.TyCl.mkPromotionErrorEnv, so they
+  cannot be used within the recursive group.  This mirrors the DataKinds
+  behaviour described at Note [Recursion and promoting data constructors]
+  in GHC.Tc.TyCl.  For example, this is rejected:
+
+    type data T f = K (f (K Int))
+
+* After a "type data" declaration has been type-checked, the type-checker
+  environment entry for each constructor (which can be recognized
+  by being in the TcCls namespace) is just the promoted type
+  constructor, not the bundle required for a data constructor.
+  (GHC.Types.TyThing.implicitTyConThings)
+
+-}
 
 warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)
                  -> SrcSpan

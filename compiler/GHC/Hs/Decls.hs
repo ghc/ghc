@@ -401,7 +401,7 @@ countTyClDecls decls
     count isNewTy        decls,  -- ...instances
     count isFamilyDecl   decls)
  where
-   isDataTy DataDecl{ tcdDataDefn = HsDataDefn { dd_cons = DataTypeCons _ } } = True
+   isDataTy DataDecl{ tcdDataDefn = HsDataDefn { dd_cons = DataTypeCons _ _ } } = True
    isDataTy _                                                       = False
 
    isNewTy DataDecl{ tcdDataDefn = HsDataDefn { dd_cons = NewTypeCon _ } } = True
@@ -698,8 +698,11 @@ ppDataDefnHeader pp_hdr HsDataDefn
   , dd_cType = mb_ct
   , dd_kindSig = mb_sig
   , dd_cons = condecls }
-  = ppr (dataDefnConsNewOrData condecls) <+> pp_ct <+> pp_hdr context <+> pp_sig
+  = pp_type <+> ppr (dataDefnConsNewOrData condecls) <+> pp_ct <+> pp_hdr context <+> pp_sig
   where
+    pp_type
+      | isTypeDataDefnCons condecls = text "type"
+      | otherwise = empty
     pp_ct = case mb_ct of
                Nothing   -> empty
                Just ct -> ppr ct

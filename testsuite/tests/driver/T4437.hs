@@ -38,6 +38,7 @@ check title expected got
 expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions =
     [ "DeepSubsumption"
+    , "TypeData"
     ]
 
 expectedCabalOnlyExtensions :: [String]

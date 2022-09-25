@@ -1287,9 +1287,15 @@ mk_prom_err_env (DataDecl { tcdLName = L _ name
                           , tcdDataDefn = HsDataDefn { dd_cons = cons } })
   = unitNameEnv name (APromotionErr TyConPE)
     `plusNameEnv`
-    mkNameEnv [ (con, APromotionErr RecDataConPE)
+    mkNameEnv [ (con, APromotionErr conPE)
               | L _ con' <- toList cons
               , L _ con  <- getConNames con' ]
+  where
+    -- In a "type data" declaration, the constructors are at the type level.
+    -- See Note [Type data declarations] in GHC.Rename.Module.
+    conPE
+      | isTypeDataDefnCons cons = TyConPE
+      | otherwise = RecDataConPE
 
 mk_prom_err_env decl
   = unitNameEnv (tcdName decl) (APromotionErr TyConPE)
@@ -1787,6 +1793,9 @@ mappings:
 
 APromotionErr is only used for DataCons, and only used during type checking
 in tcTyClGroup.
+
+The same restriction applies constructors in to "type data" declarations.
+See Note [Type data declarations] in GHC.Rename.Module.
 
 
 ************************************************************************
@@ -2952,17 +2961,17 @@ tcDataDefn err_ctxt roles_info tc_name
     -- so one could not have, say, a data family instance in an hsig file that
     -- has kind `Bool`. Therefore, this check need only occur in the code that
     -- typechecks data type declarations.
-    mk_permissive_kind HsigFile (DataTypeCons []) = True
+    mk_permissive_kind HsigFile (DataTypeCons _ []) = True
     mk_permissive_kind _ _ = False
 
     -- In an hs-boot or a signature file,
     -- a 'data' declaration with no constructors
     -- indicates a nominally distinct abstract data type.
-    mk_tc_rhs (isHsBootOrSig -> True) _ (DataTypeCons [])
+    mk_tc_rhs (isHsBootOrSig -> True) _ (DataTypeCons _ [])
       = return AbstractTyCon
 
     mk_tc_rhs _ tycon data_cons = case data_cons of
-          DataTypeCons data_cons -> return $
+          DataTypeCons _ data_cons -> return $
                         mkLevPolyDataTyConRhs
                           (isFixedRuntimeRepKind (tyConResKind tycon))
                           data_cons
@@ -3367,7 +3376,7 @@ concatMapDataDefnConsTcM name f = \ case
     NewTypeCon a -> f NewType a >>= \ case
         b:|[] -> pure (NewTypeCon b)
         bs -> failWithTc $ newtypeConError name (length bs)
-    DataTypeCons as -> DataTypeCons <$> concatMapM (fmap toList . f DataType) as
+    DataTypeCons is_type_data as -> DataTypeCons is_type_data <$> concatMapM (fmap toList . f DataType) as
 
 tcConDecl :: NewOrData
           -> DataDeclInfo
@@ -4414,6 +4423,14 @@ checkValidDataCon dflags existential_ok tc con
           -- Check that existentials are allowed if they are used
         ; checkTc (existential_ok || isVanillaDataCon con)
                   (badExistential con)
+
+          -- Check that the only constraints in signatures of constructors
+          -- in a "type data" declaration are equality constraints.
+          -- See Note [Type data declarations] in GHC.Rename.Module,
+          -- restriction (R4).
+        ; when (isTypeDataCon con) $
+          checkTc (all isEqPred (dataConOtherTheta con))
+                  (TcRnConstraintInKind (dataConRepType con))
 
           -- Check that UNPACK pragmas and bangs work out
           -- E.g.  reject   data T = MkT {-# UNPACK #-} Int     -- No "!"

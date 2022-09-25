@@ -83,6 +83,7 @@
        (Nothing)
        (Nothing)
        (DataTypeCons
+        (False)
         [(L
           (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:9-20 })
           (ConDeclGADT

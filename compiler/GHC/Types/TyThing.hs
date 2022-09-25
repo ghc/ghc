@@ -183,15 +183,25 @@ implicitTyConThings tc
     implicitCoTyCon tc ++
 
       -- for each data constructor in order,
-      --   the constructor, worker, and (possibly) wrapper
-    [ thing | dc    <- tyConDataCons tc
-            , thing <- AConLike (RealDataCon dc) : dataConImplicitTyThings dc ]
+      --   the constructor and associated implicit 'Id's
+    concatMap datacon_stuff (tyConDataCons tc)
       -- NB. record selectors are *not* implicit, they have fully-fledged
       -- bindings that pass through the compilation pipeline as normal.
   where
     class_stuff = case tyConClass_maybe tc of
         Nothing -> []
         Just cl -> implicitClassThings cl
+
+    -- For each data constructor,
+    --   the constructor, worker, and (possibly) wrapper
+    --
+    -- If the data constructor is in a "type data" declaration,
+    -- promote it to the type level now.
+    -- See Note [Type data declarations] in GHC.Rename.Module.
+    datacon_stuff dc
+      | isTypeDataCon dc = [ATyCon (promoteDataCon dc)]
+      | otherwise
+        = AConLike (RealDataCon dc) : dataConImplicitTyThings dc
 
 -- For newtypes and closed type families (only) add the implicit coercion tycon
 implicitCoTyCon :: TyCon -> [TyThing]

@@ -16,7 +16,7 @@
 
 {-
 (c) The University of Glasgow 2006
-(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+(c) The GRASP/@type@AQUA Project, Glasgow University, 1992-1998
 -}
 
 
@@ -33,6 +33,7 @@ module Language.Haskell.Syntax.Decls (
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep, FunDep(..),
   HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
   NewOrData(..), DataDefnCons(..), dataDefnConsNewOrData,
+  isTypeDataDefnCons,
   StandaloneKindSig(..), LStandaloneKindSig,
 
   -- ** Class or type declarations
@@ -991,16 +992,28 @@ data NewOrData
   | DataType                    -- ^ @data Blah ...@
   deriving ( Eq, Data )                -- Needed because Demand derives Eq
 
--- | Whether a data-type declaration is `data` or `newtype`, and its constructors
+-- | Whether a data-type declaration is @data@ or @newtype@, and its constructors.
 data DataDefnCons a
-  = NewTypeCon a                     -- ^ @newtype Blah ...@
-  | DataTypeCons [a]                    -- ^ @data Blah ...@
+  = NewTypeCon          -- @newtype N x = MkN blah@
+      a      -- Info about the single data constructor @MkN@
+
+  | DataTypeCons
+      Bool   -- True  <=> type data T x = ...
+             --           See Note [Type data declarations] in GHC.Rename.Module
+             -- False <=> data T x = ...
+      [a]    -- The (possibly empty) list of data constructors
   deriving ( Eq, Data, Foldable, Functor, Traversable )                -- Needed because Demand derives Eq
 
 dataDefnConsNewOrData :: DataDefnCons a -> NewOrData
 dataDefnConsNewOrData = \ case
     NewTypeCon _ -> NewType
-    DataTypeCons _ -> DataType
+    DataTypeCons _ _ -> DataType
+
+-- | Are the constructors within a @type data@ declaration?
+-- See Note [Type data declarations] in GHC.Rename.Module.
+isTypeDataDefnCons :: DataDefnCons a -> Bool
+isTypeDataDefnCons (NewTypeCon _) = False
+isTypeDataDefnCons (DataTypeCons is_type_data _) = is_type_data
 
 -- | Located data Constructor Declaration
 type LConDecl pass = XRec pass (ConDecl pass)

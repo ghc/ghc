@@ -994,6 +994,13 @@ instance Diagnostic TcRnMessage where
         text "No explicit" <+> text "associated type"
           <+> text "or default declaration for"
           <+> quotes (ppr name)
+    TcRnIllegalTypeData
+      -> mkSimpleDecorated $
+        text "Illegal type-level data declaration"
+    TcRnTypeDataForbids feature
+      -> mkSimpleDecorated $
+        ppr feature <+> text "are not allowed in type data declarations."
+
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -1323,6 +1330,10 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnNoExplicitAssocTypeOrDefaultDeclaration{}
       -> WarningWithFlag (Opt_WarnMissingMethods)
+    TcRnIllegalTypeData
+      -> ErrorWithoutFlag
+    TcRnTypeDataForbids{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -1654,6 +1665,10 @@ instance Diagnostic TcRnMessage where
     TcRnBadMethodErr{}
       -> noHints
     TcRnNoExplicitAssocTypeOrDefaultDeclaration{}
+      -> noHints
+    TcRnIllegalTypeData
+      -> [suggestExtension LangExt.TypeData]
+    TcRnTypeDataForbids{}
       -> noHints
 
   diagnosticCode = constructorCode

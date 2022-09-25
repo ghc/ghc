@@ -62,6 +62,12 @@ Language
 
 - Error messages are now assigned unique error codes, of the form ``[GHC-12345]``.
 
+- GHC Proposal `#106
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0106-type-data.rst>`_
+  has been implemented, introducing a new language extension
+  :extension:`TypeData`. This extension permits ``type data`` declarations
+  as a more fine-grained alternative to :extension:`DataKinds`.
+
 Compiler
 ~~~~~~~~
 
