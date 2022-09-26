@@ -805,3 +805,12 @@ function h$stg_doubleToWord64zh(v) {
   var h = h$word_float_conv_buf.getUint32(0);
   RETURN_UBX_TUP2(h,l);
 }
+
+
+const h$putchar_buf = h$newByteArray(1);
+
+function h$putchar(c) {
+  h$putchar_buf.u8[0] = c;
+  h$base_write(1, h$putchar_buf, 0, 1, null);
+  return h$errno;
+}
