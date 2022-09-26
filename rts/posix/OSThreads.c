@@ -186,22 +186,48 @@ shutdownThread(void)
   pthread_exit(NULL);
 }
 
+struct ThreadDesc {
+    OSThreadProc *startProc;
+    void *param;
+    char *name;
+};
+
+// N.B. Darwin's pthread_setname_np only allows the name of the
+// calling thread to be set. Consequently we must use this
+// trampoline.
+static void *
+start_thread (void *param)
+{
+    struct ThreadDesc desc = *(struct ThreadDesc *) param;
+    stgFree(param);
+
+#if defined(HAVE_PTHREAD_SET_NAME_NP)
+    pthread_set_name_np(pthread_self(), desc.name);
+#elif defined(HAVE_PTHREAD_SETNAME_NP)
+    pthread_setname_np(pthread_self(), desc.name);
+#elif defined(HAVE_PTHREAD_SETNAME_NP_DARWIN)
+    pthread_setname_np(desc.name);
+#elif defined(HAVE_PTHREAD_SETNAME_NP_NETBSD)
+    pthread_setname_np(pthread_self(), "%s", desc.name);
+#endif
+
+    return desc.startProc(desc.param);
+}
+
 int
 createOSThread (OSThreadId* pId, char *name STG_UNUSED,
                 OSThreadProc *startProc, void *param)
 {
-  int result = pthread_create(pId, NULL, startProc, param);
+  struct ThreadDesc *desc = stgMallocBytes(sizeof(struct ThreadDesc), "createOSThread");
+  desc->startProc = startProc;
+  desc->param = param;
+  desc->name = name;
+
+  int result = pthread_create(pId, NULL, start_thread, desc);
   if (!result) {
-    pthread_detach(*pId);
-#if defined(HAVE_PTHREAD_SET_NAME_NP)
-    pthread_set_name_np(*pId, name);
-#elif defined(HAVE_PTHREAD_SETNAME_NP)
-    pthread_setname_np(*pId, name);
-#elif defined(HAVE_PTHREAD_SETNAME_NP_DARWIN)
-    pthread_setname_np(name);
-#elif defined(HAVE_PTHREAD_SETNAME_NP_NETBSD)
-    pthread_setname_np(*pId, "%s", name);
-#endif
+      pthread_detach(*pId);
+  } else {
+      stgFree(desc);
   }
   return result;
 }
