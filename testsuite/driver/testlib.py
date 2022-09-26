@@ -259,6 +259,8 @@ def req_interp( name, opts ):
 def req_rts_linker( name, opts ):
     if not config.have_RTS_linker:
         opts.expect = 'fail'
+    # JS backend doesn't provide the RTS linker
+    js_skip(name, opts)
 
 def req_th( name, opts ):
     """
