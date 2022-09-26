@@ -952,6 +952,16 @@ parts that you are not interested in.
 
     Suppress the printing of core size stats per binding
 
+.. ghc-flag:: -dsuppress-stg-reps
+    :shortdesc: Suppress rep annotations on STG args.
+    :type: dynamic
+
+    :since: 9.6.1
+
+    default: enabled
+
+    Disabling this will annoate certain stg arguments with their prim rep.
+
 
 .. _checking-consistency:
 

@@ -168,6 +168,7 @@ Library
         GHC.Builtin.Names
         GHC.Builtin.Names.TH
         GHC.Builtin.PrimOps
+        GHC.Builtin.PrimOps.Casts
         GHC.Builtin.PrimOps.Ids
         GHC.Builtin.Types
         GHC.Builtin.Types.Literals

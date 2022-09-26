@@ -55,3 +55,12 @@ test('unpack_sums_9', normal, compile, [""])
 #      [only_ways(['normal']),
 #       extra_files([ "unboxedsums" + str(i) + ".hs" for i in range(1, 12) ])],
 #      makefile_test, [])
+test('T22208', normal, compile, ['-dstg-lint -dcmm-lint'])
+test('ManyUbxSums',
+     [ pre_cmd('{compiler} --run ./GenManyUbxSums.hs'),
+       extra_files(['GenManyUbxSums.hs', 'ManyUbxSums_Addr.hs']),
+     ],
+     multi_compile_and_run,
+     ['ManyUbxSums',
+        [('ManyUbxSums_Addr.hs','')]
+        , '-v0 -dstg-lint -dcmm-lint'])

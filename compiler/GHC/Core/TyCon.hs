@@ -130,6 +130,8 @@ module GHC.Core.TyCon(
         primRepIsFloat,
         primRepsCompatible,
         primRepCompatible,
+        primRepIsWord,
+        primRepIsInt,
 
 ) where
 
@@ -1786,6 +1788,24 @@ primRepIsFloat  FloatRep     = Just True
 primRepIsFloat  DoubleRep    = Just True
 primRepIsFloat  (VecRep _ _) = Nothing
 primRepIsFloat  _            = Just False
+
+-- Rep is one of the word reps.
+primRepIsWord :: PrimRep -> Bool
+primRepIsWord WordRep = True
+primRepIsWord (Word8Rep) = True
+primRepIsWord (Word16Rep) = True
+primRepIsWord (Word32Rep) = True
+primRepIsWord (Word64Rep) = True
+primRepIsWord _ = False
+
+-- Rep is one of the int reps.
+primRepIsInt :: PrimRep -> Bool
+primRepIsInt (IntRep) = True
+primRepIsInt (Int8Rep) = True
+primRepIsInt (Int16Rep) = True
+primRepIsInt (Int32Rep) = True
+primRepIsInt (Int64Rep) = True
+primRepIsInt _ = False
 
 {-
 ************************************************************************
